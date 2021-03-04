@@ -1,9 +1,6 @@
 {
   "name": "@uniswap/sdk-core",
-  "license": "UNLICENSED",
-  "publishConfig": {
-    "access": "restricted"
-  },
+  "license": "MIT",
   "version": "1.0.0",
   "description": "⚒️ An SDK for building applications on top of Uniswap V3",
   "main": "dist/index.js",

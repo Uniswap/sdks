@@ -1,7 +1,5 @@
-import JSBI from 'jsbi'
-
 // exports for external consumption
-export type BigintIsh = JSBI | bigint | string
+export type BigintIsh = bigint | string
 
 export enum ChainId {
   MAINNET = 1,
@@ -23,6 +21,7 @@ export enum Rounding {
 }
 
 // exports for internal consumption
-export const ONE = JSBI.BigInt(1)
-export const TEN = JSBI.BigInt(10)
-export const ONE_HUNDRED = JSBI.BigInt(100)
+export const ONE = BigInt(1)
+export const TEN = BigInt(10)
+export const ONE_HUNDRED = BigInt(100)
+export const MaxUint256 = (BigInt(2) ** BigInt(256)) - BigInt(1)
