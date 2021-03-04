@@ -21,7 +21,10 @@ export enum Rounding {
 }
 
 // exports for internal consumption
+export const ZERO = BigInt(0)
 export const ONE = BigInt(1)
+export const TWO = BigInt(2)
+export const THREE = BigInt(3)
 export const TEN = BigInt(10)
 export const ONE_HUNDRED = BigInt(100)
-export const MaxUint256 = BigInt(2) ** BigInt(256) - BigInt(1)
+export const MaxUint256 = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')
