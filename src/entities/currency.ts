@@ -1,7 +1,4 @@
-import JSBI from 'jsbi'
-
-import { SolidityType } from '../constants'
-import { validateSolidityTypeInstance } from '../utils'
+import invariant from 'tiny-invariant'
 
 /**
  * A currency is any fungible financial instrument on Ethereum, including Ether and all ERC20 tokens.
@@ -25,7 +22,7 @@ export class Currency {
    * @param name of the currency
    */
   protected constructor(decimals: number, symbol?: string, name?: string) {
-    validateSolidityTypeInstance(JSBI.BigInt(decimals), SolidityType.uint8)
+    invariant(decimals < 255, 'DECIMALS')
 
     this.decimals = decimals
     this.symbol = symbol

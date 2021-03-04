@@ -1,8 +1,11 @@
 {
   "name": "@uniswap/sdk-core",
-  "license": "MIT",
+  "license": "UNLICENSED",
+  "publishConfig": {
+    "access": "restricted"
+  },
   "version": "1.0.0",
-  "description": "⚙️ Code shared across SDK versions",
+  "description": "⚒️ An SDK for building applications on top of Uniswap V3",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
   "files": [
@@ -15,17 +18,14 @@
   ],
   "module": "dist/sdk.esm.js",
   "scripts": {
-    "lint": "tsdx lint src test",
     "build": "tsdx build",
     "start": "tsdx watch",
     "test": "tsdx test",
     "prepublishOnly": "tsdx build"
   },
   "dependencies": {
-    "@uniswap/v2-core": "^1.0.0",
     "big.js": "^5.2.2",
     "decimal.js-light": "^2.5.0",
-    "jsbi": "^3.1.1",
     "tiny-invariant": "^1.1.0",
     "tiny-warning": "^1.0.3",
     "toformat": "^2.0.0"
@@ -45,8 +45,7 @@
     "@ethersproject/solidity": "^5.0.2",
     "@types/big.js": "^4.0.5",
     "@types/jest": "^24.0.25",
-    "babel-plugin-transform-jsbi-to-bigint": "^1.3.1",
-    "tsdx": "^0.12.3"
+    "tsdx": "^0.14.1"
   },
   "engines": {
     "node": ">=10"

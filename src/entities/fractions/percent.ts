@@ -1,7 +1,7 @@
-import { Rounding, _100 } from '../../constants'
-import { Fraction } from './fraction'
+import { Rounding, ONE_HUNDRED } from '../../constants'
+import Fraction from './fraction'
 
-const _100_PERCENT = new Fraction(_100)
+const _100_PERCENT = new Fraction(ONE_HUNDRED)
 
 export class Percent extends Fraction {
   public toSignificant(significantDigits: number = 5, format?: object, rounding?: Rounding): string {

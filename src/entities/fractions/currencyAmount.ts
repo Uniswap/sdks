@@ -1,13 +1,11 @@
 import { currencyEquals } from '../token'
 import { Currency, ETHER } from '../currency'
 import invariant from 'tiny-invariant'
-import JSBI from 'jsbi'
 import _Big from 'big.js'
 import toFormat from 'toformat'
 
-import { BigintIsh, Rounding, TEN, SolidityType } from '../../constants'
-import { parseBigintIsh, validateSolidityTypeInstance } from '../../utils'
-import { Fraction } from './fraction'
+import { BigintIsh, Rounding, TEN, MaxUint256 } from '../../constants'
+import Fraction from './fraction'
 
 const Big = toFormat(_Big)
 
@@ -24,25 +22,25 @@ export class CurrencyAmount extends Fraction {
 
   // amount _must_ be raw, i.e. in the native representation
   protected constructor(currency: Currency, amount: BigintIsh) {
-    const parsedAmount = parseBigintIsh(amount)
-    validateSolidityTypeInstance(parsedAmount, SolidityType.uint256)
+    const parsedAmount = BigInt(amount)
+    invariant(parsedAmount < MaxUint256, 'AMOUNT')
 
-    super(parsedAmount, JSBI.exponentiate(TEN, JSBI.BigInt(currency.decimals)))
+    super(parsedAmount, TEN ** BigInt(currency.decimals))
     this.currency = currency
   }
 
-  public get raw(): JSBI {
+  public get raw(): bigint {
     return this.numerator
   }
 
   public add(other: CurrencyAmount): CurrencyAmount {
     invariant(currencyEquals(this.currency, other.currency), 'TOKEN')
-    return new CurrencyAmount(this.currency, JSBI.add(this.raw, other.raw))
+    return new CurrencyAmount(this.currency, this.raw + other.raw)
   }
 
   public subtract(other: CurrencyAmount): CurrencyAmount {
     invariant(currencyEquals(this.currency, other.currency), 'TOKEN')
-    return new CurrencyAmount(this.currency, JSBI.subtract(this.raw, other.raw))
+    return new CurrencyAmount(this.currency, this.raw - other.raw)
   }
 
   public toSignificant(
