@@ -1,14 +1,14 @@
 import { Token } from '../token'
-import { TokenAmount } from './tokenAmount'
+import TokenAmount from './tokenAmount'
 import { currencyEquals } from '../token'
 import invariant from 'tiny-invariant'
 
 import { BigintIsh, Rounding, TEN } from '../../constants'
 import { Currency } from '../currency'
 import Fraction from './fraction'
-import { CurrencyAmount } from './currencyAmount'
+import CurrencyAmount from './currencyAmount'
 
-export class Price extends Fraction {
+export default class Price extends Fraction {
   public readonly baseCurrency: Currency // input i.e. denominator
   public readonly quoteCurrency: Currency // output i.e. numerator
   public readonly scalar: Fraction // used to adjust the raw fraction w/r/t the decimals of the {base,quote}Token

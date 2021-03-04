@@ -3,7 +3,7 @@ import Fraction from './fraction'
 
 const _100_PERCENT = new Fraction(ONE_HUNDRED)
 
-export class Percent extends Fraction {
+export default class Percent extends Fraction {
   public toSignificant(significantDigits: number = 5, format?: object, rounding?: Rounding): string {
     return this.multiply(_100_PERCENT).toSignificant(significantDigits, format, rounding)
   }

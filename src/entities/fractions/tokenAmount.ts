@@ -1,10 +1,10 @@
-import { CurrencyAmount } from './currencyAmount'
+import CurrencyAmount from './currencyAmount'
 import { Token } from '../token'
 import invariant from 'tiny-invariant'
 
 import { BigintIsh } from '../../constants'
 
-export class TokenAmount extends CurrencyAmount {
+export default class TokenAmount extends CurrencyAmount {
   public readonly token: Token
 
   // amount _must_ be raw, i.e. in the native representation

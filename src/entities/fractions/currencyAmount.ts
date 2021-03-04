@@ -9,7 +9,7 @@ import Fraction from './fraction'
 
 const Big = toFormat(_Big)
 
-export class CurrencyAmount extends Fraction {
+export default class CurrencyAmount extends Fraction {
   public readonly currency: Currency
 
   /**
