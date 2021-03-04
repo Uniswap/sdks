@@ -1,14 +1,14 @@
 {
-  "name": "@uniswap/v2-sdk",
+  "name": "@uniswap/sdk-core",
   "license": "MIT",
   "version": "1.0.0",
-  "description": "🛠 An SDK for building applications on top of Uniswap V2",
+  "description": "⚙️ Code shared across SDK versions",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
   "files": [
     "dist"
   ],
-  "repository": "https://github.com/Uniswap/uniswap-sdk.git",
+  "repository": "https://github.com/Uniswap/uniswap-sdk-core.git",
   "keywords": [
     "uniswap",
     "ethereum"
