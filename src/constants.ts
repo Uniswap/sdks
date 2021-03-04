@@ -1,5 +1,5 @@
 // exports for external consumption
-export type BigintIsh = bigint | string
+export type BigintIsh = bigint | string | number
 
 export enum ChainId {
   MAINNET = 1,
