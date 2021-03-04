@@ -24,4 +24,4 @@ export enum Rounding {
 export const ONE = BigInt(1)
 export const TEN = BigInt(10)
 export const ONE_HUNDRED = BigInt(100)
-export const MaxUint256 = (BigInt(2) ** BigInt(256)) - BigInt(1)
+export const MaxUint256 = BigInt(2) ** BigInt(256) - BigInt(1)
