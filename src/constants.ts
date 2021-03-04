@@ -22,9 +22,7 @@ export enum Rounding {
   ROUND_UP
 }
 
-
 // exports for internal consumption
 export const ONE = JSBI.BigInt(1)
 export const TEN = JSBI.BigInt(10)
 export const ONE_HUNDRED = JSBI.BigInt(100)
-
