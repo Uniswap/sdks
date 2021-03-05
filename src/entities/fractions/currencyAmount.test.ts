@@ -1,5 +1,5 @@
 import JSBI from 'jsbi'
-import { ChainId } from '../../constants'
+import { ChainId, MaxUint256 } from '../../constants'
 import { Token } from '../token'
 import CurrencyAmount from './CurrencyAmount'
 import TokenAmount from './tokenAmount'
@@ -20,5 +20,10 @@ describe('CurrencyAmount', () => {
       const amount = CurrencyAmount.ether(100)
       expect(amount.raw).toEqual(JSBI.BigInt(100))
     })
+  })
+
+  it('token amount can be max uint256', () => {
+    const amount = new TokenAmount(new Token(ChainId.MAINNET, ADDRESS_ONE, 18), MaxUint256)
+    expect(amount.raw).toEqual(MaxUint256)
   })
 })

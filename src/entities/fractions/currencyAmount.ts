@@ -24,7 +24,7 @@ export default class CurrencyAmount extends Fraction {
   // amount _must_ be raw, i.e. in the native representation
   protected constructor(currency: Currency, amount: BigintIsh) {
     const parsedAmount = JSBI.BigInt(amount)
-    invariant(parsedAmount < MaxUint256, 'AMOUNT')
+    invariant(JSBI.lessThanOrEqual(parsedAmount, MaxUint256), 'AMOUNT')
 
     super(parsedAmount, JSBI.exponentiate(TEN, JSBI.BigInt(currency.decimals)))
     this.currency = currency
