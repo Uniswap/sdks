@@ -1,7 +1,7 @@
 import JSBI from 'jsbi'
 import { ChainId, MaxUint256 } from '../../constants'
 import { Token } from '../token'
-import CurrencyAmount from './CurrencyAmount'
+import CurrencyAmount from './currencyAmount'
 import TokenAmount from './tokenAmount'
 
 describe('CurrencyAmount', () => {
