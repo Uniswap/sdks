@@ -7,10 +7,10 @@ import { Currency } from './currency'
  * Represents an ERC20 token with a unique address and some metadata.
  */
 export class Token extends Currency {
-  public readonly chainId: ChainId
+  public readonly chainId: ChainId | number
   public readonly address: string
 
-  public constructor(chainId: ChainId, address: string, decimals: number, symbol?: string, name?: string) {
+  public constructor(chainId: ChainId | number, address: string, decimals: number, symbol?: string, name?: string) {
     super(decimals, symbol, name)
     this.chainId = chainId
     this.address = validateAndParseAddress(address)
@@ -56,28 +56,28 @@ export function currencyEquals(currencyA: Currency, currencyB: Currency): boolea
   }
 }
 
-export const WETH = {
+export const WETH9: { [chainId in ChainId]: Token } = {
   [ChainId.MAINNET]: new Token(
     ChainId.MAINNET,
     '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
     18,
-    'WETH',
+    'WETH9',
     'Wrapped Ether'
   ),
   [ChainId.ROPSTEN]: new Token(
     ChainId.ROPSTEN,
     '0xc778417E063141139Fce010982780140Aa0cD5Ab',
     18,
-    'WETH',
+    'WETH9',
     'Wrapped Ether'
   ),
   [ChainId.RINKEBY]: new Token(
     ChainId.RINKEBY,
     '0xc778417E063141139Fce010982780140Aa0cD5Ab',
     18,
-    'WETH',
+    'WETH9',
     'Wrapped Ether'
   ),
-  [ChainId.GÖRLI]: new Token(ChainId.GÖRLI, '0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6', 18, 'WETH', 'Wrapped Ether'),
-  [ChainId.KOVAN]: new Token(ChainId.KOVAN, '0xd0A1E359811322d97991E03f863a0C30C2cF029C', 18, 'WETH', 'Wrapped Ether')
+  [ChainId.GÖRLI]: new Token(ChainId.GÖRLI, '0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6', 18, 'WETH9', 'Wrapped Ether'),
+  [ChainId.KOVAN]: new Token(ChainId.KOVAN, '0xd0A1E359811322d97991E03f863a0C30C2cF029C', 18, 'WETH9', 'Wrapped Ether')
 }

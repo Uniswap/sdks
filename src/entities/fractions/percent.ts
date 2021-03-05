@@ -1,7 +1,8 @@
-import { Rounding, ONE_HUNDRED } from '../../constants'
+import JSBI from 'jsbi'
+import { Rounding } from '../../constants'
 import Fraction from './fraction'
 
-const _100_PERCENT = new Fraction(ONE_HUNDRED)
+const _100_PERCENT = new Fraction(JSBI.BigInt(100))
 
 export default class Percent extends Fraction {
   public toSignificant(significantDigits: number = 5, format?: object, rounding?: Rounding): string {

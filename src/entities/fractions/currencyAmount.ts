@@ -5,7 +5,7 @@ import invariant from 'tiny-invariant'
 import _Big from 'big.js'
 import toFormat from 'toformat'
 
-import { BigintIsh, Rounding, TEN, MaxUint256 } from '../../constants'
+import { BigintIsh, Rounding, MaxUint256 } from '../../constants'
 import Fraction from './fraction'
 
 const Big = toFormat(_Big)
@@ -26,7 +26,7 @@ export default class CurrencyAmount extends Fraction {
     const parsedAmount = JSBI.BigInt(amount)
     invariant(JSBI.lessThanOrEqual(parsedAmount, MaxUint256), 'AMOUNT')
 
-    super(parsedAmount, JSBI.exponentiate(TEN, JSBI.BigInt(currency.decimals)))
+    super(parsedAmount, JSBI.exponentiate(JSBI.BigInt(10), JSBI.BigInt(currency.decimals)))
     this.currency = currency
   }
 

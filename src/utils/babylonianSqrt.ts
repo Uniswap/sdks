@@ -1,5 +1,9 @@
 import JSBI from 'jsbi'
-import { ONE, THREE, TWO, ZERO } from '../constants'
+
+const ZERO = JSBI.BigInt(0)
+const ONE = JSBI.BigInt(1)
+const TWO = JSBI.BigInt(2)
+const THREE = JSBI.BigInt(3)
 
 // computes floor(babylonianSqrt(y)) using the babylonian method (not the fastest way)
 export default function babylonianSqrt(y: JSBI): JSBI {
