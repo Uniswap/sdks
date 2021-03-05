@@ -1,3 +1,4 @@
+import JSBI from 'jsbi'
 import { Token } from '../token'
 import TokenAmount from './tokenAmount'
 import { currencyEquals } from '../token'
@@ -19,7 +20,10 @@ export default class Price extends Fraction {
 
     this.baseCurrency = baseCurrency
     this.quoteCurrency = quoteCurrency
-    this.scalar = new Fraction(TEN ** BigInt(baseCurrency.decimals), TEN ** BigInt(quoteCurrency.decimals))
+    this.scalar = new Fraction(
+      JSBI.exponentiate(TEN, JSBI.BigInt(baseCurrency.decimals)),
+      JSBI.exponentiate(TEN, JSBI.BigInt(quoteCurrency.decimals))
+    )
   }
 
   public get raw(): Fraction {

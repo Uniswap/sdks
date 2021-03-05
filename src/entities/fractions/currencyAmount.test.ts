@@ -1,3 +1,4 @@
+import JSBI from 'jsbi'
 import { ChainId } from '../../constants'
 import { Token } from '../token'
 import CurrencyAmount from './CurrencyAmount'
@@ -10,14 +11,14 @@ describe('CurrencyAmount', () => {
     it('works', () => {
       const token = new Token(ChainId.MAINNET, ADDRESS_ONE, 18)
       const amount = new TokenAmount(token, 100)
-      expect(amount.raw).toEqual(BigInt(100))
+      expect(amount.raw).toEqual(JSBI.BigInt(100))
     })
   })
 
   describe('#ether', () => {
     it('produces ether amount', () => {
       const amount = CurrencyAmount.ether(100)
-      expect(amount.raw).toEqual(BigInt(100))
+      expect(amount.raw).toEqual(JSBI.BigInt(100))
     })
   })
 })

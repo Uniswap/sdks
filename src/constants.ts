@@ -1,5 +1,7 @@
+import JSBI from 'jsbi'
+
 // exports for external consumption
-export type BigintIsh = bigint | string | number
+export type BigintIsh = JSBI | string | number
 
 export enum ChainId {
   MAINNET = 1,
@@ -21,10 +23,10 @@ export enum Rounding {
 }
 
 // exports for internal consumption
-export const ZERO = BigInt(0)
-export const ONE = BigInt(1)
-export const TWO = BigInt(2)
-export const THREE = BigInt(3)
-export const TEN = BigInt(10)
-export const ONE_HUNDRED = BigInt(100)
-export const MaxUint256 = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')
+export const ZERO = JSBI.BigInt(0)
+export const ONE = JSBI.BigInt(1)
+export const TWO = JSBI.BigInt(2)
+export const THREE = JSBI.BigInt(3)
+export const TEN = JSBI.BigInt(10)
+export const ONE_HUNDRED = JSBI.BigInt(100)
+export const MaxUint256 = JSBI.BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')

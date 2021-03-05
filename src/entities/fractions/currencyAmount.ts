@@ -1,3 +1,4 @@
+import JSBI from 'jsbi'
 import { currencyEquals } from '../token'
 import { Currency, ETHER } from '../currency'
 import invariant from 'tiny-invariant'
@@ -22,25 +23,25 @@ export default class CurrencyAmount extends Fraction {
 
   // amount _must_ be raw, i.e. in the native representation
   protected constructor(currency: Currency, amount: BigintIsh) {
-    const parsedAmount = BigInt(amount)
+    const parsedAmount = JSBI.BigInt(amount)
     invariant(parsedAmount < MaxUint256, 'AMOUNT')
 
-    super(parsedAmount, TEN ** BigInt(currency.decimals))
+    super(parsedAmount, JSBI.exponentiate(TEN, JSBI.BigInt(currency.decimals)))
     this.currency = currency
   }
 
-  public get raw(): bigint {
+  public get raw(): JSBI {
     return this.numerator
   }
 
   public add(other: CurrencyAmount): CurrencyAmount {
     invariant(currencyEquals(this.currency, other.currency), 'TOKEN')
-    return new CurrencyAmount(this.currency, this.raw + other.raw)
+    return new CurrencyAmount(this.currency, JSBI.add(this.raw, other.raw))
   }
 
   public subtract(other: CurrencyAmount): CurrencyAmount {
     invariant(currencyEquals(this.currency, other.currency), 'TOKEN')
-    return new CurrencyAmount(this.currency, this.raw - other.raw)
+    return new CurrencyAmount(this.currency, JSBI.subtract(this.raw, other.raw))
   }
 
   public toSignificant(
