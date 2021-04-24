@@ -1,14 +1,13 @@
 import { getAddress } from '@ethersproject/address'
-import invariant from 'tiny-invariant'
-import warning from 'tiny-warning'
 
-// warns if addresses are not checksummed
+/**
+ * Validates an address and returns the parsed (checksummed) version of that address
+ * @param address the unchecksummed hex address
+ */
 export default function validateAndParseAddress(address: string): string {
   try {
-    const checksummedAddress = getAddress(address)
-    warning(address === checksummedAddress, `${address} is not checksummed.`)
-    return checksummedAddress
+    return getAddress(address)
   } catch (error) {
-    invariant(false, `${address} is not a valid address.`)
+    throw new Error(`${address} is not a valid address.`)
   }
 }
