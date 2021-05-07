@@ -1,19 +1,22 @@
 import invariant from 'tiny-invariant'
 import { ChainId } from '../constants'
-import { Currency } from './currency'
+import validateAndParseAddress from '../utils/validateAndParseAddress'
+import { BaseCurrency } from './baseCurrency'
 
 /**
  * Represents an ERC20 token with a unique address and some metadata.
  */
-export class Token extends Currency {
+export class Token extends BaseCurrency {
+  public readonly isEther: false = false
+  public readonly isToken: true = true
+
   public readonly chainId: ChainId | number
   public readonly address: string
 
   public constructor(chainId: ChainId | number, address: string, decimals: number, symbol?: string, name?: string) {
     super(decimals, symbol, name)
-    invariant(address.length === 42 && address.slice(0, 2) === '0x', 'ADDRESS')
     this.chainId = chainId
-    this.address = address
+    this.address = validateAndParseAddress(address)
   }
 
   /**
@@ -38,21 +41,6 @@ export class Token extends Currency {
     invariant(this.chainId === other.chainId, 'CHAIN_IDS')
     invariant(this.address !== other.address, 'ADDRESSES')
     return this.address.toLowerCase() < other.address.toLowerCase()
-  }
-}
-
-/**
- * Compares two currencies for equality
- */
-export function currencyEquals(currencyA: Currency, currencyB: Currency): boolean {
-  if (currencyA instanceof Token && currencyB instanceof Token) {
-    return currencyA.equals(currencyB)
-  } else if (currencyA instanceof Token) {
-    return false
-  } else if (currencyB instanceof Token) {
-    return false
-  } else {
-    return currencyA === currencyB
   }
 }
 

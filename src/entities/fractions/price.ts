@@ -1,7 +1,7 @@
 import JSBI from 'jsbi'
+import { currencyEquals } from '../../utils'
 import { Token } from '../token'
 import TokenAmount from './tokenAmount'
-import { currencyEquals } from '../token'
 import invariant from 'tiny-invariant'
 
 import { BigintIsh, Rounding } from '../../constants'
