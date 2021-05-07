@@ -1,7 +1,5 @@
 import JSBI from 'jsbi'
 import { currencyEquals } from '../../utils'
-import { Token } from '../token'
-import TokenAmount from './tokenAmount'
 import invariant from 'tiny-invariant'
 
 import { BigintIsh, Rounding } from '../../constants'
@@ -44,13 +42,10 @@ export default class Price extends Fraction {
     return new Price(this.baseCurrency, other.quoteCurrency, fraction.denominator, fraction.numerator)
   }
 
-  // performs floor division on overflow
+  // quotes with floor division
   public quote(currencyAmount: CurrencyAmount): CurrencyAmount {
     invariant(currencyEquals(currencyAmount.currency, this.baseCurrency), 'TOKEN')
-    if (this.quoteCurrency instanceof Token) {
-      return new TokenAmount(this.quoteCurrency, super.multiply(currencyAmount.raw).quotient)
-    }
-    return CurrencyAmount.ether(super.multiply(currencyAmount.raw).quotient)
+    return new CurrencyAmount(this.quoteCurrency, super.multiply(currencyAmount.raw).quotient)
   }
 
   public toSignificant(significantDigits: number = 6, format?: object, rounding?: Rounding): string {
