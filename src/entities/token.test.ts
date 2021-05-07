@@ -5,6 +5,14 @@ describe('Token', () => {
   const ADDRESS_ONE = '0x0000000000000000000000000000000000000001'
   const ADDRESS_TWO = '0x0000000000000000000000000000000000000002'
 
+  describe('#constructor', () => {
+    it('works with invalid address', () => {
+      expect(new Token(ChainId.ROPSTEN, '0xhello00000000000000000000000000000000002', 18).address).toEqual(
+        '0xhello00000000000000000000000000000000002'
+      )
+    })
+  })
+
   describe('#equals', () => {
     it('fails if address differs', () => {
       expect(new Token(ChainId.MAINNET, ADDRESS_ONE, 18).equals(new Token(ChainId.MAINNET, ADDRESS_TWO, 18))).toBe(
