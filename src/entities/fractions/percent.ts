@@ -12,7 +12,7 @@ export default class Percent extends Fraction {
   /**
    * This boolean prevents a fraction from being interpreted as a Percent
    */
-  public readonly isPercent: boolean = true
+  public readonly isPercent: true = true
 
   add(other: Fraction | BigintIsh): Percent {
     return toPercent(super.add(other))
