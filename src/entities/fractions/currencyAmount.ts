@@ -1,7 +1,7 @@
 import JSBI from 'jsbi'
 import { currencyEquals } from '../../utils'
 import { Currency } from '../currency'
-import { ETHER } from '../ether'
+import { Ether, ETHER } from '../ether'
 import invariant from 'tiny-invariant'
 import _Big from 'big.js'
 import toFormat from 'toformat'
@@ -11,19 +11,19 @@ import Fraction from './fraction'
 
 const Big = toFormat(_Big)
 
-export default class CurrencyAmount extends Fraction {
-  public readonly currency: Currency
+export default class CurrencyAmount<T extends Currency> extends Fraction {
+  public readonly currency: T
 
   /**
    * Helper that calls the constructor with the ETHER currency
    * @param amount ether amount in wei
    */
-  public static ether(amount: BigintIsh): CurrencyAmount {
+  public static ether(amount: BigintIsh): CurrencyAmount<Ether> {
     return new CurrencyAmount(ETHER, amount)
   }
 
   // amount _must_ be raw, i.e. in the native representation
-  public constructor(currency: Currency, amount: BigintIsh) {
+  public constructor(currency: T, amount: BigintIsh) {
     const parsedAmount = JSBI.BigInt(amount)
     invariant(JSBI.lessThanOrEqual(parsedAmount, MaxUint256), 'AMOUNT')
 
@@ -35,12 +35,12 @@ export default class CurrencyAmount extends Fraction {
     return this.numerator
   }
 
-  public add(other: CurrencyAmount): CurrencyAmount {
+  public add(other: CurrencyAmount<T>): CurrencyAmount<T> {
     invariant(currencyEquals(this.currency, other.currency), 'TOKEN')
     return new CurrencyAmount(this.currency, JSBI.add(this.raw, other.raw))
   }
 
-  public subtract(other: CurrencyAmount): CurrencyAmount {
+  public subtract(other: CurrencyAmount<T>): CurrencyAmount<T> {
     invariant(currencyEquals(this.currency, other.currency), 'TOKEN')
     return new CurrencyAmount(this.currency, JSBI.subtract(this.raw, other.raw))
   }
