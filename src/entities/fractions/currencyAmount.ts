@@ -1,5 +1,5 @@
 import JSBI from 'jsbi'
-import { currencyEquals } from '../../utils'
+import { currencyEquals } from '../../utils/currencyEquals'
 import { Currency } from '../currency'
 import { Ether, ETHER } from '../ether'
 import invariant from 'tiny-invariant'
