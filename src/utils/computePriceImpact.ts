@@ -11,8 +11,8 @@ export function computePriceImpact<TBase extends Currency, TQuote extends Curren
   inputAmount: CurrencyAmount<TBase>,
   outputAmount: CurrencyAmount<TQuote>
 ): Percent {
-  const exactQuote = midPrice.raw.multiply(inputAmount.raw)
+  const quotedOutputAmount = midPrice.quote(inputAmount)
   // calculate price impact := (exactQuote - outputAmount) / exactQuote
-  const priceImpact = exactQuote.subtract(outputAmount.raw).divide(exactQuote)
+  const priceImpact = quotedOutputAmount.subtract(outputAmount).divide(quotedOutputAmount)
   return new Percent(priceImpact.numerator, priceImpact.denominator)
 }

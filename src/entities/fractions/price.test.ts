@@ -13,7 +13,7 @@ describe('Price', () => {
   describe('#quote', () => {
     it('returns correct value', () => {
       const price = new Price(t0, t1, 1, 5)
-      expect(price.quote(new CurrencyAmount(t0, 10))).toEqual(new CurrencyAmount(t1, 50))
+      expect(price.quote(CurrencyAmount.fromRawAmount(t0, 10))).toEqual(CurrencyAmount.fromRawAmount(t1, 50))
     })
   })
 })

@@ -11,5 +11,9 @@ export function wrappedCurrencyAmount(
   currencyAmount: CurrencyAmount<Currency>,
   chainId: ChainId
 ): CurrencyAmount<Token> {
-  return new CurrencyAmount(wrappedCurrency(currencyAmount.currency, chainId), currencyAmount.raw)
+  return CurrencyAmount.fromFractionalAmount(
+    wrappedCurrency(currencyAmount.currency, chainId),
+    currencyAmount.numerator,
+    currencyAmount.denominator
+  )
 }
