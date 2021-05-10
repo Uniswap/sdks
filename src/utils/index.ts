@@ -4,3 +4,5 @@ import sqrt from './sqrt'
 
 export { sortedInsert, validateAndParseAddress, sqrt }
 export { currencyEquals } from './currencyEquals'
+export { wrappedCurrency } from './wrappedCurrency'
+export { wrappedCurrencyAmount } from './wrappedCurrencyAmount'
