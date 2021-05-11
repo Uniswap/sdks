@@ -2,7 +2,7 @@ import JSBI from 'jsbi'
 import { BigintIsh, Rounding } from '../../constants'
 import { Fraction } from './fraction'
 
-const ONE_HUNDRED_PERCENT = new Fraction(JSBI.BigInt(100))
+const ONE_HUNDRED = new Fraction(JSBI.BigInt(100))
 
 /**
  * Converts a fraction to a percent
@@ -35,10 +35,10 @@ export class Percent extends Fraction {
   }
 
   public toSignificant(significantDigits: number = 5, format?: object, rounding?: Rounding): string {
-    return super.multiply(ONE_HUNDRED_PERCENT).toSignificant(significantDigits, format, rounding)
+    return super.multiply(ONE_HUNDRED).toSignificant(significantDigits, format, rounding)
   }
 
   public toFixed(decimalPlaces: number = 2, format?: object, rounding?: Rounding): string {
-    return super.multiply(ONE_HUNDRED_PERCENT).toFixed(decimalPlaces, format, rounding)
+    return super.multiply(ONE_HUNDRED).toFixed(decimalPlaces, format, rounding)
   }
 }
