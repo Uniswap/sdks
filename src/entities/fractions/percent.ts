@@ -1,14 +1,18 @@
 import JSBI from 'jsbi'
 import { BigintIsh, Rounding } from '../../constants'
-import Fraction from './fraction'
+import { Fraction } from './fraction'
 
-const _100_PERCENT = new Fraction(JSBI.BigInt(100))
+const ONE_HUNDRED_PERCENT = new Fraction(JSBI.BigInt(100))
 
+/**
+ * Converts a fraction to a percent
+ * @param fraction the fraction to convert
+ */
 function toPercent(fraction: Fraction): Percent {
   return new Percent(fraction.numerator, fraction.denominator)
 }
 
-export default class Percent extends Fraction {
+export class Percent extends Fraction {
   /**
    * This boolean prevents a fraction from being interpreted as a Percent
    */
@@ -31,10 +35,10 @@ export default class Percent extends Fraction {
   }
 
   public toSignificant(significantDigits: number = 5, format?: object, rounding?: Rounding): string {
-    return this.multiply(_100_PERCENT).toSignificant(significantDigits, format, rounding)
+    return super.multiply(ONE_HUNDRED_PERCENT).toSignificant(significantDigits, format, rounding)
   }
 
   public toFixed(decimalPlaces: number = 2, format?: object, rounding?: Rounding): string {
-    return this.multiply(_100_PERCENT).toFixed(decimalPlaces, format, rounding)
+    return super.multiply(ONE_HUNDRED_PERCENT).toFixed(decimalPlaces, format, rounding)
   }
 }

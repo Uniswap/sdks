@@ -2,7 +2,7 @@ import invariant from 'tiny-invariant'
 
 // given an array of items sorted by `comparator`, insert an item into its sort index and constrain the size to
 // `maxSize` by removing the last item
-export default function sortedInsert<T>(
+export  function sortedInsert<T>(
   items: T[],
   add: T,
   maxSize: number,

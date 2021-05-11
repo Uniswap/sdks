@@ -21,7 +21,7 @@ const toFixedRounding = {
   [Rounding.ROUND_UP]: RoundingMode.RoundUp
 }
 
-export default class Fraction {
+export class Fraction {
   public readonly numerator: JSBI
   public readonly denominator: JSBI
 

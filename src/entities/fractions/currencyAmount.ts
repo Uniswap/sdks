@@ -1,17 +1,17 @@
+import invariant from 'tiny-invariant'
 import JSBI from 'jsbi'
 import { currencyEquals } from '../../utils/currencyEquals'
 import { Currency } from '../currency'
 import { Ether } from '../ether'
-import invariant from 'tiny-invariant'
+import { Fraction } from './fraction'
 import _Big from 'big.js'
-import toFormat from 'toformat'
 
+import toFormat from 'toformat'
 import { BigintIsh, Rounding, MaxUint256 } from '../../constants'
-import Fraction from './fraction'
 
 const Big = toFormat(_Big)
 
-export default class CurrencyAmount<T extends Currency> extends Fraction {
+export class CurrencyAmount<T extends Currency> extends Fraction {
   public readonly currency: T
   public readonly decimalScale: JSBI
 

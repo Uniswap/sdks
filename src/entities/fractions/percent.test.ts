@@ -1,4 +1,4 @@
-import Percent from './percent'
+import { Percent } from './percent'
 
 describe('Percent', () => {
   describe('constructor', () => {
@@ -36,6 +36,17 @@ describe('Percent', () => {
     })
     it('different denominators', () => {
       expect(new Percent(1, 25).divide(new Percent(2, 100))).toEqual(new Percent(100, 50))
+    })
+  })
+
+  describe('#toSignificant', () => {
+    it('returns the value scaled by 100', () => {
+      expect(new Percent(154, 10_000).toSignificant(3)).toEqual('1.54')
+    })
+  })
+  describe('#toFixed', () => {
+    it('returns the value scaled by 100', () => {
+      expect(new Percent(154, 10_000).toFixed(2)).toEqual('1.54')
     })
   })
 })

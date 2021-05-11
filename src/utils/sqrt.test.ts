@@ -1,6 +1,6 @@
 import JSBI from 'jsbi'
 import { MaxUint256 } from '../constants'
-import sqrt from './sqrt'
+import { sqrt } from './sqrt'
 
 describe('#sqrt', () => {
   it('correct for 0-1000', () => {

@@ -2,8 +2,8 @@ import JSBI from 'jsbi'
 import { ChainId, MaxUint256 } from '../../constants'
 import { ETHER } from '../ether'
 import { Token } from '../token'
-import CurrencyAmount from './currencyAmount'
-import Percent from './percent'
+import { CurrencyAmount } from './currencyAmount'
+import { Percent } from './percent'
 
 describe('CurrencyAmount', () => {
   const ADDRESS_ONE = '0x0000000000000000000000000000000000000001'

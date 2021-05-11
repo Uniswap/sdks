@@ -11,7 +11,7 @@ const TWO = JSBI.BigInt(2)
  * Computes floor(sqrt(value))
  * @param value the value for which to compute the square root, rounded down
  */
-export default function sqrt(value: JSBI): JSBI {
+export function sqrt(value: JSBI): JSBI {
   invariant(JSBI.greaterThanOrEqual(value, ZERO), 'NEGATIVE')
 
   // rely on built in sqrt if possible

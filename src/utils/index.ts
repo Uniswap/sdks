@@ -1,9 +1,7 @@
-import sortedInsert from './sortedInsert'
-import validateAndParseAddress from './validateAndParseAddress'
-import sqrt from './sqrt'
-
-export { sortedInsert, validateAndParseAddress, sqrt }
+export { computePriceImpact } from './computePriceImpact'
 export { currencyEquals } from './currencyEquals'
+export { validateAndParseAddress } from './validateAndParseAddress'
+export { sortedInsert } from './sortedInsert'
+export { sqrt } from './sqrt'
 export { wrappedCurrency } from './wrappedCurrency'
 export { wrappedCurrencyAmount } from './wrappedCurrencyAmount'
-export { computePriceImpact } from './computePriceImpact'
