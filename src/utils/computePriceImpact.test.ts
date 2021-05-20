@@ -1,17 +1,20 @@
-import { ChainId } from '../constants'
-import { CurrencyAmount, ETHER, Percent, Price, Token } from '../entities'
+import { CurrencyAmount, Ether, Percent, Price, Token } from '../entities'
 import { computePriceImpact } from './computePriceImpact'
 
 describe('#computePriceImpact', () => {
   const ADDRESS_ZERO = '0x0000000000000000000000000000000000000000'
   const ADDRESS_ONE = '0x0000000000000000000000000000000000000001'
 
-  const t0 = new Token(ChainId.MAINNET, ADDRESS_ZERO, 18)
-  const t1 = new Token(ChainId.MAINNET, ADDRESS_ONE, 18)
+  const t0 = new Token(1, ADDRESS_ZERO, 18)
+  const t1 = new Token(1, ADDRESS_ONE, 18)
 
   it('is correct for zero', () => {
     expect(
-      computePriceImpact(new Price(ETHER, t0, 10, 100), CurrencyAmount.ether(10), CurrencyAmount.fromRawAmount(t0, 100))
+      computePriceImpact(
+        new Price(Ether.onChain(1), t0, 10, 100),
+        CurrencyAmount.ether(1, 10),
+        CurrencyAmount.fromRawAmount(t0, 100)
+      )
     ).toEqual(new Percent(0, 10000))
   })
   it('is correct for half output', () => {

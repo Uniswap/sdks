@@ -1,5 +1,4 @@
 import JSBI from 'jsbi'
-import { currencyEquals } from '../../utils/currencyEquals'
 import invariant from 'tiny-invariant'
 
 import { BigintIsh, Rounding } from '../../constants'
@@ -12,8 +11,28 @@ export class Price<TBase extends Currency, TQuote extends Currency> extends Frac
   public readonly quoteCurrency: TQuote // output i.e. numerator
   public readonly scalar: Fraction // used to adjust the raw fraction w/r/t the decimals of the {base,quote}Token
 
-  // denominator and numerator _must_ be raw, i.e. in the native representation
-  public constructor(baseCurrency: TBase, quoteCurrency: TQuote, denominator: BigintIsh, numerator: BigintIsh) {
+  /**
+   * Construct a price, either with the base and quote currency amount, or the
+   * @param args
+   */
+  public constructor(
+    ...args:
+      | [TBase, TQuote, BigintIsh, BigintIsh]
+      | [{ baseAmount: CurrencyAmount<TBase>; quoteAmount: CurrencyAmount<TQuote> }]
+  ) {
+    let baseCurrency: TBase, quoteCurrency: TQuote, denominator: BigintIsh, numerator: BigintIsh
+
+    if (args.length === 4) {
+      ;[baseCurrency, quoteCurrency, denominator, numerator] = args
+    } else {
+      const result = args[0].quoteAmount.divide(args[0].baseAmount)
+      ;[baseCurrency, quoteCurrency, denominator, numerator] = [
+        args[0].baseAmount.currency,
+        args[0].quoteAmount.currency,
+        result.denominator,
+        result.numerator
+      ]
+    }
     super(numerator, denominator)
 
     this.baseCurrency = baseCurrency
@@ -36,7 +55,7 @@ export class Price<TBase extends Currency, TQuote extends Currency> extends Frac
    * @param other the other price
    */
   public multiply<TOtherQuote extends Currency>(other: Price<TQuote, TOtherQuote>): Price<TBase, TOtherQuote> {
-    invariant(currencyEquals(this.quoteCurrency, other.baseCurrency), 'TOKEN')
+    invariant(this.quoteCurrency.equals(other.baseCurrency), 'TOKEN')
     const fraction = super.multiply(other)
     return new Price(this.baseCurrency, other.quoteCurrency, fraction.denominator, fraction.numerator)
   }
@@ -46,7 +65,7 @@ export class Price<TBase extends Currency, TQuote extends Currency> extends Frac
    * @param currencyAmount the amount of base currency to quote against the price
    */
   public quote(currencyAmount: CurrencyAmount<TBase>): CurrencyAmount<TQuote> {
-    invariant(currencyEquals(currencyAmount.currency, this.baseCurrency), 'TOKEN')
+    invariant(currencyAmount.currency.equals(this.baseCurrency), 'TOKEN')
     const result = super.multiply(currencyAmount)
     return CurrencyAmount.fromFractionalAmount(this.quoteCurrency, result.numerator, result.denominator)
   }

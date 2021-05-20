@@ -1,4 +1,4 @@
-import { Ether } from './ether'
+import { NativeCurrency } from './nativeCurrency'
 import { Token } from './token'
 
-export type Currency = Ether | Token
+export type Currency = NativeCurrency | Token
