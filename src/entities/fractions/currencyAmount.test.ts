@@ -26,7 +26,7 @@ describe('CurrencyAmount', () => {
 
   describe('#ether', () => {
     it('produces ether amount', () => {
-      const amount = CurrencyAmount.ether(1, 100)
+      const amount = CurrencyAmount.fromRawAmount(Ether.onChain(1), 100)
       expect(amount.quotient).toEqual(JSBI.BigInt(100))
       expect(amount.currency).toEqual(Ether.onChain(1))
     })

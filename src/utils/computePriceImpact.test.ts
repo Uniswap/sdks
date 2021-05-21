@@ -12,7 +12,7 @@ describe('#computePriceImpact', () => {
     expect(
       computePriceImpact(
         new Price(Ether.onChain(1), t0, 10, 100),
-        CurrencyAmount.ether(1, 10),
+        CurrencyAmount.fromRawAmount(Ether.onChain(1), 10),
         CurrencyAmount.fromRawAmount(t0, 100)
       )
     ).toEqual(new Percent(0, 10000))

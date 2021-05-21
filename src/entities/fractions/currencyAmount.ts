@@ -1,8 +1,6 @@
 import invariant from 'tiny-invariant'
 import JSBI from 'jsbi'
 import { Currency } from '../currency'
-import { Ether } from '../ether'
-import { NativeCurrency } from '../nativeCurrency'
 import { Token } from '../token'
 import { Fraction } from './fraction'
 import _Big from 'big.js'
@@ -17,7 +15,7 @@ export class CurrencyAmount<T extends Currency> extends Fraction {
   public readonly decimalScale: JSBI
 
   /**
-   * Returns a new currency amount instance from the
+   * Returns a new currency amount instance from the unitless amount of token, i.e. the raw amount
    * @param currency the currency in the amount
    * @param rawAmount the raw token or ether amount
    */
@@ -37,15 +35,6 @@ export class CurrencyAmount<T extends Currency> extends Fraction {
     denominator: BigintIsh
   ): CurrencyAmount<T> {
     return new CurrencyAmount(currency, numerator, denominator)
-  }
-
-  /**
-   * Helper that calls the constructor with the Ether currency
-   * @param chainId the chain on which the ether exists
-   * @param rawAmount ether amount in wei
-   */
-  public static ether(chainId: number, rawAmount: BigintIsh): CurrencyAmount<NativeCurrency> {
-    return CurrencyAmount.fromRawAmount(Ether.onChain(chainId), rawAmount)
   }
 
   protected constructor(currency: T, numerator: BigintIsh, denominator?: BigintIsh) {
