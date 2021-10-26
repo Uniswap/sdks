@@ -1,0 +1,42 @@
+{
+  "name": "@uniswap/router-sdk",
+  "version": "1.0.0",
+  "description": "An sdk for routing swaps using Uniswap v2 and Uniswap v3.",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "test": "tsdx test",
+    "build": "tsdx build",
+    "start": "tsdx watch",
+    "prepublishOnly": "tsdx build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Uniswap/router-sdk.git"
+  },
+  "keywords": [
+    "uniswap",
+    "ethereum"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@ethersproject/abi": "^5.0.12",
+    "@ethersproject/solidity": "^5.0.9",
+    "@uniswap/sdk-core": "^3.0.1",
+    "@uniswap/v3-staker": "1.0.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^24.0.25",
+    "@uniswap/v3-core": "1.0.0",
+    "prettier": "^2.4.1",
+    "tsdx": "^0.14.1"
+  },
+  "prettier": {
+    "printWidth": 120,
+    "semi": false,
+    "singleQuote": true
+  }
+}
