@@ -917,9 +917,9 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
-"@ethersproject/abi@^5.0.12":
+"@ethersproject/abi@^5.0.12", "@ethersproject/abi@^5.5.0":
   version "5.5.0"
-  resolved "https://registry.npmjs.org/@ethersproject/abi/-/abi-5.5.0.tgz"
+  resolved "https://registry.yarnpkg.com/@ethersproject/abi/-/abi-5.5.0.tgz#fb52820e22e50b854ff15ce1647cc508d6660613"
   integrity sha512-loW7I4AohP5KycATvc0MgujU6JyCHPqHdeoo9z3Nr9xEiNioxa65ccdm1+fsoJhkuhdRtfcL8cfyGamz2AxZ5w==
   dependencies:
     "@ethersproject/address" "^5.5.0"
@@ -1582,6 +1582,17 @@
     tiny-invariant "^1.1.0"
     toformat "^2.0.0"
 
+"@uniswap/swap-router-contracts@^1.0.0-beta.2":
+  version "1.0.0-beta.2"
+  resolved "https://registry.yarnpkg.com/@uniswap/swap-router-contracts/-/swap-router-contracts-1.0.0-beta.2.tgz#ad4660e95f2c68020168ac2e6ed4d7e00fe67937"
+  integrity sha512-hqE4LQ3JOcFAqIAeapYwDFYE27qOZAXpUe2rlxQiyR2rSi/KtEuPWgpen6tobXbNcmw4xRbrUXy95TXsGbilfg==
+  dependencies:
+    "@openzeppelin/contracts" "3.4.1-solc-0.7-2"
+    "@uniswap/v2-core" "1.0.1"
+    "@uniswap/v3-core" "1.0.0"
+    "@uniswap/v3-periphery" "1.2.1"
+    hardhat-watcher "^2.1.1"
+
 "@uniswap/v2-core@1.0.1":
   version "1.0.1"
   resolved "https://registry.npmjs.org/@uniswap/v2-core/-/v2-core-1.0.1.tgz"
@@ -1603,7 +1614,7 @@
   resolved "https://registry.npmjs.org/@uniswap/v3-core/-/v3-core-1.0.0.tgz"
   integrity sha512-kSC4djMGKMHj7sLMYVnn61k9nu+lHjMIxgg9CDQT+s2QYLoA56GbSK9Oxr+qJXzzygbkrmuY6cwgP6cW2JXPFA==
 
-"@uniswap/v3-periphery@^1.0.1", "@uniswap/v3-periphery@^1.1.1":
+"@uniswap/v3-periphery@1.2.1", "@uniswap/v3-periphery@^1.0.1", "@uniswap/v3-periphery@^1.1.1":
   version "1.2.1"
   resolved "https://registry.npmjs.org/@uniswap/v3-periphery/-/v3-periphery-1.2.1.tgz"
   integrity sha512-45W8hT8X1j9ZcXa+y3NSVao90hMZtgtoJyDlMOg91wmUGi2idXAiGivOQYdB7+7Lq8Gc6Upv/ggFZknixZrv7g==
@@ -1615,10 +1626,10 @@
     base64-sol "1.0.1"
     hardhat-watcher "^2.1.1"
 
-"@uniswap/v3-sdk@^3.5.1":
-  version "3.5.1"
-  resolved "https://registry.yarnpkg.com/@uniswap/v3-sdk/-/v3-sdk-3.5.1.tgz#441e8e44d1ea576964d726903ec10a150cf916ea"
-  integrity sha512-DcLtlnWfkKpc5cqzKMLeFub+E8lvqTemObOYLqOZo6DdMAeLqawj8g2oo9o2JuhSVW/VXQDuSDe2V68BYF+U+w==
+"@uniswap/v3-sdk@^3.6.2":
+  version "3.6.2"
+  resolved "https://registry.yarnpkg.com/@uniswap/v3-sdk/-/v3-sdk-3.6.2.tgz#45fa659f7642e8807cb36939e4426355c7a5943c"
+  integrity sha512-RHJaFfO6+ugI0+v0xhGXuVadmJ9bTbAz/RnuS/xRpXrRIsLNRVC42bYZ3Ci0JPWhkaNygCcc3LJ36Bs6GganSg==
   dependencies:
     "@ethersproject/abi" "^5.0.12"
     "@ethersproject/solidity" "^5.0.9"
