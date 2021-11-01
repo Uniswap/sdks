@@ -3,9 +3,18 @@ import { Interface } from '@ethersproject/abi'
 import { Currency, CurrencyAmount, Percent, TradeType, validateAndParseAddress } from '@uniswap/sdk-core'
 import invariant from 'tiny-invariant'
 import { abi } from '@uniswap/swap-router-contracts/artifacts/contracts/interfaces/ISwapRouter02.sol/ISwapRouter02.json'
-import { FeeOptions, MethodParameters, Payments, PermitOptions, SelfPermit, toHex } from '@uniswap/v3-sdk'
+import {
+  encodeRouteToPath,
+  FeeOptions,
+  MethodParameters,
+  Payments,
+  PermitOptions,
+  SelfPermit,
+  toHex,
+} from '@uniswap/v3-sdk'
 import { Validation } from './multicallExtended'
-import { Trade } from '@uniswap/v2-sdk'
+import { Trade as V2Trade } from '@uniswap/v2-sdk'
+import { Trade as V3Trade } from '@uniswap/v3-sdk'
 import { ADDRESS_THIS, MSG_SENDER, MulticallExtended, PaymentsExtended } from '.'
 
 const ZERO = JSBI.BigInt(0)
@@ -13,7 +22,7 @@ const ZERO = JSBI.BigInt(0)
 /**
  * Options for producing the arguments to send calls to the router.
  */
-export interface V2SwapOptions {
+export interface SwapOptions {
   /**
    * How much the execution price is allowed to move unfavorably from the trade execution price.
    */
@@ -51,14 +60,124 @@ export abstract class SwapRouter {
    */
   private constructor() {}
 
+  private static encodeV2Swap(
+    trade: V2Trade<Currency, Currency, TradeType>,
+    options: SwapOptions,
+    routerMustCustody: boolean
+  ): string {
+    const amountIn: string = toHex(trade.maximumAmountIn(options.slippageTolerance).quotient)
+    const amountOut: string = toHex(trade.minimumAmountOut(options.slippageTolerance).quotient)
+
+    const path = trade.route.path.map((token) => token.address)
+    const recipient = routerMustCustody
+      ? ADDRESS_THIS
+      : options.recipient
+      ? validateAndParseAddress(options.recipient)
+      : MSG_SENDER
+
+    if (trade.tradeType === TradeType.EXACT_INPUT) {
+      const exactInputParams = [
+        amountIn,
+        // save gas by only passing slippage check if we can't check it later
+        // not a pure win, as sometimes this will cost us more when it would have caused an earlier failure
+        routerMustCustody ? 0 : amountOut,
+        path,
+        recipient,
+      ]
+
+      return SwapRouter.INTERFACE.encodeFunctionData('swapExactTokensForTokens', exactInputParams)
+    } else {
+      const exactOutputParams = [amountOut, amountIn, path, recipient]
+
+      return SwapRouter.INTERFACE.encodeFunctionData('swapTokensForExactTokens', exactOutputParams)
+    }
+  }
+
+  private static encodeV3Swap(
+    trade: V3Trade<Currency, Currency, TradeType>,
+    options: SwapOptions,
+    routerMustCustody: boolean
+  ): string[] {
+    const calldatas: string[] = []
+
+    for (const { route, inputAmount, outputAmount } of trade.swaps) {
+      const amountIn: string = toHex(trade.maximumAmountIn(options.slippageTolerance, inputAmount).quotient)
+      const amountOut: string = toHex(trade.minimumAmountOut(options.slippageTolerance, outputAmount).quotient)
+
+      // flag for whether the trade is single hop or not
+      const singleHop = route.pools.length === 1
+
+      const recipient = routerMustCustody
+        ? ADDRESS_THIS
+        : options.recipient
+        ? validateAndParseAddress(options.recipient)
+        : MSG_SENDER
+
+      if (singleHop) {
+        if (trade.tradeType === TradeType.EXACT_INPUT) {
+          const exactInputSingleParams = {
+            tokenIn: route.tokenPath[0].address,
+            tokenOut: route.tokenPath[1].address,
+            fee: route.pools[0].fee,
+            recipient,
+            amountIn,
+            amountOutMinimum: amountOut,
+            sqrtPriceLimitX96: 0,
+          }
+
+          calldatas.push(SwapRouter.INTERFACE.encodeFunctionData('exactInputSingle', [exactInputSingleParams]))
+        } else {
+          const exactOutputSingleParams = {
+            tokenIn: route.tokenPath[0].address,
+            tokenOut: route.tokenPath[1].address,
+            fee: route.pools[0].fee,
+            recipient,
+            amountOut,
+            amountInMaximum: amountIn,
+            sqrtPriceLimitX96: 0,
+          }
+
+          calldatas.push(SwapRouter.INTERFACE.encodeFunctionData('exactOutputSingle', [exactOutputSingleParams]))
+        }
+      } else {
+        const path: string = encodeRouteToPath(route, trade.tradeType === TradeType.EXACT_OUTPUT)
+
+        if (trade.tradeType === TradeType.EXACT_INPUT) {
+          const exactInputParams = {
+            path,
+            recipient,
+            amountIn,
+            amountOutMinimum: amountOut,
+          }
+
+          calldatas.push(SwapRouter.INTERFACE.encodeFunctionData('exactInput', [exactInputParams]))
+        } else {
+          const exactOutputParams = {
+            path,
+            recipient,
+            amountOut,
+            amountInMaximum: amountIn,
+          }
+
+          calldatas.push(SwapRouter.INTERFACE.encodeFunctionData('exactOutput', [exactOutputParams]))
+        }
+      }
+    }
+
+    return calldatas
+  }
+
   /**
    * Produces the on-chain method name to call and the hex encoded parameters to pass as arguments for a given trade.
    * @param trade to produce call parameters for
    * @param options options for the call parameters
    */
-  public static v2SwapCallParameters(
-    trades: Trade<Currency, Currency, TradeType> | Trade<Currency, Currency, TradeType>[],
-    options: V2SwapOptions
+  public static swapCallParameters(
+    trades:
+      | V2Trade<Currency, Currency, TradeType>
+      | V3Trade<Currency, Currency, TradeType>
+      | (V2Trade<Currency, Currency, TradeType> | V3Trade<Currency, Currency, TradeType>)[],
+    options: SwapOptions
   ): MethodParameters {
     if (!Array.isArray(trades)) {
       trades = [trades]
@@ -68,15 +187,15 @@ export abstract class SwapRouter {
 
     // All trades should have the same starting/ending currency and trade type
     invariant(
-      trades.every(trade => trade.inputAmount.currency.equals(sampleTrade.inputAmount.currency)),
+      trades.every((trade) => trade.inputAmount.currency.equals(sampleTrade.inputAmount.currency)),
       'TOKEN_IN_DIFF'
     )
     invariant(
-      trades.every(trade => trade.outputAmount.currency.equals(sampleTrade.outputAmount.currency)),
+      trades.every((trade) => trade.outputAmount.currency.equals(sampleTrade.outputAmount.currency)),
       'TOKEN_OUT_DIFF'
     )
     invariant(
-      trades.every(trade => trade.tradeType === sampleTrade.tradeType),
+      trades.every((trade) => trade.tradeType === sampleTrade.tradeType),
       'TRADE_TYPE_DIFF'
     )
 
@@ -101,7 +220,8 @@ export abstract class SwapRouter {
     //   2. when a fee on the output is being taken
     //   3. when there are >1 exact input trades. this one isn't strictly necessary,
     //      but typically we want to perform an aggregated slippage check
-    const routerMustCustody = outputIsNative || !!options.fee || (trades.length > 1 && sampleTrade.tradeType === TradeType.EXACT_INPUT)
+    const routerMustCustody =
+      outputIsNative || !!options.fee || (trades.length > 1 && sampleTrade.tradeType === TradeType.EXACT_INPUT)
 
     const totalValue: CurrencyAmount<Currency> = inputIsNative
       ? trades.reduce((sum, trade) => sum.add(trade.maximumAmountIn(options.slippageTolerance)), ZERO_IN)
@@ -114,32 +234,12 @@ export abstract class SwapRouter {
     }
 
     for (const trade of trades) {
-      const amountIn: string = toHex(trade.maximumAmountIn(options.slippageTolerance).quotient)
-      const amountOut: string = toHex(trade.minimumAmountOut(options.slippageTolerance).quotient)
-
-      const path = trade.route.path.map(token => token.address)
-      const recipient = routerMustCustody ? ADDRESS_THIS : (options.recipient ? validateAndParseAddress(options.recipient) : MSG_SENDER)
-
-      if (trade.tradeType === TradeType.EXACT_INPUT) {
-        const exactInputParams = [
-          amountIn,
-          // save gas by only passing slippage check if we can't check it later
-          // not a pure win, as sometimes this will cost us more when it would have caused an earlier failure
-          routerMustCustody ? 0 : amountOut,
-          path,
-          recipient
-        ]
-
-        calldatas.push(SwapRouter.INTERFACE.encodeFunctionData('swapExactTokensForTokens', exactInputParams))
+      if (trade instanceof V2Trade) {
+        calldatas.push(SwapRouter.encodeV2Swap(trade, options, routerMustCustody))
       } else {
-        const exactOutputParams = [
-          amountOut,
-          amountIn,
-          path,
-          recipient
-        ]
-
-        calldatas.push(SwapRouter.INTERFACE.encodeFunctionData('swapTokensForExactTokens', exactOutputParams))
+        for (const calldata of SwapRouter.encodeV3Swap(trade, options, routerMustCustody)) {
+          calldatas.push(calldata)
+        }
       }
     }
 
@@ -170,7 +270,7 @@ export abstract class SwapRouter {
 
     return {
       calldata: MulticallExtended.encodeMulticall(calldatas, options.deadlineOrPreviousBlockhash),
-      value: toHex(totalValue.quotient)
+      value: toHex(totalValue.quotient),
     }
   }
 }
