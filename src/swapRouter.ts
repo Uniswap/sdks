@@ -12,10 +12,11 @@ import {
   SelfPermit,
   toHex,
 } from '@uniswap/v3-sdk'
-import { Validation } from './multicallExtended'
 import { Trade as V2Trade } from '@uniswap/v2-sdk'
 import { Trade as V3Trade } from '@uniswap/v3-sdk'
-import { ADDRESS_THIS, MSG_SENDER, MulticallExtended, PaymentsExtended } from '.'
+import { ADDRESS_THIS, MSG_SENDER } from './constants'
+import { Validation, MulticallExtended } from './multicallExtended'
+import { PaymentsExtended } from './paymentsExtended'
 
 const ZERO = JSBI.BigInt(0)
 
@@ -254,7 +255,7 @@ export abstract class SwapRouter {
       } else {
         calldatas.push(
           PaymentsExtended.encodeSweepToken(
-            sampleTrade.outputAmount.currency,
+            sampleTrade.outputAmount.currency.wrapped,
             amountNecessary,
             options.recipient,
             options.fee
