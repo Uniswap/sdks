@@ -39,8 +39,6 @@ export class RouteV3<TInput extends Currency, TOutput extends Currency> extends 
         this.protocol = Protocol.V3
         this.path = v3Route.tokenPath
 
-
     }
-
 
 }
