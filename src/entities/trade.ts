@@ -207,8 +207,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
 
     for (const { routev2, amount } of v2Routes) {
       const v2Trade = new V2TradeSDK(routev2, amount, tradeType)
-      const inputAmount = v2Trade.inputAmount
-      const outputAmount = v2Trade.outputAmount
+      const { inputAmount, outputAmount } = v2Trade
 
       populatedV2Routes.push({
         routev2,
@@ -218,9 +217,8 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     }
 
     for (const { routev3, amount } of v3Routes) {
-      const v3Trade = V3TradeSDK.fromRoute(routev3, amount, tradeType)
-      const inputAmount = (await v3Trade).inputAmount
-      const outputAmount = (await v3Trade).outputAmount
+      const v3Trade = await V3TradeSDK.fromRoute(routev3, amount, tradeType)
+      const { inputAmount, outputAmount } = v3Trade
 
       populatedV3Routes.push({
         routev3,
@@ -255,21 +253,19 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
 
     if (route instanceof V2RouteSDK) {
       const v2Trade = new V2TradeSDK(route, amount, tradeType)
-      const inputAmount = v2Trade.inputAmount
-      const outputAmount = v2Trade.outputAmount
+      const { inputAmount, outputAmount } = v2Trade
       v2Routes = [{ routev2: route, inputAmount, outputAmount }]
       v3Routes = []
     } else {
-      const v3Trade = V3TradeSDK.fromRoute(route, amount, tradeType)
-      const inputAmount = (await v3Trade).inputAmount
-      const outputAmount = (await v3Trade).outputAmount
+      const v3Trade = await V3TradeSDK.fromRoute(route, amount, tradeType)
+      const { inputAmount, outputAmount } = v3Trade
       v3Routes = [{ routev3: route, inputAmount, outputAmount }]
       v2Routes = []
     }
     return new Trade({
       v2Routes,
       v3Routes,
-      tradeType
+      tradeType,
     })
   }
 }
