@@ -17,6 +17,9 @@ import { Trade as V3Trade } from '@uniswap/v3-sdk'
 import { ADDRESS_THIS, MSG_SENDER } from './constants'
 import { Validation, MulticallExtended } from './multicallExtended'
 import { PaymentsExtended } from './paymentsExtended'
+import { Trade } from './entities/trade'
+import { Protocol } from './entities/protocol'
+import { RouteV2, RouteV3 } from './entities/route'
 
 const ZERO = JSBI.BigInt(0)
 
@@ -175,11 +178,44 @@ export abstract class SwapRouter {
    */
   public static swapCallParameters(
     trades:
+      | Trade<Currency, Currency, TradeType>
       | V2Trade<Currency, Currency, TradeType>
       | V3Trade<Currency, Currency, TradeType>
       | (V2Trade<Currency, Currency, TradeType> | V3Trade<Currency, Currency, TradeType>)[],
     options: SwapOptions
   ): MethodParameters {
+    // If dealing with an instance of the aggregated Trade object, unbundle it to individual V2Trade and V3Trade objects.
+    if (trades instanceof Trade) {
+      invariant(
+        trades.swaps.every((swap) => swap.route.protocol == Protocol.V3 || swap.route.protocol == Protocol.V2),
+        'UNSUPPORTED_PROTOCOL'
+      )
+
+      let v2Andv3Trades: (V2Trade<Currency, Currency, TradeType> | V3Trade<Currency, Currency, TradeType>)[] = []
+
+      for (const { route, inputAmount, outputAmount } of trades.swaps) {
+        if (route.protocol == Protocol.V2) {
+          v2Andv3Trades.push(
+            new V2Trade(
+              route as RouteV2<Currency, Currency>,
+              trades.tradeType == TradeType.EXACT_INPUT ? inputAmount : outputAmount,
+              trades.tradeType
+            )
+          )
+        } else if (route.protocol == Protocol.V3) {
+          v2Andv3Trades.push(
+            V3Trade.createUncheckedTrade({
+              route: route as RouteV3<Currency, Currency>,
+              inputAmount,
+              outputAmount,
+              tradeType: trades.tradeType,
+            })
+          )
+        }
+      }
+
+      trades = v2Andv3Trades
+    }
     if (!Array.isArray(trades)) {
       trades = [trades]
     }
