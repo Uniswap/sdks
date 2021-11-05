@@ -1,4 +1,4 @@
-import { Currency, CurrencyAmount, Fraction, Percent, Price, TradeType, Token } from '@uniswap/sdk-core'
+import { Currency, CurrencyAmount, Fraction, Percent, Price, TradeType } from '@uniswap/sdk-core'
 import { IRoute, RouteV2, RouteV3 } from './route'
 import { Route as V2RouteSDK, Trade as V2TradeSDK } from '@uniswap/v2-sdk'
 import { Route as V3RouteSDK, Trade as V3TradeSDK } from '@uniswap/v3-sdk'
