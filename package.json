@@ -1,6 +1,6 @@
 {
   "name": "@uniswap/router-sdk",
-  "version": "1.0.0-beta.2",
+  "version": "1.0.0-beta.4",
   "description": "An sdk for routing swaps using Uniswap v2 and Uniswap v3.",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
