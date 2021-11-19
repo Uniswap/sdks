@@ -35,9 +35,12 @@ export abstract class MulticallExtended {
     }
 
     // this means the validation value should be a previousBlockhash
-    if (typeof validation === 'string') {
+    if (typeof validation === 'string' && validation.startsWith('0x')) {
       const previousBlockhash = validateAndParseBytes32(validation)
-      return MulticallExtended.INTERFACE.encodeFunctionData('multicall(bytes32,bytes[])', [previousBlockhash, calldatas])
+      return MulticallExtended.INTERFACE.encodeFunctionData('multicall(bytes32,bytes[])', [
+        previousBlockhash,
+        calldatas,
+      ])
     } else {
       const deadline = toHex(validation)
       return MulticallExtended.INTERFACE.encodeFunctionData('multicall(uint256,bytes[])', [deadline, calldatas])
