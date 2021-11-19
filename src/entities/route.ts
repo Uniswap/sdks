@@ -3,7 +3,7 @@ import { Route as V3RouteSDK, Pool } from '@uniswap/v3-sdk'
 import { Protocol } from './protocol'
 import { Currency, Price, Token } from '@uniswap/sdk-core'
 
-export interface IRoute<TInput extends Currency, TOutput extends Currency, TPool extends (Pool | Pair)> {
+export interface IRoute<TInput extends Currency, TOutput extends Currency, TPool extends Pool | Pair> {
   protocol: Protocol
   // array of pools if v3 or pairs if v2
   pools: TPool[]
