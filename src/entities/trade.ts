@@ -6,7 +6,7 @@ import { ZERO, ONE } from '../constants'
 import invariant from 'tiny-invariant'
 
 export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType extends TradeType> {
-  public readonly routes: IRoute<TInput, TOutput, (Pair | Pool)>[]
+  public readonly routes: IRoute<TInput, TOutput, Pair | Pool>[]
   public readonly tradeType: TTradeType
   private _outputAmount: CurrencyAmount<TOutput> | undefined
   private _inputAmount: CurrencyAmount<TInput> | undefined
@@ -16,7 +16,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
    * make up the trade. May consist of swaps in v2 or v3.
    */
   public readonly swaps: {
-    route: IRoute<TInput, TOutput, (Pair | Pool)>
+    route: IRoute<TInput, TOutput, Pair | Pool>
     inputAmount: CurrencyAmount<TInput>
     outputAmount: CurrencyAmount<TOutput>
   }[]
