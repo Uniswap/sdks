@@ -1,8 +1,7 @@
-import JSBI from 'jsbi'
 import { Interface } from '@ethersproject/abi'
 import { Currency, CurrencyAmount, Percent, TradeType, validateAndParseAddress } from '@uniswap/sdk-core'
-import invariant from 'tiny-invariant'
 import { abi } from '@uniswap/swap-router-contracts/artifacts/contracts/interfaces/ISwapRouter02.sol/ISwapRouter02.json'
+import { Trade as V2Trade } from '@uniswap/v2-sdk'
 import {
   encodeRouteToPath,
   FeeOptions,
@@ -11,15 +10,16 @@ import {
   PermitOptions,
   SelfPermit,
   toHex,
+  Trade as V3Trade,
 } from '@uniswap/v3-sdk'
-import { Trade as V2Trade } from '@uniswap/v2-sdk'
-import { Trade as V3Trade } from '@uniswap/v3-sdk'
+import JSBI from 'jsbi'
+import invariant from 'tiny-invariant'
 import { ADDRESS_THIS, MSG_SENDER } from './constants'
-import { Validation, MulticallExtended } from './multicallExtended'
-import { PaymentsExtended } from './paymentsExtended'
-import { Trade } from './entities/trade'
 import { Protocol } from './entities/protocol'
 import { RouteV2, RouteV3 } from './entities/route'
+import { Trade } from './entities/trade'
+import { MulticallExtended, Validation } from './multicallExtended'
+import { PaymentsExtended } from './paymentsExtended'
 
 const ZERO = JSBI.BigInt(0)
 
@@ -75,9 +75,9 @@ export abstract class SwapRouter {
     const path = trade.route.path.map((token) => token.address)
     const recipient = routerMustCustody
       ? ADDRESS_THIS
-      : options.recipient
-      ? validateAndParseAddress(options.recipient)
-      : MSG_SENDER
+      : typeof options.recipient === 'undefined'
+      ? MSG_SENDER
+      : validateAndParseAddress(options.recipient)
 
     if (trade.tradeType === TradeType.EXACT_INPUT) {
       const exactInputParams = [
@@ -87,6 +87,7 @@ export abstract class SwapRouter {
         routerMustCustody ? 0 : amountOut,
         path,
         recipient,
+        false,
       ]
 
       return SwapRouter.INTERFACE.encodeFunctionData('swapExactTokensForTokens', exactInputParams)
@@ -113,9 +114,9 @@ export abstract class SwapRouter {
 
       const recipient = routerMustCustody
         ? ADDRESS_THIS
-        : options.recipient
-        ? validateAndParseAddress(options.recipient)
-        : MSG_SENDER
+        : typeof options.recipient === 'undefined'
+        ? MSG_SENDER
+        : validateAndParseAddress(options.recipient)
 
       if (singleHop) {
         if (trade.tradeType === TradeType.EXACT_INPUT) {
@@ -127,6 +128,7 @@ export abstract class SwapRouter {
             amountIn,
             amountOutMinimum: amountOut,
             sqrtPriceLimitX96: 0,
+            hasAlreadyPaid: false,
           }
 
           calldatas.push(SwapRouter.INTERFACE.encodeFunctionData('exactInputSingle', [exactInputSingleParams]))
@@ -152,6 +154,7 @@ export abstract class SwapRouter {
             recipient,
             amountIn,
             amountOutMinimum: amountOut,
+            hasAlreadyPaid: false,
           }
 
           calldatas.push(SwapRouter.INTERFACE.encodeFunctionData('exactInput', [exactInputParams]))
@@ -216,6 +219,7 @@ export abstract class SwapRouter {
 
       trades = v2Andv3Trades
     }
+
     if (!Array.isArray(trades)) {
       trades = [trades]
     }
