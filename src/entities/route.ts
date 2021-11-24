@@ -9,6 +9,8 @@ export interface IRoute<TInput extends Currency, TOutput extends Currency, TPool
   pools: TPool[]
   path: Token[]
   midPrice: Price<TInput, TOutput>
+  input: TInput
+  output: TOutput
 }
 
 // V2 route wrapper

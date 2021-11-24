@@ -1,9 +1,10 @@
 import { Currency, CurrencyAmount, Fraction, Percent, Price, TradeType } from '@uniswap/sdk-core'
-import { IRoute, RouteV2, RouteV3 } from './route'
-import { Route as V2RouteSDK, Trade as V2TradeSDK, Pair } from '@uniswap/v2-sdk'
-import { Route as V3RouteSDK, Trade as V3TradeSDK, Pool } from '@uniswap/v3-sdk'
-import { ZERO, ONE } from '../constants'
+import { Pair, Route as V2RouteSDK, Trade as V2TradeSDK } from '@uniswap/v2-sdk'
+import { Pool, Route as V3RouteSDK, Trade as V3TradeSDK } from '@uniswap/v3-sdk'
 import invariant from 'tiny-invariant'
+import { ONE, ZERO } from '../constants'
+import { Protocol } from './protocol'
+import { IRoute, RouteV2, RouteV3 } from './route'
 
 export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType extends TradeType> {
   public readonly routes: IRoute<TInput, TOutput, Pair | Pool>[]
@@ -61,8 +62,34 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
         outputAmount,
       })
     }
-
     this.tradeType = tradeType
+
+    // each route must have the same input and output currency
+    const inputCurrency = this.swaps[0].inputAmount.currency
+    const outputCurrency = this.swaps[0].outputAmount.currency
+    invariant(
+      this.swaps.every(({ route }) => inputCurrency.wrapped.equals(route.input.wrapped)),
+      'INPUT_CURRENCY_MATCH'
+    )
+    invariant(
+      this.swaps.every(({ route }) => outputCurrency.wrapped.equals(route.output.wrapped)),
+      'OUTPUT_CURRENCY_MATCH'
+    )
+
+    // pools must be unique inter protocols
+    const numPools = this.swaps.map(({ route }) => route.pools.length).reduce((total, cur) => total + cur, 0)
+    const poolAddressSet = new Set<string>()
+    for (const { route } of this.swaps) {
+      for (const pool of route.pools) {
+        if (route.protocol == Protocol.V3) {
+          poolAddressSet.add(Pool.getAddress(pool.token0, pool.token1, (pool as Pool).fee))
+        } else {
+          const pair = pool
+          poolAddressSet.add(Pair.getAddress(pair.token0, pair.token1))
+        }
+      }
+    }
+    invariant(numPools == poolAddressSet.size, 'POOLS_DUPLICATED')
   }
 
   public get inputAmount(): CurrencyAmount<TInput> {
