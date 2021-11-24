@@ -12,7 +12,6 @@ import {
   toHex,
   Trade as V3Trade,
 } from '@uniswap/v3-sdk'
-import JSBI from 'jsbi'
 import invariant from 'tiny-invariant'
 import { ADDRESS_THIS, MSG_SENDER } from './constants'
 import { Protocol } from './entities/protocol'
@@ -20,8 +19,6 @@ import { RouteV2, RouteV3 } from './entities/route'
 import { Trade } from './entities/trade'
 import { MulticallExtended, Validation } from './multicallExtended'
 import { PaymentsExtended } from './paymentsExtended'
-
-const ZERO = JSBI.BigInt(0)
 
 /**
  * Options for producing the arguments to send calls to the router.
@@ -67,7 +64,8 @@ export abstract class SwapRouter {
   private static encodeV2Swap(
     trade: V2Trade<Currency, Currency, TradeType>,
     options: SwapOptions,
-    routerMustCustody: boolean
+    routerMustCustody: boolean,
+    performAggregatedSlippageCheck: boolean
   ): string {
     const amountIn: string = toHex(trade.maximumAmountIn(options.slippageTolerance).quotient)
     const amountOut: string = toHex(trade.minimumAmountOut(options.slippageTolerance).quotient)
@@ -80,15 +78,7 @@ export abstract class SwapRouter {
       : validateAndParseAddress(options.recipient)
 
     if (trade.tradeType === TradeType.EXACT_INPUT) {
-      const exactInputParams = [
-        amountIn,
-        // save gas by only passing slippage check if we can't check it later
-        // not a pure win, as sometimes this will cost us more when it would have caused an earlier failure
-        routerMustCustody ? 0 : amountOut,
-        path,
-        recipient,
-        false,
-      ]
+      const exactInputParams = [amountIn, performAggregatedSlippageCheck ? 0 : amountOut, path, recipient]
 
       return SwapRouter.INTERFACE.encodeFunctionData('swapExactTokensForTokens', exactInputParams)
     } else {
@@ -101,7 +91,8 @@ export abstract class SwapRouter {
   private static encodeV3Swap(
     trade: V3Trade<Currency, Currency, TradeType>,
     options: SwapOptions,
-    routerMustCustody: boolean
+    routerMustCustody: boolean,
+    performAggregatedSlippageCheck: boolean
   ): string[] {
     const calldatas: string[] = []
 
@@ -126,9 +117,8 @@ export abstract class SwapRouter {
             fee: route.pools[0].fee,
             recipient,
             amountIn,
-            amountOutMinimum: amountOut,
+            amountOutMinimum: performAggregatedSlippageCheck ? 0 : amountOut,
             sqrtPriceLimitX96: 0,
-            hasAlreadyPaid: false,
           }
 
           calldatas.push(SwapRouter.INTERFACE.encodeFunctionData('exactInputSingle', [exactInputSingleParams]))
@@ -153,8 +143,7 @@ export abstract class SwapRouter {
             path,
             recipient,
             amountIn,
-            amountOutMinimum: amountOut,
-            hasAlreadyPaid: false,
+            amountOutMinimum: performAggregatedSlippageCheck ? 0 : amountOut,
           }
 
           calldatas.push(SwapRouter.INTERFACE.encodeFunctionData('exactInput', [exactInputParams]))
@@ -224,6 +213,11 @@ export abstract class SwapRouter {
       trades = [trades]
     }
 
+    const numberOfTrades = trades.reduce(
+      (numberOfTrades, trade) => numberOfTrades + (trade instanceof V3Trade ? trade.swaps.length : 1),
+      0
+    )
+
     const sampleTrade = trades[0]
 
     // All trades should have the same starting/ending currency and trade type
@@ -256,13 +250,16 @@ export abstract class SwapRouter {
     // flag for whether a refund needs to happen
     //   1. when paying in ETH, but with an uncertain input amount
     const mustRefund = inputIsNative && sampleTrade.tradeType === TradeType.EXACT_OUTPUT
+    // flag for whether we want to perform an aggregated slippage check
+    //   1. when there are >2 exact input trades. this is only a heuristic,
+    //      as it's still more gas-expensive even in this case, but has benefits
+    //      in that the reversion probability is lower
+    const performAggregatedSlippageCheck = sampleTrade.tradeType === TradeType.EXACT_INPUT && numberOfTrades > 2
     // flag for whether funds should be send first to the router
     //   1. when receiving ETH (which much be unwrapped from WETH)
     //   2. when a fee on the output is being taken
-    //   3. when there are >1 exact input trades. this one isn't strictly necessary,
-    //      but typically we want to perform an aggregated slippage check
-    const routerMustCustody =
-      outputIsNative || !!options.fee || (trades.length > 1 && sampleTrade.tradeType === TradeType.EXACT_INPUT)
+    //   3. when performing an aggregated slippage check
+    const routerMustCustody = outputIsNative || !!options.fee || performAggregatedSlippageCheck
 
     const totalValue: CurrencyAmount<Currency> = inputIsNative
       ? trades.reduce((sum, trade) => sum.add(trade.maximumAmountIn(options.slippageTolerance)), ZERO_IN)
@@ -276,27 +273,28 @@ export abstract class SwapRouter {
 
     for (const trade of trades) {
       if (trade instanceof V2Trade) {
-        calldatas.push(SwapRouter.encodeV2Swap(trade, options, routerMustCustody))
+        calldatas.push(SwapRouter.encodeV2Swap(trade, options, routerMustCustody, performAggregatedSlippageCheck))
       } else {
-        for (const calldata of SwapRouter.encodeV3Swap(trade, options, routerMustCustody)) {
+        for (const calldata of SwapRouter.encodeV3Swap(
+          trade,
+          options,
+          routerMustCustody,
+          performAggregatedSlippageCheck
+        )) {
           calldatas.push(calldata)
         }
       }
     }
 
-    // unwrap
+    // unwrap or sweep
     if (routerMustCustody) {
-      // if all trades are exact output, we can save gas by not passing a slippage check
-      const canOmitSlippageCheck = sampleTrade.tradeType === TradeType.EXACT_OUTPUT
-      const amountNecessary = canOmitSlippageCheck ? ZERO : totalAmountOut.quotient
-
       if (outputIsNative) {
-        calldatas.push(PaymentsExtended.encodeUnwrapWETH9(amountNecessary, options.recipient, options.fee))
+        calldatas.push(PaymentsExtended.encodeUnwrapWETH9(totalAmountOut.quotient, options.recipient, options.fee))
       } else {
         calldatas.push(
           PaymentsExtended.encodeSweepToken(
             sampleTrade.outputAmount.currency.wrapped,
-            amountNecessary,
+            totalAmountOut.quotient,
             options.recipient,
             options.fee
           )
