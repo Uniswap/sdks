@@ -1582,10 +1582,10 @@
     tiny-invariant "^1.1.0"
     toformat "^2.0.0"
 
-"@uniswap/swap-router-contracts@^1.0.0-beta.5":
-  version "1.0.0-beta.5"
-  resolved "https://registry.yarnpkg.com/@uniswap/swap-router-contracts/-/swap-router-contracts-1.0.0-beta.5.tgz#ec5848b568dee38aed09f7c5a2184c9b3407e7a0"
-  integrity sha512-AogRSg8iFzDZzygbMNdRpO0yesuhiI/mMCVpRrPGlDRFxejnoa0BLD7dGFqTHis9nInenpvInE1YKaadCWsQ7g==
+"@uniswap/swap-router-contracts@1.0.0":
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/@uniswap/swap-router-contracts/-/swap-router-contracts-1.0.0.tgz#357a5b681fa5d5a5b1629271b99845c96932d4fa"
+  integrity sha512-EOO94glkJ4KI38IVklmMJkZzQLSY2MCNndYBPWlu64g3DkYJ/d04rbiHTEh7zYwT4gvGW8InQpmQA7mzmGIANw==
   dependencies:
     "@openzeppelin/contracts" "3.4.1-solc-0.7-2"
     "@uniswap/v2-core" "1.0.1"
