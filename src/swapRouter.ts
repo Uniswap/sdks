@@ -3,11 +3,9 @@ import { Currency, CurrencyAmount, Percent, TradeType, validateAndParseAddress, 
 import { abi } from '@uniswap/swap-router-contracts/artifacts/contracts/interfaces/ISwapRouter02.sol/ISwapRouter02.json'
 import { Trade as V2Trade } from '@uniswap/v2-sdk'
 import {
-  AddLiquidityOptions,
   encodeRouteToPath,
   FeeOptions,
   MethodParameters,
-  NonfungiblePositionManager,
   Payments,
   PermitOptions,
   Position,
@@ -18,7 +16,7 @@ import {
 import invariant from 'tiny-invariant'
 import JSBI from 'jsbi'
 import { ADDRESS_THIS, MSG_SENDER } from './constants'
-import { ApproveAndCall, ApprovalTypes } from './approveAndCall'
+import { ApproveAndCall, ApprovalTypes, CondensedAddLiquidityOptions } from './approveAndCall'
 import { Trade } from './entities/trade'
 import { Protocol } from './entities/protocol'
 import { RouteV2, RouteV3 } from './entities/route'
@@ -55,6 +53,13 @@ export interface SwapOptions {
    * Optional information for taking a fee on output.
    */
   fee?: FeeOptions
+}
+
+export interface SwapAndAddOptions extends SwapOptions {
+  /**
+   * The optional permit parameters for pulling in remaining output token.
+   */
+  outputTokenPermit?: PermitOptions
 }
 
 /**
@@ -185,7 +190,8 @@ export abstract class SwapRouter {
     inputIsNative: boolean
     outputIsNative: boolean
     totalAmountIn: CurrencyAmount<Currency>
-    totalAmountOut: CurrencyAmount<Currency>
+    minimumAmountOut: CurrencyAmount<Currency>
+    quoteAmountOut: CurrencyAmount<Currency>
   } {
     // If dealing with an instance of the aggregated Trade object, unbundle it to individual V2Trade and V3Trade objects.
     if (trades instanceof Trade) {
@@ -285,8 +291,13 @@ export abstract class SwapRouter {
     const ZERO_IN: CurrencyAmount<Currency> = CurrencyAmount.fromRawAmount(sampleTrade.inputAmount.currency, 0)
     const ZERO_OUT: CurrencyAmount<Currency> = CurrencyAmount.fromRawAmount(sampleTrade.outputAmount.currency, 0)
 
-    const totalAmountOut: CurrencyAmount<Currency> = trades.reduce(
+    const minimumAmountOut: CurrencyAmount<Currency> = trades.reduce(
       (sum, trade) => sum.add(trade.minimumAmountOut(options.slippageTolerance)),
+      ZERO_OUT
+    )
+
+    const quoteAmountOut: CurrencyAmount<Currency> = trades.reduce(
+      (sum, trade) => sum.add(trade.outputAmount),
       ZERO_OUT
     )
 
@@ -295,7 +306,16 @@ export abstract class SwapRouter {
       ZERO_IN
     )
 
-    return { calldatas, sampleTrade, routerMustCustody, inputIsNative, outputIsNative, totalAmountIn, totalAmountOut }
+    return {
+      calldatas,
+      sampleTrade,
+      routerMustCustody,
+      inputIsNative,
+      outputIsNative,
+      totalAmountIn,
+      minimumAmountOut,
+      quoteAmountOut,
+    }
   }
 
   /**
@@ -311,18 +331,25 @@ export abstract class SwapRouter {
       | (V2Trade<Currency, Currency, TradeType> | V3Trade<Currency, Currency, TradeType>)[],
     options: SwapOptions
   ): MethodParameters {
-    const { calldatas, sampleTrade, routerMustCustody, inputIsNative, outputIsNative, totalAmountIn, totalAmountOut } =
-      SwapRouter.encodeSwaps(trades, options)
+    const {
+      calldatas,
+      sampleTrade,
+      routerMustCustody,
+      inputIsNative,
+      outputIsNative,
+      totalAmountIn,
+      minimumAmountOut,
+    } = SwapRouter.encodeSwaps(trades, options)
 
     // unwrap or sweep
     if (routerMustCustody) {
       if (outputIsNative) {
-        calldatas.push(PaymentsExtended.encodeUnwrapWETH9(totalAmountOut.quotient, options.recipient, options.fee))
+        calldatas.push(PaymentsExtended.encodeUnwrapWETH9(minimumAmountOut.quotient, options.recipient, options.fee))
       } else {
         calldatas.push(
           PaymentsExtended.encodeSweepToken(
             sampleTrade.outputAmount.currency.wrapped,
-            totalAmountOut.quotient,
+            minimumAmountOut.quotient,
             options.recipient,
             options.fee
           )
@@ -352,9 +379,9 @@ export abstract class SwapRouter {
       | V2Trade<Currency, Currency, TradeType>
       | V3Trade<Currency, Currency, TradeType>
       | (V2Trade<Currency, Currency, TradeType> | V3Trade<Currency, Currency, TradeType>)[],
-    options: SwapOptions,
+    options: SwapAndAddOptions,
     position: Position,
-    addLiquidityOptions: AddLiquidityOptions,
+    addLiquidityOptions: CondensedAddLiquidityOptions,
     tokenInApprovalType: ApprovalTypes,
     tokenOutApprovalType: ApprovalTypes
   ): MethodParameters {
@@ -364,8 +391,14 @@ export abstract class SwapRouter {
       outputIsNative,
       sampleTrade,
       totalAmountIn: totalAmountSwapped,
-      totalAmountOut,
+      quoteAmountOut,
     } = SwapRouter.encodeSwaps(trades, options, true)
+
+    // encode output token permit if necessary
+    if (options.outputTokenPermit) {
+      invariant(quoteAmountOut.currency.isToken, 'NON_TOKEN_PERMIT_OUTPUT')
+      calldatas.push(SelfPermit.encodePermit(quoteAmountOut.currency, options.outputTokenPermit))
+    }
 
     const chainId = sampleTrade.route.chainId
     const zeroForOne = position.pool.token0 === totalAmountSwapped.currency.wrapped
@@ -376,7 +409,7 @@ export abstract class SwapRouter {
     const tokenOut = outputIsNative ? WETH9[chainId] : positionAmountOut.currency.wrapped
 
     // if swap output does not make up whole outputTokenBalanceDesired, pull in remaining tokens for adding liquidity
-    const amountOutRemaining = positionAmountOut.subtract(totalAmountOut.wrapped)
+    const amountOutRemaining = positionAmountOut.subtract(quoteAmountOut.wrapped)
     if (amountOutRemaining.greaterThan(CurrencyAmount.fromRawAmount(positionAmountOut.currency, 0))) {
       // if output is native, this means the remaining portion is included as native value in the transaction
       // and must be wrapped. Otherwise, pull in remaining ERC20 token.
@@ -397,11 +430,7 @@ export abstract class SwapRouter {
       calldatas.push(ApproveAndCall.encodeApprove(tokenOut, tokenOutApprovalType))
 
     // encode NFTManager add liquidity
-    calldatas.push(
-      ApproveAndCall.encodeCallPositionManager([
-        NonfungiblePositionManager.addCallParameters(position, addLiquidityOptions).calldata,
-      ])
-    )
+    calldatas.push(ApproveAndCall.encodeAddLiquidity(position, addLiquidityOptions, options.slippageTolerance))
 
     // sweep remaining tokens
     inputIsNative
