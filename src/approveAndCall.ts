@@ -9,6 +9,7 @@ import {
   Position,
   toHex,
 } from '@uniswap/v3-sdk'
+import JSBI from 'jsbi'
 
 // condensed version of v3-sdk AddLiquidityOptions containing only necessary swap + add attributes
 export type CondensedAddLiquidityOptions = Omit<MintSpecificOptions, 'createPool'> | IncreaseSpecificOptions
@@ -60,13 +61,30 @@ export abstract class ApproveAndCall {
       return ApproveAndCall.INTERFACE.encodeFunctionData('callPositionManager', [encodedMulticall])
     }
   }
-
+  /**
+   * Encode adding liquidity to a position in the nft manager contract
+   * @param position Forcasted position with expected amount out from swap
+   * @param minimalPosition Forcasted position with custom minimal token amounts
+   * @param addLiquidityOptions Options for adding liquidity
+   * @param slippageTolerance Defines maximum slippage
+   */
   public static encodeAddLiquidity(
     position: Position,
+    minimalPosition: Position,
     addLiquidityOptions: CondensedAddLiquidityOptions,
     slippageTolerance: Percent
   ): string {
-    const { amount0: amount0Min, amount1: amount1Min } = position.mintAmountsWithSlippage(slippageTolerance)
+    let { amount0: amount0Min, amount1: amount1Min } = position.mintAmountsWithSlippage(slippageTolerance)
+
+    // position.mintAmountsWithSlippage() can create amounts not dependenable in scenarios
+    // such as range orders. Allow the option to provide a position with custom minimum amounts
+    // for these scenarios
+    if (JSBI.lessThan(minimalPosition.amount0.quotient, amount0Min)) {
+      amount0Min = minimalPosition.amount0.quotient
+    }
+    if (JSBI.lessThan(minimalPosition.amount1.quotient, amount1Min)) {
+      amount1Min = minimalPosition.amount1.quotient
+    }
 
     if (isMint(addLiquidityOptions)) {
       return ApproveAndCall.INTERFACE.encodeFunctionData('mint', [
