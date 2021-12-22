@@ -392,6 +392,7 @@ export abstract class SwapRouter {
       sampleTrade,
       totalAmountIn: totalAmountSwapped,
       quoteAmountOut,
+      minimumAmountOut,
     } = SwapRouter.encodeSwaps(trades, options, true)
 
     // encode output token permit if necessary
@@ -429,8 +430,21 @@ export abstract class SwapRouter {
     if (tokenOutApprovalType !== ApprovalTypes.NOT_REQUIRED)
       calldatas.push(ApproveAndCall.encodeApprove(tokenOut, tokenOutApprovalType))
 
+    // represents a position with token amounts resulting from a swap with maximum slippage
+    // hence the minimal amount out possible.
+    const minimalPosition = Position.fromAmounts({
+      pool: position.pool,
+      tickLower: position.tickLower,
+      tickUpper: position.tickUpper,
+      amount0: zeroForOne ? position.amount0.quotient.toString() : minimumAmountOut.quotient.toString(),
+      amount1: zeroForOne ? minimumAmountOut.quotient.toString() : position.amount1.quotient.toString(),
+      useFullPrecision: false,
+    })
+
     // encode NFTManager add liquidity
-    calldatas.push(ApproveAndCall.encodeAddLiquidity(position, addLiquidityOptions, options.slippageTolerance))
+    calldatas.push(
+      ApproveAndCall.encodeAddLiquidity(position, minimalPosition, addLiquidityOptions, options.slippageTolerance)
+    )
 
     // sweep remaining tokens
     inputIsNative
