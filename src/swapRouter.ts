@@ -402,7 +402,7 @@ export abstract class SwapRouter {
     }
 
     const chainId = sampleTrade.route.chainId
-    const zeroForOne = position.pool.token0 === totalAmountSwapped.currency.wrapped
+    const zeroForOne = position.pool.token0.wrapped.address === totalAmountSwapped.currency.wrapped.address
     const { positionAmountIn, positionAmountOut } = SwapRouter.getPositionAmounts(position, zeroForOne)
 
     // if tokens are native they will be converted to WETH9
