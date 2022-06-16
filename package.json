@@ -30,7 +30,7 @@
     "@uniswap/sdk-core": "^3.0.1",
     "@uniswap/swap-router-contracts": "1.1.0",
     "@uniswap/v2-sdk": "^3.0.1",
-    "@uniswap/v3-sdk": "^3.7.1"
+    "@uniswap/v3-sdk": "^3.8.3"
   },
   "devDependencies": {
     "@types/jest": "^24.0.25",
