@@ -1,6 +1,6 @@
 {
   "name": "@uniswap/router-sdk",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "An sdk for routing swaps using Uniswap v2 and Uniswap v3.",
   "publishConfig": {
     "access": "public"
