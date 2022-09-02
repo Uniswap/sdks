@@ -12,16 +12,16 @@ import type {
   PopulatedTransaction,
   Signer,
   utils,
-} from "ethers";
-import type { FunctionFragment, Result } from "@ethersproject/abi";
-import type { Listener, Provider } from "@ethersproject/providers";
+} from 'ethers';
+import type { FunctionFragment, Result } from '@ethersproject/abi';
+import type { Listener, Provider } from '@ethersproject/providers';
 import type {
   TypedEventFilter,
   TypedEvent,
   TypedListener,
   OnEvent,
   PromiseOrValue,
-} from "./common";
+} from './common';
 
 export type TokenDetailsStruct = {
   tokenType: PromiseOrValue<BigNumberish>;
@@ -70,34 +70,34 @@ export type SignatureStructOutput = [number, string, string] & {
 
 export interface PermitPostInterface extends utils.Interface {
   functions: {
-    "_PERMIT_TYPEHASH()": FunctionFragment;
-    "_TOKEN_DETAILS_TYPEHASH()": FunctionFragment;
-    "nonceTransferFrom(((uint8,address,uint256,uint256)[],address,uint256,bytes32),address,address[],uint256[],uint256[],(uint8,bytes32,bytes32))": FunctionFragment;
-    "nonces(address)": FunctionFragment;
-    "saltTransferFrom(((uint8,address,uint256,uint256)[],address,uint256,bytes32),address,address[],uint256[],uint256[],bytes32,(uint8,bytes32,bytes32))": FunctionFragment;
-    "usedSalt(address,bytes32)": FunctionFragment;
+    '_PERMIT_TYPEHASH()': FunctionFragment;
+    '_TOKEN_DETAILS_TYPEHASH()': FunctionFragment;
+    'nonceTransferFrom(((uint8,address,uint256,uint256)[],address,uint256,bytes32),address,address[],uint256[],uint256[],(uint8,bytes32,bytes32))': FunctionFragment;
+    'nonces(address)': FunctionFragment;
+    'saltTransferFrom(((uint8,address,uint256,uint256)[],address,uint256,bytes32),address,address[],uint256[],uint256[],bytes32,(uint8,bytes32,bytes32))': FunctionFragment;
+    'usedSalt(address,bytes32)': FunctionFragment;
   };
 
   getFunction(
     nameOrSignatureOrTopic:
-      | "_PERMIT_TYPEHASH"
-      | "_TOKEN_DETAILS_TYPEHASH"
-      | "nonceTransferFrom"
-      | "nonces"
-      | "saltTransferFrom"
-      | "usedSalt"
+      | '_PERMIT_TYPEHASH'
+      | '_TOKEN_DETAILS_TYPEHASH'
+      | 'nonceTransferFrom'
+      | 'nonces'
+      | 'saltTransferFrom'
+      | 'usedSalt'
   ): FunctionFragment;
 
   encodeFunctionData(
-    functionFragment: "_PERMIT_TYPEHASH",
+    functionFragment: '_PERMIT_TYPEHASH',
     values?: undefined
   ): string;
   encodeFunctionData(
-    functionFragment: "_TOKEN_DETAILS_TYPEHASH",
+    functionFragment: '_TOKEN_DETAILS_TYPEHASH',
     values?: undefined
   ): string;
   encodeFunctionData(
-    functionFragment: "nonceTransferFrom",
+    functionFragment: 'nonceTransferFrom',
     values: [
       PermitStruct,
       PromiseOrValue<string>,
@@ -108,11 +108,11 @@ export interface PermitPostInterface extends utils.Interface {
     ]
   ): string;
   encodeFunctionData(
-    functionFragment: "nonces",
+    functionFragment: 'nonces',
     values: [PromiseOrValue<string>]
   ): string;
   encodeFunctionData(
-    functionFragment: "saltTransferFrom",
+    functionFragment: 'saltTransferFrom',
     values: [
       PermitStruct,
       PromiseOrValue<string>,
@@ -124,28 +124,28 @@ export interface PermitPostInterface extends utils.Interface {
     ]
   ): string;
   encodeFunctionData(
-    functionFragment: "usedSalt",
+    functionFragment: 'usedSalt',
     values: [PromiseOrValue<string>, PromiseOrValue<BytesLike>]
   ): string;
 
   decodeFunctionResult(
-    functionFragment: "_PERMIT_TYPEHASH",
+    functionFragment: '_PERMIT_TYPEHASH',
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "_TOKEN_DETAILS_TYPEHASH",
+    functionFragment: '_TOKEN_DETAILS_TYPEHASH',
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "nonceTransferFrom",
+    functionFragment: 'nonceTransferFrom',
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "nonces", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: 'nonces', data: BytesLike): Result;
   decodeFunctionResult(
-    functionFragment: "saltTransferFrom",
+    functionFragment: 'saltTransferFrom',
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "usedSalt", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: 'usedSalt', data: BytesLike): Result;
 
   events: {};
 }
