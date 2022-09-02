@@ -1,4 +1,5 @@
-import { ethers, TypedDataDomain, TypedDataField, BigNumber } from 'ethers';
+import { BigNumber, ethers, TypedDataDomain, TypedDataField } from 'ethers';
+
 import { PERMIT_POST_MAPPING } from '../constants';
 
 const DOMAIN_NAME = 'PermitPost';
@@ -11,25 +12,25 @@ export enum TokenType {
   ERC1155,
 }
 
-interface TokenDetails {
-  tokenType: TokenType,
-  token: string;
-  maxAmount: BigNumber;
-  id: BigNumber;
-}
+type TokenDetails = {
+  readonly tokenType: TokenType;
+  readonly token: string;
+  readonly maxAmount: BigNumber;
+  readonly id: BigNumber;
+};
 
-interface PermitInfo {
-  tokens: TokenDetails[];
-  spender: string;
-  deadline: number;
-  witness: string;
-  nonce: number;
-}
+type PermitInfo = {
+  readonly tokens: readonly TokenDetails[];
+  readonly spender: string;
+  readonly deadline: number;
+  readonly witness: string;
+  readonly nonce: BigNumber;
+};
 
 export class PermitPost {
-  private permitPostAddress: string;
+  private readonly permitPostAddress: string;
 
-  constructor(private chainId: number, address?: string) {
+  constructor(private readonly chainId: number, address?: string) {
     if (address) {
       this.permitPostAddress = address;
     } else if (PERMIT_POST_MAPPING[chainId]) {
@@ -53,23 +54,22 @@ export class PermitPost {
     };
   }
 
-  get types(): Record<string, Array<TypedDataField>> {
+  get types(): Record<string, TypedDataField[]> {
     return {
       Permit: [
-        { name: 'sigType', type: 'uint8', },
-        { name: 'tokens', type: 'TokenDetails[]', },
-        { name: 'spender', type: 'address', },
-        { name: 'deadline', type: 'uint256', },
-        { name: 'witness', type: 'bytes32', },
-        { name: 'nonce', type: 'uint256', }
+        { name: 'sigType', type: 'uint8' },
+        { name: 'tokens', type: 'TokenDetails[]' },
+        { name: 'spender', type: 'address' },
+        { name: 'deadline', type: 'uint256' },
+        { name: 'witness', type: 'bytes32' },
+        { name: 'nonce', type: 'uint256' },
       ],
       TokenDetails: [
-        { name: 'tokenType', type: 'uint8', },
-        { name: 'token', type: 'address', },
-        { name: 'maxAmount', type: 'uint256', },
-        { name: 'id', type: 'uint256', },
+        { name: 'tokenType', type: 'uint8' },
+        { name: 'token', type: 'address' },
+        { name: 'maxAmount', type: 'uint256' },
+        { name: 'id', type: 'uint256' },
       ],
     };
   }
 }
-
