@@ -4,7 +4,7 @@ import { BigNumber, ethers } from 'ethers';
 
 import { PermitPost, TokenType } from '../utils';
 
-import { IOrder, OrderInfo, TokenAmount } from '.';
+import { IOrder, OrderInfo, OrderValidation, TokenAmount } from '.';
 
 export type DutchOutput = {
   readonly token: Token;
@@ -74,6 +74,17 @@ export class DutchLimitOrder implements IOrder {
       },
       chainId
     );
+  }
+
+  /**
+   * @inheritdoc IOrder
+   */
+  validate(): OrderValidation {
+    if (this.info.deadline < new Date().getTime() / 1000) {
+      return OrderValidation.Expired;
+    }
+
+    return OrderValidation.OK;
   }
 
   /**

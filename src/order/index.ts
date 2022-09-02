@@ -3,15 +3,28 @@ import { Token } from '@uniswap/sdk-core';
 import { BigNumber } from 'ethers';
 
 import { OrderType, REVERSE_REACTOR_MAPPING } from '../constants';
+import { MissingConfiguration } from '../errors';
 import { stripHexPrefix } from '../utils';
 
 import { DutchLimitOrder } from './dutchLimit';
 
 export * from './dutchLimit';
 
+export enum OrderValidation {
+  Expired,
+  OK,
+}
+
 export type IOrder = {
   // TODO: maybe add generic types for more order-type specific info
   info: OrderInfo;
+
+  /**
+   * Validates the order parameters
+   * Note that this doesn't validate any on-chain properties of the order, i.e.
+   * the offerer's token balance or nonce reuse
+   */
+  validate(): OrderValidation;
 
   // TODO: maybe add generic order info getters, i.e.
   // affectedTokens, validTimes, max amounts?
@@ -64,7 +77,7 @@ export function parseOrder(order: string): IOrder {
   const reactor = '0x' + stripHexPrefix(order).slice(0, 40).toLowerCase();
 
   if (!REVERSE_REACTOR_MAPPING[reactor]) {
-    throw new Error(`Unknown reactor address: ${reactor}`);
+    throw new MissingConfiguration('reactor', 'address');
   }
 
   const { chainId, orderType } = REVERSE_REACTOR_MAPPING[reactor];
@@ -72,6 +85,6 @@ export function parseOrder(order: string): IOrder {
     case OrderType.DutchLimit:
       return DutchLimitOrder.parse(order, chainId);
     default:
-      throw new Error(`Unknown order type: ${orderType}`);
+      throw new MissingConfiguration('orderType', orderType);
   }
 }
