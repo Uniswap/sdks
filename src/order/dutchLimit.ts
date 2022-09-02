@@ -20,7 +20,15 @@ export type DutchLimitOrderInfo = OrderInfo & {
   readonly outputs: readonly DutchOutput[];
 };
 
-export class DutchLimitOrder implements IOrder<DutchLimitOrderInfo> {
+const DUTCH_LIMIT_ORDER_ABI = [
+  'tuple(address,uint256,uint256)',
+  'uint256',
+  'uint256',
+  'tuple(address,uint256)',
+  'tuple(address,uint256,uint256,address)[]',
+];
+
+export class DutchLimitOrder implements IOrder {
   private readonly permitPost: PermitPost;
 
   constructor(
@@ -30,35 +38,75 @@ export class DutchLimitOrder implements IOrder<DutchLimitOrderInfo> {
     this.permitPost = new PermitPost(chainId);
   }
 
-  serialize(): string {
+  static parse(encoded: string, chainId: number): DutchLimitOrder {
     const abiCoder = new ethers.utils.AbiCoder();
-    return abiCoder.encode(
-      [
-        'tuple(address,uint256,uint256)',
-        'uint256',
-        'uint256',
-        'tuple(address,uint256)',
-        'tuple(address,uint256,uint256,address)[]',
-      ],
-      [
-        [this.info.reactor, this.info.nonce, this.info.deadline],
-        this.info.startTime,
-        this.info.endTime,
-        [this.info.input.token, this.info.input.amount],
-        this.info.outputs.map((output) => [
-          output.token,
-          output.startAmount,
-          output.endAmount,
-          output.recipient,
-        ]),
-      ]
+    const decoded = abiCoder.decode(DUTCH_LIMIT_ORDER_ABI, encoded);
+    const [
+      [reactor, nonce, deadline],
+      startTime,
+      endTime,
+      [inputToken, inputAmount],
+      outputs,
+    ] = decoded;
+    return new DutchLimitOrder(
+      {
+        reactor,
+        nonce,
+        deadline,
+        startTime,
+        endTime,
+        input: { token: inputToken, amount: inputAmount },
+        outputs: outputs.map(
+          ([token, startAmount, endAmount, recipient]: [
+            string,
+            number,
+            number,
+            string
+          ]) => {
+            return {
+              token,
+              startAmount,
+              endAmount,
+              recipient,
+            };
+          }
+        ),
+      },
+      chainId
     );
   }
 
-  getSigner(signature: SignatureLike): string {
-    return ethers.utils.recoverPublicKey(this.digest(), signature);
+  /**
+   * @inheritdoc IOrder
+   */
+  serialize(): string {
+    const abiCoder = new ethers.utils.AbiCoder();
+    return abiCoder.encode(DUTCH_LIMIT_ORDER_ABI, [
+      [this.info.reactor, this.info.nonce, this.info.deadline],
+      this.info.startTime,
+      this.info.endTime,
+      [this.info.input.token, this.info.input.amount],
+      this.info.outputs.map((output) => [
+        output.token,
+        output.startAmount,
+        output.endAmount,
+        output.recipient,
+      ]),
+    ]);
   }
 
+  /**
+   * @inheritdoc IOrder
+   */
+  getSigner(signature: SignatureLike): string {
+    return ethers.utils.computeAddress(
+      ethers.utils.recoverPublicKey(this.digest(), signature)
+    );
+  }
+
+  /**
+   * @inheritdoc IOrder
+   */
   digest(): string {
     return this.permitPost.getPermitDigest({
       tokens: [
@@ -76,6 +124,9 @@ export class DutchLimitOrder implements IOrder<DutchLimitOrderInfo> {
     });
   }
 
+  /**
+   * @inheritdoc IOrder
+   */
   hash(): string {
     return ethers.utils.keccak256(this.serialize());
   }
