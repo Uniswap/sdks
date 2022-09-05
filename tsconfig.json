@@ -1,47 +1,35 @@
 {
+  // see https://www.typescriptlang.org/tsconfig to better understand tsconfigs
+  "include": ["src", "types"],
   "compilerOptions": {
-    "incremental": true,
-    "target": "es2017",
-    "outDir": "build/main",
-    "rootDir": "src",
-    "moduleResolution": "node",
-    "module": "commonjs",
+    "module": "esnext",
+    "lib": ["dom", "esnext"],
+    "importHelpers": true,
+    // output .d.ts declaration files for consumers
     "declaration": true,
-    "inlineSourceMap": true,
-    "esModuleInterop": true /* Enables emit interoperability between CommonJS and ES Modules via creation of namespace objects for all imports. Implies 'allowSyntheticDefaultImports'. */,
-    "resolveJsonModule": true /* Include modules imported with .json extension. */,
-
-    "strict": true /* Enable all strict type-checking options. */,
-
-    /* Strict Type-Checking Options */
-    // "noImplicitAny": true /* Raise error on expressions and declarations with an implied 'any' type. */,
-    // "strictNullChecks": true /* Enable strict null checks. */,
-    // "strictFunctionTypes": true /* Enable strict checking of function types. */,
-    // "strictPropertyInitialization": true /* Enable strict checking of property initialization in classes. */,
-    // "noImplicitThis": true /* Raise error on 'this' expressions with an implied 'any' type. */,
-    // "alwaysStrict": true /* Parse in strict mode and emit "use strict" for each source file. */,
-
-    /* Additional Checks */
-    "noUnusedLocals": true /* Report errors on unused locals. */,
-    "noUnusedParameters": true /* Report errors on unused parameters. */,
-    "noImplicitReturns": true /* Report error when not all code paths in function return a value. */,
-    "noFallthroughCasesInSwitch": true /* Report errors for fallthrough cases in switch statement. */,
-
-    /* Debugging Options */
-    "traceResolution": false /* Report module resolution log messages. */,
-    "listEmittedFiles": false /* Print names of generated files part of the compilation. */,
-    "listFiles": false /* Print names of files part of the compilation. */,
-    "pretty": true /* Stylize errors and messages using color and context. */,
-
-    /* Experimental Options */
-    // "experimentalDecorators": true /* Enables experimental support for ES7 decorators. */,
-    // "emitDecoratorMetadata": true /* Enables experimental support for emitting type metadata for decorators. */,
-
-    "lib": ["es2017"],
-    "types": ["node"],
-    "typeRoots": ["node_modules/@types", "src/types"]
-  },
-  "include": ["src/**/*.ts"],
-  "exclude": ["node_modules/**"],
-  "compileOnSave": false
+    // output .js.map sourcemap files for consumers
+    "sourceMap": true,
+    // match output dir to input dir. e.g. dist/index instead of dist/src/index
+    "rootDir": "./src",
+    // stricter type-checking for stronger correctness. Recommended by TS
+    "strict": true,
+    // linter checks for common issues
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    // noUnused* overlap with @typescript-eslint/no-unused-vars, can disable if duplicative
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    // use Node's module resolution algorithm, instead of the legacy TS one
+    "moduleResolution": "node",
+    // transpile JSX to React.createElement
+    "jsx": "react",
+    // interop between ESM and CJS modules. Recommended by TS
+    "esModuleInterop": true,
+    // significant perf increase by skipping checking .d.ts files, particularly those in node_modules. Recommended by TS
+    "skipLibCheck": true,
+    // error out if import and file system have a casing mismatch. Recommended by TS
+    "forceConsistentCasingInFileNames": true,
+    // `tsdx build` ignores this option, but it is commonly used when type-checking separately with `tsc`
+    "noEmit": true,
+  }
 }
