@@ -1,6 +1,7 @@
 import { SignatureLike } from '@ethersproject/bytes';
 import { Token } from '@uniswap/sdk-core';
 import { BigNumber } from 'ethers';
+import invariant from 'tiny-invariant';
 
 import { OrderType, REVERSE_REACTOR_MAPPING } from '../constants';
 import { MissingConfiguration } from '../errors';
@@ -63,10 +64,53 @@ export type TokenAmount = {
 };
 
 export type OrderInfo = {
-  readonly reactor: string;
-  readonly nonce: BigNumber;
-  readonly deadline: number;
+  reactor: string;
+  nonce: BigNumber;
+  deadline: number;
 };
+
+/**
+ * Builder for generating orders
+ */
+export abstract class OrderBuilder {
+  protected orderInfo: Partial<OrderInfo>;
+
+  constructor() {
+    this.orderInfo = {};
+  }
+
+  deadline(deadline: number): OrderBuilder {
+    invariant(
+      deadline > new Date().getTime() / 1000,
+      `Deadline must be in the future: ${deadline}`
+    );
+    this.orderInfo.deadline = deadline;
+    return this;
+  }
+
+  nonce(nonce: BigNumber): OrderBuilder {
+    this.orderInfo.nonce = nonce;
+    return this;
+  }
+
+  protected reactor(reactor: string): OrderBuilder {
+    this.orderInfo.reactor = reactor;
+    return this;
+  }
+
+  protected getOrderInfo(): OrderInfo {
+    invariant(this.orderInfo.reactor !== undefined, 'reactor not set');
+    invariant(this.orderInfo.nonce !== undefined, 'nonce not set');
+    invariant(this.orderInfo.deadline !== undefined, 'deadline not set');
+    return {
+      reactor: this.orderInfo.reactor,
+      nonce: this.orderInfo.nonce,
+      deadline: this.orderInfo.deadline,
+    };
+  }
+
+  abstract build(): IOrder;
+}
 
 /**
  * Parses a given serialized order
@@ -74,10 +118,14 @@ export type OrderInfo = {
  */
 export function parseOrder(order: string): IOrder {
   // reactor address is always the first field in order
-  const reactor = '0x' + stripHexPrefix(order).slice(0, 40).toLowerCase();
+  const reactor =
+    '0x' +
+    stripHexPrefix(order)
+      .slice(0, 40)
+      .toLowerCase();
 
   if (!REVERSE_REACTOR_MAPPING[reactor]) {
-    throw new MissingConfiguration('reactor', 'address');
+    throw new MissingConfiguration('reactor', reactor);
   }
 
   const { chainId, orderType } = REVERSE_REACTOR_MAPPING[reactor];
