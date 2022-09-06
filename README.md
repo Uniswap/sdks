@@ -32,7 +32,7 @@ TODO: add nice builder helper
 import { DutchLimitOrder } from '@uniswap/gouda-sdk';
 
 const order = new DutchLimitOrder({
-  reactor: 0x1234,
+  reactor: '0x1234',
   nonce: 0,
   deadline: 1662160861,
   startTime: 1662150861
@@ -49,7 +49,7 @@ const order = new DutchLimitOrder({
        recipient: '0x0000000000000000000000000000000000000000',
     },
   ],
-});
+}, 1);
 
 const digestToSign = order.digest();
 const signature = <sign digestToSign with wallet>
