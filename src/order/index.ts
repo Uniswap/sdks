@@ -4,7 +4,7 @@ import invariant from 'tiny-invariant';
 
 import { OrderType, REVERSE_REACTOR_MAPPING } from '../constants';
 import { MissingConfiguration } from '../errors';
-import { stripHexPrefix, PermitInfo } from '../utils';
+import { stripHexPrefix, PermitData } from '../utils';
 
 import { DutchLimitOrder } from './dutchLimit';
 
@@ -44,17 +44,10 @@ export type IOrder = {
   getSigner(signature: SignatureLike): string;
 
   /**
-   * Returns the values of the EIP-712 permit signature
-   * @return The values of the EIP-712 permit signature
+   * Returns the data for generating the maker EIP-712 permit signature
+   * @return The data for generating the maker EIP-712 permit signature
    */
-  permitInfo(): PermitInfo;
-
-  /**
-   * Returns the message digest that is signed over for order validation and token
-   * release
-   * @return The message digest which is signed by the offerer
-   */
-  permitDigest(): string;
+  permitData(): PermitData;
 
   /**
    * Returns the order hash
