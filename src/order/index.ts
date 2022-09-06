@@ -1,11 +1,10 @@
 import { SignatureLike } from '@ethersproject/bytes';
-import { Token } from '@uniswap/sdk-core';
 import { BigNumber } from 'ethers';
 import invariant from 'tiny-invariant';
 
 import { OrderType, REVERSE_REACTOR_MAPPING } from '../constants';
 import { MissingConfiguration } from '../errors';
-import { stripHexPrefix } from '../utils';
+import { stripHexPrefix, PermitInfo } from '../utils';
 
 import { DutchLimitOrder } from './dutchLimit';
 
@@ -45,11 +44,17 @@ export type IOrder = {
   getSigner(signature: SignatureLike): string;
 
   /**
+   * Returns the values of the EIP-712 permit signature
+   * @return The values of the EIP-712 permit signature
+   */
+  permitInfo(): PermitInfo;
+
+  /**
    * Returns the message digest that is signed over for order validation and token
    * release
    * @return The message digest which is signed by the offerer
    */
-  digest(): string;
+  permitDigest(): string;
 
   /**
    * Returns the order hash
@@ -59,7 +64,7 @@ export type IOrder = {
 };
 
 export type TokenAmount = {
-  readonly token: Token;
+  readonly token: string;
   readonly amount: BigNumber;
 };
 
