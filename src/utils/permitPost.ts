@@ -33,6 +33,12 @@ export type PermitInfo = {
   readonly nonce: BigNumber;
 };
 
+export type PermitData = {
+  domain: TypedDataDomain;
+  types: Record<string, TypedDataField[]>;
+  values: PermitInfo;
+};
+
 export class PermitPost {
   private readonly permitPostAddress: string;
 
@@ -47,6 +53,14 @@ export class PermitPost {
         chainId.toString()
       );
     }
+  }
+
+  getPermitData(info: PermitInfo): PermitData {
+    return {
+      domain: this.domain,
+      types: this.types,
+      values: info,
+    };
   }
 
   getPermitDigest(info: PermitInfo): string {

@@ -4,7 +4,7 @@ import invariant from 'tiny-invariant';
 
 import { OrderType, REACTOR_ADDRESS_MAPPING } from '../constants';
 import { MissingConfiguration } from '../errors';
-import { PermitPost, PermitInfo, SigType, TokenType } from '../utils';
+import { PermitPost, PermitData, SigType, TokenType } from '../utils';
 
 import {
   IOrder,
@@ -119,15 +119,18 @@ export class DutchLimitOrder implements IOrder {
    */
   getSigner(signature: SignatureLike): string {
     return ethers.utils.computeAddress(
-      ethers.utils.recoverPublicKey(this.permitDigest(), signature)
+      ethers.utils.recoverPublicKey(
+        this.permitPost.getPermitDigest(this.permitData().values),
+        signature
+      )
     );
   }
 
   /**
    * @inheritdoc IOrder
    */
-  permitInfo(): PermitInfo {
-    return {
+  permitData(): PermitData {
+    return this.permitPost.getPermitData({
       sigType: SigType.Unordered,
       tokens: [
         {
@@ -141,14 +144,7 @@ export class DutchLimitOrder implements IOrder {
       deadline: this.info.deadline,
       witness: this.hash(),
       nonce: this.info.nonce,
-    };
-  }
-
-  /**
-   * @inheritdoc IOrder
-   */
-  permitDigest(): string {
-    return this.permitPost.getPermitDigest(this.permitInfo());
+    });
   }
 
   /**

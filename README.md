@@ -51,8 +51,8 @@ const order = new DutchLimitOrder({
   ],
 }, 1);
 
-const digestToSign = order.digest();
-const signature = <sign digestToSign with wallet>
+const { domain, types, values } = order.permitData();
+const signature = wallet._signTypedData(domain, types, values);
 
 const serializedOrder = order.serialize();
 // submit serializedOrder and signature to order pool

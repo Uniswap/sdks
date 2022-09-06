@@ -53,17 +53,12 @@ describe('DutchLimitOrder', () => {
     expect(parsed.info).toEqual(orderInfo);
   });
 
-  it('valid signature over digest', async () => {
+  it('valid signature over info', async () => {
     const order = new DutchLimitOrder(getOrderInfo({}), 1);
-    const digest = order.permitDigest();
-    // 32 bytes + 0x
-    expect(digest.length).toEqual(66);
     const wallet = ethers.Wallet.createRandom();
-    const signature = await wallet._signTypedData(
-      order.permitPost.domain,
-      order.permitPost.types,
-      order.permitInfo()
-    );
+
+    const { domain, types, values } = order.permitData();
+    const signature = await wallet._signTypedData(domain, types, values);
     expect(order.getSigner(signature)).toEqual(await wallet.getAddress());
   });
 });
