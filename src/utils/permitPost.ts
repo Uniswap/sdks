@@ -5,12 +5,16 @@ import { MissingConfiguration } from '../errors';
 
 const DOMAIN_NAME = 'PermitPost';
 const DOMAIN_VERSION = '1';
-const UNORDERED_SIG_TYPE = 0;
 
 export enum TokenType {
   ERC20,
   ERC721,
   ERC1155,
+}
+
+export enum SigType {
+  Unordered,
+  Ordered,
 }
 
 type TokenDetails = {
@@ -20,7 +24,8 @@ type TokenDetails = {
   readonly id: BigNumber;
 };
 
-type PermitInfo = {
+export type PermitInfo = {
+  readonly sigType: SigType;
   readonly tokens: readonly TokenDetails[];
   readonly spender: string;
   readonly deadline: number;
@@ -45,8 +50,7 @@ export class PermitPost {
   }
 
   getPermitDigest(info: PermitInfo): string {
-    const values = Object.assign(info, { sigType: UNORDERED_SIG_TYPE });
-    return ethers.utils._TypedDataEncoder.hash(this.domain, this.types, values);
+    return ethers.utils._TypedDataEncoder.hash(this.domain, this.types, info);
   }
 
   get domain(): TypedDataDomain {

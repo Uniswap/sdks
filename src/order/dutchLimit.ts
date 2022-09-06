@@ -1,11 +1,10 @@
 import { SignatureLike } from '@ethersproject/bytes';
-import { Token } from '@uniswap/sdk-core';
 import { BigNumber, ethers } from 'ethers';
 import invariant from 'tiny-invariant';
 
 import { OrderType, REACTOR_ADDRESS_MAPPING } from '../constants';
 import { MissingConfiguration } from '../errors';
-import { PermitPost, TokenType } from '../utils';
+import { PermitPost, PermitInfo, SigType, TokenType } from '../utils';
 
 import {
   IOrder,
@@ -16,7 +15,7 @@ import {
 } from '.';
 
 export type DutchOutput = {
-  readonly token: Token;
+  readonly token: string;
   readonly startAmount: BigNumber;
   readonly endAmount: BigNumber;
   readonly recipient: string;
@@ -38,7 +37,7 @@ const DUTCH_LIMIT_ORDER_ABI = [
 ];
 
 export class DutchLimitOrder implements IOrder {
-  private readonly permitPost: PermitPost;
+  public readonly permitPost: PermitPost;
 
   constructor(
     public readonly info: DutchLimitOrderInfo,
@@ -61,9 +60,9 @@ export class DutchLimitOrder implements IOrder {
       {
         reactor,
         nonce,
-        deadline,
-        startTime,
-        endTime,
+        deadline: deadline.toNumber(),
+        startTime: startTime.toNumber(),
+        endTime: endTime.toNumber(),
         input: { token: inputToken, amount: inputAmount },
         outputs: outputs.map(
           ([token, startAmount, endAmount, recipient]: [
@@ -120,19 +119,20 @@ export class DutchLimitOrder implements IOrder {
    */
   getSigner(signature: SignatureLike): string {
     return ethers.utils.computeAddress(
-      ethers.utils.recoverPublicKey(this.digest(), signature)
+      ethers.utils.recoverPublicKey(this.permitDigest(), signature)
     );
   }
 
   /**
    * @inheritdoc IOrder
    */
-  digest(): string {
-    return this.permitPost.getPermitDigest({
+  permitInfo(): PermitInfo {
+    return {
+      sigType: SigType.Unordered,
       tokens: [
         {
           tokenType: TokenType.ERC20,
-          token: this.info.input.token.address,
+          token: this.info.input.token,
           maxAmount: this.info.input.amount,
           id: BigNumber.from(0),
         },
@@ -141,7 +141,14 @@ export class DutchLimitOrder implements IOrder {
       deadline: this.info.deadline,
       witness: this.hash(),
       nonce: this.info.nonce,
-    });
+    };
+  }
+
+  /**
+   * @inheritdoc IOrder
+   */
+  permitDigest(): string {
+    return this.permitPost.getPermitDigest(this.permitInfo());
   }
 
   /**
@@ -152,6 +159,9 @@ export class DutchLimitOrder implements IOrder {
   }
 }
 
+/**
+ * Helper builder for generating dutch limit orders
+ */
 export class DutchLimitOrderBuilder extends OrderBuilder {
   private info: Partial<DutchLimitOrderInfo>;
 
@@ -213,6 +223,16 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
       this.info.outputs = [];
     }
     this.info.outputs.push(output);
+    return this;
+  }
+
+  deadline(deadline: number): DutchLimitOrderBuilder {
+    super.deadline(deadline);
+    return this;
+  }
+
+  nonce(nonce: BigNumber): DutchLimitOrderBuilder {
+    super.nonce(nonce);
     return this;
   }
 
