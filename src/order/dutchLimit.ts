@@ -2,17 +2,12 @@ import { SignatureLike } from '@ethersproject/bytes';
 import { BigNumber, ethers } from 'ethers';
 import invariant from 'tiny-invariant';
 
-import { OrderType, REACTOR_ADDRESS_MAPPING } from '../constants';
 import { MissingConfiguration } from '../errors';
+import { OrderType, REACTOR_ADDRESS_MAPPING } from '../constants';
 import { PermitPost, PermitData, SigType, TokenType } from '../utils';
 
-import {
-  IOrder,
-  OrderBuilder,
-  OrderInfo,
-  OrderValidation,
-  TokenAmount,
-} from '.';
+import { IOrder, OrderInfo, OrderValidation, TokenAmount } from './types';
+import { OrderBuilder } from './builder';
 
 export type DutchOutput = {
   readonly token: string;
