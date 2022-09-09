@@ -2,6 +2,10 @@ export const PERMIT_POST_MAPPING: { readonly [key: number]: string } = {
   1: '0x0000000000000000000000000000000000000000',
 };
 
+export const ORDER_QUOTER_MAPPING: { readonly [key: number]: string } = {
+  1: '0x0000000000000000000000000000000000000000',
+};
+
 export enum OrderType {
   DutchLimit = 'DutchLimit',
 }

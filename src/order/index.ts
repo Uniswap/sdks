@@ -6,7 +6,6 @@ import { DutchLimitOrder } from './dutchLimit';
 import { MissingConfiguration } from '../errors';
 
 export * from './dutchLimit';
-export * from './builder';
 export * from './types';
 
 /**

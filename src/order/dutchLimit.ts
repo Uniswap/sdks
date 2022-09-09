@@ -1,13 +1,9 @@
 import { SignatureLike } from '@ethersproject/bytes';
 import { BigNumber, ethers } from 'ethers';
-import invariant from 'tiny-invariant';
 
-import { MissingConfiguration } from '../errors';
-import { OrderType, REACTOR_ADDRESS_MAPPING } from '../constants';
 import { PermitPost, PermitData, SigType, TokenType } from '../utils';
 
-import { IOrder, OrderInfo, OrderValidation, TokenAmount } from './types';
-import { OrderBuilder } from './builder';
+import { IOrder, OrderInfo, TokenAmount } from './types';
 
 export type DutchOutput = {
   readonly token: string;
@@ -24,11 +20,15 @@ export type DutchLimitOrderInfo = OrderInfo & {
 };
 
 const DUTCH_LIMIT_ORDER_ABI = [
-  'tuple(address,uint256,uint256)',
-  'uint256',
-  'uint256',
-  'tuple(address,uint256)',
-  'tuple(address,uint256,uint256,address)[]',
+  'tuple(' +
+    [
+      'tuple(address,uint256,uint256)',
+      'uint256',
+      'uint256',
+      'tuple(address,uint256)',
+      'tuple(address,uint256,uint256,address)[]',
+    ].join(',') +
+    ')',
 ];
 
 export class DutchLimitOrder implements IOrder {
@@ -36,20 +36,23 @@ export class DutchLimitOrder implements IOrder {
 
   constructor(
     public readonly info: DutchLimitOrderInfo,
-    public readonly chainId: number
+    public readonly chainId: number,
+    public readonly permitPostAddress?: string
   ) {
-    this.permitPost = new PermitPost(chainId);
+    this.permitPost = new PermitPost(chainId, permitPostAddress);
   }
 
   static parse(encoded: string, chainId: number): DutchLimitOrder {
     const abiCoder = new ethers.utils.AbiCoder();
     const decoded = abiCoder.decode(DUTCH_LIMIT_ORDER_ABI, encoded);
     const [
-      [reactor, nonce, deadline],
-      startTime,
-      endTime,
-      [inputToken, inputAmount],
-      outputs,
+      [
+        [reactor, nonce, deadline],
+        startTime,
+        endTime,
+        [inputToken, inputAmount],
+        outputs,
+      ],
     ] = decoded;
     return new DutchLimitOrder(
       {
@@ -82,30 +85,21 @@ export class DutchLimitOrder implements IOrder {
   /**
    * @inheritdoc IOrder
    */
-  validate(): OrderValidation {
-    if (this.info.deadline < new Date().getTime() / 1000) {
-      return OrderValidation.Expired;
-    }
-
-    return OrderValidation.OK;
-  }
-
-  /**
-   * @inheritdoc IOrder
-   */
   serialize(): string {
     const abiCoder = new ethers.utils.AbiCoder();
     return abiCoder.encode(DUTCH_LIMIT_ORDER_ABI, [
-      [this.info.reactor, this.info.nonce, this.info.deadline],
-      this.info.startTime,
-      this.info.endTime,
-      [this.info.input.token, this.info.input.amount],
-      this.info.outputs.map(output => [
-        output.token,
-        output.startAmount,
-        output.endAmount,
-        output.recipient,
-      ]),
+      [
+        [this.info.reactor, this.info.nonce, this.info.deadline],
+        this.info.startTime,
+        this.info.endTime,
+        [this.info.input.token, this.info.input.amount],
+        this.info.outputs.map(output => [
+          output.token,
+          output.startAmount,
+          output.endAmount,
+          output.recipient,
+        ]),
+      ],
     ]);
   }
 
@@ -147,103 +141,5 @@ export class DutchLimitOrder implements IOrder {
    */
   hash(): string {
     return ethers.utils.keccak256(this.serialize());
-  }
-}
-
-/**
- * Helper builder for generating dutch limit orders
- */
-export class DutchLimitOrderBuilder extends OrderBuilder {
-  private info: Partial<DutchLimitOrderInfo>;
-
-  constructor(private chainId: number, reactorAddress?: string) {
-    super();
-
-    if (reactorAddress) {
-      this.reactor(reactorAddress);
-    } else if (
-      REACTOR_ADDRESS_MAPPING[chainId] &&
-      REACTOR_ADDRESS_MAPPING[chainId][OrderType.DutchLimit]
-    ) {
-      const reactorAddress =
-        REACTOR_ADDRESS_MAPPING[chainId][OrderType.DutchLimit];
-      this.reactor(reactorAddress);
-    } else {
-      throw new MissingConfiguration('reactor', chainId.toString());
-    }
-
-    this.info = {
-      outputs: [],
-    };
-  }
-
-  startTime(startTime: number): DutchLimitOrderBuilder {
-    invariant(
-      !this.info.endTime || startTime <= this.info.endTime,
-      `startTime must be before endTime: ${startTime}`
-    );
-
-    invariant(
-      !this.orderInfo.deadline || startTime <= this.orderInfo.deadline,
-      `startTime must be before deadline: ${startTime}`
-    );
-    this.info.startTime = startTime;
-    return this;
-  }
-
-  endTime(endTime: number): DutchLimitOrderBuilder {
-    invariant(
-      !this.info.startTime || endTime >= this.info.startTime,
-      `endTime must be after startTime: ${endTime}`
-    );
-    invariant(
-      !this.orderInfo.deadline || endTime <= this.orderInfo.deadline,
-      `endTime must be before deadline: ${endTime}`
-    );
-    this.info.endTime = endTime;
-    return this;
-  }
-
-  input(input: TokenAmount): DutchLimitOrderBuilder {
-    this.info.input = input;
-    return this;
-  }
-
-  output(output: DutchOutput): DutchLimitOrderBuilder {
-    if (!this.info.outputs) {
-      this.info.outputs = [];
-    }
-    this.info.outputs.push(output);
-    return this;
-  }
-
-  deadline(deadline: number): DutchLimitOrderBuilder {
-    super.deadline(deadline);
-    return this;
-  }
-
-  nonce(nonce: BigNumber): DutchLimitOrderBuilder {
-    super.nonce(nonce);
-    return this;
-  }
-
-  build(): DutchLimitOrder {
-    invariant(this.info.startTime !== undefined, 'startTime not set');
-    invariant(this.info.endTime !== undefined, 'endTime not set');
-    invariant(this.info.input !== undefined, 'input not set');
-    invariant(
-      this.info.outputs !== undefined && this.info.outputs.length !== 0,
-      'outputs not set'
-    );
-
-    return new DutchLimitOrder(
-      Object.assign(this.getOrderInfo(), {
-        startTime: this.info.startTime,
-        endTime: this.info.endTime,
-        input: this.info.input,
-        outputs: this.info.outputs,
-      }),
-      this.chainId
-    );
   }
 }

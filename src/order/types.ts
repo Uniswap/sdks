@@ -3,21 +3,9 @@ import { BigNumber } from 'ethers';
 
 import { PermitData } from '../utils';
 
-export enum OrderValidation {
-  Expired,
-  OK,
-}
-
 export type IOrder = {
   // TODO: maybe add generic types for more order-type specific info
   info: OrderInfo;
-
-  /**
-   * Validates the order parameters
-   * Note that this doesn't validate any on-chain properties of the order, i.e.
-   * the offerer's token balance or nonce reuse
-   */
-  validate(): OrderValidation;
 
   // TODO: maybe add generic order info getters, i.e.
   // affectedTokens, validTimes, max amounts?

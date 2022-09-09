@@ -1,4 +1,5 @@
-export * from './permitPost';
+export * from './PermitPost';
+export * from './OrderValidator';
 
 export function stripHexPrefix(a: string): string {
   if (a.startsWith('0x')) {

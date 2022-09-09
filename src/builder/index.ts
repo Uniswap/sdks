@@ -1,7 +1,8 @@
 import invariant from 'tiny-invariant';
 import { BigNumber } from 'ethers';
 
-import { IOrder, OrderInfo } from './types';
+import { IOrder, OrderInfo } from '../order';
+export * from './dutchLimit';
 
 /**
  * Builder for generating orders
