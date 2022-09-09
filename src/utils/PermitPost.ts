@@ -1,5 +1,6 @@
 import { BigNumber, ethers, TypedDataDomain, TypedDataField } from 'ethers';
 
+import { MissingConfiguration } from '../errors';
 import { PERMIT_POST_MAPPING } from '../constants';
 
 const DOMAIN_NAME = 'PermitPost';
@@ -47,9 +48,7 @@ export class PermitPost {
     } else if (PERMIT_POST_MAPPING[chainId]) {
       this.permitPostAddress = PERMIT_POST_MAPPING[chainId];
     } else {
-      throw new Error(
-        `Missing configuration for permitPost with chainId: ${chainId.toString()}`
-      );
+      throw new MissingConfiguration('permitPost', chainId.toString());
     }
   }
 
