@@ -17,7 +17,7 @@
     "integration": "yarn build && cd integration && yarn test",
     "lint": "tsdx lint src && tsdx lint integration/test",
     "fix": "tsdx lint src --fix && tsdx lint integration/test --fix",
-    "prepare": "tsdx build",
+    "prepare": "yarn build",
     "typechain": "typechain --target=ethers-v5 --out-dir src/contracts --glob ./abis/**/*.json"
   },
   "peerDependencies": {},
