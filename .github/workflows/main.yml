@@ -28,5 +28,8 @@ jobs:
       - name: Test
         run: yarn test --ci --coverage --maxWorkers=2
 
+      - name: Integration
+        run: yarn integration
+
       - name: Build
         run: yarn build
