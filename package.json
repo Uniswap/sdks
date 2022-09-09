@@ -14,15 +14,16 @@
     "start": "tsdx watch",
     "build": "tsdx build",
     "test": "tsdx test --testPathPattern src",
-    "e2e": "cd e2e && yarn test",
-    "lint": "tsdx lint",
+    "e2e": "yarn build && cd e2e && yarn test",
+    "lint": "tsdx lint src && tsdx lint e2e/test",
+    "fix": "tsdx lint src --fix && tsdx lint e2e/test --fix",
     "prepare": "tsdx build",
     "typechain": "typechain --target=ethers-v5 --out-dir src/contracts --glob ./abis/**/*.json"
   },
   "peerDependencies": {},
   "husky": {
     "hooks": {
-      "pre-commit": "tsdx lint --fix"
+      "pre-commit": "tsdx fix"
     }
   },
   "prettier": {
