@@ -14,7 +14,7 @@
     "start": "tsdx watch",
     "build": "yarn typechain && tsdx build",
     "test": "tsdx test --testPathPattern src",
-    "integration": "yarn build && cd integration && yarn test",
+    "integration": "yarn build && cd integration && yarn && yarn test",
     "lint": "tsdx lint src && tsdx lint integration/test",
     "fix": "tsdx lint src --fix && tsdx lint integration/test --fix",
     "prepare": "yarn build",
