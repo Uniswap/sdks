@@ -1,5 +1,6 @@
 export * from './PermitPost';
 export * from './OrderValidator';
+export * from './NonceManager';
 
 export function stripHexPrefix(a: string): string {
   if (a.startsWith('0x')) {
