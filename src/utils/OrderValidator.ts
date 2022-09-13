@@ -1,6 +1,8 @@
 import { SignatureLike, splitSignature } from '@ethersproject/bytes';
+import { BaseProvider } from '@ethersproject/providers';
 import { ethers } from 'ethers';
 
+import { multicall } from './multicall';
 import { MissingConfiguration } from '../errors';
 import { ORDER_QUOTER_MAPPING } from '../constants';
 import { OrderQuoter, OrderQuoter__factory } from '../contracts';
@@ -17,6 +19,8 @@ export enum OrderValidation {
   OK,
 }
 
+const BASIC_ERROR = '0x08c379a0';
+
 const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
   '8baa579f': OrderValidation.InvalidSignature,
   '1f6d5aef': OrderValidation.Cancelled,
@@ -31,6 +35,11 @@ const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
   TRANSFER_FROM_FAILED: OrderValidation.InsufficientFunds,
 };
 
+export interface SignedOrder {
+  order: IOrder;
+  signature: SignatureLike;
+}
+
 /**
  * Order validator
  */
@@ -40,7 +49,7 @@ export class OrderValidator {
   private orderQuoter: OrderQuoter;
 
   constructor(
-    private provider: ethers.providers.Provider,
+    private provider: BaseProvider,
     chainId: number,
     orderQuoterAddress?: string
   ) {
@@ -59,28 +68,45 @@ export class OrderValidator {
     }
   }
 
-  async validate(
-    order: IOrder,
-    signature: SignatureLike
-  ): Promise<OrderValidation> {
-    if (order.info.deadline < new Date().getTime() / 1000) {
-      return OrderValidation.Expired;
-    }
+  async validate(order: SignedOrder): Promise<OrderValidation> {
+    return (await this.validateBatch([order]))[0];
+  }
 
-    try {
-      const { v, r, s } = splitSignature(signature);
-      await this.orderQuoter.callStatic.quote(order.serialize(), { v, r, s });
-      return OrderValidation.OK;
-    } catch (e) {
-      if (e instanceof Error) {
+  async validateBatch(orders: SignedOrder[]): Promise<OrderValidation[]> {
+    const calls = orders.map(order => {
+      const { v, r, s } = splitSignature(order.signature);
+      return [order.order.serialize(), { v, r, s }];
+    });
+
+    const results = await multicall(this.provider, {
+      address: this.orderQuoter.address,
+      contractInterface: this.orderQuoter.interface,
+      functionName: 'quote',
+      functionParams: calls,
+    });
+
+    return results.map(result => {
+      if (result.success) {
+        return OrderValidation.OK;
+      } else {
+        let returnData = result.returnData;
+
+        // Parse traditional string error messages
+        if (returnData.startsWith(BASIC_ERROR)) {
+          returnData = new ethers.utils.AbiCoder().decode(
+            ['string'],
+            '0x' + returnData.slice(10)
+          )[0];
+        }
+
         for (const key of Object.keys(KNOWN_ERRORS)) {
-          if (e.message.includes(key)) {
+          if (returnData.includes(key)) {
             return KNOWN_ERRORS[key];
           }
         }
       }
 
       return OrderValidation.UnknownError;
-    }
+    });
   }
 }
