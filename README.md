@@ -6,24 +6,7 @@ SDK for the Gouda protocol
 
 The SDK contains bindings for two main flows: parsing serialized orders & building new orders.
 
-### Parsing Orders
-```ts
-import { parseOrder, IOrder, OrderValidation } from '@uniswap/gouda-sdk';
-
-const serializedOrder = '0x1111222233334444555500000000234300234...';
-const order: IOrder = parseOrder(serializedOrder);
-switch (order.validate()) {
-  case OrderValidation.Expired:
-    throw new Error('OrderExpired');
-    ...
-}
-
-const orderData = order.info;
-const orderHash = order.hash();
-```
-
-
-### Building Orders
+### Building & Signing Orders
 
 ```ts
 import { DutchLimitOrder } from '@uniswap/gouda-sdk';
@@ -46,12 +29,51 @@ const order = builder
     recipient: '0x0000000000000000000000000000000000000000',
   })
   .build();
-
+ 
+// Sign the built order 
 const { domain, types, values } = order.permitData();
 const signature = wallet._signTypedData(domain, types, values);
 
 const serializedOrder = order.serialize();
 // submit serializedOrder and signature to order pool
+```
+
+### Parsing Orders
+```ts
+import { parseOrder, IOrder, OrderValidation } from '@uniswap/gouda-sdk';
+
+const serializedOrder = '0x1111222233334444555500000000234300234...';
+const order: IOrder = parseOrder(serializedOrder);
+
+const orderData = order.info;
+const orderHash = order.hash();
+```
+### Validating Orders 
+```ts
+import { ethers } from 'ethers';
+import { OrderValidator } from 'gouda-sdk';
+
+const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+const validator = new OrderValidator(provider, CHAIN_ID); 
+const orders: SignedOrder[] = [
+  {
+    order: order1, 
+    signature: signature1
+  }, 
+  {
+    order: order2, 
+    signature: signature2
+  }
+]; 
+
+try {
+  const statusList: OrderValidation[] = await validator.validateBatch(orders); 
+  // Do something with list of statuses 
+}
+catch(e) {
+  // Handle error
+}
+
 ```
 
 ### Order Object
