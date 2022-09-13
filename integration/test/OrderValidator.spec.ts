@@ -106,7 +106,7 @@ describe('OrderValidator', () => {
     const { domain, types, values } = order.permitData();
     const signature = await wallet._signTypedData(domain, types, values);
 
-    expect(await validator.validate(order, signature)).to.equal(
+    expect(await validator.validate({ order, signature })).to.equal(
       OrderValidation.OK
     );
   });
@@ -135,7 +135,7 @@ describe('OrderValidator', () => {
     const { domain, types, values } = order.permitData();
     const signature = await wallet._signTypedData(domain, types, values);
 
-    expect(await validator.validate(order, signature)).to.equal(
+    expect(await validator.validate({ order, signature })).to.equal(
       OrderValidation.InsufficientFunds
     );
   });
@@ -162,6 +162,7 @@ describe('OrderValidator', () => {
       Object.assign(info, {
         deadline: deadline - 100,
         endTime: deadline - 100,
+        startTime: deadline - 101,
       }),
       chainId,
       permitPost.address
@@ -170,7 +171,7 @@ describe('OrderValidator', () => {
     const { domain, types, values } = order.permitData();
     const signature = await wallet._signTypedData(domain, types, values);
 
-    expect(await validator.validate(order, signature)).to.equal(
+    expect(await validator.validate({ order, signature })).to.equal(
       OrderValidation.Expired
     );
   });
@@ -202,7 +203,7 @@ describe('OrderValidator', () => {
     const { domain, types, values } = order.permitData();
     const signature = await wallet._signTypedData(domain, types, values);
 
-    expect(await validator.validate(order, signature)).to.equal(
+    expect(await validator.validate({ order, signature })).to.equal(
       OrderValidation.InvalidOrderFields
     );
   });

@@ -43,6 +43,7 @@
   },
   "dependencies": {
     "@ethersproject/bytes": "^5.7.0",
+    "@ethersproject/providers": "^5.7.0",
     "@typechain/ethers-v5": "^10.1.0",
     "@uniswap/sdk-core": "^3.0.2",
     "ethers": "^5.7.0",

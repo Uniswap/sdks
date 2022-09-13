@@ -1,4 +1,5 @@
 import { BigNumber, ethers } from 'ethers';
+import { BaseProvider } from '@ethersproject/providers';
 
 import { PERMIT_POST_MAPPING } from '../constants';
 import { PermitPost, PermitPost__factory } from '../contracts';
@@ -18,7 +19,7 @@ export class NonceManager {
   private currentBitmap: Map<string, BigNumber>;
 
   constructor(
-    private provider: ethers.providers.Provider,
+    private provider: BaseProvider,
     chainId: number,
     permitPostAddress?: string
   ) {
