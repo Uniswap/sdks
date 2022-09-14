@@ -9,7 +9,13 @@ The SDK contains bindings for two main flows: parsing serialized orders & buildi
 ### Building & Signing Orders
 
 ```ts
-import { DutchLimitOrder } from '@uniswap/gouda-sdk';
+import { DutchLimitOrder, NonceManager } from '@uniswap/gouda-sdk';
+import { ethers } from 'ethers';
+
+const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+const account = await provider.getSigner().getAddress(); 
+const nonceMgr = new NonceManager(provider, 1); 
+const nonce = await nonceMgr.useNonce(account); 
 
 const chainId = 1;
 const builder = new DutchLimitOrderBuilder(chainId);
@@ -17,7 +23,7 @@ const order = builder
   .deadline(deadline)
   .endTime(deadline)
   .startTime(deadline - 100)
-  .nonce(BigNumber.from(100))
+  .nonce(nonce)
   .input({
     token: '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',
     amount: BigNumber.from('1000000'),
