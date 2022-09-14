@@ -1,6 +1,6 @@
 import { BigNumber } from 'ethers';
 
-import { DutchLimitOrderBuilder } from './dutchLimit';
+import { DutchLimitOrderBuilder } from './DutchLimitOrderBuilder';
 
 describe('DutchLimitOrderBuilder', () => {
   let builder: DutchLimitOrderBuilder;

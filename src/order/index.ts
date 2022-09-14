@@ -2,10 +2,10 @@ import { OrderType, REVERSE_REACTOR_MAPPING } from '../constants';
 import { stripHexPrefix } from '../utils';
 
 import { IOrder } from './types';
-import { DutchLimitOrder } from './dutchLimit';
+import { DutchLimitOrder } from './DutchLimitOrder';
 import { MissingConfiguration } from '../errors';
 
-export * from './dutchLimit';
+export * from './DutchLimitOrder';
 export * from './types';
 
 /**

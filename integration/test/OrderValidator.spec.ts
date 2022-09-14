@@ -67,21 +67,17 @@ describe('OrderValidator', () => {
     });
     validator = new OrderValidator(ethers.provider, chainId, quoter.address);
 
-    const tokenInFactory = await ethers.getContractFactory(
+    const tokenFactory = await ethers.getContractFactory(
       MockERC20Abi.abi,
       MockERC20Abi.bytecode
     );
-    tokenIn = (await tokenInFactory.deploy('TEST', 'test', 18)) as MockERC20;
+    tokenIn = (await tokenFactory.deploy('TEST', 'test', 18)) as MockERC20;
     await tokenIn.mint(await wallet.getAddress(), BigNumber.from(10).pow(18));
     await tokenIn
       .connect(wallet)
       .approve(permitPost.address, ethers.constants.MaxUint256);
 
-    const tokenOutFactory = await ethers.getContractFactory(
-      MockERC20Abi.abi,
-      MockERC20Abi.bytecode
-    );
-    tokenOut = (await tokenOutFactory.deploy('TEST', 'test', 18)) as MockERC20;
+    tokenOut = (await tokenFactory.deploy('TEST', 'test', 18)) as MockERC20;
   });
 
   it('validates a valid order', async () => {
