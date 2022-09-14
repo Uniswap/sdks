@@ -1,6 +1,6 @@
 import { ethers, BigNumber } from 'ethers';
 
-import { DutchLimitOrder, DutchLimitOrderInfo } from './dutchLimit';
+import { DutchLimitOrder, DutchLimitOrderInfo } from './DutchLimitOrder';
 
 describe('DutchLimitOrder', () => {
   const getOrderInfo = (
