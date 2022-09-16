@@ -77,6 +77,37 @@ describe('NonceManager', () => {
     ).to.equal('1');
   });
 
+  it('properly returns isUsed', async () => {
+    const newManager = new NonceManager(
+      ethers.provider,
+      chainId,
+      permitPost.address
+    );
+    expect(
+      await newManager.isUsed(await wallet.getAddress(), BigNumber.from(1234))
+    ).to.equal(false);
+
+    expect(
+      await newManager.isUsed(await wallet.getAddress(), BigNumber.from(992343))
+    ).to.equal(false);
+
+    await sendPermit(BigNumber.from(1234));
+
+    expect(
+      await newManager.isUsed(await wallet.getAddress(), BigNumber.from(1234))
+    ).to.equal(true);
+
+    expect(
+      await newManager.isUsed(await wallet.getAddress(), BigNumber.from(992343))
+    ).to.equal(false);
+
+    await sendPermit(BigNumber.from(992343));
+
+    expect(
+      await newManager.isUsed(await wallet.getAddress(), BigNumber.from(992343))
+    ).to.equal(true);
+  });
+
   it('ignores high on-chain used nonces', async () => {
     await sendPermit(BigNumber.from(512));
     await sendPermit(BigNumber.from(513));

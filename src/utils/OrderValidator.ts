@@ -5,8 +5,13 @@ import { ethers } from 'ethers';
 import { multicall } from './multicall';
 import { MissingConfiguration } from '../errors';
 import { ORDER_QUOTER_MAPPING } from '../constants';
-import { OrderQuoter, OrderQuoter__factory } from '../contracts';
+import {
+  OrderQuoter,
+  OrderQuoter__factory,
+  DutchLimitOrderReactor__factory,
+} from '../contracts';
 import { IOrder } from '../order';
+import { NonceManager } from './NonceManager';
 
 export enum OrderValidation {
   Expired,
@@ -50,7 +55,7 @@ export class OrderValidator {
 
   constructor(
     private provider: BaseProvider,
-    chainId: number,
+    private chainId: number,
     orderQuoterAddress?: string
   ) {
     if (orderQuoterAddress) {
@@ -85,7 +90,7 @@ export class OrderValidator {
       functionParams: calls,
     });
 
-    return results.map(result => {
+    const validations = results.map(result => {
       if (result.success) {
         return OrderValidation.OK;
       } else {
@@ -108,5 +113,46 @@ export class OrderValidator {
 
       return OrderValidation.UnknownError;
     });
+
+    return await this.checkTerminalStates(orders, validations);
+  }
+
+  // The quoter contract has a quirk that make validations inaccurate:
+  // - checks expiry before anything else, so old but already filled orders will return as canceled
+  // so this function takes orders in expired and already filled states and double checks them
+  async checkTerminalStates(
+    orders: SignedOrder[],
+    validations: OrderValidation[]
+  ): Promise<OrderValidation[]> {
+    return await Promise.all(
+      validations.map(async (validation, i) => {
+        const order = orders[i];
+        if (validation === OrderValidation.Expired) {
+          // all reactors have the same orderStatus interface, we just use limitorder to implement the interface
+          const reactor = DutchLimitOrderReactor__factory.connect(
+            order.order.info.reactor,
+            this.provider
+          );
+          const orderStatus = await reactor.orderStatus(order.order.hash());
+          if (orderStatus.isFilled) {
+            return OrderValidation.AlreadyFilled;
+          } else {
+            const nonceManager = new NonceManager(
+              this.provider,
+              this.chainId,
+              await reactor.permitPost()
+            );
+            const maker = order.order.getSigner(order.signature);
+            const cancelled = await nonceManager.isUsed(
+              maker,
+              order.order.info.nonce
+            );
+            return cancelled ? OrderValidation.Cancelled : validation;
+          }
+        } else {
+          return validation;
+        }
+      })
+    );
   }
 }

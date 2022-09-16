@@ -57,6 +57,15 @@ export class NonceManager {
     return buildNonce(word, bitPos);
   }
 
+  async isUsed(address: string, nonce: BigNumber): Promise<boolean> {
+    const { word, bitPos } = splitNonce(nonce);
+    const bitmap = await this.permitPost.nonceBitmap(address, word);
+    return bitmap
+      .div(BigNumber.from(2).pow(bitPos))
+      .mod(2)
+      .eq(1);
+  }
+
   // Returns the first word that contains empty bits
   private async getNextOpenWord(address: string): Promise<NonceData> {
     let currentWord: BigNumber =
@@ -75,6 +84,18 @@ export class NonceManager {
       bitmap: bitmap,
     };
   }
+}
+
+interface SplitNonce {
+  word: BigNumber;
+  bitPos: BigNumber;
+}
+
+// Splits a permitPost nonce into the word and bitPos
+export function splitNonce(nonce: BigNumber): SplitNonce {
+  const word = nonce.div(256);
+  const bitPos = nonce.mod(256);
+  return { word, bitPos };
 }
 
 // Builds a permitPost nonce from the given word and bitPos
