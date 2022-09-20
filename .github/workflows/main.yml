@@ -26,13 +26,10 @@ jobs:
         run: yarn build
 
       - name: Lint
-        run: yarn lint
+        run: yarn test:lint
 
       - name: Test
-        run: yarn test --ci --coverage --maxWorkers=2
+        run: yarn test:unit --ci --coverage --maxWorkers=2
 
       - name: Integration
-        run: yarn integration
-
-      - name: Build
-        run: yarn build
+        run: yarn test:integration

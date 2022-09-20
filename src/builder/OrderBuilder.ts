@@ -1,7 +1,7 @@
-import invariant from 'tiny-invariant';
-import { BigNumber } from 'ethers';
+import { BigNumber } from "ethers";
+import invariant from "tiny-invariant";
 
-import { IOrder, OrderInfo } from '../order';
+import { IOrder, OrderInfo } from "../order";
 
 /**
  * Builder for generating orders
@@ -33,9 +33,9 @@ export abstract class OrderBuilder {
   }
 
   protected getOrderInfo(): OrderInfo {
-    invariant(this.orderInfo.reactor !== undefined, 'reactor not set');
-    invariant(this.orderInfo.nonce !== undefined, 'nonce not set');
-    invariant(this.orderInfo.deadline !== undefined, 'deadline not set');
+    invariant(this.orderInfo.reactor !== undefined, "reactor not set");
+    invariant(this.orderInfo.nonce !== undefined, "nonce not set");
+    invariant(this.orderInfo.deadline !== undefined, "deadline not set");
     return {
       reactor: this.orderInfo.reactor,
       nonce: this.orderInfo.nonce,

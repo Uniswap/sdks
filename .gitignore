@@ -1,7 +1,9 @@
 *.log
 .DS_Store
 node_modules
-build
+build/
+dist/
 src/contracts
 cache/
 integration/dist/
+coverage/

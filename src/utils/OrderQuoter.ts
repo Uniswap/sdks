@@ -1,17 +1,18 @@
-import { SignatureLike, splitSignature } from '@ethersproject/bytes';
-import { BaseProvider } from '@ethersproject/providers';
-import { ethers } from 'ethers';
+import { SignatureLike, splitSignature } from "@ethersproject/bytes";
+import { BaseProvider } from "@ethersproject/providers";
+import { ethers } from "ethers";
 
-import { multicall, MulticallResult } from './multicall';
-import { MissingConfiguration } from '../errors';
-import { ORDER_QUOTER_MAPPING } from '../constants';
+import { ORDER_QUOTER_MAPPING } from "../constants";
 import {
-  OrderQuoter as OrderQuoterContract,
-  OrderQuoter__factory,
   DutchLimitOrderReactor__factory,
-} from '../contracts';
-import { IOrder, TokenAmount } from '../order';
-import { NonceManager } from './NonceManager';
+  OrderQuoter__factory,
+  OrderQuoter as OrderQuoterContract,
+} from "../contracts";
+import { MissingConfiguration } from "../errors";
+import { IOrder, TokenAmount } from "../order";
+
+import { NonceManager } from "./NonceManager";
+import { multicall, MulticallResult } from "./multicall";
 
 export enum OrderValidation {
   Expired,
@@ -35,18 +36,18 @@ export interface OrderQuote {
   quote: ResolvedOrder | undefined;
 }
 
-const BASIC_ERROR = '0x08c379a0';
+const BASIC_ERROR = "0x08c379a0";
 
 const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
-  '8baa579f': OrderValidation.InvalidSignature,
-  '1f6d5aef': OrderValidation.Cancelled,
+  "8baa579f": OrderValidation.InvalidSignature,
+  "1f6d5aef": OrderValidation.Cancelled,
   // invalid dutch decay time
-  '302e5b7c': OrderValidation.InvalidOrderFields,
+  "302e5b7c": OrderValidation.InvalidOrderFields,
   // invalid dutch decay time
-  '773a6187': OrderValidation.InvalidOrderFields,
+  "773a6187": OrderValidation.InvalidOrderFields,
   // invalid reactor address
-  '4ddf4a64': OrderValidation.InvalidOrderFields,
-  '70f65caa': OrderValidation.Expired,
+  "4ddf4a64": OrderValidation.InvalidOrderFields,
+  "70f65caa": OrderValidation.Expired,
   ee3b3d4b: OrderValidation.AlreadyFilled,
   TRANSFER_FROM_FAILED: OrderValidation.InsufficientFunds,
 };
@@ -78,7 +79,7 @@ export class OrderQuoter {
         this.provider
       );
     } else {
-      throw new MissingConfiguration('orderQuoter', chainId.toString());
+      throw new MissingConfiguration("orderQuoter", chainId.toString());
     }
   }
 
@@ -87,7 +88,7 @@ export class OrderQuoter {
   }
 
   async quoteBatch(orders: SignedOrder[]): Promise<OrderQuote[]> {
-    const calls = orders.map(order => {
+    const calls = orders.map((order) => {
       const { v, r, s } = splitSignature(order.signature);
       return [order.order.serialize(), { v, r, s }];
     });
@@ -95,7 +96,7 @@ export class OrderQuoter {
     const results = await multicall(this.provider, {
       address: this.orderQuoter.address,
       contractInterface: this.orderQuoter.interface,
-      functionName: 'quote',
+      functionName: "quote",
       functionParams: calls,
     });
 
@@ -107,7 +108,7 @@ export class OrderQuoter {
         }
 
         return this.orderQuoter.interface.decodeFunctionResult(
-          'quote',
+          "quote",
           returnData
         ).result;
       }
@@ -125,7 +126,7 @@ export class OrderQuoter {
     orders: SignedOrder[],
     results: MulticallResult[]
   ): Promise<OrderValidation[]> {
-    const validations = results.map(result => {
+    const validations = results.map((result) => {
       if (result.success) {
         return OrderValidation.OK;
       } else {
@@ -134,8 +135,8 @@ export class OrderQuoter {
         // Parse traditional string error messages
         if (returnData.startsWith(BASIC_ERROR)) {
           returnData = new ethers.utils.AbiCoder().decode(
-            ['string'],
-            '0x' + returnData.slice(10)
+            ["string"],
+            "0x" + returnData.slice(10)
           )[0];
         }
 
