@@ -2383,6 +2383,18 @@ function setBit(bitmap, bitPos) {
   }
 
   return bitmap.add(mask);
+} // Get parameters to cancel a nonce
+
+function getCancelSingleParams(nonceToCancel) {
+  var _splitNonce2 = splitNonce(nonceToCancel),
+      word = _splitNonce2.word,
+      bitPos = _splitNonce2.bitPos;
+
+  var mask = ethers.BigNumber.from(2).pow(bitPos);
+  return {
+    word: word,
+    mask: mask
+  };
 }
 
 (function (OrderValidation) {
@@ -3030,6 +3042,7 @@ exports.OrderQuoter = OrderQuoter;
 exports.OrderValidator = OrderValidator;
 exports.PermitPost = PermitPost;
 exports.buildNonce = buildNonce;
+exports.getCancelSingleParams = getCancelSingleParams;
 exports.getFirstUnsetBit = getFirstUnsetBit;
 exports.parseOrder = parseOrder;
 exports.setBit = setBit;

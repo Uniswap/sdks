@@ -27,4 +27,9 @@ export declare function splitNonce(nonce: BigNumber): SplitNonce;
 export declare function buildNonce(word: BigNumber, bitPos: number): BigNumber;
 export declare function getFirstUnsetBit(bitmap: BigNumber): number;
 export declare function setBit(bitmap: BigNumber, bitPos: number): BigNumber;
+interface CancelParams {
+    word: BigNumber;
+    mask: BigNumber;
+}
+export declare function getCancelSingleParams(nonceToCancel: BigNumber): CancelParams;
 export {};
