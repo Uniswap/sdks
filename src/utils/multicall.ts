@@ -19,7 +19,7 @@ export type MulticallParams<TFunctionParams> = {
   functionParams: TFunctionParams[];
 };
 
-type MulticallResult = {
+export type MulticallResult = {
   success: boolean;
   returnData: string;
 };
