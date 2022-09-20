@@ -143,3 +143,15 @@ export function setBit(bitmap: BigNumber, bitPos: number): BigNumber {
 
   return bitmap.add(mask);
 }
+
+interface CancelParams {
+  word: BigNumber;
+  mask: BigNumber;
+}
+
+// Get parameters to cancel a nonce
+export function getCancelSingleParams(nonceToCancel: BigNumber): CancelParams {
+  const { word, bitPos } = splitNonce(nonceToCancel);
+  const mask = BigNumber.from(2).pow(bitPos);
+  return { word, mask };
+}

@@ -1,5 +1,10 @@
 import { ethers, BigNumber } from 'ethers';
-import { buildNonce, setBit, getFirstUnsetBit } from './NonceManager';
+import {
+  buildNonce,
+  setBit,
+  getFirstUnsetBit,
+  getCancelSingleParams,
+} from './NonceManager';
 
 describe('NonceManager', () => {
   describe('buildNonce', () => {
@@ -87,6 +92,62 @@ describe('NonceManager', () => {
 
     it('16756735', () => {
       expect(getFirstUnsetBit(BigNumber.from(16756735))).toEqual(12);
+    });
+  });
+
+  describe('getCancelSingleParams', () => {
+    it('0', () => {
+      expect(getCancelSingleParams(BigNumber.from(0)).word.toString()).toEqual(
+        '0'
+      );
+      expect(getCancelSingleParams(BigNumber.from(0)).mask.toString()).toEqual(
+        '1'
+      );
+    });
+
+    it('1', () => {
+      expect(getCancelSingleParams(BigNumber.from(1)).word.toString()).toEqual(
+        '0'
+      );
+      expect(getCancelSingleParams(BigNumber.from(1)).mask.toString()).toEqual(
+        '2'
+      );
+    });
+
+    it('2', () => {
+      expect(getCancelSingleParams(BigNumber.from(2)).word.toString()).toEqual(
+        '0'
+      );
+      expect(getCancelSingleParams(BigNumber.from(2)).mask.toString()).toEqual(
+        '4'
+      );
+    });
+
+    it('3', () => {
+      expect(getCancelSingleParams(BigNumber.from(3)).word.toString()).toEqual(
+        '0'
+      );
+      expect(getCancelSingleParams(BigNumber.from(3)).mask.toString()).toEqual(
+        '8'
+      );
+    });
+
+    it('255', () => {
+      expect(
+        getCancelSingleParams(BigNumber.from(256)).word.toString()
+      ).toEqual('1');
+      expect(
+        getCancelSingleParams(BigNumber.from(256)).mask.toString()
+      ).toEqual('1');
+    });
+
+    it('257', () => {
+      expect(
+        getCancelSingleParams(BigNumber.from(257)).word.toString()
+      ).toEqual('1');
+      expect(
+        getCancelSingleParams(BigNumber.from(257)).mask.toString()
+      ).toEqual('2');
     });
   });
 });
