@@ -2380,6 +2380,18 @@ function setBit(bitmap, bitPos) {
   }
 
   return bitmap.add(mask);
+} // Get parameters to cancel a nonce
+
+function getCancelSingleParams(nonceToCancel) {
+  var _splitNonce2 = splitNonce(nonceToCancel),
+      word = _splitNonce2.word,
+      bitPos = _splitNonce2.bitPos;
+
+  var mask = BigNumber.from(2).pow(bitPos);
+  return {
+    word: word,
+    mask: mask
+  };
 }
 
 var OrderValidation;
@@ -3021,5 +3033,5 @@ var DutchLimitOrderBuilder = /*#__PURE__*/function (_OrderBuilder) {
   return DutchLimitOrderBuilder;
 }(OrderBuilder);
 
-export { DutchLimitOrder, DutchLimitOrderBuilder, NonceManager, OrderBuilder, OrderQuoter, OrderValidation, OrderValidator, PermitPost, SigType, TokenType, buildNonce, getFirstUnsetBit, parseOrder, setBit, splitNonce, stripHexPrefix };
+export { DutchLimitOrder, DutchLimitOrderBuilder, NonceManager, OrderBuilder, OrderQuoter, OrderValidation, OrderValidator, PermitPost, SigType, TokenType, buildNonce, getCancelSingleParams, getFirstUnsetBit, parseOrder, setBit, splitNonce, stripHexPrefix };
 //# sourceMappingURL=gouda-sdk.esm.js.map
