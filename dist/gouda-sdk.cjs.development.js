@@ -2504,15 +2504,7 @@ var OrderQuoter = /*#__PURE__*/function () {
                   return undefined;
                 }
 
-                var _this$orderQuoter$int = _this.orderQuoter["interface"].decodeFunctionResult('quote', returnData),
-                    input = _this$orderQuoter$int.input,
-                    outputs = _this$orderQuoter$int.outputs;
-
-                console.log(_this.orderQuoter["interface"].decodeFunctionResult('quote', returnData));
-                return {
-                  input: input,
-                  outputs: outputs
-                };
+                return _this.orderQuoter["interface"].decodeFunctionResult('quote', returnData).result;
               });
               return _context2.abrupt("return", validations.map(function (validation, i) {
                 return {

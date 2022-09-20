@@ -16,6 +16,7 @@ import {
   DutchLimitOrderBuilder,
   DutchLimitOrder,
   OrderValidator,
+  OrderQuoter as OrderQuoterLib,
   OrderValidation,
 } from '../../';
 
@@ -78,6 +79,42 @@ describe('OrderValidator', () => {
       .approve(permitPost.address, ethers.constants.MaxUint256);
 
     tokenOut = (await tokenFactory.deploy('TEST', 'test', 18)) as MockERC20;
+  });
+
+  it('quotes a valid order', async () => {
+    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    const order = builder
+      .deadline(deadline)
+      .endTime(deadline)
+      .startTime(deadline - 1000)
+      .nonce(BigNumber.from(98))
+      .input({
+        token: tokenIn.address,
+        amount: BigNumber.from('1000000'),
+      })
+      .output({
+        token: tokenOut.address,
+        startAmount: BigNumber.from('1000000000000000000'),
+        endAmount: BigNumber.from('900000000000000000'),
+        recipient: '0x0000000000000000000000000000000000000000',
+      })
+      .build();
+
+    const { domain, types, values } = order.permitData();
+    const signature = await wallet._signTypedData(domain, types, values);
+
+    const quoterLib = new OrderQuoterLib(
+      ethers.provider,
+      chainId,
+      quoter.address
+    );
+    const { validation, quote } = await quoterLib.quote({ order, signature });
+    expect(validation).to.equal(OrderValidation.OK);
+    if (!quote) {
+      throw new Error('Invalid quote');
+    }
+
+    expect(quote.input.amount.toString()).to.equal('1000000');
   });
 
   it('validates a valid order', async () => {
