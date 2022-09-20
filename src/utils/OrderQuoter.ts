@@ -106,17 +106,10 @@ export class OrderQuoter {
           return undefined;
         }
 
-        const {
-          input,
-          outputs,
-        } = this.orderQuoter.interface.decodeFunctionResult(
+        return this.orderQuoter.interface.decodeFunctionResult(
           'quote',
           returnData
-        );
-        return {
-          input: input as TokenAmount,
-          outputs: outputs as TokenAmount[],
-        };
+        ).result;
       }
     );
 
