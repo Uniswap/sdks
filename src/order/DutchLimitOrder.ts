@@ -1,9 +1,9 @@
-import { SignatureLike } from '@ethersproject/bytes';
-import { BigNumber, ethers } from 'ethers';
+import { SignatureLike } from "@ethersproject/bytes";
+import { BigNumber, ethers } from "ethers";
 
-import { PermitPost, PermitData, SigType, TokenType } from '../utils';
+import { PermitData, PermitPost, SigType, TokenType } from "../utils";
 
-import { IOrder, OrderInfo, TokenAmount } from './types';
+import { IOrder, OrderInfo, TokenAmount } from "./types";
 
 export type DutchOutput = {
   readonly token: string;
@@ -20,15 +20,15 @@ export type DutchLimitOrderInfo = OrderInfo & {
 };
 
 const DUTCH_LIMIT_ORDER_ABI = [
-  'tuple(' +
+  "tuple(" +
     [
-      'tuple(address,uint256,uint256)',
-      'uint256',
-      'uint256',
-      'tuple(address,uint256)',
-      'tuple(address,uint256,uint256,address)[]',
-    ].join(',') +
-    ')',
+      "tuple(address,uint256,uint256)",
+      "uint256",
+      "uint256",
+      "tuple(address,uint256)",
+      "tuple(address,uint256,uint256,address)[]",
+    ].join(",") +
+    ")",
 ];
 
 export class DutchLimitOrder implements IOrder {
@@ -93,7 +93,7 @@ export class DutchLimitOrder implements IOrder {
         this.info.startTime,
         this.info.endTime,
         [this.info.input.token, this.info.input.amount],
-        this.info.outputs.map(output => [
+        this.info.outputs.map((output) => [
           output.token,
           output.startAmount,
           output.endAmount,

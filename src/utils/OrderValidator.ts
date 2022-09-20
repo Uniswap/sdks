@@ -1,4 +1,4 @@
-import { OrderQuoter, OrderValidation, SignedOrder } from './OrderQuoter';
+import { OrderQuoter, OrderValidation, SignedOrder } from "./OrderQuoter";
 
 /**
  * Order validator
@@ -9,6 +9,6 @@ export class OrderValidator extends OrderQuoter {
   }
 
   async validateBatch(orders: SignedOrder[]): Promise<OrderValidation[]> {
-    return (await super.quoteBatch(orders)).map(order => order.validation);
+    return (await super.quoteBatch(orders)).map((order) => order.validation);
   }
 }

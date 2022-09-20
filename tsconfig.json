@@ -1,8 +1,9 @@
 {
   "include": ["src"],
   "compilerOptions": {
-    "target": "es2018",
-    "module": "esnext",
+    "outDir": "dist",
+    "target": "es6",
+    "module": "commonjs",
     "importHelpers": true,
     "declaration": true,
     "sourceMap": true,
@@ -18,7 +19,7 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "moduleResolution": "node",
-    "esModuleInterop": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "esModuleInterop": true
   }
 }

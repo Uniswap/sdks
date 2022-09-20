@@ -1,16 +1,16 @@
-import { BigNumber } from 'ethers';
-import invariant from 'tiny-invariant';
+import { BigNumber } from "ethers";
+import invariant from "tiny-invariant";
 
-import { MissingConfiguration } from '../errors';
-import { OrderType, REACTOR_ADDRESS_MAPPING } from '../constants';
-
+import { OrderType, REACTOR_ADDRESS_MAPPING } from "../constants";
+import { MissingConfiguration } from "../errors";
 import {
+  DutchLimitOrder,
   DutchLimitOrderInfo,
   DutchOutput,
   TokenAmount,
-  DutchLimitOrder,
-} from '../order';
-import { OrderBuilder } from './OrderBuilder';
+} from "../order";
+
+import { OrderBuilder } from "./OrderBuilder";
 
 /**
  * Helper builder for generating dutch limit orders
@@ -35,7 +35,7 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
         REACTOR_ADDRESS_MAPPING[chainId][OrderType.DutchLimit];
       this.reactor(reactorAddress);
     } else {
-      throw new MissingConfiguration('reactor', chainId.toString());
+      throw new MissingConfiguration("reactor", chainId.toString());
     }
 
     this.info = {
@@ -94,12 +94,12 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
   }
 
   build(): DutchLimitOrder {
-    invariant(this.info.startTime !== undefined, 'startTime not set');
-    invariant(this.info.endTime !== undefined, 'endTime not set');
-    invariant(this.info.input !== undefined, 'input not set');
+    invariant(this.info.startTime !== undefined, "startTime not set");
+    invariant(this.info.endTime !== undefined, "endTime not set");
+    invariant(this.info.input !== undefined, "input not set");
     invariant(
       this.info.outputs !== undefined && this.info.outputs.length !== 0,
-      'outputs not set'
+      "outputs not set"
     );
 
     return new DutchLimitOrder(

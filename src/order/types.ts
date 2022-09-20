@@ -1,7 +1,7 @@
-import { SignatureLike } from '@ethersproject/bytes';
-import { BigNumber } from 'ethers';
+import { SignatureLike } from "@ethersproject/bytes";
+import { BigNumber } from "ethers";
 
-import { PermitData } from '../utils';
+import { PermitData } from "../utils";
 
 export type IOrder = {
   // TODO: maybe add generic types for more order-type specific info

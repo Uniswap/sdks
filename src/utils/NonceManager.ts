@@ -1,9 +1,9 @@
-import { BigNumber, ethers } from 'ethers';
-import { BaseProvider } from '@ethersproject/providers';
+import { BaseProvider } from "@ethersproject/providers";
+import { BigNumber, ethers } from "ethers";
 
-import { PERMIT_POST_MAPPING } from '../constants';
-import { PermitPost, PermitPost__factory } from '../contracts';
-import { MissingConfiguration } from '../errors';
+import { PERMIT_POST_MAPPING } from "../constants";
+import { PermitPost, PermitPost__factory } from "../contracts";
+import { MissingConfiguration } from "../errors";
 
 interface NonceData {
   word: BigNumber;
@@ -34,7 +34,7 @@ export class NonceManager {
         this.provider
       );
     } else {
-      throw new MissingConfiguration('orderQuoter', chainId.toString());
+      throw new MissingConfiguration("orderQuoter", chainId.toString());
     }
 
     this.currentWord = new Map();
@@ -60,10 +60,7 @@ export class NonceManager {
   async isUsed(address: string, nonce: BigNumber): Promise<boolean> {
     const { word, bitPos } = splitNonce(nonce);
     const bitmap = await this.permitPost.nonceBitmap(address, word);
-    return bitmap
-      .div(BigNumber.from(2).pow(bitPos))
-      .mod(2)
-      .eq(1);
+    return bitmap.div(BigNumber.from(2).pow(bitPos)).mod(2).eq(1);
   }
 
   // Returns the first word that contains empty bits
@@ -113,12 +110,7 @@ export function getFirstUnsetBit(bitmap: BigNumber): number {
   // instead we have to do a loop
 
   for (let i = 0; i < 256; i++) {
-    if (
-      bitmap
-        .div(BigNumber.from(2).pow(i))
-        .mod(2)
-        .eq(0)
-    ) {
+    if (bitmap.div(BigNumber.from(2).pow(i)).mod(2).eq(0)) {
       return i;
     }
   }
@@ -132,12 +124,7 @@ export function setBit(bitmap: BigNumber, bitPos: number): BigNumber {
   // return bitmap & (1 << bitPos)
 
   const mask: BigNumber = BigNumber.from(2).pow(bitPos);
-  if (
-    bitmap
-      .div(mask)
-      .mod(2)
-      .eq(1)
-  ) {
+  if (bitmap.div(mask).mod(2).eq(1)) {
     return bitmap;
   }
 
