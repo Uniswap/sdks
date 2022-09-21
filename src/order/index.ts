@@ -8,13 +8,20 @@ import { IOrder } from "./types";
 export * from "./DutchLimitOrder";
 export * from "./types";
 
+const FIRST_FIELD_OFFSET = 88;
+const ADDRESS_LENGTH = 40;
+
 /**
  * Parses a given serialized order
  * @return Parsed order object
  */
 export function parseOrder(order: string): IOrder {
   // reactor address is always the first field in order
-  const reactor = "0x" + stripHexPrefix(order).slice(0, 40).toLowerCase();
+  const reactor =
+    "0x" +
+    stripHexPrefix(order)
+      .slice(FIRST_FIELD_OFFSET, FIRST_FIELD_OFFSET + ADDRESS_LENGTH)
+      .toLowerCase();
 
   if (!REVERSE_REACTOR_MAPPING[reactor]) {
     throw new MissingConfiguration("reactor", reactor);
