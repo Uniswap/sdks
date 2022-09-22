@@ -18,6 +18,7 @@ import {
   OrderValidator,
   OrderQuoter as OrderQuoterLib,
   OrderValidation,
+  getCancelSingleParams,
 } from '../../';
 
 const { BigNumber } = ethers;
@@ -209,6 +210,53 @@ describe('OrderValidator', () => {
     );
   });
 
+  it('validates an order before and after expiry', async () => {
+    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    const info = builder
+      .deadline(deadline)
+      .endTime(deadline)
+      .startTime(deadline - 1000)
+      .nonce(BigNumber.from(100))
+      .input({
+        token: tokenIn.address,
+        amount: BigNumber.from('1000000'),
+      })
+      .output({
+        token: tokenOut.address,
+        startAmount: BigNumber.from('1000000000000000000'),
+        endAmount: BigNumber.from('900000000000000000'),
+        recipient: '0x0000000000000000000000000000000000000000',
+      })
+      .build().info;
+
+    const order = new DutchLimitOrder(
+      info,
+      chainId,
+      permitPost.address
+    );
+
+    const { domain, types, values } = order.permitData();
+    const signature = await wallet._signTypedData(domain, types, values);
+
+    expect(await validator.validate({ order, signature })).to.equal(
+      OrderValidation.OK
+    );
+    await hre.network.provider.send("evm_increaseTime", [3600])
+    await hre.network.provider.send("evm_mine") // this one will have 02:00 PM as its timestamp
+    expect(await validator.validate({ order, signature })).to.equal(
+      OrderValidation.Expired
+    );
+    expect(await validator.validate({ order, signature })).to.equal(
+      OrderValidation.Expired
+    );
+    expect(await validator.validate({ order, signature })).to.equal(
+      OrderValidation.Expired
+    );
+    expect(await validator.validate({ order, signature })).to.equal(
+      OrderValidation.Expired
+    );
+  });
+
   it('validates an invalid dutch decay', async () => {
     const deadline = Math.floor(new Date().getTime() / 1000) + 1;
     const info = builder
@@ -238,6 +286,40 @@ describe('OrderValidator', () => {
 
     expect(await validator.validate({ order, signature })).to.equal(
       OrderValidation.InvalidOrderFields
+    );
+  });
+
+  it('validates a canceled order', async () => {
+    const deadline = Math.floor(new Date().getTime() / 1000) + 1;
+    const info = builder
+      .deadline(deadline)
+      .endTime(deadline)
+      .startTime(deadline - 1000)
+      .nonce(BigNumber.from(7))
+      .input({
+        token: tokenIn.address,
+        amount: BigNumber.from('1000000'),
+      })
+      .output({
+        token: tokenOut.address,
+        startAmount: BigNumber.from('1000000000000000000'),
+        endAmount: BigNumber.from('900000000000000000'),
+        recipient: '0x0000000000000000000000000000000000000000',
+      })
+      .build().info;
+    const order = new DutchLimitOrder(
+      info,
+      chainId,
+      permitPost.address
+    );
+
+    const { domain, types, values } = order.permitData();
+    const signature = await wallet._signTypedData(domain, types, values);
+    const { word, mask } = getCancelSingleParams(BigNumber.from(7));
+    await permitPost.connect(wallet).invalidateUnorderedNonces(word, mask);
+
+    expect(await validator.validate({ order, signature })).to.equal(
+      OrderValidation.Cancelled
     );
   });
 });
