@@ -40,7 +40,7 @@ export type PermitData = {
 };
 
 export class PermitPost {
-  private readonly permitPostAddress: string;
+  public readonly permitPostAddress: string;
 
   constructor(private readonly chainId: number, address?: string) {
     if (address) {

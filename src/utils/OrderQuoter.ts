@@ -163,7 +163,10 @@ export class OrderQuoter {
     return await Promise.all(
       validations.map(async (validation, i) => {
         const order = orders[i];
-        if (validation === OrderValidation.Expired) {
+        if (
+          validation === OrderValidation.Expired ||
+          order.order.info.deadline < Math.floor(new Date().getTime() / 1000)
+        ) {
           // all reactors have the same orderStatus interface, we just use limitorder to implement the interface
           const reactor = DutchLimitOrderReactor__factory.connect(
             order.order.info.reactor,
