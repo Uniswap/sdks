@@ -56,7 +56,7 @@ describe('DutchLimitOrder', () => {
       DirectTakerFillContract.abi,
       DirectTakerFillContract.bytecode
     );
-    fillContract = (await directTakerFillContractFactory.deploy()).address;
+    fillContract = (await directTakerFillContractFactory.deploy(await taker.getAddress())).address;
 
     const tokenFactory = await ethers.getContractFactory(
       MockERC20Abi.abi,
@@ -98,6 +98,7 @@ describe('DutchLimitOrder', () => {
       .deadline(deadline)
       .endTime(deadline)
       .startTime(deadline - 100)
+      .offerer(await maker.getAddress())
       .nonce(BigNumber.from(100))
       .input({
         token: tokenIn.address,
@@ -116,10 +117,6 @@ describe('DutchLimitOrder', () => {
     const { domain, types, values } = order.permitData();
     const signature = await maker._signTypedData(domain, types, values);
     const { v, r, s } = splitSignature(signature);
-    const fillData = new ethers.utils.AbiCoder().encode(
-      ['address', 'address'],
-      [await taker.getAddress(), reactor.address]
-    );
 
     const makerTokenInBalanceBefore = await tokenIn.balanceOf(
       await maker.getAddress()
@@ -134,10 +131,10 @@ describe('DutchLimitOrder', () => {
       await taker.getAddress()
     );
 
-    const res = await reactor.execute(
+    const res = await reactor.connect(taker).execute(
       { order: order.serialize(), sig: { v, r, s } },
       fillContract,
-      fillData
+      "0x"
     );
     const receipt = await res.wait();
     expect(receipt.status).to.equal(1);
@@ -168,6 +165,7 @@ describe('DutchLimitOrder', () => {
       .endTime(deadline)
       .startTime(deadline - 2000)
       .nonce(BigNumber.from(101))
+      .offerer(await maker.getAddress())
       .input({
         token: tokenIn.address,
         amount,
@@ -185,10 +183,6 @@ describe('DutchLimitOrder', () => {
     const { domain, types, values } = order.permitData();
     const signature = await maker._signTypedData(domain, types, values);
     const { v, r, s } = splitSignature(signature);
-    const fillData = new ethers.utils.AbiCoder().encode(
-      ['address', 'address'],
-      [await taker.getAddress(), reactor.address]
-    );
 
     const makerTokenInBalanceBefore = await tokenIn.balanceOf(
       await maker.getAddress()
@@ -203,10 +197,10 @@ describe('DutchLimitOrder', () => {
       await taker.getAddress()
     );
 
-    const res = await reactor.execute(
+    const res = await reactor.connect(taker).execute(
       { order: order.serialize(), sig: { v, r, s } },
       fillContract,
-      fillData
+      "0x"
     );
     const receipt = await res.wait();
     expect(receipt.status).to.equal(1);

@@ -14,7 +14,6 @@ export type DutchOutput = {
 
 export type DutchLimitOrderInfo = OrderInfo & {
   startTime: number;
-  endTime: number;
   input: TokenAmount;
   outputs: DutchOutput[];
 };
@@ -22,8 +21,7 @@ export type DutchLimitOrderInfo = OrderInfo & {
 const DUTCH_LIMIT_ORDER_ABI = [
   "tuple(" +
     [
-      "tuple(address,uint256,uint256)",
-      "uint256",
+      "tuple(address,address,uint256,uint256)",
       "uint256",
       "tuple(address,uint256)",
       "tuple(address,uint256,uint256,address)[]",
@@ -47,9 +45,8 @@ export class DutchLimitOrder implements IOrder {
     const decoded = abiCoder.decode(DUTCH_LIMIT_ORDER_ABI, encoded);
     const [
       [
-        [reactor, nonce, deadline],
+        [reactor, offerer, nonce, deadline],
         startTime,
-        endTime,
         [inputToken, inputAmount],
         outputs,
       ],
@@ -57,10 +54,10 @@ export class DutchLimitOrder implements IOrder {
     return new DutchLimitOrder(
       {
         reactor,
+        offerer,
         nonce,
         deadline: deadline.toNumber(),
         startTime: startTime.toNumber(),
-        endTime: endTime.toNumber(),
         input: { token: inputToken, amount: inputAmount },
         outputs: outputs.map(
           ([token, startAmount, endAmount, recipient]: [
@@ -89,9 +86,13 @@ export class DutchLimitOrder implements IOrder {
     const abiCoder = new ethers.utils.AbiCoder();
     return abiCoder.encode(DUTCH_LIMIT_ORDER_ABI, [
       [
-        [this.info.reactor, this.info.nonce, this.info.deadline],
+        [
+          this.info.reactor,
+          this.info.offerer,
+          this.info.nonce,
+          this.info.deadline,
+        ],
         this.info.startTime,
-        this.info.endTime,
         [this.info.input.token, this.info.input.amount],
         this.info.outputs.map((output) => [
           output.token,
