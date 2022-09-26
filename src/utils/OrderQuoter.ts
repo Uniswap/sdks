@@ -153,8 +153,8 @@ export class OrderQuoter {
   }
 
   // The quoter contract has a quirk that make validations inaccurate:
-  // - checks expiry before anything else, so old but already filled orders will return as canceled
-  // so this function takes orders in expired and already filled states and double checks them
+  // - checks expiry before anything else, so old but already filled orders will return as expired
+  // so this function takes orders in expired state and double checks them
   private async checkTerminalStates(
     orders: SignedOrder[],
     validations: OrderValidation[]
