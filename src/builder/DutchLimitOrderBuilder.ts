@@ -45,11 +45,6 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
 
   startTime(startTime: number): DutchLimitOrderBuilder {
     invariant(
-      !this.info.endTime || startTime <= this.info.endTime,
-      `startTime must be before endTime: ${startTime}`
-    );
-
-    invariant(
       !this.orderInfo.deadline || startTime <= this.orderInfo.deadline,
       `startTime must be before deadline: ${startTime}`
     );
@@ -58,15 +53,7 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
   }
 
   endTime(endTime: number): DutchLimitOrderBuilder {
-    invariant(
-      !this.info.startTime || endTime >= this.info.startTime,
-      `endTime must be after startTime: ${endTime}`
-    );
-    invariant(
-      !this.orderInfo.deadline || endTime <= this.orderInfo.deadline,
-      `endTime must be before deadline: ${endTime}`
-    );
-    this.info.endTime = endTime;
+    super.deadline(endTime);
     return this;
   }
 
@@ -88,6 +75,11 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
     return this;
   }
 
+  offerer(offerer: string): DutchLimitOrderBuilder {
+    super.offerer(offerer);
+    return this;
+  }
+
   nonce(nonce: BigNumber): DutchLimitOrderBuilder {
     super.nonce(nonce);
     return this;
@@ -95,7 +87,6 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
 
   build(): DutchLimitOrder {
     invariant(this.info.startTime !== undefined, "startTime not set");
-    invariant(this.info.endTime !== undefined, "endTime not set");
     invariant(this.info.input !== undefined, "input not set");
     invariant(
       this.info.outputs !== undefined && this.info.outputs.length !== 0,
@@ -105,7 +96,6 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
     return new DutchLimitOrder(
       Object.assign(this.getOrderInfo(), {
         startTime: this.info.startTime,
-        endTime: this.info.endTime,
         input: this.info.input,
         outputs: this.info.outputs,
       }),

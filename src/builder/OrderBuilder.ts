@@ -27,6 +27,11 @@ export abstract class OrderBuilder {
     return this;
   }
 
+  offerer(offerer: string): OrderBuilder {
+    this.orderInfo.offerer = offerer;
+    return this;
+  }
+
   protected reactor(reactor: string): OrderBuilder {
     this.orderInfo.reactor = reactor;
     return this;
@@ -36,8 +41,10 @@ export abstract class OrderBuilder {
     invariant(this.orderInfo.reactor !== undefined, "reactor not set");
     invariant(this.orderInfo.nonce !== undefined, "nonce not set");
     invariant(this.orderInfo.deadline !== undefined, "deadline not set");
+    invariant(this.orderInfo.offerer !== undefined, "offerer not set");
     return {
       reactor: this.orderInfo.reactor,
+      offerer: this.orderInfo.offerer,
       nonce: this.orderInfo.nonce,
       deadline: this.orderInfo.deadline,
     };
