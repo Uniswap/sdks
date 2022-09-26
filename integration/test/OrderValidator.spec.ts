@@ -88,6 +88,7 @@ describe('OrderValidator', () => {
       .deadline(deadline)
       .endTime(deadline)
       .startTime(deadline - 1000)
+      .offerer(await wallet.getAddress())
       .nonce(BigNumber.from(98))
       .input({
         token: tokenIn.address,
@@ -125,6 +126,7 @@ describe('OrderValidator', () => {
       .endTime(deadline)
       .startTime(deadline - 1000)
       .nonce(BigNumber.from(100))
+      .offerer(await wallet.getAddress())
       .input({
         token: tokenIn.address,
         amount: BigNumber.from('1000000'),
@@ -152,6 +154,7 @@ describe('OrderValidator', () => {
       .endTime(deadline)
       .startTime(deadline - 1000)
       .nonce(BigNumber.from(100))
+      .offerer(await wallet.getAddress())
       .input({
         token: tokenIn.address,
         amount: BigNumber.from('10')
@@ -180,6 +183,7 @@ describe('OrderValidator', () => {
       .deadline(deadline)
       .endTime(deadline)
       .startTime(deadline)
+      .offerer(await wallet.getAddress())
       .nonce(BigNumber.from(100))
       .input({
         token: tokenIn.address,
@@ -216,6 +220,7 @@ describe('OrderValidator', () => {
       .deadline(deadline)
       .endTime(deadline)
       .startTime(deadline - 1000)
+      .offerer(await wallet.getAddress())
       .nonce(BigNumber.from(100))
       .input({
         token: tokenIn.address,
@@ -263,6 +268,7 @@ describe('OrderValidator', () => {
       .deadline(deadline)
       .endTime(deadline)
       .startTime(deadline)
+      .offerer(await wallet.getAddress())
       .nonce(BigNumber.from(100))
       .input({
         token: tokenIn.address,
@@ -296,6 +302,7 @@ describe('OrderValidator', () => {
       .endTime(deadline)
       .startTime(deadline - 1000)
       .nonce(BigNumber.from(7))
+      .offerer(await wallet.getAddress())
       .input({
         token: tokenIn.address,
         amount: BigNumber.from('1000000'),
@@ -319,7 +326,7 @@ describe('OrderValidator', () => {
     await permitPost.connect(wallet).invalidateUnorderedNonces(word, mask);
 
     expect(await validator.validate({ order, signature })).to.equal(
-      OrderValidation.Cancelled
+      OrderValidation.NonceUsed
     );
   });
 });

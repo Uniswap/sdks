@@ -16,8 +16,7 @@ import { multicall, MulticallResult } from "./multicall";
 
 export enum OrderValidation {
   Expired,
-  AlreadyFilled,
-  Cancelled,
+  NonceUsed,
   InsufficientFunds,
   InvalidSignature,
   InvalidOrderFields,
@@ -40,7 +39,7 @@ const BASIC_ERROR = "0x08c379a0";
 
 const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
   "8baa579f": OrderValidation.InvalidSignature,
-  "1f6d5aef": OrderValidation.Cancelled,
+  "1f6d5aef": OrderValidation.NonceUsed,
   // invalid dutch decay time
   "302e5b7c": OrderValidation.InvalidOrderFields,
   // invalid dutch decay time
@@ -48,7 +47,7 @@ const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
   // invalid reactor address
   "4ddf4a64": OrderValidation.InvalidOrderFields,
   "70f65caa": OrderValidation.Expired,
-  ee3b3d4b: OrderValidation.AlreadyFilled,
+  ee3b3d4b: OrderValidation.NonceUsed,
   TRANSFER_FROM_FAILED: OrderValidation.InsufficientFunds,
 };
 
@@ -154,8 +153,8 @@ export class OrderQuoter {
   }
 
   // The quoter contract has a quirk that make validations inaccurate:
-  // - checks expiry before anything else, so old but already filled orders will return as canceled
-  // so this function takes orders in expired and already filled states and double checks them
+  // - checks expiry before anything else, so old but already filled orders will return as expired
+  // so this function takes orders in expired state and double checks them
   private async checkTerminalStates(
     orders: SignedOrder[],
     validations: OrderValidation[]
@@ -167,27 +166,23 @@ export class OrderQuoter {
           validation === OrderValidation.Expired ||
           order.order.info.deadline < Math.floor(new Date().getTime() / 1000)
         ) {
-          // all reactors have the same orderStatus interface, we just use limitorder to implement the interface
+          // all reactors have the same interface, we just use limitorder to implement the interface
           const reactor = DutchLimitOrderReactor__factory.connect(
             order.order.info.reactor,
             this.provider
           );
-          const orderStatus = await reactor.orderStatus(order.order.hash());
-          if (orderStatus.isFilled) {
-            return OrderValidation.AlreadyFilled;
-          } else {
-            const nonceManager = new NonceManager(
-              this.provider,
-              this.chainId,
-              await reactor.permitPost()
-            );
-            const maker = order.order.getSigner(order.signature);
-            const cancelled = await nonceManager.isUsed(
-              maker,
-              order.order.info.nonce
-            );
-            return cancelled ? OrderValidation.Cancelled : validation;
-          }
+
+          const nonceManager = new NonceManager(
+            this.provider,
+            this.chainId,
+            await reactor.permitPost()
+          );
+          const maker = order.order.getSigner(order.signature);
+          const cancelled = await nonceManager.isUsed(
+            maker,
+            order.order.info.nonce
+          );
+          return cancelled ? OrderValidation.NonceUsed : validation;
         } else {
           return validation;
         }

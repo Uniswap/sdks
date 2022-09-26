@@ -44,6 +44,7 @@ export type TokenAmount = {
 
 export type OrderInfo = {
   reactor: string;
+  offerer: string;
   nonce: BigNumber;
   deadline: number;
 };
