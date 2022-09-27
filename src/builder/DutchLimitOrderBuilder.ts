@@ -66,6 +66,10 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
     if (!this.info.outputs) {
       this.info.outputs = [];
     }
+    invariant(
+      output.startAmount.gte(output.endAmount),
+      `startAmount must be greater than endAmount: ${output.startAmount.toString()}`
+    );
     this.info.outputs.push(output);
     return this;
   }

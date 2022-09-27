@@ -63,6 +63,29 @@ describe("DutchLimitOrderBuilder", () => {
     expect(order.info.outputs.length).toEqual(2);
   });
 
+  it("startAmount <= endAmount", () => {
+    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    expect(() =>
+      builder
+        .deadline(deadline)
+        .endTime(deadline)
+        .startTime(deadline - 100)
+        .offerer("0x0000000000000000000000000000000000000001")
+        .nonce(BigNumber.from(100))
+        .input({
+          token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+          amount: BigNumber.from("1000000"),
+        })
+        .output({
+          token: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+          startAmount: BigNumber.from("100"),
+          endAmount: BigNumber.from("110"),
+          recipient: "0x0000000000000000000000000000000000000000",
+        })
+        .build()
+    ).toThrow("startAmount must be greater than endAmount: 100");
+  });
+
   it("Deadline already passed", () => {
     expect(() => builder.deadline(1234)).toThrow(
       "Deadline must be in the future: 1234"
