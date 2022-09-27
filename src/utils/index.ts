@@ -2,6 +2,7 @@ export * from "./PermitPost";
 export * from "./OrderValidator";
 export * from "./NonceManager";
 export * from "./OrderQuoter";
+export * from "./EventWatcher";
 
 export function stripHexPrefix(a: string): string {
   if (a.startsWith("0x")) {

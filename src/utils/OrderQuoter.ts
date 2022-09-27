@@ -182,7 +182,9 @@ export class OrderQuoter {
             maker,
             order.order.info.nonce
           );
-          return cancelled ? OrderValidation.NonceUsed : validation;
+          return cancelled
+            ? OrderValidation.NonceUsed
+            : OrderValidation.Expired;
         } else {
           return validation;
         }
