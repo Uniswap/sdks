@@ -191,4 +191,8 @@ export class OrderQuoter {
       })
     );
   }
+
+  get orderQuoterAddress(): string {
+    return this.orderQuoter.address;
+  }
 }
