@@ -7,6 +7,9 @@ export type IOrder = {
   // TODO: maybe add generic types for more order-type specific info
   info: OrderInfo;
 
+  // expose the chainid
+  chainId: number;
+
   // TODO: maybe add generic order info getters, i.e.
   // affectedTokens, validTimes, max amounts?
   // not yet sure what is useful / generic here
