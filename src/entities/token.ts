@@ -1,5 +1,5 @@
 import invariant from 'tiny-invariant'
-import { validateAndParseAddress } from '../utils/validateAndParseAddress'
+import { checkValidAddress, validateAndParseAddress } from '../utils/validateAndParseAddress'
 import { BaseCurrency } from './baseCurrency'
 import { Currency } from './currency'
 
@@ -15,9 +15,29 @@ export class Token extends BaseCurrency {
    */
   public readonly address: string
 
-  public constructor(chainId: number, address: string, decimals: number, symbol?: string, name?: string) {
+  /**
+   *
+   * @param chainId {@link BaseCurrency#chainId}
+   * @param address The contract address on the chain on which this token lives
+   * @param decimals {@link BaseCurrency#decimals}
+   * @param symbol {@link BaseCurrency#symbol}
+   * @param name {@link BaseCurrency#name}
+   * @param bypassChecksum If true it only checks for length === 42, startsWith 0x and contains only hex characters
+   */
+  public constructor(
+    chainId: number,
+    address: string,
+    decimals: number,
+    symbol?: string,
+    name?: string,
+    bypassChecksum?: boolean
+  ) {
     super(chainId, decimals, symbol, name)
-    this.address = validateAndParseAddress(address)
+    if (bypassChecksum) {
+      this.address = checkValidAddress(address)
+    } else {
+      this.address = validateAndParseAddress(address)
+    }
   }
 
   /**
