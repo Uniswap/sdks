@@ -11,7 +11,7 @@
     "dist"
   ],
   "scripts": {
-    "test": "tsdx test",
+    "test": "tsdx test --testPathIgnorePatterns=/permit2/",
     "build": "tsdx build",
     "start": "tsdx watch",
     "prepublishOnly": "tsdx build"
@@ -25,9 +25,7 @@
     "ethereum"
   ],
   "license": "MIT",
-  "dependencies": {
-
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/jest": "^24.0.25",
     "prettier": "^2.4.1",
