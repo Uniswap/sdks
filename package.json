@@ -25,7 +25,11 @@
     "ethereum"
   ],
   "license": "MIT",
-  "dependencies": {},
+  "dependencies": {
+    "@ethersproject/abi": "^5.7.0",
+    "@ethersproject/keccak256": "^5.7.0",
+    "@ethersproject/strings": "^5.7.0"
+  },
   "devDependencies": {
     "@types/jest": "^24.0.25",
     "prettier": "^2.4.1",
