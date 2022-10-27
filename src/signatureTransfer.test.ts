@@ -10,7 +10,7 @@ describe('SignatureTransfer', () => {
         nonce: '0',
         deadline: '0',
       })
-    ).toBe('0x9ae45bb2e5692ce50d604371e4328c12717cdd474947db6f52b4a5074a651851')
+    ).toBe('0x498cf7b0570b217737fa643377c86eb1e3541c51f0fe6a98065cde301a8b7958')
   })
 
   it('non-batch, witness', () => {
@@ -27,7 +27,7 @@ describe('SignatureTransfer', () => {
           witness: '0x0000000000000000000000000000000000000000000000000000000000000000',
         },
       })
-    ).toBe('0x2da860444ddecf3af5b79534db25eacb598a62f20707c890ef03c090b78d2a41')
+    ).toBe('0x98d27bdcf39d9b7d7fe3b4b55f1f166e712a5de1f79b2e2950434603ab0745bf')
   })
 
   it('batch, no witness', () => {
@@ -39,7 +39,7 @@ describe('SignatureTransfer', () => {
         nonce: '0',
         deadline: '0',
       })
-    ).toBe('0xfa6df6fb8d00c661f6014da4e237f018b73fe21e3cb41fc284e4ee0d2e25cf7e')
+    ).toBe('0x8a96f17df860a21985a0d54b81b07c5a914328bd63f6704e5bfb816a37602cdc')
   })
 
   it('batch, witness', () => {
@@ -56,6 +56,6 @@ describe('SignatureTransfer', () => {
           witness: '0x0000000000000000000000000000000000000000000000000000000000000000',
         },
       })
-    ).toBe('0xadcd2d4a563ecc2a46144cc1dd537d2699c87aec5a93078fa9fb83ad8662b762')
+    ).toBe('0x2b89ead0969fc66abf885ea6014be7855f80af8cdf25ea902cb8d7644052b555')
   })
 })

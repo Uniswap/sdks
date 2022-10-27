@@ -8,7 +8,7 @@ export interface Witness {
   witnessType: string
 }
 
-export interface PermitTransfer {
+export interface PermitTransferFrom {
   token: string
   spender: string
   signedAmount: string
@@ -17,7 +17,7 @@ export interface PermitTransfer {
   witness?: Witness
 }
 
-export interface PermitBatchTransfer {
+export interface PermitBatchTransferFrom {
   tokens: string[]
   spender: string
   signedAmounts: string[]
@@ -26,26 +26,22 @@ export interface PermitBatchTransfer {
   witness?: Witness
 }
 
-function isPermitTransfer(permit: PermitTransfer | PermitBatchTransfer): permit is PermitTransfer {
-  return typeof (permit as PermitTransfer).token === 'string'
+function isPermitTransferFrom(permit: PermitTransferFrom | PermitBatchTransferFrom): permit is PermitTransferFrom {
+  return typeof (permit as PermitTransferFrom).token === 'string'
 }
 
 export abstract class SignatureTransfer {
-  public static readonly _PERMIT_TYPEHASH = '0xc262c81437d10e77733d4856afeb901aafea41ef8a375a833df86061f7e69bb0'
+  public static readonly _PERMIT_TRANSFER_FROM_TYPEHASH =
+    '0x10c9c9e59d752f2a5e0b80c4634ea94f13dfc2064f262172713603fd1e244d46'
 
-  public static readonly _PERMIT_BATCH_TYPEHASH = '0x73e4ce378d8ac1888c7dc48a4acaca95db90a4623708bb440e2743b49fbd3c7a'
+  public static readonly _PERMIT_BATCH_TRANSFER_FROM_TYPEHASH =
+    '0xb4e06c597d07f3cee806099cb9eef8888970e2ad5303164b6d2814f3a5362511'
 
-  public static readonly _PERMIT_TRANSFER_TYPEHASH =
-    '0x15c180f14ea833a017e3afffacc6e6fbf366fd0bae34a27f66cfec970f272fa2'
+  public static readonly _PERMIT_TRANSFER_FROM_WITNESS_TYPEHASH_STUB =
+    'PermitWitnessTransferFrom(address token,address spender,uint256 signedAmount,uint256 nonce,uint256 deadline,'
 
-  public static readonly _PERMIT_BATCH_TRANSFER_TYPEHASH =
-    '0x62e35962f5e5b9a8756d8f7f39f30beb4680c353ed51ea60ab5ec7a9028e0495'
-
-  public static readonly _PERMIT_TRANSFER_WITNESS_TYPEHASH_STUB =
-    'PermitWitnessTransferFrom(address token,address spender,uint256 maxAmount,uint256 nonce,uint256 deadline,'
-
-  public static readonly _PERMIT_BATCH_WITNESS_TRANSFER_TYPEHASH_STUB =
-    'PermitBatchWitnessTransferFrom(address[] tokens,address spender,uint256[] maxAmounts,uint256 nonce,uint256 deadline,'
+  public static readonly _PERMIT_BATCH_WITNESS_TRANSFER_FROM_TYPEHASH_STUB =
+    'PermitBatchWitnessTransferFrom(address[] tokens,address spender,uint256[] signedAmounts,uint256 nonce,uint256 deadline,'
 
   /**
    * Cannot be constructed.
@@ -56,12 +52,12 @@ export abstract class SignatureTransfer {
     return defaultAbiCoder.encode(new Array<string>(values.length).fill(solidityType), values)
   }
 
-  public static hash(permit: PermitTransfer | PermitBatchTransfer): string {
-    if (isPermitTransfer(permit)) {
+  public static hash(permit: PermitTransferFrom | PermitBatchTransferFrom): string {
+    if (isPermitTransferFrom(permit)) {
       if (permit.witness) {
         const typeHash = keccak256(
           toUtf8Bytes(
-            `${this._PERMIT_TRANSFER_WITNESS_TYPEHASH_STUB}${permit.witness.witnessTypeName} witness)${permit.witness.witnessType}`
+            `${this._PERMIT_TRANSFER_FROM_WITNESS_TYPEHASH_STUB}${permit.witness.witnessTypeName} witness)${permit.witness.witnessType}`
           )
         )
         return keccak256(
@@ -83,7 +79,7 @@ export abstract class SignatureTransfer {
           defaultAbiCoder.encode(
             ['bytes32', 'address', 'address', 'uint256', 'uint256', 'uint256'],
             [
-              this._PERMIT_TRANSFER_TYPEHASH,
+              this._PERMIT_TRANSFER_FROM_TYPEHASH,
               permit.token,
               permit.spender,
               permit.signedAmount,
@@ -97,7 +93,7 @@ export abstract class SignatureTransfer {
       if (permit.witness) {
         const typeHash = keccak256(
           toUtf8Bytes(
-            `${this._PERMIT_BATCH_WITNESS_TRANSFER_TYPEHASH_STUB}${permit.witness.witnessTypeName} witness)${permit.witness.witnessType}`
+            `${this._PERMIT_BATCH_WITNESS_TRANSFER_FROM_TYPEHASH_STUB}${permit.witness.witnessTypeName} witness)${permit.witness.witnessType}`
           )
         )
         return keccak256(
@@ -119,7 +115,7 @@ export abstract class SignatureTransfer {
           defaultAbiCoder.encode(
             ['bytes32', 'bytes32', 'address', 'bytes32', 'uint256', 'uint256'],
             [
-              this._PERMIT_BATCH_TRANSFER_TYPEHASH,
+              this._PERMIT_BATCH_TRANSFER_FROM_TYPEHASH,
               keccak256(SignatureTransfer.encodePackedDynamicArray(permit.tokens, 'address')),
               permit.spender,
               keccak256(SignatureTransfer.encodePackedDynamicArray(permit.signedAmounts, 'uint256')),
