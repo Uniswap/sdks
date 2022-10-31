@@ -1,0 +1,14 @@
+const fs = require('fs')
+const { AllowanceTransfer, SignatureTransfer } = require('./dist')
+
+const interop = {
+  _PERMIT_TYPEHASH: AllowanceTransfer._PERMIT_TYPEHASH,
+  _PERMIT_BATCH_TYPEHASH: AllowanceTransfer._PERMIT_BATCH_TYPEHASH,
+  _PERMIT_TRANSFER_FROM_TYPEHASH: SignatureTransfer._PERMIT_TRANSFER_FROM_TYPEHASH,
+  _PERMIT_BATCH_TRANSFER_FROM_TYPEHASH: SignatureTransfer._PERMIT_BATCH_TRANSFER_FROM_TYPEHASH,
+  _PERMIT_TRANSFER_FROM_WITNESS_TYPEHASH_STUB: SignatureTransfer._PERMIT_TRANSFER_FROM_WITNESS_TYPEHASH_STUB,
+  _PERMIT_BATCH_WITNESS_TRANSFER_FROM_TYPEHASH_STUB:
+    SignatureTransfer._PERMIT_BATCH_WITNESS_TRANSFER_FROM_TYPEHASH_STUB,
+}
+
+fs.writeFileSync('./test/interop.json', JSON.stringify(interop))
