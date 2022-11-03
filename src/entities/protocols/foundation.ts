@@ -1,31 +1,62 @@
 import abi from '../../../abis/Foundation.json'
 import { Interface } from '@ethersproject/abi'
-import { NFTTrade, BuyItem } from '../NFTTrade'
+import { NFTTrade, Market, TokenType, BuyItem } from '../NFTTrade'
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
-import { ethers, BigNumber } from 'ethers'
-import { Currency, CurrencyAmount } from '@uniswap/sdk-core'
+import { BigNumber, BigNumberish } from 'ethers'
+import { CurrencyAmount, Currency, Ether } from '@uniswap/sdk-core'
+import JSBI from 'jsbi'
 
 export type FoundationData = {
+  recipient: string
+  tokenAddress: string
+  tokenId: BigNumberish
+  price: BigNumberish
   referrer: string // address
 }
 
 export class FoundationTrade extends NFTTrade<FoundationData> {
   public static INTERFACE: Interface = new Interface(abi)
 
-  constructor(recipient: string, buyItems: BuyItem<FoundationData>[]) {
-    super(recipient, buyItems)
+  constructor(orders: FoundationData[]) {
+    super(Market.Foundation, orders)
   }
 
   encode(planner: RoutePlanner): void {
-    for (const item of this.buyItems) {
-      const value = item.priceInfo.quotient.toString()
+    for (const item of this.orders) {
       const calldata = FoundationTrade.INTERFACE.encodeFunctionData('buyV2', [
-        item.address,
+        item.tokenAddress,
         item.tokenId,
-        value,
-        item.data.referrer,
+        item.price,
+        item.referrer,
       ])
-      planner.addCommand(CommandType.FOUNDATION, [value, calldata, this.recipient, item.address, item.tokenId])
+      planner.addCommand(CommandType.FOUNDATION, [
+        item.price,
+        calldata,
+        item.recipient,
+        item.tokenAddress,
+        item.tokenId,
+      ])
     }
+  }
+
+  getBuyItems(): BuyItem[] {
+    let buyItems: BuyItem[] = []
+    for (const item of this.orders) {
+      buyItems.push({
+        tokenAddress: item.tokenAddress,
+        tokenId: item.tokenId,
+        priceInfo: item.price,
+        tokenType: TokenType.ERC721,
+      })
+    }
+    return buyItems
+  }
+
+  getTotalPrice(): BigNumberish {
+    let total = BigNumber.from(0)
+    for (const item of this.orders) {
+      total = total.add(item.price)
+    }
+    return total
   }
 }

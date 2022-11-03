@@ -1,4 +1,3 @@
-import { ethers, BigNumber } from 'ethers'
 import { Currency, CurrencyAmount, Ether } from '@uniswap/sdk-core'
 
 export function getNativeCurrencyValue(currencyValues: CurrencyAmount<Currency>[]): CurrencyAmount<Currency> {

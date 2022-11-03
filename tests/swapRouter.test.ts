@@ -1,7 +1,7 @@
 import { expect } from 'chai'
-import { expandTo18Decimals } from '../src/utils/expandTo18Decimals'
+import { expandTo18DecimalsBN } from '../src/utils/expandTo18Decimals'
 import { SwapRouter } from '../src/swapRouter'
-import { TokenTypes, Markets } from '../src/entities/NFTTrade'
+import { TokenType, Market } from '../src/entities/NFTTrade'
 import { CurrencyAmount, Currency, Ether } from '@uniswap/sdk-core'
 import { FoundationTrade, FoundationData } from '../src/entities/protocols/foundation'
 import { NFTXTrade, NFTXData } from '../src/entities/protocols/nftx'
@@ -11,23 +11,19 @@ const SAMPLE_ADDR = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 
 describe('SwapRouter', () => {
   describe('Foundation', () => {
+    // buyItem from block 15725945
     const foundationData: FoundationData = {
       referrer: '0x459e213D8B5E79d706aB22b945e3aF983d51BC4C', // official foundation referrer
-    }
-
-    // buyItem from block 15725945
-    const foundationBuyItem = {
-      address: '0xEf96021Af16BD04918b0d87cE045d7984ad6c38c',
+      tokenAddress: '0xEf96021Af16BD04918b0d87cE045d7984ad6c38c',
       tokenId: 32,
-      priceInfo: CurrencyAmount.fromRawAmount(ETHER, expandTo18Decimals(0.01)),
-      tokenType: TokenTypes.ERC721,
-      data: foundationData,
+      price: expandTo18DecimalsBN(0.01),
+      recipient: SAMPLE_ADDR,
     }
 
     it('encodes a single foundation trade', async () => {
-      const foundationTrade = new FoundationTrade(SAMPLE_ADDR, [foundationBuyItem])
+      const foundationTrade = new FoundationTrade([foundationData])
       const methodParameters = SwapRouter.swapGenieCallParameters([foundationTrade])
-      expect(methodParameters.value).to.eq(foundationBuyItem.priceInfo.quotient.toString())
+      expect(methodParameters.value).to.eq(foundationData.price.toString())
       expect(methodParameters.calldata).to.eq(
         '0x24856bc30000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000010f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000160000000000000000000000000000000000000000000000000002386f26fc1000000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000000000000000000ef96021af16bd04918b0d87ce045d7984ad6c38c00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000084b01ef608000000000000000000000000ef96021af16bd04918b0d87ce045d7984ad6c38c0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000002386f26fc10000000000000000000000000000459e213d8b5e79d706ab22b945e3af983d51bc4c00000000000000000000000000000000000000000000000000000000'
       )
@@ -35,31 +31,28 @@ describe('SwapRouter', () => {
   })
 
   describe('NFTX', () => {
-    const nftxDataCovenVault: NFTXData = {
+    // buyItems from block 15360000
+    const nftxBuyItemCoven1: NFTXData = {
+      recipient: SAMPLE_ADDR,
+      tokenAddress: '0x5180db8f5c931aae63c74266b211f580155ecac8',
+      tokenId: 584,
+      price: expandTo18DecimalsBN(0.5),
+      vaultId: 333,
+      vaultAddress: '0xd89b16331f39ab3878daf395052851d3ac8cf3cd',
+    }
+    const nftxBuyItemCoven2: NFTXData = {
+      recipient: SAMPLE_ADDR,
+      tokenAddress: '0x5180db8f5c931aae63c74266b211f580155ecac8',
+      tokenId: 3033,
+      price: expandTo18DecimalsBN(0.5),
       vaultId: 333,
       vaultAddress: '0xd89b16331f39ab3878daf395052851d3ac8cf3cd',
     }
 
-    // buyItems from block 15360000
-    const nftxBuyItemCoven1 = {
-      address: '0x5180db8f5c931aae63c74266b211f580155ecac8',
-      tokenId: 584,
-      priceInfo: CurrencyAmount.fromRawAmount(ETHER, expandTo18Decimals(0.5)),
-      tokenType: TokenTypes.ERC721,
-      data: nftxDataCovenVault,
-    }
-    const nftxBuyItemCoven2 = {
-      address: '0x5180db8f5c931aae63c74266b211f580155ecac8',
-      tokenId: 3033,
-      priceInfo: CurrencyAmount.fromRawAmount(ETHER, expandTo18Decimals(0.5)),
-      tokenType: TokenTypes.ERC721,
-      data: nftxDataCovenVault,
-    }
-
     it('encodes buying two NFTs from a single NFTX vault', async () => {
-      const nftxTrade = new NFTXTrade(SAMPLE_ADDR, [nftxBuyItemCoven1, nftxBuyItemCoven2])
+      const nftxTrade = new NFTXTrade([nftxBuyItemCoven1, nftxBuyItemCoven2])
       const methodParameters = SwapRouter.swapGenieCallParameters([nftxTrade])
-      expect(methodParameters.value).to.eq(expandTo18Decimals(1).toString())
+      expect(methodParameters.value).to.eq(expandTo18DecimalsBN(1).toString())
       expect(methodParameters.calldata).to.eq(
         '0x24856bc30000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000010a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000001e00000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000001647fc82484000000000000000000000000000000000000000000000000000000000000014d000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000100000000000000000000000000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000002480000000000000000000000000000000000000000000000000000000000000bd90000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000d89b16331f39ab3878daf395052851d3ac8cf3cd00000000000000000000000000000000000000000000000000000000'
       )

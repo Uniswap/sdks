@@ -1,6 +1,6 @@
 import invariant from 'tiny-invariant'
-import { BigNumber, BigNumberish } from 'ethers'
-import { CurrencyAmount, WETH9, Ether, Currency } from '@uniswap/sdk-core'
+import { BigNumberish } from 'ethers'
+import { CurrencyAmount, Currency } from '@uniswap/sdk-core'
 import { SeaportData } from './protocols/seaport'
 import { FoundationData } from './protocols/foundation'
 import { NFTXData } from './protocols/nftx'
@@ -10,31 +10,31 @@ import { getNativeCurrencyValue } from '../utils/getNativeCurrencyValue'
 export type SupportedProtocolsData = SeaportData | FoundationData | NFTXData
 
 export abstract class NFTTrade<T> {
-  readonly recipient: string //address
-  readonly buyItems: BuyItem<T>[]
-  readonly nativeCurrencyValue: CurrencyAmount<Currency>
+  readonly orders: T[]
+  readonly market: Market
 
-  constructor(recipient: string, buyItems: BuyItem<T>[]) {
-    invariant(buyItems.length > 0, 'no buy Items')
-    invariant(recipient.length > 0, 'no recipient')
-    invariant(!!buyItems[0].priceInfo.currency.isNative, 'only native currency supported')
-    this.recipient = recipient
-    this.buyItems = buyItems
-    this.nativeCurrencyValue = getNativeCurrencyValue(buyItems.map((i) => i.priceInfo))
+  constructor(market: Market, orders: T[]) {
+    invariant(orders.length > 0, 'no buy Items')
+    this.market = market
+    this.orders = orders
   }
 
   abstract encode(planner: RoutePlanner): void
+
+  abstract getBuyItems(): BuyItem[]
+
+  abstract getTotalPrice(): BigNumberish
 }
 
-export type BuyItem<T> = {
-  address: string
+export type BuyItem = {
+  tokenAddress: string
   tokenId: BigNumberish
-  priceInfo: CurrencyAmount<Currency>
-  tokenType: TokenTypes
-  data: T
+  priceInfo: BigNumberish
+  tokenType: TokenType
+  amount?: BigNumberish // for 1155
 }
 
-export enum Markets {
+export enum Market {
   Foundation = 'foundation',
   LooksRare = 'looksrare',
   NFT20 = 'nft20',
@@ -45,7 +45,7 @@ export enum Markets {
   X2Y2 = 'x2y2',
 }
 
-export enum TokenTypes {
+export enum TokenType {
   ERC721 = 'ERC721',
   ERC1155 = 'ERC1155',
   Cryptopunk = 'Cryptopunk',
