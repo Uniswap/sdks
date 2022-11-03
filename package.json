@@ -21,6 +21,7 @@
     "test:prettier": "prettier \"src/**/*.ts\" --list-different",
     "test:unit": "jest --testPathPattern src",
     "test:integration": "yarn build && cd integration && yarn && yarn test",
+    "prepare": "npm run build",
     "typechain": "typechain --target=ethers-v5 --out-dir src/contracts --glob ./abis/**/*.json"
   },
   "peerDependencies": {},
