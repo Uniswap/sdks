@@ -1,3 +1,4 @@
+import invariant from 'tiny-invariant'
 import { abi } from '@uniswap/narwhal/artifacts/contracts/Router.sol/Router.json'
 import { Interface } from '@ethersproject/abi'
 import { BigNumber, BigNumberish } from 'ethers'
@@ -22,7 +23,7 @@ export abstract class SwapRouter {
     config: SwapRouterConfig = {}
   ): MethodParameters {
     let planner = new RoutePlanner()
-    let nativeCurrencyValue: BigNumber = BigNumber.from(0)
+    let nativeCurrencyValue = CurrencyAmount.fromRawAmount(trades[0].buyItems[0]!.priceInfo.currency, 0)
 
     for (const trade of trades) {
       trade.encode(planner)
@@ -30,17 +31,9 @@ export abstract class SwapRouter {
     }
     const { commands, inputs } = planner
 
-    let calldata: string
-    if (config.deadline) {
-      calldata = SwapRouter.INTERFACE.encodeFunctionData('execute(bytes,bytes[],uint256)', [
-        commands,
-        inputs,
-        config.deadline,
-      ])
-    } else {
-      calldata = SwapRouter.INTERFACE.encodeFunctionData('execute(bytes,bytes[])', [commands, inputs])
-    }
-
-    return { calldata, value: nativeCurrencyValue.toString() }
+    const functionSignature = !!config.deadline ? 'execute(bytes,bytes[],uint256)' : 'execute(bytes,bytes[])'
+    const parameters = !!config.deadline ? [commands, inputs, config.deadline] : [commands, inputs]
+    const calldata = SwapRouter.INTERFACE.encodeFunctionData(functionSignature, parameters)
+    return { calldata, value: nativeCurrencyValue.quotient.toString() }
   }
 }

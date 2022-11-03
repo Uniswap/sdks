@@ -1,23 +1,17 @@
 import { ethers, BigNumber } from 'ethers'
-import { Currency, CurrencyAmount } from '@uniswap/sdk-core'
+import { Currency, CurrencyAmount, Ether } from '@uniswap/sdk-core'
 
-export function getNativeCurrencyValue(currencyValues: CurrencyAmount<Currency>[]): BigNumber {
+export function getNativeCurrencyValue(currencyValues: CurrencyAmount<Currency>[]): CurrencyAmount<Currency> {
   for (const value of currencyValues) {
     if (value.currency.isNative) {
       const nativeCurrency = value.currency
       const zero = CurrencyAmount.fromRawAmount(nativeCurrency, 0)
 
-      const currencyAmount = currencyValues.reduce(function (
-        prevValue: CurrencyAmount<Currency>,
-        currValue: CurrencyAmount<Currency>
-      ) {
+      return currencyValues.reduce(function (prevValue: CurrencyAmount<Currency>, currValue: CurrencyAmount<Currency>) {
         const value = currValue.currency.isNative ? currValue : zero
         return prevValue.add(value)
-      },
-      zero)
-      return BigNumber.from(currencyAmount.quotient.toString())
+      }, zero)
     }
   }
-
-  return BigNumber.from(0)
+  return CurrencyAmount.fromRawAmount(Ether.onChain(1), 0)
 }
