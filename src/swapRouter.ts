@@ -3,7 +3,6 @@ import { abi } from '@uniswap/narwhal/artifacts/contracts/Router.sol/Router.json
 import { Interface } from '@ethersproject/abi'
 import { BigNumber, BigNumberish } from 'ethers'
 import { MethodParameters } from '@uniswap/v3-sdk'
-import { CurrencyAmount, WETH9, Ether, Currency } from '@uniswap/sdk-core'
 import { NFTTrade, Market, SupportedProtocolsData } from './entities/NFTTrade'
 import { RoutePlanner } from './utils/routerCommands'
 
