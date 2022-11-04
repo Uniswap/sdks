@@ -1,0 +1,44 @@
+name: Forge Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          token: '${{ secrets.NARWHAL_TOKEN }}'
+
+      - name: Setup node
+        uses: actions/setup-node@v2
+        with:
+          node-version: 16
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: |
+          npm config set '//registry.npmjs.org/:_authToken' "${{ secrets.NPM_AUTH_TOKEN }}" \
+          && yarn install --frozen-lockfile
+
+      - name: Build
+        run: yarn build
+
+      - name: Write interop
+        run: yarn test
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Run tests
+        run: yarn test:forge
+        env:
+          FORK_URL: '${{ secrets.FORK_URL }}'

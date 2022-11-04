@@ -12,7 +12,10 @@
     "node": ">=14"
   },
   "scripts": {
+    "test:all": "yarn test && yarn test:forge",
     "test": "env TS_NODE_COMPILER_OPTIONS='{\"module\": \"commonjs\" }' mocha -r ts-node/register 'tests/**/*.ts'",
+    "test:forge": "yarn install:narwhal && forge test",
+    "install:narwhal": "cd node_modules/@uniswap/narwhal && forge install",
     "build": "tsdx build",
     "prettier:fix": "prettier --write '**/*.ts' && prettier --write '**/*.json'",
     "prettier": "prettier --check '**/*.ts' && prettier --check '**/*.json'",
@@ -34,6 +37,7 @@
     "eslint-plugin-prettier": "^3.4.0",
     "mocha": "^9.0.0",
     "prettier": "^2.3.1",
+    "openzeppelin-contracts": "^4.0.0",
     "ts-loader": "^9.2.3",
     "ts-node": "^10.0.0",
     "tsdx": "^0.14.1",

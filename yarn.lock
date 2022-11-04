@@ -5552,6 +5552,11 @@ onetime@^5.1.0:
   dependencies:
     mimic-fn "^2.1.0"
 
+openzeppelin-contracts@^4.0.0:
+  version "4.0.0"
+  resolved "https://registry.yarnpkg.com/openzeppelin-contracts/-/openzeppelin-contracts-4.0.0.tgz#3b56ae3c5f6a59eaca2eacf935e3ebc18a59cd78"
+  integrity sha512-SlBeiWSJKhX9EY2Nlgev4P/LMBWWSk6wL+eqikAe9gODpxrQwLOx4Rw3vyHuJaChrUTlGyR4Gl1NqJMw0J15eQ==
+
 optionator@^0.8.1, optionator@^0.8.3:
   version "0.8.3"
   resolved "https://registry.yarnpkg.com/optionator/-/optionator-0.8.3.tgz#84fa1d036fe9d3c7e21d99884b601167ec8fb495"
