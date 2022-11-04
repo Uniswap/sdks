@@ -45,7 +45,6 @@ export class FoundationTrade extends NFTTrade<FoundationData> {
       buyItems.push({
         tokenAddress: item.tokenAddress,
         tokenId: item.tokenId,
-        priceInfo: item.price,
         tokenType: TokenType.ERC721,
       })
     }

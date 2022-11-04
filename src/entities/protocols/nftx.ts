@@ -66,7 +66,6 @@ export class NFTXTrade extends NFTTrade<NFTXData> {
       buyItems.push({
         tokenAddress: item.tokenAddress,
         tokenId: item.tokenId,
-        priceInfo: item.price,
         tokenType: TokenType.ERC721,
       })
     }

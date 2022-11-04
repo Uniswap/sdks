@@ -29,7 +29,6 @@ export abstract class NFTTrade<T> {
 export type BuyItem = {
   tokenAddress: string
   tokenId: BigNumberish
-  priceInfo: BigNumberish
   tokenType: TokenType
   amount?: BigNumberish // for 1155
 }
