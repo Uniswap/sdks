@@ -34,7 +34,7 @@ contract PermitHashConstants {
     }
 }
 
-contract AllowanceTransferTest is Test {
+contract Permit2Test is Test {
     using stdJson for string;
 
     address from;
