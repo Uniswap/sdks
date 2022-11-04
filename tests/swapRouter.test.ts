@@ -36,25 +36,17 @@ describe('SwapRouter', () => {
 
   describe('NFTX', () => {
     // buyItems from block 15360000
-    const nftxBuyItemCoven1: NFTXData = {
+    const nftxPurchase2Covens: NFTXData = {
       recipient: SAMPLE_ADDR,
-      tokenAddress: '0x5180db8f5c931aae63c74266b211f580155ecac8',
-      tokenId: 584,
-      price: expandTo18DecimalsBN(0.5),
-      vaultId: 333,
       vaultAddress: '0xd89b16331f39ab3878daf395052851d3ac8cf3cd',
-    }
-    const nftxBuyItemCoven2: NFTXData = {
-      recipient: SAMPLE_ADDR,
-      tokenAddress: '0x5180db8f5c931aae63c74266b211f580155ecac8',
-      tokenId: 3033,
-      price: expandTo18DecimalsBN(0.5),
       vaultId: 333,
-      vaultAddress: '0xd89b16331f39ab3878daf395052851d3ac8cf3cd',
+      tokenAddress: '0x5180db8f5c931aae63c74266b211f580155ecac8',
+      tokenIds: [584, 3033],
+      price: expandTo18DecimalsBN(1),
     }
 
     it('encodes buying two NFTs from a single NFTX vault', async () => {
-      const nftxTrade = new NFTXTrade([nftxBuyItemCoven1, nftxBuyItemCoven2])
+      const nftxTrade = new NFTXTrade([nftxPurchase2Covens])
       const methodParameters = SwapRouter.swapGenieCallParameters([nftxTrade])
       registerFixture('_NFTX_BUY_ITEMS', methodParameters)
       expect(methodParameters.value).to.eq(expandTo18DecimalsBN(1).toString())

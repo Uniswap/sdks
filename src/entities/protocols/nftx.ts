@@ -9,17 +9,17 @@ import JSBI from 'jsbi'
 
 export type NFTXData = {
   recipient: string
-  tokenAddress: string
-  price: BigNumberish
-  tokenId: BigNumberish
-  vaultId: BigNumberish
   vaultAddress: string
+  vaultId: BigNumberish
+  tokenAddress: string
+  tokenIds: BigNumberish[]
+  price: BigNumber
 }
 
 type NFTXVaultPurchase = {
-  vaultAddress: string
   recipient: string
   price: BigNumber
+  vaultAddress: string
   tokenIds: BigNumberish[]
 }
 
@@ -31,43 +31,28 @@ export class NFTXTrade extends NFTTrade<NFTXData> {
   }
 
   encode(planner: RoutePlanner): void {
-    let vaultPurchases: { [keys: string]: NFTXVaultPurchase } = {}
-    for (const item of this.orders) {
-      const vaultId = item.vaultId.toString()
-      if (!vaultPurchases[vaultId]) {
-        vaultPurchases[vaultId] = {
-          vaultAddress: item.vaultAddress,
-          recipient: item.recipient,
-          price: BigNumber.from(0),
-          tokenIds: [],
-        }
-      }
-      assert(vaultPurchases[vaultId].recipient == item.recipient)
-      vaultPurchases[vaultId].tokenIds.push(item.tokenId)
-      vaultPurchases[vaultId].price = vaultPurchases[vaultId].price.add(item.price)
-    }
-
-    for (const vaultId of Object.keys(vaultPurchases)) {
-      const purchase = vaultPurchases[vaultId]
+    for (const order of this.orders) {
       const calldata = NFTXTrade.INTERFACE.encodeFunctionData('buyAndRedeem', [
-        vaultId,
-        purchase.tokenIds.length,
-        purchase.tokenIds,
-        [Ether.onChain(1).wrapped.address, purchase.vaultAddress],
-        purchase.recipient,
+        order.vaultId,
+        order.tokenIds.length,
+        order.tokenIds,
+        [Ether.onChain(1).wrapped.address, order.vaultAddress],
+        order.recipient,
       ])
-      planner.addCommand(CommandType.NFTX, [purchase.price, calldata])
+      planner.addCommand(CommandType.NFTX, [order.price, calldata])
     }
   }
 
   getBuyItems(): BuyItem[] {
     let buyItems: BuyItem[] = []
-    for (const item of this.orders) {
-      buyItems.push({
-        tokenAddress: item.tokenAddress,
-        tokenId: item.tokenId,
-        tokenType: TokenType.ERC721,
-      })
+    for (const order of this.orders) {
+      for (const tokenId of order.tokenIds) {
+        buyItems.push({
+          tokenAddress: order.tokenAddress,
+          tokenId: tokenId,
+          tokenType: TokenType.ERC721,
+        })
+      }
     }
     return buyItems
   }
