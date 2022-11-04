@@ -1,6 +1,6 @@
 import abi from '../../../abis/NFTXZap.json'
 import { Interface } from '@ethersproject/abi'
-import { NFTTrade, BuyItem, Market, TokenType } from '../NFTTrade'
+import { BuyItem, Market, NFTTrade, TokenType, TradeConfig } from '../NFTTrade'
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
 import { ethers, BigNumber, BigNumberish } from 'ethers'
 import { Currency, CurrencyAmount, Ether } from '@uniswap/sdk-core'
@@ -30,7 +30,7 @@ export class NFTXTrade extends NFTTrade<NFTXData> {
     super(Market.NFTX, orders)
   }
 
-  encode(planner: RoutePlanner): void {
+  encode(planner: RoutePlanner, config: TradeConfig): void {
     for (const order of this.orders) {
       const calldata = NFTXTrade.INTERFACE.encodeFunctionData('buyAndRedeem', [
         order.vaultId,
@@ -39,7 +39,7 @@ export class NFTXTrade extends NFTTrade<NFTXData> {
         [Ether.onChain(1).wrapped.address, order.vaultAddress],
         order.recipient,
       ])
-      planner.addCommand(CommandType.NFTX, [order.price, calldata])
+      planner.addCommand(CommandType.NFTX, [order.price, calldata], config.allowRevert)
     }
   }
 

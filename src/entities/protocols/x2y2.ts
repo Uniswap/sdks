@@ -1,6 +1,6 @@
 import abi from '../../../abis/X2Y2.json'
 import { Interface } from '@ethersproject/abi'
-import { NFTTrade, Market, BuyItem, TokenType } from '../NFTTrade'
+import { BuyItem, Market, NFTTrade, TokenType, TradeConfig } from '../NFTTrade'
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
 import { BigNumber, BigNumberish } from 'ethers'
 
@@ -19,12 +19,16 @@ export class X2Y2Trade extends NFTTrade<X2Y2Data> {
     super(Market.X2Y2, orders)
   }
 
-  encode(planner: RoutePlanner): void {
+  encode(planner: RoutePlanner, config: TradeConfig): void {
     for (const item of this.orders) {
       const functionSelector = X2Y2Trade.INTERFACE.getSighash(X2Y2Trade.INTERFACE.getFunction('run'))
       const calldata = functionSelector + item.signedInput.slice(2)
 
-      planner.addCommand(CommandType.X2Y2_721, [item.price, calldata, item.recipient, item.tokenAddress, item.tokenId])
+      planner.addCommand(
+        CommandType.X2Y2_721,
+        [item.price, calldata, item.recipient, item.tokenAddress, item.tokenId],
+        config.allowRevert
+      )
     }
   }
 
