@@ -7,8 +7,9 @@ import { NFTXData } from './protocols/nftx'
 import { RoutePlanner } from '../utils/routerCommands'
 import { getNativeCurrencyValue } from '../utils/getNativeCurrencyValue'
 import { LooksRareData } from './protocols/looksRare'
+import { X2Y2Data } from './protocols/x2y2'
 
-export type SupportedProtocolsData = SeaportData | FoundationData | NFTXData | LooksRareData
+export type SupportedProtocolsData = SeaportData | FoundationData | NFTXData | LooksRareData | X2Y2Data
 
 export abstract class NFTTrade<T> {
   readonly orders: T[]
