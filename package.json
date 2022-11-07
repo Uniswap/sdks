@@ -1,12 +1,11 @@
 {
   "name": "@uniswap/narwhal-sdk",
-  "version": "1.0.0-beta.9",
+  "version": "0.0.1",
   "description": "sdk for integrating with the narwhal contracts",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
   "engines": {
     "node": ">=14"
