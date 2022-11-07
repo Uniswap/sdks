@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "An sdk for interacting with permit2.",
   "publishConfig": {
-    "access": "public"
+    "access": "restricted"
   },
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
