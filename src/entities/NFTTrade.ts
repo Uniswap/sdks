@@ -4,13 +4,21 @@ import { CurrencyAmount, Currency } from '@uniswap/sdk-core'
 import { SeaportData } from './protocols/seaport'
 import { FoundationData } from './protocols/foundation'
 import { NFTXData } from './protocols/nftx'
+import { NFT20Data } from './protocols/nft20'
 import { RoutePlanner } from '../utils/routerCommands'
 import { getNativeCurrencyValue } from '../utils/getNativeCurrencyValue'
 import { LooksRareData } from './protocols/looksRare'
 import { CryptopunkData } from './protocols/cryptopunk'
 import { X2Y2Data } from './protocols/x2y2'
 
-export type SupportedProtocolsData = SeaportData | FoundationData | NFTXData | LooksRareData | X2Y2Data | CryptopunkData
+export type SupportedProtocolsData =
+  | SeaportData
+  | FoundationData
+  | NFTXData
+  | LooksRareData
+  | X2Y2Data
+  | CryptopunkData
+  | NFT20Data
 
 export type TradeConfig = {
   allowRevert: boolean

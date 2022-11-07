@@ -113,7 +113,7 @@ contract SwapGenieCallParametersTest is Test, Interop, DeployRouter {
         Router router = deployRouterMainnetConfig();
         ICryptopunksMarket token = ICryptopunksMarket(0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB);
         uint256 balance = 80 ether;
-        
+
         vm.deal(from, balance);
         assertEq(from.balance, balance);
         assertEq(token.balanceOf(RECIPIENT), 0);
@@ -121,11 +121,11 @@ contract SwapGenieCallParametersTest is Test, Interop, DeployRouter {
         (bool success,) = address(router).call{value: params.value}(params.data);
         require(success, "call failed");
         assertEq(token.balanceOf(RECIPIENT), 1);
-        
+
         assertEq(token.punkIndexToAddress(2976), RECIPIENT);
         assertEq(from.balance, balance - params.value);
     }
-        
+
     function testX2Y2BuyItems() public {
         MethodParameters memory params = readFixture(json, "._X2Y2_BUY_ITEM");
 
@@ -145,6 +145,28 @@ contract SwapGenieCallParametersTest is Test, Interop, DeployRouter {
 
         require(success, "call failed");
         assertEq(token.balanceOf(RECIPIENT), 1);
+        assertEq(from.balance, balance-params.value);
+    }
+
+    function testNFT20BuyItems() public {
+        MethodParameters memory params = readFixture(json, "._NFT20_BUY_ITEM");
+
+        vm.createSelectFork(vm.envString("FORK_URL"), 15770228);
+        vm.startPrank(from);
+
+        Router router = deployRouterMainnetConfig();
+        assertEq(address(router), ROUTER_ADDRESS); // to ensure the router address in sdk is correct
+
+        ERC721 token = ERC721(0x6d05064fe99e40F1C3464E7310A23FFADed56E20);
+        uint256 balance = 20583701229648230;
+        vm.deal(from, balance);
+        assertEq(from.balance, balance);
+        assertEq(token.balanceOf(RECIPIENT), 0);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+
+        require(success, "call failed");
+        assertEq(token.balanceOf(RECIPIENT), 3);
         assertEq(from.balance, balance-params.value);
     }
 
