@@ -1,3 +1,4 @@
+export * from './cryptopunk'
 export * from './foundation'
 export * from './looksRare'
 export * from './nftx'
