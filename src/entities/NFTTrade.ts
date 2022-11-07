@@ -7,9 +7,10 @@ import { NFTXData } from './protocols/nftx'
 import { RoutePlanner } from '../utils/routerCommands'
 import { getNativeCurrencyValue } from '../utils/getNativeCurrencyValue'
 import { LooksRareData } from './protocols/looksRare'
+import { CryptopunkData } from './protocols/cryptopunk'
 import { X2Y2Data } from './protocols/x2y2'
 
-export type SupportedProtocolsData = SeaportData | FoundationData | NFTXData | LooksRareData | X2Y2Data
+export type SupportedProtocolsData = SeaportData | FoundationData | NFTXData | LooksRareData | X2Y2Data | CryptopunkData
 
 export type TradeConfig = {
   allowRevert: boolean

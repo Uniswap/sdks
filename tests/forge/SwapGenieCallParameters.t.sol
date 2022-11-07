@@ -6,6 +6,7 @@ import {ERC721} from "solmate/tokens/ERC721.sol";
 import {Router} from "narwhal/Router.sol";
 import {DeployRouter} from "./utils/DeployRouter.sol";
 import {MethodParameters, Interop} from "./utils/Interop.sol";
+import {ICryptopunksMarket} from "./utils/ICryptopunksMarket.sol";
 
 contract SwapGenieCallParametersTest is Test, Interop, DeployRouter {
     using stdJson for string;
@@ -103,6 +104,28 @@ contract SwapGenieCallParametersTest is Test, Interop, DeployRouter {
         assertEq(from.balance, balance - params.value);
     }
 
+    function testCryptopunkBuyItems() public {
+        MethodParameters memory params = readFixture(json, "._CRYPTOPUNK_BUY_ITEM");
+        // older block 15360000 does not work
+        vm.createSelectFork(vm.envString("FORK_URL"), 15898323);
+        vm.startPrank(from);
+
+        Router router = deployRouterMainnetConfig();
+        ICryptopunksMarket token = ICryptopunksMarket(0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB);
+        uint256 balance = 80 ether;
+        
+        vm.deal(from, balance);
+        assertEq(from.balance, balance);
+        assertEq(token.balanceOf(RECIPIENT), 0);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertEq(token.balanceOf(RECIPIENT), 1);
+        
+        assertEq(token.punkIndexToAddress(2976), RECIPIENT);
+        assertEq(from.balance, balance - params.value);
+    }
+        
     function testX2Y2BuyItems() public {
         MethodParameters memory params = readFixture(json, "._X2Y2_BUY_ITEM");
 
@@ -142,6 +165,7 @@ contract SwapGenieCallParametersTest is Test, Interop, DeployRouter {
         (bool success,) = address(router).call{value: params.value}(params.data);
         require(success, "call failed");
         assertEq(token.balanceOf(RECIPIENT), 1);
+
         assertEq(from.balance, balance - params.value + failedAmount);
     }
 }
