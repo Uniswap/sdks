@@ -8,6 +8,7 @@ import { NFT20Data } from './protocols/nft20'
 import { RoutePlanner } from '../utils/routerCommands'
 import { getNativeCurrencyValue } from '../utils/getNativeCurrencyValue'
 import { LooksRareData } from './protocols/looksRare'
+import { SudoswapData } from './protocols/sudoswap'
 import { CryptopunkData } from './protocols/cryptopunk'
 import { X2Y2Data } from './protocols/x2y2'
 
@@ -19,6 +20,7 @@ export type SupportedProtocolsData =
   | X2Y2Data
   | CryptopunkData
   | NFT20Data
+  | SudoswapData
 
 export type TradeConfig = {
   allowRevert: boolean

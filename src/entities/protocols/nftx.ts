@@ -16,13 +16,6 @@ export type NFTXData = {
   value: BigNumber
 }
 
-type NFTXVaultPurchase = {
-  recipient: string
-  value: BigNumber
-  vaultAddress: string
-  tokenIds: BigNumberish[]
-}
-
 export class NFTXTrade extends NFTTrade<NFTXData> {
   public static INTERFACE: Interface = new Interface(abi)
 
