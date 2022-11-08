@@ -269,11 +269,11 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
       const path: string = encodeMixedRouteToPath(newRoute)
 
       planner.addCommand(CommandType.V3_SWAP_EXACT_IN, [
-        isLastSectionInRoute(i) ? options.recipient : NARWHAL_ADDRESS, // recipient
+        isLastSectionInRoute(i) && !trade.outputAmount.currency.isNative ? options.recipient : NARWHAL_ADDRESS, // recipient
         i == 0 ? amountIn : 0, // amountIn
         !isLastSectionInRoute(i) ? 0 : amountOut, // amountOut
         path, // path
-        payerIsUser, // payerIsUser
+        payerIsUser && i === 0, // payerIsUser
       ])
     } else {
       // need to explicitly transfer input tokens to the pool as narwhal doesnt handle this for us
@@ -295,7 +295,7 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
       planner.addCommand(CommandType.V2_SWAP_EXACT_IN, [
         !isLastSectionInRoute(i) ? 0 : amountOut, // amountOutMin
         newRoute.path.map((pool) => pool.address), // path
-        isLastSectionInRoute(i) ? options.recipient : NARWHAL_ADDRESS, // recipient
+        isLastSectionInRoute(i) && !trade.outputAmount.currency.isNative ? options.recipient : NARWHAL_ADDRESS, // recipient
       ])
     }
   }

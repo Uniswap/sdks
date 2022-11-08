@@ -271,6 +271,19 @@ describe('Uniswap', () => {
       registerFixture('_UNISWAP_MIXED_EXACT_INPUT_NATIVE_V3_ONLY', methodParameters)
       expect(methodParameters.value).to.eq(inputEther)
     })
+
+    it('encodes a mixed exactInput v2DAI->v3USDC->ETH swap', async () => {
+      const inputDai = utils.parseEther('1000').toString()
+      const trade = await MixedRouteTrade.fromRoute(
+        new MixedRouteSDK([USDC_DAI_V2, WETH_USDC_V3], DAI, ETHER),
+        CurrencyAmount.fromRawAmount(DAI, inputDai),
+        TradeType.EXACT_INPUT
+      )
+      const opts = swapOptions({})
+      const methodParameters = SwapRouter.swapERC20CallParameters([trade], opts)
+      registerFixture('_UNISWAP_MIXED_EXACT_INPUT_ERC20', methodParameters)
+      expect(methodParameters.value).to.eq('0')
+    })
   })
 })
 

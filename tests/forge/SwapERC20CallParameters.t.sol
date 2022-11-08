@@ -265,6 +265,22 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         assertGt(DAI.balanceOf(RECIPIENT), 10000000);
     }
 
+    function testMixedExactInputERC20V2ToV3() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_MIXED_EXACT_INPUT_ERC20");
+
+        uint256 daiAmount = 1000 ether;
+        deal(address(DAI), from, daiAmount);
+        DAI.approve(address(permit2), daiAmount);
+        permit2.approve(address(DAI), address(router), uint160(daiAmount), uint64(block.timestamp + 1000));
+        assertEq(DAI.balanceOf(from), daiAmount);
+        uint256 startingRecipientBalance = RECIPIENT.balance;
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertLe(DAI.balanceOf(from), 0);
+        assertGe(RECIPIENT.balance, startingRecipientBalance + 10000000);
+    }
+
     function forkAndDeploy(uint256 forkBlock) private returns (Router _router, Permit2 _permit2) {
         vm.createSelectFork(vm.envString("FORK_URL"), forkBlock);
         vm.startPrank(from);
