@@ -7,6 +7,7 @@ import { NFTXData } from './protocols/nftx'
 import { NFT20Data } from './protocols/nft20'
 import { RoutePlanner } from '../utils/routerCommands'
 import { getNativeCurrencyValue } from '../utils/getNativeCurrencyValue'
+import { Command, TradeConfig } from './Command'
 import { LooksRareData } from './protocols/looksRare'
 import { SudoswapData } from './protocols/sudoswap'
 import { CryptopunkData } from './protocols/cryptopunk'
@@ -22,11 +23,7 @@ export type SupportedProtocolsData =
   | NFT20Data
   | SudoswapData
 
-export type TradeConfig = {
-  allowRevert: boolean
-}
-
-export abstract class NFTTrade<T> {
+export abstract class NFTTrade<T> implements Command {
   readonly orders: T[]
   readonly market: Market
 

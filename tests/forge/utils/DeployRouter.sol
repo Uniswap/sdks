@@ -3,6 +3,7 @@ pragma solidity ^0.8.17;
 
 import {Test} from "forge-std/Test.sol";
 import {Router} from "narwhal/Router.sol";
+import {Permit2} from "permit2/src/Permit2.sol";
 
 contract DeployRouter is Test {
     address public constant LOOKS_TOKEN = 0xf4d2888d29D722226FafA5d9B24F9164c092421E;
@@ -14,6 +15,20 @@ contract DeployRouter is Test {
     function deployRouterMainnetConfig() public returns (Router router) {
         return new Router(
             address(0), // TODO: update with permit2 address
+            address(0), // TODO: update with routerRewardsDistributor
+            address(0), // TODO: update with looksRareRewardsDistributor
+            address(LOOKS_TOKEN),
+            address(V2_FACTORY),
+            address(V3_FACTORY),
+            PAIR_INIT_CODE_HASH,
+            POOL_INIT_CODE_HASH
+        );
+    }
+
+    function deployFixtureMainnetConfig() public returns (Router router, Permit2 permit2) {
+        permit2 = new Permit2();
+        router = new Router(
+            address(permit2),
             address(0), // TODO: update with routerRewardsDistributor
             address(0), // TODO: update with looksRareRewardsDistributor
             address(LOOKS_TOKEN),

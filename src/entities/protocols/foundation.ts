@@ -1,6 +1,7 @@
 import abi from '../../../abis/Foundation.json'
 import { Interface } from '@ethersproject/abi'
-import { BuyItem, Market, NFTTrade, TokenType, TradeConfig } from '../NFTTrade'
+import { BuyItem, Market, NFTTrade, TokenType } from '../NFTTrade'
+import { TradeConfig } from '../Command'
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
 import { BigNumber, BigNumberish } from 'ethers'
 import { CurrencyAmount, Currency, Ether } from '@uniswap/sdk-core'
