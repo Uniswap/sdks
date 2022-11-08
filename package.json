@@ -12,7 +12,7 @@
   },
   "scripts": {
     "test:all": "yarn test && yarn test:forge",
-    "test": "env TS_NODE_COMPILER_OPTIONS='{\"module\": \"commonjs\" }' mocha -r ts-node/register --reporter-option maxDiffSize=10000 'tests/**/*.ts'",
+    "test": "env TS_NODE_COMPILER_OPTIONS='{\"module\": \"commonjs\" }' mocha -r ts-node/register --reporter-option maxDiffSize=100000 'tests/**/*.ts'",
     "test:forge": "yarn install:narwhal && forge test",
     "install:narwhal": "cd node_modules/@uniswap/narwhal && forge install",
     "build": "tsdx build",

@@ -192,7 +192,7 @@ contract SwapGenieCallParametersTest is Test, Interop, DeployRouter {
         assertEq(from.balance, balance - params.value);
     }
 
-    function testPartialFill() public {
+    function testPartialFillBetweenProtocols() public {
         MethodParameters memory params = readFixture(json, "._PARTIAL_FILL");
 
         vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
@@ -208,8 +208,28 @@ contract SwapGenieCallParametersTest is Test, Interop, DeployRouter {
 
         (bool success,) = address(router).call{value: params.value}(params.data);
         require(success, "call failed");
-        assertEq(token.balanceOf(RECIPIENT), 1);
+        assertEq(token.balanceOf(RECIPIENT), 2);
 
+        assertEq(from.balance, balance - params.value + failedAmount);
+    }
+
+    function testPartialFillWithinProtocol() public {
+        MethodParameters memory params = readFixture(json, "._PARTIAL_FILL_WITHIN_PROTOCOL");
+
+        vm.createSelectFork(vm.envString("FORK_URL"), 15725945);
+        vm.startPrank(from);
+
+        Router router = deployRouterMainnetConfig();
+        ERC721 token = ERC721(0xEf96021Af16BD04918b0d87cE045d7984ad6c38c);
+        uint256 balance = 0.02 ether;
+        uint256 failedAmount = 0.01 ether;
+        vm.deal(from, balance);
+        assertEq(from.balance, balance);
+        assertEq(token.balanceOf(RECIPIENT), 0);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertEq(token.balanceOf(RECIPIENT), 1);
         assertEq(from.balance, balance - params.value + failedAmount);
     }
 }

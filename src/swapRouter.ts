@@ -31,7 +31,7 @@ export abstract class SwapRouter {
     let planner = new RoutePlanner()
     let totalPrice = BigNumber.from(0)
 
-    const allowRevert = trades.length > 1 ? true : false
+    const allowRevert = trades.length == 1 && trades[0].orders.length == 1 ? false : true
 
     for (const trade of trades) {
       trade.encode(planner, { allowRevert })
