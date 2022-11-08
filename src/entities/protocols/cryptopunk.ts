@@ -1,4 +1,5 @@
 import { Interface } from '@ethersproject/abi'
+import { TradeConfig } from '../Command'
 import { NFTTrade, Market, TokenType, BuyItem } from '../NFTTrade'
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
 import { BigNumber, BigNumberish } from 'ethers'
@@ -17,9 +18,9 @@ export class CryptopunkTrade extends NFTTrade<CryptopunkData> {
     super(Market.Cryptopunks, orders)
   }
 
-  encode(planner: RoutePlanner): void {
+  encode(planner: RoutePlanner, config: TradeConfig): void {
     for (const item of this.orders) {
-      planner.addCommand(CommandType.CRYPTOPUNKS, [item.tokenId, item.recipient, item.value])
+      planner.addCommand(CommandType.CRYPTOPUNKS, [item.tokenId, item.recipient, item.value], config.allowRevert)
     }
   }
 

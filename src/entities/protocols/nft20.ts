@@ -1,5 +1,6 @@
 import abi from '../../../abis/NFT20.json'
 import { Interface } from '@ethersproject/abi'
+import { TradeConfig } from '../Command'
 import { NFTTrade, Market, TokenType, BuyItem } from '../NFTTrade'
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
 import { ethers, BigNumber, BigNumberish } from 'ethers'
@@ -22,7 +23,7 @@ export class NFT20Trade extends NFTTrade<NFT20Data> {
     super(Market.NFT20, orders)
   }
 
-  encode(planner: RoutePlanner): void {
+  encode(planner: RoutePlanner, config: TradeConfig): void {
     for (const order of this.orders) {
       const calldata = NFT20Trade.INTERFACE.encodeFunctionData('ethForNft', [
         order.tokenAddress,
@@ -32,7 +33,7 @@ export class NFT20Trade extends NFTTrade<NFT20Data> {
         order.fee,
         order.isV3,
       ])
-      planner.addCommand(CommandType.NFT20, [order.value, calldata])
+      planner.addCommand(CommandType.NFT20, [order.value, calldata], config.allowRevert)
     }
   }
 

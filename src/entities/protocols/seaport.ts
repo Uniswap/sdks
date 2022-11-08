@@ -93,7 +93,7 @@ export class SeaportTrade extends NFTTrade<SeaportData> {
           100, // TODO: look into making this a better number
         ])
       }
-      planner.addCommand(CommandType.SEAPORT, [this.getTotalPrice().toString(), calldata])
+      planner.addCommand(CommandType.SEAPORT, [this.getTotalPrice().toString(), calldata], config.allowRevert)
     }
   }
 
