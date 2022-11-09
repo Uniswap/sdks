@@ -138,26 +138,13 @@ function addV2Swap<TInput extends Currency, TOutput extends Currency>(
   )
 
   if (tradeType == TradeType.EXACT_INPUT) {
-    // need to explicitly transfer input tokens to the pool as narwhal doesnt handle this for us
-    if (payerIsUser) {
-      planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [
-        trade.inputAmount.currency.wrapped.address,
-        trade.route.pairs[0].liquidityToken.address,
-        trade.inputAmount.quotient.toString(),
-      ])
-    } else {
-      planner.addCommand(CommandType.TRANSFER, [
-        trade.inputAmount.currency.wrapped.address,
-        trade.route.pairs[0].liquidityToken.address,
-        trade.inputAmount.quotient.toString(),
-      ])
-    }
-
     planner.addCommand(CommandType.V2_SWAP_EXACT_IN, [
+      trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
       trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
       route.path.map((pool) => pool.address),
       // if native, we have to unwrap so keep in the router for now
       trade.outputAmount.currency.isNative ? NARWHAL_ADDRESS : options.recipient,
+      payerIsUser,
     ])
   } else if (tradeType == TradeType.EXACT_OUTPUT) {
     planner.addCommand(CommandType.V2_SWAP_EXACT_OUT, [
@@ -267,35 +254,29 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
 
     if (mixedRouteIsAllV3(newRoute)) {
       const path: string = encodeMixedRouteToPath(newRoute)
+      // if output is native we keep tokens in the router for unwrap
+      const recipient = isLastSectionInRoute(i)
+        ? trade.outputAmount.currency.isNative
+          ? NARWHAL_ADDRESS
+          : options.recipient
+        : // send tokens directly to the first v2 pair of the next section
+          // note: because of the partitioning function we can be sure that the next section is v2
+          (sections[i + 1][0] as Pair).liquidityToken.address
 
       planner.addCommand(CommandType.V3_SWAP_EXACT_IN, [
-        isLastSectionInRoute(i) && !trade.outputAmount.currency.isNative ? options.recipient : NARWHAL_ADDRESS, // recipient
+        recipient,
         i == 0 ? amountIn : 0, // amountIn
         !isLastSectionInRoute(i) ? 0 : amountOut, // amountOut
         path, // path
         payerIsUser && i === 0, // payerIsUser
       ])
     } else {
-      // need to explicitly transfer input tokens to the pool as narwhal doesnt handle this for us
-      if (payerIsUser && i === 0) {
-        planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [
-          newRoute.path[0].wrapped.address,
-          (newRoute.pools[0] as Pair).liquidityToken.address,
-          trade.inputAmount.quotient.toString(),
-        ])
-      } else {
-        // need to transfer whatever we got from the last trade to the first v2 pool
-        planner.addCommand(CommandType.SWEEP, [
-          newRoute.path[0].wrapped.address,
-          (newRoute.pools[0] as Pair).liquidityToken.address,
-          0,
-        ])
-      }
-
       planner.addCommand(CommandType.V2_SWAP_EXACT_IN, [
+        i === 0 ? amountIn : 0, // amountIn
         !isLastSectionInRoute(i) ? 0 : amountOut, // amountOutMin
         newRoute.path.map((pool) => pool.address), // path
         isLastSectionInRoute(i) && !trade.outputAmount.currency.isNative ? options.recipient : NARWHAL_ADDRESS, // recipient
+        payerIsUser && i === 0,
       ])
     }
   }

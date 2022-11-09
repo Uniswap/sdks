@@ -1829,10 +1829,10 @@
   resolved "https://registry.yarnpkg.com/@uniswap/lib/-/lib-4.0.1-alpha.tgz#2881008e55f075344675b3bca93f020b028fbd02"
   integrity sha512-f6UIliwBbRsgVLxIaBANF6w09tYqc6Y/qXdsrbEmXHyFA7ILiKrIwRFXe1yOg8M3cksgVsO9N7yuL2DdCGQKBA==
 
-"@uniswap/narwhal@1.0.0-beta.2":
-  version "1.0.0-beta.2"
-  resolved "https://registry.yarnpkg.com/@uniswap/narwhal/-/narwhal-1.0.0-beta.2.tgz#c9be2bfd40966a5bc3202c8890ad6885cc4560e5"
-  integrity sha512-YtkqD+S0BlBewnk6bO+a0ESVox/aWHSLboiOhU9xiYRFNed6qm4HJkQKdvnn5hS5VvUWPhzsQbVKCvg5vbDnng==
+"@uniswap/narwhal@1.0.0-beta.3":
+  version "1.0.0-beta.3"
+  resolved "https://registry.yarnpkg.com/@uniswap/narwhal/-/narwhal-1.0.0-beta.3.tgz#a7166dac411acd13f59c5f78b0f2503c9b2fbe76"
+  integrity sha512-LAQ8CJhgnGtU//YU3WKW3/LAF2kr1LJznpX9Qmo6MarFf4j7WqrqWvl3PyMYOH07ZMVWIuhG9xXjNBZQcbfmIQ==
 
 "@uniswap/router-sdk@^1.4.0":
   version "1.4.0"
