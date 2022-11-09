@@ -7,11 +7,11 @@ export function permit2Domain(permit2Address: string, chainId: number): TypedDat
     name: PERMIT2_DOMAIN_NAME,
     chainId,
     verifyingContract: permit2Address,
-  };
+  }
 }
 
 export type PermitData = {
-  domain: TypedDataDomain;
-  types: Record<string, TypedDataField[]>;
-  values: any;
-};
+  domain: TypedDataDomain
+  types: Record<string, TypedDataField[]>
+  values: any
+}

@@ -1,44 +1,44 @@
 import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
-import { _TypedDataEncoder } from '@ethersproject/hash';
-import { permit2Domain } from './domain';
+import { _TypedDataEncoder } from '@ethersproject/hash'
+import { permit2Domain } from './domain'
 
 export interface PermitDetails {
   token: string
-  amount: string;
-  expiration: string;
-  nonce: number;
+  amount: string
+  expiration: string
+  nonce: number
 }
 
 export interface PermitSingle {
-  details: PermitDetails;
-  spender: string;
-  sigDeadline: string;
+  details: PermitDetails
+  spender: string
+  sigDeadline: string
 }
 
 export interface PermitBatch {
-  details: PermitDetails[];
-  spender: string;
-  sigDeadline: string;
+  details: PermitDetails[]
+  spender: string
+  sigDeadline: string
 }
 
 export type PermitSingleData = {
-  domain: TypedDataDomain;
-  types: Record<string, TypedDataField[]>;
-  values: PermitSingle;
-};
+  domain: TypedDataDomain
+  types: Record<string, TypedDataField[]>
+  values: PermitSingle
+}
 
 export type PermitBatchData = {
-  domain: TypedDataDomain;
-  types: Record<string, TypedDataField[]>;
-  values: PermitBatch;
-};
+  domain: TypedDataDomain
+  types: Record<string, TypedDataField[]>
+  values: PermitBatch
+}
 
 const PERMIT_DETAILS = [
-    { name: 'token', type: 'address' },
-    { name: 'amount', type: 'uint160' },
-    { name: 'expiration', type: 'uint64' },
-    { name: 'nonce', type: 'uint32' },
-  ];
+  { name: 'token', type: 'address' },
+  { name: 'amount', type: 'uint160' },
+  { name: 'expiration', type: 'uint64' },
+  { name: 'nonce', type: 'uint32' },
+]
 
 const PERMIT_TYPES = {
   PermitSingle: [
@@ -70,7 +70,11 @@ export abstract class AllowanceTransfer {
 
   // return the data to be sent in a eth_signTypedData RPC call
   // for signing the given permit data
-  public static getPermitData(permit: PermitSingle | PermitBatch, permit2Address: string, chainId: number): PermitSingleData | PermitBatchData {
+  public static getPermitData(
+    permit: PermitSingle | PermitBatch,
+    permit2Address: string,
+    chainId: number
+  ): PermitSingleData | PermitBatchData {
     const domain = permit2Domain(permit2Address, chainId)
     if (isPermit(permit)) {
       return {
@@ -88,7 +92,7 @@ export abstract class AllowanceTransfer {
   }
 
   public static hash(permit: PermitSingle | PermitBatch, permit2Address: string, chainId: number): string {
-    const { domain, types, values } = AllowanceTransfer.getPermitData(permit, permit2Address, chainId);
-    return _TypedDataEncoder.hash(domain, types, values);
+    const { domain, types, values } = AllowanceTransfer.getPermitData(permit, permit2Address, chainId)
+    return _TypedDataEncoder.hash(domain, types, values)
   }
 }

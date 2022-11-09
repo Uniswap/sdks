@@ -7,5 +7,5 @@ export function permit2Domain(permit2Address: string, chainId: number): TypedDat
     name: PERMIT2_DOMAIN_NAME,
     chainId,
     verifyingContract: permit2Address,
-  };
+  }
 }
