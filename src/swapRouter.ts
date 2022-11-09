@@ -4,11 +4,12 @@ import { Interface } from '@ethersproject/abi'
 import { BigNumber, BigNumberish } from 'ethers'
 import { MethodParameters, Trade as V3Trade } from '@uniswap/v3-sdk'
 import { Trade as V2Trade } from '@uniswap/v2-sdk'
-import { Trade as RouterTrade, MixedRouteTrade, SwapOptions } from '@uniswap/router-sdk'
-import { Currency, TradeType } from '@uniswap/sdk-core'
+import { Trade as RouterTrade, MixedRouteTrade } from '@uniswap/router-sdk'
+import { Currency, TradeType, Token } from '@uniswap/sdk-core'
 import { NFTTrade, Market, SupportedProtocolsData } from './entities/NFTTrade'
-import { UniswapTrade } from './entities/protocols/uniswap'
+import { UniswapTrade, SwapOptions } from './entities/protocols/uniswap'
 import { CommandType, RoutePlanner } from './utils/routerCommands'
+import { encodePermit } from './utils/permit2'
 import { ETH_ADDRESS } from './utils/constants'
 
 export type SwapRouterConfig = {
@@ -70,7 +71,13 @@ export abstract class SwapRouter {
         ? UniswapTrade.from(trades, options)
         : UniswapTrade.from([trades], options)
 
-    const nativeCurrencyValue = trade.trade.inputAmount.currency.isNative
+    const inputCurrency = trade.trade.inputAmount.currency
+    invariant(!(inputCurrency.isNative && !!options.inputTokenPermit), 'NATIVE_INPUT_PERMIT')
+    if (options.inputTokenPermit && inputCurrency instanceof Token) {
+      encodePermit(planner, options.inputTokenPermit, inputCurrency)
+    }
+
+    const nativeCurrencyValue = inputCurrency.isNative
       ? BigNumber.from(trade.trade.maximumAmountIn(options.slippageTolerance).quotient.toString())
       : BigNumber.from(0)
 

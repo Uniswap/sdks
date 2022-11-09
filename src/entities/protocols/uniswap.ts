@@ -12,14 +12,21 @@ import {
   RouteV3,
   MixedRouteSDK,
   MixedRoute,
-  SwapOptions,
+  SwapOptions as RouterSwapOptions,
   getOutputOfPools,
   encodeMixedRouteToPath,
   partitionMixedRouteByProtocol,
 } from '@uniswap/router-sdk'
+import { Permit2Permit } from '../../utils/permit2'
 import { Currency, TradeType, CurrencyAmount, Percent } from '@uniswap/sdk-core'
 import { Command, TradeConfig } from '../Command'
 import { NARWHAL_ADDRESS } from '../../utils/constants'
+
+// the existing router permit object doesn't include enough data for permit2
+// so we extend swap options with the permit2 permit
+export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit'> & {
+  inputTokenPermit?: Permit2Permit
+}
 
 const REFUND_ETH_PRICE_IMPACT_THRESHOLD = new Percent(JSBI.BigInt(50), JSBI.BigInt(100))
 

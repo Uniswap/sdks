@@ -15,6 +15,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
+          token: '${{ secrets.NARWHAL_TOKEN }}'
 
       - name: Setup node
         uses: actions/setup-node@v2
@@ -26,6 +29,15 @@ jobs:
         run: |
           npm config set '//registry.npmjs.org/:_authToken' "${{ secrets.NPM_AUTH_TOKEN }}" \
           && yarn install --frozen-lockfile
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      # needed to generate abi
+      - name: Build solidity
+        run: forge build
 
       - name: Run tests
         run: yarn test

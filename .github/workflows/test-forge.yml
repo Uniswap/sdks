@@ -29,12 +29,6 @@ jobs:
           npm config set '//registry.npmjs.org/:_authToken' "${{ secrets.NPM_AUTH_TOKEN }}" \
           && yarn install --frozen-lockfile
 
-      - name: Build
-        run: yarn build
-
-      - name: Write interop
-        run: yarn test
-
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:

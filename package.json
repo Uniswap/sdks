@@ -35,8 +35,8 @@
     "chai": "^4.3.4",
     "eslint-plugin-prettier": "^3.4.0",
     "mocha": "^9.0.0",
-    "prettier": "^2.3.1",
     "openzeppelin-contracts": "^4.0.0",
+    "prettier": "^2.3.1",
     "ts-loader": "^9.2.3",
     "ts-node": "^10.0.0",
     "tsdx": "^0.14.1",
@@ -46,6 +46,7 @@
   },
   "dependencies": {
     "@uniswap/narwhal": "1.0.0-beta.3",
+    "@uniswap/permit2-sdk": "^0.1.0",
     "@uniswap/router-sdk": "^1.4.0",
     "@uniswap/sdk-core": "^3.1.0",
     "@uniswap/v2-sdk": "^3.0.1",

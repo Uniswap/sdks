@@ -1834,6 +1834,15 @@
   resolved "https://registry.yarnpkg.com/@uniswap/narwhal/-/narwhal-1.0.0-beta.3.tgz#a7166dac411acd13f59c5f78b0f2503c9b2fbe76"
   integrity sha512-LAQ8CJhgnGtU//YU3WKW3/LAF2kr1LJznpX9Qmo6MarFf4j7WqrqWvl3PyMYOH07ZMVWIuhG9xXjNBZQcbfmIQ==
 
+"@uniswap/permit2-sdk@^0.1.0":
+  version "0.1.0"
+  resolved "https://registry.yarnpkg.com/@uniswap/permit2-sdk/-/permit2-sdk-0.1.0.tgz#cfc73a6ea9dbb743c9adfa26cabae5bece56a33d"
+  integrity sha512-AWfLq4p+/Cb21CgwwW5VigLv1HFaEGIQGxNmN73tSxGuJv2RV0GRrxQf51SexueCnWKuLKWnPLo1L9b9XwSJ4A==
+  dependencies:
+    "@ethersproject/abi" "^5.7.0"
+    "@ethersproject/keccak256" "^5.7.0"
+    "@ethersproject/strings" "^5.7.0"
+
 "@uniswap/router-sdk@^1.4.0":
   version "1.4.0"
   resolved "https://registry.yarnpkg.com/@uniswap/router-sdk/-/router-sdk-1.4.0.tgz#0e8d49f37b36e74b6a70ec257ec0561bf1f249c3"
