@@ -1,73 +1,94 @@
-import { defaultAbiCoder } from '@ethersproject/abi'
-import { keccak256 } from '@ethersproject/keccak256'
+import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
+import { _TypedDataEncoder } from '@ethersproject/hash';
+import { permit2Domain } from './domain';
 
-export interface Permit {
+export interface PermitDetails {
   token: string
-  spender: string
-  amount: string
-  expiration: string
-  nonce: number
-  sigDeadline: string
+  amount: string;
+  expiration: string;
+  nonce: number;
+}
+
+export interface PermitSingle {
+  details: PermitDetails;
+  spender: string;
+  sigDeadline: string;
 }
 
 export interface PermitBatch {
-  tokens: string[]
-  spender: string
-  amounts: string[]
-  expirations: string[]
-  nonce: number
-  sigDeadline: string
+  details: PermitDetails[];
+  spender: string;
+  sigDeadline: string;
 }
 
-function isPermit(permit: Permit | PermitBatch): permit is Permit {
-  return typeof (permit as Permit).token === 'string'
+export type PermitSingleData = {
+  domain: TypedDataDomain;
+  types: Record<string, TypedDataField[]>;
+  values: PermitSingle;
+};
+
+export type PermitBatchData = {
+  domain: TypedDataDomain;
+  types: Record<string, TypedDataField[]>;
+  values: PermitBatch;
+};
+
+const PERMIT_DETAILS = [
+    { name: 'token', type: 'address' },
+    { name: 'amount', type: 'uint160' },
+    { name: 'expiration', type: 'uint64' },
+    { name: 'nonce', type: 'uint32' },
+  ];
+
+const PERMIT_TYPES = {
+  PermitSingle: [
+    { name: 'details', type: 'PermitDetails' },
+    { name: 'spender', type: 'address' },
+    { name: 'sigDeadline', type: 'uint256' },
+  ],
+  PermitDetails: PERMIT_DETAILS,
+}
+
+const PERMIT_BATCH_TYPES = {
+  PermitBatch: [
+    { name: 'details', type: 'PermitDetails[]' },
+    { name: 'spender', type: 'address' },
+    { name: 'sigDeadline', type: 'uint256' },
+  ],
+  PermitDetails: PERMIT_DETAILS,
+}
+
+function isPermit(permit: PermitSingle | PermitBatch): permit is PermitSingle {
+  return !Array.isArray(permit.details)
 }
 
 export abstract class AllowanceTransfer {
-  public static readonly _PERMIT_TYPEHASH = '0xc262c81437d10e77733d4856afeb901aafea41ef8a375a833df86061f7e69bb0'
-
-  public static readonly _PERMIT_BATCH_TYPEHASH = '0x1d00f263ce5f44712241eac8e0b65b8276dadd1536ae5679879126f4d4c2d653'
-
   /**
    * Cannot be constructed.
    */
   private constructor() {}
 
-  private static encodePackedDynamicArray(values: string[], solidityType: 'address' | 'uint160' | 'uint64'): string {
-    return defaultAbiCoder.encode(new Array<string>(values.length).fill(solidityType), values)
+  // return the data to be sent in a eth_signTypedData RPC call
+  // for signing the given permit data
+  public static getPermitData(permit: PermitSingle | PermitBatch, permit2Address: string, chainId: number): PermitSingleData | PermitBatchData {
+    const domain = permit2Domain(permit2Address, chainId)
+    if (isPermit(permit)) {
+      return {
+        domain,
+        types: PERMIT_TYPES,
+        values: permit,
+      }
+    } else {
+      return {
+        domain,
+        types: PERMIT_BATCH_TYPES,
+        values: permit,
+      }
+    }
   }
 
-  public static hash(permit: Permit | PermitBatch): string {
-    if (isPermit(permit)) {
-      return keccak256(
-        defaultAbiCoder.encode(
-          ['bytes32', 'address', 'address', 'uint160', 'uint64', 'uint32', 'uint256'],
-          [
-            this._PERMIT_TYPEHASH,
-            permit.token,
-            permit.spender,
-            permit.amount,
-            permit.expiration,
-            permit.nonce,
-            permit.sigDeadline,
-          ]
-        )
-      )
-    } else {
-      return keccak256(
-        defaultAbiCoder.encode(
-          ['bytes32', 'bytes32', 'address', 'bytes32', 'bytes32', 'uint32', 'uint256'],
-          [
-            this._PERMIT_BATCH_TYPEHASH,
-            keccak256(AllowanceTransfer.encodePackedDynamicArray(permit.tokens, 'address')),
-            permit.spender,
-            keccak256(AllowanceTransfer.encodePackedDynamicArray(permit.amounts, 'uint160')),
-            keccak256(AllowanceTransfer.encodePackedDynamicArray(permit.expirations, 'uint64')),
-            permit.nonce,
-            permit.sigDeadline,
-          ]
-        )
-      )
-    }
+  public static hash(permit: PermitSingle | PermitBatch, permit2Address: string, chainId: number): string {
+    const { domain, types, values } = AllowanceTransfer.getPermitData(permit, permit2Address, chainId);
+    return _TypedDataEncoder.hash(domain, types, values);
   }
 }

@@ -28,6 +28,8 @@
   "license": "MIT",
   "dependencies": {
     "@ethersproject/abi": "^5.7.0",
+    "@ethersproject/abstract-signer": "^5.7.0",
+    "@ethersproject/hash": "^5.7.0",
     "@ethersproject/keccak256": "^5.7.0",
     "@ethersproject/strings": "^5.7.0"
   },
