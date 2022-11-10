@@ -17,7 +17,7 @@ describe('AllowanceTransfer', () => {
         '0x0000000000000000000000000000000000000000',
         1
       )
-    ).toBe('0x18d57865d2758c0e50c5f2492ba3717e4ad0dd2cf1f4d785946fa7cf4a28b398')
+    ).toBe('0xd47437bffdbc4d123a2165feb6ca646b8700c038622ce304f84e9048bc744f36')
   })
 
   it('batch', () => {
@@ -38,6 +38,6 @@ describe('AllowanceTransfer', () => {
         '0x0000000000000000000000000000000000000000',
         1
       )
-    ).toBe('0x04eb5aea3274b591e2461c5fd2b98ec76f3074185afbf70af94fddcb3d86ec14')
+    ).toBe('0x49642ada5f77eb9458f8265eb01fed2684c2f25d50534fea3efdf2cf395deb2f')
   })
 })

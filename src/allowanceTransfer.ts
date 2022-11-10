@@ -36,8 +36,8 @@ export type PermitBatchData = {
 const PERMIT_DETAILS = [
   { name: 'token', type: 'address' },
   { name: 'amount', type: 'uint160' },
-  { name: 'expiration', type: 'uint64' },
-  { name: 'nonce', type: 'uint32' },
+  { name: 'expiration', type: 'uint48' },
+  { name: 'nonce', type: 'uint48' },
 ]
 
 const PERMIT_TYPES = {
