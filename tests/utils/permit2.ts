@@ -35,33 +35,8 @@ export async function generatePermitSignature(permit: PermitSingle, signer: Wall
 }
 
 export function toInputPermit(signature: string, permit: PermitSingle): Permit2Permit {
-  return _toInputPermit(
-    signature,
-    permit.details.nonce,
-    permit.details.amount,
-    permit.details.expiration,
-    permit.sigDeadline
-  )
-}
-
-function _toInputPermit(
-  signature: string,
-  nonce: BigintIsh,
-  amount: BigintIsh,
-  expiration: BigintIsh,
-  sigDeadline: BigintIsh
-): Permit2Permit {
-  const { v, r, s } = ethers.utils.splitSignature(signature)
-  if (![0, 1, 27, 28].includes(v)) {
-    throw new Error(`Invalid v: ${v}`)
-  }
   return {
-    v: v as 0 | 1 | 27 | 28,
-    r: r,
-    s: s,
-    nonce: nonce,
-    amount: amount,
-    expiration: expiration,
-    sigDeadline: sigDeadline,
+    ...permit,
+    signature,
   }
 }
