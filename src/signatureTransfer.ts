@@ -1,130 +1,142 @@
-import { defaultAbiCoder } from '@ethersproject/abi'
-import { keccak256 } from '@ethersproject/keccak256'
-import { toUtf8Bytes } from '@ethersproject/strings'
+import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
+import { _TypedDataEncoder } from '@ethersproject/hash'
+import { permit2Domain } from './domain'
 
 export interface Witness {
-  witness: string
+  witness: any
   witnessTypeName: string
-  witnessType: string
+  witnessType: TypedDataField[]
+}
+
+export interface TokenPermissions {
+  token: string
+  amount: string
 }
 
 export interface PermitTransferFrom {
-  token: string
+  permitted: TokenPermissions
   spender: string
-  signedAmount: string
   nonce: string
   deadline: string
-  witness?: Witness
 }
 
 export interface PermitBatchTransferFrom {
-  tokens: string[]
+  permitted: TokenPermissions[]
   spender: string
-  signedAmounts: string[]
   nonce: string
   deadline: string
-  witness?: Witness
+}
+
+export type PermitTransferFromData = {
+  domain: TypedDataDomain
+  types: Record<string, TypedDataField[]>
+  values: PermitTransferFrom
+}
+
+export type PermitBatchTransferFromData = {
+  domain: TypedDataDomain
+  types: Record<string, TypedDataField[]>
+  values: PermitBatchTransferFrom
+}
+
+const TOKEN_PERMISSIONS = [
+  { name: 'token', type: 'address' },
+  { name: 'amount', type: 'uint256' },
+]
+
+const PERMIT_TRANSFER_FROM_TYPES = {
+  PermitTransferFrom: [
+    { name: 'permitted', type: 'TokenPermissions' },
+    { name: 'spender', type: 'address' },
+    { name: 'nonce', type: 'uint256' },
+    { name: 'deadline', type: 'uint256' },
+  ],
+  TokenPermissions: TOKEN_PERMISSIONS,
+}
+
+const PERMIT_BATCH_TRANSFER_FROM_TYPES = {
+  PermitBatchTransferFrom: [
+    { name: 'permitted', type: 'TokenPermissions[]' },
+    { name: 'spender', type: 'address' },
+    { name: 'nonce', type: 'uint256' },
+    { name: 'deadline', type: 'uint256' },
+  ],
+  TokenPermissions: TOKEN_PERMISSIONS,
+}
+
+function permitTransferFromWithWitnessType(witness: Witness): Record<string, TypedDataField[]> {
+  return {
+    PermitWitnessTransferFrom: [
+      { name: 'permitted', type: 'TokenPermissions' },
+      { name: 'spender', type: 'address' },
+      { name: 'nonce', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' },
+      { name: 'witness', type: witness.witnessTypeName },
+    ],
+    TokenPermissions: TOKEN_PERMISSIONS,
+    [witness.witnessTypeName]: witness.witnessType,
+  }
+}
+
+function permitBatchTransferFromWithWitnessType(witness: Witness): Record<string, TypedDataField[]> {
+  return {
+    PermitBatchWitnessTransferFrom: [
+      { name: 'permitted', type: 'TokenPermissions[]' },
+      { name: 'spender', type: 'address' },
+      { name: 'nonce', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' },
+      { name: 'witness', type: witness.witnessTypeName },
+    ],
+    TokenPermissions: TOKEN_PERMISSIONS,
+    [witness.witnessTypeName]: witness.witnessType,
+  }
 }
 
 function isPermitTransferFrom(permit: PermitTransferFrom | PermitBatchTransferFrom): permit is PermitTransferFrom {
-  return typeof (permit as PermitTransferFrom).token === 'string'
+  return !Array.isArray(permit.permitted)
 }
 
 export abstract class SignatureTransfer {
-  public static readonly _PERMIT_TRANSFER_FROM_TYPEHASH =
-    '0x10c9c9e59d752f2a5e0b80c4634ea94f13dfc2064f262172713603fd1e244d46'
-
-  public static readonly _PERMIT_BATCH_TRANSFER_FROM_TYPEHASH =
-    '0xb4e06c597d07f3cee806099cb9eef8888970e2ad5303164b6d2814f3a5362511'
-
-  public static readonly _PERMIT_TRANSFER_FROM_WITNESS_TYPEHASH_STUB =
-    'PermitWitnessTransferFrom(address token,address spender,uint256 signedAmount,uint256 nonce,uint256 deadline,'
-
-  public static readonly _PERMIT_BATCH_WITNESS_TRANSFER_FROM_TYPEHASH_STUB =
-    'PermitBatchWitnessTransferFrom(address[] tokens,address spender,uint256[] signedAmounts,uint256 nonce,uint256 deadline,'
-
   /**
    * Cannot be constructed.
    */
   private constructor() {}
 
-  private static encodePackedDynamicArray(values: string[], solidityType: 'address' | 'uint256'): string {
-    return defaultAbiCoder.encode(new Array<string>(values.length).fill(solidityType), values)
-  }
-
-  public static hash(permit: PermitTransferFrom | PermitBatchTransferFrom): string {
+  // return the data to be sent in a eth_signTypedData RPC call
+  // for signing the given permit data
+  public static getPermitData(
+    permit: PermitTransferFrom | PermitBatchTransferFrom,
+    permit2Address: string,
+    chainId: number,
+    witness?: Witness
+  ): PermitTransferFromData | PermitBatchTransferFromData {
+    const domain = permit2Domain(permit2Address, chainId)
     if (isPermitTransferFrom(permit)) {
-      if (permit.witness) {
-        const typeHash = keccak256(
-          toUtf8Bytes(
-            `${this._PERMIT_TRANSFER_FROM_WITNESS_TYPEHASH_STUB}${permit.witness.witnessTypeName} witness)${permit.witness.witnessType}`
-          )
-        )
-        return keccak256(
-          defaultAbiCoder.encode(
-            ['bytes32', 'address', 'address', 'uint256', 'uint256', 'uint256', 'bytes32'],
-            [
-              typeHash,
-              permit.token,
-              permit.spender,
-              permit.signedAmount,
-              permit.nonce,
-              permit.deadline,
-              permit.witness.witness,
-            ]
-          )
-        )
-      } else {
-        return keccak256(
-          defaultAbiCoder.encode(
-            ['bytes32', 'address', 'address', 'uint256', 'uint256', 'uint256'],
-            [
-              this._PERMIT_TRANSFER_FROM_TYPEHASH,
-              permit.token,
-              permit.spender,
-              permit.signedAmount,
-              permit.nonce,
-              permit.deadline,
-            ]
-          )
-        )
+      const types = witness ? permitTransferFromWithWitnessType(witness) : PERMIT_TRANSFER_FROM_TYPES
+      const values = witness ? Object.assign(permit, { witness: witness.witness }) : permit
+      return {
+        domain,
+        types,
+        values,
       }
     } else {
-      if (permit.witness) {
-        const typeHash = keccak256(
-          toUtf8Bytes(
-            `${this._PERMIT_BATCH_WITNESS_TRANSFER_FROM_TYPEHASH_STUB}${permit.witness.witnessTypeName} witness)${permit.witness.witnessType}`
-          )
-        )
-        return keccak256(
-          defaultAbiCoder.encode(
-            ['bytes32', 'bytes32', 'address', 'bytes32', 'uint256', 'uint256', 'bytes32'],
-            [
-              typeHash,
-              keccak256(SignatureTransfer.encodePackedDynamicArray(permit.tokens, 'address')),
-              permit.spender,
-              keccak256(SignatureTransfer.encodePackedDynamicArray(permit.signedAmounts, 'uint256')),
-              permit.nonce,
-              permit.deadline,
-              permit.witness.witness,
-            ]
-          )
-        )
-      } else {
-        return keccak256(
-          defaultAbiCoder.encode(
-            ['bytes32', 'bytes32', 'address', 'bytes32', 'uint256', 'uint256'],
-            [
-              this._PERMIT_BATCH_TRANSFER_FROM_TYPEHASH,
-              keccak256(SignatureTransfer.encodePackedDynamicArray(permit.tokens, 'address')),
-              permit.spender,
-              keccak256(SignatureTransfer.encodePackedDynamicArray(permit.signedAmounts, 'uint256')),
-              permit.nonce,
-              permit.deadline,
-            ]
-          )
-        )
+      const types = witness ? permitBatchTransferFromWithWitnessType(witness) : PERMIT_BATCH_TRANSFER_FROM_TYPES
+      const values = witness ? Object.assign(permit, { witness: witness.witness }) : permit
+      return {
+        domain,
+        types,
+        values,
       }
     }
+  }
+
+  public static hash(
+    permit: PermitTransferFrom | PermitBatchTransferFrom,
+    permit2Address: string,
+    chainId: number,
+    witness?: Witness
+  ): string {
+    const { domain, types, values } = SignatureTransfer.getPermitData(permit, permit2Address, chainId, witness)
+    return _TypedDataEncoder.hash(domain, types, values)
   }
 }
