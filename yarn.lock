@@ -1044,7 +1044,7 @@
   dependencies:
     "@ethersproject/bignumber" "^5.7.0"
 
-"@ethersproject/contracts@5.7.0":
+"@ethersproject/contracts@5.7.0", "@ethersproject/contracts@^5.7.0":
   version "5.7.0"
   resolved "https://registry.yarnpkg.com/@ethersproject/contracts/-/contracts-5.7.0.tgz#c305e775abd07e48aa590e1a877ed5c316f8bd1e"
   integrity sha512-5GJbzEU3X+d33CdfPhcyS+z8MzsTrBGk/sc+G+59+tPa9yFkl6HQ9D6L0QMgNTA9q8dT0XKxxkyp883XsQvbbg==
@@ -1147,7 +1147,7 @@
   dependencies:
     "@ethersproject/logger" "^5.7.0"
 
-"@ethersproject/providers@5.7.2":
+"@ethersproject/providers@5.7.2", "@ethersproject/providers@^5.7.2":
   version "5.7.2"
   resolved "https://registry.yarnpkg.com/@ethersproject/providers/-/providers-5.7.2.tgz#f8b1a4f275d7ce58cf0a2eec222269a08beb18cb"
   integrity sha512-g34EWZ1WWAVgr4aptGlVBF8mhl3VWjv+8hoAnzStu8Ah22VHBsuGzP17eb6xDVRzw895G4W7vvx60lFFur/1Rg==
@@ -1829,18 +1829,22 @@
   resolved "https://registry.yarnpkg.com/@uniswap/lib/-/lib-4.0.1-alpha.tgz#2881008e55f075344675b3bca93f020b028fbd02"
   integrity sha512-f6UIliwBbRsgVLxIaBANF6w09tYqc6Y/qXdsrbEmXHyFA7ILiKrIwRFXe1yOg8M3cksgVsO9N7yuL2DdCGQKBA==
 
-"@uniswap/narwhal@1.0.0-beta.3":
-  version "1.0.0-beta.3"
-  resolved "https://registry.yarnpkg.com/@uniswap/narwhal/-/narwhal-1.0.0-beta.3.tgz#a7166dac411acd13f59c5f78b0f2503c9b2fbe76"
-  integrity sha512-LAQ8CJhgnGtU//YU3WKW3/LAF2kr1LJznpX9Qmo6MarFf4j7WqrqWvl3PyMYOH07ZMVWIuhG9xXjNBZQcbfmIQ==
+"@uniswap/narwhal@1.0.0-beta.4":
+  version "1.0.0-beta.4"
+  resolved "https://registry.yarnpkg.com/@uniswap/narwhal/-/narwhal-1.0.0-beta.4.tgz#811417214fe54608c0dd5e8064f31d6ecac8e591"
+  integrity sha512-p9cArp/cYDciHel7zGRYVRNoLMMjU6ux2W71FLiRwV4AokaQJZFeD2u94JSsiFTtdVUpzIZV3K2dODiGoSv0ZA==
 
-"@uniswap/permit2-sdk@^0.1.0":
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/@uniswap/permit2-sdk/-/permit2-sdk-0.1.0.tgz#cfc73a6ea9dbb743c9adfa26cabae5bece56a33d"
-  integrity sha512-AWfLq4p+/Cb21CgwwW5VigLv1HFaEGIQGxNmN73tSxGuJv2RV0GRrxQf51SexueCnWKuLKWnPLo1L9b9XwSJ4A==
+"@uniswap/permit2-sdk@^0.3.0":
+  version "0.3.0"
+  resolved "https://registry.yarnpkg.com/@uniswap/permit2-sdk/-/permit2-sdk-0.3.0.tgz#be41f1c290fb40bac22e40970f711821e4077768"
+  integrity sha512-iVhfuPTohjTXwvXrGpsWfFOZ0L47kb6xyRhZv8T+Bs00XxwxPL60HaK9JUZBGBItlb9n+SpV42gmJ0AEi//SNA==
   dependencies:
     "@ethersproject/abi" "^5.7.0"
+    "@ethersproject/abstract-signer" "^5.7.0"
+    "@ethersproject/contracts" "^5.7.0"
+    "@ethersproject/hash" "^5.7.0"
     "@ethersproject/keccak256" "^5.7.0"
+    "@ethersproject/providers" "^5.7.2"
     "@ethersproject/strings" "^5.7.0"
 
 "@uniswap/router-sdk@^1.4.0":

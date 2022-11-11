@@ -20,7 +20,7 @@ import {
 import { Permit2Permit } from '../../utils/permit2'
 import { Currency, TradeType, CurrencyAmount, Percent } from '@uniswap/sdk-core'
 import { Command, TradeConfig } from '../Command'
-import { NARWHAL_ADDRESS } from '../../utils/constants'
+import { NARWHAL_ADDRESS, CONTRACT_BALANCE } from '../../utils/constants'
 
 // the existing router permit object doesn't include enough data for permit2
 // so we extend swap options with the permit2 permit
@@ -272,14 +272,14 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
 
       planner.addCommand(CommandType.V3_SWAP_EXACT_IN, [
         recipient,
-        i == 0 ? amountIn : 0, // amountIn
+        i == 0 ? amountIn : CONTRACT_BALANCE, // amountIn
         !isLastSectionInRoute(i) ? 0 : amountOut, // amountOut
         path, // path
         payerIsUser && i === 0, // payerIsUser
       ])
     } else {
       planner.addCommand(CommandType.V2_SWAP_EXACT_IN, [
-        i === 0 ? amountIn : 0, // amountIn
+        i === 0 ? amountIn : CONTRACT_BALANCE, // amountIn
         !isLastSectionInRoute(i) ? 0 : amountOut, // amountOutMin
         newRoute.path.map((pool) => pool.address), // path
         isLastSectionInRoute(i) && !trade.outputAmount.currency.isNative ? options.recipient : NARWHAL_ADDRESS, // recipient

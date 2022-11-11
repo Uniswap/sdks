@@ -15,7 +15,7 @@ import {
 } from '@uniswap/v3-sdk'
 import { SwapOptions } from '../src'
 import { NARWHAL_ADDRESS } from '../src/utils/constants'
-import { PermitSingle } from '../src/utils/permit2'
+import { PermitSingle } from '@uniswap/permit2-sdk'
 import { generatePermitSignature, toInputPermit } from './utils/permit2'
 import { CurrencyAmount, TradeType, Ether, Token, Percent } from '@uniswap/sdk-core'
 import { registerFixture } from './forge/writeInterop'
