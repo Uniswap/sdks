@@ -1,24 +1,25 @@
 import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
+import { BigNumberish } from '@ethersproject/bignumber';
 import { _TypedDataEncoder } from '@ethersproject/hash'
 import { permit2Domain } from './domain'
 
 export interface PermitDetails {
   token: string
-  amount: string
-  expiration: string
-  nonce: number
+  amount: BigNumberish
+  expiration: BigNumberish
+  nonce: BigNumberish
 }
 
 export interface PermitSingle {
   details: PermitDetails
   spender: string
-  sigDeadline: string
+  sigDeadline: BigNumberish
 }
 
 export interface PermitBatch {
   details: PermitDetails[]
   spender: string
-  sigDeadline: string
+  sigDeadline: BigNumberish
 }
 
 export type PermitSingleData = {
