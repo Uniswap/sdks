@@ -1,5 +1,5 @@
 import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
-import { BigNumberish } from '@ethersproject/bignumber';
+import { BigNumberish } from '@ethersproject/bignumber'
 import { _TypedDataEncoder } from '@ethersproject/hash'
 import { permit2Domain } from './domain'
 
