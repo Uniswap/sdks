@@ -1,4 +1,5 @@
 import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
+import { BigNumberish } from '@ethersproject/bignumber'
 import { _TypedDataEncoder } from '@ethersproject/hash'
 import { permit2Domain } from './domain'
 
@@ -10,21 +11,21 @@ export interface Witness {
 
 export interface TokenPermissions {
   token: string
-  amount: string
+  amount: BigNumberish
 }
 
 export interface PermitTransferFrom {
   permitted: TokenPermissions
   spender: string
-  nonce: string
-  deadline: string
+  nonce: BigNumberish
+  deadline: BigNumberish
 }
 
 export interface PermitBatchTransferFrom {
   permitted: TokenPermissions[]
   spender: string
-  nonce: string
-  deadline: string
+  nonce: BigNumberish
+  deadline: BigNumberish
 }
 
 export type PermitTransferFromData = {
