@@ -24,18 +24,5 @@ contract DeployRouter is Test {
             POOL_INIT_CODE_HASH
         );
     }
-
-    function deployFixtureMainnetConfig() public returns (Router router, Permit2 permit2) {
-        permit2 = new Permit2();
-        router = new Router(
-            address(permit2),
-            address(0), // TODO: update with routerRewardsDistributor
-            address(0), // TODO: update with looksRareRewardsDistributor
-            address(LOOKS_TOKEN),
-            address(V2_FACTORY),
-            address(V3_FACTORY),
-            PAIR_INIT_CODE_HASH,
-            POOL_INIT_CODE_HASH
-        );
-    }
+    
 }

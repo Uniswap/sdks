@@ -28,8 +28,8 @@ const USDC = new Token(1, '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48', 6, 'USDC
 const feeAmount = FeeAmount.MEDIUM
 
 const WETH_USDC_V2 = new Pair(
-  CurrencyAmount.fromRawAmount(WETH, '30118865014718000095728'),
-  CurrencyAmount.fromRawAmount(USDC, '48771876162527')
+  CurrencyAmount.fromRawAmount(WETH, '34515228806027297273368'),
+  CurrencyAmount.fromRawAmount(USDC, '43711377859274')
 )
 
 const USDC_DAI_V2 = new Pair(
@@ -41,11 +41,16 @@ const USDC_DAI_V2 = new Pair(
 const WETH_USDC_V3 = makePool(
   WETH,
   USDC,
-  JSBI.BigInt('11976143461059551550'),
-  JSBI.BigInt('1968793223998213381892723903222886')
+  JSBI.BigInt('12684214223795176862'),
+  JSBI.BigInt('2230513416205233323282465616270816')
 )
 
-const USDC_DAI_V3 = makePool(USDC, DAI, JSBI.BigInt('332156389980718567434966'), JSBI.BigInt('79222186890124025850669'))
+const USDC_DAI_V3 = makePool(
+  USDC,
+  DAI,
+  JSBI.BigInt('2470149530094514024128212'),
+  JSBI.BigInt('79228223163124596104824')
+)
 
 // note: these tests aren't testing much but registering calldata to interop file
 // for use in forge fork tests
