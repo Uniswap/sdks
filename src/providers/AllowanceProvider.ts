@@ -1,5 +1,5 @@
 import { BigNumber } from '@ethersproject/bignumber'
-import { BaseProvider } from '@ethersproject/providers'
+import { Provider } from '@ethersproject/providers'
 import Permit2Abi from '../../abis/Permit2.json'
 import { Contract } from '@ethersproject/contracts'
 
@@ -12,7 +12,7 @@ export interface AllowanceData {
 export class AllowanceProvider {
   private permit2: Contract
 
-  constructor(private provider: BaseProvider, private permit2Address: string) {
+  constructor(private provider: Provider, private permit2Address: string) {
     this.permit2 = new Contract(this.permit2Address, Permit2Abi, this.provider)
   }
 
