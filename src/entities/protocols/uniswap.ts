@@ -20,7 +20,7 @@ import {
 import { Permit2Permit } from '../../utils/permit2'
 import { Currency, TradeType, CurrencyAmount, Percent } from '@uniswap/sdk-core'
 import { Command, TradeConfig } from '../Command'
-import { NARWHAL_ADDRESS, CONTRACT_BALANCE } from '../../utils/constants'
+import { MSG_SENDER, ADDRESS_THIS, NARWHAL_ADDRESS, CONTRACT_BALANCE } from '../../utils/constants'
 
 // the existing router permit object doesn't include enough data for permit2
 // so we extend swap options with the permit2 permit
@@ -46,12 +46,13 @@ export class UniswapTrade implements Command {
     if (this.trade.inputAmount.currency.isNative) {
       // TODO: opti if only one v2 pool we can directly send this to the pool
       planner.addCommand(CommandType.WRAP_ETH, [
-        NARWHAL_ADDRESS,
+        ADDRESS_THIS,
         this.trade.maximumAmountIn(this.options.slippageTolerance).quotient.toString(),
       ])
       // since WETH is now owned by the router, the router pays for inputs
       payerIsUser = false
     }
+    this.options.recipient = this.options.recipient ?? MSG_SENDER
 
     for (const swap of this.trade.swaps) {
       switch (swap.route.protocol) {
@@ -105,7 +106,7 @@ function addV2Swap<TInput extends Currency, TOutput extends Currency>(
       trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
       route.path.map((pool) => pool.address),
       // if native, we have to unwrap so keep in the router for now
-      trade.outputAmount.currency.isNative ? NARWHAL_ADDRESS : options.recipient,
+      trade.outputAmount.currency.isNative ? ADDRESS_THIS : options.recipient,
       payerIsUser,
     ])
   } else if (tradeType == TradeType.EXACT_OUTPUT) {
@@ -113,7 +114,7 @@ function addV2Swap<TInput extends Currency, TOutput extends Currency>(
       trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
       trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
       route.path.map((pool) => pool.address),
-      trade.outputAmount.currency.isNative ? NARWHAL_ADDRESS : options.recipient,
+      trade.outputAmount.currency.isNative ? ADDRESS_THIS : options.recipient,
       payerIsUser,
     ])
   }
@@ -137,7 +138,7 @@ function addV3Swap<TInput extends Currency, TOutput extends Currency>(
   const path = encodeRouteToPath(route as RouteV3<TInput, TOutput>, trade.tradeType === TradeType.EXACT_OUTPUT)
   if (tradeType == TradeType.EXACT_INPUT) {
     planner.addCommand(CommandType.V3_SWAP_EXACT_IN, [
-      trade.outputAmount.currency.isNative ? NARWHAL_ADDRESS : options.recipient,
+      trade.outputAmount.currency.isNative ? ADDRESS_THIS : options.recipient,
       trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
       trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
       path,
@@ -145,7 +146,7 @@ function addV3Swap<TInput extends Currency, TOutput extends Currency>(
     ])
   } else if (tradeType == TradeType.EXACT_OUTPUT) {
     planner.addCommand(CommandType.V3_SWAP_EXACT_OUT, [
-      trade.outputAmount.currency.isNative ? NARWHAL_ADDRESS : options.recipient,
+      trade.outputAmount.currency.isNative ? ADDRESS_THIS : options.recipient,
       trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
       trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
       path,
@@ -219,7 +220,7 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
       // if output is native we keep tokens in the router for unwrap
       const recipient = isLastSectionInRoute(i)
         ? trade.outputAmount.currency.isNative
-          ? NARWHAL_ADDRESS
+          ? ADDRESS_THIS
           : options.recipient
         : // send tokens directly to the first v2 pair of the next section
           // note: because of the partitioning function we can be sure that the next section is v2
@@ -237,7 +238,7 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
         i === 0 ? amountIn : CONTRACT_BALANCE, // amountIn
         !isLastSectionInRoute(i) ? 0 : amountOut, // amountOutMin
         newRoute.path.map((pool) => pool.address), // path
-        isLastSectionInRoute(i) && !trade.outputAmount.currency.isNative ? options.recipient : NARWHAL_ADDRESS, // recipient
+        isLastSectionInRoute(i) && !trade.outputAmount.currency.isNative ? options.recipient : ADDRESS_THIS, // recipient
         payerIsUser && i === 0,
       ])
     }

@@ -24,8 +24,8 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
     uint256 fromPrivateKey;
     string json;
 
-    Router router = Router(payable(0x5393904db506415D941726f3Cf0404Bb167537A0));
-    Permit2 permit2 = Permit2(0x6fEe9BeC3B3fc8f9DA5740f0efc6BbE6966cd6A6);
+    Router router;
+    Permit2 permit2;
 
     function setUp() public {
         fromPrivateKey = 0x1234;
@@ -35,6 +35,7 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
 
         vm.createSelectFork(vm.envString("FORK_URL"), 15947700);
         vm.startPrank(from);
+        (router, permit2) = deployFixtureMainnetConfig();
         vm.deal(from, BALANCE);
     }
 
@@ -313,5 +314,4 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         assertLe(DAI.balanceOf(from), 0);
         assertGe(RECIPIENT.balance, startingRecipientBalance + 0.1 ether);
     }
-
 }

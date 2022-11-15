@@ -33,6 +33,12 @@ export enum CommandType {
   PERMIT2_PERMIT_BATCH = 0x19,
 }
 
+const PERMIT_STRUCT =
+  '((address token,uint160 amount,uint48 expiration,uint48 nonce) details, address spender, uint256 sigDeadline)'
+
+const PERMIT_BATCH_STRUCT =
+  '((address token,uint160 amount,uint48 expiration,uint48 nonce)[] details, address spender, uint256 sigDeadline)'
+
 const ALLOW_REVERT_FLAG = 0x80
 
 const REVERTABLE_COMMANDS = new Set<CommandType>([
@@ -48,7 +54,10 @@ const REVERTABLE_COMMANDS = new Set<CommandType>([
 ])
 
 const ABI_DEFINITION: { [key in CommandType]: string[] } = {
-  [CommandType.PERMIT]: ['bytes'],
+  [CommandType.PERMIT]: [PERMIT_STRUCT, 'bytes'],
+  [CommandType.PERMIT2_PERMIT_BATCH]: [PERMIT_BATCH_STRUCT, 'bytes'],
+  [CommandType.PERMIT2_TRANSFER_FROM]: ['address', 'address', 'uint160'],
+  [CommandType.PERMIT2_TRANSFER_FROM_BATCH]: ['bytes'],
   [CommandType.TRANSFER]: ['address', 'address', 'uint256'],
   [CommandType.V3_SWAP_EXACT_IN]: ['address', 'uint256', 'uint256', 'bytes', 'bool'],
   [CommandType.V3_SWAP_EXACT_OUT]: ['address', 'uint256', 'uint256', 'bytes', 'bool'],
@@ -70,9 +79,6 @@ const ABI_DEFINITION: { [key in CommandType]: string[] } = {
   [CommandType.OWNER_CHECK_1155]: ['address', 'address', 'uint256', 'uint256'],
   [CommandType.NFT20]: ['uint256', 'bytes'],
   [CommandType.CRYPTOPUNKS]: ['uint256', 'address', 'uint256'],
-  [CommandType.PERMIT2_TRANSFER_FROM]: ['address', 'address', 'uint160'],
-  [CommandType.PERMIT2_TRANSFER_FROM_BATCH]: ['bytes'],
-  [CommandType.PERMIT2_PERMIT_BATCH]: ['bytes'],
 }
 
 export class RoutePlanner {
