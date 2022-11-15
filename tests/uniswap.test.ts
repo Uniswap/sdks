@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import JSBI from 'jsbi'
 import { ethers, utils, Wallet } from 'ethers'
 import { SwapRouter } from '../src'
-import { MixedRouteTrade, MixedRouteSDK } from '@uniswap/router-sdk'
+import { MixedRouteTrade, MixedRouteSDK, Trade as RouterTrade } from '@uniswap/router-sdk'
 import { Trade as V2Trade, Pair, Route as RouteV2 } from '@uniswap/v2-sdk'
 import {
   Trade as V3Trade,
@@ -17,7 +17,7 @@ import { SwapOptions } from '../src'
 import { NARWHAL_ADDRESS } from '../src/utils/constants'
 import { PermitSingle } from '@uniswap/permit2-sdk'
 import { generatePermitSignature, toInputPermit } from './utils/permit2'
-import { CurrencyAmount, TradeType, Ether, Token, Percent } from '@uniswap/sdk-core'
+import { CurrencyAmount, TradeType, Ether, Token, Percent, Currency } from '@uniswap/sdk-core'
 import { registerFixture } from './forge/writeInterop'
 
 const ETHER = Ether.onChain(1)
@@ -66,7 +66,7 @@ describe('Uniswap', () => {
         TradeType.EXACT_INPUT
       )
       const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapERC20CallParameters([trade], opts)
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V2_1_ETH_FOR_USDC', methodParameters)
       expect(methodParameters.value).to.eq(inputEther)
     })
@@ -79,7 +79,7 @@ describe('Uniswap', () => {
         TradeType.EXACT_INPUT
       )
       const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapERC20CallParameters([trade], opts)
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V2_1_ETH_FOR_USDC_2_HOP', methodParameters)
       expect(methodParameters.value).to.eq(inputEther)
     })
@@ -92,7 +92,7 @@ describe('Uniswap', () => {
         TradeType.EXACT_INPUT
       )
       const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapERC20CallParameters([trade], opts)
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V2_1000_USDC_FOR_ETH', methodParameters)
       expect(methodParameters.value).to.eq('0')
     })
@@ -107,7 +107,7 @@ describe('Uniswap', () => {
       const permit = makePermit(USDC.address, inputUSDC)
       const signature = await generatePermitSignature(permit, wallet, trade.route.chainId)
       const opts = swapOptions({ inputTokenPermit: toInputPermit(signature, permit) })
-      const methodParameters = SwapRouter.swapERC20CallParameters([trade], opts)
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V2_1000_USDC_FOR_ETH_PERMIT', methodParameters)
       expect(methodParameters.value).to.eq('0')
     })
@@ -120,7 +120,7 @@ describe('Uniswap', () => {
         TradeType.EXACT_INPUT
       )
       const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapERC20CallParameters([trade], opts)
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V2_10_DAI_FOR_ETH_2_HOP', methodParameters)
       expect(methodParameters.value).to.eq('0')
     })
@@ -133,7 +133,7 @@ describe('Uniswap', () => {
         TradeType.EXACT_OUTPUT
       )
       const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapERC20CallParameters([trade], opts)
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V2_ETH_FOR_1000_USDC', methodParameters)
       expect(methodParameters.value).to.not.equal('0')
     })
@@ -146,7 +146,7 @@ describe('Uniswap', () => {
         TradeType.EXACT_OUTPUT
       )
       const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapERC20CallParameters([trade], opts)
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V2_USDC_FOR_1_ETH', methodParameters)
       expect(methodParameters.value).to.eq('0')
     })
@@ -161,7 +161,7 @@ describe('Uniswap', () => {
         TradeType.EXACT_INPUT
       )
       const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapERC20CallParameters([trade], opts)
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V3_1_ETH_FOR_USDC', methodParameters)
       expect(methodParameters.value).to.eq(inputEther)
     })
@@ -174,7 +174,7 @@ describe('Uniswap', () => {
         TradeType.EXACT_INPUT
       )
       const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapERC20CallParameters([trade], opts)
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V3_1000_USDC_FOR_ETH', methodParameters)
       expect(methodParameters.value).to.eq('0')
     })
@@ -189,7 +189,7 @@ describe('Uniswap', () => {
       const permit = makePermit(USDC.address, inputUSDC)
       const signature = await generatePermitSignature(permit, wallet, trade.swaps[0].route.chainId)
       const opts = swapOptions({ inputTokenPermit: toInputPermit(signature, permit) })
-      const methodParameters = SwapRouter.swapERC20CallParameters([trade], opts)
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V3_1000_USDC_FOR_ETH_PERMIT', methodParameters)
       expect(methodParameters.value).to.eq('0')
     })
@@ -202,7 +202,7 @@ describe('Uniswap', () => {
         TradeType.EXACT_INPUT
       )
       const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapERC20CallParameters([trade], opts)
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V3_1_ETH_FOR_DAI_2_HOP', methodParameters)
       expect(methodParameters.value).to.eq(inputEther)
     })
@@ -215,7 +215,7 @@ describe('Uniswap', () => {
         TradeType.EXACT_OUTPUT
       )
       const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapERC20CallParameters([trade], opts)
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V3_ETH_FOR_1000_USDC', methodParameters)
       expect(methodParameters.value).to.not.equal('0')
     })
@@ -228,7 +228,7 @@ describe('Uniswap', () => {
         TradeType.EXACT_OUTPUT
       )
       const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapERC20CallParameters([trade], opts)
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V3_USDC_FOR_1_ETH', methodParameters)
       expect(methodParameters.value).to.eq('0')
     })
@@ -241,7 +241,7 @@ describe('Uniswap', () => {
         TradeType.EXACT_OUTPUT
       )
       const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapERC20CallParameters([trade], opts)
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V3_ETH_FOR_1000_DAI_2_HOP', methodParameters)
       expect(methodParameters.value).to.not.equal('0')
     })
@@ -254,7 +254,7 @@ describe('Uniswap', () => {
         TradeType.EXACT_OUTPUT
       )
       const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapERC20CallParameters([trade], opts)
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V3_DAI_FOR_1_ETH_2_HOP', methodParameters)
       expect(methodParameters.value).to.equal('0')
     })
@@ -269,7 +269,7 @@ describe('Uniswap', () => {
         TradeType.EXACT_INPUT
       )
       const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapERC20CallParameters([trade], opts)
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_MIXED_1_ETH_FOR_DAI', methodParameters)
       expect(methodParameters.value).to.eq(inputEther)
     })
@@ -282,7 +282,7 @@ describe('Uniswap', () => {
         TradeType.EXACT_INPUT
       )
       const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapERC20CallParameters([trade], opts)
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_MIXED_1_ETH_FOR_DAI_V2_FIRST', methodParameters)
       expect(methodParameters.value).to.eq(inputEther)
     })
@@ -295,7 +295,7 @@ describe('Uniswap', () => {
         TradeType.EXACT_INPUT
       )
       const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapERC20CallParameters([trade], opts)
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_MIXED_1_ETH_FOR_DAI_V2_ONLY', methodParameters)
       expect(methodParameters.value).to.eq(inputEther)
     })
@@ -308,7 +308,7 @@ describe('Uniswap', () => {
         TradeType.EXACT_INPUT
       )
       const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapERC20CallParameters([trade], opts)
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_MIXED_1_ETH_FOR_DAI_V3_ONLY', methodParameters)
       expect(methodParameters.value).to.eq(inputEther)
     })
@@ -321,7 +321,7 @@ describe('Uniswap', () => {
         TradeType.EXACT_INPUT
       )
       const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapERC20CallParameters([trade], opts)
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_MIXED_DAI_FOR_ETH', methodParameters)
       expect(methodParameters.value).to.eq('0')
     })
@@ -366,4 +366,38 @@ function makePool(token0: Token, token1: Token, liquidity: JSBI, sqrtRatioX96: J
       liquidityGross: liquidity,
     },
   ])
+}
+
+// alternative constructor to create from protocol-specific sdks
+function buildTrade(
+  trades: (
+    | V2Trade<Currency, Currency, TradeType>
+    | V3Trade<Currency, Currency, TradeType>
+    | MixedRouteTrade<Currency, Currency, TradeType>
+  )[]
+): RouterTrade<Currency, Currency, TradeType> {
+  return new RouterTrade({
+    v2Routes: trades
+      .filter((trade) => trade instanceof V2Trade)
+      .map((trade) => ({
+        routev2: trade.route as RouteV2<Currency, Currency>,
+        inputAmount: trade.inputAmount,
+        outputAmount: trade.outputAmount,
+      })),
+    v3Routes: trades
+      .filter((trade) => trade instanceof V3Trade)
+      .map((trade) => ({
+        routev3: trade.route as RouteV3<Currency, Currency>,
+        inputAmount: trade.inputAmount,
+        outputAmount: trade.outputAmount,
+      })),
+    mixedRoutes: trades
+      .filter((trade) => trade instanceof MixedRouteTrade)
+      .map((trade) => ({
+        mixedRoute: trade.route as MixedRouteSDK<Currency, Currency>,
+        inputAmount: trade.inputAmount,
+        outputAmount: trade.outputAmount,
+      })),
+    tradeType: trades[0].tradeType,
+  })
 }

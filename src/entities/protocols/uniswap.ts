@@ -39,51 +39,6 @@ interface Swap<TInput extends Currency, TOutput extends Currency> {
 // Wrapper for uniswap router-sdk trade entity to encode swaps for Narwhal
 // also translates trade objects from previous (v2, v3) SDKs
 export class UniswapTrade implements Command {
-  // alternative constructor to create from protocol-specific sdks
-  static from(
-    trades: (
-      | V2Trade<Currency, Currency, TradeType>
-      | V3Trade<Currency, Currency, TradeType>
-      | MixedRouteTrade<Currency, Currency, TradeType>
-    )[],
-    options: SwapOptions
-  ): UniswapTrade {
-    invariant(trades.length > 0, 'ZERO_TRADES')
-    invariant(
-      trades.every((trade) => trade.tradeType == trades[0].tradeType),
-      'INCONSISTENT_TRADE_TYPES'
-    )
-
-    return new UniswapTrade(
-      // RouterTrade constructor handles validation of routes
-      new RouterTrade({
-        v2Routes: trades
-          .filter((trade) => trade instanceof V2Trade)
-          .map((trade) => ({
-            routev2: trade.route as RouteV2<Currency, Currency>,
-            inputAmount: trade.inputAmount,
-            outputAmount: trade.outputAmount,
-          })),
-        v3Routes: trades
-          .filter((trade) => trade instanceof V3Trade)
-          .map((trade) => ({
-            routev3: trade.route as RouteV3<Currency, Currency>,
-            inputAmount: trade.inputAmount,
-            outputAmount: trade.outputAmount,
-          })),
-        mixedRoutes: trades
-          .filter((trade) => trade instanceof MixedRouteTrade)
-          .map((trade) => ({
-            mixedRoute: trade.route as MixedRouteSDK<Currency, Currency>,
-            inputAmount: trade.inputAmount,
-            outputAmount: trade.outputAmount,
-          })),
-        tradeType: trades[0].tradeType,
-      }),
-      options
-    )
-  }
-
   constructor(public trade: RouterTrade<Currency, Currency, TradeType>, public options: SwapOptions) {}
 
   encode(planner: RoutePlanner, _config: TradeConfig): void {

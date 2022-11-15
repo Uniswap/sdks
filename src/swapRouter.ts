@@ -49,27 +49,13 @@ export abstract class SwapRouter {
    * @param options options for the call parameters
    */
   public static swapERC20CallParameters(
-    trades:
-      | RouterTrade<Currency, Currency, TradeType>
-      | V2Trade<Currency, Currency, TradeType>
-      | V3Trade<Currency, Currency, TradeType>
-      | MixedRouteTrade<Currency, Currency, TradeType>
-      | (
-          | V2Trade<Currency, Currency, TradeType>
-          | V3Trade<Currency, Currency, TradeType>
-          | MixedRouteTrade<Currency, Currency, TradeType>
-        )[],
+    trades: RouterTrade<Currency, Currency, TradeType>,
     options: SwapOptions
   ): MethodParameters {
     // TODO: use permit if signature included in options
     const planner = new RoutePlanner()
 
-    const trade: UniswapTrade =
-      trades instanceof RouterTrade
-        ? new UniswapTrade(trades, options)
-        : Array.isArray(trades)
-        ? UniswapTrade.from(trades, options)
-        : UniswapTrade.from([trades], options)
+    const trade: UniswapTrade = new UniswapTrade(trades, options)
 
     const inputCurrency = trade.trade.inputAmount.currency
     invariant(!(inputCurrency.isNative && !!options.inputTokenPermit), 'NATIVE_INPUT_PERMIT')
