@@ -3,8 +3,7 @@ import { Interface } from '@ethersproject/abi'
 import { TradeConfig } from '../Command'
 import { NFTTrade, Market, TokenType, BuyItem } from '../NFTTrade'
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
-import { ethers, BigNumber, BigNumberish } from 'ethers'
-import { CurrencyAmount, Ether } from '@uniswap/sdk-core'
+import { BigNumber, BigNumberish } from 'ethers'
 
 export type NFT20Data = {
   tokenAddress: string

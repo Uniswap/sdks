@@ -3,9 +3,7 @@ import { Interface } from '@ethersproject/abi'
 import { BuyItem, Market, NFTTrade, TokenType } from '../NFTTrade'
 import { TradeConfig } from '../Command'
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
-import { ethers, BigNumber, BigNumberish } from 'ethers'
-import { Currency, CurrencyAmount, Ether } from '@uniswap/sdk-core'
-import JSBI from 'jsbi'
+import { BigNumber, BigNumberish } from 'ethers'
 
 type PairSwap = {
   swapInfo: {

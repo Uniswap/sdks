@@ -1,10 +1,9 @@
 import abi from '../../../abis/Seaport.json'
-import { BigNumber, BigNumberish, ethers } from 'ethers'
+import { BigNumber, BigNumberish } from 'ethers'
 import { Interface } from '@ethersproject/abi'
 import { BuyItem, Market, NFTTrade, TokenType } from '../NFTTrade'
 import { TradeConfig } from '../Command'
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
-import { Currency, CurrencyAmount } from '@uniswap/sdk-core'
 
 export type SeaportData = {
   items: Order[]
@@ -64,7 +63,7 @@ export class SeaportTrade extends NFTTrade<SeaportData> {
   encode(planner: RoutePlanner, config: TradeConfig): void {
     for (const order of this.orders) {
       let advancedOrders: AdvancedOrder[] = []
-      let orderFulfillments: FulfillmentComponent[][] = order.items.map((x, index) => [
+      let orderFulfillments: FulfillmentComponent[][] = order.items.map((_, index) => [
         { orderIndex: index, itemIndex: 0 },
       ])
       let considerationFulFillments: FulfillmentComponent[][] = this.getConsiderationFulfillments(order.items)

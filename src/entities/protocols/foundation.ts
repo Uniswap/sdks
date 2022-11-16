@@ -4,8 +4,6 @@ import { BuyItem, Market, NFTTrade, TokenType } from '../NFTTrade'
 import { TradeConfig } from '../Command'
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
 import { BigNumber, BigNumberish } from 'ethers'
-import { CurrencyAmount, Currency, Ether } from '@uniswap/sdk-core'
-import JSBI from 'jsbi'
 
 export type FoundationData = {
   recipient: string

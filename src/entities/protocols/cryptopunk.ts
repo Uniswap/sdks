@@ -1,9 +1,7 @@
-import { Interface } from '@ethersproject/abi'
 import { TradeConfig } from '../Command'
 import { NFTTrade, Market, TokenType, BuyItem } from '../NFTTrade'
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
 import { BigNumber, BigNumberish } from 'ethers'
-import { CurrencyAmount, Currency, Ether } from '@uniswap/sdk-core'
 
 export type CryptopunkData = {
   tokenId: BigNumberish

@@ -2,10 +2,9 @@ import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import { expandTo18DecimalsBN } from '../src/utils/expandTo18Decimals'
 import { SwapRouter } from '../src/swapRouter'
-import { CurrencyAmount, Currency, Ether } from '@uniswap/sdk-core'
 import { TokenType } from '../src/entities/NFTTrade'
 import { FoundationTrade, FoundationData } from '../src/entities/protocols/foundation'
-import { ConsiderationItem, SeaportTrade, SeaportData } from '../src/entities/protocols/seaport'
+import { ConsiderationItem, SeaportTrade } from '../src/entities/protocols/seaport'
 import { seaportData2Covens } from './shared/seaportOrders'
 import { NFTXTrade, NFTXData } from '../src/entities/protocols/nftx'
 import { NFT20Trade, NFT20Data } from '../src/entities/protocols/nft20'
@@ -17,7 +16,6 @@ import { CryptopunkTrade, CryptopunkData } from '../src/entities/protocols/crypt
 import { X2Y2Data, X2Y2Trade } from '../src/entities/protocols/x2y2'
 import { registerFixture } from './forge/writeInterop'
 
-const ETHER = Ether.onChain(1)
 const FORGE_SENDER_ADDRESS = '0xcf03dd0a894ef79cb5b601a43c4b25e3ae4c67ed'
 const SAMPLE_ADDR = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 

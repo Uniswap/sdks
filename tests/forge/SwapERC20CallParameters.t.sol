@@ -314,4 +314,34 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         assertLe(DAI.balanceOf(from), 0);
         assertGe(RECIPIENT.balance, startingRecipientBalance + 0.1 ether);
     }
+
+    function testTwoRoutesExactInputETHtoUSDC() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_SPLIT_TWO_ROUTES_ETH_TO_USDC");
+
+        uint256 eth = 2 ether;
+        assertEq(from.balance, BALANCE);
+        assertEq(USDC.balanceOf(RECIPIENT), 0);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertLe(from.balance, BALANCE - params.value);
+        assertGt(USDC.balanceOf(RECIPIENT), 2000 * ONE_USDC);
+        assertEq(WETH.balanceOf(address(router)), 0);
+        assertEq(address(router).balance, 0);
+    }
+
+    function testThreeRoutesExactInputETHtoUSDC() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_SPLIT_THREE_ROUTES_ETH_TO_USDC");
+
+        uint256 eth = 2 ether;
+        assertEq(from.balance, BALANCE);
+        assertEq(USDC.balanceOf(RECIPIENT), 0);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertLe(from.balance, BALANCE - params.value);
+        assertGt(USDC.balanceOf(RECIPIENT), 3000 * ONE_USDC);
+        assertEq(USDC.balanceOf(address(router)), 0);
+        assertEq(address(router).balance, 0);
+    }
 }
