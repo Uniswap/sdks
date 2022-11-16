@@ -1,6 +1,6 @@
 import { BigNumber } from 'ethers'
 
-export const NARWHAL_ADDRESS = '0x5393904db506415D941726f3Cf0404Bb167537A0'
+export const ROUTER_ADDRESS = '0x5393904db506415D941726f3Cf0404Bb167537A0'
 export const PERMIT2_ADDRESS = '0x6fEe9BeC3B3fc8f9DA5740f0efc6BbE6966cd6A6'
 
 export const CONTRACT_BALANCE = BigNumber.from(2).pow(255)

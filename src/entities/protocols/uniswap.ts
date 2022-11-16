@@ -35,7 +35,7 @@ interface Swap<TInput extends Currency, TOutput extends Currency> {
   outputAmount: CurrencyAmount<TOutput>
 }
 
-// Wrapper for uniswap router-sdk trade entity to encode swaps for Narwhal
+// Wrapper for uniswap router-sdk trade entity to encode swaps for Universal Router
 // also translates trade objects from previous (v2, v3) SDKs
 export class UniswapTrade implements Command {
   constructor(public trade: RouterTrade<Currency, Currency, TradeType>, public options: SwapOptions) {}

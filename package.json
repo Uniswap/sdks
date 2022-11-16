@@ -1,7 +1,7 @@
 {
-  "name": "@uniswap/narwhal-sdk",
+  "name": "@uniswap/universal-router-sdk",
   "version": "0.5.0",
-  "description": "sdk for integrating with the narwhal contracts",
+  "description": "sdk for integrating with the Universal Router contracts",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
   "files": [
@@ -13,8 +13,8 @@
   "scripts": {
     "test:all": "yarn test && yarn test:forge",
     "test": "env TS_NODE_COMPILER_OPTIONS='{\"module\": \"commonjs\" }' mocha -r ts-node/register --reporter-option maxDiffSize=100000 'tests/**/*.ts'",
-    "test:forge": "yarn install:narwhal && forge test",
-    "install:narwhal": "cd node_modules/@uniswap/narwhal && forge install",
+    "test:forge": "yarn install:ur && forge test",
+    "install:ur": "cd node_modules/@uniswap/narwhal && forge install",
     "build": "tsdx build",
     "prettier:fix": "prettier --write '**/*.ts' && prettier --write '**/*.json'",
     "prettier": "prettier --check '**/*.ts' && prettier --check '**/*.json'",
@@ -57,10 +57,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Uniswap/narwhal-sdk.git"
+    "url": "git+https://github.com/Uniswap/universal-router-sdk.git"
   },
   "bugs": {
-    "url": "https://github.com/Uniswap/narwhal-sdk/issues"
+    "url": "https://github.com/Uniswap/universal-router-sdk/issues"
   },
-  "homepage": "https://github.com/Uniswap/narwhal-sdk#readme"
+  "homepage": "https://github.com/Uniswap/universal-router-sdk#readme"
 }

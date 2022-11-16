@@ -3,7 +3,7 @@ pragma solidity ^0.8.17;
 
 import {console2} from "forge-std/console2.sol";
 import {Test} from "forge-std/Test.sol";
-import {Router} from "narwhal/Router.sol";
+import {Router} from "universal-router/Router.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {Permit2} from "permit2/src/Permit2.sol";
 import {IAllowanceTransfer} from "permit2/src/interfaces/IAllowanceTransfer.sol";

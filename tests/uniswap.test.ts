@@ -17,7 +17,7 @@ import {
 import { SwapOptions } from '../src'
 import { PermitSingle } from '@uniswap/permit2-sdk'
 import { generatePermitSignature, toInputPermit } from './utils/permit2'
-import { NARWHAL_ADDRESS } from './utils/addresses'
+import { ROUTER_ADDRESS } from './utils/addresses'
 import { CurrencyAmount, TradeType, Ether, Token, Percent, Currency } from '@uniswap/sdk-core'
 import { registerFixture } from './forge/writeInterop'
 
@@ -407,7 +407,7 @@ function makePermit(
       expiration: Math.floor(new Date().getTime() / 1000 + 1000).toString(),
       nonce,
     },
-    spender: NARWHAL_ADDRESS,
+    spender: ROUTER_ADDRESS,
     sigDeadline: Math.floor(new Date().getTime() / 1000 + 1000).toString(),
   }
 }

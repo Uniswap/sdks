@@ -4,7 +4,7 @@ pragma solidity ^0.8.17;
 import {Test, stdJson, console2} from "forge-std/Test.sol";
 import {ERC721} from "solmate/tokens/ERC721.sol";
 import {ERC1155} from "solmate/tokens/ERC1155.sol";
-import {Router} from "narwhal/Router.sol";
+import {Router} from "universal-router/Router.sol";
 import {DeployRouter} from "./utils/DeployRouter.sol";
 import {MethodParameters, Interop} from "./utils/Interop.sol";
 import {ICryptopunksMarket} from "./utils/ICryptopunksMarket.sol";
