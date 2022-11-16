@@ -1,6 +1,6 @@
 {
   "name": "@uniswap/universal-router-sdk",
-  "version": "0.5.0",
+  "version": "0.0.1",
   "description": "sdk for integrating with the Universal Router contracts",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
@@ -9,6 +9,9 @@
   ],
   "engines": {
     "node": ">=14"
+  },
+  "publishConfig": {
+    "access": "private"
   },
   "scripts": {
     "test:all": "yarn test && yarn test:forge",
