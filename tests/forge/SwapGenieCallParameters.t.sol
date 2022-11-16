@@ -64,8 +64,8 @@ contract SwapGenieCallParametersTest is Test, Interop, DeployRouter {
         assertEq(from.balance, balance - params.value);
     }
 
-    function testLooksRareBuyItems() public {
-        MethodParameters memory params = readFixture(json, "._LOOKSRARE_BUY_ITEM");
+    function testLooksRareBuyItemsERC721() public {
+        MethodParameters memory params = readFixture(json, "._LOOKSRARE_BUY_ITEM_721");
 
         vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
         vm.startPrank(from);
@@ -83,6 +83,28 @@ contract SwapGenieCallParametersTest is Test, Interop, DeployRouter {
 
         require(success, "call failed");
         assertEq(token.balanceOf(RECIPIENT), 1);
+        assertEq(from.balance, 0);
+    }
+
+    function testLooksRareBuyItemsERC1155() public {
+        MethodParameters memory params = readFixture(json, "._LOOKSRARE_BUY_ITEM_1155");
+
+        vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
+        vm.startPrank(from);
+
+        Router router = deployRouterMainnetConfig();
+        assertEq(address(router), ROUTER_ADDRESS); // to ensure the router address in sdk is correct
+
+        ERC1155 token = ERC1155(0xf4680c917A873E2dd6eAd72f9f433e74EB9c623C);
+        uint256 balance = 0.2 ether;
+        vm.deal(from, balance);
+        assertEq(from.balance, balance);
+        assertEq(token.balanceOf(RECIPIENT, 40), 0);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+
+        require(success, "call failed");
+        assertEq(token.balanceOf(RECIPIENT, 40), 1);
         assertEq(from.balance, 0);
     }
 

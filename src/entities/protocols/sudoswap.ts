@@ -5,7 +5,6 @@ import { TradeConfig } from '../Command'
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
 import { ethers, BigNumber, BigNumberish } from 'ethers'
 import { Currency, CurrencyAmount, Ether } from '@uniswap/sdk-core'
-import { assert } from 'console'
 import JSBI from 'jsbi'
 
 type PairSwap = {
