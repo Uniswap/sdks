@@ -3,6 +3,7 @@ pragma solidity ^0.8.17;
 
 import {Test, stdJson, console2} from "forge-std/Test.sol";
 import {ERC721} from "solmate/tokens/ERC721.sol";
+import {ERC1155} from "solmate/tokens/ERC1155.sol";
 import {Router} from "narwhal/Router.sol";
 import {DeployRouter} from "./utils/DeployRouter.sol";
 import {MethodParameters, Interop} from "./utils/Interop.sol";
@@ -126,8 +127,8 @@ contract SwapGenieCallParametersTest is Test, Interop, DeployRouter {
         assertEq(from.balance, balance - params.value);
     }
 
-    function testX2Y2BuyItems() public {
-        MethodParameters memory params = readFixture(json, "._X2Y2_BUY_ITEM");
+    function testX2Y2Buy721Item() public {
+        MethodParameters memory params = readFixture(json, "._X2Y2_721_BUY_ITEM");
 
         vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
         vm.startPrank(from);
@@ -145,6 +146,28 @@ contract SwapGenieCallParametersTest is Test, Interop, DeployRouter {
 
         require(success, "call failed");
         assertEq(token.balanceOf(RECIPIENT), 1);
+        assertEq(from.balance, balance - params.value);
+    }
+
+    function testX2Y2Buy1155Item() public {
+        MethodParameters memory params = readFixture(json, "._X2Y2_1155_BUY_ITEM");
+        vm.createSelectFork(vm.envString("FORK_URL"), 15978300);
+        vm.startPrank(from);
+
+        Router router = deployRouterMainnetConfig();
+        console2.log(address(router));
+        assertEq(address(router), ROUTER_ADDRESS); // to ensure the router address in sdk is correct
+
+        ERC1155 token = ERC1155(0x93317E87a3a47821803CAADC54Ae418Af80603DA);
+        uint256 balance = params.value;
+        vm.deal(from, balance);
+        assertEq(from.balance, balance);
+        assertEq(token.balanceOf(RECIPIENT, 0), 0);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+
+        require(success, "call failed");
+        assertEq(token.balanceOf(RECIPIENT, 0), 1);
         assertEq(from.balance, balance - params.value);
     }
 

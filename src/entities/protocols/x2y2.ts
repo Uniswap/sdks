@@ -5,13 +5,24 @@ import { TradeConfig } from '../Command'
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
 import { BigNumber, BigNumberish } from 'ethers'
 
-export type X2Y2Data = {
+type X2Y2PartialData = {
   signedInput: string
   recipient: string
   tokenAddress: string
   tokenId: BigNumberish
   price: BigNumberish
 }
+
+export type X2Y2_721_Data = X2Y2PartialData & {
+  tokenType: TokenType.ERC721
+}
+
+export type X2Y2_1155_Data = X2Y2PartialData & {
+  tokenType: TokenType.ERC1155
+  tokenAmount: BigNumberish
+}
+
+export type X2Y2Data = X2Y2_721_Data | X2Y2_1155_Data
 
 export class X2Y2Trade extends NFTTrade<X2Y2Data> {
   public static INTERFACE: Interface = new Interface(abi)
@@ -25,11 +36,19 @@ export class X2Y2Trade extends NFTTrade<X2Y2Data> {
       const functionSelector = X2Y2Trade.INTERFACE.getSighash(X2Y2Trade.INTERFACE.getFunction('run'))
       const calldata = functionSelector + item.signedInput.slice(2)
 
-      planner.addCommand(
-        CommandType.X2Y2_721,
-        [item.price, calldata, item.recipient, item.tokenAddress, item.tokenId],
-        config.allowRevert
-      )
+      if (item.tokenType == TokenType.ERC721) {
+        planner.addCommand(
+          CommandType.X2Y2_721,
+          [item.price, calldata, item.recipient, item.tokenAddress, item.tokenId],
+          config.allowRevert
+        )
+      } else if (item.tokenType == TokenType.ERC1155) {
+        planner.addCommand(
+          CommandType.X2Y2_1155,
+          [item.price, calldata, item.recipient, item.tokenAddress, item.tokenId, item.tokenAmount],
+          config.allowRevert
+        )
+      }
     }
   }
 
@@ -39,7 +58,7 @@ export class X2Y2Trade extends NFTTrade<X2Y2Data> {
       buyItems.push({
         tokenAddress: item.tokenAddress,
         tokenId: item.tokenId,
-        tokenType: TokenType.ERC721,
+        tokenType: item.tokenType,
       })
     }
     return buyItems
