@@ -9,7 +9,7 @@ import {DeployRouter} from "./utils/DeployRouter.sol";
 import {MethodParameters, Interop} from "./utils/Interop.sol";
 import {ICryptopunksMarket} from "./utils/ICryptopunksMarket.sol";
 
-contract SwapGenieCallParametersTest is Test, Interop, DeployRouter {
+contract swapNFTCallParametersTest is Test, Interop, DeployRouter {
     using stdJson for string;
 
     address private constant RECIPIENT = 0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa;

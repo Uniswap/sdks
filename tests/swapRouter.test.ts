@@ -42,7 +42,7 @@ describe('SwapRouter', () => {
 
     it('encodes a single foundation trade', async () => {
       const foundationTrade = new FoundationTrade([foundationData])
-      const methodParameters = SwapRouter.swapGenieCallParameters([foundationTrade], { sender: FORGE_SENDER_ADDRESS })
+      const methodParameters = SwapRouter.swapNFTCallParameters([foundationTrade], { sender: FORGE_SENDER_ADDRESS })
       registerFixture('_FOUNDATION_BUY_ITEM', methodParameters)
       expect(methodParameters.value).to.eq(foundationData.price.toString())
       expect(methodParameters.calldata).to.eq(
@@ -64,7 +64,7 @@ describe('SwapRouter', () => {
 
     it('encodes buying two NFTs from a single NFTX vault', async () => {
       const nftxTrade = new NFTXTrade([nftxPurchase2Covens])
-      const methodParameters = SwapRouter.swapGenieCallParameters([nftxTrade], { sender: FORGE_SENDER_ADDRESS })
+      const methodParameters = SwapRouter.swapNFTCallParameters([nftxTrade], { sender: FORGE_SENDER_ADDRESS })
       registerFixture('_NFTX_BUY_ITEMS', methodParameters)
       expect(methodParameters.value).to.eq(expandTo18DecimalsBN(1).toString())
       expect(methodParameters.calldata).to.eq(
@@ -114,7 +114,7 @@ describe('SwapRouter', () => {
 
     it('encodes buying one ERC721 from LooksRare', async () => {
       const looksRareTrade = new LooksRareTrade([looksRareData721])
-      const methodParameters = SwapRouter.swapGenieCallParameters([looksRareTrade], { sender: FORGE_SENDER_ADDRESS })
+      const methodParameters = SwapRouter.swapNFTCallParameters([looksRareTrade], { sender: FORGE_SENDER_ADDRESS })
       registerFixture('_LOOKSRARE_BUY_ITEM_721', methodParameters)
       expect(methodParameters.value).to.eq(looksRareOrder721.price)
       expect(methodParameters.calldata).to.eq(
@@ -124,7 +124,7 @@ describe('SwapRouter', () => {
 
     it('encodes buying one ERC1155 from LooksRare', async () => {
       const looksRareTrade = new LooksRareTrade([looksRareData1155])
-      const methodParameters = SwapRouter.swapGenieCallParameters([looksRareTrade], { sender: FORGE_SENDER_ADDRESS })
+      const methodParameters = SwapRouter.swapNFTCallParameters([looksRareTrade], { sender: FORGE_SENDER_ADDRESS })
       registerFixture('_LOOKSRARE_BUY_ITEM_1155', methodParameters)
       expect(methodParameters.value).to.eq(looksRareOrder1155.price)
       expect(methodParameters.calldata).to.eq(
@@ -160,7 +160,7 @@ describe('SwapRouter', () => {
 
     it('encodes buying one ERC-721 from X2Y2', async () => {
       const x2y2Trade = new X2Y2Trade([x2y2_721_Data])
-      const methodParameters = SwapRouter.swapGenieCallParameters([x2y2Trade], { sender: FORGE_SENDER_ADDRESS })
+      const methodParameters = SwapRouter.swapNFTCallParameters([x2y2Trade], { sender: FORGE_SENDER_ADDRESS })
       registerFixture('_X2Y2_721_BUY_ITEM', methodParameters)
       expect(methodParameters.value).to.eq(x2y2SignedOrder721.price)
       expect(methodParameters.calldata).to.eq(
@@ -169,7 +169,7 @@ describe('SwapRouter', () => {
     })
     it('encodes buying one ERC-1155 from X2Y2', async () => {
       const x2y2Trade = new X2Y2Trade([x2y2_1155_Data])
-      const methodParameters = SwapRouter.swapGenieCallParameters([x2y2Trade], { sender: FORGE_SENDER_ADDRESS })
+      const methodParameters = SwapRouter.swapNFTCallParameters([x2y2Trade], { sender: FORGE_SENDER_ADDRESS })
       registerFixture('_X2Y2_1155_BUY_ITEM', methodParameters)
       expect(methodParameters.value).to.eq(x2y2SignedOrder1155.price)
       expect(methodParameters.calldata).to.eq(
@@ -184,7 +184,7 @@ describe('SwapRouter', () => {
         calculateSeaportValue(seaportData2Covens.items[1].parameters.consideration)
       )
       const seaportTrade = new SeaportTrade([seaportData2Covens])
-      const methodParameters = SwapRouter.swapGenieCallParameters([seaportTrade], { sender: FORGE_SENDER_ADDRESS })
+      const methodParameters = SwapRouter.swapNFTCallParameters([seaportTrade], { sender: FORGE_SENDER_ADDRESS })
       registerFixture('_SEAPORT_BUY_ITEMS', methodParameters)
       expect(methodParameters.value).to.eq(value.toString())
       expect(methodParameters.calldata).to.eq(
@@ -203,7 +203,7 @@ describe('SwapRouter', () => {
 
     it('encodes a single cryptopunk trade', async () => {
       const cryptopunkTrade = new CryptopunkTrade([cryptopunk])
-      const methodParameters = SwapRouter.swapGenieCallParameters([cryptopunkTrade], { sender: FORGE_SENDER_ADDRESS })
+      const methodParameters = SwapRouter.swapNFTCallParameters([cryptopunkTrade], { sender: FORGE_SENDER_ADDRESS })
       registerFixture('_CRYPTOPUNK_BUY_ITEM', methodParameters)
       expect(methodParameters.value).to.eq(cryptopunk.value.toString())
       expect(methodParameters.calldata).to.eq(
@@ -226,7 +226,7 @@ describe('SwapRouter', () => {
 
     it('encodes an NFT20 trade with three items', async () => {
       const nft20Trade = new NFT20Trade([nft20Data])
-      const methodParameters = SwapRouter.swapGenieCallParameters([nft20Trade], { sender: FORGE_SENDER_ADDRESS })
+      const methodParameters = SwapRouter.swapNFTCallParameters([nft20Trade], { sender: FORGE_SENDER_ADDRESS })
       registerFixture('_NFT20_BUY_ITEM', methodParameters)
       expect(methodParameters.value).to.eq(nft20Data.value.toString())
       expect(methodParameters.calldata).to.eq(
@@ -255,7 +255,7 @@ describe('SwapRouter', () => {
 
     it('encodes an Sudoswap trade with three items', async () => {
       const sudoswapTrade = new SudoswapTrade([sudoswapData])
-      const methodParameters = SwapRouter.swapGenieCallParameters([sudoswapTrade], { sender: FORGE_SENDER_ADDRESS })
+      const methodParameters = SwapRouter.swapNFTCallParameters([sudoswapTrade], { sender: FORGE_SENDER_ADDRESS })
       registerFixture('_SUDOSWAP_BUY_ITEM', methodParameters)
       expect(methodParameters.value).to.eq(sudoswapData.swaps[0].maxCost.toString())
       expect(methodParameters.calldata).to.eq(
@@ -283,7 +283,7 @@ describe('SwapRouter', () => {
     it('encodes partial fill for multiple trades between protocols', async () => {
       const nftxTrade = new NFTXTrade([nftxPurchase2Covens])
       const seaportTrade = new SeaportTrade([seaportData2Covens])
-      const methodParameters = SwapRouter.swapGenieCallParameters([nftxTrade, seaportTrade], {
+      const methodParameters = SwapRouter.swapNFTCallParameters([nftxTrade, seaportTrade], {
         sender: FORGE_SENDER_ADDRESS,
       })
       registerFixture('_PARTIAL_FILL', methodParameters)
@@ -315,7 +315,7 @@ describe('SwapRouter', () => {
       const value = BigNumber.from(foundationData1.price).add(foundationData2.price)
 
       const foundationTrade = new FoundationTrade([foundationData1, foundationData2])
-      const methodParameters = SwapRouter.swapGenieCallParameters([foundationTrade], {
+      const methodParameters = SwapRouter.swapNFTCallParameters([foundationTrade], {
         sender: FORGE_SENDER_ADDRESS,
       })
       registerFixture('_PARTIAL_FILL_WITHIN_PROTOCOL', methodParameters)
