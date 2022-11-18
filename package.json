@@ -17,7 +17,7 @@
     "test:all": "yarn test && yarn test:forge",
     "test": "env TS_NODE_COMPILER_OPTIONS='{\"module\": \"commonjs\" }' mocha -r ts-node/register --reporter-option maxDiffSize=100000 'tests/**/*.ts'",
     "test:forge": "yarn install:ur && forge test",
-    "install:ur": "cd node_modules/@uniswap/narwhal && forge install",
+    "install:ur": "cd node_modules/@uniswap/universal-router && forge install",
     "build": "tsdx build",
     "prettier:fix": "prettier --write '**/*.ts' && prettier --write '**/*.json'",
     "prettier": "prettier --check '**/*.ts' && prettier --check '**/*.json'",
@@ -39,7 +39,6 @@
     "eslint-plugin-prettier": "^3.4.0",
     "mocha": "^9.0.0",
     "node-fetch": "^2.6.1",
-    "openzeppelin-contracts": "^4.0.0",
     "prettier": "^2.3.1",
     "ts-loader": "^9.2.3",
     "ts-node": "^10.0.0",
@@ -49,7 +48,7 @@
     "typescript": "^4.3.3"
   },
   "dependencies": {
-    "@uniswap/narwhal": "1.0.0-beta.5",
+    "@uniswap/universal-router": "1.0.1",
     "@uniswap/permit2-sdk": "^0.4.0",
     "@uniswap/router-sdk": "^1.4.0",
     "@uniswap/sdk-core": "^3.1.0",

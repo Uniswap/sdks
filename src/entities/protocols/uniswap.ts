@@ -119,19 +119,19 @@ function addV2Swap<TInput extends Currency, TOutput extends Currency>(
 
   if (tradeType == TradeType.EXACT_INPUT) {
     planner.addCommand(CommandType.V2_SWAP_EXACT_IN, [
+      // if native, we have to unwrap so keep in the router for now
+      routerMustCustody ? ADDRESS_THIS : options.recipient,
       trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
       trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
       route.path.map((pool) => pool.address),
-      // if native, we have to unwrap so keep in the router for now
-      routerMustCustody ? ADDRESS_THIS : options.recipient,
       payerIsUser,
     ])
   } else if (tradeType == TradeType.EXACT_OUTPUT) {
     planner.addCommand(CommandType.V2_SWAP_EXACT_OUT, [
+      routerMustCustody ? ADDRESS_THIS : options.recipient,
       trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
       trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
       route.path.map((pool) => pool.address),
-      routerMustCustody ? ADDRESS_THIS : options.recipient,
       payerIsUser,
     ])
   }
@@ -249,10 +249,10 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
       ])
     } else {
       planner.addCommand(CommandType.V2_SWAP_EXACT_IN, [
+        isLastSectionInRoute(i) ? tradeRecipient : ADDRESS_THIS, // recipient
         i === 0 ? amountIn : CONTRACT_BALANCE, // amountIn
         !isLastSectionInRoute(i) ? 0 : amountOut, // amountOutMin
         newRoute.path.map((pool) => pool.address), // path
-        isLastSectionInRoute(i) ? tradeRecipient : ADDRESS_THIS, // recipient
         payerIsUser && i === 0,
       ])
     }

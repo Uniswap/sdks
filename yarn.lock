@@ -1832,11 +1832,6 @@
   resolved "https://registry.npmjs.org/@uniswap/lib/-/lib-4.0.1-alpha.tgz"
   integrity sha512-f6UIliwBbRsgVLxIaBANF6w09tYqc6Y/qXdsrbEmXHyFA7ILiKrIwRFXe1yOg8M3cksgVsO9N7yuL2DdCGQKBA==
 
-"@uniswap/narwhal@1.0.0-beta.5":
-  version "1.0.0-beta.5"
-  resolved "https://registry.npmjs.org/@uniswap/narwhal/-/narwhal-1.0.0-beta.5.tgz"
-  integrity sha512-4j0bt1HxRBSSHsBCPoEnBIUrM7EyOzqxHAZ/pP505617oBgOsGtt/LOJMiy9T+weKRfCXMeMpeijxHKqB5ZHTw==
-
 "@uniswap/permit2-sdk@^0.4.0":
   version "0.4.0"
   resolved "https://registry.npmjs.org/@uniswap/permit2-sdk/-/permit2-sdk-0.4.0.tgz"
@@ -1895,6 +1890,11 @@
     "@uniswap/v3-periphery" "1.4.1"
     dotenv "^14.2.0"
     hardhat-watcher "^2.1.1"
+
+"@uniswap/universal-router@1.0.1":
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/@uniswap/universal-router/-/universal-router-1.0.1.tgz#130931db4c7c91222430c9706f3d6707f195fc74"
+  integrity sha512-knzmHmvDAaUKQRpATmJroPi7Ig76WAsI/nelkPDjRzk+dCm5jacyImjt6BjnzsPrjzHc97NgDJAMmSrosi7Idg==
 
 "@uniswap/v2-core@1.0.1":
   version "1.0.1"
@@ -5628,11 +5628,6 @@ onetime@^5.1.0:
   integrity sha512-kbpaSSGJTWdAY5KPVeMOKXSrPtr8C8C7wodJbcsd51jRnmD+GZu8Y0VoU6Dm5Z4vWr0Ig/1NKuWRKf7j5aaYSg==
   dependencies:
     mimic-fn "^2.1.0"
-
-openzeppelin-contracts@^4.0.0:
-  version "4.0.0"
-  resolved "https://registry.npmjs.org/openzeppelin-contracts/-/openzeppelin-contracts-4.0.0.tgz"
-  integrity sha512-SlBeiWSJKhX9EY2Nlgev4P/LMBWWSk6wL+eqikAe9gODpxrQwLOx4Rw3vyHuJaChrUTlGyR4Gl1NqJMw0J15eQ==
 
 optionator@^0.8.1, optionator@^0.8.3:
   version "0.8.3"

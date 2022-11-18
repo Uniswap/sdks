@@ -1,5 +1,5 @@
 import invariant from 'tiny-invariant'
-import { abi } from '@uniswap/narwhal/artifacts/contracts/Router.sol/Router.json'
+import { abi } from '@uniswap/universal-router/artifacts/contracts/UniversalRouter.sol/UniversalRouter.json'
 import { Interface } from '@ethersproject/abi'
 import { BigNumber, BigNumberish } from 'ethers'
 import { MethodParameters } from '@uniswap/v3-sdk'
