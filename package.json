@@ -11,7 +11,7 @@
     "node": ">=14"
   },
   "publishConfig": {
-    "access": "private"
+    "access": "public"
   },
   "scripts": {
     "test:all": "yarn test && yarn test:forge",

@@ -16,7 +16,7 @@ export const UNIVERSAL_ROUTER_ADDRESS = (chainId: number): string => {
       throw new Error(`Universal Router not deployed on chain ${chainId}`)
   }
 }
-export const PERMIT2_ADDRESS = '0x6fEe9BeC3B3fc8f9DA5740f0efc6BbE6966cd6A6'
+export const PERMIT2_ADDRESS = '0x000000000022D473030F116dDEE9F6B43aC78BA3'
 
 export const CONTRACT_BALANCE = BigNumber.from(2).pow(255)
 export const ETH_ADDRESS = '0x0000000000000000000000000000000000000000'
