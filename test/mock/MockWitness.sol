@@ -9,7 +9,6 @@ library MockWitness {
     string constant WITNESS_TYPE_STRING =
         "MockWitness witness)MockWitness(uint256 mock)TokenPermissions(address token,uint256 amount)";
 
-
     function hash(uint256 mock) internal pure returns (bytes32) {
         return keccak256(abi.encode(TYPE_HASH, mock));
     }

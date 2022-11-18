@@ -70,11 +70,7 @@ contract Permit2Test is Test {
 
         permit2.permit(
             from,
-            IAllowanceTransfer.PermitBatch({
-                details: details,
-                spender: SPENDER,
-                sigDeadline: EXPIRATION
-            }),
+            IAllowanceTransfer.PermitBatch({details: details, spender: SPENDER, sigDeadline: EXPIRATION}),
             sign(msgHash)
         );
 
@@ -92,10 +88,7 @@ contract Permit2Test is Test {
         vm.prank(SPENDER);
         permit2.permitTransferFrom(
             ISignatureTransfer.PermitTransferFrom({
-                permitted: ISignatureTransfer.TokenPermissions({
-                    token: address(token),
-                    amount: AMOUNT
-                }),
+                permitted: ISignatureTransfer.TokenPermissions({token: address(token), amount: AMOUNT}),
                 nonce: 0,
                 deadline: EXPIRATION
             }),
@@ -113,26 +106,17 @@ contract Permit2Test is Test {
         bytes32 msgHash = json.readBytes32("._PERMIT_TRANSFER_BATCH");
 
         ISignatureTransfer.TokenPermissions[] memory permitted = new ISignatureTransfer.TokenPermissions[](1);
-        permitted[0] = ISignatureTransfer.TokenPermissions({
-            token: address(token),
-            amount: AMOUNT
-        });
+        permitted[0] = ISignatureTransfer.TokenPermissions({token: address(token), amount: AMOUNT});
 
-        ISignatureTransfer.SignatureTransferDetails[] memory details = new ISignatureTransfer.SignatureTransferDetails[](1);
-        details[0] = ISignatureTransfer.SignatureTransferDetails({
-            to: address(SPENDER),
-            requestedAmount: AMOUNT
-        });
+        ISignatureTransfer.SignatureTransferDetails[] memory details =
+            new ISignatureTransfer.SignatureTransferDetails[](1);
+        details[0] = ISignatureTransfer.SignatureTransferDetails({to: address(SPENDER), requestedAmount: AMOUNT});
 
         token.mint(from, AMOUNT);
 
         vm.prank(SPENDER);
         permit2.permitTransferFrom(
-            ISignatureTransfer.PermitBatchTransferFrom({
-                permitted: permitted,
-                nonce: 0,
-                deadline: EXPIRATION
-            }),
+            ISignatureTransfer.PermitBatchTransferFrom({permitted: permitted, nonce: 0, deadline: EXPIRATION}),
             from,
             details,
             sign(msgHash)
@@ -150,10 +134,7 @@ contract Permit2Test is Test {
         vm.prank(SPENDER);
         permit2.permitWitnessTransferFrom(
             ISignatureTransfer.PermitTransferFrom({
-                permitted: ISignatureTransfer.TokenPermissions({
-                    token: address(token),
-                    amount: AMOUNT
-                }),
+                permitted: ISignatureTransfer.TokenPermissions({token: address(token), amount: AMOUNT}),
                 nonce: 0,
                 deadline: EXPIRATION
             }),
