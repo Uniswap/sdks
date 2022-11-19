@@ -19,11 +19,6 @@ contract Interop is Test {
         // so have to do a lil hack to read as string then parse
         // ref https://book.getfoundry.sh/cheatcodes/parse-json#decoding-json-objects-a-tip
         MethodParametersRaw memory raw = abi.decode(vm.parseJson(json, key), (MethodParametersRaw));
-        params = MethodParameters(raw.data, stringToUint(raw.value));
-    }
-
-    function stringToUint(string memory b) private returns (uint256) {
-        vm.setEnv("temp", b);
-        return vm.envUint("temp");
+        params = MethodParameters(raw.data, vm.parseUint(raw.value));
     }
 }
