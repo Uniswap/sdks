@@ -33,7 +33,8 @@
     "@ethersproject/hash": "^5.7.0",
     "@ethersproject/keccak256": "^5.7.0",
     "@ethersproject/providers": "^5.7.2",
-    "@ethersproject/strings": "^5.7.0"
+    "@ethersproject/strings": "^5.7.0",
+    "tiny-invariant": "^1.3.1"
   },
   "devDependencies": {
     "@ethersproject/constants": "^5.7.0",

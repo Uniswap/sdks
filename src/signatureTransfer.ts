@@ -1,7 +1,9 @@
+import invariant from 'tiny-invariant'
 import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
 import { BigNumberish } from '@ethersproject/bignumber'
 import { _TypedDataEncoder } from '@ethersproject/hash'
 import { permit2Domain } from './domain'
+import { MaxSigDeadline, MaxUnorderedNonce, MaxSignatureTransferAmount } from './constants'
 
 export interface Witness {
   witness: any
@@ -111,8 +113,12 @@ export abstract class SignatureTransfer {
     chainId: number,
     witness?: Witness
   ): PermitTransferFromData | PermitBatchTransferFromData {
+    invariant(permit.deadline <= MaxSigDeadline, 'INVALID_SIG_DEADLINE')
+    invariant(permit.nonce <= MaxUnorderedNonce, 'INVALID_NONCE')
+
     const domain = permit2Domain(permit2Address, chainId)
     if (isPermitTransferFrom(permit)) {
+      validateTokenPermissions(permit.permitted)
       const types = witness ? permitTransferFromWithWitnessType(witness) : PERMIT_TRANSFER_FROM_TYPES
       const values = witness ? Object.assign(permit, { witness: witness.witness }) : permit
       return {
@@ -121,6 +127,7 @@ export abstract class SignatureTransfer {
         values,
       }
     } else {
+      permit.permitted.forEach(validateTokenPermissions)
       const types = witness ? permitBatchTransferFromWithWitnessType(witness) : PERMIT_BATCH_TRANSFER_FROM_TYPES
       const values = witness ? Object.assign(permit, { witness: witness.witness }) : permit
       return {
@@ -140,4 +147,8 @@ export abstract class SignatureTransfer {
     const { domain, types, values } = SignatureTransfer.getPermitData(permit, permit2Address, chainId, witness)
     return _TypedDataEncoder.hash(domain, types, values)
   }
+}
+
+function validateTokenPermissions(permissions: TokenPermissions) {
+  invariant(permissions.amount <= MaxSignatureTransferAmount, 'INVALID_AMOUNT')
 }

@@ -1,6 +1,8 @@
+import invariant from 'tiny-invariant'
 import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
 import { BigNumberish } from '@ethersproject/bignumber'
 import { _TypedDataEncoder } from '@ethersproject/hash'
+import { MaxSigDeadline, MaxOrderedNonce, MaxAllowanceTransferAmount, MaxAllowanceExpiration } from './constants'
 import { permit2Domain } from './domain'
 
 export interface PermitDetails {
@@ -76,14 +78,18 @@ export abstract class AllowanceTransfer {
     permit2Address: string,
     chainId: number
   ): PermitSingleData | PermitBatchData {
+    invariant(permit.sigDeadline <= MaxSigDeadline, 'INVALID_SIG_DEADLINE')
+
     const domain = permit2Domain(permit2Address, chainId)
     if (isPermit(permit)) {
+      validatePermitDetails(permit.details)
       return {
         domain,
         types: PERMIT_TYPES,
         values: permit,
       }
     } else {
+      permit.details.forEach(validatePermitDetails)
       return {
         domain,
         types: PERMIT_BATCH_TYPES,
@@ -96,4 +102,10 @@ export abstract class AllowanceTransfer {
     const { domain, types, values } = AllowanceTransfer.getPermitData(permit, permit2Address, chainId)
     return _TypedDataEncoder.hash(domain, types, values)
   }
+}
+
+function validatePermitDetails(details: PermitDetails) {
+  invariant(details.nonce <= MaxOrderedNonce, 'INVALID_NONCE')
+  invariant(details.amount <= MaxAllowanceTransferAmount, 'INVALID_AMOUNT')
+  invariant(details.expiration <= MaxAllowanceExpiration, 'INVALID_EXPIRATION')
 }
