@@ -86,15 +86,15 @@ contract Permit2Test is Test {
         token.mint(from, AMOUNT);
 
         vm.prank(SPENDER);
+        ISignatureTransfer.SignatureTransferDetails memory details = ISignatureTransfer.SignatureTransferDetails({to: address(SPENDER), requestedAmount: AMOUNT});
         permit2.permitTransferFrom(
             ISignatureTransfer.PermitTransferFrom({
                 permitted: ISignatureTransfer.TokenPermissions({token: address(token), amount: AMOUNT}),
                 nonce: 0,
                 deadline: EXPIRATION
             }),
+            details,
             from,
-            SPENDER,
-            AMOUNT,
             sign(msgHash)
         );
 
@@ -117,8 +117,8 @@ contract Permit2Test is Test {
         vm.prank(SPENDER);
         permit2.permitTransferFrom(
             ISignatureTransfer.PermitBatchTransferFrom({permitted: permitted, nonce: 0, deadline: EXPIRATION}),
-            from,
             details,
+            from,
             sign(msgHash)
         );
 
@@ -132,15 +132,15 @@ contract Permit2Test is Test {
         token.mint(from, AMOUNT);
 
         vm.prank(SPENDER);
+        ISignatureTransfer.SignatureTransferDetails memory details = ISignatureTransfer.SignatureTransferDetails({to: address(SPENDER), requestedAmount: AMOUNT});
         permit2.permitWitnessTransferFrom(
             ISignatureTransfer.PermitTransferFrom({
                 permitted: ISignatureTransfer.TokenPermissions({token: address(token), amount: AMOUNT}),
                 nonce: 0,
                 deadline: EXPIRATION
             }),
+            details,
             from,
-            SPENDER,
-            AMOUNT,
             MockWitness.hash(0),
             MockWitness.WITNESS_TYPE_STRING,
             sign(msgHash)
