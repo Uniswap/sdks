@@ -12,9 +12,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-        with:
-          submodules: recursive
-          token: '${{ secrets.PERMIT2_TOKEN }}'
 
       - name: Set up node
         uses: actions/setup-node@v2

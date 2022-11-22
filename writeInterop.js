@@ -1,8 +1,7 @@
 const fs = require('fs')
-const { MaxUint256 } = require('@ethersproject/constants')
 const { AllowanceTransfer, SignatureTransfer } = require('./dist')
 
-const PERMIT2_ADDRESS = '0x3e512e639009bb513a8f7e0171f8a8b8a5888fb9'
+const PERMIT2_ADDRESS = '0x2ff894211e6ee99fc02564e96b519c2f61ffc00e'
 const TOKEN_ADDRESS = '0xcc2eb538c1652934ab91be26dadd0ce81d8d5945'
 const SPENDER_ADDRESS = '0x0000000000000000000000000000000000000001'
 const EXPIRATION = '10000000000000'
