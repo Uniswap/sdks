@@ -28,7 +28,6 @@ contract Permit2Test is Test {
         from = vm.addr(fromPrivateKey);
         string memory root = vm.projectRoot();
         permit2 = new Permit2{salt: 0x00}();
-        console2.log(address(permit2));
         token = new MockERC20{salt: 0x00}();
         json = vm.readFile(string.concat(root, "/test/interop.json"));
 

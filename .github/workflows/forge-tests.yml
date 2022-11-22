@@ -35,8 +35,5 @@ jobs:
         with:
           version: nightly
 
-      - name: Install dependencies
-        run: cd permit2 && forge build
-
       - name: Run tests
         run: forge test
