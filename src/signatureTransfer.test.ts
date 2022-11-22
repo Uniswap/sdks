@@ -1,6 +1,63 @@
 import { SignatureTransfer } from './signatureTransfer'
+import { MaxUnorderedNonce, MaxSignatureTransferAmount, MaxSigDeadline } from './constants'
 
 describe('SignatureTransfer', () => {
+  describe('Max values', () => {
+    it('max nonce', () => {
+      expect(() =>
+        SignatureTransfer.hash(
+          {
+            permitted: {
+              token: '0x0000000000000000000000000000000000000000',
+              amount: '0',
+            },
+            spender: '0x0000000000000000000000000000000000000000',
+            nonce: MaxUnorderedNonce.add(1).toString(),
+            deadline: '0',
+          },
+          '0x0000000000000000000000000000000000000000',
+          1
+        )
+      ).toThrow('NONCE_OUT_OF_RANGE')
+    })
+
+    it('max amount', () => {
+      expect(() =>
+        SignatureTransfer.hash(
+          {
+            permitted: {
+              token: '0x0000000000000000000000000000000000000000',
+              amount: MaxSignatureTransferAmount.add(1).toString(),
+            },
+            spender: '0x0000000000000000000000000000000000000000',
+            nonce: '0',
+            deadline: '0',
+          },
+          '0x0000000000000000000000000000000000000000',
+          1
+        )
+      ).toThrow('AMOUNT_OUT_OF_RANGE')
+    })
+
+    it('max deadline', () => {
+      expect(() =>
+        SignatureTransfer.hash(
+          {
+            permitted: {
+              token: '0x0000000000000000000000000000000000000000',
+              amount: '0',
+            },
+            spender: '0x0000000000000000000000000000000000000000',
+            nonce: '0',
+            deadline: MaxSigDeadline.add(1).toString(),
+          },
+          '0x0000000000000000000000000000000000000000',
+          1
+        )
+      ).toThrow('SIG_DEADLINE_OUT_OF_RANGE')
+    })
+  })
+
   it('non-batch, no witness', () => {
     expect(
       SignatureTransfer.hash(

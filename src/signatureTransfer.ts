@@ -113,8 +113,8 @@ export abstract class SignatureTransfer {
     chainId: number,
     witness?: Witness
   ): PermitTransferFromData | PermitBatchTransferFromData {
-    invariant(permit.deadline <= MaxSigDeadline, 'INVALID_SIG_DEADLINE')
-    invariant(permit.nonce <= MaxUnorderedNonce, 'INVALID_NONCE')
+    invariant(MaxSigDeadline.gt(permit.deadline), 'SIG_DEADLINE_OUT_OF_RANGE')
+    invariant(MaxUnorderedNonce.gt(permit.nonce), 'NONCE_OUT_OF_RANGE')
 
     const domain = permit2Domain(permit2Address, chainId)
     if (isPermitTransferFrom(permit)) {
@@ -150,5 +150,5 @@ export abstract class SignatureTransfer {
 }
 
 function validateTokenPermissions(permissions: TokenPermissions) {
-  invariant(permissions.amount <= MaxSignatureTransferAmount, 'INVALID_AMOUNT')
+  invariant(MaxSignatureTransferAmount.gt(permissions.amount), 'AMOUNT_OUT_OF_RANGE')
 }
