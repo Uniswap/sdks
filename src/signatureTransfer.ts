@@ -8,7 +8,7 @@ import { MaxSigDeadline, MaxUnorderedNonce, MaxSignatureTransferAmount } from '.
 export interface Witness {
   witness: any
   witnessTypeName: string
-  witnessType: TypedDataField[]
+  witnessType: Record<string, TypedDataField[]>
 }
 
 export interface TokenPermissions {
@@ -77,7 +77,7 @@ function permitTransferFromWithWitnessType(witness: Witness): Record<string, Typ
       { name: 'witness', type: witness.witnessTypeName },
     ],
     TokenPermissions: TOKEN_PERMISSIONS,
-    [witness.witnessTypeName]: witness.witnessType,
+    ...witness.witnessType,
   }
 }
 
@@ -91,7 +91,7 @@ function permitBatchTransferFromWithWitnessType(witness: Witness): Record<string
       { name: 'witness', type: witness.witnessTypeName },
     ],
     TokenPermissions: TOKEN_PERMISSIONS,
-    [witness.witnessTypeName]: witness.witnessType,
+    ...witness.witnessType,
   }
 }
 
