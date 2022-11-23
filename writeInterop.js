@@ -85,7 +85,7 @@ const interop = {
     chainId,
     {
       witnessTypeName: 'MockWitness',
-      witnessType: [{ name: 'mock', type: 'uint256' }],
+      witnessType: { MockWitness: [{ name: 'mock', type: 'uint256' }] },
       witness: { mock: '0' },
     }
   ),

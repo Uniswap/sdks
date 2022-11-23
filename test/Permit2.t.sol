@@ -86,7 +86,8 @@ contract Permit2Test is Test {
         token.mint(from, AMOUNT);
 
         vm.prank(SPENDER);
-        ISignatureTransfer.SignatureTransferDetails memory details = ISignatureTransfer.SignatureTransferDetails({to: address(SPENDER), requestedAmount: AMOUNT});
+        ISignatureTransfer.SignatureTransferDetails memory details =
+            ISignatureTransfer.SignatureTransferDetails({to: address(SPENDER), requestedAmount: AMOUNT});
         permit2.permitTransferFrom(
             ISignatureTransfer.PermitTransferFrom({
                 permitted: ISignatureTransfer.TokenPermissions({token: address(token), amount: AMOUNT}),
@@ -132,7 +133,8 @@ contract Permit2Test is Test {
         token.mint(from, AMOUNT);
 
         vm.prank(SPENDER);
-        ISignatureTransfer.SignatureTransferDetails memory details = ISignatureTransfer.SignatureTransferDetails({to: address(SPENDER), requestedAmount: AMOUNT});
+        ISignatureTransfer.SignatureTransferDetails memory details =
+            ISignatureTransfer.SignatureTransferDetails({to: address(SPENDER), requestedAmount: AMOUNT});
         permit2.permitWitnessTransferFrom(
             ISignatureTransfer.PermitTransferFrom({
                 permitted: ISignatureTransfer.TokenPermissions({token: address(token), amount: AMOUNT}),
