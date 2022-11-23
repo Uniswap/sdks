@@ -1,17 +1,16 @@
 import hre, { ethers } from 'hardhat';
 import { expect } from 'chai';
-import { splitSignature } from '@ethersproject/bytes';
 import { BigNumber, Signer, Event } from 'ethers';
 
 import { BlockchainTime } from './utils/time';
 
 import DutchLimitOrderReactorAbi from '../../abis/DutchLimitOrderReactor.json';
-import PermitPostAbi from '../../abis/PermitPost.json';
+import Permit2Abi from '../../abis/Permit2.json';
 import MockERC20Abi from '../../abis/MockERC20.json';
 import DirectTakerFillContract from '../../abis/DirectTakerExecutor.json';
 
 import {
-  PermitPost,
+  Permit2,
   DutchLimitOrderReactor,
   MockERC20,
 } from '../../src/contracts';
@@ -20,7 +19,7 @@ import { DutchLimitOrderBuilder, EventWatcher, FillData } from '../../';
 describe('EventWatcher', () => {
   let reactor: DutchLimitOrderReactor;
   let fillContract: string;
-  let permitPost: PermitPost;
+  let permit2: Permit2;
   let chainId: number;
   let maker: ethers.Wallet;
   let tokenIn: MockERC20;
@@ -31,18 +30,18 @@ describe('EventWatcher', () => {
 
   before(async () => {
     [admin, taker] = await ethers.getSigners();
-    const permitPostFactory = await ethers.getContractFactory(
-      PermitPostAbi.abi,
-      PermitPostAbi.bytecode
+    const permit2Factory = await ethers.getContractFactory(
+      Permit2Abi.abi,
+      Permit2Abi.bytecode
     );
-    permitPost = (await permitPostFactory.deploy()) as PermitPost;
+    permit2 = (await permit2Factory.deploy()) as Permit2;
 
     const reactorFactory = await ethers.getContractFactory(
       DutchLimitOrderReactorAbi.abi,
       DutchLimitOrderReactorAbi.bytecode
     );
     reactor = (await reactorFactory.deploy(
-      permitPost.address
+      permit2.address
     )) as DutchLimitOrderReactor;
 
     chainId = hre.network.config.chainId || 1;
@@ -75,7 +74,7 @@ describe('EventWatcher', () => {
     );
     await tokenIn
       .connect(maker)
-      .approve(permitPost.address, ethers.constants.MaxUint256);
+      .approve(permit2.address, ethers.constants.MaxUint256);
 
     await tokenOut.mint(
       await taker.getAddress(),
@@ -95,7 +94,7 @@ describe('EventWatcher', () => {
     const order = new DutchLimitOrderBuilder(
       chainId,
       reactor.address,
-      permitPost.address
+      permit2.address
     )
       .deadline(deadline)
       .endTime(deadline)
@@ -104,7 +103,8 @@ describe('EventWatcher', () => {
       .nonce(BigNumber.from(100))
       .input({
         token: tokenIn.address,
-        amount,
+        startAmount: amount,
+        endAmount: amount,
       })
       .output({
         token: tokenOut.address,
@@ -118,10 +118,9 @@ describe('EventWatcher', () => {
 
     const { domain, types, values } = order.permitData();
     const signature = await maker._signTypedData(domain, types, values);
-    const { v, r, s } = splitSignature(signature);
 
     const res = await reactor.connect(taker).execute(
-      { order: order.serialize(), sig: { v, r, s } },
+      { order: order.serialize(), sig: signature },
       fillContract,
       "0x"
     );
@@ -141,7 +140,7 @@ describe('EventWatcher', () => {
     const order = new DutchLimitOrderBuilder(
       chainId,
       reactor.address,
-      permitPost.address
+      permit2.address
     )
       .deadline(deadline)
       .endTime(deadline)
@@ -150,7 +149,8 @@ describe('EventWatcher', () => {
       .nonce(BigNumber.from(101))
       .input({
         token: tokenIn.address,
-        amount,
+        startAmount: amount,
+        endAmount: amount,
       })
       .output({
         token: tokenOut.address,
@@ -164,7 +164,6 @@ describe('EventWatcher', () => {
 
     const { domain, types, values } = order.permitData();
     const signature = await maker._signTypedData(domain, types, values);
-    const { v, r, s } = splitSignature(signature);
 
     const makerAddress = await maker.getAddress();
     const takerAddress = await taker.getAddress();
@@ -173,7 +172,7 @@ describe('EventWatcher', () => {
       expect(fill.offerer).to.equal(makerAddress);
     });
     const res = await reactor.connect(taker).execute(
-      { order: order.serialize(), sig: { v, r, s } },
+      { order: order.serialize(), sig: signature },
       fillContract,
       "0x"
     );

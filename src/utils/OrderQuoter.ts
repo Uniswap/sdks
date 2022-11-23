@@ -1,4 +1,3 @@
-import { SignatureLike, splitSignature } from "@ethersproject/bytes";
 import { BaseProvider } from "@ethersproject/providers";
 import { ethers } from "ethers";
 
@@ -53,7 +52,7 @@ const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
 
 export interface SignedOrder {
   order: IOrder;
-  signature: SignatureLike;
+  signature: string;
 }
 
 /**
@@ -88,8 +87,7 @@ export class OrderQuoter {
 
   async quoteBatch(orders: SignedOrder[]): Promise<OrderQuote[]> {
     const calls = orders.map((order) => {
-      const { v, r, s } = splitSignature(order.signature);
-      return [order.order.serialize(), { v, r, s }];
+      return [order.order.serialize(), order.signature];
     });
 
     const results = await multicall(this.provider, {
@@ -175,7 +173,7 @@ export class OrderQuoter {
           const nonceManager = new NonceManager(
             this.provider,
             this.chainId,
-            await reactor.permitPost()
+            await reactor.permit2()
           );
           const maker = order.order.getSigner(order.signature);
           const cancelled = await nonceManager.isUsed(

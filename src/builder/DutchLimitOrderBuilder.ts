@@ -4,10 +4,10 @@ import invariant from "tiny-invariant";
 import { OrderType, REACTOR_ADDRESS_MAPPING } from "../constants";
 import { MissingConfiguration } from "../errors";
 import {
+  DutchInput,
   DutchLimitOrder,
   DutchLimitOrderInfo,
   DutchOutput,
-  TokenAmount,
 } from "../order";
 
 import { OrderBuilder } from "./OrderBuilder";
@@ -21,7 +21,7 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
   constructor(
     private chainId: number,
     reactorAddress?: string,
-    private permitPostAddress?: string
+    private permit2Address?: string
   ) {
     super();
 
@@ -57,7 +57,7 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
     return this;
   }
 
-  input(input: TokenAmount): DutchLimitOrderBuilder {
+  input(input: DutchInput): DutchLimitOrderBuilder {
     this.info.input = input;
     return this;
   }
@@ -104,7 +104,7 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
         outputs: this.info.outputs,
       }),
       this.chainId,
-      this.permitPostAddress
+      this.permit2Address
     );
   }
 }

@@ -1,8 +1,8 @@
 import { BaseProvider } from "@ethersproject/providers";
 import { BigNumber, ethers } from "ethers";
 
-import { PERMIT_POST_MAPPING } from "../constants";
-import { PermitPost, PermitPost__factory } from "../contracts";
+import { PERMIT2_MAPPING } from "../constants";
+import { Permit2, Permit2__factory } from "../contracts";
 import { MissingConfiguration } from "../errors";
 
 interface NonceData {
@@ -11,26 +11,23 @@ interface NonceData {
 }
 
 /**
- * Helper to track PermitPost nonces for addresses
+ * Helper to track Permit2 nonces for addresses
  */
 export class NonceManager {
-  private permitPost: PermitPost;
+  private permit2: Permit2;
   private currentWord: Map<string, BigNumber>;
   private currentBitmap: Map<string, BigNumber>;
 
   constructor(
     private provider: BaseProvider,
     chainId: number,
-    permitPostAddress?: string
+    permit2Address?: string
   ) {
-    if (permitPostAddress) {
-      this.permitPost = PermitPost__factory.connect(
-        permitPostAddress,
-        provider
-      );
-    } else if (PERMIT_POST_MAPPING[chainId]) {
-      this.permitPost = PermitPost__factory.connect(
-        PERMIT_POST_MAPPING[chainId],
+    if (permit2Address) {
+      this.permit2 = Permit2__factory.connect(permit2Address, provider);
+    } else if (PERMIT2_MAPPING[chainId]) {
+      this.permit2 = Permit2__factory.connect(
+        PERMIT2_MAPPING[chainId],
         this.provider
       );
     } else {
@@ -59,7 +56,7 @@ export class NonceManager {
 
   async isUsed(address: string, nonce: BigNumber): Promise<boolean> {
     const { word, bitPos } = splitNonce(nonce);
-    const bitmap = await this.permitPost.nonceBitmap(address, word);
+    const bitmap = await this.permit2.nonceBitmap(address, word);
     return bitmap.div(BigNumber.from(2).pow(bitPos)).mod(2).eq(1);
   }
 
@@ -69,11 +66,11 @@ export class NonceManager {
       this.currentWord.get(address) || BigNumber.from(0);
     let bitmap =
       this.currentBitmap.get(address) ||
-      (await this.permitPost.nonceBitmap(address, currentWord));
+      (await this.permit2.nonceBitmap(address, currentWord));
 
     while (bitmap.eq(ethers.constants.MaxUint256)) {
       currentWord = currentWord.add(1);
-      bitmap = await this.permitPost.nonceBitmap(address, currentWord);
+      bitmap = await this.permit2.nonceBitmap(address, currentWord);
     }
 
     return {
@@ -88,14 +85,14 @@ interface SplitNonce {
   bitPos: BigNumber;
 }
 
-// Splits a permitPost nonce into the word and bitPos
+// Splits a permit2 nonce into the word and bitPos
 export function splitNonce(nonce: BigNumber): SplitNonce {
   const word = nonce.div(256);
   const bitPos = nonce.mod(256);
   return { word, bitPos };
 }
 
-// Builds a permitPost nonce from the given word and bitPos
+// Builds a permit2 nonce from the given word and bitPos
 export function buildNonce(word: BigNumber, bitPos: number): BigNumber {
   // word << 8
   const shiftedWord = word.mul(256);
