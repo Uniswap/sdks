@@ -1,6 +1,6 @@
-export const PERMIT_POST_MAPPING: { readonly [key: number]: string } = {
-  1: "0x320b2ADcf134128D067693417Be59754F221D9DE",
-  5: "0x99E76e161AA20a00EcE81DCCD6398169353945de",
+export const PERMIT2_MAPPING: { readonly [key: number]: string } = {
+  1: "0x000000000022d473030f116ddee9f6b43ac78ba3",
+  5: "0x000000000022d473030f116ddee9f6b43ac78ba3",
   12341234: "0xF5c9D4eFCAe2e36993C0815d3A8Dfd3E8985b677",
 };
 
