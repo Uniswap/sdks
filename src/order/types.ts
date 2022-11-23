@@ -1,7 +1,6 @@
 import { SignatureLike } from "@ethersproject/bytes";
+import { PermitTransferFromData } from "@uniswap/permit2-sdk";
 import { BigNumber } from "ethers";
-
-import { PermitData } from "../utils";
 
 export type IOrder = {
   // TODO: maybe add generic types for more order-type specific info
@@ -31,7 +30,7 @@ export type IOrder = {
    * Returns the data for generating the maker EIP-712 permit signature
    * @return The data for generating the maker EIP-712 permit signature
    */
-  permitData(): PermitData;
+  permitData(): PermitTransferFromData;
 
   /**
    * Returns the order hash

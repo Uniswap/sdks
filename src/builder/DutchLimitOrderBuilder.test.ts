@@ -19,7 +19,8 @@ describe("DutchLimitOrderBuilder", () => {
       .nonce(BigNumber.from(100))
       .input({
         token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-        amount: BigNumber.from("1000000"),
+        startAmount: BigNumber.from("1000000"),
+        endAmount: BigNumber.from("1000000"),
       })
       .output({
         token: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
@@ -43,7 +44,8 @@ describe("DutchLimitOrderBuilder", () => {
       .nonce(BigNumber.from(100))
       .input({
         token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-        amount: BigNumber.from("1000000"),
+        startAmount: BigNumber.from("1000000"),
+        endAmount: BigNumber.from("1000000"),
       })
       .output({
         token: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
@@ -74,7 +76,8 @@ describe("DutchLimitOrderBuilder", () => {
         .nonce(BigNumber.from(100))
         .input({
           token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-          amount: BigNumber.from("1000000"),
+          startAmount: BigNumber.from("1000000"),
+          endAmount: BigNumber.from("1000000"),
         })
         .output({
           token: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
@@ -116,7 +119,8 @@ describe("DutchLimitOrderBuilder", () => {
         .nonce(BigNumber.from(100))
         .input({
           token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-          amount: BigNumber.from("1000000"),
+          startAmount: BigNumber.from("1000000"),
+          endAmount: BigNumber.from("1000000"),
         })
         .output({
           token: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
@@ -137,7 +141,8 @@ describe("DutchLimitOrderBuilder", () => {
         .nonce(BigNumber.from(100))
         .input({
           token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-          amount: BigNumber.from("1000000"),
+          startAmount: BigNumber.from("1000000"),
+          endAmount: BigNumber.from("1000000"),
         })
         .output({
           token: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
@@ -158,7 +163,8 @@ describe("DutchLimitOrderBuilder", () => {
         .offerer("0x0000000000000000000000000000000000000000")
         .input({
           token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-          amount: BigNumber.from("1000000"),
+          startAmount: BigNumber.from("1000000"),
+          endAmount: BigNumber.from("1000000"),
         })
         .output({
           token: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",

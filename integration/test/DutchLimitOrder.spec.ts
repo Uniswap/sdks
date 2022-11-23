@@ -1,17 +1,16 @@
 import hre, { ethers } from 'hardhat';
 import { expect } from 'chai';
-import { splitSignature } from '@ethersproject/bytes';
 import { BigNumber, Signer } from 'ethers';
 
 import { BlockchainTime } from './utils/time';
 
 import DutchLimitOrderReactorAbi from '../../abis/DutchLimitOrderReactor.json';
-import PermitPostAbi from '../../abis/PermitPost.json';
+import Permit2Abi from '../../abis/Permit2.json';
 import MockERC20Abi from '../../abis/MockERC20.json';
 import DirectTakerFillContract from '../../abis/DirectTakerExecutor.json';
 
 import {
-  PermitPost,
+  Permit2,
   DutchLimitOrderReactor,
   MockERC20,
 } from '../../src/contracts';
@@ -20,7 +19,7 @@ import { DutchLimitOrderBuilder } from '../../';
 describe('DutchLimitOrder', () => {
   let reactor: DutchLimitOrderReactor;
   let fillContract: string;
-  let permitPost: PermitPost;
+  let permit2: Permit2;
   let chainId: number;
   let maker: ethers.Wallet;
   let tokenIn: MockERC20;
@@ -30,18 +29,18 @@ describe('DutchLimitOrder', () => {
 
   before(async () => {
     [admin, taker] = await ethers.getSigners();
-    const permitPostFactory = await ethers.getContractFactory(
-      PermitPostAbi.abi,
-      PermitPostAbi.bytecode
+    const permit2Factory = await ethers.getContractFactory(
+      Permit2Abi.abi,
+      Permit2Abi.bytecode
     );
-    permitPost = (await permitPostFactory.deploy()) as PermitPost;
+    permit2 = (await permit2Factory.deploy()) as Permit2;
 
     const reactorFactory = await ethers.getContractFactory(
       DutchLimitOrderReactorAbi.abi,
       DutchLimitOrderReactorAbi.bytecode
     );
     reactor = (await reactorFactory.deploy(
-      permitPost.address
+      permit2.address
     )) as DutchLimitOrderReactor;
 
     chainId = hre.network.config.chainId || 1;
@@ -74,7 +73,7 @@ describe('DutchLimitOrder', () => {
     );
     await tokenIn
       .connect(maker)
-      .approve(permitPost.address, ethers.constants.MaxUint256);
+      .approve(permit2.address, ethers.constants.MaxUint256);
 
     await tokenOut.mint(
       await taker.getAddress(),
@@ -93,7 +92,7 @@ describe('DutchLimitOrder', () => {
     const order = new DutchLimitOrderBuilder(
       chainId,
       reactor.address,
-      permitPost.address
+      permit2.address
     )
       .deadline(deadline)
       .endTime(deadline)
@@ -102,7 +101,8 @@ describe('DutchLimitOrder', () => {
       .nonce(BigNumber.from(100))
       .input({
         token: tokenIn.address,
-        amount,
+        startAmount: amount,
+        endAmount: amount,
       })
       .output({
         token: tokenOut.address,
@@ -116,7 +116,6 @@ describe('DutchLimitOrder', () => {
 
     const { domain, types, values } = order.permitData();
     const signature = await maker._signTypedData(domain, types, values);
-    const { v, r, s } = splitSignature(signature);
 
     const makerTokenInBalanceBefore = await tokenIn.balanceOf(
       await maker.getAddress()
@@ -132,7 +131,7 @@ describe('DutchLimitOrder', () => {
     );
 
     const res = await reactor.connect(taker).execute(
-      { order: order.serialize(), sig: { v, r, s } },
+      { order: order.serialize(), sig: signature },
       fillContract,
       "0x"
     );
@@ -159,7 +158,7 @@ describe('DutchLimitOrder', () => {
     const order = new DutchLimitOrderBuilder(
       chainId,
       reactor.address,
-      permitPost.address
+      permit2.address
     )
       .deadline(deadline)
       .endTime(deadline)
@@ -168,7 +167,8 @@ describe('DutchLimitOrder', () => {
       .offerer(await maker.getAddress())
       .input({
         token: tokenIn.address,
-        amount,
+        startAmount: amount,
+        endAmount: amount,
       })
       .output({
         token: tokenOut.address,
@@ -182,7 +182,6 @@ describe('DutchLimitOrder', () => {
 
     const { domain, types, values } = order.permitData();
     const signature = await maker._signTypedData(domain, types, values);
-    const { v, r, s } = splitSignature(signature);
 
     const makerTokenInBalanceBefore = await tokenIn.balanceOf(
       await maker.getAddress()
@@ -198,7 +197,7 @@ describe('DutchLimitOrder', () => {
     );
 
     const res = await reactor.connect(taker).execute(
-      { order: order.serialize(), sig: { v, r, s } },
+      { order: order.serialize(), sig: signature },
       fillContract,
       "0x"
     );

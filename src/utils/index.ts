@@ -1,4 +1,3 @@
-export * from "./PermitPost";
 export * from "./OrderValidator";
 export * from "./NonceManager";
 export * from "./OrderQuoter";

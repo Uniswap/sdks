@@ -2,13 +2,13 @@ import hre, { ethers } from 'hardhat';
 import { expect } from 'chai';
 
 import DutchLimitOrderReactorAbi from '../../abis/DutchLimitOrderReactor.json';
-import PermitPostAbi from '../../abis/PermitPost.json';
+import Permit2Abi from '../../abis/Permit2.json';
 import OrderQuoterAbi from '../../abis/OrderQuoter.json';
 import MockERC20Abi from '../../abis/MockERC20.json';
 
 import {
   OrderQuoter,
-  PermitPost,
+  Permit2,
   DutchLimitOrderReactor,
   MockERC20,
 } from '../../src/contracts';
@@ -25,7 +25,7 @@ const { BigNumber } = ethers;
 
 describe('OrderValidator', () => {
   let reactor: DutchLimitOrderReactor;
-  let permitPost: PermitPost;
+  let permit2: Permit2;
   let quoter: OrderQuoter;
   let chainId: number;
   let builder: DutchLimitOrderBuilder;
@@ -36,18 +36,18 @@ describe('OrderValidator', () => {
 
   before(async () => {
     const [admin] = await ethers.getSigners();
-    const permitPostFactory = await ethers.getContractFactory(
-      PermitPostAbi.abi,
-      PermitPostAbi.bytecode
+    const permit2Factory = await ethers.getContractFactory(
+      Permit2Abi.abi,
+      Permit2Abi.bytecode
     );
-    permitPost = (await permitPostFactory.deploy()) as PermitPost;
+    permit2 = (await permit2Factory.deploy()) as Permit2;
 
     const reactorFactory = await ethers.getContractFactory(
       DutchLimitOrderReactorAbi.abi,
       DutchLimitOrderReactorAbi.bytecode
     );
     reactor = (await reactorFactory.deploy(
-      permitPost.address
+      permit2.address
     )) as DutchLimitOrderReactor;
 
     const orderQuoterFactory = await ethers.getContractFactory(
@@ -59,7 +59,7 @@ describe('OrderValidator', () => {
     builder = new DutchLimitOrderBuilder(
       chainId,
       reactor.address,
-      permitPost.address
+      permit2.address
     );
 
     wallet = ethers.Wallet.createRandom().connect(ethers.provider);
@@ -77,7 +77,7 @@ describe('OrderValidator', () => {
     await tokenIn.mint(await wallet.getAddress(), BigNumber.from(10).pow(18));
     await tokenIn
       .connect(wallet)
-      .approve(permitPost.address, ethers.constants.MaxUint256);
+      .approve(permit2.address, ethers.constants.MaxUint256);
 
     tokenOut = (await tokenFactory.deploy('TEST', 'test', 18)) as MockERC20;
   });
@@ -92,7 +92,8 @@ describe('OrderValidator', () => {
       .nonce(BigNumber.from(98))
       .input({
         token: tokenIn.address,
-        amount: BigNumber.from('1000000'),
+        startAmount: BigNumber.from('1000000'),
+        endAmount: BigNumber.from('1000000'),
       })
       .output({
         token: tokenOut.address,
@@ -129,7 +130,8 @@ describe('OrderValidator', () => {
       .offerer(await wallet.getAddress())
       .input({
         token: tokenIn.address,
-        amount: BigNumber.from('1000000'),
+        startAmount: BigNumber.from('1000000'),
+        endAmount: BigNumber.from('1000000'),
       })
       .output({
         token: tokenOut.address,
@@ -157,7 +159,10 @@ describe('OrderValidator', () => {
       .offerer(await wallet.getAddress())
       .input({
         token: tokenIn.address,
-        amount: BigNumber.from('10')
+        startAmount: BigNumber.from('10')
+          .pow(18)
+          .mul(2),
+        endAmount: BigNumber.from('10')
           .pow(18)
           .mul(2),
       })
@@ -187,7 +192,8 @@ describe('OrderValidator', () => {
       .nonce(BigNumber.from(100))
       .input({
         token: tokenIn.address,
-        amount: BigNumber.from('1000000'),
+        startAmount: BigNumber.from('1000000'),
+        endAmount: BigNumber.from('1000000'),
       })
       .output({
         token: tokenOut.address,
@@ -203,7 +209,7 @@ describe('OrderValidator', () => {
         startTime: deadline - 101,
       }),
       chainId,
-      permitPost.address
+      permit2.address
     );
 
     const { domain, types, values } = order.permitData();
@@ -224,7 +230,8 @@ describe('OrderValidator', () => {
       .nonce(BigNumber.from(100))
       .input({
         token: tokenIn.address,
-        amount: BigNumber.from('1000000'),
+        startAmount: BigNumber.from('1000000'),
+        endAmount: BigNumber.from('1000000'),
       })
       .output({
         token: tokenOut.address,
@@ -237,7 +244,7 @@ describe('OrderValidator', () => {
     const order = new DutchLimitOrder(
       info,
       chainId,
-      permitPost.address
+      permit2.address
     );
 
     const { domain, types, values } = order.permitData();
@@ -272,7 +279,8 @@ describe('OrderValidator', () => {
       .nonce(BigNumber.from(100))
       .input({
         token: tokenIn.address,
-        amount: BigNumber.from('1000000'),
+        startAmount: BigNumber.from('1000000'),
+        endAmount: BigNumber.from('1000000'),
       })
       .output({
         token: tokenOut.address,
@@ -284,7 +292,7 @@ describe('OrderValidator', () => {
     const order = new DutchLimitOrder(
       Object.assign(info, { endTime: deadline - 100 }),
       chainId,
-      permitPost.address
+      permit2.address
     );
 
     const { domain, types, values } = order.permitData();
@@ -305,7 +313,8 @@ describe('OrderValidator', () => {
       .offerer(await wallet.getAddress())
       .input({
         token: tokenIn.address,
-        amount: BigNumber.from('1000000'),
+        startAmount: BigNumber.from('1000000'),
+        endAmount: BigNumber.from('1000000'),
       })
       .output({
         token: tokenOut.address,
@@ -317,13 +326,13 @@ describe('OrderValidator', () => {
     const order = new DutchLimitOrder(
       info,
       chainId,
-      permitPost.address
+      permit2.address
     );
 
     const { domain, types, values } = order.permitData();
     const signature = await wallet._signTypedData(domain, types, values);
     const { word, mask } = getCancelSingleParams(BigNumber.from(7));
-    await permitPost.connect(wallet).invalidateUnorderedNonces(word, mask);
+    await permit2.connect(wallet).invalidateUnorderedNonces(word, mask);
 
     expect(await validator.validate({ order, signature })).to.equal(
       OrderValidation.NonceUsed
