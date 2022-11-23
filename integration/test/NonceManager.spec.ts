@@ -1,22 +1,18 @@
 import hre, { ethers } from 'hardhat';
-import { splitSignature } from '@ethersproject/bytes';
 import { expect } from 'chai';
 
 import { Signer, Wallet, BigNumber } from 'ethers';
+import { PermitTransferFrom, SignatureTransfer } from '@uniswap/permit2-sdk';
 
-import PermitPostAbi from '../../abis/PermitPost.json';
+import Permit2Abi from '../../abis/Permit2.json';
 
-import { PermitPost } from '../../src/contracts';
+import { Permit2 } from '../../src/contracts';
 import {
   NonceManager,
-  PermitPost as PermitPostLib,
-  PermitInfo,
-  SigType,
 } from '../../';
 
 describe('NonceManager', () => {
-  let permitPost: PermitPost;
-  let permitPostLib: PermitPostLib;
+  let permit2: Permit2;
   let wallet: Wallet;
   let nonceManager: NonceManager;
   let chainId: number;
@@ -26,17 +22,16 @@ describe('NonceManager', () => {
     [admin] = await ethers.getSigners();
     chainId = hre.network.config.chainId || 1;
 
-    const permitPostFactory = await ethers.getContractFactory(
-      PermitPostAbi.abi,
-      PermitPostAbi.bytecode
+    const permit2Factory = await ethers.getContractFactory(
+      Permit2Abi.abi,
+      Permit2Abi.bytecode
     );
-    permitPost = (await permitPostFactory.deploy()) as PermitPost;
-    permitPostLib = new PermitPostLib(chainId, permitPost.address);
+    permit2 = (await permit2Factory.deploy()) as Permit2;
 
     nonceManager = new NonceManager(
       ethers.provider,
       chainId,
-      permitPost.address
+      permit2.address
     );
 
     wallet = ethers.Wallet.createRandom().connect(ethers.provider);
@@ -58,7 +53,7 @@ describe('NonceManager', () => {
     const newManager = new NonceManager(
       ethers.provider,
       chainId,
-      permitPost.address
+      permit2.address
     );
     expect(
       (await newManager.useNonce(await wallet.getAddress())).toString()
@@ -70,7 +65,7 @@ describe('NonceManager', () => {
     const newManager = new NonceManager(
       ethers.provider,
       chainId,
-      permitPost.address
+      permit2.address
     );
     expect(
       (await newManager.useNonce(await wallet.getAddress())).toString()
@@ -81,7 +76,7 @@ describe('NonceManager', () => {
     const newManager = new NonceManager(
       ethers.provider,
       chainId,
-      permitPost.address
+      permit2.address
     );
     expect(
       await newManager.isUsed(await wallet.getAddress(), BigNumber.from(1234))
@@ -117,7 +112,7 @@ describe('NonceManager', () => {
     const newManager = new NonceManager(
       ethers.provider,
       chainId,
-      permitPost.address
+      permit2.address
     );
     expect(
       (await newManager.useNonce(await wallet.getAddress())).toString()
@@ -133,30 +128,27 @@ describe('NonceManager', () => {
 
   const sendPermit = async (nonce: BigNumber) => {
     const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+
     // maker fills their own order
-    const permit: PermitInfo = {
-      sigType: SigType.Unordered,
-      tokens: [],
-      spender: await admin.getAddress(),
-      witness: ethers.constants.HashZero,
-      deadline,
-      nonce,
-    };
-    const { domain, types, values } = permitPostLib.getPermitData(permit);
-    const signature = await wallet._signTypedData(domain, types, values);
-    const { v, r, s } = splitSignature(signature);
-    await permitPost.unorderedTransferFrom(
-      {
-        tokens: [],
-        spender: await admin.getAddress(),
-        deadline,
-        witness: ethers.constants.HashZero,
+    const permit: PermitTransferFrom = {
+      permitted: {
+        token: '0x0000000000000000000000000000000000000000',
+        amount: ethers.utils.parseEther('1'),
       },
-      [],
-      [],
-      [],
+      spender: await admin.getAddress(),
       nonce,
-      { v, r, s }
+      deadline,
+    };
+    const { domain, types, values } = SignatureTransfer.getPermitData(permit, permit2.address, chainId);
+    const signature = await wallet._signTypedData(domain, types, values);
+    await permit2["permitTransferFrom(((address,uint256),uint256,uint256),(address,uint256),address,bytes)"](
+      permit,
+      {
+        to: await admin.getAddress(),
+        requestedAmount: ethers.utils.parseEther('1'),
+      },
+      await wallet.getAddress(),
+      signature
     );
   };
 });

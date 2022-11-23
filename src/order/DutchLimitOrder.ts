@@ -1,9 +1,16 @@
 import { SignatureLike } from "@ethersproject/bytes";
+import {
+  PermitTransferFrom,
+  PermitTransferFromData,
+  SignatureTransfer,
+  Witness,
+} from "@uniswap/permit2-sdk";
 import { BigNumber, ethers } from "ethers";
 
-import { PermitData, PermitPost, SigType, TokenType } from "../utils";
+import { PERMIT2_MAPPING } from "../constants";
+import { MissingConfiguration } from "../errors";
 
-import { IOrder, OrderInfo, TokenAmount } from "./types";
+import { IOrder, OrderInfo } from "./types";
 
 export type DutchOutput = {
   readonly token: string;
@@ -12,10 +19,44 @@ export type DutchOutput = {
   readonly recipient: string;
 };
 
+export type DutchInput = {
+  readonly token: string;
+  readonly startAmount: BigNumber;
+  readonly endAmount: BigNumber;
+};
+
 export type DutchLimitOrderInfo = OrderInfo & {
   startTime: number;
-  input: TokenAmount;
+  input: DutchInput;
   outputs: DutchOutput[];
+};
+
+type WitnessInfo = OrderInfo & {
+  startTime: number;
+  inputToken: string;
+  inputStartAmount: BigNumber;
+  inputEndAmount: BigNumber;
+  outputs: DutchOutput[];
+};
+
+const DUTCH_LIMIT_ORDER_TYPES = {
+  DutchLimitOrder: [
+    { name: "reactor", type: "address" },
+    { name: "offerer", type: "address" },
+    { name: "nonce", type: "uint256" },
+    { name: "deadline", type: "uint256" },
+    { name: "startTime", type: "uint256" },
+    { name: "inputToken", type: "address" },
+    { name: "inputStartAmount", type: "uint256" },
+    { name: "inputEndAmount", type: "uint256" },
+    { name: "outputs", type: "DutchOutput[]" },
+  ],
+  DutchOutput: [
+    { name: "token", type: "address" },
+    { name: "startAmount", type: "uint256" },
+    { name: "endAmount", type: "uint256" },
+    { name: "recipient", type: "address" },
+  ],
 };
 
 const DUTCH_LIMIT_ORDER_ABI = [
@@ -23,21 +64,27 @@ const DUTCH_LIMIT_ORDER_ABI = [
     [
       "tuple(address,address,uint256,uint256)",
       "uint256",
-      "tuple(address,uint256)",
+      "tuple(address,uint256,uint256)",
       "tuple(address,uint256,uint256,address)[]",
     ].join(",") +
     ")",
 ];
 
 export class DutchLimitOrder implements IOrder {
-  public readonly permitPost: PermitPost;
+  public permit2Address: string;
 
   constructor(
     public readonly info: DutchLimitOrderInfo,
     public readonly chainId: number,
-    public readonly permitPostAddress?: string
+    readonly _permit2Address?: string
   ) {
-    this.permitPost = new PermitPost(chainId, permitPostAddress);
+    if (_permit2Address) {
+      this.permit2Address = _permit2Address;
+    } else if (PERMIT2_MAPPING[chainId]) {
+      this.permit2Address = PERMIT2_MAPPING[chainId];
+    } else {
+      throw new MissingConfiguration("permit2", chainId.toString());
+    }
   }
 
   static parse(encoded: string, chainId: number): DutchLimitOrder {
@@ -47,7 +94,7 @@ export class DutchLimitOrder implements IOrder {
       [
         [reactor, offerer, nonce, deadline],
         startTime,
-        [inputToken, inputAmount],
+        [inputToken, inputStartAmount, inputEndAmount],
         outputs,
       ],
     ] = decoded;
@@ -58,7 +105,11 @@ export class DutchLimitOrder implements IOrder {
         nonce,
         deadline: deadline.toNumber(),
         startTime: startTime.toNumber(),
-        input: { token: inputToken, amount: inputAmount },
+        input: {
+          token: inputToken,
+          startAmount: inputStartAmount,
+          endAmount: inputEndAmount,
+        },
         outputs: outputs.map(
           ([token, startAmount, endAmount, recipient]: [
             string,
@@ -93,7 +144,11 @@ export class DutchLimitOrder implements IOrder {
           this.info.deadline,
         ],
         this.info.startTime,
-        [this.info.input.token, this.info.input.amount],
+        [
+          this.info.input.token,
+          this.info.input.startAmount,
+          this.info.input.endAmount,
+        ],
         this.info.outputs.map((output) => [
           output.token,
           output.startAmount,
@@ -110,7 +165,12 @@ export class DutchLimitOrder implements IOrder {
   getSigner(signature: SignatureLike): string {
     return ethers.utils.computeAddress(
       ethers.utils.recoverPublicKey(
-        this.permitPost.getPermitDigest(this.permitData().values),
+        SignatureTransfer.hash(
+          this.toPermit(),
+          this.permit2Address,
+          this.chainId,
+          this.witness()
+        ),
         signature
       )
     );
@@ -119,28 +179,55 @@ export class DutchLimitOrder implements IOrder {
   /**
    * @inheritdoc IOrder
    */
-  permitData(): PermitData {
-    return this.permitPost.getPermitData({
-      sigType: SigType.Unordered,
-      tokens: [
-        {
-          tokenType: TokenType.ERC20,
-          token: this.info.input.token,
-          maxAmount: this.info.input.amount,
-          id: BigNumber.from(0),
-        },
-      ],
-      spender: this.info.reactor,
-      deadline: this.info.deadline,
-      witness: this.hash(),
-      nonce: this.info.nonce,
-    });
+  permitData(): PermitTransferFromData {
+    return SignatureTransfer.getPermitData(
+      this.toPermit(),
+      this.permit2Address,
+      this.chainId,
+      this.witness()
+    ) as PermitTransferFromData;
   }
 
   /**
    * @inheritdoc IOrder
    */
   hash(): string {
-    return ethers.utils.keccak256(this.serialize());
+    return ethers.utils._TypedDataEncoder
+      .from(DUTCH_LIMIT_ORDER_TYPES)
+      .hash(this.witnessInfo());
+  }
+
+  private toPermit(): PermitTransferFrom {
+    return {
+      permitted: {
+        token: this.info.input.token,
+        amount: this.info.input.endAmount,
+      },
+      spender: this.info.reactor,
+      nonce: this.info.nonce,
+      deadline: this.info.deadline,
+    };
+  }
+
+  private witnessInfo(): WitnessInfo {
+    return {
+      reactor: this.info.reactor,
+      offerer: this.info.offerer,
+      nonce: this.info.nonce,
+      deadline: this.info.deadline,
+      startTime: this.info.startTime,
+      inputToken: this.info.input.token,
+      inputStartAmount: this.info.input.startAmount,
+      inputEndAmount: this.info.input.endAmount,
+      outputs: this.info.outputs,
+    };
+  }
+
+  private witness(): Witness {
+    return {
+      witness: this.witnessInfo(),
+      witnessTypeName: "DutchLimitOrder",
+      witnessType: DUTCH_LIMIT_ORDER_TYPES,
+    };
   }
 }
