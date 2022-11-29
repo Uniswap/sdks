@@ -20,7 +20,7 @@ const WETH = new Token(1, '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2', 18, 'WET
 const DAI = new Token(1, '0x6B175474E89094C44Da98b954EedeAC495271d0F', 18, 'DAI', 'dai')
 const USDC = new Token(1, '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48', 6, 'USDC', 'USD Coin')
 const FEE_AMOUNT = FeeAmount.MEDIUM
-const FORK_BLOCK = 16072100
+const FORK_BLOCK = 16075500
 
 // live values from the fork block
 // note: these tests aren't testing much but registering calldata to interop file

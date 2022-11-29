@@ -15,7 +15,7 @@
   },
   "scripts": {
     "test:all": "yarn test && yarn test:forge",
-    "test": "env TS_NODE_COMPILER_OPTIONS='{\"module\": \"commonjs\" }' mocha -r ts-node/register --reporter-option maxDiffSize=100000 --timeout 10000 'tests/**/*.ts'",
+    "test": "env TS_NODE_COMPILER_OPTIONS='{\"module\": \"commonjs\" }' mocha -r ts-node/register --reporter-option maxDiffSize=100000 --timeout 30000 'tests/**/*.ts'",
     "test:forge": "yarn install:ur && forge test",
     "install:ur": "cd node_modules/@uniswap/universal-router && forge install",
     "build": "tsdx build",
