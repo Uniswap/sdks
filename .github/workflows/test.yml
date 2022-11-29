@@ -38,3 +38,5 @@ jobs:
 
       - name: Run tests
         run: yarn test
+        env:
+          FORK_URL: '${{ secrets.FORK_URL }}'
