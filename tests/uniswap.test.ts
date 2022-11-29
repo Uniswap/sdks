@@ -20,7 +20,7 @@ const WETH = new Token(1, '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2', 18, 'WET
 const DAI = new Token(1, '0x6B175474E89094C44Da98b954EedeAC495271d0F', 18, 'DAI', 'dai')
 const USDC = new Token(1, '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48', 6, 'USDC', 'USD Coin')
 const FEE_AMOUNT = FeeAmount.MEDIUM
-const FORK_BLOCK = 15947700
+const FORK_BLOCK = 16072100
 
 // live values from the fork block
 // note: these tests aren't testing much but registering calldata to interop file
@@ -39,7 +39,7 @@ describe('Uniswap', () => {
 
     WETH_USDC_V3 = await getPool(WETH, USDC, FEE_AMOUNT, FORK_BLOCK)
     WETH_USDC_V3_LOW_FEE = await getPool(WETH, USDC, FeeAmount.LOW, FORK_BLOCK)
-    USDC_DAI_V3 = await getPool(USDC, DAI, FEE_AMOUNT, FORK_BLOCK)
+    USDC_DAI_V3 = await getPool(DAI, USDC, FeeAmount.LOW, FORK_BLOCK)
   })
 
   describe('v2', () => {

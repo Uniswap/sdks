@@ -33,7 +33,7 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         string memory root = vm.projectRoot();
         json = vm.readFile(string.concat(root, "/tests/forge/interop.json"));
 
-        vm.createSelectFork(vm.envString("FORK_URL"), 15947700);
+        vm.createSelectFork(vm.envString("FORK_URL"), 16072100);
         vm.startPrank(from);
         (router, permit2) = deployFixtureMainnetConfig();
         vm.deal(from, BALANCE);

@@ -65,7 +65,7 @@ contract DeployRouter is Test {
     }
 
     function useMainnetDeployment() public pure returns (UniversalRouter router, Permit2 permit2) {
-        router = UniversalRouter(payable(0x0000000052BE00bA3a005edbE83a0fB9aaDB964C));
+        router = UniversalRouter(payable(0xDE96ea98BcFDD9622F29c8372CE2D5E05e3A2233));
         permit2 = Permit2(0x000000000022D473030F116dDEE9F6B43aC78BA3);
     }
 }

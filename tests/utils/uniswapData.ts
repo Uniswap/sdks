@@ -51,11 +51,11 @@ export async function getPool(tokenA: Token, tokenB: Token, feeAmount: FeeAmount
   const poolAddress = Pool.getAddress(token0, token1, feeAmount)
   const contract = new ethers.Contract(poolAddress, IUniswapV3Pool.abi, getProvider())
   let liquidity = await contract.liquidity({ blockTag: blockNumber })
-  let { sqrtPriceX96 } = await contract.slot0({ blockTag: blockNumber })
+  let { sqrtPriceX96, tick } = await contract.slot0({ blockTag: blockNumber })
   liquidity = JSBI.BigInt(liquidity.toString())
   sqrtPriceX96 = JSBI.BigInt(sqrtPriceX96.toString())
 
-  return new Pool(token0, token1, feeAmount, sqrtPriceX96, liquidity, TickMath.getTickAtSqrtRatio(sqrtPriceX96), [
+  return new Pool(token0, token1, feeAmount, sqrtPriceX96, liquidity, tick, [
     {
       index: nearestUsableTick(TickMath.MIN_TICK, TICK_SPACINGS[feeAmount]),
       liquidityNet: liquidity,
