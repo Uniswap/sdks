@@ -23,9 +23,8 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - name: Install dependencies
-        run: |
-          npm config set '//registry.npmjs.org/:_authToken' "${{ secrets.NPM_AUTH_TOKEN }}" \
-          && yarn install --frozen-lockfile
+        run: yarn install --frozen-lockfile
+
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
