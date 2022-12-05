@@ -78,7 +78,7 @@ export abstract class AllowanceTransfer {
     permit2Address: string,
     chainId: number
   ): PermitSingleData | PermitBatchData {
-    invariant(MaxSigDeadline.gt(permit.sigDeadline), 'SIG_DEADLINE_OUT_OF_RANGE')
+    invariant(MaxSigDeadline.gte(permit.sigDeadline), 'SIG_DEADLINE_OUT_OF_RANGE')
 
     const domain = permit2Domain(permit2Address, chainId)
     if (isPermit(permit)) {
@@ -105,7 +105,7 @@ export abstract class AllowanceTransfer {
 }
 
 function validatePermitDetails(details: PermitDetails) {
-  invariant(MaxOrderedNonce.gt(details.nonce), 'NONCE_OUT_OF_RANGE')
-  invariant(MaxAllowanceTransferAmount.gt(details.amount), 'AMOUNT_OUT_OF_RANGE')
-  invariant(MaxAllowanceExpiration.gt(details.expiration), 'EXPIRATION_OUT_OF_RANGE')
+  invariant(MaxOrderedNonce.gte(details.nonce), 'NONCE_OUT_OF_RANGE')
+  invariant(MaxAllowanceTransferAmount.gte(details.amount), 'AMOUNT_OUT_OF_RANGE')
+  invariant(MaxAllowanceExpiration.gte(details.expiration), 'EXPIRATION_OUT_OF_RANGE')
 }
