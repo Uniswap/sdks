@@ -3,7 +3,26 @@ import { MaxOrderedNonce, MaxAllowanceTransferAmount, MaxAllowanceExpiration, Ma
 
 describe('AllowanceTransfer', () => {
   describe('Max values', () => {
-    it('max nonce', () => {
+    it('max values pass', () => {
+      expect(() =>
+        AllowanceTransfer.hash(
+          {
+            details: {
+              token: '0x0000000000000000000000000000000000000000',
+              amount: MaxAllowanceTransferAmount.toString(),
+              expiration: MaxAllowanceExpiration.toString(),
+              nonce: MaxOrderedNonce.toString(),
+            },
+            spender: '0x0000000000000000000000000000000000000000',
+            sigDeadline: MaxSigDeadline.toString(),
+          },
+          '0x0000000000000000000000000000000000000000',
+          1
+        )
+      ).not.toThrow()
+    })
+
+    it('nonce out of range', () => {
       expect(() =>
         AllowanceTransfer.hash(
           {
@@ -22,7 +41,7 @@ describe('AllowanceTransfer', () => {
       ).toThrow('NONCE_OUT_OF_RANGE')
     })
 
-    it('max amount', () => {
+    it('amount out of range', () => {
       expect(() =>
         AllowanceTransfer.hash(
           {
@@ -41,7 +60,7 @@ describe('AllowanceTransfer', () => {
       ).toThrow('AMOUNT_OUT_OF_RANGE')
     })
 
-    it('max expiration', () => {
+    it('expiration out of range', () => {
       expect(() =>
         AllowanceTransfer.hash(
           {
@@ -60,7 +79,7 @@ describe('AllowanceTransfer', () => {
       ).toThrow('EXPIRATION_OUT_OF_RANGE')
     })
 
-    it('max sigDeadline', () => {
+    it('sigDeadline out of range', () => {
       expect(() =>
         AllowanceTransfer.hash(
           {

@@ -3,7 +3,25 @@ import { MaxUnorderedNonce, MaxSignatureTransferAmount, MaxSigDeadline } from '.
 
 describe('SignatureTransfer', () => {
   describe('Max values', () => {
-    it('max nonce', () => {
+    it('max values', () => {
+      expect(() =>
+        SignatureTransfer.hash(
+          {
+            permitted: {
+              token: '0x0000000000000000000000000000000000000000',
+              amount: MaxSignatureTransferAmount.toString(),
+            },
+            spender: '0x0000000000000000000000000000000000000000',
+            nonce: MaxUnorderedNonce.toString(),
+            deadline: MaxSigDeadline.toString(),
+          },
+          '0x0000000000000000000000000000000000000000',
+          1
+        )
+      ).not.toThrow()
+    })
+
+    it('nonce out of range', () => {
       expect(() =>
         SignatureTransfer.hash(
           {
@@ -21,7 +39,7 @@ describe('SignatureTransfer', () => {
       ).toThrow('NONCE_OUT_OF_RANGE')
     })
 
-    it('max amount', () => {
+    it('amount out of range', () => {
       expect(() =>
         SignatureTransfer.hash(
           {
@@ -39,7 +57,7 @@ describe('SignatureTransfer', () => {
       ).toThrow('AMOUNT_OUT_OF_RANGE')
     })
 
-    it('max deadline', () => {
+    it('deadline out of range', () => {
       expect(() =>
         SignatureTransfer.hash(
           {
