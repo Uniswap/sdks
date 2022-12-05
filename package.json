@@ -49,7 +49,7 @@
   },
   "dependencies": {
     "@uniswap/universal-router": "1.1.1",
-    "@uniswap/permit2-sdk": "^0.4.0",
+    "@uniswap/permit2-sdk": "^1.2.0",
     "@uniswap/router-sdk": "^1.4.0",
     "@uniswap/sdk-core": "^3.1.0",
     "@uniswap/v2-sdk": "^3.0.1",
