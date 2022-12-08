@@ -5,7 +5,7 @@ import {console2} from "forge-std/console2.sol";
 import {Test} from "forge-std/Test.sol";
 import {UniversalRouter} from "universal-router/UniversalRouter.sol";
 import {RouterParameters} from "universal-router/base/RouterImmutables.sol";
-import {ERC20} from "solmate/tokens/ERC20.sol";
+import {ERC20} from "solmate/src/tokens/ERC20.sol";
 import {Permit2} from "permit2/src/Permit2.sol";
 import {IAllowanceTransfer} from "permit2/src/interfaces/IAllowanceTransfer.sol";
 

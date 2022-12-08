@@ -8,6 +8,6 @@ hardhat/=node_modules/@uniswap/universal-router/node_modules/hardhat/
 openzeppelin-contracts=lib/openzeppelin-contracts/
 permit2/=lib/permit2/
 universal-router/=node_modules/@uniswap/universal-router/contracts
-solmate/=lib/solmate/src/
+solmate/=lib/solmate/
 v2-core/=node_modules/@uniswap/universal-router/lib/v2-core/
 v3-core/=node_modules/@uniswap/universal-router/lib/v3-core/

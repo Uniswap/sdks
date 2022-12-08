@@ -2,8 +2,8 @@
 pragma solidity ^0.8.17;
 
 import {Test, stdJson, console2} from "forge-std/Test.sol";
-import {ERC721} from "solmate/tokens/ERC721.sol";
-import {ERC1155} from "solmate/tokens/ERC1155.sol";
+import {ERC721} from "solmate/src/tokens/ERC721.sol";
+import {ERC1155} from "solmate/src/tokens/ERC1155.sol";
 import {UniversalRouter} from "universal-router/UniversalRouter.sol";
 import {DeployRouter} from "./utils/DeployRouter.sol";
 import {MethodParameters, Interop} from "./utils/Interop.sol";
