@@ -13,6 +13,7 @@ import { ROUTER_ADDRESS } from './utils/addresses'
 import { CurrencyAmount, TradeType, Ether, Token, Percent, Currency } from '@uniswap/sdk-core'
 import { registerFixture } from './forge/writeInterop'
 import { getPair, getPool } from './utils/uniswapData'
+import { hexToDecimalString } from './utils/hexToDecimalString'
 
 const ETHER = Ether.onChain(1)
 const RECIPIENT = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
@@ -53,7 +54,7 @@ describe('Uniswap', () => {
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V2_1_ETH_FOR_USDC', methodParameters)
-      expect(methodParameters.value).to.eq(inputEther)
+      expect(hexToDecimalString(methodParameters.value)).to.eq(inputEther)
     })
 
     it('encodes an exactInput ETH->USDC->DAI swap', async () => {
@@ -66,7 +67,7 @@ describe('Uniswap', () => {
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V2_1_ETH_FOR_USDC_2_HOP', methodParameters)
-      expect(methodParameters.value).to.eq(inputEther)
+      expect(hexToDecimalString(methodParameters.value)).to.eq(inputEther)
     })
 
     it('encodes a single exactInput USDC->ETH swap', async () => {
@@ -79,7 +80,7 @@ describe('Uniswap', () => {
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V2_1000_USDC_FOR_ETH', methodParameters)
-      expect(methodParameters.value).to.eq('0')
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
     it('encodes a single exactInput USDC->ETH swap with permit', async () => {
@@ -94,7 +95,7 @@ describe('Uniswap', () => {
       const opts = swapOptions({ inputTokenPermit: toInputPermit(signature, permit) })
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V2_1000_USDC_FOR_ETH_PERMIT', methodParameters)
-      expect(methodParameters.value).to.eq('0')
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
     it('encodes an exactInput DAI->USDC->ETH swap', async () => {
@@ -107,7 +108,7 @@ describe('Uniswap', () => {
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V2_10_DAI_FOR_ETH_2_HOP', methodParameters)
-      expect(methodParameters.value).to.eq('0')
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
     it('encodes a single exactOutput ETH->USDC swap', async () => {
@@ -120,7 +121,7 @@ describe('Uniswap', () => {
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V2_ETH_FOR_1000_USDC', methodParameters)
-      expect(methodParameters.value).to.not.equal('0')
+      expect(hexToDecimalString(methodParameters.value)).to.not.equal('0')
     })
 
     it('encodes a single exactOutput USDC->ETH swap', async () => {
@@ -133,7 +134,7 @@ describe('Uniswap', () => {
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V2_USDC_FOR_1_ETH', methodParameters)
-      expect(methodParameters.value).to.eq('0')
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
   })
 
@@ -148,7 +149,7 @@ describe('Uniswap', () => {
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V3_1_ETH_FOR_USDC', methodParameters)
-      expect(methodParameters.value).to.eq(inputEther)
+      expect(hexToDecimalString(methodParameters.value)).to.eq(inputEther)
     })
 
     it('encodes a single exactInput USDC->ETH swap', async () => {
@@ -161,7 +162,7 @@ describe('Uniswap', () => {
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V3_1000_USDC_FOR_ETH', methodParameters)
-      expect(methodParameters.value).to.eq('0')
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
     it('encodes a single exactInput USDC->ETH swap with permit', async () => {
@@ -176,7 +177,7 @@ describe('Uniswap', () => {
       const opts = swapOptions({ inputTokenPermit: toInputPermit(signature, permit) })
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V3_1000_USDC_FOR_ETH_PERMIT', methodParameters)
-      expect(methodParameters.value).to.eq('0')
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
     it('encodes a single exactInput ETH->USDC->DAI swap', async () => {
@@ -189,7 +190,7 @@ describe('Uniswap', () => {
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V3_1_ETH_FOR_DAI_2_HOP', methodParameters)
-      expect(methodParameters.value).to.eq(inputEther)
+      expect(hexToDecimalString(methodParameters.value)).to.eq(inputEther)
     })
 
     it('encodes a single exactOutput ETH->USDC swap', async () => {
@@ -202,7 +203,7 @@ describe('Uniswap', () => {
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V3_ETH_FOR_1000_USDC', methodParameters)
-      expect(methodParameters.value).to.not.equal('0')
+      expect(hexToDecimalString(methodParameters.value)).to.not.equal('0')
     })
 
     it('encodes a single exactOutput USDC->ETH swap', async () => {
@@ -215,7 +216,7 @@ describe('Uniswap', () => {
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V3_USDC_FOR_1_ETH', methodParameters)
-      expect(methodParameters.value).to.eq('0')
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
     it('encodes an exactOutput ETH->USDC->DAI swap', async () => {
@@ -228,7 +229,7 @@ describe('Uniswap', () => {
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V3_ETH_FOR_1000_DAI_2_HOP', methodParameters)
-      expect(methodParameters.value).to.not.equal('0')
+      expect(hexToDecimalString(methodParameters.value)).to.not.equal('0')
     })
 
     it('encodes an exactOutput DAI->USDC->ETH swap', async () => {
@@ -241,7 +242,7 @@ describe('Uniswap', () => {
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V3_DAI_FOR_1_ETH_2_HOP', methodParameters)
-      expect(methodParameters.value).to.equal('0')
+      expect(hexToDecimalString(methodParameters.value)).to.equal('0')
     })
   })
 
@@ -256,7 +257,7 @@ describe('Uniswap', () => {
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_MIXED_1_ETH_FOR_DAI', methodParameters)
-      expect(methodParameters.value).to.eq(inputEther)
+      expect(hexToDecimalString(methodParameters.value)).to.eq(inputEther)
     })
 
     it('encodes a mixed exactInput v2ETH->v3USDC->DAI swap', async () => {
@@ -269,7 +270,7 @@ describe('Uniswap', () => {
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_MIXED_1_ETH_FOR_DAI_V2_FIRST', methodParameters)
-      expect(methodParameters.value).to.eq(inputEther)
+      expect(hexToDecimalString(methodParameters.value)).to.eq(inputEther)
     })
 
     it('encodes a mixed exactInput v2ETH->v2USDC->DAI swap', async () => {
@@ -282,7 +283,7 @@ describe('Uniswap', () => {
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_MIXED_1_ETH_FOR_DAI_V2_ONLY', methodParameters)
-      expect(methodParameters.value).to.eq(inputEther)
+      expect(hexToDecimalString(methodParameters.value)).to.eq(inputEther)
     })
 
     it('encodes a mixed exactInput v3ETH->v3USDC->DAI swap', async () => {
@@ -295,7 +296,7 @@ describe('Uniswap', () => {
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_MIXED_1_ETH_FOR_DAI_V3_ONLY', methodParameters)
-      expect(methodParameters.value).to.eq(inputEther)
+      expect(hexToDecimalString(methodParameters.value)).to.eq(inputEther)
     })
 
     it('encodes a mixed exactInput v2DAI->v3USDC->ETH swap', async () => {
@@ -308,7 +309,7 @@ describe('Uniswap', () => {
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_MIXED_DAI_FOR_ETH', methodParameters)
-      expect(methodParameters.value).to.eq('0')
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
   })
 
@@ -328,7 +329,7 @@ describe('Uniswap', () => {
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([v2Trade, v3Trade]), opts)
       registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_ETH_TO_USDC', methodParameters)
-      expect(methodParameters.value).to.eq(JSBI.multiply(inputEther, JSBI.BigInt(2)).toString())
+      expect(hexToDecimalString(methodParameters.value)).to.eq(JSBI.multiply(inputEther, JSBI.BigInt(2)).toString())
     })
 
     it('encodes a split exactInput with 3 routes v3ETH->v3USDC & v2ETH->v2USDC swap', async () => {
@@ -352,7 +353,7 @@ describe('Uniswap', () => {
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([v2Trade, v3Trade1, v3Trade2]), opts)
       registerFixture('_UNISWAP_SPLIT_THREE_ROUTES_ETH_TO_USDC', methodParameters)
-      expect(methodParameters.value).to.eq(JSBI.multiply(inputEther, JSBI.BigInt(3)).toString())
+      expect(hexToDecimalString(methodParameters.value)).to.eq(JSBI.multiply(inputEther, JSBI.BigInt(3)).toString())
     })
   })
 })

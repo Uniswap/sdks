@@ -88,6 +88,6 @@ export abstract class SwapRouter {
     const functionSignature = !!config.deadline ? 'execute(bytes,bytes[],uint256)' : 'execute(bytes,bytes[])'
     const parameters = !!config.deadline ? [commands, inputs, config.deadline] : [commands, inputs]
     const calldata = SwapRouter.INTERFACE.encodeFunctionData(functionSignature, parameters)
-    return { calldata, value: nativeCurrencyValue.toString() }
+    return { calldata, value: nativeCurrencyValue.toHexString() }
   }
 }
