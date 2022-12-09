@@ -58,7 +58,7 @@ export abstract class SwapRouter {
 
     const inputCurrency = trade.trade.inputAmount.currency
     invariant(!(inputCurrency.isNative && !!options.inputTokenPermit), 'NATIVE_INPUT_PERMIT')
-    if (options.inputTokenPermit && inputCurrency instanceof Token) {
+    if (options.inputTokenPermit) {
       encodePermit(planner, options.inputTokenPermit)
     }
 
