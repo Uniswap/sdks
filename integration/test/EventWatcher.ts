@@ -1,22 +1,22 @@
-import hre, { ethers } from 'hardhat';
-import { expect } from 'chai';
-import { BigNumber, Signer, Event } from 'ethers';
+import hre, { ethers } from "hardhat";
+import { expect } from "chai";
+import { BigNumber, Signer, Event } from "ethers";
 
-import { BlockchainTime } from './utils/time';
+import { BlockchainTime } from "./utils/time";
 
-import DutchLimitOrderReactorAbi from '../../abis/DutchLimitOrderReactor.json';
-import Permit2Abi from '../../abis/Permit2.json';
-import MockERC20Abi from '../../abis/MockERC20.json';
-import DirectTakerFillContract from '../../abis/DirectTakerExecutor.json';
+import DutchLimitOrderReactorAbi from "../../abis/DutchLimitOrderReactor.json";
+import Permit2Abi from "../../abis/Permit2.json";
+import MockERC20Abi from "../../abis/MockERC20.json";
+import DirectTakerFillContract from "../../abis/DirectTakerExecutor.json";
 
 import {
   Permit2,
   DutchLimitOrderReactor,
   MockERC20,
-} from '../../src/contracts';
-import { DutchLimitOrderBuilder, EventWatcher, FillData } from '../../';
+} from "../../src/contracts";
+import { DutchLimitOrderBuilder, EventWatcher, FillData } from "../../";
 
-describe('EventWatcher', () => {
+describe("EventWatcher", () => {
   let reactor: DutchLimitOrderReactor;
   let fillContract: string;
   let permit2: Permit2;
@@ -56,21 +56,21 @@ describe('EventWatcher', () => {
       DirectTakerFillContract.abi,
       DirectTakerFillContract.bytecode
     );
-    fillContract = (await directTakerFillContractFactory.deploy(await taker.getAddress())).address;
+    fillContract = (
+      await directTakerFillContractFactory.deploy(await taker.getAddress())
+    ).address;
 
     const tokenFactory = await ethers.getContractFactory(
       MockERC20Abi.abi,
       MockERC20Abi.bytecode
     );
-    tokenIn = (await tokenFactory.deploy('TEST A', 'ta', 18)) as MockERC20;
+    tokenIn = (await tokenFactory.deploy("TEST A", "ta", 18)) as MockERC20;
 
-    tokenOut = (await tokenFactory.deploy('TEST B', 'tb', 18)) as MockERC20;
+    tokenOut = (await tokenFactory.deploy("TEST B", "tb", 18)) as MockERC20;
 
     await tokenIn.mint(
       await maker.getAddress(),
-      BigNumber.from(10)
-        .pow(18)
-        .mul(100)
+      BigNumber.from(10).pow(18).mul(100)
     );
     await tokenIn
       .connect(maker)
@@ -78,9 +78,7 @@ describe('EventWatcher', () => {
 
     await tokenOut.mint(
       await taker.getAddress(),
-      BigNumber.from(10)
-        .pow(18)
-        .mul(100)
+      BigNumber.from(10).pow(18).mul(100)
     );
     await tokenOut
       .connect(taker)
@@ -88,7 +86,7 @@ describe('EventWatcher', () => {
     watcher = new EventWatcher(ethers.provider, reactor.address);
   });
 
-  it('Fetches fill events', async () => {
+  it("Fetches fill events", async () => {
     const amount = BigNumber.from(10).pow(18);
     const deadline = await new BlockchainTime().secondsFromNow(1000);
     const order = new DutchLimitOrderBuilder(
@@ -109,9 +107,7 @@ describe('EventWatcher', () => {
       .output({
         token: tokenOut.address,
         startAmount: amount,
-        endAmount: BigNumber.from(10)
-          .pow(17)
-          .mul(9),
+        endAmount: BigNumber.from(10).pow(17).mul(9),
         recipient: await maker.getAddress(),
       })
       .build();
@@ -119,22 +115,34 @@ describe('EventWatcher', () => {
     const { domain, types, values } = order.permitData();
     const signature = await maker._signTypedData(domain, types, values);
 
-    const res = await reactor.connect(taker).execute(
-      { order: order.serialize(), sig: signature },
-      fillContract,
-      "0x"
-    );
+    const res = await reactor
+      .connect(taker)
+      .execute(
+        { order: order.serialize(), sig: signature },
+        fillContract,
+        "0x"
+      );
     await res.wait();
 
-    const logs = await watcher.getFillEvents(0, await ethers.provider.getBlockNumber());
+    const bn = await ethers.provider.getBlockNumber();
+
+    const logs = await watcher.getFillEvents(0, bn);
     expect(logs.length).to.equal(1);
     expect(logs[0].orderHash).to.equal(order.hash());
     expect(logs[0].filler).to.equal(await taker.getAddress());
     expect(logs[0].offerer).to.equal(await maker.getAddress());
-    expect(logs[0].nonce.toString()).to.equal('100');
+    expect(logs[0].nonce.toString()).to.equal("100");
+
+    const fillInfo = await watcher.getFillInfo(0, bn);
+    expect(fillInfo.length).to.equal(1);
+    expect(fillInfo[0].outputs.length).to.equal(1);
+    expect(fillInfo[0].outputs[0].token).to.equal(tokenOut.address);
+    expect(fillInfo[0].outputs[0].amount.toString()).to.equal(
+      amount.toString()
+    );
   });
 
-  it('Handles callbacks on fill events', async () => {
+  it("Handles callbacks on fill events", async () => {
     const amount = BigNumber.from(10).pow(18);
     const deadline = await new BlockchainTime().secondsFromNow(1000);
     const order = new DutchLimitOrderBuilder(
@@ -155,9 +163,7 @@ describe('EventWatcher', () => {
       .output({
         token: tokenOut.address,
         startAmount: amount,
-        endAmount: BigNumber.from(10)
-          .pow(17)
-          .mul(9),
+        endAmount: BigNumber.from(10).pow(17).mul(9),
         recipient: await maker.getAddress(),
       })
       .build();
@@ -171,11 +177,13 @@ describe('EventWatcher', () => {
       expect(fill.filler).to.equal(takerAddress);
       expect(fill.offerer).to.equal(makerAddress);
     });
-    const res = await reactor.connect(taker).execute(
-      { order: order.serialize(), sig: signature },
-      fillContract,
-      "0x"
-    );
+    const res = await reactor
+      .connect(taker)
+      .execute(
+        { order: order.serialize(), sig: signature },
+        fillContract,
+        "0x"
+      );
     await res.wait();
   });
 });
