@@ -10,6 +10,10 @@ export const ORDER_QUOTER_MAPPING: { readonly [key: number]: string } = {
   12341234: "0x0836D41eBFFFF6cD0849770f82c922Cf14C9De95",
 };
 
+export enum KNOWN_EVENT_SIGNATURES {
+  ERC20_TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+}
+
 export enum OrderType {
   DutchLimit = "DutchLimit",
 }
