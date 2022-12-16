@@ -1,7 +1,7 @@
-import { BaseProvider } from "@ethersproject/providers";
+import { BaseProvider, TransactionReceipt } from "@ethersproject/providers";
 import { BigNumber, Event, utils } from "ethers";
 
-import { KNOWN_EVENT_SIGNATURES } from "../constants";
+import MockERC20Abi from "../../abis/MockERC20.json";
 import {
   DutchLimitOrderReactor,
   DutchLimitOrderReactor__factory,
@@ -54,9 +54,17 @@ export class EventWatcher {
   async getFillInfo(fromBlock: number, toBlock?: number): Promise<FillInfo[]> {
     const logs = await this.getFillLogs(fromBlock, toBlock);
     const events = logs.map((log) => log.args);
-    const txReceipts = await Promise.all(
-      logs.map((log) => log.getTransactionReceipt())
+
+    // TODO: deal with the edge case where if a transaction batch fills multiple orders
+    // with the same offerer and outToken, txs would contain less entries than events
+    const txs = logs.reduce(
+      (acc, log) =>
+        acc.add(
+          this.reactor.provider.getTransactionReceipt(log.transactionHash)
+        ),
+      new Set<Promise<TransactionReceipt>>()
     );
+    const txReceipts = await Promise.all(txs);
     const fills = events.map((e, i) => {
       return {
         orderHash: e.orderHash,
@@ -67,28 +75,35 @@ export class EventWatcher {
       };
     });
 
-    return fills.reduce((fillInfoAcc, fill) => {
+    const ERC20Interface = new utils.Interface(MockERC20Abi.abi);
+
+    return fills.map((fill) => {
       const outputs = fill.txLogs.reduce((logAcc, log) => {
-        if (
-          log.topics[0] === KNOWN_EVENT_SIGNATURES.ERC20_TRANSFER &&
-          utils.getAddress("0x" + log.topics[2].slice(26)) === fill.offerer
-        ) {
-          logAcc.push({
-            token: log.address,
-            amount: BigNumber.from(log.data),
-          });
+        try {
+          const parsedLog = ERC20Interface.parseLog(log);
+          if (
+            parsedLog.name === "Transfer" &&
+            parsedLog.args.to === fill.offerer
+          ) {
+            logAcc.push({
+              token: log.address,
+              amount: parsedLog.args.amount,
+            });
+          }
+          return logAcc;
+        } catch (e) {
+          return logAcc;
         }
-        return logAcc;
       }, [] as { token: string; amount: BigNumber }[]);
-      fillInfoAcc.push({
+
+      return {
         orderHash: fill.orderHash,
         offerer: fill.offerer,
         filler: fill.filler,
         nonce: fill.nonce,
         outputs: outputs,
-      });
-      return fillInfoAcc;
-    }, [] as FillInfo[]);
+      };
+    });
   }
 
   onFill(callback: (fillData: FillData, event: Event) => void): void {
