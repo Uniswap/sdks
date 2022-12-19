@@ -55,8 +55,7 @@ export class EventWatcher {
     const logs = await this.getFillLogs(fromBlock, toBlock);
     const events = logs.map((log) => log.args);
 
-    // TODO: deal with the edge case where if a transaction batch fills multiple orders
-    // with the same offerer and outToken, txs would contain less entries than events
+    // TODO: deal with batch fills for orders with the same offerer and outTOken
     const txs = logs.reduce(
       (acc, log) =>
         acc.add(
