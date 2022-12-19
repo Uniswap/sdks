@@ -55,7 +55,7 @@ export class EventWatcher {
     const logs = await this.getFillLogs(fromBlock, toBlock);
     const events = logs.map((log) => log.args);
 
-    // TODO: deal with batch fills for orders with the same offerer and outTOken
+    // TODO: deal with batch fills for orders with the same offerer and outToken
     const txs = logs.reduce(
       (acc, log) =>
         acc.add(
@@ -70,7 +70,7 @@ export class EventWatcher {
         offerer: e.offerer,
         filler: e.filler,
         nonce: e.nonce,
-        txLogs: txReceipts[i].logs,
+        txLogs: txReceipts[i].logs, // insertion order
       };
     });
 
