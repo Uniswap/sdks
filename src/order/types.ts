@@ -49,4 +49,6 @@ export type OrderInfo = {
   offerer: string;
   nonce: BigNumber;
   deadline: number;
+  validationContract: string;
+  validationData: string;
 };
