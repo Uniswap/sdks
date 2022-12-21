@@ -53,7 +53,16 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
   }
 
   endTime(endTime: number): DutchLimitOrderBuilder {
-    super.deadline(endTime);
+    if (this.orderInfo.deadline === undefined) {
+      super.deadline(endTime);
+    } else {
+      invariant(
+        endTime <= this.orderInfo.deadline,
+        `endTime must be before deadline: ${endTime}`
+      );
+    }
+
+    this.info.endTime = endTime;
     return this;
   }
 
@@ -76,6 +85,11 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
 
   deadline(deadline: number): DutchLimitOrderBuilder {
     super.deadline(deadline);
+
+    if (this.info.endTime === undefined) {
+      this.endTime(deadline);
+    }
+
     return this;
   }
 
@@ -92,14 +106,21 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
   build(): DutchLimitOrder {
     invariant(this.info.startTime !== undefined, "startTime not set");
     invariant(this.info.input !== undefined, "input not set");
+    invariant(this.info.endTime !== undefined, "endTime not set");
     invariant(
       this.info.outputs !== undefined && this.info.outputs.length !== 0,
       "outputs not set"
+    );
+    invariant(
+      this.info.endTime !== undefined ||
+        this.getOrderInfo().deadline !== undefined,
+      "Must set either deadline or endTime"
     );
 
     return new DutchLimitOrder(
       Object.assign(this.getOrderInfo(), {
         startTime: this.info.startTime,
+        endTime: this.info.endTime,
         input: this.info.input,
         outputs: this.info.outputs,
       }),

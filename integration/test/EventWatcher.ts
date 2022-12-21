@@ -41,7 +41,9 @@ describe('EventWatcher', () => {
       DutchLimitOrderReactorAbi.bytecode
     );
     reactor = (await reactorFactory.deploy(
-      permit2.address
+      permit2.address,
+      100,
+      ethers.constants.AddressZero,
     )) as DutchLimitOrderReactor;
 
     chainId = hre.network.config.chainId || 1;
@@ -113,6 +115,7 @@ describe('EventWatcher', () => {
           .pow(17)
           .mul(9),
         recipient: await maker.getAddress(),
+        isFeeOutput: false,
       })
       .build();
 
@@ -159,6 +162,7 @@ describe('EventWatcher', () => {
           .pow(17)
           .mul(9),
         recipient: await maker.getAddress(),
+        isFeeOutput: false,
       })
       .build();
 
