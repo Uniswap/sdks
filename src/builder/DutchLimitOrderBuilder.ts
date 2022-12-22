@@ -88,6 +88,11 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
 
     if (this.info.endTime === undefined) {
       this.endTime(deadline);
+    } else {
+      invariant(
+        this.info.endTime <= deadline,
+        `endTime must be before deadline: ${this.info.endTime}`
+      );
     }
 
     return this;

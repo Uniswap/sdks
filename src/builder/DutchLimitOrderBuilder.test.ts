@@ -183,6 +183,33 @@ describe("DutchLimitOrderBuilder", () => {
     expect(order.info.endTime).toEqual(deadline);
   });
 
+  it("endTime after deadline", () => {
+    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    expect(() =>
+      builder
+        .startTime(deadline - 100)
+        .endTime(deadline + 1)
+        .deadline(deadline)
+        .offerer("0x0000000000000000000000000000000000000000")
+        .nonce(BigNumber.from(100))
+        .input({
+          token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+          startAmount: BigNumber.from("1000000"),
+          endAmount: BigNumber.from("1000000"),
+        })
+        .output({
+          token: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+          startAmount: BigNumber.from("1000000000000000000"),
+          endAmount: BigNumber.from("900000000000000000"),
+          recipient: "0x0000000000000000000000000000000000000000",
+          isFeeOutput: false,
+        })
+        .build()
+    ).toThrow(
+      `Invariant failed: endTime must be before deadline: ${deadline + 1}`
+    );
+  });
+
   it("deadline defaults to endTime", () => {
     const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
     const order = builder
