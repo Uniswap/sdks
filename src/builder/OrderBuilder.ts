@@ -1,4 +1,4 @@
-import { BigNumber } from "ethers";
+import { BigNumber, ethers } from "ethers";
 import invariant from "tiny-invariant";
 
 import { IOrder, OrderInfo } from "../order";
@@ -10,7 +10,11 @@ export abstract class OrderBuilder {
   protected orderInfo: Partial<OrderInfo>;
 
   constructor() {
-    this.orderInfo = {};
+    // set defaults
+    this.orderInfo = {
+      validationContract: ethers.constants.AddressZero,
+      validationData: "0x",
+    };
   }
 
   deadline(deadline: number): OrderBuilder {
@@ -42,11 +46,21 @@ export abstract class OrderBuilder {
     invariant(this.orderInfo.nonce !== undefined, "nonce not set");
     invariant(this.orderInfo.deadline !== undefined, "deadline not set");
     invariant(this.orderInfo.offerer !== undefined, "offerer not set");
+    invariant(
+      this.orderInfo.validationContract !== undefined,
+      "validation contract not set"
+    );
+    invariant(
+      this.orderInfo.validationData !== undefined,
+      "validation data not set"
+    );
     return {
       reactor: this.orderInfo.reactor,
       offerer: this.orderInfo.offerer,
       nonce: this.orderInfo.nonce,
       deadline: this.orderInfo.deadline,
+      validationContract: this.orderInfo.validationContract,
+      validationData: this.orderInfo.validationData,
     };
   }
 

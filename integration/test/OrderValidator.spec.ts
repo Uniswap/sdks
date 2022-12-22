@@ -34,7 +34,7 @@ describe('OrderValidator', () => {
   let tokenIn: MockERC20;
   let tokenOut: MockERC20;
 
-  before(async () => {
+  beforeEach(async () => {
     const [admin] = await ethers.getSigners();
     const permit2Factory = await ethers.getContractFactory(
       Permit2Abi.abi,
@@ -47,7 +47,9 @@ describe('OrderValidator', () => {
       DutchLimitOrderReactorAbi.bytecode
     );
     reactor = (await reactorFactory.deploy(
-      permit2.address
+      permit2.address,
+      0,
+      ethers.constants.AddressZero,
     )) as DutchLimitOrderReactor;
 
     const orderQuoterFactory = await ethers.getContractFactory(
@@ -100,6 +102,7 @@ describe('OrderValidator', () => {
         startAmount: BigNumber.from('1000000000000000000'),
         endAmount: BigNumber.from('900000000000000000'),
         recipient: '0x0000000000000000000000000000000000000000',
+        isFeeOutput: false,
       })
       .build();
 
@@ -138,6 +141,7 @@ describe('OrderValidator', () => {
         startAmount: BigNumber.from('1000000000000000000'),
         endAmount: BigNumber.from('900000000000000000'),
         recipient: '0x0000000000000000000000000000000000000000',
+        isFeeOutput: false,
       })
       .build();
 
@@ -171,6 +175,7 @@ describe('OrderValidator', () => {
         startAmount: BigNumber.from('1000000000000000000'),
         endAmount: BigNumber.from('900000000000000000'),
         recipient: '0x0000000000000000000000000000000000000000',
+        isFeeOutput: false,
       })
       .build();
 
@@ -200,6 +205,7 @@ describe('OrderValidator', () => {
         startAmount: BigNumber.from('1000000000000000000'),
         endAmount: BigNumber.from('900000000000000000'),
         recipient: '0x0000000000000000000000000000000000000000',
+        isFeeOutput: false,
       })
       .build().info;
     const order = new DutchLimitOrder(
@@ -238,6 +244,7 @@ describe('OrderValidator', () => {
         startAmount: BigNumber.from('1000000000000000000'),
         endAmount: BigNumber.from('900000000000000000'),
         recipient: '0x0000000000000000000000000000000000000000',
+        isFeeOutput: false,
       })
       .build().info;
 
@@ -287,6 +294,7 @@ describe('OrderValidator', () => {
         startAmount: BigNumber.from('1000000000000000000'),
         endAmount: BigNumber.from('900000000000000000'),
         recipient: '0x0000000000000000000000000000000000000000',
+        isFeeOutput: false,
       })
       .build().info;
     const order = new DutchLimitOrder(
@@ -321,6 +329,7 @@ describe('OrderValidator', () => {
         startAmount: BigNumber.from('1000000000000000000'),
         endAmount: BigNumber.from('900000000000000000'),
         recipient: '0x0000000000000000000000000000000000000000',
+        isFeeOutput: false,
       })
       .build().info;
     const order = new DutchLimitOrder(
