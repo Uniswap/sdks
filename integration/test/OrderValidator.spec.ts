@@ -34,7 +34,7 @@ describe('OrderValidator', () => {
   let tokenIn: MockERC20;
   let tokenOut: MockERC20;
 
-  before(async () => {
+  beforeEach(async () => {
     const [admin] = await ethers.getSigners();
     const permit2Factory = await ethers.getContractFactory(
       Permit2Abi.abi,
