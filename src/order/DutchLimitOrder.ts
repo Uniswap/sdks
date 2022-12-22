@@ -17,6 +17,7 @@ export type DutchOutput = {
   readonly startAmount: BigNumber;
   readonly endAmount: BigNumber;
   readonly recipient: string;
+  readonly isFeeOutput: boolean;
 };
 
 export type DutchInput = {
@@ -27,12 +28,14 @@ export type DutchInput = {
 
 export type DutchLimitOrderInfo = OrderInfo & {
   startTime: number;
+  endTime: number;
   input: DutchInput;
   outputs: DutchOutput[];
 };
 
 type WitnessInfo = OrderInfo & {
   startTime: number;
+  endTime: number;
   inputToken: string;
   inputStartAmount: BigNumber;
   inputEndAmount: BigNumber;
@@ -45,7 +48,11 @@ const DUTCH_LIMIT_ORDER_TYPES = {
     { name: "offerer", type: "address" },
     { name: "nonce", type: "uint256" },
     { name: "deadline", type: "uint256" },
+    { name: "validationContract", type: "address" },
+    { name: "validationData", type: "bytes" },
+
     { name: "startTime", type: "uint256" },
+    { name: "endTime", type: "uint256" },
     { name: "inputToken", type: "address" },
     { name: "inputStartAmount", type: "uint256" },
     { name: "inputEndAmount", type: "uint256" },
@@ -56,16 +63,18 @@ const DUTCH_LIMIT_ORDER_TYPES = {
     { name: "startAmount", type: "uint256" },
     { name: "endAmount", type: "uint256" },
     { name: "recipient", type: "address" },
+    { name: "isFeeOutput", type: "bool" },
   ],
 };
 
 const DUTCH_LIMIT_ORDER_ABI = [
   "tuple(" +
     [
-      "tuple(address,address,uint256,uint256)",
+      "tuple(address,address,uint256,uint256,address,bytes)",
+      "uint256",
       "uint256",
       "tuple(address,uint256,uint256)",
-      "tuple(address,uint256,uint256,address)[]",
+      "tuple(address,uint256,uint256,address,bool)[]",
     ].join(",") +
     ")",
 ];
@@ -92,8 +101,9 @@ export class DutchLimitOrder implements IOrder {
     const decoded = abiCoder.decode(DUTCH_LIMIT_ORDER_ABI, encoded);
     const [
       [
-        [reactor, offerer, nonce, deadline],
+        [reactor, offerer, nonce, deadline, validationContract, validationData],
         startTime,
+        endTime,
         [inputToken, inputStartAmount, inputEndAmount],
         outputs,
       ],
@@ -104,24 +114,29 @@ export class DutchLimitOrder implements IOrder {
         offerer,
         nonce,
         deadline: deadline.toNumber(),
+        validationContract,
+        validationData,
         startTime: startTime.toNumber(),
+        endTime: endTime.toNumber(),
         input: {
           token: inputToken,
           startAmount: inputStartAmount,
           endAmount: inputEndAmount,
         },
         outputs: outputs.map(
-          ([token, startAmount, endAmount, recipient]: [
+          ([token, startAmount, endAmount, recipient, isFeeOutput]: [
             string,
             number,
             number,
-            string
+            string,
+            boolean
           ]) => {
             return {
               token,
               startAmount,
               endAmount,
               recipient,
+              isFeeOutput,
             };
           }
         ),
@@ -142,8 +157,11 @@ export class DutchLimitOrder implements IOrder {
           this.info.offerer,
           this.info.nonce,
           this.info.deadline,
+          this.info.validationContract,
+          this.info.validationData,
         ],
         this.info.startTime,
+        this.info.endTime,
         [
           this.info.input.token,
           this.info.input.startAmount,
@@ -154,6 +172,7 @@ export class DutchLimitOrder implements IOrder {
           output.startAmount,
           output.endAmount,
           output.recipient,
+          output.isFeeOutput,
         ]),
       ],
     ]);
@@ -215,7 +234,10 @@ export class DutchLimitOrder implements IOrder {
       offerer: this.info.offerer,
       nonce: this.info.nonce,
       deadline: this.info.deadline,
+      validationContract: this.info.validationContract,
+      validationData: this.info.validationData,
       startTime: this.info.startTime,
+      endTime: this.info.endTime,
       inputToken: this.info.input.token,
       inputStartAmount: this.info.input.startAmount,
       inputEndAmount: this.info.input.endAmount,
