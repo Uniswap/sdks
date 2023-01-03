@@ -51,7 +51,7 @@ export class NFT20Trade extends NFTTrade<NFT20Data> {
     return buyItems
   }
 
-  getTotalPrice(): BigNumberish {
+  getTotalPrice(): BigNumber {
     let total = BigNumber.from(0)
     for (const item of this.orders) {
       total = total.add(item.value)

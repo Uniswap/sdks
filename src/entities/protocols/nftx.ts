@@ -49,7 +49,7 @@ export class NFTXTrade extends NFTTrade<NFTXData> {
     return buyItems
   }
 
-  getTotalPrice(): BigNumberish {
+  getTotalPrice(): BigNumber {
     let total = BigNumber.from(0)
     for (const item of this.orders) {
       total = total.add(item.value)

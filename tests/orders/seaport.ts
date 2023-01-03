@@ -1,4 +1,5 @@
-import { SeaportData } from '../../src/entities/protocols/seaport'
+import { SeaportData, ConsiderationItem } from '../../src/entities/protocols/seaport'
+import { BigNumber } from 'ethers'
 
 const SAMPLE_ADDR = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 
@@ -106,4 +107,15 @@ export const seaportData2Covens: SeaportData = {
     },
   ],
   recipient: SAMPLE_ADDR,
+}
+
+export const seaportValue: BigNumber = calculateSeaportValue(seaportData2Covens.items[0].parameters.consideration).add(
+  calculateSeaportValue(seaportData2Covens.items[1].parameters.consideration)
+)
+
+function calculateSeaportValue(considerations: ConsiderationItem[]): BigNumber {
+  return considerations.reduce(
+    (amt: BigNumber, consideration: ConsiderationItem) => amt.add(consideration.startAmount),
+    BigNumber.from(0)
+  )
 }

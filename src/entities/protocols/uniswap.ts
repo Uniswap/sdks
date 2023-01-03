@@ -18,8 +18,8 @@ import {
 } from '@uniswap/router-sdk'
 import { Permit2Permit } from '../../utils/permit2'
 import { Currency, TradeType, CurrencyAmount, Percent } from '@uniswap/sdk-core'
-import { Command, TradeConfig } from '../Command'
-import { MSG_SENDER, ADDRESS_THIS, CONTRACT_BALANCE } from '../../utils/constants'
+import { Command, RouterTradeType, TradeConfig } from '../Command'
+import { SENDER_AS_RECIPIENT, ROUTER_AS_RECIPIENT, CONTRACT_BALANCE } from '../../utils/constants'
 
 // the existing router permit object doesn't include enough data for permit2
 // so we extend swap options with the permit2 permit
@@ -38,6 +38,7 @@ interface Swap<TInput extends Currency, TOutput extends Currency> {
 // Wrapper for uniswap router-sdk trade entity to encode swaps for Universal Router
 // also translates trade objects from previous (v2, v3) SDKs
 export class UniswapTrade implements Command {
+  readonly tradeType: RouterTradeType = RouterTradeType.UniswapTrade
   constructor(public trade: RouterTrade<Currency, Currency, TradeType>, public options: SwapOptions) {}
 
   encode(planner: RoutePlanner, _config: TradeConfig): void {
@@ -45,13 +46,13 @@ export class UniswapTrade implements Command {
     if (this.trade.inputAmount.currency.isNative) {
       // TODO: optimize if only one v2 pool we can directly send this to the pool
       planner.addCommand(CommandType.WRAP_ETH, [
-        ADDRESS_THIS,
+        ROUTER_AS_RECIPIENT,
         this.trade.maximumAmountIn(this.options.slippageTolerance).quotient.toString(),
       ])
       // since WETH is now owned by the router, the router pays for inputs
       payerIsUser = false
     }
-    this.options.recipient = this.options.recipient ?? MSG_SENDER
+    this.options.recipient = this.options.recipient ?? SENDER_AS_RECIPIENT
 
     // flag for whether we want to perform slippage check on aggregate output of multiple routes
     //   1. when there are >2 exact input trades. this is only a heuristic,
@@ -120,7 +121,7 @@ function addV2Swap<TInput extends Currency, TOutput extends Currency>(
   if (tradeType == TradeType.EXACT_INPUT) {
     planner.addCommand(CommandType.V2_SWAP_EXACT_IN, [
       // if native, we have to unwrap so keep in the router for now
-      routerMustCustody ? ADDRESS_THIS : options.recipient,
+      routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient,
       trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
       trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
       route.path.map((pool) => pool.address),
@@ -128,7 +129,7 @@ function addV2Swap<TInput extends Currency, TOutput extends Currency>(
     ])
   } else if (tradeType == TradeType.EXACT_OUTPUT) {
     planner.addCommand(CommandType.V2_SWAP_EXACT_OUT, [
-      routerMustCustody ? ADDRESS_THIS : options.recipient,
+      routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient,
       trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
       trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
       route.path.map((pool) => pool.address),
@@ -156,7 +157,7 @@ function addV3Swap<TInput extends Currency, TOutput extends Currency>(
   const path = encodeRouteToPath(route as RouteV3<TInput, TOutput>, trade.tradeType === TradeType.EXACT_OUTPUT)
   if (tradeType == TradeType.EXACT_INPUT) {
     planner.addCommand(CommandType.V3_SWAP_EXACT_IN, [
-      routerMustCustody ? ADDRESS_THIS : options.recipient,
+      routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient,
       trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
       trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
       path,
@@ -164,7 +165,7 @@ function addV3Swap<TInput extends Currency, TOutput extends Currency>(
     ])
   } else if (tradeType == TradeType.EXACT_OUTPUT) {
     planner.addCommand(CommandType.V3_SWAP_EXACT_OUT, [
-      routerMustCustody ? ADDRESS_THIS : options.recipient,
+      routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient,
       trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
       trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
       path,
@@ -183,7 +184,7 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
   routerMustCustody: boolean
 ): void {
   const { route, inputAmount, outputAmount } = swap
-  const tradeRecipient = routerMustCustody ? ADDRESS_THIS : options.recipient
+  const tradeRecipient = routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient
 
   // single hop, so it can be reduced to plain v2 or v3 swap logic
   if (route.pools.length === 1) {
@@ -249,7 +250,7 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
       ])
     } else {
       planner.addCommand(CommandType.V2_SWAP_EXACT_IN, [
-        isLastSectionInRoute(i) ? tradeRecipient : ADDRESS_THIS, // recipient
+        isLastSectionInRoute(i) ? tradeRecipient : ROUTER_AS_RECIPIENT, // recipient
         i === 0 ? amountIn : CONTRACT_BALANCE, // amountIn
         !isLastSectionInRoute(i) ? 0 : amountOut, // amountOutMin
         newRoute.path.map((pool) => pool.address), // path

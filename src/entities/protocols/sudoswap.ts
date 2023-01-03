@@ -61,7 +61,7 @@ export class SudoswapTrade extends NFTTrade<SudoswapData> {
     return buyItems
   }
 
-  getTotalPrice(): BigNumberish {
+  getTotalPrice(): BigNumber {
     let total = BigNumber.from(0)
     for (const order of this.orders) {
       for (const swap of order.swaps) {

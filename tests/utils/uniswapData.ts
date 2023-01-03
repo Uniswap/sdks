@@ -1,8 +1,20 @@
-import { ethers } from 'ethers'
 import JSBI from 'jsbi'
-import { CurrencyAmount, Token } from '@uniswap/sdk-core'
-import { computePairAddress, Pair } from '@uniswap/v2-sdk'
-import { Pool, nearestUsableTick, TickMath, TICK_SPACINGS, FeeAmount } from '@uniswap/v3-sdk'
+import { ethers } from 'ethers'
+import { MixedRouteTrade, MixedRouteSDK, Trade as RouterTrade } from '@uniswap/router-sdk'
+import { Trade as V2Trade, Pair, Route as RouteV2, computePairAddress } from '@uniswap/v2-sdk'
+import {
+  Trade as V3Trade,
+  Pool,
+  Route as RouteV3,
+  nearestUsableTick,
+  TickMath,
+  TICK_SPACINGS,
+  FeeAmount,
+} from '@uniswap/v3-sdk'
+import { SwapOptions } from '../../src'
+import { PermitSingle } from '@uniswap/permit2-sdk'
+import { ROUTER_ADDRESS } from './addresses'
+import { CurrencyAmount, TradeType, Ether, Token, Percent, Currency } from '@uniswap/sdk-core'
 import IUniswapV3Pool from '@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json'
 
 const V2_FACTORY = '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f'
@@ -33,6 +45,41 @@ const V2_ABI = [
     type: 'function',
   },
 ]
+
+const FORK_BLOCK = 16075500
+
+export const ETHER = Ether.onChain(1)
+export const RECIPIENT = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+export const WETH = new Token(1, '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2', 18, 'WETH', 'Wrapped Ether')
+export const DAI = new Token(1, '0x6B175474E89094C44Da98b954EedeAC495271d0F', 18, 'DAI', 'dai')
+export const USDC = new Token(1, '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48', 6, 'USDC', 'USD Coin')
+export const FEE_AMOUNT = FeeAmount.MEDIUM
+
+type UniswapPools = {
+  WETH_USDC_V2: Pair
+  USDC_DAI_V2: Pair
+  WETH_USDC_V3: Pool
+  WETH_USDC_V3_LOW_FEE: Pool
+  USDC_DAI_V3: Pool
+}
+
+export async function getUniswapPools(forkBlock?: number): Promise<UniswapPools> {
+  const fork = forkBlock ?? FORK_BLOCK
+  const WETH_USDC_V2 = await getPair(WETH, USDC, fork)
+  const USDC_DAI_V2 = await getPair(USDC, DAI, fork)
+
+  const WETH_USDC_V3 = await getPool(WETH, USDC, FEE_AMOUNT, fork)
+  const WETH_USDC_V3_LOW_FEE = await getPool(WETH, USDC, FeeAmount.LOW, fork)
+  const USDC_DAI_V3 = await getPool(USDC, DAI, FeeAmount.LOW, fork)
+
+  return {
+    WETH_USDC_V2,
+    USDC_DAI_V2,
+    WETH_USDC_V3,
+    WETH_USDC_V3_LOW_FEE,
+    USDC_DAI_V3,
+  }
+}
 
 function getProvider(): ethers.providers.BaseProvider {
   return new ethers.providers.JsonRpcProvider(process.env['FORK_URL'])
@@ -67,4 +114,66 @@ export async function getPool(tokenA: Token, tokenB: Token, feeAmount: FeeAmount
       liquidityGross: liquidity,
     },
   ])
+}
+
+// use some sane defaults
+export function swapOptions(options: Partial<SwapOptions>): SwapOptions {
+  return Object.assign(
+    {
+      slippageTolerance: new Percent(5, 100),
+      recipient: RECIPIENT,
+    },
+    options
+  )
+}
+
+export function makePermit(
+  token: string,
+  amount: string = ethers.constants.MaxUint256.toString(),
+  nonce: string = '0'
+): PermitSingle {
+  return {
+    details: {
+      token,
+      amount,
+      expiration: Math.floor(new Date().getTime() / 1000 + 1000).toString(),
+      nonce,
+    },
+    spender: ROUTER_ADDRESS,
+    sigDeadline: Math.floor(new Date().getTime() / 1000 + 1000).toString(),
+  }
+}
+
+// alternative constructor to create from protocol-specific sdks
+export function buildTrade(
+  trades: (
+    | V2Trade<Currency, Currency, TradeType>
+    | V3Trade<Currency, Currency, TradeType>
+    | MixedRouteTrade<Currency, Currency, TradeType>
+  )[]
+): RouterTrade<Currency, Currency, TradeType> {
+  return new RouterTrade({
+    v2Routes: trades
+      .filter((trade) => trade instanceof V2Trade)
+      .map((trade) => ({
+        routev2: trade.route as RouteV2<Currency, Currency>,
+        inputAmount: trade.inputAmount,
+        outputAmount: trade.outputAmount,
+      })),
+    v3Routes: trades
+      .filter((trade) => trade instanceof V3Trade)
+      .map((trade) => ({
+        routev3: trade.route as RouteV3<Currency, Currency>,
+        inputAmount: trade.inputAmount,
+        outputAmount: trade.outputAmount,
+      })),
+    mixedRoutes: trades
+      .filter((trade) => trade instanceof MixedRouteTrade)
+      .map((trade) => ({
+        mixedRoute: trade.route as MixedRouteSDK<Currency, Currency>,
+        inputAmount: trade.inputAmount,
+        outputAmount: trade.outputAmount,
+      })),
+    tradeType: trades[0].tradeType,
+  })
 }
