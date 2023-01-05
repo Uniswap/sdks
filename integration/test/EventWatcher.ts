@@ -43,7 +43,7 @@ describe("EventWatcher", () => {
     reactor = (await reactorFactory.deploy(
       permit2.address,
       100,
-      ethers.constants.AddressZero,
+      ethers.constants.AddressZero
     )) as DutchLimitOrderReactor;
 
     chainId = hre.network.config.chainId || 1;
@@ -138,6 +138,7 @@ describe("EventWatcher", () => {
 
     const fillInfo = await watcher.getFillInfo(0, bn);
     expect(fillInfo.length).to.equal(1);
+    expect(fillInfo[0].blockNumber).to.greaterThan(0);
     expect(fillInfo[0].outputs.length).to.equal(1);
     expect(fillInfo[0].outputs[0].token).to.equal(tokenOut.address);
     expect(fillInfo[0].outputs[0].amount.toString()).to.equal(
