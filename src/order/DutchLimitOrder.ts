@@ -10,7 +10,7 @@ import { BigNumber, ethers } from "ethers";
 import { PERMIT2_MAPPING } from "../constants";
 import { MissingConfiguration } from "../errors";
 
-import { IOrder, OrderInfo } from "./types";
+import { Order, OrderInfo } from "./types";
 
 export type DutchOutput = {
   readonly token: string;
@@ -79,7 +79,7 @@ const DUTCH_LIMIT_ORDER_ABI = [
     ")",
 ];
 
-export class DutchLimitOrder implements IOrder {
+export class DutchLimitOrder extends Order {
   public permit2Address: string;
 
   constructor(
@@ -87,6 +87,7 @@ export class DutchLimitOrder implements IOrder {
     public readonly chainId: number,
     readonly _permit2Address?: string
   ) {
+    super();
     if (_permit2Address) {
       this.permit2Address = _permit2Address;
     } else if (PERMIT2_MAPPING[chainId]) {
@@ -146,7 +147,7 @@ export class DutchLimitOrder implements IOrder {
   }
 
   /**
-   * @inheritdoc IOrder
+   * @inheritdoc Order
    */
   serialize(): string {
     const abiCoder = new ethers.utils.AbiCoder();
@@ -179,7 +180,7 @@ export class DutchLimitOrder implements IOrder {
   }
 
   /**
-   * @inheritdoc IOrder
+   * @inheritdoc Order
    */
   getSigner(signature: SignatureLike): string {
     return ethers.utils.computeAddress(
@@ -196,7 +197,7 @@ export class DutchLimitOrder implements IOrder {
   }
 
   /**
-   * @inheritdoc IOrder
+   * @inheritdoc Order
    */
   permitData(): PermitTransferFromData {
     return SignatureTransfer.getPermitData(
@@ -208,7 +209,7 @@ export class DutchLimitOrder implements IOrder {
   }
 
   /**
-   * @inheritdoc IOrder
+   * @inheritdoc Order
    */
   hash(): string {
     return ethers.utils._TypedDataEncoder
