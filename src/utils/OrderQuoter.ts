@@ -45,6 +45,10 @@ const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
   "773a6187": OrderValidation.InvalidOrderFields,
   // invalid reactor address
   "4ddf4a64": OrderValidation.InvalidOrderFields,
+  // both input and output decay
+  d303758b: OrderValidation.InvalidOrderFields,
+  // Incorrect amounts
+  "7c1f8113": OrderValidation.InvalidOrderFields,
   // invalid dutch decay time
   "43133453": OrderValidation.InvalidOrderFields,
   "70f65caa": OrderValidation.Expired,
