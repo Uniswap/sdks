@@ -8,7 +8,7 @@ import {
   OrderQuoter as OrderQuoterContract,
 } from "../contracts";
 import { MissingConfiguration } from "../errors";
-import { IOrder, TokenAmount } from "../order";
+import { Order, TokenAmount } from "../order";
 
 import { NonceManager } from "./NonceManager";
 import { multicall, MulticallResult } from "./multicall";
@@ -53,7 +53,7 @@ const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
 };
 
 export interface SignedOrder {
-  order: IOrder;
+  order: Order;
   signature: string;
 }
 

@@ -1,7 +1,7 @@
 import { BigNumber, ethers } from "ethers";
 import invariant from "tiny-invariant";
 
-import { IOrder, OrderInfo } from "../order";
+import { Order, OrderInfo } from "../order";
 
 /**
  * Builder for generating orders
@@ -64,5 +64,5 @@ export abstract class OrderBuilder {
     };
   }
 
-  abstract build(): IOrder;
+  abstract build(): Order;
 }
