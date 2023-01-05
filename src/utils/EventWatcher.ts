@@ -16,6 +16,7 @@ export interface FillData {
 }
 
 export interface FillInfo extends FillData {
+  blockNumber: number;
   outputs: {
     token: string;
     amount: BigNumber;
@@ -71,6 +72,7 @@ export class EventWatcher {
         filler: e.filler,
         nonce: e.nonce,
         txLogs: txReceipts[i].logs, // insertion order
+        blockNumber: txReceipts[i].blockNumber,
       };
     });
 
@@ -100,6 +102,7 @@ export class EventWatcher {
         offerer: fill.offerer,
         filler: fill.filler,
         nonce: fill.nonce,
+        blockNumber: fill.blockNumber,
         outputs: outputs,
       };
     });
