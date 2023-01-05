@@ -46,10 +46,10 @@ const serializedOrder = order.serialize();
 
 ### Parsing Orders
 ```ts
-import { parseOrder, IOrder, OrderValidation } from '@uniswap/gouda-sdk';
+import { parseOrder, Order, OrderValidation } from '@uniswap/gouda-sdk';
 
 const serializedOrder = '0x1111222233334444555500000000234300234...';
-const order: IOrder = parseOrder(serializedOrder);
+const order: Order = parseOrder(serializedOrder);
 
 const orderData = order.info;
 const orderHash = order.hash();
