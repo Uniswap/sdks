@@ -187,6 +187,105 @@ describe('OrderValidator', () => {
     );
   });
 
+  it('validates an order with both input and output decay', async () => {
+    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    const order = builder
+      .deadline(deadline)
+      .endTime(deadline)
+      .startTime(deadline - 1000)
+      .nonce(BigNumber.from(100))
+      .offerer(await wallet.getAddress())
+      .input({
+        token: tokenIn.address,
+        startAmount: BigNumber.from('1000000'),
+        endAmount: BigNumber.from('2000000'),
+      })
+      .output({
+        token: tokenOut.address,
+        startAmount: BigNumber.from('1000000000000000000'),
+        endAmount: BigNumber.from('900000000000000000'),
+        recipient: '0x0000000000000000000000000000000000000000',
+        isFeeOutput: false,
+      })
+      .build();
+
+    const { domain, types, values } = order.permitData();
+    const signature = await wallet._signTypedData(domain, types, values);
+
+    expect(await validator.validate({ order, signature })).to.equal(
+      OrderValidation.InvalidOrderFields
+    );
+  });
+
+  it('validates an order with incorrect input amount', async () => {
+    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    // input decays downward
+    const order = builder
+      .deadline(deadline)
+      .endTime(deadline)
+      .startTime(deadline - 1000)
+      .nonce(BigNumber.from(100))
+      .offerer(await wallet.getAddress())
+      .input({
+        token: tokenIn.address,
+        startAmount: BigNumber.from('1000000'),
+        endAmount: BigNumber.from('200000'),
+      })
+      .output({
+        token: tokenOut.address,
+        startAmount: BigNumber.from('1000000000000000000'),
+        endAmount: BigNumber.from('1000000000000000000'),
+        recipient: '0x0000000000000000000000000000000000000000',
+        isFeeOutput: false,
+      })
+      .build();
+
+    const { domain, types, values } = order.permitData();
+    const signature = await wallet._signTypedData(domain, types, values);
+
+    expect(await validator.validate({ order, signature })).to.equal(
+      OrderValidation.InvalidOrderFields
+    );
+  });
+
+  it('validates an order with incorrect output amount', async () => {
+    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    // output decays upward
+    const info = builder
+      .deadline(deadline)
+      .endTime(deadline)
+      .startTime(deadline - 1000)
+      .nonce(BigNumber.from(100))
+      .offerer(await wallet.getAddress())
+      .input({
+        token: tokenIn.address,
+        startAmount: BigNumber.from('1000000'),
+        endAmount: BigNumber.from('1000000'),
+      })
+      .output({
+        token: tokenOut.address,
+        startAmount: BigNumber.from('1000000000000000000'),
+        endAmount: BigNumber.from('1000000000000000000'),
+        recipient: '0x0000000000000000000000000000000000000000',
+        isFeeOutput: false,
+      })
+      .build().info;
+    const output = Object.assign({}, info.outputs[0], { endAmount: BigNumber.from('20000000000000000000') });
+
+    const order = new DutchLimitOrder(
+      Object.assign(info, { outputs: [output] }),
+      chainId,
+      permit2.address
+    );
+
+    const { domain, types, values } = order.permitData();
+    const signature = await wallet._signTypedData(domain, types, values);
+
+    expect(await validator.validate({ order, signature })).to.equal(
+      OrderValidation.InvalidOrderFields
+    );
+  });
+
   it('validates an expired order', async () => {
     const deadline = Math.floor(new Date().getTime() / 1000) + 1;
     const info = builder
