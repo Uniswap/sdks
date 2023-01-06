@@ -9,7 +9,7 @@ import {Permit2} from "permit2/src/Permit2.sol";
 import {DeployRouter} from "./utils/DeployRouter.sol";
 import {MethodParameters, Interop} from "./utils/Interop.sol";
 
-contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
+contract MixedSwapCallParameters is Test, Interop, DeployRouter {
     using stdJson for string;
 
     address private constant RECIPIENT = 0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa;
@@ -29,7 +29,7 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         fromPrivateKey = 0x1234;
         from = vm.addr(fromPrivateKey);
         string memory root = vm.projectRoot();
-        json = vm.readFile(string.concat(root, "/tests/forge/interop.json"));
+        json = vm.readFile(string.concat(root, "/test/forge/interop.json"));
     }
 
     function testMixedERC20ForLooksRareNFT() public {

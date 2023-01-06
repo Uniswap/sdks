@@ -23,7 +23,7 @@ contract swapNFTCallParametersTest is Test, Interop, DeployRouter {
         fromPrivateKey = 0x1234;
         from = vm.addr(fromPrivateKey);
         string memory root = vm.projectRoot();
-        json = vm.readFile(string.concat(root, "/tests/forge/interop.json"));
+        json = vm.readFile(string.concat(root, "/test/forge/interop.json"));
     }
 
     function testFoundationBuyItem() public {

@@ -1,7 +1,7 @@
 import fs from 'fs'
 import { hexToDecimalString } from '../utils/hexToDecimalString'
 
-const INTEROP_FILE = './tests/forge/interop.json'
+const INTEROP_FILE = './test/forge/interop.json'
 
 // updates the interop file with a new fixture
 export function registerFixture(key: string, data: any) {
