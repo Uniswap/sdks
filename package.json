@@ -1,7 +1,7 @@
 {
-  "name": "gouda-sdk",
+  "name": "@uniswap/gouda-sdk",
   "author": "Uniswap",
-  "version": "0.1.0",
+  "version": "0.3.3",
   "license": "MIT",
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
