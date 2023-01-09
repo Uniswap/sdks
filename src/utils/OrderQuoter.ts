@@ -38,7 +38,7 @@ const BASIC_ERROR = "0x08c379a0";
 
 const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
   "8baa579f": OrderValidation.InvalidSignature,
-  "1f6d5aef": OrderValidation.NonceUsed,
+  "756688fe": OrderValidation.NonceUsed,
   // invalid dutch decay time
   "302e5b7c": OrderValidation.InvalidOrderFields,
   // invalid dutch decay time
