@@ -4,7 +4,6 @@
 import type {
   BaseContract,
   BigNumber,
-  BigNumberish,
   BytesLike,
   CallOverrides,
   ContractTransaction,
@@ -121,7 +120,7 @@ export interface DutchLimitOrderReactorInterface extends utils.Interface {
   ): Result;
 
   events: {
-    "Fill(bytes32,address,uint256,address)": EventFragment;
+    "Fill(bytes32,address,address,uint256)": EventFragment;
   };
 
   getEvent(nameOrSignatureOrTopic: "Fill"): EventFragment;
@@ -130,11 +129,11 @@ export interface DutchLimitOrderReactorInterface extends utils.Interface {
 export interface FillEventObject {
   orderHash: string;
   filler: string;
-  nonce: BigNumber;
   offerer: string;
+  nonce: BigNumber;
 }
 export type FillEvent = TypedEvent<
-  [string, string, BigNumber, string],
+  [string, string, string, BigNumber],
   FillEventObject
 >;
 
@@ -279,17 +278,17 @@ export interface DutchLimitOrderReactor extends BaseContract {
   };
 
   filters: {
-    "Fill(bytes32,address,uint256,address)"(
+    "Fill(bytes32,address,address,uint256)"(
       orderHash?: PromiseOrValue<BytesLike> | null,
       filler?: PromiseOrValue<string> | null,
-      nonce?: PromiseOrValue<BigNumberish> | null,
-      offerer?: null
+      offerer?: PromiseOrValue<string> | null,
+      nonce?: null
     ): FillEventFilter;
     Fill(
       orderHash?: PromiseOrValue<BytesLike> | null,
       filler?: PromiseOrValue<string> | null,
-      nonce?: PromiseOrValue<BigNumberish> | null,
-      offerer?: null
+      offerer?: PromiseOrValue<string> | null,
+      nonce?: null
     ): FillEventFilter;
   };
 

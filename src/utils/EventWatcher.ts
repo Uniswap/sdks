@@ -114,7 +114,7 @@ export class EventWatcher {
   onFill(callback: (fillData: FillData, event: Event) => void): void {
     this.reactor.on(
       this.reactor.filters.Fill(),
-      (orderHash, filler, nonce, offerer, event) => {
+      (orderHash, filler, offerer, nonce, event) => {
         callback(
           {
             orderHash,
