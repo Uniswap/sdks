@@ -20,10 +20,20 @@ export type DutchOutput = {
   readonly isFeeOutput: boolean;
 };
 
+export type DutchOutputJSON = Omit<DutchOutput, "startAmount" | "endAmount"> & {
+  startAmount: string;
+  endAmount: string;
+};
+
 export type DutchInput = {
   readonly token: string;
   readonly startAmount: BigNumber;
   readonly endAmount: BigNumber;
+};
+
+export type DutchInputJSON = Omit<DutchInput, "startAmount" | "endAmount"> & {
+  startAmount: string;
+  endAmount: string;
 };
 
 export type DutchLimitOrderInfo = OrderInfo & {
@@ -31,6 +41,15 @@ export type DutchLimitOrderInfo = OrderInfo & {
   endTime: number;
   input: DutchInput;
   outputs: DutchOutput[];
+};
+
+export type DutchLimitOrderInfoJSON = Omit<
+  DutchLimitOrderInfo,
+  "nonce" | "input" | "outputs"
+> & {
+  nonce: string;
+  input: DutchInputJSON;
+  outputs: DutchOutputJSON[];
 };
 
 type WitnessInfo = OrderInfo & {
