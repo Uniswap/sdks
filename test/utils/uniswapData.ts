@@ -12,8 +12,6 @@ import {
   FeeAmount,
 } from '@uniswap/v3-sdk'
 import { SwapOptions } from '../../src'
-import { PermitSingle } from '@uniswap/permit2-sdk'
-import { ROUTER_ADDRESS } from './addresses'
 import { CurrencyAmount, TradeType, Ether, Token, Percent, Currency } from '@uniswap/sdk-core'
 import IUniswapV3Pool from '@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json'
 
@@ -125,23 +123,6 @@ export function swapOptions(options: Partial<SwapOptions>): SwapOptions {
     },
     options
   )
-}
-
-export function makePermit(
-  token: string,
-  amount: string = ethers.constants.MaxUint256.toString(),
-  nonce: string = '0'
-): PermitSingle {
-  return {
-    details: {
-      token,
-      amount,
-      expiration: Math.floor(new Date().getTime() / 1000 + 1000).toString(),
-      nonce,
-    },
-    spender: ROUTER_ADDRESS,
-    sigDeadline: Math.floor(new Date().getTime() / 1000 + 1000).toString(),
-  }
 }
 
 // alternative constructor to create from protocol-specific sdks

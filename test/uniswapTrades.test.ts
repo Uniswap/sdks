@@ -6,10 +6,10 @@ import { SwapRouter, UniswapTrade } from '../src'
 import { MixedRouteTrade, MixedRouteSDK } from '@uniswap/router-sdk'
 import { Trade as V2Trade, Pair, Route as RouteV2 } from '@uniswap/v2-sdk'
 import { Trade as V3Trade, Route as RouteV3, Pool } from '@uniswap/v3-sdk'
-import { generatePermitSignature, toInputPermit } from './utils/permit2'
+import { generatePermitSignature, toInputPermit, makePermit } from './utils/permit2'
 import { CurrencyAmount, TradeType } from '@uniswap/sdk-core'
 import { registerFixture } from './forge/writeInterop'
-import { buildTrade, makePermit, getUniswapPools, swapOptions, ETHER, DAI, USDC } from './utils/uniswapData'
+import { buildTrade, getUniswapPools, swapOptions, ETHER, DAI, USDC } from './utils/uniswapData'
 import { hexToDecimalString } from './utils/hexToDecimalString'
 
 const FORK_BLOCK = 16075500

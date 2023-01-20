@@ -9,7 +9,7 @@ import { SeaportTrade } from '../src/entities/protocols/seaport'
 import { seaportData2Covens, seaportValue } from './orders/seaport'
 import { NFTXTrade, NFTXData } from '../src/entities/protocols/nftx'
 import { NFT20Trade, NFT20Data } from '../src/entities/protocols/nft20'
-import { looksRareOrders } from './orders/looksRare'
+import { looksRareOrders, createLooksRareOrders } from './orders/looksRare'
 import { x2y2Orders } from './orders/x2y2'
 import { LooksRareData, LooksRareTrade, MakerOrder, TakerOrder } from '../src/entities/protocols/looksRare'
 import { SudoswapTrade, SudoswapData } from '../src/entities/protocols/sudoswap'
@@ -85,19 +85,16 @@ describe('SwapRouter', () => {
   describe('LooksRare', () => {
     const recipient = SAMPLE_ADDR
 
-    const looksRareOrder721: MakerOrder = looksRareOrders[0]
-    const looksRareOrder1155: MakerOrder = looksRareOrders[2]
-
     // buyItems from block 15360000
-    const makerOrder721: MakerOrder = looksRareOrder721
-    const takerOrder721: TakerOrder = {
-      minPercentageToAsk: looksRareOrder721.minPercentageToAsk,
-      price: looksRareOrder721.price,
-      taker: ROUTER_ADDR,
-      tokenId: looksRareOrder721.tokenId,
-      isOrderAsk: false,
-      params: looksRareOrder721.params,
-    }
+    const { makerOrder: makerOrder721, takerOrder: takerOrder721 } = createLooksRareOrders(
+      looksRareOrders[0],
+      ROUTER_ADDR
+    )
+    const { makerOrder: makerOrder1155, takerOrder: takerOrder1155 } = createLooksRareOrders(
+      looksRareOrders[2],
+      ROUTER_ADDR
+    )
+
     const looksRareData721: LooksRareData = {
       makerOrder: makerOrder721,
       takerOrder: takerOrder721,
@@ -105,15 +102,6 @@ describe('SwapRouter', () => {
       tokenType: TokenType.ERC721,
     }
 
-    const makerOrder1155: MakerOrder = looksRareOrder1155
-    const takerOrder1155: TakerOrder = {
-      minPercentageToAsk: looksRareOrder1155.minPercentageToAsk,
-      price: looksRareOrder1155.price,
-      taker: ROUTER_ADDR,
-      tokenId: looksRareOrder1155.tokenId,
-      isOrderAsk: false,
-      params: looksRareOrder1155.params,
-    }
     const looksRareData1155: LooksRareData = {
       makerOrder: makerOrder1155,
       takerOrder: takerOrder1155,
@@ -126,7 +114,7 @@ describe('SwapRouter', () => {
       const methodParameters = SwapRouter.swapNFTCallParameters([looksRareTrade])
       const methodParametersV2 = SwapRouter.swapCallParameters(looksRareTrade)
       registerFixture('_LOOKSRARE_BUY_ITEM_721', methodParameters)
-      expect(hexToDecimalString(methodParameters.value)).to.eq(looksRareOrder721.price)
+      expect(hexToDecimalString(methodParameters.value)).to.eq(makerOrder721.price)
       expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
       expect(methodParameters.value).to.eq(hexToDecimalString(methodParametersV2.value))
     })
@@ -136,7 +124,7 @@ describe('SwapRouter', () => {
       const methodParameters = SwapRouter.swapNFTCallParameters([looksRareTrade])
       const methodParametersV2 = SwapRouter.swapCallParameters(looksRareTrade)
       registerFixture('_LOOKSRARE_BUY_ITEM_1155', methodParameters)
-      expect(hexToDecimalString(methodParameters.value)).to.eq(looksRareOrder1155.price)
+      expect(hexToDecimalString(methodParameters.value)).to.eq(makerOrder1155.price)
       expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
       expect(methodParameters.value).to.eq(hexToDecimalString(methodParametersV2.value))
     })

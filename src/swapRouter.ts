@@ -8,6 +8,7 @@ import { Currency, TradeType } from '@uniswap/sdk-core'
 import { Command, RouterTradeType } from './entities/Command'
 import { NFTTrade, SupportedProtocolsData } from './entities/NFTTrade'
 import { UniswapTrade, SwapOptions } from './entities/protocols/uniswap'
+import { UnwrapWETH } from './entities/protocols/UnwrapWETH'
 import { CommandType, RoutePlanner } from './utils/routerCommands'
 import { encodePermit } from './utils/permit2'
 import { ROUTER_AS_RECIPIENT, SENDER_AS_RECIPIENT, ETH_ADDRESS } from './utils/constants'
@@ -34,7 +35,9 @@ export abstract class SwapRouter {
     let transactionValue = BigNumber.from(0)
 
     for (const trade of trades) {
-      // is NFTTrade
+      /**
+       * is NFTTrade
+       */
       if (trade.tradeType == RouterTradeType.NFTTrade) {
         const nftTrade = trade as SupportedNFTTrade
         nftTrade.encode(planner, { allowRevert })
@@ -47,7 +50,9 @@ export abstract class SwapRouter {
         } else {
           currentNativeValueInRouter = currentNativeValueInRouter.sub(tradePrice)
         }
-        // is UniswapTrade
+        /**
+         * is Uniswap Trade
+         */
       } else if (trade.tradeType == RouterTradeType.UniswapTrade) {
         const uniswapTrade = trade as UniswapTrade
         const inputIsNative = uniswapTrade.trade.inputAmount.currency.isNative
@@ -71,12 +76,22 @@ export abstract class SwapRouter {
             BigNumber.from(uniswapTrade.trade.minimumAmountOut(swapOptions.slippageTolerance).quotient.toString())
           )
         }
-
         uniswapTrade.encode(planner, { allowRevert: false })
+        /**
+         * is UnwrapWETH
+         */
+      } else if (trade.tradeType == RouterTradeType.UnwrapWETH) {
+        const UnwrapWETH = trade as UnwrapWETH
+        trade.encode(planner, { allowRevert: false })
+        currentNativeValueInRouter = currentNativeValueInRouter.add(UnwrapWETH.amount)
+        /**
+         * else
+         */
       } else {
         throw 'trade must be of instance: UniswapTrade or NFTTrade'
       }
     }
+
     // TODO: matches current logic for now, but should eventually only sweep for multiple NFT trades
     // or NFT trades with potential slippage (i.e. sudo)
     if (nftTrades.length > 0) planner.addCommand(CommandType.SWEEP, [ETH_ADDRESS, SENDER_AS_RECIPIENT, 0])

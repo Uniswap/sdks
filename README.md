@@ -70,6 +70,28 @@ const uniswapTrade = new UniswapTrade(
 const { calldata, value } = SwapRouter.swapCallParameters([uniswapTrade, seaportTrades, looksRareTrades])
 ```
 
+### Using WETH for NFT Trades
+The current router purchases all NFTs with ETH, but you can send WETH to the router to be unwrapped for ETH right before the NFT commands. Similar to ERC20 Uniswap Trades for NFTs, supplemental ETH will be sent in the transaction if the WETH amount will not cover the NFT buys. You can also use ERC20s and WETH to cover the transaction by including both commands before the NFT purchase.
+
+```typescript
+import {
+  ROUTER_AS_RECIPIENT,
+  UniswapTrade,
+  LooksRareTrade,
+  LooksRareData,
+  SeaportTrade,
+  SeaportData
+} from "@uniswap/universal-router-sdk";
+
+const looksRareTrades = new LooksRareTrade([looksrareData1, looksrareData2])
+const seaportTrades = new SeaportTrade([seaportData1])
+// if no Permit needed, omit the third var of type Permit2Permit
+const unwrapWETH = new UnwrapWETH(amountWETH, chainId, optionalPermit2Params)
+
+// Use the raw calldata and value returned to call into Universal Swap Router contracts
+const { calldata, value } = SwapRouter.swapCallParameters([unwrapWETH, seaportTrades, looksRareTrades])
+```
+
 
 ## Running this package
 Make sure you are running `node v16`
