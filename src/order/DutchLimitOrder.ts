@@ -166,7 +166,40 @@ export class DutchLimitOrder extends Order {
   }
 
   /**
-   * @inheritdoc Order
+   * @inheritdoc order
+   */
+  toJSON(): DutchLimitOrderInfoJSON & {
+    permit2Address: string;
+    chainId: number;
+  } {
+    return {
+      chainId: this.chainId,
+      permit2Address: this.permit2Address,
+      reactor: this.info.reactor,
+      offerer: this.info.offerer,
+      nonce: this.info.nonce.toString(),
+      deadline: this.info.deadline,
+      validationContract: this.info.validationContract,
+      validationData: this.info.validationData,
+      startTime: this.info.startTime,
+      endTime: this.info.endTime,
+      input: {
+        token: this.info.input.token,
+        startAmount: this.info.input.startAmount.toString(),
+        endAmount: this.info.input.endAmount.toString(),
+      },
+      outputs: this.info.outputs.map((output) => ({
+        token: output.token,
+        startAmount: output.startAmount.toString(),
+        endAmount: output.endAmount.toString(),
+        recipient: output.recipient,
+        isFeeOutput: output.isFeeOutput,
+      })),
+    };
+  }
+
+  /**
+   * @inheritdoc order
    */
   serialize(): string {
     const abiCoder = new ethers.utils.AbiCoder();
