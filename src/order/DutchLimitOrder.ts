@@ -20,10 +20,20 @@ export type DutchOutput = {
   readonly isFeeOutput: boolean;
 };
 
+export type DutchOutputJSON = Omit<DutchOutput, "startAmount" | "endAmount"> & {
+  startAmount: string;
+  endAmount: string;
+};
+
 export type DutchInput = {
   readonly token: string;
   readonly startAmount: BigNumber;
   readonly endAmount: BigNumber;
+};
+
+export type DutchInputJSON = Omit<DutchInput, "startAmount" | "endAmount"> & {
+  startAmount: string;
+  endAmount: string;
 };
 
 export type DutchLimitOrderInfo = OrderInfo & {
@@ -31,6 +41,15 @@ export type DutchLimitOrderInfo = OrderInfo & {
   endTime: number;
   input: DutchInput;
   outputs: DutchOutput[];
+};
+
+export type DutchLimitOrderInfoJSON = Omit<
+  DutchLimitOrderInfo,
+  "nonce" | "input" | "outputs"
+> & {
+  nonce: string;
+  input: DutchInputJSON;
+  outputs: DutchOutputJSON[];
 };
 
 type WitnessInfo = OrderInfo & {
@@ -147,7 +166,40 @@ export class DutchLimitOrder extends Order {
   }
 
   /**
-   * @inheritdoc Order
+   * @inheritdoc order
+   */
+  toJSON(): DutchLimitOrderInfoJSON & {
+    permit2Address: string;
+    chainId: number;
+  } {
+    return {
+      chainId: this.chainId,
+      permit2Address: this.permit2Address,
+      reactor: this.info.reactor,
+      offerer: this.info.offerer,
+      nonce: this.info.nonce.toString(),
+      deadline: this.info.deadline,
+      validationContract: this.info.validationContract,
+      validationData: this.info.validationData,
+      startTime: this.info.startTime,
+      endTime: this.info.endTime,
+      input: {
+        token: this.info.input.token,
+        startAmount: this.info.input.startAmount.toString(),
+        endAmount: this.info.input.endAmount.toString(),
+      },
+      outputs: this.info.outputs.map((output) => ({
+        token: output.token,
+        startAmount: output.startAmount.toString(),
+        endAmount: output.endAmount.toString(),
+        recipient: output.recipient,
+        isFeeOutput: output.isFeeOutput,
+      })),
+    };
+  }
+
+  /**
+   * @inheritdoc order
    */
   serialize(): string {
     const abiCoder = new ethers.utils.AbiCoder();
