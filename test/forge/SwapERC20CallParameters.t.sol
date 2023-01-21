@@ -96,6 +96,36 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         assertGe(RECIPIENT.balance, startingRecipientBalance + 0.1 ether);
     }
 
+    function testV2ExactInputSingleERC20With2098Permit() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_V2_1000_USDC_FOR_ETH_2098_PERMIT");
+
+        deal(address(USDC), from, BALANCE);
+        USDC.approve(address(permit2), BALANCE);
+
+        assertEq(USDC.balanceOf(from), BALANCE);
+        uint256 startingRecipientBalance = RECIPIENT.balance;
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertLe(USDC.balanceOf(from), BALANCE - 1000 * ONE_USDC);
+        assertGe(RECIPIENT.balance, startingRecipientBalance + 0.1 ether);
+    }
+
+    function testV2ExactInputSingleERC20With2098PermitZeroRecoveryParam() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_V2_1000_USDC_FOR_ETH_PERMIT_V_RECOVERY_PARAM");
+
+        deal(address(USDC), from, BALANCE);
+        USDC.approve(address(permit2), BALANCE);
+
+        assertEq(USDC.balanceOf(from), BALANCE);
+        uint256 startingRecipientBalance = RECIPIENT.balance;
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertLe(USDC.balanceOf(from), BALANCE - 1000 * ONE_USDC);
+        assertGe(RECIPIENT.balance, startingRecipientBalance + 0.1 ether);
+    }
+
     function testV2ExactInputERC20() public {
         MethodParameters memory params = readFixture(json, "._UNISWAP_V2_10_DAI_FOR_ETH_2_HOP");
 

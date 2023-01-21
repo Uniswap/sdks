@@ -1,4 +1,4 @@
-import { Wallet } from 'ethers'
+import { ethers, Wallet } from 'ethers'
 import { AllowanceTransfer, PermitSingle } from '@uniswap/permit2-sdk'
 import { Permit2Permit } from '../../src/utils/permit2'
 import { PERMIT2_ADDRESS, ROUTER_ADDRESS } from './addresses'
@@ -15,6 +15,17 @@ export async function generatePermitSignature(
 ): Promise<string> {
   const { domain, types, values } = AllowanceTransfer.getPermitData(permit, permitAddress, chainId)
   return await signer._signTypedData(domain, types, values)
+}
+
+export async function generateEip2098PermitSignature(
+  permit: PermitSingle,
+  signer: Wallet,
+  chainId: number,
+  permitAddress: string = PERMIT2_ADDRESS
+): Promise<string> {
+  const sig = await generatePermitSignature(permit, signer, chainId, permitAddress)
+  const split = ethers.utils.splitSignature(sig)
+  return split.compact
 }
 
 export function toInputPermit(signature: string, permit: PermitSingle): Permit2Permit {

@@ -1,12 +1,12 @@
 import { expect } from 'chai'
 import JSBI from 'jsbi'
-import { utils, Wallet } from 'ethers'
+import { BigNumber, utils, Wallet } from 'ethers'
 import { expandTo18Decimals } from '../src/utils/expandTo18Decimals'
 import { SwapRouter, UniswapTrade } from '../src'
 import { MixedRouteTrade, MixedRouteSDK } from '@uniswap/router-sdk'
 import { Trade as V2Trade, Pair, Route as RouteV2 } from '@uniswap/v2-sdk'
 import { Trade as V3Trade, Route as RouteV3, Pool } from '@uniswap/v3-sdk'
-import { generatePermitSignature, toInputPermit, makePermit } from './utils/permit2'
+import { generatePermitSignature, toInputPermit, makePermit, generateEip2098PermitSignature } from './utils/permit2'
 import { CurrencyAmount, TradeType } from '@uniswap/sdk-core'
 import { registerFixture } from './forge/writeInterop'
 import { buildTrade, getUniswapPools, swapOptions, ETHER, DAI, USDC } from './utils/uniswapData'
@@ -92,6 +92,49 @@ describe('Uniswap', () => {
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       const methodParametersV2 = SwapRouter.swapCallParameters(new UniswapTrade(buildTrade([trade]), opts))
       registerFixture('_UNISWAP_V2_1000_USDC_FOR_ETH_PERMIT', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+      expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
+      expect(methodParameters.value).to.eq(hexToDecimalString(methodParametersV2.value))
+    })
+
+    it('encodes a single exactInput USDC->ETH swap with EIP-2098 permit', async () => {
+      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const trade = new V2Trade(
+        new RouteV2([WETH_USDC_V2], USDC, ETHER),
+        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
+        TradeType.EXACT_INPUT
+      )
+      const permit = makePermit(USDC.address, inputUSDC)
+      const signature = await generateEip2098PermitSignature(permit, wallet, trade.route.chainId)
+      const opts = swapOptions({ inputTokenPermit: toInputPermit(signature, permit) })
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
+      const methodParametersV2 = SwapRouter.swapCallParameters(new UniswapTrade(buildTrade([trade]), opts))
+      registerFixture('_UNISWAP_V2_1000_USDC_FOR_ETH_2098_PERMIT', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+      expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
+      expect(methodParameters.value).to.eq(hexToDecimalString(methodParametersV2.value))
+    })
+
+    it('encodes a single exactInput USDC->ETH swap with permit with v recovery id', async () => {
+      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const trade = new V2Trade(
+        new RouteV2([WETH_USDC_V2], USDC, ETHER),
+        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
+        TradeType.EXACT_INPUT
+      )
+      const permit = makePermit(USDC.address, inputUSDC)
+      const originalSignature = await generatePermitSignature(permit, wallet, trade.route.chainId)
+      const { recoveryParam } = utils.splitSignature(originalSignature)
+      // slice off current v
+      let signature = originalSignature.substring(0, originalSignature.length - 2)
+      // append recoveryParam as v
+      signature += BigNumber.from(recoveryParam).toHexString().slice(2)
+      // assert ethers sanitization technique works
+      expect(utils.joinSignature(utils.splitSignature(signature))).to.eq(originalSignature)
+      const opts = swapOptions({ inputTokenPermit: toInputPermit(signature, permit) })
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
+      const methodParametersV2 = SwapRouter.swapCallParameters(new UniswapTrade(buildTrade([trade]), opts))
+      registerFixture('_UNISWAP_V2_1000_USDC_FOR_ETH_PERMIT_V_RECOVERY_PARAM', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
       expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
       expect(methodParameters.value).to.eq(hexToDecimalString(methodParametersV2.value))
