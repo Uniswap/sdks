@@ -320,7 +320,7 @@ const _abi = [
     stateMutability: "nonpayable",
     type: "function",
   },
-] as const;
+];
 
 export class Multicall2__factory {
   static readonly abi = _abi;

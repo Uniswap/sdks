@@ -6,7 +6,7 @@ import type { Provider, TransactionRequest } from "@ethersproject/providers";
 import type { PromiseOrValue } from "../common";
 import type {
   DirectTakerExecutor,
-  DirectTakerExecutorInterface
+  DirectTakerExecutorInterface,
 } from "../DirectTakerExecutor";
 
 const _abi = [
@@ -15,11 +15,11 @@ const _abi = [
       {
         internalType: "address",
         name: "_owner",
-        type: "address"
-      }
+        type: "address",
+      },
     ],
     stateMutability: "nonpayable",
-    type: "constructor"
+    type: "constructor",
   },
   {
     anonymous: false,
@@ -28,17 +28,17 @@ const _abi = [
         indexed: true,
         internalType: "address",
         name: "user",
-        type: "address"
+        type: "address",
       },
       {
         indexed: true,
         internalType: "address",
         name: "newOwner",
-        type: "address"
-      }
+        type: "address",
+      },
     ],
     name: "OwnerUpdated",
-    type: "event"
+    type: "event",
   },
   {
     inputs: [],
@@ -47,11 +47,11 @@ const _abi = [
       {
         internalType: "address",
         name: "",
-        type: "address"
-      }
+        type: "address",
+      },
     ],
     stateMutability: "view",
-    type: "function"
+    type: "function",
   },
   {
     inputs: [
@@ -62,131 +62,131 @@ const _abi = [
               {
                 internalType: "address",
                 name: "reactor",
-                type: "address"
+                type: "address",
               },
               {
                 internalType: "address",
                 name: "offerer",
-                type: "address"
+                type: "address",
               },
               {
                 internalType: "uint256",
                 name: "nonce",
-                type: "uint256"
+                type: "uint256",
               },
               {
                 internalType: "uint256",
                 name: "deadline",
-                type: "uint256"
+                type: "uint256",
               },
               {
                 internalType: "address",
                 name: "validationContract",
-                type: "address"
+                type: "address",
               },
               {
                 internalType: "bytes",
                 name: "validationData",
-                type: "bytes"
-              }
+                type: "bytes",
+              },
             ],
             internalType: "struct OrderInfo",
             name: "info",
-            type: "tuple"
+            type: "tuple",
           },
           {
             components: [
               {
                 internalType: "address",
                 name: "token",
-                type: "address"
+                type: "address",
               },
               {
                 internalType: "uint256",
                 name: "amount",
-                type: "uint256"
+                type: "uint256",
               },
               {
                 internalType: "uint256",
                 name: "maxAmount",
-                type: "uint256"
-              }
+                type: "uint256",
+              },
             ],
             internalType: "struct InputToken",
             name: "input",
-            type: "tuple"
+            type: "tuple",
           },
           {
             components: [
               {
                 internalType: "address",
                 name: "token",
-                type: "address"
+                type: "address",
               },
               {
                 internalType: "uint256",
                 name: "amount",
-                type: "uint256"
+                type: "uint256",
               },
               {
                 internalType: "address",
                 name: "recipient",
-                type: "address"
+                type: "address",
               },
               {
                 internalType: "bool",
                 name: "isFeeOutput",
-                type: "bool"
-              }
+                type: "bool",
+              },
             ],
             internalType: "struct OutputToken[]",
             name: "outputs",
-            type: "tuple[]"
+            type: "tuple[]",
           },
           {
             internalType: "bytes",
             name: "sig",
-            type: "bytes"
+            type: "bytes",
           },
           {
             internalType: "bytes32",
             name: "hash",
-            type: "bytes32"
-          }
+            type: "bytes32",
+          },
         ],
         internalType: "struct ResolvedOrder[]",
         name: "resolvedOrders",
-        type: "tuple[]"
+        type: "tuple[]",
       },
       {
         internalType: "address",
         name: "taker",
-        type: "address"
+        type: "address",
       },
       {
         internalType: "bytes",
         name: "",
-        type: "bytes"
-      }
+        type: "bytes",
+      },
     ],
     name: "reactorCallback",
     outputs: [],
     stateMutability: "nonpayable",
-    type: "function"
+    type: "function",
   },
   {
     inputs: [
       {
         internalType: "address",
         name: "newOwner",
-        type: "address"
-      }
+        type: "address",
+      },
     ],
     name: "setOwner",
     outputs: [],
     stateMutability: "nonpayable",
-    type: "function"
-  }
+    type: "function",
+  },
 ];
 
 const _bytecode =
