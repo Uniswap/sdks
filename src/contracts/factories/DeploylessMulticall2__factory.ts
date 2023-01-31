@@ -38,7 +38,7 @@ const _abi = [
     stateMutability: "nonpayable",
     type: "constructor",
   },
-];
+] as const;
 
 export class DeploylessMulticall2__factory {
   static readonly abi = _abi;

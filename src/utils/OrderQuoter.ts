@@ -11,7 +11,10 @@ import { MissingConfiguration } from "../errors";
 import { Order, TokenAmount } from "../order";
 
 import { NonceManager } from "./NonceManager";
-import { multicall, MulticallResult } from "./multicall";
+import {
+  MulticallResult,
+  multicallSameContractManyFunctions,
+} from "./multicall";
 
 export enum OrderValidation {
   Expired,
@@ -96,7 +99,7 @@ export class OrderQuoter {
       return [order.order.serialize(), order.signature];
     });
 
-    const results = await multicall(this.provider, {
+    const results = await multicallSameContractManyFunctions(this.provider, {
       address: this.orderQuoter.address,
       contractInterface: this.orderQuoter.interface,
       functionName: "quote",
