@@ -49,14 +49,14 @@ export async function multicall<TFunctionParams extends any[] | undefined>(
 
     return {
       target: address,
-      callData,
+      callData
     };
   });
 
   return getAggregatedCall(provider, calls);
 }
 
-async function getAggregatedCall(
+export async function getAggregatedCall(
   provider: BaseProvider,
   calls: Call[]
 ): Promise<MulticallResult[]> {
@@ -70,7 +70,7 @@ async function getAggregatedCall(
     const data = hexConcat([DEPLOYLESS_MULTICALL_BYTECODE, args]);
 
     const response = await provider.call({
-      data,
+      data
     });
     const multicallInterface = new Interface(multicall2Abi);
     return multicallInterface.decodeFunctionResult("tryAggregate", response)
