@@ -7,13 +7,13 @@ import {
   Contract,
   ContractFactory,
   BigNumberish,
-  Overrides
+  Overrides,
 } from "ethers";
 import type { Provider, TransactionRequest } from "@ethersproject/providers";
 import type { PromiseOrValue } from "../common";
 import type {
   DutchLimitOrderReactor,
-  DutchLimitOrderReactorInterface
+  DutchLimitOrderReactorInterface,
 } from "../DutchLimitOrderReactor";
 
 const _abi = [
@@ -22,76 +22,76 @@ const _abi = [
       {
         internalType: "address",
         name: "_permit2",
-        type: "address"
+        type: "address",
       },
       {
         internalType: "uint256",
         name: "_protocolFeeBps",
-        type: "uint256"
+        type: "uint256",
       },
       {
         internalType: "address",
         name: "_protocolFeeRecipient",
-        type: "address"
-      }
+        type: "address",
+      },
     ],
     stateMutability: "nonpayable",
-    type: "constructor"
+    type: "constructor",
   },
   {
     inputs: [],
     name: "DeadlineBeforeEndTime",
-    type: "error"
+    type: "error",
   },
   {
     inputs: [],
     name: "DeadlinePassed",
-    type: "error"
+    type: "error",
   },
   {
     inputs: [],
     name: "EndTimeBeforeStartTime",
-    type: "error"
+    type: "error",
   },
   {
     inputs: [],
     name: "IncorrectAmounts",
-    type: "error"
+    type: "error",
   },
   {
     inputs: [],
     name: "InputAndOutputDecay",
-    type: "error"
+    type: "error",
   },
   {
     inputs: [],
     name: "InvalidFee",
-    type: "error"
+    type: "error",
   },
   {
     inputs: [],
     name: "InvalidReactor",
-    type: "error"
+    type: "error",
   },
   {
     inputs: [],
     name: "InvalidSender",
-    type: "error"
+    type: "error",
   },
   {
     inputs: [],
     name: "NoClaimableFees",
-    type: "error"
+    type: "error",
   },
   {
     inputs: [],
     name: "UnauthorizedFeeRecipient",
-    type: "error"
+    type: "error",
   },
   {
     inputs: [],
     name: "ValidationFailed",
-    type: "error"
+    type: "error",
   },
   {
     anonymous: false,
@@ -100,29 +100,29 @@ const _abi = [
         indexed: true,
         internalType: "bytes32",
         name: "orderHash",
-        type: "bytes32"
+        type: "bytes32",
       },
       {
         indexed: true,
         internalType: "address",
         name: "filler",
-        type: "address"
+        type: "address",
       },
       {
         indexed: true,
         internalType: "address",
         name: "offerer",
-        type: "address"
+        type: "address",
       },
       {
         indexed: false,
         internalType: "uint256",
         name: "nonce",
-        type: "uint256"
-      }
+        type: "uint256",
+      },
     ],
     name: "Fill",
-    type: "event"
+    type: "event",
   },
   {
     inputs: [],
@@ -131,24 +131,24 @@ const _abi = [
       {
         internalType: "uint256",
         name: "",
-        type: "uint256"
-      }
+        type: "uint256",
+      },
     ],
     stateMutability: "view",
-    type: "function"
+    type: "function",
   },
   {
     inputs: [
       {
         internalType: "address",
         name: "token",
-        type: "address"
-      }
+        type: "address",
+      },
     ],
     name: "claimFees",
     outputs: [],
     stateMutability: "nonpayable",
-    type: "function"
+    type: "function",
   },
   {
     inputs: [
@@ -157,33 +157,33 @@ const _abi = [
           {
             internalType: "bytes",
             name: "order",
-            type: "bytes"
+            type: "bytes",
           },
           {
             internalType: "bytes",
             name: "sig",
-            type: "bytes"
-          }
+            type: "bytes",
+          },
         ],
         internalType: "struct SignedOrder",
         name: "order",
-        type: "tuple"
+        type: "tuple",
       },
       {
         internalType: "address",
         name: "fillContract",
-        type: "address"
+        type: "address",
       },
       {
         internalType: "bytes",
         name: "fillData",
-        type: "bytes"
-      }
+        type: "bytes",
+      },
     ],
     name: "execute",
     outputs: [],
     stateMutability: "nonpayable",
-    type: "function"
+    type: "function",
   },
   {
     inputs: [
@@ -192,57 +192,57 @@ const _abi = [
           {
             internalType: "bytes",
             name: "order",
-            type: "bytes"
+            type: "bytes",
           },
           {
             internalType: "bytes",
             name: "sig",
-            type: "bytes"
-          }
+            type: "bytes",
+          },
         ],
         internalType: "struct SignedOrder[]",
         name: "orders",
-        type: "tuple[]"
+        type: "tuple[]",
       },
       {
         internalType: "address",
         name: "fillContract",
-        type: "address"
+        type: "address",
       },
       {
         internalType: "bytes",
         name: "fillData",
-        type: "bytes"
-      }
+        type: "bytes",
+      },
     ],
     name: "executeBatch",
     outputs: [],
     stateMutability: "nonpayable",
-    type: "function"
+    type: "function",
   },
   {
     inputs: [
       {
         internalType: "address",
         name: "",
-        type: "address"
+        type: "address",
       },
       {
         internalType: "address",
         name: "",
-        type: "address"
-      }
+        type: "address",
+      },
     ],
     name: "feesOwed",
     outputs: [
       {
         internalType: "uint256",
         name: "",
-        type: "uint256"
-      }
+        type: "uint256",
+      },
     ],
     stateMutability: "view",
-    type: "function"
+    type: "function",
   },
   {
     inputs: [],
@@ -251,11 +251,11 @@ const _abi = [
       {
         internalType: "contract ISignatureTransfer",
         name: "",
-        type: "address"
-      }
+        type: "address",
+      },
     ],
     stateMutability: "view",
-    type: "function"
+    type: "function",
   },
   {
     inputs: [],
@@ -264,25 +264,25 @@ const _abi = [
       {
         internalType: "address",
         name: "",
-        type: "address"
-      }
+        type: "address",
+      },
     ],
     stateMutability: "view",
-    type: "function"
+    type: "function",
   },
   {
     inputs: [
       {
         internalType: "address",
         name: "_protocolFeeRecipient",
-        type: "address"
-      }
+        type: "address",
+      },
     ],
     name: "setProtocolFeeRecipient",
     outputs: [],
     stateMutability: "nonpayable",
-    type: "function"
-  }
+    type: "function",
+  },
 ];
 
 const _bytecode =

@@ -6,7 +6,7 @@ import { Contract, Signer, utils } from "ethers";
 import type { Provider } from "@ethersproject/providers";
 import type {
   DeploylessMulticall2,
-  DeploylessMulticall2Interface
+  DeploylessMulticall2Interface,
 } from "../DeploylessMulticall2";
 
 const _abi = [
@@ -15,29 +15,29 @@ const _abi = [
       {
         internalType: "bool",
         name: "requireSuccess",
-        type: "bool"
+        type: "bool",
       },
       {
         components: [
           {
             internalType: "address",
             name: "target",
-            type: "address"
+            type: "address",
           },
           {
             internalType: "bytes",
             name: "callData",
-            type: "bytes"
-          }
+            type: "bytes",
+          },
         ],
         internalType: "struct DeploylessMulticall2.Call[]",
         name: "calls",
-        type: "tuple[]"
-      }
+        type: "tuple[]",
+      },
     ],
     stateMutability: "nonpayable",
-    type: "constructor"
-  }
+    type: "constructor",
+  },
 ];
 
 export class DeploylessMulticall2__factory {
