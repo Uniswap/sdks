@@ -9,6 +9,7 @@ import {
   DutchLimitOrderInfo,
   DutchOutput,
 } from "../order";
+import { ValidationInfo } from "../order/validation";
 
 import { OrderBuilder } from "./OrderBuilder";
 
@@ -105,6 +106,11 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
 
   nonce(nonce: BigNumber): DutchLimitOrderBuilder {
     super.nonce(nonce);
+    return this;
+  }
+
+  validation(info: ValidationInfo): DutchLimitOrderBuilder {
+    super.validation(info);
     return this;
   }
 
