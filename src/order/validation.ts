@@ -1,5 +1,7 @@
 import { ethers } from "ethers";
 
+import { EXCLUSIVE_FILLER_VALIDATION_MAPPING } from "../constants";
+
 import { OrderInfo } from "./types";
 
 export enum ValidationType {
@@ -10,6 +12,11 @@ export enum ValidationType {
 type ExclusiveFillerData = {
   filler: string;
   lastExclusiveTimestamp: number;
+};
+
+export type ValidationInfo = {
+  validationContract: string;
+  validationData: string;
 };
 
 export type CustomOrderValidation =
@@ -55,4 +62,30 @@ function parseExclusiveFillerData(encoded: string): CustomOrderValidation {
   } catch {
     return NONE_VALIDATION;
   }
+}
+
+// returns decoded filler data, or null if invalid encoding
+export function encodeExclusiveFillerData(
+  fillerAddress: string,
+  lastExclusiveTimestamp: number,
+  chainId?: number,
+  validationContractAddress?: string
+): ValidationInfo {
+  let validationContract = "";
+  if (validationContractAddress) {
+    validationContract = validationContractAddress;
+  } else if (chainId) {
+    validationContract = EXCLUSIVE_FILLER_VALIDATION_MAPPING[chainId];
+  } else {
+    throw new Error("No validation contract provided");
+  }
+
+  const encoded = new ethers.utils.AbiCoder().encode(
+    ["address", "uint256"],
+    [fillerAddress, lastExclusiveTimestamp]
+  );
+  return {
+    validationContract,
+    validationData: encoded,
+  };
 }
