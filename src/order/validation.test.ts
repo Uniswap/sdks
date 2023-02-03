@@ -1,7 +1,11 @@
 import { BigNumber, ethers } from "ethers";
 
 import { OrderInfo } from "./types";
-import { parseValidation, ValidationType } from "./validation";
+import {
+  encodeExclusiveFillerData,
+  parseValidation,
+  ValidationType,
+} from "./validation";
 
 describe("OrderValidation", () => {
   it("parses an ExclusiveFiller validation", () => {
@@ -36,6 +40,29 @@ describe("OrderValidation", () => {
     expect(validation).toEqual({
       type: ValidationType.None,
       data: null,
+    });
+  });
+
+  it("encodes exclusive filler data", () => {
+    const fillerAddress = "0x1111111111111111111111111111111111111111";
+    const validationContract = "0x2222222222222222222222222222222222222222";
+    const timestamp = Math.floor(new Date().getTime() / 1000) + 100;
+    const validationInfo = encodeExclusiveFillerData(
+      fillerAddress,
+      timestamp,
+      1,
+      validationContract
+    );
+
+    const orderInfo = makeOrderInfo(validationInfo.validationData);
+    validationInfo.validationContract = validationContract;
+    const validation = parseValidation(orderInfo);
+    expect(validation).toEqual({
+      type: ValidationType.ExclusiveFiller,
+      data: {
+        filler: fillerAddress,
+        lastExclusiveTimestamp: timestamp,
+      },
     });
   });
 });
