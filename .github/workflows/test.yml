@@ -31,6 +31,9 @@ jobs:
         with:
           version: nightly
 
+      - name: build
+        run: yarn build
+
       # needed to generate abi
       - name: Build solidity
         run: forge build
