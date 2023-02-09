@@ -19,6 +19,26 @@ import { OrderBuilder } from "./OrderBuilder";
 export class DutchLimitOrderBuilder extends OrderBuilder {
   private info: Partial<DutchLimitOrderInfo>;
 
+  static fromOrder(order: DutchLimitOrder): DutchLimitOrderBuilder {
+    // note chainId not used if passing in true reactor address
+    const builder = new DutchLimitOrderBuilder(1, order.info.reactor)
+      .deadline(order.info.deadline)
+      .endTime(order.info.endTime)
+      .startTime(order.info.startTime)
+      .offerer(order.info.offerer)
+      .nonce(order.info.nonce)
+      .input(order.info.input)
+      .validation({
+        validationContract: order.info.validationContract,
+        validationData: order.info.validationData,
+      });
+
+    for (const output of order.info.outputs) {
+      builder.output(output);
+    }
+    return builder;
+  }
+
   constructor(
     private chainId: number,
     reactorAddress?: string,
