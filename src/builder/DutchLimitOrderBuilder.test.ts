@@ -80,6 +80,42 @@ describe("DutchLimitOrderBuilder", () => {
     });
   });
 
+  it("Regenerates builder from order", () => {
+    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    const fillerAddress = "0x1111111111111111111111111111111111111111";
+    const validationContract = "0x2222222222222222222222222222222222222222";
+    const timestamp = Math.floor(new Date().getTime() / 1000) + 100;
+    const validationInfo = encodeExclusiveFillerData(
+      fillerAddress,
+      timestamp,
+      1,
+      validationContract
+    );
+    const order = builder
+      .deadline(deadline)
+      .endTime(deadline)
+      .startTime(deadline - 100)
+      .offerer("0x0000000000000000000000000000000000000001")
+      .nonce(BigNumber.from(100))
+      .input({
+        token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+        startAmount: BigNumber.from("1000000"),
+        endAmount: BigNumber.from("1000000"),
+      })
+      .validation(validationInfo)
+      .output({
+        token: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+        startAmount: BigNumber.from("1000000000000000000"),
+        endAmount: BigNumber.from("900000000000000000"),
+        recipient: "0x0000000000000000000000000000000000000000",
+        isFeeOutput: false,
+      })
+      .build();
+
+    const regenerated = DutchLimitOrderBuilder.fromOrder(order).build();
+    expect(regenerated.toJSON()).toMatchObject(order.toJSON());
+  });
+
   it("Builds a valid order with multiple outputs", () => {
     const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
     const order = builder
