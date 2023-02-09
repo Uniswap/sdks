@@ -21,7 +21,10 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
 
   static fromOrder(order: DutchLimitOrder): DutchLimitOrderBuilder {
     // note chainId not used if passing in true reactor address
-    const builder = new DutchLimitOrderBuilder(1, order.info.reactor)
+    const builder = new DutchLimitOrderBuilder(
+      order.chainId,
+      order.info.reactor
+    )
       .deadline(order.info.deadline)
       .endTime(order.info.endTime)
       .startTime(order.info.startTime)
