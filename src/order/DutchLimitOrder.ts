@@ -116,6 +116,33 @@ export class DutchLimitOrder extends Order {
     }
   }
 
+  static fromJSON(
+    json: DutchLimitOrderInfoJSON,
+    chainId: number,
+    _permit2Address?: string
+  ): DutchLimitOrder {
+    return new DutchLimitOrder(
+      {
+        ...json,
+        nonce: BigNumber.from(json.nonce),
+        input: {
+          token: json.input.token,
+          startAmount: BigNumber.from(json.input.startAmount),
+          endAmount: BigNumber.from(json.input.endAmount),
+        },
+        outputs: json.outputs.map((output) => ({
+          token: output.token,
+          startAmount: BigNumber.from(output.startAmount),
+          endAmount: BigNumber.from(output.endAmount),
+          recipient: output.recipient,
+          isFeeOutput: output.isFeeOutput,
+        })),
+      },
+      chainId,
+      _permit2Address
+    );
+  }
+
   static parse(encoded: string, chainId: number): DutchLimitOrder {
     const abiCoder = new ethers.utils.AbiCoder();
     const decoded = abiCoder.decode(DUTCH_LIMIT_ORDER_ABI, encoded);
