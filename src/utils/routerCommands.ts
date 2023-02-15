@@ -55,6 +55,7 @@ const REVERTABLE_COMMANDS = new Set<CommandType>([
   CommandType.FOUNDATION,
   CommandType.SUDOSWAP,
   CommandType.NFT20,
+  CommandType.CRYPTOPUNKS,
 ])
 
 const ABI_DEFINITION: { [key in CommandType]: string[] } = {
