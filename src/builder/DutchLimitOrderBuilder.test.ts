@@ -260,10 +260,41 @@ describe("DutchLimitOrderBuilder", () => {
 
   it("Start time must be before deadline", () => {
     const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
-    expect(() => builder.deadline(deadline).startTime(deadline + 1)).toThrow(
-      `startTime must be before deadline: ${deadline + 1}`
+    const order = builder
+      .deadline(deadline)
+      .startTime(deadline + 1)
+      .endTime(deadline + 1)
+      .offerer("0x0000000000000000000000000000000000000000")
+      .nonce(BigNumber.from(100))
+      .input({
+        token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+        startAmount: BigNumber.from("1000000"),
+        endAmount: BigNumber.from("1000000"),
+      })
+      .output({
+        token: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+        startAmount: BigNumber.from("1000000000000000000"),
+        endAmount: BigNumber.from("900000000000000000"),
+        recipient: "0x0000000000000000000000000000000000000000",
+        isFeeOutput: false,
+      })
+      .output({
+        token: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+        startAmount: BigNumber.from("1000000000000000000"),
+        endAmount: BigNumber.from("900000000000000000"),
+        recipient: "0x0000000000000000000000000000000000000001",
+        isFeeOutput: false,
+      })
+
+    expect(() => order.build()).toThrow(
+      `startTime must be before or same as deadline: ${deadline + 1}`
     );
   });
+  
+  it("Does not throw before an order has not been finished building", () => {
+    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    expect(() => builder.deadline(deadline).startTime(deadline + 1)).not.toThrowError()
+  })
 
   it("Unknown chainId", () => {
     const chainId = 99999999;
@@ -365,7 +396,7 @@ describe("DutchLimitOrderBuilder", () => {
         })
         .build()
     ).toThrow(
-      `Invariant failed: endTime must be before deadline: ${deadline + 1}`
+      `Invariant failed: endTime must be before or same as deadline: ${deadline + 1}`
     );
   });
 
