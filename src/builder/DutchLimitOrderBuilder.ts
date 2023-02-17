@@ -68,10 +68,6 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
   }
 
   startTime(startTime: number): DutchLimitOrderBuilder {
-    invariant(
-      !this.orderInfo.deadline || startTime <= this.orderInfo.deadline,
-      `startTime must be before deadline: ${startTime}`
-    );
     this.info.startTime = startTime;
     return this;
   }
@@ -79,11 +75,6 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
   endTime(endTime: number): DutchLimitOrderBuilder {
     if (this.orderInfo.deadline === undefined) {
       super.deadline(endTime);
-    } else {
-      invariant(
-        endTime <= this.orderInfo.deadline,
-        `endTime must be before deadline: ${endTime}`
-      );
     }
 
     this.info.endTime = endTime;
@@ -112,11 +103,6 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
 
     if (this.info.endTime === undefined) {
       this.endTime(deadline);
-    } else {
-      invariant(
-        this.info.endTime <= deadline,
-        `endTime must be before deadline: ${this.info.endTime}`
-      );
     }
 
     return this;
@@ -149,6 +135,15 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
       this.info.endTime !== undefined ||
         this.getOrderInfo().deadline !== undefined,
       "Must set either deadline or endTime"
+    );
+    invariant(
+      !this.orderInfo.deadline ||
+        this.info.startTime <= this.orderInfo.deadline,
+      `startTime must be before or same as deadline: ${this.info.startTime}`
+    );
+    invariant(
+      !this.orderInfo.deadline || this.info.endTime <= this.orderInfo.deadline,
+      `endTime must be before or same as deadline: ${this.info.endTime}`
     );
 
     return new DutchLimitOrder(
