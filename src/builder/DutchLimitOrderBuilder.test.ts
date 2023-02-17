@@ -284,17 +284,19 @@ describe("DutchLimitOrderBuilder", () => {
         endAmount: BigNumber.from("900000000000000000"),
         recipient: "0x0000000000000000000000000000000000000001",
         isFeeOutput: false,
-      })
+      });
 
     expect(() => order.build()).toThrow(
       `startTime must be before or same as deadline: ${deadline + 1}`
     );
   });
-  
+
   it("Does not throw before an order has not been finished building", () => {
     const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
-    expect(() => builder.deadline(deadline).startTime(deadline + 1)).not.toThrowError()
-  })
+    expect(() =>
+      builder.deadline(deadline).startTime(deadline + 1)
+    ).not.toThrowError();
+  });
 
   it("Unknown chainId", () => {
     const chainId = 99999999;
@@ -396,7 +398,9 @@ describe("DutchLimitOrderBuilder", () => {
         })
         .build()
     ).toThrow(
-      `Invariant failed: endTime must be before or same as deadline: ${deadline + 1}`
+      `Invariant failed: endTime must be before or same as deadline: ${
+        deadline + 1
+      }`
     );
   });
 
