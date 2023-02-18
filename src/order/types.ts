@@ -2,6 +2,8 @@ import { SignatureLike } from "@ethersproject/bytes";
 import { PermitTransferFromData } from "@uniswap/permit2-sdk";
 import { BigNumber } from "ethers";
 
+import { ResolvedOrder } from "../utils/OrderQuoter";
+
 import { CustomOrderValidation, parseValidation } from "./validation";
 
 export abstract class Order {
@@ -41,6 +43,12 @@ export abstract class Order {
   abstract hash(): string;
 
   /**
+   * Returns the resolved order with the given options
+   * @return The resolved order
+   */
+  abstract resolve(options: OrderResolutionOptions): ResolvedOrder;
+
+  /**
    * Returns the parsed validation
    * @return The parsed validation data for the order
    */
@@ -61,4 +69,9 @@ export type OrderInfo = {
   deadline: number;
   validationContract: string;
   validationData: string;
+};
+
+// options to resolve an order
+export type OrderResolutionOptions = {
+  timestamp: number;
 };
