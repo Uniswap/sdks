@@ -13,7 +13,7 @@ describe("DutchLimitOrderBuilder", () => {
   });
 
   it("Builds a valid order", () => {
-    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    const deadline = Math.floor(Date.now() / 1000) + 1000;
     const order = builder
       .deadline(deadline)
       .endTime(deadline)
@@ -39,10 +39,10 @@ describe("DutchLimitOrderBuilder", () => {
   });
 
   it("Builds a valid order with validation", () => {
-    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    const deadline = Math.floor(Date.now() / 1000) + 1000;
     const fillerAddress = "0x1111111111111111111111111111111111111111";
     const validationContract = "0x2222222222222222222222222222222222222222";
-    const timestamp = Math.floor(new Date().getTime() / 1000) + 100;
+    const timestamp = Math.floor(Date.now() / 1000) + 100;
     const validationInfo = encodeExclusiveFillerData(
       fillerAddress,
       timestamp,
@@ -82,10 +82,10 @@ describe("DutchLimitOrderBuilder", () => {
   });
 
   it("Regenerates builder from order", () => {
-    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    const deadline = Math.floor(Date.now() / 1000) + 1000;
     const fillerAddress = "0x1111111111111111111111111111111111111111";
     const validationContract = "0x2222222222222222222222222222222222222222";
-    const timestamp = Math.floor(new Date().getTime() / 1000) + 100;
+    const timestamp = Math.floor(Date.now() / 1000) + 100;
     const validationInfo = encodeExclusiveFillerData(
       fillerAddress,
       timestamp,
@@ -118,10 +118,10 @@ describe("DutchLimitOrderBuilder", () => {
   });
 
   it("Regenerates builder from order json", () => {
-    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    const deadline = Math.floor(Date.now() / 1000) + 1000;
     const fillerAddress = "0x1111111111111111111111111111111111111111";
     const validationContract = "0x2222222222222222222222222222222222222222";
-    const timestamp = Math.floor(new Date().getTime() / 1000) + 100;
+    const timestamp = Math.floor(Date.now() / 1000) + 100;
     const validationInfo = encodeExclusiveFillerData(
       fillerAddress,
       timestamp,
@@ -157,10 +157,10 @@ describe("DutchLimitOrderBuilder", () => {
   });
 
   it("Regenerates builder allows modification", () => {
-    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    const deadline = Math.floor(Date.now() / 1000) + 1000;
     const fillerAddress = "0x1111111111111111111111111111111111111111";
     const validationContract = "0x2222222222222222222222222222222222222222";
-    const timestamp = Math.floor(new Date().getTime() / 1000) + 100;
+    const timestamp = Math.floor(Date.now() / 1000) + 100;
     const validationInfo = encodeExclusiveFillerData(
       fillerAddress,
       timestamp,
@@ -195,7 +195,7 @@ describe("DutchLimitOrderBuilder", () => {
   });
 
   it("Builds a valid order with multiple outputs", () => {
-    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    const deadline = Math.floor(Date.now() / 1000) + 1000;
     const order = builder
       .deadline(deadline)
       .endTime(deadline)
@@ -228,7 +228,7 @@ describe("DutchLimitOrderBuilder", () => {
   });
 
   it("startAmount <= endAmount", () => {
-    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    const deadline = Math.floor(Date.now() / 1000) + 1000;
     expect(() =>
       builder
         .deadline(deadline)
@@ -253,13 +253,33 @@ describe("DutchLimitOrderBuilder", () => {
   });
 
   it("Deadline already passed", () => {
-    expect(() => builder.deadline(1234)).toThrow(
-      "Deadline must be in the future: 1234"
+    const expiredDeadline = 1234
+    expect(() => builder.deadline(expiredDeadline)).not.toThrow()
+    expect(() => builder
+    .deadline(expiredDeadline)
+    .endTime(expiredDeadline)
+    .startTime(expiredDeadline - 100)
+    .offerer("0x0000000000000000000000000000000000000001")
+    .nonce(BigNumber.from(100))
+    .input({
+      token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      startAmount: BigNumber.from("1000000"),
+      endAmount: BigNumber.from("1000000"),
+    })
+    .output({
+      token: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      startAmount: BigNumber.from("100"),
+      endAmount: BigNumber.from("90"),
+      recipient: "0x0000000000000000000000000000000000000000",
+      isFeeOutput: false,
+    })
+    .build()).toThrow(
+      `Deadline must be in the future: ${expiredDeadline}`
     );
   });
 
   it("Start time must be before deadline", () => {
-    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    const deadline = Math.floor(Date.now() / 1000) + 1000;
     const order = builder
       .deadline(deadline)
       .startTime(deadline + 1)
@@ -269,7 +289,7 @@ describe("DutchLimitOrderBuilder", () => {
       .input({
         token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
         startAmount: BigNumber.from("1000000"),
-        endAmount: BigNumber.from("1000000"),
+        endAmount: BigNumber.from("1200000"),
       })
       .output({
         token: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
@@ -292,7 +312,7 @@ describe("DutchLimitOrderBuilder", () => {
   });
 
   it("Does not throw before an order has not been finished building", () => {
-    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    const deadline = Math.floor(Date.now() / 1000) + 1000;
     expect(() =>
       builder.deadline(deadline).startTime(deadline + 1)
     ).not.toThrowError();
@@ -306,7 +326,7 @@ describe("DutchLimitOrderBuilder", () => {
   });
 
   it("Must set offerer", () => {
-    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    const deadline = Math.floor(Date.now() / 1000) + 1000;
     expect(() =>
       builder
         .deadline(deadline)
@@ -330,7 +350,7 @@ describe("DutchLimitOrderBuilder", () => {
   });
 
   it("Must set deadline or endTime", () => {
-    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    const deadline = Math.floor(Date.now() / 1000) + 1000;
     expect(() =>
       builder
         .startTime(deadline - 100)
@@ -353,7 +373,7 @@ describe("DutchLimitOrderBuilder", () => {
   });
 
   it("endTime defaults to deadline", () => {
-    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    const deadline = Math.floor(Date.now() / 1000) + 1000;
     const order = builder
       .startTime(deadline - 100)
       .deadline(deadline)
@@ -376,7 +396,7 @@ describe("DutchLimitOrderBuilder", () => {
   });
 
   it("endTime after deadline", () => {
-    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    const deadline = Math.floor(Date.now() / 1000) + 1000;
     expect(() =>
       builder
         .startTime(deadline - 100)
@@ -405,7 +425,7 @@ describe("DutchLimitOrderBuilder", () => {
   });
 
   it("deadline defaults to endTime", () => {
-    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    const deadline = Math.floor(Date.now() / 1000) + 1000;
     const order = builder
       .startTime(deadline - 100)
       .endTime(deadline)
@@ -428,7 +448,7 @@ describe("DutchLimitOrderBuilder", () => {
   });
 
   it("Must set nonce", () => {
-    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    const deadline = Math.floor(Date.now() / 1000) + 1000;
     expect(() =>
       builder
         .deadline(deadline)

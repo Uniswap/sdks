@@ -19,10 +19,6 @@ export abstract class OrderBuilder {
   }
 
   deadline(deadline: number): OrderBuilder {
-    invariant(
-      deadline > new Date().getTime() / 1000,
-      `Deadline must be in the future: ${deadline}`
-    );
     this.orderInfo.deadline = deadline;
     return this;
   }
@@ -52,6 +48,10 @@ export abstract class OrderBuilder {
     invariant(this.orderInfo.reactor !== undefined, "reactor not set");
     invariant(this.orderInfo.nonce !== undefined, "nonce not set");
     invariant(this.orderInfo.deadline !== undefined, "deadline not set");
+    invariant(
+      this.orderInfo.deadline > Date.now() / 1000,
+      `Deadline must be in the future: ${this.orderInfo.deadline}`
+    );
     invariant(this.orderInfo.offerer !== undefined, "offerer not set");
     invariant(
       this.orderInfo.validationContract !== undefined,
