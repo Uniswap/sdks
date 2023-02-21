@@ -253,8 +253,8 @@ describe("DutchLimitOrderBuilder", () => {
   });
 
   it("Deadline already passed", () => {
-    const expiredDeadline = 1234
-    expect(() => builder.deadline(expiredDeadline)).not.toThrow()
+    const expiredDeadline = 1234;
+    expect(() => builder.deadline(expiredDeadline)).not.toThrow();
     expect(() =>
       builder
         .deadline(expiredDeadline)
