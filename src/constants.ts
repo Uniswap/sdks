@@ -5,7 +5,7 @@ export const PERMIT2_MAPPING: { readonly [key: number]: string } = {
 };
 
 export const ORDER_QUOTER_MAPPING: { readonly [key: number]: string } = {
-  1: "0x61D83077Bb9AFa0D5eBB9E587816e83BC11C25a5",
+  1: "0x437c3c08892B5c814E9978E4544df849b8313951",
   5: "0x3946398638B21cE394841537EC1c1F557491971a",
   12341234: "0x0836D41eBFFFF6cD0849770f82c922Cf14C9De95",
 };
@@ -13,7 +13,7 @@ export const ORDER_QUOTER_MAPPING: { readonly [key: number]: string } = {
 export const EXCLUSIVE_FILLER_VALIDATION_MAPPING: {
   readonly [key: number]: string;
 } = {
-  1: "0x0000000000000000000000000000000000000000",
+  1: "0x8A66A74e15544db9688B68B06E116f5d19e5dF90",
   5: "0x0000000000000000000000000000000000000000",
   12341234: "0x0000000000000000000000000000000000000000",
 };
@@ -37,7 +37,7 @@ type ReverseReactorMapping = {
 
 export const REACTOR_ADDRESS_MAPPING: ReactorMapping = {
   1: {
-    [OrderType.DutchLimit]: "0x8Cc1AaF08Ce7F48E4104196753bB1daA80E3530f",
+    [OrderType.DutchLimit]: "0x81f570f48BE8d3D358404f257b5bDC4A88eefA50",
   },
   5: {
     [OrderType.DutchLimit]: "0xE5D50eB6e669C32D797379aF3907478FE491036D",
