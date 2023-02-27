@@ -18,7 +18,9 @@ export enum SupportedChainId {
   POLYGON_MUMBAI = 80001,
 
   CELO = 42220,
-  CELO_ALFAJORES = 44787
+  CELO_ALFAJORES = 44787,
+
+  BSC = 56,
 }
 
 // exports for external consumption
@@ -26,13 +28,13 @@ export type BigintIsh = JSBI | string | number
 
 export enum TradeType {
   EXACT_INPUT,
-  EXACT_OUTPUT
+  EXACT_OUTPUT,
 }
 
 export enum Rounding {
   ROUND_DOWN,
   ROUND_HALF_UP,
-  ROUND_UP
+  ROUND_UP,
 }
 
 export const MaxUint256 = JSBI.BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')
