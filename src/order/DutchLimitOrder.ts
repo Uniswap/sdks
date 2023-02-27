@@ -9,8 +9,10 @@ import { BigNumber, ethers } from "ethers";
 
 import { PERMIT2_MAPPING } from "../constants";
 import { MissingConfiguration } from "../errors";
+import { ResolvedOrder } from "../utils/OrderQuoter";
+import { getDecayedAmount } from "../utils/dutchDecay";
 
-import { Order, OrderInfo } from "./types";
+import { Order, OrderInfo, OrderResolutionOptions } from "./types";
 
 export type DutchOutput = {
   readonly token: string;
@@ -294,6 +296,38 @@ export class DutchLimitOrder extends Order {
     return ethers.utils._TypedDataEncoder
       .from(DUTCH_LIMIT_ORDER_TYPES)
       .hash(this.witnessInfo());
+  }
+
+  /**
+   * @inheritdoc Order
+   */
+  resolve(options: OrderResolutionOptions): ResolvedOrder {
+    return {
+      input: {
+        token: this.info.input.token,
+        amount: getDecayedAmount(
+          {
+            startTime: this.info.startTime,
+            endTime: this.info.endTime,
+            startAmount: this.info.input.startAmount,
+            endAmount: this.info.input.endAmount,
+          },
+          options.timestamp
+        ),
+      },
+      outputs: this.info.outputs.map((output) => ({
+        token: output.token,
+        amount: getDecayedAmount(
+          {
+            startTime: this.info.startTime,
+            endTime: this.info.endTime,
+            startAmount: output.startAmount,
+            endAmount: output.endAmount,
+          },
+          options.timestamp
+        ),
+      })),
+    };
   }
 
   private toPermit(): PermitTransferFrom {
