@@ -14,7 +14,7 @@ import { ValidationInfo } from "../order/validation";
 import { OrderBuilder } from "./OrderBuilder";
 
 /**
- * Helper builder for generating dutch limit ordersg
+ * Helper builder for generating dutch limit orders
  */
 export class DutchLimitOrderBuilder extends OrderBuilder {
   private info: Partial<DutchLimitOrderInfo>;
