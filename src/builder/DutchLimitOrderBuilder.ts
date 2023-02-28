@@ -129,15 +129,7 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
       return this;
     }
     this.info.outputs = this.info.outputs.map((output) =>
-      output.isFeeOutput
-        ? output
-        : {
-            token: output.token,
-            startAmount: output.startAmount,
-            endAmount: output.endAmount,
-            recipient: recipient,
-            isFeeOutput: output.isFeeOutput,
-          }
+      output.isFeeOutput ? output : { ...output, recipient }
     );
     return this;
   }
