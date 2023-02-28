@@ -14,7 +14,7 @@ import { ValidationInfo } from "../order/validation";
 import { OrderBuilder } from "./OrderBuilder";
 
 /**
- * Helper builder for generating dutch limit orders
+ * Helper builder for generating dutch limit ordersg
  */
 export class DutchLimitOrderBuilder extends OrderBuilder {
   private info: Partial<DutchLimitOrderInfo>;
@@ -120,6 +120,25 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
 
   validation(info: ValidationInfo): DutchLimitOrderBuilder {
     super.validation(info);
+    return this;
+  }
+
+  // ensures that we only change non fee outputs
+  nonFeeRecipient(recipient: string): DutchLimitOrderBuilder {
+    if (!this.info.outputs) {
+      return this;
+    }
+    this.info.outputs = this.info.outputs.map((output) =>
+      output.isFeeOutput
+        ? output
+        : {
+            token: output.token,
+            startAmount: output.startAmount,
+            endAmount: output.endAmount,
+            recipient: recipient,
+            isFeeOutput: output.isFeeOutput,
+          }
+    );
     return this;
   }
 
