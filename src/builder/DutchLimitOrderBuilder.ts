@@ -123,6 +123,17 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
     return this;
   }
 
+  // ensures that we only change non fee outputs
+  nonFeeRecipient(recipient: string): DutchLimitOrderBuilder {
+    if (!this.info.outputs) {
+      return this;
+    }
+    this.info.outputs = this.info.outputs.map((output) =>
+      output.isFeeOutput ? output : { ...output, recipient }
+    );
+    return this;
+  }
+
   build(): DutchLimitOrder {
     invariant(this.info.startTime !== undefined, "startTime not set");
     invariant(this.info.input !== undefined, "input not set");
