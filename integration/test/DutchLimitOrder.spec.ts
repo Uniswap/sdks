@@ -42,7 +42,7 @@ describe('DutchLimitOrder', () => {
     reactor = (await reactorFactory.deploy(
       permit2.address,
       100,
-      ethers.constants.AddressZero,
+      ethers.constants.AddressZero
     )) as DutchLimitOrderReactor;
 
     chainId = hre.network.config.chainId || 1;
@@ -57,7 +57,9 @@ describe('DutchLimitOrder', () => {
       DirectTakerFillContract.abi,
       DirectTakerFillContract.bytecode
     );
-    fillContract = (await directTakerFillContractFactory.deploy(await taker.getAddress())).address;
+    fillContract = (
+      await directTakerFillContractFactory.deploy(await taker.getAddress())
+    ).address;
 
     const tokenFactory = await ethers.getContractFactory(
       MockERC20Abi.abi,
@@ -69,9 +71,7 @@ describe('DutchLimitOrder', () => {
 
     await tokenIn.mint(
       await maker.getAddress(),
-      BigNumber.from(10)
-        .pow(18)
-        .mul(100)
+      BigNumber.from(10).pow(18).mul(100)
     );
     await tokenIn
       .connect(maker)
@@ -79,13 +79,79 @@ describe('DutchLimitOrder', () => {
 
     await tokenOut.mint(
       await taker.getAddress(),
-      BigNumber.from(10)
-        .pow(18)
-        .mul(100)
+      BigNumber.from(10).pow(18).mul(100)
     );
     await tokenOut
       .connect(taker)
       .approve(fillContract, ethers.constants.MaxUint256);
+  });
+
+  it('correctly builds an order', async () => {
+    const amount = BigNumber.from(10).pow(18);
+    const deadline = await new BlockchainTime().secondsFromNow(1000);
+    const makerAddress = await maker.getAddress();
+    const preBuildOrder = new DutchLimitOrderBuilder(
+      chainId,
+      reactor.address,
+      permit2.address
+    )
+      .deadline(deadline)
+      .endTime(deadline)
+      .startTime(deadline - 100)
+      .offerer(makerAddress)
+      .nonce(BigNumber.from(100))
+      .input({
+        token: tokenIn.address,
+        startAmount: amount,
+        endAmount: amount,
+      })
+      .output({
+        token: tokenOut.address,
+        startAmount: amount,
+        endAmount: BigNumber.from(10).pow(17).mul(9),
+        recipient: makerAddress,
+        isFeeOutput: false,
+      });
+
+    let order = preBuildOrder.build();
+
+    expect(order.info.deadline).to.eq(deadline);
+    expect(order.info.endTime).to.eq(deadline);
+    expect(order.info.startTime).to.eq(deadline - 100);
+    expect(order.info.offerer).to.eq(makerAddress);
+    expect(order.info.nonce.toNumber()).to.eq(100);
+
+    expect(order.info.input.token).to.eq(tokenIn.address);
+    expect(order.info.input.startAmount).to.eq(amount);
+    expect(order.info.input.endAmount).to.eq(amount);
+
+    const builtOutput = order.info.outputs[0];
+
+    expect(builtOutput.token).to.eq(tokenOut.address);
+    expect(builtOutput.startAmount).to.eq(amount);
+    expect(builtOutput.endAmount.eq(BigNumber.from(10).pow(17).mul(9))).to.be
+      .true;
+    expect(builtOutput.recipient).to.eq(makerAddress);
+    expect(builtOutput.isFeeOutput).to.be.false;
+
+    // test changing the recipient
+    order = preBuildOrder.nonFeeRecipient(ethers.constants.AddressZero).build();
+    expect(order.info.outputs[0].recipient).to.eq(ethers.constants.AddressZero);
+
+    // test that the recipient is only changed for the non fee recipient
+    order = preBuildOrder
+      .output({
+        token: tokenOut.address,
+        startAmount: amount,
+        endAmount: BigNumber.from(10).pow(17).mul(9),
+        recipient: makerAddress,
+        isFeeOutput: true,
+      })
+      .nonFeeRecipient(ethers.constants.AddressZero)
+      .build();
+
+    expect(order.info.outputs[0].recipient).to.eq(ethers.constants.AddressZero);
+    expect(order.info.outputs[1].recipient).to.eq(makerAddress);
   });
 
   it('executes a serialized order with no decay', async () => {
@@ -109,9 +175,7 @@ describe('DutchLimitOrder', () => {
       .output({
         token: tokenOut.address,
         startAmount: amount,
-        endAmount: BigNumber.from(10)
-          .pow(17)
-          .mul(9),
+        endAmount: BigNumber.from(10).pow(17).mul(9),
         recipient: await maker.getAddress(),
         isFeeOutput: false,
       })
@@ -133,11 +197,13 @@ describe('DutchLimitOrder', () => {
       await taker.getAddress()
     );
 
-    const res = await reactor.connect(taker).execute(
-      { order: order.serialize(), sig: signature },
-      fillContract,
-      "0x"
-    );
+    const res = await reactor
+      .connect(taker)
+      .execute(
+        { order: order.serialize(), sig: signature },
+        fillContract,
+        '0x'
+      );
     const receipt = await res.wait();
     expect(receipt.status).to.equal(1);
     expect(
@@ -176,9 +242,7 @@ describe('DutchLimitOrder', () => {
       .output({
         token: tokenOut.address,
         startAmount: amount,
-        endAmount: BigNumber.from(10)
-          .pow(17)
-          .mul(9),
+        endAmount: BigNumber.from(10).pow(17).mul(9),
         recipient: await maker.getAddress(),
         isFeeOutput: false,
       })
@@ -200,11 +264,13 @@ describe('DutchLimitOrder', () => {
       await taker.getAddress()
     );
 
-    const res = await reactor.connect(taker).execute(
-      { order: order.serialize(), sig: signature },
-      fillContract,
-      "0x"
-    );
+    const res = await reactor
+      .connect(taker)
+      .execute(
+        { order: order.serialize(), sig: signature },
+        fillContract,
+        '0x'
+      );
     const receipt = await res.wait();
     expect(receipt.status).to.equal(1);
     expect(
