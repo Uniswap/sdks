@@ -22,6 +22,8 @@ export const UNIVERSAL_ROUTER_ADDRESS = (chainId: number): string => {
       return '0xC73d61d192FB994157168Fb56730FdEc64C9Cb8F'
     case 44787: // celo alfajores
       return '0x4648a43B2C14Da09FdF82B161150d3F634f40491'
+    case 56: // binance smart chain
+      return '0x4648a43B2C14Da09FdF82B161150d3F634f40491'
     default:
       throw new Error(`Universal Router not deployed on chain ${chainId}`)
   }
@@ -45,6 +47,8 @@ export const WETH_ADDRESS = (chainId: number): string => {
       return '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1'
     case 421613: // arbitrum goerli
       return '0xe39Ab88f8A4777030A534146A9Ca3B52bd5D43A3'
+    case 56: // binance smart chain
+      return '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c'
     default:
       throw new Error(`WETH9 or UniversalRouter not deployed on chain ${chainId}`)
   }
