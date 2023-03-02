@@ -56,6 +56,7 @@ const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
   "43133453": OrderValidation.InvalidOrderFields,
   "70f65caa": OrderValidation.Expired,
   ee3b3d4b: OrderValidation.NonceUsed,
+  "0x70f65caa": OrderValidation.NonceUsed,
   TRANSFER_FROM_FAILED: OrderValidation.InsufficientFunds,
 };
 
@@ -106,7 +107,12 @@ export class OrderQuoter {
       functionParams: calls,
     });
 
+    console.log(JSON.stringify(results, null, 2));
+
     const validations = await this.getValidations(orders, results);
+
+    console.log("validations in quoter");
+    console.log(JSON.stringify(validations, null, 2));
     const quotes: (ResolvedOrder | undefined)[] = results.map(
       ({ success, returnData }) => {
         if (!success) {
