@@ -107,12 +107,8 @@ export class OrderQuoter {
       functionParams: calls,
     });
 
-    console.log(JSON.stringify(results, null, 2));
-
     const validations = await this.getValidations(orders, results);
 
-    console.log("validations in quoter");
-    console.log(JSON.stringify(validations, null, 2));
     const quotes: (ResolvedOrder | undefined)[] = results.map(
       ({ success, returnData }) => {
         if (!success) {
