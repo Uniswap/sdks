@@ -3,6 +3,7 @@ import { Token } from './token'
 describe('Token', () => {
   const ADDRESS_ONE = '0x0000000000000000000000000000000000000001'
   const ADDRESS_TWO = '0x0000000000000000000000000000000000000002'
+  const DAI_MAINNET = '0x6B175474E89094C44Da98b954EedeAC495271d0F'
 
   describe('#constructor', () => {
     it('fails with invalid address', () => {
@@ -69,6 +70,12 @@ describe('Token', () => {
     it('true even if name/symbol/decimals differ', () => {
       const tokenA = new Token(1, ADDRESS_ONE, 9, 'abc', 'def')
       const tokenB = new Token(1, ADDRESS_ONE, 18, 'ghi', 'jkl')
+      expect(tokenA.equals(tokenB)).toBe(true)
+    })
+
+    it('true even if one token is checksummed and the other is not', () => {
+      const tokenA = new Token(1, DAI_MAINNET, 18, 'DAI', undefined, false)
+      const tokenB = new Token(1, DAI_MAINNET.toLowerCase(), 18, 'DAI', undefined, true)
       expect(tokenA.equals(tokenB)).toBe(true)
     })
   })
