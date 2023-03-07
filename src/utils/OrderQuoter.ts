@@ -24,6 +24,7 @@ export enum OrderValidation {
   InvalidOrderFields,
   UnknownError,
   OK,
+  ExclusivityPeriod,
 }
 
 export interface ResolvedOrder {
@@ -56,6 +57,7 @@ const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
   "43133453": OrderValidation.InvalidOrderFields,
   "70f65caa": OrderValidation.Expired,
   ee3b3d4b: OrderValidation.NonceUsed,
+  "0a0b0d79": OrderValidation.ExclusivityPeriod,
   TRANSFER_FROM_FAILED: OrderValidation.InsufficientFunds,
 };
 
