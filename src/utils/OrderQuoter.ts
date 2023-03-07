@@ -110,12 +110,7 @@ export class OrderQuoter {
       functionParams: calls,
     });
 
-    const blockTimestamp = (await this.provider.getBlock("latest")).timestamp;
-    const validations = await this.getValidations(
-      orders,
-      results,
-      blockTimestamp
-    );
+    const validations = await this.getValidations(orders, results);
     const quotes: (ResolvedOrder | undefined)[] = results.map(
       ({ success, returnData }) => {
         if (!success) {
@@ -139,8 +134,7 @@ export class OrderQuoter {
 
   private async getValidations(
     orders: SignedOrder[],
-    results: MulticallResult[],
-    blockTimestamp: number
+    results: MulticallResult[]
   ): Promise<OrderValidation[]> {
     const validations = results.map((result, idx) => {
       if (result.success) {
@@ -166,20 +160,15 @@ export class OrderQuoter {
                 fillerValidation.type === ValidationType.ExclusiveFiller &&
                 fillerValidation.data.filler !== ethers.constants.AddressZero
               ) {
-                if (
-                  fillerValidation.data.lastExclusiveTimestamp >= blockTimestamp
-                ) {
-                  return OrderValidation.ExclusivityPeriod;
-                }
-                return OrderValidation.ValidationFailed;
+                return OrderValidation.ExclusivityPeriod;
               }
+              return OrderValidation.ValidationFailed;
             }
             return KNOWN_ERRORS[key];
           }
         }
+        return OrderValidation.UnknownError;
       }
-
-      return OrderValidation.UnknownError;
     });
 
     return await this.checkTerminalStates(orders, validations);
