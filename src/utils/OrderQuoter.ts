@@ -9,6 +9,7 @@ import {
 } from "../contracts";
 import { MissingConfiguration } from "../errors";
 import { Order, TokenAmount } from "../order";
+import { parseExclusiveFillerData, ValidationType } from "../order/validation";
 
 import { NonceManager } from "./NonceManager";
 import {
@@ -23,8 +24,9 @@ export enum OrderValidation {
   InvalidSignature,
   InvalidOrderFields,
   UnknownError,
-  OK,
+  ValidationFailed,
   ExclusivityPeriod,
+  OK,
 }
 
 export interface ResolvedOrder {
@@ -57,7 +59,7 @@ const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
   "43133453": OrderValidation.InvalidOrderFields,
   "70f65caa": OrderValidation.Expired,
   ee3b3d4b: OrderValidation.NonceUsed,
-  "0a0b0d79": OrderValidation.ExclusivityPeriod,
+  "0a0b0d79": OrderValidation.ValidationFailed,
   TRANSFER_FROM_FAILED: OrderValidation.InsufficientFunds,
 };
 
@@ -108,7 +110,12 @@ export class OrderQuoter {
       functionParams: calls,
     });
 
-    const validations = await this.getValidations(orders, results);
+    const blockTimestamp = (await this.provider.getBlock("latest")).timestamp;
+    const validations = await this.getValidations(
+      orders,
+      results,
+      blockTimestamp
+    );
     const quotes: (ResolvedOrder | undefined)[] = results.map(
       ({ success, returnData }) => {
         if (!success) {
@@ -132,9 +139,10 @@ export class OrderQuoter {
 
   private async getValidations(
     orders: SignedOrder[],
-    results: MulticallResult[]
+    results: MulticallResult[],
+    blockTimestamp: number
   ): Promise<OrderValidation[]> {
-    const validations = results.map((result) => {
+    const validations = results.map((result, idx) => {
       if (result.success) {
         return OrderValidation.OK;
       } else {
@@ -150,6 +158,22 @@ export class OrderQuoter {
 
         for (const key of Object.keys(KNOWN_ERRORS)) {
           if (returnData.includes(key)) {
+            if (key === "0a0b0d79") {
+              const fillerValidation = parseExclusiveFillerData(
+                orders[idx].order.info.validationData
+              );
+              if (
+                fillerValidation.type === ValidationType.ExclusiveFiller &&
+                fillerValidation.data.filler !== ethers.constants.AddressZero
+              ) {
+                if (
+                  fillerValidation.data.lastExclusiveTimestamp > blockTimestamp
+                ) {
+                  return OrderValidation.ExclusivityPeriod;
+                }
+                return OrderValidation.ValidationFailed;
+              }
+            }
             return KNOWN_ERRORS[key];
           }
         }

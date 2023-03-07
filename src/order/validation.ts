@@ -46,7 +46,9 @@ export function parseValidation(info: OrderInfo): CustomOrderValidation {
 }
 
 // returns decoded filler data, or null if invalid encoding
-function parseExclusiveFillerData(encoded: string): CustomOrderValidation {
+export function parseExclusiveFillerData(
+  encoded: string
+): CustomOrderValidation {
   try {
     const [address, timestamp] = new ethers.utils.AbiCoder().decode(
       ["address", "uint256"],
