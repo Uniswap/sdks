@@ -167,7 +167,7 @@ export class OrderQuoter {
                 fillerValidation.data.filler !== ethers.constants.AddressZero
               ) {
                 if (
-                  fillerValidation.data.lastExclusiveTimestamp > blockTimestamp
+                  fillerValidation.data.lastExclusiveTimestamp >= blockTimestamp
                 ) {
                   return OrderValidation.ExclusivityPeriod;
                 }
