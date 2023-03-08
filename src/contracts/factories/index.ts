@@ -3,6 +3,7 @@
 /* eslint-disable */
 export { DirectTakerExecutor__factory } from "./DirectTakerExecutor__factory";
 export { DutchLimitOrderReactor__factory } from "./DutchLimitOrderReactor__factory";
+export { ExclusiveFillerValidation__factory } from "./ExclusiveFillerValidation__factory";
 export { MockERC20__factory } from "./MockERC20__factory";
 export { OrderQuoter__factory } from "./OrderQuoter__factory";
 export { Permit2__factory } from "./Permit2__factory";
