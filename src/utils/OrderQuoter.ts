@@ -9,6 +9,7 @@ import {
 } from "../contracts";
 import { MissingConfiguration } from "../errors";
 import { Order, TokenAmount } from "../order";
+import { parseExclusiveFillerData, ValidationType } from "../order/validation";
 
 import { NonceManager } from "./NonceManager";
 import {
@@ -23,6 +24,8 @@ export enum OrderValidation {
   InvalidSignature,
   InvalidOrderFields,
   UnknownError,
+  ValidationFailed,
+  ExclusivityPeriod,
   OK,
 }
 
@@ -56,6 +59,7 @@ const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
   "43133453": OrderValidation.InvalidOrderFields,
   "70f65caa": OrderValidation.Expired,
   ee3b3d4b: OrderValidation.NonceUsed,
+  "0a0b0d79": OrderValidation.ValidationFailed,
   TRANSFER_FROM_FAILED: OrderValidation.InsufficientFunds,
 };
 
@@ -132,7 +136,7 @@ export class OrderQuoter {
     orders: SignedOrder[],
     results: MulticallResult[]
   ): Promise<OrderValidation[]> {
-    const validations = results.map((result) => {
+    const validations = results.map((result, idx) => {
       if (result.success) {
         return OrderValidation.OK;
       } else {
@@ -148,12 +152,23 @@ export class OrderQuoter {
 
         for (const key of Object.keys(KNOWN_ERRORS)) {
           if (returnData.includes(key)) {
+            if (key === "0a0b0d79") {
+              const fillerValidation = parseExclusiveFillerData(
+                orders[idx].order.info.validationData
+              );
+              if (
+                fillerValidation.type === ValidationType.ExclusiveFiller &&
+                fillerValidation.data.filler !== ethers.constants.AddressZero
+              ) {
+                return OrderValidation.ExclusivityPeriod;
+              }
+              return OrderValidation.ValidationFailed;
+            }
             return KNOWN_ERRORS[key];
           }
         }
+        return OrderValidation.UnknownError;
       }
-
-      return OrderValidation.UnknownError;
     });
 
     return await this.checkTerminalStates(orders, validations);
