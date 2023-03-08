@@ -4,9 +4,11 @@ import { Signer } from "ethers";
 
 import DirectTakerFillContract from "../../abis/DirectTakerExecutor.json";
 import DutchLimitOrderReactorAbi from "../../abis/DutchLimitOrderReactor.json";
+import ExclusiveFillerValidationAbi from "../../abis/ExclusiveFillerValidation.json";
 import Permit2Abi from "../../abis/Permit2.json";
 import OrderQuoterAbi from "../../abis/OrderQuoter.json";
 import MockERC20Abi from "../../abis/MockERC20.json";
+import { encodeExclusiveFillerData } from "../../src/order/validation";
 
 import {
   OrderQuoter,
@@ -26,6 +28,8 @@ import {
 const { BigNumber } = ethers;
 
 describe("OrderValidator", () => {
+  const TWENTY_SECOND_CENTURY = 4102444800;
+  let validationContract: string;
   let fillContract: string;
   let reactor: DutchLimitOrderReactor;
   let permit2: Permit2;
@@ -41,6 +45,12 @@ describe("OrderValidator", () => {
 
   beforeEach(async () => {
     [admin, taker] = await ethers.getSigners();
+
+    const exclusivityValidatorFactory = await ethers.getContractFactory(
+      ExclusiveFillerValidationAbi.abi,
+      ExclusiveFillerValidationAbi.bytecode
+    );
+    validationContract = (await exclusivityValidatorFactory.deploy()).address;
 
     const directTakerFillContractFactory = await ethers.getContractFactory(
       DirectTakerFillContract.abi,
@@ -212,6 +222,46 @@ describe("OrderValidator", () => {
 
     expect(await validator.validate({ order, signature })).to.equal(
       OrderValidation.NonceUsed
+    );
+  });
+
+  it("validates an order in exclusivity period", async () => {
+    const validationInfo = encodeExclusiveFillerData(
+      fillContract,
+      TWENTY_SECOND_CENTURY,
+      1,
+      validationContract
+    );
+    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    const order = builder
+      .deadline(deadline)
+      .endTime(deadline)
+      .startTime(deadline - 1000)
+      .nonce(BigNumber.from(100))
+      .offerer(await maker.getAddress())
+      .input({
+        token: tokenIn.address,
+        startAmount: BigNumber.from("10").pow(18).mul(2),
+        endAmount: BigNumber.from("10").pow(18).mul(2),
+      })
+      .output({
+        token: tokenOut.address,
+        startAmount: BigNumber.from("1000000000000000000"),
+        endAmount: BigNumber.from("900000000000000000"),
+        recipient: "0x0000000000000000000000000000000000000000",
+        isFeeOutput: false,
+      })
+      .validation({
+        validationContract: validationInfo.validationContract,
+        validationData: validationInfo.validationData,
+      })
+      .build();
+
+    const { domain, types, values } = order.permitData();
+    const signature = await maker._signTypedData(domain, types, values);
+
+    expect(await validator.validate({ order, signature })).to.equal(
+      OrderValidation.ExclusivityPeriod
     );
   });
 
