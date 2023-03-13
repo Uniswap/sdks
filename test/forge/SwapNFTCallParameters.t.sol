@@ -127,6 +127,26 @@ contract swapNFTCallParametersTest is Test, Interop, DeployRouter {
         assertEq(from.balance, balance - params.value);
     }
 
+    function testSeaportV1_4BuyItems() public {
+        MethodParameters memory params = readFixture(json, "._SEAPORT_V1_4_BUY_ITEMS");
+
+        vm.createSelectFork(vm.envString("FORK_URL"), 16820453);
+        vm.startPrank(from);
+
+        UniversalRouter router = deployRouterMainnetConfig();
+        ERC1155 token = ERC1155(0x4f3AdeF2F4096740774A955E912B5F03F2C7bA2b);
+        uint256 balance = 55 ether;
+        vm.deal(from, balance);
+        assertEq(from.balance, balance);
+        assertEq(token.balanceOf(RECIPIENT, 1), 0);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertEq(token.balanceOf(RECIPIENT, 1), 2);
+        // the order is for 3 tokens, but only 2 succeed, so 1/3 of the ETH is returned
+        assertEq(from.balance, balance - (params.value * 2 / 3));
+    }
+
     function testCryptopunkBuyItems() public {
         MethodParameters memory params = readFixture(json, "._CRYPTOPUNK_BUY_ITEM");
         // older block 15360000 does not work

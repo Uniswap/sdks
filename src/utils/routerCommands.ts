@@ -20,6 +20,7 @@ export enum CommandType {
   WRAP_ETH = 0x0b,
   UNWRAP_WETH = 0x0c,
   PERMIT2_TRANSFER_FROM_BATCH = 0x0d,
+  SEAPORT_V1_4 = 0x0e,
 
   // NFT-related command types
   SEAPORT = 0x10,
@@ -69,6 +70,7 @@ const ABI_DEFINITION: { [key in CommandType]: string[] } = {
   [CommandType.V2_SWAP_EXACT_IN]: ['address', 'uint256', 'uint256', 'address[]', 'bool'],
   [CommandType.V2_SWAP_EXACT_OUT]: ['address', 'uint256', 'uint256', 'address[]', 'bool'],
   [CommandType.SEAPORT]: ['uint256', 'bytes'],
+  [CommandType.SEAPORT_V1_4]: ['uint256', 'bytes'],
   [CommandType.WRAP_ETH]: ['address', 'uint256'],
   [CommandType.UNWRAP_WETH]: ['address', 'uint256'],
   [CommandType.SWEEP]: ['address', 'address', 'uint256'],

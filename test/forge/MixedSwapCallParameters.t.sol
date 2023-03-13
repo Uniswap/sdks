@@ -55,7 +55,7 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
         assertEq(COVEN_NFT.balanceOf(RECIPIENT), 0);
         (bool success,) = address(router).call{value: params.value}(params.data);
         require(success, "call failed");
-        assertLe(USDC.balanceOf(from), balanceOfBefore);
+        assertLt(USDC.balanceOf(from), balanceOfBefore);
         assertEq(COVEN_NFT.balanceOf(RECIPIENT), 1);
     }
 
@@ -78,7 +78,7 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
         assertEq(COVEN_NFT.balanceOf(RECIPIENT), 0);
         (bool success,) = address(router).call{value: params.value}(params.data);
         require(success, "call failed");
-        assertLe(WETH.balanceOf(from), balanceOfBefore);
+        assertLt(WETH.balanceOf(from), balanceOfBefore);
         assertEq(COVEN_NFT.balanceOf(RECIPIENT), 1);
     }
 
@@ -102,7 +102,7 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
         assertEq(COVEN_NFT.balanceOf(RECIPIENT), 0);
         (bool success,) = address(router).call{value: params.value}(params.data);
         require(success, "call failed");
-        assertLe(WETH.balanceOf(from), balanceOfBefore);
+        assertLt(WETH.balanceOf(from), balanceOfBefore);
         assertEq(COVEN_NFT.balanceOf(RECIPIENT), 1);
     }
 

@@ -5,9 +5,15 @@ import { BuyItem, Market, NFTTrade, TokenType } from '../NFTTrade'
 import { TradeConfig } from '../Command'
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
 
+export enum SeaportVersion {
+  V1_1,
+  V1_4,
+}
+
 export type SeaportData = {
   items: Order[]
   recipient: string // address
+  version: SeaportVersion
 }
 
 export type FulfillmentComponent = {
@@ -92,7 +98,11 @@ export class SeaportTrade extends NFTTrade<SeaportData> {
           100, // TODO: look into making this a better number
         ])
       }
-      planner.addCommand(CommandType.SEAPORT, [this.getTotalPrice().toString(), calldata], config.allowRevert)
+      planner.addCommand(
+        this.commandMap(order.version),
+        [this.getTotalPrice().toString(), calldata],
+        config.allowRevert
+      )
     }
   }
 
@@ -120,6 +130,15 @@ export class SeaportTrade extends NFTTrade<SeaportData> {
       }
     }
     return totalPrice
+  }
+
+  private commandMap(version: SeaportVersion): CommandType {
+    switch (version) {
+      case SeaportVersion.V1_1:
+        return CommandType.SEAPORT
+      case SeaportVersion.V1_4:
+        return CommandType.SEAPORT_V1_4
+    }
   }
 
   private getConsiderationFulfillments(protocolDatas: Order[]): FulfillmentComponent[][] {
