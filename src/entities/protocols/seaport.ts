@@ -100,7 +100,7 @@ export class SeaportTrade extends NFTTrade<SeaportData> {
       }
       planner.addCommand(
         this.commandMap(order.version),
-        [this.getTotalPrice().toString(), calldata],
+        [this.getTotalOrderPrice(order).toString(), calldata],
         config.allowRevert
       )
     }
@@ -120,6 +120,14 @@ export class SeaportTrade extends NFTTrade<SeaportData> {
       }
     }
     return buyItems
+  }
+
+  getTotalOrderPrice(order: SeaportData): BigNumber {
+    let totalOrderPrice = BigNumber.from(0)
+    for (const item of order.items) {
+      totalOrderPrice = totalOrderPrice.add(this.calculateValue(item.parameters.consideration))
+    }
+    return totalOrderPrice
   }
 
   getTotalPrice(): BigNumber {
