@@ -46,8 +46,9 @@ const PERMIT_BATCH_STRUCT =
 
 const ALLOW_REVERT_FLAG = 0x80
 
-const REVERTABLE_COMMANDS = new Set<CommandType>([
+const REVERTIBLE_COMMANDS = new Set<CommandType>([
   CommandType.SEAPORT,
+  CommandType.SEAPORT_V1_4,
   CommandType.NFTX,
   CommandType.LOOKS_RARE_721,
   CommandType.LOOKS_RARE_1155,
@@ -101,7 +102,7 @@ export class RoutePlanner {
     let command = createCommand(type, parameters)
     this.inputs.push(command.encodedInput)
     if (allowRevert) {
-      if (!REVERTABLE_COMMANDS.has(command.type)) {
+      if (!REVERTIBLE_COMMANDS.has(command.type)) {
         throw new Error(`command type: ${command.type} cannot be allowed to revert`)
       }
       command.type = command.type | ALLOW_REVERT_FLAG
