@@ -5,7 +5,7 @@ import { expandTo18DecimalsBN } from '../src/utils/expandTo18Decimals'
 import { SwapRouter } from '../src/swapRouter'
 import { TokenType } from '../src/entities/NFTTrade'
 import { FoundationTrade, FoundationData } from '../src/entities/protocols/foundation'
-import { SeaportTrade, SeaportVersion } from '../src/entities/protocols/seaport'
+import { SeaportTrade } from '../src/entities/protocols/seaport'
 import { seaportData2Covens, seaportValue } from './orders/seaport'
 import { NFTXTrade, NFTXData } from '../src/entities/protocols/nftx'
 import { NFT20Trade, NFT20Data } from '../src/entities/protocols/nft20'
@@ -17,11 +17,7 @@ import { CryptopunkTrade, CryptopunkData } from '../src/entities/protocols/crypt
 import { X2Y2Data, X2Y2Trade } from '../src/entities/protocols/x2y2'
 import { registerFixture } from './forge/writeInterop'
 import { seaportV1_4Data, seaportV1_4Value } from './orders/seaportV1_4'
-
-const SAMPLE_ADDR = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-
-// this is the address forge is deploying the router to
-const ROUTER_ADDR = '0x4a873bdd49f7f9cc0a5458416a12973fab208f8d'
+import { FORGE_ROUTER_ADDRESS, TEST_RECIPIENT_ADDRESS } from './utils/addresses'
 
 describe('SwapRouter', () => {
   describe('#swapNFTCallParameters', () => {
@@ -31,7 +27,7 @@ describe('SwapRouter', () => {
         tokenAddress: '0xEf96021Af16BD04918b0d87cE045d7984ad6c38c',
         tokenId: 32,
         price: expandTo18DecimalsBN(0.01),
-        recipient: SAMPLE_ADDR,
+        recipient: TEST_RECIPIENT_ADDRESS,
       }
 
       const foundationTrade = new FoundationTrade([foundationData])
@@ -47,7 +43,7 @@ describe('SwapRouter', () => {
       tokenAddress: '0xEf96021Af16BD04918b0d87cE045d7984ad6c38c',
       tokenId: 32,
       price: expandTo18DecimalsBN(0.01),
-      recipient: SAMPLE_ADDR,
+      recipient: TEST_RECIPIENT_ADDRESS,
     }
 
     it('encodes a single foundation trade', async () => {
@@ -64,7 +60,7 @@ describe('SwapRouter', () => {
   describe('NFTX', () => {
     // buyItems from block 15360000
     const nftxPurchase2Covens: NFTXData = {
-      recipient: SAMPLE_ADDR,
+      recipient: TEST_RECIPIENT_ADDRESS,
       vaultAddress: '0xd89b16331f39ab3878daf395052851d3ac8cf3cd',
       vaultId: 333,
       tokenAddress: '0x5180db8f5c931aae63c74266b211f580155ecac8',
@@ -84,16 +80,16 @@ describe('SwapRouter', () => {
   })
 
   describe('LooksRare', () => {
-    const recipient = SAMPLE_ADDR
+    const recipient = TEST_RECIPIENT_ADDRESS
 
     // buyItems from block 15360000
     const { makerOrder: makerOrder721, takerOrder: takerOrder721 } = createLooksRareOrders(
       looksRareOrders[0],
-      ROUTER_ADDR
+      FORGE_ROUTER_ADDRESS
     )
     const { makerOrder: makerOrder1155, takerOrder: takerOrder1155 } = createLooksRareOrders(
       looksRareOrders[2],
-      ROUTER_ADDR
+      FORGE_ROUTER_ADDRESS
     )
 
     const looksRareData721: LooksRareData = {
@@ -139,7 +135,7 @@ describe('SwapRouter', () => {
 
     const x2y2_721_Data: X2Y2Data = {
       signedInput: x2y2SignedOrder721.input,
-      recipient: SAMPLE_ADDR,
+      recipient: TEST_RECIPIENT_ADDRESS,
       price: x2y2SignedOrder721.price,
       tokenId: x2y2SignedOrder721.token_id,
       tokenAddress: ENS_NFT_ADDR,
@@ -148,7 +144,7 @@ describe('SwapRouter', () => {
 
     const x2y2_1155_Data: X2Y2Data = {
       signedInput: x2y2SignedOrder1155.input,
-      recipient: SAMPLE_ADDR,
+      recipient: TEST_RECIPIENT_ADDRESS,
       price: x2y2SignedOrder1155.price,
       tokenId: x2y2SignedOrder1155.token_id,
       tokenAddress: CAMEO_ADDRESS,
@@ -206,7 +202,7 @@ describe('SwapRouter', () => {
     // buyItem from block 15725945
     const cryptopunk: CryptopunkData = {
       tokenId: 2976,
-      recipient: SAMPLE_ADDR,
+      recipient: TEST_RECIPIENT_ADDRESS,
       value: BigNumber.from('76950000000000000000'),
     }
 
@@ -227,7 +223,7 @@ describe('SwapRouter', () => {
       tokenIds: [129, 193, 278],
       tokenAddress: '0x6d05064fe99e40f1c3464e7310a23ffaded56e20',
       tokenAmounts: [1, 1, 1],
-      recipient: SAMPLE_ADDR,
+      recipient: TEST_RECIPIENT_ADDRESS,
       fee: 0,
       isV3: false,
       value: BigNumber.from('20583701229648230'),
@@ -257,8 +253,8 @@ describe('SwapRouter', () => {
           maxCost: '73337152777777783',
         },
       ],
-      nftRecipient: SAMPLE_ADDR,
-      ethRecipient: SAMPLE_ADDR,
+      nftRecipient: TEST_RECIPIENT_ADDRESS,
+      ethRecipient: TEST_RECIPIENT_ADDRESS,
       deadline: '2000000000',
     }
 
@@ -276,7 +272,7 @@ describe('SwapRouter', () => {
   describe('Partial Fill', () => {
     // buyItems from block 15360000
     const nftxPurchase2Covens: NFTXData = {
-      recipient: SAMPLE_ADDR,
+      recipient: TEST_RECIPIENT_ADDRESS,
       vaultAddress: '0xd89b16331f39ab3878daf395052851d3ac8cf3cd',
       vaultId: 333,
       tokenAddress: '0x5180db8f5c931aae63c74266b211f580155ecac8',
@@ -302,7 +298,7 @@ describe('SwapRouter', () => {
         tokenAddress: '0xEf96021Af16BD04918b0d87cE045d7984ad6c38c',
         tokenId: 32,
         price: expandTo18DecimalsBN(0.01),
-        recipient: SAMPLE_ADDR,
+        recipient: TEST_RECIPIENT_ADDRESS,
       }
 
       // buyItem from block 15725945
@@ -311,7 +307,7 @@ describe('SwapRouter', () => {
         tokenAddress: '0xEf96021Af16BD04918b0d87cE045d7984ad6c38c',
         tokenId: 100, // invalid not for sale
         price: expandTo18DecimalsBN(0.01),
-        recipient: SAMPLE_ADDR,
+        recipient: TEST_RECIPIENT_ADDRESS,
       }
 
       const value = BigNumber.from(foundationData1.price).add(foundationData2.price)

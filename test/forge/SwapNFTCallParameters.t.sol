@@ -12,13 +12,6 @@ import {ICryptopunksMarket} from "./utils/ICryptopunksMarket.sol";
 contract swapNFTCallParametersTest is Test, Interop, DeployRouter {
     using stdJson for string;
 
-    address private constant RECIPIENT = 0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa;
-    address private constant ROUTER_ADDRESS = 0x4a873bdD49F7F9CC0A5458416A12973fAB208f8D;
-
-    address from;
-    uint256 fromPrivateKey;
-    string json;
-
     function setUp() public {
         fromPrivateKey = 0x1234;
         from = vm.addr(fromPrivateKey);
@@ -32,7 +25,7 @@ contract swapNFTCallParametersTest is Test, Interop, DeployRouter {
         vm.createSelectFork(vm.envString("FORK_URL"), 15725945);
         vm.startPrank(from);
 
-        UniversalRouter router = deployRouterMainnetConfig();
+        deployRouterAndPermit2();
         ERC721 token = ERC721(0xEf96021Af16BD04918b0d87cE045d7984ad6c38c);
         uint256 balance = 1 ether;
         vm.deal(from, balance);
@@ -51,7 +44,7 @@ contract swapNFTCallParametersTest is Test, Interop, DeployRouter {
         vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
         vm.startPrank(from);
 
-        UniversalRouter router = deployRouterMainnetConfig();
+        deployRouterAndPermit2();
         ERC721 token = ERC721(0x5180db8F5c931aaE63c74266b211F580155ecac8);
         uint256 balance = 1 ether;
         vm.deal(from, balance);
@@ -70,8 +63,7 @@ contract swapNFTCallParametersTest is Test, Interop, DeployRouter {
         vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
         vm.startPrank(from);
 
-        UniversalRouter router = deployRouterMainnetConfig();
-        assertEq(address(router), ROUTER_ADDRESS); // to ensure the router address in sdk is correct
+        deployRouterAndPermit2();
 
         ERC721 token = ERC721(0x5180db8F5c931aaE63c74266b211F580155ecac8);
         uint256 balance = 32 ether;
@@ -92,8 +84,7 @@ contract swapNFTCallParametersTest is Test, Interop, DeployRouter {
         vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
         vm.startPrank(from);
 
-        UniversalRouter router = deployRouterMainnetConfig();
-        assertEq(address(router), ROUTER_ADDRESS); // to ensure the router address in sdk is correct
+        deployRouterAndPermit2();
 
         ERC1155 token = ERC1155(0xf4680c917A873E2dd6eAd72f9f433e74EB9c623C);
         uint256 balance = 0.2 ether;
@@ -114,7 +105,7 @@ contract swapNFTCallParametersTest is Test, Interop, DeployRouter {
         vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
         vm.startPrank(from);
 
-        UniversalRouter router = deployRouterMainnetConfig();
+        deployRouterAndPermit2();
         ERC721 token = ERC721(0x5180db8F5c931aaE63c74266b211F580155ecac8);
         uint256 balance = 55 ether;
         vm.deal(from, balance);
@@ -133,7 +124,7 @@ contract swapNFTCallParametersTest is Test, Interop, DeployRouter {
         vm.createSelectFork(vm.envString("FORK_URL"), 16820453);
         vm.startPrank(from);
 
-        UniversalRouter router = deployRouterMainnetConfig();
+        deployRouterAndPermit2();
         ERC1155 token = ERC1155(0x4f3AdeF2F4096740774A955E912B5F03F2C7bA2b);
         uint256 balance = 55 ether;
         vm.deal(from, balance);
@@ -153,7 +144,7 @@ contract swapNFTCallParametersTest is Test, Interop, DeployRouter {
         vm.createSelectFork(vm.envString("FORK_URL"), 15898323);
         vm.startPrank(from);
 
-        UniversalRouter router = deployRouterMainnetConfig();
+        deployRouterAndPermit2();
         ICryptopunksMarket token = ICryptopunksMarket(0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB);
         uint256 balance = 80 ether;
 
@@ -175,8 +166,7 @@ contract swapNFTCallParametersTest is Test, Interop, DeployRouter {
         vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
         vm.startPrank(from);
 
-        UniversalRouter router = deployRouterMainnetConfig();
-        assertEq(address(router), ROUTER_ADDRESS); // to ensure the router address in sdk is correct
+        deployRouter(address(0));
 
         ERC721 token = ERC721(0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85);
         uint256 balance = 1 ether;
@@ -196,8 +186,7 @@ contract swapNFTCallParametersTest is Test, Interop, DeployRouter {
         vm.createSelectFork(vm.envString("FORK_URL"), 15978300);
         vm.startPrank(from);
 
-        UniversalRouter router = deployRouterMainnetConfig();
-        assertEq(address(router), ROUTER_ADDRESS); // to ensure the router address in sdk is correct
+        deployRouter(address(0));
 
         ERC1155 token = ERC1155(0x93317E87a3a47821803CAADC54Ae418Af80603DA);
         uint256 balance = params.value;
@@ -218,8 +207,7 @@ contract swapNFTCallParametersTest is Test, Interop, DeployRouter {
         vm.createSelectFork(vm.envString("FORK_URL"), 15770228);
         vm.startPrank(from);
 
-        UniversalRouter router = deployRouterMainnetConfig();
-        assertEq(address(router), ROUTER_ADDRESS); // to ensure the router address in sdk is correct
+        deployRouterAndPermit2();
 
         ERC721 token = ERC721(0x6d05064fe99e40F1C3464E7310A23FFADed56E20);
         uint256 balance = 20583701229648230;
@@ -240,8 +228,7 @@ contract swapNFTCallParametersTest is Test, Interop, DeployRouter {
         vm.createSelectFork(vm.envString("FORK_URL"), 15740629);
         vm.startPrank(from);
 
-        UniversalRouter router = deployRouterMainnetConfig();
-        assertEq(address(router), ROUTER_ADDRESS); // to ensure the router address in sdk is correct
+        deployRouterAndPermit2();
 
         ERC721 token = ERC721(0xfA9937555Dc20A020A161232de4D2B109C62Aa9c);
         uint256 balance = 73337152777777783;
@@ -262,7 +249,7 @@ contract swapNFTCallParametersTest is Test, Interop, DeployRouter {
         vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
         vm.startPrank(from);
 
-        UniversalRouter router = deployRouterMainnetConfig();
+        deployRouterAndPermit2();
         ERC721 token = ERC721(0x5180db8F5c931aaE63c74266b211F580155ecac8);
         uint256 balance = 54 ether;
         uint256 failedAmount = 1 ether;
@@ -283,7 +270,7 @@ contract swapNFTCallParametersTest is Test, Interop, DeployRouter {
         vm.createSelectFork(vm.envString("FORK_URL"), 15725945);
         vm.startPrank(from);
 
-        UniversalRouter router = deployRouterMainnetConfig();
+        deployRouterAndPermit2();
         ERC721 token = ERC721(0xEf96021Af16BD04918b0d87cE045d7984ad6c38c);
         uint256 balance = 0.02 ether;
         uint256 failedAmount = 0.01 ether;

@@ -1,7 +1,6 @@
 import { SeaportData, ConsiderationItem, SeaportVersion } from '../../src/entities/protocols/seaport'
 import { BigNumber } from 'ethers'
-
-const SAMPLE_ADDR = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+import { TEST_RECIPIENT_ADDRESS } from '../utils/addresses'
 
 export const seaportData2Covens: SeaportData = {
   items: [
@@ -106,7 +105,7 @@ export const seaportData2Covens: SeaportData = {
         '0x81237739418cadbfd0875476c1d343550166e7099f0430ad581e98245e03db303480cbfda1e2c9aa6f3663d7f5ab86800b72ddeaaf81998179a651eef627e5f81b',
     },
   ],
-  recipient: SAMPLE_ADDR,
+  recipient: TEST_RECIPIENT_ADDRESS,
   version: SeaportVersion.V1_1,
 }
 

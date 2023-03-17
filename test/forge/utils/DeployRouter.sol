@@ -28,20 +28,20 @@ contract DeployRouter is Test {
     address public constant ROUTER_REWARDS_DISTRIBUTOR = 0x0000000000000000000000000000000000000000;
     address public constant LOOKSRARE_REWARDS_DISTRIBUTOR = 0x0554f068365eD43dcC98dcd7Fd7A8208a5638C72;
 
-    function deployRouterMainnetConfig() public returns (UniversalRouter router) {
-        return deployRouter(address(0));
-    }
+    address internal constant RECIPIENT = 0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa;
+    address internal constant MAINNET_PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
 
-    function deployFixtureMainnetConfig() public returns (UniversalRouter router, Permit2 permit2) {
-        try vm.envBool("USE_MAINNET_DEPLOYMENT") returns (bool useMainnet) {
-            if (useMainnet) return useMainnetDeployment();
-        } catch {}
-        permit2 = new Permit2();
-        router = deployRouter(address(permit2));
-    }
+    address internal constant FORGE_ROUTER_ADDRESS = 0xE808C1cfeebb6cb36B537B82FA7c9EEf31415a05;
 
-    function deployRouter(address permit2) public returns (UniversalRouter router) {
-        return new UniversalRouter(
+    UniversalRouter public router;
+    Permit2 public permit2;
+
+    address from;
+    uint256 fromPrivateKey;
+    string json;
+
+    function deployRouter(address permit2) public {
+        router = new UniversalRouter(
             RouterParameters({
                 permit2: permit2,
                 weth9: WETH9,
@@ -65,8 +65,9 @@ contract DeployRouter is Test {
         );
     }
 
-    function useMainnetDeployment() public pure returns (UniversalRouter router, Permit2 permit2) {
-        router = UniversalRouter(payable(0x4C60051384bd2d3C01bfc845Cf5F4b44bcbE9de5));
-        permit2 = Permit2(0x000000000022D473030F116dDEE9F6B43aC78BA3);
+    function deployRouterAndPermit2() public {
+        permit2 = new Permit2();
+        deployRouter(address(permit2));
+        require(FORGE_ROUTER_ADDRESS == address(router));
     }
 }

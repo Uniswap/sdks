@@ -11,6 +11,7 @@ import { CurrencyAmount, TradeType } from '@uniswap/sdk-core'
 import { registerFixture } from './forge/writeInterop'
 import { buildTrade, getUniswapPools, swapOptions, ETHER, DAI, USDC } from './utils/uniswapData'
 import { hexToDecimalString } from './utils/hexToDecimalString'
+import { FORGE_PERMIT2_ADDRESS, FORGE_ROUTER_ADDRESS } from './utils/addresses'
 
 const FORK_BLOCK = 16075500
 
@@ -86,8 +87,8 @@ describe('Uniswap', () => {
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
         TradeType.EXACT_INPUT
       )
-      const permit = makePermit(USDC.address, inputUSDC)
-      const signature = await generatePermitSignature(permit, wallet, trade.route.chainId)
+      const permit = makePermit(USDC.address, inputUSDC, undefined, FORGE_ROUTER_ADDRESS)
+      const signature = await generatePermitSignature(permit, wallet, trade.route.chainId, FORGE_PERMIT2_ADDRESS)
       const opts = swapOptions({ inputTokenPermit: toInputPermit(signature, permit) })
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       const methodParametersV2 = SwapRouter.swapCallParameters(new UniswapTrade(buildTrade([trade]), opts))
@@ -104,7 +105,7 @@ describe('Uniswap', () => {
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
         TradeType.EXACT_INPUT
       )
-      const permit = makePermit(USDC.address, inputUSDC)
+      const permit = makePermit(USDC.address, inputUSDC, undefined, FORGE_ROUTER_ADDRESS)
       const signature = await generateEip2098PermitSignature(permit, wallet, trade.route.chainId)
       const opts = swapOptions({ inputTokenPermit: toInputPermit(signature, permit) })
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
@@ -122,8 +123,13 @@ describe('Uniswap', () => {
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
         TradeType.EXACT_INPUT
       )
-      const permit = makePermit(USDC.address, inputUSDC)
-      const originalSignature = await generatePermitSignature(permit, wallet, trade.route.chainId)
+      const permit = makePermit(USDC.address, inputUSDC, undefined, FORGE_ROUTER_ADDRESS)
+      const originalSignature = await generatePermitSignature(
+        permit,
+        wallet,
+        trade.route.chainId,
+        FORGE_PERMIT2_ADDRESS
+      )
       const { recoveryParam } = utils.splitSignature(originalSignature)
       // slice off current v
       let signature = originalSignature.substring(0, originalSignature.length - 2)
@@ -229,8 +235,13 @@ describe('Uniswap', () => {
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
         TradeType.EXACT_INPUT
       )
-      const permit = makePermit(USDC.address, inputUSDC)
-      const signature = await generatePermitSignature(permit, wallet, trade.swaps[0].route.chainId)
+      const permit = makePermit(USDC.address, inputUSDC, undefined, FORGE_ROUTER_ADDRESS)
+      const signature = await generatePermitSignature(
+        permit,
+        wallet,
+        trade.swaps[0].route.chainId,
+        FORGE_PERMIT2_ADDRESS
+      )
       const opts = swapOptions({ inputTokenPermit: toInputPermit(signature, permit) })
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       const methodParametersV2 = SwapRouter.swapCallParameters(new UniswapTrade(buildTrade([trade]), opts))

@@ -1,9 +1,9 @@
 import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import { UnwrapWETH } from '../src/entities/protocols/unwrapWETH'
-import { SwapRouter, PERMIT2_ADDRESS, ROUTER_AS_RECIPIENT, UNIVERSAL_ROUTER_ADDRESS, WETH_ADDRESS } from '../src'
+import { SwapRouter, PERMIT2_ADDRESS, ROUTER_AS_RECIPIENT, WETH_ADDRESS } from '../src'
 import { utils, Wallet } from 'ethers'
-import { LooksRareData, LooksRareTrade, MakerOrder, TakerOrder } from '../src/entities/protocols/looksRare'
+import { LooksRareData, LooksRareTrade } from '../src/entities/protocols/looksRare'
 import { looksRareOrders, createLooksRareOrders } from './orders/looksRare'
 import { SeaportTrade } from '../src/entities/protocols/seaport'
 import { seaportData2Covens, seaportValue } from './orders/seaport'
@@ -16,31 +16,32 @@ import { UniswapTrade } from '../src'
 import { CurrencyAmount, TradeType } from '@uniswap/sdk-core'
 import { registerFixture } from './forge/writeInterop'
 import { buildTrade, getUniswapPools, swapOptions, DAI, ETHER, WETH, USDC } from './utils/uniswapData'
-
-const FORGE_SENDER_ADDRESS = '0xcf03dd0a894ef79cb5b601a43c4b25e3ae4c67ed'
-const SAMPLE_ADDR = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-// this is the address forge is deploying the router to
-const ROUTER_ADDR = '0xe808c1cfeebb6cb36b537b82fa7c9eef31415a05'
+import {
+  FORGE_PERMIT2_ADDRESS,
+  FORGE_ROUTER_ADDRESS,
+  FORGE_SENDER_ADDRESS,
+  TEST_RECIPIENT_ADDRESS,
+} from './utils/addresses'
 
 describe('SwapRouter.swapCallParameters', () => {
   const wallet = new Wallet(utils.zeroPad('0x1234', 32))
 
   describe('erc20 --> nft', async () => {
-    const { makerOrder, takerOrder } = createLooksRareOrders(looksRareOrders[0], ROUTER_ADDR)
+    const { makerOrder, takerOrder } = createLooksRareOrders(looksRareOrders[0], FORGE_ROUTER_ADDRESS)
     const { makerOrder: recentMakerOrder, takerOrder: recentTakerOrder } = createLooksRareOrders(
       looksRareOrders[3],
-      UNIVERSAL_ROUTER_ADDRESS(1)
+      FORGE_ROUTER_ADDRESS
     )
     const recentLooksRareData: LooksRareData = {
       makerOrder: recentMakerOrder,
       takerOrder: recentTakerOrder,
-      recipient: SAMPLE_ADDR,
+      recipient: TEST_RECIPIENT_ADDRESS,
       tokenType: TokenType.ERC721,
     }
     const looksRareData: LooksRareData = {
       makerOrder: makerOrder,
       takerOrder: takerOrder,
-      recipient: SAMPLE_ADDR,
+      recipient: TEST_RECIPIENT_ADDRESS,
       tokenType: TokenType.ERC721,
     }
     const invalidLooksRareMaker = { ...makerOrder, tokenId: 1 }
@@ -79,16 +80,16 @@ describe('SwapRouter.swapCallParameters', () => {
       const recentlooksRareTrade = new LooksRareTrade([recentLooksRareData])
 
       const outputEther = recentMakerOrder.price.toString()
-      const permit2Data = makePermit(WETH_ADDRESS(1), outputEther, '0', UNIVERSAL_ROUTER_ADDRESS(1))
-      const signature = await generatePermitSignature(permit2Data, wallet, 1, PERMIT2_ADDRESS)
+      const permit2Data = makePermit(WETH_ADDRESS(1), outputEther, '0', FORGE_ROUTER_ADDRESS)
+      const signature = await generatePermitSignature(permit2Data, wallet, 1, FORGE_PERMIT2_ADDRESS)
       const UnwrapWETHData = {
         ...permit2Data,
         signature,
       }
-      const UnwrapWETHCommand = new UnwrapWETH(outputEther, 1, UnwrapWETHData)
+      const UnwrapWETHCommand = new UnwrapWETH(outputEther, 1, UnwrapWETHData, FORGE_ROUTER_ADDRESS)
 
       const methodParameters = SwapRouter.swapCallParameters([UnwrapWETHCommand, recentlooksRareTrade], {
-        sender: FORGE_SENDER_ADDRESS,
+        sender: FORGE_ROUTER_ADDRESS,
       })
       registerFixture('_PERMIT_AND_WETH_FOR_1_LOOKSRARE_NFT', methodParameters)
       expect(methodParameters.value).to.eq('0')
@@ -98,7 +99,7 @@ describe('SwapRouter.swapCallParameters', () => {
       const recentlooksRareTrade = new LooksRareTrade([recentLooksRareData])
 
       const outputEther = recentMakerOrder.price.toString()
-      const UnwrapWETHCommand = new UnwrapWETH(outputEther, 1)
+      const UnwrapWETHCommand = new UnwrapWETH(outputEther, 1, undefined, FORGE_ROUTER_ADDRESS)
 
       const methodParameters = SwapRouter.swapCallParameters([UnwrapWETHCommand, recentlooksRareTrade], {
         sender: FORGE_SENDER_ADDRESS,

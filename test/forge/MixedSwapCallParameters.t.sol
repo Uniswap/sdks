@@ -12,10 +12,6 @@ import {MethodParameters, Interop} from "./utils/Interop.sol";
 contract MixedSwapCallParameters is Test, Interop, DeployRouter {
     using stdJson for string;
 
-    address private constant RECIPIENT = 0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa;
-    address payable private constant MAINNET_ROUTER = payable(0xEf1c6E67703c7BD7107eed8303Fbe6EC2554BF6B);
-    address private constant MAINNET_PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
-
     ERC20 private constant WETH = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     ERC20 private constant USDC = ERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
     ERC20 private constant DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
@@ -23,12 +19,6 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
     uint256 constant BALANCE = 50_000 ether;
 
     ERC721 constant COVEN_NFT = ERC721(0x5180db8F5c931aaE63c74266b211F580155ecac8);
-
-    address from;
-    uint256 fromPrivateKey;
-    string json;
-    Permit2 permit2;
-    UniversalRouter router;
 
     function setUp() public {
         fromPrivateKey = 0x1234;
@@ -43,7 +33,7 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
         vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
         vm.startPrank(from);
 
-        (router, permit2) = deployFixtureMainnetConfig();
+        deployRouterAndPermit2();
         vm.deal(from, BALANCE);
 
         deal(address(USDC), from, BALANCE);
@@ -65,8 +55,7 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
         vm.createSelectFork(vm.envString("FORK_URL"), 16300000);
         vm.startPrank(from);
 
-        router = UniversalRouter(MAINNET_ROUTER);
-        permit2 = Permit2(MAINNET_PERMIT2);
+        deployRouterAndPermit2();
 
         vm.deal(from, BALANCE);
 
@@ -88,8 +77,7 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
         vm.createSelectFork(vm.envString("FORK_URL"), 16300000);
         vm.startPrank(from);
 
-        router = UniversalRouter(MAINNET_ROUTER);
-        permit2 = Permit2(MAINNET_PERMIT2);
+        deployRouterAndPermit2();
 
         vm.deal(from, BALANCE);
 
@@ -112,7 +100,7 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
         vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
         vm.startPrank(from);
 
-        (router, permit2) = deployFixtureMainnetConfig();
+        deployRouterAndPermit2();
         vm.deal(from, BALANCE);
 
         deal(address(USDC), from, BALANCE);
@@ -137,7 +125,7 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
         vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
         vm.startPrank(from);
 
-        (router, permit2) = deployFixtureMainnetConfig();
+        deployRouterAndPermit2();
         vm.deal(from, BALANCE);
 
         deal(address(USDC), from, BALANCE);
@@ -162,7 +150,7 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
         vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
         vm.startPrank(from);
 
-        (router, permit2) = deployFixtureMainnetConfig();
+        deployRouterAndPermit2();
         vm.deal(from, BALANCE);
 
         deal(address(USDC), from, BALANCE);
@@ -187,7 +175,7 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
         vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
         vm.startPrank(from);
 
-        (router, permit2) = deployFixtureMainnetConfig();
+        deployRouterAndPermit2();
         vm.deal(from, BALANCE);
 
         deal(address(USDC), from, BALANCE);
@@ -212,7 +200,7 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
         vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
         vm.startPrank(from);
 
-        (router, permit2) = deployFixtureMainnetConfig();
+        deployRouterAndPermit2();
         vm.deal(from, BALANCE);
 
         deal(address(USDC), from, BALANCE);
@@ -242,7 +230,7 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
         vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
         vm.startPrank(from);
 
-        (router, permit2) = deployFixtureMainnetConfig();
+        deployRouterAndPermit2();
         vm.deal(from, BALANCE);
 
         deal(address(USDC), from, BALANCE);
@@ -268,7 +256,7 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
         vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
         vm.startPrank(from);
 
-        (router, permit2) = deployFixtureMainnetConfig();
+        deployRouterAndPermit2();
         vm.deal(from, BALANCE);
 
         deal(address(USDC), from, BALANCE);
@@ -286,5 +274,4 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
         assertEq(COVEN_NFT.balanceOf(RECIPIENT), 2);
         assertEq(address(router).balance, 0);
     }
-
 }

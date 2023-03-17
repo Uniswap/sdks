@@ -11,7 +11,6 @@ import {MethodParameters, Interop} from "./utils/Interop.sol";
 contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
     using stdJson for string;
 
-    address private constant RECIPIENT = 0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa;
     ERC20 private constant WETH = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     ERC20 private constant USDC = ERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
     ERC20 private constant DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
@@ -19,13 +18,6 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
     uint256 constant BALANCE = 10 ether;
     uint256 ONE_USDC = 10 ** 6;
     uint256 ONE_DAI = 1 ether;
-
-    address from;
-    uint256 fromPrivateKey;
-    string json;
-
-    UniversalRouter router;
-    Permit2 permit2;
 
     function setUp() public {
         fromPrivateKey = 0x1234;
@@ -35,7 +27,7 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
 
         vm.createSelectFork(vm.envString("FORK_URL"), 16075500);
         vm.startPrank(from);
-        (router, permit2) = deployFixtureMainnetConfig();
+        deployRouterAndPermit2();
         vm.deal(from, BALANCE);
     }
 

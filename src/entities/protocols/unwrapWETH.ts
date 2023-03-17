@@ -13,9 +13,9 @@ export class UnwrapWETH implements Command {
   readonly routerAddress: string
   readonly amount: BigNumberish
 
-  constructor(amount: BigNumberish, chainId: number, permit2?: Permit2Permit) {
+  constructor(amount: BigNumberish, chainId: number, permit2?: Permit2Permit, routerAddress?: string) {
     this.wethAddress = WETH_ADDRESS(chainId)
-    this.routerAddress = UNIVERSAL_ROUTER_ADDRESS(chainId)
+    this.routerAddress = routerAddress ?? UNIVERSAL_ROUTER_ADDRESS(chainId)
     this.amount = amount
 
     if (!!permit2) {
