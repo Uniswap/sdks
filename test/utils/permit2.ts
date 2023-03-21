@@ -1,8 +1,8 @@
 import { ethers, Wallet } from 'ethers'
 import { AllowanceTransfer, PermitSingle } from '@uniswap/permit2-sdk'
-import { Permit2Permit } from '../../src/utils/permit2'
+import { Permit2Permit } from '../../src/utils/inputTokens'
 import { PERMIT2_ADDRESS, ROUTER_ADDRESS } from './addresses'
-import { ethers } from 'ethers'
+import { MAX_UINT160 } from '../../src/utils/constants'
 
 const TEST_DEADLINE = '3000000000000'
 
@@ -37,7 +37,7 @@ export function toInputPermit(signature: string, permit: PermitSingle): Permit2P
 
 export function makePermit(
   token: string,
-  amount: string = ethers.constants.MaxUint256.toString(),
+  amount: string = MAX_UINT160.toString(),
   nonce: string = '0',
   routerAddress: string = ROUTER_ADDRESS
 ): PermitSingle {

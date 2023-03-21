@@ -1,21 +1,18 @@
 import invariant from 'tiny-invariant'
 import { BigNumberish } from 'ethers'
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
-import { Permit2Permit } from '../../utils/permit2'
+import { encodeInputTokenOptions, Permit2Permit } from '../../utils/inputTokens'
 import { Command, RouterTradeType, TradeConfig } from '../Command'
-import { encodePermit } from '../../utils/permit2'
-import { ROUTER_AS_RECIPIENT, UNIVERSAL_ROUTER_ADDRESS, WETH_ADDRESS } from '../../utils/constants'
+import { ROUTER_AS_RECIPIENT, WETH_ADDRESS } from '../../utils/constants'
 
 export class UnwrapWETH implements Command {
   readonly tradeType: RouterTradeType = RouterTradeType.UnwrapWETH
   readonly permit2Data: Permit2Permit
   readonly wethAddress: string
-  readonly routerAddress: string
   readonly amount: BigNumberish
 
-  constructor(amount: BigNumberish, chainId: number, permit2?: Permit2Permit, routerAddress?: string) {
+  constructor(amount: BigNumberish, chainId: number, permit2?: Permit2Permit) {
     this.wethAddress = WETH_ADDRESS(chainId)
-    this.routerAddress = routerAddress ?? UNIVERSAL_ROUTER_ADDRESS(chainId)
     this.amount = amount
 
     if (!!permit2) {
@@ -26,8 +23,13 @@ export class UnwrapWETH implements Command {
   }
 
   encode(planner: RoutePlanner, _: TradeConfig): void {
-    if (!!this.permit2Data) encodePermit(planner, this.permit2Data)
-    planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [this.wethAddress, this.routerAddress, this.amount])
+    encodeInputTokenOptions(planner, {
+      permit2Permit: this.permit2Data,
+      permit2TransferFrom: {
+        token: this.wethAddress,
+        amount: this.amount.toString(),
+      },
+    })
     planner.addCommand(CommandType.UNWRAP_WETH, [ROUTER_AS_RECIPIENT, this.amount])
   }
 }

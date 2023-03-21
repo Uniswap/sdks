@@ -27,6 +27,10 @@ contract DeployRouter is Test {
     address public constant LOOKS_RARE = 0x59728544B08AB483533076417FbBB2fD0B17CE3a;
     address public constant ROUTER_REWARDS_DISTRIBUTOR = 0x0000000000000000000000000000000000000000;
     address public constant LOOKSRARE_REWARDS_DISTRIBUTOR = 0x0554f068365eD43dcC98dcd7Fd7A8208a5638C72;
+    address public constant OPENSEA_CONDUIT = 0x1E0049783F008A0085193E00003D00cd54003c71;
+    address public constant ELEMENT_MARKET = 0x20F780A973856B93f63670377900C1d2a50a77c4;
+    address public constant PAYMENT_RECIPIENT = address(1);
+    uint256 public constant PAYMENT_BIPS = 100;
 
     address internal constant RECIPIENT = 0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa;
     address internal constant MAINNET_PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
@@ -46,11 +50,13 @@ contract DeployRouter is Test {
                 permit2: permit2,
                 weth9: WETH9,
                 seaport: SEAPORT,
-                seaportv1_4: SEAPORT_V1_4,
+                seaportV1_4: SEAPORT_V1_4,
+                openseaConduit: OPENSEA_CONDUIT,
                 nftxZap: NFTX_ZAP,
                 x2y2: X2Y2,
                 foundation: FOUNDATION,
                 sudoswap: SUDOSWAP,
+                elementMarket: ELEMENT_MARKET,
                 nft20Zap: NFT20_ZAP,
                 cryptopunks: CRYPTOPUNKS,
                 looksRare: LOOKS_RARE,
@@ -60,7 +66,9 @@ contract DeployRouter is Test {
                 v2Factory: V2_FACTORY,
                 v3Factory: V3_FACTORY,
                 pairInitCodeHash: PAIR_INIT_CODE_HASH,
-                poolInitCodeHash: POOL_INIT_CODE_HASH
+                poolInitCodeHash: POOL_INIT_CODE_HASH,
+                paymentRecipient: PAYMENT_RECIPIENT,
+                paymentAmountBips: PAYMENT_BIPS
             })
         );
     }

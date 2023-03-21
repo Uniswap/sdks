@@ -36,7 +36,8 @@ export abstract class NFTTrade<T> implements Command {
 
   abstract getBuyItems(): BuyItem[]
 
-  abstract getTotalPrice(): BigNumber
+  // optional parameter for the markets that accept ERC20s not just ETH
+  abstract getTotalPrice(token?: string): BigNumber
 }
 
 export type BuyItem = {

@@ -10,7 +10,7 @@ import { NFTTrade, SupportedProtocolsData } from './entities/NFTTrade'
 import { UniswapTrade, SwapOptions } from './entities/protocols/uniswap'
 import { UnwrapWETH } from './entities/protocols/unwrapWETH'
 import { CommandType, RoutePlanner } from './utils/routerCommands'
-import { encodePermit } from './utils/permit2'
+import { encodePermit } from './utils/inputTokens'
 import { ROUTER_AS_RECIPIENT, SENDER_AS_RECIPIENT, ETH_ADDRESS } from './utils/constants'
 
 export type SwapRouterConfig = {
@@ -51,7 +51,7 @@ export abstract class SwapRouter {
           currentNativeValueInRouter = currentNativeValueInRouter.sub(tradePrice)
         }
         /**
-         * is Uniswap Trade
+         * is UniswapTrade
          */
       } else if (trade.tradeType == RouterTradeType.UniswapTrade) {
         const uniswapTrade = trade as UniswapTrade

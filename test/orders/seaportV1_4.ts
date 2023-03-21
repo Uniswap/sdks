@@ -1,8 +1,8 @@
-import { SeaportData, ConsiderationItem, SeaportVersion } from '../../src/entities/protocols/seaport'
+import { SeaportData, ConsiderationItem } from '../../src/entities/protocols/seaport'
 import { BigNumber } from 'ethers'
 import { TEST_RECIPIENT_ADDRESS } from '../utils/addresses'
 
-export const seaportV1_4Data: SeaportData = {
+export const seaportV1_4DataETH: SeaportData = {
   items: [
     {
       parameters: {
@@ -56,10 +56,10 @@ export const seaportV1_4Data: SeaportData = {
     },
   ],
   recipient: TEST_RECIPIENT_ADDRESS,
-  version: SeaportVersion.V1_4,
+  protocolAddress: '0x00000000000001ad428e4906aE43D8F9852d0dD6',
 }
 
-export const seaportV1_4Value = calculateSeaportValue(seaportV1_4Data.items[0].parameters.consideration)
+export const seaportV1_4ValueETH = calculateSeaportValue(seaportV1_4DataETH.items[0].parameters.consideration)
 
 function calculateSeaportValue(considerations: ConsiderationItem[]): BigNumber {
   return considerations.reduce(

@@ -1,19 +1,24 @@
-import abi from '../../../abis/Seaport.json'
 import { BigNumber, BigNumberish } from 'ethers'
 import { Interface } from '@ethersproject/abi'
+import abi from '../../../abis/Seaport.json'
 import { BuyItem, Market, NFTTrade, TokenType } from '../NFTTrade'
 import { TradeConfig } from '../Command'
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
-
-export enum SeaportVersion {
-  V1_1,
-  V1_4,
-}
+import { encodeInputTokenOptions, Permit2Permit } from '../../utils/inputTokens'
+import { ETH_ADDRESS } from '../../utils/constants'
 
 export type SeaportData = {
   items: Order[]
   recipient: string // address
-  version: SeaportVersion
+  protocolAddress: string
+  inputTokenProcessing?: InputTokenProcessing[]
+}
+
+export type InputTokenProcessing = {
+  token: string
+  permit2Permit?: Permit2Permit
+  protocolApproval: boolean
+  permit2TransferFrom: boolean
 }
 
 export type FulfillmentComponent = {
@@ -98,9 +103,23 @@ export class SeaportTrade extends NFTTrade<SeaportData> {
           100, // TODO: look into making this a better number
         ])
       }
+
+      if (!!order.inputTokenProcessing) {
+        for (const inputToken of order.inputTokenProcessing)
+          encodeInputTokenOptions(planner, {
+            approval: inputToken.protocolApproval
+              ? { token: inputToken.token, protocol: order.protocolAddress }
+              : undefined,
+            permit2Permit: inputToken.permit2Permit,
+            permit2TransferFrom: inputToken.permit2TransferFrom
+              ? { token: inputToken.token, amount: this.getTotalOrderPrice(order, inputToken.token).toString() }
+              : undefined,
+          })
+      }
+
       planner.addCommand(
-        this.commandMap(order.version),
-        [this.getTotalOrderPrice(order).toString(), calldata],
+        this.commandMap(order.protocolAddress),
+        [this.getTotalOrderPrice(order, ETH_ADDRESS).toString(), calldata],
         config.allowRevert
       )
     }
@@ -122,30 +141,32 @@ export class SeaportTrade extends NFTTrade<SeaportData> {
     return buyItems
   }
 
-  getTotalOrderPrice(order: SeaportData): BigNumber {
+  getTotalOrderPrice(order: SeaportData, token: string = ETH_ADDRESS): BigNumber {
     let totalOrderPrice = BigNumber.from(0)
     for (const item of order.items) {
-      totalOrderPrice = totalOrderPrice.add(this.calculateValue(item.parameters.consideration))
+      totalOrderPrice = totalOrderPrice.add(this.calculateValue(item.parameters.consideration, token))
     }
     return totalOrderPrice
   }
 
-  getTotalPrice(): BigNumber {
+  getTotalPrice(token: string = ETH_ADDRESS): BigNumber {
     let totalPrice = BigNumber.from(0)
     for (const order of this.orders) {
       for (const item of order.items) {
-        totalPrice = totalPrice.add(this.calculateValue(item.parameters.consideration))
+        totalPrice = totalPrice.add(this.calculateValue(item.parameters.consideration, token))
       }
     }
     return totalPrice
   }
 
-  private commandMap(version: SeaportVersion): CommandType {
-    switch (version) {
-      case SeaportVersion.V1_1:
+  private commandMap(protocolAddress: string): CommandType {
+    switch (protocolAddress.toLowerCase()) {
+      case '0x00000000006c3852cbef3e08e8df289169ede581': // Seaport v1.1
         return CommandType.SEAPORT
-      case SeaportVersion.V1_4:
+      case '0x00000000000001ad428e4906ae43d8f9852d0dd6': // Seaport v1.4
         return CommandType.SEAPORT_V1_4
+      default:
+        throw new Error('unsupported Seaport address')
     }
   }
 
@@ -183,7 +204,7 @@ export class SeaportTrade extends NFTTrade<SeaportData> {
     return considerationFulfillments
   }
 
-  private getAdvancedOrderParams(data: Order): { advancedOrder: AdvancedOrder; value: BigNumber } {
+  private getAdvancedOrderParams(data: Order): { advancedOrder: AdvancedOrder } {
     const advancedOrder = {
       parameters: data.parameters,
       numerator: BigNumber.from('1'),
@@ -191,13 +212,13 @@ export class SeaportTrade extends NFTTrade<SeaportData> {
       signature: data.signature,
       extraData: '0x00',
     }
-    const value = this.calculateValue(data.parameters.consideration)
-    return { advancedOrder, value }
+    return { advancedOrder }
   }
 
-  private calculateValue(considerations: ConsiderationItem[]): BigNumber {
+  private calculateValue(considerations: ConsiderationItem[], token: string): BigNumber {
     return considerations.reduce(
-      (amt: BigNumber, consideration: ConsiderationItem) => amt.add(consideration.startAmount),
+      (amt: BigNumber, consideration: ConsiderationItem) =>
+        consideration.token == token ? amt.add(consideration.startAmount) : amt,
       BigNumber.from(0)
     )
   }

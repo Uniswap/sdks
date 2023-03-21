@@ -16,7 +16,7 @@ import {
   encodeMixedRouteToPath,
   partitionMixedRouteByProtocol,
 } from '@uniswap/router-sdk'
-import { Permit2Permit } from '../../utils/permit2'
+import { Permit2Permit } from '../../utils/inputTokens'
 import { Currency, TradeType, CurrencyAmount, Percent } from '@uniswap/sdk-core'
 import { Command, RouterTradeType, TradeConfig } from '../Command'
 import { SENDER_AS_RECIPIENT, ROUTER_AS_RECIPIENT, CONTRACT_BALANCE } from '../../utils/constants'
