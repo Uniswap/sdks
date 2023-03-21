@@ -10,6 +10,7 @@ import { LooksRareData } from './protocols/looksRare'
 import { SudoswapData } from './protocols/sudoswap'
 import { CryptopunkData } from './protocols/cryptopunk'
 import { X2Y2Data } from './protocols/x2y2'
+import { ElementData } from './protocols/element-market'
 
 export type SupportedProtocolsData =
   | SeaportData
@@ -20,6 +21,7 @@ export type SupportedProtocolsData =
   | CryptopunkData
   | NFT20Data
   | SudoswapData
+  | ElementData
 
 export abstract class NFTTrade<T> implements Command {
   readonly tradeType: RouterTradeType = RouterTradeType.NFTTrade
@@ -56,6 +58,7 @@ export enum Market {
   Sudoswap = 'Sudoswap',
   Cryptopunks = 'cryptopunks',
   X2Y2 = 'x2y2',
+  Element = 'element',
 }
 
 export enum TokenType {

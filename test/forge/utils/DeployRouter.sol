@@ -44,10 +44,10 @@ contract DeployRouter is Test {
     uint256 fromPrivateKey;
     string json;
 
-    function deployRouter(address permit2) public {
+    function deployRouter(address _permit2) public {
         router = new UniversalRouter(
             RouterParameters({
-                permit2: permit2,
+                permit2: _permit2,
                 weth9: WETH9,
                 seaport: SEAPORT,
                 seaportV1_4: SEAPORT_V1_4,

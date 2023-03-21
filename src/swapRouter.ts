@@ -148,7 +148,6 @@ export abstract class SwapRouter {
     return SwapRouter.encodePlan(planner, nativeCurrencyValue, {
       deadline: options.deadlineOrPreviousBlockhash ? BigNumber.from(options.deadlineOrPreviousBlockhash) : undefined,
     })
-    return SwapRouter.encodePlan(planner, nativeCurrencyValue)
   }
 
   /**

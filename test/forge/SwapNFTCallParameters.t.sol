@@ -63,6 +63,48 @@ contract swapNFTCallParametersTest is Test, Interop, DeployRouter {
         assertEq(from.balance, balance - params.value);
     }
 
+    function testElementBuyItemsERC721() public {
+        address taker = 0x75B6568025f463a98fB01082eEb6dCe04efA3Ae4;
+        MethodParameters memory params = readFixture(json, "._ELEMENT_BUY_ITEM_721");
+
+        vm.createSelectFork(vm.envString("FORK_URL"), 16627213);
+        vm.startPrank(from);
+
+        deployRouterAndPermit2();
+
+        ERC721 token = ERC721(0x4C69dBc3a2Aa3476c3F7a1227ab70950DB1F4858);
+        uint256 balance = 32 ether;
+        vm.deal(from, balance);
+        assertEq(from.balance, balance);
+        assertEq(token.balanceOf(taker), 0);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+
+        require(success, "call failed");
+        assertEq(token.balanceOf(taker), 1);
+        assertEq(from.balance, balance - params.value);
+    }
+
+    function testElementBuyitmesERC712WithFees() public {
+        MethodParameters memory params = readFixture(json, "._ELEMENT_BUY_ITEM_721_WITH_FEES");
+
+        vm.createSelectFork(vm.envString("FORK_URL"), 16870205);
+        vm.startPrank(from);
+
+        deployRouterAndPermit2();
+        ERC721 token = ERC721(0x4C69dBc3a2Aa3476c3F7a1227ab70950DB1F4858);
+        uint256 balance = 32 ether;
+        vm.deal(from, balance);
+        assertEq(from.balance, balance);
+        assertEq(token.balanceOf(RECIPIENT), 0);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+
+        require(success, "call failed");
+        assertEq(token.balanceOf(RECIPIENT), 1);
+        assertEq(from.balance, balance - params.value);
+    }
+
     function testLooksRareBuyItemsERC721() public {
         MethodParameters memory params = readFixture(json, "._LOOKSRARE_BUY_ITEM_721");
 

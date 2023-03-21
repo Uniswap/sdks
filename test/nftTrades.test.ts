@@ -20,8 +20,11 @@ import { seaportV1_4DataETH } from './orders/seaportV1_4'
 import { FORGE_PERMIT2_ADDRESS, FORGE_ROUTER_ADDRESS, TEST_RECIPIENT_ADDRESS } from './utils/addresses'
 import { ETH_ADDRESS, WETH_ADDRESS } from '../src/utils/constants'
 import { generatePermitSignature, makePermit } from './utils/permit2'
+import { ElementTrade } from '../src/entities/protocols/element-market'
+import { elementDataETH, elementDataETH_WithFees } from './orders/element'
 
 describe('SwapRouter', () => {
+  const recipient = TEST_RECIPIENT_ADDRESS
   const wallet = new Wallet(utils.zeroPad('0x1234', 32))
 
   describe('#swapNFTCallParameters', () => {
@@ -31,7 +34,7 @@ describe('SwapRouter', () => {
         tokenAddress: '0xEf96021Af16BD04918b0d87cE045d7984ad6c38c',
         tokenId: 32,
         price: expandTo18DecimalsBN(0.01),
-        recipient: TEST_RECIPIENT_ADDRESS,
+        recipient,
       }
 
       const foundationTrade = new FoundationTrade([foundationData])
@@ -47,7 +50,7 @@ describe('SwapRouter', () => {
       tokenAddress: '0xEf96021Af16BD04918b0d87cE045d7984ad6c38c',
       tokenId: 32,
       price: expandTo18DecimalsBN(0.01),
-      recipient: TEST_RECIPIENT_ADDRESS,
+      recipient,
     }
 
     it('encodes a single foundation trade', async () => {
@@ -64,7 +67,7 @@ describe('SwapRouter', () => {
   describe('NFTX', () => {
     // buyItems from block 15360000
     const nftxPurchase2Covens: NFTXData = {
-      recipient: TEST_RECIPIENT_ADDRESS,
+      recipient,
       vaultAddress: '0xd89b16331f39ab3878daf395052851d3ac8cf3cd',
       vaultId: 333,
       tokenAddress: '0x5180db8f5c931aae63c74266b211f580155ecac8',
@@ -84,8 +87,6 @@ describe('SwapRouter', () => {
   })
 
   describe('LooksRare', () => {
-    const recipient = TEST_RECIPIENT_ADDRESS
-
     // buyItems from block 15360000
     const { makerOrder: makerOrder721, takerOrder: takerOrder721 } = createLooksRareOrders(
       looksRareOrders[0],
@@ -131,6 +132,32 @@ describe('SwapRouter', () => {
     })
   })
 
+  describe('Element Market', () => {
+    // buy an ERC721 from block 16627214
+    it('encodes buying one ERC721 from Element', async () => {
+      const elementTrade = new ElementTrade([elementDataETH])
+      const methodParameters = SwapRouter.swapNFTCallParameters([elementTrade])
+      const methodParametersV2 = SwapRouter.swapCallParameters(elementTrade)
+      registerFixture('_ELEMENT_BUY_ITEM_721', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq(elementDataETH.order.erc20TokenAmount)
+      expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
+      expect(methodParameters.value).to.eq(hexToDecimalString(methodParametersV2.value))
+    })
+
+    it('encodes buying one ERC721 with fees from Element', async () => {
+      const elementTrade = new ElementTrade([elementDataETH_WithFees])
+      const methodParameters = SwapRouter.swapNFTCallParameters([elementTrade])
+      const methodParametersV2 = SwapRouter.swapCallParameters(elementTrade)
+      const value = elementTrade.getOrderPriceIncludingFees(elementDataETH_WithFees.order)
+      registerFixture('_ELEMENT_BUY_ITEM_721_WITH_FEES', methodParameters)
+      /// value should be equal to erc20amount plus fees
+      expect(hexToDecimalString(methodParameters.value)).to.eq(value.toString())
+      expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
+      expect(methodParameters.value).to.eq(hexToDecimalString(methodParametersV2.value))
+      expect(methodParameters.value).to.not.eq(elementDataETH_WithFees.order.erc20TokenAmount)
+    })
+  })
+
   describe('X2Y2', () => {
     const x2y2SignedOrder721 = x2y2Orders[0]
     const x2y2SignedOrder1155 = x2y2Orders[1]
@@ -139,7 +166,7 @@ describe('SwapRouter', () => {
 
     const x2y2_721_Data: X2Y2Data = {
       signedInput: x2y2SignedOrder721.input,
-      recipient: TEST_RECIPIENT_ADDRESS,
+      recipient,
       price: x2y2SignedOrder721.price,
       tokenId: x2y2SignedOrder721.token_id,
       tokenAddress: ENS_NFT_ADDR,
@@ -148,7 +175,7 @@ describe('SwapRouter', () => {
 
     const x2y2_1155_Data: X2Y2Data = {
       signedInput: x2y2SignedOrder1155.input,
-      recipient: TEST_RECIPIENT_ADDRESS,
+      recipient,
       price: x2y2SignedOrder1155.price,
       tokenId: x2y2SignedOrder1155.token_id,
       tokenAddress: CAMEO_ADDRESS,
@@ -264,7 +291,7 @@ describe('SwapRouter', () => {
     // buyItem from block 15725945
     const cryptopunk: CryptopunkData = {
       tokenId: 2976,
-      recipient: TEST_RECIPIENT_ADDRESS,
+      recipient,
       value: BigNumber.from('76950000000000000000'),
     }
 
@@ -285,7 +312,7 @@ describe('SwapRouter', () => {
       tokenIds: [129, 193, 278],
       tokenAddress: '0x6d05064fe99e40f1c3464e7310a23ffaded56e20',
       tokenAmounts: [1, 1, 1],
-      recipient: TEST_RECIPIENT_ADDRESS,
+      recipient,
       fee: 0,
       isV3: false,
       value: BigNumber.from('20583701229648230'),
@@ -315,8 +342,8 @@ describe('SwapRouter', () => {
           maxCost: '73337152777777783',
         },
       ],
-      nftRecipient: TEST_RECIPIENT_ADDRESS,
-      ethRecipient: TEST_RECIPIENT_ADDRESS,
+      nftRecipient: recipient,
+      ethRecipient: recipient,
       deadline: '2000000000',
     }
 
@@ -334,7 +361,7 @@ describe('SwapRouter', () => {
   describe('Partial Fill', () => {
     // buyItems from block 15360000
     const nftxPurchase2Covens: NFTXData = {
-      recipient: TEST_RECIPIENT_ADDRESS,
+      recipient,
       vaultAddress: '0xd89b16331f39ab3878daf395052851d3ac8cf3cd',
       vaultId: 333,
       tokenAddress: '0x5180db8f5c931aae63c74266b211f580155ecac8',
@@ -361,7 +388,7 @@ describe('SwapRouter', () => {
         tokenAddress: '0xEf96021Af16BD04918b0d87cE045d7984ad6c38c',
         tokenId: 32,
         price: expandTo18DecimalsBN(0.01),
-        recipient: TEST_RECIPIENT_ADDRESS,
+        recipient,
       }
 
       // buyItem from block 15725945
@@ -370,7 +397,7 @@ describe('SwapRouter', () => {
         tokenAddress: '0xEf96021Af16BD04918b0d87cE045d7984ad6c38c',
         tokenId: 100, // invalid not for sale
         price: expandTo18DecimalsBN(0.01),
-        recipient: TEST_RECIPIENT_ADDRESS,
+        recipient,
       }
 
       const value = BigNumber.from(foundationData1.price).add(foundationData2.price)
