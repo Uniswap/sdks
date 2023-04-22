@@ -26,6 +26,7 @@ import {
 } from "../../";
 
 const { BigNumber } = ethers;
+const parseEther = ethers.utils.parseEther;
 
 describe("OrderValidator", () => {
   const TWENTY_SECOND_CENTURY = 4102444800;
@@ -83,7 +84,7 @@ describe("OrderValidator", () => {
     maker = ethers.Wallet.createRandom().connect(ethers.provider);
     await admin.sendTransaction({
       to: await maker.getAddress(),
-      value: BigNumber.from(10).pow(18),
+      value: parseEther('1'),
     });
     validator = new OrderValidator(ethers.provider, chainId, quoter.address);
 
@@ -94,14 +95,14 @@ describe("OrderValidator", () => {
     tokenIn = (await tokenFactory.deploy("TEST A", "ta", 18)) as MockERC20;
     tokenOut = (await tokenFactory.deploy("TEST B", "tb", 18)) as MockERC20;
 
-    await tokenIn.mint(await maker.getAddress(), BigNumber.from(10).pow(18));
+    await tokenIn.mint(await maker.getAddress(), parseEther('1'));
     await tokenIn
       .connect(maker)
       .approve(permit2.address, ethers.constants.MaxUint256);
 
     await tokenOut.mint(
       await taker.getAddress(),
-      BigNumber.from(10).pow(18).mul(100)
+      parseEther('100'),
     );
     await tokenOut
       .connect(taker)
@@ -162,8 +163,8 @@ describe("OrderValidator", () => {
       })
       .output({
         token: tokenOut.address,
-        startAmount: BigNumber.from("1000000000000000000"),
-        endAmount: BigNumber.from("900000000000000000"),
+        startAmount: parseEther('1'),
+        endAmount: parseEther('0.9'),
         recipient: "0x0000000000000000000000000000000000000000",
       })
       .build();
@@ -176,9 +177,9 @@ describe("OrderValidator", () => {
     );
   });
 
-  it("validatesa a filled order", async () => {
+  it("validates a filled order", async () => {
     const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
-    const amount = BigNumber.from(10).pow(18);
+    const amount = parseEther('1');
     const order = builder
       .deadline(deadline)
       .endTime(deadline)
@@ -215,6 +216,85 @@ describe("OrderValidator", () => {
     );
   });
 
+  it("validates an order failing internal exclusivity", async () => {
+    const startTime = Math.floor(new Date().getTime() / 1000) + 1000;
+    const order = builder
+      .deadline(startTime + 1000)
+      .endTime(startTime + 1000)
+      .startTime(startTime)
+      .nonce(BigNumber.from(100))
+      .offerer(await maker.getAddress())
+      .input({
+        token: tokenIn.address,
+        startAmount: parseEther('1'),
+        endAmount: parseEther('1'),
+      })
+      .output({
+        token: tokenOut.address,
+        startAmount: parseEther('1'),
+        endAmount: parseEther('0.9'),
+        recipient: "0x0000000000000000000000000000000000000000",
+      })
+      .exclusiveFiller(
+        '0x1111111111111111111111111111111111111111',
+        BigNumber.from(0),
+      )
+      .build();
+
+    const { domain, types, values } = order.permitData();
+    const signature = await maker._signTypedData(domain, types, values);
+
+    expect(await validator.validate({ order, signature })).to.equal(
+      OrderValidation.ExclusivityPeriod
+    );
+  });
+
+  it("quotes an order with exclusivity override", async () => {
+    const startTime = Math.floor(new Date().getTime() / 1000) + 1000;
+    const order = builder
+      .deadline(startTime + 1000)
+      .endTime(startTime + 1000)
+      .startTime(startTime)
+      .nonce(BigNumber.from(100))
+      .offerer(await maker.getAddress())
+      .input({
+        token: tokenIn.address,
+        startAmount: parseEther('1'),
+        endAmount: parseEther('1'),
+      })
+      .output({
+        token: tokenOut.address,
+        startAmount: parseEther('1'),
+        endAmount: parseEther('1'),
+        recipient: "0x0000000000000000000000000000000000000000",
+      })
+      .exclusiveFiller(
+        '0x1111111111111111111111111111111111111111',
+        BigNumber.from(5),
+      )
+      .build();
+
+    const { domain, types, values } = order.permitData();
+    const signature = await maker._signTypedData(domain, types, values);
+
+    expect(await validator.validate({ order, signature })).to.equal(
+      OrderValidation.OK
+    );
+
+    const quoterLib = new OrderQuoterLib(
+      ethers.provider,
+      chainId,
+      quoter.address
+    );
+    const { validation, quote } = await quoterLib.quote({ order, signature });
+    expect(validation).to.equal(OrderValidation.OK);
+    if (!quote) {
+      throw new Error("Invalid quote");
+    }
+
+    expect(quote.outputs[0].amount.toString()).to.equal(parseEther("1").mul(10005).div(10000).toString());
+  });
+
   it("validates an order failing external exclusivity", async () => {
     const validationInfo = encodeExclusiveFillerData(
       DIRECT_TAKER_FILL,
@@ -231,13 +311,13 @@ describe("OrderValidator", () => {
       .offerer(await maker.getAddress())
       .input({
         token: tokenIn.address,
-        startAmount: BigNumber.from("10").pow(18).mul(2),
-        endAmount: BigNumber.from("10").pow(18).mul(2),
+        startAmount: parseEther('1'),
+        endAmount: parseEther('1'),
       })
       .output({
         token: tokenOut.address,
-        startAmount: BigNumber.from("1000000000000000000"),
-        endAmount: BigNumber.from("900000000000000000"),
+        startAmount: parseEther('1'),
+        endAmount: parseEther('0.9'),
         recipient: "0x0000000000000000000000000000000000000000",
       })
       .validation({
@@ -264,13 +344,13 @@ describe("OrderValidator", () => {
       .offerer(await maker.getAddress())
       .input({
         token: tokenIn.address,
-        startAmount: BigNumber.from("10").pow(18).mul(2),
-        endAmount: BigNumber.from("10").pow(18).mul(2),
+        startAmount: parseEther('2'),
+        endAmount: parseEther('2'),
       })
       .output({
         token: tokenOut.address,
-        startAmount: BigNumber.from("1000000000000000000"),
-        endAmount: BigNumber.from("900000000000000000"),
+        startAmount: parseEther('1'),
+        endAmount: parseEther('0.9'),
         recipient: "0x0000000000000000000000000000000000000000",
       })
       .build();

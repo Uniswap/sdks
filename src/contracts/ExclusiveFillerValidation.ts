@@ -62,14 +62,12 @@ export type OutputTokenStruct = {
   token: PromiseOrValue<string>;
   amount: PromiseOrValue<BigNumberish>;
   recipient: PromiseOrValue<string>;
-  isFeeOutput: PromiseOrValue<boolean>;
 };
 
-export type OutputTokenStructOutput = [string, BigNumber, string, boolean] & {
+export type OutputTokenStructOutput = [string, BigNumber, string] & {
   token: string;
   amount: BigNumber;
   recipient: string;
-  isFeeOutput: boolean;
 };
 
 export type ResolvedOrderStruct = {
@@ -96,7 +94,7 @@ export type ResolvedOrderStructOutput = [
 
 export interface ExclusiveFillerValidationInterface extends utils.Interface {
   functions: {
-    "validate(address,((address,address,uint256,uint256,address,bytes),(address,uint256,uint256),(address,uint256,address,bool)[],bytes,bytes32))": FunctionFragment;
+    "validate(address,((address,address,uint256,uint256,address,bytes),(address,uint256,uint256),(address,uint256,address)[],bytes,bytes32))": FunctionFragment;
   };
 
   getFunction(nameOrSignatureOrTopic: "validate"): FunctionFragment;
