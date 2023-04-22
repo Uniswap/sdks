@@ -85,12 +85,10 @@ export class DutchLimitOrderTrade<
     if (this._firstNonFeeOutputStartEndAmounts)
       return this._firstNonFeeOutputStartEndAmounts;
 
-    const output = this.order.info.outputs.find(
-      (output) => !output.isFeeOutput
-    );
-    if (!output) {
+    if (this.order.info.outputs.length === 0) {
       throw new Error("there must be at least one non-fee output token");
     }
+    const output = this.order.info.outputs[0];
 
     // assume single chain ids across all outputs for now
     const currencyOut = this._currenciesOut.find((currency) =>

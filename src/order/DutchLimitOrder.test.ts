@@ -14,6 +14,8 @@ describe("DutchLimitOrder", () => {
         nonce: BigNumber.from(10),
         validationContract: ethers.constants.AddressZero,
         validationData: "0x",
+        exclusiveFiller: ethers.constants.AddressZero,
+        exclusivityOverrideBps: BigNumber.from(0),
         startTime: Math.floor(new Date().getTime() / 1000),
         endTime: Math.floor(new Date().getTime() / 1000) + 1000,
         input: {
@@ -27,7 +29,6 @@ describe("DutchLimitOrder", () => {
             startAmount: BigNumber.from("1000000000000000000"),
             endAmount: BigNumber.from("900000000000000000"),
             recipient: "0x0000000000000000000000000000000000000000",
-            isFeeOutput: false,
           },
         ],
       },

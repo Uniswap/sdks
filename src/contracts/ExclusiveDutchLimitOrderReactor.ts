@@ -37,7 +37,8 @@ export type SignedOrderStructOutput = [string, string] & {
   sig: string;
 };
 
-export interface DutchLimitOrderReactorInterface extends utils.Interface {
+export interface ExclusiveDutchLimitOrderReactorInterface
+  extends utils.Interface {
   functions: {
     "DIRECT_TAKER_FILL()": FunctionFragment;
     "execute((bytes,bytes),address,bytes)": FunctionFragment;
@@ -150,12 +151,12 @@ export type OwnerUpdatedEvent = TypedEvent<
 
 export type OwnerUpdatedEventFilter = TypedEventFilter<OwnerUpdatedEvent>;
 
-export interface DutchLimitOrderReactor extends BaseContract {
+export interface ExclusiveDutchLimitOrderReactor extends BaseContract {
   connect(signerOrProvider: Signer | Provider | string): this;
   attach(addressOrName: string): this;
   deployed(): Promise<this>;
 
-  interface: DutchLimitOrderReactorInterface;
+  interface: ExclusiveDutchLimitOrderReactorInterface;
 
   queryFilter<TEvent extends TypedEvent>(
     event: TypedEventFilter<TEvent>,

@@ -18,7 +18,6 @@ import { DutchLimitOrderBuilder, EventWatcher, FillData } from "../../";
 
 describe("EventWatcher", () => {
   let reactor: DutchLimitOrderReactor;
-  let fillContract: string;
   let permit2: Permit2;
   let chainId: number;
   let maker: ethers.Wallet;
@@ -27,6 +26,8 @@ describe("EventWatcher", () => {
   let admin: Signer;
   let taker: Signer;
   let watcher: EventWatcher;
+
+  const DIRECT_TAKER_FILL = '0x0000000000000000000000000000000000000001';
 
   before(async () => {
     [admin, taker] = await ethers.getSigners();
@@ -42,7 +43,6 @@ describe("EventWatcher", () => {
     );
     reactor = (await reactorFactory.deploy(
       permit2.address,
-      100,
       ethers.constants.AddressZero
     )) as DutchLimitOrderReactor;
 
@@ -53,14 +53,6 @@ describe("EventWatcher", () => {
       to: await maker.getAddress(),
       value: BigNumber.from(10).pow(18),
     });
-
-    const directTakerFillContractFactory = await ethers.getContractFactory(
-      DirectTakerFillContract.abi,
-      DirectTakerFillContract.bytecode
-    );
-    fillContract = (
-      await directTakerFillContractFactory.deploy(await taker.getAddress())
-    ).address;
 
     const tokenFactory = await ethers.getContractFactory(
       MockERC20Abi.abi,
@@ -84,8 +76,10 @@ describe("EventWatcher", () => {
     );
     await tokenOut
       .connect(taker)
-      .approve(fillContract, ethers.constants.MaxUint256);
+      .approve(permit2.address, ethers.constants.MaxUint256);
     watcher = new EventWatcher(ethers.provider, reactor.address);
+
+    await permit2.connect(taker).approve(tokenOut.address, reactor.address, BigNumber.from(2).pow(160).sub(1), BigNumber.from(2).pow(48).sub(1));
   });
 
   it("Fetches fill events", async () => {
@@ -111,7 +105,6 @@ describe("EventWatcher", () => {
         startAmount: amount,
         endAmount: BigNumber.from(10).pow(17).mul(9),
         recipient: await maker.getAddress(),
-        isFeeOutput: false,
       })
       .build();
 
@@ -122,7 +115,7 @@ describe("EventWatcher", () => {
       .connect(taker)
       .execute(
         { order: order.serialize(), sig: signature },
-        fillContract,
+        DIRECT_TAKER_FILL,
         "0x"
       );
     await res.wait();
@@ -169,7 +162,6 @@ describe("EventWatcher", () => {
         startAmount: amount,
         endAmount: BigNumber.from(10).pow(17).mul(9),
         recipient: await maker.getAddress(),
-        isFeeOutput: false,
       })
       .build();
 
@@ -186,7 +178,7 @@ describe("EventWatcher", () => {
       .connect(taker)
       .execute(
         { order: order.serialize(), sig: signature },
-        fillContract,
+        DIRECT_TAKER_FILL,
         "0x"
       );
     await res.wait();
