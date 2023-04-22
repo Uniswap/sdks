@@ -64,14 +64,12 @@ export type OutputTokenStruct = {
   token: PromiseOrValue<string>;
   amount: PromiseOrValue<BigNumberish>;
   recipient: PromiseOrValue<string>;
-  isFeeOutput: PromiseOrValue<boolean>;
 };
 
-export type OutputTokenStructOutput = [string, BigNumber, string, boolean] & {
+export type OutputTokenStructOutput = [string, BigNumber, string] & {
   token: string;
   amount: BigNumber;
   recipient: string;
-  isFeeOutput: boolean;
 };
 
 export type ResolvedOrderStruct = {
@@ -100,7 +98,7 @@ export interface OrderQuoterInterface extends utils.Interface {
   functions: {
     "getReactor(bytes)": FunctionFragment;
     "quote(bytes,bytes)": FunctionFragment;
-    "reactorCallback(((address,address,uint256,uint256,address,bytes),(address,uint256,uint256),(address,uint256,address,bool)[],bytes,bytes32)[],address,bytes)": FunctionFragment;
+    "reactorCallback(((address,address,uint256,uint256,address,bytes),(address,uint256,uint256),(address,uint256,address)[],bytes,bytes32)[],address,bytes)": FunctionFragment;
   };
 
   getFunction(

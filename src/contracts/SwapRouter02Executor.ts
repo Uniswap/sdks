@@ -98,32 +98,31 @@ export type ResolvedOrderStructOutput = [
   hash: string;
 };
 
-export interface UniswapV3ExecutorInterface extends utils.Interface {
+export interface SwapRouter02ExecutorInterface extends utils.Interface {
   functions: {
-    "claimTokens(address)": FunctionFragment;
+    "multicall(address[],bytes[])": FunctionFragment;
     "owner()": FunctionFragment;
-    "reactor()": FunctionFragment;
     "reactorCallback(((address,address,uint256,uint256,address,bytes),(address,uint256,uint256),(address,uint256,address)[],bytes,bytes32)[],address,bytes)": FunctionFragment;
     "setOwner(address)": FunctionFragment;
-    "swapRouter()": FunctionFragment;
+    "unwrapWETH(address)": FunctionFragment;
+    "withdrawETH(address)": FunctionFragment;
   };
 
   getFunction(
     nameOrSignatureOrTopic:
-      | "claimTokens"
+      | "multicall"
       | "owner"
-      | "reactor"
       | "reactorCallback"
       | "setOwner"
-      | "swapRouter"
+      | "unwrapWETH"
+      | "withdrawETH"
   ): FunctionFragment;
 
   encodeFunctionData(
-    functionFragment: "claimTokens",
-    values: [PromiseOrValue<string>]
+    functionFragment: "multicall",
+    values: [PromiseOrValue<string>[], PromiseOrValue<BytesLike>[]]
   ): string;
   encodeFunctionData(functionFragment: "owner", values?: undefined): string;
-  encodeFunctionData(functionFragment: "reactor", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "reactorCallback",
     values: [
@@ -137,22 +136,26 @@ export interface UniswapV3ExecutorInterface extends utils.Interface {
     values: [PromiseOrValue<string>]
   ): string;
   encodeFunctionData(
-    functionFragment: "swapRouter",
-    values?: undefined
+    functionFragment: "unwrapWETH",
+    values: [PromiseOrValue<string>]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "withdrawETH",
+    values: [PromiseOrValue<string>]
   ): string;
 
-  decodeFunctionResult(
-    functionFragment: "claimTokens",
-    data: BytesLike
-  ): Result;
+  decodeFunctionResult(functionFragment: "multicall", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "owner", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "reactor", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "reactorCallback",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "setOwner", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "swapRouter", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "unwrapWETH", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "withdrawETH",
+    data: BytesLike
+  ): Result;
 
   events: {
     "OwnerUpdated(address,address)": EventFragment;
@@ -172,12 +175,12 @@ export type OwnerUpdatedEvent = TypedEvent<
 
 export type OwnerUpdatedEventFilter = TypedEventFilter<OwnerUpdatedEvent>;
 
-export interface UniswapV3Executor extends BaseContract {
+export interface SwapRouter02Executor extends BaseContract {
   connect(signerOrProvider: Signer | Provider | string): this;
   attach(addressOrName: string): this;
   deployed(): Promise<this>;
 
-  interface: UniswapV3ExecutorInterface;
+  interface: SwapRouter02ExecutorInterface;
 
   queryFilter<TEvent extends TypedEvent>(
     event: TypedEventFilter<TEvent>,
@@ -199,19 +202,18 @@ export interface UniswapV3Executor extends BaseContract {
   removeListener: OnEvent<this>;
 
   functions: {
-    claimTokens(
-      token: PromiseOrValue<string>,
+    multicall(
+      tokensToApprove: PromiseOrValue<string>[],
+      multicallData: PromiseOrValue<BytesLike>[],
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<ContractTransaction>;
 
     owner(overrides?: CallOverrides): Promise<[string]>;
 
-    reactor(overrides?: CallOverrides): Promise<[string]>;
-
     reactorCallback(
       resolvedOrders: ResolvedOrderStruct[],
       filler: PromiseOrValue<string>,
-      path: PromiseOrValue<BytesLike>,
+      fillData: PromiseOrValue<BytesLike>,
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<ContractTransaction>;
 
@@ -220,22 +222,29 @@ export interface UniswapV3Executor extends BaseContract {
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<ContractTransaction>;
 
-    swapRouter(overrides?: CallOverrides): Promise<[string]>;
+    unwrapWETH(
+      recipient: PromiseOrValue<string>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<ContractTransaction>;
+
+    withdrawETH(
+      recipient: PromiseOrValue<string>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<ContractTransaction>;
   };
 
-  claimTokens(
-    token: PromiseOrValue<string>,
+  multicall(
+    tokensToApprove: PromiseOrValue<string>[],
+    multicallData: PromiseOrValue<BytesLike>[],
     overrides?: Overrides & { from?: PromiseOrValue<string> }
   ): Promise<ContractTransaction>;
 
   owner(overrides?: CallOverrides): Promise<string>;
 
-  reactor(overrides?: CallOverrides): Promise<string>;
-
   reactorCallback(
     resolvedOrders: ResolvedOrderStruct[],
     filler: PromiseOrValue<string>,
-    path: PromiseOrValue<BytesLike>,
+    fillData: PromiseOrValue<BytesLike>,
     overrides?: Overrides & { from?: PromiseOrValue<string> }
   ): Promise<ContractTransaction>;
 
@@ -244,22 +253,29 @@ export interface UniswapV3Executor extends BaseContract {
     overrides?: Overrides & { from?: PromiseOrValue<string> }
   ): Promise<ContractTransaction>;
 
-  swapRouter(overrides?: CallOverrides): Promise<string>;
+  unwrapWETH(
+    recipient: PromiseOrValue<string>,
+    overrides?: Overrides & { from?: PromiseOrValue<string> }
+  ): Promise<ContractTransaction>;
+
+  withdrawETH(
+    recipient: PromiseOrValue<string>,
+    overrides?: Overrides & { from?: PromiseOrValue<string> }
+  ): Promise<ContractTransaction>;
 
   callStatic: {
-    claimTokens(
-      token: PromiseOrValue<string>,
+    multicall(
+      tokensToApprove: PromiseOrValue<string>[],
+      multicallData: PromiseOrValue<BytesLike>[],
       overrides?: CallOverrides
     ): Promise<void>;
 
     owner(overrides?: CallOverrides): Promise<string>;
 
-    reactor(overrides?: CallOverrides): Promise<string>;
-
     reactorCallback(
       resolvedOrders: ResolvedOrderStruct[],
       filler: PromiseOrValue<string>,
-      path: PromiseOrValue<BytesLike>,
+      fillData: PromiseOrValue<BytesLike>,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -268,7 +284,15 @@ export interface UniswapV3Executor extends BaseContract {
       overrides?: CallOverrides
     ): Promise<void>;
 
-    swapRouter(overrides?: CallOverrides): Promise<string>;
+    unwrapWETH(
+      recipient: PromiseOrValue<string>,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    withdrawETH(
+      recipient: PromiseOrValue<string>,
+      overrides?: CallOverrides
+    ): Promise<void>;
   };
 
   filters: {
@@ -283,19 +307,18 @@ export interface UniswapV3Executor extends BaseContract {
   };
 
   estimateGas: {
-    claimTokens(
-      token: PromiseOrValue<string>,
+    multicall(
+      tokensToApprove: PromiseOrValue<string>[],
+      multicallData: PromiseOrValue<BytesLike>[],
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<BigNumber>;
 
     owner(overrides?: CallOverrides): Promise<BigNumber>;
 
-    reactor(overrides?: CallOverrides): Promise<BigNumber>;
-
     reactorCallback(
       resolvedOrders: ResolvedOrderStruct[],
       filler: PromiseOrValue<string>,
-      path: PromiseOrValue<BytesLike>,
+      fillData: PromiseOrValue<BytesLike>,
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<BigNumber>;
 
@@ -304,23 +327,30 @@ export interface UniswapV3Executor extends BaseContract {
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<BigNumber>;
 
-    swapRouter(overrides?: CallOverrides): Promise<BigNumber>;
+    unwrapWETH(
+      recipient: PromiseOrValue<string>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<BigNumber>;
+
+    withdrawETH(
+      recipient: PromiseOrValue<string>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<BigNumber>;
   };
 
   populateTransaction: {
-    claimTokens(
-      token: PromiseOrValue<string>,
+    multicall(
+      tokensToApprove: PromiseOrValue<string>[],
+      multicallData: PromiseOrValue<BytesLike>[],
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<PopulatedTransaction>;
 
     owner(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
-    reactor(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
     reactorCallback(
       resolvedOrders: ResolvedOrderStruct[],
       filler: PromiseOrValue<string>,
-      path: PromiseOrValue<BytesLike>,
+      fillData: PromiseOrValue<BytesLike>,
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<PopulatedTransaction>;
 
@@ -329,6 +359,14 @@ export interface UniswapV3Executor extends BaseContract {
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<PopulatedTransaction>;
 
-    swapRouter(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+    unwrapWETH(
+      recipient: PromiseOrValue<string>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<PopulatedTransaction>;
+
+    withdrawETH(
+      recipient: PromiseOrValue<string>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<PopulatedTransaction>;
   };
 }
