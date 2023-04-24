@@ -288,11 +288,8 @@ describe("OrderValidator", () => {
     );
     const { validation, quote } = await quoterLib.quote({ order, signature });
     expect(validation).to.equal(OrderValidation.OK);
-    if (!quote) {
-      throw new Error("Invalid quote");
-    }
-
-    expect(quote.outputs[0].amount.toString()).to.equal(parseEther("1").mul(10005).div(10000).toString());
+    expect(quote).does.not.equal(null);
+    expect(quote!.outputs[0].amount.toString()).to.equal(parseEther("1").mul(10005).div(10000).toString());
   });
 
   it("validates an order failing external exclusivity", async () => {

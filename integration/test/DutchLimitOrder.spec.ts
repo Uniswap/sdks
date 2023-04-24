@@ -46,7 +46,7 @@ describe('DutchLimitOrder', () => {
 
     chainId = hre.network.config.chainId || 1;
 
-    maker = new ethers.Wallet('0xdfa530d8687bc01177553a29cb018ed4107c45d9d0542c5506a23a237f5e8cf1').connect(ethers.provider);
+    maker = ethers.Wallet.createRandom().connect(ethers.provider);
     await admin.sendTransaction({
       to: await maker.getAddress(),
       value: BigNumber.from(10).pow(18),

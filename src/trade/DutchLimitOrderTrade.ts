@@ -86,7 +86,7 @@ export class DutchLimitOrderTrade<
       return this._firstNonFeeOutputStartEndAmounts;
 
     if (this.order.info.outputs.length === 0) {
-      throw new Error("there must be at least one non-fee output token");
+      throw new Error("there must be at least one output token");
     }
     const output = this.order.info.outputs[0];
 
