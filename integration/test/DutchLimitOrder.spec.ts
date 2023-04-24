@@ -7,7 +7,6 @@ import { BlockchainTime } from './utils/time';
 import DutchLimitOrderReactorAbi from '../../abis/DutchLimitOrderReactor.json';
 import Permit2Abi from '../../abis/Permit2.json';
 import MockERC20Abi from '../../abis/MockERC20.json';
-import DirectTakerFillContract from '../../abis/DirectTakerExecutor.json';
 
 import {
   Permit2,
@@ -17,8 +16,9 @@ import {
 import { DutchLimitOrderBuilder } from '../../';
 
 describe('DutchLimitOrder', () => {
+  const DIRECT_TAKER_FILL = '0x0000000000000000000000000000000000000001';
+
   let reactor: DutchLimitOrderReactor;
-  let fillContract: string;
   let permit2: Permit2;
   let chainId: number;
   let maker: ethers.Wallet;
@@ -41,7 +41,6 @@ describe('DutchLimitOrder', () => {
     );
     reactor = (await reactorFactory.deploy(
       permit2.address,
-      100,
       ethers.constants.AddressZero
     )) as DutchLimitOrderReactor;
 
@@ -52,14 +51,6 @@ describe('DutchLimitOrder', () => {
       to: await maker.getAddress(),
       value: BigNumber.from(10).pow(18),
     });
-
-    const directTakerFillContractFactory = await ethers.getContractFactory(
-      DirectTakerFillContract.abi,
-      DirectTakerFillContract.bytecode
-    );
-    fillContract = (
-      await directTakerFillContractFactory.deploy(await taker.getAddress())
-    ).address;
 
     const tokenFactory = await ethers.getContractFactory(
       MockERC20Abi.abi,
@@ -83,7 +74,8 @@ describe('DutchLimitOrder', () => {
     );
     await tokenOut
       .connect(taker)
-      .approve(fillContract, ethers.constants.MaxUint256);
+      .approve(permit2.address, ethers.constants.MaxUint256);
+    await permit2.connect(taker).approve(tokenOut.address, reactor.address, BigNumber.from(2).pow(160).sub(1), BigNumber.from(2).pow(48).sub(1));
   });
 
   it('correctly builds an order', async () => {
@@ -110,7 +102,6 @@ describe('DutchLimitOrder', () => {
         startAmount: amount,
         endAmount: BigNumber.from(10).pow(17).mul(9),
         recipient: makerAddress,
-        isFeeOutput: false,
       });
 
     let order = preBuildOrder.build();
@@ -132,26 +123,9 @@ describe('DutchLimitOrder', () => {
     expect(builtOutput.endAmount.eq(BigNumber.from(10).pow(17).mul(9))).to.be
       .true;
     expect(builtOutput.recipient).to.eq(makerAddress);
-    expect(builtOutput.isFeeOutput).to.be.false;
 
-    // test changing the recipient
     order = preBuildOrder.nonFeeRecipient(ethers.constants.AddressZero).build();
     expect(order.info.outputs[0].recipient).to.eq(ethers.constants.AddressZero);
-
-    // test that the recipient is only changed for the non fee recipient
-    order = preBuildOrder
-      .output({
-        token: tokenOut.address,
-        startAmount: amount,
-        endAmount: BigNumber.from(10).pow(17).mul(9),
-        recipient: makerAddress,
-        isFeeOutput: true,
-      })
-      .nonFeeRecipient(ethers.constants.AddressZero)
-      .build();
-
-    expect(order.info.outputs[0].recipient).to.eq(ethers.constants.AddressZero);
-    expect(order.info.outputs[1].recipient).to.eq(makerAddress);
   });
 
   it('executes a serialized order with no decay', async () => {
@@ -177,7 +151,6 @@ describe('DutchLimitOrder', () => {
         startAmount: amount,
         endAmount: BigNumber.from(10).pow(17).mul(9),
         recipient: await maker.getAddress(),
-        isFeeOutput: false,
       })
       .build();
 
@@ -201,7 +174,7 @@ describe('DutchLimitOrder', () => {
       .connect(taker)
       .execute(
         { order: order.serialize(), sig: signature },
-        fillContract,
+        DIRECT_TAKER_FILL,
         '0x'
       );
     const receipt = await res.wait();
@@ -244,7 +217,6 @@ describe('DutchLimitOrder', () => {
         startAmount: amount,
         endAmount: BigNumber.from(10).pow(17).mul(9),
         recipient: await maker.getAddress(),
-        isFeeOutput: false,
       })
       .build();
 
@@ -268,7 +240,7 @@ describe('DutchLimitOrder', () => {
       .connect(taker)
       .execute(
         { order: order.serialize(), sig: signature },
-        fillContract,
+        DIRECT_TAKER_FILL,
         '0x'
       );
     const receipt = await res.wait();
