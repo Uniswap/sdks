@@ -30,7 +30,6 @@ describe("DutchLimitOrderBuilder", () => {
         startAmount: BigNumber.from("1000000000000000000"),
         endAmount: BigNumber.from("900000000000000000"),
         recipient: "0x0000000000000000000000000000000000000000",
-        isFeeOutput: false,
       })
       .build();
 
@@ -66,7 +65,6 @@ describe("DutchLimitOrderBuilder", () => {
         startAmount: BigNumber.from("1000000000000000000"),
         endAmount: BigNumber.from("900000000000000000"),
         recipient: "0x0000000000000000000000000000000000000000",
-        isFeeOutput: false,
       })
       .build();
 
@@ -109,7 +107,6 @@ describe("DutchLimitOrderBuilder", () => {
         startAmount: BigNumber.from("1000000000000000000"),
         endAmount: BigNumber.from("900000000000000000"),
         recipient: "0x0000000000000000000000000000000000000000",
-        isFeeOutput: false,
       })
       .build();
 
@@ -145,7 +142,6 @@ describe("DutchLimitOrderBuilder", () => {
         startAmount: BigNumber.from("1000000000000000000"),
         endAmount: BigNumber.from("900000000000000000"),
         recipient: "0x0000000000000000000000000000000000000000",
-        isFeeOutput: false,
       })
       .build();
 
@@ -184,7 +180,6 @@ describe("DutchLimitOrderBuilder", () => {
         startAmount: BigNumber.from("1000000000000000000"),
         endAmount: BigNumber.from("900000000000000000"),
         recipient: "0x0000000000000000000000000000000000000000",
-        isFeeOutput: false,
       })
       .build();
 
@@ -212,14 +207,12 @@ describe("DutchLimitOrderBuilder", () => {
         startAmount: BigNumber.from("1000000000000000000"),
         endAmount: BigNumber.from("900000000000000000"),
         recipient: "0x0000000000000000000000000000000000000000",
-        isFeeOutput: false,
       })
       .output({
         token: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
         startAmount: BigNumber.from("1000000000000000000"),
         endAmount: BigNumber.from("900000000000000000"),
         recipient: "0x0000000000000000000000000000000000000001",
-        isFeeOutput: false,
       })
       .build();
 
@@ -246,7 +239,6 @@ describe("DutchLimitOrderBuilder", () => {
           startAmount: BigNumber.from("100"),
           endAmount: BigNumber.from("110"),
           recipient: "0x0000000000000000000000000000000000000000",
-          isFeeOutput: false,
         })
         .build()
     ).toThrow("startAmount must be greater than endAmount: 100");
@@ -272,7 +264,6 @@ describe("DutchLimitOrderBuilder", () => {
           startAmount: BigNumber.from("100"),
           endAmount: BigNumber.from("90"),
           recipient: "0x0000000000000000000000000000000000000000",
-          isFeeOutput: false,
         })
         .build()
     ).toThrow(`Deadline must be in the future: ${expiredDeadline}`);
@@ -296,14 +287,12 @@ describe("DutchLimitOrderBuilder", () => {
         startAmount: BigNumber.from("1000000000000000000"),
         endAmount: BigNumber.from("900000000000000000"),
         recipient: "0x0000000000000000000000000000000000000000",
-        isFeeOutput: false,
       })
       .output({
         token: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
         startAmount: BigNumber.from("1000000000000000000"),
         endAmount: BigNumber.from("900000000000000000"),
         recipient: "0x0000000000000000000000000000000000000001",
-        isFeeOutput: false,
       });
 
     expect(() => order.build()).toThrow(
@@ -343,7 +332,6 @@ describe("DutchLimitOrderBuilder", () => {
           startAmount: BigNumber.from("1000000000000000000"),
           endAmount: BigNumber.from("900000000000000000"),
           recipient: "0x0000000000000000000000000000000000000000",
-          isFeeOutput: false,
         })
         .build()
     ).toThrow("Invariant failed: offerer not set");
@@ -366,7 +354,6 @@ describe("DutchLimitOrderBuilder", () => {
           startAmount: BigNumber.from("1000000000000000000"),
           endAmount: BigNumber.from("900000000000000000"),
           recipient: "0x0000000000000000000000000000000000000000",
-          isFeeOutput: false,
         })
         .build()
     ).toThrow("Invariant failed: endTime not set");
@@ -389,7 +376,6 @@ describe("DutchLimitOrderBuilder", () => {
         startAmount: BigNumber.from("1000000000000000000"),
         endAmount: BigNumber.from("900000000000000000"),
         recipient: "0x0000000000000000000000000000000000000000",
-        isFeeOutput: false,
       })
       .build();
     expect(order.info.endTime).toEqual(deadline);
@@ -414,7 +400,6 @@ describe("DutchLimitOrderBuilder", () => {
           startAmount: BigNumber.from("1000000000000000000"),
           endAmount: BigNumber.from("900000000000000000"),
           recipient: "0x0000000000000000000000000000000000000000",
-          isFeeOutput: false,
         })
         .build()
     ).toThrow(
@@ -441,7 +426,6 @@ describe("DutchLimitOrderBuilder", () => {
         startAmount: BigNumber.from("1000000000000000000"),
         endAmount: BigNumber.from("900000000000000000"),
         recipient: "0x0000000000000000000000000000000000000000",
-        isFeeOutput: false,
       })
       .build();
     expect(order.info.deadline).toEqual(deadline);
@@ -464,7 +448,6 @@ describe("DutchLimitOrderBuilder", () => {
           startAmount: BigNumber.from("1000000000000000000"),
           endAmount: BigNumber.from("900000000000000000"),
           recipient: "0x0000000000000000000000000000000000000000",
-          isFeeOutput: false,
         })
         .build()
     ).toThrow("Invariant failed: nonce not set");

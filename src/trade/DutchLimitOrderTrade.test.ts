@@ -29,6 +29,8 @@ describe("DutchLimitOrderTrade", () => {
     nonce: BigNumber.from(10),
     validationContract: ethers.constants.AddressZero,
     validationData: "0x",
+    exclusiveFiller: ethers.constants.AddressZero,
+    exclusivityOverrideBps: BigNumber.from(0),
     startTime: Math.floor(new Date().getTime() / 1000),
     endTime: Math.floor(new Date().getTime() / 1000) + 1000,
     input: {
@@ -42,14 +44,12 @@ describe("DutchLimitOrderTrade", () => {
         startAmount: NON_FEE_OUTPUT_AMOUNT,
         endAmount: NON_FEE_MINIMUM_AMOUNT_OUT,
         recipient: "0x0000000000000000000000000000000000000000",
-        isFeeOutput: false,
       },
       {
         token: DAI.address,
         startAmount: BigNumber.from("1000"),
         endAmount: BigNumber.from("2000"),
         recipient: "0x0000000000000000000000000000000000000000",
-        isFeeOutput: true,
       },
     ],
   };

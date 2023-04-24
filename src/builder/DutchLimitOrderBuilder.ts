@@ -1,4 +1,4 @@
-import { BigNumber } from "ethers";
+import { BigNumber, ethers } from "ethers";
 import invariant from "tiny-invariant";
 
 import { OrderType, REACTOR_ADDRESS_MAPPING } from "../constants";
@@ -31,6 +31,10 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
       .offerer(order.info.offerer)
       .nonce(order.info.nonce)
       .input(order.info.input)
+      .exclusiveFiller(
+        order.info.exclusiveFiller,
+        order.info.exclusivityOverrideBps
+      )
       .validation({
         validationContract: order.info.validationContract,
         validationData: order.info.validationData,
@@ -64,6 +68,8 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
 
     this.info = {
       outputs: [],
+      exclusiveFiller: ethers.constants.AddressZero,
+      exclusivityOverrideBps: BigNumber.from(0),
     };
   }
 
@@ -128,9 +134,19 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
     if (!this.info.outputs) {
       return this;
     }
-    this.info.outputs = this.info.outputs.map((output) =>
-      output.isFeeOutput ? output : { ...output, recipient }
-    );
+    this.info.outputs = this.info.outputs.map((output) => ({
+      ...output,
+      recipient,
+    }));
+    return this;
+  }
+
+  exclusiveFiller(
+    exclusiveFiller: string,
+    exclusivityOverrideBps: BigNumber
+  ): DutchLimitOrderBuilder {
+    this.info.exclusiveFiller = exclusiveFiller;
+    this.info.exclusivityOverrideBps = exclusivityOverrideBps;
     return this;
   }
 
@@ -138,6 +154,14 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
     invariant(this.info.startTime !== undefined, "startTime not set");
     invariant(this.info.input !== undefined, "input not set");
     invariant(this.info.endTime !== undefined, "endTime not set");
+    invariant(
+      this.info.exclusiveFiller !== undefined,
+      "exclusiveFiller not set"
+    );
+    invariant(
+      this.info.exclusivityOverrideBps !== undefined,
+      "exclusivityOverrideBps not set"
+    );
     invariant(
       this.info.outputs !== undefined && this.info.outputs.length !== 0,
       "outputs not set"
@@ -161,6 +185,8 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
       Object.assign(this.getOrderInfo(), {
         startTime: this.info.startTime,
         endTime: this.info.endTime,
+        exclusiveFiller: this.info.exclusiveFiller,
+        exclusivityOverrideBps: this.info.exclusivityOverrideBps,
         input: this.info.input,
         outputs: this.info.outputs,
       }),

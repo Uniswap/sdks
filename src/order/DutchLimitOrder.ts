@@ -1,4 +1,6 @@
 import { SignatureLike } from "@ethersproject/bytes";
+import { keccak256 } from "@ethersproject/keccak256";
+import { toUtf8Bytes } from "@ethersproject/strings";
 import {
   PermitTransferFrom,
   PermitTransferFromData,
@@ -14,12 +16,15 @@ import { getDecayedAmount } from "../utils/dutchDecay";
 
 import { Order, OrderInfo, OrderResolutionOptions } from "./types";
 
+export function id(text: string): string {
+  return keccak256(toUtf8Bytes(text));
+}
+
 export type DutchOutput = {
   readonly token: string;
   readonly startAmount: BigNumber;
   readonly endAmount: BigNumber;
   readonly recipient: string;
-  readonly isFeeOutput: boolean;
 };
 
 export type DutchOutputJSON = Omit<DutchOutput, "startAmount" | "endAmount"> & {
@@ -41,22 +46,28 @@ export type DutchInputJSON = Omit<DutchInput, "startAmount" | "endAmount"> & {
 export type DutchLimitOrderInfo = OrderInfo & {
   startTime: number;
   endTime: number;
+  exclusiveFiller: string;
+  exclusivityOverrideBps: BigNumber;
   input: DutchInput;
   outputs: DutchOutput[];
 };
 
 export type DutchLimitOrderInfoJSON = Omit<
   DutchLimitOrderInfo,
-  "nonce" | "input" | "outputs"
+  "nonce" | "input" | "outputs" | "exclusivityOverrideBps"
 > & {
   nonce: string;
+  exclusivityOverrideBps: string;
   input: DutchInputJSON;
   outputs: DutchOutputJSON[];
 };
 
-type WitnessInfo = OrderInfo & {
+type WitnessInfo = {
+  info: OrderInfo;
   startTime: number;
   endTime: number;
+  exclusiveFiller: string;
+  exclusivityOverrideBps: BigNumber;
   inputToken: string;
   inputStartAmount: BigNumber;
   inputEndAmount: BigNumber;
@@ -64,27 +75,30 @@ type WitnessInfo = OrderInfo & {
 };
 
 const DUTCH_LIMIT_ORDER_TYPES = {
-  DutchLimitOrder: [
+  ExclusiveDutchLimitOrder: [
+    { name: "info", type: "OrderInfo" },
+    { name: "startTime", type: "uint256" },
+    { name: "endTime", type: "uint256" },
+    { name: "exclusiveFiller", type: "address" },
+    { name: "exclusivityOverrideBps", type: "uint256" },
+    { name: "inputToken", type: "address" },
+    { name: "inputStartAmount", type: "uint256" },
+    { name: "inputEndAmount", type: "uint256" },
+    { name: "outputs", type: "DutchOutput[]" },
+  ],
+  OrderInfo: [
     { name: "reactor", type: "address" },
     { name: "offerer", type: "address" },
     { name: "nonce", type: "uint256" },
     { name: "deadline", type: "uint256" },
     { name: "validationContract", type: "address" },
     { name: "validationData", type: "bytes" },
-
-    { name: "startTime", type: "uint256" },
-    { name: "endTime", type: "uint256" },
-    { name: "inputToken", type: "address" },
-    { name: "inputStartAmount", type: "uint256" },
-    { name: "inputEndAmount", type: "uint256" },
-    { name: "outputs", type: "DutchOutput[]" },
   ],
   DutchOutput: [
     { name: "token", type: "address" },
     { name: "startAmount", type: "uint256" },
     { name: "endAmount", type: "uint256" },
     { name: "recipient", type: "address" },
-    { name: "isFeeOutput", type: "bool" },
   ],
 };
 
@@ -94,8 +108,10 @@ const DUTCH_LIMIT_ORDER_ABI = [
       "tuple(address,address,uint256,uint256,address,bytes)",
       "uint256",
       "uint256",
+      "address",
+      "uint256",
       "tuple(address,uint256,uint256)",
-      "tuple(address,uint256,uint256,address,bool)[]",
+      "tuple(address,uint256,uint256,address)[]",
     ].join(",") +
     ")",
 ];
@@ -126,6 +142,7 @@ export class DutchLimitOrder extends Order {
     return new DutchLimitOrder(
       {
         ...json,
+        exclusivityOverrideBps: BigNumber.from(json.exclusivityOverrideBps),
         nonce: BigNumber.from(json.nonce),
         input: {
           token: json.input.token,
@@ -137,7 +154,6 @@ export class DutchLimitOrder extends Order {
           startAmount: BigNumber.from(output.startAmount),
           endAmount: BigNumber.from(output.endAmount),
           recipient: output.recipient,
-          isFeeOutput: output.isFeeOutput,
         })),
       },
       chainId,
@@ -145,7 +161,11 @@ export class DutchLimitOrder extends Order {
     );
   }
 
-  static parse(encoded: string, chainId: number): DutchLimitOrder {
+  static parse(
+    encoded: string,
+    chainId: number,
+    permit2?: string
+  ): DutchLimitOrder {
     const abiCoder = new ethers.utils.AbiCoder();
     const decoded = abiCoder.decode(DUTCH_LIMIT_ORDER_ABI, encoded);
     const [
@@ -153,6 +173,8 @@ export class DutchLimitOrder extends Order {
         [reactor, offerer, nonce, deadline, validationContract, validationData],
         startTime,
         endTime,
+        exclusiveFiller,
+        exclusivityOverrideBps,
         [inputToken, inputStartAmount, inputEndAmount],
         outputs,
       ],
@@ -167,13 +189,15 @@ export class DutchLimitOrder extends Order {
         validationData,
         startTime: startTime.toNumber(),
         endTime: endTime.toNumber(),
+        exclusiveFiller,
+        exclusivityOverrideBps,
         input: {
           token: inputToken,
           startAmount: inputStartAmount,
           endAmount: inputEndAmount,
         },
         outputs: outputs.map(
-          ([token, startAmount, endAmount, recipient, isFeeOutput]: [
+          ([token, startAmount, endAmount, recipient]: [
             string,
             number,
             number,
@@ -185,12 +209,12 @@ export class DutchLimitOrder extends Order {
               startAmount,
               endAmount,
               recipient,
-              isFeeOutput,
             };
           }
         ),
       },
-      chainId
+      chainId,
+      permit2
     );
   }
 
@@ -212,6 +236,8 @@ export class DutchLimitOrder extends Order {
       validationData: this.info.validationData,
       startTime: this.info.startTime,
       endTime: this.info.endTime,
+      exclusiveFiller: this.info.exclusiveFiller,
+      exclusivityOverrideBps: this.info.exclusivityOverrideBps.toString(),
       input: {
         token: this.info.input.token,
         startAmount: this.info.input.startAmount.toString(),
@@ -222,7 +248,6 @@ export class DutchLimitOrder extends Order {
         startAmount: output.startAmount.toString(),
         endAmount: output.endAmount.toString(),
         recipient: output.recipient,
-        isFeeOutput: output.isFeeOutput,
       })),
     };
   }
@@ -244,6 +269,8 @@ export class DutchLimitOrder extends Order {
         ],
         this.info.startTime,
         this.info.endTime,
+        this.info.exclusiveFiller,
+        this.info.exclusivityOverrideBps,
         [
           this.info.input.token,
           this.info.input.startAmount,
@@ -254,7 +281,6 @@ export class DutchLimitOrder extends Order {
           output.startAmount,
           output.endAmount,
           output.recipient,
-          output.isFeeOutput,
         ]),
       ],
     ]);
@@ -344,14 +370,18 @@ export class DutchLimitOrder extends Order {
 
   private witnessInfo(): WitnessInfo {
     return {
-      reactor: this.info.reactor,
-      offerer: this.info.offerer,
-      nonce: this.info.nonce,
-      deadline: this.info.deadline,
-      validationContract: this.info.validationContract,
-      validationData: this.info.validationData,
+      info: {
+        reactor: this.info.reactor,
+        offerer: this.info.offerer,
+        nonce: this.info.nonce,
+        deadline: this.info.deadline,
+        validationContract: this.info.validationContract,
+        validationData: this.info.validationData,
+      },
       startTime: this.info.startTime,
       endTime: this.info.endTime,
+      exclusiveFiller: this.info.exclusiveFiller,
+      exclusivityOverrideBps: this.info.exclusivityOverrideBps,
       inputToken: this.info.input.token,
       inputStartAmount: this.info.input.startAmount,
       inputEndAmount: this.info.input.endAmount,
@@ -362,7 +392,7 @@ export class DutchLimitOrder extends Order {
   private witness(): Witness {
     return {
       witness: this.witnessInfo(),
-      witnessTypeName: "DutchLimitOrder",
+      witnessTypeName: "ExclusiveDutchLimitOrder",
       witnessType: DUTCH_LIMIT_ORDER_TYPES,
     };
   }
