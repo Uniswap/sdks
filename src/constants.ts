@@ -37,7 +37,7 @@ type ReverseReactorMapping = {
 
 export const REACTOR_ADDRESS_MAPPING: ReactorMapping = {
   1: {
-    [OrderType.DutchLimit]: "0x09D8D51AaC7eCd9AEaC621E7839B1860C3e6EF7b",
+    [OrderType.DutchLimit]: "0xbD7F9D0239f81C94b728d827a87b9864972661eC",
   },
   5: {
     [OrderType.DutchLimit]: "0xE5D50eB6e669C32D797379aF3907478FE491036D",
