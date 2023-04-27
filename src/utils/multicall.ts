@@ -46,7 +46,8 @@ export async function multicallSameContractManyFunctions<
   TFunctionParams extends any[] | undefined
 >(
   provider: BaseProvider,
-  params: MulticallSameContractParams<TFunctionParams>
+  params: MulticallSameContractParams<TFunctionParams>,
+  chainId?: number
 ): Promise<MulticallResult[]> {
   const { address, contractInterface, functionName, functionParams } = params;
 
@@ -63,14 +64,15 @@ export async function multicallSameContractManyFunctions<
     };
   });
 
-  return multicall(provider, calls);
+  return multicall(provider, calls, chainId);
 }
 
 export async function multicallSameFunctionManyContracts<
   TFunctionParams extends any[] | undefined
 >(
   provider: BaseProvider,
-  params: MulticallSameFunctionParams<TFunctionParams>
+  params: MulticallSameFunctionParams<TFunctionParams>,
+  chainId?: number
 ): Promise<MulticallResult[]> {
   const { addresses, contractInterface, functionName, functionParam } = params;
 
@@ -86,14 +88,17 @@ export async function multicallSameFunctionManyContracts<
     };
   });
 
-  return multicall(provider, calls);
+  return multicall(provider, calls, chainId);
 }
 
 export async function multicall(
   provider: BaseProvider,
-  calls: Call[]
+  calls: Call[],
+  chainId?: number
 ): Promise<MulticallResult[]> {
-  const multicallAddress = getMulticall2Address(provider.network.chainId);
+  const multicallAddress = getMulticall2Address(
+    chainId ? chainId : (await provider.getNetwork()).chainId
+  );
   const code = await provider.getCode(multicallAddress);
   if (code.length > 2) {
     const multicall = Multicall2__factory.connect(multicallAddress, provider);
