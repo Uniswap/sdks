@@ -50,6 +50,11 @@ export async function multicallSameContractManyFunctions<
   chainId?: number
 ): Promise<MulticallResult[]> {
   const { address, contractInterface, functionName, functionParams } = params;
+  console.log(
+    "multicallSameContractManyFunctions chainId, params: ",
+    chainId,
+    params
+  );
 
   const fragment = contractInterface.getFunction(functionName);
   const calls: Call[] = functionParams.map((functionParam) => {
@@ -96,10 +101,13 @@ export async function multicall(
   calls: Call[],
   chainId?: number
 ): Promise<MulticallResult[]> {
+  console.log("multicall function chainId: ", chainId);
   const multicallAddress = getMulticall2Address(
     chainId ? chainId : (await provider.getNetwork()).chainId
   );
+  console.log("multicall function multicallAddress: ", multicallAddress);
   const code = await provider.getCode(multicallAddress);
+  console.log("multicall function code: ", code);
   if (code.length > 2) {
     const multicall = Multicall2__factory.connect(multicallAddress, provider);
     return await multicall.callStatic.tryAggregate(false, calls);
