@@ -104,6 +104,8 @@ export class OrderQuoter {
       return [order.order.serialize(), order.signature];
     });
 
+    console.log("OrderQuoter chainId: ", this.chainId);
+
     const results = await multicallSameContractManyFunctions(
       this.provider,
       {
