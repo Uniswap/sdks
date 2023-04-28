@@ -29,6 +29,7 @@
     "sort-imports": [
       "error",
       { "ignoreDeclarationSort": true, "ignoreCase": true }
-    ]
+    ],
+    "comma-dangle": ["error", "always-multiline"]
   }
 }
