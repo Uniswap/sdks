@@ -5,7 +5,7 @@ import { ORDER_QUOTER_MAPPING } from "../constants";
 import {
   DutchLimitOrderReactor__factory,
   OrderQuoter__factory,
-  OrderQuoter as OrderQuoterContract
+  OrderQuoter as OrderQuoterContract,
 } from "../contracts";
 import { MissingConfiguration } from "../errors";
 import { Order, TokenAmount } from "../order";
@@ -14,7 +14,7 @@ import { parseExclusiveFillerData, ValidationType } from "../order/validation";
 import { NonceManager } from "./NonceManager";
 import {
   MulticallResult,
-  multicallSameContractManyFunctions
+  multicallSameContractManyFunctions,
 } from "./multicall";
 
 export enum OrderValidation {
@@ -26,7 +26,7 @@ export enum OrderValidation {
   UnknownError,
   ValidationFailed,
   ExclusivityPeriod,
-  OK
+  OK,
 }
 
 export interface ResolvedOrder {
@@ -61,7 +61,7 @@ const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
   ee3b3d4b: OrderValidation.NonceUsed,
   "0a0b0d79": OrderValidation.ValidationFailed,
   b9ec1e96: OrderValidation.ExclusivityPeriod,
-  TRANSFER_FROM_FAILED: OrderValidation.InsufficientFunds
+  TRANSFER_FROM_FAILED: OrderValidation.InsufficientFunds,
 };
 
 export interface SignedOrder {
@@ -104,16 +104,12 @@ export class OrderQuoter {
       return [order.order.serialize(), order.signature];
     });
 
-    const results = await multicallSameContractManyFunctions(
-      this.provider,
-      {
-        address: this.orderQuoter.address,
-        contractInterface: this.orderQuoter.interface,
-        functionName: "quote",
-        functionParams: calls
-      },
-      this.chainId
-    );
+    const results = await multicallSameContractManyFunctions(this.provider, {
+      address: this.orderQuoter.address,
+      contractInterface: this.orderQuoter.interface,
+      functionName: "quote",
+      functionParams: calls,
+    });
 
     const validations = await this.getValidations(orders, results);
     const quotes: (ResolvedOrder | undefined)[] = results.map(
@@ -132,7 +128,7 @@ export class OrderQuoter {
     return validations.map((validation, i) => {
       return {
         validation,
-        quote: quotes[i]
+        quote: quotes[i],
       };
     });
   }
