@@ -4,15 +4,14 @@ import { BuyItem, Market, NFTTrade, TokenType } from '../NFTTrade'
 import { TradeConfig } from '../Command'
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
 import { BigNumber, BigNumberish } from 'ethers'
-import { Ether } from '@uniswap/sdk-core'
 
 export type NFTXData = {
   recipient: string
-  vaultAddress: string
   vaultId: BigNumberish
   tokenAddress: string
   tokenIds: BigNumberish[]
   value: BigNumber
+  swapCalldata: string
 }
 
 export class NFTXTrade extends NFTTrade<NFTXData> {
@@ -28,9 +27,10 @@ export class NFTXTrade extends NFTTrade<NFTXData> {
         order.vaultId,
         order.tokenIds.length,
         order.tokenIds,
-        [Ether.onChain(1).wrapped.address, order.vaultAddress],
+        order.swapCalldata,
         order.recipient,
       ])
+
       planner.addCommand(CommandType.NFTX, [order.value, calldata], config.allowRevert)
     }
   }

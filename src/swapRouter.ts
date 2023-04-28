@@ -93,7 +93,8 @@ export abstract class SwapRouter {
     }
 
     // TODO: matches current logic for now, but should eventually only sweep for multiple NFT trades
-    // or NFT trades with potential slippage (i.e. sudo)
+    // or NFT trades with potential slippage (i.e. sudo).
+    // Note: NFTXV2 sends excess ETH to the caller (router), not the specified recipient
     if (nftTrades.length > 0) planner.addCommand(CommandType.SWEEP, [ETH_ADDRESS, SENDER_AS_RECIPIENT, 0])
     return SwapRouter.encodePlan(planner, transactionValue, config)
   }

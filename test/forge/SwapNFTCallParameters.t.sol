@@ -47,19 +47,19 @@ contract swapNFTCallParametersTest is Test, Interop, DeployRouter {
     function testNftxBuyItems() public {
         MethodParameters memory params = readFixture(json, "._NFTX_BUY_ITEMS");
 
-        vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
+        vm.createSelectFork(vm.envString("FORK_URL"), 17029001);
         vm.startPrank(from);
 
         deployRouterAndPermit2();
-        ERC721 token = ERC721(0x5180db8F5c931aaE63c74266b211F580155ecac8);
-        uint256 balance = 1 ether;
+        ERC721 token = ERC721(0x5Af0D9827E0c53E4799BB226655A1de152A425a5);
+        uint256 balance = 32 ether;
         vm.deal(from, balance);
         assertEq(from.balance, balance);
         assertEq(token.balanceOf(RECIPIENT), 0);
 
         (bool success,) = address(router).call{value: params.value}(params.data);
         require(success, "call failed");
-        assertEq(token.balanceOf(RECIPIENT), 2);
+        assertEq(token.balanceOf(RECIPIENT), 1);
         assertEq(from.balance, balance - params.value);
     }
 
@@ -327,20 +327,24 @@ contract swapNFTCallParametersTest is Test, Interop, DeployRouter {
     function testPartialFillBetweenProtocols() public {
         MethodParameters memory params = readFixture(json, "._PARTIAL_FILL");
 
-        vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
+        vm.createSelectFork(vm.envString("FORK_URL"), 17030829);
         vm.startPrank(from);
 
         deployRouterAndPermit2();
-        ERC721 token = ERC721(0x5180db8F5c931aaE63c74266b211F580155ecac8);
+        ERC721 LOOKS_RARE_NFT = ERC721(0xAA107cCFe230a29C345Fd97bc6eb9Bd2fccD0750);
+        ERC721 SEAPORT_NFT = ERC721(0xcee3C4F9f52cE89e310F19b363a9d4F796B56A68);
+
         uint256 balance = 54 ether;
-        uint256 failedAmount = 1 ether;
+        uint256 failedAmount = 200000000000000000;
         vm.deal(from, balance);
         assertEq(from.balance, balance);
-        assertEq(token.balanceOf(RECIPIENT), 0);
+        assertEq(LOOKS_RARE_NFT.balanceOf(RECIPIENT), 0);
+        assertEq(SEAPORT_NFT.balanceOf(RECIPIENT), 0);
 
         (bool success,) = address(router).call{value: params.value}(params.data);
         require(success, "call failed");
-        assertEq(token.balanceOf(RECIPIENT), 2);
+        assertEq(LOOKS_RARE_NFT.balanceOf(RECIPIENT), 0);
+        assertEq(SEAPORT_NFT.balanceOf(RECIPIENT), 1);
 
         assertEq(from.balance, balance - params.value + failedAmount);
     }

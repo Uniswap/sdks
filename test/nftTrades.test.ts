@@ -14,7 +14,7 @@ import { SudoswapTrade, SudoswapData } from '../src/entities/protocols/sudoswap'
 import { CryptopunkTrade, CryptopunkData } from '../src/entities/protocols/cryptopunk'
 import { X2Y2Data, X2Y2Trade } from '../src/entities/protocols/x2y2'
 import { registerFixture } from './forge/writeInterop'
-import { seaportV1_4DataETH } from './orders/seaportV1_4'
+import { seaportV1_4DataETH, seaportV1_4DataETHRecent } from './orders/seaportV1_4'
 import { FORGE_PERMIT2_ADDRESS, FORGE_ROUTER_ADDRESS, TEST_RECIPIENT_ADDRESS } from './utils/addresses'
 import { ETH_ADDRESS, WETH_ADDRESS } from '../src/utils/constants'
 import { generatePermitSignature, makePermit } from './utils/permit2'
@@ -26,6 +26,10 @@ import { looksRareV2Orders } from './orders/looksRareV2'
 describe('SwapRouter', () => {
   const recipient = TEST_RECIPIENT_ADDRESS
   const wallet = new Wallet(utils.zeroPad('0x1234', 32))
+  const looksRareV2Data: LooksRareV2Data = {
+    apiOrder: looksRareV2Orders[0],
+    taker: recipient,
+  }
 
   describe('#swapNFTCallParameters', () => {
     it('returns hex number value in Method Parameters', async () => {
@@ -65,22 +69,24 @@ describe('SwapRouter', () => {
   })
 
   describe('NFTX', () => {
-    // buyItems from block 15360000
-    const nftxPurchase2Covens: NFTXData = {
+    // buyItems from block 17029002
+    const price: BigNumber = BigNumber.from('2016360357822219079')
+    const nftxPurchase: NFTXData = {
       recipient,
-      vaultAddress: '0xd89b16331f39ab3878daf395052851d3ac8cf3cd',
-      vaultId: 333,
-      tokenAddress: '0x5180db8f5c931aae63c74266b211f580155ecac8',
-      tokenIds: [584, 3033],
-      value: expandTo18DecimalsBN(1),
+      vaultId: 392, // milady vault ID
+      tokenAddress: '0x5Af0D9827E0c53E4799BB226655A1de152A425a5',
+      tokenIds: [7132],
+      value: price,
+      swapCalldata:
+        '0xd9627aa400000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000001bfb8d0ff32c43470000000000000000000000000000000000000000000000000e27c49886e6000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000227c7df69d3ed1ae7574a1a7685fded90292eb48869584cd00000000000000000000000010000000000000000000000000000000000000110000000000000000000000000000000000000000000000465b3a7f1b643618cb',
     }
 
-    it('encodes buying two NFTs from a single NFTX vault', async () => {
-      const nftxTrade = new NFTXTrade([nftxPurchase2Covens])
+    it('encodes buying an NFT from a single NFTX vault', async () => {
+      const nftxTrade = new NFTXTrade([nftxPurchase])
       const methodParameters = SwapRouter.swapNFTCallParameters([nftxTrade])
       const methodParametersV2 = SwapRouter.swapCallParameters(nftxTrade)
       registerFixture('_NFTX_BUY_ITEMS', methodParameters)
-      expect(hexToDecimalString(methodParameters.value)).to.eq(expandTo18DecimalsBN(1).toString())
+      expect(hexToDecimalString(methodParameters.value)).to.eq(price.toString())
       expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
       expect(methodParameters.value).to.eq(hexToDecimalString(methodParametersV2.value))
     })
@@ -331,24 +337,22 @@ describe('SwapRouter', () => {
   })
 
   describe('Partial Fill', () => {
-    // buyItems from block 15360000
-    const nftxPurchase2Covens: NFTXData = {
-      recipient,
-      vaultAddress: '0xd89b16331f39ab3878daf395052851d3ac8cf3cd',
-      vaultId: 333,
-      tokenAddress: '0x5180db8f5c931aae63c74266b211f580155ecac8',
-      tokenIds: [584, 303], // invalid tokenIds
-      value: expandTo18DecimalsBN(1),
+    const invalidLooksRareV2Data: LooksRareV2Data = {
+      ...looksRareV2Data,
+      apiOrder: { ...looksRareV2Data.apiOrder, itemIds: ['1'] },
     }
 
     it('encodes partial fill for multiple trades between protocols', async () => {
-      const nftxTrade = new NFTXTrade([nftxPurchase2Covens])
-      const seaportTrade = new SeaportTrade([seaportDataETH])
+      const invalidLooksRareV2Trade = new LooksRareV2Trade([invalidLooksRareV2Data])
+      const looksRareV2Value = invalidLooksRareV2Trade.getTotalPrice()
+      const seaportTrade = new SeaportTrade([seaportV1_4DataETHRecent])
       const seaportValue = seaportTrade.getTotalPrice(ETH_ADDRESS)
-      const methodParameters = SwapRouter.swapNFTCallParameters([nftxTrade, seaportTrade])
-      const methodParametersV2 = SwapRouter.swapCallParameters([nftxTrade, seaportTrade])
+      const totalValue = looksRareV2Value.add(seaportValue).toString()
+
+      const methodParameters = SwapRouter.swapNFTCallParameters([invalidLooksRareV2Trade, seaportTrade])
+      const methodParametersV2 = SwapRouter.swapCallParameters([invalidLooksRareV2Trade, seaportTrade])
       registerFixture('_PARTIAL_FILL', methodParameters)
-      expect(hexToDecimalString(methodParameters.value)).to.eq(expandTo18DecimalsBN(1).add(seaportValue).toString())
+      expect(hexToDecimalString(methodParameters.value)).to.eq(totalValue)
       expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
       expect(methodParameters.value).to.eq(hexToDecimalString(methodParametersV2.value))
     })
