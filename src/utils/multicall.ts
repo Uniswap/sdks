@@ -7,7 +7,7 @@ import { BaseProvider } from "@ethersproject/providers";
 
 import deploylessMulticall2Abi from "../../abis/deploylessMulticall2.json";
 import multicall2Abi from "../../abis/multicall2.json";
-import { getMulticall2Address } from "../constants";
+import { MULTICALL_ADDRESS } from "../constants";
 import { Multicall2__factory } from "../contracts";
 
 const DEPLOYLESS_MULTICALL_BYTECODE =
@@ -46,15 +46,9 @@ export async function multicallSameContractManyFunctions<
   TFunctionParams extends any[] | undefined
 >(
   provider: BaseProvider,
-  params: MulticallSameContractParams<TFunctionParams>,
-  chainId?: number
+  params: MulticallSameContractParams<TFunctionParams>
 ): Promise<MulticallResult[]> {
   const { address, contractInterface, functionName, functionParams } = params;
-  console.log(
-    "multicallSameContractManyFunctions chainId, params: ",
-    chainId,
-    params
-  );
 
   const fragment = contractInterface.getFunction(functionName);
   const calls: Call[] = functionParams.map((functionParam) => {
@@ -65,19 +59,18 @@ export async function multicallSameContractManyFunctions<
 
     return {
       target: address,
-      callData
+      callData,
     };
   });
 
-  return multicall(provider, calls, chainId);
+  return multicall(provider, calls);
 }
 
 export async function multicallSameFunctionManyContracts<
   TFunctionParams extends any[] | undefined
 >(
   provider: BaseProvider,
-  params: MulticallSameFunctionParams<TFunctionParams>,
-  chainId?: number
+  params: MulticallSameFunctionParams<TFunctionParams>
 ): Promise<MulticallResult[]> {
   const { addresses, contractInterface, functionName, functionParam } = params;
 
@@ -89,27 +82,20 @@ export async function multicallSameFunctionManyContracts<
   const calls: Call[] = addresses.map((address) => {
     return {
       target: address,
-      callData
+      callData,
     };
   });
 
-  return multicall(provider, calls, chainId);
+  return multicall(provider, calls);
 }
 
 export async function multicall(
   provider: BaseProvider,
-  calls: Call[],
-  chainId?: number
+  calls: Call[]
 ): Promise<MulticallResult[]> {
-  console.log("multicall function chainId: ", chainId);
-  const multicallAddress = getMulticall2Address(
-    chainId ? chainId : (await provider.getNetwork()).chainId
-  );
-  console.log("multicall function multicallAddress: ", multicallAddress);
-  const code = await provider.getCode(multicallAddress);
-  console.log("multicall function code: ", code);
+  const code = await provider.getCode(MULTICALL_ADDRESS);
   if (code.length > 2) {
-    const multicall = Multicall2__factory.connect(multicallAddress, provider);
+    const multicall = Multicall2__factory.connect(MULTICALL_ADDRESS, provider);
     return await multicall.callStatic.tryAggregate(false, calls);
   } else {
     const deploylessInterface = new Interface(deploylessMulticall2Abi);
@@ -117,7 +103,7 @@ export async function multicall(
     const data = hexConcat([DEPLOYLESS_MULTICALL_BYTECODE, args]);
 
     const response = await provider.call({
-      data
+      data,
     });
     const multicallInterface = new Interface(multicall2Abi);
     return multicallInterface.decodeFunctionResult("tryAggregate", response)
