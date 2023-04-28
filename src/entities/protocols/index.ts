@@ -1,6 +1,6 @@
 export * from './cryptopunk'
 export * from './foundation'
-export * from './looksRare'
+export * from './looksRareV2'
 export * from './nft20'
 export * from './nftx'
 export * from './seaport'

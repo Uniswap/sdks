@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import {Test, stdJson, console2} from "forge-std/Test.sol";
+import {Test, stdJson} from "forge-std/Test.sol";
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
 import {ERC721} from "solmate/src/tokens/ERC721.sol";
 import {UniversalRouter} from "universal-router/UniversalRouter.sol";
@@ -18,7 +18,8 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
     // starting eth balance
     uint256 constant BALANCE = 50_000 ether;
 
-    ERC721 constant COVEN_NFT = ERC721(0x5180db8F5c931aaE63c74266b211F580155ecac8);
+    ERC721 constant LOOKS_RARE_NFT = ERC721(0xAA107cCFe230a29C345Fd97bc6eb9Bd2fccD0750);
+    ERC721 constant SEAPORT_NFT = ERC721(0xcee3C4F9f52cE89e310F19b363a9d4F796B56A68);
 
     function setUp() public {
         fromPrivateKey = 0x1234;
@@ -30,7 +31,7 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
     function testMixedERC20ForLooksRareNFT() public {
         MethodParameters memory params = readFixture(json, "._ERC20_FOR_1_LOOKSRARE_NFT");
 
-        vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
+        vm.createSelectFork(vm.envString("FORK_URL"), 17030829);
         vm.startPrank(from);
 
         deployRouterAndPermit2();
@@ -42,17 +43,17 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
         assertEq(USDC.balanceOf(from), BALANCE);
 
         uint256 balanceOfBefore = USDC.balanceOf(from);
-        assertEq(COVEN_NFT.balanceOf(RECIPIENT), 0);
+        assertEq(LOOKS_RARE_NFT.balanceOf(RECIPIENT), 0);
         (bool success,) = address(router).call{value: params.value}(params.data);
         require(success, "call failed");
         assertLt(USDC.balanceOf(from), balanceOfBefore);
-        assertEq(COVEN_NFT.balanceOf(RECIPIENT), 1);
+        assertEq(LOOKS_RARE_NFT.balanceOf(RECIPIENT), 1);
     }
 
     function testMixedWETHForLooksRareNFTWithPermit() public {
         MethodParameters memory params = readFixture(json, "._PERMIT_AND_WETH_FOR_1_LOOKSRARE_NFT");
 
-        vm.createSelectFork(vm.envString("FORK_URL"), 16300000);
+        vm.createSelectFork(vm.envString("FORK_URL"), 17030829);
         vm.startPrank(from);
 
         deployRouterAndPermit2();
@@ -64,17 +65,17 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
         assertEq(WETH.balanceOf(from), BALANCE);
 
         uint256 balanceOfBefore = WETH.balanceOf(from);
-        assertEq(COVEN_NFT.balanceOf(RECIPIENT), 0);
+        assertEq(LOOKS_RARE_NFT.balanceOf(RECIPIENT), 0);
         (bool success,) = address(router).call{value: params.value}(params.data);
         require(success, "call failed");
         assertLt(WETH.balanceOf(from), balanceOfBefore);
-        assertEq(COVEN_NFT.balanceOf(RECIPIENT), 1);
+        assertEq(LOOKS_RARE_NFT.balanceOf(RECIPIENT), 1);
     }
 
     function testMixedWETHForLooksRareNFT() public {
         MethodParameters memory params = readFixture(json, "._WETH_FOR_1_LOOKSRARE_NFT");
 
-        vm.createSelectFork(vm.envString("FORK_URL"), 16300000);
+        vm.createSelectFork(vm.envString("FORK_URL"), 17030829);
         vm.startPrank(from);
 
         deployRouterAndPermit2();
@@ -87,17 +88,17 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
         assertEq(WETH.balanceOf(from), BALANCE);
 
         uint256 balanceOfBefore = WETH.balanceOf(from);
-        assertEq(COVEN_NFT.balanceOf(RECIPIENT), 0);
+        assertEq(LOOKS_RARE_NFT.balanceOf(RECIPIENT), 0);
         (bool success,) = address(router).call{value: params.value}(params.data);
         require(success, "call failed");
         assertLt(WETH.balanceOf(from), balanceOfBefore);
-        assertEq(COVEN_NFT.balanceOf(RECIPIENT), 1);
+        assertEq(LOOKS_RARE_NFT.balanceOf(RECIPIENT), 1);
     }
 
     function testMixedERC20AndETHForLooksRareNFT() public {
         MethodParameters memory params = readFixture(json, "._ERC20_AND_ETH_FOR_1_LOOKSRARE_NFT");
 
-        vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
+        vm.createSelectFork(vm.envString("FORK_URL"), 17030829);
         vm.startPrank(from);
 
         deployRouterAndPermit2();
@@ -110,19 +111,19 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
 
         uint256 balanceOfBefore = USDC.balanceOf(from);
         uint256 ethBalanceOfBefore = address(from).balance;
-        assertEq(COVEN_NFT.balanceOf(RECIPIENT), 0);
+        assertEq(LOOKS_RARE_NFT.balanceOf(RECIPIENT), 0);
         (bool success,) = address(router).call{value: params.value}(params.data);
         require(success, "call failed");
-        assertEq(balanceOfBefore - USDC.balanceOf(from), 58607323117);
-        assertEq(ethBalanceOfBefore - address(from).balance, 198890409591425744);
-        assertEq(COVEN_NFT.balanceOf(RECIPIENT), 1);
+        assertEq(balanceOfBefore - USDC.balanceOf(from), 184272629);
+        assertEq(ethBalanceOfBefore - address(from).balance, 101892924857227687);
+        assertEq(LOOKS_RARE_NFT.balanceOf(RECIPIENT), 1);
         assertEq(address(router).balance, 0);
     }
 
     function testMixedERC20ForLooksRareAndSeaportNFTs() public {
-        MethodParameters memory params = readFixture(json, "._ERC20_FOR_1_LOOKSRARE_NFT_2_SEAPORT_NFTS");
+        MethodParameters memory params = readFixture(json, "._ERC20_FOR_1_LOOKSRARE_NFT_1_SEAPORT_NFT");
 
-        vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
+        vm.createSelectFork(vm.envString("FORK_URL"), 17030829);
         vm.startPrank(from);
 
         deployRouterAndPermit2();
@@ -135,19 +136,21 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
 
         uint256 balanceOfBefore = USDC.balanceOf(from);
         uint256 ethBalanceOfBefore = address(from).balance;
-        assertEq(COVEN_NFT.balanceOf(RECIPIENT), 0);
+        assertEq(LOOKS_RARE_NFT.balanceOf(RECIPIENT), 0);
+        assertEq(SEAPORT_NFT.balanceOf(RECIPIENT), 0);
         (bool success,) = address(router).call{value: params.value}(params.data);
         require(success, "call failed");
-        assertEq(balanceOfBefore - USDC.balanceOf(from), 156678862725);
+        assertEq(balanceOfBefore - USDC.balanceOf(from), 412470713);
         assertEq(ethBalanceOfBefore - address(from).balance, 0);
-        assertEq(COVEN_NFT.balanceOf(RECIPIENT), 3);
+        assertEq(LOOKS_RARE_NFT.balanceOf(RECIPIENT), 1);
+        assertEq(SEAPORT_NFT.balanceOf(RECIPIENT), 1);
         assertEq(address(router).balance, 0);
     }
 
     function testMixedERC20AndETHForLooksRareAndSeaportNFTs() public {
-        MethodParameters memory params = readFixture(json, "._ERC20_AND_ETH_FOR_1_LOOKSRARE_NFT_2_SEAPORT_NFTS");
+        MethodParameters memory params = readFixture(json, "._ERC20_AND_ETH_FOR_1_LOOKSRARE_NFT_1_SEAPORT_NFT");
 
-        vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
+        vm.createSelectFork(vm.envString("FORK_URL"), 17030829);
         vm.startPrank(from);
 
         deployRouterAndPermit2();
@@ -160,44 +163,21 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
 
         uint256 balanceOfBefore = USDC.balanceOf(from);
         uint256 ethBalanceOfBefore = address(from).balance;
-        assertEq(COVEN_NFT.balanceOf(RECIPIENT), 0);
+        assertEq(LOOKS_RARE_NFT.balanceOf(RECIPIENT), 0);
+        assertEq(SEAPORT_NFT.balanceOf(RECIPIENT), 0);
         (bool success,) = address(router).call{value: params.value}(params.data);
         require(success, "call failed");
-        assertEq(balanceOfBefore - USDC.balanceOf(from), 58973906433);
-        assertEq(ethBalanceOfBefore - address(from).balance, 53000000000000000000);
-        assertEq(COVEN_NFT.balanceOf(RECIPIENT), 3);
-        assertEq(address(router).balance, 0);
-    }
-
-    function testMixedERC20ForNFTRevertsOnFailedUniswapSwap() public {
-        MethodParameters memory params = readFixture(json, "._ERC20_AND_ETH_FOR_1_LOOKSRARE_NFT_2_SEAPORT_NFTS");
-
-        vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
-        vm.startPrank(from);
-
-        deployRouterAndPermit2();
-        vm.deal(from, BALANCE);
-
-        deal(address(USDC), from, BALANCE);
-        USDC.approve(address(permit2), BALANCE);
-        permit2.approve(address(USDC), address(router), uint160(BALANCE), uint48(block.timestamp + 1000));
-        assertEq(USDC.balanceOf(from), BALANCE);
-
-        uint256 balanceOfBefore = USDC.balanceOf(from);
-        uint256 ethBalanceOfBefore = address(from).balance;
-        assertEq(COVEN_NFT.balanceOf(RECIPIENT), 0);
-        (bool success,) = address(router).call{value: params.value}(params.data);
-        require(success, "call failed");
-        assertEq(balanceOfBefore - USDC.balanceOf(from), 58973906433);
-        assertEq(ethBalanceOfBefore - address(from).balance, 53000000000000000000);
-        assertEq(COVEN_NFT.balanceOf(RECIPIENT), 3);
+        assertEq(balanceOfBefore - USDC.balanceOf(from), 375656349);
+        assertEq(ethBalanceOfBefore - address(from).balance, 19599999999999998);
+        assertEq(LOOKS_RARE_NFT.balanceOf(RECIPIENT), 1);
+        assertEq(SEAPORT_NFT.balanceOf(RECIPIENT), 1);
         assertEq(address(router).balance, 0);
     }
 
     function testMixedERC20AndERC20For1NFT() public {
         MethodParameters memory params = readFixture(json, "._2_ERC20s_FOR_1_NFT");
 
-        vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
+        vm.createSelectFork(vm.envString("FORK_URL"), 17030829);
         vm.startPrank(from);
 
         deployRouterAndPermit2();
@@ -213,21 +193,19 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
 
         uint256 balanceOfBefore = USDC.balanceOf(from);
         uint256 ethBalanceOfBefore = address(from).balance;
-        assertEq(COVEN_NFT.balanceOf(RECIPIENT), 0);
+        assertEq(LOOKS_RARE_NFT.balanceOf(RECIPIENT), 0);
         (bool success,) = address(router).call{value: params.value}(params.data);
         require(success, "call failed");
-        assertEq(balanceOfBefore - USDC.balanceOf(from), 29485281598);
+        assertEq(balanceOfBefore - USDC.balanceOf(from), 187828076);
         assertGt(address(from).balance - ethBalanceOfBefore, 0); // v2 exactOut rounding imprecision
-        console2.log(ethBalanceOfBefore);
-        console2.log(address(from).balance);
-        assertEq(COVEN_NFT.balanceOf(RECIPIENT), 1);
+        assertEq(LOOKS_RARE_NFT.balanceOf(RECIPIENT), 1);
         assertEq(address(router).balance, 0);
     }
 
     function testMixedERC20For1InvalidNFTReverts() public {
         MethodParameters memory params = readFixture(json, "._ERC20_FOR_1_INVALID_NFT");
 
-        vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
+        vm.createSelectFork(vm.envString("FORK_URL"), 17030829);
         vm.startPrank(from);
 
         deployRouterAndPermit2();
@@ -240,20 +218,20 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
 
         uint256 balanceOfBefore = USDC.balanceOf(from);
         uint256 ethBalanceOfBefore = address(from).balance;
-        assertEq(COVEN_NFT.balanceOf(RECIPIENT), 0);
+        assertEq(LOOKS_RARE_NFT.balanceOf(RECIPIENT), 0);
         vm.expectRevert(bytes("error message"));
         (bool success,) = address(router).call{value: params.value}(params.data);
         assertFalse(success, "expectRevert: call did not revert");
         assertEq(balanceOfBefore - USDC.balanceOf(from), 0);
         assertEq(ethBalanceOfBefore - address(from).balance, 0);
-        assertEq(COVEN_NFT.balanceOf(RECIPIENT), 0);
+        assertEq(LOOKS_RARE_NFT.balanceOf(RECIPIENT), 0);
         assertEq(address(router).balance, 0);
     }
 
     function testMixedERC20SwapForNFTsPartialFill() public {
         MethodParameters memory params = readFixture(json, "._ERC20_FOR_NFTS_PARTIAL_FILL");
 
-        vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
+        vm.createSelectFork(vm.envString("FORK_URL"), 17030829);
         vm.startPrank(from);
 
         deployRouterAndPermit2();
@@ -266,12 +244,14 @@ contract MixedSwapCallParameters is Test, Interop, DeployRouter {
 
         uint256 balanceOfBefore = USDC.balanceOf(from);
         uint256 ethBalanceOfBefore = address(from).balance;
-        assertEq(COVEN_NFT.balanceOf(RECIPIENT), 0);
+        assertEq(LOOKS_RARE_NFT.balanceOf(RECIPIENT), 0);
+        assertEq(SEAPORT_NFT.balanceOf(RECIPIENT), 0);
         (bool success,) = address(router).call{value: params.value}(params.data);
         require(success, "call failed");
-        assertEq(balanceOfBefore - USDC.balanceOf(from), 156678862725);
-        assertEq(address(from).balance - ethBalanceOfBefore, 32000000000000000000); // earned ETH back from partial fill
-        assertEq(COVEN_NFT.balanceOf(RECIPIENT), 2);
+        assertEq(balanceOfBefore - USDC.balanceOf(from), 412470713);
+        assertEq(address(from).balance - ethBalanceOfBefore, 200000000000000000); // earned ETH back from partial fill
+        assertEq(LOOKS_RARE_NFT.balanceOf(RECIPIENT), 0);
+        assertEq(SEAPORT_NFT.balanceOf(RECIPIENT), 1);
         assertEq(address(router).balance, 0);
     }
 }

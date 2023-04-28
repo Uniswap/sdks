@@ -98,13 +98,12 @@ Make sure you are running `node v16`
 Install dependencies and run typescript unit tests
 ```bash
 yarn install
-yarn test
+yarn test:hardhat
 ```
 
 Run forge integration tests
 ```bash
 yarn symlink # must install git submodules
 forge install
-forge build
-forge test
+yarn test:forge
 ```

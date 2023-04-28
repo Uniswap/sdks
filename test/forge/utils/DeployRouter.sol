@@ -24,13 +24,11 @@ contract DeployRouter is Test {
     address public constant SUDOSWAP = 0x2B2e8cDA09bBA9660dCA5cB6233787738Ad68329;
     address public constant NFT20_ZAP = 0xA42f6cADa809Bcf417DeefbdD69C5C5A909249C0;
     address public constant CRYPTOPUNKS = 0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB;
-    address public constant LOOKS_RARE = 0x59728544B08AB483533076417FbBB2fD0B17CE3a;
+    address public constant LOOKS_RARE_V2 = 0x0000000000E655fAe4d56241588680F86E3b2377;
     address public constant ROUTER_REWARDS_DISTRIBUTOR = 0x0000000000000000000000000000000000000000;
     address public constant LOOKSRARE_REWARDS_DISTRIBUTOR = 0x0554f068365eD43dcC98dcd7Fd7A8208a5638C72;
     address public constant OPENSEA_CONDUIT = 0x1E0049783F008A0085193E00003D00cd54003c71;
     address public constant ELEMENT_MARKET = 0x20F780A973856B93f63670377900C1d2a50a77c4;
-    address public constant PAYMENT_RECIPIENT = address(1);
-    uint256 public constant PAYMENT_BIPS = 100;
 
     address internal constant RECIPIENT = 0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa;
     address internal constant MAINNET_PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
@@ -59,16 +57,14 @@ contract DeployRouter is Test {
                 elementMarket: ELEMENT_MARKET,
                 nft20Zap: NFT20_ZAP,
                 cryptopunks: CRYPTOPUNKS,
-                looksRare: LOOKS_RARE,
+                looksRareV2: LOOKS_RARE_V2,
                 routerRewardsDistributor: ROUTER_REWARDS_DISTRIBUTOR,
                 looksRareRewardsDistributor: LOOKSRARE_REWARDS_DISTRIBUTOR,
                 looksRareToken: LOOKS_TOKEN,
                 v2Factory: V2_FACTORY,
                 v3Factory: V3_FACTORY,
                 pairInitCodeHash: PAIR_INIT_CODE_HASH,
-                poolInitCodeHash: POOL_INIT_CODE_HASH,
-                paymentRecipient: PAYMENT_RECIPIENT,
-                paymentAmountBips: PAYMENT_BIPS
+                poolInitCodeHash: POOL_INIT_CODE_HASH
             })
         );
     }

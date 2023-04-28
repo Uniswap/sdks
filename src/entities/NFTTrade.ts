@@ -6,17 +6,17 @@ import { NFTXData } from './protocols/nftx'
 import { NFT20Data } from './protocols/nft20'
 import { RoutePlanner } from '../utils/routerCommands'
 import { Command, RouterTradeType, TradeConfig } from './Command'
-import { LooksRareData } from './protocols/looksRare'
 import { SudoswapData } from './protocols/sudoswap'
 import { CryptopunkData } from './protocols/cryptopunk'
 import { X2Y2Data } from './protocols/x2y2'
 import { ElementData } from './protocols/element-market'
+import { LooksRareV2Data } from './protocols/looksRareV2'
 
 export type SupportedProtocolsData =
   | SeaportData
   | FoundationData
   | NFTXData
-  | LooksRareData
+  | LooksRareV2Data
   | X2Y2Data
   | CryptopunkData
   | NFT20Data
@@ -51,7 +51,7 @@ export type BuyItem = {
 
 export enum Market {
   Foundation = 'foundation',
-  LooksRare = 'looksrare',
+  LooksRareV2 = 'looksrareV2',
   NFT20 = 'nft20',
   NFTX = 'nftx',
   Seaport = 'seaport',

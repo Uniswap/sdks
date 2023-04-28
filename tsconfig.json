@@ -10,7 +10,6 @@
     "outDir": "dist",
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "moduleResolution": "node",
     "lib": ["esnext.string"],
     "typeRoots": ["./typechain", "./node_modules/@types"],
     "types": ["@types/mocha", "node"]

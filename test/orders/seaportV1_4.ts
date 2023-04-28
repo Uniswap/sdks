@@ -59,11 +59,59 @@ export const seaportV1_4DataETH: SeaportData = {
   protocolAddress: '0x00000000000001ad428e4906aE43D8F9852d0dD6',
 }
 
-export const seaportV1_4ValueETH = calculateSeaportValue(seaportV1_4DataETH.items[0].parameters.consideration)
-
-function calculateSeaportValue(considerations: ConsiderationItem[]): BigNumber {
-  return considerations.reduce(
-    (amt: BigNumber, consideration: ConsiderationItem) => amt.add(consideration.startAmount),
-    BigNumber.from(0)
-  )
+export const seaportV1_4DataETHRecent: SeaportData = {
+  items: [
+    {
+      parameters: {
+        offerer: '0xdc84079993e56499eed18b938071f551750d0e89',
+        zone: '0x004c00500000ad104d7dbd00e3ae0a5c00560c00',
+        offer: [
+          {
+            itemType: 2,
+            token: '0xcee3c4f9f52ce89e310f19b363a9d4f796b56a68',
+            identifierOrCriteria: '277',
+            startAmount: '1',
+            endAmount: '1',
+          },
+        ],
+        consideration: [
+          {
+            itemType: 0,
+            token: '0x0000000000000000000000000000000000000000',
+            identifierOrCriteria: '0',
+            startAmount: '17542000000000000',
+            endAmount: '17542000000000000',
+            recipient: '0xdc84079993e56499eed18b938071f551750d0e89',
+          },
+          {
+            itemType: 0,
+            token: '0x0000000000000000000000000000000000000000',
+            identifierOrCriteria: '0',
+            startAmount: '489999999999999',
+            endAmount: '489999999999999',
+            recipient: '0x0000a26b00c1f0df003000390027140000faa719',
+          },
+          {
+            itemType: 0,
+            token: '0x0000000000000000000000000000000000000000',
+            identifierOrCriteria: '0',
+            startAmount: '1567999999999999',
+            endAmount: '1567999999999999',
+            recipient: '0x1c12aea4bc03469ce2d10227f6e6e63099f42424',
+          },
+        ],
+        orderType: 0,
+        startTime: '1681289091',
+        endTime: '1689065091',
+        zoneHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+        salt: '24446860302761739304752683030156737591518664810215442929818314405008806322811',
+        conduitKey: '0x0000007b02230091a7ed01230072f7006a004d60a8d4e71d599b8104250f0000',
+        totalOriginalConsiderationItems: '3',
+      },
+      signature:
+        '0x3ad4ad346a8a807051b3601ec311af516f6cc15db1654e082c33e5721de4c1ac9b9254087fc55aeebc142703782998b2b06859a450eb616fd144ae519030bb45',
+    },
+  ],
+  recipient: TEST_RECIPIENT_ADDRESS,
+  protocolAddress: '0x00000000000001ad428e4906aE43D8F9852d0dD6',
 }

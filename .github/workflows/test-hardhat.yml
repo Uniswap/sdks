@@ -1,4 +1,4 @@
-name: Unit Tests
+name: Hardhat Tests
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   tests:
-    name: Unit tests
+    name: Hardhat tests
 
     runs-on: ubuntu-latest
 
@@ -39,6 +39,6 @@ jobs:
         run: forge build
 
       - name: Run tests
-        run: yarn test
+        run: yarn test:hardhat
         env:
           FORK_URL: '${{ secrets.FORK_URL }}'

@@ -9,9 +9,7 @@ import { SeaportTrade } from '../src/entities/protocols/seaport'
 import { seaportDataETH, seaportDataERC20 } from './orders/seaport'
 import { NFTXTrade, NFTXData } from '../src/entities/protocols/nftx'
 import { NFT20Trade, NFT20Data } from '../src/entities/protocols/nft20'
-import { looksRareOrders, createLooksRareOrders } from './orders/looksRare'
 import { x2y2Orders } from './orders/x2y2'
-import { LooksRareData, LooksRareTrade } from '../src/entities/protocols/looksRare'
 import { SudoswapTrade, SudoswapData } from '../src/entities/protocols/sudoswap'
 import { CryptopunkTrade, CryptopunkData } from '../src/entities/protocols/cryptopunk'
 import { X2Y2Data, X2Y2Trade } from '../src/entities/protocols/x2y2'
@@ -22,6 +20,8 @@ import { ETH_ADDRESS, WETH_ADDRESS } from '../src/utils/constants'
 import { generatePermitSignature, makePermit } from './utils/permit2'
 import { ElementTrade } from '../src/entities/protocols/element-market'
 import { elementDataETH, elementDataETH_WithFees } from './orders/element'
+import { LooksRareV2Data, LooksRareV2Trade } from '../src/entities/protocols/looksRareV2'
+import { looksRareV2Orders } from './orders/looksRareV2'
 
 describe('SwapRouter', () => {
   const recipient = TEST_RECIPIENT_ADDRESS
@@ -86,47 +86,19 @@ describe('SwapRouter', () => {
     })
   })
 
-  describe('LooksRare', () => {
-    // buyItems from block 15360000
-    const { makerOrder: makerOrder721, takerOrder: takerOrder721 } = createLooksRareOrders(
-      looksRareOrders[0],
-      FORGE_ROUTER_ADDRESS
-    )
-    const { makerOrder: makerOrder1155, takerOrder: takerOrder1155 } = createLooksRareOrders(
-      looksRareOrders[2],
-      FORGE_ROUTER_ADDRESS
-    )
-
-    const looksRareData721: LooksRareData = {
-      makerOrder: makerOrder721,
-      takerOrder: takerOrder721,
-      recipient,
-      tokenType: TokenType.ERC721,
-    }
-
-    const looksRareData1155: LooksRareData = {
-      makerOrder: makerOrder1155,
-      takerOrder: takerOrder1155,
-      recipient,
-      tokenType: TokenType.ERC1155,
+  describe('LooksRareV2', () => {
+    // buyItems from block 17030830
+    const looksRareV2Data: LooksRareV2Data = {
+      apiOrder: looksRareV2Orders[0],
+      taker: recipient,
     }
 
     it('encodes buying one ERC721 from LooksRare', async () => {
-      const looksRareTrade = new LooksRareTrade([looksRareData721])
-      const methodParameters = SwapRouter.swapNFTCallParameters([looksRareTrade])
-      const methodParametersV2 = SwapRouter.swapCallParameters(looksRareTrade)
-      registerFixture('_LOOKSRARE_BUY_ITEM_721', methodParameters)
-      expect(hexToDecimalString(methodParameters.value)).to.eq(makerOrder721.price)
-      expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
-      expect(methodParameters.value).to.eq(hexToDecimalString(methodParametersV2.value))
-    })
-
-    it('encodes buying one ERC1155 from LooksRare', async () => {
-      const looksRareTrade = new LooksRareTrade([looksRareData1155])
-      const methodParameters = SwapRouter.swapNFTCallParameters([looksRareTrade])
-      const methodParametersV2 = SwapRouter.swapCallParameters(looksRareTrade)
-      registerFixture('_LOOKSRARE_BUY_ITEM_1155', methodParameters)
-      expect(hexToDecimalString(methodParameters.value)).to.eq(makerOrder1155.price)
+      const looksRareV2Trade = new LooksRareV2Trade([looksRareV2Data])
+      const methodParameters = SwapRouter.swapNFTCallParameters([looksRareV2Trade])
+      const methodParametersV2 = SwapRouter.swapCallParameters(looksRareV2Trade)
+      registerFixture('_LOOKSRARE_V2_BUY_ITEM_721', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq(looksRareV2Data.apiOrder.price)
       expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
       expect(methodParameters.value).to.eq(hexToDecimalString(methodParametersV2.value))
     })
