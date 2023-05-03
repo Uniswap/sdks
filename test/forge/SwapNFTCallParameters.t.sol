@@ -126,6 +126,27 @@ contract swapNFTCallParametersTest is Test, Interop, DeployRouter {
         assertEq(from.balance, balance - params.value);
     }
 
+    function testLooksRareV2BatchBuyItemsERC721() public {
+        MethodParameters memory params = readFixture(json, "._LOOKSRARE_V2_BATCH_BUY_ITEM_721");
+
+        vm.createSelectFork(vm.envString("FORK_URL"), 17037139);
+        vm.startPrank(from);
+
+        deployRouterAndPermit2();
+
+        ERC721 token = ERC721(0xAA107cCFe230a29C345Fd97bc6eb9Bd2fccD0750);
+        uint256 balance = 32 ether;
+        vm.deal(from, balance);
+        assertEq(from.balance, balance);
+        assertEq(token.balanceOf(RECIPIENT), 0);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+
+        require(success, "call failed");
+        assertEq(token.balanceOf(RECIPIENT), 2);
+        assertEq(from.balance, balance - params.value);
+    }
+
     // function testSeaportBuyItemsETH() public {
     //     MethodParameters memory params = readFixture(json, "._SEAPORT_BUY_ITEMS_ETH");
 

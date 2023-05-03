@@ -44,8 +44,8 @@ export type LRV2APIOrder = MakerOrder & {
   hash: string
   signature: string
   createdAt: string
-  merkleRoot: string
-  merkleProof: MerkleProof[]
+  merkleRoot?: string
+  merkleProof?: MerkleProof[]
   status: string
 }
 
@@ -63,18 +63,29 @@ export class LooksRareV2Trade extends NFTTrade<LooksRareV2Data> {
   }
 
   encode(planner: RoutePlanner, config: TradeConfig): void {
-    for (const item of this.orders) {
-      const { takerBid, makerOrder, makerSignature, value, merkleTree } = this.refactorAPIData(item)
-      const calldata = LooksRareV2Trade.INTERFACE.encodeFunctionData('executeTakerBid', [
-        takerBid,
-        makerOrder,
-        makerSignature,
-        merkleTree,
+    const { takerBids, makerOrders, makerSignatures, totalValue, merkleTrees } = this.refactorAPIData(this.orders)
+
+    let calldata
+    if (this.orders.length == 1) {
+      calldata = LooksRareV2Trade.INTERFACE.encodeFunctionData('executeTakerBid', [
+        takerBids[0],
+        makerOrders[0],
+        makerSignatures[0],
+        merkleTrees[0],
         ZERO_ADDRESS, // affiliate
       ])
-
-      planner.addCommand(CommandType.LOOKS_RARE_V2, [value, calldata], config.allowRevert)
+    } else {
+      calldata = LooksRareV2Trade.INTERFACE.encodeFunctionData('executeMultipleTakerBids', [
+        takerBids,
+        makerOrders,
+        makerSignatures,
+        merkleTrees,
+        ZERO_ADDRESS, // affiliate
+        false, // isAtomic (we deal with this in allowRevert)
+      ])
     }
+
+    planner.addCommand(CommandType.LOOKS_RARE_V2, [totalValue, calldata], config.allowRevert)
   }
 
   getBuyItems(): BuyItem[] {
@@ -101,29 +112,37 @@ export class LooksRareV2Trade extends NFTTrade<LooksRareV2Data> {
     return total
   }
 
-  private refactorAPIData(data: LooksRareV2Data): {
-    takerBid: TakerOrder
-    makerOrder: MakerOrder
-    makerSignature: string
-    value: BigNumber
-    merkleTree: MerkleTree
+  private refactorAPIData(orders: LooksRareV2Data[]): {
+    takerBids: TakerOrder[]
+    makerOrders: MakerOrder[]
+    makerSignatures: string[]
+    totalValue: BigNumber
+    merkleTrees: MerkleTree[]
   } {
-    const makerOrder: MakerOrder = { ...data.apiOrder }
+    let takerBids: TakerOrder[] = []
+    let makerOrders: MakerOrder[] = []
+    let makerSignatures: string[] = []
+    let totalValue: BigNumber = BigNumber.from(0)
+    let merkleTrees: MerkleTree[] = []
 
-    const makerSignature: string = data.apiOrder.signature
+    orders.forEach((order) => {
+      makerOrders.push({ ...order.apiOrder })
 
-    const takerBid: TakerOrder = {
-      recipient: data.taker,
-      additionalParameters: '0x',
-    }
+      makerSignatures.push(order.apiOrder.signature)
 
-    const value: BigNumber = BigNumber.from(data.apiOrder.price)
+      takerBids.push({
+        recipient: order.taker,
+        additionalParameters: '0x',
+      })
 
-    const merkleTree: MerkleTree = {
-      root: data.apiOrder.merkleRoot,
-      proof: data.apiOrder.merkleProof,
-    }
+      totalValue = totalValue.add(BigNumber.from(order.apiOrder.price))
 
-    return { takerBid, makerOrder, makerSignature, value, merkleTree }
+      merkleTrees.push({
+        root: order.apiOrder.merkleRoot ?? '0x0000000000000000000000000000000000000000000000000000000000000000',
+        proof: order.apiOrder.merkleProof ?? [],
+      })
+    })
+
+    return { takerBids, makerOrders, makerSignatures, totalValue, merkleTrees }
   }
 }

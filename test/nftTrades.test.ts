@@ -93,18 +93,37 @@ describe('SwapRouter', () => {
   })
 
   describe('LooksRareV2', () => {
-    // buyItems from block 17030830
-    const looksRareV2Data: LooksRareV2Data = {
-      apiOrder: looksRareV2Orders[0],
-      taker: recipient,
-    }
-
     it('encodes buying one ERC721 from LooksRare', async () => {
+      // buy items from block 17030830
+      const looksRareV2Data: LooksRareV2Data = {
+        apiOrder: looksRareV2Orders[0],
+        taker: recipient,
+      }
       const looksRareV2Trade = new LooksRareV2Trade([looksRareV2Data])
       const methodParameters = SwapRouter.swapNFTCallParameters([looksRareV2Trade])
       const methodParametersV2 = SwapRouter.swapCallParameters(looksRareV2Trade)
       registerFixture('_LOOKSRARE_V2_BUY_ITEM_721', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq(looksRareV2Data.apiOrder.price)
+      expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
+      expect(methodParameters.value).to.eq(hexToDecimalString(methodParametersV2.value))
+    })
+
+    it('encodes batch buying 2 ERC721s from LooksRare', async () => {
+      // buy items from block 17037140
+      const looksRareV2Data1: LooksRareV2Data = {
+        apiOrder: looksRareV2Orders[1],
+        taker: recipient,
+      }
+      const looksRareV2Data2: LooksRareV2Data = {
+        apiOrder: looksRareV2Orders[2],
+        taker: recipient,
+      }
+      const totalPrice = BigNumber.from(looksRareV2Data1.apiOrder.price).add(looksRareV2Data2.apiOrder.price)
+      const looksRareV2Trade = new LooksRareV2Trade([looksRareV2Data1, looksRareV2Data2])
+      const methodParameters = SwapRouter.swapNFTCallParameters([looksRareV2Trade])
+      const methodParametersV2 = SwapRouter.swapCallParameters(looksRareV2Trade)
+      registerFixture('_LOOKSRARE_V2_BATCH_BUY_ITEM_721', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq(totalPrice.toString())
       expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
       expect(methodParameters.value).to.eq(hexToDecimalString(methodParametersV2.value))
     })
