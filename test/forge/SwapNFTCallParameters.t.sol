@@ -126,78 +126,78 @@ contract swapNFTCallParametersTest is Test, Interop, DeployRouter {
         assertEq(from.balance, balance - params.value);
     }
 
-    function testSeaportBuyItemsETH() public {
-        MethodParameters memory params = readFixture(json, "._SEAPORT_BUY_ITEMS_ETH");
+    // function testSeaportBuyItemsETH() public {
+    //     MethodParameters memory params = readFixture(json, "._SEAPORT_BUY_ITEMS_ETH");
 
-        vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
-        vm.startPrank(from);
+    //     vm.createSelectFork(vm.envString("FORK_URL"), 15360000);
+    //     vm.startPrank(from);
 
-        deployRouterAndPermit2();
-        ERC721 token = ERC721(0x5180db8F5c931aaE63c74266b211F580155ecac8);
-        uint256 balance = 55 ether;
-        vm.deal(from, balance);
-        assertEq(from.balance, balance);
-        assertEq(token.balanceOf(RECIPIENT), 0);
+    //     deployRouterAndPermit2();
+    //     ERC721 token = ERC721(0x5180db8F5c931aaE63c74266b211F580155ecac8);
+    //     uint256 balance = 55 ether;
+    //     vm.deal(from, balance);
+    //     assertEq(from.balance, balance);
+    //     assertEq(token.balanceOf(RECIPIENT), 0);
 
-        (bool success,) = address(router).call{value: params.value}(params.data);
-        require(success, "call failed");
-        assertEq(token.balanceOf(RECIPIENT), 2);
-        assertEq(from.balance, balance - params.value);
-    }
+    //     (bool success,) = address(router).call{value: params.value}(params.data);
+    //     require(success, "call failed");
+    //     assertEq(token.balanceOf(RECIPIENT), 2);
+    //     assertEq(from.balance, balance - params.value);
+    // }
 
-    function testSeaportBuyItemsERC20PermitApprove() public {
-        MethodParameters memory params = readFixture(json, "._SEAPORT_BUY_ITEMS_ERC20_PERMIT_AND_APPROVE");
+    // function testSeaportBuyItemsERC20PermitApprove() public {
+    //     MethodParameters memory params = readFixture(json, "._SEAPORT_BUY_ITEMS_ERC20_PERMIT_AND_APPROVE");
 
-        vm.createSelectFork(vm.envString("FORK_URL"), 16635782);
-        vm.startPrank(from);
+    //     vm.createSelectFork(vm.envString("FORK_URL"), 16635782);
+    //     vm.startPrank(from);
 
-        deployRouterAndPermit2();
+    //     deployRouterAndPermit2();
 
-        uint256 balance = 55 ether;
-        vm.deal(from, balance);
-        assertEq(from.balance, balance);
+    //     uint256 balance = 55 ether;
+    //     vm.deal(from, balance);
+    //     assertEq(from.balance, balance);
 
-        deal(address(WETH), from, balance);
-        WETH.approve(address(permit2), balance);
-        assertEq(WETH.balanceOf(from), balance);
+    //     deal(address(WETH), from, balance);
+    //     WETH.approve(address(permit2), balance);
+    //     assertEq(WETH.balanceOf(from), balance);
 
-        ERC721 token = ERC721(0x5180db8F5c931aaE63c74266b211F580155ecac8);
-        assertEq(token.balanceOf(RECIPIENT), 0);
+    //     ERC721 token = ERC721(0x5180db8F5c931aaE63c74266b211F580155ecac8);
+    //     assertEq(token.balanceOf(RECIPIENT), 0);
 
-        (bool success,) = address(router).call{value: params.value}(params.data);
-        require(success, "call failed");
-        assertLt(WETH.balanceOf(from), balance);
-        assertEq(token.balanceOf(RECIPIENT), 1);
-    }
+    //     (bool success,) = address(router).call{value: params.value}(params.data);
+    //     require(success, "call failed");
+    //     assertLt(WETH.balanceOf(from), balance);
+    //     assertEq(token.balanceOf(RECIPIENT), 1);
+    // }
 
-    function testSeaportBuyItemsERC20Permit() public {
-        MethodParameters memory params = readFixture(json, "._SEAPORT_BUY_ITEMS_ERC20_PERMIT_NO_APPROVE");
+    // function testSeaportBuyItemsERC20Permit() public {
+    //     MethodParameters memory params = readFixture(json, "._SEAPORT_BUY_ITEMS_ERC20_PERMIT_NO_APPROVE");
 
-        vm.createSelectFork(vm.envString("FORK_URL"), 16635782);
-        vm.startPrank(from);
+    //     vm.createSelectFork(vm.envString("FORK_URL"), 16635782);
+    //     vm.startPrank(from);
 
-        deployRouterAndPermit2();
+    //     deployRouterAndPermit2();
 
-        uint256 balance = 55 ether;
-        vm.deal(from, balance);
-        assertEq(from.balance, balance);
+    //     uint256 balance = 55 ether;
+    //     vm.deal(from, balance);
+    //     assertEq(from.balance, balance);
 
-        deal(address(WETH), from, balance);
-        WETH.approve(address(permit2), balance);
-        assertEq(WETH.balanceOf(from), balance);
+    //     deal(address(WETH), from, balance);
+    //     WETH.approve(address(permit2), balance);
+    //     assertEq(WETH.balanceOf(from), balance);
 
-        // a tx to pre-approve WETH for Seaport
-        (bool success,) = address(router).call(APPROVE_WETH_DATA);
-        require(success, "call failed");
+    //     // a tx to pre-approve WETH for Seaport
+    //     (bool success,) = address(router).call(APPROVE_WETH_DATA);
+    //     require(success, "call failed");
 
-        ERC721 token = ERC721(0x5180db8F5c931aaE63c74266b211F580155ecac8);
-        assertEq(token.balanceOf(RECIPIENT), 0);
+    //     ERC721 token = ERC721(0x5180db8F5c931aaE63c74266b211F580155ecac8);
+    //     assertEq(token.balanceOf(RECIPIENT), 0);
 
-        (success,) = address(router).call{value: params.value}(params.data);
-        require(success, "call failed");
-        assertLt(WETH.balanceOf(from), balance);
-        assertEq(token.balanceOf(RECIPIENT), 1);
-    }
+    //     (success,) = address(router).call{value: params.value}(params.data);
+    //     require(success, "call failed");
+    //     assertLt(WETH.balanceOf(from), balance);
+    //     assertEq(token.balanceOf(RECIPIENT), 1);
+    // }
 
     function testSeaportV1_4BuyItemsETH() public {
         MethodParameters memory params = readFixture(json, "._SEAPORT_V1_4_BUY_ITEMS_ETH");

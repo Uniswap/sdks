@@ -79,7 +79,7 @@ export function encodeInputTokenOptions(planner: RoutePlanner, options: InputTok
 
 function mapApprovalProtocol(protocolAddress: string): number {
   switch (protocolAddress.toLowerCase()) {
-    case '0x00000000006c3852cbef3e08e8df289169ede581': // Seaport v1.1
+    case '0x00000000000000ADc04C56Bf30aC9d3c0aAF14dC': // Seaport v1.5
       return OPENSEA_CONDUIT_SPENDER_ID
     case '0x00000000000001ad428e4906ae43d8f9852d0dd6': // Seaport v1.4
       return OPENSEA_CONDUIT_SPENDER_ID

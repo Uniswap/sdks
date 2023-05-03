@@ -16,7 +16,7 @@ contract DeployRouter is Test {
     bytes32 public constant PAIR_INIT_CODE_HASH = 0x96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f;
     bytes32 public constant POOL_INIT_CODE_HASH = 0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54;
     address public constant WETH9 = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-    address public constant SEAPORT = 0x00000000006c3852cbEf3e08E8dF289169EdE581;
+    address public constant SEAPORT_V1_5 = 0x00000000000000ADc04C56Bf30aC9d3c0aAF14dC;
     address public constant SEAPORT_V1_4 = 0x00000000000001ad428e4906aE43D8F9852d0dD6;
     address public constant NFTX_ZAP = 0x941A6d105802CCCaa06DE58a13a6F49ebDCD481C;
     address public constant X2Y2 = 0x74312363e45DCaBA76c59ec49a7Aa8A65a67EeD3;
@@ -47,7 +47,7 @@ contract DeployRouter is Test {
             RouterParameters({
                 permit2: _permit2,
                 weth9: WETH9,
-                seaport: SEAPORT,
+                seaportV1_5: SEAPORT_V1_5,
                 seaportV1_4: SEAPORT_V1_4,
                 openseaConduit: OPENSEA_CONDUIT,
                 nftxZap: NFTX_ZAP,
