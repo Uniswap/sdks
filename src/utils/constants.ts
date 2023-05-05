@@ -2,28 +2,28 @@ import { BigNumber } from 'ethers'
 
 export const UNIVERSAL_ROUTER_ADDRESS = (chainId: number): string => {
   switch (chainId) {
-    case 1: // mainnet. UR v1.2, all others are v1
+    case 1: // mainnet
       return '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD'
     case 5: // goerli
-      return '0x4648a43B2C14Da09FdF82B161150d3F634f40491'
+      return '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD'
     case 137: // polygon
-      return '0x4C60051384bd2d3C01bfc845Cf5F4b44bcbE9de5'
+      return '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD'
     case 80001: // polygon mumbai
-      return '0x4648a43B2C14Da09FdF82B161150d3F634f40491'
+      return '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD'
     case 10: // optimism
-      return '0xb555edF5dcF85f42cEeF1f3630a52A108E55A654'
+      return '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD'
     case 420: // optimism goerli
-      return '0x4648a43B2C14Da09FdF82B161150d3F634f40491'
+      return '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD'
     case 42161: // arbitrum
-      return '0x4C60051384bd2d3C01bfc845Cf5F4b44bcbE9de5'
+      return '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD'
     case 421613: // arbitrum goerli
-      return '0x4648a43B2C14Da09FdF82B161150d3F634f40491'
+      return '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD'
     case 42220: // celo
-      return '0xC73d61d192FB994157168Fb56730FdEc64C9Cb8F'
+      return '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD'
     case 44787: // celo alfajores
-      return '0x4648a43B2C14Da09FdF82B161150d3F634f40491'
+      return '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD'
     case 56: // binance smart chain
-      return '0x5Dc88340E1c5c6366864Ee415d6034cadd1A9897'
+      return '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD'
     default:
       throw new Error(`Universal Router not deployed on chain ${chainId}`)
   }
