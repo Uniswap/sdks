@@ -20,6 +20,7 @@ import {
   TEST_RECIPIENT_ADDRESS,
 } from './utils/addresses'
 import { ETH_ADDRESS } from '../src/utils/constants'
+import { hexToDecimalString } from './utils/hexToDecimalString'
 
 describe('SwapRouter.swapCallParameters', () => {
   const wallet = new Wallet(utils.zeroPad('0x1234', 32))
@@ -65,7 +66,7 @@ describe('SwapRouter.swapCallParameters', () => {
         sender: FORGE_SENDER_ADDRESS,
       })
       registerFixture('_ERC20_FOR_1_LOOKSRARE_NFT', methodParameters)
-      expect(methodParameters.value).to.eq('0')
+      expect(methodParameters.value).to.eq('0x00')
     })
 
     it('weth -> 1 looksrare nft with Permit', async () => {
@@ -81,7 +82,7 @@ describe('SwapRouter.swapCallParameters', () => {
         sender: FORGE_ROUTER_ADDRESS,
       })
       registerFixture('_PERMIT_AND_WETH_FOR_1_LOOKSRARE_NFT', methodParameters)
-      expect(methodParameters.value).to.eq('0')
+      expect(methodParameters.value).to.eq('0x00')
     })
 
     it('weth -> 1 looksrare nft without Permit', async () => {
@@ -91,7 +92,7 @@ describe('SwapRouter.swapCallParameters', () => {
         sender: FORGE_SENDER_ADDRESS,
       })
       registerFixture('_WETH_FOR_1_LOOKSRARE_NFT', methodParameters)
-      expect(methodParameters.value).to.eq('0')
+      expect(methodParameters.value).to.eq('0x00')
     })
 
     it('erc20 + eth -> 1 looksrare nft', async () => {
@@ -131,7 +132,7 @@ describe('SwapRouter.swapCallParameters', () => {
         sender: FORGE_SENDER_ADDRESS,
       })
       registerFixture('_ERC20_FOR_1_LOOKSRARE_NFT_1_SEAPORT_NFT', methodParameters)
-      expect(methodParameters.value).to.eq('0')
+      expect(methodParameters.value).to.eq('0x00')
     })
 
     it('erc20 + eth -> 1 looksRare nft & 1 seaport nft1', async () => {
@@ -149,7 +150,7 @@ describe('SwapRouter.swapCallParameters', () => {
         sender: FORGE_SENDER_ADDRESS,
       })
       registerFixture('_ERC20_AND_ETH_FOR_1_LOOKSRARE_NFT_1_SEAPORT_NFT', methodParameters)
-      expect(methodParameters.value).to.eq(seaportValue.toString())
+      expect(hexToDecimalString(methodParameters.value)).to.eq(seaportValue.toString())
     })
 
     it('2 erc20s -> 1 NFT', async () => {
@@ -175,7 +176,7 @@ describe('SwapRouter.swapCallParameters', () => {
         sender: FORGE_SENDER_ADDRESS,
       })
       registerFixture('_2_ERC20s_FOR_1_NFT', methodParameters)
-      expect(methodParameters.value).to.eq('0')
+      expect(methodParameters.value).to.eq('0x00')
     })
 
     it('erc20 -> 1 invalid NFT', async () => {
@@ -193,7 +194,7 @@ describe('SwapRouter.swapCallParameters', () => {
         sender: FORGE_SENDER_ADDRESS,
       })
       registerFixture('_ERC20_FOR_1_INVALID_NFT', methodParameters)
-      expect(methodParameters.value).to.eq('0')
+      expect(methodParameters.value).to.eq('0x00')
     })
 
     it('erc20 -> 2 NFTs partial fill', async () => {
@@ -214,7 +215,7 @@ describe('SwapRouter.swapCallParameters', () => {
         sender: FORGE_SENDER_ADDRESS,
       })
       registerFixture('_ERC20_FOR_NFTS_PARTIAL_FILL', methodParameters)
-      expect(methodParameters.value).to.eq('0')
+      expect(methodParameters.value).to.eq('0x00')
     })
   })
 })

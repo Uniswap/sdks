@@ -6,12 +6,13 @@ import { MethodParameters } from '@uniswap/v3-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
 import { Currency, TradeType } from '@uniswap/sdk-core'
 import { Command, RouterTradeType } from './entities/Command'
-import { NFTTrade, SupportedProtocolsData } from './entities/NFTTrade'
+import { Market, NFTTrade, SupportedProtocolsData } from './entities/NFTTrade'
 import { UniswapTrade, SwapOptions } from './entities/protocols/uniswap'
 import { UnwrapWETH } from './entities/protocols/unwrapWETH'
 import { CommandType, RoutePlanner } from './utils/routerCommands'
 import { encodePermit } from './utils/inputTokens'
 import { ROUTER_AS_RECIPIENT, SENDER_AS_RECIPIENT, ETH_ADDRESS } from './utils/constants'
+import { SeaportTrade } from './entities'
 
 export type SwapRouterConfig = {
   sender?: string // address
@@ -34,6 +35,9 @@ export abstract class SwapRouter {
     let currentNativeValueInRouter = BigNumber.from(0)
     let transactionValue = BigNumber.from(0)
 
+    // tracks the input tokens (and ETH) used to buy NFTs to allow us to sweep
+    let nftInputTokens = new Set<string>()
+
     for (const trade of trades) {
       /**
        * is NFTTrade
@@ -42,6 +46,16 @@ export abstract class SwapRouter {
         const nftTrade = trade as SupportedNFTTrade
         nftTrade.encode(planner, { allowRevert })
         const tradePrice = nftTrade.getTotalPrice()
+
+        if (nftTrade.market == Market.Seaport) {
+          const seaportTrade = nftTrade as SeaportTrade
+          const seaportInputTokens = seaportTrade.getInputTokens()
+          seaportInputTokens.forEach((inputToken) => {
+            nftInputTokens.add(inputToken)
+          })
+        } else {
+          nftInputTokens.add(ETH_ADDRESS)
+        }
 
         // send enough native value to contract for NFT purchase
         if (currentNativeValueInRouter.lt(tradePrice)) {
@@ -95,12 +109,15 @@ export abstract class SwapRouter {
     // TODO: matches current logic for now, but should eventually only sweep for multiple NFT trades
     // or NFT trades with potential slippage (i.e. sudo).
     // Note: NFTXV2 sends excess ETH to the caller (router), not the specified recipient
-    if (nftTrades.length > 0) planner.addCommand(CommandType.SWEEP, [ETH_ADDRESS, SENDER_AS_RECIPIENT, 0])
+    nftInputTokens.forEach((inputToken) => {
+      planner.addCommand(CommandType.SWEEP, [inputToken, SENDER_AS_RECIPIENT, 0])
+    })
     return SwapRouter.encodePlan(planner, transactionValue, config)
   }
 
   /**
    * @deprecated in favor of swapCallParameters. Update before next major version 2.0.0
+   * This version does not work correctly for Seaport ERC20->NFT purchases
    * Produces the on-chain method name to call and the hex encoded parameters to pass as arguments for a given swap.
    * @param trades to produce call parameters for
    */

@@ -16,7 +16,10 @@ export class UnwrapWETH implements Command {
     this.amount = amount
 
     if (!!permit2) {
-      invariant(permit2.details.token === this.wethAddress, `must be permitting WETH address: ${this.wethAddress}`)
+      invariant(
+        permit2.details.token.toLowerCase() === this.wethAddress.toLowerCase(),
+        `must be permitting WETH address: ${this.wethAddress}`
+      )
       invariant(permit2.details.amount >= amount, `Did not permit enough WETH for unwrapWETH transaction`)
       this.permit2Data = permit2
     }
