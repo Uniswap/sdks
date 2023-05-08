@@ -1,2 +1,2 @@
-export * from "./DutchLimitOrderBuilder";
+export * from "./DutchOrderBuilder";
 export * from "./OrderBuilder";

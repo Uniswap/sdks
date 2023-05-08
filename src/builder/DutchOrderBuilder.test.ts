@@ -1,15 +1,15 @@
 import { BigNumber } from "ethers";
 
-import { DutchLimitOrder } from "../order/DutchLimitOrder";
+import { DutchOrder } from "../order/DutchOrder";
 import { encodeExclusiveFillerData, ValidationType } from "../order/validation";
 
-import { DutchLimitOrderBuilder } from "./DutchLimitOrderBuilder";
+import { DutchOrderBuilder } from "./DutchOrderBuilder";
 
-describe("DutchLimitOrderBuilder", () => {
-  let builder: DutchLimitOrderBuilder;
+describe("DutchOrderBuilder", () => {
+  let builder: DutchOrderBuilder;
 
   beforeEach(() => {
-    builder = new DutchLimitOrderBuilder(1);
+    builder = new DutchOrderBuilder(1);
   });
 
   it("Builds a valid order", () => {
@@ -110,7 +110,7 @@ describe("DutchLimitOrderBuilder", () => {
       })
       .build();
 
-    const regenerated = DutchLimitOrderBuilder.fromOrder(order).build();
+    const regenerated = DutchOrderBuilder.fromOrder(order).build();
     expect(regenerated.toJSON()).toMatchObject(order.toJSON());
   });
 
@@ -146,8 +146,8 @@ describe("DutchLimitOrderBuilder", () => {
       .build();
 
     const json = order.toJSON();
-    const regenerated = DutchLimitOrderBuilder.fromOrder(
-      DutchLimitOrder.fromJSON(json, 1)
+    const regenerated = DutchOrderBuilder.fromOrder(
+      DutchOrder.fromJSON(json, 1)
     ).build();
     expect(regenerated.toJSON()).toMatchObject(order.toJSON());
   });
@@ -183,7 +183,7 @@ describe("DutchLimitOrderBuilder", () => {
       })
       .build();
 
-    const regenerated = DutchLimitOrderBuilder.fromOrder(order)
+    const regenerated = DutchOrderBuilder.fromOrder(order)
       .startTime(order.info.startTime + 1)
       .build();
     expect(regenerated.info.startTime).toEqual(order.info.startTime + 1);
@@ -309,7 +309,7 @@ describe("DutchLimitOrderBuilder", () => {
 
   it("Unknown chainId", () => {
     const chainId = 99999999;
-    expect(() => new DutchLimitOrderBuilder(chainId)).toThrow(
+    expect(() => new DutchOrderBuilder(chainId)).toThrow(
       `Missing configuration for reactor: ${chainId}`
     );
   });

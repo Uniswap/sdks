@@ -14,7 +14,7 @@ import {
   DutchLimitOrderReactor,
   MockERC20,
 } from "../../src/contracts";
-import { DutchLimitOrderBuilder, EventWatcher, FillData } from "../../";
+import { DutchOrderBuilder, EventWatcher, FillData } from "../../";
 
 describe("EventWatcher", () => {
   let reactor: DutchLimitOrderReactor;
@@ -85,7 +85,7 @@ describe("EventWatcher", () => {
   it("Fetches fill events", async () => {
     const amount = BigNumber.from(10).pow(18);
     const deadline = await new BlockchainTime().secondsFromNow(1000);
-    const order = new DutchLimitOrderBuilder(
+    const order = new DutchOrderBuilder(
       chainId,
       reactor.address,
       permit2.address
@@ -142,7 +142,7 @@ describe("EventWatcher", () => {
   it("Handles callbacks on fill events", async () => {
     const amount = BigNumber.from(10).pow(18);
     const deadline = await new BlockchainTime().secondsFromNow(1000);
-    const order = new DutchLimitOrderBuilder(
+    const order = new DutchOrderBuilder(
       chainId,
       reactor.address,
       permit2.address

@@ -1,1 +1,1 @@
-export * from "./DutchLimitOrderTrade";
+export * from "./DutchOrderTrade";

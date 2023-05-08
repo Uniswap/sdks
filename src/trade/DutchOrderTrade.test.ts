@@ -1,9 +1,9 @@
 import { Currency, Token, TradeType } from "@uniswap/sdk-core";
 import { BigNumber, ethers } from "ethers";
 
-import { DutchLimitOrderInfo } from "../order";
+import { DutchOrderInfo } from "../order";
 
-import { DutchLimitOrderTrade } from "./DutchLimitOrderTrade";
+import { DutchOrderTrade } from "./DutchOrderTrade";
 
 const USDC = new Token(
   1,
@@ -18,11 +18,11 @@ const DAI = new Token(
   "DAI"
 );
 
-describe("DutchLimitOrderTrade", () => {
+describe("DutchOrderTrade", () => {
   const NON_FEE_OUTPUT_AMOUNT = BigNumber.from("1000000000000000000");
   const NON_FEE_MINIMUM_AMOUNT_OUT = BigNumber.from("900000000000000000");
 
-  const orderInfo: DutchLimitOrderInfo = {
+  const orderInfo: DutchOrderInfo = {
     deadline: Math.floor(new Date().getTime() / 1000) + 1000,
     reactor: "0x0000000000000000000000000000000000000000",
     offerer: "0x0000000000000000000000000000000000000000",
@@ -54,7 +54,7 @@ describe("DutchLimitOrderTrade", () => {
     ],
   };
 
-  const trade = new DutchLimitOrderTrade<Currency, Currency, TradeType>({
+  const trade = new DutchOrderTrade<Currency, Currency, TradeType>({
     currencyIn: USDC,
     currenciesOut: [DAI],
     orderInfo,
