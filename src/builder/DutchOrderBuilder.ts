@@ -3,12 +3,7 @@ import invariant from "tiny-invariant";
 
 import { OrderType, REACTOR_ADDRESS_MAPPING } from "../constants";
 import { MissingConfiguration } from "../errors";
-import {
-  DutchInput,
-  DutchLimitOrder,
-  DutchLimitOrderInfo,
-  DutchOutput,
-} from "../order";
+import { DutchInput, DutchOrder, DutchOrderInfo, DutchOutput } from "../order";
 import { ValidationInfo } from "../order/validation";
 
 import { OrderBuilder } from "./OrderBuilder";
@@ -16,15 +11,12 @@ import { OrderBuilder } from "./OrderBuilder";
 /**
  * Helper builder for generating dutch limit orders
  */
-export class DutchLimitOrderBuilder extends OrderBuilder {
-  private info: Partial<DutchLimitOrderInfo>;
+export class DutchOrderBuilder extends OrderBuilder {
+  private info: Partial<DutchOrderInfo>;
 
-  static fromOrder(order: DutchLimitOrder): DutchLimitOrderBuilder {
+  static fromOrder(order: DutchOrder): DutchOrderBuilder {
     // note chainId not used if passing in true reactor address
-    const builder = new DutchLimitOrderBuilder(
-      order.chainId,
-      order.info.reactor
-    )
+    const builder = new DutchOrderBuilder(order.chainId, order.info.reactor)
       .deadline(order.info.deadline)
       .endTime(order.info.endTime)
       .startTime(order.info.startTime)
@@ -57,10 +49,9 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
       this.reactor(reactorAddress);
     } else if (
       REACTOR_ADDRESS_MAPPING[chainId] &&
-      REACTOR_ADDRESS_MAPPING[chainId][OrderType.DutchLimit]
+      REACTOR_ADDRESS_MAPPING[chainId][OrderType.Dutch]
     ) {
-      const reactorAddress =
-        REACTOR_ADDRESS_MAPPING[chainId][OrderType.DutchLimit];
+      const reactorAddress = REACTOR_ADDRESS_MAPPING[chainId][OrderType.Dutch];
       this.reactor(reactorAddress);
     } else {
       throw new MissingConfiguration("reactor", chainId.toString());
@@ -73,12 +64,12 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
     };
   }
 
-  startTime(startTime: number): DutchLimitOrderBuilder {
+  startTime(startTime: number): DutchOrderBuilder {
     this.info.startTime = startTime;
     return this;
   }
 
-  endTime(endTime: number): DutchLimitOrderBuilder {
+  endTime(endTime: number): DutchOrderBuilder {
     if (this.orderInfo.deadline === undefined) {
       super.deadline(endTime);
     }
@@ -87,12 +78,12 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
     return this;
   }
 
-  input(input: DutchInput): DutchLimitOrderBuilder {
+  input(input: DutchInput): DutchOrderBuilder {
     this.info.input = input;
     return this;
   }
 
-  output(output: DutchOutput): DutchLimitOrderBuilder {
+  output(output: DutchOutput): DutchOrderBuilder {
     if (!this.info.outputs) {
       this.info.outputs = [];
     }
@@ -104,7 +95,7 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
     return this;
   }
 
-  deadline(deadline: number): DutchLimitOrderBuilder {
+  deadline(deadline: number): DutchOrderBuilder {
     super.deadline(deadline);
 
     if (this.info.endTime === undefined) {
@@ -114,23 +105,23 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
     return this;
   }
 
-  offerer(offerer: string): DutchLimitOrderBuilder {
+  offerer(offerer: string): DutchOrderBuilder {
     super.offerer(offerer);
     return this;
   }
 
-  nonce(nonce: BigNumber): DutchLimitOrderBuilder {
+  nonce(nonce: BigNumber): DutchOrderBuilder {
     super.nonce(nonce);
     return this;
   }
 
-  validation(info: ValidationInfo): DutchLimitOrderBuilder {
+  validation(info: ValidationInfo): DutchOrderBuilder {
     super.validation(info);
     return this;
   }
 
   // ensures that we only change non fee outputs
-  nonFeeRecipient(recipient: string): DutchLimitOrderBuilder {
+  nonFeeRecipient(recipient: string): DutchOrderBuilder {
     if (!this.info.outputs) {
       return this;
     }
@@ -144,13 +135,13 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
   exclusiveFiller(
     exclusiveFiller: string,
     exclusivityOverrideBps: BigNumber
-  ): DutchLimitOrderBuilder {
+  ): DutchOrderBuilder {
     this.info.exclusiveFiller = exclusiveFiller;
     this.info.exclusivityOverrideBps = exclusivityOverrideBps;
     return this;
   }
 
-  build(): DutchLimitOrder {
+  build(): DutchOrder {
     invariant(this.info.startTime !== undefined, "startTime not set");
     invariant(this.info.input !== undefined, "input not set");
     invariant(this.info.endTime !== undefined, "endTime not set");
@@ -181,7 +172,7 @@ export class DutchLimitOrderBuilder extends OrderBuilder {
       `endTime must be before or same as deadline: ${this.info.endTime}`
     );
 
-    return new DutchLimitOrder(
+    return new DutchOrder(
       Object.assign(this.getOrderInfo(), {
         startTime: this.info.startTime,
         endTime: this.info.endTime,

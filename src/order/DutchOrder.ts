@@ -43,7 +43,7 @@ export type DutchInputJSON = Omit<DutchInput, "startAmount" | "endAmount"> & {
   endAmount: string;
 };
 
-export type DutchLimitOrderInfo = OrderInfo & {
+export type DutchOrderInfo = OrderInfo & {
   startTime: number;
   endTime: number;
   exclusiveFiller: string;
@@ -52,8 +52,8 @@ export type DutchLimitOrderInfo = OrderInfo & {
   outputs: DutchOutput[];
 };
 
-export type DutchLimitOrderInfoJSON = Omit<
-  DutchLimitOrderInfo,
+export type DutchOrderInfoJSON = Omit<
+  DutchOrderInfo,
   "nonce" | "input" | "outputs" | "exclusivityOverrideBps"
 > & {
   nonce: string;
@@ -74,7 +74,8 @@ type WitnessInfo = {
   outputs: DutchOutput[];
 };
 
-const DUTCH_LIMIT_ORDER_TYPES = {
+const DUTCH_ORDER_TYPES = {
+  // TODO: remove "Limit"
   ExclusiveDutchLimitOrder: [
     { name: "info", type: "OrderInfo" },
     { name: "startTime", type: "uint256" },
@@ -102,7 +103,7 @@ const DUTCH_LIMIT_ORDER_TYPES = {
   ],
 };
 
-const DUTCH_LIMIT_ORDER_ABI = [
+const DUTCH_ORDER_ABI = [
   "tuple(" +
     [
       "tuple(address,address,uint256,uint256,address,bytes)",
@@ -116,11 +117,11 @@ const DUTCH_LIMIT_ORDER_ABI = [
     ")",
 ];
 
-export class DutchLimitOrder extends Order {
+export class DutchOrder extends Order {
   public permit2Address: string;
 
   constructor(
-    public readonly info: DutchLimitOrderInfo,
+    public readonly info: DutchOrderInfo,
     public readonly chainId: number,
     readonly _permit2Address?: string
   ) {
@@ -135,11 +136,11 @@ export class DutchLimitOrder extends Order {
   }
 
   static fromJSON(
-    json: DutchLimitOrderInfoJSON,
+    json: DutchOrderInfoJSON,
     chainId: number,
     _permit2Address?: string
-  ): DutchLimitOrder {
-    return new DutchLimitOrder(
+  ): DutchOrder {
+    return new DutchOrder(
       {
         ...json,
         exclusivityOverrideBps: BigNumber.from(json.exclusivityOverrideBps),
@@ -161,13 +162,9 @@ export class DutchLimitOrder extends Order {
     );
   }
 
-  static parse(
-    encoded: string,
-    chainId: number,
-    permit2?: string
-  ): DutchLimitOrder {
+  static parse(encoded: string, chainId: number, permit2?: string): DutchOrder {
     const abiCoder = new ethers.utils.AbiCoder();
-    const decoded = abiCoder.decode(DUTCH_LIMIT_ORDER_ABI, encoded);
+    const decoded = abiCoder.decode(DUTCH_ORDER_ABI, encoded);
     const [
       [
         [reactor, offerer, nonce, deadline, validationContract, validationData],
@@ -179,7 +176,7 @@ export class DutchLimitOrder extends Order {
         outputs,
       ],
     ] = decoded;
-    return new DutchLimitOrder(
+    return new DutchOrder(
       {
         reactor,
         offerer,
@@ -221,7 +218,7 @@ export class DutchLimitOrder extends Order {
   /**
    * @inheritdoc order
    */
-  toJSON(): DutchLimitOrderInfoJSON & {
+  toJSON(): DutchOrderInfoJSON & {
     permit2Address: string;
     chainId: number;
   } {
@@ -257,7 +254,7 @@ export class DutchLimitOrder extends Order {
    */
   serialize(): string {
     const abiCoder = new ethers.utils.AbiCoder();
-    return abiCoder.encode(DUTCH_LIMIT_ORDER_ABI, [
+    return abiCoder.encode(DUTCH_ORDER_ABI, [
       [
         [
           this.info.reactor,
@@ -320,7 +317,7 @@ export class DutchLimitOrder extends Order {
    */
   hash(): string {
     return ethers.utils._TypedDataEncoder
-      .from(DUTCH_LIMIT_ORDER_TYPES)
+      .from(DUTCH_ORDER_TYPES)
       .hash(this.witnessInfo());
   }
 
@@ -392,8 +389,9 @@ export class DutchLimitOrder extends Order {
   private witness(): Witness {
     return {
       witness: this.witnessInfo(),
+      // TODO: remove "Limit"
       witnessTypeName: "ExclusiveDutchLimitOrder",
-      witnessType: DUTCH_LIMIT_ORDER_TYPES,
+      witnessType: DUTCH_ORDER_TYPES,
     };
   }
 }
