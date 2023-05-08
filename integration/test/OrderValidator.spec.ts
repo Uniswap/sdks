@@ -17,8 +17,8 @@ import {
   MockERC20,
 } from "../../src/contracts";
 import {
-  DutchLimitOrderBuilder,
-  DutchLimitOrder,
+  DutchOrderBuilder,
+  DutchOrder,
   OrderValidator,
   OrderQuoter as OrderQuoterLib,
   OrderValidation,
@@ -37,7 +37,7 @@ describe("OrderValidator", () => {
   let permit2: Permit2;
   let quoter: OrderQuoter;
   let chainId: number;
-  let builder: DutchLimitOrderBuilder;
+  let builder: DutchOrderBuilder;
   let validator: OrderValidator;
   let tokenIn: MockERC20;
   let tokenOut: MockERC20;
@@ -75,7 +75,7 @@ describe("OrderValidator", () => {
     );
     quoter = (await orderQuoterFactory.deploy()) as OrderQuoter;
     chainId = hre.network.config.chainId || 1;
-    builder = new DutchLimitOrderBuilder(
+    builder = new DutchOrderBuilder(
       chainId,
       reactor.address,
       permit2.address
@@ -444,7 +444,7 @@ describe("OrderValidator", () => {
       endAmount: BigNumber.from("20000000000000000000"),
     });
 
-    const order = new DutchLimitOrder(
+    const order = new DutchOrder(
       Object.assign(info, { outputs: [output] }),
       chainId,
       permit2.address
@@ -478,7 +478,7 @@ describe("OrderValidator", () => {
         recipient: "0x0000000000000000000000000000000000000000",
       })
       .build().info;
-    const order = new DutchLimitOrder(
+    const order = new DutchOrder(
       Object.assign(info, {
         deadline: deadline - 100,
         endTime: deadline - 100,
@@ -517,7 +517,7 @@ describe("OrderValidator", () => {
       })
       .build().info;
 
-    const order = new DutchLimitOrder(info, chainId, permit2.address);
+    const order = new DutchOrder(info, chainId, permit2.address);
 
     const { domain, types, values } = order.permitData();
     const signature = await maker._signTypedData(domain, types, values);
@@ -561,7 +561,7 @@ describe("OrderValidator", () => {
         recipient: "0x0000000000000000000000000000000000000000",
       })
       .build().info;
-    const order = new DutchLimitOrder(
+    const order = new DutchOrder(
       Object.assign(info, { endTime: deadline - 100 }),
       chainId,
       permit2.address
@@ -595,7 +595,7 @@ describe("OrderValidator", () => {
         recipient: "0x0000000000000000000000000000000000000000",
       })
       .build().info;
-    const order = new DutchLimitOrder(info, chainId, permit2.address);
+    const order = new DutchOrder(info, chainId, permit2.address);
 
     const { domain, types, values } = order.permitData();
     const signature = await maker._signTypedData(domain, types, values);

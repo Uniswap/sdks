@@ -1,11 +1,9 @@
 import { BigNumber, ethers } from "ethers";
 
-import { DutchLimitOrder, DutchLimitOrderInfo } from "./DutchLimitOrder";
+import { DutchOrder, DutchOrderInfo } from "./DutchOrder";
 
-describe("DutchLimitOrder", () => {
-  const getOrderInfo = (
-    data: Partial<DutchLimitOrderInfo>
-  ): DutchLimitOrderInfo => {
+describe("DutchOrder", () => {
+  const getOrderInfo = (data: Partial<DutchOrderInfo>): DutchOrderInfo => {
     return Object.assign(
       {
         deadline: Math.floor(new Date().getTime() / 1000) + 1000,
@@ -38,14 +36,14 @@ describe("DutchLimitOrder", () => {
 
   it("parses a serialized order", () => {
     const orderInfo = getOrderInfo({});
-    const order = new DutchLimitOrder(orderInfo, 1);
+    const order = new DutchOrder(orderInfo, 1);
     const serialized = order.serialize();
-    const parsed = DutchLimitOrder.parse(serialized, 1);
+    const parsed = DutchOrder.parse(serialized, 1);
     expect(parsed.info).toEqual(orderInfo);
   });
 
   it("valid signature over info", async () => {
-    const order = new DutchLimitOrder(getOrderInfo({}), 1);
+    const order = new DutchOrder(getOrderInfo({}), 1);
     const wallet = ethers.Wallet.createRandom();
 
     const { domain, types, values } = order.permitData();

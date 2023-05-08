@@ -25,7 +25,7 @@ export enum KNOWN_EVENT_SIGNATURES {
 }
 
 export enum OrderType {
-  DutchLimit = "DutchLimit",
+  Dutch = "Dutch",
 }
 
 type Reactors = {
@@ -39,16 +39,16 @@ type ReverseReactorMapping = {
 
 export const REACTOR_ADDRESS_MAPPING: ReactorMapping = {
   1: {
-    [OrderType.DutchLimit]: "0xbD7F9D0239f81C94b728d827a87b9864972661eC",
+    [OrderType.Dutch]: "0xbD7F9D0239f81C94b728d827a87b9864972661eC",
   },
   5: {
-    [OrderType.DutchLimit]: "0xE5D50eB6e669C32D797379aF3907478FE491036D",
+    [OrderType.Dutch]: "0xE5D50eB6e669C32D797379aF3907478FE491036D",
   },
   137: {
-    [OrderType.DutchLimit]: "0xbD7F9D0239f81C94b728d827a87b9864972661eC",
+    [OrderType.Dutch]: "0xbD7F9D0239f81C94b728d827a87b9864972661eC",
   },
   12341234: {
-    [OrderType.DutchLimit]: "0xFF086b7696Dc4116B336Dd0e42ecd2164FC2712B",
+    [OrderType.Dutch]: "0xFF086b7696Dc4116B336Dd0e42ecd2164FC2712B",
   },
 };
 
