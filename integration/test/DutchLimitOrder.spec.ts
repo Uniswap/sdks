@@ -13,9 +13,9 @@ import {
   DutchLimitOrderReactor,
   MockERC20,
 } from '../../src/contracts';
-import { DutchLimitOrderBuilder } from '../../';
+import { DutchOrderBuilder } from '../../';
 
-describe('DutchLimitOrder', () => {
+describe('DutchOrder', () => {
   const DIRECT_TAKER_FILL = '0x0000000000000000000000000000000000000001';
 
   let reactor: DutchLimitOrderReactor;
@@ -82,7 +82,7 @@ describe('DutchLimitOrder', () => {
     const amount = BigNumber.from(10).pow(18);
     const deadline = await new BlockchainTime().secondsFromNow(1000);
     const makerAddress = await maker.getAddress();
-    const preBuildOrder = new DutchLimitOrderBuilder(
+    const preBuildOrder = new DutchOrderBuilder(
       chainId,
       reactor.address,
       permit2.address
@@ -131,7 +131,7 @@ describe('DutchLimitOrder', () => {
   it('executes a serialized order with no decay', async () => {
     const amount = BigNumber.from(10).pow(18);
     const deadline = await new BlockchainTime().secondsFromNow(1000);
-    const order = new DutchLimitOrderBuilder(
+    const order = new DutchOrderBuilder(
       chainId,
       reactor.address,
       permit2.address
@@ -197,7 +197,7 @@ describe('DutchLimitOrder', () => {
     const amount = BigNumber.from(10).pow(18);
     const time = new BlockchainTime();
     const deadline = await time.secondsFromNow(1000);
-    const order = new DutchLimitOrderBuilder(
+    const order = new DutchOrderBuilder(
       chainId,
       reactor.address,
       permit2.address

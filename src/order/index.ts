@@ -2,10 +2,10 @@ import { OrderType, REVERSE_REACTOR_MAPPING } from "../constants";
 import { MissingConfiguration } from "../errors";
 import { stripHexPrefix } from "../utils";
 
-import { DutchLimitOrder } from "./DutchLimitOrder";
+import { DutchOrder } from "./DutchOrder";
 import { Order } from "./types";
 
-export * from "./DutchLimitOrder";
+export * from "./DutchOrder";
 export * from "./types";
 export * from "./validation";
 
@@ -30,8 +30,8 @@ export function parseOrder(order: string): Order {
 
   const { chainId, orderType } = REVERSE_REACTOR_MAPPING[reactor];
   switch (orderType) {
-    case OrderType.DutchLimit:
-      return DutchLimitOrder.parse(order, chainId);
+    case OrderType.Dutch:
+      return DutchOrder.parse(order, chainId);
     default:
       throw new MissingConfiguration("orderType", orderType);
   }

@@ -1,16 +1,16 @@
 import { Currency, CurrencyAmount, Price, TradeType } from "@uniswap/sdk-core";
 
-import { DutchLimitOrder, DutchLimitOrderInfo } from "../order";
+import { DutchOrder, DutchOrderInfo } from "../order";
 
 import { areCurrenciesEqual } from "./utils";
 
-export class DutchLimitOrderTrade<
+export class DutchOrderTrade<
   TInput extends Currency,
   TOutput extends Currency,
   TTradeType extends TradeType
 > {
   public readonly tradeType: TTradeType;
-  public readonly order: DutchLimitOrder;
+  public readonly order: DutchOrder;
 
   private _inputAmount: CurrencyAmount<TInput> | undefined;
   private _outputAmounts: CurrencyAmount<TOutput>[] | undefined;
@@ -26,7 +26,7 @@ export class DutchLimitOrderTrade<
   }: {
     currencyIn: TInput;
     currenciesOut: TOutput[];
-    orderInfo: DutchLimitOrderInfo;
+    orderInfo: DutchOrderInfo;
     tradeType: TTradeType;
   }) {
     this._currencyIn = currencyIn;
@@ -34,7 +34,7 @@ export class DutchLimitOrderTrade<
     this.tradeType = tradeType;
 
     // assume single-chain for now
-    this.order = new DutchLimitOrder(orderInfo, currencyIn.chainId);
+    this.order = new DutchOrder(orderInfo, currencyIn.chainId);
   }
 
   public get inputAmount(): CurrencyAmount<TInput> {
