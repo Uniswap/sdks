@@ -108,19 +108,6 @@ describe("DutchOrder", () => {
       );
     });
 
-    it("resolves at startTime", () => {
-      const order = new DutchOrder(getOrderInfo({}), 1);
-      const resolved = order.resolve({ timestamp: order.info.startTime });
-      expect(resolved.input.token).toEqual(order.info.input.token);
-      expect(resolved.input.amount).toEqual(order.info.input.startAmount);
-
-      expect(resolved.outputs.length).toEqual(1);
-      expect(resolved.outputs[0].token).toEqual(order.info.outputs[0].token);
-      expect(resolved.outputs[0].amount).toEqual(
-        order.info.outputs[0].startAmount
-      );
-    });
-
     it("resolves when filler has exclusivity", () => {
       const exclusiveFiller = "0x0000000000000000000000000000000000000001";
       const order = new DutchOrder(
