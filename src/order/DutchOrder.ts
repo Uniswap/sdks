@@ -9,7 +9,7 @@ import {
 } from "@uniswap/permit2-sdk";
 import { BigNumber, ethers } from "ethers";
 
-import { PERMIT2_MAPPING } from "../constants";
+import { BPS, PERMIT2_MAPPING } from "../constants";
 import { MissingConfiguration } from "../errors";
 import { ResolvedOrder } from "../utils/OrderQuoter";
 import { getDecayedAmount } from "../utils/dutchDecay";
@@ -51,6 +51,8 @@ export type DutchOrderInfo = OrderInfo & {
   input: DutchInput;
   outputs: DutchOutput[];
 };
+
+const STRICT_EXCLUSIVITY = BigNumber.from(0);
 
 export type DutchOrderInfoJSON = Omit<
   DutchOrderInfo,
@@ -325,6 +327,10 @@ export class DutchOrder extends Order {
    * @inheritdoc Order
    */
   resolve(options: OrderResolutionOptions): ResolvedOrder {
+    const useOverride =
+      this.info.exclusiveFiller !== ethers.constants.AddressZero &&
+      options.timestamp <= this.info.startTime &&
+      options.filler !== this.info.exclusiveFiller;
     return {
       input: {
         token: this.info.input.token,
@@ -338,9 +344,8 @@ export class DutchOrder extends Order {
           options.timestamp
         ),
       },
-      outputs: this.info.outputs.map((output) => ({
-        token: output.token,
-        amount: getDecayedAmount(
+      outputs: this.info.outputs.map((output) => {
+        const baseAmount = getDecayedAmount(
           {
             startTime: this.info.startTime,
             endTime: this.info.endTime,
@@ -348,8 +353,23 @@ export class DutchOrder extends Order {
             endAmount: output.endAmount,
           },
           options.timestamp
-        ),
-      })),
+        );
+        let amount = baseAmount;
+        // strict exclusivity means the order cant be resolved filled at any price
+        if (useOverride) {
+          if (this.info.exclusivityOverrideBps.eq(STRICT_EXCLUSIVITY)) {
+            amount = ethers.constants.MaxUint256;
+          } else {
+            amount = baseAmount
+              .mul(this.info.exclusivityOverrideBps.add(BPS))
+              .div(BPS);
+          }
+        }
+        return {
+          token: output.token,
+          amount,
+        };
+      }),
     };
   }
 

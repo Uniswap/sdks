@@ -74,4 +74,5 @@ export type OrderInfo = {
 // options to resolve an order
 export type OrderResolutionOptions = {
   timestamp: number;
+  filler?: string;
 };
