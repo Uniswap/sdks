@@ -61,6 +61,7 @@ const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
   ee3b3d4b: OrderValidation.NonceUsed,
   "0a0b0d79": OrderValidation.ValidationFailed,
   b9ec1e96: OrderValidation.ExclusivityPeriod,
+  "062dec56": OrderValidation.ExclusivityPeriod,
   TRANSFER_FROM_FAILED: OrderValidation.InsufficientFunds,
 };
 

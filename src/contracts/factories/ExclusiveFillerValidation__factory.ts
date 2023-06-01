@@ -12,8 +12,8 @@ import type {
 const _abi = [
   {
     inputs: [],
-    stateMutability: "nonpayable",
-    type: "constructor",
+    name: "NotExclusiveFiller",
+    type: "error",
   },
   {
     inputs: [
@@ -27,13 +27,13 @@ const _abi = [
           {
             components: [
               {
-                internalType: "address",
+                internalType: "contract IReactor",
                 name: "reactor",
                 type: "address",
               },
               {
                 internalType: "address",
-                name: "offerer",
+                name: "swapper",
                 type: "address",
               },
               {
@@ -47,7 +47,7 @@ const _abi = [
                 type: "uint256",
               },
               {
-                internalType: "address",
+                internalType: "contract IValidationCallback",
                 name: "validationContract",
                 type: "address",
               },
@@ -64,7 +64,7 @@ const _abi = [
           {
             components: [
               {
-                internalType: "address",
+                internalType: "contract ERC20",
                 name: "token",
                 type: "address",
               },
@@ -122,20 +122,14 @@ const _abi = [
       },
     ],
     name: "validate",
-    outputs: [
-      {
-        internalType: "bool",
-        name: "",
-        type: "bool",
-      },
-    ],
+    outputs: [],
     stateMutability: "view",
     type: "function",
   },
 ];
 
 const _bytecode =
-  "0x608060405234801561001057600080fd5b5061024e806100206000396000f3fe608060405234801561001057600080fd5b506004361061002b5760003560e01c80636e84ba2b14610030575b600080fd5b61004361003e3660046100eb565b610057565b604051901515815260200160405180910390f35b600080806100658480610142565b6100739060a0810190610180565b81019061008091906101ec565b91509150428110806100bd57508173ffffffffffffffffffffffffffffffffffffffff168573ffffffffffffffffffffffffffffffffffffffff16145b95945050505050565b73ffffffffffffffffffffffffffffffffffffffff811681146100e857600080fd5b50565b600080604083850312156100fe57600080fd5b8235610109816100c6565b9150602083013567ffffffffffffffff81111561012557600080fd5b830160e0818603121561013757600080fd5b809150509250929050565b600082357fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff4183360301811261017657600080fd5b9190910192915050565b60008083357fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe18436030181126101b557600080fd5b83018035915067ffffffffffffffff8211156101d057600080fd5b6020019150368190038213156101e557600080fd5b9250929050565b600080604083850312156101ff57600080fd5b823561020a816100c6565b94602093909301359350505056fea26469706673582212204ae87741ad4ea41528966909537dbd547cf5569211ee6c340523bf183e716caa64736f6c63430008130033";
+  "0x608060405234801561001057600080fd5b50610272806100206000396000f3fe608060405234801561001057600080fd5b506004361061002b5760003560e01c80636e84ba2b14610030575b600080fd5b61004361003e36600461010f565b610045565b005b6000806100528380610166565b6100609060a08101906101a4565b81019061006d9190610210565b915091504281101580156100ad57508173ffffffffffffffffffffffffffffffffffffffff168473ffffffffffffffffffffffffffffffffffffffff1614155b156100e4576040517f062dec5600000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b50505050565b73ffffffffffffffffffffffffffffffffffffffff8116811461010c57600080fd5b50565b6000806040838503121561012257600080fd5b823561012d816100ea565b9150602083013567ffffffffffffffff81111561014957600080fd5b830160e0818603121561015b57600080fd5b809150509250929050565b600082357fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff4183360301811261019a57600080fd5b9190910192915050565b60008083357fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe18436030181126101d957600080fd5b83018035915067ffffffffffffffff8211156101f457600080fd5b60200191503681900382131561020957600080fd5b9250929050565b6000806040838503121561022357600080fd5b823561022e816100ea565b94602093909301359350505056fea2646970667358221220343f716608e500b1f3bc31159441a878683e7e642c2c8960bffc1bf28c292b1d64736f6c63430008130033";
 
 type ExclusiveFillerValidationConstructorParams =
   | [signer?: Signer]

@@ -129,7 +129,7 @@ describe('NonceManager', () => {
   const sendPermit = async (nonce: BigNumber) => {
     const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
 
-    // maker fills their own order
+    // swapper fills their own order
     const permit: PermitTransferFrom = {
       permitted: {
         token: '0x0000000000000000000000000000000000000000',

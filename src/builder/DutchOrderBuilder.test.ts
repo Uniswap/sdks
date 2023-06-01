@@ -18,7 +18,7 @@ describe("DutchOrderBuilder", () => {
       .deadline(deadline)
       .endTime(deadline)
       .startTime(deadline - 100)
-      .offerer("0x0000000000000000000000000000000000000001")
+      .swapper("0x0000000000000000000000000000000000000001")
       .nonce(BigNumber.from(100))
       .input({
         token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
@@ -52,7 +52,7 @@ describe("DutchOrderBuilder", () => {
       .deadline(deadline)
       .endTime(deadline)
       .startTime(deadline - 100)
-      .offerer("0x0000000000000000000000000000000000000001")
+      .swapper("0x0000000000000000000000000000000000000001")
       .nonce(BigNumber.from(100))
       .input({
         token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
@@ -94,7 +94,7 @@ describe("DutchOrderBuilder", () => {
       .deadline(deadline)
       .endTime(deadline)
       .startTime(deadline - 100)
-      .offerer("0x0000000000000000000000000000000000000001")
+      .swapper("0x0000000000000000000000000000000000000001")
       .nonce(BigNumber.from(100))
       .input({
         token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
@@ -129,7 +129,7 @@ describe("DutchOrderBuilder", () => {
       .deadline(deadline)
       .endTime(deadline)
       .startTime(deadline - 100)
-      .offerer("0x0000000000000000000000000000000000000001")
+      .swapper("0x0000000000000000000000000000000000000001")
       .nonce(BigNumber.from(100))
       .input({
         token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
@@ -167,7 +167,7 @@ describe("DutchOrderBuilder", () => {
       .deadline(deadline)
       .endTime(deadline)
       .startTime(deadline - 100)
-      .offerer("0x0000000000000000000000000000000000000001")
+      .swapper("0x0000000000000000000000000000000000000001")
       .nonce(BigNumber.from(100))
       .input({
         token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
@@ -195,7 +195,7 @@ describe("DutchOrderBuilder", () => {
       .deadline(deadline)
       .endTime(deadline)
       .startTime(deadline - 100)
-      .offerer("0x0000000000000000000000000000000000000000")
+      .swapper("0x0000000000000000000000000000000000000000")
       .nonce(BigNumber.from(100))
       .input({
         token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
@@ -227,7 +227,7 @@ describe("DutchOrderBuilder", () => {
         .deadline(deadline)
         .endTime(deadline)
         .startTime(deadline - 100)
-        .offerer("0x0000000000000000000000000000000000000001")
+        .swapper("0x0000000000000000000000000000000000000001")
         .nonce(BigNumber.from(100))
         .input({
           token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
@@ -252,7 +252,7 @@ describe("DutchOrderBuilder", () => {
         .deadline(expiredDeadline)
         .endTime(expiredDeadline)
         .startTime(expiredDeadline - 100)
-        .offerer("0x0000000000000000000000000000000000000001")
+        .swapper("0x0000000000000000000000000000000000000001")
         .nonce(BigNumber.from(100))
         .input({
           token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
@@ -275,7 +275,7 @@ describe("DutchOrderBuilder", () => {
       .deadline(deadline)
       .startTime(deadline + 1)
       .endTime(deadline + 1)
-      .offerer("0x0000000000000000000000000000000000000000")
+      .swapper("0x0000000000000000000000000000000000000000")
       .nonce(BigNumber.from(100))
       .input({
         token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
@@ -314,7 +314,7 @@ describe("DutchOrderBuilder", () => {
     );
   });
 
-  it("Must set offerer", () => {
+  it("Must set swapper", () => {
     const deadline = Math.floor(Date.now() / 1000) + 1000;
     expect(() =>
       builder
@@ -334,7 +334,7 @@ describe("DutchOrderBuilder", () => {
           recipient: "0x0000000000000000000000000000000000000000",
         })
         .build()
-    ).toThrow("Invariant failed: offerer not set");
+    ).toThrow("Invariant failed: swapper not set");
   });
 
   it("Must set deadline or endTime", () => {
@@ -342,7 +342,7 @@ describe("DutchOrderBuilder", () => {
     expect(() =>
       builder
         .startTime(deadline - 100)
-        .offerer("0x0000000000000000000000000000000000000000")
+        .swapper("0x0000000000000000000000000000000000000000")
         .nonce(BigNumber.from(100))
         .input({
           token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
@@ -364,7 +364,7 @@ describe("DutchOrderBuilder", () => {
     const order = builder
       .startTime(deadline - 100)
       .deadline(deadline)
-      .offerer("0x0000000000000000000000000000000000000000")
+      .swapper("0x0000000000000000000000000000000000000000")
       .nonce(BigNumber.from(100))
       .input({
         token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
@@ -388,7 +388,7 @@ describe("DutchOrderBuilder", () => {
         .startTime(deadline - 100)
         .endTime(deadline + 1)
         .deadline(deadline)
-        .offerer("0x0000000000000000000000000000000000000000")
+        .swapper("0x0000000000000000000000000000000000000000")
         .nonce(BigNumber.from(100))
         .input({
           token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
@@ -414,7 +414,7 @@ describe("DutchOrderBuilder", () => {
     const order = builder
       .startTime(deadline - 100)
       .endTime(deadline)
-      .offerer("0x0000000000000000000000000000000000000000")
+      .swapper("0x0000000000000000000000000000000000000000")
       .nonce(BigNumber.from(100))
       .input({
         token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
@@ -437,7 +437,7 @@ describe("DutchOrderBuilder", () => {
       builder
         .deadline(deadline)
         .startTime(deadline - 100)
-        .offerer("0x0000000000000000000000000000000000000000")
+        .swapper("0x0000000000000000000000000000000000000000")
         .input({
           token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
           startAmount: BigNumber.from("1000000"),

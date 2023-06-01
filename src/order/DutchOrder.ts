@@ -91,7 +91,7 @@ const DUTCH_ORDER_TYPES = {
   ],
   OrderInfo: [
     { name: "reactor", type: "address" },
-    { name: "offerer", type: "address" },
+    { name: "swapper", type: "address" },
     { name: "nonce", type: "uint256" },
     { name: "deadline", type: "uint256" },
     { name: "validationContract", type: "address" },
@@ -169,7 +169,7 @@ export class DutchOrder extends Order {
     const decoded = abiCoder.decode(DUTCH_ORDER_ABI, encoded);
     const [
       [
-        [reactor, offerer, nonce, deadline, validationContract, validationData],
+        [reactor, swapper, nonce, deadline, validationContract, validationData],
         startTime,
         endTime,
         exclusiveFiller,
@@ -181,7 +181,7 @@ export class DutchOrder extends Order {
     return new DutchOrder(
       {
         reactor,
-        offerer,
+        swapper,
         nonce,
         deadline: deadline.toNumber(),
         validationContract,
@@ -228,7 +228,7 @@ export class DutchOrder extends Order {
       chainId: this.chainId,
       permit2Address: this.permit2Address,
       reactor: this.info.reactor,
-      offerer: this.info.offerer,
+      swapper: this.info.swapper,
       nonce: this.info.nonce.toString(),
       deadline: this.info.deadline,
       validationContract: this.info.validationContract,
@@ -260,7 +260,7 @@ export class DutchOrder extends Order {
       [
         [
           this.info.reactor,
-          this.info.offerer,
+          this.info.swapper,
           this.info.nonce,
           this.info.deadline,
           this.info.validationContract,
@@ -389,7 +389,7 @@ export class DutchOrder extends Order {
     return {
       info: {
         reactor: this.info.reactor,
-        offerer: this.info.offerer,
+        swapper: this.info.swapper,
         nonce: this.info.nonce,
         deadline: this.info.deadline,
         validationContract: this.info.validationContract,

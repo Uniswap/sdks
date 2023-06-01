@@ -7,7 +7,6 @@ import { BlockchainTime } from "./utils/time";
 import DutchLimitOrderReactorAbi from "../../abis/DutchLimitOrderReactor.json";
 import Permit2Abi from "../../abis/Permit2.json";
 import MockERC20Abi from "../../abis/MockERC20.json";
-import DirectTakerFillContract from "../../abis/DirectTakerExecutor.json";
 
 import {
   Permit2,
@@ -20,17 +19,17 @@ describe("EventWatcher", () => {
   let reactor: DutchLimitOrderReactor;
   let permit2: Permit2;
   let chainId: number;
-  let maker: ethers.Wallet;
+  let swapper: ethers.Wallet;
   let tokenIn: MockERC20;
   let tokenOut: MockERC20;
   let admin: Signer;
-  let taker: Signer;
+  let filler: Signer;
   let watcher: EventWatcher;
 
-  const DIRECT_TAKER_FILL = '0x0000000000000000000000000000000000000001';
+  const DIRECT_FILL = '0x0000000000000000000000000000000000000001';
 
   before(async () => {
-    [admin, taker] = await ethers.getSigners();
+    [admin, filler] = await ethers.getSigners();
     const permit2Factory = await ethers.getContractFactory(
       Permit2Abi.abi,
       Permit2Abi.bytecode
@@ -48,9 +47,9 @@ describe("EventWatcher", () => {
 
     chainId = hre.network.config.chainId || 1;
 
-    maker = ethers.Wallet.createRandom().connect(ethers.provider);
+    swapper = ethers.Wallet.createRandom().connect(ethers.provider);
     await admin.sendTransaction({
-      to: await maker.getAddress(),
+      to: await swapper.getAddress(),
       value: BigNumber.from(10).pow(18),
     });
 
@@ -63,23 +62,23 @@ describe("EventWatcher", () => {
     tokenOut = (await tokenFactory.deploy("TEST B", "tb", 18)) as MockERC20;
 
     await tokenIn.mint(
-      await maker.getAddress(),
+      await swapper.getAddress(),
       BigNumber.from(10).pow(18).mul(100)
     );
     await tokenIn
-      .connect(maker)
+      .connect(swapper)
       .approve(permit2.address, ethers.constants.MaxUint256);
 
     await tokenOut.mint(
-      await taker.getAddress(),
+      await filler.getAddress(),
       BigNumber.from(10).pow(18).mul(100)
     );
     await tokenOut
-      .connect(taker)
+      .connect(filler)
       .approve(permit2.address, ethers.constants.MaxUint256);
     watcher = new EventWatcher(ethers.provider, reactor.address);
 
-    await permit2.connect(taker).approve(tokenOut.address, reactor.address, BigNumber.from(2).pow(160).sub(1), BigNumber.from(2).pow(48).sub(1));
+    await permit2.connect(filler).approve(tokenOut.address, reactor.address, BigNumber.from(2).pow(160).sub(1), BigNumber.from(2).pow(48).sub(1));
   });
 
   it("Fetches fill events", async () => {
@@ -93,7 +92,7 @@ describe("EventWatcher", () => {
       .deadline(deadline)
       .endTime(deadline)
       .startTime(deadline - 100)
-      .offerer(await maker.getAddress())
+      .swapper(await swapper.getAddress())
       .nonce(BigNumber.from(100))
       .input({
         token: tokenIn.address,
@@ -104,18 +103,18 @@ describe("EventWatcher", () => {
         token: tokenOut.address,
         startAmount: amount,
         endAmount: BigNumber.from(10).pow(17).mul(9),
-        recipient: await maker.getAddress(),
+        recipient: await swapper.getAddress(),
       })
       .build();
 
     const { domain, types, values } = order.permitData();
-    const signature = await maker._signTypedData(domain, types, values);
+    const signature = await swapper._signTypedData(domain, types, values);
 
     const res = await reactor
-      .connect(taker)
+      .connect(filler)
       .execute(
         { order: order.serialize(), sig: signature },
-        DIRECT_TAKER_FILL,
+        DIRECT_FILL,
         "0x"
       );
     await res.wait();
@@ -125,8 +124,8 @@ describe("EventWatcher", () => {
     const logs = await watcher.getFillEvents(0, bn);
     expect(logs.length).to.equal(1);
     expect(logs[0].orderHash).to.equal(order.hash());
-    expect(logs[0].filler).to.equal(await taker.getAddress());
-    expect(logs[0].offerer).to.equal(await maker.getAddress());
+    expect(logs[0].filler).to.equal(await filler.getAddress());
+    expect(logs[0].swapper).to.equal(await swapper.getAddress());
     expect(logs[0].nonce.toString()).to.equal("100");
 
     const fillInfo = await watcher.getFillInfo(0, bn);
@@ -150,7 +149,7 @@ describe("EventWatcher", () => {
       .deadline(deadline)
       .endTime(deadline)
       .startTime(deadline - 100)
-      .offerer(await maker.getAddress())
+      .swapper(await swapper.getAddress())
       .nonce(BigNumber.from(101))
       .input({
         token: tokenIn.address,
@@ -161,24 +160,24 @@ describe("EventWatcher", () => {
         token: tokenOut.address,
         startAmount: amount,
         endAmount: BigNumber.from(10).pow(17).mul(9),
-        recipient: await maker.getAddress(),
+        recipient: await swapper.getAddress(),
       })
       .build();
 
     const { domain, types, values } = order.permitData();
-    const signature = await maker._signTypedData(domain, types, values);
+    const signature = await swapper._signTypedData(domain, types, values);
 
-    const makerAddress = await maker.getAddress();
-    const takerAddress = await taker.getAddress();
+    const swapperAddress = await swapper.getAddress();
+    const fillerAddress = await filler.getAddress();
     watcher.onFill((fill: FillData) => {
-      expect(fill.filler).to.equal(takerAddress);
-      expect(fill.offerer).to.equal(makerAddress);
+      expect(fill.filler).to.equal(fillerAddress);
+      expect(fill.swapper).to.equal(swapperAddress);
     });
     const res = await reactor
-      .connect(taker)
+      .connect(filler)
       .execute(
         { order: order.serialize(), sig: signature },
-        DIRECT_TAKER_FILL,
+        DIRECT_FILL,
         "0x"
       );
     await res.wait();
