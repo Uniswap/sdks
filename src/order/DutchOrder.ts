@@ -345,7 +345,7 @@ export class DutchOrder extends Order {
         ),
       },
       outputs: this.info.outputs.map((output) => {
-        const amount = getDecayedAmount(
+        const baseAmount = getDecayedAmount(
           {
             startTime: this.info.startTime,
             endTime: this.info.endTime,
@@ -354,13 +354,20 @@ export class DutchOrder extends Order {
           },
           options.timestamp
         );
+        let amount = baseAmount;
+        // strict exclusivity means the order cant be resolved filled at any price
+        if (useOverride) {
+          if (this.info.exclusivityOverrideBps.eq(STRICT_EXCLUSIVITY)) {
+            amount = ethers.constants.MaxUint256;
+          } else {
+            amount = baseAmount
+              .mul(this.info.exclusivityOverrideBps.add(BPS))
+              .div(BPS);
+          }
+        }
         return {
           token: output.token,
-          amount: useOverride
-            ? this.info.exclusivityOverrideBps.eq(STRICT_EXCLUSIVITY)
-              ? ethers.constants.MaxUint256
-              : amount.mul(this.info.exclusivityOverrideBps.add(BPS)).div(BPS)
-            : amount,
+          amount,
         };
       }),
     };
