@@ -3,6 +3,7 @@ import JSBI from 'jsbi'
 export enum SupportedChainId {
   MAINNET = 1,
   GOERLI = 5,
+  SEPOLIA = 11155111,
 
   ARBITRUM_ONE = 42161,
   ARBITRUM_GOERLI = 421613,
