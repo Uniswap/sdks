@@ -68,3 +68,5 @@ export const REVERSE_REACTOR_MAPPING: ReverseReactorMapping = Object.entries(
 
   return acc;
 }, {});
+
+export const BPS = 10000;
