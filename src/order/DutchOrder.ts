@@ -9,7 +9,7 @@ import {
 } from "@uniswap/permit2-sdk";
 import { BigNumber, ethers } from "ethers";
 
-import { PERMIT2_MAPPING } from "../constants";
+import { BPS, PERMIT2_MAPPING } from "../constants";
 import { MissingConfiguration } from "../errors";
 import { ResolvedOrder } from "../utils/OrderQuoter";
 import { getDecayedAmount } from "../utils/dutchDecay";
@@ -325,6 +325,10 @@ export class DutchOrder extends Order {
    * @inheritdoc Order
    */
   resolve(options: OrderResolutionOptions): ResolvedOrder {
+    const useOverride =
+      this.info.exclusiveFiller !== ethers.constants.AddressZero &&
+      options.timestamp <= this.info.startTime &&
+      options.filler !== this.info.exclusiveFiller;
     return {
       input: {
         token: this.info.input.token,
@@ -338,18 +342,20 @@ export class DutchOrder extends Order {
           options.timestamp
         ),
       },
-      outputs: this.info.outputs.map((output) => ({
-        token: output.token,
-        amount: getDecayedAmount(
-          {
-            startTime: this.info.startTime,
-            endTime: this.info.endTime,
-            startAmount: output.startAmount,
-            endAmount: output.endAmount,
-          },
-          options.timestamp
-        ),
-      })),
+      outputs: this.info.outputs.map((output) => {
+        const amount = getDecayedAmount({
+          startTime: this.info.startTime,
+          endTime: this.info.endTime,
+          startAmount: output.startAmount,
+          endAmount: output.endAmount,
+        });
+        return {
+          token: output.token,
+          amount: useOverride
+            ? amount.mul(this.info.exclusivityOverrideBps).div(BPS)
+            : amount,
+        };
+      }),
     };
   }
 
