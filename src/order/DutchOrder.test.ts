@@ -50,4 +50,173 @@ describe("DutchOrder", () => {
     const signature = await wallet._signTypedData(domain, types, values);
     expect(order.getSigner(signature)).toEqual(await wallet.getAddress());
   });
+
+  describe.only("resolve", () => {
+    it("resolves before startTime", () => {
+      const order = new DutchOrder(getOrderInfo({}), 1);
+      const resolved = order.resolve({ timestamp: order.info.startTime - 100 });
+      expect(resolved.input.token).toEqual(order.info.input.token);
+      expect(resolved.input.amount).toEqual(order.info.input.startAmount);
+
+      expect(resolved.outputs.length).toEqual(1);
+      expect(resolved.outputs[0].token).toEqual(order.info.outputs[0].token);
+      expect(resolved.outputs[0].amount).toEqual(
+        order.info.outputs[0].startAmount
+      );
+    });
+
+    it("resolves at startTime", () => {
+      const order = new DutchOrder(getOrderInfo({}), 1);
+      const resolved = order.resolve({ timestamp: order.info.startTime });
+      expect(resolved.input.token).toEqual(order.info.input.token);
+      expect(resolved.input.amount).toEqual(order.info.input.startAmount);
+
+      expect(resolved.outputs.length).toEqual(1);
+      expect(resolved.outputs[0].token).toEqual(order.info.outputs[0].token);
+      expect(resolved.outputs[0].amount).toEqual(
+        order.info.outputs[0].startAmount
+      );
+    });
+
+    it("resolves at endTime", () => {
+      const order = new DutchOrder(getOrderInfo({}), 1);
+      const resolved = order.resolve({
+        timestamp: order.info.endTime,
+      });
+      expect(resolved.input.token).toEqual(order.info.input.token);
+      expect(resolved.input.amount).toEqual(order.info.input.endAmount);
+
+      expect(resolved.outputs.length).toEqual(1);
+      expect(resolved.outputs[0].token).toEqual(order.info.outputs[0].token);
+      expect(resolved.outputs[0].amount).toEqual(
+        order.info.outputs[0].endAmount
+      );
+    });
+
+    it("resolves after endTime", () => {
+      const order = new DutchOrder(getOrderInfo({}), 1);
+      const resolved = order.resolve({
+        timestamp: order.info.endTime + 100,
+      });
+      expect(resolved.input.token).toEqual(order.info.input.token);
+      expect(resolved.input.amount).toEqual(order.info.input.endAmount);
+
+      expect(resolved.outputs.length).toEqual(1);
+      expect(resolved.outputs[0].token).toEqual(order.info.outputs[0].token);
+      expect(resolved.outputs[0].amount).toEqual(
+        order.info.outputs[0].endAmount
+      );
+    });
+
+    it("resolves at startTime", () => {
+      const order = new DutchOrder(getOrderInfo({}), 1);
+      const resolved = order.resolve({ timestamp: order.info.startTime });
+      expect(resolved.input.token).toEqual(order.info.input.token);
+      expect(resolved.input.amount).toEqual(order.info.input.startAmount);
+
+      expect(resolved.outputs.length).toEqual(1);
+      expect(resolved.outputs[0].token).toEqual(order.info.outputs[0].token);
+      expect(resolved.outputs[0].amount).toEqual(
+        order.info.outputs[0].startAmount
+      );
+    });
+
+    it("resolves when filler has exclusivity", () => {
+      const exclusiveFiller = "0x0000000000000000000000000000000000000001";
+      const order = new DutchOrder(
+        getOrderInfo({
+          exclusiveFiller: exclusiveFiller,
+          exclusivityOverrideBps: BigNumber.from(100),
+        }),
+        1
+      );
+      const resolved = order.resolve({
+        timestamp: order.info.startTime - 1,
+        filler: exclusiveFiller,
+      });
+      expect(resolved.input.token).toEqual(order.info.input.token);
+      expect(resolved.input.amount).toEqual(order.info.input.startAmount);
+
+      expect(resolved.outputs.length).toEqual(1);
+      expect(resolved.outputs[0].token).toEqual(order.info.outputs[0].token);
+      expect(resolved.outputs[0].amount).toEqual(
+        order.info.outputs[0].startAmount
+      );
+    });
+
+    it("resolves when filler doesnt have exclusivity", () => {
+      const nonExclusiveFiller = "0x0000000000000000000000000000000000000000";
+      const exclusiveFiller = "0x0000000000000000000000000000000000000001";
+      const exclusivityOverrideBps = BigNumber.from(100);
+      const order = new DutchOrder(
+        getOrderInfo({
+          exclusiveFiller,
+          exclusivityOverrideBps,
+        }),
+        1
+      );
+      const resolved = order.resolve({
+        timestamp: order.info.startTime - 1,
+        filler: nonExclusiveFiller,
+      });
+      expect(resolved.input.token).toEqual(order.info.input.token);
+      expect(resolved.input.amount).toEqual(order.info.input.startAmount);
+
+      expect(resolved.outputs.length).toEqual(1);
+      expect(resolved.outputs[0].token).toEqual(order.info.outputs[0].token);
+      expect(resolved.outputs[0].amount).toEqual(
+        order.info.outputs[0].startAmount
+          .mul(exclusivityOverrideBps.add(10000))
+          .div(10000)
+      );
+    });
+
+    it("resolves when filler doesnt have exclusivity but startTime is past", () => {
+      const nonExclusiveFiller = "0x0000000000000000000000000000000000000000";
+      const exclusiveFiller = "0x0000000000000000000000000000000000000001";
+      const exclusivityOverrideBps = BigNumber.from(100);
+      const order = new DutchOrder(
+        getOrderInfo({
+          exclusiveFiller,
+          exclusivityOverrideBps,
+        }),
+        1
+      );
+      const resolved = order.resolve({
+        timestamp: order.info.endTime,
+        filler: nonExclusiveFiller,
+      });
+      expect(resolved.input.token).toEqual(order.info.input.token);
+      expect(resolved.input.amount).toEqual(order.info.input.startAmount);
+
+      expect(resolved.outputs.length).toEqual(1);
+      expect(resolved.outputs[0].token).toEqual(order.info.outputs[0].token);
+      expect(resolved.outputs[0].amount).toEqual(
+        order.info.outputs[0].endAmount
+      );
+    });
+
+    it("resolves when filler is not set but there is exclusivity", () => {
+      const exclusiveFiller = "0x0000000000000000000000000000000000000001";
+      const exclusivityOverrideBps = BigNumber.from(100);
+      const order = new DutchOrder(
+        getOrderInfo({
+          exclusiveFiller,
+          exclusivityOverrideBps,
+        }),
+        1
+      );
+      const resolved = order.resolve({ timestamp: order.info.startTime - 1 });
+      expect(resolved.input.token).toEqual(order.info.input.token);
+      expect(resolved.input.amount).toEqual(order.info.input.startAmount);
+
+      expect(resolved.outputs.length).toEqual(1);
+      expect(resolved.outputs[0].token).toEqual(order.info.outputs[0].token);
+      expect(resolved.outputs[0].amount).toEqual(
+        order.info.outputs[0].startAmount
+          .mul(exclusivityOverrideBps.add(10000))
+          .div(10000)
+      );
+    });
+  });
 });
