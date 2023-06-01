@@ -12,7 +12,7 @@ export interface FillData {
   orderHash: string;
   filler: string;
   nonce: BigNumber;
-  offerer: string;
+  swapper: string;
 }
 
 export interface FillInfo extends FillData {
@@ -57,7 +57,7 @@ export class EventWatcher {
     const logs = await this.getFillLogs(fromBlock, toBlock);
     const events = logs.map((log) => log.args);
 
-    // TODO: deal with batch fills for orders with the same offerer and outToken
+    // TODO: deal with batch fills for orders with the same swapper and outToken
     const txs = logs.reduce(
       (acc, log) =>
         acc.add(
@@ -69,7 +69,7 @@ export class EventWatcher {
     const fills = events.map((e, i) => {
       return {
         orderHash: e.orderHash,
-        offerer: e.offerer,
+        swapper: e.swapper,
         filler: e.filler,
         nonce: e.nonce,
         txLogs: txReceipts[i].logs, // insertion order
@@ -86,7 +86,7 @@ export class EventWatcher {
           const parsedLog = ERC20Interface.parseLog(log);
           if (
             parsedLog.name === "Transfer" &&
-            parsedLog.args.to === fill.offerer
+            parsedLog.args.to === fill.swapper
           ) {
             logAcc.push({
               token: log.address,
@@ -101,7 +101,7 @@ export class EventWatcher {
 
       return {
         orderHash: fill.orderHash,
-        offerer: fill.offerer,
+        swapper: fill.swapper,
         filler: fill.filler,
         nonce: fill.nonce,
         blockNumber: fill.blockNumber,
@@ -114,13 +114,13 @@ export class EventWatcher {
   onFill(callback: (fillData: FillData, event: Event) => void): void {
     this.reactor.on(
       this.reactor.filters.Fill(),
-      (orderHash, filler, offerer, nonce, event) => {
+      (orderHash, filler, swapper, nonce, event) => {
         callback(
           {
             orderHash,
             filler,
             nonce,
-            offerer,
+            swapper,
           },
           event
         );

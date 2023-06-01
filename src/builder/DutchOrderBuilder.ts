@@ -20,7 +20,7 @@ export class DutchOrderBuilder extends OrderBuilder {
       .deadline(order.info.deadline)
       .endTime(order.info.endTime)
       .startTime(order.info.startTime)
-      .offerer(order.info.offerer)
+      .swapper(order.info.swapper)
       .nonce(order.info.nonce)
       .input(order.info.input)
       .exclusiveFiller(
@@ -105,8 +105,8 @@ export class DutchOrderBuilder extends OrderBuilder {
     return this;
   }
 
-  offerer(offerer: string): DutchOrderBuilder {
-    super.offerer(offerer);
+  swapper(swapper: string): DutchOrderBuilder {
+    super.swapper(swapper);
     return this;
   }
 

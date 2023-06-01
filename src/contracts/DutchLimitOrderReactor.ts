@@ -39,7 +39,7 @@ export type SignedOrderStructOutput = [string, string] & {
 
 export interface DutchLimitOrderReactorInterface extends utils.Interface {
   functions: {
-    "DIRECT_TAKER_FILL()": FunctionFragment;
+    "DIRECT_FILL()": FunctionFragment;
     "execute((bytes,bytes),address,bytes)": FunctionFragment;
     "executeBatch((bytes,bytes)[],address,bytes)": FunctionFragment;
     "feeController()": FunctionFragment;
@@ -51,7 +51,7 @@ export interface DutchLimitOrderReactorInterface extends utils.Interface {
 
   getFunction(
     nameOrSignatureOrTopic:
-      | "DIRECT_TAKER_FILL"
+      | "DIRECT_FILL"
       | "execute"
       | "executeBatch"
       | "feeController"
@@ -62,7 +62,7 @@ export interface DutchLimitOrderReactorInterface extends utils.Interface {
   ): FunctionFragment;
 
   encodeFunctionData(
-    functionFragment: "DIRECT_TAKER_FILL",
+    functionFragment: "DIRECT_FILL",
     values?: undefined
   ): string;
   encodeFunctionData(
@@ -97,7 +97,7 @@ export interface DutchLimitOrderReactorInterface extends utils.Interface {
   ): string;
 
   decodeFunctionResult(
-    functionFragment: "DIRECT_TAKER_FILL",
+    functionFragment: "DIRECT_FILL",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "execute", data: BytesLike): Result;
@@ -129,7 +129,7 @@ export interface DutchLimitOrderReactorInterface extends utils.Interface {
 export interface FillEventObject {
   orderHash: string;
   filler: string;
-  offerer: string;
+  swapper: string;
   nonce: BigNumber;
 }
 export type FillEvent = TypedEvent<
@@ -177,7 +177,7 @@ export interface DutchLimitOrderReactor extends BaseContract {
   removeListener: OnEvent<this>;
 
   functions: {
-    DIRECT_TAKER_FILL(overrides?: CallOverrides): Promise<[string]>;
+    DIRECT_FILL(overrides?: CallOverrides): Promise<[string]>;
 
     execute(
       order: SignedOrderStruct,
@@ -210,7 +210,7 @@ export interface DutchLimitOrderReactor extends BaseContract {
     ): Promise<ContractTransaction>;
   };
 
-  DIRECT_TAKER_FILL(overrides?: CallOverrides): Promise<string>;
+  DIRECT_FILL(overrides?: CallOverrides): Promise<string>;
 
   execute(
     order: SignedOrderStruct,
@@ -243,7 +243,7 @@ export interface DutchLimitOrderReactor extends BaseContract {
   ): Promise<ContractTransaction>;
 
   callStatic: {
-    DIRECT_TAKER_FILL(overrides?: CallOverrides): Promise<string>;
+    DIRECT_FILL(overrides?: CallOverrides): Promise<string>;
 
     execute(
       order: SignedOrderStruct,
@@ -280,13 +280,13 @@ export interface DutchLimitOrderReactor extends BaseContract {
     "Fill(bytes32,address,address,uint256)"(
       orderHash?: PromiseOrValue<BytesLike> | null,
       filler?: PromiseOrValue<string> | null,
-      offerer?: PromiseOrValue<string> | null,
+      swapper?: PromiseOrValue<string> | null,
       nonce?: null
     ): FillEventFilter;
     Fill(
       orderHash?: PromiseOrValue<BytesLike> | null,
       filler?: PromiseOrValue<string> | null,
-      offerer?: PromiseOrValue<string> | null,
+      swapper?: PromiseOrValue<string> | null,
       nonce?: null
     ): FillEventFilter;
 
@@ -301,7 +301,7 @@ export interface DutchLimitOrderReactor extends BaseContract {
   };
 
   estimateGas: {
-    DIRECT_TAKER_FILL(overrides?: CallOverrides): Promise<BigNumber>;
+    DIRECT_FILL(overrides?: CallOverrides): Promise<BigNumber>;
 
     execute(
       order: SignedOrderStruct,
@@ -335,7 +335,7 @@ export interface DutchLimitOrderReactor extends BaseContract {
   };
 
   populateTransaction: {
-    DIRECT_TAKER_FILL(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+    DIRECT_FILL(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     execute(
       order: SignedOrderStruct,

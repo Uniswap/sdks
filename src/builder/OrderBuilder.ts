@@ -28,8 +28,8 @@ export abstract class OrderBuilder {
     return this;
   }
 
-  offerer(offerer: string): OrderBuilder {
-    this.orderInfo.offerer = offerer;
+  swapper(swapper: string): OrderBuilder {
+    this.orderInfo.swapper = swapper;
     return this;
   }
 
@@ -52,7 +52,7 @@ export abstract class OrderBuilder {
       this.orderInfo.deadline > Date.now() / 1000,
       `Deadline must be in the future: ${this.orderInfo.deadline}`
     );
-    invariant(this.orderInfo.offerer !== undefined, "offerer not set");
+    invariant(this.orderInfo.swapper !== undefined, "swapper not set");
     invariant(
       this.orderInfo.validationContract !== undefined,
       "validation contract not set"
@@ -63,7 +63,7 @@ export abstract class OrderBuilder {
     );
     return {
       reactor: this.orderInfo.reactor,
-      offerer: this.orderInfo.offerer,
+      swapper: this.orderInfo.swapper,
       nonce: this.orderInfo.nonce,
       deadline: this.orderInfo.deadline,
       validationContract: this.orderInfo.validationContract,

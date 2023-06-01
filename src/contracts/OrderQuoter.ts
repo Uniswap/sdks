@@ -25,7 +25,7 @@ import type {
 
 export type OrderInfoStruct = {
   reactor: PromiseOrValue<string>;
-  offerer: PromiseOrValue<string>;
+  swapper: PromiseOrValue<string>;
   nonce: PromiseOrValue<BigNumberish>;
   deadline: PromiseOrValue<BigNumberish>;
   validationContract: PromiseOrValue<string>;
@@ -41,7 +41,7 @@ export type OrderInfoStructOutput = [
   string
 ] & {
   reactor: string;
-  offerer: string;
+  swapper: string;
   nonce: BigNumber;
   deadline: BigNumber;
   validationContract: string;

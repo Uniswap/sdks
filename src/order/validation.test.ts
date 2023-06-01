@@ -70,7 +70,7 @@ describe("OrderValidation", () => {
 function makeOrderInfo(data: string): OrderInfo {
   return {
     reactor: ethers.constants.AddressZero,
-    offerer: ethers.constants.AddressZero,
+    swapper: ethers.constants.AddressZero,
     nonce: BigNumber.from(0),
     deadline: 5,
     validationContract: ethers.constants.AddressZero,
