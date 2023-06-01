@@ -52,6 +52,8 @@ export type DutchOrderInfo = OrderInfo & {
   outputs: DutchOutput[];
 };
 
+const STRICT_EXCLUSIVITY = BigNumber.from(0);
+
 export type DutchOrderInfoJSON = Omit<
   DutchOrderInfo,
   "nonce" | "input" | "outputs" | "exclusivityOverrideBps"
@@ -343,16 +345,21 @@ export class DutchOrder extends Order {
         ),
       },
       outputs: this.info.outputs.map((output) => {
-        const amount = getDecayedAmount({
-          startTime: this.info.startTime,
-          endTime: this.info.endTime,
-          startAmount: output.startAmount,
-          endAmount: output.endAmount,
-        });
+        const amount = getDecayedAmount(
+          {
+            startTime: this.info.startTime,
+            endTime: this.info.endTime,
+            startAmount: output.startAmount,
+            endAmount: output.endAmount,
+          },
+          options.timestamp
+        );
         return {
           token: output.token,
           amount: useOverride
-            ? amount.mul(this.info.exclusivityOverrideBps).div(BPS)
+            ? this.info.exclusivityOverrideBps.eq(STRICT_EXCLUSIVITY)
+              ? ethers.constants.MaxUint256
+              : amount.mul(this.info.exclusivityOverrideBps.add(BPS)).div(BPS)
             : amount,
         };
       }),
