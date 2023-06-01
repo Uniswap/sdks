@@ -51,7 +51,7 @@ describe("DutchOrder", () => {
     expect(order.getSigner(signature)).toEqual(await wallet.getAddress());
   });
 
-  describe.only("resolve", () => {
+  describe("resolve", () => {
     it("resolves before startTime", () => {
       const order = new DutchOrder(getOrderInfo({}), 1);
       const resolved = order.resolve({ timestamp: order.info.startTime - 100 });
