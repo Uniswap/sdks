@@ -1,7 +1,7 @@
 {
   "name": "@uniswap/sdk-core",
   "license": "MIT",
-  "version": "3.2.2",
+  "version": "3.2.3",
   "description": "⚒️ An SDK for building applications on top of Uniswap V3",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
