@@ -1,25 +1,5 @@
 import JSBI from 'jsbi'
 
-export enum SupportedChainId {
-  MAINNET = 1,
-  GOERLI = 5,
-  SEPOLIA = 11155111,
-
-  ARBITRUM_ONE = 42161,
-  ARBITRUM_GOERLI = 421613,
-
-  OPTIMISM = 10,
-  OPTIMISM_GOERLI = 420,
-
-  POLYGON = 137,
-  POLYGON_MUMBAI = 80001,
-
-  CELO = 42220,
-  CELO_ALFAJORES = 44787,
-
-  BNB = 56
-}
-
 // exports for external consumption
 export type BigintIsh = JSBI | string | number
 
