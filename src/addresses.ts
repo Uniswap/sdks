@@ -143,7 +143,10 @@ export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses>
 /* V3 Contract Addresses */
 export const V3_CORE_FACTORY_ADDRESSES: AddressMap = {
   ...SUPPORTED_CHAINS.reduce<AddressMap>(
-    (memo, chainId) => (memo[chainId] = CHAIN_TO_ADDRESSES_MAP[chainId].v3CoreFactoryAddress),
+    (memo, chainId) => {
+      memo[chainId] = CHAIN_TO_ADDRESSES_MAP[chainId].v3CoreFactoryAddress
+      return memo
+    },
     {}
   )
 }
@@ -160,7 +163,10 @@ export const V3_MIGRATOR_ADDRESSES: AddressMap = {
 
 export const MULTICALL_ADDRESSES: AddressMap = {
   ...SUPPORTED_CHAINS.reduce<AddressMap>(
-    (memo, chainId) => (memo[chainId] = CHAIN_TO_ADDRESSES_MAP[chainId].multicallAddress),
+    (memo, chainId) => {
+      memo[chainId] = CHAIN_TO_ADDRESSES_MAP[chainId].multicallAddress
+      return memo
+    },
     {}
   )
 }
@@ -196,7 +202,10 @@ export const ARGENT_WALLET_DETECTOR_ADDRESS: AddressMap = {
 
 export const QUOTER_ADDRESSES: AddressMap = {
   ...SUPPORTED_CHAINS.reduce<AddressMap>(
-    (memo, chainId) => (memo[chainId] = CHAIN_TO_ADDRESSES_MAP[chainId].quoterAddress),
+    (memo, chainId) => {
+      memo[chainId] = CHAIN_TO_ADDRESSES_MAP[chainId].quoterAddress
+      return memo
+    },
     {}
   )
 }
