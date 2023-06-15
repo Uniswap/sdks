@@ -23,7 +23,7 @@ import type {
 
 export type OrderInfoStruct = {
   reactor: PromiseOrValue<string>;
-  offerer: PromiseOrValue<string>;
+  swapper: PromiseOrValue<string>;
   nonce: PromiseOrValue<BigNumberish>;
   deadline: PromiseOrValue<BigNumberish>;
   validationContract: PromiseOrValue<string>;
@@ -39,7 +39,7 @@ export type OrderInfoStructOutput = [
   string
 ] & {
   reactor: string;
-  offerer: string;
+  swapper: string;
   nonce: BigNumber;
   deadline: BigNumber;
   validationContract: string;
@@ -140,21 +140,21 @@ export interface ExclusiveFillerValidation extends BaseContract {
       filler: PromiseOrValue<string>,
       resolvedOrder: ResolvedOrderStruct,
       overrides?: CallOverrides
-    ): Promise<[boolean]>;
+    ): Promise<[void]>;
   };
 
   validate(
     filler: PromiseOrValue<string>,
     resolvedOrder: ResolvedOrderStruct,
     overrides?: CallOverrides
-  ): Promise<boolean>;
+  ): Promise<void>;
 
   callStatic: {
     validate(
       filler: PromiseOrValue<string>,
       resolvedOrder: ResolvedOrderStruct,
       overrides?: CallOverrides
-    ): Promise<boolean>;
+    ): Promise<void>;
   };
 
   filters: {};

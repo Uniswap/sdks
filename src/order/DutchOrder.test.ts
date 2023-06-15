@@ -8,7 +8,7 @@ describe("DutchOrder", () => {
       {
         deadline: Math.floor(new Date().getTime() / 1000) + 1000,
         reactor: "0x0000000000000000000000000000000000000000",
-        offerer: "0x0000000000000000000000000000000000000000",
+        swapper: "0x0000000000000000000000000000000000000000",
         nonce: BigNumber.from(10),
         validationContract: ethers.constants.AddressZero,
         validationData: "0x",
