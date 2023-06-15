@@ -16,19 +16,19 @@ import {
 import { DutchOrderBuilder } from '../../';
 
 describe('DutchOrder', () => {
-  const DIRECT_TAKER_FILL = '0x0000000000000000000000000000000000000001';
+  const DIRECT_FILL = '0x0000000000000000000000000000000000000001';
 
   let reactor: DutchLimitOrderReactor;
   let permit2: Permit2;
   let chainId: number;
-  let maker: ethers.Wallet;
+  let swapper: ethers.Wallet;
   let tokenIn: MockERC20;
   let tokenOut: MockERC20;
   let admin: Signer;
-  let taker: Signer;
+  let filler: Signer;
 
   before(async () => {
-    [admin, taker] = await ethers.getSigners();
+    [admin, filler] = await ethers.getSigners();
     const permit2Factory = await ethers.getContractFactory(
       Permit2Abi.abi,
       Permit2Abi.bytecode
@@ -46,9 +46,9 @@ describe('DutchOrder', () => {
 
     chainId = hre.network.config.chainId || 1;
 
-    maker = ethers.Wallet.createRandom().connect(ethers.provider);
+    swapper = ethers.Wallet.createRandom().connect(ethers.provider);
     await admin.sendTransaction({
-      to: await maker.getAddress(),
+      to: await swapper.getAddress(),
       value: BigNumber.from(10).pow(18),
     });
 
@@ -61,27 +61,27 @@ describe('DutchOrder', () => {
     tokenOut = (await tokenFactory.deploy('TEST B', 'tb', 18)) as MockERC20;
 
     await tokenIn.mint(
-      await maker.getAddress(),
+      await swapper.getAddress(),
       BigNumber.from(10).pow(18).mul(100)
     );
     await tokenIn
-      .connect(maker)
+      .connect(swapper)
       .approve(permit2.address, ethers.constants.MaxUint256);
 
     await tokenOut.mint(
-      await taker.getAddress(),
+      await filler.getAddress(),
       BigNumber.from(10).pow(18).mul(100)
     );
     await tokenOut
-      .connect(taker)
+      .connect(filler)
       .approve(permit2.address, ethers.constants.MaxUint256);
-    await permit2.connect(taker).approve(tokenOut.address, reactor.address, BigNumber.from(2).pow(160).sub(1), BigNumber.from(2).pow(48).sub(1));
+    await permit2.connect(filler).approve(tokenOut.address, reactor.address, BigNumber.from(2).pow(160).sub(1), BigNumber.from(2).pow(48).sub(1));
   });
 
   it('correctly builds an order', async () => {
     const amount = BigNumber.from(10).pow(18);
     const deadline = await new BlockchainTime().secondsFromNow(1000);
-    const makerAddress = await maker.getAddress();
+    const swapperAddress = await swapper.getAddress();
     const preBuildOrder = new DutchOrderBuilder(
       chainId,
       reactor.address,
@@ -90,7 +90,7 @@ describe('DutchOrder', () => {
       .deadline(deadline)
       .endTime(deadline)
       .startTime(deadline - 100)
-      .offerer(makerAddress)
+      .swapper(swapperAddress)
       .nonce(BigNumber.from(100))
       .input({
         token: tokenIn.address,
@@ -101,7 +101,7 @@ describe('DutchOrder', () => {
         token: tokenOut.address,
         startAmount: amount,
         endAmount: BigNumber.from(10).pow(17).mul(9),
-        recipient: makerAddress,
+        recipient: swapperAddress,
       });
 
     let order = preBuildOrder.build();
@@ -109,7 +109,7 @@ describe('DutchOrder', () => {
     expect(order.info.deadline).to.eq(deadline);
     expect(order.info.endTime).to.eq(deadline);
     expect(order.info.startTime).to.eq(deadline - 100);
-    expect(order.info.offerer).to.eq(makerAddress);
+    expect(order.info.swapper).to.eq(swapperAddress);
     expect(order.info.nonce.toNumber()).to.eq(100);
 
     expect(order.info.input.token).to.eq(tokenIn.address);
@@ -122,7 +122,7 @@ describe('DutchOrder', () => {
     expect(builtOutput.startAmount).to.eq(amount);
     expect(builtOutput.endAmount.eq(BigNumber.from(10).pow(17).mul(9))).to.be
       .true;
-    expect(builtOutput.recipient).to.eq(makerAddress);
+    expect(builtOutput.recipient).to.eq(swapperAddress);
 
     order = preBuildOrder.nonFeeRecipient(ethers.constants.AddressZero).build();
     expect(order.info.outputs[0].recipient).to.eq(ethers.constants.AddressZero);
@@ -139,7 +139,7 @@ describe('DutchOrder', () => {
       .deadline(deadline)
       .endTime(deadline)
       .startTime(deadline - 100)
-      .offerer(await maker.getAddress())
+      .swapper(await swapper.getAddress())
       .nonce(BigNumber.from(100))
       .input({
         token: tokenIn.address,
@@ -150,47 +150,47 @@ describe('DutchOrder', () => {
         token: tokenOut.address,
         startAmount: amount,
         endAmount: BigNumber.from(10).pow(17).mul(9),
-        recipient: await maker.getAddress(),
+        recipient: await swapper.getAddress(),
       })
       .build();
 
     const { domain, types, values } = order.permitData();
-    const signature = await maker._signTypedData(domain, types, values);
+    const signature = await swapper._signTypedData(domain, types, values);
 
-    const makerTokenInBalanceBefore = await tokenIn.balanceOf(
-      await maker.getAddress()
+    const swapperTokenInBalanceBefore = await tokenIn.balanceOf(
+      await swapper.getAddress()
     );
-    const takerTokenInBalanceBefore = await tokenIn.balanceOf(
-      await taker.getAddress()
+    const fillerTokenInBalanceBefore = await tokenIn.balanceOf(
+      await filler.getAddress()
     );
-    const makerTokenOutBalanceBefore = await tokenOut.balanceOf(
-      await maker.getAddress()
+    const swapperTokenOutBalanceBefore = await tokenOut.balanceOf(
+      await swapper.getAddress()
     );
-    const takerTokenOutBalanceBefore = await tokenOut.balanceOf(
-      await taker.getAddress()
+    const fillerTokenOutBalanceBefore = await tokenOut.balanceOf(
+      await filler.getAddress()
     );
 
     const res = await reactor
-      .connect(taker)
+      .connect(filler)
       .execute(
         { order: order.serialize(), sig: signature },
-        DIRECT_TAKER_FILL,
+        DIRECT_FILL,
         '0x'
       );
     const receipt = await res.wait();
     expect(receipt.status).to.equal(1);
     expect(
-      (await tokenIn.balanceOf(await maker.getAddress())).toString()
-    ).to.equal(makerTokenInBalanceBefore.sub(amount).toString());
+      (await tokenIn.balanceOf(await swapper.getAddress())).toString()
+    ).to.equal(swapperTokenInBalanceBefore.sub(amount).toString());
     expect(
-      (await tokenIn.balanceOf(await taker.getAddress())).toString()
-    ).to.equal(takerTokenInBalanceBefore.add(amount).toString());
+      (await tokenIn.balanceOf(await filler.getAddress())).toString()
+    ).to.equal(fillerTokenInBalanceBefore.add(amount).toString());
     expect(
-      (await tokenOut.balanceOf(await maker.getAddress())).toString()
-    ).to.equal(makerTokenOutBalanceBefore.add(amount).toString());
+      (await tokenOut.balanceOf(await swapper.getAddress())).toString()
+    ).to.equal(swapperTokenOutBalanceBefore.add(amount).toString());
     expect(
-      (await tokenOut.balanceOf(await taker.getAddress())).toString()
-    ).to.equal(takerTokenOutBalanceBefore.sub(amount).toString());
+      (await tokenOut.balanceOf(await filler.getAddress())).toString()
+    ).to.equal(fillerTokenOutBalanceBefore.sub(amount).toString());
   });
 
   it('executes a serialized order with decay', async () => {
@@ -206,7 +206,7 @@ describe('DutchOrder', () => {
       .endTime(deadline)
       .startTime(deadline - 2000)
       .nonce(BigNumber.from(101))
-      .offerer(await maker.getAddress())
+      .swapper(await swapper.getAddress())
       .input({
         token: tokenIn.address,
         startAmount: amount,
@@ -216,53 +216,53 @@ describe('DutchOrder', () => {
         token: tokenOut.address,
         startAmount: amount,
         endAmount: BigNumber.from(10).pow(17).mul(9),
-        recipient: await maker.getAddress(),
+        recipient: await swapper.getAddress(),
       })
       .build();
 
     const { domain, types, values } = order.permitData();
-    const signature = await maker._signTypedData(domain, types, values);
+    const signature = await swapper._signTypedData(domain, types, values);
 
-    const makerTokenInBalanceBefore = await tokenIn.balanceOf(
-      await maker.getAddress()
+    const swapperTokenInBalanceBefore = await tokenIn.balanceOf(
+      await swapper.getAddress()
     );
-    const takerTokenInBalanceBefore = await tokenIn.balanceOf(
-      await taker.getAddress()
+    const fillerTokenInBalanceBefore = await tokenIn.balanceOf(
+      await filler.getAddress()
     );
-    const makerTokenOutBalanceBefore = await tokenOut.balanceOf(
-      await maker.getAddress()
+    const swapperTokenOutBalanceBefore = await tokenOut.balanceOf(
+      await swapper.getAddress()
     );
-    const takerTokenOutBalanceBefore = await tokenOut.balanceOf(
-      await taker.getAddress()
+    const fillerTokenOutBalanceBefore = await tokenOut.balanceOf(
+      await filler.getAddress()
     );
 
     const res = await reactor
-      .connect(taker)
+      .connect(filler)
       .execute(
         { order: order.serialize(), sig: signature },
-        DIRECT_TAKER_FILL,
+        DIRECT_FILL,
         '0x'
       );
     const receipt = await res.wait();
     expect(receipt.status).to.equal(1);
     expect(
-      (await tokenIn.balanceOf(await maker.getAddress())).toString()
-    ).to.equal(makerTokenInBalanceBefore.sub(amount).toString());
+      (await tokenIn.balanceOf(await swapper.getAddress())).toString()
+    ).to.equal(swapperTokenInBalanceBefore.sub(amount).toString());
     expect(
-      (await tokenIn.balanceOf(await taker.getAddress())).toString()
-    ).to.equal(takerTokenInBalanceBefore.add(amount).toString());
+      (await tokenIn.balanceOf(await filler.getAddress())).toString()
+    ).to.equal(fillerTokenInBalanceBefore.add(amount).toString());
     const amountOut = order.info.outputs[0].startAmount
       .add(order.info.outputs[0].endAmount)
       .div(2);
     // some variance in block timestamp so we need to use a threshold
     expectThreshold(
-      await tokenOut.balanceOf(await maker.getAddress()),
-      makerTokenOutBalanceBefore.add(amountOut),
+      await tokenOut.balanceOf(await swapper.getAddress()),
+      swapperTokenOutBalanceBefore.add(amountOut),
       BigNumber.from(10).pow(15)
     );
     expectThreshold(
-      await tokenOut.balanceOf(await taker.getAddress()),
-      takerTokenOutBalanceBefore.sub(amountOut),
+      await tokenOut.balanceOf(await filler.getAddress()),
+      fillerTokenOutBalanceBefore.sub(amountOut),
       BigNumber.from(10).pow(15)
     );
   });
