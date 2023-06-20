@@ -81,6 +81,12 @@ const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
     weth: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
     creationBlock: 27915533,
   },
+  // avalanche
+  [43114]: {
+    router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
+    weth: '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7',
+    creationBlock: 31583684,
+  },
 }
 
 export const UNIVERSAL_ROUTER_ADDRESS = (chainId: number): string => {

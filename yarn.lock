@@ -2238,10 +2238,10 @@
     dotenv "^14.2.0"
     hardhat-watcher "^2.1.1"
 
-"@uniswap/universal-router@1.4.2":
-  version "1.4.2"
-  resolved "https://registry.yarnpkg.com/@uniswap/universal-router/-/universal-router-1.4.2.tgz#7f46f83ae8e69cf38cc2391891965785b1da253f"
-  integrity sha512-oNa9e+dYB/QnwYy59i5bRwrUIgq/e66TEVd/np/wk+FnUGMemblyRwDgg2sSqmLu90XAUQYpe1IYFEh1a0XYZg==
+"@uniswap/universal-router@1.4.3":
+  version "1.4.3"
+  resolved "https://registry.yarnpkg.com/@uniswap/universal-router/-/universal-router-1.4.3.tgz#7736cf7f8dc99435a6be87c2e80b5c5d4589d641"
+  integrity sha512-SZmYfhYZtsuxrTMCitcA39iJuG9sbe2nvm9iQfd70WjMpbB0+GuEs5OqSHc5tB/ujrVKzPJ1LOoNNGOs0xPEeA==
   dependencies:
     "@openzeppelin/contracts" "4.7.0"
     "@uniswap/v2-core" "1.0.1"
