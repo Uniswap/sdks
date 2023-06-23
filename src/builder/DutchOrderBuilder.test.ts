@@ -16,8 +16,8 @@ describe("DutchOrderBuilder", () => {
     const deadline = Math.floor(Date.now() / 1000) + 1000;
     const order = builder
       .deadline(deadline)
-      .endTime(deadline)
-      .startTime(deadline - 100)
+      .decayEndTime(deadline)
+      .decayStartTime(deadline - 100)
       .swapper("0x0000000000000000000000000000000000000001")
       .nonce(BigNumber.from(100))
       .input({
@@ -33,25 +33,26 @@ describe("DutchOrderBuilder", () => {
       })
       .build();
 
-    expect(order.info.startTime).toEqual(deadline - 100);
+    expect(order.info.decayStartTime).toEqual(deadline - 100);
     expect(order.info.outputs.length).toEqual(1);
   });
 
   it("Builds a valid order with validation", () => {
     const deadline = Math.floor(Date.now() / 1000) + 1000;
     const fillerAddress = "0x1111111111111111111111111111111111111111";
-    const validationContract = "0x2222222222222222222222222222222222222222";
+    const additionalValidationContract =
+      "0x2222222222222222222222222222222222222222";
     const timestamp = Math.floor(Date.now() / 1000) + 100;
     const validationInfo = encodeExclusiveFillerData(
       fillerAddress,
       timestamp,
       1,
-      validationContract
+      additionalValidationContract
     );
     const order = builder
       .deadline(deadline)
-      .endTime(deadline)
-      .startTime(deadline - 100)
+      .decayEndTime(deadline)
+      .decayStartTime(deadline - 100)
       .swapper("0x0000000000000000000000000000000000000001")
       .nonce(BigNumber.from(100))
       .input({
@@ -68,7 +69,7 @@ describe("DutchOrderBuilder", () => {
       })
       .build();
 
-    expect(order.info.startTime).toEqual(deadline - 100);
+    expect(order.info.decayStartTime).toEqual(deadline - 100);
     expect(order.info.outputs.length).toEqual(1);
     expect(order.validation).toEqual({
       type: ValidationType.ExclusiveFiller,
@@ -82,18 +83,19 @@ describe("DutchOrderBuilder", () => {
   it("Regenerates builder from order", () => {
     const deadline = Math.floor(Date.now() / 1000) + 1000;
     const fillerAddress = "0x1111111111111111111111111111111111111111";
-    const validationContract = "0x2222222222222222222222222222222222222222";
+    const additionalValidationContract =
+      "0x2222222222222222222222222222222222222222";
     const timestamp = Math.floor(Date.now() / 1000) + 100;
     const validationInfo = encodeExclusiveFillerData(
       fillerAddress,
       timestamp,
       1,
-      validationContract
+      additionalValidationContract
     );
     const order = builder
       .deadline(deadline)
-      .endTime(deadline)
-      .startTime(deadline - 100)
+      .decayEndTime(deadline)
+      .decayStartTime(deadline - 100)
       .swapper("0x0000000000000000000000000000000000000001")
       .nonce(BigNumber.from(100))
       .input({
@@ -117,18 +119,19 @@ describe("DutchOrderBuilder", () => {
   it("Regenerates builder from order json", () => {
     const deadline = Math.floor(Date.now() / 1000) + 1000;
     const fillerAddress = "0x1111111111111111111111111111111111111111";
-    const validationContract = "0x2222222222222222222222222222222222222222";
+    const additionalValidationContract =
+      "0x2222222222222222222222222222222222222222";
     const timestamp = Math.floor(Date.now() / 1000) + 100;
     const validationInfo = encodeExclusiveFillerData(
       fillerAddress,
       timestamp,
       1,
-      validationContract
+      additionalValidationContract
     );
     const order = builder
       .deadline(deadline)
-      .endTime(deadline)
-      .startTime(deadline - 100)
+      .decayEndTime(deadline)
+      .decayStartTime(deadline - 100)
       .swapper("0x0000000000000000000000000000000000000001")
       .nonce(BigNumber.from(100))
       .input({
@@ -155,18 +158,19 @@ describe("DutchOrderBuilder", () => {
   it("Regenerates builder allows modification", () => {
     const deadline = Math.floor(Date.now() / 1000) + 1000;
     const fillerAddress = "0x1111111111111111111111111111111111111111";
-    const validationContract = "0x2222222222222222222222222222222222222222";
+    const additionalValidationContract =
+      "0x2222222222222222222222222222222222222222";
     const timestamp = Math.floor(Date.now() / 1000) + 100;
     const validationInfo = encodeExclusiveFillerData(
       fillerAddress,
       timestamp,
       1,
-      validationContract
+      additionalValidationContract
     );
     const order = builder
       .deadline(deadline)
-      .endTime(deadline)
-      .startTime(deadline - 100)
+      .decayEndTime(deadline)
+      .decayStartTime(deadline - 100)
       .swapper("0x0000000000000000000000000000000000000001")
       .nonce(BigNumber.from(100))
       .input({
@@ -184,17 +188,19 @@ describe("DutchOrderBuilder", () => {
       .build();
 
     const regenerated = DutchOrderBuilder.fromOrder(order)
-      .startTime(order.info.startTime + 1)
+      .decayStartTime(order.info.decayStartTime + 1)
       .build();
-    expect(regenerated.info.startTime).toEqual(order.info.startTime + 1);
+    expect(regenerated.info.decayStartTime).toEqual(
+      order.info.decayStartTime + 1
+    );
   });
 
   it("Builds a valid order with multiple outputs", () => {
     const deadline = Math.floor(Date.now() / 1000) + 1000;
     const order = builder
       .deadline(deadline)
-      .endTime(deadline)
-      .startTime(deadline - 100)
+      .decayEndTime(deadline)
+      .decayStartTime(deadline - 100)
       .swapper("0x0000000000000000000000000000000000000000")
       .nonce(BigNumber.from(100))
       .input({
@@ -216,7 +222,7 @@ describe("DutchOrderBuilder", () => {
       })
       .build();
 
-    expect(order.info.startTime).toEqual(deadline - 100);
+    expect(order.info.decayStartTime).toEqual(deadline - 100);
     expect(order.info.outputs.length).toEqual(2);
   });
 
@@ -225,8 +231,8 @@ describe("DutchOrderBuilder", () => {
     expect(() =>
       builder
         .deadline(deadline)
-        .endTime(deadline)
-        .startTime(deadline - 100)
+        .decayEndTime(deadline)
+        .decayStartTime(deadline - 100)
         .swapper("0x0000000000000000000000000000000000000001")
         .nonce(BigNumber.from(100))
         .input({
@@ -250,8 +256,8 @@ describe("DutchOrderBuilder", () => {
     expect(() =>
       builder
         .deadline(expiredDeadline)
-        .endTime(expiredDeadline)
-        .startTime(expiredDeadline - 100)
+        .decayEndTime(expiredDeadline)
+        .decayStartTime(expiredDeadline - 100)
         .swapper("0x0000000000000000000000000000000000000001")
         .nonce(BigNumber.from(100))
         .input({
@@ -273,8 +279,8 @@ describe("DutchOrderBuilder", () => {
     const deadline = Math.floor(Date.now() / 1000) + 1000;
     const order = builder
       .deadline(deadline)
-      .startTime(deadline + 1)
-      .endTime(deadline + 1)
+      .decayStartTime(deadline + 1)
+      .decayEndTime(deadline + 1)
       .swapper("0x0000000000000000000000000000000000000000")
       .nonce(BigNumber.from(100))
       .input({
@@ -296,14 +302,14 @@ describe("DutchOrderBuilder", () => {
       });
 
     expect(() => order.build()).toThrow(
-      `startTime must be before or same as deadline: ${deadline + 1}`
+      `decayStartTime must be before or same as deadline: ${deadline + 1}`
     );
   });
 
   it("Does not throw before an order has not been finished building", () => {
     const deadline = Math.floor(Date.now() / 1000) + 1000;
     expect(() =>
-      builder.deadline(deadline).startTime(deadline + 1)
+      builder.deadline(deadline).decayStartTime(deadline + 1)
     ).not.toThrowError();
   });
 
@@ -319,8 +325,8 @@ describe("DutchOrderBuilder", () => {
     expect(() =>
       builder
         .deadline(deadline)
-        .endTime(deadline)
-        .startTime(deadline - 100)
+        .decayEndTime(deadline)
+        .decayStartTime(deadline - 100)
         .nonce(BigNumber.from(100))
         .input({
           token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
@@ -337,11 +343,11 @@ describe("DutchOrderBuilder", () => {
     ).toThrow("Invariant failed: swapper not set");
   });
 
-  it("Must set deadline or endTime", () => {
+  it("Must set deadline or decayEndTime", () => {
     const deadline = Math.floor(Date.now() / 1000) + 1000;
     expect(() =>
       builder
-        .startTime(deadline - 100)
+        .decayStartTime(deadline - 100)
         .swapper("0x0000000000000000000000000000000000000000")
         .nonce(BigNumber.from(100))
         .input({
@@ -356,13 +362,13 @@ describe("DutchOrderBuilder", () => {
           recipient: "0x0000000000000000000000000000000000000000",
         })
         .build()
-    ).toThrow("Invariant failed: endTime not set");
+    ).toThrow("Invariant failed: decayEndTime not set");
   });
 
-  it("endTime defaults to deadline", () => {
+  it("decayEndTime defaults to deadline", () => {
     const deadline = Math.floor(Date.now() / 1000) + 1000;
     const order = builder
-      .startTime(deadline - 100)
+      .decayStartTime(deadline - 100)
       .deadline(deadline)
       .swapper("0x0000000000000000000000000000000000000000")
       .nonce(BigNumber.from(100))
@@ -378,15 +384,15 @@ describe("DutchOrderBuilder", () => {
         recipient: "0x0000000000000000000000000000000000000000",
       })
       .build();
-    expect(order.info.endTime).toEqual(deadline);
+    expect(order.info.decayEndTime).toEqual(deadline);
   });
 
-  it("endTime after deadline", () => {
+  it("decayEndTime after deadline", () => {
     const deadline = Math.floor(Date.now() / 1000) + 1000;
     expect(() =>
       builder
-        .startTime(deadline - 100)
-        .endTime(deadline + 1)
+        .decayStartTime(deadline - 100)
+        .decayEndTime(deadline + 1)
         .deadline(deadline)
         .swapper("0x0000000000000000000000000000000000000000")
         .nonce(BigNumber.from(100))
@@ -403,17 +409,17 @@ describe("DutchOrderBuilder", () => {
         })
         .build()
     ).toThrow(
-      `Invariant failed: endTime must be before or same as deadline: ${
+      `Invariant failed: decayEndTime must be before or same as deadline: ${
         deadline + 1
       }`
     );
   });
 
-  it("deadline defaults to endTime", () => {
+  it("deadline defaults to decayEndTime", () => {
     const deadline = Math.floor(Date.now() / 1000) + 1000;
     const order = builder
-      .startTime(deadline - 100)
-      .endTime(deadline)
+      .decayStartTime(deadline - 100)
+      .decayEndTime(deadline)
       .swapper("0x0000000000000000000000000000000000000000")
       .nonce(BigNumber.from(100))
       .input({
@@ -436,7 +442,7 @@ describe("DutchOrderBuilder", () => {
     expect(() =>
       builder
         .deadline(deadline)
-        .startTime(deadline - 100)
+        .decayStartTime(deadline - 100)
         .swapper("0x0000000000000000000000000000000000000000")
         .input({
           token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",

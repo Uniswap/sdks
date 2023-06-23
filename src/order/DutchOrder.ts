@@ -44,8 +44,8 @@ export type DutchInputJSON = Omit<DutchInput, "startAmount" | "endAmount"> & {
 };
 
 export type DutchOrderInfo = OrderInfo & {
-  startTime: number;
-  endTime: number;
+  decayStartTime: number;
+  decayEndTime: number;
   exclusiveFiller: string;
   exclusivityOverrideBps: BigNumber;
   input: DutchInput;
@@ -66,8 +66,8 @@ export type DutchOrderInfoJSON = Omit<
 
 type WitnessInfo = {
   info: OrderInfo;
-  startTime: number;
-  endTime: number;
+  decayStartTime: number;
+  decayEndTime: number;
   exclusiveFiller: string;
   exclusivityOverrideBps: BigNumber;
   inputToken: string;
@@ -77,11 +77,10 @@ type WitnessInfo = {
 };
 
 const DUTCH_ORDER_TYPES = {
-  // TODO: remove "Limit"
-  ExclusiveDutchLimitOrder: [
+  ExclusiveDutchOrder: [
     { name: "info", type: "OrderInfo" },
-    { name: "startTime", type: "uint256" },
-    { name: "endTime", type: "uint256" },
+    { name: "decayStartTime", type: "uint256" },
+    { name: "decayEndTime", type: "uint256" },
     { name: "exclusiveFiller", type: "address" },
     { name: "exclusivityOverrideBps", type: "uint256" },
     { name: "inputToken", type: "address" },
@@ -94,8 +93,8 @@ const DUTCH_ORDER_TYPES = {
     { name: "swapper", type: "address" },
     { name: "nonce", type: "uint256" },
     { name: "deadline", type: "uint256" },
-    { name: "validationContract", type: "address" },
-    { name: "validationData", type: "bytes" },
+    { name: "additionalValidationContract", type: "address" },
+    { name: "additionalValidationData", type: "bytes" },
   ],
   DutchOutput: [
     { name: "token", type: "address" },
@@ -169,9 +168,16 @@ export class DutchOrder extends Order {
     const decoded = abiCoder.decode(DUTCH_ORDER_ABI, encoded);
     const [
       [
-        [reactor, swapper, nonce, deadline, validationContract, validationData],
-        startTime,
-        endTime,
+        [
+          reactor,
+          swapper,
+          nonce,
+          deadline,
+          additionalValidationContract,
+          additionalValidationData,
+        ],
+        decayStartTime,
+        decayEndTime,
         exclusiveFiller,
         exclusivityOverrideBps,
         [inputToken, inputStartAmount, inputEndAmount],
@@ -184,10 +190,10 @@ export class DutchOrder extends Order {
         swapper,
         nonce,
         deadline: deadline.toNumber(),
-        validationContract,
-        validationData,
-        startTime: startTime.toNumber(),
-        endTime: endTime.toNumber(),
+        additionalValidationContract,
+        additionalValidationData,
+        decayStartTime: decayStartTime.toNumber(),
+        decayEndTime: decayEndTime.toNumber(),
         exclusiveFiller,
         exclusivityOverrideBps,
         input: {
@@ -231,10 +237,10 @@ export class DutchOrder extends Order {
       swapper: this.info.swapper,
       nonce: this.info.nonce.toString(),
       deadline: this.info.deadline,
-      validationContract: this.info.validationContract,
-      validationData: this.info.validationData,
-      startTime: this.info.startTime,
-      endTime: this.info.endTime,
+      additionalValidationContract: this.info.additionalValidationContract,
+      additionalValidationData: this.info.additionalValidationData,
+      decayStartTime: this.info.decayStartTime,
+      decayEndTime: this.info.decayEndTime,
       exclusiveFiller: this.info.exclusiveFiller,
       exclusivityOverrideBps: this.info.exclusivityOverrideBps.toString(),
       input: {
@@ -263,11 +269,11 @@ export class DutchOrder extends Order {
           this.info.swapper,
           this.info.nonce,
           this.info.deadline,
-          this.info.validationContract,
-          this.info.validationData,
+          this.info.additionalValidationContract,
+          this.info.additionalValidationData,
         ],
-        this.info.startTime,
-        this.info.endTime,
+        this.info.decayStartTime,
+        this.info.decayEndTime,
         this.info.exclusiveFiller,
         this.info.exclusivityOverrideBps,
         [
@@ -329,15 +335,15 @@ export class DutchOrder extends Order {
   resolve(options: OrderResolutionOptions): ResolvedOrder {
     const useOverride =
       this.info.exclusiveFiller !== ethers.constants.AddressZero &&
-      options.timestamp <= this.info.startTime &&
+      options.timestamp <= this.info.decayStartTime &&
       options.filler !== this.info.exclusiveFiller;
     return {
       input: {
         token: this.info.input.token,
         amount: getDecayedAmount(
           {
-            startTime: this.info.startTime,
-            endTime: this.info.endTime,
+            decayStartTime: this.info.decayStartTime,
+            decayEndTime: this.info.decayEndTime,
             startAmount: this.info.input.startAmount,
             endAmount: this.info.input.endAmount,
           },
@@ -347,8 +353,8 @@ export class DutchOrder extends Order {
       outputs: this.info.outputs.map((output) => {
         const baseAmount = getDecayedAmount(
           {
-            startTime: this.info.startTime,
-            endTime: this.info.endTime,
+            decayStartTime: this.info.decayStartTime,
+            decayEndTime: this.info.decayEndTime,
             startAmount: output.startAmount,
             endAmount: output.endAmount,
           },
@@ -392,11 +398,11 @@ export class DutchOrder extends Order {
         swapper: this.info.swapper,
         nonce: this.info.nonce,
         deadline: this.info.deadline,
-        validationContract: this.info.validationContract,
-        validationData: this.info.validationData,
+        additionalValidationContract: this.info.additionalValidationContract,
+        additionalValidationData: this.info.additionalValidationData,
       },
-      startTime: this.info.startTime,
-      endTime: this.info.endTime,
+      decayStartTime: this.info.decayStartTime,
+      decayEndTime: this.info.decayEndTime,
       exclusiveFiller: this.info.exclusiveFiller,
       exclusivityOverrideBps: this.info.exclusivityOverrideBps,
       inputToken: this.info.input.token,
@@ -410,7 +416,7 @@ export class DutchOrder extends Order {
     return {
       witness: this.witnessInfo(),
       // TODO: remove "Limit"
-      witnessTypeName: "ExclusiveDutchLimitOrder",
+      witnessTypeName: "ExclusiveDutchOrder",
       witnessType: DUTCH_ORDER_TYPES,
     };
   }

@@ -3,23 +3,23 @@ import { BigNumber } from "ethers";
 export interface DutchDecayConfig {
   startAmount: BigNumber;
   endAmount: BigNumber;
-  startTime: number;
-  endTime: number;
+  decayStartTime: number;
+  decayEndTime: number;
 }
 
 export function getDecayedAmount(
   config: DutchDecayConfig,
   atTime: number = Math.floor(Date.now() / 1000)
 ): BigNumber {
-  const { startAmount, endAmount, startTime, endTime } = config;
+  const { startAmount, endAmount, decayStartTime, decayEndTime } = config;
 
   // decay is over, return the ending amount
-  if (endTime <= atTime) {
+  if (decayEndTime <= atTime) {
     return endAmount;
   }
 
   // decay hasnt started, return the starting amount
-  if (startTime >= atTime) {
+  if (decayStartTime >= atTime) {
     return startAmount;
   }
 
@@ -28,8 +28,8 @@ export function getDecayedAmount(
     return startAmount;
   }
 
-  const duration = endTime - startTime;
-  const elapsed = atTime - startTime;
+  const duration = decayEndTime - decayStartTime;
+  const elapsed = atTime - decayStartTime;
   if (startAmount.gt(endAmount)) {
     // decaying downward
     const decay = startAmount.sub(endAmount).mul(elapsed).div(duration);

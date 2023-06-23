@@ -45,17 +45,18 @@ describe("OrderValidation", () => {
 
   it("encodes exclusive filler data", () => {
     const fillerAddress = "0x1111111111111111111111111111111111111111";
-    const validationContract = "0x2222222222222222222222222222222222222222";
+    const additionalValidationContract =
+      "0x2222222222222222222222222222222222222222";
     const timestamp = Math.floor(new Date().getTime() / 1000) + 100;
     const validationInfo = encodeExclusiveFillerData(
       fillerAddress,
       timestamp,
       1,
-      validationContract
+      additionalValidationContract
     );
 
-    const orderInfo = makeOrderInfo(validationInfo.validationData);
-    validationInfo.validationContract = validationContract;
+    const orderInfo = makeOrderInfo(validationInfo.additionalValidationData);
+    validationInfo.additionalValidationContract = additionalValidationContract;
     const validation = parseValidation(orderInfo);
     expect(validation).toEqual({
       type: ValidationType.ExclusiveFiller,
@@ -73,7 +74,7 @@ function makeOrderInfo(data: string): OrderInfo {
     swapper: ethers.constants.AddressZero,
     nonce: BigNumber.from(0),
     deadline: 5,
-    validationContract: ethers.constants.AddressZero,
-    validationData: data,
+    additionalValidationContract: ethers.constants.AddressZero,
+    additionalValidationData: data,
   };
 }

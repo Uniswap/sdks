@@ -4,19 +4,19 @@ import { BigNumber, Signer, Event } from "ethers";
 
 import { BlockchainTime } from "./utils/time";
 
-import DutchLimitOrderReactorAbi from "../../abis/DutchLimitOrderReactor.json";
+import ExclusiveDutchOrderReactorAbi from "../../abis/ExclusiveDutchOrderReactor.json";
 import Permit2Abi from "../../abis/Permit2.json";
 import MockERC20Abi from "../../abis/MockERC20.json";
 
 import {
   Permit2,
-  DutchLimitOrderReactor,
+  DutchOrderReactor,
   MockERC20,
 } from "../../src/contracts";
 import { DutchOrderBuilder, EventWatcher, FillData } from "../../";
 
 describe("EventWatcher", () => {
-  let reactor: DutchLimitOrderReactor;
+  let reactor: DutchOrderReactor;
   let permit2: Permit2;
   let chainId: number;
   let swapper: ethers.Wallet;
@@ -37,13 +37,13 @@ describe("EventWatcher", () => {
     permit2 = (await permit2Factory.deploy()) as Permit2;
 
     const reactorFactory = await ethers.getContractFactory(
-      DutchLimitOrderReactorAbi.abi,
-      DutchLimitOrderReactorAbi.bytecode
+      ExclusiveDutchOrderReactorAbi.abi,
+      ExclusiveDutchOrderReactorAbi.bytecode
     );
     reactor = (await reactorFactory.deploy(
       permit2.address,
       ethers.constants.AddressZero
-    )) as DutchLimitOrderReactor;
+    )) as DutchOrderReactor;
 
     chainId = hre.network.config.chainId || 1;
 
@@ -90,8 +90,8 @@ describe("EventWatcher", () => {
       permit2.address
     )
       .deadline(deadline)
-      .endTime(deadline)
-      .startTime(deadline - 100)
+      .decayEndTime(deadline)
+      .decayStartTime(deadline - 100)
       .swapper(await swapper.getAddress())
       .nonce(BigNumber.from(100))
       .input({
@@ -147,8 +147,8 @@ describe("EventWatcher", () => {
       permit2.address
     )
       .deadline(deadline)
-      .endTime(deadline)
-      .startTime(deadline - 100)
+      .decayEndTime(deadline)
+      .decayStartTime(deadline - 100)
       .swapper(await swapper.getAddress())
       .nonce(BigNumber.from(101))
       .input({

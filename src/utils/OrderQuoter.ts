@@ -3,7 +3,7 @@ import { ethers } from "ethers";
 
 import { ORDER_QUOTER_MAPPING } from "../constants";
 import {
-  DutchLimitOrderReactor__factory,
+  ExclusiveDutchOrderReactor__factory,
   OrderQuoter__factory,
   OrderQuoter as OrderQuoterContract,
 } from "../contracts";
@@ -57,11 +57,13 @@ const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
   "7c1f8113": OrderValidation.InvalidOrderFields,
   // invalid dutch decay time
   "43133453": OrderValidation.InvalidOrderFields,
+  "48fee69c": OrderValidation.InvalidOrderFields,
   "70f65caa": OrderValidation.Expired,
   ee3b3d4b: OrderValidation.NonceUsed,
   "0a0b0d79": OrderValidation.ValidationFailed,
   b9ec1e96: OrderValidation.ExclusivityPeriod,
   "062dec56": OrderValidation.ExclusivityPeriod,
+  "75c1bb14": OrderValidation.ExclusivityPeriod,
   TRANSFER_FROM_FAILED: OrderValidation.InsufficientFunds,
 };
 
@@ -156,7 +158,7 @@ export class OrderQuoter {
           if (returnData.includes(key)) {
             if (key === "0a0b0d79") {
               const fillerValidation = parseExclusiveFillerData(
-                orders[idx].order.info.validationData
+                orders[idx].order.info.additionalValidationData
               );
               if (
                 fillerValidation.type === ValidationType.ExclusiveFiller &&
@@ -191,7 +193,7 @@ export class OrderQuoter {
           order.order.info.deadline < Math.floor(new Date().getTime() / 1000)
         ) {
           // all reactors have the same interface, we just use limitorder to implement the interface
-          const reactor = DutchLimitOrderReactor__factory.connect(
+          const reactor = ExclusiveDutchOrderReactor__factory.connect(
             order.order.info.reactor,
             this.provider
           );

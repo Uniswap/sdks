@@ -18,8 +18,8 @@ export class DutchOrderBuilder extends OrderBuilder {
     // note chainId not used if passing in true reactor address
     const builder = new DutchOrderBuilder(order.chainId, order.info.reactor)
       .deadline(order.info.deadline)
-      .endTime(order.info.endTime)
-      .startTime(order.info.startTime)
+      .decayEndTime(order.info.decayEndTime)
+      .decayStartTime(order.info.decayStartTime)
       .swapper(order.info.swapper)
       .nonce(order.info.nonce)
       .input(order.info.input)
@@ -28,8 +28,8 @@ export class DutchOrderBuilder extends OrderBuilder {
         order.info.exclusivityOverrideBps
       )
       .validation({
-        validationContract: order.info.validationContract,
-        validationData: order.info.validationData,
+        additionalValidationContract: order.info.additionalValidationContract,
+        additionalValidationData: order.info.additionalValidationData,
       });
 
     for (const output of order.info.outputs) {
@@ -64,17 +64,17 @@ export class DutchOrderBuilder extends OrderBuilder {
     };
   }
 
-  startTime(startTime: number): DutchOrderBuilder {
-    this.info.startTime = startTime;
+  decayStartTime(decayStartTime: number): DutchOrderBuilder {
+    this.info.decayStartTime = decayStartTime;
     return this;
   }
 
-  endTime(endTime: number): DutchOrderBuilder {
+  decayEndTime(decayEndTime: number): DutchOrderBuilder {
     if (this.orderInfo.deadline === undefined) {
-      super.deadline(endTime);
+      super.deadline(decayEndTime);
     }
 
-    this.info.endTime = endTime;
+    this.info.decayEndTime = decayEndTime;
     return this;
   }
 
@@ -98,8 +98,8 @@ export class DutchOrderBuilder extends OrderBuilder {
   deadline(deadline: number): DutchOrderBuilder {
     super.deadline(deadline);
 
-    if (this.info.endTime === undefined) {
-      this.endTime(deadline);
+    if (this.info.decayEndTime === undefined) {
+      this.decayEndTime(deadline);
     }
 
     return this;
@@ -142,9 +142,9 @@ export class DutchOrderBuilder extends OrderBuilder {
   }
 
   build(): DutchOrder {
-    invariant(this.info.startTime !== undefined, "startTime not set");
+    invariant(this.info.decayStartTime !== undefined, "decayStartTime not set");
     invariant(this.info.input !== undefined, "input not set");
-    invariant(this.info.endTime !== undefined, "endTime not set");
+    invariant(this.info.decayEndTime !== undefined, "decayEndTime not set");
     invariant(
       this.info.exclusiveFiller !== undefined,
       "exclusiveFiller not set"
@@ -158,24 +158,25 @@ export class DutchOrderBuilder extends OrderBuilder {
       "outputs not set"
     );
     invariant(
-      this.info.endTime !== undefined ||
+      this.info.decayEndTime !== undefined ||
         this.getOrderInfo().deadline !== undefined,
-      "Must set either deadline or endTime"
+      "Must set either deadline or decayEndTime"
     );
     invariant(
       !this.orderInfo.deadline ||
-        this.info.startTime <= this.orderInfo.deadline,
-      `startTime must be before or same as deadline: ${this.info.startTime}`
+        this.info.decayStartTime <= this.orderInfo.deadline,
+      `decayStartTime must be before or same as deadline: ${this.info.decayStartTime}`
     );
     invariant(
-      !this.orderInfo.deadline || this.info.endTime <= this.orderInfo.deadline,
-      `endTime must be before or same as deadline: ${this.info.endTime}`
+      !this.orderInfo.deadline ||
+        this.info.decayEndTime <= this.orderInfo.deadline,
+      `decayEndTime must be before or same as deadline: ${this.info.decayEndTime}`
     );
 
     return new DutchOrder(
       Object.assign(this.getOrderInfo(), {
-        startTime: this.info.startTime,
-        endTime: this.info.endTime,
+        decayStartTime: this.info.decayStartTime,
+        decayEndTime: this.info.decayEndTime,
         exclusiveFiller: this.info.exclusiveFiller,
         exclusivityOverrideBps: this.info.exclusivityOverrideBps,
         input: this.info.input,
