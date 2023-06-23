@@ -2,7 +2,7 @@ import hre, { ethers } from "hardhat";
 import { expect } from "chai";
 import { Signer } from "ethers";
 
-import DutchLimitOrderReactorAbi from "../../abis/DutchLimitOrderReactor.json";
+import ExclusiveDutchOrderReactorAbi from "../../abis/ExclusiveDutchOrderReactor.json";
 import ExclusiveFillerValidationAbi from "../../abis/ExclusiveFillerValidation.json";
 import Permit2Abi from "../../abis/Permit2.json";
 import OrderQuoterAbi from "../../abis/OrderQuoter.json";
@@ -12,7 +12,7 @@ import { encodeExclusiveFillerData } from "../../src/order/validation";
 import {
   OrderQuoter,
   Permit2,
-  DutchLimitOrderReactor,
+  DutchOrderReactor,
   MockERC20,
 } from "../../src/contracts";
 import {
@@ -31,8 +31,8 @@ describe("OrderValidator", () => {
   const TWENTY_SECOND_CENTURY = 4102444800;
   const DIRECT_FILL = '0x0000000000000000000000000000000000000001';
 
-  let validationContract: string;
-  let reactor: DutchLimitOrderReactor;
+  let additionalValidationContract: string;
+  let reactor: DutchOrderReactor;
   let permit2: Permit2;
   let quoter: OrderQuoter;
   let chainId: number;
@@ -51,7 +51,7 @@ describe("OrderValidator", () => {
       ExclusiveFillerValidationAbi.abi,
       ExclusiveFillerValidationAbi.bytecode
     );
-    validationContract = (await exclusivityValidatorFactory.deploy()).address;
+    additionalValidationContract = (await exclusivityValidatorFactory.deploy()).address;
 
     const permit2Factory = await ethers.getContractFactory(
       Permit2Abi.abi,
@@ -60,13 +60,13 @@ describe("OrderValidator", () => {
     permit2 = (await permit2Factory.deploy()) as Permit2;
 
     const reactorFactory = await ethers.getContractFactory(
-      DutchLimitOrderReactorAbi.abi,
-      DutchLimitOrderReactorAbi.bytecode
+      ExclusiveDutchOrderReactorAbi.abi,
+      ExclusiveDutchOrderReactorAbi.bytecode
     );
     reactor = (await reactorFactory.deploy(
       permit2.address,
       ethers.constants.AddressZero
-    )) as DutchLimitOrderReactor;
+    )) as DutchOrderReactor;
 
     const orderQuoterFactory = await ethers.getContractFactory(
       OrderQuoterAbi.abi,
@@ -113,8 +113,8 @@ describe("OrderValidator", () => {
     const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
     const order = builder
       .deadline(deadline)
-      .endTime(deadline)
-      .startTime(deadline - 1000)
+      .decayEndTime(deadline)
+      .decayStartTime(deadline - 1000)
       .swapper(await swapper.getAddress())
       .nonce(BigNumber.from(98))
       .input({
@@ -151,8 +151,8 @@ describe("OrderValidator", () => {
     const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
     const order = builder
       .deadline(deadline)
-      .endTime(deadline)
-      .startTime(deadline - 1000)
+      .decayEndTime(deadline)
+      .decayStartTime(deadline - 1000)
       .nonce(BigNumber.from(100))
       .swapper(await swapper.getAddress())
       .input({
@@ -181,8 +181,8 @@ describe("OrderValidator", () => {
     const amount = parseEther('1');
     const order = builder
       .deadline(deadline)
-      .endTime(deadline)
-      .startTime(deadline - 1000)
+      .decayEndTime(deadline)
+      .decayStartTime(deadline - 1000)
       .nonce(BigNumber.from(100))
       .swapper(await swapper.getAddress())
       .input({
@@ -216,11 +216,11 @@ describe("OrderValidator", () => {
   });
 
   it("validates an order failing internal exclusivity", async () => {
-    const startTime = Math.floor(new Date().getTime() / 1000) + 1000;
+    const decayStartTime = Math.floor(new Date().getTime() / 1000) + 1000;
     const order = builder
-      .deadline(startTime + 1000)
-      .endTime(startTime + 1000)
-      .startTime(startTime)
+      .deadline(decayStartTime + 1000)
+      .decayEndTime(decayStartTime + 1000)
+      .decayStartTime(decayStartTime)
       .nonce(BigNumber.from(100))
       .swapper(await swapper.getAddress())
       .input({
@@ -249,11 +249,11 @@ describe("OrderValidator", () => {
   });
 
   it("quotes an order with exclusivity override", async () => {
-    const startTime = Math.floor(new Date().getTime() / 1000) + 1000;
+    const decayStartTime = Math.floor(new Date().getTime() / 1000) + 1000;
     const order = builder
-      .deadline(startTime + 1000)
-      .endTime(startTime + 1000)
-      .startTime(startTime)
+      .deadline(decayStartTime + 1000)
+      .decayEndTime(decayStartTime + 1000)
+      .decayStartTime(decayStartTime)
       .nonce(BigNumber.from(100))
       .swapper(await swapper.getAddress())
       .input({
@@ -296,13 +296,13 @@ describe("OrderValidator", () => {
       DIRECT_FILL,
       TWENTY_SECOND_CENTURY,
       1,
-      validationContract
+      additionalValidationContract
     );
     const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
     const order = builder
       .deadline(deadline)
-      .endTime(deadline)
-      .startTime(deadline - 1000)
+      .decayEndTime(deadline)
+      .decayStartTime(deadline - 1000)
       .nonce(BigNumber.from(100))
       .swapper(await swapper.getAddress())
       .input({
@@ -317,8 +317,8 @@ describe("OrderValidator", () => {
         recipient: "0x0000000000000000000000000000000000000000",
       })
       .validation({
-        validationContract: validationInfo.validationContract,
-        validationData: validationInfo.validationData,
+        additionalValidationContract: validationInfo.additionalValidationContract,
+        additionalValidationData: validationInfo.additionalValidationData,
       })
       .build();
 
@@ -334,8 +334,8 @@ describe("OrderValidator", () => {
     const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
     const order = builder
       .deadline(deadline)
-      .endTime(deadline)
-      .startTime(deadline - 1000)
+      .decayEndTime(deadline)
+      .decayStartTime(deadline - 1000)
       .nonce(BigNumber.from(100))
       .swapper(await swapper.getAddress())
       .input({
@@ -363,8 +363,8 @@ describe("OrderValidator", () => {
     const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
     const order = builder
       .deadline(deadline)
-      .endTime(deadline)
-      .startTime(deadline - 1000)
+      .decayEndTime(deadline)
+      .decayStartTime(deadline - 1000)
       .nonce(BigNumber.from(100))
       .swapper(await swapper.getAddress())
       .input({
@@ -393,8 +393,8 @@ describe("OrderValidator", () => {
     // input decays downward
     const order = builder
       .deadline(deadline)
-      .endTime(deadline)
-      .startTime(deadline - 1000)
+      .decayEndTime(deadline)
+      .decayStartTime(deadline - 1000)
       .nonce(BigNumber.from(100))
       .swapper(await swapper.getAddress())
       .input({
@@ -423,8 +423,8 @@ describe("OrderValidator", () => {
     // output decays upward
     const info = builder
       .deadline(deadline)
-      .endTime(deadline)
-      .startTime(deadline - 1000)
+      .decayEndTime(deadline)
+      .decayStartTime(deadline - 1000)
       .nonce(BigNumber.from(100))
       .swapper(await swapper.getAddress())
       .input({
@@ -461,8 +461,8 @@ describe("OrderValidator", () => {
     const deadline = Math.floor(new Date().getTime() / 1000) + 1;
     const info = builder
       .deadline(deadline)
-      .endTime(deadline)
-      .startTime(deadline)
+      .decayEndTime(deadline)
+      .decayStartTime(deadline)
       .swapper(await swapper.getAddress())
       .nonce(BigNumber.from(100))
       .input({
@@ -480,8 +480,8 @@ describe("OrderValidator", () => {
     const order = new DutchOrder(
       Object.assign(info, {
         deadline: deadline - 100,
-        endTime: deadline - 100,
-        startTime: deadline - 101,
+        decayEndTime: deadline - 100,
+        decayStartTime: deadline - 101,
       }),
       chainId,
       permit2.address
@@ -499,8 +499,8 @@ describe("OrderValidator", () => {
     const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
     const info = builder
       .deadline(deadline)
-      .endTime(deadline)
-      .startTime(deadline - 1000)
+      .decayEndTime(deadline)
+      .decayStartTime(deadline - 1000)
       .swapper(await swapper.getAddress())
       .nonce(BigNumber.from(100))
       .input({
@@ -544,8 +544,8 @@ describe("OrderValidator", () => {
     const deadline = Math.floor(new Date().getTime() / 1000) + 1;
     const info = builder
       .deadline(deadline)
-      .endTime(deadline)
-      .startTime(deadline)
+      .decayEndTime(deadline)
+      .decayStartTime(deadline)
       .swapper(await swapper.getAddress())
       .nonce(BigNumber.from(100))
       .input({
@@ -561,7 +561,7 @@ describe("OrderValidator", () => {
       })
       .build().info;
     const order = new DutchOrder(
-      Object.assign(info, { endTime: deadline - 100 }),
+      Object.assign(info, { decayEndTime: deadline - 100 }),
       chainId,
       permit2.address
     );
@@ -578,8 +578,8 @@ describe("OrderValidator", () => {
     const deadline = Math.floor(new Date().getTime() / 1000) + 1;
     const info = builder
       .deadline(deadline)
-      .endTime(deadline)
-      .startTime(deadline - 1000)
+      .decayEndTime(deadline)
+      .decayStartTime(deadline - 1000)
       .nonce(BigNumber.from(7))
       .swapper(await swapper.getAddress())
       .input({

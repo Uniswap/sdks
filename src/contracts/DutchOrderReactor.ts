@@ -37,7 +37,7 @@ export type SignedOrderStructOutput = [string, string] & {
   sig: string;
 };
 
-export interface DutchLimitOrderReactorInterface extends utils.Interface {
+export interface DutchOrderReactorInterface extends utils.Interface {
   functions: {
     "DIRECT_FILL()": FunctionFragment;
     "execute((bytes,bytes),address,bytes)": FunctionFragment;
@@ -168,12 +168,12 @@ export type ProtocolFeeControllerSetEvent = TypedEvent<
 export type ProtocolFeeControllerSetEventFilter =
   TypedEventFilter<ProtocolFeeControllerSetEvent>;
 
-export interface DutchLimitOrderReactor extends BaseContract {
+export interface DutchOrderReactor extends BaseContract {
   connect(signerOrProvider: Signer | Provider | string): this;
   attach(addressOrName: string): this;
   deployed(): Promise<this>;
 
-  interface: DutchLimitOrderReactorInterface;
+  interface: DutchOrderReactorInterface;
 
   queryFilter<TEvent extends TypedEvent>(
     event: TypedEventFilter<TEvent>,

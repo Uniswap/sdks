@@ -26,8 +26,8 @@ export type OrderInfoStruct = {
   swapper: PromiseOrValue<string>;
   nonce: PromiseOrValue<BigNumberish>;
   deadline: PromiseOrValue<BigNumberish>;
-  validationContract: PromiseOrValue<string>;
-  validationData: PromiseOrValue<BytesLike>;
+  additionalValidationContract: PromiseOrValue<string>;
+  additionalValidationData: PromiseOrValue<BytesLike>;
 };
 
 export type OrderInfoStructOutput = [
@@ -42,8 +42,8 @@ export type OrderInfoStructOutput = [
   swapper: string;
   nonce: BigNumber;
   deadline: BigNumber;
-  validationContract: string;
-  validationData: string;
+  additionalValidationContract: string;
+  additionalValidationData: string;
 };
 
 export type InputTokenStruct = {
