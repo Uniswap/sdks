@@ -67,8 +67,8 @@ export type OrderInfo = {
   swapper: string;
   nonce: BigNumber;
   deadline: number;
-  validationContract: string;
-  validationData: string;
+  additionalValidationContract: string;
+  additionalValidationData: string;
 };
 
 // options to resolve an order

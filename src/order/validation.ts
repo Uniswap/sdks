@@ -15,8 +15,8 @@ type ExclusiveFillerData = {
 };
 
 export type ValidationInfo = {
-  validationContract: string;
-  validationData: string;
+  additionalValidationContract: string;
+  additionalValidationData: string;
 };
 
 export type CustomOrderValidation =
@@ -37,7 +37,7 @@ const NONE_VALIDATION: CustomOrderValidation = {
 export function parseValidation(info: OrderInfo): CustomOrderValidation {
   // TODO: extend to support multiple validation types
   // Add mapping of address to validation type, if no matches iterate through attempting to parse
-  const data = parseExclusiveFillerData(info.validationData);
+  const data = parseExclusiveFillerData(info.additionalValidationData);
   if (data.type !== ValidationType.None) {
     return data;
   }
@@ -71,13 +71,13 @@ export function encodeExclusiveFillerData(
   fillerAddress: string,
   lastExclusiveTimestamp: number,
   chainId?: number,
-  validationContractAddress?: string
+  additionalValidationContractAddress?: string
 ): ValidationInfo {
-  let validationContract = "";
-  if (validationContractAddress) {
-    validationContract = validationContractAddress;
+  let additionalValidationContract = "";
+  if (additionalValidationContractAddress) {
+    additionalValidationContract = additionalValidationContractAddress;
   } else if (chainId) {
-    validationContract = EXCLUSIVE_FILLER_VALIDATION_MAPPING[chainId];
+    additionalValidationContract = EXCLUSIVE_FILLER_VALIDATION_MAPPING[chainId];
   } else {
     throw new Error("No validation contract provided");
   }
@@ -87,7 +87,7 @@ export function encodeExclusiveFillerData(
     [fillerAddress, lastExclusiveTimestamp]
   );
   return {
-    validationContract,
-    validationData: encoded,
+    additionalValidationContract,
+    additionalValidationData: encoded,
   };
 }

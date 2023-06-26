@@ -32,8 +32,8 @@ export type OrderInfoStruct = {
   swapper: PromiseOrValue<string>;
   nonce: PromiseOrValue<BigNumberish>;
   deadline: PromiseOrValue<BigNumberish>;
-  validationContract: PromiseOrValue<string>;
-  validationData: PromiseOrValue<BytesLike>;
+  additionalValidationContract: PromiseOrValue<string>;
+  additionalValidationData: PromiseOrValue<BytesLike>;
 };
 
 export type OrderInfoStructOutput = [
@@ -48,8 +48,8 @@ export type OrderInfoStructOutput = [
   swapper: string;
   nonce: BigNumber;
   deadline: BigNumber;
-  validationContract: string;
-  validationData: string;
+  additionalValidationContract: string;
+  additionalValidationData: string;
 };
 
 export type InputTokenStruct = {
@@ -103,7 +103,7 @@ export interface SwapRouter02ExecutorInterface extends utils.Interface {
     "multicall(address[],bytes[])": FunctionFragment;
     "owner()": FunctionFragment;
     "reactorCallback(((address,address,uint256,uint256,address,bytes),(address,uint256,uint256),(address,uint256,address)[],bytes,bytes32)[],address,bytes)": FunctionFragment;
-    "setOwner(address)": FunctionFragment;
+    "transferOwnership(address)": FunctionFragment;
     "unwrapWETH(address)": FunctionFragment;
     "withdrawETH(address)": FunctionFragment;
   };
@@ -113,7 +113,7 @@ export interface SwapRouter02ExecutorInterface extends utils.Interface {
       | "multicall"
       | "owner"
       | "reactorCallback"
-      | "setOwner"
+      | "transferOwnership"
       | "unwrapWETH"
       | "withdrawETH"
   ): FunctionFragment;
@@ -132,7 +132,7 @@ export interface SwapRouter02ExecutorInterface extends utils.Interface {
     ]
   ): string;
   encodeFunctionData(
-    functionFragment: "setOwner",
+    functionFragment: "transferOwnership",
     values: [PromiseOrValue<string>]
   ): string;
   encodeFunctionData(
@@ -150,7 +150,10 @@ export interface SwapRouter02ExecutorInterface extends utils.Interface {
     functionFragment: "reactorCallback",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "setOwner", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "transferOwnership",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "unwrapWETH", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "withdrawETH",
@@ -158,22 +161,23 @@ export interface SwapRouter02ExecutorInterface extends utils.Interface {
   ): Result;
 
   events: {
-    "OwnerUpdated(address,address)": EventFragment;
+    "OwnershipTransferred(address,address)": EventFragment;
   };
 
-  getEvent(nameOrSignatureOrTopic: "OwnerUpdated"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "OwnershipTransferred"): EventFragment;
 }
 
-export interface OwnerUpdatedEventObject {
+export interface OwnershipTransferredEventObject {
   user: string;
   newOwner: string;
 }
-export type OwnerUpdatedEvent = TypedEvent<
+export type OwnershipTransferredEvent = TypedEvent<
   [string, string],
-  OwnerUpdatedEventObject
+  OwnershipTransferredEventObject
 >;
 
-export type OwnerUpdatedEventFilter = TypedEventFilter<OwnerUpdatedEvent>;
+export type OwnershipTransferredEventFilter =
+  TypedEventFilter<OwnershipTransferredEvent>;
 
 export interface SwapRouter02Executor extends BaseContract {
   connect(signerOrProvider: Signer | Provider | string): this;
@@ -217,7 +221,7 @@ export interface SwapRouter02Executor extends BaseContract {
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<ContractTransaction>;
 
-    setOwner(
+    transferOwnership(
       newOwner: PromiseOrValue<string>,
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<ContractTransaction>;
@@ -248,7 +252,7 @@ export interface SwapRouter02Executor extends BaseContract {
     overrides?: Overrides & { from?: PromiseOrValue<string> }
   ): Promise<ContractTransaction>;
 
-  setOwner(
+  transferOwnership(
     newOwner: PromiseOrValue<string>,
     overrides?: Overrides & { from?: PromiseOrValue<string> }
   ): Promise<ContractTransaction>;
@@ -279,7 +283,7 @@ export interface SwapRouter02Executor extends BaseContract {
       overrides?: CallOverrides
     ): Promise<void>;
 
-    setOwner(
+    transferOwnership(
       newOwner: PromiseOrValue<string>,
       overrides?: CallOverrides
     ): Promise<void>;
@@ -296,14 +300,14 @@ export interface SwapRouter02Executor extends BaseContract {
   };
 
   filters: {
-    "OwnerUpdated(address,address)"(
+    "OwnershipTransferred(address,address)"(
       user?: PromiseOrValue<string> | null,
       newOwner?: PromiseOrValue<string> | null
-    ): OwnerUpdatedEventFilter;
-    OwnerUpdated(
+    ): OwnershipTransferredEventFilter;
+    OwnershipTransferred(
       user?: PromiseOrValue<string> | null,
       newOwner?: PromiseOrValue<string> | null
-    ): OwnerUpdatedEventFilter;
+    ): OwnershipTransferredEventFilter;
   };
 
   estimateGas: {
@@ -322,7 +326,7 @@ export interface SwapRouter02Executor extends BaseContract {
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<BigNumber>;
 
-    setOwner(
+    transferOwnership(
       newOwner: PromiseOrValue<string>,
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<BigNumber>;
@@ -354,7 +358,7 @@ export interface SwapRouter02Executor extends BaseContract {
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<PopulatedTransaction>;
 
-    setOwner(
+    transferOwnership(
       newOwner: PromiseOrValue<string>,
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<PopulatedTransaction>;

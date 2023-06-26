@@ -10,23 +10,23 @@ describe("Dutch Decay", () => {
         {
           startAmount: endAmount.div(2),
           endAmount: endAmount,
-          startTime: 1,
-          endTime: 10,
+          decayStartTime: 1,
+          decayEndTime: 10,
         },
         11
       )
     ).toEqual(endAmount);
   });
 
-  it("Returns endAmount if eq to endTime", () => {
+  it("Returns endAmount if eq to decayEndTime", () => {
     const endAmount = BigNumber.from("100000000");
     expect(
       getDecayedAmount(
         {
           startAmount: endAmount.div(2),
           endAmount: endAmount,
-          startTime: 1,
-          endTime: 10,
+          decayStartTime: 1,
+          decayEndTime: 10,
         },
         10
       )
@@ -40,23 +40,23 @@ describe("Dutch Decay", () => {
         {
           startAmount: startAmount,
           endAmount: startAmount.mul(2),
-          startTime: 10,
-          endTime: 100,
+          decayStartTime: 10,
+          decayEndTime: 100,
         },
         9
       )
     ).toEqual(startAmount);
   });
 
-  it("Returns startAmount if eq to startTime", () => {
+  it("Returns startAmount if eq to decayStartTime", () => {
     const startAmount = BigNumber.from("100000000");
     expect(
       getDecayedAmount(
         {
           startAmount: startAmount,
           endAmount: startAmount.mul(2),
-          startTime: 10,
-          endTime: 100,
+          decayStartTime: 10,
+          decayEndTime: 100,
         },
         10
       )
@@ -70,8 +70,8 @@ describe("Dutch Decay", () => {
         {
           startAmount: startAmount,
           endAmount: startAmount.mul(2),
-          startTime: 10,
-          endTime: 20,
+          decayStartTime: 10,
+          decayEndTime: 20,
         },
         15
       )
@@ -85,8 +85,8 @@ describe("Dutch Decay", () => {
         {
           startAmount: endAmount.mul(2),
           endAmount: endAmount,
-          startTime: 10,
-          endTime: 20,
+          decayStartTime: 10,
+          decayEndTime: 20,
         },
         15
       )
