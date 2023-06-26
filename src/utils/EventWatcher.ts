@@ -3,10 +3,10 @@ import { BigNumber, Event, utils } from "ethers";
 
 import MockERC20Abi from "../../abis/MockERC20.json";
 import {
-  DutchLimitOrderReactor,
-  DutchLimitOrderReactor__factory,
+  ExclusiveDutchOrderReactor,
+  ExclusiveDutchOrderReactor__factory,
 } from "../contracts";
-import { FillEvent } from "../contracts/DutchLimitOrderReactor";
+import { FillEvent } from "../contracts/DutchOrderReactor";
 
 export interface FillData {
   orderHash: string;
@@ -28,10 +28,10 @@ export interface FillInfo extends FillData {
  * Helper for watching events
  */
 export class EventWatcher {
-  private reactor: DutchLimitOrderReactor;
+  private reactor: ExclusiveDutchOrderReactor;
 
   constructor(provider: BaseProvider, reactorAddress: string) {
-    this.reactor = DutchLimitOrderReactor__factory.connect(
+    this.reactor = ExclusiveDutchOrderReactor__factory.connect(
       reactorAddress,
       provider
     );

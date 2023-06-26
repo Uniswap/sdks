@@ -10,12 +10,12 @@ describe("DutchOrder", () => {
         reactor: "0x0000000000000000000000000000000000000000",
         swapper: "0x0000000000000000000000000000000000000000",
         nonce: BigNumber.from(10),
-        validationContract: ethers.constants.AddressZero,
-        validationData: "0x",
+        additionalValidationContract: ethers.constants.AddressZero,
+        additionalValidationData: "0x",
         exclusiveFiller: ethers.constants.AddressZero,
         exclusivityOverrideBps: BigNumber.from(0),
-        startTime: Math.floor(new Date().getTime() / 1000),
-        endTime: Math.floor(new Date().getTime() / 1000) + 1000,
+        decayStartTime: Math.floor(new Date().getTime() / 1000),
+        decayEndTime: Math.floor(new Date().getTime() / 1000) + 1000,
         input: {
           token: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
           startAmount: BigNumber.from("1000000"),
@@ -52,36 +52,38 @@ describe("DutchOrder", () => {
   });
 
   describe("resolve", () => {
-    it("resolves before startTime", () => {
-      const order = new DutchOrder(getOrderInfo({}), 1);
-      const resolved = order.resolve({ timestamp: order.info.startTime - 100 });
-      expect(resolved.input.token).toEqual(order.info.input.token);
-      expect(resolved.input.amount).toEqual(order.info.input.startAmount);
-
-      expect(resolved.outputs.length).toEqual(1);
-      expect(resolved.outputs[0].token).toEqual(order.info.outputs[0].token);
-      expect(resolved.outputs[0].amount).toEqual(
-        order.info.outputs[0].startAmount
-      );
-    });
-
-    it("resolves at startTime", () => {
-      const order = new DutchOrder(getOrderInfo({}), 1);
-      const resolved = order.resolve({ timestamp: order.info.startTime });
-      expect(resolved.input.token).toEqual(order.info.input.token);
-      expect(resolved.input.amount).toEqual(order.info.input.startAmount);
-
-      expect(resolved.outputs.length).toEqual(1);
-      expect(resolved.outputs[0].token).toEqual(order.info.outputs[0].token);
-      expect(resolved.outputs[0].amount).toEqual(
-        order.info.outputs[0].startAmount
-      );
-    });
-
-    it("resolves at endTime", () => {
+    it("resolves before decayStartTime", () => {
       const order = new DutchOrder(getOrderInfo({}), 1);
       const resolved = order.resolve({
-        timestamp: order.info.endTime,
+        timestamp: order.info.decayStartTime - 100,
+      });
+      expect(resolved.input.token).toEqual(order.info.input.token);
+      expect(resolved.input.amount).toEqual(order.info.input.startAmount);
+
+      expect(resolved.outputs.length).toEqual(1);
+      expect(resolved.outputs[0].token).toEqual(order.info.outputs[0].token);
+      expect(resolved.outputs[0].amount).toEqual(
+        order.info.outputs[0].startAmount
+      );
+    });
+
+    it("resolves at decayStartTime", () => {
+      const order = new DutchOrder(getOrderInfo({}), 1);
+      const resolved = order.resolve({ timestamp: order.info.decayStartTime });
+      expect(resolved.input.token).toEqual(order.info.input.token);
+      expect(resolved.input.amount).toEqual(order.info.input.startAmount);
+
+      expect(resolved.outputs.length).toEqual(1);
+      expect(resolved.outputs[0].token).toEqual(order.info.outputs[0].token);
+      expect(resolved.outputs[0].amount).toEqual(
+        order.info.outputs[0].startAmount
+      );
+    });
+
+    it("resolves at decayEndTime", () => {
+      const order = new DutchOrder(getOrderInfo({}), 1);
+      const resolved = order.resolve({
+        timestamp: order.info.decayEndTime,
       });
       expect(resolved.input.token).toEqual(order.info.input.token);
       expect(resolved.input.amount).toEqual(order.info.input.endAmount);
@@ -93,10 +95,10 @@ describe("DutchOrder", () => {
       );
     });
 
-    it("resolves after endTime", () => {
+    it("resolves after decayEndTime", () => {
       const order = new DutchOrder(getOrderInfo({}), 1);
       const resolved = order.resolve({
-        timestamp: order.info.endTime + 100,
+        timestamp: order.info.decayEndTime + 100,
       });
       expect(resolved.input.token).toEqual(order.info.input.token);
       expect(resolved.input.amount).toEqual(order.info.input.endAmount);
@@ -118,7 +120,7 @@ describe("DutchOrder", () => {
         1
       );
       const resolved = order.resolve({
-        timestamp: order.info.startTime - 1,
+        timestamp: order.info.decayStartTime - 1,
         filler: exclusiveFiller,
       });
       expect(resolved.input.token).toEqual(order.info.input.token);
@@ -143,7 +145,7 @@ describe("DutchOrder", () => {
         1
       );
       const resolved = order.resolve({
-        timestamp: order.info.startTime - 1,
+        timestamp: order.info.decayStartTime - 1,
         filler: nonExclusiveFiller,
       });
       expect(resolved.input.token).toEqual(order.info.input.token);
@@ -158,7 +160,7 @@ describe("DutchOrder", () => {
       );
     });
 
-    it("resolves when filler doesnt have exclusivity but startTime is past", () => {
+    it("resolves when filler doesnt have exclusivity but decayStartTime is past", () => {
       const nonExclusiveFiller = "0x0000000000000000000000000000000000000000";
       const exclusiveFiller = "0x0000000000000000000000000000000000000001";
       const exclusivityOverrideBps = BigNumber.from(100);
@@ -170,7 +172,7 @@ describe("DutchOrder", () => {
         1
       );
       const resolved = order.resolve({
-        timestamp: order.info.endTime,
+        timestamp: order.info.decayEndTime,
         filler: nonExclusiveFiller,
       });
       expect(resolved.input.token).toEqual(order.info.input.token);
@@ -193,7 +195,9 @@ describe("DutchOrder", () => {
         }),
         1
       );
-      const resolved = order.resolve({ timestamp: order.info.startTime - 1 });
+      const resolved = order.resolve({
+        timestamp: order.info.decayStartTime - 1,
+      });
       expect(resolved.input.token).toEqual(order.info.input.token);
       expect(resolved.input.amount).toEqual(order.info.input.startAmount);
 

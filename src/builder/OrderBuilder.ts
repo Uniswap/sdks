@@ -13,8 +13,8 @@ export abstract class OrderBuilder {
   constructor() {
     // set defaults
     this.orderInfo = {
-      validationContract: ethers.constants.AddressZero,
-      validationData: "0x",
+      additionalValidationContract: ethers.constants.AddressZero,
+      additionalValidationData: "0x",
     };
   }
 
@@ -34,8 +34,9 @@ export abstract class OrderBuilder {
   }
 
   validation(info: ValidationInfo): OrderBuilder {
-    this.orderInfo.validationContract = info.validationContract;
-    this.orderInfo.validationData = info.validationData;
+    this.orderInfo.additionalValidationContract =
+      info.additionalValidationContract;
+    this.orderInfo.additionalValidationData = info.additionalValidationData;
     return this;
   }
 
@@ -54,11 +55,11 @@ export abstract class OrderBuilder {
     );
     invariant(this.orderInfo.swapper !== undefined, "swapper not set");
     invariant(
-      this.orderInfo.validationContract !== undefined,
+      this.orderInfo.additionalValidationContract !== undefined,
       "validation contract not set"
     );
     invariant(
-      this.orderInfo.validationData !== undefined,
+      this.orderInfo.additionalValidationData !== undefined,
       "validation data not set"
     );
     return {
@@ -66,8 +67,8 @@ export abstract class OrderBuilder {
       swapper: this.orderInfo.swapper,
       nonce: this.orderInfo.nonce,
       deadline: this.orderInfo.deadline,
-      validationContract: this.orderInfo.validationContract,
-      validationData: this.orderInfo.validationData,
+      additionalValidationContract: this.orderInfo.additionalValidationContract,
+      additionalValidationData: this.orderInfo.additionalValidationData,
     };
   }
 
