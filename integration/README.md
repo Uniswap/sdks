@@ -1,3 +1,3 @@
-# E2E tests for Gouda SDK
+# E2E tests for UniswapX SDK
 
-This project uses hardhat to deploy basic gouda contracts, and uses the SDK to interact with them
+This project uses hardhat to deploy basic uniswapx contracts, and uses the SDK to interact with them
