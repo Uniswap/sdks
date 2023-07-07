@@ -1,5 +1,5 @@
 {
-  "name": "@uniswap/gouda-sdk",
+  "name": "@uniswap/uniswapx-sdk",
   "author": "Uniswap",
   "version": "1.0.0-alpha.5",
   "license": "MIT",
@@ -30,7 +30,7 @@
       "pre-commit": "yarn fix"
     }
   },
-  "module": "dist/gouda-sdk.esm.js",
+  "module": "dist/uniswapx-sdk.esm.js",
   "devDependencies": {
     "@typechain/ethers-v5": "^10.1.0",
     "@types/jest": "^29.0.3",
