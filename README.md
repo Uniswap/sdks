@@ -1,6 +1,6 @@
-# gouda-sdk
+# uniswapx-sdk
 
-SDK for the Gouda protocol
+SDK for the UniswapX protocol
 
 ## Usage
 
@@ -9,7 +9,7 @@ The SDK contains bindings for two main flows: parsing serialized orders & buildi
 ### Building & Signing Orders
 
 ```ts
-import { DutchOrder, NonceManager } from '@uniswap/gouda-sdk';
+import { DutchOrder, NonceManager } from '@uniswap/uniswapx-sdk';
 import { ethers } from 'ethers';
 
 const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
@@ -46,7 +46,7 @@ const serializedOrder = order.serialize();
 
 ### Parsing Orders
 ```ts
-import { parseOrder, Order, OrderValidation } from '@uniswap/gouda-sdk';
+import { parseOrder, Order, OrderValidation } from '@uniswap/uniswapx-sdk';
 
 const serializedOrder = '0x1111222233334444555500000000234300234...';
 const order: Order = parseOrder(serializedOrder);
@@ -57,7 +57,7 @@ const orderHash = order.hash();
 ### Validating Orders 
 ```ts
 import { ethers } from 'ethers';
-import { OrderValidator } from 'gouda-sdk';
+import { OrderValidator } from 'uniswapx-sdk';
 
 const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
 const validator = new OrderValidator(provider, CHAIN_ID); 
