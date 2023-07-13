@@ -14,7 +14,8 @@ export enum ChainId {
   MOONBEAM = 1284,
   BNB = 56,
   AVALANCHE = 43114,
-  BASE_GOERLI = 84531
+  BASE_GOERLI = 84531,
+  BASE = 8453
 }
 
 export const SUPPORTED_CHAINS = [
