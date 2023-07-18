@@ -55,7 +55,7 @@
     "@ethersproject/bytes": "^5.7.0",
     "@ethersproject/providers": "^5.7.0",
     "@uniswap/permit2-sdk": "^1.2.0",
-    "@uniswap/sdk-core": "^3.0.2",
+    "@uniswap/sdk-core": "^4.0.3",
     "ethers": "^5.7.0"
   }
 }
