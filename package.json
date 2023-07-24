@@ -1,6 +1,6 @@
 {
   "name": "@uniswap/universal-router-sdk",
-  "version": "1.5.4",
+  "version": "1.5.5",
   "description": "sdk for integrating with the Universal Router contracts",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
