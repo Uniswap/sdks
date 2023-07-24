@@ -87,6 +87,18 @@ const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
     weth: '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7',
     creationBlock: 31583684,
   },
+  // base goerli
+  [84531]: {
+    router: '0xd0872d928672ae2ff74bdb2f5130ac12229cafaf',
+    weth: '0x4200000000000000000000000000000000000006',
+    creationBlock: 6915289,
+  },
+  // base mainnet
+  [8453]: {
+    router: '0x198EF79F1F515F02dFE9e3115eD9fC07183f02fC',
+    weth: '0x4200000000000000000000000000000000000006',
+    creationBlock: 1452376,
+  },
 }
 
 export const UNIVERSAL_ROUTER_ADDRESS = (chainId: number): string => {
