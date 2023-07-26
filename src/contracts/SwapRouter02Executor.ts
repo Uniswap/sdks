@@ -27,6 +27,16 @@ import type {
   PromiseOrValue,
 } from "./common";
 
+export type SignedOrderStruct = {
+  order: PromiseOrValue<BytesLike>;
+  sig: PromiseOrValue<BytesLike>;
+};
+
+export type SignedOrderStructOutput = [string, string] & {
+  order: string;
+  sig: string;
+};
+
 export type OrderInfoStruct = {
   reactor: PromiseOrValue<string>;
   swapper: PromiseOrValue<string>;
@@ -100,9 +110,11 @@ export type ResolvedOrderStructOutput = [
 
 export interface SwapRouter02ExecutorInterface extends utils.Interface {
   functions: {
+    "execute((bytes,bytes),bytes)": FunctionFragment;
+    "executeBatch((bytes,bytes)[],bytes)": FunctionFragment;
     "multicall(address[],bytes[])": FunctionFragment;
     "owner()": FunctionFragment;
-    "reactorCallback(((address,address,uint256,uint256,address,bytes),(address,uint256,uint256),(address,uint256,address)[],bytes,bytes32)[],address,bytes)": FunctionFragment;
+    "reactorCallback(((address,address,uint256,uint256,address,bytes),(address,uint256,uint256),(address,uint256,address)[],bytes,bytes32)[],bytes)": FunctionFragment;
     "transferOwnership(address)": FunctionFragment;
     "unwrapWETH(address)": FunctionFragment;
     "withdrawETH(address)": FunctionFragment;
@@ -110,6 +122,8 @@ export interface SwapRouter02ExecutorInterface extends utils.Interface {
 
   getFunction(
     nameOrSignatureOrTopic:
+      | "execute"
+      | "executeBatch"
       | "multicall"
       | "owner"
       | "reactorCallback"
@@ -119,17 +133,21 @@ export interface SwapRouter02ExecutorInterface extends utils.Interface {
   ): FunctionFragment;
 
   encodeFunctionData(
+    functionFragment: "execute",
+    values: [SignedOrderStruct, PromiseOrValue<BytesLike>]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "executeBatch",
+    values: [SignedOrderStruct[], PromiseOrValue<BytesLike>]
+  ): string;
+  encodeFunctionData(
     functionFragment: "multicall",
     values: [PromiseOrValue<string>[], PromiseOrValue<BytesLike>[]]
   ): string;
   encodeFunctionData(functionFragment: "owner", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "reactorCallback",
-    values: [
-      ResolvedOrderStruct[],
-      PromiseOrValue<string>,
-      PromiseOrValue<BytesLike>
-    ]
+    values: [ResolvedOrderStruct[], PromiseOrValue<BytesLike>]
   ): string;
   encodeFunctionData(
     functionFragment: "transferOwnership",
@@ -144,6 +162,11 @@ export interface SwapRouter02ExecutorInterface extends utils.Interface {
     values: [PromiseOrValue<string>]
   ): string;
 
+  decodeFunctionResult(functionFragment: "execute", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "executeBatch",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "multicall", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "owner", data: BytesLike): Result;
   decodeFunctionResult(
@@ -206,6 +229,18 @@ export interface SwapRouter02Executor extends BaseContract {
   removeListener: OnEvent<this>;
 
   functions: {
+    execute(
+      order: SignedOrderStruct,
+      callbackData: PromiseOrValue<BytesLike>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<ContractTransaction>;
+
+    executeBatch(
+      orders: SignedOrderStruct[],
+      callbackData: PromiseOrValue<BytesLike>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<ContractTransaction>;
+
     multicall(
       tokensToApprove: PromiseOrValue<string>[],
       multicallData: PromiseOrValue<BytesLike>[],
@@ -215,9 +250,8 @@ export interface SwapRouter02Executor extends BaseContract {
     owner(overrides?: CallOverrides): Promise<[string]>;
 
     reactorCallback(
-      resolvedOrders: ResolvedOrderStruct[],
-      filler: PromiseOrValue<string>,
-      fillData: PromiseOrValue<BytesLike>,
+      arg0: ResolvedOrderStruct[],
+      callbackData: PromiseOrValue<BytesLike>,
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<ContractTransaction>;
 
@@ -237,6 +271,18 @@ export interface SwapRouter02Executor extends BaseContract {
     ): Promise<ContractTransaction>;
   };
 
+  execute(
+    order: SignedOrderStruct,
+    callbackData: PromiseOrValue<BytesLike>,
+    overrides?: Overrides & { from?: PromiseOrValue<string> }
+  ): Promise<ContractTransaction>;
+
+  executeBatch(
+    orders: SignedOrderStruct[],
+    callbackData: PromiseOrValue<BytesLike>,
+    overrides?: Overrides & { from?: PromiseOrValue<string> }
+  ): Promise<ContractTransaction>;
+
   multicall(
     tokensToApprove: PromiseOrValue<string>[],
     multicallData: PromiseOrValue<BytesLike>[],
@@ -246,9 +292,8 @@ export interface SwapRouter02Executor extends BaseContract {
   owner(overrides?: CallOverrides): Promise<string>;
 
   reactorCallback(
-    resolvedOrders: ResolvedOrderStruct[],
-    filler: PromiseOrValue<string>,
-    fillData: PromiseOrValue<BytesLike>,
+    arg0: ResolvedOrderStruct[],
+    callbackData: PromiseOrValue<BytesLike>,
     overrides?: Overrides & { from?: PromiseOrValue<string> }
   ): Promise<ContractTransaction>;
 
@@ -268,6 +313,18 @@ export interface SwapRouter02Executor extends BaseContract {
   ): Promise<ContractTransaction>;
 
   callStatic: {
+    execute(
+      order: SignedOrderStruct,
+      callbackData: PromiseOrValue<BytesLike>,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    executeBatch(
+      orders: SignedOrderStruct[],
+      callbackData: PromiseOrValue<BytesLike>,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
     multicall(
       tokensToApprove: PromiseOrValue<string>[],
       multicallData: PromiseOrValue<BytesLike>[],
@@ -277,9 +334,8 @@ export interface SwapRouter02Executor extends BaseContract {
     owner(overrides?: CallOverrides): Promise<string>;
 
     reactorCallback(
-      resolvedOrders: ResolvedOrderStruct[],
-      filler: PromiseOrValue<string>,
-      fillData: PromiseOrValue<BytesLike>,
+      arg0: ResolvedOrderStruct[],
+      callbackData: PromiseOrValue<BytesLike>,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -311,6 +367,18 @@ export interface SwapRouter02Executor extends BaseContract {
   };
 
   estimateGas: {
+    execute(
+      order: SignedOrderStruct,
+      callbackData: PromiseOrValue<BytesLike>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<BigNumber>;
+
+    executeBatch(
+      orders: SignedOrderStruct[],
+      callbackData: PromiseOrValue<BytesLike>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<BigNumber>;
+
     multicall(
       tokensToApprove: PromiseOrValue<string>[],
       multicallData: PromiseOrValue<BytesLike>[],
@@ -320,9 +388,8 @@ export interface SwapRouter02Executor extends BaseContract {
     owner(overrides?: CallOverrides): Promise<BigNumber>;
 
     reactorCallback(
-      resolvedOrders: ResolvedOrderStruct[],
-      filler: PromiseOrValue<string>,
-      fillData: PromiseOrValue<BytesLike>,
+      arg0: ResolvedOrderStruct[],
+      callbackData: PromiseOrValue<BytesLike>,
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<BigNumber>;
 
@@ -343,6 +410,18 @@ export interface SwapRouter02Executor extends BaseContract {
   };
 
   populateTransaction: {
+    execute(
+      order: SignedOrderStruct,
+      callbackData: PromiseOrValue<BytesLike>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<PopulatedTransaction>;
+
+    executeBatch(
+      orders: SignedOrderStruct[],
+      callbackData: PromiseOrValue<BytesLike>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<PopulatedTransaction>;
+
     multicall(
       tokensToApprove: PromiseOrValue<string>[],
       multicallData: PromiseOrValue<BytesLike>[],
@@ -352,9 +431,8 @@ export interface SwapRouter02Executor extends BaseContract {
     owner(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     reactorCallback(
-      resolvedOrders: ResolvedOrderStruct[],
-      filler: PromiseOrValue<string>,
-      fillData: PromiseOrValue<BytesLike>,
+      arg0: ResolvedOrderStruct[],
+      callbackData: PromiseOrValue<BytesLike>,
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<PopulatedTransaction>;
 

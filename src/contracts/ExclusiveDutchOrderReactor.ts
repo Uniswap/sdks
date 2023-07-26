@@ -39,9 +39,10 @@ export type SignedOrderStructOutput = [string, string] & {
 
 export interface ExclusiveDutchOrderReactorInterface extends utils.Interface {
   functions: {
-    "DIRECT_FILL()": FunctionFragment;
-    "execute((bytes,bytes),address,bytes)": FunctionFragment;
-    "executeBatch((bytes,bytes)[],address,bytes)": FunctionFragment;
+    "execute((bytes,bytes))": FunctionFragment;
+    "executeBatch((bytes,bytes)[])": FunctionFragment;
+    "executeBatchWithCallback((bytes,bytes)[],bytes)": FunctionFragment;
+    "executeWithCallback((bytes,bytes),bytes)": FunctionFragment;
     "feeController()": FunctionFragment;
     "owner()": FunctionFragment;
     "permit2()": FunctionFragment;
@@ -51,9 +52,10 @@ export interface ExclusiveDutchOrderReactorInterface extends utils.Interface {
 
   getFunction(
     nameOrSignatureOrTopic:
-      | "DIRECT_FILL"
       | "execute"
       | "executeBatch"
+      | "executeBatchWithCallback"
+      | "executeWithCallback"
       | "feeController"
       | "owner"
       | "permit2"
@@ -62,24 +64,20 @@ export interface ExclusiveDutchOrderReactorInterface extends utils.Interface {
   ): FunctionFragment;
 
   encodeFunctionData(
-    functionFragment: "DIRECT_FILL",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
     functionFragment: "execute",
-    values: [
-      SignedOrderStruct,
-      PromiseOrValue<string>,
-      PromiseOrValue<BytesLike>
-    ]
+    values: [SignedOrderStruct]
   ): string;
   encodeFunctionData(
     functionFragment: "executeBatch",
-    values: [
-      SignedOrderStruct[],
-      PromiseOrValue<string>,
-      PromiseOrValue<BytesLike>
-    ]
+    values: [SignedOrderStruct[]]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "executeBatchWithCallback",
+    values: [SignedOrderStruct[], PromiseOrValue<BytesLike>]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "executeWithCallback",
+    values: [SignedOrderStruct, PromiseOrValue<BytesLike>]
   ): string;
   encodeFunctionData(
     functionFragment: "feeController",
@@ -96,13 +94,17 @@ export interface ExclusiveDutchOrderReactorInterface extends utils.Interface {
     values: [PromiseOrValue<string>]
   ): string;
 
-  decodeFunctionResult(
-    functionFragment: "DIRECT_FILL",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(functionFragment: "execute", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "executeBatch",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "executeBatchWithCallback",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "executeWithCallback",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -195,19 +197,25 @@ export interface ExclusiveDutchOrderReactor extends BaseContract {
   removeListener: OnEvent<this>;
 
   functions: {
-    DIRECT_FILL(overrides?: CallOverrides): Promise<[string]>;
-
     execute(
       order: SignedOrderStruct,
-      fillContract: PromiseOrValue<string>,
-      fillData: PromiseOrValue<BytesLike>,
       overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
     ): Promise<ContractTransaction>;
 
     executeBatch(
       orders: SignedOrderStruct[],
-      fillContract: PromiseOrValue<string>,
-      fillData: PromiseOrValue<BytesLike>,
+      overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
+    ): Promise<ContractTransaction>;
+
+    executeBatchWithCallback(
+      orders: SignedOrderStruct[],
+      callbackData: PromiseOrValue<BytesLike>,
+      overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
+    ): Promise<ContractTransaction>;
+
+    executeWithCallback(
+      order: SignedOrderStruct,
+      callbackData: PromiseOrValue<BytesLike>,
       overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
     ): Promise<ContractTransaction>;
 
@@ -228,19 +236,25 @@ export interface ExclusiveDutchOrderReactor extends BaseContract {
     ): Promise<ContractTransaction>;
   };
 
-  DIRECT_FILL(overrides?: CallOverrides): Promise<string>;
-
   execute(
     order: SignedOrderStruct,
-    fillContract: PromiseOrValue<string>,
-    fillData: PromiseOrValue<BytesLike>,
     overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
   ): Promise<ContractTransaction>;
 
   executeBatch(
     orders: SignedOrderStruct[],
-    fillContract: PromiseOrValue<string>,
-    fillData: PromiseOrValue<BytesLike>,
+    overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
+  ): Promise<ContractTransaction>;
+
+  executeBatchWithCallback(
+    orders: SignedOrderStruct[],
+    callbackData: PromiseOrValue<BytesLike>,
+    overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
+  ): Promise<ContractTransaction>;
+
+  executeWithCallback(
+    order: SignedOrderStruct,
+    callbackData: PromiseOrValue<BytesLike>,
     overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
   ): Promise<ContractTransaction>;
 
@@ -261,19 +275,22 @@ export interface ExclusiveDutchOrderReactor extends BaseContract {
   ): Promise<ContractTransaction>;
 
   callStatic: {
-    DIRECT_FILL(overrides?: CallOverrides): Promise<string>;
-
-    execute(
-      order: SignedOrderStruct,
-      fillContract: PromiseOrValue<string>,
-      fillData: PromiseOrValue<BytesLike>,
-      overrides?: CallOverrides
-    ): Promise<void>;
+    execute(order: SignedOrderStruct, overrides?: CallOverrides): Promise<void>;
 
     executeBatch(
       orders: SignedOrderStruct[],
-      fillContract: PromiseOrValue<string>,
-      fillData: PromiseOrValue<BytesLike>,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    executeBatchWithCallback(
+      orders: SignedOrderStruct[],
+      callbackData: PromiseOrValue<BytesLike>,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    executeWithCallback(
+      order: SignedOrderStruct,
+      callbackData: PromiseOrValue<BytesLike>,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -328,19 +345,25 @@ export interface ExclusiveDutchOrderReactor extends BaseContract {
   };
 
   estimateGas: {
-    DIRECT_FILL(overrides?: CallOverrides): Promise<BigNumber>;
-
     execute(
       order: SignedOrderStruct,
-      fillContract: PromiseOrValue<string>,
-      fillData: PromiseOrValue<BytesLike>,
       overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
     ): Promise<BigNumber>;
 
     executeBatch(
       orders: SignedOrderStruct[],
-      fillContract: PromiseOrValue<string>,
-      fillData: PromiseOrValue<BytesLike>,
+      overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
+    ): Promise<BigNumber>;
+
+    executeBatchWithCallback(
+      orders: SignedOrderStruct[],
+      callbackData: PromiseOrValue<BytesLike>,
+      overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
+    ): Promise<BigNumber>;
+
+    executeWithCallback(
+      order: SignedOrderStruct,
+      callbackData: PromiseOrValue<BytesLike>,
       overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
     ): Promise<BigNumber>;
 
@@ -362,19 +385,25 @@ export interface ExclusiveDutchOrderReactor extends BaseContract {
   };
 
   populateTransaction: {
-    DIRECT_FILL(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
     execute(
       order: SignedOrderStruct,
-      fillContract: PromiseOrValue<string>,
-      fillData: PromiseOrValue<BytesLike>,
       overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
     ): Promise<PopulatedTransaction>;
 
     executeBatch(
       orders: SignedOrderStruct[],
-      fillContract: PromiseOrValue<string>,
-      fillData: PromiseOrValue<BytesLike>,
+      overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
+    ): Promise<PopulatedTransaction>;
+
+    executeBatchWithCallback(
+      orders: SignedOrderStruct[],
+      callbackData: PromiseOrValue<BytesLike>,
+      overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
+    ): Promise<PopulatedTransaction>;
+
+    executeWithCallback(
+      order: SignedOrderStruct,
+      callbackData: PromiseOrValue<BytesLike>,
       overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
     ): Promise<PopulatedTransaction>;
 

@@ -74,8 +74,7 @@ describe('DutchOrder', () => {
     );
     await tokenOut
       .connect(filler)
-      .approve(permit2.address, ethers.constants.MaxUint256);
-    await permit2.connect(filler).approve(tokenOut.address, reactor.address, BigNumber.from(2).pow(160).sub(1), BigNumber.from(2).pow(48).sub(1));
+      .approve(reactor.address, ethers.constants.MaxUint256);
   });
 
   it('correctly builds an order', async () => {
@@ -174,8 +173,6 @@ describe('DutchOrder', () => {
       .connect(filler)
       .execute(
         { order: order.serialize(), sig: signature },
-        DIRECT_FILL,
-        '0x'
       );
     const receipt = await res.wait();
     expect(receipt.status).to.equal(1);
@@ -240,8 +237,6 @@ describe('DutchOrder', () => {
       .connect(filler)
       .execute(
         { order: order.serialize(), sig: signature },
-        DIRECT_FILL,
-        '0x'
       );
     const receipt = await res.wait();
     expect(receipt.status).to.equal(1);
