@@ -98,7 +98,7 @@ export interface OrderQuoterInterface extends utils.Interface {
   functions: {
     "getReactor(bytes)": FunctionFragment;
     "quote(bytes,bytes)": FunctionFragment;
-    "reactorCallback(((address,address,uint256,uint256,address,bytes),(address,uint256,uint256),(address,uint256,address)[],bytes,bytes32)[],address,bytes)": FunctionFragment;
+    "reactorCallback(((address,address,uint256,uint256,address,bytes),(address,uint256,uint256),(address,uint256,address)[],bytes,bytes32)[],bytes)": FunctionFragment;
   };
 
   getFunction(
@@ -115,11 +115,7 @@ export interface OrderQuoterInterface extends utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "reactorCallback",
-    values: [
-      ResolvedOrderStruct[],
-      PromiseOrValue<string>,
-      PromiseOrValue<BytesLike>
-    ]
+    values: [ResolvedOrderStruct[], PromiseOrValue<BytesLike>]
   ): string;
 
   decodeFunctionResult(functionFragment: "getReactor", data: BytesLike): Result;
@@ -172,8 +168,7 @@ export interface OrderQuoter extends BaseContract {
 
     reactorCallback(
       resolvedOrders: ResolvedOrderStruct[],
-      filler: PromiseOrValue<string>,
-      arg2: PromiseOrValue<BytesLike>,
+      arg1: PromiseOrValue<BytesLike>,
       overrides?: CallOverrides
     ): Promise<[void]>;
   };
@@ -191,8 +186,7 @@ export interface OrderQuoter extends BaseContract {
 
   reactorCallback(
     resolvedOrders: ResolvedOrderStruct[],
-    filler: PromiseOrValue<string>,
-    arg2: PromiseOrValue<BytesLike>,
+    arg1: PromiseOrValue<BytesLike>,
     overrides?: CallOverrides
   ): Promise<void>;
 
@@ -210,8 +204,7 @@ export interface OrderQuoter extends BaseContract {
 
     reactorCallback(
       resolvedOrders: ResolvedOrderStruct[],
-      filler: PromiseOrValue<string>,
-      arg2: PromiseOrValue<BytesLike>,
+      arg1: PromiseOrValue<BytesLike>,
       overrides?: CallOverrides
     ): Promise<void>;
   };
@@ -232,8 +225,7 @@ export interface OrderQuoter extends BaseContract {
 
     reactorCallback(
       resolvedOrders: ResolvedOrderStruct[],
-      filler: PromiseOrValue<string>,
-      arg2: PromiseOrValue<BytesLike>,
+      arg1: PromiseOrValue<BytesLike>,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
   };
@@ -252,8 +244,7 @@ export interface OrderQuoter extends BaseContract {
 
     reactorCallback(
       resolvedOrders: ResolvedOrderStruct[],
-      filler: PromiseOrValue<string>,
-      arg2: PromiseOrValue<BytesLike>,
+      arg1: PromiseOrValue<BytesLike>,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
   };
