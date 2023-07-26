@@ -75,10 +75,8 @@ describe("EventWatcher", () => {
     );
     await tokenOut
       .connect(filler)
-      .approve(permit2.address, ethers.constants.MaxUint256);
+      .approve(reactor.address, ethers.constants.MaxUint256);
     watcher = new EventWatcher(ethers.provider, reactor.address);
-
-    await permit2.connect(filler).approve(tokenOut.address, reactor.address, BigNumber.from(2).pow(160).sub(1), BigNumber.from(2).pow(48).sub(1));
   });
 
   it("Fetches fill events", async () => {
@@ -114,8 +112,6 @@ describe("EventWatcher", () => {
       .connect(filler)
       .execute(
         { order: order.serialize(), sig: signature },
-        DIRECT_FILL,
-        "0x"
       );
     await res.wait();
 
@@ -177,8 +173,6 @@ describe("EventWatcher", () => {
       .connect(filler)
       .execute(
         { order: order.serialize(), sig: signature },
-        DIRECT_FILL,
-        "0x"
       );
     await res.wait();
   });
