@@ -105,8 +105,7 @@ describe("OrderValidator", () => {
     );
     await tokenOut
       .connect(filler)
-      .approve(permit2.address, ethers.constants.MaxUint256);
-    await permit2.connect(filler).approve(tokenOut.address, reactor.address, BigNumber.from(2).pow(160).sub(1), BigNumber.from(2).pow(48).sub(1));
+      .approve(reactor.address, ethers.constants.MaxUint256);
   });
 
   it("quotes a valid order", async () => {
@@ -205,8 +204,6 @@ describe("OrderValidator", () => {
       .connect(filler)
       .execute(
         { order: order.serialize(), sig: signature },
-        DIRECT_FILL,
-        "0x"
       );
     await res.wait();
 
