@@ -1,17 +1,17 @@
 import { expect } from 'chai'
 import JSBI from 'jsbi'
 import { BigNumber, utils, Wallet } from 'ethers'
-import { expandTo18Decimals } from '../src/utils/expandTo18Decimals'
+import { expandTo18Decimals } from '../src/utils/numbers'
 import { SwapRouter, UniswapTrade } from '../src'
 import { MixedRouteTrade, MixedRouteSDK } from '@uniswap/router-sdk'
 import { Trade as V2Trade, Pair, Route as RouteV2 } from '@uniswap/v2-sdk'
-import { Trade as V3Trade, Route as RouteV3, Pool } from '@uniswap/v3-sdk'
+import { Trade as V3Trade, Route as RouteV3, Pool, FeeOptions } from '@uniswap/v3-sdk'
 import { generatePermitSignature, toInputPermit, makePermit, generateEip2098PermitSignature } from './utils/permit2'
-import { CurrencyAmount, TradeType } from '@uniswap/sdk-core'
+import { CurrencyAmount, Percent, TradeType } from '@uniswap/sdk-core'
 import { registerFixture } from './forge/writeInterop'
 import { buildTrade, getUniswapPools, swapOptions, ETHER, DAI, USDC } from './utils/uniswapData'
 import { hexToDecimalString } from './utils/hexToDecimalString'
-import { FORGE_PERMIT2_ADDRESS, FORGE_ROUTER_ADDRESS } from './utils/addresses'
+import { FORGE_PERMIT2_ADDRESS, FORGE_ROUTER_ADDRESS, TEST_FEE_RECIPIENT_ADDRESS } from './utils/addresses'
 
 const FORK_BLOCK = 16075500
 
@@ -48,6 +48,23 @@ describe('Uniswap', () => {
       expect(methodParameters.value).to.eq(methodParametersV2.value)
     })
 
+    it('encodes a single exactInput ETH->USDC swap, with a fee', async () => {
+      const inputEther = utils.parseEther('1').toString()
+      const trade = new V2Trade(
+        new RouteV2([WETH_USDC_V2], ETHER, USDC),
+        CurrencyAmount.fromRawAmount(ETHER, inputEther),
+        TradeType.EXACT_INPUT
+      )
+      const feeOptions: FeeOptions = { fee: new Percent(5, 100), recipient: TEST_FEE_RECIPIENT_ADDRESS }
+      const opts = swapOptions({ fee: feeOptions })
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
+      const methodParametersV2 = SwapRouter.swapCallParameters(new UniswapTrade(buildTrade([trade]), opts))
+      registerFixture('_UNISWAP_V2_1_ETH_FOR_USDC_WITH_FEE', methodParametersV2)
+      expect(hexToDecimalString(methodParameters.value)).to.eq(inputEther)
+      expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
+      expect(methodParameters.value).to.eq(methodParametersV2.value)
+    })
+
     it('encodes an exactInput ETH->USDC->DAI swap', async () => {
       const inputEther = utils.parseEther('1').toString()
       const trade = new V2Trade(
@@ -64,6 +81,23 @@ describe('Uniswap', () => {
       expect(methodParameters.value).to.eq(methodParametersV2.value)
     })
 
+    it('encodes an exactInput ETH->USDC->DAI swap, with a fee', async () => {
+      const inputEther = utils.parseEther('1').toString()
+      const trade = new V2Trade(
+        new RouteV2([WETH_USDC_V2, USDC_DAI_V2], ETHER, DAI),
+        CurrencyAmount.fromRawAmount(ETHER, inputEther),
+        TradeType.EXACT_INPUT
+      )
+      const feeOptions: FeeOptions = { fee: new Percent(5, 100), recipient: TEST_FEE_RECIPIENT_ADDRESS }
+      const opts = swapOptions({ fee: feeOptions })
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
+      const methodParametersV2 = SwapRouter.swapCallParameters(new UniswapTrade(buildTrade([trade]), opts))
+      registerFixture('_UNISWAP_V2_1_ETH_FOR_USDC_2_HOP_WITH_FEE', methodParametersV2)
+      expect(hexToDecimalString(methodParameters.value)).to.eq(inputEther)
+      expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
+      expect(methodParameters.value).to.eq(methodParametersV2.value)
+    })
+
     it('encodes a single exactInput USDC->ETH swap', async () => {
       const inputUSDC = utils.parseUnits('1000', 6).toString()
       const trade = new V2Trade(
@@ -75,6 +109,23 @@ describe('Uniswap', () => {
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       const methodParametersV2 = SwapRouter.swapCallParameters(new UniswapTrade(buildTrade([trade]), opts))
       registerFixture('_UNISWAP_V2_1000_USDC_FOR_ETH', methodParametersV2)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+      expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
+      expect(methodParameters.value).to.eq(methodParametersV2.value)
+    })
+
+    it('encodes a single exactInput USDC->ETH swap, with WETH fee', async () => {
+      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const trade = new V2Trade(
+        new RouteV2([WETH_USDC_V2], USDC, ETHER),
+        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
+        TradeType.EXACT_INPUT
+      )
+      const feeOptions: FeeOptions = { fee: new Percent(5, 100), recipient: TEST_FEE_RECIPIENT_ADDRESS }
+      const opts = swapOptions({ fee: feeOptions })
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
+      const methodParametersV2 = SwapRouter.swapCallParameters(new UniswapTrade(buildTrade([trade]), opts))
+      registerFixture('_UNISWAP_V2_1000_USDC_FOR_ETH_WITH_WETH_FEE', methodParametersV2)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
       expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
       expect(methodParameters.value).to.eq(methodParametersV2.value)
@@ -178,6 +229,28 @@ describe('Uniswap', () => {
       expect(methodParameters.value).to.eq(methodParametersV2.value)
     })
 
+    it('encodes a single exactOutput ETH->USDC swap, with a fee', async () => {
+      // We must adjust the output amount for the 5% output fee
+      const outputUSDC = utils.parseUnits('1000', 6)
+      const adjustedOutputUSDC = outputUSDC
+        .mul(10000)
+        .div(10000 - 500)
+        .toString()
+      const trade = new V2Trade(
+        new RouteV2([WETH_USDC_V2], ETHER, USDC),
+        CurrencyAmount.fromRawAmount(USDC, adjustedOutputUSDC),
+        TradeType.EXACT_OUTPUT
+      )
+      const feeOptions: FeeOptions = { fee: new Percent(5, 100), recipient: TEST_FEE_RECIPIENT_ADDRESS }
+      const opts = swapOptions({ fee: feeOptions })
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
+      const methodParametersV2 = SwapRouter.swapCallParameters(new UniswapTrade(buildTrade([trade]), opts))
+      registerFixture('_UNISWAP_V2_ETH_FOR_1000_USDC_WITH_FEE', methodParametersV2)
+      expect(hexToDecimalString(methodParameters.value)).to.not.equal('0')
+      expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
+      expect(methodParameters.value).to.eq(methodParametersV2.value)
+    })
+
     it('encodes a single exactOutput USDC->ETH swap', async () => {
       const outputETH = utils.parseEther('1').toString()
       const trade = new V2Trade(
@@ -212,6 +285,23 @@ describe('Uniswap', () => {
       expect(methodParameters.value).to.eq(methodParametersV2.value)
     })
 
+    it('encodes a single exactInput ETH->USDC swap, with a fee', async () => {
+      const inputEther = utils.parseEther('1').toString()
+      const trade = await V3Trade.fromRoute(
+        new RouteV3([WETH_USDC_V3], ETHER, USDC),
+        CurrencyAmount.fromRawAmount(ETHER, inputEther),
+        TradeType.EXACT_INPUT
+      )
+      const feeOptions: FeeOptions = { fee: new Percent(5, 100), recipient: TEST_FEE_RECIPIENT_ADDRESS }
+      const opts = swapOptions({ fee: feeOptions })
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
+      const methodParametersV2 = SwapRouter.swapCallParameters(new UniswapTrade(buildTrade([trade]), opts))
+      registerFixture('_UNISWAP_V3_1_ETH_FOR_USDC_WITH_FEE', methodParametersV2)
+      expect(hexToDecimalString(methodParameters.value)).to.eq(inputEther)
+      expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
+      expect(methodParameters.value).to.eq(methodParametersV2.value)
+    })
+
     it('encodes a single exactInput USDC->ETH swap', async () => {
       const inputUSDC = utils.parseUnits('1000', 6).toString()
       const trade = await V3Trade.fromRoute(
@@ -223,6 +313,23 @@ describe('Uniswap', () => {
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       const methodParametersV2 = SwapRouter.swapCallParameters(new UniswapTrade(buildTrade([trade]), opts))
       registerFixture('_UNISWAP_V3_1000_USDC_FOR_ETH', methodParametersV2)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+      expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
+      expect(methodParameters.value).to.eq(methodParametersV2.value)
+    })
+
+    it('encodes a single exactInput USDC->ETH swap, with WETH fee', async () => {
+      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const trade = await V3Trade.fromRoute(
+        new RouteV3([WETH_USDC_V3], USDC, ETHER),
+        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
+        TradeType.EXACT_INPUT
+      )
+      const feeOptions: FeeOptions = { fee: new Percent(5, 100), recipient: TEST_FEE_RECIPIENT_ADDRESS }
+      const opts = swapOptions({ fee: feeOptions })
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
+      const methodParametersV2 = SwapRouter.swapCallParameters(new UniswapTrade(buildTrade([trade]), opts))
+      registerFixture('_UNISWAP_V3_1000_USDC_FOR_ETH_WITH_WETH_FEE', methodParametersV2)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
       expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
       expect(methodParameters.value).to.eq(methodParametersV2.value)
@@ -326,6 +433,28 @@ describe('Uniswap', () => {
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       const methodParametersV2 = SwapRouter.swapCallParameters(new UniswapTrade(buildTrade([trade]), opts))
       registerFixture('_UNISWAP_V3_DAI_FOR_1_ETH_2_HOP', methodParametersV2)
+      expect(hexToDecimalString(methodParameters.value)).to.equal('0')
+      expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
+      expect(methodParameters.value).to.eq(methodParametersV2.value)
+    })
+
+    it('encodes an exactOutput DAI->USDC->ETH swap, with WETH fee', async () => {
+      // "exact output" of 1ETH. We must adjust for a 5% fee
+      const outputEther = utils.parseEther('1')
+      const adjustedOutputEther = outputEther
+        .mul(10000)
+        .div(10000 - 500)
+        .toString()
+      const trade = await V3Trade.fromRoute(
+        new RouteV3([USDC_DAI_V3, WETH_USDC_V3], DAI, ETHER),
+        CurrencyAmount.fromRawAmount(ETHER, adjustedOutputEther),
+        TradeType.EXACT_OUTPUT
+      )
+      const feeOptions: FeeOptions = { fee: new Percent(5, 100), recipient: TEST_FEE_RECIPIENT_ADDRESS }
+      const opts = swapOptions({ fee: feeOptions })
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
+      const methodParametersV2 = SwapRouter.swapCallParameters(new UniswapTrade(buildTrade([trade]), opts))
+      registerFixture('_UNISWAP_V3_DAI_FOR_1_ETH_2_HOP_WITH_WETH_FEE', methodParametersV2)
       expect(hexToDecimalString(methodParameters.value)).to.equal('0')
       expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
       expect(methodParameters.value).to.eq(methodParametersV2.value)

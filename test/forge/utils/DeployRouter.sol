@@ -31,6 +31,7 @@ contract DeployRouter is Test {
     address public constant ELEMENT_MARKET = 0x20F780A973856B93f63670377900C1d2a50a77c4;
 
     address internal constant RECIPIENT = 0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa;
+    address internal constant FEE_RECIPIENT = 0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB;
     address internal constant MAINNET_PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
 
     address internal constant FORGE_ROUTER_ADDRESS = 0xE808C1cfeebb6cb36B537B82FA7c9EEf31415a05;

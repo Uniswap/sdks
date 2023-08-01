@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { BigNumber, utils, Wallet } from 'ethers'
 import { hexToDecimalString } from './utils/hexToDecimalString'
-import { expandTo18DecimalsBN } from '../src/utils/expandTo18Decimals'
+import { expandTo18DecimalsBN } from '../src/utils/numbers'
 import { SwapRouter } from '../src/swapRouter'
 import { TokenType } from '../src/entities/NFTTrade'
 import { FoundationTrade, FoundationData } from '../src/entities/protocols/foundation'
