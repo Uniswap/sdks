@@ -1,4 +1,24 @@
-import { Currency } from "@uniswap/sdk-core";
+import { ChainId, Currency } from "@uniswap/sdk-core";
+
+export enum NativeAssets {
+  MATIC = 'MATIC',
+  BNB = 'BNB',
+  AVAX = 'AVAX',
+  ETH = 'ETH',
+}
+
+function nativeCurrencyAddressString(chainId: number): string {
+  switch (chainId) {
+    case ChainId.POLYGON:
+      return NativeAssets.MATIC 
+    case ChainId.BNB:
+      return NativeAssets.BNB 
+    case ChainId.AVALANCHE:
+      return NativeAssets.AVAX
+    default:
+      return NativeAssets.ETH
+  }
+}
 
 export function areCurrenciesEqual(
   currency: Currency,
@@ -7,12 +27,8 @@ export function areCurrenciesEqual(
 ) {
   if (currency.chainId !== chainId) return false;
 
-  // TODO: once native currencies are supported by dutch order trades, add handling based on
-  // shared native currency address format
   if (currency.isNative) {
-    throw new Error(
-      "native currencies are not currently supported by DutchOrder trades"
-    );
+    return address === nativeCurrencyAddressString(chainId)
   }
 
   return currency.address.toLowerCase() === address?.toLowerCase();
