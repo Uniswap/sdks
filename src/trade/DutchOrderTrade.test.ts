@@ -1,9 +1,10 @@
-import { Currency, Token, TradeType } from "@uniswap/sdk-core";
+import { Currency, Ether,  Token, TradeType } from "@uniswap/sdk-core";
 import { BigNumber, ethers } from "ethers";
 
 import { DutchOrderInfo } from "../order";
 
 import { DutchOrderTrade } from "./DutchOrderTrade";
+import { NativeAssets } from "./utils";
 
 const USDC = new Token(
   1,
@@ -78,4 +79,25 @@ describe("DutchOrderTrade", () => {
       NON_FEE_MINIMUM_AMOUNT_OUT.toString()
     );
   });
+
+  it("works for native output trades", () => {
+    const ethOutputOrderInfo = {
+      ...orderInfo,
+      outputs: [
+        {
+          token: NativeAssets.ETH,
+          startAmount: NON_FEE_OUTPUT_AMOUNT,
+          endAmount: NON_FEE_MINIMUM_AMOUNT_OUT,
+          recipient: "0x0000000000000000000000000000000000000000",
+        },
+      ],
+    }
+    const ethOutputTrade = new DutchOrderTrade<Currency, Currency, TradeType>({
+      currencyIn: USDC,
+      currenciesOut: [Ether.onChain(1)],
+      orderInfo: ethOutputOrderInfo,
+      tradeType: TradeType.EXACT_INPUT,
+    });
+    expect(ethOutputTrade.outputAmount.currency).toEqual(Ether.onChain(1))
+  })
 });
