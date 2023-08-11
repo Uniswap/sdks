@@ -1,5 +1,5 @@
 import { Currency, Ether,  Token, TradeType } from "@uniswap/sdk-core";
-import { BigNumber, ethers } from "ethers";
+import { BigNumber, constants, ethers } from "ethers";
 
 import { DutchOrderInfo } from "../order";
 
@@ -86,6 +86,27 @@ describe("DutchOrderTrade", () => {
       outputs: [
         {
           token: NativeAssets.ETH,
+          startAmount: NON_FEE_OUTPUT_AMOUNT,
+          endAmount: NON_FEE_MINIMUM_AMOUNT_OUT,
+          recipient: "0x0000000000000000000000000000000000000000",
+        },
+      ],
+    }
+    const ethOutputTrade = new DutchOrderTrade<Currency, Currency, TradeType>({
+      currencyIn: USDC,
+      currenciesOut: [Ether.onChain(1)],
+      orderInfo: ethOutputOrderInfo,
+      tradeType: TradeType.EXACT_INPUT,
+    });
+    expect(ethOutputTrade.outputAmount.currency).toEqual(Ether.onChain(1))
+  })
+
+  it("works for native output trades where order info has 0 address", () => {
+    const ethOutputOrderInfo = {
+      ...orderInfo,
+      outputs: [
+        {
+          token: constants.AddressZero,
           startAmount: NON_FEE_OUTPUT_AMOUNT,
           endAmount: NON_FEE_MINIMUM_AMOUNT_OUT,
           recipient: "0x0000000000000000000000000000000000000000",
