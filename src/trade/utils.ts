@@ -1,4 +1,5 @@
 import { ChainId, Currency } from "@uniswap/sdk-core";
+import { constants } from "ethers";
 
 export enum NativeAssets {
   MATIC = 'MATIC',
@@ -28,7 +29,7 @@ export function areCurrenciesEqual(
   if (currency.chainId !== chainId) return false;
 
   if (currency.isNative) {
-    return address === nativeCurrencyAddressString(chainId)
+    return address === constants.AddressZero || address === nativeCurrencyAddressString(chainId)
   }
 
   return currency.address.toLowerCase() === address?.toLowerCase();
