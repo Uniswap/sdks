@@ -2,22 +2,22 @@ import { ChainId, Currency } from "@uniswap/sdk-core";
 import { constants } from "ethers";
 
 export enum NativeAssets {
-  MATIC = 'MATIC',
-  BNB = 'BNB',
-  AVAX = 'AVAX',
-  ETH = 'ETH',
+  MATIC = "MATIC",
+  BNB = "BNB",
+  AVAX = "AVAX",
+  ETH = "ETH",
 }
 
 function nativeCurrencyAddressString(chainId: number): string {
   switch (chainId) {
     case ChainId.POLYGON:
-      return NativeAssets.MATIC 
+      return NativeAssets.MATIC;
     case ChainId.BNB:
-      return NativeAssets.BNB 
+      return NativeAssets.BNB;
     case ChainId.AVALANCHE:
-      return NativeAssets.AVAX
+      return NativeAssets.AVAX;
     default:
-      return NativeAssets.ETH
+      return NativeAssets.ETH;
   }
 }
 
@@ -29,7 +29,10 @@ export function areCurrenciesEqual(
   if (currency.chainId !== chainId) return false;
 
   if (currency.isNative) {
-    return address === constants.AddressZero || address === nativeCurrencyAddressString(chainId)
+    return (
+      address === constants.AddressZero ||
+      address === nativeCurrencyAddressString(chainId)
+    );
   }
 
   return currency.address.toLowerCase() === address?.toLowerCase();
