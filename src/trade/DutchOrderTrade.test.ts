@@ -1,4 +1,4 @@
-import { Currency, Ether,  Token, TradeType } from "@uniswap/sdk-core";
+import { Currency, Ether, Token, TradeType } from "@uniswap/sdk-core";
 import { BigNumber, constants, ethers } from "ethers";
 
 import { DutchOrderInfo } from "../order";
@@ -91,15 +91,15 @@ describe("DutchOrderTrade", () => {
           recipient: "0x0000000000000000000000000000000000000000",
         },
       ],
-    }
+    };
     const ethOutputTrade = new DutchOrderTrade<Currency, Currency, TradeType>({
       currencyIn: USDC,
       currenciesOut: [Ether.onChain(1)],
       orderInfo: ethOutputOrderInfo,
       tradeType: TradeType.EXACT_INPUT,
     });
-    expect(ethOutputTrade.outputAmount.currency).toEqual(Ether.onChain(1))
-  })
+    expect(ethOutputTrade.outputAmount.currency).toEqual(Ether.onChain(1));
+  });
 
   it("works for native output trades where order info has 0 address", () => {
     const ethOutputOrderInfo = {
@@ -112,13 +112,13 @@ describe("DutchOrderTrade", () => {
           recipient: "0x0000000000000000000000000000000000000000",
         },
       ],
-    }
+    };
     const ethOutputTrade = new DutchOrderTrade<Currency, Currency, TradeType>({
       currencyIn: USDC,
       currenciesOut: [Ether.onChain(1)],
       orderInfo: ethOutputOrderInfo,
       tradeType: TradeType.EXACT_INPUT,
     });
-    expect(ethOutputTrade.outputAmount.currency).toEqual(Ether.onChain(1))
-  })
+    expect(ethOutputTrade.outputAmount.currency).toEqual(Ether.onChain(1));
+  });
 });
