@@ -41,8 +41,8 @@ type Call = {
 // Perform multiple on-chain calls in a single http request
 // return all results including errors
 // Uses deployless method to function properly even on chains with no multicall contract deployed
-// eslint-disable-next-line
 export async function multicallSameContractManyFunctions<
+  // eslint-disable-next-line
   TFunctionParams extends any[] | undefined
 >(
   provider: BaseProvider,
@@ -67,6 +67,7 @@ export async function multicallSameContractManyFunctions<
 }
 
 export async function multicallSameFunctionManyContracts<
+  // eslint-disable-next-line
   TFunctionParams extends any[] | undefined
 >(
   provider: BaseProvider,

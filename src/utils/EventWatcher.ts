@@ -1,4 +1,8 @@
-import { BaseProvider, TransactionReceipt } from "@ethersproject/providers";
+import {
+  BaseProvider,
+  Log,
+  TransactionReceipt,
+} from "@ethersproject/providers";
 import { BigNumber, Event, utils } from "ethers";
 
 import MockERC20Abi from "../../abis/MockERC20.json";
@@ -7,6 +11,13 @@ import {
   ExclusiveDutchOrderReactor__factory,
 } from "../contracts";
 import { FillEvent } from "../contracts/DutchOrderReactor";
+
+const TRANSFER = "Transfer";
+
+export type TokenTransfer = {
+  token: string;
+  amount: BigNumber;
+};
 
 export interface FillData {
   orderHash: string;
@@ -18,10 +29,8 @@ export interface FillData {
 export interface FillInfo extends FillData {
   blockNumber: number;
   txHash: string;
-  outputs: {
-    token: string;
-    amount: BigNumber;
-  }[];
+  inputs: TokenTransfer[];
+  outputs: TokenTransfer[];
 }
 
 /**
@@ -78,26 +87,9 @@ export class EventWatcher {
       };
     });
 
-    const ERC20Interface = new utils.Interface(MockERC20Abi.abi);
-
     return fills.map((fill) => {
-      const outputs = fill.txLogs.reduce((logAcc, log) => {
-        try {
-          const parsedLog = ERC20Interface.parseLog(log);
-          if (
-            parsedLog.name === "Transfer" &&
-            parsedLog.args.to === fill.swapper
-          ) {
-            logAcc.push({
-              token: log.address,
-              amount: parsedLog.args.amount,
-            });
-          }
-          return logAcc;
-        } catch (e) {
-          return logAcc;
-        }
-      }, [] as { token: string; amount: BigNumber }[]);
+      const outputs = this.getTokenTransfers(fill.txLogs, fill.swapper);
+      const inputs = this.getTokenTransfers(fill.txLogs, fill.filler);
 
       return {
         orderHash: fill.orderHash,
@@ -106,6 +98,7 @@ export class EventWatcher {
         nonce: fill.nonce,
         blockNumber: fill.blockNumber,
         txHash: fill.txHash,
+        inputs: inputs,
         outputs: outputs,
       };
     });
@@ -126,5 +119,23 @@ export class EventWatcher {
         );
       }
     );
+  }
+
+  getTokenTransfers(logs: Log[], recipient: string) {
+    const ERC20Interface = new utils.Interface(MockERC20Abi.abi);
+    return logs.reduce((logAcc, log) => {
+      try {
+        const parsedLog = ERC20Interface.parseLog(log);
+        if (parsedLog.name === TRANSFER && parsedLog.args.to === recipient) {
+          logAcc.push({
+            token: log.address,
+            amount: parsedLog.args.amount,
+          });
+        }
+        return logAcc;
+      } catch (e) {
+        return logAcc;
+      }
+    }, [] as { token: string; amount: BigNumber }[]);
   }
 }
