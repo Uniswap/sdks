@@ -1,4 +1,5 @@
 import { Token } from './token'
+import { BigNumber } from '@ethersproject/bignumber'
 
 describe('Token', () => {
   const ADDRESS_ONE = '0x0000000000000000000000000000000000000001'
@@ -19,6 +20,14 @@ describe('Token', () => {
     })
     it('fails with non-integer decimals', () => {
       expect(() => new Token(3, ADDRESS_ONE, 1.5).address).toThrow('DECIMALS')
+    })
+    it('fails with negative FOT fees', () => {
+      expect(
+        () => new Token(3, ADDRESS_ONE, 18, undefined, undefined, undefined, BigNumber.from(-1), undefined)
+      ).toThrow('NON-NEGATIVE FOT FEES')
+      expect(
+        () => new Token(3, ADDRESS_ONE, 18, undefined, undefined, undefined, undefined, BigNumber.from(-1))
+      ).toThrow('NON-NEGATIVE FOT FEES')
     })
   })
 
