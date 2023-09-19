@@ -2,7 +2,7 @@ import { Currency, CurrencyAmount, Fraction, Percent, Price, TradeType } from '@
 import { Pair, Route as V2RouteSDK, Trade as V2TradeSDK } from '@uniswap/v2-sdk'
 import { Pool, Route as V3RouteSDK, Trade as V3TradeSDK } from '@uniswap/v3-sdk'
 import invariant from 'tiny-invariant'
-import { ONE, ZERO } from '../constants'
+import { ONE, ZERO, ZERO_PERCENT } from '../constants'
 import { MixedRouteSDK } from './mixedRoute/route'
 import { MixedRouteTrade as MixedRouteTradeSDK } from './mixedRoute/trade'
 import { IRoute, MixedRoute, RouteV2, RouteV3 } from './route'
@@ -159,7 +159,27 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
   }
 
   /**
-   * The cached result of the price impact computation
+   * Returns the sell tax of the input token
+   */
+  public get inputTax(): Percent {
+    const inputCurrency = this.inputAmount.currency
+    if (inputCurrency.isNative || !inputCurrency.sellFeeBps) return ZERO_PERCENT
+
+    return new Percent(inputCurrency.sellFeeBps.toNumber(), 10000)
+  }
+
+  /**
+   * Returns the buy tax of the output token
+   */
+  public get outputTax(): Percent {
+    const outputCurrency = this.outputAmount.currency
+    if (outputCurrency.isNative || !outputCurrency.buyFeeBps) return ZERO_PERCENT
+
+    return new Percent(outputCurrency.buyFeeBps.toNumber(), 10000)
+  }
+
+  /**
+   * The cached result of the price impact computation, excluding FOT fees
    * @private
    */
   private _priceImpact: Percent | undefined
@@ -174,10 +194,13 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     let spotOutputAmount = CurrencyAmount.fromRawAmount(this.outputAmount.currency, 0)
     for (const { route, inputAmount } of this.swaps) {
       const midPrice = route.midPrice
-      spotOutputAmount = spotOutputAmount.add(midPrice.quote(inputAmount))
+
+      const postTaxInputAmount = inputAmount.multiply(new Fraction(ONE).subtract(this.inputTax))
+      spotOutputAmount = spotOutputAmount.add(midPrice.quote(postTaxInputAmount))
     }
 
-    const priceImpact = spotOutputAmount.subtract(this.outputAmount).divide(spotOutputAmount)
+    const preTaxOutputAmount = this.outputAmount.divide(new Fraction(ONE).subtract(this.outputTax))
+    const priceImpact = spotOutputAmount.subtract(preTaxOutputAmount).divide(spotOutputAmount)
     this._priceImpact = new Percent(priceImpact.numerator, priceImpact.denominator)
 
     return this._priceImpact
