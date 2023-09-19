@@ -163,9 +163,9 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
    */
   public get inputTax(): Percent {
     const inputCurrency = this.inputAmount.currency
-    if (inputCurrency.isNative || !inputCurrency.sellFeeBps) return ZERO_PERCENT
+    if (inputCurrency.isNative || !inputCurrency.wrapped.sellFeeBps) return ZERO_PERCENT
 
-    return new Percent(inputCurrency.sellFeeBps.toNumber(), 10000)
+    return new Percent(inputCurrency.wrapped.sellFeeBps.toNumber(), 10000)
   }
 
   /**
@@ -173,9 +173,9 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
    */
   public get outputTax(): Percent {
     const outputCurrency = this.outputAmount.currency
-    if (outputCurrency.isNative || !outputCurrency.buyFeeBps) return ZERO_PERCENT
+    if (outputCurrency.isNative || !outputCurrency.wrapped.buyFeeBps) return ZERO_PERCENT
 
-    return new Percent(outputCurrency.buyFeeBps.toNumber(), 10000)
+    return new Percent(outputCurrency.wrapped.buyFeeBps.toNumber(), 10000)
   }
 
   /**
