@@ -1,5 +1,5 @@
 import { sqrt, Token, CurrencyAmount, TradeType, WETH9, Ether, Percent, Price } from '@uniswap/sdk-core'
-import { BigNumber } from '@ethersproject/bignumber';
+import { BigNumber } from '@ethersproject/bignumber'
 
 import JSBI from 'jsbi'
 import { MixedRoute, RouteV2, RouteV3 } from './route'
@@ -23,8 +23,26 @@ describe('Trade', () => {
   const token1 = new Token(1, '0x0000000000000000000000000000000000000002', 18, 't1', 'token1')
   const token2 = new Token(1, '0x0000000000000000000000000000000000000003', 18, 't2', 'token2')
   const token3 = new Token(1, '0x0000000000000000000000000000000000000004', 18, 't3', 'token3')
-  const token4WithTax = new Token(1, '0x0000000000000000000000000000000000000005', 18, 't4', 'token4', false, BigNumber.from(100), BigNumber.from(100))
-  const token5WithTax = new Token(1, '0x0000000000000000000000000000000000000005', 18, 't5', 'token5', false, BigNumber.from(500), BigNumber.from(500))
+  const token4WithTax = new Token(
+    1,
+    '0x0000000000000000000000000000000000000005',
+    18,
+    't4',
+    'token4',
+    false,
+    BigNumber.from(100),
+    BigNumber.from(100)
+  )
+  const token5WithTax = new Token(
+    1,
+    '0x0000000000000000000000000000000000000005',
+    18,
+    't5',
+    'token5',
+    false,
+    BigNumber.from(500),
+    BigNumber.from(500)
+  )
 
   function v2StylePool(
     reserve0: CurrencyAmount<Token>,
