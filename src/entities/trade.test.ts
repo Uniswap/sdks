@@ -1210,7 +1210,7 @@ describe('Trade', () => {
         expect(trade.priceImpact === trade.priceImpact).toStrictEqual(true)
       })
       it('is correct', () => {
-        expect(trade.priceImpact.toSignificant(3)).toEqual('00.0')
+        expect(trade.priceImpact.toSignificant(3)).toEqual('30.3')
       })
     })
 
@@ -1232,7 +1232,7 @@ describe('Trade', () => {
         expect(trade.priceImpact === trade.priceImpact).toStrictEqual(true)
       })
       it('is correct', () => {
-        expect(trade.priceImpact.toSignificant(3)).toEqual('00.0')
+        expect(trade.priceImpact.toSignificant(3)).toEqual('27.4')
       })
     })
 
