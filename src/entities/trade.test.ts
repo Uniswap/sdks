@@ -1192,7 +1192,7 @@ describe('Trade', () => {
   })
   // v3 sdk price impact tests
   describe('#priceImpact', () => {
-    describe('with FOT fees', () => {
+    describe('with FOT sell fees', () => {
       const routev3 = new V3RouteSDK([pool_tax_output], weth, token4WithTax)
       const trade = new Trade({
         v2Routes: [],
@@ -1201,6 +1201,28 @@ describe('Trade', () => {
             routev3,
             inputAmount: CurrencyAmount.fromRawAmount(weth, 100),
             outputAmount: CurrencyAmount.fromRawAmount(token4WithTax, 69),
+          },
+        ],
+        tradeType: TradeType.EXACT_INPUT,
+      })
+
+      it('is cached', () => {
+        expect(trade.priceImpact === trade.priceImpact).toStrictEqual(true)
+      })
+      it('is correct', () => {
+        expect(trade.priceImpact.toSignificant(3)).toEqual('00.0')
+      })
+    })
+
+    describe('with FOT buy fees', () => {
+      const routev3 = new V3RouteSDK([pool_tax_input], token5WithTax, weth)
+      const trade = new Trade({
+        v2Routes: [],
+        v3Routes: [
+          {
+            routev3,
+            inputAmount: CurrencyAmount.fromRawAmount(token5WithTax, 100),
+            outputAmount: CurrencyAmount.fromRawAmount(weth, 69),
           },
         ],
         tradeType: TradeType.EXACT_INPUT,
