@@ -179,12 +179,14 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
   }
 
   /**
-   * The cached result of the price impact computation, excluding FOT fees
+   * The cached result of the price impact computation
    * @private
    */
   private _priceImpact: Percent | undefined
   /**
-   * Returns the percent difference between the route's mid price and the price impact
+   * Returns the percent difference between the route's mid price and the expected execution price
+   * In order to exclude token taxes from the price impact calculation, the spot price is calculated
+   * using a ratio of values that go into the pools, which are the post-tax input amount and pre-tax output amount.
    */
   public get priceImpact(): Percent {
     if (this._priceImpact) {
@@ -194,7 +196,6 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     let spotOutputAmount = CurrencyAmount.fromRawAmount(this.outputAmount.currency, 0)
     for (const { route, inputAmount } of this.swaps) {
       const midPrice = route.midPrice
-
       const postTaxInputAmount = inputAmount.multiply(new Fraction(ONE).subtract(this.inputTax))
       spotOutputAmount = spotOutputAmount.add(midPrice.quote(postTaxInputAmount))
     }
