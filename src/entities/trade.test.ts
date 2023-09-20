@@ -1194,11 +1194,13 @@ describe('Trade', () => {
     describe('with FOT sell fees', () => {
       const routev2 = new V2RouteSDK([pair_tax_output], weth, token4WithTax)
       const trade = new Trade({
-        v2Routes: [{
-          routev2,
-          inputAmount: CurrencyAmount.fromRawAmount(weth, 100),
-          outputAmount: CurrencyAmount.fromRawAmount(token4WithTax, 69),
-        }],
+        v2Routes: [
+          {
+            routev2,
+            inputAmount: CurrencyAmount.fromRawAmount(weth, 100),
+            outputAmount: CurrencyAmount.fromRawAmount(token4WithTax, 69),
+          },
+        ],
         v3Routes: [],
         tradeType: TradeType.EXACT_INPUT,
       })
@@ -1214,11 +1216,13 @@ describe('Trade', () => {
     describe('with FOT buy fees', () => {
       const routev2 = new V2RouteSDK([pair_tax_input], token5WithTax, weth)
       const trade = new Trade({
-        v2Routes: [{
-          routev2,
-          inputAmount: CurrencyAmount.fromRawAmount(token5WithTax, 100),
+        v2Routes: [
+          {
+            routev2,
+            inputAmount: CurrencyAmount.fromRawAmount(token5WithTax, 100),
             outputAmount: CurrencyAmount.fromRawAmount(weth, 69),
-        }],
+          },
+        ],
         v3Routes: [],
         tradeType: TradeType.EXACT_INPUT,
       })
