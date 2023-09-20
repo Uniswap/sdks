@@ -1,4 +1,5 @@
 import { sqrt, Token, CurrencyAmount, TradeType, WETH9, Ether, Percent, Price } from '@uniswap/sdk-core'
+import { BigNumber } from '@ethersproject/bignumber'
 import JSBI from 'jsbi'
 import { MixedRoute, RouteV2, RouteV3 } from './route'
 import { Trade } from './trade'
@@ -21,6 +22,26 @@ describe('Trade', () => {
   const token1 = new Token(1, '0x0000000000000000000000000000000000000002', 18, 't1', 'token1')
   const token2 = new Token(1, '0x0000000000000000000000000000000000000003', 18, 't2', 'token2')
   const token3 = new Token(1, '0x0000000000000000000000000000000000000004', 18, 't3', 'token3')
+  const token4WithTax = new Token(
+    1,
+    '0x0000000000000000000000000000000000000005',
+    18,
+    't4',
+    'token4',
+    false,
+    BigNumber.from(100),
+    BigNumber.from(100)
+  )
+  const token5WithTax = new Token(
+    1,
+    '0x0000000000000000000000000000000000000005',
+    18,
+    't5',
+    'token5',
+    false,
+    BigNumber.from(500),
+    BigNumber.from(500)
+  )
 
   function v2StylePool(
     reserve0: CurrencyAmount<Token>,
@@ -99,6 +120,16 @@ describe('Trade', () => {
   const pair_weth_2 = new Pair(
     CurrencyAmount.fromRawAmount(weth, JSBI.BigInt(10000)),
     CurrencyAmount.fromRawAmount(token2, JSBI.BigInt(10000))
+  )
+
+  const pair_tax_output = new Pair(
+    CurrencyAmount.fromRawAmount(weth, JSBI.BigInt(100000)),
+    CurrencyAmount.fromRawAmount(token4WithTax, JSBI.BigInt(100000))
+  )
+
+  const pair_tax_input = new Pair(
+    CurrencyAmount.fromRawAmount(token5WithTax, JSBI.BigInt(100000)),
+    CurrencyAmount.fromRawAmount(weth, JSBI.BigInt(100000))
   )
 
   const pool_weth_0 = v2StylePool(
@@ -1160,6 +1191,50 @@ describe('Trade', () => {
   })
   // v3 sdk price impact tests
   describe('#priceImpact', () => {
+    describe('with FOT sell fees', () => {
+      const routev2 = new V2RouteSDK([pair_tax_output], weth, token4WithTax)
+      const trade = new Trade({
+        v2Routes: [
+          {
+            routev2,
+            inputAmount: CurrencyAmount.fromRawAmount(weth, 100),
+            outputAmount: CurrencyAmount.fromRawAmount(token4WithTax, 69),
+          },
+        ],
+        v3Routes: [],
+        tradeType: TradeType.EXACT_INPUT,
+      })
+
+      it('is cached', () => {
+        expect(trade.priceImpact === trade.priceImpact).toStrictEqual(true)
+      })
+      it('is correct', () => {
+        expect(trade.priceImpact.toSignificant(3)).toEqual('30.3')
+      })
+    })
+
+    describe('with FOT buy fees', () => {
+      const routev2 = new V2RouteSDK([pair_tax_input], token5WithTax, weth)
+      const trade = new Trade({
+        v2Routes: [
+          {
+            routev2,
+            inputAmount: CurrencyAmount.fromRawAmount(token5WithTax, 100),
+            outputAmount: CurrencyAmount.fromRawAmount(weth, 69),
+          },
+        ],
+        v3Routes: [],
+        tradeType: TradeType.EXACT_INPUT,
+      })
+
+      it('is cached', () => {
+        expect(trade.priceImpact === trade.priceImpact).toStrictEqual(true)
+      })
+      it('is correct', () => {
+        expect(trade.priceImpact.toSignificant(3)).toEqual('27.4')
+      })
+    })
+
     describe('tradeType = EXACT_INPUT', () => {
       const routev3 = new V3RouteSDK([pool_0_1, pool_1_2], token0, token2)
       const mixedRoute = new MixedRouteSDK([pool_0_1, pool_1_2], token0, token2)

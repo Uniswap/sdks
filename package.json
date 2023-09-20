@@ -27,7 +27,7 @@
   "license": "MIT",
   "dependencies": {
     "@ethersproject/abi": "^5.5.0",
-    "@uniswap/sdk-core": "^4",
+    "@uniswap/sdk-core": "^4.0.7",
     "@uniswap/swap-router-contracts": "^1.1.0",
     "@uniswap/v2-sdk": "^3.2.0",
     "@uniswap/v3-sdk": "^3.10.0"
