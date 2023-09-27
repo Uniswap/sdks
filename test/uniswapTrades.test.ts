@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import JSBI from 'jsbi'
 import { BigNumber, utils, Wallet } from 'ethers'
 import { expandTo18Decimals } from '../src/utils/numbers'
-import { SwapRouter, UniswapTrade } from '../src'
+import { SwapRouter, UniswapTrade, FlatFeeOptions } from '../src'
 import { MixedRouteTrade, MixedRouteSDK } from '@uniswap/router-sdk'
 import { Trade as V2Trade, Pair, Route as RouteV2 } from '@uniswap/v2-sdk'
 import { Trade as V3Trade, Route as RouteV3, Pool, FeeOptions } from '@uniswap/v3-sdk'
@@ -251,6 +251,40 @@ describe('Uniswap', () => {
       expect(methodParameters.value).to.eq(methodParametersV2.value)
     })
 
+    it('encodes a single exactOutput ETH->USDC swap, with a flat fee', async () => {
+      const outputUSDC = utils.parseUnits('1050', 6).toString()
+      const trade = new V2Trade(
+        new RouteV2([WETH_USDC_V2], ETHER, USDC),
+        CurrencyAmount.fromRawAmount(USDC, outputUSDC),
+        TradeType.EXACT_OUTPUT
+      )
+      const feeOptions: FlatFeeOptions = { amount: utils.parseUnits('50', 6), recipient: TEST_FEE_RECIPIENT_ADDRESS }
+      const opts = swapOptions({ flatFee: feeOptions })
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
+      const methodParametersV2 = SwapRouter.swapCallParameters(new UniswapTrade(buildTrade([trade]), opts))
+      registerFixture('_UNISWAP_V2_ETH_FOR_1000_USDC_WITH_FLAT_FEE', methodParametersV2)
+      expect(hexToDecimalString(methodParameters.value)).to.not.equal('0')
+      expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
+      expect(methodParameters.value).to.eq(methodParametersV2.value)
+    })
+
+    it('encodes a single exactOutput USDC->ETH swap, with a flat fee', async () => {
+      const outputUSDC = utils.parseUnits('15', 18).toString()
+      const trade = new V2Trade(
+        new RouteV2([WETH_USDC_V2], USDC, ETHER),
+        CurrencyAmount.fromRawAmount(ETHER, outputUSDC),
+        TradeType.EXACT_OUTPUT
+      )
+      const feeOptions: FlatFeeOptions = { amount: utils.parseUnits('5', 18), recipient: TEST_FEE_RECIPIENT_ADDRESS }
+      const opts = swapOptions({ flatFee: feeOptions })
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
+      const methodParametersV2 = SwapRouter.swapCallParameters(new UniswapTrade(buildTrade([trade]), opts))
+      registerFixture('_UNISWAP_V2_USCD_FOR_10_ETH_WITH_FLAT_FEE', methodParametersV2)
+      expect(hexToDecimalString(methodParameters.value)).to.equal('0')
+      expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
+      expect(methodParameters.value).to.eq(methodParametersV2.value)
+    })
+
     it('encodes a single exactOutput USDC->ETH swap', async () => {
       const outputETH = utils.parseEther('1').toString()
       const trade = new V2Trade(
@@ -297,6 +331,23 @@ describe('Uniswap', () => {
       const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
       const methodParametersV2 = SwapRouter.swapCallParameters(new UniswapTrade(buildTrade([trade]), opts))
       registerFixture('_UNISWAP_V3_1_ETH_FOR_USDC_WITH_FEE', methodParametersV2)
+      expect(hexToDecimalString(methodParameters.value)).to.eq(inputEther)
+      expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
+      expect(methodParameters.value).to.eq(methodParametersV2.value)
+    })
+
+    it('encodes a single exactInput ETH->USDC swap, with a flat fee', async () => {
+      const inputEther = utils.parseEther('1').toString()
+      const trade = await V3Trade.fromRoute(
+        new RouteV3([WETH_USDC_V3], ETHER, USDC),
+        CurrencyAmount.fromRawAmount(ETHER, inputEther),
+        TradeType.EXACT_INPUT
+      )
+      const feeOptions: FlatFeeOptions = { amount: utils.parseUnits('50', 6), recipient: TEST_FEE_RECIPIENT_ADDRESS }
+      const opts = swapOptions({ flatFee: feeOptions })
+      const methodParameters = SwapRouter.swapERC20CallParameters(buildTrade([trade]), opts)
+      const methodParametersV2 = SwapRouter.swapCallParameters(new UniswapTrade(buildTrade([trade]), opts))
+      registerFixture('_UNISWAP_V3_1_ETH_FOR_USDC_WITH_FLAT_FEE', methodParametersV2)
       expect(hexToDecimalString(methodParameters.value)).to.eq(inputEther)
       expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
       expect(methodParameters.value).to.eq(methodParametersV2.value)
@@ -593,6 +644,37 @@ describe('Uniswap', () => {
       expect(hexToDecimalString(methodParameters.value)).to.eq(JSBI.multiply(inputEther, JSBI.BigInt(3)).toString())
       expect(methodParameters.calldata).to.eq(methodParametersV2.calldata)
       expect(methodParameters.value).to.eq(methodParametersV2.value)
+    })
+  })
+
+  describe('fees', () => {
+    it('throws if instantiated with a proportional fee and a flat fee', async () => {
+      const outputUSDC = utils.parseUnits('1050', 6).toString()
+      const trade = new V2Trade(
+        new RouteV2([WETH_USDC_V2], ETHER, USDC),
+        CurrencyAmount.fromRawAmount(USDC, outputUSDC),
+        TradeType.EXACT_OUTPUT
+      )
+      const proportionalFee: FeeOptions = { fee: new Percent(5, 100), recipient: TEST_FEE_RECIPIENT_ADDRESS }
+      const feeOptions: FlatFeeOptions = { amount: utils.parseUnits('50', 6), recipient: TEST_FEE_RECIPIENT_ADDRESS }
+      const opts = swapOptions({ fee: proportionalFee, flatFee: feeOptions })
+      expect(function () {
+        SwapRouter.swapCallParameters(new UniswapTrade(buildTrade([trade]), opts))
+      }).to.throw('Only one fee option permitted')
+    })
+
+    it('throws if flat fee amount is larger than minimumAmountOut', async () => {
+      const inputEther = utils.parseEther('1').toString()
+      const trade = await V3Trade.fromRoute(
+        new RouteV3([WETH_USDC_V3], ETHER, USDC),
+        CurrencyAmount.fromRawAmount(ETHER, inputEther),
+        TradeType.EXACT_INPUT
+      )
+      const feeOptions: FlatFeeOptions = { amount: utils.parseUnits('5000', 6), recipient: TEST_FEE_RECIPIENT_ADDRESS }
+      const opts = swapOptions({ flatFee: feeOptions })
+      expect(function () {
+        SwapRouter.swapCallParameters(new UniswapTrade(buildTrade([trade]), opts))
+      }).to.throw('Flat fee amount greater than minimumAmountOut')
     })
   })
 })
