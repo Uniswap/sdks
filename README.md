@@ -93,7 +93,7 @@ const { calldata, value } = SwapRouter.swapCallParameters([unwrapWETH, seaportTr
 ```
 
 ### Trading stETH
-To trade stETH as an input token, you can make sure the router automatically wraps stETH to wstETH before trading across a wstETH route.
+To trade stETH as an input token, you can make sure the router automatically wraps stETH to wstETH before trading across a wstETH route. Make sure to specify the router is the payer of the swap (since it's in custody of wSTETH after wrapping)
 
 If this is an exactOut trade, we'll need to wrap the maximumAmountIn of steth, and therefore should add an unwrap command at the end of the transaction to account for any leftover steth that didn't get traded. `amountMinimum` can be set to 0 in this scenario for the unwrapSteth commmand.
 ```typescript
@@ -107,19 +107,19 @@ import {
 } from "@uniswap/universal-router-sdk";
 
 // EXACT INPUT
-// including optional permit2 parameter will transfer STETH amount using permit2 
-const wrapSTETH = new WrapSTETH(inputSTETH, 1, WrapSTETHPermitData?, wrapAmountOtherThanContractBalance?)
+// including optional permit2 parameter will transfer STETH amount using permit2
+const wrapSTETH = new WrapSTETH(inputSTETH, chainId, WrapSTETHPermitData?, wrapAmountOtherThanContractBalance?)
 const uniswapWstethTrade = new UniswapTrade(
   new RouterTrade({ v2Routes, v3Routes, mixedRoutes, tradeType: TradeType.EXACT_INPUT }),
-  { slippageTolerance}
+  { slippageTolerance, payerIsRouter: true }
 )
 const { calldata, value } = SwapRouter.swapCallParameters([wrapSTETH, uniswapWstethTrade])
 
 // EXACT OUTPUT
-const wrapSTETH = new WrapSTETH(maximumInputSTETH, 1, WrapSTETHPermitData?, wrapAmountOtherThanContractBalance?)
+const wrapSTETH = new WrapSTETH(maximumInputSTETH, chainId, WrapSTETHPermitData?, wrapAmountOtherThanContractBalance?)
 const uniswapWstethTrade = new UniswapTrade(
   new RouterTrade({ v2Routes, v3Routes, mixedRoutes, tradeType: TradeType.EXACT_OUTPUT }),
-  { slippageTolerance}
+  { slippageTolerance, payerIsRouter: true }
 )
 const unwrapSTETH = new UnwrapSTETH(recipient, amountMinimum = 0, chainId)
 
@@ -142,7 +142,7 @@ import {
 // return trade to the router instead of the recipient using the ROUTER_AS_RECIPIENT constant so that the router may custody tokens to unwrap
 const uniswapWstethTrade = new UniswapTrade(
   new RouterTrade({ v2Routes, v3Routes, mixedRoutes, tradeType: TradeType.EXACT_INPUT }),
-  { slippageTolerance, ROUTER_AS_RECIPIENT}
+  { slippageTolerance, recipient: ROUTER_AS_RECIPIENT}
 )
 const unwrapSTETH = new UnwrapSTETH(recipient, amountMinimum, chainId)
 
