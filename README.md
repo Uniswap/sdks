@@ -92,6 +92,63 @@ const unwrapWETH = new UnwrapWETH(amountWETH, chainId, optionalPermit2Params)
 const { calldata, value } = SwapRouter.swapCallParameters([unwrapWETH, seaportTrades, looksRareTrades])
 ```
 
+### Trading stETH
+To trade stETH as an input token, you can make sure the router automatically wraps stETH to wstETH before trading across a wstETH route.
+
+If this is an exactOut trade, we'll need to wrap the maximumAmountIn of steth, and therefore should add an unwrap command at the end of the transaction to account for any leftover steth that didn't get traded. `amountMinimum` can be set to 0 in this scenario for the unwrapSteth commmand.
+```typescript
+import { TradeType } from '@uniswap/sdk-core'
+import { Trade as V2TradeSDK } from '@uniswap/v2-sdk'
+import { Trade as V3TradeSDK } from '@uniswap/v3-sdk'
+import { MixedRouteTrade, MixedRouteSDK, Trade as RouterTrade } from '@uniswap/router-sdk'
+import {
+  UniswapTrade,
+  WrapSTETH
+} from "@uniswap/universal-router-sdk";
+
+// EXACT INPUT
+// including optional permit2 parameter will transfer STETH amount using permit2 
+const wrapSTETH = new WrapSTETH(inputSTETH, 1, WrapSTETHPermitData?, wrapAmountOtherThanContractBalance?)
+const uniswapWstethTrade = new UniswapTrade(
+  new RouterTrade({ v2Routes, v3Routes, mixedRoutes, tradeType: TradeType.EXACT_INPUT }),
+  { slippageTolerance}
+)
+const { calldata, value } = SwapRouter.swapCallParameters([wrapSTETH, uniswapWstethTrade])
+
+// EXACT OUTPUT
+const wrapSTETH = new WrapSTETH(maximumInputSTETH, 1, WrapSTETHPermitData?, wrapAmountOtherThanContractBalance?)
+const uniswapWstethTrade = new UniswapTrade(
+  new RouterTrade({ v2Routes, v3Routes, mixedRoutes, tradeType: TradeType.EXACT_OUTPUT }),
+  { slippageTolerance}
+)
+const unwrapSTETH = new UnwrapSTETH(recipient, amountMinimum = 0, chainId)
+
+const { calldata, value } = SwapRouter.swapCallParameters([wrapSTETH, uniswapWstethTrade, unwrapSTETH])
+
+```
+
+To recieve stETH as an output token, you can make sure the router automatically unwraps wstETH to stETH before returning to the swapper
+```typescript
+import { TradeType } from '@uniswap/sdk-core'
+import { Trade as V2TradeSDK } from '@uniswap/v2-sdk'
+import { Trade as V3TradeSDK } from '@uniswap/v3-sdk'
+import { MixedRouteTrade, MixedRouteSDK, Trade as RouterTrade } from '@uniswap/router-sdk'
+import {
+  ROUTER_AS_RECIPIENT,
+  UniswapTrade,
+  UnwrapSTETH
+} from "@uniswap/universal-router-sdk";
+
+// return trade to the router instead of the recipient using the ROUTER_AS_RECIPIENT constant so that the router may custody tokens to unwrap
+const uniswapWstethTrade = new UniswapTrade(
+  new RouterTrade({ v2Routes, v3Routes, mixedRoutes, tradeType: TradeType.EXACT_INPUT }),
+  { slippageTolerance, ROUTER_AS_RECIPIENT}
+)
+const unwrapSTETH = new UnwrapSTETH(recipient, amountMinimum, chainId)
+
+const { calldata, value } = SwapRouter.swapCallParameters([uniswapWstethTrade, unwrapSTETH])
+```
+
 
 ## Running this package
 Make sure you are running `node v16`

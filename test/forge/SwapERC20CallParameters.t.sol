@@ -14,6 +14,8 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
     ERC20 private constant WETH = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     ERC20 private constant USDC = ERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
     ERC20 private constant DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+    ERC20 private constant STETH_TOKEN = ERC20(STETH);
+
     // starting eth balance
     uint256 constant BALANCE = 10 ether;
     uint256 ONE_USDC = 10 ** 6;
@@ -604,6 +606,143 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         assertLe(from.balance, BALANCE - params.value);
         assertGt(USDC.balanceOf(RECIPIENT), 3000 * ONE_USDC);
         assertEq(USDC.balanceOf(address(router)), 0);
+        assertEq(address(router).balance, 0);
+    }
+
+    function testSTETHtoWETH() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_V3_001_STETH_FOR_WETH");
+
+        vm.createSelectFork(vm.envString("FORK_URL"), 18135610);
+        deployRouterAndPermit2();
+        vm.deal(from, BALANCE);
+
+        vm.stopPrank();
+
+        vm.prank(WSTETH); // STETH whale
+        STETH_TOKEN.transfer(from, BALANCE);
+
+        vm.startPrank(from);
+
+        assertEq(from.balance, BALANCE);
+        assertEq(WETH.balanceOf(RECIPIENT), 0);
+        STETH_TOKEN.approve(address(permit2), type(uint256).max);
+
+        uint256 balanceStethBefore = STETH_TOKEN.balanceOf(from);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertLe(from.balance, BALANCE - params.value);
+        assertEq(WETH.balanceOf(RECIPIENT), 999761518427454);
+        assertLt(STETH_TOKEN.balanceOf(from), balanceStethBefore);
+        assertEq(address(router).balance, 0);
+    }
+
+    function testSTETHtoWETHExactOut() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_V3_001_STETH_FOR_WETH_EXACT_OUT");
+
+        vm.createSelectFork(vm.envString("FORK_URL"), 18135610);
+        deployRouterAndPermit2();
+        vm.deal(from, BALANCE);
+
+        vm.stopPrank();
+
+        vm.prank(WSTETH); // STETH whale
+        STETH_TOKEN.transfer(from, BALANCE);
+
+        vm.startPrank(from);
+
+        assertEq(from.balance, BALANCE);
+        assertEq(WETH.balanceOf(RECIPIENT), 0);
+        STETH_TOKEN.approve(address(permit2), type(uint256).max);
+
+        uint256 balanceStethBefore = STETH_TOKEN.balanceOf(from);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertEq(WETH.balanceOf(RECIPIENT), 1e15);
+        assertLt(STETH_TOKEN.balanceOf(from), balanceStethBefore);
+        assertEq(address(router).balance, 0);
+    }
+
+    function testSTETHtoETH() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_V3_001_STETH_FOR_ETH");
+
+        vm.createSelectFork(vm.envString("FORK_URL"), 18135610);
+        deployRouterAndPermit2();
+        vm.deal(from, BALANCE);
+        assertEq(from.balance, BALANCE);
+
+        vm.stopPrank();
+
+        vm.prank(WSTETH); // STETH whale
+        STETH_TOKEN.transfer(from, BALANCE);
+
+        vm.startPrank(from);
+
+        uint256 balanceStethBefore = STETH_TOKEN.balanceOf(from);
+        uint256 balanceETHBefore = RECIPIENT.balance;
+
+        STETH_TOKEN.approve(address(permit2), type(uint256).max);
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertEq(RECIPIENT.balance - balanceETHBefore, 999761518427454);
+        assertLt(STETH_TOKEN.balanceOf(from), balanceStethBefore);
+        assertEq(address(router).balance, 0);
+    }
+
+    function testWETHToSTETH() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_V3_001_WETH_FOR_STETH");
+
+        vm.createSelectFork(vm.envString("FORK_URL"), 18135610);
+        deployRouterAndPermit2();
+        vm.deal(from, BALANCE);
+        deal(address(WETH), from, BALANCE);
+
+        WETH.approve(address(permit2), type(uint256).max);
+        permit2.approve(address(WETH), address(router), type(uint160).max, uint48(block.timestamp + 1000));
+
+        uint256 balanceWethBefore = WETH.balanceOf(from);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertEq(STETH_TOKEN.balanceOf(RECIPIENT), 1000038500708199);
+        assertLt(WETH.balanceOf(from), balanceWethBefore);
+        assertEq(address(router).balance, 0);
+    }
+
+    function testWETHToSTETHExactOut() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_V3_001_WETH_FOR_STETH_EXACT_OUTPUT");
+
+        vm.createSelectFork(vm.envString("FORK_URL"), 18135610);
+        deployRouterAndPermit2();
+        vm.deal(from, BALANCE);
+        deal(address(WETH), from, BALANCE);
+
+        WETH.approve(address(permit2), type(uint256).max);
+        permit2.approve(address(WETH), address(router), type(uint160).max, uint48(block.timestamp + 1000));
+
+        uint256 balanceWethBefore = WETH.balanceOf(from);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertEq(STETH_TOKEN.balanceOf(RECIPIENT), 1e15);
+        assertLt(WETH.balanceOf(from), balanceWethBefore);
+        assertEq(address(router).balance, 0);
+    }
+
+    function testETHToSTETH() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_V3_001_ETH_FOR_STETH");
+
+        vm.createSelectFork(vm.envString("FORK_URL"), 18135610);
+        deployRouterAndPermit2();
+        vm.deal(from, BALANCE);
+
+        uint256 balanceEthBefore = from.balance;
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertEq(STETH_TOKEN.balanceOf(RECIPIENT), 1000038500708199);
+        assertLt(from.balance, balanceEthBefore);
         assertEq(address(router).balance, 0);
     }
 }

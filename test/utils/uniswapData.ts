@@ -45,12 +45,61 @@ const V2_ABI = [
   },
 ]
 
+const STETH_ABI = [
+  {
+    inputs: [
+      {
+        internalType: 'uint256',
+        name: '_ethAmount',
+        type: 'uint256',
+      },
+    ],
+    name: 'getSharesByPooledEth',
+    outputs: [
+      {
+        internalType: 'uint256',
+        name: '',
+        type: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'uint256',
+        name: '_sharesAmount',
+        type: 'uint256',
+      },
+    ],
+    name: 'getPooledEthByShares',
+    outputs: [
+      {
+        internalType: 'uint256',
+        name: '',
+        type: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+]
+
 const FORK_BLOCK = 16075500
 
 export const ETHER = Ether.onChain(1)
 export const WETH = new Token(1, '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2', 18, 'WETH', 'Wrapped Ether')
 export const DAI = new Token(1, '0x6B175474E89094C44Da98b954EedeAC495271d0F', 18, 'DAI', 'dai')
 export const USDC = new Token(1, '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48', 6, 'USDC', 'USD Coin')
+export const STETH = new Token(1, '0xae7ab96520de3a18e5e111b5eaab095312d7fe84', 18, 'STETH', 'Liquid staked Ether')
+export const WSTETH = new Token(
+  1,
+  '0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0',
+  18,
+  'WSTETH',
+  'Wrapped liquid staked Ether'
+)
 export const FEE_AMOUNT = FeeAmount.MEDIUM
 
 type UniswapPools = {
@@ -77,6 +126,12 @@ export async function getUniswapPools(forkBlock?: number): Promise<UniswapPools>
     WETH_USDC_V3_LOW_FEE,
     USDC_DAI_V3,
   }
+}
+
+const STETH_BLOCK = 18135610
+
+export async function getUniswapStethPool(forkBlock: number = STETH_BLOCK): Promise<Pool> {
+  return await getPool(WSTETH, WETH, FeeAmount.LOWEST, forkBlock)
 }
 
 function getProvider(): ethers.providers.BaseProvider {
@@ -112,6 +167,19 @@ export async function getPool(tokenA: Token, tokenB: Token, feeAmount: FeeAmount
       liquidityGross: liquidity,
     },
   ])
+}
+
+export async function getWStethPerSteth(stethAmount: BigNumber, blockNumber: number = STETH_BLOCK): Promise<BigNumber> {
+  const contract = new ethers.Contract(STETH.address, STETH_ABI, getProvider())
+  return await contract.getSharesByPooledEth(stethAmount, { blockTag: blockNumber })
+}
+
+export async function getStethPerWsteth(
+  wstethAmount: BigNumber,
+  blockNumber: number = STETH_BLOCK
+): Promise<BigNumber> {
+  const contract = new ethers.Contract(STETH.address, STETH_ABI, getProvider())
+  return await contract.getPooledEthByShares(wstethAmount, { blockTag: blockNumber })
 }
 
 // use some sane defaults

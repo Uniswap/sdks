@@ -31,6 +31,7 @@ export type FlatFeeOptions = {
 // so we extend swap options with the permit2 permit
 export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit'> & {
   inputTokenPermit?: Permit2Permit
+  payerIsRouter?: boolean
   flatFee?: FlatFeeOptions
 }
 
@@ -51,7 +52,7 @@ export class UniswapTrade implements Command {
   }
 
   encode(planner: RoutePlanner, _config: TradeConfig): void {
-    let payerIsUser = true
+    let payerIsUser = !this.options.payerIsRouter
 
     // If the input currency is the native currency, we need to wrap it with the router as the recipient
     if (this.trade.inputAmount.currency.isNative) {
