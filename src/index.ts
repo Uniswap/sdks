@@ -1,5 +1,6 @@
 export { SwapRouter } from './swapRouter'
 export * from './entities'
+export { RoutePlanner, CommandType } from './utils/routerCommands'
 export {
   UNIVERSAL_ROUTER_ADDRESS,
   UNIVERSAL_ROUTER_CREATION_BLOCK,
