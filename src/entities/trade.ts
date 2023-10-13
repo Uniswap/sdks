@@ -199,7 +199,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     }
 
     if (this.outputTax.equalTo(ONE_HUNDRED_PERCENT)) {
-      throw new Error("Unable to calculate price impact for a 100% buy-tax token")
+      throw new Error('Unable to calculate price impact for a 100% buy-tax token')
     }
 
     let spotOutputAmount = CurrencyAmount.fromRawAmount(this.outputAmount.currency, 0)
