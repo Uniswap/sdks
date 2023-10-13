@@ -134,7 +134,10 @@ export class DutchOrderBuilder extends OrderBuilder {
     }
     this.info.outputs = this.info.outputs.map((output) => {
       // if fee output then pass through
-      if (feeRecipient && output.recipient.toLowerCase() === feeRecipient.toLowerCase()) {
+      if (
+        feeRecipient &&
+        output.recipient.toLowerCase() === feeRecipient.toLowerCase()
+      ) {
         return output;
       }
 
