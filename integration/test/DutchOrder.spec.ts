@@ -170,6 +170,49 @@ describe('DutchOrder', () => {
     expect(order.info.outputs[1].recipient).to.eq(feeRecipient);
   });
 
+  it('nonFeeRecipient updates recipient for all outputs if no feeRecipient given', async () => {
+    const amount = BigNumber.from(10).pow(18);
+    const deadline = await new BlockchainTime().secondsFromNow(1000);
+    const swapperAddress = await swapper.getAddress();
+    const feeRecipient = '0x1111111111111111111111111111111111111111';
+    const preBuildOrder = new DutchOrderBuilder(
+      chainId,
+      reactor.address,
+      permit2.address
+    )
+      .deadline(deadline)
+      .decayEndTime(deadline)
+      .decayStartTime(deadline - 100)
+      .swapper(swapperAddress)
+      .nonce(BigNumber.from(100))
+      .input({
+        token: tokenIn.address,
+        startAmount: amount,
+        endAmount: amount,
+      })
+      .output({
+        token: tokenOut.address,
+        startAmount: amount,
+        endAmount: BigNumber.from(10).pow(17).mul(9),
+        recipient: swapperAddress,
+      })
+      .output({
+        token: tokenOut.address,
+        startAmount: amount,
+        endAmount: BigNumber.from(10).pow(17).mul(9),
+        recipient: feeRecipient,
+      });
+
+    let order = preBuildOrder.build();
+
+    expect(order.info.outputs[0].recipient).to.eq(swapperAddress);
+    expect(order.info.outputs[1].recipient).to.eq(feeRecipient);
+
+    order = preBuildOrder.nonFeeRecipient(ethers.constants.AddressZero).build();
+    expect(order.info.outputs[0].recipient).to.eq(ethers.constants.AddressZero);
+    expect(order.info.outputs[1].recipient).to.eq(ethers.constants.AddressZero);
+  });
+
   it('nonFeeRecipient fails if same as newRecipient', async () => {
     const amount = BigNumber.from(10).pow(18);
     const deadline = await new BlockchainTime().secondsFromNow(1000);
