@@ -198,12 +198,16 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       return this._priceImpact
     }
 
-    let spotOutputAmount = CurrencyAmount.fromRawAmount(this.outputAmount.currency, 0)
+    let spotOutputAmount = CurrencyAmount.fromRawAmount(this.outputAmount.currency, 0)  
     for (const { route, inputAmount } of this.swaps) {
       const midPrice = route.midPrice
       const postTaxInputAmount = inputAmount.multiply(new Fraction(ONE).subtract(this.inputTax))
       spotOutputAmount = spotOutputAmount.add(midPrice.quote(postTaxInputAmount))
     }
+
+    // if the total output of this trade is 0, then most likely the post-tax input was also 0, and therefore this swap
+    // does not move the pools' market price
+    if (spotOutputAmount.equalTo(ZERO)) return ZERO_PERCENT
 
     const preTaxOutputAmount = this.outputAmount.divide(new Fraction(ONE).subtract(this.outputTax))
     const priceImpact = spotOutputAmount.subtract(preTaxOutputAmount).divide(spotOutputAmount)
