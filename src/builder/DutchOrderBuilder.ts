@@ -121,14 +121,28 @@ export class DutchOrderBuilder extends OrderBuilder {
   }
 
   // ensures that we only change non fee outputs
-  nonFeeRecipient(recipient: string): DutchOrderBuilder {
+  nonFeeRecipient(
+    newRecipient: string,
+    feeRecipient: string
+  ): DutchOrderBuilder {
+    invariant(
+      newRecipient !== feeRecipient,
+      `newRecipient must be different from feeRecipient: ${newRecipient}`
+    );
     if (!this.info.outputs) {
       return this;
     }
-    this.info.outputs = this.info.outputs.map((output) => ({
-      ...output,
-      recipient,
-    }));
+    this.info.outputs = this.info.outputs.map((output) => {
+      // if fee fee output then pass through
+      if (output.recipient.toLowerCase() === feeRecipient.toLowerCase()) {
+        return output;
+      }
+
+      return {
+        ...output,
+        recipient: newRecipient,
+      };
+    });
     return this;
   }
 
