@@ -198,7 +198,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       return this._priceImpact
     }
 
-    // returns 0% price impact even though this may be inaccurate as a swap may have occured. 
+    // returns 0% price impact even though this may be inaccurate as a swap may have occured.
     // because we're unable to derive the pre-buy-tax amount, use 0% as a placeholder.
     if (this.outputTax.equalTo(ONE_HUNDRED_PERCENT)) return ZERO_PERCENT
 
