@@ -125,6 +125,10 @@ export class DutchOrderBuilder extends OrderBuilder {
     newRecipient: string,
     feeRecipient: string
   ): DutchOrderBuilder {
+    invariant(
+      newRecipient !== feeRecipient,
+      `newRecipient must be different from feeRecipient: ${newRecipient}`
+    );
     if (!this.info.outputs) {
       return this;
     }
