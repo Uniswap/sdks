@@ -2,7 +2,7 @@ import { Currency, CurrencyAmount, Fraction, Percent, Price, TradeType } from '@
 import { Pair, Route as V2RouteSDK, Trade as V2TradeSDK } from '@uniswap/v2-sdk'
 import { Pool, Route as V3RouteSDK, Trade as V3TradeSDK } from '@uniswap/v3-sdk'
 import invariant from 'tiny-invariant'
-import { ONE, ZERO, ZERO_PERCENT } from '../constants'
+import { ONE, ONE_HUNDRED_PERCENT, ZERO, ZERO_PERCENT } from '../constants'
 import { MixedRouteSDK } from './mixedRoute/route'
 import { MixedRouteTrade as MixedRouteTradeSDK } from './mixedRoute/trade'
 import { IRoute, MixedRoute, RouteV2, RouteV3 } from './route'
@@ -196,6 +196,10 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
   public get priceImpact(): Percent {
     if (this._priceImpact) {
       return this._priceImpact
+    }
+
+    if (this.outputTax.equalTo(ONE_HUNDRED_PERCENT)) {
+      throw new Error("Unable to calculate price impact for a 100% buy-tax token")
     }
 
     let spotOutputAmount = CurrencyAmount.fromRawAmount(this.outputAmount.currency, 0)
