@@ -123,7 +123,7 @@ export class DutchOrderBuilder extends OrderBuilder {
   // ensures that we only change non fee outputs
   nonFeeRecipient(
     newRecipient: string,
-    feeRecipient: string
+    feeRecipient?: string
   ): DutchOrderBuilder {
     invariant(
       newRecipient !== feeRecipient,
@@ -133,8 +133,8 @@ export class DutchOrderBuilder extends OrderBuilder {
       return this;
     }
     this.info.outputs = this.info.outputs.map((output) => {
-      // if fee fee output then pass through
-      if (output.recipient.toLowerCase() === feeRecipient.toLowerCase()) {
+      // if fee output then pass through
+      if (feeRecipient && output.recipient.toLowerCase() === feeRecipient.toLowerCase()) {
         return output;
       }
 
