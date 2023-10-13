@@ -198,9 +198,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       return this._priceImpact
     }
 
-    if (this.outputTax.equalTo(ONE_HUNDRED_PERCENT)) {
-      throw new Error('Unable to calculate price impact for a 100% buy-tax token')
-    }
+    if (this.outputTax.equalTo(ONE_HUNDRED_PERCENT)) return ZERO_PERCENT
 
     let spotOutputAmount = CurrencyAmount.fromRawAmount(this.outputAmount.currency, 0)
     for (const { route, inputAmount } of this.swaps) {
