@@ -2,7 +2,7 @@ import { Currency, CurrencyAmount, Fraction, Percent, Price, TradeType } from '@
 import { Pair, Route as V2RouteSDK, Trade as V2TradeSDK } from '@uniswap/v2-sdk'
 import { Pool, Route as V3RouteSDK, Trade as V3TradeSDK } from '@uniswap/v3-sdk'
 import invariant from 'tiny-invariant'
-import { ONE, ZERO, ZERO_PERCENT } from '../constants'
+import { ONE, ONE_HUNDRED_PERCENT, ZERO, ZERO_PERCENT } from '../constants'
 import { MixedRouteSDK } from './mixedRoute/route'
 import { MixedRouteTrade as MixedRouteTradeSDK } from './mixedRoute/trade'
 import { IRoute, MixedRoute, RouteV2, RouteV3 } from './route'
@@ -198,12 +198,20 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       return this._priceImpact
     }
 
+    if (this.outputTax.equalTo(ONE_HUNDRED_PERCENT)) {
+      throw new Error('Unable to calculate price impact for a 100% buy-tax token')
+    }
+
     let spotOutputAmount = CurrencyAmount.fromRawAmount(this.outputAmount.currency, 0)
     for (const { route, inputAmount } of this.swaps) {
       const midPrice = route.midPrice
       const postTaxInputAmount = inputAmount.multiply(new Fraction(ONE).subtract(this.inputTax))
       spotOutputAmount = spotOutputAmount.add(midPrice.quote(postTaxInputAmount))
     }
+
+    // if the total output of this trade is 0, then most likely the post-tax input was also 0, and therefore this swap
+    // does not move the pools' market price
+    if (spotOutputAmount.equalTo(ZERO)) return ZERO_PERCENT
 
     const preTaxOutputAmount = this.outputAmount.divide(new Fraction(ONE).subtract(this.outputTax))
     const priceImpact = spotOutputAmount.subtract(preTaxOutputAmount).divide(spotOutputAmount)
