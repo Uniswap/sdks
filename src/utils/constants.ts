@@ -13,7 +13,7 @@ export const NOT_SUPPORTED_ON_CHAIN = '0x000000000000000000000000000000000000000
 const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // mainnet
   [1]: {
-    router: '0x3F6328669a86bef431Dc6F9201A5B90F7975a023',
+    router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
     weth: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
     steth: '0xae7ab96520de3a18e5e111b5eaab095312d7fe84',
     wsteth: '0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0',
@@ -21,7 +21,7 @@ const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   },
   // goerli
   [5]: {
-    router: '0x3F6328669a86bef431Dc6F9201A5B90F7975a023',
+    router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
     weth: '0xb4fbf271143f4fbf7b91a5ded31805e42b2208d6',
     steth: '0x1643E812aE58766192Cf7D2Cf9567dF2C37e9B7F',
     wsteth: '0x6320cD32aA674d2898A68ec82e869385Fc5f7E2f',
