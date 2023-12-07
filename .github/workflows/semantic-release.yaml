@@ -1,0 +1,33 @@
+name: Release
+
+on:
+  workflow_dispatch:
+      
+jobs:
+  release:
+    name: Release
+    environment:
+      name: production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
+
+      - name: Setup Node
+        uses: actions/setup-node@1a4442cacd436585916779262731d5b162bc6ec7
+        with:
+          cache: yarn
+          node-version: 18
+
+      - name: Install dependencies
+        run: yarn --immutable
+
+      - name: Build SDK's
+        run: yarn g:build
+
+      - name: Release needed SDK's
+        env:
+          NPM_CONFIG_USERCONFIG: /dev/null
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: yarn g:release

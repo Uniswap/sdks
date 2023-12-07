@@ -1,0 +1,13 @@
+* @adjkant
+
+sdks/sdk-core/**/* @uniswap/protocols @adjkant
+
+sdks/v2-sdk/**/* @uniswap/protocols @adjkant
+sdks/v3-sdk/**/* @uniswap/protocols @adjkant
+
+sdks/permit2-sdk/**/* @uniswap/protocols @adjkant
+sdks/uniswapx-sdk/**/* @uniswap/protocols @adjkant
+
+sdks/router-sdk/**/* @uniswap/protocols @tinaszheng @zzmp @adjkant
+sdks/universal-router-sdk/**/* @uniswap/protocols @adjkant
+sdks/smart-order-router/**/* @uniswap/routing @adjkant

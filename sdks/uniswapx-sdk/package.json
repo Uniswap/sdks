@@ -1,7 +1,6 @@
 {
-  "name": "@uniswap/uniswapx-sdk",
+  "name": "@adjkant/uniswapx-sdk",
   "author": "Uniswap",
-  "version": "2.0.1-alpha.10",
   "license": "MIT",
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
@@ -11,8 +10,10 @@
   "engines": {
     "node": ">=10"
   },
+  "repository": "https://github.com/Uniswap/sdks.git",
   "scripts": {
-    "build": "npm run typechain && tsc -p tsconfig.json",
+    "release": "semantic-release",
+    "build": "yarn run typechain && tsc -p tsconfig.json",
     "fix": "run-s fix:*",
     "fix:prettier": "prettier \"src/**/*.ts\" --write",
     "fix:lint": "eslint src --ext .ts --fix",
@@ -21,10 +22,8 @@
     "test:prettier": "prettier \"src/**/*.ts\" --list-different",
     "test:unit": "jest --testPathPattern src --detectOpenHandles --forceExit --testPathIgnorePatterns dist",
     "test:integration": "yarn build && cd integration && yarn && yarn test",
-    "prepare": "npm run build",
     "typechain": "typechain --target=ethers-v5 --out-dir src/contracts --glob ./abis/**/*.json"
   },
-  "peerDependencies": {},
   "husky": {
     "hooks": {
       "pre-commit": "yarn fix"
@@ -33,7 +32,7 @@
   "module": "dist/uniswapx-sdk.esm.js",
   "devDependencies": {
     "@typechain/ethers-v5": "^10.1.0",
-    "@types/jest": "^29.0.3",
+    "@types/jest": "^24.0.25",
     "@types/node": "^18.7.16",
     "@typescript-eslint/eslint-plugin": "^5.62",
     "@typescript-eslint/parser": "^5.62",
@@ -42,20 +41,47 @@
     "eslint-plugin-eslint-comments": "^3.2.0",
     "eslint-plugin-functional": "^3.0.2",
     "eslint-plugin-import": "^2.22.0",
-    "husky": "^8.0.1",
+    "husky": "^8.0.3",
     "jest": "^29.0.3",
     "npm-run-all": "^4.1.5",
-    "prettier": "^2.1.1",
+    "prettier": "^2.4.1",
     "ts-jest": "^29.0.1",
     "ts-node": "^10.9.1",
     "typechain": "^8.1.0",
-    "typescript": "^4.0.2"
+    "typescript": "^4.3.3"
   },
   "dependencies": {
     "@ethersproject/bytes": "^5.7.0",
     "@ethersproject/providers": "^5.7.0",
     "@uniswap/permit2-sdk": "^1.2.0",
     "@uniswap/sdk-core": "^4.0.3",
-    "ethers": "^5.7.0"
+    "ethers": "^5.3.1"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "release": {
+    "extends": "semantic-release-monorepo",
+    "branches": "main",
+    "plugins": [
+      [
+        "@semantic-release/commit-analyzer",
+        {
+          "preset": "angular",
+          "releaseRules": "../../publishing/release-rules.cjs"
+        }
+      ],
+      "@semantic-release/release-notes-generator",
+      "@semantic-release/npm",
+      "@semantic-release/github",
+      [
+        "@semantic-release/exec",
+        {
+          "successCmd": "git restore yarn.lock && yarn",
+          "failCmd": "git restore yarn.lock && yarn",
+          "execCwd": "../.."
+        }
+      ]
+    ]
   }
 }

@@ -1,6 +1,5 @@
 {
-  "name": "@uniswap/universal-router-sdk",
-  "version": "1.9.0",
+  "name": "@adjkant/universal-router-sdk",
   "description": "sdk for integrating with the Universal Router contracts",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
@@ -10,10 +9,8 @@
   "engines": {
     "node": ">=14"
   },
-  "publishConfig": {
-    "access": "public"
-  },
   "scripts": {
+    "release": "semantic-release",
     "test:all": "yarn test:hardhat && yarn test:forge",
     "test:hardhat": "env TS_NODE_COMPILER_OPTIONS='{\"module\": \"commonjs\" }' hardhat test",
     "test:forge": "forge test",
@@ -35,14 +32,14 @@
   "devDependencies": {
     "@types/chai": "^4.2.18",
     "@types/mocha": "^8.2.2",
-    "@types/node": "^15.12.2",
+    "@types/node": "^18.7.16",
     "@types/node-fetch": "^2.6.2",
     "chai": "^4.3.4",
     "dotenv": "^16.0.3",
     "eslint-plugin-prettier": "^3.4.0",
-    "hardhat": "^2.6.8",
-    "prettier": "^2.3.1",
-    "ts-node": "^10.0.0",
+    "hardhat": "^2.12.2",
+    "prettier": "^2.4.1",
+    "ts-node": "^10.9.1",
     "tsdx": "^0.14.1",
     "tslib": "^2.3.0",
     "typedoc": "^0.21.2",
@@ -58,12 +55,36 @@
     "bignumber.js": "^9.0.2",
     "ethers": "^5.3.1"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Uniswap/universal-router-sdk.git"
-  },
+  "repository": "https://github.com/Uniswap/sdks.git",
   "bugs": {
     "url": "https://github.com/Uniswap/universal-router-sdk/issues"
   },
-  "homepage": "https://github.com/Uniswap/universal-router-sdk#readme"
+  "homepage": "https://github.com/Uniswap/universal-router-sdk#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "release": {
+    "extends": "semantic-release-monorepo",
+    "branches": "main",
+    "plugins": [
+      [
+        "@semantic-release/commit-analyzer",
+        {
+          "preset": "angular",
+          "releaseRules": "../../publishing/release-rules.cjs"
+        }
+      ],
+      "@semantic-release/release-notes-generator",
+      "@semantic-release/npm",
+      "@semantic-release/github",
+      [
+        "@semantic-release/exec",
+        {
+          "successCmd": "git restore yarn.lock && yarn",
+          "failCmd": "git restore yarn.lock && yarn",
+          "execCwd": "../.."
+        }
+      ]
+    ]
+  }
 }

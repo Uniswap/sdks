@@ -1,0 +1,39 @@
+{
+  "name": "sdks",
+  "version": "0.0.0",
+  "dependencies": {
+    "@babel/runtime": "7.18.9",
+    "@manypkg/cli": "^0.19.2",
+    "@semantic-release/exec": "6.0.3",
+    "@typescript-eslint/eslint-plugin": "^5.62",
+    "conventional-changelog-conventionalcommits": "7.0.2",
+    "danger": "11.2.6",
+    "eslint": "^7.8.0",
+    "husky": "^8.0.3",
+    "semantic-release": "^20.1.0",
+    "semantic-release-monorepo": "7.0.5",
+    "syncpack": "^8.5.14",
+    "turbo": "1.10.16"
+  },
+  "engines": {
+    "node": ">=10",
+    "yarn": ">=3.2.3"
+  },
+  "manypkg": {
+    "ignoredRules": [
+      "INTERNAL_MISMATCH"
+    ]
+  },
+  "packageManager": "yarn@3.2.3",
+  "private": true,
+  "scripts": {
+    "g:build": "turbo run build",
+    "g:lint": "turbo run lint",
+    "g:release": "turbo run release --concurrency=1 --continue",
+    "g:test": "turbo run test",
+    "g:typecheck": "turbo run typecheck"
+  },
+  "workspaces": [
+    "sdks/*"
+  ]
+}
