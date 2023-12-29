@@ -1,6 +1,12 @@
 {
   "name": "@adjkant/universal-router-sdk",
   "description": "sdk for integrating with the Universal Router contracts",
+  "repository": "https://github.com/Uniswap/sdks.git",
+  "keywords": [
+    "uniswap",
+    "ethereum"
+  ],
+  "license": "MIT",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
   "files": [
@@ -10,24 +16,28 @@
     "node": ">=14"
   },
   "scripts": {
-    "release": "semantic-release",
-    "test:all": "yarn test:hardhat && yarn test:forge",
-    "test:hardhat": "env TS_NODE_COMPILER_OPTIONS='{\"module\": \"commonjs\" }' hardhat test",
-    "test:forge": "forge test",
-    "install:ur": "cd node_modules/@uniswap/universal-router && forge install",
     "build": "tsdx build",
-    "prettier:fix": "prettier --write '**/*.ts' && prettier --write '**/*.json'",
+    "docs": "typedoc",
     "forge:fix": "forge fmt",
+    "install:ur": "cd node_modules/@uniswap/universal-router && forge install",
+    "lint": "yarn prettier",
     "lint:fix": "yarn prettier:fix && yarn forge:fix",
     "prettier": "prettier --check '**/*.ts' && prettier --check '**/*.json'",
-    "docs": "typedoc"
+    "prettier:fix": "prettier --write '**/*.ts' && prettier --write '**/*.json'",
+    "release": "semantic-release",
+    "test": "yarn test:hardhat && yarn test:forge",
+    "test:forge": "forge test",
+    "test:hardhat": "env TS_NODE_COMPILER_OPTIONS='{\"module\": \"commonjs\" }' hardhat test"
   },
-  "author": "@Uniswap",
-  "prettier": {
-    "printWidth": 120,
-    "semi": false,
-    "singleQuote": true,
-    "trailingComma": "es5"
+  "dependencies": {
+    "@uniswap/permit2-sdk": "^1.2.0",
+    "@uniswap/router-sdk": "^1.9.0",
+    "@uniswap/sdk-core": "^4.2.0",
+    "@uniswap/universal-router": "1.6.0",
+    "@uniswap/v2-sdk": "^4.3.0",
+    "@uniswap/v3-sdk": "^3.11.0",
+    "bignumber.js": "^9.0.2",
+    "ethers": "^5.3.1"
   },
   "devDependencies": {
     "@types/chai": "^4.2.18",
@@ -45,21 +55,12 @@
     "typedoc": "^0.21.2",
     "typescript": "^4.3.3"
   },
-  "dependencies": {
-    "@uniswap/permit2-sdk": "^1.2.0",
-    "@uniswap/router-sdk": "^1.9.0",
-    "@uniswap/sdk-core": "^4.2.0",
-    "@uniswap/universal-router": "1.6.0",
-    "@uniswap/v2-sdk": "^4.3.0",
-    "@uniswap/v3-sdk": "^3.11.0",
-    "bignumber.js": "^9.0.2",
-    "ethers": "^5.3.1"
+  "prettier": {
+    "printWidth": 120,
+    "semi": false,
+    "singleQuote": true,
+    "trailingComma": "es5"
   },
-  "repository": "https://github.com/Uniswap/sdks.git",
-  "bugs": {
-    "url": "https://github.com/Uniswap/universal-router-sdk/issues"
-  },
-  "homepage": "https://github.com/Uniswap/universal-router-sdk#readme",
   "publishConfig": {
     "access": "public"
   },

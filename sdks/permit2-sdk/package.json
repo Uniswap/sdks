@@ -1,24 +1,24 @@
 {
   "name": "@adjkant/permit2-sdk",
   "description": "An sdk for interacting with permit2.",
-  "main": "dist/index.js",
-  "typings": "dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "test": "tsdx test --testPathIgnorePatterns=/permit2/",
-    "build": "tsdx build",
-    "start": "tsdx watch",
-    "interop": "yarn node writeInterop.js",
-    "release": "semantic-release"
-  },
   "repository": "https://github.com/Uniswap/sdks.git",
   "keywords": [
     "uniswap",
     "ethereum"
   ],
   "license": "MIT",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdx build",
+    "interop": "yarn node writeInterop.js",
+    "release": "semantic-release",
+    "start": "tsdx watch",
+    "test": "tsdx test --testPathIgnorePatterns=/permit2/"
+  },
   "dependencies": {
     "ethers": "^5.3.1",
     "tiny-invariant": "^1.1.0"

@@ -1,35 +1,39 @@
 {
   "name": "@adjkant/uniswapx-sdk",
   "author": "Uniswap",
+  "repository": "https://github.com/Uniswap/sdks.git",
+  "keywords": [
+    "uniswap",
+    "ethereum"
+  ],
   "license": "MIT",
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
+  "module": "dist/uniswapx-sdk.esm.js",
   "files": [
     "dist"
   ],
   "engines": {
     "node": ">=10"
   },
-  "repository": "https://github.com/Uniswap/sdks.git",
   "scripts": {
-    "release": "semantic-release",
     "build": "yarn run typechain && tsc -p tsconfig.json",
-    "fix": "run-s fix:*",
-    "fix:prettier": "prettier \"src/**/*.ts\" --write",
-    "fix:lint": "eslint src --ext .ts --fix",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "prettier": "prettier \"src/**/*.ts\" --list-different",
+    "release": "semantic-release",
     "test": "run-s build test:*",
-    "test:lint": "eslint src --ext .ts",
-    "test:prettier": "prettier \"src/**/*.ts\" --list-different",
-    "test:unit": "jest --testPathPattern src --detectOpenHandles --forceExit --testPathIgnorePatterns dist",
+    "test:unit": "jest --testPathPattern src --detectOpenHandles --forceExit  --testPathIgnorePatterns dist",
     "test:integration": "yarn build && cd integration && yarn && yarn test",
     "typechain": "typechain --target=ethers-v5 --out-dir src/contracts --glob ./abis/**/*.json"
   },
-  "husky": {
-    "hooks": {
-      "pre-commit": "yarn fix"
-    }
+  "dependencies": {
+    "@ethersproject/bytes": "^5.7.0",
+    "@ethersproject/providers": "^5.7.0",
+    "@uniswap/permit2-sdk": "^1.2.0",
+    "@uniswap/sdk-core": "^4.0.3",
+    "ethers": "^5.3.1"
   },
-  "module": "dist/uniswapx-sdk.esm.js",
   "devDependencies": {
     "@typechain/ethers-v5": "^10.1.0",
     "@types/jest": "^24.0.25",
@@ -50,12 +54,10 @@
     "typechain": "^8.1.0",
     "typescript": "^4.3.3"
   },
-  "dependencies": {
-    "@ethersproject/bytes": "^5.7.0",
-    "@ethersproject/providers": "^5.7.0",
-    "@uniswap/permit2-sdk": "^1.2.0",
-    "@uniswap/sdk-core": "^4.0.3",
-    "ethers": "^5.3.1"
+  "husky": {
+    "hooks": {
+      "pre-commit": "yarn fix"
+    }
   },
   "publishConfig": {
     "access": "public"

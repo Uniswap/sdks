@@ -1,21 +1,24 @@
 {
   "name": "@adjkant/v2-sdk",
-  "license": "MIT",
   "description": "🛠 An SDK for building applications on top of Uniswap V2",
-  "main": "dist/index.js",
-  "typings": "dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
   "repository": "https://github.com/Uniswap/sdks.git",
   "keywords": [
     "uniswap",
     "ethereum"
   ],
+  "license": "MIT",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
   "module": "dist/v2-sdk.esm.js",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=10"
+  },
   "scripts": {
-    "lint": "tsdx lint src test",
     "build": "tsdx build",
+    "lint": "tsdx lint src test",
     "release": "semantic-release",
     "start": "tsdx watch",
     "test": "tsdx test"
@@ -32,9 +35,6 @@
     "@types/jest": "^24.0.25",
     "@uniswap/v2-core": "^1.0.1",
     "tsdx": "^0.14.1"
-  },
-  "engines": {
-    "node": ">=10"
   },
   "prettier": {
     "printWidth": 120,

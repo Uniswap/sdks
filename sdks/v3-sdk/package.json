@@ -1,23 +1,26 @@
 {
   "name": "@adjkant/v3-sdk",
-  "license": "MIT",
   "description": "⚒️ An SDK for building applications on top of Uniswap V3",
-  "main": "dist/index.js",
-  "typings": "dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
   "repository": "https://github.com/Uniswap/sdks.git",
   "keywords": [
     "uniswap",
     "ethereum"
   ],
+  "license": "MIT",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
   "module": "dist/v3-sdk.esm.js",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=10"
+  },
   "scripts": {
     "build": "tsdx build",
+    "release": "semantic-release",
     "start": "tsdx watch",
-    "test": "tsdx test",
-    "release": "semantic-release"
+    "test": "tsdx test"
   },
   "dependencies": {
     "@ethersproject/abi": "^5.5.0",
@@ -39,9 +42,6 @@
   },
   "resolutionsComments": {
     "regenerator-runtime": "Fixes https://github.com/facebook/regenerator/pull/480. It can be removed when `tsdx` updates their dependencies."
-  },
-  "engines": {
-    "node": ">=10"
   },
   "prettier": {
     "printWidth": 120,

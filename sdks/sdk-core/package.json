@@ -1,18 +1,21 @@
 {
   "name": "@adjkant/sdk-core",
-  "license": "MIT",
   "description": "⚒️ An SDK for building applications on top of Uniswap V3",
-  "main": "dist/index.js",
-  "typings": "dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
   "repository": "https://github.com/Uniswap/sdks.git",
   "keywords": [
     "uniswap",
     "ethereum"
   ],
+  "license": "MIT",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
   "module": "dist/sdk-core.esm.js",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=10"
+  },
   "scripts": {
     "build": "tsdx build",
     "release": "semantic-release",
@@ -31,9 +34,6 @@
     "@types/big.js": "^4.0.5",
     "@types/jest": "^24.0.25",
     "tsdx": "^0.14.1"
-  },
-  "engines": {
-    "node": ">=10"
   },
   "prettier": {
     "printWidth": 120,
