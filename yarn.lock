@@ -6767,15 +6767,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"conventional-changelog-conventionalcommits@npm:7.0.2":
-  version: 7.0.2
-  resolution: "conventional-changelog-conventionalcommits@npm:7.0.2"
-  dependencies:
-    compare-func: ^2.0.0
-  checksum: e17ac5970ae09d6e9b0c3a7edaed075b836c0c09c34c514589cbe06554f46ed525067fa8150a8467cc03b1cf9af2073e7ecf48790d4f5ea399921b1cbe313711
-  languageName: node
-  linkType: hard
-
 "conventional-changelog-writer@npm:^5.0.0":
   version: 5.0.1
   resolution: "conventional-changelog-writer@npm:5.0.1"
@@ -16078,7 +16069,6 @@ __metadata:
     "@manypkg/cli": ^0.19.2
     "@semantic-release/exec": 6.0.3
     "@typescript-eslint/eslint-plugin": ^5.62
-    conventional-changelog-conventionalcommits: 7.0.2
     danger: 11.2.6
     eslint: ^7.8.0
     husky: ^8.0.3

@@ -6,7 +6,6 @@
     "@manypkg/cli": "^0.19.2",
     "@semantic-release/exec": "6.0.3",
     "@typescript-eslint/eslint-plugin": "^5.62",
-    "conventional-changelog-conventionalcommits": "7.0.2",
     "danger": "11.2.6",
     "eslint": "^7.8.0",
     "husky": "^8.0.3",
