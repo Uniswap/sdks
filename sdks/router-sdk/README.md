@@ -8,4 +8,3 @@ Pull requests welcome!
 # Uniswap Swap Router SDK
 
 This SDK is meant to facilitate interactions with the contracts in [swap-router-contracts](https://github.com/Uniswap/swap-router-contracts).
-

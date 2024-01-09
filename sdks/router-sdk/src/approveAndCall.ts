@@ -54,7 +54,7 @@ export abstract class ApproveAndCall {
   public static encodeCallPositionManager(calldatas: string[]): string {
     invariant(calldatas.length > 0, 'NULL_CALLDATA')
 
-    if (calldatas.length == 1) {
+    if (calldatas.length === 1) {
       return ApproveAndCall.INTERFACE.encodeFunctionData('callPositionManager', calldatas)
     } else {
       const encodedMulticall = NonfungiblePositionManager.INTERFACE.encodeFunctionData('multicall', [calldatas])
@@ -123,7 +123,7 @@ export abstract class ApproveAndCall {
       case ApprovalTypes.ZERO_THEN_MAX_MINUS_ONE:
         return ApproveAndCall.encodeApproveZeroThenMaxMinusOne(token.wrapped)
       default:
-        throw 'Error: invalid ApprovalType'
+        throw new Error('Error: invalid ApprovalType')
     }
   }
 }

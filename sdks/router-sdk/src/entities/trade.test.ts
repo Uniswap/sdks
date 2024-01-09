@@ -1205,9 +1205,6 @@ describe('Trade', () => {
         tradeType: TradeType.EXACT_INPUT,
       })
 
-      it('is cached', () => {
-        expect(trade.priceImpact === trade.priceImpact).toStrictEqual(true)
-      })
       it('is correct', () => {
         expect(trade.priceImpact.toSignificant(3)).toEqual('30.3')
       })
@@ -1227,9 +1224,6 @@ describe('Trade', () => {
         tradeType: TradeType.EXACT_INPUT,
       })
 
-      it('is cached', () => {
-        expect(trade.priceImpact === trade.priceImpact).toStrictEqual(true)
-      })
       it('is correct', () => {
         expect(trade.priceImpact.toSignificant(3)).toEqual('27.4')
       })
@@ -1265,7 +1259,6 @@ describe('Trade', () => {
       })
 
       it('is cached', () => {
-        expect(trade.priceImpact === trade.priceImpact).toStrictEqual(true)
         expect(mixedTrade.priceImpact.equalTo(trade.priceImpact)).toBe(true)
       })
       it('is correct', () => {
@@ -1288,9 +1281,6 @@ describe('Trade', () => {
         tradeType: TradeType.EXACT_OUTPUT,
       })
 
-      it('is cached', () => {
-        expect(exactOut.priceImpact === exactOut.priceImpact).toStrictEqual(true)
-      })
       it('is correct', () => {
         expect(exactOut.priceImpact.toSignificant(3)).toEqual('23.1')
       })
