@@ -6,6 +6,12 @@ import { ResolvedOrder } from "../utils/OrderQuoter";
 
 import { CustomOrderValidation, parseValidation } from "./validation";
 
+export abstract class V2Order {
+  abstract info: OrderInfo;
+
+  abstract chainId: number;
+}
+
 export abstract class Order {
   // TODO: maybe add generic types for more order-type specific info
   abstract info: OrderInfo;
@@ -75,4 +81,27 @@ export type OrderInfo = {
 export type OrderResolutionOptions = {
   timestamp: number;
   filler?: string;
+};
+
+export type DutchOutput = {
+  readonly token: string;
+  readonly startAmount: BigNumber;
+  readonly endAmount: BigNumber;
+  readonly recipient: string;
+};
+
+export type DutchOutputJSON = Omit<DutchOutput, "startAmount" | "endAmount"> & {
+  startAmount: string;
+  endAmount: string;
+};
+
+export type DutchInput = {
+  readonly token: string;
+  readonly startAmount: BigNumber;
+  readonly endAmount: BigNumber;
+};
+
+export type DutchInputJSON = Omit<DutchInput, "startAmount" | "endAmount"> & {
+  startAmount: string;
+  endAmount: string;
 };
