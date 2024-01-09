@@ -24,7 +24,7 @@ import { InsufficientInputAmountError, InsufficientReservesError } from '../erro
 export const computePairAddress = ({
   factoryAddress,
   tokenA,
-  tokenB
+  tokenB,
 }: {
   factoryAddress: string
   tokenA: Token
@@ -225,7 +225,7 @@ export class Pair {
 
     return [
       outputAmountAfterTax,
-      new Pair(inputReserve.add(inputAmountAfterTax), outputReserve.subtract(outputAmountAfterTax))
+      new Pair(inputReserve.add(inputAmountAfterTax), outputReserve.subtract(outputAmountAfterTax)),
     ]
   }
 

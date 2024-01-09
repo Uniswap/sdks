@@ -7,7 +7,7 @@ import {
   Percent,
   Price,
   sortedInsert,
-  TradeType
+  TradeType,
 } from '@uniswap/sdk-core'
 import { ONE, ZERO } from '../constants'
 import invariant from 'tiny-invariant'
@@ -205,8 +205,9 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     if (this.tradeType === TradeType.EXACT_INPUT) {
       return this.inputAmount
     } else {
-      const slippageAdjustedAmountIn = new Fraction(ONE).add(slippageTolerance).multiply(this.inputAmount.quotient)
-        .quotient
+      const slippageAdjustedAmountIn = new Fraction(ONE)
+        .add(slippageTolerance)
+        .multiply(this.inputAmount.quotient).quotient
       return CurrencyAmount.fromRawAmount(this.inputAmount.currency, slippageAdjustedAmountIn)
     }
   }
@@ -250,7 +251,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       let amountOut: CurrencyAmount<Token>
       try {
         ;[amountOut] = pair.getOutputAmount(amountIn)
-      } catch (error) {
+      } catch (error: any) {
         // input too low
         if (error.isInsufficientInputAmountError) {
           continue
@@ -279,7 +280,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
           currencyOut,
           {
             maxNumResults,
-            maxHops: maxHops - 1
+            maxHops: maxHops - 1,
           },
           [...currentPairs, pair],
           amountOut,
@@ -344,7 +345,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       let amountIn: CurrencyAmount<Token>
       try {
         ;[amountIn] = pair.getInputAmount(amountOut)
-      } catch (error) {
+      } catch (error: any) {
         // not enough liquidity in this pair
         if (error.isInsufficientReservesError) {
           continue
@@ -373,7 +374,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
           currencyAmountOut,
           {
             maxNumResults,
-            maxHops: maxHops - 1
+            maxHops: maxHops - 1,
           },
           [pair, ...currentPairs],
           amountIn,
