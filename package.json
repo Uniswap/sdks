@@ -33,6 +33,7 @@
     "g:typecheck": "turbo run typecheck"
   },
   "workspaces": [
-    "sdks/*"
+    "sdks/*",
+    "sdks/uniswapx-sdk/integration"
   ]
 }
