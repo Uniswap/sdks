@@ -15,6 +15,7 @@
   "scripts": {
     "build": "tsdx build",
     "interop": "yarn node writeInterop.js",
+    "lint": "prettier --check src/",
     "release": "semantic-release",
     "start": "tsdx watch",
     "test": "tsdx test --testPathIgnorePatterns=/permit2/"
