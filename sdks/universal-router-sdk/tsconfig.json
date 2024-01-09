@@ -10,9 +10,16 @@
     "outDir": "dist",
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "lib": ["esnext.string"],
-    "typeRoots": ["./typechain", "./node_modules/@types"],
-    "types": ["@types/mocha", "node"]
+    "lib": [
+      "esnext.string"
+    ],
+    "types": [
+      "@types/mocha",
+      "node"
+    ]
   },
-  "include": ["src", "test"]
+  "include": [
+    "src",
+    "test"
+  ]
 }

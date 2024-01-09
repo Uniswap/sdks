@@ -5,7 +5,6 @@ import { TradeConfig } from '../Command'
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
 import { BigNumber } from 'ethers'
 import { ZERO_ADDRESS } from '../../utils/constants'
-import { ZERO } from '@uniswap/router-sdk'
 
 export interface Fee {
   recipient: string

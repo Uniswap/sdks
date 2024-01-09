@@ -1,5 +1,5 @@
 import JSBI from 'jsbi'
-import { ethers } from 'ethers'
+import { BigNumber, ethers } from 'ethers'
 import { MixedRouteTrade, MixedRouteSDK, Trade as RouterTrade } from '@uniswap/router-sdk'
 import { Trade as V2Trade, Pair, Route as RouteV2, computePairAddress } from '@uniswap/v2-sdk'
 import {

@@ -87,5 +87,8 @@
         }
       ]
     ]
+  },
+  "installConfig": {
+    "hoistingLimits": "workspaces"
   }
 }
