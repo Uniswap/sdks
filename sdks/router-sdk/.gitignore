@@ -1,5 +1,5 @@
-#build 
+# build 
 dist
 
-#dependencies
+# dependencies
 node_modules

@@ -2,6 +2,7 @@ import { Ether } from './ether'
 
 describe('Ether', () => {
   it('static constructor uses cache', () => {
+    // eslint-disable-next-line no-self-compare
     expect(Ether.onChain(1) === Ether.onChain(1)).toEqual(true)
   })
   it('caches once per chain ID', () => {
