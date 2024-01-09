@@ -18,6 +18,7 @@
   },
   "scripts": {
     "build": "tsdx build",
+    "lint": "tsdx lint src",
     "release": "semantic-release",
     "start": "tsdx watch",
     "test": "tsdx test"
@@ -35,6 +36,7 @@
   "devDependencies": {
     "@types/jest": "^24.0.25",
     "@uniswap/v3-core": "^1.0.0",
+    "babel-jest": "25.5.1",
     "tsdx": "^0.14.1"
   },
   "resolutions": {

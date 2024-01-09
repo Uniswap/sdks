@@ -71,7 +71,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
    * i.e. which pools the trade goes through.
    */
   public get route(): Route<TInput, TOutput> {
-    invariant(this.swaps.length == 1, 'MULTIPLE_ROUTES')
+    invariant(this.swaps.length === 1, 'MULTIPLE_ROUTES')
     return this.swaps[0].route
   }
 
@@ -259,7 +259,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
 
     return new Trade({
       routes: [{ inputAmount, outputAmount, route }],
-      tradeType
+      tradeType,
     })
   }
 
@@ -330,7 +330,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
 
     return new Trade({
       routes: populatedRoutes,
-      tradeType
+      tradeType,
     })
   }
 
@@ -359,9 +359,9 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
         {
           inputAmount: constructorArguments.inputAmount,
           outputAmount: constructorArguments.outputAmount,
-          route: constructorArguments.route
-        }
-      ]
+          route: constructorArguments.route,
+        },
+      ],
     })
   }
 
@@ -396,7 +396,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
    */
   private constructor({
     routes,
-    tradeType
+    tradeType,
   }: {
     routes: {
       route: Route<TInput, TOutput>
@@ -424,7 +424,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       }
     }
 
-    invariant(numPools == poolAddressSet.size, 'POOLS_DUPLICATED')
+    invariant(numPools === poolAddressSet.size, 'POOLS_DUPLICATED')
 
     this.swaps = routes
     this.tradeType = tradeType
@@ -516,7 +516,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       let amountOut: CurrencyAmount<Token>
       try {
         ;[amountOut] = await pool.getOutputAmount(amountIn)
-      } catch (error) {
+      } catch (error: any) {
         // input too low
         if (error.isInsufficientInputAmountError) {
           continue
@@ -545,7 +545,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
           currencyOut,
           {
             maxNumResults,
-            maxHops: maxHops - 1
+            maxHops: maxHops - 1,
           },
           [...currentPools, pool],
           amountOut,
@@ -597,7 +597,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       let amountIn: CurrencyAmount<Token>
       try {
         ;[amountIn] = await pool.getInputAmount(amountOut)
-      } catch (error) {
+      } catch (error: any) {
         // not enough liquidity in this pool
         if (error.isInsufficientReservesError) {
           continue
@@ -626,7 +626,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
           currencyAmountOut,
           {
             maxNumResults,
-            maxHops: maxHops - 1
+            maxHops: maxHops - 1,
           },
           [pool, ...currentPools],
           amountIn,

@@ -143,6 +143,7 @@ __metadata:
     "@uniswap/v3-core": ^1.0.0
     "@uniswap/v3-periphery": ^1.1.1
     "@uniswap/v3-staker": 1.0.0
+    babel-jest: 25.5.1
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
     tsdx: ^0.14.1
@@ -6030,7 +6031,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"babel-jest@npm:^25.5.1":
+"babel-jest@npm:25.5.1, babel-jest@npm:^25.5.1":
   version: 25.5.1
   resolution: "babel-jest@npm:25.5.1"
   dependencies:
