@@ -251,9 +251,9 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       let amountOut: CurrencyAmount<Token>
       try {
         ;[amountOut] = pair.getOutputAmount(amountIn)
-      } catch (error: any) {
+      } catch (error) {
         // input too low
-        if (error.isInsufficientInputAmountError) {
+        if ((error as any).isInsufficientInputAmountError) {
           continue
         }
         throw error
@@ -345,9 +345,9 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       let amountIn: CurrencyAmount<Token>
       try {
         ;[amountIn] = pair.getInputAmount(amountOut)
-      } catch (error: any) {
+      } catch (error) {
         // not enough liquidity in this pair
-        if (error.isInsufficientReservesError) {
+        if ((error as any).isInsufficientReservesError) {
           continue
         }
         throw error
