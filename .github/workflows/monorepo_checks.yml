@@ -1,0 +1,39 @@
+name: "Code Quality Checks"
+
+on:
+  workflow_call:
+
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+jobs:
+  build-and-test:
+    name: Lint, Build, and Test
+    runs-on: ubuntu-latest
+    env:
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+    defaults:
+      run:
+        working-directory: ./
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
+        with:
+          fetch-depth: 2
+
+      - name: 📥 Install
+        uses: ./.github/actions/monorepo_yarn_install
+
+      - name: 🔬 Lint
+        run: yarn g:lint
+
+      - name: 🏗  Build
+        run: yarn g:build
+
+      - name: 🧪 Unit Tests
+        run: yarn g:test
