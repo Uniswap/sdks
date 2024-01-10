@@ -1,6 +1,4 @@
 import { SignatureLike } from "@ethersproject/bytes";
-import { keccak256 } from "@ethersproject/keccak256";
-import { toUtf8Bytes } from "@ethersproject/strings";
 import {
   PermitTransferFrom,
   PermitTransferFromData,
@@ -9,7 +7,7 @@ import {
 } from "@uniswap/permit2-sdk";
 import { BigNumber, ethers } from "ethers";
 
-import { BPS, PERMIT2_MAPPING } from "../constants";
+import { PERMIT2_MAPPING } from "../constants";
 import { MissingConfiguration } from "../errors";
 import { ResolvedOrder } from "../utils/OrderQuoter";
 import { getDecayedAmount } from "../utils/dutchDecay";
@@ -23,12 +21,6 @@ import {
   OrderInfo,
   OrderResolutionOptions,
 } from "./types";
-
-const STRICT_EXCLUSIVITY = BigNumber.from(0);
-
-export function id(text: string): string {
-  return keccak256(toUtf8Bytes(text));
-}
 
 export type CosignerData = {
   decayStartTime: number;
@@ -97,7 +89,7 @@ string internal constant PERMIT2_ORDER_TYPE = string(
 */
 
 const V2_DUTCH_ORDER_TYPES = {
-  ExclusiveDutchOrder: [
+  V2DutchOrder: [
     { name: "info", type: "OrderInfo" },
     { name: "cosigner", type: "address" },
     { name: "inputToken", type: "address" },
@@ -225,8 +217,8 @@ export class V2DutchOrder extends Order {
         additionalValidationData,
         cosigner,
         cosignerData: {
-          decayStartTime,
-          decayEndTime,
+          decayStartTime: decayStartTime.toNumber(),
+          decayEndTime: decayEndTime.toNumber(),
           exclusiveFiller,
           inputOverride,
           outputOverrides,
@@ -381,10 +373,6 @@ export class V2DutchOrder extends Order {
    * @inheritdoc Order
    */
   resolve(options: OrderResolutionOptions): ResolvedOrder {
-    const useOverride =
-      this.info.cosignerData.exclusiveFiller !== ethers.constants.AddressZero &&
-      options.timestamp <= this.info.cosignerData.decayStartTime &&
-      options.filler !== this.info.cosignerData.exclusiveFiller;
     return {
       input: {
         token: this.info.input.token,
@@ -392,36 +380,24 @@ export class V2DutchOrder extends Order {
           {
             decayStartTime: this.info.cosignerData.decayStartTime,
             decayEndTime: this.info.cosignerData.decayEndTime,
-            startAmount: this.info.input.startAmount,
+            startAmount: this.info.cosignerData.inputOverride,
             endAmount: this.info.input.endAmount,
           },
           options.timestamp
         ),
       },
-      outputs: this.info.outputs.map((output) => {
-        const baseAmount = getDecayedAmount(
-          {
-            decayStartTime: this.info.cosignerData.decayStartTime,
-            decayEndTime: this.info.cosignerData.decayEndTime,
-            startAmount: output.startAmount,
-            endAmount: output.endAmount,
-          },
-          options.timestamp
-        );
-        let amount = baseAmount;
-        // strict exclusivity means the order cant be resolved filled at any price
-        if (useOverride) {
-          if (this.info.exclusivityOverrideBps.eq(STRICT_EXCLUSIVITY)) {
-            amount = ethers.constants.MaxUint256;
-          } else {
-            amount = baseAmount
-              .mul(this.info.exclusivityOverrideBps.add(BPS))
-              .div(BPS);
-          }
-        }
+      outputs: this.info.outputs.map((output, idx) => {
         return {
           token: output.token,
-          amount,
+          amount: getDecayedAmount(
+            {
+              decayStartTime: this.info.cosignerData.decayStartTime,
+              decayEndTime: this.info.cosignerData.decayEndTime,
+              startAmount: this.info.cosignerData.outputOverrides[idx],
+              endAmount: output.endAmount,
+            },
+            options.timestamp
+          ),
         };
       }),
     };
