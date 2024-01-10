@@ -14,34 +14,19 @@ import { MissingConfiguration } from "../errors";
 import { ResolvedOrder } from "../utils/OrderQuoter";
 import { getDecayedAmount } from "../utils/dutchDecay";
 
-import { Order, OrderInfo, OrderResolutionOptions } from "./types";
+import {
+  DutchInput,
+  DutchInputJSON,
+  DutchOutput,
+  DutchOutputJSON,
+  Order,
+  OrderInfo,
+  OrderResolutionOptions,
+} from "./types";
 
 export function id(text: string): string {
   return keccak256(toUtf8Bytes(text));
 }
-
-export type DutchOutput = {
-  readonly token: string;
-  readonly startAmount: BigNumber;
-  readonly endAmount: BigNumber;
-  readonly recipient: string;
-};
-
-export type DutchOutputJSON = Omit<DutchOutput, "startAmount" | "endAmount"> & {
-  startAmount: string;
-  endAmount: string;
-};
-
-export type DutchInput = {
-  readonly token: string;
-  readonly startAmount: BigNumber;
-  readonly endAmount: BigNumber;
-};
-
-export type DutchInputJSON = Omit<DutchInput, "startAmount" | "endAmount"> & {
-  startAmount: string;
-  endAmount: string;
-};
 
 export type DutchOrderInfo = OrderInfo & {
   decayStartTime: number;
