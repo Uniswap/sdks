@@ -43,5 +43,5 @@ jobs:
       - name: 🏗  Build
         run: yarn g:build
 
-      - name: 🧪 Unit Tests
+      - name: 🧪 Testing
         run: yarn g:test
