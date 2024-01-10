@@ -59,6 +59,19 @@ export abstract class Order {
 
 export abstract class V2Order extends Order {
   /**
+   * Recovers the signer (user) that signed over the inner order
+   *  * @param signature The signature to recover
+   *  * @returns address The address which created the signature
+   */
+  abstract getSigner(signature: SignatureLike): string;
+
+  /**
+   * Returns the abi encoded full order, including cosigned data, cosignature, etc
+   * @return The abi encoded serialized order which can be submitted on-chain
+   */
+  abstract serialize(): string;
+
+  /**
    * Recovers the cosigner address that signed over the full order
    * @param fullOrderHash The full order hash over (orderHash || cosignerData)
    * @returns address The cosigner address
