@@ -43,6 +43,11 @@ jobs:
       - name: 🏗  Build
         run: yarn g:build
 
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
       - name: 🧪 Testing
         run: yarn g:test
         env:
