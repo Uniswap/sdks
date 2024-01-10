@@ -17,9 +17,9 @@ import {
   DutchInputJSON,
   DutchOutput,
   DutchOutputJSON,
-  Order,
   OrderInfo,
   OrderResolutionOptions,
+  V2Order,
 } from "./types";
 
 export type CosignerData = {
@@ -65,29 +65,6 @@ type V2WitnessInfo = {
   outputs: DutchOutput[];
 };
 
-/*
-  bytes internal constant V2_DUTCH_ORDER_TYPE = abi.encodePacked(
-      "V2DutchOrder(",
-      "OrderInfo info,",
-      "address cosigner,",
-      "address inputToken,",
-      "uint256 inputStartAmount,",
-      "uint256 inputEndAmount,",
-      "DutchOutput[] outputs)"
-  );
-
-/// @dev Note that sub-structs have to be defined in alphabetical order in the EIP-712 spec
-string internal constant PERMIT2_ORDER_TYPE = string(
-    abi.encodePacked(
-        "V2DutchOrder witness)",
-        DutchOrderLib.DUTCH_OUTPUT_TYPE,
-        OrderInfoLib.ORDER_INFO_TYPE,
-        DutchOrderLib.TOKEN_PERMISSIONS_TYPE,
-        V2_DUTCH_ORDER_TYPE
-    )
-);
-*/
-
 const V2_DUTCH_ORDER_TYPES = {
   V2DutchOrder: [
     { name: "info", type: "OrderInfo" },
@@ -126,7 +103,7 @@ const V2_DUTCH_ORDER_ABI = [
     ")",
 ];
 
-export class V2DutchOrder extends Order {
+export class V2DutchOrder extends V2Order {
   public permit2Address: string;
 
   constructor(
@@ -351,6 +328,16 @@ export class V2DutchOrder extends Order {
   /**
    * @inheritdoc Order
    */
+  recoverCosigner(
+    fullOrderHash: string,
+    cosignature: string = this.info.cosignature
+  ): string {
+    return ethers.utils.verifyMessage(fullOrderHash, cosignature);
+  }
+
+  /**
+   * @inheritdoc Order
+   */
   permitData(): PermitTransferFromData {
     return SignatureTransfer.getPermitData(
       this.toPermit(),
@@ -367,6 +354,29 @@ export class V2DutchOrder extends Order {
     return ethers.utils._TypedDataEncoder
       .from(V2_DUTCH_ORDER_TYPES)
       .hash(this.witnessInfo());
+  }
+
+  /**
+   * @inheritdoc Order
+   */
+  hashFullOrder(): string {
+    const abiCoder = new ethers.utils.AbiCoder();
+    return ethers.utils.solidityKeccak256(
+      ["bytes32", "bytes"],
+      [
+        this.hash(),
+        abiCoder.encode(
+          ["uint256", "uint256", "address", "uint256", "uint256[]"],
+          [
+            this.info.cosignerData.decayStartTime,
+            this.info.cosignerData.decayEndTime,
+            this.info.cosignerData.exclusiveFiller,
+            this.info.cosignerData.inputOverride,
+            this.info.cosignerData.outputOverrides,
+          ]
+        ),
+      ]
+    );
   }
 
   /**

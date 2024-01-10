@@ -6,12 +6,6 @@ import { ResolvedOrder } from "../utils/OrderQuoter";
 
 import { CustomOrderValidation, parseValidation } from "./validation";
 
-export abstract class V2Order {
-  abstract info: OrderInfo;
-
-  abstract chainId: number;
-}
-
 export abstract class Order {
   // TODO: maybe add generic types for more order-type specific info
   abstract info: OrderInfo;
@@ -61,6 +55,20 @@ export abstract class Order {
   get validation(): CustomOrderValidation {
     return parseValidation(this.info);
   }
+}
+
+export abstract class V2Order extends Order {
+  /**
+   * Recovers the cosigner address that signed over the full order
+   * @param fullOrderHash The full order hash over (orderHash || cosignerData)
+   * @returns address The cosigner address
+   */
+  abstract recoverCosigner(fullOrderHash: string): string;
+
+  /**
+   * @return Returns the full order hash over (orderHash || cosignerData)
+   */
+  abstract hashFullOrder(): string;
 }
 
 export type TokenAmount = {
