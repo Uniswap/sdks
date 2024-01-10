@@ -26,8 +26,16 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: 📥 Install
-        uses: ./.github/actions/monorepo_yarn_install
+      - name: 📥 yarn install
+        shell: bash
+        working-directory: ./
+        run: |
+          yarn --immutable
+        env:
+          # CI optimizations. Overrides yarnrc.yml options (or their defaults) in the CI action.
+          YARN_ENABLE_GLOBAL_CACHE: "false" # Use local cache folder to keep downloaded archives
+          YARN_NM_MODE: "hardlinks-local" # Hardlinks-local reduces io / node_modules size
+          HUSKY: "0" # By default do not run HUSKY install
 
       - name: 🔬 Lint
         run: yarn g:lint
