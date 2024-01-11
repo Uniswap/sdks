@@ -43,7 +43,7 @@ export type V2DutchOrderInfo = OrderInfo & {
   cosignerData: CosignerData;
   input: DutchInput;
   outputs: DutchOutput[];
-  cosignature: string;
+  cosignature?: string;
 };
 
 export type V2DutchOrderInfoJSON = Omit<
@@ -328,16 +328,6 @@ export class V2DutchOrder extends V2Order {
   /**
    * @inheritdoc Order
    */
-  recoverCosigner(
-    fullOrderHash: string,
-    cosignature: string = this.info.cosignature
-  ): string {
-    return ethers.utils.verifyMessage(fullOrderHash, cosignature);
-  }
-
-  /**
-   * @inheritdoc Order
-   */
   permitData(): PermitTransferFromData {
     return SignatureTransfer.getPermitData(
       this.toPermit(),
@@ -450,5 +440,44 @@ export class V2DutchOrder extends V2Order {
       witnessTypeName: "V2DutchOrder",
       witnessType: V2_DUTCH_ORDER_TYPES,
     };
+  }
+}
+
+export class CosignedV2DutchOrder extends V2DutchOrder {
+  constructor(
+    public readonly info: Omit<V2DutchOrderInfo, "cosignature"> & {
+      cosignature: string;
+    },
+    public readonly chainId: number,
+    readonly _permit2Address?: string
+  ) {
+    super(info, chainId, _permit2Address);
+  }
+
+  static fromUnsignedOrder(
+    order: V2DutchOrder,
+    cosignature: string
+  ): CosignedV2DutchOrder {
+    return new CosignedV2DutchOrder(
+      {
+        ...order.info,
+        cosignature,
+      },
+      order.chainId,
+      order.permit2Address
+    );
+  }
+
+  /**
+   *  recovers co-signer address from cosignature and full order hash
+   *  @param fullOrderHash The full order hash over (orderHash || cosignerData)
+   *  @param cosignature The cosignature to recover
+   *  @returns The address which co-signed the order
+   */
+  recoverCosigner(
+    fullOrderHash: string,
+    cosignature: string = this.info.cosignature
+  ): string {
+    return ethers.utils.verifyMessage(fullOrderHash, cosignature);
   }
 }

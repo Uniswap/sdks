@@ -1,6 +1,10 @@
 import { BigNumber, ethers } from "ethers";
 
-import { V2DutchOrder, V2DutchOrderInfo } from "./V2DutchOrder";
+import {
+  CosignedV2DutchOrder,
+  V2DutchOrder,
+  V2DutchOrderInfo,
+} from "./V2DutchOrder";
 
 const RAW_AMOUNT = BigNumber.from("1000000");
 const INPUT_TOKEN = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
@@ -70,7 +74,12 @@ describe("V2DutchOrder", () => {
     );
     const fullOrderHash = order.hashFullOrder();
     const cosignature = await wallet.signMessage(fullOrderHash);
-    expect(order.recoverCosigner(fullOrderHash, cosignature)).toEqual(
+    const signedOrder = CosignedV2DutchOrder.fromUnsignedOrder(
+      order,
+      cosignature
+    );
+
+    expect(signedOrder.recoverCosigner(fullOrderHash, cosignature)).toEqual(
       await wallet.getAddress()
     );
   });
