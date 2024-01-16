@@ -336,6 +336,19 @@ export class V2DutchOrder extends V2Order {
   }
 
   /**
+   *  recovers co-signer address from cosignature and full order hash
+   *  @param fullOrderHash The full order hash over (orderHash || cosignerData)
+   *  @param cosignature The cosignature to recover
+   *  @returns The address which co-signed the order
+   */
+  recoverCosigner(
+    fullOrderHash: string,
+    cosignature: string = this.info.cosignature ?? "0x"
+  ): string {
+    return ethers.utils.verifyMessage(fullOrderHash, cosignature);
+  }
+
+  /**
    * @inheritdoc Order
    */
   permitData(): PermitTransferFromData {
@@ -392,7 +405,10 @@ export class V2DutchOrder extends V2Order {
           {
             decayStartTime: this.info.cosignerData.decayStartTime,
             decayEndTime: this.info.cosignerData.decayEndTime,
-            startAmount: this.info.cosignerData.inputOverride,
+            startAmount: originalIfZero(
+              this.info.cosignerData.inputOverride,
+              this.info.input.startAmount
+            ),
             endAmount: this.info.input.endAmount,
           },
           options.timestamp
@@ -405,7 +421,10 @@ export class V2DutchOrder extends V2Order {
             {
               decayStartTime: this.info.cosignerData!.decayStartTime,
               decayEndTime: this.info.cosignerData!.decayEndTime,
-              startAmount: this.info.cosignerData!.outputOverrides[idx],
+              startAmount: originalIfZero(
+                this.info.cosignerData!.outputOverrides[idx],
+                output.startAmount
+              ),
               endAmount: output.endAmount,
             },
             options.timestamp
@@ -485,17 +504,8 @@ export class CosignedV2DutchOrder extends V2DutchOrder {
       order.permit2Address
     );
   }
+}
 
-  /**
-   *  recovers co-signer address from cosignature and full order hash
-   *  @param fullOrderHash The full order hash over (orderHash || cosignerData)
-   *  @param cosignature The cosignature to recover
-   *  @returns The address which co-signed the order
-   */
-  recoverCosigner(
-    fullOrderHash: string,
-    cosignature: string = this.info.cosignature
-  ): string {
-    return ethers.utils.verifyMessage(fullOrderHash, cosignature);
-  }
+function originalIfZero(value: BigNumber, original: BigNumber): BigNumber {
+  return value.isZero() ? original : value;
 }

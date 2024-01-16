@@ -106,6 +106,30 @@ describe("V2DutchOrder", () => {
       );
     });
 
+    it("resolves with original value when overrides == 0", () => {
+      const order = new V2DutchOrder(
+        getOrderInfo({
+          cosignerData: {
+            decayStartTime: Math.floor(new Date().getTime() / 1000),
+            decayEndTime: Math.floor(new Date().getTime() / 1000) + 1000,
+            exclusiveFiller: ethers.constants.AddressZero,
+            inputOverride: BigNumber.from(0),
+            outputOverrides: [BigNumber.from(0)],
+          },
+        }),
+        1
+      );
+      const resolved = order.resolve({
+        timestamp: order.info.cosignerData.decayStartTime - 100,
+      });
+      expect(resolved.input.token).toEqual(order.info.input.token);
+      expect(resolved.input.amount).toEqual(order.info.input.startAmount);
+      expect(resolved.outputs[0].token).toEqual(order.info.outputs[0].token);
+      expect(resolved.outputs[0].amount).toEqual(
+        order.info.outputs[0].startAmount
+      );
+    });
+
     it("resolves at decayStartTime", () => {
       const order = new CosignedV2DutchOrder(getFullOrderInfo({}), 1);
       const resolved = order.resolve({
