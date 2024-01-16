@@ -135,6 +135,7 @@ export class V2DutchOrder extends V2Order {
     chainId: number,
     _permit2Address?: string
   ): V2DutchOrder {
+    const defaultCosignerData = cosignderDataOrDefault(json.cosignerData);
     return new V2DutchOrder(
       {
         ...json,
@@ -150,10 +151,10 @@ export class V2DutchOrder extends V2Order {
           endAmount: BigNumber.from(output.endAmount),
           recipient: output.recipient,
         })),
-        cosignerData: json.cosignerData && {
-          ...json.cosignerData,
-          inputOverride: BigNumber.from(json.cosignerData.inputOverride),
-          outputOverrides: json.cosignerData.outputOverrides.map((value) =>
+        cosignerData: {
+          ...defaultCosignerData,
+          inputOverride: BigNumber.from(defaultCosignerData.inputOverride),
+          outputOverrides: defaultCosignerData.outputOverrides.map((value) =>
             BigNumber.from(value)
           ),
         },
@@ -508,4 +509,19 @@ export class CosignedV2DutchOrder extends V2DutchOrder {
 
 function originalIfZero(value: BigNumber, original: BigNumber): BigNumber {
   return value.isZero() ? original : value;
+}
+
+function cosignderDataOrDefault(
+  data: CosignerDataJSON | undefined
+): CosignerDataJSON {
+  if (data == undefined) {
+    return {
+      decayStartTime: 0,
+      decayEndTime: 0,
+      exclusiveFiller: ethers.constants.AddressZero,
+      inputOverride: "0",
+      outputOverrides: ["0"],
+    };
+  }
+  return data;
 }

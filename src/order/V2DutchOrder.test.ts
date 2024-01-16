@@ -60,6 +60,39 @@ describe("V2DutchOrder", () => {
     expect(parsed.info).toEqual(orderInfo);
   });
 
+  it("parses the inner v2 order with no cosignerOverrides", () => {
+    const orderInfoJSON = {
+      ...getOrderInfo({}),
+      nonce: "10",
+      input: {
+        token: INPUT_TOKEN,
+        startAmount: "1000000",
+        endAmount: "1000000",
+      },
+      outputs: [
+        {
+          token: OUTPUT_TOKEN,
+          startAmount: "1000000",
+          endAmount: "900000",
+          recipient: ethers.constants.AddressZero,
+        },
+      ],
+      cosignerData: undefined,
+    };
+    const order = V2DutchOrder.fromJSON(orderInfoJSON, 1);
+    expect(order.info.input.startAmount).toEqual(BigNumber.from("1000000"));
+    expect(order.info.outputs[0].startAmount).toEqual(
+      BigNumber.from("1000000")
+    );
+    expect(order.info.cosignerData).toEqual({
+      decayStartTime: 0,
+      decayEndTime: 0,
+      exclusiveFiller: ethers.constants.AddressZero,
+      inputOverride: BigNumber.from(0),
+      outputOverrides: [BigNumber.from(0)],
+    });
+  });
+
   it("valid signature over inner order", async () => {
     const order = new V2DutchOrder(getFullOrderInfo({}), 1);
     const wallet = ethers.Wallet.createRandom();
