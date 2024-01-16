@@ -57,6 +57,33 @@ export abstract class Order {
   }
 }
 
+export abstract class V2Order extends Order {
+  /**
+   * Recovers the signer (user) that signed over the inner order
+   *  * @param signature The signature to recover
+   *  * @returns address The address which created the signature
+   */
+  abstract getSigner(signature: SignatureLike): string;
+
+  /**
+   * Returns the abi encoded full order, including cosigned data, cosignature, etc
+   * @return The abi encoded serialized order which can be submitted on-chain
+   */
+  abstract serialize(): string;
+
+  /**
+   * Recovers the cosigner address that signed over the full order
+   * @param fullOrderHash The full order hash over (orderHash || cosignerData)
+   * @returns address The cosigner address
+   */
+  abstract recoverCosigner(fullOrderHash: string): string;
+
+  /**
+   * @return Returns the full order hash over (orderHash || cosignerData)
+   */
+  abstract hashFullOrder(): string;
+}
+
 export type TokenAmount = {
   readonly token: string;
   readonly amount: BigNumber;
@@ -75,4 +102,27 @@ export type OrderInfo = {
 export type OrderResolutionOptions = {
   timestamp: number;
   filler?: string;
+};
+
+export type DutchOutput = {
+  readonly token: string;
+  readonly startAmount: BigNumber;
+  readonly endAmount: BigNumber;
+  readonly recipient: string;
+};
+
+export type DutchOutputJSON = Omit<DutchOutput, "startAmount" | "endAmount"> & {
+  startAmount: string;
+  endAmount: string;
+};
+
+export type DutchInput = {
+  readonly token: string;
+  readonly startAmount: BigNumber;
+  readonly endAmount: BigNumber;
+};
+
+export type DutchInputJSON = Omit<DutchInput, "startAmount" | "endAmount"> & {
+  startAmount: string;
+  endAmount: string;
 };

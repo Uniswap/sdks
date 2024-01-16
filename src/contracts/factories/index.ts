@@ -7,5 +7,6 @@ export { MockERC20__factory } from "./MockERC20__factory";
 export { OrderQuoter__factory } from "./OrderQuoter__factory";
 export { Permit2__factory } from "./Permit2__factory";
 export { SwapRouter02Executor__factory } from "./SwapRouter02Executor__factory";
+export { V2DutchOrderReactor__factory } from "./V2DutchOrderReactor__factory";
 export { DeploylessMulticall2__factory } from "./DeploylessMulticall2__factory";
 export { Multicall2__factory } from "./Multicall2__factory";

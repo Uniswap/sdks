@@ -1,6 +1,4 @@
 import { SignatureLike } from "@ethersproject/bytes";
-import { keccak256 } from "@ethersproject/keccak256";
-import { toUtf8Bytes } from "@ethersproject/strings";
 import {
   PermitTransferFrom,
   PermitTransferFromData,
@@ -9,7 +7,7 @@ import {
 } from "@uniswap/permit2-sdk";
 import { BigNumber, ethers } from "ethers";
 
-import { BPS, PERMIT2_MAPPING } from "../constants";
+import { PERMIT2_MAPPING } from "../constants";
 import { MissingConfiguration } from "../errors";
 import { ResolvedOrder } from "../utils/OrderQuoter";
 import { getDecayedAmount } from "../utils/dutchDecay";
@@ -19,55 +17,58 @@ import {
   DutchInputJSON,
   DutchOutput,
   DutchOutputJSON,
-  Order,
   OrderInfo,
   OrderResolutionOptions,
+  V2Order,
 } from "./types";
 
-export function id(text: string): string {
-  return keccak256(toUtf8Bytes(text));
-}
-
-export type DutchOrderInfo = OrderInfo & {
+export type CosignerData = {
   decayStartTime: number;
   decayEndTime: number;
   exclusiveFiller: string;
-  exclusivityOverrideBps: BigNumber;
+  inputOverride: BigNumber;
+  outputOverrides: BigNumber[];
+};
+
+export type CosignerDataJSON = {
+  decayStartTime: number;
+  decayEndTime: number;
+  exclusiveFiller: string;
+  inputOverride: string;
+  outputOverrides: string[];
+};
+
+export type V2DutchOrderInfo = OrderInfo & {
+  cosigner: string;
+  cosignerData: CosignerData;
   input: DutchInput;
   outputs: DutchOutput[];
+  cosignature: string;
 };
 
-const STRICT_EXCLUSIVITY = BigNumber.from(0);
-
-export type DutchOrderInfoJSON = Omit<
-  DutchOrderInfo,
-  "nonce" | "input" | "outputs" | "exclusivityOverrideBps"
+export type V2DutchOrderInfoJSON = Omit<
+  V2DutchOrderInfo,
+  "nonce" | "input" | "outputs" | "cosignerData"
 > & {
   nonce: string;
-  exclusivityOverrideBps: string;
   input: DutchInputJSON;
   outputs: DutchOutputJSON[];
+  cosignerData?: CosignerDataJSON;
 };
 
-type WitnessInfo = {
+type V2WitnessInfo = {
   info: OrderInfo;
-  decayStartTime: number;
-  decayEndTime: number;
-  exclusiveFiller: string;
-  exclusivityOverrideBps: BigNumber;
+  cosigner: string;
   inputToken: string;
   inputStartAmount: BigNumber;
   inputEndAmount: BigNumber;
   outputs: DutchOutput[];
 };
 
-const DUTCH_ORDER_TYPES = {
-  ExclusiveDutchOrder: [
+const V2_DUTCH_ORDER_TYPES = {
+  V2DutchOrder: [
     { name: "info", type: "OrderInfo" },
-    { name: "decayStartTime", type: "uint256" },
-    { name: "decayEndTime", type: "uint256" },
-    { name: "exclusiveFiller", type: "address" },
-    { name: "exclusivityOverrideBps", type: "uint256" },
+    { name: "cosigner", type: "address" },
     { name: "inputToken", type: "address" },
     { name: "inputStartAmount", type: "uint256" },
     { name: "inputEndAmount", type: "uint256" },
@@ -89,25 +90,24 @@ const DUTCH_ORDER_TYPES = {
   ],
 };
 
-const DUTCH_ORDER_ABI = [
+const V2_DUTCH_ORDER_ABI = [
   "tuple(" +
     [
-      "tuple(address,address,uint256,uint256,address,bytes)",
-      "uint256",
-      "uint256",
-      "address",
-      "uint256",
-      "tuple(address,uint256,uint256)",
-      "tuple(address,uint256,uint256,address)[]",
+      "tuple(address,address,uint256,uint256,address,bytes)", // OrderInfo
+      "address", // cosigner
+      "tuple(address,uint256,uint256)", // input
+      "tuple(address,uint256,uint256,address)[]", // outputs
+      "tuple(uint256,uint256,address,uint256,uint256[])", // cosignerData
+      "bytes", // cosignature
     ].join(",") +
     ")",
 ];
 
-export class DutchOrder extends Order {
+export class V2DutchOrder extends V2Order {
   public permit2Address: string;
 
   constructor(
-    public readonly info: DutchOrderInfo,
+    public readonly info: V2DutchOrderInfo,
     public readonly chainId: number,
     readonly _permit2Address?: string
   ) {
@@ -122,14 +122,14 @@ export class DutchOrder extends Order {
   }
 
   static fromJSON(
-    json: DutchOrderInfoJSON,
+    json: V2DutchOrderInfoJSON,
     chainId: number,
     _permit2Address?: string
-  ): DutchOrder {
-    return new DutchOrder(
+  ): V2DutchOrder {
+    const defaultCosignerData = cosignderDataOrDefault(json.cosignerData);
+    return new V2DutchOrder(
       {
         ...json,
-        exclusivityOverrideBps: BigNumber.from(json.exclusivityOverrideBps),
         nonce: BigNumber.from(json.nonce),
         input: {
           token: json.input.token,
@@ -142,15 +142,26 @@ export class DutchOrder extends Order {
           endAmount: BigNumber.from(output.endAmount),
           recipient: output.recipient,
         })),
+        cosignerData: {
+          ...defaultCosignerData,
+          inputOverride: BigNumber.from(defaultCosignerData.inputOverride),
+          outputOverrides: defaultCosignerData.outputOverrides.map((value) =>
+            BigNumber.from(value)
+          ),
+        },
       },
       chainId,
       _permit2Address
     );
   }
 
-  static parse(encoded: string, chainId: number, permit2?: string): DutchOrder {
+  static parse(
+    encoded: string,
+    chainId: number,
+    permit2?: string
+  ): V2DutchOrder {
     const abiCoder = new ethers.utils.AbiCoder();
-    const decoded = abiCoder.decode(DUTCH_ORDER_ABI, encoded);
+    const decoded = abiCoder.decode(V2_DUTCH_ORDER_ABI, encoded);
     const [
       [
         [
@@ -161,15 +172,20 @@ export class DutchOrder extends Order {
           additionalValidationContract,
           additionalValidationData,
         ],
-        decayStartTime,
-        decayEndTime,
-        exclusiveFiller,
-        exclusivityOverrideBps,
+        cosigner,
         [inputToken, inputStartAmount, inputEndAmount],
         outputs,
+        [
+          decayStartTime,
+          decayEndTime,
+          exclusiveFiller,
+          inputOverride,
+          outputOverrides,
+        ],
+        cosignature,
       ],
     ] = decoded;
-    return new DutchOrder(
+    return new V2DutchOrder(
       {
         reactor,
         swapper,
@@ -177,10 +193,14 @@ export class DutchOrder extends Order {
         deadline: deadline.toNumber(),
         additionalValidationContract,
         additionalValidationData,
-        decayStartTime: decayStartTime.toNumber(),
-        decayEndTime: decayEndTime.toNumber(),
-        exclusiveFiller,
-        exclusivityOverrideBps,
+        cosigner,
+        cosignerData: {
+          decayStartTime: decayStartTime.toNumber(),
+          decayEndTime: decayEndTime.toNumber(),
+          exclusiveFiller,
+          inputOverride,
+          outputOverrides,
+        },
         input: {
           token: inputToken,
           startAmount: inputStartAmount,
@@ -202,6 +222,7 @@ export class DutchOrder extends Order {
             };
           }
         ),
+        cosignature,
       },
       chainId,
       permit2
@@ -211,7 +232,7 @@ export class DutchOrder extends Order {
   /**
    * @inheritdoc order
    */
-  toJSON(): DutchOrderInfoJSON & {
+  toJSON(): V2DutchOrderInfoJSON & {
     permit2Address: string;
     chainId: number;
   } {
@@ -224,10 +245,6 @@ export class DutchOrder extends Order {
       deadline: this.info.deadline,
       additionalValidationContract: this.info.additionalValidationContract,
       additionalValidationData: this.info.additionalValidationData,
-      decayStartTime: this.info.decayStartTime,
-      decayEndTime: this.info.decayEndTime,
-      exclusiveFiller: this.info.exclusiveFiller,
-      exclusivityOverrideBps: this.info.exclusivityOverrideBps.toString(),
       input: {
         token: this.info.input.token,
         startAmount: this.info.input.startAmount.toString(),
@@ -239,6 +256,17 @@ export class DutchOrder extends Order {
         endAmount: output.endAmount.toString(),
         recipient: output.recipient,
       })),
+      cosigner: this.info.cosigner,
+      cosignerData: {
+        decayStartTime: this.info.cosignerData.decayStartTime,
+        decayEndTime: this.info.cosignerData.decayEndTime,
+        exclusiveFiller: this.info.cosignerData.exclusiveFiller,
+        inputOverride: this.info.cosignerData.inputOverride.toString(),
+        outputOverrides: this.info.cosignerData.outputOverrides.map((value) =>
+          value.toString()
+        ),
+      },
+      cosignature: this.info.cosignature,
     };
   }
 
@@ -247,7 +275,7 @@ export class DutchOrder extends Order {
    */
   serialize(): string {
     const abiCoder = new ethers.utils.AbiCoder();
-    return abiCoder.encode(DUTCH_ORDER_ABI, [
+    return abiCoder.encode(V2_DUTCH_ORDER_ABI, [
       [
         [
           this.info.reactor,
@@ -257,10 +285,7 @@ export class DutchOrder extends Order {
           this.info.additionalValidationContract,
           this.info.additionalValidationData,
         ],
-        this.info.decayStartTime,
-        this.info.decayEndTime,
-        this.info.exclusiveFiller,
-        this.info.exclusivityOverrideBps,
+        this.info.cosigner,
         [
           this.info.input.token,
           this.info.input.startAmount,
@@ -272,6 +297,14 @@ export class DutchOrder extends Order {
           output.endAmount,
           output.recipient,
         ]),
+        [
+          this.info.cosignerData.decayStartTime,
+          this.info.cosignerData.decayEndTime,
+          this.info.cosignerData.exclusiveFiller,
+          this.info.cosignerData.inputOverride,
+          this.info.cosignerData.outputOverrides,
+        ],
+        this.info.cosignature,
       ],
     ]);
   }
@@ -296,6 +329,16 @@ export class DutchOrder extends Order {
   /**
    * @inheritdoc Order
    */
+  recoverCosigner(
+    fullOrderHash: string,
+    cosignature: string = this.info.cosignature
+  ): string {
+    return ethers.utils.verifyMessage(fullOrderHash, cosignature);
+  }
+
+  /**
+   * @inheritdoc Order
+   */
   permitData(): PermitTransferFromData {
     return SignatureTransfer.getPermitData(
       this.toPermit(),
@@ -310,55 +353,68 @@ export class DutchOrder extends Order {
    */
   hash(): string {
     return ethers.utils._TypedDataEncoder
-      .from(DUTCH_ORDER_TYPES)
+      .from(V2_DUTCH_ORDER_TYPES)
       .hash(this.witnessInfo());
   }
 
   /**
    * @inheritdoc Order
    */
+  hashFullOrder(): string {
+    const abiCoder = new ethers.utils.AbiCoder();
+    return ethers.utils.solidityKeccak256(
+      ["bytes32", "bytes"],
+      [
+        this.hash(),
+        abiCoder.encode(
+          ["uint256", "uint256", "address", "uint256", "uint256[]"],
+          [
+            this.info.cosignerData.decayStartTime,
+            this.info.cosignerData.decayEndTime,
+            this.info.cosignerData.exclusiveFiller,
+            this.info.cosignerData.inputOverride,
+            this.info.cosignerData.outputOverrides,
+          ]
+        ),
+      ]
+    );
+  }
+
+  /**
+   * @inheritdoc Order
+   */
   resolve(options: OrderResolutionOptions): ResolvedOrder {
-    const useOverride =
-      this.info.exclusiveFiller !== ethers.constants.AddressZero &&
-      options.timestamp <= this.info.decayStartTime &&
-      options.filler !== this.info.exclusiveFiller;
     return {
       input: {
         token: this.info.input.token,
         amount: getDecayedAmount(
           {
-            decayStartTime: this.info.decayStartTime,
-            decayEndTime: this.info.decayEndTime,
-            startAmount: this.info.input.startAmount,
+            decayStartTime: this.info.cosignerData.decayStartTime,
+            decayEndTime: this.info.cosignerData.decayEndTime,
+            startAmount: originalIfZero(
+              this.info.cosignerData.inputOverride,
+              this.info.input.startAmount
+            ),
             endAmount: this.info.input.endAmount,
           },
           options.timestamp
         ),
       },
-      outputs: this.info.outputs.map((output) => {
-        const baseAmount = getDecayedAmount(
-          {
-            decayStartTime: this.info.decayStartTime,
-            decayEndTime: this.info.decayEndTime,
-            startAmount: output.startAmount,
-            endAmount: output.endAmount,
-          },
-          options.timestamp
-        );
-        let amount = baseAmount;
-        // strict exclusivity means the order cant be resolved filled at any price
-        if (useOverride) {
-          if (this.info.exclusivityOverrideBps.eq(STRICT_EXCLUSIVITY)) {
-            amount = ethers.constants.MaxUint256;
-          } else {
-            amount = baseAmount
-              .mul(this.info.exclusivityOverrideBps.add(BPS))
-              .div(BPS);
-          }
-        }
+      outputs: this.info.outputs.map((output, idx) => {
         return {
           token: output.token,
-          amount,
+          amount: getDecayedAmount(
+            {
+              decayStartTime: this.info.cosignerData.decayStartTime,
+              decayEndTime: this.info.cosignerData.decayEndTime,
+              startAmount: originalIfZero(
+                this.info.cosignerData.outputOverrides[idx],
+                output.startAmount
+              ),
+              endAmount: output.endAmount,
+            },
+            options.timestamp
+          ),
         };
       }),
     };
@@ -376,7 +432,7 @@ export class DutchOrder extends Order {
     };
   }
 
-  private witnessInfo(): WitnessInfo {
+  private witnessInfo(): V2WitnessInfo {
     return {
       info: {
         reactor: this.info.reactor,
@@ -386,10 +442,7 @@ export class DutchOrder extends Order {
         additionalValidationContract: this.info.additionalValidationContract,
         additionalValidationData: this.info.additionalValidationData,
       },
-      decayStartTime: this.info.decayStartTime,
-      decayEndTime: this.info.decayEndTime,
-      exclusiveFiller: this.info.exclusiveFiller,
-      exclusivityOverrideBps: this.info.exclusivityOverrideBps,
+      cosigner: this.info.cosigner,
       inputToken: this.info.input.token,
       inputStartAmount: this.info.input.startAmount,
       inputEndAmount: this.info.input.endAmount,
@@ -401,8 +454,27 @@ export class DutchOrder extends Order {
     return {
       witness: this.witnessInfo(),
       // TODO: remove "Limit"
-      witnessTypeName: "ExclusiveDutchOrder",
-      witnessType: DUTCH_ORDER_TYPES,
+      witnessTypeName: "V2DutchOrder",
+      witnessType: V2_DUTCH_ORDER_TYPES,
     };
   }
+}
+
+function originalIfZero(value: BigNumber, original: BigNumber): BigNumber {
+  return value.isZero() ? original : value;
+}
+
+function cosignderDataOrDefault(
+  data: CosignerDataJSON | undefined
+): CosignerDataJSON {
+  if (data == undefined) {
+    return {
+      decayStartTime: 0,
+      decayEndTime: 0,
+      exclusiveFiller: ethers.constants.AddressZero,
+      inputOverride: "0",
+      outputOverrides: ["0"],
+    };
+  }
+  return data;
 }
