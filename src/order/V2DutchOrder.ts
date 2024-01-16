@@ -390,7 +390,10 @@ export class V2DutchOrder extends V2Order {
           {
             decayStartTime: this.info.cosignerData.decayStartTime,
             decayEndTime: this.info.cosignerData.decayEndTime,
-            startAmount: this.info.cosignerData.inputOverride,
+            startAmount: originalIfZero(
+              this.info.cosignerData.inputOverride,
+              this.info.input.startAmount
+            ),
             endAmount: this.info.input.endAmount,
           },
           options.timestamp
@@ -403,7 +406,10 @@ export class V2DutchOrder extends V2Order {
             {
               decayStartTime: this.info.cosignerData.decayStartTime,
               decayEndTime: this.info.cosignerData.decayEndTime,
-              startAmount: this.info.cosignerData.outputOverrides[idx],
+              startAmount: originalIfZero(
+                this.info.cosignerData.outputOverrides[idx],
+                output.startAmount
+              ),
               endAmount: output.endAmount,
             },
             options.timestamp
@@ -451,4 +457,8 @@ export class V2DutchOrder extends V2Order {
       witnessType: V2_DUTCH_ORDER_TYPES,
     };
   }
+}
+
+function originalIfZero(value: BigNumber, original: BigNumber): BigNumber {
+  return value.isZero() ? original : value;
 }
