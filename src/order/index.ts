@@ -8,6 +8,7 @@ import { Order } from "./types";
 export * from "./DutchOrder";
 export * from "./types";
 export * from "./validation";
+export * from "./V2DutchOrder";
 
 const FIRST_FIELD_OFFSET = 88;
 const ADDRESS_LENGTH = 40;
