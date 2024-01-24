@@ -2,6 +2,7 @@ import { BigNumber, ethers } from "ethers";
 
 import {
   buildNonce,
+  getCancelMultipleParams,
   getCancelSingleParams,
   getFirstUnsetBit,
   setBit,
@@ -149,6 +150,56 @@ describe("NonceManager", () => {
       expect(
         getCancelSingleParams(BigNumber.from(257)).mask.toString()
       ).toEqual("2");
+    });
+  });
+
+  describe("getCancelMultipleParams", () => {
+    it("0, 1", () => {
+      expect(
+        getCancelMultipleParams([BigNumber.from(0), BigNumber.from(1)]).length
+      ).toEqual(1);
+      expect(
+        getCancelMultipleParams([
+          BigNumber.from(0),
+          BigNumber.from(1),
+        ])[0].word.toString()
+      ).toEqual("0");
+      expect(
+        getCancelMultipleParams([
+          BigNumber.from(0),
+          BigNumber.from(1),
+        ])[0].mask.toString()
+      ).toEqual("3");
+    });
+
+    it("0, 256", () => {
+      expect(
+        getCancelMultipleParams([BigNumber.from(0), BigNumber.from(256)]).length
+      ).toEqual(2);
+      expect(
+        getCancelMultipleParams([
+          BigNumber.from(0),
+          BigNumber.from(256),
+        ])[0].word.toString()
+      ).toEqual("0");
+      expect(
+        getCancelMultipleParams([
+          BigNumber.from(0),
+          BigNumber.from(256),
+        ])[1].word.toString()
+      ).toEqual("1");
+      expect(
+        getCancelMultipleParams([
+          BigNumber.from(0),
+          BigNumber.from(256),
+        ])[0].mask.toString()
+      ).toEqual("1");
+      expect(
+        getCancelMultipleParams([
+          BigNumber.from(0),
+          BigNumber.from(256),
+        ])[1].mask.toString()
+      ).toEqual("1");
     });
   });
 });
