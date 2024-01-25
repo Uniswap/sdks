@@ -1,7 +1,7 @@
 {
   "name": "@uniswap/uniswapx-sdk",
   "author": "Uniswap",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "license": "MIT",
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
@@ -19,7 +19,7 @@
     "test": "run-s build test:*",
     "test:lint": "eslint src --ext .ts",
     "test:prettier": "prettier \"src/**/*.ts\" --list-different",
-    "test:unit": "jest --testPathPattern src --detectOpenHandles --forceExit",
+    "test:unit": "jest --testPathPattern src --detectOpenHandles --forceExit --testPathIgnorePatterns dist/",
     "test:integration": "yarn build && cd integration && yarn && yarn test",
     "prepare": "npm run build",
     "typechain": "typechain --target=ethers-v5 --out-dir src/contracts --glob ./abis/**/*.json"
