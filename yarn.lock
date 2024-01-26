@@ -1604,10 +1604,10 @@
   resolved "https://registry.npmjs.org/@uniswap/v2-core/-/v2-core-1.0.1.tgz"
   integrity sha512-MtybtkUPSyysqLY2U210NBDeCHX+ltHt3oADGdjqoThZaFRDKwM6k1Nb3F0A3hk5hwuQvytFWhrWHOEq6nVJ8Q==
 
-"@uniswap/v2-sdk@^4.0.1":
-  version "4.0.1"
-  resolved "https://registry.yarnpkg.com/@uniswap/v2-sdk/-/v2-sdk-4.0.1.tgz#3dc47ba46dbd762e418c3e05880d3f33c3389a22"
-  integrity sha512-3mYejrgPcxzjntqTrd2ZlnCHvbxAkKUUQPQkH1J3bXSxjEjQC93UuMCdD4g9Pfizw0jFku3mN+rz8DiZ+GfSRg==
+"@uniswap/v2-sdk@^4.1.0":
+  version "4.1.0"
+  resolved "https://registry.yarnpkg.com/@uniswap/v2-sdk/-/v2-sdk-4.1.0.tgz#05c18bcef11daeec3224e0fb78e81eeb4e0d31d0"
+  integrity sha512-sIfEF/zYxssjXNum1HBO/vT5rQuDuSuKB3rp23z1V9vZaatkWwW91LwJtlpVh5X0j+nZ+nduBb1pWxeDHdq4Zg==
   dependencies:
     "@ethersproject/address" "^5.0.0"
     "@ethersproject/solidity" "^5.0.0"
