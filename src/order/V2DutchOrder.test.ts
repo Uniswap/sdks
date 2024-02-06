@@ -52,6 +52,36 @@ describe("V2DutchOrder", () => {
     );
   };
 
+  const getOrderInfo = (data: Partial<V2DutchOrderInfo>): V2DutchOrderInfo => {
+    return Object.assign(
+      {
+        deadline: NOW + 1000,
+        reactor: ethers.constants.AddressZero,
+        swapper: ethers.constants.AddressZero,
+        nonce: BigNumber.from(10),
+        additionalValidationContract: ethers.constants.AddressZero,
+        additionalValidationData: "0x",
+        cosigner: ethers.constants.AddressZero,
+        cosignerData: undefined,
+        input: {
+          token: INPUT_TOKEN,
+          startAmount: RAW_AMOUNT,
+          endAmount: RAW_AMOUNT,
+        },
+        outputs: [
+          {
+            token: OUTPUT_TOKEN,
+            startAmount: RAW_AMOUNT,
+            endAmount: RAW_AMOUNT.mul(90).div(100),
+            recipient: ethers.constants.AddressZero,
+          },
+        ],
+        cosignature: undefined,
+      },
+      data
+    );
+  };
+
   it("parses a serialized order", () => {
     const orderInfo = getFullOrderInfo({});
     const order = new V2DutchOrder(orderInfo, 1);
@@ -153,7 +183,7 @@ describe("V2DutchOrder", () => {
         1
       );
       const resolved = order.resolve({
-        timestamp: order.info.cosignerData.decayStartTime - 100,
+        timestamp: order.info.cosignerData!.decayStartTime - 100,
       });
       expect(resolved.input.token).toEqual(order.info.input.token);
       expect(resolved.input.amount).toEqual(order.info.input.startAmount);
