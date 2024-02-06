@@ -22,6 +22,7 @@ describe("V2DutchOrderBuilder", () => {
     const deadline = Math.floor(Date.now() / 1000) + 1000;
     const order = builder
       .cosigner(constants.AddressZero)
+      .cosignature("0x")
       .deadline(deadline)
       .decayEndTime(deadline)
       .decayStartTime(deadline - 100)
@@ -60,6 +61,7 @@ describe("V2DutchOrderBuilder", () => {
     );
     const order = builder
       .cosigner(constants.AddressZero)
+      .cosignature("0x")
       .deadline(deadline)
       .decayEndTime(deadline)
       .decayStartTime(deadline - 100)
@@ -106,6 +108,7 @@ describe("V2DutchOrderBuilder", () => {
     );
     const order = builder
       .cosigner(constants.AddressZero)
+      .cosignature("0x")
       .deadline(deadline)
       .decayEndTime(deadline)
       .decayStartTime(deadline - 100)
@@ -148,6 +151,7 @@ describe("V2DutchOrderBuilder", () => {
     );
     const order = builder
       .cosigner(constants.AddressZero)
+      .cosignature("0x")
       .deadline(deadline)
       .decayEndTime(deadline)
       .decayStartTime(deadline - 100)
@@ -181,6 +185,7 @@ describe("V2DutchOrderBuilder", () => {
     const deadline = Math.floor(Date.now() / 1000) + 1000;
     const order = builder
       .cosigner(constants.AddressZero)
+      .cosignature("0x")
       .deadline(deadline)
       .decayEndTime(deadline)
       .decayStartTime(deadline - 100)
@@ -215,6 +220,7 @@ describe("V2DutchOrderBuilder", () => {
     const deadline = Math.floor(Date.now() / 1000) + 1000;
     expect(() =>
       builder
+        .cosignature("0x")
         .deadline(deadline)
         .decayEndTime(deadline)
         .decayStartTime(deadline - 100)
@@ -242,6 +248,7 @@ describe("V2DutchOrderBuilder", () => {
     expect(() =>
       builder
         .cosigner(constants.AddressZero)
+        .cosignature("0x")
         .deadline(deadline)
         .decayEndTime(deadline)
         .decayStartTime(deadline - 100)
@@ -268,6 +275,7 @@ describe("V2DutchOrderBuilder", () => {
     expect(() =>
       builder
         .cosigner(constants.AddressZero)
+        .cosignature("0x")
         .decayStartTime(deadline - 100)
         .nonce(BigNumber.from(100))
         .swapper(constants.AddressZero)
@@ -293,6 +301,7 @@ describe("V2DutchOrderBuilder", () => {
     expect(() =>
       builder
         .cosigner(constants.AddressZero)
+        .cosignature("0x")
         .deadline(deadline)
         .decayEndTime(deadline)
         .decayStartTime(deadline - 100)
@@ -319,6 +328,7 @@ describe("V2DutchOrderBuilder", () => {
     expect(() =>
       builder
         .cosigner(constants.AddressZero)
+        .cosignature("0x")
         .nonce(BigNumber.from(1))
         .deadline(deadline)
         .decayEndTime(deadline)
@@ -348,6 +358,7 @@ describe("V2DutchOrderBuilder", () => {
     expect(() =>
       builder
         .cosigner(constants.AddressZero)
+        .cosignature("0x")
         .nonce(BigNumber.from(1))
         .deadline(deadline)
         .decayEndTime(deadline)
@@ -376,6 +387,7 @@ describe("V2DutchOrderBuilder", () => {
     const deadline = Math.floor(Date.now() / 1000) + 1000;
     const order = builder
       .cosigner(constants.AddressZero)
+      .cosignature("0x")
       .deadline(deadline)
       .decayStartTime(deadline - 100)
       .swapper(constants.AddressZero)
@@ -403,6 +415,7 @@ describe("V2DutchOrderBuilder", () => {
     const decayEndTime = Math.floor(Date.now() / 1000) + 1000;
     const order = builder
       .cosigner(constants.AddressZero)
+      .cosignature("0x")
       .decayEndTime(decayEndTime)
       .decayStartTime(decayEndTime - 100)
       .swapper(constants.AddressZero)
@@ -431,6 +444,7 @@ describe("V2DutchOrderBuilder", () => {
     expect(() =>
       builder
         .cosigner(constants.AddressZero)
+        .cosignature("0x")
         .deadline(deadline)
         .decayEndTime(deadline)
         .decayStartTime(deadline - 100)
@@ -458,6 +472,7 @@ describe("V2DutchOrderBuilder", () => {
     expect(() =>
       builder
         .cosigner(constants.AddressZero)
+        .cosignature("0x")
         .deadline(deadline)
         .decayEndTime(deadline)
         .decayStartTime(deadline - 100)
@@ -485,6 +500,7 @@ describe("V2DutchOrderBuilder", () => {
     expect(() =>
       builder
         .cosigner(constants.AddressZero)
+        .cosignature("0x")
         .deadline(deadline)
         .decayEndTime(deadline)
         .decayStartTime(deadline + 100)
@@ -516,6 +532,7 @@ describe("V2DutchOrderBuilder", () => {
     expect(() =>
       builder
         .cosigner(constants.AddressZero)
+        .cosignature("0x")
         .deadline(deadline)
         .decayEndTime(deadline + 100)
         .decayStartTime(deadline - 100)
@@ -554,5 +571,68 @@ describe("V2DutchOrderBuilder", () => {
     expect(() => new V2DutchOrderBuilder(chainId)).toThrow(
       `Missing configuration for reactor: ${chainId}`
     );
+  });
+
+  describe("partial order tests", () => {
+    it("builds an unsigned partial order with default cosignerData values", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const order = builder
+        .cosigner(constants.AddressZero)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .deadline(deadline)
+        .input({
+          token: INPUT_TOKEN,
+          startAmount: INTPUT_START_AMOUNT,
+          endAmount: INTPUT_START_AMOUNT,
+        })
+        .output({
+          token: OUTPUT_TOKEN,
+          startAmount: OUTPUT_START_AMOUNT,
+          endAmount: OUTPUT_START_AMOUNT.mul(90).div(100),
+          recipient: constants.AddressZero,
+        })
+        .buildPartial();
+
+      expect(order.info.cosignerData).toEqual({
+        decayStartTime: 0,
+        decayEndTime: deadline,
+        exclusiveFiller: constants.AddressZero,
+        inputOverride: BigNumber.from(0),
+        outputOverrides: [],
+      });
+      expect(order.info.outputs.length).toEqual(1);
+    });
+
+    it("builds an unsigned partial order with incomplete cosignerData values", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const order = builder
+        .cosigner(constants.AddressZero)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .deadline(deadline)
+        .decayStartTime(1)
+        .input({
+          token: INPUT_TOKEN,
+          startAmount: INTPUT_START_AMOUNT,
+          endAmount: INTPUT_START_AMOUNT,
+        })
+        .output({
+          token: OUTPUT_TOKEN,
+          startAmount: OUTPUT_START_AMOUNT,
+          endAmount: OUTPUT_START_AMOUNT.mul(90).div(100),
+          recipient: constants.AddressZero,
+        })
+        .inputOverride(INTPUT_START_AMOUNT.mul(102).div(100))
+        .buildPartial();
+
+      expect(order.info.cosignerData).toEqual({
+        decayStartTime: 1,
+        decayEndTime: deadline,
+        exclusiveFiller: constants.AddressZero,
+        inputOverride: INTPUT_START_AMOUNT.mul(102).div(100),
+        outputOverrides: [],
+      });
+    });
   });
 });

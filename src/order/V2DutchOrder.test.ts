@@ -2,32 +2,37 @@ import { BigNumber, ethers } from "ethers";
 
 import {
   CosignedV2DutchOrder,
+  CosignedV2DutchOrderInfo,
   V2DutchOrder,
   V2DutchOrderInfo,
 } from "./V2DutchOrder";
 
+const NOW = Math.floor(new Date().getTime() / 1000);
 const RAW_AMOUNT = BigNumber.from("1000000");
 const INPUT_TOKEN = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
 const OUTPUT_TOKEN = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
+const COSIGNER_DATA = {
+  decayStartTime: NOW,
+  decayEndTime: NOW + 1000,
+  exclusiveFiller: ethers.constants.AddressZero,
+  inputOverride: RAW_AMOUNT,
+  outputOverrides: [RAW_AMOUNT.mul(102).div(100)],
+};
 
 describe("V2DutchOrder", () => {
-  const getOrderInfo = (data: Partial<V2DutchOrderInfo>): V2DutchOrderInfo => {
+  const getFullOrderInfo = (
+    data: Partial<V2DutchOrderInfo>
+  ): CosignedV2DutchOrderInfo => {
     return Object.assign(
       {
-        deadline: Math.floor(new Date().getTime() / 1000) + 1000,
+        deadline: NOW + 1000,
         reactor: ethers.constants.AddressZero,
         swapper: ethers.constants.AddressZero,
         nonce: BigNumber.from(10),
         additionalValidationContract: ethers.constants.AddressZero,
         additionalValidationData: "0x",
         cosigner: ethers.constants.AddressZero,
-        cosignerData: {
-          decayStartTime: Math.floor(new Date().getTime() / 1000),
-          decayEndTime: Math.floor(new Date().getTime() / 1000) + 1000,
-          exclusiveFiller: ethers.constants.AddressZero,
-          inputOverride: RAW_AMOUNT,
-          outputOverrides: [RAW_AMOUNT.mul(102).div(100)],
-        },
+        cosignerData: COSIGNER_DATA,
         input: {
           token: INPUT_TOKEN,
           startAmount: RAW_AMOUNT,
@@ -48,7 +53,7 @@ describe("V2DutchOrder", () => {
   };
 
   it("parses a serialized order", () => {
-    const orderInfo = getOrderInfo({});
+    const orderInfo = getFullOrderInfo({});
     const order = new V2DutchOrder(orderInfo, 1);
     const serialized = order.serialize();
     const parsed = V2DutchOrder.parse(serialized, 1);
@@ -56,7 +61,7 @@ describe("V2DutchOrder", () => {
   });
 
   it("valid signature over inner order", async () => {
-    const order = new V2DutchOrder(getOrderInfo({}), 1);
+    const order = new V2DutchOrder(getFullOrderInfo({}), 1);
     const wallet = ethers.Wallet.createRandom();
 
     const { domain, types, values } = order.permitData();
@@ -67,7 +72,7 @@ describe("V2DutchOrder", () => {
   it("validates cosignature over (hash || cosignerData)", async () => {
     const wallet = ethers.Wallet.createRandom();
     const order = new V2DutchOrder(
-      getOrderInfo({
+      getFullOrderInfo({
         cosigner: await wallet.getAddress(),
       }),
       1
@@ -76,6 +81,7 @@ describe("V2DutchOrder", () => {
     const cosignature = await wallet.signMessage(fullOrderHash);
     const signedOrder = CosignedV2DutchOrder.fromUnsignedOrder(
       order,
+      COSIGNER_DATA,
       cosignature
     );
 
@@ -86,7 +92,7 @@ describe("V2DutchOrder", () => {
 
   describe("resolve", () => {
     it("resolves before decayStartTime", () => {
-      const order = new V2DutchOrder(getOrderInfo({}), 1);
+      const order = new CosignedV2DutchOrder(getFullOrderInfo({}), 1);
       const resolved = order.resolve({
         timestamp: order.info.cosignerData.decayStartTime - 100,
       });
@@ -101,7 +107,7 @@ describe("V2DutchOrder", () => {
     });
 
     it("resolves at decayStartTime", () => {
-      const order = new V2DutchOrder(getOrderInfo({}), 1);
+      const order = new CosignedV2DutchOrder(getFullOrderInfo({}), 1);
       const resolved = order.resolve({
         timestamp: order.info.cosignerData.decayStartTime,
       });
@@ -118,7 +124,7 @@ describe("V2DutchOrder", () => {
     });
 
     it("resolves at decayEndTime", () => {
-      const order = new V2DutchOrder(getOrderInfo({}), 1);
+      const order = new CosignedV2DutchOrder(getFullOrderInfo({}), 1);
       const resolved = order.resolve({
         timestamp: order.info.cosignerData.decayEndTime,
       });
@@ -135,7 +141,7 @@ describe("V2DutchOrder", () => {
     });
 
     it("resolves after decayEndTime", () => {
-      const order = new V2DutchOrder(getOrderInfo({}), 1);
+      const order = new CosignedV2DutchOrder(getFullOrderInfo({}), 1);
       const resolved = order.resolve({
         timestamp: order.info.cosignerData.decayEndTime + 100,
       });
@@ -153,8 +159,8 @@ describe("V2DutchOrder", () => {
 
     it("resolves when filler has exclusivity", () => {
       const exclusiveFiller = "0x0000000000000000000000000000000000000001";
-      const order = new V2DutchOrder(
-        getOrderInfo({
+      const order = new CosignedV2DutchOrder(
+        getFullOrderInfo({
           cosignerData: {
             exclusiveFiller: exclusiveFiller,
             decayStartTime: Math.floor(new Date().getTime() / 1000),
@@ -184,8 +190,8 @@ describe("V2DutchOrder", () => {
     it("resolves when filler doesnt have exclusivity", () => {
       const nonExclusiveFiller = ethers.constants.AddressZero;
       const exclusiveFiller = "0x0000000000000000000000000000000000000001";
-      const order = new V2DutchOrder(
-        getOrderInfo({
+      const order = new CosignedV2DutchOrder(
+        getFullOrderInfo({
           cosignerData: {
             exclusiveFiller,
             decayStartTime: Math.floor(new Date().getTime() / 1000),
@@ -216,8 +222,8 @@ describe("V2DutchOrder", () => {
     it("resolves when filler doesnt have exclusivity but decayStartTime is past", () => {
       const nonExclusiveFiller = ethers.constants.AddressZero;
       const exclusiveFiller = "0x0000000000000000000000000000000000000001";
-      const order = new V2DutchOrder(
-        getOrderInfo({
+      const order = new CosignedV2DutchOrder(
+        getFullOrderInfo({
           cosignerData: {
             exclusiveFiller,
             decayStartTime: Math.floor(new Date().getTime() / 1000),
@@ -246,8 +252,8 @@ describe("V2DutchOrder", () => {
 
     it("resolves when filler is not set but there is exclusivity", () => {
       const exclusiveFiller = "0x0000000000000000000000000000000000000001";
-      const order = new V2DutchOrder(
-        getOrderInfo({
+      const order = new CosignedV2DutchOrder(
+        getFullOrderInfo({
           cosignerData: {
             exclusiveFiller,
             decayStartTime: Math.floor(new Date().getTime() / 1000),

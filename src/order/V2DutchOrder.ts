@@ -6,6 +6,7 @@ import {
   Witness,
 } from "@uniswap/permit2-sdk";
 import { BigNumber, ethers } from "ethers";
+import invariant from "tiny-invariant";
 
 import { PERMIT2_MAPPING } from "../constants";
 import { MissingConfiguration } from "../errors";
@@ -40,10 +41,18 @@ export type CosignerDataJSON = {
 
 export type V2DutchOrderInfo = OrderInfo & {
   cosigner: string;
-  cosignerData: CosignerData;
   input: DutchInput;
   outputs: DutchOutput[];
+  cosignerData?: CosignerData;
   cosignature?: string;
+};
+
+export type CosignedV2DutchOrderInfo = OrderInfo & {
+  cosigner: string;
+  input: DutchInput;
+  outputs: DutchOutput[];
+  cosignerData: CosignerData;
+  cosignature: string;
 };
 
 export type V2DutchOrderInfoJSON = Omit<
@@ -53,7 +62,7 @@ export type V2DutchOrderInfoJSON = Omit<
   nonce: string;
   input: DutchInputJSON;
   outputs: DutchOutputJSON[];
-  cosignerData: CosignerDataJSON;
+  cosignerData?: CosignerDataJSON;
 };
 
 type V2WitnessInfo = {
@@ -141,7 +150,7 @@ export class V2DutchOrder extends V2Order {
           endAmount: BigNumber.from(output.endAmount),
           recipient: output.recipient,
         })),
-        cosignerData: {
+        cosignerData: json.cosignerData && {
           ...json.cosignerData,
           inputOverride: BigNumber.from(json.cosignerData.inputOverride),
           outputOverrides: json.cosignerData.outputOverrides.map((value) =>
@@ -256,7 +265,7 @@ export class V2DutchOrder extends V2Order {
         recipient: output.recipient,
       })),
       cosigner: this.info.cosigner,
-      cosignerData: {
+      cosignerData: this.info.cosignerData && {
         decayStartTime: this.info.cosignerData.decayStartTime,
         decayEndTime: this.info.cosignerData.decayEndTime,
         exclusiveFiller: this.info.cosignerData.exclusiveFiller,
@@ -273,6 +282,7 @@ export class V2DutchOrder extends V2Order {
    * @inheritdoc order
    */
   serialize(): string {
+    invariant(this.info.cosignerData, "cosignerData is required");
     const abiCoder = new ethers.utils.AbiCoder();
     return abiCoder.encode(V2_DUTCH_ORDER_ABI, [
       [
@@ -350,6 +360,7 @@ export class V2DutchOrder extends V2Order {
    * @inheritdoc Order
    */
   hashFullOrder(): string {
+    invariant(this.info.cosignerData, "cosignerData is required");
     const abiCoder = new ethers.utils.AbiCoder();
     return ethers.utils.solidityKeccak256(
       ["bytes32", "bytes"],
@@ -373,6 +384,7 @@ export class V2DutchOrder extends V2Order {
    * @inheritdoc Order
    */
   resolve(options: OrderResolutionOptions): ResolvedOrder {
+    invariant(this.info.cosignerData, "cosignerData is required");
     return {
       input: {
         token: this.info.input.token,
@@ -391,9 +403,9 @@ export class V2DutchOrder extends V2Order {
           token: output.token,
           amount: getDecayedAmount(
             {
-              decayStartTime: this.info.cosignerData.decayStartTime,
-              decayEndTime: this.info.cosignerData.decayEndTime,
-              startAmount: this.info.cosignerData.outputOverrides[idx],
+              decayStartTime: this.info.cosignerData!.decayStartTime,
+              decayEndTime: this.info.cosignerData!.decayEndTime,
+              startAmount: this.info.cosignerData!.outputOverrides[idx],
               endAmount: output.endAmount,
             },
             options.timestamp
@@ -445,8 +457,12 @@ export class V2DutchOrder extends V2Order {
 
 export class CosignedV2DutchOrder extends V2DutchOrder {
   constructor(
-    public readonly info: Omit<V2DutchOrderInfo, "cosignature"> & {
+    public readonly info: Omit<
+      V2DutchOrderInfo,
+      "cosignature" | "cosignerData"
+    > & {
       cosignature: string;
+      cosignerData: CosignerData;
     },
     public readonly chainId: number,
     readonly _permit2Address?: string
@@ -456,11 +472,13 @@ export class CosignedV2DutchOrder extends V2DutchOrder {
 
   static fromUnsignedOrder(
     order: V2DutchOrder,
+    cosignerData: CosignerData,
     cosignature: string
   ): CosignedV2DutchOrder {
     return new CosignedV2DutchOrder(
       {
         ...order.info,
+        cosignerData,
         cosignature,
       },
       order.chainId,
