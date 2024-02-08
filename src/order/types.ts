@@ -72,13 +72,6 @@ export abstract class V2Order extends Order {
   abstract serialize(): string;
 
   /**
-   * Recovers the cosigner address that signed over the full order
-   * @param fullOrderHash The full order hash over (orderHash || cosignerData)
-   * @returns address The cosigner address
-   */
-  abstract recoverCosigner(fullOrderHash: string): string;
-
-  /**
    * @return Returns the full order hash over (orderHash || cosignerData)
    */
   abstract hashFullOrder(): string;
