@@ -139,3 +139,25 @@ export function getCancelSingleParams(nonceToCancel: BigNumber): CancelParams {
   const mask = BigNumber.from(2).pow(bitPos);
   return { word, mask };
 }
+
+// Get parameters to cancel multiple nonces
+export function getCancelMultipleParams(
+  noncesToCancel: BigNumber[]
+): CancelParams[] {
+  const splitNonces = noncesToCancel.map(splitNonce);
+  const splitNoncesByWord: { [word: string]: SplitNonce[] } = {};
+  splitNonces.forEach((splitNonce) => {
+    const word = splitNonce.word.toString();
+    if (!splitNoncesByWord[word]) {
+      splitNoncesByWord[word] = [];
+    }
+    splitNoncesByWord[word].push(splitNonce);
+  });
+  return Object.entries(splitNoncesByWord).map(([word, splitNonce]) => {
+    let mask = BigNumber.from(0);
+    splitNonce.forEach((splitNonce) => {
+      mask = mask.or(BigNumber.from(2).pow(splitNonce.bitPos));
+    });
+    return { word: BigNumber.from(word), mask };
+  });
+}
