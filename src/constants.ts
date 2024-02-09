@@ -27,15 +27,16 @@ export enum KNOWN_EVENT_SIGNATURES {
 export enum OrderType {
   Dutch = "Dutch",
   Dutch_V2 = "Dutch_V2",
+  Limit = "Limit",
 }
 
-type Reactors = {
+type Reactors = Partial<{
   [key in OrderType]: string;
-};
+}>;
 
 type ReactorMapping = { readonly [key: number]: Reactors };
 type ReverseReactorMapping = {
-  [key: string]: { chainId: number; orderType: OrderType };
+  [key: string]: { orderType: OrderType };
 };
 
 export const REACTOR_ADDRESS_MAPPING: ReactorMapping = {
@@ -62,11 +63,10 @@ export const MULTICALL_ADDRESS = "0xcA11bde05977b3631167028862bE2a173976CA11";
 
 export const REVERSE_REACTOR_MAPPING: ReverseReactorMapping = Object.entries(
   REACTOR_ADDRESS_MAPPING
-).reduce((acc: ReverseReactorMapping, [chainId, orderTypes]) => {
+).reduce((acc: ReverseReactorMapping, [_, orderTypes]) => {
   for (const [orderType, reactorAddress] of Object.entries(orderTypes)) {
     // lowercase for consistency when parsing orders
     acc[reactorAddress.toLowerCase()] = {
-      chainId: parseInt(chainId),
       orderType: OrderType[orderType as keyof typeof OrderType],
     };
   }

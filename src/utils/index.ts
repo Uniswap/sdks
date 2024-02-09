@@ -4,6 +4,7 @@ export * from "./OrderQuoter";
 export * from "./EventWatcher";
 export * from "./multicall";
 export * from "./dutchDecay";
+export * from "./order";
 
 export function stripHexPrefix(a: string): string {
   if (a.startsWith("0x")) {

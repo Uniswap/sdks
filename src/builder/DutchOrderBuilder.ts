@@ -45,14 +45,14 @@ export class DutchOrderBuilder extends OrderBuilder {
   ) {
     super();
 
+    const mappedReactorAddress = REACTOR_ADDRESS_MAPPING[chainId]
+      ? REACTOR_ADDRESS_MAPPING[chainId][OrderType.Dutch]
+      : undefined;
+
     if (reactorAddress) {
       this.reactor(reactorAddress);
-    } else if (
-      REACTOR_ADDRESS_MAPPING[chainId] &&
-      REACTOR_ADDRESS_MAPPING[chainId][OrderType.Dutch]
-    ) {
-      const reactorAddress = REACTOR_ADDRESS_MAPPING[chainId][OrderType.Dutch];
-      this.reactor(reactorAddress);
+    } else if (mappedReactorAddress) {
+      this.reactor(mappedReactorAddress);
     } else {
       throw new MissingConfiguration("reactor", chainId.toString());
     }
