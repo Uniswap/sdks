@@ -47,10 +47,10 @@ export type V2DutchOrderInfo = OrderInfo & {
   cosignature?: string;
 };
 
-export type CosignedV2DutchOrderInfo = OrderInfo & {
-  cosigner: string;
-  input: DutchInput;
-  outputs: DutchOutput[];
+export type CosignedV2DutchOrderInfo = Omit<
+  V2DutchOrderInfo,
+  "cosignerData" | "cosignature"
+> & {
   cosignerData: CosignerData;
   cosignature: string;
 };
