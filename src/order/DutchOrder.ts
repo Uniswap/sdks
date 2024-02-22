@@ -9,8 +9,8 @@ import {
 } from "@uniswap/permit2-sdk";
 import { BigNumber, ethers } from "ethers";
 
-import { BPS } from "../constants";
-import { getPermit2 } from "../utils";
+import { BPS, PERMIT2_MAPPING } from "../constants";
+import { MissingConfiguration } from "../errors";
 import { ResolvedOrder } from "../utils/OrderQuoter";
 import { getDecayedAmount } from "../utils/dutchDecay";
 
@@ -112,7 +112,13 @@ export class DutchOrder extends Order {
     readonly _permit2Address?: string
   ) {
     super();
-    this.permit2Address = getPermit2(chainId, _permit2Address);
+    if (_permit2Address) {
+      this.permit2Address = _permit2Address;
+    } else if (PERMIT2_MAPPING[chainId]) {
+      this.permit2Address = PERMIT2_MAPPING[chainId];
+    } else {
+      throw new MissingConfiguration("permit2", chainId.toString());
+    }
   }
 
   static fromJSON(

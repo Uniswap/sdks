@@ -115,7 +115,7 @@ export class UnsignedV2DutchOrder extends Order {
   constructor(
     public readonly info: UnsignedV2DutchOrderInfo,
     public readonly chainId: number,
-    readonly _permit2Address?: string
+    _permit2Address?: string
   ) {
     super();
     this.permit2Address = getPermit2(chainId, _permit2Address);
@@ -404,7 +404,7 @@ export class CosignedV2DutchOrder extends UnsignedV2DutchOrder {
   constructor(
     public readonly info: CosignedV2DutchOrderInfo,
     public readonly chainId: number,
-    readonly _permit2Address?: string
+    _permit2Address?: string
   ) {
     super(info, chainId, _permit2Address);
   }
@@ -542,7 +542,13 @@ function parseSerializedOrder(serialized: string): CosignedV2DutchOrderInfo {
       cosigner,
       [inputToken, inputStartAmount, inputEndAmount],
       outputs,
-      cosignerData,
+      [
+        decayStartTime,
+        decayEndTime,
+        exclusiveFiller,
+        inputOverride,
+        outputOverrides,
+      ],
       cosignature,
     ],
   ] = decoded;
@@ -575,7 +581,13 @@ function parseSerializedOrder(serialized: string): CosignedV2DutchOrderInfo {
         };
       }
     ),
-    cosignerData,
+    cosignerData: {
+      decayStartTime: decayStartTime.toNumber(),
+      decayEndTime: decayEndTime.toNumber(),
+      exclusiveFiller,
+      inputOverride,
+      outputOverrides,
+    },
     cosignature,
   };
 }

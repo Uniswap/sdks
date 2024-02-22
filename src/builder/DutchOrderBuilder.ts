@@ -1,10 +1,10 @@
 import { BigNumber, ethers } from "ethers";
 import invariant from "tiny-invariant";
 
-import { OrderType } from "../constants";
+import { OrderType, REACTOR_ADDRESS_MAPPING } from "../constants";
+import { MissingConfiguration } from "../errors";
 import { DutchInput, DutchOrder, DutchOrderInfo, DutchOutput } from "../order";
 import { ValidationInfo } from "../order/validation";
-import { getPermit2, getReactor } from "../utils";
 
 import { OrderBuilder } from "./OrderBuilder";
 
@@ -13,7 +13,6 @@ import { OrderBuilder } from "./OrderBuilder";
  */
 export class DutchOrderBuilder extends OrderBuilder {
   private info: Partial<DutchOrderInfo>;
-  private permit2Address: string;
 
   static fromOrder(order: DutchOrder): DutchOrderBuilder {
     // note chainId not used if passing in true reactor address
@@ -42,12 +41,21 @@ export class DutchOrderBuilder extends OrderBuilder {
   constructor(
     private chainId: number,
     reactorAddress?: string,
-    _permit2Address?: string
+    private permit2Address?: string
   ) {
     super();
 
-    this.reactor(getReactor(chainId, OrderType.Dutch_V2, reactorAddress));
-    this.permit2Address = getPermit2(chainId, _permit2Address);
+    const mappedReactorAddress = REACTOR_ADDRESS_MAPPING[chainId]
+      ? REACTOR_ADDRESS_MAPPING[chainId][OrderType.Dutch]
+      : undefined;
+
+    if (reactorAddress) {
+      this.reactor(reactorAddress);
+    } else if (mappedReactorAddress) {
+      this.reactor(mappedReactorAddress);
+    } else {
+      throw new MissingConfiguration("reactor", chainId.toString());
+    }
 
     this.info = {
       outputs: [],
