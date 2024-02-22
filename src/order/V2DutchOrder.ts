@@ -6,10 +6,8 @@ import {
   Witness,
 } from "@uniswap/permit2-sdk";
 import { BigNumber, ethers } from "ethers";
-import invariant from "tiny-invariant";
 
-import { PERMIT2_MAPPING } from "../constants";
-import { MissingConfiguration } from "../errors";
+import { getPermit2 } from "../utils";
 import { ResolvedOrder } from "../utils/OrderQuoter";
 import { getDecayedAmount } from "../utils/dutchDecay";
 
@@ -18,9 +16,9 @@ import {
   DutchInputJSON,
   DutchOutput,
   DutchOutputJSON,
+  Order,
   OrderInfo,
   OrderResolutionOptions,
-  V2Order,
 } from "./types";
 
 export type CosignerData = {
@@ -39,30 +37,29 @@ export type CosignerDataJSON = {
   outputOverrides: string[];
 };
 
-export type V2DutchOrderInfo = OrderInfo & {
+export type UnsignedV2DutchOrderInfo = OrderInfo & {
   cosigner: string;
   input: DutchInput;
   outputs: DutchOutput[];
-  cosignerData?: CosignerData;
-  cosignature?: string;
 };
 
-export type CosignedV2DutchOrderInfo = Omit<
-  V2DutchOrderInfo,
-  "cosignerData" | "cosignature"
-> & {
+export type CosignedV2DutchOrderInfo = UnsignedV2DutchOrderInfo & {
   cosignerData: CosignerData;
   cosignature: string;
 };
 
-export type V2DutchOrderInfoJSON = Omit<
-  V2DutchOrderInfo,
+export type UnsignedV2DutchOrderInfoJSON = Omit<
+  UnsignedV2DutchOrderInfo,
   "nonce" | "input" | "outputs" | "cosignerData"
 > & {
   nonce: string;
   input: DutchInputJSON;
   outputs: DutchOutputJSON[];
-  cosignerData?: CosignerDataJSON;
+};
+
+export type CosignedV2DutchOrderInfoJSON = UnsignedV2DutchOrderInfoJSON & {
+  cosignerData: CosignerDataJSON;
+  cosignature: string;
 };
 
 type V2WitnessInfo = {
@@ -112,47 +109,24 @@ const V2_DUTCH_ORDER_ABI = [
     ")",
 ];
 
-export class V2DutchOrder extends V2Order {
+export class UnsignedV2DutchOrder extends Order {
   public permit2Address: string;
 
   constructor(
-    public readonly info: V2DutchOrderInfo,
+    public readonly info: UnsignedV2DutchOrderInfo,
     public readonly chainId: number,
-    readonly _permit2Address?: string
+    _permit2Address?: string
   ) {
     super();
-    if (_permit2Address) {
-      this.permit2Address = _permit2Address;
-    } else if (PERMIT2_MAPPING[chainId]) {
-      this.permit2Address = PERMIT2_MAPPING[chainId];
-    } else {
-      throw new MissingConfiguration("permit2", chainId.toString());
-    }
+    this.permit2Address = getPermit2(chainId, _permit2Address);
   }
 
   static fromJSON(
-    json: V2DutchOrderInfoJSON,
+    json: UnsignedV2DutchOrderInfoJSON,
     chainId: number,
     _permit2Address?: string
-  ): V2DutchOrder {
-    const defaultCosignerData = cosignerDataOrDefault(json.cosignerData);
-    const cosignerData = json.cosignerData
-      ? {
-          ...json.cosignerData,
-          inputOverride: BigNumber.from(json.cosignerData.inputOverride),
-          outputOverrides: json.cosignerData.outputOverrides.map((value) =>
-            BigNumber.from(value)
-          ),
-        }
-      : {
-          ...defaultCosignerData,
-          inputOverride: BigNumber.from(defaultCosignerData.inputOverride),
-          outputOverrides: defaultCosignerData.outputOverrides.map((value) =>
-            BigNumber.from(value)
-          ),
-        };
-
-    return new V2DutchOrder(
+  ): UnsignedV2DutchOrder {
+    return new UnsignedV2DutchOrder(
       {
         ...json,
         nonce: BigNumber.from(json.nonce),
@@ -167,7 +141,6 @@ export class V2DutchOrder extends V2Order {
           endAmount: BigNumber.from(output.endAmount),
           recipient: output.recipient,
         })),
-        cosignerData: cosignerData,
       },
       chainId,
       _permit2Address
@@ -178,71 +151,9 @@ export class V2DutchOrder extends V2Order {
     encoded: string,
     chainId: number,
     permit2?: string
-  ): V2DutchOrder {
-    const abiCoder = new ethers.utils.AbiCoder();
-    const decoded = abiCoder.decode(V2_DUTCH_ORDER_ABI, encoded);
-    const [
-      [
-        [
-          reactor,
-          swapper,
-          nonce,
-          deadline,
-          additionalValidationContract,
-          additionalValidationData,
-        ],
-        cosigner,
-        [inputToken, inputStartAmount, inputEndAmount],
-        outputs,
-        [
-          decayStartTime,
-          decayEndTime,
-          exclusiveFiller,
-          inputOverride,
-          outputOverrides,
-        ],
-        cosignature,
-      ],
-    ] = decoded;
-    return new V2DutchOrder(
-      {
-        reactor,
-        swapper,
-        nonce,
-        deadline: deadline.toNumber(),
-        additionalValidationContract,
-        additionalValidationData,
-        cosigner,
-        cosignerData: {
-          decayStartTime: decayStartTime.toNumber(),
-          decayEndTime: decayEndTime.toNumber(),
-          exclusiveFiller,
-          inputOverride,
-          outputOverrides,
-        },
-        input: {
-          token: inputToken,
-          startAmount: inputStartAmount,
-          endAmount: inputEndAmount,
-        },
-        outputs: outputs.map(
-          ([token, startAmount, endAmount, recipient]: [
-            string,
-            number,
-            number,
-            string,
-            boolean
-          ]) => {
-            return {
-              token,
-              startAmount,
-              endAmount,
-              recipient,
-            };
-          }
-        ),
-        cosignature,
-      },
+  ): UnsignedV2DutchOrder {
+    return new UnsignedV2DutchOrder(
+      parseSerializedOrder(encoded),
       chainId,
       permit2
     );
@@ -251,7 +162,7 @@ export class V2DutchOrder extends V2Order {
   /**
    * @inheritdoc order
    */
-  toJSON(): V2DutchOrderInfoJSON & {
+  toJSON(): UnsignedV2DutchOrderInfoJSON & {
     permit2Address: string;
     chainId: number;
   } {
@@ -276,16 +187,6 @@ export class V2DutchOrder extends V2Order {
         recipient: output.recipient,
       })),
       cosigner: this.info.cosigner,
-      cosignerData: this.info.cosignerData && {
-        decayStartTime: this.info.cosignerData.decayStartTime,
-        decayEndTime: this.info.cosignerData.decayEndTime,
-        exclusiveFiller: this.info.cosignerData.exclusiveFiller,
-        inputOverride: this.info.cosignerData.inputOverride.toString(),
-        outputOverrides: this.info.cosignerData.outputOverrides.map((value) =>
-          value.toString()
-        ),
-      },
-      cosignature: this.info.cosignature,
     };
   }
 
@@ -293,7 +194,6 @@ export class V2DutchOrder extends V2Order {
    * @inheritdoc order
    */
   serialize(): string {
-    invariant(this.info.cosignerData, "cosignerData is required");
     const abiCoder = new ethers.utils.AbiCoder();
     return abiCoder.encode(V2_DUTCH_ORDER_ABI, [
       [
@@ -317,14 +217,9 @@ export class V2DutchOrder extends V2Order {
           output.endAmount,
           output.recipient,
         ]),
-        [
-          this.info.cosignerData.decayStartTime,
-          this.info.cosignerData.decayEndTime,
-          this.info.cosignerData.exclusiveFiller,
-          this.info.cosignerData.inputOverride,
-          this.info.cosignerData.outputOverrides,
-        ],
-        this.info.cosignature,
+        // use empty default for cosignerData and cosignature
+        [0, 0, ethers.constants.AddressZero, 0, [0]],
+        "0x",
       ],
     ]);
   }
@@ -344,19 +239,6 @@ export class V2DutchOrder extends V2Order {
         signature
       )
     );
-  }
-
-  /**
-   *  recovers co-signer address from cosignature and full order hash
-   *  @param fullOrderHash The full order hash over (orderHash || cosignerData)
-   *  @param cosignature The cosignature to recover
-   *  @returns The address which co-signed the order
-   */
-  recoverCosigner(
-    fullOrderHash: string,
-    cosignature: string = this.info.cosignature ?? "0x"
-  ): string {
-    return ethers.utils.verifyMessage(fullOrderHash, cosignature);
   }
 
   /**
@@ -383,66 +265,9 @@ export class V2DutchOrder extends V2Order {
   /**
    * @inheritdoc Order
    */
-  hashFullOrder(): string {
-    invariant(this.info.cosignerData, "cosignerData is required");
-    const abiCoder = new ethers.utils.AbiCoder();
-    return ethers.utils.solidityKeccak256(
-      ["bytes32", "bytes"],
-      [
-        this.hash(),
-        abiCoder.encode(
-          ["uint256", "uint256", "address", "uint256", "uint256[]"],
-          [
-            this.info.cosignerData.decayStartTime,
-            this.info.cosignerData.decayEndTime,
-            this.info.cosignerData.exclusiveFiller,
-            this.info.cosignerData.inputOverride,
-            this.info.cosignerData.outputOverrides,
-          ]
-        ),
-      ]
-    );
-  }
-
-  /**
-   * @inheritdoc Order
-   */
-  resolve(options: OrderResolutionOptions): ResolvedOrder {
-    invariant(this.info.cosignerData, "cosignerData is required");
-    return {
-      input: {
-        token: this.info.input.token,
-        amount: getDecayedAmount(
-          {
-            decayStartTime: this.info.cosignerData.decayStartTime,
-            decayEndTime: this.info.cosignerData.decayEndTime,
-            startAmount: originalIfZero(
-              this.info.cosignerData.inputOverride,
-              this.info.input.startAmount
-            ),
-            endAmount: this.info.input.endAmount,
-          },
-          options.timestamp
-        ),
-      },
-      outputs: this.info.outputs.map((output, idx) => {
-        return {
-          token: output.token,
-          amount: getDecayedAmount(
-            {
-              decayStartTime: this.info.cosignerData!.decayStartTime,
-              decayEndTime: this.info.cosignerData!.decayEndTime,
-              startAmount: originalIfZero(
-                this.info.cosignerData!.outputOverrides[idx],
-                output.startAmount
-              ),
-              endAmount: output.endAmount,
-            },
-            options.timestamp
-          ),
-        };
-      }),
-    };
+  resolve(_options: OrderResolutionOptions): ResolvedOrder {
+    // no cosigner data so no resolution possible
+    throw new Error("Method not implemented");
   }
 
   private toPermit(): PermitTransferFrom {
@@ -483,25 +308,35 @@ export class V2DutchOrder extends V2Order {
       witnessType: V2_DUTCH_ORDER_TYPES,
     };
   }
+
+  /**
+   * Hash signed over by the cosigner
+   */
+  cosignatureHash(cosignerData: CosignerData): string {
+    const abiCoder = new ethers.utils.AbiCoder();
+    return ethers.utils.solidityKeccak256(
+      ["bytes32", "bytes"],
+      [
+        this.hash(),
+        abiCoder.encode(
+          ["uint256", "uint256", "address", "uint256", "uint256[]"],
+          [
+            cosignerData.decayStartTime,
+            cosignerData.decayEndTime,
+            cosignerData.exclusiveFiller,
+            cosignerData.inputOverride,
+            cosignerData.outputOverrides,
+          ]
+        ),
+      ]
+    );
+  }
 }
 
-export class CosignedV2DutchOrder extends V2DutchOrder {
-  constructor(
-    public readonly info: Omit<
-      V2DutchOrderInfo,
-      "cosignature" | "cosignerData"
-    > & {
-      cosignature: string;
-      cosignerData: CosignerData;
-    },
-    public readonly chainId: number,
-    readonly _permit2Address?: string
-  ) {
-    super(info, chainId, _permit2Address);
-  }
-
+export class CosignedV2DutchOrder extends UnsignedV2DutchOrder {
+  // build a cosigned order from an unsigned order plus cosigner data
   static fromUnsignedOrder(
-    order: V2DutchOrder,
+    order: UnsignedV2DutchOrder,
     cosignerData: CosignerData,
     cosignature: string
   ): CosignedV2DutchOrder {
@@ -515,23 +350,244 @@ export class CosignedV2DutchOrder extends V2DutchOrder {
       order.permit2Address
     );
   }
+
+  // build a cosigned order from json
+  static fromJSON(
+    json: CosignedV2DutchOrderInfoJSON,
+    chainId: number,
+    _permit2Address?: string
+  ): CosignedV2DutchOrder {
+    return new CosignedV2DutchOrder(
+      {
+        ...json,
+        nonce: BigNumber.from(json.nonce),
+        input: {
+          token: json.input.token,
+          startAmount: BigNumber.from(json.input.startAmount),
+          endAmount: BigNumber.from(json.input.endAmount),
+        },
+        outputs: json.outputs.map((output) => ({
+          token: output.token,
+          startAmount: BigNumber.from(output.startAmount),
+          endAmount: BigNumber.from(output.endAmount),
+          recipient: output.recipient,
+        })),
+        cosignerData: {
+          decayStartTime: json.cosignerData.decayStartTime,
+          decayEndTime: json.cosignerData.decayEndTime,
+          exclusiveFiller: json.cosignerData.exclusiveFiller,
+          inputOverride: BigNumber.from(json.cosignerData.inputOverride),
+          outputOverrides: json.cosignerData.outputOverrides.map(
+            BigNumber.from
+          ),
+        },
+        cosignature: json.cosignature,
+      },
+      chainId,
+      _permit2Address
+    );
+  }
+
+  // build a cosigned order from serialized
+  static parse(
+    encoded: string,
+    chainId: number,
+    permit2?: string
+  ): CosignedV2DutchOrder {
+    return new CosignedV2DutchOrder(
+      parseSerializedOrder(encoded),
+      chainId,
+      permit2
+    );
+  }
+
+  constructor(
+    public readonly info: CosignedV2DutchOrderInfo,
+    public readonly chainId: number,
+    _permit2Address?: string
+  ) {
+    super(info, chainId, _permit2Address);
+  }
+
+  /**
+   * @inheritdoc order
+   */
+  toJSON(): CosignedV2DutchOrderInfoJSON & {
+    permit2Address: string;
+    chainId: number;
+  } {
+    return {
+      ...super.toJSON(),
+      cosignerData: {
+        decayStartTime: this.info.cosignerData.decayStartTime,
+        decayEndTime: this.info.cosignerData.decayEndTime,
+        exclusiveFiller: this.info.cosignerData.exclusiveFiller,
+        inputOverride: this.info.cosignerData.inputOverride.toString(),
+        outputOverrides: this.info.cosignerData.outputOverrides.map((o) =>
+          o.toString()
+        ),
+      },
+      cosignature: this.info.cosignature,
+    };
+  }
+
+  /**
+   * @inheritdoc Order
+   */
+  resolve(options: OrderResolutionOptions): ResolvedOrder {
+    return {
+      input: {
+        token: this.info.input.token,
+        amount: getDecayedAmount(
+          {
+            decayStartTime: this.info.cosignerData.decayStartTime,
+            decayEndTime: this.info.cosignerData.decayEndTime,
+            startAmount: originalIfZero(
+              this.info.cosignerData.inputOverride,
+              this.info.input.startAmount
+            ),
+            endAmount: this.info.input.endAmount,
+          },
+          options.timestamp
+        ),
+      },
+      outputs: this.info.outputs.map((output, idx) => {
+        return {
+          token: output.token,
+          amount: getDecayedAmount(
+            {
+              decayStartTime: this.info.cosignerData!.decayStartTime,
+              decayEndTime: this.info.cosignerData!.decayEndTime,
+              startAmount: originalIfZero(
+                this.info.cosignerData!.outputOverrides[idx],
+                output.startAmount
+              ),
+              endAmount: output.endAmount,
+            },
+            options.timestamp
+          ),
+        };
+      }),
+    };
+  }
+
+  /**
+   * @inheritdoc order
+   */
+  serialize(): string {
+    const abiCoder = new ethers.utils.AbiCoder();
+    return abiCoder.encode(V2_DUTCH_ORDER_ABI, [
+      [
+        [
+          this.info.reactor,
+          this.info.swapper,
+          this.info.nonce,
+          this.info.deadline,
+          this.info.additionalValidationContract,
+          this.info.additionalValidationData,
+        ],
+        this.info.cosigner,
+        [
+          this.info.input.token,
+          this.info.input.startAmount,
+          this.info.input.endAmount,
+        ],
+        this.info.outputs.map((output) => [
+          output.token,
+          output.startAmount,
+          output.endAmount,
+          output.recipient,
+        ]),
+        [
+          this.info.cosignerData.decayStartTime,
+          this.info.cosignerData.decayEndTime,
+          this.info.cosignerData.exclusiveFiller,
+          this.info.cosignerData.inputOverride.toString(),
+          this.info.cosignerData.outputOverrides.map((o) => o.toString()),
+        ],
+        this.info.cosignature,
+      ],
+    ]);
+  }
+
+  /**
+   *  recovers co-signer address from cosignature and full order hash
+   *  @returns The address which co-signed the order
+   */
+  recoverCosigner(): string {
+    return ethers.utils.verifyMessage(
+      this.cosignatureHash(this.info.cosignerData),
+      this.info.cosignature
+    );
+  }
 }
 
 function originalIfZero(value: BigNumber, original: BigNumber): BigNumber {
   return value.isZero() ? original : value;
 }
 
-function cosignerDataOrDefault(
-  data: CosignerDataJSON | undefined
-): CosignerDataJSON {
-  if (data == undefined) {
-    return {
-      decayStartTime: 0,
-      decayEndTime: 0,
-      exclusiveFiller: ethers.constants.AddressZero,
-      inputOverride: "0",
-      outputOverrides: ["0"],
-    };
-  }
-  return data;
+function parseSerializedOrder(serialized: string): CosignedV2DutchOrderInfo {
+  const abiCoder = new ethers.utils.AbiCoder();
+  const decoded = abiCoder.decode(V2_DUTCH_ORDER_ABI, serialized);
+  const [
+    [
+      [
+        reactor,
+        swapper,
+        nonce,
+        deadline,
+        additionalValidationContract,
+        additionalValidationData,
+      ],
+      cosigner,
+      [inputToken, inputStartAmount, inputEndAmount],
+      outputs,
+      [
+        decayStartTime,
+        decayEndTime,
+        exclusiveFiller,
+        inputOverride,
+        outputOverrides,
+      ],
+      cosignature,
+    ],
+  ] = decoded;
+  return {
+    reactor,
+    swapper,
+    nonce,
+    deadline: deadline.toNumber(),
+    additionalValidationContract,
+    additionalValidationData,
+    cosigner,
+    input: {
+      token: inputToken,
+      startAmount: inputStartAmount,
+      endAmount: inputEndAmount,
+    },
+    outputs: outputs.map(
+      ([token, startAmount, endAmount, recipient]: [
+        string,
+        number,
+        number,
+        string,
+        boolean
+      ]) => {
+        return {
+          token,
+          startAmount,
+          endAmount,
+          recipient,
+        };
+      }
+    ),
+    cosignerData: {
+      decayStartTime: decayStartTime.toNumber(),
+      decayEndTime: decayEndTime.toNumber(),
+      exclusiveFiller,
+      inputOverride,
+      outputOverrides,
+    },
+    cosignature,
+  };
 }

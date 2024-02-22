@@ -1,6 +1,6 @@
 import { BigNumber, constants } from "ethers";
 
-import { V2DutchOrder } from "../order";
+import { CosignedV2DutchOrder } from "../order";
 import { encodeExclusiveFillerData, ValidationType } from "../order/validation";
 
 import { V2DutchOrderBuilder } from "./V2DutchOrderBuilder";
@@ -132,7 +132,7 @@ describe("V2DutchOrderBuilder", () => {
 
     const json = order.toJSON();
     const regenerated = V2DutchOrderBuilder.fromOrder(
-      V2DutchOrder.fromJSON(json, 1)
+      CosignedV2DutchOrder.fromJSON(json, 1)
     ).build();
     expect(regenerated.toJSON()).toMatchObject(order.toJSON());
   });
@@ -594,13 +594,6 @@ describe("V2DutchOrderBuilder", () => {
         })
         .buildPartial();
 
-      expect(order.info.cosignerData).toEqual({
-        decayStartTime: 0,
-        decayEndTime: deadline,
-        exclusiveFiller: constants.AddressZero,
-        inputOverride: BigNumber.from(0),
-        outputOverrides: [],
-      });
       expect(order.info.outputs.length).toEqual(1);
     });
 
@@ -626,13 +619,7 @@ describe("V2DutchOrderBuilder", () => {
         .inputOverride(INTPUT_START_AMOUNT.mul(102).div(100))
         .buildPartial();
 
-      expect(order.info.cosignerData).toEqual({
-        decayStartTime: 1,
-        decayEndTime: deadline,
-        exclusiveFiller: constants.AddressZero,
-        inputOverride: INTPUT_START_AMOUNT.mul(102).div(100),
-        outputOverrides: [],
-      });
+      expect(order.info.outputs.length).toEqual(1);
     });
   });
 });

@@ -3,8 +3,8 @@ import { BigNumber, ethers } from "ethers";
 import {
   CosignedV2DutchOrder,
   CosignedV2DutchOrderInfo,
-  V2DutchOrder,
-  V2DutchOrderInfo,
+  UnsignedV2DutchOrder,
+  UnsignedV2DutchOrderInfo,
 } from "./V2DutchOrder";
 
 const NOW = Math.floor(new Date().getTime() / 1000);
@@ -21,7 +21,7 @@ const COSIGNER_DATA = {
 
 describe("V2DutchOrder", () => {
   const getFullOrderInfo = (
-    data: Partial<V2DutchOrderInfo>
+    data: Partial<CosignedV2DutchOrderInfo>
   ): CosignedV2DutchOrderInfo => {
     return Object.assign(
       {
@@ -52,7 +52,9 @@ describe("V2DutchOrder", () => {
     );
   };
 
-  const getOrderInfo = (data: Partial<V2DutchOrderInfo>): V2DutchOrderInfo => {
+  const getOrderInfo = (
+    data: Partial<UnsignedV2DutchOrderInfo>
+  ): UnsignedV2DutchOrderInfo => {
     return Object.assign(
       {
         deadline: NOW + 1000,
@@ -84,9 +86,9 @@ describe("V2DutchOrder", () => {
 
   it("parses a serialized order", () => {
     const orderInfo = getFullOrderInfo({});
-    const order = new V2DutchOrder(orderInfo, 1);
+    const order = new CosignedV2DutchOrder(orderInfo, 1);
     const serialized = order.serialize();
-    const parsed = V2DutchOrder.parse(serialized, 1);
+    const parsed = CosignedV2DutchOrder.parse(serialized, 1);
     expect(parsed.info).toEqual(orderInfo);
   });
 
@@ -109,38 +111,36 @@ describe("V2DutchOrder", () => {
       ],
       cosignerData: undefined,
     };
-    const order = V2DutchOrder.fromJSON(orderInfoJSON, 1);
+    const order = UnsignedV2DutchOrder.fromJSON(orderInfoJSON, 1);
     expect(order.info.input.startAmount).toEqual(BigNumber.from("1000000"));
     expect(order.info.outputs[0].startAmount).toEqual(
       BigNumber.from("1000000")
     );
-    expect(order.info.cosignerData).toEqual({
-      decayStartTime: 0,
-      decayEndTime: 0,
-      exclusiveFiller: ethers.constants.AddressZero,
-      inputOverride: BigNumber.from(0),
-      outputOverrides: [BigNumber.from(0)],
-    });
   });
 
   it("valid signature over inner order", async () => {
-    const order = new V2DutchOrder(getFullOrderInfo({}), 1);
+    const fullOrderInfo = getFullOrderInfo({});
+    const order = new UnsignedV2DutchOrder(fullOrderInfo, 1);
     const wallet = ethers.Wallet.createRandom();
 
     const { domain, types, values } = order.permitData();
     const signature = await wallet._signTypedData(domain, types, values);
     expect(order.getSigner(signature)).toEqual(await wallet.getAddress());
+    const fullOrder = CosignedV2DutchOrder.fromUnsignedOrder(
+      order,
+      fullOrderInfo.cosignerData,
+      fullOrderInfo.cosignature
+    );
+    expect(fullOrder.getSigner(signature)).toEqual(await wallet.getAddress());
   });
 
   it("validates cosignature over (hash || cosignerData)", async () => {
     const wallet = ethers.Wallet.createRandom();
-    const order = new V2DutchOrder(
-      getFullOrderInfo({
-        cosigner: await wallet.getAddress(),
-      }),
-      1
-    );
-    const fullOrderHash = order.hashFullOrder();
+    const orderInfo = getFullOrderInfo({
+      cosigner: await wallet.getAddress(),
+    });
+    const order = new UnsignedV2DutchOrder(orderInfo, 1);
+    const fullOrderHash = order.cosignatureHash(orderInfo.cosignerData);
     const cosignature = await wallet.signMessage(fullOrderHash);
     const signedOrder = CosignedV2DutchOrder.fromUnsignedOrder(
       order,
@@ -148,9 +148,7 @@ describe("V2DutchOrder", () => {
       cosignature
     );
 
-    expect(signedOrder.recoverCosigner(fullOrderHash, cosignature)).toEqual(
-      await wallet.getAddress()
-    );
+    expect(signedOrder.recoverCosigner()).toEqual(await wallet.getAddress());
   });
 
   describe("resolve", () => {
@@ -170,8 +168,8 @@ describe("V2DutchOrder", () => {
     });
 
     it("resolves with original value when overrides == 0", () => {
-      const order = new V2DutchOrder(
-        getOrderInfo({
+      const order = new CosignedV2DutchOrder(
+        getFullOrderInfo({
           cosignerData: {
             decayStartTime: Math.floor(new Date().getTime() / 1000),
             decayEndTime: Math.floor(new Date().getTime() / 1000) + 1000,
