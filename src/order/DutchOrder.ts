@@ -1,6 +1,4 @@
 import { SignatureLike } from "@ethersproject/bytes";
-import { keccak256 } from "@ethersproject/keccak256";
-import { toUtf8Bytes } from "@ethersproject/strings";
 import {
   PermitTransferFrom,
   PermitTransferFromData,
@@ -8,10 +6,11 @@ import {
   Witness,
 } from "@uniswap/permit2-sdk";
 import { BigNumber, ethers } from "ethers";
+import { keccak256, toUtf8Bytes } from "ethers/lib/utils";
 
 import { BPS, PERMIT2_MAPPING } from "../constants";
 import { MissingConfiguration } from "../errors";
-import { ResolvedOrder } from "../utils/OrderQuoter";
+import { ResolvedUniswapXOrder } from "../utils/OrderQuoter";
 import { getDecayedAmount } from "../utils/dutchDecay";
 
 import {
@@ -19,9 +18,9 @@ import {
   DutchInputJSON,
   DutchOutput,
   DutchOutputJSON,
-  Order,
   OrderInfo,
   OrderResolutionOptions,
+  UniswapXOrder,
 } from "./types";
 
 export function id(text: string): string {
@@ -103,7 +102,7 @@ const DUTCH_ORDER_ABI = [
     ")",
 ];
 
-export class DutchOrder extends Order {
+export class DutchOrder extends UniswapXOrder {
   public permit2Address: string;
 
   constructor(
@@ -208,9 +207,6 @@ export class DutchOrder extends Order {
     );
   }
 
-  /**
-   * @inheritdoc order
-   */
   toJSON(): DutchOrderInfoJSON & {
     permit2Address: string;
     chainId: number;
@@ -277,7 +273,7 @@ export class DutchOrder extends Order {
   }
 
   /**
-   * @inheritdoc Order
+   * @inheritDoc OrderInterface
    */
   getSigner(signature: SignatureLike): string {
     return ethers.utils.computeAddress(
@@ -294,7 +290,7 @@ export class DutchOrder extends Order {
   }
 
   /**
-   * @inheritdoc Order
+   * @inheritDoc OrderInterface
    */
   permitData(): PermitTransferFromData {
     return SignatureTransfer.getPermitData(
@@ -306,7 +302,7 @@ export class DutchOrder extends Order {
   }
 
   /**
-   * @inheritdoc Order
+   * @inheritDoc OrderInterface
    */
   hash(): string {
     return ethers.utils._TypedDataEncoder
@@ -317,7 +313,7 @@ export class DutchOrder extends Order {
   /**
    * @inheritdoc Order
    */
-  resolve(options: OrderResolutionOptions): ResolvedOrder {
+  resolve(options: OrderResolutionOptions): ResolvedUniswapXOrder {
     const useOverride =
       this.info.exclusiveFiller !== ethers.constants.AddressZero &&
       options.timestamp <= this.info.decayStartTime &&

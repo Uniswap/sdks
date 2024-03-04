@@ -31,7 +31,7 @@ export class NonceManager {
         this.provider
       );
     } else {
-      throw new MissingConfiguration("orderQuoter", chainId.toString());
+      throw new MissingConfiguration("permit2", chainId.toString());
     }
 
     this.currentWord = new Map();

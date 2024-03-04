@@ -1,52 +1,52 @@
 import { SignatureLike } from "@ethersproject/bytes";
-import { PermitTransferFromData } from "@uniswap/permit2-sdk";
+import {
+  PermitBatchTransferFromData,
+  PermitTransferFromData,
+} from "@uniswap/permit2-sdk";
 import { BigNumber } from "ethers";
 
-import { ResolvedOrder } from "../utils/OrderQuoter";
+import { ResolvedUniswapXOrder } from "../utils/OrderQuoter";
 
 import { CustomOrderValidation, parseValidation } from "./validation";
 
-export abstract class Order {
-  // TODO: maybe add generic types for more order-type specific info
-  abstract info: OrderInfo;
-
-  // expose the chainid
-  abstract chainId: number;
-
-  // TODO: maybe add generic order info getters, i.e.
-  // affectedTokens, validTimes, max amounts?
-  // not yet sure what is useful / generic here
-
+// General interface implemented by off chain orders
+export interface OffChainOrder {
   /**
    * Returns the abi encoded order
    * @return The abi encoded serialized order which can be submitted on-chain
    */
-  abstract serialize(): string;
-
+  serialize(): string;
   /**
    * Recovers the given signature, returning the address which created it
    *  * @param signature The signature to recover
    *  * @returns address The address which created the signature
    */
-  abstract getSigner(signature: SignatureLike): string;
-
+  getSigner(signature: SignatureLike): string;
   /**
    * Returns the data for generating the maker EIP-712 permit signature
    * @return The data for generating the maker EIP-712 permit signature
    */
-  abstract permitData(): PermitTransferFromData;
-
+  permitData(): PermitTransferFromData | PermitBatchTransferFromData;
   /**
    * Returns the order hash
    * @return The order hash which is used as a key on-chain
    */
-  abstract hash(): string;
+  hash(): string;
+}
 
-  /**
-   * Returns the resolved order with the given options
-   * @return The resolved order
-   */
-  abstract resolve(options: OrderResolutionOptions): ResolvedOrder;
+// Base class for a UniswapX order
+export abstract class UniswapXOrder implements OffChainOrder {
+  abstract info: OrderInfo;
+
+  abstract chainId: number;
+
+  abstract serialize(): string;
+
+  abstract getSigner(signature: SignatureLike): string;
+
+  abstract permitData(): PermitTransferFromData;
+
+  abstract hash(): string;
 
   /**
    * Returns the parsed validation
@@ -55,9 +55,20 @@ export abstract class Order {
   get validation(): CustomOrderValidation {
     return parseValidation(this.info);
   }
+
+  /**
+   * Returns the resolved order with the given options
+   * @return The resolved order
+   */
+  abstract resolve(options: OrderResolutionOptions): ResolvedUniswapXOrder;
 }
 
 export type TokenAmount = {
+  readonly token: string;
+  readonly amount: BigNumber;
+};
+
+export type ResolvedRelayFee = {
   readonly token: string;
   readonly amount: BigNumber;
 };

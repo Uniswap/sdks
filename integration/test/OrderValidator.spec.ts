@@ -19,10 +19,12 @@ import {
   DutchOrderBuilder,
   DutchOrder,
   OrderValidator,
-  OrderQuoter as OrderQuoterLib,
+  UniswapXOrderQuoter as OrderQuoterLib,
   OrderValidation,
   getCancelSingleParams,
+  PERMIT2_MAPPING,
 } from "../../";
+import { deployAndReturnPermit2 } from "./utils/permit2";
 
 const { BigNumber } = ethers;
 const parseEther = ethers.utils.parseEther;
@@ -47,17 +49,15 @@ describe("OrderValidator", () => {
   beforeEach(async () => {
     [admin, filler] = await ethers.getSigners();
 
+    chainId = hre.network.config.chainId || 1;
+
     const exclusivityValidatorFactory = await ethers.getContractFactory(
       ExclusiveFillerValidationAbi.abi,
       ExclusiveFillerValidationAbi.bytecode
     );
     additionalValidationContract = (await exclusivityValidatorFactory.deploy()).address;
 
-    const permit2Factory = await ethers.getContractFactory(
-      Permit2Abi.abi,
-      Permit2Abi.bytecode
-    );
-    permit2 = (await permit2Factory.deploy()) as Permit2;
+    permit2 = await deployAndReturnPermit2(admin);
 
     const reactorFactory = await ethers.getContractFactory(
       ExclusiveDutchOrderReactorAbi.abi,
@@ -73,7 +73,6 @@ describe("OrderValidator", () => {
       OrderQuoterAbi.bytecode
     );
     quoter = (await orderQuoterFactory.deploy()) as OrderQuoter;
-    chainId = hre.network.config.chainId || 1;
     builder = new DutchOrderBuilder(
       chainId,
       reactor.address,

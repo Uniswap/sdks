@@ -8,7 +8,7 @@ import {
 import { BigNumber, ethers } from "ethers";
 
 import { getPermit2 } from "../utils";
-import { ResolvedOrder } from "../utils/OrderQuoter";
+import { ResolvedUniswapXOrder } from "../utils/OrderQuoter";
 import { getDecayedAmount } from "../utils/dutchDecay";
 
 import {
@@ -16,9 +16,9 @@ import {
   DutchInputJSON,
   DutchOutput,
   DutchOutputJSON,
-  Order,
   OrderInfo,
   OrderResolutionOptions,
+  UniswapXOrder,
 } from "./types";
 
 export type CosignerData = {
@@ -109,7 +109,7 @@ const V2_DUTCH_ORDER_ABI = [
     ")",
 ];
 
-export class UnsignedV2DutchOrder extends Order {
+export class UnsignedV2DutchOrder extends UniswapXOrder {
   public permit2Address: string;
 
   constructor(
@@ -265,7 +265,7 @@ export class UnsignedV2DutchOrder extends Order {
   /**
    * @inheritdoc Order
    */
-  resolve(_options: OrderResolutionOptions): ResolvedOrder {
+  resolve(_options: OrderResolutionOptions): ResolvedUniswapXOrder {
     // no cosigner data so no resolution possible
     throw new Error("Method not implemented");
   }
@@ -434,7 +434,7 @@ export class CosignedV2DutchOrder extends UnsignedV2DutchOrder {
   /**
    * @inheritdoc Order
    */
-  resolve(options: OrderResolutionOptions): ResolvedOrder {
+  resolve(options: OrderResolutionOptions): ResolvedUniswapXOrder {
     return {
       input: {
         token: this.info.input.token,
