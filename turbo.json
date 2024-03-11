@@ -11,7 +11,8 @@
       "inputs": [
         "yarn.lock",
         "**/package.json",
-        "{sdks}/*/src/**.ts"
+        "sdks/*/src/**.ts",
+        "sdks/*/src/**.tsx"
       ],
       "outputs": []
     },
@@ -21,10 +22,10 @@
       ]
     },
     "release": {
-      "dependsOn": [ ]
+      "dependsOn": []
     },
     "typecheck": {
-      "dependsOn": [ ]
+      "dependsOn": []
     }
   }
 }

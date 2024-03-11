@@ -271,6 +271,7 @@ export class UnsignedV2DutchOrder implements OffChainOrder {
    * Returns the resolved order with the given options
    * @return The resolved order
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   resolve(_options: OrderResolutionOptions): ResolvedUniswapXOrder {
     // no cosigner data so no resolution possible
     throw new Error("Method not implemented");
@@ -478,9 +479,12 @@ export class CosignedV2DutchOrder extends UnsignedV2DutchOrder {
           token: output.token,
           amount: getDecayedAmount(
             {
+              // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
               decayStartTime: this.info.cosignerData!.decayStartTime,
+              // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
               decayEndTime: this.info.cosignerData!.decayEndTime,
               startAmount: originalIfZero(
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                 this.info.cosignerData!.outputOverrides[idx],
                 output.startAmount
               ),
