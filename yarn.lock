@@ -17,7 +17,7 @@ __metadata:
   resolution: "@adjkant/permit2-sdk@workspace:sdks/permit2-sdk"
   dependencies:
     "@types/jest": ^24.0.25
-    ethers: ^5.3.1
+    ethers: ^5.7.0
     prettier: ^2.4.1
     tiny-invariant: ^1.1.0
     tsdx: ^0.14.1
@@ -73,7 +73,7 @@ __metadata:
     eslint-plugin-eslint-comments: ^3.2.0
     eslint-plugin-functional: ^3.0.2
     eslint-plugin-import: ^2.22.0
-    ethers: ^5.3.1
+    ethers: ^5.7.0
     husky: ^8.0.3
     jest: 25.5.0
     jest-environment-node: 25.5.0
@@ -104,7 +104,7 @@ __metadata:
     chai: ^4.3.6
     dotenv: ^16.0.3
     eslint-plugin-prettier: ^3.4.1
-    ethers: ^5.3.1
+    ethers: ^5.7.0
     hardhat: ^2.14.0
     prettier: ^2.4.1
     ts-node: ^10.9.1
@@ -8212,7 +8212,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"eslint-plugin-prettier@npm:3.4.1, eslint-plugin-prettier@npm:^3.1.0, eslint-plugin-prettier@npm:^3.4.1":
+"eslint-plugin-prettier@npm:^3.1.0, eslint-plugin-prettier@npm:^3.4.1":
   version: 3.4.1
   resolution: "eslint-plugin-prettier@npm:3.4.1"
   dependencies:
@@ -10306,7 +10306,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"husky@npm:^8.0.1, husky@npm:^8.0.3":
+"husky@npm:^8.0.3":
   version: 8.0.3
   resolution: "husky@npm:8.0.3"
   bin:
@@ -16000,7 +16000,7 @@ __metadata:
     danger: 11.2.6
     depcheck: 1.4.7
     eslint: ^7.8.0
-    eslint-plugin-prettier: 3.4.1
+    eslint-plugin-prettier: ^3.4.1
     husky: ^8.0.3
     semantic-release: ^20.1.0
     semantic-release-monorepo: 7.0.5
@@ -18138,7 +18138,7 @@ __metadata:
     chai: ^4.3.6
     ethers: ^5.7.0
     hardhat: ^2.14.0
-    husky: ^8.0.1
+    husky: ^8.0.3
     ts-node: ^10.9.1
     tsdx: ^0.14.1
     typechain: ^8.1.0
