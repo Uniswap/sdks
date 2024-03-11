@@ -1,0 +1,37 @@
+name: "Monorepo Integrity"
+
+on:
+  pull_request:
+    branches:
+      - "**"
+  push:
+    branches:
+      - main
+
+jobs:
+  monorepo-integrity:
+    name: Check monorepo integrity
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./
+    steps:
+      - name: Checkout
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
+        with:
+          fetch-depth: 2
+
+      - name: 📥 Install
+        uses: ./.github/actions/monorepo_yarn_install
+
+      - name: 👬🏽 Check for conflicting versions across the monorepo
+        run: yarn g:check:deps:mismatch
+
+      - name: 🏋️ Check for correct dependency usage and definition locations
+        run: yarn g:check:deps:usage
+
+      - name: 👬🏽 Check for duplicate dependencies in lock file
+        run: yarn dedupe --check
+
+      - name: 🧑‍⚖️ Check for yarn constraints.pro
+        run: yarn constraints
