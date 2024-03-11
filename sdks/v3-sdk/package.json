@@ -55,7 +55,16 @@
   },
   "release": {
     "extends": "semantic-release-monorepo",
-    "branches": "main",
+    "branches": [
+      {
+        "name": "main",
+        "prerelease": false
+      },
+      {
+        "name": "beta",
+        "prerelease": true
+      }
+    ],
     "plugins": [
       [
         "@semantic-release/commit-analyzer",
