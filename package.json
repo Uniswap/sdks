@@ -20,11 +20,6 @@
     "node": ">=10",
     "yarn": ">=3.2.3"
   },
-  "manypkg": {
-    "ignoredRules": [
-      "INTERNAL_MISMATCH"
-    ]
-  },
   "packageManager": "yarn@3.2.3",
   "private": true,
   "scripts": {
