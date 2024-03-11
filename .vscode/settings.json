@@ -12,5 +12,6 @@
     "./sdks/universal-router-sdk",
     "./sdks/v2-sdk",
     "./sdks/v3-sdk",
-  ]
+  ],
+  "testing.openTesting": "neverOpen"
 }
