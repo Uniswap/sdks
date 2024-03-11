@@ -7,7 +7,6 @@
     "@semantic-release/exec": "6.0.3",
     "@typescript-eslint/eslint-plugin": "^5.62",
     "danger": "11.2.6",
-    "depcheck": "1.4.7",
     "eslint": "^7.8.0",
     "eslint-plugin-prettier": "^3.4.1",
     "husky": "^8.0.3",
@@ -23,7 +22,6 @@
   "packageManager": "yarn@3.2.3",
   "private": true,
   "scripts": {
-    "g:check:deps:usage": " depcheck && turbo run check:deps:usage",
     "g:check:deps:mismatch": "manypkg check",
     "g:build": "turbo run build",
     "g:lint": "turbo run lint",

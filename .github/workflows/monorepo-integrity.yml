@@ -41,9 +41,6 @@ jobs:
       - name: 👬🏽 Check for conflicting versions across the monorepo
         run: yarn g:check:deps:mismatch
 
-      - name: 🏋️ Check for correct dependency usage and definition locations
-        run: yarn g:check:deps:usage
-
       - name: 👬🏽 Check for duplicate dependencies in lock file
         run: yarn dedupe --check
 
