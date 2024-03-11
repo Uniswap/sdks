@@ -47,7 +47,7 @@ export const V2_FACTORY_ADDRESSES: AddressMap = {
   [ChainId.BNB]: '0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6',
   [ChainId.POLYGON]: '0x9e5A52f57b3038F1B8EeE45F28b3C1967e22799C',
   [ChainId.CELO]: '0x79a530c8e2fA8748B7B40dd3629C0520c2cCf03f',
-  [ChainId.BLAST]: '0x5C346464d33F90bABaf70dB6388507CC889C1070'
+  [ChainId.BLAST]: '0x5C346464d33F90bABaf70dB6388507CC889C1070',
 }
 /**
  * @deprecated use V2_ROUTER_ADDRESSES instead
@@ -62,7 +62,7 @@ export const V2_ROUTER_ADDRESSES: AddressMap = {
   [ChainId.AVALANCHE]: '0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24',
   [ChainId.BNB]: '0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24',
   [ChainId.POLYGON]: '0xedf6066a2b290c185783862c7f4776a2c8077ad1',
-  [ChainId.BLAST]: '0xBB66Eb1c5e875933D44DAe661dbD80e5D9B03035'
+  [ChainId.BLAST]: '0xBB66Eb1c5e875933D44DAe661dbD80e5D9B03035',
 }
 
 // Networks that share most of the same addresses i.e. Mainnet, Goerli, Optimism, Arbitrum, Polygon
@@ -129,7 +129,7 @@ const OPTIMISM_SEPOLIA_ADDRESSES: ChainAddresses = {
   v3MigratorAddress: '0xE7EcbAAaA54D007A00dbb6c1d2f150066D69dA07',
   nonfungiblePositionManagerAddress: '0xdA75cEf1C93078e8b736FCA5D5a30adb97C8957d',
   tickLensAddress: '0xCb7f54747F58F8944973cea5b8f4ac2209BadDC5',
-  swapRouter02Address: '0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4'
+  swapRouter02Address: '0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4',
 }
 
 // arbitrum goerli v3 addresses
@@ -150,7 +150,7 @@ const ARBITRUM_SEPOLIA_ADDRESSES: ChainAddresses = {
   v3MigratorAddress: '0x398f43ef2c67B941147157DA1c5a868E906E043D',
   nonfungiblePositionManagerAddress: '0x6b2937Bde17889EDCf8fbD8dE31C3C2a70Bc4d65',
   tickLensAddress: '0x0fd18587734e5C2dcE2dccDcC7DD1EC89ba557d9',
-  swapRouter02Address: '0x101F443B4d1b059569D643917553c771E1b9663E'
+  swapRouter02Address: '0x101F443B4d1b059569D643917553c771E1b9663E',
 }
 
 // sepolia v3 addresses
@@ -203,7 +203,7 @@ const ZORA_ADDRESSES: ChainAddresses = {
   v3MigratorAddress: '0x048352d8dCF13686982C799da63fA6426a9D0b60',
   nonfungiblePositionManagerAddress: '0xbC91e8DfA3fF18De43853372A3d7dfe585137D78',
   tickLensAddress: '0x209AAda09D74Ad3B8D0E92910Eaf85D2357e3044',
-  swapRouter02Address: '0x7De04c96BE5159c3b5CeffC82aa176dc81281557'
+  swapRouter02Address: '0x7De04c96BE5159c3b5CeffC82aa176dc81281557',
 }
 
 const ZORA_SEPOLIA_ADDRESSES: ChainAddresses = {
@@ -212,7 +212,7 @@ const ZORA_SEPOLIA_ADDRESSES: ChainAddresses = {
   quoterAddress: '0xC195976fEF0985886E37036E2DF62bF371E12Df0',
   v3MigratorAddress: '0x65ef259b31bf1d977c37e9434658694267674897',
   nonfungiblePositionManagerAddress: '0xB8458EaAe43292e3c1F7994EFd016bd653d23c20',
-  tickLensAddress: '0x23C0F71877a1Fc4e20A78018f9831365c85f3064'
+  tickLensAddress: '0x23C0F71877a1Fc4e20A78018f9831365c85f3064',
 }
 
 const ROOTSTOCK_ADDRESSES: ChainAddresses = {
@@ -222,7 +222,7 @@ const ROOTSTOCK_ADDRESSES: ChainAddresses = {
   v3MigratorAddress: '0x16678977CA4ec3DAD5efc7b15780295FE5f56162',
   nonfungiblePositionManagerAddress: '0x9d9386c042F194B460Ec424a1e57ACDE25f5C4b1',
   tickLensAddress: '0x55B9dF5bF68ADe972191a91980459f48ecA16afC',
-  swapRouter02Address: '0x0B14ff67f0014046b4b99057Aec4509640b3947A'
+  swapRouter02Address: '0x0B14ff67f0014046b4b99057Aec4509640b3947A',
 }
 
 const BLAST_ADDRESSES: ChainAddresses = {
@@ -232,7 +232,7 @@ const BLAST_ADDRESSES: ChainAddresses = {
   v3MigratorAddress: '0x15CA7043CD84C5D21Ae76Ba0A1A967d42c40ecE0',
   nonfungiblePositionManagerAddress: '0xB218e4f7cF0533d4696fDfC419A0023D33345F28',
   tickLensAddress: '0x2E95185bCdD928a3e984B7e2D6560Ab1b17d7274',
-  swapRouter02Address: '0x549FEB8c9bd4c12Ad2AB27022dA12492aC452B66'
+  swapRouter02Address: '0x549FEB8c9bd4c12Ad2AB27022dA12492aC452B66',
 }
 
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {

@@ -63,7 +63,7 @@ describe('Pair', () => {
         computePairAddress({
           factoryAddress: V2_FACTORY_ADDRESSES[ChainId.SEPOLIA],
           tokenA: USDC_SEPOLIA,
-          tokenB: DAI_SEPOLIA
+          tokenB: DAI_SEPOLIA,
         })
       )
     })

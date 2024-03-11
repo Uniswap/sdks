@@ -20,3 +20,5 @@ export { Permit2__factory } from "./factories/Permit2__factory";
 export { RelayOrderReactor__factory } from "./factories/RelayOrderReactor__factory";
 export { SwapRouter02Executor__factory } from "./factories/SwapRouter02Executor__factory";
 export { V2DutchOrderReactor__factory } from "./factories/V2DutchOrderReactor__factory";
+export { DeploylessMulticall2__factory } from "./factories/DeploylessMulticall2__factory";
+export { Multicall2__factory } from "./factories/Multicall2__factory";

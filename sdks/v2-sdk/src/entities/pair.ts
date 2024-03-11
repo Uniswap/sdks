@@ -17,7 +17,7 @@ import {
   ONE,
   ONE_HUNDRED_PERCENT,
   ZERO,
-  ZERO_PERCENT
+  ZERO_PERCENT,
 } from '../constants'
 import { InsufficientInputAmountError, InsufficientReservesError } from '../errors'
 
