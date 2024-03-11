@@ -90,8 +90,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@adjkant/universal-router-sdk@workspace:sdks/universal-router-sdk"
   dependencies:
-    "@types/chai": ^4.2.18
-    "@types/mocha": ^8.2.2
+    "@types/chai": ^4.3.3
+    "@types/mocha": ^9.1.1
     "@types/node": ^18.7.16
     "@types/node-fetch": ^2.6.2
     "@uniswap/permit2-sdk": ^1.2.0
@@ -101,11 +101,11 @@ __metadata:
     "@uniswap/v2-sdk": ^4.3.0
     "@uniswap/v3-sdk": ^3.11.0
     bignumber.js: ^9.0.2
-    chai: ^4.3.4
+    chai: ^4.3.6
     dotenv: ^16.0.3
-    eslint-plugin-prettier: ^3.4.0
+    eslint-plugin-prettier: ^3.4.1
     ethers: ^5.3.1
-    hardhat: ^2.12.2
+    hardhat: ^2.14.0
     prettier: ^2.4.1
     ts-node: ^10.9.1
     tsdx: ^0.14.1
@@ -4185,7 +4185,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/chai@npm:^4.2.18, @types/chai@npm:^4.3.3":
+"@types/chai@npm:^4.3.3":
   version: 4.3.11
   resolution: "@types/chai@npm:4.3.11"
   checksum: d0c05fe5d02b2e6bbca2bd4866a2ab20a59cf729bc04af0060e7a3277eaf2fb65651b90d4c74b0ebf1d152b4b1d49fa8e44143acef276a2bbaa7785fbe5642d3
@@ -4315,13 +4315,6 @@ __metadata:
   version: 1.2.5
   resolution: "@types/minimist@npm:1.2.5"
   checksum: 477047b606005058ab0263c4f58097136268007f320003c348794f74adedc3166ffc47c80ec3e94687787f2ab7f4e72c468223946e79892cf0fd9e25e9970a90
-  languageName: node
-  linkType: hard
-
-"@types/mocha@npm:^8.2.2":
-  version: 8.2.3
-  resolution: "@types/mocha@npm:8.2.3"
-  checksum: b43ed1b642a2ee62bf10792a07d5d21d66ab8b4d2cf5d822c8a7643e77b90009aecc000eefab5f6ddc9eb69004192f84119a6f97a8499e1a13ea082e7a5e71bf
   languageName: node
   linkType: hard
 
@@ -6430,7 +6423,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"chai@npm:^4.3.4, chai@npm:^4.3.6":
+"chai@npm:^4.3.6":
   version: 4.4.0
   resolution: "chai@npm:4.4.0"
   dependencies:
@@ -8219,7 +8212,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"eslint-plugin-prettier@npm:3.4.1, eslint-plugin-prettier@npm:^3.1.0, eslint-plugin-prettier@npm:^3.4.0":
+"eslint-plugin-prettier@npm:3.4.1, eslint-plugin-prettier@npm:^3.1.0, eslint-plugin-prettier@npm:^3.4.1":
   version: 3.4.1
   resolution: "eslint-plugin-prettier@npm:3.4.1"
   dependencies:
@@ -9899,7 +9892,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"hardhat@npm:^2.12.2, hardhat@npm:^2.14.0":
+"hardhat@npm:^2.14.0":
   version: 2.19.4
   resolution: "hardhat@npm:2.19.4"
   dependencies:
