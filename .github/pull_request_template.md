@@ -1,3 +1,12 @@
+## PR Scope
+
+Please title your PR according to the following types and scopes following [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/):
+
+- `fix(SDK name):` will trigger a patch version
+- `<type>(public):` will trigger a patch version if needed for non-code changes we wish to publish (e.g. README changes)
+- `feat(SDK name):` will trigger a minor version
+- `feat(!):` will trigger a major version for a breaking change
+
 ## Description
 
 _[Summary of the change, motivation, and context]_
