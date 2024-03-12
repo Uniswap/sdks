@@ -2,10 +2,10 @@ import { BaseProvider } from "@ethersproject/providers";
 import { Contract, ethers } from "ethers";
 
 import {
-  ORDER_QUOTER_MAPPING,
   OrderType,
   PERMIT2_MAPPING,
   REACTOR_ADDRESS_MAPPING,
+  UNISWAPX_ORDER_QUOTER_MAPPING,
 } from "../constants";
 import {
   OrderQuoter__factory,
@@ -173,9 +173,9 @@ export class UniswapXOrderQuoter
   ) {
     if (orderQuoterAddress) {
       this.quoter = OrderQuoter__factory.connect(orderQuoterAddress, provider);
-    } else if (ORDER_QUOTER_MAPPING[chainId]) {
+    } else if (UNISWAPX_ORDER_QUOTER_MAPPING[chainId]) {
       this.quoter = OrderQuoter__factory.connect(
-        ORDER_QUOTER_MAPPING[chainId],
+        UNISWAPX_ORDER_QUOTER_MAPPING[chainId],
         this.provider
       );
     } else {
