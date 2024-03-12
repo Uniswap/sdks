@@ -2530,7 +2530,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@manypkg/cli@npm:^0.19.2":
+"@manypkg/cli@npm:0.19.2":
   version: 0.19.2
   resolution: "@manypkg/cli@npm:0.19.2"
   dependencies:
@@ -2551,6 +2551,30 @@ __metadata:
   bin:
     manypkg: bin.js
   checksum: b40e9bff3aaccdfe85b4bfc08aee3b50ccde6c62bbe81ccf9c11e159e7adf26a0ebb990efa68c8fbd05b03ac9da5d6301b362c40c319e6ff6be45489361bd5c9
+  languageName: node
+  linkType: hard
+
+"@manypkg/cli@patch:@manypkg/cli@npm%3A0.19.2#./.yarn/patches/@manypkg-cli-npm-0.19.2-ea52ff91d4.patch::locator=sdks%40workspace%3A.":
+  version: 0.19.2
+  resolution: "@manypkg/cli@patch:@manypkg/cli@npm%3A0.19.2#./.yarn/patches/@manypkg-cli-npm-0.19.2-ea52ff91d4.patch::version=0.19.2&hash=f49145&locator=sdks%40workspace%3A."
+  dependencies:
+    "@babel/runtime": ^7.5.5
+    "@manypkg/get-packages": ^1.1.3
+    chalk: ^2.4.2
+    detect-indent: ^6.0.0
+    find-up: ^4.1.0
+    fs-extra: ^8.1.0
+    normalize-path: ^3.0.0
+    p-limit: ^2.2.1
+    package-json: ^6.5.0
+    parse-github-url: ^1.0.2
+    sembear: ^0.5.0
+    semver: ^6.3.0
+    spawndamnit: ^2.0.0
+    validate-npm-package-name: ^3.0.0
+  bin:
+    manypkg: bin.js
+  checksum: 5265dd04a2c819bbfc48e7ca634237b5751a633cd6a453cfb4bca1b8250f4c461304b9649b8dfb4c14a685e8fcc9a44d139417e88c68575cb222ede71380136a
   languageName: node
   linkType: hard
 
