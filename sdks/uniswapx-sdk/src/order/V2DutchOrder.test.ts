@@ -183,6 +183,7 @@ describe("V2DutchOrder", () => {
         1
       );
       const resolved = order.resolve({
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         timestamp: order.info.cosignerData!.decayStartTime - 100,
       });
       expect(resolved.input.token).toEqual(order.info.input.token);

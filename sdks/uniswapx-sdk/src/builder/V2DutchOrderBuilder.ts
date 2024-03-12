@@ -297,6 +297,7 @@ export class V2DutchOrderBuilder extends OrderBuilder {
     );
     this.info.cosignerData.outputOverrides.forEach((override, idx) => {
       invariant(
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         override.gte(this.info.outputs![idx].startAmount),
         "outputOverride must be larger than or equal to original output"
       );

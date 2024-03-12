@@ -1,5 +1,5 @@
 {
-  "name": "@adjkant/universal-router-sdk",
+  "name": "@uniswap/universal-router-sdk",
   "description": "sdk for integrating with the Universal Router contracts",
   "repository": "https://github.com/Uniswap/sdks.git",
   "keywords": [

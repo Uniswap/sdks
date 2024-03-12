@@ -94,6 +94,7 @@ export const RELAY_SENTINEL_RECIPIENT =
 
 export const REVERSE_REACTOR_MAPPING: ReverseReactorMapping = Object.entries(
   REACTOR_ADDRESS_MAPPING
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 ).reduce((acc: ReverseReactorMapping, [_, orderTypes]) => {
   for (const [orderType, reactorAddress] of Object.entries(orderTypes)) {
     // lowercase for consistency when parsing orders
