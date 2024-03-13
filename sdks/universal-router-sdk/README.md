@@ -92,9 +92,8 @@ const unwrapWETH = new UnwrapWETH(amountWETH, chainId, optionalPermit2Params)
 const { calldata, value } = SwapRouter.swapCallParameters([unwrapWETH, seaportTrades, looksRareTrades])
 ```
 
-
 ## Running this package
-Make sure you are running `node v16`
+Make sure you are running `node v18`
 Install dependencies and run typescript unit tests
 ```bash
 yarn install
@@ -103,7 +102,6 @@ yarn test:hardhat
 
 Run forge integration tests
 ```bash
-yarn symlink # must install git submodules
 forge install
 yarn test:forge
 ```

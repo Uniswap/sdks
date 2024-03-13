@@ -2,12 +2,6 @@
 
 ## Local Development
 
-### Checkout the repo
-- `git clone --recurse-submodules https://github.com/Uniswap/permit2-sdk.git`
-
-### Install dependencies
-- `yarn`
-
 ### Run Unit Tests
 - `yarn test`
 
