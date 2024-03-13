@@ -105,24 +105,24 @@ export interface RelayOrderReactorInterface extends utils.Interface {
   ): Result;
 
   events: {
-    "Fill(bytes32,address,address,uint256)": EventFragment;
+    "Relay(bytes32,address,address,uint256)": EventFragment;
   };
 
-  getEvent(nameOrSignatureOrTopic: "Fill"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "Relay"): EventFragment;
 }
 
-export interface FillEventObject {
+export interface RelayEventObject {
   orderHash: string;
   filler: string;
   swapper: string;
   nonce: BigNumber;
 }
-export type FillEvent = TypedEvent<
+export type RelayEvent = TypedEvent<
   [string, string, string, BigNumber],
-  FillEventObject
+  RelayEventObject
 >;
 
-export type FillEventFilter = TypedEventFilter<FillEvent>;
+export type RelayEventFilter = TypedEventFilter<RelayEvent>;
 
 export interface RelayOrderReactor extends BaseContract {
   connect(signerOrProvider: Signer | Provider | string): this;
@@ -251,18 +251,18 @@ export interface RelayOrderReactor extends BaseContract {
   };
 
   filters: {
-    "Fill(bytes32,address,address,uint256)"(
+    "Relay(bytes32,address,address,uint256)"(
       orderHash?: PromiseOrValue<BytesLike> | null,
       filler?: PromiseOrValue<string> | null,
       swapper?: PromiseOrValue<string> | null,
       nonce?: null
-    ): FillEventFilter;
-    Fill(
+    ): RelayEventFilter;
+    Relay(
       orderHash?: PromiseOrValue<BytesLike> | null,
       filler?: PromiseOrValue<string> | null,
       swapper?: PromiseOrValue<string> | null,
       nonce?: null
-    ): FillEventFilter;
+    ): RelayEventFilter;
   };
 
   estimateGas: {
