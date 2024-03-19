@@ -1,6 +1,12 @@
 import { OrderType, REVERSE_REACTOR_MAPPING } from "../constants";
 import { MissingConfiguration } from "../errors";
-import { DutchOrder, Order, RelayOrder, UnsignedV2DutchOrder } from "../order";
+import {
+  CosignedV2DutchOrder,
+  DutchOrder,
+  Order,
+  RelayOrder,
+  UnsignedV2DutchOrder,
+} from "../order";
 
 import { stripHexPrefix } from ".";
 
@@ -61,8 +67,16 @@ export class UniswapXOrderParser extends OrderParser {
     switch (orderType) {
       case OrderType.Dutch:
         return DutchOrder.parse(order, chainId);
-      case OrderType.Dutch_V2:
-        return UnsignedV2DutchOrder.parse(order, chainId);
+      case OrderType.Dutch_V2: {
+        // cosigned and unsigned serialized versions are the same format
+        const cosignedOrder = CosignedV2DutchOrder.parse(order, chainId);
+        // if no cosignature, returned unsigned variant
+        if (cosignedOrder.info.cosignature === "0x") {
+          return UnsignedV2DutchOrder.parse(order, chainId);
+        }
+        // if cosignature exists then returned cosigned version
+        return cosignedOrder;
+      }
       default:
         throw new MissingConfiguration("orderType", orderType);
     }
