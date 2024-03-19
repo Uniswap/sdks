@@ -59,7 +59,7 @@ type ReverseReactorMapping = {
 export const REACTOR_ADDRESS_MAPPING: ReactorMapping = {
   ...constructSameAddressMap({
     [OrderType.Dutch]: "0x6000da47483062A0D734Ba3dc7576Ce6A0B645C4",
-    [OrderType.Dutch_V2]: "0x0000000000000000000000000000000000000000",
+    [OrderType.Dutch_V2]: "0x3867393cC6EA7b0414C2c3e1D9fe7cEa987Fd066",
     [OrderType.Relay]: "0x0000000000000000000000000000000000000001",
   }),
   12341234: {
