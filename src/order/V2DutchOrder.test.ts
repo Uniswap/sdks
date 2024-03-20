@@ -15,6 +15,7 @@ const COSIGNER_DATA = {
   decayStartTime: NOW,
   decayEndTime: NOW + 1000,
   exclusiveFiller: ethers.constants.AddressZero,
+  exclusivityOverrideBps: BigNumber.from(0),
   inputOverride: RAW_AMOUNT,
   outputOverrides: [RAW_AMOUNT.mul(102).div(100)],
 };
@@ -174,6 +175,7 @@ describe("V2DutchOrder", () => {
             decayStartTime: Math.floor(new Date().getTime() / 1000),
             decayEndTime: Math.floor(new Date().getTime() / 1000) + 1000,
             exclusiveFiller: ethers.constants.AddressZero,
+            exclusivityOverrideBps: BigNumber.from(0),
             inputOverride: BigNumber.from(0),
             outputOverrides: [BigNumber.from(0)],
           },
@@ -248,6 +250,7 @@ describe("V2DutchOrder", () => {
         getFullOrderInfo({
           cosignerData: {
             exclusiveFiller: exclusiveFiller,
+            exclusivityOverrideBps: BigNumber.from(0),
             decayStartTime: Math.floor(new Date().getTime() / 1000),
             decayEndTime: Math.floor(new Date().getTime() / 1000) + 1000,
             inputOverride: RAW_AMOUNT,
@@ -279,6 +282,7 @@ describe("V2DutchOrder", () => {
         getFullOrderInfo({
           cosignerData: {
             exclusiveFiller,
+            exclusivityOverrideBps: BigNumber.from(0),
             decayStartTime: Math.floor(new Date().getTime() / 1000),
             decayEndTime: Math.floor(new Date().getTime() / 1000) + 1000,
             inputOverride: RAW_AMOUNT,
@@ -311,6 +315,7 @@ describe("V2DutchOrder", () => {
         getFullOrderInfo({
           cosignerData: {
             exclusiveFiller,
+            exclusivityOverrideBps: BigNumber.from(0),
             decayStartTime: Math.floor(new Date().getTime() / 1000),
             decayEndTime: Math.floor(new Date().getTime() / 1000) + 1000,
             inputOverride: RAW_AMOUNT,
@@ -341,6 +346,7 @@ describe("V2DutchOrder", () => {
         getFullOrderInfo({
           cosignerData: {
             exclusiveFiller,
+            exclusivityOverrideBps: BigNumber.from(0),
             decayStartTime: Math.floor(new Date().getTime() / 1000),
             decayEndTime: Math.floor(new Date().getTime() / 1000) + 1000,
             inputOverride: RAW_AMOUNT,

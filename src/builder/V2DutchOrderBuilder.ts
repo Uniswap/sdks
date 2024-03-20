@@ -66,6 +66,7 @@ export class V2DutchOrderBuilder extends OrderBuilder {
         decayStartTime: 0,
         decayEndTime: 0,
         exclusiveFiller: ethers.constants.AddressZero,
+        exclusivityOverrideBps: BigNumber.from(0),
         inputOverride: BigNumber.from(0),
         outputOverrides: [],
       },
@@ -165,11 +166,27 @@ export class V2DutchOrderBuilder extends OrderBuilder {
         decayStartTime: 0,
         decayEndTime: 0,
         exclusiveFiller: exclusiveFiller,
+        exclusivityOverrideBps: BigNumber.from(0),
         inputOverride: BigNumber.from(0),
         outputOverrides: [],
       };
     }
     this.info.cosignerData.exclusiveFiller = exclusiveFiller;
+    return this;
+  }
+
+  exclusivityOverrideBps(exclusivityOverrideBps: BigNumber): this {
+    if (!this.info.cosignerData) {
+      this.info.cosignerData = {
+        decayStartTime: 0,
+        decayEndTime: 0,
+        exclusiveFiller: ethers.constants.AddressZero,
+        exclusivityOverrideBps: exclusivityOverrideBps,
+        inputOverride: BigNumber.from(0),
+        outputOverrides: [],
+      };
+    }
+    this.info.cosignerData.exclusivityOverrideBps = exclusivityOverrideBps;
     return this;
   }
 
@@ -205,6 +222,7 @@ export class V2DutchOrderBuilder extends OrderBuilder {
     this.decayStartTime(cosignerData.decayStartTime);
     this.decayEndTime(cosignerData.decayEndTime);
     this.exclusiveFiller(cosignerData.exclusiveFiller);
+    this.exclusivityOverrideBps(cosignerData.exclusivityOverrideBps);
     this.inputOverride(cosignerData.inputOverride);
     this.outputOverrides(cosignerData.outputOverrides);
     return this;
@@ -265,6 +283,10 @@ export class V2DutchOrderBuilder extends OrderBuilder {
       "exclusiveFiller not set"
     );
     invariant(
+      this.info.cosignerData.exclusivityOverrideBps !== undefined,
+      "exclusivityOverrideBps not set"
+    );
+    invariant(
       this.info.cosignerData.inputOverride !== undefined &&
         this.info.cosignerData.inputOverride.gte(this.info.input.startAmount),
       "inputOverride not set or smaller than original input"
@@ -309,6 +331,7 @@ export class V2DutchOrderBuilder extends OrderBuilder {
       decayStartTime: 0,
       decayEndTime: 0,
       exclusiveFiller: ethers.constants.AddressZero,
+      exclusivityOverrideBps: BigNumber.from(0),
       inputOverride: BigNumber.from(0),
       outputOverrides: [],
       ...overrides,
