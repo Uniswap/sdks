@@ -310,7 +310,7 @@ export class UnsignedV2DutchOrder extends UniswapXOrder {
   }
 
   /**
-   * Hash signed over by the cosigner
+   * Full order hash that should be signed over by the cosigner
    */
   cosignatureHash(cosignerData: CosignerData): string {
     const abiCoder = new ethers.utils.AbiCoder();
