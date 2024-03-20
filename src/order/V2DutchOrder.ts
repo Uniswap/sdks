@@ -25,6 +25,7 @@ export type CosignerData = {
   decayStartTime: number;
   decayEndTime: number;
   exclusiveFiller: string;
+  exclusivityOverrideBps: BigNumber;
   inputOverride: BigNumber;
   outputOverrides: BigNumber[];
 };
@@ -33,6 +34,7 @@ export type CosignerDataJSON = {
   decayStartTime: number;
   decayEndTime: number;
   exclusiveFiller: string;
+  exclusivityOverrideBps: number;
   inputOverride: string;
   outputOverrides: string[];
 };
@@ -103,7 +105,7 @@ const V2_DUTCH_ORDER_ABI = [
       "address", // cosigner
       "tuple(address,uint256,uint256)", // input
       "tuple(address,uint256,uint256,address)[]", // outputs
-      "tuple(uint256,uint256,address,uint256,uint256[])", // cosignerData
+      "tuple(uint256,uint256,address,uint256,uint256,uint256[])", // cosignerData
       "bytes", // cosignature
     ].join(",") +
     ")",
@@ -218,7 +220,7 @@ export class UnsignedV2DutchOrder extends UniswapXOrder {
           output.recipient,
         ]),
         // use empty default for cosignerData and cosignature
-        [0, 0, ethers.constants.AddressZero, 0, [0]],
+        [0, 0, ethers.constants.AddressZero, 0, 0, [0]],
         "0x",
       ],
     ]);
@@ -319,11 +321,12 @@ export class UnsignedV2DutchOrder extends UniswapXOrder {
       [
         this.hash(),
         abiCoder.encode(
-          ["uint256", "uint256", "address", "uint256", "uint256[]"],
+          ["uint256", "uint256", "address", "uint256", "uint256", "uint256[]"],
           [
             cosignerData.decayStartTime,
             cosignerData.decayEndTime,
             cosignerData.exclusiveFiller,
+            cosignerData.exclusivityOverrideBps,
             cosignerData.inputOverride,
             cosignerData.outputOverrides,
           ]
@@ -376,6 +379,9 @@ export class CosignedV2DutchOrder extends UnsignedV2DutchOrder {
           decayStartTime: json.cosignerData.decayStartTime,
           decayEndTime: json.cosignerData.decayEndTime,
           exclusiveFiller: json.cosignerData.exclusiveFiller,
+          exclusivityOverrideBps: BigNumber.from(
+            json.cosignerData.exclusivityOverrideBps
+          ),
           inputOverride: BigNumber.from(json.cosignerData.inputOverride),
           outputOverrides: json.cosignerData.outputOverrides.map(
             BigNumber.from
@@ -422,6 +428,8 @@ export class CosignedV2DutchOrder extends UnsignedV2DutchOrder {
         decayStartTime: this.info.cosignerData.decayStartTime,
         decayEndTime: this.info.cosignerData.decayEndTime,
         exclusiveFiller: this.info.cosignerData.exclusiveFiller,
+        exclusivityOverrideBps:
+          this.info.cosignerData.exclusivityOverrideBps.toNumber(),
         inputOverride: this.info.cosignerData.inputOverride.toString(),
         outputOverrides: this.info.cosignerData.outputOverrides.map((o) =>
           o.toString()
@@ -502,6 +510,7 @@ export class CosignedV2DutchOrder extends UnsignedV2DutchOrder {
           this.info.cosignerData.decayStartTime,
           this.info.cosignerData.decayEndTime,
           this.info.cosignerData.exclusiveFiller,
+          this.info.cosignerData.exclusivityOverrideBps,
           this.info.cosignerData.inputOverride.toString(),
           this.info.cosignerData.outputOverrides.map((o) => o.toString()),
         ],
@@ -546,6 +555,7 @@ function parseSerializedOrder(serialized: string): CosignedV2DutchOrderInfo {
         decayStartTime,
         decayEndTime,
         exclusiveFiller,
+        exclusivityOverrideBps,
         inputOverride,
         outputOverrides,
       ],
@@ -585,6 +595,7 @@ function parseSerializedOrder(serialized: string): CosignedV2DutchOrderInfo {
       decayStartTime: decayStartTime.toNumber(),
       decayEndTime: decayEndTime.toNumber(),
       exclusiveFiller,
+      exclusivityOverrideBps,
       inputOverride,
       outputOverrides,
     },
