@@ -67,20 +67,23 @@ export type CosignedV2DutchOrderInfoJSON = UnsignedV2DutchOrderInfoJSON & {
 type V2WitnessInfo = {
   info: OrderInfo;
   cosigner: string;
-  inputToken: string;
-  inputStartAmount: BigNumber;
-  inputEndAmount: BigNumber;
-  outputs: DutchOutput[];
+  baseInputToken: string;
+  baseInputStartAmount: BigNumber;
+  baseInputEndAmount: BigNumber;
+  baseOutputs: DutchOutput[];
 };
+
+const COSIGNER_DATA_TUPLE_ABI =
+  "tuple(uint256,uint256,address,uint256,uint256,uint256[])";
 
 const V2_DUTCH_ORDER_TYPES = {
   V2DutchOrder: [
     { name: "info", type: "OrderInfo" },
     { name: "cosigner", type: "address" },
-    { name: "inputToken", type: "address" },
-    { name: "inputStartAmount", type: "uint256" },
-    { name: "inputEndAmount", type: "uint256" },
-    { name: "outputs", type: "DutchOutput[]" },
+    { name: "baseInputToken", type: "address" },
+    { name: "baseInputStartAmount", type: "uint256" },
+    { name: "baseInputEndAmount", type: "uint256" },
+    { name: "baseOutputs", type: "DutchOutput[]" },
   ],
   OrderInfo: [
     { name: "reactor", type: "address" },
@@ -105,7 +108,7 @@ const V2_DUTCH_ORDER_ABI = [
       "address", // cosigner
       "tuple(address,uint256,uint256)", // input
       "tuple(address,uint256,uint256,address)[]", // outputs
-      "tuple(uint256,uint256,address,uint256,uint256,uint256[])", // cosignerData
+      COSIGNER_DATA_TUPLE_ABI, // cosignerData
       "bytes", // cosignature
     ].join(",") +
     ")",
@@ -295,17 +298,16 @@ export class UnsignedV2DutchOrder extends UniswapXOrder {
         additionalValidationData: this.info.additionalValidationData,
       },
       cosigner: this.info.cosigner,
-      inputToken: this.info.input.token,
-      inputStartAmount: this.info.input.startAmount,
-      inputEndAmount: this.info.input.endAmount,
-      outputs: this.info.outputs,
+      baseInputToken: this.info.input.token,
+      baseInputStartAmount: this.info.input.startAmount,
+      baseInputEndAmount: this.info.input.endAmount,
+      baseOutputs: this.info.outputs,
     };
   }
 
   private witness(): Witness {
     return {
       witness: this.witnessInfo(),
-      // TODO: remove "Limit"
       witnessTypeName: "V2DutchOrder",
       witnessType: V2_DUTCH_ORDER_TYPES,
     };
@@ -316,19 +318,22 @@ export class UnsignedV2DutchOrder extends UniswapXOrder {
    */
   cosignatureHash(cosignerData: CosignerData): string {
     const abiCoder = new ethers.utils.AbiCoder();
+
     return ethers.utils.solidityKeccak256(
       ["bytes32", "bytes"],
       [
         this.hash(),
         abiCoder.encode(
-          ["uint256", "uint256", "address", "uint256", "uint256", "uint256[]"],
+          [COSIGNER_DATA_TUPLE_ABI],
           [
-            cosignerData.decayStartTime,
-            cosignerData.decayEndTime,
-            cosignerData.exclusiveFiller,
-            cosignerData.exclusivityOverrideBps,
-            cosignerData.inputOverride,
-            cosignerData.outputOverrides,
+            [
+              cosignerData.decayStartTime,
+              cosignerData.decayEndTime,
+              cosignerData.exclusiveFiller,
+              cosignerData.exclusivityOverrideBps,
+              cosignerData.inputOverride,
+              cosignerData.outputOverrides,
+            ],
           ]
         ),
       ]
