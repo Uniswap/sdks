@@ -38,6 +38,7 @@ export enum OrderValidation {
   UnknownError,
   ValidationFailed,
   ExclusivityPeriod,
+  InvalidCosignature,
   OK,
 }
 
@@ -87,6 +88,14 @@ const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
   b9ec1e96: OrderValidation.ExclusivityPeriod,
   "062dec56": OrderValidation.ExclusivityPeriod,
   "75c1bb14": OrderValidation.ExclusivityPeriod,
+  // invalid cosigner output
+  a305df82: OrderValidation.InvalidOrderFields,
+  // invalid cosigner input
+  ac9143e7: OrderValidation.InvalidOrderFields,
+  // duplicate fee output
+  fff08303: OrderValidation.InvalidOrderFields,
+  // invalid cosignature
+  d7815be1: OrderValidation.InvalidCosignature,
   TRANSFER_FROM_FAILED: OrderValidation.InsufficientFunds,
 };
 
