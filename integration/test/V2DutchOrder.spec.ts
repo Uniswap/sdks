@@ -94,39 +94,6 @@ describe("DutchV2Order", () => {
     openFillerAddress = await openFiller.getAddress();
   });
 
-  //// resets token balances
-  //afterEach(async () => {
-  //  try {
-  //    await tokenOut.transferFrom(
-  //      swapper.getAddress(),
-  //      ethers.constants.AddressZero,
-  //      tokenOut.balanceOf(await swapper.getAddress())
-  //    );
-  //    await tokenIn.transferFrom(
-  //      filler.getAddress(),
-  //      ethers.constants.AddressZero,
-  //      tokenOut.balanceOf(await filler.getAddress())
-  //    );
-  //    await tokenIn.transferFrom(
-  //      openFiller.getAddress(),
-  //      ethers.constants.AddressZero,
-  //      tokenOut.balanceOf(await openFiller.getAddress())
-  //    );
-
-  //    await tokenIn.mint(swapperAddress, BigNumber.from(10).pow(18).mul(100));
-  //    await tokenOut.mint(
-  //      await filler.getAddress(),
-  //      BigNumber.from(10).pow(18).mul(100)
-  //    );
-  //    await tokenOut.mint(
-  //      await openFiller.getAddress(),
-  //      BigNumber.from(10).pow(18).mul(100)
-  //    );
-  //  } catch (e) {
-  //    console.log(e);
-  //  }
-  //});
-
   describe("Partial Order", () => {
     it("correctly builds a partial order", async () => {
       const deadline = await new BlockchainTime().secondsFromNow(1000);
