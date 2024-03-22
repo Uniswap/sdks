@@ -32,7 +32,6 @@
   },
   "module": "dist/uniswapx-sdk.esm.js",
   "devDependencies": {
-    "@nomicfoundation/hardhat-network-helpers": "^1.0.10",
     "@typechain/ethers-v5": "^10.1.0",
     "@types/jest": "^29.0.3",
     "@types/node": "^18.7.16",

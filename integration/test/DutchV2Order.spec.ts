@@ -1,7 +1,6 @@
 import hre, { ethers } from "hardhat";
 import { expect } from "chai";
 import { BigNumber, Signer, Wallet } from "ethers";
-import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 import { BlockchainTime } from "./utils/time";
 
@@ -94,6 +93,39 @@ describe("DutchV2Order", () => {
     fillerAddress = await filler.getAddress();
     openFillerAddress = await openFiller.getAddress();
   });
+
+  //// resets token balances
+  //afterEach(async () => {
+  //  try {
+  //    await tokenOut.transferFrom(
+  //      swapper.getAddress(),
+  //      ethers.constants.AddressZero,
+  //      tokenOut.balanceOf(await swapper.getAddress())
+  //    );
+  //    await tokenIn.transferFrom(
+  //      filler.getAddress(),
+  //      ethers.constants.AddressZero,
+  //      tokenOut.balanceOf(await filler.getAddress())
+  //    );
+  //    await tokenIn.transferFrom(
+  //      openFiller.getAddress(),
+  //      ethers.constants.AddressZero,
+  //      tokenOut.balanceOf(await openFiller.getAddress())
+  //    );
+
+  //    await tokenIn.mint(swapperAddress, BigNumber.from(10).pow(18).mul(100));
+  //    await tokenOut.mint(
+  //      await filler.getAddress(),
+  //      BigNumber.from(10).pow(18).mul(100)
+  //    );
+  //    await tokenOut.mint(
+  //      await openFiller.getAddress(),
+  //      BigNumber.from(10).pow(18).mul(100)
+  //    );
+  //  } catch (e) {
+  //    console.log(e);
+  //  }
+  //});
 
   describe("Partial Order", () => {
     it("correctly builds a partial order", async () => {
@@ -490,7 +522,7 @@ describe("DutchV2Order", () => {
       ).to.equal(fillerTokenOutBalanceBefore.sub(AMOUNT).toString());
     });
 
-    it("executes an open order past exclusivity", async () => {
+    it("open filler executes an open order past exclusivity", async () => {
       const deadline = await new BlockchainTime().secondsFromNow(1000);
       const order = new V2DutchOrderBuilder(
         chainId,
@@ -498,7 +530,6 @@ describe("DutchV2Order", () => {
         permit2.address
       )
         .cosigner(cosigner.address)
-        .decayStartTime(deadline - 1000)
         .deadline(deadline)
         .swapper(swapper.address)
         .nonce(BigNumber.from(102))
@@ -520,6 +551,7 @@ describe("DutchV2Order", () => {
 
       const cosignerData = getCosignerData(deadline, {
         exclusiveFiller: fillerAddress,
+        decayStartTime: deadline - 1000,
       });
       const cosignerHash = order.cosignatureHash(cosignerData);
       const cosignature = ethers.utils.joinSignature(
@@ -533,29 +565,22 @@ describe("DutchV2Order", () => {
       const swapperTokenInBalanceBefore = await tokenIn.balanceOf(
         swapperAddress
       );
-      const fillerTokenInBalanceBefore = await tokenIn.balanceOf(
+      const fillerTokenInBalanceBefore = await tokenIn.balanceOf(fillerAddress);
+      const openFillerTokenInBalanceBefore = await tokenIn.balanceOf(
         openFillerAddress
       );
       const swapperTokenOutBalanceBefore = await tokenOut.balanceOf(
         swapperAddress
       );
       const fillerTokenOutBalanceBefore = await tokenOut.balanceOf(
+        fillerAddress
+      );
+      const openFillerTokenOutBalanceBefore = await tokenOut.balanceOf(
         openFillerAddress
       );
 
-      console.log(`start blocknumber: ${await time.latestBlock()}`);
-      // mine a new block before end of exclusivity
-      await new BlockchainTime().increaseTime(1);
-      console.log(`before blocknumber: ${await time.latestBlock()}`);
       // mine another block to pass exclusivity
-      await new BlockchainTime().increaseTime(800);
-      console.log(`after blocknumber: ${await time.latestBlock()}`);
-
-      const calld = await reactor.populateTransaction.execute({
-        order: fullOrder.serialize(),
-        sig: signature,
-      });
-      console.log(JSON.stringify(calld, null, 2));
+      await new BlockchainTime().increaseTime(500);
 
       const res = await reactor
         .connect(openFiller)
@@ -565,8 +590,13 @@ describe("DutchV2Order", () => {
       expect((await tokenIn.balanceOf(swapperAddress)).toString()).to.equal(
         swapperTokenInBalanceBefore.sub(AMOUNT).toString()
       );
+      // exclusive filler did not fill
       expect((await tokenIn.balanceOf(fillerAddress)).toString()).to.equal(
-        fillerTokenInBalanceBefore.add(AMOUNT).toString()
+        fillerTokenInBalanceBefore.toString()
+      );
+      // filled by open filler
+      expect((await tokenIn.balanceOf(openFillerAddress)).toString()).to.equal(
+        openFillerTokenInBalanceBefore.add(AMOUNT).toString()
       );
 
       const amountOut = order.info.outputs[0].startAmount
@@ -581,9 +611,59 @@ describe("DutchV2Order", () => {
       );
       expectThreshold(
         await tokenOut.balanceOf(openFillerAddress),
-        fillerTokenOutBalanceBefore.sub(amountOut),
+        openFillerTokenOutBalanceBefore.sub(amountOut),
         BigNumber.from(10).pow(15)
       );
+    });
+
+    it("open filler fails to execute an open order before exclusivity", async () => {
+      const deadline = await new BlockchainTime().secondsFromNow(1000);
+      const order = new V2DutchOrderBuilder(
+        chainId,
+        reactor.address,
+        permit2.address
+      )
+        .cosigner(cosigner.address)
+        .deadline(deadline)
+        .swapper(swapper.address)
+        .nonce(BigNumber.from(102))
+        .input({
+          token: tokenIn.address,
+          startAmount: AMOUNT,
+          endAmount: AMOUNT,
+        })
+        .output({
+          token: tokenOut.address,
+          startAmount: AMOUNT,
+          endAmount: AMOUNT.div(2),
+          recipient: swapper.address,
+        })
+        .buildPartial();
+
+      const { domain, types, values } = order.permitData();
+      const signature = await swapper._signTypedData(domain, types, values);
+
+      const cosignerData = getCosignerData(deadline, {
+        exclusiveFiller: fillerAddress,
+        decayStartTime: deadline - 500,
+      });
+      const cosignerHash = order.cosignatureHash(cosignerData);
+      const cosignature = ethers.utils.joinSignature(
+        cosigner._signingKey().signDigest(cosignerHash)
+      );
+      const fullOrder = V2DutchOrderBuilder.fromOrder(order)
+        .cosignerData(cosignerData)
+        .cosignature(cosignature)
+        .build();
+
+      // mine another block to pass exclusivity
+      await new BlockchainTime().increaseTime(100);
+
+      await expect(
+        reactor
+          .connect(openFiller)
+          .execute({ order: fullOrder.serialize(), sig: signature })
+      ).to.be.revertedWithCustomError(reactor, "NoExclusiveOverride");
     });
   });
 
