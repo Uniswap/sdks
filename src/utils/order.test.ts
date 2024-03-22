@@ -122,7 +122,6 @@ describe("order utils", () => {
         endAmount: BigNumber.from("1000000000000000000"),
         recipient: "0x0000000000000000000000000000000000000000",
       })
-      .outputOverrides([BigNumber.from(0)])
       .outputOverrides([BigNumber.from("100000000000000000000")]);
 
     unsignedV2DutchOrder = v2Builder.buildPartial();
