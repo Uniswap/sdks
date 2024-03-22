@@ -14,6 +14,7 @@ import { V2DutchOrderBuilder, CosignerData } from "../..";
 describe("DutchV2Order", () => {
   const FEE_RECIPIENT = "0x1111111111111111111111111111111111111111";
   const AMOUNT = BigNumber.from(10).pow(18);
+  let NONCE = BigNumber.from(100);
 
   let reactor: V2DutchOrderReactor;
   let permit2: Permit2;
@@ -94,6 +95,10 @@ describe("DutchV2Order", () => {
     openFillerAddress = await openFiller.getAddress();
   });
 
+  afterEach(() => {
+    NONCE = NONCE.add(1);
+  });
+
   describe("Partial Order", () => {
     it("correctly builds a partial order", async () => {
       const deadline = await new BlockchainTime().secondsFromNow(1000);
@@ -105,7 +110,7 @@ describe("DutchV2Order", () => {
         .cosigner(cosignerAddress)
         .deadline(deadline)
         .swapper(swapperAddress)
-        .nonce(BigNumber.from(100))
+        .nonce(NONCE)
         .input({
           token: tokenIn.address,
           startAmount: AMOUNT,
@@ -158,7 +163,7 @@ describe("DutchV2Order", () => {
         .cosigner(cosignerAddress)
         .deadline(deadline)
         .swapper(swapperAddress)
-        .nonce(BigNumber.from(100))
+        .nonce(NONCE)
         .input({
           token: tokenIn.address,
           startAmount: AMOUNT,
@@ -204,7 +209,7 @@ describe("DutchV2Order", () => {
         .cosigner(cosignerAddress)
         .deadline(deadline)
         .swapper(swapperAddress)
-        .nonce(BigNumber.from(100))
+        .nonce(NONCE)
         .input({
           token: tokenIn.address,
           startAmount: AMOUNT,
@@ -252,7 +257,7 @@ describe("DutchV2Order", () => {
         .cosigner(cosignerAddress)
         .deadline(deadline)
         .swapper(swapperAddress)
-        .nonce(BigNumber.from(100))
+        .nonce(NONCE)
         .input({
           token: tokenIn.address,
           startAmount: AMOUNT,
@@ -298,7 +303,7 @@ describe("DutchV2Order", () => {
         .cosigner(cosignerAddress)
         .deadline(deadline)
         .swapper(swapperAddress)
-        .nonce(BigNumber.from(100))
+        .nonce(NONCE)
         .input({
           token: tokenIn.address,
           startAmount: AMOUNT,
@@ -327,7 +332,7 @@ describe("DutchV2Order", () => {
       expect(order.info.swapper).to.eq(swapperAddress);
       expect(order.info.cosigner).to.eq(cosignerAddress);
       expect(order.info.cosignature).to.eq(cosignature);
-      expect(order.info.nonce.toNumber()).to.eq(100);
+      expect(order.info.nonce.toNumber()).to.eq(NONCE);
 
       expect(order.info.input.token).to.eq(tokenIn.address);
       expect(order.info.input.startAmount).to.eq(AMOUNT);
@@ -342,6 +347,50 @@ describe("DutchV2Order", () => {
       expect(builtOutput.recipient).to.eq(swapperAddress);
     });
 
+    it("reverts if cosignature is invalid", async () => {
+      const deadline = await new BlockchainTime().secondsFromNow(1000);
+      const order = new V2DutchOrderBuilder(
+        chainId,
+        reactor.address,
+        permit2.address
+      )
+        .cosigner(cosigner.address)
+        .deadline(deadline)
+        .swapper(swapper.address)
+        .nonce(NONCE)
+        .input({
+          token: tokenIn.address,
+          startAmount: AMOUNT,
+          endAmount: AMOUNT,
+        })
+        .output({
+          token: tokenOut.address,
+          startAmount: AMOUNT,
+          endAmount: AMOUNT,
+          recipient: swapper.address,
+        })
+        .buildPartial();
+
+      const { domain, types, values } = order.permitData();
+      const signature = await swapper._signTypedData(domain, types, values);
+
+      const cosignerData = getCosignerData(deadline, {});
+      const cosignerHash = order.cosignatureHash(cosignerData);
+      let cosignature = ethers.utils.joinSignature(
+        cosigner._signingKey().signDigest(cosignerHash)
+      );
+      const fullOrder = V2DutchOrderBuilder.fromOrder(order)
+        .cosignerData({ ...cosignerData, inputOverride: AMOUNT.sub(1) })
+        .cosignature(cosignature)
+        .build();
+
+      await expect(
+        reactor
+          .connect(openFiller)
+          .execute({ order: fullOrder.serialize(), sig: signature })
+      ).to.be.revertedWithCustomError(reactor, "InvalidCosignature");
+    });
+
     it("executes a serialized order with no decay", async () => {
       const deadline = await new BlockchainTime().secondsFromNow(1000);
       const order = new V2DutchOrderBuilder(
@@ -352,7 +401,7 @@ describe("DutchV2Order", () => {
         .cosigner(cosigner.address)
         .deadline(deadline)
         .swapper(swapper.address)
-        .nonce(BigNumber.from(100))
+        .nonce(NONCE)
         .input({
           token: tokenIn.address,
           startAmount: AMOUNT,
@@ -419,6 +468,145 @@ describe("DutchV2Order", () => {
       );
     });
 
+    it("executes a serialized order with no decay, override of double original output amount", async () => {
+      const deadline = await new BlockchainTime().secondsFromNow(1000);
+      const order = new V2DutchOrderBuilder(
+        chainId,
+        reactor.address,
+        permit2.address
+      )
+        .cosigner(cosigner.address)
+        .deadline(deadline)
+        .swapper(swapper.address)
+        .nonce(NONCE)
+        .input({
+          token: tokenIn.address,
+          startAmount: AMOUNT,
+          endAmount: AMOUNT,
+        })
+        .output({
+          token: tokenOut.address,
+          startAmount: AMOUNT,
+          endAmount: AMOUNT,
+          recipient: swapper.address,
+        })
+        .buildPartial();
+
+      const { domain, types, values } = order.permitData();
+      const signature = await swapper._signTypedData(domain, types, values);
+
+      const cosignerData = getCosignerData(deadline, {
+        outputOverrides: [AMOUNT.mul(2)],
+      });
+      const cosignerHash = order.cosignatureHash(cosignerData);
+      const cosignature = ethers.utils.joinSignature(
+        cosigner._signingKey().signDigest(cosignerHash)
+      );
+      const fullOrder = V2DutchOrderBuilder.fromOrder(order)
+        .cosignerData(cosignerData)
+        .cosignature(cosignature)
+        .build();
+
+      const swapperTokenInBalanceBefore = await tokenIn.balanceOf(
+        swapperAddress
+      );
+      const fillerTokenInBalanceBefore = await tokenIn.balanceOf(fillerAddress);
+      const swapperTokenOutBalanceBefore = await tokenOut.balanceOf(
+        swapperAddress
+      );
+      const fillerTokenOutBalanceBefore = await tokenOut.balanceOf(
+        fillerAddress
+      );
+
+      const res = await reactor
+        .connect(filler)
+        .execute({ order: fullOrder.serialize(), sig: signature });
+      const receipt = await res.wait();
+      expect(receipt.status).to.equal(1);
+      expect((await tokenIn.balanceOf(swapperAddress)).toString()).to.equal(
+        swapperTokenInBalanceBefore.sub(AMOUNT).toString()
+      );
+      expect((await tokenIn.balanceOf(fillerAddress)).toString()).to.equal(
+        fillerTokenInBalanceBefore.add(AMOUNT).toString()
+      );
+
+      expect((await tokenOut.balanceOf(swapperAddress)).toString()).to.equal(
+        swapperTokenOutBalanceBefore.add(AMOUNT.mul(2)).toString()
+      );
+      expect((await tokenOut.balanceOf(fillerAddress)).toString()).to.equal(
+        fillerTokenOutBalanceBefore.sub(AMOUNT.mul(2)).toString()
+      );
+    });
+
+    it("executes a serialized order with no decay, override of half original input amount", async () => {
+      const deadline = await new BlockchainTime().secondsFromNow(1000);
+      const order = new V2DutchOrderBuilder(
+        chainId,
+        reactor.address,
+        permit2.address
+      )
+        .cosigner(cosigner.address)
+        .deadline(deadline)
+        .swapper(swapper.address)
+        .nonce(NONCE)
+        .input({
+          token: tokenIn.address,
+          startAmount: AMOUNT,
+          endAmount: AMOUNT,
+        })
+        .output({
+          token: tokenOut.address,
+          startAmount: AMOUNT,
+          endAmount: AMOUNT,
+          recipient: swapper.address,
+        })
+        .buildPartial();
+
+      const { domain, types, values } = order.permitData();
+      const signature = await swapper._signTypedData(domain, types, values);
+
+      const cosignerData = getCosignerData(deadline, {
+        inputOverride: AMOUNT.div(2),
+      });
+      const cosignerHash = order.cosignatureHash(cosignerData);
+      const cosignature = ethers.utils.joinSignature(
+        cosigner._signingKey().signDigest(cosignerHash)
+      );
+      const fullOrder = V2DutchOrderBuilder.fromOrder(order)
+        .cosignerData(cosignerData)
+        .cosignature(cosignature)
+        .build();
+
+      const swapperTokenInBalanceBefore = await tokenIn.balanceOf(
+        swapperAddress
+      );
+      const fillerTokenInBalanceBefore = await tokenIn.balanceOf(fillerAddress);
+      const swapperTokenOutBalanceBefore = await tokenOut.balanceOf(
+        swapperAddress
+      );
+      const fillerTokenOutBalanceBefore = await tokenOut.balanceOf(
+        fillerAddress
+      );
+
+      const res = await reactor
+        .connect(filler)
+        .execute({ order: fullOrder.serialize(), sig: signature });
+      const receipt = await res.wait();
+      expect(receipt.status).to.equal(1);
+      expect((await tokenIn.balanceOf(swapperAddress)).toString()).to.equal(
+        swapperTokenInBalanceBefore.sub(AMOUNT.div(2)).toString()
+      );
+      expect((await tokenIn.balanceOf(fillerAddress)).toString()).to.equal(
+        fillerTokenInBalanceBefore.add(AMOUNT.div(2)).toString()
+      );
+      expect((await tokenOut.balanceOf(swapperAddress)).toString()).to.equal(
+        swapperTokenOutBalanceBefore.add(AMOUNT).toString()
+      );
+      expect((await tokenOut.balanceOf(fillerAddress)).toString()).to.equal(
+        fillerTokenOutBalanceBefore.sub(AMOUNT).toString()
+      );
+    });
+
     it("executes a serialized order with decay", async () => {
       const deadline = await new BlockchainTime().secondsFromNow(1000);
       const order = new V2DutchOrderBuilder(
@@ -430,7 +618,7 @@ describe("DutchV2Order", () => {
         .deadline(deadline)
         .decayStartTime(deadline - 2000)
         .swapper(swapper.address)
-        .nonce(BigNumber.from(101))
+        .nonce(NONCE)
         .input({
           token: tokenIn.address,
           startAmount: AMOUNT,
@@ -499,7 +687,7 @@ describe("DutchV2Order", () => {
         .cosigner(cosigner.address)
         .deadline(deadline)
         .swapper(swapper.address)
-        .nonce(BigNumber.from(102))
+        .nonce(NONCE)
         .input({
           token: tokenIn.address,
           startAmount: AMOUNT,
@@ -593,7 +781,7 @@ describe("DutchV2Order", () => {
         .cosigner(cosigner.address)
         .deadline(deadline)
         .swapper(swapper.address)
-        .nonce(BigNumber.from(102))
+        .nonce(NONCE)
         .input({
           token: tokenIn.address,
           startAmount: AMOUNT,
