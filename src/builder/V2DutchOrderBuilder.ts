@@ -288,8 +288,8 @@ export class V2DutchOrderBuilder extends OrderBuilder {
     );
     invariant(
       this.info.cosignerData.inputOverride !== undefined &&
-        this.info.cosignerData.inputOverride.gte(this.info.input.startAmount),
-      "inputOverride not set or smaller than original input"
+        this.info.cosignerData.inputOverride.lte(this.info.input.startAmount),
+      "inputOverride not set or larger than original input"
     );
     invariant(
       this.info.cosignerData.outputOverrides.length > 0,
@@ -297,8 +297,8 @@ export class V2DutchOrderBuilder extends OrderBuilder {
     );
     this.info.cosignerData.outputOverrides.forEach((override, idx) => {
       invariant(
-        override.lte(this.info.outputs![idx].startAmount),
-        "outputOverride must not be larger than original output"
+        override.gte(this.info.outputs![idx].startAmount),
+        "outputOverride must be larger than or equal to original output"
       );
     });
     invariant(this.info.input !== undefined, "original input not set");

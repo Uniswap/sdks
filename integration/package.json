@@ -15,7 +15,9 @@
   },
   "author": "Uniswap",
   "devDependencies": {
-    "@nomiclabs/hardhat-ethers": "^2.1.1",
+    "@nomicfoundation/hardhat-chai-matchers": "1.0.6",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.10",
+    "@nomiclabs/hardhat-ethers": "^2.2.3",
     "@types/chai": "^4.3.3",
     "@types/mocha": "^9.1.1",
     "@types/node": "^18.7.16",
