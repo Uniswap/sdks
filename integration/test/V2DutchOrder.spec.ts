@@ -623,7 +623,7 @@ describe("DutchV2Order", () => {
         .cosignature(cosignature)
         .build();
 
-      // mine another block to pass exclusivity
+      // mine another block, but do not pass exclusivity
       await new BlockchainTime().increaseTime(100);
 
       await expect(
