@@ -1,3 +1,5 @@
+import { ethers } from "ethers";
+
 import { OrderType, REVERSE_REACTOR_MAPPING } from "../constants";
 import { MissingConfiguration } from "../errors";
 import {
@@ -10,12 +12,13 @@ import {
 
 import { stripHexPrefix } from ".";
 
-const UNISWAPX_FIRST_FIELD_OFFSET = 664;
-const RELAY_FIRST_FIELD_OFFSET = 88;
+const UNISWAPX_ORDER_INFO_OFFSET = 64;
+const RELAY_ORDER_INFO_OFFSET = 64;
+const SLOT_LENGTH = 64;
 const ADDRESS_LENGTH = 40;
 
 abstract class OrderParser {
-  abstract offset: number;
+  abstract orderInfoOffset: number;
 
   abstract parseOrder(order: string, chainId: number): Order;
 
@@ -24,17 +27,34 @@ abstract class OrderParser {
    * @dev called by derived classes which set the offset
    */
   protected _parseOrder(order: string): OrderType {
-    const reactor =
-      "0x" +
-      stripHexPrefix(order)
-        .slice(this.offset, this.offset + ADDRESS_LENGTH)
-        .toLowerCase();
+    const strippedOrder = stripHexPrefix(order);
+    // look up the tail offset of orderInfo
+    // orderInfo is always the first field in the order,
+    // but since it is dynamic size it is a pointer in the tail
+    const orderInfoOffsetBytes = parseInt(
+      strippedOrder.slice(
+        this.orderInfoOffset,
+        this.orderInfoOffset + SLOT_LENGTH
+      ),
+      16
+    );
+    // multiply tail offset by 2 to get in terms of hex characters instead of bytes
+    // and add one slot to skip the orderinfo size slot
+    const reactorAddressOffset = orderInfoOffsetBytes * 2 + SLOT_LENGTH;
+    const reactorAddressSlot = strippedOrder.slice(
+      reactorAddressOffset,
+      reactorAddressOffset + SLOT_LENGTH
+    );
+    // slice off the 0 padding in front of the address
+    const reactorAddress = ethers.utils
+      .getAddress(reactorAddressSlot.slice(SLOT_LENGTH - ADDRESS_LENGTH))
+      .toLowerCase();
 
-    if (!REVERSE_REACTOR_MAPPING[reactor]) {
-      throw new MissingConfiguration("reactor", reactor);
+    if (!REVERSE_REACTOR_MAPPING[reactorAddress]) {
+      throw new MissingConfiguration("reactor", reactorAddress);
     }
 
-    return REVERSE_REACTOR_MAPPING[reactor].orderType;
+    return REVERSE_REACTOR_MAPPING[reactorAddress].orderType;
   }
 
   /**
@@ -57,7 +77,7 @@ abstract class OrderParser {
 }
 
 export class UniswapXOrderParser extends OrderParser {
-  offset = UNISWAPX_FIRST_FIELD_OFFSET;
+  orderInfoOffset = UNISWAPX_ORDER_INFO_OFFSET;
 
   /**
    * Parses a serialized order
@@ -105,7 +125,7 @@ export class UniswapXOrderParser extends OrderParser {
 }
 
 export class RelayOrderParser extends OrderParser {
-  offset = RELAY_FIRST_FIELD_OFFSET;
+  orderInfoOffset = RELAY_ORDER_INFO_OFFSET;
 
   /**
    * Parses a serialized order
