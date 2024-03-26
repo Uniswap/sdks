@@ -16,10 +16,11 @@ import {
   DutchInputJSON,
   DutchOutput,
   DutchOutputJSON,
+  OffChainOrder,
   OrderInfo,
   OrderResolutionOptions,
-  UniswapXOrder,
 } from "./types";
+import { CustomOrderValidation, parseValidation } from "./validation";
 
 export type CosignerData = {
   decayStartTime: number;
@@ -114,7 +115,7 @@ const V2_DUTCH_ORDER_ABI = [
     ")",
 ];
 
-export class UnsignedV2DutchOrder extends UniswapXOrder {
+export class UnsignedV2DutchOrder implements OffChainOrder {
   public permit2Address: string;
 
   constructor(
@@ -122,7 +123,6 @@ export class UnsignedV2DutchOrder extends UniswapXOrder {
     public readonly chainId: number,
     _permit2Address?: string
   ) {
-    super();
     this.permit2Address = getPermit2(chainId, _permit2Address);
   }
 
@@ -268,11 +268,20 @@ export class UnsignedV2DutchOrder extends UniswapXOrder {
   }
 
   /**
-   * @inheritdoc Order
+   * Returns the resolved order with the given options
+   * @return The resolved order
    */
   resolve(_options: OrderResolutionOptions): ResolvedUniswapXOrder {
     // no cosigner data so no resolution possible
     throw new Error("Method not implemented");
+  }
+
+  /**
+   * Returns the parsed validation
+   * @return The parsed validation data for the order
+   */
+  get validation(): CustomOrderValidation {
+    return parseValidation(this.info);
   }
 
   private toPermit(): PermitTransferFrom {

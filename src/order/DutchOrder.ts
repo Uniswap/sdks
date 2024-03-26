@@ -18,10 +18,11 @@ import {
   DutchInputJSON,
   DutchOutput,
   DutchOutputJSON,
+  OffChainOrder,
   OrderInfo,
   OrderResolutionOptions,
-  UniswapXOrder,
 } from "./types";
+import { CustomOrderValidation, parseValidation } from "./validation";
 
 export function id(text: string): string {
   return keccak256(toUtf8Bytes(text));
@@ -102,7 +103,7 @@ const DUTCH_ORDER_ABI = [
     ")",
 ];
 
-export class DutchOrder extends UniswapXOrder {
+export class DutchOrder implements OffChainOrder {
   public permit2Address: string;
 
   constructor(
@@ -110,7 +111,6 @@ export class DutchOrder extends UniswapXOrder {
     public readonly chainId: number,
     readonly _permit2Address?: string
   ) {
-    super();
     if (_permit2Address) {
       this.permit2Address = _permit2Address;
     } else if (PERMIT2_MAPPING[chainId]) {
@@ -311,7 +311,8 @@ export class DutchOrder extends UniswapXOrder {
   }
 
   /**
-   * @inheritdoc Order
+   * Returns the resolved order with the given options
+   * @return The resolved order
    */
   resolve(options: OrderResolutionOptions): ResolvedUniswapXOrder {
     const useOverride =
@@ -358,6 +359,14 @@ export class DutchOrder extends UniswapXOrder {
         };
       }),
     };
+  }
+
+  /**
+   * Returns the parsed validation
+   * @return The parsed validation data for the order
+   */
+  get validation(): CustomOrderValidation {
+    return parseValidation(this.info);
   }
 
   private toPermit(): PermitTransferFrom {

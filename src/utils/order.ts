@@ -7,6 +7,7 @@ import {
   DutchOrder,
   Order,
   RelayOrder,
+  UniswapXOrder,
   UnsignedV2DutchOrder,
 } from "../order";
 
@@ -82,7 +83,7 @@ export class UniswapXOrderParser extends OrderParser {
   /**
    * Parses a serialized order
    */
-  parseOrder(order: string, chainId: number): Order {
+  parseOrder(order: string, chainId: number): UniswapXOrder {
     const orderType = this._parseOrder(order);
     switch (orderType) {
       case OrderType.Dutch:
@@ -130,7 +131,7 @@ export class RelayOrderParser extends OrderParser {
   /**
    * Parses a serialized order
    */
-  parseOrder(order: string, chainId: number): Order {
+  parseOrder(order: string, chainId: number): RelayOrder {
     return RelayOrder.parse(order, chainId);
   }
 }

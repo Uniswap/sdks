@@ -8,8 +8,9 @@ export * from "./types";
 export * from "./validation";
 export * from "./V2DutchOrder";
 
-export type Order =
+export type UniswapXOrder =
   | DutchOrder
-  | RelayOrder
   | UnsignedV2DutchOrder
   | CosignedV2DutchOrder;
+
+export type Order = UniswapXOrder | RelayOrder;

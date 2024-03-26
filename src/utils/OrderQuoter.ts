@@ -15,7 +15,7 @@ import {
 } from "../contracts";
 import { MissingConfiguration } from "../errors";
 import {
-  OffChainOrder,
+  Order,
   RelayOrder,
   ResolvedRelayFee,
   TokenAmount,
@@ -109,8 +109,8 @@ export interface SignedRelayOrder {
   signature: string;
 }
 
-export interface OffchainSignedOrder {
-  order: OffChainOrder;
+export interface SignedOrder {
+  order: Order;
   signature: string;
 }
 
@@ -153,7 +153,7 @@ async function getMulticallResults(
   provider: BaseProvider,
   quoter: Contract,
   functionName: string,
-  orders: OffchainSignedOrder[]
+  orders: SignedOrder[]
 ): Promise<MulticallResult[]> {
   const calls = orders.map((order) => {
     return [order.order.serialize(), order.signature];
