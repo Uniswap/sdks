@@ -148,6 +148,59 @@ describe("order utils", () => {
       );
     });
 
+    it("parses CosignedV2DutchOrder 2", () => {
+      const FROM_ADDRESS = "0xabCd111111111111111111111111111111111111";
+      const USDC_MAINNET_CHECKSUMMED_ADDRESS =
+        "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+
+      const TIMESTAMP_SECONDS = 1660562791;
+      const WETH_MAINNET_CHECKSUMMED_ADDRESS =
+        "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
+
+      const ENCODED_DUTCH_V2_ORDER = new V2DutchOrderBuilder(
+        1,
+        "0x3867393cC6EA7b0414C2c3e1D9fe7cEa987Fd066"
+      )
+        .decayStartTime(TIMESTAMP_SECONDS)
+        .decayEndTime(TIMESTAMP_SECONDS)
+        .input({
+          token: WETH_MAINNET_CHECKSUMMED_ADDRESS,
+          startAmount: BigNumber.from(10).pow(18).mul(2),
+          endAmount: BigNumber.from(10).pow(18),
+        })
+        .output({
+          token: USDC_MAINNET_CHECKSUMMED_ADDRESS,
+          startAmount: BigNumber.from(10).pow(6).mul(3),
+          endAmount: BigNumber.from(10).pow(6).mul(2),
+          recipient: FROM_ADDRESS,
+        })
+        .nonce(BigNumber.from(1))
+        .deadline(Math.floor(Date.now() / 1000 + 600))
+        .swapper(FROM_ADDRESS)
+        .inputOverride(BigNumber.from(10).pow(18).mul(2))
+        .outputOverrides([BigNumber.from(10).pow(6).mul(3)])
+        .exclusivityOverrideBps(BigNumber.from(0))
+        .cosigner("0x0000000000000000000000000000000000000000")
+        .cosignature(
+          "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+        )
+        .cosignerData({
+          decayStartTime: TIMESTAMP_SECONDS,
+          decayEndTime: TIMESTAMP_SECONDS,
+          exclusiveFiller: "0x0000000000000000000000000000000000000000",
+          exclusivityOverrideBps: BigNumber.from(0),
+          inputOverride: BigNumber.from(10).pow(18).mul(2),
+          outputOverrides: [BigNumber.from(10).pow(6).mul(3)],
+        })
+        .build()
+        .serialize();
+
+      //Missing configuration for reactor: 0xabcd111111111111111111111111111111111111 (swapper)
+      expect(uniswapXOrderParser.parseOrder(ENCODED_DUTCH_V2_ORDER, 1)).toEqual(
+        CosignedV2DutchOrder.parse(ENCODED_DUTCH_V2_ORDER, 1)
+      );
+    });
+
     it("parses DutchOrder with multiple outputs", () => {
       dutchOrder.info.outputs.push({
         token: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
