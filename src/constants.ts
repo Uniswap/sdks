@@ -81,6 +81,9 @@ export const REACTOR_ADDRESS_MAPPING: ReactorMapping = {
   },
 };
 
+// aliasing for backwards compatibility
+export const REACTOR_CONTRACT_MAPPING: ReactorMapping = REACTOR_ADDRESS_MAPPING;
+
 // https://github.com/mds1/multicall
 export const MULTICALL_ADDRESS = "0xcA11bde05977b3631167028862bE2a173976CA11";
 
