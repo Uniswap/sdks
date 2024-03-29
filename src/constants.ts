@@ -78,6 +78,8 @@ export const REACTOR_ADDRESS_MAPPING: ReactorMapping = {
   },
   11155111: {
     [OrderType.Dutch_V2]: "0x0e22B6638161A89533940Db590E67A52474bEBcd",
+    [OrderType.Dutch]: "0xD6c073F2A3b676B8f9002b276B618e0d8bA84Fad",
+    [OrderType.Relay]: "0x0000000000A4e21E2597DCac987455c48b12edBF",
   },
 };
 
