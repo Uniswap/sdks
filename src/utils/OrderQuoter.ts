@@ -317,7 +317,7 @@ export class RelayOrderQuoter
     const results = await getMulticallResults(
       this.provider,
       this.quoter,
-      "execute",
+      "0x3f62192e",
       orders
     );
     const validations = await this.getValidations(orders, results);
