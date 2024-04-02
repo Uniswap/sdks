@@ -42,7 +42,7 @@ export class V2DutchOrderTrade<
 
     const amount = CurrencyAmount.fromRawAmount(
       this._currencyIn,
-      this.order.info.input.startAmount.toString()
+      this.order.info.baseInput.startAmount.toString()
     );
     this._inputAmount = amount;
     return amount;
@@ -51,7 +51,7 @@ export class V2DutchOrderTrade<
   public get outputAmounts(): CurrencyAmount<TOutput>[] {
     if (this._outputAmounts) return this._outputAmounts;
 
-    const amounts = this.order.info.outputs.map((output) => {
+    const amounts = this.order.info.baseOutputs.map((output) => {
       // assume single chain ids across all outputs for now
       const currencyOut = this._currenciesOut.find((currency) =>
         areCurrenciesEqual(currency, output.token, currency.chainId)
@@ -85,10 +85,10 @@ export class V2DutchOrderTrade<
     if (this._firstNonFeeOutputStartEndAmounts)
       return this._firstNonFeeOutputStartEndAmounts;
 
-    if (this.order.info.outputs.length === 0) {
+    if (this.order.info.baseOutputs.length === 0) {
       throw new Error("there must be at least one output token");
     }
-    const output = this.order.info.outputs[0];
+    const output = this.order.info.baseOutputs[0];
 
     // assume single chain ids across all outputs for now
     const currencyOut = this._currenciesOut.find((currency) =>
@@ -128,7 +128,7 @@ export class V2DutchOrderTrade<
   public maximumAmountIn(): CurrencyAmount<TInput> {
     return CurrencyAmount.fromRawAmount(
       this._currencyIn,
-      this.order.info.input.endAmount.toString()
+      this.order.info.baseInput.endAmount.toString()
     );
   }
 

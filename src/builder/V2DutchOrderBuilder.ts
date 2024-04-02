@@ -29,14 +29,14 @@ export class V2DutchOrderBuilder extends OrderBuilder {
       .deadline(order.info.deadline)
       .swapper(order.info.swapper)
       .nonce(order.info.nonce)
-      .input(order.info.input)
+      .input(order.info.baseInput)
       .cosigner(order.info.cosigner)
       .validation({
         additionalValidationContract: order.info.additionalValidationContract,
         additionalValidationData: order.info.additionalValidationData,
       });
 
-    for (const output of order.info.outputs) {
+    for (const output of order.info.baseOutputs) {
       builder.output(output);
     }
 
@@ -61,7 +61,7 @@ export class V2DutchOrderBuilder extends OrderBuilder {
     this.permit2Address = getPermit2(chainId, _permit2Address);
 
     this.info = {
-      outputs: [],
+      baseOutputs: [],
       cosignerData: {
         decayStartTime: 0,
         decayEndTime: 0,
@@ -95,7 +95,7 @@ export class V2DutchOrderBuilder extends OrderBuilder {
   }
 
   input(input: DutchInput): this {
-    this.info.input = input;
+    this.info.baseInput = input;
     return this;
   }
 
@@ -104,7 +104,7 @@ export class V2DutchOrderBuilder extends OrderBuilder {
       output.startAmount.gte(output.endAmount),
       `startAmount must be greater than endAmount: ${output.startAmount.toString()}`
     );
-    this.info.outputs?.push(output);
+    this.info.baseOutputs?.push(output);
     return this;
   }
 
@@ -140,10 +140,10 @@ export class V2DutchOrderBuilder extends OrderBuilder {
       newRecipient !== feeRecipient,
       `newRecipient must be different from feeRecipient: ${newRecipient}`
     );
-    if (!this.info.outputs) {
+    if (!this.info.baseOutputs) {
       return this;
     }
-    this.info.outputs = this.info.outputs.map((output) => {
+    this.info.baseOutputs = this.info.baseOutputs.map((output) => {
       // if fee output then pass through
       if (
         feeRecipient &&
@@ -230,12 +230,12 @@ export class V2DutchOrderBuilder extends OrderBuilder {
 
   buildPartial(): UnsignedV2DutchOrder {
     invariant(this.info.cosigner !== undefined, "cosigner not set");
-    invariant(this.info.input !== undefined, "input not set");
+    invariant(this.info.baseInput !== undefined, "input not set");
     invariant(
-      this.info.outputs && this.info.outputs.length > 0,
+      this.info.baseOutputs && this.info.baseOutputs.length > 0,
       "outputs not set"
     );
-    invariant(this.info.input !== undefined, "original input not set");
+    invariant(this.info.baseInput !== undefined, "original input not set");
     invariant(
       !this.orderInfo.deadline ||
         (this.info.cosignerData &&
@@ -251,8 +251,8 @@ export class V2DutchOrderBuilder extends OrderBuilder {
 
     return new UnsignedV2DutchOrder(
       Object.assign(this.getOrderInfo(), {
-        input: this.info.input,
-        outputs: this.info.outputs,
+        baseInput: this.info.baseInput,
+        baseOutputs: this.info.baseOutputs,
         cosigner: this.info.cosigner,
       }),
       this.chainId,
@@ -263,9 +263,9 @@ export class V2DutchOrderBuilder extends OrderBuilder {
   build(): CosignedV2DutchOrder {
     invariant(this.info.cosigner !== undefined, "cosigner not set");
     invariant(this.info.cosignature !== undefined, "cosignature not set");
-    invariant(this.info.input !== undefined, "input not set");
+    invariant(this.info.baseInput !== undefined, "input not set");
     invariant(
-      this.info.outputs && this.info.outputs.length > 0,
+      this.info.baseOutputs && this.info.baseOutputs.length > 0,
       "outputs not set"
     );
     invariant(this.info.cosignerData !== undefined, "cosignerData not set");
@@ -288,7 +288,7 @@ export class V2DutchOrderBuilder extends OrderBuilder {
     );
     invariant(
       this.info.cosignerData.inputOverride !== undefined &&
-        this.info.cosignerData.inputOverride.lte(this.info.input.startAmount),
+        this.info.cosignerData.inputOverride.lte(this.info.baseInput.startAmount),
       "inputOverride not set or larger than original input"
     );
     invariant(
@@ -297,11 +297,11 @@ export class V2DutchOrderBuilder extends OrderBuilder {
     );
     this.info.cosignerData.outputOverrides.forEach((override, idx) => {
       invariant(
-        override.gte(this.info.outputs![idx].startAmount),
+        override.gte(this.info.baseOutputs![idx].startAmount),
         "outputOverride must be larger than or equal to original output"
       );
     });
-    invariant(this.info.input !== undefined, "original input not set");
+    invariant(this.info.baseInput !== undefined, "original input not set");
     invariant(
       !this.orderInfo.deadline ||
         this.info.cosignerData.decayStartTime <= this.orderInfo.deadline,
@@ -316,8 +316,8 @@ export class V2DutchOrderBuilder extends OrderBuilder {
     return new CosignedV2DutchOrder(
       Object.assign(this.getOrderInfo(), {
         cosignerData: this.info.cosignerData,
-        input: this.info.input,
-        outputs: this.info.outputs,
+        baseInput: this.info.baseInput,
+        baseOutputs: this.info.baseOutputs,
         cosigner: this.info.cosigner,
         cosignature: this.info.cosignature,
       }),

@@ -32,12 +32,12 @@ describe("V2DutchOrderTrade", () => {
     cosigner: "0x0000000000000000000000000000000000000000",
     additionalValidationContract: ethers.constants.AddressZero,
     additionalValidationData: "0x",
-    input: {
+    baseInput: {
       token: USDC.address,
       startAmount: BigNumber.from(1000),
       endAmount: BigNumber.from(1000),
     },
-    outputs: [
+    baseOutputs: [
       {
         token: DAI.address,
         startAmount: NON_FEE_OUTPUT_AMOUNT,
@@ -62,7 +62,7 @@ describe("V2DutchOrderTrade", () => {
 
   it("returns the right input amount for an exact-in trade", () => {
     expect(trade.inputAmount.quotient.toString()).toEqual(
-      orderInfo.input.startAmount.toString()
+      orderInfo.baseInput.startAmount.toString()
     );
   });
 
