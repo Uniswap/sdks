@@ -1,5 +1,5 @@
 import { BaseProvider } from "@ethersproject/providers";
-import { Contract, ethers } from "ethers";
+import { ethers } from "ethers";
 
 import {
   OrderType,
@@ -97,6 +97,10 @@ const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
   // invalid cosignature
   d7815be1: OrderValidation.InvalidCosignature,
   TRANSFER_FROM_FAILED: OrderValidation.InsufficientFunds,
+  // invalid fee escalation amounts
+  d856fc5a: OrderValidation.InvalidOrderFields,
+  // Signature expired
+  cd21db4f: OrderValidation.Expired,
 };
 
 export interface SignedUniswapXOrder {
@@ -148,25 +152,6 @@ async function checkTerminalStates(
   );
 }
 
-/// Get the results of a multicall for a given function
-async function getMulticallResults(
-  provider: BaseProvider,
-  quoter: Contract,
-  functionName: string,
-  orders: SignedOrder[]
-): Promise<MulticallResult[]> {
-  const calls = orders.map((order) => {
-    return [order.order.serialize(), order.signature];
-  });
-
-  return await multicallSameContractManyFunctions(provider, {
-    address: quoter.address,
-    contractInterface: quoter.interface,
-    functionName: functionName,
-    functionParams: calls,
-  });
-}
-
 /**
  * UniswapX order quoter
  */
@@ -199,12 +184,7 @@ export class UniswapXOrderQuoter
   async quoteBatch(
     orders: SignedUniswapXOrder[]
   ): Promise<UniswapXOrderQuote[]> {
-    const results = await getMulticallResults(
-      this.provider,
-      this.quoter,
-      "quote",
-      orders
-    );
+    const results = await this.getMulticallResults("quote", orders);
     const validations = await this.getValidations(orders, results);
 
     const quotes: (ResolvedUniswapXOrder | undefined)[] = results.map(
@@ -276,6 +256,23 @@ export class UniswapXOrderQuoter
     );
   }
 
+  /// Get the results of a multicall for a given function
+  private async getMulticallResults(
+    functionName: string,
+    orders: SignedOrder[]
+  ): Promise<MulticallResult[]> {
+    const calls = orders.map((order) => {
+      return [order.order.serialize(), order.signature];
+    });
+
+    return await multicallSameContractManyFunctions(this.provider, {
+      address: this.quoter.address,
+      contractInterface: this.quoter.interface,
+      functionName: functionName,
+      functionParams: calls,
+    });
+  }
+
   get orderQuoterAddress(): string {
     return this.quoter.address;
   }
@@ -288,6 +285,7 @@ export class RelayOrderQuoter
   implements OrderQuoter<SignedRelayOrder, RelayOrderQuote>
 {
   protected quoter: RelayOrderReactor;
+  private quoteFunctionSelector = "0x3f62192e"; // function execute((bytes, bytes))
 
   constructor(
     protected provider: BaseProvider,
@@ -314,10 +312,8 @@ export class RelayOrderQuoter
   }
 
   async quoteBatch(orders: SignedRelayOrder[]): Promise<RelayOrderQuote[]> {
-    const results = await getMulticallResults(
-      this.provider,
-      this.quoter,
-      "execute",
+    const results = await this.getMulticallResults(
+      this.quoteFunctionSelector,
       orders
     );
     const validations = await this.getValidations(orders, results);
@@ -341,6 +337,28 @@ export class RelayOrderQuoter
         validation,
         quote: quotes[i],
       };
+    });
+  }
+
+  /// Get the results of a multicall for a given function
+  private async getMulticallResults(
+    functionName: string,
+    orders: SignedRelayOrder[]
+  ): Promise<MulticallResult[]> {
+    const calls = orders.map((order) => {
+      return [
+        {
+          order: order.order.serialize(),
+          sig: order.signature,
+        },
+      ];
+    });
+
+    return await multicallSameContractManyFunctions(this.provider, {
+      address: this.quoter.address,
+      contractInterface: this.quoter.interface,
+      functionName: functionName,
+      functionParams: calls,
     });
   }
 

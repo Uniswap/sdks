@@ -4,7 +4,6 @@ import { Signer } from "ethers";
 
 import ExclusiveDutchOrderReactorAbi from "../../abis/ExclusiveDutchOrderReactor.json";
 import ExclusiveFillerValidationAbi from "../../abis/ExclusiveFillerValidation.json";
-import Permit2Abi from "../../abis/Permit2.json";
 import OrderQuoterAbi from "../../abis/OrderQuoter.json";
 import MockERC20Abi from "../../abis/MockERC20.json";
 import { encodeExclusiveFillerData } from "../../src/order/validation";
@@ -520,20 +519,16 @@ describe("OrderValidator", () => {
     expect(await validator.validate({ order, signature })).to.equal(
       OrderValidation.OK
     );
-    await hre.network.provider.send("evm_increaseTime", [3600]);
-    await hre.network.provider.send("evm_mine"); // this one will have 02:00 PM as its timestamp
+    
+    const snapshot = await hre.network.provider.send("evm_snapshot");
+
+    await hre.network.provider.send("evm_setNextBlockTimestamp", [deadline + 1]);
+    await hre.network.provider.send("evm_mine"); 
     expect(await validator.validate({ order, signature })).to.equal(
       OrderValidation.Expired
     );
-    expect(await validator.validate({ order, signature })).to.equal(
-      OrderValidation.Expired
-    );
-    expect(await validator.validate({ order, signature })).to.equal(
-      OrderValidation.Expired
-    );
-    expect(await validator.validate({ order, signature })).to.equal(
-      OrderValidation.Expired
-    );
+
+    await hre.network.provider.send("evm_revert", [snapshot]);
   });
 
   it("validates an invalid dutch decay", async () => {
