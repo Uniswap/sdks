@@ -285,6 +285,7 @@ export class RelayOrderQuoter
   implements OrderQuoter<SignedRelayOrder, RelayOrderQuote>
 {
   protected quoter: RelayOrderReactor;
+  private quoteFunctionSelector = "0x3f62192e"; // function execute((bytes, bytes))
 
   constructor(
     protected provider: BaseProvider,
@@ -311,7 +312,10 @@ export class RelayOrderQuoter
   }
 
   async quoteBatch(orders: SignedRelayOrder[]): Promise<RelayOrderQuote[]> {
-    const results = await this.getMulticallResults("0x3f62192e", orders);
+    const results = await this.getMulticallResults(
+      this.quoteFunctionSelector,
+      orders
+    );
     const validations = await this.getValidations(orders, results);
 
     const quotes: (ResolvedRelayOrder | undefined)[] = results.map(

@@ -115,11 +115,9 @@ describe("RelayOrderValidator", () => {
     );
     const { validation, quote } = await quoterLib.quote({ order, signature });
     expect(validation).to.equal(OrderValidation.OK);
-    if (!quote) {
-      throw new Error("Invalid quote");
-    }
+    expect(quote).to.not.be.undefined;
 
-    expect(quote.fee.amount.toString()).to.equal("1000000");
+    expect(quote!.fee.amount.toString()).to.equal("1000000");
   });
 
   it("validates a valid order", async () => {
