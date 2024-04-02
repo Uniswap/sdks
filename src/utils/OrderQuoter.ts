@@ -342,10 +342,12 @@ export class RelayOrderQuoter
     orders: SignedRelayOrder[]
   ): Promise<MulticallResult[]> {
     const calls = orders.map((order) => {
-      return [{
+      return [
+        {
           order: order.order.serialize(),
           sig: order.signature,
-      }]
+        },
+      ];
     });
 
     return await multicallSameContractManyFunctions(this.provider, {
