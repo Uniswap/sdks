@@ -162,7 +162,9 @@ describe("V2DutchOrder", () => {
       expect(resolved.input.amount).toEqual(
         order.info.cosignerData.inputOverride
       );
-      expect(resolved.outputs[0].token).toEqual(order.info.baseOutputs[0].token);
+      expect(resolved.outputs[0].token).toEqual(
+        order.info.baseOutputs[0].token
+      );
       expect(resolved.outputs[0].amount).toEqual(
         order.info.cosignerData.outputOverrides[0]
       );
@@ -187,7 +189,9 @@ describe("V2DutchOrder", () => {
       });
       expect(resolved.input.token).toEqual(order.info.baseInput.token);
       expect(resolved.input.amount).toEqual(order.info.baseInput.startAmount);
-      expect(resolved.outputs[0].token).toEqual(order.info.baseOutputs[0].token);
+      expect(resolved.outputs[0].token).toEqual(
+        order.info.baseOutputs[0].token
+      );
       expect(resolved.outputs[0].amount).toEqual(
         order.info.baseOutputs[0].startAmount
       );
@@ -204,7 +208,9 @@ describe("V2DutchOrder", () => {
       );
 
       expect(resolved.outputs.length).toEqual(1);
-      expect(resolved.outputs[0].token).toEqual(order.info.baseOutputs[0].token);
+      expect(resolved.outputs[0].token).toEqual(
+        order.info.baseOutputs[0].token
+      );
       expect(resolved.outputs[0].amount).toEqual(
         order.info.cosignerData.outputOverrides[0]
       );
@@ -221,7 +227,9 @@ describe("V2DutchOrder", () => {
       );
 
       expect(resolved.outputs.length).toEqual(1);
-      expect(resolved.outputs[0].token).toEqual(order.info.baseOutputs[0].token);
+      expect(resolved.outputs[0].token).toEqual(
+        order.info.baseOutputs[0].token
+      );
       expect(resolved.outputs[0].amount).toEqual(
         order.info.baseOutputs[0].endAmount
       );
@@ -238,7 +246,9 @@ describe("V2DutchOrder", () => {
       );
 
       expect(resolved.outputs.length).toEqual(1);
-      expect(resolved.outputs[0].token).toEqual(order.info.baseOutputs[0].token);
+      expect(resolved.outputs[0].token).toEqual(
+        order.info.baseOutputs[0].token
+      );
       expect(resolved.outputs[0].amount).toEqual(
         order.info.baseOutputs[0].endAmount
       );
@@ -269,7 +279,9 @@ describe("V2DutchOrder", () => {
       );
 
       expect(resolved.outputs.length).toEqual(1);
-      expect(resolved.outputs[0].token).toEqual(order.info.baseOutputs[0].token);
+      expect(resolved.outputs[0].token).toEqual(
+        order.info.baseOutputs[0].token
+      );
       expect(resolved.outputs[0].amount).toEqual(
         order.info.cosignerData.outputOverrides[0]
       );
@@ -302,7 +314,9 @@ describe("V2DutchOrder", () => {
       );
 
       expect(resolved.outputs.length).toEqual(1);
-      expect(resolved.outputs[0].token).toEqual(order.info.baseOutputs[0].token);
+      expect(resolved.outputs[0].token).toEqual(
+        order.info.baseOutputs[0].token
+      );
       expect(resolved.outputs[0].amount).toEqual(
         order.info.cosignerData.outputOverrides[0]
       );
@@ -334,7 +348,9 @@ describe("V2DutchOrder", () => {
       );
 
       expect(resolved.outputs.length).toEqual(1);
-      expect(resolved.outputs[0].token).toEqual(order.info.baseOutputs[0].token);
+      expect(resolved.outputs[0].token).toEqual(
+        order.info.baseOutputs[0].token
+      );
       expect(resolved.outputs[0].amount).toEqual(
         order.info.baseOutputs[0].endAmount
       );
@@ -364,7 +380,9 @@ describe("V2DutchOrder", () => {
       );
 
       expect(resolved.outputs.length).toEqual(1);
-      expect(resolved.outputs[0].token).toEqual(order.info.baseOutputs[0].token);
+      expect(resolved.outputs[0].token).toEqual(
+        order.info.baseOutputs[0].token
+      );
       expect(resolved.outputs[0].amount).toEqual(
         order.info.cosignerData.outputOverrides[0]
       );

@@ -3,12 +3,14 @@ import {
   Log,
   TransactionReceipt,
 } from "@ethersproject/providers";
-import { BigNumber, Event, utils } from "ethers";
+import { BaseContract, BigNumber, Event, utils } from "ethers";
 
 import MockERC20Abi from "../../abis/MockERC20.json";
 import {
   ExclusiveDutchOrderReactor,
   ExclusiveDutchOrderReactor__factory,
+  RelayOrderReactor,
+  RelayOrderReactor__factory,
 } from "../contracts";
 import { FillEvent } from "../contracts/DutchOrderReactor";
 
@@ -36,23 +38,14 @@ export interface FillInfo extends FillData {
 /**
  * Helper for watching events
  */
-export class EventWatcher {
-  private reactor: ExclusiveDutchOrderReactor;
+abstract class EventWatcher<TReactor extends BaseContract> {
+  constructor(protected reactor: TReactor) {}
 
-  constructor(provider: BaseProvider, reactorAddress: string) {
-    this.reactor = ExclusiveDutchOrderReactor__factory.connect(
-      reactorAddress,
-      provider
-    );
-  }
-
-  async getFillLogs(fromBlock: number, toBlock?: number): Promise<FillEvent[]> {
-    return await this.reactor.queryFilter(
-      this.reactor.filters.Fill(),
-      fromBlock,
-      toBlock
-    );
-  }
+  abstract getFillLogs(
+    fromBlock: number,
+    toBlock?: number
+  ): Promise<FillEvent[]>;
+  abstract onFill(callback: (fillData: FillData, event: Event) => void): void;
 
   async getFillEvents(
     fromBlock: number,
@@ -104,23 +97,6 @@ export class EventWatcher {
     });
   }
 
-  onFill(callback: (fillData: FillData, event: Event) => void): void {
-    this.reactor.on(
-      this.reactor.filters.Fill(),
-      (orderHash, filler, swapper, nonce, event) => {
-        callback(
-          {
-            orderHash,
-            filler,
-            nonce,
-            swapper,
-          },
-          event
-        );
-      }
-    );
-  }
-
   getTokenTransfers(logs: Log[], recipient: string) {
     const ERC20Interface = new utils.Interface(MockERC20Abi.abi);
     return logs.reduce((logAcc, log) => {
@@ -137,5 +113,75 @@ export class EventWatcher {
         return logAcc;
       }
     }, [] as { token: string; amount: BigNumber }[]);
+  }
+}
+
+export class UniswapXEventWatcher extends EventWatcher<ExclusiveDutchOrderReactor> {
+  constructor(provider: BaseProvider, reactorAddress: string) {
+    const reactor = ExclusiveDutchOrderReactor__factory.connect(
+      reactorAddress,
+      provider
+    );
+    super(reactor);
+  }
+
+  async getFillLogs(fromBlock: number, toBlock?: number): Promise<FillEvent[]> {
+    return await this.reactor.queryFilter(
+      this.reactor.filters.Fill(),
+      fromBlock,
+      toBlock
+    );
+  }
+
+  onFill(callback: (fillData: FillData, event: Event) => void): void {
+    this.reactor.on(
+      this.reactor.filters.Fill(),
+      (orderHash, filler, swapper, nonce, event) => {
+        callback(
+          {
+            orderHash,
+            filler,
+            nonce,
+            swapper,
+          },
+          event
+        );
+      }
+    );
+  }
+}
+
+export class RelayEventWatcher extends EventWatcher<RelayOrderReactor> {
+  constructor(provider: BaseProvider, reactorAddress: string) {
+    const reactor = RelayOrderReactor__factory.connect(
+      reactorAddress,
+      provider
+    );
+    super(reactor);
+  }
+
+  async getFillLogs(fromBlock: number, toBlock?: number): Promise<FillEvent[]> {
+    return await this.reactor.queryFilter(
+      this.reactor.filters.Relay(),
+      fromBlock,
+      toBlock
+    );
+  }
+
+  onFill(callback: (fillData: FillData, event: Event) => void): void {
+    this.reactor.on(
+      this.reactor.filters.Relay(),
+      (orderHash, filler, swapper, nonce, event) => {
+        callback(
+          {
+            orderHash,
+            filler,
+            nonce,
+            swapper,
+          },
+          event
+        );
+      }
+    );
   }
 }

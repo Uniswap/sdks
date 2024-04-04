@@ -288,7 +288,9 @@ export class V2DutchOrderBuilder extends OrderBuilder {
     );
     invariant(
       this.info.cosignerData.inputOverride !== undefined &&
-        this.info.cosignerData.inputOverride.lte(this.info.baseInput.startAmount),
+        this.info.cosignerData.inputOverride.lte(
+          this.info.baseInput.startAmount
+        ),
       "inputOverride not set or larger than original input"
     );
     invariant(
