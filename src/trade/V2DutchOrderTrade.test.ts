@@ -81,7 +81,7 @@ describe("V2DutchOrderTrade", () => {
   it("works for native output trades", () => {
     const ethOutputOrderInfo = {
       ...orderInfo,
-      baseOutputs: [
+      outputs: [
         {
           token: NativeAssets.ETH,
           startAmount: NON_FEE_OUTPUT_AMOUNT,
@@ -104,7 +104,7 @@ describe("V2DutchOrderTrade", () => {
   it("works for native output trades where order info has 0 address", () => {
     const ethOutputOrderInfo = {
       ...orderInfo,
-      baseOutputs: [
+      outputs: [
         {
           token: constants.AddressZero,
           startAmount: NON_FEE_OUTPUT_AMOUNT,
