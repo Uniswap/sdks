@@ -34,12 +34,12 @@ describe("V2DutchOrder", () => {
         additionalValidationData: "0x",
         cosigner: ethers.constants.AddressZero,
         cosignerData: COSIGNER_DATA,
-        baseInput: {
+        input: {
           token: INPUT_TOKEN,
           startAmount: RAW_AMOUNT,
           endAmount: RAW_AMOUNT,
         },
-        baseOutputs: [
+        outputs: [
           {
             token: OUTPUT_TOKEN,
             startAmount: RAW_AMOUNT,
@@ -66,12 +66,12 @@ describe("V2DutchOrder", () => {
         additionalValidationData: "0x",
         cosigner: ethers.constants.AddressZero,
         cosignerData: undefined,
-        baseInput: {
+        input: {
           token: INPUT_TOKEN,
           startAmount: RAW_AMOUNT,
           endAmount: RAW_AMOUNT,
         },
-        baseOutputs: [
+        outputs: [
           {
             token: OUTPUT_TOKEN,
             startAmount: RAW_AMOUNT,
@@ -97,12 +97,12 @@ describe("V2DutchOrder", () => {
     const orderInfoJSON = {
       ...getOrderInfo({}),
       nonce: "10",
-      baseInput: {
+      input: {
         token: INPUT_TOKEN,
         startAmount: "1000000",
         endAmount: "1000000",
       },
-      baseOutputs: [
+      outputs: [
         {
           token: OUTPUT_TOKEN,
           startAmount: "1000000",
@@ -113,8 +113,8 @@ describe("V2DutchOrder", () => {
       cosignerData: undefined,
     };
     const order = UnsignedV2DutchOrder.fromJSON(orderInfoJSON, 1);
-    expect(order.info.baseInput.startAmount).toEqual(BigNumber.from("1000000"));
-    expect(order.info.baseOutputs[0].startAmount).toEqual(
+    expect(order.info.input.startAmount).toEqual(BigNumber.from("1000000"));
+    expect(order.info.outputs[0].startAmount).toEqual(
       BigNumber.from("1000000")
     );
   });
@@ -158,13 +158,11 @@ describe("V2DutchOrder", () => {
       const resolved = order.resolve({
         timestamp: order.info.cosignerData.decayStartTime - 100,
       });
-      expect(resolved.input.token).toEqual(order.info.baseInput.token);
+      expect(resolved.input.token).toEqual(order.info.input.token);
       expect(resolved.input.amount).toEqual(
         order.info.cosignerData.inputOverride
       );
-      expect(resolved.outputs[0].token).toEqual(
-        order.info.baseOutputs[0].token
-      );
+      expect(resolved.outputs[0].token).toEqual(order.info.outputs[0].token);
       expect(resolved.outputs[0].amount).toEqual(
         order.info.cosignerData.outputOverrides[0]
       );
@@ -187,13 +185,11 @@ describe("V2DutchOrder", () => {
       const resolved = order.resolve({
         timestamp: order.info.cosignerData!.decayStartTime - 100,
       });
-      expect(resolved.input.token).toEqual(order.info.baseInput.token);
-      expect(resolved.input.amount).toEqual(order.info.baseInput.startAmount);
-      expect(resolved.outputs[0].token).toEqual(
-        order.info.baseOutputs[0].token
-      );
+      expect(resolved.input.token).toEqual(order.info.input.token);
+      expect(resolved.input.amount).toEqual(order.info.input.startAmount);
+      expect(resolved.outputs[0].token).toEqual(order.info.outputs[0].token);
       expect(resolved.outputs[0].amount).toEqual(
-        order.info.baseOutputs[0].startAmount
+        order.info.outputs[0].startAmount
       );
     });
 
@@ -202,15 +198,13 @@ describe("V2DutchOrder", () => {
       const resolved = order.resolve({
         timestamp: order.info.cosignerData.decayStartTime,
       });
-      expect(resolved.input.token).toEqual(order.info.baseInput.token);
+      expect(resolved.input.token).toEqual(order.info.input.token);
       expect(resolved.input.amount).toEqual(
         order.info.cosignerData.inputOverride
       );
 
       expect(resolved.outputs.length).toEqual(1);
-      expect(resolved.outputs[0].token).toEqual(
-        order.info.baseOutputs[0].token
-      );
+      expect(resolved.outputs[0].token).toEqual(order.info.outputs[0].token);
       expect(resolved.outputs[0].amount).toEqual(
         order.info.cosignerData.outputOverrides[0]
       );
@@ -221,17 +215,15 @@ describe("V2DutchOrder", () => {
       const resolved = order.resolve({
         timestamp: order.info.cosignerData.decayEndTime,
       });
-      expect(resolved.input.token).toEqual(order.info.baseInput.token);
+      expect(resolved.input.token).toEqual(order.info.input.token);
       expect(resolved.input.amount).toEqual(
         order.info.cosignerData.inputOverride
       );
 
       expect(resolved.outputs.length).toEqual(1);
-      expect(resolved.outputs[0].token).toEqual(
-        order.info.baseOutputs[0].token
-      );
+      expect(resolved.outputs[0].token).toEqual(order.info.outputs[0].token);
       expect(resolved.outputs[0].amount).toEqual(
-        order.info.baseOutputs[0].endAmount
+        order.info.outputs[0].endAmount
       );
     });
 
@@ -240,17 +232,15 @@ describe("V2DutchOrder", () => {
       const resolved = order.resolve({
         timestamp: order.info.cosignerData.decayEndTime + 100,
       });
-      expect(resolved.input.token).toEqual(order.info.baseInput.token);
+      expect(resolved.input.token).toEqual(order.info.input.token);
       expect(resolved.input.amount).toEqual(
         order.info.cosignerData.inputOverride
       );
 
       expect(resolved.outputs.length).toEqual(1);
-      expect(resolved.outputs[0].token).toEqual(
-        order.info.baseOutputs[0].token
-      );
+      expect(resolved.outputs[0].token).toEqual(order.info.outputs[0].token);
       expect(resolved.outputs[0].amount).toEqual(
-        order.info.baseOutputs[0].endAmount
+        order.info.outputs[0].endAmount
       );
     });
 
@@ -273,15 +263,13 @@ describe("V2DutchOrder", () => {
         timestamp: order.info.cosignerData.decayStartTime - 1,
         filler: exclusiveFiller,
       });
-      expect(resolved.input.token).toEqual(order.info.baseInput.token);
+      expect(resolved.input.token).toEqual(order.info.input.token);
       expect(resolved.input.amount).toEqual(
         order.info.cosignerData.inputOverride
       );
 
       expect(resolved.outputs.length).toEqual(1);
-      expect(resolved.outputs[0].token).toEqual(
-        order.info.baseOutputs[0].token
-      );
+      expect(resolved.outputs[0].token).toEqual(order.info.outputs[0].token);
       expect(resolved.outputs[0].amount).toEqual(
         order.info.cosignerData.outputOverrides[0]
       );
@@ -308,15 +296,13 @@ describe("V2DutchOrder", () => {
         timestamp: order.info.cosignerData.decayStartTime - 1,
         filler: nonExclusiveFiller,
       });
-      expect(resolved.input.token).toEqual(order.info.baseInput.token);
+      expect(resolved.input.token).toEqual(order.info.input.token);
       expect(resolved.input.amount).toEqual(
         order.info.cosignerData.inputOverride
       );
 
       expect(resolved.outputs.length).toEqual(1);
-      expect(resolved.outputs[0].token).toEqual(
-        order.info.baseOutputs[0].token
-      );
+      expect(resolved.outputs[0].token).toEqual(order.info.outputs[0].token);
       expect(resolved.outputs[0].amount).toEqual(
         order.info.cosignerData.outputOverrides[0]
       );
@@ -342,17 +328,15 @@ describe("V2DutchOrder", () => {
         timestamp: order.info.cosignerData.decayEndTime,
         filler: nonExclusiveFiller,
       });
-      expect(resolved.input.token).toEqual(order.info.baseInput.token);
+      expect(resolved.input.token).toEqual(order.info.input.token);
       expect(resolved.input.amount).toEqual(
         order.info.cosignerData.inputOverride
       );
 
       expect(resolved.outputs.length).toEqual(1);
-      expect(resolved.outputs[0].token).toEqual(
-        order.info.baseOutputs[0].token
-      );
+      expect(resolved.outputs[0].token).toEqual(order.info.outputs[0].token);
       expect(resolved.outputs[0].amount).toEqual(
-        order.info.baseOutputs[0].endAmount
+        order.info.outputs[0].endAmount
       );
     });
 
@@ -374,15 +358,13 @@ describe("V2DutchOrder", () => {
       const resolved = order.resolve({
         timestamp: order.info.cosignerData.decayStartTime - 1,
       });
-      expect(resolved.input.token).toEqual(order.info.baseInput.token);
+      expect(resolved.input.token).toEqual(order.info.input.token);
       expect(resolved.input.amount).toEqual(
         order.info.cosignerData.inputOverride
       );
 
       expect(resolved.outputs.length).toEqual(1);
-      expect(resolved.outputs[0].token).toEqual(
-        order.info.baseOutputs[0].token
-      );
+      expect(resolved.outputs[0].token).toEqual(order.info.outputs[0].token);
       expect(resolved.outputs[0].amount).toEqual(
         order.info.cosignerData.outputOverrides[0]
       );

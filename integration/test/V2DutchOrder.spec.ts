@@ -130,11 +130,11 @@ describe("DutchV2Order", () => {
       expect(order.info.cosigner).to.eq(cosignerAddress);
       expect(order.info.nonce.toNumber()).to.eq(100);
 
-      expect(order.info.baseInput.token).to.eq(tokenIn.address);
-      expect(order.info.baseInput.startAmount).to.eq(AMOUNT);
-      expect(order.info.baseInput.endAmount).to.eq(AMOUNT);
+      expect(order.info.input.token).to.eq(tokenIn.address);
+      expect(order.info.input.startAmount).to.eq(AMOUNT);
+      expect(order.info.input.endAmount).to.eq(AMOUNT);
 
-      const builtOutput = order.info.baseOutputs[0];
+      const builtOutput = order.info.outputs[0];
 
       expect(builtOutput.token).to.eq(tokenOut.address);
       expect(builtOutput.startAmount).to.eq(AMOUNT);
@@ -145,7 +145,7 @@ describe("DutchV2Order", () => {
       order = preBuildOrder
         .nonFeeRecipient(ethers.constants.AddressZero, FEE_RECIPIENT)
         .buildPartial();
-      expect(order.info.baseOutputs[0].recipient).to.eq(
+      expect(order.info.outputs[0].recipient).to.eq(
         ethers.constants.AddressZero
       );
     });
@@ -183,17 +183,17 @@ describe("DutchV2Order", () => {
         });
 
       let order = preBuildOrder.buildPartial();
-      expect(order.info.baseOutputs[0].recipient).to.eq(swapperAddress);
-      expect(order.info.baseOutputs[1].recipient).to.eq(FEE_RECIPIENT);
+      expect(order.info.outputs[0].recipient).to.eq(swapperAddress);
+      expect(order.info.outputs[1].recipient).to.eq(FEE_RECIPIENT);
 
       order = preBuildOrder
         .nonFeeRecipient(ethers.constants.AddressZero, FEE_RECIPIENT)
         .buildPartial();
 
-      expect(order.info.baseOutputs[0].recipient).to.eq(
+      expect(order.info.outputs[0].recipient).to.eq(
         ethers.constants.AddressZero
       );
-      expect(order.info.baseOutputs[1].recipient).to.eq(FEE_RECIPIENT);
+      expect(order.info.outputs[1].recipient).to.eq(FEE_RECIPIENT);
     });
 
     it("nonFeeRecipient updates recipient for all outputs if no feeRecipient given", async () => {
@@ -229,17 +229,17 @@ describe("DutchV2Order", () => {
         });
 
       let order = preBuildOrder.buildPartial();
-      expect(order.info.baseOutputs[0].recipient).to.eq(swapperAddress);
-      expect(order.info.baseOutputs[1].recipient).to.eq(FEE_RECIPIENT);
+      expect(order.info.outputs[0].recipient).to.eq(swapperAddress);
+      expect(order.info.outputs[1].recipient).to.eq(FEE_RECIPIENT);
 
       order = preBuildOrder
         .nonFeeRecipient(ethers.constants.AddressZero)
         .buildPartial();
 
-      expect(order.info.baseOutputs[0].recipient).to.eq(
+      expect(order.info.outputs[0].recipient).to.eq(
         ethers.constants.AddressZero
       );
-      expect(order.info.baseOutputs[1].recipient).to.eq(
+      expect(order.info.outputs[1].recipient).to.eq(
         ethers.constants.AddressZero
       );
     });
@@ -277,8 +277,8 @@ describe("DutchV2Order", () => {
         });
 
       let order = preBuildOrder.buildPartial();
-      expect(order.info.baseOutputs[0].recipient).to.eq(swapperAddress);
-      expect(order.info.baseOutputs[1].recipient).to.eq(FEE_RECIPIENT);
+      expect(order.info.outputs[0].recipient).to.eq(swapperAddress);
+      expect(order.info.outputs[1].recipient).to.eq(FEE_RECIPIENT);
 
       expect(() =>
         preBuildOrder
@@ -334,11 +334,11 @@ describe("DutchV2Order", () => {
       expect(order.info.cosignature).to.eq(cosignature);
       expect(order.info.nonce.toNumber()).to.eq(NONCE);
 
-      expect(order.info.baseInput.token).to.eq(tokenIn.address);
-      expect(order.info.baseInput.startAmount).to.eq(AMOUNT);
-      expect(order.info.baseInput.endAmount).to.eq(AMOUNT);
+      expect(order.info.input.token).to.eq(tokenIn.address);
+      expect(order.info.input.startAmount).to.eq(AMOUNT);
+      expect(order.info.input.endAmount).to.eq(AMOUNT);
 
-      const builtOutput = order.info.baseOutputs[0];
+      const builtOutput = order.info.outputs[0];
 
       expect(builtOutput.token).to.eq(tokenOut.address);
       expect(builtOutput.startAmount).to.eq(AMOUNT);
@@ -451,8 +451,8 @@ describe("DutchV2Order", () => {
         fillerTokenInBalanceBefore.add(AMOUNT).toString()
       );
 
-      const amountOut = order.info.baseOutputs[0].startAmount
-        .add(order.info.baseOutputs[0].endAmount)
+      const amountOut = order.info.outputs[0].startAmount
+        .add(order.info.outputs[0].endAmount)
         .div(2);
 
       // some variance in block timestamp so we need to use a threshold
@@ -754,8 +754,8 @@ describe("DutchV2Order", () => {
         openFillerTokenInBalanceBefore.add(AMOUNT).toString()
       );
 
-      const amountOut = order.info.baseOutputs[0].startAmount
-        .add(order.info.baseOutputs[0].endAmount)
+      const amountOut = order.info.outputs[0].startAmount
+        .add(order.info.outputs[0].endAmount)
         .div(2);
 
       // some variance in block timestamp so we need to use a threshold
