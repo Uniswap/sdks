@@ -44,7 +44,7 @@ describe("V2DutchOrderBuilder", () => {
       .build();
 
     expect(order.info.cosignerData.decayStartTime).toEqual(deadline - 100);
-    expect(order.info.baseOutputs.length).toEqual(1);
+    expect(order.info.outputs.length).toEqual(1);
   });
 
   it("Builds a valid order with validation", () => {
@@ -84,7 +84,7 @@ describe("V2DutchOrderBuilder", () => {
       .build();
 
     expect(order.info.cosignerData.decayStartTime).toEqual(deadline - 100);
-    expect(order.info.baseOutputs.length).toEqual(1);
+    expect(order.info.outputs.length).toEqual(1);
     expect(order.validation).toEqual({
       type: ValidationType.ExclusiveFiller,
       data: {
@@ -213,7 +213,7 @@ describe("V2DutchOrderBuilder", () => {
       .build();
 
     expect(order.info.cosignerData.decayStartTime).toEqual(deadline - 100);
-    expect(order.info.baseOutputs.length).toEqual(2);
+    expect(order.info.outputs.length).toEqual(2);
   });
 
   it("cosigner not set", () => {
@@ -408,7 +408,7 @@ describe("V2DutchOrderBuilder", () => {
       .build();
 
     expect(order.info.cosignerData.decayEndTime).toEqual(deadline);
-    expect(order.info.baseOutputs.length).toEqual(1);
+    expect(order.info.outputs.length).toEqual(1);
   });
 
   it("deadline defaults to decayEndTime", () => {
@@ -436,7 +436,7 @@ describe("V2DutchOrderBuilder", () => {
       .build();
 
     expect(order.info.deadline).toEqual(decayEndTime);
-    expect(order.info.baseOutputs.length).toEqual(1);
+    expect(order.info.outputs.length).toEqual(1);
   });
 
   it("startAmount <= endAmount", () => {
@@ -594,7 +594,7 @@ describe("V2DutchOrderBuilder", () => {
         })
         .buildPartial();
 
-      expect(order.info.baseOutputs.length).toEqual(1);
+      expect(order.info.outputs.length).toEqual(1);
     });
 
     it("builds an unsigned partial order with incomplete cosignerData values", () => {
@@ -619,7 +619,7 @@ describe("V2DutchOrderBuilder", () => {
         .inputOverride(INPUT_START_AMOUNT.mul(98).div(100))
         .buildPartial();
 
-      expect(order.info.baseOutputs.length).toEqual(1);
+      expect(order.info.outputs.length).toEqual(1);
     });
   });
 });
