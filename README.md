@@ -33,4 +33,3 @@ Publishing of each SDK is done on merge to main using semantic-release and seman
 ```
 
 Versions will only be generated based on the changelog of the relevant SDK's folder/files.
-
