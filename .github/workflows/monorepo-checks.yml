@@ -55,6 +55,9 @@ jobs:
         with:
           version: nightly
 
+      - name: 🏗  Confirm secret is there
+        run: echo ${{ secrets.FORK_URL }}
+
       - name: 🧪 Testing
         run: yarn g:test
         env:
