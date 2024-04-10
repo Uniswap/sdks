@@ -31,7 +31,7 @@ jobs:
         uses: actions/setup-node@1a4442cacd436585916779262731d5b162bc6ec7
         with:
           cache: yarn
-          node-version: 16
+          node-version: 18
 
       - name: 📥 yarn install
         shell: bash
@@ -54,9 +54,6 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
-
-      - name: 🏗  Confirm secret is there
-        run: echo ${{ secrets.FORK_URL }} | sed 's/./& /g'
 
       - name: 🧪 Testing
         run: yarn g:test
