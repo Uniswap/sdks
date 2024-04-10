@@ -69,6 +69,7 @@
     "branches": [
       {
         "name": "main",
+        "channel": "beta",
         "prerelease": true
       }
     ],
