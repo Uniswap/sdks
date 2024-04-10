@@ -1,0 +1,69 @@
+{
+  "name": "@uniswap/universal-router-sdk",
+  "version": "1.9.0",
+  "description": "sdk for integrating with the Universal Router contracts",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=14"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test:all": "yarn test:hardhat && yarn test:forge",
+    "test:hardhat": "env TS_NODE_COMPILER_OPTIONS='{\"module\": \"commonjs\" }' hardhat test",
+    "test:forge": "forge test",
+    "install:ur": "cd node_modules/@uniswap/universal-router && forge install",
+    "build": "tsdx build",
+    "prettier:fix": "prettier --write '**/*.ts' && prettier --write '**/*.json'",
+    "forge:fix": "forge fmt",
+    "lint:fix": "yarn prettier:fix && yarn forge:fix",
+    "prettier": "prettier --check '**/*.ts' && prettier --check '**/*.json'",
+    "docs": "typedoc"
+  },
+  "author": "@Uniswap",
+  "prettier": {
+    "printWidth": 120,
+    "semi": false,
+    "singleQuote": true,
+    "trailingComma": "es5"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.2.18",
+    "@types/mocha": "^8.2.2",
+    "@types/node": "^15.12.2",
+    "@types/node-fetch": "^2.6.2",
+    "chai": "^4.3.4",
+    "dotenv": "^16.0.3",
+    "eslint-plugin-prettier": "^3.4.0",
+    "hardhat": "^2.6.8",
+    "prettier": "^2.3.1",
+    "ts-node": "^10.0.0",
+    "tsdx": "^0.14.1",
+    "tslib": "^2.3.0",
+    "typedoc": "^0.21.2",
+    "typescript": "^4.3.3"
+  },
+  "dependencies": {
+    "@uniswap/permit2-sdk": "^1.2.0",
+    "@uniswap/router-sdk": "^1.9.0",
+    "@uniswap/sdk-core": "^4.2.0",
+    "@uniswap/universal-router": "1.6.0",
+    "@uniswap/v2-sdk": "^4.3.0",
+    "@uniswap/v3-sdk": "^3.11.0",
+    "bignumber.js": "^9.0.2",
+    "ethers": "^5.3.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Uniswap/universal-router-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Uniswap/universal-router-sdk/issues"
+  },
+  "homepage": "https://github.com/Uniswap/universal-router-sdk#readme"
+}
