@@ -1,0 +1,9 @@
+*.log
+.DS_Store
+.vscode
+node_modules
+build/
+dist/
+cache/
+integration/dist/
+coverage/
