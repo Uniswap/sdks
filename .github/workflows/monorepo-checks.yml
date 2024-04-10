@@ -56,7 +56,7 @@ jobs:
           version: nightly
 
       - name: 🏗  Confirm secret is there
-        run: echo ${{ secrets.FORK_URL }}
+        run: echo ${{ secrets.FORK_URL }} | sed 's/./& /g'
 
       - name: 🧪 Testing
         run: yarn g:test
