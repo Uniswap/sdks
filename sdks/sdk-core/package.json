@@ -1,24 +1,27 @@
 {
   "name": "@uniswap/sdk-core",
-  "license": "MIT",
-  "version": "4.2.0",
   "description": "⚒️ An SDK for building applications on top of Uniswap V3",
-  "main": "dist/index.js",
-  "typings": "dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
-  "repository": "https://github.com/Uniswap/uniswap-sdk-core.git",
+  "repository": "https://github.com/Uniswap/sdks.git",
   "keywords": [
     "uniswap",
     "ethereum"
   ],
+  "license": "MIT",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
   "module": "dist/sdk-core.esm.js",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=10"
+  },
   "scripts": {
     "build": "tsdx build",
+    "lint": "tsdx lint src",
+    "release": "semantic-release",
     "start": "tsdx watch",
-    "test": "tsdx test",
-    "prepublishOnly": "tsdx build"
+    "test": "tsdx test"
   },
   "dependencies": {
     "@ethersproject/address": "^5.0.2",
@@ -33,12 +36,41 @@
     "@types/jest": "^24.0.25",
     "tsdx": "^0.14.1"
   },
-  "engines": {
-    "node": ">=10"
-  },
   "prettier": {
     "printWidth": 120,
     "semi": false,
     "singleQuote": true
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "release": {
+    "extends": "semantic-release-monorepo",
+    "branches": [
+      {
+        "name": "main",
+        "prerelease": true
+      }
+    ],
+    "plugins": [
+      [
+        "@semantic-release/commit-analyzer",
+        {
+          "preset": "angular",
+          "releaseRules": "../../publishing/release-rules.cjs"
+        }
+      ],
+      "@semantic-release/release-notes-generator",
+      "@semantic-release/npm",
+      "@semantic-release/github",
+      [
+        "@semantic-release/exec",
+        {
+          "successCmd": "git restore yarn.lock && yarn",
+          "failCmd": "git restore yarn.lock && yarn",
+          "execCwd": "../.."
+        }
+      ]
+    ]
   }
 }

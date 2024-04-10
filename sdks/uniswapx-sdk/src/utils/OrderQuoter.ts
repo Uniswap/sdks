@@ -299,6 +299,7 @@ export class RelayOrderQuoter
       );
     } else if (REACTOR_ADDRESS_MAPPING[chainId][OrderType.Relay]) {
       this.quoter = RelayOrderReactor__factory.connect(
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         REACTOR_ADDRESS_MAPPING[chainId][OrderType.Relay]!,
         this.provider
       );

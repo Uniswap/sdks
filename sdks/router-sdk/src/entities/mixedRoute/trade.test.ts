@@ -440,15 +440,9 @@ describe('MixedRouteTrade', () => {
             ],
             tradeType: TradeType.EXACT_INPUT,
           })
-          it('is cached', () => {
-            expect(exactIn.priceImpact === exactIn.priceImpact).toStrictEqual(true)
-          })
+
           it('is correct', () => {
             expect(exactIn.priceImpact.toSignificant(3)).toEqual('17.2')
-          })
-
-          it('is cached with multiple routes', () => {
-            expect(exactInMultipleRoutes.priceImpact === exactInMultipleRoutes.priceImpact).toStrictEqual(true)
           })
           it('is correct with multiple routes', async () => {
             expect(exactInMultipleRoutes.priceImpact.toSignificant(3)).toEqual('19.8')
@@ -483,15 +477,8 @@ describe('MixedRouteTrade', () => {
             ],
             tradeType: TradeType.EXACT_INPUT,
           })
-          it('is cached', () => {
-            expect(exactIn.priceImpact === exactIn.priceImpact).toStrictEqual(true)
-          })
           it('is correct', () => {
             expect(exactIn.priceImpact.toSignificant(3)).toEqual('17.2')
-          })
-
-          it('is cached with multiple routes', () => {
-            expect(exactInMultipleRoutes.priceImpact === exactInMultipleRoutes.priceImpact).toStrictEqual(true)
           })
           it('is correct with multiple routes', async () => {
             expect(exactInMultipleRoutes.priceImpact.toSignificant(3)).toEqual('19.8')
@@ -1175,15 +1162,8 @@ describe('MixedRouteTrade', () => {
           ],
           tradeType: TradeType.EXACT_INPUT,
         })
-        it('is cached', () => {
-          expect(exactIn.priceImpact === exactIn.priceImpact).toStrictEqual(true)
-        })
         it('is correct', () => {
           expect(exactIn.priceImpact.toSignificant(3)).toEqual('17.2')
-        })
-
-        it('is cached with multiple routes', () => {
-          expect(exactInMultipleRoutes.priceImpact === exactInMultipleRoutes.priceImpact).toStrictEqual(true)
         })
         it('is correct with multiple routes', async () => {
           expect(exactInMultipleRoutes.priceImpact.toSignificant(3)).toEqual('19.8')

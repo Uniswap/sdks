@@ -1,5 +1,7 @@
 {
-  "include": ["src"],
+  "include": [
+    "src"
+  ],
   "compilerOptions": {
     "outDir": "dist",
     "target": "es6",
@@ -20,6 +22,7 @@
     "noFallthroughCasesInSwitch": true,
     "moduleResolution": "node",
     "resolveJsonModule": true,
-    "esModuleInterop": true
-  }
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
 }

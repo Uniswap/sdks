@@ -1,5 +1,4 @@
-import { SeaportData, ConsiderationItem } from '../../src/entities/protocols/seaport'
-import { BigNumber } from 'ethers'
+import { SeaportData } from '../../src/entities/protocols/seaport'
 import { TEST_RECIPIENT_ADDRESS } from '../utils/addresses'
 
 export const seaportV1_4DataETH: SeaportData = {

@@ -1,0 +1,18 @@
+{
+  "solidity.packageDefaultDependenciesContractsDirectory": "src",
+  "solidity.packageDefaultDependenciesDirectory": "lib",
+  "solidity.compileUsingRemoteVersion": "v0.8.17",
+  "solidity.formatter": "forge",
+  "files.insertFinalNewline": true,
+  "editor.formatOnSave": true,
+  "eslint.workingDirectories": [
+    "./sdks/permit2-sdk",
+    "./sdks/router-sdk",
+    "./sdks/sdk-core",
+    "./sdks/uniswapx-sdk",
+    "./sdks/universal-router-sdk",
+    "./sdks/v2-sdk",
+    "./sdks/v3-sdk",
+  ],
+  "testing.openTesting": "neverOpen"
+}

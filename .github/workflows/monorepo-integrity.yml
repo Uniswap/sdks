@@ -1,0 +1,49 @@
+name: "Monorepo Integrity"
+
+on:
+  pull_request:
+    branches:
+      - "**"
+  push:
+    branches:
+      - main
+
+jobs:
+  monorepo-integrity:
+    name: Check monorepo integrity
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./
+    steps:
+      - name: Checkout
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
+        with:
+          fetch-depth: 2
+          submodules: "true"
+
+      - name: 💽 Node and Caching
+        uses: actions/setup-node@1a4442cacd436585916779262731d5b162bc6ec7
+        with:
+          cache: yarn
+          node-version: 18
+
+      - name: 📥 yarn install
+        shell: bash
+        working-directory: ./
+        run: |
+          yarn --immutable
+        env:
+          # CI optimizations. Overrides yarnrc.yml options (or their defaults) in the CI action.
+          YARN_ENABLE_GLOBAL_CACHE: "false" # Use local cache folder to keep downloaded archives
+          YARN_NM_MODE: "hardlinks-local" # Hardlinks-local reduces io / node_modules size
+          HUSKY: "0" # By default do not run HUSKY install
+
+      - name: 👬🏽 Check for conflicting versions across the monorepo
+        run: yarn g:check:deps:mismatch
+
+      - name: 👬🏽 Check for duplicate dependencies in lock file
+        run: yarn dedupe --check
+
+      - name: 🧑‍⚖️ Check for yarn constraints.pro
+        run: yarn constraints

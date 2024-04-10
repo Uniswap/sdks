@@ -30,7 +30,7 @@ export class Price<TBase extends Currency, TQuote extends Currency> extends Frac
         args[0].baseAmount.currency,
         args[0].quoteAmount.currency,
         result.denominator,
-        result.numerator
+        result.numerator,
       ]
     }
     super(numerator, denominator)

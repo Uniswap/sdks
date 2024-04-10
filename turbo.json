@@ -1,0 +1,30 @@
+{
+  "pipeline": {
+    "lint": {
+      "inputs": [
+        "sdks/*/src/**.ts",
+        "sdks/*/src/**.tsx"
+      ]
+    },
+    "build": {
+      "inputs": [
+        "yarn.lock",
+        "**/package.json",
+        "sdks/*/src/**.ts",
+        "sdks/*/src/**.tsx"
+      ],
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": [
+        "build"
+      ]
+    },
+    "release": {
+      "dependsOn": []
+    },
+    "typecheck": {
+      "dependsOn": []
+    }
+  }
+}

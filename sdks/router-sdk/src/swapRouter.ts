@@ -299,14 +299,14 @@ export abstract class SwapRouter {
               // special case exists where we are unwrapping WETH output, in which case `routerMustCustody` is set to true
               // and router still holds the funds. That logic bundled into how the value of `recipient` is calculated
               recipient: isLastSectionInRoute(i) ? recipient : ADDRESS_THIS,
-              amountIn: i == 0 ? amountIn : 0,
+              amountIn: i === 0 ? amountIn : 0,
               amountOutMinimum: !isLastSectionInRoute(i) ? 0 : amountOut,
             }
 
             calldatas.push(SwapRouter.INTERFACE.encodeFunctionData('exactInput', [exactInputParams]))
           } else {
             const exactInputParams = [
-              i == 0 ? amountIn : 0, // amountIn
+              i === 0 ? amountIn : 0, // amountIn
               !isLastSectionInRoute(i) ? 0 : amountOut, // amountOutMin
               newRoute.path.map((token) => token.address), // path
               isLastSectionInRoute(i) ? recipient : ADDRESS_THIS, // to
@@ -343,9 +343,9 @@ export abstract class SwapRouter {
       invariant(
         trades.swaps.every(
           (swap) =>
-            swap.route.protocol == Protocol.V3 ||
-            swap.route.protocol == Protocol.V2 ||
-            swap.route.protocol == Protocol.MIXED
+            swap.route.protocol === Protocol.V3 ||
+            swap.route.protocol === Protocol.V2 ||
+            swap.route.protocol === Protocol.MIXED
         ),
         'UNSUPPORTED_PROTOCOL'
       )
@@ -357,15 +357,15 @@ export abstract class SwapRouter {
       )[] = []
 
       for (const { route, inputAmount, outputAmount } of trades.swaps) {
-        if (route.protocol == Protocol.V2) {
+        if (route.protocol === Protocol.V2) {
           individualTrades.push(
             new V2Trade(
               route as RouteV2<Currency, Currency>,
-              trades.tradeType == TradeType.EXACT_INPUT ? inputAmount : outputAmount,
+              trades.tradeType === TradeType.EXACT_INPUT ? inputAmount : outputAmount,
               trades.tradeType
             )
           )
-        } else if (route.protocol == Protocol.V3) {
+        } else if (route.protocol === Protocol.V3) {
           individualTrades.push(
             V3Trade.createUncheckedTrade({
               route: route as RouteV3<Currency, Currency>,
@@ -374,7 +374,7 @@ export abstract class SwapRouter {
               tradeType: trades.tradeType,
             })
           )
-        } else if (route.protocol == Protocol.MIXED) {
+        } else if (route.protocol === Protocol.MIXED) {
           individualTrades.push(
             /// we can change the naming of this function on MixedRouteTrade if needed
             MixedRouteTrade.createUncheckedTrade({

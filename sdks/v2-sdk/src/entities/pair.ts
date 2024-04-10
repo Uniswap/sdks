@@ -17,14 +17,14 @@ import {
   ONE,
   ONE_HUNDRED_PERCENT,
   ZERO,
-  ZERO_PERCENT
+  ZERO_PERCENT,
 } from '../constants'
 import { InsufficientInputAmountError, InsufficientReservesError } from '../errors'
 
 export const computePairAddress = ({
   factoryAddress,
   tokenA,
-  tokenB
+  tokenB,
 }: {
   factoryAddress: string
   tokenA: Token
@@ -225,7 +225,7 @@ export class Pair {
 
     return [
       outputAmountAfterTax,
-      new Pair(inputReserve.add(inputAmountAfterTax), outputReserve.subtract(outputAmountAfterTax))
+      new Pair(inputReserve.add(inputAmountAfterTax), outputReserve.subtract(outputAmountAfterTax)),
     ]
   }
 

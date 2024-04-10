@@ -1,0 +1,10 @@
+# .yarn files
+.yarn/cache
+.yarn/versions
+.yarn/install-state.gz
+
+# Turbo
+.turbo
+
+# dependencies
+node_modules
