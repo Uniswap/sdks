@@ -30,8 +30,8 @@
   "dependencies": {
     "@ethersproject/bytes": "^5.7.0",
     "@ethersproject/providers": "^5.7.0",
-    "@uniswap/permit2-sdk": "^1.2.0",
-    "@uniswap/sdk-core": "^4.2.0",
+    "@uniswap/permit2-sdk": "^1.2.1-beta.1",
+    "@uniswap/sdk-core": "^4.2.1-beta.1",
     "ethers": "^5.7.0"
   },
   "devDependencies": {
