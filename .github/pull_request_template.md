@@ -15,6 +15,12 @@ _[Summary of the change, motivation, and context]_
 
 _[e.g. Manually, E2E tests, unit tests, Storybook]_
 
+## Are there any breaking changes?
+
+_[e.g. Type definitions, API definitions]_
+
+Bump the major version and post a notice in the #eng-sdks channel.
+
 ## (Optional) Feedback Focus
 
 _[Specific parts of this PR you'd like feedback on, or that reviewers should pay closer attention to]_
