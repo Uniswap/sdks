@@ -51,10 +51,6 @@
       {
         "name": "main",
         "prerelease": false
-      },
-      {
-        "name": "beta",
-        "prerelease": true
       }
     ],
     "plugins": [
