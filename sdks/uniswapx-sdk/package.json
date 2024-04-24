@@ -71,7 +71,7 @@
         "prerelease": false
       },
       {
-        "name": "main",
+        "name": "wont-release-yet",
         "prerelease": true
       }
     ],
