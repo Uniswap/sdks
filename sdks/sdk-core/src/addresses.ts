@@ -183,6 +183,7 @@ const BASE_ADDRESSES: ChainAddresses = {
   nonfungiblePositionManagerAddress: '0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1',
   tickLensAddress: '0x0CdeE061c75D43c82520eD998C23ac2991c9ac6d',
   swapRouter02Address: '0x2626664c2603336E57B271c5C0b26F421741e481',
+  v1MixedRouteQuoterAddress: '0xe544efae946f0008ae9a8d64493efa7886b73776',
 }
 
 // Base Goerli v3 addresses
