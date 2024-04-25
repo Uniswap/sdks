@@ -26,7 +26,7 @@
   "dependencies": {
     "@ethersproject/address": "^5.0.2",
     "@ethersproject/solidity": "^5.0.9",
-    "@uniswap/sdk-core": "^4.2.1-beta.1",
+    "@uniswap/sdk-core": "^4.2.1",
     "tiny-invariant": "^1.1.0",
     "tiny-warning": "^1.0.3"
   },
@@ -49,7 +49,7 @@
     "extends": "semantic-release-monorepo",
     "branches": [
       {
-        "name": "wont-release-yet",
+        "name": "main",
         "prerelease": false
       }
     ],
