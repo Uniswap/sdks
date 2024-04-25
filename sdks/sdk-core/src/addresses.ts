@@ -350,9 +350,9 @@ export const TICK_LENS_ADDRESSES: AddressMap = {
 }
 
 export const MIXED_ROUTE_QUOTER_V1_ADDRESSES: AddressMap = SUPPORTED_CHAINS.reduce<AddressMap>((memo, chainId) => {
-  const v1MixedRouteQuoterAddress = CHAIN_TO_ADDRESSES_MAP[chainId].mixedRouteQuoterV1Address
-  if (v1MixedRouteQuoterAddress) {
-    memo[chainId] = v1MixedRouteQuoterAddress
+  const mixedRouteQuoterV1Address = CHAIN_TO_ADDRESSES_MAP[chainId].mixedRouteQuoterV1Address
+  if (mixedRouteQuoterV1Address) {
+    memo[chainId] = mixedRouteQuoterV1Address
   }
   return memo
 }, {})
