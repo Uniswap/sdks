@@ -4631,10 +4631,10 @@ __metadata:
   dependencies:
     "@ethersproject/abi": ^5.5.0
     "@types/jest": ^24.0.25
-    "@uniswap/sdk-core": ^4.2.1-beta.1
+    "@uniswap/sdk-core": ^4.2.1
     "@uniswap/swap-router-contracts": ^1.3.0
-    "@uniswap/v2-sdk": ^4.3.1-beta.2
-    "@uniswap/v3-sdk": ^3.11.1-beta.2
+    "@uniswap/v2-sdk": ^4.3.1
+    "@uniswap/v3-sdk": ^3.11.1
     prettier: ^2.4.1
     tsdx: ^0.14.1
   languageName: unknown
@@ -4776,6 +4776,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@uniswap/v2-sdk@npm:^4.3.1":
+  version: 4.3.1
+  resolution: "@uniswap/v2-sdk@npm:4.3.1"
+  dependencies:
+    "@ethersproject/address": ^5.0.2
+    "@ethersproject/solidity": ^5.0.9
+    "@uniswap/sdk-core": ^4.2.1
+    tiny-invariant: ^1.1.0
+    tiny-warning: ^1.0.3
+  checksum: 44588fc5857257c4aa1820468e97f2288ef22b259ec5a05471f3914cd90db56683fd37f1e0be8f0339f40c90a669765f8f08245fdc022f2704a6f6fad3ce823f
+  languageName: node
+  linkType: hard
+
 "@uniswap/v2-sdk@npm:^4.3.1-beta.2":
   version: 4.3.1-beta.2
   resolution: "@uniswap/v2-sdk@npm:4.3.1-beta.2"
@@ -4830,6 +4843,22 @@ __metadata:
     "@uniswap/v3-core": ^1.0.0
     base64-sol: 1.0.1
   checksum: 48b57f1f648cb002935421ac1770666ab3c0263885a03c769985b06501b88d513a435c8edc439b41ac5aef7ad40a11038a3561f7e828cce5ae6ec2c77742f1af
+  languageName: node
+  linkType: hard
+
+"@uniswap/v3-sdk@npm:^3.11.1":
+  version: 3.11.1
+  resolution: "@uniswap/v3-sdk@npm:3.11.1"
+  dependencies:
+    "@ethersproject/abi": ^5.5.0
+    "@ethersproject/solidity": ^5.0.9
+    "@uniswap/sdk-core": ^4.2.1
+    "@uniswap/swap-router-contracts": ^1.3.0
+    "@uniswap/v3-periphery": ^1.1.1
+    "@uniswap/v3-staker": 1.0.0
+    tiny-invariant: ^1.1.0
+    tiny-warning: ^1.0.3
+  checksum: 07baeecc3318ccd6d7a4132e87bd24f3710072665ac51fc22aaf855f178940201f06cfa2024f25a5696ccbb52f1e3f97103e8a08399fd08fd4c7e76f0060f122
   languageName: node
   linkType: hard
 
