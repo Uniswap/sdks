@@ -67,11 +67,11 @@
     "extends": "semantic-release-monorepo",
     "branches": [
       {
-        "name": "main",
+        "name": "still-in-alpha",
         "prerelease": false
       },
       {
-        "name": "alpha",
+        "name": "wont-release-yet",
         "prerelease": true
       }
     ],
