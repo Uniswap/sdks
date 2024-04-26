@@ -3,6 +3,7 @@
 Please title your PR according to the following types and scopes following [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/):
 
 - `fix(SDK name):` will trigger a patch version
+- `chore(<type>):` will not trigger any release and should be used for internal repo changes
 - `<type>(public):` will trigger a patch version for non-code changes (e.g. README changes)
 - `feat(SDK name):` will trigger a minor version
 - `feat(!):` will trigger a major version for a breaking change
