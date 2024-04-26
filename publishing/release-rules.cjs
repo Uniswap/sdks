@@ -1,4 +1,4 @@
 module.exports = [
-  { type: "feat", scope: "!", release: "major" },
+  { type: "feat", scope: "breaking", release: "major" },
   { scope: "public", release: "patch" },
 ];

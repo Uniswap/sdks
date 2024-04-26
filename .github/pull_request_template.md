@@ -6,7 +6,7 @@ Please title your PR according to the following types and scopes following [conv
 - `chore(<type>):` will not trigger any release and should be used for internal repo changes
 - `<type>(public):` will trigger a patch version for non-code changes (e.g. README changes)
 - `feat(SDK name):` will trigger a minor version
-- `feat(!):` will trigger a major version for a breaking change
+- `feat(breaking):` will trigger a major version for a breaking change
 
 ## Description
 
@@ -20,7 +20,7 @@ _[e.g. Manually, E2E tests, unit tests, Storybook]_
 
 _[e.g. Type definitions, API definitions]_
 
-If there are breaking changes, please ensure you bump the major version Bump the major version (by using the title `feat(!): ...`), post a notice in #eng-sdks, and explicitly notify all Uniswap Labs consumers of the SDK.
+If there are breaking changes, please ensure you bump the major version Bump the major version (by using the title `feat(breaking): ...`), post a notice in #eng-sdks, and explicitly notify all Uniswap Labs consumers of the SDK.
 
 ## (Optional) Feedback Focus
 
