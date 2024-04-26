@@ -71,7 +71,7 @@
         "prerelease": false
       },
       {
-        "name": "alpha",
+        "name": "beta",
         "prerelease": true
       }
     ],
