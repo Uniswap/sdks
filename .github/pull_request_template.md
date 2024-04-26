@@ -19,7 +19,7 @@ _[e.g. Manually, E2E tests, unit tests, Storybook]_
 
 _[e.g. Type definitions, API definitions]_
 
-Bump the major version and post a notice in the #eng-sdks channel.
+If there are breaking changes, please ensure you bump the major version Bump the major version (by using the title `feat(!): ...`), post a notice in #eng-sdks, and explicitly notify all Uniswap Labs consumers of the SDK.
 
 ## (Optional) Feedback Focus
 
