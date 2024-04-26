@@ -29,7 +29,7 @@ Publishing of each SDK is done on merge to main using semantic-release and seman
 - `fix(SDK name):` will trigger a patch version
 - `<type>(public):` will trigger a patch version
 - `feat(SDK name):` will trigger a minor version
-- `feat(!):` will trigger a major version for a breaking change
+- `feat(breaking):` will trigger a major version for a breaking change
 ```
 
 Versions will only be generated based on the changelog of the relevant SDK's folder/files.
