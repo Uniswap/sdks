@@ -22,10 +22,6 @@ jobs:
           git config user.name "UL Mobile Service Account"
           git config user.email "hello-happy-puppy@users.noreply.github.com"
 
-      - name: ↗️  Push to beta
-        run: |
-          git push -u origin main:beta --force
-
       - name: ↗️  Push to alpha
         run: |
           git push -u origin main:alpha --force
