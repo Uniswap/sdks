@@ -15,6 +15,12 @@ _[Summary of the change, motivation, and context]_
 
 _[e.g. Manually, E2E tests, unit tests, Storybook]_
 
+## Are there any breaking changes?
+
+_[e.g. Type definitions, API definitions]_
+
+If there are breaking changes, please ensure you bump the major version Bump the major version (by using the title `feat(!): ...`), post a notice in #eng-sdks, and explicitly notify all Uniswap Labs consumers of the SDK.
+
 ## (Optional) Feedback Focus
 
 _[Specific parts of this PR you'd like feedback on, or that reviewers should pay closer attention to]_
