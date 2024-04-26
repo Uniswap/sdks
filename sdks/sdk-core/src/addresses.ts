@@ -10,7 +10,7 @@ type ChainAddresses = {
   nonfungiblePositionManagerAddress?: string
   tickLensAddress?: string
   swapRouter02Address?: string
-  v1MixedRouteQuoterAddress?: string
+  mixedRouteQuoterV1Address?: string
 }
 
 const DEFAULT_NETWORKS = [ChainId.MAINNET, ChainId.GOERLI, ChainId.SEPOLIA]
@@ -75,11 +75,11 @@ const DEFAULT_ADDRESSES: ChainAddresses = {
 }
 const MAINNET_ADDRESSES: ChainAddresses = {
   ...DEFAULT_ADDRESSES,
-  v1MixedRouteQuoterAddress: '0x84E44095eeBfEC7793Cd7d5b57B7e401D7f1cA2E',
+  mixedRouteQuoterV1Address: '0x84E44095eeBfEC7793Cd7d5b57B7e401D7f1cA2E',
 }
 const GOERLI_ADDRESSES: ChainAddresses = {
   ...DEFAULT_ADDRESSES,
-  v1MixedRouteQuoterAddress: '0xBa60b6e6fF25488308789E6e0A65D838be34194e',
+  mixedRouteQuoterV1Address: '0xBa60b6e6fF25488308789E6e0A65D838be34194e',
 }
 
 const OPTIMISM_ADDRESSES: ChainAddresses = DEFAULT_ADDRESSES
@@ -183,6 +183,7 @@ const BASE_ADDRESSES: ChainAddresses = {
   nonfungiblePositionManagerAddress: '0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1',
   tickLensAddress: '0x0CdeE061c75D43c82520eD998C23ac2991c9ac6d',
   swapRouter02Address: '0x2626664c2603336E57B271c5C0b26F421741e481',
+  mixedRouteQuoterV1Address: '0xe544efae946f0008ae9a8d64493efa7886b73776',
 }
 
 // Base Goerli v3 addresses
@@ -349,9 +350,9 @@ export const TICK_LENS_ADDRESSES: AddressMap = {
 }
 
 export const MIXED_ROUTE_QUOTER_V1_ADDRESSES: AddressMap = SUPPORTED_CHAINS.reduce<AddressMap>((memo, chainId) => {
-  const v1MixedRouteQuoterAddress = CHAIN_TO_ADDRESSES_MAP[chainId].v1MixedRouteQuoterAddress
-  if (v1MixedRouteQuoterAddress) {
-    memo[chainId] = v1MixedRouteQuoterAddress
+  const mixedRouteQuoterV1Address = CHAIN_TO_ADDRESSES_MAP[chainId].mixedRouteQuoterV1Address
+  if (mixedRouteQuoterV1Address) {
+    memo[chainId] = mixedRouteQuoterV1Address
   }
   return memo
 }, {})
