@@ -4855,6 +4855,33 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@uniswap/v4-sdk@workspace:sdks/v4-sdk":
+  version: 0.0.0-use.local
+  resolution: "@uniswap/v4-sdk@workspace:sdks/v4-sdk"
+  dependencies:
+    "@ethersproject/abi": ^5.5.0
+    "@ethersproject/solidity": ^5.0.9
+    "@types/chai": ^4.3.3
+    "@types/mocha": ^9.1.1
+    "@types/node": ^18.7.16
+    "@types/node-fetch": ^2.6.2
+    "@uniswap/sdk-core": ^4.2.1-beta.1
+    "@uniswap/swap-router-contracts": ^1.3.0
+    chai: ^4.3.6
+    dotenv: ^16.0.3
+    eslint-plugin-prettier: ^3.4.1
+    hardhat: ^2.14.0
+    prettier: ^2.4.1
+    tiny-invariant: ^1.1.0
+    tiny-warning: ^1.0.3
+    ts-node: ^10.9.1
+    tsdx: ^0.14.1
+    tslib: ^2.3.0
+    typedoc: ^0.21.2
+    typescript: ^4.3.3
+  languageName: unknown
+  linkType: soft
+
 "JSONStream@npm:^1.0.4":
   version: 1.3.5
   resolution: "JSONStream@npm:1.3.5"
