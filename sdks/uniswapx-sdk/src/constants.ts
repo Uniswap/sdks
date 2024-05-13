@@ -68,7 +68,7 @@ export const REACTOR_ADDRESS_MAPPING: ReactorMapping = {
   //test contract is only on mainnet
   1: {
     [OrderType.Dutch]: "0x6000da47483062A0D734Ba3dc7576Ce6A0B645C4",
-    [OrderType.Dutch_V2]: "0x3867393cC6EA7b0414C2c3e1D9fe7cEa987Fd066",
+    [OrderType.Dutch_V2]: "0x00000011F84B9aa48e5f8aA8B9897600006289Be",
     [OrderType.Relay]: "0x0000000000A4e21E2597DCac987455c48b12edBF",
   },
   12341234: {
