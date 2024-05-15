@@ -88,7 +88,7 @@ export const REACTOR_ADDRESS_MAPPING: ReactorMapping = {
     [OrderType.Dutch_V2]: "0x1bd1aAdc9E230626C44a139d7E70d842749351eb",
     [OrderType.Dutch]: "0x0000000000000000000000000000000000000000",
     [OrderType.Relay]: "0x0000000000000000000000000000000000000000",
-  }
+  },
 };
 
 // aliasing for backwards compatibility
