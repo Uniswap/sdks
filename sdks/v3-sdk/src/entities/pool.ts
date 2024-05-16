@@ -4,7 +4,7 @@ import invariant from 'tiny-invariant'
 import { FACTORY_ADDRESS, FeeAmount, TICK_SPACINGS } from '../constants'
 import { NEGATIVE_ONE, Q192 } from '../internalConstants'
 import { computePoolAddress } from '../utils/computePoolAddress'
-import { v3Swap } from '../utils/swap'
+import { v3Swap } from '../utils/v3swap'
 import { TickMath } from '../utils/tickMath'
 import { Tick, TickConstructorArgs } from './tick'
 import { NoTickDataProvider, TickDataProvider } from './tickDataProvider'
@@ -208,7 +208,7 @@ export class Pool {
     amountSpecified: JSBI,
     sqrtPriceLimitX96?: JSBI
   ): Promise<{ amountCalculated: JSBI; sqrtRatioX96: JSBI; liquidity: JSBI; tickCurrent: number }> {
-      return v3Swap(this, zeroForOne, amountSpecified, sqrtPriceLimitX96)
+      return v3Swap(JSBI.BigInt(this.fee), this.sqrtRatioX96, this.tickCurrent, this.liquidity, this.tickSpacing, this.tickDataProvider, zeroForOne, amountSpecified, sqrtPriceLimitX96)
   }
 
   public get tickSpacing(): number {

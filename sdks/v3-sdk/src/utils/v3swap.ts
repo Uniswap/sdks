@@ -4,7 +4,7 @@ import JSBI from 'jsbi'
 import invariant from 'tiny-invariant'
 import { TickMath } from './tickMath'
 import { NEGATIVE_ONE, ONE, ZERO } from '../internalConstants'
-import { Pool } from '../entities/pool'
+import { TickDataProvider } from '../entities/tickDataProvider'
 
 
 interface StepComputations {
@@ -18,7 +18,12 @@ interface StepComputations {
 }
 
 export async function v3Swap(
-  pool: Pool,
+  fee: JSBI,
+  sqrtRatioX96: JSBI,
+  tickCurrent: number,
+  liquidity: JSBI,
+  tickSpacing: number,
+  tickDataProvider: TickDataProvider,
   zeroForOne: boolean,
   amountSpecified: JSBI,
   sqrtPriceLimitX96?: JSBI
@@ -30,10 +35,10 @@ export async function v3Swap(
 
   if (zeroForOne) {
     invariant(JSBI.greaterThan(sqrtPriceLimitX96, TickMath.MIN_SQRT_RATIO), 'RATIO_MIN')
-    invariant(JSBI.lessThan(sqrtPriceLimitX96, pool.sqrtRatioX96), 'RATIO_CURRENT')
+    invariant(JSBI.lessThan(sqrtPriceLimitX96, sqrtRatioX96), 'RATIO_CURRENT')
   } else {
     invariant(JSBI.lessThan(sqrtPriceLimitX96, TickMath.MAX_SQRT_RATIO), 'RATIO_MAX')
-    invariant(JSBI.greaterThan(sqrtPriceLimitX96, pool.sqrtRatioX96), 'RATIO_CURRENT')
+    invariant(JSBI.greaterThan(sqrtPriceLimitX96, sqrtRatioX96), 'RATIO_CURRENT')
   }
 
   const exactInput = JSBI.greaterThanOrEqual(amountSpecified, ZERO)
@@ -43,9 +48,9 @@ export async function v3Swap(
   const state = {
     amountSpecifiedRemaining: amountSpecified,
     amountCalculated: ZERO,
-    sqrtPriceX96: pool.sqrtRatioX96,
-    tick: pool.tickCurrent,
-    liquidity: pool.liquidity,
+    sqrtPriceX96: sqrtRatioX96,
+    tick: tickCurrent,
+    liquidity: liquidity,
   }
 
   // start swap while loop
@@ -56,10 +61,10 @@ export async function v3Swap(
     // because each iteration of the while loop rounds, we can't optimize this code (relative to the smart contract)
     // by simply traversing to the next available tick, we instead need to exactly replicate
     // tickBitmap.nextInitializedTickWithinOneWord
-    ;[step.tickNext, step.initialized] = await pool.tickDataProvider.nextInitializedTickWithinOneWord(
+    ;[step.tickNext, step.initialized] = await tickDataProvider.nextInitializedTickWithinOneWord(
       state.tick,
       zeroForOne,
-      pool.tickSpacing
+      tickSpacing
     )
 
     if (step.tickNext < TickMath.MIN_TICK) {
@@ -80,7 +85,7 @@ export async function v3Swap(
         : step.sqrtPriceNextX96,
       state.liquidity,
       state.amountSpecifiedRemaining,
-      pool.fee
+      fee
     )
 
     if (exactInput) {
@@ -98,7 +103,7 @@ export async function v3Swap(
     if (JSBI.equal(state.sqrtPriceX96, step.sqrtPriceNextX96)) {
       // if the tick is initialized, run the tick transition
       if (step.initialized) {
-        let liquidityNet = JSBI.BigInt((await pool.tickDataProvider.getTick(step.tickNext)).liquidityNet)
+        let liquidityNet = JSBI.BigInt((await tickDataProvider.getTick(step.tickNext)).liquidityNet)
         // if we're moving leftward, we interpret liquidityNet as the opposite sign
         // safe because liquidityNet cannot be type(int128).min
         if (zeroForOne) liquidityNet = JSBI.multiply(liquidityNet, NEGATIVE_ONE)
