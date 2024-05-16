@@ -1,6 +1,17 @@
-import { Currency, Percent, Currency } from '@uniswap/sdk-core'
-import { v3Swap } from '@uniswap/v3-sdk'
-import { BigNumber, constants } from 'ethers'
+import invariant from 'tiny-invariant'
+import { keccak256 } from '@ethersproject/solidity'
+import { BigintIsh, Currency, CurrencyAmount, Price } from '@uniswap/sdk-core'
+import { v3Swap, NoTickDataProvider, Tick, TickConstructorArgs, TickDataProvider, TickListDataProvider, TickMath } from '@emag3m/v3-sdk'
+import { defaultAbiCoder } from 'ethers/lib/utils'
+import { sortsBefore } from '../utils/sortsBefore'
+import { constants } from 'ethers'
+import JSBI from 'jsbi'
+
+const Q96 = JSBI.exponentiate(JSBI.BigInt(2), JSBI.BigInt(96))
+const Q192 = JSBI.exponentiate(Q96, JSBI.BigInt(2))
+const NEGATIVE_ONE = JSBI.BigInt(-1)
+
+const NO_TICK_DATA_PROVIDER_DEFAULT = new NoTickDataProvider()
 
 /**
  * Represents a V4 pool
@@ -8,12 +19,13 @@ import { BigNumber, constants } from 'ethers'
 export class Pool {
   public readonly currency0: Currency
   public readonly currency1: Currency
-  public readonly fee: JSBI
-  public readonly tickSpacing: JSBI
+  public readonly fee: number
+  public readonly tickSpacing: number
   public readonly sqrtRatioX96: JSBI
   public readonly hooks: string // address
   public readonly liquidity: JSBI
   public readonly tickCurrent: number
+  public readonly tickDataProvider: TickDataProvider
 
   private _currency0Price?: Price<Currency, Currency>
   private _currency1Price?: Price<Currency, Currency>
@@ -21,15 +33,14 @@ export class Pool {
   public static getPoolId(
     currencyA: Currency,
     currencyB: Currency,
-    fee: JSBI,
-    tickSpacing: JSBI,
+    fee: number,
+    tickSpacing: number,
     hooks: string
   ): string {
-    const [currency0, currency1] = currencyA.sortsBefore(currencyB) ? [currencyA, currencyB] : [currencyB, currencyA]
+    const [currency0, currency1] = sortsBefore(currencyA, currencyB) ? [currencyA, currencyB] : [currencyB, currencyA]
     return keccak256(
         ['bytes'],
-        [defaultAbiCoder.encode(/* encode pool key */)]
-      )
+        [defaultAbiCoder.encode(['address', 'address', 'uint24', 'int24', 'address'], [currency0.wrapped.address, currency1.wrapped.address, fee, tickSpacing, hooks])]
     )
   }
 
@@ -45,11 +56,13 @@ export class Pool {
   public constructor(
     currencyA: Currency,
     currencyB: Currency,
-    fee: BigintIsh,
-    tickSpacing: BigintIsh,
+    fee: number,
+    tickSpacing: number,
+    hooks: string,
     sqrtRatioX96: BigintIsh,
     liquidity: BigintIsh,
     tickCurrent: number,
+    ticks: TickDataProvider | (Tick | TickConstructorArgs)[] = NO_TICK_DATA_PROVIDER_DEFAULT
   ) {
     invariant(Number.isInteger(fee) && fee < 1_000_000, 'FEE')
     const tickCurrentSqrtRatioX96 = TickMath.getSqrtRatioAtTick(tickCurrent)
@@ -60,12 +73,14 @@ export class Pool {
       'PRICE_BOUNDS'
     )
     // always create a copy of the list since we want the pool's tick list to be immutable
-    ;[this.currency0, this.currency1] = currencyA.sortsBefore(currencyB) ? [currencyA, currencyB] : [currencyB, currencyA]
-    this.fee = JSBI.BigInt(fee)
+    ;[this.currency0, this.currency1] = sortsBefore(currencyA, currencyB) ? [currencyA, currencyB] : [currencyB, currencyA]
+    this.fee = fee
     this.sqrtRatioX96 = JSBI.BigInt(sqrtRatioX96)
+    this.tickSpacing =  tickSpacing
+    this.hooks = hooks
     this.liquidity = JSBI.BigInt(liquidity)
     this.tickCurrent = tickCurrent
-    this.tickDataProvider = Array.isArray(ticks) ? new TickListDataProvider(ticks, TICK_SPACINGS[fee]) : ticks
+    this.tickDataProvider = Array.isArray(ticks) ? new TickListDataProvider(ticks, tickSpacing) : ticks
   }
 
   /**
@@ -141,7 +156,7 @@ export class Pool {
     const outputCurrency = zeroForOne ? this.currency1 : this.currency0
     return [
       CurrencyAmount.fromRawAmount(outputCurrency, JSBI.multiply(outputAmount, NEGATIVE_ONE)),
-      new Pool(this.currency0, this.currency1, this.fee, sqrtRatioX96, liquidity, tickCurrent, this.tickDataProvider),
+      new Pool(this.currency0, this.currency1, this.fee, this.tickSpacing, this.hooks, sqrtRatioX96, liquidity, tickCurrent, this.tickDataProvider),
     ]
   }
 
@@ -155,7 +170,7 @@ export class Pool {
     outputAmount: CurrencyAmount<Currency>,
     sqrtPriceLimitX96?: JSBI
   ): Promise<[CurrencyAmount<Currency>, Pool]> {
-    invariant(outputAmount.currency.isCurrency && this.involvesCurrency(outputAmount.currency), 'CURRENCY')
+    invariant(this.involvesCurrency(outputAmount.currency), 'CURRENCY')
 
     const zeroForOne = outputAmount.currency.equals(this.currency1)
 
@@ -168,7 +183,7 @@ export class Pool {
     const inputCurrency = zeroForOne ? this.currency0 : this.currency1
     return [
       CurrencyAmount.fromRawAmount(inputCurrency, inputAmount),
-      new Pool(this.currency0, this.currency1, this.fee, sqrtRatioX96, liquidity, tickCurrent, this.tickDataProvider),
+      new Pool(this.currency0, this.currency1, this.fee, this.tickSpacing, this.hooks, sqrtRatioX96, liquidity, tickCurrent, this.tickDataProvider),
     ]
   }
 
@@ -185,18 +200,17 @@ export class Pool {
   private async swap(
     zeroForOne: boolean,
     amountSpecified: JSBI,
-    sqrtPriceLimitX96?: JSBI
-    hookData?: string
+    sqrtPriceLimitX96?: JSBI,
   ): Promise<{ amountCalculated: JSBI; sqrtRatioX96: JSBI; liquidity: JSBI; tickCurrent: number }> {
       if (this.nonImpactfulHook()) {
-        return v3Swap(this, zeroForOne, amountSpecified, sqrtPriceLimitX96)
+        return v3Swap(JSBI.BigInt(this.fee), this.sqrtRatioX96, this.tickCurrent, this.liquidity, this.tickSpacing, this.tickDataProvider, zeroForOne, amountSpecified, sqrtPriceLimitX96)
       } else {
-        return "Error: Unsupported hook"
+        throw "Error: Unsupported hook"
       }
   }
 
   private nonImpactfulHook(): boolean {
-      // TODO: reference chain specific hook addresses that do not impact swaps
-      return this.hook === constants.AddressZero
+    // TODO: reference chain specific hook addresses or patterns that do not impact swaps
+    return this.hooks === constants.AddressZero
   }
 }

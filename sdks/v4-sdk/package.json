@@ -24,6 +24,7 @@
     "test": "tsdx test"
   },
   "dependencies": {
+    "@emag3m/v3-sdk": "1.0.1",
     "@ethersproject/abi": "^5.5.0",
     "@ethersproject/solidity": "^5.0.9",
     "@uniswap/sdk-core": "^4.2.1-beta.1",
