@@ -130,28 +130,28 @@ describe('Route', () => {
 
     it('correct for ether -> 0', () => {
       const price = new Route([pool_0_eth], eth, currency0).midPrice
-      expect(price.toFixed(4)).toEqual('0.3333')
+      expect(price.toFixed(4)).toEqual('3.0000')
       expect(price.baseCurrency.equals(eth)).toEqual(true)
       expect(price.quoteCurrency.equals(currency0)).toEqual(true)
     })
 
     it('correct for 1 -> eth', () => {
       const price = new Route([pool_1_eth], currency1, eth).midPrice
-      expect(price.toFixed(4)).toEqual('0.1429')
+      expect(price.toFixed(4)).toEqual('7.0000')
       expect(price.baseCurrency.equals(currency1)).toEqual(true)
       expect(price.quoteCurrency.equals(eth)).toEqual(true)
     })
 
     it('correct for ether -> 0 -> 1 -> eth', () => {
       const price = new Route([pool_0_eth, pool_0_1, pool_1_eth], eth, eth).midPrice
-      expect(price.toSignificant(4)).toEqual('0.009524')
+      expect(price.toSignificant(4)).toEqual('4.2')
       expect(price.baseCurrency.equals(eth)).toEqual(true)
       expect(price.quoteCurrency.equals(eth)).toEqual(true)
     })
 
     it('correct for eth -> 0 -> 1 -> ether', () => {
       const price = new Route([pool_0_eth, pool_0_1, pool_1_eth], eth, eth).midPrice
-      expect(price.toSignificant(4)).toEqual('0.009524')
+      expect(price.toSignificant(4)).toEqual('4.2')
       expect(price.baseCurrency.equals(eth)).toEqual(true)
       expect(price.quoteCurrency.equals(eth)).toEqual(true)
     })
