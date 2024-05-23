@@ -6,7 +6,6 @@ import { TickMath } from './tickMath'
 import { NEGATIVE_ONE, ONE, ZERO } from '../internalConstants'
 import { TickDataProvider } from '../entities/tickDataProvider'
 
-
 interface StepComputations {
   sqrtPriceStartX96: JSBI
   tickNext: number
@@ -27,7 +26,7 @@ export async function v3Swap(
   zeroForOne: boolean,
   amountSpecified: JSBI,
   sqrtPriceLimitX96?: JSBI
-  ): Promise<{ amountCalculated: JSBI; sqrtRatioX96: JSBI; liquidity: JSBI; tickCurrent: number }> {
+): Promise<{ amountCalculated: JSBI; sqrtRatioX96: JSBI; liquidity: JSBI; tickCurrent: number }> {
   if (!sqrtPriceLimitX96)
     sqrtPriceLimitX96 = zeroForOne
       ? JSBI.add(TickMath.MIN_SQRT_RATIO, ONE)

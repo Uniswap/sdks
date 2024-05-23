@@ -208,7 +208,17 @@ export class Pool {
     amountSpecified: JSBI,
     sqrtPriceLimitX96?: JSBI
   ): Promise<{ amountCalculated: JSBI; sqrtRatioX96: JSBI; liquidity: JSBI; tickCurrent: number }> {
-      return v3Swap(JSBI.BigInt(this.fee), this.sqrtRatioX96, this.tickCurrent, this.liquidity, this.tickSpacing, this.tickDataProvider, zeroForOne, amountSpecified, sqrtPriceLimitX96)
+    return v3Swap(
+      JSBI.BigInt(this.fee),
+      this.sqrtRatioX96,
+      this.tickCurrent,
+      this.liquidity,
+      this.tickSpacing,
+      this.tickDataProvider,
+      zeroForOne,
+      amountSpecified,
+      sqrtPriceLimitX96
+    )
   }
 
   public get tickSpacing(): number {
