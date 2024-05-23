@@ -1,4 +1,4 @@
-import { CurrencyAmount, Ether, Percent, Price, sqrt, Token, TradeType, WETH9 } from '@uniswap/sdk-core'
+import { Currency, CurrencyAmount, Ether, Percent, Price, sqrt, Token, TradeType } from '@uniswap/sdk-core'
 import { constants } from 'ethers'
 import JSBI from 'jsbi'
 import { nearestUsableTick, encodeSqrtRatioX96, TickMath } from '@emag3m/v3-sdk'
@@ -11,7 +11,7 @@ describe('Trade', () => {
   // const FEE_AMOUNT_LOW = 100
   const FEE_AMOUNT_MEDIUM = 3000
   // const FEE_AMOUNT_HIGHEST = 10_000
-  const TICK_SPACING_TEN = 10
+  const TICK_SPACING_TEN = 60
   // const ONE_ETHER = JSBI.exponentiate(JSBI.BigInt(10), JSBI.BigInt(18))
   // const NEGATIVE_ONE = JSBI.BigInt(-1)
   const ADDRESS_ZERO = constants.AddressZero
@@ -22,8 +22,8 @@ describe('Trade', () => {
   const token3 = new Token(1, '0x0000000000000000000000000000000000000004', 18, 't3', 'token3')
 
   function v2StylePool(
-    reserve0: CurrencyAmount<Token>,
-    reserve1: CurrencyAmount<Token>,
+    reserve0: CurrencyAmount<Currency>,
+    reserve1: CurrencyAmount<Currency>,
     feeAmount: number = FEE_AMOUNT_MEDIUM
   ) {
     const sqrtRatioX96 = encodeSqrtRatioX96(reserve1.quotient, reserve0.quotient)
@@ -71,25 +71,25 @@ describe('Trade', () => {
     CurrencyAmount.fromRawAmount(token3, 130000)
   )
 
-  const pool_weth_0 = v2StylePool(
-    CurrencyAmount.fromRawAmount(WETH9[1], JSBI.BigInt(100000)),
+  const pool_eth_0 = v2StylePool(
+    CurrencyAmount.fromRawAmount(ETHER, JSBI.BigInt(100000)),
     CurrencyAmount.fromRawAmount(token0, JSBI.BigInt(100000))
   )
 
-  const pool_weth_1 = v2StylePool(
-    CurrencyAmount.fromRawAmount(WETH9[1], JSBI.BigInt(100000)),
+  const pool_eth_1 = v2StylePool(
+    CurrencyAmount.fromRawAmount(ETHER, JSBI.BigInt(100000)),
     CurrencyAmount.fromRawAmount(token1, JSBI.BigInt(100000))
   )
 
-  const pool_weth_2 = v2StylePool(
-    CurrencyAmount.fromRawAmount(WETH9[1], JSBI.BigInt(100000)),
+  const pool_eth_2 = v2StylePool(
+    CurrencyAmount.fromRawAmount(ETHER, JSBI.BigInt(100000)),
     CurrencyAmount.fromRawAmount(token2, JSBI.BigInt(100000))
   )
 
   describe('#fromRoute', () => {
     it('can be constructed with ETHER as input', async () => {
       const trade = await Trade.fromRoute(
-        new Route([pool_weth_0], ETHER, token0),
+        new Route([pool_eth_0], ETHER, token0),
         CurrencyAmount.fromRawAmount(Ether.onChain(1), JSBI.BigInt(10000)),
         TradeType.EXACT_INPUT
       )
@@ -98,7 +98,7 @@ describe('Trade', () => {
     })
     it('can be constructed with ETHER as input for exact output', async () => {
       const trade = await Trade.fromRoute(
-        new Route([pool_weth_0], ETHER, token0),
+        new Route([pool_eth_0], ETHER, token0),
         CurrencyAmount.fromRawAmount(token0, JSBI.BigInt(10000)),
         TradeType.EXACT_OUTPUT
       )
@@ -108,7 +108,7 @@ describe('Trade', () => {
 
     it('can be constructed with ETHER as output', async () => {
       const trade = await Trade.fromRoute(
-        new Route([pool_weth_0], token0, ETHER),
+        new Route([pool_eth_0], token0, ETHER),
         CurrencyAmount.fromRawAmount(Ether.onChain(1), JSBI.BigInt(10000)),
         TradeType.EXACT_OUTPUT
       )
@@ -117,7 +117,7 @@ describe('Trade', () => {
     })
     it('can be constructed with ETHER as output for exact input', async () => {
       const trade = await Trade.fromRoute(
-        new Route([pool_weth_0], token0, ETHER),
+        new Route([pool_eth_0], token0, ETHER),
         CurrencyAmount.fromRawAmount(token0, JSBI.BigInt(10000)),
         TradeType.EXACT_INPUT
       )
@@ -132,7 +132,7 @@ describe('Trade', () => {
         [
           {
             amount: CurrencyAmount.fromRawAmount(Ether.onChain(1), JSBI.BigInt(10000)),
-            route: new Route([pool_weth_0], ETHER, token0),
+            route: new Route([pool_eth_0], ETHER, token0),
           },
         ],
         TradeType.EXACT_INPUT
@@ -146,11 +146,11 @@ describe('Trade', () => {
         [
           {
             amount: CurrencyAmount.fromRawAmount(token0, JSBI.BigInt(3000)),
-            route: new Route([pool_weth_0], ETHER, token0),
+            route: new Route([pool_eth_0], ETHER, token0),
           },
           {
             amount: CurrencyAmount.fromRawAmount(token0, JSBI.BigInt(7000)),
-            route: new Route([pool_weth_1, pool_0_1], ETHER, token0),
+            route: new Route([pool_eth_1, pool_0_1], ETHER, token0),
           },
         ],
         TradeType.EXACT_OUTPUT
@@ -164,11 +164,11 @@ describe('Trade', () => {
         [
           {
             amount: CurrencyAmount.fromRawAmount(Ether.onChain(1), JSBI.BigInt(4000)),
-            route: new Route([pool_weth_0], token0, ETHER),
+            route: new Route([pool_eth_0], token0, ETHER),
           },
           {
             amount: CurrencyAmount.fromRawAmount(Ether.onChain(1), JSBI.BigInt(6000)),
-            route: new Route([pool_0_1, pool_weth_1], token0, ETHER),
+            route: new Route([pool_0_1, pool_eth_1], token0, ETHER),
           },
         ],
         TradeType.EXACT_OUTPUT
@@ -181,11 +181,11 @@ describe('Trade', () => {
         [
           {
             amount: CurrencyAmount.fromRawAmount(token0, JSBI.BigInt(3000)),
-            route: new Route([pool_weth_0], token0, ETHER),
+            route: new Route([pool_eth_0], token0, ETHER),
           },
           {
             amount: CurrencyAmount.fromRawAmount(token0, JSBI.BigInt(7000)),
-            route: new Route([pool_0_1, pool_weth_1], token0, ETHER),
+            route: new Route([pool_0_1, pool_eth_1], token0, ETHER),
           },
         ],
         TradeType.EXACT_INPUT
@@ -200,11 +200,11 @@ describe('Trade', () => {
           [
             {
               amount: CurrencyAmount.fromRawAmount(token0, JSBI.BigInt(4500)),
-              route: new Route([pool_0_1, pool_weth_1], token0, ETHER),
+              route: new Route([pool_0_1, pool_eth_1], token0, ETHER),
             },
             {
               amount: CurrencyAmount.fromRawAmount(token0, JSBI.BigInt(5500)),
-              route: new Route([pool_0_1, pool_1_2, pool_weth_2], token0, ETHER),
+              route: new Route([pool_0_1, pool_1_2, pool_eth_2], token0, ETHER),
             },
           ],
           TradeType.EXACT_INPUT
@@ -604,31 +604,31 @@ describe('Trade', () => {
 
     it('works for ETHER currency input', async () => {
       const result = await Trade.bestTradeExactIn(
-        [pool_weth_0, pool_0_1, pool_0_3, pool_1_3],
+        [pool_eth_0, pool_0_1, pool_0_3, pool_1_3],
         CurrencyAmount.fromRawAmount(Ether.onChain(1), JSBI.BigInt(100)),
         token3
       )
       expect(result).toHaveLength(2)
       expect(result[0].inputAmount.currency).toEqual(ETHER)
-      expect(result[0].swaps[0].route.currencyPath).toEqual([WETH9[1], token0, token1, token3])
+      expect(result[0].swaps[0].route.currencyPath).toEqual([ETHER, token0, token1, token3])
       expect(result[0].outputAmount.currency).toEqual(token3)
       expect(result[1].inputAmount.currency).toEqual(ETHER)
-      expect(result[1].swaps[0].route.currencyPath).toEqual([WETH9[1], token0, token3])
+      expect(result[1].swaps[0].route.currencyPath).toEqual([ETHER, token0, token3])
       expect(result[1].outputAmount.currency).toEqual(token3)
     })
 
     it('works for ETHER currency output', async () => {
       const result = await Trade.bestTradeExactIn(
-        [pool_weth_0, pool_0_1, pool_0_3, pool_1_3],
+        [pool_eth_0, pool_0_1, pool_0_3, pool_1_3],
         CurrencyAmount.fromRawAmount(token3, JSBI.BigInt(100)),
         ETHER
       )
       expect(result).toHaveLength(2)
       expect(result[0].inputAmount.currency).toEqual(token3)
-      expect(result[0].swaps[0].route.currencyPath).toEqual([token3, token0, WETH9[1]])
+      expect(result[0].swaps[0].route.currencyPath).toEqual([token3, token0, ETHER])
       expect(result[0].outputAmount.currency).toEqual(ETHER)
       expect(result[1].inputAmount.currency).toEqual(token3)
-      expect(result[1].swaps[0].route.currencyPath).toEqual([token3, token1, token0, WETH9[1]])
+      expect(result[1].swaps[0].route.currencyPath).toEqual([token3, token1, token0, ETHER])
       expect(result[1].outputAmount.currency).toEqual(ETHER)
     })
   })
@@ -798,6 +798,7 @@ describe('Trade', () => {
         token0,
         CurrencyAmount.fromRawAmount(token2, 10000)
       )
+
       expect(result).toHaveLength(2)
       expect(result[0].swaps[0].route.pools).toHaveLength(1) // 0 -> 2 at 10:11
       expect(result[0].swaps[0].route.currencyPath).toEqual([token0, token2])
@@ -861,30 +862,30 @@ describe('Trade', () => {
 
     it('works for ETHER currency input', async () => {
       const result = await Trade.bestTradeExactOut(
-        [pool_weth_0, pool_0_1, pool_0_3, pool_1_3],
+        [pool_eth_0, pool_0_1, pool_0_3, pool_1_3],
         ETHER,
         CurrencyAmount.fromRawAmount(token3, 10000)
       )
       expect(result).toHaveLength(2)
       expect(result[0].inputAmount.currency).toEqual(ETHER)
-      expect(result[0].swaps[0].route.currencyPath).toEqual([WETH9[1], token0, token1, token3])
+      expect(result[0].swaps[0].route.currencyPath).toEqual([ETHER, token0, token1, token3])
       expect(result[0].outputAmount.currency).toEqual(token3)
       expect(result[1].inputAmount.currency).toEqual(ETHER)
-      expect(result[1].swaps[0].route.currencyPath).toEqual([WETH9[1], token0, token3])
+      expect(result[1].swaps[0].route.currencyPath).toEqual([ETHER, token0, token3])
       expect(result[1].outputAmount.currency).toEqual(token3)
     })
     it('works for ETHER currency output', async () => {
       const result = await Trade.bestTradeExactOut(
-        [pool_weth_0, pool_0_1, pool_0_3, pool_1_3],
+        [pool_eth_0, pool_0_1, pool_0_3, pool_1_3],
         token3,
         CurrencyAmount.fromRawAmount(Ether.onChain(1), JSBI.BigInt(100))
       )
       expect(result).toHaveLength(2)
       expect(result[0].inputAmount.currency).toEqual(token3)
-      expect(result[0].swaps[0].route.currencyPath).toEqual([token3, token0, WETH9[1]])
+      expect(result[0].swaps[0].route.currencyPath).toEqual([token3, token0, ETHER])
       expect(result[0].outputAmount.currency).toEqual(ETHER)
       expect(result[1].inputAmount.currency).toEqual(token3)
-      expect(result[1].swaps[0].route.currencyPath).toEqual([token3, token1, token0, WETH9[1]])
+      expect(result[1].swaps[0].route.currencyPath).toEqual([token3, token1, token0, ETHER])
       expect(result[1].outputAmount.currency).toEqual(ETHER)
     })
   })

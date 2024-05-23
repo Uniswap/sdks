@@ -28,7 +28,7 @@ describe('Router', () => {
 
   describe('#swapCallParameters', () => {
     describe('exact in', () => {
-      it.only('ether to token1', () => {
+      it('ether to token1', () => {
         const result = Router.swapCallParameters(
           Trade.exactIn(
             new Route([pair_weth_0, pair_0_1], ETHER, token1),

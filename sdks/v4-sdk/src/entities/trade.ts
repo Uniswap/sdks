@@ -1,13 +1,13 @@
 import { Currency, Fraction, Percent, Price, sortedInsert, CurrencyAmount, TradeType, Token } from '@uniswap/sdk-core'
 import invariant from 'tiny-invariant'
-import { ONE, ZERO } from '../internalConstants'
+import { ONE, ZERO } from '../utils/internalConstants'
 import { Pool } from './pool'
 import { Route } from './route'
 
 /**
  * Trades comparator, an extension of the input output comparator that also considers other dimensions of the trade in ranking them
- * @template TInput The input token, either Ether or an ERC-20
- * @template TOutput The output token, either Ether or an ERC-20
+ * @template TInput The input currency, either Ether or an ERC-20
+ * @template TOutput The output currency, either Ether or an ERC-20
  * @template TTradeType The trade type, either exact input or exact output
  * @param a The first trade to compare
  * @param b The second trade to compare
@@ -17,14 +17,14 @@ export function tradeComparator<TInput extends Currency, TOutput extends Currenc
   a: Trade<TInput, TOutput, TTradeType>,
   b: Trade<TInput, TOutput, TTradeType>
 ) {
-  // must have same input and output token for comparison
+  // must have same input and output currency for comparison
   invariant(a.inputAmount.currency.equals(b.inputAmount.currency), 'INPUT_CURRENCY')
   invariant(a.outputAmount.currency.equals(b.outputAmount.currency), 'OUTPUT_CURRENCY')
   if (a.outputAmount.equalTo(b.outputAmount)) {
     if (a.inputAmount.equalTo(b.inputAmount)) {
       // consider the number of hops since each hop costs gas
-      const aHops = a.swaps.reduce((total, cur) => total + cur.route.tokenPath.length, 0)
-      const bHops = b.swaps.reduce((total, cur) => total + cur.route.tokenPath.length, 0)
+      const aHops = a.swaps.reduce((total, cur) => total + cur.route.currencyPath.length, 0)
+      const bHops = b.swaps.reduce((total, cur) => total + cur.route.currencyPath.length, 0)
       return aHops - bHops
     }
     // trade A requires less input than trade B, so A should come first
@@ -58,11 +58,23 @@ export interface BestTradeOptions {
  *
  * Does not account for slippage, i.e., changes in price environment that can occur between
  * the time the trade is submitted and when it is executed.
- * @template TInput The input token, either Ether or an ERC-20
- * @template TOutput The output token, either Ether or an ERC-20
+ * @template TInput The input currency, either Ether or an ERC-20
+ * @template TOutput The output currency, either Ether or an ERC-20
  * @template TTradeType The trade type, either exact input or exact output
  */
 export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType extends TradeType> {
+  /**
+   * @deprecated Deprecated in favor of 'swaps' property. If the trade consists of multiple routes
+   * this will return an error.
+   *
+   * When the trade consists of just a single route, this returns the route of the trade,
+   * i.e. which pools the trade goes through.
+   */
+  public get route(): Route<TInput, TOutput> {
+    invariant(this.swaps.length === 1, 'MULTIPLE_ROUTES')
+    return this.swaps[0].route
+  }
+
   /**
    * The swaps of the trade, i.e. which routes and how much is swapped in each that
    * make up the trade.
@@ -173,8 +185,8 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
 
   /**
    * Constructs an exact in trade with the given amount in and route
-   * @template TInput The input token, either Ether or an ERC-20
-   * @template TOutput The output token, either Ether or an ERC-20
+   * @template TInput The input currency, either Ether or an ERC-20
+   * @template TOutput The output currency, either Ether or an ERC-20
    * @param route The route of the exact in trade
    * @param amountIn The amount being passed in
    * @returns The exact in trade
@@ -188,8 +200,8 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
 
   /**
    * Constructs an exact out trade with the given amount out and route
-   * @template TInput The input token, either Ether or an ERC-20
-   * @template TOutput The output token, either Ether or an ERC-20
+   * @template TInput The input currency, either Ether or an ERC-20
+   * @template TOutput The output currency, either Ether or an ERC-20
    * @param route The route of the exact out trade
    * @param amountOut The amount returned by the trade
    * @returns The exact out trade
@@ -203,8 +215,8 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
 
   /**
    * Constructs a trade by simulating swaps through the given route
-   * @template TInput The input token, either Ether or an ERC-20.
-   * @template TOutput The output token, either Ether or an ERC-20.
+   * @template TInput The input currency, either Ether or an ERC-20.
+   * @template TOutput The output currency, either Ether or an ERC-20.
    * @template TTradeType The type of the trade, either exact in or exact out.
    * @param route route to swap through
    * @param amount the amount specified, either input or output, depending on tradeType
@@ -216,13 +228,13 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     amount: TTradeType extends TradeType.EXACT_INPUT ? CurrencyAmount<TInput> : CurrencyAmount<TOutput>,
     tradeType: TTradeType
   ): Promise<Trade<TInput, TOutput, TTradeType>> {
-    const amounts: CurrencyAmount<Token>[] = new Array(route.tokenPath.length)
+    const amounts: CurrencyAmount<Token | Currency>[] = new Array(route.currencyPath.length)
     let inputAmount: CurrencyAmount<TInput>
     let outputAmount: CurrencyAmount<TOutput>
     if (tradeType === TradeType.EXACT_INPUT) {
       invariant(amount.currency.equals(route.input), 'INPUT')
-      amounts[0] = amount.wrapped
-      for (let i = 0; i < route.tokenPath.length - 1; i++) {
+      amounts[0] = amount
+      for (let i = 0; i < route.currencyPath.length - 1; i++) {
         const pool = route.pools[i]
         const [outputAmount] = await pool.getOutputAmount(amounts[i])
         amounts[i + 1] = outputAmount
@@ -235,8 +247,8 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       )
     } else {
       invariant(amount.currency.equals(route.output), 'OUTPUT')
-      amounts[amounts.length - 1] = amount.wrapped
-      for (let i = route.tokenPath.length - 1; i > 0; i--) {
+      amounts[amounts.length - 1] = amount
+      for (let i = route.currencyPath.length - 1; i > 0; i--) {
         const pool = route.pools[i - 1]
         const [inputAmount] = await pool.getInputAmount(amounts[i])
         amounts[i - 1] = inputAmount
@@ -254,8 +266,8 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
   /**
    * Constructs a trade from routes by simulating swaps
    *
-   * @template TInput The input token, either Ether or an ERC-20.
-   * @template TOutput The output token, either Ether or an ERC-20.
+   * @template TInput The input currency, either Ether or an ERC-20.
+   * @template TOutput The output currency, either Ether or an ERC-20.
    * @template TTradeType The type of the trade, either exact in or exact out.
    * @param routes the routes to swap through and how much of the amount should be routed through each
    * @param tradeType whether the trade is an exact input or exact output swap
@@ -275,16 +287,16 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     }[] = []
 
     for (const { route, amount } of routes) {
-      const amounts: CurrencyAmount<Token>[] = new Array(route.tokenPath.length)
+      const amounts: CurrencyAmount<Token | Currency>[] = new Array(route.currencyPath.length)
       let inputAmount: CurrencyAmount<TInput>
       let outputAmount: CurrencyAmount<TOutput>
 
       if (tradeType === TradeType.EXACT_INPUT) {
         invariant(amount.currency.equals(route.input), 'INPUT')
         inputAmount = CurrencyAmount.fromFractionalAmount(route.input, amount.numerator, amount.denominator)
-        amounts[0] = CurrencyAmount.fromFractionalAmount(route.input.wrapped, amount.numerator, amount.denominator)
+        amounts[0] = CurrencyAmount.fromFractionalAmount(route.input, amount.numerator, amount.denominator)
 
-        for (let i = 0; i < route.tokenPath.length - 1; i++) {
+        for (let i = 0; i < route.currencyPath.length - 1; i++) {
           const pool = route.pools[i]
           const [outputAmount] = await pool.getOutputAmount(amounts[i])
           amounts[i + 1] = outputAmount
@@ -299,12 +311,12 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
         invariant(amount.currency.equals(route.output), 'OUTPUT')
         outputAmount = CurrencyAmount.fromFractionalAmount(route.output, amount.numerator, amount.denominator)
         amounts[amounts.length - 1] = CurrencyAmount.fromFractionalAmount(
-          route.output.wrapped,
+          route.output,
           amount.numerator,
           amount.denominator
         )
 
-        for (let i = route.tokenPath.length - 1; i > 0; i--) {
+        for (let i = route.currencyPath.length - 1; i > 0; i--) {
           const pool = route.pools[i - 1]
           const [inputAmount] = await pool.getInputAmount(amounts[i])
           amounts[i - 1] = inputAmount
@@ -325,8 +337,8 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
   /**
    * Creates a trade without computing the result of swapping through the route. Useful when you have simulated the trade
    * elsewhere and do not have any tick data
-   * @template TInput The input token, either Ether or an ERC-20
-   * @template TOutput The output token, either Ether or an ERC-20
+   * @template TInput The input currency, either Ether or an ERC-20
+   * @template TOutput The output currency, either Ether or an ERC-20
    * @template TTradeType The type of the trade, either exact in or exact out
    * @param constructorArguments The arguments passed to the trade constructor
    * @returns The unchecked trade
@@ -356,8 +368,8 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
   /**
    * Creates a trade without computing the result of swapping through the routes. Useful when you have simulated the trade
    * elsewhere and do not have any tick data
-   * @template TInput The input token, either Ether or an ERC-20
-   * @template TOutput The output token, either Ether or an ERC-20
+   * @template TInput The input currency, either Ether or an ERC-20
+   * @template TOutput The output currency, either Ether or an ERC-20
    * @template TTradeType The type of the trade, either exact in or exact out
    * @param constructorArguments The arguments passed to the trade constructor
    * @returns The unchecked trade
@@ -396,23 +408,23 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     const inputCurrency = routes[0].inputAmount.currency
     const outputCurrency = routes[0].outputAmount.currency
     invariant(
-      routes.every(({ route }) => inputCurrency.wrapped.equals(route.input.wrapped)),
+      routes.every(({ route }) => inputCurrency.equals(route.input)),
       'INPUT_CURRENCY_MATCH'
     )
     invariant(
-      routes.every(({ route }) => outputCurrency.wrapped.equals(route.output.wrapped)),
+      routes.every(({ route }) => outputCurrency.equals(route.output)),
       'OUTPUT_CURRENCY_MATCH'
     )
 
     const numPools = routes.map(({ route }) => route.pools.length).reduce((total, cur) => total + cur, 0)
-    const poolAddressSet = new Set<string>()
+    const poolIDSet = new Set<string>()
     for (const { route } of routes) {
       for (const pool of route.pools) {
-        poolAddressSet.add(Pool.getAddress(pool.token0, pool.token1, pool.fee))
+        poolIDSet.add(Pool.getPoolId(pool.currency0, pool.currency1, pool.fee, pool.tickSpacing, pool.hooks))
       }
     }
 
-    invariant(numPools === poolAddressSet.size, 'POOLS_DUPLICATED')
+    invariant(numPools === poolIDSet.size, 'POOLS_DUPLICATED')
 
     this.swaps = routes
     this.tradeType = tradeType
@@ -466,8 +478,8 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
   }
 
   /**
-   * Given a list of pools, and a fixed amount in, returns the top `maxNumResults` trades that go from an input token
-   * amount to an output token, making at most `maxHops` hops.
+   * Given a list of pools, and a fixed amount in, returns the top `maxNumResults` trades that go from an input currency
+   * amount to an output currency, making at most `maxHops` hops.
    * Note this does not consider aggregation, as routes are linear. It's possible a better route exists by splitting
    * the amount in among multiple routes.
    * @param pools the pools to consider in finding the best trade
@@ -494,14 +506,13 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     invariant(maxHops > 0, 'MAX_HOPS')
     invariant(currencyAmountIn === nextAmountIn || currentPools.length > 0, 'INVALID_RECURSION')
 
-    const amountIn = nextAmountIn.wrapped
-    const tokenOut = currencyOut.wrapped
+    const amountIn = nextAmountIn
     for (let i = 0; i < pools.length; i++) {
       const pool = pools[i]
       // pool irrelevant
-      if (!pool.token0.equals(amountIn.currency) && !pool.token1.equals(amountIn.currency)) continue
+      if (!pool.currency0.equals(amountIn.currency) && !pool.currency1.equals(amountIn.currency)) continue
 
-      let amountOut: CurrencyAmount<Token>
+      let amountOut: CurrencyAmount<Token | Currency>
       try {
         ;[amountOut] = await pool.getOutputAmount(amountIn)
       } catch (error) {
@@ -511,8 +522,8 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
         }
         throw error
       }
-      // we have arrived at the output token, so this is the final trade of one of the paths
-      if (amountOut.currency.isToken && amountOut.currency.equals(tokenOut)) {
+      // we have arrived at the output currency, so this is the final trade of one of the paths
+      if (amountOut.currency.equals(currencyOut)) {
         sortedInsert(
           bestTrades,
           await Trade.fromRoute(
@@ -526,7 +537,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       } else if (maxHops > 1 && pools.length > 1) {
         const poolsExcludingThisPool = pools.slice(0, i).concat(pools.slice(i + 1, pools.length))
 
-        // otherwise, consider all the other paths that lead from this token as long as we have not exceeded maxHops
+        // otherwise, consider all the other paths that lead from this currency as long as we have not exceeded maxHops
         await Trade.bestTradeExactIn(
           poolsExcludingThisPool,
           currencyAmountIn,
@@ -541,14 +552,13 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
         )
       }
     }
-
     return bestTrades
   }
 
   /**
    * similar to the above method but instead targets a fixed output amount
-   * given a list of pools, and a fixed amount out, returns the top `maxNumResults` trades that go from an input token
-   * to an output token amount, making at most `maxHops` hops
+   * given a list of pools, and a fixed amount out, returns the top `maxNumResults` trades that go from an input currency
+   * to an output currency amount, making at most `maxHops` hops
    * note this does not consider aggregation, as routes are linear. it's possible a better route exists by splitting
    * the amount in among multiple routes.
    * @param pools the pools to consider in finding the best trade
@@ -575,14 +585,13 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     invariant(maxHops > 0, 'MAX_HOPS')
     invariant(currencyAmountOut === nextAmountOut || currentPools.length > 0, 'INVALID_RECURSION')
 
-    const amountOut = nextAmountOut.wrapped
-    const tokenIn = currencyIn.wrapped
+    const amountOut = nextAmountOut
     for (let i = 0; i < pools.length; i++) {
       const pool = pools[i]
       // pool irrelevant
-      if (!pool.token0.equals(amountOut.currency) && !pool.token1.equals(amountOut.currency)) continue
+      if (!pool.currency0.equals(amountOut.currency) && !pool.currency1.equals(amountOut.currency)) continue
 
-      let amountIn: CurrencyAmount<Token>
+      let amountIn: CurrencyAmount<Token | Currency>
       try {
         ;[amountIn] = await pool.getInputAmount(amountOut)
       } catch (error) {
@@ -592,8 +601,8 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
         }
         throw error
       }
-      // we have arrived at the input token, so this is the first trade of one of the paths
-      if (amountIn.currency.equals(tokenIn)) {
+      // we have arrived at the input currency, so this is the first trade of one of the paths
+      if (amountIn.currency.equals(currencyIn)) {
         sortedInsert(
           bestTrades,
           await Trade.fromRoute(
@@ -607,7 +616,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       } else if (maxHops > 1 && pools.length > 1) {
         const poolsExcludingThisPool = pools.slice(0, i).concat(pools.slice(i + 1, pools.length))
 
-        // otherwise, consider all the other paths that arrive at this token as long as we have not exceeded maxHops
+        // otherwise, consider all the other paths that arrive at this currency as long as we have not exceeded maxHops
         await Trade.bestTradeExactOut(
           poolsExcludingThisPool,
           currencyIn,
