@@ -1,4 +1,5 @@
 import JSBI from 'jsbi'
+import { FeeAmount } from '../constants'
 import { NEGATIVE_ONE, ZERO } from '../internalConstants'
 import { FullMath } from './fullMath'
 import { SqrtPriceMath } from './sqrtPriceMath'
@@ -16,7 +17,7 @@ export abstract class SwapMath {
     sqrtRatioTargetX96: JSBI,
     liquidity: JSBI,
     amountRemaining: JSBI,
-    feePips: JSBI
+    feePips: JSBI | FeeAmount
   ): [JSBI, JSBI, JSBI, JSBI] {
     const returnValues: Partial<{
       sqrtRatioNextX96: JSBI
@@ -25,6 +26,7 @@ export abstract class SwapMath {
       feeAmount: JSBI
     }> = {}
 
+    feePips = JSBI.BigInt(feePips)
     const zeroForOne = JSBI.greaterThanOrEqual(sqrtRatioCurrentX96, sqrtRatioTargetX96)
     const exactIn = JSBI.greaterThanOrEqual(amountRemaining, ZERO)
 
