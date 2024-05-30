@@ -159,7 +159,7 @@ describe("order utils", () => {
 
       const ENCODED_DUTCH_V2_ORDER = new V2DutchOrderBuilder(
         1,
-        "0x3867393cC6EA7b0414C2c3e1D9fe7cEa987Fd066"
+        "0x00000011F84B9aa48e5f8aA8B9897600006289Be"
       )
         .decayStartTime(TIMESTAMP_SECONDS)
         .decayEndTime(TIMESTAMP_SECONDS)

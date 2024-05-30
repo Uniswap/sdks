@@ -104,3 +104,4 @@ Returns the domain, types, and values used to generate an EIP-712 signature over
 **hash()**
 
 Returns the order hash. This is used as a key to track order fulfillment on-chain. It may also be useful as a unique order identifier for off-chain purposes.
+

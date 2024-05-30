@@ -25,7 +25,3 @@ jobs:
       - name: ↗️  Push to beta
         run: |
           git push -u origin main:beta --force
-
-      - name: ↗️  Push to alpha
-        run: |
-          git push -u origin main:alpha --force

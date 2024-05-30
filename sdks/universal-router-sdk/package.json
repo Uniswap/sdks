@@ -30,12 +30,12 @@
     "test:hardhat": "env TS_NODE_COMPILER_OPTIONS='{\"module\": \"commonjs\" }' hardhat test"
   },
   "dependencies": {
-    "@uniswap/permit2-sdk": "^1.2.1-beta.1",
-    "@uniswap/router-sdk": "^1.9.1-beta.2",
-    "@uniswap/sdk-core": "^4.2.1-beta.1",
+    "@uniswap/permit2-sdk": "^1.2.1",
+    "@uniswap/router-sdk": "^1.9.2",
+    "@uniswap/sdk-core": "^5.0.0",
     "@uniswap/universal-router": "1.6.0",
-    "@uniswap/v2-sdk": "^4.3.1-beta.2",
-    "@uniswap/v3-sdk": "^3.11.1-beta.2",
+    "@uniswap/v2-sdk": "^4.3.2",
+    "@uniswap/v3-sdk": "^3.11.2",
     "bignumber.js": "^9.0.2",
     "ethers": "^5.7.0"
   },
@@ -70,10 +70,6 @@
       {
         "name": "main",
         "prerelease": false
-      },
-      {
-        "name": "beta",
-        "prerelease": true
       }
     ],
     "plugins": [
