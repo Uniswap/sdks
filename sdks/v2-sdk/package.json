@@ -28,7 +28,8 @@
     "@ethersproject/solidity": "^5.0.9",
     "@uniswap/sdk-core": "^5.0.0",
     "tiny-invariant": "^1.1.0",
-    "tiny-warning": "^1.0.3"
+    "tiny-warning": "^1.0.3",
+    "zksync-ethers": "6.7.1"
   },
   "devDependencies": {
     "@types/big.js": "^4.0.5",
