@@ -31,10 +31,7 @@ export function computePoolAddress({
   chainId?: ChainId
 }): string {
   const [token0, token1] = tokenA.sortsBefore(tokenB) ? [tokenA, tokenB] : [tokenB, tokenA] // does safety checks
-  const salt = keccak256(
-      ['bytes'],
-      [defaultAbiCoder.encode(['address', 'address', 'uint24'], [token0.address, token1.address, fee])]
-  )
+  const salt = keccak256(['bytes'], [defaultAbiCoder.encode(['address', 'address', 'uint24'], [token0.address, token1.address, fee])])
   const initCodeHash = initCodeHashManualOverride ?? POOL_INIT_CODE_HASH
 
   // ZKSync uses a different create2 address computation
