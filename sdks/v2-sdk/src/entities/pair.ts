@@ -1,10 +1,10 @@
 import { getCreate2Address } from '@ethersproject/address'
 import { BigNumber } from '@ethersproject/bignumber'
 import { keccak256, pack } from '@ethersproject/solidity'
-import {BigintIsh, ChainId, CurrencyAmount, Percent, Price, sqrt, Token} from '@uniswap/sdk-core'
+import { BigintIsh, ChainId, CurrencyAmount, Percent, Price, sqrt, Token } from '@uniswap/sdk-core'
 import JSBI from 'jsbi'
 import invariant from 'tiny-invariant'
-import {utils} from "zksync-ethers";
+import { utils } from "zksync-ethers";
 
 import {
   _1000,
@@ -26,7 +26,7 @@ export const computePairAddress = ({
   factoryAddress,
   tokenA,
   tokenB,
-  chainId
+  chainId,
 }: {
   factoryAddress: string
   tokenA: Token
@@ -40,17 +40,9 @@ export const computePairAddress = ({
   // If chainId is ZKSYNC, use zksync's create2Address
   // In future, likely all zkevm create2 address computation will differ from standard evm create2 address computation
   if (chainId === ChainId.ZKSYNC) {
-    return utils.create2Address(
-        factoryAddress,
-        salt,
-        initCodeHash
-    )
+    return utils.create2Address(factoryAddress, salt, initCodeHash)
   } else {
-    return getCreate2Address(
-        factoryAddress,
-        salt,
-        initCodeHash
-    )
+    return getCreate2Address(factoryAddress, salt, initCodeHash)
   }
 }
 export class Pair {
