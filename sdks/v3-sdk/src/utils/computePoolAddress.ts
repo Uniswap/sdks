@@ -1,8 +1,9 @@
-import { defaultAbiCoder } from '@ethersproject/abi'
-import { getCreate2Address } from '@ethersproject/address'
-import { keccak256 } from '@ethersproject/solidity'
-import { Token } from '@uniswap/sdk-core'
-import { FeeAmount, POOL_INIT_CODE_HASH } from '../constants'
+import {utils} from 'zksync-ethers'
+import {defaultAbiCoder} from '@ethersproject/abi'
+import {getCreate2Address} from '@ethersproject/address'
+import {keccak256} from '@ethersproject/solidity'
+import {ChainId, Token} from '@uniswap/sdk-core'
+import {FeeAmount, POOL_INIT_CODE_HASH} from '../constants'
 
 /**
  * Computes a pool address
@@ -11,6 +12,7 @@ import { FeeAmount, POOL_INIT_CODE_HASH } from '../constants'
  * @param tokenB The second token of the pair, irrespective of sort order
  * @param fee The fee tier of the pool
  * @param initCodeHashManualOverride Override the init code hash used to compute the pool address if necessary
+ * @param chainId
  * @returns The pool address
  */
 export function computePoolAddress({
@@ -19,20 +21,35 @@ export function computePoolAddress({
   tokenB,
   fee,
   initCodeHashManualOverride,
+  chainId,
 }: {
   factoryAddress: string
   tokenA: Token
   tokenB: Token
   fee: FeeAmount
   initCodeHashManualOverride?: string
+  chainId?: ChainId
 }): string {
   const [token0, token1] = tokenA.sortsBefore(tokenB) ? [tokenA, tokenB] : [tokenB, tokenA] // does safety checks
-  return getCreate2Address(
-    factoryAddress,
-    keccak256(
+  const salt = keccak256(
       ['bytes'],
       [defaultAbiCoder.encode(['address', 'address', 'uint24'], [token0.address, token1.address, fee])]
-    ),
-    initCodeHashManualOverride ?? POOL_INIT_CODE_HASH
   )
+  const initCodeHash = initCodeHashManualOverride ?? POOL_INIT_CODE_HASH
+
+  // ZKSync uses a different create2 address computation
+  // Most likely all ZKEVM chains will use the different computation from standard create2
+  if (chainId === ChainId.ZKSYNC) {
+    return utils.create2Address(
+      factoryAddress,
+      initCodeHash,
+      salt
+    )
+  } else {
+    return getCreate2Address(
+        factoryAddress,
+        salt,
+        initCodeHash
+    )
+  }
 }
