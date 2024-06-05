@@ -1,5 +1,5 @@
 import { BigNumber } from '@ethersproject/bignumber'
-import {ChainId} from "sdks/sdk-core";
+import { ChainId } from '@uniswap/sdk-core';
 
 // @deprecated please use permit2Address(chainId: ChainId)
 export const PERMIT2_ADDRESS = '0x000000000022D473030F116dDEE9F6B43aC78BA3'
