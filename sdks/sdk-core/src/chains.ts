@@ -22,7 +22,7 @@ export enum ChainId {
   ZORA_SEPOLIA = 999999999,
   ROOTSTOCK = 30,
   BLAST = 81457,
-  ZKSYNC = 77,
+  ZKSYNC = 324,
 }
 
 export const SUPPORTED_CHAINS = [
