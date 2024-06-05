@@ -2,7 +2,7 @@ import { defaultAbiCoder } from '@ethersproject/abi'
 import { getCreate2Address } from '@ethersproject/address'
 import { keccak256 } from '@ethersproject/solidity'
 import { ChainId, Token } from '@uniswap/sdk-core'
-import { FeeAmount, POOL_INIT_CODE_HASH } from '../constants'
+import {FeeAmount, POOL_INIT_CODE_HASH, poolInitCodeHash} from '../constants'
 import { utils } from 'zksync-ethers'
 
 /**
@@ -32,7 +32,7 @@ export function computePoolAddress({
 }): string {
   const [token0, token1] = tokenA.sortsBefore(tokenB) ? [tokenA, tokenB] : [tokenB, tokenA] // does safety checks
   const salt = keccak256(['bytes'], [defaultAbiCoder.encode(['address', 'address', 'uint24'], [token0.address, token1.address, fee])])
-  const initCodeHash = initCodeHashManualOverride ?? POOL_INIT_CODE_HASH
+  const initCodeHash = initCodeHashManualOverride ?? poolInitCodeHash(chainId)
 
   // ZKSync uses a different create2 address computation
   // Most likely all ZKEVM chains will use the different computation from standard create2
