@@ -4649,6 +4649,9 @@ __metadata:
   resolution: "@uniswap/sdk-core@workspace:sdks/sdk-core"
   dependencies:
     "@ethersproject/address": ^5.0.2
+    "@ethersproject/bytes": ^5.7.0
+    "@ethersproject/keccak256": 5.7.0
+    "@ethersproject/strings": 5.7.0
     "@types/big.js": ^4.0.5
     "@types/jest": ^24.0.25
     big.js: ^5.2.2
