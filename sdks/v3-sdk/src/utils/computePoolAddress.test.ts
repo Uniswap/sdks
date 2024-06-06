@@ -1,5 +1,6 @@
 import { defaultAbiCoder } from '@ethersproject/abi'
-import { computeZksyncCreate2Address, Token } from '@uniswap/sdk-core'
+import { Token } from '@uniswap/sdk-core'
+import { computeZksyncCreate2Address } from '@uniswap/sdk-core/dist/utils/computeZksyncCreate2Address'
 import { FeeAmount } from '../constants'
 import { computePoolAddress } from './computePoolAddress'
 import { keccak256 as solKeccak256 } from '@ethersproject/solidity'

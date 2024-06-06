@@ -2,7 +2,7 @@ import { defaultAbiCoder } from '@ethersproject/abi'
 import { getCreate2Address } from '@ethersproject/address'
 import { keccak256 } from '@ethersproject/solidity'
 import { ChainId, Token } from '@uniswap/sdk-core'
-import { computeZksyncCreate2Address } from '@uniswap/sdk-core'
+import { computeZksyncCreate2Address } from '@uniswap/sdk-core/dist/utils/computeZksyncCreate2Address'
 import { FeeAmount, poolInitCodeHash } from '../constants'
 
 /**
