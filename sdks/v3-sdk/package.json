@@ -26,12 +26,13 @@
   "dependencies": {
     "@ethersproject/abi": "^5.5.0",
     "@ethersproject/solidity": "^5.0.9",
-    "@uniswap/sdk-core": "^5.0.0",
+    "@uniswap/sdk-core": "^5.1.0",
     "@uniswap/swap-router-contracts": "^1.3.0",
     "@uniswap/v3-periphery": "^1.1.1",
     "@uniswap/v3-staker": "1.0.0",
     "tiny-invariant": "^1.1.0",
-    "tiny-warning": "^1.0.3"
+    "tiny-warning": "^1.0.3",
+    "zksync-ethers": "6.7.1"
   },
   "devDependencies": {
     "@types/jest": "^24.0.25",
