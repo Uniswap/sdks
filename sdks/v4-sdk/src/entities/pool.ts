@@ -1,7 +1,15 @@
 import invariant from 'tiny-invariant'
 import { keccak256 } from '@ethersproject/solidity'
 import { BigintIsh, Currency, CurrencyAmount, Price } from '@uniswap/sdk-core'
-import { v3Swap, NoTickDataProvider, Tick, TickConstructorArgs, TickDataProvider, TickListDataProvider, TickMath } from '@uniswap/v3-sdk'
+import {
+  v3Swap,
+  NoTickDataProvider,
+  Tick,
+  TickConstructorArgs,
+  TickDataProvider,
+  TickListDataProvider,
+  TickMath,
+} from '@uniswap/v3-sdk'
 import { defaultAbiCoder } from 'ethers/lib/utils'
 import { sortsBefore } from '../utils/sortsBefore'
 import { constants } from 'ethers'
@@ -39,8 +47,13 @@ export class Pool {
   ): string {
     const [currency0, currency1] = sortsBefore(currencyA, currencyB) ? [currencyA, currencyB] : [currencyB, currencyA]
     return keccak256(
-        ['bytes'],
-        [defaultAbiCoder.encode(['address', 'address', 'uint24', 'int24', 'address'], [currency0.wrapped.address, currency1.wrapped.address, fee, tickSpacing, hooks])]
+      ['bytes'],
+      [
+        defaultAbiCoder.encode(
+          ['address', 'address', 'uint24', 'int24', 'address'],
+          [currency0.wrapped.address, currency1.wrapped.address, fee, tickSpacing, hooks]
+        ),
+      ]
     )
   }
 
@@ -73,10 +86,12 @@ export class Pool {
       'PRICE_BOUNDS'
     )
     // always create a copy of the list since we want the pool's tick list to be immutable
-    ;[this.currency0, this.currency1] = sortsBefore(currencyA, currencyB) ? [currencyA, currencyB] : [currencyB, currencyA]
+    ;[this.currency0, this.currency1] = sortsBefore(currencyA, currencyB)
+      ? [currencyA, currencyB]
+      : [currencyB, currencyA]
     this.fee = fee
     this.sqrtRatioX96 = JSBI.BigInt(sqrtRatioX96)
-    this.tickSpacing =  tickSpacing
+    this.tickSpacing = tickSpacing
     this.hooks = hooks
     this.liquidity = JSBI.BigInt(liquidity)
     this.tickCurrent = tickCurrent
@@ -156,7 +171,17 @@ export class Pool {
     const outputCurrency = zeroForOne ? this.currency1 : this.currency0
     return [
       CurrencyAmount.fromRawAmount(outputCurrency, JSBI.multiply(outputAmount, NEGATIVE_ONE)),
-      new Pool(this.currency0, this.currency1, this.fee, this.tickSpacing, this.hooks, sqrtRatioX96, liquidity, tickCurrent, this.tickDataProvider),
+      new Pool(
+        this.currency0,
+        this.currency1,
+        this.fee,
+        this.tickSpacing,
+        this.hooks,
+        sqrtRatioX96,
+        liquidity,
+        tickCurrent,
+        this.tickDataProvider
+      ),
     ]
   }
 
@@ -183,7 +208,17 @@ export class Pool {
     const inputCurrency = zeroForOne ? this.currency0 : this.currency1
     return [
       CurrencyAmount.fromRawAmount(inputCurrency, inputAmount),
-      new Pool(this.currency0, this.currency1, this.fee, this.tickSpacing, this.hooks, sqrtRatioX96, liquidity, tickCurrent, this.tickDataProvider),
+      new Pool(
+        this.currency0,
+        this.currency1,
+        this.fee,
+        this.tickSpacing,
+        this.hooks,
+        sqrtRatioX96,
+        liquidity,
+        tickCurrent,
+        this.tickDataProvider
+      ),
     ]
   }
 
@@ -200,13 +235,23 @@ export class Pool {
   private async swap(
     zeroForOne: boolean,
     amountSpecified: JSBI,
-    sqrtPriceLimitX96?: JSBI,
+    sqrtPriceLimitX96?: JSBI
   ): Promise<{ amountCalculated: JSBI; sqrtRatioX96: JSBI; liquidity: JSBI; tickCurrent: number }> {
-      if (this.nonImpactfulHook()) {
-        return v3Swap(JSBI.BigInt(this.fee), this.sqrtRatioX96, this.tickCurrent, this.liquidity, this.tickSpacing, this.tickDataProvider, zeroForOne, amountSpecified, sqrtPriceLimitX96)
-      } else {
-        throw "Error: Unsupported hook"
-      }
+    if (this.nonImpactfulHook()) {
+      return v3Swap(
+        JSBI.BigInt(this.fee),
+        this.sqrtRatioX96,
+        this.tickCurrent,
+        this.liquidity,
+        this.tickSpacing,
+        this.tickDataProvider,
+        zeroForOne,
+        amountSpecified,
+        sqrtPriceLimitX96
+      )
+    } else {
+      throw 'Error: Unsupported hook'
+    }
   }
 
   private nonImpactfulHook(): boolean {

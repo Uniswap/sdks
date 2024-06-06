@@ -15,9 +15,39 @@ describe('Route', () => {
   const currency2 = new Token(1, '0x0000000000000000000000000000000000000003', 18, 't2')
   // const weth = WETH9[1]
 
-  const pool_0_1 = new Pool(currency0, currency1, FEE_AMOUNT_MEDIUM, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
-  const pool_0_eth = new Pool(currency0, eth, FEE_AMOUNT_MEDIUM, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
-  const pool_1_eth = new Pool(currency1, eth, FEE_AMOUNT_MEDIUM, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
+  const pool_0_1 = new Pool(
+    currency0,
+    currency1,
+    FEE_AMOUNT_MEDIUM,
+    TICK_SPACING_TEN,
+    ADDRESS_ZERO,
+    encodeSqrtRatioX96(1, 1),
+    0,
+    0,
+    []
+  )
+  const pool_0_eth = new Pool(
+    currency0,
+    eth,
+    FEE_AMOUNT_MEDIUM,
+    TICK_SPACING_TEN,
+    ADDRESS_ZERO,
+    encodeSqrtRatioX96(1, 1),
+    0,
+    0,
+    []
+  )
+  const pool_1_eth = new Pool(
+    currency1,
+    eth,
+    FEE_AMOUNT_MEDIUM,
+    TICK_SPACING_TEN,
+    ADDRESS_ZERO,
+    encodeSqrtRatioX96(1, 1),
+    0,
+    0,
+    []
+  )
 
   describe('path', () => {
     it('constructs a path from the currencies', () => {
@@ -61,7 +91,9 @@ describe('Route', () => {
     const pool_0_1 = new Pool(
       currency0,
       currency1,
-      FEE_AMOUNT_MEDIUM, TICK_SPACING_TEN, ADDRESS_ZERO,
+      FEE_AMOUNT_MEDIUM,
+      TICK_SPACING_TEN,
+      ADDRESS_ZERO,
       encodeSqrtRatioX96(1, 5),
       0,
       TickMath.getTickAtSqrtRatio(encodeSqrtRatioX96(1, 5)),
@@ -70,7 +102,9 @@ describe('Route', () => {
     const pool_1_2 = new Pool(
       currency1,
       currency2,
-      FEE_AMOUNT_MEDIUM, TICK_SPACING_TEN, ADDRESS_ZERO,
+      FEE_AMOUNT_MEDIUM,
+      TICK_SPACING_TEN,
+      ADDRESS_ZERO,
       encodeSqrtRatioX96(15, 30),
       0,
       TickMath.getTickAtSqrtRatio(encodeSqrtRatioX96(15, 30)),
@@ -79,7 +113,9 @@ describe('Route', () => {
     const pool_0_eth = new Pool(
       currency0,
       eth,
-      FEE_AMOUNT_MEDIUM, TICK_SPACING_TEN, ADDRESS_ZERO,
+      FEE_AMOUNT_MEDIUM,
+      TICK_SPACING_TEN,
+      ADDRESS_ZERO,
       encodeSqrtRatioX96(3, 1),
       0,
       TickMath.getTickAtSqrtRatio(encodeSqrtRatioX96(3, 1)),
@@ -88,7 +124,9 @@ describe('Route', () => {
     const pool_1_eth = new Pool(
       currency1,
       eth,
-      FEE_AMOUNT_MEDIUM, TICK_SPACING_TEN, ADDRESS_ZERO,
+      FEE_AMOUNT_MEDIUM,
+      TICK_SPACING_TEN,
+      ADDRESS_ZERO,
       encodeSqrtRatioX96(1, 7),
       0,
       TickMath.getTickAtSqrtRatio(encodeSqrtRatioX96(1, 7)),

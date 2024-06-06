@@ -31,7 +31,9 @@ describe('Trade', () => {
     return new Pool(
       reserve0.currency,
       reserve1.currency,
-      feeAmount, TICK_SPACING_TEN, ADDRESS_ZERO,
+      feeAmount,
+      TICK_SPACING_TEN,
+      ADDRESS_ZERO,
       sqrtRatioX96,
       liquidity,
       TickMath.getTickAtSqrtRatio(sqrtRatioX96),

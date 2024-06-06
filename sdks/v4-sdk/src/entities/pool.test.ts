@@ -4,7 +4,6 @@ import JSBI from 'jsbi'
 import { nearestUsableTick, encodeSqrtRatioX96, TickMath } from '@uniswap/v3-sdk'
 import { constants } from 'ethers'
 
-
 const FEE_AMOUNT_LOW = 100
 const FEE_AMOUNT_MEDIUM = 3000
 const FEE_AMOUNT_HIGHEST = 10_000
@@ -26,7 +25,17 @@ describe('Pool', () => {
 
     it('fee must be integer', () => {
       expect(() => {
-        new Pool(USDC, WETH9[1], FEE_AMOUNT_MEDIUM + 0.5, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
+        new Pool(
+          USDC,
+          WETH9[1],
+          FEE_AMOUNT_MEDIUM + 0.5,
+          TICK_SPACING_TEN,
+          ADDRESS_ZERO,
+          encodeSqrtRatioX96(1, 1),
+          0,
+          0,
+          []
+        )
       }).toThrow('FEE')
     })
 
@@ -47,7 +56,17 @@ describe('Pool', () => {
         new Pool(USDC, WETH9[1], FEE_AMOUNT_MEDIUM, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 1, [])
       }).toThrow('PRICE_BOUNDS')
       expect(() => {
-        new Pool(USDC, WETH9[1], FEE_AMOUNT_MEDIUM,  TICK_SPACING_TEN, ADDRESS_ZERO, JSBI.add(encodeSqrtRatioX96(1, 1), JSBI.BigInt(1)), 0, -1, [])
+        new Pool(
+          USDC,
+          WETH9[1],
+          FEE_AMOUNT_MEDIUM,
+          TICK_SPACING_TEN,
+          ADDRESS_ZERO,
+          JSBI.add(encodeSqrtRatioX96(1, 1), JSBI.BigInt(1)),
+          0,
+          -1,
+          []
+        )
       }).toThrow('PRICE_BOUNDS')
     })
 
@@ -182,18 +201,28 @@ describe('Pool', () => {
     let pool: Pool
 
     beforeEach(() => {
-      pool = new Pool(USDC, DAI, FEE_AMOUNT_LOW, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), ONE_ETHER, 0, [
-        {
-          index: nearestUsableTick(TickMath.MIN_TICK, TICK_SPACING_TEN),
-          liquidityNet: ONE_ETHER,
-          liquidityGross: ONE_ETHER,
-        },
-        {
-          index: nearestUsableTick(TickMath.MAX_TICK, TICK_SPACING_TEN),
-          liquidityNet: JSBI.multiply(ONE_ETHER, NEGATIVE_ONE),
-          liquidityGross: ONE_ETHER,
-        },
-      ])
+      pool = new Pool(
+        USDC,
+        DAI,
+        FEE_AMOUNT_LOW,
+        TICK_SPACING_TEN,
+        ADDRESS_ZERO,
+        encodeSqrtRatioX96(1, 1),
+        ONE_ETHER,
+        0,
+        [
+          {
+            index: nearestUsableTick(TickMath.MIN_TICK, TICK_SPACING_TEN),
+            liquidityNet: ONE_ETHER,
+            liquidityGross: ONE_ETHER,
+          },
+          {
+            index: nearestUsableTick(TickMath.MAX_TICK, TICK_SPACING_TEN),
+            liquidityNet: JSBI.multiply(ONE_ETHER, NEGATIVE_ONE),
+            liquidityGross: ONE_ETHER,
+          },
+        ]
+      )
     })
 
     describe('#getOutputAmount', () => {
@@ -234,18 +263,28 @@ describe('Pool', () => {
     const bigNum1 = JSBI.add(JSBI.BigInt(Number.MAX_SAFE_INTEGER), JSBI.BigInt(1))
     const bigNum2 = JSBI.add(JSBI.BigInt(Number.MAX_SAFE_INTEGER), JSBI.BigInt(1))
     beforeEach(() => {
-      pool = new Pool(USDC, DAI, FEE_AMOUNT_LOW, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(bigNum1, bigNum2), ONE_ETHER, 0, [
-        {
-          index: nearestUsableTick(TickMath.MIN_TICK, TICK_SPACING_TEN),
-          liquidityNet: ONE_ETHER,
-          liquidityGross: ONE_ETHER,
-        },
-        {
-          index: nearestUsableTick(TickMath.MAX_TICK, TICK_SPACING_TEN),
-          liquidityNet: JSBI.multiply(ONE_ETHER, NEGATIVE_ONE),
-          liquidityGross: ONE_ETHER,
-        },
-      ])
+      pool = new Pool(
+        USDC,
+        DAI,
+        FEE_AMOUNT_LOW,
+        TICK_SPACING_TEN,
+        ADDRESS_ZERO,
+        encodeSqrtRatioX96(bigNum1, bigNum2),
+        ONE_ETHER,
+        0,
+        [
+          {
+            index: nearestUsableTick(TickMath.MIN_TICK, TICK_SPACING_TEN),
+            liquidityNet: ONE_ETHER,
+            liquidityGross: ONE_ETHER,
+          },
+          {
+            index: nearestUsableTick(TickMath.MAX_TICK, TICK_SPACING_TEN),
+            liquidityNet: JSBI.multiply(ONE_ETHER, NEGATIVE_ONE),
+            liquidityGross: ONE_ETHER,
+          },
+        ]
+      )
     })
 
     describe('#priceLimit', () => {
