@@ -7,7 +7,7 @@ export function computeZksyncCreate2Address(
   sender: string,
   bytecodeHash: BytesLike,
   salt: BytesLike,
-  input: BytesLike = ''
+  input: BytesLike = '0x'
 ) {
   const prefix = keccak256(toUtf8Bytes('zksyncCreate2'))
   const inputHash = keccak256(input)
