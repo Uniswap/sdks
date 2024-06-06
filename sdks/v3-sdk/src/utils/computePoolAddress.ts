@@ -2,8 +2,8 @@ import { defaultAbiCoder } from '@ethersproject/abi'
 import { getCreate2Address } from '@ethersproject/address'
 import { keccak256 } from '@ethersproject/solidity'
 import { ChainId, Token } from '@uniswap/sdk-core'
+import { create2Address } from 'zksync-ethers/src/utils'
 import { FeeAmount, poolInitCodeHash } from '../constants'
-import { utils } from 'zksync-ethers'
 
 /**
  * Computes a pool address
@@ -40,7 +40,7 @@ export function computePoolAddress({
   // ZKSync uses a different create2 address computation
   // Most likely all ZKEVM chains will use the different computation from standard create2
   if (chainId === ChainId.ZKSYNC) {
-    return utils.create2Address(factoryAddress, initCodeHash, salt)
+    return create2Address(factoryAddress, initCodeHash, salt)
   } else {
     return getCreate2Address(factoryAddress, initCodeHash, salt)
   }
