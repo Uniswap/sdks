@@ -4,12 +4,12 @@ import { BigNumber } from '@ethersproject/bignumber'
 export const PERMIT2_ADDRESS = '0x000000000022D473030F116dDEE9F6B43aC78BA3'
 
 export function permit2Address(chainId: number): string {
-    switch (chainId) {
-        case 324:
-            return '0x0000000000225e31d15943971f47ad3022f714fa'
-        default:
-            return PERMIT2_ADDRESS
-    }
+  switch (chainId) {
+    case 324:
+      return '0x0000000000225e31d15943971f47ad3022f714fa'
+    default:
+      return PERMIT2_ADDRESS
+  }
 }
 
 export const MaxUint48 = BigNumber.from('0xffffffffffff')
