@@ -4630,21 +4630,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@uniswap/sdk-core@npm:^5.0.0":
-  version: 5.1.0
-  resolution: "@uniswap/sdk-core@npm:5.1.0"
-  dependencies:
-    "@ethersproject/address": ^5.0.2
-    big.js: ^5.2.2
-    decimal.js-light: ^2.5.0
-    jsbi: ^3.1.4
-    tiny-invariant: ^1.1.0
-    toformat: ^2.0.0
-  checksum: 89204850c73c954bffc54dffb3e0edb98c1a5314d953367d11283c63cb5c6f4b650b497745352f287983ae82ec1571efb3400d3854be8175b1b53092375135c5
-  languageName: node
-  linkType: hard
-
-"@uniswap/sdk-core@npm:^5.2.0":
+"@uniswap/sdk-core@npm:^5.0.0, @uniswap/sdk-core@npm:^5.2.0":
   version: 5.2.0
   resolution: "@uniswap/sdk-core@npm:5.2.0"
   dependencies:
