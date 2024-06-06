@@ -1,7 +1,7 @@
 import { Token, CurrencyAmount, WETH9 } from '@uniswap/sdk-core'
 import { Pool } from './pool'
 import JSBI from 'jsbi'
-import { nearestUsableTick, encodeSqrtRatioX96, TickMath } from '@emag3m/v3-sdk'
+import { nearestUsableTick, encodeSqrtRatioX96, TickMath } from '@uniswap/v3-sdk'
 import { constants } from 'ethers'
 
 

@@ -1,5 +1,5 @@
 import { Ether, Token } from '@uniswap/sdk-core'
-import { encodeSqrtRatioX96, TickMath } from '@emag3m/v3-sdk'
+import { encodeSqrtRatioX96, TickMath } from '@uniswap/v3-sdk'
 import { Pool } from './pool'
 import { Route } from './route'
 import { constants } from 'ethers'

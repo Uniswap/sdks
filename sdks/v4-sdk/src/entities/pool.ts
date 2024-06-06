@@ -1,7 +1,7 @@
 import invariant from 'tiny-invariant'
 import { keccak256 } from '@ethersproject/solidity'
 import { BigintIsh, Currency, CurrencyAmount, Price } from '@uniswap/sdk-core'
-import { v3Swap, NoTickDataProvider, Tick, TickConstructorArgs, TickDataProvider, TickListDataProvider, TickMath } from '@emag3m/v3-sdk'
+import { v3Swap, NoTickDataProvider, Tick, TickConstructorArgs, TickDataProvider, TickListDataProvider, TickMath } from '@uniswap/v3-sdk'
 import { defaultAbiCoder } from 'ethers/lib/utils'
 import { sortsBefore } from '../utils/sortsBefore'
 import { constants } from 'ethers'
