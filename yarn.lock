@@ -4823,7 +4823,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v3-sdk@npm:3.12.0":
+"@uniswap/v3-sdk@npm:3.12.0, @uniswap/v3-sdk@npm:^3.11.2":
   version: 3.12.0
   resolution: "@uniswap/v3-sdk@npm:3.12.0"
   dependencies:
@@ -4836,22 +4836,6 @@ __metadata:
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
   checksum: d8d507a8ed302c983217575bcead36700c4ee823db98ea9281cf8f9e5dfb9a5c49da111199f28f65f43ccb4c4dc2996d8a120128076b622b560fe780f8bb8db5
-  languageName: node
-  linkType: hard
-
-"@uniswap/v3-sdk@npm:^3.11.2":
-  version: 3.11.2
-  resolution: "@uniswap/v3-sdk@npm:3.11.2"
-  dependencies:
-    "@ethersproject/abi": ^5.5.0
-    "@ethersproject/solidity": ^5.0.9
-    "@uniswap/sdk-core": ^5.0.0
-    "@uniswap/swap-router-contracts": ^1.3.0
-    "@uniswap/v3-periphery": ^1.1.1
-    "@uniswap/v3-staker": 1.0.0
-    tiny-invariant: ^1.1.0
-    tiny-warning: ^1.0.3
-  checksum: 82092b239b482b8fd9fd21afdcc4cf9860315af4c524e100a7ac02d25aba0bf25ad1aaf12d97105874590bad97eed4ff2f95dd56e849f881596ac32148cce726
   languageName: node
   linkType: hard
 
