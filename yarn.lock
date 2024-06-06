@@ -4844,7 +4844,6 @@ __metadata:
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
     tsdx: ^0.14.1
-    zksync-ethers: 6.7.1
   languageName: unknown
   linkType: soft
 
@@ -18552,14 +18551,5 @@ __metadata:
   version: 1.0.0
   resolution: "yocto-queue@npm:1.0.0"
   checksum: 2cac84540f65c64ccc1683c267edce396b26b1e931aa429660aefac8fbe0188167b7aee815a3c22fa59a28a58d898d1a2b1825048f834d8d629f4c2a5d443801
-  languageName: node
-  linkType: hard
-
-"zksync-ethers@npm:6.7.1":
-  version: 6.7.1
-  resolution: "zksync-ethers@npm:6.7.1"
-  peerDependencies:
-    ethers: ^6.7.1
-  checksum: 899d46f74d5c3ae646f0127668bad6ee963e26336b20d292748b4df62a4ec5b35fb534f7eba98d9e2c3d1073515a081af5842440a2565ba7c760f9cf8ba4b60e
   languageName: node
   linkType: hard

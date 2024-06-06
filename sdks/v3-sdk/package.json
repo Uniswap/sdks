@@ -31,8 +31,7 @@
     "@uniswap/v3-periphery": "^1.1.1",
     "@uniswap/v3-staker": "1.0.0",
     "tiny-invariant": "^1.1.0",
-    "tiny-warning": "^1.0.3",
-    "zksync-ethers": "6.7.1"
+    "tiny-warning": "^1.0.3"
   },
   "devDependencies": {
     "@types/jest": "^24.0.25",
