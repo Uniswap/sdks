@@ -1,7 +1,8 @@
+import {ChainId} from "@uniswap/sdk-core";
 import { Signer } from "ethers";
 import { ethers } from "hardhat";
+import { permit2Address } from "@uniswap/permit2-sdk";
 import Permit2Abi from '../../../abis/Permit2.json';
-import { PERMIT2_ADDRESS } from "@uniswap/permit2-sdk";
 import { Permit2 } from "../../../src/contracts";
 
 export async function deployAndReturnPermit2(signer: Signer) {
@@ -11,8 +12,8 @@ export async function deployAndReturnPermit2(signer: Signer) {
         "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3"
       ]);
 
-    if(await signer.provider?.getCode(PERMIT2_ADDRESS) !== '0x') {
-        return await ethers.getContractAt(Permit2Abi.abi, PERMIT2_ADDRESS) as Permit2; 
+    if(await signer.provider?.getCode(permit2Address(ChainId.MAINNET)) !== '0x') {
+        return await ethers.getContractAt(Permit2Abi.abi, permit2Address(ChainId.MAINNET)) as Permit2;
     }
     
     // deploy permit2
@@ -22,5 +23,5 @@ export async function deployAndReturnPermit2(signer: Signer) {
     });
     await res.wait();
           
-    return await ethers.getContractAt(Permit2Abi.abi, PERMIT2_ADDRESS) as Permit2; 
+    return await ethers.getContractAt(Permit2Abi.abi, permit2Address(ChainId.MAINNET)) as Permit2;
 }
