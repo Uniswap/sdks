@@ -1,5 +1,5 @@
 import { Currency, CurrencyAmount, Ether, Percent, Price, sqrt, Token, TradeType } from '@uniswap/sdk-core'
-import { constants } from 'ethers'
+import { ADDRESS_ZERO, FEE_AMOUNT_MEDIUM, TICK_SPACING_SIXTY } from '../utils/internalConstants'
 import JSBI from 'jsbi'
 import { nearestUsableTick, encodeSqrtRatioX96, TickMath } from '@uniswap/v3-sdk'
 import { Pool } from './pool'
@@ -8,13 +8,6 @@ import { Trade } from './trade'
 
 describe('Trade', () => {
   const ETHER = Ether.onChain(1)
-  // const FEE_AMOUNT_LOW = 100
-  const FEE_AMOUNT_MEDIUM = 3000
-  // const FEE_AMOUNT_HIGHEST = 10_000
-  const TICK_SPACING_TEN = 60
-  // const ONE_ETHER = JSBI.exponentiate(JSBI.BigInt(10), JSBI.BigInt(18))
-  // const NEGATIVE_ONE = JSBI.BigInt(-1)
-  const ADDRESS_ZERO = constants.AddressZero
 
   const token0 = new Token(1, '0x0000000000000000000000000000000000000001', 18, 't0', 'token0')
   const token1 = new Token(1, '0x0000000000000000000000000000000000000002', 18, 't1', 'token1')
@@ -32,19 +25,19 @@ describe('Trade', () => {
       reserve0.currency,
       reserve1.currency,
       feeAmount,
-      TICK_SPACING_TEN,
+      TICK_SPACING_SIXTY,
       ADDRESS_ZERO,
       sqrtRatioX96,
       liquidity,
       TickMath.getTickAtSqrtRatio(sqrtRatioX96),
       [
         {
-          index: nearestUsableTick(TickMath.MIN_TICK, TICK_SPACING_TEN),
+          index: nearestUsableTick(TickMath.MIN_TICK, TICK_SPACING_SIXTY),
           liquidityNet: liquidity,
           liquidityGross: liquidity,
         },
         {
-          index: nearestUsableTick(TickMath.MAX_TICK, TICK_SPACING_TEN),
+          index: nearestUsableTick(TickMath.MAX_TICK, TICK_SPACING_SIXTY),
           liquidityNet: JSBI.multiply(liquidity, JSBI.BigInt(-1)),
           liquidityGross: liquidity,
         },

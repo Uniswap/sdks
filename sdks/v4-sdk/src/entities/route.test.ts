@@ -2,11 +2,7 @@ import { Ether, Token } from '@uniswap/sdk-core'
 import { encodeSqrtRatioX96, TickMath } from '@uniswap/v3-sdk'
 import { Pool } from './pool'
 import { Route } from './route'
-import { constants } from 'ethers'
-
-const FEE_AMOUNT_MEDIUM = 3000
-const TICK_SPACING_TEN = 10
-const ADDRESS_ZERO = constants.AddressZero
+import { ADDRESS_ZERO, FEE_AMOUNT_MEDIUM, TICK_SPACING_TEN } from '../utils/internalConstants'
 
 describe('Route', () => {
   const eth = Ether.onChain(1)

@@ -12,12 +12,8 @@ import {
 } from '@uniswap/v3-sdk'
 import { defaultAbiCoder } from 'ethers/lib/utils'
 import { sortsBefore } from '../utils/sortsBefore'
-import { constants } from 'ethers'
+import { ADDRESS_ZERO, NEGATIVE_ONE, Q192 } from '../utils/internalConstants'
 import JSBI from 'jsbi'
-
-const Q96 = JSBI.exponentiate(JSBI.BigInt(2), JSBI.BigInt(96))
-const Q192 = JSBI.exponentiate(Q96, JSBI.BigInt(2))
-const NEGATIVE_ONE = JSBI.BigInt(-1)
 
 const NO_TICK_DATA_PROVIDER_DEFAULT = new NoTickDataProvider()
 
@@ -46,12 +42,14 @@ export class Pool {
     hooks: string
   ): string {
     const [currency0, currency1] = sortsBefore(currencyA, currencyB) ? [currencyA, currencyB] : [currencyB, currencyA]
+    const currency0Addr = currency0.isNative ? ADDRESS_ZERO : currency0.wrapped.address
+    const currency1Addr = currency1.isNative ? ADDRESS_ZERO : currency1.wrapped.address
     return keccak256(
       ['bytes'],
       [
         defaultAbiCoder.encode(
           ['address', 'address', 'uint24', 'int24', 'address'],
-          [currency0.wrapped.address, currency1.wrapped.address, fee, tickSpacing, hooks]
+          [currency0Addr, currency1Addr, fee, tickSpacing, hooks]
         ),
       ]
     )
@@ -256,6 +254,6 @@ export class Pool {
 
   private nonImpactfulHook(): boolean {
     // TODO: reference chain specific hook addresses or patterns that do not impact swaps
-    return this.hooks === constants.AddressZero
+    return this.hooks === ADDRESS_ZERO
   }
 }

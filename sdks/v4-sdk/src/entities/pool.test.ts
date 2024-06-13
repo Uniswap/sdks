@@ -2,15 +2,15 @@ import { Token, CurrencyAmount, WETH9 } from '@uniswap/sdk-core'
 import { Pool } from './pool'
 import JSBI from 'jsbi'
 import { nearestUsableTick, encodeSqrtRatioX96, TickMath } from '@uniswap/v3-sdk'
-import { constants } from 'ethers'
-
-const FEE_AMOUNT_LOW = 100
-const FEE_AMOUNT_MEDIUM = 3000
-const FEE_AMOUNT_HIGHEST = 10_000
-const TICK_SPACING_TEN = 10
-const ONE_ETHER = JSBI.exponentiate(JSBI.BigInt(10), JSBI.BigInt(18))
-const NEGATIVE_ONE = JSBI.BigInt(-1)
-const ADDRESS_ZERO = constants.AddressZero
+import {
+  ADDRESS_ZERO,
+  FEE_AMOUNT_LOW,
+  FEE_AMOUNT_MEDIUM,
+  FEE_AMOUNT_HIGHEST,
+  NEGATIVE_ONE,
+  ONE_ETHER,
+  TICK_SPACING_TEN,
+} from '../utils/internalConstants'
 
 describe('Pool', () => {
   const USDC = new Token(1, '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', 6, 'USDC', 'USD Coin')
