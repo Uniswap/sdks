@@ -1,6 +1,6 @@
 # uniswapx-sdk
 
-SDK for the UniswapX protocol used by Taraswap
+SDK for the UniswapX protocol used by Taraswap.
 
 ## Usage
 
