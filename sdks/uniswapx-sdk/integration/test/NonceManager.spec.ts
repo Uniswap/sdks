@@ -2,7 +2,7 @@ import hre, { ethers } from 'hardhat';
 import { expect } from 'chai';
 
 import { Signer, Wallet, BigNumber } from 'ethers';
-import { PermitTransferFrom, SignatureTransfer } from '@uniswap/permit2-sdk';
+import { PermitTransferFrom, SignatureTransfer } from '@taraswap/permit2-sdk';
 
 import Permit2Abi from '../../abis/Permit2.json';
 

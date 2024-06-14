@@ -1,4 +1,4 @@
-import { Currency, Ether, Token, TradeType } from "@uniswap/sdk-core";
+import { Currency, Ether, Token, TradeType } from "@taraswap/sdk-core";
 import { BigNumber, constants, ethers } from "ethers";
 
 import { DutchOrderInfo } from "../order";

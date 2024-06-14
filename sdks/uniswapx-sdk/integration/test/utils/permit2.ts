@@ -1,7 +1,7 @@
-import {ChainId} from "@uniswap/sdk-core";
+import {ChainId} from "@taraswap/sdk-core";
 import { Signer } from "ethers";
 import { ethers } from "hardhat";
-import { permit2Address } from "@uniswap/permit2-sdk";
+import { permit2Address } from "@taraswap/permit2-sdk";
 import Permit2Abi from '../../../abis/Permit2.json';
 import { Permit2 } from "../../../src/contracts";
 

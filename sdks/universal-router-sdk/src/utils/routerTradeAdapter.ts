@@ -1,7 +1,7 @@
-import { MixedRouteSDK, Trade as RouterTrade } from '@uniswap/router-sdk'
-import { Currency, CurrencyAmount, Ether, Token, TradeType } from '@uniswap/sdk-core'
-import { Pair, Route as V2Route } from '@uniswap/v2-sdk'
-import { Pool, Route as V3Route, FeeAmount } from '@uniswap/v3-sdk'
+import { MixedRouteSDK, Trade as RouterTrade } from '@taraswap/router-sdk'
+import { Currency, CurrencyAmount, Ether, Token, TradeType } from '@taraswap/sdk-core'
+import { Pair, Route as V2Route } from '@taraswap/v2-sdk'
+import { Pool, Route as V3Route, FeeAmount } from '@taraswap/v3-sdk'
 import { BigNumber } from 'ethers'
 import { ETH_ADDRESS, E_ETH_ADDRESS } from './constants'
 

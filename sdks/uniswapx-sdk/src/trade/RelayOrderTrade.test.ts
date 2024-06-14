@@ -1,4 +1,4 @@
-import { Currency, CurrencyAmount, Token, TradeType } from "@uniswap/sdk-core";
+import { Currency, CurrencyAmount, Token, TradeType } from "@taraswap/sdk-core";
 import { BigNumber, ethers } from "ethers";
 
 import { RelayOrderInfo } from "../order";

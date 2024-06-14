@@ -1,7 +1,7 @@
 import JSBI from 'jsbi'
 import { BigNumber, ethers } from 'ethers'
-import { MixedRouteTrade, MixedRouteSDK, Trade as RouterTrade } from '@uniswap/router-sdk'
-import { Trade as V2Trade, Pair, Route as RouteV2, computePairAddress } from '@uniswap/v2-sdk'
+import { MixedRouteTrade, MixedRouteSDK, Trade as RouterTrade } from '@taraswap/router-sdk'
+import { Trade as V2Trade, Pair, Route as RouteV2, computePairAddress } from '@taraswap/v2-sdk'
 import {
   Trade as V3Trade,
   Pool,
@@ -10,9 +10,9 @@ import {
   TickMath,
   TICK_SPACINGS,
   FeeAmount,
-} from '@uniswap/v3-sdk'
+} from '@taraswap/v3-sdk'
 import { SwapOptions } from '../../src'
-import { CurrencyAmount, TradeType, Ether, Token, Percent, Currency } from '@uniswap/sdk-core'
+import { CurrencyAmount, TradeType, Ether, Token, Percent, Currency } from '@taraswap/sdk-core'
 import IUniswapV3Pool from '@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json'
 import { TEST_RECIPIENT_ADDRESS } from './addresses'
 

@@ -4,7 +4,7 @@ import {
   PermitBatchTransferFromData,
   SignatureTransfer,
   Witness,
-} from "@uniswap/permit2-sdk";
+} from "@taraswap/permit2-sdk";
 import { BigNumber, ethers } from "ethers";
 
 import { PERMIT2_MAPPING } from "../constants";

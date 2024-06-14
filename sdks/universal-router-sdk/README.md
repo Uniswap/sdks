@@ -27,10 +27,10 @@ const { calldata, value } = SwapRouter.swapCallParameters([looksRareTrades, seap
 ### Trading ERC20s on Uniswap
 warning: `swapERC20CallParameters()` to be deprecated in favor of `swapCallParameters()`
 ```typescript
-import { TradeType } from '@uniswap/sdk-core'
-import { Trade as V2TradeSDK } from '@uniswap/v2-sdk'
-import { Trade as V3TradeSDK } from '@uniswap/v3-sdk'
-import { MixedRouteTrade, MixedRouteSDK, Trade as RouterTrade } from '@uniswap/router-sdk'
+import { TradeType } from '@taraswap/sdk-core'
+import { Trade as V2TradeSDK } from '@taraswap/v2-sdk'
+import { Trade as V3TradeSDK } from '@taraswap/v3-sdk'
+import { MixedRouteTrade, MixedRouteSDK, Trade as RouterTrade } from '@taraswap/router-sdk'
 
 const options = { slippageTolerance, recipient }
 const routerTrade = new UniswapTrade(
@@ -46,10 +46,10 @@ Send ETH to the router by trading an ERC20 for ETH with a Uniswap Trade and enco
 
 Use `trade_type: TradeType.EXACT_OUTPUT` to cover the entire NFT price, alternatively the transaction will send supplemental ETH to fulfill the entire price if the swap does not cover it in full. Keep in mind that `TradeType.EXACT_INPUT` trades are subject to slippage on output, and ETH will be sent to cover potential slippage and any remaining ETH will be returned to sender.
 ```typescript
-import { TradeType } from '@uniswap/sdk-core'
-import { Trade as V2TradeSDK } from '@uniswap/v2-sdk'
-import { Trade as V3TradeSDK } from '@uniswap/v3-sdk'
-import { MixedRouteTrade, MixedRouteSDK, Trade as RouterTrade } from '@uniswap/router-sdk'
+import { TradeType } from '@taraswap/sdk-core'
+import { Trade as V2TradeSDK } from '@taraswap/v2-sdk'
+import { Trade as V3TradeSDK } from '@taraswap/v3-sdk'
+import { MixedRouteTrade, MixedRouteSDK, Trade as RouterTrade } from '@taraswap/router-sdk'
 import {
   ROUTER_AS_RECIPIENT,
   UniswapTrade,
