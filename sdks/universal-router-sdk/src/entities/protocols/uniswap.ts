@@ -41,7 +41,7 @@ export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit'> & {
 const REFUND_ETH_PRICE_IMPACT_THRESHOLD = new Percent(50, 100)
 
 interface Swap<TInput extends Currency, TOutput extends Currency> {
-  route: IRoute<TInput, TOutput, Pair | Pool>
+  route: IRoute<TInput, TOutput, Pair | Pool | any>
   inputAmount: CurrencyAmount<TInput>
   outputAmount: CurrencyAmount<TOutput>
 }
@@ -176,8 +176,8 @@ function addV2Swap<TInput extends Currency, TOutput extends Currency>(
   routerMustCustody: boolean
 ): void {
   const trade = new V2Trade(
-    route as RouteV2<TInput, TOutput>,
-    tradeType == TradeType.EXACT_INPUT ? inputAmount : outputAmount,
+    route as RouteV2<TInput, TOutput> as any,
+    tradeType == TradeType.EXACT_INPUT ? (inputAmount as any) : outputAmount,
     tradeType
   )
 
@@ -211,13 +211,13 @@ function addV3Swap<TInput extends Currency, TOutput extends Currency>(
   routerMustCustody: boolean
 ): void {
   const trade = V3Trade.createUncheckedTrade({
-    route: route as RouteV3<TInput, TOutput>,
+    route: route as RouteV3<TInput, TOutput> as any,
     inputAmount,
     outputAmount,
     tradeType,
   })
 
-  const path = encodeRouteToPath(route as RouteV3<TInput, TOutput>, trade.tradeType === TradeType.EXACT_OUTPUT)
+  const path = encodeRouteToPath(route as RouteV3<TInput, TOutput> as any, trade.tradeType === TradeType.EXACT_OUTPUT)
   if (tradeType == TradeType.EXACT_INPUT) {
     planner.addCommand(CommandType.V3_SWAP_EXACT_IN, [
       routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient,
@@ -305,7 +305,7 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
       planner.addCommand(CommandType.V3_SWAP_EXACT_IN, [
         // if not last section: send tokens directly to the first v2 pair of the next section
         // note: because of the partitioning function we can be sure that the next section is v2
-        isLastSectionInRoute(i) ? tradeRecipient : (sections[i + 1][0] as Pair).liquidityToken.address,
+        isLastSectionInRoute(i) ? tradeRecipient : (sections[i + 1][0] as any as Pair).liquidityToken.address,
         i == 0 ? amountIn : CONTRACT_BALANCE, // amountIn
         !isLastSectionInRoute(i) ? 0 : amountOut, // amountOut
         path, // path

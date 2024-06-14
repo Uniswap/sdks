@@ -27,11 +27,11 @@ const FORK_BLOCK = 16075500
 // for use in forge fork tests
 describe('Uniswap', () => {
   const wallet = new Wallet(utils.zeroPad('0x1234', 32))
-  let WETH_USDC_V2: Pair
-  let USDC_DAI_V2: Pair
-  let WETH_USDC_V3: Pool
-  let WETH_USDC_V3_LOW_FEE: Pool
-  let USDC_DAI_V3: Pool
+  let WETH_USDC_V2: Pair | any
+  let USDC_DAI_V2: Pair | any
+  let WETH_USDC_V3: Pool | any
+  let WETH_USDC_V3_LOW_FEE: Pool | any
+  let USDC_DAI_V3: Pool | any
 
   before(async () => {
     ;({ WETH_USDC_V2, USDC_DAI_V2, WETH_USDC_V3, USDC_DAI_V3, WETH_USDC_V3_LOW_FEE } = await getUniswapPools(

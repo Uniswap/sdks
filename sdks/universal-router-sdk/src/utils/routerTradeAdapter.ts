@@ -121,7 +121,11 @@ export class RouterTradeAdapter {
           : null,
         mixedRoute:
           !isOnlyV3 && !isOnlyV2
-            ? new MixedRouteSDK(subRoute.map(RouterTradeAdapter.toPoolOrPair), parsedCurrencyIn, parsedCurrencyOut)
+            ? new MixedRouteSDK(
+                subRoute.map(RouterTradeAdapter.toPoolOrPair as any),
+                parsedCurrencyIn,
+                parsedCurrencyOut
+              )
             : null,
         inputAmount,
         outputAmount,
@@ -135,14 +139,14 @@ export class RouterTradeAdapter {
           routev2: route.routev2 as V2Route<Currency, Currency>,
           inputAmount: route.inputAmount,
           outputAmount: route.outputAmount,
-        })),
+        })) as any,
       v3Routes: typedRoutes
         .filter((route) => route.routev3)
         .map((route) => ({
           routev3: route.routev3 as V3Route<Currency, Currency>,
           inputAmount: route.inputAmount,
           outputAmount: route.outputAmount,
-        })),
+        })) as any,
       mixedRoutes: typedRoutes
         .filter((route) => route.mixedRoute)
         .map((route) => ({
