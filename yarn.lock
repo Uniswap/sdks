@@ -2748,6 +2748,35 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@nomicfoundation/hardhat-chai-matchers@npm:1.0.6":
+  version: 1.0.6
+  resolution: "@nomicfoundation/hardhat-chai-matchers@npm:1.0.6"
+  dependencies:
+    "@ethersproject/abi": ^5.1.2
+    "@types/chai-as-promised": ^7.1.3
+    chai-as-promised: ^7.1.1
+    deep-eql: ^4.0.1
+    ordinal: ^1.0.3
+  peerDependencies:
+    "@nomiclabs/hardhat-ethers": ^2.0.0
+    chai: ^4.2.0
+    ethers: ^5.0.0
+    hardhat: ^2.9.4
+  checksum: c388e5ed9068f2ba7c227737ab7312dd03405d5fab195247b061f2fa52e700fbd0fb65359c2d4f2086f2905bfca642c19a9122d034533edd936f89aea65ac7f2
+  languageName: node
+  linkType: hard
+
+"@nomicfoundation/hardhat-network-helpers@npm:^1.0.10":
+  version: 1.0.11
+  resolution: "@nomicfoundation/hardhat-network-helpers@npm:1.0.11"
+  dependencies:
+    ethereumjs-util: ^7.1.4
+  peerDependencies:
+    hardhat: ^2.9.5
+  checksum: b1566de2b0ff6de0fa825b13befd9a3318538e45c2d7e54b52dbf724b9ea5019365f1cf6962f4b89313747da847b575692783cfe03b60dbff3a2e419e135c3fb
+  languageName: node
+  linkType: hard
+
 "@nomicfoundation/solidity-analyzer-darwin-arm64@npm:0.1.2":
   version: 0.1.2
   resolution: "@nomicfoundation/solidity-analyzer-darwin-arm64@npm:0.1.2"
@@ -2824,6 +2853,16 @@ __metadata:
     "@nomicfoundation/solidity-analyzer-win32-x64-msvc":
       optional: true
   checksum: 0de3a317658345b9012285665bb4c810a98b3668bcf32a118912fda00e5760fa2c77d0a92bce6b687dcc7b4bb34b0a83f8e6748bfa68660a2303d781ca728aef
+  languageName: node
+  linkType: hard
+
+"@nomiclabs/hardhat-ethers@npm:^2.2.3":
+  version: 2.2.3
+  resolution: "@nomiclabs/hardhat-ethers@npm:2.2.3"
+  peerDependencies:
+    ethers: ^5.0.0
+    hardhat: ^2.0.0
+  checksum: 72321317e55eb510306e04c42353c5f7ceb42d086fc76cc740120da6e1635b7ad5bbf23a8d6b02bd590754adcf646618933111624085ab249b1ff3482e773226
   languageName: node
   linkType: hard
 
@@ -3918,6 +3957,22 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@typechain/hardhat@npm:^6.1.2":
+  version: 6.1.6
+  resolution: "@typechain/hardhat@npm:6.1.6"
+  dependencies:
+    fs-extra: ^9.1.0
+  peerDependencies:
+    "@ethersproject/abi": ^5.4.7
+    "@ethersproject/providers": ^5.4.7
+    "@typechain/ethers-v5": ^10.2.1
+    ethers: ^5.4.7
+    hardhat: ^2.9.9
+    typechain: ^8.1.1
+  checksum: f214bebf7860956230478cb92696ba757829cfd9dc65ac99c3bc7e539378310318d92b009054186f446595c8ffc1a81e9c6d028da0eb04253253049ea1b6e8d3
+  languageName: node
+  linkType: hard
+
 "@types/babel__core@npm:^7.1.7":
   version: 7.20.5
   resolution: "@types/babel__core@npm:7.20.5"
@@ -3996,7 +4051,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/chai@npm:^4.3.3":
+"@types/chai-as-promised@npm:^7.1.3":
+  version: 7.1.8
+  resolution: "@types/chai-as-promised@npm:7.1.8"
+  dependencies:
+    "@types/chai": "*"
+  checksum: f0e5eab451b91bc1e289ed89519faf6591932e8a28d2ec9bbe95826eb73d28fe43713633e0c18706f3baa560a7d97e7c7c20dc53ce639e5d75bac46b2a50bf21
+  languageName: node
+  linkType: hard
+
+"@types/chai@npm:*, @types/chai@npm:^4.3.3":
   version: 4.3.16
   resolution: "@types/chai@npm:4.3.16"
   checksum: bb5f52d1b70534ed8b4bf74bd248add003ffe1156303802ea367331607c06b494da885ffbc2b674a66b4f90c9ee88759790a5f243879f6759f124f22328f5e95
@@ -5696,7 +5760,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bn.js@npm:^5.2.0, bn.js@npm:^5.2.1":
+"bn.js@npm:^5.1.2, bn.js@npm:^5.2.0, bn.js@npm:^5.2.1":
   version: 5.2.1
   resolution: "bn.js@npm:5.2.1"
   checksum: 3dd8c8d38055fedfa95c1d5fc3c99f8dd547b36287b37768db0abab3c239711f88ff58d18d155dd8ad902b0b0cee973747b7ae20ea12a09473272b0201c9edd3
@@ -6099,6 +6163,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"chai-as-promised@npm:^7.1.1":
+  version: 7.1.2
+  resolution: "chai-as-promised@npm:7.1.2"
+  dependencies:
+    check-error: ^1.0.2
+  peerDependencies:
+    chai: ">= 2.1.2 < 6"
+  checksum: 671ee980054eb23a523875c1d22929a2ac05d89b5428e1fd12800f54fc69baf41014667b87e2368e2355ee2a3140d3e3d7d5a1f8638b07cfefd7fe38a149e3f6
+  languageName: node
+  linkType: hard
+
 "chai@npm:^4.3.6":
   version: 4.4.1
   resolution: "chai@npm:4.4.1"
@@ -6159,7 +6234,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"check-error@npm:^1.0.3":
+"check-error@npm:^1.0.2, check-error@npm:^1.0.3":
   version: 1.0.3
   resolution: "check-error@npm:1.0.3"
   dependencies:
@@ -7102,7 +7177,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"deep-eql@npm:^4.1.3":
+"deep-eql@npm:^4.0.1, deep-eql@npm:^4.1.3":
   version: 4.1.4
   resolution: "deep-eql@npm:4.1.4"
   dependencies:
@@ -8303,6 +8378,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"ethereumjs-util@npm:^7.1.4":
+  version: 7.1.5
+  resolution: "ethereumjs-util@npm:7.1.5"
+  dependencies:
+    "@types/bn.js": ^5.1.0
+    bn.js: ^5.1.2
+    create-hash: ^1.1.2
+    ethereum-cryptography: ^0.1.3
+    rlp: ^2.2.4
+  checksum: 27a3c79d6e06b2df34b80d478ce465b371c8458b58f5afc14d91c8564c13363ad336e6e83f57eb0bd719fde94d10ee5697ceef78b5aa932087150c5287b286d1
+  languageName: node
+  linkType: hard
+
 "ethers@npm:^5.7.0":
   version: 5.7.2
   resolution: "ethers@npm:5.7.2"
@@ -9051,7 +9139,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"fs-extra@npm:^9.0.0":
+"fs-extra@npm:^9.0.0, fs-extra@npm:^9.1.0":
   version: 9.1.0
   resolution: "fs-extra@npm:9.1.0"
   dependencies:
@@ -13721,6 +13809,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"ordinal@npm:^1.0.3":
+  version: 1.0.3
+  resolution: "ordinal@npm:1.0.3"
+  checksum: 6761c5b7606b6c4b0c22b4097dab4fe7ffcddacc49238eedf9c0ced877f5d4e4ad3f4fd43fefa1cc3f167cc54c7149267441b2ae85b81ccf13f45cf4b7947164
+  languageName: node
+  linkType: hard
+
 "os-tmpdir@npm:~1.0.2":
   version: 1.0.2
   resolution: "os-tmpdir@npm:1.0.2"
@@ -15280,7 +15375,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"rlp@npm:^2.2.3":
+"rlp@npm:^2.2.3, rlp@npm:^2.2.4":
   version: 2.2.7
   resolution: "rlp@npm:2.2.7"
   dependencies:
@@ -17635,6 +17730,30 @@ __metadata:
   checksum: ef68f639136bcfe040cf7e3cd7a8dff076a665288122855148a6f7134092e6ed33bf83a7f3a9185e46c98dddc445a0da6ac25612afa1a7c38b8b654d6c02498e
   languageName: node
   linkType: hard
+
+"uniswapx-integration@workspace:sdks/uniswapx-sdk/integration":
+  version: 0.0.0-use.local
+  resolution: "uniswapx-integration@workspace:sdks/uniswapx-sdk/integration"
+  dependencies:
+    "@ethersproject/bytes": ^5.7.0
+    "@nomicfoundation/hardhat-chai-matchers": 1.0.6
+    "@nomicfoundation/hardhat-network-helpers": ^1.0.10
+    "@nomiclabs/hardhat-ethers": ^2.2.3
+    "@typechain/ethers-v5": ^10.1.0
+    "@typechain/hardhat": ^6.1.2
+    "@types/chai": ^4.3.3
+    "@types/mocha": ^9.1.1
+    "@types/node": ^18.7.16
+    "@uniswap/sdk-core": ^5.3.0
+    chai: ^4.3.6
+    ethers: ^5.7.0
+    hardhat: ^2.14.0
+    husky: ^8.0.3
+    ts-node: ^10.9.1
+    tsdx: ^0.14.1
+    typechain: ^8.1.0
+  languageName: unknown
+  linkType: soft
 
 "universal-user-agent@npm:^6.0.0":
   version: 6.0.1
