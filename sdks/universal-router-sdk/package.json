@@ -1,7 +1,7 @@
 {
-  "name": "@uniswap/universal-router-sdk",
+  "name": "@taraswap/universal-router-sdk",
   "description": "sdk for integrating with the Universal Router contracts",
-  "repository": "https://github.com/Uniswap/sdks.git",
+  "repository": "https://github.com/taraswap/sdks.git",
   "keywords": [
     "uniswap",
     "ethereum"

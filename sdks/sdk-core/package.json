@@ -1,9 +1,10 @@
 {
-  "name": "@uniswap/sdk-core",
+  "name": "@taraswap/sdk-core",
   "description": "⚒️ An SDK for building applications on top of Uniswap V3",
-  "repository": "https://github.com/Uniswap/sdks.git",
+  "repository": "https://github.com/taraswap/sdks.git",
   "keywords": [
     "uniswap",
+    "taraswap",
     "ethereum"
   ],
   "license": "MIT",
