@@ -22,7 +22,7 @@ export class RouteV2<TInput extends Currency, TOutput extends Currency>
 {
   public readonly protocol: Protocol = Protocol.V2
   public get midPrice(): any {
-    return this.midPrice.invert() as any as Price<TInput, TOutput>
+    return super.midPrice as any as Price<TInput, TOutput>
   }
   public readonly pools: Pair[]
 
