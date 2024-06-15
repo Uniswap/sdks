@@ -29,8 +29,6 @@ describe("UniswapXEventWatcher", () => {
   let filler: Signer;
   let watcher: UniswapXEventWatcher;
 
-  const DIRECT_FILL = '0x0000000000000000000000000000000000000001';
-
   before(async () => {
     [admin, filler] = await ethers.getSigners();
     const permit2Factory = await ethers.getContractFactory(
