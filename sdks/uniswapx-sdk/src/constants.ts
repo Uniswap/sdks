@@ -95,7 +95,7 @@ export const REACTOR_ADDRESS_MAPPING: ReactorMapping = {
 export const REACTOR_CONTRACT_MAPPING: ReactorMapping = REACTOR_ADDRESS_MAPPING;
 
 // https://github.com/mds1/multicall
-export const multicallAddressOn = (chainId: number = 1) => {
+export const multicallAddressOn = (chainId = 1) => {
   switch(chainId) {
     // multicall3 is deployed to a different address on zksync than all other EVM chains
     // due to differences in create2 address derivation 
