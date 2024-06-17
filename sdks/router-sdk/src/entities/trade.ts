@@ -105,9 +105,9 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     const poolAddressSet = new Set<string>()
     for (const { route } of this.swaps) {
       for (const pool of route.pools) {
-        if (pool instanceof Pool) {
+        if (pool.token0) {
           poolAddressSet.add(Pool.getAddress(pool.token0, pool.token1, (pool as Pool).fee))
-        } else if (pool instanceof Pair) {
+        } else if ((pool as Pair).liquidityToken) {
           const pair = pool
           poolAddressSet.add(Pair.getAddress(pair.token0, pair.token1))
         } else {
