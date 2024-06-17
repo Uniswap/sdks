@@ -19,7 +19,6 @@ import {
   RelayOrder,
 } from "../../dist/src";
 import { deployAndReturnPermit2 } from "./utils/permit2";
-import { MULTICALL_ADDRESS } from "../../src/constants";
 import { deployMulticall3 } from "./utils/multicall";
 
 const { BigNumber } = ethers;
