@@ -1,4 +1,11 @@
 {
+  "resolutions": {
+    "@taraswap/router-sdk": "1.0.8",
+    "@taraswap/sdk-core": "1.1.1",
+    "@taraswap/v3-sdk": "1.0.4",
+    "@taraswap/v2-sdk": "1.0.4",
+    "regenerator-runtime": "^0.14.1"
+  },
   "name": "sdks",
   "version": "0.0.0",
   "dependencies": {
@@ -22,6 +29,7 @@
   "packageManager": "yarn@3.2.3",
   "private": true,
   "scripts": {
+    "checkCoreDeps": "node crossCheckCoreDeps.js",
     "g:check:deps:mismatch": "manypkg check",
     "g:build": "turbo run build",
     "g:lint": "turbo run lint",
@@ -33,8 +41,5 @@
   "workspaces": [
     "sdks/*",
     "sdks/uniswapx-sdk/integration"
-  ],
-  "resolutions": {
-    "@manypkg/cli@^0.19.2": "patch:@manypkg/cli@npm%3A0.19.2#./.yarn/patches/@manypkg-cli-npm-0.19.2-ea52ff91d4.patch"
-  }
+  ]
 }

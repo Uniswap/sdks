@@ -1731,7 +1731,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ethersproject/abi@npm:5.7.0, @ethersproject/abi@npm:^5.0.12, @ethersproject/abi@npm:^5.1.2, @ethersproject/abi@npm:^5.5.0, @ethersproject/abi@npm:^5.7.0":
+"@ethersproject/abi@npm:5.7.0, @ethersproject/abi@npm:^5.1.2, @ethersproject/abi@npm:^5.5.0, @ethersproject/abi@npm:^5.7.0":
   version: 5.7.0
   resolution: "@ethersproject/abi@npm:5.7.0"
   dependencies:
@@ -1776,7 +1776,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ethersproject/address@npm:5.7.0, @ethersproject/address@npm:^5.0.0, @ethersproject/address@npm:^5.0.2, @ethersproject/address@npm:^5.7.0":
+"@ethersproject/address@npm:5.7.0, @ethersproject/address@npm:^5.0.2, @ethersproject/address@npm:^5.7.0":
   version: 5.7.0
   resolution: "@ethersproject/address@npm:5.7.0"
   dependencies:
@@ -2031,7 +2031,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ethersproject/solidity@npm:5.7.0, @ethersproject/solidity@npm:^5.0.0, @ethersproject/solidity@npm:^5.0.9":
+"@ethersproject/solidity@npm:5.7.0, @ethersproject/solidity@npm:^5.0.9":
   version: 5.7.0
   resolution: "@ethersproject/solidity@npm:5.7.0"
   dependencies:
@@ -2497,7 +2497,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@manypkg/cli@npm:0.19.2":
+"@manypkg/cli@npm:^0.19.2":
   version: 0.19.2
   resolution: "@manypkg/cli@npm:0.19.2"
   dependencies:
@@ -2518,30 +2518,6 @@ __metadata:
   bin:
     manypkg: bin.js
   checksum: b40e9bff3aaccdfe85b4bfc08aee3b50ccde6c62bbe81ccf9c11e159e7adf26a0ebb990efa68c8fbd05b03ac9da5d6301b362c40c319e6ff6be45489361bd5c9
-  languageName: node
-  linkType: hard
-
-"@manypkg/cli@patch:@manypkg/cli@npm%3A0.19.2#./.yarn/patches/@manypkg-cli-npm-0.19.2-ea52ff91d4.patch::locator=sdks%40workspace%3A.":
-  version: 0.19.2
-  resolution: "@manypkg/cli@patch:@manypkg/cli@npm%3A0.19.2#./.yarn/patches/@manypkg-cli-npm-0.19.2-ea52ff91d4.patch::version=0.19.2&hash=f49145&locator=sdks%40workspace%3A."
-  dependencies:
-    "@babel/runtime": ^7.5.5
-    "@manypkg/get-packages": ^1.1.3
-    chalk: ^2.4.2
-    detect-indent: ^6.0.0
-    find-up: ^4.1.0
-    fs-extra: ^8.1.0
-    normalize-path: ^3.0.0
-    p-limit: ^2.2.1
-    package-json: ^6.5.0
-    parse-github-url: ^1.0.2
-    sembear: ^0.5.0
-    semver: ^6.3.0
-    spawndamnit: ^2.0.0
-    validate-npm-package-name: ^3.0.0
-  bin:
-    manypkg: bin.js
-  checksum: 5265dd04a2c819bbfc48e7ca634237b5751a633cd6a453cfb4bca1b8250f4c461304b9649b8dfb4c14a685e8fcc9a44d139417e88c68575cb222ede71380136a
   languageName: node
   linkType: hard
 
@@ -3786,16 +3762,16 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@taraswap/router-sdk@npm:^1.0.8":
-  version: 1.10.1
-  resolution: "@taraswap/router-sdk@npm:1.10.1"
+"@taraswap/router-sdk@npm:1.0.8":
+  version: 1.0.8
+  resolution: "@taraswap/router-sdk@npm:1.0.8"
   dependencies:
     "@ethersproject/abi": ^5.5.0
-    "@taraswap/sdk-core": ^4.2.0
-    "@taraswap/v2-sdk": ^4.3.1
-    "@taraswap/v3-sdk": ^3.11.0
-    "@uniswap/swap-router-contracts": ^1.1.0
-  checksum: ac8c622fb7e9ac58f9013609b0e6bebb4dec1020fa1df9605f534016bf8b9724edbc3884c3fe2f2b18b1eace2cbf2c5d18e9bd198332326be8b7e21d5671455c
+    "@taraswap/sdk-core": ^1.1.1
+    "@taraswap/v2-sdk": ^1.0.3
+    "@taraswap/v3-sdk": ^1.0.3
+    "@uniswap/swap-router-contracts": ^1.3.0
+  checksum: 81821a1da55453add8796f9ebb131f05cbb1d7c79c14ad04235cb3adbf068397836daf1456180f333349412dad8b7c68e49f1fb074348b7b62a5c6c8321b9c5b
   languageName: node
   linkType: hard
 
@@ -3805,8 +3781,8 @@ __metadata:
   dependencies:
     "@ethersproject/abi": ^5.5.0
     "@taraswap/sdk-core": ^1.1.1
-    "@taraswap/v2-sdk": ^1.0.3
-    "@taraswap/v3-sdk": ^1.0.3
+    "@taraswap/v2-sdk": ^1.0.4
+    "@taraswap/v3-sdk": ^1.0.4
     "@types/jest": ^24.0.25
     "@uniswap/swap-router-contracts": ^1.3.0
     prettier: ^2.4.1
@@ -3814,24 +3790,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@taraswap/sdk-core@npm:^1.1.0":
-  version: 1.1.0
-  resolution: "@taraswap/sdk-core@npm:1.1.0"
-  dependencies:
-    "@ethersproject/address": ^5.0.2
-    "@ethersproject/bytes": ^5.7.0
-    "@ethersproject/keccak256": 5.7.0
-    "@ethersproject/strings": 5.7.0
-    big.js: ^5.2.2
-    decimal.js-light: ^2.5.0
-    jsbi: ^3.1.4
-    tiny-invariant: ^1.1.0
-    toformat: ^2.0.0
-  checksum: 493d7a2cb0b21b742d617e63d406219b1085e6a3349427a8bc82875ed9ca2fd8f6bf238e87a2ee6d9732a4990ca321f6184abfc76c028a63ff34a62dcc28d646
-  languageName: node
-  linkType: hard
-
-"@taraswap/sdk-core@npm:^1.1.1":
+"@taraswap/sdk-core@npm:1.1.1":
   version: 1.1.1
   resolution: "@taraswap/sdk-core@npm:1.1.1"
   dependencies:
@@ -3845,20 +3804,6 @@ __metadata:
     tiny-invariant: ^1.1.0
     toformat: ^2.0.0
   checksum: 4e11eec8ad1497c09d94f4efc59325c8fcefb4fdf0573b97c9fe571da913c8da8bba2dd3a92714927a1bd4889763e7e3afec005c4d0ad6f595178e12723b7940
-  languageName: node
-  linkType: hard
-
-"@taraswap/sdk-core@npm:^4.1.5, @taraswap/sdk-core@npm:^4.2.0":
-  version: 4.2.0
-  resolution: "@taraswap/sdk-core@npm:4.2.0"
-  dependencies:
-    "@ethersproject/address": ^5.0.2
-    big.js: ^5.2.2
-    decimal.js-light: ^2.5.0
-    jsbi: ^3.1.4
-    tiny-invariant: ^1.1.0
-    toformat: ^2.0.0
-  checksum: e1037b56ce3f56f4c0d3d13375835e0d8b29bad428c30b29601cd9f357d9a776f1e432a5dcede584163ccb28e66182bcec8b20cc0a5ff10465282691b26bc32e
   languageName: node
   linkType: hard
 
@@ -3919,8 +3864,8 @@ __metadata:
     "@taraswap/permit2-sdk": ^1.0.2
     "@taraswap/router-sdk": ^1.0.8
     "@taraswap/sdk-core": ^1.1.1
-    "@taraswap/v2-sdk": ^1.0.3
-    "@taraswap/v3-sdk": ^1.0.3
+    "@taraswap/v2-sdk": ^1.0.4
+    "@taraswap/v3-sdk": ^1.0.4
     "@types/chai": ^4.3.3
     "@types/mocha": ^9.1.1
     "@types/node": ^18.7.16
@@ -3941,29 +3886,16 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@taraswap/v2-sdk@npm:^1.0.3":
-  version: 1.0.3
-  resolution: "@taraswap/v2-sdk@npm:1.0.3"
+"@taraswap/v2-sdk@npm:1.0.4":
+  version: 1.0.4
+  resolution: "@taraswap/v2-sdk@npm:1.0.4"
   dependencies:
     "@ethersproject/address": ^5.0.2
     "@ethersproject/solidity": ^5.0.9
-    "@taraswap/sdk-core": ^1.1.0
+    "@taraswap/sdk-core": ^1.1.1
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
-  checksum: 92e5936820bc07c9b25e949e2e8b764be276b7c6db93aa0e5163fa339777e1d31504578372e4a3671d28738423a17d812c220923586bb65a9932e3ad40b8a80b
-  languageName: node
-  linkType: hard
-
-"@taraswap/v2-sdk@npm:^4.3.1":
-  version: 4.3.1
-  resolution: "@taraswap/v2-sdk@npm:4.3.1"
-  dependencies:
-    "@ethersproject/address": ^5.0.0
-    "@ethersproject/solidity": ^5.0.0
-    "@taraswap/sdk-core": ^4.1.5
-    tiny-invariant: ^1.1.0
-    tiny-warning: ^1.0.3
-  checksum: 9e980a818ec1a05d697a75ed8e7b325f191cf2140405a898e25e3a9b3805abee6fdebec9d3eb8bb24aa1e43464aee25eeca04f73952a31287fbe22eb0779aa28
+  checksum: fabfac467449a31f8175bdf054446cd31f0ca22b1e42c347b67832b6a351b3db9e906f1eee9e873d4eee48f7bdf1c9e86a826468bf4639b0116f053a0f45a82a
   languageName: node
   linkType: hard
 
@@ -3984,35 +3916,19 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@taraswap/v3-sdk@npm:^1.0.3":
-  version: 1.0.3
-  resolution: "@taraswap/v3-sdk@npm:1.0.3"
+"@taraswap/v3-sdk@npm:1.0.4":
+  version: 1.0.4
+  resolution: "@taraswap/v3-sdk@npm:1.0.4"
   dependencies:
     "@ethersproject/abi": ^5.5.0
     "@ethersproject/solidity": ^5.0.9
-    "@taraswap/sdk-core": ^1.1.0
+    "@taraswap/sdk-core": ^1.1.1
     "@uniswap/swap-router-contracts": ^1.3.0
     "@uniswap/v3-periphery": ^1.1.1
     "@uniswap/v3-staker": 1.0.0
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
-  checksum: 94088cf0d1db710fb0becea5aed8efc39eb1fd5ee6e30aef865ec4215cd9eb52085f200e7ca82c9fff95013a49c0147364efff33d8d6f9f869dcec3a565f4428
-  languageName: node
-  linkType: hard
-
-"@taraswap/v3-sdk@npm:^3.11.0":
-  version: 3.11.0
-  resolution: "@taraswap/v3-sdk@npm:3.11.0"
-  dependencies:
-    "@ethersproject/abi": ^5.0.12
-    "@ethersproject/solidity": ^5.0.9
-    "@taraswap/sdk-core": ^4.2.0
-    "@uniswap/swap-router-contracts": ^1.2.1
-    "@uniswap/v3-periphery": ^1.1.1
-    "@uniswap/v3-staker": 1.0.0
-    tiny-invariant: ^1.1.0
-    tiny-warning: ^1.0.3
-  checksum: 3cf3483aaa7a2b452b66acd9f697b2e90081c96fd4d3db526ac53d3eaa543d75261b9bbf877d07f6c33291207d68950c6e84ee9bbef748a66f292664705d57a6
+  checksum: 38e61a70905d935c147e2e02fbf91a5fcae99cd7836815227723ff5bc2e583c4f4b1f3b80cd0fa8087cd7826c5a5310ce878c347760810c4a7adff56825c3a7c
   languageName: node
   linkType: hard
 
@@ -4734,7 +4650,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/swap-router-contracts@npm:^1.1.0, @uniswap/swap-router-contracts@npm:^1.2.1, @uniswap/swap-router-contracts@npm:^1.3.0":
+"@uniswap/swap-router-contracts@npm:^1.3.0":
   version: 1.3.1
   resolution: "@uniswap/swap-router-contracts@npm:1.3.1"
   dependencies:
@@ -15009,14 +14925,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"regenerator-runtime@npm:^0.13.4, regenerator-runtime@npm:^0.13.7, regenerator-runtime@npm:^0.13.9":
-  version: 0.13.11
-  resolution: "regenerator-runtime@npm:0.13.11"
-  checksum: 27481628d22a1c4e3ff551096a683b424242a216fee44685467307f14d58020af1e19660bf2e26064de946bad7eff28950eae9f8209d55723e2d9351e632bbb4
-  languageName: node
-  linkType: hard
-
-"regenerator-runtime@npm:^0.14.0":
+"regenerator-runtime@npm:^0.14.1":
   version: 0.14.1
   resolution: "regenerator-runtime@npm:0.14.1"
   checksum: 9f57c93277b5585d3c83b0cf76be47b473ae8c6d9142a46ce8b0291a04bb2cf902059f0f8445dcabb3fb7378e5fe4bb4ea1e008876343d42e46d3b484534ce38
