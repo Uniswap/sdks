@@ -30,8 +30,8 @@
   "dependencies": {
     "@ethersproject/bytes": "^5.7.0",
     "@ethersproject/providers": "^5.7.0",
-    "@taraswap/permit2-sdk": "^1.0.0",
-    "@taraswap/sdk-core": "^1.1.0",
+    "@taraswap/permit2-sdk": "^1.0.2",
+    "@taraswap/sdk-core": "^1.1.1",
     "ethers": "^5.7.0"
   },
   "devDependencies": {
