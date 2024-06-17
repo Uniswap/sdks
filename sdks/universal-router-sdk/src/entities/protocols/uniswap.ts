@@ -41,7 +41,7 @@ export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit'> & {
 const REFUND_ETH_PRICE_IMPACT_THRESHOLD = new Percent(50, 100)
 
 interface Swap<TInput extends Currency, TOutput extends Currency> {
-  route: IRoute<TInput, TOutput, Pair | Pool | any>
+  route: IRoute<TInput, TOutput, Pair | Pool>
   inputAmount: CurrencyAmount<TInput>
   outputAmount: CurrencyAmount<TOutput>
 }
@@ -88,13 +88,13 @@ export class UniswapTrade implements Command {
     for (const swap of this.trade.swaps) {
       switch (swap.route.protocol) {
         case Protocol.V2:
-          addV2Swap(planner, swap as any, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
+          addV2Swap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
           break
         case Protocol.V3:
-          addV3Swap(planner, swap as any, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
+          addV3Swap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
           break
         case Protocol.MIXED:
-          addMixedSwap(planner, swap as any, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
+          addMixedSwap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
           break
         default:
           throw new Error('UNSUPPORTED_TRADE_PROTOCOL')
@@ -176,8 +176,8 @@ function addV2Swap<TInput extends Currency, TOutput extends Currency>(
   routerMustCustody: boolean
 ): void {
   const trade = new V2Trade(
-    route as unknown as RouteV2<TInput, TOutput> as any,
-    tradeType == TradeType.EXACT_INPUT ? inputAmount as any : outputAmount,
+    route as unknown as RouteV2<TInput, TOutput>,
+    tradeType == TradeType.EXACT_INPUT ? inputAmount : outputAmount,
     tradeType
   )
 
@@ -211,13 +211,16 @@ function addV3Swap<TInput extends Currency, TOutput extends Currency>(
   routerMustCustody: boolean
 ): void {
   const trade = V3Trade.createUncheckedTrade({
-    route: route as unknown as RouteV3<TInput, TOutput> as any,
+    route: route as unknown as RouteV3<TInput, TOutput>,
     inputAmount,
     outputAmount,
     tradeType,
   })
 
-  const path = encodeRouteToPath(route as unknown as RouteV3<TInput, TOutput> as any, trade.tradeType === TradeType.EXACT_OUTPUT)
+  const path = encodeRouteToPath(
+    route as unknown as RouteV3<TInput, TOutput>,
+    trade.tradeType === TradeType.EXACT_OUTPUT
+  )
   if (tradeType == TradeType.EXACT_INPUT) {
     planner.addCommand(CommandType.V3_SWAP_EXACT_IN, [
       routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient,

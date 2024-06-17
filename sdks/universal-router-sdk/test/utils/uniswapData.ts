@@ -143,14 +143,14 @@ export function buildTrade(
         routev2: trade.route as RouteV2<Currency, Currency>,
         inputAmount: trade.inputAmount,
         outputAmount: trade.outputAmount,
-      })) as any,
+      })),
     v3Routes: trades
       .filter((trade) => trade instanceof V3Trade)
       .map((trade) => ({
         routev3: trade.route as RouteV3<Currency, Currency>,
         inputAmount: trade.inputAmount,
         outputAmount: trade.outputAmount,
-      })) as any,
+      })),
     mixedRoutes: trades
       .filter((trade) => trade instanceof MixedRouteTrade)
       .map((trade) => ({
