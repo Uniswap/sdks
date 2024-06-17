@@ -15,15 +15,13 @@ export interface IRoute<TInput extends Currency, TOutput extends Currency, TPool
   input: TInput
   output: TOutput
 }
+
 // V2 route wrapper
 export class RouteV2<TInput extends Currency, TOutput extends Currency>
   extends V2RouteSDK<TInput, TOutput>
   implements IRoute<TInput, TOutput, Pair>
 {
   public readonly protocol: Protocol = Protocol.V2
-  public get midPrice(): any {
-    return super.midPrice as any as Price<TInput, TOutput>
-  }
   public readonly pools: Pair[]
 
   constructor(v2Route: V2RouteSDK<TInput, TOutput>) {
@@ -31,15 +29,13 @@ export class RouteV2<TInput extends Currency, TOutput extends Currency>
     this.pools = this.pairs
   }
 }
+
 // V3 route wrapper
 export class RouteV3<TInput extends Currency, TOutput extends Currency>
   extends V3RouteSDK<TInput, TOutput>
   implements IRoute<TInput, TOutput, Pool>
 {
   public readonly protocol: Protocol = Protocol.V3
-  public get midPrice(): any {
-    return super.midPrice
-  }
   public readonly path: Token[]
 
   constructor(v3Route: V3RouteSDK<TInput, TOutput>) {

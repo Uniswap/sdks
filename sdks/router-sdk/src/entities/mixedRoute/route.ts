@@ -4,7 +4,7 @@ import { Currency, Price, Token } from '@taraswap/sdk-core'
 import { Pool } from '@taraswap/v3-sdk'
 import { Pair } from '@taraswap/v2-sdk'
 
-type TPool = Pair | Pool | any
+type TPool = Pair | Pool
 
 /**
  * Represents a list of pools or pairs through which a swap can occur
