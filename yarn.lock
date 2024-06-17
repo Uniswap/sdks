@@ -3786,7 +3786,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@taraswap/router-sdk@npm:^1.0.7":
+"@taraswap/router-sdk@npm:^1.0.8":
   version: 1.10.1
   resolution: "@taraswap/router-sdk@npm:1.10.1"
   dependencies:
@@ -3917,7 +3917,7 @@ __metadata:
   resolution: "@taraswap/universal-router-sdk@workspace:sdks/universal-router-sdk"
   dependencies:
     "@taraswap/permit2-sdk": ^1.0.2
-    "@taraswap/router-sdk": ^1.0.7
+    "@taraswap/router-sdk": ^1.0.8
     "@taraswap/sdk-core": ^1.1.1
     "@taraswap/v2-sdk": ^1.0.3
     "@taraswap/v3-sdk": ^1.0.3
