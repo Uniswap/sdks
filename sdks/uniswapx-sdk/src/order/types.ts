@@ -56,6 +56,10 @@ export type OrderResolutionOptions = {
   filler?: string;
 };
 
+export type PriorityOrderResolutionOptions = {
+  priorityFee: BigNumber;
+};
+
 export type DutchOutput = {
   readonly token: string;
   readonly startAmount: BigNumber;
@@ -77,4 +81,26 @@ export type DutchInput = {
 export type DutchInputJSON = Omit<DutchInput, "startAmount" | "endAmount"> & {
   startAmount: string;
   endAmount: string;
+};
+
+export type PriorityInput = {
+  readonly token: string;
+  readonly amount: BigNumber;
+  readonly mpsPerPriorityFeeWei: BigNumber;
+};
+
+export type PriorityOutput = PriorityInput & {
+  readonly recipient: string;
+};
+
+export type PriorityInputJSON = Omit<
+  PriorityInput,
+  "amount" | "mpsPerPriorityFeeWei"
+> & {
+  amount: string;
+  mpsPerPriorityFeeWei: string;
+};
+
+export type PriorityOutputJSON = PriorityInputJSON & {
+  recipient: string;
 };
