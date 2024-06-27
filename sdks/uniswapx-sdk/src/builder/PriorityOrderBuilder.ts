@@ -136,8 +136,8 @@ export class PriorityOrderBuilder extends OrderBuilder {
     );
     invariant(this.info.startBlock !== undefined, "startBlock not set");
     invariant(
-      this.info.input.mpsPerPriorityFeeWei.eq(0) &&
-        this.info.outputs.every((output) => output.mpsPerPriorityFeeWei.eq(0)),
+      !this.info.input.mpsPerPriorityFeeWei.eq(0) ||
+        this.info.outputs.every((output) => !output.mpsPerPriorityFeeWei.eq(0)),
       "Priority auction not configured"
     );
 
