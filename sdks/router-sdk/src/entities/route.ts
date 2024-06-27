@@ -2,6 +2,7 @@
 
 import { Route as V2RouteSDK, Pair } from '@uniswap/v2-sdk'
 import { Route as V3RouteSDK, Pool as V3Pool } from '@uniswap/v3-sdk'
+import { Route as V4RouteSDK, Pool as V4Pool } from '../../../v4-sdk'
 import { Protocol } from './protocol'
 import { Currency, Price, Token } from '@uniswap/sdk-core'
 import { MixedRouteSDK } from './mixedRoute/route'
@@ -41,6 +42,20 @@ export class RouteV3<TInput extends Currency, TOutput extends Currency>
   constructor(v3Route: V3RouteSDK<TInput, TOutput>) {
     super(v3Route.pools, v3Route.input, v3Route.output)
     this.path = v3Route.tokenPath
+  }
+}
+
+// V4 route wrapper
+export class RouteV4<TInput extends Currency, TOutput extends Currency>
+  extends V4RouteSDK<TInput, TOutput>
+  implements IRoute<TInput, TOutput, V4Pool>
+{
+  public readonly protocol: Protocol = Protocol.V4
+  public readonly path: Currency[]
+
+  constructor(v4Route: V4RouteSDK<TInput, TOutput>) {
+    super(v4Route.pools, v4Route.input, v4Route.output)
+    this.path = v4Route.currencyPath
   }
 }
 
