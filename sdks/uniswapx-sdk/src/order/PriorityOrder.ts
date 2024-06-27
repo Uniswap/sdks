@@ -7,7 +7,7 @@ import {
 } from "@uniswap/permit2-sdk";
 import { BigNumber, ethers } from "ethers";
 
-import { ResolvedUniswapXOrder, getPermit2 } from "../utils";
+import { getPermit2, ResolvedUniswapXOrder } from "../utils";
 
 import {
   OffChainOrder,
@@ -21,6 +21,13 @@ import {
 import { CustomOrderValidation, parseValidation } from "./validation";
 
 export const MPS = BigNumber.from(10).pow(7);
+
+export class OrderNotFillable extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "OrderNotFillable";
+  }
+}
 
 export type PriorityOrderInfo = OrderInfo & {
   startBlock: BigNumber;
@@ -235,6 +242,9 @@ export class PriorityOrder implements OffChainOrder {
    * @return The resolved order
    */
   resolve(options: PriorityOrderResolutionOptions): ResolvedUniswapXOrder {
+    if (options.currentBlock && options.currentBlock.lt(this.info.startBlock)) {
+      throw new OrderNotFillable("Start block in the future");
+    }
     return {
       input: {
         token: this.info.input.token,
@@ -360,7 +370,7 @@ function scaleOutputs(
     const div = product.div(MPS);
     return {
       ...output,
-      amount: mod ? div.add(1) : div,
+      amount: mod.eq(0) ? div : div.add(1),
     };
   });
 }

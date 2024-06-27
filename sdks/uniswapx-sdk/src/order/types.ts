@@ -58,6 +58,7 @@ export type OrderResolutionOptions = {
 
 export type PriorityOrderResolutionOptions = {
   priorityFee: BigNumber;
+  currentBlock?: BigNumber;
 };
 
 export type DutchOutput = {
