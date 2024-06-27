@@ -1,10 +1,10 @@
 import invariant from 'tiny-invariant'
 
 import { Currency, Price, Token } from '@uniswap/sdk-core'
-import { Pool } from '@uniswap/v3-sdk'
+import { Pool as V3Pool } from '@uniswap/v3-sdk'
 import { Pair } from '@uniswap/v2-sdk'
 
-type TPool = Pair | Pool
+type TPool = Pair | V3Pool
 
 /**
  * Represents a list of pools or pairs through which a swap can occur

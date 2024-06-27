@@ -1,5 +1,5 @@
 import { Ether, Token, WETH9, CurrencyAmount, Currency } from '@uniswap/sdk-core'
-import { Route as V3RouteSDK, Pool, FeeAmount, TickMath, encodeSqrtRatioX96 } from '@uniswap/v3-sdk'
+import { Route as V3RouteSDK, Pool as V3Pool, FeeAmount, TickMath, encodeSqrtRatioX96 } from '@uniswap/v3-sdk'
 import { MixedRoute, RouteV3 } from '../route'
 import { Protocol } from '../protocol'
 import { Route as V2RouteSDK, Pair } from '@uniswap/v2-sdk'
@@ -14,11 +14,11 @@ describe('MixedRoute', () => {
   const token3 = new Token(1, '0x0000000000000000000000000000000000000004', 18, 't3')
   const weth = WETH9[1]
 
-  const pool_0_1 = new Pool(token0, token1, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
-  const pool_0_weth = new Pool(token0, weth, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
-  const pool_1_weth = new Pool(token1, weth, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
-  const pool_2_weth = new Pool(token2, weth, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
-  const pool_2_3 = new Pool(token2, token3, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
+  const pool_0_1 = new V3Pool(token0, token1, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
+  const pool_0_weth = new V3Pool(token0, weth, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
+  const pool_1_weth = new V3Pool(token1, weth, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
+  const pool_2_weth = new V3Pool(token2, weth, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
+  const pool_2_3 = new V3Pool(token2, token3, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
   /// @dev copied from v2-sdk route.test.ts
   const pair_0_1 = new Pair(CurrencyAmount.fromRawAmount(token0, '100'), CurrencyAmount.fromRawAmount(token1, '200'))
   const pair_0_weth = new Pair(CurrencyAmount.fromRawAmount(token0, '100'), CurrencyAmount.fromRawAmount(weth, '100'))
@@ -154,7 +154,7 @@ describe('MixedRoute', () => {
 
   describe('#midPrice', () => {
     /// @dev creating new local variables so we can easily test different pool ratios independent of other tests
-    const pool_0_1 = new Pool(
+    const pool_0_1 = new V3Pool(
       token0,
       token1,
       FeeAmount.MEDIUM,
@@ -163,7 +163,7 @@ describe('MixedRoute', () => {
       TickMath.getTickAtSqrtRatio(encodeSqrtRatioX96(1, 5)),
       []
     )
-    const pool_1_2 = new Pool(
+    const pool_1_2 = new V3Pool(
       token1,
       token2,
       FeeAmount.MEDIUM,
@@ -172,7 +172,7 @@ describe('MixedRoute', () => {
       TickMath.getTickAtSqrtRatio(encodeSqrtRatioX96(15, 30)),
       []
     )
-    const pool_0_weth = new Pool(
+    const pool_0_weth = new V3Pool(
       token0,
       weth,
       FeeAmount.MEDIUM,
@@ -181,7 +181,7 @@ describe('MixedRoute', () => {
       TickMath.getTickAtSqrtRatio(encodeSqrtRatioX96(3, 1)),
       []
     )
-    const pool_1_weth = new Pool(
+    const pool_1_weth = new V3Pool(
       token1,
       weth,
       FeeAmount.MEDIUM,
@@ -191,7 +191,7 @@ describe('MixedRoute', () => {
       []
     )
 
-    const pool_2_weth = new Pool(
+    const pool_2_weth = new V3Pool(
       token2,
       weth,
       FeeAmount.MEDIUM,

@@ -1,6 +1,6 @@
 import { Currency, Fraction, Percent, Price, sortedInsert, CurrencyAmount, TradeType, Token } from '@uniswap/sdk-core'
 import { Pair } from '@uniswap/v2-sdk'
-import { BestTradeOptions, Pool } from '@uniswap/v3-sdk'
+import { BestTradeOptions, Pool as V3Pool } from '@uniswap/v3-sdk'
 import invariant from 'tiny-invariant'
 import { ONE, ZERO } from '../../constants'
 import { MixedRouteSDK } from './route'
@@ -48,7 +48,7 @@ export function tradeComparator<TInput extends Currency, TOutput extends Currenc
  * Represents a trade executed against a set of routes where some percentage of the input is
  * split across each route.
  *
- * Each route has its own set of pools. Pools can not be re-used across routes.
+ * Each route has its own set of pools. V3Pools can not be re-used across routes.
  *
  * Does not account for slippage, i.e., changes in price environment that can occur between
  * the time the trade is submitted and when it is executed.
@@ -360,8 +360,8 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
     const poolAddressSet = new Set<string>()
     for (const { route } of routes) {
       for (const pool of route.pools) {
-        pool instanceof Pool
-          ? poolAddressSet.add(Pool.getAddress(pool.token0, pool.token1, pool.fee))
+        pool instanceof V3Pool
+          ? poolAddressSet.add(V3Pool.getAddress(pool.token0, pool.token1, pool.fee))
           : poolAddressSet.add(Pair.getAddress(pool.token0, pool.token1))
       }
     }
@@ -430,12 +430,12 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
    * @returns The exact in trade
    */
   public static async bestTradeExactIn<TInput extends Currency, TOutput extends Currency>(
-    pools: (Pool | Pair)[],
+    pools: (V3Pool | Pair)[],
     currencyAmountIn: CurrencyAmount<TInput>,
     currencyOut: TOutput,
     { maxNumResults = 3, maxHops = 3 }: BestTradeOptions = {},
     // used in recursion.
-    currentPools: (Pool | Pair)[] = [],
+    currentPools: (V3Pool | Pair)[] = [],
     nextAmountIn: CurrencyAmount<Currency> = currencyAmountIn,
     bestTrades: MixedRouteTrade<TInput, TOutput, TradeType.EXACT_INPUT>[] = []
   ): Promise<MixedRouteTrade<TInput, TOutput, TradeType.EXACT_INPUT>[]> {

@@ -7,7 +7,7 @@ import {
   Route as V3RouteSDK,
   FeeAmount,
   TICK_SPACINGS,
-  Pool,
+  Pool as V3Pool,
   TickMath,
   nearestUsableTick,
   encodeSqrtRatioX96,
@@ -50,7 +50,7 @@ describe('Trade', () => {
   ) {
     const sqrtRatioX96 = encodeSqrtRatioX96(reserve1.quotient, reserve0.quotient)
     const liquidity = sqrt(JSBI.multiply(reserve0.quotient, reserve1.quotient))
-    return new Pool(
+    return new V3Pool(
       reserve0.currency,
       reserve1.currency,
       feeAmount,
