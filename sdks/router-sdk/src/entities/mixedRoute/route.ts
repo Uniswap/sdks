@@ -1,10 +1,11 @@
 import invariant from 'tiny-invariant'
 
 import { Currency, Price, Token } from '@uniswap/sdk-core'
-import { Pool as V3Pool } from '@uniswap/v3-sdk'
 import { Pair } from '@uniswap/v2-sdk'
+import { Pool as V3Pool } from '@uniswap/v3-sdk'
+import { Pool as V4Pool } from '@emag3m/v4-sdk'
 
-type TPool = Pair | V3Pool
+type TPool = Pair | V3Pool | V4Pool
 
 /**
  * Represents a list of pools or pairs through which a swap can occur
@@ -13,7 +14,7 @@ type TPool = Pair | V3Pool
  */
 export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
   public readonly pools: TPool[]
-  public readonly path: Token[]
+  public readonly path: Currency[]
   public readonly input: TInput
   public readonly output: TOutput
 
