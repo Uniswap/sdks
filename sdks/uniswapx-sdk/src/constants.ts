@@ -25,6 +25,7 @@ export const PERMIT2_MAPPING: AddressMap = {
   11155111: "0x000000000022d473030f116ddee9f6b43ac78ba3",
   42161: "0x000000000022d473030f116ddee9f6b43ac78ba3",
   12341234: "0x000000000022d473030f116ddee9f6b43ac78ba3",
+  8453: "0x000000000022d473030f116ddee9f6b43ac78ba3",
 };
 
 export const UNISWAPX_ORDER_QUOTER_MAPPING: AddressMap = {
@@ -51,6 +52,7 @@ export enum OrderType {
   Relay = "Relay",
   Dutch_V2 = "Dutch_V2",
   Limit = "Limit",
+  Priority = "Priority",
 }
 
 type Reactors = Partial<{
@@ -67,6 +69,7 @@ export const REACTOR_ADDRESS_MAPPING: ReactorMapping = {
     [OrderType.Dutch]: "0x6000da47483062A0D734Ba3dc7576Ce6A0B645C4",
     [OrderType.Dutch_V2]: "0x0000000000000000000000000000000000000000",
     [OrderType.Relay]: "0x0000000000A4e21E2597DCac987455c48b12edBF",
+    [OrderType.Priority]: "0x0000000000000000000000000000000000000000"
   }),
   //test contract is only on mainnet
   1: {
@@ -89,6 +92,12 @@ export const REACTOR_ADDRESS_MAPPING: ReactorMapping = {
     [OrderType.Dutch]: "0x0000000000000000000000000000000000000000",
     [OrderType.Relay]: "0x0000000000000000000000000000000000000000",
   },
+  8453: {
+    [OrderType.Dutch]: "0x0000000000000000000000000000000000000000",
+    [OrderType.Dutch_V2]: "0x0000000000000000000000000000000000000000",
+    [OrderType.Relay]: "0x0000000000000000000000000000000000000000",
+    [OrderType.Priority]: "0x0000000000000000000000000000000000000000"
+  }
 };
 
 // aliasing for backwards compatibility
