@@ -26,6 +26,7 @@ export class PriorityOrderBuilder extends OrderBuilder {
       .swapper(order.info.swapper)
       .nonce(order.info.nonce)
       .input(order.info.input)
+      .startBlock(order.info.startBlock)
       .validation({
         additionalValidationContract: order.info.additionalValidationContract,
         additionalValidationData: order.info.additionalValidationData,
@@ -134,11 +135,21 @@ export class PriorityOrderBuilder extends OrderBuilder {
       this.info.outputs !== undefined && this.info.outputs.length !== 0,
       "outputs not set"
     );
-    invariant(this.info.startBlock !== undefined, "startBlock not set");
+    invariant(
+      this.info.startBlock !== undefined && this.info.startBlock.gt(0),
+      "startBlock not set"
+    );
     invariant(
       !this.info.input.mpsPerPriorityFeeWei.eq(0) ||
         this.info.outputs.every((output) => !output.mpsPerPriorityFeeWei.eq(0)),
       "Priority auction not configured"
+    );
+    invariant(
+      !(
+        this.info.input.mpsPerPriorityFeeWei.gt(0) &&
+        this.info.outputs.every((output) => output.mpsPerPriorityFeeWei.gt(0))
+      ),
+      "Can only configure priority auction on either input or output"
     );
 
     return new PriorityOrder(
