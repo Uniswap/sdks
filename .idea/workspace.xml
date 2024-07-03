@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="622c4fdf-e1f9-44c4-ac1e-dd7a5d3f8c66" name="Changes" comment="" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="MarkdownSettingsMigration">
+    <option name="stateVersion" value="1" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
+  &quot;associatedIndex&quot;: 2
+}</component>
+  <component name="ProjectId" id="2fbcRPM0cWIeeF1gZZ9lKRB0QGv" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Jest.#computePoolAddress.executor": "Run",
+    "Jest.#computePoolAddress.should correctly compute zkevm pool address.executor": "Run",
+    "Jest.computePoolAddress.test.ts.executor": "Run",
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "git-widget-placeholder": "jsy1218/zora-blast-weth9",
+    "last_opened_file_path": "/Users/siyu.jiang/workspace/sdks",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs.jest.jest_package": "/Users/siyu.jiang/workspace/sdks/node_modules/jest",
+    "nodejs_package_manager_path": "yarn",
+    "ts.external.directory.path": "/Users/siyu.jiang/workspace/sdks/node_modules/typescript/lib",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="RunManager" selected="Jest.#computePoolAddress.should correctly compute zkevm pool address">
+    <configuration name="#computePoolAddress" type="JavaScriptTestRunnerJest" temporary="true" nameIsGenerated="true">
+      <node-interpreter value="project" />
+      <jest-package value="$PROJECT_DIR$/node_modules/jest" />
+      <working-dir value="$PROJECT_DIR$/sdks/v3-sdk" />
+      <envs />
+      <scope-kind value="SUITE" />
+      <test-file value="$PROJECT_DIR$/sdks/v3-sdk/src/utils/computePoolAddress.test.ts" />
+      <test-names>
+        <test-name value="#computePoolAddress" />
+      </test-names>
+      <method v="2" />
+    </configuration>
+    <configuration name="#computePoolAddress.should correctly compute zkevm pool address" type="JavaScriptTestRunnerJest" temporary="true" nameIsGenerated="true">
+      <node-interpreter value="project" />
+      <jest-package value="$PROJECT_DIR$/node_modules/jest" />
+      <working-dir value="$PROJECT_DIR$/sdks/v3-sdk" />
+      <envs />
+      <scope-kind value="TEST" />
+      <test-file value="$PROJECT_DIR$/sdks/v3-sdk/src/utils/computePoolAddress.test.ts" />
+      <test-names>
+        <test-name value="#computePoolAddress" />
+        <test-name value="should correctly compute zkevm pool address" />
+      </test-names>
+      <method v="2" />
+    </configuration>
+    <configuration name="computePoolAddress.test.ts" type="JavaScriptTestRunnerJest" temporary="true" nameIsGenerated="true">
+      <node-interpreter value="project" />
+      <jest-package value="$PROJECT_DIR$/node_modules/jest" />
+      <working-dir value="$PROJECT_DIR$/sdks/v3-sdk" />
+      <envs />
+      <scope-kind value="TEST_FILE" />
+      <test-file value="$PROJECT_DIR$/sdks/v3-sdk/src/utils/computePoolAddress.test.ts" />
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Jest.#computePoolAddress.should correctly compute zkevm pool address" />
+        <item itemvalue="Jest.computePoolAddress.test.ts" />
+        <item itemvalue="Jest.#computePoolAddress" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="622c4fdf-e1f9-44c4-ac1e-dd7a5d3f8c66" name="Changes" comment="" />
+      <created>1714073209620</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1714073209620</updated>
+      <workItem from="1714073210785" duration="7575000" />
+      <workItem from="1714651076530" duration="14000" />
+      <workItem from="1716238723141" duration="564000" />
+      <workItem from="1716321028710" duration="19043000" />
+      <workItem from="1718295734001" duration="35704000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+</project>
