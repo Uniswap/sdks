@@ -300,4 +300,34 @@ describe('Pool', () => {
       })
     })
   })
+
+  describe('backwards compatibility', () => {
+    let pool = new Pool(USDC, DAI, FEE_AMOUNT_LOW, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
+
+    describe("#token0", () => {
+      it('equals currency0', () => {
+        expect(pool.currency0).toEqual(pool.token0)
+      })
+    })
+    describe("#token1", () => {
+      it('equals currency1', () => {
+        expect(pool.currency1).toEqual(pool.token1)
+      })
+    })
+    describe("#token0Price", () => {
+      it('equals currency0Price', () => {
+        expect(pool.currency0Price).toEqual(pool.token0Price)
+      })
+    })
+    describe("#token1Price", () => {
+      it('equals currency1Price', () => {
+        expect(pool.currency1Price).toEqual(pool.token1Price)
+      })
+    })
+    describe('#involvesToken', () => {
+      it('equals involvesCurrency', () => {
+        expect(pool.involvesCurrency(USDC)).toEqual(pool.involvesToken(USDC))
+      })
+    })
+  })
 })

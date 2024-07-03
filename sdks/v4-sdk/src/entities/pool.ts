@@ -31,6 +31,13 @@ export class Pool {
   public readonly tickCurrent: number
   public readonly tickDataProvider: TickDataProvider
 
+  // backwards compatibility with Pool interface v2/v3 sdk
+  public readonly token0: Currency
+  public readonly token1: Currency
+  public readonly involvesToken: Function
+  public readonly token0Price: Price<Currency, Currency>
+  public readonly token1Price: Price<Currency, Currency>
+
   private _currency0Price?: Price<Currency, Currency>
   private _currency1Price?: Price<Currency, Currency>
 
@@ -94,6 +101,13 @@ export class Pool {
     this.liquidity = JSBI.BigInt(liquidity)
     this.tickCurrent = tickCurrent
     this.tickDataProvider = Array.isArray(ticks) ? new TickListDataProvider(ticks, tickSpacing) : ticks
+
+    // define backwards compatibility interface
+    this.token0 = this.currency0
+    this.token1 = this.currency1
+    this.involvesToken = this.involvesCurrency
+    this.token0Price = this.currency0Price
+    this.token1Price = this.currency1Price
   }
 
   /**
