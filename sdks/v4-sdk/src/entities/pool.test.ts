@@ -84,9 +84,28 @@ describe('Pool', () => {
   })
 
   describe('#getPoolId', () => {
+    it('returns the correct poolId', () => {
+      const result1 = Pool.getPoolId(USDC, DAI, FEE_AMOUNT_LOW, TICK_SPACING_TEN, ADDRESS_ZERO)
+      expect(result1).toEqual('0x503fb8d73fd2351c645ae9fea85381bac6b16ea0c2038e14dc1e96d447c8ffbb')
+
+      const result2 = Pool.getPoolId(DAI, USDC, FEE_AMOUNT_LOW, TICK_SPACING_TEN, ADDRESS_ZERO)
+      expect(result2).toEqual(result1)
+    })
+  })
+
+  describe('#getPoolKey', () => {
     it('matches an example', () => {
-      const result = Pool.getPoolId(USDC, DAI, FEE_AMOUNT_LOW, TICK_SPACING_TEN, ADDRESS_ZERO)
-      expect(result).toEqual('0x503fb8d73fd2351c645ae9fea85381bac6b16ea0c2038e14dc1e96d447c8ffbb')
+      const result1 = Pool.getPoolKey(USDC, DAI, FEE_AMOUNT_LOW, TICK_SPACING_TEN, ADDRESS_ZERO)
+      expect(result1).toEqual({
+        currency0: DAI.address,
+        currency1: USDC.address,
+        fee: FEE_AMOUNT_LOW,
+        tickSpacing: TICK_SPACING_TEN,
+        hooks: ADDRESS_ZERO,
+      })
+
+      const result2 = Pool.getPoolKey(DAI, USDC, FEE_AMOUNT_LOW, TICK_SPACING_TEN, ADDRESS_ZERO)
+      expect(result2).toEqual(result1)
     })
   })
 
@@ -104,6 +123,22 @@ describe('Pool', () => {
       expect(pool.currency1).toEqual(USDC)
       pool = new Pool(DAI, USDC, FEE_AMOUNT_LOW, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
       expect(pool.currency1).toEqual(USDC)
+    })
+  })
+
+  describe('#poolId', () => {
+    let pool = new Pool(USDC, DAI, FEE_AMOUNT_LOW, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
+    expect(pool.poolId).toEqual('0x503fb8d73fd2351c645ae9fea85381bac6b16ea0c2038e14dc1e96d447c8ffbb')
+  })
+
+  describe('#poolKey', () => {
+    let pool = new Pool(USDC, DAI, FEE_AMOUNT_LOW, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
+    expect(pool.poolKey).toEqual({
+      currency0: DAI.address,
+      currency1: USDC.address,
+      fee: FEE_AMOUNT_LOW,
+      tickSpacing: TICK_SPACING_TEN,
+      hooks: ADDRESS_ZERO,
     })
   })
 
@@ -304,22 +339,22 @@ describe('Pool', () => {
   describe('backwards compatibility', () => {
     let pool = new Pool(USDC, DAI, FEE_AMOUNT_LOW, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
 
-    describe("#token0", () => {
+    describe('#token0', () => {
       it('equals currency0', () => {
         expect(pool.currency0).toEqual(pool.token0)
       })
     })
-    describe("#token1", () => {
+    describe('#token1', () => {
       it('equals currency1', () => {
         expect(pool.currency1).toEqual(pool.token1)
       })
     })
-    describe("#token0Price", () => {
+    describe('#token0Price', () => {
       it('equals currency0Price', () => {
         expect(pool.currency0Price).toEqual(pool.token0Price)
       })
     })
-    describe("#token1Price", () => {
+    describe('#token1Price', () => {
       it('equals currency1Price', () => {
         expect(pool.currency1Price).toEqual(pool.token1Price)
       })
