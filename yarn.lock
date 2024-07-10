@@ -4898,7 +4898,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@uniswap/v4-sdk@workspace:sdks/v4-sdk"
   dependencies:
-    "@ethersproject/abi": ^5.5.0
     "@ethersproject/solidity": ^5.0.9
     "@types/chai": ^4.3.3
     "@types/mocha": ^9.1.1
