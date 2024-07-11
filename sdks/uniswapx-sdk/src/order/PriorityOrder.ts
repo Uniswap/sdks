@@ -29,33 +29,64 @@ export class OrderNotFillable extends Error {
   }
 }
 
-export type PriorityOrderInfo = OrderInfo & {
-  startBlock: BigNumber;
+export type PriorityCosignerData = {
+  auctionTargetBlock: BigNumber;
+};
+
+export type UnsignedPriorityOrderInfo = OrderInfo & {
+  cosigner: string;
+  auctionStartBlock: BigNumber;
+  baselinePriorityFeeWei: BigNumber;
   input: PriorityInput;
   outputs: PriorityOutput[];
 };
 
-export type PriorityOrderInfoJSON = Omit<
-  PriorityOrderInfo,
-  "nonce" | "input" | "outputs" | "startBlock"
+export type CosignedPriorityOrderInfo = UnsignedPriorityOrderInfo & {
+  cosignerData: PriorityCosignerData;
+  cosignature: string;
+};
+
+export type UnsignedPriorityOrderInfoJSON = Omit<
+  UnsignedPriorityOrderInfo,
+  | "nonce"
+  | "input"
+  | "outputs"
+  | "auctionStartBlock"
+  | "baselinePriorityFeeWei"
+  | "cosignerData"
 > & {
   nonce: string;
-  startBlock: string;
+  cosigner: string;
+  auctionStartBlock: string;
+  baselinePriorityFeeWei: string;
   input: PriorityInputJSON;
   outputs: PriorityOutputJSON[];
 };
 
+export type CosignedPriorityOrderInfoJSON = UnsignedPriorityOrderInfoJSON & {
+  cosignerData: {
+    auctionTargetBlock: string;
+  };
+  cosignature: string;
+};
+
 type PriorityWitnessInfo = {
   info: OrderInfo;
-  startBlock: BigNumber;
+  cosigner: string;
+  auctionStartBlock: BigNumber;
+  baselinePriorityFeeWei: BigNumber;
   input: PriorityInput;
   outputs: PriorityOutput[];
 };
 
+const PRIORITY_COSIGNER_DATA_TUPLE_ABI = "tuple(uint256)";
+
 const PRIORITY_ORDER_TYPES = {
   PriorityOrder: [
     { name: "info", type: "OrderInfo" },
-    { name: "startBlock", type: "uint256" },
+    { name: "cosigner", type: "address" },
+    { name: "auctionStartBlock", type: "uint256" },
+    { name: "baselinePriorityFeeWei", type: "uint256" },
     { name: "input", type: "PriorityInput" },
     { name: "outputs", type: "PriorityOutput[]" },
   ],
@@ -84,18 +115,22 @@ const PRIORITY_ORDER_ABI = [
   "tuple(" +
     [
       "tuple(address,address,uint256,uint256,address,bytes)", // OrderInfo
-      "uint256", // startBlock
+      "address", // cosigner
+      "uint256", // auctionStartBlock
+      "uint256", // baselinePriorityFeeWei
       "tuple(address,uint256,uint256)", // input
       "tuple(address,uint256,uint256,address)[]", // outputs
+      "tuple(uint256)", // cosignerData
+      "bytes", // cosignature
     ].join(",") +
     ")",
 ];
 
-export class PriorityOrder implements OffChainOrder {
+export class UnsignedPriorityOrder implements OffChainOrder {
   public permit2Address: string;
 
   constructor(
-    public readonly info: PriorityOrderInfo,
+    public readonly info: UnsignedPriorityOrderInfo,
     public readonly chainId: number,
     _permit2Address?: string
   ) {
@@ -103,14 +138,16 @@ export class PriorityOrder implements OffChainOrder {
   }
 
   static fromJSON(
-    json: PriorityOrderInfoJSON,
+    json: UnsignedPriorityOrderInfoJSON,
     chainId: number,
     _permit2Address?: string
-  ): PriorityOrder {
-    return new PriorityOrder(
+  ): UnsignedPriorityOrder {
+    return new UnsignedPriorityOrder(
       {
         ...json,
-        startBlock: BigNumber.from(json.startBlock),
+        cosigner: json.cosigner,
+        auctionStartBlock: BigNumber.from(json.auctionStartBlock),
+        baselinePriorityFeeWei: BigNumber.from(json.baselinePriorityFeeWei),
         nonce: BigNumber.from(json.nonce),
         input: {
           token: json.input.token,
@@ -133,14 +170,18 @@ export class PriorityOrder implements OffChainOrder {
     encoded: string,
     chainId: number,
     permit2?: string
-  ): PriorityOrder {
-    return new PriorityOrder(parseSerializedOrder(encoded), chainId, permit2);
+  ): UnsignedPriorityOrder {
+    return new UnsignedPriorityOrder(
+      parseSerializedOrder(encoded),
+      chainId,
+      permit2
+    );
   }
 
   /**
    * @inheritdoc order
    */
-  toJSON(): PriorityOrderInfoJSON & {
+  toJSON(): UnsignedPriorityOrderInfoJSON & {
     permit2Address: string;
     chainId: number;
   } {
@@ -153,7 +194,9 @@ export class PriorityOrder implements OffChainOrder {
       deadline: this.info.deadline,
       additionalValidationContract: this.info.additionalValidationContract,
       additionalValidationData: this.info.additionalValidationData,
-      startBlock: this.info.startBlock.toString(),
+      cosigner: this.info.cosigner,
+      auctionStartBlock: this.info.auctionStartBlock.toString(),
+      baselinePriorityFeeWei: this.info.baselinePriorityFeeWei.toString(),
       input: {
         token: this.info.input.token,
         amount: this.info.input.amount.toString(),
@@ -183,7 +226,9 @@ export class PriorityOrder implements OffChainOrder {
           this.info.additionalValidationContract,
           this.info.additionalValidationData,
         ],
-        this.info.startBlock,
+        this.info.cosigner,
+        this.info.auctionStartBlock,
+        this.info.baselinePriorityFeeWei,
         [
           this.info.input.token,
           this.info.input.amount,
@@ -195,6 +240,9 @@ export class PriorityOrder implements OffChainOrder {
           output.mpsPerPriorityFeeWei,
           output.recipient,
         ]),
+        // use empty default for cosignerData and cosignature
+        [0],
+        "0x",
       ],
     ]);
   }
@@ -241,17 +289,9 @@ export class PriorityOrder implements OffChainOrder {
    * Returns the resolved order with the given options
    * @return The resolved order
    */
-  resolve(options: PriorityOrderResolutionOptions): ResolvedUniswapXOrder {
-    if (options.currentBlock && options.currentBlock.lt(this.info.startBlock)) {
-      throw new OrderNotFillable("Start block in the future");
-    }
-    return {
-      input: {
-        token: this.info.input.token,
-        amount: scaleInput(this.info.input, options.priorityFee),
-      },
-      outputs: scaleOutputs(this.info.outputs, options.priorityFee),
-    };
+  resolve(_options: PriorityOrderResolutionOptions): ResolvedUniswapXOrder {
+    // no cosigner data so no resolution possible
+    throw new Error("Method not implemented.");
   }
 
   /**
@@ -284,7 +324,9 @@ export class PriorityOrder implements OffChainOrder {
         additionalValidationContract: this.info.additionalValidationContract,
         additionalValidationData: this.info.additionalValidationData,
       },
-      startBlock: this.info.startBlock,
+      cosigner: this.info.cosigner,
+      auctionStartBlock: this.info.auctionStartBlock,
+      baselinePriorityFeeWei: this.info.baselinePriorityFeeWei,
       input: this.info.input,
       outputs: this.info.outputs,
     };
@@ -297,9 +339,195 @@ export class PriorityOrder implements OffChainOrder {
       witnessType: PRIORITY_ORDER_TYPES,
     };
   }
+
+  /**
+   * Full order hash that should be signed over by the cosigner
+   */
+  cosignatureHash(cosignerData: PriorityCosignerData): string {
+    const abiCoder = new ethers.utils.AbiCoder();
+
+    return ethers.utils.solidityKeccak256(
+      ["bytes32", "bytes"],
+      [
+        this.hash(),
+        abiCoder.encode(
+          [PRIORITY_COSIGNER_DATA_TUPLE_ABI],
+          [[cosignerData.auctionTargetBlock]]
+        ),
+      ]
+    );
+  }
 }
 
-function parseSerializedOrder(serialized: string): PriorityOrderInfo {
+export class CosignedPriorityOrder extends UnsignedPriorityOrder {
+  // build a cosigned order from an unsigned order plus cosigner data
+  static fromUnsignedOrder(
+    order: UnsignedPriorityOrder,
+    cosignerData: PriorityCosignerData,
+    cosignature: string
+  ): CosignedPriorityOrder {
+    return new CosignedPriorityOrder(
+      {
+        ...order.info,
+        cosignerData,
+        cosignature,
+      },
+      order.chainId,
+      order.permit2Address
+    );
+  }
+
+  // build a cosigned order from json
+  static fromJSON(
+    json: CosignedPriorityOrderInfoJSON,
+    chainId: number,
+    _permit2Address?: string
+  ): CosignedPriorityOrder {
+    return new CosignedPriorityOrder(
+      {
+        ...json,
+        nonce: BigNumber.from(json.nonce),
+        cosigner: json.cosigner,
+        auctionStartBlock: BigNumber.from(json.auctionStartBlock),
+        baselinePriorityFeeWei: BigNumber.from(json.baselinePriorityFeeWei),
+        input: {
+          token: json.input.token,
+          amount: BigNumber.from(json.input.amount),
+          mpsPerPriorityFeeWei: BigNumber.from(json.input.mpsPerPriorityFeeWei),
+        },
+        outputs: json.outputs.map((output) => ({
+          token: output.token,
+          amount: BigNumber.from(output.amount),
+          mpsPerPriorityFeeWei: BigNumber.from(output.mpsPerPriorityFeeWei),
+          recipient: output.recipient,
+        })),
+        cosignerData: {
+          auctionTargetBlock: BigNumber.from(
+            json.cosignerData.auctionTargetBlock
+          ),
+        },
+        cosignature: json.cosignature,
+      },
+      chainId,
+      _permit2Address
+    );
+  }
+
+  // build a cosigned order from serialized
+  static parse(
+    encoded: string,
+    chainId: number,
+    permit2?: string
+  ): CosignedPriorityOrder {
+    return new CosignedPriorityOrder(
+      parseSerializedOrder(encoded),
+      chainId,
+      permit2
+    );
+  }
+
+  constructor(
+    public readonly info: CosignedPriorityOrderInfo,
+    public readonly chainId: number,
+    _permit2Address?: string
+  ) {
+    super(info, chainId, _permit2Address);
+  }
+
+  /**
+   * @inheritdoc order
+   */
+  toJSON(): CosignedPriorityOrderInfoJSON & {
+    permit2Address: string;
+    chainId: number;
+  } {
+    return {
+      ...super.toJSON(),
+      cosignerData: {
+        auctionTargetBlock:
+          this.info.cosignerData.auctionTargetBlock.toString(),
+      },
+      cosignature: this.info.cosignature,
+    };
+  }
+
+  /**
+   * @inheritdoc Order
+   */
+  resolve(options: PriorityOrderResolutionOptions): ResolvedUniswapXOrder {
+    if (options.currentBlock) {
+      if (
+        this.info.cosignerData.auctionTargetBlock.gt(0) &&
+        options.currentBlock.lt(this.info.cosignerData.auctionTargetBlock)
+      ) {
+        throw new OrderNotFillable("Target block in the future");
+      } else if (options.currentBlock.lt(this.info.auctionStartBlock)) {
+        throw new OrderNotFillable("Start block in the future");
+      }
+    }
+    if (
+      options.currentBlock &&
+      options.currentBlock.lt(this.info.auctionStartBlock)
+    ) {
+      throw new OrderNotFillable("Start block in the future");
+    }
+    return {
+      input: {
+        token: this.info.input.token,
+        amount: scaleInput(this.info.input, options.priorityFee),
+      },
+      outputs: scaleOutputs(this.info.outputs, options.priorityFee),
+    };
+  }
+
+  /**
+   * @inheritdoc order
+   */
+  serialize(): string {
+    const abiCoder = new ethers.utils.AbiCoder();
+    return abiCoder.encode(PRIORITY_ORDER_ABI, [
+      [
+        [
+          this.info.reactor,
+          this.info.swapper,
+          this.info.nonce,
+          this.info.deadline,
+          this.info.additionalValidationContract,
+          this.info.additionalValidationData,
+        ],
+        this.info.cosigner,
+        this.info.auctionStartBlock,
+        this.info.baselinePriorityFeeWei,
+        [
+          this.info.input.token,
+          this.info.input.amount,
+          this.info.input.mpsPerPriorityFeeWei,
+        ],
+        this.info.outputs.map((output) => [
+          output.token,
+          output.amount,
+          output.mpsPerPriorityFeeWei,
+          output.recipient,
+        ]),
+        [this.info.cosignerData.auctionTargetBlock],
+        this.info.cosignature,
+      ],
+    ]);
+  }
+
+  /**
+   *  recovers co-signer address from cosignature and full order hash
+   *  @returns The address which co-signed the order
+   */
+  recoverCosigner(): string {
+    return ethers.utils.verifyMessage(
+      this.cosignatureHash(this.info.cosignerData),
+      this.info.cosignature
+    );
+  }
+}
+
+function parseSerializedOrder(serialized: string): CosignedPriorityOrderInfo {
   const abiCoder = new ethers.utils.AbiCoder();
   const decoded = abiCoder.decode(PRIORITY_ORDER_ABI, serialized);
   const [
@@ -312,9 +540,13 @@ function parseSerializedOrder(serialized: string): PriorityOrderInfo {
         additionalValidationContract,
         additionalValidationData,
       ],
-      startBlock,
+      cosigner,
+      auctionStartBlock,
+      baselinePriorityFeeWei,
       [token, amount, mpsPerPriorityFeeWei],
       outputs,
+      [auctionTargetBlock],
+      cosignature,
     ],
   ] = decoded;
 
@@ -325,7 +557,9 @@ function parseSerializedOrder(serialized: string): PriorityOrderInfo {
     deadline: deadline.toNumber(),
     additionalValidationContract,
     additionalValidationData,
-    startBlock,
+    cosigner,
+    auctionStartBlock,
+    baselinePriorityFeeWei,
     input: {
       token,
       amount,
@@ -346,6 +580,10 @@ function parseSerializedOrder(serialized: string): PriorityOrderInfo {
         };
       }
     ),
+    cosignerData: {
+      auctionTargetBlock,
+    },
+    cosignature,
   };
 }
 

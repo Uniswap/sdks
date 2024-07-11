@@ -1,12 +1,15 @@
 import { BigNumber, ethers } from "ethers";
 
 import {
+  CosignedPriorityOrder,
+  CosignedPriorityOrderInfo,
   OrderNotFillable,
-  PriorityOrder,
-  PriorityOrderInfo,
+  //UnsignedPriorityOrder,
+  //UnsignedPriorityOrderInfo,
 } from "./PriorityOrder";
 
 const BLOCK = BigNumber.from(100);
+
 const NOW = Math.floor(new Date().getTime() / 1000);
 const RAW_AMOUNT = BigNumber.from("1000000");
 const INPUT_TOKEN = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
@@ -14,8 +17,8 @@ const OUTPUT_TOKEN = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
 
 describe("PriorityOrder", () => {
   const getFullOrderInfo = (
-    data: Partial<PriorityOrderInfo>
-  ): PriorityOrderInfo => {
+    data: Partial<CosignedPriorityOrderInfo>
+  ): CosignedPriorityOrderInfo => {
     return Object.assign(
       {
         deadline: NOW + 1000,
@@ -24,7 +27,9 @@ describe("PriorityOrder", () => {
         nonce: BigNumber.from(10),
         additionalValidationContract: ethers.constants.AddressZero,
         additionalValidationData: "0x",
-        startBlock: BLOCK,
+        cosigner: ethers.constants.AddressZero,
+        auctionStartBlock: BLOCK,
+        baselinePriorityFeeWei: BigNumber.from(0),
         input: {
           token: INPUT_TOKEN,
           amount: RAW_AMOUNT,
@@ -38,6 +43,10 @@ describe("PriorityOrder", () => {
             recipient: ethers.constants.AddressZero,
           },
         ],
+        cosignerData: {
+          auctionTargetBlock: BLOCK.sub(2),
+        },
+        cosignature: "0x",
       },
       data
     );
@@ -45,15 +54,15 @@ describe("PriorityOrder", () => {
 
   it("parses a serialized order", () => {
     const orderInfo = getFullOrderInfo({});
-    const order = new PriorityOrder(orderInfo, 1);
+    const order = new CosignedPriorityOrder(orderInfo, 1);
     const serialized = order.serialize();
-    const parsed = PriorityOrder.parse(serialized, 1);
+    const parsed = CosignedPriorityOrder.parse(serialized, 1);
     expect(parsed.info).toEqual(orderInfo);
   });
 
   it("valid signature over order", async () => {
     const fullOrderInfo = getFullOrderInfo({});
-    const order = new PriorityOrder(fullOrderInfo, 1);
+    const order = new CosignedPriorityOrder(fullOrderInfo, 1);
     const wallet = ethers.Wallet.createRandom();
 
     const { domain, types, values } = order.permitData();
@@ -62,8 +71,24 @@ describe("PriorityOrder", () => {
   });
 
   describe("resolve", () => {
-    it("throws when resolving if current block < startBlock", () => {
-      const order = new PriorityOrder(getFullOrderInfo({}), 1);
+    it("throws when resolving if current block < auctionTargetBlock", () => {
+      let order = new CosignedPriorityOrder(getFullOrderInfo({}), 1);
+      expect(() =>
+        order.resolve({
+          priorityFee: BigNumber.from(1),
+          currentBlock: BLOCK.sub(10),
+        })
+      ).toThrowError(new OrderNotFillable("Target block in the future"));
+
+      order = new CosignedPriorityOrder(
+        getFullOrderInfo({
+          cosignerData: {
+            auctionTargetBlock: BigNumber.from(0),
+          },
+        }),
+        1
+      );
+
       expect(() =>
         order.resolve({
           priorityFee: BigNumber.from(1),
@@ -73,7 +98,7 @@ describe("PriorityOrder", () => {
     });
 
     it("resolves at currentBlock", () => {
-      const order = new PriorityOrder(getFullOrderInfo({}), 1);
+      const order = new CosignedPriorityOrder(getFullOrderInfo({}), 1);
       const resolved = order.resolve({
         priorityFee: BigNumber.from(1),
         currentBlock: BLOCK,

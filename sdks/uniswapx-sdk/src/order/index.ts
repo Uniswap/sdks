@@ -1,5 +1,5 @@
 import { DutchOrder } from "./DutchOrder";
-import { PriorityOrder } from "./PriorityOrder";
+import { CosignedPriorityOrder, UnsignedPriorityOrder } from "./PriorityOrder";
 import { RelayOrder } from "./RelayOrder";
 import { CosignedV2DutchOrder, UnsignedV2DutchOrder } from "./V2DutchOrder";
 
@@ -14,6 +14,7 @@ export type UniswapXOrder =
   | DutchOrder
   | UnsignedV2DutchOrder
   | CosignedV2DutchOrder
-  | PriorityOrder;
+  | UnsignedPriorityOrder
+  | CosignedPriorityOrder;
 
 export type Order = UniswapXOrder | RelayOrder;
