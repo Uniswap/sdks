@@ -147,7 +147,7 @@ export class Pool {
   /**
    * Returns true if the currency is either currency0 or currency1
    * @param currency The currency to check
-   * @returns True if currency is either currency0 or currency
+   * @returns True if currency is either currency0 or currency1
    */
   public involvesCurrency(currency: Currency): boolean {
     return currency.equals(this.currency0) || currency.equals(this.currency1)
