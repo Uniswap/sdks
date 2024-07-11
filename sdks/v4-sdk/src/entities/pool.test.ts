@@ -46,20 +46,30 @@ describe('Pool', () => {
     })
 
     it('fee can be dynamic', () => {
-      const pool = new Pool(USDC, WETH9[1], DYNAMIC_FEE_FLAG, TICK_SPACING_TEN, '0xfff0000000000000000000000000000000000000', encodeSqrtRatioX96(1, 1), 0, 0, [])
+      const pool = new Pool(
+        USDC,
+        WETH9[1],
+        DYNAMIC_FEE_FLAG,
+        TICK_SPACING_TEN,
+        '0xfff0000000000000000000000000000000000000',
+        encodeSqrtRatioX96(1, 1),
+        0,
+        0,
+        []
+      )
       expect(pool.fee).toEqual(DYNAMIC_FEE_FLAG)
     })
 
     it('dynamic fee pool requires hook', () => {
       expect(() => {
         new Pool(USDC, WETH9[1], DYNAMIC_FEE_FLAG, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
-      }).toThrow("Dynamic fee pool requires a hook")
+      }).toThrow('Dynamic fee pool requires a hook')
     })
 
     it('cannot give invalid address for hook', () => {
       expect(() => {
         new Pool(USDC, WETH9[1], FEE_AMOUNT_MEDIUM, TICK_SPACING_TEN, '0x123', encodeSqrtRatioX96(1, 1), 0, 0, [])
-      }).toThrow("Invalid hook address")
+      }).toThrow('Invalid hook address')
     })
 
     it('cannot be given two of the same currency', () => {

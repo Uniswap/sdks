@@ -111,7 +111,7 @@ export class Pool {
     invariant(isAddress(hooks), 'Invalid hook address')
     invariant(Number.isInteger(fee) && (fee == DYNAMIC_FEE_FLAG || fee < 1_000_000), 'FEE')
     if (fee == DYNAMIC_FEE_FLAG) {
-      invariant(Number(hooks) > 0, "Dynamic fee pool requires a hook")
+      invariant(Number(hooks) > 0, 'Dynamic fee pool requires a hook')
     }
     const tickCurrentSqrtRatioX96 = TickMath.getSqrtRatioAtTick(tickCurrent)
     const nextTickSqrtRatioX96 = TickMath.getSqrtRatioAtTick(tickCurrent + 1)
@@ -194,7 +194,6 @@ export class Pool {
   public get token1Price(): Price<Currency, Currency> {
     return this.currency1Price
   }
-
 
   /**
    * Return the price of the given currency in terms of the other currency in the pool.
