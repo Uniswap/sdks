@@ -7,7 +7,7 @@ import { BaseProvider } from "@ethersproject/providers";
 
 import deploylessMulticall2Abi from "../../abis/deploylessMulticall2.json";
 import multicall2Abi from "../../abis/multicall2.json";
-import { MULTICALL_ADDRESS } from "../constants";
+import { multicallAddressOn } from "../constants";
 import { Multicall2__factory } from "../contracts";
 
 const DEPLOYLESS_MULTICALL_BYTECODE =
@@ -94,9 +94,10 @@ export async function multicall(
   provider: BaseProvider,
   calls: Call[]
 ): Promise<MulticallResult[]> {
-  const code = await provider.getCode(MULTICALL_ADDRESS);
+  const chainId = (await provider.getNetwork()).chainId
+  const code = await provider.getCode(multicallAddressOn(chainId));
   if (code.length > 2) {
-    const multicall = Multicall2__factory.connect(MULTICALL_ADDRESS, provider);
+    const multicall = Multicall2__factory.connect(multicallAddressOn(chainId), provider);
     return await multicall.callStatic.tryAggregate(false, calls);
   } else {
     const deploylessInterface = new Interface(deploylessMulticall2Abi);
