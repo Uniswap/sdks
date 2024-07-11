@@ -15,6 +15,7 @@ import { sortsBefore } from '../utils/sortsBefore'
 import { ADDRESS_ZERO, NEGATIVE_ONE, Q192 } from '../utils/internalConstants'
 import JSBI from 'jsbi'
 
+export const DYNAMIC_FEE_FLAG = 0x800000
 const NO_TICK_DATA_PROVIDER_DEFAULT = new NoTickDataProvider()
 
 export type PoolKey = {
@@ -107,7 +108,11 @@ export class Pool {
     tickCurrent: number,
     ticks: TickDataProvider | (Tick | TickConstructorArgs)[] = NO_TICK_DATA_PROVIDER_DEFAULT
   ) {
-    invariant(Number.isInteger(fee) && fee < 1_000_000, 'FEE')
+    invariant(isAddress(hooks), 'Invalid hook address')
+    invariant(Number.isInteger(fee) && (fee == DYNAMIC_FEE_FLAG || fee < 1_000_000), 'FEE')
+    if (fee == DYNAMIC_FEE_FLAG) {
+      invariant(Number(hooks) > 0, "Dynamic fee pool requires a hook")
+    }
     const tickCurrentSqrtRatioX96 = TickMath.getSqrtRatioAtTick(tickCurrent)
     const nextTickSqrtRatioX96 = TickMath.getSqrtRatioAtTick(tickCurrent + 1)
     invariant(
@@ -115,7 +120,6 @@ export class Pool {
         JSBI.lessThanOrEqual(JSBI.BigInt(sqrtRatioX96), nextTickSqrtRatioX96),
       'PRICE_BOUNDS'
     )
-    invariant(isAddress(hooks), 'Invalid hook address')
 
     // always create a copy of the list since we want the pool's tick list to be immutable
     ;[this.currency0, this.currency1] = sortsBefore(currencyA, currencyB)

@@ -1,5 +1,5 @@
 import { Token, CurrencyAmount, WETH9 } from '@uniswap/sdk-core'
-import { Pool } from './pool'
+import { Pool, DYNAMIC_FEE_FLAG } from './pool'
 import JSBI from 'jsbi'
 import { nearestUsableTick, encodeSqrtRatioX96, TickMath } from '@uniswap/v3-sdk'
 import {
@@ -43,6 +43,23 @@ describe('Pool', () => {
       expect(() => {
         new Pool(USDC, WETH9[1], 1e6, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
       }).toThrow('FEE')
+    })
+
+    it('fee can be dynamic', () => {
+      const pool = new Pool(USDC, WETH9[1], DYNAMIC_FEE_FLAG, TICK_SPACING_TEN, '0xfff0000000000000000000000000000000000000', encodeSqrtRatioX96(1, 1), 0, 0, [])
+      expect(pool.fee).toEqual(DYNAMIC_FEE_FLAG)
+    })
+
+    it('dynamic fee pool requires hook', () => {
+      expect(() => {
+        new Pool(USDC, WETH9[1], DYNAMIC_FEE_FLAG, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
+      }).toThrow("Dynamic fee pool requires a hook")
+    })
+
+    it('cannot give invalid address for hook', () => {
+      expect(() => {
+        new Pool(USDC, WETH9[1], FEE_AMOUNT_MEDIUM, TICK_SPACING_TEN, '0x123', encodeSqrtRatioX96(1, 1), 0, 0, [])
+      }).toThrow("Invalid hook address")
     })
 
     it('cannot be given two of the same currency', () => {
