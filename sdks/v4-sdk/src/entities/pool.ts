@@ -38,13 +38,6 @@ export class Pool {
   public readonly liquidity: JSBI
   public readonly tickCurrent: number
   public readonly tickDataProvider: TickDataProvider
-
-  // backwards compatibility with Pool interface v2/v3 sdk
-  public readonly token0: Currency
-  public readonly token1: Currency
-  public readonly involvesToken: Function
-  public readonly token0Price: Price<Currency, Currency>
-  public readonly token1Price: Price<Currency, Currency>
   public readonly poolKey: PoolKey
   public readonly poolId: string
 
@@ -137,13 +130,14 @@ export class Pool {
     this.tickDataProvider = Array.isArray(ticks) ? new TickListDataProvider(ticks, tickSpacing) : ticks
     this.poolKey = Pool.getPoolKey(this.currency0, this.currency1, this.fee, this.tickSpacing, this.hooks)
     this.poolId = Pool.getPoolId(this.currency0, this.currency1, this.fee, this.tickSpacing, this.hooks)
+  }
 
-    // define backwards compatibility interface
-    this.token0 = this.currency0
-    this.token1 = this.currency1
-    this.involvesToken = this.involvesCurrency
-    this.token0Price = this.currency0Price
-    this.token1Price = this.currency1Price
+  /** backwards compatibility with v2/3 sdks */
+  public get token0(): Currency {
+    return this.currency0
+  }
+  public get token1(): Currency {
+    return this.currency1
   }
 
   /**
@@ -153,6 +147,10 @@ export class Pool {
    */
   public involvesCurrency(currency: Currency): boolean {
     return currency.equals(this.currency0) || currency.equals(this.currency1)
+  }
+  /** backwards compatibility with v2/3 sdks */
+  public involvesToken(currency: Currency): boolean {
+    return this.involvesCurrency(currency)
   }
 
   /**
@@ -169,6 +167,10 @@ export class Pool {
       ))
     )
   }
+  /** backwards compatibility with v2/3 sdks */
+  public get token0Price(): Price<Currency, Currency> {
+    return this.currency0Price
+  }
 
   /**
    * Returns the current mid price of the pool in terms of currency1, i.e. the ratio of currency0 over currency1
@@ -184,6 +186,11 @@ export class Pool {
       ))
     )
   }
+  /** backwards compatibility with v2/3 sdks */
+  public get token1Price(): Price<Currency, Currency> {
+    return this.currency1Price
+  }
+
 
   /**
    * Return the price of the given currency in terms of the other currency in the pool.
@@ -202,6 +209,7 @@ export class Pool {
     return this.currency0.chainId
   }
 
+  /** Works only for vanilla hookless v3 pools, otherwise throws an error */
   public async getOutputAmount(
     inputAmount: CurrencyAmount<Currency>,
     sqrtPriceLimitX96?: JSBI
@@ -235,6 +243,7 @@ export class Pool {
 
   /**
    * Given a desired output amount of a currency, return the computed input amount and a pool with state updated after the trade
+   * Works only for vanilla hookless v3 pools, otherwise throws an error
    * @param outputAmount the output amount for which to quote the input amount
    * @param sqrtPriceLimitX96 The Q64.96 sqrt price limit. If zero for one, the price cannot be less than this value after the swap. If one for zero, the price cannot be greater than this value after the swap
    * @returns The input amount and the pool with updated state
