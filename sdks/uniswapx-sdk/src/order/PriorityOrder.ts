@@ -7,6 +7,7 @@ import {
 } from "@uniswap/permit2-sdk";
 import { BigNumber, ethers } from "ethers";
 
+import { MPS } from "../constants";
 import { getPermit2, ResolvedUniswapXOrder } from "../utils";
 
 import {
@@ -19,8 +20,6 @@ import {
   PriorityOutputJSON,
 } from "./types";
 import { CustomOrderValidation, parseValidation } from "./validation";
-
-export const MPS = BigNumber.from(10).pow(7);
 
 export class OrderNotFillable extends Error {
   constructor(message: string) {
