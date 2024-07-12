@@ -62,7 +62,7 @@ export class RouteV4<TInput extends Currency, TOutput extends Currency>
 // Mixed route wrapper
 export class MixedRoute<TInput extends Currency, TOutput extends Currency>
   extends MixedRouteSDK<TInput, TOutput>
-  implements IRoute<TInput, TOutput, V3Pool | Pair>
+  implements IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>
 {
   public readonly protocol: Protocol = Protocol.MIXED
 

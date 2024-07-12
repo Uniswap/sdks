@@ -33,15 +33,15 @@ export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
     const allOnSameChain = pools.every((pool) => pool.chainId === chainId)
     invariant(allOnSameChain, 'CHAIN_IDS')
 
-    const wrappedInput = input.wrapped
-    invariant(pools[0].involvesToken(wrappedInput), 'INPUT')
+    const adjustedInput = (pools[0] instanceof V4Pool ? input : input.wrapped) as Token
+    invariant(pools[0].involvesToken(adjustedInput), 'INPUT')
 
     invariant(pools[pools.length - 1].involvesToken(output.wrapped), 'OUTPUT')
 
     /**
      * Normalizes token0-token1 order and selects the next token/fee step to add to the path
      * */
-    const tokenPath: Token[] = [wrappedInput]
+    const tokenPath: Currency[] = [adjustedInput]
     for (const [i, pool] of pools.entries()) {
       const currentInputToken = tokenPath[i]
       invariant(currentInputToken.equals(pool.token0) || currentInputToken.equals(pool.token1), 'PATH')
@@ -66,25 +66,27 @@ export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
     if (this._midPrice !== null) return this._midPrice
 
     const price = this.pools.slice(1).reduce(
+
       ({ nextInput, price }, pool) => {
         return nextInput.equals(pool.token0)
           ? {
               nextInput: pool.token1,
-              price: price.multiply(pool.token0Price),
+              price: price.asFraction.multiply(pool.token0Price.asFraction),
             }
           : {
               nextInput: pool.token0,
-              price: price.multiply(pool.token1Price),
+              price: price.asFraction.multiply(pool.token1Price.asFraction),
             }
       },
+
       this.pools[0].token0.equals(this.input.wrapped)
         ? {
             nextInput: this.pools[0].token1,
-            price: this.pools[0].token0Price,
+            price: this.pools[0].token0Price.asFraction,
           }
         : {
             nextInput: this.pools[0].token0,
-            price: this.pools[0].token1Price,
+            price: this.pools[0].token1Price.asFraction,
           }
     ).price
 
