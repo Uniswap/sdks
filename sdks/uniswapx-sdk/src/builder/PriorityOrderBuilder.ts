@@ -168,7 +168,6 @@ export class PriorityOrderBuilder extends OrderBuilder {
   buildPartial(): UnsignedPriorityOrder {
     invariant(this.info.input !== undefined, "input not set");
     invariant(this.info.cosigner !== undefined, "cosigner not set");
-    invariant(this.info.cosignature !== undefined, "cosignature not set");
     invariant(
       this.info.baselinePriorityFeeWei !== undefined,
       "baselinePriorityFeeWei not set"
@@ -224,13 +223,16 @@ export class PriorityOrderBuilder extends OrderBuilder {
         this.info.auctionStartBlock.gt(0),
       "auctionStartBlock not set"
     );
+    invariant(this.info.cosignerData !== undefined, "cosignerData not set");
     invariant(
-      this.info.cosignerData !== undefined &&
-        this.info.cosignerData.auctionTargetBlock.gt(0) &&
-        this.info.cosignerData.auctionTargetBlock.lt(
-          this.info.auctionStartBlock
-        ),
-      "auctionTargetBlock not set properly"
+      this.info.cosignerData.auctionTargetBlock.gt(0),
+      "auctionTargetBlock must be positive"
+    );
+    invariant(
+      this.info.cosignerData.auctionTargetBlock.lte(
+        this.info.auctionStartBlock
+      ),
+      "auctionTargetBlock must not be larger than auctionStartBlock"
     );
     invariant(
       !this.info.input.mpsPerPriorityFeeWei.eq(0) ||
