@@ -240,7 +240,7 @@ export class PriorityOrderBuilder extends OrderBuilder {
     invariant(
       !(
         this.info.input.mpsPerPriorityFeeWei.gt(0) &&
-        this.info.outputs.every((output) => output.mpsPerPriorityFeeWei.gt(0))
+        this.info.outputs.some((output) => output.mpsPerPriorityFeeWei.gt(0))
       ),
       "Can only configure priority auction on either input or output"
     );
