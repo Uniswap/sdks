@@ -459,12 +459,6 @@ export class CosignedPriorityOrder extends UnsignedPriorityOrder {
         throw new OrderNotFillable("Start block in the future");
       }
     }
-    if (
-      options.currentBlock &&
-      options.currentBlock.lt(this.info.auctionStartBlock)
-    ) {
-      throw new OrderNotFillable("Start block in the future");
-    }
     return {
       input: {
         token: this.info.input.token,
