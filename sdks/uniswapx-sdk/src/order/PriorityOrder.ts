@@ -47,12 +47,7 @@ export type CosignedPriorityOrderInfo = UnsignedPriorityOrderInfo & {
 
 export type UnsignedPriorityOrderInfoJSON = Omit<
   UnsignedPriorityOrderInfo,
-  | "nonce"
-  | "input"
-  | "outputs"
-  | "auctionStartBlock"
-  | "baselinePriorityFeeWei"
-  | "cosignerData"
+  "nonce" | "input" | "outputs" | "auctionStartBlock" | "baselinePriorityFeeWei"
 > & {
   nonce: string;
   cosigner: string;

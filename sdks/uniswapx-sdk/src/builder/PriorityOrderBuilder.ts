@@ -56,7 +56,7 @@ export class PriorityOrderBuilder extends OrderBuilder {
   ) {
     super();
 
-    this.reactor(getReactor(chainId, OrderType.Dutch_V2, reactorAddress));
+    this.reactor(getReactor(chainId, OrderType.Priority, reactorAddress));
     this.permit2Address = getPermit2(chainId, permit2Address);
 
     this.info = {
@@ -168,7 +168,6 @@ export class PriorityOrderBuilder extends OrderBuilder {
   buildPartial(): UnsignedPriorityOrder {
     invariant(this.info.input !== undefined, "input not set");
     invariant(this.info.cosigner !== undefined, "cosigner not set");
-    invariant(this.info.cosignature !== undefined, "cosignature not set");
     invariant(
       this.info.baselinePriorityFeeWei !== undefined,
       "baselinePriorityFeeWei not set"
