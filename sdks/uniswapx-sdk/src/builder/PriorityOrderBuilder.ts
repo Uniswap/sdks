@@ -56,7 +56,7 @@ export class PriorityOrderBuilder extends OrderBuilder {
   ) {
     super();
 
-    this.reactor(getReactor(chainId, OrderType.Dutch_V2, reactorAddress));
+    this.reactor(getReactor(chainId, OrderType.Priority, reactorAddress));
     this.permit2Address = getPermit2(chainId, permit2Address);
 
     this.info = {
@@ -223,16 +223,13 @@ export class PriorityOrderBuilder extends OrderBuilder {
         this.info.auctionStartBlock.gt(0),
       "auctionStartBlock not set"
     );
-    invariant(this.info.cosignerData !== undefined, "cosignerData not set");
     invariant(
-      this.info.cosignerData.auctionTargetBlock.gt(0),
-      "auctionTargetBlock must be positive"
-    );
-    invariant(
-      this.info.cosignerData.auctionTargetBlock.lte(
-        this.info.auctionStartBlock
-      ),
-      "auctionTargetBlock must not be larger than auctionStartBlock"
+      this.info.cosignerData !== undefined &&
+        this.info.cosignerData.auctionTargetBlock.gt(0) &&
+        this.info.cosignerData.auctionTargetBlock.lt(
+          this.info.auctionStartBlock
+        ),
+      "auctionTargetBlock not set properly"
     );
     invariant(
       !this.info.input.mpsPerPriorityFeeWei.eq(0) ||
@@ -242,7 +239,7 @@ export class PriorityOrderBuilder extends OrderBuilder {
     invariant(
       !(
         this.info.input.mpsPerPriorityFeeWei.gt(0) &&
-        this.info.outputs.every((output) => output.mpsPerPriorityFeeWei.gt(0))
+        this.info.outputs.some((output) => output.mpsPerPriorityFeeWei.gt(0))
       ),
       "Can only configure priority auction on either input or output"
     );
