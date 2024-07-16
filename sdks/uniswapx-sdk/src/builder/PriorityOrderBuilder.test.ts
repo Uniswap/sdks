@@ -19,7 +19,7 @@ describe("PriorityOrderBuilder", () => {
       .swapper("0x0000000000000000000000000000000000000001")
       .nonce(BigNumber.from(100))
       .auctionStartBlock(BLOCK)
-      .baselinePriorityFeeWei(BigNumber.from(1))
+      .baselinePriorityFeeWei(BigNumber.from(0))
       .cosigner(constants.AddressZero)
       .input({
         token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",

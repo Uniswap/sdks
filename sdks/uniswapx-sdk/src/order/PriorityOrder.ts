@@ -47,12 +47,7 @@ export type CosignedPriorityOrderInfo = UnsignedPriorityOrderInfo & {
 
 export type UnsignedPriorityOrderInfoJSON = Omit<
   UnsignedPriorityOrderInfo,
-  | "nonce"
-  | "input"
-  | "outputs"
-  | "auctionStartBlock"
-  | "baselinePriorityFeeWei"
-  | "cosignerData"
+  "nonce" | "input" | "outputs" | "auctionStartBlock" | "baselinePriorityFeeWei"
 > & {
   nonce: string;
   cosigner: string;
@@ -463,12 +458,6 @@ export class CosignedPriorityOrder extends UnsignedPriorityOrder {
       } else if (options.currentBlock.lt(this.info.auctionStartBlock)) {
         throw new OrderNotFillable("Start block in the future");
       }
-    }
-    if (
-      options.currentBlock &&
-      options.currentBlock.lt(this.info.auctionStartBlock)
-    ) {
-      throw new OrderNotFillable("Start block in the future");
     }
     return {
       input: {
