@@ -619,6 +619,85 @@ describe("PriorityOrder", () => {
         fillerTokenOutBalanceBefore.sub(scaledOutput).toString()
       );
     });
+
+    it("executes a serialized order at auctionStartBlock, 1 wei of excess priority fee", async () => {
+      const auctionStartBlock = BigNumber.from(block).add(3);
+      const deadline = await new BlockchainTime().secondsFromNow(1000);
+      const order = new PriorityOrderBuilder(
+        chainId,
+        reactor.address,
+        permit2.address
+      )
+        .cosigner(cosigner.address)
+        .auctionStartBlock(auctionStartBlock)
+        .baselinePriorityFeeWei(BigNumber.from(1))
+        .deadline(deadline)
+        .swapper(swapper.address)
+        .nonce(NONCE)
+        .input({
+          token: tokenIn.address,
+          amount: AMOUNT,
+          mpsPerPriorityFeeWei: BigNumber.from(0),
+        })
+        .output({
+          token: tokenOut.address,
+          amount: AMOUNT,
+          mpsPerPriorityFeeWei: BigNumber.from(1),
+          recipient: swapper.address,
+        })
+        .buildPartial();
+
+      const { domain, types, values } = order.permitData();
+      const signature = await swapper._signTypedData(domain, types, values);
+
+      const cosignerData = getCosignerData({
+        auctionTargetBlock: auctionStartBlock.sub(1),
+      });
+      const cosignerHash = order.cosignatureHash(cosignerData);
+      let cosignature = ethers.utils.joinSignature(
+        cosigner._signingKey().signDigest(cosignerHash)
+      );
+      const fullOrder = PriorityOrderBuilder.fromOrder(order)
+        .cosignerData(cosignerData)
+        .cosignature(cosignature)
+        .build();
+
+      await mine(3);
+      const swapperTokenInBalanceBefore = await tokenIn.balanceOf(
+        swapperAddress
+      );
+      const fillerTokenInBalanceBefore = await tokenIn.balanceOf(fillerAddress);
+      const swapperTokenOutBalanceBefore = await tokenOut.balanceOf(
+        swapperAddress
+      );
+      const fillerTokenOutBalanceBefore = await tokenOut.balanceOf(
+        fillerAddress
+      );
+
+      const res = await reactor
+        .connect(filler)
+        .execute(
+          { order: fullOrder.serialize(), sig: signature },
+          { maxPriorityFeePerGas: 2 }
+        );
+      const receipt = await res.wait();
+      expect(receipt.status).to.equal(1);
+
+      expect((await tokenIn.balanceOf(swapperAddress)).toString()).to.equal(
+        swapperTokenInBalanceBefore.sub(AMOUNT).toString()
+      );
+      expect((await tokenIn.balanceOf(fillerAddress)).toString()).to.equal(
+        fillerTokenInBalanceBefore.add(AMOUNT).toString()
+      );
+      // AMOUNT * (((MPS == 1e7) + 1) / MPS)
+      const scaledOutput = AMOUNT.mul(BigNumber.from(1e7).add(1)).div(1e7);
+      expect((await tokenOut.balanceOf(swapperAddress)).toString()).to.equal(
+        swapperTokenOutBalanceBefore.add(scaledOutput).toString()
+      );
+      expect((await tokenOut.balanceOf(fillerAddress)).toString()).to.equal(
+        fillerTokenOutBalanceBefore.sub(scaledOutput).toString()
+      );
+    });
   });
 
   const getCosignerData = (
