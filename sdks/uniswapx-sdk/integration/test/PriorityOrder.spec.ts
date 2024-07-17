@@ -356,6 +356,7 @@ describe("PriorityOrder", () => {
       expect(builtOutput.recipient).to.eq(swapperAddress);
     });
 
+    // cosignature is only checked if current block < auctionStartBlock, so we set it in the future
     it("reverts if cosignature is invalid", async () => {
       const auctionStartBlock = BigNumber.from(block).add(3);
       const deadline = await new BlockchainTime().secondsFromNow(1000);
