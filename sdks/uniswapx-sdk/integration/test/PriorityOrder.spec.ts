@@ -90,6 +90,12 @@ describe("PriorityOrder", () => {
     fillerAddress = await filler.getAddress();
   });
 
+  beforeEach(async () => {
+    block = BigNumber.from(
+      (await hre.ethers.provider.getBlock("latest")).number
+    );
+  })
+
   afterEach(() => {
     NONCE = NONCE.add(1);
   });
@@ -296,7 +302,7 @@ describe("PriorityOrder", () => {
       const swapperAddress = await swapper.getAddress();
       const cosignerAddress = await cosigner.getAddress();
       const cosignerData = getCosignerData({
-        auctionTargetBlock: BigNumber.from(block),
+        auctionTargetBlock: BigNumber.from(block.sub(1)),
       });
       const preBuildOrder = new PriorityOrderBuilder(
         chainId,
@@ -351,6 +357,7 @@ describe("PriorityOrder", () => {
     });
 
     it("reverts if cosignature is invalid", async () => {
+      const auctionStartBlock = BigNumber.from(block).add(3);
       const deadline = await new BlockchainTime().secondsFromNow(1000);
       const order = new PriorityOrderBuilder(
         chainId,
@@ -358,7 +365,7 @@ describe("PriorityOrder", () => {
         permit2.address
       )
         .cosigner(cosigner.address)
-        .auctionStartBlock(BigNumber.from(block))
+        .auctionStartBlock(auctionStartBlock)
         .baselinePriorityFeeWei(BigNumber.from(1))
         .deadline(deadline)
         .swapper(swapper.address)
@@ -380,32 +387,25 @@ describe("PriorityOrder", () => {
       const signature = await swapper._signTypedData(domain, types, values);
 
       const cosignerData = getCosignerData({
-        auctionTargetBlock: block.sub(1),
+        auctionTargetBlock: auctionStartBlock.sub(1),
       });
       const cosignerHash = order.cosignatureHash(cosignerData);
       let cosignature = ethers.utils.joinSignature(
         cosigner._signingKey().signDigest(cosignerHash)
       );
       const fullOrder = PriorityOrderBuilder.fromOrder(order)
-        .cosignerData({ auctionTargetBlock: block.sub(2) })
+        .cosignerData({ auctionTargetBlock: auctionStartBlock.sub(2) })
         .cosignature(cosignature)
         .build();
 
-      await reactor
-        .connect(filler)
-        .execute(
-          { order: fullOrder.serialize(), sig: signature },
-          { maxPriorityFeePerGas: 3 }
-        );
-
-      //await expect(
-      //  reactor
-      //    .connect(filler)
-      //    .execute(
-      //      { order: fullOrder.serialize(), sig: signature },
-      //      { maxPriorityFeePerGas: 3 }
-      //    )
-      //).to.be.revertedWithCustomError(reactor, "InvalidCosignature");
+      await expect(
+       reactor
+         .connect(filler)
+         .execute(
+           { order: fullOrder.serialize(), sig: signature },
+           { maxPriorityFeePerGas: 3 }
+         )
+      ).to.be.revertedWithCustomError(reactor, "InvalidCosignature");
     });
 
     /* 
