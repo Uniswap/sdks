@@ -25,7 +25,11 @@ export class PriorityOrderBuilder extends OrderBuilder {
     order: O
   ): PriorityOrderBuilder {
     // note chainId not used if passing in true reactor address
-    const builder = new PriorityOrderBuilder(order.chainId, order.info.reactor)
+    const builder = new PriorityOrderBuilder(
+      order.chainId,
+      order.info.reactor,
+      order.permit2Address
+    )
       .deadline(order.info.deadline)
       .swapper(order.info.swapper)
       .nonce(order.info.nonce)
@@ -226,7 +230,7 @@ export class PriorityOrderBuilder extends OrderBuilder {
     invariant(
       this.info.cosignerData !== undefined &&
         this.info.cosignerData.auctionTargetBlock.gt(0) &&
-        this.info.cosignerData.auctionTargetBlock.lt(
+        this.info.cosignerData.auctionTargetBlock.lte(
           this.info.auctionStartBlock
         ),
       "auctionTargetBlock not set properly"

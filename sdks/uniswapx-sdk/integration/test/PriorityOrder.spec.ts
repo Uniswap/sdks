@@ -88,13 +88,17 @@ describe("PriorityOrder", () => {
     swapperAddress = await swapper.getAddress();
     cosignerAddress = await cosigner.getAddress();
     fillerAddress = await filler.getAddress();
+
+    console.log(
+      `swapper: ${swapperAddress}; cosigner: ${cosignerAddress}; inToken: ${tokenIn.address}; outToken: ${tokenOut.address}`
+    );
   });
 
   beforeEach(async () => {
     block = BigNumber.from(
       (await hre.ethers.provider.getBlock("latest")).number
     );
-  })
+  });
 
   afterEach(() => {
     NONCE = NONCE.add(1);
@@ -302,7 +306,7 @@ describe("PriorityOrder", () => {
       const swapperAddress = await swapper.getAddress();
       const cosignerAddress = await cosigner.getAddress();
       const cosignerData = getCosignerData({
-        auctionTargetBlock: BigNumber.from(block.sub(1)),
+        auctionTargetBlock: block.sub(1),
       });
       const preBuildOrder = new PriorityOrderBuilder(
         chainId,
@@ -313,7 +317,7 @@ describe("PriorityOrder", () => {
         .deadline(deadline)
         .swapper(swapperAddress)
         .nonce(NONCE)
-        .auctionStartBlock(BigNumber.from(block))
+        .auctionStartBlock(block)
         .baselinePriorityFeeWei(BigNumber.from(1))
         .input({
           token: tokenIn.address,
@@ -400,12 +404,12 @@ describe("PriorityOrder", () => {
         .build();
 
       await expect(
-       reactor
-         .connect(filler)
-         .execute(
-           { order: fullOrder.serialize(), sig: signature },
-           { maxPriorityFeePerGas: 3 }
-         )
+        reactor
+          .connect(filler)
+          .execute(
+            { order: fullOrder.serialize(), sig: signature },
+            { maxPriorityFeePerGas: 3 }
+          )
       ).to.be.revertedWithCustomError(reactor, "InvalidCosignature");
     });
 
