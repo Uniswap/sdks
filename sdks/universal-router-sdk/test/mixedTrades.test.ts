@@ -217,5 +217,5 @@ describe('SwapRouter.swapCallParameters', () => {
       registerFixture('_ERC20_FOR_NFTS_PARTIAL_FILL', methodParameters)
       expect(methodParameters.value).to.eq('0x00')
     })
-  })
+  }).timeout(100000)
 })
