@@ -101,6 +101,7 @@ describe('SwapRouter', () => {
                 amount: amountIn,
               },
             ],
+            [],
             TradeType.EXACT_INPUT
           )
 
@@ -149,6 +150,7 @@ describe('SwapRouter', () => {
                 amount: amountOut,
               },
             ],
+            [],
             TradeType.EXACT_OUTPUT
           )
 
@@ -201,6 +203,7 @@ describe('SwapRouter', () => {
                 amount: amountIn,
               },
             ],
+            [],
             TradeType.EXACT_INPUT
           )
 
@@ -253,6 +256,7 @@ describe('SwapRouter', () => {
                 amount: amountOut,
               },
             ],
+            [],
             TradeType.EXACT_OUTPUT
           )
 
@@ -324,6 +328,7 @@ describe('SwapRouter', () => {
                   amount: amountIn,
                 },
               ],
+              [],
               TradeType.EXACT_INPUT
             )
 
@@ -335,7 +340,7 @@ describe('SwapRouter', () => {
             expect(calldata).toEqual(expectedCalldata)
             expect(value).toBe('0x00')
 
-            const mixedRouteTrades = await Trade.fromRoutes([], [], TradeType.EXACT_INPUT, [
+            const mixedRouteTrades = await Trade.fromRoutes([], [], [], TradeType.EXACT_INPUT, [
               {
                 mixedRoute: (await mixedRouteTrade1).swaps[0].route,
                 amount: amountIn,
@@ -390,7 +395,7 @@ describe('SwapRouter', () => {
           })
 
           it('meta-trade', async () => {
-            const trades = await Trade.fromRoutes([], [], TradeType.EXACT_INPUT, [
+            const trades = await Trade.fromRoutes([], [], [], TradeType.EXACT_INPUT, [
               {
                 mixedRoute: (await mixedRouteTrade1).swaps[0].route,
                 amount: amountIn,
@@ -493,6 +498,7 @@ describe('SwapRouter', () => {
                   amount: amountIn,
                 },
               ],
+              [],
               TradeType.EXACT_INPUT
             )
 
@@ -513,6 +519,7 @@ describe('SwapRouter', () => {
                   amount: amountIn,
                 },
               ],
+              [],
               [],
               TradeType.EXACT_INPUT,
               [
@@ -572,6 +579,7 @@ describe('SwapRouter', () => {
                   amount: amountOut,
                 },
               ],
+              [],
               TradeType.EXACT_OUTPUT
             )
 
@@ -641,6 +649,7 @@ describe('SwapRouter', () => {
                   amount: amountIn,
                 },
               ],
+              [],
               TradeType.EXACT_INPUT
             )
 
@@ -666,6 +675,7 @@ describe('SwapRouter', () => {
                   amount: amountIn,
                 },
               ],
+              [],
               TradeType.EXACT_INPUT,
               [
                 {
@@ -724,6 +734,7 @@ describe('SwapRouter', () => {
                   amount: amountOut,
                 },
               ],
+              [],
               TradeType.EXACT_OUTPUT
             )
 
@@ -845,6 +856,7 @@ describe('SwapRouter', () => {
                   amount: amountIn,
                 },
               ],
+              [],
               TradeType.EXACT_INPUT
             )
 
@@ -865,6 +877,7 @@ describe('SwapRouter', () => {
                   amount: amountIn,
                 },
               ],
+              [],
               [],
               TradeType.EXACT_INPUT,
               [
@@ -924,6 +937,7 @@ describe('SwapRouter', () => {
                   amount: amountOut,
                 },
               ],
+              [],
               TradeType.EXACT_OUTPUT
             )
 
@@ -993,6 +1007,7 @@ describe('SwapRouter', () => {
                   amount: amountIn,
                 },
               ],
+              [],
               TradeType.EXACT_INPUT
             )
 
@@ -1016,6 +1031,7 @@ describe('SwapRouter', () => {
                   amount: amountIn,
                 },
               ],
+              [],
               TradeType.EXACT_INPUT,
               [
                 {
@@ -1074,6 +1090,7 @@ describe('SwapRouter', () => {
                   amount: amountOut,
                 },
               ],
+              [],
               TradeType.EXACT_OUTPUT
             )
 

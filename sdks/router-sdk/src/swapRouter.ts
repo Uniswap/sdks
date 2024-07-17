@@ -249,8 +249,8 @@ export abstract class SwapRouter {
         /// We don't use encodeV3Swap() or encodeV2Swap() because casting the trade to a V3Trade or V2Trade is overcomplex
         if (mixedRouteIsAllV3(route)) {
           const exactInputSingleParams = {
-            tokenIn: route.path[0].address,
-            tokenOut: route.path[1].address,
+            tokenIn: route.path[0].wrapped.address,
+            tokenOut: route.path[1].wrapped.address,
             fee: (route.pools as Pool[])[0].fee,
             recipient,
             amountIn,

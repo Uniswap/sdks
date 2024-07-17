@@ -463,7 +463,6 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
 
       let amountOut: CurrencyAmount<Currency>
       try {
-        // ;[amountOut] = await pool.getOutputAmount(amountIn)
         ;[amountOut] = pool instanceof V4Pool ? await pool.getOutputAmount(amountInAdjusted) : await pool.getOutputAmount(amountInAdjusted.wrapped)
       } catch (error) {
         // input too low
