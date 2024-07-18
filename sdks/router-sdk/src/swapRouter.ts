@@ -260,7 +260,7 @@ export abstract class SwapRouter {
 
           calldatas.push(SwapRouter.INTERFACE.encodeFunctionData('exactInputSingle', [exactInputSingleParams]))
         } else {
-          const path = route.path.map((token) => token.address)
+          const path = route.path.map((token) => token.wrapped.address)
 
           const exactInputParams = [amountIn, performAggregatedSlippageCheck ? 0 : amountOut, path, recipient]
 
@@ -308,7 +308,7 @@ export abstract class SwapRouter {
             const exactInputParams = [
               i === 0 ? amountIn : 0, // amountIn
               !isLastSectionInRoute(i) ? 0 : amountOut, // amountOutMin
-              newRoute.path.map((token) => token.address), // path
+              newRoute.path.map((token) => token.wrapped.address), // path TODOEmily: this should only be wrapped sometimes
               isLastSectionInRoute(i) ? recipient : ADDRESS_THIS, // to
             ]
 
