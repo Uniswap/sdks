@@ -40,11 +40,11 @@ export const partitionMixedRouteByProtocol = (route: MixedRouteSDK<Currency, Cur
  * @param firstInputToken
  * @returns the output token of the last pool in the array
  */
-export const getOutputOfPools = (pools: TPool[], firstInputToken: Token): Token => {
+export const getOutputOfPools = (pools: TPool[], firstInputToken: Currency): Currency => {
   const { inputToken: outputToken } = pools.reduce(
-    ({ inputToken }, pool: TPool): { inputToken: Token } => {
-      if (!pool.involvesToken(inputToken)) throw new Error('PATH')
-      const outputToken: Token = pool.token0.equals(inputToken) ? pool.token1 : pool.token0
+    ({ inputToken }, pool: TPool): { inputToken: Currency } => {
+      if (!pool.involvesToken(inputToken as Token)) throw new Error('PATH')
+      const outputToken: Currency = pool.token0.equals(inputToken) ? pool.token1 : pool.token0
       return {
         inputToken: outputToken,
       }
