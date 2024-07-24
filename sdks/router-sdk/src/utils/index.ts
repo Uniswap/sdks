@@ -4,7 +4,7 @@ import { Pool as V3Pool } from '@uniswap/v3-sdk'
 import { Pool as V4Pool } from '@uniswap/v4-sdk'
 import { MixedRouteSDK } from '../entities/mixedRoute/route'
 
-type TPool = (Pair | V3Pool | V4Pool)
+type TPool = Pair | V3Pool | V4Pool
 
 /**
  * Utility function to return each consecutive section of Pools or Pairs in a MixedRoute

@@ -6,7 +6,7 @@ import { Pair } from '@uniswap/v2-sdk'
 import { MixedRouteSDK } from '../entities/mixedRoute/route'
 import { V2_FEE_PATH_PLACEHOLDER } from '../constants'
 
-type TPool = (Pair | V3Pool | V4Pool)
+type TPool = Pair | V3Pool | V4Pool
 /**
  * Converts a route to a hex encoded path
  * @notice only supports exactIn route encodings
@@ -27,7 +27,11 @@ export function encodeMixedRouteToPath(route: MixedRouteSDK<Currency, Currency>)
         return {
           inputToken: outputToken,
           types: ['address', 'uint24', 'address'],
-          path: [inputToken.wrapped.address, pool instanceof V3Pool ? pool.fee : V2_FEE_PATH_PLACEHOLDER, outputToken.wrapped.address],
+          path: [
+            inputToken.wrapped.address,
+            pool instanceof V3Pool ? pool.fee : V2_FEE_PATH_PLACEHOLDER,
+            outputToken.wrapped.address,
+          ],
         }
       } else {
         return {

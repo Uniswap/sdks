@@ -66,7 +66,6 @@ export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
     if (this._midPrice !== null) return this._midPrice
 
     const price = this.pools.slice(1).reduce(
-
       ({ nextInput, price }, pool) => {
         return nextInput.equals(pool.token0)
           ? {

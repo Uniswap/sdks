@@ -206,7 +206,8 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
     amounts[0] = amount.wrapped
     for (let i = 0; i < route.path.length - 1; i++) {
       const pool = route.pools[i]
-      const [outputAmount] = pool instanceof V4Pool ? await pool.getOutputAmount(amounts[i]) : await pool.getOutputAmount(amounts[i].wrapped)
+      const [outputAmount] =
+        pool instanceof V4Pool ? await pool.getOutputAmount(amounts[i]) : await pool.getOutputAmount(amounts[i].wrapped)
       amounts[i + 1] = outputAmount
     }
     inputAmount = CurrencyAmount.fromFractionalAmount(route.input, amount.numerator, amount.denominator)
@@ -258,7 +259,10 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
 
       for (let i = 0; i < route.path.length - 1; i++) {
         const pool = route.pools[i]
-        const [outputAmount] = pool instanceof V4Pool ? await pool.getOutputAmount(amounts[i]) : await pool.getOutputAmount(amounts[i].wrapped)
+        const [outputAmount] =
+          pool instanceof V4Pool
+            ? await pool.getOutputAmount(amounts[i])
+            : await pool.getOutputAmount(amounts[i].wrapped)
         amounts[i + 1] = outputAmount
       }
 
@@ -437,12 +441,12 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
    * @returns The exact in trade
    */
   public static async bestTradeExactIn<TInput extends Currency, TOutput extends Currency>(
-    pools: (TPool)[],
+    pools: TPool[],
     currencyAmountIn: CurrencyAmount<TInput>,
     currencyOut: TOutput,
     { maxNumResults = 3, maxHops = 3 }: BestTradeOptions = {},
     // used in recursion.
-    currentPools: (TPool)[] = [],
+    currentPools: TPool[] = [],
     nextAmountIn: CurrencyAmount<Currency> = currencyAmountIn,
     bestTrades: MixedRouteTrade<TInput, TOutput, TradeType.EXACT_INPUT>[] = []
   ): Promise<MixedRouteTrade<TInput, TOutput, TradeType.EXACT_INPUT>[]> {
@@ -463,7 +467,10 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
 
       let amountOut: CurrencyAmount<Currency>
       try {
-        ;[amountOut] = pool instanceof V4Pool ? await pool.getOutputAmount(amountInAdjusted) : await pool.getOutputAmount(amountInAdjusted.wrapped)
+        ;[amountOut] =
+          pool instanceof V4Pool
+            ? await pool.getOutputAmount(amountInAdjusted)
+            : await pool.getOutputAmount(amountInAdjusted.wrapped)
       } catch (error) {
         // input too low
         // @ts-ignore[2571] error is unknown
