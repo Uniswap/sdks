@@ -207,9 +207,7 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
     for (let i = 0; i < route.path.length - 1; i++) {
       const pool = route.pools[i]
       const [outputAmount] =
-        pool instanceof V4Pool
-          ? await pool.getOutputAmount(amounts[i])
-          : await pool.getOutputAmount(amounts[i].wrapped)
+        pool instanceof V4Pool ? await pool.getOutputAmount(amounts[i]) : await pool.getOutputAmount(amounts[i].wrapped)
       amounts[i + 1] = outputAmount
     }
 
