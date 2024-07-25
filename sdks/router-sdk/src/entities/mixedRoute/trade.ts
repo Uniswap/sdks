@@ -201,15 +201,18 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
     let outputAmount: CurrencyAmount<TOutput>
 
     invariant(tradeType === TradeType.EXACT_INPUT, 'TRADE_TYPE')
-
     invariant(amount.currency.equals(route.input), 'INPUT')
-    amounts[0] = amount.wrapped
+
+    amounts[0] = route.pools[0] instanceof V4Pool ? amount : amount.wrapped
     for (let i = 0; i < route.path.length - 1; i++) {
       const pool = route.pools[i]
       const [outputAmount] =
-        pool instanceof V4Pool ? await pool.getOutputAmount(amounts[i]) : await pool.getOutputAmount(amounts[i].wrapped)
+        pool instanceof V4Pool
+          ? await pool.getOutputAmount(amounts[i])
+          : await pool.getOutputAmount(amounts[i].wrapped)
       amounts[i + 1] = outputAmount
     }
+
     inputAmount = CurrencyAmount.fromFractionalAmount(route.input, amount.numerator, amount.denominator)
     outputAmount = CurrencyAmount.fromFractionalAmount(
       route.output,
@@ -255,7 +258,7 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
 
       invariant(amount.currency.equals(route.input), 'INPUT')
       inputAmount = CurrencyAmount.fromFractionalAmount(route.input, amount.numerator, amount.denominator)
-      amounts[0] = CurrencyAmount.fromFractionalAmount(route.input.wrapped, amount.numerator, amount.denominator)
+      amounts[0] = CurrencyAmount.fromFractionalAmount(route.adjustedInput, amount.numerator, amount.denominator)
 
       for (let i = 0; i < route.path.length - 1; i++) {
         const pool = route.pools[i]
@@ -455,7 +458,6 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
     invariant(currencyAmountIn === nextAmountIn || currentPools.length > 0, 'INVALID_RECURSION')
 
     const amountIn = nextAmountIn
-    const tokenOut = currencyOut.wrapped
     for (let i = 0; i < pools.length; i++) {
       const pool = pools[i]
       const amountInAdjusted = pool instanceof V4Pool ? amountIn : amountIn.wrapped
@@ -480,7 +482,7 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
         throw error
       }
       // we have arrived at the output token, so this is the final trade of one of the paths
-      if (amountOut.currency.isToken && amountOut.currency.equals(tokenOut)) {
+      if (amountOut.currency.wrapped.equals(currencyOut.wrapped)) {
         sortedInsert(
           bestTrades,
           await MixedRouteTrade.fromRoute(

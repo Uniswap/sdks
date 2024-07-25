@@ -17,6 +17,7 @@ export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
   public readonly path: Currency[]
   public readonly input: TInput
   public readonly output: TOutput
+  public readonly adjustedInput: Currency // routes with v2/v3 initial pool must wrap native input currency before trading
 
   private _midPrice: Price<TInput, TOutput> | null = null
 
@@ -33,15 +34,18 @@ export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
     const allOnSameChain = pools.every((pool) => pool.chainId === chainId)
     invariant(allOnSameChain, 'CHAIN_IDS')
 
-    const adjustedInput = (pools[0] instanceof V4Pool ? input : input.wrapped) as Token
-    invariant(pools[0].involvesToken(adjustedInput), 'INPUT')
-
+    if (pools[0] instanceof V4Pool) {
+      this.adjustedInput = pools[0].involvesToken(input) ? input : input.wrapped
+    } else {
+      this.adjustedInput = input.wrapped // no native currencies in v2/v3
+    }
+    invariant(pools[0].involvesToken(this.adjustedInput as Token), 'INPUT')
     invariant(pools[pools.length - 1].involvesToken(output.wrapped), 'OUTPUT')
 
     /**
      * Normalizes token0-token1 order and selects the next token/fee step to add to the path
      * */
-    const tokenPath: Currency[] = [adjustedInput]
+    const tokenPath: Currency[] = [this.adjustedInput]
     for (const [i, pool] of pools.entries()) {
       const currentInputToken = tokenPath[i]
       invariant(currentInputToken.equals(pool.token0) || currentInputToken.equals(pool.token1), 'PATH')
@@ -70,15 +74,15 @@ export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
         return nextInput.equals(pool.token0)
           ? {
               nextInput: pool.token1,
-              price: price.asFraction.multiply(pool.token0Price.asFraction),
+              price: price.multiply(pool.token0Price.asFraction),
             }
           : {
               nextInput: pool.token0,
-              price: price.asFraction.multiply(pool.token1Price.asFraction),
+              price: price.multiply(pool.token1Price.asFraction),
             }
       },
 
-      this.pools[0].token0.equals(this.input.wrapped)
+      this.pools[0].token0.equals(this.adjustedInput)
         ? {
             nextInput: this.pools[0].token1,
             price: this.pools[0].token0Price.asFraction,
