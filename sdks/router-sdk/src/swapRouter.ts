@@ -289,7 +289,7 @@ export abstract class SwapRouter {
           const newRoute = new MixedRoute(newRouteOriginal)
 
           /// Previous output is now input
-          inputToken = outputToken
+          inputToken = outputToken.wrapped
 
           if (mixedRouteIsAllV3(newRoute)) {
             const path: string = encodeMixedRouteToPath(newRoute)
