@@ -27,17 +27,13 @@ export function encodeMixedRouteToPath(route: MixedRouteSDK<Currency, Currency>)
         return {
           inputToken: outputToken,
           types: ['address', 'uint24', 'address'],
-          path: [
-            inputToken.wrapped.address,
-            pool instanceof V3Pool ? pool.fee : V2_FEE_PATH_PLACEHOLDER,
-            outputToken.wrapped.address,
-          ],
+          path: [inputToken.address, pool instanceof Pool ? pool.fee : V2_FEE_PATH_PLACEHOLDER, outputToken.address],
         }
       } else {
         return {
           inputToken: outputToken,
           types: [...types, 'uint24', 'address'],
-          path: [...path, pool instanceof V3Pool ? pool.fee : V2_FEE_PATH_PLACEHOLDER, outputToken.wrapped.address],
+          path: [...path, pool instanceof V3Pool ? pool.fee : V2_FEE_PATH_PLACEHOLDER, outputToken.address],
         }
       }
     },
