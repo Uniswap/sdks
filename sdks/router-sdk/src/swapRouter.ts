@@ -8,12 +8,13 @@ import {
   MethodParameters,
   Payments,
   PermitOptions,
-  Pool,
+  Pool as V3Pool,
   Position,
   SelfPermit,
   toHex,
   Trade as V3Trade,
 } from '@uniswap/v3-sdk'
+import { Pool as V4Pool } from '@uniswap/v4-sdk'
 import invariant from 'tiny-invariant'
 import JSBI from 'jsbi'
 import { ADDRESS_THIS, MSG_SENDER } from './constants'
@@ -228,6 +229,7 @@ export abstract class SwapRouter {
     invariant(trade.tradeType === TradeType.EXACT_INPUT, 'TRADE_TYPE')
 
     for (const { route, inputAmount, outputAmount } of trade.swaps) {
+      if (route.pools.some((pool) => pool instanceof V4Pool)) throw 'Encoding mixed routes with V4 not supported'
       const amountIn: string = toHex(trade.maximumAmountIn(options.slippageTolerance, inputAmount).quotient)
       const amountOut: string = toHex(trade.minimumAmountOut(options.slippageTolerance, outputAmount).quotient)
 
@@ -241,7 +243,7 @@ export abstract class SwapRouter {
         : validateAndParseAddress(options.recipient)
 
       const mixedRouteIsAllV3 = (route: MixedRouteSDK<Currency, Currency>) => {
-        return route.pools.every((pool) => pool instanceof Pool)
+        return route.pools.every((pool) => pool instanceof V3Pool)
       }
 
       if (singleHop) {
@@ -251,7 +253,7 @@ export abstract class SwapRouter {
           const exactInputSingleParams = {
             tokenIn: route.path[0].wrapped.address,
             tokenOut: route.path[1].wrapped.address,
-            fee: (route.pools as Pool[])[0].fee,
+            fee: (route.pools as V3Pool[])[0].fee,
             recipient,
             amountIn,
             amountOutMinimum: performAggregatedSlippageCheck ? 0 : amountOut,
@@ -347,7 +349,7 @@ export abstract class SwapRouter {
             swap.route.protocol === Protocol.V2 ||
             swap.route.protocol === Protocol.MIXED
         ),
-        'UNSUPPORTED_PROTOCOL'
+        'UNSUPPORTED_PROTOCOL (encoding routes with v4 not supported)'
       )
 
       let individualTrades: (
