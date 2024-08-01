@@ -310,7 +310,7 @@ export abstract class SwapRouter {
             const exactInputParams = [
               i === 0 ? amountIn : 0, // amountIn
               !isLastSectionInRoute(i) ? 0 : amountOut, // amountOutMin
-              newRoute.path.map((token) => token.wrapped.address), // path TODOEmily: this should only be wrapped sometimes
+              newRoute.path.map((token) => token.wrapped.address),
               isLastSectionInRoute(i) ? recipient : ADDRESS_THIS, // to
             ]
 

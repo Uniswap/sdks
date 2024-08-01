@@ -119,20 +119,22 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
 
     // pools must be unique inter protocols
     const numPools = this.swaps.map(({ route }) => route.pools.length).reduce((total, cur) => total + cur, 0)
-    const poolAddressSet = new Set<string>()
+    const poolIdentifierSet = new Set<string>()
     for (const { route } of this.swaps) {
       for (const pool of route.pools) {
-        if (pool instanceof V3Pool) {
-          poolAddressSet.add(V3Pool.getAddress(pool.token0, pool.token1, (pool as V3Pool).fee))
+        if (pool instanceof V4Pool) {
+          poolIdentifierSet.add(pool.poolId)
+        } else if (pool instanceof V3Pool) {
+          poolIdentifierSet.add(V3Pool.getAddress(pool.token0, pool.token1, pool.fee))
         } else if (pool instanceof Pair) {
           const pair = pool
-          poolAddressSet.add(Pair.getAddress(pair.token0, pair.token1))
+          poolIdentifierSet.add(Pair.getAddress(pair.token0, pair.token1))
         } else {
           throw new Error('Unexpected pool type in route when constructing trade object')
         }
       }
     }
-    invariant(numPools === poolAddressSet.size, 'POOLS_DUPLICATED')
+    invariant(numPools === poolIdentifierSet.size, 'POOLS_DUPLICATED')
   }
 
   public get inputAmount(): CurrencyAmount<TInput> {

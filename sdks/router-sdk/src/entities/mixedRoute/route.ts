@@ -39,8 +39,14 @@ export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
     } else {
       this.adjustedInput = input.wrapped // no native currencies in v2/v3
     }
+
     invariant(pools[0].involvesToken(this.adjustedInput as Token), 'INPUT')
-    invariant(pools[pools.length - 1].involvesToken(output.wrapped), 'OUTPUT')
+    const lastPool = pools[pools.length - 1]
+    if (lastPool instanceof V4Pool) {
+      invariant(lastPool.involvesToken(output) || lastPool.involvesToken(output.wrapped) , 'OUTPUT')
+    } else {
+      invariant(lastPool.involvesToken(output.wrapped as Token), 'OUTPUT')
+    }
 
     /**
      * Normalizes token0-token1 order and selects the next token/fee step to add to the path

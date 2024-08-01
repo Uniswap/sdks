@@ -5,6 +5,7 @@ import { Pool as V4Pool } from '@uniswap/v4-sdk'
 import invariant from 'tiny-invariant'
 import { ONE, ZERO } from '../../constants'
 import { MixedRouteSDK } from './route'
+import { getOutputAmount } from '../../utils/getOutputAmount'
 
 type TPool = Pair | V3Pool | V4Pool
 
@@ -51,7 +52,7 @@ export function tradeComparator<TInput extends Currency, TOutput extends Currenc
  * Represents a trade executed against a set of routes where some percentage of the input is
  * split across each route.
  *
- * Each route has its own set of pools. V3Pools can not be re-used across routes.
+ * Each route has its own set of pools. Pools can not be re-used across routes.
  *
  * Does not account for slippage, i.e., changes in price environment that can occur between
  * the time the trade is submitted and when it is executed.
@@ -206,8 +207,7 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
     amounts[0] = route.pools[0] instanceof V4Pool ? amount : amount.wrapped
     for (let i = 0; i < route.path.length - 1; i++) {
       const pool = route.pools[i]
-      const [outputAmount] =
-        pool instanceof V4Pool ? await pool.getOutputAmount(amounts[i]) : await pool.getOutputAmount(amounts[i].wrapped)
+      const [outputAmount] = await getOutputAmount(pool, amounts[i])
       amounts[i + 1] = outputAmount
     }
 
@@ -260,10 +260,7 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
 
       for (let i = 0; i < route.path.length - 1; i++) {
         const pool = route.pools[i]
-        const [outputAmount] =
-          pool instanceof V4Pool
-            ? await pool.getOutputAmount(amounts[i])
-            : await pool.getOutputAmount(amounts[i].wrapped)
+        const [outputAmount] = await getOutputAmount(pool, amounts[i])
         amounts[i + 1] = outputAmount
       }
 
@@ -368,12 +365,15 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
     const poolIdentifierSet = new Set<string>()
     for (const { route } of routes) {
       for (const pool of route.pools) {
-        if (pool instanceof Pair) {
-          poolIdentifierSet.add(Pair.getAddress(pool.token0, pool.token1))
+        if (pool instanceof V4Pool) {
+          poolIdentifierSet.add(pool.poolId)
         } else if (pool instanceof V3Pool) {
           poolIdentifierSet.add(V3Pool.getAddress(pool.token0, pool.token1, pool.fee))
-        } else if (pool instanceof V4Pool) {
-          poolIdentifierSet.add(pool.poolId)
+        } else if (pool instanceof Pair) {
+          const pair = pool
+          poolIdentifierSet.add(Pair.getAddress(pair.token0, pair.token1))
+        } else {
+          throw new Error('Unexpected pool type in route when constructing trade object')
         }
       }
     }
