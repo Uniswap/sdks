@@ -1,5 +1,5 @@
 import JSBI from 'jsbi'
-import { BigNumber, ethers } from 'ethers'
+import { ethers } from 'ethers'
 import { MixedRouteTrade, MixedRouteSDK, Trade as RouterTrade } from '@uniswap/router-sdk'
 import { Trade as V2Trade, Pair, Route as RouteV2, computePairAddress } from '@uniswap/v2-sdk'
 import {
@@ -151,6 +151,8 @@ export function buildTrade(
         inputAmount: trade.inputAmount,
         outputAmount: trade.outputAmount,
       })),
+    // TODO: ROUTE-219 - Support v4 trade in universal-router sdk
+    v4Routes: [],
     mixedRoutes: trades
       .filter((trade) => trade instanceof MixedRouteTrade)
       .map((trade) => ({

@@ -1,6 +1,7 @@
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
 import { Trade as V2Trade, Pair } from '@uniswap/v2-sdk'
-import { Trade as V3Trade, Pool, encodeRouteToPath } from '@uniswap/v3-sdk'
+import { Trade as V3Trade, Pool as V3Pool, encodeRouteToPath } from '@uniswap/v3-sdk'
+import { Pool as V4Pool } from '@uniswap/v4-sdk'
 import {
   Trade as RouterTrade,
   MixedRouteTrade,
@@ -41,7 +42,7 @@ export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit'> & {
 const REFUND_ETH_PRICE_IMPACT_THRESHOLD = new Percent(50, 100)
 
 interface Swap<TInput extends Currency, TOutput extends Currency> {
-  route: IRoute<TInput, TOutput, Pair | Pool>
+  route: IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>
   inputAmount: CurrencyAmount<TInput>
   outputAmount: CurrencyAmount<TOutput>
 }
@@ -187,7 +188,7 @@ function addV2Swap<TInput extends Currency, TOutput extends Currency>(
       routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient,
       trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
       trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
-      route.path.map((pool) => pool.address),
+      route.path.map((token) => token.wrapped.address),
       payerIsUser,
     ])
   } else if (tradeType == TradeType.EXACT_OUTPUT) {
@@ -195,7 +196,7 @@ function addV2Swap<TInput extends Currency, TOutput extends Currency>(
       routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient,
       trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
       trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
-      route.path.map((pool) => pool.address),
+      route.path.map((token) => token.wrapped.address),
       payerIsUser,
     ])
   }
@@ -251,7 +252,7 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
 
   // single hop, so it can be reduced to plain v2 or v3 swap logic
   if (route.pools.length === 1) {
-    if (route.pools[0] instanceof Pool) {
+    if (route.pools[0] instanceof V3Pool) {
       return addV3Swap(planner, swap, tradeType, options, payerIsUser, routerMustCustody)
     } else if (route.pools[0] instanceof Pair) {
       return addV2Swap(planner, swap, tradeType, options, payerIsUser, routerMustCustody)
@@ -293,10 +294,10 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
     const newRoute = new MixedRoute(newRouteOriginal)
 
     /// Previous output is now input
-    inputToken = outputToken
+    inputToken = outputToken.wrapped
 
     const mixedRouteIsAllV3 = (route: MixedRouteSDK<Currency, Currency>) => {
-      return route.pools.every((pool) => pool instanceof Pool)
+      return route.pools.every((pool) => pool instanceof V3Pool)
     }
 
     if (mixedRouteIsAllV3(newRoute)) {
@@ -316,7 +317,7 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
         isLastSectionInRoute(i) ? tradeRecipient : ROUTER_AS_RECIPIENT, // recipient
         i === 0 ? amountIn : CONTRACT_BALANCE, // amountIn
         !isLastSectionInRoute(i) ? 0 : amountOut, // amountOutMin
-        newRoute.path.map((pool) => pool.address), // path
+        newRoute.path.map((token) => token.wrapped.address), // path
         payerIsUser && i === 0,
       ])
     }
