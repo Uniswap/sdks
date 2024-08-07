@@ -341,9 +341,10 @@ export class UnsignedPriorityOrder implements OffChainOrder {
     const abiCoder = new ethers.utils.AbiCoder();
 
     return ethers.utils.solidityKeccak256(
-      ["bytes32", "bytes"],
+      ["bytes32", "uint256", "bytes"],
       [
         this.hash(),
+        this.chainId,
         abiCoder.encode(
           [PRIORITY_COSIGNER_DATA_TUPLE_ABI],
           [[cosignerData.auctionTargetBlock]]
