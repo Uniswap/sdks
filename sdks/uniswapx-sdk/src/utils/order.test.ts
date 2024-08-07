@@ -2,14 +2,17 @@ import { BigNumber, constants } from "ethers";
 
 import {
   DutchOrderBuilder,
+  PriorityOrderBuilder,
   RelayOrderBuilder,
   V2DutchOrderBuilder,
 } from "../builder";
 import { OrderType } from "../constants";
 import {
+  CosignedPriorityOrder,
   CosignedV2DutchOrder,
   DutchOrder,
   RelayOrder,
+  UnsignedPriorityOrder,
   UnsignedV2DutchOrder,
 } from "../order";
 
@@ -20,15 +23,19 @@ describe("order utils", () => {
   let dutchOrderExactOut: DutchOrder;
   let cosignedV2DutchOrder: CosignedV2DutchOrder;
   let unsignedV2DutchOrder: UnsignedV2DutchOrder;
+  let unsignedPriorityOrder: UnsignedPriorityOrder;
+  let cosignedPriorityOrder: CosignedPriorityOrder;
   let limitOrder: DutchOrder;
   let relayOrder: RelayOrder;
   let chainId: number;
+  let priorityChainId: number;
 
   const uniswapXOrderParser = new UniswapXOrderParser();
   const relayOrderParser = new RelayOrderParser();
 
   beforeAll(() => {
     chainId = 1;
+    priorityChainId = 8453;
     const dutchBuilder = new DutchOrderBuilder(chainId);
     const deadline = Math.floor(Date.now() / 1000) + 1000;
     const input = {
@@ -127,6 +134,36 @@ describe("order utils", () => {
     unsignedV2DutchOrder = v2Builder.buildPartial();
 
     cosignedV2DutchOrder = v2Builder
+      .cosignature(
+        "0x65c6470fea0e1ca7d204b6904d0c1b0b640d7e6dcd4be3065497756e163c0399288c3eea0fba9b31ed00f34ccffe389ec3027bcd764df9fa853eeae8f68c9beb1b"
+      )
+      .build();
+
+    const priorityBuilder = new PriorityOrderBuilder(priorityChainId)
+      .cosigner("0xe463635f6e73C1E595554C3ae216472D0fb929a9")
+      .deadline(deadline)
+      .swapper(constants.AddressZero)
+      .nonce(BigNumber.from(100))
+      .auctionStartBlock(BigNumber.from(123))
+      .baselinePriorityFeeWei(BigNumber.from(0))
+      .input({
+        token: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        amount: BigNumber.from("1000000"),
+        mpsPerPriorityFeeWei: BigNumber.from(0),
+      })
+      .output({
+        token: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        amount: BigNumber.from("1000000000000000000"),
+        mpsPerPriorityFeeWei: BigNumber.from(1),
+        recipient: "0x0000000000000000000000000000000000000000",
+      });
+
+    unsignedPriorityOrder = priorityBuilder.buildPartial();
+
+    cosignedPriorityOrder = priorityBuilder
+      .cosignerData({
+        auctionTargetBlock: BigNumber.from(123),
+      })
       .cosignature(
         "0x65c6470fea0e1ca7d204b6904d0c1b0b640d7e6dcd4be3065497756e163c0399288c3eea0fba9b31ed00f34ccffe389ec3027bcd764df9fa853eeae8f68c9beb1b"
       )
@@ -243,6 +280,20 @@ describe("order utils", () => {
         uniswapXOrderParser.parseOrder(encodedOrder, chainId)
       ).toMatchObject(unsignedV2DutchOrder);
     });
+
+    it("parses CosignedPriorityOrder", () => {
+      const encodedOrder = cosignedPriorityOrder.serialize();
+      expect(uniswapXOrderParser.parseOrder(encodedOrder, priorityChainId)).toEqual(
+        cosignedPriorityOrder
+      );
+    });
+
+    it("parses UnsignedPriorityOrder", () => {
+      const encodedOrder = unsignedPriorityOrder.serialize();
+      expect(
+        uniswapXOrderParser.parseOrder(encodedOrder, priorityChainId)
+      ).toMatchObject(unsignedPriorityOrder);
+    });
   });
 
   describe("getOrderType", () => {
@@ -274,6 +325,16 @@ describe("order utils", () => {
     it("parses UnsignedV2DutchOrder type", () => {
       expect(uniswapXOrderParser.getOrderType(unsignedV2DutchOrder)).toEqual(
         OrderType.Dutch_V2
+      );
+    });
+    it("parses CosignedPriorityOrder type", () => {
+      expect(uniswapXOrderParser.getOrderType(cosignedPriorityOrder)).toEqual(
+        OrderType.Priority
+      );
+    });
+    it("parses UnsignedPriorityOrder type", () => {
+      expect(uniswapXOrderParser.getOrderType(unsignedPriorityOrder)).toEqual(
+        OrderType.Priority
       );
     });
   });
@@ -326,6 +387,22 @@ describe("order utils", () => {
           chainId
         )
       ).toEqual(OrderType.Dutch_V2);
+    });
+    it("parses UnsignedPriorityOrder type", () => {
+      expect(
+        uniswapXOrderParser.getOrderTypeFromEncoded(
+          unsignedPriorityOrder.serialize(),
+          priorityChainId
+        )
+      ).toEqual(OrderType.Priority);
+    });
+    it("parses CosignedPriorityOrder type", () => {
+      expect(
+        uniswapXOrderParser.getOrderTypeFromEncoded(
+          cosignedPriorityOrder.serialize(),
+          priorityChainId
+        )
+      ).toEqual(OrderType.Priority);
     });
   });
 });
