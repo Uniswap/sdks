@@ -1,10 +1,11 @@
 import invariant from 'tiny-invariant'
 
 import { Currency, Price, Token } from '@uniswap/sdk-core'
-import { Pool } from '@uniswap/v3-sdk'
 import { Pair } from '@uniswap/v2-sdk'
+import { Pool as V3Pool } from '@uniswap/v3-sdk'
+import { Pool as V4Pool } from '@uniswap/v4-sdk'
 
-type TPool = Pair | Pool
+type TPool = Pair | V3Pool | V4Pool
 
 /**
  * Represents a list of pools or pairs through which a swap can occur
@@ -13,9 +14,10 @@ type TPool = Pair | Pool
  */
 export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
   public readonly pools: TPool[]
-  public readonly path: Token[]
+  public readonly path: Currency[]
   public readonly input: TInput
   public readonly output: TOutput
+  public readonly adjustedInput: Currency // routes with v2/v3 initial pool must wrap native input currency before trading
 
   private _midPrice: Price<TInput, TOutput> | null = null
 
@@ -32,15 +34,24 @@ export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
     const allOnSameChain = pools.every((pool) => pool.chainId === chainId)
     invariant(allOnSameChain, 'CHAIN_IDS')
 
-    const wrappedInput = input.wrapped
-    invariant(pools[0].involvesToken(wrappedInput), 'INPUT')
+    if (pools[0] instanceof V4Pool) {
+      this.adjustedInput = pools[0].involvesToken(input) ? input : input.wrapped
+    } else {
+      this.adjustedInput = input.wrapped // no native currencies in v2/v3
+    }
 
-    invariant(pools[pools.length - 1].involvesToken(output.wrapped), 'OUTPUT')
+    invariant(pools[0].involvesToken(this.adjustedInput as Token), 'INPUT')
+    const lastPool = pools[pools.length - 1]
+    if (lastPool instanceof V4Pool) {
+      invariant(lastPool.involvesToken(output) || lastPool.involvesToken(output.wrapped), 'OUTPUT')
+    } else {
+      invariant(lastPool.involvesToken(output.wrapped as Token), 'OUTPUT')
+    }
 
     /**
      * Normalizes token0-token1 order and selects the next token/fee step to add to the path
      * */
-    const tokenPath: Token[] = [wrappedInput]
+    const tokenPath: Currency[] = [this.adjustedInput]
     for (const [i, pool] of pools.entries()) {
       const currentInputToken = tokenPath[i]
       invariant(currentInputToken.equals(pool.token0) || currentInputToken.equals(pool.token1), 'PATH')
@@ -69,21 +80,22 @@ export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
         return nextInput.equals(pool.token0)
           ? {
               nextInput: pool.token1,
-              price: price.multiply(pool.token0Price),
+              price: price.multiply(pool.token0Price.asFraction),
             }
           : {
               nextInput: pool.token0,
-              price: price.multiply(pool.token1Price),
+              price: price.multiply(pool.token1Price.asFraction),
             }
       },
-      this.pools[0].token0.equals(this.input.wrapped)
+
+      this.pools[0].token0.equals(this.adjustedInput)
         ? {
             nextInput: this.pools[0].token1,
-            price: this.pools[0].token0Price,
+            price: this.pools[0].token0Price.asFraction,
           }
         : {
             nextInput: this.pools[0].token0,
-            price: this.pools[0].token1Price,
+            price: this.pools[0].token1Price.asFraction,
           }
     ).price
 

@@ -1,14 +1,15 @@
 import { Currency, CurrencyAmount, Fraction, Percent, Price, TradeType } from '@uniswap/sdk-core'
 import { Pair, Route as V2RouteSDK, Trade as V2TradeSDK } from '@uniswap/v2-sdk'
-import { Pool, Route as V3RouteSDK, Trade as V3TradeSDK } from '@uniswap/v3-sdk'
+import { Pool as V3Pool, Route as V3RouteSDK, Trade as V3TradeSDK } from '@uniswap/v3-sdk'
+import { Pool as V4Pool, Route as V4RouteSDK, Trade as V4TradeSDK } from '@uniswap/v4-sdk'
 import invariant from 'tiny-invariant'
 import { ONE, ONE_HUNDRED_PERCENT, ZERO, ZERO_PERCENT } from '../constants'
 import { MixedRouteSDK } from './mixedRoute/route'
 import { MixedRouteTrade as MixedRouteTradeSDK } from './mixedRoute/trade'
-import { IRoute, MixedRoute, RouteV2, RouteV3 } from './route'
+import { IRoute, MixedRoute, RouteV2, RouteV3, RouteV4 } from './route'
 
 export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType extends TradeType> {
-  public readonly routes: IRoute<TInput, TOutput, Pair | Pool>[]
+  public readonly routes: IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>[]
   public readonly tradeType: TTradeType
   private _outputAmount: CurrencyAmount<TOutput> | undefined
   private _inputAmount: CurrencyAmount<TInput> | undefined
@@ -18,7 +19,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
    * make up the trade. May consist of swaps in v2 or v3.
    */
   public readonly swaps: {
-    route: IRoute<TInput, TOutput, Pair | Pool>
+    route: IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>
     inputAmount: CurrencyAmount<TInput>
     outputAmount: CurrencyAmount<TOutput>
   }[]
@@ -27,6 +28,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
   public constructor({
     v2Routes,
     v3Routes,
+    v4Routes,
     tradeType,
     mixedRoutes,
   }: {
@@ -37,6 +39,11 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     }[]
     v3Routes: {
       routev3: V3RouteSDK<TInput, TOutput>
+      inputAmount: CurrencyAmount<TInput>
+      outputAmount: CurrencyAmount<TOutput>
+    }[]
+    v4Routes: {
+      routev4: V4RouteSDK<TInput, TOutput>
       inputAmount: CurrencyAmount<TInput>
       outputAmount: CurrencyAmount<TOutput>
     }[]
@@ -62,6 +69,16 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     // wrap v3 routes
     for (const { routev3, inputAmount, outputAmount } of v3Routes) {
       const route = new RouteV3(routev3)
+      this.routes.push(route)
+      this.swaps.push({
+        route,
+        inputAmount,
+        outputAmount,
+      })
+    }
+    // wrap v4 routes
+    for (const { routev4, inputAmount, outputAmount } of v4Routes) {
+      const route = new RouteV4(routev4)
       this.routes.push(route)
       this.swaps.push({
         route,
@@ -102,20 +119,22 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
 
     // pools must be unique inter protocols
     const numPools = this.swaps.map(({ route }) => route.pools.length).reduce((total, cur) => total + cur, 0)
-    const poolAddressSet = new Set<string>()
+    const poolIdentifierSet = new Set<string>()
     for (const { route } of this.swaps) {
       for (const pool of route.pools) {
-        if (pool instanceof Pool) {
-          poolAddressSet.add(Pool.getAddress(pool.token0, pool.token1, (pool as Pool).fee))
+        if (pool instanceof V4Pool) {
+          poolIdentifierSet.add(pool.poolId)
+        } else if (pool instanceof V3Pool) {
+          poolIdentifierSet.add(V3Pool.getAddress(pool.token0, pool.token1, pool.fee))
         } else if (pool instanceof Pair) {
           const pair = pool
-          poolAddressSet.add(Pair.getAddress(pair.token0, pair.token1))
+          poolIdentifierSet.add(Pair.getAddress(pair.token0, pair.token1))
         } else {
           throw new Error('Unexpected pool type in route when constructing trade object')
         }
       }
     }
-    invariant(numPools === poolAddressSet.size, 'POOLS_DUPLICATED')
+    invariant(numPools === poolIdentifierSet.size, 'POOLS_DUPLICATED')
   }
 
   public get inputAmount(): CurrencyAmount<TInput> {
@@ -276,6 +295,10 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       routev3: V3RouteSDK<TInput, TOutput>
       amount: TTradeType extends TradeType.EXACT_INPUT ? CurrencyAmount<TInput> : CurrencyAmount<TOutput>
     }[],
+    v4Routes: {
+      routev4: V4RouteSDK<TInput, TOutput>
+      amount: TTradeType extends TradeType.EXACT_INPUT ? CurrencyAmount<TInput> : CurrencyAmount<TOutput>
+    }[],
     tradeType: TTradeType,
     mixedRoutes?: {
       mixedRoute: MixedRouteSDK<TInput, TOutput>
@@ -290,6 +313,12 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
 
     const populatedV3Routes: {
       routev3: V3RouteSDK<TInput, TOutput>
+      inputAmount: CurrencyAmount<TInput>
+      outputAmount: CurrencyAmount<TOutput>
+    }[] = []
+
+    const populatedV4Routes: {
+      routev4: V4RouteSDK<TInput, TOutput>
       inputAmount: CurrencyAmount<TInput>
       outputAmount: CurrencyAmount<TOutput>
     }[] = []
@@ -322,6 +351,17 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       })
     }
 
+    for (const { routev4, amount } of v4Routes) {
+      const v4Trade = await V4TradeSDK.fromRoute(routev4, amount, tradeType)
+      const { inputAmount, outputAmount } = v4Trade
+
+      populatedV4Routes.push({
+        routev4,
+        inputAmount,
+        outputAmount,
+      })
+    }
+
     if (mixedRoutes) {
       for (const { mixedRoute, amount } of mixedRoutes) {
         const mixedRouteTrade = await MixedRouteTradeSDK.fromRoute(mixedRoute, amount, tradeType)
@@ -338,6 +378,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     return new Trade({
       v2Routes: populatedV2Routes,
       v3Routes: populatedV3Routes,
+      v4Routes: populatedV4Routes,
       mixedRoutes: populatedMixedRoutes,
       tradeType,
     })
@@ -360,6 +401,12 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       outputAmount: CurrencyAmount<TOutput>
     }[] = []
 
+    let v4Routes: {
+      routev4: V4RouteSDK<TInput, TOutput>
+      inputAmount: CurrencyAmount<TInput>
+      outputAmount: CurrencyAmount<TOutput>
+    }[] = []
+
     let mixedRoutes: {
       mixedRoute: MixedRouteSDK<TInput, TOutput>
       inputAmount: CurrencyAmount<TInput>
@@ -374,6 +421,10 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       const v3Trade = await V3TradeSDK.fromRoute(route, amount, tradeType)
       const { inputAmount, outputAmount } = v3Trade
       v3Routes = [{ routev3: route, inputAmount, outputAmount }]
+    } else if (route instanceof V4RouteSDK) {
+      const v4Trade = await V4TradeSDK.fromRoute(route, amount, tradeType)
+      const { inputAmount, outputAmount } = v4Trade
+      v4Routes = [{ routev4: route, inputAmount, outputAmount }]
     } else if (route instanceof MixedRouteSDK) {
       const mixedRouteTrade = await MixedRouteTradeSDK.fromRoute(route, amount, tradeType)
       const { inputAmount, outputAmount } = mixedRouteTrade
@@ -385,6 +436,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     return new Trade({
       v2Routes,
       v3Routes,
+      v4Routes,
       mixedRoutes,
       tradeType,
     })
