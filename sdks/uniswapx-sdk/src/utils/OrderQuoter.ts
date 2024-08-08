@@ -1,4 +1,4 @@
-import { JsonRpcProvider } from "@ethersproject/providers";
+import { BaseProvider } from "@ethersproject/providers";
 import { ethers } from "ethers";
 
 import {
@@ -171,7 +171,7 @@ export class UniswapXOrderQuoter
   protected quoter: OrderQuoterContract;
 
   constructor(
-    protected provider: JsonRpcProvider,
+    protected provider: BaseProvider,
     protected chainId: number,
     orderQuoterAddress?: string
   ) {
@@ -298,7 +298,7 @@ export class RelayOrderQuoter
   private quoteFunctionSelector = "0x3f62192e"; // function execute((bytes, bytes))
 
   constructor(
-    protected provider: JsonRpcProvider,
+    protected provider: BaseProvider,
     protected chainId: number,
     reactorAddress?: string
   ) {
