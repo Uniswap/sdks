@@ -110,7 +110,7 @@ const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
   // PriorityOrderReactor:InputOutputScaling()
   a6b844f5: OrderValidation.InvalidOrderFields,
   // PriorityOrderReactor:InvalidGasPrice()
-  f3eb44e5: OrderValidation.InvalidGasPrice
+  f3eb44e5: OrderValidation.InvalidGasPrice,
 };
 
 export interface SignedUniswapXOrder {
