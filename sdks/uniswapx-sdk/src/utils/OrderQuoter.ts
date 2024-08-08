@@ -38,6 +38,8 @@ export enum OrderValidation {
   UnknownError,
   ValidationFailed,
   ExclusivityPeriod,
+  OrderNotFillable,
+  InvalidGasPrice,
   InvalidCosignature,
   OK,
 }
@@ -101,6 +103,14 @@ const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
   d856fc5a: OrderValidation.InvalidOrderFields,
   // Signature expired
   cd21db4f: OrderValidation.Expired,
+  // PriorityOrderReactor:InvalidDeadline() 
+  "769d11e4": OrderValidation.Expired,
+  // PriorityOrderReactor:OrderNotFillable()
+  c6035520: OrderValidation.OrderNotFillable,
+  // PriorityOrderReactor:InputOutputScaling()
+  a6b844f5: OrderValidation.InvalidOrderFields,
+  // PriorityOrderReactor:InvalidGasPrice()
+  f3eb44e5: OrderValidation.InvalidGasPrice,
 };
 
 export interface SignedUniswapXOrder {
