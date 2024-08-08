@@ -194,7 +194,10 @@ export class UniswapXOrderQuoter
   async quoteBatch(
     orders: SignedUniswapXOrder[]
   ): Promise<UniswapXOrderQuote[]> {
-    const results = await this.getMulticallResults("quote", orders);
+    const results = await this.getMulticallResults(
+      "quote",
+      orders
+    );
     const validations = await this.getValidations(orders, results);
 
     const quotes: (ResolvedUniswapXOrder | undefined)[] = results.map(

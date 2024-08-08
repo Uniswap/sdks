@@ -94,18 +94,20 @@ export async function multicallSameFunctionManyContracts<
 export async function multicall(
   provider: JsonRpcProvider,
   calls: Call[],
-  stateOverrides?: {},
-  blockOverrides?: Partial<{
+  stateOverrides: {} = {},
+  blockOverrides: Partial<{
     number: number;
     time: number;
-  }>
+  }> = {}
 ): Promise<MulticallResult[]> {
   const chainId = (await provider.getNetwork()).chainId
   const code = await provider.getCode(multicallAddressOn(chainId));
+  let response;
   if (code.length > 2) {
     const multicall = Multicall2__factory.connect(multicallAddressOn(chainId), provider);
-    return await provider.send("call", [
+    response =  await provider.send("eth_call", [
       {
+        from: ethers.constants.AddressZero,
         to: multicall.address,
         data: multicall.interface.encodeFunctionData("tryAggregate", [false, calls]),
       },
@@ -118,8 +120,9 @@ export async function multicall(
     const args = deploylessInterface.encodeDeploy([false, calls]);
     const data = hexConcat([DEPLOYLESS_MULTICALL_BYTECODE, args]);
 
-    const response = await provider.send("call", [
+    response = await provider.send("eth_call", [
       {
+        from: ethers.constants.AddressZero,
         to: ethers.constants.AddressZero,
         data
       },
@@ -127,8 +130,8 @@ export async function multicall(
       stateOverrides,
       blockOverrides
     ]);
-    const multicallInterface = new Interface(multicall2Abi);
+  }
+  const multicallInterface = new Interface(multicall2Abi);
     return multicallInterface.decodeFunctionResult("tryAggregate", response)
       .returnData;
-  }
 }
