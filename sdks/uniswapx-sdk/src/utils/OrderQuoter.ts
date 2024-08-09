@@ -4,6 +4,7 @@ import { ethers } from "ethers";
 import {
   OrderType,
   PERMIT2_MAPPING,
+  PRIORITY_ORDER_REACTOR_QUOTER_BYTECODE,
   REACTOR_ADDRESS_MAPPING,
   UNISWAPX_ORDER_QUOTER_MAPPING,
 } from "../constants";
@@ -28,6 +29,7 @@ import {
   MulticallResult,
   multicallSameContractManyFunctions,
 } from "./multicall";
+// import { UniswapXOrderParser } from "./order";
 
 export enum OrderValidation {
   Expired,
@@ -110,7 +112,7 @@ const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
   // PriorityOrderReactor:InputOutputScaling()
   a6b844f5: OrderValidation.InvalidOrderFields,
   // PriorityOrderReactor:InvalidGasPrice()
-  f3eb44e5: OrderValidation.InvalidGasPrice
+  f3eb44e5: OrderValidation.InvalidGasPrice,
 };
 
 export interface SignedUniswapXOrder {
@@ -278,12 +280,27 @@ export class UniswapXOrderQuoter
       return [order.order.serialize(), order.signature];
     });
 
+    // const orderParser = new UniswapXOrderParser();
+    // const priorityOrders = orders.filter((o) => orderParser.getOrderTypeFromEncoded(o.order.serialize(), o.order.chainId) === OrderType.Priority);
+    const priorityOrders = orders;
+
+    let stateOverrides = undefined;
+    // for every order of type priority, we need to override the reactor's code with the priority order quoter bytecode
+    if(priorityOrders.length > 0) {
+      stateOverrides = priorityOrders.reduce((acc: {[key: string]: { code?: string, state?: any}}, order) => {
+          acc[order.order.info.reactor] = {
+            code: PRIORITY_ORDER_REACTOR_QUOTER_BYTECODE
+          };
+          return acc;
+      }, {});
+    }
+
     return await multicallSameContractManyFunctions(this.provider, {
       address: this.quoter.address,
       contractInterface: this.quoter.interface,
       functionName: functionName,
       functionParams: calls,
-    });
+    }, stateOverrides);
   }
 
   get orderQuoterAddress(): string {
