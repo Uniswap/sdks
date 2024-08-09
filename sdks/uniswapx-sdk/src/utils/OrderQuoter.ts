@@ -289,7 +289,7 @@ export class UniswapXOrderQuoter
     if(priorityOrders.length > 0) {
       stateOverrides = priorityOrders.reduce((acc: {[key: string]: { code?: string, state?: any}}, order) => {
           acc[order.order.info.reactor] = {
-            code: PRIORITY_ORDER_REACTOR_QUOTER_BYTECODE
+            code: PRIORITY_ORDER_REACTOR_QUOTER_BYTECODE,
           };
           return acc;
       }, {});

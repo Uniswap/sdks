@@ -48,7 +48,10 @@ export async function multicallSameContractManyFunctions<
 >(
   provider: JsonRpcProvider,
   params: MulticallSameContractParams<TFunctionParams>,
-  stateOverrrides?: {}
+  stateOverrrides?: {
+    code?: string;
+    state?: any
+  }
 ): Promise<MulticallResult[]> {
   const { address, contractInterface, functionName, functionParams } = params;
 
@@ -74,7 +77,10 @@ export async function multicallSameFunctionManyContracts<
 >(
   provider: JsonRpcProvider,
   params: MulticallSameFunctionParams<TFunctionParams>,
-  stateOverrrides?: {}
+  stateOverrrides?: {
+    code?: string;
+    state?: any
+  }
 ): Promise<MulticallResult[]> {
   const { addresses, contractInterface, functionName, functionParam } = params;
 
@@ -96,7 +102,10 @@ export async function multicallSameFunctionManyContracts<
 export async function multicall(
   provider: JsonRpcProvider,
   calls: Call[],
-  stateOverrides?: {},
+  stateOverrides?: {
+    code?: string;
+    state?: any
+  }
 ): Promise<MulticallResult[]> {
   const chainId = (await provider.getNetwork()).chainId
   const code = await provider.getCode(multicallAddressOn(chainId));
@@ -110,7 +119,7 @@ export async function multicall(
         data: multicall.interface.encodeFunctionData("tryAggregate", [false, calls]),
       },
       'latest',
-      stateOverrides
+      stateOverrides,
     ])
   } else {
     const deploylessInterface = new Interface(deploylessMulticall2Abi);
@@ -124,7 +133,7 @@ export async function multicall(
         data,
       },
       'latest',
-      stateOverrides
+      stateOverrides,
     ]);
   }
   const multicallInterface = new Interface(multicall2Abi);
