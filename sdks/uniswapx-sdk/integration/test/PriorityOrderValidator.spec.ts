@@ -14,13 +14,10 @@ import {
 } from "../../src/contracts";
 import {
   PriorityOrderBuilder,
-  UnsignedPriorityOrder,
-  CosignedPriorityOrder,
   OrderValidator,
   UniswapXOrderQuoter as OrderQuoterLib,
   OrderValidation,
   getCancelSingleParams,
-  PERMIT2_MAPPING,
   PriorityCosignerData,
 } from "../../dist/src";
 import { deployAndReturnPermit2 } from "./utils/permit2";
