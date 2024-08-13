@@ -1,4 +1,4 @@
-import { SignatureLike } from "@ethersproject/bytes";
+import { hexStripZeros, SignatureLike } from "@ethersproject/bytes";
 import {
   PermitTransferFrom,
   PermitTransferFromData,
@@ -11,6 +11,7 @@ import { MPS } from "../constants";
 import { getPermit2, ResolvedUniswapXOrder } from "../utils";
 
 import {
+  BlockOverrides,
   OffChainOrder,
   OrderInfo,
   PriorityInput,
@@ -204,6 +205,16 @@ export class UnsignedPriorityOrder implements OffChainOrder {
       })),
     };
   }
+
+  /**
+   * @inheritdoc Order
+   */
+  get blockOverrides(): BlockOverrides {
+      return {
+        number: hexStripZeros(this.info.auctionStartBlock.toHexString()),
+      };
+  }
+  
 
   /**
    * @inheritdoc order
@@ -466,6 +477,15 @@ export class CosignedPriorityOrder extends UnsignedPriorityOrder {
         amount: scaleInput(this.info.input, options.priorityFee),
       },
       outputs: scaleOutputs(this.info.outputs, options.priorityFee),
+    };
+  }
+
+  /**
+   * @inheritdoc Order
+   */
+  get blockOverrides(): BlockOverrides {
+    return {
+      number: hexStripZeros(this.info.cosignerData.auctionTargetBlock.toHexString()),
     };
   }
 

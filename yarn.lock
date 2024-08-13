@@ -17883,6 +17883,7 @@ __metadata:
     "@types/node": ^18.7.16
     "@uniswap/sdk-core": ^5.0.0
     chai: ^4.3.6
+    dotenv: ^16.0.3
     ethers: ^5.7.0
     hardhat: ^2.14.0
     husky: ^8.0.3
