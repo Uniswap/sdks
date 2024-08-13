@@ -5,9 +5,12 @@ import {
 } from "@uniswap/permit2-sdk";
 import { BigNumber } from "ethers";
 
+export type BlockOverrides = { number?: number } | undefined;
+
 // General interface implemented by off chain orders
 export interface OffChainOrder {
   chainId: number;
+
   /**
    * Returns the abi encoded order
    * @return The abi encoded serialized order which can be submitted on-chain
@@ -29,6 +32,12 @@ export interface OffChainOrder {
    * @return The order hash which is used as a key on-chain
    */
   hash(): string;
+
+  /**
+   * Returns any block overrides to be applied when quoting the order on chain
+   * @return The block overrides
+   */
+  blockOverrides(): BlockOverrides
 }
 
 export type TokenAmount = {

@@ -12,6 +12,7 @@ import { ResolvedUniswapXOrder } from "../utils/OrderQuoter";
 import { getDecayedAmount } from "../utils/dutchDecay";
 
 import {
+  BlockOverrides,
   DutchInput,
   DutchInputJSON,
   DutchOutput,
@@ -193,6 +194,13 @@ export class UnsignedV2DutchOrder implements OffChainOrder {
       })),
       cosigner: this.info.cosigner,
     };
+  }
+
+  /**
+   * @inheritdoc order
+   */
+  blockOverrides(): BlockOverrides {
+      return undefined
   }
 
   /**

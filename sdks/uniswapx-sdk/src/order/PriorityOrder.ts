@@ -206,6 +206,16 @@ export class UnsignedPriorityOrder implements OffChainOrder {
   }
 
   /**
+   * @inheritdoc Order
+   */
+  blockOverrides(): { number: number } {
+      return {
+        number: this.info.auctionStartBlock.toNumber(),
+      };
+  }
+  
+
+  /**
    * @inheritdoc order
    */
   serialize(): string {
@@ -466,6 +476,15 @@ export class CosignedPriorityOrder extends UnsignedPriorityOrder {
         amount: scaleInput(this.info.input, options.priorityFee),
       },
       outputs: scaleOutputs(this.info.outputs, options.priorityFee),
+    };
+  }
+
+  /**
+   * @inheritdoc Order
+   */
+  blockOverrides(): { number: number } {
+    return {
+      number: this.info.cosignerData.auctionTargetBlock.toNumber(),
     };
   }
 

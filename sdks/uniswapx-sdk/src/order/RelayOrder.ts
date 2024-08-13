@@ -12,7 +12,7 @@ import { MissingConfiguration } from "../errors";
 import { ResolvedRelayOrder } from "../utils/OrderQuoter";
 import { getDecayedAmount } from "../utils/dutchDecay";
 
-import { OffChainOrder, OrderInfo, OrderResolutionOptions } from "./types";
+import { BlockOverrides, OffChainOrder, OrderInfo, OrderResolutionOptions } from "./types";
 
 export type RelayInput = {
   readonly token: string;
@@ -208,6 +208,13 @@ export class RelayOrder implements OffChainOrder {
         endTime: this.info.fee.endTime,
       },
     };
+  }
+
+  /**
+   * @inheritdoc order
+   */
+  blockOverrides(): BlockOverrides {
+    return undefined
   }
 
   serialize(): string {

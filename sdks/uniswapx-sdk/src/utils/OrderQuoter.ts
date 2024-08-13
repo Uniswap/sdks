@@ -4,7 +4,6 @@ import { ethers } from "ethers";
 import {
   OrderType,
   PERMIT2_MAPPING,
-  PRIORITY_ORDER_REACTOR_QUOTER_BYTECODE,
   REACTOR_ADDRESS_MAPPING,
   UNISWAPX_ORDER_QUOTER_MAPPING,
 } from "../constants";
@@ -16,6 +15,7 @@ import {
 } from "../contracts";
 import { MissingConfiguration } from "../errors";
 import {
+  BlockOverrides,
   Order,
   RelayOrder,
   ResolvedRelayFee,
@@ -280,27 +280,23 @@ export class UniswapXOrderQuoter
       return [order.order.serialize(), order.signature];
     });
 
-    // const orderParser = new UniswapXOrderParser();
-    // const priorityOrders = orders.filter((o) => orderParser.getOrderTypeFromEncoded(o.order.serialize(), o.order.chainId) === OrderType.Priority);
-    const priorityOrders = orders;
-
-    let stateOverrides = undefined;
-    // for every order of type priority, we need to override the reactor's code with the priority order quoter bytecode
-    if(priorityOrders.length > 0) {
-      stateOverrides = priorityOrders.reduce((acc: {[key: string]: { code?: string, state?: any}}, order) => {
-          acc[order.order.info.reactor] = {
-            code: PRIORITY_ORDER_REACTOR_QUOTER_BYTECODE,
-          };
-          return acc;
-      }, {});
-    }
+    // TODO: does not work with multiple different block overrides
+    const blockOverrides = orders.reduce((acc: BlockOverrides, order) => {
+      const blockOverride = order.order.blockOverrides();
+      if (blockOverride && blockOverride.number) {
+        acc = {
+          number: blockOverride.number
+        }
+      }
+      return acc;
+    }, undefined);
 
     return await multicallSameContractManyFunctions(this.provider, {
       address: this.quoter.address,
       contractInterface: this.quoter.interface,
       functionName: functionName,
       functionParams: calls,
-    }, stateOverrides);
+    }, undefined, blockOverrides);
   }
 
   get orderQuoterAddress(): string {
