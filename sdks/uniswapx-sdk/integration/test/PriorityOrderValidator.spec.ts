@@ -25,6 +25,10 @@ import { REACTOR_ADDRESS_MAPPING, UNISWAPX_ORDER_QUOTER_MAPPING } from "../../sr
 import { parseEther } from "ethers/lib/utils";
 import { PERMIT2_ADDRESS } from "@uniswap/permit2-sdk";
 
+if(!process.env.FORK_URL_8453) {
+  throw new Error("FORK_URL_8453 not defined in environment");
+}
+
 // Priority order integration tests do not run on hardhat because they require
 // a full JsonRpcProvider which supports block overrides
 describe("PriorityOrderValidator", () => {
@@ -41,9 +45,9 @@ describe("PriorityOrderValidator", () => {
   let swapperAddress: string;
   let cosignerAddress: string;
 
-  const provider = new JsonRpcProvider(process.env.RPC_URL_8453);
+  const provider = new JsonRpcProvider(process.env.FORK_URL_8453);
   const USDC_BASE = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
-  const ZERO_ADDRESS = ethers.constants.AddressZero;
+  const ZERO_ADDRESS = ethers.constants.AddressZero; // tokenOut for simplicity
 
   beforeEach(async () => {
     chainId = 8453;

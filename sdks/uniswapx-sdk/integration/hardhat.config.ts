@@ -12,7 +12,7 @@ const config: HardhatUserConfig = {
       chainId: 1,
       forking: {
         enabled: true,
-        url: process.env.RPC_URL_1!
+        url: process.env.FORK_URL!
       }
     },
   },
