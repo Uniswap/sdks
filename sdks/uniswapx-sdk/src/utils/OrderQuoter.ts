@@ -382,25 +382,51 @@ export class RelayOrderQuoter
   }
 
   /// Get the results of a multicall for a given function
+  /// Each order with a blockOverride is multicalled separately
   private async getMulticallResults(
     functionName: string,
     orders: SignedRelayOrder[]
   ): Promise<MulticallResult[]> {
-    const calls = orders.map((order) => {
+    const ordersWithBlockOverrides = orders.filter((order) => order.order.blockOverrides);
+    const promises = [];
+    ordersWithBlockOverrides.map((order) => {
+      promises.push(
+        multicallSameContractManyFunctions(this.provider, {
+          address: this.quoter.address,
+          contractInterface: this.quoter.interface,
+          functionName: functionName,
+          functionParams: [
+            [
+              {
+                order: order.order.serialize(), 
+                sig: order.signature,
+              },
+            ],
+          ],
+        }, undefined, order.order.blockOverrides)
+      )
+    });
+
+    const ordersWithoutBlockOverrides = orders.filter((order) => !order.order.blockOverrides);
+
+    const calls = ordersWithoutBlockOverrides.map((order) => {
       return [
         {
-          order: order.order.serialize(),
+          order: order.order.serialize(), 
           sig: order.signature,
         },
       ];
     });
-
-    return await multicallSameContractManyFunctions(this.provider, {
+  
+    promises.push(multicallSameContractManyFunctions(this.provider, {
       address: this.quoter.address,
       contractInterface: this.quoter.interface,
       functionName: functionName,
       functionParams: calls,
-    });
+    }));
+
+    const results = await Promise.all(promises);
+    return results.flat();
   }
 
   private async getValidations(
