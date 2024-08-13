@@ -1,5 +1,5 @@
 import { hexStripZeros } from "@ethersproject/bytes";
-import { JsonRpcProvider } from "@ethersproject/providers";
+import { StaticJsonRpcProvider } from "@ethersproject/providers";
 import { ethers } from "ethers";
 
 import {
@@ -140,7 +140,7 @@ interface OrderQuoter<TOrder, TQuote> {
 // all reactors check expiry before anything else, so old but already filled orders will return as expired
 // so this function takes orders in expired state and double checks them
 async function checkTerminalStates(
-  provider: JsonRpcProvider,
+  provider: StaticJsonRpcProvider,
   nonceManager: NonceManager,
   orders: (SignedUniswapXOrder | SignedRelayOrder)[],
   validations: OrderValidation[]
@@ -162,7 +162,7 @@ async function checkTerminalStates(
       // if the order has block overrides AND order validation is OK, it is invalid if current block number is < block override
       else if (order.order.blockOverrides && validation === OrderValidation.OK) {
         const blockNumber = await provider.getBlockNumber();
-        const blockOverrides = order.order.blockOverrides!;
+        const blockOverrides = order.order.blockOverrides;
         if(blockOverrides.number && blockNumber < parseInt(blockOverrides.number, 16)) {
           return OrderValidation.OrderNotFillable;
         }
@@ -183,7 +183,7 @@ export class UniswapXOrderQuoter
   protected quoter: OrderQuoterContract;
 
   constructor(
-    protected provider: JsonRpcProvider,
+    protected provider: StaticJsonRpcProvider,
     protected chainId: number,
     orderQuoterAddress?: string
   ) {
@@ -325,7 +325,7 @@ export class RelayOrderQuoter
   private quoteFunctionSelector = "0x3f62192e"; // function execute((bytes, bytes))
 
   constructor(
-    protected provider: JsonRpcProvider,
+    protected provider: StaticJsonRpcProvider,
     protected chainId: number,
     reactorAddress?: string
   ) {
