@@ -1,4 +1,4 @@
-import { SignatureLike } from "@ethersproject/bytes";
+import { hexStripZeros, SignatureLike } from "@ethersproject/bytes";
 import {
   PermitTransferFrom,
   PermitTransferFromData,
@@ -211,7 +211,7 @@ export class UnsignedPriorityOrder implements OffChainOrder {
    */
   get blockOverrides(): BlockOverrides {
       return {
-        number: this.info.auctionStartBlock.toHexString(),
+        number: hexStripZeros(this.info.auctionStartBlock.toHexString()),
       };
   }
   
@@ -485,7 +485,7 @@ export class CosignedPriorityOrder extends UnsignedPriorityOrder {
    */
   get blockOverrides(): BlockOverrides {
     return {
-      number: this.info.cosignerData.auctionTargetBlock.toHexString(),
+      number: hexStripZeros(this.info.cosignerData.auctionTargetBlock.toHexString()),
     };
   }
 

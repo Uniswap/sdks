@@ -1,4 +1,3 @@
-import { hexStripZeros } from "@ethersproject/bytes";
 import { StaticJsonRpcProvider } from "@ethersproject/providers";
 import { ethers } from "ethers";
 
@@ -16,7 +15,6 @@ import {
 } from "../contracts";
 import { MissingConfiguration } from "../errors";
 import {
-  BlockOverrides,
   Order,
   RelayOrder,
   ResolvedRelayFee,
@@ -40,7 +38,7 @@ export enum OrderValidation {
   UnknownError,
   ValidationFailed,
   ExclusivityPeriod,
-  OrderNotFillable,
+  OrderNotFillableYet,
   InvalidGasPrice,
   InvalidCosignature,
   OK,
@@ -108,7 +106,7 @@ const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
   // PriorityOrderReactor:InvalidDeadline() 
   "769d11e4": OrderValidation.Expired,
   // PriorityOrderReactor:OrderNotFillable()
-  c6035520: OrderValidation.OrderNotFillable,
+  c6035520: OrderValidation.OrderNotFillableYet,
   // PriorityOrderReactor:InputOutputScaling()
   a6b844f5: OrderValidation.InvalidOrderFields,
   // PriorityOrderReactor:InvalidGasPrice()
@@ -160,16 +158,13 @@ async function checkTerminalStates(
         return cancelled ? OrderValidation.NonceUsed : OrderValidation.Expired;
       }
       // if the order has block overrides AND order validation is OK, it is invalid if current block number is < block override
-      else if (order.order.blockOverrides && validation === OrderValidation.OK) {
+      else if (order.order.blockOverrides && order.order.blockOverrides.number && validation === OrderValidation.OK) {
         const blockNumber = await provider.getBlockNumber();
-        const blockOverrides = order.order.blockOverrides;
-        if(blockOverrides.number && blockNumber < parseInt(blockOverrides.number, 16)) {
-          return OrderValidation.OrderNotFillable;
+        if (blockNumber < parseInt(order.order.blockOverrides.number, 16)) {
+          return OrderValidation.OrderNotFillableYet;
         }
-        return validation;
-      } else {
-        return validation;
       }
+      return validation;
     })
   );
 }
@@ -283,31 +278,39 @@ export class UniswapXOrderQuoter
   }
 
   /// Get the results of a multicall for a given function
+  /// Each order with a blockOverride is multicalled separately
   private async getMulticallResults(
     functionName: string,
     orders: SignedOrder[]
   ): Promise<MulticallResult[]> {
-    const calls = orders.map((order) => {
-      return [order.order.serialize(), order.signature];
+    const ordersWithBlockOverrides = orders.filter((order) => order.order.blockOverrides);
+    const promises = [];
+    ordersWithBlockOverrides.map((order) => {
+      promises.push(
+        multicallSameContractManyFunctions(this.provider, {
+          address: this.quoter.address,
+          contractInterface: this.quoter.interface,
+          functionName: functionName,
+          functionParams: [[order.order.serialize(), order.signature]],
+        }, undefined, order.order.blockOverrides)
+      )
     });
 
-    // TODO: does not work with multiple different block overrides
-    const blockOverrides = orders.reduce((acc: BlockOverrides, order) => {
-      const blockOverride = order.order.blockOverrides;
-      if (blockOverride && blockOverride.number) {
-        acc = {
-          number: hexStripZeros(blockOverride.number),
-        }
-      }
-      return acc;
-    }, undefined);
+    const ordersWithoutBlockOverrides = orders.filter((order) => !order.order.blockOverrides);
 
-    return await multicallSameContractManyFunctions(this.provider, {
+    const calls = ordersWithoutBlockOverrides.map((order) => {
+      return [order.order.serialize(), order.signature];
+    });
+  
+    promises.push(multicallSameContractManyFunctions(this.provider, {
       address: this.quoter.address,
       contractInterface: this.quoter.interface,
       functionName: functionName,
       functionParams: calls,
-    }, undefined, blockOverrides);
+    }));
+
+    const results = await Promise.all(promises);
+    return results.flat();
   }
 
   get orderQuoterAddress(): string {
