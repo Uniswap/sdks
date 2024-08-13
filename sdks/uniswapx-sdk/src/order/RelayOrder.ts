@@ -213,7 +213,7 @@ export class RelayOrder implements OffChainOrder {
   /**
    * @inheritdoc order
    */
-  blockOverrides(): BlockOverrides {
+  get blockOverrides(): BlockOverrides {
     return undefined
   }
 

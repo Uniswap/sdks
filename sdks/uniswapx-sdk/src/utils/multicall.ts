@@ -116,14 +116,14 @@ export async function multicall(
   let response;
   if (code.length > 2) {
     const multicall = Multicall2__factory.connect(multicallAddressOn(chainId), provider);
-    let params: any[] = [
+    const params: any[] = [
       {
         from: ethers.constants.AddressZero,
         to: multicall.address,
         data: multicall.interface.encodeFunctionData("tryAggregate", [false, calls]),
       },
       'latest',
-      (stateOverrides ?? stateOverrides)
+      (stateOverrides ? stateOverrides : {}),
     ]
     if(blockOverrides) params.push(blockOverrides);
     
@@ -133,14 +133,14 @@ export async function multicall(
     const args = deploylessInterface.encodeDeploy([false, calls]);
     const data = hexConcat([DEPLOYLESS_MULTICALL_BYTECODE, args]);
 
-    let params: any[] = [
+    const params: any[] = [
       {
         from: ethers.constants.AddressZero,
         to: ethers.constants.AddressZero,
         data,
       },
       'latest',
-      (stateOverrides ?? stateOverrides)
+      (stateOverrides ? stateOverrides : {}),
     ]
     if(blockOverrides) params.push(blockOverrides);
 

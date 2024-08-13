@@ -199,7 +199,7 @@ export class UnsignedV2DutchOrder implements OffChainOrder {
   /**
    * @inheritdoc order
    */
-  blockOverrides(): BlockOverrides {
+  get blockOverrides(): BlockOverrides {
       return undefined
   }
 

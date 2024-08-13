@@ -1,6 +1,5 @@
-import hre, { ethers } from "hardhat";
 import { expect } from "chai";
-import { Signer } from "ethers";
+import { BigNumber, Contract, ethers } from "ethers";
 
 import PriorityOrderReactorAbi from "../../abis/PriorityOrderReactor.json";
 import OrderQuoterAbi from "../../abis/OrderQuoter.json";
@@ -11,20 +10,23 @@ import {
   Permit2,
   PriorityOrderReactor,
   MockERC20,
+  Permit2__factory,
 } from "../../src/contracts";
 import {
   PriorityOrderBuilder,
   OrderValidator,
   UniswapXOrderQuoter as OrderQuoterLib,
   OrderValidation,
-  getCancelSingleParams,
   PriorityCosignerData,
+  CosignedPriorityOrder,
 } from "../../dist/src";
-import { deployAndReturnPermit2 } from "./utils/permit2";
+import { JsonRpcProvider } from "@ethersproject/providers";
+import { REACTOR_ADDRESS_MAPPING, UNISWAPX_ORDER_QUOTER_MAPPING } from "../../src/constants";
+import { parseEther } from "ethers/lib/utils";
+import { PERMIT2_ADDRESS } from "@uniswap/permit2-sdk";
 
-const { BigNumber } = ethers;
-const parseEther = ethers.utils.parseEther;
-
+// Priority order integration tests do not run on hardhat because they require
+// a full JsonRpcProvider which supports block overrides
 describe("PriorityOrderValidator", () => {
   let reactor: PriorityOrderReactor;
   let permit2: Permit2;
@@ -33,74 +35,39 @@ describe("PriorityOrderValidator", () => {
   let builder: PriorityOrderBuilder;
   let validator: OrderValidator;
   let tokenIn: MockERC20;
-  let tokenOut: MockERC20;
-  let admin: Signer;
-  let filler: Signer;
   let cosigner: ethers.Wallet;
   let swapper: ethers.Wallet;
   let blockNumber: BigNumber;
   let swapperAddress: string;
   let cosignerAddress: string;
 
+  const provider = new JsonRpcProvider(process.env.RPC_URL_8453);
+  const USDC_BASE = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
+  const ZERO_ADDRESS = ethers.constants.AddressZero;
+
   beforeEach(async () => {
-    [admin, filler, cosigner] = await ethers.getSigners();
+    chainId = 8453;
 
-    chainId = hre.network.config.chainId || 1;
+    permit2 = new Contract(PERMIT2_ADDRESS, Permit2__factory.abi, provider) as Permit2;
+    reactor = new Contract(REACTOR_ADDRESS_MAPPING[chainId].Priority!, PriorityOrderReactorAbi.abi, provider) as PriorityOrderReactor;
+    quoter = new Contract(UNISWAPX_ORDER_QUOTER_MAPPING[chainId], OrderQuoterAbi.abi, provider) as OrderQuoter;
 
-    permit2 = await deployAndReturnPermit2(admin);
-
-    const reactorFactory = await ethers.getContractFactory(
-      PriorityOrderReactorAbi.abi,
-      PriorityOrderReactorAbi.bytecode
-    );
-    reactor = (await reactorFactory.deploy(
-      permit2.address,
-      ethers.constants.AddressZero
-    )) as PriorityOrderReactor;
-
-    const orderQuoterFactory = await ethers.getContractFactory(
-      OrderQuoterAbi.abi,
-      OrderQuoterAbi.bytecode
-    );
-    quoter = (await orderQuoterFactory.deploy()) as OrderQuoter;
     builder = new PriorityOrderBuilder(
       chainId,
       reactor.address,
       permit2.address
     );
 
-    swapper = ethers.Wallet.createRandom().connect(ethers.provider);
+    swapper = ethers.Wallet.createRandom().connect(provider);
     swapperAddress = await swapper.getAddress();
-    cosigner = ethers.Wallet.createRandom().connect(ethers.provider);
+    cosigner = ethers.Wallet.createRandom().connect(provider);
     cosignerAddress = await cosigner.getAddress();
 
-    await admin.sendTransaction({
-      to: await swapper.getAddress(),
-      value: parseEther('1'),
-    });
-    validator = new OrderValidator(ethers.provider, chainId, quoter.address);
+    validator = new OrderValidator(provider, chainId, quoter.address);
 
-    const tokenFactory = await ethers.getContractFactory(
-      MockERC20Abi.abi,
-      MockERC20Abi.bytecode
-    );
-    tokenIn = (await tokenFactory.deploy("TEST A", "ta", 18)) as MockERC20;
-    tokenOut = (await tokenFactory.deploy("TEST B", "tb", 18)) as MockERC20;
+    tokenIn = new Contract(USDC_BASE, MockERC20Abi.abi, provider) as MockERC20;
 
-    await tokenIn.mint(await swapper.getAddress(), parseEther('1'));
-    await tokenIn
-      .connect(swapper)
-      .approve(permit2.address, ethers.constants.MaxUint256);
-
-    await tokenOut.mint(
-      await filler.getAddress(),
-      parseEther('100'),
-    );
-    await tokenOut
-      .connect(filler)
-      .approve(reactor.address, ethers.constants.MaxUint256);
-    
-    blockNumber = BigNumber.from(await ethers.provider.getBlockNumber());
+    blockNumber = BigNumber.from(await provider.getBlockNumber());
   });
 
   const getCosignerData = (
@@ -124,11 +91,11 @@ describe("PriorityOrderValidator", () => {
       .nonce(BigNumber.from(98))
       .input({
         token: tokenIn.address,
-        amount: BigNumber.from("1000000"),
+        amount: BigNumber.from(0),
         mpsPerPriorityFeeWei: BigNumber.from(0)
       })
       .output({
-        token: tokenOut.address,
+        token: ZERO_ADDRESS,
         amount: BigNumber.from("1000000000000000000"),
         mpsPerPriorityFeeWei: BigNumber.from(1),
         recipient: "0x0000000000000000000000000000000000000000",
@@ -151,7 +118,7 @@ describe("PriorityOrderValidator", () => {
     const signature = await swapper._signTypedData(domain, types, values);
 
     const quoterLib = new OrderQuoterLib(
-      ethers.provider,
+      provider,
       chainId,
       quoter.address
     );
@@ -161,7 +128,7 @@ describe("PriorityOrderValidator", () => {
       throw new Error("Invalid quote");
     }
 
-    expect(quote.input.amount.toString()).to.equal("1000000");
+    expect(quote.input.amount.toString()).to.equal("0");
   });
 
   it("validates a valid order", async () => {
@@ -175,12 +142,12 @@ describe("PriorityOrderValidator", () => {
       .swapper(swapperAddress)
       .input({
         token: tokenIn.address,
-        amount: BigNumber.from("1000000"),
+        amount: BigNumber.from(0),
         mpsPerPriorityFeeWei: BigNumber.from(0)
       })
       .output({
-        token: tokenOut.address,
-        amount: parseEther('1'),
+        token: ZERO_ADDRESS,
+        amount: BigNumber.from(0),
         mpsPerPriorityFeeWei: BigNumber.from(1),
         recipient: "0x0000000000000000000000000000000000000000",
       });
@@ -218,12 +185,12 @@ describe("PriorityOrderValidator", () => {
       .nonce(BigNumber.from(98))
       .input({
         token: tokenIn.address,
-        amount: BigNumber.from("1000000"),
+        amount: BigNumber.from(0),
         mpsPerPriorityFeeWei: BigNumber.from(0)
       })
       .output({
-        token: tokenOut.address,
-        amount: BigNumber.from("1000000000000000000"),
+        token: ZERO_ADDRESS,
+        amount: BigNumber.from(0),
         mpsPerPriorityFeeWei: BigNumber.from(1),
         recipient: "0x0000000000000000000000000000000000000000",
       });
@@ -249,55 +216,6 @@ describe("PriorityOrderValidator", () => {
     );
   });
 
-  it("validates a filled order", async () => {
-    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
-    const preBuildOrder = builder
-      .deadline(deadline)
-      .auctionStartBlock(blockNumber)
-      .cosigner(cosignerAddress)
-      .baselinePriorityFeeWei(BigNumber.from(0))
-      .nonce(BigNumber.from(100))
-      .swapper(swapperAddress)
-      .input({
-        token: tokenIn.address,
-        amount: parseEther('0.1'),
-        mpsPerPriorityFeeWei: BigNumber.from(0)
-      })
-      .output({
-        token: tokenOut.address,
-        amount: parseEther('0.1'),
-        mpsPerPriorityFeeWei: BigNumber.from(1),
-        recipient: swapperAddress
-      });
-
-    let unsignedPriorityOrder = preBuildOrder.buildPartial();
-    
-    const cosignerData = getCosignerData(blockNumber, {});
-    const cosignerHash = unsignedPriorityOrder.cosignatureHash(cosignerData);
-    const cosignature = ethers.utils.joinSignature(
-      cosigner._signingKey().signDigest(cosignerHash)
-    );
-  
-    const order = preBuildOrder
-        .cosignerData(cosignerData)
-        .cosignature(cosignature)
-        .build();
-
-    const { domain, types, values } = order.permitData();
-    const signature = await swapper._signTypedData(domain, types, values);
-
-    const res = await reactor
-      .connect(filler)
-      .execute(
-        { order: order.serialize(), sig: signature },
-      );
-    await res.wait();
-
-    expect(await validator.validate({ order, signature })).to.equal(
-      OrderValidation.NonceUsed
-    );
-  });
-
   it("validates an order with insufficient funds", async () => {
     const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
     const preBuildOrder = builder
@@ -313,8 +231,8 @@ describe("PriorityOrderValidator", () => {
         mpsPerPriorityFeeWei: BigNumber.from(0),
       })
       .output({
-        token: tokenOut.address,
-        amount: parseEther('1'),
+        token: ZERO_ADDRESS,
+        amount: BigNumber.from(0),
         mpsPerPriorityFeeWei: BigNumber.from(1),
         recipient: "0x0000000000000000000000000000000000000000",
       });
@@ -355,8 +273,8 @@ describe("PriorityOrderValidator", () => {
         mpsPerPriorityFeeWei: BigNumber.from(0),
       })
       .output({
-        token: tokenOut.address,
-        amount: parseEther('1'),
+        token: ZERO_ADDRESS,
+        amount: BigNumber.from(0),
         mpsPerPriorityFeeWei: BigNumber.from(1),
         recipient: "0x0000000000000000000000000000000000000000",
       });
@@ -383,7 +301,7 @@ describe("PriorityOrderValidator", () => {
   });
 
   it("validates an expired order", async () => {
-    const deadline = Math.floor(new Date().getTime() / 1000) + 100;
+    const deadline = Math.floor(new Date().getTime() / 1000) + 1;
     const preBuildOrder = builder
       .deadline(deadline)
       .auctionStartBlock(blockNumber)
@@ -393,83 +311,41 @@ describe("PriorityOrderValidator", () => {
       .nonce(BigNumber.from(100))
       .input({
         token: tokenIn.address,
-        amount: BigNumber.from("1000000"),
+        amount: BigNumber.from(0),
         mpsPerPriorityFeeWei: BigNumber.from(0)
       })
       .output({
-        token: tokenOut.address,
-        amount: BigNumber.from("1000000000000000000"),
+        token: ZERO_ADDRESS,
+        amount: BigNumber.from(0),
         mpsPerPriorityFeeWei: BigNumber.from(1),
         recipient: "0x0000000000000000000000000000000000000000",
       });
-    
-    let unsignedPriorityOrder = preBuildOrder.buildPartial();
+
 
     const cosignerData = getCosignerData(blockNumber, {});
-    const cosignerHash = unsignedPriorityOrder.cosignatureHash(cosignerData);
+    const cosignerHash = preBuildOrder.buildPartial().cosignatureHash(cosignerData);
     const cosignature = ethers.utils.joinSignature(
       cosigner._signingKey().signDigest(cosignerHash)
     );
 
-    const order = preBuildOrder
+    let order = preBuildOrder
       .cosignerData(cosignerData)
       .cosignature(cosignature)
       .build();
 
+    order = new CosignedPriorityOrder(
+        Object.assign(order.info, {
+          deadline: deadline - 100
+        }),
+        chainId,
+        permit2.address
+      )
+
     const { domain, types, values } = order.permitData();
     const signature = await swapper._signTypedData(domain, types, values);
-
-    // Move the block time forward
-    await hre.network.provider.send("evm_setNextBlockTimestamp", [deadline + 1]);
-    await hre.network.provider.send("evm_mine");
 
     expect(await validator.validate({ order, signature })).to.equal(
       OrderValidation.Expired
-    );
-  });
-
-  it("validates a canceled order", async () => {
-    const deadline = Math.floor(new Date().getTime() / 1000) + 1;
-    const preBuildOrder = builder
-      .deadline(deadline)
-      .auctionStartBlock(blockNumber)
-      .cosigner(cosignerAddress)
-      .baselinePriorityFeeWei(BigNumber.from(0))
-      .nonce(BigNumber.from(7))
-      .swapper(swapperAddress)
-      .input({
-        token: tokenIn.address,
-        amount: BigNumber.from("1000000"),
-        mpsPerPriorityFeeWei: BigNumber.from(0)
-      })
-      .output({
-        token: tokenOut.address,
-        amount: BigNumber.from("1000000000000000000"),
-        mpsPerPriorityFeeWei: BigNumber.from(1),
-        recipient: "0x0000000000000000000000000000000000000000",
-      });
-    
-      let unsignedPriorityOrder = preBuildOrder.buildPartial();
-
-      const cosignerData = getCosignerData(blockNumber, {});
-      const cosignerHash = unsignedPriorityOrder.cosignatureHash(cosignerData);
-      const cosignature = ethers.utils.joinSignature(
-        cosigner._signingKey().signDigest(cosignerHash)
-      );
-  
-      const order = preBuildOrder
-        .cosignerData(cosignerData)
-        .cosignature(cosignature)
-        .build();
-  
-
-    const { domain, types, values } = order.permitData();
-    const signature = await swapper._signTypedData(domain, types, values);
-    const { word, mask } = getCancelSingleParams(BigNumber.from(7));
-    await permit2.connect(swapper).invalidateUnorderedNonces(word, mask);
-
-    expect(await validator.validate({ order, signature })).to.equal(
-      OrderValidation.NonceUsed
     );
   });
 });

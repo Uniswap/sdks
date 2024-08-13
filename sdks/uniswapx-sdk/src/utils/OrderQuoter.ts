@@ -1,3 +1,4 @@
+import { hexStripZeros } from "@ethersproject/bytes";
 import { JsonRpcProvider } from "@ethersproject/providers";
 import { ethers } from "ethers";
 
@@ -140,6 +141,7 @@ interface OrderQuoter<TOrder, TQuote> {
 // all reactors check expiry before anything else, so old but already filled orders will return as expired
 // so this function takes orders in expired state and double checks them
 async function checkTerminalStates(
+  provider: JsonRpcProvider,
   nonceManager: NonceManager,
   orders: (SignedUniswapXOrder | SignedRelayOrder)[],
   validations: OrderValidation[]
@@ -157,6 +159,15 @@ async function checkTerminalStates(
           order.order.info.nonce
         );
         return cancelled ? OrderValidation.NonceUsed : OrderValidation.Expired;
+      }
+      // if the order has block overrides AND order validation is OK, it is invalid if current block number is < block override
+      else if (order.order.blockOverrides && validation === OrderValidation.OK) {
+        const blockNumber = await provider.getBlockNumber();
+        const blockOverrides = order.order.blockOverrides!;
+        if(blockOverrides.number && blockNumber < parseInt(blockOverrides.number, 16)) {
+          return OrderValidation.OrderNotFillable;
+        }
+        return validation;
       } else {
         return validation;
       }
@@ -261,6 +272,7 @@ export class UniswapXOrderQuoter
     });
 
     return await checkTerminalStates(
+      this.provider,
       new NonceManager(
         this.provider,
         this.chainId,
@@ -282,10 +294,10 @@ export class UniswapXOrderQuoter
 
     // TODO: does not work with multiple different block overrides
     const blockOverrides = orders.reduce((acc: BlockOverrides, order) => {
-      const blockOverride = order.order.blockOverrides();
+      const blockOverride = order.order.blockOverrides;
       if (blockOverride && blockOverride.number) {
         acc = {
-          number: blockOverride.number
+          number: hexStripZeros(blockOverride.number),
         }
       }
       return acc;
@@ -417,6 +429,7 @@ export class RelayOrderQuoter
     });
 
     return await checkTerminalStates(
+      this.provider,
       new NonceManager(
         this.provider,
         this.chainId,

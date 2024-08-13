@@ -11,6 +11,7 @@ import { MPS } from "../constants";
 import { getPermit2, ResolvedUniswapXOrder } from "../utils";
 
 import {
+  BlockOverrides,
   OffChainOrder,
   OrderInfo,
   PriorityInput,
@@ -208,9 +209,9 @@ export class UnsignedPriorityOrder implements OffChainOrder {
   /**
    * @inheritdoc Order
    */
-  blockOverrides(): { number: number } {
+  get blockOverrides(): BlockOverrides {
       return {
-        number: this.info.auctionStartBlock.toNumber(),
+        number: this.info.auctionStartBlock.toHexString(),
       };
   }
   
@@ -482,9 +483,9 @@ export class CosignedPriorityOrder extends UnsignedPriorityOrder {
   /**
    * @inheritdoc Order
    */
-  blockOverrides(): { number: number } {
+  get blockOverrides(): BlockOverrides {
     return {
-      number: this.info.cosignerData.auctionTargetBlock.toNumber(),
+      number: this.info.cosignerData.auctionTargetBlock.toHexString(),
     };
   }
 
