@@ -3,7 +3,7 @@
 
 import { Interface } from "@ethersproject/abi";
 import { hexConcat } from "@ethersproject/bytes";
-import { JsonRpcProvider } from "@ethersproject/providers";
+import { StaticJsonRpcProvider } from "@ethersproject/providers";
 import { ethers } from "ethers";
 
 import deploylessMulticall2Abi from "../../abis/deploylessMulticall2.json";
@@ -47,7 +47,7 @@ export async function multicallSameContractManyFunctions<
   // eslint-disable-next-line
   TFunctionParams extends any[] | undefined
 >(
-  provider: JsonRpcProvider,
+  provider: StaticJsonRpcProvider,
   params: MulticallSameContractParams<TFunctionParams>,
   stateOverrrides?: {
     code?: string;
@@ -77,7 +77,7 @@ export async function multicallSameFunctionManyContracts<
   // eslint-disable-next-line
   TFunctionParams extends any[] | undefined
 >(
-  provider: JsonRpcProvider,
+  provider: StaticJsonRpcProvider,
   params: MulticallSameFunctionParams<TFunctionParams>,
   stateOverrrides?: {
     code?: string;
@@ -103,7 +103,7 @@ export async function multicallSameFunctionManyContracts<
 }
 
 export async function multicall(
-  provider: JsonRpcProvider,
+  provider: StaticJsonRpcProvider,
   calls: Call[],
   stateOverrides?: {
     code?: string;

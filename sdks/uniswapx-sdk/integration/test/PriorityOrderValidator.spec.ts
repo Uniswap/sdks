@@ -20,7 +20,7 @@ import {
   PriorityCosignerData,
   CosignedPriorityOrder,
 } from "../../dist/src";
-import { JsonRpcProvider } from "@ethersproject/providers";
+import { StaticJsonRpcProvider } from "@ethersproject/providers";
 import { REACTOR_ADDRESS_MAPPING, UNISWAPX_ORDER_QUOTER_MAPPING } from "../../src/constants";
 import { parseEther } from "ethers/lib/utils";
 import { PERMIT2_ADDRESS } from "@uniswap/permit2-sdk";
@@ -45,7 +45,7 @@ describe("PriorityOrderValidator", () => {
   let swapperAddress: string;
   let cosignerAddress: string;
 
-  const provider = new JsonRpcProvider(process.env.FORK_URL_8453);
+  const provider = new StaticJsonRpcProvider(process.env.FORK_URL_8453);
   const USDC_BASE = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
   const ZERO_ADDRESS = ethers.constants.AddressZero; // tokenOut for simplicity
 
