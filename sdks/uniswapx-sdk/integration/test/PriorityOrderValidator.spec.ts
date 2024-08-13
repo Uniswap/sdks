@@ -216,7 +216,7 @@ describe("PriorityOrderValidator", () => {
     const signature = await swapper._signTypedData(domain, types, values);
 
     expect(await validator.validate({ order, signature })).to.equal(
-      OrderValidation.OrderNotFillable
+      OrderValidation.OrderNotFillableYet
     );
   });
 
