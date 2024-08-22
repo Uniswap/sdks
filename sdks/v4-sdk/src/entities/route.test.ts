@@ -1,4 +1,4 @@
-import { Ether, Token } from '@uniswap/sdk-core'
+import { Ether, Token, WETH9 } from '@uniswap/sdk-core'
 import { encodeSqrtRatioX96, TickMath } from '@uniswap/v3-sdk'
 import { Pool } from './pool'
 import { Route } from './route'
@@ -9,7 +9,7 @@ describe('Route', () => {
   const currency0 = new Token(1, '0x0000000000000000000000000000000000000001', 18, 't0')
   const currency1 = new Token(1, '0x0000000000000000000000000000000000000002', 18, 't1')
   const currency2 = new Token(1, '0x0000000000000000000000000000000000000003', 18, 't2')
-  // const weth = WETH9[1]
+  const weth = WETH9[1]
 
   const pool_0_1 = new Pool(
     currency0,
@@ -36,6 +36,28 @@ describe('Route', () => {
   const pool_1_eth = new Pool(
     currency1,
     eth,
+    FEE_AMOUNT_MEDIUM,
+    TICK_SPACING_TEN,
+    ADDRESS_ZERO,
+    encodeSqrtRatioX96(1, 1),
+    0,
+    0,
+    []
+  )
+  const pool_0_weth = new Pool(
+    currency0,
+    weth,
+    FEE_AMOUNT_MEDIUM,
+    TICK_SPACING_TEN,
+    ADDRESS_ZERO,
+    encodeSqrtRatioX96(1, 1),
+    0,
+    0,
+    []
+  )
+  const pool_eth_weth = new Pool(
+    eth,
+    weth,
     FEE_AMOUNT_MEDIUM,
     TICK_SPACING_TEN,
     ADDRESS_ZERO,
@@ -81,6 +103,21 @@ describe('Route', () => {
     expect(route.pools).toEqual([pool_0_eth])
     expect(route.input).toEqual(currency0)
     expect(route.output).toEqual(eth)
+  })
+
+  it('does not support WETH -> ETH conversion without trading through an ETH->WETH pool', () => {
+    expect(() => new Route([pool_0_weth, pool_1_eth], currency0, currency1)).toThrow("PATH")
+  })
+
+  it('does not support ETH -> WETH conversion without trading through an ETH->WETH pool', () => {
+    expect(() => new Route([pool_1_eth, pool_0_weth], currency1, currency0)).toThrow("PATH")
+  })
+
+  it('supports trading through ETH/WETH pools', () => {
+    const route = new Route([pool_0_weth, pool_eth_weth, pool_1_eth], currency0, currency1)
+    expect(route.pools).toEqual([pool_0_weth, pool_eth_weth, pool_1_eth])
+    expect(route.input).toEqual(currency0)
+    expect(route.output).toEqual(currency1)
   })
 
   describe('#midPrice', () => {
