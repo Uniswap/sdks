@@ -106,11 +106,11 @@ describe('Route', () => {
   })
 
   it('does not support WETH -> ETH conversion without trading through an ETH->WETH pool', () => {
-    expect(() => new Route([pool_0_weth, pool_1_eth], currency0, currency1)).toThrow("PATH")
+    expect(() => new Route([pool_0_weth, pool_1_eth], currency0, currency1)).toThrow('PATH')
   })
 
   it('does not support ETH -> WETH conversion without trading through an ETH->WETH pool', () => {
-    expect(() => new Route([pool_1_eth, pool_0_weth], currency1, currency0)).toThrow("PATH")
+    expect(() => new Route([pool_1_eth, pool_0_weth], currency1, currency0)).toThrow('PATH')
   })
 
   it('supports trading through ETH/WETH pools', () => {
