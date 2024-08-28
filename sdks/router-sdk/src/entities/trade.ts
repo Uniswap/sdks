@@ -26,33 +26,33 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
 
   //  construct a trade across v2 and v3 routes from pre-computed amounts
   public constructor({
-    v2Routes,
-    v3Routes,
-    v4Routes,
+    v2Routes = [],
+    v3Routes = [],
+    v4Routes = [],
+    mixedRoutes = [],
     tradeType,
-    mixedRoutes,
   }: {
-    v2Routes: {
+    v2Routes?: {
       routev2: V2RouteSDK<TInput, TOutput>
       inputAmount: CurrencyAmount<TInput>
       outputAmount: CurrencyAmount<TOutput>
     }[]
-    v3Routes: {
+    v3Routes?: {
       routev3: V3RouteSDK<TInput, TOutput>
       inputAmount: CurrencyAmount<TInput>
       outputAmount: CurrencyAmount<TOutput>
     }[]
-    v4Routes: {
+    v4Routes?: {
       routev4: V4RouteSDK<TInput, TOutput>
       inputAmount: CurrencyAmount<TInput>
       outputAmount: CurrencyAmount<TOutput>
     }[]
-    tradeType: TTradeType
     mixedRoutes?: {
       mixedRoute: MixedRouteSDK<TInput, TOutput>
       inputAmount: CurrencyAmount<TInput>
       outputAmount: CurrencyAmount<TOutput>
     }[]
+    tradeType: TTradeType
   }) {
     this.swaps = []
     this.routes = []
@@ -86,17 +86,14 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
         outputAmount,
       })
     }
-    // wrap mixedRoutes
-    if (mixedRoutes) {
-      for (const { mixedRoute, inputAmount, outputAmount } of mixedRoutes) {
-        const route = new MixedRoute(mixedRoute)
-        this.routes.push(route)
-        this.swaps.push({
-          route,
-          inputAmount,
-          outputAmount,
-        })
-      }
+    for (const { mixedRoute, inputAmount, outputAmount } of mixedRoutes) {
+      const route = new MixedRoute(mixedRoute)
+      this.routes.push(route)
+      this.swaps.push({
+        route,
+        inputAmount,
+        outputAmount,
+      })
     }
 
     if (this.swaps.length === 0) {
@@ -295,15 +292,15 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       routev3: V3RouteSDK<TInput, TOutput>
       amount: TTradeType extends TradeType.EXACT_INPUT ? CurrencyAmount<TInput> : CurrencyAmount<TOutput>
     }[],
-    v4Routes: {
-      routev4: V4RouteSDK<TInput, TOutput>
-      amount: TTradeType extends TradeType.EXACT_INPUT ? CurrencyAmount<TInput> : CurrencyAmount<TOutput>
-    }[],
     tradeType: TTradeType,
     mixedRoutes?: {
       mixedRoute: MixedRouteSDK<TInput, TOutput>
       amount: TTradeType extends TradeType.EXACT_INPUT ? CurrencyAmount<TInput> : CurrencyAmount<TOutput>
-    }[]
+    }[],
+    v4Routes?: {
+      routev4: V4RouteSDK<TInput, TOutput>
+      amount: TTradeType extends TradeType.EXACT_INPUT ? CurrencyAmount<TInput> : CurrencyAmount<TOutput>
+    }[],
   ): Promise<Trade<TInput, TOutput, TTradeType>> {
     const populatedV2Routes: {
       routev2: V2RouteSDK<TInput, TOutput>
@@ -351,15 +348,17 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       })
     }
 
-    for (const { routev4, amount } of v4Routes) {
-      const v4Trade = await V4TradeSDK.fromRoute(routev4, amount, tradeType)
-      const { inputAmount, outputAmount } = v4Trade
+    if (v4Routes) {
+      for (const { routev4, amount } of v4Routes) {
+        const v4Trade = await V4TradeSDK.fromRoute(routev4, amount, tradeType)
+        const { inputAmount, outputAmount } = v4Trade
 
-      populatedV4Routes.push({
-        routev4,
-        inputAmount,
-        outputAmount,
-      })
+        populatedV4Routes.push({
+          routev4,
+          inputAmount,
+          outputAmount,
+        })
+      }
     }
 
     if (mixedRoutes) {
@@ -385,7 +384,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
   }
 
   public static async fromRoute<TInput extends Currency, TOutput extends Currency, TTradeType extends TradeType>(
-    route: V2RouteSDK<TInput, TOutput> | V3RouteSDK<TInput, TOutput> | MixedRouteSDK<TInput, TOutput>,
+    route: V2RouteSDK<TInput, TOutput> | V3RouteSDK<TInput, TOutput> | V4RouteSDK<TInput, TOutput> | MixedRouteSDK<TInput, TOutput>,
     amount: TTradeType extends TradeType.EXACT_INPUT ? CurrencyAmount<TInput> : CurrencyAmount<TOutput>,
     tradeType: TTradeType
   ): Promise<Trade<TInput, TOutput, TTradeType>> {
