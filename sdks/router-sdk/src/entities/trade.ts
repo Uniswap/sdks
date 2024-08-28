@@ -300,7 +300,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     v4Routes?: {
       routev4: V4RouteSDK<TInput, TOutput>
       amount: TTradeType extends TradeType.EXACT_INPUT ? CurrencyAmount<TInput> : CurrencyAmount<TOutput>
-    }[],
+    }[]
   ): Promise<Trade<TInput, TOutput, TTradeType>> {
     const populatedV2Routes: {
       routev2: V2RouteSDK<TInput, TOutput>
@@ -384,7 +384,11 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
   }
 
   public static async fromRoute<TInput extends Currency, TOutput extends Currency, TTradeType extends TradeType>(
-    route: V2RouteSDK<TInput, TOutput> | V3RouteSDK<TInput, TOutput> | V4RouteSDK<TInput, TOutput> | MixedRouteSDK<TInput, TOutput>,
+    route:
+      | V2RouteSDK<TInput, TOutput>
+      | V3RouteSDK<TInput, TOutput>
+      | V4RouteSDK<TInput, TOutput>
+      | MixedRouteSDK<TInput, TOutput>,
     amount: TTradeType extends TradeType.EXACT_INPUT ? CurrencyAmount<TInput> : CurrencyAmount<TOutput>,
     tradeType: TTradeType
   ): Promise<Trade<TInput, TOutput, TTradeType>> {
