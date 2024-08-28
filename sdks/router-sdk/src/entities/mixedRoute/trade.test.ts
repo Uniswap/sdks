@@ -57,6 +57,16 @@ describe('MixedRouteTrade', () => {
     CurrencyAmount.fromRawAmount(WETH9[1], 130000),
     true
   )
+  const pool_v4_0_eth = v2StylePool(
+    CurrencyAmount.fromRawAmount(token0, 120000),
+    CurrencyAmount.fromRawAmount(ETHER, 130000),
+    true
+  )
+  // const pool_v4_1_eth = v2StylePool(
+  //   CurrencyAmount.fromRawAmount(token1, 120000),
+  //   CurrencyAmount.fromRawAmount(ETHER, 130000),
+  //   true
+  // )
 
   const pool_v3_0_1 = v2StylePool(
     CurrencyAmount.fromRawAmount(token0, 100000),
@@ -1381,7 +1391,7 @@ describe('MixedRouteTrade', () => {
   })
 
   describe('multihop v2 + v3 + v4', () => {
-    it('can be constructed with an eth output from a v4 pool', async () => {
+    it('can be constructed with a weth output from a v4 pool', async () => {
       const trade = await MixedRouteTrade.fromRoute(
         new MixedRouteSDK([pool_v3_0_1, pool_v4_0_weth], token1, WETH9[1]),
         CurrencyAmount.fromRawAmount(token1, JSBI.BigInt(100)),
@@ -1389,6 +1399,56 @@ describe('MixedRouteTrade', () => {
       )
       expect(trade.inputAmount.currency).toEqual(token1)
       expect(trade.outputAmount.currency).toEqual(WETH9[1])
+    })
+
+    it('can be constructed with an eth output from a v4 pool', async () => {
+      const trade = await MixedRouteTrade.fromRoute(
+        new MixedRouteSDK([pool_v3_0_1, pool_v4_0_eth], token1, ETHER),
+        CurrencyAmount.fromRawAmount(token1, JSBI.BigInt(100)),
+        TradeType.EXACT_INPUT
+      )
+      expect(trade.inputAmount.currency).toEqual(token1)
+      expect(trade.outputAmount.currency).toEqual(ETHER)
+    })
+
+    it('can be constructed with an eth output from a v4 weth pool', async () => {
+      const trade = await MixedRouteTrade.fromRoute(
+        new MixedRouteSDK([pool_v3_0_1, pool_v4_0_weth], token1, ETHER),
+        CurrencyAmount.fromRawAmount(token1, JSBI.BigInt(100)),
+        TradeType.EXACT_INPUT
+      )
+      expect(trade.inputAmount.currency).toEqual(token1)
+      expect(trade.outputAmount.currency).toEqual(ETHER)
+    })
+
+    it('can be constructed with an intermediate conversion WETH->ETH when trading to v4 pool', async () => {
+      const trade = await MixedRouteTrade.fromRoute(
+        new MixedRouteSDK([pool_v3_weth_0, pool_v4_0_eth], token0, ETHER),
+        CurrencyAmount.fromRawAmount(token0, JSBI.BigInt(100)),
+        TradeType.EXACT_INPUT
+      )
+      expect(trade.inputAmount.currency).toEqual(token0)
+      expect(trade.outputAmount.currency).toEqual(ETHER)
+    })
+
+    it('can be constructed with an intermediate conversion ETH->WETH when trading from a v4 pool', async () => {
+      const trade = await MixedRouteTrade.fromRoute(
+        new MixedRouteSDK([pool_v4_0_eth, pool_v3_weth_0], token0, WETH9[1]),
+        CurrencyAmount.fromRawAmount(token0, JSBI.BigInt(100)),
+        TradeType.EXACT_INPUT
+      )
+      expect(trade.inputAmount.currency).toEqual(token0)
+      expect(trade.outputAmount.currency).toEqual(WETH9[1])
+    })
+
+    it('can be constructed with an intermediate conversion ETH->WETH when trading from a v4 pool with ETH output', async () => {
+      const trade = await MixedRouteTrade.fromRoute(
+        new MixedRouteSDK([pool_v4_0_eth, pool_v3_weth_0], token0, ETHER),
+        CurrencyAmount.fromRawAmount(token0, JSBI.BigInt(100)),
+        TradeType.EXACT_INPUT
+      )
+      expect(trade.inputAmount.currency).toEqual(token0)
+      expect(trade.outputAmount.currency).toEqual(ETHER)
     })
   })
 })

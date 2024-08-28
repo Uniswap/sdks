@@ -4,6 +4,7 @@ import { Currency, Price, Token } from '@uniswap/sdk-core'
 import { Pair } from '@uniswap/v2-sdk'
 import { Pool as V3Pool } from '@uniswap/v3-sdk'
 import { Pool as V4Pool } from '@uniswap/v4-sdk'
+import { isValidTokenPath } from '../../utils/isValidTokenPath'
 
 type TPool = Pair | V3Pool | V4Pool
 
@@ -52,11 +53,16 @@ export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
      * Normalizes token0-token1 order and selects the next token/fee step to add to the path
      * */
     const tokenPath: Currency[] = [this.adjustedInput]
-    for (const [i, pool] of pools.entries()) {
-      const currentInputToken = tokenPath[i]
-      invariant(currentInputToken.equals(pool.token0) || currentInputToken.equals(pool.token1), 'PATH')
-      const nextToken = currentInputToken.equals(pool.token0) ? pool.token1 : pool.token0
-      tokenPath.push(nextToken)
+    pools[0].token0 == this.adjustedInput ? tokenPath.push(pools[0].token1) : tokenPath.push(pools[0].token0)
+
+    for (let i = 1; i < pools.length; i++) {
+      const prevPool = pools[i-1]
+      const pool = pools[i]
+      const inputToken = tokenPath[i]
+      const outputToken = pool.token0.wrapped.equals(inputToken.wrapped) ? pool.token1 : pool.token0
+
+      invariant(isValidTokenPath(prevPool, pool, inputToken), 'PATH')
+      tokenPath.push(outputToken)
     }
 
     this.pools = pools
