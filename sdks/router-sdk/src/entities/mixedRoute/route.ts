@@ -53,7 +53,7 @@ export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
      * Normalizes token0-token1 order and selects the next token/fee step to add to the path
      * */
     const tokenPath: Currency[] = [this.adjustedInput]
-    pools[0].token0 == this.adjustedInput ? tokenPath.push(pools[0].token1) : tokenPath.push(pools[0].token0)
+    pools[0].token0.equals(this.adjustedInput) ? tokenPath.push(pools[0].token1) : tokenPath.push(pools[0].token0)
 
     for (let i = 1; i < pools.length; i++) {
       const prevPool = pools[i - 1]
