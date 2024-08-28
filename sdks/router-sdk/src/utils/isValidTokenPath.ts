@@ -12,7 +12,7 @@ export function isValidTokenPath(prevPool: TPool, currentPool: TPool, inputToken
   if (prevPool instanceof V4Pool && currentPool instanceof V4Pool) return false
 
   // v2/v3 --> v4 valid if v2/v3 output is the wrapped version of the v4 pool native currency
-  if (currentPool instanceof V4Pool){
+  if (currentPool instanceof V4Pool) {
     if (currentPool.token0.wrapped.equals(inputToken) || currentPool.token1.wrapped.equals(inputToken)) return true
   }
 
