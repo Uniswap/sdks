@@ -13,9 +13,6 @@ export async function getOutputAmount(
     if (pool.involvesCurrency(amountIn.currency)) {
       return await pool.getOutputAmount(amountIn)
     }
-    if (pool.involvesCurrency(amountIn.currency.wrapped)) {
-      return await pool.getOutputAmount(amountIn.wrapped)
-    }
     if (pool.token0.wrapped.equals(amountIn.currency)) {
       return await pool.getOutputAmount(CurrencyAmount.fromRawAmount(pool.token0, amountIn.quotient))
     }
