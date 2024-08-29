@@ -375,7 +375,6 @@ describe('Trade', () => {
       const trade = await Trade.fromRoutes(
         [{ routev2, amount: amountv2 }],
         [{ routev3, amount: amountv3 }],
-        [],
         TradeType.EXACT_INPUT
       )
 
@@ -414,7 +413,6 @@ describe('Trade', () => {
       const trade = await Trade.fromRoutes(
         [{ routev2, amount: amountv2 }],
         [{ routev3, amount: amountv3 }],
-        [],
         TradeType.EXACT_INPUT,
         [{ mixedRoute, amount: amountMixedRoute }]
       )
@@ -460,7 +458,6 @@ describe('Trade', () => {
       const trade = await Trade.fromRoutes(
         [{ routev2, amount: amountv2 }],
         [{ routev3, amount: amountv3 }],
-        [],
         TradeType.EXACT_INPUT,
         [
           { mixedRoute, amount: amountMixedRoute },
@@ -516,7 +513,6 @@ describe('Trade', () => {
           { routev3, amount: amountv3 },
           { routev3: route2v3, amount: amount2v3 },
         ],
-        [],
         TradeType.EXACT_OUTPUT
       )
 
@@ -549,7 +545,6 @@ describe('Trade', () => {
       const trade = await Trade.fromRoutes(
         [{ routev2, amount: amountv2 }],
         [{ routev3, amount: amountv3 }],
-        [],
         TradeType.EXACT_INPUT,
         [{ mixedRoute, amount: amountMixedRoute }]
       )
@@ -573,7 +568,6 @@ describe('Trade', () => {
       const trade = await Trade.fromRoutes(
         [{ routev2, amount: amountv2 }],
         [{ routev3, amount: amountv3 }],
-        [],
         TradeType.EXACT_OUTPUT
       )
 
@@ -596,7 +590,6 @@ describe('Trade', () => {
       const trade = await Trade.fromRoutes(
         [{ routev2, amount: amountv2 }],
         [{ routev3, amount: amountv3 }],
-        [],
         TradeType.EXACT_OUTPUT
       )
 
@@ -623,7 +616,6 @@ describe('Trade', () => {
       const trade = await Trade.fromRoutes(
         [{ routev2, amount: amountv2 }],
         [{ routev3, amount: amountv3 }],
-        [],
         TradeType.EXACT_INPUT,
         [{ mixedRoute, amount: amountMixedRoute }]
       )
@@ -656,7 +648,6 @@ describe('Trade', () => {
             { routev3, amount: amountv3 },
             { routev3: route2v3, amount: amount2v3 },
           ],
-          [],
           TradeType.EXACT_INPUT
         )
       ).rejects.toThrow('POOLS_DUPLICATED')
@@ -682,7 +673,6 @@ describe('Trade', () => {
             { routev2: route2v2, amount: amount2v2 },
           ],
           [{ routev3, amount: amountv3 }],
-          [],
           TradeType.EXACT_INPUT
         )
       ).rejects.toThrow('POOLS_DUPLICATED')
@@ -703,7 +693,7 @@ describe('Trade', () => {
       const amountMixedRoute = CurrencyAmount.fromRawAmount(token0, JSBI.BigInt(1000))
 
       await expect(
-        Trade.fromRoutes([{ routev2, amount: amountv2 }], [{ routev3, amount: amountv3 }], [], TradeType.EXACT_INPUT, [
+        Trade.fromRoutes([{ routev2, amount: amountv2 }], [{ routev3, amount: amountv3 }], TradeType.EXACT_INPUT, [
           { mixedRoute, amount: amountMixedRoute },
         ])
       ).rejects.toThrow('POOLS_DUPLICATED')
@@ -724,7 +714,7 @@ describe('Trade', () => {
       const amountMixedRoute = CurrencyAmount.fromRawAmount(token0, JSBI.BigInt(1000))
 
       await expect(
-        Trade.fromRoutes([{ routev2, amount: amountv2 }], [{ routev3, amount: amountv3 }], [], TradeType.EXACT_INPUT, [
+        Trade.fromRoutes([{ routev2, amount: amountv2 }], [{ routev3, amount: amountv3 }], TradeType.EXACT_INPUT, [
           { mixedRoute, amount: amountMixedRoute },
         ])
       ).rejects.toThrow('POOLS_DUPLICATED')
@@ -740,7 +730,7 @@ describe('Trade', () => {
       const amountv3 = CurrencyAmount.fromRawAmount(token0, JSBI.BigInt(1000))
 
       await expect(
-        Trade.fromRoutes([{ routev2, amount: amountv2 }], [{ routev3, amount: amountv3 }], [], TradeType.EXACT_INPUT)
+        Trade.fromRoutes([{ routev2, amount: amountv2 }], [{ routev3, amount: amountv3 }], TradeType.EXACT_INPUT)
       ).rejects.toThrow('INPUT_CURRENCY_MATCH')
     })
 
@@ -754,7 +744,7 @@ describe('Trade', () => {
       const amountMixedRoute = CurrencyAmount.fromRawAmount(token0, JSBI.BigInt(1000))
 
       await expect(
-        Trade.fromRoutes([{ routev2, amount: amountv2 }], [], [], TradeType.EXACT_INPUT, [
+        Trade.fromRoutes([{ routev2, amount: amountv2 }], [], TradeType.EXACT_INPUT, [
           { mixedRoute, amount: amountMixedRoute },
         ])
       ).rejects.toThrow('INPUT_CURRENCY_MATCH')
@@ -770,7 +760,7 @@ describe('Trade', () => {
       const amountv3 = CurrencyAmount.fromRawAmount(token0, JSBI.BigInt(1000))
 
       await expect(
-        Trade.fromRoutes([{ routev2, amount: amountv2 }], [{ routev3, amount: amountv3 }], [], TradeType.EXACT_INPUT)
+        Trade.fromRoutes([{ routev2, amount: amountv2 }], [{ routev3, amount: amountv3 }], TradeType.EXACT_INPUT)
       ).rejects.toThrow('OUTPUT_CURRENCY_MATCH')
     })
 
@@ -784,7 +774,7 @@ describe('Trade', () => {
       const amountMixedRoute = CurrencyAmount.fromRawAmount(token0, JSBI.BigInt(1000))
 
       await expect(
-        Trade.fromRoutes([], [{ routev3, amount: amountv3 }], [], TradeType.EXACT_INPUT, [
+        Trade.fromRoutes([], [{ routev3, amount: amountv3 }], TradeType.EXACT_INPUT, [
           { mixedRoute, amount: amountMixedRoute },
         ])
       ).rejects.toThrow('OUTPUT_CURRENCY_MATCH')
@@ -800,7 +790,7 @@ describe('Trade', () => {
       const mixedRouteAmount = CurrencyAmount.fromRawAmount(token1, JSBI.BigInt(1000))
 
       await expect(
-        Trade.fromRoutes([{ routev2, amount: amountv2 }], [], [], TradeType.EXACT_OUTPUT, [
+        Trade.fromRoutes([{ routev2, amount: amountv2 }], [], TradeType.EXACT_OUTPUT, [
           { mixedRoute, amount: mixedRouteAmount },
         ])
       ).rejects.toThrow('TRADE_TYPE')
@@ -822,14 +812,12 @@ describe('Trade', () => {
       const exactInV3 = new Trade({
         v2Routes: [],
         v3Routes: [{ routev3, inputAmount, outputAmount }],
-        v4Routes: [],
         tradeType,
       })
 
       const exactInMixed = new Trade({
         v2Routes: [],
         v3Routes: [],
-        v4Routes: [],
         tradeType,
         mixedRoutes: [{ mixedRoute, inputAmount, outputAmount }],
       })
@@ -848,14 +836,12 @@ describe('Trade', () => {
             outputAmount: CurrencyAmount.fromRawAmount(token2, 34),
           },
         ],
-        v4Routes: [],
         tradeType: TradeType.EXACT_INPUT,
       })
 
       const exactInMultiMixedRoute = new Trade({
         v2Routes: [],
         v3Routes: [],
-        v4Routes: [],
         tradeType: TradeType.EXACT_INPUT,
         mixedRoutes: [
           {
@@ -916,7 +902,6 @@ describe('Trade', () => {
             outputAmount: CurrencyAmount.fromRawAmount(token2, 100),
           },
         ],
-        v4Routes: [],
         tradeType: TradeType.EXACT_OUTPUT,
       })
 
@@ -934,7 +919,6 @@ describe('Trade', () => {
             outputAmount: CurrencyAmount.fromRawAmount(token2, 50),
           },
         ],
-        v4Routes: [],
         tradeType: TradeType.EXACT_OUTPUT,
       })
 
@@ -1014,9 +998,6 @@ describe('Trade', () => {
       const mixedRoute = new MixedRouteSDK([pool_weth_0, pair_weth_2], token0, token2)
       const mixedRoute2 = new MixedRouteSDK([pair_0_1, pool_weth_1, pool_weth_2], token0, token2)
       const exactIn = new Trade({
-        v2Routes: [],
-        v3Routes: [],
-        v4Routes: [],
         tradeType: TradeType.EXACT_INPUT,
         mixedRoutes: [
           {
@@ -1062,7 +1043,6 @@ describe('Trade', () => {
             outputAmount: CurrencyAmount.fromRawAmount(token2, 100),
           },
         ],
-        v4Routes: [],
         tradeType: TradeType.EXACT_OUTPUT,
       })
       it('throws if less than 0', () => {
@@ -1092,7 +1072,6 @@ describe('Trade', () => {
       const trade = new Trade({
         v2Routes: [{ routev2, inputAmount, outputAmount }],
         v3Routes: [{ routev3, inputAmount, outputAmount }],
-        v4Routes: [],
         tradeType,
         mixedRoutes: [{ mixedRoute, inputAmount, outputAmount }],
       })
@@ -1125,7 +1104,6 @@ describe('Trade', () => {
         const trade = new Trade({
           v2Routes: [{ routev2, inputAmount, outputAmount }],
           v3Routes: [{ routev3, inputAmount, outputAmount }],
-          v4Routes: [],
           tradeType,
         })
 
@@ -1159,7 +1137,6 @@ describe('Trade', () => {
       const trade = new Trade({
         v2Routes: [{ routev2, inputAmount, outputAmount }],
         v3Routes: [{ routev3, inputAmount, outputAmount }],
-        v4Routes: [],
         tradeType,
         mixedRoutes: [{ mixedRoute, inputAmount, outputAmount }],
       })
@@ -1189,7 +1166,6 @@ describe('Trade', () => {
         const trade = new Trade({
           v2Routes: [{ routev2, inputAmount, outputAmount }],
           v3Routes: [{ routev3, inputAmount, outputAmount }],
-          v4Routes: [],
           tradeType,
         })
 
@@ -1225,7 +1201,6 @@ describe('Trade', () => {
           },
         ],
         v3Routes: [],
-        v4Routes: [],
         tradeType: TradeType.EXACT_INPUT,
       })
 
@@ -1244,8 +1219,6 @@ describe('Trade', () => {
             outputAmount: CurrencyAmount.fromRawAmount(weth, 69),
           },
         ],
-        v3Routes: [],
-        v4Routes: [],
         tradeType: TradeType.EXACT_INPUT,
       })
 
@@ -1259,7 +1232,6 @@ describe('Trade', () => {
       const mixedRoute = new MixedRouteSDK([pool_0_1, pool_1_2], token0, token2)
 
       const trade = new Trade({
-        v2Routes: [],
         v3Routes: [
           {
             routev3,
@@ -1267,14 +1239,10 @@ describe('Trade', () => {
             outputAmount: CurrencyAmount.fromRawAmount(token2, 69),
           },
         ],
-        v4Routes: [],
         tradeType: TradeType.EXACT_INPUT,
       })
 
       const mixedTrade = new Trade({
-        v2Routes: [],
-        v3Routes: [],
-        v4Routes: [],
         tradeType: TradeType.EXACT_INPUT,
         mixedRoutes: [
           {
@@ -1297,7 +1265,6 @@ describe('Trade', () => {
     describe('tradeType = EXACT_OUTPUT', () => {
       const routev3 = new V3RouteSDK([pool_0_1, pool_1_2], token0, token2)
       const exactOut = new Trade({
-        v2Routes: [],
         v3Routes: [
           {
             routev3,
@@ -1305,7 +1272,6 @@ describe('Trade', () => {
             outputAmount: CurrencyAmount.fromRawAmount(token2, 100),
           },
         ],
-        v4Routes: [],
         tradeType: TradeType.EXACT_OUTPUT,
       })
 
@@ -1336,7 +1302,6 @@ describe('Trade', () => {
       const trade = await Trade.fromRoutes(
         [{ routev2, amount: amountv2 }],
         [{ routev3, amount: amountv3 }],
-        [],
         TradeType.EXACT_INPUT,
         [{ mixedRoute, amount: amountMixed }]
       )
@@ -1364,7 +1329,6 @@ describe('Trade', () => {
       const trade = await Trade.fromRoutes(
         [{ routev2, amount: amountv2 }],
         [{ routev3, amount: amountv3 }],
-        [],
         TradeType.EXACT_OUTPUT
       )
       const expectedPrice = new Price(
