@@ -109,8 +109,8 @@ export class Pool {
     ticks: TickDataProvider | (Tick | TickConstructorArgs)[] = NO_TICK_DATA_PROVIDER_DEFAULT
   ) {
     invariant(isAddress(hooks), 'Invalid hook address')
-    invariant(Number.isInteger(fee) && (fee == DYNAMIC_FEE_FLAG || fee < 1_000_000), 'FEE')
-    if (fee == DYNAMIC_FEE_FLAG) {
+    invariant(Number.isInteger(fee) && (fee === DYNAMIC_FEE_FLAG || fee < 1_000_000), 'FEE')
+    if (fee === DYNAMIC_FEE_FLAG) {
       invariant(Number(hooks) > 0, 'Dynamic fee pool requires a hook')
     }
     const tickCurrentSqrtRatioX96 = TickMath.getSqrtRatioAtTick(tickCurrent)
@@ -310,7 +310,7 @@ export class Pool {
         sqrtPriceLimitX96
       )
     } else {
-      throw 'Error: Unsupported hook'
+      throw new Error('Unsupported hook')
     }
   }
 
