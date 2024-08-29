@@ -62,11 +62,6 @@ describe('MixedRouteTrade', () => {
     CurrencyAmount.fromRawAmount(ETHER, 130000),
     true
   )
-  // const pool_v4_1_eth = v2StylePool(
-  //   CurrencyAmount.fromRawAmount(token1, 120000),
-  //   CurrencyAmount.fromRawAmount(ETHER, 130000),
-  //   true
-  // )
 
   const pool_v3_0_1 = v2StylePool(
     CurrencyAmount.fromRawAmount(token0, 100000),
