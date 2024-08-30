@@ -18,7 +18,7 @@ import {
 } from '@uniswap/router-sdk'
 import { Permit2Permit } from '../../utils/inputTokens'
 import { Currency, TradeType, CurrencyAmount, Percent } from '@uniswap/sdk-core'
-import { Command, RouterTradeType, TradeConfig } from '../Command'
+import { Command, RouterActionType, TradeConfig } from '../Command'
 import { SENDER_AS_RECIPIENT, ROUTER_AS_RECIPIENT, CONTRACT_BALANCE, ETH_ADDRESS } from '../../utils/constants'
 import { encodeFeeBips } from '../../utils/numbers'
 import { BigNumber, BigNumberish } from 'ethers'
@@ -50,12 +50,11 @@ interface Swap<TInput extends Currency, TOutput extends Currency> {
 // Wrapper for uniswap router-sdk trade entity to encode swaps for Universal Router
 // also translates trade objects from previous (v2, v3) SDKs
 export class UniswapTrade implements Command {
-  readonly tradeType: RouterTradeType = RouterTradeType.UniswapTrade
+  readonly tradeType: RouterActionType = RouterActionType.UniswapTrade
   readonly payerIsUser: boolean
 
   constructor(public trade: RouterTrade<Currency, Currency, TradeType>, public options: SwapOptions) {
     if (!!options.fee && !!options.flatFee) throw new Error('Only one fee option permitted')
-
     if (this.inputRequiresWrap) this.payerIsUser = false
     else if (this.options.useRouterBalance) this.payerIsUser = false
     else this.payerIsUser = true
