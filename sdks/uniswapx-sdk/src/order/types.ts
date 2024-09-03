@@ -114,3 +114,34 @@ export type PriorityInputJSON = Omit<
 export type PriorityOutputJSON = PriorityInputJSON & {
   recipient: string;
 };
+
+export type V3DutchInput = {
+  readonly token: string;
+  readonly startAmount: BigNumber;
+  readonly curve: V3Decay;
+  readonly maxAmount: BigNumber;
+};
+
+export type V3DutchInputJSON = Omit<V3DutchInput, "startAmount" | "curve" | "maxAmount"> & {
+  startAmount: string;
+  curve: V3Decay;
+  maxAmount: string;
+};
+
+export type V3Decay = {
+  relativeBlocks: number[];
+  relativeAmount: BigNumber[]; //amounts plural
+  // relativeBlocks: number[];
+  // relativeAmount: number[];
+};
+
+export type V3DutchOutput = {
+  readonly token: string;
+  readonly startAmount: BigNumber;
+  readonly curve: V3Decay;
+  readonly recipient: string;
+};
+
+export type V3DutchOutputJSON = Omit<V3DutchOutput, "startAmount"> & {
+  startAmount: string;
+};
