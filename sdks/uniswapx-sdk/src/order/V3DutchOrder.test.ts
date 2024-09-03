@@ -1,5 +1,6 @@
-import { BigNumber, ethers } from "ethers";
 import { expect } from "chai";
+import { BigNumber, ethers } from "ethers";
+
 import { CosignedV3DutchOrder, CosignedV3DutchOrderInfo, UnsignedV3DutchOrder, UnsignedV3DutchOrderInfoJSON } from "./V3DutchOrder";
 
 const TIME= 1725379823;
@@ -38,9 +39,9 @@ describe("V3DutchOrder", () => {
                     startAmount: RAW_AMOUNT,
                     curve: {
                         relativeBlocks: [1],
-                        relativeAmount: [BigNumber.from(1), BigNumber.from(2), BigNumber.from(3), BigNumber.from(4)] // 1e-18, 2e-18, 3e-18, 4e-18
+                        relativeAmount: [BigNumber.from(1), BigNumber.from(2), BigNumber.from(3), BigNumber.from(4)], // 1e-18, 2e-18, 3e-18, 4e-18
                     },
-                    maxAmount: RAW_AMOUNT.add(1)
+                    maxAmount: RAW_AMOUNT.add(1),
                 },
                 outputs: [
                     {
@@ -48,10 +49,10 @@ describe("V3DutchOrder", () => {
                         startAmount: RAW_AMOUNT,
                         curve: {
                             relativeBlocks: [1],
-                            relativeAmount: [BigNumber.from(1), BigNumber.from(2), BigNumber.from(3), BigNumber.from(4)] // 1e-18, 2e-18, 3e-18, 4e-18
+                            relativeAmount: [BigNumber.from(1), BigNumber.from(2), BigNumber.from(3), BigNumber.from(4)], // 1e-18, 2e-18, 3e-18, 4e-18
                         },
                         recipient: ethers.constants.AddressZero,
-                    }
+                    },
                 ],
                 cosignature: "0x",
                 },
@@ -77,9 +78,9 @@ describe("V3DutchOrder", () => {
                 startAmount: "1000000",
                 curve: {
                     relativeBlocks: [1],
-                    relativeAmount: [BigNumber.from(1), BigNumber.from(2), BigNumber.from(3), BigNumber.from(4)]
+                    relativeAmount: [BigNumber.from(1), BigNumber.from(2), BigNumber.from(3), BigNumber.from(4)],
                 },
-                maxAmount: "1000001"
+                maxAmount: "1000001",
             },
             outputs: [
                 {
@@ -87,7 +88,7 @@ describe("V3DutchOrder", () => {
                     startAmount: "1000000",
                     curve: {
                         relativeBlocks: [1],
-                        relativeAmount: [BigNumber.from(1), BigNumber.from(2), BigNumber.from(3), BigNumber.from(4)]
+                        relativeAmount: [BigNumber.from(1), BigNumber.from(2), BigNumber.from(3), BigNumber.from(4)],
                     },
                     recipient: ethers.constants.AddressZero,
                 }
