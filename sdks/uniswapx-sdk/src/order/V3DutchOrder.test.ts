@@ -15,7 +15,7 @@ const COSIGNER_DATA = {
     exclusiveFiller: ethers.constants.AddressZero,
     exclusivityOverrideBps: BigNumber.from(0),
     inputOverride: RAW_AMOUNT,
-    outputOverrides: [RAW_AMOUNT.mul(102).div(100)]
+    outputOverrides: [RAW_AMOUNT.mul(102).div(100)],
 };
 
 describe("V3DutchOrder", () => {
@@ -91,8 +91,8 @@ describe("V3DutchOrder", () => {
                         relativeAmount: [BigNumber.from(1), BigNumber.from(2), BigNumber.from(3), BigNumber.from(4)],
                     },
                     recipient: ethers.constants.AddressZero,
-                }
-            ]
+                },
+            ],
         };
         const order = UnsignedV3DutchOrder.fromJSON(orderInfoJSON, CHAIN_ID);
         expect(order.info.input.startAmount.toString()).to.equal("1000000");

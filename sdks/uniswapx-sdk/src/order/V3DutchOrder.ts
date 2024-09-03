@@ -1,8 +1,9 @@
-import { getPermit2 } from "../utils";
-import { V3DutchInput, OffChainOrder, OrderInfo, V3DutchInputJSON, V3DutchOutput, V3DutchOutputJSON, BlockOverrides } from "./types";
 import { BigNumber, ethers } from "ethers";
-import { PermitTransferFromData, SignatureTransfer, PermitTransferFrom, Witness } from "@uniswap/permit2-sdk";
 import { SignatureLike } from "@ethersproject/bytes";
+import { PermitTransferFrom, PermitTransferFromData, SignatureTransfer, Witness } from "@uniswap/permit2-sdk";
+
+import { V3DutchInput, OffChainOrder, OrderInfo, V3DutchInputJSON, V3DutchOutput, V3DutchOutputJSON, BlockOverrides } from "./types";
+import { getPermit2 } from "../utils";
 
 export type CosignerDataJSON = {
     decayStartBlock: number;
