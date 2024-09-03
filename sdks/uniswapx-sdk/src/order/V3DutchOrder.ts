@@ -104,6 +104,38 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
         this.permit2Address = getPermit2(chainId, _permit2Address);
     }
 
+    static fromJSON(
+        json: UnsignedV3DutchOrderInfoJSON,
+        chainId: number,
+        _permit2Address?: string
+    ): UnsignedV3DutchOrder {
+        return new UnsignedV3DutchOrder(
+            {
+                ...json,
+                nonce: BigNumber.from(json.nonce),
+                input: {
+                    ...json.input,
+                    startAmount: BigNumber.from(json.input.startAmount),
+                    curve: {
+                        relativeBlocks: json.input.curve.relativeBlocks,
+                        relativeAmount: json.input.curve.relativeAmount.map(BigNumber.from)
+                    },
+                    maxAmount: BigNumber.from(json.input.maxAmount)
+                },
+                outputs: json.outputs.map(output => ({
+                    ...output,
+                    startAmount: BigNumber.from(output.startAmount),
+                    curve: {
+                        relativeBlocks: output.curve.relativeBlocks,
+                        relativeAmount: output.curve.relativeAmount.map(BigNumber.from)
+                    }
+                }))
+            },
+            chainId,
+            _permit2Address
+        );
+    }
+
     /**
     * @inheritdoc order
     */

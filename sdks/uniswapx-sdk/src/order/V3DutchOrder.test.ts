@@ -1,6 +1,6 @@
 import { BigNumber, ethers } from "ethers";
 import { expect } from "chai";
-import { CosignedV3DutchOrder, CosignedV3DutchOrderInfo } from "./V3DutchOrder";
+import { CosignedV3DutchOrder, CosignedV3DutchOrderInfo, UnsignedV3DutchOrder, UnsignedV3DutchOrderInfoJSON } from "./V3DutchOrder";
 
 const TIME= 1725379823;
 const BLOCK_NUMBER = 20671221;
@@ -64,12 +64,40 @@ describe("V3DutchOrder", () => {
     it("Parses a serialized v3 order", () => {
         const orderInfo = getFullOrderInfo({});
         const order = new CosignedV3DutchOrder(orderInfo, CHAIN_ID);
-        console.log(order);
         const seralized = order.serialize();
-        console.log(seralized);
         const parsed = CosignedV3DutchOrder.parse(seralized, CHAIN_ID);
         expect(parsed.info).to.deep.eq(orderInfo);
     }
     );
 
+    it("parses inner v3 order with no cosigner overrides", () => {
+        const orderInfoJSON : UnsignedV3DutchOrderInfoJSON = {
+            ...getFullOrderInfo({}),
+            nonce: "21",
+            input: {
+                token: INPUT_TOKEN,
+                startAmount: "1000000",
+                curve: {
+                    relativeBlocks: [1],
+                    relativeAmount: [BigNumber.from(1), BigNumber.from(2), BigNumber.from(3), BigNumber.from(4)]
+                },
+                maxAmount: "1000001"
+            },
+            outputs: [
+                {
+                    token: OUTPUT_TOKEN,
+                    startAmount: "1000000",
+                    curve: {
+                        relativeBlocks: [1],
+                        relativeAmount: [BigNumber.from(1), BigNumber.from(2), BigNumber.from(3), BigNumber.from(4)]
+                    },
+                    recipient: ethers.constants.AddressZero,
+                }
+            ]
+        };
+        const order = UnsignedV3DutchOrder.fromJSON(orderInfoJSON, CHAIN_ID);
+        expect(order.info.input.startAmount.toString()).to.equal("1000000");
+        expect(order.info.outputs[0].startAmount.toString()).to.eq("1000000");
+    });
+    
 });
