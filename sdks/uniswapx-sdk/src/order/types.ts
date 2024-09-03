@@ -130,9 +130,7 @@ export type V3DutchInputJSON = Omit<V3DutchInput, "startAmount" | "curve" | "max
 
 export type V3Decay = {
   relativeBlocks: number[];
-  relativeAmount: BigNumber[]; //amounts plural
-  // relativeBlocks: number[];
-  // relativeAmount: number[];
+  relativeAmounts: BigNumber[]; //amounts plural
 };
 
 export type V3DutchOutput = {

@@ -1,9 +1,10 @@
-import { BigNumber, ethers } from "ethers";
 import { SignatureLike } from "@ethersproject/bytes";
 import { PermitTransferFrom, PermitTransferFromData, SignatureTransfer, Witness } from "@uniswap/permit2-sdk";
+import { BigNumber, ethers } from "ethers";
 
-import { V3DutchInput, OffChainOrder, OrderInfo, V3DutchInputJSON, V3DutchOutput, V3DutchOutputJSON, BlockOverrides } from "./types";
 import { getPermit2 } from "../utils";
+
+import { BlockOverrides, OffChainOrder, OrderInfo, V3DutchInput, V3DutchInputJSON, V3DutchOutput, V3DutchOutputJSON } from "./types";
 
 export type CosignerDataJSON = {
     decayStartBlock: number;
@@ -78,8 +79,8 @@ const V3_DUTCH_ORDER_TYPES = {
     ],
     V3Decay: [
         { name: "relativeBlocks", type: "uint256" },
-        { name: "relativeAmount", type: "int256[]" },
-    ]
+        { name: "relativeAmounts", type: "int256[]" },
+    ],
 };
 
 const V3_DUTCH_ORDER_ABI = [
@@ -90,8 +91,8 @@ const V3_DUTCH_ORDER_ABI = [
         "tuple(address,uint256,tuple(uint256,int256[]),uint256)", // V3DutchInput
         "tuple(address,uint256,tuple(uint256,int256[]),address)[]", // V3DutchOutput
         COSIGNER_DATA_TUPLE_ABI,
-        "bytes" // Cosignature
-    ].join(",") + ")"
+        "bytes", // Cosignature
+    ].join(",") + ")",
 ];
 
 export class UnsignedV3DutchOrder implements OffChainOrder {
@@ -119,17 +120,17 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                     startAmount: BigNumber.from(json.input.startAmount),
                     curve: {
                         relativeBlocks: json.input.curve.relativeBlocks,
-                        relativeAmount: json.input.curve.relativeAmount.map(BigNumber.from)
+                        relativeAmounts: json.input.curve.relativeAmounts.map(BigNumber.from),
                     },
-                    maxAmount: BigNumber.from(json.input.maxAmount)
+                    maxAmount: BigNumber.from(json.input.maxAmount),
                 },
                 outputs: json.outputs.map(output => ({
                     ...output,
                     startAmount: BigNumber.from(output.startAmount),
                     curve: {
                         relativeBlocks: output.curve.relativeBlocks,
-                        relativeAmount: output.curve.relativeAmount.map(BigNumber.from)
-                    }
+                        relativeAmounts: output.curve.relativeAmounts.map(BigNumber.from),
+                    },
                 }))
             },
             chainId,
@@ -158,23 +159,23 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                     this.info.nonce,
                     this.info.deadline,
                     this.info.additionalValidationContract,
-                    this.info.additionalValidationData
+                    this.info.additionalValidationData,
                 ],
                 this.info.cosigner,
                 [
                     this.info.input.token,
                     this.info.input.startAmount,
-                    [encodedRelativeBlocks, this.info.input.curve.relativeAmount],
-                    this.info.input.maxAmount
+                    [encodedRelativeBlocks, this.info.input.curve.relativeAmounts],
+                    this.info.input.maxAmount,
                 ],
                 this.info.outputs.map(output => [
                     output.token,
                     output.startAmount,
-                    [encodedRelativeBlocks, output.curve.relativeAmount],
-                    output.recipient
+                    [encodedRelativeBlocks, output.curve.relativeAmounts],
+                    output.recipient,
                 ]),
                 [0, ethers.constants.AddressZero, 0, 0, [0]],
-                "0x"
+                "0x",
             ],
         ]);
     }
@@ -195,14 +196,14 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                 token: this.info.input.token,
                 startAmount: this.info.input.startAmount.toString(),
                 curve: this.info.input.curve,
-                maxAmount: this.info.input.maxAmount.toString()
+                maxAmount: this.info.input.maxAmount.toString(),
             },
             outputs: this.info.outputs.map(output => ({
                 token: output.token,
                 startAmount: output.startAmount.toString(),
                 curve: output.curve,
-                recipient: output.recipient
-            }))
+                recipient: output.recipient,
+            })),
         }
     };
 
@@ -211,7 +212,7 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
             this.toPermit(),
             this.permit2Address,
             this.chainId,
-            this.witness()
+            this.witness(),
         ) as PermitTransferFromData;
     }
 
@@ -235,11 +236,11 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                 nonce: this.info.nonce,
                 deadline: this.info.deadline,
                 additionalValidationContract: this.info.additionalValidationContract,
-                additionalValidationData: this.info.additionalValidationData
+                additionalValidationData: this.info.additionalValidationData,
             },
             cosigner: this.info.cosigner,
             baseInput: this.info.input,
-            baseOutputs: this.info.outputs
+            baseOutputs: this.info.outputs,
         }
     }
 
@@ -258,7 +259,7 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                     this.toPermit(),
                     this.permit2Address,
                     this.chainId,
-                    this.witness()
+                    this.witness(),
                 ),
                 signature
             )
@@ -286,9 +287,9 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                         cosignerData.exclusivityOverrideBps,
                         cosignerData.inputOverride,
                         cosignerData.outputOverrides
-                        ]
-                    ]
-                )
+                        ],
+                    ],
+                ),
             ]
         )
     }
@@ -343,29 +344,29 @@ export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
                     this.info.nonce,
                     this.info.deadline,
                     this.info.additionalValidationContract,
-                    this.info.additionalValidationData
+                    this.info.additionalValidationData,
                 ],
                 this.info.cosigner,
                 [
                     this.info.input.token,
                     this.info.input.startAmount,
-                    [encodedRelativeBlocks, this.info.input.curve.relativeAmount],
-                    this.info.input.maxAmount
+                    [encodedRelativeBlocks, this.info.input.curve.relativeAmounts],
+                    this.info.input.maxAmount,
                 ],
                 this.info.outputs.map(output => [
                     output.token,
                     output.startAmount,
-                    [encodedRelativeBlocks, output.curve.relativeAmount],
-                    output.recipient
+                    [encodedRelativeBlocks, output.curve.relativeAmounts],
+                    output.recipient,
                 ]),
                 [
                     this.info.cosignerData.decayStartBlock,
                     this.info.cosignerData.exclusiveFiller,
                     this.info.cosignerData.exclusivityOverrideBps,
                     this.info.cosignerData.inputOverride.toString(),
-                    this.info.cosignerData.outputOverrides.map(override => override.toString())
+                    this.info.cosignerData.outputOverrides.map(override => override.toString()),
                 ],
-                this.info.cosignature
+                this.info.cosignature,
             ],
         ]);
     }
@@ -376,6 +377,12 @@ export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
           this.info.cosignature
         );
     }
+
+    // resolve(options: OrderResolutionOptions): ResolvedUniswapXOrder {
+    //     return {
+
+    //     }
+    // } TODO
 }
 
 function parseSerializedOrder(serialized: string): CosignedV3DutchOrderInfo {
@@ -395,7 +402,7 @@ function parseSerializedOrder(serialized: string): CosignedV3DutchOrderInfo {
             [
                 token,
                 startAmount,
-                [relativeBlocks, relativeAmount],
+                [relativeBlocks, relativeAmounts],
                 maxAmount
             ],
             outputs,
@@ -419,19 +426,19 @@ function parseSerializedOrder(serialized: string): CosignedV3DutchOrderInfo {
             startAmount,
             curve: {
                 relativeBlocks: decodedRelativeBlocks,
-                relativeAmount
+                relativeAmounts
             },
             maxAmount
         },
         outputs: outputs.map(
-            ([token, startAmount,[relativeBlocks, relativeAmount],recipient]: [
+            ([token, startAmount,[relativeBlocks, relativeAmounts],recipient]: [
                 string, number, [BigNumber, number[]], string, boolean
             ]) => ({
             token,
             startAmount,
             curve: {
                 relativeBlocks: decodeRelativeBlocks(relativeBlocks),
-                relativeAmount
+                relativeAmounts
             },
             recipient
         })),
