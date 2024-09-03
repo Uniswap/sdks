@@ -22,7 +22,7 @@ describe("V3DutchOrder", () => {
         expect(BLOCK_NUMBER).to.be.greaterThan(0);
     });
 
-    const getFullOrderInfo = ( data: Partial<CosignedV3DutchOrder>): CosignedV3DutchOrderInfo => {
+    const getFullOrderInfo = ( data: Partial<CosignedV3DutchOrderInfo>): CosignedV3DutchOrderInfo => {
         return Object.assign(
             {
                 reactor: ethers.constants.AddressZero,
@@ -58,8 +58,6 @@ describe("V3DutchOrder", () => {
                 data
             );
     };
-
-
 
     it("Parses a serialized v3 order", () => {
         const orderInfo = getFullOrderInfo({});
@@ -99,5 +97,39 @@ describe("V3DutchOrder", () => {
         expect(order.info.input.startAmount.toString()).to.equal("1000000");
         expect(order.info.outputs[0].startAmount.toString()).to.eq("1000000");
     });
+
+    it("valid signature over inner order", async () => {
+        const fullOrderInfo = getFullOrderInfo({});
+        const order = new UnsignedV3DutchOrder(fullOrderInfo, 1);
+        const wallet = ethers.Wallet.createRandom();
+    
+        const { domain, types, values } = order.permitData();
+        const signature = await wallet._signTypedData(domain, types, values);
+        expect(order.getSigner(signature)).equal(await wallet.getAddress());
+        const fullOrder = CosignedV3DutchOrder.fromUnsignedOrder(
+          order,
+          fullOrderInfo.cosignerData,
+          fullOrderInfo.cosignature
+        );
+        expect(fullOrder.getSigner(signature)).equal(await wallet.getAddress());
+      });
+
+      it("validates cosignature over (hash || cosignerData)", async () => {
+        const wallet = ethers.Wallet.createRandom();
+        const orderInfo = getFullOrderInfo({
+          cosigner: await wallet.getAddress(),
+        });
+        const order = new UnsignedV3DutchOrder(orderInfo, 1);
+        const fullOrderHash = order.cosignatureHash(orderInfo.cosignerData);
+        const cosignature = await wallet.signMessage(fullOrderHash);
+        const signedOrder = CosignedV3DutchOrder.fromUnsignedOrder(
+          order,
+          COSIGNER_DATA,
+          cosignature
+        );
+    
+        expect(signedOrder.recoverCosigner()).equal(await wallet.getAddress());
+      });
+
     
 });

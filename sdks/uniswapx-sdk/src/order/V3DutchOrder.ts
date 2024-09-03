@@ -270,9 +270,47 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
             .hash(this.witnessInfo());
     }
 
+    cosignatureHash(cosignerData: CosignerData): string {
+        const abiCoder = new ethers.utils.AbiCoder();
+        return ethers.utils.solidityKeccak256(
+            ["bytes32", "bytes"],
+            [
+                this.hash(),
+                abiCoder.encode(
+                    [COSIGNER_DATA_TUPLE_ABI],
+                    [
+                        [
+                        cosignerData.decayStartBlock,
+                        cosignerData.exclusiveFiller,
+                        cosignerData.exclusivityOverrideBps,
+                        cosignerData.inputOverride,
+                        cosignerData.outputOverrides
+                        ]
+                    ]
+                )
+            ]
+        )
+    }
+
 }
 
 export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
+    static fromUnsignedOrder(
+        order: UnsignedV3DutchOrder,
+        cosignerData: CosignerData,
+        cosignature: string
+    ): CosignedV3DutchOrder {
+        return new CosignedV3DutchOrder(
+            {
+                ...order.info,
+                cosignerData,
+                cosignature
+            },
+            order.chainId,
+            order.permit2Address
+        );
+    }
+
     constructor(
         public readonly info: CosignedV3DutchOrderInfo,
         public readonly chainId: number,
@@ -330,8 +368,13 @@ export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
             ],
         ]);
     }
-    
 
+    recoverCosigner(): string {
+        return ethers.utils.verifyMessage(
+          this.cosignatureHash(this.info.cosignerData),
+          this.info.cosignature
+        );
+    }
 }
 
 function parseSerializedOrder(serialized: string): CosignedV3DutchOrderInfo {
