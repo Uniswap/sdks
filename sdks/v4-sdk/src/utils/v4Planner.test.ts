@@ -1,7 +1,10 @@
 import { BigNumber } from 'ethers'
-import { Token, WETH9 } from '@uniswap/sdk-core'
+import { CurrencyAmount, TradeType, Token, WETH9 } from '@uniswap/sdk-core'
 import { encodeSqrtRatioX96 } from '@uniswap/v3-sdk'
 import { Pool } from '../entities/pool'
+import { Trade } from '../entities/trade'
+import { Route } from '../entities/route'
+import { encodeRouteToPath } from './encodeRouteToPath'
 import {
   ADDRESS_ZERO,
   FEE_AMOUNT_MEDIUM,
@@ -17,6 +20,17 @@ const DAI = new Token(1, '0x6B175474E89094C44Da98b954EedeAC495271d0F', 18, 'DAI'
 const USDC_WETH = new Pool(
   USDC,
   WETH9[1],
+  FEE_AMOUNT_MEDIUM,
+  TICK_SPACING_TEN,
+  ADDRESS_ZERO,
+  encodeSqrtRatioX96(1, 1),
+  0,
+  0,
+  []
+)
+const DAI_USDC = new Pool(
+  USDC,
+  DAI,
   FEE_AMOUNT_MEDIUM,
   TICK_SPACING_TEN,
   ADDRESS_ZERO,
@@ -51,32 +65,27 @@ describe.only('RouterPlanner', () => {
     expect(planner.params[1]).toEqual('0x000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2')
   })
 
-  it.only('completes a v4 exactIn 2 hop swap', async () => {
-    v4Planner.addAction(Actions.SWAP_EXACT_IN, [
+  it('completes a v4 exactIn 2 hop swap', async () => {
+    const route = new Route([DAI_USDC, USDC_WETH], DAI, WETH9[1])
+
+    // encode with addAction function
+    planner.addAction(Actions.SWAP_EXACT_IN, [
       {
-        DAI.address,
-        path: encodeMultihopExactInPath([DAI_USDC.poolKey, USDC_WETH.poolKey], currencyIn),
-        amountIn: amountInDAI,
-        amountOutMinimum: minAmountOutNative,
+        currencyIn: DAI.address,
+        path: encodeRouteToPath(route),
+        amountIn: ONE_ETHER,
+        amountOutMinimum: ONE_ETHER.div(2),
       },
     ])
-    v4Planner.addAction(Actions.SETTLE_TAKE_PAIR, [currencyIn, wethContract.address])
+    planner.addAction(Actions.SETTLE_TAKE_PAIR, [DAI.address, WETH9[1].address])
 
-    planner.addCommand(CommandType.V4_SWAP, [v4Planner.actions, v4Planner.params])
-
-    const { daiBalanceBefore, daiBalanceAfter, wethBalanceBefore, wethBalanceAfter } = await executeRouter(
-      planner,
-      bob,
-      router,
-      wethContract,
-      daiContract,
-      usdcContract
-    )
-    console.log(planner)
+    // encode with addTrade function
+    const tradePlanner = new V4Planner()
+    const trade = await Trade.fromRoute(route, CurrencyAmount.fromRawAmount(DAI, ONE_ETHER.toString()), TradeType.EXACT_INPUT)
+    tradePlanner.addTrade(trade)
+    console.log(tradePlanner)
 
 
-    expect(wethBalanceAfter.sub(wethBalanceBefore)).to.be.gte(minAmountOutNative)
-    expect(daiBalanceBefore.sub(daiBalanceAfter)).to.be.eq(amountInDAI)
   })
 
 })

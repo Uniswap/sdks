@@ -1,5 +1,8 @@
 import { defaultAbiCoder } from 'ethers/lib/utils'
-
+import { Currency, TradeType} from '@uniswap/sdk-core'
+import { Trade } from '../entities/trade'
+import { ADDRESS_ZERO } from './internalConstants'
+import { encodeRouteToPath } from './encodeRouteToPath'
 /**
  * Actions
  * @description Constants that define what action to perform
@@ -92,6 +95,24 @@ export class V4Planner {
     let command = createAction(type, parameters)
     this.params.push(command.encodedInput)
     this.actions = this.actions.concat(command.action.toString(16).padStart(2, '0'))
+  }
+
+  addTrade(trade: Trade<Currency, Currency, TradeType>, slippageTolerance: Percent): void {
+    const actionType = trade.tradeType === TradeType.EXACT_INPUT ? Actions.SWAP_EXACT_IN : Actions.SWAP_EXACT_OUT
+    const inputCurrency = trade.inputAmount.currency
+
+    for (let swap of trade.swaps) {
+      this.addAction(actionType, [
+        {
+          inputCurrency.isNative ? ADDRESS_ZERO : inputCurrency.wrapped.address,
+          path: encodeRouteToPath(swap.route),
+          amountIn: swap.inputAmount,
+          amountOutMinimum: /* need to do slippage checks for each individual route??? */,
+        },
+      ])
+    }
+
+    this.addAction(Actions.SETTLE_TAKE_PAIR, [inputCurrency.address, wethContract.address])
   }
 
   finalize(): string {
