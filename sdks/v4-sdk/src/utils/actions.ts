@@ -10,8 +10,9 @@ export enum ActionType {
   MINT_POSITION = 0x02,
   BURN_POSITION = 0x03,
   SETTLE = 0x09,
+  SETTLE_PAIR = 0x11,
   TAKE = 0x12,
-  TAKE_PAIR = 0x156,
+  TAKE_PAIR = 0x15,
 }
 
 /**
@@ -68,21 +69,10 @@ export const ABI_DEFINITION: { [key in ActionType]: string[] } = {
     'bytes hookData',
   ],
   [ActionType.BURN_POSITION]: ['uint256 tokenId', 'uint128 amount0Min', 'uint128 amount1Min', 'bytes hookData'],
-  [ActionType.SETTLE]: [
-    'address currency',
-    'uint256 amount',
-    'bool payerIsUser'
-  ],
-  [ActionType.TAKE]: [
-    'address currency',
-    'address recipient',
-    'uint256 amount',
-  ],
-  [ActionType.TAKE_PAIR]: [
-    'address currency0',
-    'address currency1',
-    'address recipient',
-  ]
+  [ActionType.SETTLE]: ['address currency', 'uint256 amount', 'bool payerIsUser'],
+  [ActionType.SETTLE_PAIR]: ['address currency0', 'address currency1'],
+  [ActionType.TAKE]: ['address currency', 'address recipient', 'uint256 amount'],
+  [ActionType.TAKE_PAIR]: ['address currency0', 'address currency1', 'address recipient'],
 }
 
 export type RouterCommand = {

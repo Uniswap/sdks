@@ -1,6 +1,6 @@
 import { Currency, Fraction, Percent, Price, sortedInsert, CurrencyAmount, TradeType, Token } from '@uniswap/sdk-core'
 import invariant from 'tiny-invariant'
-import { ONE, ZERO } from '../utils/internalConstants'
+import { ONE, ZERO } from '../internalConstants'
 import { Pool } from './pool'
 import { Route } from './route'
 
