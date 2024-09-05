@@ -5,12 +5,8 @@ import { BigNumber, BigNumberish } from 'ethers'
 import { MethodParameters } from '@uniswap/v3-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
 import { Currency, TradeType } from '@uniswap/sdk-core'
-import { Command, RouterActionType } from './entities/Command'
 import { UniswapTrade, SwapOptions } from './entities/actions/uniswap'
-import { UnwrapWETH } from './entities/actions/unwrapWETH'
-import { CommandType, RoutePlanner } from './utils/routerCommands'
-import { encodePermit } from './utils/inputTokens'
-import { ROUTER_AS_RECIPIENT, SENDER_AS_RECIPIENT, ETH_ADDRESS } from './utils/constants'
+import { RoutePlanner } from './utils/routerCommands'
 
 export type SwapRouterConfig = {
   sender?: string // address

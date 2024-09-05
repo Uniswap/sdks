@@ -143,8 +143,6 @@ export class RouterTradeAdapter {
           inputAmount: route.inputAmount,
           outputAmount: route.outputAmount,
         })),
-      // TODO: ROUTE-219 - Support v4 trade in universal-router sdk
-      v4Routes: [],
       mixedRoutes: typedRoutes
         .filter((route) => route.mixedRoute)
         .map((route) => ({
@@ -152,6 +150,8 @@ export class RouterTradeAdapter {
           inputAmount: route.inputAmount,
           outputAmount: route.outputAmount,
         })),
+      // TODO: ROUTE-219 - Support v4 trade in universal-router sdk
+      v4Routes: [],
       tradeType: quote.tradeType,
     })
   }

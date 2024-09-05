@@ -21,9 +21,14 @@ export enum CommandType {
   UNWRAP_WETH = 0x0c,
   PERMIT2_TRANSFER_FROM_BATCH = 0x0d,
   BALANCE_CHECK_ERC20 = 0x0e,
+
+  EXECUTE_SUB_PLAN = 0x21,
 }
 
 const ALLOW_REVERT_FLAG = 0x80
+const REVERTIBLE_COMMANDS = new Set<CommandType>([
+  CommandType.EXECUTE_SUB_PLAN,
+])
 
 const PERMIT_STRUCT =
   '((address token,uint160 amount,uint48 expiration,uint48 nonce) details,address spender,uint256 sigDeadline)'
