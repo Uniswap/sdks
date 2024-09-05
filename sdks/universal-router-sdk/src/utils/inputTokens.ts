@@ -47,8 +47,6 @@ export function encodePermit(planner: RoutePlanner, permit2: Permit2Permit): voi
 // Transfer: A Permit2 TransferFrom of tokens from a user to either the router or another address
 export function encodeInputTokenOptions(planner: RoutePlanner, options: InputTokenOptions) {
   // first ensure that all tokens provided for encoding are the same
-  if (!!options.approval && !!options.permit2Permit)
-    invariant(options.approval.token === options.permit2Permit.details.token, `inconsistent token`)
   if (!!options.permit2TransferFrom && !!options.permit2Permit)
     invariant(options.permit2TransferFrom.token === options.permit2Permit.details.token, `inconsistent token`)
 

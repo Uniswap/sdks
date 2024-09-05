@@ -7,6 +7,7 @@ import { Trade as RouterTrade } from '@uniswap/router-sdk'
 import { Currency, TradeType } from '@uniswap/sdk-core'
 import { UniswapTrade, SwapOptions } from './entities/actions/uniswap'
 import { RoutePlanner } from './utils/routerCommands'
+import { encodePermit } from './utils/inputTokens'
 
 export type SwapRouterConfig = {
   sender?: string // address
