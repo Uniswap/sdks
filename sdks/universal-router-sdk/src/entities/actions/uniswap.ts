@@ -9,6 +9,7 @@ import {
   IRoute,
   RouteV2,
   RouteV3,
+  RouteV4
   MixedRouteSDK,
   MixedRoute,
   SwapOptions as RouterSwapOptions,
@@ -92,6 +93,9 @@ export class UniswapTrade implements Command {
           break
         case Protocol.V3:
           addV3Swap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
+          break
+        case Protocol.V4:
+          addV4Swap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
           break
         case Protocol.MIXED:
           addMixedSwap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
@@ -224,6 +228,35 @@ function addV3Swap<TInput extends Currency, TOutput extends Currency>(
       routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient,
       trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
       routerMustCustody ? 0 : trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
+      path,
+      payerIsUser,
+    ])
+  } else if (tradeType == TradeType.EXACT_OUTPUT) {
+    planner.addCommand(CommandType.V3_SWAP_EXACT_OUT, [
+      routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient,
+      trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
+      trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
+      path,
+      payerIsUser,
+    ])
+  }
+}
+
+function addV4Swap<Tnput extends Currency, TOutput extends Currency(): void {
+  const trade = V4Trade.createUncheckedTrade({
+    route: route as RouteV4<TInput, TOutput>,
+    inputAmount,
+    outputAmount,
+    tradeType,
+  })
+
+  const path = encodeRouteToPath(route as RouteV3<TInput, TOutput>, trade.tradeType === TradeType.EXACT_OUTPUT)
+
+  if (tradeType == TradeType.EXACT_INPUT) {
+    planner.addCommand(CommandType.V4_SWAP_EXACT_IN, [
+      routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient,
+      trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
+      trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
       path,
       payerIsUser,
     ])
