@@ -72,13 +72,39 @@ describe('MixedRoute', () => {
       expect(route.chainId).toEqual(1)
     })
 
-    it('wraps mixed route object with v4 route successfully constructs a pth from the tokens', () => {
+    it('wraps mixed route object with v4 route successfully constructs a path from the tokens', () => {
       const route = new MixedRouteSDK([pool_v3_0_1, pool_v4_0_weth], token1, weth)
       expect(route.pools).toEqual([pool_v3_0_1, pool_v4_0_weth])
       expect(route.path).toEqual([token1, token0, weth])
       expect(route.input).toEqual(token1)
       expect(route.output).toEqual(weth)
       expect(route.chainId).toEqual(1)
+    })
+
+    it('wraps mixed route object with mixed v4 route that converts WETH -> ETH ', () => {
+      const route = new MixedRouteSDK([pool_v3_0_weth, pool_v4_1_eth], token0, token1)
+      expect(route.pools).toEqual([pool_v3_0_weth, pool_v4_1_eth])
+      expect(route.path).toEqual([token0, weth, token1])
+      expect(route.input).toEqual(token0)
+      expect(route.output).toEqual(token1)
+      expect(route.chainId).toEqual(1)
+    })
+
+    it('wraps mixed route object with mixed v4 route that converts ETH -> WETH ', () => {
+      const route = new MixedRouteSDK([pool_v4_1_eth, pool_v3_0_weth], token1, token0)
+      expect(route.pools).toEqual([pool_v4_1_eth, pool_v3_0_weth])
+      expect(route.path).toEqual([token1, ETHER, token0])
+      expect(route.input).toEqual(token1)
+      expect(route.output).toEqual(token0)
+      expect(route.chainId).toEqual(1)
+    })
+
+    it('cannot wrap mixed route object with pure v4 route that converts ETH -> WETH ', () => {
+      expect(() => new MixedRouteSDK([pool_v4_1_eth, pool_v4_0_weth], token1, token0)).toThrow('PATH')
+    })
+
+    it('cannot wrap mixed route object with pure v4 route that converts WETH -> ETH ', () => {
+      expect(() => new MixedRouteSDK([pool_v4_0_weth, pool_v4_1_eth], token0, token1)).toThrow('PATH')
     })
 
     it('wraps complex mixed route object and successfully constructs a path from the tokens', () => {
