@@ -70,6 +70,11 @@ export type PriorityOrderResolutionOptions = {
   currentBlock?: BigNumber;
 };
 
+export type V3OrderResolutionOptions = {
+  currentBlock: number;
+  filler?: string;
+}
+
 export type DutchOutput = {
   readonly token: string;
   readonly startAmount: BigNumber;

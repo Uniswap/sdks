@@ -2,9 +2,11 @@ import { SignatureLike } from "@ethersproject/bytes";
 import { PermitTransferFrom, PermitTransferFromData, SignatureTransfer, Witness } from "@uniswap/permit2-sdk";
 import { BigNumber, ethers } from "ethers";
 
-import { getPermit2 } from "../utils";
+import { getPermit2, ResolvedUniswapXOrder } from "../utils";
 
-import { BlockOverrides, OffChainOrder, OrderInfo, V3DutchInput, V3DutchInputJSON, V3DutchOutput, V3DutchOutputJSON } from "./types";
+import { BlockOverrides, OffChainOrder, OrderInfo, V3DutchInput, V3DutchInputJSON, V3DutchOutput, V3DutchOutputJSON, V3OrderResolutionOptions } from "./types";
+import { getBlockDecayedAmount } from "../utils/dutchBlockDecay";
+import { originalIfZero } from ".";
 
 export type CosignerDataJSON = {
     decayStartBlock: number;
@@ -131,7 +133,7 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                         relativeBlocks: output.curve.relativeBlocks,
                         relativeAmounts: output.curve.relativeAmounts.map(BigNumber.from),
                     },
-                }))
+                })),
             },
             chainId,
             _permit2Address
@@ -220,7 +222,7 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
         return {
             permitted: {
                 token: this.info.input.token,
-                amount: this.info.input.maxAmount
+                amount: this.info.input.maxAmount,
             },
             spender: this.info.reactor,
             nonce: this.info.nonce,
@@ -286,7 +288,7 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                         cosignerData.exclusiveFiller,
                         cosignerData.exclusivityOverrideBps,
                         cosignerData.inputOverride,
-                        cosignerData.outputOverrides
+                        cosignerData.outputOverrides,
                         ],
                     ],
                 ),
@@ -306,7 +308,7 @@ export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
             {
                 ...order.info,
                 cosignerData,
-                cosignature
+                cosignature,
             },
             order.chainId,
             order.permit2Address
@@ -334,7 +336,7 @@ export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
     }
 
     serialize(): string {
-        const encodedRelativeBlocks = encodeRelativeBlocks(this.info.input.curve.relativeBlocks);
+        const encodedInputRelativeBlocks = encodeRelativeBlocks(this.info.input.curve.relativeBlocks);
         const abiCoder = new ethers.utils.AbiCoder();
         return abiCoder.encode(V3_DUTCH_ORDER_ABI, [
             [
@@ -350,13 +352,13 @@ export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
                 [
                     this.info.input.token,
                     this.info.input.startAmount,
-                    [encodedRelativeBlocks, this.info.input.curve.relativeAmounts],
+                    [encodedInputRelativeBlocks, this.info.input.curve.relativeAmounts],
                     this.info.input.maxAmount,
                 ],
                 this.info.outputs.map(output => [
                     output.token,
                     output.startAmount,
-                    [encodedRelativeBlocks, output.curve.relativeAmounts],
+                    [encodeRelativeBlocks(output.curve.relativeBlocks), output.curve.relativeAmounts],
                     output.recipient,
                 ]),
                 [
@@ -378,11 +380,36 @@ export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
         );
     }
 
-    // resolve(options: OrderResolutionOptions): ResolvedUniswapXOrder {
-    //     return {
-
-    //     }
-    // } TODO
+    resolve(options: V3OrderResolutionOptions): ResolvedUniswapXOrder {
+        return {
+            input: {
+                token: this.info.input.token,
+                amount: getBlockDecayedAmount(
+                    {
+                        decayStartBlock: this.info.cosignerData.decayStartBlock,
+                        startAmount: originalIfZero(this.info.cosignerData.inputOverride, this.info.input.startAmount),
+                        relativeBlocks: this.info.input.curve.relativeBlocks,
+                        relativeAmounts: this.info.input.curve.relativeAmounts,
+                    },
+                    options.currentBlock
+                ),
+            },
+            outputs: this.info.outputs.map((output, idx) => {
+                return {
+                    token: output.token,
+                    amount: getBlockDecayedAmount(
+                        {
+                            decayStartBlock: this.info.cosignerData.decayStartBlock,
+                            startAmount: originalIfZero(this.info.cosignerData!.outputOverrides[idx], output.startAmount),
+                            relativeBlocks: output.curve.relativeBlocks,
+                            relativeAmounts: output.curve.relativeAmounts,
+                        },
+                        options.currentBlock
+                    ),
+                }
+            }),
+        };
+    }
 }
 
 function parseSerializedOrder(serialized: string): CosignedV3DutchOrderInfo {
@@ -396,18 +423,18 @@ function parseSerializedOrder(serialized: string): CosignedV3DutchOrderInfo {
                 nonce,
                 deadline,
                 additionalValidationContract,
-                additionalValidationData
+                additionalValidationData,
             ],
             cosigner,
             [
                 token,
                 startAmount,
                 [relativeBlocks, relativeAmounts],
-                maxAmount
+                maxAmount,
             ],
             outputs,
             [decayStartBlock, exclusiveFiller, exclusivityOverrideBps, inputOverride, outputOverrides],
-            cosignature
+            cosignature,
         ],
     ] = decoded;
 
@@ -426,9 +453,9 @@ function parseSerializedOrder(serialized: string): CosignedV3DutchOrderInfo {
             startAmount,
             curve: {
                 relativeBlocks: decodedRelativeBlocks,
-                relativeAmounts
+                relativeAmounts,
             },
-            maxAmount
+            maxAmount,
         },
         outputs: outputs.map(
             ([token, startAmount,[relativeBlocks, relativeAmounts],recipient]: [

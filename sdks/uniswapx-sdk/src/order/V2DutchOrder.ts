@@ -22,6 +22,7 @@ import {
   OrderResolutionOptions,
 } from "./types";
 import { CustomOrderValidation, parseValidation } from "./validation";
+import { originalIfZero } from ".";
 
 export type CosignerData = {
   decayStartTime: number;
@@ -555,10 +556,6 @@ export class CosignedV2DutchOrder extends UnsignedV2DutchOrder {
       this.info.cosignature
     );
   }
-}
-
-function originalIfZero(value: BigNumber, original: BigNumber): BigNumber {
-  return value.isZero() ? original : value;
 }
 
 function parseSerializedOrder(serialized: string): CosignedV2DutchOrderInfo {
