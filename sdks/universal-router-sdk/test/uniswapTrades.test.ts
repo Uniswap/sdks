@@ -690,8 +690,7 @@ describe('Uniswap', () => {
           : CurrencyAmount.fromRawAmount(tokenOut, amount)
       }
 
-      function compareUniswapTrades(left: UniswapTrade, right: UniswapTrade): void {
-      }
+      function compareUniswapTrades(left: UniswapTrade, right: UniswapTrade): void {}
 
       it('v2 - erc20 <> erc20', async () => {
         const [tokenIn, tokenOut] = [DAI, USDC]
