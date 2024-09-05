@@ -12,9 +12,14 @@ export async function getOutputAmount(
   if (pool instanceof V4Pool) {
     if (pool.involvesCurrency(amountIn.currency)) {
       return await pool.getOutputAmount(amountIn)
-    } else if (pool.involvesCurrency(amountIn.currency.wrapped)) {
-      return await pool.getOutputAmount(amountIn.wrapped)
+    }
+    if (pool.token0.wrapped.equals(amountIn.currency)) {
+      return await pool.getOutputAmount(CurrencyAmount.fromRawAmount(pool.token0, amountIn.quotient))
+    }
+    if (pool.token1.wrapped.equals(amountIn.currency)) {
+      return await pool.getOutputAmount(CurrencyAmount.fromRawAmount(pool.token1, amountIn.quotient))
     }
   }
+
   return await pool.getOutputAmount(amountIn.wrapped)
 }
