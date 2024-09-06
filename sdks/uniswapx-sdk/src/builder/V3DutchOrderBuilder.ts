@@ -18,6 +18,7 @@ export class V3DutchOrderBuilder extends OrderBuilder {
           this.info.outputs && this.info.outputs.length > 0,
           "outputs not set"
         );
+        // In V3, we are not enforcing that the startAmount is greater than the endAmount
         invariant(this.info.cosignerData !== undefined, "cosignerData not set");
         invariant(this.info.cosignerData.decayStartBlock !== undefined, "decayStartBlock not set");
         // In V3, we don't have a decayEndTime field and use OrderInfo.deadline field for Permit2
@@ -31,9 +32,8 @@ export class V3DutchOrderBuilder extends OrderBuilder {
             "exclusivityOverrideBps not set"
         );
         invariant(
-            this.info.cosignerData.inputOverride !== undefined &&
               this.info.cosignerData.inputOverride.lte(this.info.input.startAmount),
-            "inputOverride not set or larger than original input"
+            "inputOverride larger than original input"
         );
         invariant(
             this.info.cosignerData.outputOverrides.length > 0,
@@ -42,11 +42,11 @@ export class V3DutchOrderBuilder extends OrderBuilder {
         this.info.cosignerData.outputOverrides.forEach((override, idx) => {
             invariant(
                 override.gte(this.info.outputs![idx].startAmount),
-                "outputOverride not set or smaller than original output"
+                "outputOverride smaller than original output"
             );
         });
         invariant(this.info.input !== undefined, "original input not set");
-        //TODO: We need to check if the decayStartTime is before the deadline but it's hard because we have block unit vs timestamp unit
+        // We are not checking if the decayStartTime is before the deadline because it is not enforced in the smart contract
 
         return new CosignedV3DutchOrder(
             Object.assign(this.getOrderInfo(), {
@@ -105,14 +105,14 @@ export class V3DutchOrderBuilder extends OrderBuilder {
         return this;
     }
 
-    private initializeCosignerData(overrides: Partial<CosignerData>): void {
+    private initializeCosignerData(data: Partial<CosignerData>): void {
         this.info.cosignerData = {
           decayStartBlock: 0,
           exclusiveFiller: ethers.constants.AddressZero,
           exclusivityOverrideBps: BigNumber.from(0),
           inputOverride: BigNumber.from(0),
           outputOverrides: [],
-          ...overrides,
+          ...data,
         };
     }
 
@@ -135,9 +135,9 @@ export class V3DutchOrderBuilder extends OrderBuilder {
         
     inputOverride(inputOverride: BigNumber): this {
         if (!this.info.cosignerData) {
-        this.initializeCosignerData({ inputOverride });
+            this.initializeCosignerData({ inputOverride });
         } else {
-        this.info.cosignerData.inputOverride = inputOverride;
+            this.info.cosignerData.inputOverride = inputOverride;
         }
         return this;
     }
@@ -166,4 +166,58 @@ export class V3DutchOrderBuilder extends OrderBuilder {
         return this;
     }
 
+    cosignerData(cosignerData: CosignerData): this {
+        this.decayStartBlock(cosignerData.decayStartBlock);
+        this.exclusiveFiller(cosignerData.exclusiveFiller);
+        this.exclusivityOverrideBps(cosignerData.exclusivityOverrideBps);
+        this.inputOverride(cosignerData.inputOverride);
+        this.outputOverrides(cosignerData.outputOverrides);
+        return this;
+    }
+
+    exclusiveFiller(exclusiveFiller: string): this {
+        if (!this.info.cosignerData) {
+            this.initializeCosignerData({ exclusiveFiller });
+        } else {
+            this.info.cosignerData.exclusiveFiller = exclusiveFiller;
+        }
+        return this;
+    }
+
+    exclusivityOverrideBps(exclusivityOverrideBps: BigNumber): this {
+        if (!this.info.cosignerData) {
+            this.initializeCosignerData({ exclusivityOverrideBps });
+        } else {
+            this.info.cosignerData.exclusivityOverrideBps = exclusivityOverrideBps;
+        }
+        return this;
+    }
+
+    // ensures that we only change non fee outputs
+    nonFeeRecipient(newRecipient: string, feeRecipient?: string): this {
+        invariant(
+        newRecipient !== feeRecipient,
+        `newRecipient must be different from feeRecipient: ${newRecipient}`
+        );
+        if (!this.info.outputs) {
+            return this;
+        }
+        this.info.outputs = this.info.outputs.map((output) => {
+            // if fee output then pass through
+            if (
+                feeRecipient &&
+                output.recipient.toLowerCase() === feeRecipient.toLowerCase()
+            ) {
+                return output;
+            }
+
+            return {
+                ...output,
+                recipient: newRecipient,
+            };
+        });
+        return this;
+    }
+
+    //TODO: buildPartial(), fromOrder()
 }
