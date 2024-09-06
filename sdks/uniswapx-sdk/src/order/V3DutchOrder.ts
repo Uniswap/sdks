@@ -6,6 +6,7 @@ import { getPermit2, ResolvedUniswapXOrder } from "../utils";
 import { getBlockDecayedAmount } from "../utils/dutchBlockDecay";
 
 import { BlockOverrides, OffChainOrder, OrderInfo, V3DutchInput, V3DutchInputJSON, V3DutchOutput, V3DutchOutputJSON, V3OrderResolutionOptions } from "./types";
+
 import { originalIfZero } from ".";
 
 export type CosignerDataJSON = {
@@ -489,6 +490,7 @@ function encodeRelativeBlocks(relativeBlocks: number[]): BigNumber {
 }
 
 function decodeRelativeBlocks(packedData: BigNumber): number[] {
+    /*es-lint-disable-next-line*/
     let relativeBlocks: number[] = [];
     for (let i = 0; i < 16; i++) {
         const block = packedData.shr(i * 16).toNumber() & 0xFFFF;

@@ -1,8 +1,10 @@
 import { BigNumber } from "ethers";
+
 import { DutchOrder } from "./DutchOrder";
 import { CosignedPriorityOrder, UnsignedPriorityOrder } from "./PriorityOrder";
 import { RelayOrder } from "./RelayOrder";
 import { CosignedV2DutchOrder, UnsignedV2DutchOrder } from "./V2DutchOrder";
+import { CosignedV3DutchOrder, UnsignedV3DutchOrder } from "./V3DutchOrder";
 
 export * from "./DutchOrder";
 export * from "./PriorityOrder";
@@ -15,6 +17,8 @@ export type UniswapXOrder =
   | DutchOrder
   | UnsignedV2DutchOrder
   | CosignedV2DutchOrder
+  | UnsignedV3DutchOrder
+  | CosignedV3DutchOrder
   | UnsignedPriorityOrder
   | CosignedPriorityOrder;
 

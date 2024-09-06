@@ -1,10 +1,11 @@
 import { BigNumber } from "ethers";
-import { V3Decay } from "../order";
 
+import { V3Decay } from "../order";
 /*
 These functions mimic the smart contract functions as closely as possible to ensure that the same results are produced.
 Essentially Solidity translated to TypeScript.
 */
+/* eslint-disable */
 function locateArrayPosition(
     curve: V3Decay,
     targetValue: number

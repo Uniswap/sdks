@@ -54,6 +54,7 @@ export enum OrderType {
   Dutch = "Dutch",
   Relay = "Relay",
   Dutch_V2 = "Dutch_V2",
+  Dutch_V3 = "Dutch_V3",
   Limit = "Limit",
   Priority = "Priority",
 }
@@ -94,6 +95,7 @@ export const REACTOR_ADDRESS_MAPPING: ReactorMapping = {
     [OrderType.Dutch_V2]: "0x1bd1aAdc9E230626C44a139d7E70d842749351eb",
     [OrderType.Dutch]: "0x0000000000000000000000000000000000000000",
     [OrderType.Relay]: "0x0000000000000000000000000000000000000000",
+    [OrderType.Dutch_V3]: "0x4200000000000000000000000000000000000000",
   },
   8453: {
     [OrderType.Dutch]: "0x0000000000000000000000000000000000000000",
