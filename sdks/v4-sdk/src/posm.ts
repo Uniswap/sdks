@@ -174,8 +174,112 @@ export abstract class V4PositionManager {
    */
   private constructor() {}
 
+  public static collectCallParameters(options: CollectOptions): MethodParameters {
+    const calldatas: string[] = V4PositionManager.encodeCollect(options)
+
+    return {
+      calldata: Multicall.encodeMulticall(calldatas),
+      value: toHex(0),
+    }
+  }
+
   /**
-   * Functions to encode calldata for different actions on the PositionManager contract
+   * Produces the calldata for completely or partially exiting a position
+   * @param position The position to exit
+   * @param options Additional information necessary for generating the calldata
+   * @returns The call parameters
+   */
+  public static removeCallParameters(position: Position, options: DecreaseLiquidityOptions): MethodParameters {
+    const calldatas: string[] = []
+
+    // const deadline = toHex(options.deadline) // TODO?
+    const tokenId = toHex(options.tokenId)
+
+    // construct a partial position with a percentage of liquidity
+    const partialPosition = new Position({
+      pool: position.pool,
+      liquidity: options.liquidityPercentage.multiply(position.liquidity).quotient,
+      tickLower: position.tickLower,
+      tickUpper: position.tickUpper,
+    })
+    invariant(JSBI.greaterThan(partialPosition.liquidity, ZERO), 'ZERO_LIQUIDITY')
+
+    // slippage-adjusted underlying amounts
+    const { amount0: amount0Min, amount1: amount1Min } = partialPosition.burnAmountsWithSlippage(
+      options.slippageTolerance
+    )
+
+    if (options.permit) {
+      calldatas.push(
+        V4PositionManager.INTERFACE.encodeFunctionData('permit', [
+          validateAndParseAddress(options.permit.spender),
+          tokenId,
+          toHex(options.permit.deadline),
+          options.permit.nonce,
+          options.permit.signature,
+        ])
+      )
+    }
+
+    // remove liquidity
+    calldatas.push(
+      V4PositionManager.encodeDecrease(
+        tokenId,
+        partialPosition.liquidity.toString(),
+        amount0Min.toString(),
+        amount1Min.toString(),
+        options.hookData
+      )
+    )
+
+    // Collect fees
+    const { expectedCurrencyOwed0, expectedCurrencyOwed1, ...rest } = options.collectOptions
+    calldatas.push(
+      ...V4PositionManager.encodeCollect({
+        tokenId: toHex(options.tokenId),
+        // add the underlying value to the expected currency already owed
+        expectedCurrencyOwed0: expectedCurrencyOwed0.add(
+          CurrencyAmount.fromRawAmount(expectedCurrencyOwed0.currency, amount0Min)
+        ),
+        expectedCurrencyOwed1: expectedCurrencyOwed1.add(
+          CurrencyAmount.fromRawAmount(expectedCurrencyOwed1.currency, amount1Min)
+        ),
+        ...rest,
+      })
+    )
+
+    if (options.liquidityPercentage.equalTo(ONE)) {
+      if (options.burnToken) {
+        calldatas.push(V4PositionManager.encodeBurn(tokenId, amount0Min, amount1Min, options.hookData))
+      }
+    } else {
+      invariant(options.burnToken !== true, 'CANNOT_BURN')
+    }
+
+    return {
+      calldata: Multicall.encodeMulticall(calldatas),
+      value: toHex(0),
+    }
+  }
+
+  public static transferFromParameters(options: TransferOptions): MethodParameters {
+    const recipient = validateAndParseAddress(options.recipient)
+    const sender = validateAndParseAddress(options.sender)
+
+    let calldata: string
+    calldata = V4PositionManager.INTERFACE.encodeFunctionData('transferFrom(address,address,uint256)', [
+      sender,
+      recipient,
+      toHex(options.tokenId),
+    ])
+    return {
+      calldata: calldata,
+      value: toHex(0),
+    }
+  }
+
+  /**
+   * ---- Private functions to encode calldata for different actions on the PositionManager contract -----
    */
 
   // Initialize a pool
@@ -393,109 +497,5 @@ export abstract class V4PositionManager {
     }
 
     return calldatas
-  }
-
-  public static collectCallParameters(options: CollectOptions): MethodParameters {
-    const calldatas: string[] = V4PositionManager.encodeCollect(options)
-
-    return {
-      calldata: Multicall.encodeMulticall(calldatas),
-      value: toHex(0),
-    }
-  }
-
-  /**
-   * Produces the calldata for completely or partially exiting a position
-   * @param position The position to exit
-   * @param options Additional information necessary for generating the calldata
-   * @returns The call parameters
-   */
-  public static removeCallParameters(position: Position, options: DecreaseLiquidityOptions): MethodParameters {
-    const calldatas: string[] = []
-
-    // const deadline = toHex(options.deadline) // TODO?
-    const tokenId = toHex(options.tokenId)
-
-    // construct a partial position with a percentage of liquidity
-    const partialPosition = new Position({
-      pool: position.pool,
-      liquidity: options.liquidityPercentage.multiply(position.liquidity).quotient,
-      tickLower: position.tickLower,
-      tickUpper: position.tickUpper,
-    })
-    invariant(JSBI.greaterThan(partialPosition.liquidity, ZERO), 'ZERO_LIQUIDITY')
-
-    // slippage-adjusted underlying amounts
-    const { amount0: amount0Min, amount1: amount1Min } = partialPosition.burnAmountsWithSlippage(
-      options.slippageTolerance
-    )
-
-    if (options.permit) {
-      calldatas.push(
-        V4PositionManager.INTERFACE.encodeFunctionData('permit', [
-          validateAndParseAddress(options.permit.spender),
-          tokenId,
-          toHex(options.permit.deadline),
-          options.permit.nonce,
-          options.permit.signature,
-        ])
-      )
-    }
-
-    // remove liquidity
-    calldatas.push(
-      V4PositionManager.encodeDecrease(
-        tokenId,
-        partialPosition.liquidity.toString(),
-        amount0Min.toString(),
-        amount1Min.toString(),
-        options.hookData
-      )
-    )
-
-    // Collect fees
-    const { expectedCurrencyOwed0, expectedCurrencyOwed1, ...rest } = options.collectOptions
-    calldatas.push(
-      ...V4PositionManager.encodeCollect({
-        tokenId: toHex(options.tokenId),
-        // add the underlying value to the expected currency already owed
-        expectedCurrencyOwed0: expectedCurrencyOwed0.add(
-          CurrencyAmount.fromRawAmount(expectedCurrencyOwed0.currency, amount0Min)
-        ),
-        expectedCurrencyOwed1: expectedCurrencyOwed1.add(
-          CurrencyAmount.fromRawAmount(expectedCurrencyOwed1.currency, amount1Min)
-        ),
-        ...rest,
-      })
-    )
-
-    if (options.liquidityPercentage.equalTo(ONE)) {
-      if (options.burnToken) {
-        calldatas.push(V4PositionManager.encodeBurn(tokenId, amount0Min, amount1Min, options.hookData))
-      }
-    } else {
-      invariant(options.burnToken !== true, 'CANNOT_BURN')
-    }
-
-    return {
-      calldata: Multicall.encodeMulticall(calldatas),
-      value: toHex(0),
-    }
-  }
-
-  public static transferFromParameters(options: TransferOptions): MethodParameters {
-    const recipient = validateAndParseAddress(options.recipient)
-    const sender = validateAndParseAddress(options.sender)
-
-    let calldata: string
-    calldata = V4PositionManager.INTERFACE.encodeFunctionData('transferFrom(address,address,uint256)', [
-      sender,
-      recipient,
-      toHex(options.tokenId),
-    ])
-    return {
-      calldata: calldata,
-      value: toHex(0),
-    }
   }
 }
