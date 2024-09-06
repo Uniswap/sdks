@@ -147,3 +147,9 @@ export class RelayOrderParser extends OrderParser {
     return RelayOrder.parse(order, chainId);
   }
 }
+
+export function isCosigned(
+  order: UnsignedV2DutchOrder | CosignedV2DutchOrder
+): order is CosignedV2DutchOrder {
+  return (order as CosignedV2DutchOrder).info.cosignature !== undefined;
+}

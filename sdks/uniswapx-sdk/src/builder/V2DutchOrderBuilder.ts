@@ -11,7 +11,7 @@ import {
   UnsignedV2DutchOrder,
 } from "../order";
 import { ValidationInfo } from "../order/validation";
-import { getPermit2, getReactor } from "../utils";
+import { getPermit2, getReactor, isCosigned } from "../utils";
 
 import { OrderBuilder } from "./OrderBuilder";
 
@@ -287,9 +287,9 @@ export class V2DutchOrderBuilder extends OrderBuilder {
       "exclusivityOverrideBps not set"
     );
     invariant(
-      this.info.cosignerData.inputOverride !== undefined &&
+      this.info.cosignerData.inputOverride !== undefined && // inputOverride is defaulted to 0 because enforced to be of type BigNumber
         this.info.cosignerData.inputOverride.lte(this.info.input.startAmount),
-      "inputOverride not set or larger than original input"
+      "inputOverride larger than original input"
     );
     invariant(
       this.info.cosignerData.outputOverrides.length > 0,
@@ -338,10 +338,4 @@ export class V2DutchOrderBuilder extends OrderBuilder {
       ...overrides,
     };
   }
-}
-
-function isCosigned(
-  order: UnsignedV2DutchOrder | CosignedV2DutchOrder
-): order is CosignedV2DutchOrder {
-  return (order as CosignedV2DutchOrder).info.cosignature !== undefined;
 }

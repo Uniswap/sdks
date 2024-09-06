@@ -349,7 +349,7 @@ describe("V2DutchOrderBuilder", () => {
         .outputOverrides([OUTPUT_START_AMOUNT.mul(102).div(100)])
         .build()
     ).toThrow(
-      "Invariant failed: inputOverride not set or larger than original input"
+      "Invariant failed: inputOverride larger than original input"
     );
   });
 
