@@ -4,12 +4,42 @@ import invariant from "tiny-invariant";
 import { OrderType } from "../constants";
 import { CosignedV3DutchOrder, CosignedV3DutchOrderInfo, CosignerData, UnsignedV3DutchOrder } from "../order/V3DutchOrder";
 import { V3DutchInput, V3DutchOutput } from "../order/types";
-import { getPermit2, getReactor } from "../utils";
+import { getPermit2, getReactor, isCosigned } from "../utils";
 import { getEndAmount } from "../utils/dutchBlockDecay";
 
 import { OrderBuilder } from "./OrderBuilder";
 
 export class V3DutchOrderBuilder extends OrderBuilder {
+    static fromOrder<T extends UnsignedV3DutchOrder>(
+        order: T
+    ): V3DutchOrderBuilder {
+        const builder = new V3DutchOrderBuilder(order.chainId, order.info.reactor);
+        builder
+            .cosigner(order.info.cosigner)
+            .input(order.info.input)
+            .deadline(order.info.deadline)
+            .nonce(order.info.nonce)
+            .swapper(order.info.swapper)
+            .validation({
+                additionalValidationContract: order.info.additionalValidationContract,
+                additionalValidationData: order.info.additionalValidationData,
+            });
+
+        order.info.outputs.forEach((output) => {
+            builder.output(output);
+        });
+
+        if (isCosigned(order)) {
+            builder.cosignature(order.info.cosignature);
+            builder.decayStartBlock(order.info.cosignerData.decayStartBlock);
+            builder.exclusiveFiller(order.info.cosignerData.exclusiveFiller);
+            builder.inputOverride(order.info.cosignerData.inputOverride);
+            builder.exclusivityOverrideBps(order.info.cosignerData.exclusivityOverrideBps);
+            builder.outputOverrides(order.info.cosignerData.outputOverrides);
+        }
+        return builder;
+    }
+
     build(): CosignedV3DutchOrder {
         invariant(this.info.cosigner !== undefined, "cosigner not set");
         invariant(this.info.cosignature !== undefined, "cosignature not set");

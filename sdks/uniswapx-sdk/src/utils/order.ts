@@ -14,6 +14,7 @@ import {
 } from "../order";
 
 import { stripHexPrefix } from ".";
+import { CosignedV3DutchOrder, UnsignedV3DutchOrder } from "../order/V3DutchOrder";
 
 const UNISWAPX_ORDER_INFO_OFFSET = 64;
 const RELAY_ORDER_INFO_OFFSET = 64;
@@ -149,7 +150,14 @@ export class RelayOrderParser extends OrderParser {
 }
 
 export function isCosigned(
-  order: UnsignedV2DutchOrder | CosignedV2DutchOrder
-): order is CosignedV2DutchOrder {
-  return (order as CosignedV2DutchOrder).info.cosignature !== undefined;
+  order: UnsignedV2DutchOrder | CosignedV2DutchOrder | UnsignedV3DutchOrder | CosignedV3DutchOrder
+): order is CosignedV2DutchOrder | CosignedV3DutchOrder {
+  const parser = new UniswapXOrderParser();
+  if (parser.getOrderType(order) === OrderType.Dutch_V2) {
+    return (order as CosignedV2DutchOrder).info.cosignature !== undefined;
+  } else if (parser.getOrderType(order) === OrderType.Dutch_V3) {
+    return (order as CosignedV3DutchOrder).info.cosignature !== undefined;
+  } else {
+    return false;
+  }
 }
