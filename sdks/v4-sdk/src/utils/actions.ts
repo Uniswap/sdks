@@ -30,7 +30,7 @@ struct PoolKey {
     IHooks hooks;
 }
  */
-const POOL_KEY_STRUCT = '(address,address,uint24,int24,address)'
+const POOL_KEY_STRUCT = '(address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks)'
 
 /**
  struct PathKey {
@@ -83,4 +83,8 @@ export type RouterCommand = {
 export function encodeAction(type: ActionType, parameters: any[]): RouterCommand {
   const encodedInput = defaultAbiCoder.encode(ABI_DEFINITION[type], parameters)
   return { type, encodedInput }
+}
+
+export function decodeAction(type: ActionType, encodedInput: string): any {
+  return defaultAbiCoder.decode(ABI_DEFINITION[type], encodedInput)
 }
