@@ -270,13 +270,11 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   },
 }
 
-// Todo: Change `CHAIN_CONFIGS` to pull the UR address with v4
 export const UNIVERSAL_ROUTER_ADDRESS = (version: RouterVersion, chainId: number): string => {
   if (!(chainId in CHAIN_CONFIGS)) throw new Error(`Universal Router not deployed on chain ${chainId}`)
   return CHAIN_CONFIGS[chainId].routerConfigs[version].address
 }
 
-// Todo: Change `CHAIN_CONFIGS` to pull the UR address with v4
 export const UNIVERSAL_ROUTER_CREATION_BLOCK = (version: RouterVersion, chainId: number): number => {
   if (!(chainId in CHAIN_CONFIGS)) throw new Error(`Universal Router not deployed on chain ${chainId}`)
   return CHAIN_CONFIGS[chainId].routerConfigs[version].creationBlock
