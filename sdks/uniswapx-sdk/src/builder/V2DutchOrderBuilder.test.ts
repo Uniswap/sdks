@@ -574,7 +574,7 @@ describe("V2DutchOrderBuilder", () => {
   });
 
   describe("partial order tests", () => {
-    it("builds an unsigned partial order with default cosignerData values", () => {
+    it("builds an unsigned partial order with default cosignerData values", () => { //TODO: partial orders don't have cosignerData...
       const deadline = Math.floor(Date.now() / 1000) + 1000;
       const order = builder
         .cosigner(constants.AddressZero)

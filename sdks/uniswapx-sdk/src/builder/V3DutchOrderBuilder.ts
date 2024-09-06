@@ -2,12 +2,12 @@ import { BigNumber, ethers } from "ethers";
 import invariant from "tiny-invariant";
 
 import { OrderType } from "../constants";
-import { CosignedV3DutchOrder, CosignedV3DutchOrderInfo, CosignerData } from "../order/V3DutchOrder";
+import { CosignedV3DutchOrder, CosignedV3DutchOrderInfo, CosignerData, UnsignedV3DutchOrder } from "../order/V3DutchOrder";
+import { V3DutchInput, V3DutchOutput } from "../order/types";
 import { getPermit2, getReactor } from "../utils";
+import { getEndAmount } from "../utils/dutchBlockDecay";
 
 import { OrderBuilder } from "./OrderBuilder";
-import { V3DutchInput, V3DutchOutput } from "../order/types";
-import { getEndAmount } from "../utils/dutchBlockDecay";
 
 export class V3DutchOrderBuilder extends OrderBuilder {
     build(): CosignedV3DutchOrder {
@@ -41,6 +41,7 @@ export class V3DutchOrderBuilder extends OrderBuilder {
         );
         this.info.cosignerData.outputOverrides.forEach((override, idx) => {
             invariant(
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                 override.gte(this.info.outputs![idx].startAmount),
                 "outputOverride smaller than original output"
             );
@@ -219,5 +220,25 @@ export class V3DutchOrderBuilder extends OrderBuilder {
         return this;
     }
 
-    //TODO: buildPartial(), fromOrder()
+    buildPartial(): UnsignedV3DutchOrder { //build an unsigned order
+        invariant(this.info.cosigner !== undefined, "cosigner not set");
+        invariant(this.info.input !== undefined, "input not set");
+        invariant(
+          this.info.outputs && this.info.outputs.length > 0,
+          "outputs not set"
+        );
+        invariant(this.info.input !== undefined, "original input not set");
+        invariant(!this.info.deadline, "deadline not set");
+        invariant(!this.info.swapper, "swapper not set");
+        return new UnsignedV3DutchOrder(
+            Object.assign(this.getOrderInfo(), {
+                input: this.info.input,
+                outputs: this.info.outputs,
+                cosigner: this.info.cosigner,
+            }),
+            this.chainId,
+            this.permit2Address
+        );
+    }
+    //TODO: fromOrder()
 }

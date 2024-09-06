@@ -117,3 +117,4 @@ export function getEndAmount(
     }
     return startAmount.sub(relativeAmounts[relativeAmounts.length - 1]);
 }
+/* eslint-enable */

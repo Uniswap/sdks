@@ -401,7 +401,7 @@ export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
                     amount: getBlockDecayedAmount(
                         {
                             decayStartBlock: this.info.cosignerData.decayStartBlock,
-                            startAmount: originalIfZero(this.info.cosignerData!.outputOverrides[idx], output.startAmount),
+                            startAmount: originalIfZero(this.info.cosignerData.outputOverrides[idx], output.startAmount),
                             relativeBlocks: output.curve.relativeBlocks,
                             relativeAmounts: output.curve.relativeAmounts,
                         },
@@ -488,9 +488,8 @@ function encodeRelativeBlocks(relativeBlocks: number[]): BigNumber {
     }
     return packedData;
 }
-
+/* eslint-disable */
 function decodeRelativeBlocks(packedData: BigNumber): number[] {
-    /*es-lint-disable-next-line*/
     let relativeBlocks: number[] = [];
     for (let i = 0; i < 16; i++) {
         const block = packedData.shr(i * 16).toNumber() & 0xFFFF;
@@ -500,3 +499,4 @@ function decodeRelativeBlocks(packedData: BigNumber): number[] {
     }
     return relativeBlocks;
 }
+/* eslint-enable */

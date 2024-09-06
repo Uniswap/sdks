@@ -1,4 +1,5 @@
 import { BigNumber, constants } from "ethers";
+
 import { V3DutchOrderBuilder } from "./V3DutchOrderBuilder";
 
 const INPUT_TOKEN = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
@@ -377,8 +378,81 @@ describe("V3DutchOrderBuilder", () => {
             .swapper(constants.AddressZero)
             .nonce(BigNumber.from(100))
             .build()
-          ).toThrow("Invariant failed: Deadline must be in the future: 2121");
+        ).toThrow("Invariant failed: Deadline must be in the future: 2121");
+    });
+
+    it("Does not throw before an order has not been finished building", () => {
+        const deadline = Math.floor(Date.now() / 1000) + 1000;
+        expect(() =>
+          builder.deadline(deadline).decayStartBlock(21212121212121)
+        ).not.toThrowError();
+      });
+
+    it("Unknown chainId", () => {
+        const chainId = 99999999;
+        expect(() => new V3DutchOrderBuilder(chainId)).toThrow(
+            `Missing configuration for reactor: ${chainId}`
+        );
+    });
+    
+    describe("Partial order tests", () => {
+        it("Test valid order with buildPartial", () => {
+            const order = builder
+                .cosigner(constants.AddressZero)
+                .input({
+                    token: INPUT_TOKEN,
+                    startAmount: INPUT_START_AMOUNT,
+                    curve: {
+                        relativeBlocks: [1],
+                        relativeAmounts: [BigNumber.from(0)],
+                    },
+                    maxAmount: INPUT_START_AMOUNT.add(1),
+                })
+                .output({
+                    token: OUTPUT_TOKEN,
+                    startAmount: OUTPUT_START_AMOUNT,
+                    curve: {
+                        relativeBlocks: [4],
+                        relativeAmounts: [BigNumber.from(4)],
+                    },
+                    recipient: constants.AddressZero,
+                })
+                .swapper(constants.AddressZero)
+                .nonce(BigNumber.from(100))
+                .deadline(Math.floor(Date.now() / 1000) + 1000)
+                .buildPartial();
+            expect(order.info.outputs.length).toEqual(1);
+            expect(order.chainId).toBeDefined();
+            expect(order.info.reactor).toBeDefined();
         });
-
-
+    
+        it("Test invalid order with buildPartial", () => {
+            expect(() =>
+                builder
+                .cosigner(constants.AddressZero)
+                .input({
+                    token: INPUT_TOKEN,
+                    startAmount: INPUT_START_AMOUNT,
+                    curve: {
+                        relativeBlocks: [1],
+                        relativeAmounts: [BigNumber.from(0)],
+                    },
+                    maxAmount: INPUT_START_AMOUNT.add(1),
+                })
+                .output({
+                    token: OUTPUT_TOKEN,
+                    startAmount: OUTPUT_START_AMOUNT,
+                    curve: {
+                        relativeBlocks: [4],
+                        relativeAmounts: [BigNumber.from(4)],
+                    },
+                    recipient: constants.AddressZero,
+                })
+                // omitting swapper
+                .deadline(Math.floor(Date.now() / 1000) + 1000)
+                .nonce(BigNumber.from(100))
+                .buildPartial()
+            ).toThrow("Invariant failed: swapper not set");
+        });
+    });
 });
