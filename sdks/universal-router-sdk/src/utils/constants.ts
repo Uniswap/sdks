@@ -1,6 +1,6 @@
 import { BigNumber } from 'ethers'
 
-export enum RouterVersion {
+export enum UniversalRouterVersion {
   V1_2,
   V2_0,
 }
@@ -12,7 +12,7 @@ export type RouterConfig = {
 
 type ChainConfig = {
   weth: string
-  routerConfigs: { [key in RouterVersion]: RouterConfig }
+  routerConfigs: { [key in UniversalRouterVersion]: RouterConfig }
 }
 
 const WETH_NOT_SUPPORTED_ON_CHAIN = '0x0000000000000000000000000000000000000000'
@@ -23,11 +23,11 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   [1]: {
     weth: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
     routerConfigs: {
-      [RouterVersion.V1_2]: {
+      [UniversalRouterVersion.V1_2]: {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
         creationBlock: 17143817,
       },
-      [RouterVersion.V2_0]: {
+      [UniversalRouterVersion.V2_0]: {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
         creationBlock: 17143817,
       },
@@ -37,11 +37,11 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   [5]: {
     weth: '0xb4fbf271143f4fbf7b91a5ded31805e42b2208d6',
     routerConfigs: {
-      [RouterVersion.V1_2]: {
+      [UniversalRouterVersion.V1_2]: {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
         creationBlock: 8940568,
       },
-      [RouterVersion.V2_0]: {
+      [UniversalRouterVersion.V2_0]: {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
         creationBlock: 8940568,
       },
@@ -51,11 +51,11 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   [11155111]: {
     weth: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14',
     routerConfigs: {
-      [RouterVersion.V1_2]: {
+      [UniversalRouterVersion.V1_2]: {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
         creationBlock: 3543575,
       },
-      [RouterVersion.V2_0]: {
+      [UniversalRouterVersion.V2_0]: {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
         creationBlock: 3543575,
       },
@@ -65,11 +65,11 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   [137]: {
     weth: '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
     routerConfigs: {
-      [RouterVersion.V1_2]: {
+      [UniversalRouterVersion.V1_2]: {
         address: '0xec7BE89e9d109e7e3Fec59c222CF297125FEFda2',
         creationBlock: 52210153,
       },
-      [RouterVersion.V2_0]: {
+      [UniversalRouterVersion.V2_0]: {
         address: '0xec7BE89e9d109e7e3Fec59c222CF297125FEFda2',
         creationBlock: 52210153,
       },
@@ -79,11 +79,11 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   [80001]: {
     weth: '0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889',
     routerConfigs: {
-      [RouterVersion.V1_2]: {
+      [UniversalRouterVersion.V1_2]: {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
         creationBlock: 35176052,
       },
-      [RouterVersion.V2_0]: {
+      [UniversalRouterVersion.V2_0]: {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
         creationBlock: 35176052,
       },
@@ -93,11 +93,11 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   [10]: {
     weth: '0x4200000000000000000000000000000000000006',
     routerConfigs: {
-      [RouterVersion.V1_2]: {
+      [UniversalRouterVersion.V1_2]: {
         address: '0xCb1355ff08Ab38bBCE60111F1bb2B784bE25D7e8',
         creationBlock: 114702266,
       },
-      [RouterVersion.V2_0]: {
+      [UniversalRouterVersion.V2_0]: {
         address: '0xCb1355ff08Ab38bBCE60111F1bb2B784bE25D7e8',
         creationBlock: 114702266,
       },
@@ -107,11 +107,11 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   [420]: {
     weth: '0x4200000000000000000000000000000000000006',
     routerConfigs: {
-      [RouterVersion.V1_2]: {
+      [UniversalRouterVersion.V1_2]: {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
         creationBlock: 8887728,
       },
-      [RouterVersion.V2_0]: {
+      [UniversalRouterVersion.V2_0]: {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
         creationBlock: 8887728,
       },
@@ -121,11 +121,11 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   [42161]: {
     weth: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
     routerConfigs: {
-      [RouterVersion.V1_2]: {
+      [UniversalRouterVersion.V1_2]: {
         address: '0x5E325eDA8064b456f4781070C0738d849c824258',
         creationBlock: 169472836,
       },
-      [RouterVersion.V2_0]: {
+      [UniversalRouterVersion.V2_0]: {
         address: '0x5E325eDA8064b456f4781070C0738d849c824258',
         creationBlock: 169472836,
       },
@@ -135,11 +135,11 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   [421613]: {
     weth: '0xe39Ab88f8A4777030A534146A9Ca3B52bd5D43A3',
     routerConfigs: {
-      [RouterVersion.V1_2]: {
+      [UniversalRouterVersion.V1_2]: {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
         creationBlock: 18815277,
       },
-      [RouterVersion.V2_0]: {
+      [UniversalRouterVersion.V2_0]: {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
         creationBlock: 18815277,
       },
@@ -149,11 +149,11 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   [42220]: {
     weth: WETH_NOT_SUPPORTED_ON_CHAIN,
     routerConfigs: {
-      [RouterVersion.V1_2]: {
+      [UniversalRouterVersion.V1_2]: {
         address: '0x643770e279d5d0733f21d6dc03a8efbabf3255b4',
         creationBlock: 21407637,
       },
-      [RouterVersion.V2_0]: {
+      [UniversalRouterVersion.V2_0]: {
         address: '0x643770e279d5d0733f21d6dc03a8efbabf3255b4',
         creationBlock: 21407637,
       },
@@ -163,11 +163,11 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   [44787]: {
     weth: WETH_NOT_SUPPORTED_ON_CHAIN,
     routerConfigs: {
-      [RouterVersion.V1_2]: {
+      [UniversalRouterVersion.V1_2]: {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
         creationBlock: 17566658,
       },
-      [RouterVersion.V2_0]: {
+      [UniversalRouterVersion.V2_0]: {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
         creationBlock: 17566658,
       },
@@ -177,11 +177,11 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   [56]: {
     weth: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
     routerConfigs: {
-      [RouterVersion.V1_2]: {
+      [UniversalRouterVersion.V1_2]: {
         address: '0x4Dae2f939ACf50408e13d58534Ff8c2776d45265',
         creationBlock: 35160263,
       },
-      [RouterVersion.V2_0]: {
+      [UniversalRouterVersion.V2_0]: {
         address: '0x4Dae2f939ACf50408e13d58534Ff8c2776d45265',
         creationBlock: 35160263,
       },
@@ -191,11 +191,11 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   [43114]: {
     weth: '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7',
     routerConfigs: {
-      [RouterVersion.V1_2]: {
+      [UniversalRouterVersion.V1_2]: {
         address: '0x4Dae2f939ACf50408e13d58534Ff8c2776d45265',
         creationBlock: 40237257,
       },
-      [RouterVersion.V2_0]: {
+      [UniversalRouterVersion.V2_0]: {
         address: '0x4Dae2f939ACf50408e13d58534Ff8c2776d45265',
         creationBlock: 40237257,
       },
@@ -205,11 +205,11 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   [84531]: {
     weth: '0x4200000000000000000000000000000000000006',
     routerConfigs: {
-      [RouterVersion.V1_2]: {
+      [UniversalRouterVersion.V1_2]: {
         address: '0xd0872d928672ae2ff74bdb2f5130ac12229cafaf',
         creationBlock: 6915289,
       },
-      [RouterVersion.V2_0]: {
+      [UniversalRouterVersion.V2_0]: {
         address: '0xd0872d928672ae2ff74bdb2f5130ac12229cafaf',
         creationBlock: 6915289,
       },
@@ -219,11 +219,11 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   [8453]: {
     weth: '0x4200000000000000000000000000000000000006',
     routerConfigs: {
-      [RouterVersion.V1_2]: {
+      [UniversalRouterVersion.V1_2]: {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
         creationBlock: 9107268,
       },
-      [RouterVersion.V2_0]: {
+      [UniversalRouterVersion.V2_0]: {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
         creationBlock: 9107268,
       },
@@ -232,11 +232,11 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   [81457]: {
     weth: '0x4300000000000000000000000000000000000004',
     routerConfigs: {
-      [RouterVersion.V1_2]: {
+      [UniversalRouterVersion.V1_2]: {
         address: '0x643770E279d5D0733F21d6DC03A8efbABf3255B4',
         creationBlock: 1116444,
       },
-      [RouterVersion.V2_0]: {
+      [UniversalRouterVersion.V2_0]: {
         address: '0x643770E279d5D0733F21d6DC03A8efbABf3255B4',
         creationBlock: 1116444,
       },
@@ -245,11 +245,11 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   [7777777]: {
     weth: '0x4200000000000000000000000000000000000006',
     routerConfigs: {
-      [RouterVersion.V1_2]: {
+      [UniversalRouterVersion.V1_2]: {
         address: '0x2986d9721A49838ab4297b695858aF7F17f38014',
         creationBlock: 11832155,
       },
-      [RouterVersion.V2_0]: {
+      [UniversalRouterVersion.V2_0]: {
         address: '0x2986d9721A49838ab4297b695858aF7F17f38014',
         creationBlock: 11832155,
       },
@@ -258,11 +258,11 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   [324]: {
     weth: '0x5aea5775959fbc2557cc8789bc1bf90a239d9a91',
     routerConfigs: {
-      [RouterVersion.V1_2]: {
+      [UniversalRouterVersion.V1_2]: {
         address: '0x28731BCC616B5f51dD52CF2e4dF0E78dD1136C06',
         creationBlock: 12640979,
       },
-      [RouterVersion.V2_0]: {
+      [UniversalRouterVersion.V2_0]: {
         address: '0x28731BCC616B5f51dD52CF2e4dF0E78dD1136C06',
         creationBlock: 12640979,
       },
@@ -270,12 +270,12 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   },
 }
 
-export const UNIVERSAL_ROUTER_ADDRESS = (version: RouterVersion, chainId: number): string => {
+export const UNIVERSAL_ROUTER_ADDRESS = (version: UniversalRouterVersion, chainId: number): string => {
   if (!(chainId in CHAIN_CONFIGS)) throw new Error(`Universal Router not deployed on chain ${chainId}`)
   return CHAIN_CONFIGS[chainId].routerConfigs[version].address
 }
 
-export const UNIVERSAL_ROUTER_CREATION_BLOCK = (version: RouterVersion, chainId: number): number => {
+export const UNIVERSAL_ROUTER_CREATION_BLOCK = (version: UniversalRouterVersion, chainId: number): number => {
   if (!(chainId in CHAIN_CONFIGS)) throw new Error(`Universal Router not deployed on chain ${chainId}`)
   return CHAIN_CONFIGS[chainId].routerConfigs[version].creationBlock
 }

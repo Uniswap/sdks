@@ -8,4 +8,5 @@ export {
   PERMIT2_ADDRESS,
   ROUTER_AS_RECIPIENT,
   WETH_ADDRESS,
+  UniversalRouterVersion,
 } from './utils/constants'
