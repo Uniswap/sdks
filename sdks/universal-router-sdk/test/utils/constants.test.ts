@@ -11,7 +11,7 @@ describe('Universal Router Constants', () => {
   const chainIds = Object.keys(CHAIN_CONFIGS).map(Number)
   const versions = Object.keys(CHAIN_CONFIGS[1].routerConfigs) as unknown as RouterVersion[]
 
-  describe.only('UNIVERSAL_ROUTER_ADDRESS', () => {
+  describe('UNIVERSAL_ROUTER_ADDRESS', () => {
     versions.forEach((version) => {
       chainIds.forEach((chainId) => {
         it(`should return a valid address for version ${RouterVersion[version]} on chain ${chainId}`, () => {
