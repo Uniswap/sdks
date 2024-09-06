@@ -108,8 +108,11 @@ export function getBlockDecayedAmount(
 }
 
 export function getEndAmount(
-    config: DutchBlockDecayConfig
+    config: Partial<DutchBlockDecayConfig>
 ): BigNumber {
     const { startAmount, relativeAmounts } = config;
+    if (!startAmount || !relativeAmounts) {
+        throw new Error("Invalid config for getting V3 decay end amount"); //TODO: Should we throw?
+    }
     return startAmount.sub(relativeAmounts[relativeAmounts.length - 1]);
 }

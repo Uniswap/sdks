@@ -3,9 +3,9 @@ import { PermitTransferFrom, PermitTransferFromData, SignatureTransfer, Witness 
 import { BigNumber, ethers } from "ethers";
 
 import { getPermit2, ResolvedUniswapXOrder } from "../utils";
+import { getBlockDecayedAmount } from "../utils/dutchBlockDecay";
 
 import { BlockOverrides, OffChainOrder, OrderInfo, V3DutchInput, V3DutchInputJSON, V3DutchOutput, V3DutchOutputJSON, V3OrderResolutionOptions } from "./types";
-import { getBlockDecayedAmount } from "../utils/dutchBlockDecay";
 import { originalIfZero } from ".";
 
 export type CosignerDataJSON = {
@@ -465,16 +465,16 @@ function parseSerializedOrder(serialized: string): CosignedV3DutchOrderInfo {
             startAmount,
             curve: {
                 relativeBlocks: decodeRelativeBlocks(relativeBlocks),
-                relativeAmounts
+                relativeAmounts,
             },
-            recipient
+            recipient,
         })),
         cosignerData: {
             decayStartBlock: decayStartBlock.toNumber(),
             exclusiveFiller,
             exclusivityOverrideBps: exclusivityOverrideBps,
             inputOverride: inputOverride,
-            outputOverrides
+            outputOverrides,
         },
         cosignature,
     };

@@ -1,8 +1,8 @@
 import { expect } from "chai";
 import { BigNumber, ethers } from "ethers";
 
-import { CosignedV3DutchOrder, CosignedV3DutchOrderInfo, UnsignedV3DutchOrder, UnsignedV3DutchOrderInfoJSON } from "./V3DutchOrder";
 import { getEndAmount } from "../utils/dutchBlockDecay";
+import { CosignedV3DutchOrder, CosignedV3DutchOrderInfo, UnsignedV3DutchOrder, UnsignedV3DutchOrderInfoJSON } from "./V3DutchOrder";
 
 const TIME= 1725379823;
 const BLOCK_NUMBER = 20671221;
@@ -192,7 +192,7 @@ describe("V3DutchOrder", () => {
             expect(resolved.outputs[0].amount).eq(order.info.cosignerData.outputOverrides[0]);
         });
 
-        it("resolves at decayEndtime without overrides", () => {
+        it("resolves at last decay block without overrides", () => {
             const order = new CosignedV3DutchOrder(getFullOrderInfoWithoutOverrides, CHAIN_ID);
             const relativeBlocks = order.info.outputs[0].curve.relativeBlocks;
             const resolved = order.resolve({
@@ -225,5 +225,26 @@ describe("V3DutchOrder", () => {
             expect(resolved.outputs[0].amount.toNumber()).eq(endAmount.toNumber()); //deep eq on bignumber failed
         });
         //TODO: resolves for overrides
+        it("resolves when filler has exclusivity: Before Decay Start", () => {
+            const exclusiveFiller = ethers.Wallet.createRandom().address;
+            const order = new CosignedV3DutchOrder(
+                getFullOrderInfo({
+                    cosignerData: {
+                        ...COSIGNER_DATA_WITH_OVERRIDES,
+                        exclusiveFiller,
+                    },
+                }),
+                CHAIN_ID
+            );
+            const resolved = order.resolve({
+                currentBlock: BLOCK_NUMBER - 1,
+                filler: exclusiveFiller,
+            });
+            expect(resolved.input.token).eq(order.info.input.token);
+            expect(resolved.input.amount).eq(order.info.cosignerData.inputOverride);
+            expect(resolved.outputs.length).eq(1);
+            expect(resolved.outputs[0].token).eq(order.info.outputs[0].token);
+            expect(resolved.outputs[0].amount).eq(order.info.cosignerData.outputOverrides[0]);
+        });
     });
 });
