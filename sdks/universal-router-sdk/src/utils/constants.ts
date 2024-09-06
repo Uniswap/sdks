@@ -138,7 +138,7 @@ const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
 // Todo: Change `CHAIN_CONFIGS` to pull the UR address with v4
 export const UNIVERSAL_ROUTER_ADDRESS_V4 = (chainId: number): string => {
   if (!(chainId in CHAIN_CONFIGS)) throw new Error(`Universal Router not deployed on chain ${chainId}`)
-  return CHAIN_CONFIGS[chainId].v3Router
+  return CHAIN_CONFIGS[chainId].v4Router
 }
 
 export const UNIVERSAL_ROUTER_ADDRESS_V3 = (chainId: number): string => {
