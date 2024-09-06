@@ -1,15 +1,19 @@
 import { expect } from 'chai'
-import { RouterVersion, UNIVERSAL_ROUTER_ADDRESS, UNIVERSAL_ROUTER_CREATION_BLOCK, CHAIN_CONFIGS } from '../../src/utils/constants'
+import {
+  RouterVersion,
+  UNIVERSAL_ROUTER_ADDRESS,
+  UNIVERSAL_ROUTER_CREATION_BLOCK,
+  CHAIN_CONFIGS,
+} from '../../src/utils/constants'
 
 describe('Universal Router Constants', () => {
-    // only the chain numbers that have a router deployed
+  // only the chain numbers that have a router deployed
   const chainIds = Object.keys(CHAIN_CONFIGS).map(Number)
   const versions = Object.keys(CHAIN_CONFIGS[1].routerConfigs) as unknown as RouterVersion[]
 
   describe.only('UNIVERSAL_ROUTER_ADDRESS', () => {
     versions.forEach((version) => {
       chainIds.forEach((chainId) => {
-      
         it(`should return a valid address for version ${RouterVersion[version]} on chain ${chainId}`, () => {
           const address = UNIVERSAL_ROUTER_ADDRESS(version, chainId)
           expect(address).to.be.a('string')

@@ -12,11 +12,10 @@ export type RouterConfig = {
 
 type ChainConfig = {
   weth: string
-  routerConfigs: { [key in RouterVersion]: RouterConfig } 
+  routerConfigs: { [key in RouterVersion]: RouterConfig }
 }
 
 const WETH_NOT_SUPPORTED_ON_CHAIN = '0x0000000000000000000000000000000000000000'
-
 
 // Todo: Change `CHAIN_CONFIGS` to pull the UR address with v4
 export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
@@ -24,13 +23,13 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   [1]: {
     weth: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
     routerConfigs: {
-    [RouterVersion.V1_2]: {
-      address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
-      creationBlock: 17143817,
-    },
-    [RouterVersion.V2_0]: {
-      address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
-      creationBlock: 17143817,
+      [RouterVersion.V1_2]: {
+        address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
+        creationBlock: 17143817,
+      },
+      [RouterVersion.V2_0]: {
+        address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
+        creationBlock: 17143817,
       },
     },
   },
@@ -267,7 +266,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x28731BCC616B5f51dD52CF2e4dF0E78dD1136C06',
         creationBlock: 12640979,
       },
-  },
+    },
   },
 }
 
