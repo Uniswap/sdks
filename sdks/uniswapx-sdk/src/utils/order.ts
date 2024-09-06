@@ -12,9 +12,9 @@ import {
   UnsignedPriorityOrder,
   UnsignedV2DutchOrder,
 } from "../order";
+import { CosignedV3DutchOrder, UnsignedV3DutchOrder } from "../order/V3DutchOrder";
 
 import { stripHexPrefix } from ".";
-import { CosignedV3DutchOrder, UnsignedV3DutchOrder } from "../order/V3DutchOrder";
 
 const UNISWAPX_ORDER_INFO_OFFSET = 64;
 const RELAY_ORDER_INFO_OFFSET = 64;

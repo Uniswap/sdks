@@ -1,7 +1,8 @@
 import { BigNumber, constants } from "ethers";
 
-import { V3DutchOrderBuilder } from "./V3DutchOrderBuilder";
 import { CosignedV3DutchOrder, UnsignedV3DutchOrder } from "../order/V3DutchOrder";
+
+import { V3DutchOrderBuilder } from "./V3DutchOrderBuilder";
 
 const INPUT_TOKEN = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
 const OUTPUT_TOKEN = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2";

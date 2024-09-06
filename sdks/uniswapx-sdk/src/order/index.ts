@@ -12,6 +12,7 @@ export * from "./RelayOrder";
 export * from "./types";
 export * from "./validation";
 export * from "./V2DutchOrder";
+// TODO: To make v3 exports cleaner, export here but resolve ambiguous names vs V2
 
 export type UniswapXOrder =
   | DutchOrder
