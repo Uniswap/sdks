@@ -4,7 +4,7 @@ export * from './utils/routerTradeAdapter'
 export { RoutePlanner, CommandType } from './utils/routerCommands'
 export {
   UNIVERSAL_ROUTER_ADDRESS,
-  UNIVERSAL_ROUTER_CREATION_BLOCK,
+  UNIVERSAL_ROUTER_CREATION_BLOCK_V1_2 as UNIVERSAL_ROUTER_CREATION_BLOCK,
   PERMIT2_ADDRESS,
   ROUTER_AS_RECIPIENT,
   WETH_ADDRESS,

@@ -2,8 +2,9 @@ import { BigNumber } from 'ethers'
 
 type ChainConfig = {
   v1_2Router: string
-  v2Router: string
-  creationBlock: number
+  v2_0Router: string
+  v1_2creationBlock: number
+  v2_0creationBlock: number
   weth: string
 }
 
@@ -13,132 +14,150 @@ const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // mainnet
   [1]: {
     v1_2Router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
-    v2Router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
+    v2_0Router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
     weth: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
-    creationBlock: 17143817,
+    v1_2creationBlock: 17143817,
+    v2_0creationBlock: 17143817,
   },
   // goerli
   [5]: {
     v1_2Router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
-    v2Router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
+    v2_0Router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
     weth: '0xb4fbf271143f4fbf7b91a5ded31805e42b2208d6',
-    creationBlock: 8940568,
+    v1_2creationBlock: 8940568,
+    v2_0creationBlock: 8940568,
   },
   // sepolia
   [11155111]: {
     v1_2Router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
-    v2Router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
+    v2_0Router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
     weth: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14',
-    creationBlock: 3543575,
+    v1_2creationBlock: 3543575,
+    v2_0creationBlock: 3543575,
   },
   // polygon
   [137]: {
     v1_2Router: '0xec7BE89e9d109e7e3Fec59c222CF297125FEFda2',
-    v2Router: '0xec7BE89e9d109e7e3Fec59c222CF297125FEFda2',
+    v2_0Router: '0xec7BE89e9d109e7e3Fec59c222CF297125FEFda2',
     weth: '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
-    creationBlock: 52210153,
+    v1_2creationBlock: 52210153,
+    v2_0creationBlock: 52210153,
   },
   //polygon mumbai
   [80001]: {
     v1_2Router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
-    v2Router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
+    v2_0Router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
     weth: '0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889',
-    creationBlock: 35176052,
+    v1_2creationBlock: 35176052,
+    v2_0creationBlock: 35176052,
   },
   //optimism
   [10]: {
     v1_2Router: '0xCb1355ff08Ab38bBCE60111F1bb2B784bE25D7e8',
-    v2Router: '0xCb1355ff08Ab38bBCE60111F1bb2B784bE25D7e8',
+    v2_0Router: '0xCb1355ff08Ab38bBCE60111F1bb2B784bE25D7e8',
     weth: '0x4200000000000000000000000000000000000006',
-    creationBlock: 114702266,
+    v1_2creationBlock: 114702266,
+    v2_0creationBlock: 114702266,
   },
   // optimism goerli
   [420]: {
     v1_2Router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
-    v2Router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
+    v2_0Router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
     weth: '0x4200000000000000000000000000000000000006',
-    creationBlock: 8887728,
+    v1_2creationBlock: 8887728,
+    v2_0creationBlock: 8887728,
   },
   // arbitrum
   [42161]: {
     v1_2Router: '0x5E325eDA8064b456f4781070C0738d849c824258',
-    v2Router: '0x5E325eDA8064b456f4781070C0738d849c824258',
+    v2_0Router: '0x5E325eDA8064b456f4781070C0738d849c824258',
     weth: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
-    creationBlock: 169472836,
+    v1_2creationBlock: 169472836,
+    v2_0creationBlock: 169472836,
   },
   // arbitrum goerli
   [421613]: {
     v1_2Router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
-    v2Router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
+    v2_0Router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
     weth: '0xe39Ab88f8A4777030A534146A9Ca3B52bd5D43A3',
-    creationBlock: 18815277,
+    v1_2creationBlock: 18815277,
+    v2_0creationBlock: 18815277,
   },
   // celo
   [42220]: {
     v1_2Router: '0x643770e279d5d0733f21d6dc03a8efbabf3255b4',
-    v2Router: '0x643770e279d5d0733f21d6dc03a8efbabf3255b4',
+    v2_0Router: '0x643770e279d5d0733f21d6dc03a8efbabf3255b4',
     weth: WETH_NOT_SUPPORTED_ON_CHAIN,
-    creationBlock: 21407637,
+    v1_2creationBlock: 21407637,
+    v2_0creationBlock: 21407637,
   },
   // celo alfajores
   [44787]: {
     v1_2Router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
-    v2Router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
+    v2_0Router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
     weth: WETH_NOT_SUPPORTED_ON_CHAIN,
-    creationBlock: 17566658,
+    v1_2creationBlock: 17566658,
+    v2_0creationBlock: 17566658,
   },
   // binance smart chain
   [56]: {
     v1_2Router: '0x4Dae2f939ACf50408e13d58534Ff8c2776d45265',
-    v2Router: '0x4Dae2f939ACf50408e13d58534Ff8c2776d45265',
+    v2_0Router: '0x4Dae2f939ACf50408e13d58534Ff8c2776d45265',
     weth: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
-    creationBlock: 35160263,
+    v1_2creationBlock: 35160263,
+    v2_0creationBlock: 35160263,
   },
   // avalanche
   [43114]: {
     v1_2Router: '0x4Dae2f939ACf50408e13d58534Ff8c2776d45265',
-    v2Router: '0x4Dae2f939ACf50408e13d58534Ff8c2776d45265',
+    v2_0Router: '0x4Dae2f939ACf50408e13d58534Ff8c2776d45265',
     weth: '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7',
-    creationBlock: 40237257,
+    v1_2creationBlock: 40237257,
+    v2_0creationBlock: 40237257,
   },
   // base goerli
   [84531]: {
     v1_2Router: '0xd0872d928672ae2ff74bdb2f5130ac12229cafaf',
-    v2Router: '0xd0872d928672ae2ff74bdb2f5130ac12229cafaf',
+    v2_0Router: '0xd0872d928672ae2ff74bdb2f5130ac12229cafaf',
     weth: '0x4200000000000000000000000000000000000006',
-    creationBlock: 6915289,
+    v1_2creationBlock: 6915289,
+    v2_0creationBlock: 6915289,
   },
   // base mainnet
   [8453]: {
     v1_2Router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
-    v2Router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
+    v2_0Router: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
     weth: '0x4200000000000000000000000000000000000006',
-    creationBlock: 9107268,
+    v1_2creationBlock: 9107268,
+    v2_0creationBlock: 9107268,
   },
   [81457]: {
     v1_2Router: '0x643770E279d5D0733F21d6DC03A8efbABf3255B4',
-    v2Router: '0x643770E279d5D0733F21d6DC03A8efbABf3255B4',
+    v2_0Router: '0x643770E279d5D0733F21d6DC03A8efbABf3255B4',
     weth: '0x4300000000000000000000000000000000000004',
-    creationBlock: 1116444,
+    v1_2creationBlock: 1116444,
+    v2_0creationBlock: 1116444,
   },
   [7777777]: {
     v1_2Router: '0x2986d9721A49838ab4297b695858aF7F17f38014',
-    v2Router: '0x2986d9721A49838ab4297b695858aF7F17f38014',
+    v2_0Router: '0x2986d9721A49838ab4297b695858aF7F17f38014',
     weth: '0x4200000000000000000000000000000000000006',
-    creationBlock: 11832155,
+    v1_2creationBlock: 11832155,
+    v2_0creationBlock: 11832155,
   },
   [324]: {
     v1_2Router: '0x28731BCC616B5f51dD52CF2e4dF0E78dD1136C06',
-    v2Router: '0x28731BCC616B5f51dD52CF2e4dF0E78dD1136C06',
+    v2_0Router: '0x28731BCC616B5f51dD52CF2e4dF0E78dD1136C06',
     weth: '0x5aea5775959fbc2557cc8789bc1bf90a239d9a91',
-    creationBlock: 12640979,
+    v1_2creationBlock: 12640979,
+    v2_0creationBlock: 12640979,
   },
 }
 
 // Todo: Change `CHAIN_CONFIGS` to pull the UR address with v4
-export const UNIVERSAL_ROUTER_ADDRESS_V2 = (chainId: number): string => {
+export const UNIVERSAL_ROUTER_ADDRESS_V2_0 = (chainId: number): string => {
   if (!(chainId in CHAIN_CONFIGS)) throw new Error(`Universal Router not deployed on chain ${chainId}`)
-  return CHAIN_CONFIGS[chainId].v2Router
+  return CHAIN_CONFIGS[chainId].v2_0Router
 }
 
 export const UNIVERSAL_ROUTER_ADDRESS_V1_2 = (chainId: number): string => {
@@ -146,9 +165,15 @@ export const UNIVERSAL_ROUTER_ADDRESS_V1_2 = (chainId: number): string => {
   return CHAIN_CONFIGS[chainId].v1_2Router
 }
 
-export const UNIVERSAL_ROUTER_CREATION_BLOCK = (chainId: number): number => {
+// Todo: Change `CHAIN_CONFIGS` to pull the UR address with v4
+export const UNIVERSAL_ROUTER_CREATION_BLOCK_V1_2 = (chainId: number): number => {
   if (!(chainId in CHAIN_CONFIGS)) throw new Error(`Universal Router not deployed on chain ${chainId}`)
-  return CHAIN_CONFIGS[chainId].creationBlock
+  return CHAIN_CONFIGS[chainId].v1_2creationBlock
+}
+
+export const UNIVERSAL_ROUTER_CREATION_BLOCK_V2_0 = (chainId: number): number => {
+  if (!(chainId in CHAIN_CONFIGS)) throw new Error(`Universal Router not deployed on chain ${chainId}`)
+  return CHAIN_CONFIGS[chainId].v2_0creationBlock
 }
 
 export const WETH_ADDRESS = (chainId: number): string => {
