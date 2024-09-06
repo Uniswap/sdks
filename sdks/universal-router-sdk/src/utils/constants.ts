@@ -17,6 +17,8 @@ type ChainConfig = {
 
 const WETH_NOT_SUPPORTED_ON_CHAIN = '0x0000000000000000000000000000000000000000'
 
+
+// Todo: Change `CHAIN_CONFIGS` to pull the UR address with v4
 const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // mainnet
   [1]: {
