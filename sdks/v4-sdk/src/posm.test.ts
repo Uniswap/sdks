@@ -5,7 +5,7 @@ import { Position } from './entities/position'
 import { V4PositionManager } from './posm'
 import { encodeSqrtRatioX96 } from './utils/encodeSqrtRatioX96'
 import { Multicall } from './multicall'
-import { ActionType, decodeAction, encodeAction } from './utils/actions'
+import { ActionType, encodeAction } from './utils/actions'
 
 describe('POSM', () => {
   const token0 = new Token(1, '0x0000000000000000000000000000000000000001', 18, 't0', 'token0')
@@ -104,7 +104,8 @@ describe('POSM', () => {
       )
       // Expect there to be a settle pair call afterwards
       expect(calldatas[1]).toEqual(
-        encodeAction(ActionType.SETTLE_PAIR, [pool_0_1.token0.wrapped.address, pool_0_1.token1.wrapped.address]).encodedInput
+        encodeAction(ActionType.SETTLE_PAIR, [pool_0_1.token0.wrapped.address, pool_0_1.token1.wrapped.address])
+          .encodedInput
       )
       expect(value).toEqual('0x00')
     })
@@ -122,16 +123,11 @@ describe('POSM', () => {
 
       const calldatas = Multicall.decodeMulticall(calldata)
       // Expect increase liquidity to be called correctly
-      expect(calldatas[0]).toEqual(encodeAction(ActionType.INCREASE_LIQUIDITY, [
-        tokenId,
-        1,
-        0,
-        0,
-        '0x'
-      ]).encodedInput)
+      expect(calldatas[0]).toEqual(encodeAction(ActionType.INCREASE_LIQUIDITY, [tokenId, 1, 0, 0, '0x']).encodedInput)
       // Expect there to be a settle pair call afterwards
       expect(calldatas[1]).toEqual(
-        encodeAction(ActionType.SETTLE_PAIR, [pool_0_1.token0.wrapped.address, pool_0_1.token1.wrapped.address]).encodedInput
+        encodeAction(ActionType.SETTLE_PAIR, [pool_0_1.token0.wrapped.address, pool_0_1.token1.wrapped.address])
+          .encodedInput
       )
 
       expect(value).toEqual('0x00')
@@ -169,9 +165,10 @@ describe('POSM', () => {
       )
       // Expect there to be a settle pair call afterwards
       expect(calldatas[2]).toEqual(
-        encodeAction(ActionType.SETTLE_PAIR, [pool_0_1.token0.wrapped.address, pool_0_1.token1.wrapped.address]).encodedInput
+        encodeAction(ActionType.SETTLE_PAIR, [pool_0_1.token0.wrapped.address, pool_0_1.token1.wrapped.address])
+          .encodedInput
       )
-        
+
       expect(value).toEqual('0x00')
     })
   })
@@ -187,13 +184,14 @@ describe('POSM', () => {
 
       const calldatas = Multicall.decodeMulticall(calldata)
       // Expect decrease liquidity to be called correctly with 0 amounts
-      expect(calldatas[0]).toEqual(
-        encodeAction(ActionType.DECREASE_LIQUIDITY, [tokenId, 0, 0, 0, '0x']).encodedInput
-      )
+      expect(calldatas[0]).toEqual(encodeAction(ActionType.DECREASE_LIQUIDITY, [tokenId, 0, 0, 0, '0x']).encodedInput)
       // Expect take pair to be called correctly
       expect(calldatas[1]).toEqual(
-        encodeAction(ActionType.TAKE_PAIR, [pool_0_1.token0.wrapped.address, pool_0_1.token1.wrapped.address, recipient])
-          .encodedInput
+        encodeAction(ActionType.TAKE_PAIR, [
+          pool_0_1.token0.wrapped.address,
+          pool_0_1.token1.wrapped.address,
+          recipient,
+        ]).encodedInput
       )
       expect(value).toEqual('0x00')
     })
@@ -299,17 +297,16 @@ describe('POSM', () => {
       const calldatas = Multicall.decodeMulticall(calldata)
       expect(calldatas.length).toEqual(3)
       // Expect decrease liquidity to be called correctly with amounts
-      expect(calldatas[0]).toEqual(
-        encodeAction(ActionType.DECREASE_LIQUIDITY, [tokenId, 100, 0, 0, '0x']).encodedInput
-      )
+      expect(calldatas[0]).toEqual(encodeAction(ActionType.DECREASE_LIQUIDITY, [tokenId, 100, 0, 0, '0x']).encodedInput)
       // Expect take pair to be called correctly
       expect(calldatas[1]).toEqual(
-        encodeAction(ActionType.TAKE_PAIR, [pool_0_1.token0.wrapped.address, pool_0_1.token1.wrapped.address, recipient])
-          .encodedInput
+        encodeAction(ActionType.TAKE_PAIR, [
+          pool_0_1.token0.wrapped.address,
+          pool_0_1.token1.wrapped.address,
+          recipient,
+        ]).encodedInput
       )
-      expect(calldatas[2]).toEqual(
-        encodeAction(ActionType.BURN_POSITION, [tokenId, 0, 0, '0x']).encodedInput
-      )
+      expect(calldatas[2]).toEqual(encodeAction(ActionType.BURN_POSITION, [tokenId, 0, 0, '0x']).encodedInput)
 
       expect(value).toEqual('0x00')
     })

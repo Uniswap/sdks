@@ -32,17 +32,6 @@ struct PoolKey {
  */
 const POOL_KEY_STRUCT = '(address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks)'
 
-/**
- struct PathKey {
-    Currency intermediateCurrency;
-    uint24 fee;
-    int24 tickSpacing;
-    IHooks hooks;
-    bytes hookData;
-  }
- */
-const PATH_KEY_STRUCT = '(address,uint24,int24,address,bytes)'
-
 export const ABI_DEFINITION: { [key in ActionType]: string[] } = {
   [ActionType.INCREASE_LIQUIDITY]: [
     'uint256 tokenId',
@@ -83,8 +72,4 @@ export type RouterCommand = {
 export function encodeAction(type: ActionType, parameters: any[]): RouterCommand {
   const encodedInput = defaultAbiCoder.encode(ABI_DEFINITION[type], parameters)
   return { type, encodedInput }
-}
-
-export function decodeAction(type: ActionType, encodedInput: string): any {
-  return defaultAbiCoder.decode(ABI_DEFINITION[type], encodedInput)
 }
