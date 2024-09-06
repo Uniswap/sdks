@@ -101,6 +101,16 @@ export class UniswapXOrderParser extends OrderParser {
         // if cosignature exists then returned cosigned version
         return cosignedOrder;
       }
+      case OrderType.Dutch_V3: {
+        // cosigned and unsigned serialized versions are the same format
+        const cosignedOrder = CosignedV3DutchOrder.parse(order, chainId);
+        // if no cosignature, returned unsigned variant
+        if (cosignedOrder.info.cosignature === "0x") {
+          return UnsignedV3DutchOrder.parse(order, chainId);
+        }
+        // if cosignature exists then returned cosigned version
+        return cosignedOrder;
+      }
       case OrderType.Priority: {
         // cosigned and unsigned serialized versions are the same format
         const cosignedOrder = CosignedPriorityOrder.parse(order, chainId);
@@ -149,15 +159,14 @@ export class RelayOrderParser extends OrderParser {
   }
 }
 
-export function isCosigned(
-  order: UnsignedV2DutchOrder | CosignedV2DutchOrder | UnsignedV3DutchOrder | CosignedV3DutchOrder
-): order is CosignedV2DutchOrder | CosignedV3DutchOrder {
-  const parser = new UniswapXOrderParser();
-  if (parser.getOrderType(order) === OrderType.Dutch_V2) {
-    return (order as CosignedV2DutchOrder).info.cosignature !== undefined;
-  } else if (parser.getOrderType(order) === OrderType.Dutch_V3) {
-    return (order as CosignedV3DutchOrder).info.cosignature !== undefined;
-  } else {
-    return false;
-  }
+export function isCosignedV2(
+  order: UnsignedV2DutchOrder | CosignedV2DutchOrder
+): order is CosignedV2DutchOrder {
+  return (order as CosignedV2DutchOrder).info.cosignature !== undefined;
+}
+
+export function isCosignedV3(
+  order: UnsignedV3DutchOrder | CosignedV3DutchOrder
+): order is CosignedV3DutchOrder {
+  return (order as CosignedV3DutchOrder).info.cosignature !== undefined;
 }

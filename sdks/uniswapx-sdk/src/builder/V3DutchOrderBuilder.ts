@@ -4,7 +4,7 @@ import invariant from "tiny-invariant";
 import { OrderType } from "../constants";
 import { CosignedV3DutchOrder, CosignedV3DutchOrderInfo, CosignerData, UnsignedV3DutchOrder } from "../order/V3DutchOrder";
 import { V3DutchInput, V3DutchOutput } from "../order/types";
-import { getPermit2, getReactor, isCosigned } from "../utils";
+import { getPermit2, getReactor, isCosignedV3 } from "../utils";
 import { getEndAmount } from "../utils/dutchBlockDecay";
 
 import { OrderBuilder } from "./OrderBuilder";
@@ -29,7 +29,7 @@ export class V3DutchOrderBuilder extends OrderBuilder {
             builder.output(output);
         });
 
-        if (isCosigned(order)) {
+        if (isCosignedV3(order)) {
             builder.cosignature(order.info.cosignature);
             builder.decayStartBlock(order.info.cosignerData.decayStartBlock);
             builder.exclusiveFiller(order.info.cosignerData.exclusiveFiller);

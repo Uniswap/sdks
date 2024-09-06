@@ -297,6 +297,18 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
         )
     }
 
+    static parse(
+        encoded: string,
+        chainId: number,
+        permit2?: string
+      ): UnsignedV3DutchOrder {
+        return new UnsignedV3DutchOrder(
+          parseSerializedOrder(encoded),
+          chainId,
+          permit2
+        );
+    }
+
 }
 
 export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
