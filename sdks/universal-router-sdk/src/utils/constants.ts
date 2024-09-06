@@ -95,11 +95,11 @@ const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
     weth: '0x4200000000000000000000000000000000000006',
     routerConfigs: {
       [RouterVersion.V1_2]: {
-        address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
+        address: '0xCb1355ff08Ab38bBCE60111F1bb2B784bE25D7e8',
         creationBlock: 114702266,
       },
       [RouterVersion.V2_0]: {
-        address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
+        address: '0xCb1355ff08Ab38bBCE60111F1bb2B784bE25D7e8',
         creationBlock: 114702266,
       },
     },
