@@ -1,10 +1,10 @@
 import {
   UNIVERSAL_ROUTER_ADDRESS,
   PERMIT2_ADDRESS as MAINNET_PERMIT2_ADDRESS,
-  RouterVersion,
+  UniversalRouterVersion,
 } from '../../src/utils/constants'
 
-export const MAINNET_ROUTER_ADDRESS = UNIVERSAL_ROUTER_ADDRESS(RouterVersion.V1_2, 1)
+export const MAINNET_ROUTER_ADDRESS = UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V1_2, 1)
 export const FORGE_ROUTER_ADDRESS = '0xe808c1cfeebb6cb36b537b82fa7c9eef31415a05'
 export const FORGE_PERMIT2_ADDRESS = '0x4a873bdd49f7f9cc0a5458416a12973fab208f8d'
 
