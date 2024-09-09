@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { BigintIsh, MaxUint256, Percent, Price, CurrencyAmount, Currency } from '@uniswap/sdk-core'
 import JSBI from 'jsbi'
 import invariant from 'tiny-invariant'
@@ -18,6 +19,7 @@ interface PositionConstructorArgs {
 
 /**
  * Represents a position on a Uniswap V4 Pool
+ * // WARNING
  * @dev Similar to the V3 implementation
  * - using Currency instead of Token
  * - keep in mind that Pool and liquidity must be fetched from the pool manager
@@ -56,78 +58,28 @@ export class Position {
    */
   public get token0PriceLower(): Price<Currency, Currency> {
     // TODO: Currency or wrapped token here?
-    return tickToPrice(this.pool.token0.wrapped, this.pool.token1.wrapped, this.tickLower)
+    throw new Error('Not implemented')
   }
 
   /**
    * Returns the price of token0 at the upper tick
    */
   public get token0PriceUpper(): Price<Currency, Currency> {
-    return tickToPrice(this.pool.token0.wrapped, this.pool.token1.wrapped, this.tickUpper)
+    throw new Error('Not implemented')
   }
 
   /**
    * Returns the amount of token0 that this position's liquidity could be burned for at the current pool price
    */
   public get amount0(): CurrencyAmount<Currency> {
-    if (this._token0Amount === null) {
-      if (this.pool.tickCurrent < this.tickLower) {
-        this._token0Amount = CurrencyAmount.fromRawAmount(
-          this.pool.token0,
-          SqrtPriceMath.getAmount0Delta(
-            TickMath.getSqrtRatioAtTick(this.tickLower),
-            TickMath.getSqrtRatioAtTick(this.tickUpper),
-            this.liquidity,
-            false
-          )
-        )
-      } else if (this.pool.tickCurrent < this.tickUpper) {
-        this._token0Amount = CurrencyAmount.fromRawAmount(
-          this.pool.token0,
-          SqrtPriceMath.getAmount0Delta(
-            this.pool.sqrtRatioX96,
-            TickMath.getSqrtRatioAtTick(this.tickUpper),
-            this.liquidity,
-            false
-          )
-        )
-      } else {
-        this._token0Amount = CurrencyAmount.fromRawAmount(this.pool.token0, ZERO)
-      }
-    }
-    return this._token0Amount
+    throw new Error('Not implemented')
   }
 
   /**
    * Returns the amount of token1 that this position's liquidity could be burned for at the current pool price
    */
   public get amount1(): CurrencyAmount<Currency> {
-    if (this._token1Amount === null) {
-      if (this.pool.tickCurrent < this.tickLower) {
-        this._token1Amount = CurrencyAmount.fromRawAmount(this.pool.token1, ZERO)
-      } else if (this.pool.tickCurrent < this.tickUpper) {
-        this._token1Amount = CurrencyAmount.fromRawAmount(
-          this.pool.token1,
-          SqrtPriceMath.getAmount1Delta(
-            TickMath.getSqrtRatioAtTick(this.tickLower),
-            this.pool.sqrtRatioX96,
-            this.liquidity,
-            false
-          )
-        )
-      } else {
-        this._token1Amount = CurrencyAmount.fromRawAmount(
-          this.pool.token1,
-          SqrtPriceMath.getAmount1Delta(
-            TickMath.getSqrtRatioAtTick(this.tickLower),
-            TickMath.getSqrtRatioAtTick(this.tickUpper),
-            this.liquidity,
-            false
-          )
-        )
-      }
-    }
-    return this._token1Amount
+    throw new Error('Not implemented')
   }
 
   /**
@@ -135,21 +87,9 @@ export class Position {
    * @param slippageTolerance The amount by which the price can 'slip' before the transaction will revert
    * @returns The sqrt ratios after slippage
    */
-  private ratiosAfterSlippage(slippageTolerance: Percent): { sqrtRatioX96Lower: JSBI; sqrtRatioX96Upper: JSBI } {
-    const priceLower = this.pool.token0Price.asFraction.multiply(new Percent(1).subtract(slippageTolerance))
-    const priceUpper = this.pool.token0Price.asFraction.multiply(slippageTolerance.add(1))
-    let sqrtRatioX96Lower = encodeSqrtRatioX96(priceLower.numerator, priceLower.denominator)
-    if (JSBI.lessThanOrEqual(sqrtRatioX96Lower, TickMath.MIN_SQRT_RATIO)) {
-      sqrtRatioX96Lower = JSBI.add(TickMath.MIN_SQRT_RATIO, JSBI.BigInt(1))
-    }
-    let sqrtRatioX96Upper = encodeSqrtRatioX96(priceUpper.numerator, priceUpper.denominator)
-    if (JSBI.greaterThanOrEqual(sqrtRatioX96Upper, TickMath.MAX_SQRT_RATIO)) {
-      sqrtRatioX96Upper = JSBI.subtract(TickMath.MAX_SQRT_RATIO, JSBI.BigInt(1))
-    }
-    return {
-      sqrtRatioX96Lower,
-      sqrtRatioX96Upper,
-    }
+  // @ts-ignore
+  private ratiosAfterSlippage(_slippageTolerance: Percent): { sqrtRatioX96Lower: JSBI; sqrtRatioX96Upper: JSBI } {
+    throw new Error('Not implemented')
   }
 
   /**
@@ -158,155 +98,18 @@ export class Position {
    * @param slippageTolerance Tolerance of unfavorable slippage from the current price
    * @returns The amounts, with slippage
    */
+  // @ts-ignore
   public mintAmountsWithSlippage(slippageTolerance: Percent): Readonly<{ amount0: JSBI; amount1: JSBI }> {
-    // get lower/upper prices
-    const { sqrtRatioX96Upper, sqrtRatioX96Lower } = this.ratiosAfterSlippage(slippageTolerance)
-
-    // construct counterfactual pools
-    const poolLower = new Pool(
-      this.pool.token0,
-      this.pool.token1,
-      this.pool.fee,
-      this.pool.tickSpacing,
-      this.pool.hooks,
-      sqrtRatioX96Lower,
-      0 /* liquidity doesn't matter */,
-      TickMath.getTickAtSqrtRatio(sqrtRatioX96Lower)
-    )
-    const poolUpper = new Pool(
-      this.pool.token0,
-      this.pool.token1,
-      this.pool.fee,
-      this.pool.tickSpacing,
-      this.pool.hooks,
-      sqrtRatioX96Upper,
-      0 /* liquidity doesn't matter */,
-      TickMath.getTickAtSqrtRatio(sqrtRatioX96Upper)
-    )
-
-    // because the router is imprecise, we need to calculate the position that will be created (assuming no slippage)
-    const positionThatWillBeCreated = Position.fromAmounts({
-      pool: this.pool,
-      tickLower: this.tickLower,
-      tickUpper: this.tickUpper,
-      ...this.mintAmounts, // the mint amounts are what will be passed as calldata
-      useFullPrecision: false,
-    })
-
-    // we want the smaller amounts...
-    // ...which occurs at the upper price for amount0...
-    const { amount0 } = new Position({
-      pool: poolUpper,
-      liquidity: positionThatWillBeCreated.liquidity,
-      tickLower: this.tickLower,
-      tickUpper: this.tickUpper,
-    }).mintAmounts
-    // ...and the lower for amount1
-    const { amount1 } = new Position({
-      pool: poolLower,
-      liquidity: positionThatWillBeCreated.liquidity,
-      tickLower: this.tickLower,
-      tickUpper: this.tickUpper,
-    }).mintAmounts
-
-    return { amount0, amount1 }
-  }
-
-  /**
-   * Returns the minimum amounts that should be requested in order to safely burn the amount of liquidity held by the
-   * position with the given slippage tolerance
-   * @param slippageTolerance tolerance of unfavorable slippage from the current price
-   * @returns The amounts, with slippage
-   */
-  public burnAmountsWithSlippage(slippageTolerance: Percent): Readonly<{ amount0: JSBI; amount1: JSBI }> {
-    // get lower/upper prices
-    const { sqrtRatioX96Upper, sqrtRatioX96Lower } = this.ratiosAfterSlippage(slippageTolerance)
-
-    // construct counterfactual pools
-    const poolLower = new Pool(
-      this.pool.token0,
-      this.pool.token1,
-      this.pool.fee,
-      this.pool.tickSpacing,
-      this.pool.hooks,
-      sqrtRatioX96Lower,
-      0 /* liquidity doesn't matter */,
-      TickMath.getTickAtSqrtRatio(sqrtRatioX96Lower)
-    )
-    const poolUpper = new Pool(
-      this.pool.token0,
-      this.pool.token1,
-      this.pool.fee,
-      this.pool.tickSpacing,
-      this.pool.hooks,
-      sqrtRatioX96Upper,
-      0 /* liquidity doesn't matter */,
-      TickMath.getTickAtSqrtRatio(sqrtRatioX96Upper)
-    )
-
-    // we want the smaller amounts...
-    // ...which occurs at the upper price for amount0...
-    const amount0 = new Position({
-      pool: poolUpper,
-      liquidity: this.liquidity,
-      tickLower: this.tickLower,
-      tickUpper: this.tickUpper,
-    }).amount0
-    // ...and the lower for amount1
-    const amount1 = new Position({
-      pool: poolLower,
-      liquidity: this.liquidity,
-      tickLower: this.tickLower,
-      tickUpper: this.tickUpper,
-    }).amount1
-
-    return { amount0: amount0.quotient, amount1: amount1.quotient }
+    throw new Error('Not implemented')
   }
 
   /**
    * Returns the minimum amounts that must be sent in order to mint the amount of liquidity held by the position at
    * the current price for the pool
    */
+  // @ts-ignore
   public get mintAmounts(): Readonly<{ amount0: JSBI; amount1: JSBI }> {
-    if (this._mintAmounts === null) {
-      if (this.pool.tickCurrent < this.tickLower) {
-        return {
-          amount0: SqrtPriceMath.getAmount0Delta(
-            TickMath.getSqrtRatioAtTick(this.tickLower),
-            TickMath.getSqrtRatioAtTick(this.tickUpper),
-            this.liquidity,
-            true
-          ),
-          amount1: ZERO,
-        }
-      } else if (this.pool.tickCurrent < this.tickUpper) {
-        return {
-          amount0: SqrtPriceMath.getAmount0Delta(
-            this.pool.sqrtRatioX96,
-            TickMath.getSqrtRatioAtTick(this.tickUpper),
-            this.liquidity,
-            true
-          ),
-          amount1: SqrtPriceMath.getAmount1Delta(
-            TickMath.getSqrtRatioAtTick(this.tickLower),
-            this.pool.sqrtRatioX96,
-            this.liquidity,
-            true
-          ),
-        }
-      } else {
-        return {
-          amount0: ZERO,
-          amount1: SqrtPriceMath.getAmount1Delta(
-            TickMath.getSqrtRatioAtTick(this.tickLower),
-            TickMath.getSqrtRatioAtTick(this.tickUpper),
-            this.liquidity,
-            true
-          ),
-        }
-      }
-    }
-    return this._mintAmounts
+    throw new Error('Not implemented')
   }
 
   /**
@@ -321,6 +124,7 @@ export class Position {
    * not what core can theoretically support
    * @returns The amount of liquidity for the position
    */
+  // @ts-ignore
   public static fromAmounts({
     pool,
     tickLower,
@@ -336,21 +140,7 @@ export class Position {
     amount1: BigintIsh
     useFullPrecision: boolean
   }) {
-    const sqrtRatioAX96 = TickMath.getSqrtRatioAtTick(tickLower)
-    const sqrtRatioBX96 = TickMath.getSqrtRatioAtTick(tickUpper)
-    return new Position({
-      pool,
-      tickLower,
-      tickUpper,
-      liquidity: maxLiquidityForAmounts(
-        pool.sqrtRatioX96,
-        sqrtRatioAX96,
-        sqrtRatioBX96,
-        amount0,
-        amount1,
-        useFullPrecision
-      ),
-    })
+    throw new Error('not implemented')
   }
 
   /**
@@ -363,6 +153,7 @@ export class Position {
    * not what core can theoretically support
    * @returns The position
    */
+  // @ts-ignore
   public static fromAmount0({
     pool,
     tickLower,
@@ -376,7 +167,7 @@ export class Position {
     amount0: BigintIsh
     useFullPrecision: boolean
   }) {
-    return Position.fromAmounts({ pool, tickLower, tickUpper, amount0, amount1: MaxUint256, useFullPrecision })
+    throw new Error('not implemented')
   }
 
   /**
@@ -387,6 +178,7 @@ export class Position {
    * @param amount1 The desired amount of token1
    * @returns The position
    */
+  // @ts-ignore
   public static fromAmount1({
     pool,
     tickLower,
@@ -398,7 +190,6 @@ export class Position {
     tickUpper: number
     amount1: BigintIsh
   }) {
-    // this function always uses full precision,
-    return Position.fromAmounts({ pool, tickLower, tickUpper, amount0: MaxUint256, amount1, useFullPrecision: true })
+    throw new Error('not implemented')
   }
 }
