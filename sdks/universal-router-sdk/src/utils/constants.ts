@@ -1,8 +1,8 @@
 import { BigNumber } from 'ethers'
 
 export enum UniversalRouterVersion {
-  V1_2 = "1.2",
-  V2_0 = "2.0",
+  V1_2 = '1.2',
+  V2_0 = '2.0',
 }
 
 export type RouterConfig = {
