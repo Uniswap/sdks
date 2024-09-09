@@ -22,14 +22,14 @@
   "packageManager": "yarn@3.2.3",
   "private": true,
   "scripts": {
-    "g:install": "yarn install && husky",
     "g:check:deps:mismatch": "manypkg check",
     "g:build": "turbo run build",
     "g:lint": "turbo run lint",
     "g:release": "turbo run release --concurrency=1 --continue",
     "g:test": "turbo run test",
     "g:typecheck": "turbo run typecheck",
-    "sdk": "yarn workspace"
+    "sdk": "yarn workspace",
+    "postinstall": "husky"
   },
   "workspaces": [
     "sdks/*",

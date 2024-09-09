@@ -8,7 +8,7 @@ A repository for many Uniswap SDK's. All SDK's can be found in `sdk/` and have m
 # Clone
 git clone --recurse-submodules https://github.com/Uniswap/sdks.git
 # Install
-yarn g:install
+yarn
 # Build
 yarn g:build
 # Typecheck
