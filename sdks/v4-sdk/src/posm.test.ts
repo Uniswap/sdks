@@ -180,6 +180,7 @@ describe('POSM', () => {
         expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(token0, 0),
         expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(token1, 0),
         recipient,
+        slippageTolerance: new Percent(1),
       })
 
       const calldatas = Multicall.decodeMulticall(calldata)
