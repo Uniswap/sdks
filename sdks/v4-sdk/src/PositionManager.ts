@@ -185,6 +185,8 @@ export abstract class V4PositionManager {
   public static addCallParameters(_position: Position, _options: AddLiquidityOptions): MethodParameters {
     /**
      * Cases:
+     * - if pool does not exist yet, encode initializePool
+     * then,
      * - if is mint, encode MINT_POSITION and then SETTLE_PAIR
      * - else, encode INCREASE_LIQUIDITY and then SETTLE_PAIR
      */
@@ -219,7 +221,7 @@ export abstract class V4PositionManager {
 
   public static collectCallParameters(_options: CollectOptions): MethodParameters {
     /**
-     * Collecting in V3 is just a DECREASE_LIQUIDITY with 0 liquidity and then a TAKE_PAIR
+     * Collecting in V4 is just a DECREASE_LIQUIDITY with 0 liquidity and then a TAKE_PAIR
      */
     const calldatas = ['0x', '0x']
 
