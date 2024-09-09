@@ -2,12 +2,12 @@ import { Percent, Token, CurrencyAmount, WETH9, Ether } from '@uniswap/sdk-core'
 import { FeeAmount, TICK_SPACINGS } from './internalConstants'
 import { Pool } from './entities/pool'
 import { Position } from './entities/position'
-import { V4PositionManager } from './posm'
+import { V4PositionManager } from './PositionManager'
 import { encodeSqrtRatioX96 } from './utils/encodeSqrtRatioX96'
 import { Multicall } from './multicall'
 import { ActionType, encodeAction } from './utils/actions'
 
-describe('POSM', () => {
+describe('V4 Position Manager', () => {
   const token0 = new Token(1, '0x0000000000000000000000000000000000000001', 18, 't0', 'token0')
   const token1 = new Token(1, '0x0000000000000000000000000000000000000002', 18, 't1', 'token1')
 
