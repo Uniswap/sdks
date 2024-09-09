@@ -19,7 +19,6 @@ interface PositionConstructorArgs {
 
 /**
  * Represents a position on a Uniswap V4 Pool
- * // WARNING
  * @dev Similar to the V3 implementation
  * - using Currency instead of Token
  * - keep in mind that Pool and liquidity must be fetched from the pool manager
@@ -28,7 +27,7 @@ export class Position {
   public readonly pool: Pool
   public readonly tickLower: number
   public readonly tickUpper: number
-  public readonly liquidity: JSBI // needs to be fetched from pool manager
+  public readonly liquidity: JSBI // TODO: needs to be fetched from pool manager
 
   // cached resuts for the getters
   private _token0Amount: CurrencyAmount<Currency> | null = null
