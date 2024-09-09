@@ -26,10 +26,6 @@ export interface ModifyPositionSpecificOptions {
    * Indicates the ID of the position to increase liquidity for.
    */
   tokenId: BigintIsh
-  /**
-   * How much the pool price is allowed to move.
-   */
-  slippageTolerance: Percent
 
   /**
    * When the transaction expires, in epoch seconds.
@@ -38,10 +34,6 @@ export interface ModifyPositionSpecificOptions {
 }
 
 export interface MintSpecificOptions {
-  /**
-   * How much the pool price is allowed to move.
-   */
-  slippageTolerance: Percent
   /**
    * The account that should receive the minted NFT.
    */
@@ -63,6 +55,10 @@ export interface MintSpecificOptions {
  */
 export interface CommonAddLiquidityOptions {
   /**
+   * How much the pool price is allowed to move.
+   */
+  slippageTolerance: Percent
+  /**
    * Whether to spend ether. If true, one of the pool tokens must be WETH, by default false
    */
   useNative?: NativeCurrency
@@ -82,6 +78,10 @@ export interface CommonAddLiquidityOptions {
  * Options for producing the calldata to exit a position.
  */
 export interface RemoveLiquiditySpecificOptions {
+  /**
+   * How much the pool price is allowed to move.
+   */
+  slippageTolerance: Percent
   /**
    * The percentage of position liquidity to exit.
    */
@@ -126,11 +126,13 @@ export interface CollectSpecificOptions {
 }
 
 export type MintOptions = CommonOptions & CommonAddLiquidityOptions & MintSpecificOptions
-export type IncreaseOptions = CommonOptions & CommonAddLiquidityOptions & ModifyPositionSpecificOptions
+export type IncreaseLiquidityOptions = CommonOptions & CommonAddLiquidityOptions & ModifyPositionSpecificOptions
 
-export type DecreaseLiquidityOptions = CommonOptions & RemoveLiquiditySpecificOptions & ModifyPositionSpecificOptions
+export type AddLiquidityOptions = MintOptions | IncreaseLiquidityOptions
+
+export type RemoveLiquidityOptions = CommonOptions & RemoveLiquiditySpecificOptions & ModifyPositionSpecificOptions
+
 export type CollectOptions = CommonOptions & CollectSpecificOptions
-export type AddLiquidityOptions = MintOptions | IncreaseOptions
 
 export interface TransferOptions {
   /**
@@ -185,7 +187,11 @@ export abstract class V4PositionManager {
   }
 
   public static addCallParameters(_position: Position, _options: AddLiquidityOptions): MethodParameters {
-    // Encode INCREASE_LIQUDITY or MINT_POSITION and then SETTLE_PAIR
+    /**
+     * Cases:
+     * - if is mint, encode MINT_POSITION and then SETTLE_PAIR
+     * - else, encode INCREASE_LIQUIDITY and then SETTLE_PAIR
+     */
     const calldatas = ['0x', '0x']
     let value = toHex(0)
 
@@ -201,8 +207,12 @@ export abstract class V4PositionManager {
    * @param options Additional information necessary for generating the calldata
    * @returns The call parameters
    */
-  public static removeCallParameters(_position: Position, _options: DecreaseLiquidityOptions): MethodParameters {
-    // Encode DECREASE_LIQUIDITY and then COLLECT
+  public static removeCallParameters(_position: Position, _options: RemoveLiquidityOptions): MethodParameters {
+    /**
+     * cases:
+     * - if liquidityPercentage is 100%, encode BURN_POSITION and then TAKE_PAIR
+     * - else, encode DECREASE_LIQUIDITY and then TAKE_PAIR
+     */
     const calldatas = ['0x', '0x']
 
     return {
@@ -212,7 +222,9 @@ export abstract class V4PositionManager {
   }
 
   public static collectCallParameters(_options: CollectOptions): MethodParameters {
-    // Encode DECREASE_LIQUIDITY and then TAKE_PAIR
+    /**
+     * Collecting in V3 is just a DECREASE_LIQUIDITY with 0 liquidity and then a TAKE_PAIR
+     */
     const calldatas = ['0x', '0x']
 
     return {
