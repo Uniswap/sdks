@@ -1,5 +1,5 @@
 import { defaultAbiCoder } from 'ethers/lib/utils'
-import { Currency, TradeType} from '@uniswap/sdk-core'
+import { Currency, Percent, TradeType} from '@uniswap/sdk-core'
 import { Trade } from '../entities/trade'
 import { ADDRESS_ZERO } from './internalConstants'
 import { encodeRouteToPath } from './encodeRouteToPath'
@@ -40,8 +40,6 @@ const POOL_KEY_STRUCT = '(address currency0,address currency1,uint24 fee,int24 t
 
 const PATH_KEY_STRUCT = '(address intermediateCurrency,uint256 fee,int24 tickSpacing,address hooks,bytes hookData)'
 
-const POSITION_CONFIG_STRUCT = '(' + POOL_KEY_STRUCT + ' poolKey,int24 tickLower,int24 tickUpper)'
-
 const SWAP_EXACT_IN_SINGLE_STRUCT =
   '(' +
   POOL_KEY_STRUCT +
@@ -60,10 +58,31 @@ const SWAP_EXACT_OUT_STRUCT =
 
 const ABI_DEFINITION: { [key in Actions]: string[] } = {
   // Liquidity commands
-  [Actions.INCREASE_LIQUIDITY]: ['uint256', POSITION_CONFIG_STRUCT, 'uint256', 'uint128', 'uint128', 'bytes'],
-  [Actions.DECREASE_LIQUIDITY]: ['uint256', POSITION_CONFIG_STRUCT, 'uint256', 'uint128', 'uint128', 'bytes'],
-  [Actions.MINT_POSITION]: [POSITION_CONFIG_STRUCT, 'uint256', 'uint128', 'uint128', 'address', 'bytes'],
-  [Actions.BURN_POSITION]: ['uint256', POSITION_CONFIG_STRUCT, 'uint128', 'uint128', 'bytes'],
+  [Actions.INCREASE_LIQUIDITY]: [
+    'uint256 tokenId',
+    'uint256 liquidity',
+    'uint128 amount0Max',
+    'uint128 amount1Max',
+    'bytes hookData',
+  ],
+  [Actions.DECREASE_LIQUIDITY]: [
+    'uint256 tokenId',
+    'uint256 liquidity',
+    'uint128 amount0Min',
+    'uint128 amount1Min',
+    'bytes hookData',
+  ],
+  [Actions.MINT_POSITION]: [
+    POOL_KEY_STRUCT,
+    'int24 tickLower',
+    'int24 tickUpper',
+    'uint256 liquidity',
+    'uint128 amount0Max',
+    'uint128 amount1Max',
+    'address owner',
+    'bytes hookData',
+  ],
+  [Actions.BURN_POSITION]: ['uint256 tokenId', 'uint128 amount0Min', 'uint128 amount1Min', 'bytes hookData'],
 
   // Swapping commands
   [Actions.SWAP_EXACT_IN_SINGLE]: [SWAP_EXACT_IN_SINGLE_STRUCT],
@@ -99,12 +118,14 @@ export class V4Planner {
 
   addTrade(trade: Trade<Currency, Currency, TradeType>, slippageTolerance: Percent): void {
     const actionType = trade.tradeType === TradeType.EXACT_INPUT ? Actions.SWAP_EXACT_IN : Actions.SWAP_EXACT_OUT
-    const inputCurrency = trade.inputAmount.currency
+
+    const inputCurrency = trade.inputAmount.currency.isNative ? ADDRESS_ZERO : trade.inputAmount.currency.address
+    const outputCurrency = trade.outputAmount.currency.isNative ? ADDRESS_ZERO : trade.outputAmount.currency.address
 
     for (let swap of trade.swaps) {
       this.addAction(actionType, [
         {
-          inputCurrency.isNative ? ADDRESS_ZERO : inputCurrency.wrapped.address,
+          currencyIn: inputCurrency,
           path: encodeRouteToPath(swap.route),
           amountIn: swap.inputAmount,
           amountOutMinimum: /* need to do slippage checks for each individual route??? */,
@@ -112,7 +133,7 @@ export class V4Planner {
       ])
     }
 
-    this.addAction(Actions.SETTLE_TAKE_PAIR, [inputCurrency.address, wethContract.address])
+    this.addAction(Actions.SETTLE_TAKE_PAIR, [inputCurrency, outputCurrency])
   }
 
   finalize(): string {
