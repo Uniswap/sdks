@@ -16,6 +16,10 @@ import { abi } from './utils/abi'
 
 export interface CommonOptions {
   /**
+   * How much the pool price is allowed to move from the specified action.
+   */
+  slippageTolerance: Percent
+  /**
    * Optional data to pass to hooks
    */
   hookData?: string
@@ -55,10 +59,6 @@ export interface MintSpecificOptions {
  */
 export interface CommonAddLiquidityOptions {
   /**
-   * How much the pool price is allowed to move.
-   */
-  slippageTolerance: Percent
-  /**
    * Whether to spend ether. If true, one of the pool tokens must be WETH, by default false
    */
   useNative?: NativeCurrency
@@ -78,10 +78,6 @@ export interface CommonAddLiquidityOptions {
  * Options for producing the calldata to exit a position.
  */
 export interface RemoveLiquiditySpecificOptions {
-  /**
-   * How much the pool price is allowed to move.
-   */
-  slippageTolerance: Percent
   /**
    * The percentage of position liquidity to exit.
    */
@@ -125,15 +121,6 @@ export interface CollectSpecificOptions {
   recipient: string
 }
 
-export type MintOptions = CommonOptions & CommonAddLiquidityOptions & MintSpecificOptions
-export type IncreaseLiquidityOptions = CommonOptions & CommonAddLiquidityOptions & ModifyPositionSpecificOptions
-
-export type AddLiquidityOptions = MintOptions | IncreaseLiquidityOptions
-
-export type RemoveLiquidityOptions = CommonOptions & RemoveLiquiditySpecificOptions & ModifyPositionSpecificOptions
-
-export type CollectOptions = CommonOptions & CollectSpecificOptions
-
 export interface TransferOptions {
   /**
    * The account sending the NFT.
@@ -151,17 +138,26 @@ export interface TransferOptions {
   tokenId: BigintIsh
 }
 
-// type guard
-// @ts-ignore
-function isMint(options: AddLiquidityOptions): options is MintOptions {
-  return Object.keys(options).some((k) => k === 'recipient')
-}
-
 export interface NFTPermitOptions {
   signature: string
   deadline: BigintIsh
   spender: string
   nonce: BigintIsh
+}
+
+export type MintOptions = CommonOptions & CommonAddLiquidityOptions & MintSpecificOptions
+export type IncreaseLiquidityOptions = CommonOptions & CommonAddLiquidityOptions & ModifyPositionSpecificOptions
+
+export type AddLiquidityOptions = MintOptions | IncreaseLiquidityOptions
+
+export type RemoveLiquidityOptions = CommonOptions & RemoveLiquiditySpecificOptions & ModifyPositionSpecificOptions
+
+export type CollectOptions = CommonOptions & CollectSpecificOptions
+
+// type guard
+// @ts-ignore
+function isMint(options: AddLiquidityOptions): options is MintOptions {
+  return Object.keys(options).some((k) => k === 'recipient')
 }
 
 export abstract class V4PositionManager {
