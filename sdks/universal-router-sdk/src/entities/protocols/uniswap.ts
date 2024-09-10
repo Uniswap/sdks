@@ -270,7 +270,9 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
   })
 
   const amountIn = trade.maximumAmountIn(options.slippageTolerance, inputAmount).quotient.toString()
-  const amountOut = routerMustCustody ? 0 : trade.minimumAmountOut(options.slippageTolerance, outputAmount).quotient.toString()
+  const amountOut = routerMustCustody
+    ? 0
+    : trade.minimumAmountOut(options.slippageTolerance, outputAmount).quotient.toString()
 
   // logic from
   // https://github.com/Uniswap/router-sdk/blob/d8eed164e6c79519983844ca8b6a3fc24ebcb8f8/src/swapRouter.ts#L276
