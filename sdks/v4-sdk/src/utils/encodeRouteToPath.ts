@@ -12,7 +12,7 @@ export type PathKey = {
 
 export const encodeRouteToPath = (route: Route<Currency, Currency>): PathKey[] => {
   let currencyIn = route.input
-  let pathKeys:  PathKey[] = []
+  let pathKeys: PathKey[] = []
 
   for (let i = 0; i < route.pools.length; i++) {
     const pool = route.pools[i]

@@ -1,5 +1,5 @@
 import { defaultAbiCoder } from 'ethers/lib/utils'
-import { Currency, Percent, TradeType} from '@uniswap/sdk-core'
+import { Currency, Percent, TradeType } from '@uniswap/sdk-core'
 import { Trade } from '../entities/trade'
 import { ADDRESS_ZERO } from './internalConstants'
 import { encodeRouteToPath } from './encodeRouteToPath'
@@ -116,29 +116,33 @@ export class V4Planner {
     this.actions = this.actions.concat(command.action.toString(16).padStart(2, '0'))
   }
 
-  addTrade(trade: Trade<Currency, Currency, TradeType>, slippageTolerance: Percent): void {
+  addTrade(trade: Trade<Currency, Currency, TradeType>, slippageTolerance?: Percent): void {
     const actionType = trade.tradeType === TradeType.EXACT_INPUT ? Actions.SWAP_EXACT_IN : Actions.SWAP_EXACT_OUT
 
-    const inputCurrency = trade.inputAmount.currency.isNative ? ADDRESS_ZERO : trade.inputAmount.currency.address
-    const outputCurrency = trade.outputAmount.currency.isNative ? ADDRESS_ZERO : trade.outputAmount.currency.address
+    const currencyIn = currencyAddress(trade.inputAmount.currency)
+    const currencyOut = currencyAddress(trade.outputAmount.currency)
 
     for (let swap of trade.swaps) {
       this.addAction(actionType, [
         {
-          currencyIn: inputCurrency,
+          currencyIn,
           path: encodeRouteToPath(swap.route),
-          amountIn: swap.inputAmount,
-          amountOutMinimum: /* need to do slippage checks for each individual route??? */,
+          amountIn: swap.inputAmount.quotient.toString(),
+          amountOutMinimum: slippageTolerance ? trade.minimumAmountOut(slippageTolerance).quotient.toString() : 0,
         },
       ])
     }
 
-    this.addAction(Actions.SETTLE_TAKE_PAIR, [inputCurrency, outputCurrency])
+    this.addAction(Actions.SETTLE_TAKE_PAIR, [currencyIn, currencyOut])
   }
 
   finalize(): string {
     return defaultAbiCoder.encode(['bytes', 'bytes[]'], [this.actions, this.params])
   }
+}
+
+function currencyAddress(currency: Currency): string {
+  return currency.isNative ? ADDRESS_ZERO : currency.wrapped.address
 }
 
 export type RouterAction = {
