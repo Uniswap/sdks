@@ -187,7 +187,8 @@ function addV2Swap<TInput extends Currency, TOutput extends Currency>(
       // if native, we have to unwrap so keep in the router for now
       routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient,
       trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
-      trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
+      // if router will custody funds, we do aggregated slippage check from rotuer
+      routerMustCustody ? 0 : trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
       route.path.map((token) => token.wrapped.address),
       payerIsUser,
     ])
@@ -223,7 +224,7 @@ function addV3Swap<TInput extends Currency, TOutput extends Currency>(
     planner.addCommand(CommandType.V3_SWAP_EXACT_IN, [
       routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient,
       trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
-      trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
+      routerMustCustody ? 0 : trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
       path,
       payerIsUser,
     ])
@@ -269,7 +270,7 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
   })
 
   const amountIn = trade.maximumAmountIn(options.slippageTolerance, inputAmount).quotient.toString()
-  const amountOut = trade.minimumAmountOut(options.slippageTolerance, outputAmount).quotient.toString()
+  const amountOut = routerMustCustody ? 0 : trade.minimumAmountOut(options.slippageTolerance, outputAmount).quotient.toString()
 
   // logic from
   // https://github.com/Uniswap/router-sdk/blob/d8eed164e6c79519983844ca8b6a3fc24ebcb8f8/src/swapRouter.ts#L276
