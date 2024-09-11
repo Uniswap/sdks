@@ -145,12 +145,12 @@ function currencyAddress(currency: Currency): string {
   return currency.isNative ? ADDRESS_ZERO : currency.wrapped.address
 }
 
-export type RouterAction = {
+ type RouterAction = {
   action: Actions
   encodedInput: string
 }
 
-export function createAction(action: Actions, parameters: any[]): RouterAction {
+function createAction(action: Actions, parameters: any[]): RouterAction {
   const encodedInput = defaultAbiCoder.encode(ABI_DEFINITION[action], parameters)
   return { action, encodedInput }
 }
