@@ -10,6 +10,7 @@ import { BigNumber, ethers } from "ethers";
 import { getPermit2 } from "../utils";
 import { ResolvedUniswapXOrder } from "../utils/OrderQuoter";
 import { getDecayedAmount } from "../utils/dutchDecay";
+import { originalIfZero } from "../utils/order";
 
 import {
   BlockOverrides,
@@ -22,8 +23,6 @@ import {
   OrderResolutionOptions,
 } from "./types";
 import { CustomOrderValidation, parseValidation } from "./validation";
-
-import { originalIfZero } from ".";
 
 export type CosignerData = {
   decayStartTime: number;

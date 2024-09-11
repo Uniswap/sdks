@@ -1,5 +1,3 @@
-import { BigNumber } from "ethers";
-
 import { DutchOrder } from "./DutchOrder";
 import { CosignedPriorityOrder, UnsignedPriorityOrder } from "./PriorityOrder";
 import { RelayOrder } from "./RelayOrder";
@@ -12,7 +10,7 @@ export * from "./RelayOrder";
 export * from "./types";
 export * from "./validation";
 export * from "./V2DutchOrder";
-// TODO: To make v3 exports cleaner, export here but resolve ambiguous names vs V2
+// TODO: To make V3 exports cleaner, export here but resolve ambiguous names vs V2
 
 export type UniswapXOrder =
   | DutchOrder
@@ -24,7 +22,3 @@ export type UniswapXOrder =
   | CosignedPriorityOrder;
 
 export type Order = UniswapXOrder | RelayOrder;
-
-export function originalIfZero(value: BigNumber, original: BigNumber): BigNumber {
-  return value.isZero() ? original : value;
-}

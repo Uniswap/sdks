@@ -2,7 +2,7 @@ import { BigNumber, ethers } from "ethers";
 import invariant from "tiny-invariant";
 
 import { OrderType } from "../constants";
-import { CosignedV3DutchOrder, CosignedV3DutchOrderInfo, V3CosignerData, UnsignedV3DutchOrder } from "../order/V3DutchOrder";
+import { CosignedV3DutchOrder, CosignedV3DutchOrderInfo, UnsignedV3DutchOrder, V3CosignerData } from "../order/V3DutchOrder";
 import { V3DutchInput, V3DutchOutput } from "../order/types";
 import { getPermit2, getReactor, isCosignedV3 } from "../utils";
 import { getEndAmount } from "../utils/dutchBlockDecay";

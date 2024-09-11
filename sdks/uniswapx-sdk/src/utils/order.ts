@@ -1,4 +1,4 @@
-import { ethers } from "ethers";
+import { BigNumber, ethers } from "ethers";
 
 import { OrderType, REVERSE_REACTOR_MAPPING } from "../constants";
 import { MissingConfiguration } from "../errors";
@@ -169,4 +169,8 @@ export function isCosignedV3(
   order: UnsignedV3DutchOrder | CosignedV3DutchOrder
 ): order is CosignedV3DutchOrder {
   return (order as CosignedV3DutchOrder).info.cosignature !== undefined;
+}
+
+export function originalIfZero(value: BigNumber, original: BigNumber): BigNumber {
+  return value.isZero() ? original : value;
 }

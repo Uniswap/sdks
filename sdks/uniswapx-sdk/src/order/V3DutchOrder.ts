@@ -4,10 +4,9 @@ import { BigNumber, ethers } from "ethers";
 
 import { getPermit2, ResolvedUniswapXOrder } from "../utils";
 import { getBlockDecayedAmount } from "../utils/dutchBlockDecay";
+import { originalIfZero } from "../utils/order";
 
 import { BlockOverrides, OffChainOrder, OrderInfo, V3DutchInput, V3DutchInputJSON, V3DutchOutput, V3DutchOutputJSON, V3OrderResolutionOptions } from "./types";
-
-import { originalIfZero } from ".";
 
 export type V3CosignerDataJSON = {
     decayStartBlock: number;
