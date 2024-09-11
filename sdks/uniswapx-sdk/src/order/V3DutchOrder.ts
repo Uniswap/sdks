@@ -441,7 +441,7 @@ function parseSerializedOrder(serialized: string): CosignedV3DutchOrderInfo {
             [
                 token,
                 startAmount,
-                [relativeBlocks, relativeAmounts],
+                [inputRelativeBlocks, relativeAmounts],
                 maxAmount,
             ],
             outputs,
@@ -449,8 +449,6 @@ function parseSerializedOrder(serialized: string): CosignedV3DutchOrderInfo {
             cosignature,
         ],
     ] = decoded;
-
-    const decodedRelativeBlocks = decodeRelativeBlocks(relativeBlocks);
 
     return {
         reactor,
@@ -464,13 +462,13 @@ function parseSerializedOrder(serialized: string): CosignedV3DutchOrderInfo {
             token,
             startAmount,
             curve: {
-                relativeBlocks: decodedRelativeBlocks,
+                relativeBlocks: decodeRelativeBlocks(inputRelativeBlocks),
                 relativeAmounts,
             },
             maxAmount,
         },
         outputs: outputs.map(
-            ([token, startAmount, [relativeBlocks, relativeAmounts], recipient]: [
+            ([token, startAmount, [outputRelativeBlocks, relativeAmounts], recipient]: [
                 string,
                 number,
                 [BigNumber, number[]],
@@ -480,7 +478,7 @@ function parseSerializedOrder(serialized: string): CosignedV3DutchOrderInfo {
                 token,
                 startAmount,
                 curve: {
-                    relativeBlocks: decodeRelativeBlocks(relativeBlocks),
+                    relativeBlocks: decodeRelativeBlocks(outputRelativeBlocks),
                     relativeAmounts,
                 },
                 recipient,
@@ -504,9 +502,9 @@ function encodeRelativeBlocks(relativeBlocks: number[]): BigNumber {
     }
     return packedData;
 }
-/* eslint-disable */
+
 function decodeRelativeBlocks(packedData: BigNumber): number[] {
-    let relativeBlocks: number[] = [];
+    const relativeBlocks: number[] = [];
     for (let i = 0; i < 16; i++) {
         const block = packedData.shr(i * 16).toNumber() & 0xFFFF;
         if (block !== 0) {
@@ -515,4 +513,3 @@ function decodeRelativeBlocks(packedData: BigNumber): number[] {
     }
     return relativeBlocks;
 }
-/* eslint-enable */
