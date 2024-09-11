@@ -1,5 +1,5 @@
 import { Currency, CurrencyAmount, Ether, Percent, Price, sqrt, Token, TradeType } from '@uniswap/sdk-core'
-import { ADDRESS_ZERO, FEE_AMOUNT_MEDIUM, TICK_SPACING_SIXTY } from '../utils/internalConstants'
+import { ADDRESS_ZERO, FEE_AMOUNT_MEDIUM, TICK_SPACING_SIXTY } from '../internalConstants'
 import JSBI from 'jsbi'
 import { nearestUsableTick, encodeSqrtRatioX96, TickMath } from '@uniswap/v3-sdk'
 import { Pool } from './pool'
