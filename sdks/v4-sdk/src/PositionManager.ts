@@ -1,3 +1,4 @@
+// @ts-nocheck TODO: remove once implemented
 import {
   BigintIsh,
   Percent,
@@ -11,7 +12,6 @@ import { MethodParameters, toHex } from './utils/calldata'
 import { Interface } from '@ethersproject/abi'
 import { Pool, PoolKey } from './entities'
 import { Multicall } from './multicall'
-import { ActionType, encodeAction } from './utils/actions'
 import { abi } from './utils/abi'
 
 export interface CommonOptions {
@@ -171,11 +171,7 @@ export abstract class V4PositionManager {
   /**
    * Public methods to encode method parameters for different actions on the PositionManager contract
    */
-  public static initializeCallParameters(
-    poolKey: PoolKey,
-    sqrtPriceX96: BigintIsh,
-    hookData?: string
-  ): MethodParameters {
+  public static createCallParameters(poolKey: PoolKey, sqrtPriceX96: BigintIsh, hookData?: string): MethodParameters {
     return {
       calldata: this.encodeInitializePool(poolKey, sqrtPriceX96, hookData),
       value: toHex(0),
@@ -271,17 +267,7 @@ export abstract class V4PositionManager {
     owner: string,
     hookData?: string
   ): string {
-    const inputs = [
-      Pool.getPoolKey(pool.currency0, pool.currency1, pool.fee, pool.tickSpacing, pool.hooks),
-      tickLower,
-      tickUpper,
-      liquidity.toString(),
-      amount0Max.toString(),
-      amount1Max.toString(),
-      owner,
-      hookData ?? '0x',
-    ]
-    return encodeAction(ActionType.MINT_POSITION, inputs).encodedInput
+    throw new Error('not implemented')
   }
 
   // @ts-ignore
@@ -292,14 +278,7 @@ export abstract class V4PositionManager {
     amount1Max: BigintIsh,
     hookData?: string
   ): string {
-    const inputs = [
-      tokenId.toString(),
-      liquidity.toString(),
-      amount0Max.toString(),
-      amount1Max.toString(),
-      hookData ?? '0x',
-    ]
-    return encodeAction(ActionType.INCREASE_LIQUIDITY, inputs).encodedInput
+    throw new Error('not implemented')
   }
 
   // @ts-ignore
@@ -310,14 +289,7 @@ export abstract class V4PositionManager {
     amount1Min: BigintIsh,
     hookData?: string
   ): string {
-    const inputs = [
-      tokenId.toString(),
-      liquidity.toString(),
-      amount0Min.toString(),
-      amount1Min.toString(),
-      hookData ?? '0x',
-    ]
-    return encodeAction(ActionType.DECREASE_LIQUIDITY, inputs).encodedInput
+    throw new Error('not implemented')
   }
 
   // @ts-ignore
@@ -327,32 +299,27 @@ export abstract class V4PositionManager {
     amount1Min: BigintIsh,
     hookData?: string
   ): string {
-    const inputs = [tokenId.toString(), amount0Min.toString(), amount1Min.toString(), hookData ?? '0x']
-    return encodeAction(ActionType.BURN_POSITION, inputs).encodedInput
+    throw new Error('not implemented')
   }
 
   // @ts-ignore
   private static encodeTake(currency: Currency, recipient: string, amount: BigintIsh): string {
-    const inputs = [currency, recipient, amount.toString()]
-    return encodeAction(ActionType.TAKE, inputs).encodedInput
+    throw new Error('not implemented')
   }
 
   // @ts-ignore
   private static encodeSettle(currency: Currency, amount: BigintIsh, payerIsUser: boolean): string {
-    const inputs = [currency, amount.toString(), payerIsUser]
-    return encodeAction(ActionType.SETTLE, inputs).encodedInput
+    throw new Error('not implemented')
   }
 
   // @ts-ignore
   private static encodeSettlePair(currency0: Currency, currency1: Currency): string {
-    const inputs = [currency0.wrapped.address, currency1.wrapped.address]
-    return encodeAction(ActionType.SETTLE_PAIR, inputs).encodedInput
+    throw new Error('not implemented')
   }
 
   // @ts-ignore
   private static encodeTakePair(currency0: Currency, currency1: Currency, recipient: string): string {
-    const inputs = [currency0.wrapped.address, currency1.wrapped.address, recipient]
-    return encodeAction(ActionType.TAKE_PAIR, inputs).encodedInput
+    throw new Error('not implemented')
   }
 
   // @ts-ignore
