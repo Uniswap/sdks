@@ -285,11 +285,11 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                     [COSIGNER_DATA_TUPLE_ABI],
                     [
                         [
-                        cosignerData.decayStartBlock,
-                        cosignerData.exclusiveFiller,
-                        cosignerData.exclusivityOverrideBps,
-                        cosignerData.inputOverride,
-                        cosignerData.outputOverrides,
+                            cosignerData.decayStartBlock,
+                            cosignerData.exclusiveFiller,
+                            cosignerData.exclusivityOverrideBps,
+                            cosignerData.inputOverride,
+                            cosignerData.outputOverrides,
                         ],
                     ],
                 ),
@@ -471,17 +471,22 @@ function parseSerializedOrder(serialized: string): CosignedV3DutchOrderInfo {
             maxAmount,
         },
         outputs: outputs.map(
-            ([token, startAmount,[relativeBlocks, relativeAmounts],recipient]: [
-                string, number, [BigNumber, number[]], string, boolean
+            ([token, startAmount, [relativeBlocks, relativeAmounts], recipient]: [
+                string,
+                number,
+                [BigNumber, number[]],
+                string,
+                boolean
             ]) => ({
-            token,
-            startAmount,
-            curve: {
-                relativeBlocks: decodeRelativeBlocks(relativeBlocks),
-                relativeAmounts,
-            },
-            recipient,
-        })),
+                token,
+                startAmount,
+                curve: {
+                    relativeBlocks: decodeRelativeBlocks(relativeBlocks),
+                    relativeAmounts,
+                },
+                recipient,
+            })
+        ),
         cosignerData: {
             decayStartBlock: decayStartBlock.toNumber(),
             exclusiveFiller,

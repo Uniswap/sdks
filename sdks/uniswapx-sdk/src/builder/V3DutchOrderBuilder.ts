@@ -270,5 +270,4 @@ export class V3DutchOrderBuilder extends OrderBuilder {
             this.permit2Address
         );
     }
-    //TODO: fromOrder()
 }
