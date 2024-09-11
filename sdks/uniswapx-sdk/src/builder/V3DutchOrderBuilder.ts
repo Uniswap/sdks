@@ -2,7 +2,7 @@ import { BigNumber, ethers } from "ethers";
 import invariant from "tiny-invariant";
 
 import { OrderType } from "../constants";
-import { CosignedV3DutchOrder, CosignedV3DutchOrderInfo, CosignerData, UnsignedV3DutchOrder } from "../order/V3DutchOrder";
+import { CosignedV3DutchOrder, CosignedV3DutchOrderInfo, V3CosignerData, UnsignedV3DutchOrder } from "../order/V3DutchOrder";
 import { V3DutchInput, V3DutchOutput } from "../order/types";
 import { getPermit2, getReactor, isCosignedV3 } from "../utils";
 import { getEndAmount } from "../utils/dutchBlockDecay";
@@ -136,7 +136,7 @@ export class V3DutchOrderBuilder extends OrderBuilder {
         return this;
     }
 
-    private initializeCosignerData(data: Partial<CosignerData>): void {
+    private initializeCosignerData(data: Partial<V3CosignerData>): void {
         this.info.cosignerData = {
           decayStartBlock: 0,
           exclusiveFiller: ethers.constants.AddressZero,
@@ -197,7 +197,7 @@ export class V3DutchOrderBuilder extends OrderBuilder {
         return this;
     }
 
-    cosignerData(cosignerData: CosignerData): this {
+    cosignerData(cosignerData: V3CosignerData): this {
         this.decayStartBlock(cosignerData.decayStartBlock);
         this.exclusiveFiller(cosignerData.exclusiveFiller);
         this.exclusivityOverrideBps(cosignerData.exclusivityOverrideBps);

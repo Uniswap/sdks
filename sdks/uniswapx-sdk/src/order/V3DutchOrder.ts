@@ -9,7 +9,7 @@ import { BlockOverrides, OffChainOrder, OrderInfo, V3DutchInput, V3DutchInputJSO
 
 import { originalIfZero } from ".";
 
-export type CosignerDataJSON = {
+export type V3CosignerDataJSON = {
     decayStartBlock: number;
     exclusiveFiller: string;
     exclusivityOverrideBps: number;
@@ -23,7 +23,7 @@ export type UnsignedV3DutchOrderInfoJSON = Omit<UnsignedV3DutchOrderInfo, "nonce
     outputs: V3DutchOutputJSON[];
 };
 
-export type CosignerData = {
+export type V3CosignerData = {
     decayStartBlock: number;
     //No end in cosignerData
     exclusiveFiller: string;
@@ -39,7 +39,7 @@ export type UnsignedV3DutchOrderInfo = OrderInfo & {
 };
 
 export type CosignedV3DutchOrderInfo = UnsignedV3DutchOrderInfo & {
-    cosignerData: CosignerData;
+    cosignerData: V3CosignerData;
     cosignature: string;
 };
 
@@ -275,7 +275,7 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
             .hash(this.witnessInfo());
     }
 
-    cosignatureHash(cosignerData: CosignerData): string {
+    cosignatureHash(cosignerData: V3CosignerData): string {
         const abiCoder = new ethers.utils.AbiCoder();
         return ethers.utils.solidityKeccak256(
             ["bytes32", "bytes"],
@@ -314,7 +314,7 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
 export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
     static fromUnsignedOrder(
         order: UnsignedV3DutchOrder,
-        cosignerData: CosignerData,
+        cosignerData: V3CosignerData,
         cosignature: string
     ): CosignedV3DutchOrder {
         return new CosignedV3DutchOrder(
