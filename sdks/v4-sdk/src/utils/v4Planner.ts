@@ -145,7 +145,7 @@ function currencyAddress(currency: Currency): string {
   return currency.isNative ? ADDRESS_ZERO : currency.wrapped.address
 }
 
- type RouterAction = {
+type RouterAction = {
   action: Actions
   encodedInput: string
 }
