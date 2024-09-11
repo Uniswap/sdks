@@ -1,9 +1,10 @@
 // @ts-nocheck
+
 import { BigintIsh, Percent, Price, CurrencyAmount, Currency } from '@uniswap/sdk-core'
 import JSBI from 'jsbi'
 import invariant from 'tiny-invariant'
-import { TickMath } from '../utils/tickMath'
 import { Pool } from './pool'
+import { TickMath } from '@uniswap/v3-sdk'
 
 interface PositionConstructorArgs {
   pool: Pool
@@ -133,7 +134,7 @@ export class Position {
     amount0: BigintIsh
     amount1: BigintIsh
     useFullPrecision: boolean
-  }) {
+  }): Position {
     throw new Error('not implemented')
   }
 
@@ -160,7 +161,7 @@ export class Position {
     tickUpper: number
     amount0: BigintIsh
     useFullPrecision: boolean
-  }) {
+  }): Position {
     throw new Error('not implemented')
   }
 
@@ -183,7 +184,7 @@ export class Position {
     tickLower: number
     tickUpper: number
     amount1: BigintIsh
-  }) {
+  }): Position {
     throw new Error('not implemented')
   }
 }
