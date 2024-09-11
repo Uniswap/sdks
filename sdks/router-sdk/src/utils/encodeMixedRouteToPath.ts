@@ -39,10 +39,10 @@ export function encodeMixedRouteToPath(route: MixedRouteSDK<Currency, Currency>)
       if (pool instanceof V4Pool) {
         const v4Fee = pool.fee + MIXED_QUOTER_V2_V4_FEE_PATH_PLACEHOLDER
         path.push(
-            v4Fee,
-            pool.tickSpacing,
-            pool.hooks,
-            currencyOut.isNative ? ADDRESS_ZERO : currencyOut.wrapped.address
+          v4Fee,
+          pool.tickSpacing,
+          pool.hooks,
+          currencyOut.isNative ? ADDRESS_ZERO : currencyOut.wrapped.address
         )
         types.push('uint24', 'uint24', 'address', 'address')
       } else if (pool instanceof V3Pool) {
@@ -64,35 +64,35 @@ export function encodeMixedRouteToPath(route: MixedRouteSDK<Currency, Currency>)
     // We introduced this else block as a safety measure to prevent non-v4 mixed routes from potentially regressing
     // We'd like to gain more confidence in the new implementation before removing this block
     const result = route.pools.reduce(
-        (
-            { inputToken, path, types }: { inputToken: Currency; path: (string | number)[]; types: string[] },
-            pool: TPool,
-            index
-        ): { inputToken: Currency; path: (string | number)[]; types: string[] } => {
-          const outputToken: Currency = pool.token0.equals(inputToken) ? pool.token1 : pool.token0
-          if (index === 0) {
-            return {
-              inputToken: outputToken,
-              types: ['address', 'uint24', 'address'],
-              path: [
-                inputToken.wrapped.address,
-                pool instanceof V3Pool ? pool.fee : MIXED_QUOTER_V1_V2_FEE_PATH_PLACEHOLDER,
-                outputToken.wrapped.address,
-              ],
-            }
-          } else {
-            return {
-              inputToken: outputToken,
-              types: [...types, 'uint24', 'address'],
-              path: [
-                ...path,
-                pool instanceof V3Pool ? pool.fee : MIXED_QUOTER_V1_V2_FEE_PATH_PLACEHOLDER,
-                outputToken.wrapped.address,
-              ],
-            }
+      (
+        { inputToken, path, types }: { inputToken: Currency; path: (string | number)[]; types: string[] },
+        pool: TPool,
+        index
+      ): { inputToken: Currency; path: (string | number)[]; types: string[] } => {
+        const outputToken: Currency = pool.token0.equals(inputToken) ? pool.token1 : pool.token0
+        if (index === 0) {
+          return {
+            inputToken: outputToken,
+            types: ['address', 'uint24', 'address'],
+            path: [
+              inputToken.wrapped.address,
+              pool instanceof V3Pool ? pool.fee : MIXED_QUOTER_V1_V2_FEE_PATH_PLACEHOLDER,
+              outputToken.wrapped.address,
+            ],
           }
-        },
-        { inputToken: firstTokenIn, path: [], types: [] }
+        } else {
+          return {
+            inputToken: outputToken,
+            types: [...types, 'uint24', 'address'],
+            path: [
+              ...path,
+              pool instanceof V3Pool ? pool.fee : MIXED_QUOTER_V1_V2_FEE_PATH_PLACEHOLDER,
+              outputToken.wrapped.address,
+            ],
+          }
+        }
+      },
+      { inputToken: firstTokenIn, path: [], types: [] }
     )
 
     path = result.path
