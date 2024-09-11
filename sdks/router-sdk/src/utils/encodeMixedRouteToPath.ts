@@ -69,7 +69,6 @@ export function encodeMixedRouteToPath(route: MixedRouteSDK<Currency, Currency>)
         pool: TPool,
         index
       ): { inputToken: Currency; path: (string | number)[]; types: string[] } => {
-        if (pool instanceof V4Pool) throw 'Encoding mixed routes with V4 not supported'
         const outputToken: Currency = pool.token0.equals(inputToken) ? pool.token1 : pool.token0
         if (index === 0) {
           return {
