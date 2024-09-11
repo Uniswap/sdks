@@ -10,23 +10,24 @@ export type PathKey = {
   hookData: string // bytes
 }
 
-export const encodeRouteToPath = (route: Route<Currency, Currency>): PathKey[] => {
-  let currencyIn = route.input
+export const encodeRouteToPath = (route: Route<Currency, Currency>, exactOutput?: boolean): PathKey[] => {
+  let startingCurrency = exactOutput ? route.output : route.input
+  let pools = exactOutput ? route.pools.reverse() : route.pools
   let pathKeys: PathKey[] = []
 
-  for (let pool of route.pools) {
-    const currencyOut = currencyIn.equals(pool.currency0) ? pool.currency1 : pool.currency0
+  for (let pool of pools) {
+    const nextCurrency = startingCurrency.equals(pool.currency0) ? pool.currency1 : pool.currency0
 
     pathKeys.push({
-      intermediateCurrency: currencyOut.isNative ? ADDRESS_ZERO : currencyOut.address,
+      intermediateCurrency: nextCurrency.isNative ? ADDRESS_ZERO : nextCurrency.address,
       fee: pool.fee,
       tickSpacing: pool.tickSpacing,
       hooks: pool.hooks,
       hookData: '0x',
     })
 
-    currencyIn = currencyOut
+    startingCurrency = nextCurrency
   }
 
-  return pathKeys
+  return exactOutput ? pathKeys.reverse() : pathKeys
 }
