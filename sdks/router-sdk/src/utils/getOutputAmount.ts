@@ -1,9 +1,6 @@
 import { Currency, CurrencyAmount } from '@uniswap/sdk-core'
 import { Pool as V4Pool } from '@uniswap/v4-sdk'
-import { Pair } from '@uniswap/v2-sdk'
-import { Pool as V3Pool } from '@uniswap/v3-sdk'
-
-type TPool = Pair | V3Pool | V4Pool
+import { TPool } from './TPool'
 
 export async function getOutputAmount(
   pool: TPool,
