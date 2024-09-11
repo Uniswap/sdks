@@ -84,11 +84,11 @@ class NonLinearDutchDecayLib {
 		const duration = BigNumber.from(endPoint - startPoint);
 		if (endAmount.lt(startAmount)) {
 			return startAmount.sub(
-				startAmount.sub(endAmount.mul(elapsed).div(duration)) //muldivdown in contract
+				(startAmount.sub(endAmount)).mul(elapsed).div(duration) //muldivdown in contract
 			);
 		} else {
 			return startAmount.add(
-				endAmount.sub(startAmount.mul(elapsed).div(duration)) //muldivup in contract
+				(endAmount.sub(startAmount)).mul(elapsed).div(duration) //muldivup in contract
 				//TODO: How can we do muldivup in JS?
 			);
 		}
