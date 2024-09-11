@@ -1,4 +1,5 @@
 // @ts-nocheck TODO: remove once implemented
+
 import {
   BigintIsh,
   Percent,
@@ -12,7 +13,6 @@ import { MethodParameters, toHex } from './utils/calldata'
 import { Interface } from '@ethersproject/abi'
 import { Pool, PoolKey } from './entities'
 import { Multicall } from './multicall'
-import { abi } from './utils/abi'
 
 export interface CommonOptions {
   /**
@@ -161,7 +161,7 @@ function isMint(options: AddLiquidityOptions): options is MintOptions {
 }
 
 export abstract class V4PositionManager {
-  public static INTERFACE: Interface = new Interface(abi)
+  public static INTERFACE: Interface = new Interface([])
 
   /**
    * Cannot be constructed.
@@ -249,11 +249,7 @@ export abstract class V4PositionManager {
 
   // Initialize a pool
   private static encodeInitializePool(poolKey: PoolKey, sqrtPriceX96: BigintIsh, hookData?: string): string {
-    return V4PositionManager.INTERFACE.encodeFunctionData('initializePool', [
-      poolKey,
-      sqrtPriceX96.toString(),
-      hookData ?? '0x',
-    ])
+    throw new Error('not implemented')
   }
 
   // @ts-ignore
