@@ -70,16 +70,16 @@ const V3_DUTCH_ORDER_TYPES = {
     V3DutchInput: [
         { name: "token", type: "address" },
         { name: "startAmount", type: "uint256" },
-        { name: "curve", type: "V3Decay" },
+        { name: "curve", type: "NonlinearDutchDecay" },
         { name: "maxAmount", type: "uint256" },
     ],
     V3DutchOutput: [
         { name: "token", type: "address" },
         { name: "startAmount", type: "uint256" },
-        { name: "curve", type: "V3Decay" },
+        { name: "curve", type: "NonlinearDutchDecay" },
         { name: "recipient", type: "address" },
     ],
-    V3Decay: [
+    NonlinearDutchDecay: [
         { name: "relativeBlocks", type: "uint256" },
         { name: "relativeAmounts", type: "int256[]" },
     ],

@@ -123,17 +123,17 @@ export type PriorityOutputJSON = PriorityInputJSON & {
 export type V3DutchInput = {
   readonly token: string;
   readonly startAmount: BigNumber;
-  readonly curve: V3Decay;
+  readonly curve: NonlinearDutchDecay;
   readonly maxAmount: BigNumber;
 };
 
 export type V3DutchInputJSON = Omit<V3DutchInput, "startAmount" | "curve" | "maxAmount"> & {
   startAmount: string;
-  curve: V3Decay;
+  curve: NonlinearDutchDecay;
   maxAmount: string;
 };
 
-export type V3Decay = {
+export type NonlinearDutchDecay = {
   relativeBlocks: number[];
   relativeAmounts: BigNumber[]; //amounts plural
 };
@@ -141,7 +141,7 @@ export type V3Decay = {
 export type V3DutchOutput = {
   readonly token: string;
   readonly startAmount: BigNumber;
-  readonly curve: V3Decay;
+  readonly curve: NonlinearDutchDecay;
   readonly recipient: string;
 };
 
