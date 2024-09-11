@@ -88,7 +88,9 @@ describe('#encodeMixedRouteToPath', () => {
 
   describe('pure v4', () => {
     it('throws if MixedRouteSDK is a pure v4 route', () => {
-      expect(() => encodeMixedRouteToPath(route_0_V4_1)).toThrow('Encoding mixed routes with V4 not supported')
+      expect(encodeMixedRouteToPath(route_0_V4_1)).toEqual(
+        '0x0000000000000000000000000000000000000001400bb800001e00000000000000000000000000000000000000000000000000000000000000000000000000000002'
+      )
     })
   })
 
@@ -150,7 +152,9 @@ describe('#encodeMixedRouteToPath', () => {
     })
 
     it('throws if it contains a v4 pool', () => {
-      expect(() => encodeMixedRouteToPath(route_0_V3_weth_V4_1)).toThrow('Encoding mixed routes with V4 not supported')
+      expect(encodeMixedRouteToPath(route_0_V3_weth_V4_1)).toEqual(
+        '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2300bb80000000000000000000000000000000000000001400bb800001e00000000000000000000000000000000000000000000000000000000000000000000000000000002'
+      )
     })
   })
 })
