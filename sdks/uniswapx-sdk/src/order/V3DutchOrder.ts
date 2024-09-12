@@ -49,7 +49,6 @@ type V3WitnessInfo = {
     baseOutputs: V3DutchOutput[],
 };
 
-
 const COSIGNER_DATA_TUPLE_ABI = "tuple(uint256,address,uint256,uint256,uint256[])";
 
 const V3_DUTCH_ORDER_TYPES = {

@@ -35,7 +35,7 @@ class NonLinearDutchDecayLib {
 	): BigNumber {
 		// mismatch of relativeAmounts and relativeBlocks
 		if (curve.relativeAmounts.length > 16) {
-			throw new Error('InvalidDecayCurve');
+			throw new Error("InvalidDecayCurve");
 		}
 
 		// handle current block before decay or no decay
@@ -85,11 +85,11 @@ class NonLinearDutchDecayLib {
 		const duration = BigNumber.from(endPoint - startPoint);
 		if (endAmount.lt(startAmount)) {
 			return startAmount.sub(
-				(startAmount.sub(endAmount)).mul(elapsed).div(duration) //muldivdown in contract
+				startAmount.sub(endAmount).mul(elapsed).div(duration) //muldivdown in contract
 			);
 		} else {
 			return startAmount.add(
-				(endAmount.sub(startAmount)).mul(elapsed).div(duration) //muldivup in contract
+				endAmount.sub(startAmount).mul(elapsed).div(duration) //muldivup in contract
 				//TODO: How can we do muldivup in JS?
 			);
 		}
@@ -109,8 +109,14 @@ export function getBlockDecayedAmount(
 	config: DutchBlockDecayConfig,
 	atBlock: number
 ): BigNumber {
-	const { decayStartBlock, startAmount, relativeBlocks, relativeAmounts } = config;
-	return NonLinearDutchDecayLib.decay({ relativeAmounts, relativeBlocks }, startAmount, decayStartBlock, atBlock);
+	const { decayStartBlock, startAmount, relativeBlocks, relativeAmounts } =
+		config;
+	return NonLinearDutchDecayLib.decay(
+		{ relativeAmounts, relativeBlocks },
+		startAmount,
+		decayStartBlock,
+		atBlock
+	);
 }
 
 export function getEndAmount(
@@ -120,5 +126,7 @@ export function getEndAmount(
 	if (!startAmount || !relativeAmounts) {
 		throw new Error("Invalid config for getting V3 decay end amount"); //TODO: Should we throw?
 	}
-	return startAmount.sub(relativeAmounts[relativeAmounts.length - 1].toString());
+	return startAmount.sub(
+		relativeAmounts[relativeAmounts.length - 1].toString()
+	);
 }
