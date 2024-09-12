@@ -1,5 +1,5 @@
 import { pack } from '@ethersproject/solidity'
-import { Currency, Token } from '@uniswap/sdk-core'
+import { Currency } from '@uniswap/sdk-core'
 import { Pair } from '@uniswap/v2-sdk'
 import { Pool as V3Pool } from '@uniswap/v3-sdk'
 import { Pool as V4Pool } from '@uniswap/v4-sdk'
@@ -11,8 +11,8 @@ import {
   MIXED_QUOTER_V1_V2_FEE_PATH_PLACEHOLDER,
 } from '../constants'
 import { MixedRouteSDK } from '../entities/mixedRoute/route'
+import { TPool } from './TPool'
 
-type TPool = Pair | V3Pool | V4Pool
 /**
  * Converts a route to a hex encoded path
  * @notice only supports exactIn route encodings
@@ -22,16 +22,13 @@ type TPool = Pair | V3Pool | V4Pool
 export function encodeMixedRouteToPath(route: MixedRouteSDK<Currency, Currency>): string {
   const containsV4Pool = route.pools.some((pool) => pool instanceof V4Pool)
 
-  const firstCurrencyIn: Currency = route.input
-  const firstTokenIn: Token = firstCurrencyIn.wrapped
-
   let path: (string | number)[]
   let types: string[]
 
   if (containsV4Pool) {
-    path = [firstTokenIn.isNative ? ADDRESS_ZERO : firstTokenIn.address]
+    path = [route.adjustedInput.isNative ? ADDRESS_ZERO : route.adjustedInput.address]
     types = ['address']
-    let currencyIn = firstCurrencyIn
+    let currencyIn = route.adjustedInput
 
     for (const pool of route.pools) {
       const currencyOut = currencyIn.equals(pool.token0) ? pool.token1 : pool.token0
@@ -92,7 +89,7 @@ export function encodeMixedRouteToPath(route: MixedRouteSDK<Currency, Currency>)
           }
         }
       },
-      { inputToken: firstTokenIn, path: [], types: [] }
+      { inputToken: route.input, path: [], types: [] }
     )
 
     path = result.path
