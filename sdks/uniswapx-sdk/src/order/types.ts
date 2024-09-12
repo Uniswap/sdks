@@ -135,7 +135,7 @@ export type V3DutchInputJSON = Omit<V3DutchInput, "startAmount" | "curve" | "max
 
 export type NonlinearDutchDecay = {
   relativeBlocks: number[];
-  relativeAmounts: BigInt[]; // Cannot be BigNumber because could be negative
+  relativeAmounts: bigint[]; // Cannot be BigNumber because could be negative
 };
 
 export type V3DutchOutput = {

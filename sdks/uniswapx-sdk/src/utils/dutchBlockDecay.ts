@@ -102,7 +102,7 @@ export interface DutchBlockDecayConfig {
 	decayStartBlock: number;
 	startAmount: BigNumber;
 	relativeBlocks: number[];
-	relativeAmounts: BigInt[];
+	relativeAmounts: bigint[];
 }
 
 export function getBlockDecayedAmount(
