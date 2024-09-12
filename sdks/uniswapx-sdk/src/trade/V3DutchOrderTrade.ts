@@ -1,9 +1,10 @@
 import { Currency, CurrencyAmount, Price, TradeType } from "@uniswap/sdk-core";
 
 import { UnsignedV3DutchOrder, UnsignedV3DutchOrderInfo } from "../order/V3DutchOrder";
-import { getEndAmount } from "../utils/dutchBlockDecay";
 
 import { areCurrenciesEqual } from "./utils";
+import { V3DutchOutput } from "../order";
+import { BigNumber } from "ethers";
 
 export class V3DutchOrderTrade<
     TInput extends Currency,
@@ -34,7 +35,7 @@ export class V3DutchOrderTrade<
         this._currenciesOut = currenciesOut
         this.tradeType = tradeType
 
-        // assume single-chain for now
+        // Assuming not cross-chain
         this.order = new UnsignedV3DutchOrder(orderInfo, currencyIn.chainId)
     }
 
@@ -53,7 +54,7 @@ export class V3DutchOrderTrade<
         if (this._outputAmounts) return this._outputAmounts
 
         const amounts = this.order.info.outputs.map((output) => {
-            // assume single chain ids across all outputs for now
+            // Assuming all outputs on the same chain
             const currencyOut = this._currenciesOut.find((currency) =>
                 areCurrenciesEqual(currency, output.token, currency.chainId)
             )
@@ -68,62 +69,28 @@ export class V3DutchOrderTrade<
         this._outputAmounts = amounts
         return amounts
     }
-
-    private _firstNonFeeOutputStartEndAmounts:
-        | { startAmount: CurrencyAmount<TOutput>; endAmount: CurrencyAmount<TOutput> }
-        | undefined;
-
-    private getFirstNonFeeOutputStartEndAmounts(): {
-        startAmount: CurrencyAmount<TOutput>
-        endAmount: CurrencyAmount<TOutput>
-    } {
-        if (this._firstNonFeeOutputStartEndAmounts)
-            return this._firstNonFeeOutputStartEndAmounts;
-      
-        if (this.order.info.outputs.length === 0) {
-            throw new Error("there must be at least one output token");
-        }
-        const output = this.order.info.outputs[0];
     
-        // assume single chain ids across all outputs for now
-        const currencyOut = this._currenciesOut.find((currency) =>
-            areCurrenciesEqual(currency, output.token, currency.chainId)
-        );
-    
-        if (!currencyOut) {
-        throw new Error(
-            "currency output from order must exist in currenciesOut list"
-        );
-        }
-
-        const startAmount = CurrencyAmount.fromRawAmount(currencyOut, output.startAmount.toString())
-        const nonFeeOutputEndAmount = getEndAmount({
-            startAmount: output.startAmount,
-            relativeAmounts: output.curve.relativeAmounts,
-        });
-        const endAmount = CurrencyAmount.fromRawAmount(currencyOut, nonFeeOutputEndAmount.toString())
-
-        this._firstNonFeeOutputStartEndAmounts = { startAmount, endAmount }
-        return { startAmount, endAmount }
-    }
-    
-     // TODO: revise when there are actually multiple output amounts. for now, assume only one non-fee output at a time
+    // Same assumption as V2 that there is only one non-fee output at a time, and it exists at index 0
   public get outputAmount(): CurrencyAmount<TOutput> {
-    return this.getFirstNonFeeOutputStartEndAmounts().startAmount;
+    return this.outputAmounts[0];
   }
 
   public minimumAmountOut(): CurrencyAmount<TOutput> {
-    return this.getFirstNonFeeOutputStartEndAmounts().endAmount;
+    const nonFeeOutput: V3DutchOutput = this.order.info.outputs[0];
+    const relativeAmounts: bigint[] = nonFeeOutput.curve.relativeAmounts;
+    const startAmount: BigNumber = nonFeeOutput.startAmount;
+    // Get the maximum of the relative amounts
+    const maxRelativeAmount = relativeAmounts.reduce((max, amount) => amount > max ? amount : max, BigInt(0));
+    // minimum is the start - the max of the relative amounts
+    const minOut = startAmount.sub(maxRelativeAmount.toString());
+    return CurrencyAmount.fromRawAmount(this.outputAmount.currency, minOut.toString());
   }
 
   public maximumAmountIn(): CurrencyAmount<TInput> {
-    const endAmount = getEndAmount({
-        startAmount: this.order.info.input.startAmount,
-        relativeAmounts: this.order.info.input.curve.relativeAmounts,
-    });
+    const maxAmountIn = this.order.info.input.maxAmount;
     return CurrencyAmount.fromRawAmount(
       this._currencyIn,
-      endAmount.toString()
+      maxAmountIn.toString()
     );
   }
 
