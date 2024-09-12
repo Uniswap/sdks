@@ -20,7 +20,17 @@ describe('#encodeMixedRouteToPath', () => {
   const pool_V3_1_weth = new V3Pool(token1, weth, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
 
   const pool_V4_0_1 = new V4Pool(token0, token1, FeeAmount.MEDIUM, 30, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
-  const pool_V4_0_eth = new V4Pool(token0, ETHER, FeeAmount.MEDIUM, 30, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
+  const pool_V4_0_eth = new V4Pool(
+    token0,
+    ETHER,
+    FeeAmount.MEDIUM,
+    30,
+    ADDRESS_ZERO,
+    encodeSqrtRatioX96(1, 1),
+    0,
+    0,
+    []
+  )
 
   const pair_0_1 = new Pair(CurrencyAmount.fromRawAmount(token0, '100'), CurrencyAmount.fromRawAmount(token1, '200'))
   const pair_1_2 = new Pair(CurrencyAmount.fromRawAmount(token1, '150'), CurrencyAmount.fromRawAmount(token2, '150'))
@@ -161,7 +171,7 @@ describe('#encodeMixedRouteToPath', () => {
 
     it('packs them for exact input native eth v4 -> v3', () => {
       expect(encodeMixedRouteToPath(route_eth_V4_0_V3_1)).toEqual(
-          '0x0000000000000000000000000000000000000000400bb800001e00000000000000000000000000000000000000000000000000000000000000000000000000000001300bb80000000000000000000000000000000000000002'
+        '0x0000000000000000000000000000000000000000400bb800001e00000000000000000000000000000000000000000000000000000000000000000000000000000001300bb80000000000000000000000000000000000000002'
       )
     })
   })
