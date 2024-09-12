@@ -7,22 +7,17 @@ Essentially Solidity translated to TypeScript.
 */
 function locateArrayPosition(
 	curve: NonlinearDutchDecay,
-	targetValue: number
+	currentRelativeBlock: number
 ): [number, number] {
 	const relativeBlocks = curve.relativeBlocks;
-	// eslint-disable-next-line prefer-const
 	let prev = 0;
-	// eslint-disable-next-line prefer-const
-	let next = 0;
-
-	while (next < curve.relativeAmounts.length) {
-		if (relativeBlocks[next] >= targetValue) {
+	let next = 0; 
+	for (; next < relativeBlocks.length; next++) {
+		if(relativeBlocks[next] >= currentRelativeBlock) {
 			return [prev, next];
 		}
 		prev = next;
-		next++;
 	}
-
 	return [next - 1, next - 1];
 }
 
@@ -83,16 +78,13 @@ class NonLinearDutchDecayLib {
 
 		const elapsed = BigNumber.from(currentPoint - startPoint);
 		const duration = BigNumber.from(endPoint - startPoint);
+		let delta;
 		if (endAmount.lt(startAmount)) {
-			return startAmount.sub(
-				startAmount.sub(endAmount).mul(elapsed).div(duration) //muldivdown in contract
-			);
+			delta = BigNumber.from(0).sub((startAmount.sub(endAmount)).mul(elapsed).div(duration)); // mulDivDown in contract
 		} else {
-			return startAmount.add(
-				endAmount.sub(startAmount).mul(elapsed).div(duration) //muldivup in contract
-				//TODO: How can we do muldivup in JS?
-			);
+			delta = (endAmount.sub(startAmount)).mul(elapsed).div(duration); // mulDivDown in contract
 		}
+		return startAmount.add(delta);
 	}
 }
 

@@ -19,10 +19,10 @@ describe("NonLinearDutchDecayLib", () => {
             expect(result.toString()).toEqual('110');
         });
 
-        it.skip("Test for mulDivUp for endAmount > startAmount", () => {
+        it("Test for mulDivDown for endAmount > startAmount", () => {
             const result = NonLinearDutchDecayLib.linearDecay(0, 10, 5, BigNumber.from(100), BigNumber.from(125));
-            //if we successfully emulated mulDivUp then this is 113
-            expect(result.toString()).toEqual('113');
+            //if we successfully emulated mulDivDown then this is 112
+            expect(result.toString()).toEqual('112');
         });
     });
 
