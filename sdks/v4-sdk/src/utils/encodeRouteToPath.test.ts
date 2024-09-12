@@ -3,7 +3,7 @@ import { encodeSqrtRatioX96 } from '@uniswap/v3-sdk'
 import { Route } from '../entities/route'
 import { Pool } from '../entities/pool'
 import { encodeRouteToPath } from './encodeRouteToPath'
-import { ADDRESS_ZERO, FEE_AMOUNT_MEDIUM, TICK_SPACING_TEN } from './internalConstants'
+import { ADDRESS_ZERO, FEE_AMOUNT_MEDIUM, TICK_SPACING_TEN } from '../internalConstants'
 
 const eth = Ether.onChain(1)
 const currency1 = new Token(1, '0x0000000000000000000000000000000000000001', 18, 't1')

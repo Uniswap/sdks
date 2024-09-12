@@ -1,6 +1,6 @@
 import { Currency } from '@uniswap/sdk-core'
 import { Route } from '../entities/route'
-import { ADDRESS_ZERO } from './internalConstants'
+import { ADDRESS_ZERO } from '../internalConstants'
 
 export type PathKey = {
   intermediateCurrency: string // address
