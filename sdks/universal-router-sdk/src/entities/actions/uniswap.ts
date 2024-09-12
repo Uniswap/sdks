@@ -1,7 +1,7 @@
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
 import { Trade as V2Trade, Pair } from '@uniswap/v2-sdk'
 import { Trade as V3Trade, Pool as V3Pool, encodeRouteToPath } from '@uniswap/v3-sdk'
-import { Pool as V4Pool } from '@uniswap/v4-sdk'
+import { V4Planner } from '@uniswap/v4-sdk'
 import {
   Trade as RouterTrade,
   MixedRouteTrade,
@@ -9,10 +9,11 @@ import {
   IRoute,
   RouteV2,
   RouteV3,
-  RouteV4
+  RouteV4,
   MixedRouteSDK,
   MixedRoute,
   SwapOptions as RouterSwapOptions,
+  TPool,
   getOutputOfPools,
   encodeMixedRouteToPath,
   partitionMixedRouteByProtocol,
@@ -43,7 +44,7 @@ export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit'> & {
 const REFUND_ETH_PRICE_IMPACT_THRESHOLD = new Percent(50, 100)
 
 interface Swap<TInput extends Currency, TOutput extends Currency> {
-  route: IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>
+  route: IRoute<TInput, TOutput, TPool>
   inputAmount: CurrencyAmount<TInput>
   outputAmount: CurrencyAmount<TOutput>
 }
@@ -242,7 +243,7 @@ function addV3Swap<TInput extends Currency, TOutput extends Currency>(
   }
 }
 
-function addV4Swap<Tnput extends Currency, TOutput extends Currency(): void {
+function addV4Swap<Tnput extends Currency, TOutput extends Currency>(): void {
   const trade = V4Trade.createUncheckedTrade({
     route: route as RouteV4<TInput, TOutput>,
     inputAmount,
