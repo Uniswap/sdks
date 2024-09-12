@@ -49,7 +49,7 @@ describe("V3DutchOrder", () => {
                     startAmount: RAW_AMOUNT,
                     curve: {
                         relativeBlocks: [1], //TODO: can we have relativeblocks be an array of just 0
-                        relativeAmounts: [BigNumber.from(0)], // 1e-18, 2e-18, 3e-18, 4e-18
+                        relativeAmounts: [BigInt(0)],
                     },
                     maxAmount: RAW_AMOUNT, //we don't want input to change, we're testing for decaying output
                 },
@@ -59,7 +59,7 @@ describe("V3DutchOrder", () => {
                         startAmount: RAW_AMOUNT,
                         curve: {
                             relativeBlocks: [1,2,3,4],
-                            relativeAmounts: [BigNumber.from(1), BigNumber.from(2), BigNumber.from(3), BigNumber.from(4)], // 1e-18, 2e-18, 3e-18, 4e-18
+                            relativeAmounts: [BigInt(1), BigInt(2), BigInt(3), BigInt(4)], // 1e-18, 2e-18, 3e-18, 4e-18
                         },
                         recipient: ethers.constants.AddressZero,
                     },
@@ -81,8 +81,27 @@ describe("V3DutchOrder", () => {
         const seralized = order.serialize();
         const parsed = CosignedV3DutchOrder.parse(seralized, CHAIN_ID);
         expect(parsed.info).to.deep.eq(orderInfo);
-    }
-    );
+    });
+
+    it("Parses a serialized v3 order with negative relativeAmounts", () => {
+        const orderInfo = getFullOrderInfo({
+            outputs: [
+                {
+                    token: OUTPUT_TOKEN,
+                    startAmount: RAW_AMOUNT,
+                    curve: {
+                        relativeBlocks: [1,2,3,4],
+                        relativeAmounts: [BigInt(-1), BigInt(-2), BigInt(-3), BigInt(-4)],
+                    },
+                    recipient: ethers.constants.AddressZero,
+                },
+            ],
+        });
+        const order = new CosignedV3DutchOrder(orderInfo, CHAIN_ID);
+        const seralized = order.serialize();
+        const parsed = CosignedV3DutchOrder.parse(seralized, CHAIN_ID);
+        expect(parsed.info).to.deep.eq(orderInfo);
+    });
 
     it("parses inner v3 order with no cosigner overrides, both input and output curves", () => {
         const orderInfoJSON : UnsignedV3DutchOrderInfoJSON = {
@@ -93,7 +112,7 @@ describe("V3DutchOrder", () => {
                 startAmount: "1000000",
                 curve: {
                     relativeBlocks: [1,2,3,4],
-                    relativeAmounts: [BigNumber.from(1), BigNumber.from(2), BigNumber.from(3), BigNumber.from(4)],
+                    relativeAmounts: [BigInt(1), BigInt(2), BigInt(3), BigInt(4)],
                 },
                 maxAmount: "1000001",
             },
@@ -103,7 +122,7 @@ describe("V3DutchOrder", () => {
                     startAmount: "1000000",
                     curve: {
                         relativeBlocks: [1,2,3,4],
-                        relativeAmounts: [BigNumber.from(1), BigNumber.from(2), BigNumber.from(3), BigNumber.from(4)],
+                        relativeAmounts: [BigInt(1), BigInt(2), BigInt(3), BigInt(4)],
                     },
                     recipient: ethers.constants.AddressZero,
                 },

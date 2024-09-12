@@ -28,7 +28,7 @@ describe("V3DutchOrderBuilder", () => {
                 startAmount: INPUT_START_AMOUNT,
                 curve: {
                     relativeBlocks: [1],
-                    relativeAmounts: [BigNumber.from(0)],
+                    relativeAmounts: [BigInt(0)],
                 },
                 maxAmount: INPUT_START_AMOUNT.add(1),
             })
@@ -37,7 +37,7 @@ describe("V3DutchOrderBuilder", () => {
                 startAmount: OUTPUT_START_AMOUNT,
                 curve: {
                     relativeBlocks: [4],
-                    relativeAmounts: [BigNumber.from(4)],
+                    relativeAmounts: [BigInt(4)],
                 },
                 recipient: constants.AddressZero,
             })
@@ -67,7 +67,7 @@ describe("V3DutchOrderBuilder", () => {
                 startAmount: INPUT_START_AMOUNT,
                 curve: {
                     relativeBlocks: [1],
-                    relativeAmounts: [BigNumber.from(0)],
+                    relativeAmounts: [BigInt(0)],
                 },
                 maxAmount: INPUT_START_AMOUNT.add(1),
             })
@@ -76,7 +76,7 @@ describe("V3DutchOrderBuilder", () => {
                 startAmount: OUTPUT_START_AMOUNT,
                 curve: {
                     relativeBlocks: [4],
-                    relativeAmounts: [BigNumber.from(4)],
+                    relativeAmounts: [BigInt(4)],
                 },
                 recipient: constants.AddressZero,
             })
@@ -85,7 +85,7 @@ describe("V3DutchOrderBuilder", () => {
                 startAmount: OUTPUT_START_AMOUNT,
                 curve: {
                     relativeBlocks: [17],
-                    relativeAmounts: [BigNumber.from(17)],
+                    relativeAmounts: [BigInt(17)],
                 },
                 recipient: constants.AddressZero,
             })
@@ -107,7 +107,7 @@ describe("V3DutchOrderBuilder", () => {
                 startAmount: INPUT_START_AMOUNT,
                 curve: {
                     relativeBlocks: [1],
-                    relativeAmounts: [BigNumber.from(0)],
+                    relativeAmounts: [BigInt(0)],
                 },
                 maxAmount: INPUT_START_AMOUNT.add(1),
             })
@@ -116,7 +116,7 @@ describe("V3DutchOrderBuilder", () => {
                 startAmount: OUTPUT_START_AMOUNT,
                 curve: {
                     relativeBlocks: [4],
-                    relativeAmounts: [BigNumber.from(4)],
+                    relativeAmounts: [BigInt(4)],
                 },
                 recipient: constants.AddressZero,
             })
@@ -141,7 +141,7 @@ describe("V3DutchOrderBuilder", () => {
                 startAmount: INPUT_START_AMOUNT,
                 curve: {
                     relativeBlocks: [1],
-                    relativeAmounts: [BigNumber.from(0)],
+                    relativeAmounts: [BigInt(0)],
                 },
                 maxAmount: INPUT_START_AMOUNT.add(1),
             })
@@ -150,7 +150,7 @@ describe("V3DutchOrderBuilder", () => {
                 startAmount: OUTPUT_START_AMOUNT,
                 curve: {
                     relativeBlocks: [4],
-                    relativeAmounts: [BigNumber.from(4)],
+                    relativeAmounts: [BigInt(4)],
                 },
                 recipient: constants.AddressZero,
             })
@@ -172,7 +172,7 @@ describe("V3DutchOrderBuilder", () => {
                 startAmount: INPUT_START_AMOUNT,
                 curve: {
                     relativeBlocks: [1],
-                    relativeAmounts: [BigNumber.from(0)],
+                    relativeAmounts: [BigInt(0)],
                 },
                 maxAmount: INPUT_START_AMOUNT.add(1),
             })
@@ -181,7 +181,7 @@ describe("V3DutchOrderBuilder", () => {
                 startAmount: OUTPUT_START_AMOUNT,
                 curve: {
                     relativeBlocks: [4],
-                    relativeAmounts: [BigNumber.from(4)],
+                    relativeAmounts: [BigInt(4)],
                 },
                 recipient: constants.AddressZero,
             })
@@ -205,7 +205,7 @@ describe("V3DutchOrderBuilder", () => {
                 startAmount: INPUT_START_AMOUNT,
                 curve: {
                     relativeBlocks: [1],
-                    relativeAmounts: [BigNumber.from(0)],
+                    relativeAmounts: [BigInt(0)],
                 },
                 maxAmount: INPUT_START_AMOUNT.add(1),
             })
@@ -214,7 +214,7 @@ describe("V3DutchOrderBuilder", () => {
                 startAmount: OUTPUT_START_AMOUNT,
                 curve: {
                     relativeBlocks: [4],
-                    relativeAmounts: [BigNumber.from(4)],
+                    relativeAmounts: [BigInt(4)],
                 },
                 recipient: constants.AddressZero,
             })
@@ -240,7 +240,7 @@ describe("V3DutchOrderBuilder", () => {
                 startAmount: OUTPUT_START_AMOUNT,
                 curve: {
                     relativeBlocks: [4],
-                    relativeAmounts: [BigNumber.from(4)],
+                    relativeAmounts: [BigInt(4)],
                 },
                 recipient: constants.AddressZero,
             })
@@ -265,7 +265,7 @@ describe("V3DutchOrderBuilder", () => {
                 startAmount: INPUT_START_AMOUNT,
                 curve: {
                     relativeBlocks: [1],
-                    relativeAmounts: [BigNumber.from(0)],
+                    relativeAmounts: [BigInt(0)],
                 },
                 maxAmount: INPUT_START_AMOUNT.add(1),
             })
@@ -291,7 +291,7 @@ describe("V3DutchOrderBuilder", () => {
                 startAmount: INPUT_START_AMOUNT,
                 curve: {
                     relativeBlocks: [1],
-                    relativeAmounts: [BigNumber.from(0)],
+                    relativeAmounts: [BigInt(0)],
                 },
                 maxAmount: INPUT_START_AMOUNT.add(1),
             })
@@ -300,7 +300,7 @@ describe("V3DutchOrderBuilder", () => {
                 startAmount: OUTPUT_START_AMOUNT,
                 curve: {
                     relativeBlocks: [4],
-                    relativeAmounts: [BigNumber.from(4)],
+                    relativeAmounts: [BigInt(4)],
                 },
                 recipient: constants.AddressZero,
             })
@@ -325,7 +325,7 @@ describe("V3DutchOrderBuilder", () => {
                 startAmount: INPUT_START_AMOUNT,
                 curve: {
                     relativeBlocks: [1],
-                    relativeAmounts: [BigNumber.from(0)],
+                    relativeAmounts: [BigInt(0)],
                 },
                 maxAmount: INPUT_START_AMOUNT.add(1),
             })
@@ -334,7 +334,7 @@ describe("V3DutchOrderBuilder", () => {
                 startAmount: OUTPUT_START_AMOUNT,
                 curve: {
                     relativeBlocks: [4],
-                    relativeAmounts: [BigNumber.from(4)],
+                    relativeAmounts: [BigInt(4)],
                 },
                 recipient: constants.AddressZero,
             })
@@ -361,7 +361,7 @@ describe("V3DutchOrderBuilder", () => {
                 startAmount: INPUT_START_AMOUNT,
                 curve: {
                     relativeBlocks: [1],
-                    relativeAmounts: [BigNumber.from(0)],
+                    relativeAmounts: [BigInt(0)],
                 },
                 maxAmount: INPUT_START_AMOUNT.add(1),
             })
@@ -370,7 +370,7 @@ describe("V3DutchOrderBuilder", () => {
                 startAmount: OUTPUT_START_AMOUNT,
                 curve: {
                     relativeBlocks: [4],
-                    relativeAmounts: [BigNumber.from(4)],
+                    relativeAmounts: [BigInt(4)],
                 },
                 recipient: constants.AddressZero,
             })
@@ -406,7 +406,7 @@ describe("V3DutchOrderBuilder", () => {
                     startAmount: INPUT_START_AMOUNT,
                     curve: {
                         relativeBlocks: [1],
-                        relativeAmounts: [BigNumber.from(0)],
+                        relativeAmounts: [BigInt(0)],
                     },
                     maxAmount: INPUT_START_AMOUNT.add(1),
                 })
@@ -415,7 +415,7 @@ describe("V3DutchOrderBuilder", () => {
                     startAmount: OUTPUT_START_AMOUNT,
                     curve: {
                         relativeBlocks: [4],
-                        relativeAmounts: [BigNumber.from(4)],
+                        relativeAmounts: [BigInt(4)],
                     },
                     recipient: constants.AddressZero,
                 })
@@ -437,7 +437,7 @@ describe("V3DutchOrderBuilder", () => {
                     startAmount: INPUT_START_AMOUNT,
                     curve: {
                         relativeBlocks: [1],
-                        relativeAmounts: [BigNumber.from(0)],
+                        relativeAmounts: [BigInt(0)],
                     },
                     maxAmount: INPUT_START_AMOUNT.add(1),
                 })
@@ -446,7 +446,7 @@ describe("V3DutchOrderBuilder", () => {
                     startAmount: OUTPUT_START_AMOUNT,
                     curve: {
                         relativeBlocks: [4],
-                        relativeAmounts: [BigNumber.from(4)],
+                        relativeAmounts: [BigInt(4)],
                     },
                     recipient: constants.AddressZero,
                 })
@@ -473,7 +473,7 @@ describe("V3DutchOrderBuilder", () => {
                         startAmount: INPUT_START_AMOUNT,
                         curve: {
                             relativeBlocks: [1],
-                            relativeAmounts: [BigNumber.from(0)],
+                            relativeAmounts: [BigInt(0)],
                         },
                         maxAmount: INPUT_START_AMOUNT.add(1),
                     })
@@ -482,7 +482,7 @@ describe("V3DutchOrderBuilder", () => {
                         startAmount: OUTPUT_START_AMOUNT,
                         curve: {
                             relativeBlocks: [4],
-                            relativeAmounts: [BigNumber.from(4)],
+                            relativeAmounts: [BigInt(4)],
                         },
                         recipient: constants.AddressZero,
                     })
@@ -510,7 +510,7 @@ describe("V3DutchOrderBuilder", () => {
                     startAmount: INPUT_START_AMOUNT,
                     curve: {
                         relativeBlocks: [1],
-                        relativeAmounts: [BigNumber.from(0)],
+                        relativeAmounts: [BigInt(0)],
                     },
                     maxAmount: INPUT_START_AMOUNT.add(1),
                 })
@@ -519,7 +519,7 @@ describe("V3DutchOrderBuilder", () => {
                     startAmount: OUTPUT_START_AMOUNT,
                     curve: {
                         relativeBlocks: [4],
-                        relativeAmounts: [BigNumber.from(4)],
+                        relativeAmounts: [BigInt(4)],
                     },
                     recipient: constants.AddressZero,
                 })

@@ -36,7 +36,7 @@ const USDC = new Token(
             startAmount: BigNumber.from(1000),
             curve: {
                 relativeBlocks: [1],
-                relativeAmounts: [BigNumber.from(0)],
+                relativeAmounts: [BigInt(0)],
             },
             maxAmount: BigNumber.from(1000),
         },
@@ -46,7 +46,7 @@ const USDC = new Token(
                 startAmount: NON_FEE_OUTPUT_AMOUNT,
                 curve: {
                     relativeBlocks: [21],
-                    relativeAmounts: [BigNumber.from("100000000000000000")],
+                    relativeAmounts: [BigInt("100000000000000000")],
                 },
                 recipient: "0x0000000000000000000000000000000000000000",
             },
@@ -55,7 +55,7 @@ const USDC = new Token(
               startAmount: BigNumber.from("1000"),
               curve: {
                   relativeBlocks: [21],
-                  relativeAmounts: [BigNumber.from("100")],
+                  relativeAmounts: [BigInt("100")],
               },
               recipient: "0x0000000000000000000000000000000000000000",
             },
@@ -96,7 +96,7 @@ const USDC = new Token(
               startAmount: NON_FEE_OUTPUT_AMOUNT,
               curve: {
                   relativeBlocks: [21],
-                  relativeAmounts: [BigNumber.from("100000000000000000")],
+                  relativeAmounts: [BigInt("100000000000000000")],
               },
               recipient: "0x0000000000000000000000000000000000000000",
             },
@@ -122,7 +122,7 @@ const USDC = new Token(
               startAmount: NON_FEE_OUTPUT_AMOUNT,
               curve: {
                   relativeBlocks: [21],
-                  relativeAmounts: [BigNumber.from("100000000000000000")],
+                  relativeAmounts: [BigInt("100000000000000000")],
               },
               recipient: "0x0000000000000000000000000000000000000000",
             },

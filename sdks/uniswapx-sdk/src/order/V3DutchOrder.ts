@@ -122,7 +122,7 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                     startAmount: BigNumber.from(json.input.startAmount),
                     curve: {
                         relativeBlocks: json.input.curve.relativeBlocks,
-                        relativeAmounts: json.input.curve.relativeAmounts.map(BigNumber.from),
+                        relativeAmounts: json.input.curve.relativeAmounts,
                     },
                     maxAmount: BigNumber.from(json.input.maxAmount),
                 },
@@ -131,7 +131,7 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                     startAmount: BigNumber.from(output.startAmount),
                     curve: {
                         relativeBlocks: output.curve.relativeBlocks,
-                        relativeAmounts: output.curve.relativeAmounts.map(BigNumber.from),
+                        relativeAmounts: output.curve.relativeAmounts,
                     },
                 })),
             },
@@ -463,7 +463,7 @@ function parseSerializedOrder(serialized: string): CosignedV3DutchOrderInfo {
             startAmount,
             curve: {
                 relativeBlocks: decodeRelativeBlocks(inputRelativeBlocks),
-                relativeAmounts,
+                relativeAmounts: relativeAmounts.map((amount: BigNumber) => amount.toBigInt()),
             },
             maxAmount,
         },
@@ -471,15 +471,14 @@ function parseSerializedOrder(serialized: string): CosignedV3DutchOrderInfo {
             ([token, startAmount, [outputRelativeBlocks, relativeAmounts], recipient]: [
                 string,
                 number,
-                [BigNumber, number[]],
+                [BigNumber, BigNumber[]], //abiDecode automatically converts to BigNumber
                 string,
-                boolean
             ]) => ({
                 token,
                 startAmount,
                 curve: {
                     relativeBlocks: decodeRelativeBlocks(outputRelativeBlocks),
-                    relativeAmounts,
+                    relativeAmounts: relativeAmounts.map((amount: BigNumber) => amount.toBigInt()),
                 },
                 recipient,
             })

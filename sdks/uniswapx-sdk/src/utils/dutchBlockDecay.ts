@@ -52,14 +52,15 @@ class NonLinearDutchDecayLib {
 				curve.relativeBlocks[0],
 				blockDelta,
 				startAmount,
-				startAmount.sub(curve.relativeAmounts[0])
+				startAmount.sub(curve.relativeAmounts[0].toString())
 			);
 		}
 
 		// the current pos is within or after the curve
 		const [prev, next] = locateArrayPosition(curve, blockDelta);
-		const lastAmount = startAmount.sub(curve.relativeAmounts[prev]);
-		const nextAmount = startAmount.sub(curve.relativeAmounts[next]);
+		//relativeAmounts holds BigInts so we can't directly subtract without conversion
+		const lastAmount = startAmount.sub(curve.relativeAmounts[prev].toString());
+		const nextAmount = startAmount.sub(curve.relativeAmounts[next].toString());
 		return this.linearDecay(
 			curve.relativeBlocks[prev],
 			curve.relativeBlocks[next],
@@ -101,7 +102,7 @@ export interface DutchBlockDecayConfig {
 	decayStartBlock: number;
 	startAmount: BigNumber;
 	relativeBlocks: number[];
-	relativeAmounts: BigNumber[];
+	relativeAmounts: BigInt[];
 }
 
 export function getBlockDecayedAmount(
@@ -119,5 +120,5 @@ export function getEndAmount(
 	if (!startAmount || !relativeAmounts) {
 		throw new Error("Invalid config for getting V3 decay end amount"); //TODO: Should we throw?
 	}
-	return startAmount.sub(relativeAmounts[relativeAmounts.length - 1]);
+	return startAmount.sub(relativeAmounts[relativeAmounts.length - 1].toString());
 }
