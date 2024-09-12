@@ -243,7 +243,14 @@ function addV3Swap<TInput extends Currency, TOutput extends Currency>(
   }
 }
 
-function addV4Swap<Tnput extends Currency, TOutput extends Currency>(): void {
+function addV4Swap<Tnput extends Currency, TOutput extends Currency>(
+  planner: RoutePlanner,
+  { route, inputAmount, outputAmount }: Swap<TInput, TOutput>,
+  tradeType: TradeType,
+  options: SwapOptions,
+  payerIsUser: boolean,
+  routerMustCustody: boolean
+): void {
   const trade = V4Trade.createUncheckedTrade({
     route: route as RouteV4<TInput, TOutput>,
     inputAmount,
@@ -251,7 +258,7 @@ function addV4Swap<Tnput extends Currency, TOutput extends Currency>(): void {
     tradeType,
   })
 
-  const v4Calldata = new V4Planner().addTrade(trade, routerMustCustody ? 0 : ).finalize()
+  const v4Calldata = new V4Planner().addTrade(trade, routerMustCustody ? 0 : options.slippageTolerance).finalize()
   planner.addCommand(CommandType.V4_SWAP, [v4Calldata])
 }
 
