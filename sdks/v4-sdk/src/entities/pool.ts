@@ -12,7 +12,7 @@ import {
 } from '@uniswap/v3-sdk'
 import { defaultAbiCoder, isAddress } from 'ethers/lib/utils'
 import { sortsBefore } from '../utils/sortsBefore'
-import { ADDRESS_ZERO, NEGATIVE_ONE, Q192 } from '../utils/internalConstants'
+import { ADDRESS_ZERO, NEGATIVE_ONE, Q192 } from '../internalConstants'
 import JSBI from 'jsbi'
 
 export const DYNAMIC_FEE_FLAG = 0x800000

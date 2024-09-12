@@ -1,12 +1,8 @@
 import invariant from 'tiny-invariant'
-
 import { Currency, Price, Token } from '@uniswap/sdk-core'
-import { Pair } from '@uniswap/v2-sdk'
-import { Pool as V3Pool } from '@uniswap/v3-sdk'
 import { Pool as V4Pool } from '@uniswap/v4-sdk'
 import { isValidTokenPath } from '../../utils/isValidTokenPath'
-
-type TPool = Pair | V3Pool | V4Pool
+import { TPool } from '../../utils/TPool'
 
 /**
  * Represents a list of pools or pairs through which a swap can occur
