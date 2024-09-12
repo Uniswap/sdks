@@ -57,7 +57,7 @@ export function encodeMixedRouteToPath(route: MixedRouteSDK<Currency, Currency>)
       currencyIn = currencyOut
     }
   } else {
-    // TODO: delete this else block
+    // TODO: ROUTE-276 - delete this else block
     // We introduced this else block as a safety measure to prevent non-v4 mixed routes from potentially regressing
     // We'd like to gain more confidence in the new implementation before removing this block
     const result = route.pools.reduce(
