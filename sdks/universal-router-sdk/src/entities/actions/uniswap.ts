@@ -251,25 +251,8 @@ function addV4Swap<Tnput extends Currency, TOutput extends Currency>(): void {
     tradeType,
   })
 
-  const path = encodeRouteToPath(route as RouteV3<TInput, TOutput>, trade.tradeType === TradeType.EXACT_OUTPUT)
-
-  if (tradeType == TradeType.EXACT_INPUT) {
-    planner.addCommand(CommandType.V4_SWAP_EXACT_IN, [
-      routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient,
-      trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
-      trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
-      path,
-      payerIsUser,
-    ])
-  } else if (tradeType == TradeType.EXACT_OUTPUT) {
-    planner.addCommand(CommandType.V3_SWAP_EXACT_OUT, [
-      routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient,
-      trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
-      trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
-      path,
-      payerIsUser,
-    ])
-  }
+  const v4Calldata = new V4Planner().addTrade(trade, routerMustCustody ? 0 : ).finalize()
+  planner.addCommand(CommandType.V4_SWAP, [v4Calldata])
 }
 
 // encode a mixed route swap, i.e. including both v2 and v3 pools
