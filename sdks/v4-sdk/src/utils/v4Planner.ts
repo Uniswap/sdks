@@ -1,3 +1,4 @@
+import invariant from 'tiny-invariant'
 import { defaultAbiCoder } from 'ethers/lib/utils'
 import { Currency, Percent, TradeType } from '@uniswap/sdk-core'
 import { Trade } from '../entities/trade'
@@ -117,21 +118,31 @@ export class V4Planner {
   }
 
   addTrade(trade: Trade<Currency, Currency, TradeType>, slippageTolerance?: Percent): void {
-    const actionType = trade.tradeType === TradeType.EXACT_INPUT ? Actions.SWAP_EXACT_IN : Actions.SWAP_EXACT_OUT
+    const exactOutput = trade.tradeType === TradeType.EXACT_OUTPUT
+
+    if (exactOutput) invariant(!!slippageTolerance, 'ExactOut requires slippageTolerance')
+    invariant(trade.swaps.length === 1, 'Only accepts Trades with 1 swap (must break swaps into individual trades)')
+
+    const actionType = exactOutput ? Actions.SWAP_EXACT_OUT : Actions.SWAP_EXACT_IN
 
     const currencyIn = currencyAddress(trade.inputAmount.currency)
     const currencyOut = currencyAddress(trade.outputAmount.currency)
 
-    for (let swap of trade.swaps) {
-      this.addAction(actionType, [
-        {
-          currencyIn,
-          path: encodeRouteToPath(swap.route),
-          amountIn: swap.inputAmount.quotient.toString(),
-          amountOutMinimum: slippageTolerance ? trade.minimumAmountOut(slippageTolerance).quotient.toString() : 0,
-        },
-      ])
-    }
+    this.addAction(actionType, [
+      exactOutput
+        ? {
+            currencyOut,
+            path: encodeRouteToPath(trade.route, exactOutput),
+            amountInMaximum: trade.minimumAmountOut(slippageTolerance ?? new Percent(0)).quotient.toString(),
+            amountOut: trade.inputAmount.quotient.toString(),
+          }
+        : {
+            currencyIn,
+            path: encodeRouteToPath(trade.route, exactOutput),
+            amountIn: trade.inputAmount.quotient.toString(),
+            amountOutMinimum: slippageTolerance ? trade.minimumAmountOut(slippageTolerance).quotient.toString() : 0,
+          },
+    ])
 
     this.addAction(Actions.SETTLE_TAKE_PAIR, [currencyIn, currencyOut])
   }
