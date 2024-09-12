@@ -25,10 +25,12 @@ export enum Actions {
   // settling
   SETTLE = 0x09,
   SETTLE_ALL = 0x10,
+  SETTLE_PAIR = 0x11,
   // taking
   TAKE = 0x12,
   TAKE_ALL = 0x13,
   TAKE_PORTION = 0x14,
+  TAKE_PAIR = 0x15,
 
   SETTLE_TAKE_PAIR = 0x16,
 
@@ -93,9 +95,11 @@ const ABI_DEFINITION: { [key in Actions]: string[] } = {
   // Payments commands
   [Actions.SETTLE]: ['address', 'uint256', 'bool'],
   [Actions.SETTLE_ALL]: ['address', 'uint256'],
+  [Actions.SETTLE_PAIR]: ['address', 'address'],
   [Actions.TAKE]: ['address', 'address', 'uint256'],
   [Actions.TAKE_ALL]: ['address', 'uint256'],
   [Actions.TAKE_PORTION]: ['address', 'address', 'uint256'],
+  [Actions.TAKE_PAIR]: ['address', 'address', 'address'],
   [Actions.SETTLE_TAKE_PAIR]: ['address', 'address'],
   [Actions.CLOSE_CURRENCY]: ['address'],
   [Actions.SWEEP]: ['address', 'address'],

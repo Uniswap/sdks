@@ -59,6 +59,7 @@ export class Position {
    * Returns the price of token0 at the upper tick
    */
   public get token0PriceUpper(): Price<Currency, Currency> {
+    // TODO: Currency or wrapped token here?
     return tickToPrice(this.pool.token0.wrapped, this.pool.token1.wrapped, this.tickUpper)
   }
 
