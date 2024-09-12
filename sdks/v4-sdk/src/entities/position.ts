@@ -1,13 +1,9 @@
-import { BigintIsh, MaxUint256, Percent, Price, CurrencyAmount, Currency } from '@uniswap/sdk-core'
+import { BigintIsh, Percent, Price, CurrencyAmount, Currency, MaxUint256 } from '@uniswap/sdk-core'
 import JSBI from 'jsbi'
 import invariant from 'tiny-invariant'
-import { ZERO } from '../internalConstants'
-import { maxLiquidityForAmounts } from '../utils/maxLiquidityForAmounts'
-import { tickToPrice } from '../utils/priceTickConversions'
-import { SqrtPriceMath } from '../utils/sqrtPriceMath'
-import { TickMath } from '../utils/tickMath'
-import { encodeSqrtRatioX96 } from '../utils/encodeSqrtRatioX96'
 import { Pool } from './pool'
+import { encodeSqrtRatioX96, maxLiquidityForAmounts, SqrtPriceMath, TickMath, tickToPrice } from '@uniswap/v3-sdk'
+import { ZERO } from '../internalConstants'
 
 interface PositionConstructorArgs {
   pool: Pool
@@ -26,7 +22,7 @@ export class Position {
   public readonly pool: Pool
   public readonly tickLower: number
   public readonly tickUpper: number
-  public readonly liquidity: JSBI // needs to be fetched from pool manager
+  public readonly liquidity: JSBI // TODO: needs to be fetched from pool manager
 
   // cached resuts for the getters
   private _token0Amount: CurrencyAmount<Currency> | null = null
