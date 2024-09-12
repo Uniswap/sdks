@@ -129,13 +129,18 @@ export type V3DutchInput = {
 
 export type V3DutchInputJSON = Omit<V3DutchInput, "startAmount" | "curve" | "maxAmount"> & {
   startAmount: string;
-  curve: NonlinearDutchDecay;
+  curve: NonlinearDutchDecayJSON;
   maxAmount: string;
 };
 
 export type NonlinearDutchDecay = {
   relativeBlocks: number[];
   relativeAmounts: bigint[]; // Cannot be BigNumber because could be negative
+};
+
+export type NonlinearDutchDecayJSON = {
+  relativeBlocks: number[];
+  relativeAmounts: string[];
 };
 
 export type V3DutchOutput = {
@@ -145,6 +150,7 @@ export type V3DutchOutput = {
   readonly recipient: string;
 };
 
-export type V3DutchOutputJSON = Omit<V3DutchOutput, "startAmount"> & {
+export type V3DutchOutputJSON = Omit<V3DutchOutput, "startAmount" | "curve"> & {
   startAmount: string;
+  curve: NonlinearDutchDecayJSON;
 };

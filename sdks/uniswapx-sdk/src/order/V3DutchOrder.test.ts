@@ -112,7 +112,7 @@ describe("V3DutchOrder", () => {
                 startAmount: "1000000",
                 curve: {
                     relativeBlocks: [1,2,3,4],
-                    relativeAmounts: [BigInt(1), BigInt(2), BigInt(3), BigInt(4)],
+                    relativeAmounts: ["1", "2", "3", "4"],
                 },
                 maxAmount: "1000001",
             },
@@ -122,7 +122,7 @@ describe("V3DutchOrder", () => {
                     startAmount: "1000000",
                     curve: {
                         relativeBlocks: [1,2,3,4],
-                        relativeAmounts: [BigInt(1), BigInt(2), BigInt(3), BigInt(4)],
+                        relativeAmounts: ["1", "2", "3", "4"],
                     },
                     recipient: ethers.constants.AddressZero,
                 },

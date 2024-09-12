@@ -122,7 +122,7 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                     startAmount: BigNumber.from(json.input.startAmount),
                     curve: {
                         relativeBlocks: json.input.curve.relativeBlocks,
-                        relativeAmounts: json.input.curve.relativeAmounts,
+                        relativeAmounts: json.input.curve.relativeAmounts.map(amount => BigInt(amount)),
                     },
                     maxAmount: BigNumber.from(json.input.maxAmount),
                 },
@@ -131,7 +131,7 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                     startAmount: BigNumber.from(output.startAmount),
                     curve: {
                         relativeBlocks: output.curve.relativeBlocks,
-                        relativeAmounts: output.curve.relativeAmounts,
+                        relativeAmounts: output.curve.relativeAmounts.map(amount => BigInt(amount)),
                     },
                 })),
             },
@@ -197,13 +197,19 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
             input: {
                 token: this.info.input.token,
                 startAmount: this.info.input.startAmount.toString(),
-                curve: this.info.input.curve,
+                curve: {
+                    relativeBlocks: this.info.input.curve.relativeBlocks,
+                    relativeAmounts: this.info.input.curve.relativeAmounts.map(amount => amount.toString()),
+                },
                 maxAmount: this.info.input.maxAmount.toString(),
             },
             outputs: this.info.outputs.map(output => ({
                 token: output.token,
                 startAmount: output.startAmount.toString(),
-                curve: output.curve,
+                curve: {
+                    relativeBlocks: output.curve.relativeBlocks,
+                    relativeAmounts: output.curve.relativeAmounts.map(amount => amount.toString()),
+                },
                 recipient: output.recipient,
             })),
         }
