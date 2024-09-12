@@ -1,10 +1,10 @@
 import { Currency, CurrencyAmount, Price, TradeType } from "@uniswap/sdk-core";
+import { BigNumber } from "ethers";
 
+import { V3DutchOutput } from "../order";
 import { UnsignedV3DutchOrder, UnsignedV3DutchOrderInfo } from "../order/V3DutchOrder";
 
 import { areCurrenciesEqual } from "./utils";
-import { V3DutchOutput } from "../order";
-import { BigNumber } from "ethers";
 
 export class V3DutchOrderTrade<
     TInput extends Currency,
