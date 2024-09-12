@@ -11,6 +11,7 @@ type ChainAddresses = {
   tickLensAddress?: string
   swapRouter02Address?: string
   mixedRouteQuoterV1Address?: string
+  mixedRouteQuoterV2Address?: string
 }
 
 const DEFAULT_NETWORKS = [ChainId.MAINNET, ChainId.GOERLI, ChainId.SEPOLIA]
@@ -162,6 +163,7 @@ const SEPOLIA_ADDRESSES: ChainAddresses = {
   nonfungiblePositionManagerAddress: '0x1238536071E1c677A632429e3655c799b22cDA52',
   tickLensAddress: '0xd7f33bcdb21b359c8ee6f0251d30e94832baad07',
   swapRouter02Address: '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E',
+  // TODO add sepolia mixed route quoter v2 address
 }
 
 // Avalanche v3 addresses
