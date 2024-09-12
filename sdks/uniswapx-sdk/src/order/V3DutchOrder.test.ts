@@ -29,10 +29,6 @@ const COSIGNER_DATA_WITHOUT_OVERRIDES = {
 };
 
 describe("V3DutchOrder", () => {
-    it("should get block number", () => {
-        expect(BLOCK_NUMBER).to.be.greaterThan(0);
-    });
-
     const getFullOrderInfo = ( data: Partial<CosignedV3DutchOrderInfo>): CosignedV3DutchOrderInfo => {
         return Object.assign(
             {
@@ -183,11 +179,7 @@ describe("V3DutchOrder", () => {
         it("resolves with original value when overrides==0", () => {
             const order = new CosignedV3DutchOrder(
                 getFullOrderInfo({
-                    cosignerData: {
-                        ...COSIGNER_DATA_WITH_OVERRIDES,
-                        inputOverride: BigNumber.from(0),
-                        outputOverrides: [BigNumber.from(0)],
-                    },
+                    cosignerData: COSIGNER_DATA_WITHOUT_OVERRIDES,
                 }),
                 CHAIN_ID
             );

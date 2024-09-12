@@ -98,6 +98,24 @@ export type DutchInputJSON = Omit<DutchInput, "startAmount" | "endAmount"> & {
   endAmount: string;
 };
 
+export type CosignerData = {
+  decayStartTime: number;
+  decayEndTime: number;
+  exclusiveFiller: string;
+  exclusivityOverrideBps: BigNumber;
+  inputOverride: BigNumber;
+  outputOverrides: BigNumber[];
+};
+
+export type CosignerDataJSON = {
+  decayStartTime: number;
+  decayEndTime: number;
+  exclusiveFiller: string;
+  exclusivityOverrideBps: number;
+  inputOverride: string;
+  outputOverrides: string[];
+};
+
 export type PriorityInput = {
   readonly token: string;
   readonly amount: BigNumber;

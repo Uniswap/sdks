@@ -6,30 +6,21 @@ import { getPermit2, ResolvedUniswapXOrder } from "../utils";
 import { getBlockDecayedAmount } from "../utils/dutchBlockDecay";
 import { originalIfZero } from "../utils/order";
 
-import { BlockOverrides, OffChainOrder, OrderInfo, V3DutchInput, V3DutchInputJSON, V3DutchOutput, V3DutchOutputJSON, V3OrderResolutionOptions } from "./types";
+import { BlockOverrides, CosignerData, CosignerDataJSON, OffChainOrder, OrderInfo, V3DutchInput, V3DutchInputJSON, V3DutchOutput, V3DutchOutputJSON, V3OrderResolutionOptions } from "./types";
 
-export type V3CosignerDataJSON = {
+export type V3CosignerDataJSON = Omit<CosignerDataJSON, "decayStartTime" | "decayEndTime"> & {
     decayStartBlock: number;
-    exclusiveFiller: string;
-    exclusivityOverrideBps: number;
-    inputOverride: string;
-    outputOverrides: string[];
-}
+};
+
+export type V3CosignerData = Omit<CosignerData, "decayStartTime" | "decayEndTime"> & {
+    decayStartBlock: number;
+};
 
 export type UnsignedV3DutchOrderInfoJSON = Omit<UnsignedV3DutchOrderInfo, "nonce" | "input" | "outputs" | "cosignerData"> & {
     nonce: string;
     input: V3DutchInputJSON;
     outputs: V3DutchOutputJSON[];
 };
-
-export type V3CosignerData = {
-    decayStartBlock: number;
-    //No end in cosignerData
-    exclusiveFiller: string;
-    exclusivityOverrideBps: BigNumber;
-    inputOverride: BigNumber;
-    outputOverrides: BigNumber[];
-}
 
 export type UnsignedV3DutchOrderInfo = OrderInfo & {
     cosigner: string;

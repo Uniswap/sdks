@@ -124,7 +124,7 @@ export function getEndAmount(
 ): BigNumber {
 	const { startAmount, relativeAmounts } = config;
 	if (!startAmount || !relativeAmounts) {
-		throw new Error("Invalid config for getting V3 decay end amount"); //TODO: Should we throw?
+		throw new Error("Invalid config for getting V3 decay end amount");
 	}
 	return startAmount.sub(
 		relativeAmounts[relativeAmounts.length - 1].toString()

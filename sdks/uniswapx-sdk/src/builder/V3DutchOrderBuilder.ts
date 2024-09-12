@@ -103,17 +103,10 @@ export class V3DutchOrderBuilder extends OrderBuilder {
 
         this.reactor(getReactor(chainId, OrderType.Dutch_V3, reactorAddress));
         this.permit2Address = getPermit2(chainId, _permit2Address);
-
         this.info = {
             outputs: [],
-            cosignerData: {
-                decayStartBlock: 0,
-                exclusiveFiller: ethers.constants.AddressZero,
-                exclusivityOverrideBps: BigNumber.from(0),
-                inputOverride: BigNumber.from(0),
-                outputOverrides: [],
-            },
         };
+        this.initializeCosignerData({});
     }
 
     cosigner(cosigner: string): this {

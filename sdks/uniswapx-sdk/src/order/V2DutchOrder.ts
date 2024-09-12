@@ -14,6 +14,8 @@ import { originalIfZero } from "../utils/order";
 
 import {
   BlockOverrides,
+  CosignerData,
+  CosignerDataJSON,
   DutchInput,
   DutchInputJSON,
   DutchOutput,
@@ -23,24 +25,6 @@ import {
   OrderResolutionOptions,
 } from "./types";
 import { CustomOrderValidation, parseValidation } from "./validation";
-
-export type CosignerData = {
-  decayStartTime: number;
-  decayEndTime: number;
-  exclusiveFiller: string;
-  exclusivityOverrideBps: BigNumber;
-  inputOverride: BigNumber;
-  outputOverrides: BigNumber[];
-};
-
-export type CosignerDataJSON = {
-  decayStartTime: number;
-  decayEndTime: number;
-  exclusiveFiller: string;
-  exclusivityOverrideBps: number;
-  inputOverride: string;
-  outputOverrides: string[];
-};
 
 export type UnsignedV2DutchOrderInfo = OrderInfo & {
   cosigner: string;
