@@ -19,6 +19,9 @@
 [submodule "sdks/universal-router-sdk/lib/permit2"]
 	path = sdks/universal-router-sdk/lib/permit2
 	url = https://github.com/Uniswap/permit2
+[submodule "sdks/universal-router-sdk/lib/universal-router"]
+	path = sdks/universal-router-sdk/lib/universal-router
+	url = https://github.com/Uniswap/universal-router
 [submodule "sdks/universal-router-sdk/lib/openzeppelin-contracts"]
 	path = sdks/universal-router-sdk/lib/openzeppelin-contracts
 	url = https://github.com/openzeppelin/openzeppelin-contracts
