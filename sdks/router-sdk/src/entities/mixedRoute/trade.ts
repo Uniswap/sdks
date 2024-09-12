@@ -6,8 +6,7 @@ import invariant from 'tiny-invariant'
 import { ONE, ZERO } from '../../constants'
 import { MixedRouteSDK } from './route'
 import { getOutputAmount } from '../../utils/getOutputAmount'
-
-type TPool = Pair | V3Pool | V4Pool
+import { TPool } from '../../utils/TPool'
 
 /**
  * Trades comparator, an extension of the input output comparator that also considers other dimensions of the trade in ranking them

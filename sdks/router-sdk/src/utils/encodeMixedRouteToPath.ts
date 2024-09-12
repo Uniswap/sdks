@@ -2,11 +2,10 @@ import { pack } from '@ethersproject/solidity'
 import { Currency } from '@uniswap/sdk-core'
 import { Pool as V3Pool } from '@uniswap/v3-sdk'
 import { Pool as V4Pool } from '@uniswap/v4-sdk'
-import { Pair } from '@uniswap/v2-sdk'
 import { MixedRouteSDK } from '../entities/mixedRoute/route'
 import { V2_FEE_PATH_PLACEHOLDER } from '../constants'
+import { TPool } from './TPool'
 
-type TPool = Pair | V3Pool | V4Pool
 /**
  * Converts a route to a hex encoded path
  * @notice only supports exactIn route encodings

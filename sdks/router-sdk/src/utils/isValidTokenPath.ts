@@ -1,9 +1,6 @@
 import { Currency, Token } from '@uniswap/sdk-core'
 import { Pool as V4Pool } from '@uniswap/v4-sdk'
-import { Pair } from '@uniswap/v2-sdk'
-import { Pool as V3Pool } from '@uniswap/v3-sdk'
-
-type TPool = Pair | V3Pool | V4Pool
+import { TPool } from './TPool'
 
 export function isValidTokenPath(prevPool: TPool, currentPool: TPool, inputToken: Currency): boolean {
   if (currentPool.involvesToken(inputToken as Token)) return true
