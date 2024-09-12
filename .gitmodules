@@ -26,3 +26,9 @@
 	path = sdks/universal-router-sdk/lib/openzeppelin-contracts
 	url = https://github.com/openzeppelin/openzeppelin-contracts
 	branch = v4.8.0
+[submodule "sdks/universal-router-sdk/lib/v4-periphery"]
+	path = sdks/universal-router-sdk/lib/v4-periphery
+	url = https://github.com/uniswap/v4-periphery
+[submodule "sdks/universal-router-sdk/lib/v4-core"]
+	path = sdks/universal-router-sdk/lib/v4-core
+	url = https://github.com/uniswap/v4-core
