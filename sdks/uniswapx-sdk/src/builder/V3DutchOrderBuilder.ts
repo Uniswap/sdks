@@ -5,7 +5,6 @@ import { OrderType } from "../constants";
 import { CosignedV3DutchOrder, CosignedV3DutchOrderInfo, UnsignedV3DutchOrder, V3CosignerData } from "../order/V3DutchOrder";
 import { V3DutchInput, V3DutchOutput } from "../order/types";
 import { getPermit2, getReactor, isCosignedV3 } from "../utils";
-import { getEndAmount } from "../utils/dutchBlockDecay";
 
 import { OrderBuilder } from "./OrderBuilder";
 
@@ -153,13 +152,6 @@ export class V3DutchOrderBuilder extends OrderBuilder {
     }
 
     output(output: V3DutchOutput): this {
-        invariant(
-            output.startAmount.gte(getEndAmount({
-                startAmount: output.startAmount,
-                relativeAmounts: output.curve.relativeAmounts,
-                relativeBlocks: output.curve.relativeBlocks,
-            })), "startAmount must be greater than the endAmount"
-        );
         this.info.outputs?.push(output);
         return this;
     }

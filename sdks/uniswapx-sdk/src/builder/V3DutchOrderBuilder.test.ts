@@ -347,7 +347,38 @@ describe("V3DutchOrderBuilder", () => {
           ).toThrow("Invariant failed: outputOverride smaller than original output");
     });
 
-    //TODO: double check that we don't enforce endamount < startamount
+	it("Do not enforce endAmount < startAmount for V3", () => {
+		const deadline = Math.floor(Date.now() / 1000) + 1000;
+		expect(() =>
+			builder
+			.cosignature("0x")
+			.cosigner(constants.AddressZero)
+			.decayStartBlock(212121)
+			.input({
+				token: INPUT_TOKEN,
+				startAmount: INPUT_START_AMOUNT,
+				curve: {
+					relativeBlocks: [1],
+					relativeAmounts: [BigInt(0)],
+				},
+				maxAmount: INPUT_START_AMOUNT,
+			})
+			.output({
+				token: OUTPUT_TOKEN,
+				startAmount: OUTPUT_START_AMOUNT,
+				curve: {
+					relativeBlocks: [4],
+					relativeAmounts: [BigInt(-4)],
+				},
+				recipient: constants.AddressZero,
+			})
+			.deadline(deadline)
+			.outputOverrides([OUTPUT_START_AMOUNT])
+			.swapper(constants.AddressZero)
+			.nonce(BigNumber.from(100))
+			.build()
+		).not.toThrow();
+	});
 
     it("Throw if deadline already passed", () => {
         const deadline = 2121;
