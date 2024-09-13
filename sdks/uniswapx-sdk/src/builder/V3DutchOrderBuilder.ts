@@ -2,7 +2,7 @@ import { BigNumber, ethers } from "ethers";
 import invariant from "tiny-invariant";
 
 import { OrderType } from "../constants";
-import { CosignedV3DutchOrder, CosignedV3DutchOrderInfo, UnsignedV3DutchOrder, V3CosignerData } from "../order/V3DutchOrder";
+import { CosignedV3DutchOrder, CosignedV3DutchOrderInfo, UnsignedV3DutchOrder, UnsignedV3DutchOrderInfo, V3CosignerData } from "../order/V3DutchOrder";
 import { V3DutchInput, V3DutchOutput } from "../order/types";
 import { getPermit2, getReactor, isCosigned } from "../utils";
 
@@ -40,56 +40,9 @@ export class V3DutchOrderBuilder extends OrderBuilder {
     }
 
     build(): CosignedV3DutchOrder {
-        invariant(this.info.cosigner !== undefined, "cosigner not set");
         invariant(this.info.cosignature !== undefined, "cosignature not set");
-        invariant(this.info.input !== undefined, "input not set");
-        invariant(
-          this.info.outputs && this.info.outputs.length > 0,
-          "outputs not set"
-        );
-        // Check if input curve is valid
-        invariant(this.info.input.curve.relativeAmounts.length === this.info.input.curve.relativeBlocks.length, "relativeBlocks and relativeAmounts length mismatch");
-        invariant(this.isRelativeBlocksIncreasing(this.info.input.curve.relativeBlocks), "relativeBlocks not strictly increasing");
-        // For each output's curve, we need to make sure relativeBlocks is strictly increasing
-        this.info.outputs.forEach((output) => {
-            invariant(
-                output.curve.relativeBlocks.length === output.curve.relativeAmounts.length,
-                "relativeBlocks and relativeAmounts length mismatch"
-            );
-            // For each output's curve, we need to make sure relativeBlocks is strictly increasing
-            invariant(this.isRelativeBlocksIncreasing(output.curve.relativeBlocks), "relativeBlocks not strictly increasing");
-        });
-        // In V3, we are not enforcing that the startAmount is greater than the endAmount
-        invariant(this.info.cosignerData !== undefined, "cosignerData not set");
-        invariant(this.info.cosignerData.decayStartBlock !== undefined, "decayStartBlock not set");
-        // In V3, we don't have a decayEndTime field and use OrderInfo.deadline field for Permit2
-        invariant(this.orderInfo.deadline !== undefined, "deadline not set");
-        invariant(
-            this.info.cosignerData.exclusiveFiller !== undefined,
-            "exclusiveFiller not set"
-          );
-        invariant(
-            this.info.cosignerData.exclusivityOverrideBps !== undefined,
-            "exclusivityOverrideBps not set"
-        );
-        invariant(
-              this.info.cosignerData.inputOverride.lte(this.info.input.startAmount),
-            "inputOverride larger than original input"
-        );
-        invariant(
-            this.info.cosignerData.outputOverrides.length > 0,
-            "outputOverrides not set"
-        );
-        this.info.cosignerData.outputOverrides.forEach((override, idx) => {
-            invariant(
-                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                override.gte(this.info.outputs![idx].startAmount),
-                "outputOverride smaller than original output"
-            );
-        });
-        invariant(this.info.input !== undefined, "original input not set");
-        // We are not checking if the decayStartTime is before the deadline because it is not enforced in the smart contract
-
+        this.checkUnsignedInvariants(this.info);
+        this.checkCosignedInvariants(this.info);
         return new CosignedV3DutchOrder(
             Object.assign(this.getOrderInfo(), {
                 cosignerData: this.info.cosignerData,
@@ -101,7 +54,6 @@ export class V3DutchOrderBuilder extends OrderBuilder {
             this.chainId,
             this.permit2Address
         );
-
     }
     private permit2Address: string;
     private info: Partial<CosignedV3DutchOrderInfo>;
@@ -142,12 +94,12 @@ export class V3DutchOrderBuilder extends OrderBuilder {
 
     private initializeCosignerData(data: Partial<V3CosignerData>): void {
         this.info.cosignerData = {
-          decayStartBlock: 0,
-          exclusiveFiller: ethers.constants.AddressZero,
-          exclusivityOverrideBps: BigNumber.from(0),
-          inputOverride: BigNumber.from(0),
-          outputOverrides: [],
-          ...data,
+            decayStartBlock: 0,
+            exclusiveFiller: ethers.constants.AddressZero,
+            exclusivityOverrideBps: BigNumber.from(0),
+            inputOverride: BigNumber.from(0),
+            outputOverrides: [],
+            ...data,
         };
     }
 
@@ -162,6 +114,61 @@ export class V3DutchOrderBuilder extends OrderBuilder {
         return true;
     }
 
+    private checkUnsignedInvariants(info: Partial<CosignedV3DutchOrderInfo>): asserts info is UnsignedV3DutchOrderInfo {
+        invariant(info.cosigner !== undefined, "cosigner not set");
+        invariant(info.input !== undefined, "input not set");
+        invariant(
+            info.outputs && info.outputs.length > 0,
+            "outputs not set"
+        );
+        // Check if input curve is valid
+        invariant(info.input.curve.relativeAmounts.length === info.input.curve.relativeBlocks.length, "relativeBlocks and relativeAmounts length mismatch");
+        invariant(this.isRelativeBlocksIncreasing(info.input.curve.relativeBlocks), "relativeBlocks not strictly increasing");
+        // For each output's curve, we need to make sure relativeBlocks is strictly increasing
+        info.outputs.forEach((output) => {
+            invariant(
+                output.curve.relativeBlocks.length === output.curve.relativeAmounts.length,
+                "relativeBlocks and relativeAmounts length mismatch"
+            );
+            // For each output's curve, we need to make sure relativeBlocks is strictly increasing
+            invariant(this.isRelativeBlocksIncreasing(output.curve.relativeBlocks), "relativeBlocks not strictly increasing");
+        });
+        // In V3, we don't have a decayEndTime field and use OrderInfo.deadline field for Permit2
+        invariant(this.orderInfo.deadline !== undefined, "deadline not set");
+        invariant(this.orderInfo.swapper !== undefined, "swapper not set");
+    }
+
+    private checkCosignedInvariants(info: Partial<CosignedV3DutchOrderInfo>): asserts info is CosignedV3DutchOrderInfo {
+        // In V3, we are not enforcing that the startAmount is greater than the endAmount
+        invariant(info.cosignerData !== undefined, "cosignerData not set");
+        invariant(info.cosignerData.decayStartBlock !== undefined, "decayStartBlock not set");
+        invariant(
+            info.cosignerData.exclusiveFiller !== undefined,
+            "exclusiveFiller not set"
+        );
+        invariant(
+            info.cosignerData.exclusivityOverrideBps !== undefined,
+            "exclusivityOverrideBps not set"
+        );
+        invariant(
+            info.cosignerData.outputOverrides.length > 0,
+            "outputOverrides not set"
+        );
+        invariant(
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            info.cosignerData.inputOverride.lte(this.info.input!.startAmount),
+            "inputOverride larger than original input"
+        );
+        info.cosignerData.outputOverrides.forEach((override, idx) => {
+            invariant(
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                override.gte(this.info.outputs![idx].startAmount),
+                "outputOverride smaller than original output"
+            );
+        });
+        // We are not checking if the decayStartTime is before the deadline because it is not enforced in the smart contract
+    }
+
     input(input: V3DutchInput): this {
         this.info.input = input;
         return this;
@@ -171,7 +178,7 @@ export class V3DutchOrderBuilder extends OrderBuilder {
         this.info.outputs?.push(output);
         return this;
     }
-        
+
     inputOverride(inputOverride: BigNumber): this {
         if (!this.info.cosignerData) {
             this.initializeCosignerData({ inputOverride });
@@ -183,9 +190,9 @@ export class V3DutchOrderBuilder extends OrderBuilder {
 
     outputOverrides(outputOverrides: BigNumber[]): this {
         if (!this.info.cosignerData) {
-          this.initializeCosignerData({ outputOverrides });
+            this.initializeCosignerData({ outputOverrides });
         } else {
-          this.info.cosignerData.outputOverrides = outputOverrides;
+            this.info.cosignerData.outputOverrides = outputOverrides;
         }
         return this;
     }
@@ -199,7 +206,7 @@ export class V3DutchOrderBuilder extends OrderBuilder {
         super.swapper(swapper);
         return this;
     }
-    
+
     nonce(nonce: BigNumber): this {
         super.nonce(nonce);
         return this;
@@ -235,8 +242,8 @@ export class V3DutchOrderBuilder extends OrderBuilder {
     // ensures that we only change non fee outputs
     nonFeeRecipient(newRecipient: string, feeRecipient?: string): this {
         invariant(
-        newRecipient !== feeRecipient,
-        `newRecipient must be different from feeRecipient: ${newRecipient}`
+            newRecipient !== feeRecipient,
+            `newRecipient must be different from feeRecipient: ${newRecipient}`
         );
         if (!this.info.outputs) {
             return this;
@@ -259,15 +266,7 @@ export class V3DutchOrderBuilder extends OrderBuilder {
     }
 
     buildPartial(): UnsignedV3DutchOrder { //build an unsigned order
-        invariant(this.info.cosigner !== undefined, "cosigner not set");
-        invariant(this.info.input !== undefined, "input not set");
-        invariant(
-          this.info.outputs && this.info.outputs.length > 0,
-          "outputs not set"
-        );
-        invariant(this.info.input !== undefined, "original input not set");
-        invariant(!this.info.deadline, "deadline not set");
-        invariant(!this.info.swapper, "swapper not set");
+        this.checkUnsignedInvariants(this.info);
         return new UnsignedV3DutchOrder(
             Object.assign(this.getOrderInfo(), {
                 input: this.info.input,
