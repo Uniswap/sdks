@@ -59,6 +59,7 @@ describe('#encodeMixedRouteToPath', () => {
   const route_0_V3_1_v3_weth_V2_2 = new MixedRouteSDK([pool_V3_0_1_medium, pool_V3_1_weth, pair_2_weth], token0, token2)
   const route_0_V3_weth_V4_1 = new MixedRouteSDK([pool_V3_0_weth, pool_V4_0_1], ETHER, token1)
   const route_eth_V4_0_V3_1 = new MixedRouteSDK([pool_V4_0_eth, pool_V3_0_1_medium], ETHER, token1)
+  const route_eth_V3_0_V4_1 = new MixedRouteSDK([pool_V3_0_weth, pool_V4_0_1], ETHER, token1)
 
   describe('pure V3', () => {
     it('packs them for exact input single hop', () => {
@@ -172,6 +173,12 @@ describe('#encodeMixedRouteToPath', () => {
     it('packs them for exact input native eth v4 -> v3', () => {
       expect(encodeMixedRouteToPath(route_eth_V4_0_V3_1)).toEqual(
         '0x0000000000000000000000000000000000000000400bb800001e00000000000000000000000000000000000000000000000000000000000000000000000000000001300bb80000000000000000000000000000000000000002'
+      )
+    })
+
+    it('packs them for exact input native eth v3 -> v4', () => {
+      expect(encodeMixedRouteToPath(route_eth_V3_0_V4_1)).toEqual(
+          '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2300bb80000000000000000000000000000000000000001400bb800001e00000000000000000000000000000000000000000000000000000000000000000000000000000002'
       )
     })
   })
