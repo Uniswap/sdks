@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="5a2fd03f-5137-4e1b-9728-8b47dd03fca0" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/sdks/sdk-core/src/addresses.ts" beforeDir="false" afterPath="$PROJECT_DIR$/sdks/sdk-core/src/addresses.ts" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="MarkdownSettingsMigration">
+    <option name="stateVersion" value="1" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
+  &quot;associatedIndex&quot;: 2
+}</component>
+  <component name="ProjectId" id="2k47zthNytHSYi0qGn4RksG7q43" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Jest.mixedTrades.test.ts.executor": "Run",
+    "Jest.uniswapTrades.test.ts.executor": "Run",
+    "Mocha.sdks/router-sdk/src/utils/encodeMixedRouteToPath.test.ts.executor": "Run",
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "git-widget-placeholder": "siyujiang/mixed-quoter-v2-property",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs.jest.jest_package": "/Users/siyu.jiang/workspace/sdks/node_modules/jest",
+    "nodejs.mocha.mocha_node_package_dir": "",
+    "nodejs_package_manager_path": "yarn",
+    "ts.external.directory.path": "/Users/siyu.jiang/workspace/sdks/node_modules/typescript/lib",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="RunManager" selected="Mocha.sdks/router-sdk/src/utils/encodeMixedRouteToPath.test.ts">
+    <configuration name="mixedTrades.test.ts" type="JavaScriptTestRunnerJest" temporary="true" nameIsGenerated="true">
+      <node-interpreter value="project" />
+      <jest-package value="$PROJECT_DIR$/node_modules/jest" />
+      <working-dir value="$PROJECT_DIR$/sdks/universal-router-sdk" />
+      <envs />
+      <scope-kind value="TEST_FILE" />
+      <test-file value="$PROJECT_DIR$/sdks/universal-router-sdk/test/mixedTrades.test.ts" />
+      <method v="2" />
+    </configuration>
+    <configuration name="uniswapTrades.test.ts" type="JavaScriptTestRunnerJest" temporary="true" nameIsGenerated="true">
+      <node-interpreter value="project" />
+      <jest-package value="$PROJECT_DIR$/node_modules/jest" />
+      <working-dir value="$PROJECT_DIR$/sdks/universal-router-sdk" />
+      <envs />
+      <scope-kind value="TEST_FILE" />
+      <test-file value="$PROJECT_DIR$/sdks/universal-router-sdk/test/uniswapTrades.test.ts" />
+      <method v="2" />
+    </configuration>
+    <configuration name="sdks/router-sdk/src/utils/encodeMixedRouteToPath.test.ts" type="mocha-javascript-test-runner" temporary="true" nameIsGenerated="true">
+      <node-interpreter>project</node-interpreter>
+      <node-options />
+      <mocha-package />
+      <working-directory>$PROJECT_DIR$/sdks/router-sdk</working-directory>
+      <pass-parent-env>true</pass-parent-env>
+      <ui>bdd</ui>
+      <extra-mocha-options />
+      <test-kind>TEST_FILE</test-kind>
+      <test-file>$PROJECT_DIR$/sdks/router-sdk/src/utils/encodeMixedRouteToPath.test.ts</test-file>
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Mocha.sdks/router-sdk/src/utils/encodeMixedRouteToPath.test.ts" />
+        <item itemvalue="Jest.mixedTrades.test.ts" />
+        <item itemvalue="Jest.uniswapTrades.test.ts" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="5a2fd03f-5137-4e1b-9728-8b47dd03fca0" name="Changes" comment="" />
+      <created>1722531260170</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1722531260170</updated>
+      <workItem from="1722531261301" duration="18203000" />
+      <workItem from="1723027085782" duration="1021000" />
+      <workItem from="1723028541433" duration="11955000" />
+      <workItem from="1724457050651" duration="2162000" />
+      <workItem from="1724604539859" duration="24479000" />
+      <workItem from="1724974305576" duration="25273000" />
+      <workItem from="1725859565096" duration="11860000" />
+      <workItem from="1726081047280" duration="18359000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+</project>

@@ -163,7 +163,8 @@ const SEPOLIA_ADDRESSES: ChainAddresses = {
   nonfungiblePositionManagerAddress: '0x1238536071E1c677A632429e3655c799b22cDA52',
   tickLensAddress: '0xd7f33bcdb21b359c8ee6f0251d30e94832baad07',
   swapRouter02Address: '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E',
-  // TODO add sepolia mixed route quoter v2 address
+  // TODO: ROUTE-277 - update deploy address once after quoter refactoring.
+  mixedRouteQuoterV2Address: '0xa8b0be287acB850952DE4287b84B7222cc654C09',
 }
 
 // Avalanche v3 addresses
