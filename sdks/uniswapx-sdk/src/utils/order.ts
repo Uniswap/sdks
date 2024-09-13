@@ -159,16 +159,12 @@ export class RelayOrderParser extends OrderParser {
   }
 }
 
-export function isCosignedV2(
-  order: UnsignedV2DutchOrder | CosignedV2DutchOrder
-): order is CosignedV2DutchOrder {
-  return (order as CosignedV2DutchOrder).info.cosignature !== undefined;
-}
-
-export function isCosignedV3(
-  order: UnsignedV3DutchOrder | CosignedV3DutchOrder
-): order is CosignedV3DutchOrder {
-  return (order as CosignedV3DutchOrder).info.cosignature !== undefined;
+type UnsignedOrder = UnsignedV2DutchOrder | UnsignedV3DutchOrder;
+type CosignedOrder = CosignedV2DutchOrder | CosignedV3DutchOrder;
+export function isCosigned<T extends UnsignedOrder, U extends CosignedOrder>(
+  order: T | U
+): order is U {
+  return 'cosignature' in (order as U).info;
 }
 
 export function originalIfZero(value: BigNumber, original: BigNumber): BigNumber {

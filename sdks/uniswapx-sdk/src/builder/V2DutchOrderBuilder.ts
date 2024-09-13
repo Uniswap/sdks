@@ -11,7 +11,7 @@ import {
   UnsignedV2DutchOrder,
 } from "../order";
 import { ValidationInfo } from "../order/validation";
-import { getPermit2, getReactor, isCosignedV2 } from "../utils";
+import { getPermit2, getReactor, isCosigned } from "../utils";
 
 import { OrderBuilder } from "./OrderBuilder";
 
@@ -40,7 +40,7 @@ export class V2DutchOrderBuilder extends OrderBuilder {
       builder.output(output);
     }
 
-    if (isCosignedV2(order)) {
+    if (isCosigned<UnsignedV2DutchOrder, CosignedV2DutchOrder>(order)) {
       builder.cosignature(order.info.cosignature);
       builder.decayEndTime(order.info.cosignerData.decayEndTime);
       builder.decayStartTime(order.info.cosignerData.decayStartTime);
