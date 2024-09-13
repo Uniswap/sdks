@@ -129,6 +129,142 @@ describe("V3DutchOrderBuilder", () => {
           ).toThrow("Invariant failed: cosigner not set");
     });
 
+	it("Throw if relativeBlocks and relativeAmounts length mismatch in output", () => {
+		const deadline = Math.floor(Date.now() / 1000) + 1000;
+		expect(() =>
+			builder
+			.cosignature("0x")
+			.cosigner(constants.AddressZero)
+			.decayStartBlock(212121)
+			.input({
+				token: INPUT_TOKEN,
+				startAmount: INPUT_START_AMOUNT,
+				curve: {
+					relativeBlocks: [1],
+					relativeAmounts: [BigInt(1)],
+				},
+				maxAmount: INPUT_START_AMOUNT.add(1),
+			})
+			.output({
+				token: OUTPUT_TOKEN,
+				startAmount: OUTPUT_START_AMOUNT,
+				curve: {
+					relativeBlocks: [4,5],
+					relativeAmounts: [BigInt(4)],
+				},
+				recipient: constants.AddressZero,
+			})
+			.inputOverride(INPUT_START_AMOUNT.mul(99).div(100))
+			.outputOverrides([OUTPUT_START_AMOUNT])
+			.deadline(deadline)
+			.swapper(constants.AddressZero)
+			.nonce(BigNumber.from(100))
+			.build()
+		).toThrow("Invariant failed: relativeBlocks and relativeAmounts length mismatch");
+	});
+
+	it("Throw if relativeBlocks and relativeAmounts length mismatch in input", () => {
+		const deadline = Math.floor(Date.now() / 1000) + 1000;
+		expect(() =>
+			builder
+			.cosignature("0x")
+			.cosigner(constants.AddressZero)
+			.decayStartBlock(212121)
+			.input({
+				token: INPUT_TOKEN,
+				startAmount: INPUT_START_AMOUNT,
+				curve: {
+					relativeBlocks: [1],
+					relativeAmounts: [BigInt(0), BigInt(1)],
+				},
+				maxAmount: INPUT_START_AMOUNT.add(1),
+			})
+			.output({
+				token: OUTPUT_TOKEN,
+				startAmount: OUTPUT_START_AMOUNT,
+				curve: {
+					relativeBlocks: [4],
+					relativeAmounts: [BigInt(4)],
+				},
+				recipient: constants.AddressZero,
+			})
+			.inputOverride(BigNumber.from(0))
+			.outputOverrides([OUTPUT_START_AMOUNT])
+			.deadline(deadline)
+			.swapper(constants.AddressZero)
+			.nonce(BigNumber.from(100))
+			.build()
+		).toThrow("Invariant failed: relativeBlocks and relativeAmounts length mismatch");
+	});
+
+	it("Throw if relativeBlocks is not strictly increasing in input", () => {
+		const deadline = Math.floor(Date.now() / 1000) + 1000;
+		expect(() =>
+            builder
+            .cosignature("0x")
+            .cosigner(constants.AddressZero)
+            .decayStartBlock(212121)
+            .input({
+                token: INPUT_TOKEN,
+                startAmount: INPUT_START_AMOUNT,
+                curve: {
+                    relativeBlocks: [1, 2, 1],
+                    relativeAmounts: [BigInt(1), BigInt(2), BigInt(3)],
+                },
+                maxAmount: INPUT_START_AMOUNT.add(1),
+            })
+            .output({
+                token: OUTPUT_TOKEN,
+                startAmount: OUTPUT_START_AMOUNT,
+                curve: {
+                    relativeBlocks: [],
+                    relativeAmounts: [],
+                },
+                recipient: constants.AddressZero,
+            })
+            .inputOverride(BigNumber.from(0))
+            .outputOverrides([OUTPUT_START_AMOUNT])
+            .deadline(deadline)
+            .nonce(BigNumber.from(100))
+			.swapper(constants.AddressZero)
+            .build()
+		).toThrow("Invariant failed: relativeBlocks not strictly increasing");
+	});
+
+	it("Throw if relativeBlocks is not strictly increasing in output", () => {
+		const deadline = Math.floor(Date.now() / 1000) + 1000;
+		expect(() =>
+            builder
+            .cosignature("0x")
+            .cosigner(constants.AddressZero)
+            .decayStartBlock(212121)
+            .input({
+                token: INPUT_TOKEN,
+                startAmount: INPUT_START_AMOUNT,
+                curve: {
+                    relativeBlocks: [1],
+                    relativeAmounts: [BigInt(0)],
+                },
+                maxAmount: INPUT_START_AMOUNT.add(1),
+            })
+            .output({
+                token: OUTPUT_TOKEN,
+                startAmount: OUTPUT_START_AMOUNT,
+                curve: {
+                    relativeBlocks: [5, 5],
+                    relativeAmounts: [BigInt(4), BigInt(22)],
+                },
+                recipient: constants.AddressZero,
+            })
+            .inputOverride(INPUT_START_AMOUNT.mul(99).div(100))
+            .outputOverrides([OUTPUT_START_AMOUNT])
+            .deadline(deadline)
+            .nonce(BigNumber.from(100))
+			.swapper(constants.AddressZero)
+            .build()
+		).toThrow("Invariant failed: relativeBlocks not strictly increasing");
+	});
+
     it("Throw if swapper is not set", () => {
         const deadline = Math.floor(Date.now() / 1000) + 1000;
         expect(() =>

@@ -47,6 +47,18 @@ export class V3DutchOrderBuilder extends OrderBuilder {
           this.info.outputs && this.info.outputs.length > 0,
           "outputs not set"
         );
+        // Check if input curve is valid
+        invariant(this.info.input.curve.relativeAmounts.length === this.info.input.curve.relativeBlocks.length, "relativeBlocks and relativeAmounts length mismatch");
+        invariant(this.isRelativeBlocksIncreasing(this.info.input.curve.relativeBlocks), "relativeBlocks not strictly increasing");
+        // For each output's curve, we need to make sure relativeBlocks is strictly increasing
+        this.info.outputs.forEach((output) => {
+            invariant(
+                output.curve.relativeBlocks.length === output.curve.relativeAmounts.length,
+                "relativeBlocks and relativeAmounts length mismatch"
+            );
+            // For each output's curve, we need to make sure relativeBlocks is strictly increasing
+            invariant(this.isRelativeBlocksIncreasing(output.curve.relativeBlocks), "relativeBlocks not strictly increasing");
+        });
         // In V3, we are not enforcing that the startAmount is greater than the endAmount
         invariant(this.info.cosignerData !== undefined, "cosignerData not set");
         invariant(this.info.cosignerData.decayStartBlock !== undefined, "decayStartBlock not set");
@@ -137,6 +149,17 @@ export class V3DutchOrderBuilder extends OrderBuilder {
           outputOverrides: [],
           ...data,
         };
+    }
+
+    private isRelativeBlocksIncreasing(relativeBlocks: number[]): boolean {
+        let prevBlock = 0;
+        for (const block of relativeBlocks) {
+            if (block <= prevBlock) {
+                return false;
+            }
+            prevBlock = block;
+        }
+        return true;
     }
 
     input(input: V3DutchInput): this {
