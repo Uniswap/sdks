@@ -5,7 +5,7 @@ import { Position } from './entities/position'
 import { V4PositionManager } from './PositionManager'
 import { Multicall } from './multicall'
 import { Actions, V4Planner } from './utils'
-import {PoolKey} from './entities/pool'
+import { PoolKey } from './entities/pool'
 
 describe('POSM', () => {
   const currency0 = new Token(1, '0x0000000000000000000000000000000000000001', 18, 't0', 'currency0')
@@ -16,17 +16,7 @@ describe('POSM', () => {
 
   const pool_key_0_1 = Pool.getPoolKey(currency0, currency1, fee, tickSpacing, EMPTY_HOOK)
 
-  const pool_0_1 = new Pool(
-    currency0,
-    currency1,
-    fee,
-    tickSpacing,
-    EMPTY_HOOK,
-    SQRT_PRICE_1_1.toString(),
-    0,
-    0,
-    []
-  )
+  const pool_0_1 = new Pool(currency0, currency1, fee, tickSpacing, EMPTY_HOOK, SQRT_PRICE_1_1.toString(), 0, 0, [])
 
   const recipient = '0x0000000000000000000000000000000000000003'
   const sender = '0x0000000000000000000000000000000000000004'

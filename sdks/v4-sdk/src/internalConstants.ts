@@ -1,6 +1,6 @@
 import JSBI from 'jsbi'
 import { constants } from 'ethers'
-import {encodeSqrtRatioX96} from '@uniswap/v3-sdk'
+import { encodeSqrtRatioX96 } from '@uniswap/v3-sdk'
 
 // constants used internally but not expected to be used externally
 export const ADDRESS_ZERO = constants.AddressZero

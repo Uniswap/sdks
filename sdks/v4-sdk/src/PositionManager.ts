@@ -15,7 +15,7 @@ import { Multicall } from './multicall'
 import invariant from 'tiny-invariant'
 import { MIN_SLIPPAGE_DECREASE, ONE, ZERO } from './internalConstants'
 import { Actions, V4Planner } from './utils'
-import {abi} from './utils/abi'
+import { abi } from './utils/abi'
 
 export interface CommonOptions {
   /**
