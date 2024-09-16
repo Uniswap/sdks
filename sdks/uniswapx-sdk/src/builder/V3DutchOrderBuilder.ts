@@ -4,6 +4,7 @@ import invariant from "tiny-invariant";
 import { OrderType } from "../constants";
 import { CosignedV3DutchOrder, CosignedV3DutchOrderInfo, UnsignedV3DutchOrder, UnsignedV3DutchOrderInfo, V3CosignerData } from "../order/V3DutchOrder";
 import { V3DutchInput, V3DutchOutput } from "../order/types";
+import { ValidationInfo } from "../order/validation";
 import { getPermit2, getReactor, isCosigned } from "../utils";
 
 import { OrderBuilder } from "./OrderBuilder";
@@ -210,6 +211,11 @@ export class V3DutchOrderBuilder extends OrderBuilder {
     nonce(nonce: BigNumber): this {
         super.nonce(nonce);
         return this;
+    }
+
+    validation(info: ValidationInfo): this {
+    super.validation(info);
+    return this;
     }
 
     cosignerData(cosignerData: V3CosignerData): this {

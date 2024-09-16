@@ -1,6 +1,7 @@
 import { BigNumber, constants } from "ethers";
 
 import { CosignedV3DutchOrder, UnsignedV3DutchOrder } from "../order/V3DutchOrder";
+import { encodeExclusiveFillerData } from "../order/validation";
 
 import { V3DutchOrderBuilder } from "./V3DutchOrderBuilder";
 
@@ -564,6 +565,103 @@ describe("V3DutchOrderBuilder", () => {
         );
     });
     
+	it("Regenerate builder from order JSON", () => {
+		const deadline = Math.floor(Date.now() / 1000) + 1000;
+		const fillerAddress = "0x1111111111111111111111111111111111111111";
+		const additionalValidationContract =
+		  "0x2222222222222222222222222222222222222222";
+		const timestamp = Math.floor(Date.now() / 1000) + 100;
+		const validationInfo = encodeExclusiveFillerData(
+		  fillerAddress,
+		  timestamp,
+		  1,
+		  additionalValidationContract
+		);
+        const order = builder
+            .cosigner(constants.AddressZero)
+            .cosignature("0x")
+            .decayStartBlock(212121)
+            .input({
+                token: INPUT_TOKEN,
+                startAmount: INPUT_START_AMOUNT,
+                curve: {
+                    relativeBlocks: [1],
+                    relativeAmounts: [BigInt(0)],
+                },
+                maxAmount: INPUT_START_AMOUNT.add(1),
+            })
+            .output({
+                token: OUTPUT_TOKEN,
+                startAmount: OUTPUT_START_AMOUNT,
+                curve: {
+                    relativeBlocks: [4],
+                    relativeAmounts: [BigInt(4)],
+                },
+                recipient: constants.AddressZero,
+            })
+            .inputOverride(INPUT_START_AMOUNT.mul(99).div(100))
+            .outputOverrides([OUTPUT_START_AMOUNT])
+            .deadline(deadline)
+            .swapper(constants.AddressZero)
+            .nonce(BigNumber.from(100))
+			.validation(validationInfo)
+            .build();
+
+		const json = order.toJSON();
+		const jsonToOrder = CosignedV3DutchOrder.fromJSON(json, 1);
+		const regeneratedBuilder = V3DutchOrderBuilder.fromOrder(jsonToOrder);
+		const regeneratedOrder = regeneratedBuilder.build();
+		expect(regeneratedOrder.toJSON()).toMatchObject(order.toJSON());
+	});
+
+	it("Regenerate builder and modify", () => {
+		const deadline = Math.floor(Date.now() / 1000) + 1000;
+		const fillerAddress = "0x1111111111111111111111111111111111111111";
+		const additionalValidationContract =
+		  "0x2222222222222222222222222222222222222222";
+		const timestamp = Math.floor(Date.now() / 1000) + 100;
+		const validationInfo = encodeExclusiveFillerData(
+		  fillerAddress,
+		  timestamp,
+		  1,
+		  additionalValidationContract
+		);
+		const order = builder
+            .cosigner(constants.AddressZero)
+            .cosignature("0x")
+            .decayStartBlock(212121)
+            .input({
+                token: INPUT_TOKEN,
+                startAmount: INPUT_START_AMOUNT,
+                curve: {
+                    relativeBlocks: [1],
+                    relativeAmounts: [BigInt(0)],
+                },
+                maxAmount: INPUT_START_AMOUNT.add(1),
+            })
+            .output({
+                token: OUTPUT_TOKEN,
+                startAmount: OUTPUT_START_AMOUNT,
+                curve: {
+                    relativeBlocks: [4],
+                    relativeAmounts: [BigInt(4)],
+                },
+                recipient: constants.AddressZero,
+            })
+            .inputOverride(INPUT_START_AMOUNT.mul(99).div(100))
+            .outputOverrides([OUTPUT_START_AMOUNT])
+            .deadline(deadline)
+            .swapper(constants.AddressZero)
+            .nonce(BigNumber.from(100))
+			.validation(validationInfo)
+            .build();
+
+		const regeneratedBuilder = V3DutchOrderBuilder.fromOrder(order);
+		regeneratedBuilder.decayStartBlock(214221422142);
+		const regeneratedOrder = regeneratedBuilder.build();
+		expect(regeneratedOrder.info.cosignerData.decayStartBlock).toEqual(214221422142);
+	});
+
     describe("Partial order tests", () => {
         it("Test valid order with buildPartial", () => {
             const order = builder

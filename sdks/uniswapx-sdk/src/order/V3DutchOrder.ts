@@ -28,6 +28,11 @@ export type UnsignedV3DutchOrderInfo = OrderInfo & {
     outputs: V3DutchOutput[];
 };
 
+export type CosignedV3DutchOrderInfoJSON = UnsignedV3DutchOrderInfoJSON & {
+    cosignerData: V3CosignerDataJSON;
+    cosignature: string;
+};
+
 export type CosignedV3DutchOrderInfo = UnsignedV3DutchOrderInfo & {
     cosignerData: V3CosignerData;
     cosignature: string;
@@ -175,7 +180,10 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
     /**
      * @inheritdoc order
      */
-    toJSON(): UnsignedV3DutchOrderInfoJSON {
+    toJSON(): UnsignedV3DutchOrderInfoJSON & {
+        permit2Address: string;
+        chainId: number;    
+    } {
         return {
             reactor: this.info.reactor,
             swapper: this.info.swapper,
@@ -202,6 +210,8 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                 },
                 recipient: output.recipient,
             })),
+            chainId: this.chainId,
+            permit2Address: this.permit2Address,
         }
     };
 
@@ -323,12 +333,75 @@ export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
         );
     }
 
+    static fromJSON(
+        json: CosignedV3DutchOrderInfoJSON,
+        chainId: number,
+        _permit2Address?: string
+    ): CosignedV3DutchOrder {
+        return new CosignedV3DutchOrder(
+            {
+                ...json,
+                nonce: BigNumber.from(json.nonce),
+                input: {
+                    token: json.input.token,
+                    startAmount: BigNumber.from(json.input.startAmount),
+                    curve: {
+                        relativeBlocks: json.input.curve.relativeBlocks,
+                        relativeAmounts: json.input.curve.relativeAmounts.map(amount => BigInt(amount)),
+                    },
+                    maxAmount: BigNumber.from(json.input.maxAmount),
+                },
+                outputs: json.outputs.map(output => ({
+                    token: output.token,
+                    startAmount: BigNumber.from(output.startAmount),
+                    curve: {
+                        relativeBlocks: output.curve.relativeBlocks,
+                        relativeAmounts: output.curve.relativeAmounts.map(amount => BigInt(amount)),
+                    },
+                    recipient: output.recipient,
+                })),
+                cosignerData: {
+                    decayStartBlock: json.cosignerData.decayStartBlock,
+                    exclusiveFiller: json.cosignerData.exclusiveFiller,
+                    exclusivityOverrideBps: BigNumber.from(
+                        json.cosignerData.exclusivityOverrideBps
+                    ),
+                    inputOverride: BigNumber.from(json.cosignerData.inputOverride),
+                    outputOverrides: json.cosignerData.outputOverrides.map(BigNumber.from),
+                },
+                cosignature: json.cosignature,
+            },
+            chainId,
+            _permit2Address
+        );
+    }
+
     constructor(
         public readonly info: CosignedV3DutchOrderInfo,
         public readonly chainId: number,
         _permit2Address?: string
     ) {
         super(info, chainId, _permit2Address);
+    }
+
+    /**
+     * @inheritdoc order
+     */
+    toJSON(): CosignedV3DutchOrderInfoJSON & {
+    permit2Address: string;
+    chainId: number;
+    } {
+        return {
+            ...super.toJSON(),
+            cosignerData: {
+                decayStartBlock: this.info.cosignerData.decayStartBlock,
+                exclusiveFiller: this.info.cosignerData.exclusiveFiller,
+                exclusivityOverrideBps: this.info.cosignerData.exclusivityOverrideBps.toNumber(),
+                inputOverride: this.info.cosignerData.inputOverride.toString(),
+                outputOverrides: this.info.cosignerData.outputOverrides.map(override => override.toString()),
+            },
+            cosignature: this.info.cosignature,
+        };
     }
 
     static parse(
