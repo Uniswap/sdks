@@ -43,7 +43,7 @@ describe('POSM', () => {
   const slippageTolerance = new Percent(1, 100)
   const deadline = 123
 
-  let planner: V4Planner;
+  let planner: V4Planner
 
   beforeEach(() => {
     planner = new V4Planner()
@@ -222,9 +222,9 @@ describe('POSM', () => {
         liquidity: 0,
       })
 
-      expect(() =>
-        V4PositionManager.removeCallParameters(zeroLiquidityPosition, commonOptions)
-      ).toThrow('ZERO_LIQUIDITY')
+      expect(() => V4PositionManager.removeCallParameters(zeroLiquidityPosition, commonOptions)).toThrow(
+        'ZERO_LIQUIDITY'
+      )
     })
 
     it('removes liquidity', () => {
@@ -266,7 +266,7 @@ describe('POSM', () => {
       expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(token0, 10),
       expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(token1, 20),
       recipient,
-      slippageTolerance
+      slippageTolerance,
     }
 
     it('collects fees', () => {
@@ -275,7 +275,13 @@ describe('POSM', () => {
       const calldatas = Multicall.decodeMulticall(calldata)
       const planner = new V4Planner()
 
-      planner.addAction(Actions.DECREASE_LIQUIDITY, [tokenId.toString(), '0', MIN_SLIPPAGE_DECREASE, MIN_SLIPPAGE_DECREASE, '0x'])
+      planner.addAction(Actions.DECREASE_LIQUIDITY, [
+        tokenId.toString(),
+        '0',
+        MIN_SLIPPAGE_DECREASE,
+        MIN_SLIPPAGE_DECREASE,
+        '0x',
+      ])
       planner.addAction(Actions.TAKE_PAIR, [token0.address, token1.address, recipient])
 
       expect(calldatas[0]).toEqual(planner.finalize())
@@ -286,7 +292,7 @@ describe('POSM', () => {
       const nativeOptions = {
         ...commonOptions,
         expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(Ether.onChain(1), 10),
-        slippageTolerance
+        slippageTolerance,
       }
 
       const { calldata, value } = V4PositionManager.collectCallParameters(nativeOptions)
@@ -294,7 +300,13 @@ describe('POSM', () => {
       const calldatas = Multicall.decodeMulticall(calldata)
       const planner = new V4Planner()
 
-      planner.addAction(Actions.DECREASE_LIQUIDITY, [tokenId.toString(), '0', MIN_SLIPPAGE_DECREASE, MIN_SLIPPAGE_DECREASE, '0x'])
+      planner.addAction(Actions.DECREASE_LIQUIDITY, [
+        tokenId.toString(),
+        '0',
+        MIN_SLIPPAGE_DECREASE,
+        MIN_SLIPPAGE_DECREASE,
+        '0x',
+      ])
       planner.addAction(Actions.TAKE_PAIR, [token0.wrapped.address, token1.address, recipient])
 
       expect(calldatas[0]).toEqual(planner.finalize())
