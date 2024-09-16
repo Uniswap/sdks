@@ -1,5 +1,6 @@
 import JSBI from 'jsbi'
 import { constants } from 'ethers'
+import {encodeSqrtRatioX96} from '@uniswap/v3-sdk'
 
 // constants used internally but not expected to be used externally
 export const ADDRESS_ZERO = constants.AddressZero
@@ -21,6 +22,12 @@ export const TICK_SPACING_SIXTY = 60
 
 // used in position manager math
 export const MIN_SLIPPAGE_DECREASE = 0
+
+// default prices
+export const SQRT_PRICE_1_1 = encodeSqrtRatioX96(1, 1)
+
+// default hook addresses
+export const EMPTY_HOOK = '0x0000000000000000000000000000000000000000'
 
 /**
  * The default factory enabled fee amounts, denominated in hundredths of bips.

@@ -15,6 +15,7 @@ import { Multicall } from './multicall'
 import invariant from 'tiny-invariant'
 import { MIN_SLIPPAGE_DECREASE, ONE, ZERO } from './internalConstants'
 import { Actions, V4Planner } from './utils'
+import {abi} from './utils/abi'
 
 export interface CommonOptions {
   /**
@@ -162,7 +163,7 @@ function isMint(options: AddLiquidityOptions): options is MintOptions {
 }
 
 export abstract class V4PositionManager {
-  public static INTERFACE: Interface = new Interface([])
+  public static INTERFACE: Interface = new Interface(abi)
 
   /**
    * Cannot be constructed.
