@@ -150,16 +150,18 @@ export class Position {
   }
 
   /**
-   * Returns the minimum amounts that must be sent in order to safely mint the amount of liquidity held by the position
+   * Returns the maximum amount of token0 and token1 that must be sent in order to safely mint the amount of liquidity held by the position
    * with the given slippage tolerance
    * @param slippageTolerance Tolerance of unfavorable slippage from the current price
    * @returns The amounts, with slippage
+   * @dev In v4, minting and increasing is protected by maximum amounts of token0 and token1.
    */
   public mintAmountsWithSlippage(slippageTolerance: Percent): Readonly<{ amount0: JSBI; amount1: JSBI }> {
     // get lower/upper prices
+    // these represent the lowest and highest prices that the pool is allowed to "slip" to
     const { sqrtRatioX96Upper, sqrtRatioX96Lower } = this.ratiosAfterSlippage(slippageTolerance)
 
-    // construct counterfactual pools
+    // construct counterfactual pools from the lower bounded price and the upper bounded price
     const poolLower = new Pool(
       this.pool.token0,
       this.pool.token1,
@@ -181,8 +183,8 @@ export class Position {
       TickMath.getTickAtSqrtRatio(sqrtRatioX96Upper)
     )
 
-    // because the router is imprecise, we need to calculate the position that will be created (assuming no slippage)
-    const positionThatWillBeCreated = Position.fromAmounts({
+    // because the router is imprecise, we need to calculate the position (assuming no slippage) to get the estimated actual liquidity
+    const positionWithoutSlippage = Position.fromAmounts({
       pool: this.pool,
       tickLower: this.tickLower,
       tickUpper: this.tickUpper,
@@ -190,18 +192,21 @@ export class Position {
       useFullPrecision: false,
     })
 
-    // we want the smaller amounts...
-    // ...which occurs at the upper price for amount0...
-    const { amount0 } = new Position({
+    // Note: Slippage derivation in v4 is different from v3.
+    // When creating a position (minting) or adding to a position (increasing) slippage is bounded by the MAXIMUM amount in in token0 and token1.
+    // The largest amount of token1 will happen when the price slips up, so we use the poolUpper to get amount1.
+    // The largest amount of token0 will happen when the price slips down, so we use the poolLower to get amount0.
+    // Ie...We want the larger amounts, which occurs at the upper price for amount1...
+    const { amount1 } = new Position({
       pool: poolUpper,
-      liquidity: positionThatWillBeCreated.liquidity,
+      liquidity: positionWithoutSlippage.liquidity,
       tickLower: this.tickLower,
       tickUpper: this.tickUpper,
     }).mintAmounts
-    // ...and the lower for amount1
-    const { amount1 } = new Position({
+    // ...and the lower for amount0
+    const { amount0 } = new Position({
       pool: poolLower,
-      liquidity: positionThatWillBeCreated.liquidity,
+      liquidity: positionWithoutSlippage.liquidity,
       tickLower: this.tickLower,
       tickUpper: this.tickUpper,
     }).mintAmounts

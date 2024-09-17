@@ -9,12 +9,13 @@ import {
 import JSBI from 'jsbi'
 import { Position } from './entities/position'
 import { MethodParameters, toHex } from './utils/calldata'
+import { MSG_SENDER } from './actionConstants'
 import { Interface } from '@ethersproject/abi'
-import { Pool, PoolKey } from './entities'
+import { PoolKey } from './entities'
 import { Multicall } from './multicall'
 import invariant from 'tiny-invariant'
-import { MIN_SLIPPAGE_DECREASE, ONE, ZERO } from './internalConstants'
-import { Actions, V4Planner } from './utils'
+import { ZERO } from './internalConstants'
+import { V4PositionPlanner } from './utils'
 import { abi } from './utils/abi'
 
 export interface CommonOptions {
@@ -62,7 +63,7 @@ export interface MintSpecificOptions {
  */
 export interface CommonAddLiquidityOptions {
   /**
-   * Whether to spend ether. If true, one of the pool tokens must be WETH, by default false
+   * Whether to spend ether. If true, one of the currencies must be the NATIVE currency.
    */
   useNative?: NativeCurrency
 
@@ -162,6 +163,10 @@ function isMint(options: AddLiquidityOptions): options is MintOptions {
   return Object.keys(options).some((k) => k === 'recipient')
 }
 
+function shouldCreatePool(options: MintOptions): boolean {
+  return options.createPool === true && options.sqrtPriceX96 !== undefined
+}
+
 export abstract class V4PositionManager {
   public static INTERFACE: Interface = new Interface(abi)
 
@@ -180,199 +185,71 @@ export abstract class V4PositionManager {
     }
   }
 
+  // TODO: Add Support for permit2 batch forwarding
   public static addCallParameters(position: Position, options: AddLiquidityOptions): MethodParameters {
     /**
      * Cases:
      * - if pool does not exist yet, encode initializePool
      * then,
-     * - if is mint, encode MINT_POSITION and then SETTLE_PAIR
-     * - else, encode INCREASE_LIQUIDITY and then SETTLE_PAIR
+     * - if is mint, encode MINT_POSITION. If it is on a NATIVE pool, encode a SWEEP. Finally encode a SETTLE_PAIR
+     * - else, encode INCREASE_LIQUIDITY. If it is on a NATIVE pool, encode a SWEEP. Finally encode a SETTLE_PAIR
      */
     invariant(JSBI.greaterThan(position.liquidity, ZERO), 'ZERO_LIQUIDITY')
 
     const calldatas: string[] = []
-    const planner = new V4Planner()
+    const planner = new V4PositionPlanner()
 
-    // get amounts
-    // const { amount0: amount0Desired, amount1: amount1Desired } = position.mintAmounts
+    const isMintAction = isMint(options)
 
-    // adjust for slippage
-    const minimumAmounts = position.mintAmountsWithSlippage(options.slippageTolerance)
-    const amount0Min = toHex(minimumAmounts.amount0)
-    const amount1Min = toHex(minimumAmounts.amount1)
-
-    // create pool if needed
-    if (isMint(options) && options.createPool && options.sqrtPriceX96 !== undefined) {
+    // Encode initialize pool.
+    if (isMintAction && shouldCreatePool(options)) {
       // No planner used here because initializePool is not supported as an Action
       calldatas.push(
-        V4PositionManager.encodeInitializePool(position.pool.poolKey, options.sqrtPriceX96, options.hookData)
+        V4PositionManager.encodeInitializePool(position.pool.poolKey, options.sqrtPriceX96!, options.hookData)
       )
     }
 
-    // permits if necessary
-    if (options.token0Permit && !position.pool.token0.isNative) {
-      // TODO: add permit2 permit forwarding support
-    }
-    if (options.token1Permit && !position.pool.token1.isNative) {
-      // TODO: add permit2 permit forwarding support
-    }
+    // adjust for slippage
+    const maximumAmounts = position.mintAmountsWithSlippage(options.slippageTolerance)
+    const amount0Max = toHex(maximumAmounts.amount0)
+    const amount1Max = toHex(maximumAmounts.amount1)
 
     // mint
-    if (isMint(options)) {
+    if (isMintAction) {
       const recipient: string = validateAndParseAddress(options.recipient)
-
-      V4PositionManager.encodeMint(
-        planner,
+      planner.addMint(
         position.pool,
         position.tickLower,
         position.tickUpper,
         position.liquidity,
-        amount0Min,
-        amount1Min,
+        amount0Max,
+        amount1Max,
         recipient,
         options.hookData
       )
     } else {
       // increase
-      V4PositionManager.encodeIncrease(
-        planner,
-        options.tokenId,
-        position.liquidity,
-        amount0Min,
-        amount1Min,
-        options.hookData
-      )
+      planner.addIncrease(options.tokenId, position.liquidity, amount0Max, amount1Max, options.hookData)
     }
 
     let value: string = toHex(0)
-
     if (options.useNative) {
-      // TODO: handle if we are supplying native to pool as liquidity, and optionally refund leftover ETH
+      invariant(position.pool.currency0.isNative || position.pool.currency1.isNative, 'NO_NATIVE')
+      let nativeCurrency: Currency = position.pool.currency0.isNative
+        ? position.pool.currency0
+        : position.pool.currency1
+      value = position.pool.currency0.isNative ? toHex(amount0Max) : toHex(amount1Max)
+      planner.addSweep(nativeCurrency, MSG_SENDER)
     }
 
-    // need to settle when minting / adding liquidity
-    V4PositionManager.encodeSettlePair(planner, position.pool.token0, position.pool.token1)
+    // need to settle both currencies when minting / adding liquidity
+    planner.addSettlePair(position.pool.token0, position.pool.token1)
 
     calldatas.push(planner.finalize())
 
     return {
       calldata: Multicall.encodeMulticall(calldatas),
       value,
-    }
-  }
-
-  /**
-   * Produces the calldata for completely or partially exiting a position
-   * @param position The position to exit
-   * @param options Additional information necessary for generating the calldata
-   * @returns The call parameters
-   */
-  public static removeCallParameters(position: Position, options: RemoveLiquidityOptions): MethodParameters {
-    /**
-     * cases:
-     * - if liquidityPercentage is 100%, encode BURN_POSITION and then TAKE_PAIR
-     * - else, encode DECREASE_LIQUIDITY and then TAKE_PAIR
-     */
-    const calldatas: string[] = []
-    const planner = new V4Planner()
-
-    // const deadline = toHex(options.deadline) // TODO?
-    const tokenId = toHex(options.tokenId)
-
-    // construct a partial position with a percentage of liquidity
-    const partialPosition = new Position({
-      pool: position.pool,
-      liquidity: options.liquidityPercentage.multiply(position.liquidity).quotient,
-      tickLower: position.tickLower,
-      tickUpper: position.tickUpper,
-    })
-    invariant(JSBI.greaterThan(partialPosition.liquidity, ZERO), 'ZERO_LIQUIDITY')
-
-    // slippage-adjusted underlying amounts
-    const { amount0: amount0Min, amount1: amount1Min } = partialPosition.burnAmountsWithSlippage(
-      options.slippageTolerance
-    )
-
-    if (options.permit) {
-      // TODO: support ERC721Permit
-    }
-
-    // remove liquidity
-    V4PositionManager.encodeDecrease(
-      planner,
-      tokenId,
-      partialPosition.liquidity.toString(),
-      amount0Min.toString(),
-      amount1Min.toString(),
-      options.hookData
-    )
-
-    // Collect fees
-    const { expectedCurrencyOwed0, expectedCurrencyOwed1, recipient } = options.collectOptions
-
-    // now take the collected fees using take pair
-    V4PositionManager.encodeTakePair(planner, expectedCurrencyOwed0.currency, expectedCurrencyOwed1.currency, recipient)
-
-    if (options.liquidityPercentage.equalTo(ONE)) {
-      if (options.burnToken) {
-        V4PositionManager.encodeBurn(planner, tokenId, amount0Min, amount1Min, options.hookData)
-      }
-    } else {
-      invariant(options.burnToken !== true, 'CANNOT_BURN')
-    }
-
-    return {
-      calldata: Multicall.encodeMulticall(calldatas),
-      value: toHex(0),
-    }
-  }
-
-  public static collectCallParameters(options: CollectOptions): MethodParameters {
-    /**
-     * Collecting in V4 is just a DECREASE_LIQUIDITY with 0 liquidity and then a TAKE_PAIR
-     */
-    const planner = new V4Planner()
-    const tokenId = toHex(options.tokenId)
-
-    const recipient = validateAndParseAddress(options.recipient)
-
-    // first, decrease liquidity by 0 to trigger fee collection
-    V4PositionManager.encodeDecrease(
-      planner,
-      tokenId,
-      0,
-      MIN_SLIPPAGE_DECREASE,
-      MIN_SLIPPAGE_DECREASE,
-      options.hookData
-    )
-
-    // now take the fee using take pair
-    V4PositionManager.encodeTakePair(
-      planner,
-      options.expectedCurrencyOwed0.currency,
-      options.expectedCurrencyOwed1.currency,
-      recipient // TODO: do we need to special case when ETH is involved?
-    )
-
-    return {
-      calldata: Multicall.encodeMulticall(planner.finalize()),
-      value: toHex(0),
-    }
-  }
-
-  public static transferFromParameters(options: TransferOptions): MethodParameters {
-    const recipient = validateAndParseAddress(options.recipient)
-    const sender = validateAndParseAddress(options.sender)
-
-    let calldata: string
-    calldata = V4PositionManager.INTERFACE.encodeFunctionData('transferFrom(address,address,uint256)', [
-      sender,
-      recipient,
-      toHex(options.tokenId),
-    ])
-    return {
-      calldata: calldata,
-      value: toHex(0),
     }
   }
 
@@ -383,96 +260,5 @@ export abstract class V4PositionManager {
       sqrtPriceX96.toString(),
       hookData ?? '0x',
     ])
-  }
-
-  /**
-   * ---- Private functions to encode calldata for different actions on the PositionManager contract -----
-   */
-
-  // MINT_POSITION
-  private static encodeMint(
-    planner: V4Planner,
-    pool: Pool,
-    tickLower: number,
-    tickUpper: number,
-    liquidity: BigintIsh,
-    amount0Max: BigintIsh,
-    amount1Max: BigintIsh,
-    owner: string,
-    hookData?: string
-  ): void {
-    const inputs = [
-      Pool.getPoolKey(pool.currency0, pool.currency1, pool.fee, pool.tickSpacing, pool.hooks),
-      tickLower,
-      tickUpper,
-      liquidity.toString(),
-      amount0Max.toString(),
-      amount1Max.toString(),
-      owner,
-      hookData ?? '0x',
-    ]
-    planner.addAction(Actions.MINT_POSITION, inputs)
-  }
-
-  // INCREASE_LIQUIDITY
-  private static encodeIncrease(
-    planner: V4Planner,
-    tokenId: BigintIsh,
-    liquidity: BigintIsh,
-    amount0Max: BigintIsh,
-    amount1Max: BigintIsh,
-    hookData?: string
-  ): void {
-    const inputs = [
-      tokenId.toString(),
-      liquidity.toString(),
-      amount0Max.toString(),
-      amount1Max.toString(),
-      hookData ?? '0x',
-    ]
-    planner.addAction(Actions.INCREASE_LIQUIDITY, inputs)
-  }
-
-  // DECREASE_LIQUIDITY
-  private static encodeDecrease(
-    planner: V4Planner,
-    tokenId: BigintIsh,
-    liquidity: BigintIsh,
-    amount0Min: BigintIsh,
-    amount1Min: BigintIsh,
-    hookData?: string
-  ): void {
-    const inputs = [
-      tokenId.toString(),
-      liquidity.toString(),
-      amount0Min.toString(),
-      amount1Min.toString(),
-      hookData ?? '0x',
-    ]
-    planner.addAction(Actions.DECREASE_LIQUIDITY, inputs)
-  }
-
-  // BURN_POSITION
-  private static encodeBurn(
-    planner: V4Planner,
-    tokenId: BigintIsh,
-    amount0Min: BigintIsh,
-    amount1Min: BigintIsh,
-    hookData?: string
-  ): void {
-    const inputs = [tokenId.toString(), amount0Min.toString(), amount1Min.toString(), hookData ?? '0x']
-    planner.addAction(Actions.BURN_POSITION, inputs)
-  }
-
-  // SETTLE_PAIR
-  private static encodeSettlePair(planner: V4Planner, currency0: Currency, currency1: Currency): void {
-    const inputs = [currency0.wrapped.address, currency1.wrapped.address]
-    planner.addAction(Actions.SETTLE_PAIR, inputs)
-  }
-
-  // TAKE_PAIR
-  private static encodeTakePair(planner: V4Planner, currency0: Currency, currency1: Currency, recipient: string): void {
-    const inputs = [currency0.wrapped.address, currency1.wrapped.address, recipient]
-    planner.addAction(Actions.TAKE_PAIR, inputs)
   }
 }
