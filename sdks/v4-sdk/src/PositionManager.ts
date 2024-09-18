@@ -27,6 +27,11 @@ export interface CommonOptions {
    * Optional data to pass to hooks
    */
   hookData?: string
+
+  /**
+   * When the transaction expires, in epoch seconds.
+   */
+  deadline: BigintIsh
 }
 
 export interface ModifyPositionSpecificOptions {
@@ -34,11 +39,6 @@ export interface ModifyPositionSpecificOptions {
    * Indicates the ID of the position to increase liquidity for.
    */
   tokenId: BigintIsh
-
-  /**
-   * When the transaction expires, in epoch seconds.
-   */
-  deadline: BigintIsh
 }
 
 export interface MintSpecificOptions {
@@ -232,6 +232,10 @@ export abstract class V4PositionManager {
       planner.addIncrease(options.tokenId, position.liquidity, amount0Max, amount1Max, options.hookData)
     }
 
+    // need to settle both currencies when minting / adding liquidity
+    planner.addSettlePair(position.pool.token0, position.pool.token1)
+
+    // Any sweeping must happen after the settling.
     let value: string = toHex(0)
     if (options.useNative) {
       invariant(position.pool.currency0.isNative || position.pool.currency1.isNative, 'NO_NATIVE')
@@ -242,10 +246,7 @@ export abstract class V4PositionManager {
       planner.addSweep(nativeCurrency, MSG_SENDER)
     }
 
-    // need to settle both currencies when minting / adding liquidity
-    planner.addSettlePair(position.pool.token0, position.pool.token1)
-
-    calldatas.push(planner.finalize())
+    calldatas.push(V4PositionManager.encodeModifyLiquidities(planner.finalize(), options.deadline))
 
     return {
       calldata: Multicall.encodeMulticall(calldatas),
@@ -260,5 +261,9 @@ export abstract class V4PositionManager {
       sqrtPriceX96.toString(),
       hookData ?? '0x',
     ])
+  }
+
+  public static encodeModifyLiquidities(unlockData: string, deadline: BigintIsh): string {
+    return V4PositionManager.INTERFACE.encodeFunctionData('modifyLiquidities', [unlockData, deadline])
   }
 }
