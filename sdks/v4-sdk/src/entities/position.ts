@@ -2,8 +2,9 @@ import { BigintIsh, Percent, Price, CurrencyAmount, Currency, MaxUint256 } from 
 import JSBI from 'jsbi'
 import invariant from 'tiny-invariant'
 import { Pool } from './pool'
-import { encodeSqrtRatioX96, maxLiquidityForAmounts, SqrtPriceMath, TickMath, tickToPrice } from '@uniswap/v3-sdk'
+import { encodeSqrtRatioX96, maxLiquidityForAmounts, SqrtPriceMath, TickMath } from '@uniswap/v3-sdk'
 import { ZERO } from '../internalConstants'
+import { tickToPrice } from '../utils/priceTickConversions'
 
 interface PositionConstructorArgs {
   pool: Pool
@@ -51,16 +52,14 @@ export class Position {
    * Returns the price of token0 at the lower tick
    */
   public get token0PriceLower(): Price<Currency, Currency> {
-    // TODO: Currency or wrapped token here?
-    return tickToPrice(this.pool.token0.wrapped, this.pool.token1.wrapped, this.tickLower)
+    return tickToPrice(this.pool.currency0, this.pool.currency1, this.tickLower)
   }
 
   /**
    * Returns the price of token0 at the upper tick
    */
   public get token0PriceUpper(): Price<Currency, Currency> {
-    // TODO: Currency or wrapped token here?
-    return tickToPrice(this.pool.token0.wrapped, this.pool.token1.wrapped, this.tickUpper)
+    return tickToPrice(this.pool.currency0, this.pool.currency1, this.tickUpper)
   }
 
   /**
@@ -70,7 +69,7 @@ export class Position {
     if (this._token0Amount === null) {
       if (this.pool.tickCurrent < this.tickLower) {
         this._token0Amount = CurrencyAmount.fromRawAmount(
-          this.pool.token0,
+          this.pool.currency0,
           SqrtPriceMath.getAmount0Delta(
             TickMath.getSqrtRatioAtTick(this.tickLower),
             TickMath.getSqrtRatioAtTick(this.tickUpper),
@@ -80,7 +79,7 @@ export class Position {
         )
       } else if (this.pool.tickCurrent < this.tickUpper) {
         this._token0Amount = CurrencyAmount.fromRawAmount(
-          this.pool.token0,
+          this.pool.currency0,
           SqrtPriceMath.getAmount0Delta(
             this.pool.sqrtRatioX96,
             TickMath.getSqrtRatioAtTick(this.tickUpper),
@@ -89,7 +88,7 @@ export class Position {
           )
         )
       } else {
-        this._token0Amount = CurrencyAmount.fromRawAmount(this.pool.token0, ZERO)
+        this._token0Amount = CurrencyAmount.fromRawAmount(this.pool.currency0, ZERO)
       }
     }
     return this._token0Amount
@@ -101,10 +100,10 @@ export class Position {
   public get amount1(): CurrencyAmount<Currency> {
     if (this._token1Amount === null) {
       if (this.pool.tickCurrent < this.tickLower) {
-        this._token1Amount = CurrencyAmount.fromRawAmount(this.pool.token1, ZERO)
+        this._token1Amount = CurrencyAmount.fromRawAmount(this.pool.currency1, ZERO)
       } else if (this.pool.tickCurrent < this.tickUpper) {
         this._token1Amount = CurrencyAmount.fromRawAmount(
-          this.pool.token1,
+          this.pool.currency1,
           SqrtPriceMath.getAmount1Delta(
             TickMath.getSqrtRatioAtTick(this.tickLower),
             this.pool.sqrtRatioX96,
@@ -114,7 +113,7 @@ export class Position {
         )
       } else {
         this._token1Amount = CurrencyAmount.fromRawAmount(
-          this.pool.token1,
+          this.pool.currency1,
           SqrtPriceMath.getAmount1Delta(
             TickMath.getSqrtRatioAtTick(this.tickLower),
             TickMath.getSqrtRatioAtTick(this.tickUpper),

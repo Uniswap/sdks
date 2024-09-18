@@ -233,7 +233,7 @@ export abstract class V4PositionManager {
     }
 
     // need to settle both currencies when minting / adding liquidity
-    planner.addSettlePair(position.pool.token0, position.pool.token1)
+    planner.addSettlePair(position.pool.currency0, position.pool.currency1)
 
     // Any sweeping must happen after the settling.
     let value: string = toHex(0)
