@@ -159,14 +159,6 @@ export class RelayOrderParser extends OrderParser {
   }
 }
 
-type UnsignedOrder = UnsignedV2DutchOrder | UnsignedV3DutchOrder;
-type CosignedOrder = CosignedV2DutchOrder | CosignedV3DutchOrder;
-export function isCosigned<T extends UnsignedOrder, U extends CosignedOrder>(
-  order: T | U
-): order is U {
-  return 'cosignature' in (order as U).info;
-}
-
 export function originalIfZero(value: BigNumber, original: BigNumber): BigNumber {
   return value.isZero() ? original : value;
 }

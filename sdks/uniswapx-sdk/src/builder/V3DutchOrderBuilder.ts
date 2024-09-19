@@ -5,7 +5,7 @@ import { OrderType } from "../constants";
 import { CosignedV3DutchOrder, CosignedV3DutchOrderInfo, UnsignedV3DutchOrder, UnsignedV3DutchOrderInfo, V3CosignerData } from "../order/V3DutchOrder";
 import { V3DutchInput, V3DutchOutput } from "../order/types";
 import { ValidationInfo } from "../order/validation";
-import { getPermit2, getReactor, isCosigned } from "../utils";
+import { getPermit2, getReactor } from "../utils";
 
 import { OrderBuilder } from "./OrderBuilder";
 
@@ -29,7 +29,7 @@ export class V3DutchOrderBuilder extends OrderBuilder {
             builder.output(output);
         });
 
-        if (isCosigned<UnsignedV3DutchOrder, CosignedV3DutchOrder>(order)) {
+        if (order instanceof CosignedV3DutchOrder) {
             builder.cosignature(order.info.cosignature);
             builder.decayStartBlock(order.info.cosignerData.decayStartBlock);
             builder.exclusiveFiller(order.info.cosignerData.exclusiveFiller);
@@ -167,7 +167,7 @@ export class V3DutchOrderBuilder extends OrderBuilder {
                 "outputOverride smaller than original output"
             );
         });
-        // We are not checking if the decayStartTime is before the deadline because it is not enforced in the smart contract
+        // We are not checking if the decayStartBlock is before the deadline because it is not enforced in the smart contract
     }
 
     input(input: V3DutchInput): this {
