@@ -8,3 +8,6 @@
 
 # dependencies
 node_modules
+
+# Intellij IDEA artifacts
+.idea/
