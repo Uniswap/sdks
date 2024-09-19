@@ -283,4 +283,16 @@ export class V3DutchOrderBuilder extends OrderBuilder {
             this.permit2Address
         );
     }
+
+    // A helper function for users of the class to easily the value to pass to maxAmount in an input
+    static getMaxAmountOut(startAmount: BigNumber, relativeAmounts: bigint[]) : BigNumber {
+        if (relativeAmounts.length == 0) {
+            throw new Error("relativeAmounts cannot be empty");
+        }
+        // Find the minimum of the relative amounts
+		const minRelativeAmount = relativeAmounts.reduce((min, amount) => amount < min ? amount : min, relativeAmounts[0]);
+		// Maximum is the start - the min of the relative amounts
+		const maxOut = startAmount.sub(minRelativeAmount.toString());
+        return maxOut;
+    }
 }

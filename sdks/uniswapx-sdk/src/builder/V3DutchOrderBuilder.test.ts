@@ -721,6 +721,13 @@ describe("V3DutchOrderBuilder", () => {
                 .buildPartial()
             ).toThrow("Invariant failed: swapper not set");
         });
+
+        it("Test maxAmountOut", () => {
+            const startAmount = INPUT_START_AMOUNT;
+            const relativeAmounts = [BigInt(0), BigInt(3), BigInt(-2), BigInt(-4), BigInt(-3)];
+            const maxout = V3DutchOrderBuilder.getMaxAmountOut(startAmount, relativeAmounts);
+            expect(maxout).toEqual(startAmount.add(4));
+        });
     });
 
     describe("fromOrder", () => {
