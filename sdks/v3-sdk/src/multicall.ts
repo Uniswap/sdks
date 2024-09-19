@@ -9,11 +9,11 @@ export abstract class Multicall {
    */
   private constructor() {}
 
-  public static encodeMulticall(calldatas: string | string[]): string {
-    if (!Array.isArray(calldatas)) {
-      calldatas = [calldatas]
+  public static encodeMulticall(calldataList: string | string[]): string {
+    if (!Array.isArray(calldataList)) {
+      calldataList = [calldataList]
     }
 
-    return calldatas.length === 1 ? calldatas[0] : Multicall.INTERFACE.encodeFunctionData('multicall', [calldatas])
+    return calldataList.length === 1 ? calldataList[0] : Multicall.INTERFACE.encodeFunctionData('multicall', [calldataList])
   }
 }

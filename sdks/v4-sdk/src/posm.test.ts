@@ -107,7 +107,7 @@ describe('POSM', () => {
       ).toThrow('NO_NATIVE')
     })
 
-    it.only('throws if createPool is true but there is no sqrtPrice defined', () => {
+    it('throws if createPool is true but there is no sqrtPrice defined', () => {
       let createPool: boolean = true
       expect(() =>
         V4PositionManager.addCallParameters(
@@ -121,7 +121,6 @@ describe('POSM', () => {
         )
       ).toThrow('NO_SQRT_PRICE')
     })
-
 
     it('succeeds for mint', () => {
       const position: Position = new Position({
@@ -202,9 +201,9 @@ describe('POSM', () => {
       })
 
       // The resulting calldata should be multicall with two calls: initializePool and modifyLiquidities
-      const calldatas = Multicall.decodeMulticall(calldata)
+      const calldataList = Multicall.decodeMulticall(calldata)
       // Expect initializePool to be called correctly
-      expect(calldatas[0]).toEqual(
+      expect(calldataList[0]).toEqual(
         V4PositionManager.INTERFACE.encodeFunctionData('initializePool', [
           pool_0_1.poolKey,
           SQRT_PRICE_1_1.toString(),
@@ -225,7 +224,7 @@ describe('POSM', () => {
         '0x',
       ])
       planner.addAction(Actions.SETTLE_PAIR, [toAddress(pool_0_1.currency0), toAddress(pool_0_1.currency1)])
-      expect(calldatas[1]).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
+      expect(calldataList[1]).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
       expect(value).toEqual('0x00')
     })
 

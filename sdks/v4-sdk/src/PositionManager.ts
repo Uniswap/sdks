@@ -200,7 +200,7 @@ export abstract class V4PositionManager {
      */
     invariant(JSBI.greaterThan(position.liquidity, ZERO), 'ZERO_LIQUIDITY')
 
-    const calldatas: string[] = []
+    const calldataList: string[] = []
     const planner = new V4PositionPlanner()
 
     const isMintAction = isMint(options)
@@ -208,7 +208,7 @@ export abstract class V4PositionManager {
     // Encode initialize pool.
     if (isMintAction && shouldCreatePool(options)) {
       // No planner used here because initializePool is not supported as an Action
-      calldatas.push(
+      calldataList.push(
         V4PositionManager.encodeInitializePool(position.pool.poolKey, options.sqrtPriceX96!, options.hookData)
       )
     }
@@ -250,10 +250,10 @@ export abstract class V4PositionManager {
       planner.addSweep(nativeCurrency, MSG_SENDER)
     }
 
-    calldatas.push(V4PositionManager.encodeModifyLiquidities(planner.finalize(), options.deadline))
+    calldataList.push(V4PositionManager.encodeModifyLiquidities(planner.finalize(), options.deadline))
 
     return {
-      calldata: Multicall.encodeMulticall(calldatas),
+      calldata: Multicall.encodeMulticall(calldataList),
       value,
     }
   }
