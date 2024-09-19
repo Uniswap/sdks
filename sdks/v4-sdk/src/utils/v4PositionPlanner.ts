@@ -3,6 +3,7 @@ import { Pool } from '../entities'
 import { Actions } from '../utils'
 import { BigintIsh, Currency } from '@uniswap/sdk-core'
 import { toAddress } from '../utils/currencyMap'
+import { EMPTY_BYTES } from '../internalConstants'
 
 // A wrapper around V4Planner to help handle PositionManager actions
 export class V4PositionPlanner extends V4Planner {
@@ -25,7 +26,7 @@ export class V4PositionPlanner extends V4Planner {
       amount0Max.toString(),
       amount1Max.toString(),
       owner,
-      hookData ?? '0x',
+      hookData ?? EMPTY_BYTES,
     ]
     this.addAction(Actions.MINT_POSITION, inputs)
   }
@@ -43,7 +44,7 @@ export class V4PositionPlanner extends V4Planner {
       liquidity.toString(),
       amount0Max.toString(),
       amount1Max.toString(),
-      hookData ?? '0x',
+      hookData ?? EMPTY_BYTES,
     ]
     this.addAction(Actions.INCREASE_LIQUIDITY, inputs)
   }
@@ -61,14 +62,14 @@ export class V4PositionPlanner extends V4Planner {
       liquidity.toString(),
       amount0Min.toString(),
       amount1Min.toString(),
-      hookData ?? '0x',
+      hookData ?? EMPTY_BYTES,
     ]
     this.addAction(Actions.DECREASE_LIQUIDITY, inputs)
   }
 
   // BURN_POSITION
   addBurn(tokenId: BigintIsh, amount0Min: BigintIsh, amount1Min: BigintIsh, hookData?: string): void {
-    const inputs = [tokenId.toString(), amount0Min.toString(), amount1Min.toString(), hookData ?? '0x']
+    const inputs = [tokenId.toString(), amount0Min.toString(), amount1Min.toString(), hookData ?? EMPTY_BYTES]
     this.addAction(Actions.BURN_POSITION, inputs)
   }
 

@@ -14,7 +14,7 @@ import { Interface } from '@ethersproject/abi'
 import { PoolKey } from './entities'
 import { Multicall } from './multicall'
 import invariant from 'tiny-invariant'
-import { ZERO } from './internalConstants'
+import { NO_NATIVE, PositionFunctions, ZERO } from './internalConstants'
 import { V4PositionPlanner } from './utils'
 import { abi } from './utils/abi'
 
@@ -242,7 +242,7 @@ export abstract class V4PositionManager {
     // Any sweeping must happen after the settling.
     let value: string = toHex(0)
     if (options.useNative) {
-      invariant(position.pool.currency0.isNative || position.pool.currency1.isNative, 'NO_NATIVE')
+      invariant(position.pool.currency0.isNative || position.pool.currency1.isNative, NO_NATIVE)
       let nativeCurrency: Currency = position.pool.currency0.isNative
         ? position.pool.currency0
         : position.pool.currency1
@@ -260,7 +260,7 @@ export abstract class V4PositionManager {
 
   // Initialize a pool
   private static encodeInitializePool(poolKey: PoolKey, sqrtPriceX96: BigintIsh, hookData?: string): string {
-    return V4PositionManager.INTERFACE.encodeFunctionData('initializePool', [
+    return V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.INITIALIZE_POOL, [
       poolKey,
       sqrtPriceX96.toString(),
       hookData ?? '0x',
@@ -268,6 +268,6 @@ export abstract class V4PositionManager {
   }
 
   public static encodeModifyLiquidities(unlockData: string, deadline: BigintIsh): string {
-    return V4PositionManager.INTERFACE.encodeFunctionData('modifyLiquidities', [unlockData, deadline])
+    return V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.MODIFY_LIQUIDITIES, [unlockData, deadline])
   }
 }

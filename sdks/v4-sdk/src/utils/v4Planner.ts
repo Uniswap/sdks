@@ -1,7 +1,7 @@
 import { defaultAbiCoder } from 'ethers/lib/utils'
 import { Currency, Percent, TradeType } from '@uniswap/sdk-core'
 import { Trade } from '../entities/trade'
-import { ADDRESS_ZERO } from '../internalConstants'
+import { ADDRESS_ZERO, EMPTY_BYTES } from '../internalConstants'
 import { encodeRouteToPath } from './encodeRouteToPath'
 /**
  * Actions
@@ -110,7 +110,7 @@ export class V4Planner {
   params: string[]
 
   constructor() {
-    this.actions = '0x'
+    this.actions = EMPTY_BYTES
     this.params = []
   }
 

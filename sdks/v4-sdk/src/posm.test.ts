@@ -1,5 +1,5 @@
 import { Ether, Percent, Token } from '@uniswap/sdk-core'
-import { EMPTY_HOOK, FeeAmount, SQRT_PRICE_1_1, TICK_SPACINGS } from './internalConstants'
+import { EMPTY_BYTES, EMPTY_HOOK, FeeAmount, NO_NATIVE, SQRT_PRICE_1_1, TICK_SPACINGS } from './internalConstants'
 import { Pool } from './entities/pool'
 import { Position } from './entities/position'
 import { V4PositionManager } from './PositionManager'
@@ -104,7 +104,7 @@ describe('POSM', () => {
           }),
           { recipient, slippageTolerance, deadline, useNative: Ether.onChain(1) }
         )
-      ).toThrow('NO_NATIVE')
+      ).toThrow(NO_NATIVE)
     })
 
     it('throws if createPool is true but there is no sqrtPrice defined', () => {
@@ -146,7 +146,7 @@ describe('POSM', () => {
         toHex(amount0Max),
         toHex(amount1Max),
         recipient,
-        '0x',
+        EMPTY_BYTES,
       ])
       // Expect there to be a settle pair call afterwards
       planner.addAction(Actions.SETTLE_PAIR, [toAddress(pool_0_1.currency0), toAddress(pool_0_1.currency1)])
@@ -177,7 +177,7 @@ describe('POSM', () => {
         666,
         toHex(amount0Max),
         toHex(amount1Max),
-        '0x',
+        EMPTY_BYTES,
       ])
       // Expect there to be a settle pair call afterwards
       planner.addAction(Actions.SETTLE_PAIR, [toAddress(pool_0_1.currency0), toAddress(pool_0_1.currency1)])
@@ -207,7 +207,7 @@ describe('POSM', () => {
         V4PositionManager.INTERFACE.encodeFunctionData('initializePool', [
           pool_0_1.poolKey,
           SQRT_PRICE_1_1.toString(),
-          '0x',
+          EMPTY_BYTES,
         ])
       )
       const planner = new V4Planner()
@@ -221,7 +221,7 @@ describe('POSM', () => {
         toHex(amount0Max),
         toHex(amount1Max),
         recipient,
-        '0x',
+        EMPTY_BYTES,
       ])
       planner.addAction(Actions.SETTLE_PAIR, [toAddress(pool_0_1.currency0), toAddress(pool_0_1.currency1)])
       expect(calldataList[1]).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
@@ -255,7 +255,7 @@ describe('POSM', () => {
         toHex(amount0Max),
         toHex(amount1Max),
         recipient,
-        '0x',
+        EMPTY_BYTES,
       ])
 
       planner.addAction(Actions.SETTLE_PAIR, [toAddress(pool_1_eth.currency0), toAddress(pool_1_eth.currency1)])
