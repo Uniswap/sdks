@@ -163,7 +163,7 @@ describe("V3DutchOrder", () => {
       });
 
     describe("resolve DutchV3 orders", () => {
-        it("resolves before decayStartTime", () => {
+        it("resolves before decayStartBlock", () => {
             const order = new CosignedV3DutchOrder(getFullOrderInfo({}), CHAIN_ID);
             const resolved = order.resolve({
                 currentBlock: BLOCK_NUMBER - 1, //no decay yet
@@ -192,7 +192,7 @@ describe("V3DutchOrder", () => {
             expect(resolved.outputs[0].amount).eq(order.info.outputs[0].startAmount);
         });
 
-        it("resolves at decayStartTime", () => {
+        it("resolves at decayStartBlock", () => {
             const order = new CosignedV3DutchOrder(getFullOrderInfo({}), CHAIN_ID);
             const resolved = order.resolve({
                 currentBlock: BLOCK_NUMBER,
@@ -221,7 +221,7 @@ describe("V3DutchOrder", () => {
             expect(resolved.outputs[0].amount.toNumber()).eq(endAmount.toNumber());
         });
 
-        it("resolves after decayEndTime without overrides", () => {
+        it("resolves after last decay without overrides", () => {
             const order = new CosignedV3DutchOrder(getFullOrderInfoWithoutOverrides, CHAIN_ID);
             const resolved = order.resolve({
                 currentBlock: BLOCK_NUMBER + 42,
