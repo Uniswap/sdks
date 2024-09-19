@@ -187,7 +187,7 @@ function addV2Swap<TInput extends Currency, TOutput extends Currency>(
       // if native, we have to unwrap so keep in the router for now
       routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient,
       trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
-      // if router will custody funds, we do aggregated slippage check from rotuer
+      // if router will custody funds, we do aggregated slippage check from router
       routerMustCustody ? 0 : trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
       route.path.map((token) => token.wrapped.address),
       payerIsUser,
