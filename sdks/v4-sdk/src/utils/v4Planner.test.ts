@@ -65,7 +65,6 @@ describe('RouterPlanner', () => {
 
   beforeEach(() => {
     planner = new V4Planner()
-    // console.log(planner)
   })
 
   describe('addAction', () => {
