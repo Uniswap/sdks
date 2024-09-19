@@ -96,7 +96,7 @@ export class UniswapTrade implements Command {
           addV3Swap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
           break
         case Protocol.V4:
-          addV4Swap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
+          addV4Swap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody, performAggregatedSlippageCheck)
           break
         case Protocol.MIXED:
           addMixedSwap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
@@ -249,7 +249,8 @@ function addV4Swap<Tnput extends Currency, TOutput extends Currency>(
   tradeType: TradeType,
   options: SwapOptions,
   payerIsUser: boolean,
-  routerMustCustody: boolean
+  routerMustCustody: boolean,
+  performAggregatedSlippageCheck: boolean
 ): void {
   const trade = V4Trade.createUncheckedTrade({
     route: route as RouteV4<TInput, TOutput>,
@@ -258,7 +259,8 @@ function addV4Swap<Tnput extends Currency, TOutput extends Currency>(
     tradeType,
   })
 
-  const v4Calldata = new V4Planner().addTrade(trade, routerMustCustody ? 0 : options.slippageTolerance).finalize()
+  const slippageToleranceOnSwap = performAggregatedSlippageCheck ? undefined : options.slippageTolerance
+  const v4Calldata = new V4Planner().addTrade(trade, slippageToleranceOnSwap).finalize()
   planner.addCommand(CommandType.V4_SWAP, [v4Calldata])
 }
 
