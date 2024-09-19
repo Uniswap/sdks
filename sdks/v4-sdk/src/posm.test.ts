@@ -107,6 +107,22 @@ describe('POSM', () => {
       ).toThrow('NO_NATIVE')
     })
 
+    it.only('throws if createPool is true but there is no sqrtPrice defined', () => {
+      let createPool: boolean = true
+      expect(() =>
+        V4PositionManager.addCallParameters(
+          new Position({
+            pool: pool_0_1,
+            tickLower: -TICK_SPACINGS[FeeAmount.MEDIUM],
+            tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
+            liquidity: 1,
+          }),
+          { createPool, recipient, slippageTolerance, deadline }
+        )
+      ).toThrow('NO_SQRT_PRICE')
+    })
+
+
     it('succeeds for mint', () => {
       const position: Position = new Position({
         pool: pool_0_1,

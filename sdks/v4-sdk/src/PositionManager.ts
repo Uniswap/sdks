@@ -164,7 +164,11 @@ function isMint(options: AddLiquidityOptions): options is MintOptions {
 }
 
 function shouldCreatePool(options: MintOptions): boolean {
-  return options.createPool === true && options.sqrtPriceX96 !== undefined
+  if (options.createPool) {
+    invariant(options.sqrtPriceX96 !== undefined, 'NO_SQRT_PRICE')
+    return true
+  }
+  return false
 }
 
 export abstract class V4PositionManager {
