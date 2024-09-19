@@ -66,7 +66,7 @@ export class Position {
    * Returns the amount of token0 that this position's liquidity could be burned for at the current pool price
    */
   public get amount0(): CurrencyAmount<Currency> {
-    if (this._token0Amount === null) {
+    if (!this._token0Amount) {
       if (this.pool.tickCurrent < this.tickLower) {
         this._token0Amount = CurrencyAmount.fromRawAmount(
           this.pool.currency0,
@@ -98,7 +98,7 @@ export class Position {
    * Returns the amount of token1 that this position's liquidity could be burned for at the current pool price
    */
   public get amount1(): CurrencyAmount<Currency> {
-    if (this._token1Amount === null) {
+    if (!this._token1Amount) {
       if (this.pool.tickCurrent < this.tickLower) {
         this._token1Amount = CurrencyAmount.fromRawAmount(this.pool.currency1, ZERO)
       } else if (this.pool.tickCurrent < this.tickUpper) {
