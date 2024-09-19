@@ -95,7 +95,7 @@ const ABI_DEFINITION: { [key in Actions]: string[] } = {
   // Payments commands
   [Actions.SETTLE]: ['address', 'uint256', 'bool'], // currency, amount, payerIsUser
   [Actions.SETTLE_ALL]: ['address', 'uint256'],
-  [Actions.TAKE]: ['address', 'address', 'uint256'], //
+  [Actions.TAKE]: ['address', 'address', 'uint256'], // currency, receiver, amount
   [Actions.TAKE_ALL]: ['address', 'uint256'],
   [Actions.TAKE_PORTION]: ['address', 'address', 'uint256'],
   [Actions.SETTLE_TAKE_PAIR]: ['address', 'address'],
