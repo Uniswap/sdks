@@ -125,6 +125,7 @@ export class V4Planner {
   addTrade(trade: Trade<Currency, Currency, TradeType>, slippageTolerance?: Percent): void {
     const exactOutput = trade.tradeType === TradeType.EXACT_OUTPUT
 
+    // exactInput we sometimes perform aggregated slippage checks, but not with exactOutput
     if (exactOutput) invariant(!!slippageTolerance, 'ExactOut requires slippageTolerance')
     invariant(trade.swaps.length === 1, 'Only accepts Trades with 1 swap (must break swaps into individual trades)')
 
