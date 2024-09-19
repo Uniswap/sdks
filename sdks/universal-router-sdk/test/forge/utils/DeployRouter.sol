@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.24;
 
 import {console2} from "forge-std/console2.sol";
 import {Test} from "forge-std/Test.sol";
 import {UniversalRouter} from "universal-router/UniversalRouter.sol";
 import {RouterParameters} from "universal-router/base/RouterImmutables.sol";
-import {ERC20} from "solmate/src/tokens/ERC20.sol";
-import {Permit2} from "permit2/src/Permit2.sol";
-import {IAllowanceTransfer} from "permit2/src/interfaces/IAllowanceTransfer.sol";
+import {IPermit2} from "permit2/src/interfaces/IPermit2.sol";
 
 contract DeployRouter is Test {
     address public constant V2_FACTORY = 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f;
@@ -26,7 +24,7 @@ contract DeployRouter is Test {
     address internal constant FORGE_ROUTER_ADDRESS = 0xE808C1cfeebb6cb36B537B82FA7c9EEf31415a05;
 
     UniversalRouter public router;
-    Permit2 public permit2;
+    IPermit2 public permit2;
 
     address from;
     uint256 fromPrivateKey;
@@ -49,7 +47,10 @@ contract DeployRouter is Test {
     }
 
     function deployRouterAndPermit2() public {
-        permit2 = new Permit2();
+        bytes memory bytecode = vm.readFileBinary("test/forge/bin/permit2.bin");
+        assembly {
+            sstore(permit2.slot, create(0, add(bytecode, 0x20), mload(bytecode)))
+        }
         deployRouter(address(permit2));
         require(FORGE_ROUTER_ADDRESS == address(router));
     }
