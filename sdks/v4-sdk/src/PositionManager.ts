@@ -14,7 +14,16 @@ import { Interface } from '@ethersproject/abi'
 import { PoolKey } from './entities'
 import { Multicall } from './multicall'
 import invariant from 'tiny-invariant'
-import { NO_NATIVE, PositionFunctions, ZERO } from './internalConstants'
+import {
+  EMPTY_BYTES,
+  CANNOT_BURN,
+  NO_NATIVE,
+  NO_SQRT_PRICE,
+  ONE,
+  PositionFunctions,
+  ZERO,
+  ZERO_LIQUIDITY,
+} from './internalConstants'
 import { V4PositionPlanner } from './utils'
 import { abi } from './utils/abi'
 
@@ -96,11 +105,6 @@ export interface RemoveLiquiditySpecificOptions {
    * The optional permit of the token ID being exited, in case the exit transaction is being sent by an account that does not own the NFT
    */
   permit?: NFTPermitOptions
-
-  /**
-   * Parameters to be passed on to collect
-   */
-  collectOptions: Omit<CollectSpecificOptions, 'tokenId'>
 }
 
 export interface CollectSpecificOptions {
@@ -165,7 +169,7 @@ function isMint(options: AddLiquidityOptions): options is MintOptions {
 
 function shouldCreatePool(options: MintOptions): boolean {
   if (options.createPool) {
-    invariant(options.sqrtPriceX96 !== undefined, 'NO_SQRT_PRICE')
+    invariant(options.sqrtPriceX96 !== undefined, NO_SQRT_PRICE)
     return true
   }
   return false
@@ -198,7 +202,7 @@ export abstract class V4PositionManager {
      * - if is mint, encode MINT_POSITION. If it is on a NATIVE pool, encode a SWEEP. Finally encode a SETTLE_PAIR
      * - else, encode INCREASE_LIQUIDITY. If it is on a NATIVE pool, encode a SWEEP. Finally encode a SETTLE_PAIR
      */
-    invariant(JSBI.greaterThan(position.liquidity, ZERO), 'ZERO_LIQUIDITY')
+    invariant(JSBI.greaterThan(position.liquidity, ZERO), ZERO_LIQUIDITY)
 
     const calldataList: string[] = []
     const planner = new V4PositionPlanner()
@@ -255,6 +259,66 @@ export abstract class V4PositionManager {
     return {
       calldata: Multicall.encodeMulticall(calldataList),
       value,
+    }
+  }
+
+  /**
+   * Produces the calldata for completely or partially exiting a position
+   * @param position The position to exit
+   * @param options Additional information necessary for generating the calldata
+   * @returns The call parameters
+   */
+  public static removeCallParameters(position: Position, options: RemoveLiquidityOptions): MethodParameters {
+    /**
+     * cases:
+     * - if liquidityPercentage is 100%, encode BURN_POSITION and then TAKE_PAIR
+     * - else, encode DECREASE_LIQUIDITY and then TAKE_PAIR
+     */
+    const calldataList: string[] = []
+    const planner = new V4PositionPlanner()
+
+    const tokenId = toHex(options.tokenId)
+
+    if (options.burnToken) {
+      // if burnToken is true, the specified liquidity percentage must be 100%
+      invariant(options.liquidityPercentage.equalTo(ONE), CANNOT_BURN)
+
+      // slippage-adjusted amounts derived from current position liquidity
+      const { amount0: amount0Min, amount1: amount1Min } = position.burnAmountsWithSlippage(options.slippageTolerance)
+      planner.addBurn(tokenId, amount0Min, amount1Min, options.hookData)
+    } else {
+      // construct a partial position with a percentage of liquidity
+      const partialPosition = new Position({
+        pool: position.pool,
+        liquidity: options.liquidityPercentage.multiply(position.liquidity).quotient,
+        tickLower: position.tickLower,
+        tickUpper: position.tickUpper,
+      })
+
+      // If the partial position has liquidity=0, this is a collect call and collectCallParameters should be used
+      invariant(JSBI.greaterThan(partialPosition.liquidity, ZERO), ZERO_LIQUIDITY)
+
+      // slippage-adjusted underlying amounts
+      const { amount0: amount0Min, amount1: amount1Min } = partialPosition.burnAmountsWithSlippage(
+        options.slippageTolerance
+      )
+
+      planner.addDecrease(
+        tokenId,
+        partialPosition.liquidity.toString(),
+        amount0Min.toString(),
+        amount1Min.toString(),
+        options.hookData ?? EMPTY_BYTES
+      )
+    }
+
+    planner.addTakePair(position.pool.currency0, position.pool.currency1, MSG_SENDER)
+
+    calldataList.push(V4PositionManager.encodeModifyLiquidities(planner.finalize(), options.deadline))
+
+    return {
+      calldata: Multicall.encodeMulticall(calldataList),
+      value: toHex(0),
     }
   }
 

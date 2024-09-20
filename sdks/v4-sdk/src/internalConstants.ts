@@ -32,6 +32,9 @@ export const EMPTY_HOOK = '0x0000000000000000000000000000000000000000'
 
 // error constants
 export const NO_NATIVE = 'NO_NATIVE'
+export const ZERO_LIQUIDITY = 'ZERO_LIQUIDITY'
+export const NO_SQRT_PRICE = 'NO_SQRT_PRICE'
+export const CANNOT_BURN = 'CANNOT_BURN'
 
 /**
  * Function fragments that exist on the PositionManager contract.
