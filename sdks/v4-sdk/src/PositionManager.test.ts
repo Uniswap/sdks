@@ -11,7 +11,7 @@ import {
 } from './internalConstants'
 import { Pool } from './entities/pool'
 import { Position } from './entities/position'
-import { RemoveLiquidityOptions, V4PositionManager } from './PositionManager'
+import { CollectOptions, RemoveLiquidityOptions, V4PositionManager } from './PositionManager'
 import { Multicall } from './multicall'
 import { Actions, toHex, V4Planner } from './utils'
 import { PoolKey } from './entities/pool'
@@ -19,7 +19,7 @@ import { toAddress } from './utils/currencyMap'
 import { MSG_SENDER } from './actionConstants'
 import { V4PositionPlanner } from './utils'
 
-describe('POSM', () => {
+describe('PositionManager', () => {
   const currency0 = new Token(1, '0x0000000000000000000000000000000000000001', 18, 't0', 'currency0')
   const currency1 = new Token(1, '0x0000000000000000000000000000000000000002', 18, 't1', 'currency1')
   const currency_native = Ether.onChain(1)
@@ -372,6 +372,41 @@ describe('POSM', () => {
       expect(calldata).toEqual(
         V4PositionManager.encodeModifyLiquidities(planner.finalize(), partialRemoveOptions.deadline)
       )
+      expect(value).toEqual('0x00')
+    })
+  })
+
+  describe('#collectCallParameters', () => {
+    const position = new Position({
+      pool: pool_0_1,
+      tickLower: -TICK_SPACINGS[FeeAmount.MEDIUM],
+      tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
+      liquidity: 100,
+    })
+
+    const collectLiqOptions: CollectOptions = {
+      tokenId,
+      slippageTolerance,
+      deadline,
+      recipient,
+    }
+
+    it('succeeds', () => {
+      const { calldata, value } = V4PositionManager.collectCallParameters(position, collectLiqOptions)
+
+      const planner = new V4Planner()
+
+      planner.addAction(Actions.DECREASE_LIQUIDITY, [
+        tokenId.toString(),
+        '0',
+        '0',
+        '0',
+        EMPTY_BYTES,  
+      ])
+
+      planner.addAction(Actions.TAKE_PAIR, [toAddress(currency0), toAddress(currency1), recipient])
+
+      expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), collectLiqOptions.deadline))
       expect(value).toEqual('0x00')
     })
   })
