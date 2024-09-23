@@ -19,14 +19,13 @@
     "build": "tsdx build",
     "docs": "typedoc",
     "forge:fix": "forge fmt",
-    "install:ur": "cd lib/universal-router && forge install",
     "lint": "yarn prettier",
     "lint:fix": "yarn prettier:fix && yarn forge:fix",
     "prettier": "prettier --check '**/*.ts' && prettier --check '**/*.json'",
     "prettier:fix": "prettier --write '**/*.ts' && prettier --write '**/*.json'",
     "release": "semantic-release",
     "test": "yarn test:hardhat && yarn test:forge",
-    "test:forge": "yarn install:ur && forge test",
+    "test:forge": "forge test",
     "test:hardhat": "env TS_NODE_COMPILER_OPTIONS='{\"module\": \"commonjs\" }' hardhat test"
   },
   "dependencies": {
