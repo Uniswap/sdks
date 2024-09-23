@@ -221,10 +221,8 @@ export abstract class V4PositionManager {
     const calldataList: string[] = []
     const planner = new V4PositionPlanner()
 
-    const isMintAction = isMint(options)
-
     // Encode initialize pool.
-    if (isMintAction && shouldCreatePool(options)) {
+    if (isMint(options) && shouldCreatePool(options)) {
       // No planner used here because initializePool is not supported as an Action
       calldataList.push(
         V4PositionManager.encodeInitializePool(position.pool.poolKey, options.sqrtPriceX96!, options.hookData)
@@ -256,7 +254,7 @@ export abstract class V4PositionManager {
     }
 
     // mint
-    if (isMintAction) {
+    if (isMint(options)) {
       const recipient: string = validateAndParseAddress(options.recipient)
       planner.addMint(
         position.pool,
