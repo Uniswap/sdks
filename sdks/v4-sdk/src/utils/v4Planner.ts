@@ -1,4 +1,6 @@
+import invariant from 'tiny-invariant'
 import { defaultAbiCoder } from 'ethers/lib/utils'
+import { BigNumber } from 'ethers'
 import { Currency, Percent, TradeType } from '@uniswap/sdk-core'
 import { Trade } from '../entities/trade'
 import { ADDRESS_ZERO } from '../internalConstants'
@@ -91,15 +93,19 @@ const ABI_DEFINITION: { [key in Actions]: string[] } = {
   [Actions.SWAP_EXACT_OUT]: [SWAP_EXACT_OUT_STRUCT],
 
   // Payments commands
-  [Actions.SETTLE]: ['address', 'uint256', 'bool'],
+  [Actions.SETTLE]: ['address', 'uint256', 'bool'], // currency, amount, payerIsUser
   [Actions.SETTLE_ALL]: ['address', 'uint256'],
-  [Actions.TAKE]: ['address', 'address', 'uint256'],
+  [Actions.TAKE]: ['address', 'address', 'uint256'], // currency, receiver, amount
   [Actions.TAKE_ALL]: ['address', 'uint256'],
   [Actions.TAKE_PORTION]: ['address', 'address', 'uint256'],
   [Actions.SETTLE_TAKE_PAIR]: ['address', 'address'],
   [Actions.CLOSE_CURRENCY]: ['address'],
   [Actions.SWEEP]: ['address', 'address'],
 }
+
+const FULL_DELTA_AMOUNT = 0
+const MSG_SENDER = '0x0000000000000000000000000000000000000001'
+const ADDRESS_THIS = '0x0000000000000000000000000000000000000002'
 
 export class V4Planner {
   actions: string
@@ -117,23 +123,42 @@ export class V4Planner {
   }
 
   addTrade(trade: Trade<Currency, Currency, TradeType>, slippageTolerance?: Percent): void {
-    const actionType = trade.tradeType === TradeType.EXACT_INPUT ? Actions.SWAP_EXACT_IN : Actions.SWAP_EXACT_OUT
+    const exactOutput = trade.tradeType === TradeType.EXACT_OUTPUT
+
+    // exactInput we sometimes perform aggregated slippage checks, but not with exactOutput
+    if (exactOutput) invariant(!!slippageTolerance, 'ExactOut requires slippageTolerance')
+    invariant(trade.swaps.length === 1, 'Only accepts Trades with 1 swap (must break swaps into individual trades)')
+
+    const actionType = exactOutput ? Actions.SWAP_EXACT_OUT : Actions.SWAP_EXACT_IN
 
     const currencyIn = currencyAddress(trade.inputAmount.currency)
     const currencyOut = currencyAddress(trade.outputAmount.currency)
 
-    for (let swap of trade.swaps) {
-      this.addAction(actionType, [
-        {
-          currencyIn,
-          path: encodeRouteToPath(swap.route),
-          amountIn: swap.inputAmount.quotient.toString(),
-          amountOutMinimum: slippageTolerance ? trade.minimumAmountOut(slippageTolerance).quotient.toString() : 0,
-        },
-      ])
-    }
+    this.addAction(actionType, [
+      exactOutput
+        ? {
+            currencyOut,
+            path: encodeRouteToPath(trade.route, exactOutput),
+            amountInMaximum: trade.maximumAmountIn(slippageTolerance ?? new Percent(0)).quotient.toString(),
+            amountOut: trade.inputAmount.quotient.toString(),
+          }
+        : {
+            currencyIn,
+            path: encodeRouteToPath(trade.route, exactOutput),
+            amountIn: trade.inputAmount.quotient.toString(),
+            amountOutMinimum: slippageTolerance ? trade.minimumAmountOut(slippageTolerance).quotient.toString() : 0,
+          },
+    ])
+  }
 
-    this.addAction(Actions.SETTLE_TAKE_PAIR, [currencyIn, currencyOut])
+  addSettle(currency: Currency, payerIsUser: boolean, amount?: BigNumber): void {
+    this.addAction(Actions.SETTLE, [currencyAddress(currency), amount ?? FULL_DELTA_AMOUNT, payerIsUser])
+  }
+
+  addTake(currency: Currency, routerMustCustody: boolean, amount?: BigNumber): void {
+    const receiver = routerMustCustody ? ADDRESS_THIS : MSG_SENDER
+    const takeAmount = amount ?? FULL_DELTA_AMOUNT
+    this.addAction(Actions.TAKE, [currencyAddress(currency), receiver, takeAmount])
   }
 
   finalize(): string {
