@@ -5,7 +5,6 @@ import { Pool } from './pool'
 import { encodeSqrtRatioX96, maxLiquidityForAmounts, SqrtPriceMath, TickMath } from '@uniswap/v3-sdk'
 import { ZERO } from '../internalConstants'
 import { tickToPrice } from '../utils/priceTickConversions'
-import { AllowanceTransferPermitBatch } from '../PositionManager'
 
 interface PositionConstructorArgs {
   pool: Pool
@@ -312,46 +311,12 @@ export class Position {
   }
 
   /**
-   * Returns the AllowanceTransferPermitBatch for adding liquidity to a position
-   * @param slippageTolerance The amount by which the price can 'slip' before the transaction will revert
-   * @param spender The spender of the permit (should usually be the PositionManager)
-   * @param nonce A valid permit2 nonce
-   * @param deadline The deadline for the permit
-   */
-  public permitBatchData(
-    slippageTolerance: Percent,
-    spender: string,
-    nonce: BigintIsh,
-    deadline: BigintIsh
-  ): AllowanceTransferPermitBatch {
-    const { amount0, amount1 } = this.mintAmountsWithSlippage(slippageTolerance)
-    return {
-      details: [
-        {
-          token: this.pool.currency0.wrapped.address,
-          amount: amount0,
-          expiration: deadline,
-          nonce: nonce,
-        },
-        {
-          token: this.pool.currency1.wrapped.address,
-          amount: amount1,
-          expiration: deadline,
-          nonce: nonce,
-        },
-      ],
-      spender,
-      sigDeadline: deadline,
-    }
-  }
-
-  /**
    * Computes the maximum amount of liquidity received for a given amount of token0, token1,
    * and the prices at the tick boundaries.
    * @param pool The pool for which the position should be created
    * @param tickLower The lower tick of the position
    * @param tickUpper The upper tick of the position
-   * @param amount0 token0 amount
+   * @param amount0 token0 amountzw
    * @param amount1 token1 amount
    * @param useFullPrecision If false, liquidity will be maximized according to what the router can calculate,
    * not what core can theoretically support

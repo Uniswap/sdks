@@ -39,9 +39,6 @@ export const NO_NATIVE = 'NO_NATIVE'
 export enum PositionFunctions {
   INITIALIZE_POOL = 'initializePool',
   MODIFY_LIQUIDITIES = 'modifyLiquidities',
-  // Inherited from PermitForwarder
-  PERMIT = 'permit',
-  PERMIT_BATCH = 'permitBatch',
 }
 
 /**
