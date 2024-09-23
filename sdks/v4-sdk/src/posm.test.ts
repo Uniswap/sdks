@@ -1,13 +1,23 @@
 import { Ether, Percent, Token } from '@uniswap/sdk-core'
-import { EMPTY_BYTES, EMPTY_HOOK, FeeAmount, NO_NATIVE, SQRT_PRICE_1_1, TICK_SPACINGS } from './internalConstants'
+import {
+  EMPTY_BYTES,
+  EMPTY_HOOK,
+  FeeAmount,
+  CANNOT_BURN,
+  NO_NATIVE,
+  SQRT_PRICE_1_1,
+  TICK_SPACINGS,
+  ZERO_LIQUIDITY,
+} from './internalConstants'
 import { Pool } from './entities/pool'
 import { Position } from './entities/position'
-import { V4PositionManager } from './PositionManager'
+import { RemoveLiquidityOptions, V4PositionManager } from './PositionManager'
 import { Multicall } from './multicall'
 import { Actions, toHex, V4Planner } from './utils'
 import { PoolKey } from './entities/pool'
 import { toAddress } from './utils/currencyMap'
 import { MSG_SENDER } from './actionConstants'
+import { V4PositionPlanner } from './utils'
 
 describe('POSM', () => {
   const currency0 = new Token(1, '0x0000000000000000000000000000000000000001', 18, 't0', 'currency0')
@@ -263,6 +273,106 @@ describe('POSM', () => {
       expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
 
       expect(value).toEqual(toHex(amount0Max))
+    })
+  })
+
+  describe('#removeCallParameters', () => {
+    const position = new Position({
+      pool: pool_0_1,
+      tickLower: -TICK_SPACINGS[FeeAmount.MEDIUM],
+      tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
+      liquidity: 100,
+    })
+
+    const removeLiqOptions: RemoveLiquidityOptions = {
+      tokenId,
+      liquidityPercentage: new Percent(1),
+      slippageTolerance,
+      deadline,
+    }
+
+    const partialRemoveOptions: RemoveLiquidityOptions = {
+      tokenId,
+      liquidityPercentage: new Percent(1, 100),
+      slippageTolerance,
+      deadline,
+    }
+
+    const burnLiqOptions: RemoveLiquidityOptions = {
+      burnToken: true,
+      ...removeLiqOptions,
+    }
+
+    it('throws for 0 liquidity', () => {
+      const zeroLiquidityPosition = new Position({
+        ...position,
+        liquidity: 0,
+      })
+
+      expect(() => V4PositionManager.removeCallParameters(zeroLiquidityPosition, removeLiqOptions)).toThrow(
+        ZERO_LIQUIDITY
+      )
+    })
+
+    it('throws when burn is true but liquidityPercentage is not 100%', () => {
+      const fullLiquidityPosition = new Position({
+        ...position,
+        liquidity: 999,
+      })
+
+      let invalidBurnLiqOptions = {
+        burnToken: true,
+        liquidityPercentage: new Percent(1, 100),
+        tokenId,
+        slippageTolerance,
+        deadline,
+      }
+
+      expect(() => V4PositionManager.removeCallParameters(fullLiquidityPosition, invalidBurnLiqOptions)).toThrow(
+        CANNOT_BURN
+      )
+    })
+
+    it('succeeds for burn', () => {
+      const { calldata, value } = V4PositionManager.removeCallParameters(position, burnLiqOptions)
+
+      const { amount0: amount0Min, amount1: amount1Min } = position.burnAmountsWithSlippage(slippageTolerance)
+
+      const planner = new V4PositionPlanner()
+
+      planner.addAction(Actions.BURN_POSITION, [
+        tokenId.toString(),
+        amount0Min.toString(),
+        amount1Min.toString(),
+        EMPTY_BYTES,
+      ])
+      planner.addAction(Actions.TAKE_PAIR, [toAddress(currency0), toAddress(currency1), MSG_SENDER])
+
+      expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), burnLiqOptions.deadline))
+      expect(value).toEqual('0x00')
+    })
+
+    it('succeeds for remove partial liquidity', () => {
+      // remove 1% of 100, 1
+      let amountToRemove = '1'
+      const { calldata, value } = V4PositionManager.removeCallParameters(position, partialRemoveOptions)
+      const { amount0: amount0Min, amount1: amount1Min } = position.burnAmountsWithSlippage(slippageTolerance)
+
+      const planner = new V4Planner()
+
+      planner.addAction(Actions.DECREASE_LIQUIDITY, [
+        tokenId.toString(),
+        amountToRemove,
+        amount0Min.toString(),
+        amount1Min.toString(),
+        EMPTY_BYTES,
+      ])
+      planner.addAction(Actions.TAKE_PAIR, [toAddress(currency0), toAddress(currency1), MSG_SENDER])
+
+      expect(calldata).toEqual(
+        V4PositionManager.encodeModifyLiquidities(planner.finalize(), partialRemoveOptions.deadline)
+      )
+      expect(value).toEqual('0x00')
     })
   })
 })
