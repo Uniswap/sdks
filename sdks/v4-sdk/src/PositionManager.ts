@@ -19,7 +19,7 @@ import {
 } from './internalConstants'
 import { V4PositionPlanner } from './utils'
 import { abi } from './utils/abi'
-import { ERC2612Permit, ERC2612PermitOptions } from './utils/erc2612Permit'
+import { ERC2612Permit, ERC2612PermitOptions } from './utils/ERC2612Permit'
 
 export interface CommonOptions {
   /**
@@ -413,11 +413,6 @@ export abstract class V4PositionManager {
     return V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.MODIFY_LIQUIDITIES, [unlockData, deadline])
   }
 
-  // Encode a permit call
-  public static encodePermit(owner: string, permit: AllowanceTransferPermitBatch, signature: string): string {
-    return V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.PERMIT, [owner, permit, signature])
-  }
-
   // Encode a permit batch call
   public static encodePermitBatch(owner: string, permitBatch: AllowanceTransferPermitBatch, signature: string): string {
     return V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.PERMIT_BATCH, [
@@ -438,25 +433,6 @@ export abstract class V4PositionManager {
     return V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.ERC721PERMIT_PERMIT, [
       spender,
       tokenId,
-      deadline,
-      nonce,
-      signature,
-    ])
-  }
-
-  // Encode a ERC721Permit permitForAll call
-  public static encodeERC721PermitForAll(
-    owner: string,
-    spender: string,
-    approved: boolean,
-    deadline: BigintIsh,
-    nonce: BigintIsh,
-    signature: string
-  ): string {
-    return V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.ERC721PERMIT_PERMIT_FOR_ALL, [
-      owner,
-      spender,
-      approved,
       deadline,
       nonce,
       signature,

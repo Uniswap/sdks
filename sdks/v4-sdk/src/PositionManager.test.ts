@@ -19,7 +19,7 @@ import { PoolKey } from './entities/pool'
 import { toAddress } from './utils/currencyMap'
 import { MSG_SENDER } from './actionConstants'
 import { V4PositionPlanner } from './utils'
-import { ERC2612Permit } from './utils/erc2612Permit'
+import { ERC2612Permit } from './utils/ERC2612Permit'
 
 describe('PositionManager', () => {
   const currency0 = new Token(1, '0x0000000000000000000000000000000000000001', 18, 't0', 'currency0')
