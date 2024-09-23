@@ -19,7 +19,7 @@
     "build": "tsdx build",
     "docs": "typedoc",
     "forge:fix": "forge fmt",
-    "install:ur": "cd node_modules/@uniswap/universal-router && forge install",
+    "install:ur": "cd lib/universal-router && yarn install && forge install",
     "lint": "yarn prettier",
     "lint:fix": "yarn prettier:fix && yarn forge:fix",
     "prettier": "prettier --check '**/*.ts' && prettier --check '**/*.json'",
