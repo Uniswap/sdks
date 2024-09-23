@@ -219,7 +219,6 @@ export abstract class V4PositionManager {
     }
   }
 
-  // TODO: Add Support for permit2 batch forwarding
   public static addCallParameters(position: Position, options: AddLiquidityOptions): MethodParameters {
     /**
      * Cases:

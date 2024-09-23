@@ -312,13 +312,13 @@ export class Position {
   }
 
   /**
-   * Returns the Permit2PermitBatchOptions for the position
+   * Returns the AllowanceTransferPermitBatch for adding liquidity to a position
    * @param slippageTolerance The amount by which the price can 'slip' before the transaction will revert
    * @param spender The spender of the permit (should usually be the PositionManager)
    * @param nonce A valid permit2 nonce
    * @param deadline The deadline for the permit
    */
-  public getAllowanceTransferPermitBatch(
+  public permitBatchData(
     slippageTolerance: Percent,
     spender: string,
     nonce: BigintIsh,
