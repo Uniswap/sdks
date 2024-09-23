@@ -1,10 +1,4 @@
-import {
-  BigintIsh,
-  Percent,
-  validateAndParseAddress,
-  Currency,
-  NativeCurrency,
-} from '@uniswap/sdk-core'
+import { BigintIsh, Percent, validateAndParseAddress, Currency, NativeCurrency } from '@uniswap/sdk-core'
 import JSBI from 'jsbi'
 import { Position } from './entities/position'
 import { MethodParameters, toHex } from './utils/calldata'
