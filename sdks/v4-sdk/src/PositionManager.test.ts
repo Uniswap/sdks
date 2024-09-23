@@ -396,17 +396,13 @@ describe('PositionManager', () => {
 
       const planner = new V4Planner()
 
-      planner.addAction(Actions.DECREASE_LIQUIDITY, [
-        tokenId.toString(),
-        '0',
-        '0',
-        '0',
-        EMPTY_BYTES,  
-      ])
+      planner.addAction(Actions.DECREASE_LIQUIDITY, [tokenId.toString(), '0', '0', '0', EMPTY_BYTES])
 
       planner.addAction(Actions.TAKE_PAIR, [toAddress(currency0), toAddress(currency1), recipient])
 
-      expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), collectLiqOptions.deadline))
+      expect(calldata).toEqual(
+        V4PositionManager.encodeModifyLiquidities(planner.finalize(), collectLiqOptions.deadline)
+      )
       expect(value).toEqual('0x00')
     })
   })
