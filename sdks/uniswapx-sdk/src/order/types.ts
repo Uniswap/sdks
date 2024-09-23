@@ -143,12 +143,14 @@ export type V3DutchInput = {
   readonly startAmount: BigNumber;
   readonly curve: NonlinearDutchDecay;
   readonly maxAmount: BigNumber;
+  readonly adjustmentPerGweiBaseFee: BigNumber;
 };
 
-export type V3DutchInputJSON = Omit<V3DutchInput, "startAmount" | "curve" | "maxAmount"> & {
+export type V3DutchInputJSON = Omit<V3DutchInput, "startAmount" | "curve" | "maxAmount" | "adjustmentPerGweiBaseFee"> & {
   startAmount: string;
   curve: NonlinearDutchDecayJSON;
   maxAmount: string;
+  adjustmentPerGweiBaseFee: string;
 };
 
 export type NonlinearDutchDecay = {
@@ -166,9 +168,13 @@ export type V3DutchOutput = {
   readonly startAmount: BigNumber;
   readonly curve: NonlinearDutchDecay;
   readonly recipient: string;
+  readonly minAmount: BigNumber;
+  readonly adjustmentPerGweiBaseFee: BigNumber;
 };
 
-export type V3DutchOutputJSON = Omit<V3DutchOutput, "startAmount" | "curve"> & {
+export type V3DutchOutputJSON = Omit<V3DutchOutput, "startAmount" | "curve" | "minAmount" | "adjustmentPerGweiBaseFee"> & {
   startAmount: string;
   curve: NonlinearDutchDecayJSON;
+  minAmount: string;
+  adjustmentPerGweiBaseFee: string;
 };

@@ -16,14 +16,16 @@ export type V3CosignerData = Omit<CosignerData, "decayStartTime" | "decayEndTime
     decayStartBlock: number;
 };
 
-export type UnsignedV3DutchOrderInfoJSON = Omit<UnsignedV3DutchOrderInfo, "nonce" | "input" | "outputs" | "cosignerData"> & {
+export type UnsignedV3DutchOrderInfoJSON = Omit<UnsignedV3DutchOrderInfo, "nonce" | "startingBaseFee" | "input" | "outputs" | "cosignerData"> & {
     nonce: string;
+    startingBaseFee: string;
     input: V3DutchInputJSON;
     outputs: V3DutchOutputJSON[];
 };
 
 export type UnsignedV3DutchOrderInfo = OrderInfo & {
     cosigner: string;
+    startingBaseFee: BigNumber;
     input: V3DutchInput; //different from V2DutchOrder
     outputs: V3DutchOutput[];
 };
@@ -41,6 +43,7 @@ export type CosignedV3DutchOrderInfo = UnsignedV3DutchOrderInfo & {
 type V3WitnessInfo = {
     info: OrderInfo,
     cosigner: string,
+    startingBaseFee: BigNumber,
     baseInput: V3DutchInput,
     baseOutputs: V3DutchOutput[],
 };
@@ -51,6 +54,7 @@ const V3_DUTCH_ORDER_TYPES = {
     V3DutchOrder: [
         { name: "info", type: "OrderInfo" },
         { name: "cosigner", type: "address" },
+        { name: "startingBaseFee", type: "uint256" },
         { name: "baseInput", type: "V3DutchInput" },
         { name: "baseOutputs", type: "V3DutchOutput[]" },
     ],
@@ -67,12 +71,15 @@ const V3_DUTCH_ORDER_TYPES = {
         { name: "startAmount", type: "uint256" },
         { name: "curve", type: "NonlinearDutchDecay" },
         { name: "maxAmount", type: "uint256" },
+        { name: "adjustmentPerGweiBaseFee", type: "uint256" },
     ],
     V3DutchOutput: [
         { name: "token", type: "address" },
         { name: "startAmount", type: "uint256" },
         { name: "curve", type: "NonlinearDutchDecay" },
         { name: "recipient", type: "address" },
+        { name: "minAmount", type: "uint256"},
+        { name: "adjustmentPerGweiBaseFee", type: "uint256" },
     ],
     NonlinearDutchDecay: [
         { name: "relativeBlocks", type: "uint256" },
@@ -85,8 +92,9 @@ const V3_DUTCH_ORDER_ABI = [
     [
         "tuple(address,address,uint256,uint256,address,bytes)", // OrderInfo
         "address", // Cosigner
-        "tuple(address,uint256,tuple(uint256,int256[]),uint256)", // V3DutchInput
-        "tuple(address,uint256,tuple(uint256,int256[]),address)[]", // V3DutchOutput
+        "uint256", //startingBaseFee
+        "tuple(address,uint256,tuple(uint256,int256[]),uint256,uint256)", // V3DutchInput
+        "tuple(address,uint256,tuple(uint256,int256[]),address,uint256,uint256)[]", // V3DutchOutput
         COSIGNER_DATA_TUPLE_ABI,
         "bytes", // Cosignature
     ].join(",") + ")",
@@ -112,6 +120,7 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
             {
                 ...json,
                 nonce: BigNumber.from(json.nonce),
+                startingBaseFee: BigNumber.from(json.startingBaseFee),
                 input: {
                     ...json.input,
                     startAmount: BigNumber.from(json.input.startAmount),
@@ -120,6 +129,7 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                         relativeAmounts: json.input.curve.relativeAmounts.map(amount => BigInt(amount)),
                     },
                     maxAmount: BigNumber.from(json.input.maxAmount),
+                    adjustmentPerGweiBaseFee: BigNumber.from(json.input.adjustmentPerGweiBaseFee),
                 },
                 outputs: json.outputs.map(output => ({
                     ...output,
@@ -128,6 +138,8 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                         relativeBlocks: output.curve.relativeBlocks,
                         relativeAmounts: output.curve.relativeAmounts.map(amount => BigInt(amount)),
                     },
+                    minAmount: BigNumber.from(output.minAmount),
+                    adjustmentPerGweiBaseFee: BigNumber.from(output.adjustmentPerGweiBaseFee),
                 })),
             },
             chainId,
@@ -159,17 +171,21 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                     this.info.additionalValidationData,
                 ],
                 this.info.cosigner,
+                this.info.startingBaseFee,
                 [
                     this.info.input.token,
                     this.info.input.startAmount,
                     [encodedRelativeBlocks, this.info.input.curve.relativeAmounts],
                     this.info.input.maxAmount,
+                    this.info.input.adjustmentPerGweiBaseFee,
                 ],
                 this.info.outputs.map(output => [
                     output.token,
                     output.startAmount,
                     [encodedRelativeBlocks, output.curve.relativeAmounts],
                     output.recipient,
+                    output.minAmount,
+                    output.adjustmentPerGweiBaseFee,
                 ]),
                 [0, ethers.constants.AddressZero, 0, 0, [0]],
                 "0x",
@@ -192,6 +208,7 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
             additionalValidationContract: this.info.additionalValidationContract,
             additionalValidationData: this.info.additionalValidationData,
             cosigner: this.info.cosigner,
+            startingBaseFee: this.info.startingBaseFee.toString(),
             input: {
                 token: this.info.input.token,
                 startAmount: this.info.input.startAmount.toString(),
@@ -200,6 +217,7 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                     relativeAmounts: this.info.input.curve.relativeAmounts.map(amount => amount.toString()),
                 },
                 maxAmount: this.info.input.maxAmount.toString(),
+                adjustmentPerGweiBaseFee: this.info.input.adjustmentPerGweiBaseFee.toString(),
             },
             outputs: this.info.outputs.map(output => ({
                 token: output.token,
@@ -209,6 +227,8 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                     relativeAmounts: output.curve.relativeAmounts.map(amount => amount.toString()),
                 },
                 recipient: output.recipient,
+                minAmount: output.minAmount.toString(),
+                adjustmentPerGweiBaseFee: output.adjustmentPerGweiBaseFee.toString(),
             })),
             chainId: this.chainId,
             permit2Address: this.permit2Address,
@@ -247,6 +267,7 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                 additionalValidationData: this.info.additionalValidationData,
             },
             cosigner: this.info.cosigner,
+            startingBaseFee: this.info.startingBaseFee,
             baseInput: this.info.input,
             baseOutputs: this.info.outputs,
         }
@@ -342,6 +363,7 @@ export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
             {
                 ...json,
                 nonce: BigNumber.from(json.nonce),
+                startingBaseFee: BigNumber.from(json.startingBaseFee),
                 input: {
                     token: json.input.token,
                     startAmount: BigNumber.from(json.input.startAmount),
@@ -350,6 +372,7 @@ export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
                         relativeAmounts: json.input.curve.relativeAmounts.map(amount => BigInt(amount)),
                     },
                     maxAmount: BigNumber.from(json.input.maxAmount),
+                    adjustmentPerGweiBaseFee: BigNumber.from(json.input.adjustmentPerGweiBaseFee),
                 },
                 outputs: json.outputs.map(output => ({
                     token: output.token,
@@ -359,6 +382,8 @@ export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
                         relativeAmounts: output.curve.relativeAmounts.map(amount => BigInt(amount)),
                     },
                     recipient: output.recipient,
+                    minAmount: BigNumber.from(output.minAmount),
+                    adjustmentPerGweiBaseFee: BigNumber.from(output.adjustmentPerGweiBaseFee),
                 })),
                 cosignerData: {
                     decayStartBlock: json.cosignerData.decayStartBlock,
@@ -430,17 +455,21 @@ export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
                     this.info.additionalValidationData,
                 ],
                 this.info.cosigner,
+                this.info.startingBaseFee,
                 [
                     this.info.input.token,
                     this.info.input.startAmount,
                     [encodedInputRelativeBlocks, this.info.input.curve.relativeAmounts],
                     this.info.input.maxAmount,
+                    this.info.input.adjustmentPerGweiBaseFee,
                 ],
                 this.info.outputs.map(output => [
                     output.token,
                     output.startAmount,
                     [encodeRelativeBlocks(output.curve.relativeBlocks), output.curve.relativeAmounts],
                     output.recipient,
+                    output.minAmount,
+                    output.adjustmentPerGweiBaseFee,
                 ]),
                 [
                     this.info.cosignerData.decayStartBlock,
@@ -507,11 +536,13 @@ function parseSerializedOrder(serialized: string): CosignedV3DutchOrderInfo {
                 additionalValidationData,
             ],
             cosigner,
+            startingBaseFee,
             [
                 token,
                 startAmount,
                 [inputRelativeBlocks, relativeAmounts],
                 maxAmount,
+                adjustmentPerGweiBaseFee,
             ],
             outputs,
             [decayStartBlock, exclusiveFiller, exclusivityOverrideBps, inputOverride, outputOverrides],
@@ -527,6 +558,7 @@ function parseSerializedOrder(serialized: string): CosignedV3DutchOrderInfo {
         additionalValidationContract,
         additionalValidationData,
         cosigner,
+        startingBaseFee,
         input: {
             token,
             startAmount,
@@ -535,13 +567,16 @@ function parseSerializedOrder(serialized: string): CosignedV3DutchOrderInfo {
                 relativeAmounts: relativeAmounts.map((amount: BigNumber) => amount.toBigInt()),
             },
             maxAmount,
+            adjustmentPerGweiBaseFee,
         },
         outputs: outputs.map(
-            ([token, startAmount, [outputRelativeBlocks, relativeAmounts], recipient]: [
+            ([token, startAmount, [outputRelativeBlocks, relativeAmounts], recipient, minAmount, adjustmentPerGweiBaseFee]: [
                 string,
                 number,
                 [BigNumber, BigNumber[]], //abiDecode automatically converts to BigNumber
                 string,
+                BigNumber,
+                BigNumber,
             ]) => ({
                 token,
                 startAmount,
@@ -550,6 +585,8 @@ function parseSerializedOrder(serialized: string): CosignedV3DutchOrderInfo {
                     relativeAmounts: relativeAmounts.map((amount: BigNumber) => amount.toBigInt()),
                 },
                 recipient,
+                minAmount,
+                adjustmentPerGweiBaseFee,
             })
         ),
         cosignerData: {

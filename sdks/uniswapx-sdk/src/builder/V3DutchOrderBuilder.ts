@@ -16,6 +16,7 @@ export class V3DutchOrderBuilder extends OrderBuilder {
         const builder = new V3DutchOrderBuilder(order.chainId, order.info.reactor);
         builder
             .cosigner(order.info.cosigner)
+            .startingBaseFee(order.info.startingBaseFee)
             .input(order.info.input)
             .deadline(order.info.deadline)
             .nonce(order.info.nonce)
@@ -47,6 +48,7 @@ export class V3DutchOrderBuilder extends OrderBuilder {
         return new CosignedV3DutchOrder(
             Object.assign(this.getOrderInfo(), {
                 cosignerData: this.info.cosignerData,
+                startingBaseFee: this.info.startingBaseFee,
                 input: this.info.input,
                 outputs: this.info.outputs,
                 cosigner: this.info.cosigner,
@@ -117,6 +119,7 @@ export class V3DutchOrderBuilder extends OrderBuilder {
 
     private checkUnsignedInvariants(info: Partial<CosignedV3DutchOrderInfo>): asserts info is UnsignedV3DutchOrderInfo {
         invariant(info.cosigner !== undefined, "cosigner not set");
+        invariant(info.startingBaseFee !== undefined, "startingBaseFee not set");
         invariant(info.input !== undefined, "input not set");
         invariant(
             info.outputs && info.outputs.length > 0,
@@ -170,6 +173,11 @@ export class V3DutchOrderBuilder extends OrderBuilder {
         // We are not checking if the decayStartBlock is before the deadline because it is not enforced in the smart contract
     }
 
+    startingBaseFee(startingBaseFee: BigNumber): this {
+        this.info.startingBaseFee = startingBaseFee;
+        return this;
+    }
+
     input(input: V3DutchInput): this {
         this.info.input = input;
         return this;
@@ -214,8 +222,8 @@ export class V3DutchOrderBuilder extends OrderBuilder {
     }
 
     validation(info: ValidationInfo): this {
-    super.validation(info);
-    return this;
+        super.validation(info);
+        return this;
     }
 
     cosignerData(cosignerData: V3CosignerData): this {
@@ -278,6 +286,7 @@ export class V3DutchOrderBuilder extends OrderBuilder {
                 input: this.info.input,
                 outputs: this.info.outputs,
                 cosigner: this.info.cosigner,
+                startingBaseFee: this.info.startingBaseFee,
             }),
             this.chainId,
             this.permit2Address
