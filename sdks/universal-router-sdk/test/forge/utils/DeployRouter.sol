@@ -48,7 +48,7 @@ contract DeployRouter is Test {
 
     function deployRouterAndPermit2() public {
         bytes memory bytecode = vm.readFileBinary("test/forge/bin/permit2.bin");
-        assembly {
+        assembly ("memory-safe") {
             sstore(permit2.slot, create(0, add(bytecode, 0x20), mload(bytecode)))
         }
         deployRouter(address(permit2));
