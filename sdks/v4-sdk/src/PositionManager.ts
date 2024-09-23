@@ -1,11 +1,4 @@
-import {
-  BigintIsh,
-  Percent,
-  CurrencyAmount,
-  validateAndParseAddress,
-  Currency,
-  NativeCurrency,
-} from '@uniswap/sdk-core'
+import { BigintIsh, Percent, validateAndParseAddress, Currency, NativeCurrency } from '@uniswap/sdk-core'
 import JSBI from 'jsbi'
 import { Position } from './entities/position'
 import { MethodParameters, toHex } from './utils/calldata'
@@ -118,16 +111,6 @@ export interface CollectSpecificOptions {
    * Indicates the ID of the position to collect for.
    */
   tokenId: BigintIsh
-
-  /**
-   * Expected value of tokensOwed0, including as-of-yet-unaccounted-for fees/liquidity value to be burned
-   */
-  expectedCurrencyOwed0: CurrencyAmount<Currency>
-
-  /**
-   * Expected value of tokensOwed1, including as-of-yet-unaccounted-for fees/liquidity value to be burned
-   */
-  expectedCurrencyOwed1: CurrencyAmount<Currency>
 
   /**
    * The account that should receive the tokens.
@@ -376,6 +359,37 @@ export abstract class V4PositionManager {
     }
 
     planner.addTakePair(position.pool.currency0, position.pool.currency1, MSG_SENDER)
+
+    calldataList.push(V4PositionManager.encodeModifyLiquidities(planner.finalize(), options.deadline))
+
+    return {
+      calldata: Multicall.encodeMulticall(calldataList),
+      value: toHex(0),
+    }
+  }
+
+  /**
+   * Produces the calldata for collecting fees from a position
+   * @param position The position to collect fees from
+   * @param options Additional information necessary for generating the calldata
+   * @returns The call parameters
+   */
+  public static collectCallParameters(position: Position, options: CollectOptions): MethodParameters {
+    const calldataList: string[] = []
+    const planner = new V4PositionPlanner()
+
+    const tokenId = toHex(options.tokenId)
+    const recipient = validateAndParseAddress(options.recipient)
+
+    /**
+     * To collect fees in V4, we need to:
+     * - encode a decrease liquidity by 0
+     * - and encode a TAKE_PAIR
+     */
+
+    planner.addDecrease(tokenId, '0', '0', '0', options.hookData)
+
+    planner.addTakePair(position.pool.currency0, position.pool.currency1, recipient)
 
     calldataList.push(V4PositionManager.encodeModifyLiquidities(planner.finalize(), options.deadline))
 
