@@ -8,6 +8,7 @@ import {
   SQRT_PRICE_1_1,
   TICK_SPACINGS,
   ZERO_LIQUIDITY,
+  PositionFunctions,
 } from './internalConstants'
 import { Pool } from './entities/pool'
 import { Position } from './entities/position'
@@ -303,6 +304,17 @@ describe('POSM', () => {
       ...removeLiqOptions,
     }
 
+    const burnLiqWithPermitOptions: RemoveLiquidityOptions = {
+      ...burnLiqOptions,
+      permit: {
+        spender: '0x0000000000000000000000000000000000000004',
+        tokenId,
+        deadline,
+        nonce: 1,
+        signature: '0x00',
+      },
+    }
+
     it('throws for 0 liquidity', () => {
       const zeroLiquidityPosition = new Position({
         ...position,
@@ -372,6 +384,38 @@ describe('POSM', () => {
       expect(calldata).toEqual(
         V4PositionManager.encodeModifyLiquidities(planner.finalize(), partialRemoveOptions.deadline)
       )
+      expect(value).toEqual('0x00')
+    })
+
+    it('succeeds for burn with permit', () => {
+      const { calldata, value } = V4PositionManager.removeCallParameters(position, burnLiqOptions)
+
+      const { amount0: amount0Min, amount1: amount1Min } = position.burnAmountsWithSlippage(slippageTolerance)
+
+      const planner = new V4PositionPlanner()
+
+      planner.addAction(Actions.BURN_POSITION, [
+        tokenId.toString(),
+        amount0Min.toString(),
+        amount1Min.toString(),
+        EMPTY_BYTES,
+      ])
+      planner.addAction(Actions.TAKE_PAIR, [toAddress(currency0), toAddress(currency1), MSG_SENDER])
+
+      // The resulting calldata should be multicall with two calls: ERC721Permit_Permit and modifyLiquidities
+      const calldataList = Multicall.decodeMulticall(calldata)
+      // Expect ERC721Permit_Permit to be called correctly
+      expect(calldataList[0]).toEqual(
+        V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.ERC721PERMIT_PERMIT, [
+          burnLiqWithPermitOptions.permit!.spender,
+          tokenId.toString(),
+          burnLiqWithPermitOptions.permit!.deadline,
+          burnLiqWithPermitOptions.permit!.nonce,
+          burnLiqWithPermitOptions.permit!.signature,
+        ])
+      )
+      // Expect modifyLiquidities to be called correctly
+      expect(calldataList[1]).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), burnLiqOptions.deadline))
       expect(value).toEqual('0x00')
     })
   })
