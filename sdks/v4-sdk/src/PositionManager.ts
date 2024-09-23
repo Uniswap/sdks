@@ -79,12 +79,12 @@ export interface CommonAddLiquidityOptions {
   /**
    * The optional ERC2612 permit parameters for approving token0 for Permit2
    */
-  token0Permit?: any 
+  token0Permit?: any
 
   /**
    * The optional ERC2612 permit parameters for approving token1 for Permit2
    */
-  token1Permit?: any 
+  token1Permit?: any
 
   /**
    * The optional permit2 batch permit parameters for spending token0 and token1

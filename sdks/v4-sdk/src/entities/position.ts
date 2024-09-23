@@ -318,32 +318,32 @@ export class Position {
    * @param nonce A valid permit2 nonce
    * @param deadline The deadline for the permit
    */
-    public permitBatchData(
-      slippageTolerance: Percent,
-      spender: string,
-      nonce: BigintIsh,
-      deadline: BigintIsh
-    ): AllowanceTransferPermitBatch {
-      const { amount0, amount1 } = this.mintAmountsWithSlippage(slippageTolerance)
-      return {
-        details: [
-          {
-            token: this.pool.currency0.wrapped.address,
-            amount: amount0,
-            expiration: deadline,
-            nonce: nonce,
-          },
-          {
-            token: this.pool.currency1.wrapped.address,
-            amount: amount1,
-            expiration: deadline,
-            nonce: nonce,
-          },
-        ],
-        spender,
-        sigDeadline: deadline,
-      }
+  public permitBatchData(
+    slippageTolerance: Percent,
+    spender: string,
+    nonce: BigintIsh,
+    deadline: BigintIsh
+  ): AllowanceTransferPermitBatch {
+    const { amount0, amount1 } = this.mintAmountsWithSlippage(slippageTolerance)
+    return {
+      details: [
+        {
+          token: this.pool.currency0.wrapped.address,
+          amount: amount0,
+          expiration: deadline,
+          nonce: nonce,
+        },
+        {
+          token: this.pool.currency1.wrapped.address,
+          amount: amount1,
+          expiration: deadline,
+          nonce: nonce,
+        },
+      ],
+      spender,
+      sigDeadline: deadline,
     }
+  }
 
   /**
    * Computes the maximum amount of liquidity received for a given amount of token0, token1,
