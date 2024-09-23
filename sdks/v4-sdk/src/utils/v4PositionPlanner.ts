@@ -26,7 +26,7 @@ export class V4PositionPlanner extends V4Planner {
       amount0Max.toString(),
       amount1Max.toString(),
       owner,
-      hookData
+      hookData,
     ]
     this.addAction(Actions.MINT_POSITION, inputs)
   }
@@ -39,13 +39,7 @@ export class V4PositionPlanner extends V4Planner {
     amount1Max: BigintIsh,
     hookData: string = EMPTY_BYTES
   ): void {
-    const inputs = [
-      tokenId.toString(),
-      liquidity.toString(),
-      amount0Max.toString(),
-      amount1Max.toString(),
-      hookData
-    ]
+    const inputs = [tokenId.toString(), liquidity.toString(), amount0Max.toString(), amount1Max.toString(), hookData]
     this.addAction(Actions.INCREASE_LIQUIDITY, inputs)
   }
 
@@ -57,13 +51,7 @@ export class V4PositionPlanner extends V4Planner {
     amount1Min: BigintIsh,
     hookData: string = EMPTY_BYTES
   ): void {
-    const inputs = [
-      tokenId.toString(),
-      liquidity.toString(),
-      amount0Min.toString(),
-      amount1Min.toString(),
-      hookData
-    ]
+    const inputs = [tokenId.toString(), liquidity.toString(), amount0Min.toString(), amount1Min.toString(), hookData]
     this.addAction(Actions.DECREASE_LIQUIDITY, inputs)
   }
 
