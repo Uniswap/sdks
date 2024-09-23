@@ -39,6 +39,7 @@ describe("V3DutchOrder", () => {
                 additionalValidationContract: ethers.constants.AddressZero,
                 additionalValidationData: "0x",
                 cosigner: ethers.constants.AddressZero,
+                startingBaseFee: BigNumber.from(0),
                 cosignerData: COSIGNER_DATA_WITH_OVERRIDES,
                 input: {
                     token: INPUT_TOKEN,
@@ -48,6 +49,7 @@ describe("V3DutchOrder", () => {
                         relativeAmounts: [BigInt(0)],
                     },
                     maxAmount: RAW_AMOUNT, //we don't want input to change, we're testing for decaying output
+                    adjustmentPerGweiBaseFee: BigNumber.from(0),
                 },
                 outputs: [
                     {
@@ -58,6 +60,8 @@ describe("V3DutchOrder", () => {
                             relativeAmounts: [BigInt(1), BigInt(2), BigInt(3), BigInt(4)], // 1e-18, 2e-18, 3e-18, 4e-18
                         },
                         recipient: ethers.constants.AddressZero,
+                        minAmount: RAW_AMOUNT.sub(4),
+                        adjustmentPerGweiBaseFee: BigNumber.from(0),
                     },
                 ],
                 cosignature: "0x",
@@ -90,6 +94,8 @@ describe("V3DutchOrder", () => {
                         relativeAmounts: [BigInt(-1), BigInt(-2), BigInt(-3), BigInt(-4)],
                     },
                     recipient: ethers.constants.AddressZero,
+                    minAmount: BigNumber.from(0),
+                    adjustmentPerGweiBaseFee: BigNumber.from(0),
                 },
             ],
         });
@@ -103,6 +109,7 @@ describe("V3DutchOrder", () => {
         const orderInfoJSON : UnsignedV3DutchOrderInfoJSON = {
             ...getFullOrderInfo({}),
             nonce: "21",
+            startingBaseFee: "0",
             input: {
                 token: INPUT_TOKEN,
                 startAmount: "1000000",
@@ -111,6 +118,7 @@ describe("V3DutchOrder", () => {
                     relativeAmounts: ["1", "2", "3", "4"],
                 },
                 maxAmount: "1000001",
+                adjustmentPerGweiBaseFee: "0",
             },
             outputs: [
                 {
@@ -121,6 +129,8 @@ describe("V3DutchOrder", () => {
                         relativeAmounts: ["1", "2", "3", "4"],
                     },
                     recipient: ethers.constants.AddressZero,
+                    minAmount: "1000000",
+                    adjustmentPerGweiBaseFee: "0",
                 },
             ],
         };

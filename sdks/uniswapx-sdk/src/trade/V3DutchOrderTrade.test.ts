@@ -29,6 +29,7 @@ describe("V3DutchOrderTrade", () => {
 		swapper: "0x0000000000000000000000000000000000000000",
 		nonce: BigNumber.from(10),
 		cosigner: "0x0000000000000000000000000000000000000000",
+		startingBaseFee: BigNumber.from(0),
 		additionalValidationContract: ethers.constants.AddressZero,
 		additionalValidationData: "0x",
 		input: {
@@ -39,6 +40,7 @@ describe("V3DutchOrderTrade", () => {
 				relativeAmounts: [BigInt(0)],
 			},
 			maxAmount: BigNumber.from(1000),
+			adjustmentPerGweiBaseFee: BigNumber.from(0),
 		},
 		outputs: [
 			{
@@ -49,6 +51,8 @@ describe("V3DutchOrderTrade", () => {
 					relativeAmounts: [BigInt("100000000000000000")],
 				},
 				recipient: "0x0000000000000000000000000000000000000000",
+				minAmount: NON_FEE_MINIMUM_AMOUNT_OUT,
+				adjustmentPerGweiBaseFee: BigNumber.from(0),
 			},
 			{
 				token: DAI.address,
@@ -58,6 +62,8 @@ describe("V3DutchOrderTrade", () => {
 					relativeAmounts: [BigInt("100")],
 				},
 				recipient: "0x0000000000000000000000000000000000000000",
+				minAmount: BigNumber.from("900"),
+				adjustmentPerGweiBaseFee: BigNumber.from(0),
 			},
 		],
 	};
@@ -96,6 +102,7 @@ describe("V3DutchOrderTrade", () => {
 			swapper: "0x0000000000000000000000000000000000000000",
 			nonce: BigNumber.from(10),
 			cosigner: "0x0000000000000000000000000000000000000000",
+			startingBaseFee: BigNumber.from(0),
 			additionalValidationContract: ethers.constants.AddressZero,
 			additionalValidationData: "0x",
 			input: {
@@ -106,6 +113,7 @@ describe("V3DutchOrderTrade", () => {
 					relativeAmounts: [BigInt(-100)],
 				},
 				maxAmount: BigNumber.from(1100),
+				adjustmentPerGweiBaseFee: BigNumber.from(0),
 			},
 			outputs: [
 				{
@@ -116,6 +124,8 @@ describe("V3DutchOrderTrade", () => {
 						relativeAmounts: [BigInt(0)],
 					},
 					recipient: "0x0000000000000000000000000000000000000000",
+					minAmount: NON_FEE_OUTPUT_AMOUNT,
+					adjustmentPerGweiBaseFee: BigNumber.from(0),
 				},
 				{
 					token: DAI.address,
@@ -125,6 +135,8 @@ describe("V3DutchOrderTrade", () => {
 						relativeAmounts: [BigInt(0)],
 					},
 					recipient: "0x0000000000000000000000000000000000000000",
+					minAmount: BigNumber.from("1000"),
+					adjustmentPerGweiBaseFee: BigNumber.from(0),
 				},
 			],
 		};
@@ -155,6 +167,8 @@ describe("V3DutchOrderTrade", () => {
 							relativeAmounts: [BigInt("100000000000000000")],
 						},
 						recipient: "0x0000000000000000000000000000000000000000",
+						minAmount: NON_FEE_MINIMUM_AMOUNT_OUT,
+						adjustmentPerGweiBaseFee: BigNumber.from(0),
 					},
 				],
 			};
@@ -181,6 +195,8 @@ describe("V3DutchOrderTrade", () => {
 							relativeAmounts: [BigInt("100000000000000000")],
 						},
 						recipient: "0x0000000000000000000000000000000000000000",
+						minAmount: NON_FEE_MINIMUM_AMOUNT_OUT,
+						adjustmentPerGweiBaseFee: BigNumber.from(0),
 					},
 				],
 			};
