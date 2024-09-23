@@ -177,10 +177,11 @@ export interface BatchPermitOptions {
 }
 
 export interface NFTPermitOptions {
-  signature: string
-  deadline: BigintIsh
   spender: string
+  tokenId: BigintIsh
+  deadline: BigintIsh
   nonce: BigintIsh
+  signature: string
 }
 
 export type MintOptions = CommonOptions & CommonAddLiquidityOptions & MintSpecificOptions
@@ -223,7 +224,6 @@ export abstract class V4PositionManager {
     }
   }
 
-  // TODO: Add Support for permit2 batch forwarding
   public static addCallParameters(position: Position, options: AddLiquidityOptions): MethodParameters {
     /**
      * Cases:
@@ -332,6 +332,19 @@ export abstract class V4PositionManager {
       // if burnToken is true, the specified liquidity percentage must be 100%
       invariant(options.liquidityPercentage.equalTo(ONE), CANNOT_BURN)
 
+      // if there is a permit, encode the ERC721Permit permit call
+      if (options.permit) {
+        calldataList.push(
+          V4PositionManager.encodeERC721Permit(
+            options.permit.spender,
+            options.permit.tokenId,
+            options.permit.deadline,
+            options.permit.nonce,
+            options.permit.signature
+          )
+        )
+      }
+
       // slippage-adjusted amounts derived from current position liquidity
       const { amount0: amount0Min, amount1: amount1Min } = position.burnAmountsWithSlippage(options.slippageTolerance)
       planner.addBurn(tokenId, amount0Min, amount1Min, options.hookData)
@@ -395,6 +408,42 @@ export abstract class V4PositionManager {
     return V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.PERMIT_BATCH, [
       owner,
       permitBatch,
+      signature,
+    ])
+  }
+
+  // Encode a ERC721Permit permit call
+  public static encodeERC721Permit(
+    spender: string,
+    tokenId: BigintIsh,
+    deadline: BigintIsh,
+    nonce: BigintIsh,
+    signature: string
+  ): string {
+    return V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.ERC721PERMIT_PERMIT, [
+      spender,
+      tokenId,
+      deadline,
+      nonce,
+      signature,
+    ])
+  }
+
+  // Encode a ERC721Permit permitForAll call
+  public static encodeERC721PermitForAll(
+    owner: string,
+    spender: string,
+    approved: boolean,
+    deadline: BigintIsh,
+    nonce: BigintIsh,
+    signature: string
+  ): string {
+    return V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.ERC721PERMIT_PERMIT_FOR_ALL, [
+      owner,
+      spender,
+      approved,
+      deadline,
+      nonce,
       signature,
     ])
   }

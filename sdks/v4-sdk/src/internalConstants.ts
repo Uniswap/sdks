@@ -45,6 +45,9 @@ export enum PositionFunctions {
   // Inherited from PermitForwarder
   PERMIT = 'permit',
   PERMIT_BATCH = 'permitBatch',
+  // Inherited from ERC721Permit
+  ERC721PERMIT_PERMIT = 'permit',
+  ERC721PERMIT_PERMIT_FOR_ALL = 'permitForAll',
 }
 
 /**
