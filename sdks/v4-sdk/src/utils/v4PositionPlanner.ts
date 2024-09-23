@@ -16,7 +16,7 @@ export class V4PositionPlanner extends V4Planner {
     amount0Max: BigintIsh,
     amount1Max: BigintIsh,
     owner: string,
-    hookData?: string
+    hookData: string = EMPTY_BYTES
   ): void {
     const inputs = [
       Pool.getPoolKey(pool.currency0, pool.currency1, pool.fee, pool.tickSpacing, pool.hooks),
@@ -26,7 +26,7 @@ export class V4PositionPlanner extends V4Planner {
       amount0Max.toString(),
       amount1Max.toString(),
       owner,
-      hookData ?? EMPTY_BYTES,
+      hookData
     ]
     this.addAction(Actions.MINT_POSITION, inputs)
   }
@@ -37,14 +37,14 @@ export class V4PositionPlanner extends V4Planner {
     liquidity: BigintIsh,
     amount0Max: BigintIsh,
     amount1Max: BigintIsh,
-    hookData?: string
+    hookData: string = EMPTY_BYTES
   ): void {
     const inputs = [
       tokenId.toString(),
       liquidity.toString(),
       amount0Max.toString(),
       amount1Max.toString(),
-      hookData ?? EMPTY_BYTES,
+      hookData
     ]
     this.addAction(Actions.INCREASE_LIQUIDITY, inputs)
   }
@@ -55,21 +55,21 @@ export class V4PositionPlanner extends V4Planner {
     liquidity: BigintIsh,
     amount0Min: BigintIsh,
     amount1Min: BigintIsh,
-    hookData?: string
+    hookData: string = EMPTY_BYTES
   ): void {
     const inputs = [
       tokenId.toString(),
       liquidity.toString(),
       amount0Min.toString(),
       amount1Min.toString(),
-      hookData ?? EMPTY_BYTES,
+      hookData
     ]
     this.addAction(Actions.DECREASE_LIQUIDITY, inputs)
   }
 
   // BURN_POSITION
-  addBurn(tokenId: BigintIsh, amount0Min: BigintIsh, amount1Min: BigintIsh, hookData?: string): void {
-    const inputs = [tokenId.toString(), amount0Min.toString(), amount1Min.toString(), hookData ?? EMPTY_BYTES]
+  addBurn(tokenId: BigintIsh, amount0Min: BigintIsh, amount1Min: BigintIsh, hookData: string = EMPTY_BYTES): void {
+    const inputs = [tokenId.toString(), amount0Min.toString(), amount1Min.toString(), hookData]
     this.addAction(Actions.BURN_POSITION, inputs)
   }
 
@@ -85,6 +85,7 @@ export class V4PositionPlanner extends V4Planner {
     this.addAction(Actions.TAKE_PAIR, inputs)
   }
 
+  // SWEEP
   addSweep(currency: Currency, to: string): void {
     const inputs = [toAddress(currency), to]
     this.addAction(Actions.SWEEP, inputs)
