@@ -316,7 +316,7 @@ export class Position {
    * @param pool The pool for which the position should be created
    * @param tickLower The lower tick of the position
    * @param tickUpper The upper tick of the position
-   * @param amount0 token0 amount
+   * @param amount0 token0 amountzw
    * @param amount1 token1 amount
    * @param useFullPrecision If false, liquidity will be maximized according to what the router can calculate,
    * not what core can theoretically support
