@@ -77,14 +77,19 @@ export interface CommonAddLiquidityOptions {
   useNative?: NativeCurrency
 
   /**
-   * The optional permit parameters for spending token0
+   * The optional ERC2612 permit parameters for approving token0 for Permit2
    */
-  token0Permit?: any // TODO: add permit2 permit type here
+  token0Permit?: any 
 
   /**
-   * The optional permit parameters for spending token1
+   * The optional ERC2612 permit parameters for approving token1 for Permit2
    */
-  token1Permit?: any // TODO: add permit2 permit type here
+  token1Permit?: any 
+
+  /**
+   * The optional permit2 batch permit parameters for spending token0 and token1
+   */
+  batchPermit?: BatchPermitOptions
 }
 
 /**
@@ -144,6 +149,31 @@ export interface TransferOptions {
    * The id of the token being sent.
    */
   tokenId: BigintIsh
+}
+
+export interface PermitDetails {
+  token: string
+  amount: BigintIsh
+  expiration: BigintIsh
+  nonce: BigintIsh
+}
+
+export interface AllowanceTransferPermitSingle {
+  details: PermitDetails
+  spender: string
+  sigDeadline: BigintIsh
+}
+
+export interface AllowanceTransferPermitBatch {
+  details: PermitDetails[]
+  spender: string
+  sigDeadline: BigintIsh
+}
+
+export interface BatchPermitOptions {
+  owner: string
+  permitBatch: AllowanceTransferPermitBatch
+  signature: string
 }
 
 export interface NFTPermitOptions {
@@ -221,6 +251,25 @@ export abstract class V4PositionManager {
     const maximumAmounts = position.mintAmountsWithSlippage(options.slippageTolerance)
     const amount0Max = toHex(maximumAmounts.amount0)
     const amount1Max = toHex(maximumAmounts.amount1)
+
+    // if we need to approve tokens to permit2
+    if (options.token0Permit) {
+      // TODO: support native 2612 permit
+    }
+    if (options.token1Permit) {
+      // TODO: support native 2612 permit
+    }
+
+    // if we need to use permit2 to approve tokens to the position manager
+    if (options.batchPermit) {
+      calldataList.push(
+        V4PositionManager.encodePermitBatch(
+          options.batchPermit.owner,
+          options.batchPermit.permitBatch,
+          options.batchPermit.signature
+        )
+      )
+    }
 
     // mint
     if (isMintAction) {
@@ -331,7 +380,22 @@ export abstract class V4PositionManager {
     ])
   }
 
+  // Encode a modify liquidities call
   public static encodeModifyLiquidities(unlockData: string, deadline: BigintIsh): string {
     return V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.MODIFY_LIQUIDITIES, [unlockData, deadline])
+  }
+
+  // Encode a permit call
+  public static encodePermit(owner: string, permit: AllowanceTransferPermitBatch, signature: string): string {
+    return V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.PERMIT, [owner, permit, signature])
+  }
+
+  // Encode a permit batch call
+  public static encodePermitBatch(owner: string, permitBatch: AllowanceTransferPermitBatch, signature: string): string {
+    return V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.PERMIT_BATCH, [
+      owner,
+      permitBatch,
+      signature,
+    ])
   }
 }

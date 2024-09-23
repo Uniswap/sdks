@@ -42,6 +42,9 @@ export const CANNOT_BURN = 'CANNOT_BURN'
 export enum PositionFunctions {
   INITIALIZE_POOL = 'initializePool',
   MODIFY_LIQUIDITIES = 'modifyLiquidities',
+  // Inherited from PermitForwarder
+  PERMIT = 'permit',
+  PERMIT_BATCH = 'permitBatch',
 }
 
 /**
