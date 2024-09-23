@@ -19,6 +19,7 @@ import { PoolKey } from './entities/pool'
 import { toAddress } from './utils/currencyMap'
 import { MSG_SENDER } from './actionConstants'
 import { V4PositionPlanner } from './utils'
+import { ERC2612Permit } from './utils/erc2612Permit'
 
 describe('POSM', () => {
   const currency0 = new Token(1, '0x0000000000000000000000000000000000000001', 18, 't0', 'currency0')
@@ -44,11 +45,14 @@ describe('POSM', () => {
     []
   )
 
-  const recipient = '0x0000000000000000000000000000000000000003'
-
   const tokenId = 1
   const slippageTolerance = new Percent(1, 100)
   const deadline = 123
+
+  const mockOwner = '0x0000000000000000000000000000000000000001'
+  const mockSpender = '0x0000000000000000000000000000000000000004'
+  const recipient = '0x0000000000000000000000000000000000000003'
+  const mockBytes32 = '0x0000000000000000000000000000000000000000000000000000000000000000'
 
   let planner: V4Planner
 
@@ -275,6 +279,118 @@ describe('POSM', () => {
 
       expect(value).toEqual(toHex(amount0Max))
     })
+
+    it('encodes token0Permit when provided', () => {
+      const position: Position = new Position({
+        pool: pool_0_1,
+        tickLower: -TICK_SPACINGS[FeeAmount.MEDIUM],
+        tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
+        liquidity: 1,
+      })
+
+      const { calldata, value } = V4PositionManager.addCallParameters(position, {
+        recipient,
+        slippageTolerance,
+        deadline,
+        token0Permit: {
+          owner: mockOwner,
+          spender: mockSpender,
+          amount: 1,
+          deadline,
+          v: 0,
+          r: mockBytes32,
+          s: mockBytes32,
+        },
+      })
+
+      const calldataList = Multicall.decodeMulticall(calldata)
+
+      expect(calldataList[0]).toEqual(
+        ERC2612Permit.INTERFACE.encodeFunctionData('permit', [
+          mockOwner,
+          mockSpender,
+          toHex(1),
+          toHex(deadline),
+          0,
+          mockBytes32,
+          mockBytes32,
+        ])
+      )
+
+      const planner = new V4Planner()
+      const { amount0: amount0Max, amount1: amount1Max } = position.mintAmountsWithSlippage(slippageTolerance)
+      // Expect position to be minted correctly
+      planner.addAction(Actions.MINT_POSITION, [
+        pool_0_1.poolKey,
+        -TICK_SPACINGS[FeeAmount.MEDIUM],
+        TICK_SPACINGS[FeeAmount.MEDIUM],
+        1,
+        toHex(amount0Max),
+        toHex(amount1Max),
+        recipient,
+        EMPTY_BYTES,
+      ])
+      planner.addAction(Actions.SETTLE_PAIR, [toAddress(pool_0_1.currency0), toAddress(pool_0_1.currency1)])
+
+      expect(calldataList[1]).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
+      expect(value).toEqual('0x00')
+    })
+
+    it('succeeds when token1Permit is provided', () => {
+      const position: Position = new Position({
+        pool: pool_0_1,
+        tickLower: -TICK_SPACINGS[FeeAmount.MEDIUM],
+        tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
+        liquidity: 1,
+      })
+
+      const { calldata, value } = V4PositionManager.addCallParameters(position, {
+        recipient,
+        slippageTolerance,
+        deadline,
+        token1Permit: {
+          owner: mockOwner,
+          spender: mockSpender,
+          amount: 1,
+          deadline,
+          v: 0,
+          r: mockBytes32,
+          s: mockBytes32,
+        },
+      })
+
+      const calldataList = Multicall.decodeMulticall(calldata)
+
+      expect(calldataList[0]).toEqual(
+        ERC2612Permit.INTERFACE.encodeFunctionData('permit', [
+          mockOwner,
+          mockSpender,
+          toHex(1),
+          toHex(deadline),
+          0,
+          mockBytes32,
+          mockBytes32,
+        ])
+      )
+
+      const planner = new V4Planner()
+      const { amount0: amount0Max, amount1: amount1Max } = position.mintAmountsWithSlippage(slippageTolerance)
+      // Expect position to be minted correctly
+      planner.addAction(Actions.MINT_POSITION, [
+        pool_0_1.poolKey,
+        -TICK_SPACINGS[FeeAmount.MEDIUM],
+        TICK_SPACINGS[FeeAmount.MEDIUM],
+        1,
+        toHex(amount0Max),
+        toHex(amount1Max),
+        recipient,
+        EMPTY_BYTES,
+      ])
+      planner.addAction(Actions.SETTLE_PAIR, [toAddress(pool_0_1.currency0), toAddress(pool_0_1.currency1)])
+
+      expect(calldataList[1]).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
+      expect(value).toEqual('0x00')
+    })
   })
 
   describe('#removeCallParameters', () => {
@@ -307,7 +423,7 @@ describe('POSM', () => {
     const burnLiqWithPermitOptions: RemoveLiquidityOptions = {
       ...burnLiqOptions,
       permit: {
-        spender: '0x0000000000000000000000000000000000000004',
+        spender: mockSpender,
         tokenId,
         deadline,
         nonce: 1,
@@ -388,7 +504,7 @@ describe('POSM', () => {
     })
 
     it('succeeds for burn with permit', () => {
-      const { calldata, value } = V4PositionManager.removeCallParameters(position, burnLiqOptions)
+      const { calldata, value } = V4PositionManager.removeCallParameters(position, burnLiqWithPermitOptions)
 
       const { amount0: amount0Min, amount1: amount1Min } = position.burnAmountsWithSlippage(slippageTolerance)
 
@@ -415,7 +531,9 @@ describe('POSM', () => {
         ])
       )
       // Expect modifyLiquidities to be called correctly
-      expect(calldataList[1]).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), burnLiqOptions.deadline))
+      expect(calldataList[1]).toEqual(
+        V4PositionManager.encodeModifyLiquidities(planner.finalize(), burnLiqOptions.deadline)
+      )
       expect(value).toEqual('0x00')
     })
   })

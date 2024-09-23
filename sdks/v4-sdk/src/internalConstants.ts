@@ -43,11 +43,11 @@ export enum PositionFunctions {
   INITIALIZE_POOL = 'initializePool',
   MODIFY_LIQUIDITIES = 'modifyLiquidities',
   // Inherited from PermitForwarder
-  PERMIT = 'permit',
-  PERMIT_BATCH = 'permitBatch',
+  PERMIT = '0x2b67b570', // "permit(address,((address,uint160,uint48,uint48),address,uint256),bytes)
+  PERMIT_BATCH = '0x002a3e3a', // "permitBatch(address,((address,uint160,uint48,uint48)[],address,uint256),bytes)"
   // Inherited from ERC721Permit
-  ERC721PERMIT_PERMIT = 'permit',
-  ERC721PERMIT_PERMIT_FOR_ALL = 'permitForAll',
+  ERC721PERMIT_PERMIT = '0x0f5730f1', // "permit(address,uint256,uint256,uint256,bytes)"
+  ERC721PERMIT_PERMIT_FOR_ALL = '0x3aea60f0', // "permitForAll(address,address,bool,uint256,uint256,bytes)"
 }
 
 /**
