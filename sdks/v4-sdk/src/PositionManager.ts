@@ -19,7 +19,6 @@ import {
 } from './internalConstants'
 import { V4PositionPlanner } from './utils'
 import { abi } from './utils/abi'
-import { ERC2612Permit, ERC2612PermitOptions } from './utils/ERC2612Permit'
 
 export interface CommonOptions {
   /**
@@ -69,16 +68,6 @@ export interface CommonAddLiquidityOptions {
    * Whether to spend ether. If true, one of the currencies must be the NATIVE currency.
    */
   useNative?: NativeCurrency
-
-  /**
-   * The optional ERC2612 permit parameters for approving token0 for Permit2
-   */
-  token0Permit?: ERC2612PermitOptions
-
-  /**
-   * The optional ERC2612 permit parameters for approving token1 for Permit2
-   */
-  token1Permit?: ERC2612PermitOptions
 
   /**
    * The optional permit2 batch permit parameters for spending token0 and token1
@@ -233,14 +222,6 @@ export abstract class V4PositionManager {
     const maximumAmounts = position.mintAmountsWithSlippage(options.slippageTolerance)
     const amount0Max = toHex(maximumAmounts.amount0)
     const amount1Max = toHex(maximumAmounts.amount1)
-
-    // Optionally, if the token is not native and has not been approved to Permit2, encode a permit call
-    if (options.token0Permit && !position.pool.token0.isNative) {
-      calldataList.push(ERC2612Permit.encodePermit(options.token0Permit))
-    }
-    if (options.token1Permit && !position.pool.token1.isNative) {
-      calldataList.push(ERC2612Permit.encodePermit(options.token1Permit))
-    }
 
     // We use permit2 to approve tokens to the position manager
     if (options.batchPermit) {
