@@ -315,13 +315,15 @@ describe('PositionManager', () => {
       )
 
       const planner = new V4Planner()
+      const { amount0: amount0Max, amount1: amount1Max } = position.mintAmountsWithSlippage(slippageTolerance)
+
       planner.addAction(Actions.MINT_POSITION, [
         pool_0_1.poolKey,
         -TICK_SPACINGS[FeeAmount.MEDIUM],
         TICK_SPACINGS[FeeAmount.MEDIUM],
         1,
-        '0x00',
-        '0x00',
+        toHex(amount0Max),
+        toHex(amount1Max),
         recipient,
         EMPTY_BYTES,
       ])
