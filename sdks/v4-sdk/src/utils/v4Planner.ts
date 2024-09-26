@@ -144,7 +144,7 @@ export class V4Planner {
             currencyOut,
             path: encodeRouteToPath(trade.route, exactOutput),
             amountInMaximum: trade.maximumAmountIn(slippageTolerance ?? new Percent(0)).quotient.toString(),
-            amountOut: trade.inputAmount.quotient.toString(),
+            amountOut: trade.outputAmount.quotient.toString(),
           }
         : {
             currencyIn,
