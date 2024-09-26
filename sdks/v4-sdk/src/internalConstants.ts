@@ -42,6 +42,10 @@ export const CANNOT_BURN = 'CANNOT_BURN'
 export enum PositionFunctions {
   INITIALIZE_POOL = 'initializePool',
   MODIFY_LIQUIDITIES = 'modifyLiquidities',
+  // Inherited from PermitForwarder
+  PERMIT_BATCH = '0x002a3e3a', // "permitBatch(address,((address,uint160,uint48,uint48)[],address,uint256),bytes)"
+  // Inherited from ERC721Permit
+  ERC721PERMIT_PERMIT = '0x0f5730f1', // "permit(address,uint256,uint256,uint256,bytes)"
 }
 
 /**
