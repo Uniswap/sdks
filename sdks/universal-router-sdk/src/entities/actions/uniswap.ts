@@ -1,7 +1,7 @@
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
 import { Trade as V2Trade, Pair } from '@uniswap/v2-sdk'
 import { Trade as V3Trade, Pool as V3Pool, encodeRouteToPath } from '@uniswap/v3-sdk'
-import { V4Planner } from '@uniswap/v4-sdk'
+import { Trade as V4Trade, V4Planner } from '@uniswap/v4-sdk'
 import {
   Trade as RouterTrade,
   MixedRouteTrade,
@@ -96,7 +96,15 @@ export class UniswapTrade implements Command {
           addV3Swap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
           break
         case Protocol.V4:
-          addV4Swap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody, performAggregatedSlippageCheck)
+          addV4Swap(
+            planner,
+            swap,
+            this.trade.tradeType,
+            this.options,
+            this.payerIsUser,
+            routerMustCustody,
+            performAggregatedSlippageCheck
+          )
           break
         case Protocol.MIXED:
           addMixedSwap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
@@ -223,6 +231,7 @@ function addV3Swap<TInput extends Currency, TOutput extends Currency>(
     tradeType,
   })
 
+
   const path = encodeRouteToPath(route as RouteV3<TInput, TOutput>, trade.tradeType === TradeType.EXACT_OUTPUT)
   if (tradeType == TradeType.EXACT_INPUT) {
     planner.addCommand(CommandType.V3_SWAP_EXACT_IN, [
@@ -258,10 +267,13 @@ function addV4Swap<Tnput extends Currency, TOutput extends Currency>(
     outputAmount,
     tradeType,
   })
-
   const slippageToleranceOnSwap = performAggregatedSlippageCheck ? undefined : options.slippageTolerance
-  const v4Calldata = new V4Planner().addTrade(trade, slippageToleranceOnSwap).finalize()
-  planner.addCommand(CommandType.V4_SWAP, [v4Calldata])
+  const v4Planner = new V4Planner()
+  v4Planner.addTrade(trade, slippageToleranceOnSwap)
+  v4Planner.addSettle(inputAmount.currency, payerIsUser)
+  v4Planner.addTake(outputAmount.currency, routerMustCustody)
+
+  planner.addCommand(CommandType.V4_SWAP, [v4Planner.finalize()])
 }
 
 // encode a mixed route swap, i.e. including both v2 and v3 pools
