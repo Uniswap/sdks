@@ -1,5 +1,6 @@
 import JSBI from 'jsbi'
 import { constants } from 'ethers'
+import { encodeSqrtRatioX96 } from '@uniswap/v3-sdk'
 
 // constants used internally but not expected to be used externally
 export const ADDRESS_ZERO = constants.AddressZero
@@ -7,6 +8,7 @@ export const NEGATIVE_ONE = JSBI.BigInt(-1)
 export const ZERO = JSBI.BigInt(0)
 export const ONE = JSBI.BigInt(1)
 export const ONE_ETHER = JSBI.exponentiate(JSBI.BigInt(10), JSBI.BigInt(18))
+export const EMPTY_BYTES = '0x'
 
 // used in liquidity amount math
 export const Q96 = JSBI.exponentiate(JSBI.BigInt(2), JSBI.BigInt(96))
@@ -21,6 +23,26 @@ export const TICK_SPACING_SIXTY = 60
 
 // used in position manager math
 export const MIN_SLIPPAGE_DECREASE = 0
+
+// default prices
+export const SQRT_PRICE_1_1 = encodeSqrtRatioX96(1, 1)
+
+// default hook addresses
+export const EMPTY_HOOK = '0x0000000000000000000000000000000000000000'
+
+// error constants
+export const NO_NATIVE = 'NO_NATIVE'
+export const ZERO_LIQUIDITY = 'ZERO_LIQUIDITY'
+export const NO_SQRT_PRICE = 'NO_SQRT_PRICE'
+export const CANNOT_BURN = 'CANNOT_BURN'
+
+/**
+ * Function fragments that exist on the PositionManager contract.
+ */
+export enum PositionFunctions {
+  INITIALIZE_POOL = 'initializePool',
+  MODIFY_LIQUIDITIES = 'modifyLiquidities',
+}
 
 /**
  * The default factory enabled fee amounts, denominated in hundredths of bips.

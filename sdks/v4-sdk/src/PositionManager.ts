@@ -1,18 +1,24 @@
-// @ts-nocheck TODO: remove once implemented
-
-import {
-  BigintIsh,
-  Percent,
-  CurrencyAmount,
-  validateAndParseAddress,
-  Currency,
-  NativeCurrency,
-} from '@uniswap/sdk-core'
+import { BigintIsh, Percent, validateAndParseAddress, Currency, NativeCurrency } from '@uniswap/sdk-core'
+import JSBI from 'jsbi'
 import { Position } from './entities/position'
 import { MethodParameters, toHex } from './utils/calldata'
+import { MSG_SENDER } from './actionConstants'
 import { Interface } from '@ethersproject/abi'
-import { Pool, PoolKey } from './entities'
+import { PoolKey } from './entities'
 import { Multicall } from './multicall'
+import invariant from 'tiny-invariant'
+import {
+  EMPTY_BYTES,
+  CANNOT_BURN,
+  NO_NATIVE,
+  NO_SQRT_PRICE,
+  ONE,
+  PositionFunctions,
+  ZERO,
+  ZERO_LIQUIDITY,
+} from './internalConstants'
+import { V4PositionPlanner } from './utils'
+import { abi } from './utils/abi'
 
 export interface CommonOptions {
   /**
@@ -23,6 +29,11 @@ export interface CommonOptions {
    * Optional data to pass to hooks
    */
   hookData?: string
+
+  /**
+   * When the transaction expires, in epoch seconds.
+   */
+  deadline: BigintIsh
 }
 
 export interface ModifyPositionSpecificOptions {
@@ -30,11 +41,6 @@ export interface ModifyPositionSpecificOptions {
    * Indicates the ID of the position to increase liquidity for.
    */
   tokenId: BigintIsh
-
-  /**
-   * When the transaction expires, in epoch seconds.
-   */
-  deadline: BigintIsh
 }
 
 export interface MintSpecificOptions {
@@ -59,7 +65,7 @@ export interface MintSpecificOptions {
  */
 export interface CommonAddLiquidityOptions {
   /**
-   * Whether to spend ether. If true, one of the pool tokens must be WETH, by default false
+   * Whether to spend ether. If true, one of the currencies must be the NATIVE currency.
    */
   useNative?: NativeCurrency
 
@@ -92,11 +98,6 @@ export interface RemoveLiquiditySpecificOptions {
    * The optional permit of the token ID being exited, in case the exit transaction is being sent by an account that does not own the NFT
    */
   permit?: NFTPermitOptions
-
-  /**
-   * Parameters to be passed on to collect
-   */
-  collectOptions: Omit<CollectSpecificOptions, 'tokenId'>
 }
 
 export interface CollectSpecificOptions {
@@ -104,16 +105,6 @@ export interface CollectSpecificOptions {
    * Indicates the ID of the position to collect for.
    */
   tokenId: BigintIsh
-
-  /**
-   * Expected value of tokensOwed0, including as-of-yet-unaccounted-for fees/liquidity value to be burned
-   */
-  expectedCurrencyOwed0: CurrencyAmount<Currency>
-
-  /**
-   * Expected value of tokensOwed1, including as-of-yet-unaccounted-for fees/liquidity value to be burned
-   */
-  expectedCurrencyOwed1: CurrencyAmount<Currency>
 
   /**
    * The account that should receive the tokens.
@@ -155,13 +146,20 @@ export type RemoveLiquidityOptions = CommonOptions & RemoveLiquiditySpecificOpti
 export type CollectOptions = CommonOptions & CollectSpecificOptions
 
 // type guard
-// @ts-ignore
 function isMint(options: AddLiquidityOptions): options is MintOptions {
   return Object.keys(options).some((k) => k === 'recipient')
 }
 
+function shouldCreatePool(options: MintOptions): boolean {
+  if (options.createPool) {
+    invariant(options.sqrtPriceX96 !== undefined, NO_SQRT_PRICE)
+    return true
+  }
+  return false
+}
+
 export abstract class V4PositionManager {
-  public static INTERFACE: Interface = new Interface([])
+  public static INTERFACE: Interface = new Interface(abi)
 
   /**
    * Cannot be constructed.
@@ -178,19 +176,69 @@ export abstract class V4PositionManager {
     }
   }
 
-  public static addCallParameters(_position: Position, _options: AddLiquidityOptions): MethodParameters {
+  // TODO: Add Support for permit2 batch forwarding
+  public static addCallParameters(position: Position, options: AddLiquidityOptions): MethodParameters {
     /**
      * Cases:
      * - if pool does not exist yet, encode initializePool
      * then,
-     * - if is mint, encode MINT_POSITION and then SETTLE_PAIR
-     * - else, encode INCREASE_LIQUIDITY and then SETTLE_PAIR
+     * - if is mint, encode MINT_POSITION. If it is on a NATIVE pool, encode a SWEEP. Finally encode a SETTLE_PAIR
+     * - else, encode INCREASE_LIQUIDITY. If it is on a NATIVE pool, encode a SWEEP. Finally encode a SETTLE_PAIR
      */
-    const calldatas = ['0x', '0x']
-    let value = toHex(0)
+    invariant(JSBI.greaterThan(position.liquidity, ZERO), ZERO_LIQUIDITY)
+
+    const calldataList: string[] = []
+    const planner = new V4PositionPlanner()
+
+    // Encode initialize pool.
+    if (isMint(options) && shouldCreatePool(options)) {
+      // No planner used here because initializePool is not supported as an Action
+      calldataList.push(
+        V4PositionManager.encodeInitializePool(position.pool.poolKey, options.sqrtPriceX96!, options.hookData)
+      )
+    }
+
+    // adjust for slippage
+    const maximumAmounts = position.mintAmountsWithSlippage(options.slippageTolerance)
+    const amount0Max = toHex(maximumAmounts.amount0)
+    const amount1Max = toHex(maximumAmounts.amount1)
+
+    // mint
+    if (isMint(options)) {
+      const recipient: string = validateAndParseAddress(options.recipient)
+      planner.addMint(
+        position.pool,
+        position.tickLower,
+        position.tickUpper,
+        position.liquidity,
+        amount0Max,
+        amount1Max,
+        recipient,
+        options.hookData
+      )
+    } else {
+      // increase
+      planner.addIncrease(options.tokenId, position.liquidity, amount0Max, amount1Max, options.hookData)
+    }
+
+    // need to settle both currencies when minting / adding liquidity
+    planner.addSettlePair(position.pool.currency0, position.pool.currency1)
+
+    // Any sweeping must happen after the settling.
+    let value: string = toHex(0)
+    if (options.useNative) {
+      invariant(position.pool.currency0.isNative || position.pool.currency1.isNative, NO_NATIVE)
+      let nativeCurrency: Currency = position.pool.currency0.isNative
+        ? position.pool.currency0
+        : position.pool.currency1
+      value = position.pool.currency0.isNative ? toHex(amount0Max) : toHex(amount1Max)
+      planner.addSweep(nativeCurrency, MSG_SENDER)
+    }
+
+    calldataList.push(V4PositionManager.encodeModifyLiquidities(planner.finalize(), options.deadline))
 
     return {
-      calldata: Multicall.encodeMulticall(calldatas),
+      calldata: Multicall.encodeMulticall(calldataList),
       value,
     }
   }
@@ -201,127 +249,101 @@ export abstract class V4PositionManager {
    * @param options Additional information necessary for generating the calldata
    * @returns The call parameters
    */
-  public static removeCallParameters(_position: Position, _options: RemoveLiquidityOptions): MethodParameters {
+  public static removeCallParameters(position: Position, options: RemoveLiquidityOptions): MethodParameters {
     /**
      * cases:
      * - if liquidityPercentage is 100%, encode BURN_POSITION and then TAKE_PAIR
      * - else, encode DECREASE_LIQUIDITY and then TAKE_PAIR
      */
-    const calldatas = ['0x', '0x']
+    const calldataList: string[] = []
+    const planner = new V4PositionPlanner()
 
-    return {
-      calldata: Multicall.encodeMulticall(calldatas),
-      value: toHex(0),
+    const tokenId = toHex(options.tokenId)
+
+    if (options.burnToken) {
+      // if burnToken is true, the specified liquidity percentage must be 100%
+      invariant(options.liquidityPercentage.equalTo(ONE), CANNOT_BURN)
+
+      // slippage-adjusted amounts derived from current position liquidity
+      const { amount0: amount0Min, amount1: amount1Min } = position.burnAmountsWithSlippage(options.slippageTolerance)
+      planner.addBurn(tokenId, amount0Min, amount1Min, options.hookData)
+    } else {
+      // construct a partial position with a percentage of liquidity
+      const partialPosition = new Position({
+        pool: position.pool,
+        liquidity: options.liquidityPercentage.multiply(position.liquidity).quotient,
+        tickLower: position.tickLower,
+        tickUpper: position.tickUpper,
+      })
+
+      // If the partial position has liquidity=0, this is a collect call and collectCallParameters should be used
+      invariant(JSBI.greaterThan(partialPosition.liquidity, ZERO), ZERO_LIQUIDITY)
+
+      // slippage-adjusted underlying amounts
+      const { amount0: amount0Min, amount1: amount1Min } = partialPosition.burnAmountsWithSlippage(
+        options.slippageTolerance
+      )
+
+      planner.addDecrease(
+        tokenId,
+        partialPosition.liquidity.toString(),
+        amount0Min.toString(),
+        amount1Min.toString(),
+        options.hookData ?? EMPTY_BYTES
+      )
     }
-  }
 
-  public static collectCallParameters(_options: CollectOptions): MethodParameters {
-    /**
-     * Collecting in V4 is just a DECREASE_LIQUIDITY with 0 liquidity and then a TAKE_PAIR
-     */
-    const calldatas = ['0x', '0x']
+    planner.addTakePair(position.pool.currency0, position.pool.currency1, MSG_SENDER)
+
+    calldataList.push(V4PositionManager.encodeModifyLiquidities(planner.finalize(), options.deadline))
 
     return {
-      calldata: Multicall.encodeMulticall(calldatas),
-      value: toHex(0),
-    }
-  }
-
-  public static transferFromParameters(options: TransferOptions): MethodParameters {
-    const recipient = validateAndParseAddress(options.recipient)
-    const sender = validateAndParseAddress(options.sender)
-
-    let calldata: string
-    calldata = V4PositionManager.INTERFACE.encodeFunctionData('transferFrom(address,address,uint256)', [
-      sender,
-      recipient,
-      toHex(options.tokenId),
-    ])
-    return {
-      calldata: calldata,
+      calldata: Multicall.encodeMulticall(calldataList),
       value: toHex(0),
     }
   }
 
   /**
-   * ---- Private functions to encode calldata for different actions on the PositionManager contract -----
+   * Produces the calldata for collecting fees from a position
+   * @param position The position to collect fees from
+   * @param options Additional information necessary for generating the calldata
+   * @returns The call parameters
    */
+  public static collectCallParameters(position: Position, options: CollectOptions): MethodParameters {
+    const calldataList: string[] = []
+    const planner = new V4PositionPlanner()
+
+    const tokenId = toHex(options.tokenId)
+    const recipient = validateAndParseAddress(options.recipient)
+
+    /**
+     * To collect fees in V4, we need to:
+     * - encode a decrease liquidity by 0
+     * - and encode a TAKE_PAIR
+     */
+
+    planner.addDecrease(tokenId, '0', '0', '0', options.hookData)
+
+    planner.addTakePair(position.pool.currency0, position.pool.currency1, recipient)
+
+    calldataList.push(V4PositionManager.encodeModifyLiquidities(planner.finalize(), options.deadline))
+
+    return {
+      calldata: Multicall.encodeMulticall(calldataList),
+      value: toHex(0),
+    }
+  }
 
   // Initialize a pool
   private static encodeInitializePool(poolKey: PoolKey, sqrtPriceX96: BigintIsh, hookData?: string): string {
-    throw new Error('not implemented')
+    return V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.INITIALIZE_POOL, [
+      poolKey,
+      sqrtPriceX96.toString(),
+      hookData ?? '0x',
+    ])
   }
 
-  // @ts-ignore
-  private static encodeMint(
-    pool: Pool,
-    tickLower: number,
-    tickUpper: number,
-    liquidity: BigintIsh,
-    amount0Max: BigintIsh,
-    amount1Max: BigintIsh,
-    owner: string,
-    hookData?: string
-  ): string {
-    throw new Error('not implemented')
-  }
-
-  // @ts-ignore
-  private static encodeIncrease(
-    tokenId: BigintIsh,
-    liquidity: BigintIsh,
-    amount0Max: BigintIsh,
-    amount1Max: BigintIsh,
-    hookData?: string
-  ): string {
-    throw new Error('not implemented')
-  }
-
-  // @ts-ignore
-  private static encodeDecrease(
-    tokenId: BigintIsh,
-    liquidity: BigintIsh,
-    amount0Min: BigintIsh,
-    amount1Min: BigintIsh,
-    hookData?: string
-  ): string {
-    throw new Error('not implemented')
-  }
-
-  // @ts-ignore
-  private static encodeBurn(
-    tokenId: BigintIsh,
-    amount0Min: BigintIsh,
-    amount1Min: BigintIsh,
-    hookData?: string
-  ): string {
-    throw new Error('not implemented')
-  }
-
-  // @ts-ignore
-  private static encodeTake(currency: Currency, recipient: string, amount: BigintIsh): string {
-    throw new Error('not implemented')
-  }
-
-  // @ts-ignore
-  private static encodeSettle(currency: Currency, amount: BigintIsh, payerIsUser: boolean): string {
-    throw new Error('not implemented')
-  }
-
-  // @ts-ignore
-  private static encodeSettlePair(currency0: Currency, currency1: Currency): string {
-    throw new Error('not implemented')
-  }
-
-  // @ts-ignore
-  private static encodeTakePair(currency0: Currency, currency1: Currency, recipient: string): string {
-    throw new Error('not implemented')
-  }
-
-  // @ts-ignore
-  private static encodeCollect(options: CollectOptions): string[] {
-    const calldatas: string[] = []
-
-    return calldatas
+  public static encodeModifyLiquidities(unlockData: string, deadline: BigintIsh): string {
+    return V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.MODIFY_LIQUIDITIES, [unlockData, deadline])
   }
 }

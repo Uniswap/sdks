@@ -3,7 +3,7 @@ import { defaultAbiCoder } from 'ethers/lib/utils'
 import { BigNumber } from 'ethers'
 import { Currency, Percent, TradeType } from '@uniswap/sdk-core'
 import { Trade } from '../entities/trade'
-import { ADDRESS_ZERO } from '../internalConstants'
+import { ADDRESS_ZERO, EMPTY_BYTES } from '../internalConstants'
 import { encodeRouteToPath } from './encodeRouteToPath'
 /**
  * Actions
@@ -27,10 +27,12 @@ export enum Actions {
   // settling
   SETTLE = 0x09,
   SETTLE_ALL = 0x10,
+  SETTLE_PAIR = 0x11,
   // taking
   TAKE = 0x12,
   TAKE_ALL = 0x13,
   TAKE_PORTION = 0x14,
+  TAKE_PAIR = 0x15,
 
   SETTLE_TAKE_PAIR = 0x16,
 
@@ -95,9 +97,11 @@ const ABI_DEFINITION: { [key in Actions]: string[] } = {
   // Payments commands
   [Actions.SETTLE]: ['address', 'uint256', 'bool'], // currency, amount, payerIsUser
   [Actions.SETTLE_ALL]: ['address', 'uint256'],
+  [Actions.SETTLE_PAIR]: ['address', 'address'],
   [Actions.TAKE]: ['address', 'address', 'uint256'], // currency, receiver, amount
   [Actions.TAKE_ALL]: ['address', 'uint256'],
   [Actions.TAKE_PORTION]: ['address', 'address', 'uint256'],
+  [Actions.TAKE_PAIR]: ['address', 'address', 'address'],
   [Actions.SETTLE_TAKE_PAIR]: ['address', 'address'],
   [Actions.CLOSE_CURRENCY]: ['address'],
   [Actions.SWEEP]: ['address', 'address'],
@@ -112,7 +116,7 @@ export class V4Planner {
   params: string[]
 
   constructor() {
-    this.actions = '0x'
+    this.actions = EMPTY_BYTES
     this.params = []
   }
 
