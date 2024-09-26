@@ -8,10 +8,11 @@ import {
   SQRT_PRICE_1_1,
   TICK_SPACINGS,
   ZERO_LIQUIDITY,
+  PositionFunctions,
 } from './internalConstants'
 import { Pool } from './entities/pool'
 import { Position } from './entities/position'
-import { CollectOptions, RemoveLiquidityOptions, V4PositionManager } from './PositionManager'
+import { BatchPermitOptions, CollectOptions, RemoveLiquidityOptions, V4PositionManager } from './PositionManager'
 import { Multicall } from './multicall'
 import { Actions, toHex, V4Planner } from './utils'
 import { PoolKey } from './entities/pool'
@@ -43,11 +44,14 @@ describe('PositionManager', () => {
     []
   )
 
-  const recipient = '0x0000000000000000000000000000000000000003'
-
   const tokenId = 1
   const slippageTolerance = new Percent(1, 100)
   const deadline = 123
+
+  const mockOwner = '0x000000000000000000000000000000000000000a'
+  const mockSpender = '0x000000000000000000000000000000000000000b'
+  const recipient = '0x000000000000000000000000000000000000000c'
+  const mockBytes32 = '0x0000000000000000000000000000000000000000000000000000000000000000'
 
   let planner: V4Planner
 
@@ -274,6 +278,59 @@ describe('PositionManager', () => {
 
       expect(value).toEqual(toHex(amount0Max))
     })
+
+    it('succeeds for batchPermit', () => {
+      const position: Position = new Position({
+        pool: pool_0_1,
+        tickLower: -TICK_SPACINGS[FeeAmount.MEDIUM],
+        tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
+        liquidity: 1,
+      })
+
+      const batchPermit: BatchPermitOptions = {
+        owner: mockOwner,
+        permitBatch: {
+          details: [],
+          sigDeadline: deadline,
+          spender: mockSpender,
+        },
+        signature: mockBytes32,
+      }
+
+      const { calldata, value } = V4PositionManager.addCallParameters(position, {
+        recipient,
+        slippageTolerance,
+        deadline,
+        batchPermit,
+      })
+
+      const calldataList = Multicall.decodeMulticall(calldata)
+      // Expect permitBatch to be called correctly
+      expect(calldataList[0]).toEqual(
+        V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.PERMIT_BATCH, [
+          batchPermit.owner,
+          batchPermit.permitBatch,
+          batchPermit.signature,
+        ])
+      )
+
+      const planner = new V4Planner()
+      const { amount0: amount0Max, amount1: amount1Max } = position.mintAmountsWithSlippage(slippageTolerance)
+
+      planner.addAction(Actions.MINT_POSITION, [
+        pool_0_1.poolKey,
+        -TICK_SPACINGS[FeeAmount.MEDIUM],
+        TICK_SPACINGS[FeeAmount.MEDIUM],
+        1,
+        toHex(amount0Max),
+        toHex(amount1Max),
+        recipient,
+        EMPTY_BYTES,
+      ])
+      planner.addAction(Actions.SETTLE_PAIR, [toAddress(pool_0_1.currency0), toAddress(pool_0_1.currency1)])
+      expect(calldataList[1]).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
+      expect(value).toEqual('0x00')
+    })
   })
 
   describe('#removeCallParameters', () => {
@@ -301,6 +358,17 @@ describe('PositionManager', () => {
     const burnLiqOptions: RemoveLiquidityOptions = {
       burnToken: true,
       ...removeLiqOptions,
+    }
+
+    const burnLiqWithPermitOptions: RemoveLiquidityOptions = {
+      ...burnLiqOptions,
+      permit: {
+        spender: mockSpender,
+        tokenId,
+        deadline,
+        nonce: 1,
+        signature: '0x00',
+      },
     }
 
     it('throws for 0 liquidity', () => {
@@ -371,6 +439,40 @@ describe('PositionManager', () => {
 
       expect(calldata).toEqual(
         V4PositionManager.encodeModifyLiquidities(planner.finalize(), partialRemoveOptions.deadline)
+      )
+      expect(value).toEqual('0x00')
+    })
+
+    it('succeeds for burn with permit', () => {
+      const { calldata, value } = V4PositionManager.removeCallParameters(position, burnLiqWithPermitOptions)
+
+      const { amount0: amount0Min, amount1: amount1Min } = position.burnAmountsWithSlippage(slippageTolerance)
+
+      const planner = new V4PositionPlanner()
+
+      planner.addAction(Actions.BURN_POSITION, [
+        tokenId.toString(),
+        amount0Min.toString(),
+        amount1Min.toString(),
+        EMPTY_BYTES,
+      ])
+      planner.addAction(Actions.TAKE_PAIR, [toAddress(currency0), toAddress(currency1), MSG_SENDER])
+
+      // The resulting calldata should be multicall with two calls: ERC721Permit_Permit and modifyLiquidities
+      const calldataList = Multicall.decodeMulticall(calldata)
+      // Expect ERC721Permit_Permit to be called correctly
+      expect(calldataList[0]).toEqual(
+        V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.ERC721PERMIT_PERMIT, [
+          burnLiqWithPermitOptions.permit!.spender,
+          tokenId.toString(),
+          burnLiqWithPermitOptions.permit!.deadline,
+          burnLiqWithPermitOptions.permit!.nonce,
+          burnLiqWithPermitOptions.permit!.signature,
+        ])
+      )
+      // Expect modifyLiquidities to be called correctly
+      expect(calldataList[1]).toEqual(
+        V4PositionManager.encodeModifyLiquidities(planner.finalize(), burnLiqOptions.deadline)
       )
       expect(value).toEqual('0x00')
     })

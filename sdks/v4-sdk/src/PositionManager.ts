@@ -70,14 +70,9 @@ export interface CommonAddLiquidityOptions {
   useNative?: NativeCurrency
 
   /**
-   * The optional permit parameters for spending token0
+   * The optional permit2 batch permit parameters for spending token0 and token1
    */
-  token0Permit?: any // TODO: add permit2 permit type here
-
-  /**
-   * The optional permit parameters for spending token1
-   */
-  token1Permit?: any // TODO: add permit2 permit type here
+  batchPermit?: BatchPermitOptions
 }
 
 /**
@@ -129,11 +124,37 @@ export interface TransferOptions {
   tokenId: BigintIsh
 }
 
-export interface NFTPermitOptions {
-  signature: string
-  deadline: BigintIsh
-  spender: string
+export interface PermitDetails {
+  token: string
+  amount: BigintIsh
+  expiration: BigintIsh
   nonce: BigintIsh
+}
+
+export interface AllowanceTransferPermitSingle {
+  details: PermitDetails
+  spender: string
+  sigDeadline: BigintIsh
+}
+
+export interface AllowanceTransferPermitBatch {
+  details: PermitDetails[]
+  spender: string
+  sigDeadline: BigintIsh
+}
+
+export interface BatchPermitOptions {
+  owner: string
+  permitBatch: AllowanceTransferPermitBatch
+  signature: string
+}
+
+export interface NFTPermitOptions {
+  spender: string
+  tokenId: BigintIsh
+  deadline: BigintIsh
+  nonce: BigintIsh
+  signature: string
 }
 
 export type MintOptions = CommonOptions & CommonAddLiquidityOptions & MintSpecificOptions
@@ -176,7 +197,6 @@ export abstract class V4PositionManager {
     }
   }
 
-  // TODO: Add Support for permit2 batch forwarding
   public static addCallParameters(position: Position, options: AddLiquidityOptions): MethodParameters {
     /**
      * Cases:
@@ -202,6 +222,17 @@ export abstract class V4PositionManager {
     const maximumAmounts = position.mintAmountsWithSlippage(options.slippageTolerance)
     const amount0Max = toHex(maximumAmounts.amount0)
     const amount1Max = toHex(maximumAmounts.amount1)
+
+    // We use permit2 to approve tokens to the position manager
+    if (options.batchPermit) {
+      calldataList.push(
+        V4PositionManager.encodePermitBatch(
+          options.batchPermit.owner,
+          options.batchPermit.permitBatch,
+          options.batchPermit.signature
+        )
+      )
+    }
 
     // mint
     if (isMint(options)) {
@@ -263,6 +294,19 @@ export abstract class V4PositionManager {
     if (options.burnToken) {
       // if burnToken is true, the specified liquidity percentage must be 100%
       invariant(options.liquidityPercentage.equalTo(ONE), CANNOT_BURN)
+
+      // if there is a permit, encode the ERC721Permit permit call
+      if (options.permit) {
+        calldataList.push(
+          V4PositionManager.encodeERC721Permit(
+            options.permit.spender,
+            options.permit.tokenId,
+            options.permit.deadline,
+            options.permit.nonce,
+            options.permit.signature
+          )
+        )
+      }
 
       // slippage-adjusted amounts derived from current position liquidity
       const { amount0: amount0Min, amount1: amount1Min } = position.burnAmountsWithSlippage(options.slippageTolerance)
@@ -343,7 +387,34 @@ export abstract class V4PositionManager {
     ])
   }
 
+  // Encode a modify liquidities call
   public static encodeModifyLiquidities(unlockData: string, deadline: BigintIsh): string {
     return V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.MODIFY_LIQUIDITIES, [unlockData, deadline])
+  }
+
+  // Encode a permit batch call
+  public static encodePermitBatch(owner: string, permitBatch: AllowanceTransferPermitBatch, signature: string): string {
+    return V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.PERMIT_BATCH, [
+      owner,
+      permitBatch,
+      signature,
+    ])
+  }
+
+  // Encode a ERC721Permit permit call
+  public static encodeERC721Permit(
+    spender: string,
+    tokenId: BigintIsh,
+    deadline: BigintIsh,
+    nonce: BigintIsh,
+    signature: string
+  ): string {
+    return V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.ERC721PERMIT_PERMIT, [
+      spender,
+      tokenId,
+      deadline,
+      nonce,
+      signature,
+    ])
   }
 }
