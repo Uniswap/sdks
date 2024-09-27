@@ -13,7 +13,6 @@ import {
   MixedRouteSDK,
   MixedRoute,
   SwapOptions as RouterSwapOptions,
-  TPool,
   getOutputOfPools,
   encodeMixedRouteToPath,
   partitionMixedRouteByProtocol,
@@ -24,6 +23,7 @@ import { Command, RouterActionType, TradeConfig } from '../Command'
 import { SENDER_AS_RECIPIENT, ROUTER_AS_RECIPIENT, CONTRACT_BALANCE, ETH_ADDRESS } from '../../utils/constants'
 import { encodeFeeBips } from '../../utils/numbers'
 import { BigNumber, BigNumberish } from 'ethers'
+import { TPool } from '@uniswap/router-sdk/dist/utils/TPool'
 
 export type FlatFeeOptions = {
   amount: BigNumberish
@@ -251,7 +251,7 @@ function addV3Swap<TInput extends Currency, TOutput extends Currency>(
   }
 }
 
-function addV4Swap<Tnput extends Currency, TOutput extends Currency>(
+function addV4Swap<TInput extends Currency, TOutput extends Currency>(
   planner: RoutePlanner,
   { route, inputAmount, outputAmount }: Swap<TInput, TOutput>,
   tradeType: TradeType,
