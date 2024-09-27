@@ -23,6 +23,9 @@ export enum CommandType {
   BALANCE_CHECK_ERC20 = 0x0e,
 
   V4_SWAP = 0x10,
+  V3_POSITION_MANAGER_PERMIT = 0x11,
+  V3_POSITION_MANAGER_CALL = 0x12,
+  V4_POSITION_CALL = 0x13,
 
   EXECUTE_SUB_PLAN = 0x21,
 }
@@ -63,6 +66,11 @@ const ABI_DEFINITION: { [key in CommandType]: string[] } = {
   [CommandType.TRANSFER]: ['address', 'address', 'uint256'],
   [CommandType.PAY_PORTION]: ['address', 'address', 'uint256'],
   [CommandType.BALANCE_CHECK_ERC20]: ['address', 'address', 'uint256'],
+
+  // Position Actions
+  [CommandType.V3_POSITION_MANAGER_PERMIT]: ['bytes'],
+  [CommandType.V3_POSITION_MANAGER_CALL]: ['bytes'],
+  [CommandType.V4_POSITION_CALL]: ['bytes'],
 }
 
 export class RoutePlanner {
