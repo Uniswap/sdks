@@ -58,6 +58,11 @@ export interface MintSpecificOptions {
    * Initial price to set on the pool if creating
    */
   sqrtPriceX96?: BigintIsh
+
+  /**
+   * Whether the mint is part of a migration from V3 to V4.
+   */
+  migrate?: boolean
 }
 
 /**
@@ -185,7 +190,7 @@ export abstract class V4PositionManager {
   /**
    * Cannot be constructed.
    */
-  private constructor() {}
+  private constructor() { }
 
   /**
    * Public methods to encode method parameters for different actions on the PositionManager contract
@@ -202,8 +207,8 @@ export abstract class V4PositionManager {
      * Cases:
      * - if pool does not exist yet, encode initializePool
      * then,
-     * - if is mint, encode MINT_POSITION. If it is on a NATIVE pool, encode a SWEEP. Finally encode a SETTLE_PAIR
-     * - else, encode INCREASE_LIQUIDITY. If it is on a NATIVE pool, encode a SWEEP. Finally encode a SETTLE_PAIR
+     * - if is mint, encode MINT_POSITION and SETTLE_PAIR. If it is on a NATIVE pool, encode a SWEEP. If migrating, encode a SWEEP for both currencies.
+     * - else, encode INCREASE_LIQUIDITY and SETTLE_PAIR. If it is on a NATIVE pool, encode a SWEEP.
      */
     invariant(JSBI.greaterThan(position.liquidity, ZERO), ZERO_LIQUIDITY)
 
@@ -264,6 +269,11 @@ export abstract class V4PositionManager {
         : position.pool.currency1
       value = position.pool.currency0.isNative ? toHex(amount0Max) : toHex(amount1Max)
       planner.addSweep(nativeCurrency, MSG_SENDER)
+    }
+
+    if (isMint(options) && options.migrate) {
+      planner.addSweep(position.pool.currency0, MSG_SENDER)
+      planner.addSweep(position.pool.currency1, MSG_SENDER)
     }
 
     calldataList.push(V4PositionManager.encodeModifyLiquidities(planner.finalize(), options.deadline))
