@@ -62,8 +62,22 @@ export class UniswapTrade implements Command {
     else this.payerIsUser = true
   }
 
+  get isAllV4(): boolean {
+    let result = true
+    for (const swap of this.trade.swaps) {
+      result = result && swap.route.protocol == Protocol.V4
+    }
+    return result
+  }
+
   get inputRequiresWrap(): boolean {
-    return this.trade.inputAmount.currency.isNative
+    if (!this.isAllV4) {
+      return this.trade.inputAmount.currency.isNative
+    } else {
+      // We only support wrapping all ETH or no ETH currently. We cannot support splitting where half needs to be wrapped
+      // If the input currency is ETH and the input of the first path is NOT ETH thats a sign it needs to be wrapped
+      return this.trade.inputAmount.currency.isNative && !this.trade.swaps[0].route.input.isNative
+    }
   }
 
   encode(planner: RoutePlanner, _config: TradeConfig): void {
@@ -267,9 +281,13 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
     tradeType,
   })
   const slippageToleranceOnSwap = performAggregatedSlippageCheck ? undefined : options.slippageTolerance
+
+  const inputWethFromRouter = inputAmount.currency.isNative && !route.input.isNative
+  if (inputWethFromRouter && !payerIsUser) throw new Error('Inconsistent payer')
+
   const v4Planner = new V4Planner()
   v4Planner.addTrade(trade, slippageToleranceOnSwap)
-  v4Planner.addSettle(inputAmount.currency, payerIsUser)
+  v4Planner.addSettle(inputWethFromRouter ? inputAmount.currency.wrapped : inputAmount.currency, payerIsUser)
   v4Planner.addTake(outputAmount.currency, routerMustCustody)
 
   planner.addCommand(CommandType.V4_SWAP, [v4Planner.finalize()])

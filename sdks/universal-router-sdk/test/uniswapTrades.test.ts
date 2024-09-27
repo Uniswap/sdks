@@ -5,7 +5,15 @@ import { expandTo18Decimals } from '../src/utils/numbers'
 import { SwapRouter, UniswapTrade, FlatFeeOptions } from '../src'
 import { MixedRouteTrade, MixedRouteSDK } from '@uniswap/router-sdk'
 import { Trade as V2Trade, Pair, Route as RouteV2 } from '@uniswap/v2-sdk'
-import { Trade as V3Trade, Route as V3Route, Pool as V3Pool, FeeOptions, encodeSqrtRatioX96 } from '@uniswap/v3-sdk'
+import {
+  Trade as V3Trade,
+  Route as V3Route,
+  Pool as V3Pool,
+  FeeOptions,
+  encodeSqrtRatioX96,
+  nearestUsableTick,
+  TickMath,
+} from '@uniswap/v3-sdk'
 import { Pool as V4Pool, Route as V4Route, Trade as V4Trade } from '@uniswap/v4-sdk'
 import { generatePermitSignature, toInputPermit, makePermit, generateEip2098PermitSignature } from './utils/permit2'
 import { CurrencyAmount, Ether, Percent, Token, TradeType } from '@uniswap/sdk-core'
@@ -15,7 +23,7 @@ import { hexToDecimalString } from './utils/hexToDecimalString'
 import { FORGE_PERMIT2_ADDRESS, FORGE_ROUTER_ADDRESS, TEST_FEE_RECIPIENT_ADDRESS } from './utils/addresses'
 import {
   PartialClassicQuote,
-  V3PoolType,
+  PoolType,
   RouterTradeAdapter,
   V2PoolInRoute,
   V3PoolInRoute,
@@ -26,7 +34,7 @@ const FORK_BLOCK = 16075500
 
 // note: these tests aren't testing much but registering calldata to interop file
 // for use in forge fork tests
-describe('Uniswap', () => {
+describe.only('Uniswap', () => {
   const wallet = new Wallet(utils.zeroPad('0x1234', 32))
   let WETH_USDC_V2: Pair
   let USDC_DAI_V2: Pair
@@ -42,40 +50,55 @@ describe('Uniswap', () => {
       FORK_BLOCK
     ))
 
+    let liquidity = JSBI.BigInt(utils.parseEther('1000').toString())
+    let tickSpacing = 60
+    let tickProviderMock = [
+      {
+        index: nearestUsableTick(TickMath.MIN_TICK, tickSpacing),
+        liquidityNet: liquidity,
+        liquidityGross: liquidity,
+      },
+      {
+        index: nearestUsableTick(TickMath.MAX_TICK, tickSpacing),
+        liquidityNet: JSBI.multiply(liquidity, JSBI.BigInt('-1')),
+        liquidityGross: liquidity,
+      },
+    ]
+
     WETH_USDC_V4 = new V4Pool(
       WETH,
       USDC,
       3_000,
-      60,
+      tickSpacing,
       ZERO_ADDRESS,
       encodeSqrtRatioX96(1, 1),
-      utils.parseEther('1000'),
+      liquidity,
       0,
-      WETH_USDC_V3.tickDataProvider
+      tickProviderMock
     )
 
     ETH_USDC_V4 = new V4Pool(
       ETHER,
       USDC,
       3_000,
-      60,
+      tickSpacing,
       ZERO_ADDRESS,
       encodeSqrtRatioX96(1, 1),
-      utils.parseEther('1000'),
+      liquidity,
       0,
-      WETH_USDC_V3.tickDataProvider
+      tickProviderMock
     )
 
     USDC_DAI_V4 = new V4Pool(
       DAI,
       USDC,
       3_000,
-      60,
+      tickSpacing,
       ZERO_ADDRESS,
       encodeSqrtRatioX96(1, 1),
-      utils.parseEther('1000'),
+      liquidity,
       0,
-      USDC_DAI_V3.tickDataProvider
+      tickProviderMock
     )
   })
 
@@ -460,7 +483,7 @@ describe('Uniswap', () => {
       expect(hexToDecimalString(methodParameters.value)).to.not.equal('0')
     })
 
-    it.only('encodes an exactOutput DAI->USDC->ETH swap', async () => {
+    it('encodes an exactOutput DAI->USDC->ETH swap', async () => {
       const outputEther = utils.parseEther('1').toString()
       const trade = await V3Trade.fromRoute(
         new V3Route([USDC_DAI_V3, WETH_USDC_V3], DAI, ETHER),
@@ -473,7 +496,7 @@ describe('Uniswap', () => {
       expect(hexToDecimalString(methodParameters.value)).to.equal('0')
     })
 
-    it.only('encodes an exactOutput DAI->USDC->ETH swap, with WETH fee', async () => {
+    it('encodes an exactOutput DAI->USDC->ETH swap, with WETH fee', async () => {
       // "exact output" of 1ETH. We must adjust for a 5% fee
       const outputEther = utils.parseEther('1')
       const adjustedOutputEther = outputEther
@@ -494,7 +517,7 @@ describe('Uniswap', () => {
     })
   })
 
-  describe.only('v4', () => {
+  describe('v4', () => {
     it('encodes a single exactInput ETH->USDC swap', async () => {
       const inputEther = utils.parseEther('1').toString()
       const trade = await V4Trade.fromRoute(
@@ -502,7 +525,6 @@ describe('Uniswap', () => {
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
         TradeType.EXACT_INPUT
       )
-      console.log('^^^^', encodeSqrtRatioX96(1, 1).toString())
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V4_1_ETH_FOR_USDC', methodParameters)
@@ -557,8 +579,6 @@ describe('Uniswap', () => {
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
         TradeType.EXACT_INPUT
       )
-      console.log(trade.outputAmount.quotient.toString())
-      console.log(trade.inputAmount.quotient.toString())
       const opts = swapOptions({ safeMode: true })
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V4_ETH_FOR_DAI', methodParameters)
@@ -572,11 +592,6 @@ describe('Uniswap', () => {
         CurrencyAmount.fromRawAmount(ETHER, outputEther),
         TradeType.EXACT_OUTPUT
       )
-      console.log(
-        (await ETH_USDC_V4.getInputAmount(CurrencyAmount.fromRawAmount(ETHER, outputEther)))[0].quotient.toString()
-      )
-      console.log(trade.outputAmount.quotient.toString())
-      console.log(trade.inputAmount.quotient.toString())
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V4_DAI_FOR_1_ETH_2_HOP', methodParameters)
@@ -759,7 +774,7 @@ describe('Uniswap', () => {
     const token1 = tokenIn.sortsBefore(tokenOut) ? tokenOut : tokenIn
 
     return {
-      type: V3PoolType.V2Pool,
+      type: PoolType.V2Pool,
       tokenIn: {
         address: tokenIn.address,
         chainId: 1,
@@ -803,7 +818,7 @@ describe('Uniswap', () => {
     amountOut: string
   ): V3PoolInRoute => {
     return {
-      type: V3PoolType.V3Pool,
+      type: PoolType.V3Pool,
       tokenIn: {
         address: tokenIn.address,
         chainId: 1,

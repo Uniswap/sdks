@@ -543,19 +543,19 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
     }
 
     function testV4ExactInWithFee() public {
-      MethodParameters memory params = readFixture(json, "._UNISWAP_V4_1_ETH_FOR_USDC_WITH_FEE");
+        MethodParameters memory params = readFixture(json, "._UNISWAP_V4_1_ETH_FOR_USDC_WITH_FEE");
     }
 
     function testV4ExactInWithFlatFee() public {
-      MethodParameters memory params = readFixture(json, "._UNISWAP_V4_1_ETH_FOR_USDC_WITH_FLAT_FEE");
+        MethodParameters memory params = readFixture(json, "._UNISWAP_V4_1_ETH_FOR_USDC_WITH_FLAT_FEE");
     }
 
     function testV4ExactInNativeOutput() public {
-      MethodParameters memory params = readFixture(json, "._UNISWAP_V4_1000_USDC_FOR_ETH");
+        MethodParameters memory params = readFixture(json, "._UNISWAP_V4_1000_USDC_FOR_ETH");
     }
 
     function testV4ExactInMultiHop() public {
-      MethodParameters memory params = readFixture(json, "._UNISWAP_V4_ETH_FOR_DAI");
+        MethodParameters memory params = readFixture(json, "._UNISWAP_V4_ETH_FOR_DAI");
     }
 
     function testMixedExactInputNative() public {

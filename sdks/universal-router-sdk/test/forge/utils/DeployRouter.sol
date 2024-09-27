@@ -18,6 +18,7 @@ import {IPermit2} from "permit2/src/interfaces/IPermit2.sol";
 
 contract DeployRouter is Test {
     using PoolIdLibrary for PoolKey;
+
     address public constant V2_FACTORY = 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f;
     address public constant V3_FACTORY = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
     bytes32 public constant PAIR_INIT_CODE_HASH = 0x96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f;
@@ -35,7 +36,7 @@ contract DeployRouter is Test {
 
     UniversalRouter public router;
     IPermit2 public permit2;
-    PoolManager public poolManager;
+    IPoolManager public poolManager;
 
     address from;
     uint256 fromPrivateKey;
@@ -93,43 +94,42 @@ contract DeployRouter is Test {
 
         vm.deal(address(this), amount * 2);
 
-        poolManager.unlock(abi.encode([
-          PoolKey(eth, usdc, 3000, 60, IHooks(address(0))),
-          PoolKey(dai, usdc, 3000, 60, IHooks(address(0))),
-          PoolKey(usdc, weth, 3000, 60, IHooks(address(0)))
-        ]));
+        poolManager.unlock(
+            abi.encode(
+                [
+                    PoolKey(eth, usdc, 3000, 60, IHooks(address(0))),
+                    PoolKey(dai, usdc, 3000, 60, IHooks(address(0))),
+                    PoolKey(usdc, weth, 3000, 60, IHooks(address(0)))
+                ]
+            )
+        );
     }
 
     function unlockCallback(bytes calldata data) external returns (bytes memory) {
-      PoolKey[3] memory poolKeys = abi.decode(data, (PoolKey[3]));
+        PoolKey[3] memory poolKeys = abi.decode(data, (PoolKey[3]));
 
-      for(uint256 i = 0; i < poolKeys.length; i++) {
-        PoolKey memory poolKey = poolKeys[i];
-        poolManager.initialize(poolKey, 79228162514264337593543950336, bytes(""));
+        for (uint256 i = 0; i < poolKeys.length; i++) {
+            PoolKey memory poolKey = poolKeys[i];
+            poolManager.initialize(poolKey, 79228162514264337593543950336, bytes(""));
 
-        (BalanceDelta delta, BalanceDelta feesAccrued) = poolManager.modifyLiquidity(
-            poolKey,
-            IPoolManager.ModifyLiquidityParams({
-                tickLower: -60,
-                tickUpper: 60,
-                liquidityDelta: 100 ether,
-                salt: 0
-            }),
-            bytes("")
-        );
+            (BalanceDelta delta, BalanceDelta feesAccrued) = poolManager.modifyLiquidity(
+                poolKey,
+                IPoolManager.ModifyLiquidityParams({tickLower: -60, tickUpper: 60, liquidityDelta: 1000 ether, salt: 0}),
+                bytes("")
+            );
 
-        settle(poolKey.currency0, uint256((uint128(-delta.amount0()))));
-        settle(poolKey.currency1, uint256((uint128(-delta.amount1()))));
-      }
+            settle(poolKey.currency0, uint256((uint128(-delta.amount0()))));
+            settle(poolKey.currency1, uint256((uint128(-delta.amount1()))));
+        }
     }
 
     function settle(Currency currency, uint256 amount) internal {
-    if (currency.isAddressZero()) {
-        poolManager.settle{value: amount}();
-      } else {
-        poolManager.sync(currency);
-        IERC20Minimal(Currency.unwrap(currency)).transfer(address(poolManager), amount);
-        poolManager.settle();
-      }
+        if (currency.isAddressZero()) {
+            poolManager.settle{value: amount}();
+        } else {
+            poolManager.sync(currency);
+            IERC20Minimal(Currency.unwrap(currency)).transfer(address(poolManager), amount);
+            poolManager.settle();
+        }
     }
 }

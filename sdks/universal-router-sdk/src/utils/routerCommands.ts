@@ -106,6 +106,9 @@ export type RouterCommand = {
 }
 
 export function createCommand(type: CommandType, parameters: any[]): RouterCommand {
+  if (type === CommandType.V4_SWAP) {
+    return { type, encodedInput: parameters[0] }
+  }
   const encodedInput = defaultAbiCoder.encode(ABI_DEFINITION[type], parameters)
   return { type, encodedInput }
 }
