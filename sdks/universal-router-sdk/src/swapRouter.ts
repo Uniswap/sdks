@@ -95,6 +95,7 @@ export abstract class SwapRouter {
     //     recipient: options.universalRouterAddress,
     //   },
     // });
+    // TODO: recipient == posm
     planner.addCommand(CommandType.V3_POSITION_MANAGER_CALL, [v3RemoveParams.calldata])
 
     // encode v4 mint
@@ -109,6 +110,7 @@ export abstract class SwapRouter {
     // });
     planner.addCommand(CommandType.V4_POSITION_CALL, [v4AddParams.calldata]);
 
+    // TODO sweep on posm not UR
     planner.addCommand(CommandType.SWEEP, [options.outputPosition.pool.token0, options.recipient, 0]);
     planner.addCommand(CommandType.SWEEP, [options.outputPosition.pool.token1, options.recipient, 0]);
 
