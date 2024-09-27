@@ -1,5 +1,7 @@
 import invariant from 'tiny-invariant'
 import { ethers } from 'ethers'
+import { validateAndParseAddress, BigintIsh } from '@uniswap/sdk-core';
+import { NFTPermitOptions, NonfungiblePositionManager } from '@uniswap/v3-sdk';
 import { PermitSingle } from '@uniswap/permit2-sdk'
 import { CommandType, RoutePlanner } from './routerCommands'
 import { ROUTER_AS_RECIPIENT } from './constants'
@@ -24,6 +26,10 @@ export type InputTokenOptions = {
   permit2TransferFrom?: Permit2TransferFrom
 }
 
+export interface V3PositionPermit extends NFTPermitOptions {
+  tokenId: BigintIsh,
+}
+
 const SIGNATURE_LENGTH = 65
 const EIP_2098_SIGNATURE_LENGTH = 64
 
@@ -38,6 +44,19 @@ export function encodePermit(planner: RoutePlanner, permit2: Permit2Permit): voi
   }
 
   planner.addCommand(CommandType.PERMIT2_PERMIT, [permit2, signature])
+}
+
+export function encodeV3PositionPermit(planner: RoutePlanner, permit: V3PositionPermit): void {
+  const calldata = NonfungiblePositionManager.INTERFACE.encodeFunctionData('permit', [
+    validateAndParseAddress(permit.spender),
+    permit.tokenId,
+    permit.deadline,
+    permit.v,
+    permit.r,
+    permit.s,
+  ])
+
+  planner.addCommand(CommandType.V3_POSITION_MANAGER_PERMIT, [calldata])
 }
 
 // Handles the encoding of commands needed to gather input tokens for a trade
