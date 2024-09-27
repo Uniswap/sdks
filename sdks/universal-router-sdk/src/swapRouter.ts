@@ -14,7 +14,7 @@ import {
   AddLiquidityOptions as V4AddLiquidityOptions,
 } from '@uniswap/v4-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
-import { Currency, CurrencyAmount, TradeType, BigintIsh, Percent } from '@uniswap/sdk-core'
+import { Currency, TradeType, Percent } from '@uniswap/sdk-core'
 import { UniswapTrade, SwapOptions } from './entities/actions/uniswap'
 import { RoutePlanner, CommandType } from './utils/routerCommands'
 import { encodePermit, encodeV3PositionPermit, V3PositionPermit } from './utils/inputTokens'
@@ -26,7 +26,6 @@ export type SwapRouterConfig = {
 
 export interface MigrateV3ToV4Options {
   inputPosition: V3Position
-  inputTokenId: BigintIsh
   outputPosition: V4Position
   v3RemoveLiquidityOptions: V3RemoveLiquidityOptions
   v4AddLiquidityOptions: V4AddLiquidityOptions
