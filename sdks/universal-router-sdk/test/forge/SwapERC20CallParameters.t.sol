@@ -537,10 +537,16 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         MethodParameters memory params = readFixture(json, "._UNISWAP_V4_1_ETH_FOR_USDC");
         assertEq(from.balance, BALANCE);
         assertEq(USDC.balanceOf(RECIPIENT), 0);
+        assertEq(params.value, 1e18);
 
         (bool success,) = address(router).call{value: params.value}(params.data);
         require(success, "call failed");
+
+        assertLe(from.balance, BALANCE - params.value);
+        assertGt(USDC.balanceOf(RECIPIENT), 1000 * ONE_USDC);
     }
+
+    function testV4ExactInputEthWithWrap() public {}
 
     function testV4ExactInWithFee() public {
         MethodParameters memory params = readFixture(json, "._UNISWAP_V4_1_ETH_FOR_USDC_WITH_FEE");
