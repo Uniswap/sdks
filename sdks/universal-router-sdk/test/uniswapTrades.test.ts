@@ -5,7 +5,7 @@ import { expandTo18Decimals } from '../src/utils/numbers'
 import { SwapRouter, UniswapTrade, FlatFeeOptions } from '../src'
 import { MixedRouteTrade, MixedRouteSDK } from '@uniswap/router-sdk'
 import { Trade as V2Trade, Pair, Route as RouteV2 } from '@uniswap/v2-sdk'
-import { Trade as V3Trade, Route as V3Route, Pool as V3Pool, FeeOptions } from '@uniswap/v3-sdk'
+import { Trade as V3Trade, Route as V3Route, Pool as V3Pool, FeeOptions, encodeSqrtRatioX96 } from '@uniswap/v3-sdk'
 import { Pool as V4Pool, Route as V4Route, Trade as V4Trade } from '@uniswap/v4-sdk'
 import { generatePermitSignature, toInputPermit, makePermit, generateEip2098PermitSignature } from './utils/permit2'
 import { CurrencyAmount, Ether, Percent, Token, TradeType } from '@uniswap/sdk-core'
@@ -48,9 +48,9 @@ describe('Uniswap', () => {
       3_000,
       60,
       ZERO_ADDRESS,
-      WETH_USDC_V3.sqrtRatioX96,
-      WETH_USDC_V3.liquidity,
-      WETH_USDC_V3.tickCurrent,
+      encodeSqrtRatioX96(1, 1),
+      utils.parseEther('1000'),
+      0,
       WETH_USDC_V3.tickDataProvider
     )
 
@@ -60,9 +60,9 @@ describe('Uniswap', () => {
       3_000,
       60,
       ZERO_ADDRESS,
-      WETH_USDC_V3.sqrtRatioX96,
-      WETH_USDC_V3.liquidity,
-      WETH_USDC_V3.tickCurrent,
+      encodeSqrtRatioX96(1, 1),
+      utils.parseEther('1000'),
+      0,
       WETH_USDC_V3.tickDataProvider
     )
 
@@ -72,9 +72,9 @@ describe('Uniswap', () => {
       3_000,
       60,
       ZERO_ADDRESS,
-      USDC_DAI_V3.sqrtRatioX96,
-      USDC_DAI_V3.liquidity,
-      USDC_DAI_V3.tickCurrent,
+      encodeSqrtRatioX96(1, 1),
+      utils.parseEther('1000'),
+      0,
       USDC_DAI_V3.tickDataProvider
     )
   })
@@ -502,6 +502,7 @@ describe('Uniswap', () => {
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
         TradeType.EXACT_INPUT
       )
+      console.log('^^^^', encodeSqrtRatioX96(1, 1).toString())
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V4_1_ETH_FOR_USDC', methodParameters)
@@ -556,13 +557,15 @@ describe('Uniswap', () => {
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
         TradeType.EXACT_INPUT
       )
+      console.log(trade.outputAmount.quotient.toString())
+      console.log(trade.inputAmount.quotient.toString())
       const opts = swapOptions({ safeMode: true })
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V4_ETH_FOR_DAI', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq(inputEther)
     })
 
-    it.skip('encodes an exactOutput DAI->USDC->ETH swap', async () => {
+    it('encodes an exactOutput DAI->USDC->ETH swap', async () => {
       const outputEther = utils.parseEther('1').toString()
       const trade = await V4Trade.fromRoute(
         new V4Route([USDC_DAI_V4, ETH_USDC_V4], DAI, ETHER),
@@ -572,7 +575,8 @@ describe('Uniswap', () => {
       console.log(
         (await ETH_USDC_V4.getInputAmount(CurrencyAmount.fromRawAmount(ETHER, outputEther)))[0].quotient.toString()
       )
-      // console.log(trade.inputAmount.quotient.toString())
+      console.log(trade.outputAmount.quotient.toString())
+      console.log(trade.inputAmount.quotient.toString())
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V4_DAI_FOR_1_ETH_2_HOP', methodParameters)

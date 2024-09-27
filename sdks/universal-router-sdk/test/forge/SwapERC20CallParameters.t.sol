@@ -26,6 +26,8 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         json = vm.readFile(string.concat(root, "/test/forge/interop.json"));
 
         vm.createSelectFork(vm.envString("FORK_URL"), 16075500);
+        deployV4Contracts();
+        initializeV4Pools(WETH, USDC, DAI);
         vm.startPrank(from);
         deployRouterAndPermit2();
         vm.deal(from, BALANCE);
@@ -529,6 +531,26 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         // Nothing left in the router!
         assertEq(WETH.balanceOf(address(router)), 0);
         assertEq(address(router).balance, 0);
+    }
+
+    function testV4ExactInputETH() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_V4_1_ETH_FOR_USDC");
+    }
+
+    function testV4ExactInWithFee() public {
+      MethodParameters memory params = readFixture(json, "._UNISWAP_V4_1_ETH_FOR_USDC_WITH_FEE");
+    }
+
+    function testV4ExactInWithFlatFee() public {
+      MethodParameters memory params = readFixture(json, "._UNISWAP_V4_1_ETH_FOR_USDC_WITH_FLAT_FEE");
+    }
+
+    function testV4ExactInNativeOutput() public {
+      MethodParameters memory params = readFixture(json, "._UNISWAP_V4_1000_USDC_FOR_ETH");
+    }
+
+    function testV4ExactInMultiHop() public {
+      MethodParameters memory params = readFixture(json, "._UNISWAP_V4_ETH_FOR_DAI");
     }
 
     function testMixedExactInputNative() public {
