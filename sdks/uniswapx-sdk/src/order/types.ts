@@ -158,6 +158,19 @@ export type NonlinearDutchDecay = {
   relativeAmounts: bigint[]; // Cannot be BigNumber because could be negative
 };
 
+export type EncodedNonlinearDutchDecay = {
+  relativeBlocks: BigNumber;
+  relativeAmounts: bigint[];
+};
+
+export type EncodedV3DutchInput = Omit<V3DutchInput, "curve"> & {
+  curve: EncodedNonlinearDutchDecay;
+};
+
+export type EncodedV3DutchOutput = Omit<V3DutchOutput, "curve"> & {
+  curve: EncodedNonlinearDutchDecay;
+};
+
 export type NonlinearDutchDecayJSON = {
   relativeBlocks: number[];
   relativeAmounts: string[];

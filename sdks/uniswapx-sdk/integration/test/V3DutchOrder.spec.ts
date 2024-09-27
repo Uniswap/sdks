@@ -8,7 +8,7 @@ import { MockERC20 } from "../../dist/src/contracts";
 import { BlockchainTime } from "./utils/time";
 import { V3DutchOrderBuilder } from "../../src/builder/V3DutchOrderBuilder"
 import { expect } from "chai";
-import { UnsignedV3DutchOrder, V3CosignerData } from "../../src/order/V3DutchOrder";
+import { UnsignedV3DutchOrder, V3_DUTCH_ORDER_TYPES, V3CosignerData } from "../../src/order/V3DutchOrder";
 
 describe.only("DutchV3Order", () => {
     const FEE_RECIPIENT = "0x1111111111111111111111111111111111111111";
@@ -227,6 +227,118 @@ describe.only("DutchV3Order", () => {
         ).to.be.revertedWithCustomError(reactor, "InvalidCosignature");
     }); 
 
+    it.only("debug cosignature", async () => {
+        const deadline = 1800000000;
+        const cosignerData : V3CosignerData = {
+            decayStartBlock: 260000000,
+            exclusiveFiller: ethers.constants.AddressZero,
+            exclusivityOverrideBps: BigNumber.from(0),
+            inputOverride: BigNumber.from(0),
+            outputOverrides: [BigNumber.from(0)],
+        }
+
+        const order = new V3DutchOrderBuilder(
+            1, ethers.constants.AddressZero//chainId doesn't get hashed so doesn't matter
+        )
+            .cosigner(ethers.constants.AddressZero)
+            .deadline(deadline)
+            .swapper(ethers.constants.AddressZero)
+            .nonce(BigNumber.from(0))
+            .startingBaseFee(BigNumber.from(0))
+            .input({
+                token: "0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f",
+                startAmount: BigNumber.from(21),
+                curve: {
+                    relativeBlocks: [1],
+                    relativeAmounts: [BigInt(0)],
+                },
+                maxAmount: BigNumber.from(21),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
+            })
+            .output({
+                token: ethers.constants.AddressZero,
+                startAmount: BigNumber.from(21),
+                curve: {
+                    relativeBlocks: [1],
+                    relativeAmounts: [BigInt(1)],
+                },
+                recipient: ethers.constants.AddressZero,
+                minAmount: BigNumber.from(20),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
+            })
+            .buildPartial()
+
+            const { domain, types, values } = order.permitData();
+            const signature = await swapper._signTypedData(domain, types, values);
+
+            // const { domain, types, values } = order.permitData();
+            // const signature = await swapper._signTypedData(domain, types, values);
+            const encoder = ethers.utils._TypedDataEncoder.from(V3_DUTCH_ORDER_TYPES);
+            const hashOfTypes = ethers.utils.keccak256(
+                ethers.utils.toUtf8Bytes(encoder.encodeType("V3DutchOrder"))
+            );
+            console.log("the hash of the types is: ", hashOfTypes);
+            const orderHash = order.hash();
+            console.log("the orderHash is: ", orderHash);
+            const cosignerHash = order.cosignatureHash(cosignerData);
+            console.log("the cosignerHash is: ", cosignerHash);
+            // const cosignature = ethers.utils.joinSignature(
+            //   cosigner._signingKey().signDigest(cosignerHash)
+            // );
+            const cosignature = "0x"; //emptyBytes
+            // console.log("the cosigner that signed the cosignerHash is: ", await cosigner.getAddress());
+            const fullOrder = V3DutchOrderBuilder.fromOrder(order)
+            .cosignerData(cosignerData)
+            .cosignature(cosignature)
+            .build();
+
+        console.log("Order Info:");
+        console.log("  Reactor:", fullOrder.info.reactor);
+        console.log("  Swapper:", fullOrder.info.swapper);
+        console.log("  Nonce:", fullOrder.info.nonce);
+        console.log("  deadline:", fullOrder.info.deadline);
+        console.log("  additionalValidationContract:", fullOrder.info.additionalValidationContract);
+        console.log("  additionalValidationData:", fullOrder.info.additionalValidationData);
+
+
+        console.log("Base Input:");
+        console.log("  Token:", fullOrder.info.input.token);
+        console.log("  Start Amount:", fullOrder.info.input.startAmount);
+        console.log("  Curve, RelativeBlocks:", fullOrder.info.input.curve.relativeBlocks);
+        for (let i = 0; i < fullOrder.info.input.curve.relativeAmounts.length; i++) {
+            console.log("  Curve, RelativeAmounts:", fullOrder.info.input.curve.relativeAmounts[i]);
+        }
+        console.log("  Max Amount:", fullOrder.info.input.maxAmount);
+        console.log("  adjustmentPerGweiBaseFee:", fullOrder.info.input.adjustmentPerGweiBaseFee);
+
+        console.log("Base Outputs:");
+        for (let i = 0; i < fullOrder.info.outputs.length; i++) {
+            console.log("  Output", i);
+            console.log("    Token:", fullOrder.info.outputs[i].token);
+            console.log("    Start Amount:", fullOrder.info.outputs[i].startAmount);
+            console.log("  Curve, RelativeBlocks:", fullOrder.info.outputs[i].curve.relativeBlocks);
+            for (let j = 0; j < fullOrder.info.outputs[i].curve.relativeAmounts.length; j++) {
+                console.log("  Curve, RelativeAmounts:", fullOrder.info.outputs[i].curve.relativeAmounts[j]);
+            }
+            console.log("    Recipient:", fullOrder.info.outputs[i].recipient);
+            console.log("    minAmount:", fullOrder.info.outputs[i].minAmount);
+            console.log("    adjustmentPerGweiBaseFee:", fullOrder.info.outputs[i].adjustmentPerGweiBaseFee);
+        }
+
+        console.log("Cosigner Data:");
+        console.log("  decayStartBlock:", fullOrder.info.cosignerData.decayStartBlock);
+        console.log("  exclusiveFiller:", fullOrder.info.cosignerData.exclusiveFiller);
+        console.log("  exclusivityOverrideBps:", fullOrder.info.cosignerData.exclusivityOverrideBps);
+        console.log("  inputOverride:", fullOrder.info.cosignerData.inputOverride);
+        for (let i = 0; i < fullOrder.info.cosignerData.outputOverrides.length; i++) {
+            console.log("  outputOverrides:", fullOrder.info.cosignerData.outputOverrides[i]);
+        }
+            console.log("The encoded order is: ", fullOrder.serialize());
+
+
+    });
+
+
     it("executes a serialized order with no decay", async () => {
         const deadline = await new BlockchainTime().secondsFromNow(1000);
         const cosignerData = await getCosignerData();
@@ -339,7 +451,7 @@ describe.only("DutchV3Order", () => {
         overrides: Partial<V3CosignerData> = {}
         ): Promise<V3CosignerData> => {
         const defaultData: V3CosignerData = {
-            decayStartBlock: await new BlockchainTime().blocksFromNow(10),
+            decayStartBlock: 260000000,
             exclusiveFiller: ethers.constants.AddressZero,
             exclusivityOverrideBps: BigNumber.from(0),
             // overrides of 0 will not affect the values

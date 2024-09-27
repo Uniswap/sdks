@@ -15,6 +15,8 @@ import {
     BlockOverrides,
     CosignerData,
     CosignerDataJSON,
+    EncodedV3DutchInput,
+    EncodedV3DutchOutput,
     OffChainOrder,
     OrderInfo,
     V3DutchInput,
@@ -69,14 +71,14 @@ type V3WitnessInfo = {
     info: OrderInfo;
     cosigner: string;
     startingBaseFee: BigNumber;
-    baseInput: V3DutchInput;
-    baseOutputs: V3DutchOutput[];
+    baseInput: EncodedV3DutchInput;
+    baseOutputs: EncodedV3DutchOutput[];
 };
 
 const COSIGNER_DATA_TUPLE_ABI =
     "tuple(uint256,address,uint256,uint256,uint256[])";
 
-const V3_DUTCH_ORDER_TYPES = {
+export const V3_DUTCH_ORDER_TYPES = {
     V3DutchOrder: [
         { name: "info", type: "OrderInfo" },
         { name: "cosigner", type: "address" },
@@ -310,8 +312,27 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
             },
             cosigner: this.info.cosigner,
             startingBaseFee: this.info.startingBaseFee,
-            baseInput: this.info.input,
-            baseOutputs: this.info.outputs,
+            baseInput: {
+                token: this.info.input.token,
+                startAmount: this.info.input.startAmount,
+                curve: {
+                    relativeBlocks: encodeRelativeBlocks(this.info.input.curve.relativeBlocks),
+                    relativeAmounts: this.info.input.curve.relativeAmounts,
+                },
+                maxAmount: this.info.input.maxAmount,
+                adjustmentPerGweiBaseFee: this.info.input.adjustmentPerGweiBaseFee,
+            },
+            baseOutputs: this.info.outputs.map((output) => ({
+                token: output.token,
+                startAmount: output.startAmount,
+                curve: {
+                    relativeBlocks: encodeRelativeBlocks(output.curve.relativeBlocks),
+                    relativeAmounts: output.curve.relativeAmounts,
+                },
+                recipient: output.recipient,
+                minAmount: output.minAmount,
+                adjustmentPerGweiBaseFee: output.adjustmentPerGweiBaseFee,
+            })),
         };
     }
 
@@ -338,9 +359,11 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
     }
 
     hash(): string {
+        const witnessInfo = this.witnessInfo();
+        console.log(witnessInfo);
         return ethers.utils._TypedDataEncoder
             .from(V3_DUTCH_ORDER_TYPES)
-            .hash(this.witnessInfo());
+            .hash(witnessInfo);
     }
 
     cosignatureHash(cosignerData: V3CosignerData): string {
