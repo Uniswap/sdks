@@ -547,7 +547,7 @@ export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
     recoverCosigner(): string {
         const messageHash = this.cosignatureHash(this.info.cosignerData);
         const signature = this.info.cosignature;
-        return ethers.utils.recoverAddress(messageHash, signature);
+        return ethers.utils.verifyMessage(messageHash, signature);
     }
 
     resolve(options: V3OrderResolutionOptions): ResolvedUniswapXOrder {
