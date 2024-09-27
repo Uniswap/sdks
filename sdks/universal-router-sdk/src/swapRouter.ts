@@ -22,7 +22,6 @@ export interface MigrateV3ToV4Options {
     v3RemoveLiquidityOptions: V3RemoveLiquidityOptions,
     v4AddLiquidityOptions: V4AddLiquidityOptions,
     slippageTolerance: Percent;
-    universalRouterAddress: string;
     recipient: string;
     inputV3NFTPermit?: V3PositionPermit;
 }
@@ -58,7 +57,11 @@ export abstract class SwapRouter {
 
   /**
    * Builds the call parameters for a migration from a V3 position to a V4 position.
-   *
+   * Some requirements of the parameters:
+   *   - v3RemoveLiquidityOptions.collectOptions.recipient must equal v4PositionManager
+   *   - v3RemoveLiquidityOptions.liquidityPercentage must be 100%
+   *   - input pool and output pool must have the same tokens
+   *   - V3 NFT must be approved, or valid inputV3NFTPermit must be provided with UR as spender
    */
   public static migrateV3ToV4CallParameters(options: MigrateV3ToV4Options): MethodParameters {
     const token0 = options.inputPosition.pool.token0;
@@ -76,46 +79,15 @@ export abstract class SwapRouter {
     }
 
     // encode v3 withdraw
-    // consider just taking in a full v3 add params with require checks
     const v3RemoveParams = V3PositionManager.removeCallParameters(options.inputPosition, options.v3RemoveLiquidityOptions)
-
-    //   {
-    //   tokenId: options.inputTokenId,
-    //   // always remove all for migrate
-    //   liquidityPercentage: new Percent(100),
-    //   // no slippage check on removal since we will check slippage on addition
-    //   slippageTolerance: new Percent(100),
-    //   deadline: options.deadlineOrPreviousBlockhash,
-    //   burnToken: true,
-    //   collectOptions: {
-    //     // no slippage check on collect since we will check slippage on addition
-    //     expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(token0, '0'),
-    //     expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(token1, '0'),
-    //     // collect to the router so it can migrate to v4
-    //     recipient: options.universalRouterAddress,
-    //   },
-    // });
-    // TODO: recipient == posm
     planner.addCommand(CommandType.V3_POSITION_MANAGER_CALL, [v3RemoveParams.calldata])
 
     // encode v4 mint
     const v4AddParams = V4PositionManager.addCallParameters(options.outputPosition, options.v4AddLiquidityOptions);
-    // {
-    //   deadline: options.deadlineOrPreviousBlockhash,
-    //   slippageTolerance: options.slippageTolerance,
-    //   hookData: options.hookData,
-    //   recipient: options.recipient,
-    //   sqrtPriceX96: options.sqrtPriceX96,
-    //   createPool: options.createPool,
-    // });
     planner.addCommand(CommandType.V4_POSITION_CALL, [v4AddParams.calldata]);
 
-    // TODO sweep on posm not UR
-    planner.addCommand(CommandType.SWEEP, [options.outputPosition.pool.token0, options.recipient, 0]);
-    planner.addCommand(CommandType.SWEEP, [options.outputPosition.pool.token1, options.recipient, 0]);
-
     return SwapRouter.encodePlan(planner, BigNumber.from(0), {
-      deadline: options.deadlineOrPreviousBlockhash ? BigNumber.from(options.deadlineOrPreviousBlockhash) : undefined,
+      deadline: BigNumber.from(options.v4AddLiquidityOptions.deadline),
     })
   }
 
