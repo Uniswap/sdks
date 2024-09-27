@@ -2,8 +2,17 @@ import invariant from 'tiny-invariant'
 import { abi } from '@uniswap/universal-router/artifacts/contracts/UniversalRouter.sol/UniversalRouter.json'
 import { Interface } from '@ethersproject/abi'
 import { BigNumber, BigNumberish } from 'ethers'
-import { MethodParameters, Position as V3Position, NonfungiblePositionManager as V3PositionManager, RemoveLiquidityOptions as V3RemoveLiquidityOptions } from '@uniswap/v3-sdk'
-import { Position as V4Position, V4PositionManager, AddLiquidityOptions as V4AddLiquidityOptions } from '@uniswap/v4-sdk';
+import {
+  MethodParameters,
+  Position as V3Position,
+  NonfungiblePositionManager as V3PositionManager,
+  RemoveLiquidityOptions as V3RemoveLiquidityOptions,
+} from '@uniswap/v3-sdk'
+import {
+  Position as V4Position,
+  V4PositionManager,
+  AddLiquidityOptions as V4AddLiquidityOptions,
+} from '@uniswap/v4-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
 import { Currency, CurrencyAmount, TradeType, BigintIsh, Percent } from '@uniswap/sdk-core'
 import { UniswapTrade, SwapOptions } from './entities/actions/uniswap'
@@ -16,14 +25,14 @@ export type SwapRouterConfig = {
 }
 
 export interface MigrateV3ToV4Options {
-    inputPosition: V3Position,
-    inputTokenId: BigintIsh,
-    outputPosition: V4Position,
-    v3RemoveLiquidityOptions: V3RemoveLiquidityOptions,
-    v4AddLiquidityOptions: V4AddLiquidityOptions,
-    slippageTolerance: Percent;
-    recipient: string;
-    inputV3NFTPermit?: V3PositionPermit;
+  inputPosition: V3Position
+  inputTokenId: BigintIsh
+  outputPosition: V4Position
+  v3RemoveLiquidityOptions: V3RemoveLiquidityOptions
+  v4AddLiquidityOptions: V4AddLiquidityOptions
+  slippageTolerance: Percent
+  recipient: string
+  inputV3NFTPermit?: V3PositionPermit
 }
 
 export abstract class SwapRouter {
@@ -64,8 +73,8 @@ export abstract class SwapRouter {
    *   - V3 NFT must be approved, or valid inputV3NFTPermit must be provided with UR as spender
    */
   public static migrateV3ToV4CallParameters(options: MigrateV3ToV4Options): MethodParameters {
-    const token0 = options.inputPosition.pool.token0;
-    const token1 = options.inputPosition.pool.token1;
+    const token0 = options.inputPosition.pool.token0
+    const token1 = options.inputPosition.pool.token1
     invariant(token0 === options.outputPosition.pool.token0, 'TOKEN0_MISMATCH')
     invariant(token1 === options.outputPosition.pool.token1, 'TOKEN1_MISMATCH')
     invariant(options.v3RemoveLiquidityOptions.liquidityPercentage.equalTo(new Percent(100)), 'FULL_REMOVAL_REQUIRED')
@@ -79,12 +88,15 @@ export abstract class SwapRouter {
     }
 
     // encode v3 withdraw
-    const v3RemoveParams = V3PositionManager.removeCallParameters(options.inputPosition, options.v3RemoveLiquidityOptions)
+    const v3RemoveParams = V3PositionManager.removeCallParameters(
+      options.inputPosition,
+      options.v3RemoveLiquidityOptions
+    )
     planner.addCommand(CommandType.V3_POSITION_MANAGER_CALL, [v3RemoveParams.calldata])
 
     // encode v4 mint
-    const v4AddParams = V4PositionManager.addCallParameters(options.outputPosition, options.v4AddLiquidityOptions);
-    planner.addCommand(CommandType.V4_POSITION_CALL, [v4AddParams.calldata]);
+    const v4AddParams = V4PositionManager.addCallParameters(options.outputPosition, options.v4AddLiquidityOptions)
+    planner.addCommand(CommandType.V4_POSITION_CALL, [v4AddParams.calldata])
 
     return SwapRouter.encodePlan(planner, BigNumber.from(0), {
       deadline: BigNumber.from(options.v4AddLiquidityOptions.deadline),

@@ -1,7 +1,7 @@
 import invariant from 'tiny-invariant'
 import { ethers } from 'ethers'
-import { validateAndParseAddress, BigintIsh } from '@uniswap/sdk-core';
-import { NFTPermitOptions, NonfungiblePositionManager } from '@uniswap/v3-sdk';
+import { validateAndParseAddress, BigintIsh } from '@uniswap/sdk-core'
+import { NFTPermitOptions, NonfungiblePositionManager } from '@uniswap/v3-sdk'
 import { PermitSingle } from '@uniswap/permit2-sdk'
 import { CommandType, RoutePlanner } from './routerCommands'
 import { ROUTER_AS_RECIPIENT } from './constants'
@@ -27,7 +27,7 @@ export type InputTokenOptions = {
 }
 
 export interface V3PositionPermit extends NFTPermitOptions {
-  tokenId: BigintIsh,
+  tokenId: BigintIsh
 }
 
 const SIGNATURE_LENGTH = 65
