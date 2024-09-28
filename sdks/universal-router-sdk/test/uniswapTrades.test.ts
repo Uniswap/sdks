@@ -46,7 +46,7 @@ describe('Uniswap', () => {
   let USDC_DAI_V4: V4Pool
 
   before(async () => {
-    ;({ WETH_USDC_V2, USDC_DAI_V2, WETH_USDC_V3, USDC_DAI_V3, WETH_USDC_V3_LOW_FEE } = await getUniswapPools(
+    ; ({ WETH_USDC_V2, USDC_DAI_V2, WETH_USDC_V3, USDC_DAI_V3, WETH_USDC_V3_LOW_FEE } = await getUniswapPools(
       FORK_BLOCK
     ))
 
@@ -614,13 +614,14 @@ describe('Uniswap', () => {
 
     it.skip('encodes an exactOutput DAI->USDC->ETH swap, with WETH fee', async () => {
       // "exact output" of 1ETH. We must adjust for a 5% fee
+      // v4-sdk 1.6.3 needed
       const outputEther = utils.parseEther('1')
       const adjustedOutputEther = outputEther
         .mul(10000)
         .div(10000 - 500)
         .toString()
       const trade = await V4Trade.fromRoute(
-        new V4Route([USDC_DAI_V4, ETH_USDC_V4], DAI, ETHER),
+        new V4Route([USDC_DAI_V4, WETH_USDC_V4], DAI, ETHER),
         CurrencyAmount.fromRawAmount(ETHER, adjustedOutputEther),
         TradeType.EXACT_OUTPUT
       )
@@ -870,7 +871,7 @@ describe('Uniswap', () => {
           : CurrencyAmount.fromRawAmount(tokenOut, amount)
       }
 
-      function compareUniswapTrades(left: UniswapTrade, right: UniswapTrade): void {}
+      function compareUniswapTrades(left: UniswapTrade, right: UniswapTrade): void { }
 
       it('v2 - erc20 <> erc20', async () => {
         const [tokenIn, tokenOut] = [DAI, USDC]
