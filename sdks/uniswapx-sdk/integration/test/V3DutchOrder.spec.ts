@@ -334,8 +334,6 @@ describe.only("DutchV3Order", () => {
             console.log("  outputOverrides:", fullOrder.info.cosignerData.outputOverrides[i]);
         }
             console.log("The encoded order is: ", fullOrder.serialize());
-
-
     });
 
 
