@@ -75,8 +75,17 @@ export class UniswapTrade implements Command {
       return this.trade.inputAmount.currency.isNative
     } else {
       // We only support wrapping all ETH or no ETH currently. We cannot support splitting where half needs to be wrapped
-      // If the input currency is ETH and the input of the first path is NOT ETH thats a sign it needs to be wrapped
+      // If the input currency is ETH and the input of the first path is not ETH it must be WETH that needs wrapping
       return this.trade.inputAmount.currency.isNative && !this.trade.swaps[0].route.input.isNative
+    }
+  }
+
+  get outputRequiresUnwrap(): boolean {
+    if (!this.isAllV4) {
+      return this.trade.outputAmount.currency.isNative
+    } else {
+      // If the output currency is ETH and the output of the swap is not ETH it must be WETH that needs unwrapping
+      return this.trade.outputAmount.currency.isNative && !this.trade.swaps[0].route.output.isNative
     }
   }
 
@@ -98,8 +107,7 @@ export class UniswapTrade implements Command {
     //      in that the reversion probability is lower
     const performAggregatedSlippageCheck =
       this.trade.tradeType === TradeType.EXACT_INPUT && this.trade.routes.length > 2
-    const outputIsNative = this.trade.outputAmount.currency.isNative
-    const routerMustCustody = performAggregatedSlippageCheck || outputIsNative || hasFeeOption(this.options)
+    const routerMustCustody = performAggregatedSlippageCheck || this.outputRequiresUnwrap || hasFeeOption(this.options)
 
     for (const swap of this.trade.swaps) {
       switch (swap.route.protocol) {
@@ -172,7 +180,7 @@ export class UniswapTrade implements Command {
 
       // The remaining tokens that need to be sent to the user after the fee is taken will be caught
       // by this if-else clause.
-      if (outputIsNative) {
+      if (this.outputRequiresUnwrap) {
         planner.addCommand(CommandType.UNWRAP_WETH, [this.options.recipient, minimumAmountOut])
       } else {
         planner.addCommand(CommandType.SWEEP, [
@@ -288,7 +296,7 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
   const v4Planner = new V4Planner()
   v4Planner.addTrade(trade, slippageToleranceOnSwap)
   v4Planner.addSettle(inputWethFromRouter ? inputAmount.currency.wrapped : inputAmount.currency, payerIsUser)
-  v4Planner.addTake(outputAmount.currency, routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient)
+  v4Planner.addTake(outputAmount.currency, routerMustCustody)
 
   planner.addCommand(CommandType.V4_SWAP, [v4Planner.finalize()])
 }

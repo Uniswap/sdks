@@ -34,7 +34,7 @@ const FORK_BLOCK = 16075500
 
 // note: these tests aren't testing much but registering calldata to interop file
 // for use in forge fork tests
-describe.only('Uniswap', () => {
+describe('Uniswap', () => {
   const wallet = new Wallet(utils.zeroPad('0x1234', 32))
   let WETH_USDC_V2: Pair
   let USDC_DAI_V2: Pair
@@ -50,7 +50,7 @@ describe.only('Uniswap', () => {
       FORK_BLOCK
     ))
 
-    let liquidity = JSBI.BigInt(utils.parseEther('1000').toString())
+    let liquidity = JSBI.BigInt(utils.parseEther('1000000').toString())
     let tickSpacing = 60
     let tickProviderMock = [
       {
@@ -530,6 +530,20 @@ describe.only('Uniswap', () => {
       registerFixture('_UNISWAP_V4_1_ETH_FOR_USDC', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq(inputEther)
     })
+
+    // this test needs v4-sdk 1.6.3 to merge
+    // it('encodes a single exactInput ETH->USDC swap, via WETH', async () => {
+    //   const inputEther = utils.parseEther('1').toString()
+    //   const trade = await V4Trade.fromRoute(
+    //     new V4Route([WETH_USDC_V4], ETHER, USDC),
+    //     CurrencyAmount.fromRawAmount(ETHER, inputEther),
+    //     TradeType.EXACT_INPUT
+    //   )
+    //   const opts = swapOptions({})
+    //   const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
+    //   registerFixture('_UNISWAP_V4_1_ETH_FOR_USDC_WITH_WRAP', methodParameters)
+    //   expect(hexToDecimalString(methodParameters.value)).to.eq(inputEther)
+    // })
 
     it('encodes a single exactInput ETH->USDC swap, with a fee', async () => {
       const inputEther = utils.parseEther('1').toString()

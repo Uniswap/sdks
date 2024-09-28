@@ -114,7 +114,12 @@ contract DeployRouter is Test {
 
             (BalanceDelta delta, BalanceDelta feesAccrued) = poolManager.modifyLiquidity(
                 poolKey,
-                IPoolManager.ModifyLiquidityParams({tickLower: -60, tickUpper: 60, liquidityDelta: 1000 ether, salt: 0}),
+                IPoolManager.ModifyLiquidityParams({
+                    tickLower: -60,
+                    tickUpper: 60,
+                    liquidityDelta: 1000000 ether,
+                    salt: 0
+                }),
                 bytes("")
             );
 
