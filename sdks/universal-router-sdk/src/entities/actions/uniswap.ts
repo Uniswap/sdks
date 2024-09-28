@@ -296,7 +296,9 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
   const v4Planner = new V4Planner()
   v4Planner.addTrade(trade, slippageToleranceOnSwap)
   v4Planner.addSettle(inputWethFromRouter ? inputAmount.currency.wrapped : inputAmount.currency, payerIsUser)
-  v4Planner.addTake(outputAmount.currency, routerMustCustody)
+
+  options.recipient = options.recipient ?? SENDER_AS_RECIPIENT
+  v4Planner.addTake(outputAmount.currency, routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient)
 
   planner.addCommand(CommandType.V4_SWAP, [v4Planner.finalize()])
 }
