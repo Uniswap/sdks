@@ -2,6 +2,7 @@ import invariant from 'tiny-invariant'
 
 import { Currency, Price } from '@uniswap/sdk-core'
 import { Pool } from './pool'
+import { getAdjustedCurrency } from '../utils/adjustedCurrency'
 
 /**
  * Represents a list of pools through which a swap can occur
@@ -13,6 +14,8 @@ export class Route<TInput extends Currency, TOutput extends Currency> {
   public readonly currencyPath: Currency[]
   public readonly input: TInput
   public readonly output: TOutput
+  public readonly inputAdjusted: Currency // equivalent or wrapped/unwrapped input to match pool
+  public readonly outputAdjusted: Currency // equivalent or wrapped/unwrapped output to match pool
 
   private _midPrice: Price<TInput, TOutput> | null = null
 
@@ -29,20 +32,16 @@ export class Route<TInput extends Currency, TOutput extends Currency> {
     const allOnSameChain = pools.every((pool) => pool.chainId === chainId)
     invariant(allOnSameChain, 'CHAIN_IDS')
 
-    // The currency can be ETH and then the path contains WETH, or the path contains ETH.
-    invariant(pools[0].involvesCurrency(input) || pools[0].involvesCurrency(input.wrapped), 'INPUT')
-    invariant(
-      pools[pools.length - 1].involvesCurrency(output) || pools[pools.length - 1].involvesCurrency(output.wrapped),
-      'OUTPUT'
-    )
-
-    // We know from invariants that the first swap is either input or input.wrapped
-    const pathInput = pools[0].involvesCurrency(input) ? input : input.wrapped
+    /**
+     * function throws if pools do not involve the input and output currency or the native/wrapped equivalent
+     **/
+    this.inputAdjusted = getAdjustedCurrency(input, pools[0])
+    this.outputAdjusted = getAdjustedCurrency(output, pools[pools.length - 1])
 
     /**
      * Normalizes currency0-currency1 order and selects the next currency/fee step to add to the path
      * */
-    const currencyPath: Currency[] = [pathInput]
+    const currencyPath: Currency[] = [this.inputAdjusted]
     for (const [i, pool] of pools.entries()) {
       const currentInputCurrency = currencyPath[i]
       invariant(currentInputCurrency.equals(pool.currency0) || currentInputCurrency.equals(pool.currency1), 'PATH')

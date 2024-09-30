@@ -77,10 +77,10 @@ describe('Route', () => {
       expect(route.chainId).toEqual(1)
     })
     it('should fail if the input is not in the first pool', () => {
-      expect(() => new Route([pool_0_1], eth, currency1)).toThrow()
+      expect(() => new Route([pool_0_1], eth, currency1)).toThrow('Expected currency ETH to be either t0 or t1')
     })
     it('should fail if output is not in the last pool', () => {
-      expect(() => new Route([pool_0_1], currency0, eth)).toThrow()
+      expect(() => new Route([pool_0_1], currency0, eth)).toThrow('Expected currency ETH to be either t0 or t1')
     })
   })
 
@@ -225,6 +225,38 @@ describe('Route', () => {
       expect(price.toSignificant(4)).toEqual('4.2')
       expect(price.baseCurrency.equals(eth)).toEqual(true)
       expect(price.quoteCurrency.equals(eth)).toEqual(true)
+    })
+
+    it('can be constructed with ETHER as input on a WETH Pool', async () => {
+      const route = new Route([pool_0_weth], eth, currency0)
+      expect(route.input).toEqual(eth)
+      expect(route.inputAdjusted).toEqual(weth)
+      expect(route.output).toEqual(currency0)
+      expect(route.outputAdjusted).toEqual(currency0)
+    })
+
+    it('can be constructed with WETH as input on a ETH Pool', async () => {
+      const route = new Route([pool_0_eth], weth, currency0)
+      expect(route.input).toEqual(weth)
+      expect(route.inputAdjusted).toEqual(eth)
+      expect(route.output).toEqual(currency0)
+      expect(route.outputAdjusted).toEqual(currency0)
+    })
+
+    it('can be constructed with ETHER as output on a WETH Pool', async () => {
+      const route = new Route([pool_0_weth], currency0, eth)
+      expect(route.input).toEqual(currency0)
+      expect(route.inputAdjusted).toEqual(currency0)
+      expect(route.output).toEqual(eth)
+      expect(route.outputAdjusted).toEqual(weth)
+    })
+
+    it('can be constructed with WETH as output on a ETH Pool', async () => {
+      const route = new Route([pool_0_eth], currency0, weth)
+      expect(route.input).toEqual(currency0)
+      expect(route.inputAdjusted).toEqual(currency0)
+      expect(route.output).toEqual(weth)
+      expect(route.outputAdjusted).toEqual(eth)
     })
   })
 })
