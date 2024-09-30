@@ -11,6 +11,7 @@ import {
   TICK_SPACINGS,
   FeeAmount,
 } from '@uniswap/v3-sdk'
+import { Pool as V4Pool, Route as V4Route, Trade as V4Trade } from '@uniswap/v4-sdk'
 import { SwapOptions } from '../../src'
 import { CurrencyAmount, TradeType, Ether, Token, Percent, Currency } from '@uniswap/sdk-core'
 import IUniswapV3Pool from '@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json'
@@ -133,6 +134,7 @@ export function buildTrade(
   trades: (
     | V2Trade<Currency, Currency, TradeType>
     | V3Trade<Currency, Currency, TradeType>
+    | V4Trade<Currency, Currency, TradeType>
     | MixedRouteTrade<Currency, Currency, TradeType>
   )[]
 ): RouterTrade<Currency, Currency, TradeType> {
@@ -151,8 +153,13 @@ export function buildTrade(
         inputAmount: trade.inputAmount,
         outputAmount: trade.outputAmount,
       })),
-    // TODO: ROUTE-219 - Support v4 trade in universal-router sdk
-    v4Routes: [],
+    v4Routes: trades
+      .filter((trade) => trade instanceof V4Trade)
+      .map((trade) => ({
+        routev4: trade.route as RouteV4<Currency, Currency>,
+        inputAmount: trade.inputAmount,
+        outputAmount: trade.outputAmount,
+      })),
     mixedRoutes: trades
       .filter((trade) => trade instanceof MixedRouteTrade)
       .map((trade) => ({
