@@ -1,5 +1,5 @@
 import { BigintIsh, Percent, validateAndParseAddress, Currency, NativeCurrency } from '@uniswap/sdk-core'
-import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer';
+import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
 import JSBI from 'jsbi'
 import { Position } from './entities/position'
 import { MethodParameters, toHex } from './utils/calldata'
@@ -157,7 +157,7 @@ const NFT_PERMIT_TYPES = {
     { name: 'nonce', type: 'uint256' },
     { name: 'deadline', type: 'uint256' },
   ],
-};
+}
 
 export interface NFTPermitValues {
   spender: string
@@ -171,9 +171,9 @@ export interface NFTPermitOptions extends NFTPermitValues {
 }
 
 export interface NFTPermitData {
-  domain: TypedDataDomain;
-  types: Record<string, TypedDataField[]>;
-  values: NFTPermitValues;
+  domain: TypedDataDomain
+  types: Record<string, TypedDataField[]>
+  values: NFTPermitValues
 }
 
 export type MintOptions = CommonOptions & CommonAddLiquidityOptions & MintSpecificOptions
@@ -438,11 +438,7 @@ export abstract class V4PositionManager {
   }
 
   // Prepare the params for an EIP712 signTypedData request
-  public static getPermitData(
-    permit: NFTPermitValues,
-    positionManagerAddress: string,
-    chainId: number,
-  ): NFTPermitData {
+  public static getPermitData(permit: NFTPermitValues, positionManagerAddress: string, chainId: number): NFTPermitData {
     return {
       domain: {
         name: 'Uniswap V4 Positions NFT',
