@@ -3,11 +3,13 @@ import { ethers } from "ethers";
 import { OrderType, REVERSE_REACTOR_MAPPING } from "../constants";
 import { MissingConfiguration } from "../errors";
 import {
+  CosignedPriorityOrder,
   CosignedV2DutchOrder,
   DutchOrder,
   Order,
   RelayOrder,
   UniswapXOrder,
+  UnsignedPriorityOrder,
   UnsignedV2DutchOrder,
 } from "../order";
 
@@ -94,6 +96,16 @@ export class UniswapXOrderParser extends OrderParser {
         // if no cosignature, returned unsigned variant
         if (cosignedOrder.info.cosignature === "0x") {
           return UnsignedV2DutchOrder.parse(order, chainId);
+        }
+        // if cosignature exists then returned cosigned version
+        return cosignedOrder;
+      }
+      case OrderType.Priority: {
+        // cosigned and unsigned serialized versions are the same format
+        const cosignedOrder = CosignedPriorityOrder.parse(order, chainId);
+        // if no cosignature, returned unsigned variant
+        if (cosignedOrder.info.cosignature === "0x") {
+          return UnsignedPriorityOrder.parse(order, chainId);
         }
         // if cosignature exists then returned cosigned version
         return cosignedOrder;

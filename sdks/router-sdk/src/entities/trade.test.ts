@@ -7,7 +7,7 @@ import {
   Route as V3RouteSDK,
   FeeAmount,
   TICK_SPACINGS,
-  Pool,
+  Pool as V3Pool,
   TickMath,
   nearestUsableTick,
   encodeSqrtRatioX96,
@@ -50,7 +50,7 @@ describe('Trade', () => {
   ) {
     const sqrtRatioX96 = encodeSqrtRatioX96(reserve1.quotient, reserve0.quotient)
     const liquidity = sqrt(JSBI.multiply(reserve0.quotient, reserve1.quotient))
-    return new Pool(
+    return new V3Pool(
       reserve0.currency,
       reserve1.currency,
       feeAmount,
@@ -971,6 +971,7 @@ describe('Trade', () => {
             outputAmount: CurrencyAmount.fromRawAmount(token2, 100),
           },
         ],
+        v4Routes: [],
         tradeType: TradeType.EXACT_INPUT,
         mixedRoutes: [
           {
@@ -997,8 +998,6 @@ describe('Trade', () => {
       const mixedRoute = new MixedRouteSDK([pool_weth_0, pair_weth_2], token0, token2)
       const mixedRoute2 = new MixedRouteSDK([pair_0_1, pool_weth_1, pool_weth_2], token0, token2)
       const exactIn = new Trade({
-        v2Routes: [],
-        v3Routes: [],
         tradeType: TradeType.EXACT_INPUT,
         mixedRoutes: [
           {
@@ -1220,7 +1219,6 @@ describe('Trade', () => {
             outputAmount: CurrencyAmount.fromRawAmount(weth, 69),
           },
         ],
-        v3Routes: [],
         tradeType: TradeType.EXACT_INPUT,
       })
 
@@ -1234,7 +1232,6 @@ describe('Trade', () => {
       const mixedRoute = new MixedRouteSDK([pool_0_1, pool_1_2], token0, token2)
 
       const trade = new Trade({
-        v2Routes: [],
         v3Routes: [
           {
             routev3,
@@ -1246,8 +1243,6 @@ describe('Trade', () => {
       })
 
       const mixedTrade = new Trade({
-        v2Routes: [],
-        v3Routes: [],
         tradeType: TradeType.EXACT_INPUT,
         mixedRoutes: [
           {
@@ -1270,7 +1265,6 @@ describe('Trade', () => {
     describe('tradeType = EXACT_OUTPUT', () => {
       const routev3 = new V3RouteSDK([pool_0_1, pool_1_2], token0, token2)
       const exactOut = new Trade({
-        v2Routes: [],
         v3Routes: [
           {
             routev3,

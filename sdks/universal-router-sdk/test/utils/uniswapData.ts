@@ -1,5 +1,5 @@
 import JSBI from 'jsbi'
-import { BigNumber, ethers } from 'ethers'
+import { ethers } from 'ethers'
 import { MixedRouteTrade, MixedRouteSDK, Trade as RouterTrade } from '@uniswap/router-sdk'
 import { Trade as V2Trade, Pair, Route as RouteV2, computePairAddress } from '@uniswap/v2-sdk'
 import {
@@ -11,6 +11,7 @@ import {
   TICK_SPACINGS,
   FeeAmount,
 } from '@uniswap/v3-sdk'
+import { Pool as V4Pool, Route as V4Route, Trade as V4Trade } from '@uniswap/v4-sdk'
 import { SwapOptions } from '../../src'
 import { CurrencyAmount, TradeType, Ether, Token, Percent, Currency } from '@uniswap/sdk-core'
 import IUniswapV3Pool from '@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json'
@@ -133,6 +134,7 @@ export function buildTrade(
   trades: (
     | V2Trade<Currency, Currency, TradeType>
     | V3Trade<Currency, Currency, TradeType>
+    | V4Trade<Currency, Currency, TradeType>
     | MixedRouteTrade<Currency, Currency, TradeType>
   )[]
 ): RouterTrade<Currency, Currency, TradeType> {
@@ -148,6 +150,13 @@ export function buildTrade(
       .filter((trade) => trade instanceof V3Trade)
       .map((trade) => ({
         routev3: trade.route as RouteV3<Currency, Currency>,
+        inputAmount: trade.inputAmount,
+        outputAmount: trade.outputAmount,
+      })),
+    v4Routes: trades
+      .filter((trade) => trade instanceof V4Trade)
+      .map((trade) => ({
+        routev4: trade.route as RouteV4<Currency, Currency>,
         inputAmount: trade.inputAmount,
         outputAmount: trade.outputAmount,
       })),

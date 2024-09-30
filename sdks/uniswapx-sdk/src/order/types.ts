@@ -5,9 +5,12 @@ import {
 } from "@uniswap/permit2-sdk";
 import { BigNumber } from "ethers";
 
+export type BlockOverrides = { number?: string } | undefined;
+
 // General interface implemented by off chain orders
 export interface OffChainOrder {
   chainId: number;
+
   /**
    * Returns the abi encoded order
    * @return The abi encoded serialized order which can be submitted on-chain
@@ -29,6 +32,12 @@ export interface OffChainOrder {
    * @return The order hash which is used as a key on-chain
    */
   hash(): string;
+
+  /**
+   * Returns any block overrides to be applied when quoting the order on chain
+   * @return The block overrides
+   */
+  get blockOverrides(): BlockOverrides
 }
 
 export type TokenAmount = {
@@ -56,6 +65,11 @@ export type OrderResolutionOptions = {
   filler?: string;
 };
 
+export type PriorityOrderResolutionOptions = {
+  priorityFee: BigNumber;
+  currentBlock?: BigNumber;
+};
+
 export type DutchOutput = {
   readonly token: string;
   readonly startAmount: BigNumber;
@@ -77,4 +91,26 @@ export type DutchInput = {
 export type DutchInputJSON = Omit<DutchInput, "startAmount" | "endAmount"> & {
   startAmount: string;
   endAmount: string;
+};
+
+export type PriorityInput = {
+  readonly token: string;
+  readonly amount: BigNumber;
+  readonly mpsPerPriorityFeeWei: BigNumber;
+};
+
+export type PriorityOutput = PriorityInput & {
+  readonly recipient: string;
+};
+
+export type PriorityInputJSON = Omit<
+  PriorityInput,
+  "amount" | "mpsPerPriorityFeeWei"
+> & {
+  amount: string;
+  mpsPerPriorityFeeWei: string;
+};
+
+export type PriorityOutputJSON = PriorityInputJSON & {
+  recipient: string;
 };
