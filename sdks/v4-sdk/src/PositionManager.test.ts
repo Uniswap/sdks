@@ -1,4 +1,5 @@
 import { Ether, Percent, Token } from '@uniswap/sdk-core'
+import { ethers } from 'ethers';
 import {
   EMPTY_BYTES,
   EMPTY_HOOK,
@@ -508,4 +509,37 @@ describe('PositionManager', () => {
       expect(value).toEqual('0x00')
     })
   })
+
+  describe('#getPermitData', () => {
+    it('succeeds', () => {
+      const permit = {
+        spender: mockSpender,
+        tokenId: 1,
+        deadline: 123,
+        nonce: 1,
+      };
+      const { domain, types, values } = V4PositionManager.getPermitData(permit, mockOwner, 1);
+      expect(domain).toEqual({
+        name: 'Uniswap V4 Positions NFT',
+        chainId: 1,
+        verifyingContract: mockOwner,
+      });
+      expect(types).toEqual({
+        Permit: [
+          { name: 'spender', type: 'address' },
+          { name: 'tokenId', type: 'uint256' },
+          { name: 'nonce', type: 'uint256' },
+          { name: 'deadline', type: 'uint256' },
+        ],
+      });
+      expect(values).toEqual(permit);
+      // get typehash
+      const encodedType = ethers.utils._TypedDataEncoder.from(types).encodeType('Permit');
+
+      // Compute the type hash by hashing the encoded type
+      const typeHash = ethers.utils.id(encodedType);
+      // ref https://github.com/Uniswap/v3-periphery/blob/main/contracts/base/ERC721Permit.sol
+      expect(typeHash).toEqual('0x49ecf333e5b8c95c40fdafc95c1ad136e8914a8fb55e9dc8bb01eaa83a2df9ad');
+    });
+  });
 })
