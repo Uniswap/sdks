@@ -29,16 +29,20 @@ export class Route<TInput extends Currency, TOutput extends Currency> {
     const allOnSameChain = pools.every((pool) => pool.chainId === chainId)
     invariant(allOnSameChain, 'CHAIN_IDS')
 
+    // The currency can be ETH and then the path contains WETH, or the path contains ETH.
     invariant(pools[0].involvesCurrency(input) || pools[0].involvesCurrency(input.wrapped), 'INPUT')
     invariant(
       pools[pools.length - 1].involvesCurrency(output) || pools[pools.length - 1].involvesCurrency(output.wrapped),
       'OUTPUT'
     )
 
+    // We know from invariants that the first swap is either input or input.wrapped
+    const pathInput = pools[0].involvesCurrency(input) ? input : input.wrapped
+
     /**
      * Normalizes currency0-currency1 order and selects the next currency/fee step to add to the path
      * */
-    const currencyPath: Currency[] = [input]
+    const currencyPath: Currency[] = [pathInput]
     for (const [i, pool] of pools.entries()) {
       const currentInputCurrency = currencyPath[i]
       invariant(currentInputCurrency.equals(pool.currency0) || currentInputCurrency.equals(pool.currency1), 'PATH')

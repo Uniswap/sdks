@@ -233,7 +233,8 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     let outputAmount: CurrencyAmount<TOutput>
     if (tradeType === TradeType.EXACT_INPUT) {
       invariant(amount.currency.equals(route.input), 'INPUT')
-      amounts[0] = amount
+      // Account for trades that wrap as a first step
+      amounts[0] = route.pools[0].involvesCurrency(amount.currency) ? amount : amount.wrapped
       for (let i = 0; i < route.currencyPath.length - 1; i++) {
         const pool = route.pools[i]
         const [outputAmount] = await pool.getOutputAmount(amounts[i])
@@ -247,7 +248,8 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       )
     } else {
       invariant(amount.currency.equals(route.output), 'OUTPUT')
-      amounts[amounts.length - 1] = amount
+      // Account for trades that unwrap as a last step
+      amounts[amounts.length - 1] = route.pools[route.pools.length - 1].involvesCurrency(amount.currency) ? amount : amount.wrapped;
       for (let i = route.currencyPath.length - 1; i > 0; i--) {
         const pool = route.pools[i - 1]
         const [inputAmount] = await pool.getInputAmount(amounts[i])
