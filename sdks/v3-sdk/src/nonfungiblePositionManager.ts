@@ -13,7 +13,7 @@ import { Position } from './entities/position'
 import { ONE, ZERO } from './internalConstants'
 import { MethodParameters, toHex } from './utils/calldata'
 import { Interface } from '@ethersproject/abi'
-import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer';
+import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
 import INonfungiblePositionManager from '@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json'
 import { PermitOptions, SelfPermit } from './selfPermit'
 import { ADDRESS_ZERO } from './constants'
@@ -132,7 +132,7 @@ const NFT_PERMIT_TYPES = {
     { name: 'nonce', type: 'uint256' },
     { name: 'deadline', type: 'uint256' },
   ],
-};
+}
 
 export interface NFTPermitValues {
   spender: string
@@ -142,9 +142,9 @@ export interface NFTPermitValues {
 }
 
 export interface NFTPermitData {
-  domain: TypedDataDomain;
-  types: Record<string, TypedDataField[]>;
-  values: NFTPermitValues;
+  domain: TypedDataDomain
+  types: Record<string, TypedDataField[]>
+  values: NFTPermitValues
 }
 
 export interface NFTPermitOptions {
@@ -460,11 +460,7 @@ export abstract class NonfungiblePositionManager {
   }
 
   // Prepare the params for an EIP712 signTypedData request
-  public static getPermitData(
-    permit: NFTPermitValues,
-    positionManagerAddress: string,
-    chainId: number,
-  ): NFTPermitData {
+  public static getPermitData(permit: NFTPermitValues, positionManagerAddress: string, chainId: number): NFTPermitData {
     return {
       domain: {
         name: 'Uniswap V3 Positions NFT-V1',
