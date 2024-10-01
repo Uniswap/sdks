@@ -12,6 +12,10 @@ type ChainAddresses = {
   swapRouter02Address?: string
   mixedRouteQuoterV1Address?: string
   mixedRouteQuoterV2Address?: string
+
+  // v4
+  v4PoolManagerAddress?: string
+  v4PositionManagerAddress?: string
 }
 
 const DEFAULT_NETWORKS = [ChainId.MAINNET, ChainId.GOERLI, ChainId.SEPOLIA]
@@ -165,6 +169,9 @@ const SEPOLIA_ADDRESSES: ChainAddresses = {
   swapRouter02Address: '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E',
   // TODO: ROUTE-277 - update deploy address once after quoter refactoring.
   mixedRouteQuoterV2Address: '0xa8b0be287acB850952DE4287b84B7222cc654C09',
+
+  v4PoolManagerAddress: '0xE8E23e97Fa135823143d6b9Cba9c699040D51F70',
+  v4PositionManagerAddress: '0x0048d1C09771Bb87b6A44e1294769E1DFd698584',
 }
 
 // Avalanche v3 addresses
