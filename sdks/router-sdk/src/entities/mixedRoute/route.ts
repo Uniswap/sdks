@@ -2,6 +2,7 @@ import invariant from 'tiny-invariant'
 import { Currency, Price, Token } from '@uniswap/sdk-core'
 import { Pool as V4Pool } from '@uniswap/v4-sdk'
 import { isValidTokenPath } from '../../utils/isValidTokenPath'
+import { getPathCurrency } from '../../utils/pathCurrency'
 import { TPool } from '../../utils/TPool'
 
 /**
@@ -14,7 +15,8 @@ export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
   public readonly path: Currency[]
   public readonly input: TInput
   public readonly output: TOutput
-  public readonly pathInput: Currency // routes with v2/v3 initial pool must wrap native input currency before trading
+  public readonly pathInput: Currency // routes may need to wrap/unwrap a currency to begin trading path
+  public readonly pathOutput: Currency // routes may need to wrap/unwrap a currency at the end of trading path
 
   private _midPrice: Price<TInput, TOutput> | null = null
 
@@ -30,6 +32,9 @@ export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
     const chainId = pools[0].chainId
     const allOnSameChain = pools.every((pool) => pool.chainId === chainId)
     invariant(allOnSameChain, 'CHAIN_IDS')
+
+    this.pathInput = getPathCurrency(input, pools[0])
+    this.pathOutput = getPathCurrency(output, pools[pools.length - 1])
 
     if (pools[0] instanceof V4Pool) {
       this.pathInput = pools[0].involvesToken(input) ? input : input.wrapped
