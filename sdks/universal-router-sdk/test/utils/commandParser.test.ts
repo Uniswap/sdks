@@ -134,6 +134,102 @@ describe('Command Parser', () => {
         ],
       },
     },
+    {
+      input: new RoutePlanner().addCommand(CommandType.V3_SWAP_EXACT_IN, [
+        addressOne,
+        amount,
+        amount,
+        encodePathExactInput([addressOne, addressTwo], 123),
+        true,
+      ]),
+      result: {
+        commands: [
+          {
+            commandName: 'V3_SWAP_EXACT_IN',
+            commandType: CommandType.V3_SWAP_EXACT_IN,
+            params: [
+              { name: 'recipient', value: addressOne },
+              { name: 'amountIn', value: amount },
+              { name: 'amountOutMin', value: amount },
+              { name: 'path', value: [{ tokenIn: addressOne, tokenOut: addressTwo, fee: 123 }] },
+              { name: 'payerIsUser', value: true },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      input: new RoutePlanner().addCommand(CommandType.V3_SWAP_EXACT_OUT, [
+        addressOne,
+        amount,
+        amount,
+        encodePathExactOutput([addressOne, addressTwo], 123),
+        true,
+      ]),
+      result: {
+        commands: [
+          {
+            commandName: 'V3_SWAP_EXACT_OUT',
+            commandType: CommandType.V3_SWAP_EXACT_OUT,
+            params: [
+              { name: 'recipient', value: addressOne },
+              { name: 'amountOut', value: amount },
+              { name: 'amountInMax', value: amount },
+              { name: 'path', value: [{ tokenIn: addressOne, tokenOut: addressTwo, fee: 123 }] },
+              { name: 'payerIsUser', value: true },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      input: new RoutePlanner().addCommand(CommandType.V2_SWAP_EXACT_IN, [
+        addressOne,
+        amount,
+        amount,
+        [addressOne, addressTwo],
+        true,
+      ]),
+      result: {
+        commands: [
+          {
+            commandName: 'V2_SWAP_EXACT_IN',
+            commandType: CommandType.V2_SWAP_EXACT_IN,
+            params: [
+              { name: 'recipient', value: addressOne },
+              { name: 'amountIn', value: amount },
+              { name: 'amountOutMin', value: amount },
+              { name: 'path', value: [addressOne, addressTwo] },
+              { name: 'payerIsUser', value: true },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      input: new RoutePlanner().addCommand(CommandType.V2_SWAP_EXACT_OUT, [
+        addressOne,
+        amount,
+        amount,
+        [addressOne, addressTwo],
+        true,
+      ]),
+      result: {
+        commands: [
+          {
+            commandName: 'V2_SWAP_EXACT_OUT',
+            commandType: CommandType.V2_SWAP_EXACT_OUT,
+            params: [
+              { name: 'recipient', value: addressOne },
+              { name: 'amountOut', value: amount },
+              { name: 'amountInMax', value: amount },
+              { name: 'path', value: [addressOne, addressTwo] },
+              { name: 'payerIsUser', value: true },
+            ],
+          },
+        ],
+      },
+    },
   ]
 
   for (const test of tests) {
@@ -147,3 +243,25 @@ describe('Command Parser', () => {
     })
   }
 })
+
+function encodePath(path: string[], fee: number): string {
+  let encoded = '0x'
+  for (let i = 0; i < path.length - 1; i++) {
+    // 20 byte encoding of the address
+    encoded += path[i].slice(2)
+    // 3 byte encoding of the fee
+    encoded += fee.toString(16).padStart(6, '0')
+  }
+  // encode the final token
+  encoded += path[path.length - 1].slice(2)
+
+  return encoded.toLowerCase()
+}
+
+function encodePathExactInput(tokens: string[], fee: number): string {
+  return encodePath(tokens, fee)
+}
+
+function encodePathExactOutput(tokens: string[], fee: number): string {
+  return encodePath(tokens.slice().reverse(), fee)
+}
