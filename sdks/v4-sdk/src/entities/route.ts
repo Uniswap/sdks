@@ -14,8 +14,8 @@ export class Route<TInput extends Currency, TOutput extends Currency> {
   public readonly currencyPath: Currency[]
   public readonly input: TInput
   public readonly output: TOutput
-  public readonly inputAdjusted: Currency // equivalent or wrapped/unwrapped input to match pool
-  public readonly outputAdjusted: Currency // equivalent or wrapped/unwrapped output to match pool
+  public readonly pathInput: Currency // equivalent or wrapped/unwrapped input to match pool
+  public readonly pathOutput: Currency // equivalent or wrapped/unwrapped output to match pool
 
   private _midPrice: Price<TInput, TOutput> | null = null
 
@@ -35,13 +35,13 @@ export class Route<TInput extends Currency, TOutput extends Currency> {
     /**
      * function throws if pools do not involve the input and output currency or the native/wrapped equivalent
      **/
-    this.inputAdjusted = getAdjustedCurrency(input, pools[0])
-    this.outputAdjusted = getAdjustedCurrency(output, pools[pools.length - 1])
+    this.pathInput = getAdjustedCurrency(input, pools[0])
+    this.pathOutput = getAdjustedCurrency(output, pools[pools.length - 1])
 
     /**
      * Normalizes currency0-currency1 order and selects the next currency/fee step to add to the path
      * */
-    const currencyPath: Currency[] = [this.inputAdjusted]
+    const currencyPath: Currency[] = [this.pathInput]
     for (const [i, pool] of pools.entries()) {
       const currentInputCurrency = currencyPath[i]
       invariant(currentInputCurrency.equals(pool.currency0) || currentInputCurrency.equals(pool.currency1), 'PATH')
