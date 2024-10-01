@@ -280,7 +280,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 4063979,
       },
     },
-  }
+  },
 }
 
 export const UNIVERSAL_ROUTER_ADDRESS = (version: UniversalRouterVersion, chainId: number): string => {
