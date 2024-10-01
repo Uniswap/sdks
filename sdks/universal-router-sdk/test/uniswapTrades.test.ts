@@ -1396,8 +1396,7 @@ describe('Uniswap', () => {
       const opts = migrateOptions()
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts)
       registerFixture('MIGRATE', methodParameters)
-      expect(hexToDecimalString(methodParameters.value)).to.eq("0")
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
-
   })
 })
