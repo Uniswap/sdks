@@ -15,8 +15,10 @@ Then import the corresponding Trade class and Data object for each protocol you'
 import { TradeType, CurrencyAmount, Token, Percent } from '@uniswap/sdk-core'
 import { Trade as V2TradeSDK } from '@uniswap/v2-sdk'
 import { Trade as V3TradeSDK } from '@uniswap/v3-sdk'
-import { MixedRouteTrade, MixedRouteSDK, Trade as RouterTrade } from '@uniswap/router-sdk'
+import { Trade as V2TradeSDK } from '@uniswap/v2-sdk'
+import { Trade as RouterTrade } from '@uniswap/router-sdk'
 import { SwapRouter, UNIVERSAL_ROUTER_ADDRESS } from '@uniswap/universal-router-sdk'
+import { Percent, Token, TradeType } from '@uniswap/sdk-core'
 
 // Define your tokens
 const WETH = new Token(1, '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', 18, 'WETH')
