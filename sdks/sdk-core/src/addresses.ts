@@ -53,6 +53,7 @@ export const V2_FACTORY_ADDRESSES: AddressMap = {
   [ChainId.POLYGON]: '0x9e5A52f57b3038F1B8EeE45F28b3C1967e22799C',
   [ChainId.CELO]: '0x79a530c8e2fA8748B7B40dd3629C0520c2cCf03f',
   [ChainId.BLAST]: '0x5C346464d33F90bABaf70dB6388507CC889C1070',
+  [ChainId.WORLDCHAIN]: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
 }
 /**
  * @deprecated use V2_ROUTER_ADDRESSES instead
@@ -256,6 +257,16 @@ const ZKSYNC_ADDRESSES: ChainAddresses = {
   swapRouter02Address: '0x99c56385daBCE3E81d8499d0b8d0257aBC07E8A3',
 }
 
+const WORLDCHAIN_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: '0x7a5028BDa40e7B173C278C5342087826455ea25a',
+  multicallAddress: '0x0a22c04215c97E3F532F4eF30e0aD9458792dAB9',
+  quoterAddress: '0x10158D43e6cc414deE1Bd1eB0EfC6a5cBCfF244c',
+  v3MigratorAddress: '0x9EBDdCBa71C9027E1eB45135672a30bcFEec9de3',
+  nonfungiblePositionManagerAddress: '0xec12a9F9a09f50550686363766Cc153D03c27b5e',
+  tickLensAddress: '0xE61df0CaC9d85876aCE5E3037005D80943570623',
+  swapRouter02Address: '0x091AD9e2e6e5eD44c1c66dB50e49A601F9f36cF6',
+}
+
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
   [ChainId.MAINNET]: MAINNET_ADDRESSES,
   [ChainId.OPTIMISM]: OPTIMISM_ADDRESSES,
@@ -279,6 +290,7 @@ export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses>
   [ChainId.ROOTSTOCK]: ROOTSTOCK_ADDRESSES,
   [ChainId.BLAST]: BLAST_ADDRESSES,
   [ChainId.ZKSYNC]: ZKSYNC_ADDRESSES,
+  [ChainId.WORLDCHAIN]: WORLDCHAIN_ADDRESSES,
 }
 
 /* V3 Contract Addresses */
