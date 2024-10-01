@@ -14,7 +14,7 @@ export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
   public readonly path: Currency[]
   public readonly input: TInput
   public readonly output: TOutput
-  public readonly adjustedInput: Currency // routes with v2/v3 initial pool must wrap native input currency before trading
+  public readonly pathInput: Currency // routes with v2/v3 initial pool must wrap native input currency before trading
 
   private _midPrice: Price<TInput, TOutput> | null = null
 
@@ -32,12 +32,12 @@ export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
     invariant(allOnSameChain, 'CHAIN_IDS')
 
     if (pools[0] instanceof V4Pool) {
-      this.adjustedInput = pools[0].involvesToken(input) ? input : input.wrapped
+      this.pathInput = pools[0].involvesToken(input) ? input : input.wrapped
     } else {
-      this.adjustedInput = input.wrapped // no native currencies in v2/v3
+      this.pathInput = input.wrapped // no native currencies in v2/v3
     }
 
-    invariant(pools[0].involvesToken(this.adjustedInput as Token), 'INPUT')
+    invariant(pools[0].involvesToken(this.pathInput as Token), 'INPUT')
     const lastPool = pools[pools.length - 1]
     if (lastPool instanceof V4Pool) {
       invariant(lastPool.involvesToken(output) || lastPool.involvesToken(output.wrapped), 'OUTPUT')
@@ -48,8 +48,8 @@ export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
     /**
      * Normalizes token0-token1 order and selects the next token/fee step to add to the path
      * */
-    const tokenPath: Currency[] = [this.adjustedInput]
-    pools[0].token0.equals(this.adjustedInput) ? tokenPath.push(pools[0].token1) : tokenPath.push(pools[0].token0)
+    const tokenPath: Currency[] = [this.pathInput]
+    pools[0].token0.equals(this.pathInput) ? tokenPath.push(pools[0].token1) : tokenPath.push(pools[0].token0)
 
     for (let i = 1; i < pools.length; i++) {
       const prevPool = pools[i - 1]
@@ -90,7 +90,7 @@ export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
             }
       },
 
-      this.pools[0].token0.equals(this.adjustedInput)
+      this.pools[0].token0.equals(this.pathInput)
         ? {
             nextInput: this.pools[0].token1,
             price: this.pools[0].token0Price.asFraction,

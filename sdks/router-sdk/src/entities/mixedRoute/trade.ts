@@ -255,7 +255,7 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
 
       invariant(amount.currency.equals(route.input), 'INPUT')
       inputAmount = CurrencyAmount.fromFractionalAmount(route.input, amount.numerator, amount.denominator)
-      amounts[0] = CurrencyAmount.fromFractionalAmount(route.adjustedInput, amount.numerator, amount.denominator)
+      amounts[0] = CurrencyAmount.fromFractionalAmount(route.pathInput, amount.numerator, amount.denominator)
 
       for (let i = 0; i < route.path.length - 1; i++) {
         const pool = route.pools[i]
