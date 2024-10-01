@@ -4629,10 +4629,10 @@ __metadata:
   dependencies:
     "@ethersproject/abi": ^5.5.0
     "@types/jest": ^24.0.25
-    "@uniswap/sdk-core": ^5.3.1
+    "@uniswap/sdk-core": ^5.6.0
     "@uniswap/swap-router-contracts": ^1.3.0
-    "@uniswap/v2-sdk": ^4.3.2
-    "@uniswap/v3-sdk": ^3.11.2
+    "@uniswap/v2-sdk": ^4.5.0
+    "@uniswap/v3-sdk": ^3.16.0
     "@uniswap/v4-sdk": ^1.6.0
     prettier: ^2.4.1
     tsdx: ^0.14.1
@@ -4771,16 +4771,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v2-sdk@npm:^4.3.2, @uniswap/v2-sdk@npm:^4.4.1":
-  version: 4.4.1
-  resolution: "@uniswap/v2-sdk@npm:4.4.1"
+"@uniswap/v2-sdk@npm:^4.3.2, @uniswap/v2-sdk@npm:^4.4.1, @uniswap/v2-sdk@npm:^4.5.0":
+  version: 4.5.0
+  resolution: "@uniswap/v2-sdk@npm:4.5.0"
   dependencies:
     "@ethersproject/address": ^5.0.2
     "@ethersproject/solidity": ^5.0.9
-    "@uniswap/sdk-core": ^5.3.1
+    "@uniswap/sdk-core": ^5.6.0
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
-  checksum: 4f80f7927002c8a3accbec8fc855f53efcf753bb95cf01c566b9147d0ecb39ebf63829148eee91f710f9b9f7d968e4d882efcb7715764a15136658da0ecd3f13
+  checksum: 5bee6763ccb9ef30e767e178848c44342ddc0e16fa91dbe6c37c9b0a6aa0b7313fe1986e54f7234fae71ffc4bc37e7da509f51619d06f16f451c6bc4bd0a705c
   languageName: node
   linkType: hard
 
@@ -4844,19 +4844,19 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v3-sdk@npm:^3.11.2, @uniswap/v3-sdk@npm:^3.13.1":
-  version: 3.13.1
-  resolution: "@uniswap/v3-sdk@npm:3.13.1"
+"@uniswap/v3-sdk@npm:^3.11.2, @uniswap/v3-sdk@npm:^3.13.1, @uniswap/v3-sdk@npm:^3.16.0":
+  version: 3.16.0
+  resolution: "@uniswap/v3-sdk@npm:3.16.0"
   dependencies:
     "@ethersproject/abi": ^5.5.0
     "@ethersproject/solidity": ^5.0.9
-    "@uniswap/sdk-core": ^5.3.1
+    "@uniswap/sdk-core": ^5.6.0
     "@uniswap/swap-router-contracts": ^1.3.0
     "@uniswap/v3-periphery": ^1.1.1
     "@uniswap/v3-staker": 1.0.0
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
-  checksum: 8f22e9b8138161541c32704763c4e708f0b8229bdc5560e5de6be6e4eef0262db6276644597815ad4a226b1d63928fd3e55f5eb1d47bceb4e7119c81498ae22c
+  checksum: d7276ffbce3aa1ce751c74520cde14db9a248a375984aa2a1d192b26a23c208d01c5b096b44775972832b5b399b3d4a08b6a6cb9bfa513cad69f58966bac38ad
   languageName: node
   linkType: hard
 
