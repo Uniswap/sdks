@@ -262,8 +262,8 @@ export abstract class V4PositionManager {
       // payer is v4 positiion manager
       planner.addSettle(position.pool.currency0, false)
       planner.addSettle(position.pool.currency1, false)
-      planner.addSweep(position.pool.currency0, MSG_SENDER)
-      planner.addSweep(position.pool.currency1, MSG_SENDER)
+      planner.addSweep(position.pool.currency0, options.recipient)
+      planner.addSweep(position.pool.currency1, options.recipient)
     } else {
       // need to settle both currencies when minting / adding liquidity (user is the payer)
       planner.addSettlePair(position.pool.currency0, position.pool.currency1)
