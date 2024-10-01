@@ -168,6 +168,7 @@ export function migrateOptions(): MigrateV3ToV4Options {
     },
     v4AddLiquidityOptions: {
       deadline: 1,
+      migrate: true,
       slippageTolerance: new Percent(5, 100),
       createPool: true,
       sqrtPriceX96: encodeSqrtRatioX96(1, 1),
