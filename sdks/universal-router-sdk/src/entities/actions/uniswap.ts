@@ -1,7 +1,7 @@
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
 import { Trade as V2Trade, Pair } from '@uniswap/v2-sdk'
 import { Trade as V3Trade, Pool as V3Pool, encodeRouteToPath } from '@uniswap/v3-sdk'
-import { Pool as V4Pool } from '@uniswap/v4-sdk'
+import { Trade as V4Trade, V4Planner } from '@uniswap/v4-sdk'
 import {
   Trade as RouterTrade,
   MixedRouteTrade,
@@ -9,6 +9,7 @@ import {
   IRoute,
   RouteV2,
   RouteV3,
+  RouteV4,
   MixedRouteSDK,
   MixedRoute,
   SwapOptions as RouterSwapOptions,
@@ -22,6 +23,7 @@ import { Command, RouterActionType, TradeConfig } from '../Command'
 import { SENDER_AS_RECIPIENT, ROUTER_AS_RECIPIENT, CONTRACT_BALANCE, ETH_ADDRESS } from '../../utils/constants'
 import { encodeFeeBips } from '../../utils/numbers'
 import { BigNumber, BigNumberish } from 'ethers'
+import { TPool } from '@uniswap/router-sdk/dist/utils/TPool'
 
 export type FlatFeeOptions = {
   amount: BigNumberish
@@ -42,7 +44,7 @@ export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit'> & {
 const REFUND_ETH_PRICE_IMPACT_THRESHOLD = new Percent(50, 100)
 
 interface Swap<TInput extends Currency, TOutput extends Currency> {
-  route: IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>
+  route: IRoute<TInput, TOutput, TPool>
   inputAmount: CurrencyAmount<TInput>
   outputAmount: CurrencyAmount<TOutput>
 }
@@ -60,8 +62,31 @@ export class UniswapTrade implements Command {
     else this.payerIsUser = true
   }
 
+  get isAllV4(): boolean {
+    let result = true
+    for (const swap of this.trade.swaps) {
+      result = result && swap.route.protocol == Protocol.V4
+    }
+    return result
+  }
+
   get inputRequiresWrap(): boolean {
-    return this.trade.inputAmount.currency.isNative
+    if (!this.isAllV4) {
+      return this.trade.inputAmount.currency.isNative
+    } else {
+      // We only support wrapping all ETH or no ETH currently. We cannot support splitting where half needs to be wrapped
+      // If the input currency is ETH and the input of the first path is not ETH it must be WETH that needs wrapping
+      return this.trade.inputAmount.currency.isNative && !this.trade.swaps[0].route.input.isNative
+    }
+  }
+
+  get outputRequiresUnwrap(): boolean {
+    if (!this.isAllV4) {
+      return this.trade.outputAmount.currency.isNative
+    } else {
+      // If the output currency is ETH and the output of the swap is not ETH it must be WETH that needs unwrapping
+      return this.trade.outputAmount.currency.isNative && !this.trade.swaps[0].route.output.isNative
+    }
   }
 
   encode(planner: RoutePlanner, _config: TradeConfig): void {
@@ -82,8 +107,7 @@ export class UniswapTrade implements Command {
     //      in that the reversion probability is lower
     const performAggregatedSlippageCheck =
       this.trade.tradeType === TradeType.EXACT_INPUT && this.trade.routes.length > 2
-    const outputIsNative = this.trade.outputAmount.currency.isNative
-    const routerMustCustody = performAggregatedSlippageCheck || outputIsNative || hasFeeOption(this.options)
+    const routerMustCustody = performAggregatedSlippageCheck || this.outputRequiresUnwrap || hasFeeOption(this.options)
 
     for (const swap of this.trade.swaps) {
       switch (swap.route.protocol) {
@@ -92,6 +116,17 @@ export class UniswapTrade implements Command {
           break
         case Protocol.V3:
           addV3Swap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
+          break
+        case Protocol.V4:
+          addV4Swap(
+            planner,
+            swap,
+            this.trade.tradeType,
+            this.options,
+            this.payerIsUser,
+            routerMustCustody,
+            performAggregatedSlippageCheck
+          )
           break
         case Protocol.MIXED:
           addMixedSwap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
@@ -145,7 +180,7 @@ export class UniswapTrade implements Command {
 
       // The remaining tokens that need to be sent to the user after the fee is taken will be caught
       // by this if-else clause.
-      if (outputIsNative) {
+      if (this.outputRequiresUnwrap) {
         planner.addCommand(CommandType.UNWRAP_WETH, [this.options.recipient, minimumAmountOut])
       } else {
         planner.addCommand(CommandType.SWEEP, [
@@ -236,6 +271,36 @@ function addV3Swap<TInput extends Currency, TOutput extends Currency>(
       payerIsUser,
     ])
   }
+}
+
+function addV4Swap<TInput extends Currency, TOutput extends Currency>(
+  planner: RoutePlanner,
+  { route, inputAmount, outputAmount }: Swap<TInput, TOutput>,
+  tradeType: TradeType,
+  options: SwapOptions,
+  payerIsUser: boolean,
+  routerMustCustody: boolean,
+  performAggregatedSlippageCheck: boolean
+): void {
+  const trade = V4Trade.createUncheckedTrade({
+    route: route as RouteV4<TInput, TOutput>,
+    inputAmount,
+    outputAmount,
+    tradeType,
+  })
+  const slippageToleranceOnSwap = performAggregatedSlippageCheck ? undefined : options.slippageTolerance
+
+  const inputWethFromRouter = inputAmount.currency.isNative && !route.input.isNative
+  if (inputWethFromRouter && !payerIsUser) throw new Error('Inconsistent payer')
+
+  const v4Planner = new V4Planner()
+  v4Planner.addTrade(trade, slippageToleranceOnSwap)
+  v4Planner.addSettle(inputWethFromRouter ? inputAmount.currency.wrapped : inputAmount.currency, payerIsUser)
+
+  options.recipient = options.recipient ?? SENDER_AS_RECIPIENT
+  v4Planner.addTake(outputAmount.currency, routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient)
+
+  planner.addCommand(CommandType.V4_SWAP, [v4Planner.finalize()])
 }
 
 // encode a mixed route swap, i.e. including both v2 and v3 pools
