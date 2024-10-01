@@ -2,7 +2,7 @@ import invariant from 'tiny-invariant'
 
 import { Currency, Price } from '@uniswap/sdk-core'
 import { Pool } from './pool'
-import { getAdjustedCurrency } from '../utils/adjustedCurrency'
+import { getPathCurrency } from '../utils/pathCurrency'
 
 /**
  * Represents a list of pools through which a swap can occur
@@ -35,8 +35,8 @@ export class Route<TInput extends Currency, TOutput extends Currency> {
     /**
      * function throws if pools do not involve the input and output currency or the native/wrapped equivalent
      **/
-    this.pathInput = getAdjustedCurrency(input, pools[0])
-    this.pathOutput = getAdjustedCurrency(output, pools[pools.length - 1])
+    this.pathInput = getPathCurrency(input, pools[0])
+    this.pathOutput = getPathCurrency(output, pools[pools.length - 1])
 
     /**
      * Normalizes currency0-currency1 order and selects the next currency/fee step to add to the path

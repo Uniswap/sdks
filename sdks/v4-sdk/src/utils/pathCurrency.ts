@@ -1,15 +1,15 @@
 import { Currency, CurrencyAmount } from '@uniswap/sdk-core'
 import { Pool } from '../entities/pool'
 
-export function amountWithAdjustedCurrency(amount: CurrencyAmount<Currency>, pool: Pool): CurrencyAmount<Currency> {
+export function amountWithPathCurrency(amount: CurrencyAmount<Currency>, pool: Pool): CurrencyAmount<Currency> {
   return CurrencyAmount.fromFractionalAmount(
-    getAdjustedCurrency(amount.currency, pool),
+    getPathCurrency(amount.currency, pool),
     amount.numerator,
     amount.denominator
   )
 }
 
-export function getAdjustedCurrency(currency: Currency, pool: Pool): Currency {
+export function getPathCurrency(currency: Currency, pool: Pool): Currency {
   if (pool.involvesCurrency(currency)) {
     return currency
   } else if (pool.involvesCurrency(currency.wrapped)) {
