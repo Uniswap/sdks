@@ -207,7 +207,7 @@ export abstract class V4PositionManager {
      * Cases:
      * - if pool does not exist yet, encode initializePool
      * then,
-     * - if is mint, encode MINT_POSITION and SETTLE_PAIR. If it is on a NATIVE pool, encode a SWEEP. If migrating, encode a SWEEP for both currencies.
+     * - if is mint, encode MINT_POSITION. If migrating, encode a SETTLE and SWEEP for both currencies. Else, encode a SETTLE_PAIR. If on a NATIVE pool, encode a SWEEP.
      * - else, encode INCREASE_LIQUIDITY and SETTLE_PAIR. If it is on a NATIVE pool, encode a SWEEP.
      */
     invariant(JSBI.greaterThan(position.liquidity, ZERO), ZERO_LIQUIDITY)
@@ -257,8 +257,17 @@ export abstract class V4PositionManager {
       planner.addIncrease(options.tokenId, position.liquidity, amount0Max, amount1Max, options.hookData)
     }
 
-    // need to settle both currencies when minting / adding liquidity
-    planner.addSettlePair(position.pool.currency0, position.pool.currency1)
+    // If migrating, we need to settle and sweep both currencies individually
+    if (isMint(options) && options.migrate) {
+      // payer is v4 positiion manager
+      planner.addSettle(position.pool.currency0, false)
+      planner.addSettle(position.pool.currency1, false)
+      planner.addSweep(position.pool.currency0, MSG_SENDER)
+      planner.addSweep(position.pool.currency1, MSG_SENDER)
+    } else {
+      // need to settle both currencies when minting / adding liquidity (user is the payer)
+      planner.addSettlePair(position.pool.currency0, position.pool.currency1)
+    }
 
     // Any sweeping must happen after the settling.
     let value: string = toHex(0)
@@ -269,11 +278,6 @@ export abstract class V4PositionManager {
         : position.pool.currency1
       value = position.pool.currency0.isNative ? toHex(amount0Max) : toHex(amount1Max)
       planner.addSweep(nativeCurrency, MSG_SENDER)
-    }
-
-    if (isMint(options) && options.migrate) {
-      planner.addSweep(position.pool.currency0, MSG_SENDER)
-      planner.addSweep(position.pool.currency1, MSG_SENDER)
     }
 
     calldataList.push(V4PositionManager.encodeModifyLiquidities(planner.finalize(), options.deadline))
