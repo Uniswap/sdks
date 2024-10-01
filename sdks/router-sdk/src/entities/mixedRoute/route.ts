@@ -36,12 +36,6 @@ export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
     this.pathInput = getPathCurrency(input, pools[0])
     this.pathOutput = getPathCurrency(output, pools[pools.length - 1])
 
-    if (pools[0] instanceof V4Pool) {
-      this.pathInput = pools[0].involvesToken(input) ? input : input.wrapped
-    } else {
-      this.pathInput = input.wrapped // no native currencies in v2/v3
-    }
-
     invariant(pools[0].involvesToken(this.pathInput as Token), 'INPUT')
     const lastPool = pools[pools.length - 1]
     if (lastPool instanceof V4Pool) {
