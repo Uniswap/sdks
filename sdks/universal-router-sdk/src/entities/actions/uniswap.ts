@@ -118,15 +118,7 @@ export class UniswapTrade implements Command {
           addV3Swap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
           break
         case Protocol.V4:
-          addV4Swap(
-            planner,
-            swap,
-            this.trade.tradeType,
-            this.options,
-            this.payerIsUser,
-            routerMustCustody,
-            performAggregatedSlippageCheck
-          )
+          addV4Swap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
           break
         case Protocol.MIXED:
           addMixedSwap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
@@ -279,8 +271,7 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
   tradeType: TradeType,
   options: SwapOptions,
   payerIsUser: boolean,
-  routerMustCustody: boolean,
-  performAggregatedSlippageCheck: boolean
+  routerMustCustody: boolean
 ): void {
   const trade = V4Trade.createUncheckedTrade({
     route: route as RouteV4<TInput, TOutput>,
@@ -288,7 +279,7 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
     outputAmount,
     tradeType,
   })
-  const slippageToleranceOnSwap = performAggregatedSlippageCheck ? undefined : options.slippageTolerance
+  const slippageToleranceOnSwap = routerMustCustody ? undefined : options.slippageTolerance
 
   const inputWethFromRouter = inputAmount.currency.isNative && !route.input.isNative
   if (inputWethFromRouter && !payerIsUser) throw new Error('Inconsistent payer')
@@ -310,14 +301,17 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
   tradeType: TradeType,
   options: SwapOptions,
   payerIsUser: boolean,
-  routerMustCustody: boolean
+  routerMustCustody: boolean,
+  performAggregatedSlippageCheck: boolean
 ): void {
   const { route, inputAmount, outputAmount } = swap
   const tradeRecipient = routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient
 
   // single hop, so it can be reduced to plain v2 or v3 swap logic
   if (route.pools.length === 1) {
-    if (route.pools[0] instanceof V3Pool) {
+    if (route.pools[0] instanceof V4Pool) {
+      return addV4Swap(planner, swap, tradeType, options, payerIsUser, routerMustCustody)
+    } else if (route.pools[0] instanceof V3Pool) {
       return addV3Swap(planner, swap, tradeType, options, payerIsUser, routerMustCustody)
     } else if (route.pools[0] instanceof Pair) {
       return addV2Swap(planner, swap, tradeType, options, payerIsUser, routerMustCustody)
