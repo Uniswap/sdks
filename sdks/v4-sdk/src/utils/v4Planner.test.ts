@@ -199,33 +199,23 @@ describe('RouterPlanner', () => {
 
   describe('addTrade', () => {
     it('completes a take without a specified amount', async () => {
-      const routerMustCustody = true
-      planner.addTake(DAI, routerMustCustody)
+      const recipient = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+      planner.addTake(DAI, recipient)
 
       expect(planner.actions).toEqual('0x12')
       expect(planner.params[0]).toEqual(
-        '0x0000000000000000000000006b175474e89094c44da98b954eedeac495271d0f00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000'
+        '0x0000000000000000000000006b175474e89094c44da98b954eedeac495271d0f000000000000000000000000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0000000000000000000000000000000000000000000000000000000000000000'
       )
     })
 
     it('completes a take with a specified amount', async () => {
-      const routerMustCustody = true
+      const recipient = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
       const amount = BigNumber.from('8')
-      planner.addTake(DAI, routerMustCustody, amount)
+      planner.addTake(DAI, recipient, amount)
 
       expect(planner.actions).toEqual('0x12')
       expect(planner.params[0]).toEqual(
-        '0x0000000000000000000000006b175474e89094c44da98b954eedeac495271d0f00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000008'
-      )
-    })
-
-    it('completes a take when router will not custody', async () => {
-      const routerMustCustody = false
-      planner.addTake(DAI, routerMustCustody)
-
-      expect(planner.actions).toEqual('0x12')
-      expect(planner.params[0]).toEqual(
-        '0x0000000000000000000000006b175474e89094c44da98b954eedeac495271d0f00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000'
+        '0x0000000000000000000000006b175474e89094c44da98b954eedeac495271d0f000000000000000000000000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0000000000000000000000000000000000000000000000000000000000000008'
       )
     })
   })

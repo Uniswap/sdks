@@ -108,8 +108,6 @@ const ABI_DEFINITION: { [key in Actions]: string[] } = {
 }
 
 const FULL_DELTA_AMOUNT = 0
-const MSG_SENDER = '0x0000000000000000000000000000000000000001'
-const ADDRESS_THIS = '0x0000000000000000000000000000000000000002'
 
 export class V4Planner {
   actions: string
@@ -159,10 +157,9 @@ export class V4Planner {
     this.addAction(Actions.SETTLE, [currencyAddress(currency), amount ?? FULL_DELTA_AMOUNT, payerIsUser])
   }
 
-  addTake(currency: Currency, routerMustCustody: boolean, amount?: BigNumber): void {
-    const receiver = routerMustCustody ? ADDRESS_THIS : MSG_SENDER
+  addTake(currency: Currency, recipient: string, amount?: BigNumber): void {
     const takeAmount = amount ?? FULL_DELTA_AMOUNT
-    this.addAction(Actions.TAKE, [currencyAddress(currency), receiver, takeAmount])
+    this.addAction(Actions.TAKE, [currencyAddress(currency), recipient, takeAmount])
   }
 
   finalize(): string {

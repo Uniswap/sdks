@@ -4609,17 +4609,17 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@uniswap/router-sdk@npm:^1.11.0":
-  version: 1.11.1
-  resolution: "@uniswap/router-sdk@npm:1.11.1"
+"@uniswap/router-sdk@npm:^1.12.1":
+  version: 1.12.1
+  resolution: "@uniswap/router-sdk@npm:1.12.1"
   dependencies:
     "@ethersproject/abi": ^5.5.0
     "@uniswap/sdk-core": ^5.3.1
     "@uniswap/swap-router-contracts": ^1.3.0
     "@uniswap/v2-sdk": ^4.3.2
     "@uniswap/v3-sdk": ^3.11.2
-    "@uniswap/v4-sdk": ^1.0.0
-  checksum: 14530401e29bef09de817f243cf73820d2b043b35da7f34f1a9e06d82ce924cb396d715ea4a9f137bb8e98d5e593254f6eb78b1008e2f84b9e8166feb0297014
+    "@uniswap/v4-sdk": ^1.6.0
+  checksum: d97732822cdd062349a42762c9c4c458e156bdcf436fc9ba8ee3a7fb4e2ade803a6b6305b4a59e869073436dd510ad0d229ec58aa56dddff60a3f06d3670a84c
   languageName: node
   linkType: hard
 
@@ -4639,9 +4639,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@uniswap/sdk-core@npm:^5.0.0, @uniswap/sdk-core@npm:^5.3.0, @uniswap/sdk-core@npm:^5.3.1":
-  version: 5.3.1
-  resolution: "@uniswap/sdk-core@npm:5.3.1"
+"@uniswap/sdk-core@npm:^5.0.0, @uniswap/sdk-core@npm:^5.3.0, @uniswap/sdk-core@npm:^5.3.1, @uniswap/sdk-core@npm:^5.6.0":
+  version: 5.6.0
+  resolution: "@uniswap/sdk-core@npm:5.6.0"
   dependencies:
     "@ethersproject/address": ^5.0.2
     "@ethersproject/bytes": ^5.7.0
@@ -4652,7 +4652,7 @@ __metadata:
     jsbi: ^3.1.4
     tiny-invariant: ^1.1.0
     toformat: ^2.0.0
-  checksum: fcf33b2dc07f740070a79468f9c7d0badd668a8126b512c5cfa71d5f7a406fe0d25b5d6994745b8c2f112a0f416c76cd5cc7e1b3198039813c3a09539f6fe345
+  checksum: 2fabe33e94e70a1fb3d194ef3e622920cd0eed2a23e68a0cf0c3535a8589a0175b4c6a8c7aed55a28d16539ff3ea9058ada5a98200f82728179f3b8445856665
   languageName: node
   linkType: hard
 
@@ -4730,14 +4730,14 @@ __metadata:
     "@types/node": ^18.7.16
     "@types/node-fetch": ^2.6.2
     "@uniswap/permit2-sdk": ^1.3.0
-    "@uniswap/router-sdk": ^1.11.0
+    "@uniswap/router-sdk": ^1.12.1
     "@uniswap/sdk-core": ^5.3.1
     "@uniswap/universal-router": 2.0.0-beta.1
     "@uniswap/v2-core": ^1.0.1
     "@uniswap/v2-sdk": ^4.4.1
     "@uniswap/v3-core": 1.0.0
     "@uniswap/v3-sdk": ^3.13.1
-    "@uniswap/v4-sdk": ^1.6.1
+    "@uniswap/v4-sdk": ^1.0.0
     bignumber.js: ^9.0.2
     chai: ^4.3.6
     dotenv: ^16.0.3
@@ -4792,7 +4792,7 @@ __metadata:
     "@ethersproject/solidity": ^5.0.9
     "@types/big.js": ^4.0.5
     "@types/jest": ^24.0.25
-    "@uniswap/sdk-core": ^5.3.1
+    "@uniswap/sdk-core": ^5.6.0
     "@uniswap/v2-core": ^1.0.1
     eslint-config-react-app: 7.0.1
     tiny-invariant: ^1.1.0
@@ -4867,7 +4867,7 @@ __metadata:
     "@ethersproject/abi": ^5.5.0
     "@ethersproject/solidity": ^5.0.9
     "@types/jest": ^24.0.25
-    "@uniswap/sdk-core": ^5.3.1
+    "@uniswap/sdk-core": ^5.6.0
     "@uniswap/swap-router-contracts": ^1.3.0
     "@uniswap/v3-core": 1.0.0
     "@uniswap/v3-periphery": ^1.1.1
@@ -4890,16 +4890,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v4-sdk@npm:^1.0.0, @uniswap/v4-sdk@npm:^1.6.0, @uniswap/v4-sdk@npm:^1.6.1":
-  version: 1.6.1
-  resolution: "@uniswap/v4-sdk@npm:1.6.1"
+"@uniswap/v4-sdk@npm:^1.0.0, @uniswap/v4-sdk@npm:^1.6.0":
+  version: 1.6.0
+  resolution: "@uniswap/v4-sdk@npm:1.6.0"
   dependencies:
     "@ethersproject/solidity": ^5.0.9
     "@uniswap/sdk-core": ^5.3.1
     "@uniswap/v3-sdk": 3.12.0
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
-  checksum: 8a924f6479ae37ed83bff79b4d2fa3b2f99f5ae44988c681bd8da44af213de7e2927601083bc99f2d2a1e48d55f0e4e93ac4528c949125375600c53d0a4eec90
+  checksum: 6ca999a8e519fe8b9c4337153ecfeec52051b8ad5adf18fb8bf05aed09b6853533081eeaa3409b027135032c2b4e5cece593088b7c6ff4fef1c3b5e9bceceb0a
   languageName: node
   linkType: hard
 

@@ -28,8 +28,12 @@ export class Route<TInput extends Currency, TOutput extends Currency> {
     const chainId = pools[0].chainId
     const allOnSameChain = pools.every((pool) => pool.chainId === chainId)
     invariant(allOnSameChain, 'CHAIN_IDS')
-    invariant(pools[0].involvesCurrency(input), 'INPUT')
-    invariant(pools[pools.length - 1].involvesCurrency(output), 'OUTPUT')
+
+    invariant(pools[0].involvesCurrency(input) || pools[0].involvesCurrency(input.wrapped), 'INPUT')
+    invariant(
+      pools[pools.length - 1].involvesCurrency(output) || pools[pools.length - 1].involvesCurrency(output.wrapped),
+      'OUTPUT'
+    )
 
     /**
      * Normalizes currency0-currency1 order and selects the next currency/fee step to add to the path
