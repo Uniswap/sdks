@@ -56,8 +56,8 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 3543575,
       },
       [UniversalRouterVersion.V2_0]: {
-        address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
-        creationBlock: 3543575,
+        address: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
+        creationBlock: 6789351,
       },
     },
   },
@@ -265,6 +265,19 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       [UniversalRouterVersion.V2_0]: {
         address: '0x28731BCC616B5f51dD52CF2e4dF0E78dD1136C06',
         creationBlock: 12640979,
+      },
+    },
+  },
+  [480]: {
+    weth: '0x4200000000000000000000000000000000000006',
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',
+        creationBlock: 4063979,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',
+        creationBlock: 4063979,
       },
     },
   },

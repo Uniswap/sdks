@@ -49,7 +49,7 @@ describe('DutchOrder', () => {
     swapper = ethers.Wallet.createRandom().connect(ethers.provider);
     await admin.sendTransaction({
       to: await swapper.getAddress(),
-      value: BigNumber.from(10).pow(18),
+      value: BigNumber.from(10).pow(18).mul(10),
     });
 
     const tokenFactory = await ethers.getContractFactory(
