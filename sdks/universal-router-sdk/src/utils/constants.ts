@@ -56,8 +56,8 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 3543575,
       },
       [UniversalRouterVersion.V2_0]: {
-        address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
-        creationBlock: 3543575,
+        address: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
+        creationBlock: 6789351,
       },
     },
   },
@@ -297,6 +297,3 @@ export const MAX_UINT160 = BigNumber.from(2).pow(160).sub(1)
 
 export const SENDER_AS_RECIPIENT = '0x0000000000000000000000000000000000000001'
 export const ROUTER_AS_RECIPIENT = '0x0000000000000000000000000000000000000002'
-
-export const OPENSEA_CONDUIT_SPENDER_ID = 0
-export const SUDOSWAP_SPENDER_ID = 1

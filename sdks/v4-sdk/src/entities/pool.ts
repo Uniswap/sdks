@@ -12,7 +12,7 @@ import {
 } from '@uniswap/v3-sdk'
 import { defaultAbiCoder, isAddress } from 'ethers/lib/utils'
 import { sortsBefore } from '../utils/sortsBefore'
-import { ADDRESS_ZERO, NEGATIVE_ONE, Q192 } from '../utils/internalConstants'
+import { ADDRESS_ZERO, NEGATIVE_ONE, Q192 } from '../internalConstants'
 import JSBI from 'jsbi'
 
 export const DYNAMIC_FEE_FLAG = 0x800000
@@ -93,6 +93,8 @@ export class Pool {
    * @param currencyA One of the currencys in the pool
    * @param currencyB The other currency in the pool
    * @param fee The fee in hundredths of a bips of the input amount of every swap that is collected by the pool
+   * @param tickSpacing The tickSpacing of the pool
+   * @param hooks The address of the hook contract
    * @param sqrtRatioX96 The sqrt of the current ratio of amounts of currency1 to currency0
    * @param liquidity The current value of in range liquidity
    * @param tickCurrent The current tick of the pool
