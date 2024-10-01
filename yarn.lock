@@ -4609,17 +4609,17 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@uniswap/router-sdk@npm:^1.11.0":
-  version: 1.11.1
-  resolution: "@uniswap/router-sdk@npm:1.11.1"
+"@uniswap/router-sdk@npm:^1.12.1":
+  version: 1.12.1
+  resolution: "@uniswap/router-sdk@npm:1.12.1"
   dependencies:
     "@ethersproject/abi": ^5.5.0
     "@uniswap/sdk-core": ^5.3.1
     "@uniswap/swap-router-contracts": ^1.3.0
     "@uniswap/v2-sdk": ^4.3.2
     "@uniswap/v3-sdk": ^3.11.2
-    "@uniswap/v4-sdk": ^1.0.0
-  checksum: 14530401e29bef09de817f243cf73820d2b043b35da7f34f1a9e06d82ce924cb396d715ea4a9f137bb8e98d5e593254f6eb78b1008e2f84b9e8166feb0297014
+    "@uniswap/v4-sdk": ^1.6.0
+  checksum: d97732822cdd062349a42762c9c4c458e156bdcf436fc9ba8ee3a7fb4e2ade803a6b6305b4a59e869073436dd510ad0d229ec58aa56dddff60a3f06d3670a84c
   languageName: node
   linkType: hard
 
@@ -4730,14 +4730,14 @@ __metadata:
     "@types/node": ^18.7.16
     "@types/node-fetch": ^2.6.2
     "@uniswap/permit2-sdk": ^1.3.0
-    "@uniswap/router-sdk": ^1.11.0
+    "@uniswap/router-sdk": ^1.12.1
     "@uniswap/sdk-core": ^5.3.1
     "@uniswap/universal-router": 2.0.0-beta.1
     "@uniswap/v2-core": ^1.0.1
     "@uniswap/v2-sdk": ^4.4.1
     "@uniswap/v3-core": 1.0.0
     "@uniswap/v3-sdk": ^3.13.1
-    "@uniswap/v4-sdk": ^1.0.0
+    "@uniswap/v4-sdk": ^1.6.3
     bignumber.js: ^9.0.2
     chai: ^4.3.6
     dotenv: ^16.0.3
@@ -4890,16 +4890,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v4-sdk@npm:^1.0.0, @uniswap/v4-sdk@npm:^1.6.0":
-  version: 1.6.0
-  resolution: "@uniswap/v4-sdk@npm:1.6.0"
+"@uniswap/v4-sdk@npm:^1.6.0, @uniswap/v4-sdk@npm:^1.6.3":
+  version: 1.6.3
+  resolution: "@uniswap/v4-sdk@npm:1.6.3"
   dependencies:
     "@ethersproject/solidity": ^5.0.9
     "@uniswap/sdk-core": ^5.3.1
     "@uniswap/v3-sdk": 3.12.0
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
-  checksum: 6ca999a8e519fe8b9c4337153ecfeec52051b8ad5adf18fb8bf05aed09b6853533081eeaa3409b027135032c2b4e5cece593088b7c6ff4fef1c3b5e9bceceb0a
+  checksum: b5137b2fe2cfc2940e986cd89458f56318bb9bec1899b511724462ee6956d6fa9f8a598c300d697339c4f0a51c45d4061a1afb2144c42798a5774c0e90bd89f6
   languageName: node
   linkType: hard
 

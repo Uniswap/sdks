@@ -22,6 +22,7 @@ export enum CommandType {
   PERMIT2_TRANSFER_FROM_BATCH = 0x0d,
   BALANCE_CHECK_ERC20 = 0x0e,
 
+  V4_SWAP = 0x10,
   V3_POSITION_MANAGER_PERMIT = 0x11,
   V3_POSITION_MANAGER_CALL = 0x12,
   V4_POSITION_CALL = 0x13,
@@ -56,6 +57,7 @@ const ABI_DEFINITION: { [key in CommandType]: string[] } = {
   [CommandType.V3_SWAP_EXACT_OUT]: ['address', 'uint256', 'uint256', 'bytes', 'bool'],
   [CommandType.V2_SWAP_EXACT_IN]: ['address', 'uint256', 'uint256', 'address[]', 'bool'],
   [CommandType.V2_SWAP_EXACT_OUT]: ['address', 'uint256', 'uint256', 'address[]', 'bool'],
+  [CommandType.V4_SWAP]: ['bytes'],
 
   // Token Actions and Checks
   [CommandType.WRAP_ETH]: ['address', 'uint256'],
@@ -104,6 +106,9 @@ export type RouterCommand = {
 }
 
 export function createCommand(type: CommandType, parameters: any[]): RouterCommand {
+  if (type === CommandType.V4_SWAP) {
+    return { type, encodedInput: parameters[0] }
+  }
   const encodedInput = defaultAbiCoder.encode(ABI_DEFINITION[type], parameters)
   return { type, encodedInput }
 }
