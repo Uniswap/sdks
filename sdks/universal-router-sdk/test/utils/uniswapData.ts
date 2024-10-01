@@ -10,11 +10,15 @@ import {
   TickMath,
   TICK_SPACINGS,
   FeeAmount,
+  Position
 } from '@uniswap/v3-sdk'
 import { SwapOptions } from '../../src'
 import { CurrencyAmount, TradeType, Ether, Token, Percent, Currency } from '@uniswap/sdk-core'
 import IUniswapV3Pool from '@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json'
-import { TEST_RECIPIENT_ADDRESS } from './addresses'
+import { TEST_RECIPIENT_ADDRESS, ROUTER_ADDRESS } from './addresses'
+import { MigrateV3ToV4Options } from '../../src/swapRouter'
+import { encodeSqrtRatioX96 } from '@uniswap/v3-sdk'
+import { Pool as V4Pool, Position as V4Position } from '@uniswap/v4-sdk'
 
 const V2_FACTORY = '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f'
 const V2_ABI = [
@@ -125,6 +129,51 @@ export function swapOptions(options: Partial<SwapOptions>): SwapOptions {
       recipient: TEST_RECIPIENT_ADDRESS,
     },
     options
+  )
+}
+
+export function migrateOptions(): MigrateV3ToV4Options {
+  return Object.assign(
+    {
+      inputPosition: new Position({
+        pool: new Pool(USDC, DAI, FeeAmount.LOW, encodeSqrtRatioX96(1, 1), 0, 0, []),
+        liquidity: 1,
+        tickLower: -10,
+        tickUpper: 10,
+      }),
+      outputPosition: new V4Position({
+        pool: new V4Pool(USDC, DAI, FeeAmount.LOW, 10, "0x0000000000000000000000000000000000000000", encodeSqrtRatioX96(1, 1), 0, 0),
+        liquidity: 1,
+        tickLower: -10,
+        tickUpper: 10,
+      }),
+      v3RemoveLiquidityOptions: {
+        tokenId: 1,
+        liquidityPercentage: new Percent(100),
+        slippageTolerance: new Percent(5, 100),
+        deadline: 1,
+        collectOptions: {
+          expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
+          expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(DAI, 0),
+          recipient: TEST_RECIPIENT_ADDRESS,
+        },
+      },
+      v4AddLiquidityOptions: {
+        deadline: 1,
+        slippageTolerance: new Percent(5, 100),
+        createPool: true,
+        sqrtPriceX96: encodeSqrtRatioX96(1, 1),
+        recipient: TEST_RECIPIENT_ADDRESS,
+      },
+      inputV3NFTPermit: {
+        tokenId: 1,
+        v: 0,
+        r: '0x0000000000000000000000000000000000000000000000000000000000000001',
+        s: '0x0000000000000000000000000000000000000000000000000000000000000002',
+        deadline: 1,
+        spender: ROUTER_ADDRESS,
+      }
+    }
   )
 }
 

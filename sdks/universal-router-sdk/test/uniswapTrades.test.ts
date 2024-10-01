@@ -9,7 +9,7 @@ import { Trade as V3Trade, Route as RouteV3, Pool, FeeOptions } from '@uniswap/v
 import { generatePermitSignature, toInputPermit, makePermit, generateEip2098PermitSignature } from './utils/permit2'
 import { CurrencyAmount, Ether, Percent, Token, TradeType } from '@uniswap/sdk-core'
 import { registerFixture } from './forge/writeInterop'
-import { buildTrade, getUniswapPools, swapOptions, ETHER, DAI, USDC, WETH } from './utils/uniswapData'
+import { buildTrade, getUniswapPools, swapOptions, ETHER, DAI, USDC, WETH, migrateOptions } from './utils/uniswapData'
 import { hexToDecimalString } from './utils/hexToDecimalString'
 import { FORGE_PERMIT2_ADDRESS, FORGE_ROUTER_ADDRESS, TEST_FEE_RECIPIENT_ADDRESS } from './utils/addresses'
 import {
@@ -1208,5 +1208,15 @@ describe('Uniswap', () => {
         'Expected both raw amountIn and raw amountOut to be present'
       )
     })
+  })
+
+  describe('migrate', () => {
+    it('encodes a migration', async () => {
+      const opts = migrateOptions()
+      const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts)
+      registerFixture('MIGRATE', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq("0")
+    })
+
   })
 })

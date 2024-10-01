@@ -29,8 +29,6 @@ export interface MigrateV3ToV4Options {
   outputPosition: V4Position
   v3RemoveLiquidityOptions: V3RemoveLiquidityOptions
   v4AddLiquidityOptions: V4AddLiquidityOptions
-  slippageTolerance: Percent
-  recipient: string
   inputV3NFTPermit?: V3PositionPermit
 }
 
