@@ -206,7 +206,9 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
     amounts[0] = amountWithPathCurrency(amount, route.pools[0])
     for (let i = 0; i < route.path.length - 1; i++) {
       const pool = route.pools[i]
-      const [outputAmount] = await pool.getOutputAmount(amountWithPathCurrency(amounts[i], pool) as CurrencyAmount<Token>)
+      const [outputAmount] = await pool.getOutputAmount(
+        amountWithPathCurrency(amounts[i], pool) as CurrencyAmount<Token>
+      )
       amounts[i + 1] = outputAmount
     }
 
@@ -259,7 +261,9 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
 
       for (let i = 0; i < route.path.length - 1; i++) {
         const pool = route.pools[i]
-        const [outputAmount] = await pool.getOutputAmount(amountWithPathCurrency(amounts[i], pool) as CurrencyAmount<Token>)
+        const [outputAmount] = await pool.getOutputAmount(
+          amountWithPathCurrency(amounts[i], pool) as CurrencyAmount<Token>
+        )
         amounts[i + 1] = outputAmount
       }
 
