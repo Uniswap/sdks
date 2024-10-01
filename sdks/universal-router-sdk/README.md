@@ -15,7 +15,6 @@ Then import the corresponding Trade class and Data object for each protocol you'
 import { TradeType, CurrencyAmount, Token, Percent } from '@uniswap/sdk-core'
 import { Trade as V2TradeSDK } from '@uniswap/v2-sdk'
 import { Trade as V3TradeSDK } from '@uniswap/v3-sdk'
-import { Trade as V2TradeSDK } from '@uniswap/v2-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
 import { SwapRouter, UNIVERSAL_ROUTER_ADDRESS } from '@uniswap/universal-router-sdk'
 import { Percent, Token, TradeType } from '@uniswap/sdk-core'
@@ -50,21 +49,12 @@ const tx = {
 }
 
 // Send the transaction using your preferred method (e.g., ethers.js, web3.js)
-// const txResponse = await wallet.sendTransaction(tx)
-// await txResponse.wait()
+const txResponse = await wallet.sendTransaction(tx)
+await txResponse.wait()
 
-console.log('Transaction parameters:', tx)
 ```
 
-This example demonstrates how to:
-1. Import necessary classes and functions from Uniswap SDKs
-2. Define tokens for the trade
-3. Create a trade object (simplified in this example)
-4. Set up trade options including slippage tolerance and recipient
-5. Generate the calldata and value for the swap
-6. Prepare a transaction object for sending to the Universal Router
-
-Remember to handle errors, validate inputs, and implement proper transaction sending and confirmation in your actual implementation.
+The code above is provided strictly as an example implementation of using the SDK to build a UniversalRouter swap.
 
 ## Running this package
 Make sure you are running `node v18`
@@ -80,6 +70,3 @@ Run forge integration tests
 forge install
 yarn test:forge
 ```
-
-## Contributing
-Contributions to improve the SDK or documentation are welcome. Please ensure you follow the existing code style and add appropriate tests for any new functionality.
