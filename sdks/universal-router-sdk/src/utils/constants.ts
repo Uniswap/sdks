@@ -268,6 +268,32 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
   },
+  [480]: {
+    weth: '0x4200000000000000000000000000000000000006',
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',
+        creationBlock: 4063979,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',
+        creationBlock: 4063979,
+      },
+    },
+  },
+  [1301]: {
+    weth: '0x4200000000000000000000000000000000000006',
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: '0xf164fC0Ec4E93095b804a4795bBe1e041497b92a',
+        creationBlock: 618210,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: '0xf164fC0Ec4E93095b804a4795bBe1e041497b92a',
+        creationBlock: 618210,
+      },
+    },
+  },
 }
 
 export const UNIVERSAL_ROUTER_ADDRESS = (version: UniversalRouterVersion, chainId: number): string => {
@@ -287,8 +313,6 @@ export const WETH_ADDRESS = (chainId: number): string => {
 
   return CHAIN_CONFIGS[chainId].weth
 }
-
-export const PERMIT2_ADDRESS = '0x000000000022D473030F116dDEE9F6B43aC78BA3'
 
 export const CONTRACT_BALANCE = BigNumber.from(2).pow(255)
 export const ETH_ADDRESS = '0x0000000000000000000000000000000000000000'
