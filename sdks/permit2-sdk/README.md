@@ -31,7 +31,16 @@ async function frontendExample() {
 
   // Get the next valid nonce
   const allowanceProvider = new AllowanceProvider(provider, PERMIT2_ADDRESS)
-  const { nonce } = await allowanceProvider.getAllowanceData(await signer.getAddress(), tokenAddress, spenderAddress)
+
+  const tokenAddress = '0x...'; // Replace with actual token address
+  const ownerAddress = await signer.getAddress(); // Retrieve the owner's address
+  const spenderAddress = '0x...'; // Replace with actual spender address
+
+  // Call getAllowanceData to get the allowance data
+  const allowanceData = await allowanceProvider.getAllowanceData(tokenAddress, ownerAddress, spenderAddress);
+  const { nonce, amount, expiration } = allowanceData;
+
+  // NOTE: If the allowance is enough and the expiration is still valid, you can skip the permit
 
   // Construct the PermitSingle object
   const permitSingle: PermitSingle = {
