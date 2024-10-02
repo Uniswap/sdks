@@ -24,7 +24,6 @@ import {
   CurrencyAmount,
   Ether,
   Percent,
-  SUPPORTED_CHAINS,
   SupportedChainsType,
   Token,
   TradeType,

@@ -20,14 +20,11 @@ import {
   TradeType,
   Percent,
   CHAIN_TO_ADDRESSES_MAP,
-  ChainId,
-  SUPPORTED_CHAINS,
   SupportedChainsType,
 } from '@uniswap/sdk-core'
 import { UniswapTrade, SwapOptions } from './entities/actions/uniswap'
 import { RoutePlanner, CommandType } from './utils/routerCommands'
 import { encodePermit, encodeV3PositionPermit, V3PositionPermit } from './utils/inputTokens'
-import { UNIVERSAL_ROUTER_ADDRESS } from './utils/constants'
 
 export type SwapRouterConfig = {
   sender?: string // address
