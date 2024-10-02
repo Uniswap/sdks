@@ -26,7 +26,7 @@ const TICKLIST = [
 
 const USDC = new Token(1, '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', 6, 'USDC', 'USD Coin')
 const DAI = new Token(1, '0x6B175474E89094C44Da98b954EedeAC495271d0F', 18, 'DAI', 'DAI Stablecoin')
-const USDC_WETH = new Pool(
+export const USDC_WETH = new Pool(
   USDC,
   WETH9[1],
   FEE_AMOUNT_MEDIUM,
@@ -37,7 +37,7 @@ const USDC_WETH = new Pool(
   0,
   TICKLIST
 )
-const DAI_USDC = new Pool(
+export const DAI_USDC = new Pool(
   USDC,
   DAI,
   FEE_AMOUNT_MEDIUM,
@@ -48,7 +48,7 @@ const DAI_USDC = new Pool(
   0,
   TICKLIST
 )
-const DAI_WETH = new Pool(
+export const DAI_WETH = new Pool(
   WETH9[1],
   DAI,
   FEE_AMOUNT_MEDIUM,

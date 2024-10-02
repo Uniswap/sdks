@@ -103,7 +103,6 @@ export const V4_SWAP_ABI_DEFINITION: { [key in Actions]: readonly ParamType[] } 
   ],
   [Actions.BURN_POSITION]: [
     { name: 'tokenId', type: 'uint256' },
-    { name: 'liquidity', type: 'uint256' },
     { name: 'amount0Min', type: 'uint128' },
     { name: 'amount1Min', type: 'uint128' },
     { name: 'hookData', type: 'bytes' },
