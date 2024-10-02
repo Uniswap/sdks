@@ -15,10 +15,19 @@ import {
   MintOptions,
 } from '@uniswap/v4-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
-import { Currency, TradeType, Percent } from '@uniswap/sdk-core'
+import {
+  Currency,
+  TradeType,
+  Percent,
+  CHAIN_TO_ADDRESSES_MAP,
+  ChainId,
+  SUPPORTED_CHAINS,
+  SupportedChainsType,
+} from '@uniswap/sdk-core'
 import { UniswapTrade, SwapOptions } from './entities/actions/uniswap'
 import { RoutePlanner, CommandType } from './utils/routerCommands'
 import { encodePermit, encodeV3PositionPermit, V3PositionPermit } from './utils/inputTokens'
+import { UNIVERSAL_ROUTER_ADDRESS } from './utils/constants'
 
 export type SwapRouterConfig = {
   sender?: string // address
@@ -77,16 +86,19 @@ export abstract class SwapRouter {
   public static migrateV3ToV4CallParameters(options: MigrateV3ToV4Options): MethodParameters {
     const token0 = options.inputPosition.pool.token0
     const token1 = options.inputPosition.pool.token1
-    //const positionManagerAddress = CHAIN_TO_ADDRESSES_MAP[ChainId[options.inputPosition.pool.chainId]].v4PositionManagerAddress
+    const v4PositionManagerAddress =
+      CHAIN_TO_ADDRESSES_MAP[options.outputPosition.pool.chainId as SupportedChainsType].v4PositionManagerAddress
+
     invariant(token0 === options.outputPosition.pool.token0, 'TOKEN0_MISMATCH')
     invariant(token1 === options.outputPosition.pool.token1, 'TOKEN1_MISMATCH')
     invariant(options.v3RemoveLiquidityOptions.liquidityPercentage.equalTo(new Percent(100)), 'FULL_REMOVAL_REQUIRED')
+    invariant(
+      options.v3RemoveLiquidityOptions.collectOptions.recipient === v4PositionManagerAddress,
+      'RECIPIENT_NOT_POSITION_MANAGER'
+    )
 
     invariant(isMint(options.v4AddLiquidityOptions), 'MINT_REQUIRED')
-
-    if (isMint(options.v4AddLiquidityOptions)) {
-      invariant(options.v4AddLiquidityOptions.migrate, 'MIGRATE_REQUIRED')
-    }
+    invariant(options.v4AddLiquidityOptions.migrate, 'MIGRATE_REQUIRED')
 
     const planner = new RoutePlanner()
 
