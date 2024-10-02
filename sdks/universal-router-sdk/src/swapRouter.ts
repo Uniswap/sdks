@@ -12,6 +12,7 @@ import {
   Position as V4Position,
   V4PositionManager,
   AddLiquidityOptions as V4AddLiquidityOptions,
+  MintOptions,
 } from '@uniswap/v4-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
 import { Currency, TradeType, Percent } from '@uniswap/sdk-core'
@@ -30,6 +31,10 @@ export interface MigrateV3ToV4Options {
   v3RemoveLiquidityOptions: V3RemoveLiquidityOptions
   v4AddLiquidityOptions: V4AddLiquidityOptions
   inputV3NFTPermit?: V3PositionPermit
+}
+
+function isMint(options: V4AddLiquidityOptions): options is MintOptions {
+  return Object.keys(options).some((k) => k === 'recipient')
 }
 
 export abstract class SwapRouter {
@@ -77,11 +82,11 @@ export abstract class SwapRouter {
     invariant(token1 === options.outputPosition.pool.token1, 'TOKEN1_MISMATCH')
     invariant(options.v3RemoveLiquidityOptions.liquidityPercentage.equalTo(new Percent(100)), 'FULL_REMOVAL_REQUIRED')
 
-    // invariant(isMint(options.v4AddLiquidityOptions), "MINT_REQUIRED")
+    invariant(isMint(options.v4AddLiquidityOptions), 'MINT_REQUIRED')
 
-    // if (isMint(options.v4AddLiquidityOptions)) {
-    //   invariant(options.v4AddLiquidityOptions.migrate === true, 'MIGRATE_REQUIRED')
-    // }
+    if (isMint(options.v4AddLiquidityOptions)) {
+      invariant(options.v4AddLiquidityOptions.migrate, 'MIGRATE_REQUIRED')
+    }
 
     const planner = new RoutePlanner()
 

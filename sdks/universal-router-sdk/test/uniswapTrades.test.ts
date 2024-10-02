@@ -1438,8 +1438,6 @@ describe('Uniswap', () => {
           deadline: 1,
           migrate: true,
           slippageTolerance: new Percent(5, 100),
-          createPool: true,
-          sqrtPriceX96: encodeSqrtRatioX96(1, 1),
           recipient: TEST_RECIPIENT_ADDRESS,
         },
         inputV3NFTPermit: {
@@ -1494,8 +1492,6 @@ describe('Uniswap', () => {
           deadline: 1,
           migrate: true,
           slippageTolerance: new Percent(5, 100),
-          createPool: true,
-          sqrtPriceX96: encodeSqrtRatioX96(1, 1),
           recipient: TEST_RECIPIENT_ADDRESS,
         },
       })
@@ -1540,10 +1536,8 @@ describe('Uniswap', () => {
         },
         v4AddLiquidityOptions: {
           deadline: 1,
-          mirgate: false,
+          mirgate: true,
           slippageTolerance: new Percent(5, 100),
-          createPool: true,
-          sqrtPriceX96: encodeSqrtRatioX96(1, 1),
           recipient: TEST_RECIPIENT_ADDRESS,
         },
       })
@@ -1586,10 +1580,8 @@ describe('Uniswap', () => {
         },
         v4AddLiquidityOptions: {
           deadline: 1,
-          mirgate: false,
+          mirgate: true,
           slippageTolerance: new Percent(5, 100),
-          createPool: true,
-          sqrtPriceX96: encodeSqrtRatioX96(1, 1),
           recipient: TEST_RECIPIENT_ADDRESS,
         },
       })
@@ -1632,14 +1624,100 @@ describe('Uniswap', () => {
         },
         v4AddLiquidityOptions: {
           deadline: 1,
-          mirgate: false,
+          mirgate: true,
           slippageTolerance: new Percent(5, 100),
-          createPool: true,
-          sqrtPriceX96: encodeSqrtRatioX96(1, 1),
           recipient: TEST_RECIPIENT_ADDRESS,
         },
       })
       expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('FULL_REMOVAL_REQUIRED')
+    })
+
+    it('throws if not minting when migrating', async () => {
+      const opts = Object.assign({
+        inputPosition: new Position({
+          pool: new V3Pool(USDC, DAI, FeeAmount.LOW, encodeSqrtRatioX96(1, 1), 0, 0, []),
+          liquidity: 1,
+          tickLower: -10,
+          tickUpper: 10,
+        }),
+        outputPosition: new V4Position({
+          pool: new V4Pool(
+            USDC,
+            DAI,
+            FeeAmount.LOW,
+            10,
+            '0x0000000000000000000000000000000000000000',
+            encodeSqrtRatioX96(1, 1),
+            0,
+            0
+          ),
+          liquidity: 1,
+          tickLower: -10,
+          tickUpper: 10,
+        }),
+        v3RemoveLiquidityOptions: {
+          tokenId: 1,
+          liquidityPercentage: new Percent(100),
+          slippageTolerance: new Percent(5, 100),
+          deadline: 1,
+          collectOptions: {
+            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(DAI, 0),
+            recipient: TEST_RECIPIENT_ADDRESS,
+          },
+        },
+        v4AddLiquidityOptions: {
+          tokenId: 1,
+          deadline: 1,
+          slippageTolerance: new Percent(5, 100),
+          sqrtPriceX96: encodeSqrtRatioX96(1, 1),
+        },
+      })
+      expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('MINT_REQUIRED')
+    })
+
+    it('throws if migrating flag not set', async () => {
+      const opts = Object.assign({
+        inputPosition: new Position({
+          pool: new V3Pool(USDC, DAI, FeeAmount.LOW, encodeSqrtRatioX96(1, 1), 0, 0, []),
+          liquidity: 1,
+          tickLower: -10,
+          tickUpper: 10,
+        }),
+        outputPosition: new V4Position({
+          pool: new V4Pool(
+            USDC,
+            DAI,
+            FeeAmount.LOW,
+            10,
+            '0x0000000000000000000000000000000000000000',
+            encodeSqrtRatioX96(1, 1),
+            0,
+            0
+          ),
+          liquidity: 1,
+          tickLower: -10,
+          tickUpper: 10,
+        }),
+        v3RemoveLiquidityOptions: {
+          tokenId: 1,
+          liquidityPercentage: new Percent(100),
+          slippageTolerance: new Percent(5, 100),
+          deadline: 1,
+          collectOptions: {
+            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(DAI, 0),
+            recipient: TEST_RECIPIENT_ADDRESS,
+          },
+        },
+        v4AddLiquidityOptions: {
+          deadline: 1,
+          migrate: false,
+          slippageTolerance: new Percent(5, 100),
+          recipient: TEST_RECIPIENT_ADDRESS,
+        },
+      })
+      expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('MIGRATE_REQUIRED')
     })
   })
 })
