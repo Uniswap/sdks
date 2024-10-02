@@ -1443,12 +1443,13 @@ describe('Uniswap', () => {
         }),
         v3RemoveLiquidityOptions: {
           tokenId: 1,
-          liquidityPercentage: new Percent(100),
+          liquidityPercentage: new Percent(100, 100),
           slippageTolerance: new Percent(5, 100),
           deadline: 1,
+          burnToken: true,
           collectOptions: {
-            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
-            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(DAI, 0),
+            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(TOKEN0, 0),
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(TOKEN1, 0),
             recipient: CHAIN_TO_ADDRESSES_MAP[chainId].v4PositionManagerAddress,
           },
         },
@@ -1497,12 +1498,13 @@ describe('Uniswap', () => {
         }),
         v3RemoveLiquidityOptions: {
           tokenId: 1,
-          liquidityPercentage: new Percent(100),
+          liquidityPercentage: new Percent(100, 100),
           slippageTolerance: new Percent(5, 100),
           deadline: 1,
+          burnToken: true,
           collectOptions: {
-            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
-            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(DAI, 0),
+            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(TOKEN0, 0),
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(TOKEN1, 0),
             recipient: CHAIN_TO_ADDRESSES_MAP[chainId].v4PositionManagerAddress,
           },
         },
@@ -1543,9 +1545,10 @@ describe('Uniswap', () => {
         }),
         v3RemoveLiquidityOptions: {
           tokenId: 1,
-          liquidityPercentage: new Percent(100),
+          liquidityPercentage: new Percent(100, 100),
           slippageTolerance: new Percent(5, 100),
           deadline: 1,
+          burnToken: true,
           collectOptions: {
             expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
             expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(DAI, 0),
@@ -1587,9 +1590,10 @@ describe('Uniswap', () => {
         }),
         v3RemoveLiquidityOptions: {
           tokenId: 1,
-          liquidityPercentage: new Percent(100),
+          liquidityPercentage: new Percent(100, 100),
           slippageTolerance: new Percent(5, 100),
           deadline: 1,
+          burnToken: true,
           collectOptions: {
             expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
             expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(DAI, 0),
@@ -1634,6 +1638,7 @@ describe('Uniswap', () => {
           liquidityPercentage: new Percent(90),
           slippageTolerance: new Percent(5, 100),
           deadline: 1,
+          burnToken: true,
           collectOptions: {
             expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
             expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(DAI, 0),
@@ -1648,6 +1653,50 @@ describe('Uniswap', () => {
         },
       })
       expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('FULL_REMOVAL_REQUIRED')
+    })
+
+    it('burn required for v3', async () => {
+      const opts = Object.assign({
+        inputPosition: new Position({
+          pool: new V3Pool(USDC, DAI, FeeAmount.LOW, encodeSqrtRatioX96(1, 1), 0, 0, []),
+          liquidity: 1,
+          tickLower: -10,
+          tickUpper: 10,
+        }),
+        outputPosition: new V4Position({
+          pool: new V4Pool(
+            USDC,
+            DAI,
+            FeeAmount.LOW,
+            10,
+            '0x0000000000000000000000000000000000000000',
+            encodeSqrtRatioX96(1, 1),
+            0,
+            0
+          ),
+          liquidity: 1,
+          tickLower: -10,
+          tickUpper: 10,
+        }),
+        v3RemoveLiquidityOptions: {
+          tokenId: 1,
+          liquidityPercentage: new Percent(100, 100),
+          slippageTolerance: new Percent(5, 100),
+          deadline: 1,
+          collectOptions: {
+            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(DAI, 0),
+            recipient: TEST_RECIPIENT_ADDRESS,
+          },
+        },
+        v4AddLiquidityOptions: {
+          deadline: 1,
+          mirgate: true,
+          slippageTolerance: new Percent(5, 100),
+          recipient: TEST_RECIPIENT_ADDRESS,
+        },
+      })
+      expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('BURN_TOKEN_REQUIRED')
     })
 
     it('throws if not minting when migrating', async () => {
@@ -1675,9 +1724,10 @@ describe('Uniswap', () => {
         }),
         v3RemoveLiquidityOptions: {
           tokenId: 1,
-          liquidityPercentage: new Percent(100),
+          liquidityPercentage: new Percent(100, 100),
           slippageTolerance: new Percent(5, 100),
           deadline: 1,
+          burnToken: true,
           collectOptions: {
             expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
             expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(DAI, 0),
@@ -1719,9 +1769,10 @@ describe('Uniswap', () => {
         }),
         v3RemoveLiquidityOptions: {
           tokenId: 1,
-          liquidityPercentage: new Percent(100),
+          liquidityPercentage: new Percent(100, 100),
           slippageTolerance: new Percent(5, 100),
           deadline: 1,
+          burnToken: true,
           collectOptions: {
             expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
             expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(DAI, 0),
@@ -1763,9 +1814,10 @@ describe('Uniswap', () => {
         }),
         v3RemoveLiquidityOptions: {
           tokenId: 1,
-          liquidityPercentage: new Percent(100),
+          liquidityPercentage: new Percent(100, 100),
           slippageTolerance: new Percent(5, 100),
           deadline: 1,
+          burnToken: true,
           collectOptions: {
             expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
             expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(DAI, 0),

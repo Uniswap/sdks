@@ -83,7 +83,11 @@ export abstract class SwapRouter {
 
     invariant(token0 === options.outputPosition.pool.token0, 'TOKEN0_MISMATCH')
     invariant(token1 === options.outputPosition.pool.token1, 'TOKEN1_MISMATCH')
-    invariant(options.v3RemoveLiquidityOptions.liquidityPercentage.equalTo(new Percent(100)), 'FULL_REMOVAL_REQUIRED')
+    invariant(
+      options.v3RemoveLiquidityOptions.liquidityPercentage.equalTo(new Percent(100, 100)),
+      'FULL_REMOVAL_REQUIRED'
+    )
+    invariant(options.v3RemoveLiquidityOptions.burnToken == true, 'BURN_TOKEN_REQUIRED')
     invariant(
       options.v3RemoveLiquidityOptions.collectOptions.recipient === v4PositionManagerAddress,
       'RECIPIENT_NOT_POSITION_MANAGER'
