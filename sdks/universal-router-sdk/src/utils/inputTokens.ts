@@ -26,10 +26,6 @@ export type InputTokenOptions = {
   permit2TransferFrom?: Permit2TransferFrom
 }
 
-export interface V3PositionPermit extends NFTPermitOptions {
-  tokenId: BigintIsh
-}
-
 const SIGNATURE_LENGTH = 65
 const EIP_2098_SIGNATURE_LENGTH = 64
 
@@ -46,10 +42,10 @@ export function encodePermit(planner: RoutePlanner, permit2: Permit2Permit): voi
   planner.addCommand(CommandType.PERMIT2_PERMIT, [permit2, signature])
 }
 
-export function encodeV3PositionPermit(planner: RoutePlanner, permit: V3PositionPermit): void {
+export function encodeV3PositionPermit(planner: RoutePlanner, permit: NFTPermitOptions, tokenId: BigintIsh): void {
   const calldata = NonfungiblePositionManager.INTERFACE.encodeFunctionData('permit', [
     validateAndParseAddress(permit.spender),
-    permit.tokenId,
+    tokenId,
     permit.deadline,
     permit.v,
     permit.r,

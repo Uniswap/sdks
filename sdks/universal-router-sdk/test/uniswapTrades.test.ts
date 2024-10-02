@@ -1452,20 +1452,19 @@ describe('Uniswap', () => {
             expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(TOKEN1, 0),
             recipient: CHAIN_TO_ADDRESSES_MAP[chainId].v4PositionManagerAddress,
           },
+          permit: {
+            v: 0,
+            r: '0x0000000000000000000000000000000000000000000000000000000000000001',
+            s: '0x0000000000000000000000000000000000000000000000000000000000000002',
+            deadline: 1,
+            spender: UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, chainId),
+          },
         },
         v4AddLiquidityOptions: {
           deadline: 1,
           migrate: true,
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
-        },
-        inputV3NFTPermit: {
-          tokenId: 1,
-          v: 0,
-          r: '0x0000000000000000000000000000000000000000000000000000000000000001',
-          s: '0x0000000000000000000000000000000000000000000000000000000000000002',
-          deadline: 1,
-          spender: UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, chainId),
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts)
@@ -1823,20 +1822,19 @@ describe('Uniswap', () => {
             expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(DAI, 0),
             recipient: CHAIN_TO_ADDRESSES_MAP[chainId].v4PositionManagerAddress,
           },
+          permit: {
+            v: 0,
+            r: '0x0000000000000000000000000000000000000000000000000000000000000001',
+            s: '0x0000000000000000000000000000000000000000000000000000000000000002',
+            deadline: 1,
+            spender: TEST_RECIPIENT_ADDRESS,
+          },
         },
         v4AddLiquidityOptions: {
           deadline: 1,
           migrate: true,
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
-        },
-        inputV3NFTPermit: {
-          tokenId: 1,
-          v: 0,
-          r: '0x0000000000000000000000000000000000000000000000000000000000000001',
-          s: '0x0000000000000000000000000000000000000000000000000000000000000002',
-          deadline: 1,
-          spender: TEST_RECIPIENT_ADDRESS,
         },
       })
       expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('INVALID_SPENDER')

@@ -18,7 +18,7 @@ import { Trade as RouterTrade } from '@uniswap/router-sdk'
 import { Currency, TradeType, Percent, CHAIN_TO_ADDRESSES_MAP, SupportedChainsType } from '@uniswap/sdk-core'
 import { UniswapTrade, SwapOptions } from './entities/actions/uniswap'
 import { RoutePlanner, CommandType } from './utils/routerCommands'
-import { encodePermit, encodeV3PositionPermit, V3PositionPermit } from './utils/inputTokens'
+import { encodePermit, encodeV3PositionPermit } from './utils/inputTokens'
 import { UNIVERSAL_ROUTER_ADDRESS, UniversalRouterVersion } from './utils/constants'
 
 export type SwapRouterConfig = {
@@ -31,7 +31,6 @@ export interface MigrateV3ToV4Options {
   outputPosition: V4Position
   v3RemoveLiquidityOptions: V3RemoveLiquidityOptions
   v4AddLiquidityOptions: V4AddLiquidityOptions
-  inputV3NFTPermit?: V3PositionPermit
 }
 
 function isMint(options: V4AddLiquidityOptions): options is MintOptions {
@@ -98,15 +97,15 @@ export abstract class SwapRouter {
 
     const planner = new RoutePlanner()
 
-    if (options.inputV3NFTPermit) {
+    if (options.v3RemoveLiquidityOptions.permit) {
       // permit spender should be UR
       const universalRouterAddress = UNIVERSAL_ROUTER_ADDRESS(
         UniversalRouterVersion.V2_0,
         options.inputPosition.pool.chainId as SupportedChainsType
       )
-      invariant(universalRouterAddress == options.inputV3NFTPermit.spender, 'INVALID_SPENDER')
+      invariant(universalRouterAddress == options.v3RemoveLiquidityOptions.permit.spender, 'INVALID_SPENDER')
       // don't need to transfer it because v3posm uses isApprovedOrOwner()
-      encodeV3PositionPermit(planner, options.inputV3NFTPermit)
+      encodeV3PositionPermit(planner, options.v3RemoveLiquidityOptions.permit, options.v3RemoveLiquidityOptions.tokenId)
     }
 
     // encode v3 withdraw
