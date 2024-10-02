@@ -115,7 +115,7 @@ export const COMMAND_ABI_DEFINITION: { [key in CommandType]: readonly ParamType[
   // Token Actions and Checks
   [CommandType.WRAP_ETH]: [
     { name: 'recipient', type: 'address' },
-    { name: 'amountMin', type: 'uint256' },
+    { name: 'amount', type: 'uint256' },
   ],
   [CommandType.UNWRAP_WETH]: [
     { name: 'recipient', type: 'address' },

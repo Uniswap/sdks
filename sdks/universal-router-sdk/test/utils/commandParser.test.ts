@@ -24,7 +24,7 @@ describe('Command Parser', () => {
             commandType: CommandType.WRAP_ETH,
             params: [
               { name: 'recipient', value: addressOne },
-              { name: 'amountMin', value: amount },
+              { name: 'amount', value: amount },
             ],
           },
         ],
@@ -120,7 +120,7 @@ describe('Command Parser', () => {
             commandType: CommandType.WRAP_ETH,
             params: [
               { name: 'recipient', value: addressOne },
-              { name: 'amountMin', value: amount },
+              { name: 'amount', value: amount },
             ],
           },
           {
