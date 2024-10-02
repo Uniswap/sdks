@@ -9,18 +9,26 @@ import {
   Trade as V3Trade,
   Route as V3Route,
   Pool as V3Pool,
+  Position,
   FeeOptions,
   encodeSqrtRatioX96,
   nearestUsableTick,
   TickMath,
+  FeeAmount,
 } from '@uniswap/v3-sdk'
-import { Pool as V4Pool, Route as V4Route, Trade as V4Trade } from '@uniswap/v4-sdk'
+import { Pool as V4Pool, Route as V4Route, Trade as V4Trade, Position as V4Position } from '@uniswap/v4-sdk'
 import { generatePermitSignature, toInputPermit, makePermit, generateEip2098PermitSignature } from './utils/permit2'
 import { CurrencyAmount, Ether, Percent, Token, TradeType } from '@uniswap/sdk-core'
 import { registerFixture } from './forge/writeInterop'
-import { buildTrade, getUniswapPools, swapOptions, ETHER, DAI, USDC, WETH, migrateOptions } from './utils/uniswapData'
+import { buildTrade, getUniswapPools, swapOptions, ETHER, DAI, USDC, WETH } from './utils/uniswapData'
 import { hexToDecimalString } from './utils/hexToDecimalString'
-import { FORGE_PERMIT2_ADDRESS, FORGE_ROUTER_ADDRESS, TEST_FEE_RECIPIENT_ADDRESS } from './utils/addresses'
+import {
+  FORGE_PERMIT2_ADDRESS,
+  FORGE_ROUTER_ADDRESS,
+  TEST_FEE_RECIPIENT_ADDRESS,
+  TEST_RECIPIENT_ADDRESS,
+  ROUTER_ADDRESS,
+} from './utils/addresses'
 import {
   PartialClassicQuote,
   PoolType,
@@ -1393,10 +1401,113 @@ describe('Uniswap', () => {
 
   describe('migrate', () => {
     it('encodes a migration', async () => {
-      const opts = migrateOptions()
+      const opts = Object.assign({
+        inputPosition: new Position({
+          pool: new V3Pool(USDC, DAI, FeeAmount.LOW, encodeSqrtRatioX96(1, 1), 0, 0, []),
+          liquidity: 1,
+          tickLower: -10,
+          tickUpper: 10,
+        }),
+        outputPosition: new V4Position({
+          pool: new V4Pool(
+            USDC,
+            DAI,
+            FeeAmount.LOW,
+            10,
+            '0x0000000000000000000000000000000000000000',
+            encodeSqrtRatioX96(1, 1),
+            0,
+            0
+          ),
+          liquidity: 1,
+          tickLower: -10,
+          tickUpper: 10,
+        }),
+        v3RemoveLiquidityOptions: {
+          tokenId: 1,
+          liquidityPercentage: new Percent(100),
+          slippageTolerance: new Percent(5, 100),
+          deadline: 1,
+          collectOptions: {
+            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(DAI, 0),
+            recipient: TEST_RECIPIENT_ADDRESS,
+          },
+        },
+        v4AddLiquidityOptions: {
+          deadline: 1,
+          migrate: true,
+          slippageTolerance: new Percent(5, 100),
+          createPool: true,
+          sqrtPriceX96: encodeSqrtRatioX96(1, 1),
+          recipient: TEST_RECIPIENT_ADDRESS,
+        },
+        inputV3NFTPermit: {
+          tokenId: 1,
+          v: 0,
+          r: '0x0000000000000000000000000000000000000000000000000000000000000001',
+          s: '0x0000000000000000000000000000000000000000000000000000000000000002',
+          deadline: 1,
+          spender: ROUTER_ADDRESS,
+        },
+      })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts)
       registerFixture('MIGRATE', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+    })
+
+    it('throws if token0s are different', async () => {
+      const opts = Object.assign({
+        inputPosition: new Position({
+          pool: new V3Pool(USDC, DAI, FeeAmount.LOW, encodeSqrtRatioX96(1, 1), 0, 0, []),
+          liquidity: 1,
+          tickLower: -10,
+          tickUpper: 10,
+        }),
+        outputPosition: new V4Position({
+          pool: new V4Pool(
+            USDC,
+            WETH,
+            FeeAmount.LOW,
+            10,
+            '0x0000000000000000000000000000000000000000',
+            encodeSqrtRatioX96(1, 1),
+            0,
+            0
+          ),
+          liquidity: 1,
+          tickLower: -10,
+          tickUpper: 10,
+        }),
+        v3RemoveLiquidityOptions: {
+          tokenId: 1,
+          liquidityPercentage: new Percent(100),
+          slippageTolerance: new Percent(5, 100),
+          deadline: 1,
+          collectOptions: {
+            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(DAI, 0),
+            recipient: TEST_RECIPIENT_ADDRESS,
+          },
+        },
+        v4AddLiquidityOptions: {
+          deadline: 1,
+          mirgate: false,
+          slippageTolerance: new Percent(5, 100),
+          createPool: true,
+          sqrtPriceX96: encodeSqrtRatioX96(1, 1),
+          recipient: TEST_RECIPIENT_ADDRESS,
+        },
+        inputV3NFTPermit: {
+          tokenId: 1,
+          v: 0,
+          r: '0x0000000000000000000000000000000000000000000000000000000000000001',
+          s: '0x0000000000000000000000000000000000000000000000000000000000000002',
+          deadline: 1,
+          spender: ROUTER_ADDRESS,
+        },
+      })
+      expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('TOKEN0_MISMATCH')
     })
   })
 })

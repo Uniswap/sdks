@@ -14,7 +14,7 @@ import {
   AddLiquidityOptions as V4AddLiquidityOptions,
 } from '@uniswap/v4-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
-import { Currency, TradeType, Percent } from '@uniswap/sdk-core'
+import { Currency, TradeType, Percent, CHAIN_TO_ADDRESSES_MAP, ChainId } from '@uniswap/sdk-core'
 import { UniswapTrade, SwapOptions } from './entities/actions/uniswap'
 import { RoutePlanner, CommandType } from './utils/routerCommands'
 import { encodePermit, encodeV3PositionPermit, V3PositionPermit } from './utils/inputTokens'
@@ -72,9 +72,16 @@ export abstract class SwapRouter {
   public static migrateV3ToV4CallParameters(options: MigrateV3ToV4Options): MethodParameters {
     const token0 = options.inputPosition.pool.token0
     const token1 = options.inputPosition.pool.token1
+    //const positionManagerAddress = CHAIN_TO_ADDRESSES_MAP[ChainId[options.inputPosition.pool.chainId]].v4PositionManagerAddress
     invariant(token0 === options.outputPosition.pool.token0, 'TOKEN0_MISMATCH')
     invariant(token1 === options.outputPosition.pool.token1, 'TOKEN1_MISMATCH')
     invariant(options.v3RemoveLiquidityOptions.liquidityPercentage.equalTo(new Percent(100)), 'FULL_REMOVAL_REQUIRED')
+
+    // invariant(isMint(options.v4AddLiquidityOptions), "MINT_REQUIRED")
+
+    // if (isMint(options.v4AddLiquidityOptions)) {
+    //   invariant(options.v4AddLiquidityOptions.migrate === true, 'MIGRATE_REQUIRED')
+    // }
 
     const planner = new RoutePlanner()
 
