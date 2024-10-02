@@ -14,7 +14,7 @@ export const TEST_RECIPIENT_ADDRESS = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 export const TEST_FEE_RECIPIENT_ADDRESS = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
 
 export const PERMIT2_ADDRESS =
-  process.env.USE_MAINNET_DEPLOYMENT === 'true' ? MAINNET_PERMIT2_ADDRESS : FORGE_PERMIT2_ADDRESS
+  process.env.USE_MAINNET_DEPLOYMENT === 'true' ? permit2Address(ChainId.MAINNET) : FORGE_PERMIT2_ADDRESS
 // Universal Router address in tests
 export const ROUTER_ADDRESS =
   process.env.USE_MAINNET_DEPLOYMENT === 'true' ? MAINNET_ROUTER_ADDRESS : FORGE_ROUTER_ADDRESS
