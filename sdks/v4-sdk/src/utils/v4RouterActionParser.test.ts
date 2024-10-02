@@ -242,18 +242,18 @@ describe('Command Parser', () => {
                   path: [
                     {
                       intermediateCurrency: USDC.address,
-                      fee: BigNumber.from(DAI_USDC.fee),
+                      fee: DAI_USDC.fee,
                       tickSpacing: DAI_USDC.tickSpacing,
                       hooks: DAI_USDC.hooks,
                       hookData: '0x',
                     },
                     {
                       intermediateCurrency: WETH9[1].address,
-                      fee: BigNumber.from(USDC_WETH.fee),
+                      fee: USDC_WETH.fee,
                       tickSpacing: USDC_WETH.tickSpacing,
                       hooks: USDC_WETH.hooks,
                       hookData: '0x',
-                    }
+                    },
                   ],
                   amountIn: amount,
                   amountOutMinimum: amount,
@@ -286,18 +286,18 @@ describe('Command Parser', () => {
                   path: [
                     {
                       intermediateCurrency: USDC.address,
-                      fee: BigNumber.from(DAI_USDC.fee),
+                      fee: DAI_USDC.fee,
                       tickSpacing: DAI_USDC.tickSpacing,
                       hooks: DAI_USDC.hooks,
                       hookData: '0x',
                     },
                     {
                       intermediateCurrency: WETH9[1].address,
-                      fee: BigNumber.from(USDC_WETH.fee),
+                      fee: USDC_WETH.fee,
                       tickSpacing: USDC_WETH.tickSpacing,
                       hooks: USDC_WETH.hooks,
                       hookData: '0x',
-                    }
+                    },
                   ],
                   amountOut: amount,
                   amountInMaximum: amount,

@@ -1,9 +1,7 @@
 import { ethers } from 'ethers'
-import {
-  Actions,
-  Subparser,
-  V4_SWAP_ABI_DEFINITION,
-} from './v4Planner'
+import { PoolKey } from '../entities/pool'
+import { PathKey } from './encodeRouteToPath'
+import { Actions, Subparser, V4_SWAP_ABI_DEFINITION } from './v4Planner'
 
 export type Param = {
   readonly name: string
@@ -24,22 +22,6 @@ export type V3PathItem = {
   readonly tokenIn: string
   readonly tokenOut: string
   readonly fee: string
-}
-
-export type PoolKey = {
-  readonly currency0: string
-  readonly currency1: string
-  readonly fee: string
-  readonly tickSpacing: string
-  readonly hooks: string
-}
-
-export type PathKey = {
-  readonly intermediateCurrency: string
-  readonly fee: string
-  readonly tickSpacing: string
-  readonly hooks: string
-  readonly hookData: string
 }
 
 export type SwapExactInSingle = {
@@ -151,8 +133,8 @@ function parsePoolKey(data: string): PoolKey {
   return {
     currency0,
     currency1,
-    fee,
-    tickSpacing,
+    fee: parseInt(fee),
+    tickSpacing: parseInt(tickSpacing),
     hooks,
   }
 }
@@ -162,8 +144,8 @@ function parsePathKey(data: string): PathKey {
 
   return {
     intermediateCurrency,
-    fee,
-    tickSpacing,
+    fee: parseInt(fee),
+    tickSpacing: parseInt(tickSpacing),
     hooks,
     hookData,
   }
