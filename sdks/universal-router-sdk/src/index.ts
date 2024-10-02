@@ -10,3 +10,4 @@ export {
   WETH_ADDRESS,
   UniversalRouterVersion,
 } from './utils/constants'
+export { CommandParser, UniversalRouterCommand, UniversalRouterCall, Param } from './utils/commandParser'
