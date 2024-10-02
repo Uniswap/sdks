@@ -54,25 +54,25 @@ export type ParamType = {
   readonly subparser?: Subparser
 }
 
-export const POOL_KEY_STRUCT = '(address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks)'
+const POOL_KEY_STRUCT = '(address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks)'
 
-export const PATH_KEY_STRUCT =
+const PATH_KEY_STRUCT =
   '(address intermediateCurrency,uint256 fee,int24 tickSpacing,address hooks,bytes hookData)'
 
-export const SWAP_EXACT_IN_SINGLE_STRUCT =
+const SWAP_EXACT_IN_SINGLE_STRUCT =
   '(' +
   POOL_KEY_STRUCT +
   ' poolKey,bool zeroForOne,uint128 amountIn,uint128 amountOutMinimum,uint160 sqrtPriceLimitX96,bytes hookData)'
 
-export const SWAP_EXACT_IN_STRUCT =
+const SWAP_EXACT_IN_STRUCT =
   '(address currencyIn,' + PATH_KEY_STRUCT + '[] path,uint128 amountIn,uint128 amountOutMinimum)'
 
-export const SWAP_EXACT_OUT_SINGLE_STRUCT =
+const SWAP_EXACT_OUT_SINGLE_STRUCT =
   '(' +
   POOL_KEY_STRUCT +
   ' poolKey,bool zeroForOne,uint128 amountOut,uint128 amountInMaximum,uint160 sqrtPriceLimitX96,bytes hookData)'
 
-export const SWAP_EXACT_OUT_STRUCT =
+const SWAP_EXACT_OUT_STRUCT =
   '(address currencyOut,' + PATH_KEY_STRUCT + '[] path,uint128 amountOut,uint128 amountInMaximum)'
 
 export const V4_SWAP_ABI_DEFINITION: { [key in Actions]: readonly ParamType[] } = {

@@ -1,8 +1,11 @@
 import { expect } from 'chai'
+import { WETH9 } from '@uniswap/sdk-core'
 import { BigNumber, ethers } from 'ethers'
-import { V4RouterActionParser, V4RouterCall } from './v4CommandParser'
+import { Route } from '../entities/route'
+import { encodeRouteToPath } from './encodeRouteToPath'
+import { V4RouterActionParser, V4RouterCall } from './v4RouterActionParser'
 import { V4Planner, Actions } from './v4Planner'
-import { USDC_WETH } from './v4Planner.test'
+import { USDC_WETH, DAI_USDC, DAI, USDC } from './v4Planner.test'
 
 const addressOne = '0x0000000000000000000000000000000000000001'
 const addressTwo = '0x0000000000000000000000000000000000000002'
@@ -37,9 +40,7 @@ describe('Command Parser', () => {
           {
             actionName: 'CLOSE_CURRENCY',
             actionType: Actions.CLOSE_CURRENCY,
-            params: [
-              { name: 'currency', value: addressOne },
-            ],
+            params: [{ name: 'currency', value: addressOne }],
           },
         ],
       },
@@ -154,26 +155,154 @@ describe('Command Parser', () => {
       },
     },
     {
-      input: new V4Planner().addAction(Actions.SWAP_EXACT_IN_SINGLE, [{
+      input: new V4Planner().addAction(Actions.SWAP_EXACT_IN_SINGLE, [
+        {
           poolKey: USDC_WETH.poolKey,
           zeroForOne: true,
           amountIn: amount,
           amountOutMinimum: amount,
           sqrtPriceLimitX96: 0,
           hookData: '0x',
-      }]),
+        },
+      ]),
       result: {
         actions: [
           {
             actionName: 'SWAP_EXACT_IN_SINGLE',
             actionType: Actions.SWAP_EXACT_IN_SINGLE,
             params: [
-              { name: 'poolKey', value: USDC_WETH.poolKey },
-              { name: 'zeroForOne', value: true },
-              { name: 'amountIn', value: amount },
-              { name: 'amountOutMinimum', value: amount },
-              { name: 'sqrtPriceLimitX96', value: BigNumber.from(0) },
-              { name: 'hookData', value: '0x' },
+              {
+                name: 'swap',
+                value: {
+                  poolKey: USDC_WETH.poolKey,
+                  zeroForOne: true,
+                  amountIn: amount,
+                  amountOutMinimum: amount,
+                  sqrtPriceLimitX96: BigNumber.from(0),
+                  hookData: '0x',
+                },
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      input: new V4Planner().addAction(Actions.SWAP_EXACT_OUT_SINGLE, [
+        {
+          poolKey: USDC_WETH.poolKey,
+          zeroForOne: true,
+          amountOut: amount,
+          amountInMaximum: amount,
+          sqrtPriceLimitX96: 0,
+          hookData: '0x',
+        },
+      ]),
+      result: {
+        actions: [
+          {
+            actionName: 'SWAP_EXACT_OUT_SINGLE',
+            actionType: Actions.SWAP_EXACT_OUT_SINGLE,
+            params: [
+              {
+                name: 'swap',
+                value: {
+                  poolKey: USDC_WETH.poolKey,
+                  zeroForOne: true,
+                  amountOut: amount,
+                  amountInMaximum: amount,
+                  sqrtPriceLimitX96: BigNumber.from(0),
+                  hookData: '0x',
+                },
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      input: new V4Planner().addAction(Actions.SWAP_EXACT_IN, [
+        {
+          currencyIn: DAI.address,
+          path: encodeRouteToPath(new Route([DAI_USDC, USDC_WETH], DAI, WETH9[1])),
+          amountIn: amount,
+          amountOutMinimum: amount,
+        },
+      ]),
+      result: {
+        actions: [
+          {
+            actionName: 'SWAP_EXACT_IN',
+            actionType: Actions.SWAP_EXACT_IN,
+            params: [
+              {
+                name: 'swap',
+                value: {
+                  currencyIn: DAI.address,
+                  path: [
+                    {
+                      intermediateCurrency: USDC.address,
+                      fee: BigNumber.from(DAI_USDC.fee),
+                      tickSpacing: DAI_USDC.tickSpacing,
+                      hooks: DAI_USDC.hooks,
+                      hookData: '0x',
+                    },
+                    {
+                      intermediateCurrency: WETH9[1].address,
+                      fee: BigNumber.from(USDC_WETH.fee),
+                      tickSpacing: USDC_WETH.tickSpacing,
+                      hooks: USDC_WETH.hooks,
+                      hookData: '0x',
+                    }
+                  ],
+                  amountIn: amount,
+                  amountOutMinimum: amount,
+                },
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      input: new V4Planner().addAction(Actions.SWAP_EXACT_OUT, [
+        {
+          currencyOut: DAI.address,
+          path: encodeRouteToPath(new Route([DAI_USDC, USDC_WETH], DAI, WETH9[1])),
+          amountOut: amount,
+          amountInMaximum: amount,
+        },
+      ]),
+      result: {
+        actions: [
+          {
+            actionName: 'SWAP_EXACT_OUT',
+            actionType: Actions.SWAP_EXACT_OUT,
+            params: [
+              {
+                name: 'swap',
+                value: {
+                  currencyOut: DAI.address,
+                  path: [
+                    {
+                      intermediateCurrency: USDC.address,
+                      fee: BigNumber.from(DAI_USDC.fee),
+                      tickSpacing: DAI_USDC.tickSpacing,
+                      hooks: DAI_USDC.hooks,
+                      hookData: '0x',
+                    },
+                    {
+                      intermediateCurrency: WETH9[1].address,
+                      fee: BigNumber.from(USDC_WETH.fee),
+                      tickSpacing: USDC_WETH.tickSpacing,
+                      hooks: USDC_WETH.hooks,
+                      hookData: '0x',
+                    }
+                  ],
+                  amountOut: amount,
+                  amountInMaximum: amount,
+                },
+              },
             ],
           },
         ],

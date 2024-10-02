@@ -3,12 +3,6 @@ import {
   Actions,
   Subparser,
   V4_SWAP_ABI_DEFINITION,
-  POOL_KEY_STRUCT,
-  PATH_KEY_STRUCT,
-  SWAP_EXACT_IN_SINGLE_STRUCT,
-  SWAP_EXACT_IN_STRUCT,
-  SWAP_EXACT_OUT_SINGLE_STRUCT,
-  SWAP_EXACT_OUT_STRUCT,
 } from './v4Planner'
 
 export type Param = {
@@ -29,21 +23,21 @@ export type V4RouterCall = {
 export type V3PathItem = {
   readonly tokenIn: string
   readonly tokenOut: string
-  readonly fee: number
+  readonly fee: string
 }
 
 export type PoolKey = {
   readonly currency0: string
   readonly currency1: string
-  readonly fee: number
-  readonly tickSpacing: number
+  readonly fee: string
+  readonly tickSpacing: string
   readonly hooks: string
 }
 
 export type PathKey = {
   readonly intermediateCurrency: string
-  readonly fee: number
-  readonly tickSpacing: number
+  readonly fee: string
+  readonly tickSpacing: string
   readonly hooks: string
   readonly hookData: string
 }
@@ -51,33 +45,33 @@ export type PathKey = {
 export type SwapExactInSingle = {
   readonly poolKey: PoolKey
   readonly zeroForOne: boolean
-  readonly amountIn: number
-  readonly amountOutMinimum: number
-  readonly sqrtPriceLimitX96: number
+  readonly amountIn: string
+  readonly amountOutMinimum: string
+  readonly sqrtPriceLimitX96: string
   readonly hookData: string
 }
 
 export type SwapExactIn = {
   readonly currencyIn: string
   readonly path: readonly PathKey[]
-  readonly amountIn: number
-  readonly amountOutMinimum: number
+  readonly amountIn: string
+  readonly amountOutMinimum: string
 }
 
 export type SwapExactOutSingle = {
   readonly poolKey: PoolKey
   readonly zeroForOne: boolean
-  readonly amountOut: number
-  readonly amountInMaximum: number
-  readonly sqrtPriceLimitX96: number
+  readonly amountOut: string
+  readonly amountInMaximum: string
+  readonly sqrtPriceLimitX96: string
   readonly hookData: string
 }
 
 export type SwapExactOut = {
   readonly currencyOut: string
   readonly path: readonly PathKey[]
-  readonly amountOut: number
-  readonly amountInMaximum: number
+  readonly amountOut: string
+  readonly amountInMaximum: string
 }
 
 // Parses V4Router actions
@@ -94,7 +88,7 @@ export abstract class V4RouterActionParser {
           abiDef.map((command) => command.type),
           inputs[i]
         )
-        const params = rawParams.map((param: string, j: number) => {
+        const params = rawParams.map((param, j) => {
           switch (abiDef[j].subparser) {
             case Subparser.V4SwapExactInSingle:
               return {
@@ -152,7 +146,7 @@ export abstract class V4RouterActionParser {
 }
 
 function parsePoolKey(data: string): PoolKey {
-  const [currency0, currency1, fee, tickSpacing, hooks] = ethers.utils.defaultAbiCoder.decode([POOL_KEY_STRUCT], data)
+  const [currency0, currency1, fee, tickSpacing, hooks] = data
 
   return {
     currency0,
@@ -164,10 +158,7 @@ function parsePoolKey(data: string): PoolKey {
 }
 
 function parsePathKey(data: string): PathKey {
-  const [intermediateCurrency, fee, tickSpacing, hooks, hookData] = ethers.utils.defaultAbiCoder.decode(
-    [PATH_KEY_STRUCT],
-    data
-  )
+  const [intermediateCurrency, fee, tickSpacing, hooks, hookData] = data
 
   return {
     intermediateCurrency,
@@ -178,12 +169,17 @@ function parsePathKey(data: string): PathKey {
   }
 }
 
-function parseV4ExactInSingle(data: string): SwapExactInSingle {
-  const [poolKey, zeroForOne, amountIn, amountOutMinimum, sqrtPriceLimitX96, hookData] =
-    ethers.utils.defaultAbiCoder.decode([SWAP_EXACT_IN_SINGLE_STRUCT], data)
-
+function parseV4ExactInSingle(data: any[]): SwapExactInSingle {
+  const [poolKey, zeroForOne, amountIn, amountOutMinimum, sqrtPriceLimitX96, hookData] = data
+  const [currency0, currency1, fee, tickSpacing, hooks] = poolKey
   return {
-    poolKey: parsePoolKey(poolKey),
+    poolKey: {
+      currency0,
+      currency1,
+      fee,
+      tickSpacing,
+      hooks,
+    },
     zeroForOne,
     amountIn,
     amountOutMinimum,
@@ -192,11 +188,8 @@ function parseV4ExactInSingle(data: string): SwapExactInSingle {
   }
 }
 
-function parseV4ExactIn(data: string): SwapExactIn {
-  const [currencyIn, path, amountIn, amountOutMinimum] = ethers.utils.defaultAbiCoder.decode(
-    [SWAP_EXACT_IN_STRUCT],
-    data
-  )
+function parseV4ExactIn(data: any[]): SwapExactIn {
+  const [currencyIn, path, amountIn, amountOutMinimum] = data
   const paths: readonly PathKey[] = path.map((pathKey: string) => parsePathKey(pathKey))
 
   return {
@@ -207,12 +200,18 @@ function parseV4ExactIn(data: string): SwapExactIn {
   }
 }
 
-function parseV4ExactOutSingle(data: string): SwapExactOutSingle {
-  const [poolKey, zeroForOne, amountOut, amountInMaximum, sqrtPriceLimitX96, hookData] =
-    ethers.utils.defaultAbiCoder.decode([SWAP_EXACT_OUT_SINGLE_STRUCT], data)
+function parseV4ExactOutSingle(data: any[]): SwapExactOutSingle {
+  const [poolKey, zeroForOne, amountOut, amountInMaximum, sqrtPriceLimitX96, hookData] = data
+  const { currency0, currency1, fee, tickSpacing, hooks } = poolKey
 
   return {
-    poolKey: parsePoolKey(poolKey),
+    poolKey: {
+      currency0,
+      currency1,
+      fee,
+      tickSpacing,
+      hooks,
+    },
     zeroForOne,
     amountOut,
     amountInMaximum,
@@ -221,11 +220,8 @@ function parseV4ExactOutSingle(data: string): SwapExactOutSingle {
   }
 }
 
-function parseV4ExactOut(data: string): SwapExactOut {
-  const [currencyOut, path, amountOut, amountInMaximum] = ethers.utils.defaultAbiCoder.decode(
-    [SWAP_EXACT_OUT_STRUCT],
-    data
-  )
+function parseV4ExactOut(data: any[]): SwapExactOut {
+  const [currencyOut, path, amountOut, amountInMaximum] = data
   const paths: readonly PathKey[] = path.map((pathKey: string) => parsePathKey(pathKey))
 
   return {
