@@ -59,6 +59,11 @@ export interface MintSpecificOptions {
    * Initial price to set on the pool if creating
    */
   sqrtPriceX96?: BigintIsh
+
+  /**
+   * Whether the mint is part of a migration from V3 to V4.
+   */
+  migrate?: boolean
 }
 
 /**
@@ -221,8 +226,8 @@ export abstract class V4PositionManager {
      * Cases:
      * - if pool does not exist yet, encode initializePool
      * then,
-     * - if is mint, encode MINT_POSITION. If it is on a NATIVE pool, encode a SWEEP. Finally encode a SETTLE_PAIR
-     * - else, encode INCREASE_LIQUIDITY. If it is on a NATIVE pool, encode a SWEEP. Finally encode a SETTLE_PAIR
+     * - if is mint, encode MINT_POSITION. If migrating, encode a SETTLE and SWEEP for both currencies. Else, encode a SETTLE_PAIR. If on a NATIVE pool, encode a SWEEP.
+     * - else, encode INCREASE_LIQUIDITY and SETTLE_PAIR. If it is on a NATIVE pool, encode a SWEEP.
      */
     invariant(JSBI.greaterThan(position.liquidity, ZERO), ZERO_LIQUIDITY)
 
@@ -271,8 +276,17 @@ export abstract class V4PositionManager {
       planner.addIncrease(options.tokenId, position.liquidity, amount0Max, amount1Max, options.hookData)
     }
 
-    // need to settle both currencies when minting / adding liquidity
-    planner.addSettlePair(position.pool.currency0, position.pool.currency1)
+    // If migrating, we need to settle and sweep both currencies individually
+    if (isMint(options) && options.migrate) {
+      // payer is v4 positiion manager
+      planner.addSettle(position.pool.currency0, false)
+      planner.addSettle(position.pool.currency1, false)
+      planner.addSweep(position.pool.currency0, options.recipient)
+      planner.addSweep(position.pool.currency1, options.recipient)
+    } else {
+      // need to settle both currencies when minting / adding liquidity (user is the payer)
+      planner.addSettlePair(position.pool.currency0, position.pool.currency1)
+    }
 
     // Any sweeping must happen after the settling.
     let value: string = toHex(0)

@@ -3,6 +3,7 @@ import invariant from 'tiny-invariant'
 import { ONE, ZERO } from '../internalConstants'
 import { Pool } from './pool'
 import { Route } from './route'
+import { amountWithPathCurrency } from '../utils/pathCurrency'
 
 /**
  * Trades comparator, an extension of the input output comparator that also considers other dimensions of the trade in ranking them
@@ -233,7 +234,8 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     let outputAmount: CurrencyAmount<TOutput>
     if (tradeType === TradeType.EXACT_INPUT) {
       invariant(amount.currency.equals(route.input), 'INPUT')
-      amounts[0] = amount
+      // Account for trades that wrap/unwrap as a first step
+      amounts[0] = amountWithPathCurrency(amount, route.pools[0])
       for (let i = 0; i < route.currencyPath.length - 1; i++) {
         const pool = route.pools[i]
         const [outputAmount] = await pool.getOutputAmount(amounts[i])
@@ -247,7 +249,8 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       )
     } else {
       invariant(amount.currency.equals(route.output), 'OUTPUT')
-      amounts[amounts.length - 1] = amount
+      // Account for trades that wrap/unwrap as a last step
+      amounts[amounts.length - 1] = amountWithPathCurrency(amount, route.pools[route.pools.length - 1])
       for (let i = route.currencyPath.length - 1; i > 0; i--) {
         const pool = route.pools[i - 1]
         const [inputAmount] = await pool.getInputAmount(amounts[i])
