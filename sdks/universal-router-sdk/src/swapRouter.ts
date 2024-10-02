@@ -15,16 +15,11 @@ import {
   MintOptions,
 } from '@uniswap/v4-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
-import {
-  Currency,
-  TradeType,
-  Percent,
-  CHAIN_TO_ADDRESSES_MAP,
-  SupportedChainsType,
-} from '@uniswap/sdk-core'
+import { Currency, TradeType, Percent, CHAIN_TO_ADDRESSES_MAP, SupportedChainsType } from '@uniswap/sdk-core'
 import { UniswapTrade, SwapOptions } from './entities/actions/uniswap'
 import { RoutePlanner, CommandType } from './utils/routerCommands'
 import { encodePermit, encodeV3PositionPermit, V3PositionPermit } from './utils/inputTokens'
+import { UNIVERSAL_ROUTER_ADDRESS, UniversalRouterVersion } from './utils/constants'
 
 export type SwapRouterConfig = {
   sender?: string // address
@@ -100,7 +95,12 @@ export abstract class SwapRouter {
     const planner = new RoutePlanner()
 
     if (options.inputV3NFTPermit) {
-      // note: permit spender should be UR
+      // permit spender should be UR
+      const universalRouterAddress = UNIVERSAL_ROUTER_ADDRESS(
+        UniversalRouterVersion.V2_0,
+        options.inputPosition.pool.chainId as SupportedChainsType
+      )
+      invariant(universalRouterAddress == options.inputV3NFTPermit.spender, 'INVALID_SPENDER')
       // don't need to transfer it because v3posm uses isApprovedOrOwner()
       encodeV3PositionPermit(planner, options.inputV3NFTPermit)
     }
