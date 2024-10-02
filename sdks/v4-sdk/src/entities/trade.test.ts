@@ -1,4 +1,4 @@
-import { Currency, CurrencyAmount, Ether, Percent, Price, sqrt, Token, TradeType } from '@uniswap/sdk-core'
+import { Currency, CurrencyAmount, Ether, WETH9, Percent, Price, sqrt, Token, TradeType } from '@uniswap/sdk-core'
 import { ADDRESS_ZERO, FEE_AMOUNT_MEDIUM, TICK_SPACING_SIXTY } from '../internalConstants'
 import JSBI from 'jsbi'
 import { nearestUsableTick, encodeSqrtRatioX96, TickMath } from '@uniswap/v3-sdk'
@@ -8,7 +8,7 @@ import { Trade } from './trade'
 
 describe('Trade', () => {
   const ETHER = Ether.onChain(1)
-
+  const weth = WETH9[1]
   const token0 = new Token(1, '0x0000000000000000000000000000000000000001', 18, 't0', 'token0')
   const token1 = new Token(1, '0x0000000000000000000000000000000000000002', 18, 't1', 'token1')
   const token2 = new Token(1, '0x0000000000000000000000000000000000000003', 18, 't2', 'token2')
@@ -81,6 +81,11 @@ describe('Trade', () => {
     CurrencyAmount.fromRawAmount(token2, JSBI.BigInt(100000))
   )
 
+  const pool_weth_0 = v2StylePool(
+    CurrencyAmount.fromRawAmount(weth, JSBI.BigInt(100000)),
+    CurrencyAmount.fromRawAmount(token0, JSBI.BigInt(100000))
+  )
+
   describe('#fromRoute', () => {
     it('can be constructed with ETHER as input', async () => {
       const trade = await Trade.fromRoute(
@@ -91,6 +96,47 @@ describe('Trade', () => {
       expect(trade.inputAmount.currency).toEqual(ETHER)
       expect(trade.outputAmount.currency).toEqual(token0)
     })
+
+    it('can be constructed with ETHER as input on a WETH Pool', async () => {
+      const trade = await Trade.fromRoute(
+        new Route([pool_weth_0], ETHER, token0),
+        CurrencyAmount.fromRawAmount(Ether.onChain(1), JSBI.BigInt(10000)),
+        TradeType.EXACT_INPUT
+      )
+      expect(trade.inputAmount.currency).toEqual(ETHER)
+      expect(trade.outputAmount.currency).toEqual(token0)
+    })
+
+    it('can be constructed with WETH as input on a ETH Pool', async () => {
+      const trade = await Trade.fromRoute(
+        new Route([pool_eth_0], weth, token0),
+        CurrencyAmount.fromRawAmount(weth, JSBI.BigInt(10000)),
+        TradeType.EXACT_INPUT
+      )
+      expect(trade.inputAmount.currency).toEqual(weth)
+      expect(trade.outputAmount.currency).toEqual(token0)
+    })
+
+    it('can be constructed with ETHER as output on a WETH Pool', async () => {
+      const trade = await Trade.fromRoute(
+        new Route([pool_weth_0], token0, ETHER),
+        CurrencyAmount.fromRawAmount(token0, JSBI.BigInt(10000)),
+        TradeType.EXACT_INPUT
+      )
+      expect(trade.inputAmount.currency).toEqual(token0)
+      expect(trade.outputAmount.currency).toEqual(ETHER)
+    })
+
+    it('can be constructed with WETH as output on a ETH Pool', async () => {
+      const trade = await Trade.fromRoute(
+        new Route([pool_eth_0], token0, weth),
+        CurrencyAmount.fromRawAmount(token0, JSBI.BigInt(10000)),
+        TradeType.EXACT_INPUT
+      )
+      expect(trade.inputAmount.currency).toEqual(token0)
+      expect(trade.outputAmount.currency).toEqual(weth)
+    })
+
     it('can be constructed with ETHER as input for exact output', async () => {
       const trade = await Trade.fromRoute(
         new Route([pool_eth_0], ETHER, token0),
