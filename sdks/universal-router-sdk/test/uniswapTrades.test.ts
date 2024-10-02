@@ -1468,7 +1468,7 @@ describe('Uniswap', () => {
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts)
-      registerFixture('MIGRATE', methodParameters)
+      registerFixture('MIGRATE_WITH_PERMIT', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
@@ -1515,7 +1515,7 @@ describe('Uniswap', () => {
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts)
-      registerFixture('MIGRATE', methodParameters)
+      registerFixture('MIGRATE_WITHOUT_PERMIT', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
