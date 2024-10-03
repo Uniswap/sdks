@@ -112,6 +112,7 @@ export abstract class V4BaseActionsParser {
   private static getActions(actions: string): Actions[] {
     const actionTypes = []
 
+    // parse action types from packed bytes string
     for (let i = 2; i < actions.length; i += 2) {
       const byte = actions.substring(i, i + 2)
       actionTypes.push(parseInt(byte, 16) as Actions)
