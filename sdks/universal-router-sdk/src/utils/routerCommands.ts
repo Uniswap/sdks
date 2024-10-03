@@ -30,10 +30,6 @@ export enum CommandType {
   EXECUTE_SUB_PLAN = 0x21,
 }
 
-export enum AltParser {
-  V4Call,
-}
-
 export enum Subparser {
   V3PathExactIn,
   V3PathExactOut,
@@ -42,6 +38,7 @@ export enum Subparser {
 export enum Parser {
   Abi,
   V4Actions,
+  V3Actions,
 }
 
 export type ParamType = {
@@ -57,6 +54,9 @@ export type CommandDefinition =
     }
   | {
       parser: Parser.V4Actions
+    }
+  | {
+      parser: Parser.V3Actions
     }
 
 const ALLOW_REVERT_FLAG = 0x80
@@ -255,6 +255,9 @@ export function createCommand(type: CommandType, parameters: any[]): RouterComma
       )
       return { type, encodedInput }
     case Parser.V4Actions:
+      // v4 swap data comes pre-encoded at index 0
+      return { type, encodedInput: parameters[0] }
+    case Parser.V3Actions:
       // v4 swap data comes pre-encoded at index 0
       return { type, encodedInput: parameters[0] }
   }
