@@ -10,12 +10,15 @@ import {
   TickMath,
   TICK_SPACINGS,
   FeeAmount,
+  Position,
 } from '@uniswap/v3-sdk'
-import { Pool as V4Pool, Route as V4Route, Trade as V4Trade } from '@uniswap/v4-sdk'
+import { Pool as V4Pool, Route as RouteV4, Trade as V4Trade, Position as V4Position } from '@uniswap/v4-sdk'
 import { SwapOptions } from '../../src'
 import { CurrencyAmount, TradeType, Ether, Token, Percent, Currency } from '@uniswap/sdk-core'
 import IUniswapV3Pool from '@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json'
-import { TEST_RECIPIENT_ADDRESS } from './addresses'
+import { TEST_RECIPIENT_ADDRESS, ROUTER_ADDRESS } from './addresses'
+import { MigrateV3ToV4Options } from '../../src/swapRouter'
+import { encodeSqrtRatioX96 } from '@uniswap/v3-sdk'
 
 const V2_FACTORY = '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f'
 const V2_ABI = [
