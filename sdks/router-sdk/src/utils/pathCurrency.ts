@@ -21,7 +21,7 @@ export function getPathCurrency(currency: Currency, pool: TPool): Currency {
 
     // return native currency if pool involves native version of wrapped currency (only applies to V4)
   } else if (pool instanceof V4Pool) {
-    if (pool.currency0.wrapped.equals(currency)) {
+    if (pool.token0.wrapped.equals(currency)) {
       return pool.token0
     } else if (pool.token1.wrapped.equals(currency)) {
       return pool.token1
