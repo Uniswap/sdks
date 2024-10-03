@@ -70,6 +70,8 @@ export const V2_ROUTER_ADDRESSES: AddressMap = {
   [ChainId.BNB]: '0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24',
   [ChainId.POLYGON]: '0xedf6066a2b290c185783862c7f4776a2c8077ad1',
   [ChainId.BLAST]: '0xBB66Eb1c5e875933D44DAe661dbD80e5D9B03035',
+  [ChainId.WORLDCHAIN]: '0xf164fC0Ec4E93095b804a4795bBe1e041497b92a',
+  [ChainId.ASTROCHAIN_SEPOLIA]: '0x9e5A52f57b3038F1B8EeE45F28b3C1967e22799C',
 }
 
 // Networks that share most of the same addresses i.e. Mainnet, Goerli, Optimism, Arbitrum, Polygon
@@ -271,11 +273,11 @@ const WORLDCHAIN_ADDRESSES: ChainAddresses = {
 const ASTROCHAIN_SEPOLIA_ADDRESSES: ChainAddresses = {
   v3CoreFactoryAddress: '0x1F98431c8aD98523631AE4a59f267346ea31F984',
   multicallAddress: '0x9D0F15f2cf58655fDDcD1EE6129C547fDaeD01b1',
-  quoterAddress: '0x8C41f1696360ca987803a4c24B8b7c36dFd61c4d',
-  v3MigratorAddress: '0x0e4b7B0d0125eCF02D6bBFd21Cf4559D9C9AcE42',
-  nonfungiblePositionManagerAddress: '0x05701915588BB4Dd144216d2f5Af70cdc7A8BFE4',
+  quoterAddress: '0x6Dd37329A1A225a6Fca658265D460423DCafBF89',
+  v3MigratorAddress: '0xb5FA244C9d6D04B2FBac84418b3c4910ED1Ae5f2',
+  nonfungiblePositionManagerAddress: '0xB7F724d6dDDFd008eFf5cc2834edDE5F9eF0d075',
   tickLensAddress: '0x5f739c790a48E97eec0efb81bab5D152c0A0ecA0',
-  swapRouter02Address: '0xa8b0be287acB850952DE4287b84B7222cc654C09',
+  swapRouter02Address: '0xd1AAE39293221B77B0C71fBD6dCb7Ea29Bb5B166',
 }
 
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
