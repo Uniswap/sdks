@@ -78,6 +78,8 @@ describe('MixedRoute', () => {
       expect(route.path).toEqual([token1, token0, weth])
       expect(route.input).toEqual(token1)
       expect(route.output).toEqual(weth)
+      expect(route.pathInput).toEqual(token1)
+      expect(route.pathOutput).toEqual(weth)
       expect(route.chainId).toEqual(1)
     })
 
@@ -87,6 +89,8 @@ describe('MixedRoute', () => {
       expect(route.path).toEqual([token0, weth, token1])
       expect(route.input).toEqual(token0)
       expect(route.output).toEqual(token1)
+      expect(route.pathInput).toEqual(token0)
+      expect(route.pathOutput).toEqual(token1)
       expect(route.chainId).toEqual(1)
     })
 
@@ -122,6 +126,17 @@ describe('MixedRoute', () => {
       expect(route.path).toEqual([token0, token1, weth, token2])
       expect(route.input).toEqual(token0)
       expect(route.output).toEqual(token2)
+      expect(route.chainId).toEqual(1)
+    })
+
+    it('wraps complex mixed route object that unwraps WETH to ETH at the end', () => {
+      const route = new MixedRouteSDK([pool_v3_0_1, pool_v3_1_weth], token0, ETHER)
+      expect(route.pools).toEqual([pool_v3_0_1, pool_v3_1_weth])
+      expect(route.path).toEqual([token0, token1, weth])
+      expect(route.input).toEqual(token0)
+      expect(route.output).toEqual(ETHER)
+      expect(route.pathInput).toEqual(token0)
+      expect(route.pathOutput).toEqual(weth)
       expect(route.chainId).toEqual(1)
     })
 
@@ -463,6 +478,7 @@ describe('MixedRoute', () => {
       const route = new MixedRouteSDK([pool_v3_0_1], token0, token1)
       expect(partitionMixedRouteByProtocol(route)).toStrictEqual([[pool_v3_0_1]])
     })
+
     it('returns correct for single pool', () => {
       const route = new MixedRouteSDK([pair_0_1], token0, token1)
       expect(partitionMixedRouteByProtocol(route)).toStrictEqual([[pair_0_1]])
@@ -492,6 +508,7 @@ describe('MixedRoute', () => {
       })
       expect(result[2][0]).toStrictEqual(pool_v3_2_3)
     })
+
     it('consecutive pair at the end', () => {
       const route: MixedRouteSDK<Currency, Currency> = new MixedRouteSDK(
         [pool_v3_0_1, pair_1_weth, pair_weth_2, pair_2_3],
@@ -506,6 +523,7 @@ describe('MixedRoute', () => {
         expect(pair).toStrictEqual(referenceSecondPart[i])
       })
     })
+
     it('consecutive pair at the beginning', () => {
       const route: MixedRouteSDK<Currency, Currency> = new MixedRouteSDK(
         [pair_0_1, pair_1_weth, pair_weth_2, pool_v3_2_3],
@@ -519,6 +537,24 @@ describe('MixedRoute', () => {
         expect(pair).toStrictEqual(referenceFirstPart[i])
       })
       expect(result[1][0]).toStrictEqual(pool_v3_2_3)
+    })
+
+    it('returns correct for route with V4Pool', () => {
+      const route: MixedRouteSDK<Currency, Currency> = new MixedRouteSDK(
+        [pool_v4_0_1, pool_v4_1_eth, pair_weth_2, pool_v3_2_3],
+        token0,
+        token3
+      )
+
+      const result = partitionMixedRouteByProtocol(route)
+      expect(result.length).toEqual(3)
+      expect(result[0].length).toEqual(2)
+      expect(result[1].length).toEqual(1)
+      expect(result[2].length).toEqual(1)
+      expect(result[0][0]).toStrictEqual(pool_v4_0_1)
+      expect(result[0][1]).toStrictEqual(pool_v4_1_eth)
+      expect(result[1][0]).toStrictEqual(pair_weth_2)
+      expect(result[2][0]).toStrictEqual(pool_v3_2_3)
     })
   })
 })
