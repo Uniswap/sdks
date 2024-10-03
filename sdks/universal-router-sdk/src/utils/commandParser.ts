@@ -78,7 +78,12 @@ export abstract class CommandParser {
             params,
           }
         } else if (commandDef.parser === Parser.V3Actions) {
-          throw new Error(`Not implemented: `)
+          // TODO: implement better parsing here
+          return {
+            commandName: CommandType[commandType],
+            commandType,
+            params: inputs,
+          }
         } else {
           throw new Error(`Unsupported parser: ${commandDef}`)
         }
