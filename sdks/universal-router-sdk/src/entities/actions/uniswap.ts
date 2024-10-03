@@ -302,12 +302,11 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
   options: SwapOptions,
   payerIsUser: boolean,
   routerMustCustody: boolean,
-  performAggregatedSlippageCheck: boolean
 ): void {
   const { route, inputAmount, outputAmount } = swap
   const tradeRecipient = routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient
 
-  // single hop, so it can be reduced to plain v2 or v3 swap logic
+  // single hop, so it can be reduced to plain swap logic for one protocol version
   if (route.pools.length === 1) {
     if (route.pools[0] instanceof V4Pool) {
       return addV4Swap(planner, swap, tradeType, options, payerIsUser, routerMustCustody)
