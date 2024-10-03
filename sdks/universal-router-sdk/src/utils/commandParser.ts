@@ -1,7 +1,8 @@
 import { ethers } from 'ethers'
 import { abi } from '@uniswap/universal-router/artifacts/contracts/UniversalRouter.sol/UniversalRouter.json'
 import { Interface } from '@ethersproject/abi'
-import { CommandType, COMMAND_ABI_DEFINITION, Subparser } from '../utils/routerCommands'
+import { V4BaseActionsParser, V4RouterAction } from '@uniswap/v4-sdk'
+import { CommandType, COMMAND_DEFINITION, Subparser, Parser } from '../utils/routerCommands'
 
 export type Param = {
   readonly name: string
@@ -36,35 +37,48 @@ export abstract class CommandParser {
 
     return {
       commands: commandTypes.map((commandType: CommandType, i: number) => {
-        const abiDef = COMMAND_ABI_DEFINITION[commandType]
-        const rawParams = ethers.utils.defaultAbiCoder.decode(
-          abiDef.map((command) => command.type),
-          inputs[i]
-        )
-        const params = rawParams.map((param: any, j: number) => {
-          switch (abiDef[j].subparser) {
-            case Subparser.V3PathExactIn:
-              return {
-                name: abiDef[j].name,
-                value: parseV3PathExactIn(param),
-              }
-            case Subparser.V3PathExactOut:
-              return {
-                name: abiDef[j].name,
-                value: parseV3PathExactOut(param),
-              }
-            default:
-              return {
-                name: abiDef[j].name,
-                value: param,
-              }
-          }
-        })
+        const commandDef = COMMAND_DEFINITION[commandType]
 
-        return {
-          commandName: CommandType[commandType],
-          commandType,
-          params,
+        if (commandDef.parser === Parser.V4Actions) {
+          const { actions } = V4BaseActionsParser.parseCalldata(inputs[i])
+          return {
+            commandName: CommandType[commandType],
+            commandType,
+            params: v4RouterCallToParams(actions),
+          }
+        } else if (commandDef.parser === Parser.Abi) {
+          const abiDef = commandDef.params
+          const rawParams = ethers.utils.defaultAbiCoder.decode(
+            abiDef.map((command) => command.type),
+            inputs[i]
+          )
+
+          const params = rawParams.map((param: any, j: number) => {
+            switch (abiDef[j].subparser) {
+              case Subparser.V3PathExactIn:
+                return {
+                  name: abiDef[j].name,
+                  value: parseV3PathExactIn(param),
+                }
+              case Subparser.V3PathExactOut:
+                return {
+                  name: abiDef[j].name,
+                  value: parseV3PathExactOut(param),
+                }
+              default:
+                return {
+                  name: abiDef[j].name,
+                  value: param,
+                }
+            }
+          })
+          return {
+            commandName: CommandType[commandType],
+            commandType,
+            params,
+          }
+        } else {
+          throw new Error(`Unsupported parser: ${commandDef}`)
         }
       }),
     }
@@ -126,4 +140,18 @@ export function parseV3PathExactOut(path: string): readonly V3PathItem[] {
   }
 
   return res
+}
+
+function v4RouterCallToParams(actions: readonly V4RouterAction[]): readonly Param[] {
+  return actions.map((action) => {
+    return {
+      name: action.actionName,
+      value: action.params.map((param) => {
+        return {
+          name: param.name,
+          value: param.value,
+        }
+      }),
+    }
+  })
 }

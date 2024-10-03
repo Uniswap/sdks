@@ -30,9 +30,18 @@ export enum CommandType {
   EXECUTE_SUB_PLAN = 0x21,
 }
 
+export enum AltParser {
+  V4Call,
+}
+
 export enum Subparser {
   V3PathExactIn,
   V3PathExactOut,
+}
+
+export enum Parser {
+  Abi,
+  V4Actions,
 }
 
 export type ParamType = {
@@ -40,6 +49,15 @@ export type ParamType = {
   readonly type: string
   readonly subparser?: Subparser
 }
+
+export type CommandDefinition =
+  | {
+      parser: Parser.Abi
+      params: ParamType[]
+    }
+  | {
+      parser: Parser.V4Actions
+    }
 
 const ALLOW_REVERT_FLAG = 0x80
 const REVERTIBLE_COMMANDS = new Set<CommandType>([CommandType.EXECUTE_SUB_PLAN])
@@ -53,99 +71,144 @@ const PERMIT_BATCH_STRUCT =
 const PERMIT2_TRANSFER_FROM_STRUCT = '(address from,address to,uint160 amount,address token)'
 const PERMIT2_TRANSFER_FROM_BATCH_STRUCT = PERMIT2_TRANSFER_FROM_STRUCT + '[]'
 
-export const COMMAND_ABI_DEFINITION: { [key in CommandType]: readonly ParamType[] } = {
+export const COMMAND_DEFINITION: { [key in CommandType]: CommandDefinition } = {
   // Batch Reverts
-  [CommandType.EXECUTE_SUB_PLAN]: [
-    { name: 'commands', type: 'bytes' },
-    { name: 'inputs', type: 'bytes[]' },
-  ],
+  [CommandType.EXECUTE_SUB_PLAN]: {
+    parser: Parser.Abi,
+    params: [
+      { name: 'commands', type: 'bytes' },
+      { name: 'inputs', type: 'bytes[]' },
+    ],
+  },
 
   // Permit2 Actions
-  [CommandType.PERMIT2_PERMIT]: [
-    { name: 'permit', type: PERMIT_STRUCT },
-    { name: 'signature', type: 'bytes' },
-  ],
-  [CommandType.PERMIT2_PERMIT_BATCH]: [
-    { name: 'permit', type: PERMIT_BATCH_STRUCT },
-    { name: 'signature', type: 'bytes' },
-  ],
-  [CommandType.PERMIT2_TRANSFER_FROM]: [
-    { name: 'token', type: 'address' },
-    { name: 'recipient', type: 'address' },
-    { name: 'amount', type: 'uint160' },
-  ],
-  [CommandType.PERMIT2_TRANSFER_FROM_BATCH]: [
-    {
-      name: 'transferFrom',
-      type: PERMIT2_TRANSFER_FROM_BATCH_STRUCT,
-    },
-  ],
+  [CommandType.PERMIT2_PERMIT]: {
+    parser: Parser.Abi,
+    params: [
+      { name: 'permit', type: PERMIT_STRUCT },
+      { name: 'signature', type: 'bytes' },
+    ],
+  },
+  [CommandType.PERMIT2_PERMIT_BATCH]: {
+    parser: Parser.Abi,
+    params: [
+      { name: 'permit', type: PERMIT_BATCH_STRUCT },
+      { name: 'signature', type: 'bytes' },
+    ],
+  },
+  [CommandType.PERMIT2_TRANSFER_FROM]: {
+    parser: Parser.Abi,
+    params: [
+      { name: 'token', type: 'address' },
+      { name: 'recipient', type: 'address' },
+      { name: 'amount', type: 'uint160' },
+    ],
+  },
+  [CommandType.PERMIT2_TRANSFER_FROM_BATCH]: {
+    parser: Parser.Abi,
+    params: [
+      {
+        name: 'transferFrom',
+        type: PERMIT2_TRANSFER_FROM_BATCH_STRUCT,
+      },
+    ],
+  },
 
   // Uniswap Actions
-  [CommandType.V3_SWAP_EXACT_IN]: [
-    { name: 'recipient', type: 'address' },
-    { name: 'amountIn', type: 'uint256' },
-    { name: 'amountOutMin', type: 'uint256' },
-    { name: 'path', subparser: Subparser.V3PathExactIn, type: 'bytes' },
-    { name: 'payerIsUser', type: 'bool' },
-  ],
-  [CommandType.V3_SWAP_EXACT_OUT]: [
-    { name: 'recipient', type: 'address' },
-    { name: 'amountOut', type: 'uint256' },
-    { name: 'amountInMax', type: 'uint256' },
-    { name: 'path', subparser: Subparser.V3PathExactOut, type: 'bytes' },
-    { name: 'payerIsUser', type: 'bool' },
-  ],
-  [CommandType.V2_SWAP_EXACT_IN]: [
-    { name: 'recipient', type: 'address' },
-    { name: 'amountIn', type: 'uint256' },
-    { name: 'amountOutMin', type: 'uint256' },
-    { name: 'path', type: 'address[]' },
-    { name: 'payerIsUser', type: 'bool' },
-  ],
-  [CommandType.V2_SWAP_EXACT_OUT]: [
-    { name: 'recipient', type: 'address' },
-    { name: 'amountOut', type: 'uint256' },
-    { name: 'amountInMax', type: 'uint256' },
-    { name: 'path', type: 'address[]' },
-    { name: 'payerIsUser', type: 'bool' },
-  ],
-  [CommandType.V4_SWAP]: [{ name: 'command', type: 'bytes' }],
+  [CommandType.V3_SWAP_EXACT_IN]: {
+    parser: Parser.Abi,
+    params: [
+      { name: 'recipient', type: 'address' },
+      { name: 'amountIn', type: 'uint256' },
+      { name: 'amountOutMin', type: 'uint256' },
+      { name: 'path', subparser: Subparser.V3PathExactIn, type: 'bytes' },
+      { name: 'payerIsUser', type: 'bool' },
+    ],
+  },
+  [CommandType.V3_SWAP_EXACT_OUT]: {
+    parser: Parser.Abi,
+    params: [
+      { name: 'recipient', type: 'address' },
+      { name: 'amountOut', type: 'uint256' },
+      { name: 'amountInMax', type: 'uint256' },
+      { name: 'path', subparser: Subparser.V3PathExactOut, type: 'bytes' },
+      { name: 'payerIsUser', type: 'bool' },
+    ],
+  },
+  [CommandType.V2_SWAP_EXACT_IN]: {
+    parser: Parser.Abi,
+    params: [
+      { name: 'recipient', type: 'address' },
+      { name: 'amountIn', type: 'uint256' },
+      { name: 'amountOutMin', type: 'uint256' },
+      { name: 'path', type: 'address[]' },
+      { name: 'payerIsUser', type: 'bool' },
+    ],
+  },
+  [CommandType.V2_SWAP_EXACT_OUT]: {
+    parser: Parser.Abi,
+    params: [
+      { name: 'recipient', type: 'address' },
+      { name: 'amountOut', type: 'uint256' },
+      { name: 'amountInMax', type: 'uint256' },
+      { name: 'path', type: 'address[]' },
+      { name: 'payerIsUser', type: 'bool' },
+    ],
+  },
+  [CommandType.V4_SWAP]: { parser: Parser.V4Actions },
 
   // Token Actions and Checks
-  [CommandType.WRAP_ETH]: [
-    { name: 'recipient', type: 'address' },
-    { name: 'amount', type: 'uint256' },
-  ],
-  [CommandType.UNWRAP_WETH]: [
-    { name: 'recipient', type: 'address' },
-    { name: 'amountMin', type: 'uint256' },
-  ],
-  [CommandType.SWEEP]: [
-    { name: 'token', type: 'address' },
-    { name: 'recipient', type: 'address' },
-    { name: 'amountMin', type: 'uint256' },
-  ],
-  [CommandType.TRANSFER]: [
-    { name: 'token', type: 'address' },
-    { name: 'recipient', type: 'address' },
-    { name: 'value', type: 'uint256' },
-  ],
-  [CommandType.PAY_PORTION]: [
-    { name: 'token', type: 'address' },
-    { name: 'recipient', type: 'address' },
-    { name: 'bips', type: 'uint256' },
-  ],
-  [CommandType.BALANCE_CHECK_ERC20]: [
-    { name: 'owner', type: 'address' },
-    { name: 'token', type: 'address' },
-    { name: 'minBalance', type: 'uint256' },
-  ],
+  [CommandType.WRAP_ETH]: {
+    parser: Parser.Abi,
+    params: [
+      { name: 'recipient', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+  },
+  [CommandType.UNWRAP_WETH]: {
+    parser: Parser.Abi,
+    params: [
+      { name: 'recipient', type: 'address' },
+      { name: 'amountMin', type: 'uint256' },
+    ],
+  },
+  [CommandType.SWEEP]: {
+    parser: Parser.Abi,
+    params: [
+      { name: 'token', type: 'address' },
+      { name: 'recipient', type: 'address' },
+      { name: 'amountMin', type: 'uint256' },
+    ],
+  },
+  [CommandType.TRANSFER]: {
+    parser: Parser.Abi,
+    params: [
+      { name: 'token', type: 'address' },
+      { name: 'recipient', type: 'address' },
+      { name: 'value', type: 'uint256' },
+    ],
+  },
+  [CommandType.PAY_PORTION]: {
+    parser: Parser.Abi,
+    params: [
+      { name: 'token', type: 'address' },
+      { name: 'recipient', type: 'address' },
+      { name: 'bips', type: 'uint256' },
+    ],
+  },
+  [CommandType.BALANCE_CHECK_ERC20]: {
+    parser: Parser.Abi,
+    params: [
+      { name: 'owner', type: 'address' },
+      { name: 'token', type: 'address' },
+      { name: 'minBalance', type: 'uint256' },
+    ],
+  },
 
   // Position Actions
-  [CommandType.V3_POSITION_MANAGER_PERMIT]: [{ name: 'calldata', type: 'bytes' }],
-  [CommandType.V3_POSITION_MANAGER_CALL]: [{ name: 'calldata', type: 'bytes' }],
-  [CommandType.V4_POSITION_CALL]: [{ name: 'calldata', type: 'bytes' }],
+  [CommandType.V3_POSITION_MANAGER_PERMIT]: { parser: Parser.Abi, params: [{ name: 'calldata', type: 'bytes' }] },
+  [CommandType.V3_POSITION_MANAGER_CALL]: { parser: Parser.Abi, params: [{ name: 'calldata', type: 'bytes' }] },
+  [CommandType.V4_POSITION_CALL]: { parser: Parser.V4Actions },
 }
 
 export class RoutePlanner {
@@ -183,12 +246,16 @@ export type RouterCommand = {
 }
 
 export function createCommand(type: CommandType, parameters: any[]): RouterCommand {
-  if (type === CommandType.V4_SWAP) {
-    return { type, encodedInput: parameters[0] }
+  const commandDef = COMMAND_DEFINITION[type]
+  switch (commandDef.parser) {
+    case Parser.Abi:
+      const encodedInput = defaultAbiCoder.encode(
+        commandDef.params.map((abi) => abi.type),
+        parameters
+      )
+      return { type, encodedInput }
+    case Parser.V4Actions:
+      // v4 swap data comes pre-encoded at index 0
+      return { type, encodedInput: parameters[0] }
   }
-  const encodedInput = defaultAbiCoder.encode(
-    COMMAND_ABI_DEFINITION[type].map((abi) => abi.type),
-    parameters
-  )
-  return { type, encodedInput }
 }
