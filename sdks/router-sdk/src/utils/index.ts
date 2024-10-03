@@ -1,6 +1,7 @@
 import { Currency, Token } from '@uniswap/sdk-core'
 import { Pair } from '@uniswap/v2-sdk'
 import { Pool as V3Pool } from '@uniswap/v3-sdk'
+import { Pool as V4Pool } from '@uniswap/v4-sdk'
 import { MixedRouteSDK } from '../entities/mixedRoute/route'
 import { TPool } from './TPool'
 
@@ -16,8 +17,9 @@ export const partitionMixedRouteByProtocol = (route: MixedRouteSDK<Currency, Cur
   let right = 0
   while (right < route.pools.length) {
     if (
-      (route.pools[left] instanceof V3Pool && route.pools[right] instanceof Pair) ||
-      (route.pools[left] instanceof Pair && route.pools[right] instanceof V3Pool)
+      (route.pools[left] instanceof V4Pool && !(route.pools[right] instanceof V4Pool)) ||
+      (route.pools[left] instanceof V3Pool && !(route.pools[right] instanceof V3Pool)) ||
+      (route.pools[left] instanceof Pair && !(route.pools[right] instanceof Pair))
     ) {
       acc.push(route.pools.slice(left, right))
       left = right
