@@ -206,8 +206,8 @@ export const COMMAND_DEFINITION: { [key in CommandType]: CommandDefinition } = {
   },
 
   // Position Actions
-  [CommandType.V3_POSITION_MANAGER_PERMIT]: { parser: Parser.Abi, params: [{ name: 'calldata', type: 'bytes' }] },
-  [CommandType.V3_POSITION_MANAGER_CALL]: { parser: Parser.Abi, params: [{ name: 'calldata', type: 'bytes' }] },
+  [CommandType.V3_POSITION_MANAGER_PERMIT]: { parser: Parser.V3Actions },
+  [CommandType.V3_POSITION_MANAGER_CALL]: { parser: Parser.V3Actions },
   [CommandType.V4_POSITION_CALL]: { parser: Parser.V4Actions },
 }
 
