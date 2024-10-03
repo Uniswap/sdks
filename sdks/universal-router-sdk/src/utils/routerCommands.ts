@@ -183,7 +183,12 @@ export type RouterCommand = {
 }
 
 export function createCommand(type: CommandType, parameters: any[]): RouterCommand {
-  if (type === CommandType.V4_SWAP) {
+  if (
+    type === CommandType.V4_SWAP ||
+    type === CommandType.V3_POSITION_MANAGER_CALL ||
+    type === CommandType.V3_POSITION_MANAGER_PERMIT ||
+    type === CommandType.V4_POSITION_CALL
+  ) {
     return { type, encodedInput: parameters[0] }
   }
   const encodedInput = defaultAbiCoder.encode(
