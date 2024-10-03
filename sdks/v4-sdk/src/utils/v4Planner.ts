@@ -122,7 +122,7 @@ export const V4_BASE_ACTIONS_ABI_DEFINITION: { [key in Actions]: readonly ParamT
     { name: 'currency', type: 'address' },
     { name: 'amount', type: 'uint256' },
     { name: 'payerIsUser', type: 'bool' },
-  ], // currency, amount, payerIsUser
+  ],
   [Actions.SETTLE_ALL]: [
     { name: 'currency', type: 'address' },
     { name: 'maxAmount', type: 'uint256' },
@@ -135,7 +135,7 @@ export const V4_BASE_ACTIONS_ABI_DEFINITION: { [key in Actions]: readonly ParamT
     { name: 'currency', type: 'address' },
     { name: 'recipient', type: 'address' },
     { name: 'amount', type: 'uint256' },
-  ], // currency, receiver, amount
+  ],
   [Actions.TAKE_ALL]: [
     { name: 'currency', type: 'address' },
     { name: 'minAmount', type: 'uint256' },
