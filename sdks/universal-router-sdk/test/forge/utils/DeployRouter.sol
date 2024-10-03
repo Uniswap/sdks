@@ -73,6 +73,7 @@ contract DeployRouter is Test {
 
     function deployV4Contracts() public {
         poolManager = new PoolManager();
+        console2.log(address(poolManager));
     }
 
     function initializeV4Pools(ERC20 WETH, ERC20 USDC, ERC20 DAI) public {

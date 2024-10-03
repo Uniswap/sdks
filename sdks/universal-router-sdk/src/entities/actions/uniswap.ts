@@ -1,7 +1,7 @@
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
 import { Trade as V2Trade, Pair } from '@uniswap/v2-sdk'
 import { Trade as V3Trade, Pool as V3Pool, encodeRouteToPath } from '@uniswap/v3-sdk'
-import { Trade as V4Trade, V4Planner } from '@uniswap/v4-sdk'
+import { Trade as V4Trade, V4Planner, Pool as V4Pool, PathKey, encodeRouteToPath as encodeV4RouteToPath } from '@uniswap/v4-sdk'
 import {
   Trade as RouterTrade,
   MixedRouteTrade,
@@ -20,7 +20,7 @@ import {
 import { Permit2Permit } from '../../utils/inputTokens'
 import { Currency, TradeType, CurrencyAmount, Percent } from '@uniswap/sdk-core'
 import { Command, RouterActionType, TradeConfig } from '../Command'
-import { SENDER_AS_RECIPIENT, ROUTER_AS_RECIPIENT, CONTRACT_BALANCE, ETH_ADDRESS } from '../../utils/constants'
+import { SENDER_AS_RECIPIENT, ROUTER_AS_RECIPIENT, CONTRACT_BALANCE, ETH_ADDRESS, V4_POOL_MANAGER } from '../../utils/constants'
 import { encodeFeeBips } from '../../utils/numbers'
 import { BigNumber, BigNumberish } from 'ethers'
 import { TPool } from '@uniswap/router-sdk/dist/utils/TPool'
@@ -338,49 +338,77 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
     return i === sections.length - 1
   }
 
-  let outputToken
-  let inputToken = route.input.wrapped
+  let inputToken = route.pathInput
 
   for (let i = 0; i < sections.length; i++) {
     const section = sections[i]
-    /// Now, we get output of this section
-    outputToken = getOutputOfPools(section, inputToken)
+    const routePool = section[0]
+    const outputToken = getOutputOfPools(section, inputToken)
 
-    const newRouteOriginal = new MixedRouteSDK(
+    const newRoute = new MixedRoute(new MixedRouteSDK(
       [...section],
       section[0].token0.equals(inputToken) ? section[0].token0 : section[0].token1,
       outputToken
-    )
-    const newRoute = new MixedRoute(newRouteOriginal)
+    ))
 
-    /// Previous output is now input
-    inputToken = outputToken.wrapped
-
-    const mixedRouteIsAllV3 = (route: MixedRouteSDK<Currency, Currency>) => {
-      return route.pools.every((pool) => pool instanceof V3Pool)
+    const getSwapRecipient = (i: number, tradeRecipient: string): string => {
+      if (isLastSectionInRoute(i)) {
+        return tradeRecipient
+      }  else {
+        const nextPool = sections[i + 1][0]
+        if (nextPool instanceof Pair) {
+          // if trading to V2, pay directly to next V2 pool
+          return nextPool.liquidityToken.address
+        } else {
+          // otherwise the router acts as an intermediary
+          return ROUTER_AS_RECIPIENT
+        }
+      }
     }
 
-    if (mixedRouteIsAllV3(newRoute)) {
+    if (routePool instanceof V4Pool) {
+      console.log('here')
+      const path: string = encodeV4RouteToPath(newRoute)
+
+
+    } else if (routePool instanceof V3Pool) {
       const path: string = encodeMixedRouteToPath(newRoute)
 
       planner.addCommand(CommandType.V3_SWAP_EXACT_IN, [
         // if not last section: send tokens directly to the first v2 pair of the next section
         // note: because of the partitioning function we can be sure that the next section is v2
-        isLastSectionInRoute(i) ? tradeRecipient : (sections[i + 1][0] as Pair).liquidityToken.address,
+        getSwapRecipient(i, tradeRecipient), // recipient
         i == 0 ? amountIn : CONTRACT_BALANCE, // amountIn
         !isLastSectionInRoute(i) ? 0 : amountOut, // amountOut
         path, // path
         payerIsUser && i === 0, // payerIsUser
       ])
-    } else {
+    } else if (routePool instanceof Pair) {
       planner.addCommand(CommandType.V2_SWAP_EXACT_IN, [
-        isLastSectionInRoute(i) ? tradeRecipient : ROUTER_AS_RECIPIENT, // recipient
+        getSwapRecipient(i, tradeRecipient), // recipient
         i === 0 ? amountIn : CONTRACT_BALANCE, // amountIn
         !isLastSectionInRoute(i) ? 0 : amountOut, // amountOutMin
         newRoute.path.map((token) => token.wrapped.address), // path
         payerIsUser && i === 0,
       ])
+    } else {
+      throw new Error('Unexpected Pool Type')
     }
+
+
+    const getNextInputTokenAndPerformTransitions = (): string => {
+        if (isLastSectionInRoute(i)) {
+          return outputToken
+        } else {
+          const nextPool = sections[i + 1][0]
+        }
+    }
+
+    // possible inputToken transitions:
+    //     token --> token
+    //     v2/v3 wrapped --> v4 native
+    //     v4 native --> v2/v3 wrapped
+    inputToken = getNextInputTokenAndPerformTransitions()
   }
 }
 
