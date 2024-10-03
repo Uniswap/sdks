@@ -1,7 +1,7 @@
 import { ethers } from 'ethers'
 import { PoolKey } from '../entities/pool'
 import { PathKey } from './encodeRouteToPath'
-import { Actions, Subparser, V4_SWAP_ABI_DEFINITION } from './v4Planner'
+import { Actions, Subparser, V4_BASE_ACTIONS_ABI_DEFINITION } from './v4Planner'
 
 export type Param = {
   readonly name: string
@@ -57,15 +57,15 @@ export type SwapExactOut = {
 }
 
 // Parses V4Router actions
-export abstract class V4RouterActionParser {
+export abstract class V4BaseActionsParser {
   public static parseCalldata(calldata: string): V4RouterCall {
     const [actions, inputs] = ethers.utils.defaultAbiCoder.decode(['bytes', 'bytes[]'], calldata)
 
-    const actionTypes = V4RouterActionParser.getActions(actions)
+    const actionTypes = V4BaseActionsParser.getActions(actions)
 
     return {
       actions: actionTypes.map((actionType: Actions, i: number) => {
-        const abiDef = V4_SWAP_ABI_DEFINITION[actionType]
+        const abiDef = V4_BASE_ACTIONS_ABI_DEFINITION[actionType]
         const rawParams = ethers.utils.defaultAbiCoder.decode(
           abiDef.map((command) => command.type),
           inputs[i]

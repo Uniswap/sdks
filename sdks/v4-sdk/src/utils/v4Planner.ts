@@ -74,7 +74,7 @@ const SWAP_EXACT_OUT_SINGLE_STRUCT =
 const SWAP_EXACT_OUT_STRUCT =
   '(address currencyOut,' + PATH_KEY_STRUCT + '[] path,uint128 amountOut,uint128 amountInMaximum)'
 
-export const V4_SWAP_ABI_DEFINITION: { [key in Actions]: readonly ParamType[] } = {
+export const V4_BASE_ACTIONS_ABI_DEFINITION: { [key in Actions]: readonly ParamType[] } = {
   // Liquidity commands
   [Actions.INCREASE_LIQUIDITY]: [
     { name: 'tokenId', type: 'uint256' },
@@ -236,7 +236,7 @@ type RouterAction = {
 
 function createAction(action: Actions, parameters: any[]): RouterAction {
   const encodedInput = defaultAbiCoder.encode(
-    V4_SWAP_ABI_DEFINITION[action].map((v) => v.type),
+    V4_BASE_ACTIONS_ABI_DEFINITION[action].map((v) => v.type),
     parameters
   )
   return { action, encodedInput }

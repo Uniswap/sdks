@@ -3,7 +3,7 @@ import { WETH9 } from '@uniswap/sdk-core'
 import { BigNumber, ethers } from 'ethers'
 import { Route } from '../entities/route'
 import { encodeRouteToPath } from './encodeRouteToPath'
-import { V4RouterActionParser, V4RouterCall } from './v4RouterActionParser'
+import { V4BaseActionsParser, V4RouterCall } from './v4BaseActionsParser'
 import { V4Planner, Actions } from './v4Planner'
 import { USDC_WETH, DAI_USDC, DAI, USDC } from './v4Planner.test'
 
@@ -313,7 +313,7 @@ describe('Command Parser', () => {
   for (const test of tests) {
     it(`should parse calldata ${test.input.actions}`, () => {
       const calldata = test.input.finalize()
-      const result = V4RouterActionParser.parseCalldata(calldata)
+      const result = V4BaseActionsParser.parseCalldata(calldata)
       expect(result).to.deep.equal(test.result)
     })
   }
