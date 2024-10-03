@@ -18,6 +18,7 @@ import {
   partitionMixedRouteByProtocol,
 } from '@uniswap/router-sdk'
 import { Permit2Permit } from '../../utils/inputTokens'
+import { getPathCurrency } from '../../utils/pathCurrency'
 import { Currency, TradeType, CurrencyAmount, Percent } from '@uniswap/sdk-core'
 import { Command, RouterActionType, TradeConfig } from '../Command'
 import { SENDER_AS_RECIPIENT, ROUTER_AS_RECIPIENT, CONTRACT_BALANCE, ETH_ADDRESS, V4_POOL_MANAGER } from '../../utils/constants'
@@ -367,7 +368,6 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
     }
 
     if (routePool instanceof V4Pool) {
-      console.log('here')
       const path: string = encodeV4RouteToPath(newRoute)
 
 
@@ -396,19 +396,18 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
     }
 
 
-    const getNextInputTokenAndPerformTransitions = (): string => {
-        if (isLastSectionInRoute(i)) {
-          return outputToken
-        } else {
-          const nextPool = sections[i + 1][0]
-        }
-    }
+    if (!isLastSectionInRoute(i)) {
+      const nextPool = sections[i + 1][0]
+      const nextInputToken = getPathCurrency(outputToken, nextPool)
 
-    // possible inputToken transitions:
-    //     token --> token
-    //     v2/v3 wrapped --> v4 native
-    //     v4 native --> v2/v3 wrapped
-    inputToken = getNextInputTokenAndPerformTransitions()
+      if (outputToken.isNative && !nextInputToken.isNative) {
+        planner.addCommand(CommandType.WRAP_ETH, [ROUTER_AS_RECIPIENT, 0])
+      } else if (!outputToken.isNative && nextInputToken.isNative) {
+        planner.addCommand(CommandType.UNWRAP_WETH, [ROUTER_AS_RECIPIENT, 0])
+      }
+
+      inputToken = nextInputToken
+    }
   }
 }
 
