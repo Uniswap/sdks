@@ -31,5 +31,6 @@ export function getPathCurrency(currency: Currency, pool: TPool): Currency {
   } else {
     throw new Error(`Expected currency ${currency.symbol} to be either ${pool.token0.symbol} or ${pool.token1.symbol}`)
   }
-  return currency.wrapped
+
+  return currency // this line needed for typescript to compile
 }
