@@ -4891,15 +4891,15 @@ __metadata:
   linkType: hard
 
 "@uniswap/v4-sdk@npm:^1.6.0, @uniswap/v4-sdk@npm:^1.6.3":
-  version: 1.6.3
-  resolution: "@uniswap/v4-sdk@npm:1.6.3"
+  version: 1.8.1
+  resolution: "@uniswap/v4-sdk@npm:1.8.1"
   dependencies:
     "@ethersproject/solidity": ^5.0.9
     "@uniswap/sdk-core": ^5.3.1
     "@uniswap/v3-sdk": 3.12.0
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
-  checksum: b5137b2fe2cfc2940e986cd89458f56318bb9bec1899b511724462ee6956d6fa9f8a598c300d697339c4f0a51c45d4061a1afb2144c42798a5774c0e90bd89f6
+  checksum: d19ed9242ad177fa219d78ef83a221b61dd611c9935b0cb5be28b51aeb6e100df2825a9b433462240fb2dbf1e1877c32e18b0ae3d25ec480a7d892773c0ef31d
   languageName: node
   linkType: hard
 
