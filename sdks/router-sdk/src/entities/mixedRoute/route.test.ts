@@ -78,6 +78,8 @@ describe('MixedRoute', () => {
       expect(route.path).toEqual([token1, token0, weth])
       expect(route.input).toEqual(token1)
       expect(route.output).toEqual(weth)
+      expect(route.pathInput).toEqual(token1)
+      expect(route.pathOutput).toEqual(weth)
       expect(route.chainId).toEqual(1)
     })
 
@@ -87,6 +89,8 @@ describe('MixedRoute', () => {
       expect(route.path).toEqual([token0, weth, token1])
       expect(route.input).toEqual(token0)
       expect(route.output).toEqual(token1)
+      expect(route.pathInput).toEqual(token0)
+      expect(route.pathOutput).toEqual(token1)
       expect(route.chainId).toEqual(1)
     })
 
@@ -122,6 +126,17 @@ describe('MixedRoute', () => {
       expect(route.path).toEqual([token0, token1, weth, token2])
       expect(route.input).toEqual(token0)
       expect(route.output).toEqual(token2)
+      expect(route.chainId).toEqual(1)
+    })
+
+    it('wraps complex mixed route object that unwraps WETH to ETH at the end', () => {
+      const route = new MixedRouteSDK([pool_v3_0_1, pool_v3_1_weth], token0, ETHER)
+      expect(route.pools).toEqual([pool_v3_0_1, pool_v3_1_weth])
+      expect(route.path).toEqual([token0, token1, weth])
+      expect(route.input).toEqual(token0)
+      expect(route.output).toEqual(ETHER)
+      expect(route.pathInput).toEqual(token0)
+      expect(route.pathOutput).toEqual(weth)
       expect(route.chainId).toEqual(1)
     })
 
