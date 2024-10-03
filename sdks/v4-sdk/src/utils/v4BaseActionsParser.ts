@@ -18,12 +18,6 @@ export type V4RouterCall = {
   readonly actions: readonly V4RouterAction[]
 }
 
-export type V3PathItem = {
-  readonly tokenIn: string
-  readonly tokenOut: string
-  readonly fee: string
-}
-
 export type SwapExactInSingle = {
   readonly poolKey: PoolKey
   readonly zeroForOne: boolean
