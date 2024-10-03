@@ -2,16 +2,39 @@ import invariant from 'tiny-invariant'
 import { abi } from '@uniswap/universal-router/artifacts/contracts/UniversalRouter.sol/UniversalRouter.json'
 import { Interface } from '@ethersproject/abi'
 import { BigNumber, BigNumberish } from 'ethers'
-import { MethodParameters } from '@uniswap/v3-sdk'
+import {
+  MethodParameters,
+  Position as V3Position,
+  NonfungiblePositionManager as V3PositionManager,
+  RemoveLiquidityOptions as V3RemoveLiquidityOptions,
+} from '@uniswap/v3-sdk'
+import {
+  Position as V4Position,
+  V4PositionManager,
+  AddLiquidityOptions as V4AddLiquidityOptions,
+  MintOptions,
+} from '@uniswap/v4-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
-import { Currency, TradeType } from '@uniswap/sdk-core'
+import { Currency, TradeType, Percent, CHAIN_TO_ADDRESSES_MAP, SupportedChainsType } from '@uniswap/sdk-core'
 import { UniswapTrade, SwapOptions } from './entities/actions/uniswap'
-import { RoutePlanner } from './utils/routerCommands'
-import { encodePermit } from './utils/inputTokens'
+import { RoutePlanner, CommandType } from './utils/routerCommands'
+import { encodePermit, encodeV3PositionPermit } from './utils/inputTokens'
+import { UNIVERSAL_ROUTER_ADDRESS, UniversalRouterVersion } from './utils/constants'
 
 export type SwapRouterConfig = {
   sender?: string // address
   deadline?: BigNumberish
+}
+
+export interface MigrateV3ToV4Options {
+  inputPosition: V3Position
+  outputPosition: V4Position
+  v3RemoveLiquidityOptions: V3RemoveLiquidityOptions
+  v4AddLiquidityOptions: V4AddLiquidityOptions
+}
+
+function isMint(options: V4AddLiquidityOptions): options is MintOptions {
+  return Object.keys(options).some((k) => k === 'recipient')
 }
 
 export abstract class SwapRouter {
@@ -40,6 +63,64 @@ export abstract class SwapRouter {
     trade.encode(planner, { allowRevert: false })
     return SwapRouter.encodePlan(planner, nativeCurrencyValue, {
       deadline: options.deadlineOrPreviousBlockhash ? BigNumber.from(options.deadlineOrPreviousBlockhash) : undefined,
+    })
+  }
+
+  /**
+   * Builds the call parameters for a migration from a V3 position to a V4 position.
+   * Some requirements of the parameters:
+   *   - v3RemoveLiquidityOptions.collectOptions.recipient must equal v4PositionManager
+   *   - v3RemoveLiquidityOptions.liquidityPercentage must be 100%
+   *   - input pool and output pool must have the same tokens
+   *   - V3 NFT must be approved, or valid inputV3NFTPermit must be provided with UR as spender
+   */
+  public static migrateV3ToV4CallParameters(options: MigrateV3ToV4Options): MethodParameters {
+    const token0 = options.inputPosition.pool.token0
+    const token1 = options.inputPosition.pool.token1
+    const v4PositionManagerAddress =
+      CHAIN_TO_ADDRESSES_MAP[options.outputPosition.pool.chainId as SupportedChainsType].v4PositionManagerAddress
+
+    invariant(token0 === options.outputPosition.pool.token0, 'TOKEN0_MISMATCH')
+    invariant(token1 === options.outputPosition.pool.token1, 'TOKEN1_MISMATCH')
+    invariant(
+      options.v3RemoveLiquidityOptions.liquidityPercentage.equalTo(new Percent(100, 100)),
+      'FULL_REMOVAL_REQUIRED'
+    )
+    invariant(options.v3RemoveLiquidityOptions.burnToken == true, 'BURN_TOKEN_REQUIRED')
+    invariant(
+      options.v3RemoveLiquidityOptions.collectOptions.recipient === v4PositionManagerAddress,
+      'RECIPIENT_NOT_POSITION_MANAGER'
+    )
+
+    invariant(isMint(options.v4AddLiquidityOptions), 'MINT_REQUIRED')
+    invariant(options.v4AddLiquidityOptions.migrate, 'MIGRATE_REQUIRED')
+
+    const planner = new RoutePlanner()
+
+    if (options.v3RemoveLiquidityOptions.permit) {
+      // permit spender should be UR
+      const universalRouterAddress = UNIVERSAL_ROUTER_ADDRESS(
+        UniversalRouterVersion.V2_0,
+        options.inputPosition.pool.chainId as SupportedChainsType
+      )
+      invariant(universalRouterAddress == options.v3RemoveLiquidityOptions.permit.spender, 'INVALID_SPENDER')
+      // don't need to transfer it because v3posm uses isApprovedOrOwner()
+      encodeV3PositionPermit(planner, options.v3RemoveLiquidityOptions.permit, options.v3RemoveLiquidityOptions.tokenId)
+    }
+
+    // encode v3 withdraw
+    const v3RemoveParams = V3PositionManager.removeCallParameters(
+      options.inputPosition,
+      options.v3RemoveLiquidityOptions
+    )
+    planner.addCommand(CommandType.V3_POSITION_MANAGER_CALL, [v3RemoveParams.calldata])
+
+    // encode v4 mint
+    const v4AddParams = V4PositionManager.addCallParameters(options.outputPosition, options.v4AddLiquidityOptions)
+    planner.addCommand(CommandType.V4_POSITION_CALL, [v4AddParams.calldata])
+
+    return SwapRouter.encodePlan(planner, BigNumber.from(0), {
+      deadline: BigNumber.from(options.v4AddLiquidityOptions.deadline),
     })
   }
 

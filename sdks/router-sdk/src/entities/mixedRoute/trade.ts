@@ -1,11 +1,11 @@
-import { Currency, Fraction, Percent, Price, sortedInsert, CurrencyAmount, TradeType } from '@uniswap/sdk-core'
+import { Currency, Fraction, Percent, Price, sortedInsert, CurrencyAmount, TradeType, Token } from '@uniswap/sdk-core'
 import { Pair } from '@uniswap/v2-sdk'
 import { BestTradeOptions, Pool as V3Pool } from '@uniswap/v3-sdk'
 import { Pool as V4Pool } from '@uniswap/v4-sdk'
 import invariant from 'tiny-invariant'
 import { ONE, ZERO } from '../../constants'
 import { MixedRouteSDK } from './route'
-import { getOutputAmount } from '../../utils/getOutputAmount'
+import { amountWithPathCurrency } from '../../utils/pathCurrency'
 import { TPool } from '../../utils/TPool'
 
 /**
@@ -203,10 +203,12 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
     invariant(tradeType === TradeType.EXACT_INPUT, 'TRADE_TYPE')
     invariant(amount.currency.equals(route.input), 'INPUT')
 
-    amounts[0] = route.pools[0] instanceof V4Pool ? amount : amount.wrapped
+    amounts[0] = amountWithPathCurrency(amount, route.pools[0])
     for (let i = 0; i < route.path.length - 1; i++) {
       const pool = route.pools[i]
-      const [outputAmount] = await getOutputAmount(pool, amounts[i])
+      const [outputAmount] = await pool.getOutputAmount(
+        amountWithPathCurrency(amounts[i], pool) as CurrencyAmount<Token>
+      )
       amounts[i + 1] = outputAmount
     }
 
@@ -255,11 +257,13 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
 
       invariant(amount.currency.equals(route.input), 'INPUT')
       inputAmount = CurrencyAmount.fromFractionalAmount(route.input, amount.numerator, amount.denominator)
-      amounts[0] = CurrencyAmount.fromFractionalAmount(route.adjustedInput, amount.numerator, amount.denominator)
+      amounts[0] = CurrencyAmount.fromFractionalAmount(route.pathInput, amount.numerator, amount.denominator)
 
       for (let i = 0; i < route.path.length - 1; i++) {
         const pool = route.pools[i]
-        const [outputAmount] = await getOutputAmount(pool, amounts[i])
+        const [outputAmount] = await pool.getOutputAmount(
+          amountWithPathCurrency(amounts[i], pool) as CurrencyAmount<Token>
+        )
         amounts[i + 1] = outputAmount
       }
 
