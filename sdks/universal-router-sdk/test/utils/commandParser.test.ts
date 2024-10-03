@@ -300,6 +300,88 @@ describe('Command Parser', () => {
         ],
       },
     },
+    {
+      input: new RoutePlanner().addCommand(CommandType.V4_SWAP, [
+        new V4Planner().addAction(Actions.TAKE_ALL, [addressOne, amount]).finalize(),
+      ]),
+      result: {
+        commands: [
+          {
+            commandName: 'V4_SWAP',
+            commandType: CommandType.V4_SWAP,
+            params: [
+              {
+                name: 'TAKE_ALL',
+                value: [
+                  {
+                    name: 'currency',
+                    value: addressOne,
+                  },
+                  {
+                    name: 'minAmount',
+                    value: amount,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      input: new RoutePlanner().addCommand(CommandType.V4_POSITION_CALL, [
+        new V4Planner()
+          .addAction(Actions.MINT_POSITION, [USDC_WETH.poolKey, -60, 60, 5000000, amount, amount, addressOne, '0x'])
+          .finalize(),
+      ]),
+      result: {
+        commands: [
+          {
+            commandName: 'V4_POSITION_CALL',
+            commandType: CommandType.V4_POSITION_CALL,
+            params: [
+              {
+                name: 'MINT_POSITION',
+                value: [
+                  {
+                    name: 'poolKey',
+                    value: USDC_WETH.poolKey,
+                  },
+                  {
+                    name: 'tickLower',
+                    value: -60,
+                  },
+                  {
+                    name: 'tickUpper',
+                    value: 60,
+                  },
+                  {
+                    name: 'liquidity',
+                    value: BigNumber.from(5000000),
+                  },
+                  {
+                    name: 'amount0Max',
+                    value: amount,
+                  },
+                  {
+                    name: 'amount1Max',
+                    value: amount,
+                  },
+                  {
+                    name: 'owner',
+                    value: addressOne,
+                  },
+                  {
+                    name: 'hookData',
+                    value: '0x',
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    },
   ]
 
   for (const test of tests) {
