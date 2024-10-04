@@ -285,11 +285,11 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
     weth: '0x4200000000000000000000000000000000000006',
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
-        address: '0xf164fC0Ec4E93095b804a4795bBe1e041497b92a',
+        address: '0x16D4F26C15f3658ec65B1126ff27DD3dF2a2996b',
         creationBlock: 618210,
       },
       [UniversalRouterVersion.V2_0]: {
-        address: '0xf164fC0Ec4E93095b804a4795bBe1e041497b92a',
+        address: '0x16D4F26C15f3658ec65B1126ff27DD3dF2a2996b',
         creationBlock: 618210,
       },
     },
