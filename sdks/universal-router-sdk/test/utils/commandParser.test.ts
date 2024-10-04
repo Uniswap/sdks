@@ -1,12 +1,39 @@
 import { expect } from 'chai'
-import { ethers } from 'ethers'
+import { Token, WETH9 } from '@uniswap/sdk-core'
+import { encodeSqrtRatioX96, nearestUsableTick, TickMath } from '@uniswap/v3-sdk'
+import { ethers, BigNumber } from 'ethers'
 import { CommandParser, UniversalRouterCall } from '../../src/utils/commandParser'
 import { RoutePlanner, CommandType } from '../../src/utils/routerCommands'
 import { SwapRouter } from '../../src/swapRouter'
+import { V4Planner, Actions, Pool } from '@uniswap/v4-sdk'
 
 const addressOne = '0x0000000000000000000000000000000000000001'
 const addressTwo = '0x0000000000000000000000000000000000000002'
 const amount = ethers.utils.parseEther('1')
+const TICKLIST = [
+  {
+    index: nearestUsableTick(TickMath.MIN_TICK, 10),
+    liquidityNet: amount,
+    liquidityGross: amount,
+  },
+  {
+    index: nearestUsableTick(TickMath.MAX_TICK, 10),
+    liquidityNet: amount.mul(-1),
+    liquidityGross: amount,
+  },
+]
+const USDC = new Token(1, '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', 6, 'USDC', 'USD Coin')
+const USDC_WETH = new Pool(
+  USDC,
+  WETH9[1],
+  3000,
+  10,
+  ethers.constants.AddressZero,
+  encodeSqrtRatioX96(1, 1),
+  0,
+  0,
+  TICKLIST
+)
 
 describe('Command Parser', () => {
   type ParserTest = {
@@ -225,6 +252,130 @@ describe('Command Parser', () => {
               { name: 'amountInMax', value: amount },
               { name: 'path', value: [addressOne, addressTwo] },
               { name: 'payerIsUser', value: true },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      input: new RoutePlanner().addCommand(CommandType.V4_SWAP, [
+        new V4Planner()
+          .addAction(Actions.SWAP_EXACT_IN_SINGLE, [
+            {
+              poolKey: USDC_WETH.poolKey,
+              zeroForOne: true,
+              amountIn: amount,
+              amountOutMinimum: amount,
+              sqrtPriceLimitX96: 0,
+              hookData: '0x',
+            },
+          ])
+          .finalize(),
+      ]),
+      result: {
+        commands: [
+          {
+            commandName: 'V4_SWAP',
+            commandType: CommandType.V4_SWAP,
+            params: [
+              {
+                name: 'SWAP_EXACT_IN_SINGLE',
+                value: [
+                  {
+                    name: 'swap',
+                    value: {
+                      poolKey: USDC_WETH.poolKey,
+                      zeroForOne: true,
+                      amountIn: amount,
+                      amountOutMinimum: amount,
+                      sqrtPriceLimitX96: BigNumber.from(0),
+                      hookData: '0x',
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      input: new RoutePlanner().addCommand(CommandType.V4_SWAP, [
+        new V4Planner().addAction(Actions.TAKE_ALL, [addressOne, amount]).finalize(),
+      ]),
+      result: {
+        commands: [
+          {
+            commandName: 'V4_SWAP',
+            commandType: CommandType.V4_SWAP,
+            params: [
+              {
+                name: 'TAKE_ALL',
+                value: [
+                  {
+                    name: 'currency',
+                    value: addressOne,
+                  },
+                  {
+                    name: 'minAmount',
+                    value: amount,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      input: new RoutePlanner().addCommand(CommandType.V4_POSITION_CALL, [
+        new V4Planner()
+          .addAction(Actions.MINT_POSITION, [USDC_WETH.poolKey, -60, 60, 5000000, amount, amount, addressOne, '0x'])
+          .finalize(),
+      ]),
+      result: {
+        commands: [
+          {
+            commandName: 'V4_POSITION_CALL',
+            commandType: CommandType.V4_POSITION_CALL,
+            params: [
+              {
+                name: 'MINT_POSITION',
+                value: [
+                  {
+                    name: 'poolKey',
+                    value: USDC_WETH.poolKey,
+                  },
+                  {
+                    name: 'tickLower',
+                    value: -60,
+                  },
+                  {
+                    name: 'tickUpper',
+                    value: 60,
+                  },
+                  {
+                    name: 'liquidity',
+                    value: BigNumber.from(5000000),
+                  },
+                  {
+                    name: 'amount0Max',
+                    value: amount,
+                  },
+                  {
+                    name: 'amount1Max',
+                    value: amount,
+                  },
+                  {
+                    name: 'owner',
+                    value: addressOne,
+                  },
+                  {
+                    name: 'hookData',
+                    value: '0x',
+                  },
+                ],
+              },
             ],
           },
         ],
