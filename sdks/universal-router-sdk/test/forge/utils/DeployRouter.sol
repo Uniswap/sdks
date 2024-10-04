@@ -114,7 +114,7 @@ contract DeployRouter is Test {
             PoolKey memory poolKey = poolKeys[i];
             poolManager.initialize(poolKey, 79228162514264337593543950336, bytes(""));
 
-            (BalanceDelta delta, BalanceDelta feesAccrued) = poolManager.modifyLiquidity(
+            (BalanceDelta delta,) = poolManager.modifyLiquidity(
                 poolKey,
                 IPoolManager.ModifyLiquidityParams({
                     tickLower: -60,
