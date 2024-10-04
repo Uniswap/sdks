@@ -17,8 +17,6 @@ type ChainConfig = {
 
 const WETH_NOT_SUPPORTED_ON_CHAIN = '0x0000000000000000000000000000000000000000'
 
-export const V4_POOL_MANAGER = '0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f'
-
 // Todo: Change `CHAIN_CONFIGS` to pull the UR address with v4
 export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // mainnet

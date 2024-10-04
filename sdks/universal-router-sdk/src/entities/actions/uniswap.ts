@@ -382,16 +382,17 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
 
     if (routePool instanceof V4Pool) {
       const v4Planner = new V4Planner()
+      v4Planner.addSettle(inputToken, payerIsUser && i === 0, i == 0 ? amountIn : CONTRACT_BALANCE)
       v4Planner.addAction(Actions.SWAP_EXACT_IN, [
         {
           currencyIn: inputToken.address ?? ETH_ADDRESS,
           path: encodeV4RouteToPath(subRoute),
-          amountIn: i == 0 ? amountIn : CONTRACT_BALANCE,
+          amountIn: 0, // open delta determined in v4Planner.addSettle() above
           amountOutMinimum: !isLastSectionInRoute(i) ? 0 : amountOut,
         },
       ])
-      v4Planner.addSettle(inputToken, payerIsUser && i === 0)
       v4Planner.addTake(outputToken, swapRecipient)
+      planner.addCommand(CommandType.V4_SWAP, [v4Planner.finalize()])
     } else if (routePool instanceof V3Pool) {
       planner.addCommand(CommandType.V3_SWAP_EXACT_IN, [
         swapRecipient, // recipient
@@ -415,7 +416,7 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
     // perform a token transition (wrap/unwrap if necessary)
     if (!isLastSectionInRoute(i)) {
       if (outputToken.isNative && !nextInputToken.isNative) {
-        planner.addCommand(CommandType.WRAP_ETH, [ROUTER_AS_RECIPIENT, 0])
+        planner.addCommand(CommandType.WRAP_ETH, [ROUTER_AS_RECIPIENT, CONTRACT_BALANCE])
       } else if (!outputToken.isNative && nextInputToken.isNative) {
         planner.addCommand(CommandType.UNWRAP_WETH, [ROUTER_AS_RECIPIENT, 0])
       }

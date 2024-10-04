@@ -756,13 +756,13 @@ describe('Uniswap', () => {
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
         TradeType.EXACT_INPUT
       )
-      const opts = swapOptions({})
+      const opts = swapOptions({ slippageTolerance: new Percent(999, 1000)})
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_MIXED_USDC_DAI_UNWRAP_WETH_V2_TO_V4', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
-    it.only('encodes a mixed exactInput v4DAI->ETH->V3WETH->USDC', async () => {
+    it('encodes a mixed exactInput v4DAI->ETH->V3WETH->USDC', async () => {
       const inputDAI = utils.parseEther('1000').toString()
       const trade = await MixedRouteTrade.fromRoute(
         new MixedRouteSDK([ETH_DAI_V4, WETH_USDC_V3], DAI, USDC),
@@ -775,7 +775,7 @@ describe('Uniswap', () => {
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
-    it.only('encodes a mixed exactInput v4DAI->ETH->V2WETH->USDC', async () => {
+    it('encodes a mixed exactInput v4DAI->ETH->V2WETH->USDC', async () => {
       const inputDAI = utils.parseEther('1000').toString()
       const trade = await MixedRouteTrade.fromRoute(
         new MixedRouteSDK([ETH_DAI_V4, WETH_USDC_V2], DAI, USDC),
