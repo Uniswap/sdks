@@ -757,7 +757,7 @@ describe('Uniswap', () => {
         TradeType.EXACT_INPUT
       )
 
-      const opts = swapOptions({ slippageTolerance: new Percent(5, 100)})
+      const opts = swapOptions({ slippageTolerance: new Percent(5, 100) })
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_MIXED_USDC_DAI_UNWRAP_WETH_V2_TO_V4', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
