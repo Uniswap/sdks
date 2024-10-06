@@ -1,6 +1,6 @@
 import { Currency, CurrencyAmount, Token } from '@uniswap/sdk-core'
 import { Pool as V4Pool } from '@uniswap/v4-sdk'
-import { TPool } from './TPool'
+import { TPool } from '@uniswap/router-sdk/dist/utils/TPool'
 
 export function amountWithPathCurrency(amount: CurrencyAmount<Currency>, pool: TPool): CurrencyAmount<Currency> {
   return CurrencyAmount.fromFractionalAmount(

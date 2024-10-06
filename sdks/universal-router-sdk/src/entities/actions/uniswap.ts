@@ -2,10 +2,10 @@ import { RoutePlanner, CommandType } from '../../utils/routerCommands'
 import { Trade as V2Trade, Pair } from '@uniswap/v2-sdk'
 import { Trade as V3Trade, Pool as V3Pool, encodeRouteToPath } from '@uniswap/v3-sdk'
 import {
+  Route as V4Route,
   Trade as V4Trade,
-  V4Planner,
   Pool as V4Pool,
-  PathKey,
+  V4Planner,
   encodeRouteToPath as encodeV4RouteToPath,
   Actions,
 } from '@uniswap/v4-sdk'
@@ -33,7 +33,6 @@ import {
   ROUTER_AS_RECIPIENT,
   CONTRACT_BALANCE,
   ETH_ADDRESS,
-  V4_POOL_MANAGER,
 } from '../../utils/constants'
 import { encodeFeeBips } from '../../utils/numbers'
 import { BigNumber, BigNumberish } from 'ethers'
@@ -317,8 +316,10 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
   payerIsUser: boolean,
   routerMustCustody: boolean
 ): void {
-  const { route, inputAmount, outputAmount } = swap
-  const tradeRecipient = routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient
+  const route = swap.route as MixedRoute<TInput, TOutput>
+  const inputAmount = swap.inputAmount
+  const outputAmount = swap.outputAmount
+  const tradeRecipient = routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient ?? SENDER_AS_RECIPIENT
 
   // single hop, so it can be reduced to plain swap logic for one protocol version
   if (route.pools.length === 1) {
@@ -377,21 +378,24 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
       nextInputToken = getPathCurrency(outputToken, nextPool)
 
       const v2PoolIsSwapRecipient = nextPool instanceof Pair && outputToken.equals(nextInputToken)
-      swapRecipient = v2PoolIsSwapRecipient ? nextPool.liquidityToken.address : ROUTER_AS_RECIPIENT
+      swapRecipient = v2PoolIsSwapRecipient ? (nextPool as Pair).liquidityToken.address : ROUTER_AS_RECIPIENT
     }
 
     if (routePool instanceof V4Pool) {
       const v4Planner = new V4Planner()
-      v4Planner.addSettle(inputToken, payerIsUser && i === 0, i == 0 ? amountIn : CONTRACT_BALANCE)
+      const v4SubRoute = new V4Route(section as V4Pool[], subRoute.input, subRoute.output)
+
+      v4Planner.addSettle(inputToken, payerIsUser && i === 0, (i == 0 ? amountIn : CONTRACT_BALANCE) as BigNumber)
       v4Planner.addAction(Actions.SWAP_EXACT_IN, [
         {
-          currencyIn: inputToken.address ?? ETH_ADDRESS,
-          path: encodeV4RouteToPath(subRoute),
-          amountIn: 0, // open delta determined in v4Planner.addSettle() above
+          currencyIn: inputToken.isNative ? ETH_ADDRESS : inputToken.address,
+          path: encodeV4RouteToPath(v4SubRoute),
+          amountIn: 0, // denotes open delta, amount set in v4Planner.addSettle()
           amountOutMinimum: !isLastSectionInRoute(i) ? 0 : amountOut,
         },
       ])
       v4Planner.addTake(outputToken, swapRecipient)
+
       planner.addCommand(CommandType.V4_SWAP, [v4Planner.finalize()])
     } else if (routePool instanceof V3Pool) {
       planner.addCommand(CommandType.V3_SWAP_EXACT_IN, [
