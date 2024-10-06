@@ -1,4 +1,4 @@
-export { SwapRouter } from './swapRouter'
+export { SwapRouter, MigrateV3ToV4Options } from './swapRouter'
 export * from './entities'
 export * from './utils/routerTradeAdapter'
 export { RoutePlanner, CommandType } from './utils/routerCommands'
