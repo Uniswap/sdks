@@ -28,12 +28,7 @@ import { Permit2Permit } from '../../utils/inputTokens'
 import { getPathCurrency } from '../../utils/pathCurrency'
 import { Currency, TradeType, CurrencyAmount, Percent } from '@uniswap/sdk-core'
 import { Command, RouterActionType, TradeConfig } from '../Command'
-import {
-  SENDER_AS_RECIPIENT,
-  ROUTER_AS_RECIPIENT,
-  CONTRACT_BALANCE,
-  ETH_ADDRESS,
-} from '../../utils/constants'
+import { SENDER_AS_RECIPIENT, ROUTER_AS_RECIPIENT, CONTRACT_BALANCE, ETH_ADDRESS } from '../../utils/constants'
 import { encodeFeeBips } from '../../utils/numbers'
 import { BigNumber, BigNumberish } from 'ethers'
 import { TPool } from '@uniswap/router-sdk/dist/utils/TPool'
