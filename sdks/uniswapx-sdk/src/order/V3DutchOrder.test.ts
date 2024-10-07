@@ -162,7 +162,9 @@ describe("V3DutchOrder", () => {
         });
         const order = new UnsignedV3DutchOrder(orderInfo, 1);
         const fullOrderHash = order.cosignatureHash(orderInfo.cosignerData);
-        const cosignature = await wallet.signMessage(fullOrderHash);
+        const cosignature = ethers.utils.joinSignature(
+            wallet._signingKey().signDigest(fullOrderHash)
+        );
         const signedOrder = CosignedV3DutchOrder.fromUnsignedOrder(
           order,
           COSIGNER_DATA_WITH_OVERRIDES,
