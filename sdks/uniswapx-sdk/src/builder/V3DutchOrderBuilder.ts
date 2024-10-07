@@ -53,10 +53,6 @@ export class V3DutchOrderBuilder extends OrderBuilder {
     invariant(this.info.cosignature !== undefined, "cosignature not set");
     this.checkUnsignedInvariants(this.info);
     this.checkCosignedInvariants(this.info);
-    console.log(
-      "this is the cosigner address we're building with:",
-      this.info.cosigner
-    );
     return new CosignedV3DutchOrder(
       Object.assign(this.getOrderInfo(), {
         cosignerData: this.info.cosignerData,

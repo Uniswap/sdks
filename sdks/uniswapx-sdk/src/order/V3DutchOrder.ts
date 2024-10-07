@@ -360,7 +360,6 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
 
     hash(): string {
         const witnessInfo = this.witnessInfo();
-        console.log("the witness info is:", witnessInfo);
         return ethers.utils._TypedDataEncoder
             .from(V3_DUTCH_ORDER_TYPES)
             .hash(witnessInfo);

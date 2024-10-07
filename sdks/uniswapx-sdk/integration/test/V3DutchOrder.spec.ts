@@ -54,17 +54,14 @@ describe.only("DutchV3Order", () => {
         swapperAddress = await swapper.getAddress();
         cosignerAddress = await cosigner.getAddress();
         fillerAddress = await filler.getAddress();
-        console.log("before funds");
         const tx = await admin.sendTransaction({
             to: swapperAddress,
             value: AMOUNT.mul(10),
         });
-
         const tx1 = await bot.sendTransaction({
             to: fillerAddress,
             value: AMOUNT,
         });
-        console.log("after funds");
 
         const tokenFactory = await ethers.getContractFactory(
             MockERC20Abi.abi,
@@ -73,7 +70,7 @@ describe.only("DutchV3Order", () => {
 
         tokenIn = (await tokenFactory.deploy("Token A", "A", 18)) as MockERC20;
         tokenOut = (await tokenFactory.deploy("Token B", "B", 18)) as MockERC20;
-        console.log("after token deploys")
+        
         await tokenIn.mint(
             swapperAddress,
             AMOUNT,
@@ -225,203 +222,6 @@ describe.only("DutchV3Order", () => {
             .execute({ order: fullOrder.serialize(), sig: signature })
         ).to.be.revertedWithCustomError(reactor, "InvalidCosignature");
     }); 
-
-    it("debug cosignature", async () => {
-        const deadline = 1800000000;
-        const cosignerData : V3CosignerData = {
-            decayStartBlock: 260000000,
-            exclusiveFiller: ethers.constants.AddressZero,
-            exclusivityOverrideBps: BigNumber.from(0),
-            inputOverride: BigNumber.from(0),
-            outputOverrides: [BigNumber.from(0)],
-        }
-
-        const order = new V3DutchOrderBuilder(
-            1, ethers.constants.AddressZero//chainId doesn't get hashed so doesn't matter
-        )
-            .cosigner(ethers.constants.AddressZero)
-            .deadline(deadline)
-            .swapper(ethers.constants.AddressZero)
-            .nonce(BigNumber.from(0))
-            .startingBaseFee(BigNumber.from(0))
-            .input({
-                token: "0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f",
-                startAmount: BigNumber.from(21),
-                curve: {
-                    relativeBlocks: [1],
-                    relativeAmounts: [BigInt(1)],
-                },
-                maxAmount: BigNumber.from(21),
-                adjustmentPerGweiBaseFee: BigNumber.from(0),
-            })
-            .output({
-                token: ethers.constants.AddressZero,
-                startAmount: BigNumber.from(21),
-                curve: {
-                    relativeBlocks: [1],
-                    relativeAmounts: [BigInt(1)],
-                },
-                recipient: ethers.constants.AddressZero,
-                minAmount: BigNumber.from(20),
-                adjustmentPerGweiBaseFee: BigNumber.from(0),
-            })
-            .buildPartial()
-
-            const { domain, types, values } = order.permitData();
-            const signature = await swapper._signTypedData(domain, types, values);
-
-            const encoder = ethers.utils._TypedDataEncoder.from(V3_DUTCH_ORDER_TYPES);
-            const hashOfTypes = ethers.utils.keccak256(
-                ethers.utils.toUtf8Bytes(encoder.encodeType("V3DutchOrder"))
-            );
-            console.log("hash of DutchV3Output: ", ethers.utils.keccak256(
-                ethers.utils.toUtf8Bytes(encoder.encodeType("V3DutchOutput"))
-            ));
-            
-
-            const orderHash = order.hash();
-            console.log("input hash", ethers.utils._TypedDataEncoder.from(   { V3DutchInput: [
-                { name: "token", type: "address" },
-                { name: "startAmount", type: "uint256" },
-                { name: "curve", type: "NonlinearDutchDecay" },
-                { name: "maxAmount", type: "uint256" },
-                { name: "adjustmentPerGweiBaseFee", type: "uint256" },
-            ],
-            NonlinearDutchDecay: [
-                { name: "relativeBlocks", type: "uint256" },
-                { name: "relativeAmounts", type: "int256[]" },
-            ]}).hashStruct("V3DutchInput", {
-                token: order.info.input.token,
-                startAmount: order.info.input.startAmount,
-                curve: {
-                    relativeBlocks: encodeRelativeBlocks(order.info.input.curve.relativeBlocks),
-                    relativeAmounts: order.info.input.curve.relativeAmounts,
-                },
-                maxAmount: order.info.input.maxAmount,
-                adjustmentPerGweiBaseFee: order.info.input.adjustmentPerGweiBaseFee,
-            }));
-            const curveEncoder = ethers.utils._TypedDataEncoder.from({
-                NonlinearDutchDecay: [
-                    { name: "relativeBlocks", type: "uint256" },
-                    { name: "relativeAmounts", type: "int256[]" },
-                ]});
-            
-
-            console.log(encodeRelativeBlocks([1,2]));
-            console.log("Input's NonlinearDecay Hash:", curveEncoder.hashStruct("NonlinearDutchDecay", {
-                relativeBlocks: encodeRelativeBlocks([1,2]),
-                relativeAmounts: [BigInt(1), BigInt(2)],
-            }));
-
-            const encodedOutputs = encoder.hashStruct("V3DutchOutput[]", 
-                order.info.outputs.map((output) => ({
-                    token: output.token,
-                    startAmount: output.startAmount,
-                    curve: {
-                        relativeBlocks: encodeRelativeBlocks(output.curve.relativeBlocks),
-                        relativeAmounts: output.curve.relativeAmounts,
-                    },
-                    recipient: output.recipient,
-                    minAmount: output.minAmount,
-                    adjustmentPerGweiBaseFee: output.adjustmentPerGweiBaseFee,
-                }))
-            );
-            //console.log("hash of encoded outputs", encodedOutputs);
-
-            const cosignerHash = order.cosignatureHash(cosignerData);
-            console.log("the cosignerHash is: ", cosignerHash);
-            // const cosignature = ethers.utils.joinSignature(
-            //   cosigner._signingKey().signDigest(cosignerHash)
-            // );
-            const cosignature = "0x"; //emptyBytes
-            // console.log("the cosigner that signed the cosignerHash is: ", await cosigner.getAddress());
-            const fullOrder = V3DutchOrderBuilder.fromOrder(order)
-            .cosignerData(cosignerData)
-            .cosignature(cosignature)
-            .build();
-
-        console.log("Order Info:");
-        console.log("  Reactor:", fullOrder.info.reactor);
-        console.log("  Swapper:", fullOrder.info.swapper);
-        console.log("  Nonce:", fullOrder.info.nonce);
-        console.log("  deadline:", fullOrder.info.deadline);
-        console.log("  additionalValidationContract:", fullOrder.info.additionalValidationContract);
-        console.log("  additionalValidationData:", fullOrder.info.additionalValidationData);
-
-
-        console.log("Base Input:");
-        console.log("  Token:", fullOrder.info.input.token);
-        console.log("  Start Amount:", fullOrder.info.input.startAmount);
-        console.log("  Curve, RelativeBlocks:", encodeRelativeBlocks(fullOrder.info.input.curve.relativeBlocks));
-        for (let i = 0; i < fullOrder.info.input.curve.relativeAmounts.length; i++) {
-            console.log("  Curve, RelativeAmounts:", fullOrder.info.input.curve.relativeAmounts[i]);
-        }
-        console.log("  Max Amount:", fullOrder.info.input.maxAmount);
-        console.log("  adjustmentPerGweiBaseFee:", fullOrder.info.input.adjustmentPerGweiBaseFee);
-
-        /* Output Logs
-        console.log("Base Outputs:");
-        for (let i = 0; i < fullOrder.info.outputs.length; i++) {
-            console.log("  Output", i);
-            console.log("    Token:", fullOrder.info.outputs[i].token);
-            console.log("    Start Amount:", fullOrder.info.outputs[i].startAmount);
-            console.log("  Curve, RelativeBlocks:", fullOrder.info.outputs[i].curve.relativeBlocks);
-            for (let j = 0; j < fullOrder.info.outputs[i].curve.relativeAmounts.length; j++) {
-                console.log("  Curve, RelativeAmounts:", fullOrder.info.outputs[i].curve.relativeAmounts[j]);
-            }
-            console.log("    Recipient:", fullOrder.info.outputs[i].recipient);
-            console.log("    minAmount:", fullOrder.info.outputs[i].minAmount);
-            console.log("    adjustmentPerGweiBaseFee:", fullOrder.info.outputs[i].adjustmentPerGweiBaseFee);
-        }
-
-        console.log("Cosigner Data:");
-        console.log("  decayStartBlock:", fullOrder.info.cosignerData.decayStartBlock);
-        console.log("  exclusiveFiller:", fullOrder.info.cosignerData.exclusiveFiller);
-        console.log("  exclusivityOverrideBps:", fullOrder.info.cosignerData.exclusivityOverrideBps);
-        console.log("  inputOverride:", fullOrder.info.cosignerData.inputOverride);
-        for (let i = 0; i < fullOrder.info.cosignerData.outputOverrides.length; i++) {
-            console.log("  outputOverrides:", fullOrder.info.cosignerData.outputOverrides[i]);
-        }
-        */
-        console.log("V3 Order Type Hash: ", hashOfTypes);
-        console.log("Order Hash: ", orderHash);
-        console.log("NonlinearDecay Type Hash:", ethers.utils.keccak256(
-            ethers.utils.toUtf8Bytes(curveEncoder.encodeType("NonlinearDutchDecay"))
-        ));
-        console.log("Input's NonlinearDecay Hash:", curveEncoder.hashStruct("NonlinearDutchDecay", {
-            relativeBlocks: encodeRelativeBlocks(fullOrder.info.input.curve.relativeBlocks),
-            relativeAmounts: fullOrder.info.input.curve.relativeAmounts,
-        }));
-
-        console.log("Input Type Hash:", ethers.utils.keccak256(
-            ethers.utils.toUtf8Bytes(encoder.encodeType("V3DutchInput"))
-        ));
-
-        console.log("Hashed Input:", encoder.hashStruct("V3DutchInput", {
-            token: fullOrder.info.input.token,
-            startAmount: fullOrder.info.input.startAmount,
-            curve: {
-                relativeBlocks: encodeRelativeBlocks(fullOrder.info.input.curve.relativeBlocks),
-                relativeAmounts: fullOrder.info.input.curve.relativeAmounts,
-            },
-            maxAmount: fullOrder.info.input.maxAmount,
-            adjustmentPerGweiBaseFee: fullOrder.info.input.adjustmentPerGweiBaseFee,
-        }));
-
-        console.log("Hashed Output:", encoder.hashStruct("V3DutchOutput", {
-            token: fullOrder.info.outputs[0].token,
-            startAmount: fullOrder.info.outputs[0].startAmount,
-            curve: {
-                relativeBlocks: encodeRelativeBlocks(fullOrder.info.outputs[0].curve.relativeBlocks),
-                relativeAmounts: fullOrder.info.outputs[0].curve.relativeAmounts,
-            },
-            recipient: fullOrder.info.outputs[0].recipient,
-            minAmount: fullOrder.info.outputs[0].minAmount,
-            adjustmentPerGweiBaseFee: fullOrder.info.outputs[0].adjustmentPerGweiBaseFee,
-        }));
-
-        console.log("The encoded order is: ", fullOrder.serialize());
-    });
 
     it("executes a serialized order with no decay", async () => {
         const deadline = await new BlockchainTime().secondsFromNow(1000);
