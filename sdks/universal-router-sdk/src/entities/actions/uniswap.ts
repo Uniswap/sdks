@@ -287,7 +287,8 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
     outputAmount,
     tradeType,
   })
-  const slippageToleranceOnSwap = routerMustCustody ? undefined : options.slippageTolerance
+  const slippageToleranceOnSwap =
+    routerMustCustody && tradeType == TradeType.EXACT_INPUT ? undefined : options.slippageTolerance
 
   const inputWethFromRouter = inputAmount.currency.isNative && !route.input.isNative
   if (inputWethFromRouter && !payerIsUser) throw new Error('Inconsistent payer')
