@@ -546,11 +546,6 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         assertGt(USDC.balanceOf(RECIPIENT), 2000 * ONE_USDC);
     }
 
-    // v4-sdk 1.6.3 allows this
-    // function testV4ExactInputEthWithWrap() public {
-    //     MethodParameters memory params = readFixture(json, "._UNISWAP_V4_1_ETH_FOR_USDC_WITH_WRAP");
-    // }
-
     function testV4ExactInWithFee() public {
         MethodParameters memory params = readFixture(json, "._UNISWAP_V4_1_ETH_FOR_USDC_WITH_FEE");
 
@@ -606,9 +601,12 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         assertGe(from.balance, startingRecipientBalance);
     }
 
-    // v4-sdk 1.6.3 allows this
     // function testV4ExactInNativeOutputWithUnwrap() public {
     //     MethodParameters memory params = readFixture(json, "._UNISWAP_V4_1000_USDC_FOR_ETH_WITH_UNWRAP");
+    // }
+
+    // function testV4ExactInputEthWithWrap() public {
+    //     MethodParameters memory params = readFixture(json, "._UNISWAP_V4_1_ETH_FOR_USDC_WITH_WRAP");
     // }
 
     function testV4ExactInMultiHop() public {
