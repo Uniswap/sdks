@@ -16,7 +16,7 @@ import {
     CosignerData,
     CosignerDataJSON,
     EncodedV3DutchInput,
-    // EncodedV3DutchOutput,
+    EncodedV3DutchOutput,
     OffChainOrder,
     OrderInfo,
     V3DutchInput,
@@ -72,7 +72,7 @@ type V3WitnessInfo = {
     cosigner: string;
     startingBaseFee: BigNumber;
     baseInput: EncodedV3DutchInput;
-    // baseOutputs: EncodedV3DutchOutput[];
+    baseOutputs: EncodedV3DutchOutput[];
 };
 
 const COSIGNER_DATA_TUPLE_ABI =
@@ -84,7 +84,7 @@ export const V3_DUTCH_ORDER_TYPES = {
         { name: "cosigner", type: "address" },
         { name: "startingBaseFee", type: "uint256" },
         { name: "baseInput", type: "V3DutchInput" },
-        // { name: "baseOutputs", type: "V3DutchOutput[]" },
+        { name: "baseOutputs", type: "V3DutchOutput[]" },
     ],
     OrderInfo: [
         { name: "reactor", type: "address" },
@@ -101,14 +101,14 @@ export const V3_DUTCH_ORDER_TYPES = {
         { name: "maxAmount", type: "uint256" },
         { name: "adjustmentPerGweiBaseFee", type: "uint256" },
     ],
-    // V3DutchOutput: [
-    //     { name: "token", type: "address" },
-    //     { name: "startAmount", type: "uint256" },
-    //     { name: "curve", type: "NonlinearDutchDecay" },
-    //     { name: "recipient", type: "address" },
-    //     { name: "minAmount", type: "uint256" },
-    //     { name: "adjustmentPerGweiBaseFee", type: "uint256" },
-    // ],
+    V3DutchOutput: [
+        { name: "token", type: "address" },
+        { name: "startAmount", type: "uint256" },
+        { name: "curve", type: "NonlinearDutchDecay" },
+        { name: "recipient", type: "address" },
+        { name: "minAmount", type: "uint256" },
+        { name: "adjustmentPerGweiBaseFee", type: "uint256" },
+    ],
     NonlinearDutchDecay: [
         { name: "relativeBlocks", type: "uint256" },
         { name: "relativeAmounts", type: "int256[]" },
@@ -322,17 +322,17 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                 maxAmount: this.info.input.maxAmount,
                 adjustmentPerGweiBaseFee: this.info.input.adjustmentPerGweiBaseFee,
             },
-            // baseOutputs: this.info.outputs.map((output) => ({
-            //     token: output.token,
-            //     startAmount: output.startAmount,
-            //     curve: {
-            //         relativeBlocks: encodeRelativeBlocks(output.curve.relativeBlocks),
-            //         relativeAmounts: output.curve.relativeAmounts,
-            //     },
-            //     recipient: output.recipient,
-            //     minAmount: output.minAmount,
-            //     adjustmentPerGweiBaseFee: output.adjustmentPerGweiBaseFee,
-            // })),
+            baseOutputs: this.info.outputs.map((output) => ({
+                token: output.token,
+                startAmount: output.startAmount,
+                curve: {
+                    relativeBlocks: encodeRelativeBlocks(output.curve.relativeBlocks),
+                    relativeAmounts: output.curve.relativeAmounts,
+                },
+                recipient: output.recipient,
+                minAmount: output.minAmount,
+                adjustmentPerGweiBaseFee: output.adjustmentPerGweiBaseFee,
+            })),
         };
     }
 
@@ -360,7 +360,7 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
 
     hash(): string {
         const witnessInfo = this.witnessInfo();
-        console.log(witnessInfo);
+        console.log("the witness info is:", witnessInfo);
         return ethers.utils._TypedDataEncoder
             .from(V3_DUTCH_ORDER_TYPES)
             .hash(witnessInfo);
@@ -712,7 +712,7 @@ function parseSerializedOrder(serialized: string): CosignedV3DutchOrderInfo {
     };
 }
 
-function encodeRelativeBlocks(relativeBlocks: number[]): BigNumber {
+export function encodeRelativeBlocks(relativeBlocks: number[]): BigNumber {
     let packedData = BigNumber.from(0);
     for (let i = 0; i < relativeBlocks.length; i++) {
         packedData = packedData.or(BigNumber.from(relativeBlocks[i]).shl(i * 16));
