@@ -647,7 +647,7 @@ describe('Uniswap', () => {
       expect(hexToDecimalString(methodParameters.value)).to.equal('0')
     })
 
-    it('encodes an exactOutput DAI->USDC->ETH swap, with WETH fee', async () => {
+    it('encodes an exactOutput DAI->USDC->ETH swap, with ETH fee', async () => {
       const outputEther = utils.parseEther('1')
       const adjustedOutputEther = outputEther
         .mul(10000)
@@ -662,7 +662,7 @@ describe('Uniswap', () => {
       const opts = swapOptions({ fee: feeOptions })
       buildTrade([trade])
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
-      registerFixture('_UNISWAP_V4_USDC_FOR_1_ETH_2_HOP_WITH_WETH_FEE', methodParameters)
+      registerFixture('_UNISWAP_V4_USDC_FOR_1_ETH_2_HOP_WITH_ETH_FEE', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.equal('0')
     })
   })
