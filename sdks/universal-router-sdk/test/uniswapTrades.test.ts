@@ -668,16 +668,6 @@ describe('Uniswap', () => {
   })
 
   describe('mixed (interleaved)', async () => {
-    it('throws if trying to encode an exactOutput trade with a MixedRoute', () => {
-      const inputEther = utils.parseEther('1').toString()
-      const trade = await MixedRouteTrade.fromRoute(
-        new MixedRouteSDK([WETH_USDC_V3, USDC_DAI_V2], ETHER, DAI),
-        CurrencyAmount.fromRawAmount(ETHER, inputEther),
-        TradeType.EXACT_INPUT
-      )
-      SwapRouter.swapCallParameters(buildTrade([trade]), opts)
-    })
-
     it('encodes a mixed exactInput v3ETH->v2USDC->DAI swap', async () => {
       const inputEther = utils.parseEther('1').toString()
       const trade = await MixedRouteTrade.fromRoute(
