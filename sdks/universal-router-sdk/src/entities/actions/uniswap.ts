@@ -355,13 +355,7 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
     const section = sections[i]
     const routePool = section[0]
     const outputToken = getOutputOfPools(section, inputToken)
-    const subRoute = new MixedRoute(
-      new MixedRouteSDK(
-        [...section],
-        section[0].token0.equals(inputToken) ? section[0].token0 : section[0].token1,
-        outputToken
-      )
-    )
+    const subRoute = new MixedRoute(new MixedRouteSDK([...section], inputToken, outputToken))
 
     let nextInputToken
     let swapRecipient
