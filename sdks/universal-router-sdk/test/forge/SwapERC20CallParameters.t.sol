@@ -7,6 +7,7 @@ import {UniversalRouter} from "universal-router/UniversalRouter.sol";
 import {IPermit2} from "permit2/src/interfaces/IPermit2.sol";
 import {DeployRouter} from "./utils/DeployRouter.sol";
 import {MethodParameters, Interop} from "./utils/Interop.sol";
+import {INonfungiblePositionManager} from "v3-periphery/interfaces/INonfungiblePositionManager.sol";
 
 contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
     using stdJson for string;
@@ -713,5 +714,11 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         assertGt(USDC.balanceOf(RECIPIENT), 3000 * ONE_USDC);
         assertEq(USDC.balanceOf(address(router)), 0);
         assertEq(address(router).balance, 0);
+    }
+
+    function testMigration() public {
+        MethodParameters memory params = readFixture(json, "._MIGRATE_WITH_PERMIT");
+        initializeAndAddV3(WETH, USDC);
+        //assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(address(this)), 1);
     }
 }

@@ -15,6 +15,7 @@ import {IHooks} from "v4-core/interfaces/IHooks.sol";
 import {BalanceDelta} from "v4-core/types/BalanceDelta.sol";
 import {RouterParameters} from "universal-router/base/RouterImmutables.sol";
 import {IPermit2} from "permit2/src/interfaces/IPermit2.sol";
+import {INonfungiblePositionManager} from "v3-periphery/interfaces/INonfungiblePositionManager.sol";
 
 contract DeployRouter is Test {
     using PoolIdLibrary for PoolKey;
@@ -126,6 +127,24 @@ contract DeployRouter is Test {
             settle(poolKey.currency0, uint256((uint128(-delta.amount0()))));
             settle(poolKey.currency1, uint256((uint128(-delta.amount1()))));
         }
+    }
+
+    function initializeAndAddV3(ERC20 WETH, ERC20 USDC) public {
+        INonfungiblePositionManager(V3_POSITION_MANAGER).mint(
+            INonfungiblePositionManager.MintParams({
+                token0: address(WETH),
+                token1: address(USDC),
+                fee: 500,
+                tickLower: 0,
+                tickUpper: 194980,
+                amount0Desired: 1,
+                amount1Desired: 1,
+                amount0Min: 0,
+                amount1Min: 0,
+                recipient: address(this),
+                deadline: type(uint256).max
+            })
+        );
     }
 
     function settle(Currency currency, uint256 amount) internal {
