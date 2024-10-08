@@ -1,7 +1,8 @@
 import { ethers } from 'ethers'
 import { abi } from '@uniswap/universal-router/artifacts/contracts/UniversalRouter.sol/UniversalRouter.json'
 import { Interface } from '@ethersproject/abi'
-import { CommandType, COMMAND_ABI_DEFINITION, Subparser } from '../utils/routerCommands'
+import { V4BaseActionsParser, V4RouterAction } from '@uniswap/v4-sdk'
+import { CommandType, CommandDefinition, COMMAND_DEFINITION, Subparser, Parser } from '../utils/routerCommands'
 
 export type Param = {
   readonly name: string
@@ -24,47 +25,80 @@ export type V3PathItem = {
   readonly fee: number
 }
 
-// Parses UniversalRouter commands
+export interface CommandsDefinition {
+  [key: number]: CommandDefinition
+}
+
+// Parses UniversalRouter V2 commands
 export abstract class CommandParser {
   public static INTERFACE: Interface = new Interface(abi)
 
   public static parseCalldata(calldata: string): UniversalRouterCall {
+    const genericParser = new GenericCommandParser(COMMAND_DEFINITION)
     const txDescription = CommandParser.INTERFACE.parseTransaction({ data: calldata })
     const { commands, inputs } = txDescription.args
+    return genericParser.parse(commands, inputs)
+  }
+}
 
-    const commandTypes = CommandParser.getCommands(commands)
+// Parses commands based on given command definition
+export class GenericCommandParser {
+  constructor(private readonly commandDefinition: CommandsDefinition) {}
+
+  public parse(commands: string, inputs: string[]): UniversalRouterCall {
+    const commandTypes = GenericCommandParser.getCommands(commands)
 
     return {
       commands: commandTypes.map((commandType: CommandType, i: number) => {
-        const abiDef = COMMAND_ABI_DEFINITION[commandType]
-        const rawParams = ethers.utils.defaultAbiCoder.decode(
-          abiDef.map((command) => command.type),
-          inputs[i]
-        )
-        const params = rawParams.map((param: any, j: number) => {
-          switch (abiDef[j].subparser) {
-            case Subparser.V3PathExactIn:
-              return {
-                name: abiDef[j].name,
-                value: parseV3PathExactIn(param),
-              }
-            case Subparser.V3PathExactOut:
-              return {
-                name: abiDef[j].name,
-                value: parseV3PathExactOut(param),
-              }
-            default:
-              return {
-                name: abiDef[j].name,
-                value: param,
-              }
-          }
-        })
+        const commandDef = this.commandDefinition[commandType]
 
-        return {
-          commandName: CommandType[commandType],
-          commandType,
-          params,
+        if (commandDef.parser === Parser.V4Actions) {
+          const { actions } = V4BaseActionsParser.parseCalldata(inputs[i])
+          return {
+            commandName: CommandType[commandType],
+            commandType,
+            params: v4RouterCallToParams(actions),
+          }
+        } else if (commandDef.parser === Parser.Abi) {
+          const abiDef = commandDef.params
+          const rawParams = ethers.utils.defaultAbiCoder.decode(
+            abiDef.map((command) => command.type),
+            inputs[i]
+          )
+
+          const params = rawParams.map((param: any, j: number) => {
+            switch (abiDef[j].subparser) {
+              case Subparser.V3PathExactIn:
+                return {
+                  name: abiDef[j].name,
+                  value: parseV3PathExactIn(param),
+                }
+              case Subparser.V3PathExactOut:
+                return {
+                  name: abiDef[j].name,
+                  value: parseV3PathExactOut(param),
+                }
+              default:
+                return {
+                  name: abiDef[j].name,
+                  value: param,
+                }
+            }
+          })
+          return {
+            commandName: CommandType[commandType],
+            commandType,
+            params,
+          }
+        } else if (commandDef.parser === Parser.V3Actions) {
+          // TODO: implement better parsing here
+          return {
+            commandName: CommandType[commandType],
+            commandType,
+            params: inputs.map((input) => ({ name: 'command', value: input })),
+          }
+        } else {
+          throw new Error(`Unsupported parser: ${commandDef}`)
         }
       }),
     }
@@ -126,4 +160,18 @@ export function parseV3PathExactOut(path: string): readonly V3PathItem[] {
   }
 
   return res
+}
+
+function v4RouterCallToParams(actions: readonly V4RouterAction[]): readonly Param[] {
+  return actions.map((action) => {
+    return {
+      name: action.actionName,
+      value: action.params.map((param) => {
+        return {
+          name: param.name,
+          value: param.value,
+        }
+      }),
+    }
+  })
 }

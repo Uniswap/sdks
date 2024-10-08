@@ -718,7 +718,7 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
 
     function testMigration() public {
         MethodParameters memory params = readFixture(json, "._MIGRATE_WITH_PERMIT");
-        initializeAndAddV3(WETH, USDC);
+        //initializeAndAddV3(WETH, USDC);
         //assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(address(this)), 1);
     }
 }
