@@ -312,6 +312,8 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
   payerIsUser: boolean,
   routerMustCustody: boolean
 ): void {
+  if (tradeType == TradeType.EXACT_OUTPUT) throw new Error('MixedRoute does not support ExactOutput')
+
   const route = swap.route as MixedRoute<TInput, TOutput>
   const inputAmount = swap.inputAmount
   const outputAmount = swap.outputAmount
