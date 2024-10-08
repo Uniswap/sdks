@@ -142,12 +142,16 @@ export class UniswapTrade implements Command {
 
     // The router custodies for 3 reasons: to unwrap, to take a fee, and/or to do a slippage check
     if (routerMustCustody) {
+      const pools = this.trade.swaps[0].route.pools
+      const outputCurrency = getPathCurrency(this.trade.outputAmount.currency, pools[pools.length - 1])
+      const outputCurrencyAddress = outputCurrency.isNative ? ETH_ADDRESS : outputCurrency.address
+
       // If there is a fee, that percentage is sent to the fee recipient
       // In the case where ETH is the output currency, the fee is taken in WETH (for gas reasons)
       if (!!this.options.fee) {
         const feeBips = encodeFeeBips(this.options.fee.fee)
         planner.addCommand(CommandType.PAY_PORTION, [
-          this.trade.outputAmount.currency.wrapped.address,
+          outputCurrencyAddress,
           this.options.fee.recipient,
           feeBips,
         ])
@@ -166,7 +170,7 @@ export class UniswapTrade implements Command {
         if (minimumAmountOut.lt(feeAmount)) throw new Error('Flat fee amount greater than minimumAmountOut')
 
         planner.addCommand(CommandType.TRANSFER, [
-          this.trade.outputAmount.currency.wrapped.address,
+          outputCurrencyAddress,
           this.options.flatFee.recipient,
           feeAmount,
         ])
@@ -184,7 +188,7 @@ export class UniswapTrade implements Command {
         planner.addCommand(CommandType.UNWRAP_WETH, [this.options.recipient, minimumAmountOut])
       } else {
         planner.addCommand(CommandType.SWEEP, [
-          this.trade.outputAmount.currency.wrapped.address,
+          outputCurrencyAddress,
           this.options.recipient,
           minimumAmountOut,
         ])
