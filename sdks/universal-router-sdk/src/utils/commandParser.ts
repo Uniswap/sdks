@@ -2,7 +2,7 @@ import { ethers } from 'ethers'
 import { abi } from '@uniswap/universal-router/artifacts/contracts/UniversalRouter.sol/UniversalRouter.json'
 import { Interface } from '@ethersproject/abi'
 import { V4BaseActionsParser, V4RouterAction } from '@uniswap/v4-sdk'
-import { CommandType, COMMAND_DEFINITION, Subparser, Parser } from '../utils/routerCommands'
+import { CommandType, CommandDefinition, COMMAND_DEFINITION, Subparser, Parser } from '../utils/routerCommands'
 
 export type Param = {
   readonly name: string
@@ -25,19 +25,32 @@ export type V3PathItem = {
   readonly fee: number
 }
 
-// Parses UniversalRouter commands
+export interface CommandsDefinition {
+  [key: number]: CommandDefinition
+}
+
+// Parses UniversalRouter V2 commands
 export abstract class CommandParser {
   public static INTERFACE: Interface = new Interface(abi)
 
   public static parseCalldata(calldata: string): UniversalRouterCall {
+    const genericParser = new GenericCommandParser(COMMAND_DEFINITION)
     const txDescription = CommandParser.INTERFACE.parseTransaction({ data: calldata })
     const { commands, inputs } = txDescription.args
+    return genericParser.parse(commands, inputs)
+  }
+}
 
-    const commandTypes = CommandParser.getCommands(commands)
+// Parses commands based on given command definition
+export class GenericCommandParser {
+  constructor(private readonly commandDefinition: CommandsDefinition) {}
+
+  public parse(commands: string, inputs: string[]): UniversalRouterCall {
+    const commandTypes = GenericCommandParser.getCommands(commands)
 
     return {
       commands: commandTypes.map((commandType: CommandType, i: number) => {
-        const commandDef = COMMAND_DEFINITION[commandType]
+        const commandDef = this.commandDefinition[commandType]
 
         if (commandDef.parser === Parser.V4Actions) {
           const { actions } = V4BaseActionsParser.parseCalldata(inputs[i])
@@ -82,7 +95,7 @@ export abstract class CommandParser {
           return {
             commandName: CommandType[commandType],
             commandType,
-            params: inputs,
+            params: inputs.map((input) => ({ name: 'command', value: input })),
           }
         } else {
           throw new Error(`Unsupported parser: ${commandDef}`)
