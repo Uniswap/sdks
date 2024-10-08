@@ -18,6 +18,7 @@ export type TokenInRoute = {
 export enum PoolType {
   V2Pool = 'v2-pool',
   V3Pool = 'v3-pool',
+  V4Pool = 'v4-pool',
 }
 
 export type V2Reserve = {

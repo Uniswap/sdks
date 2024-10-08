@@ -1,7 +1,14 @@
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
 import { Trade as V2Trade, Pair } from '@uniswap/v2-sdk'
 import { Trade as V3Trade, Pool as V3Pool, encodeRouteToPath } from '@uniswap/v3-sdk'
-import { Trade as V4Trade, V4Planner } from '@uniswap/v4-sdk'
+import {
+  Route as V4Route,
+  Trade as V4Trade,
+  Pool as V4Pool,
+  V4Planner,
+  encodeRouteToPath as encodeV4RouteToPath,
+  Actions,
+} from '@uniswap/v4-sdk'
 import {
   Trade as RouterTrade,
   MixedRouteTrade,
@@ -18,6 +25,7 @@ import {
   partitionMixedRouteByProtocol,
 } from '@uniswap/router-sdk'
 import { Permit2Permit } from '../../utils/inputTokens'
+import { getPathCurrency } from '../../utils/pathCurrency'
 import { Currency, TradeType, CurrencyAmount, Percent } from '@uniswap/sdk-core'
 import { Command, RouterActionType, TradeConfig } from '../Command'
 import { SENDER_AS_RECIPIENT, ROUTER_AS_RECIPIENT, CONTRACT_BALANCE, ETH_ADDRESS } from '../../utils/constants'
@@ -118,15 +126,7 @@ export class UniswapTrade implements Command {
           addV3Swap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
           break
         case Protocol.V4:
-          addV4Swap(
-            planner,
-            swap,
-            this.trade.tradeType,
-            this.options,
-            this.payerIsUser,
-            routerMustCustody,
-            performAggregatedSlippageCheck
-          )
+          addV4Swap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
           break
         case Protocol.MIXED:
           addMixedSwap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
@@ -279,8 +279,7 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
   tradeType: TradeType,
   options: SwapOptions,
   payerIsUser: boolean,
-  routerMustCustody: boolean,
-  performAggregatedSlippageCheck: boolean
+  routerMustCustody: boolean
 ): void {
   const trade = V4Trade.createUncheckedTrade({
     route: route as RouteV4<TInput, TOutput>,
@@ -288,7 +287,8 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
     outputAmount,
     tradeType,
   })
-  const slippageToleranceOnSwap = performAggregatedSlippageCheck ? undefined : options.slippageTolerance
+  const slippageToleranceOnSwap =
+    routerMustCustody && tradeType == TradeType.EXACT_INPUT ? undefined : options.slippageTolerance
 
   const inputWethFromRouter = inputAmount.currency.isNative && !route.input.isNative
   if (inputWethFromRouter && !payerIsUser) throw new Error('Inconsistent payer')
@@ -312,12 +312,16 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
   payerIsUser: boolean,
   routerMustCustody: boolean
 ): void {
-  const { route, inputAmount, outputAmount } = swap
-  const tradeRecipient = routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient
+  const route = swap.route as MixedRoute<TInput, TOutput>
+  const inputAmount = swap.inputAmount
+  const outputAmount = swap.outputAmount
+  const tradeRecipient = routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient ?? SENDER_AS_RECIPIENT
 
-  // single hop, so it can be reduced to plain v2 or v3 swap logic
+  // single hop, so it can be reduced to plain swap logic for one protocol version
   if (route.pools.length === 1) {
-    if (route.pools[0] instanceof V3Pool) {
+    if (route.pools[0] instanceof V4Pool) {
+      return addV4Swap(planner, swap, tradeType, options, payerIsUser, routerMustCustody)
+    } else if (route.pools[0] instanceof V3Pool) {
       return addV3Swap(planner, swap, tradeType, options, payerIsUser, routerMustCustody)
     } else if (route.pools[0] instanceof Pair) {
       return addV2Swap(planner, swap, tradeType, options, payerIsUser, routerMustCustody)
@@ -345,49 +349,74 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
     return i === sections.length - 1
   }
 
-  let outputToken
-  let inputToken = route.input.wrapped
+  let inputToken = route.pathInput
 
   for (let i = 0; i < sections.length; i++) {
     const section = sections[i]
-    /// Now, we get output of this section
-    outputToken = getOutputOfPools(section, inputToken)
+    const routePool = section[0]
+    const outputToken = getOutputOfPools(section, inputToken)
+    const subRoute = new MixedRoute(new MixedRouteSDK([...section], inputToken, outputToken))
 
-    const newRouteOriginal = new MixedRouteSDK(
-      [...section],
-      section[0].token0.equals(inputToken) ? section[0].token0 : section[0].token1,
-      outputToken
-    )
-    const newRoute = new MixedRoute(newRouteOriginal)
+    let nextInputToken
+    let swapRecipient
 
-    /// Previous output is now input
-    inputToken = outputToken.wrapped
+    if (isLastSectionInRoute(i)) {
+      nextInputToken = outputToken
+      swapRecipient = tradeRecipient
+    } else {
+      const nextPool = sections[i + 1][0]
+      nextInputToken = getPathCurrency(outputToken, nextPool)
 
-    const mixedRouteIsAllV3 = (route: MixedRouteSDK<Currency, Currency>) => {
-      return route.pools.every((pool) => pool instanceof V3Pool)
+      const v2PoolIsSwapRecipient = nextPool instanceof Pair && outputToken.equals(nextInputToken)
+      swapRecipient = v2PoolIsSwapRecipient ? (nextPool as Pair).liquidityToken.address : ROUTER_AS_RECIPIENT
     }
 
-    if (mixedRouteIsAllV3(newRoute)) {
-      const path: string = encodeMixedRouteToPath(newRoute)
+    if (routePool instanceof V4Pool) {
+      const v4Planner = new V4Planner()
+      const v4SubRoute = new V4Route(section as V4Pool[], subRoute.input, subRoute.output)
 
+      v4Planner.addSettle(inputToken, payerIsUser && i === 0, (i == 0 ? amountIn : CONTRACT_BALANCE) as BigNumber)
+      v4Planner.addAction(Actions.SWAP_EXACT_IN, [
+        {
+          currencyIn: inputToken.isNative ? ETH_ADDRESS : inputToken.address,
+          path: encodeV4RouteToPath(v4SubRoute),
+          amountIn: 0, // denotes open delta, amount set in v4Planner.addSettle()
+          amountOutMinimum: !isLastSectionInRoute(i) ? 0 : amountOut,
+        },
+      ])
+      v4Planner.addTake(outputToken, swapRecipient)
+
+      planner.addCommand(CommandType.V4_SWAP, [v4Planner.finalize()])
+    } else if (routePool instanceof V3Pool) {
       planner.addCommand(CommandType.V3_SWAP_EXACT_IN, [
-        // if not last section: send tokens directly to the first v2 pair of the next section
-        // note: because of the partitioning function we can be sure that the next section is v2
-        isLastSectionInRoute(i) ? tradeRecipient : (sections[i + 1][0] as Pair).liquidityToken.address,
+        swapRecipient, // recipient
         i == 0 ? amountIn : CONTRACT_BALANCE, // amountIn
         !isLastSectionInRoute(i) ? 0 : amountOut, // amountOut
-        path, // path
+        encodeMixedRouteToPath(subRoute), // path
         payerIsUser && i === 0, // payerIsUser
       ])
-    } else {
+    } else if (routePool instanceof Pair) {
       planner.addCommand(CommandType.V2_SWAP_EXACT_IN, [
-        isLastSectionInRoute(i) ? tradeRecipient : ROUTER_AS_RECIPIENT, // recipient
+        swapRecipient, // recipient
         i === 0 ? amountIn : CONTRACT_BALANCE, // amountIn
         !isLastSectionInRoute(i) ? 0 : amountOut, // amountOutMin
-        newRoute.path.map((token) => token.wrapped.address), // path
+        subRoute.path.map((token) => token.wrapped.address), // path
         payerIsUser && i === 0,
       ])
+    } else {
+      throw new Error('Unexpected Pool Type')
     }
+
+    // perform a token transition (wrap/unwrap if necessary)
+    if (!isLastSectionInRoute(i)) {
+      if (outputToken.isNative && !nextInputToken.isNative) {
+        planner.addCommand(CommandType.WRAP_ETH, [ROUTER_AS_RECIPIENT, CONTRACT_BALANCE])
+      } else if (!outputToken.isNative && nextInputToken.isNative) {
+        planner.addCommand(CommandType.UNWRAP_WETH, [ROUTER_AS_RECIPIENT, 0])
+      }
+    }
+
+    inputToken = nextInputToken
   }
 }
 
