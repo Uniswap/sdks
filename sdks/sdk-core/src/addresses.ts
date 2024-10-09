@@ -16,6 +16,8 @@ type ChainAddresses = {
   // v4
   v4PoolManagerAddress?: string
   v4PositionManagerAddress?: string
+  v4StateView?: string
+  v4QuoterAddress?: string
 }
 
 const DEFAULT_NETWORKS = [ChainId.MAINNET, ChainId.GOERLI, ChainId.SEPOLIA]
@@ -171,11 +173,12 @@ const SEPOLIA_ADDRESSES: ChainAddresses = {
   nonfungiblePositionManagerAddress: '0x1238536071E1c677A632429e3655c799b22cDA52',
   tickLensAddress: '0xd7f33bcdb21b359c8ee6f0251d30e94832baad07',
   swapRouter02Address: '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E',
-  // TODO: ROUTE-277 - update deploy address once after quoter refactoring.
-  mixedRouteQuoterV2Address: '0xa8b0be287acB850952DE4287b84B7222cc654C09',
+  mixedRouteQuoterV2Address: '0x4745f77b56a0e2294426e3936dc4fab68d9543cd',
 
   v4PoolManagerAddress: '0xE8E23e97Fa135823143d6b9Cba9c699040D51F70',
   v4PositionManagerAddress: '0x0048d1C09771Bb87b6A44e1294769E1DFd698584',
+  v4StateView: '0x6Bb7157fb50e3Ae4983Ccdc62Fb8173c03c6b0a7',
+  v4QuoterAddress: '0x9336CF25dDad216FD480A5422CBEa7b3BC5bDda8',
 }
 
 // Avalanche v3 addresses
@@ -278,6 +281,11 @@ const ASTROCHAIN_SEPOLIA_ADDRESSES: ChainAddresses = {
   nonfungiblePositionManagerAddress: '0xB7F724d6dDDFd008eFf5cc2834edDE5F9eF0d075',
   tickLensAddress: '0x5f739c790a48E97eec0efb81bab5D152c0A0ecA0',
   swapRouter02Address: '0xd1AAE39293221B77B0C71fBD6dCb7Ea29Bb5B166',
+
+  v4PoolManagerAddress: '0x38EB8B22Df3Ae7fb21e92881151B365Df14ba967',
+  v4PositionManagerAddress: '0x05deD3F8a8e84700d68A4D81cd6780c982dB13F9',
+  v4StateView: '0xad328439DCa7ce857662afA4584A3d571bbDDC75',
+  v4QuoterAddress: '0x2cfa87651D3AB05Bc59E325E5eaC8495CF34cE55',
 }
 
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
