@@ -12,13 +12,8 @@ import {INonfungiblePositionManager} from "v3-periphery/interfaces/INonfungibleP
 contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
     using stdJson for string;
 
-    ERC20 private constant WETH = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-    ERC20 private constant USDC = ERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
-    ERC20 private constant DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     // starting eth balance
     uint256 constant BALANCE = 10 ether;
-    uint256 ONE_USDC = 10 ** 6;
-    uint256 ONE_DAI = 1 ether;
 
     function setUp() public {
         fromPrivateKey = 0x1234;
@@ -28,7 +23,7 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
 
         vm.createSelectFork(vm.envString("FORK_URL"), 16075500);
         deployV4Contracts();
-        initializeV4Pools(WETH, USDC, DAI);
+        initializeV4Pools();
         vm.startPrank(from);
         deployRouterAndPermit2();
         vm.deal(from, BALANCE);
@@ -714,11 +709,5 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         assertGt(USDC.balanceOf(RECIPIENT), 3000 * ONE_USDC);
         assertEq(USDC.balanceOf(address(router)), 0);
         assertEq(address(router).balance, 0);
-    }
-
-    function testMigration() public {
-        MethodParameters memory params = readFixture(json, "._MIGRATE_WITH_PERMIT");
-        //initializeAndAddV3(WETH, USDC);
-        //assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(address(this)), 1);
     }
 }

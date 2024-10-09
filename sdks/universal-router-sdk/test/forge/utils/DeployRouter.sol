@@ -35,6 +35,13 @@ contract DeployRouter is Test {
 
     address internal constant FORGE_ROUTER_ADDRESS = 0xE808C1cfeebb6cb36B537B82FA7c9EEf31415a05;
 
+    ERC20 internal constant WETH = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    ERC20 internal constant USDC = ERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
+    ERC20 internal constant DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+
+    uint256 ONE_USDC = 10 ** 6;
+    uint256 ONE_DAI = 1 ether;
+
     UniversalRouter public router;
     IPermit2 public permit2;
     IPoolManager public poolManager;
@@ -42,6 +49,8 @@ contract DeployRouter is Test {
     address from;
     uint256 fromPrivateKey;
     string json;
+
+    error InvalidTokenOrder();
 
     function deployRouter(address _permit2) public {
         router = new UniversalRouter(
@@ -76,7 +85,7 @@ contract DeployRouter is Test {
         poolManager = new PoolManager();
     }
 
-    function initializeV4Pools(ERC20 WETH, ERC20 USDC, ERC20 DAI) public {
+    function initializeV4Pools() public {
         Currency eth = Currency.wrap(address(0));
         Currency weth = Currency.wrap(address(WETH));
         Currency usdc = Currency.wrap(address(USDC));
@@ -113,7 +122,7 @@ contract DeployRouter is Test {
             PoolKey memory poolKey = poolKeys[i];
             poolManager.initialize(poolKey, 79228162514264337593543950336, bytes(""));
 
-            (BalanceDelta delta, BalanceDelta feesAccrued) = poolManager.modifyLiquidity(
+            (BalanceDelta delta,) = poolManager.modifyLiquidity(
                 poolKey,
                 IPoolManager.ModifyLiquidityParams({
                     tickLower: -60,
@@ -124,30 +133,43 @@ contract DeployRouter is Test {
                 bytes("")
             );
 
-            settle(poolKey.currency0, uint256((uint128(-delta.amount0()))));
-            settle(poolKey.currency1, uint256((uint128(-delta.amount1()))));
+            _settle(poolKey.currency0, uint256((uint128(-delta.amount0()))));
+            _settle(poolKey.currency1, uint256((uint128(-delta.amount1()))));
         }
     }
 
-    function initializeAndAddV3(ERC20 WETH, ERC20 USDC) public {
+    function mintV3Position(address token0, address token1, uint24 fee, uint256 amount0Desired, uint256 amount1Desired)
+        public
+    {
+        if (token0 >= token1) revert InvalidTokenOrder();
+
+        deal(token0, from, 2 * amount0Desired);
+        deal(token1, from, 2 * amount1Desired);
+
+        vm.startPrank(from);
+        ERC20(token0).approve(V3_POSITION_MANAGER, type(uint256).max);
+        ERC20(token1).approve(V3_POSITION_MANAGER, type(uint256).max);
+
         INonfungiblePositionManager(V3_POSITION_MANAGER).mint(
             INonfungiblePositionManager.MintParams({
-                token0: address(WETH),
-                token1: address(USDC),
-                fee: 500,
+                token0: token0,
+                token1: token1,
+                fee: fee,
                 tickLower: 0,
                 tickUpper: 194980,
-                amount0Desired: 1,
-                amount1Desired: 1,
+                amount0Desired: amount0Desired,
+                amount1Desired: amount1Desired,
                 amount0Min: 0,
                 amount1Min: 0,
-                recipient: address(this),
+                recipient: from,
                 deadline: type(uint256).max
             })
         );
+
+        vm.stopPrank();
     }
 
-    function settle(Currency currency, uint256 amount) internal {
+    function _settle(Currency currency, uint256 amount) internal {
         if (currency.isAddressZero()) {
             poolManager.settle{value: amount}();
         } else {
