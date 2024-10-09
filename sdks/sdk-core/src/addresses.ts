@@ -178,7 +178,7 @@ const SEPOLIA_ADDRESSES: ChainAddresses = {
   v4PoolManagerAddress: '0xE8E23e97Fa135823143d6b9Cba9c699040D51F70',
   v4PositionManagerAddress: '0x0048d1C09771Bb87b6A44e1294769E1DFd698584',
   v4StateView: '0x6Bb7157fb50e3Ae4983Ccdc62Fb8173c03c6b0a7',
-  v4QuoterAddress: '0x9336CF25dDad216FD480A5422CBEa7b3BC5bDda8'
+  v4QuoterAddress: '0x9336CF25dDad216FD480A5422CBEa7b3BC5bDda8',
 }
 
 // Avalanche v3 addresses
@@ -285,7 +285,7 @@ const ASTROCHAIN_SEPOLIA_ADDRESSES: ChainAddresses = {
   v4PoolManagerAddress: '0x38EB8B22Df3Ae7fb21e92881151B365Df14ba967',
   v4PositionManagerAddress: '0x05deD3F8a8e84700d68A4D81cd6780c982dB13F9',
   v4StateView: '0xad328439DCa7ce857662afA4584A3d571bbDDC75',
-  v4QuoterAddress: '0x2cfa87651D3AB05Bc59E325E5eaC8495CF34cE55'
+  v4QuoterAddress: '0x2cfa87651D3AB05Bc59E325E5eaC8495CF34cE55',
 }
 
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
