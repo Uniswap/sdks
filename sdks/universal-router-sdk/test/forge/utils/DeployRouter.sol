@@ -34,7 +34,7 @@ contract DeployRouter is Test {
     address internal constant MAINNET_PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
     address internal constant MAINNET_ROUTER = 0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD;
 
-    // IF THIS CHANGES, YOU NEED TO UPDATE
+    // if this changes you need to update FORGE_V4_POSITION_MANAGER in addresses.ts
     address internal constant FORGE_POSM_ADDRESS = 0x2e234DAe75C793f67A35089C9d99245E1C58470b;
 
     ERC20 internal constant WETH = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
@@ -148,9 +148,7 @@ contract DeployRouter is Test {
         ERC20(token0).approve(V3_POSITION_MANAGER, type(uint256).max);
         ERC20(token1).approve(V3_POSITION_MANAGER, type(uint256).max);
 
-        (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1) = INonfungiblePositionManager(
-            V3_POSITION_MANAGER
-        ).mint(
+        INonfungiblePositionManager(V3_POSITION_MANAGER).mint(
             INonfungiblePositionManager.MintParams({
                 token0: token0,
                 token1: token1,

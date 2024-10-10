@@ -43,7 +43,18 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         INonfungiblePositionManager(V3_POSITION_MANAGER).setApprovalForAll(MAINNET_ROUTER, true);
 
         assertEq(params.value, 0);
+        vm.prank(from);
         (bool success,) = address(router).call(params.data);
         require(success, "call failed");
+
+        // all funds were swept out of contracts
+        assertEq(USDC.balanceOf(MAINNET_ROUTER), 0);
+        assertEq(WETH.balanceOf(MAINNET_ROUTER), 0);
+        assertEq(USDC.balanceOf(address(v4PositionManager)), 0);
+        assertEq(WETH.balanceOf(address(v4PositionManager)), 0);
+
+        // old position burned, new position minted
+        assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0, "V3 NOT BURNT");
+        assertEq(v4PositionManager.balanceOf(RECIPIENT), 1, "V4 NOT MINTED");
     }
 }
