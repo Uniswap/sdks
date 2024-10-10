@@ -8,9 +8,9 @@ import { MockERC20 } from "../../dist/src/contracts";
 import { BlockchainTime } from "./utils/time";
 import { V3DutchOrderBuilder } from "../../src/builder/V3DutchOrderBuilder"
 import { expect } from "chai";
-import { encodeRelativeBlocks, UnsignedV3DutchOrder, V3_DUTCH_ORDER_TYPES, V3CosignerData } from "../../src/order/V3DutchOrder";
+import { UnsignedV3DutchOrder, V3CosignerData } from "../../src/order/V3DutchOrder";
 
-describe.only("DutchV3Order", () => {
+describe("DutchV3Order", () => {
     const FEE_RECIPIENT = "0x1111111111111111111111111111111111111111";
     const AMOUNT = BigNumber.from(10).pow(18);
     const SMALL_AMOUNT = BigNumber.from(10).pow(10);
@@ -29,6 +29,7 @@ describe.only("DutchV3Order", () => {
     let swapperAddress: string;
     let fillerAddress: string;
     let cosignerAddress : string;
+    let botAddress : string;
     let validPartialOrder : UnsignedV3DutchOrder;
     
     before(async () => {
@@ -54,6 +55,7 @@ describe.only("DutchV3Order", () => {
         swapperAddress = await swapper.getAddress();
         cosignerAddress = await cosigner.getAddress();
         fillerAddress = await filler.getAddress();
+        botAddress = await bot.getAddress();
         const tx = await admin.sendTransaction({
             to: swapperAddress,
             value: AMOUNT.mul(10),
@@ -70,7 +72,7 @@ describe.only("DutchV3Order", () => {
 
         tokenIn = (await tokenFactory.deploy("Token A", "A", 18)) as MockERC20;
         tokenOut = (await tokenFactory.deploy("Token B", "B", 18)) as MockERC20;
-        
+
         await tokenIn.mint(
             swapperAddress,
             AMOUNT,
@@ -83,8 +85,15 @@ describe.only("DutchV3Order", () => {
             fillerAddress,
             AMOUNT,
         );
+        await tokenOut.mint(
+            botAddress,
+            AMOUNT,
+        )
         await tokenOut
             .connect(filler)
+            .approve(reactor.address, ethers.constants.MaxUint256);
+        await tokenOut
+            .connect(bot)
             .approve(reactor.address, ethers.constants.MaxUint256);
 
         validPartialOrder = new V3DutchOrderBuilder(
@@ -126,7 +135,6 @@ describe.only("DutchV3Order", () => {
     });
     
     it("Partial V3 Order", async () => {
-
         const preBuildOrder = validPartialOrder;
         expect(preBuildOrder.info.deadline).to.eq(futureDeadline);
 
@@ -217,9 +225,9 @@ describe.only("DutchV3Order", () => {
           .build();
         
         await expect(
-        reactor
-            .connect(filler)
-            .execute({ order: fullOrder.serialize(), sig: signature })
+            reactor
+                .connect(filler)
+                .execute({ order: fullOrder.serialize(), sig: signature })
         ).to.be.revertedWithCustomError(reactor, "InvalidCosignature");
     }); 
 
@@ -303,17 +311,436 @@ describe.only("DutchV3Order", () => {
         );
     });
 
-    const getCosignerData = async (
-        overrides: Partial<V3CosignerData> = {}
-        ): Promise<V3CosignerData> => {
-        const defaultData: V3CosignerData = {
-            decayStartBlock: 20916059,
-            exclusiveFiller: ethers.constants.AddressZero,
-            exclusivityOverrideBps: BigNumber.from(0),
-            // overrides of 0 will not affect the values
-            inputOverride: BigNumber.from(0),
-            outputOverrides: [BigNumber.from(0)],
-        };
-        return Object.assign(defaultData, overrides);
-        };
+    it("executes a serialized order with no decay, override of double original output amount", async () => {
+        const deadline = await new BlockchainTime().secondsFromNow(1000);
+        const order = new V3DutchOrderBuilder(
+            chainId,
+            reactor.address,
+            permit2.address
+        )
+            .cosigner(cosigner.address)
+            .deadline(deadline)
+            .swapper(swapper.address)
+            .nonce(NONCE)
+            .startingBaseFee(BigNumber.from(0))
+            .input({
+                token: tokenIn.address,
+                startAmount: SMALL_AMOUNT,
+                curve: {
+                    relativeBlocks: [1],
+                    relativeAmounts: [BigInt(0)],
+                },
+                maxAmount: SMALL_AMOUNT,
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
+            })
+            .output({
+                token: tokenOut.address,
+                startAmount: SMALL_AMOUNT,
+                curve: {
+                    relativeBlocks: [1],
+                    relativeAmounts: [BigInt(0)],
+                },
+                recipient: swapperAddress,
+                minAmount: SMALL_AMOUNT,
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
+            })
+            .buildPartial()
+
+        const { domain, types, values } = order.permitData();
+        const signature = await swapper._signTypedData(domain, types, values);
+        const cosignerData = await getCosignerData({
+            outputOverrides: [SMALL_AMOUNT.mul(2)],
+        });
+
+        const cosignerHash = order.cosignatureHash(cosignerData);
+        const cosignature = ethers.utils.joinSignature(
+            cosigner._signingKey().signDigest(cosignerHash)
+        );
+
+        const fullOrder = V3DutchOrderBuilder.fromOrder(order)
+            .cosignerData(cosignerData)
+            .cosignature(cosignature)
+            .build();
+
+        const swapperTokenInBalanceBefore = await tokenIn.balanceOf(swapperAddress);
+        const fillerTokenInBalanceBefore = await tokenIn.balanceOf(fillerAddress);
+        const swapperTokenOutBalanceBefore = await tokenOut.balanceOf(swapperAddress);
+        const fillerTokenOutBalanceBefore = await tokenOut.balanceOf(fillerAddress);
+
+        const res = await reactor
+            .connect(filler)
+            .execute(
+                { 
+                    order: fullOrder.serialize(), 
+                    sig: signature
+                }
+            );
+        const receipt = await res.wait();
+        expect(receipt.status).to.equal(1);
+        expect((await tokenIn.balanceOf(swapperAddress)).toString()).to.equal(
+            swapperTokenInBalanceBefore.sub(SMALL_AMOUNT).toString()
+        );
+        expect((await tokenIn.balanceOf(fillerAddress)).toString()).to.equal(
+            fillerTokenInBalanceBefore.add(SMALL_AMOUNT).toString()
+        );
+
+        const amountOut = SMALL_AMOUNT.mul(2);
+        expect((await tokenOut.balanceOf(swapperAddress)).toString()).to.equal(
+            swapperTokenOutBalanceBefore.add(amountOut)
+        );
+        expect((await tokenOut.balanceOf(fillerAddress)).toString()).to.equal(
+            fillerTokenOutBalanceBefore.sub(amountOut)
+        );
+    });
+
+    it("executes a serialized order with no decay, override of half original input amount", async () => {
+        const deadline = await new BlockchainTime().secondsFromNow(1000);
+        const order = new V3DutchOrderBuilder(
+            chainId,
+            reactor.address,
+            permit2.address
+        )
+            .cosigner(cosigner.address)
+            .deadline(deadline)
+            .swapper(swapper.address)
+            .nonce(NONCE)
+            .startingBaseFee(BigNumber.from(0))
+            .input({
+                token: tokenIn.address,
+                startAmount: SMALL_AMOUNT,
+                curve: {
+                    relativeBlocks: [1],
+                    relativeAmounts: [BigInt(0)],
+                },
+                maxAmount: SMALL_AMOUNT,
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
+            })
+            .output({
+                token: tokenOut.address,
+                startAmount: SMALL_AMOUNT,
+                curve: {
+                    relativeBlocks: [1],
+                    relativeAmounts: [BigInt(0)],
+                },
+                recipient: swapperAddress,
+                minAmount: SMALL_AMOUNT,
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
+            })
+            .buildPartial()
+
+        const { domain, types, values } = order.permitData();
+        const signature = await swapper._signTypedData(domain, types, values);
+        const cosignerData = await getCosignerData({
+            inputOverride: SMALL_AMOUNT.div(2)
+        });
+
+        const cosignerHash = order.cosignatureHash(cosignerData);
+        const cosignature = ethers.utils.joinSignature(
+            cosigner._signingKey().signDigest(cosignerHash)
+        );
+
+        const fullOrder = V3DutchOrderBuilder.fromOrder(order)
+            .cosignerData(cosignerData)
+            .cosignature(cosignature)
+            .build();
+
+        const swapperTokenInBalanceBefore = await tokenIn.balanceOf(swapperAddress);
+        const fillerTokenInBalanceBefore = await tokenIn.balanceOf(fillerAddress);
+        const swapperTokenOutBalanceBefore = await tokenOut.balanceOf(swapperAddress);
+        const fillerTokenOutBalanceBefore = await tokenOut.balanceOf(fillerAddress);
+
+        const res = await reactor
+            .connect(filler)
+            .execute(
+                { 
+                    order: fullOrder.serialize(), 
+                    sig: signature
+                }
+            );
+        const receipt = await res.wait();
+        expect(receipt.status).to.equal(1);
+
+        const amountIn = SMALL_AMOUNT.div(2);
+        expect((await tokenIn.balanceOf(swapperAddress)).toString()).to.equal(
+            swapperTokenInBalanceBefore.sub(amountIn).toString()
+        );
+        expect((await tokenIn.balanceOf(fillerAddress)).toString()).to.equal(
+            fillerTokenInBalanceBefore.add(amountIn).toString()
+        );
+
+        expect((await tokenOut.balanceOf(swapperAddress)).toString()).to.equal(
+            swapperTokenOutBalanceBefore.add(SMALL_AMOUNT)
+        );
+        expect((await tokenOut.balanceOf(fillerAddress)).toString()).to.equal(
+            fillerTokenOutBalanceBefore.sub(SMALL_AMOUNT)
+        );
+    });
+
+    it("executes a serialized order with decay", async () => {
+        const deadline = await new BlockchainTime().secondsFromNow(1000);
+        const order = new V3DutchOrderBuilder(
+            chainId,
+            reactor.address,
+            permit2.address
+        )
+            .cosigner(cosigner.address)
+            .deadline(deadline)
+            .swapper(swapper.address)
+            .nonce(NONCE)
+            .startingBaseFee(BigNumber.from(0))
+            .input({
+                token: tokenIn.address,
+                startAmount: SMALL_AMOUNT,
+                curve: {
+                    relativeBlocks: [1],
+                    relativeAmounts: [BigInt(0)],
+                },
+                maxAmount: SMALL_AMOUNT,
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
+            })
+            .output({
+                token: tokenOut.address,
+                startAmount: SMALL_AMOUNT,
+                curve: {
+                    relativeBlocks: [4],
+                    relativeAmounts: [BigInt(4)],
+                },
+                recipient: swapperAddress,
+                minAmount: SMALL_AMOUNT.sub(4),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
+            })
+            .buildPartial()
+
+        const { domain, types, values } = order.permitData();
+        const signature = await swapper._signTypedData(domain, types, values);
+        const cosignerData = await getCosignerData({
+            decayStartBlock: await new BlockchainTime().blocksFromNow(-1),
+        });
+
+        const cosignerHash = order.cosignatureHash(cosignerData);
+        const cosignature = ethers.utils.joinSignature(
+            cosigner._signingKey().signDigest(cosignerHash)
+        );
+
+        const fullOrder = V3DutchOrderBuilder.fromOrder(order)
+            .cosignerData(cosignerData)
+            .cosignature(cosignature)
+            .build();
+
+        const swapperTokenInBalanceBefore = await tokenIn.balanceOf(swapperAddress);
+        const fillerTokenInBalanceBefore = await tokenIn.balanceOf(fillerAddress);
+        const swapperTokenOutBalanceBefore = await tokenOut.balanceOf(swapperAddress);
+        const fillerTokenOutBalanceBefore = await tokenOut.balanceOf(fillerAddress);
+        const res = await reactor
+            .connect(filler)
+            .execute(
+                { 
+                    order: fullOrder.serialize(), 
+                    sig: signature
+                }
+            );
+        const receipt = await res.wait();
+        expect(receipt.status).to.equal(1);
+
+        // We can take the startAmount because we aren't decaying input
+        const amountIn = fullOrder.info.input.startAmount;
+        expect((await tokenIn.balanceOf(swapperAddress)).toString()).to.equal(
+            swapperTokenInBalanceBefore.sub(amountIn).toString()
+        );
+        expect((await tokenIn.balanceOf(fillerAddress)).toString()).to.equal(
+            fillerTokenInBalanceBefore.add(amountIn).toString()
+        );
+
+        const currentBlock = await ethers.provider.getBlockNumber();
+        const decayAmount = currentBlock - cosignerData.decayStartBlock;
+        // Decay with a curve of 4 over 4 blocks
+        expect((await tokenOut.balanceOf(swapperAddress)).toString()).to.equal(
+            swapperTokenOutBalanceBefore.add(SMALL_AMOUNT.sub(decayAmount))
+        );
+        expect((await tokenOut.balanceOf(fillerAddress)).toString()).to.equal(
+            fillerTokenOutBalanceBefore.sub(SMALL_AMOUNT.sub(decayAmount))
+        );
+    });
+
+    it("open filler executes an open order past exclusivity", async () => {
+        const deadline = await new BlockchainTime().secondsFromNow(1000);
+        const order = new V3DutchOrderBuilder(
+            chainId,
+            reactor.address,
+            permit2.address
+        )
+            .cosigner(cosigner.address)
+            .deadline(deadline)
+            .swapper(swapper.address)
+            .nonce(NONCE)
+            .startingBaseFee(BigNumber.from(0))
+            .input({
+                token: tokenIn.address,
+                startAmount: SMALL_AMOUNT,
+                curve: {
+                    relativeBlocks: [1],
+                    relativeAmounts: [BigInt(0)],
+                },
+                maxAmount: SMALL_AMOUNT,
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
+            })
+            .output({
+                token: tokenOut.address,
+                startAmount: SMALL_AMOUNT,
+                curve: {
+                    relativeBlocks: [4],
+                    relativeAmounts: [BigInt(4)],
+                },
+                recipient: swapperAddress,
+                minAmount: SMALL_AMOUNT.sub(4),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
+            })
+            .buildPartial()
+
+        const { domain, types, values } = order.permitData();
+        const signature = await swapper._signTypedData(domain, types, values);
+        const cosignerData = await getCosignerData({
+            decayStartBlock: await new BlockchainTime().blocksFromNow(0),
+            exclusiveFiller: fillerAddress,
+        });
+
+        const cosignerHash = order.cosignatureHash(cosignerData);
+        const cosignature = ethers.utils.joinSignature(
+            cosigner._signingKey().signDigest(cosignerHash)
+        );
+
+        const fullOrder = V3DutchOrderBuilder.fromOrder(order)
+            .cosignerData(cosignerData)
+            .cosignature(cosignature)
+            .build();
+
+        const swapperTokenInBalanceBefore = await tokenIn.balanceOf(
+            swapperAddress
+            );
+        const fillerTokenInBalanceBefore = await tokenIn.balanceOf(fillerAddress);
+        const botTokenInBalanceBefore = await tokenIn.balanceOf(
+            botAddress
+        );
+        const swapperTokenOutBalanceBefore = await tokenOut.balanceOf(
+            swapperAddress
+        );
+        const fillerTokenOutBalanceBefore = await tokenOut.balanceOf(
+            fillerAddress
+        );
+        const botTokenOutBalanceBefore = await tokenOut.balanceOf(
+            botAddress
+        );
+
+        const res = await reactor
+            .connect(bot)
+            .execute(
+                { 
+                    order: fullOrder.serialize(), 
+                    sig: signature
+                }
+            );
+        const receipt = await res.wait();
+        expect(receipt.status).to.equal(1);
+
+        // We can take the startAmount because we aren't decaying input
+        const amountIn = fullOrder.info.input.startAmount;
+        expect((await tokenIn.balanceOf(swapperAddress)).toString()).to.equal(
+            swapperTokenInBalanceBefore.sub(amountIn).toString()
+        );
+        // Exclusive filler did not fill
+        expect((await tokenIn.balanceOf(fillerAddress)).toString()).to.equal(
+            fillerTokenInBalanceBefore.toString()
+        );
+        expect((await tokenOut.balanceOf(fillerAddress)).toString()).to.equal(
+            fillerTokenOutBalanceBefore.toString()
+        );
+        // Bot (non-exclusive) filled
+        expect((await tokenIn.balanceOf(botAddress)).toString()).to.equal(
+            botTokenInBalanceBefore.add(amountIn).toString()
+        );
+        expect((await tokenOut.balanceOf(swapperAddress)).toString()).to.equal(
+            swapperTokenOutBalanceBefore.add(SMALL_AMOUNT.sub(1)).toString()
+        );
+        expect((await tokenOut.balanceOf(botAddress)).toString()).to.equal(
+            botTokenOutBalanceBefore.sub(SMALL_AMOUNT.sub(1)).toString()
+        );
+    });
+
+    it("Open filler fails to execute order before exclusivity", async () => {
+        const deadline = await new BlockchainTime().secondsFromNow(1000);
+        const order = new V3DutchOrderBuilder(
+            chainId,
+            reactor.address,
+            permit2.address
+        )
+            .cosigner(cosigner.address)
+            .deadline(deadline)
+            .swapper(swapper.address)
+            .nonce(NONCE)
+            .startingBaseFee(BigNumber.from(0))
+            .input({
+                token: tokenIn.address,
+                startAmount: SMALL_AMOUNT,
+                curve: {
+                    relativeBlocks: [1],
+                    relativeAmounts: [BigInt(0)],
+                },
+                maxAmount: SMALL_AMOUNT,
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
+            })
+            .output({
+                token: tokenOut.address,
+                startAmount: SMALL_AMOUNT,
+                curve: {
+                    relativeBlocks: [4],
+                    relativeAmounts: [BigInt(4)],
+                },
+                recipient: swapperAddress,
+                minAmount: SMALL_AMOUNT.sub(4),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
+            })
+            .buildPartial()
+
+        const { domain, types, values } = order.permitData();
+        const signature = await swapper._signTypedData(domain, types, values);
+        const cosignerData = await getCosignerData({
+            decayStartBlock: await new BlockchainTime().blocksFromNow(5),
+            exclusiveFiller: fillerAddress,
+        });
+
+        const cosignerHash = order.cosignatureHash(cosignerData);
+        const cosignature = ethers.utils.joinSignature(
+            cosigner._signingKey().signDigest(cosignerHash)
+        );
+
+        const fullOrder = V3DutchOrderBuilder.fromOrder(order)
+            .cosignerData(cosignerData)
+            .cosignature(cosignature)
+            .build();
+
+        await expect(
+            reactor
+                .connect(bot)
+                .execute(
+                    { 
+                        order: fullOrder.serialize(), 
+                        sig: signature
+                    }
+                )
+        ).to.be.revertedWithCustomError(reactor, "NoExclusiveOverride");
+    });
 });
+
+const getCosignerData = async (
+    overrides: Partial<V3CosignerData> = {}
+    ): Promise<V3CosignerData> => {
+    const defaultData: V3CosignerData = {
+        decayStartBlock: 29000000,
+        exclusiveFiller: ethers.constants.AddressZero,
+        exclusivityOverrideBps: BigNumber.from(0),
+        // overrides of 0 will not affect the values
+        inputOverride: BigNumber.from(0),
+        outputOverrides: [BigNumber.from(0)],
+    };
+    return Object.assign(defaultData, overrides);
+};
