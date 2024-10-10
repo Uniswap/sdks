@@ -49,7 +49,7 @@ const pool_2_3 = new Pool(
 
 const route = new Route([pool_eth_1, pool_1_2, pool_2_3], eth, currency3)
 
-describe.only('RouterPlanner', () => {
+describe('RouterPlanner', () => {
   it('encodes the correct route for exactIn', async () => {
     const expected = [
       {
@@ -124,7 +124,7 @@ describe.only('RouterPlanner', () => {
         tickSpacing: 10,
         hooks: '0x0000000000000000000000000000000000000000',
         hookData: '0x',
-      }
+      },
     ]
 
     expect(encodeRouteToPath(newRoute, exactOutput)).toEqual(expected)
@@ -147,7 +147,7 @@ describe.only('RouterPlanner', () => {
         tickSpacing: 10,
         hooks: '0x0000000000000000000000000000000000000000',
         hookData: '0x',
-      }
+      },
     ]
 
     expect(encodeRouteToPath(newRoute, exactOutput)).toEqual(expected)
