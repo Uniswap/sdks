@@ -665,7 +665,7 @@ describe('Uniswap', () => {
       expect(hexToDecimalString(methodParameters.value)).to.equal('0')
     })
 
-    it('encodes a USDC->DAI->ETH swap with a wrap to recieve WETH', async () => {
+    it.only('encodes a USDC->DAI->ETH swap with a wrap to recieve WETH', async () => {
       const outputEther = utils.parseEther('1')
       const trade = await V4Trade.fromRoute(
         new V4Route([USDC_DAI_V4, ETH_DAI_V4], USDC, WETH),

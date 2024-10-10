@@ -16,4 +16,8 @@ export abstract class Multicall {
 
     return calldatas.length === 1 ? calldatas[0] : Multicall.INTERFACE.encodeFunctionData('multicall', [calldatas])
   }
+
+  public static decodeMulticall(multicall: string): string[] {
+    return Multicall.INTERFACE.decodeFunctionData('multicall', multicall).data
+  }
 }

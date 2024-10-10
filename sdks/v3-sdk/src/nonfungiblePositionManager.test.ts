@@ -392,6 +392,7 @@ describe('NonfungiblePositionManager', () => {
       expect(domain).toEqual({
         name: 'Uniswap V3 Positions NFT-V1',
         chainId: 1,
+        version: '1',
         verifyingContract: mockPositionManager,
       })
       expect(types).toEqual({
