@@ -639,10 +639,19 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         assertGe(from.balance, startingRecipientBalance);
     }
 
-    // v4-sdk 1.6.3 allows this
-    // function testV4ExactInNativeOutputWithUnwrap() public {
-    //     MethodParameters memory params = readFixture(json, "._UNISWAP_V4_1000_USDC_FOR_ETH_WITH_UNWRAP");
-    // }
+    function testV4ExactInNativeOutputWithUnwrap() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_V4_1000_USDC_FOR_ETH_WITH_UNWRAP");
+
+        deal(address(USDC), from, BALANCE);
+        USDC.approve(address(permit2), BALANCE);
+        assertEq(USDC.balanceOf(from), BALANCE);
+        uint256 startingRecipientBalance = RECIPIENT.balance;
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+
+        assertEq(WETH.balanceOf(RECIPIENT), 1 ether);
+    }
 
     function testV4ExactInMultiHop() public {
         MethodParameters memory params = readFixture(json, "._UNISWAP_V4_ETH_FOR_DAI");

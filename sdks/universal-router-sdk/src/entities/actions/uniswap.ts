@@ -97,6 +97,17 @@ export class UniswapTrade implements Command {
     }
   }
 
+  get outputRequiresWrap(): boolean {
+    if (this.isAllV4) {
+      return !this.trade.outputAmount.currency.isNative && this.trade.swaps[0].route.output.isNative
+    }
+    return false
+  }
+
+  get outputRequiresTransition(): boolean {
+    this.outputRequiresWrap || this.outputRequiresUnwrap
+  }
+
   encode(planner: RoutePlanner, _config: TradeConfig): void {
     // If the input currency is the native currency, we need to wrap it with the router as the recipient
     if (this.inputRequiresWrap) {
@@ -115,7 +126,8 @@ export class UniswapTrade implements Command {
     //      in that the reversion probability is lower
     const performAggregatedSlippageCheck =
       this.trade.tradeType === TradeType.EXACT_INPUT && this.trade.routes.length > 2
-    const routerMustCustody = performAggregatedSlippageCheck || this.outputRequiresUnwrap || hasFeeOption(this.options)
+    const routerMustCustody =
+      performAggregatedSlippageCheck || this.outputRequiresTransition || hasFeeOption(this.options)
 
     for (const swap of this.trade.swaps) {
       switch (swap.route.protocol) {
@@ -150,11 +162,7 @@ export class UniswapTrade implements Command {
       // In the case where ETH is the output currency, the fee is taken in WETH (for gas reasons)
       if (!!this.options.fee) {
         const feeBips = encodeFeeBips(this.options.fee.fee)
-        planner.addCommand(CommandType.PAY_PORTION, [
-          outputCurrencyAddress,
-          this.options.fee.recipient,
-          feeBips,
-        ])
+        planner.addCommand(CommandType.PAY_PORTION, [outputCurrencyAddress, this.options.fee.recipient, feeBips])
 
         // If the trade is exact output, and a fee was taken, we must adjust the amount out to be the amount after the fee
         // Otherwise we continue as expected with the trade's normal expected output
@@ -169,11 +177,7 @@ export class UniswapTrade implements Command {
         const feeAmount = this.options.flatFee.amount
         if (minimumAmountOut.lt(feeAmount)) throw new Error('Flat fee amount greater than minimumAmountOut')
 
-        planner.addCommand(CommandType.TRANSFER, [
-          outputCurrencyAddress,
-          this.options.flatFee.recipient,
-          feeAmount,
-        ])
+        planner.addCommand(CommandType.TRANSFER, [outputCurrencyAddress, this.options.flatFee.recipient, feeAmount])
 
         // If the trade is exact output, and a fee was taken, we must adjust the amount out to be the amount after the fee
         // Otherwise we continue as expected with the trade's normal expected output
@@ -187,12 +191,12 @@ export class UniswapTrade implements Command {
       if (this.outputRequiresUnwrap) {
         planner.addCommand(CommandType.UNWRAP_WETH, [this.options.recipient, minimumAmountOut])
       } else {
-        planner.addCommand(CommandType.SWEEP, [
-          outputCurrencyAddress,
-          this.options.recipient,
-          minimumAmountOut,
-        ])
+        planner.addCommand(CommandType.SWEEP, [outputCurrencyAddress, this.options.recipient, minimumAmountOut])
       }
+    }
+
+    if (this.outputRequiresWrap) {
+      planner.addCommand(CommandType.WRAP_ETH, [this.options.recipient, 0])
     }
 
     if (this.inputRequiresWrap && (this.trade.tradeType === TradeType.EXACT_OUTPUT || riskOfPartialFill(this.trade))) {
@@ -291,6 +295,10 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
     outputAmount,
     tradeType,
   })
+
+  console.log(trade.route.pools)
+  console.log(inputAmount)
+  console.log(outputAmount)
   const slippageToleranceOnSwap =
     routerMustCustody && tradeType == TradeType.EXACT_INPUT ? undefined : options.slippageTolerance
 
@@ -299,6 +307,7 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
 
   const v4Planner = new V4Planner()
   v4Planner.addTrade(trade, slippageToleranceOnSwap)
+  console.log(v4Planner)
   v4Planner.addSettle(inputWethFromRouter ? inputAmount.currency.wrapped : inputAmount.currency, payerIsUser)
 
   options.recipient = options.recipient ?? SENDER_AS_RECIPIENT

@@ -665,6 +665,21 @@ describe('Uniswap', () => {
       registerFixture('_UNISWAP_V4_USDC_FOR_1_ETH_2_HOP_WITH_ETH_FEE', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.equal('0')
     })
+
+    it('encodes a DAI->USDC->ETH swap with a wrap to recieve WETH', async () => {
+      const outputEther = utils.parseEther('1')
+      const trade = await V4Trade.fromRoute(
+        new V4Route([USDC_DAI_V4, ETH_DAI_V4], USDC, WETH),
+        CurrencyAmount.fromRawAmount(WETH, outputEther),
+        TradeType.EXACT_OUTPUT
+      )
+
+      const opts = swapOptions({})
+      buildTrade([trade])
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
+      registerFixture('_UNISWAP_V4_1000_USDC_FOR_ETH_WITH_UNWRAP', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.equal('0')
+    })
   })
 
   describe('mixed (interleaved)', async () => {
