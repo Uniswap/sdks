@@ -29,6 +29,7 @@ import { getPathCurrency } from '../../utils/pathCurrency'
 import { Currency, TradeType, CurrencyAmount, Percent } from '@uniswap/sdk-core'
 import { Command, RouterActionType, TradeConfig } from '../Command'
 import { SENDER_AS_RECIPIENT, ROUTER_AS_RECIPIENT, CONTRACT_BALANCE, ETH_ADDRESS } from '../../utils/constants'
+import { getCurrencyAddress } from '../../utils/getCurrencyAddress'
 import { encodeFeeBips } from '../../utils/numbers'
 import { BigNumber, BigNumberish } from 'ethers'
 import { TPool } from '@uniswap/router-sdk/dist/utils/TPool'
@@ -190,13 +191,15 @@ export class UniswapTrade implements Command {
       // by this if-else clause.
       if (this.outputRequiresUnwrap) {
         planner.addCommand(CommandType.UNWRAP_WETH, [this.options.recipient, minimumAmountOut])
+      } else if (this.outputRequiresWrap) {
+        planner.addCommand(CommandType.WRAP_ETH, [this.options.recipient, 0])
       } else {
-        planner.addCommand(CommandType.SWEEP, [pathOutputCurrencyAddress, this.options.recipient, minimumAmountOut])
+        planner.addCommand(CommandType.SWEEP, [
+          getCurrencyAddress(this.trade.outputAmount.currency),
+          this.options.recipient,
+          minimumAmountOut,
+        ])
       }
-    }
-
-    if (this.outputRequiresWrap) {
-      planner.addCommand(CommandType.WRAP_ETH, [this.options.recipient, 0])
     }
 
     if (this.inputRequiresWrap && (this.trade.tradeType === TradeType.EXACT_OUTPUT || riskOfPartialFill(this.trade))) {
