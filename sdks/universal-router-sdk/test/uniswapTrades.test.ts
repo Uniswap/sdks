@@ -19,7 +19,16 @@ import {
 } from '@uniswap/v3-sdk'
 import { Pool as V4Pool, Route as V4Route, Trade as V4Trade, Position as V4Position } from '@uniswap/v4-sdk'
 import { generatePermitSignature, toInputPermit, makePermit, generateEip2098PermitSignature } from './utils/permit2'
-import { CHAIN_TO_ADDRESSES_MAP, ChainId, CurrencyAmount, Ether, NONFUNGIBLE_POSITION_MANAGER_ADDRESSES, Percent, Token, TradeType } from '@uniswap/sdk-core'
+import {
+  CHAIN_TO_ADDRESSES_MAP,
+  ChainId,
+  CurrencyAmount,
+  Ether,
+  NONFUNGIBLE_POSITION_MANAGER_ADDRESSES,
+  Percent,
+  Token,
+  TradeType,
+} from '@uniswap/sdk-core'
 import { registerFixture } from './forge/writeInterop'
 import { buildTrade, getUniswapPools, swapOptions, ETHER, DAI, USDC, WETH } from './utils/uniswapData'
 import { hexToDecimalString } from './utils/hexToDecimalString'
@@ -64,7 +73,7 @@ describe('Uniswap', () => {
   let USDC_DAI_V4: V4Pool
 
   before(async () => {
-    ; ({ WETH_USDC_V2, USDC_DAI_V2, WETH_USDC_V3, USDC_DAI_V3, WETH_USDC_V3_LOW_FEE } = await getUniswapPools(
+    ;({ WETH_USDC_V2, USDC_DAI_V2, WETH_USDC_V3, USDC_DAI_V3, WETH_USDC_V3_LOW_FEE } = await getUniswapPools(
       FORK_BLOCK
     ))
 
@@ -961,7 +970,7 @@ describe('Uniswap', () => {
           : CurrencyAmount.fromRawAmount(tokenOut, amount)
       }
 
-      function compareUniswapTrades(left: UniswapTrade, right: UniswapTrade): void { }
+      function compareUniswapTrades(left: UniswapTrade, right: UniswapTrade): void {}
 
       it('v2 - erc20 <> erc20', async () => {
         const [tokenIn, tokenOut] = [DAI, USDC]
@@ -1489,9 +1498,13 @@ describe('Uniswap', () => {
         spender: UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, 1),
         tokenId,
         deadline: MAX_UINT160.toString(),
-        nonce: 0
+        nonce: 0,
       }
-      const { domain, types, values } = NonfungiblePositionManager.getPermitData(permit, NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[ChainId.MAINNET], ChainId.MAINNET)
+      const { domain, types, values } = NonfungiblePositionManager.getPermitData(
+        permit,
+        NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[ChainId.MAINNET],
+        ChainId.MAINNET
+      )
 
       const signature: Signature = splitSignature(await wallet._signTypedData(domain, types, values))
 
