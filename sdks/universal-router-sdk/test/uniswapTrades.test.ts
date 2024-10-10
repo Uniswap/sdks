@@ -660,17 +660,64 @@ describe('Uniswap', () => {
       )
       const feeOptions: FeeOptions = { fee: new Percent(5, 100), recipient: TEST_FEE_RECIPIENT_ADDRESS }
       const opts = swapOptions({ fee: feeOptions })
-      buildTrade([trade])
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V4_USDC_FOR_1_ETH_2_HOP_WITH_ETH_FEE', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.equal('0')
     })
 
-    it('encodes a DAI->USDC->ETH swap with a wrap to recieve WETH', async () => {
+    it('encodes a USDC->DAI->ETH swap with a wrap to recieve WETH', async () => {
       const outputEther = utils.parseEther('1')
       const trade = await V4Trade.fromRoute(
         new V4Route([USDC_DAI_V4, ETH_DAI_V4], USDC, WETH),
         CurrencyAmount.fromRawAmount(WETH, outputEther),
+        TradeType.EXACT_OUTPUT
+      )
+
+      const opts = swapOptions({})
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
+      registerFixture('_UNISWAP_V4_1000_USDC_FOR_ETH_WITH_UNWRAP', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.equal('0')
+    })
+
+    it('encodes a USDC->DAI->ETH swap with a fee that must then wrap to recieve WETH', async () => {
+      const outputEther = utils.parseEther('1')
+      const adjustedOutputEther = outputEther
+        .mul(10000)
+        .div(10000 - 500)
+        .toString()
+      const trade = await V4Trade.fromRoute(
+        new V4Route([USDC_DAI_V4, ETH_DAI_V4], USDC, WETH),
+        CurrencyAmount.fromRawAmount(WETH, adjustedOutputEther),
+        TradeType.EXACT_OUTPUT
+      )
+
+      const feeOptions: FeeOptions = { fee: new Percent(5, 100), recipient: TEST_FEE_RECIPIENT_ADDRESS }
+      const opts = swapOptions({ fee: feeOptions })
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
+      registerFixture('_UNISWAP_V4_1000_USDC_FOR_ETH_WITH_FEE_AND_UNWRAP', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.equal('0')
+    })
+
+    it('encodes an exactOutput ETH->DAI->USDC swap that must first wrap WETH', async () => {
+      const outputUSDC =  utils.parseUnits('1000', 6).toString()
+      const trade = await V4Trade.fromRoute(
+        new V4Route([ETH_DAI_V4, USDC_DAI_V4], WETH, USDC),
+        CurrencyAmount.fromRawAmount(WETH, outputEther),
+        TradeType.EXACT_OUTPUT
+      )
+
+      const opts = swapOptions({})
+      buildTrade([trade])
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
+      registerFixture('_UNISWAP_V4_WRAP_WETH_TO_ETHFOR_1000_USDC', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.equal('0')
+    })
+
+    it('encodes an exactOutput WETH->DAI->USDC swap that must first wrap ETH', async () => {
+      const outputUSDC =  utils.parseUnits('1000', 6).toString()
+      const trade = await V4Trade.fromRoute(
+        new V4Route([WETH_DAI_V4, USDC_DAI_V4], ETH, USDC),
+        CurrencyAmount.fromRawAmount(USDC, outputUSDC),
         TradeType.EXACT_OUTPUT
       )
 
