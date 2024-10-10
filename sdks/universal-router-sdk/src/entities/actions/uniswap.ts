@@ -106,7 +106,7 @@ export class UniswapTrade implements Command {
   }
 
   get outputRequiresTransition(): boolean {
-    this.outputRequiresWrap || this.outputRequiresUnwrap
+    return this.outputRequiresWrap || this.outputRequiresUnwrap
   }
 
   encode(planner: RoutePlanner, _config: TradeConfig): void {
