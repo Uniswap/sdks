@@ -29,13 +29,21 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         vm.deal(from, BALANCE);
     }
 
-    function testMigration() public {
-        MethodParameters memory params = readFixture(json, "._MIGRATE_WITH_PERMIT");
+    function test_migrate_withoutPermit() public {
+        MethodParameters memory params = readFixture(json, "._MIGRATE_WITHOUT_PERMIT");
 
-        // add liquidity to v3 so we have something to migrate
+        // add the position to v3 so we have something to migrate
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0);
         // USDC < WETH
-        mintV3Position(address(USDC), address(WETH), 500, 2500e6, 1e18);
+        mintV3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18);
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 1);
+
+        // approve the UniversalRouter to access the position (instead of permit)
+        vm.prank(from);
+        INonfungiblePositionManager(V3_POSITION_MANAGER).setApprovalForAll(MAINNET_ROUTER, true);
+
+        assertEq(params.value, 0);
+        (bool success,) = address(router).call(params.data);
+        require(success, "call failed");
     }
 }

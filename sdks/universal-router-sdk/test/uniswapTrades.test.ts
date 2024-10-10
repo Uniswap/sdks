@@ -15,6 +15,7 @@ import {
   nearestUsableTick,
   TickMath,
   FeeAmount,
+  NonfungiblePositionManager,
 } from '@uniswap/v3-sdk'
 import { Pool as V4Pool, Route as V4Route, Trade as V4Trade, Position as V4Position } from '@uniswap/v4-sdk'
 import { generatePermitSignature, toInputPermit, makePermit, generateEip2098PermitSignature } from './utils/permit2'
@@ -38,6 +39,7 @@ import {
 import {
   E_ETH_ADDRESS,
   ETH_ADDRESS,
+  MAX_UINT160,
   UNIVERSAL_ROUTER_ADDRESS,
   UniversalRouterVersion,
   ZERO_ADDRESS,
@@ -59,7 +61,7 @@ describe('Uniswap', () => {
   let USDC_DAI_V4: V4Pool
 
   before(async () => {
-    ;({ WETH_USDC_V2, USDC_DAI_V2, WETH_USDC_V3, USDC_DAI_V3, WETH_USDC_V3_LOW_FEE } = await getUniswapPools(
+    ; ({ WETH_USDC_V2, USDC_DAI_V2, WETH_USDC_V3, USDC_DAI_V3, WETH_USDC_V3_LOW_FEE } = await getUniswapPools(
       FORK_BLOCK
     ))
 
@@ -894,7 +896,7 @@ describe('Uniswap', () => {
           : CurrencyAmount.fromRawAmount(tokenOut, amount)
       }
 
-      function compareUniswapTrades(left: UniswapTrade, right: UniswapTrade): void {}
+      function compareUniswapTrades(left: UniswapTrade, right: UniswapTrade): void { }
 
       it('v2 - erc20 <> erc20', async () => {
         const [tokenIn, tokenOut] = [DAI, USDC]
@@ -1415,26 +1417,27 @@ describe('Uniswap', () => {
   })
 
   describe('migrate', () => {
-    // Test tokens on sepolia
+
     it('encodes a migration', async () => {
+      // NonfungiblePositionManager.getPermitData
       const opts = Object.assign({
         inputPosition: new Position({
           pool: WETH_USDC_V3,
-          liquidity: 1,
-          tickLower: -WETH_USDC_V3.tickSpacing,
-          tickUpper: WETH_USDC_V3.tickSpacing,
+          liquidity: 72249373570746,
+          tickLower: 200040,
+          tickUpper: 300000,
         }),
         outputPosition: new V4Position({
           pool: WETH_USDC_V4,
-          liquidity: 1,
-          tickLower: -WETH_USDC_V4.tickSpacing,
-          tickUpper: WETH_USDC_V4.tickSpacing,
+          liquidity: 72249373570746,
+          tickLower: 200040,
+          tickUpper: 300000,
         }),
         v3RemoveLiquidityOptions: {
-          tokenId: 1,
+          tokenId: 377972,
           liquidityPercentage: new Percent(100, 100),
           slippageTolerance: new Percent(5, 100),
-          deadline: 1,
+          deadline: MAX_UINT160,
           burnToken: true,
           collectOptions: {
             expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
@@ -1450,7 +1453,7 @@ describe('Uniswap', () => {
           },
         },
         v4AddLiquidityOptions: {
-          deadline: 1,
+          deadline: MAX_UINT160,
           migrate: true,
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
@@ -1465,21 +1468,21 @@ describe('Uniswap', () => {
       const opts = Object.assign({
         inputPosition: new Position({
           pool: WETH_USDC_V3,
-          liquidity: 1,
-          tickLower: -WETH_USDC_V3.tickSpacing,
-          tickUpper: WETH_USDC_V3.tickSpacing,
+          liquidity: 72249373570746,
+          tickLower: 200040,
+          tickUpper: 300000,
         }),
         outputPosition: new V4Position({
           pool: WETH_USDC_V4,
-          liquidity: 1,
-          tickLower: -WETH_USDC_V4.tickSpacing,
-          tickUpper: WETH_USDC_V4.tickSpacing,
+          liquidity: 72249373570746,
+          tickLower: 200040,
+          tickUpper: 300000,
         }),
         v3RemoveLiquidityOptions: {
-          tokenId: 1,
+          tokenId: 377972,
           liquidityPercentage: new Percent(100, 100),
           slippageTolerance: new Percent(5, 100),
-          deadline: 1,
+          deadline: MAX_UINT160,
           burnToken: true,
           collectOptions: {
             expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
@@ -1488,7 +1491,7 @@ describe('Uniswap', () => {
           },
         },
         v4AddLiquidityOptions: {
-          deadline: 1,
+          deadline: MAX_UINT160,
           migrate: true,
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,

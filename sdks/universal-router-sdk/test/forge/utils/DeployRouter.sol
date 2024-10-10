@@ -81,7 +81,6 @@ contract DeployRouter is Test {
     function deployV4Contracts() public {
         poolManager = new PoolManager();
         v4PositionManager = new PositionManager(poolManager, IPermit2(MAINNET_PERMIT2), 100000);
-        console2.log("posm", address(v4PositionManager));
     }
 
     function initializeV4Pools() public {
@@ -149,13 +148,15 @@ contract DeployRouter is Test {
         ERC20(token0).approve(V3_POSITION_MANAGER, type(uint256).max);
         ERC20(token1).approve(V3_POSITION_MANAGER, type(uint256).max);
 
-        INonfungiblePositionManager(V3_POSITION_MANAGER).mint(
+        (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1) = INonfungiblePositionManager(
+            V3_POSITION_MANAGER
+        ).mint(
             INonfungiblePositionManager.MintParams({
                 token0: token0,
                 token1: token1,
                 fee: fee,
-                tickLower: 0,
-                tickUpper: 194980,
+                tickLower: 200040,
+                tickUpper: 300000,
                 amount0Desired: amount0Desired,
                 amount1Desired: amount1Desired,
                 amount0Min: 0,
