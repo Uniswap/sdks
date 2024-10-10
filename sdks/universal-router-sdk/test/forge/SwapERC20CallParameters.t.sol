@@ -25,7 +25,7 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         deployV4Contracts();
         initializeV4Pools();
         vm.startPrank(from);
-        deployRouterAndPermit2();
+        deployRouter();
         vm.deal(from, BALANCE);
     }
 

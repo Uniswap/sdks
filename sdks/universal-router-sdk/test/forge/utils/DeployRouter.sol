@@ -4,6 +4,7 @@ pragma solidity ^0.8.26;
 import {console2} from "forge-std/console2.sol";
 import {Test} from "forge-std/Test.sol";
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
+import {IUniversalRouter} from "universal-router/interfaces/IUniversalRouter.sol";
 import {UniversalRouter} from "universal-router/UniversalRouter.sol";
 import {PoolManager} from "v4-core/PoolManager.sol";
 import {IERC20Minimal} from "v4-core/interfaces/external/IERC20Minimal.sol";
@@ -13,6 +14,7 @@ import {Currency} from "v4-core/types/Currency.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {IHooks} from "v4-core/interfaces/IHooks.sol";
 import {BalanceDelta} from "v4-core/types/BalanceDelta.sol";
+import {PositionManager} from "v4-periphery/src/PositionManager.sol";
 import {RouterParameters} from "universal-router/base/RouterImmutables.sol";
 import {IPermit2} from "permit2/src/interfaces/IPermit2.sol";
 import {INonfungiblePositionManager} from "v3-periphery/interfaces/INonfungiblePositionManager.sol";
@@ -25,15 +27,15 @@ contract DeployRouter is Test {
     bytes32 public constant PAIR_INIT_CODE_HASH = 0x96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f;
     bytes32 public constant POOL_INIT_CODE_HASH = 0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54;
     address public constant WETH9 = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-    address public constant V4_POOL_MANAGER_PLACEHOLDER = 0x4444444444444444444444444444444444444444;
-    address public constant V4_POSITION_MANAGER_PLACEHOLDER = 0x4444444444444444400000000000000000000000;
     address public constant V3_POSITION_MANAGER = 0xC36442b4a4522E871399CD717aBDD847Ab11FE88;
 
     address internal constant RECIPIENT = 0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa;
     address internal constant FEE_RECIPIENT = 0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB;
     address internal constant MAINNET_PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
+    address internal constant MAINNET_ROUTER = 0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD;
 
-    address internal constant FORGE_ROUTER_ADDRESS = 0xE808C1cfeebb6cb36B537B82FA7c9EEf31415a05;
+    // IF THIS CHANGES, YOU NEED TO UPDATE
+    address internal constant FORGE_POSM_ADDRESS = 0x2e234DAe75C793f67A35089C9d99245E1C58470b;
 
     ERC20 internal constant WETH = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     ERC20 internal constant USDC = ERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
@@ -42,9 +44,10 @@ contract DeployRouter is Test {
     uint256 ONE_USDC = 10 ** 6;
     uint256 ONE_DAI = 1 ether;
 
-    UniversalRouter public router;
-    IPermit2 public permit2;
+    IUniversalRouter public router;
+    IPermit2 public permit2 = IPermit2(MAINNET_PERMIT2);
     IPoolManager public poolManager;
+    PositionManager public v4PositionManager;
 
     address from;
     uint256 fromPrivateKey;
@@ -52,10 +55,10 @@ contract DeployRouter is Test {
 
     error InvalidTokenOrder();
 
-    function deployRouter(address _permit2) public {
-        router = new UniversalRouter(
+    function deployRouter() public {
+        UniversalRouter mockrouter = new UniversalRouter(
             RouterParameters({
-                permit2: _permit2,
+                permit2: MAINNET_PERMIT2,
                 weth9: WETH9,
                 v2Factory: V2_FACTORY,
                 v3Factory: V3_FACTORY,
@@ -63,18 +66,12 @@ contract DeployRouter is Test {
                 poolInitCodeHash: POOL_INIT_CODE_HASH,
                 v4PoolManager: address(poolManager),
                 v3NFTPositionManager: V3_POSITION_MANAGER,
-                v4PositionManager: V4_POSITION_MANAGER_PLACEHOLDER
+                v4PositionManager: address(v4PositionManager)
             })
         );
-    }
 
-    function deployRouterAndPermit2() public {
-        bytes memory bytecode = vm.readFileBinary("test/forge/bin/permit2.bin");
-        assembly ("memory-safe") {
-            sstore(permit2.slot, create(0, add(bytecode, 0x20), mload(bytecode)))
-        }
-        deployRouter(address(permit2));
-        require(FORGE_ROUTER_ADDRESS == address(router), "Invalid Router Address");
+        vm.etch(MAINNET_ROUTER, address(mockrouter).code);
+        router = IUniversalRouter(MAINNET_ROUTER);
     }
 
     ////////////////////////////////////////////////////////////////
@@ -83,6 +80,8 @@ contract DeployRouter is Test {
 
     function deployV4Contracts() public {
         poolManager = new PoolManager();
+        v4PositionManager = new PositionManager(poolManager, IPermit2(MAINNET_PERMIT2), 100000);
+        console2.log("posm", address(v4PositionManager));
     }
 
     function initializeV4Pools() public {

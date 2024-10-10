@@ -74,10 +74,15 @@ export abstract class SwapRouter {
    *   - input pool and output pool must have the same tokens
    *   - V3 NFT must be approved, or valid inputV3NFTPermit must be provided with UR as spender
    */
-  public static migrateV3ToV4CallParameters(options: MigrateV3ToV4Options): MethodParameters {
+  public static migrateV3ToV4CallParameters(
+    options: MigrateV3ToV4Options,
+    positionManagerOverride?: string
+  ): MethodParameters {
     const token0 = options.inputPosition.pool.token0
     const token1 = options.inputPosition.pool.token1
+
     const v4PositionManagerAddress =
+      positionManagerOverride ??
       CHAIN_TO_ADDRESSES_MAP[options.outputPosition.pool.chainId as SupportedChainsType].v4PositionManagerAddress
 
     invariant(token0 === options.outputPosition.pool.token0, 'TOKEN0_MISMATCH')
