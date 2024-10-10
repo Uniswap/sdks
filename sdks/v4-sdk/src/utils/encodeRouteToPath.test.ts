@@ -23,18 +23,6 @@ const pool_eth_1 = new Pool(
   []
 )
 
-const pool_weth_1 = new Pool(
-  weth,
-  currency1,
-  FEE_AMOUNT_MEDIUM,
-  TICK_SPACING_TEN,
-  ADDRESS_ZERO,
-  encodeSqrtRatioX96(1, 1),
-  0,
-  0,
-  []
-)
-
 const pool_1_2 = new Pool(
   currency1,
   currency2,
@@ -119,19 +107,19 @@ describe.only('RouterPlanner', () => {
     expect(encodeRouteToPath(route, exactOutput)).toEqual(expected)
   })
 
-  it.only('encodes the correct route with native pool token that must wrap final output', async () => {
+  it('encodes the correct path when route has a different output than route.pathOutput', async () => {
     const newRoute = new Route([pool_1_2, pool_eth_1], currency2, weth)
     const exactOutput = true
     const expected = [
       {
-        intermediateCurrency: '0x1111111111111111111111111111111111111111',
+        intermediateCurrency: '0x2222222222222222222222222222222222222222',
         fee: 3000,
         tickSpacing: 10,
         hooks: '0x0000000000000000000000000000000000000000',
         hookData: '0x',
       },
       {
-        intermediateCurrency: '0x0000000000000000000000000000000000000000',
+        intermediateCurrency: '0x1111111111111111111111111111111111111111',
         fee: 3000,
         tickSpacing: 10,
         hooks: '0x0000000000000000000000000000000000000000',
@@ -142,8 +130,8 @@ describe.only('RouterPlanner', () => {
     expect(encodeRouteToPath(newRoute, exactOutput)).toEqual(expected)
   })
 
-  it('encodes the correct route with pool wrapped token but must unwrap for final output', async () => {
-    const newRoute = new Route([pool_1_2, pool_weth_1], currency2, eth)
+  it('encodes the correct path when route has a different output than route.pathOutput', async () => {
+    const newRoute = new Route([pool_eth_1, pool_1_2], weth, currency2)
     const exactOutput = false
     const expected = [
       {
@@ -154,7 +142,7 @@ describe.only('RouterPlanner', () => {
         hookData: '0x',
       },
       {
-        intermediateCurrency: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+        intermediateCurrency: '0x2222222222222222222222222222222222222222',
         fee: 3000,
         tickSpacing: 10,
         hooks: '0x0000000000000000000000000000000000000000',
