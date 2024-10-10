@@ -19,6 +19,7 @@ export {
 } from './utils/constants'
 export {
   CommandParser,
+  GenericCommandParser,
   UniversalRouterCommand,
   UniversalRouterCall,
   Param,
