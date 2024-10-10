@@ -130,7 +130,7 @@ describe('RouterPlanner', () => {
     expect(encodeRouteToPath(newRoute, exactOutput)).toEqual(expected)
   })
 
-  it('encodes the correct path when route has a different output than route.pathOutput', async () => {
+  it('encodes the correct path when route has a different input than route.pathInput', async () => {
     const newRoute = new Route([pool_eth_1, pool_1_2], weth, currency2)
     const exactOutput = false
     const expected = [
