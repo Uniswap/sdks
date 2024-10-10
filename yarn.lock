@@ -4633,7 +4633,7 @@ __metadata:
     "@uniswap/swap-router-contracts": ^1.3.0
     "@uniswap/v2-sdk": ^4.6.0
     "@uniswap/v3-sdk": ^3.17.0
-    "@uniswap/v4-sdk": ^1.9.0
+    "@uniswap/v4-sdk": ^1.10.3
     prettier: ^2.4.1
     tsdx: ^0.14.1
   languageName: unknown
@@ -4890,16 +4890,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v4-sdk@npm:^1.10.0, @uniswap/v4-sdk@npm:^1.9.0":
-  version: 1.10.0
-  resolution: "@uniswap/v4-sdk@npm:1.10.0"
+"@uniswap/v4-sdk@npm:^1.10.0, @uniswap/v4-sdk@npm:^1.10.3, @uniswap/v4-sdk@npm:^1.9.0":
+  version: 1.10.3
+  resolution: "@uniswap/v4-sdk@npm:1.10.3"
   dependencies:
     "@ethersproject/solidity": ^5.0.9
     "@uniswap/sdk-core": ^5.3.1
     "@uniswap/v3-sdk": 3.12.0
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
-  checksum: c1a55b0e52e2db986c463e75d9de337c48a76b90076705bc4a50da2a27de2f4c91a7c68f79bb04ac7fc7c7b3244fd8c955645e6dcac7e8b9af70354fd905e164
+  checksum: ca0565f4e87c2b306dc642ca13b7e2605a994cf5e9cb661503a60a3cc8dd86727f73328ebd529f9a42cedf6751dde91735b4ff7e3468deef37fa254d47e3ee9b
   languageName: node
   linkType: hard
 
