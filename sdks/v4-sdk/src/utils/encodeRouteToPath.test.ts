@@ -1,4 +1,4 @@
-import { Ether, Token, WETH9 } from '@uniswap/sdk-core'
+import { Ether, Token } from '@uniswap/sdk-core'
 import { encodeSqrtRatioX96 } from '@uniswap/v3-sdk'
 import { Route } from '../entities/route'
 import { Pool } from '../entities/pool'
@@ -6,25 +6,12 @@ import { encodeRouteToPath } from './encodeRouteToPath'
 import { ADDRESS_ZERO, FEE_AMOUNT_MEDIUM, TICK_SPACING_TEN } from '../internalConstants'
 
 const eth = Ether.onChain(1)
-const weth = WETH9[1]
 const currency1 = new Token(1, '0x0000000000000000000000000000000000000001', 18, 't1')
 const currency2 = new Token(1, '0x0000000000000000000000000000000000000002', 18, 't2')
 const currency3 = new Token(1, '0x0000000000000000000000000000000000000003', 18, 't3')
 
 const pool_eth_1 = new Pool(
   eth,
-  currency1,
-  FEE_AMOUNT_MEDIUM,
-  TICK_SPACING_TEN,
-  ADDRESS_ZERO,
-  encodeSqrtRatioX96(1, 1),
-  0,
-  0,
-  []
-)
-
-const pool_weth_1 = new Pool(
-  weth,
   currency1,
   FEE_AMOUNT_MEDIUM,
   TICK_SPACING_TEN,
@@ -117,28 +104,5 @@ describe('RouterPlanner', () => {
     ]
 
     expect(encodeRouteToPath(route, exactOutput)).toEqual(expected)
-  })
-
-  it.only('encodes the correct route with native pool token but wrapped output', async () => {
-    const newRoute = new Route([pool_1_2, pool_eth_1], currency2, weth)
-    const exactOutput = false
-    const expected = [
-      {
-        intermediateCurrency: '0x0000000000000000000000000000000000000001',
-        fee: 3000,
-        tickSpacing: 10,
-        hooks: '0x0000000000000000000000000000000000000000',
-        hookData: '0x',
-      },
-      {
-        intermediateCurrency: '0x0000000000000000000000000000000000000000',
-        fee: 3000,
-        tickSpacing: 10,
-        hooks: '0x0000000000000000000000000000000000000000',
-        hookData: '0x',
-      }
-    ]
-
-    expect(encodeRouteToPath(newRoute, exactOutput)).toEqual(expected)
   })
 })
