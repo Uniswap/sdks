@@ -188,8 +188,8 @@ export class V4Planner {
 
     const actionType = exactOutput ? Actions.SWAP_EXACT_OUT : Actions.SWAP_EXACT_IN
 
-    const currencyIn = currencyAddress(trade.inputAmount.currency)
-    const currencyOut = currencyAddress(trade.outputAmount.currency)
+    const currencyIn = currencyAddress(trade.route.pathInput)
+    const currencyOut = currencyAddress(trade.route.pathOutput)
 
     this.addAction(actionType, [
       exactOutput

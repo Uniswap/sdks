@@ -11,7 +11,7 @@ export type PathKey = {
 }
 
 export const encodeRouteToPath = (route: Route<Currency, Currency>, exactOutput?: boolean): PathKey[] => {
-  let startingCurrency = exactOutput ? route.output : route.input
+  let startingCurrency = exactOutput ? route.pathOutput : route.pathInput
   let pools = exactOutput ? route.pools.reverse() : route.pools
   let pathKeys: PathKey[] = []
 
