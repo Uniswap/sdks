@@ -128,8 +128,8 @@ export abstract class SwapRouter {
       const selector = v3Call.slice(0, 10)
       invariant(
         selector == V3PositionManager.INTERFACE.getSighash('collect') ||
-          selector == V3PositionManager.INTERFACE.getSighash('decreaseLiquidity') ||
-          selector == V3PositionManager.INTERFACE.getSighash('burn'),
+        selector == V3PositionManager.INTERFACE.getSighash('decreaseLiquidity') ||
+        selector == V3PositionManager.INTERFACE.getSighash('burn'),
         'INVALID_CALL: ' + selector
       )
       planner.addCommand(CommandType.V3_POSITION_MANAGER_CALL, [v3Call])

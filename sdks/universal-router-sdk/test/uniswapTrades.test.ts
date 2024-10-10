@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import JSBI from 'jsbi'
-import { BigNumber, ethers, utils, Wallet } from 'ethers'
+import { BigNumber, ethers, utils, Wallet, Signature } from 'ethers'
 import { expandTo18Decimals } from '../src/utils/numbers'
 import { SwapRouter, UniswapTrade, FlatFeeOptions } from '../src'
 import { MixedRouteTrade, MixedRouteSDK } from '@uniswap/router-sdk'
@@ -19,7 +19,7 @@ import {
 } from '@uniswap/v3-sdk'
 import { Pool as V4Pool, Route as V4Route, Trade as V4Trade, Position as V4Position } from '@uniswap/v4-sdk'
 import { generatePermitSignature, toInputPermit, makePermit, generateEip2098PermitSignature } from './utils/permit2'
-import { CHAIN_TO_ADDRESSES_MAP, ChainId, CurrencyAmount, Ether, Percent, Token, TradeType } from '@uniswap/sdk-core'
+import { CHAIN_TO_ADDRESSES_MAP, ChainId, CurrencyAmount, Ether, NONFUNGIBLE_POSITION_MANAGER_ADDRESSES, Percent, Token, TradeType } from '@uniswap/sdk-core'
 import { registerFixture } from './forge/writeInterop'
 import { buildTrade, getUniswapPools, swapOptions, ETHER, DAI, USDC, WETH } from './utils/uniswapData'
 import { hexToDecimalString } from './utils/hexToDecimalString'
@@ -44,6 +44,7 @@ import {
   UniversalRouterVersion,
   ZERO_ADDRESS,
 } from '../src/utils/constants'
+import { splitSignature } from 'ethers/lib/utils'
 
 const FORK_BLOCK = 16075500
 
@@ -63,7 +64,7 @@ describe('Uniswap', () => {
   let USDC_DAI_V4: V4Pool
 
   before(async () => {
-    ;({ WETH_USDC_V2, USDC_DAI_V2, WETH_USDC_V3, USDC_DAI_V3, WETH_USDC_V3_LOW_FEE } = await getUniswapPools(
+    ; ({ WETH_USDC_V2, USDC_DAI_V2, WETH_USDC_V3, USDC_DAI_V3, WETH_USDC_V3_LOW_FEE } = await getUniswapPools(
       FORK_BLOCK
     ))
 
@@ -960,7 +961,7 @@ describe('Uniswap', () => {
           : CurrencyAmount.fromRawAmount(tokenOut, amount)
       }
 
-      function compareUniswapTrades(left: UniswapTrade, right: UniswapTrade): void {}
+      function compareUniswapTrades(left: UniswapTrade, right: UniswapTrade): void { }
 
       it('v2 - erc20 <> erc20', async () => {
         const [tokenIn, tokenOut] = [DAI, USDC]
@@ -1482,7 +1483,19 @@ describe('Uniswap', () => {
 
   describe('migrate', () => {
     it('encodes a migration', async () => {
-      // NonfungiblePositionManager.getPermitData
+      // sign a permit for the token
+      const tokenId = 377972
+      const permit = {
+        spender: UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, 1),
+        tokenId,
+        deadline: MAX_UINT160.toString(),
+        nonce: 0
+      }
+      const { domain, types, values } = NonfungiblePositionManager.getPermitData(permit, NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[ChainId.MAINNET], ChainId.MAINNET)
+
+      const signature: Signature = splitSignature(await wallet._signTypedData(domain, types, values))
+
+      // create migrate options
       const opts = Object.assign({
         inputPosition: new Position({
           pool: WETH_USDC_V3,
@@ -1492,12 +1505,12 @@ describe('Uniswap', () => {
         }),
         outputPosition: new V4Position({
           pool: WETH_USDC_V4,
-          liquidity: 72249373570746,
+          liquidity: 100000,
           tickLower: 200040,
           tickUpper: 300000,
         }),
         v3RemoveLiquidityOptions: {
-          tokenId: 377972,
+          tokenId,
           liquidityPercentage: new Percent(100, 100),
           slippageTolerance: new Percent(5, 100),
           deadline: MAX_UINT160,
@@ -1508,11 +1521,11 @@ describe('Uniswap', () => {
             recipient: FORGE_V4_POSITION_MANAGER,
           },
           permit: {
-            v: 0,
-            r: '0x0000000000000000000000000000000000000000000000000000000000000001',
-            s: '0x0000000000000000000000000000000000000000000000000000000000000002',
-            deadline: 1,
-            spender: UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, 1),
+            v: signature.v,
+            r: signature.r,
+            s: signature.s,
+            deadline: permit.deadline,
+            spender: permit.spender,
           },
         },
         v4AddLiquidityOptions: {
