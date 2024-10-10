@@ -465,6 +465,7 @@ export abstract class NonfungiblePositionManager {
       domain: {
         name: 'Uniswap V3 Positions NFT-V1',
         chainId,
+        version: '1',
         verifyingContract: positionManagerAddress,
       },
       types: NFT_PERMIT_TYPES,
