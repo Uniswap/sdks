@@ -162,7 +162,7 @@ export const COMMAND_DEFINITION: { [key in CommandType]: CommandDefinition } = {
     parser: Parser.Abi,
     params: [
       { name: 'recipient', type: 'address' },
-      { name: 'amount', type: 'uint256' },
+      { name: 'amountMin', type: 'uint256' },
     ],
   },
   [CommandType.UNWRAP_WETH]: {
