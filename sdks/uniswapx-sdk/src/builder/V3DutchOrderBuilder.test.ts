@@ -24,14 +24,16 @@ describe("V3DutchOrderBuilder", () => {
             .cosigner(constants.AddressZero)
             .cosignature("0x")
             .decayStartBlock(212121)
+            .startingBaseFee(BigNumber.from(0))
             .input({
                 token: INPUT_TOKEN,
                 startAmount: INPUT_START_AMOUNT,
                 curve: {
-                    relativeBlocks: [1],
-                    relativeAmounts: [BigInt(0)],
+                    relativeBlocks: [],
+                    relativeAmounts: [],
                 },
                 maxAmount: INPUT_START_AMOUNT.add(1),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .output({
                 token: OUTPUT_TOKEN,
@@ -41,6 +43,8 @@ describe("V3DutchOrderBuilder", () => {
                     relativeAmounts: [BigInt(4)],
                 },
                 recipient: constants.AddressZero,
+                minAmount: OUTPUT_START_AMOUNT.sub(4),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .inputOverride(INPUT_START_AMOUNT.mul(99).div(100))
             .outputOverrides([OUTPUT_START_AMOUNT])
@@ -63,14 +67,16 @@ describe("V3DutchOrderBuilder", () => {
             .decayStartBlock(212121)
             .swapper(constants.AddressZero)
             .nonce(BigNumber.from(100))
+            .startingBaseFee(BigNumber.from(0))
             .input({
                 token: INPUT_TOKEN,
                 startAmount: INPUT_START_AMOUNT,
                 curve: {
-                    relativeBlocks: [1],
-                    relativeAmounts: [BigInt(0)],
+                    relativeBlocks: [],
+                    relativeAmounts: [],
                 },
                 maxAmount: INPUT_START_AMOUNT.add(1),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .output({
                 token: OUTPUT_TOKEN,
@@ -80,6 +86,8 @@ describe("V3DutchOrderBuilder", () => {
                     relativeAmounts: [BigInt(4)],
                 },
                 recipient: constants.AddressZero,
+                minAmount: OUTPUT_START_AMOUNT.sub(4),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .output({
                 token: OUTPUT_TOKEN,
@@ -89,6 +97,8 @@ describe("V3DutchOrderBuilder", () => {
                     relativeAmounts: [BigInt(17)],
                 },
                 recipient: constants.AddressZero,
+                minAmount: OUTPUT_START_AMOUNT.sub(17),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .inputOverride(INPUT_START_AMOUNT.mul(99).div(100))
             .outputOverrides([OUTPUT_START_AMOUNT.mul(101).div(100), OUTPUT_START_AMOUNT])
@@ -103,14 +113,16 @@ describe("V3DutchOrderBuilder", () => {
             builder
             .cosignature("0x")
             .decayStartBlock(212121)
+            .startingBaseFee(BigNumber.from(0))
             .input({
                 token: INPUT_TOKEN,
                 startAmount: INPUT_START_AMOUNT,
                 curve: {
-                    relativeBlocks: [1],
-                    relativeAmounts: [BigInt(0)],
+                    relativeBlocks: [],
+                    relativeAmounts: [],
                 },
                 maxAmount: INPUT_START_AMOUNT.add(1),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .output({
                 token: OUTPUT_TOKEN,
@@ -120,6 +132,8 @@ describe("V3DutchOrderBuilder", () => {
                     relativeAmounts: [BigInt(4)],
                 },
                 recipient: constants.AddressZero,
+                minAmount: OUTPUT_START_AMOUNT.sub(4),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .inputOverride(INPUT_START_AMOUNT.mul(99).div(100))
             .outputOverrides([OUTPUT_START_AMOUNT])
@@ -137,6 +151,7 @@ describe("V3DutchOrderBuilder", () => {
 			.cosignature("0x")
 			.cosigner(constants.AddressZero)
 			.decayStartBlock(212121)
+            .startingBaseFee(BigNumber.from(0))
 			.input({
 				token: INPUT_TOKEN,
 				startAmount: INPUT_START_AMOUNT,
@@ -145,6 +160,7 @@ describe("V3DutchOrderBuilder", () => {
 					relativeAmounts: [BigInt(1)],
 				},
 				maxAmount: INPUT_START_AMOUNT.add(1),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
 			})
 			.output({
 				token: OUTPUT_TOKEN,
@@ -154,6 +170,8 @@ describe("V3DutchOrderBuilder", () => {
 					relativeAmounts: [BigInt(4)],
 				},
 				recipient: constants.AddressZero,
+                minAmount: OUTPUT_START_AMOUNT.sub(4),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
 			})
 			.inputOverride(INPUT_START_AMOUNT.mul(99).div(100))
 			.outputOverrides([OUTPUT_START_AMOUNT])
@@ -171,6 +189,7 @@ describe("V3DutchOrderBuilder", () => {
 			.cosignature("0x")
 			.cosigner(constants.AddressZero)
 			.decayStartBlock(212121)
+            .startingBaseFee(BigNumber.from(0))
 			.input({
 				token: INPUT_TOKEN,
 				startAmount: INPUT_START_AMOUNT,
@@ -179,6 +198,7 @@ describe("V3DutchOrderBuilder", () => {
 					relativeAmounts: [BigInt(0), BigInt(1)],
 				},
 				maxAmount: INPUT_START_AMOUNT.add(1),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
 			})
 			.output({
 				token: OUTPUT_TOKEN,
@@ -188,6 +208,8 @@ describe("V3DutchOrderBuilder", () => {
 					relativeAmounts: [BigInt(4)],
 				},
 				recipient: constants.AddressZero,
+                minAmount: OUTPUT_START_AMOUNT.sub(4),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
 			})
 			.inputOverride(BigNumber.from(0))
 			.outputOverrides([OUTPUT_START_AMOUNT])
@@ -205,6 +227,7 @@ describe("V3DutchOrderBuilder", () => {
             .cosignature("0x")
             .cosigner(constants.AddressZero)
             .decayStartBlock(212121)
+            .startingBaseFee(BigNumber.from(0))
             .input({
                 token: INPUT_TOKEN,
                 startAmount: INPUT_START_AMOUNT,
@@ -213,6 +236,7 @@ describe("V3DutchOrderBuilder", () => {
                     relativeAmounts: [BigInt(1), BigInt(2), BigInt(3)],
                 },
                 maxAmount: INPUT_START_AMOUNT.add(1),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .output({
                 token: OUTPUT_TOKEN,
@@ -222,6 +246,8 @@ describe("V3DutchOrderBuilder", () => {
                     relativeAmounts: [],
                 },
                 recipient: constants.AddressZero,
+                minAmount: OUTPUT_START_AMOUNT,
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .inputOverride(BigNumber.from(0))
             .outputOverrides([OUTPUT_START_AMOUNT])
@@ -239,14 +265,16 @@ describe("V3DutchOrderBuilder", () => {
             .cosignature("0x")
             .cosigner(constants.AddressZero)
             .decayStartBlock(212121)
+            .startingBaseFee(BigNumber.from(0))
             .input({
                 token: INPUT_TOKEN,
                 startAmount: INPUT_START_AMOUNT,
                 curve: {
-                    relativeBlocks: [1],
-                    relativeAmounts: [BigInt(0)],
+                    relativeBlocks: [],
+                    relativeAmounts: [],
                 },
                 maxAmount: INPUT_START_AMOUNT.add(1),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .output({
                 token: OUTPUT_TOKEN,
@@ -256,6 +284,8 @@ describe("V3DutchOrderBuilder", () => {
                     relativeAmounts: [BigInt(4), BigInt(22)],
                 },
                 recipient: constants.AddressZero,
+                minAmount: OUTPUT_START_AMOUNT.sub(5),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .inputOverride(INPUT_START_AMOUNT.mul(99).div(100))
             .outputOverrides([OUTPUT_START_AMOUNT])
@@ -273,14 +303,16 @@ describe("V3DutchOrderBuilder", () => {
             .cosignature("0x")
             .cosigner(constants.AddressZero)
             .decayStartBlock(212121)
+            .startingBaseFee(BigNumber.from(0))
             .input({
                 token: INPUT_TOKEN,
                 startAmount: INPUT_START_AMOUNT,
                 curve: {
-                    relativeBlocks: [1],
-                    relativeAmounts: [BigInt(0)],
+                    relativeBlocks: [],
+                    relativeAmounts: [],
                 },
                 maxAmount: INPUT_START_AMOUNT.add(1),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .output({
                 token: OUTPUT_TOKEN,
@@ -290,6 +322,8 @@ describe("V3DutchOrderBuilder", () => {
                     relativeAmounts: [BigInt(4)],
                 },
                 recipient: constants.AddressZero,
+                minAmount: OUTPUT_START_AMOUNT.sub(4),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .inputOverride(INPUT_START_AMOUNT.mul(99).div(100))
             .outputOverrides([OUTPUT_START_AMOUNT])
@@ -304,14 +338,16 @@ describe("V3DutchOrderBuilder", () => {
             .cosigner(constants.AddressZero)
             .cosignature("0x")
             .decayStartBlock(212121)
+            .startingBaseFee(BigNumber.from(0))
             .input({
                 token: INPUT_TOKEN,
                 startAmount: INPUT_START_AMOUNT,
                 curve: {
-                    relativeBlocks: [1],
-                    relativeAmounts: [BigInt(0)],
+                    relativeBlocks: [],
+                    relativeAmounts: [],
                 },
                 maxAmount: INPUT_START_AMOUNT.add(1),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .output({
                 token: OUTPUT_TOKEN,
@@ -321,6 +357,8 @@ describe("V3DutchOrderBuilder", () => {
                     relativeAmounts: [BigInt(4)],
                 },
                 recipient: constants.AddressZero,
+                minAmount: OUTPUT_START_AMOUNT.sub(4),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .inputOverride(INPUT_START_AMOUNT.mul(99).div(100))
             .outputOverrides([OUTPUT_START_AMOUNT])
@@ -337,14 +375,16 @@ describe("V3DutchOrderBuilder", () => {
             .cosignature("0x")
             .cosigner(constants.AddressZero)
             .decayStartBlock(212121)
+            .startingBaseFee(BigNumber.from(0))
             .input({
                 token: INPUT_TOKEN,
                 startAmount: INPUT_START_AMOUNT,
                 curve: {
-                    relativeBlocks: [1],
-                    relativeAmounts: [BigInt(0)],
+                    relativeBlocks: [],
+                    relativeAmounts: [],
                 },
                 maxAmount: INPUT_START_AMOUNT.add(1),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .output({
                 token: OUTPUT_TOKEN,
@@ -354,6 +394,8 @@ describe("V3DutchOrderBuilder", () => {
                     relativeAmounts: [BigInt(4)],
                 },
                 recipient: constants.AddressZero,
+                minAmount: OUTPUT_START_AMOUNT.sub(4),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .inputOverride(INPUT_START_AMOUNT.mul(99).div(100))
             .outputOverrides([OUTPUT_START_AMOUNT])
@@ -364,6 +406,43 @@ describe("V3DutchOrderBuilder", () => {
           ).toThrow("Invariant failed: nonce not set");
     });
 
+    it("Throw if startingBaseFee not set", () => {
+        const deadline = Date.now() + 1000;
+        expect(() =>
+            builder
+            .cosigner(constants.AddressZero)
+            .cosignature("0x")
+            .decayStartBlock(212121)
+            .input({
+                token: INPUT_TOKEN,
+                startAmount: INPUT_START_AMOUNT,
+                curve: {
+                    relativeBlocks: [],
+                    relativeAmounts: [],
+                },
+                maxAmount: INPUT_START_AMOUNT.add(1),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
+            })
+            .output({
+                token: OUTPUT_TOKEN,
+                startAmount: OUTPUT_START_AMOUNT,
+                curve: {
+                    relativeBlocks: [4],
+                    relativeAmounts: [BigInt(4)],
+                },
+                recipient: constants.AddressZero,
+                minAmount: OUTPUT_START_AMOUNT.sub(4),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
+            })
+            .inputOverride(INPUT_START_AMOUNT.mul(99).div(100))
+            .outputOverrides([OUTPUT_START_AMOUNT])
+            .deadline(deadline)
+            .swapper(constants.AddressZero)
+            .nonce(BigNumber.from(100))
+            .build()
+        ).toThrow("Invariant failed: startingBaseFee not set");
+    });
+
     it("Throw if input is not set", () => {
         const deadline = Math.floor(Date.now() / 1000) + 1000;
         expect(() =>
@@ -371,6 +450,7 @@ describe("V3DutchOrderBuilder", () => {
             .cosignature("0x")
             .cosigner(constants.AddressZero)
             .decayStartBlock(212121)
+            .startingBaseFee(BigNumber.from(0))
             // omitting input
             .output({
                 token: OUTPUT_TOKEN,
@@ -380,6 +460,8 @@ describe("V3DutchOrderBuilder", () => {
                     relativeAmounts: [BigInt(4)],
                 },
                 recipient: constants.AddressZero,
+                minAmount: OUTPUT_START_AMOUNT.sub(4),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .inputOverride(INPUT_START_AMOUNT.mul(99).div(100))
             .outputOverrides([OUTPUT_START_AMOUNT])
@@ -397,14 +479,16 @@ describe("V3DutchOrderBuilder", () => {
             .cosignature("0x")
             .cosigner(constants.AddressZero)
             .decayStartBlock(212121)
+            .startingBaseFee(BigNumber.from(0))
             .input({
                 token: INPUT_TOKEN,
                 startAmount: INPUT_START_AMOUNT,
                 curve: {
-                    relativeBlocks: [1],
-                    relativeAmounts: [BigInt(0)],
+                    relativeBlocks: [],
+                    relativeAmounts: [],
                 },
                 maxAmount: INPUT_START_AMOUNT.add(1),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             // omitting output
             .inputOverride(INPUT_START_AMOUNT.mul(99).div(100))
@@ -423,14 +507,16 @@ describe("V3DutchOrderBuilder", () => {
             .cosignature("0x")
             .cosigner(constants.AddressZero)
             .decayStartBlock(212121)
+            .startingBaseFee(BigNumber.from(0))
             .input({
                 token: INPUT_TOKEN,
                 startAmount: INPUT_START_AMOUNT,
                 curve: {
-                    relativeBlocks: [1],
-                    relativeAmounts: [BigInt(0)],
+                    relativeBlocks: [],
+                    relativeAmounts: [],
                 },
                 maxAmount: INPUT_START_AMOUNT.add(1),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .output({
                 token: OUTPUT_TOKEN,
@@ -440,6 +526,8 @@ describe("V3DutchOrderBuilder", () => {
                     relativeAmounts: [BigInt(4)],
                 },
                 recipient: constants.AddressZero,
+                minAmount: OUTPUT_START_AMOUNT.sub(4),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .inputOverride(INPUT_START_AMOUNT.add(1))
             .outputOverrides([OUTPUT_START_AMOUNT])
@@ -457,14 +545,16 @@ describe("V3DutchOrderBuilder", () => {
             .cosignature("0x")
             .cosigner(constants.AddressZero)
             .decayStartBlock(212121)
+            .startingBaseFee(BigNumber.from(0))
             .input({
                 token: INPUT_TOKEN,
                 startAmount: INPUT_START_AMOUNT,
                 curve: {
-                    relativeBlocks: [1],
-                    relativeAmounts: [BigInt(0)],
+                    relativeBlocks: [],
+                    relativeAmounts: [],
                 },
                 maxAmount: INPUT_START_AMOUNT.add(1),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .output({
                 token: OUTPUT_TOKEN,
@@ -474,6 +564,8 @@ describe("V3DutchOrderBuilder", () => {
                     relativeAmounts: [BigInt(4)],
                 },
                 recipient: constants.AddressZero,
+                minAmount: OUTPUT_START_AMOUNT.sub(4),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .inputOverride(INPUT_START_AMOUNT.mul(99).div(100))
             .outputOverrides([OUTPUT_START_AMOUNT.sub(2121)])
@@ -491,14 +583,16 @@ describe("V3DutchOrderBuilder", () => {
 			.cosignature("0x")
 			.cosigner(constants.AddressZero)
 			.decayStartBlock(212121)
+            .startingBaseFee(BigNumber.from(0))
 			.input({
 				token: INPUT_TOKEN,
 				startAmount: INPUT_START_AMOUNT,
 				curve: {
-					relativeBlocks: [1],
-					relativeAmounts: [BigInt(0)],
+					relativeBlocks: [],
+					relativeAmounts: [],
 				},
 				maxAmount: INPUT_START_AMOUNT,
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
 			})
 			.output({
 				token: OUTPUT_TOKEN,
@@ -508,6 +602,8 @@ describe("V3DutchOrderBuilder", () => {
 					relativeAmounts: [BigInt(-4)],
 				},
 				recipient: constants.AddressZero,
+                minAmount: OUTPUT_START_AMOUNT.add(4),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
 			})
 			.deadline(deadline)
 			.outputOverrides([OUTPUT_START_AMOUNT])
@@ -524,14 +620,16 @@ describe("V3DutchOrderBuilder", () => {
             .cosignature("0x")
             .cosigner(constants.AddressZero)
             .decayStartBlock(212121)
+            .startingBaseFee(BigNumber.from(0))
             .input({
                 token: INPUT_TOKEN,
                 startAmount: INPUT_START_AMOUNT,
                 curve: {
-                    relativeBlocks: [1],
-                    relativeAmounts: [BigInt(0)],
+                    relativeBlocks: [],
+                    relativeAmounts: [],
                 },
                 maxAmount: INPUT_START_AMOUNT.add(1),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .output({
                 token: OUTPUT_TOKEN,
@@ -541,6 +639,8 @@ describe("V3DutchOrderBuilder", () => {
                     relativeAmounts: [BigInt(4)],
                 },
                 recipient: constants.AddressZero,
+                minAmount: OUTPUT_START_AMOUNT.sub(4),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .inputOverride(INPUT_START_AMOUNT.mul(99).div(100))
             .outputOverrides([OUTPUT_START_AMOUNT])
@@ -581,14 +681,16 @@ describe("V3DutchOrderBuilder", () => {
             .cosigner(constants.AddressZero)
             .cosignature("0x")
             .decayStartBlock(212121)
+            .startingBaseFee(BigNumber.from(0))
             .input({
                 token: INPUT_TOKEN,
                 startAmount: INPUT_START_AMOUNT,
                 curve: {
-                    relativeBlocks: [1],
-                    relativeAmounts: [BigInt(0)],
+                    relativeBlocks: [],
+                    relativeAmounts: [],
                 },
                 maxAmount: INPUT_START_AMOUNT.add(1),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .output({
                 token: OUTPUT_TOKEN,
@@ -598,6 +700,8 @@ describe("V3DutchOrderBuilder", () => {
                     relativeAmounts: [BigInt(4)],
                 },
                 recipient: constants.AddressZero,
+                minAmount: OUTPUT_START_AMOUNT.sub(4),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .inputOverride(INPUT_START_AMOUNT.mul(99).div(100))
             .outputOverrides([OUTPUT_START_AMOUNT])
@@ -630,14 +734,16 @@ describe("V3DutchOrderBuilder", () => {
             .cosigner(constants.AddressZero)
             .cosignature("0x")
             .decayStartBlock(212121)
+            .startingBaseFee(BigNumber.from(0))
             .input({
                 token: INPUT_TOKEN,
                 startAmount: INPUT_START_AMOUNT,
                 curve: {
-                    relativeBlocks: [1],
-                    relativeAmounts: [BigInt(0)],
+                    relativeBlocks: [],
+                    relativeAmounts: [],
                 },
                 maxAmount: INPUT_START_AMOUNT.add(1),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .output({
                 token: OUTPUT_TOKEN,
@@ -647,6 +753,8 @@ describe("V3DutchOrderBuilder", () => {
                     relativeAmounts: [BigInt(4)],
                 },
                 recipient: constants.AddressZero,
+                minAmount: OUTPUT_START_AMOUNT.sub(4),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
             .inputOverride(INPUT_START_AMOUNT.mul(99).div(100))
             .outputOverrides([OUTPUT_START_AMOUNT])
@@ -666,14 +774,16 @@ describe("V3DutchOrderBuilder", () => {
         it("Test valid order with buildPartial", () => {
             const order = builder
                 .cosigner(constants.AddressZero)
+                .startingBaseFee(BigNumber.from(0))
                 .input({
                     token: INPUT_TOKEN,
                     startAmount: INPUT_START_AMOUNT,
                     curve: {
-                        relativeBlocks: [1],
-                        relativeAmounts: [BigInt(0)],
+                        relativeBlocks: [],
+                        relativeAmounts: [],
                     },
                     maxAmount: INPUT_START_AMOUNT.add(1),
+                    adjustmentPerGweiBaseFee: BigNumber.from(0),
                 })
                 .output({
                     token: OUTPUT_TOKEN,
@@ -683,6 +793,8 @@ describe("V3DutchOrderBuilder", () => {
                         relativeAmounts: [BigInt(4)],
                     },
                     recipient: constants.AddressZero,
+                    minAmount: OUTPUT_START_AMOUNT.sub(4),
+                    adjustmentPerGweiBaseFee: BigNumber.from(0),
                 })
                 .swapper(constants.AddressZero)
                 .nonce(BigNumber.from(100))
@@ -697,14 +809,16 @@ describe("V3DutchOrderBuilder", () => {
             expect(() =>
                 builder
                 .cosigner(constants.AddressZero)
+                .startingBaseFee(BigNumber.from(0))
                 .input({
                     token: INPUT_TOKEN,
                     startAmount: INPUT_START_AMOUNT,
                     curve: {
-                        relativeBlocks: [1],
-                        relativeAmounts: [BigInt(0)],
+                        relativeBlocks: [],
+                        relativeAmounts: [],
                     },
                     maxAmount: INPUT_START_AMOUNT.add(1),
+                    adjustmentPerGweiBaseFee: BigNumber.from(0),
                 })
                 .output({
                     token: OUTPUT_TOKEN,
@@ -714,6 +828,8 @@ describe("V3DutchOrderBuilder", () => {
                         relativeAmounts: [BigInt(4)],
                     },
                     recipient: constants.AddressZero,
+                    minAmount: OUTPUT_START_AMOUNT.sub(4),
+                    adjustmentPerGweiBaseFee: BigNumber.from(0),
                 })
                 // omitting swapper
                 .deadline(Math.floor(Date.now() / 1000) + 1000)
@@ -740,14 +856,16 @@ describe("V3DutchOrderBuilder", () => {
         it("should create a V3DutchOrderBuilder from an UnsignedV3DutchOrder", () => {
             const order: UnsignedV3DutchOrder = builder
                     .cosigner(constants.AddressZero)
+                    .startingBaseFee(BigNumber.from(0))
                     .input({
                         token: INPUT_TOKEN,
                         startAmount: INPUT_START_AMOUNT,
                         curve: {
-                            relativeBlocks: [1],
-                            relativeAmounts: [BigInt(0)],
+                            relativeBlocks: [],
+                            relativeAmounts: [],
                         },
                         maxAmount: INPUT_START_AMOUNT.add(1),
+                        adjustmentPerGweiBaseFee: BigNumber.from(0),
                     })
                     .output({
                         token: OUTPUT_TOKEN,
@@ -757,6 +875,8 @@ describe("V3DutchOrderBuilder", () => {
                             relativeAmounts: [BigInt(4)],
                         },
                         recipient: constants.AddressZero,
+                        minAmount: OUTPUT_START_AMOUNT.sub(4),
+                        adjustmentPerGweiBaseFee: BigNumber.from(0),
                     })
                     .swapper(constants.AddressZero)
                     .nonce(BigNumber.from(100))
@@ -777,14 +897,16 @@ describe("V3DutchOrderBuilder", () => {
                 .cosigner(constants.AddressZero)
                 .cosignature("0x")
                 .decayStartBlock(212121)
+                .startingBaseFee(BigNumber.from(0))
                 .input({
                     token: INPUT_TOKEN,
                     startAmount: INPUT_START_AMOUNT,
                     curve: {
-                        relativeBlocks: [1],
-                        relativeAmounts: [BigInt(0)],
+                        relativeBlocks: [],
+                        relativeAmounts: [],
                     },
                     maxAmount: INPUT_START_AMOUNT.add(1),
+                    adjustmentPerGweiBaseFee: BigNumber.from(0),
                 })
                 .output({
                     token: OUTPUT_TOKEN,
@@ -794,6 +916,8 @@ describe("V3DutchOrderBuilder", () => {
                         relativeAmounts: [BigInt(4)],
                     },
                     recipient: constants.AddressZero,
+                    minAmount: OUTPUT_START_AMOUNT.sub(4),
+                    adjustmentPerGweiBaseFee: BigNumber.from(0),
                 })
                 .inputOverride(INPUT_START_AMOUNT.mul(99).div(100))
                 .outputOverrides([OUTPUT_START_AMOUNT])

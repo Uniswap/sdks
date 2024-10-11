@@ -1,29 +1,58 @@
 import { SignatureLike } from "@ethersproject/bytes";
-import { PermitTransferFrom, PermitTransferFromData, SignatureTransfer, Witness } from "@uniswap/permit2-sdk";
+import {
+    PermitTransferFrom,
+    PermitTransferFromData,
+    SignatureTransfer,
+    Witness,
+} from "@uniswap/permit2-sdk";
 import { BigNumber, ethers } from "ethers";
 
 import { getPermit2, ResolvedUniswapXOrder } from "../utils";
 import { getBlockDecayedAmount } from "../utils/dutchBlockDecay";
 import { originalIfZero } from "../utils/order";
 
-import { BlockOverrides, CosignerData, CosignerDataJSON, OffChainOrder, OrderInfo, V3DutchInput, V3DutchInputJSON, V3DutchOutput, V3DutchOutputJSON, V3OrderResolutionOptions } from "./types";
+import {
+    BlockOverrides,
+    CosignerData,
+    CosignerDataJSON,
+    EncodedV3DutchInput,
+    EncodedV3DutchOutput,
+    OffChainOrder,
+    OrderInfo,
+    V3DutchInput,
+    V3DutchInputJSON,
+    V3DutchOutput,
+    V3DutchOutputJSON,
+    V3OrderResolutionOptions,
+} from "./types";
 
-export type V3CosignerDataJSON = Omit<CosignerDataJSON, "decayStartTime" | "decayEndTime"> & {
+export type V3CosignerDataJSON = Omit<
+    CosignerDataJSON,
+    "decayStartTime" | "decayEndTime"
+> & {
     decayStartBlock: number;
 };
 
-export type V3CosignerData = Omit<CosignerData, "decayStartTime" | "decayEndTime"> & {
+export type V3CosignerData = Omit<
+    CosignerData,
+    "decayStartTime" | "decayEndTime"
+> & {
     decayStartBlock: number;
 };
 
-export type UnsignedV3DutchOrderInfoJSON = Omit<UnsignedV3DutchOrderInfo, "nonce" | "input" | "outputs" | "cosignerData"> & {
+export type UnsignedV3DutchOrderInfoJSON = Omit<
+    UnsignedV3DutchOrderInfo,
+    "nonce" | "startingBaseFee" | "input" | "outputs" | "cosignerData"
+> & {
     nonce: string;
+    startingBaseFee: string;
     input: V3DutchInputJSON;
     outputs: V3DutchOutputJSON[];
 };
 
 export type UnsignedV3DutchOrderInfo = OrderInfo & {
     cosigner: string;
+    startingBaseFee: BigNumber;
     input: V3DutchInput; //different from V2DutchOrder
     outputs: V3DutchOutput[];
 };
@@ -39,18 +68,21 @@ export type CosignedV3DutchOrderInfo = UnsignedV3DutchOrderInfo & {
 };
 
 type V3WitnessInfo = {
-    info: OrderInfo,
-    cosigner: string,
-    baseInput: V3DutchInput,
-    baseOutputs: V3DutchOutput[],
+    info: OrderInfo;
+    cosigner: string;
+    startingBaseFee: BigNumber;
+    baseInput: EncodedV3DutchInput;
+    baseOutputs: EncodedV3DutchOutput[];
 };
 
-const COSIGNER_DATA_TUPLE_ABI = "tuple(uint256,address,uint256,uint256,uint256[])";
+const COSIGNER_DATA_TUPLE_ABI =
+    "tuple(uint256,address,uint256,uint256,uint256[])";
 
-const V3_DUTCH_ORDER_TYPES = {
+export const V3_DUTCH_ORDER_TYPES = {
     V3DutchOrder: [
         { name: "info", type: "OrderInfo" },
         { name: "cosigner", type: "address" },
+        { name: "startingBaseFee", type: "uint256" },
         { name: "baseInput", type: "V3DutchInput" },
         { name: "baseOutputs", type: "V3DutchOutput[]" },
     ],
@@ -67,12 +99,15 @@ const V3_DUTCH_ORDER_TYPES = {
         { name: "startAmount", type: "uint256" },
         { name: "curve", type: "NonlinearDutchDecay" },
         { name: "maxAmount", type: "uint256" },
+        { name: "adjustmentPerGweiBaseFee", type: "uint256" },
     ],
     V3DutchOutput: [
         { name: "token", type: "address" },
         { name: "startAmount", type: "uint256" },
         { name: "curve", type: "NonlinearDutchDecay" },
         { name: "recipient", type: "address" },
+        { name: "minAmount", type: "uint256" },
+        { name: "adjustmentPerGweiBaseFee", type: "uint256" },
     ],
     NonlinearDutchDecay: [
         { name: "relativeBlocks", type: "uint256" },
@@ -81,21 +116,23 @@ const V3_DUTCH_ORDER_TYPES = {
 };
 
 const V3_DUTCH_ORDER_ABI = [
-    "tuple(" + 
+    "tuple(" +
     [
         "tuple(address,address,uint256,uint256,address,bytes)", // OrderInfo
         "address", // Cosigner
-        "tuple(address,uint256,tuple(uint256,int256[]),uint256)", // V3DutchInput
-        "tuple(address,uint256,tuple(uint256,int256[]),address)[]", // V3DutchOutput
+        "uint256", //startingBaseFee
+        "tuple(address,uint256,tuple(uint256,int256[]),uint256,uint256)", // V3DutchInput
+        "tuple(address,uint256,tuple(uint256,int256[]),address,uint256,uint256)[]", // V3DutchOutput
         COSIGNER_DATA_TUPLE_ABI,
         "bytes", // Cosignature
-    ].join(",") + ")",
+    ].join(",") +
+    ")",
 ];
 
 export class UnsignedV3DutchOrder implements OffChainOrder {
     public permit2Address: string;
 
-    constructor (
+    constructor(
         public readonly info: UnsignedV3DutchOrderInfo,
         public readonly chainId: number,
         _permit2Address?: string
@@ -112,22 +149,34 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
             {
                 ...json,
                 nonce: BigNumber.from(json.nonce),
+                startingBaseFee: BigNumber.from(json.startingBaseFee),
                 input: {
                     ...json.input,
                     startAmount: BigNumber.from(json.input.startAmount),
                     curve: {
                         relativeBlocks: json.input.curve.relativeBlocks,
-                        relativeAmounts: json.input.curve.relativeAmounts.map(amount => BigInt(amount)),
+                        relativeAmounts: json.input.curve.relativeAmounts.map((amount) =>
+                            BigInt(amount)
+                        ),
                     },
                     maxAmount: BigNumber.from(json.input.maxAmount),
+                    adjustmentPerGweiBaseFee: BigNumber.from(
+                        json.input.adjustmentPerGweiBaseFee
+                    ),
                 },
-                outputs: json.outputs.map(output => ({
+                outputs: json.outputs.map((output) => ({
                     ...output,
                     startAmount: BigNumber.from(output.startAmount),
                     curve: {
                         relativeBlocks: output.curve.relativeBlocks,
-                        relativeAmounts: output.curve.relativeAmounts.map(amount => BigInt(amount)),
+                        relativeAmounts: output.curve.relativeAmounts.map((amount) =>
+                            BigInt(amount)
+                        ),
                     },
+                    minAmount: BigNumber.from(output.minAmount),
+                    adjustmentPerGweiBaseFee: BigNumber.from(
+                        output.adjustmentPerGweiBaseFee
+                    ),
                 })),
             },
             chainId,
@@ -136,17 +185,19 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
     }
 
     /**
-    * @inheritdoc order
-    */
+     * @inheritdoc order
+     */
     get blockOverrides(): BlockOverrides {
-        return undefined
+        return undefined;
     }
 
     /**
      * @inheritdoc order
      */
     serialize(): string {
-        const encodedRelativeBlocks = encodeRelativeBlocks(this.info.input.curve.relativeBlocks);
+        const encodedRelativeBlocks = encodeRelativeBlocks(
+            this.info.input.curve.relativeBlocks
+        );
         const abiCoder = new ethers.utils.AbiCoder();
         return abiCoder.encode(V3_DUTCH_ORDER_ABI, [
             [
@@ -159,17 +210,21 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                     this.info.additionalValidationData,
                 ],
                 this.info.cosigner,
+                this.info.startingBaseFee,
                 [
                     this.info.input.token,
                     this.info.input.startAmount,
                     [encodedRelativeBlocks, this.info.input.curve.relativeAmounts],
                     this.info.input.maxAmount,
+                    this.info.input.adjustmentPerGweiBaseFee,
                 ],
-                this.info.outputs.map(output => [
+                this.info.outputs.map((output) => [
                     output.token,
                     output.startAmount,
                     [encodedRelativeBlocks, output.curve.relativeAmounts],
                     output.recipient,
+                    output.minAmount,
+                    output.adjustmentPerGweiBaseFee,
                 ]),
                 [0, ethers.constants.AddressZero, 0, 0, [0]],
                 "0x",
@@ -182,7 +237,7 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
      */
     toJSON(): UnsignedV3DutchOrderInfoJSON & {
         permit2Address: string;
-        chainId: number;    
+        chainId: number;
     } {
         return {
             reactor: this.info.reactor,
@@ -192,35 +247,44 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
             additionalValidationContract: this.info.additionalValidationContract,
             additionalValidationData: this.info.additionalValidationData,
             cosigner: this.info.cosigner,
+            startingBaseFee: this.info.startingBaseFee.toString(),
             input: {
                 token: this.info.input.token,
                 startAmount: this.info.input.startAmount.toString(),
                 curve: {
                     relativeBlocks: this.info.input.curve.relativeBlocks,
-                    relativeAmounts: this.info.input.curve.relativeAmounts.map(amount => amount.toString()),
+                    relativeAmounts: this.info.input.curve.relativeAmounts.map((amount) =>
+                        amount.toString()
+                    ),
                 },
                 maxAmount: this.info.input.maxAmount.toString(),
+                adjustmentPerGweiBaseFee:
+                    this.info.input.adjustmentPerGweiBaseFee.toString(),
             },
-            outputs: this.info.outputs.map(output => ({
+            outputs: this.info.outputs.map((output) => ({
                 token: output.token,
                 startAmount: output.startAmount.toString(),
                 curve: {
                     relativeBlocks: output.curve.relativeBlocks,
-                    relativeAmounts: output.curve.relativeAmounts.map(amount => amount.toString()),
+                    relativeAmounts: output.curve.relativeAmounts.map((amount) =>
+                        amount.toString()
+                    ),
                 },
                 recipient: output.recipient,
+                minAmount: output.minAmount.toString(),
+                adjustmentPerGweiBaseFee: output.adjustmentPerGweiBaseFee.toString(),
             })),
             chainId: this.chainId,
             permit2Address: this.permit2Address,
-        }
-    };
+        };
+    }
 
     permitData(): PermitTransferFromData {
         return SignatureTransfer.getPermitData(
             this.toPermit(),
             this.permit2Address,
             this.chainId,
-            this.witness(),
+            this.witness()
         ) as PermitTransferFromData;
     }
 
@@ -233,7 +297,7 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
             spender: this.info.reactor,
             nonce: this.info.nonce,
             deadline: this.info.deadline,
-        }
+        };
     }
 
     private witnessInfo(): V3WitnessInfo {
@@ -247,9 +311,29 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                 additionalValidationData: this.info.additionalValidationData,
             },
             cosigner: this.info.cosigner,
-            baseInput: this.info.input,
-            baseOutputs: this.info.outputs,
-        }
+            startingBaseFee: this.info.startingBaseFee,
+            baseInput: {
+                token: this.info.input.token,
+                startAmount: this.info.input.startAmount,
+                curve: {
+                    relativeBlocks: encodeRelativeBlocks(this.info.input.curve.relativeBlocks),
+                    relativeAmounts: this.info.input.curve.relativeAmounts,
+                },
+                maxAmount: this.info.input.maxAmount,
+                adjustmentPerGweiBaseFee: this.info.input.adjustmentPerGweiBaseFee,
+            },
+            baseOutputs: this.info.outputs.map((output) => ({
+                token: output.token,
+                startAmount: output.startAmount,
+                curve: {
+                    relativeBlocks: encodeRelativeBlocks(output.curve.relativeBlocks),
+                    relativeAmounts: output.curve.relativeAmounts,
+                },
+                recipient: output.recipient,
+                minAmount: output.minAmount,
+                adjustmentPerGweiBaseFee: output.adjustmentPerGweiBaseFee,
+            })),
+        };
     }
 
     private witness(): Witness {
@@ -260,14 +344,14 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
         };
     }
 
-    getSigner(signature: SignatureLike): string { 
+    getSigner(signature: SignatureLike): string {
         return ethers.utils.computeAddress(
             ethers.utils.recoverPublicKey(
                 SignatureTransfer.hash(
                     this.toPermit(),
                     this.permit2Address,
                     this.chainId,
-                    this.witness(),
+                    this.witness()
                 ),
                 signature
             )
@@ -275,9 +359,10 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
     }
 
     hash(): string {
+        const witnessInfo = this.witnessInfo();
         return ethers.utils._TypedDataEncoder
             .from(V3_DUTCH_ORDER_TYPES)
-            .hash(this.witnessInfo());
+            .hash(witnessInfo);
     }
 
     cosignatureHash(cosignerData: V3CosignerData): string {
@@ -296,24 +381,23 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                             cosignerData.inputOverride,
                             cosignerData.outputOverrides,
                         ],
-                    ],
+                    ]
                 ),
             ]
-        )
+        );
     }
 
     static parse(
         encoded: string,
         chainId: number,
         permit2?: string
-      ): UnsignedV3DutchOrder {
+    ): UnsignedV3DutchOrder {
         return new UnsignedV3DutchOrder(
-          parseSerializedOrder(encoded),
-          chainId,
-          permit2
+            parseSerializedOrder(encoded),
+            chainId,
+            permit2
         );
     }
-
 }
 
 export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
@@ -342,23 +426,35 @@ export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
             {
                 ...json,
                 nonce: BigNumber.from(json.nonce),
+                startingBaseFee: BigNumber.from(json.startingBaseFee),
                 input: {
                     token: json.input.token,
                     startAmount: BigNumber.from(json.input.startAmount),
                     curve: {
                         relativeBlocks: json.input.curve.relativeBlocks,
-                        relativeAmounts: json.input.curve.relativeAmounts.map(amount => BigInt(amount)),
+                        relativeAmounts: json.input.curve.relativeAmounts.map((amount) =>
+                            BigInt(amount)
+                        ),
                     },
                     maxAmount: BigNumber.from(json.input.maxAmount),
+                    adjustmentPerGweiBaseFee: BigNumber.from(
+                        json.input.adjustmentPerGweiBaseFee
+                    ),
                 },
-                outputs: json.outputs.map(output => ({
+                outputs: json.outputs.map((output) => ({
                     token: output.token,
                     startAmount: BigNumber.from(output.startAmount),
                     curve: {
                         relativeBlocks: output.curve.relativeBlocks,
-                        relativeAmounts: output.curve.relativeAmounts.map(amount => BigInt(amount)),
+                        relativeAmounts: output.curve.relativeAmounts.map((amount) =>
+                            BigInt(amount)
+                        ),
                     },
                     recipient: output.recipient,
+                    minAmount: BigNumber.from(output.minAmount),
+                    adjustmentPerGweiBaseFee: BigNumber.from(
+                        output.adjustmentPerGweiBaseFee
+                    ),
                 })),
                 cosignerData: {
                     decayStartBlock: json.cosignerData.decayStartBlock,
@@ -367,7 +463,9 @@ export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
                         json.cosignerData.exclusivityOverrideBps
                     ),
                     inputOverride: BigNumber.from(json.cosignerData.inputOverride),
-                    outputOverrides: json.cosignerData.outputOverrides.map(BigNumber.from),
+                    outputOverrides: json.cosignerData.outputOverrides.map(
+                        BigNumber.from
+                    ),
                 },
                 cosignature: json.cosignature,
             },
@@ -388,17 +486,20 @@ export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
      * @inheritdoc order
      */
     toJSON(): CosignedV3DutchOrderInfoJSON & {
-    permit2Address: string;
-    chainId: number;
+        permit2Address: string;
+        chainId: number;
     } {
         return {
             ...super.toJSON(),
             cosignerData: {
                 decayStartBlock: this.info.cosignerData.decayStartBlock,
                 exclusiveFiller: this.info.cosignerData.exclusiveFiller,
-                exclusivityOverrideBps: this.info.cosignerData.exclusivityOverrideBps.toNumber(),
+                exclusivityOverrideBps:
+                    this.info.cosignerData.exclusivityOverrideBps.toNumber(),
                 inputOverride: this.info.cosignerData.inputOverride.toString(),
-                outputOverrides: this.info.cosignerData.outputOverrides.map(override => override.toString()),
+                outputOverrides: this.info.cosignerData.outputOverrides.map(
+                    (override) => override.toString()
+                ),
             },
             cosignature: this.info.cosignature,
         };
@@ -408,16 +509,18 @@ export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
         encoded: string,
         chainId: number,
         permit2?: string
-      ): CosignedV3DutchOrder {
+    ): CosignedV3DutchOrder {
         return new CosignedV3DutchOrder(
-          parseSerializedOrder(encoded),
-          chainId,
-          permit2
+            parseSerializedOrder(encoded),
+            chainId,
+            permit2
         );
     }
 
     serialize(): string {
-        const encodedInputRelativeBlocks = encodeRelativeBlocks(this.info.input.curve.relativeBlocks);
+        const encodedInputRelativeBlocks = encodeRelativeBlocks(
+            this.info.input.curve.relativeBlocks
+        );
         const abiCoder = new ethers.utils.AbiCoder();
         return abiCoder.encode(V3_DUTCH_ORDER_ABI, [
             [
@@ -430,24 +533,33 @@ export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
                     this.info.additionalValidationData,
                 ],
                 this.info.cosigner,
+                this.info.startingBaseFee,
                 [
                     this.info.input.token,
                     this.info.input.startAmount,
                     [encodedInputRelativeBlocks, this.info.input.curve.relativeAmounts],
                     this.info.input.maxAmount,
+                    this.info.input.adjustmentPerGweiBaseFee,
                 ],
-                this.info.outputs.map(output => [
+                this.info.outputs.map((output) => [
                     output.token,
                     output.startAmount,
-                    [encodeRelativeBlocks(output.curve.relativeBlocks), output.curve.relativeAmounts],
+                    [
+                        encodeRelativeBlocks(output.curve.relativeBlocks),
+                        output.curve.relativeAmounts,
+                    ],
                     output.recipient,
+                    output.minAmount,
+                    output.adjustmentPerGweiBaseFee,
                 ]),
                 [
                     this.info.cosignerData.decayStartBlock,
                     this.info.cosignerData.exclusiveFiller,
                     this.info.cosignerData.exclusivityOverrideBps,
                     this.info.cosignerData.inputOverride.toString(),
-                    this.info.cosignerData.outputOverrides.map(override => override.toString()),
+                    this.info.cosignerData.outputOverrides.map((override) =>
+                        override.toString()
+                    ),
                 ],
                 this.info.cosignature,
             ],
@@ -455,10 +567,9 @@ export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
     }
 
     recoverCosigner(): string {
-        return ethers.utils.verifyMessage(
-          this.cosignatureHash(this.info.cosignerData),
-          this.info.cosignature
-        );
+        const messageHash = this.cosignatureHash(this.info.cosignerData);
+        const signature = this.info.cosignature;
+        return ethers.utils.recoverAddress(messageHash, signature);
     }
 
     resolve(options: V3OrderResolutionOptions): ResolvedUniswapXOrder {
@@ -468,7 +579,10 @@ export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
                 amount: getBlockDecayedAmount(
                     {
                         decayStartBlock: this.info.cosignerData.decayStartBlock,
-                        startAmount: originalIfZero(this.info.cosignerData.inputOverride, this.info.input.startAmount),
+                        startAmount: originalIfZero(
+                            this.info.cosignerData.inputOverride,
+                            this.info.input.startAmount
+                        ),
                         relativeBlocks: this.info.input.curve.relativeBlocks,
                         relativeAmounts: this.info.input.curve.relativeAmounts,
                     },
@@ -481,13 +595,16 @@ export class CosignedV3DutchOrder extends UnsignedV3DutchOrder {
                     amount: getBlockDecayedAmount(
                         {
                             decayStartBlock: this.info.cosignerData.decayStartBlock,
-                            startAmount: originalIfZero(this.info.cosignerData.outputOverrides[idx], output.startAmount),
+                            startAmount: originalIfZero(
+                                this.info.cosignerData.outputOverrides[idx],
+                                output.startAmount
+                            ),
                             relativeBlocks: output.curve.relativeBlocks,
                             relativeAmounts: output.curve.relativeAmounts,
                         },
                         options.currentBlock
                     ),
-                }
+                };
             }),
         };
     }
@@ -507,14 +624,22 @@ function parseSerializedOrder(serialized: string): CosignedV3DutchOrderInfo {
                 additionalValidationData,
             ],
             cosigner,
+            startingBaseFee,
             [
                 token,
                 startAmount,
                 [inputRelativeBlocks, relativeAmounts],
                 maxAmount,
+                adjustmentPerGweiBaseFee,
             ],
             outputs,
-            [decayStartBlock, exclusiveFiller, exclusivityOverrideBps, inputOverride, outputOverrides],
+            [
+                decayStartBlock,
+                exclusiveFiller,
+                exclusivityOverrideBps,
+                inputOverride,
+                outputOverrides,
+            ],
             cosignature,
         ],
     ] = decoded;
@@ -527,30 +652,53 @@ function parseSerializedOrder(serialized: string): CosignedV3DutchOrderInfo {
         additionalValidationContract,
         additionalValidationData,
         cosigner,
+        startingBaseFee,
         input: {
             token,
             startAmount,
             curve: {
-                relativeBlocks: decodeRelativeBlocks(inputRelativeBlocks, relativeAmounts.length),
-                relativeAmounts: relativeAmounts.map((amount: BigNumber) => amount.toBigInt()),
+                relativeBlocks: decodeRelativeBlocks(
+                    inputRelativeBlocks,
+                    relativeAmounts.length
+                ),
+                relativeAmounts: relativeAmounts.map((amount: BigNumber) =>
+                    amount.toBigInt()
+                ),
             },
             maxAmount,
+            adjustmentPerGweiBaseFee,
         },
         outputs: outputs.map(
-            ([token, startAmount, [outputRelativeBlocks, relativeAmounts], recipient]: [
-                string,
-                number,
-                [BigNumber, BigNumber[]], //abiDecode automatically converts to BigNumber
-                string,
-            ]) => ({
+            ([
                 token,
                 startAmount,
-                curve: {
-                    relativeBlocks: decodeRelativeBlocks(outputRelativeBlocks, relativeAmounts.length),
-                    relativeAmounts: relativeAmounts.map((amount: BigNumber) => amount.toBigInt()),
-                },
+                [outputRelativeBlocks, relativeAmounts],
                 recipient,
-            })
+                minAmount,
+                adjustmentPerGweiBaseFee,
+            ]: [
+                    string,
+                    number,
+                    [BigNumber, BigNumber[]], //abiDecode automatically converts to BigNumber
+                    string,
+                    BigNumber,
+                    BigNumber
+                ]) => ({
+                    token,
+                    startAmount,
+                    curve: {
+                        relativeBlocks: decodeRelativeBlocks(
+                            outputRelativeBlocks,
+                            relativeAmounts.length
+                        ),
+                        relativeAmounts: relativeAmounts.map((amount: BigNumber) =>
+                            amount.toBigInt()
+                        ),
+                    },
+                    recipient,
+                    minAmount,
+                    adjustmentPerGweiBaseFee,
+                })
         ),
         cosignerData: {
             decayStartBlock: decayStartBlock.toNumber(),
@@ -563,7 +711,7 @@ function parseSerializedOrder(serialized: string): CosignedV3DutchOrderInfo {
     };
 }
 
-function encodeRelativeBlocks(relativeBlocks: number[]): BigNumber {
+export function encodeRelativeBlocks(relativeBlocks: number[]): BigNumber {
     let packedData = BigNumber.from(0);
     for (let i = 0; i < relativeBlocks.length; i++) {
         packedData = packedData.or(BigNumber.from(relativeBlocks[i]).shl(i * 16));
@@ -571,10 +719,13 @@ function encodeRelativeBlocks(relativeBlocks: number[]): BigNumber {
     return packedData;
 }
 
-function decodeRelativeBlocks(packedData: BigNumber, relativeAmountsLength: number): number[] {
+function decodeRelativeBlocks(
+    packedData: BigNumber,
+    relativeAmountsLength: number
+): number[] {
     const relativeBlocks: number[] = [];
     for (let i = 0; i < relativeAmountsLength; i++) {
-        const block = packedData.shr(i * 16).toNumber() & 0xFFFF;
+        const block = packedData.shr(i * 16).toNumber() & 0xffff;
         relativeBlocks.push(block);
     }
     return relativeBlocks;
