@@ -562,6 +562,93 @@ describe("DutchV3Order", () => {
         );
     });
 
+    it("executes a serialized order with multi-point decay", async () => {
+        const deadline = await new BlockchainTime().secondsFromNow(1000);
+        const order = new V3DutchOrderBuilder(
+            chainId,
+            reactor.address,
+            permit2.address
+        )
+            .cosigner(cosigner.address)
+            .deadline(deadline)
+            .swapper(swapper.address)
+            .nonce(NONCE)
+            .startingBaseFee(BigNumber.from(0))
+            .input({
+                token: tokenIn.address,
+                startAmount: SMALL_AMOUNT,
+                curve: {
+                    relativeBlocks: [],
+                    relativeAmounts: [],
+                },
+                maxAmount: SMALL_AMOUNT,
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
+            })
+            .output({
+                token: tokenOut.address,
+                startAmount: SMALL_AMOUNT,
+                curve: {
+                    relativeBlocks: [4, 8],
+                    relativeAmounts: [BigInt(4), BigInt(24)],
+                },
+                recipient: swapperAddress,
+                minAmount: SMALL_AMOUNT.sub(24),
+                adjustmentPerGweiBaseFee: BigNumber.from(0),
+            })
+            .buildPartial()
+
+        const { domain, types, values } = order.permitData();
+        const signature = await swapper._signTypedData(domain, types, values);
+        const cosignerData = await getCosignerData({
+            // Construct this order at time t with a decayStartBlock of t-5
+            decayStartBlock: await new BlockchainTime().blocksFromNow(-5),
+        });
+        const cosignerHash = order.cosignatureHash(cosignerData);
+        const cosignature = ethers.utils.joinSignature(
+            cosigner._signingKey().signDigest(cosignerHash)
+        );
+
+        const fullOrder = V3DutchOrderBuilder.fromOrder(order)
+            .cosignerData(cosignerData)
+            .cosignature(cosignature)
+            .build();
+
+        const swapperTokenInBalanceBefore = await tokenIn.balanceOf(swapperAddress);
+        const fillerTokenInBalanceBefore = await tokenIn.balanceOf(fillerAddress);
+        const swapperTokenOutBalanceBefore = await tokenOut.balanceOf(swapperAddress);
+        const fillerTokenOutBalanceBefore = await tokenOut.balanceOf(fillerAddress);
+        const res = await reactor
+            .connect(filler)
+            .execute(
+                { 
+                    order: fullOrder.serialize(), 
+                    sig: signature
+                }
+            );
+        const receipt = await res.wait();
+        expect(receipt.status).to.equal(1);
+        // This transaction should be at block t+1
+        // So the relative block is t+1 - (t-5) = 6
+        // The relative amount decayed is 4 + 2(5) = 14
+        const decayAmount = 14;
+
+        // We can take the startAmount because we aren't decaying input
+        const amountIn = fullOrder.info.input.startAmount;
+        expect((await tokenIn.balanceOf(swapperAddress)).toString()).to.equal(
+            swapperTokenInBalanceBefore.sub(amountIn).toString()
+        );
+        expect((await tokenIn.balanceOf(fillerAddress)).toString()).to.equal(
+            fillerTokenInBalanceBefore.add(amountIn).toString()
+        );
+
+        expect((await tokenOut.balanceOf(swapperAddress)).toString()).to.equal(
+            swapperTokenOutBalanceBefore.add(SMALL_AMOUNT.sub(decayAmount))
+        );
+        expect((await tokenOut.balanceOf(fillerAddress)).toString()).to.equal(
+            fillerTokenOutBalanceBefore.sub(SMALL_AMOUNT.sub(decayAmount))
+        );
+    });
+
     it("open filler executes an open order past exclusivity", async () => {
         const deadline = await new BlockchainTime().secondsFromNow(1000);
         const order = new V3DutchOrderBuilder(
