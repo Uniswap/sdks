@@ -3,7 +3,7 @@ import { defaultAbiCoder } from 'ethers/lib/utils'
 import { BigNumber } from 'ethers'
 import { Currency, Percent, TradeType } from '@uniswap/sdk-core'
 import { Trade } from '../entities/trade'
-import { ADDRESS_ZERO } from '../internalConstants'
+import { ADDRESS_ZERO, EMPTY_BYTES } from '../internalConstants'
 import { encodeRouteToPath } from './encodeRouteToPath'
 /**
  * Actions
@@ -27,15 +27,31 @@ export enum Actions {
   // settling
   SETTLE = 0x09,
   SETTLE_ALL = 0x10,
+  SETTLE_PAIR = 0x11,
   // taking
   TAKE = 0x12,
   TAKE_ALL = 0x13,
   TAKE_PORTION = 0x14,
+  TAKE_PAIR = 0x15,
 
   SETTLE_TAKE_PAIR = 0x16,
 
   CLOSE_CURRENCY = 0x17,
   SWEEP = 0x19,
+}
+
+export enum Subparser {
+  V4SwapExactInSingle,
+  V4SwapExactIn,
+  V4SwapExactOutSingle,
+  V4SwapExactOut,
+  PoolKey,
+}
+
+export type ParamType = {
+  readonly name: string
+  readonly type: string
+  readonly subparser?: Subparser
 }
 
 const POOL_KEY_STRUCT = '(address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks)'
@@ -58,71 +74,112 @@ const SWAP_EXACT_OUT_SINGLE_STRUCT =
 const SWAP_EXACT_OUT_STRUCT =
   '(address currencyOut,' + PATH_KEY_STRUCT + '[] path,uint128 amountOut,uint128 amountInMaximum)'
 
-const ABI_DEFINITION: { [key in Actions]: string[] } = {
+export const V4_BASE_ACTIONS_ABI_DEFINITION: { [key in Actions]: readonly ParamType[] } = {
   // Liquidity commands
   [Actions.INCREASE_LIQUIDITY]: [
-    'uint256 tokenId',
-    'uint256 liquidity',
-    'uint128 amount0Max',
-    'uint128 amount1Max',
-    'bytes hookData',
+    { name: 'tokenId', type: 'uint256' },
+    { name: 'liquidity', type: 'uint256' },
+    { name: 'amount0Max', type: 'uint128' },
+    { name: 'amount1Max', type: 'uint128' },
+    { name: 'hookData', type: 'bytes' },
   ],
   [Actions.DECREASE_LIQUIDITY]: [
-    'uint256 tokenId',
-    'uint256 liquidity',
-    'uint128 amount0Min',
-    'uint128 amount1Min',
-    'bytes hookData',
+    { name: 'tokenId', type: 'uint256' },
+    { name: 'liquidity', type: 'uint256' },
+    { name: 'amount0Min', type: 'uint128' },
+    { name: 'amount1Min', type: 'uint128' },
+    { name: 'hookData', type: 'bytes' },
   ],
   [Actions.MINT_POSITION]: [
-    POOL_KEY_STRUCT,
-    'int24 tickLower',
-    'int24 tickUpper',
-    'uint256 liquidity',
-    'uint128 amount0Max',
-    'uint128 amount1Max',
-    'address owner',
-    'bytes hookData',
+    { name: 'poolKey', type: POOL_KEY_STRUCT, subparser: Subparser.PoolKey },
+    { name: 'tickLower', type: 'int24' },
+    { name: 'tickUpper', type: 'int24' },
+    { name: 'liquidity', type: 'uint256' },
+    { name: 'amount0Max', type: 'uint128' },
+    { name: 'amount1Max', type: 'uint128' },
+    { name: 'owner', type: 'address' },
+    { name: 'hookData', type: 'bytes' },
   ],
-  [Actions.BURN_POSITION]: ['uint256 tokenId', 'uint128 amount0Min', 'uint128 amount1Min', 'bytes hookData'],
+  [Actions.BURN_POSITION]: [
+    { name: 'tokenId', type: 'uint256' },
+    { name: 'amount0Min', type: 'uint128' },
+    { name: 'amount1Min', type: 'uint128' },
+    { name: 'hookData', type: 'bytes' },
+  ],
 
   // Swapping commands
-  [Actions.SWAP_EXACT_IN_SINGLE]: [SWAP_EXACT_IN_SINGLE_STRUCT],
-  [Actions.SWAP_EXACT_IN]: [SWAP_EXACT_IN_STRUCT],
-  [Actions.SWAP_EXACT_OUT_SINGLE]: [SWAP_EXACT_OUT_SINGLE_STRUCT],
-  [Actions.SWAP_EXACT_OUT]: [SWAP_EXACT_OUT_STRUCT],
+  [Actions.SWAP_EXACT_IN_SINGLE]: [
+    { name: 'swap', type: SWAP_EXACT_IN_SINGLE_STRUCT, subparser: Subparser.V4SwapExactInSingle },
+  ],
+  [Actions.SWAP_EXACT_IN]: [{ name: 'swap', type: SWAP_EXACT_IN_STRUCT, subparser: Subparser.V4SwapExactIn }],
+  [Actions.SWAP_EXACT_OUT_SINGLE]: [
+    { name: 'swap', type: SWAP_EXACT_OUT_SINGLE_STRUCT, subparser: Subparser.V4SwapExactOutSingle },
+  ],
+  [Actions.SWAP_EXACT_OUT]: [{ name: 'swap', type: SWAP_EXACT_OUT_STRUCT, subparser: Subparser.V4SwapExactOut }],
 
   // Payments commands
-  [Actions.SETTLE]: ['address', 'uint256', 'bool'], // currency, amount, payerIsUser
-  [Actions.SETTLE_ALL]: ['address', 'uint256'],
-  [Actions.TAKE]: ['address', 'address', 'uint256'], // currency, receiver, amount
-  [Actions.TAKE_ALL]: ['address', 'uint256'],
-  [Actions.TAKE_PORTION]: ['address', 'address', 'uint256'],
-  [Actions.SETTLE_TAKE_PAIR]: ['address', 'address'],
-  [Actions.CLOSE_CURRENCY]: ['address'],
-  [Actions.SWEEP]: ['address', 'address'],
+  [Actions.SETTLE]: [
+    { name: 'currency', type: 'address' },
+    { name: 'amount', type: 'uint256' },
+    { name: 'payerIsUser', type: 'bool' },
+  ],
+  [Actions.SETTLE_ALL]: [
+    { name: 'currency', type: 'address' },
+    { name: 'maxAmount', type: 'uint256' },
+  ],
+  [Actions.SETTLE_PAIR]: [
+    { name: 'currency0', type: 'address' },
+    { name: 'currency1', type: 'address' },
+  ],
+  [Actions.TAKE]: [
+    { name: 'currency', type: 'address' },
+    { name: 'recipient', type: 'address' },
+    { name: 'amount', type: 'uint256' },
+  ],
+  [Actions.TAKE_ALL]: [
+    { name: 'currency', type: 'address' },
+    { name: 'minAmount', type: 'uint256' },
+  ],
+  [Actions.TAKE_PORTION]: [
+    { name: 'currency', type: 'address' },
+    { name: 'recipient', type: 'address' },
+    { name: 'bips', type: 'uint256' },
+  ],
+  [Actions.TAKE_PAIR]: [
+    { name: 'currency0', type: 'address' },
+    { name: 'currency1', type: 'address' },
+    { name: 'recipient', type: 'address' },
+  ],
+  [Actions.SETTLE_TAKE_PAIR]: [
+    { name: 'settleCurrency', type: 'address' },
+    { name: 'takeCurrency', type: 'address' },
+  ],
+  [Actions.CLOSE_CURRENCY]: [{ name: 'currency', type: 'address' }],
+  [Actions.SWEEP]: [
+    { name: 'currency', type: 'address' },
+    { name: 'recipient', type: 'address' },
+  ],
 }
 
 const FULL_DELTA_AMOUNT = 0
-const MSG_SENDER = '0x0000000000000000000000000000000000000001'
-const ADDRESS_THIS = '0x0000000000000000000000000000000000000002'
 
 export class V4Planner {
   actions: string
   params: string[]
 
   constructor() {
-    this.actions = '0x'
+    this.actions = EMPTY_BYTES
     this.params = []
   }
 
-  addAction(type: Actions, parameters: any[]): void {
+  addAction(type: Actions, parameters: any[]): V4Planner {
     let command = createAction(type, parameters)
     this.params.push(command.encodedInput)
     this.actions = this.actions.concat(command.action.toString(16).padStart(2, '0'))
+    return this
   }
 
-  addTrade(trade: Trade<Currency, Currency, TradeType>, slippageTolerance?: Percent): void {
+  addTrade(trade: Trade<Currency, Currency, TradeType>, slippageTolerance?: Percent): V4Planner {
     const exactOutput = trade.tradeType === TradeType.EXACT_OUTPUT
 
     // exactInput we sometimes perform aggregated slippage checks, but not with exactOutput
@@ -131,8 +188,8 @@ export class V4Planner {
 
     const actionType = exactOutput ? Actions.SWAP_EXACT_OUT : Actions.SWAP_EXACT_IN
 
-    const currencyIn = currencyAddress(trade.inputAmount.currency)
-    const currencyOut = currencyAddress(trade.outputAmount.currency)
+    const currencyIn = currencyAddress(trade.route.pathInput)
+    const currencyOut = currencyAddress(trade.route.pathOutput)
 
     this.addAction(actionType, [
       exactOutput
@@ -140,7 +197,7 @@ export class V4Planner {
             currencyOut,
             path: encodeRouteToPath(trade.route, exactOutput),
             amountInMaximum: trade.maximumAmountIn(slippageTolerance ?? new Percent(0)).quotient.toString(),
-            amountOut: trade.inputAmount.quotient.toString(),
+            amountOut: trade.outputAmount.quotient.toString(),
           }
         : {
             currencyIn,
@@ -149,16 +206,18 @@ export class V4Planner {
             amountOutMinimum: slippageTolerance ? trade.minimumAmountOut(slippageTolerance).quotient.toString() : 0,
           },
     ])
+    return this
   }
 
-  addSettle(currency: Currency, payerIsUser: boolean, amount?: BigNumber): void {
+  addSettle(currency: Currency, payerIsUser: boolean, amount?: BigNumber): V4Planner {
     this.addAction(Actions.SETTLE, [currencyAddress(currency), amount ?? FULL_DELTA_AMOUNT, payerIsUser])
+    return this
   }
 
-  addTake(currency: Currency, routerMustCustody: boolean, amount?: BigNumber): void {
-    const receiver = routerMustCustody ? ADDRESS_THIS : MSG_SENDER
+  addTake(currency: Currency, recipient: string, amount?: BigNumber): V4Planner {
     const takeAmount = amount ?? FULL_DELTA_AMOUNT
-    this.addAction(Actions.TAKE, [currencyAddress(currency), receiver, takeAmount])
+    this.addAction(Actions.TAKE, [currencyAddress(currency), recipient, takeAmount])
+    return this
   }
 
   finalize(): string {
@@ -176,6 +235,9 @@ type RouterAction = {
 }
 
 function createAction(action: Actions, parameters: any[]): RouterAction {
-  const encodedInput = defaultAbiCoder.encode(ABI_DEFINITION[action], parameters)
+  const encodedInput = defaultAbiCoder.encode(
+    V4_BASE_ACTIONS_ABI_DEFINITION[action].map((v) => v.type),
+    parameters
+  )
   return { action, encodedInput }
 }

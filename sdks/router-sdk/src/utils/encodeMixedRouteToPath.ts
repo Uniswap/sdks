@@ -26,9 +26,9 @@ export function encodeMixedRouteToPath(route: MixedRouteSDK<Currency, Currency>)
   let types: string[]
 
   if (containsV4Pool) {
-    path = [route.adjustedInput.isNative ? ADDRESS_ZERO : route.adjustedInput.address]
+    path = [route.pathInput.isNative ? ADDRESS_ZERO : route.pathInput.address]
     types = ['address']
-    let currencyIn = route.adjustedInput
+    let currencyIn = route.pathInput
 
     for (const pool of route.pools) {
       const currencyOut = currencyIn.equals(pool.token0) ? pool.token1 : pool.token0

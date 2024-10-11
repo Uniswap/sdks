@@ -12,6 +12,12 @@ type ChainAddresses = {
   swapRouter02Address?: string
   mixedRouteQuoterV1Address?: string
   mixedRouteQuoterV2Address?: string
+
+  // v4
+  v4PoolManagerAddress?: string
+  v4PositionManagerAddress?: string
+  v4StateView?: string
+  v4QuoterAddress?: string
 }
 
 const DEFAULT_NETWORKS = [ChainId.MAINNET, ChainId.GOERLI, ChainId.SEPOLIA]
@@ -49,6 +55,8 @@ export const V2_FACTORY_ADDRESSES: AddressMap = {
   [ChainId.POLYGON]: '0x9e5A52f57b3038F1B8EeE45F28b3C1967e22799C',
   [ChainId.CELO]: '0x79a530c8e2fA8748B7B40dd3629C0520c2cCf03f',
   [ChainId.BLAST]: '0x5C346464d33F90bABaf70dB6388507CC889C1070',
+  [ChainId.WORLDCHAIN]: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
+  [ChainId.ASTROCHAIN_SEPOLIA]: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
 }
 /**
  * @deprecated use V2_ROUTER_ADDRESSES instead
@@ -64,6 +72,8 @@ export const V2_ROUTER_ADDRESSES: AddressMap = {
   [ChainId.BNB]: '0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24',
   [ChainId.POLYGON]: '0xedf6066a2b290c185783862c7f4776a2c8077ad1',
   [ChainId.BLAST]: '0xBB66Eb1c5e875933D44DAe661dbD80e5D9B03035',
+  [ChainId.WORLDCHAIN]: '0xf164fC0Ec4E93095b804a4795bBe1e041497b92a',
+  [ChainId.ASTROCHAIN_SEPOLIA]: '0x9e5A52f57b3038F1B8EeE45F28b3C1967e22799C',
 }
 
 // Networks that share most of the same addresses i.e. Mainnet, Goerli, Optimism, Arbitrum, Polygon
@@ -163,8 +173,12 @@ const SEPOLIA_ADDRESSES: ChainAddresses = {
   nonfungiblePositionManagerAddress: '0x1238536071E1c677A632429e3655c799b22cDA52',
   tickLensAddress: '0xd7f33bcdb21b359c8ee6f0251d30e94832baad07',
   swapRouter02Address: '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E',
-  // TODO: ROUTE-277 - update deploy address once after quoter refactoring.
-  mixedRouteQuoterV2Address: '0xa8b0be287acB850952DE4287b84B7222cc654C09',
+  mixedRouteQuoterV2Address: '0x4745f77b56a0e2294426e3936dc4fab68d9543cd',
+
+  v4PoolManagerAddress: '0xE8E23e97Fa135823143d6b9Cba9c699040D51F70',
+  v4PositionManagerAddress: '0x0048d1C09771Bb87b6A44e1294769E1DFd698584',
+  v4StateView: '0x6Bb7157fb50e3Ae4983Ccdc62Fb8173c03c6b0a7',
+  v4QuoterAddress: '0x9336CF25dDad216FD480A5422CBEa7b3BC5bDda8',
 }
 
 // Avalanche v3 addresses
@@ -249,6 +263,31 @@ const ZKSYNC_ADDRESSES: ChainAddresses = {
   swapRouter02Address: '0x99c56385daBCE3E81d8499d0b8d0257aBC07E8A3',
 }
 
+const WORLDCHAIN_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: '0x7a5028BDa40e7B173C278C5342087826455ea25a',
+  multicallAddress: '0x0a22c04215c97E3F532F4eF30e0aD9458792dAB9',
+  quoterAddress: '0x10158D43e6cc414deE1Bd1eB0EfC6a5cBCfF244c',
+  v3MigratorAddress: '0x9EBDdCBa71C9027E1eB45135672a30bcFEec9de3',
+  nonfungiblePositionManagerAddress: '0xec12a9F9a09f50550686363766Cc153D03c27b5e',
+  tickLensAddress: '0xE61df0CaC9d85876aCE5E3037005D80943570623',
+  swapRouter02Address: '0x091AD9e2e6e5eD44c1c66dB50e49A601F9f36cF6',
+}
+
+const ASTROCHAIN_SEPOLIA_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: '0x1F98431c8aD98523631AE4a59f267346ea31F984',
+  multicallAddress: '0x9D0F15f2cf58655fDDcD1EE6129C547fDaeD01b1',
+  quoterAddress: '0x6Dd37329A1A225a6Fca658265D460423DCafBF89',
+  v3MigratorAddress: '0xb5FA244C9d6D04B2FBac84418b3c4910ED1Ae5f2',
+  nonfungiblePositionManagerAddress: '0xB7F724d6dDDFd008eFf5cc2834edDE5F9eF0d075',
+  tickLensAddress: '0x5f739c790a48E97eec0efb81bab5D152c0A0ecA0',
+  swapRouter02Address: '0xd1AAE39293221B77B0C71fBD6dCb7Ea29Bb5B166',
+
+  v4PoolManagerAddress: '0x38EB8B22Df3Ae7fb21e92881151B365Df14ba967',
+  v4PositionManagerAddress: '0x05deD3F8a8e84700d68A4D81cd6780c982dB13F9',
+  v4StateView: '0xad328439DCa7ce857662afA4584A3d571bbDDC75',
+  v4QuoterAddress: '0x2cfa87651D3AB05Bc59E325E5eaC8495CF34cE55',
+}
+
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
   [ChainId.MAINNET]: MAINNET_ADDRESSES,
   [ChainId.OPTIMISM]: OPTIMISM_ADDRESSES,
@@ -272,6 +311,8 @@ export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses>
   [ChainId.ROOTSTOCK]: ROOTSTOCK_ADDRESSES,
   [ChainId.BLAST]: BLAST_ADDRESSES,
   [ChainId.ZKSYNC]: ZKSYNC_ADDRESSES,
+  [ChainId.WORLDCHAIN]: WORLDCHAIN_ADDRESSES,
+  [ChainId.ASTROCHAIN_SEPOLIA]: ASTROCHAIN_SEPOLIA_ADDRESSES,
 }
 
 /* V3 Contract Addresses */
