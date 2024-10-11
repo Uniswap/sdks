@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import JSBI from 'jsbi'
-import { BigNumber, ethers, utils, Wallet } from 'ethers'
+import { BigNumber, ethers, utils, Wallet, Signature } from 'ethers'
 import { expandTo18Decimals } from '../src/utils/numbers'
 import { SwapRouter, UniswapTrade, FlatFeeOptions } from '../src'
 import { MixedRouteTrade, MixedRouteSDK } from '@uniswap/router-sdk'
@@ -15,6 +15,7 @@ import {
   nearestUsableTick,
   TickMath,
   FeeAmount,
+  NonfungiblePositionManager,
 } from '@uniswap/v3-sdk'
 import { Pool as V4Pool, Route as V4Route, Trade as V4Trade, Position as V4Position } from '@uniswap/v4-sdk'
 import { generatePermitSignature, toInputPermit, makePermit, generateEip2098PermitSignature } from './utils/permit2'
@@ -23,8 +24,8 @@ import {
   ChainId,
   CurrencyAmount,
   Ether,
+  NONFUNGIBLE_POSITION_MANAGER_ADDRESSES,
   Percent,
-  SupportedChainsType,
   Token,
   TradeType,
 } from '@uniswap/sdk-core'
@@ -32,10 +33,10 @@ import { registerFixture } from './forge/writeInterop'
 import { buildTrade, getUniswapPools, swapOptions, ETHER, DAI, USDC, WETH } from './utils/uniswapData'
 import { hexToDecimalString } from './utils/hexToDecimalString'
 import {
-  FORGE_PERMIT2_ADDRESS,
-  FORGE_ROUTER_ADDRESS,
+  FORGE_V4_POSITION_MANAGER,
   TEST_FEE_RECIPIENT_ADDRESS,
   TEST_RECIPIENT_ADDRESS,
+  PERMIT2_ADDRESS,
 } from './utils/addresses'
 import {
   PartialClassicQuote,
@@ -47,10 +48,12 @@ import {
 import {
   E_ETH_ADDRESS,
   ETH_ADDRESS,
-  ZERO_ADDRESS,
+  MAX_UINT160,
   UNIVERSAL_ROUTER_ADDRESS,
   UniversalRouterVersion,
+  ZERO_ADDRESS,
 } from '../src/utils/constants'
+import { splitSignature } from 'ethers/lib/utils'
 
 const FORK_BLOCK = 16075500
 
@@ -227,8 +230,13 @@ describe('Uniswap', () => {
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
         TradeType.EXACT_INPUT
       )
-      const permit = makePermit(USDC.address, inputUSDC, undefined, FORGE_ROUTER_ADDRESS)
-      const signature = await generatePermitSignature(permit, wallet, trade.route.chainId, FORGE_PERMIT2_ADDRESS)
+      const permit = makePermit(
+        USDC.address,
+        inputUSDC,
+        undefined,
+        UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, 1)
+      )
+      const signature = await generatePermitSignature(permit, wallet, trade.route.chainId, PERMIT2_ADDRESS)
       const opts = swapOptions({ inputTokenPermit: toInputPermit(signature, permit) })
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V2_1000_USDC_FOR_ETH_PERMIT', methodParameters)
@@ -242,7 +250,12 @@ describe('Uniswap', () => {
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
         TradeType.EXACT_INPUT
       )
-      const permit = makePermit(USDC.address, inputUSDC, undefined, FORGE_ROUTER_ADDRESS)
+      const permit = makePermit(
+        USDC.address,
+        inputUSDC,
+        undefined,
+        UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, 1)
+      )
       const signature = await generateEip2098PermitSignature(permit, wallet, trade.route.chainId)
       const opts = swapOptions({ inputTokenPermit: toInputPermit(signature, permit) })
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
@@ -257,13 +270,13 @@ describe('Uniswap', () => {
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
         TradeType.EXACT_INPUT
       )
-      const permit = makePermit(USDC.address, inputUSDC, undefined, FORGE_ROUTER_ADDRESS)
-      const originalSignature = await generatePermitSignature(
-        permit,
-        wallet,
-        trade.route.chainId,
-        FORGE_PERMIT2_ADDRESS
+      const permit = makePermit(
+        USDC.address,
+        inputUSDC,
+        undefined,
+        UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, 1)
       )
+      const originalSignature = await generatePermitSignature(permit, wallet, trade.route.chainId, PERMIT2_ADDRESS)
       const { recoveryParam } = utils.splitSignature(originalSignature)
       // slice off current v
       let signature = originalSignature.substring(0, originalSignature.length - 2)
@@ -441,13 +454,13 @@ describe('Uniswap', () => {
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
         TradeType.EXACT_INPUT
       )
-      const permit = makePermit(USDC.address, inputUSDC, undefined, FORGE_ROUTER_ADDRESS)
-      const signature = await generatePermitSignature(
-        permit,
-        wallet,
-        trade.swaps[0].route.chainId,
-        FORGE_PERMIT2_ADDRESS
+      const permit = makePermit(
+        USDC.address,
+        inputUSDC,
+        undefined,
+        UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, 1)
       )
+      const signature = await generatePermitSignature(permit, wallet, trade.swaps[0].route.chainId, PERMIT2_ADDRESS)
       const opts = swapOptions({ inputTokenPermit: toInputPermit(signature, permit) })
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V3_1000_USDC_FOR_ETH_PERMIT', methodParameters)
@@ -1433,7 +1446,7 @@ describe('Uniswap', () => {
         'Expected both tokenIn and tokenOut to be present'
       )
     })
-    it('throws on route with mismatched token chainIds', async () => {
+    it('throws on route with mismatched token ChainId.MAINNETs', async () => {
       const classicQuote: PartialClassicQuote = {
         tokenIn: DAI.address,
         tokenOut: USDC.address,
@@ -1478,133 +1491,119 @@ describe('Uniswap', () => {
   })
 
   describe('migrate', () => {
-    // Test tokens on sepolia
-    const chainId: SupportedChainsType = ChainId.SEPOLIA
-    const TOKEN0 = new Token(ChainId.SEPOLIA, '0x0000000000000000000000000000000000000001', 18, 'T0', 'Token0')
-    const TOKEN1 = new Token(ChainId.SEPOLIA, '0x0000000000000000000000000000000000000002', 18, 'T1', 'Token1')
     it('encodes a migration', async () => {
+      // sign a permit for the token
+      const tokenId = 377972
+      const permit = {
+        spender: UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, 1),
+        tokenId,
+        deadline: MAX_UINT160.toString(),
+        nonce: 0,
+      }
+      const { domain, types, values } = NonfungiblePositionManager.getPermitData(
+        permit,
+        NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[ChainId.MAINNET],
+        ChainId.MAINNET
+      )
+
+      const signature: Signature = splitSignature(await wallet._signTypedData(domain, types, values))
+
+      // create migrate options
       const opts = Object.assign({
         inputPosition: new Position({
-          pool: new V3Pool(TOKEN0, TOKEN1, FeeAmount.LOW, encodeSqrtRatioX96(1, 1), 0, 0, []),
-          liquidity: 1,
-          tickLower: -10,
-          tickUpper: 10,
+          pool: WETH_USDC_V3,
+          liquidity: 72249373570746,
+          tickLower: 200040,
+          tickUpper: 300000,
         }),
         outputPosition: new V4Position({
-          pool: new V4Pool(
-            TOKEN0,
-            TOKEN1,
-            FeeAmount.LOW,
-            10,
-            '0x0000000000000000000000000000000000000000',
-            encodeSqrtRatioX96(1, 1),
-            0,
-            0
-          ),
-          liquidity: 1,
-          tickLower: -10,
-          tickUpper: 10,
+          pool: WETH_USDC_V4,
+          liquidity: 100000,
+          tickLower: 200040,
+          tickUpper: 300000,
         }),
         v3RemoveLiquidityOptions: {
-          tokenId: 1,
+          tokenId,
           liquidityPercentage: new Percent(100, 100),
           slippageTolerance: new Percent(5, 100),
-          deadline: 1,
+          deadline: MAX_UINT160,
           burnToken: true,
           collectOptions: {
-            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(TOKEN0, 0),
-            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(TOKEN1, 0),
-            recipient: CHAIN_TO_ADDRESSES_MAP[chainId].v4PositionManagerAddress,
+            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(WETH, 0),
+            recipient: FORGE_V4_POSITION_MANAGER,
           },
           permit: {
-            v: 0,
-            r: '0x0000000000000000000000000000000000000000000000000000000000000001',
-            s: '0x0000000000000000000000000000000000000000000000000000000000000002',
-            deadline: 1,
-            spender: UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, chainId),
+            v: signature.v,
+            r: signature.r,
+            s: signature.s,
+            deadline: permit.deadline,
+            spender: permit.spender,
           },
         },
         v4AddLiquidityOptions: {
-          deadline: 1,
+          deadline: MAX_UINT160,
           migrate: true,
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
         },
       })
-      const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts)
-      registerFixture('MIGRATE_WITH_PERMIT', methodParameters)
+      const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
+      registerFixture('_MIGRATE_WITH_PERMIT', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
     it('encodes a migration if no v3 permit', async () => {
       const opts = Object.assign({
         inputPosition: new Position({
-          pool: new V3Pool(TOKEN0, TOKEN1, FeeAmount.LOW, encodeSqrtRatioX96(1, 1), 0, 0, []),
-          liquidity: 1,
-          tickLower: -10,
-          tickUpper: 10,
+          pool: WETH_USDC_V3,
+          liquidity: 72249373570746,
+          tickLower: 200040,
+          tickUpper: 300000,
         }),
         outputPosition: new V4Position({
-          pool: new V4Pool(
-            TOKEN0,
-            TOKEN1,
-            FeeAmount.LOW,
-            10,
-            '0x0000000000000000000000000000000000000000',
-            encodeSqrtRatioX96(1, 1),
-            0,
-            0
-          ),
-          liquidity: 1,
-          tickLower: -10,
-          tickUpper: 10,
+          pool: WETH_USDC_V4,
+          liquidity: 100000,
+          tickLower: 200040,
+          tickUpper: 300000,
         }),
         v3RemoveLiquidityOptions: {
-          tokenId: 1,
+          tokenId: 377972,
           liquidityPercentage: new Percent(100, 100),
           slippageTolerance: new Percent(5, 100),
-          deadline: 1,
+          deadline: MAX_UINT160,
           burnToken: true,
           collectOptions: {
-            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(TOKEN0, 0),
-            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(TOKEN1, 0),
-            recipient: CHAIN_TO_ADDRESSES_MAP[chainId].v4PositionManagerAddress,
+            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(WETH, 0),
+            recipient: FORGE_V4_POSITION_MANAGER,
           },
         },
         v4AddLiquidityOptions: {
-          deadline: 1,
+          deadline: MAX_UINT160,
           migrate: true,
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
         },
       })
-      const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts)
-      registerFixture('MIGRATE_WITHOUT_PERMIT', methodParameters)
+      const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
+      registerFixture('_MIGRATE_WITHOUT_PERMIT', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
     it('throws if token0s are different', async () => {
       const opts = Object.assign({
         inputPosition: new Position({
-          pool: new V3Pool(USDC, DAI, FeeAmount.LOW, encodeSqrtRatioX96(1, 1), 0, 0, []),
+          pool: USDC_DAI_V3,
           liquidity: 1,
-          tickLower: -10,
-          tickUpper: 10,
+          tickLower: -USDC_DAI_V3.tickSpacing,
+          tickUpper: USDC_DAI_V3.tickSpacing,
         }),
         outputPosition: new V4Position({
-          pool: new V4Pool(
-            WETH,
-            USDC,
-            FeeAmount.LOW,
-            10,
-            '0x0000000000000000000000000000000000000000',
-            encodeSqrtRatioX96(1, 1),
-            0,
-            0
-          ),
+          pool: WETH_USDC_V4,
           liquidity: 1,
-          tickLower: -10,
-          tickUpper: 10,
+          tickLower: -WETH_USDC_V4.tickSpacing,
+          tickUpper: WETH_USDC_V4.tickSpacing,
         }),
         v3RemoveLiquidityOptions: {
           tokenId: 1,
@@ -1631,10 +1630,10 @@ describe('Uniswap', () => {
     it('throws if token1s are different', async () => {
       const opts = Object.assign({
         inputPosition: new Position({
-          pool: new V3Pool(DAI, USDC, FeeAmount.LOW, encodeSqrtRatioX96(1, 1), 0, 0, []),
+          pool: USDC_DAI_V3,
           liquidity: 1,
-          tickLower: -10,
-          tickUpper: 10,
+          tickLower: -USDC_DAI_V3.tickSpacing,
+          tickUpper: USDC_DAI_V3.tickSpacing,
         }),
         outputPosition: new V4Position({
           pool: new V4Pool(
@@ -1676,25 +1675,16 @@ describe('Uniswap', () => {
     it('throws if not migrating 100%', async () => {
       const opts = Object.assign({
         inputPosition: new Position({
-          pool: new V3Pool(USDC, DAI, FeeAmount.LOW, encodeSqrtRatioX96(1, 1), 0, 0, []),
+          pool: USDC_DAI_V3,
           liquidity: 1,
-          tickLower: -10,
-          tickUpper: 10,
+          tickLower: -USDC_DAI_V3.tickSpacing,
+          tickUpper: USDC_DAI_V3.tickSpacing,
         }),
         outputPosition: new V4Position({
-          pool: new V4Pool(
-            USDC,
-            DAI,
-            FeeAmount.LOW,
-            10,
-            '0x0000000000000000000000000000000000000000',
-            encodeSqrtRatioX96(1, 1),
-            0,
-            0
-          ),
+          pool: USDC_DAI_V4,
           liquidity: 1,
-          tickLower: -10,
-          tickUpper: 10,
+          tickLower: -USDC_DAI_V4.tickSpacing,
+          tickUpper: USDC_DAI_V4.tickSpacing,
         }),
         v3RemoveLiquidityOptions: {
           tokenId: 1,
@@ -1721,25 +1711,16 @@ describe('Uniswap', () => {
     it('burn required for v3', async () => {
       const opts = Object.assign({
         inputPosition: new Position({
-          pool: new V3Pool(USDC, DAI, FeeAmount.LOW, encodeSqrtRatioX96(1, 1), 0, 0, []),
+          pool: USDC_DAI_V3,
           liquidity: 1,
-          tickLower: -10,
-          tickUpper: 10,
+          tickLower: -USDC_DAI_V3.tickSpacing,
+          tickUpper: USDC_DAI_V3.tickSpacing,
         }),
         outputPosition: new V4Position({
-          pool: new V4Pool(
-            USDC,
-            DAI,
-            FeeAmount.LOW,
-            10,
-            '0x0000000000000000000000000000000000000000',
-            encodeSqrtRatioX96(1, 1),
-            0,
-            0
-          ),
+          pool: USDC_DAI_V4,
           liquidity: 1,
-          tickLower: -10,
-          tickUpper: 10,
+          tickLower: -USDC_DAI_V4.tickSpacing,
+          tickUpper: USDC_DAI_V4.tickSpacing,
         }),
         v3RemoveLiquidityOptions: {
           tokenId: 1,
@@ -1765,25 +1746,16 @@ describe('Uniswap', () => {
     it('throws if not minting when migrating', async () => {
       const opts = Object.assign({
         inputPosition: new Position({
-          pool: new V3Pool(TOKEN0, TOKEN1, FeeAmount.LOW, encodeSqrtRatioX96(1, 1), 0, 0, []),
+          pool: WETH_USDC_V3,
           liquidity: 1,
-          tickLower: -10,
-          tickUpper: 10,
+          tickLower: -WETH_USDC_V3.tickSpacing,
+          tickUpper: WETH_USDC_V3.tickSpacing,
         }),
         outputPosition: new V4Position({
-          pool: new V4Pool(
-            TOKEN0,
-            TOKEN1,
-            FeeAmount.LOW,
-            10,
-            '0x0000000000000000000000000000000000000000',
-            encodeSqrtRatioX96(1, 1),
-            0,
-            0
-          ),
+          pool: WETH_USDC_V4,
           liquidity: 1,
-          tickLower: -10,
-          tickUpper: 10,
+          tickLower: -WETH_USDC_V4.tickSpacing,
+          tickUpper: WETH_USDC_V4.tickSpacing,
         }),
         v3RemoveLiquidityOptions: {
           tokenId: 1,
@@ -1793,8 +1765,8 @@ describe('Uniswap', () => {
           burnToken: true,
           collectOptions: {
             expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
-            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(DAI, 0),
-            recipient: CHAIN_TO_ADDRESSES_MAP[chainId].v4PositionManagerAddress,
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(WETH, 0),
+            recipient: CHAIN_TO_ADDRESSES_MAP[ChainId.MAINNET].v4PositionManagerAddress,
           },
         },
         v4AddLiquidityOptions: {
@@ -1810,25 +1782,16 @@ describe('Uniswap', () => {
     it('throws if migrating flag not set', async () => {
       const opts = Object.assign({
         inputPosition: new Position({
-          pool: new V3Pool(TOKEN0, TOKEN1, FeeAmount.LOW, encodeSqrtRatioX96(1, 1), 0, 0, []),
+          pool: WETH_USDC_V3,
           liquidity: 1,
-          tickLower: -10,
-          tickUpper: 10,
+          tickLower: -WETH_USDC_V3.tickSpacing,
+          tickUpper: WETH_USDC_V3.tickSpacing,
         }),
         outputPosition: new V4Position({
-          pool: new V4Pool(
-            TOKEN0,
-            TOKEN1,
-            FeeAmount.LOW,
-            10,
-            '0x0000000000000000000000000000000000000000',
-            encodeSqrtRatioX96(1, 1),
-            0,
-            0
-          ),
+          pool: WETH_USDC_V4,
           liquidity: 1,
-          tickLower: -10,
-          tickUpper: 10,
+          tickLower: -WETH_USDC_V4.tickSpacing,
+          tickUpper: WETH_USDC_V4.tickSpacing,
         }),
         v3RemoveLiquidityOptions: {
           tokenId: 1,
@@ -1838,8 +1801,8 @@ describe('Uniswap', () => {
           burnToken: true,
           collectOptions: {
             expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
-            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(DAI, 0),
-            recipient: CHAIN_TO_ADDRESSES_MAP[chainId].v4PositionManagerAddress,
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(WETH, 0),
+            recipient: CHAIN_TO_ADDRESSES_MAP[ChainId.MAINNET].v4PositionManagerAddress,
           },
         },
         v4AddLiquidityOptions: {
@@ -1855,25 +1818,16 @@ describe('Uniswap', () => {
     it('throws if not permitting the Universal router', async () => {
       const opts = Object.assign({
         inputPosition: new Position({
-          pool: new V3Pool(TOKEN0, TOKEN1, FeeAmount.LOW, encodeSqrtRatioX96(1, 1), 0, 0, []),
+          pool: WETH_USDC_V3,
           liquidity: 1,
-          tickLower: -10,
-          tickUpper: 10,
+          tickLower: -WETH_USDC_V3.tickSpacing,
+          tickUpper: WETH_USDC_V3.tickSpacing,
         }),
         outputPosition: new V4Position({
-          pool: new V4Pool(
-            TOKEN0,
-            TOKEN1,
-            FeeAmount.LOW,
-            10,
-            '0x0000000000000000000000000000000000000000',
-            encodeSqrtRatioX96(1, 1),
-            0,
-            0
-          ),
+          pool: WETH_USDC_V4,
           liquidity: 1,
-          tickLower: -10,
-          tickUpper: 10,
+          tickLower: -WETH_USDC_V4.tickSpacing,
+          tickUpper: WETH_USDC_V4.tickSpacing,
         }),
         v3RemoveLiquidityOptions: {
           tokenId: 1,
@@ -1883,8 +1837,8 @@ describe('Uniswap', () => {
           burnToken: true,
           collectOptions: {
             expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
-            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(DAI, 0),
-            recipient: CHAIN_TO_ADDRESSES_MAP[chainId].v4PositionManagerAddress,
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(WETH, 0),
+            recipient: CHAIN_TO_ADDRESSES_MAP[ChainId.MAINNET].v4PositionManagerAddress,
           },
           permit: {
             v: 0,

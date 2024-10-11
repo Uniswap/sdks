@@ -4,6 +4,7 @@ import { Interface } from '@ethersproject/abi'
 import { BigNumber, BigNumberish } from 'ethers'
 import {
   MethodParameters,
+  Multicall,
   Position as V3Position,
   NonfungiblePositionManager as V3PositionManager,
   RemoveLiquidityOptions as V3RemoveLiquidityOptions,
@@ -74,12 +75,17 @@ export abstract class SwapRouter {
    *   - input pool and output pool must have the same tokens
    *   - V3 NFT must be approved, or valid inputV3NFTPermit must be provided with UR as spender
    */
-  public static migrateV3ToV4CallParameters(options: MigrateV3ToV4Options): MethodParameters {
+  public static migrateV3ToV4CallParameters(
+    options: MigrateV3ToV4Options,
+    positionManagerOverride?: string
+  ): MethodParameters {
     const token0 = options.inputPosition.pool.token0
     const token1 = options.inputPosition.pool.token1
     const v4PositionManagerAddress =
+      positionManagerOverride ??
       CHAIN_TO_ADDRESSES_MAP[options.outputPosition.pool.chainId as SupportedChainsType].v4PositionManagerAddress
 
+    // validate the parameters
     invariant(token0 === options.outputPosition.pool.token0, 'TOKEN0_MISMATCH')
     invariant(token1 === options.outputPosition.pool.token1, 'TOKEN1_MISMATCH')
     invariant(
@@ -91,12 +97,12 @@ export abstract class SwapRouter {
       options.v3RemoveLiquidityOptions.collectOptions.recipient === v4PositionManagerAddress,
       'RECIPIENT_NOT_POSITION_MANAGER'
     )
-
     invariant(isMint(options.v4AddLiquidityOptions), 'MINT_REQUIRED')
     invariant(options.v4AddLiquidityOptions.migrate, 'MIGRATE_REQUIRED')
 
     const planner = new RoutePlanner()
 
+    // add position permit to the universal router planner
     if (options.v3RemoveLiquidityOptions.permit) {
       // permit spender should be UR
       const universalRouterAddress = UNIVERSAL_ROUTER_ADDRESS(
@@ -106,14 +112,28 @@ export abstract class SwapRouter {
       invariant(universalRouterAddress == options.v3RemoveLiquidityOptions.permit.spender, 'INVALID_SPENDER')
       // don't need to transfer it because v3posm uses isApprovedOrOwner()
       encodeV3PositionPermit(planner, options.v3RemoveLiquidityOptions.permit, options.v3RemoveLiquidityOptions.tokenId)
+      // remove permit so that multicall doesnt add it again
+      delete options.v3RemoveLiquidityOptions.permit
     }
 
     // encode v3 withdraw
-    const v3RemoveParams = V3PositionManager.removeCallParameters(
+    const v3RemoveParams: MethodParameters = V3PositionManager.removeCallParameters(
       options.inputPosition,
       options.v3RemoveLiquidityOptions
     )
-    planner.addCommand(CommandType.V3_POSITION_MANAGER_CALL, [v3RemoveParams.calldata])
+    const v3Calls: string[] = Multicall.decodeMulticall(v3RemoveParams.calldata)
+
+    for (const v3Call of v3Calls) {
+      // slice selector - 0x + 4 bytes = 10 characters
+      const selector = v3Call.slice(0, 10)
+      invariant(
+        selector == V3PositionManager.INTERFACE.getSighash('collect') ||
+          selector == V3PositionManager.INTERFACE.getSighash('decreaseLiquidity') ||
+          selector == V3PositionManager.INTERFACE.getSighash('burn'),
+        'INVALID_CALL: ' + selector
+      )
+      planner.addCommand(CommandType.V3_POSITION_MANAGER_CALL, [v3Call])
+    }
 
     // encode v4 mint
     const v4AddParams = V4PositionManager.addCallParameters(options.outputPosition, options.v4AddLiquidityOptions)

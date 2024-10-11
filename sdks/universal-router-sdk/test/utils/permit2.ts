@@ -1,8 +1,8 @@
 import { ethers, Wallet } from 'ethers'
 import { AllowanceTransfer, PermitSingle } from '@uniswap/permit2-sdk'
 import { Permit2Permit } from '../../src/utils/inputTokens'
-import { PERMIT2_ADDRESS, ROUTER_ADDRESS } from './addresses'
-import { MAX_UINT160 } from '../../src/utils/constants'
+import { PERMIT2_ADDRESS } from './addresses'
+import { MAX_UINT160, UNIVERSAL_ROUTER_ADDRESS, UniversalRouterVersion } from '../../src/utils/constants'
 
 const TEST_DEADLINE = '3000000000000'
 
@@ -39,7 +39,7 @@ export function makePermit(
   token: string,
   amount: string = MAX_UINT160.toString(),
   nonce: string = '0',
-  routerAddress: string = ROUTER_ADDRESS
+  routerAddress: string = UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, 1)
 ): PermitSingle {
   return {
     details: {
