@@ -45,8 +45,8 @@ describe("V3DutchOrder", () => {
                     token: INPUT_TOKEN,
                     startAmount: RAW_AMOUNT,
                     curve: {
-                        relativeBlocks: [1], //TODO: can we have relativeblocks be an array of just 0
-                        relativeAmounts: [BigInt(0)],
+                        relativeBlocks: [],
+                        relativeAmounts: [],
                     },
                     maxAmount: RAW_AMOUNT, //we don't want input to change, we're testing for decaying output
                     adjustmentPerGweiBaseFee: BigNumber.from(0),

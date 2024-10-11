@@ -36,8 +36,8 @@ describe("V3DutchOrderTrade", () => {
 			token: USDC.address,
 			startAmount: BigNumber.from(1000),
 			curve: {
-				relativeBlocks: [1],
-				relativeAmounts: [BigInt(0)],
+				relativeBlocks: [],
+				relativeAmounts: [],
 			},
 			maxAmount: BigNumber.from(1000),
 			adjustmentPerGweiBaseFee: BigNumber.from(0),
@@ -120,8 +120,8 @@ describe("V3DutchOrderTrade", () => {
 					token: DAI.address,
 					startAmount: NON_FEE_OUTPUT_AMOUNT,
 					curve: {
-						relativeBlocks: [10],
-						relativeAmounts: [BigInt(0)],
+						relativeBlocks: [],
+						relativeAmounts: [],
 					},
 					recipient: "0x0000000000000000000000000000000000000000",
 					minAmount: NON_FEE_OUTPUT_AMOUNT,
@@ -131,8 +131,8 @@ describe("V3DutchOrderTrade", () => {
 					token: DAI.address,
 					startAmount: BigNumber.from("1000"),
 					curve: {
-						relativeBlocks: [10],
-						relativeAmounts: [BigInt(0)],
+						relativeBlocks: [],
+						relativeAmounts: [],
 					},
 					recipient: "0x0000000000000000000000000000000000000000",
 					minAmount: BigNumber.from("1000"),
