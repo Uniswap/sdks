@@ -639,11 +639,28 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         assertGe(from.balance, startingRecipientBalance);
     }
 
-    function testV4ExactInNativeOutputWithUnwrap() public {
-        MethodParameters memory params = readFixture(json, "._UNISWAP_V4_1000_USDC_FOR_ETH_WITH_UNWRAP");
+    function testV4ExactOutNativeOutput() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_V4_DAI_FOR_1_ETH_2_HOP");
+
+        deal(address(DAI), from, BALANCE);
+        DAI.approve(address(permit2), BALANCE);
+        permit2.approve(address(DAI), address(router), uint160(BALANCE), uint48(block.timestamp + 1000));
+        assertEq(DAI.balanceOf(from), BALANCE);
+        uint256 startingRecipientBalance = from.balance;
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+
+        assertLt(DAI.balanceOf(from), BALANCE - ONE_DAI);
+        assertGe(from.balance, startingRecipientBalance);
+    }
+
+    function testV4ExactOutNativeOutputWithUnwrap() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_V4_USDC_FOR_1_ETH_WITH_UNWRAP");
 
         deal(address(USDC), from, BALANCE);
         USDC.approve(address(permit2), BALANCE);
+        permit2.approve(address(USDC), address(router), uint160(BALANCE), uint48(block.timestamp + 1000));
         assertEq(USDC.balanceOf(from), BALANCE);
         uint256 startingRecipientBalance = RECIPIENT.balance;
 

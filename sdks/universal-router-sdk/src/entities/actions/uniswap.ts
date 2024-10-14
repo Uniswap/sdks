@@ -100,7 +100,7 @@ export class UniswapTrade implements Command {
 
   get outputRequiresWrap(): boolean {
     if (this.isAllV4) {
-      return !this.trade.outputAmount.currency.isNative && this.trade.swaps[0].route.output.isNative
+      return !this.trade.outputAmount.currency.isNative && this.trade.swaps[0].route.pathOutput.isNative
     }
     return false
   }
@@ -192,7 +192,7 @@ export class UniswapTrade implements Command {
       if (this.outputRequiresUnwrap) {
         planner.addCommand(CommandType.UNWRAP_WETH, [this.options.recipient, minimumAmountOut])
       } else if (this.outputRequiresWrap) {
-        planner.addCommand(CommandType.WRAP_ETH, [this.options.recipient, 0])
+        planner.addCommand(CommandType.WRAP_ETH, [this.options.recipient, CONTRACT_BALANCE])
       } else {
         planner.addCommand(CommandType.SWEEP, [
           getCurrencyAddress(this.trade.outputAmount.currency),
@@ -299,23 +299,33 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
     tradeType,
   })
 
-  console.log(trade.route.pools)
-  console.log(inputAmount)
-  console.log(outputAmount)
+  // console.log(route)
+  // console.log(route.pools[0].currency0)
+  // console.log(route.pools[0].currency1)
+  // console.log(route.pools[1].currency0)
+  // console.log(route.pools[1].currency1)
+  // console.log(tradeType)
+  // console.log(trade)
+  // console.log(trade.swaps[0])
+  // console.log(trade.inputAmount)
+  // console.log(trade.outputAmount)
+
+  // console.log(payerIsUser)
+  // console.log(trade.tradeType === TradeType.EXACT_OUTPUT)
+  //
+  // console.log(encodeV4RouteToPath(trade.route, true))
+  // console.log(trade.route.pathInput)
+  // console.log(trade.route.pathOutput)
+
+  payerIsUser = payerIsUser && route.input == route.pathInput
+
   const slippageToleranceOnSwap =
     routerMustCustody && tradeType == TradeType.EXACT_INPUT ? undefined : options.slippageTolerance
 
-  const inputWethFromRouter = inputAmount.currency.isNative && !route.input.isNative
-  if (inputWethFromRouter && !payerIsUser) throw new Error('Inconsistent payer')
-
   const v4Planner = new V4Planner()
   v4Planner.addTrade(trade, slippageToleranceOnSwap)
-  console.log(v4Planner)
-  v4Planner.addSettle(inputWethFromRouter ? inputAmount.currency.wrapped : inputAmount.currency, payerIsUser)
-
-  options.recipient = options.recipient ?? SENDER_AS_RECIPIENT
-  v4Planner.addTake(outputAmount.currency, routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient)
-
+  v4Planner.addSettle(trade.route.pathInput, payerIsUser)
+  v4Planner.addTake(trade.route.pathOutput, routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient ?? SENDER_AS_RECIPIENT)
   planner.addCommand(CommandType.V4_SWAP, [v4Planner.finalize()])
 }
 
