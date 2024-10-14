@@ -174,8 +174,11 @@ const SEPOLIA_ADDRESSES: ChainAddresses = {
   nonfungiblePositionManagerAddress: '0x1238536071E1c677A632429e3655c799b22cDA52',
   tickLensAddress: '0xd7f33bcdb21b359c8ee6f0251d30e94832baad07',
   swapRouter02Address: '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E',
+
+  // TODO: update mixedRouteQuoterV2Address once v4 on sepolia redeployed
   mixedRouteQuoterV2Address: '0x4745f77b56a0e2294426e3936dc4fab68d9543cd',
 
+  // TODO: update all below once v4 on sepolia redeployed
   v4PoolManagerAddress: '0xE8E23e97Fa135823143d6b9Cba9c699040D51F70',
   v4PositionManagerAddress: '0x0048d1C09771Bb87b6A44e1294769E1DFd698584',
   v4StateView: '0x6Bb7157fb50e3Ae4983Ccdc62Fb8173c03c6b0a7',
