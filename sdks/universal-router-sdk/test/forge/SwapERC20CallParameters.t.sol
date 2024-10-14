@@ -7,17 +7,13 @@ import {UniversalRouter} from "universal-router/UniversalRouter.sol";
 import {IPermit2} from "permit2/src/interfaces/IPermit2.sol";
 import {DeployRouter} from "./utils/DeployRouter.sol";
 import {MethodParameters, Interop} from "./utils/Interop.sol";
+import {INonfungiblePositionManager} from "v3-periphery/interfaces/INonfungiblePositionManager.sol";
 
 contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
     using stdJson for string;
 
-    ERC20 private constant WETH = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-    ERC20 private constant USDC = ERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
-    ERC20 private constant DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     // starting eth balance
     uint256 constant BALANCE = 10 ether;
-    uint256 ONE_USDC = 10 ** 6;
-    uint256 ONE_DAI = 1 ether;
 
     function setUp() public {
         fromPrivateKey = 0x1234;
@@ -27,9 +23,9 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
 
         vm.createSelectFork(vm.envString("FORK_URL"), 16075500);
         deployV4Contracts();
-        initializeV4Pools(WETH, USDC, DAI);
+        initializeV4Pools();
         vm.startPrank(from);
-        deployRouterAndPermit2();
+        deployRouter();
         vm.deal(from, BALANCE);
     }
 
@@ -775,24 +771,24 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
     }
 
     function testMixedV3ToV4UnwrapWETH() public {
-      MethodParameters memory params = readFixture(json, "._UNISWAP_MIXED_USDC_DAI_UNWRAP_WETH_V3_TO_V4");
+        MethodParameters memory params = readFixture(json, "._UNISWAP_MIXED_USDC_DAI_UNWRAP_WETH_V3_TO_V4");
 
-      uint256 usdcAmount = 1000000000;
-      deal(address(USDC), from, usdcAmount);
-      USDC.approve(address(permit2), usdcAmount);
-      permit2.approve(address(USDC), address(router), uint160(usdcAmount), uint48(block.timestamp + 1000));
+        uint256 usdcAmount = 1000000000;
+        deal(address(USDC), from, usdcAmount);
+        USDC.approve(address(permit2), usdcAmount);
+        permit2.approve(address(USDC), address(router), uint160(usdcAmount), uint48(block.timestamp + 1000));
 
-      assertEq(USDC.balanceOf(from), usdcAmount);
-      assertEq(DAI.balanceOf(RECIPIENT), 0);
+        assertEq(USDC.balanceOf(from), usdcAmount);
+        assertEq(DAI.balanceOf(RECIPIENT), 0);
 
-      (bool success,) = address(router).call{value: params.value}(params.data);
-      require(success, "call failed");
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
 
-      assertLe(from.balance, BALANCE - params.value);
-      assertEq(USDC.balanceOf(from), 0);
-      assertEq(DAI.balanceOf(address(router)), 0);
-      assertGt(DAI.balanceOf(RECIPIENT), 0);
-      assertEq(address(router).balance, 0);
+        assertLe(from.balance, BALANCE - params.value);
+        assertEq(USDC.balanceOf(from), 0);
+        assertEq(DAI.balanceOf(address(router)), 0);
+        assertGt(DAI.balanceOf(RECIPIENT), 0);
+        assertEq(address(router).balance, 0);
     }
 
     function testMixedV2ToV4UnwrapWETH() public {
@@ -817,24 +813,24 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
     }
 
     function testMixedV4ToV3WrapETH() public {
-      MethodParameters memory params = readFixture(json, "._UNISWAP_MIXED_DAI_USDC_WRAP_ETH_V4_TO_V3");
+        MethodParameters memory params = readFixture(json, "._UNISWAP_MIXED_DAI_USDC_WRAP_ETH_V4_TO_V3");
 
-      uint256 daiAmount = 1000 ether;
-      deal(address(DAI), from, daiAmount);
-      DAI.approve(address(permit2), daiAmount);
-      permit2.approve(address(DAI), address(router), uint160(daiAmount), uint48(block.timestamp + 1000));
+        uint256 daiAmount = 1000 ether;
+        deal(address(DAI), from, daiAmount);
+        DAI.approve(address(permit2), daiAmount);
+        permit2.approve(address(DAI), address(router), uint160(daiAmount), uint48(block.timestamp + 1000));
 
-      assertEq(DAI.balanceOf(from), daiAmount);
-      assertEq(USDC.balanceOf(RECIPIENT), 0);
+        assertEq(DAI.balanceOf(from), daiAmount);
+        assertEq(USDC.balanceOf(RECIPIENT), 0);
 
-      (bool success,) = address(router).call{value: params.value}(params.data);
-      require(success, "call failed");
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
 
-      assertLe(from.balance, BALANCE - params.value);
-      assertEq(DAI.balanceOf(from), 0);
-      assertEq(USDC.balanceOf(address(router)), 0);
-      assertGt(USDC.balanceOf(RECIPIENT), 0);
-      assertEq(address(router).balance, 0);
+        assertLe(from.balance, BALANCE - params.value);
+        assertEq(DAI.balanceOf(from), 0);
+        assertEq(USDC.balanceOf(address(router)), 0);
+        assertGt(USDC.balanceOf(RECIPIENT), 0);
+        assertEq(address(router).balance, 0);
     }
 
     function testMixedV4ToV2WrapETH() public {
