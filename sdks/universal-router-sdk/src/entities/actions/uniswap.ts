@@ -125,9 +125,9 @@ export class UniswapTrade implements Command {
       planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [
         this.trade.inputAmount.currency.address,
         ROUTER_AS_RECIPIENT,
-        this.trade.maximumAmountIn(this.options.slippageTolerance).quotient.toString()
+        this.trade.maximumAmountIn(this.options.slippageTolerance).quotient.toString(),
       ])
-      planner.addCommand(CommandType.UNWRAP_WETH, [ROUTER_AS_RECIPIENT,  0])
+      planner.addCommand(CommandType.UNWRAP_WETH, [ROUTER_AS_RECIPIENT, 0])
     }
     // The overall recipient at the end of the trade, SENDER_AS_RECIPIENT uses the msg.sender
     this.options.recipient = this.options.recipient ?? SENDER_AS_RECIPIENT
@@ -306,9 +306,8 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
   payerIsUser: boolean,
   routerMustCustody: boolean
 ): void {
-
   // create a deep copy of pools since v4Planner encoding tampers with array
-  const pools = route.pools.map(p => p)
+  const pools = route.pools.map((p) => p)
   const v4Route = new V4Route(pools, inputAmount.currency, outputAmount.currency)
   const trade = V4Trade.createUncheckedTrade({
     route: v4Route,
