@@ -16,7 +16,6 @@ import {
   IRoute,
   RouteV2,
   RouteV3,
-  RouteV4,
   MixedRouteSDK,
   MixedRoute,
   SwapOptions as RouterSwapOptions,
@@ -26,7 +25,7 @@ import {
 } from '@uniswap/router-sdk'
 import { Permit2Permit } from '../../utils/inputTokens'
 import { getPathCurrency } from '../../utils/pathCurrency'
-import { Currency, TradeType, CurrencyAmount, Percent } from '@uniswap/sdk-core'
+import { Currency, TradeType, Token, CurrencyAmount, Percent } from '@uniswap/sdk-core'
 import { Command, RouterActionType, TradeConfig } from '../Command'
 import { SENDER_AS_RECIPIENT, ROUTER_AS_RECIPIENT, CONTRACT_BALANCE, ETH_ADDRESS } from '../../utils/constants'
 import { getCurrencyAddress } from '../../utils/getCurrencyAddress'
@@ -80,7 +79,10 @@ export class UniswapTrade implements Command {
 
   get inputRequiresWrap(): boolean {
     if (this.isAllV4) {
-      return this.trade.inputAmount.currency.isNative && !this.trade.swaps[0].route.pathInput.isNative
+      return (
+        this.trade.inputAmount.currency.isNative &&
+        !(this.trade.swaps[0].route as unknown as V4Route<Currency, Currency>).pathInput.isNative
+      )
     } else {
       return this.trade.inputAmount.currency.isNative
     }
@@ -88,21 +90,30 @@ export class UniswapTrade implements Command {
 
   get inputRequiresUnwrap(): boolean {
     if (this.isAllV4) {
-      return !this.trade.inputAmount.currency.isNative && this.trade.swaps[0].route.pathInput.isNative
+      return (
+        !this.trade.inputAmount.currency.isNative &&
+        (this.trade.swaps[0].route as unknown as V4Route<Currency, Currency>).pathInput.isNative
+      )
     }
     return false
   }
 
   get outputRequiresWrap(): boolean {
     if (this.isAllV4) {
-      return !this.trade.outputAmount.currency.isNative && this.trade.swaps[0].route.pathOutput.isNative
+      return (
+        !this.trade.outputAmount.currency.isNative &&
+        (this.trade.swaps[0].route as unknown as V4Route<Currency, Currency>).pathOutput.isNative
+      )
     }
     return false
   }
 
   get outputRequiresUnwrap(): boolean {
     if (this.isAllV4) {
-      return this.trade.outputAmount.currency.isNative && !this.trade.swaps[0].route.output.isNative
+      return (
+        this.trade.outputAmount.currency.isNative &&
+        !(this.trade.swaps[0].route as unknown as V4Route<Currency, Currency>).pathOutput.isNative
+      )
     } else {
       return this.trade.outputAmount.currency.isNative
     }
@@ -123,7 +134,7 @@ export class UniswapTrade implements Command {
     } else if (this.inputRequiresUnwrap) {
       // send wrapped token to router to unwrap
       planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [
-        this.trade.inputAmount.currency.address,
+        (this.trade.inputAmount.currency as Token).address,
         ROUTER_AS_RECIPIENT,
         this.trade.maximumAmountIn(this.options.slippageTolerance).quotient.toString(),
       ])
@@ -307,7 +318,7 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
   routerMustCustody: boolean
 ): void {
   // create a deep copy of pools since v4Planner encoding tampers with array
-  const pools = route.pools.map((p) => p)
+  const pools = route.pools.map((p) => p) as V4Pool[]
   const v4Route = new V4Route(pools, inputAmount.currency, outputAmount.currency)
   const trade = V4Trade.createUncheckedTrade({
     route: v4Route,
