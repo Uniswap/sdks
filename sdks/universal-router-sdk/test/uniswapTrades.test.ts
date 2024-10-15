@@ -734,7 +734,7 @@ describe('Uniswap', () => {
       const opts = swapOptions({})
       buildTrade([trade])
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
-      registerFixture('_UNISWAP_V4_WRAP_ETH_FOR_1000_USDC', methodParameters)
+      registerFixture('_UNISWAP_V4_WRAP_ETH_FOR_1_DAI', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.not.equal('0')
     })
   })

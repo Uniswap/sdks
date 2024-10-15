@@ -615,7 +615,7 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         assertEq(FEE_RECIPIENT.balance - startingFeeRecipientBalance, expectedFee);
     }
 
-    function testUnwrapWETHToTradeETHForUSDC() public {
+    function testV4UnwrapWETHToTradeETHForUSDC() public {
         MethodParameters memory params = readFixture(json, "._UNISWAP_V4_UNWRAP_WETH_TO_ETH_FOR_1000_USDC");
         deal(address(WETH), from, BALANCE);
         WETH.approve(address(permit2), BALANCE);
@@ -629,6 +629,21 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         uint256 expectedAmount = 1000 * 10 ** 6;
 
         assertEq(USDC.balanceOf(RECIPIENT) - startingRecipientBalance, expectedAmount);
+        assertEq(WETH.balanceOf(address(router)), 0);
+        assertEq(address(router).balance, 0);
+    }
+
+    function testV4WrapETHToTradeWETHForDAI() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_V4_WRAP_ETH_FOR_1_DAI");
+
+        uint256 startingRecipientBalance = USDC.balanceOf(RECIPIENT);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+
+        uint256 expectedAmount = 1 ether;
+
+        assertEq(DAI.balanceOf(RECIPIENT) - startingRecipientBalance, expectedAmount);
         assertEq(WETH.balanceOf(address(router)), 0);
         assertEq(address(router).balance, 0);
     }

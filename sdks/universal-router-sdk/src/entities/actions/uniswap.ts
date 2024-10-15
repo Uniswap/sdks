@@ -79,12 +79,10 @@ export class UniswapTrade implements Command {
   }
 
   get inputRequiresWrap(): boolean {
-    if (!this.isAllV4) {
-      return this.trade.inputAmount.currency.isNative
+    if (this.isAllV4) {
+      return this.trade.inputAmount.currency.isNative && !this.trade.swaps[0].route.pathInput.isNative
     } else {
-      // We only support wrapping all ETH or no ETH currently. We cannot support splitting where half needs to be wrapped
-      // If the input currency is ETH and the input of the first path is not ETH it must be WETH that needs wrapping
-      return this.trade.inputAmount.currency.isNative && !this.trade.swaps[0].route.input.isNative
+      return this.trade.inputAmount.currency.isNative
     }
   }
 
@@ -103,11 +101,10 @@ export class UniswapTrade implements Command {
   }
 
   get outputRequiresUnwrap(): boolean {
-    if (!this.isAllV4) {
-      return this.trade.outputAmount.currency.isNative
-    } else {
-      // If the output currency is ETH and the output of the swap is not ETH it must be WETH that needs unwrapping
+    if (this.isAllV4) {
       return this.trade.outputAmount.currency.isNative && !this.trade.swaps[0].route.output.isNative
+    } else {
+      return this.trade.outputAmount.currency.isNative
     }
   }
 
