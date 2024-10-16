@@ -10,5 +10,6 @@ export { PriorityOrderReactor__factory } from "./PriorityOrderReactor__factory";
 export { RelayOrderReactor__factory } from "./RelayOrderReactor__factory";
 export { SwapRouter02Executor__factory } from "./SwapRouter02Executor__factory";
 export { V2DutchOrderReactor__factory } from "./V2DutchOrderReactor__factory";
+export { V3DutchOrderReactor__factory } from "./V3DutchOrderReactor__factory";
 export { DeploylessMulticall2__factory } from "./DeploylessMulticall2__factory";
 export { Multicall2__factory } from "./Multicall2__factory";
