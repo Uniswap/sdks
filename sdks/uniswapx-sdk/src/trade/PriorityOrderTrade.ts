@@ -51,14 +51,12 @@ export class PriorityOrderTrade<
     if (this._inputAmount) return this._inputAmount;
 
     // If we have classic quote data use that, otherwise use the order input amount
-    if(this.classicAmounts?.classicAmountInGasAndPortionAdjusted) {
-      return this.getClassicAmountIn();
-    }
-
-    const amount = CurrencyAmount.fromRawAmount(
-      this._currencyIn,
-      this.order.info.input.amount.toString()
-    );
+    const amount = this.classicAmounts?.classicAmountInGasAndPortionAdjusted 
+      ? this.getClassicAmountIn() 
+      : CurrencyAmount.fromRawAmount(
+          this._currencyIn,
+          this.order.info.input.amount.toString()
+        );
     this._inputAmount = amount;
     return amount;
   }
