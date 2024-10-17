@@ -113,7 +113,7 @@ export abstract class SwapRouter {
         v4Pool.tickSpacing,
         v4Pool.hooks
       )
-      planner.addCommand(CommandType.V4_INITIALIZE_POOL, [poolKey, v4Pool.sqrtRatioX96])
+      planner.addCommand(CommandType.V4_INITIALIZE_POOL, [poolKey, v4Pool.sqrtRatioX96.toString()])
       // remove createPool setting, so that it doesnt get encoded again later
       delete options.v4AddLiquidityOptions.createPool
     }
