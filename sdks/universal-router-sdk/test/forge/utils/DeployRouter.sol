@@ -6,18 +6,19 @@ import {Test} from "forge-std/Test.sol";
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
 import {IUniversalRouter} from "universal-router/interfaces/IUniversalRouter.sol";
 import {UniversalRouter} from "universal-router/UniversalRouter.sol";
-import {PoolManager} from "v4-core/PoolManager.sol";
-import {IERC20Minimal} from "v4-core/interfaces/external/IERC20Minimal.sol";
-import {PoolKey} from "v4-core/types/PoolKey.sol";
-import {PoolId, PoolIdLibrary} from "v4-core/types/PoolId.sol";
-import {Currency} from "v4-core/types/Currency.sol";
-import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
-import {IHooks} from "v4-core/interfaces/IHooks.sol";
-import {BalanceDelta} from "v4-core/types/BalanceDelta.sol";
-import {PositionManager} from "v4-periphery/src/PositionManager.sol";
+import {PoolManager} from "@uniswap/v4-core/src/PoolManager.sol";
+import {IERC20Minimal} from "@uniswap/v4-core/src/interfaces/external/IERC20Minimal.sol";
+import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
+import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
+import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
+import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
+import {PositionManager} from "@uniswap/v4-periphery/src/PositionManager.sol";
+import {IPositionDescriptor} from "@uniswap/v4-periphery/src/interfaces/IPositionDescriptor.sol";
 import {RouterParameters} from "universal-router/base/RouterImmutables.sol";
 import {IPermit2} from "permit2/src/interfaces/IPermit2.sol";
-import {INonfungiblePositionManager} from "v3-periphery/interfaces/INonfungiblePositionManager.sol";
+import {INonfungiblePositionManager} from "@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol";
 
 contract DeployRouter is Test {
     using PoolIdLibrary for PoolKey;
@@ -80,7 +81,8 @@ contract DeployRouter is Test {
 
     function deployV4Contracts() public {
         poolManager = new PoolManager();
-        v4PositionManager = new PositionManager(poolManager, IPermit2(MAINNET_PERMIT2), 100000);
+        v4PositionManager =
+            new PositionManager(poolManager, IPermit2(MAINNET_PERMIT2), 100000, IPositionDescriptor(address(0)));
     }
 
     function initializeV4Pools() public {
@@ -119,7 +121,7 @@ contract DeployRouter is Test {
 
         for (uint256 i = 0; i < poolKeys.length; i++) {
             PoolKey memory poolKey = poolKeys[i];
-            poolManager.initialize(poolKey, 79228162514264337593543950336, bytes(""));
+            poolManager.initialize(poolKey, 79228162514264337593543950336);
 
             (BalanceDelta delta,) = poolManager.modifyLiquidity(
                 poolKey,

@@ -70,6 +70,7 @@ describe('Uniswap', () => {
   let ETH_DAI_V4: V4Pool
   let ETH_USDC_V4: V4Pool
   let WETH_USDC_V4: V4Pool
+  let WETH_USDC_V4_LOW_FEE: V4Pool
   let USDC_DAI_V4: V4Pool
 
   before(async () => {
@@ -95,7 +96,19 @@ describe('Uniswap', () => {
     WETH_USDC_V4 = new V4Pool(
       WETH,
       USDC,
-      3_000,
+      FeeAmount.MEDIUM,
+      tickSpacing,
+      ZERO_ADDRESS,
+      encodeSqrtRatioX96(1, 1),
+      liquidity,
+      0,
+      tickProviderMock
+    )
+
+    WETH_USDC_V4_LOW_FEE = new V4Pool(
+      WETH,
+      USDC,
+      FeeAmount.LOW,
       tickSpacing,
       ZERO_ADDRESS,
       encodeSqrtRatioX96(1, 1),
@@ -107,7 +120,7 @@ describe('Uniswap', () => {
     ETH_USDC_V4 = new V4Pool(
       ETHER,
       USDC,
-      3_000,
+      FeeAmount.MEDIUM,
       tickSpacing,
       ZERO_ADDRESS,
       encodeSqrtRatioX96(1, 1),
@@ -119,7 +132,7 @@ describe('Uniswap', () => {
     USDC_DAI_V4 = new V4Pool(
       DAI,
       USDC,
-      3_000,
+      FeeAmount.MEDIUM,
       tickSpacing,
       ZERO_ADDRESS,
       encodeSqrtRatioX96(1, 1),
@@ -131,7 +144,7 @@ describe('Uniswap', () => {
     ETH_DAI_V4 = new V4Pool(
       DAI,
       ETHER,
-      3_000,
+      FeeAmount.MEDIUM,
       tickSpacing,
       ZERO_ADDRESS,
       encodeSqrtRatioX96(1, 1),
@@ -1588,6 +1601,69 @@ describe('Uniswap', () => {
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
       registerFixture('_MIGRATE_WITHOUT_PERMIT', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+    })
+
+    it('encodes a migration including pool initialization', async () => {
+      // sign a permit for the token
+      const tokenId = 377972
+      const permit = {
+        spender: UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, 1),
+        tokenId,
+        deadline: MAX_UINT160.toString(),
+        nonce: 0,
+      }
+      const { domain, types, values } = NonfungiblePositionManager.getPermitData(
+        permit,
+        NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[ChainId.MAINNET],
+        ChainId.MAINNET
+      )
+
+      const signature: Signature = splitSignature(await wallet._signTypedData(domain, types, values))
+
+      // create migrate options
+      const opts = Object.assign({
+        inputPosition: new Position({
+          pool: WETH_USDC_V3,
+          liquidity: 72249373570746,
+          tickLower: 200040,
+          tickUpper: 300000,
+        }),
+        outputPosition: new V4Position({
+          pool: WETH_USDC_V4_LOW_FEE, // migrate to LOW pool, which hasn't been initialized
+          liquidity: 100000,
+          tickLower: 200040,
+          tickUpper: 300000,
+        }),
+        v3RemoveLiquidityOptions: {
+          tokenId,
+          liquidityPercentage: new Percent(100, 100),
+          slippageTolerance: new Percent(5, 100),
+          deadline: MAX_UINT160,
+          burnToken: true,
+          collectOptions: {
+            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(WETH, 0),
+            recipient: FORGE_V4_POSITION_MANAGER,
+          },
+          permit: {
+            v: signature.v,
+            r: signature.r,
+            s: signature.s,
+            deadline: permit.deadline,
+            spender: permit.spender,
+          },
+        },
+        v4AddLiquidityOptions: {
+          deadline: MAX_UINT160,
+          migrate: true,
+          slippageTolerance: new Percent(5, 100),
+          recipient: TEST_RECIPIENT_ADDRESS,
+          createPool: true, // boolean to signal pool creation
+        },
+      })
+      const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
+      registerFixture('_MIGRATE_WITH_PERMIT_AND_POOL_INITIALIZE', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
