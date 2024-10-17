@@ -15,6 +15,7 @@ import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {IHooks} from "v4-core/interfaces/IHooks.sol";
 import {BalanceDelta} from "v4-core/types/BalanceDelta.sol";
 import {PositionManager} from "v4-periphery/src/PositionManager.sol";
+import {IPositionDescriptor} from "v4-periphery/src/interfaces/IPositionDescriptor.sol";
 import {RouterParameters} from "universal-router/base/RouterImmutables.sol";
 import {IPermit2} from "permit2/src/interfaces/IPermit2.sol";
 import {INonfungiblePositionManager} from "v3-periphery/interfaces/INonfungiblePositionManager.sol";
@@ -80,7 +81,8 @@ contract DeployRouter is Test {
 
     function deployV4Contracts() public {
         poolManager = new PoolManager();
-        v4PositionManager = new PositionManager(poolManager, IPermit2(MAINNET_PERMIT2), 100000);
+        v4PositionManager =
+            new PositionManager(poolManager, IPermit2(MAINNET_PERMIT2), 100000, IPositionDescriptor(address(0)));
     }
 
     function initializeV4Pools() public {
@@ -119,7 +121,7 @@ contract DeployRouter is Test {
 
         for (uint256 i = 0; i < poolKeys.length; i++) {
             PoolKey memory poolKey = poolKeys[i];
-            poolManager.initialize(poolKey, 79228162514264337593543950336, bytes(""));
+            poolManager.initialize(poolKey, 79228162514264337593543950336);
 
             (BalanceDelta delta,) = poolManager.modifyLiquidity(
                 poolKey,
