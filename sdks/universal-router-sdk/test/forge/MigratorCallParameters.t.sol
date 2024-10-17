@@ -7,7 +7,7 @@ import {UniversalRouter} from "universal-router/UniversalRouter.sol";
 import {IPermit2} from "permit2/src/interfaces/IPermit2.sol";
 import {DeployRouter} from "./utils/DeployRouter.sol";
 import {MethodParameters, Interop} from "./utils/Interop.sol";
-import {INonfungiblePositionManager} from "v3-periphery/interfaces/INonfungiblePositionManager.sol";
+import {INonfungiblePositionManager} from "@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol";
 
 contract MigratorCallParametersTest is Test, Interop, DeployRouter {
     using stdJson for string;
