@@ -12,14 +12,10 @@ export function getPathCurrency(currency: Currency, pool: TPool): Currency {
     return currency.wrapped
 
     // return native currency if pool involves native version of wrapped currency (only applies to V4)
-  } else if (pool instanceof V4Pool) {
-    if (pool.token0.wrapped.equals(currency)) {
-      return pool.token0
-    } else if (pool.token1.wrapped.equals(currency)) {
-      return pool.token1
-    }
-
-    // otherwise the token is invalid
+  } else if (pool instanceof V4Pool && pool.token0.wrapped.equals(currency)) {
+    return pool.token0
+  } else if (pool instanceof V4Pool && pool.token1.wrapped.equals(currency)) {
+    return pool.token1
   } else {
     throw new Error(`Expected currency ${currency.symbol} to be either ${pool.token0.symbol} or ${pool.token1.symbol}`)
   }
