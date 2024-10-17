@@ -177,8 +177,9 @@ export class UniswapTrade implements Command {
     // The router custodies for 3 reasons: to unwrap, to take a fee, and/or to do a slippage check
     if (routerMustCustody) {
       const pools = this.trade.swaps[0].route.pools
-      const pathOutputCurrency = getPathCurrency(this.trade.outputAmount.currency, pools[pools.length - 1])
-      const pathOutputCurrencyAddress = pathOutputCurrency.isNative ? ETH_ADDRESS : pathOutputCurrency.address
+      const pathOutputCurrencyAddress = getCurrencyAddress(
+        getPathCurrency(this.trade.outputAmount.currency, pools[pools.length - 1])
+      )
 
       // If there is a fee, that percentage is sent to the fee recipient
       // In the case where ETH is the output currency, the fee is taken in WETH (for gas reasons)
@@ -326,8 +327,6 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
     outputAmount,
     tradeType,
   })
-
-  payerIsUser = payerIsUser && v4Route.input == v4Route.pathInput
 
   const slippageToleranceOnSwap =
     routerMustCustody && tradeType == TradeType.EXACT_INPUT ? undefined : options.slippageTolerance
