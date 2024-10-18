@@ -32,8 +32,7 @@
     "postinstall": "husky"
   },
   "workspaces": [
-    "sdks/*",
-    "sdks/uniswapx-sdk/integration"
+    "sdks/*"
   ],
   "resolutions": {
     "@manypkg/cli@^0.19.2": "patch:@manypkg/cli@npm%3A0.19.2#./.yarn/patches/@manypkg-cli-npm-0.19.2-ea52ff91d4.patch"
