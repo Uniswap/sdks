@@ -53,7 +53,7 @@
     "extends": "semantic-release-monorepo",
     "branches": [
       {
-        "name": "main",
+        "name": "master",
         "prerelease": false
       }
     ],
