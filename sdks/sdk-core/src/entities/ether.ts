@@ -3,17 +3,18 @@ import { Currency } from './currency'
 import { NativeCurrency } from './nativeCurrency'
 import { Token } from './token'
 import { WETH9 } from './weth9'
+import { ChainId } from '../chains'
 
 /**
  * Ether is the main usage of a 'native' currency, i.e. for Ethereum mainnet and all testnets
  */
 export class Ether extends NativeCurrency {
   protected constructor(chainId: number) {
-    super(chainId, 18, 'ETH', 'Ether')
+    super(chainId, 18, 'XDC', 'XDC')
   }
 
   public get wrapped(): Token {
-    const weth9 = WETH9[this.chainId]
+    const weth9 = WETH9[this.chainId as ChainId]
     invariant(!!weth9, 'WRAPPED')
     return weth9
   }
