@@ -29,6 +29,9 @@ jobs:
           cache: yarn
           node-version: 18
 
+      - name: Install Yarn
+        run: npm install -g yarn
+
       - name: Install dependencies
         run: yarn --immutable
 
