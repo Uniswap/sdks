@@ -24,7 +24,11 @@
   "packageManager": "yarn@3.2.3",
   "private": true,
   "release": {
-    "branches": ["master"]
+    "branches": [{
+      "name": "master",
+      "prerelease": true
+    }
+    ]
   },
   "scripts": {
     "g:check:deps:mismatch": "manypkg check",
