@@ -23,6 +23,9 @@
   },
   "packageManager": "yarn@3.2.3",
   "private": true,
+  "release": {
+    "branches": ["master"]
+  },
   "scripts": {
     "g:check:deps:mismatch": "manypkg check",
     "g:build": "turbo run build",
