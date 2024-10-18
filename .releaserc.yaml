@@ -1,0 +1,2 @@
+branch: master
+tagFormat: "${version}"
