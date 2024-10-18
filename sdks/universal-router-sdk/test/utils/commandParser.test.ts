@@ -328,7 +328,7 @@ describe('Command Parser', () => {
       },
     },
     {
-      input: new RoutePlanner().addCommand(CommandType.V4_POSITION_CALL, [
+      input: new RoutePlanner().addCommand(CommandType.V4_POSITION_MANAGER_CALL, [
         new V4Planner()
           .addAction(Actions.MINT_POSITION, [USDC_WETH.poolKey, -60, 60, 5000000, amount, amount, addressOne, '0x'])
           .finalize(),
@@ -336,8 +336,8 @@ describe('Command Parser', () => {
       result: {
         commands: [
           {
-            commandName: 'V4_POSITION_CALL',
-            commandType: CommandType.V4_POSITION_CALL,
+            commandName: 'V4_POSITION_MANAGER_CALL',
+            commandType: CommandType.V4_POSITION_MANAGER_CALL,
             params: [
               {
                 name: 'MINT_POSITION',
