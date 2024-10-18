@@ -11,7 +11,7 @@ jobs:
     name: Release
     environment:
       name: production
-    runs-on: 
+    runs-on:
       group: npm-deploy
     permissions:
       contents: write
@@ -34,15 +34,6 @@ jobs:
 
       - name: Build SDK's
         run: yarn g:build
-
-      - name: Load Secrets
-        uses: 1password/load-secrets-action@581a835fb51b8e7ec56b71cf2ffddd7e68bb25e0
-        with:
-          # Export loaded secrets as environment variables
-          export-env: true
-        env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          NPM_TOKEN: op://npm-deploy/npm-runner-token/secret
 
       - name: Release Needed SDK's
         env:
