@@ -23,7 +23,7 @@ yarn sdk @uniswap/{sdk-name} {command}
 
 ## Publishing SDK's
 
-Publishing of each SDK is done on merge to main using semantic-release and semantic-release-monorepo. PR titles / commits follow angular conventional commits with custom settings that map as follows:
+Publishing of each SDK is done on merge to master using semantic-release and semantic-release-monorepo. PR titles / commits follow angular conventional commits with custom settings that map as follows:
 
 ```markdown
 - `fix(SDK name):` will trigger a patch version
