@@ -45,6 +45,9 @@ export class Token extends BaseCurrency {
     sellFeeBps?: BigNumber
   ) {
     super(chainId, decimals, symbol, name)
+    if (address.startsWith('xdc')) {
+      address = '0x' + address.substring(3)
+    }
     if (bypassChecksum) {
       this.address = checkValidAddress(address)
     } else {
