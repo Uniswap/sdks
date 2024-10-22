@@ -85,7 +85,6 @@ export const abi = [
         ],
       },
       { name: 'sqrtPriceX96', type: 'uint160', internalType: 'uint160' },
-      { name: 'hookData', type: 'bytes', internalType: 'bytes' },
     ],
     outputs: [{ name: '', type: 'int24', internalType: 'int24' }],
     stateMutability: 'payable',

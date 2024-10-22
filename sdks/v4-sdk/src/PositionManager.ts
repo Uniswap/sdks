@@ -214,9 +214,9 @@ export abstract class V4PositionManager {
   /**
    * Public methods to encode method parameters for different actions on the PositionManager contract
    */
-  public static createCallParameters(poolKey: PoolKey, sqrtPriceX96: BigintIsh, hookData?: string): MethodParameters {
+  public static createCallParameters(poolKey: PoolKey, sqrtPriceX96: BigintIsh): MethodParameters {
     return {
-      calldata: this.encodeInitializePool(poolKey, sqrtPriceX96, hookData),
+      calldata: this.encodeInitializePool(poolKey, sqrtPriceX96),
       value: toHex(0),
     }
   }
@@ -237,9 +237,7 @@ export abstract class V4PositionManager {
     // Encode initialize pool.
     if (isMint(options) && shouldCreatePool(options)) {
       // No planner used here because initializePool is not supported as an Action
-      calldataList.push(
-        V4PositionManager.encodeInitializePool(position.pool.poolKey, options.sqrtPriceX96!, options.hookData)
-      )
+      calldataList.push(V4PositionManager.encodeInitializePool(position.pool.poolKey, options.sqrtPriceX96!))
     }
 
     // adjust for slippage
@@ -412,11 +410,10 @@ export abstract class V4PositionManager {
   }
 
   // Initialize a pool
-  private static encodeInitializePool(poolKey: PoolKey, sqrtPriceX96: BigintIsh, hookData?: string): string {
+  private static encodeInitializePool(poolKey: PoolKey, sqrtPriceX96: BigintIsh): string {
     return V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.INITIALIZE_POOL, [
       poolKey,
       sqrtPriceX96.toString(),
-      hookData ?? '0x',
     ])
   }
 
