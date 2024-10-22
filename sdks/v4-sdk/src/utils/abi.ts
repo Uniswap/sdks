@@ -6,6 +6,7 @@ export const abi = [
       { name: '_poolManager', type: 'address', internalType: 'contract IPoolManager' },
       { name: '_permit2', type: 'address', internalType: 'contract IAllowanceTransfer' },
       { name: '_unsubscribeGasLimit', type: 'uint256', internalType: 'uint256' },
+      { name: '_tokenDescriptor', type: 'address', internalType: 'contract IPositionDescriptor' },
     ],
     stateMutability: 'nonpayable',
   },
@@ -85,7 +86,6 @@ export const abi = [
         ],
       },
       { name: 'sqrtPriceX96', type: 'uint160', internalType: 'uint160' },
-      { name: 'hookData', type: 'bytes', internalType: 'bytes' },
     ],
     outputs: [{ name: '', type: 'int24', internalType: 'int24' }],
     stateMutability: 'payable',
@@ -360,10 +360,17 @@ export const abi = [
   },
   {
     type: 'function',
+    name: 'tokenDescriptor',
+    inputs: [],
+    outputs: [{ name: '', type: 'address', internalType: 'contract IPositionDescriptor' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'tokenURI',
-    inputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+    inputs: [{ name: 'tokenId', type: 'uint256', internalType: 'uint256' }],
     outputs: [{ name: '', type: 'string', internalType: 'string' }],
-    stateMutability: 'pure',
+    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -494,7 +501,6 @@ export const abi = [
   { type: 'error', name: 'NotPoolManager', inputs: [] },
   { type: 'error', name: 'NotSubscribed', inputs: [] },
   { type: 'error', name: 'SignatureDeadlineExpired', inputs: [] },
-  { type: 'error', name: 'SliceOutOfBounds', inputs: [] },
   { type: 'error', name: 'Unauthorized', inputs: [] },
   { type: 'error', name: 'UnsupportedAction', inputs: [{ name: 'action', type: 'uint256', internalType: 'uint256' }] },
   {
