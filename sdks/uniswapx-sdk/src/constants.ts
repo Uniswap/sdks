@@ -23,10 +23,10 @@ export function constructSameAddressMap<T>(
 }
 
 export const PERMIT2_MAPPING: AddressMap = {
-  ...constructSameAddressMap("0x000000000022d473030f116ddee9f6b43ac78ba3", [
-    11155111,
-    42161,
-  ]),
+  ...constructSameAddressMap(
+    "0x000000000022d473030f116ddee9f6b43ac78ba3",
+    [11155111, 42161]
+  ),
   12341234: "0x000000000022d473030f116ddee9f6b43ac78ba3",
 };
 
@@ -95,7 +95,7 @@ export const REACTOR_ADDRESS_MAPPING: ReactorMapping = {
     [OrderType.Dutch_V2]: "0x1bd1aAdc9E230626C44a139d7E70d842749351eb",
     [OrderType.Dutch]: "0x0000000000000000000000000000000000000000",
     [OrderType.Relay]: "0x0000000000000000000000000000000000000000",
-    [OrderType.Dutch_V3]: "0x0000000000000000000000000000000000000000",
+    [OrderType.Dutch_V3]: "0xB274d5F4b833b61B340b654d600A864fB604a87c",
   },
   8453: {
     [OrderType.Dutch]: "0x0000000000000000000000000000000000000000",
