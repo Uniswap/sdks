@@ -325,13 +325,20 @@ export class V3DutchOrderBuilder extends OrderBuilder {
     relativeAmounts: bigint[]
   ): BigNumber {
     if (relativeAmounts.length == 0) {
-      throw new Error("relativeAmounts cannot be empty");
+      return startAmount;
     }
+
     // Find the minimum of the relative amounts
     const minRelativeAmount = relativeAmounts.reduce(
       (min, amount) => (amount < min ? amount : min),
       relativeAmounts[0]
     );
+
+    // If the minimum is positive, then the curve is strictly negatively sloped so the maximum is the start
+    if (minRelativeAmount > 0) {
+      return startAmount;
+    }
+
     // Maximum is the start - the min of the relative amounts
     const maxOut = startAmount.sub(minRelativeAmount.toString());
     return maxOut;

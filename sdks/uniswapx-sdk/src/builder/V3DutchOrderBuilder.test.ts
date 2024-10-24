@@ -844,6 +844,27 @@ describe("V3DutchOrderBuilder", () => {
             const maxout = V3DutchOrderBuilder.getMaxAmountOut(startAmount, relativeAmounts);
             expect(maxout).toEqual(startAmount.add(4));
         });
+
+        it("Test maxAmountOut with empty curve", () => {
+            const startAmount = INPUT_START_AMOUNT;
+            const relativeAmounts : bigint[] = [];
+            const maxout = V3DutchOrderBuilder.getMaxAmountOut(startAmount, relativeAmounts);
+            expect(maxout).toEqual(startAmount);
+        });
+
+        it("Test maxAmountOut with negative relativeAmounts", () => {
+            const startAmount = INPUT_START_AMOUNT;
+            const relativeAmounts = [BigInt(-1), BigInt(-2), BigInt(-3)];
+            const maxout = V3DutchOrderBuilder.getMaxAmountOut(startAmount, relativeAmounts);
+            expect(maxout).toEqual(startAmount.add(3));
+        });
+
+        it("Test maxAmountOut with entirely positive relativeAmounts", () => {
+            const startAmount = INPUT_START_AMOUNT;
+            const relativeAmounts = [BigInt(1), BigInt(2), BigInt(3)];
+            const maxout = V3DutchOrderBuilder.getMaxAmountOut(startAmount, relativeAmounts);
+            expect(maxout).toEqual(startAmount);
+        });
     });
 
     describe("fromOrder", () => {
