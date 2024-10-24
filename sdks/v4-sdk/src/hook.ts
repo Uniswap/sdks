@@ -1,3 +1,6 @@
+import invariant from 'tiny-invariant'
+import { isAddress } from 'ethers/lib/utils'
+
 export type HookPermissions = {
   beforeInitialize: boolean
   afterInitialize: boolean
@@ -34,6 +37,9 @@ export enum HookOptions {
 
 export class Hook {
   public static permissions(address: string): HookPermissions {
+    invariant(isAddress(address), 'invalid address')
+    if (/0x/.test(address)) address = address.slice(2)
+
     return {
       beforeInitialize: this.hasPermission(address, HookOptions.BeforeInitialize),
       afterInitialize: this.hasPermission(address, HookOptions.AfterInitialize),
@@ -52,7 +58,7 @@ export class Hook {
     }
   }
 
-  public static hasPermission(address: string, permissionIndex: HookOptions) {
-    return !!(parseInt(address.slice(38), 16) & (1 << permissionIndex))
+  private static hasPermission(address: string, permissionIndex: HookOptions) {
+    return !!(parseInt(address.slice(36), 16) & (1 << permissionIndex))
   }
 }
