@@ -11,6 +11,10 @@ export class PriorityOrderTrade<
 > {
   public readonly tradeType: TTradeType;
   public readonly order: UnsignedPriorityOrder;
+  public readonly classicAmounts: {
+    classicAmountInGasAndPortionAdjusted: string;
+    classicAmountOutGasAndPortionAdjusted: string;
+  } | undefined;
 
   private _inputAmount: CurrencyAmount<TInput> | undefined;
   private _outputAmounts: CurrencyAmount<TOutput>[] | undefined;
@@ -23,15 +27,21 @@ export class PriorityOrderTrade<
     currenciesOut,
     orderInfo,
     tradeType,
+    classicAmounts,
   }: {
     currencyIn: TInput;
     currenciesOut: TOutput[];
     orderInfo: UnsignedPriorityOrderInfo;
     tradeType: TTradeType;
+    classicAmounts?: {
+      classicAmountInGasAndPortionAdjusted: string;
+      classicAmountOutGasAndPortionAdjusted: string;
+    };
   }) {
     this._currencyIn = currencyIn;
     this._currenciesOut = currenciesOut;
     this.tradeType = tradeType;
+    this.classicAmounts = classicAmounts;
 
     // assume single-chain for now
     this.order = new UnsignedPriorityOrder(orderInfo, currencyIn.chainId);
@@ -40,10 +50,13 @@ export class PriorityOrderTrade<
   public get inputAmount(): CurrencyAmount<TInput> {
     if (this._inputAmount) return this._inputAmount;
 
-    const amount = CurrencyAmount.fromRawAmount(
-      this._currencyIn,
-      this.order.info.input.amount.toString()
-    );
+    // If we have classic quote data use that, otherwise use the order input amount
+    const amount = this.classicAmounts?.classicAmountInGasAndPortionAdjusted 
+      ? this.getClassicAmountIn() 
+      : CurrencyAmount.fromRawAmount(
+          this._currencyIn,
+          this.order.info.input.amount.toString()
+        );
     this._inputAmount = amount;
     return amount;
   }
@@ -107,8 +120,8 @@ export class PriorityOrderTrade<
 
   // TODO: revise when there are actually multiple output amounts. for now, assume only one non-fee output at a time
   public get outputAmount(): CurrencyAmount<TOutput> {
-    // TODO: estimate epected amount, using classic quote or expected priority
-    return this.getFirstNonFeeOutputAmount();
+    // If we have classic quote data use that, otherwise use the first non-fee output
+    return this.classicAmounts?.classicAmountOutGasAndPortionAdjusted ? this.getClassicAmountOut() : this.getFirstNonFeeOutputAmount();
   }
 
   public minimumAmountOut(): CurrencyAmount<TOutput> {
@@ -149,6 +162,28 @@ export class PriorityOrderTrade<
       this.outputAmount.currency,
       this.maximumAmountIn().quotient,
       this.minimumAmountOut().quotient
+    );
+  }
+
+  private getClassicAmountIn(): CurrencyAmount<TInput> {
+    if (!this.classicAmounts?.classicAmountInGasAndPortionAdjusted) {
+      throw new Error("classicAmountInGasAndPortionAdjusted not set");
+    }
+
+    return CurrencyAmount.fromRawAmount(
+      this._currencyIn,
+      this.classicAmounts.classicAmountInGasAndPortionAdjusted
+    );
+  }
+
+  private getClassicAmountOut(): CurrencyAmount<TOutput> {
+    if (!this.classicAmounts?.classicAmountOutGasAndPortionAdjusted) {
+      throw new Error("classicAmountOutGasAndPortionAdjusted not set");
+    }
+
+    return CurrencyAmount.fromRawAmount(
+      this._currenciesOut[0],
+      this.classicAmounts.classicAmountOutGasAndPortionAdjusted
     );
   }
 }
