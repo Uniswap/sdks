@@ -1,4 +1,4 @@
-import { ethers } from "ethers";
+import { BigNumber, ethers } from "ethers";
 
 import { OrderType, REVERSE_REACTOR_MAPPING } from "../constants";
 import { MissingConfiguration } from "../errors";
@@ -12,6 +12,7 @@ import {
   UnsignedPriorityOrder,
   UnsignedV2DutchOrder,
 } from "../order";
+import { CosignedV3DutchOrder, UnsignedV3DutchOrder } from "../order/V3DutchOrder";
 
 import { stripHexPrefix } from ".";
 
@@ -100,6 +101,16 @@ export class UniswapXOrderParser extends OrderParser {
         // if cosignature exists then returned cosigned version
         return cosignedOrder;
       }
+      case OrderType.Dutch_V3: {
+        // cosigned and unsigned serialized versions are the same format
+        const cosignedOrder = CosignedV3DutchOrder.parse(order, chainId);
+        // if no cosignature, returned unsigned variant
+        if (cosignedOrder.info.cosignature === "0x") {
+          return UnsignedV3DutchOrder.parse(order, chainId);
+        }
+        // if cosignature exists then returned cosigned version
+        return cosignedOrder;
+      }
       case OrderType.Priority: {
         // cosigned and unsigned serialized versions are the same format
         const cosignedOrder = CosignedPriorityOrder.parse(order, chainId);
@@ -146,4 +157,8 @@ export class RelayOrderParser extends OrderParser {
   parseOrder(order: string, chainId: number): RelayOrder {
     return RelayOrder.parse(order, chainId);
   }
+}
+
+export function originalIfZero(value: BigNumber, original: BigNumber): BigNumber {
+  return value.isZero() ? original : value;
 }
