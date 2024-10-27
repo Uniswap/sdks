@@ -1,10 +1,10 @@
 {
-  "name": "@uniswap/v2-sdk",
-  "description": "🛠 An SDK for building applications on top of Uniswap V2",
-  "repository": "https://github.com/Uniswap/sdks.git",
+  "name": "@x-swap-protocol/v2-sdk",
+  "description": "🛠 An SDK for building applications on top of XSwap Protocol V2",
+  "repository": "https://github.com/XSwapProtocol/sdks.git",
   "keywords": [
-    "uniswap",
-    "ethereum"
+    "xswapprotocol",
+    "xdc"
   ],
   "license": "MIT",
   "main": "dist/index.js",
@@ -26,14 +26,13 @@
   "dependencies": {
     "@ethersproject/address": "^5.0.2",
     "@ethersproject/solidity": "^5.0.9",
-    "@uniswap/sdk-core": "^5.8.1",
+    "@x-swap-protocol/sdk-core": "^1.0.1",
     "tiny-invariant": "^1.1.0",
     "tiny-warning": "^1.0.3"
   },
   "devDependencies": {
     "@types/big.js": "^4.0.5",
     "@types/jest": "^24.0.25",
-    "@uniswap/v2-core": "^1.0.1",
     "eslint-config-react-app": "7.0.1",
     "tsdx": "^0.14.1"
   },

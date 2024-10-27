@@ -4580,23 +4580,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v2-sdk@workspace:sdks/v2-sdk":
-  version: 0.0.0-use.local
-  resolution: "@uniswap/v2-sdk@workspace:sdks/v2-sdk"
-  dependencies:
-    "@ethersproject/address": ^5.0.2
-    "@ethersproject/solidity": ^5.0.9
-    "@types/big.js": ^4.0.5
-    "@types/jest": ^24.0.25
-    "@uniswap/sdk-core": ^5.8.1
-    "@uniswap/v2-core": ^1.0.1
-    eslint-config-react-app: 7.0.1
-    tiny-invariant: ^1.1.0
-    tiny-warning: ^1.0.3
-    tsdx: ^0.14.1
-  languageName: unknown
-  linkType: soft
-
 "@uniswap/v3-core@npm:1.0.0":
   version: 1.0.0
   resolution: "@uniswap/v3-core@npm:1.0.0"
@@ -4724,6 +4707,23 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@x-swap-protocol/sdk-core@npm:^1.0.1":
+  version: 1.0.1
+  resolution: "@x-swap-protocol/sdk-core@npm:1.0.1"
+  dependencies:
+    "@ethersproject/address": ^5.0.2
+    "@ethersproject/bytes": ^5.7.0
+    "@ethersproject/keccak256": 5.7.0
+    "@ethersproject/strings": 5.7.0
+    big.js: ^5.2.2
+    decimal.js-light: ^2.5.0
+    jsbi: ^3.1.4
+    tiny-invariant: ^1.1.0
+    toformat: ^2.0.0
+  checksum: 7c8aed465043de8ea96e004188db691c072314519bed47d6a3f73b0e973586e7f4c45bc45505989d7285c411ed44a428ddc7d8ca19cb34913f7b934eb536a207
+  languageName: node
+  linkType: hard
+
 "@x-swap-protocol/sdk-core@workspace:sdks/sdk-core":
   version: 0.0.0-use.local
   resolution: "@x-swap-protocol/sdk-core@workspace:sdks/sdk-core"
@@ -4739,6 +4739,22 @@ __metadata:
     jsbi: ^3.1.4
     tiny-invariant: ^1.1.0
     toformat: ^2.0.0
+    tsdx: ^0.14.1
+  languageName: unknown
+  linkType: soft
+
+"@x-swap-protocol/v2-sdk@workspace:sdks/v2-sdk":
+  version: 0.0.0-use.local
+  resolution: "@x-swap-protocol/v2-sdk@workspace:sdks/v2-sdk"
+  dependencies:
+    "@ethersproject/address": ^5.0.2
+    "@ethersproject/solidity": ^5.0.9
+    "@types/big.js": ^4.0.5
+    "@types/jest": ^24.0.25
+    "@x-swap-protocol/sdk-core": ^1.0.1
+    eslint-config-react-app: 7.0.1
+    tiny-invariant: ^1.1.0
+    tiny-warning: ^1.0.3
     tsdx: ^0.14.1
   languageName: unknown
   linkType: soft
