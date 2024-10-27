@@ -1,11 +1,11 @@
-import { Ether, Token, WETH9, CurrencyAmount } from '@uniswap/sdk-core'
+import { Ether, Token, WETH9, CurrencyAmount } from '@x-swap-protocol/sdk-core'
 import { Pair, Route } from './index'
 
 describe('Route', () => {
-  const ETHER = Ether.onChain(1)
-  const token0 = new Token(1, '0x0000000000000000000000000000000000000001', 18, 't0')
-  const token1 = new Token(1, '0x0000000000000000000000000000000000000002', 18, 't1')
-  const weth = WETH9[1]
+  const ETHER = Ether.onChain(50)
+  const token0 = new Token(50, '0x0000000000000000000000000000000000000001', 18, 't0')
+  const token1 = new Token(50, '0x0000000000000000000000000000000000000002', 18, 't1')
+  const weth = WETH9[50]
   const pair_0_1 = new Pair(CurrencyAmount.fromRawAmount(token0, '100'), CurrencyAmount.fromRawAmount(token1, '200'))
   const pair_0_weth = new Pair(CurrencyAmount.fromRawAmount(token0, '100'), CurrencyAmount.fromRawAmount(weth, '100'))
   const pair_1_weth = new Pair(CurrencyAmount.fromRawAmount(token1, '175'), CurrencyAmount.fromRawAmount(weth, '100'))
@@ -16,7 +16,7 @@ describe('Route', () => {
     expect(route.path).toEqual([token0, token1])
     expect(route.input).toEqual(token0)
     expect(route.output).toEqual(token1)
-    expect(route.chainId).toEqual(1)
+    expect(route.chainId).toEqual(50)
   })
 
   it('can have a token as both input and output', () => {

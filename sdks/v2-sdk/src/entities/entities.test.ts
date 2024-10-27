@@ -1,6 +1,6 @@
 import JSBI from 'jsbi'
 import invariant from 'tiny-invariant'
-import { WETH9 as _WETH9, TradeType, Token, CurrencyAmount } from '@uniswap/sdk-core'
+import { WETH9 as _WETH9, TradeType, Token, CurrencyAmount } from '@x-swap-protocol/sdk-core'
 import { Pair, Route, Trade } from '../index'
 
 const ADDRESSES = [
@@ -8,8 +8,8 @@ const ADDRESSES = [
   '0x0000000000000000000000000000000000000002',
   '0x0000000000000000000000000000000000000003',
 ]
-const CHAIN_ID = 3
-const WETH9 = _WETH9[3]
+const CHAIN_ID = 50
+const WETH9 = _WETH9[CHAIN_ID]
 const DECIMAL_PERMUTATIONS: [number, number, number][] = [
   [0, 0, 0],
   [0, 9, 18],

@@ -1,4 +1,4 @@
-import { Token, Currency, CurrencyAmount, Percent, TradeType, validateAndParseAddress } from '@uniswap/sdk-core'
+import { Token, Currency, CurrencyAmount, Percent, TradeType, validateAndParseAddress } from '@x-swap-protocol/sdk-core'
 import { Trade } from './entities'
 import invariant from 'tiny-invariant'
 
