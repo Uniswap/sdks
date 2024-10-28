@@ -1,9 +1,9 @@
-import { Hook, HookOptions } from './hook'
+import { Hook, HookOptions, hookFlagIndex } from './hook'
 
 function constructAddress(hookOptions: HookOptions[]): string {
   let hookFlags = 0
   for (const hookOption of hookOptions) {
-    hookFlags = hookFlags | (1 << hookOption)
+    hookFlags = hookFlags | (1 << hookFlagIndex[hookOption])
   }
 
   const addressFlag = hookFlags.toString(16)

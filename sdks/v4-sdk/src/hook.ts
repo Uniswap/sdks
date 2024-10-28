@@ -1,38 +1,40 @@
 import invariant from 'tiny-invariant'
 import { isAddress } from 'ethers/lib/utils'
 
-export type HookPermissions = {
-  beforeInitialize: boolean
-  afterInitialize: boolean
-  beforeAddLiquidity: boolean
-  afterAddLiquidity: boolean
-  beforeRemoveLiquidity: boolean
-  afterRemoveLiquidity: boolean
-  beforeSwap: boolean
-  afterSwap: boolean
-  beforeDonate: boolean
-  afterDonate: boolean
-  beforeSwapReturnsDelta: boolean
-  afterSwapReturnsDelta: boolean
-  afterAddLiquidityReturnsDelta: boolean
-  afterRemoveLiquidityReturnsDelta: boolean
-}
+export type HookPermissions = { [key in HookOptions]: boolean }
 
 export enum HookOptions {
-  AfterRemoveLiquidityReturnsDelta,
-  AfterAddLiquidityReturnsDelta,
-  AfterSwapReturnsDelta,
-  BeforeSwapReturnsDelta,
-  AfterDonate,
-  BeforeDonate,
-  AfterSwap,
-  BeforeSwap,
-  AfterRemoveLiquidity,
-  BeforeRemoveLiquidity,
-  AfterAddLiquidity,
-  BeforeAddLiquidity,
-  AfterInitialize,
-  BeforeInitialize,
+  AfterRemoveLiquidityReturnsDelta = 'afterRemoveLiquidityReturnsDelta',
+  AfterAddLiquidityReturnsDelta = 'afterAddLiquidityReturnsDelta',
+  AfterSwapReturnsDelta = 'afterSwapReturnsDelta',
+  BeforeSwapReturnsDelta = 'beforeSwapReturnsDelta',
+  AfterDonate = 'afterDonate',
+  BeforeDonate = 'beforeDonate',
+  AfterSwap = 'afterSwap',
+  BeforeSwap = 'beforeSwap',
+  AfterRemoveLiquidity = 'afterRemoveLiquidity',
+  BeforeRemoveLiquidity = 'beforeRemoveLiquidity',
+  AfterAddLiquidity = 'afterAddLiquidity',
+  BeforeAddLiquidity = 'beforeAddLiquidity',
+  AfterInitialize = 'afterInitialize',
+  BeforeInitialize = 'beforeInitialize',
+}
+
+export const hookFlagIndex = {
+  [HookOptions.AfterRemoveLiquidityReturnsDelta]: 0,
+  [HookOptions.AfterAddLiquidityReturnsDelta]: 1,
+  [HookOptions.AfterSwapReturnsDelta]: 2,
+  [HookOptions.BeforeSwapReturnsDelta]: 3,
+  [HookOptions.AfterDonate]: 4,
+  [HookOptions.BeforeDonate]: 5,
+  [HookOptions.AfterSwap]: 6,
+  [HookOptions.BeforeSwap]: 7,
+  [HookOptions.AfterRemoveLiquidity]: 8,
+  [HookOptions.BeforeRemoveLiquidity]: 9,
+  [HookOptions.AfterAddLiquidity]: 10,
+  [HookOptions.BeforeAddLiquidity]: 11,
+  [HookOptions.AfterInitialize]: 12,
+  [HookOptions.BeforeInitialize]: 13,
 }
 
 export class Hook {
@@ -58,7 +60,7 @@ export class Hook {
     }
   }
 
-  private static hasPermission(address: string, permissionIndex: HookOptions) {
-    return !!(parseInt(address.slice(36), 16) & (1 << permissionIndex))
+  private static hasPermission(address: string, hookOption: HookOptions) {
+    return !!(parseInt(address.slice(36), 16) & (1 << hookFlagIndex[hookOption]))
   }
 }
