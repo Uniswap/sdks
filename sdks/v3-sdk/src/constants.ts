@@ -1,16 +1,22 @@
-import { ChainId } from '@uniswap/sdk-core'
+import { ChainId } from '@x-swap-protocol/sdk-core'
 
-export const FACTORY_ADDRESS = '0x1F98431c8aD98523631AE4a59f267346ea31F984'
+// @deprecated please use FACTORY_ADDRESSES[ChainId]
+export const FACTORY_ADDRESS = '0x30f317a9ec0f0d06d5de0f8d248ec3506b7e4a8a'
+
+export const FACTORY_ADDRESSES: { [chainId in ChainId]: string } = {
+  [ChainId.XDC]: '0x30f317a9ec0f0d06d5de0f8d248ec3506b7e4a8a',
+  [ChainId.APOTHEM]: '0xe91bf417b470ccc6b7307e58a5aa0644572981d7',
+}
 
 export const ADDRESS_ZERO = '0x0000000000000000000000000000000000000000'
 
 // @deprecated please use poolInitCodeHash(chainId: ChainId)
-export const POOL_INIT_CODE_HASH = '0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54'
+export const POOL_INIT_CODE_HASH = '0xd191442867020895af7761f344ec15480865676419d842260d75b06e75e00136'
 
 export function poolInitCodeHash(chainId?: ChainId): string {
   switch (chainId) {
-    case ChainId.ZKSYNC:
-      return '0x010013f177ea1fcbc4520f9a3ca7cd2d1d77959e05aa66484027cb38e712aeed'
+    // case ChainId.ZKSYNC:
+    //   return '0x010013f177ea1fcbc4520f9a3ca7cd2d1d77959e05aa66484027cb38e712aeed'
     default:
       return POOL_INIT_CODE_HASH
   }
@@ -21,9 +27,6 @@ export function poolInitCodeHash(chainId?: ChainId): string {
  */
 export enum FeeAmount {
   LOWEST = 100,
-  LOW_200 = 200,
-  LOW_300 = 300,
-  LOW_400 = 400,
   LOW = 500,
   MEDIUM = 3000,
   HIGH = 10000,
@@ -34,9 +37,6 @@ export enum FeeAmount {
  */
 export const TICK_SPACINGS: { [amount in FeeAmount]: number } = {
   [FeeAmount.LOWEST]: 1,
-  [FeeAmount.LOW_200]: 4,
-  [FeeAmount.LOW_300]: 6,
-  [FeeAmount.LOW_400]: 8,
   [FeeAmount.LOW]: 10,
   [FeeAmount.MEDIUM]: 60,
   [FeeAmount.HIGH]: 200,

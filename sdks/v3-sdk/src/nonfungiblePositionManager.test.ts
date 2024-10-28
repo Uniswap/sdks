@@ -1,4 +1,4 @@
-import { Percent, Token, CurrencyAmount, WETH9, Ether } from '@uniswap/sdk-core'
+import { Percent, Token, CurrencyAmount, WETH9, Ether } from '@x-swap-protocol/sdk-core'
 import { ethers } from 'ethers'
 import { FeeAmount, TICK_SPACINGS } from './constants'
 import { Pool } from './entities/pool'
