@@ -1,8 +1,8 @@
-import { Ether, Token, WETH9, CurrencyAmount, Currency } from '@uniswap/sdk-core'
-import { Route as V3RouteSDK, Pool, FeeAmount, TickMath, encodeSqrtRatioX96 } from '@uniswap/v3-sdk'
+import { Ether, Token, WETH9, CurrencyAmount, Currency } from '@x-swap-protocol/sdk-core'
+import { Route as V3RouteSDK, Pool, FeeAmount, TickMath, encodeSqrtRatioX96 } from '@x-swap-protocol/v3-sdk'
 import { MixedRoute, RouteV3 } from '../route'
 import { Protocol } from '../protocol'
-import { Route as V2RouteSDK, Pair } from '@uniswap/v2-sdk'
+import { Route as V2RouteSDK, Pair } from '@x-swap-protocol/v2-sdk'
 import { MixedRouteSDK } from './route'
 import { partitionMixedRouteByProtocol } from '../../utils'
 

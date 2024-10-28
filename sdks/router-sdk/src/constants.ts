@@ -1,4 +1,4 @@
-import { Percent } from '@uniswap/sdk-core'
+import { Percent } from '@x-swap-protocol/sdk-core'
 import JSBI from 'jsbi'
 
 export const MSG_SENDER = '0x0000000000000000000000000000000000000001'

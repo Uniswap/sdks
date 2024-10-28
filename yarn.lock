@@ -4679,9 +4679,9 @@ __metadata:
     "@ethersproject/abi": ^5.5.0
     "@types/jest": ^24.0.25
     "@uniswap/swap-router-contracts": ^1.3.0
-    "@uniswap/v3-sdk": ^3.17.0
     "@x-swap-protocol/sdk-core": ^1.0.1
-    "@x-swap-protocol/v2-sdk": ^1.0.0
+    "@x-swap-protocol/v2-sdk": ^1.1.0
+    "@x-swap-protocol/v3-sdk": ^1.1.0
     prettier: ^2.4.1
     tsdx: ^0.14.1
   languageName: unknown
@@ -4723,7 +4723,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@x-swap-protocol/v2-sdk@npm:^1.0.0":
+"@x-swap-protocol/v2-sdk@npm:^1.1.0":
   version: 1.1.0
   resolution: "@x-swap-protocol/v2-sdk@npm:1.1.0"
   dependencies:
@@ -4751,6 +4751,22 @@ __metadata:
     tsdx: ^0.14.1
   languageName: unknown
   linkType: soft
+
+"@x-swap-protocol/v3-sdk@npm:^1.1.0":
+  version: 1.1.0
+  resolution: "@x-swap-protocol/v3-sdk@npm:1.1.0"
+  dependencies:
+    "@ethersproject/abi": ^5.5.0
+    "@ethersproject/solidity": ^5.0.9
+    "@uniswap/swap-router-contracts": ^1.3.0
+    "@uniswap/v3-periphery": ^1.1.1
+    "@uniswap/v3-staker": 1.0.0
+    "@x-swap-protocol/sdk-core": ^1.0.1
+    tiny-invariant: ^1.1.0
+    tiny-warning: ^1.0.3
+  checksum: 5f0a4eba5b0831f20def9116f8f0c0fdf92e926b82ae02940af1ee7ca80c03afe41f04b04509693241f273c7814225348450b349c2ec60c10410a1d2de2333b1
+  languageName: node
+  linkType: hard
 
 "@x-swap-protocol/v3-sdk@workspace:sdks/v3-sdk":
   version: 0.0.0-use.local

@@ -1,4 +1,4 @@
-import { sqrt, Token, CurrencyAmount, TradeType, WETH9, Ether, Percent, Price } from '@uniswap/sdk-core'
+import { sqrt, Token, CurrencyAmount, TradeType, WETH9, Ether, Percent, Price } from '@x-swap-protocol/sdk-core'
 import { BigNumber } from '@ethersproject/bignumber'
 import JSBI from 'jsbi'
 import { MixedRoute, RouteV2, RouteV3 } from './route'
@@ -11,8 +11,8 @@ import {
   TickMath,
   nearestUsableTick,
   encodeSqrtRatioX96,
-} from '@uniswap/v3-sdk'
-import { Pair, Route as V2RouteSDK } from '@uniswap/v2-sdk'
+} from '@x-swap-protocol/v3-sdk'
+import { Pair, Route as V2RouteSDK } from '@x-swap-protocol/v2-sdk'
 import { MixedRouteSDK } from './mixedRoute/route'
 
 describe('Trade', () => {

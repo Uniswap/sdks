@@ -1,5 +1,13 @@
 import { Interface } from '@ethersproject/abi'
-import { Currency, CurrencyAmount, Percent, TradeType, validateAndParseAddress, WETH9 } from '@uniswap/sdk-core'
+import {
+  ChainId,
+  Currency,
+  CurrencyAmount,
+  Percent,
+  TradeType,
+  validateAndParseAddress,
+  WETH9
+} from '@x-swap-protocol/sdk-core'
 import { abi } from '@uniswap/swap-router-contracts/artifacts/contracts/interfaces/ISwapRouter02.sol/ISwapRouter02.json'
 import { Trade as V2Trade } from '@x-swap-protocol/v2-sdk'
 import {
@@ -13,7 +21,7 @@ import {
   SelfPermit,
   toHex,
   Trade as V3Trade,
-} from '@uniswap/v3-sdk'
+} from '@x-swap-protocol/v3-sdk'
 import invariant from 'tiny-invariant'
 import JSBI from 'jsbi'
 import { ADDRESS_THIS, MSG_SENDER } from './constants'
@@ -581,9 +589,10 @@ export abstract class SwapRouter {
       calldatas.push(SelfPermit.encodePermit(quoteAmountOut.currency, options.outputTokenPermit))
     }
 
-    const chainId = sampleTrade.route.chainId
+    const chainId: ChainId = sampleTrade.route.chainId
     const zeroForOne = position.pool.token0.wrapped.address === totalAmountSwapped.currency.wrapped.address
     const { positionAmountIn, positionAmountOut } = SwapRouter.getPositionAmounts(position, zeroForOne)
+
 
     // if tokens are native they will be converted to WETH9
     const tokenIn = inputIsNative ? WETH9[chainId] : positionAmountIn.currency.wrapped
