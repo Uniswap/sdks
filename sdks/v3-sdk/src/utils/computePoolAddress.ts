@@ -1,7 +1,7 @@
 import { defaultAbiCoder } from '@ethersproject/abi'
 import { getCreate2Address } from '@ethersproject/address'
 import { keccak256 } from '@ethersproject/solidity'
-import { ChainId, computeZksyncCreate2Address, Token } from '@uniswap/sdk-core'
+import { ChainId, Token } from '@x-swap-protocol/sdk-core'
 import { FeeAmount, poolInitCodeHash } from '../constants'
 
 /**
@@ -36,11 +36,7 @@ export function computePoolAddress({
   )
   const initCodeHash = initCodeHashManualOverride ?? poolInitCodeHash(chainId)
 
-  // ZKSync uses a different create2 address computation
-  // Most likely all ZKEVM chains will use the different computation from standard create2
   switch (chainId) {
-    case ChainId.ZKSYNC:
-      return computeZksyncCreate2Address(factoryAddress, initCodeHash, salt)
     default:
       return getCreate2Address(factoryAddress, salt, initCodeHash)
   }

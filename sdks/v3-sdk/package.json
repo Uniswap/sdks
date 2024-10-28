@@ -1,10 +1,10 @@
 {
-  "name": "@uniswap/v3-sdk",
-  "description": "⚒️ An SDK for building applications on top of Uniswap V3",
-  "repository": "https://github.com/Uniswap/sdks.git",
+  "name": "@x-swap-protocol/v3-sdk",
+  "description": "⚒️ An SDK for building applications on top of XSwap Protocol V3",
+  "repository": "https://github.com/XSwapProtocol/sdks.git",
   "keywords": [
-    "uniswap",
-    "ethereum"
+    "xswapprotocol",
+    "xdc"
   ],
   "license": "MIT",
   "main": "dist/index.js",
@@ -26,10 +26,10 @@
   "dependencies": {
     "@ethersproject/abi": "^5.5.0",
     "@ethersproject/solidity": "^5.0.9",
-    "@uniswap/sdk-core": "^5.8.1",
     "@uniswap/swap-router-contracts": "^1.3.0",
     "@uniswap/v3-periphery": "^1.1.1",
     "@uniswap/v3-staker": "1.0.0",
+    "@x-swap-protocol/sdk-core": "^1.0.1",
     "tiny-invariant": "^1.1.0",
     "tiny-warning": "^1.0.3"
   },
@@ -58,7 +58,7 @@
     "extends": "semantic-release-monorepo",
     "branches": [
       {
-        "name": "main",
+        "name": "master",
         "prerelease": false
       }
     ],

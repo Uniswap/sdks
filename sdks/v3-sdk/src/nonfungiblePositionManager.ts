@@ -6,7 +6,7 @@ import {
   validateAndParseAddress,
   Currency,
   NativeCurrency,
-} from '@uniswap/sdk-core'
+} from '@x-swap-protocol/sdk-core'
 import JSBI from 'jsbi'
 import invariant from 'tiny-invariant'
 import { Position } from './entities/position'
