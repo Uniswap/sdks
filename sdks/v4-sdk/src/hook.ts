@@ -40,6 +40,8 @@ export const hookFlagIndex = {
 export class Hook {
   public static permissions(address: string): HookPermissions {
     invariant(isAddress(address), 'invalid address')
+    // addresses with and without the '0x' prefix are considered valid but we must remove the 0x prefix to normalize
+    // all addresses in order to slice the last 14 bits representing hook flags
     if (/0x/.test(address)) address = address.slice(2)
 
     return {
@@ -61,6 +63,7 @@ export class Hook {
   }
 
   private static hasPermission(address: string, hookOption: HookOptions) {
+    // slice only the last 14 bits which are the hook flags and compare with the specific hookOption
     return !!(parseInt(address.slice(36), 16) & (1 << hookFlagIndex[hookOption]))
   }
 }
