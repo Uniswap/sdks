@@ -1,15 +1,14 @@
 import { Currency, CurrencyAmount, Fraction, Percent, Price, TradeType } from '@uniswap/sdk-core'
 import { Pair, Route as V2RouteSDK, Trade as V2TradeSDK } from '@uniswap/v2-sdk'
-import { Pool as V3Pool, Route as V3RouteSDK, Trade as V3TradeSDK } from '@uniswap/v3-sdk'
-import { Pool as V4Pool, Route as V4RouteSDK, Trade as V4TradeSDK } from '@uniswap/v4-sdk'
+import { Pool, Route as V3RouteSDK, Trade as V3TradeSDK } from '@uniswap/v3-sdk'
 import invariant from 'tiny-invariant'
 import { ONE, ONE_HUNDRED_PERCENT, ZERO, ZERO_PERCENT } from '../constants'
 import { MixedRouteSDK } from './mixedRoute/route'
 import { MixedRouteTrade as MixedRouteTradeSDK } from './mixedRoute/trade'
-import { IRoute, MixedRoute, RouteV2, RouteV3, RouteV4 } from './route'
+import { IRoute, MixedRoute, RouteV2, RouteV3 } from './route'
 
 export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType extends TradeType> {
-  public readonly routes: IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>[]
+  public readonly routes: IRoute<TInput, TOutput, Pair | Pool>[]
   public readonly tradeType: TTradeType
   private _outputAmount: CurrencyAmount<TOutput> | undefined
   private _inputAmount: CurrencyAmount<TInput> | undefined
@@ -19,40 +18,34 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
    * make up the trade. May consist of swaps in v2 or v3.
    */
   public readonly swaps: {
-    route: IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>
+    route: IRoute<TInput, TOutput, Pair | Pool>
     inputAmount: CurrencyAmount<TInput>
     outputAmount: CurrencyAmount<TOutput>
   }[]
 
   //  construct a trade across v2 and v3 routes from pre-computed amounts
   public constructor({
-    v2Routes = [],
-    v3Routes = [],
-    v4Routes = [],
-    mixedRoutes = [],
-    tradeType,
-  }: {
-    v2Routes?: {
+                       v2Routes,
+                       v3Routes,
+                       tradeType,
+                       mixedRoutes,
+                     }: {
+    v2Routes: {
       routev2: V2RouteSDK<TInput, TOutput>
       inputAmount: CurrencyAmount<TInput>
       outputAmount: CurrencyAmount<TOutput>
     }[]
-    v3Routes?: {
+    v3Routes: {
       routev3: V3RouteSDK<TInput, TOutput>
       inputAmount: CurrencyAmount<TInput>
       outputAmount: CurrencyAmount<TOutput>
     }[]
-    v4Routes?: {
-      routev4: V4RouteSDK<TInput, TOutput>
-      inputAmount: CurrencyAmount<TInput>
-      outputAmount: CurrencyAmount<TOutput>
-    }[]
+    tradeType: TTradeType
     mixedRoutes?: {
       mixedRoute: MixedRouteSDK<TInput, TOutput>
       inputAmount: CurrencyAmount<TInput>
       outputAmount: CurrencyAmount<TOutput>
     }[]
-    tradeType: TTradeType
   }) {
     this.swaps = []
     this.routes = []
@@ -76,24 +69,17 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
         outputAmount,
       })
     }
-    // wrap v4 routes
-    for (const { routev4, inputAmount, outputAmount } of v4Routes) {
-      const route = new RouteV4(routev4)
-      this.routes.push(route)
-      this.swaps.push({
-        route,
-        inputAmount,
-        outputAmount,
-      })
-    }
-    for (const { mixedRoute, inputAmount, outputAmount } of mixedRoutes) {
-      const route = new MixedRoute(mixedRoute)
-      this.routes.push(route)
-      this.swaps.push({
-        route,
-        inputAmount,
-        outputAmount,
-      })
+    // wrap mixedRoutes
+    if (mixedRoutes) {
+      for (const { mixedRoute, inputAmount, outputAmount } of mixedRoutes) {
+        const route = new MixedRoute(mixedRoute)
+        this.routes.push(route)
+        this.swaps.push({
+          route,
+          inputAmount,
+          outputAmount,
+        })
+      }
     }
 
     if (this.swaps.length === 0) {
@@ -106,32 +92,30 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     const inputCurrency = this.swaps[0].inputAmount.currency
     const outputCurrency = this.swaps[0].outputAmount.currency
     invariant(
-      this.swaps.every(({ route }) => inputCurrency.wrapped.equals(route.input.wrapped)),
-      'INPUT_CURRENCY_MATCH'
+        this.swaps.every(({ route }) => inputCurrency.wrapped.equals(route.input.wrapped)),
+        'INPUT_CURRENCY_MATCH'
     )
     invariant(
-      this.swaps.every(({ route }) => outputCurrency.wrapped.equals(route.output.wrapped)),
-      'OUTPUT_CURRENCY_MATCH'
+        this.swaps.every(({ route }) => outputCurrency.wrapped.equals(route.output.wrapped)),
+        'OUTPUT_CURRENCY_MATCH'
     )
 
     // pools must be unique inter protocols
     const numPools = this.swaps.map(({ route }) => route.pools.length).reduce((total, cur) => total + cur, 0)
-    const poolIdentifierSet = new Set<string>()
+    const poolAddressSet = new Set<string>()
     for (const { route } of this.swaps) {
       for (const pool of route.pools) {
-        if (pool instanceof V4Pool) {
-          poolIdentifierSet.add(pool.poolId)
-        } else if (pool instanceof V3Pool) {
-          poolIdentifierSet.add(V3Pool.getAddress(pool.token0, pool.token1, pool.fee))
+        if (pool instanceof Pool) {
+          poolAddressSet.add(Pool.getAddress(pool.token0, pool.token1, (pool as Pool).fee))
         } else if (pool instanceof Pair) {
           const pair = pool
-          poolIdentifierSet.add(Pair.getAddress(pair.token0, pair.token1))
+          poolAddressSet.add(Pair.getAddress(pair.token0, pair.token1))
         } else {
           throw new Error('Unexpected pool type in route when constructing trade object')
         }
       }
     }
-    invariant(numPools === poolIdentifierSet.size, 'POOLS_DUPLICATED')
+    invariant(numPools === poolAddressSet.size, 'POOLS_DUPLICATED')
   }
 
   public get inputAmount(): CurrencyAmount<TInput> {
@@ -141,8 +125,8 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
 
     const inputCurrency = this.swaps[0].inputAmount.currency
     const totalInputFromRoutes = this.swaps
-      .map(({ inputAmount }) => inputAmount)
-      .reduce((total, cur) => total.add(cur), CurrencyAmount.fromRawAmount(inputCurrency, 0))
+        .map(({ inputAmount }) => inputAmount)
+        .reduce((total, cur) => total.add(cur), CurrencyAmount.fromRawAmount(inputCurrency, 0))
 
     this._inputAmount = totalInputFromRoutes
     return this._inputAmount
@@ -155,8 +139,8 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
 
     const outputCurrency = this.swaps[0].outputAmount.currency
     const totalOutputFromRoutes = this.swaps
-      .map(({ outputAmount }) => outputAmount)
-      .reduce((total, cur) => total.add(cur), CurrencyAmount.fromRawAmount(outputCurrency, 0))
+        .map(({ outputAmount }) => outputAmount)
+        .reduce((total, cur) => total.add(cur), CurrencyAmount.fromRawAmount(outputCurrency, 0))
 
     this._outputAmount = totalOutputFromRoutes
     return this._outputAmount
@@ -169,13 +153,13 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
    */
   public get executionPrice(): Price<TInput, TOutput> {
     return (
-      this._executionPrice ??
-      (this._executionPrice = new Price(
-        this.inputAmount.currency,
-        this.outputAmount.currency,
-        this.inputAmount.quotient,
-        this.outputAmount.quotient
-      ))
+        this._executionPrice ??
+        (this._executionPrice = new Price(
+            this.inputAmount.currency,
+            this.outputAmount.currency,
+            this.inputAmount.quotient,
+            this.outputAmount.quotient
+        ))
     )
   }
 
@@ -247,9 +231,9 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       return amountOut
     } else {
       const slippageAdjustedAmountOut = new Fraction(ONE)
-        .add(slippageTolerance)
-        .invert()
-        .multiply(amountOut.quotient).quotient
+          .add(slippageTolerance)
+          .invert()
+          .multiply(amountOut.quotient).quotient
       return CurrencyAmount.fromRawAmount(amountOut.currency, slippageAdjustedAmountOut)
     }
   }
@@ -276,31 +260,27 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
    */
   public worstExecutionPrice(slippageTolerance: Percent): Price<TInput, TOutput> {
     return new Price(
-      this.inputAmount.currency,
-      this.outputAmount.currency,
-      this.maximumAmountIn(slippageTolerance).quotient,
-      this.minimumAmountOut(slippageTolerance).quotient
+        this.inputAmount.currency,
+        this.outputAmount.currency,
+        this.maximumAmountIn(slippageTolerance).quotient,
+        this.minimumAmountOut(slippageTolerance).quotient
     )
   }
 
   public static async fromRoutes<TInput extends Currency, TOutput extends Currency, TTradeType extends TradeType>(
-    v2Routes: {
-      routev2: V2RouteSDK<TInput, TOutput>
-      amount: TTradeType extends TradeType.EXACT_INPUT ? CurrencyAmount<TInput> : CurrencyAmount<TOutput>
-    }[],
-    v3Routes: {
-      routev3: V3RouteSDK<TInput, TOutput>
-      amount: TTradeType extends TradeType.EXACT_INPUT ? CurrencyAmount<TInput> : CurrencyAmount<TOutput>
-    }[],
-    tradeType: TTradeType,
-    mixedRoutes?: {
-      mixedRoute: MixedRouteSDK<TInput, TOutput>
-      amount: TTradeType extends TradeType.EXACT_INPUT ? CurrencyAmount<TInput> : CurrencyAmount<TOutput>
-    }[],
-    v4Routes?: {
-      routev4: V4RouteSDK<TInput, TOutput>
-      amount: TTradeType extends TradeType.EXACT_INPUT ? CurrencyAmount<TInput> : CurrencyAmount<TOutput>
-    }[]
+      v2Routes: {
+        routev2: V2RouteSDK<TInput, TOutput>
+        amount: TTradeType extends TradeType.EXACT_INPUT ? CurrencyAmount<TInput> : CurrencyAmount<TOutput>
+      }[],
+      v3Routes: {
+        routev3: V3RouteSDK<TInput, TOutput>
+        amount: TTradeType extends TradeType.EXACT_INPUT ? CurrencyAmount<TInput> : CurrencyAmount<TOutput>
+      }[],
+      tradeType: TTradeType,
+      mixedRoutes?: {
+        mixedRoute: MixedRouteSDK<TInput, TOutput>
+        amount: TTradeType extends TradeType.EXACT_INPUT ? CurrencyAmount<TInput> : CurrencyAmount<TOutput>
+      }[]
   ): Promise<Trade<TInput, TOutput, TTradeType>> {
     const populatedV2Routes: {
       routev2: V2RouteSDK<TInput, TOutput>
@@ -310,12 +290,6 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
 
     const populatedV3Routes: {
       routev3: V3RouteSDK<TInput, TOutput>
-      inputAmount: CurrencyAmount<TInput>
-      outputAmount: CurrencyAmount<TOutput>
-    }[] = []
-
-    const populatedV4Routes: {
-      routev4: V4RouteSDK<TInput, TOutput>
       inputAmount: CurrencyAmount<TInput>
       outputAmount: CurrencyAmount<TOutput>
     }[] = []
@@ -348,19 +322,6 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       })
     }
 
-    if (v4Routes) {
-      for (const { routev4, amount } of v4Routes) {
-        const v4Trade = await V4TradeSDK.fromRoute(routev4, amount, tradeType)
-        const { inputAmount, outputAmount } = v4Trade
-
-        populatedV4Routes.push({
-          routev4,
-          inputAmount,
-          outputAmount,
-        })
-      }
-    }
-
     if (mixedRoutes) {
       for (const { mixedRoute, amount } of mixedRoutes) {
         const mixedRouteTrade = await MixedRouteTradeSDK.fromRoute(mixedRoute, amount, tradeType)
@@ -377,20 +338,15 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     return new Trade({
       v2Routes: populatedV2Routes,
       v3Routes: populatedV3Routes,
-      v4Routes: populatedV4Routes,
       mixedRoutes: populatedMixedRoutes,
       tradeType,
     })
   }
 
   public static async fromRoute<TInput extends Currency, TOutput extends Currency, TTradeType extends TradeType>(
-    route:
-      | V2RouteSDK<TInput, TOutput>
-      | V3RouteSDK<TInput, TOutput>
-      | V4RouteSDK<TInput, TOutput>
-      | MixedRouteSDK<TInput, TOutput>,
-    amount: TTradeType extends TradeType.EXACT_INPUT ? CurrencyAmount<TInput> : CurrencyAmount<TOutput>,
-    tradeType: TTradeType
+      route: V2RouteSDK<TInput, TOutput> | V3RouteSDK<TInput, TOutput> | MixedRouteSDK<TInput, TOutput>,
+      amount: TTradeType extends TradeType.EXACT_INPUT ? CurrencyAmount<TInput> : CurrencyAmount<TOutput>,
+      tradeType: TTradeType
   ): Promise<Trade<TInput, TOutput, TTradeType>> {
     let v2Routes: {
       routev2: V2RouteSDK<TInput, TOutput>
@@ -400,12 +356,6 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
 
     let v3Routes: {
       routev3: V3RouteSDK<TInput, TOutput>
-      inputAmount: CurrencyAmount<TInput>
-      outputAmount: CurrencyAmount<TOutput>
-    }[] = []
-
-    let v4Routes: {
-      routev4: V4RouteSDK<TInput, TOutput>
       inputAmount: CurrencyAmount<TInput>
       outputAmount: CurrencyAmount<TOutput>
     }[] = []
@@ -424,10 +374,6 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       const v3Trade = await V3TradeSDK.fromRoute(route, amount, tradeType)
       const { inputAmount, outputAmount } = v3Trade
       v3Routes = [{ routev3: route, inputAmount, outputAmount }]
-    } else if (route instanceof V4RouteSDK) {
-      const v4Trade = await V4TradeSDK.fromRoute(route, amount, tradeType)
-      const { inputAmount, outputAmount } = v4Trade
-      v4Routes = [{ routev4: route, inputAmount, outputAmount }]
     } else if (route instanceof MixedRouteSDK) {
       const mixedRouteTrade = await MixedRouteTradeSDK.fromRoute(route, amount, tradeType)
       const { inputAmount, outputAmount } = mixedRouteTrade
@@ -439,7 +385,6 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     return new Trade({
       v2Routes,
       v3Routes,
-      v4Routes,
       mixedRoutes,
       tradeType,
     })

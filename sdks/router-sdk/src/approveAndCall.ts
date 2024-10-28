@@ -69,10 +69,10 @@ export abstract class ApproveAndCall {
    * @param slippageTolerance Defines maximum slippage
    */
   public static encodeAddLiquidity(
-    position: Position,
-    minimalPosition: Position,
-    addLiquidityOptions: CondensedAddLiquidityOptions,
-    slippageTolerance: Percent
+      position: Position,
+      minimalPosition: Position,
+      addLiquidityOptions: CondensedAddLiquidityOptions,
+      slippageTolerance: Percent
   ): string {
     let { amount0: amount0Min, amount1: amount1Min } = position.mintAmountsWithSlippage(slippageTolerance)
 

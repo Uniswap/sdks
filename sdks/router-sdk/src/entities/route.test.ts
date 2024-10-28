@@ -1,5 +1,5 @@
 import { Ether, Token, WETH9, CurrencyAmount } from '@uniswap/sdk-core'
-import { Route as V3RouteSDK, Pool as V3Pool, FeeAmount, TickMath, encodeSqrtRatioX96 } from '@uniswap/v3-sdk'
+import { Route as V3RouteSDK, Pool, FeeAmount, TickMath, encodeSqrtRatioX96 } from '@uniswap/v3-sdk'
 import { RouteV3 } from './route'
 import { Protocol } from './protocol'
 import { Route as V2RouteSDK, Pair } from '@uniswap/v2-sdk'
@@ -12,9 +12,9 @@ describe('RouteV3', () => {
   const token2 = new Token(1, '0x0000000000000000000000000000000000000003', 18, 't2')
   const weth = WETH9[1]
 
-  const pool_0_1 = new V3Pool(token0, token1, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
-  const pool_0_weth = new V3Pool(token0, weth, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
-  const pool_1_weth = new V3Pool(token1, weth, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
+  const pool_0_1 = new Pool(token0, token1, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
+  const pool_0_weth = new Pool(token0, weth, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
+  const pool_1_weth = new Pool(token1, weth, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
 
   describe('path', () => {
     it('wraps original v3 route object and successfully constructs a path from the tokens', () => {
@@ -70,41 +70,41 @@ describe('RouteV3', () => {
   })
 
   describe('#midPrice', () => {
-    const pool_0_1 = new V3Pool(
-      token0,
-      token1,
-      FeeAmount.MEDIUM,
-      encodeSqrtRatioX96(1, 5),
-      0,
-      TickMath.getTickAtSqrtRatio(encodeSqrtRatioX96(1, 5)),
-      []
+    const pool_0_1 = new Pool(
+        token0,
+        token1,
+        FeeAmount.MEDIUM,
+        encodeSqrtRatioX96(1, 5),
+        0,
+        TickMath.getTickAtSqrtRatio(encodeSqrtRatioX96(1, 5)),
+        []
     )
-    const pool_1_2 = new V3Pool(
-      token1,
-      token2,
-      FeeAmount.MEDIUM,
-      encodeSqrtRatioX96(15, 30),
-      0,
-      TickMath.getTickAtSqrtRatio(encodeSqrtRatioX96(15, 30)),
-      []
+    const pool_1_2 = new Pool(
+        token1,
+        token2,
+        FeeAmount.MEDIUM,
+        encodeSqrtRatioX96(15, 30),
+        0,
+        TickMath.getTickAtSqrtRatio(encodeSqrtRatioX96(15, 30)),
+        []
     )
-    const pool_0_weth = new V3Pool(
-      token0,
-      weth,
-      FeeAmount.MEDIUM,
-      encodeSqrtRatioX96(3, 1),
-      0,
-      TickMath.getTickAtSqrtRatio(encodeSqrtRatioX96(3, 1)),
-      []
+    const pool_0_weth = new Pool(
+        token0,
+        weth,
+        FeeAmount.MEDIUM,
+        encodeSqrtRatioX96(3, 1),
+        0,
+        TickMath.getTickAtSqrtRatio(encodeSqrtRatioX96(3, 1)),
+        []
     )
-    const pool_1_weth = new V3Pool(
-      token1,
-      weth,
-      FeeAmount.MEDIUM,
-      encodeSqrtRatioX96(1, 7),
-      0,
-      TickMath.getTickAtSqrtRatio(encodeSqrtRatioX96(1, 7)),
-      []
+    const pool_1_weth = new Pool(
+        token1,
+        weth,
+        FeeAmount.MEDIUM,
+        encodeSqrtRatioX96(1, 7),
+        0,
+        TickMath.getTickAtSqrtRatio(encodeSqrtRatioX96(1, 7)),
+        []
     )
 
     it('correct for 0 -> 1', () => {

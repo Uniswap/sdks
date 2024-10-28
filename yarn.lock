@@ -4469,22 +4469,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/router-sdk@workspace:sdks/router-sdk":
-  version: 0.0.0-use.local
-  resolution: "@uniswap/router-sdk@workspace:sdks/router-sdk"
-  dependencies:
-    "@ethersproject/abi": ^5.5.0
-    "@types/jest": ^24.0.25
-    "@uniswap/sdk-core": ^5.8.1
-    "@uniswap/swap-router-contracts": ^1.3.0
-    "@uniswap/v2-sdk": ^4.6.0
-    "@uniswap/v3-sdk": ^3.17.0
-    "@uniswap/v4-sdk": ^1.10.3
-    prettier: ^2.4.1
-    tsdx: ^0.14.1
-  languageName: unknown
-  linkType: soft
-
 "@uniswap/sdk-core@npm:^5.3.0, @uniswap/sdk-core@npm:^5.3.1, @uniswap/sdk-core@npm:^5.8.0, @uniswap/sdk-core@npm:^5.8.1":
   version: 5.8.2
   resolution: "@uniswap/sdk-core@npm:5.8.2"
@@ -4669,7 +4653,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v4-sdk@npm:^1.10.0, @uniswap/v4-sdk@npm:^1.10.3, @uniswap/v4-sdk@npm:^1.9.0":
+"@uniswap/v4-sdk@npm:^1.10.0, @uniswap/v4-sdk@npm:^1.9.0":
   version: 1.10.3
   resolution: "@uniswap/v4-sdk@npm:1.10.3"
   dependencies:
@@ -4704,6 +4688,21 @@ __metadata:
     tslib: ^2.3.0
     typedoc: ^0.21.2
     typescript: ^4.3.3
+  languageName: unknown
+  linkType: soft
+
+"@x-swap-protocol/router-sdk@workspace:sdks/router-sdk":
+  version: 0.0.0-use.local
+  resolution: "@x-swap-protocol/router-sdk@workspace:sdks/router-sdk"
+  dependencies:
+    "@ethersproject/abi": ^5.5.0
+    "@types/jest": ^24.0.25
+    "@uniswap/swap-router-contracts": ^1.3.0
+    "@uniswap/v3-sdk": ^3.17.0
+    "@x-swap-protocol/sdk-core": ^1.0.1
+    "@x-swap-protocol/v2-sdk": ^1.0.0
+    prettier: ^2.4.1
+    tsdx: ^0.14.1
   languageName: unknown
   linkType: soft
 
@@ -4742,6 +4741,19 @@ __metadata:
     tsdx: ^0.14.1
   languageName: unknown
   linkType: soft
+
+"@x-swap-protocol/v2-sdk@npm:^1.0.0":
+  version: 1.1.0
+  resolution: "@x-swap-protocol/v2-sdk@npm:1.1.0"
+  dependencies:
+    "@ethersproject/address": ^5.0.2
+    "@ethersproject/solidity": ^5.0.9
+    "@x-swap-protocol/sdk-core": ^1.0.1
+    tiny-invariant: ^1.1.0
+    tiny-warning: ^1.0.3
+  checksum: 682b656e650e9ff26316ccc24f1c47cbb22cf072125dd5bda3d55b77023ce8116674fc6361105b4ef65ac7105100348c21c31a304a8f51bd601bb706028b14b8
+  languageName: node
+  linkType: hard
 
 "@x-swap-protocol/v2-sdk@workspace:sdks/v2-sdk":
   version: 0.0.0-use.local

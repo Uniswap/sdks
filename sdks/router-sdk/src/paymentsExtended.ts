@@ -37,10 +37,10 @@ export abstract class PaymentsExtended {
   }
 
   public static encodeSweepToken(
-    token: Token,
-    amountMinimum: JSBI,
-    recipient?: string,
-    feeOptions?: FeeOptions
+      token: Token,
+      amountMinimum: JSBI,
+      recipient?: string,
+      feeOptions?: FeeOptions
   ): string {
     // if there's a recipient, just pass it along
     if (typeof recipient === 'string') {
