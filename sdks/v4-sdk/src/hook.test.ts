@@ -28,7 +28,15 @@ describe('Hook', () => {
   const hookAfterAddLiquidityReturnsDelta = constructAddress([HookOptions.AfterAddLiquidityReturnsDelta])
   const hookAfterRemoveLiquidityReturnsDelta = constructAddress([HookOptions.AfterRemoveLiquidityReturnsDelta])
 
-  describe('hookPermissions', () => {
+  describe('permissions', () => {
+    it('throws for an invalid address', () => {
+      expect(() => Hook.permissions('0x123')).toThrow('Invariant failed: invalid address')
+    })
+
+    it('works if address has no 0x prefix', () => {
+      expect(Hook.permissions(hookBeforeInitialize.slice(2)).beforeInitialize).toEqual(true)
+    })
+
     it('returns the correct results for beforeInitialize', () => {
       expect(Hook.permissions(hookBeforeInitialize).beforeInitialize).toEqual(true)
       expect(Hook.permissions(allHooksAddress).beforeInitialize).toEqual(true)
@@ -138,6 +146,94 @@ describe('Hook', () => {
       expect(Hook.permissions(hookAfterAddLiquidityReturnsDelta).afterRemoveLiquidityReturnsDelta).toEqual(false)
       expect(Hook.permissions(hookBeforeSwapReturnsDelta).afterRemoveLiquidityReturnsDelta).toEqual(false)
       expect(Hook.permissions(emptyHookAddress).afterRemoveLiquidityReturnsDelta).toEqual(false)
+    })
+  })
+
+  describe('hasPermission', () => {
+    it('throws for an invalid address', () => {
+      expect(() => Hook.hasPermission('0x123', HookOptions.BeforeInitialize)).toThrow(
+        'Invariant failed: invalid address'
+      )
+    })
+
+    it('works if address has no 0x prefix', () => {
+      expect(Hook.hasPermission(hookBeforeInitialize.slice(2), HookOptions.BeforeInitialize)).toEqual(true)
+    })
+
+    it('returns the correct results for beforeInitialize', () => {
+      expect(Hook.hasPermission(hookBeforeInitialize, HookOptions.BeforeInitialize)).toEqual(true)
+      expect(Hook.hasPermission(emptyHookAddress, HookOptions.BeforeInitialize)).toEqual(false)
+    })
+
+    it('returns the correct results for afterInitialize', () => {
+      expect(Hook.hasPermission(hookAfterInitialize, HookOptions.AfterInitialize)).toEqual(true)
+      expect(Hook.hasPermission(emptyHookAddress, HookOptions.AfterInitialize)).toEqual(false)
+    })
+
+    it('returns the correct results for beforeAddLiquidity', () => {
+      expect(Hook.hasPermission(hookBeforeAddLiquidity, HookOptions.BeforeAddLiquidity)).toEqual(true)
+      expect(Hook.hasPermission(emptyHookAddress, HookOptions.BeforeAddLiquidity)).toEqual(false)
+    })
+
+    it('returns the correct results for afterAddLiquidity', () => {
+      expect(Hook.hasPermission(hookAfterAddLiquidity, HookOptions.AfterAddLiquidity)).toEqual(true)
+      expect(Hook.hasPermission(emptyHookAddress, HookOptions.AfterAddLiquidity)).toEqual(false)
+    })
+
+    it('returns the correct results for beforeRemoveLiquidity', () => {
+      expect(Hook.hasPermission(hookBeforeRemoveLiquidity, HookOptions.BeforeRemoveLiquidity)).toEqual(true)
+      expect(Hook.hasPermission(emptyHookAddress, HookOptions.BeforeRemoveLiquidity)).toEqual(false)
+    })
+
+    it('returns the correct results for afterRemoveLiquidity', () => {
+      expect(Hook.hasPermission(hookAfterRemoveLiquidity, HookOptions.AfterRemoveLiquidity)).toEqual(true)
+      expect(Hook.hasPermission(emptyHookAddress, HookOptions.AfterRemoveLiquidity)).toEqual(false)
+    })
+
+    it('returns the correct results for beforeSwap', () => {
+      expect(Hook.hasPermission(hookBeforeSwap, HookOptions.BeforeSwap)).toEqual(true)
+      expect(Hook.hasPermission(emptyHookAddress, HookOptions.BeforeSwap)).toEqual(false)
+    })
+
+    it('returns the correct results for afterSwap', () => {
+      expect(Hook.hasPermission(hookAfterSwap, HookOptions.AfterSwap)).toEqual(true)
+      expect(Hook.hasPermission(emptyHookAddress, HookOptions.AfterSwap)).toEqual(false)
+    })
+
+    it('returns the correct results for beforeDonate', () => {
+      expect(Hook.hasPermission(hookBeforeDonate, HookOptions.BeforeDonate)).toEqual(true)
+      expect(Hook.hasPermission(emptyHookAddress, HookOptions.BeforeDonate)).toEqual(false)
+    })
+
+    it('returns the correct results for afterDonate', () => {
+      expect(Hook.hasPermission(hookAfterDonate, HookOptions.AfterDonate)).toEqual(true)
+      expect(Hook.hasPermission(emptyHookAddress, HookOptions.AfterDonate)).toEqual(false)
+    })
+
+    it('returns the correct results for beforeSwapReturnsDelta', () => {
+      expect(Hook.hasPermission(hookBeforeSwapReturnsDelta, HookOptions.BeforeSwapReturnsDelta)).toEqual(true)
+      expect(Hook.hasPermission(hookAfterDonate, HookOptions.BeforeSwapReturnsDelta)).toEqual(false)
+    })
+
+    it('returns the correct results for afterSwapReturnsDelta', () => {
+      expect(Hook.hasPermission(hookAfterSwapReturnsDelta, HookOptions.AfterSwapReturnsDelta)).toEqual(true)
+      expect(Hook.hasPermission(hookBeforeSwapReturnsDelta, HookOptions.AfterSwapReturnsDelta)).toEqual(false)
+    })
+
+    it('returns the correct results for afterAddLiquidityReturnsDelta', () => {
+      expect(Hook.hasPermission(hookAfterAddLiquidityReturnsDelta, HookOptions.AfterAddLiquidityReturnsDelta)).toEqual(
+        true
+      )
+      expect(Hook.hasPermission(hookAfterSwapReturnsDelta, HookOptions.AfterAddLiquidityReturnsDelta)).toEqual(false)
+    })
+
+    it('returns the correct results for afterRemoveLiquidityReturnsDelta', () => {
+      expect(
+        Hook.hasPermission(hookAfterRemoveLiquidityReturnsDelta, HookOptions.AfterRemoveLiquidityReturnsDelta)
+      ).toEqual(true)
+      expect(
+        Hook.hasPermission(hookAfterAddLiquidityReturnsDelta, HookOptions.AfterRemoveLiquidityReturnsDelta)
+      ).toEqual(false)
     })
   })
 })

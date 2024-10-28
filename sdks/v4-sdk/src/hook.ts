@@ -39,31 +39,39 @@ export const hookFlagIndex = {
 
 export class Hook {
   public static permissions(address: string): HookPermissions {
-    invariant(isAddress(address), 'invalid address')
-    // addresses with and without the '0x' prefix are considered valid but we must remove the 0x prefix to normalize
-    // all addresses in order to slice the last 14 bits representing hook flags
-    if (/0x/.test(address)) address = address.slice(2)
+    address = this._normalizeHookAddress(address)
 
     return {
-      beforeInitialize: this.hasPermission(address, HookOptions.BeforeInitialize),
-      afterInitialize: this.hasPermission(address, HookOptions.AfterInitialize),
-      beforeAddLiquidity: this.hasPermission(address, HookOptions.BeforeAddLiquidity),
-      afterAddLiquidity: this.hasPermission(address, HookOptions.AfterAddLiquidity),
-      beforeRemoveLiquidity: this.hasPermission(address, HookOptions.BeforeRemoveLiquidity),
-      afterRemoveLiquidity: this.hasPermission(address, HookOptions.AfterRemoveLiquidity),
-      beforeSwap: this.hasPermission(address, HookOptions.BeforeSwap),
-      afterSwap: this.hasPermission(address, HookOptions.AfterSwap),
-      beforeDonate: this.hasPermission(address, HookOptions.BeforeDonate),
-      afterDonate: this.hasPermission(address, HookOptions.AfterDonate),
-      beforeSwapReturnsDelta: this.hasPermission(address, HookOptions.BeforeSwapReturnsDelta),
-      afterSwapReturnsDelta: this.hasPermission(address, HookOptions.AfterSwapReturnsDelta),
-      afterAddLiquidityReturnsDelta: this.hasPermission(address, HookOptions.AfterAddLiquidityReturnsDelta),
-      afterRemoveLiquidityReturnsDelta: this.hasPermission(address, HookOptions.AfterRemoveLiquidityReturnsDelta),
+      beforeInitialize: this._hasPermission(address, HookOptions.BeforeInitialize),
+      afterInitialize: this._hasPermission(address, HookOptions.AfterInitialize),
+      beforeAddLiquidity: this._hasPermission(address, HookOptions.BeforeAddLiquidity),
+      afterAddLiquidity: this._hasPermission(address, HookOptions.AfterAddLiquidity),
+      beforeRemoveLiquidity: this._hasPermission(address, HookOptions.BeforeRemoveLiquidity),
+      afterRemoveLiquidity: this._hasPermission(address, HookOptions.AfterRemoveLiquidity),
+      beforeSwap: this._hasPermission(address, HookOptions.BeforeSwap),
+      afterSwap: this._hasPermission(address, HookOptions.AfterSwap),
+      beforeDonate: this._hasPermission(address, HookOptions.BeforeDonate),
+      afterDonate: this._hasPermission(address, HookOptions.AfterDonate),
+      beforeSwapReturnsDelta: this._hasPermission(address, HookOptions.BeforeSwapReturnsDelta),
+      afterSwapReturnsDelta: this._hasPermission(address, HookOptions.AfterSwapReturnsDelta),
+      afterAddLiquidityReturnsDelta: this._hasPermission(address, HookOptions.AfterAddLiquidityReturnsDelta),
+      afterRemoveLiquidityReturnsDelta: this._hasPermission(address, HookOptions.AfterRemoveLiquidityReturnsDelta),
     }
   }
 
-  private static hasPermission(address: string, hookOption: HookOptions) {
+  public static hasPermission(address: string, hookOption: HookOptions) {
+    return this._hasPermission(this._normalizeHookAddress(address), hookOption)
+  }
+
+  private static _hasPermission(address: string, hookOption: HookOptions) {
     // slice only the last 14 bits which are the hook flags and compare with the specific hookOption
     return !!(parseInt(address.slice(36), 16) & (1 << hookFlagIndex[hookOption]))
+  }
+
+  private static _normalizeHookAddress(address: string): string {
+    invariant(isAddress(address), 'invalid address')
+    // addresses with and without the '0x' prefix are considered valid but we must remove the 0x prefix to normalize
+    // all addresses in order to slice the last 14 bits representing hook flags
+    return /0x/.test(address) ? address.slice(2) : address
   }
 }
