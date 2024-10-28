@@ -125,25 +125,27 @@ describe("PriorityOrderTrade", () => {
     expect(ethOutputTrade.outputAmount.currency).toEqual(Ether.onChain(1));
   });
 
-  it("returns the correct amountIn and amountOut with classic quote data", () => {
-    const classicAmounts = {
-      classicAmountInGasAndPortionAdjusted: "1",
-      classicAmountOutGasAndPortionAdjusted: "1",
+  it("returns the correct amountIn and amountOut with expected quote data", () => {
+    const expectedAmounts = {
+      expectedAmountIn: "1",
+      expectedAmountOut: "1",
     };
-    const classicAmountTrade = new PriorityOrderTrade<Currency, Currency, TradeType>(
-      {
-        currencyIn: USDC,
-        currenciesOut: [DAI],
-        orderInfo,
-        tradeType: TradeType.EXACT_INPUT,
-        classicAmounts,
-      }
+    const expectedAmountTrade = new PriorityOrderTrade<
+      Currency,
+      Currency,
+      TradeType
+    >({
+      currencyIn: USDC,
+      currenciesOut: [DAI],
+      orderInfo,
+      tradeType: TradeType.EXACT_INPUT,
+      expectedAmounts,
+    });
+    expect(expectedAmountTrade.inputAmount.quotient.toString()).toEqual(
+      expectedAmounts.expectedAmountIn
     );
-    expect(classicAmountTrade.inputAmount.quotient.toString()).toEqual(
-      classicAmounts.classicAmountInGasAndPortionAdjusted
-    );
-    expect(classicAmountTrade.outputAmount.quotient.toString()).toEqual(
-      classicAmounts.classicAmountOutGasAndPortionAdjusted
+    expect(expectedAmountTrade.outputAmount.quotient.toString()).toEqual(
+      expectedAmounts.expectedAmountOut
     );
   });
 });
