@@ -1,4 +1,6 @@
 import invariant from 'tiny-invariant'
+import { defaultAbiCoder } from '@ethersproject/abi'
+import { isAddress } from '@ethersproject/address'
 import { keccak256 } from '@ethersproject/solidity'
 import { BigintIsh, Currency, CurrencyAmount, Price } from '@uniswap/sdk-core'
 import {
@@ -10,7 +12,6 @@ import {
   TickListDataProvider,
   TickMath,
 } from '@uniswap/v3-sdk'
-import { defaultAbiCoder, isAddress } from 'ethers/lib/utils'
 import { sortsBefore } from '../utils/sortsBefore'
 import { ADDRESS_ZERO, NEGATIVE_ONE, Q192 } from '../internalConstants'
 import JSBI from 'jsbi'
@@ -119,14 +120,14 @@ export class Pool {
     const nextTickSqrtRatioX96 = TickMath.getSqrtRatioAtTick(tickCurrent + 1)
     invariant(
       JSBI.greaterThanOrEqual(JSBI.BigInt(sqrtRatioX96), tickCurrentSqrtRatioX96) &&
-        JSBI.lessThanOrEqual(JSBI.BigInt(sqrtRatioX96), nextTickSqrtRatioX96),
+      JSBI.lessThanOrEqual(JSBI.BigInt(sqrtRatioX96), nextTickSqrtRatioX96),
       'PRICE_BOUNDS'
     )
 
-    // always create a copy of the list since we want the pool's tick list to be immutable
-    ;[this.currency0, this.currency1] = sortsBefore(currencyA, currencyB)
-      ? [currencyA, currencyB]
-      : [currencyB, currencyA]
+      // always create a copy of the list since we want the pool's tick list to be immutable
+      ;[this.currency0, this.currency1] = sortsBefore(currencyA, currencyB)
+        ? [currencyA, currencyB]
+        : [currencyB, currencyA]
     this.fee = fee
     this.sqrtRatioX96 = JSBI.BigInt(sqrtRatioX96)
     this.tickSpacing = tickSpacing

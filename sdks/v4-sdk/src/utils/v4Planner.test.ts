@@ -1,4 +1,4 @@
-import { BigNumber } from 'ethers'
+import { BigNumber } from '@ethersproject/bignumber'
 import JSBI from 'jsbi'
 import { CurrencyAmount, Ether, Percent, TradeType, Token, WETH9 } from '@uniswap/sdk-core'
 import { encodeSqrtRatioX96, nearestUsableTick, TickMath } from '@uniswap/v3-sdk'
