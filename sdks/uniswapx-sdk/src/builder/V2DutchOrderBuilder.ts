@@ -40,7 +40,7 @@ export class V2DutchOrderBuilder extends OrderBuilder {
       builder.output(output);
     }
 
-    if (isCosigned(order)) {
+    if (order instanceof CosignedV2DutchOrder) {
       builder.cosignature(order.info.cosignature);
       builder.decayEndTime(order.info.cosignerData.decayEndTime);
       builder.decayStartTime(order.info.cosignerData.decayStartTime);
@@ -287,9 +287,8 @@ export class V2DutchOrderBuilder extends OrderBuilder {
       "exclusivityOverrideBps not set"
     );
     invariant(
-      this.info.cosignerData.inputOverride !== undefined &&
         this.info.cosignerData.inputOverride.lte(this.info.input.startAmount),
-      "inputOverride not set or larger than original input"
+      "inputOverride larger than original input"
     );
     invariant(
       this.info.cosignerData.outputOverrides.length > 0,
@@ -338,10 +337,4 @@ export class V2DutchOrderBuilder extends OrderBuilder {
       ...overrides,
     };
   }
-}
-
-function isCosigned(
-  order: UnsignedV2DutchOrder | CosignedV2DutchOrder
-): order is CosignedV2DutchOrder {
-  return (order as CosignedV2DutchOrder).info.cosignature !== undefined;
 }

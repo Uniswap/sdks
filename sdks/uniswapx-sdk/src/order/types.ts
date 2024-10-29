@@ -70,6 +70,11 @@ export type PriorityOrderResolutionOptions = {
   currentBlock?: BigNumber;
 };
 
+export type V3OrderResolutionOptions = {
+  currentBlock: number;
+  filler?: string;
+}
+
 export type DutchOutput = {
   readonly token: string;
   readonly startAmount: BigNumber;
@@ -93,6 +98,24 @@ export type DutchInputJSON = Omit<DutchInput, "startAmount" | "endAmount"> & {
   endAmount: string;
 };
 
+export type CosignerData = {
+  decayStartTime: number;
+  decayEndTime: number;
+  exclusiveFiller: string;
+  exclusivityOverrideBps: BigNumber;
+  inputOverride: BigNumber;
+  outputOverrides: BigNumber[];
+};
+
+export type CosignerDataJSON = {
+  decayStartTime: number;
+  decayEndTime: number;
+  exclusiveFiller: string;
+  exclusivityOverrideBps: number;
+  inputOverride: string;
+  outputOverrides: string[];
+};
+
 export type PriorityInput = {
   readonly token: string;
   readonly amount: BigNumber;
@@ -113,4 +136,58 @@ export type PriorityInputJSON = Omit<
 
 export type PriorityOutputJSON = PriorityInputJSON & {
   recipient: string;
+};
+
+export type V3DutchInput = {
+  readonly token: string;
+  readonly startAmount: BigNumber;
+  readonly curve: NonlinearDutchDecay;
+  readonly maxAmount: BigNumber;
+  readonly adjustmentPerGweiBaseFee: BigNumber;
+};
+
+export type V3DutchInputJSON = Omit<V3DutchInput, "startAmount" | "curve" | "maxAmount" | "adjustmentPerGweiBaseFee"> & {
+  startAmount: string;
+  curve: NonlinearDutchDecayJSON;
+  maxAmount: string;
+  adjustmentPerGweiBaseFee: string;
+};
+
+export type NonlinearDutchDecay = {
+  relativeBlocks: number[];
+  relativeAmounts: bigint[]; // Cannot be BigNumber because could be negative
+};
+
+export type EncodedNonlinearDutchDecay = {
+  relativeBlocks: BigNumber;
+  relativeAmounts: bigint[];
+};
+
+export type EncodedV3DutchInput = Omit<V3DutchInput, "curve"> & {
+  curve: EncodedNonlinearDutchDecay;
+};
+
+export type EncodedV3DutchOutput = Omit<V3DutchOutput, "curve"> & {
+  curve: EncodedNonlinearDutchDecay;
+};
+
+export type NonlinearDutchDecayJSON = {
+  relativeBlocks: number[];
+  relativeAmounts: string[];
+};
+
+export type V3DutchOutput = {
+  readonly token: string;
+  readonly startAmount: BigNumber;
+  readonly curve: NonlinearDutchDecay;
+  readonly recipient: string;
+  readonly minAmount: BigNumber;
+  readonly adjustmentPerGweiBaseFee: BigNumber;
+};
+
+export type V3DutchOutputJSON = Omit<V3DutchOutput, "startAmount" | "curve" | "minAmount" | "adjustmentPerGweiBaseFee"> & {
+  startAmount: string;
+  curve: NonlinearDutchDecayJSON;
+  minAmount: string;
+  adjustmentPerGweiBaseFee: string;
 };
