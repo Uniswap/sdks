@@ -39,8 +39,7 @@ export const hookFlagIndex = {
 
 export class Hook {
   public static permissions(address: string): HookPermissions {
-    address = this._normalizeHookAddress(address)
-
+    invariant(isAddress(address), 'invalid address')
     return {
       beforeInitialize: this._hasPermission(address, HookOptions.BeforeInitialize),
       afterInitialize: this._hasPermission(address, HookOptions.AfterInitialize),
@@ -60,18 +59,11 @@ export class Hook {
   }
 
   public static hasPermission(address: string, hookOption: HookOptions) {
-    return this._hasPermission(this._normalizeHookAddress(address), hookOption)
+    invariant(isAddress(address), 'invalid address')
+    return this._hasPermission(address, hookOption)
   }
 
   private static _hasPermission(address: string, hookOption: HookOptions) {
-    // slice only the last 14 bits which are the hook flags and compare with the specific hookOption
-    return !!(parseInt(address.slice(36), 16) & (1 << hookFlagIndex[hookOption]))
-  }
-
-  private static _normalizeHookAddress(address: string): string {
-    invariant(isAddress(address), 'invalid address')
-    // addresses with and without the '0x' prefix are considered valid but we must remove the 0x prefix to normalize
-    // all addresses in order to slice the last 14 bits representing hook flags
-    return /0x/.test(address) ? address.slice(2) : address
+    return !!(parseInt(address, 16) & (1 << hookFlagIndex[hookOption]))
   }
 }
