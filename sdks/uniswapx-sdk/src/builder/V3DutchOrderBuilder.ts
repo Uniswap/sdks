@@ -319,7 +319,7 @@ export class V3DutchOrderBuilder extends OrderBuilder {
     );
   }
 
-  // A helper function for users of the class to easily the value to pass to maxAmount in an input
+  // A helper function for users of the class to easily find the value to pass to maxAmount in an input
   static getMaxAmountOut(
     startAmount: BigNumber,
     relativeAmounts: bigint[]
@@ -337,5 +337,25 @@ export class V3DutchOrderBuilder extends OrderBuilder {
     // Maximum is the start - the min of the relative amounts
     const maxOut = startAmount.sub(minRelativeAmount.toString());
     return maxOut;
+  }
+
+  // A helper function for users of the class find the lowest possible output amount
+  static getMinAmountOut(
+    startAmount: BigNumber,
+    relativeAmounts: bigint[]
+  ): BigNumber {
+    if (relativeAmounts.length == 0) {
+      return startAmount;
+    }
+
+    // Find the maximum of the relative amounts
+    const maxRelativeAmount = relativeAmounts.reduce(
+      (max, amount) => (amount > max ? amount : max),
+      BigInt(0)
+    );
+
+    // Minimum is the start - the max of the relative amounts
+    const minOut = startAmount.sub(maxRelativeAmount.toString());
+    return minOut;
   }
 }

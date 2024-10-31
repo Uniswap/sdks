@@ -865,6 +865,34 @@ describe("V3DutchOrderBuilder", () => {
             const maxout = V3DutchOrderBuilder.getMaxAmountOut(startAmount, relativeAmounts);
             expect(maxout).toEqual(startAmount);
         });
+
+        it("Test minAmountOut", () => {
+            const startAmount = OUTPUT_START_AMOUNT;
+            const relativeAmounts = [BigInt(0), BigInt(3), BigInt(-2), BigInt(-4), BigInt(-3)];
+            const minout = V3DutchOrderBuilder.getMinAmountOut(startAmount, relativeAmounts);
+            expect(minout).toEqual(startAmount.sub(3));
+        });
+
+        it("Test minAmountOut with empty curve", () => {
+            const startAmount = OUTPUT_START_AMOUNT;
+            const relativeAmounts : bigint[] = [];
+            const minout = V3DutchOrderBuilder.getMinAmountOut(startAmount, relativeAmounts);
+            expect(minout).toEqual(startAmount);
+        });
+
+        it("Test minAmountOut with negative relativeAmounts", () => {
+            const startAmount = OUTPUT_START_AMOUNT;
+            const relativeAmounts = [BigInt(-1), BigInt(-2), BigInt(-3)];
+            const minout = V3DutchOrderBuilder.getMinAmountOut(startAmount, relativeAmounts);
+            expect(minout).toEqual(startAmount);
+        });
+
+        it("Test minAmountOut with entirely positive relativeAmounts", () => {
+            const startAmount = OUTPUT_START_AMOUNT;
+            const relativeAmounts = [BigInt(1), BigInt(2), BigInt(3)];
+            const minout = V3DutchOrderBuilder.getMinAmountOut(startAmount, relativeAmounts);
+            expect(minout).toEqual(startAmount.sub(3));
+        });
     });
 
     describe("fromOrder", () => {
