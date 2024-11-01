@@ -3386,10 +3386,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@openzeppelin/contracts@npm:4.7.0":
-  version: 4.7.0
-  resolution: "@openzeppelin/contracts@npm:4.7.0"
-  checksum: ac917e668505ffbd300fcb00fd2f39b5f1153f77f82d482988336a881134b806b2d820f4293962691ef4d6f9f8ee5ecc71da82c6eb6ad2f02810511e90fa0d96
+"@openzeppelin/contracts@npm:4.9.6":
+  version: 4.9.6
+  resolution: "@openzeppelin/contracts@npm:4.9.6"
+  checksum: 274b6e968268294f12d5ca4f0278f6e6357792c8bb4d76664f83dbdc325f780541538a127e6a6e97e4f018088b42f65952014dec9c745c0fa25081f43ef9c4bf
   languageName: node
   linkType: hard
 
@@ -4641,7 +4641,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@uniswap/universal-router-sdk@workspace:sdks/universal-router-sdk"
   dependencies:
-    "@openzeppelin/contracts": 4.7.0
+    "@openzeppelin/contracts": 4.9.6
     "@types/chai": ^4.3.3
     "@types/mocha": ^9.1.1
     "@types/node": ^18.7.16
