@@ -317,7 +317,9 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                 startAmount: this.info.input.startAmount,
                 curve: {
                     relativeBlocks: encodeRelativeBlocks(this.info.input.curve.relativeBlocks),
-                    relativeAmounts: this.info.input.curve.relativeAmounts,
+                    relativeAmounts: this.info.input.curve.relativeAmounts.map((amount) =>
+                        amount.toString()
+                    ),
                 },
                 maxAmount: this.info.input.maxAmount,
                 adjustmentPerGweiBaseFee: this.info.input.adjustmentPerGweiBaseFee,
@@ -327,7 +329,9 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                 startAmount: output.startAmount,
                 curve: {
                     relativeBlocks: encodeRelativeBlocks(output.curve.relativeBlocks),
-                    relativeAmounts: output.curve.relativeAmounts,
+                    relativeAmounts: output.curve.relativeAmounts.map((amount) =>
+                        amount.toString()
+                    ),
                 },
                 recipient: output.recipient,
                 minAmount: output.minAmount,
