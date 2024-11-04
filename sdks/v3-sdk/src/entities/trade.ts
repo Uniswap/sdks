@@ -518,7 +518,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
         ;[amountOut] = await pool.getOutputAmount(amountIn)
       } catch (error) {
         // not enough liquidity in this pool
-        if ((error as Error).message == 'INSUFFICIENT_LIQUIDITY') {
+        if ((error as Error).message === 'INSUFFICIENT_LIQUIDITY') {
           continue
         }
         throw error
@@ -599,7 +599,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
         ;[amountIn] = await pool.getInputAmount(amountOut)
       } catch (error) {
         // not enough liquidity in this pool
-        if ((error as Error).message == 'INSUFFICIENT_LIQUIDITY') {
+        if ((error as Error).message === 'INSUFFICIENT_LIQUIDITY') {
           continue
         }
         throw error
