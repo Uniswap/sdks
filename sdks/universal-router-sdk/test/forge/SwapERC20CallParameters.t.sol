@@ -597,7 +597,7 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
     }
 
     function testV4ExactInSwapWithETHFeeAndUnwrap() public {
-        MethodParameters memory params = readFixture(json, "._UNISWAP_V4_USDC_FOR_1000_ETH_WITH_FEE_AND_UNWRAP");
+        MethodParameters memory params = readFixture(json, "._UNISWAP_V4_USDC_FOR_1000_ETH_WITH_FEE_AND_WRAP");
         deal(address(USDC), from, BALANCE);
         USDC.approve(address(permit2), BALANCE);
         permit2.approve(address(USDC), address(router), uint160(BALANCE), uint48(block.timestamp + 1000));

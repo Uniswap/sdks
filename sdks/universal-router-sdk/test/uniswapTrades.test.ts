@@ -704,7 +704,7 @@ describe('Uniswap', () => {
       const feeOptions: FlatFeeOptions = { amount: flatFee, recipient: TEST_FEE_RECIPIENT_ADDRESS }
       const opts = swapOptions({ flatFee: feeOptions })
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
-      registerFixture('_UNISWAP_V4_USDC_FOR_1000_ETH_WITH_FEE_AND_UNWRAP', methodParameters)
+      registerFixture('_UNISWAP_V4_USDC_FOR_1000_ETH_WITH_FEE_AND_WRAP', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.equal('0')
     })
 
