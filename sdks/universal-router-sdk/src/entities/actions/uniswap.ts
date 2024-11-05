@@ -65,8 +65,12 @@ export class UniswapTrade implements Command {
 
   constructor(public trade: RouterTrade<Currency, Currency, TradeType>, public options: SwapOptions) {
     if (!!options.fee && !!options.flatFee) throw new Error('Only one fee option permitted')
-    if (this.inputRequiresWrap || this.inputRequiresUnwrap || this.options.useRouterBalance) this.payerIsUser = false
-    else this.payerIsUser = true
+
+    if (this.inputRequiresWrap || this.inputRequiresUnwrap || this.options.useRouterBalance) {
+      this.payerIsUser = false
+    } else {
+      this.payerIsUser = true
+    }
   }
 
   get isAllV4(): boolean {
