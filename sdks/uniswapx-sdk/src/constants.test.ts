@@ -28,6 +28,7 @@ describe("REACTOR_ADDRESS_MAPPING", () => {
         "42161": Object {
           "Dutch": "0x0000000000000000000000000000000000000000",
           "Dutch_V2": "0x1bd1aAdc9E230626C44a139d7E70d842749351eb",
+          "Dutch_V3": "0xB274d5F4b833b61B340b654d600A864fB604a87c",
           "Relay": "0x0000000000000000000000000000000000000000",
         },
         "5": Object {

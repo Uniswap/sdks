@@ -25,7 +25,8 @@ export enum CommandType {
   V4_SWAP = 0x10,
   V3_POSITION_MANAGER_PERMIT = 0x11,
   V3_POSITION_MANAGER_CALL = 0x12,
-  V4_POSITION_CALL = 0x13,
+  V4_INITIALIZE_POOL = 0x13,
+  V4_POSITION_MANAGER_CALL = 0x14,
 
   EXECUTE_SUB_PLAN = 0x21,
 }
@@ -67,6 +68,8 @@ const PERMIT_STRUCT =
 
 const PERMIT_BATCH_STRUCT =
   '((address token,uint160 amount,uint48 expiration,uint48 nonce)[] details,address spender,uint256 sigDeadline)'
+
+const POOL_KEY_STRUCT = '(address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks)'
 
 const PERMIT2_TRANSFER_FROM_STRUCT = '(address from,address to,uint160 amount,address token)'
 const PERMIT2_TRANSFER_FROM_BATCH_STRUCT = PERMIT2_TRANSFER_FROM_STRUCT + '[]'
@@ -204,11 +207,18 @@ export const COMMAND_DEFINITION: { [key in CommandType]: CommandDefinition } = {
       { name: 'minBalance', type: 'uint256' },
     ],
   },
+  [CommandType.V4_INITIALIZE_POOL]: {
+    parser: Parser.Abi,
+    params: [
+      { name: 'poolKey', type: POOL_KEY_STRUCT },
+      { name: 'sqrtPriceX96', type: 'uint160' },
+    ],
+  },
 
   // Position Actions
   [CommandType.V3_POSITION_MANAGER_PERMIT]: { parser: Parser.V3Actions },
   [CommandType.V3_POSITION_MANAGER_CALL]: { parser: Parser.V3Actions },
-  [CommandType.V4_POSITION_CALL]: { parser: Parser.V4Actions },
+  [CommandType.V4_POSITION_MANAGER_CALL]: { parser: Parser.V4Actions },
 }
 
 export class RoutePlanner {

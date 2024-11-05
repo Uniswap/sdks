@@ -124,4 +124,28 @@ describe("PriorityOrderTrade", () => {
     );
     expect(ethOutputTrade.outputAmount.currency).toEqual(Ether.onChain(1));
   });
+
+  it("returns the correct amountIn and amountOut with expected quote data", () => {
+    const expectedAmounts = {
+      expectedAmountIn: "1",
+      expectedAmountOut: "1",
+    };
+    const expectedAmountTrade = new PriorityOrderTrade<
+      Currency,
+      Currency,
+      TradeType
+    >({
+      currencyIn: USDC,
+      currenciesOut: [DAI],
+      orderInfo,
+      tradeType: TradeType.EXACT_INPUT,
+      expectedAmounts,
+    });
+    expect(expectedAmountTrade.inputAmount.quotient.toString()).toEqual(
+      expectedAmounts.expectedAmountIn
+    );
+    expect(expectedAmountTrade.outputAmount.quotient.toString()).toEqual(
+      expectedAmounts.expectedAmountOut
+    );
+  });
 });

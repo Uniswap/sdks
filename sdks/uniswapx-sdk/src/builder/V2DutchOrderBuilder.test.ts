@@ -349,7 +349,7 @@ describe("V2DutchOrderBuilder", () => {
         .outputOverrides([OUTPUT_START_AMOUNT.mul(102).div(100)])
         .build()
     ).toThrow(
-      "Invariant failed: inputOverride not set or larger than original input"
+      "Invariant failed: inputOverride larger than original input"
     );
   });
 
@@ -574,7 +574,7 @@ describe("V2DutchOrderBuilder", () => {
   });
 
   describe("partial order tests", () => {
-    it("builds an unsigned partial order with default cosignerData values", () => {
+    it("builds an unsigned partial order with default cosignerData values", () => { //TODO: partial orders don't have cosignerData...
       const deadline = Math.floor(Date.now() / 1000) + 1000;
       const order = builder
         .cosigner(constants.AddressZero)
