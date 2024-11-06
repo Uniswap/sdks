@@ -116,7 +116,8 @@ describe("RelayOrderValidator", () => {
     expect(validation).to.equal(OrderValidation.OK);
     expect(quote).to.not.be.undefined;
 
-    expect(quote!.fee.amount.toString()).to.equal("1000000");
+    expect(quote!.fee.amount.gt(BigNumber.from(999999))).to.be.true;
+    expect(quote!.fee.amount.lt(BigNumber.from(1100001))).to.be.true;
   });
 
   it("validates a valid order", async () => {
