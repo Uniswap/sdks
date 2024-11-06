@@ -4643,7 +4643,7 @@ __metadata:
     dotenv: ^16.0.3
     eslint-plugin-prettier: ^3.4.1
     ethers: ^5.7.0
-    hardhat: ^2.14.0
+    hardhat: ^2.22.15
     prettier: ^2.4.1
     ts-node: ^10.9.1
     tsdx: ^0.14.1
@@ -9588,7 +9588,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"hardhat@npm:^2.14.0, hardhat@npm:^2.22.15":
+"hardhat@npm:^2.22.15":
   version: 2.22.15
   resolution: "hardhat@npm:2.22.15"
   dependencies:
