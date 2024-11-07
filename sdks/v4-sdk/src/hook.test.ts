@@ -1,6 +1,6 @@
 import { Hook, HookOptions, hookFlagIndex } from './hook'
 
-function constructAddress(hookOptions: HookOptions[]): string {
+export function constructHookAddress(hookOptions: HookOptions[]): string {
   let hookFlags = 0
   for (const hookOption of hookOptions) {
     hookFlags = hookFlags | (1 << hookFlagIndex[hookOption])
@@ -13,20 +13,20 @@ function constructAddress(hookOptions: HookOptions[]): string {
 describe('Hook', () => {
   const allHooksAddress = '0x0000000000000000000000000000000000003fff'
   const emptyHookAddress = '0x0000000000000000000000000000000000000000'
-  const hookBeforeInitialize = constructAddress([HookOptions.BeforeInitialize])
-  const hookAfterInitialize = constructAddress([HookOptions.AfterInitialize])
-  const hookBeforeAddLiquidity = constructAddress([HookOptions.BeforeAddLiquidity])
-  const hookAfterAddLiquidity = constructAddress([HookOptions.AfterAddLiquidity])
-  const hookBeforeRemoveLiquidity = constructAddress([HookOptions.BeforeRemoveLiquidity])
-  const hookAfterRemoveLiquidity = constructAddress([HookOptions.AfterRemoveLiquidity])
-  const hookBeforeSwap = constructAddress([HookOptions.BeforeSwap])
-  const hookAfterSwap = constructAddress([HookOptions.AfterSwap])
-  const hookBeforeDonate = constructAddress([HookOptions.BeforeDonate])
-  const hookAfterDonate = constructAddress([HookOptions.AfterDonate])
-  const hookBeforeSwapReturnsDelta = constructAddress([HookOptions.BeforeSwapReturnsDelta])
-  const hookAfterSwapReturnsDelta = constructAddress([HookOptions.AfterSwapReturnsDelta])
-  const hookAfterAddLiquidityReturnsDelta = constructAddress([HookOptions.AfterAddLiquidityReturnsDelta])
-  const hookAfterRemoveLiquidityReturnsDelta = constructAddress([HookOptions.AfterRemoveLiquidityReturnsDelta])
+  const hookBeforeInitialize = constructHookAddress([HookOptions.BeforeInitialize])
+  const hookAfterInitialize = constructHookAddress([HookOptions.AfterInitialize])
+  const hookBeforeAddLiquidity = constructHookAddress([HookOptions.BeforeAddLiquidity])
+  const hookAfterAddLiquidity = constructHookAddress([HookOptions.AfterAddLiquidity])
+  const hookBeforeRemoveLiquidity = constructHookAddress([HookOptions.BeforeRemoveLiquidity])
+  const hookAfterRemoveLiquidity = constructHookAddress([HookOptions.AfterRemoveLiquidity])
+  const hookBeforeSwap = constructHookAddress([HookOptions.BeforeSwap])
+  const hookAfterSwap = constructHookAddress([HookOptions.AfterSwap])
+  const hookBeforeDonate = constructHookAddress([HookOptions.BeforeDonate])
+  const hookAfterDonate = constructHookAddress([HookOptions.AfterDonate])
+  const hookBeforeSwapReturnsDelta = constructHookAddress([HookOptions.BeforeSwapReturnsDelta])
+  const hookAfterSwapReturnsDelta = constructHookAddress([HookOptions.AfterSwapReturnsDelta])
+  const hookAfterAddLiquidityReturnsDelta = constructHookAddress([HookOptions.AfterAddLiquidityReturnsDelta])
+  const hookAfterRemoveLiquidityReturnsDelta = constructHookAddress([HookOptions.AfterRemoveLiquidityReturnsDelta])
 
   describe('permissions', () => {
     it('throws for an invalid address', () => {
