@@ -37,7 +37,7 @@ export interface OffChainOrder {
    * Returns any block overrides to be applied when quoting the order on chain
    * @return The block overrides
    */
-  get blockOverrides(): BlockOverrides
+  get blockOverrides(): BlockOverrides;
 }
 
 export type TokenAmount = {
@@ -73,7 +73,7 @@ export type PriorityOrderResolutionOptions = {
 export type V3OrderResolutionOptions = {
   currentBlock: number;
   filler?: string;
-}
+};
 
 export type DutchOutput = {
   readonly token: string;
@@ -146,7 +146,10 @@ export type V3DutchInput = {
   readonly adjustmentPerGweiBaseFee: BigNumber;
 };
 
-export type V3DutchInputJSON = Omit<V3DutchInput, "startAmount" | "curve" | "maxAmount" | "adjustmentPerGweiBaseFee"> & {
+export type V3DutchInputJSON = Omit<
+  V3DutchInput,
+  "startAmount" | "curve" | "maxAmount" | "adjustmentPerGweiBaseFee"
+> & {
   startAmount: string;
   curve: NonlinearDutchDecayJSON;
   maxAmount: string;
@@ -160,7 +163,7 @@ export type NonlinearDutchDecay = {
 
 export type EncodedNonlinearDutchDecay = {
   relativeBlocks: BigNumber;
-  relativeAmounts: bigint[];
+  relativeAmounts: string[];
 };
 
 export type EncodedV3DutchInput = Omit<V3DutchInput, "curve"> & {
@@ -185,7 +188,10 @@ export type V3DutchOutput = {
   readonly adjustmentPerGweiBaseFee: BigNumber;
 };
 
-export type V3DutchOutputJSON = Omit<V3DutchOutput, "startAmount" | "curve" | "minAmount" | "adjustmentPerGweiBaseFee"> & {
+export type V3DutchOutputJSON = Omit<
+  V3DutchOutput,
+  "startAmount" | "curve" | "minAmount" | "adjustmentPerGweiBaseFee"
+> & {
   startAmount: string;
   curve: NonlinearDutchDecayJSON;
   minAmount: string;
