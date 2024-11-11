@@ -11,8 +11,8 @@ import {
   ONE_ETHER,
   TICK_SPACING_TEN,
 } from '../internalConstants'
-import { constructHookAddress } from '../hook.test'
-import { HookOptions } from '../hook'
+import { constructHookAddress } from '../utils/hook.test'
+import { HookOptions } from '../utils/hook'
 
 describe('Pool', () => {
   const USDC = new Token(1, '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', 6, 'USDC', 'USD Coin')

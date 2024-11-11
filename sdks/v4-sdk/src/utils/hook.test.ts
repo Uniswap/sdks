@@ -236,4 +236,40 @@ describe('Hook', () => {
       ).toEqual(false)
     })
   })
+
+  describe('hasLiquidityPermissions', () => {
+    it('returns the correct results for beforeAddLiquidity', () => {
+      expect(Hook.hasLiquidityPermissions(hookBeforeAddLiquidity)).toEqual(true)
+    })
+
+    it('returns the correct results for afterAddLiquidity', () => {
+      expect(Hook.hasLiquidityPermissions(hookAfterAddLiquidity)).toEqual(true)
+    })
+
+    it('returns the correct results for beforeRemoveLiquidity', () => {
+      expect(Hook.hasLiquidityPermissions(hookBeforeRemoveLiquidity)).toEqual(true)
+    })
+
+    it('returns the correct results for afterRemoveLiquidity', () => {
+      expect(Hook.hasLiquidityPermissions(hookAfterRemoveLiquidity)).toEqual(true)
+    })
+
+    it('returns false if only delta flag is flagged (an incorrect address)', () => {
+      expect(Hook.hasLiquidityPermissions(hookAfterRemoveLiquidityReturnsDelta)).toEqual(false)
+    })
+  })
+
+  describe('hasSwapPermissions', () => {
+    it('returns the correct results for beforeSwap', () => {
+      expect(Hook.hasSwapPermissions(hookBeforeSwap)).toEqual(true)
+    })
+
+    it('returns the correct results for afterSwap', () => {
+      expect(Hook.hasSwapPermissions(hookAfterSwap)).toEqual(true)
+    })
+
+    it('returns false if only delta flag is flagged (an incorrect address)', () => {
+      expect(Hook.hasSwapPermissions(hookBeforeSwapReturnsDelta)).toEqual(false)
+    })
+  })
 })

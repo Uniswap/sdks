@@ -39,7 +39,7 @@ export const hookFlagIndex = {
 
 export class Hook {
   public static permissions(address: string): HookPermissions {
-    invariant(isAddress(address), 'invalid address')
+    this._checkAddress(address)
     return {
       beforeInitialize: this._hasPermission(address, HookOptions.BeforeInitialize),
       afterInitialize: this._hasPermission(address, HookOptions.AfterInitialize),
@@ -59,11 +59,48 @@ export class Hook {
   }
 
   public static hasPermission(address: string, hookOption: HookOptions) {
-    invariant(isAddress(address), 'invalid address')
+    this._checkAddress(address)
     return this._hasPermission(address, hookOption)
+  }
+
+  public static hasInitializePermissions(address: string) {
+    this._checkAddress(address)
+    return (
+      this._hasPermission(address, HookOptions.BeforeInitialize) ||
+      Hook._hasPermission(address, HookOptions.AfterInitialize)
+    )
+  }
+
+  public static hasLiquidityPermissions(address: string) {
+    this._checkAddress(address)
+    // this implicitly encapsulates liquidity delta permissions
+    return (
+      this._hasPermission(address, HookOptions.BeforeAddLiquidity) ||
+      Hook._hasPermission(address, HookOptions.AfterAddLiquidity) ||
+      Hook._hasPermission(address, HookOptions.BeforeRemoveLiquidity) ||
+      Hook._hasPermission(address, HookOptions.AfterRemoveLiquidity)
+    )
+  }
+
+  public static hasSwapPermissions(address: string) {
+    this._checkAddress(address)
+    // this implicitly encapsulates swap delta permissions
+    return this._hasPermission(address, HookOptions.BeforeSwap) || Hook._hasPermission(address, HookOptions.AfterSwap)
+  }
+
+  public static hasDonatePermissions(address: string) {
+    this._checkAddress(address)
+    return (
+      this._hasPermission(address, HookOptions.BeforeDonate) ||
+      Hook._hasPermission(address, HookOptions.AfterDonate)
+    )
   }
 
   private static _hasPermission(address: string, hookOption: HookOptions) {
     return !!(parseInt(address, 16) & (1 << hookFlagIndex[hookOption]))
+  }
+
+  private static _checkAddress(address: string) {
+    invariant(isAddress(address), 'invalid address')
   }
 }

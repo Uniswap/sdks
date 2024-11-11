@@ -12,7 +12,7 @@ import {
 } from '@uniswap/v3-sdk'
 import { defaultAbiCoder, isAddress } from 'ethers/lib/utils'
 import { sortsBefore } from '../utils/sortsBefore'
-import { HookOptions, Hook } from '../hook'
+import { HookOptions, Hook } from '../utils/hook'
 import { ADDRESS_ZERO, NEGATIVE_ONE, Q192 } from '../internalConstants'
 import JSBI from 'jsbi'
 
