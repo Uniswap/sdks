@@ -91,8 +91,7 @@ export class Hook {
   public static hasDonatePermissions(address: string) {
     this._checkAddress(address)
     return (
-      this._hasPermission(address, HookOptions.BeforeDonate) ||
-      Hook._hasPermission(address, HookOptions.AfterDonate)
+      this._hasPermission(address, HookOptions.BeforeDonate) || Hook._hasPermission(address, HookOptions.AfterDonate)
     )
   }
 
