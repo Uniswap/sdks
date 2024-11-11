@@ -237,6 +237,20 @@ describe('Hook', () => {
     })
   })
 
+  describe('hasInitializePermissions', () => {
+    it('returns the correct results for beforeSwap', () => {
+      expect(Hook.hasInitializePermissions(hookBeforeInitialize)).toEqual(true)
+    })
+
+    it('returns the correct results for afterInitialize', () => {
+      expect(Hook.hasInitializePermissions(hookAfterInitialize)).toEqual(true)
+    })
+
+    it('returns false for non-donate hooks', () => {
+      expect(Hook.hasInitializePermissions(hookAfterSwap)).toEqual(false)
+    })
+  })
+
   describe('hasLiquidityPermissions', () => {
     it('returns the correct results for beforeAddLiquidity', () => {
       expect(Hook.hasLiquidityPermissions(hookBeforeAddLiquidity)).toEqual(true)
@@ -270,6 +284,20 @@ describe('Hook', () => {
 
     it('returns false if only delta flag is flagged (an incorrect address)', () => {
       expect(Hook.hasSwapPermissions(hookBeforeSwapReturnsDelta)).toEqual(false)
+    })
+  })
+
+  describe('hasDonatePermissions', () => {
+    it('returns the correct results for beforeSwap', () => {
+      expect(Hook.hasDonatePermissions(hookBeforeDonate)).toEqual(true)
+    })
+
+    it('returns the correct results for afterDonate', () => {
+      expect(Hook.hasDonatePermissions(hookAfterDonate)).toEqual(true)
+    })
+
+    it('returns false for non-donate hooks', () => {
+      expect(Hook.hasDonatePermissions(hookAfterSwap)).toEqual(false)
     })
   })
 })
