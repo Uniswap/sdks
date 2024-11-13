@@ -57,6 +57,7 @@ export const V2_FACTORY_ADDRESSES: AddressMap = {
   [ChainId.BLAST]: '0x5C346464d33F90bABaf70dB6388507CC889C1070',
   [ChainId.WORLDCHAIN]: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
   [ChainId.ASTROCHAIN_SEPOLIA]: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
+  [ChainId.UNICHAIN]: '0x1f98400000000000000000000000000000000002',
 }
 /**
  * @deprecated use V2_ROUTER_ADDRESSES instead
@@ -75,6 +76,7 @@ export const V2_ROUTER_ADDRESSES: AddressMap = {
   [ChainId.BLAST]: '0xBB66Eb1c5e875933D44DAe661dbD80e5D9B03035',
   [ChainId.WORLDCHAIN]: '0x541aB7c31A119441eF3575F6973277DE0eF460bd',
   [ChainId.ASTROCHAIN_SEPOLIA]: '0x920b806E40A00E02E7D2b94fFc89860fDaEd3640',
+  [ChainId.UNICHAIN]: '0x284f11109359a7e1306c3e447ef14d38400063ff',
 }
 
 // Networks that share most of the same addresses i.e. Mainnet, Goerli, Optimism, Arbitrum, Polygon
@@ -292,6 +294,16 @@ const ASTROCHAIN_SEPOLIA_ADDRESSES: ChainAddresses = {
   v4QuoterAddress: '0x2cfa87651D3AB05Bc59E325E5eaC8495CF34cE55',
 }
 
+const UNICHAIN_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: '0x1f98400000000000000000000000000000000003',
+  multicallAddress: '0xb7610f9b733e7d45184be3a1bc966960ccc54f0b',
+  quoterAddress: '0x565ac8c7863d9bb16d07e809ff49fe5cd467634c',
+  v3MigratorAddress: '0xb9d0c246f306b1aaf02ae6ba112d5ef25e5b60dc',
+  nonfungiblePositionManagerAddress: '0x943e6e07a7e8e791dafc44083e54041d743c46e9',
+  tickLensAddress: '0xd5d76fa166ab8d8ad4c9f61aaa81457b66cbe443',
+  swapRouter02Address: '0x73855d06de49d0fe4a9c42636ba96c62da12ff9c',
+}
+
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
   [ChainId.MAINNET]: MAINNET_ADDRESSES,
   [ChainId.OPTIMISM]: OPTIMISM_ADDRESSES,
@@ -317,6 +329,7 @@ export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses>
   [ChainId.ZKSYNC]: ZKSYNC_ADDRESSES,
   [ChainId.WORLDCHAIN]: WORLDCHAIN_ADDRESSES,
   [ChainId.ASTROCHAIN_SEPOLIA]: ASTROCHAIN_SEPOLIA_ADDRESSES,
+  [ChainId.UNICHAIN]: UNICHAIN_ADDRESSES,
 }
 
 /* V3 Contract Addresses */
