@@ -11,6 +11,8 @@ import {
   ONE_ETHER,
   TICK_SPACING_TEN,
 } from '../internalConstants'
+import { constructHookAddress } from '../utils/hook.test'
+import { HookOptions } from '../utils/hook'
 
 describe('Pool', () => {
   const USDC = new Token(1, '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', 6, 'USDC', 'USD Coin')
@@ -261,6 +263,7 @@ describe('Pool', () => {
 
   describe('swaps', () => {
     let pool: Pool
+    let poolWithSwapHook: Pool
 
     beforeEach(() => {
       pool = new Pool(
@@ -285,9 +288,26 @@ describe('Pool', () => {
           },
         ]
       )
+
+      poolWithSwapHook = new Pool(
+        USDC,
+        DAI,
+        FEE_AMOUNT_LOW,
+        TICK_SPACING_TEN,
+        constructHookAddress([HookOptions.BeforeSwap]),
+        encodeSqrtRatioX96(1, 1),
+        ONE_ETHER,
+        0,
+        []
+      )
     })
 
     describe('#getOutputAmount', () => {
+      it('throws if pool has beforeSwap hooks', async () => {
+        const inputAmount = CurrencyAmount.fromRawAmount(USDC, 100)
+        await expect(() => poolWithSwapHook.getOutputAmount(inputAmount)).rejects.toThrow('Unsupported hook')
+      })
+
       it('USDC -> DAI', async () => {
         const inputAmount = CurrencyAmount.fromRawAmount(USDC, 100)
         const [outputAmount] = await pool.getOutputAmount(inputAmount)
@@ -304,6 +324,11 @@ describe('Pool', () => {
     })
 
     describe('#getInputAmount', () => {
+      it('throws if pool has beforeSwap hooks', async () => {
+        const outputAmount = CurrencyAmount.fromRawAmount(DAI, 98)
+        await expect(() => poolWithSwapHook.getInputAmount(outputAmount)).rejects.toThrow('Unsupported hook')
+      })
+
       it('USDC -> DAI', async () => {
         const outputAmount = CurrencyAmount.fromRawAmount(DAI, 98)
         const [inputAmount] = await pool.getInputAmount(outputAmount)
