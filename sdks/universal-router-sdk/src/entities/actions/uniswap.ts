@@ -228,7 +228,7 @@ export class UniswapTrade implements Command {
       }
     }
 
-    // for exactOutput swaps that with native input or perform an inputToken transition (wrap or unwrap)
+    // for exactOutput swaps with native input or that perform an inputToken transition (wrap or unwrap)
     // we need to send back the change to the user
     if (this.trade.tradeType === TradeType.EXACT_OUTPUT || riskOfPartialFill(this.trade)) {
       if (this.inputRequiresWrap) {
