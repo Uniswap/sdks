@@ -12,6 +12,7 @@ import {
 } from '@uniswap/v3-sdk'
 import { defaultAbiCoder, isAddress } from 'ethers/lib/utils'
 import { sortsBefore } from '../utils/sortsBefore'
+import { Hook } from '../utils/hook'
 import { ADDRESS_ZERO, NEGATIVE_ONE, Q192 } from '../internalConstants'
 import JSBI from 'jsbi'
 
@@ -299,7 +300,7 @@ export class Pool {
     amountSpecified: JSBI,
     sqrtPriceLimitX96?: JSBI
   ): Promise<{ amountCalculated: JSBI; sqrtRatioX96: JSBI; liquidity: JSBI; tickCurrent: number }> {
-    if (this.nonImpactfulHook()) {
+    if (!this.hookImpactsSwap()) {
       return v3Swap(
         JSBI.BigInt(this.fee),
         this.sqrtRatioX96,
@@ -316,8 +317,9 @@ export class Pool {
     }
   }
 
-  private nonImpactfulHook(): boolean {
-    // TODO: reference chain specific hook addresses or patterns that do not impact swaps
-    return this.hooks === ADDRESS_ZERO
+  private hookImpactsSwap(): boolean {
+    // could use this function to clear certain hooks that may have swap Permissions, but we know they don't interfere
+    // in the swap outcome
+    return Hook.hasSwapPermissions(this.hooks)
   }
 }
