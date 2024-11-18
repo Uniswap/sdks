@@ -736,7 +736,6 @@ describe('Uniswap', () => {
       expect(hexToDecimalString(methodParameters.value)).to.not.equal('0')
     })
 
-
     it('encodes an exactOutput ETH->DAI->USDC swap that must first unwrap WETH', async () => {
       const outputUSDC = utils.parseUnits('1000', 6).toString()
       const trade = await V4Trade.fromRoute(
