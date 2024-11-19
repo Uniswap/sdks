@@ -16,7 +16,6 @@ import {
   IRoute,
   RouteV2,
   RouteV3,
-  RouteV4,
   MixedRouteSDK,
   MixedRoute,
   SwapOptions as RouterSwapOptions,
@@ -26,9 +25,10 @@ import {
 } from '@uniswap/router-sdk'
 import { Permit2Permit } from '../../utils/inputTokens'
 import { getPathCurrency } from '../../utils/pathCurrency'
-import { Currency, TradeType, CurrencyAmount, Percent } from '@uniswap/sdk-core'
+import { Currency, TradeType, Token, CurrencyAmount, Percent } from '@uniswap/sdk-core'
 import { Command, RouterActionType, TradeConfig } from '../Command'
 import { SENDER_AS_RECIPIENT, ROUTER_AS_RECIPIENT, CONTRACT_BALANCE, ETH_ADDRESS } from '../../utils/constants'
+import { getCurrencyAddress } from '../../utils/getCurrencyAddress'
 import { encodeFeeBips } from '../../utils/numbers'
 import { BigNumber, BigNumberish } from 'ethers'
 import { TPool } from '@uniswap/router-sdk/dist/utils/TPool'
@@ -65,9 +65,12 @@ export class UniswapTrade implements Command {
 
   constructor(public trade: RouterTrade<Currency, Currency, TradeType>, public options: SwapOptions) {
     if (!!options.fee && !!options.flatFee) throw new Error('Only one fee option permitted')
-    if (this.inputRequiresWrap) this.payerIsUser = false
-    else if (this.options.useRouterBalance) this.payerIsUser = false
-    else this.payerIsUser = true
+
+    if (this.inputRequiresWrap || this.inputRequiresUnwrap || this.options.useRouterBalance) {
+      this.payerIsUser = false
+    } else {
+      this.payerIsUser = true
+    }
   }
 
   get isAllV4(): boolean {
@@ -79,22 +82,49 @@ export class UniswapTrade implements Command {
   }
 
   get inputRequiresWrap(): boolean {
-    if (!this.isAllV4) {
-      return this.trade.inputAmount.currency.isNative
+    if (this.isAllV4) {
+      return (
+        this.trade.inputAmount.currency.isNative &&
+        !(this.trade.swaps[0].route as unknown as V4Route<Currency, Currency>).pathInput.isNative
+      )
     } else {
-      // We only support wrapping all ETH or no ETH currently. We cannot support splitting where half needs to be wrapped
-      // If the input currency is ETH and the input of the first path is not ETH it must be WETH that needs wrapping
-      return this.trade.inputAmount.currency.isNative && !this.trade.swaps[0].route.input.isNative
+      return this.trade.inputAmount.currency.isNative
     }
   }
 
-  get outputRequiresUnwrap(): boolean {
-    if (!this.isAllV4) {
-      return this.trade.outputAmount.currency.isNative
-    } else {
-      // If the output currency is ETH and the output of the swap is not ETH it must be WETH that needs unwrapping
-      return this.trade.outputAmount.currency.isNative && !this.trade.swaps[0].route.output.isNative
+  get inputRequiresUnwrap(): boolean {
+    if (this.isAllV4) {
+      return (
+        !this.trade.inputAmount.currency.isNative &&
+        (this.trade.swaps[0].route as unknown as V4Route<Currency, Currency>).pathInput.isNative
+      )
     }
+    return false
+  }
+
+  get outputRequiresWrap(): boolean {
+    if (this.isAllV4) {
+      return (
+        !this.trade.outputAmount.currency.isNative &&
+        (this.trade.swaps[0].route as unknown as V4Route<Currency, Currency>).pathOutput.isNative
+      )
+    }
+    return false
+  }
+
+  get outputRequiresUnwrap(): boolean {
+    if (this.isAllV4) {
+      return (
+        this.trade.outputAmount.currency.isNative &&
+        !(this.trade.swaps[0].route as unknown as V4Route<Currency, Currency>).pathOutput.isNative
+      )
+    } else {
+      return this.trade.outputAmount.currency.isNative
+    }
+  }
+
+  get outputRequiresTransition(): boolean {
+    return this.outputRequiresWrap || this.outputRequiresUnwrap
   }
 
   encode(planner: RoutePlanner, _config: TradeConfig): void {
@@ -105,6 +135,14 @@ export class UniswapTrade implements Command {
         ROUTER_AS_RECIPIENT,
         this.trade.maximumAmountIn(this.options.slippageTolerance).quotient.toString(),
       ])
+    } else if (this.inputRequiresUnwrap) {
+      // send wrapped token to router to unwrap
+      planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [
+        (this.trade.inputAmount.currency as Token).address,
+        ROUTER_AS_RECIPIENT,
+        this.trade.maximumAmountIn(this.options.slippageTolerance).quotient.toString(),
+      ])
+      planner.addCommand(CommandType.UNWRAP_WETH, [ROUTER_AS_RECIPIENT, 0])
     }
     // The overall recipient at the end of the trade, SENDER_AS_RECIPIENT uses the msg.sender
     this.options.recipient = this.options.recipient ?? SENDER_AS_RECIPIENT
@@ -115,7 +153,8 @@ export class UniswapTrade implements Command {
     //      in that the reversion probability is lower
     const performAggregatedSlippageCheck =
       this.trade.tradeType === TradeType.EXACT_INPUT && this.trade.routes.length > 2
-    const routerMustCustody = performAggregatedSlippageCheck || this.outputRequiresUnwrap || hasFeeOption(this.options)
+    const routerMustCustody =
+      performAggregatedSlippageCheck || this.outputRequiresTransition || hasFeeOption(this.options)
 
     for (const swap of this.trade.swaps) {
       switch (swap.route.protocol) {
@@ -139,18 +178,18 @@ export class UniswapTrade implements Command {
     let minimumAmountOut: BigNumber = BigNumber.from(
       this.trade.minimumAmountOut(this.options.slippageTolerance).quotient.toString()
     )
-
     // The router custodies for 3 reasons: to unwrap, to take a fee, and/or to do a slippage check
     if (routerMustCustody) {
+      const pools = this.trade.swaps[0].route.pools
+      const pathOutputCurrencyAddress = getCurrencyAddress(
+        getPathCurrency(this.trade.outputAmount.currency, pools[pools.length - 1])
+      )
+
       // If there is a fee, that percentage is sent to the fee recipient
       // In the case where ETH is the output currency, the fee is taken in WETH (for gas reasons)
       if (!!this.options.fee) {
         const feeBips = encodeFeeBips(this.options.fee.fee)
-        planner.addCommand(CommandType.PAY_PORTION, [
-          this.trade.outputAmount.currency.wrapped.address,
-          this.options.fee.recipient,
-          feeBips,
-        ])
+        planner.addCommand(CommandType.PAY_PORTION, [pathOutputCurrencyAddress, this.options.fee.recipient, feeBips])
 
         // If the trade is exact output, and a fee was taken, we must adjust the amount out to be the amount after the fee
         // Otherwise we continue as expected with the trade's normal expected output
@@ -165,11 +204,7 @@ export class UniswapTrade implements Command {
         const feeAmount = this.options.flatFee.amount
         if (minimumAmountOut.lt(feeAmount)) throw new Error('Flat fee amount greater than minimumAmountOut')
 
-        planner.addCommand(CommandType.TRANSFER, [
-          this.trade.outputAmount.currency.wrapped.address,
-          this.options.flatFee.recipient,
-          feeAmount,
-        ])
+        planner.addCommand(CommandType.TRANSFER, [pathOutputCurrencyAddress, this.options.flatFee.recipient, feeAmount])
 
         // If the trade is exact output, and a fee was taken, we must adjust the amount out to be the amount after the fee
         // Otherwise we continue as expected with the trade's normal expected output
@@ -182,19 +217,28 @@ export class UniswapTrade implements Command {
       // by this if-else clause.
       if (this.outputRequiresUnwrap) {
         planner.addCommand(CommandType.UNWRAP_WETH, [this.options.recipient, minimumAmountOut])
+      } else if (this.outputRequiresWrap) {
+        planner.addCommand(CommandType.WRAP_ETH, [this.options.recipient, CONTRACT_BALANCE])
       } else {
         planner.addCommand(CommandType.SWEEP, [
-          this.trade.outputAmount.currency.wrapped.address,
+          getCurrencyAddress(this.trade.outputAmount.currency),
           this.options.recipient,
           minimumAmountOut,
         ])
       }
     }
 
-    if (this.inputRequiresWrap && (this.trade.tradeType === TradeType.EXACT_OUTPUT || riskOfPartialFill(this.trade))) {
-      // for exactOutput swaps that take native currency as input
-      // we need to send back the change to the user
-      planner.addCommand(CommandType.UNWRAP_WETH, [this.options.recipient, 0])
+    // for exactOutput swaps with native input or that perform an inputToken transition (wrap or unwrap)
+    // we need to send back the change to the user
+    if (this.trade.tradeType === TradeType.EXACT_OUTPUT || riskOfPartialFill(this.trade)) {
+      if (this.inputRequiresWrap) {
+        planner.addCommand(CommandType.UNWRAP_WETH, [this.options.recipient, 0])
+      } else if (this.inputRequiresUnwrap) {
+        planner.addCommand(CommandType.WRAP_ETH, [this.options.recipient, CONTRACT_BALANCE])
+      } else if (this.trade.inputAmount.currency.isNative) {
+        // must refund extra native currency sent along for native v4 trades (no input transition)
+        planner.addCommand(CommandType.SWEEP, [ETH_ADDRESS, this.options.recipient, 0])
+      }
     }
 
     if (this.options.safeMode) planner.addCommand(CommandType.SWEEP, [ETH_ADDRESS, this.options.recipient, 0])
@@ -275,31 +319,32 @@ function addV3Swap<TInput extends Currency, TOutput extends Currency>(
 
 function addV4Swap<TInput extends Currency, TOutput extends Currency>(
   planner: RoutePlanner,
-  { route, inputAmount, outputAmount }: Swap<TInput, TOutput>,
+  { inputAmount, outputAmount, route }: Swap<TInput, TOutput>,
   tradeType: TradeType,
   options: SwapOptions,
   payerIsUser: boolean,
   routerMustCustody: boolean
 ): void {
+  // create a deep copy of pools since v4Planner encoding tampers with array
+  const pools = route.pools.map((p) => p) as V4Pool[]
+  const v4Route = new V4Route(pools, inputAmount.currency, outputAmount.currency)
   const trade = V4Trade.createUncheckedTrade({
-    route: route as RouteV4<TInput, TOutput>,
+    route: v4Route,
     inputAmount,
     outputAmount,
     tradeType,
   })
+
   const slippageToleranceOnSwap =
     routerMustCustody && tradeType == TradeType.EXACT_INPUT ? undefined : options.slippageTolerance
 
-  const inputWethFromRouter = inputAmount.currency.isNative && !route.input.isNative
-  if (inputWethFromRouter && !payerIsUser) throw new Error('Inconsistent payer')
-
   const v4Planner = new V4Planner()
   v4Planner.addTrade(trade, slippageToleranceOnSwap)
-  v4Planner.addSettle(inputWethFromRouter ? inputAmount.currency.wrapped : inputAmount.currency, payerIsUser)
-
-  options.recipient = options.recipient ?? SENDER_AS_RECIPIENT
-  v4Planner.addTake(outputAmount.currency, routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient)
-
+  v4Planner.addSettle(trade.route.pathInput, payerIsUser)
+  v4Planner.addTake(
+    trade.route.pathOutput,
+    routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient ?? SENDER_AS_RECIPIENT
+  )
   planner.addCommand(CommandType.V4_SWAP, [v4Planner.finalize()])
 }
 
