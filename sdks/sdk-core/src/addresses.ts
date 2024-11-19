@@ -56,7 +56,8 @@ export const V2_FACTORY_ADDRESSES: AddressMap = {
   [ChainId.CELO]: '0x79a530c8e2fA8748B7B40dd3629C0520c2cCf03f',
   [ChainId.BLAST]: '0x5C346464d33F90bABaf70dB6388507CC889C1070',
   [ChainId.WORLDCHAIN]: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
-  [ChainId.ASTROCHAIN_SEPOLIA]: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
+  [ChainId.UNICHAIN_SEPOLIA]: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
+  [ChainId.UNICHAIN]: '0x1f98400000000000000000000000000000000002',
 }
 /**
  * @deprecated use V2_ROUTER_ADDRESSES instead
@@ -74,7 +75,8 @@ export const V2_ROUTER_ADDRESSES: AddressMap = {
   [ChainId.POLYGON]: '0xedf6066a2b290c185783862c7f4776a2c8077ad1',
   [ChainId.BLAST]: '0xBB66Eb1c5e875933D44DAe661dbD80e5D9B03035',
   [ChainId.WORLDCHAIN]: '0x541aB7c31A119441eF3575F6973277DE0eF460bd',
-  [ChainId.ASTROCHAIN_SEPOLIA]: '0x920b806E40A00E02E7D2b94fFc89860fDaEd3640',
+  [ChainId.UNICHAIN_SEPOLIA]: '0x920b806E40A00E02E7D2b94fFc89860fDaEd3640',
+  [ChainId.UNICHAIN]: '0x284f11109359a7e1306c3e447ef14d38400063ff',
 }
 
 // Networks that share most of the same addresses i.e. Mainnet, Goerli, Optimism, Arbitrum, Polygon
@@ -277,7 +279,7 @@ const WORLDCHAIN_ADDRESSES: ChainAddresses = {
   swapRouter02Address: '0x091AD9e2e6e5eD44c1c66dB50e49A601F9f36cF6',
 }
 
-const ASTROCHAIN_SEPOLIA_ADDRESSES: ChainAddresses = {
+const UNICHAIN_SEPOLIA_ADDRESSES: ChainAddresses = {
   v3CoreFactoryAddress: '0x1F98431c8aD98523631AE4a59f267346ea31F984',
   multicallAddress: '0x9D0F15f2cf58655fDDcD1EE6129C547fDaeD01b1',
   quoterAddress: '0x6Dd37329A1A225a6Fca658265D460423DCafBF89',
@@ -290,6 +292,16 @@ const ASTROCHAIN_SEPOLIA_ADDRESSES: ChainAddresses = {
   v4PositionManagerAddress: '0x05deD3F8a8e84700d68A4D81cd6780c982dB13F9',
   v4StateView: '0xad328439DCa7ce857662afA4584A3d571bbDDC75',
   v4QuoterAddress: '0x2cfa87651D3AB05Bc59E325E5eaC8495CF34cE55',
+}
+
+const UNICHAIN_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: '0x1f98400000000000000000000000000000000003',
+  multicallAddress: '0xb7610f9b733e7d45184be3a1bc966960ccc54f0b',
+  quoterAddress: '0x565ac8c7863d9bb16d07e809ff49fe5cd467634c',
+  v3MigratorAddress: '0xb9d0c246f306b1aaf02ae6ba112d5ef25e5b60dc',
+  nonfungiblePositionManagerAddress: '0x943e6e07a7e8e791dafc44083e54041d743c46e9',
+  tickLensAddress: '0xd5d76fa166ab8d8ad4c9f61aaa81457b66cbe443',
+  swapRouter02Address: '0x73855d06de49d0fe4a9c42636ba96c62da12ff9c',
 }
 
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
@@ -316,7 +328,8 @@ export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses>
   [ChainId.BLAST]: BLAST_ADDRESSES,
   [ChainId.ZKSYNC]: ZKSYNC_ADDRESSES,
   [ChainId.WORLDCHAIN]: WORLDCHAIN_ADDRESSES,
-  [ChainId.ASTROCHAIN_SEPOLIA]: ASTROCHAIN_SEPOLIA_ADDRESSES,
+  [ChainId.UNICHAIN_SEPOLIA]: UNICHAIN_SEPOLIA_ADDRESSES,
+  [ChainId.UNICHAIN]: UNICHAIN_ADDRESSES,
 }
 
 /* V3 Contract Addresses */
