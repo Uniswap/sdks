@@ -4529,10 +4529,10 @@ __metadata:
   dependencies:
     "@ethersproject/abi": ^5.5.0
     "@types/jest": ^24.0.25
-    "@uniswap/sdk-core": ^5.8.0
+    "@uniswap/sdk-core": ^6.0.0
     "@uniswap/swap-router-contracts": ^1.3.0
-    "@uniswap/v2-sdk": ^4.6.0
-    "@uniswap/v3-sdk": ^3.17.0
+    "@uniswap/v2-sdk": ^4.7.0
+    "@uniswap/v3-sdk": ^3.19.0
     "@uniswap/v4-sdk": ^1.10.3
     prettier: ^2.4.1
     tsdx: ^0.14.1
@@ -4701,6 +4701,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@uniswap/v2-sdk@npm:^4.7.0":
+  version: 4.7.0
+  resolution: "@uniswap/v2-sdk@npm:4.7.0"
+  dependencies:
+    "@ethersproject/address": ^5.0.2
+    "@ethersproject/solidity": ^5.0.9
+    "@uniswap/sdk-core": ^6.0.0
+    tiny-invariant: ^1.1.0
+    tiny-warning: ^1.0.3
+  checksum: 234f018ca2a42e76251bd15482f24a5f7c8987695e74681a62800bc0e878b3b0f0052490fd7d269408a5f269ca74befa15d2ab01f541596271e44aa0364258d7
+  languageName: node
+  linkType: hard
+
 "@uniswap/v2-sdk@workspace:sdks/v2-sdk":
   version: 0.0.0-use.local
   resolution: "@uniswap/v2-sdk@workspace:sdks/v2-sdk"
@@ -4774,6 +4787,22 @@ __metadata:
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
   checksum: ab86fb564f3970b9ea8361781e026d539a1b7216d4d248280b619cac7ea9ab859431be38b464582ca1312f37f5ed05a1dc685af63eba4adf4e0148be473cbf21
+  languageName: node
+  linkType: hard
+
+"@uniswap/v3-sdk@npm:^3.19.0":
+  version: 3.19.0
+  resolution: "@uniswap/v3-sdk@npm:3.19.0"
+  dependencies:
+    "@ethersproject/abi": ^5.5.0
+    "@ethersproject/solidity": ^5.0.9
+    "@uniswap/sdk-core": ^6.0.0
+    "@uniswap/swap-router-contracts": ^1.3.0
+    "@uniswap/v3-periphery": ^1.1.1
+    "@uniswap/v3-staker": 1.0.0
+    tiny-invariant: ^1.1.0
+    tiny-warning: ^1.0.3
+  checksum: b076fa983838694ee7c38ebfbe5fb211514f5b5d5b37089b79ddc2a5684cd11cc32bc4f7182ed0db99f7f46b08a850397991702078bd6043103f35cf36cb6a84
   languageName: node
   linkType: hard
 
