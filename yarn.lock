@@ -4529,11 +4529,11 @@ __metadata:
   dependencies:
     "@ethersproject/abi": ^5.5.0
     "@types/jest": ^24.0.25
-    "@uniswap/sdk-core": ^5.8.0
+    "@uniswap/sdk-core": ^6.0.0
     "@uniswap/swap-router-contracts": ^1.3.0
-    "@uniswap/v2-sdk": ^4.6.0
-    "@uniswap/v3-sdk": ^3.17.0
-    "@uniswap/v4-sdk": ^1.10.3
+    "@uniswap/v2-sdk": ^4.7.0
+    "@uniswap/v3-sdk": ^3.19.0
+    "@uniswap/v4-sdk": ^1.12.0
     prettier: ^2.4.1
     tsdx: ^0.14.1
   languageName: unknown
@@ -4701,6 +4701,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@uniswap/v2-sdk@npm:^4.7.0":
+  version: 4.7.0
+  resolution: "@uniswap/v2-sdk@npm:4.7.0"
+  dependencies:
+    "@ethersproject/address": ^5.0.2
+    "@ethersproject/solidity": ^5.0.9
+    "@uniswap/sdk-core": ^6.0.0
+    tiny-invariant: ^1.1.0
+    tiny-warning: ^1.0.3
+  checksum: 234f018ca2a42e76251bd15482f24a5f7c8987695e74681a62800bc0e878b3b0f0052490fd7d269408a5f269ca74befa15d2ab01f541596271e44aa0364258d7
+  languageName: node
+  linkType: hard
+
 "@uniswap/v2-sdk@workspace:sdks/v2-sdk":
   version: 0.0.0-use.local
   resolution: "@uniswap/v2-sdk@workspace:sdks/v2-sdk"
@@ -4758,6 +4771,22 @@ __metadata:
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
   checksum: d8d507a8ed302c983217575bcead36700c4ee823db98ea9281cf8f9e5dfb9a5c49da111199f28f65f43ccb4c4dc2996d8a120128076b622b560fe780f8bb8db5
+  languageName: node
+  linkType: hard
+
+"@uniswap/v3-sdk@npm:3.19.0, @uniswap/v3-sdk@npm:^3.19.0":
+  version: 3.19.0
+  resolution: "@uniswap/v3-sdk@npm:3.19.0"
+  dependencies:
+    "@ethersproject/abi": ^5.5.0
+    "@ethersproject/solidity": ^5.0.9
+    "@uniswap/sdk-core": ^6.0.0
+    "@uniswap/swap-router-contracts": ^1.3.0
+    "@uniswap/v3-periphery": ^1.1.1
+    "@uniswap/v3-staker": 1.0.0
+    tiny-invariant: ^1.1.0
+    tiny-warning: ^1.0.3
+  checksum: b076fa983838694ee7c38ebfbe5fb211514f5b5d5b37089b79ddc2a5684cd11cc32bc4f7182ed0db99f7f46b08a850397991702078bd6043103f35cf36cb6a84
   languageName: node
   linkType: hard
 
@@ -4820,6 +4849,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@uniswap/v4-sdk@npm:^1.12.0":
+  version: 1.12.0
+  resolution: "@uniswap/v4-sdk@npm:1.12.0"
+  dependencies:
+    "@ethersproject/solidity": ^5.0.9
+    "@uniswap/sdk-core": ^6.0.0
+    "@uniswap/v3-sdk": 3.19.0
+    tiny-invariant: ^1.1.0
+    tiny-warning: ^1.0.3
+  checksum: 975b88da4b70cc3fe66fe768ad94b2019ac4c70d9601ac148e6c8081a53d26fdd77cc77f1bf286faec1072d13463608ff629c59820f2f0aa7f7bd16a46cb328c
+  languageName: node
+  linkType: hard
+
 "@uniswap/v4-sdk@workspace:sdks/v4-sdk":
   version: 0.0.0-use.local
   resolution: "@uniswap/v4-sdk@workspace:sdks/v4-sdk"
@@ -4829,8 +4871,8 @@ __metadata:
     "@types/mocha": ^9.1.1
     "@types/node": ^18.7.16
     "@types/node-fetch": ^2.6.2
-    "@uniswap/sdk-core": ^5.3.1
-    "@uniswap/v3-sdk": 3.12.0
+    "@uniswap/sdk-core": ^6.0.0
+    "@uniswap/v3-sdk": 3.19.0
     chai: ^4.3.6
     dotenv: ^16.0.3
     eslint-plugin-prettier: ^3.4.1
