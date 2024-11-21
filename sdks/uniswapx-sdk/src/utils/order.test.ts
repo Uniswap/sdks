@@ -39,7 +39,7 @@ describe("order utils", () => {
   const uniswapXOrderParser = new UniswapXOrderParser();
   const relayOrderParser = new RelayOrderParser();
 
-  beforeAll(async () => {
+  beforeAll(() => {
     chainId = 1;
     priorityChainId = 8453;
     blockBasedChainId = 42161;
@@ -454,7 +454,6 @@ describe("order utils", () => {
           blockBasedChainId
         )
       ).toEqual(OrderType.Dutch_V3);
-      console.log(unsignedV3DutchOrder.serialize());
     });
     it("parses CosignedV3DutchOrder type", () => {
       expect(
