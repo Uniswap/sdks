@@ -5,15 +5,18 @@ import {
   PriorityOrderBuilder,
   RelayOrderBuilder,
   V2DutchOrderBuilder,
+  V3DutchOrderBuilder,
 } from "../builder";
 import { OrderType } from "../constants";
 import {
   CosignedPriorityOrder,
   CosignedV2DutchOrder,
+  CosignedV3DutchOrder,
   DutchOrder,
   RelayOrder,
   UnsignedPriorityOrder,
   UnsignedV2DutchOrder,
+  UnsignedV3DutchOrder,
 } from "../order";
 
 import { RelayOrderParser, UniswapXOrderParser } from "./order";
@@ -23,19 +26,23 @@ describe("order utils", () => {
   let dutchOrderExactOut: DutchOrder;
   let cosignedV2DutchOrder: CosignedV2DutchOrder;
   let unsignedV2DutchOrder: UnsignedV2DutchOrder;
+  let unsignedV3DutchOrder: UnsignedV3DutchOrder;
+  let cosignedV3DutchOrder: CosignedV3DutchOrder;
   let unsignedPriorityOrder: UnsignedPriorityOrder;
   let cosignedPriorityOrder: CosignedPriorityOrder;
   let limitOrder: DutchOrder;
   let relayOrder: RelayOrder;
   let chainId: number;
   let priorityChainId: number;
+  let blockBasedChainId: number;
 
   const uniswapXOrderParser = new UniswapXOrderParser();
   const relayOrderParser = new RelayOrderParser();
 
-  beforeAll(() => {
+  beforeAll(async () => {
     chainId = 1;
     priorityChainId = 8453;
+    blockBasedChainId = 42161;
     const dutchBuilder = new DutchOrderBuilder(chainId);
     const deadline = Math.floor(Date.now() / 1000) + 1000;
     const input = {
@@ -168,6 +175,48 @@ describe("order utils", () => {
         "0x65c6470fea0e1ca7d204b6904d0c1b0b640d7e6dcd4be3065497756e163c0399288c3eea0fba9b31ed00f34ccffe389ec3027bcd764df9fa853eeae8f68c9beb1b"
       )
       .build();
+
+    const v3Builder = new V3DutchOrderBuilder(blockBasedChainId)
+      .cosigner("0xf4c37D77623D476F52225df3Bbe8a874209a1149")
+      .deadline(deadline)
+      .swapper(constants.AddressZero)
+      .nonce(BigNumber.from(100))
+      .startingBaseFee(BigNumber.from(0))
+      .input({
+        token: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
+        startAmount: BigNumber.from("1000000"),
+        curve: {
+          relativeBlocks: [],
+          relativeAmounts: [],
+        },
+        maxAmount: BigNumber.from("1000000"),
+        adjustmentPerGweiBaseFee: BigNumber.from(0),
+      })
+      .output({
+        token: "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f",
+        startAmount: BigNumber.from("1000000"),
+        curve: {
+          relativeBlocks: [4],
+          relativeAmounts: [BigInt(4)],
+        },
+        recipient: constants.AddressZero,
+        minAmount: BigNumber.from("1000000").sub(4),
+        adjustmentPerGweiBaseFee: BigNumber.from(0),
+      });
+
+    unsignedV3DutchOrder = v3Builder.buildPartial();
+    cosignedV3DutchOrder = v3Builder
+      .cosignerData({
+        decayStartBlock: 100,
+        exclusiveFiller: constants.AddressZero,
+        exclusivityOverrideBps: BigNumber.from(0),
+        inputOverride: BigNumber.from(0),
+        outputOverrides: [BigNumber.from(0)],
+      })
+      .cosignature(
+        "0x88a3d425308d71431b514826cbf9c74f713b57946b0a29f7d7e094ccf0ab562e270216a537b59210f1b5c87f5cc5662cd87dea5df7e699d92b061191bd2499c71b"
+      )
+      .build();
   });
 
   describe("parseOrder", () => {
@@ -283,9 +332,9 @@ describe("order utils", () => {
 
     it("parses CosignedPriorityOrder", () => {
       const encodedOrder = cosignedPriorityOrder.serialize();
-      expect(uniswapXOrderParser.parseOrder(encodedOrder, priorityChainId)).toEqual(
-        cosignedPriorityOrder
-      );
+      expect(
+        uniswapXOrderParser.parseOrder(encodedOrder, priorityChainId)
+      ).toEqual(cosignedPriorityOrder);
     });
 
     it("parses UnsignedPriorityOrder", () => {
@@ -335,6 +384,16 @@ describe("order utils", () => {
     it("parses UnsignedPriorityOrder type", () => {
       expect(uniswapXOrderParser.getOrderType(unsignedPriorityOrder)).toEqual(
         OrderType.Priority
+      );
+    });
+    it("parses UnsignedV3DutchOrder type", () => {
+      expect(uniswapXOrderParser.getOrderType(unsignedV3DutchOrder)).toEqual(
+        OrderType.Dutch_V3
+      );
+    });
+    it("parses CosignedV3DutchOrder type", () => {
+      expect(uniswapXOrderParser.getOrderType(cosignedV3DutchOrder)).toEqual(
+        OrderType.Dutch_V3
       );
     });
   });
@@ -387,6 +446,23 @@ describe("order utils", () => {
           chainId
         )
       ).toEqual(OrderType.Dutch_V2);
+    });
+    it("parses UnsignedV3DutchOrder type", () => {
+      expect(
+        uniswapXOrderParser.getOrderTypeFromEncoded(
+          unsignedV3DutchOrder.serialize(),
+          blockBasedChainId
+        )
+      ).toEqual(OrderType.Dutch_V3);
+      console.log(unsignedV3DutchOrder.serialize());
+    });
+    it("parses CosignedV3DutchOrder type", () => {
+      expect(
+        uniswapXOrderParser.getOrderTypeFromEncoded(
+          cosignedV3DutchOrder.serialize(),
+          blockBasedChainId
+        )
+      ).toEqual(OrderType.Dutch_V3);
     });
     it("parses UnsignedPriorityOrder type", () => {
       expect(
