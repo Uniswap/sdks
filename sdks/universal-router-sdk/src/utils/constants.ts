@@ -294,6 +294,19 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
   },
+  [130]: {
+    weth: '0x4200000000000000000000000000000000000006',
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: '0x284F11109359a7e1306C3e447ef14D38400063FF',
+        creationBlock: 294151,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: '0x284F11109359a7e1306C3e447ef14D38400063FF',
+        creationBlock: 294151,
+      },
+    },
+  },
 }
 
 export const UNIVERSAL_ROUTER_ADDRESS = (version: UniversalRouterVersion, chainId: number): string => {
