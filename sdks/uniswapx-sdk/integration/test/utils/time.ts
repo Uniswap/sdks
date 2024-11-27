@@ -10,6 +10,15 @@ export class BlockchainTime {
     return timestamp + secondsFromNow;
   }
 
+  async blocksFromNow(blocksFromNow: number): Promise<number> {
+    const res = await hre.network.provider.send('eth_getBlockByNumber', [
+      'latest',
+      false,
+    ]);
+    const blockNum = parseInt(res.number, 16);
+    return blockNum + blocksFromNow;
+  }
+
   async increaseTime(seconds: number): Promise<void> {
     await hre.network.provider.send('evm_increaseTime', [seconds]);
     await hre.network.provider.send('evm_mine');
