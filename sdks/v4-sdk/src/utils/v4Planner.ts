@@ -17,27 +17,26 @@ export enum Actions {
   DECREASE_LIQUIDITY = 0x01,
   MINT_POSITION = 0x02,
   BURN_POSITION = 0x03,
+  
   // swapping
-  SWAP_EXACT_IN_SINGLE = 0x04,
-  SWAP_EXACT_IN = 0x05,
-  SWAP_EXACT_OUT_SINGLE = 0x06,
-  SWAP_EXACT_OUT = 0x07,
+  SWAP_EXACT_IN_SINGLE = 0x06,
+  SWAP_EXACT_IN = 0x07,
+  SWAP_EXACT_OUT_SINGLE = 0x08,
+  SWAP_EXACT_OUT = 0x09,
 
   // closing deltas on the pool manager
   // settling
-  SETTLE = 0x09,
-  SETTLE_ALL = 0x10,
-  SETTLE_PAIR = 0x11,
+  SETTLE = 0x0b,
+  SETTLE_ALL = 0x0c,
+  SETTLE_PAIR = 0x0d,
   // taking
-  TAKE = 0x12,
-  TAKE_ALL = 0x13,
-  TAKE_PORTION = 0x14,
-  TAKE_PAIR = 0x15,
+  TAKE = 0x0e,
+  TAKE_ALL = 0x0f,
+  TAKE_PORTION = 0x10,
+  TAKE_PAIR = 0x11,
 
-  SETTLE_TAKE_PAIR = 0x16,
-
-  CLOSE_CURRENCY = 0x17,
-  SWEEP = 0x19,
+  CLOSE_CURRENCY = 0x12,
+  SWEEP = 0x14,
 }
 
 export enum Subparser {
@@ -149,10 +148,6 @@ export const V4_BASE_ACTIONS_ABI_DEFINITION: { [key in Actions]: readonly ParamT
     { name: 'currency0', type: 'address' },
     { name: 'currency1', type: 'address' },
     { name: 'recipient', type: 'address' },
-  ],
-  [Actions.SETTLE_TAKE_PAIR]: [
-    { name: 'settleCurrency', type: 'address' },
-    { name: 'takeCurrency', type: 'address' },
   ],
   [Actions.CLOSE_CURRENCY]: [{ name: 'currency', type: 'address' }],
   [Actions.SWEEP]: [

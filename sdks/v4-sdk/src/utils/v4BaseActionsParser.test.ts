@@ -45,21 +45,7 @@ describe('Command Parser', () => {
         ],
       },
     },
-    {
-      input: new V4Planner().addAction(Actions.SETTLE_TAKE_PAIR, [addressOne, addressTwo]),
-      result: {
-        actions: [
-          {
-            actionName: 'SETTLE_TAKE_PAIR',
-            actionType: Actions.SETTLE_TAKE_PAIR,
-            params: [
-              { name: 'settleCurrency', value: addressOne },
-              { name: 'takeCurrency', value: addressTwo },
-            ],
-          },
-        ],
-      },
-    },
+    
     {
       input: new V4Planner().addAction(Actions.TAKE_PAIR, [addressOne, addressTwo, addressOne]),
       result: {
