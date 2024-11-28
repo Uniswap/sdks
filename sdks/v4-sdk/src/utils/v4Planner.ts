@@ -17,7 +17,7 @@ export enum Actions {
   DECREASE_LIQUIDITY = 0x01,
   MINT_POSITION = 0x02,
   BURN_POSITION = 0x03,
-  
+
   // swapping
   SWAP_EXACT_IN_SINGLE = 0x06,
   SWAP_EXACT_IN = 0x07,

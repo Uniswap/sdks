@@ -45,7 +45,7 @@ describe('Command Parser', () => {
         ],
       },
     },
-    
+
     {
       input: new V4Planner().addAction(Actions.TAKE_PAIR, [addressOne, addressTwo, addressOne]),
       result: {
