@@ -8,6 +8,7 @@ import { encodeRouteToPath } from './encodeRouteToPath'
 /**
  * Actions
  * @description Constants that define what action to perform
+ * Not all actions are supported yet.
  * @enum {number}
  */
 export enum Actions {
@@ -17,6 +18,10 @@ export enum Actions {
   DECREASE_LIQUIDITY = 0x01,
   MINT_POSITION = 0x02,
   BURN_POSITION = 0x03,
+
+  // for fee on transfer tokens
+  // INCREASE_LIQUIDITY_FROM_DELTAS = 0x04,
+  // MINT_POSITION_FROM_DELTAS = 0x05,
 
   // swapping
   SWAP_EXACT_IN_SINGLE = 0x06,
@@ -36,7 +41,12 @@ export enum Actions {
   TAKE_PAIR = 0x11,
 
   CLOSE_CURRENCY = 0x12,
+  // CLEAR_OR_TAKE = 0x13,
   SWEEP = 0x14,
+
+  // for wrapping/unwrapping native
+  // WRAP = 0x15,
+  // UNWRAP = 0x16,
 }
 
 export enum Subparser {
