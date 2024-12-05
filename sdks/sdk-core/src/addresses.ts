@@ -303,6 +303,7 @@ const UNICHAIN_ADDRESSES: ChainAddresses = {
   tickLensAddress: '0xd5d76fa166ab8d8ad4c9f61aaa81457b66cbe443',
   swapRouter02Address: '0x73855d06de49d0fe4a9c42636ba96c62da12ff9c',
 }
+
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
   [ChainId.MAINNET]: MAINNET_ADDRESSES,
   [ChainId.OPTIMISM]: OPTIMISM_ADDRESSES,
