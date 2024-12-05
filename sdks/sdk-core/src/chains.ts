@@ -55,7 +55,6 @@ export const SUPPORTED_CHAINS = [
   ChainId.WORLDCHAIN,
   ChainId.UNICHAIN_SEPOLIA,
   ChainId.UNICHAIN,
-  ChainId.MONAD_TESTNET,
 ] as const
 export type SupportedChainsType = (typeof SUPPORTED_CHAINS)[number]
 
