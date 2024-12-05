@@ -303,7 +303,6 @@ const UNICHAIN_ADDRESSES: ChainAddresses = {
   tickLensAddress: '0xd5d76fa166ab8d8ad4c9f61aaa81457b66cbe443',
   swapRouter02Address: '0x73855d06de49d0fe4a9c42636ba96c62da12ff9c',
 }
-// exclude monad because it doesn't have v3 support
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
   [ChainId.MAINNET]: MAINNET_ADDRESSES,
   [ChainId.OPTIMISM]: OPTIMISM_ADDRESSES,
@@ -335,7 +334,7 @@ export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses>
 /* V3 Contract Addresses */
 export const V3_CORE_FACTORY_ADDRESSES: AddressMap = {
   ...SUPPORTED_CHAINS.reduce<AddressMap>((memo, chainId) => {
-    memo[chainId] = CHAIN_TO_ADDRESSES_MAP?.[chainId].v3CoreFactoryAddress
+    memo[chainId] = CHAIN_TO_ADDRESSES_MAP[chainId].v3CoreFactoryAddress
     return memo
   }, {}),
 }
