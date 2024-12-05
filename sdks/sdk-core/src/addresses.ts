@@ -303,8 +303,8 @@ const UNICHAIN_ADDRESSES: ChainAddresses = {
   tickLensAddress: '0xd5d76fa166ab8d8ad4c9f61aaa81457b66cbe443',
   swapRouter02Address: '0x73855d06de49d0fe4a9c42636ba96c62da12ff9c',
 }
-
-export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
+// exclude monad because it doesn't have v3 support
+export const CHAIN_TO_ADDRESSES_MAP: Omit<Record<SupportedChainsType, ChainAddresses>, ChainId.MONAD_TESTNET> = {
   [ChainId.MAINNET]: MAINNET_ADDRESSES,
   [ChainId.OPTIMISM]: OPTIMISM_ADDRESSES,
   [ChainId.ARBITRUM_ONE]: ARBITRUM_ONE_ADDRESSES,
@@ -335,13 +335,15 @@ export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses>
 /* V3 Contract Addresses */
 export const V3_CORE_FACTORY_ADDRESSES: AddressMap = {
   ...SUPPORTED_CHAINS.reduce<AddressMap>((memo, chainId) => {
-    memo[chainId] = CHAIN_TO_ADDRESSES_MAP[chainId].v3CoreFactoryAddress
+    if (chainId === ChainId.MONAD_TESTNET) return memo
+    memo[chainId] = CHAIN_TO_ADDRESSES_MAP?.[chainId].v3CoreFactoryAddress
     return memo
   }, {}),
 }
 
 export const V3_MIGRATOR_ADDRESSES: AddressMap = {
   ...SUPPORTED_CHAINS.reduce<AddressMap>((memo, chainId) => {
+    if (chainId === ChainId.MONAD_TESTNET) return memo
     const v3MigratorAddress = CHAIN_TO_ADDRESSES_MAP[chainId].v3MigratorAddress
     if (v3MigratorAddress) {
       memo[chainId] = v3MigratorAddress
@@ -352,6 +354,7 @@ export const V3_MIGRATOR_ADDRESSES: AddressMap = {
 
 export const MULTICALL_ADDRESSES: AddressMap = {
   ...SUPPORTED_CHAINS.reduce<AddressMap>((memo, chainId) => {
+    if (chainId === ChainId.MONAD_TESTNET) return memo
     memo[chainId] = CHAIN_TO_ADDRESSES_MAP[chainId].multicallAddress
     return memo
   }, {}),
@@ -388,6 +391,7 @@ export const ARGENT_WALLET_DETECTOR_ADDRESS: AddressMap = {
 
 export const QUOTER_ADDRESSES: AddressMap = {
   ...SUPPORTED_CHAINS.reduce<AddressMap>((memo, chainId) => {
+    if (chainId === ChainId.MONAD_TESTNET) return memo
     memo[chainId] = CHAIN_TO_ADDRESSES_MAP[chainId].quoterAddress
     return memo
   }, {}),
@@ -395,6 +399,7 @@ export const QUOTER_ADDRESSES: AddressMap = {
 
 export const NONFUNGIBLE_POSITION_MANAGER_ADDRESSES: AddressMap = {
   ...SUPPORTED_CHAINS.reduce<AddressMap>((memo, chainId) => {
+    if (chainId === ChainId.MONAD_TESTNET) return memo
     const nonfungiblePositionManagerAddress = CHAIN_TO_ADDRESSES_MAP[chainId].nonfungiblePositionManagerAddress
     if (nonfungiblePositionManagerAddress) {
       memo[chainId] = nonfungiblePositionManagerAddress
@@ -413,6 +418,7 @@ export const SOCKS_CONTROLLER_ADDRESSES: AddressMap = {
 
 export const TICK_LENS_ADDRESSES: AddressMap = {
   ...SUPPORTED_CHAINS.reduce<AddressMap>((memo, chainId) => {
+    if (chainId === ChainId.MONAD_TESTNET) return memo
     const tickLensAddress = CHAIN_TO_ADDRESSES_MAP[chainId].tickLensAddress
     if (tickLensAddress) {
       memo[chainId] = tickLensAddress
@@ -422,6 +428,7 @@ export const TICK_LENS_ADDRESSES: AddressMap = {
 }
 
 export const MIXED_ROUTE_QUOTER_V1_ADDRESSES: AddressMap = SUPPORTED_CHAINS.reduce<AddressMap>((memo, chainId) => {
+  if (chainId === ChainId.MONAD_TESTNET) return memo
   const mixedRouteQuoterV1Address = CHAIN_TO_ADDRESSES_MAP[chainId].mixedRouteQuoterV1Address
   if (mixedRouteQuoterV1Address) {
     memo[chainId] = mixedRouteQuoterV1Address
@@ -432,6 +439,7 @@ export const MIXED_ROUTE_QUOTER_V1_ADDRESSES: AddressMap = SUPPORTED_CHAINS.redu
 export const SWAP_ROUTER_02_ADDRESSES = (chainId: number) => {
   if (SUPPORTED_CHAINS.includes(chainId)) {
     const id = chainId as SupportedChainsType
+    if (id === ChainId.MONAD_TESTNET) return ''
     return CHAIN_TO_ADDRESSES_MAP[id].swapRouter02Address ?? '0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45'
   }
   return ''
