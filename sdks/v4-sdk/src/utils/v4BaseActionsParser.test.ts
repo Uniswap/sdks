@@ -1,6 +1,7 @@
 import { expect } from 'chai'
 import { WETH9 } from '@uniswap/sdk-core'
-import { BigNumber, ethers } from 'ethers'
+import { BigNumber } from '@ethersproject/bignumber'
+import { parseEther } from '@ethersproject/units'
 import { Route } from '../entities/route'
 import { encodeRouteToPath } from './encodeRouteToPath'
 import { V4BaseActionsParser, V4RouterCall } from './v4BaseActionsParser'
@@ -9,7 +10,7 @@ import { USDC_WETH, DAI_USDC, DAI, USDC } from './v4Planner.test'
 
 const addressOne = '0x0000000000000000000000000000000000000001'
 const addressTwo = '0x0000000000000000000000000000000000000002'
-const amount = ethers.utils.parseEther('1')
+const amount = parseEther('1')
 
 describe('Command Parser', () => {
   type ParserTest = {
