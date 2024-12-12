@@ -26,6 +26,7 @@ export enum ChainId {
   WORLDCHAIN = 480,
   UNICHAIN_SEPOLIA = 1301,
   UNICHAIN = 130,
+  MONAD_TESTNET = 41454,
 }
 
 export const SUPPORTED_CHAINS = [
