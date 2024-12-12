@@ -17616,7 +17616,6 @@ __metadata:
     hardhat: ^2.22.15
     husky: ^8.0.3
     ts-node: ^10.9.1
-    tsdx: ^0.14.1
     typechain: ^8.1.0
   languageName: unknown
   linkType: soft

@@ -4,7 +4,7 @@ import Permit2Abi from "../../abis/Permit2.json"
 import V3DutchOrderReactorAbi from "../../abis/V3DutchOrderReactor.json"
 import MockERC20Abi from "../../abis/MockERC20.json"
 import { Permit2, V3DutchOrderReactor } from "../../src/contracts"
-import { MockERC20 } from "../../dist/src/contracts";
+import { MockERC20 } from "../../src/contracts";
 import { BlockchainTime } from "./utils/time";
 import { V3DutchOrderBuilder } from "../../src/builder/V3DutchOrderBuilder"
 import { expect } from "chai";

@@ -1,11 +1,9 @@
 {
-  "include": [
-    "src"
-  ],
+  "include": ["src", "abis"],
   "compilerOptions": {
-    "outDir": "dist",
+    "rootDir": ".",
+    "baseUrl": ".",
     "target": "es6",
-    "module": "commonjs",
     "importHelpers": true,
     "declaration": true,
     "sourceMap": true,
@@ -23,6 +21,7 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "esModuleInterop": true,
-    "skipLibCheck": true
-  },
-}
+    "skipLibCheck": true,
+    "isolatedModules": true
+  }
+} 
