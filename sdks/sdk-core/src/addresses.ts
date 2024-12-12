@@ -181,10 +181,10 @@ const SEPOLIA_ADDRESSES: ChainAddresses = {
   mixedRouteQuoterV2Address: '0x4745f77b56a0e2294426e3936dc4fab68d9543cd',
 
   // TODO: update all below once v4 on sepolia redeployed
-  v4PoolManagerAddress: '0x8C4BcBE6b9eF47855f97E675296FA3F6fafa5F1A',
-  v4PositionManagerAddress: '0x1B1C77B606d13b09C84d1c7394B96b147bC03147',
-  v4StateView: '0x823d45b1329bcF3b369F08F36ba2690Ff8e058C3',
-  v4QuoterAddress: '0xCd8716395D55aD17496448a4b2C42557001e9743',
+  v4PoolManagerAddress: '0x00b036b58a818b1bc34d502d3fe730db729e62ac',
+  v4PositionManagerAddress: '0xf969aee60879c54baaed9f3ed26147db216fd664',
+  v4StateView: '0xc199f1072a74d4e905aba1a84d9a45e2546b6222',
+  v4QuoterAddress: '0x56dcd40a3f2d466f48e7f48bdbe5cc9b92ae4472',
 }
 
 // Avalanche v3 addresses
