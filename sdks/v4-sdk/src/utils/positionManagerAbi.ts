@@ -1,5 +1,5 @@
 // TODO: import this from npm
-export const abi = [
+export const positionManagerAbi = [
   {
     type: 'constructor',
     inputs: [
