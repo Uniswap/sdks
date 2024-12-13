@@ -7,9 +7,9 @@ import { ROUTER_AS_RECIPIENT, WETH_ADDRESS } from '../../utils/constants'
 
 export class UnwrapWETH implements Command {
   readonly tradeType: RouterActionType = RouterActionType.UnwrapWETH
-  readonly permit2Data: Permit2Permit
   readonly wethAddress: string
   readonly amount: BigNumberish
+  readonly permit2Data?: Permit2Permit
 
   constructor(amount: BigNumberish, chainId: number, permit2?: Permit2Permit) {
     this.wethAddress = WETH_ADDRESS(chainId)
