@@ -4293,10 +4293,17 @@ __metadata:
     "@types/jest": ^24.0.25
     big.js: ^5.2.2
     decimal.js-light: ^2.5.0
+    eslint: ^7.8.0
+    eslint-config-prettier: ^6.11.0
+    eslint-plugin-eslint-comments: ^3.2.0
+    eslint-plugin-functional: ^3.0.2
+    eslint-plugin-import: ^2.22.0
+    jest: 25.5.0
     jsbi: ^3.1.4
+    prettier: ^2.4.1
     tiny-invariant: ^1.1.0
     toformat: ^2.0.0
-    tsdx: ^0.14.1
+    typescript: ^4.3.3
   languageName: unknown
   linkType: soft
 
@@ -4487,10 +4494,16 @@ __metadata:
     "@uniswap/v3-core": 1.0.0
     "@uniswap/v3-periphery": ^1.1.1
     "@uniswap/v3-staker": 1.0.0
-    babel-jest: 25.5.1
+    eslint: ^7.8.0
+    eslint-config-prettier: ^6.11.0
+    eslint-plugin-eslint-comments: ^3.2.0
+    eslint-plugin-functional: ^3.0.2
+    eslint-plugin-import: ^2.22.0
+    jest: 25.5.0
+    prettier: ^2.4.1
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
-    tsdx: ^0.14.1
+    typescript: ^4.3.3
   languageName: unknown
   linkType: soft
 
@@ -5233,7 +5246,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"babel-jest@npm:25.5.1, babel-jest@npm:^25.5.1":
+"babel-jest@npm:^25.5.1":
   version: 25.5.1
   resolution: "babel-jest@npm:25.5.1"
   dependencies:
