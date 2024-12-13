@@ -1,6 +1,7 @@
+import { WETH9 as _WETH9, CurrencyAmount, Token, TradeType } from '@uniswap/sdk-core'
 import JSBI from 'jsbi'
 import invariant from 'tiny-invariant'
-import { WETH9 as _WETH9, TradeType, Token, CurrencyAmount } from '@uniswap/sdk-core'
+
 import { Pair, Route, Trade } from '../index'
 
 const ADDRESSES = [
@@ -33,15 +34,15 @@ describe('entities', () => {
         pairs = [
           new Pair(
             CurrencyAmount.fromRawAmount(tokens[0], decimalize(1, tokens[0].decimals)),
-            CurrencyAmount.fromRawAmount(tokens[1], decimalize(1, tokens[1].decimals))
+            CurrencyAmount.fromRawAmount(tokens[1], decimalize(1, tokens[1].decimals)),
           ),
           new Pair(
             CurrencyAmount.fromRawAmount(tokens[1], decimalize(1, tokens[1].decimals)),
-            CurrencyAmount.fromRawAmount(tokens[2], decimalize(1, tokens[2].decimals))
+            CurrencyAmount.fromRawAmount(tokens[2], decimalize(1, tokens[2].decimals)),
           ),
           new Pair(
             CurrencyAmount.fromRawAmount(tokens[2], decimalize(1, tokens[2].decimals)),
-            CurrencyAmount.fromRawAmount(WETH9, decimalize(1234, WETH9.decimals))
+            CurrencyAmount.fromRawAmount(WETH9, decimalize(1234, WETH9.decimals)),
           ),
         ]
       })
@@ -59,13 +60,15 @@ describe('entities', () => {
         invariant(route.input.isToken)
         invariant(route.output.isToken)
         expect(
-          route.midPrice.quote(CurrencyAmount.fromRawAmount(route.input, decimalize(1, route.input.decimals))).toExact()
+          route.midPrice
+            .quote(CurrencyAmount.fromRawAmount(route.input, decimalize(1, route.input.decimals)))
+            .toExact(),
         ).toEqual(CurrencyAmount.fromRawAmount(route.output, decimalize(1234, route.output.decimals)).toExact())
         expect(
           route.midPrice
             .invert()
             .quote(CurrencyAmount.fromRawAmount(route.output, decimalize(1234, route.output.decimals)))
-            .toExact()
+            .toExact(),
         ).toEqual(CurrencyAmount.fromRawAmount(route.input, decimalize(1, route.input.decimals)).toExact())
 
         expect(route.midPrice.invert().toSignificant(5)).toEqual('0.00081037')
@@ -80,11 +83,11 @@ describe('entities', () => {
             [
               new Pair(
                 CurrencyAmount.fromRawAmount(tokens[1], decimalize(5, tokens[1].decimals)),
-                CurrencyAmount.fromRawAmount(WETH9, decimalize(10, WETH9.decimals))
+                CurrencyAmount.fromRawAmount(WETH9, decimalize(10, WETH9.decimals)),
               ),
             ],
             tokens[1],
-            WETH9
+            WETH9,
           )
           const inputAmount = CurrencyAmount.fromRawAmount(tokens[1], decimalize(1, tokens[1].decimals))
           const expectedOutputAmount = CurrencyAmount.fromRawAmount(WETH9, '1662497915624478906')
@@ -129,19 +132,19 @@ describe('entities', () => {
                     WETH9,
                     JSBI.add(
                       decimalize(10, WETH9.decimals),
-                      tokens[1].decimals === 9 ? JSBI.BigInt('30090280812437312') : JSBI.BigInt('30090270812437322')
-                    )
-                  )
+                      tokens[1].decimals === 9 ? JSBI.BigInt('30090280812437312') : JSBI.BigInt('30090270812437322'),
+                    ),
+                  ),
                 ),
               ],
               tokens[1],
-              WETH9
+              WETH9,
             )
             const outputAmount = CurrencyAmount.fromRawAmount(tokens[1], '1')
             const trade = new Trade(route, outputAmount, TradeType.EXACT_INPUT)
 
             expect(trade.priceImpact.toSignificant(18)).toEqual(
-              tokens[1].decimals === 9 ? '0.300000099400899902' : '0.3000000000000001'
+              tokens[1].decimals === 9 ? '0.300000099400899902' : '0.3000000000000001',
             )
           }
         })

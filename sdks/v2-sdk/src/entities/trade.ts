@@ -1,16 +1,17 @@
 import {
   computePriceImpact,
-  Token,
   Currency,
   CurrencyAmount,
   Fraction,
   Percent,
   Price,
   sortedInsert,
+  Token,
   TradeType,
 } from '@uniswap/sdk-core'
-import { ONE, ZERO } from '../constants'
 import invariant from 'tiny-invariant'
+
+import { ONE, ZERO } from '../constants'
 
 import { Pair } from './pair'
 import { Route } from './route'
@@ -25,7 +26,7 @@ interface InputOutput<TInput extends Currency, TOutput extends Currency> {
 // in increasing order. i.e. the best trades have the most outputs for the least inputs and are sorted first
 export function inputOutputComparator<TInput extends Currency, TOutput extends Currency>(
   a: InputOutput<TInput, TOutput>,
-  b: InputOutput<TInput, TOutput>
+  b: InputOutput<TInput, TOutput>,
 ): number {
   // must have same input and output token for comparison
   invariant(a.inputAmount.currency.equals(b.inputAmount.currency), 'INPUT_CURRENCY')
@@ -53,7 +54,7 @@ export function inputOutputComparator<TInput extends Currency, TOutput extends C
 // extension of the input output comparator that also considers other dimensions of the trade in ranking them
 export function tradeComparator<TInput extends Currency, TOutput extends Currency, TTradeType extends TradeType>(
   a: Trade<TInput, TOutput, TTradeType>,
-  b: Trade<TInput, TOutput, TTradeType>
+  b: Trade<TInput, TOutput, TTradeType>,
 ) {
   const ioComp = inputOutputComparator(a, b)
   if (ioComp !== 0) {
@@ -115,7 +116,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
    */
   public static exactIn<TInput extends Currency, TOutput extends Currency>(
     route: Route<TInput, TOutput>,
-    amountIn: CurrencyAmount<TInput>
+    amountIn: CurrencyAmount<TInput>,
   ): Trade<TInput, TOutput, TradeType.EXACT_INPUT> {
     return new Trade(route, amountIn, TradeType.EXACT_INPUT)
   }
@@ -127,7 +128,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
    */
   public static exactOut<TInput extends Currency, TOutput extends Currency>(
     route: Route<TInput, TOutput>,
-    amountOut: CurrencyAmount<TOutput>
+    amountOut: CurrencyAmount<TOutput>,
   ): Trade<TInput, TOutput, TradeType.EXACT_OUTPUT> {
     return new Trade(route, amountOut, TradeType.EXACT_OUTPUT)
   }
@@ -135,7 +136,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
   public constructor(
     route: Route<TInput, TOutput>,
     amount: TTradeType extends TradeType.EXACT_INPUT ? CurrencyAmount<TInput> : CurrencyAmount<TOutput>,
-    tradeType: TTradeType
+    tradeType: TTradeType,
   ) {
     this.route = route
     this.tradeType = tradeType
@@ -153,7 +154,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       this.outputAmount = CurrencyAmount.fromFractionalAmount(
         route.output,
         tokenAmounts[tokenAmounts.length - 1].numerator,
-        tokenAmounts[tokenAmounts.length - 1].denominator
+        tokenAmounts[tokenAmounts.length - 1].denominator,
       )
     } else {
       invariant(amount.currency.equals(route.output), 'OUTPUT')
@@ -166,7 +167,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       this.inputAmount = CurrencyAmount.fromFractionalAmount(
         route.input,
         tokenAmounts[0].numerator,
-        tokenAmounts[0].denominator
+        tokenAmounts[0].denominator,
       )
       this.outputAmount = CurrencyAmount.fromFractionalAmount(route.output, amount.numerator, amount.denominator)
     }
@@ -174,7 +175,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       this.inputAmount.currency,
       this.outputAmount.currency,
       this.inputAmount.quotient,
-      this.outputAmount.quotient
+      this.outputAmount.quotient,
     )
     this.priceImpact = computePriceImpact(route.midPrice, this.inputAmount, this.outputAmount)
   }
@@ -234,7 +235,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     // used in recursion.
     currentPairs: Pair[] = [],
     nextAmountIn: CurrencyAmount<Currency> = currencyAmountIn,
-    bestTrades: Trade<TInput, TOutput, TradeType.EXACT_INPUT>[] = []
+    bestTrades: Trade<TInput, TOutput, TradeType.EXACT_INPUT>[] = [],
   ): Trade<TInput, TOutput, TradeType.EXACT_INPUT>[] {
     invariant(pairs.length > 0, 'PAIRS')
     invariant(maxHops > 0, 'MAX_HOPS')
@@ -253,6 +254,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
         ;[amountOut] = pair.getOutputAmount(amountIn)
       } catch (error) {
         // input too low
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if ((error as any).isInsufficientInputAmountError) {
           continue
         }
@@ -265,10 +267,10 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
           new Trade(
             new Route([...currentPairs, pair], currencyAmountIn.currency, currencyOut),
             currencyAmountIn,
-            TradeType.EXACT_INPUT
+            TradeType.EXACT_INPUT,
           ),
           maxNumResults,
-          tradeComparator
+          tradeComparator,
         )
       } else if (maxHops > 1 && pairs.length > 1) {
         const pairsExcludingThisPair = pairs.slice(0, i).concat(pairs.slice(i + 1, pairs.length))
@@ -284,7 +286,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
           },
           [...currentPairs, pair],
           amountOut,
-          bestTrades
+          bestTrades,
         )
       }
     }
@@ -301,7 +303,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       this.inputAmount.currency,
       this.outputAmount.currency,
       this.maximumAmountIn(slippageTolerance).quotient,
-      this.minimumAmountOut(slippageTolerance).quotient
+      this.minimumAmountOut(slippageTolerance).quotient,
     )
   }
 
@@ -328,7 +330,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     // used in recursion.
     currentPairs: Pair[] = [],
     nextAmountOut: CurrencyAmount<Currency> = currencyAmountOut,
-    bestTrades: Trade<TInput, TOutput, TradeType.EXACT_OUTPUT>[] = []
+    bestTrades: Trade<TInput, TOutput, TradeType.EXACT_OUTPUT>[] = [],
   ): Trade<TInput, TOutput, TradeType.EXACT_OUTPUT>[] {
     invariant(pairs.length > 0, 'PAIRS')
     invariant(maxHops > 0, 'MAX_HOPS')
@@ -347,6 +349,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
         ;[amountIn] = pair.getInputAmount(amountOut)
       } catch (error) {
         // not enough liquidity in this pair
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if ((error as any).isInsufficientReservesError) {
           continue
         }
@@ -359,10 +362,10 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
           new Trade(
             new Route([pair, ...currentPairs], currencyIn, currencyAmountOut.currency),
             currencyAmountOut,
-            TradeType.EXACT_OUTPUT
+            TradeType.EXACT_OUTPUT,
           ),
           maxNumResults,
-          tradeComparator
+          tradeComparator,
         )
       } else if (maxHops > 1 && pairs.length > 1) {
         const pairsExcludingThisPair = pairs.slice(0, i).concat(pairs.slice(i + 1, pairs.length))
@@ -378,7 +381,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
           },
           [pair, ...currentPairs],
           amountIn,
-          bestTrades
+          bestTrades,
         )
       }
     }

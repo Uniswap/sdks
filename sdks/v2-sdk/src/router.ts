@@ -1,6 +1,7 @@
-import { Token, Currency, CurrencyAmount, Percent, TradeType, validateAndParseAddress } from '@uniswap/sdk-core'
-import { Trade } from './entities'
+import { Currency, CurrencyAmount, Percent, Token, TradeType, validateAndParseAddress } from '@uniswap/sdk-core'
 import invariant from 'tiny-invariant'
+
+import { Trade } from './entities'
 
 /**
  * Options for producing the arguments to send call to the router.
@@ -74,7 +75,7 @@ export abstract class Router {
    */
   public static swapCallParameters(
     trade: Trade<Currency, Currency, TradeType>,
-    options: TradeOptions | TradeOptionsDeadline
+    options: TradeOptions | TradeOptionsDeadline,
   ): SwapParameters {
     const etherIn = trade.inputAmount.currency.isNative
     const etherOut = trade.outputAmount.currency.isNative

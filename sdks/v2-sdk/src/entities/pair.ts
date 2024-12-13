@@ -34,7 +34,7 @@ export const computePairAddress = ({
   return getCreate2Address(
     factoryAddress,
     keccak256(['bytes'], [pack(['address', 'address'], [token0.address, token1.address])]),
-    INIT_CODE_HASH
+    INIT_CODE_HASH,
   )
 }
 export class Pair {
@@ -55,7 +55,7 @@ export class Pair {
       Pair.getAddress(tokenAmounts[0].currency, tokenAmounts[1].currency),
       18,
       'UNI-V2',
-      'Uniswap V2'
+      'Uniswap V2',
     )
     this.tokenAmounts = tokenAmounts as [CurrencyAmount<Token>, CurrencyAmount<Token>]
   }
@@ -181,10 +181,7 @@ export class Pair {
    * @param inputAmount
    * @param calculateFotFees
    */
-  public getOutputAmount(
-    inputAmount: CurrencyAmount<Token>,
-    calculateFotFees: boolean = true
-  ): [CurrencyAmount<Token>, Pair] {
+  public getOutputAmount(inputAmount: CurrencyAmount<Token>, calculateFotFees = true): [CurrencyAmount<Token>, Pair] {
     invariant(this.involvesToken(inputAmount.currency), 'TOKEN')
     if (JSBI.equal(this.reserve0.quotient, ZERO) || JSBI.equal(this.reserve1.quotient, ZERO)) {
       throw new InsufficientReservesError()
@@ -196,7 +193,7 @@ export class Pair {
     const inputAmountAfterTax = percentAfterSellFees.greaterThan(ZERO_PERCENT)
       ? CurrencyAmount.fromRawAmount(
           inputAmount.currency,
-          percentAfterSellFees.multiply(inputAmount).quotient // fraction.quotient will round down by itself, which is desired
+          percentAfterSellFees.multiply(inputAmount).quotient, // fraction.quotient will round down by itself, which is desired
         )
       : inputAmount
 
@@ -205,7 +202,7 @@ export class Pair {
     const denominator = JSBI.add(JSBI.multiply(inputReserve.quotient, _1000), inputAmountWithFeeAndAfterTax)
     const outputAmount = CurrencyAmount.fromRawAmount(
       inputAmount.currency.equals(this.token0) ? this.token1 : this.token0,
-      JSBI.divide(numerator, denominator) // JSBI.divide will round down by itself, which is desired
+      JSBI.divide(numerator, denominator), // JSBI.divide will round down by itself, which is desired
     )
 
     if (JSBI.equal(outputAmount.quotient, ZERO)) {
@@ -216,7 +213,7 @@ export class Pair {
     const outputAmountAfterTax = percentAfterBuyFees.greaterThan(ZERO_PERCENT)
       ? CurrencyAmount.fromRawAmount(
           outputAmount.currency,
-          outputAmount.multiply(percentAfterBuyFees).quotient // fraction.quotient will round down by itself, which is desired
+          outputAmount.multiply(percentAfterBuyFees).quotient, // fraction.quotient will round down by itself, which is desired
         )
       : outputAmount
     if (JSBI.equal(outputAmountAfterTax.quotient, ZERO)) {
@@ -271,16 +268,13 @@ export class Pair {
    *
    * @param outputAmount
    */
-  public getInputAmount(
-    outputAmount: CurrencyAmount<Token>,
-    calculateFotFees: boolean = true
-  ): [CurrencyAmount<Token>, Pair] {
+  public getInputAmount(outputAmount: CurrencyAmount<Token>, calculateFotFees = true): [CurrencyAmount<Token>, Pair] {
     invariant(this.involvesToken(outputAmount.currency), 'TOKEN')
     const percentAfterBuyFees = calculateFotFees ? this.derivePercentAfterBuyFees(outputAmount) : ZERO_PERCENT
     const outputAmountBeforeTax = percentAfterBuyFees.greaterThan(ZERO_PERCENT)
       ? CurrencyAmount.fromRawAmount(
           outputAmount.currency,
-          JSBI.add(outputAmount.divide(percentAfterBuyFees).quotient, ONE) // add 1 for rounding up
+          JSBI.add(outputAmount.divide(percentAfterBuyFees).quotient, ONE), // add 1 for rounding up
         )
       : outputAmount
 
@@ -300,14 +294,14 @@ export class Pair {
     const denominator = JSBI.multiply(JSBI.subtract(outputReserve.quotient, outputAmountBeforeTax.quotient), _997)
     const inputAmount = CurrencyAmount.fromRawAmount(
       outputAmount.currency.equals(this.token0) ? this.token1 : this.token0,
-      JSBI.add(JSBI.divide(numerator, denominator), ONE) // add 1 here is part of the formula, no rounding needed here, since there will not be decimal at this point
+      JSBI.add(JSBI.divide(numerator, denominator), ONE), // add 1 here is part of the formula, no rounding needed here, since there will not be decimal at this point
     )
 
     const percentAfterSellFees = calculateFotFees ? this.derivePercentAfterSellFees(inputAmount) : ZERO_PERCENT
     const inputAmountBeforeTax = percentAfterSellFees.greaterThan(ZERO_PERCENT)
       ? CurrencyAmount.fromRawAmount(
           inputAmount.currency,
-          JSBI.add(inputAmount.divide(percentAfterSellFees).quotient, ONE) // add 1 for rounding up
+          JSBI.add(inputAmount.divide(percentAfterSellFees).quotient, ONE), // add 1 for rounding up
         )
       : inputAmount
     return [inputAmountBeforeTax, new Pair(inputReserve.add(inputAmount), outputReserve.subtract(outputAmount))]
@@ -316,7 +310,7 @@ export class Pair {
   public getLiquidityMinted(
     totalSupply: CurrencyAmount<Token>,
     tokenAmountA: CurrencyAmount<Token>,
-    tokenAmountB: CurrencyAmount<Token>
+    tokenAmountB: CurrencyAmount<Token>,
   ): CurrencyAmount<Token> {
     invariant(totalSupply.currency.equals(this.liquidityToken), 'LIQUIDITY')
     const tokenAmounts = tokenAmountA.currency.sortsBefore(tokenAmountB.currency) // does safety checks
@@ -328,7 +322,7 @@ export class Pair {
     if (JSBI.equal(totalSupply.quotient, ZERO)) {
       liquidity = JSBI.subtract(
         sqrt(JSBI.multiply(tokenAmounts[0].quotient, tokenAmounts[1].quotient)),
-        MINIMUM_LIQUIDITY
+        MINIMUM_LIQUIDITY,
       )
     } else {
       const amount0 = JSBI.divide(JSBI.multiply(tokenAmounts[0].quotient, totalSupply.quotient), this.reserve0.quotient)
@@ -345,8 +339,8 @@ export class Pair {
     token: Token,
     totalSupply: CurrencyAmount<Token>,
     liquidity: CurrencyAmount<Token>,
-    feeOn: boolean = false,
-    kLast?: BigintIsh
+    feeOn = false,
+    kLast?: BigintIsh,
   ): CurrencyAmount<Token> {
     invariant(this.involvesToken(token), 'TOKEN')
     invariant(totalSupply.currency.equals(this.liquidityToken), 'TOTAL_SUPPLY')
@@ -377,7 +371,7 @@ export class Pair {
 
     return CurrencyAmount.fromRawAmount(
       token,
-      JSBI.divide(JSBI.multiply(liquidity.quotient, this.reserveOf(token).quotient), totalSupplyAdjusted.quotient)
+      JSBI.divide(JSBI.multiply(liquidity.quotient, this.reserveOf(token).quotient), totalSupplyAdjusted.quotient),
     )
   }
 
