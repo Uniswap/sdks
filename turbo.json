@@ -13,7 +13,8 @@
         "sdks/*/src/**.ts",
         "sdks/*/src/**.tsx"
       ],
-      "outputs": []
+      "outputs": [],
+      "dependsOn": ["^build"]
     },
     "test": {
       "dependsOn": [
