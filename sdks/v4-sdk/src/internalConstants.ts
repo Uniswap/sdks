@@ -1,9 +1,9 @@
 import JSBI from 'jsbi'
-import { constants } from 'ethers'
+import { AddressZero } from '@ethersproject/constants'
 import { encodeSqrtRatioX96 } from '@uniswap/v3-sdk'
 
 // constants used internally but not expected to be used externally
-export const ADDRESS_ZERO = constants.AddressZero
+export const ADDRESS_ZERO = AddressZero
 export const NEGATIVE_ONE = JSBI.BigInt(-1)
 export const ZERO = JSBI.BigInt(0)
 export const ONE = JSBI.BigInt(1)
