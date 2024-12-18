@@ -17,7 +17,7 @@ import {
   RelayOrderBuilder,
   RelayOrderValidator,
   RelayOrder,
-} from "../../dist/src";
+} from "../../src";
 import { deployAndReturnPermit2 } from "./utils/permit2";
 import { deployMulticall3 } from "./utils/multicall";
 
