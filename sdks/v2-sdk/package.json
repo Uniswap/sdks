@@ -7,9 +7,9 @@
     "ethereum"
   ],
   "license": "MIT",
-  "main": "dist/index.js",
-  "typings": "dist/index.d.ts",
-  "module": "dist/v2-sdk.esm.js",
+  "main": "./dist/cjs/src/index.js",
+  "module": "./dist/esm/src/index.js",
+  "types": "./dist/types/src/index.d.ts",
   "files": [
     "dist"
   ],
@@ -17,11 +17,14 @@
     "node": ">=10"
   },
   "scripts": {
-    "build": "tsdx build",
-    "lint": "tsdx lint src",
-    "release": "semantic-release",
-    "start": "tsdx watch",
-    "test": "tsdx test"
+    "clean": "rm -rf dist",
+    "build": "yarn clean && yarn build:cjs && yarn build:esm && yarn build:types",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "build:types": "tsc -p tsconfig.types.json",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "test": "jest"
   },
   "dependencies": {
     "@ethersproject/address": "^5.0.2",
@@ -34,8 +37,14 @@
     "@types/big.js": "^4.0.5",
     "@types/jest": "^24.0.25",
     "@uniswap/v2-core": "^1.0.1",
-    "eslint-config-react-app": "7.0.1",
-    "tsdx": "^0.14.1"
+    "eslint": "^7.8.0",
+    "eslint-config-prettier": "^6.11.0",
+    "eslint-plugin-eslint-comments": "^3.2.0",
+    "eslint-plugin-functional": "^3.0.2",
+    "eslint-plugin-import": "^2.22.0",
+    "jest": "25.5.0",
+    "prettier": "^2.4.1",
+    "typescript": "^4.3.3"
   },
   "prettier": {
     "printWidth": 120,
@@ -45,6 +54,13 @@
   "publishConfig": {
     "access": "public",
     "provenance": true
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/types/src/index.d.ts",
+      "import": "./dist/esm/src/index.js",
+      "require": "./dist/cjs/src/index.js"
+    }
   },
   "release": {
     "extends": "semantic-release-monorepo",
