@@ -556,28 +556,28 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
     // }
 
     function testV4ExactInputUSDCForETHwithETHFee() public {
-      MethodParameters memory params = readFixture(json, "._UNISWAP_V4_USDC_FOR_1_ETH_2_HOP_WITH_ETH_FEE");
-      deal(address(USDC), from, BALANCE);
-      USDC.approve(address(permit2), BALANCE);
-      permit2.approve(address(USDC), address(router), uint160(BALANCE), uint48(block.timestamp + 1000));
+        MethodParameters memory params = readFixture(json, "._UNISWAP_V4_USDC_FOR_1_ETH_2_HOP_WITH_ETH_FEE");
+        deal(address(USDC), from, BALANCE);
+        USDC.approve(address(permit2), BALANCE);
+        permit2.approve(address(USDC), address(router), uint160(BALANCE), uint48(block.timestamp + 1000));
 
-      assertEq(USDC.balanceOf(from), BALANCE);
-      uint256 startingRecipientBalance = RECIPIENT.balance;
-      uint256 startingFeeRecipientBalance = FEE_RECIPIENT.balance;
-      assertEq(WETH.balanceOf(FEE_RECIPIENT), 0);
+        assertEq(USDC.balanceOf(from), BALANCE);
+        uint256 startingRecipientBalance = RECIPIENT.balance;
+        uint256 startingFeeRecipientBalance = FEE_RECIPIENT.balance;
+        assertEq(WETH.balanceOf(FEE_RECIPIENT), 0);
 
-      (bool success,) = address(router).call{value: params.value}(params.data);
-      require(success, "call failed");
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
 
-      uint256 recipientOutETH = RECIPIENT.balance - startingRecipientBalance;
-      uint256 feeRecipientOutETH = FEE_RECIPIENT.balance - startingFeeRecipientBalance;
-      uint256 totalOut = recipientOutETH + feeRecipientOutETH;
-      uint256 expectedFee = totalOut * 500 / 10000;
+        uint256 recipientOutETH = RECIPIENT.balance - startingRecipientBalance;
+        uint256 feeRecipientOutETH = FEE_RECIPIENT.balance - startingFeeRecipientBalance;
+        uint256 totalOut = recipientOutETH + feeRecipientOutETH;
+        uint256 expectedFee = totalOut * 500 / 10000;
 
-      assertLe(USDC.balanceOf(from), BALANCE);
-      assertEq(feeRecipientOutETH, expectedFee);
-      assertEq(recipientOutETH, totalOut - expectedFee);
-      assertEq(address(router).balance, 0);
+        assertLe(USDC.balanceOf(from), BALANCE);
+        assertEq(feeRecipientOutETH, expectedFee);
+        assertEq(recipientOutETH, totalOut - expectedFee);
+        assertEq(address(router).balance, 0);
     }
 
     function testV4ExactOutNativeOutputWithUnwrap() public {
