@@ -234,6 +234,12 @@ const BASE_SEPOLIA_ADDRESSES: ChainAddresses = {
   nonfungiblePositionManagerAddress: '0x27F971cb582BF9E50F397e4d29a5C7A34f11faA2',
   tickLensAddress: '0xedf6066a2b290C185783862C7F4776A2C8077AD1',
   swapRouter02Address: '0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4',
+
+  // v4
+  v4PoolManagerAddress: '0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408',
+  v4PositionManagerAddress: '0xda4910cdbbBe7894DE9f62245a6D4e2875671Ef3',
+  v4StateView: '0x571291b572ed32ce6751a2cb2486ebee8defb9b4',
+  v4QuoterAddress: '0x4a6513c898fe1b2d0e78d3b0e0a4a151589b1cba',
 }
 
 const ZORA_ADDRESSES: ChainAddresses = {
