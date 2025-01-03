@@ -22,10 +22,9 @@
     "@types/mocha": "^9.1.1",
     "@types/node": "^18.7.16",
     "chai": "^4.3.6",
-    "hardhat": "^2.14.0",
+    "hardhat": "^2.22.15",
     "husky": "^8.0.3",
-    "ts-node": "^10.9.1",
-    "tsdx": "^0.14.1"
+    "ts-node": "^10.9.1"
   },
   "dependencies": {
     "@ethersproject/bytes": "^5.7.0",

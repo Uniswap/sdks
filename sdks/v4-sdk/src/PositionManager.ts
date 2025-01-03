@@ -19,7 +19,7 @@ import {
   ZERO_LIQUIDITY,
 } from './internalConstants'
 import { V4PositionPlanner } from './utils'
-import { abi } from './utils/abi'
+import { positionManagerAbi } from './utils/positionManagerAbi'
 
 export interface CommonOptions {
   /**
@@ -204,7 +204,7 @@ function shouldCreatePool(options: MintOptions): boolean {
 }
 
 export abstract class V4PositionManager {
-  public static INTERFACE: Interface = new Interface(abi)
+  public static INTERFACE: Interface = new Interface(positionManagerAbi)
 
   /**
    * Cannot be constructed.

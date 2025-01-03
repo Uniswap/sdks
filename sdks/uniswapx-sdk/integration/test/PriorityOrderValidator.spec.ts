@@ -19,7 +19,7 @@ import {
   OrderValidation,
   PriorityCosignerData,
   CosignedPriorityOrder,
-} from "../../dist/src";
+} from "../../src";
 import { StaticJsonRpcProvider } from "@ethersproject/providers";
 import { REACTOR_ADDRESS_MAPPING, UNISWAPX_ORDER_QUOTER_MAPPING } from "../../src/constants";
 import { parseEther } from "ethers/lib/utils";

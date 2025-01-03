@@ -317,7 +317,9 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                 startAmount: this.info.input.startAmount,
                 curve: {
                     relativeBlocks: encodeRelativeBlocks(this.info.input.curve.relativeBlocks),
-                    relativeAmounts: this.info.input.curve.relativeAmounts,
+                    relativeAmounts: this.info.input.curve.relativeAmounts.map((amount) =>
+                        amount.toString()
+                    ),
                 },
                 maxAmount: this.info.input.maxAmount,
                 adjustmentPerGweiBaseFee: this.info.input.adjustmentPerGweiBaseFee,
@@ -327,7 +329,9 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
                 startAmount: output.startAmount,
                 curve: {
                     relativeBlocks: encodeRelativeBlocks(output.curve.relativeBlocks),
-                    relativeAmounts: output.curve.relativeAmounts,
+                    relativeAmounts: output.curve.relativeAmounts.map((amount) =>
+                        amount.toString()
+                    ),
                 },
                 recipient: output.recipient,
                 minAmount: output.minAmount,
@@ -365,26 +369,31 @@ export class UnsignedV3DutchOrder implements OffChainOrder {
             .hash(witnessInfo);
     }
 
+    /**
+     * Full order hash that should be signed over by the cosigner
+     */
     cosignatureHash(cosignerData: V3CosignerData): string {
-        const abiCoder = new ethers.utils.AbiCoder();
-        return ethers.utils.solidityKeccak256(
-            ["bytes32", "bytes"],
+      const abiCoder = new ethers.utils.AbiCoder();
+  
+      return ethers.utils.solidityKeccak256(
+        ["bytes32", "uint256", "bytes"],
+        [
+          this.hash(),
+          this.chainId,
+          abiCoder.encode(
+            [COSIGNER_DATA_TUPLE_ABI],
             [
-                this.hash(),
-                abiCoder.encode(
-                    [COSIGNER_DATA_TUPLE_ABI],
-                    [
-                        [
-                            cosignerData.decayStartBlock,
-                            cosignerData.exclusiveFiller,
-                            cosignerData.exclusivityOverrideBps,
-                            cosignerData.inputOverride,
-                            cosignerData.outputOverrides,
-                        ],
-                    ]
-                ),
+                [
+                    cosignerData.decayStartBlock,
+                    cosignerData.exclusiveFiller,
+                    cosignerData.exclusivityOverrideBps,
+                    cosignerData.inputOverride,
+                    cosignerData.outputOverrides,
+                ],
             ]
-        );
+          ),
+        ]
+      );
     }
 
     static parse(

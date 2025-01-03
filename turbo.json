@@ -13,11 +13,16 @@
         "sdks/*/src/**.ts",
         "sdks/*/src/**.tsx"
       ],
-      "outputs": []
+      "outputs": [
+        "sdks/*/dist/**"
+      ]
     },
     "test": {
       "dependsOn": [
         "build"
+      ],
+      "inputs": [
+        "sdks/*/dist/**"
       ]
     },
     "release": {
