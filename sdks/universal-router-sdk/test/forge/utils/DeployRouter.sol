@@ -37,7 +37,7 @@ contract DeployRouter is Test {
     address internal constant MAINNET_ROUTER = 0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD;
 
     // if this changes you need to update FORGE_V4_POSITION_MANAGER in addresses.ts
-    address internal constant FORGE_POSM_ADDRESS = 0x2e234DAe75C793f67A35089C9d99245E1C58470b;
+    address internal constant FORGE_POSM_ADDRESS = 0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4;
 
     ERC20 internal constant WETH = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     ERC20 internal constant USDC = ERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
