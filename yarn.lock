@@ -4556,24 +4556,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/sdk-core@npm:^6.0.0":
-  version: 6.0.0
-  resolution: "@uniswap/sdk-core@npm:6.0.0"
-  dependencies:
-    "@ethersproject/address": ^5.0.2
-    "@ethersproject/bytes": ^5.7.0
-    "@ethersproject/keccak256": 5.7.0
-    "@ethersproject/strings": 5.7.0
-    big.js: ^5.2.2
-    decimal.js-light: ^2.5.0
-    jsbi: ^3.1.4
-    tiny-invariant: ^1.1.0
-    toformat: ^2.0.0
-  checksum: 395808ddb8425a98226fd5d19783067c29bdda6c8e6b05032a57a6c66db58870f8f6766b0d1c93bd9e15e4c646f283712bea8cb177aca7818234c3b3c743db2d
-  languageName: node
-  linkType: hard
-
-"@uniswap/sdk-core@npm:^6.1.1":
+"@uniswap/sdk-core@npm:^6.0.0, @uniswap/sdk-core@npm:^6.1.1":
   version: 6.1.1
   resolution: "@uniswap/sdk-core@npm:6.1.1"
   dependencies:
@@ -4809,19 +4792,6 @@ __metadata:
   linkType: hard
 
 "@uniswap/v4-sdk@npm:^1.12.0, @uniswap/v4-sdk@npm:^1.12.3":
-  version: 1.12.3
-  resolution: "@uniswap/v4-sdk@npm:1.12.3"
-  dependencies:
-    "@ethersproject/solidity": ^5.0.9
-    "@uniswap/sdk-core": ^6.0.0
-    "@uniswap/v3-sdk": 3.19.0
-    tiny-invariant: ^1.1.0
-    tiny-warning: ^1.0.3
-  checksum: 4f3a8e9b32b893ba2e06d34c8d205b9de28e2435a01d5aa5d82a872f93b1302b456d214b5f56e83c13cc2bd5f5be9324f8149b588caf5309c57f989da7310695
-  languageName: node
-  linkType: hard
-
-"@uniswap/v4-sdk@npm:^1.12.3":
   version: 1.12.3
   resolution: "@uniswap/v4-sdk@npm:1.12.3"
   dependencies:
