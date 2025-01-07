@@ -239,7 +239,7 @@ const BASE_SEPOLIA_ADDRESSES: ChainAddresses = {
 
   // v4
   v4PoolManagerAddress: '0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408',
-  v4PositionManagerAddress: '0xda4910cdbbBe7894DE9f62245a6D4e2875671Ef3',
+  v4PositionManagerAddress: '0x4b2c77d209d3405f41a037ec6c77f7f5b8e2ca80',
   v4StateView: '0x571291b572ed32ce6751a2cb2486ebee8defb9b4',
   v4QuoterAddress: '0x4a6513c898fe1b2d0e78d3b0e0a4a151589b1cba',
 }
