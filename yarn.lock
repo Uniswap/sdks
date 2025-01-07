@@ -4556,9 +4556,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/sdk-core@npm:^6.0.0":
-  version: 6.0.0
-  resolution: "@uniswap/sdk-core@npm:6.0.0"
+"@uniswap/sdk-core@npm:^6.0.0, @uniswap/sdk-core@npm:^6.1.1":
+  version: 6.1.1
+  resolution: "@uniswap/sdk-core@npm:6.1.1"
   dependencies:
     "@ethersproject/address": ^5.0.2
     "@ethersproject/bytes": ^5.7.0
@@ -4569,7 +4569,7 @@ __metadata:
     jsbi: ^3.1.4
     tiny-invariant: ^1.1.0
     toformat: ^2.0.0
-  checksum: 395808ddb8425a98226fd5d19783067c29bdda6c8e6b05032a57a6c66db58870f8f6766b0d1c93bd9e15e4c646f283712bea8cb177aca7818234c3b3c743db2d
+  checksum: f9b0433aaec6727fbf012eb5a1fecf34c791ae5411980e56032db694bf12eff09dee281a19266ffae138a968ce14b8dac2740a5b4e9495c81b3b21299303c72d
   languageName: node
   linkType: hard
 
@@ -4648,7 +4648,7 @@ __metadata:
     "@types/node-fetch": ^2.6.2
     "@uniswap/permit2-sdk": ^1.3.0
     "@uniswap/router-sdk": ^1.15.0
-    "@uniswap/sdk-core": ^6.0.0
+    "@uniswap/sdk-core": ^6.1.1
     "@uniswap/universal-router": 2.0.0-beta.2
     "@uniswap/v2-core": ^1.0.1
     "@uniswap/v2-sdk": ^4.7.0
