@@ -16,9 +16,10 @@ import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {PositionManager} from "@uniswap/v4-periphery/src/PositionManager.sol";
 import {IPositionDescriptor} from "@uniswap/v4-periphery/src/interfaces/IPositionDescriptor.sol";
-import {RouterParameters} from "universal-router/base/RouterImmutables.sol";
+import {RouterParameters} from "universal-router/types/RouterParameters.sol";
 import {IPermit2} from "permit2/src/interfaces/IPermit2.sol";
 import {INonfungiblePositionManager} from "@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol";
+import {IWETH9} from "@uniswap/v4-periphery/src/interfaces/external/IWETH9.sol";
 
 contract DeployRouter is Test {
     using PoolIdLibrary for PoolKey;
@@ -80,9 +81,10 @@ contract DeployRouter is Test {
     ////////////////////////////////////////////////////////////////
 
     function deployV4Contracts() public {
-        poolManager = new PoolManager();
-        v4PositionManager =
-            new PositionManager(poolManager, IPermit2(MAINNET_PERMIT2), 100000, IPositionDescriptor(address(0)));
+        poolManager = new PoolManager(address(this));
+        v4PositionManager = new PositionManager(
+            poolManager, IPermit2(MAINNET_PERMIT2), 100000, IPositionDescriptor(address(0)), IWETH9(WETH9)
+        );
     }
 
     function initializeV4Pools() public {
