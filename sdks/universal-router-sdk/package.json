@@ -25,7 +25,7 @@
     "prettier:fix": "prettier --write '**/*.ts' && prettier --write '**/*.json'",
     "release": "semantic-release",
     "test": "yarn test:hardhat && yarn test:forge",
-    "test:forge": "forge test -vvvv",
+    "test:forge": "forge test",
     "test:hardhat": "env TS_NODE_COMPILER_OPTIONS='{\"module\": \"commonjs\" }' hardhat test"
   },
   "dependencies": {
