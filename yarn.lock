@@ -4745,7 +4745,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v3-sdk@npm:3.19.0, @uniswap/v3-sdk@npm:^3.19.0":
+"@uniswap/v3-sdk@npm:3.19.0":
   version: 3.19.0
   resolution: "@uniswap/v3-sdk@npm:3.19.0"
   dependencies:
@@ -4758,6 +4758,22 @@ __metadata:
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
   checksum: b076fa983838694ee7c38ebfbe5fb211514f5b5d5b37089b79ddc2a5684cd11cc32bc4f7182ed0db99f7f46b08a850397991702078bd6043103f35cf36cb6a84
+  languageName: node
+  linkType: hard
+
+"@uniswap/v3-sdk@npm:3.20.0, @uniswap/v3-sdk@npm:^3.19.0":
+  version: 3.20.0
+  resolution: "@uniswap/v3-sdk@npm:3.20.0"
+  dependencies:
+    "@ethersproject/abi": ^5.5.0
+    "@ethersproject/solidity": ^5.0.9
+    "@uniswap/sdk-core": ^6.1.1
+    "@uniswap/swap-router-contracts": ^1.3.0
+    "@uniswap/v3-periphery": ^1.1.1
+    "@uniswap/v3-staker": 1.0.0
+    tiny-invariant: ^1.1.0
+    tiny-warning: ^1.0.3
+  checksum: 156b75bad315f1be67422a2c08d8c9fc19dfc6328d0c065b37b9261a48f577f909c7a4e2be27b30d4af401261f0fdf9605f41b87aaa9d7810a97a361f7e6840d
   languageName: node
   linkType: hard
 
@@ -4813,8 +4829,8 @@ __metadata:
     "@types/mocha": ^9.1.1
     "@types/node": ^18.7.16
     "@types/node-fetch": ^2.6.2
-    "@uniswap/sdk-core": ^6.0.0
-    "@uniswap/v3-sdk": 3.19.0
+    "@uniswap/sdk-core": ^6.1.1
+    "@uniswap/v3-sdk": 3.20.0
     chai: ^4.3.6
     dotenv: ^16.0.3
     eslint-plugin-prettier: ^3.4.1
