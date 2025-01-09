@@ -4745,7 +4745,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v3-sdk@npm:3.19.0, @uniswap/v3-sdk@npm:^3.19.0":
+"@uniswap/v3-sdk@npm:3.19.0":
   version: 3.19.0
   resolution: "@uniswap/v3-sdk@npm:3.19.0"
   dependencies:
@@ -4761,7 +4761,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v3-sdk@npm:3.20.0":
+"@uniswap/v3-sdk@npm:3.20.0, @uniswap/v3-sdk@npm:^3.19.0":
   version: 3.20.0
   resolution: "@uniswap/v3-sdk@npm:3.20.0"
   dependencies:
