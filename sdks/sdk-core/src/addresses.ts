@@ -59,6 +59,7 @@ export const V2_FACTORY_ADDRESSES: AddressMap = {
   [ChainId.WORLDCHAIN]: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
   [ChainId.UNICHAIN_SEPOLIA]: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
   [ChainId.UNICHAIN]: '0x1f98400000000000000000000000000000000002',
+  [ChainId.MONAD_TESTNET]: '0x733e88f248b742db6c14c0b1713af5ad7fdd59d0',
 }
 /**
  * @deprecated use V2_ROUTER_ADDRESSES instead
@@ -79,6 +80,7 @@ export const V2_ROUTER_ADDRESSES: AddressMap = {
   [ChainId.WORLDCHAIN]: '0x541aB7c31A119441eF3575F6973277DE0eF460bd',
   [ChainId.UNICHAIN_SEPOLIA]: '0x920b806E40A00E02E7D2b94fFc89860fDaEd3640',
   [ChainId.UNICHAIN]: '0x284f11109359a7e1306c3e447ef14d38400063ff',
+  [ChainId.MONAD_TESTNET]: '0xfb8e1c3b833f9e67a71c859a132cf783b645e436',
 }
 
 // Networks that share most of the same addresses i.e. Mainnet, Goerli, Optimism, Arbitrum, Polygon
@@ -328,6 +330,16 @@ const UNICHAIN_ADDRESSES: ChainAddresses = {
   swapRouter02Address: '0x73855d06de49d0fe4a9c42636ba96c62da12ff9c',
 }
 
+const MONAD_TESTNET_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: '0x961235a9020b05c44df1026d956d1f4d78014276',
+  multicallAddress: '0xa707ceb989cc3728551ed0e6e44b718dd114cf44',
+  quoterAddress: '0x1ba215c17565de7b0cb7ecab971bcf540c24a862',
+  v3MigratorAddress: '0x0a78348b71f8ae8caff2f8f9d4d74a2f36516661',
+  nonfungiblePositionManagerAddress: '0x3dcc735c74f10fe2b9db2bb55c40fbbbf24490f7',
+  tickLensAddress: '0x337478eb6058455ecb3696184b30dd6a29e3a893',
+  swapRouter02Address: '0x4c4eabd5fb1d1a7234a48692551eaecff8194ca7',
+}
+
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
   [ChainId.MAINNET]: MAINNET_ADDRESSES,
   [ChainId.OPTIMISM]: OPTIMISM_ADDRESSES,
@@ -355,6 +367,7 @@ export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses>
   [ChainId.WORLDCHAIN]: WORLDCHAIN_ADDRESSES,
   [ChainId.UNICHAIN_SEPOLIA]: UNICHAIN_SEPOLIA_ADDRESSES,
   [ChainId.UNICHAIN]: UNICHAIN_ADDRESSES,
+  [ChainId.MONAD_TESTNET]: MONAD_TESTNET_ADDRESSES,
 }
 
 /* V3 Contract Addresses */
