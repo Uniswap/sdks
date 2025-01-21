@@ -117,7 +117,7 @@ const POLYGON_ADDRESSES: ChainAddresses = {
   v4PoolManagerAddress: '0x67366782805870060151383f4bbff9dab53e5cd6',
   v4PositionManagerAddress: '0x1ec2ebf4f37e7363fdfe3551602425af0b3ceef9',
   v4StateView: '0x5ea1bd7974c8a611cbab0bdcafcb1d9cc9b3ba5a',
-  v4QuoterAddress: '0xb3d5c3dfc3a7aebff71895a7191796bffc2c81b9'
+  v4QuoterAddress: '0xb3d5c3dfc3a7aebff71895a7191796bffc2c81b9',
 }
 
 // celo v3 addresses
