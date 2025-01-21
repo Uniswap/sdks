@@ -4509,17 +4509,17 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@uniswap/router-sdk@npm:^1.15.0":
-  version: 1.15.0
-  resolution: "@uniswap/router-sdk@npm:1.15.0"
+"@uniswap/router-sdk@npm:^1.18.0":
+  version: 1.18.0
+  resolution: "@uniswap/router-sdk@npm:1.18.0"
   dependencies:
     "@ethersproject/abi": ^5.5.0
-    "@uniswap/sdk-core": ^6.0.0
+    "@uniswap/sdk-core": ^7.1.0
     "@uniswap/swap-router-contracts": ^1.3.0
-    "@uniswap/v2-sdk": ^4.7.0
-    "@uniswap/v3-sdk": ^3.19.0
-    "@uniswap/v4-sdk": ^1.12.3
-  checksum: f41fcec2c06775071e1139426bddb569ab88a314d20d6e7d10a56f6994325b39bdf00105a0b35a7d114a07c17e7ab59360cef5ce4632fba53000f13543ff8284
+    "@uniswap/v2-sdk": ^4.9.0
+    "@uniswap/v3-sdk": ^3.21.0
+    "@uniswap/v4-sdk": ^1.15.0
+  checksum: b715c91be8653697251cca6c27054e4a2c1edfd074c93205a9b320ffa16de4afb34a78822485aa72964d4c8f1f1bb2af7ffba0a3c5daf116b57ec8a56fd0608b
   languageName: node
   linkType: hard
 
@@ -4529,11 +4529,11 @@ __metadata:
   dependencies:
     "@ethersproject/abi": ^5.5.0
     "@types/jest": ^24.0.25
-    "@uniswap/sdk-core": ^6.0.0
+    "@uniswap/sdk-core": ^7.1.0
     "@uniswap/swap-router-contracts": ^1.3.0
-    "@uniswap/v2-sdk": ^4.7.0
-    "@uniswap/v3-sdk": ^3.19.0
-    "@uniswap/v4-sdk": ^1.12.0
+    "@uniswap/v2-sdk": ^4.9.0
+    "@uniswap/v3-sdk": ^3.21.0
+    "@uniswap/v4-sdk": ^1.15.0
     prettier: ^2.4.1
     tsdx: ^0.14.1
   languageName: unknown
@@ -4556,9 +4556,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/sdk-core@npm:^6.0.0, @uniswap/sdk-core@npm:^6.1.1":
-  version: 6.1.1
-  resolution: "@uniswap/sdk-core@npm:6.1.1"
+"@uniswap/sdk-core@npm:^7.1.0, @uniswap/sdk-core@npm:^7.2.0":
+  version: 7.2.0
+  resolution: "@uniswap/sdk-core@npm:7.2.0"
   dependencies:
     "@ethersproject/address": ^5.0.2
     "@ethersproject/bytes": ^5.7.0
@@ -4569,7 +4569,7 @@ __metadata:
     jsbi: ^3.1.4
     tiny-invariant: ^1.1.0
     toformat: ^2.0.0
-  checksum: f9b0433aaec6727fbf012eb5a1fecf34c791ae5411980e56032db694bf12eff09dee281a19266ffae138a968ce14b8dac2740a5b4e9495c81b3b21299303c72d
+  checksum: 381e8caabc04f401e92e683bd7ebb6ee14ba3adf3377983621c067b1cfd69dde496804f2332504b861fe67bebf2b570ff94127378af494f211b134633b07e8b4
   languageName: node
   linkType: hard
 
@@ -4647,14 +4647,14 @@ __metadata:
     "@types/node": ^18.7.16
     "@types/node-fetch": ^2.6.2
     "@uniswap/permit2-sdk": ^1.3.0
-    "@uniswap/router-sdk": ^1.15.0
-    "@uniswap/sdk-core": ^6.1.1
+    "@uniswap/router-sdk": ^1.18.0
+    "@uniswap/sdk-core": ^7.1.0
     "@uniswap/universal-router": 2.0.0-beta.2
     "@uniswap/v2-core": ^1.0.1
-    "@uniswap/v2-sdk": ^4.7.0
+    "@uniswap/v2-sdk": ^4.9.0
     "@uniswap/v3-core": 1.0.0
-    "@uniswap/v3-sdk": ^3.19.0
-    "@uniswap/v4-sdk": ^1.12.3
+    "@uniswap/v3-sdk": ^3.21.0
+    "@uniswap/v4-sdk": ^1.15.0
     bignumber.js: ^9.0.2
     chai: ^4.3.6
     dotenv: ^16.0.3
@@ -4688,16 +4688,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v2-sdk@npm:^4.7.0":
-  version: 4.7.0
-  resolution: "@uniswap/v2-sdk@npm:4.7.0"
+"@uniswap/v2-sdk@npm:^4.9.0":
+  version: 4.9.0
+  resolution: "@uniswap/v2-sdk@npm:4.9.0"
   dependencies:
     "@ethersproject/address": ^5.0.2
     "@ethersproject/solidity": ^5.0.9
-    "@uniswap/sdk-core": ^6.0.0
+    "@uniswap/sdk-core": ^7.1.0
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
-  checksum: 234f018ca2a42e76251bd15482f24a5f7c8987695e74681a62800bc0e878b3b0f0052490fd7d269408a5f269ca74befa15d2ab01f541596271e44aa0364258d7
+  checksum: 2612f8c8658ceee6856860674d7c1d01fa93501d1e6aef35c9e62746355c4838502b075a7def7e967f08932df117d48528377517c5d2eeab7a48d4a46711b147
   languageName: node
   linkType: hard
 
@@ -4709,7 +4709,7 @@ __metadata:
     "@ethersproject/solidity": ^5.0.9
     "@types/big.js": ^4.0.5
     "@types/jest": ^24.0.25
-    "@uniswap/sdk-core": ^6.0.0
+    "@uniswap/sdk-core": ^7.2.0
     "@uniswap/v2-core": ^1.0.1
     eslint-config-react-app: 7.0.1
     tiny-invariant: ^1.1.0
@@ -4745,19 +4745,19 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v3-sdk@npm:3.19.0, @uniswap/v3-sdk@npm:^3.19.0":
-  version: 3.19.0
-  resolution: "@uniswap/v3-sdk@npm:3.19.0"
+"@uniswap/v3-sdk@npm:3.21.0, @uniswap/v3-sdk@npm:^3.21.0":
+  version: 3.21.0
+  resolution: "@uniswap/v3-sdk@npm:3.21.0"
   dependencies:
     "@ethersproject/abi": ^5.5.0
     "@ethersproject/solidity": ^5.0.9
-    "@uniswap/sdk-core": ^6.0.0
+    "@uniswap/sdk-core": ^7.1.0
     "@uniswap/swap-router-contracts": ^1.3.0
     "@uniswap/v3-periphery": ^1.1.1
     "@uniswap/v3-staker": 1.0.0
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
-  checksum: b076fa983838694ee7c38ebfbe5fb211514f5b5d5b37089b79ddc2a5684cd11cc32bc4f7182ed0db99f7f46b08a850397991702078bd6043103f35cf36cb6a84
+  checksum: 252b6b4f53cad00147542f722cdd5bd7cf42085480c984e56fa3b02321b5fc41f866783d2be783020e9ee9b385510467656c55a2256889fe31092fec1f9ec7d8
   languageName: node
   linkType: hard
 
@@ -4768,7 +4768,7 @@ __metadata:
     "@ethersproject/abi": ^5.5.0
     "@ethersproject/solidity": ^5.0.9
     "@types/jest": ^24.0.25
-    "@uniswap/sdk-core": ^6.0.0
+    "@uniswap/sdk-core": ^7.1.0
     "@uniswap/swap-router-contracts": ^1.3.0
     "@uniswap/v3-core": 1.0.0
     "@uniswap/v3-periphery": ^1.1.1
@@ -4791,16 +4791,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v4-sdk@npm:^1.12.0, @uniswap/v4-sdk@npm:^1.12.3":
-  version: 1.12.3
-  resolution: "@uniswap/v4-sdk@npm:1.12.3"
+"@uniswap/v4-sdk@npm:^1.15.0":
+  version: 1.15.0
+  resolution: "@uniswap/v4-sdk@npm:1.15.0"
   dependencies:
     "@ethersproject/solidity": ^5.0.9
-    "@uniswap/sdk-core": ^6.0.0
-    "@uniswap/v3-sdk": 3.19.0
+    "@uniswap/sdk-core": ^7.1.0
+    "@uniswap/v3-sdk": 3.21.0
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
-  checksum: 4f3a8e9b32b893ba2e06d34c8d205b9de28e2435a01d5aa5d82a872f93b1302b456d214b5f56e83c13cc2bd5f5be9324f8149b588caf5309c57f989da7310695
+  checksum: 8541dcaec654fc6dd2c0d4ce61e1858df5e07577349678e6a66c4f1b582cde316c5c036b2d8658ba11708633f9269c59bd24a6f460c1d7d7e5e708c7e09a45dc
   languageName: node
   linkType: hard
 
@@ -4813,8 +4813,8 @@ __metadata:
     "@types/mocha": ^9.1.1
     "@types/node": ^18.7.16
     "@types/node-fetch": ^2.6.2
-    "@uniswap/sdk-core": ^6.0.0
-    "@uniswap/v3-sdk": 3.19.0
+    "@uniswap/sdk-core": ^7.1.0
+    "@uniswap/v3-sdk": 3.21.0
     chai: ^4.3.6
     dotenv: ^16.0.3
     eslint-plugin-prettier: ^3.4.1

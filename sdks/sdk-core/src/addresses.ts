@@ -50,6 +50,7 @@ export const V2_FACTORY_ADDRESSES: AddressMap = {
   [ChainId.OPTIMISM]: '0x0c3c1c532F1e39EdF36BE9Fe0bE1410313E074Bf',
   [ChainId.ARBITRUM_ONE]: '0xf1D7CC64Fb4452F05c498126312eBE29f30Fbcf9',
   [ChainId.AVALANCHE]: '0x9e5A52f57b3038F1B8EeE45F28b3C1967e22799C',
+  [ChainId.BASE_SEPOLIA]: '0x7Ae58f10f7849cA6F5fB71b7f45CB416c9204b1e',
   [ChainId.BASE]: '0x8909dc15e40173ff4699343b6eb8132c65e18ec6',
   [ChainId.BNB]: '0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6',
   [ChainId.POLYGON]: '0x9e5A52f57b3038F1B8EeE45F28b3C1967e22799C',
@@ -58,6 +59,7 @@ export const V2_FACTORY_ADDRESSES: AddressMap = {
   [ChainId.WORLDCHAIN]: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
   [ChainId.UNICHAIN_SEPOLIA]: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
   [ChainId.UNICHAIN]: '0x1f98400000000000000000000000000000000002',
+  [ChainId.MONAD_TESTNET]: '0x733e88f248b742db6c14c0b1713af5ad7fdd59d0',
 }
 /**
  * @deprecated use V2_ROUTER_ADDRESSES instead
@@ -69,6 +71,7 @@ export const V2_ROUTER_ADDRESSES: AddressMap = {
   [ChainId.SEPOLIA]: '0xeE567Fe1712Faf6149d80dA1E6934E354124CfE3',
   [ChainId.ARBITRUM_ONE]: '0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24',
   [ChainId.OPTIMISM]: '0x4a7b5da61326a6379179b40d00f57e5bbdc962c2',
+  [ChainId.BASE_SEPOLIA]: '0x1689E7B1F10000AE47eBfE339a4f69dECd19F602',
   [ChainId.BASE]: '0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24',
   [ChainId.AVALANCHE]: '0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24',
   [ChainId.BNB]: '0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24',
@@ -77,6 +80,7 @@ export const V2_ROUTER_ADDRESSES: AddressMap = {
   [ChainId.WORLDCHAIN]: '0x541aB7c31A119441eF3575F6973277DE0eF460bd',
   [ChainId.UNICHAIN_SEPOLIA]: '0x920b806E40A00E02E7D2b94fFc89860fDaEd3640',
   [ChainId.UNICHAIN]: '0x284f11109359a7e1306c3e447ef14d38400063ff',
+  [ChainId.MONAD_TESTNET]: '0xfb8e1c3b833f9e67a71c859a132cf783b645e436',
 }
 
 // Networks that share most of the same addresses i.e. Mainnet, Goerli, Optimism, Arbitrum, Polygon
@@ -101,8 +105,20 @@ const ARBITRUM_ONE_ADDRESSES: ChainAddresses = {
   ...DEFAULT_ADDRESSES,
   multicallAddress: '0xadF885960B47eA2CD9B55E6DAc6B42b7Cb2806dB',
   tickLensAddress: '0xbfd8137f7d1516D3ea5cA83523914859ec47F573',
+
+  v4PoolManagerAddress: '0x360e68faccca8ca495c1b759fd9eee466db9fb32',
+  v4PositionManagerAddress: '0xd88f38f930b7952f2db2432cb002e7abbf3dd869',
+  v4StateView: '0x76fd297e2d437cd7f76d50f01afe6160f86e9990',
+  v4QuoterAddress: '0x3972c00f7ed4885e145823eb7c655375d275a1c5',
 }
-const POLYGON_ADDRESSES: ChainAddresses = DEFAULT_ADDRESSES
+const POLYGON_ADDRESSES: ChainAddresses = {
+  ...DEFAULT_ADDRESSES,
+
+  v4PoolManagerAddress: '0x67366782805870060151383f4bbff9dab53e5cd6',
+  v4PositionManagerAddress: '0x1ec2ebf4f37e7363fdfe3551602425af0b3ceef9',
+  v4StateView: '0x5ea1bd7974c8a611cbab0bdcafcb1d9cc9b3ba5a',
+  v4QuoterAddress: '0xb3d5c3dfc3a7aebff71895a7191796bffc2c81b9',
+}
 
 // celo v3 addresses
 const CELO_ADDRESSES: ChainAddresses = {
@@ -212,6 +228,11 @@ const BASE_ADDRESSES: ChainAddresses = {
   tickLensAddress: '0x0CdeE061c75D43c82520eD998C23ac2991c9ac6d',
   swapRouter02Address: '0x2626664c2603336E57B271c5C0b26F421741e481',
   mixedRouteQuoterV1Address: '0xe544efae946f0008ae9a8d64493efa7886b73776',
+
+  v4PoolManagerAddress: '0x498581ff718922c3f8e6a244956af099b2652b2b',
+  v4PositionManagerAddress: '0x7c5f5a4bbd8fd63184577525326123b519429bdc',
+  v4StateView: '0xa3c0c9b65bad0b08107aa264b0f3db444b867a71',
+  v4QuoterAddress: '0x0d5e0f971ed27fbff6c2837bf31316121532048d',
 }
 
 // Base Goerli v3 addresses
@@ -223,6 +244,23 @@ const BASE_GOERLI_ADDRESSES: ChainAddresses = {
   nonfungiblePositionManagerAddress: '0x3c61369ef0D1D2AFa70d8feC2F31C5D6Ce134F30',
   tickLensAddress: '0x1acB873Ee909D0c98adB18e4474943249F931b92',
   swapRouter02Address: '0x8357227D4eDc78991Db6FDB9bD6ADE250536dE1d',
+}
+
+// Base Sepolia v3 addresses
+const BASE_SEPOLIA_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: '0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24',
+  multicallAddress: '0xd867e273eAbD6c853fCd0Ca0bFB6a3aE6491d2C1',
+  quoterAddress: '0xC5290058841028F1614F3A6F0F5816cAd0df5E27',
+  v3MigratorAddress: '0xCbf8b7f80800bd4888Fbc7bf1713B80FE4E23E10',
+  nonfungiblePositionManagerAddress: '0x27F971cb582BF9E50F397e4d29a5C7A34f11faA2',
+  tickLensAddress: '0xedf6066a2b290C185783862C7F4776A2C8077AD1',
+  swapRouter02Address: '0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4',
+
+  // v4
+  v4PoolManagerAddress: '0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408',
+  v4PositionManagerAddress: '0x4b2c77d209d3405f41a037ec6c77f7f5b8e2ca80',
+  v4StateView: '0x571291b572ed32ce6751a2cb2486ebee8defb9b4',
+  v4QuoterAddress: '0x4a6513c898fe1b2d0e78d3b0e0a4a151589b1cba',
 }
 
 const ZORA_ADDRESSES: ChainAddresses = {
@@ -309,6 +347,16 @@ const UNICHAIN_ADDRESSES: ChainAddresses = {
   swapRouter02Address: '0x73855d06de49d0fe4a9c42636ba96c62da12ff9c',
 }
 
+const MONAD_TESTNET_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: '0x961235a9020b05c44df1026d956d1f4d78014276',
+  multicallAddress: '0xa707ceb989cc3728551ed0e6e44b718dd114cf44',
+  quoterAddress: '0x1ba215c17565de7b0cb7ecab971bcf540c24a862',
+  v3MigratorAddress: '0x0a78348b71f8ae8caff2f8f9d4d74a2f36516661',
+  nonfungiblePositionManagerAddress: '0x3dcc735c74f10fe2b9db2bb55c40fbbbf24490f7',
+  tickLensAddress: '0x337478eb6058455ecb3696184b30dd6a29e3a893',
+  swapRouter02Address: '0x4c4eabd5fb1d1a7234a48692551eaecff8194ca7',
+}
+
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
   [ChainId.MAINNET]: MAINNET_ADDRESSES,
   [ChainId.OPTIMISM]: OPTIMISM_ADDRESSES,
@@ -327,6 +375,7 @@ export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses>
   [ChainId.AVALANCHE]: AVALANCHE_ADDRESSES,
   [ChainId.BASE]: BASE_ADDRESSES,
   [ChainId.BASE_GOERLI]: BASE_GOERLI_ADDRESSES,
+  [ChainId.BASE_SEPOLIA]: BASE_SEPOLIA_ADDRESSES,
   [ChainId.ZORA]: ZORA_ADDRESSES,
   [ChainId.ZORA_SEPOLIA]: ZORA_SEPOLIA_ADDRESSES,
   [ChainId.ROOTSTOCK]: ROOTSTOCK_ADDRESSES,
@@ -335,6 +384,7 @@ export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses>
   [ChainId.WORLDCHAIN]: WORLDCHAIN_ADDRESSES,
   [ChainId.UNICHAIN_SEPOLIA]: UNICHAIN_SEPOLIA_ADDRESSES,
   [ChainId.UNICHAIN]: UNICHAIN_ADDRESSES,
+  [ChainId.MONAD_TESTNET]: MONAD_TESTNET_ADDRESSES,
 }
 
 /* V3 Contract Addresses */
