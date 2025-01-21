@@ -109,7 +109,7 @@ const ARBITRUM_ONE_ADDRESSES: ChainAddresses = {
   v4PoolManagerAddress: '0x360e68faccca8ca495c1b759fd9eee466db9fb32',
   v4PositionManagerAddress: '0xd88f38f930b7952f2db2432cb002e7abbf3dd869',
   v4StateView: '0x76fd297e2d437cd7f76d50f01afe6160f86e9990',
-  v4QuoterAddress: '0x3972c00f7ed4885e145823eb7c655375d275a1c5'
+  v4QuoterAddress: '0x3972c00f7ed4885e145823eb7c655375d275a1c5',
 }
 const POLYGON_ADDRESSES: ChainAddresses = {
   ...DEFAULT_ADDRESSES,
