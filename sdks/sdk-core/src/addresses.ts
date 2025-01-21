@@ -105,8 +105,20 @@ const ARBITRUM_ONE_ADDRESSES: ChainAddresses = {
   ...DEFAULT_ADDRESSES,
   multicallAddress: '0xadF885960B47eA2CD9B55E6DAc6B42b7Cb2806dB',
   tickLensAddress: '0xbfd8137f7d1516D3ea5cA83523914859ec47F573',
+
+  v4PoolManagerAddress: '0x360e68faccca8ca495c1b759fd9eee466db9fb32',
+  v4PositionManagerAddress: '0xd88f38f930b7952f2db2432cb002e7abbf3dd869',
+  v4StateView: '0x76fd297e2d437cd7f76d50f01afe6160f86e9990',
+  v4QuoterAddress: '0x3972c00f7ed4885e145823eb7c655375d275a1c5',
 }
-const POLYGON_ADDRESSES: ChainAddresses = DEFAULT_ADDRESSES
+const POLYGON_ADDRESSES: ChainAddresses = {
+  ...DEFAULT_ADDRESSES,
+
+  v4PoolManagerAddress: '0x67366782805870060151383f4bbff9dab53e5cd6',
+  v4PositionManagerAddress: '0x1ec2ebf4f37e7363fdfe3551602425af0b3ceef9',
+  v4StateView: '0x5ea1bd7974c8a611cbab0bdcafcb1d9cc9b3ba5a',
+  v4QuoterAddress: '0xb3d5c3dfc3a7aebff71895a7191796bffc2c81b9',
+}
 
 // celo v3 addresses
 const CELO_ADDRESSES: ChainAddresses = {
@@ -216,6 +228,11 @@ const BASE_ADDRESSES: ChainAddresses = {
   tickLensAddress: '0x0CdeE061c75D43c82520eD998C23ac2991c9ac6d',
   swapRouter02Address: '0x2626664c2603336E57B271c5C0b26F421741e481',
   mixedRouteQuoterV1Address: '0xe544efae946f0008ae9a8d64493efa7886b73776',
+
+  v4PoolManagerAddress: '0x498581ff718922c3f8e6a244956af099b2652b2b',
+  v4PositionManagerAddress: '0x7c5f5a4bbd8fd63184577525326123b519429bdc',
+  v4StateView: '0xa3c0c9b65bad0b08107aa264b0f3db444b867a71',
+  v4QuoterAddress: '0x0d5e0f971ed27fbff6c2837bf31316121532048d',
 }
 
 // Base Goerli v3 addresses
