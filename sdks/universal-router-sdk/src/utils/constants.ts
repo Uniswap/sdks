@@ -70,8 +70,8 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 52210153,
       },
       [UniversalRouterVersion.V2_0]: {
-        address: '0xec7BE89e9d109e7e3Fec59c222CF297125FEFda2',
-        creationBlock: 52210153,
+        address: '0x1095692a6237d83c6a72f3f5efedb9a670c49223',
+        creationBlock: 1737492197,
       },
     },
   },
@@ -126,8 +126,8 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 169472836,
       },
       [UniversalRouterVersion.V2_0]: {
-        address: '0x5E325eDA8064b456f4781070C0738d849c824258',
-        creationBlock: 169472836,
+        address: '0xa51afafe0263b40edaef0df8781ea9aa03e381a3',
+        creationBlock: 1737487458,
       },
     },
   },
@@ -224,8 +224,8 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 9107268,
       },
       [UniversalRouterVersion.V2_0]: {
-        address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
-        creationBlock: 9107268,
+        address: '0x6ff5693b99212da76ad316178a184ab56d299b43',
+        creationBlock: 1737491485,
       },
     },
   },
