@@ -105,6 +105,11 @@ const ARBITRUM_ONE_ADDRESSES: ChainAddresses = {
   ...DEFAULT_ADDRESSES,
   multicallAddress: '0xadF885960B47eA2CD9B55E6DAc6B42b7Cb2806dB',
   tickLensAddress: '0xbfd8137f7d1516D3ea5cA83523914859ec47F573',
+
+  v4PoolManagerAddress: '0x360e68faccca8ca495c1b759fd9eee466db9fb32',
+  v4PositionManagerAddress: '0xd88f38f930b7952f2db2432cb002e7abbf3dd869',
+  v4StateView: '0x76fd297e2d437cd7f76d50f01afe6160f86e9990',
+  v4QuoterAddress: '0x3972c00f7ed4885e145823eb7c655375d275a1c5'
 }
 const POLYGON_ADDRESSES: ChainAddresses = DEFAULT_ADDRESSES
 
