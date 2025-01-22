@@ -151,7 +151,7 @@ const BNB_ADDRESSES: ChainAddresses = {
   v4PoolManagerAddress: '0x28e2ea090877bf75740558f6bfb36a5ffee9e9df',
   v4PositionManagerAddress: '0x7a4a5c919ae2541aed11041a1aeee68f1287f95b',
   v4StateView: '0xd13dd3d6e93f276fafc9db9e6bb47c1180aee0c4',
-  v4QuoterAddress: '0x9f75dd27d6664c475b90e105573e550ff69437b0'
+  v4QuoterAddress: '0x9f75dd27d6664c475b90e105573e550ff69437b0',
 }
 
 // optimism goerli addresses
@@ -342,7 +342,7 @@ const WORLDCHAIN_ADDRESSES: ChainAddresses = {
   v4PoolManagerAddress: '0xb1860d529182ac3bc1f51fa2abd56662b7d13f33',
   v4PositionManagerAddress: '0xc585e0f504613b5fbf874f21af14c65260fb41fa',
   v4StateView: '0x51d394718bc09297262e368c1a481217fdeb71eb',
-  v4QuoterAddress: '0x55d235b3ff2daf7c3ede0defc9521f1d6fe6c5c0'
+  v4QuoterAddress: '0x55d235b3ff2daf7c3ede0defc9521f1d6fe6c5c0',
 }
 
 const UNICHAIN_SEPOLIA_ADDRESSES: ChainAddresses = {
