@@ -3330,10 +3330,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@openzeppelin/contracts@npm:5.1.0":
-  version: 5.1.0
-  resolution: "@openzeppelin/contracts@npm:5.1.0"
-  checksum: dd42b4b331912cc743bc7eb27c8cf9e78249909c065bb59513c00d66941444c085c4e3b2ebf1cdd89535c26497fc994a7ab028b3c88858b636694e3c9c2d622f
+"@openzeppelin/contracts@npm:5.2.0":
+  version: 5.2.0
+  resolution: "@openzeppelin/contracts@npm:5.2.0"
+  checksum: badff8c3be46b099c331e90ba27f75e36f7af681279952cf0b123c7448bc53cd541ef447de8e6ebc38e7b29aed8f17dacf0756aac5891eed03fe96a0a4eba1a0
   languageName: node
   linkType: hard
 
@@ -4625,7 +4625,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@uniswap/universal-router-sdk@workspace:sdks/universal-router-sdk"
   dependencies:
-    "@openzeppelin/contracts": 5.1.0
+    "@openzeppelin/contracts": 5.2.0
     "@types/chai": ^4.3.3
     "@types/mocha": ^9.1.1
     "@types/node": ^18.7.16
@@ -17870,11 +17870,11 @@ __metadata:
   linkType: hard
 
 "undici@npm:^5.14.0":
-  version: 5.28.4
-  resolution: "undici@npm:5.28.4"
+  version: 5.28.5
+  resolution: "undici@npm:5.28.5"
   dependencies:
     "@fastify/busboy": ^2.0.0
-  checksum: a8193132d84540e4dc1895ecc8dbaa176e8a49d26084d6fbe48a292e28397cd19ec5d13bc13e604484e76f94f6e334b2bdc740d5f06a6e50c44072818d0c19f9
+  checksum: a402d699a602a8feee1c0f78267467c8ffcbd7682267fec7a1307fd11554a32976a2307bf1cc8bf6ef7a667654336592fbd66d675df20ce28357536fb55a3a7d
   languageName: node
   linkType: hard
 
