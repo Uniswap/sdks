@@ -100,7 +100,15 @@ const GOERLI_ADDRESSES: ChainAddresses = {
   mixedRouteQuoterV1Address: '0xBa60b6e6fF25488308789E6e0A65D838be34194e',
 }
 
-const OPTIMISM_ADDRESSES: ChainAddresses = DEFAULT_ADDRESSES
+const OPTIMISM_ADDRESSES: ChainAddresses = {
+  ...DEFAULT_ADDRESSES,
+
+  v4PoolManagerAddress: '0x9a13f98cb987694c9f086b1f5eb990eea8264ec3',
+  v4PositionManagerAddress: '0x3c3ea4b57a46241e54610e5f022e5c45859a1017',
+  v4StateView: '0xc18a3169788f4f75a170290584eca6395c75ecdb',
+  v4QuoterAddress: '0x1f3131a13296fb91c90870043742c3cdbff1a8d7',
+}
+
 const ARBITRUM_ONE_ADDRESSES: ChainAddresses = {
   ...DEFAULT_ADDRESSES,
   multicallAddress: '0xadF885960B47eA2CD9B55E6DAc6B42b7Cb2806dB',
@@ -139,6 +147,11 @@ const BNB_ADDRESSES: ChainAddresses = {
   nonfungiblePositionManagerAddress: '0x7b8A01B39D58278b5DE7e48c8449c9f4F5170613',
   tickLensAddress: '0xD9270014D396281579760619CCf4c3af0501A47C',
   swapRouter02Address: '0xB971eF87ede563556b2ED4b1C0b0019111Dd85d2',
+
+  v4PoolManagerAddress: '0x28e2ea090877bf75740558f6bfb36a5ffee9e9df',
+  v4PositionManagerAddress: '0x7a4a5c919ae2541aed11041a1aeee68f1287f95b',
+  v4StateView: '0xd13dd3d6e93f276fafc9db9e6bb47c1180aee0c4',
+  v4QuoterAddress: '0x9f75dd27d6664c475b90e105573e550ff69437b0',
 }
 
 // optimism goerli addresses
@@ -217,6 +230,11 @@ const AVALANCHE_ADDRESSES: ChainAddresses = {
   nonfungiblePositionManagerAddress: '0x655C406EBFa14EE2006250925e54ec43AD184f8B',
   tickLensAddress: '0xEB9fFC8bf81b4fFd11fb6A63a6B0f098c6e21950',
   swapRouter02Address: '0xbb00FF08d01D300023C629E8fFfFcb65A5a578cE',
+
+  v4PoolManagerAddress: '0x06380c0e0912312b5150364b9dc4542ba0dbbc85',
+  v4PositionManagerAddress: '0xb74b1f14d2754acfcbbe1a221023a5cf50ab8acd',
+  v4StateView: '0xc3c9e198c735a4b97e3e683f391ccbdd60b69286',
+  v4QuoterAddress: '0xbe40675bb704506a3c2ccfb762dcfd1e979845c2',
 }
 
 const BASE_ADDRESSES: ChainAddresses = {
@@ -320,6 +338,11 @@ const WORLDCHAIN_ADDRESSES: ChainAddresses = {
   nonfungiblePositionManagerAddress: '0xec12a9F9a09f50550686363766Cc153D03c27b5e',
   tickLensAddress: '0xE61df0CaC9d85876aCE5E3037005D80943570623',
   swapRouter02Address: '0x091AD9e2e6e5eD44c1c66dB50e49A601F9f36cF6',
+
+  v4PoolManagerAddress: '0xb1860d529182ac3bc1f51fa2abd56662b7d13f33',
+  v4PositionManagerAddress: '0xc585e0f504613b5fbf874f21af14c65260fb41fa',
+  v4StateView: '0x51d394718bc09297262e368c1a481217fdeb71eb',
+  v4QuoterAddress: '0x55d235b3ff2daf7c3ede0defc9521f1d6fe6c5c0',
 }
 
 const UNICHAIN_SEPOLIA_ADDRESSES: ChainAddresses = {
