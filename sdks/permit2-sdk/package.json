@@ -1,5 +1,5 @@
 {
-  "name": "@xterswap/permit2-sdk",
+  "name": "@uniswap/permit2-sdk",
   "description": "An sdk for interacting with permit2.",
   "repository": "https://github.com/Uniswap/sdks.git",
   "keywords": [
