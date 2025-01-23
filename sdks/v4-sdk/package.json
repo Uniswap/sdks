@@ -1,5 +1,5 @@
 {
-  "name": "@xterswap/v4-sdk",
+  "name": "@uniswap/v4-sdk",
   "description": "⚒️ An SDK for building applications on top of Uniswap V4",
   "repository": "https://github.com/Uniswap/sdks.git",
   "keywords": [
@@ -25,8 +25,8 @@
   },
   "dependencies": {
     "@ethersproject/solidity": "^5.0.9",
-    "@xterswap/sdk-core": "^7.3.0",
-    "@xterswap/v3-sdk": "3.23.0",
+    "@uniswap/sdk-core": "^7.3.0",
+    "@uniswap/v3-sdk": "3.23.0",
     "tiny-invariant": "^1.1.0",
     "tiny-warning": "^1.0.3"
   },
