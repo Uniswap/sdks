@@ -289,6 +289,11 @@ const ZORA_ADDRESSES: ChainAddresses = {
   nonfungiblePositionManagerAddress: '0xbC91e8DfA3fF18De43853372A3d7dfe585137D78',
   tickLensAddress: '0x209AAda09D74Ad3B8D0E92910Eaf85D2357e3044',
   swapRouter02Address: '0x7De04c96BE5159c3b5CeffC82aa176dc81281557',
+
+  v4PoolManagerAddress: '0x0575338e4c17006ae181b47900a84404247ca30f',
+  v4PositionManagerAddress: '0xf66c7b99e2040f0d9b326b3b7c152e9663543d63',
+  v4StateView: '0x385785af07d63b50d0a0ea57c4ff89d06adf7328',
+  v4QuoterAddress: '0x5edaccc0660e0a2c44b06e07ce8b915e625dc2c6',
 }
 
 const ZORA_SEPOLIA_ADDRESSES: ChainAddresses = {
@@ -318,6 +323,11 @@ const BLAST_ADDRESSES: ChainAddresses = {
   nonfungiblePositionManagerAddress: '0xB218e4f7cF0533d4696fDfC419A0023D33345F28',
   tickLensAddress: '0x2E95185bCdD928a3e984B7e2D6560Ab1b17d7274',
   swapRouter02Address: '0x549FEB8c9bd4c12Ad2AB27022dA12492aC452B66',
+
+  v4PoolManagerAddress: '0x1631559198a9e474033433b2958dabc135ab6446',
+  v4PositionManagerAddress: '0x4ad2f4cca2682cbb5b950d660dd458a1d3f1baad',
+  v4StateView: '0x12a88ae16f46dce4e8b15368008ab3380885df30',
+  v4QuoterAddress: '0x6f71cdcb0d119ff72c6eb501abceb576fbf62bcf',
 }
 
 const ZKSYNC_ADDRESSES: ChainAddresses = {
@@ -368,6 +378,11 @@ const UNICHAIN_ADDRESSES: ChainAddresses = {
   nonfungiblePositionManagerAddress: '0x943e6e07a7e8e791dafc44083e54041d743c46e9',
   tickLensAddress: '0xd5d76fa166ab8d8ad4c9f61aaa81457b66cbe443',
   swapRouter02Address: '0x73855d06de49d0fe4a9c42636ba96c62da12ff9c',
+
+  v4PoolManagerAddress: '0x1f98400000000000000000000000000000000004',
+  v4PositionManagerAddress: '0x4529a01c7a0410167c5740c487a8de60232617bf',
+  v4StateView: '0x86e8631a016f9068c3f085faf484ee3f5fdee8f2',
+  v4QuoterAddress: '0x333e3c607b141b18ff6de9f258db6e77fe7491e0',
 }
 
 const MONAD_TESTNET_ADDRESSES: ChainAddresses = {
