@@ -4556,24 +4556,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/sdk-core@npm:^7.3.0":
-  version: 7.3.0
-  resolution: "@uniswap/sdk-core@npm:7.3.0"
-  dependencies:
-    "@ethersproject/address": ^5.0.2
-    "@ethersproject/bytes": ^5.7.0
-    "@ethersproject/keccak256": 5.7.0
-    "@ethersproject/strings": 5.7.0
-    big.js: ^5.2.2
-    decimal.js-light: ^2.5.0
-    jsbi: ^3.1.4
-    tiny-invariant: ^1.1.0
-    toformat: ^2.0.0
-  checksum: 849a07594cee7a2647bd28d86b06c761bdcbe7cea1ffcb0d45a2c1de5a311dcfbe48c0b2751736c1e272311f345e1258194101d7632c4d48ea94297eab2f931b
-  languageName: node
-  linkType: hard
-
-"@uniswap/sdk-core@npm:^7.4.0":
+"@uniswap/sdk-core@npm:^7.3.0, @uniswap/sdk-core@npm:^7.4.0":
   version: 7.4.0
   resolution: "@uniswap/sdk-core@npm:7.4.0"
   dependencies:
