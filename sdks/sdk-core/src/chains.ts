@@ -1,4 +1,6 @@
 export enum ChainId {
+  XTERIO_TESTNET = 1637450,
+  // XTERIO = 112358,
   MAINNET = 1,
   GOERLI = 5,
   SEPOLIA = 11155111,
@@ -31,6 +33,8 @@ export enum ChainId {
 }
 
 export const SUPPORTED_CHAINS = [
+  ChainId.XTERIO_TESTNET,
+  // ChainId.XTERIO,
   ChainId.MAINNET,
   ChainId.OPTIMISM,
   ChainId.OPTIMISM_GOERLI,
@@ -63,6 +67,7 @@ export type SupportedChainsType = (typeof SUPPORTED_CHAINS)[number]
 
 export enum NativeCurrencyName {
   // Strings match input for CLI
+  XTER = 'XTER',
   ETHER = 'ETH',
   MATIC = 'MATIC',
   CELO = 'CELO',

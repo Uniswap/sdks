@@ -128,6 +128,16 @@ const POLYGON_ADDRESSES: ChainAddresses = {
   v4QuoterAddress: '0xb3d5c3dfc3a7aebff71895a7191796bffc2c81b9',
 }
 
+// XTERIO TESTNET v3 addresses
+const XTERIO_TESTNET_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: '0x83957422e417ce43c493199ef6c1162c12fd8a37',
+  multicallAddress: '0xe3e992ae0e914af23597d2209b272dad9e71524a',
+  quoterAddress: '0x4216bcc3d4b52226c654ad252fb99416e4f3ac6a',
+  v3MigratorAddress: '',
+  nonfungiblePositionManagerAddress: '0x6f58796d4563a5140cb636fd4c48eb20fe97ff1f',
+  tickLensAddress: '0xae86f74421aea7e79342e0b9aa1e4c4cb98d8a74',
+}
+
 // celo v3 addresses
 const CELO_ADDRESSES: ChainAddresses = {
   v3CoreFactoryAddress: '0xAfE208a311B21f13EF87E33A90049fC17A7acDEc',
@@ -381,6 +391,7 @@ const MONAD_TESTNET_ADDRESSES: ChainAddresses = {
 }
 
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
+  [ChainId.XTERIO_TESTNET]: XTERIO_TESTNET_ADDRESSES,
   [ChainId.MAINNET]: MAINNET_ADDRESSES,
   [ChainId.OPTIMISM]: OPTIMISM_ADDRESSES,
   [ChainId.ARBITRUM_ONE]: ARBITRUM_ONE_ADDRESSES,
