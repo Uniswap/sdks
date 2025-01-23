@@ -1,6 +1,6 @@
 export enum ChainId {
   XTERIO_TESTNET = 1637450,
-  // XTERIO = 112358,
+  XTERIO = 112358,
   MAINNET = 1,
   GOERLI = 5,
   SEPOLIA = 11155111,

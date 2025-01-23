@@ -4,15 +4,13 @@ on:
   push:
     branches:
       - main
-      - beta
 
 jobs:
   release:
     name: Release
     environment:
       name: production
-    runs-on: 
-      group: ubuntu-latest
+    runs-on: ubuntu-latest
     permissions:
       contents: write
       id-token: write
