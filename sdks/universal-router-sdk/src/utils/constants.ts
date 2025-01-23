@@ -28,8 +28,8 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 17143817,
       },
       [UniversalRouterVersion.V2_0]: {
-        address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
-        creationBlock: 17143817,
+        address: '0x66a9893cc07d91d95644aedd05d03f95e1dba8af',
+        creationBlock: 1737658355,
       },
     },
   },
@@ -229,6 +229,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
   },
+  // blast
   [81457]: {
     weth: '0x4300000000000000000000000000000000000004',
     routerConfigs: {
@@ -237,11 +238,12 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 1116444,
       },
       [UniversalRouterVersion.V2_0]: {
-        address: '0x643770E279d5D0733F21d6DC03A8efbABf3255B4',
-        creationBlock: 1116444,
+        address: '0xeabbcb3e8e415306207ef514f660a3f820025be3',
+        creationBlock: 1737564586,
       },
     },
   },
+  // zora
   [7777777]: {
     weth: '0x4200000000000000000000000000000000000006',
     routerConfigs: {
@@ -250,8 +252,8 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 11832155,
       },
       [UniversalRouterVersion.V2_0]: {
-        address: '0x2986d9721A49838ab4297b695858aF7F17f38014',
-        creationBlock: 11832155,
+        address: '0x3315ef7ca28db74abadc6c44570efdf06b04b020',
+        creationBlock: 1737562927,
       },
     },
   },
@@ -295,6 +297,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
   },
+  // unichain mainnet
   [130]: {
     weth: '0x4200000000000000000000000000000000000006',
     routerConfigs: {
@@ -303,8 +306,8 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 23678,
       },
       [UniversalRouterVersion.V2_0]: {
-        address: '0x4D73A4411CA1c660035e4AECC8270E5DdDEC8C17',
-        creationBlock: 23678,
+        address: '0xef740bf23acae26f6492b10de645d6b98dc8eaf3',
+        creationBlock: 1737568156,
       },
     },
   },
