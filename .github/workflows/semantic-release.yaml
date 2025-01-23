@@ -12,7 +12,7 @@ jobs:
     environment:
       name: production
     runs-on: 
-      group: npm-deploy
+      group: ubuntu-latest
     permissions:
       contents: write
       id-token: write
