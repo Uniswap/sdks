@@ -36,7 +36,7 @@ contract DeployRouter is Test {
     address internal constant RECIPIENT = 0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa;
     address internal constant FEE_RECIPIENT = 0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB;
     address internal constant MAINNET_PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
-    address internal constant MAINNET_ROUTER = 0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD;
+    address internal constant MAINNET_ROUTER = 0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af;
 
     // This is not the address of the position manager on mainnet
     // It’s the address where Foundry deploys PositionManager during the test
