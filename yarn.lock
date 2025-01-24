@@ -4509,17 +4509,17 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@uniswap/router-sdk@npm:^1.20.0":
-  version: 1.20.0
-  resolution: "@uniswap/router-sdk@npm:1.20.0"
+"@uniswap/router-sdk@npm:^1.21.0":
+  version: 1.21.0
+  resolution: "@uniswap/router-sdk@npm:1.21.0"
   dependencies:
     "@ethersproject/abi": ^5.5.0
-    "@uniswap/sdk-core": ^7.3.0
+    "@uniswap/sdk-core": ^7.5.0
     "@uniswap/swap-router-contracts": ^1.3.0
-    "@uniswap/v2-sdk": ^4.11.0
-    "@uniswap/v3-sdk": ^3.23.0
-    "@uniswap/v4-sdk": ^1.17.0
-  checksum: 6ea6c9ab9ea6d7c56087a7bd302c9fc9d852d47db4e70500bf1f291880d51801b6102597a57f14d2fd9a954936a816de421346f390b4dc50b988faff42093832
+    "@uniswap/v2-sdk": ^4.13.0
+    "@uniswap/v3-sdk": ^3.24.0
+    "@uniswap/v4-sdk": ^1.18.0
+  checksum: 44544b912e1b7fa00de41b001ad3165c1359eaeb599de983b362b02dc8510af71f73f67fbe0ae18ef3faa761af69c9be7478e5af21e040b91f50647ddaa74ba4
   languageName: node
   linkType: hard
 
@@ -4556,7 +4556,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/sdk-core@npm:^7.3.0, @uniswap/sdk-core@npm:^7.5.0":
+"@uniswap/sdk-core@npm:^7.5.0":
   version: 7.5.0
   resolution: "@uniswap/sdk-core@npm:7.5.0"
   dependencies:
@@ -4647,14 +4647,14 @@ __metadata:
     "@types/node": ^18.7.16
     "@types/node-fetch": ^2.6.2
     "@uniswap/permit2-sdk": ^1.3.0
-    "@uniswap/router-sdk": ^1.20.0
-    "@uniswap/sdk-core": ^7.3.0
+    "@uniswap/router-sdk": ^1.21.0
+    "@uniswap/sdk-core": ^7.5.0
     "@uniswap/universal-router": 2.0.0-beta.2
     "@uniswap/v2-core": ^1.0.1
-    "@uniswap/v2-sdk": ^4.11.0
+    "@uniswap/v2-sdk": ^4.13.0
     "@uniswap/v3-core": 1.0.0
-    "@uniswap/v3-sdk": ^3.23.0
-    "@uniswap/v4-sdk": ^1.17.0
+    "@uniswap/v3-sdk": ^3.24.0
+    "@uniswap/v4-sdk": ^1.18.0
     bignumber.js: ^9.0.2
     chai: ^4.3.6
     dotenv: ^16.0.3
@@ -4688,7 +4688,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v2-sdk@npm:^4.11.0, @uniswap/v2-sdk@npm:^4.13.0":
+"@uniswap/v2-sdk@npm:^4.13.0":
   version: 4.13.0
   resolution: "@uniswap/v2-sdk@npm:4.13.0"
   dependencies:
@@ -4745,7 +4745,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v3-sdk@npm:3.24.0, @uniswap/v3-sdk@npm:^3.23.0, @uniswap/v3-sdk@npm:^3.24.0":
+"@uniswap/v3-sdk@npm:3.24.0, @uniswap/v3-sdk@npm:^3.24.0":
   version: 3.24.0
   resolution: "@uniswap/v3-sdk@npm:3.24.0"
   dependencies:
@@ -4791,7 +4791,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v4-sdk@npm:^1.17.0, @uniswap/v4-sdk@npm:^1.18.0":
+"@uniswap/v4-sdk@npm:^1.18.0":
   version: 1.18.0
   resolution: "@uniswap/v4-sdk@npm:1.18.0"
   dependencies:
