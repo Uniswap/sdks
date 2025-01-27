@@ -8,6 +8,7 @@ const NETWORKS_WITH_SAME_ADDRESS: ChainId[] = [
   ChainId.GOERLI,
   ChainId.POLYGON,
   ChainId.BASE,
+  ChainId.UNICHAIN,
 ];
 
 export function constructSameAddressMap<T>(
