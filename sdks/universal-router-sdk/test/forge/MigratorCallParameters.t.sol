@@ -35,7 +35,8 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         // add the position to v3 so we have something to migrate
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0);
         // USDC < WETH
-        mintInRangeV3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18);
+        // in range v3 position
+        mintV3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18, 200040, 300000);
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 1);
 
         // approve the UniversalRouter to access the position (instead of permit)
@@ -64,7 +65,8 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         // add the position to v3 so we have something to migrate
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0);
         // USDC < WETH
-        mintInRangeV3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18);
+        // in range v3 position
+        mintV3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18, 200040, 300000);
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 1);
 
         assertEq(params.value, 0);
@@ -89,7 +91,7 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         // add the position to v3 so we have something to migrate
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0);
         // USDC < WETH
-        mintInRangeV3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18);
+        mintV3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18, 200040, 300000);
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 1);
 
         assertEq(params.value, 0);
@@ -114,7 +116,8 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         // add the position to v3 so we have something to migrate
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0);
         // USDC < WETH
-        mintOutOfRange0V3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18);
+        // one sided v3 position in USDC
+        mintV3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18, 205320, 300000);
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 1);
 
         // approve the UniversalRouter to access the position (instead of permit)
@@ -148,7 +151,8 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         // add the position to v3 so we have something to migrate
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0);
         // USDC < WETH
-        mintOutOfRange0V3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18);
+        // one sided v3 position in USDC
+        mintV3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18, 205320, 300000);
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 1);
 
         // approve the UniversalRouter to access the position (instead of permit)
@@ -182,7 +186,8 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         // add the position to v3 so we have something to migrate
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0);
         // USDC < WETH
-        mintOutOfRange0V3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18);
+        // one sided v3 position in USDC
+        mintV3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18, 205320, 300000);
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 1);
 
         // approve the UniversalRouter to access the position (instead of permit)
@@ -211,7 +216,8 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         // add the position to v3 so we have something to migrate
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0);
         // USDC < WETH
-        mintOutOfRange1V3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18);
+        // one sided v3 position in USDC
+        mintV3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18, 204720, 204960);
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 1);
 
         // approve the UniversalRouter to access the position (instead of permit)
@@ -245,7 +251,8 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         // add the position to v3 so we have something to migrate
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0);
         // USDC < WETH
-        mintOutOfRange1V3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18);
+        // one sided v3 position in USDC
+        mintV3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18, 204720, 204960);
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 1);
 
         // approve the UniversalRouter to access the position (instead of permit)
@@ -279,7 +286,8 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         // add the position to v3 so we have something to migrate
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0);
         // USDC < WETH
-        mintOutOfRange1V3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18);
+        // one sided v3 position in USDC
+        mintV3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18, 204720, 204960);
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 1);
 
         // approve the UniversalRouter to access the position (instead of permit)

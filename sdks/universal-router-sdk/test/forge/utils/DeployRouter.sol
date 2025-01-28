@@ -146,12 +146,14 @@ contract DeployRouter is Test {
         }
     }
 
-    function mintInRangeV3Position(
+    function mintV3Position(
         address token0,
         address token1,
         uint24 fee,
         uint256 amount0Desired,
-        uint256 amount1Desired
+        uint256 amount1Desired,
+        int24 tickLower,
+        int24 tickUpper
     ) public {
         if (token0 >= token1) revert InvalidTokenOrder();
 
@@ -167,8 +169,8 @@ contract DeployRouter is Test {
                 token0: token0,
                 token1: token1,
                 fee: fee,
-                tickLower: 200040,
-                tickUpper: 300000,
+                tickLower: tickLower,
+                tickUpper: tickUpper,
                 amount0Desired: amount0Desired,
                 amount1Desired: amount1Desired,
                 amount0Min: 0,
@@ -181,75 +183,75 @@ contract DeployRouter is Test {
         vm.stopPrank();
     }
 
-    function mintOutOfRange0V3Position(
-        address token0,
-        address token1,
-        uint24 fee,
-        uint256 amount0Desired,
-        uint256 amount1Desired
-    ) public {
-        if (token0 >= token1) revert InvalidTokenOrder();
+    // function mintOutOfRange0V3Position(
+    //     address token0,
+    //     address token1,
+    //     uint24 fee,
+    //     uint256 amount0Desired,
+    //     uint256 amount1Desired
+    // ) public {
+    //     if (token0 >= token1) revert InvalidTokenOrder();
 
-        deal(token0, from, 2 * amount0Desired);
-        deal(token1, from, 2 * amount1Desired);
+    //     deal(token0, from, 2 * amount0Desired);
+    //     deal(token1, from, 2 * amount1Desired);
 
-        vm.startPrank(from);
-        ERC20(token0).approve(V3_POSITION_MANAGER, type(uint256).max);
-        ERC20(token1).approve(V3_POSITION_MANAGER, type(uint256).max);
+    //     vm.startPrank(from);
+    //     ERC20(token0).approve(V3_POSITION_MANAGER, type(uint256).max);
+    //     ERC20(token1).approve(V3_POSITION_MANAGER, type(uint256).max);
 
-        (, uint128 liq,,) = INonfungiblePositionManager(V3_POSITION_MANAGER).mint(
-            INonfungiblePositionManager.MintParams({
-                token0: token0,
-                token1: token1,
-                fee: fee,
-                tickLower: 205320,
-                tickUpper: 300000,
-                amount0Desired: amount0Desired,
-                amount1Desired: amount1Desired,
-                amount0Min: 0,
-                amount1Min: 0,
-                recipient: from,
-                deadline: type(uint256).max
-            })
-        );
+    //     (, uint128 liq,,) = INonfungiblePositionManager(V3_POSITION_MANAGER).mint(
+    //         INonfungiblePositionManager.MintParams({
+    //             token0: token0,
+    //             token1: token1,
+    //             fee: fee,
+    //             tickLower: 205320,
+    //             tickUpper: 300000,
+    //             amount0Desired: amount0Desired,
+    //             amount1Desired: amount1Desired,
+    //             amount0Min: 0,
+    //             amount1Min: 0,
+    //             recipient: from,
+    //             deadline: type(uint256).max
+    //         })
+    //     );
 
-        vm.stopPrank();
-    }
+    //     vm.stopPrank();
+    // }
 
-    function mintOutOfRange1V3Position(
-        address token0,
-        address token1,
-        uint24 fee,
-        uint256 amount0Desired,
-        uint256 amount1Desired
-    ) public {
-        if (token0 >= token1) revert InvalidTokenOrder();
+    // function mintOutOfRange1V3Position(
+    //     address token0,
+    //     address token1,
+    //     uint24 fee,
+    //     uint256 amount0Desired,
+    //     uint256 amount1Desired
+    // ) public {
+    //     if (token0 >= token1) revert InvalidTokenOrder();
 
-        deal(token0, from, 2 * amount0Desired);
-        deal(token1, from, 2 * amount1Desired);
+    //     deal(token0, from, 2 * amount0Desired);
+    //     deal(token1, from, 2 * amount1Desired);
 
-        vm.startPrank(from);
-        ERC20(token0).approve(V3_POSITION_MANAGER, type(uint256).max);
-        ERC20(token1).approve(V3_POSITION_MANAGER, type(uint256).max);
+    //     vm.startPrank(from);
+    //     ERC20(token0).approve(V3_POSITION_MANAGER, type(uint256).max);
+    //     ERC20(token1).approve(V3_POSITION_MANAGER, type(uint256).max);
 
-        (, uint128 liq,,) = INonfungiblePositionManager(V3_POSITION_MANAGER).mint(
-            INonfungiblePositionManager.MintParams({
-                token0: token0,
-                token1: token1,
-                fee: fee,
-                tickLower: 204720,
-                tickUpper: 204960,
-                amount0Desired: amount0Desired,
-                amount1Desired: amount1Desired,
-                amount0Min: 0,
-                amount1Min: 0,
-                recipient: from,
-                deadline: type(uint256).max
-            })
-        );
+    //     (, uint128 liq,,) = INonfungiblePositionManager(V3_POSITION_MANAGER).mint(
+    //         INonfungiblePositionManager.MintParams({
+    //             token0: token0,
+    //             token1: token1,
+    //             fee: fee,
+    //             tickLower: 204720,
+    //             tickUpper: 204960,
+    //             amount0Desired: amount0Desired,
+    //             amount1Desired: amount1Desired,
+    //             amount0Min: 0,
+    //             amount1Min: 0,
+    //             recipient: from,
+    //             deadline: type(uint256).max
+    //         })
+    //     );
 
-        vm.stopPrank();
-    }
+    //     vm.stopPrank();
+    // }
 
     function _settle(Currency currency, uint256 amount) internal {
         if (currency.isAddressZero()) {
