@@ -9,14 +9,7 @@ import {
   NonfungiblePositionManager as V3PositionManager,
   RemoveLiquidityOptions as V3RemoveLiquidityOptions,
 } from '@uniswap/v3-sdk'
-import {
-  Position as V4Position,
-  V4PositionManager,
-  MigrateOptions,
-  MintOptions,
-  Pool as V4Pool,
-  PoolKey,
-} from '@uniswap/v4-sdk'
+import { Position as V4Position, V4PositionManager, MigrateOptions, Pool as V4Pool, PoolKey } from '@uniswap/v4-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
 import { Currency, TradeType, Percent, CHAIN_TO_ADDRESSES_MAP, SupportedChainsType } from '@uniswap/sdk-core'
 import { UniswapTrade, SwapOptions } from './entities/actions/uniswap'
@@ -99,6 +92,7 @@ export abstract class SwapRouter {
       options.v3RemoveLiquidityOptions.collectOptions.recipient === v4PositionManagerAddress,
       'RECIPIENT_NOT_POSITION_MANAGER'
     )
+    // Migration must be a mint operation, not an increase because the UR should not have permission to increase liquidity on a v4 position
     invariant(isMint(options.migrateOptions), 'MINT_REQUIRED')
     invariant(options.migrateOptions.migrate, 'MIGRATE_REQUIRED')
 
@@ -165,15 +159,6 @@ export abstract class SwapRouter {
       ])
       delete options.migrateOptions.batchPermit
     }
-
-    // if (options.migrateOptions.batchPermit) {
-    //   planner.addCommand(CommandType.PERMIT2_PERMIT_BATCH, [options.migrateOptions.batchPermit.permitBatch, options.migrateOptions.batchPermit.signature])
-    //   delete options.migrateOptions.batchPermit
-    // }
-
-    // if (options.migrateOptions.currency) {
-    //   planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [options.migrateOptions.currency, options.v3RemoveLiquidityOptions.collectOptions.recipient, options.migrateOptions.amount])
-    // }
 
     // encode v4 mint
     const v4AddParams = V4PositionManager.addCallParameters(options.outputPosition, options.migrateOptions)
