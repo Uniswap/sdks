@@ -144,8 +144,8 @@ export abstract class SwapRouter {
       const selector = v3Call.slice(0, 10)
       invariant(
         selector == V3PositionManager.INTERFACE.getSighash('collect') ||
-        selector == V3PositionManager.INTERFACE.getSighash('decreaseLiquidity') ||
-        selector == V3PositionManager.INTERFACE.getSighash('burn'),
+          selector == V3PositionManager.INTERFACE.getSighash('decreaseLiquidity') ||
+          selector == V3PositionManager.INTERFACE.getSighash('burn'),
         'INVALID_V3_CALL: ' + selector
       )
       planner.addCommand(CommandType.V3_POSITION_MANAGER_CALL, [v3Call])
@@ -154,8 +154,15 @@ export abstract class SwapRouter {
     // if migrate options has a currency, require a batch permit
     if (options.migrateOptions.additionalTransfer) {
       invariant(options.migrateOptions.batchPermit, 'PERMIT_REQUIRED')
-      planner.addCommand(CommandType.PERMIT2_PERMIT_BATCH, [options.migrateOptions.batchPermit.permitBatch, options.migrateOptions.batchPermit.signature])
-      planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [options.migrateOptions.additionalTransfer.neededCurrency, options.v3RemoveLiquidityOptions.collectOptions.recipient, options.migrateOptions.additionalTransfer.neededAmount])
+      planner.addCommand(CommandType.PERMIT2_PERMIT_BATCH, [
+        options.migrateOptions.batchPermit.permitBatch,
+        options.migrateOptions.batchPermit.signature,
+      ])
+      planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [
+        options.migrateOptions.additionalTransfer.neededCurrency,
+        options.v3RemoveLiquidityOptions.collectOptions.recipient,
+        options.migrateOptions.additionalTransfer.neededAmount,
+      ])
       delete options.migrateOptions.batchPermit
     }
 

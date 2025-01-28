@@ -18,7 +18,14 @@ import {
   NonfungiblePositionManager,
 } from '@uniswap/v3-sdk'
 import { Pool as V4Pool, Route as V4Route, Trade as V4Trade, Position as V4Position } from '@uniswap/v4-sdk'
-import { generatePermitSignature, generatePermitSignatureFromBatch, toInputPermit, makePermit, makePermitBatch, generateEip2098PermitSignature } from './utils/permit2'
+import {
+  generatePermitSignature,
+  generatePermitSignatureFromBatch,
+  toInputPermit,
+  makePermit,
+  makePermitBatch,
+  generateEip2098PermitSignature,
+} from './utils/permit2'
 import {
   CHAIN_TO_ADDRESSES_MAP,
   ChainId,
@@ -74,7 +81,7 @@ describe('Uniswap', () => {
   let USDC_DAI_V4: V4Pool
 
   before(async () => {
-    ; ({ WETH_USDC_V2, USDC_DAI_V2, WETH_USDC_V3, USDC_DAI_V3, WETH_USDC_V3_LOW_FEE } = await getUniswapPools(
+    ;({ WETH_USDC_V2, USDC_DAI_V2, WETH_USDC_V3, USDC_DAI_V3, WETH_USDC_V3_LOW_FEE } = await getUniswapPools(
       FORK_BLOCK
     ))
 
@@ -1057,7 +1064,7 @@ describe('Uniswap', () => {
           : CurrencyAmount.fromRawAmount(tokenOut, amount)
       }
 
-      function compareUniswapTrades(left: UniswapTrade, right: UniswapTrade): void { }
+      function compareUniswapTrades(left: UniswapTrade, right: UniswapTrade): void {}
 
       it('v2 - erc20 <> erc20', async () => {
         const [tokenIn, tokenOut] = [DAI, USDC]

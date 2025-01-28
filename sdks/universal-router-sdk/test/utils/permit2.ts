@@ -70,12 +70,14 @@ export function makePermitBatch(
   routerAddress: string = UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, 1)
 ): PermitBatch {
   return {
-    details: [{
-      token,
-      amount,
-      expiration: TEST_DEADLINE,
-      nonce,
-    }],
+    details: [
+      {
+        token,
+        amount,
+        expiration: TEST_DEADLINE,
+        nonce,
+      },
+    ],
     spender: routerAddress,
     sigDeadline: TEST_DEADLINE,
   }
