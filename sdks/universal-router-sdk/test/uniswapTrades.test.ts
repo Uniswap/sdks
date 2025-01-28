@@ -71,6 +71,7 @@ describe('Uniswap', () => {
   let ETH_USDC_V4: V4Pool
   let WETH_USDC_V4: V4Pool
   let WETH_USDC_V4_LOW_FEE: V4Pool
+  let ETH_USDC_V4_LOW_FEE: V4Pool
   let USDC_DAI_V4: V4Pool
 
   before(async () => {
@@ -107,6 +108,18 @@ describe('Uniswap', () => {
 
     WETH_USDC_V4_LOW_FEE = new V4Pool(
       WETH,
+      USDC,
+      FeeAmount.LOW,
+      tickSpacing,
+      ZERO_ADDRESS,
+      encodeSqrtRatioX96(1, 1),
+      liquidity,
+      0,
+      tickProviderMock
+    )
+
+    ETH_USDC_V4_LOW_FEE = new V4Pool(
+      ETHER,
       USDC,
       FeeAmount.LOW,
       tickSpacing,
@@ -1604,7 +1617,7 @@ describe('Uniswap', () => {
           tickUpper: 300000,
         }),
         outputPosition: new V4Position({
-          pool: WETH_USDC_V4,
+          pool: ETH_USDC_V4,
           liquidity: 100000,
           tickLower: 200040,
           tickUpper: 300000,
@@ -1633,6 +1646,7 @@ describe('Uniswap', () => {
           migrate: true,
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
+          useNative: true,
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
@@ -1649,7 +1663,7 @@ describe('Uniswap', () => {
           tickUpper: 300000,
         }),
         outputPosition: new V4Position({
-          pool: WETH_USDC_V4,
+          pool: ETH_USDC_V4,
           liquidity: 100000,
           tickLower: 200040,
           tickUpper: 300000,
@@ -1671,6 +1685,7 @@ describe('Uniswap', () => {
           migrate: true,
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
+          useNative: true,
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
@@ -1704,7 +1719,7 @@ describe('Uniswap', () => {
           tickUpper: 300000,
         }),
         outputPosition: new V4Position({
-          pool: WETH_USDC_V4_LOW_FEE, // migrate to LOW pool, which hasn't been initialized
+          pool: ETH_USDC_V4_LOW_FEE,
           liquidity: 100000,
           tickLower: 200040,
           tickUpper: 300000,
@@ -1734,6 +1749,7 @@ describe('Uniswap', () => {
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
           createPool: true, // boolean to signal pool creation
+          useNative: true,
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
@@ -1896,6 +1912,42 @@ describe('Uniswap', () => {
     it('throws if not minting when migrating', async () => {
       const opts = Object.assign({
         inputPosition: new Position({
+          pool: USDC_DAI_V3,
+          liquidity: 1,
+          tickLower: -USDC_DAI_V3.tickSpacing,
+          tickUpper: USDC_DAI_V3.tickSpacing,
+        }),
+        outputPosition: new V4Position({
+          pool: USDC_DAI_V4,
+          liquidity: 1,
+          tickLower: -USDC_DAI_V4.tickSpacing,
+          tickUpper: USDC_DAI_V4.tickSpacing,
+        }),
+        v3RemoveLiquidityOptions: {
+          tokenId: 1,
+          liquidityPercentage: new Percent(100, 100),
+          slippageTolerance: new Percent(5, 100),
+          deadline: 1,
+          burnToken: true,
+          collectOptions: {
+            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(WETH, 0),
+            recipient: CHAIN_TO_ADDRESSES_MAP[ChainId.MAINNET].v4PositionManagerAddress,
+          },
+        },
+        v4AddLiquidityOptions: {
+          migrate: true,
+          deadline: 1,
+          slippageTolerance: new Percent(5, 100),
+          sqrtPriceX96: encodeSqrtRatioX96(1, 1),
+        },
+      })
+      expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('MINT_REQUIRED')
+    })
+
+    it('throws if migrating weth to weth', async () => {
+      const opts = Object.assign({
+        inputPosition: new Position({
           pool: WETH_USDC_V3,
           liquidity: 1,
           tickLower: -WETH_USDC_V3.tickSpacing,
@@ -1920,16 +1972,17 @@ describe('Uniswap', () => {
           },
         },
         v4AddLiquidityOptions: {
-          tokenId: 1,
+          migrate: true,
           deadline: 1,
           slippageTolerance: new Percent(5, 100),
           sqrtPriceX96: encodeSqrtRatioX96(1, 1),
+          recipient: TEST_RECIPIENT_ADDRESS,
         },
       })
-      expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('MINT_REQUIRED')
+      expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('ETH_REQUIRED_TO_ADD')
     })
 
-    it('throws if migrating flag not set', async () => {
+    it('throws if migrating weth to eth with flag not set', async () => {
       const opts = Object.assign({
         inputPosition: new Position({
           pool: WETH_USDC_V3,
@@ -1938,10 +1991,85 @@ describe('Uniswap', () => {
           tickUpper: WETH_USDC_V3.tickSpacing,
         }),
         outputPosition: new V4Position({
-          pool: WETH_USDC_V4,
+          pool: ETH_USDC_V4,
           liquidity: 1,
-          tickLower: -WETH_USDC_V4.tickSpacing,
-          tickUpper: WETH_USDC_V4.tickSpacing,
+          tickLower: -ETH_USDC_V4.tickSpacing,
+          tickUpper: ETH_USDC_V4.tickSpacing,
+        }),
+        v3RemoveLiquidityOptions: {
+          tokenId: 1,
+          liquidityPercentage: new Percent(100, 100),
+          slippageTolerance: new Percent(5, 100),
+          deadline: 1,
+          burnToken: true,
+          collectOptions: {
+            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(WETH, 0),
+            recipient: CHAIN_TO_ADDRESSES_MAP[ChainId.MAINNET].v4PositionManagerAddress,
+          },
+        },
+        v4AddLiquidityOptions: {
+          migrate: true,
+          deadline: 1,
+          slippageTolerance: new Percent(5, 100),
+          sqrtPriceX96: encodeSqrtRatioX96(1, 1),
+          recipient: TEST_RECIPIENT_ADDRESS,
+        },
+      })
+      expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('USE_NATIVE_FLAG_REQUIRED')
+    })
+
+    it('throws if migrating weth to eth with token mismatch', async () => {
+      const opts = Object.assign({
+        inputPosition: new Position({
+          pool: WETH_USDC_V3,
+          liquidity: 1,
+          tickLower: -WETH_USDC_V3.tickSpacing,
+          tickUpper: WETH_USDC_V3.tickSpacing,
+        }),
+        outputPosition: new V4Position({
+          pool: ETH_DAI_V4,
+          liquidity: 1,
+          tickLower: -ETH_DAI_V4.tickSpacing,
+          tickUpper: ETH_DAI_V4.tickSpacing,
+        }),
+        v3RemoveLiquidityOptions: {
+          tokenId: 1,
+          liquidityPercentage: new Percent(100, 100),
+          slippageTolerance: new Percent(5, 100),
+          deadline: 1,
+          burnToken: true,
+          collectOptions: {
+            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(WETH, 0),
+            recipient: CHAIN_TO_ADDRESSES_MAP[ChainId.MAINNET].v4PositionManagerAddress,
+          },
+        },
+        v4AddLiquidityOptions: {
+          migrate: true,
+          deadline: 1,
+          slippageTolerance: new Percent(5, 100),
+          sqrtPriceX96: encodeSqrtRatioX96(1, 1),
+          useNative: true,
+          recipient: TEST_RECIPIENT_ADDRESS,
+        },
+      })
+      expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('TOKEN_MISMATCH')
+    })
+
+    it('throws if migrating flag not set', async () => {
+      const opts = Object.assign({
+        inputPosition: new Position({
+          pool: USDC_DAI_V3,
+          liquidity: 1,
+          tickLower: -USDC_DAI_V3.tickSpacing,
+          tickUpper: USDC_DAI_V3.tickSpacing,
+        }),
+        outputPosition: new V4Position({
+          pool: USDC_DAI_V4,
+          liquidity: 1,
+          tickLower: -USDC_DAI_V4.tickSpacing,
+          tickUpper: USDC_DAI_V4.tickSpacing,
         }),
         v3RemoveLiquidityOptions: {
           tokenId: 1,
@@ -1968,16 +2096,16 @@ describe('Uniswap', () => {
     it('throws if not permitting the Universal router', async () => {
       const opts = Object.assign({
         inputPosition: new Position({
-          pool: WETH_USDC_V3,
+          pool: USDC_DAI_V3,
           liquidity: 1,
-          tickLower: -WETH_USDC_V3.tickSpacing,
-          tickUpper: WETH_USDC_V3.tickSpacing,
+          tickLower: -USDC_DAI_V3.tickSpacing,
+          tickUpper: USDC_DAI_V3.tickSpacing,
         }),
         outputPosition: new V4Position({
-          pool: WETH_USDC_V4,
+          pool: USDC_DAI_V4,
           liquidity: 1,
-          tickLower: -WETH_USDC_V4.tickSpacing,
-          tickUpper: WETH_USDC_V4.tickSpacing,
+          tickLower: -USDC_DAI_V4.tickSpacing,
+          tickUpper: USDC_DAI_V4.tickSpacing,
         }),
         v3RemoveLiquidityOptions: {
           tokenId: 1,

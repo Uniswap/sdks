@@ -23,6 +23,7 @@ import { UniswapTrade, SwapOptions } from './entities/actions/uniswap'
 import { RoutePlanner, CommandType } from './utils/routerCommands'
 import { encodePermit, encodeV3PositionPermit } from './utils/inputTokens'
 import { UNIVERSAL_ROUTER_ADDRESS, UniversalRouterVersion } from './utils/constants'
+import { WETH } from '../test/utils/uniswapData'
 
 export type SwapRouterConfig = {
   sender?: string // address
@@ -82,14 +83,26 @@ export abstract class SwapRouter {
     positionManagerOverride?: string
   ): MethodParameters {
     const v4Pool: V4Pool = options.outputPosition.pool
-    const token0 = options.inputPosition.pool.token0
-    const token1 = options.inputPosition.pool.token1
+    let token0 = options.inputPosition.pool.token0
+    let token1 = options.inputPosition.pool.token1
     const v4PositionManagerAddress =
       positionManagerOverride ?? CHAIN_TO_ADDRESSES_MAP[v4Pool.chainId as SupportedChainsType].v4PositionManagerAddress
 
-    // validate the parameters
-    invariant(token0 === v4Pool.token0, 'TOKEN0_MISMATCH')
-    invariant(token1 === v4Pool.token1, 'TOKEN1_MISMATCH')
+    // cannot migrate into a WETH position
+    if (token0 === WETH || token1 === WETH) {
+      invariant(v4Pool.token0.isNative, 'ETH_REQUIRED_TO_ADD')
+      invariant(options.v4AddLiquidityOptions.useNative, 'USE_NATIVE_FLAG_REQUIRED')
+      if (token0 === WETH) {
+        invariant(token1 == v4Pool.token1, 'TOKEN_MISMATCH')
+      } else {
+        invariant(token0 == v4Pool.token1, 'TOKEN_MISMATCH')
+      }
+    } else {
+      // validate the parameters
+      invariant(token0 === v4Pool.token0, 'TOKEN0_MISMATCH')
+      invariant(token1 === v4Pool.token1, 'TOKEN1_MISMATCH')
+    }
+
     invariant(
       options.v3RemoveLiquidityOptions.liquidityPercentage.equalTo(new Percent(100, 100)),
       'FULL_REMOVAL_REQUIRED'
