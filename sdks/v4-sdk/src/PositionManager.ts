@@ -1,4 +1,4 @@
-import { BigintIsh, Percent, validateAndParseAddress, Currency, NativeCurrency } from '@uniswap/sdk-core'
+import { BigintIsh, Percent, validateAndParseAddress, NativeCurrency } from '@uniswap/sdk-core'
 import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
 import JSBI from 'jsbi'
 import { Position } from './entities/position'
@@ -209,7 +209,7 @@ export abstract class V4PositionManager {
   /**
    * Cannot be constructed.
    */
-  private constructor() {}
+  private constructor() { }
 
   /**
    * Public methods to encode method parameters for different actions on the PositionManager contract
@@ -277,6 +277,10 @@ export abstract class V4PositionManager {
     // If migrating, we need to settle and sweep both currencies individually
     if (isMint(options) && options.migrate) {
       // payer is v4 positiion manager
+      if (options.useNative) {
+        invariant(position.pool.currency0.isNative, NO_NATIVE)
+        planner.addUnwrap('0x8000000000000000000000000000000000000000000000000000000000000000')
+      }
       planner.addSettle(position.pool.currency0, false)
       planner.addSettle(position.pool.currency1, false)
       planner.addSweep(position.pool.currency0, options.recipient)
@@ -287,14 +291,13 @@ export abstract class V4PositionManager {
     }
 
     // Any sweeping must happen after the settling.
+    // not migrating
+    // native currency will always be currency0 in v4
     let value: string = toHex(0)
-    if (options.useNative) {
-      invariant(position.pool.currency0.isNative || position.pool.currency1.isNative, NO_NATIVE)
-      let nativeCurrency: Currency = position.pool.currency0.isNative
-        ? position.pool.currency0
-        : position.pool.currency1
-      value = position.pool.currency0.isNative ? toHex(amount0Max) : toHex(amount1Max)
-      planner.addSweep(nativeCurrency, MSG_SENDER)
+    if (options.useNative && !(isMint(options) && options.migrate)) {
+      invariant(position.pool.currency0.isNative, NO_NATIVE)
+      value = toHex(amount0Max)
+      planner.addSweep(position.pool.currency0, MSG_SENDER)
     }
 
     calldataList.push(V4PositionManager.encodeModifyLiquidities(planner.finalize(), options.deadline))

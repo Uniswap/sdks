@@ -46,7 +46,7 @@ export enum Actions {
 
   // for wrapping/unwrapping native
   // WRAP = 0x15,
-  // UNWRAP = 0x16,
+  UNWRAP = 0x16,
 }
 
 export enum Subparser {
@@ -160,6 +160,7 @@ export const V4_BASE_ACTIONS_ABI_DEFINITION: { [key in Actions]: readonly ParamT
     { name: 'currency', type: 'address' },
     { name: 'recipient', type: 'address' },
   ],
+  [Actions.UNWRAP]: [{ name: 'amount', type: 'uint256' }],
 }
 
 const FULL_DELTA_AMOUNT = 0
@@ -195,17 +196,17 @@ export class V4Planner {
     this.addAction(actionType, [
       exactOutput
         ? {
-            currencyOut,
-            path: encodeRouteToPath(trade.route, exactOutput),
-            amountInMaximum: trade.maximumAmountIn(slippageTolerance ?? new Percent(0)).quotient.toString(),
-            amountOut: trade.outputAmount.quotient.toString(),
-          }
+          currencyOut,
+          path: encodeRouteToPath(trade.route, exactOutput),
+          amountInMaximum: trade.maximumAmountIn(slippageTolerance ?? new Percent(0)).quotient.toString(),
+          amountOut: trade.outputAmount.quotient.toString(),
+        }
         : {
-            currencyIn,
-            path: encodeRouteToPath(trade.route, exactOutput),
-            amountIn: trade.inputAmount.quotient.toString(),
-            amountOutMinimum: slippageTolerance ? trade.minimumAmountOut(slippageTolerance).quotient.toString() : 0,
-          },
+          currencyIn,
+          path: encodeRouteToPath(trade.route, exactOutput),
+          amountIn: trade.inputAmount.quotient.toString(),
+          amountOutMinimum: slippageTolerance ? trade.minimumAmountOut(slippageTolerance).quotient.toString() : 0,
+        },
     ])
     return this
   }
@@ -218,6 +219,11 @@ export class V4Planner {
   addTake(currency: Currency, recipient: string, amount?: BigNumber): V4Planner {
     const takeAmount = amount ?? FULL_DELTA_AMOUNT
     this.addAction(Actions.TAKE, [currencyAddress(currency), recipient, takeAmount])
+    return this
+  }
+
+  addUnwrap(amount: string): V4Planner {
+    this.addAction(Actions.UNWRAP, [amount])
     return this
   }
 
