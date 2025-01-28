@@ -209,7 +209,7 @@ export abstract class V4PositionManager {
   /**
    * Cannot be constructed.
    */
-  private constructor() { }
+  private constructor() {}
 
   /**
    * Public methods to encode method parameters for different actions on the PositionManager contract

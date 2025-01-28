@@ -196,17 +196,17 @@ export class V4Planner {
     this.addAction(actionType, [
       exactOutput
         ? {
-          currencyOut,
-          path: encodeRouteToPath(trade.route, exactOutput),
-          amountInMaximum: trade.maximumAmountIn(slippageTolerance ?? new Percent(0)).quotient.toString(),
-          amountOut: trade.outputAmount.quotient.toString(),
-        }
+            currencyOut,
+            path: encodeRouteToPath(trade.route, exactOutput),
+            amountInMaximum: trade.maximumAmountIn(slippageTolerance ?? new Percent(0)).quotient.toString(),
+            amountOut: trade.outputAmount.quotient.toString(),
+          }
         : {
-          currencyIn,
-          path: encodeRouteToPath(trade.route, exactOutput),
-          amountIn: trade.inputAmount.quotient.toString(),
-          amountOutMinimum: slippageTolerance ? trade.minimumAmountOut(slippageTolerance).quotient.toString() : 0,
-        },
+            currencyIn,
+            path: encodeRouteToPath(trade.route, exactOutput),
+            amountIn: trade.inputAmount.quotient.toString(),
+            amountOutMinimum: slippageTolerance ? trade.minimumAmountOut(slippageTolerance).quotient.toString() : 0,
+          },
     ])
     return this
   }
