@@ -129,16 +129,17 @@ export interface MigrateSpecificOptions {
   /**
    * Whether the mint is part of a migration from V3 to V4.
    */
-  migrate: boolean;
-  /** 
-   * Whether the migrate needs additional transfer or not 
-  */
-  additionalTransfer?: AdditionalTransferDetails;
+  migrate: boolean
+
+  /**
+   * Whether the migrate needs additional transfer or not
+   */
+  additionalTransfer?: AdditionalTransferDetails
 }
 
 export interface AdditionalTransferDetails {
-  neededCurrency: Currency;
-  neededAmount: BigintIsh;
+  neededCurrency: Currency
+  neededAmount: BigintIsh
 }
 
 export interface PermitDetails {
@@ -193,7 +194,7 @@ export interface NFTPermitData {
 }
 
 export type MintOptions = CommonOptions & CommonAddLiquidityOptions & MintSpecificOptions
-export type MigrateOptions = MintOptions & MigrateSpecificOptions;
+export type MigrateOptions = MintOptions & MigrateSpecificOptions
 export type IncreaseLiquidityOptions = CommonOptions & CommonAddLiquidityOptions & ModifyPositionSpecificOptions
 
 export type AddLiquidityOptions = MintOptions | IncreaseLiquidityOptions | MigrateOptions
