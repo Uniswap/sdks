@@ -12,7 +12,7 @@ import {
 import {
   Position as V4Position,
   V4PositionManager,
-  AddLiquidityOptions as V4AddLiquidityOptions,
+  MigrateOptions,
   MintOptions,
   Pool as V4Pool,
   PoolKey,
@@ -33,10 +33,10 @@ export interface MigrateV3ToV4Options {
   inputPosition: V3Position
   outputPosition: V4Position
   v3RemoveLiquidityOptions: V3RemoveLiquidityOptions
-  v4AddLiquidityOptions: V4AddLiquidityOptions
+  migrateOptions: MigrateOptions
 }
 
-function isMint(options: V4AddLiquidityOptions): options is MintOptions {
+function isMint(options: MigrateOptions): options is MigrateOptions {
   return Object.keys(options).some((k) => k === 'recipient')
 }
 
@@ -99,13 +99,13 @@ export abstract class SwapRouter {
       options.v3RemoveLiquidityOptions.collectOptions.recipient === v4PositionManagerAddress,
       'RECIPIENT_NOT_POSITION_MANAGER'
     )
-    invariant(isMint(options.v4AddLiquidityOptions), 'MINT_REQUIRED')
-    invariant(options.v4AddLiquidityOptions.migrate, 'MIGRATE_REQUIRED')
+    invariant(isMint(options.migrateOptions), 'MINT_REQUIRED')
+    invariant(options.migrateOptions.migrate, 'MIGRATE_REQUIRED')
 
     const planner = new RoutePlanner()
 
     // to prevent reentrancy by the pool hook, we initialize the v4 pool before moving funds
-    if (options.v4AddLiquidityOptions.createPool) {
+    if (options.migrateOptions.createPool) {
       const poolKey: PoolKey = V4Pool.getPoolKey(
         v4Pool.currency0,
         v4Pool.currency1,
@@ -115,7 +115,7 @@ export abstract class SwapRouter {
       )
       planner.addCommand(CommandType.V4_INITIALIZE_POOL, [poolKey, v4Pool.sqrtRatioX96.toString()])
       // remove createPool setting, so that it doesnt get encoded again later
-      delete options.v4AddLiquidityOptions.createPool
+      delete options.migrateOptions.createPool
     }
 
     // add position permit to the universal router planner
@@ -144,15 +144,32 @@ export abstract class SwapRouter {
       const selector = v3Call.slice(0, 10)
       invariant(
         selector == V3PositionManager.INTERFACE.getSighash('collect') ||
-          selector == V3PositionManager.INTERFACE.getSighash('decreaseLiquidity') ||
-          selector == V3PositionManager.INTERFACE.getSighash('burn'),
+        selector == V3PositionManager.INTERFACE.getSighash('decreaseLiquidity') ||
+        selector == V3PositionManager.INTERFACE.getSighash('burn'),
         'INVALID_V3_CALL: ' + selector
       )
       planner.addCommand(CommandType.V3_POSITION_MANAGER_CALL, [v3Call])
     }
 
+    // if migrate options has a currency, require a batch permit
+    if (options.migrateOptions.additionalTransfer) {
+      invariant(options.migrateOptions.batchPermit, 'PERMIT_REQUIRED')
+      planner.addCommand(CommandType.PERMIT2_PERMIT_BATCH, [options.migrateOptions.batchPermit.permitBatch, options.migrateOptions.batchPermit.signature])
+      planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [options.migrateOptions.additionalTransfer.neededCurrency, options.v3RemoveLiquidityOptions.collectOptions.recipient, options.migrateOptions.additionalTransfer.neededAmount])
+      delete options.migrateOptions.batchPermit
+    }
+
+    // if (options.migrateOptions.batchPermit) {
+    //   planner.addCommand(CommandType.PERMIT2_PERMIT_BATCH, [options.migrateOptions.batchPermit.permitBatch, options.migrateOptions.batchPermit.signature])
+    //   delete options.migrateOptions.batchPermit
+    // }
+
+    // if (options.migrateOptions.currency) {
+    //   planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [options.migrateOptions.currency, options.v3RemoveLiquidityOptions.collectOptions.recipient, options.migrateOptions.amount])
+    // }
+
     // encode v4 mint
-    const v4AddParams = V4PositionManager.addCallParameters(options.outputPosition, options.v4AddLiquidityOptions)
+    const v4AddParams = V4PositionManager.addCallParameters(options.outputPosition, options.migrateOptions)
     // only modifyLiquidities can be called by the UniversalRouter
     const selector = v4AddParams.calldata.slice(0, 10)
     invariant(selector == V4PositionManager.INTERFACE.getSighash('modifyLiquidities'), 'INVALID_V4_CALL: ' + selector)
@@ -160,7 +177,7 @@ export abstract class SwapRouter {
     planner.addCommand(CommandType.V4_POSITION_MANAGER_CALL, [v4AddParams.calldata])
 
     return SwapRouter.encodePlan(planner, BigNumber.from(0), {
-      deadline: BigNumber.from(options.v4AddLiquidityOptions.deadline),
+      deadline: BigNumber.from(options.migrateOptions.deadline),
     })
   }
 
