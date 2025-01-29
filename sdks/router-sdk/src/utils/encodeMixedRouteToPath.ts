@@ -29,32 +29,54 @@ export function encodeMixedRouteToPath(route: MixedRouteSDK<Currency, Currency>)
     path = [route.pathInput.isNative ? ADDRESS_ZERO : route.pathInput.address]
     types = ['address']
     let currencyIn = route.pathInput
+    let lastCurrencyOut = undefined
 
-    for (const pool of route.pools) {
+    for (let i = 0; i < route.pools.length; i++) {
+      const pool = route.pools[i]
       const currencyOut = currencyIn.equals(pool.token0) ? pool.token1 : pool.token0
+      let shouldSkip = false
 
-      if (pool instanceof V4Pool) {
-        const v4Fee = pool.fee + MIXED_QUOTER_V2_V4_FEE_PATH_PLACEHOLDER
-        path.push(
-          v4Fee,
-          pool.tickSpacing,
-          pool.hooks,
-          currencyOut.isNative ? ADDRESS_ZERO : currencyOut.wrapped.address
-        )
-        types.push('uint24', 'uint24', 'address', 'address')
-      } else if (pool instanceof V3Pool) {
-        const v3Fee = pool.fee + MIXED_QUOTER_V2_V3_FEE_PATH_PLACEHOLDER
-        path.push(v3Fee, currencyOut.wrapped.address)
-        types.push('uint24', 'address')
-      } else if (pool instanceof Pair) {
-        const v2Fee = MIXED_QUOTER_V2_V2_FEE_PATH_PLACEHOLDER
-        path.push(v2Fee, currencyOut.wrapped.address)
-        types.push('uint8', 'address')
-      } else {
-        throw new Error(`Unsupported pool type ${JSON.stringify(pool)}`)
+      if (lastCurrencyOut) {
+        const lastCurrencyOutNativeCurrencyInWrapped = lastCurrencyOut.isNative && currencyIn.isToken
+        const lastCurrencyOutWrappedCurrencyInNative = lastCurrencyOut.isToken && currencyIn.isNative
+
+        shouldSkip = lastCurrencyOutWrappedCurrencyInNative || lastCurrencyOutNativeCurrencyInWrapped
+
+        if (shouldSkip) {
+          const v0SpecialEncoding = 0
+          path.push(
+              v0SpecialEncoding,
+              currencyIn.isNative ? ADDRESS_ZERO : currencyIn.wrapped.address
+          )
+          types.push('uint8', 'address')
+        }
+      }
+      
+      if (!shouldSkip) {
+        if (pool instanceof V4Pool) {
+          const v4Fee = pool.fee + MIXED_QUOTER_V2_V4_FEE_PATH_PLACEHOLDER
+          path.push(
+              v4Fee,
+              pool.tickSpacing,
+              pool.hooks,
+              currencyOut.isNative ? ADDRESS_ZERO : currencyOut.wrapped.address
+          )
+          types.push('uint24', 'uint24', 'address', 'address')
+        } else if (pool instanceof V3Pool) {
+          const v3Fee = pool.fee + MIXED_QUOTER_V2_V3_FEE_PATH_PLACEHOLDER
+          path.push(v3Fee, currencyOut.wrapped.address)
+          types.push('uint24', 'address')
+        } else if (pool instanceof Pair) {
+          const v2Fee = MIXED_QUOTER_V2_V2_FEE_PATH_PLACEHOLDER
+          path.push(v2Fee, currencyOut.wrapped.address)
+          types.push('uint8', 'address')
+        } else {
+          throw new Error(`Unsupported pool type ${JSON.stringify(pool)}`)
+        }
       }
 
       currencyIn = currencyOut
+      lastCurrencyOut = currencyOut
     }
   } else {
     // TODO: ROUTE-276 - delete this else block
