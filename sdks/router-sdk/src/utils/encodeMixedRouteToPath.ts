@@ -44,22 +44,19 @@ export function encodeMixedRouteToPath(route: MixedRouteSDK<Currency, Currency>)
 
         if (shouldSkip) {
           const v0SpecialEncoding = 0
-          path.push(
-              v0SpecialEncoding,
-              currencyIn.isNative ? ADDRESS_ZERO : currencyIn.wrapped.address
-          )
+          path.push(v0SpecialEncoding, currencyIn.isNative ? ADDRESS_ZERO : currencyIn.wrapped.address)
           types.push('uint8', 'address')
         }
       }
-      
+
       if (!shouldSkip) {
         if (pool instanceof V4Pool) {
           const v4Fee = pool.fee + MIXED_QUOTER_V2_V4_FEE_PATH_PLACEHOLDER
           path.push(
-              v4Fee,
-              pool.tickSpacing,
-              pool.hooks,
-              currencyOut.isNative ? ADDRESS_ZERO : currencyOut.wrapped.address
+            v4Fee,
+            pool.tickSpacing,
+            pool.hooks,
+            currencyOut.isNative ? ADDRESS_ZERO : currencyOut.wrapped.address
           )
           types.push('uint24', 'uint24', 'address', 'address')
         } else if (pool instanceof V3Pool) {
