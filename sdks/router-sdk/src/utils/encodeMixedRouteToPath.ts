@@ -38,8 +38,10 @@ export function encodeMixedRouteToPath(route: MixedRouteSDK<Currency, Currency>)
       const currencyOut = currencyIn.wrapped.equals(pool.token0.wrapped) ? pool.token1 : pool.token0
 
       if (lastCurrencyOut) {
-        const lastCurrencyOutNativeCurrencyInWrapped = lastCurrencyOut.isNative && currencyIn.isToken && lastCurrencyOut.wrapped.equals(currencyIn)
-        const lastCurrencyOutWrappedCurrencyInNative = lastCurrencyOut.isToken && currencyIn.isNative && lastCurrencyOut.equals(currencyIn.wrapped)
+        const lastCurrencyOutNativeCurrencyInWrapped =
+          lastCurrencyOut.isNative && currencyIn.isToken && lastCurrencyOut.wrapped.equals(currencyIn)
+        const lastCurrencyOutWrappedCurrencyInNative =
+          lastCurrencyOut.isToken && currencyIn.isNative && lastCurrencyOut.equals(currencyIn.wrapped)
 
         if (lastCurrencyOutWrappedCurrencyInNative) {
           const v0SpecialEncoding = 0
@@ -48,9 +50,9 @@ export function encodeMixedRouteToPath(route: MixedRouteSDK<Currency, Currency>)
         }
 
         if (lastCurrencyOutNativeCurrencyInWrapped) {
-            const v0SpecialEncoding = 0
-            path.push(v0SpecialEncoding, currencyIn.wrapped.address)
-            types.push('uint8', 'address')
+          const v0SpecialEncoding = 0
+          path.push(v0SpecialEncoding, currencyIn.wrapped.address)
+          types.push('uint8', 'address')
         }
       }
 
