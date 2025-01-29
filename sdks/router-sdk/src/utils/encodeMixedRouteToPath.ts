@@ -29,15 +29,18 @@ export function encodeMixedRouteToPath(route: MixedRouteSDK<Currency, Currency>)
     path = [route.pathInput.isNative ? ADDRESS_ZERO : route.pathInput.address]
     types = ['address']
     let currencyIn = route.pathInput
-    let lastCurrencyOut = undefined
 
     for (let i = 0; i < route.pools.length; i++) {
       const pool = route.pools[i]
+
       // it's possible lastCurrencyOut is native and currencyIn is wrapped native, or vice versa
       // in this case we need to wrap both and check they are equal
       const currencyOut = currencyIn.wrapped.equals(pool.token0.wrapped) ? pool.token1 : pool.token0
 
-      if (lastCurrencyOut) {
+      if (i > 0) {
+        const lastPool = route.pools[i - 1]
+        const lastCurrencyOut = currencyIn.wrapped.equals(lastPool.token0.wrapped) ? lastPool.token0 : lastPool.token1
+
         const lastCurrencyOutNativeCurrencyInWrapped =
           lastCurrencyOut.isNative && currencyIn.isToken && lastCurrencyOut.wrapped.equals(currencyIn)
         const lastCurrencyOutWrappedCurrencyInNative =
@@ -78,7 +81,6 @@ export function encodeMixedRouteToPath(route: MixedRouteSDK<Currency, Currency>)
       }
 
       currencyIn = currencyOut
-      lastCurrencyOut = currencyOut
     }
   } else {
     // TODO: ROUTE-276 - delete this else block
