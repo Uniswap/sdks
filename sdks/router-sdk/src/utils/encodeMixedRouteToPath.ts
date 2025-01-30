@@ -35,7 +35,7 @@ export function encodeMixedRouteToPath(route: MixedRouteSDK<Currency, Currency>)
 
       if (pool instanceof V4Pool) {
         // a tickSpacing of 0 indicates a "fake" v4 pool where the quote actually requires a wrap or unwrap
-        if (pool.tickSpacing == 0) {
+        if (pool.tickSpacing === 0) {
           let wrapOrUnwrapEncoding = 0
           path.push(wrapOrUnwrapEncoding, currencyOut.isNative ? ADDRESS_ZERO : currencyOut.wrapped.address)
           types.push('uint8', 'address')
