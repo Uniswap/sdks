@@ -1604,12 +1604,14 @@ describe('Uniswap', () => {
 
       // create migrate options
       const opts = Object.assign({
+        // in range (current tick = 205265)
         inputPosition: new Position({
           pool: WETH_USDC_V3,
           liquidity: 72249373570746,
           tickLower: 200040,
           tickUpper: 300000,
         }),
+        // above range (current tick = 0)
         outputPosition: new V4Position({
           pool: WETH_USDC_V4,
           liquidity: 100000,
@@ -1640,6 +1642,7 @@ describe('Uniswap', () => {
           migrate: true,
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
+          // no need to transfer any additional currency because v3 position is in range so both currencies are sent to pool and unused currency is swept
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
@@ -1649,12 +1652,14 @@ describe('Uniswap', () => {
 
     it('encodes a migration if no v3 permit', async () => {
       const opts = Object.assign({
+        // in range (current tick = 205265)
         inputPosition: new Position({
           pool: WETH_USDC_V3,
           liquidity: 72249373570746,
           tickLower: 200040,
           tickUpper: 300000,
         }),
+        // above range
         outputPosition: new V4Position({
           pool: WETH_USDC_V4,
           liquidity: 100000,
@@ -1678,10 +1683,77 @@ describe('Uniswap', () => {
           migrate: true,
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
+          // no need to transfer any additional currency because v3 position is in range so both currencies are sent to pool and unused currency is swept
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
       registerFixture('_MIGRATE_WITHOUT_PERMIT', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+    })
+
+    it('encodes a migration including pool initialization', async () => {
+      // sign a permit for the token
+      const tokenId = 377972
+      const permit = {
+        spender: UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, 1),
+        tokenId,
+        deadline: MAX_UINT160.toString(),
+        nonce: 0,
+      }
+      const { domain, types, values } = NonfungiblePositionManager.getPermitData(
+        permit,
+        NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[ChainId.MAINNET],
+        ChainId.MAINNET
+      )
+
+      const signature: Signature = splitSignature(await wallet._signTypedData(domain, types, values))
+
+      // create migrate options
+      const opts = Object.assign({
+        // in range (current tick = 205265)
+        inputPosition: new Position({
+          pool: WETH_USDC_V3,
+          liquidity: 72249373570746,
+          tickLower: 200040,
+          tickUpper: 300000,
+        }),
+        // above range (current tick = 0)
+        outputPosition: new V4Position({
+          pool: WETH_USDC_V4_LOW_FEE, // migrate to LOW pool, which hasn't been initialized
+          liquidity: 100000,
+          tickLower: 200040,
+          tickUpper: 300000,
+        }),
+        v3RemoveLiquidityOptions: {
+          tokenId,
+          liquidityPercentage: new Percent(100, 100),
+          slippageTolerance: new Percent(5, 100),
+          deadline: MAX_UINT160,
+          burnToken: true,
+          collectOptions: {
+            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(WETH, 0),
+            recipient: FORGE_V4_POSITION_MANAGER,
+          },
+          permit: {
+            v: signature.v,
+            r: signature.r,
+            s: signature.s,
+            deadline: permit.deadline,
+            spender: permit.spender,
+          },
+        },
+        migrateOptions: {
+          deadline: MAX_UINT160,
+          migrate: true,
+          slippageTolerance: new Percent(5, 100),
+          recipient: TEST_RECIPIENT_ADDRESS,
+          createPool: true, // boolean to signal pool creation
+          // no need to transfer any additional currency because v3 position is in range so both currencies are sent to pool and unused currency is swept
+        },
+      })
+      const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
+      registerFixture('_MIGRATE_WITH_PERMIT_AND_POOL_INITIALIZE', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
@@ -1694,12 +1766,14 @@ describe('Uniswap', () => {
       )
       const signature = await generatePermitSignatureFromBatch(permit, wallet, WETH_USDC_V3.chainId, PERMIT2_ADDRESS)
       const opts = Object.assign({
+        // above range (current tick = 205265)
         inputPosition: new Position({
           pool: WETH_USDC_V3,
           liquidity: 72446937194878,
           tickLower: 205320,
           tickUpper: 300000,
         }),
+        // in range (current tick = 0)
         outputPosition: new V4Position({
           pool: WETH_USDC_V4,
           liquidity: 100000,
@@ -1744,12 +1818,14 @@ describe('Uniswap', () => {
       )
       const signature = await generatePermitSignatureFromBatch(permit, wallet, WETH_USDC_V3.chainId, PERMIT2_ADDRESS)
       const opts = Object.assign({
+        // above range (current tick = 205265)
         inputPosition: new Position({
           pool: WETH_USDC_V3,
           liquidity: 72446937194878,
           tickLower: 205320,
           tickUpper: 300000,
         }),
+        // below range (current tick = 0)
         outputPosition: new V4Position({
           pool: WETH_USDC_V4,
           liquidity: 100000,
@@ -1787,12 +1863,14 @@ describe('Uniswap', () => {
 
     it('encodes a migration from out of range v3 in token0 to out of range v4 in token0', async () => {
       const opts = Object.assign({
+        // above range (current tick = 205265)
         inputPosition: new Position({
           pool: WETH_USDC_V3,
           liquidity: 72446937194878,
           tickLower: 205320,
           tickUpper: 300000,
         }),
+        // above range (current tick = 0)
         outputPosition: new V4Position({
           pool: WETH_USDC_V4,
           liquidity: 100000,
@@ -1816,6 +1894,7 @@ describe('Uniswap', () => {
           migrate: true,
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
+          // no need to transfer any additional currency because both positions are out of range on same side
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
@@ -1832,12 +1911,14 @@ describe('Uniswap', () => {
       )
       const signature = await generatePermitSignatureFromBatch(permit, wallet, WETH_USDC_V3.chainId, PERMIT2_ADDRESS)
       const opts = Object.assign({
+        // below range (current tick = 205265)
         inputPosition: new Position({
           pool: WETH_USDC_V3,
           liquidity: 2971776649834933,
           tickLower: 204720,
           tickUpper: 204960,
         }),
+        // in range (current tick = 0)
         outputPosition: new V4Position({
           pool: WETH_USDC_V4,
           liquidity: 100000,
@@ -1882,12 +1963,14 @@ describe('Uniswap', () => {
       )
       const signature = await generatePermitSignatureFromBatch(permit, wallet, WETH_USDC_V3.chainId, PERMIT2_ADDRESS)
       const opts = Object.assign({
+        // below range (current tick = 205265)
         inputPosition: new Position({
           pool: WETH_USDC_V3,
           liquidity: 2971776649834933,
           tickLower: 204720,
           tickUpper: 204960,
         }),
+        // above range (current tick = 0)
         outputPosition: new V4Position({
           pool: WETH_USDC_V4,
           liquidity: 100000,
@@ -1925,12 +2008,14 @@ describe('Uniswap', () => {
 
     it('encodes a migration from out of range v3 in token1 to out of range v4 in token1', async () => {
       const opts = Object.assign({
+        // below range (current tick = 205265)
         inputPosition: new Position({
           pool: WETH_USDC_V3,
           liquidity: 2971776649834933,
           tickLower: 204720,
           tickUpper: 204960,
         }),
+        // below range (current tick = 0)
         outputPosition: new V4Position({
           pool: WETH_USDC_V4,
           liquidity: 100000,
@@ -1954,73 +2039,11 @@ describe('Uniswap', () => {
           migrate: true,
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
+          // no need to transfer any additional currency because both positions are out of range on the same side
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
       registerFixture('_MIGRATE_OUT_OF_RANGE1_TO_OUT_OF_RANGE1', methodParameters)
-      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
-    })
-
-    it('encodes a migration including pool initialization', async () => {
-      // sign a permit for the token
-      const tokenId = 377972
-      const permit = {
-        spender: UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, 1),
-        tokenId,
-        deadline: MAX_UINT160.toString(),
-        nonce: 0,
-      }
-      const { domain, types, values } = NonfungiblePositionManager.getPermitData(
-        permit,
-        NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[ChainId.MAINNET],
-        ChainId.MAINNET
-      )
-
-      const signature: Signature = splitSignature(await wallet._signTypedData(domain, types, values))
-
-      // create migrate options
-      const opts = Object.assign({
-        inputPosition: new Position({
-          pool: WETH_USDC_V3,
-          liquidity: 72249373570746,
-          tickLower: 200040,
-          tickUpper: 300000,
-        }),
-        outputPosition: new V4Position({
-          pool: WETH_USDC_V4_LOW_FEE, // migrate to LOW pool, which hasn't been initialized
-          liquidity: 100000,
-          tickLower: 200040,
-          tickUpper: 300000,
-        }),
-        v3RemoveLiquidityOptions: {
-          tokenId,
-          liquidityPercentage: new Percent(100, 100),
-          slippageTolerance: new Percent(5, 100),
-          deadline: MAX_UINT160,
-          burnToken: true,
-          collectOptions: {
-            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
-            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(WETH, 0),
-            recipient: FORGE_V4_POSITION_MANAGER,
-          },
-          permit: {
-            v: signature.v,
-            r: signature.r,
-            s: signature.s,
-            deadline: permit.deadline,
-            spender: permit.spender,
-          },
-        },
-        migrateOptions: {
-          deadline: MAX_UINT160,
-          migrate: true,
-          slippageTolerance: new Percent(5, 100),
-          recipient: TEST_RECIPIENT_ADDRESS,
-          createPool: true, // boolean to signal pool creation
-        },
-      })
-      const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
-      registerFixture('_MIGRATE_WITH_PERMIT_AND_POOL_INITIALIZE', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
@@ -2207,6 +2230,7 @@ describe('Uniswap', () => {
           deadline: 1,
           slippageTolerance: new Percent(5, 100),
           sqrtPriceX96: encodeSqrtRatioX96(1, 1),
+          // no recipient option means not minting
         },
       })
       expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('MINT_REQUIRED')
@@ -2278,7 +2302,7 @@ describe('Uniswap', () => {
             r: '0x0000000000000000000000000000000000000000000000000000000000000001',
             s: '0x0000000000000000000000000000000000000000000000000000000000000002',
             deadline: 1,
-            spender: TEST_RECIPIENT_ADDRESS,
+            spender: TEST_RECIPIENT_ADDRESS, // not the universal router
           },
         },
         migrateOptions: {

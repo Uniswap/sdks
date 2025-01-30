@@ -145,7 +145,7 @@ export abstract class SwapRouter {
       planner.addCommand(CommandType.V3_POSITION_MANAGER_CALL, [v3Call])
     }
 
-    // if migrate options has a currency, require a batch permit
+    // if migrate options has an additionalTransfer option, require a batch permit
     if (options.migrateOptions.additionalTransfer) {
       invariant(options.migrateOptions.batchPermit, 'PERMIT_REQUIRED')
       planner.addCommand(CommandType.PERMIT2_PERMIT_BATCH, [
@@ -157,6 +157,7 @@ export abstract class SwapRouter {
         options.v3RemoveLiquidityOptions.collectOptions.recipient,
         options.migrateOptions.additionalTransfer.neededAmount,
       ])
+      // remove batchPermit so it doesn't get encoded again later
       delete options.migrateOptions.batchPermit
     }
 
