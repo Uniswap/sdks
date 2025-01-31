@@ -141,7 +141,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
    * @dev BaseCurrency and CompareCurrency must have the same wrapped versions
    * @param baseCurrency The base currency to map to
    * @param amount The amount to map
-   * @returns The mapped amount
+   * @returns The mapped amount in terms of baseCurrency
    */
   public mapAmount = <BaseCurrency extends Currency, CompareCurrency extends Currency>(baseCurrency: BaseCurrency, amount: CurrencyAmount<BaseCurrency | CompareCurrency>): CurrencyAmount<BaseCurrency> => {
     if(baseCurrency.equals(amount.currency)) return amount as CurrencyAmount<BaseCurrency>
@@ -149,10 +149,8 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     if(!baseCurrency.wrapped.equals(amount.currency.wrapped)) throw new Error('Wrapped currencies mismatch')
 
     if(baseCurrency.isNative){
-      // Top level input is ETH, but input to route is WETH
       return CurrencyAmount.fromRawAmount(baseCurrency, amount.quotient) as CurrencyAmount<BaseCurrency>
     } else {
-      // Top level input is WETH, but input to route is ETH
       return CurrencyAmount.fromRawAmount(baseCurrency.wrapped, amount.quotient) as CurrencyAmount<BaseCurrency>
     }
   }
