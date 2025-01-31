@@ -39,7 +39,7 @@ export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
     invariant(pools[0].involvesToken(this.pathInput as Token), 'INPUT')
     const lastPool = pools[pools.length - 1]
     if (lastPool instanceof V4Pool) {
-      invariant(lastPool.involvesToken(output) || lastPool.involvesToken(output.wrapped), 'OUTPUT')
+      invariant(lastPool.v4InvolvesToken(output) || lastPool.v4InvolvesToken(output.wrapped), 'OUTPUT')
     } else {
       invariant(lastPool.involvesToken(output.wrapped as Token), 'OUTPUT')
     }
