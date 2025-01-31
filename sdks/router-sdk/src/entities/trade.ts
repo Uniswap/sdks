@@ -162,36 +162,33 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     return this._outputAmount
   }
 
+  /**
+   * Returns the sum of all swaps within the trade where the pathInput/Output is native
+   */
   public get amounts(): {
     inputAmount: CurrencyAmount<TInput>
     inputAmountNative: CurrencyAmount<TInput> | undefined
     outputAmount: CurrencyAmount<TOutput>
     outputAmountNative: CurrencyAmount<TOutput> | undefined
   } {
+    // Find native currencies for reduce below
     const inputNativeCurrency = this.swaps.find(({ inputAmount }) => inputAmount.currency.isNative)?.inputAmount
       .currency
     const outputNativeCurrency = this.swaps.find(({ outputAmount }) => outputAmount.currency.isNative)?.outputAmount
       .currency
-    const sumNativeAmounts = <T extends Currency>(amounts: CurrencyAmount<T>[], nativeCurrency: T) => {
-      return amounts.reduce((total, cur) => {
-        return cur.currency.isNative ? total.add(cur) : total
-      }, CurrencyAmount.fromRawAmount(nativeCurrency, 0))
-    }
 
     return {
       inputAmount: this.inputAmount,
       inputAmountNative: inputNativeCurrency
-        ? sumNativeAmounts(
-            this.swaps.map(({ inputAmount }) => inputAmount),
-            inputNativeCurrency
-          )
+        ? this.swaps.reduce((total, swap) => {
+            return swap.route.pathInput.isNative ? total.add(swap.inputAmount) : total
+          }, CurrencyAmount.fromRawAmount(inputNativeCurrency, 0))
         : undefined,
       outputAmount: this.outputAmount,
       outputAmountNative: outputNativeCurrency
-        ? sumNativeAmounts(
-            this.swaps.map(({ outputAmount }) => outputAmount),
-            outputNativeCurrency
-          )
+        ? this.swaps.reduce((total, swap) => {
+            return swap.route.pathOutput.isNative ? total.add(swap.outputAmount) : total
+          }, CurrencyAmount.fromRawAmount(outputNativeCurrency, 0))
         : undefined,
     }
   }

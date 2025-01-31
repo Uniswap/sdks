@@ -151,18 +151,28 @@ describe('Trade', () => {
     CurrencyAmount.fromRawAmount(token1, JSBI.BigInt(100000))
   )
 
-  const pool_v4_1_eth = new V4Pool(token1, ETHER, FeeAmount.MEDIUM, 60, ADDRESS_ZERO, SQRT_RATIO_ONE, 0, 0, [
-    {
-      index: nearestUsableTick(TickMath.MIN_TICK, TICK_SPACINGS[FeeAmount.MEDIUM]),
-      liquidityNet: 0,
-      liquidityGross: 0,
-    },
-    {
-      index: nearestUsableTick(TickMath.MAX_TICK, TICK_SPACINGS[FeeAmount.MEDIUM]),
-      liquidityNet: JSBI.multiply(JSBI.BigInt(0), JSBI.BigInt(-1)),
-      liquidityGross: 0,
-    },
-  ])
+  const pool_v4_1_eth = new V4Pool(
+    token1,
+    ETHER,
+    FeeAmount.MEDIUM,
+    60,
+    ADDRESS_ZERO,
+    SQRT_RATIO_ONE,
+    JSBI.BigInt(10000000000000),
+    0,
+    [
+      {
+        index: nearestUsableTick(TickMath.MIN_TICK, TICK_SPACINGS[FeeAmount.MEDIUM]),
+        liquidityNet: JSBI.BigInt(10000000000000),
+        liquidityGross: JSBI.BigInt(10000000000000),
+      },
+      {
+        index: nearestUsableTick(TickMath.MAX_TICK, TICK_SPACINGS[FeeAmount.MEDIUM]),
+        liquidityNet: JSBI.multiply(JSBI.BigInt(10000000000000), JSBI.BigInt(-1)),
+        liquidityGross: JSBI.BigInt(10000000000000),
+      },
+    ]
+  )
 
   describe('#fromRoute', () => {
     it('can contain only a v3 route', async () => {
@@ -238,8 +248,7 @@ describe('Trade', () => {
       expect(trade.outputAmount.currency).toEqual(token0)
 
       expect(trade.amounts.inputAmountNative).toBeDefined()
-      expect(trade.amounts.inputAmount.equalTo(trade.amounts.inputAmountNative!)).toBe(true)
-      expect(trade.amounts.inputAmountNative?.equalTo(amount)).toBe(true)
+      expect(trade.amounts.inputAmountNative?.equalTo(0)).toBe(true)
       expect(trade.amounts.outputAmountNative).toEqual(undefined)
     })
 
@@ -253,7 +262,7 @@ describe('Trade', () => {
       expect(trade.outputAmount.currency).toEqual(token0)
 
       expect(trade.amounts.inputAmountNative).toBeDefined()
-      expect(trade.amounts.inputAmount.equalTo(trade.amounts.inputAmountNative!)).toBe(true)
+      expect(trade.amounts.inputAmountNative?.equalTo(0)).toBe(true)
       expect(trade.amounts.outputAmountNative).toEqual(undefined)
     })
 
@@ -269,8 +278,7 @@ describe('Trade', () => {
       expect(trade.inputAmount).toEqual(expectedIn[0])
 
       expect(trade.amounts.outputAmountNative).toBeDefined()
-      expect(trade.amounts.outputAmount.equalTo(trade.amounts.outputAmountNative!)).toBe(true)
-      expect(trade.amounts.outputAmountNative?.equalTo(amount)).toBe(true)
+      expect(trade.amounts.outputAmountNative?.equalTo(0)).toBe(true)
       expect(trade.amounts.inputAmountNative).toEqual(undefined)
     })
 
@@ -286,8 +294,7 @@ describe('Trade', () => {
       expect(trade.outputAmount.wrapped).toEqual(expectedOut[0])
 
       expect(trade.amounts.outputAmountNative).toBeDefined()
-      expect(trade.amounts.outputAmount.equalTo(trade.amounts.outputAmountNative!)).toBe(true)
-      expect(trade.amounts.outputAmountNative?.equalTo(expectedOut[0])).toBe(true)
+      expect(trade.amounts.outputAmountNative?.equalTo(0)).toBe(true)
       expect(trade.amounts.inputAmountNative).toEqual(undefined)
     })
 
@@ -301,8 +308,7 @@ describe('Trade', () => {
       expect(trade.outputAmount.currency).toEqual(token2)
 
       expect(trade.amounts.inputAmountNative).toBeDefined()
-      expect(trade.amounts.inputAmount.equalTo(trade.amounts.inputAmountNative!)).toBe(true)
-      expect(trade.amounts.inputAmountNative?.equalTo(amount)).toBe(true)
+      expect(trade.amounts.inputAmountNative?.equalTo(0)).toBe(true)
       expect(trade.amounts.outputAmountNative).toEqual(undefined)
     })
 
@@ -316,7 +322,7 @@ describe('Trade', () => {
       expect(trade.outputAmount.currency).toEqual(token2)
 
       expect(trade.amounts.inputAmountNative).toBeDefined()
-      expect(trade.amounts.inputAmount.equalTo(trade.amounts.inputAmountNative!)).toBe(true)
+      expect(trade.amounts.inputAmountNative?.equalTo(0)).toBe(true)
       expect(trade.amounts.outputAmountNative).toEqual(undefined)
     })
 
@@ -330,7 +336,7 @@ describe('Trade', () => {
       expect(trade.outputAmount.currency).toEqual(ETHER)
 
       expect(trade.amounts.outputAmountNative).toBeDefined()
-      expect(trade.amounts.outputAmount.equalTo(trade.amounts.outputAmountNative!)).toBe(true)
+      expect(trade.amounts.outputAmountNative?.equalTo(0)).toBe(true)
       expect(trade.amounts.inputAmountNative).toEqual(undefined)
     })
 
@@ -344,7 +350,7 @@ describe('Trade', () => {
       expect(trade.outputAmount.currency).toEqual(ETHER)
 
       expect(trade.amounts.outputAmountNative).toBeDefined()
-      expect(trade.amounts.outputAmount.equalTo(trade.amounts.outputAmountNative!)).toBe(true)
+      expect(trade.amounts.outputAmountNative?.equalTo(0)).toBe(true)
       expect(trade.amounts.inputAmountNative).toEqual(undefined)
     })
 
@@ -358,8 +364,7 @@ describe('Trade', () => {
       expect(trade.outputAmount.currency).toEqual(token0)
 
       expect(trade.amounts.inputAmountNative).toBeDefined()
-      expect(trade.amounts.inputAmount.equalTo(trade.amounts.inputAmountNative!)).toBe(true)
-      expect(trade.amounts.inputAmountNative?.equalTo(amount)).toBe(true)
+      expect(trade.amounts.inputAmountNative?.equalTo(0)).toBe(true)
       expect(trade.amounts.outputAmountNative).toEqual(undefined)
     })
 
@@ -375,8 +380,7 @@ describe('Trade', () => {
       expect(trade.outputAmount.wrapped).toEqual(expectedOut[0])
 
       expect(trade.amounts.outputAmountNative).toBeDefined()
-      expect(trade.amounts.outputAmount.equalTo(trade.amounts.outputAmountNative!)).toBe(true)
-      expect(trade.amounts.outputAmountNative?.equalTo(expectedOut[0])).toBe(true)
+      expect(trade.amounts.outputAmountNative?.equalTo(0)).toBe(true)
       expect(trade.amounts.inputAmountNative).toEqual(undefined)
     })
 
@@ -722,18 +726,59 @@ describe('Trade', () => {
         [{ routev4, amount: amountv4 }]
       )
 
+      expect(trade.tradeType).toEqual(TradeType.EXACT_INPUT)
       expect(trade.inputAmount.currency).toEqual(ETHER)
       expect(trade.outputAmount.currency).toEqual(token1)
       expect(trade.swaps.length).toEqual(2)
       expect(trade.routes.length).toEqual(2)
-      // Expect all input amounts to be native
+      // Expect all swap input amounts to be native
       expect(trade.swaps.every((swap) => swap.inputAmount.currency.isNative)).toBe(true)
       // Expect all route inputs to be ETH
       expect(trade.swaps.every((swap) => swap.route.input.isNative)).toBe(true)
       // However, expect the routes to be preserved (v2 using WETH and v4 using ETH)
-      expect(trade.swaps[0].route.pools[0].involvesToken(weth)).toBe(true)
-      expect(trade.swaps[1].route.pools[0].token0.isNative || trade.swaps[1].route.pools[0].token1.isNative).toBe(true)
+      expect(trade.swaps[0].route.pathInput).toEqual(weth)
+      expect(trade.swaps[1].route.pathInput).toEqual(ETHER)
+
+      // Expect inputAmountNative to correctly track only the amount required for the ETH input V4 route
+      expect(trade.amounts.inputAmountNative).toBeDefined()
+      expect(trade.amounts.inputAmountNative?.equalTo(amountv4)).toBe(true)
+      expect(trade.amounts.outputAmountNative).toBeUndefined()
+    })
+
+    it('can be constructed with ETHER as output for exact input swap, with V4 eth route and V2 weth route', async () => {
+      const routeOriginalV2 = new V2RouteSDK([pair_0_1, pair_weth_0], token1, ETHER)
+      const routev2 = new RouteV2(routeOriginalV2)
+      const amountv2 = CurrencyAmount.fromRawAmount(token1, JSBI.BigInt(100))
+
+      const routeOriginalV4 = new V4RouteSDK([pool_v4_1_eth], token1, ETHER)
+      const routev4 = new RouteV4(routeOriginalV4)
+      const amountv4 = CurrencyAmount.fromRawAmount(token1, JSBI.BigInt(1000))
+
+      const trade = await Trade.fromRoutes(
+        [{ routev2, amount: amountv2 }],
+        [],
+        TradeType.EXACT_INPUT,
+        [],
+        [{ routev4, amount: amountv4 }]
+      )
+
       expect(trade.tradeType).toEqual(TradeType.EXACT_INPUT)
+      expect(trade.inputAmount.currency).toEqual(token1)
+      expect(trade.outputAmount.currency).toEqual(ETHER)
+      expect(trade.swaps.length).toEqual(2)
+      expect(trade.routes.length).toEqual(2)
+      // Expect all swap output amounts to be native
+      expect(trade.swaps.every((swap) => swap.outputAmount.currency.isNative)).toBe(true)
+      // Expect all route outputs to be ETH
+      expect(trade.swaps.every((swap) => swap.route.output.isNative)).toBe(true)
+      // However, expect the routes to be preserved (v2 using WETH and v4 using ETH)
+      expect(trade.swaps[0].route.pathOutput).toEqual(weth)
+      expect(trade.swaps[1].route.pathOutput).toEqual(ETHER)
+
+      // Expect outputAmountNative to correctly track only the amount required for the ETH output V4 route
+      expect(trade.amounts.outputAmountNative).toBeDefined()
+      expect(trade.amounts.outputAmountNative?.greaterThan(0)).toBe(true)
+      expect(trade.amounts.inputAmountNative).toBeUndefined()
     })
 
     it('throws if pools are re-used between V3 routes', async () => {
