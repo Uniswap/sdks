@@ -10,10 +10,10 @@ import {
   RemoveLiquidityOptions as V3RemoveLiquidityOptions,
 } from '@uniswap/v3-sdk'
 import {
+  MintOptions,
   Position as V4Position,
   V4PositionManager,
   AddLiquidityOptions as V4AddLiquidityOptions,
-  MintOptions,
   Pool as V4Pool,
   PoolKey,
 } from '@uniswap/v4-sdk'
@@ -37,7 +37,11 @@ export interface MigrateV3ToV4Options {
 }
 
 function isMint(options: V4AddLiquidityOptions): options is MintOptions {
-  return Object.keys(options).some((k) => k === 'recipient')
+  return 'recipient' in options
+}
+
+function isMigrate(options: V4AddLiquidityOptions): options is MintOptions {
+  return 'migrateOptions' in options && options.migrateOptions?.migrate === true
 }
 
 export abstract class SwapRouter {
@@ -87,6 +91,11 @@ export abstract class SwapRouter {
     const v4PositionManagerAddress =
       positionManagerOverride ?? CHAIN_TO_ADDRESSES_MAP[v4Pool.chainId as SupportedChainsType].v4PositionManagerAddress
 
+    const universalRouterAddress = UNIVERSAL_ROUTER_ADDRESS(
+      UniversalRouterVersion.V2_0,
+      options.inputPosition.pool.chainId as SupportedChainsType
+    )
+
     // validate the parameters
     invariant(token0 === v4Pool.token0, 'TOKEN0_MISMATCH')
     invariant(token1 === v4Pool.token1, 'TOKEN1_MISMATCH')
@@ -99,8 +108,9 @@ export abstract class SwapRouter {
       options.v3RemoveLiquidityOptions.collectOptions.recipient === v4PositionManagerAddress,
       'RECIPIENT_NOT_POSITION_MANAGER'
     )
+    // Migration must be a mint operation, not an increase because the UR should not have permission to increase liquidity on a v4 position
     invariant(isMint(options.v4AddLiquidityOptions), 'MINT_REQUIRED')
-    invariant(options.v4AddLiquidityOptions.migrate, 'MIGRATE_REQUIRED')
+    invariant(isMigrate(options.v4AddLiquidityOptions), 'MIGRATE_REQUIRED')
 
     const planner = new RoutePlanner()
 
@@ -121,10 +131,6 @@ export abstract class SwapRouter {
     // add position permit to the universal router planner
     if (options.v3RemoveLiquidityOptions.permit) {
       // permit spender should be UR
-      const universalRouterAddress = UNIVERSAL_ROUTER_ADDRESS(
-        UniversalRouterVersion.V2_0,
-        options.inputPosition.pool.chainId as SupportedChainsType
-      )
       invariant(universalRouterAddress == options.v3RemoveLiquidityOptions.permit.spender, 'INVALID_SPENDER')
       // don't need to transfer it because v3posm uses isApprovedOrOwner()
       encodeV3PositionPermit(planner, options.v3RemoveLiquidityOptions.permit, options.v3RemoveLiquidityOptions.tokenId)
@@ -149,6 +155,27 @@ export abstract class SwapRouter {
         'INVALID_V3_CALL: ' + selector
       )
       planner.addCommand(CommandType.V3_POSITION_MANAGER_CALL, [v3Call])
+    }
+
+    // if migrate options has a currency, require a batch permit
+    if (options.v4AddLiquidityOptions.migrateOptions?.neededCurrency) {
+      // need to permit the UR to spend your currency on permit2
+      invariant(options.v4AddLiquidityOptions.batchPermit, 'PERMIT_REQUIRED')
+      invariant(
+        options.v4AddLiquidityOptions.batchPermit.permitBatch.spender == universalRouterAddress,
+        'INVALID_SPENDER'
+      )
+      planner.addCommand(CommandType.PERMIT2_PERMIT_BATCH, [
+        options.v4AddLiquidityOptions.batchPermit.permitBatch,
+        options.v4AddLiquidityOptions.batchPermit.signature,
+      ])
+      planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [
+        options.v4AddLiquidityOptions.migrateOptions.neededCurrency,
+        options.v3RemoveLiquidityOptions.collectOptions.recipient,
+        options.v4AddLiquidityOptions.migrateOptions.neededAmount,
+      ])
+      // remove batchPermit so it doesn't get encoded again later
+      delete options.v4AddLiquidityOptions.batchPermit
     }
 
     // encode v4 mint
