@@ -3,8 +3,9 @@ import { Pool as V4Pool } from '@uniswap/v4-sdk'
 import { TPool } from './TPool'
 
 export function isValidTokenPath(prevPool: TPool, currentPool: TPool, inputToken: Currency): boolean {
-  if ((currentPool instanceof V4Pool && currentPool.involvesToken(inputToken))
-      || currentPool.involvesToken(inputToken as Token)) return true
+  if (inputToken instanceof Token && currentPool.involvesToken(inputToken)) return true
+
+  if (currentPool instanceof V4Pool && currentPool.involvesToken(inputToken)) return true
 
   // throw if both v4 pools, native/wrapped tokens not interchangeable in v4
   if (prevPool instanceof V4Pool && currentPool instanceof V4Pool) return false
