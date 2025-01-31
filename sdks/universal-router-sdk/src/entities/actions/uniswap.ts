@@ -96,24 +96,11 @@ export class UniswapTrade implements Command {
   }
 
   get outputRequiresWrap(): boolean {
-    if (this.isAllV4) {
-      return (
-        !this.trade.outputAmount.currency.isNative &&
-        (this.trade.swaps[0].route as unknown as V4Route<Currency, Currency>).pathOutput.isNative
-      )
-    }
-    return false
+    return this.numberOfSplitOutputsRequireWrap > 0
   }
 
   get outputRequiresUnwrap(): boolean {
-    if (this.isAllV4) {
-      return (
-        this.trade.outputAmount.currency.isNative &&
-        !(this.trade.swaps[0].route as unknown as V4Route<Currency, Currency>).pathOutput.isNative
-      )
-    } else {
-      return this.trade.outputAmount.currency.isNative
-    }
+    return this.numberOfSplitOutputsRequireUnwrap > 0
   }
 
   get outputRequiresTransition(): boolean {
@@ -149,7 +136,6 @@ export class UniswapTrade implements Command {
     //   1. when there are >2 exact input trades. this is only a heuristic,
     //      as it's still more gas-expensive even in this case, but has benefits
     //      in that the reversion probability is lower
-    // TODO there are more cases now
     const performAggregatedSlippageCheck =
       this.trade.tradeType === TradeType.EXACT_INPUT && this.trade.routes.length > 2
     const routerMustCustody =
@@ -184,18 +170,24 @@ export class UniswapTrade implements Command {
     let minimumAmountOut: BigNumber = BigNumber.from(
       this.trade.minimumAmountOut(this.options.slippageTolerance).quotient.toString()
     )
-    // The router custodies for 3 reasons: to unwrap, to take a fee, and/or to do a slippage check
-    if (routerMustCustody) {
-      const pools = this.trade.swaps[0].route.pools
-      const pathOutputCurrencyAddress = getCurrencyAddress(
-        getPathCurrency(this.trade.outputAmount.currency, pools[pools.length - 1])
-      )
 
-      // If there is a fee, that percentage is sent to the fee recipient
-      // In the case where ETH is the output currency, the fee is taken in WETH (for gas reasons)
+    // The router custodies for 3 reasons: to unwrap/wrap, to take a fee, and/or to do a slippage check
+    if (routerMustCustody) {
+      let outputCurrencyAddr = getCurrencyAddress(this.trade.outputAmount.currency)
+
+      // 1. If some/all of the output needs to be wrapped or unwrapped we do that first to get all the output into the same currency
+      if (this.outputRequiresUnwrap) {
+        planner.addCommand(CommandType.UNWRAP_WETH, [ROUTER_AS_RECIPIENT, 0])
+      } else if (this.outputRequiresWrap) {
+        planner.addCommand(CommandType.WRAP_ETH, [ROUTER_AS_RECIPIENT, CONTRACT_BALANCE])
+      }
+
+      // 2. Take a fee, in the output currency of the trade
+
+      // If there is a fee, that percentage is sent to the fee recipient.
       if (!!this.options.fee) {
         const feeBips = encodeFeeBips(this.options.fee.fee)
-        planner.addCommand(CommandType.PAY_PORTION, [pathOutputCurrencyAddress, this.options.fee.recipient, feeBips])
+        planner.addCommand(CommandType.PAY_PORTION, [outputCurrencyAddr, this.options.fee.recipient, feeBips])
 
         // If the trade is exact output, and a fee was taken, we must adjust the amount out to be the amount after the fee
         // Otherwise we continue as expected with the trade's normal expected output
@@ -205,12 +197,11 @@ export class UniswapTrade implements Command {
       }
 
       // If there is a flat fee, that absolute amount is sent to the fee recipient
-      // In the case where ETH is the output currency, the fee is taken in WETH (for gas reasons)
       if (!!this.options.flatFee) {
         const feeAmount = this.options.flatFee.amount
         if (minimumAmountOut.lt(feeAmount)) throw new Error('Flat fee amount greater than minimumAmountOut')
 
-        planner.addCommand(CommandType.TRANSFER, [pathOutputCurrencyAddress, this.options.flatFee.recipient, feeAmount])
+        planner.addCommand(CommandType.TRANSFER, [outputCurrencyAddr, this.options.flatFee.recipient, feeAmount])
 
         // If the trade is exact output, and a fee was taken, we must adjust the amount out to be the amount after the fee
         // Otherwise we continue as expected with the trade's normal expected output
@@ -219,19 +210,9 @@ export class UniswapTrade implements Command {
         }
       }
 
-      // The remaining tokens that need to be sent to the user after the fee is taken will be caught
-      // by this if-else clause.
-      if (this.outputRequiresUnwrap) {
-        planner.addCommand(CommandType.UNWRAP_WETH, [this.options.recipient, minimumAmountOut])
-      } else if (this.outputRequiresWrap) {
-        planner.addCommand(CommandType.WRAP_ETH, [this.options.recipient, CONTRACT_BALANCE])
-      } else {
-        planner.addCommand(CommandType.SWEEP, [
-          getCurrencyAddress(this.trade.outputAmount.currency),
-          this.options.recipient,
-          minimumAmountOut,
-        ])
-      }
+      // 3. Slippage check, for aggregate slippage, or post-fee slippage
+      // Some cases will end up with a slippage check that don't need one, but its harmless
+      planner.addCommand(CommandType.SWEEP, [outputCurrencyAddr, this.options.recipient, minimumAmountOut])
     }
 
     // for exactOutput swaps with native input or that perform an inputToken transition (wrap or unwrap)
