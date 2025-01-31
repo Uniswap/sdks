@@ -105,10 +105,17 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       return this._inputAmount
     }
 
-    const inputCurrency = this.swaps[0].inputAmount.currency
-    const totalInputFromRoutes = this.swaps
+    // optimistically sum the wrapped
+    const inputCurrency = this.swaps[0].inputAmount.currency.wrapped
+    let totalInputFromRoutes = this.swaps
       .map(({ inputAmount }) => inputAmount)
-      .reduce((total, cur) => total.add(cur), CurrencyAmount.fromRawAmount(inputCurrency, 0))
+      // cast here to avoid type errors
+      .reduce((total, cur) => total.add(cur.wrapped), CurrencyAmount.fromRawAmount(inputCurrency, 0)) as CurrencyAmount<TInput>
+
+    const nativeInputCurrency = this.swaps.find(({ inputAmount }) => inputAmount.currency.isNative)?.inputAmount.currency
+    if (nativeInputCurrency) {
+      totalInputFromRoutes = CurrencyAmount.fromRawAmount(nativeInputCurrency, totalInputFromRoutes.quotient)
+    }
 
     this._inputAmount = totalInputFromRoutes
     return this._inputAmount
@@ -128,10 +135,17 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       return this._outputAmount
     }
 
-    const outputCurrency = this.swaps[0].outputAmount.currency
-    const totalOutputFromRoutes = this.swaps
+    // optimistically sum the wrapped
+    const outputCurrency = this.swaps[0].outputAmount.currency.wrapped
+    // the only edge case is for ETH/WETH, and we know they have same decimals
+    let totalOutputFromRoutes = this.swaps
       .map(({ outputAmount }) => outputAmount)
-      .reduce((total, cur) => total.add(cur), CurrencyAmount.fromRawAmount(outputCurrency, 0))
+      .reduce((total, cur) => total.add(cur.wrapped), CurrencyAmount.fromRawAmount(outputCurrency, 0)) as CurrencyAmount<TOutput>
+
+    const nativeOutputCurrency = this.swaps.find(({ outputAmount }) => outputAmount.currency.isNative)?.outputAmount.currency
+    if (nativeOutputCurrency) {
+      totalOutputFromRoutes = CurrencyAmount.fromRawAmount(nativeOutputCurrency, totalOutputFromRoutes.quotient)
+    }
 
     this._outputAmount = totalOutputFromRoutes
     return this._outputAmount
@@ -367,11 +381,11 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     const inputCurrency = routes[0].inputAmount.currency
     const outputCurrency = routes[0].outputAmount.currency
     invariant(
-      routes.every(({ route }) => inputCurrency.equals(route.input)),
+      routes.every(({ route }) => inputCurrency.wrapped.equals(route.input.wrapped)),
       'INPUT_CURRENCY_MATCH'
     )
     invariant(
-      routes.every(({ route }) => outputCurrency.equals(route.output)),
+      routes.every(({ route }) => outputCurrency.wrapped.equals(route.output.wrapped)),
       'OUTPUT_CURRENCY_MATCH'
     )
 

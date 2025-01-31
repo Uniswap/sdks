@@ -175,6 +175,10 @@ describe('Trade', () => {
             amount: CurrencyAmount.fromRawAmount(Ether.onChain(1), JSBI.BigInt(10000)),
             route: new Route([pool_eth_0], ETHER, token0),
           },
+          {
+            amount: CurrencyAmount.fromRawAmount(Ether.onChain(1), JSBI.BigInt(10000)),
+            route: new Route([pool_eth_1, pool_0_1], ETHER, token0),
+          },
         ],
         TradeType.EXACT_INPUT
       )
@@ -235,6 +239,42 @@ describe('Trade', () => {
       expect(trade.outputAmount.currency).toEqual(ETHER)
     })
 
+    it('can be constructed with ETHER or WETH as input for exact input with multiple routes', async () => {
+      const trade = await Trade.fromRoutes<Currency, Token, TradeType.EXACT_INPUT>(
+        [
+          {
+            amount: CurrencyAmount.fromRawAmount(ETHER, JSBI.BigInt(10000)),
+            route: new Route([pool_eth_0], ETHER, token0),
+          },
+          {
+            amount: CurrencyAmount.fromRawAmount(weth, JSBI.BigInt(10000)),
+            route: new Route([pool_weth_0], weth, token0),
+          },
+        ],
+        TradeType.EXACT_INPUT
+      )
+      expect(trade.inputAmount.currency).toEqual(ETHER)
+      expect(trade.outputAmount.currency).toEqual(token0)
+    })
+
+    it('can be constructed with ETHER or WETH as output for exact input with multiple routes', async () => {
+      const trade = await Trade.fromRoutes<Token, Currency, TradeType.EXACT_INPUT>(
+        [
+          {
+            amount: CurrencyAmount.fromRawAmount(token0, JSBI.BigInt(10000)),
+            route: new Route([pool_eth_0], token0, ETHER),
+          },
+          {
+            amount: CurrencyAmount.fromRawAmount(token0, JSBI.BigInt(10000)),
+            route: new Route([pool_weth_0], token0, weth),
+          },
+        ],
+        TradeType.EXACT_INPUT
+      )
+      expect(trade.inputAmount.currency).toEqual(token0)
+      expect(trade.outputAmount.currency).toEqual(ETHER)
+    })
+    
     it('throws if pools are re-used between routes', async () => {
       await expect(
         Trade.fromRoutes<Token, Ether, TradeType.EXACT_INPUT>(
