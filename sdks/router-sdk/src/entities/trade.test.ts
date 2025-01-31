@@ -705,7 +705,7 @@ describe('Trade', () => {
       expect(trade.tradeType).toEqual(TradeType.EXACT_INPUT)
     })
 
-    it('can be constructed with ETHER as input for exact input swap, with V4 eth input', async () => {
+    it('can be constructed with ETHER as input for exact input swap, with V4 eth route and V2 weth route', async () => {
       const routeOriginalV2 = new V2RouteSDK([pair_weth_0, pair_0_1], ETHER, token1)
       const routev2 = new RouteV2(routeOriginalV2)
       const amountv2 = CurrencyAmount.fromRawAmount(ETHER, JSBI.BigInt(100))
