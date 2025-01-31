@@ -140,7 +140,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     }
 
     const inputAmountCurrency = this.swaps[0].inputAmount.currency
-    let totalInputFromRoutes = this.swaps
+    const totalInputFromRoutes = this.swaps
       .map(({ inputAmount: routeInputAmount }) => routeInputAmount)
       .reduce((total, cur) => total.add(cur), CurrencyAmount.fromRawAmount(inputAmountCurrency, 0))
 
