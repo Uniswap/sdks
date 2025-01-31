@@ -110,8 +110,8 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         assertEq(v4PositionManager.balanceOf(RECIPIENT), 1, "V4 NOT MINTED");
     }
 
-    function test_migrate_outOfRange0_inRange() public {
-        MethodParameters memory params = readFixture(json, "._MIGRATE_OUT_OF_RANGE0_TO_IN_RANGE");
+    function test_migrate_v3OutOfRangein0_to_v4InRange() public {
+        MethodParameters memory params = readFixture(json, "._MIGRATE_V3RANGE0_TO_V4INRANGE");
 
         // add the position to v3 so we have something to migrate
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0);
@@ -144,8 +144,8 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         assertEq(v4PositionManager.balanceOf(RECIPIENT), 1, "V4 NOT MINTED");
     }
 
-    function test_migrate_outOfRange0_outOfRange1() public {
-        MethodParameters memory params = readFixture(json, "._MIGRATE_OUT_OF_RANGE0_TO_OUT_OF_RANGE1");
+    function test_migrate_v3OutOfRangeIn0_to_v4OutOfRangeIn1() public {
+        MethodParameters memory params = readFixture(json, "._MIGRATE_V3RANGE0_TO_V4RANGE1");
 
         // add the position to v3 so we have something to migrate
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0);
@@ -178,8 +178,8 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         assertEq(v4PositionManager.balanceOf(RECIPIENT), 1, "V4 NOT MINTED");
     }
 
-    function test_migrate_outOfRange0_outOfRange0() public {
-        MethodParameters memory params = readFixture(json, "._MIGRATE_OUT_OF_RANGE0_TO_OUT_OF_RANGE0");
+    function test_migrate_v3OutOfRangeIn0_to_v4OutOfRangeIn0() public {
+        MethodParameters memory params = readFixture(json, "._MIGRATE_V3RANGE0_TO_V4RANGE0");
 
         // add the position to v3 so we have something to migrate
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0);
@@ -208,8 +208,8 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         assertEq(v4PositionManager.balanceOf(RECIPIENT), 1, "V4 NOT MINTED");
     }
 
-    function test_migrate_outOfRange1_inRange() public {
-        MethodParameters memory params = readFixture(json, "._MIGRATE_OUT_OF_RANGE1_TO_IN_RANGE");
+    function test_migrate_v3OutOfRangeIn1_v4InRange() public {
+        MethodParameters memory params = readFixture(json, "._MIGRATE_V3RANGE1_TO_V4INRANGE");
 
         // add the position to v3 so we have something to migrate
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0);
@@ -242,8 +242,8 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         assertEq(v4PositionManager.balanceOf(RECIPIENT), 1, "V4 NOT MINTED");
     }
 
-    function test_migrate_outOfRange1_outOfRange0() public {
-        MethodParameters memory params = readFixture(json, "._MIGRATE_OUT_OF_RANGE1_TO_OUT_OF_RANGE0");
+    function test_migrate_v3OutOfRangeIn1_v4OutOfRangeIn0() public {
+        MethodParameters memory params = readFixture(json, "._MIGRATE_V3RANGE1_TO_V4RANGE0");
 
         // add the position to v3 so we have something to migrate
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0);
@@ -276,8 +276,8 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         assertEq(v4PositionManager.balanceOf(RECIPIENT), 1, "V4 NOT MINTED");
     }
 
-    function test_migrate_outOfRange1_outOfRange1() public {
-        MethodParameters memory params = readFixture(json, "._MIGRATE_OUT_OF_RANGE1_TO_OUT_OF_RANGE1");
+    function test_migrate_v3OutOfRangeIn1_v4OutOfRangeIn1() public {
+        MethodParameters memory params = readFixture(json, "._MIGRATE_V3RANGE1_TO_V4RANGE1");
 
         // add the position to v3 so we have something to migrate
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0);

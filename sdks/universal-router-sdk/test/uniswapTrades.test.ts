@@ -1611,11 +1611,11 @@ describe('Uniswap', () => {
           tickLower: 200040,
           tickUpper: 300000,
         }),
-        // above range (current tick = 0)
+        // in range (current tick = 0)
         outputPosition: new V4Position({
           pool: WETH_USDC_V4,
           liquidity: 100000,
-          tickLower: 200040,
+          tickLower: -200040,
           tickUpper: 300000,
         }),
         v3RemoveLiquidityOptions: {
@@ -1717,12 +1717,12 @@ describe('Uniswap', () => {
           tickLower: 200040,
           tickUpper: 300000,
         }),
-        // above range (current tick = 0)
+        // below range (current tick = 0)
         outputPosition: new V4Position({
           pool: WETH_USDC_V4_LOW_FEE, // migrate to LOW pool, which hasn't been initialized
           liquidity: 100000,
-          tickLower: 200040,
-          tickUpper: 300000,
+          tickLower: -300000,
+          tickUpper: -200040,
         }),
         v3RemoveLiquidityOptions: {
           tokenId,
@@ -1805,7 +1805,7 @@ describe('Uniswap', () => {
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
-      registerFixture('_MIGRATE_OUT_OF_RANGE0_TO_IN_RANGE', methodParameters)
+      registerFixture('_MIGRATE_V3RANGE0_TO_V4INRANGE', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
@@ -1857,7 +1857,7 @@ describe('Uniswap', () => {
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
-      registerFixture('_MIGRATE_OUT_OF_RANGE0_TO_OUT_OF_RANGE1', methodParameters)
+      registerFixture('_MIGRATE_V3RANGE0_TO_V4RANGE1', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
@@ -1898,7 +1898,7 @@ describe('Uniswap', () => {
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
-      registerFixture('_MIGRATE_OUT_OF_RANGE0_TO_OUT_OF_RANGE0', methodParameters)
+      registerFixture('_MIGRATE_V3RANGE0_TO_V4RANGE0', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
@@ -1950,7 +1950,7 @@ describe('Uniswap', () => {
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
-      registerFixture('_MIGRATE_OUT_OF_RANGE1_TO_IN_RANGE', methodParameters)
+      registerFixture('_MIGRATE_V3RANGE1_TO_V4INRANGE', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
@@ -2002,7 +2002,7 @@ describe('Uniswap', () => {
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
-      registerFixture('_MIGRATE_OUT_OF_RANGE1_TO_OUT_OF_RANGE0', methodParameters)
+      registerFixture('_MIGRATE_V3RANGE1_TO_V4RANGE0', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
@@ -2043,7 +2043,7 @@ describe('Uniswap', () => {
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
-      registerFixture('_MIGRATE_OUT_OF_RANGE1_TO_OUT_OF_RANGE1', methodParameters)
+      registerFixture('_MIGRATE_V3RANGE1_TO_V4RANGE1', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
@@ -2308,7 +2308,7 @@ describe('Uniswap', () => {
       expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('MIGRATE_REQUIRED')
     })
 
-    it('throws if not permitting the Universal router', async () => {
+    it('throws if not permitting the Universal router when burning v3 position', async () => {
       const opts = Object.assign({
         inputPosition: new Position({
           pool: WETH_USDC_V3,
