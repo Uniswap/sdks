@@ -61,9 +61,9 @@ export interface MintSpecificOptions {
   sqrtPriceX96?: BigintIsh
 
   /**
-   * Whether the mint is part of a migration from V3 to V4.
+   * Whether the mint is part of a migration from V3 to V4 and the additional currency and amount to send if needed
    */
-  migrate?: boolean
+  migrateOptions?: MigrateOptions
 }
 
 /**
@@ -113,21 +113,19 @@ export interface CollectSpecificOptions {
   recipient: string
 }
 
-export interface TransferOptions {
+export interface MigrateOptions {
   /**
-   * The account sending the NFT.
+   * Whether the mint is part of a migration from V3 to V4.
    */
-  sender: string
-
+  migrate?: boolean
   /**
-   * The account that should receive the NFT.
+   * The additional currency that needs to be transferred
    */
-  recipient: string
-
+  neededCurrency?: Currency
   /**
-   * The id of the token being sent.
+   * The amount of additional currency that needs to be transferred
    */
-  tokenId: BigintIsh
+  neededAmount?: BigintIsh
 }
 
 export interface PermitDetails {
@@ -275,7 +273,7 @@ export abstract class V4PositionManager {
     }
 
     // If migrating, we need to settle and sweep both currencies individually
-    if (isMint(options) && options.migrate) {
+    if (isMint(options) && options.migrateOptions?.migrate) {
       // payer is v4 positiion manager
       planner.addSettle(position.pool.currency0, false)
       planner.addSettle(position.pool.currency1, false)
