@@ -288,6 +288,10 @@ export abstract class V4PositionManager {
       planner.addSettle(position.pool.currency1, false)
       planner.addSweep(position.pool.currency0, options.recipient)
       planner.addSweep(position.pool.currency1, options.recipient)
+      // sweep wrapped native for good measure
+      if (options.useNative) {
+        planner.addSweep(position.pool.currency0.wrapped, options.recipient)
+      }
     } else {
       // need to settle both currencies when minting / adding liquidity (user is the payer)
       planner.addSettlePair(position.pool.currency0, position.pool.currency1)

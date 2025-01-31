@@ -361,6 +361,7 @@ describe('PositionManager', () => {
       planner.addAction(Actions.SETTLE, [toAddress(pool_1_eth.currency1), 0, false])
       planner.addAction(Actions.SWEEP, [toAddress(pool_1_eth.currency0), recipient])
       planner.addAction(Actions.SWEEP, [toAddress(pool_1_eth.currency1), recipient])
+      planner.addAction(Actions.SWEEP, [toAddress(pool_1_eth.currency0.wrapped), recipient])
       expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
 
       expect(value).toEqual('0x00')
