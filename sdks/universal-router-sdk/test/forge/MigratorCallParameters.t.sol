@@ -40,11 +40,10 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 1);
 
         // approve the UniversalRouter to access the position (instead of permit)
-        vm.prank(from);
+        vm.startPrank(from);
         INonfungiblePositionManager(V3_POSITION_MANAGER).setApprovalForAll(MAINNET_ROUTER, true);
 
         assertEq(params.value, 0);
-        vm.prank(from);
         (bool success,) = address(router).call(params.data);
         require(success, "call failed");
 
@@ -122,9 +121,8 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 1);
 
         // approve the UniversalRouter to access the position (instead of permit)
-        vm.startPrank(from);
+        vm.prank(from);
         INonfungiblePositionManager(V3_POSITION_MANAGER).setApprovalForAll(MAINNET_ROUTER, true);
-        vm.stopPrank();
 
         assertEq(params.value, 0);
         WETH.transfer(from, WETH.balanceOf(address(this)));
@@ -157,9 +155,8 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 1);
 
         // approve the UniversalRouter to access the position (instead of permit)
-        vm.startPrank(from);
+        vm.prank(from);
         INonfungiblePositionManager(V3_POSITION_MANAGER).setApprovalForAll(MAINNET_ROUTER, true);
-        vm.stopPrank();
 
         assertEq(params.value, 0);
         WETH.transfer(from, WETH.balanceOf(address(this)));
@@ -222,9 +219,8 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 1);
 
         // approve the UniversalRouter to access the position (instead of permit)
-        vm.startPrank(from);
+        vm.prank(from);
         INonfungiblePositionManager(V3_POSITION_MANAGER).setApprovalForAll(MAINNET_ROUTER, true);
-        vm.stopPrank();
 
         assertEq(params.value, 0);
         USDC.transfer(from, USDC.balanceOf(address(this)));
@@ -257,9 +253,8 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 1);
 
         // approve the UniversalRouter to access the position (instead of permit)
-        vm.startPrank(from);
+        vm.prank(from);
         INonfungiblePositionManager(V3_POSITION_MANAGER).setApprovalForAll(MAINNET_ROUTER, true);
-        vm.stopPrank();
 
         assertEq(params.value, 0);
         USDC.transfer(from, USDC.balanceOf(address(this)));
