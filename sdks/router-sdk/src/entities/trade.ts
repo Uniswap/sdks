@@ -7,6 +7,7 @@ import { ONE, ONE_HUNDRED_PERCENT, ZERO, ZERO_PERCENT } from '../constants'
 import { MixedRouteSDK } from './mixedRoute/route'
 import { MixedRouteTrade as MixedRouteTradeSDK } from './mixedRoute/trade'
 import { IRoute, MixedRoute, RouteV2, RouteV3, RouteV4 } from './route'
+import { Protocol } from './protocol'
 
 export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType extends TradeType> {
   public readonly routes: IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>[]
@@ -134,22 +135,41 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     invariant(numPools === poolIdentifierSet.size, 'POOLS_DUPLICATED')
   }
 
+  /**
+   * Maps an amount from a compareCurrency to a baseCurrency
+   * 
+   * @dev BaseCurrency and CompareCurrency must have the same wrapped versions
+   * @param baseCurrency The base currency to map to
+   * @param amount The amount to map
+   * @returns The mapped amount
+   */
+  public mapAmount = <BaseCurrency extends Currency, CompareCurrency extends Currency>(baseCurrency: BaseCurrency, amount: CurrencyAmount<BaseCurrency | CompareCurrency>): CurrencyAmount<BaseCurrency> => {
+    if(baseCurrency.equals(amount.currency)) return amount as CurrencyAmount<BaseCurrency>
+
+    if(!baseCurrency.wrapped.equals(amount.currency.wrapped)) throw new Error('Wrapped currencies mismatch')
+
+    if(baseCurrency.isNative){
+      // Top level input is ETH, but input to route is WETH
+      return CurrencyAmount.fromRawAmount(baseCurrency, amount.quotient) as CurrencyAmount<BaseCurrency>
+    } else {
+      // Top level input is WETH, but input to route is ETH
+      return CurrencyAmount.fromRawAmount(baseCurrency.wrapped, amount.quotient) as CurrencyAmount<BaseCurrency>
+    }
+  }
+
   public get inputAmount(): CurrencyAmount<TInput> {
     if (this._inputAmount) {
       return this._inputAmount
     }
 
-    // optimistically sum the wrapped
-    const inputCurrency = this.swaps[0].inputAmount.currency.wrapped
+    // We always accumulate in inputAmount.currency, since that's what the user specified
+    const inputAmountCurrency = this.swaps[0].inputAmount.currency
+    // However, its possible for routes within the trade to have different pathInput
     let totalInputFromRoutes = this.swaps
-      .map(({ inputAmount }) => inputAmount)
-      // cast here to avoid type errors
-      .reduce((total, cur) => total.add(cur.wrapped), CurrencyAmount.fromRawAmount(inputCurrency, 0)) as CurrencyAmount<TInput>
-
-    const nativeInputCurrency = this.swaps.find(({ inputAmount }) => inputAmount.currency.isNative)?.inputAmount.currency
-    if (nativeInputCurrency) {
-      totalInputFromRoutes = CurrencyAmount.fromRawAmount(nativeInputCurrency, totalInputFromRoutes.quotient)
-    }
+      .map(({ route, inputAmount: routeInputAmount }) => 
+        route.protocol === Protocol.V4 ? 
+          this.mapAmount<typeof inputAmountCurrency, typeof routeInputAmount.currency>(inputAmountCurrency, routeInputAmount) : routeInputAmount)
+      .reduce((total, cur) => total.add(cur), CurrencyAmount.fromRawAmount(inputAmountCurrency, 0))
 
     this._inputAmount = totalInputFromRoutes
     return this._inputAmount
@@ -160,17 +180,14 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       return this._outputAmount
     }
 
-    // optimistically sum the wrapped
-    const outputCurrency = this.swaps[0].outputAmount.currency.wrapped
-    // the only edge case is for ETH/WETH, and we know they have same decimals
+    // We always accumulate in outputAmount.currency, since that's what the user specified
+    const outputCurrency = this.swaps[0].outputAmount.currency
+    // However, its possible for routes within the trade to have different pathOutput
     let totalOutputFromRoutes = this.swaps
-      .map(({ outputAmount }) => outputAmount)
-      .reduce((total, cur) => total.add(cur.wrapped), CurrencyAmount.fromRawAmount(outputCurrency, 0)) as CurrencyAmount<TOutput>
-
-    const nativeOutputCurrency = this.swaps.find(({ outputAmount }) => outputAmount.currency.isNative)?.outputAmount.currency
-    if (nativeOutputCurrency) {
-      totalOutputFromRoutes = CurrencyAmount.fromRawAmount(nativeOutputCurrency, totalOutputFromRoutes.quotient)
-    }
+      .map(({ route, outputAmount: routeOutputAmount }) => 
+        route.protocol === Protocol.V4 ? 
+          this.mapAmount<typeof outputCurrency, typeof routeOutputAmount.currency>(outputCurrency, routeOutputAmount) : routeOutputAmount)
+      .reduce((total, cur) => total.add(cur), CurrencyAmount.fromRawAmount(outputCurrency, 0))
 
     this._outputAmount = totalOutputFromRoutes
     return this._outputAmount
