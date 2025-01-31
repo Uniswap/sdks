@@ -4533,7 +4533,7 @@ __metadata:
     "@uniswap/swap-router-contracts": ^1.3.0
     "@uniswap/v2-sdk": ^4.13.0
     "@uniswap/v3-sdk": ^3.24.0
-    "@uniswap/v4-sdk": ^1.18.0
+    "@uniswap/v4-sdk": ^1.18.1
     prettier: ^2.4.1
     tsdx: ^0.14.1
   languageName: unknown
@@ -4801,6 +4801,19 @@ __metadata:
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
   checksum: 37d2ebd3781eb9d5f5e0e875d7788d2369720fd30a53dba9abb7bb8df97eb89ddad2baab99c99aab566b350e1efbfe4e0d26765a9a49da38aaab767be05eafb8
+  languageName: node
+  linkType: hard
+
+"@uniswap/v4-sdk@npm:^1.18.1":
+  version: 1.18.1
+  resolution: "@uniswap/v4-sdk@npm:1.18.1"
+  dependencies:
+    "@ethersproject/solidity": ^5.0.9
+    "@uniswap/sdk-core": ^7.5.0
+    "@uniswap/v3-sdk": 3.24.0
+    tiny-invariant: ^1.1.0
+    tiny-warning: ^1.0.3
+  checksum: b107e7afec5f9422472bb0752a117b17f98b2671a6824a216d557e8d179ce2af9eacd21c8591b7f946f0f4cf933e2adda6d4dfd3747067576fb16435714dde0c
   languageName: node
   linkType: hard
 
