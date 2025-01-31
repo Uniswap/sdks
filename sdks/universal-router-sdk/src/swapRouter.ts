@@ -9,7 +9,14 @@ import {
   NonfungiblePositionManager as V3PositionManager,
   RemoveLiquidityOptions as V3RemoveLiquidityOptions,
 } from '@uniswap/v3-sdk'
-import { Position as V4Position, V4PositionManager, MigrateOptions, Pool as V4Pool, PoolKey } from '@uniswap/v4-sdk'
+import {
+  MintOptions,
+  Position as V4Position,
+  V4PositionManager,
+  AddLiquidityOptions as V4AddLiquidityOptions,
+  Pool as V4Pool,
+  PoolKey,
+} from '@uniswap/v4-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
 import { Currency, TradeType, Percent, CHAIN_TO_ADDRESSES_MAP, SupportedChainsType } from '@uniswap/sdk-core'
 import { UniswapTrade, SwapOptions } from './entities/actions/uniswap'
@@ -26,11 +33,15 @@ export interface MigrateV3ToV4Options {
   inputPosition: V3Position
   outputPosition: V4Position
   v3RemoveLiquidityOptions: V3RemoveLiquidityOptions
-  migrateOptions: MigrateOptions
+  v4AddLiquidityOptions: V4AddLiquidityOptions
 }
 
-function isMint(options: MigrateOptions): options is MigrateOptions {
-  return Object.keys(options).some((k) => k === 'recipient')
+function isMint(options: V4AddLiquidityOptions): options is MintOptions {
+  return 'recipient' in options
+}
+
+function isMigrate(options: V4AddLiquidityOptions): options is MintOptions {
+  return 'migrateOptions' in options && options.migrateOptions?.migrate === true
 }
 
 export abstract class SwapRouter {
@@ -80,6 +91,11 @@ export abstract class SwapRouter {
     const v4PositionManagerAddress =
       positionManagerOverride ?? CHAIN_TO_ADDRESSES_MAP[v4Pool.chainId as SupportedChainsType].v4PositionManagerAddress
 
+    const universalRouterAddress = UNIVERSAL_ROUTER_ADDRESS(
+      UniversalRouterVersion.V2_0,
+      options.inputPosition.pool.chainId as SupportedChainsType
+    )
+
     // validate the parameters
     invariant(token0 === v4Pool.token0, 'TOKEN0_MISMATCH')
     invariant(token1 === v4Pool.token1, 'TOKEN1_MISMATCH')
@@ -93,13 +109,13 @@ export abstract class SwapRouter {
       'RECIPIENT_NOT_POSITION_MANAGER'
     )
     // Migration must be a mint operation, not an increase because the UR should not have permission to increase liquidity on a v4 position
-    invariant(isMint(options.migrateOptions), 'MINT_REQUIRED')
-    invariant(options.migrateOptions.migrate, 'MIGRATE_REQUIRED')
+    invariant(isMint(options.v4AddLiquidityOptions), 'MINT_REQUIRED')
+    invariant(isMigrate(options.v4AddLiquidityOptions), 'MIGRATE_REQUIRED')
 
     const planner = new RoutePlanner()
 
     // to prevent reentrancy by the pool hook, we initialize the v4 pool before moving funds
-    if (options.migrateOptions.createPool) {
+    if (options.v4AddLiquidityOptions.createPool) {
       const poolKey: PoolKey = V4Pool.getPoolKey(
         v4Pool.currency0,
         v4Pool.currency1,
@@ -109,16 +125,12 @@ export abstract class SwapRouter {
       )
       planner.addCommand(CommandType.V4_INITIALIZE_POOL, [poolKey, v4Pool.sqrtRatioX96.toString()])
       // remove createPool setting, so that it doesnt get encoded again later
-      delete options.migrateOptions.createPool
+      delete options.v4AddLiquidityOptions.createPool
     }
 
     // add position permit to the universal router planner
     if (options.v3RemoveLiquidityOptions.permit) {
       // permit spender should be UR
-      const universalRouterAddress = UNIVERSAL_ROUTER_ADDRESS(
-        UniversalRouterVersion.V2_0,
-        options.inputPosition.pool.chainId as SupportedChainsType
-      )
       invariant(universalRouterAddress == options.v3RemoveLiquidityOptions.permit.spender, 'INVALID_SPENDER')
       // don't need to transfer it because v3posm uses isApprovedOrOwner()
       encodeV3PositionPermit(planner, options.v3RemoveLiquidityOptions.permit, options.v3RemoveLiquidityOptions.tokenId)
@@ -145,24 +157,29 @@ export abstract class SwapRouter {
       planner.addCommand(CommandType.V3_POSITION_MANAGER_CALL, [v3Call])
     }
 
-    // if migrate options has an additionalTransfer option, require a batch permit
-    if (options.migrateOptions.additionalTransfer) {
-      invariant(options.migrateOptions.batchPermit, 'PERMIT_REQUIRED')
+    // if migrate options has a currency, require a batch permit
+    if (options.v4AddLiquidityOptions.migrateOptions?.neededCurrency) {
+      // need to permit the UR to spend your currency on permit2
+      invariant(options.v4AddLiquidityOptions.batchPermit, 'PERMIT_REQUIRED')
+      invariant(
+        options.v4AddLiquidityOptions.batchPermit.permitBatch.spender == universalRouterAddress,
+        'INVALID_SPENDER'
+      )
       planner.addCommand(CommandType.PERMIT2_PERMIT_BATCH, [
-        options.migrateOptions.batchPermit.permitBatch,
-        options.migrateOptions.batchPermit.signature,
+        options.v4AddLiquidityOptions.batchPermit.permitBatch,
+        options.v4AddLiquidityOptions.batchPermit.signature,
       ])
       planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [
-        options.migrateOptions.additionalTransfer.neededCurrency,
+        options.v4AddLiquidityOptions.migrateOptions.neededCurrency,
         options.v3RemoveLiquidityOptions.collectOptions.recipient,
-        options.migrateOptions.additionalTransfer.neededAmount,
+        options.v4AddLiquidityOptions.migrateOptions.neededAmount,
       ])
       // remove batchPermit so it doesn't get encoded again later
-      delete options.migrateOptions.batchPermit
+      delete options.v4AddLiquidityOptions.batchPermit
     }
 
     // encode v4 mint
-    const v4AddParams = V4PositionManager.addCallParameters(options.outputPosition, options.migrateOptions)
+    const v4AddParams = V4PositionManager.addCallParameters(options.outputPosition, options.v4AddLiquidityOptions)
     // only modifyLiquidities can be called by the UniversalRouter
     const selector = v4AddParams.calldata.slice(0, 10)
     invariant(selector == V4PositionManager.INTERFACE.getSighash('modifyLiquidities'), 'INVALID_V4_CALL: ' + selector)
@@ -170,7 +187,7 @@ export abstract class SwapRouter {
     planner.addCommand(CommandType.V4_POSITION_MANAGER_CALL, [v4AddParams.calldata])
 
     return SwapRouter.encodePlan(planner, BigNumber.from(0), {
-      deadline: BigNumber.from(options.migrateOptions.deadline),
+      deadline: BigNumber.from(options.v4AddLiquidityOptions.deadline),
     })
   }
 

@@ -1637,12 +1637,12 @@ describe('Uniswap', () => {
             spender: permit.spender,
           },
         },
-        migrateOptions: {
+        v4AddLiquidityOptions: {
           deadline: MAX_UINT160,
-          migrate: true,
+          migrateOptions: { migrate: true },
+          // no need to transfer any additional currency because v3 position is in range so both currencies are sent to pool and unused currency is swept
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
-          // no need to transfer any additional currency because v3 position is in range so both currencies are sent to pool and unused currency is swept
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
@@ -1678,12 +1678,12 @@ describe('Uniswap', () => {
             recipient: FORGE_V4_POSITION_MANAGER,
           },
         },
-        migrateOptions: {
+        v4AddLiquidityOptions: {
           deadline: MAX_UINT160,
-          migrate: true,
+          migrateOptions: { migrate: true },
+          // no need to transfer any additional currency because v3 position is in range so both currencies are sent to pool and unused currency is swept
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
-          // no need to transfer any additional currency because v3 position is in range so both currencies are sent to pool and unused currency is swept
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
@@ -1743,13 +1743,13 @@ describe('Uniswap', () => {
             spender: permit.spender,
           },
         },
-        migrateOptions: {
+        v4AddLiquidityOptions: {
           deadline: MAX_UINT160,
-          migrate: true,
+          migrateOptions: { migrate: true },
+          // no need to transfer any additional currency because v3 position is in range so both currencies are sent to pool and unused currency is swept
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
           createPool: true, // boolean to signal pool creation
-          // no need to transfer any additional currency because v3 position is in range so both currencies are sent to pool and unused currency is swept
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
@@ -1792,15 +1792,15 @@ describe('Uniswap', () => {
             recipient: FORGE_V4_POSITION_MANAGER,
           },
         },
-        migrateOptions: {
+        v4AddLiquidityOptions: {
           deadline: MAX_UINT160,
-          migrate: true,
-          slippageTolerance: new Percent(5, 100),
-          recipient: TEST_RECIPIENT_ADDRESS,
-          additionalTransfer: {
+          migrateOptions: {
+            migrate: true,
             neededCurrency: WETH.address,
             neededAmount: '1013935132270157186975',
           },
+          slippageTolerance: new Percent(5, 100),
+          recipient: TEST_RECIPIENT_ADDRESS,
           batchPermit: { permitBatch: permit, signature: signature },
         },
       })
@@ -1844,15 +1844,15 @@ describe('Uniswap', () => {
             recipient: FORGE_V4_POSITION_MANAGER,
           },
         },
-        migrateOptions: {
+        v4AddLiquidityOptions: {
           deadline: MAX_UINT160,
-          migrate: true,
-          slippageTolerance: new Percent(5, 100),
-          recipient: TEST_RECIPIENT_ADDRESS,
-          additionalTransfer: {
+          migrateOptions: {
+            migrate: true,
             neededCurrency: WETH.address,
             neededAmount: '1013935132270157186975',
           },
+          slippageTolerance: new Percent(5, 100),
+          recipient: TEST_RECIPIENT_ADDRESS,
           batchPermit: { permitBatch: permit, signature: signature },
         },
       })
@@ -1889,12 +1889,12 @@ describe('Uniswap', () => {
             recipient: FORGE_V4_POSITION_MANAGER,
           },
         },
-        migrateOptions: {
+        v4AddLiquidityOptions: {
           deadline: MAX_UINT160,
-          migrate: true,
+          migrateOptions: { migrate: true },
+          // no need to transfer any additional currency because both positions are out of range on same side
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
-          // no need to transfer any additional currency because both positions are out of range on same side
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
@@ -1937,15 +1937,15 @@ describe('Uniswap', () => {
             recipient: FORGE_V4_POSITION_MANAGER,
           },
         },
-        migrateOptions: {
+        v4AddLiquidityOptions: {
           deadline: MAX_UINT160,
-          migrate: true,
-          slippageTolerance: new Percent(5, 100),
-          recipient: TEST_RECIPIENT_ADDRESS,
-          additionalTransfer: {
+          migrateOptions: {
+            migrate: true,
             neededCurrency: USDC.address,
             neededAmount: '1013935132270157186975',
           },
+          slippageTolerance: new Percent(5, 100),
+          recipient: TEST_RECIPIENT_ADDRESS,
           batchPermit: { permitBatch: permit, signature: signature },
         },
       })
@@ -1989,15 +1989,15 @@ describe('Uniswap', () => {
             recipient: FORGE_V4_POSITION_MANAGER,
           },
         },
-        migrateOptions: {
+        v4AddLiquidityOptions: {
           deadline: MAX_UINT160,
-          migrate: true,
-          slippageTolerance: new Percent(5, 100),
-          recipient: TEST_RECIPIENT_ADDRESS,
-          additionalTransfer: {
+          migrateOptions: {
+            migrate: true,
             neededCurrency: USDC.address,
             neededAmount: '1013935132270157186975',
           },
+          slippageTolerance: new Percent(5, 100),
+          recipient: TEST_RECIPIENT_ADDRESS,
           batchPermit: { permitBatch: permit, signature: signature },
         },
       })
@@ -2034,12 +2034,12 @@ describe('Uniswap', () => {
             recipient: FORGE_V4_POSITION_MANAGER,
           },
         },
-        migrateOptions: {
+        v4AddLiquidityOptions: {
           deadline: MAX_UINT160,
-          migrate: true,
+          migrateOptions: { migrate: true },
+          // no need to transfer any additional currency because both positions are out of range on the same side
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
-          // no need to transfer any additional currency because both positions are out of range on the same side
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
@@ -2073,9 +2073,9 @@ describe('Uniswap', () => {
             recipient: TEST_RECIPIENT_ADDRESS,
           },
         },
-        migrateOptions: {
+        v4AddLiquidityOptions: {
           deadline: 1,
-          migrate: true,
+          migrateOptions: { migrate: true },
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
         },
@@ -2118,9 +2118,9 @@ describe('Uniswap', () => {
             recipient: TEST_RECIPIENT_ADDRESS,
           },
         },
-        migrateOptions: {
+        v4AddLiquidityOptions: {
           deadline: 1,
-          migrate: true,
+          migrateOptions: { migrate: true },
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
         },
@@ -2154,9 +2154,9 @@ describe('Uniswap', () => {
             recipient: TEST_RECIPIENT_ADDRESS,
           },
         },
-        migrateOptions: {
+        v4AddLiquidityOptions: {
           deadline: 1,
-          migrate: true,
+          migrateOptions: { migrate: true },
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
         },
@@ -2189,9 +2189,9 @@ describe('Uniswap', () => {
             recipient: TEST_RECIPIENT_ADDRESS,
           },
         },
-        migrateOptions: {
+        v4AddLiquidityOptions: {
           deadline: 1,
-          migrate: true,
+          migrateOptions: { migrate: true },
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
         },
@@ -2225,7 +2225,7 @@ describe('Uniswap', () => {
             recipient: CHAIN_TO_ADDRESSES_MAP[ChainId.MAINNET].v4PositionManagerAddress,
           },
         },
-        migrateOptions: {
+        v4AddLiquidityOptions: {
           tokenId: 1,
           deadline: 1,
           slippageTolerance: new Percent(5, 100),
@@ -2236,7 +2236,7 @@ describe('Uniswap', () => {
       expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('MINT_REQUIRED')
     })
 
-    it('throws if migrating flag not set', async () => {
+    it('throws if no migrateOptions', async () => {
       const opts = Object.assign({
         inputPosition: new Position({
           pool: WETH_USDC_V3,
@@ -2262,9 +2262,45 @@ describe('Uniswap', () => {
             recipient: CHAIN_TO_ADDRESSES_MAP[ChainId.MAINNET].v4PositionManagerAddress,
           },
         },
-        migrateOptions: {
+        v4AddLiquidityOptions: {
           deadline: 1,
-          migrate: false,
+          // no migrateOptions flag
+          slippageTolerance: new Percent(5, 100),
+          recipient: TEST_RECIPIENT_ADDRESS,
+        },
+      })
+      expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('MIGRATE_REQUIRED')
+    })
+
+    it('throws if migrate flag not set', async () => {
+      const opts = Object.assign({
+        inputPosition: new Position({
+          pool: WETH_USDC_V3,
+          liquidity: 1,
+          tickLower: -WETH_USDC_V3.tickSpacing,
+          tickUpper: WETH_USDC_V3.tickSpacing,
+        }),
+        outputPosition: new V4Position({
+          pool: WETH_USDC_V4,
+          liquidity: 1,
+          tickLower: -WETH_USDC_V4.tickSpacing,
+          tickUpper: WETH_USDC_V4.tickSpacing,
+        }),
+        v3RemoveLiquidityOptions: {
+          tokenId: 1,
+          liquidityPercentage: new Percent(100, 100),
+          slippageTolerance: new Percent(5, 100),
+          deadline: 1,
+          burnToken: true,
+          collectOptions: {
+            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(WETH, 0),
+            recipient: CHAIN_TO_ADDRESSES_MAP[ChainId.MAINNET].v4PositionManagerAddress,
+          },
+        },
+        v4AddLiquidityOptions: {
+          deadline: 1,
+          migrateOptions: { migrate: false },
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
         },
@@ -2305,11 +2341,56 @@ describe('Uniswap', () => {
             spender: TEST_RECIPIENT_ADDRESS, // not the universal router
           },
         },
-        migrateOptions: {
+        v4AddLiquidityOptions: {
           deadline: 1,
-          migrate: true,
+          migrateOptions: { migrate: true },
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
+        },
+      })
+      expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('INVALID_SPENDER')
+    })
+
+    it('throws if migrating out of range and not permitting the universal router', async () => {
+      const permit = makePermitBatch(USDC.address, '1013935132270157186975', undefined, TEST_RECIPIENT_ADDRESS)
+      const signature = await generatePermitSignatureFromBatch(permit, wallet, WETH_USDC_V3.chainId, PERMIT2_ADDRESS)
+      const opts = Object.assign({
+        // below range (current tick = 205265)
+        inputPosition: new Position({
+          pool: WETH_USDC_V3,
+          liquidity: 2971776649834933,
+          tickLower: 204720,
+          tickUpper: 204960,
+        }),
+        // above range (current tick = 0)
+        outputPosition: new V4Position({
+          pool: WETH_USDC_V4,
+          liquidity: 100000,
+          tickLower: 60,
+          tickUpper: 300000,
+        }),
+        v3RemoveLiquidityOptions: {
+          tokenId: 377972,
+          liquidityPercentage: new Percent(100, 100),
+          slippageTolerance: new Percent(10, 100),
+          deadline: MAX_UINT160,
+          burnToken: true,
+          collectOptions: {
+            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(WETH, 0),
+            recipient: CHAIN_TO_ADDRESSES_MAP[ChainId.MAINNET].v4PositionManagerAddress,
+          },
+        },
+        v4AddLiquidityOptions: {
+          deadline: MAX_UINT160,
+          migrateOptions: {
+            migrate: true,
+            neededCurrency: USDC.address,
+            neededAmount: '1013935132270157186975',
+          },
+          slippageTolerance: new Percent(5, 100),
+          recipient: TEST_RECIPIENT_ADDRESS,
+          batchPermit: { permitBatch: permit, signature: signature },
         },
       })
       expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('INVALID_SPENDER')
