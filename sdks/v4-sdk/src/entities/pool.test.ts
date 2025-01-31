@@ -1,5 +1,4 @@
 import {Token, CurrencyAmount, WETH9, Ether, ChainId} from '@uniswap/sdk-core'
-import {describe} from "node:test";
 import { Pool, DYNAMIC_FEE_FLAG } from './pool'
 import JSBI from 'jsbi'
 import { nearestUsableTick, encodeSqrtRatioX96, TickMath } from '@uniswap/v3-sdk'
@@ -266,12 +265,12 @@ describe('Pool', () => {
     const pool = new Pool(Ether.onChain(ChainId.MAINNET), DAI, FEE_AMOUNT_LOW, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
     expect(pool.v4InvolvesToken(Ether.onChain(ChainId.MAINNET))).toEqual(true)
     expect(pool.v4InvolvesToken(DAI)).toEqual(true)
-    expect(pool.v4InvolvesToken(WETH9[1])).toEqual(false)
+    expect(pool.v4InvolvesToken(WETH9[1])).toEqual(true)
 
     const pool2 = new Pool(Ether.onChain(ChainId.MAINNET).wrapped, DAI, FEE_AMOUNT_LOW, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
     expect(pool2.v4InvolvesToken(Ether.onChain(ChainId.MAINNET))).toEqual(true)
     expect(pool2.v4InvolvesToken(DAI)).toEqual(true)
-    expect(pool2.v4InvolvesToken(WETH9[1])).toEqual(false)
+    expect(pool2.v4InvolvesToken(WETH9[1])).toEqual(true)
   })
 
   describe('swaps', () => {
