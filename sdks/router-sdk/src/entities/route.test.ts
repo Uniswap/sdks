@@ -237,4 +237,11 @@ describe('RouteV2', () => {
     expect(route.input).toEqual(token0)
     expect(route.output).toEqual(ETHER)
   })
+
+  it('assigns pathInput and pathOutput correctly', () => {
+    const routeOriginal = new V2RouteSDK([pair_0_weth], token0, ETHER)
+    const route = new RouteV2(routeOriginal)
+    expect(route.pathInput).toEqual(token0)
+    expect(route.pathOutput).toEqual(weth)
+  })
 })
