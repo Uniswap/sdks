@@ -222,7 +222,7 @@ export class V4Planner {
     return this
   }
 
-  addUnwrap(amount: string): V4Planner {
+  addUnwrap(amount: BigNumber): V4Planner {
     this.addAction(Actions.UNWRAP, [amount])
     return this
   }
