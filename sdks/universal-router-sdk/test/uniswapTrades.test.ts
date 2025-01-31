@@ -1954,7 +1954,7 @@ describe('Uniswap', () => {
           tickUpper: WETH_USDC_V3.tickSpacing,
         }),
         outputPosition: new V4Position({
-          pool: WETH_USDC_V4,
+          pool: WETH_USDC_V4, // not an eth pool
           liquidity: 1,
           tickLower: -WETH_USDC_V4.tickSpacing,
           tickUpper: WETH_USDC_V4.tickSpacing,
@@ -1979,7 +1979,7 @@ describe('Uniswap', () => {
           recipient: TEST_RECIPIENT_ADDRESS,
         },
       })
-      expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('ETH_REQUIRED_TO_ADD')
+      expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('NATIVE_REQUIRED')
     })
 
     it('throws if migrating weth to eth with flag not set', async () => {
@@ -2014,9 +2014,10 @@ describe('Uniswap', () => {
           slippageTolerance: new Percent(5, 100),
           sqrtPriceX96: encodeSqrtRatioX96(1, 1),
           recipient: TEST_RECIPIENT_ADDRESS,
+          // useNative flag not set
         },
       })
-      expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('USE_NATIVE_FLAG_REQUIRED')
+      expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('NATIVE_REQUIRED')
     })
 
     it('throws if migrating weth to eth with token mismatch', async () => {
@@ -2054,7 +2055,7 @@ describe('Uniswap', () => {
           recipient: TEST_RECIPIENT_ADDRESS,
         },
       })
-      expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('TOKEN_MISMATCH')
+      expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('TOKEN1_MISMATCH')
     })
 
     it('throws if migrating flag not set', async () => {

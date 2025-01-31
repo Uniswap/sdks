@@ -18,7 +18,7 @@ import {
   PoolKey,
 } from '@uniswap/v4-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
-import { Currency, TradeType, Percent, CHAIN_TO_ADDRESSES_MAP, SupportedChainsType } from '@uniswap/sdk-core'
+import { Currency, TradeType, Percent, CHAIN_TO_ADDRESSES_MAP, SupportedChainsType, Ether } from '@uniswap/sdk-core'
 import { UniswapTrade, SwapOptions } from './entities/actions/uniswap'
 import { RoutePlanner, CommandType } from './utils/routerCommands'
 import { encodePermit, encodeV3PositionPermit } from './utils/inputTokens'
@@ -83,25 +83,29 @@ export abstract class SwapRouter {
     positionManagerOverride?: string
   ): MethodParameters {
     const v4Pool: V4Pool = options.outputPosition.pool
-    let token0 = options.inputPosition.pool.token0
-    let token1 = options.inputPosition.pool.token1
+    let token0: Currency = options.inputPosition.pool.token0
+    let token1: Currency = options.inputPosition.pool.token1
     const v4PositionManagerAddress =
       positionManagerOverride ?? CHAIN_TO_ADDRESSES_MAP[v4Pool.chainId as SupportedChainsType].v4PositionManagerAddress
 
-    // cannot migrate into a WETH position
-    if (token0 === WETH || token1 === WETH) {
-      invariant(v4Pool.token0.isNative, 'ETH_REQUIRED_TO_ADD')
-      invariant(options.v4AddLiquidityOptions.useNative, 'USE_NATIVE_FLAG_REQUIRED')
-      if (token0 === WETH) {
-        invariant(token1 == v4Pool.token1, 'TOKEN_MISMATCH')
-      } else {
-        invariant(token0 == v4Pool.token1, 'TOKEN_MISMATCH')
+    const nativeCurrency = Ether.onChain(v4Pool.chainId)
+
+    // if migrating wrapped native -> native
+    if (nativeCurrency.wrapped.equals(token0) || nativeCurrency.wrapped.equals(token1)) {
+      // v4 pool must use native currency and must have useNative flag set
+      invariant(v4Pool.token0.isNative === options.v4AddLiquidityOptions.useNative, 'NATIVE_REQUIRED')
+      // set token0 or token1 to native currency to validate parameters later
+      if (nativeCurrency.wrapped.equals(token0)) {
+        token0 = nativeCurrency
+      } else if (nativeCurrency.wrapped.equals(token1)) {
+        token1 = token0
+        token0 = nativeCurrency
       }
-    } else {
-      // validate the parameters
-      invariant(token0 === v4Pool.token0, 'TOKEN0_MISMATCH')
-      invariant(token1 === v4Pool.token1, 'TOKEN1_MISMATCH')
     }
+
+    // validate the parameters
+    invariant(token0 === v4Pool.token0, 'TOKEN0_MISMATCH')
+    invariant(token1 === v4Pool.token1, 'TOKEN1_MISMATCH')
 
     invariant(
       options.v3RemoveLiquidityOptions.liquidityPercentage.equalTo(new Percent(100, 100)),
