@@ -164,6 +164,9 @@ describe('Trade', () => {
       expect(trade.swaps.length).toEqual(1)
       expect(trade.routes.length).toEqual(1)
       expect(trade.tradeType).toEqual(TradeType.EXACT_INPUT)
+
+      expect(trade.amounts.inputAmountNative).toEqual(undefined)
+      expect(trade.amounts.outputAmountNative).toEqual(undefined)
     })
 
     it('can contain only a v2 route', async () => {
@@ -182,6 +185,9 @@ describe('Trade', () => {
       expect(trade.swaps.length).toEqual(1)
       expect(trade.routes.length).toEqual(1)
       expect(trade.tradeType).toEqual(TradeType.EXACT_OUTPUT)
+
+      expect(trade.amounts.inputAmountNative).toEqual(undefined)
+      expect(trade.amounts.outputAmountNative).toEqual(undefined)
     })
 
     it('can contain only a mixed route', async () => {
@@ -200,6 +206,9 @@ describe('Trade', () => {
       expect(trade.swaps.length).toEqual(1)
       expect(trade.routes.length).toEqual(1)
       expect(trade.tradeType).toEqual(TradeType.EXACT_INPUT)
+
+      expect(trade.amounts.inputAmountNative).toEqual(undefined)
+      expect(trade.amounts.outputAmountNative).toEqual(undefined)
     })
 
     it('can be constructed with ETHER as input for a V3 Route exact input swap', async () => {
@@ -210,6 +219,11 @@ describe('Trade', () => {
       const trade = await Trade.fromRoute(route, amount, TradeType.EXACT_INPUT)
       expect(trade.inputAmount.currency).toEqual(ETHER)
       expect(trade.outputAmount.currency).toEqual(token0)
+
+      expect(trade.amounts.inputAmountNative).toBeDefined()
+      expect(trade.amounts.inputAmount.equalTo(trade.amounts.inputAmountNative!)).toBe(true)
+      expect(trade.amounts.inputAmountNative?.equalTo(amount)).toBe(true)
+      expect(trade.amounts.outputAmountNative).toEqual(undefined)
     })
 
     it('can be constructed with ETHER as input for a V3 Route exact output swap', async () => {
@@ -220,6 +234,10 @@ describe('Trade', () => {
       const trade = await Trade.fromRoute(route, amount, TradeType.EXACT_OUTPUT)
       expect(trade.inputAmount.currency).toEqual(ETHER)
       expect(trade.outputAmount.currency).toEqual(token0)
+
+      expect(trade.amounts.inputAmountNative).toBeDefined()
+      expect(trade.amounts.inputAmount.equalTo(trade.amounts.inputAmountNative!)).toBe(true)
+      expect(trade.amounts.outputAmountNative).toEqual(undefined)
     })
 
     it('can be constructed with ETHER as output for a V3 Route exact output swap', async () => {
@@ -232,6 +250,11 @@ describe('Trade', () => {
       expect(trade.outputAmount.currency).toEqual(ETHER)
       expect(trade.outputAmount).toEqual(amount)
       expect(trade.inputAmount).toEqual(expectedIn[0])
+
+      expect(trade.amounts.outputAmountNative).toBeDefined()
+      expect(trade.amounts.outputAmount.equalTo(trade.amounts.outputAmountNative!)).toBe(true)
+      expect(trade.amounts.outputAmountNative?.equalTo(amount)).toBe(true)
+      expect(trade.amounts.inputAmountNative).toEqual(undefined)
     })
 
     it('can be constructed with ETHER as output for a V3 Route exact input swap', async () => {
@@ -244,6 +267,11 @@ describe('Trade', () => {
       expect(trade.outputAmount.currency).toEqual(ETHER)
       expect(trade.inputAmount).toEqual(amount)
       expect(trade.outputAmount.wrapped).toEqual(expectedOut[0])
+
+      expect(trade.amounts.outputAmountNative).toBeDefined()
+      expect(trade.amounts.outputAmount.equalTo(trade.amounts.outputAmountNative!)).toBe(true)
+      expect(trade.amounts.outputAmountNative?.equalTo(expectedOut[0])).toBe(true)
+      expect(trade.amounts.inputAmountNative).toEqual(undefined)
     })
 
     it('can be constructed with ETHER as input for a V2 Route exact input swap', async () => {
@@ -254,6 +282,11 @@ describe('Trade', () => {
       const trade = await Trade.fromRoute(route, amount, TradeType.EXACT_INPUT)
       expect(trade.inputAmount.currency).toEqual(ETHER)
       expect(trade.outputAmount.currency).toEqual(token2)
+
+      expect(trade.amounts.inputAmountNative).toBeDefined()
+      expect(trade.amounts.inputAmount.equalTo(trade.amounts.inputAmountNative!)).toBe(true)
+      expect(trade.amounts.inputAmountNative?.equalTo(amount)).toBe(true)
+      expect(trade.amounts.outputAmountNative).toEqual(undefined)
     })
 
     it('can be constructed with ETHER as input for a V2 Route exact output swap', async () => {
@@ -264,6 +297,10 @@ describe('Trade', () => {
       const trade = await Trade.fromRoute(route, amount, TradeType.EXACT_OUTPUT)
       expect(trade.inputAmount.currency).toEqual(ETHER)
       expect(trade.outputAmount.currency).toEqual(token2)
+
+      expect(trade.amounts.inputAmountNative).toBeDefined()
+      expect(trade.amounts.inputAmount.equalTo(trade.amounts.inputAmountNative!)).toBe(true)
+      expect(trade.amounts.outputAmountNative).toEqual(undefined)
     })
 
     it('can be constructed with ETHER as output for a V2 Route exact output swap', async () => {
@@ -274,6 +311,10 @@ describe('Trade', () => {
       const trade = await Trade.fromRoute(route, amount, TradeType.EXACT_OUTPUT)
       expect(trade.inputAmount.currency).toEqual(token2)
       expect(trade.outputAmount.currency).toEqual(ETHER)
+
+      expect(trade.amounts.outputAmountNative).toBeDefined()
+      expect(trade.amounts.outputAmount.equalTo(trade.amounts.outputAmountNative!)).toBe(true)
+      expect(trade.amounts.inputAmountNative).toEqual(undefined)
     })
 
     it('can be constructed with ETHER as output for a V2 Route exact input swap', async () => {
@@ -284,6 +325,10 @@ describe('Trade', () => {
       const trade = await Trade.fromRoute(route, amount, TradeType.EXACT_INPUT)
       expect(trade.inputAmount.currency).toEqual(token2)
       expect(trade.outputAmount.currency).toEqual(ETHER)
+
+      expect(trade.amounts.outputAmountNative).toBeDefined()
+      expect(trade.amounts.outputAmount.equalTo(trade.amounts.outputAmountNative!)).toBe(true)
+      expect(trade.amounts.inputAmountNative).toEqual(undefined)
     })
 
     it('can be constructed with ETHER as input for a Mixed Route exact input swap', async () => {
@@ -294,6 +339,11 @@ describe('Trade', () => {
       const trade = await Trade.fromRoute(route, amount, TradeType.EXACT_INPUT)
       expect(trade.inputAmount.currency).toEqual(ETHER)
       expect(trade.outputAmount.currency).toEqual(token0)
+
+      expect(trade.amounts.inputAmountNative).toBeDefined()
+      expect(trade.amounts.inputAmount.equalTo(trade.amounts.inputAmountNative!)).toBe(true)
+      expect(trade.amounts.inputAmountNative?.equalTo(amount)).toBe(true)
+      expect(trade.amounts.outputAmountNative).toEqual(undefined)
     })
 
     it('can be constructed with ETHER as output for a Mixed Route exact input swap', async () => {
@@ -306,6 +356,11 @@ describe('Trade', () => {
       expect(trade.outputAmount.currency).toEqual(ETHER)
       expect(trade.inputAmount).toEqual(amount)
       expect(trade.outputAmount.wrapped).toEqual(expectedOut[0])
+
+      expect(trade.amounts.outputAmountNative).toBeDefined()
+      expect(trade.amounts.outputAmount.equalTo(trade.amounts.outputAmountNative!)).toBe(true)
+      expect(trade.amounts.outputAmountNative?.equalTo(expectedOut[0])).toBe(true)
+      expect(trade.amounts.inputAmountNative).toEqual(undefined)
     })
 
     it('throws if input currency does not match for V2 Route', async () => {
