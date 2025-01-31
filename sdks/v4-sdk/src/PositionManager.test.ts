@@ -285,7 +285,7 @@ describe('PositionManager', () => {
         recipient,
         slippageTolerance,
         deadline,
-        migrate: true,
+        migrateOptions: { migrate: true },
       })
 
       // Rebuild the data with the planner for the expected mint. MUST sweep since we are using the native currency.

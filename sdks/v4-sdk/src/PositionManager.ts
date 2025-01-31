@@ -63,7 +63,7 @@ export interface MintSpecificOptions {
   /**
    * Whether the mint is part of a migration from V3 to V4 and the additional currency and amount to send if needed
    */
-  migrateOptions?: MigrateSpecificOptions
+  migrateOptions?: MigrateOptions
 }
 
 /**
@@ -113,24 +113,7 @@ export interface CollectSpecificOptions {
   recipient: string
 }
 
-export interface TransferOptions {
-  /**
-   * The account sending the NFT.
-   */
-  sender: string
-
-  /**
-   * The account that should receive the NFT.
-   */
-  recipient: string
-
-  /**
-   * The id of the token being sent.
-   */
-  tokenId: BigintIsh
-}
-
-export interface MigrateSpecificOptions {
+export interface MigrateOptions {
   /**
    * Whether the mint is part of a migration from V3 to V4.
    */
