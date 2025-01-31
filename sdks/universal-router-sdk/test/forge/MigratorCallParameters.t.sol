@@ -52,6 +52,7 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         assertEq(WETH.balanceOf(MAINNET_ROUTER), 0);
         assertEq(USDC.balanceOf(address(v4PositionManager)), 0);
         assertEq(WETH.balanceOf(address(v4PositionManager)), 0);
+        assertEq(address(v4PositionManager).balance, 0);
 
         // old position burned, new position minted
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0, "V3 NOT BURNT");
@@ -77,6 +78,7 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         assertEq(WETH.balanceOf(MAINNET_ROUTER), 0);
         assertEq(USDC.balanceOf(address(v4PositionManager)), 0);
         assertEq(WETH.balanceOf(address(v4PositionManager)), 0);
+        assertEq(address(v4PositionManager).balance, 0);
 
         // old position burned, new position minted
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0, "V3 NOT BURNT");
@@ -102,6 +104,7 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         assertEq(WETH.balanceOf(MAINNET_ROUTER), 0);
         assertEq(USDC.balanceOf(address(v4PositionManager)), 0);
         assertEq(WETH.balanceOf(address(v4PositionManager)), 0);
+        assertEq(address(v4PositionManager).balance, 0);
 
         // old position burned, new position minted
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0, "V3 NOT BURNT");
