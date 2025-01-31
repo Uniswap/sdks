@@ -59,6 +59,11 @@ export interface MintSpecificOptions {
    * Initial price to set on the pool if creating
    */
   sqrtPriceX96?: BigintIsh
+
+  /**
+   * Whether the mint is part of a migration from V3 to V4 and the additional currency and amount to send if needed
+   */
+  migrateOptions?: MigrateSpecificOptions
 }
 
 /**
@@ -129,17 +134,15 @@ export interface MigrateSpecificOptions {
   /**
    * Whether the mint is part of a migration from V3 to V4.
    */
-  migrate: boolean
-
+  migrate?: boolean
   /**
-   * Whether the migrate needs additional transfer or not
+   * The additional currency that needs to be transferred
    */
-  additionalTransfer?: AdditionalTransferDetails
-}
-
-export interface AdditionalTransferDetails {
-  neededCurrency: Currency
-  neededAmount: BigintIsh
+  neededCurrency?: Currency
+  /**
+   * The amount of additional currency that needs to be transferred
+   */
+  neededAmount?: BigintIsh
 }
 
 export interface PermitDetails {
@@ -194,10 +197,9 @@ export interface NFTPermitData {
 }
 
 export type MintOptions = CommonOptions & CommonAddLiquidityOptions & MintSpecificOptions
-export type MigrateOptions = MintOptions & MigrateSpecificOptions
 export type IncreaseLiquidityOptions = CommonOptions & CommonAddLiquidityOptions & ModifyPositionSpecificOptions
 
-export type AddLiquidityOptions = MintOptions | IncreaseLiquidityOptions | MigrateOptions
+export type AddLiquidityOptions = MintOptions | IncreaseLiquidityOptions
 
 export type RemoveLiquidityOptions = CommonOptions & RemoveLiquiditySpecificOptions & ModifyPositionSpecificOptions
 
@@ -206,10 +208,6 @@ export type CollectOptions = CommonOptions & CollectSpecificOptions
 // type guard
 function isMint(options: AddLiquidityOptions): options is MintOptions {
   return Object.keys(options).some((k) => k === 'recipient')
-}
-
-function isMigrate(options: AddLiquidityOptions): options is MigrateOptions {
-  return Object.keys(options).some((k) => k === 'migrate')
 }
 
 function shouldCreatePool(options: MintOptions): boolean {
@@ -292,7 +290,7 @@ export abstract class V4PositionManager {
     }
 
     // If migrating, we need to settle and sweep both currencies individually
-    if (isMigrate(options) && options.migrate) {
+    if (isMint(options) && options.migrateOptions?.migrate) {
       // payer is v4 positiion manager
       planner.addSettle(position.pool.currency0, false)
       planner.addSettle(position.pool.currency1, false)
