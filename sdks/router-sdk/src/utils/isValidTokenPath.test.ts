@@ -1,8 +1,8 @@
 import { Ether, Token, WETH9 } from '@uniswap/sdk-core'
 import { FeeAmount, encodeSqrtRatioX96 } from '@uniswap/v3-sdk'
 import { Pool as V4Pool } from '@uniswap/v4-sdk'
-import {isValidTokenPath} from './isValidTokenPath'
 import { ADDRESS_ZERO } from '../constants'
+import { isValidTokenPath } from './isValidTokenPath'
 
 describe('#isValidTokenPath', () => {
   const SQRT_RATIO_ONE = encodeSqrtRatioX96(1, 1)
