@@ -129,7 +129,7 @@ describe('PositionManager', () => {
             tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
             liquidity: 8888888,
           }),
-          { recipient, slippageTolerance, deadline }
+          { recipient, slippageTolerance, deadline } // useNative not set
         )
       ).toThrow(NO_NATIVE)
     })
