@@ -71,7 +71,11 @@ describe('#encodeMixedRouteToPath', () => {
   const route_eth_V4_0_V3_1 = new MixedRouteSDK([pool_V4_0_eth, pool_V3_0_1_medium], ETHER, token1)
   const route_eth_V3_0_V4_1 = new MixedRouteSDK([pool_V3_0_weth, pool_V4_0_1], ETHER, token1)
 
-  const route_1_v2_weth_v0_eth_v4_token0 = new MixedRouteSDK([pair_1_weth, fake_v4_eth_weth_pool, pool_V4_0_eth], token1, token0)
+  const route_1_v2_weth_v0_eth_v4_token0 = new MixedRouteSDK(
+    [pair_1_weth, fake_v4_eth_weth_pool, pool_V4_0_eth],
+    token1,
+    token0
+  )
 
   describe('pure V3', () => {
     it('packs them for exact input single hop', () => {
@@ -184,7 +188,7 @@ describe('#encodeMixedRouteToPath', () => {
 
     it('packs them for exact input native eth v4 -> v3', () => {
       expect(encodeMixedRouteToPath(route_eth_V4_0_V3_1)).toEqual(
-        '0x0000000000000000000000000000000000000000 400bb800001e00000000000000000000000000000000000000000000000000000000000000000000000000000001300bb80000000000000000000000000000000000000002'
+        '0x0000000000000000000000000000000000000000400bb800001e00000000000000000000000000000000000000000000000000000000000000000000000000000001300bb80000000000000000000000000000000000000002'
       )
     })
 
@@ -195,7 +199,9 @@ describe('#encodeMixedRouteToPath', () => {
     })
 
     it('encodes the mixed route with an unwrap, token1 v2 -> v4 token0 through an unwrap', () => {
-      expect(encodeMixedRouteToPath(route_1_v2_weth_v0_eth_v4_token0)).toEqual('0x000000000000000000000000000000000000000220c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000000000000000000000400bb800001e00000000000000000000000000000000000000000000000000000000000000000000000000000001')
+      expect(encodeMixedRouteToPath(route_1_v2_weth_v0_eth_v4_token0)).toEqual(
+        '0x000000000000000000000000000000000000000220c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000000000000000000000400bb800001e00000000000000000000000000000000000000000000000000000000000000000000000000000001'
+      )
       // comments left for future reference, to show special cased eth-weth v4 (version0) encoding in the mixed route quoter
       // // first path address - token1
       // 0x0000000000000000000000000000000000000002
@@ -215,7 +221,6 @@ describe('#encodeMixedRouteToPath', () => {
       // 0x0000000000000000000000000000000000000000
       // // last path address - v4 pool, token0
       // 0x0000000000000000000000000000000000000001
-
     })
   })
 })
