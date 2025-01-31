@@ -63,10 +63,15 @@ export class UniswapTrade implements Command {
   readonly tradeType: RouterActionType = RouterActionType.UniswapTrade
   readonly payerIsUser: boolean
 
+  readonly numberOfSplitInputsRequireWrap: number
+  readonly numberOfSplitInputsRequireUnwrap: number
+  readonly numberOfSplitOutputsRequireWrap: number
+  readonly numberOfSplitOutputsRequireUnwrap: number
+
   constructor(public trade: RouterTrade<Currency, Currency, TradeType>, public options: SwapOptions) {
     if (!!options.fee && !!options.flatFee) throw new Error('Only one fee option permitted')
 
-    if (this.inputRequiresWrap || this.inputRequiresUnwrap || this.options.useRouterBalance) {
+    if (this.amountInputRequiresWrap || this.numberOfSplitInputsRequireUnwrap > 0 || this.options.useRouterBalance) {
       this.payerIsUser = false
     } else {
       this.payerIsUser = true
@@ -81,25 +86,13 @@ export class UniswapTrade implements Command {
     return result
   }
 
-  get inputRequiresWrap(): boolean {
-    if (this.isAllV4) {
-      return (
-        this.trade.inputAmount.currency.isNative &&
-        !(this.trade.swaps[0].route as unknown as V4Route<Currency, Currency>).pathInput.isNative
-      )
-    } else {
-      return this.trade.inputAmount.currency.isNative
-    }
-  }
-
-  get inputRequiresUnwrap(): boolean {
-    if (this.isAllV4) {
-      return (
-        !this.trade.inputAmount.currency.isNative &&
-        (this.trade.swaps[0].route as unknown as V4Route<Currency, Currency>).pathInput.isNative
-      )
-    }
-    return false
+  get amountInputRequiresWrap(): number {
+    // if the trade isnt native input, nothing needs to be wrapped
+    if (!this.trade.inputAmount.currency.isNative) return 0
+    // if the trade is exactOutput, we preemptively wrap everything as we dont know how much WETH is needed
+    if (this.trade.tradeType === TradeType.EXACT_OUTPUT) return this.trade.amounts.inputAmount
+    // if the trade is exactInput, we can just wrap the precise amount of WETH that is needed
+    return this.trade.amounts.inputAmount.sub(this.trade.amounts.inputAmountNative)
   }
 
   get outputRequiresWrap(): boolean {
@@ -128,22 +121,27 @@ export class UniswapTrade implements Command {
   }
 
   encode(planner: RoutePlanner, _config: TradeConfig): void {
-    // If the input currency is the native currency, we need to wrap it with the router as the recipient
-    if (this.inputRequiresWrap) {
-      // TODO: optimize if only one v2 pool we can directly send this to the pool
-      planner.addCommand(CommandType.WRAP_ETH, [
-        ROUTER_AS_RECIPIENT,
-        this.trade.maximumAmountIn(this.options.slippageTolerance).quotient.toString(),
-      ])
-    } else if (this.inputRequiresUnwrap) {
-      // send wrapped token to router to unwrap
+    let midSplitUnwrapNeeded: boolean = false
+
+    let amountToWrap = this.amountInputRequiresWrap
+    if (amountToWrap > 0 && this.numberOfSplitInputsRequireUnwrap > 0) throw new Error('Input wrap mismatch')
+
+    // If the input currency is the native currency, and some routes require WETH-input we wrap ETH
+    // For exactInput this is the precise amount that needs to be wrapped, for exactOutput we wrap everything and unwrap the remainder later
+    if (amountToWrap > 0) {
+      planner.addCommand(CommandType.WRAP_ETH, [ROUTER_AS_RECIPIENT, amountToWrap])
+      if (this.trade.tradeType === TradeType.EXACT_OUTPUT) midSplitUnwrapNeeded = true
+    } else if (this.numberOfSplitInputsRequireUnwrap > 0) {
+      // if the input currency is WETH, send all the wrapped tokens to router, so that they can be unwrapped when the time comes
+      // first all WETH-input routes will be added, then the remaining WETH will be unwrapped for the ETH-input routes
       planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [
         (this.trade.inputAmount.currency as Token).address,
         ROUTER_AS_RECIPIENT,
         this.trade.maximumAmountIn(this.options.slippageTolerance).quotient.toString(),
       ])
-      planner.addCommand(CommandType.UNWRAP_WETH, [ROUTER_AS_RECIPIENT, 0])
+      midSplitUnwrapNeeded = true
     }
+
     // The overall recipient at the end of the trade, SENDER_AS_RECIPIENT uses the msg.sender
     this.options.recipient = this.options.recipient ?? SENDER_AS_RECIPIENT
 
@@ -151,12 +149,20 @@ export class UniswapTrade implements Command {
     //   1. when there are >2 exact input trades. this is only a heuristic,
     //      as it's still more gas-expensive even in this case, but has benefits
     //      in that the reversion probability is lower
+    // TODO there are more cases now
     const performAggregatedSlippageCheck =
       this.trade.tradeType === TradeType.EXACT_INPUT && this.trade.routes.length > 2
     const routerMustCustody =
       performAggregatedSlippageCheck || this.outputRequiresTransition || hasFeeOption(this.options)
 
+    // the swaps are sorted such that WETH input routes come before ETH input routes, so we can unwrap if we need to
     for (const swap of this.trade.swaps) {
+      // when the first ETH-input swap is reached, unwrap all the WETH in the contract
+      // this could be triggered on the first loop if all of the splits require ETH input
+      if (midSplitUnwrapNeeded && swap.route.input.isNative) {
+        planner.addCommand(CommandType.UNWRAP_WETH, [ROUTER_AS_RECIPIENT, 0])
+        midSplitUnwrapNeeded = false
+      }
       switch (swap.route.protocol) {
         case Protocol.V2:
           addV2Swap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
@@ -231,12 +237,16 @@ export class UniswapTrade implements Command {
     // for exactOutput swaps with native input or that perform an inputToken transition (wrap or unwrap)
     // we need to send back the change to the user
     if (this.trade.tradeType === TradeType.EXACT_OUTPUT || riskOfPartialFill(this.trade)) {
-      if (this.inputRequiresWrap) {
+      if (amountToWrap > 0 && midSplitUnwrapNeeded) {
+        // all routes were WETH input, so no unwrap happened, we now unwrap the leftover ETH back to the user
         planner.addCommand(CommandType.UNWRAP_WETH, [this.options.recipient, 0])
-      } else if (this.inputRequiresUnwrap) {
+      } else if (this.numberOfSplitInputsRequireUnwrap > 0 && !midSplitUnwrapNeeded) {
+        // all input WETH was brought into the router, and it was unwrapped for ETH-input routes
+        // we wrap leftover WETH back to the user
         planner.addCommand(CommandType.WRAP_ETH, [this.options.recipient, CONTRACT_BALANCE])
       } else if (this.trade.inputAmount.currency.isNative) {
-        // must refund extra native currency sent along for native v4 trades (no input transition)
+        // either all routes were v4-ETH-input so no wraps were needed, or leftover WETH was already unwrapped
+        // back into ETH due to midSplitUnwrapNeeded. We sweep the ETH back to the user
         planner.addCommand(CommandType.SWEEP, [ETH_ADDRESS, this.options.recipient, 0])
       }
     }
