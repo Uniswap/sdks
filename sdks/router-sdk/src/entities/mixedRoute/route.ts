@@ -54,9 +54,9 @@ export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
       const prevPool = pools[i - 1]
       const pool = pools[i]
       const inputToken = tokenPath[i]
-      const outputToken = pool.token0.wrapped.equals(inputToken.wrapped) ? pool.token1 : pool.token0
+      const outputToken = pool.token0.equals(inputToken) ? pool.token1 : pool.token0
 
-      invariant(isValidTokenPath(prevPool, pool, inputToken), 'PATH')
+      invariant(isValidTokenPath(prevPool, pool, inputToken), `PATH ${JSON.stringify(prevPool)} ${JSON.stringify(pool)} ${JSON.stringify(inputToken)} ${JSON.stringify(tokenPath)}`)
       tokenPath.push(outputToken)
     }
 
