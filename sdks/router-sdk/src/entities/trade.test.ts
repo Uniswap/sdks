@@ -1,7 +1,7 @@
 import { sqrt, Token, CurrencyAmount, TradeType, WETH9, Ether, Percent, Price } from '@uniswap/sdk-core'
 import { BigNumber } from '@ethersproject/bignumber'
 import JSBI from 'jsbi'
-import { MixedRoute, RouteV2, RouteV3 } from './route'
+import { MixedRoute, RouteV2, RouteV3, RouteV4 } from './route'
 import { Trade } from './trade'
 import {
   Route as V3RouteSDK,
@@ -14,6 +14,8 @@ import {
 } from '@uniswap/v3-sdk'
 import { Pair, Route as V2RouteSDK } from '@uniswap/v2-sdk'
 import { MixedRouteSDK } from './mixedRoute/route'
+import { Route as V4RouteSDK, Pool as V4Pool } from '@uniswap/v4-sdk'
+import { ADDRESS_ZERO } from '../constants'
 
 describe('Trade', () => {
   const ETHER = Ether.onChain(1)
@@ -22,6 +24,8 @@ describe('Trade', () => {
   const token1 = new Token(1, '0x0000000000000000000000000000000000000002', 18, 't1', 'token1')
   const token2 = new Token(1, '0x0000000000000000000000000000000000000003', 18, 't2', 'token2')
   const token3 = new Token(1, '0x0000000000000000000000000000000000000004', 18, 't3', 'token3')
+  const SQRT_RATIO_ONE = encodeSqrtRatioX96(1, 1)
+
   const token4WithTax = new Token(
     1,
     '0x0000000000000000000000000000000000000005',
@@ -146,6 +150,19 @@ describe('Trade', () => {
     CurrencyAmount.fromRawAmount(weth, JSBI.BigInt(100000)),
     CurrencyAmount.fromRawAmount(token1, JSBI.BigInt(100000))
   )
+
+  const pool_v4_1_eth = new V4Pool(token1, ETHER, FeeAmount.MEDIUM, 60, ADDRESS_ZERO, SQRT_RATIO_ONE, 0, 0, [
+    {
+      index: nearestUsableTick(TickMath.MIN_TICK, TICK_SPACINGS[FeeAmount.MEDIUM]),
+      liquidityNet: 0,
+      liquidityGross: 0,
+    },
+    {
+      index: nearestUsableTick(TickMath.MAX_TICK, TICK_SPACINGS[FeeAmount.MEDIUM]),
+      liquidityNet: JSBI.multiply(JSBI.BigInt(0), JSBI.BigInt(-1)),
+      liquidityGross: 0,
+    },
+  ])
 
   describe('#fromRoute', () => {
     it('can contain only a v3 route', async () => {
@@ -607,6 +624,12 @@ describe('Trade', () => {
       expect(trade.inputAmount.currency).toEqual(ETHER)
       expect(trade.outputAmount.currency).toEqual(token1)
       expect(trade.swaps.length).toEqual(3)
+      // Expect all input amounts to be native
+      expect(trade.swaps.every((swap) => swap.inputAmount.currency.isNative)).toBe(true)
+      // Expect all route inputs to be ETH
+      expect(trade.swaps.every((swap) => swap.route.input.isNative)).toBe(true)
+      // Expect all route path inputs to be WETH, can't use pathInput because not supported in older SDKs
+      expect(trade.swaps.every((swap) => swap.route.pools[0].involvesToken(weth))).toBe(true)
       expect(trade.routes.length).toEqual(3)
       expect(trade.tradeType).toEqual(TradeType.EXACT_INPUT)
     })
@@ -679,6 +702,37 @@ describe('Trade', () => {
       expect(trade.outputAmount.currency).toEqual(ETHER)
       expect(trade.swaps.length).toEqual(3)
       expect(trade.routes.length).toEqual(3)
+      expect(trade.tradeType).toEqual(TradeType.EXACT_INPUT)
+    })
+
+    it('can be constructed with ETHER as input for exact input swap, with V4 eth input', async () => {
+      const routeOriginalV2 = new V2RouteSDK([pair_weth_0, pair_0_1], ETHER, token1)
+      const routev2 = new RouteV2(routeOriginalV2)
+      const amountv2 = CurrencyAmount.fromRawAmount(ETHER, JSBI.BigInt(100))
+
+      const routeOriginalV4 = new V4RouteSDK([pool_v4_1_eth], ETHER, token1)
+      const routev4 = new RouteV4(routeOriginalV4)
+      const amountv4 = CurrencyAmount.fromRawAmount(ETHER, JSBI.BigInt(1000))
+
+      const trade = await Trade.fromRoutes(
+        [{ routev2, amount: amountv2 }],
+        [],
+        TradeType.EXACT_INPUT,
+        [],
+        [{ routev4, amount: amountv4 }]
+      )
+
+      expect(trade.inputAmount.currency).toEqual(ETHER)
+      expect(trade.outputAmount.currency).toEqual(token1)
+      expect(trade.swaps.length).toEqual(2)
+      expect(trade.routes.length).toEqual(2)
+      // Expect all input amounts to be native
+      expect(trade.swaps.every((swap) => swap.inputAmount.currency.isNative)).toBe(true)
+      // Expect all route inputs to be ETH
+      expect(trade.swaps.every((swap) => swap.route.input.isNative)).toBe(true)
+      // However, expect the routes to be preserved (v2 using WETH and v4 using ETH)
+      expect(trade.swaps[0].route.pools[0].involvesToken(weth)).toBe(true)
+      expect(trade.swaps[1].route.pools[0].token0.isNative || trade.swaps[1].route.pools[0].token1.isNative).toBe(true)
       expect(trade.tradeType).toEqual(TradeType.EXACT_INPUT)
     })
 

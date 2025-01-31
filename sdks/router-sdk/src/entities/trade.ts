@@ -137,18 +137,21 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
 
   /**
    * Maps an amount from a compareCurrency to a baseCurrency
-   * 
+   *
    * @dev BaseCurrency and CompareCurrency must have the same wrapped versions
    * @param baseCurrency The base currency to map to
    * @param amount The amount to map
    * @returns The mapped amount in terms of baseCurrency
    */
-  public mapAmount = <BaseCurrency extends Currency, CompareCurrency extends Currency>(baseCurrency: BaseCurrency, amount: CurrencyAmount<BaseCurrency | CompareCurrency>): CurrencyAmount<BaseCurrency> => {
-    if(baseCurrency.equals(amount.currency)) return amount as CurrencyAmount<BaseCurrency>
+  public mapAmount = <BaseCurrency extends Currency, CompareCurrency extends Currency>(
+    baseCurrency: BaseCurrency,
+    amount: CurrencyAmount<BaseCurrency | CompareCurrency>
+  ): CurrencyAmount<BaseCurrency> => {
+    if (baseCurrency.equals(amount.currency)) return amount as CurrencyAmount<BaseCurrency>
 
-    if(!baseCurrency.wrapped.equals(amount.currency.wrapped)) throw new Error('Wrapped currencies mismatch')
+    if (!baseCurrency.wrapped.equals(amount.currency.wrapped)) throw new Error('Wrapped currencies mismatch')
 
-    if(baseCurrency.isNative){
+    if (baseCurrency.isNative) {
       return CurrencyAmount.fromRawAmount(baseCurrency, amount.quotient) as CurrencyAmount<BaseCurrency>
     } else {
       return CurrencyAmount.fromRawAmount(baseCurrency.wrapped, amount.quotient) as CurrencyAmount<BaseCurrency>
@@ -164,9 +167,14 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     const inputAmountCurrency = this.swaps[0].inputAmount.currency
     // However, its possible for routes within the trade to have different pathInput
     let totalInputFromRoutes = this.swaps
-      .map(({ route, inputAmount: routeInputAmount }) => 
-        route.protocol === Protocol.V4 ? 
-          this.mapAmount<typeof inputAmountCurrency, typeof routeInputAmount.currency>(inputAmountCurrency, routeInputAmount) : routeInputAmount)
+      .map(({ route, inputAmount: routeInputAmount }) =>
+        route.protocol === Protocol.V4
+          ? this.mapAmount<typeof inputAmountCurrency, typeof routeInputAmount.currency>(
+              inputAmountCurrency,
+              routeInputAmount
+            )
+          : routeInputAmount
+      )
       .reduce((total, cur) => total.add(cur), CurrencyAmount.fromRawAmount(inputAmountCurrency, 0))
 
     this._inputAmount = totalInputFromRoutes
@@ -182,9 +190,11 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     const outputCurrency = this.swaps[0].outputAmount.currency
     // However, its possible for routes within the trade to have different pathOutput
     let totalOutputFromRoutes = this.swaps
-      .map(({ route, outputAmount: routeOutputAmount }) => 
-        route.protocol === Protocol.V4 ? 
-          this.mapAmount<typeof outputCurrency, typeof routeOutputAmount.currency>(outputCurrency, routeOutputAmount) : routeOutputAmount)
+      .map(({ route, outputAmount: routeOutputAmount }) =>
+        route.protocol === Protocol.V4
+          ? this.mapAmount<typeof outputCurrency, typeof routeOutputAmount.currency>(outputCurrency, routeOutputAmount)
+          : routeOutputAmount
+      )
       .reduce((total, cur) => total.add(cur), CurrencyAmount.fromRawAmount(outputCurrency, 0))
 
     this._outputAmount = totalOutputFromRoutes
@@ -197,8 +207,10 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     outputAmount: CurrencyAmount<TOutput>
     outputAmountNative: CurrencyAmount<TOutput> | undefined
   } {
-    const inputNativeCurrency = this.swaps.find(({ inputAmount }) => inputAmount.currency.isNative)?.inputAmount.currency
-    const outputNativeCurrency = this.swaps.find(({ outputAmount }) => outputAmount.currency.isNative)?.outputAmount.currency
+    const inputNativeCurrency = this.swaps.find(({ inputAmount }) => inputAmount.currency.isNative)?.inputAmount
+      .currency
+    const outputNativeCurrency = this.swaps.find(({ outputAmount }) => outputAmount.currency.isNative)?.outputAmount
+      .currency
     const sumNativeAmounts = <T extends Currency>(amounts: CurrencyAmount<T>[], nativeCurrency: T) => {
       return amounts.reduce((total, cur) => {
         return cur.currency.isNative ? total.add(cur) : total
@@ -207,9 +219,19 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
 
     return {
       inputAmount: this.inputAmount,
-      inputAmountNative: inputNativeCurrency ? sumNativeAmounts(this.swaps.map(({ inputAmount }) => inputAmount), inputNativeCurrency) : undefined,
+      inputAmountNative: inputNativeCurrency
+        ? sumNativeAmounts(
+            this.swaps.map(({ inputAmount }) => inputAmount),
+            inputNativeCurrency
+          )
+        : undefined,
       outputAmount: this.outputAmount,
-      outputAmountNative: outputNativeCurrency ? sumNativeAmounts(this.swaps.map(({ outputAmount }) => outputAmount), outputNativeCurrency) : undefined,
+      outputAmountNative: outputNativeCurrency
+        ? sumNativeAmounts(
+            this.swaps.map(({ outputAmount }) => outputAmount),
+            outputNativeCurrency
+          )
+        : undefined,
     }
   }
 
