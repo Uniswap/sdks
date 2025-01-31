@@ -165,11 +165,13 @@ export class Pool {
    * @param currency
    */
   public v4InvolvesToken(currency: Currency): boolean {
-    return this.involvesCurrency(currency)
-        || currency.wrapped.equals(this.currency0)
-        || currency.wrapped.equals(this.currency1)
-        || currency.wrapped.equals(this.currency0.wrapped)
-        || currency.wrapped.equals(this.currency1.wrapped)
+    return (
+      this.involvesCurrency(currency) ||
+      currency.wrapped.equals(this.currency0) ||
+      currency.wrapped.equals(this.currency1) ||
+      currency.wrapped.equals(this.currency0.wrapped) ||
+      currency.wrapped.equals(this.currency1.wrapped)
+    )
   }
 
   /**
