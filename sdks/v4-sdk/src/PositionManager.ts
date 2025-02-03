@@ -285,16 +285,20 @@ export abstract class V4PositionManager {
     // If migrating, we need to settle and sweep both currencies individually
     if (isMint(options) && options.migrate) {
       if (options.useNative) {
+        // unwrap the exact amount needed to send to the pool manager
         planner.addUnwrap(OPEN_DELTA)
-      }
-      // payer is v4 position manager
-      planner.addSettle(position.pool.currency0, false)
-      planner.addSettle(position.pool.currency1, false)
-      planner.addSweep(position.pool.currency0, options.recipient)
-      planner.addSweep(position.pool.currency1, options.recipient)
-      // sweep wrapped native for good measure
-      if (options.useNative) {
+        // payer is v4 position manager
+        planner.addSettle(position.pool.currency0, false)
+        planner.addSettle(position.pool.currency1, false)
+        // sweep any leftover wrapped native that was not unwrapped
         planner.addSweep(position.pool.currency0.wrapped, options.recipient)
+        planner.addSweep(position.pool.currency1, options.recipient)
+      } else {
+        // payer is v4 position manager
+        planner.addSettle(position.pool.currency0, false)
+        planner.addSettle(position.pool.currency1, false)
+        planner.addSweep(position.pool.currency0, options.recipient)
+        planner.addSweep(position.pool.currency1, options.recipient)
       }
     } else {
       // need to settle both currencies when minting / adding liquidity (user is the payer)
