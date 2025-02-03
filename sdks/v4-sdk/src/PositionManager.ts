@@ -11,7 +11,7 @@ import invariant from 'tiny-invariant'
 import {
   EMPTY_BYTES,
   CANNOT_BURN,
-  NO_NATIVE,
+  NATIVE_NOT_SET,
   NO_SQRT_PRICE,
   ONE,
   PositionFunctions,
@@ -245,7 +245,7 @@ export abstract class V4PositionManager {
     invariant(
       (position.pool.currency0 === options.useNative && options.useNative === Ether.onChain(position.pool.chainId)) ||
         (!position.pool.currency0.isNative && options.useNative === undefined),
-      NO_NATIVE
+      NATIVE_NOT_SET
     )
 
     // adjust for slippage

@@ -34,7 +34,7 @@ export const SQRT_PRICE_1_1 = encodeSqrtRatioX96(1, 1)
 export const EMPTY_HOOK = '0x0000000000000000000000000000000000000000'
 
 // error constants
-export const NO_NATIVE = 'NO_NATIVE'
+export const NATIVE_NOT_SET = 'NATIVE_NOT_SET'
 export const ZERO_LIQUIDITY = 'ZERO_LIQUIDITY'
 export const NO_SQRT_PRICE = 'NO_SQRT_PRICE'
 export const CANNOT_BURN = 'CANNOT_BURN'

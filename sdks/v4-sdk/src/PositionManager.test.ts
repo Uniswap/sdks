@@ -5,7 +5,7 @@ import {
   EMPTY_HOOK,
   FeeAmount,
   CANNOT_BURN,
-  NO_NATIVE,
+  NATIVE_NOT_SET,
   SQRT_PRICE_1_1,
   TICK_SPACINGS,
   ZERO_LIQUIDITY,
@@ -117,7 +117,7 @@ describe('PositionManager', () => {
           }),
           { recipient, slippageTolerance, deadline, useNative: currency_native }
         )
-      ).toThrow(NO_NATIVE)
+      ).toThrow(NATIVE_NOT_SET)
     })
 
     it('throws if pool has ether and useNative is set to incorrect native', () => {
@@ -131,7 +131,7 @@ describe('PositionManager', () => {
           }),
           { recipient, slippageTolerance, deadline, useNative: Ether.onChain(2) } // not the same as the pool currency
         )
-      ).toThrow(NO_NATIVE)
+      ).toThrow(NATIVE_NOT_SET)
     })
 
     it('throws if pool involves ether and useNative is not set', () => {
@@ -145,7 +145,7 @@ describe('PositionManager', () => {
           }),
           { recipient, slippageTolerance, deadline } // useNative not set
         )
-      ).toThrow(NO_NATIVE)
+      ).toThrow(NATIVE_NOT_SET)
     })
 
     it('throws if createPool is true but there is no sqrtPrice defined', () => {
