@@ -106,7 +106,7 @@ describe('PositionManager', () => {
       ).toThrow('ZERO_LIQUIDITY')
     })
 
-    it('throws if pool does not involve ether and useNative is true', () => {
+    it('throws if pool does not involve ether and useNative is set', () => {
       expect(() =>
         V4PositionManager.addCallParameters(
           new Position({
@@ -115,12 +115,26 @@ describe('PositionManager', () => {
             tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
             liquidity: 8888888,
           }),
-          { recipient, slippageTolerance, deadline, useNative: true }
+          { recipient, slippageTolerance, deadline, useNative: currency_native }
         )
       ).toThrow(NO_NATIVE)
     })
 
-    it('throws if pool involves ether and useNative is false', () => {
+    it('throws if pool has ether and useNative is set to incorrect native', () => {
+      expect(() =>
+        V4PositionManager.addCallParameters(
+          new Position({
+            pool: pool_0_1,
+            tickLower: -TICK_SPACINGS[FeeAmount.MEDIUM],
+            tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
+            liquidity: 8888888,
+          }),
+          { recipient, slippageTolerance, deadline, useNative: Ether.onChain(2) } // not the same as the pool currency
+        )
+      ).toThrow(NO_NATIVE)
+    })
+
+    it('throws if pool involves ether and useNative is not set', () => {
       expect(() =>
         V4PositionManager.addCallParameters(
           new Position({
@@ -251,7 +265,7 @@ describe('PositionManager', () => {
       expect(value).toEqual('0x00')
     })
 
-    it('succeeds when useNative is true', () => {
+    it('succeeds when useNative is set', () => {
       const position: Position = new Position({
         pool: pool_1_eth,
         tickLower: -TICK_SPACINGS[FeeAmount.MEDIUM],
@@ -262,7 +276,7 @@ describe('PositionManager', () => {
         recipient,
         slippageTolerance,
         deadline,
-        useNative: true,
+        useNative: currency_native,
       })
 
       // Rebuild the data with the planner for the expected mint. MUST sweep since we are using the native currency.
@@ -338,7 +352,7 @@ describe('PositionManager', () => {
         slippageTolerance,
         deadline,
         migrate: true,
-        useNative: true,
+        useNative: currency_native,
       })
 
       // Rebuild the data with the planner for the expected mint. MUST sweep since we are using the native currency.
@@ -356,7 +370,7 @@ describe('PositionManager', () => {
         EMPTY_BYTES,
       ])
 
-      planner.addAction(Actions.UNWRAP, ['0x8000000000000000000000000000000000000000000000000000000000000000'])
+      planner.addAction(Actions.UNWRAP, [0])
       planner.addAction(Actions.SETTLE, [toAddress(pool_1_eth.currency0), 0, false])
       planner.addAction(Actions.SETTLE, [toAddress(pool_1_eth.currency1), 0, false])
       planner.addAction(Actions.SWEEP, [toAddress(pool_1_eth.currency0), recipient])

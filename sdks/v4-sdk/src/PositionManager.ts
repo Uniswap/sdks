@@ -1,6 +1,5 @@
-import { BigintIsh, Percent, validateAndParseAddress } from '@uniswap/sdk-core'
+import { BigintIsh, Percent, validateAndParseAddress, NativeCurrency } from '@uniswap/sdk-core'
 import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
-import { BigNumber } from 'ethers'
 import JSBI from 'jsbi'
 import { Position } from './entities/position'
 import { MethodParameters, toHex } from './utils/calldata'
@@ -18,6 +17,7 @@ import {
   PositionFunctions,
   ZERO,
   ZERO_LIQUIDITY,
+  OPEN_DELTA,
 } from './internalConstants'
 import { V4PositionPlanner } from './utils'
 import { positionManagerAbi } from './utils/positionManagerAbi'
@@ -74,7 +74,7 @@ export interface CommonAddLiquidityOptions {
   /**
    * Whether to spend ether. If true, one of the currencies must be the NATIVE currency.
    */
-  useNative?: boolean
+  useNative?: NativeCurrency
 
   /**
    * The optional permit2 batch permit parameters for spending token0 and token1
@@ -241,8 +241,12 @@ export abstract class V4PositionManager {
       calldataList.push(V4PositionManager.encodeInitializePool(position.pool.poolKey, options.sqrtPriceX96!))
     }
 
-    // undefined is treated as false for useNative
-    invariant(position.pool.currency0.isNative === !!options.useNative, NO_NATIVE)
+    // position.pool.currency0 is native if and only if options.useNative is native
+    invariant(
+      position.pool.currency0 === options.useNative ||
+        (!position.pool.currency0.isNative && options.useNative === undefined),
+      NO_NATIVE
+    )
 
     // adjust for slippage
     const maximumAmounts = position.mintAmountsWithSlippage(options.slippageTolerance)
@@ -281,7 +285,7 @@ export abstract class V4PositionManager {
     // If migrating, we need to settle and sweep both currencies individually
     if (isMint(options) && options.migrate) {
       if (options.useNative) {
-        planner.addUnwrap(BigNumber.from('0x8000000000000000000000000000000000000000000000000000000000000000'))
+        planner.addUnwrap(OPEN_DELTA)
       }
       // payer is v4 position manager
       planner.addSettle(position.pool.currency0, false)

@@ -24,6 +24,9 @@ export const TICK_SPACING_SIXTY = 60
 // used in position manager math
 export const MIN_SLIPPAGE_DECREASE = 0
 
+// used when unwrapping weth in positon manager
+export const OPEN_DELTA = constants.Zero
+
 // default prices
 export const SQRT_PRICE_1_1 = encodeSqrtRatioX96(1, 1)
 
