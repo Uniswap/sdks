@@ -23,7 +23,6 @@ import { UniswapTrade, SwapOptions } from './entities/actions/uniswap'
 import { RoutePlanner, CommandType } from './utils/routerCommands'
 import { encodePermit, encodeV3PositionPermit } from './utils/inputTokens'
 import { UNIVERSAL_ROUTER_ADDRESS, UniversalRouterVersion } from './utils/constants'
-import { WETH } from '../test/utils/uniswapData'
 
 export type SwapRouterConfig = {
   sender?: string // address
@@ -83,29 +82,24 @@ export abstract class SwapRouter {
     positionManagerOverride?: string
   ): MethodParameters {
     const v4Pool: V4Pool = options.outputPosition.pool
-    let token0: Currency = options.inputPosition.pool.token0
-    let token1: Currency = options.inputPosition.pool.token1
+    let v3Token0 = options.inputPosition.pool.token0
+    let v3Token1 = options.inputPosition.pool.token1
     const v4PositionManagerAddress =
       positionManagerOverride ?? CHAIN_TO_ADDRESSES_MAP[v4Pool.chainId as SupportedChainsType].v4PositionManagerAddress
 
     const nativeCurrency = Ether.onChain(v4Pool.chainId)
 
-    // if migrating wrapped native -> native
-    if (nativeCurrency.wrapped.equals(token0) || nativeCurrency.wrapped.equals(token1)) {
-      // v4 pool must use native currency and must have useNative flag set
-      invariant(v4Pool.token0.isNative === options.v4AddLiquidityOptions.useNative, 'NATIVE_REQUIRED')
-      // set token0 or token1 to native currency to validate parameters later
-      if (nativeCurrency.wrapped.equals(token0)) {
-        token0 = nativeCurrency
-      } else if (nativeCurrency.wrapped.equals(token1)) {
-        token1 = token0
-        token0 = nativeCurrency
-      }
-    }
-
     // validate the parameters
-    invariant(token0 === v4Pool.token0, 'TOKEN0_MISMATCH')
-    invariant(token1 === v4Pool.token1, 'TOKEN1_MISMATCH')
+    if (nativeCurrency.equals(v4Pool.currency0)) {
+      invariant(
+        (nativeCurrency.wrapped.equals(v3Token0) && v3Token1.equals(v4Pool.currency1)) ||
+        (nativeCurrency.wrapped.equals(v3Token1) && v3Token0.equals(v4Pool.currency1)),
+        'TOKEN_MISMATCH'
+      )
+    } else {
+      invariant(v3Token0 === v4Pool.token0, 'TOKEN0_MISMATCH')
+      invariant(v3Token1 === v4Pool.token1, 'TOKEN1_MISMATCH')
+    }
 
     invariant(
       options.v3RemoveLiquidityOptions.liquidityPercentage.equalTo(new Percent(100, 100)),
@@ -161,8 +155,8 @@ export abstract class SwapRouter {
       const selector = v3Call.slice(0, 10)
       invariant(
         selector == V3PositionManager.INTERFACE.getSighash('collect') ||
-          selector == V3PositionManager.INTERFACE.getSighash('decreaseLiquidity') ||
-          selector == V3PositionManager.INTERFACE.getSighash('burn'),
+        selector == V3PositionManager.INTERFACE.getSighash('decreaseLiquidity') ||
+        selector == V3PositionManager.INTERFACE.getSighash('burn'),
         'INVALID_V3_CALL: ' + selector
       )
       planner.addCommand(CommandType.V3_POSITION_MANAGER_CALL, [v3Call])
