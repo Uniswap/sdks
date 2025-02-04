@@ -1646,7 +1646,7 @@ describe('Uniswap', () => {
           migrate: true,
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
-          useNative: true,
+          useNative: ETHER,
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
@@ -1685,7 +1685,7 @@ describe('Uniswap', () => {
           migrate: true,
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
-          useNative: true,
+          useNative: ETHER,
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
@@ -1749,7 +1749,7 @@ describe('Uniswap', () => {
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
           createPool: true, // boolean to signal pool creation
-          useNative: true,
+          useNative: ETHER,
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
@@ -1945,43 +1945,6 @@ describe('Uniswap', () => {
       expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('MINT_REQUIRED')
     })
 
-    it('throws if migrating weth to weth', async () => {
-      const opts = Object.assign({
-        inputPosition: new Position({
-          pool: WETH_USDC_V3,
-          liquidity: 1,
-          tickLower: -WETH_USDC_V3.tickSpacing,
-          tickUpper: WETH_USDC_V3.tickSpacing,
-        }),
-        outputPosition: new V4Position({
-          pool: WETH_USDC_V4, // not an eth pool
-          liquidity: 1,
-          tickLower: -WETH_USDC_V4.tickSpacing,
-          tickUpper: WETH_USDC_V4.tickSpacing,
-        }),
-        v3RemoveLiquidityOptions: {
-          tokenId: 1,
-          liquidityPercentage: new Percent(100, 100),
-          slippageTolerance: new Percent(5, 100),
-          deadline: 1,
-          burnToken: true,
-          collectOptions: {
-            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
-            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(WETH, 0),
-            recipient: CHAIN_TO_ADDRESSES_MAP[ChainId.MAINNET].v4PositionManagerAddress,
-          },
-        },
-        v4AddLiquidityOptions: {
-          migrate: true,
-          deadline: 1,
-          slippageTolerance: new Percent(5, 100),
-          sqrtPriceX96: encodeSqrtRatioX96(1, 1),
-          recipient: TEST_RECIPIENT_ADDRESS,
-        },
-      })
-      expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('NATIVE_REQUIRED')
-    })
-
     it('throws if migrating weth to eth with flag not set', async () => {
       const opts = Object.assign({
         inputPosition: new Position({
@@ -2017,7 +1980,7 @@ describe('Uniswap', () => {
           // useNative flag not set
         },
       })
-      expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('NATIVE_REQUIRED')
+      expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('NATIVE_NOT_SET')
     })
 
     it('throws if migrating weth to eth with token mismatch', async () => {
@@ -2051,11 +2014,11 @@ describe('Uniswap', () => {
           deadline: 1,
           slippageTolerance: new Percent(5, 100),
           sqrtPriceX96: encodeSqrtRatioX96(1, 1),
-          useNative: true,
+          useNative: ETHER,
           recipient: TEST_RECIPIENT_ADDRESS,
         },
       })
-      expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('TOKEN1_MISMATCH')
+      expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('TOKEN_MISMATCH')
     })
 
     it('throws if migrating flag not set', async () => {

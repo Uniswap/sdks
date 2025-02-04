@@ -92,8 +92,8 @@ export abstract class SwapRouter {
     // validate the parameters
     if (nativeCurrency.equals(v4Pool.currency0)) {
       invariant(
-        (nativeCurrency.wrapped.equals(v3Token0) && v3Token1.equals(v4Pool.currency1)) ||
-        (nativeCurrency.wrapped.equals(v3Token1) && v3Token0.equals(v4Pool.currency1)),
+        (v4Pool.currency0.wrapped.equals(v3Token0) && v4Pool.currency1.equals(v3Token1)) ||
+          (v4Pool.currency0.wrapped.equals(v3Token1) && v4Pool.currency1.equals(v3Token0)),
         'TOKEN_MISMATCH'
       )
     } else {
@@ -155,8 +155,8 @@ export abstract class SwapRouter {
       const selector = v3Call.slice(0, 10)
       invariant(
         selector == V3PositionManager.INTERFACE.getSighash('collect') ||
-        selector == V3PositionManager.INTERFACE.getSighash('decreaseLiquidity') ||
-        selector == V3PositionManager.INTERFACE.getSighash('burn'),
+          selector == V3PositionManager.INTERFACE.getSighash('decreaseLiquidity') ||
+          selector == V3PositionManager.INTERFACE.getSighash('burn'),
         'INVALID_V3_CALL: ' + selector
       )
       planner.addCommand(CommandType.V3_POSITION_MANAGER_CALL, [v3Call])
