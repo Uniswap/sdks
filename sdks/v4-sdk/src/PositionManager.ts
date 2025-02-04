@@ -14,10 +14,10 @@ import {
   NATIVE_NOT_SET,
   NO_SQRT_PRICE,
   ONE,
+  OPEN_DELTA,
   PositionFunctions,
   ZERO,
   ZERO_LIQUIDITY,
-  OPEN_DELTA,
 } from './internalConstants'
 import { V4PositionPlanner } from './utils'
 import { positionManagerAbi } from './utils/positionManagerAbi'

@@ -6,6 +6,7 @@ import {
   FeeAmount,
   CANNOT_BURN,
   NATIVE_NOT_SET,
+  OPEN_DELTA,
   SQRT_PRICE_1_1,
   TICK_SPACINGS,
   ZERO_LIQUIDITY,
@@ -317,8 +318,8 @@ describe('PositionManager', () => {
         EMPTY_BYTES,
       ])
 
-      planner.addAction(Actions.SETTLE, [toAddress(pool_0_1.currency0), 0, false])
-      planner.addAction(Actions.SETTLE, [toAddress(pool_0_1.currency1), 0, false])
+      planner.addAction(Actions.SETTLE, [toAddress(pool_0_1.currency0), OPEN_DELTA, false])
+      planner.addAction(Actions.SETTLE, [toAddress(pool_0_1.currency1), OPEN_DELTA, false])
       planner.addAction(Actions.SWEEP, [toAddress(pool_0_1.currency0), recipient])
       planner.addAction(Actions.SWEEP, [toAddress(pool_0_1.currency1), recipient])
       expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
@@ -356,9 +357,9 @@ describe('PositionManager', () => {
         EMPTY_BYTES,
       ])
 
-      planner.addAction(Actions.UNWRAP, [0])
-      planner.addAction(Actions.SETTLE, [toAddress(pool_1_eth.currency0), 0, false])
-      planner.addAction(Actions.SETTLE, [toAddress(pool_1_eth.currency1), 0, false])
+      planner.addAction(Actions.UNWRAP, [OPEN_DELTA])
+      planner.addAction(Actions.SETTLE, [toAddress(pool_1_eth.currency0), OPEN_DELTA, false])
+      planner.addAction(Actions.SETTLE, [toAddress(pool_1_eth.currency1), OPEN_DELTA, false])
       planner.addAction(Actions.SWEEP, [toAddress(pool_1_eth.currency0.wrapped), recipient])
       planner.addAction(Actions.SWEEP, [toAddress(pool_1_eth.currency1), recipient])
       expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
