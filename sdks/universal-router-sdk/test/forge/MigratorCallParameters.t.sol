@@ -42,6 +42,11 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         vm.prank(from);
         INonfungiblePositionManager(V3_POSITION_MANAGER).setApprovalForAll(MAINNET_ROUTER, true);
 
+        // pool manager balance before
+        uint256 ethBalanceBefore = address(poolManager).balance;
+        uint256 usdcBalanceBefore = USDC.balanceOf(address(poolManager));
+        uint256 wethBalanceBefore = WETH.balanceOf(address(poolManager));
+
         assertEq(params.value, 0);
         vm.prank(from);
         (bool success,) = address(router).call(params.data);
@@ -50,9 +55,15 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         // all funds were swept out of contracts
         assertEq(USDC.balanceOf(MAINNET_ROUTER), 0);
         assertEq(WETH.balanceOf(MAINNET_ROUTER), 0);
+        assertEq(address(MAINNET_ROUTER).balance, 0);
         assertEq(USDC.balanceOf(address(v4PositionManager)), 0);
         assertEq(WETH.balanceOf(address(v4PositionManager)), 0);
         assertEq(address(v4PositionManager).balance, 0);
+
+        // pool manager balance after, eth and usdc deposited
+        assertGt(address(poolManager).balance, ethBalanceBefore);
+        assertGt(USDC.balanceOf(address(poolManager)), usdcBalanceBefore);
+        assertEq(WETH.balanceOf(address(poolManager)), wethBalanceBefore);
 
         // old position burned, new position minted
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0, "V3 NOT BURNT");
@@ -72,6 +83,11 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         vm.prank(from);
         INonfungiblePositionManager(V3_POSITION_MANAGER).setApprovalForAll(MAINNET_ROUTER, true);
 
+        // pool manager balance before
+        uint256 ethBalanceBefore = address(poolManager).balance;
+        uint256 usdcBalanceBefore = USDC.balanceOf(address(poolManager));
+        uint256 wethBalanceBefore = WETH.balanceOf(address(poolManager));
+
         assertEq(params.value, 0);
         vm.prank(from);
         (bool success,) = address(router).call(params.data);
@@ -80,8 +96,15 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         // all funds were swept out of contracts
         assertEq(USDC.balanceOf(MAINNET_ROUTER), 0);
         assertEq(WETH.balanceOf(MAINNET_ROUTER), 0);
+        assertEq(address(MAINNET_ROUTER).balance, 0);
         assertEq(USDC.balanceOf(address(v4PositionManager)), 0);
         assertEq(WETH.balanceOf(address(v4PositionManager)), 0);
+        assertEq(address(v4PositionManager).balance, 0);
+
+        // pool manager balance after, weth and usdc deposited
+        assertEq(address(poolManager).balance, ethBalanceBefore);
+        assertGt(USDC.balanceOf(address(poolManager)), usdcBalanceBefore);
+        assertGt(WETH.balanceOf(address(poolManager)), wethBalanceBefore);
 
         // old position burned, new position minted
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0, "V3 NOT BURNT");
@@ -97,6 +120,11 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         mintV3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18);
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 1);
 
+        // pool manager balance before
+        uint256 ethBalanceBefore = address(poolManager).balance;
+        uint256 usdcBalanceBefore = USDC.balanceOf(address(poolManager));
+        uint256 wethBalanceBefore = WETH.balanceOf(address(poolManager));
+
         assertEq(params.value, 0);
         vm.prank(from);
         (bool success,) = address(router).call(params.data);
@@ -105,9 +133,15 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         // all funds were swept out of contracts
         assertEq(USDC.balanceOf(MAINNET_ROUTER), 0);
         assertEq(WETH.balanceOf(MAINNET_ROUTER), 0);
+        assertEq(address(MAINNET_ROUTER).balance, 0);
         assertEq(USDC.balanceOf(address(v4PositionManager)), 0);
         assertEq(WETH.balanceOf(address(v4PositionManager)), 0);
         assertEq(address(v4PositionManager).balance, 0);
+
+        // pool manager balance after, eth and usdc deposited
+        assertGt(address(poolManager).balance, ethBalanceBefore);
+        assertGt(USDC.balanceOf(address(poolManager)), usdcBalanceBefore);
+        assertEq(WETH.balanceOf(address(poolManager)), wethBalanceBefore);
 
         // old position burned, new position minted
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0, "V3 NOT BURNT");
@@ -123,6 +157,11 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         mintV3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18);
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 1);
 
+        // pool manager balance before
+        uint256 ethBalanceBefore = address(poolManager).balance;
+        uint256 usdcBalanceBefore = USDC.balanceOf(address(poolManager));
+        uint256 wethBalanceBefore = WETH.balanceOf(address(poolManager));
+
         assertEq(params.value, 0);
         vm.prank(from);
         (bool success,) = address(router).call(params.data);
@@ -131,8 +170,15 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         // all funds were swept out of contracts
         assertEq(USDC.balanceOf(MAINNET_ROUTER), 0);
         assertEq(WETH.balanceOf(MAINNET_ROUTER), 0);
+        assertEq(address(MAINNET_ROUTER).balance, 0);
         assertEq(USDC.balanceOf(address(v4PositionManager)), 0);
         assertEq(WETH.balanceOf(address(v4PositionManager)), 0);
+        assertEq(address(v4PositionManager).balance, 0);
+
+        // pool manager balance after, weth and usdc deposited
+        assertEq(address(poolManager).balance, ethBalanceBefore);
+        assertGt(USDC.balanceOf(address(poolManager)), usdcBalanceBefore);
+        assertGt(WETH.balanceOf(address(poolManager)), wethBalanceBefore);
 
         // old position burned, new position minted
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0, "V3 NOT BURNT");
@@ -148,6 +194,11 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         mintV3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18);
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 1);
 
+        // pool manager balance before
+        uint256 ethBalanceBefore = address(poolManager).balance;
+        uint256 usdcBalanceBefore = USDC.balanceOf(address(poolManager));
+        uint256 wethBalanceBefore = WETH.balanceOf(address(poolManager));
+
         assertEq(params.value, 0);
         vm.prank(from);
         (bool success,) = address(router).call(params.data);
@@ -156,9 +207,15 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         // all funds were swept out of contracts
         assertEq(USDC.balanceOf(MAINNET_ROUTER), 0);
         assertEq(WETH.balanceOf(MAINNET_ROUTER), 0);
+        assertEq(address(MAINNET_ROUTER).balance, 0);
         assertEq(USDC.balanceOf(address(v4PositionManager)), 0);
         assertEq(WETH.balanceOf(address(v4PositionManager)), 0);
         assertEq(address(v4PositionManager).balance, 0);
+
+        // pool manager balance after, eth and usdc deposited
+        assertGt(address(poolManager).balance, ethBalanceBefore);
+        assertGt(USDC.balanceOf(address(poolManager)), usdcBalanceBefore);
+        assertEq(WETH.balanceOf(address(poolManager)), wethBalanceBefore);
 
         // old position burned, new position minted
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0, "V3 NOT BURNT");
@@ -174,6 +231,11 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         mintV3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18);
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 1);
 
+        // pool manager balance before
+        uint256 ethBalanceBefore = address(poolManager).balance;
+        uint256 usdcBalanceBefore = USDC.balanceOf(address(poolManager));
+        uint256 wethBalanceBefore = WETH.balanceOf(address(poolManager));
+
         assertEq(params.value, 0);
         vm.prank(from);
         (bool success,) = address(router).call(params.data);
@@ -182,8 +244,15 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         // all funds were swept out of contracts
         assertEq(USDC.balanceOf(MAINNET_ROUTER), 0);
         assertEq(WETH.balanceOf(MAINNET_ROUTER), 0);
+        assertEq(address(MAINNET_ROUTER).balance, 0);
         assertEq(USDC.balanceOf(address(v4PositionManager)), 0);
         assertEq(WETH.balanceOf(address(v4PositionManager)), 0);
+        assertEq(address(v4PositionManager).balance, 0);
+
+        // pool manager balance after, weth and usdc deposited
+        assertEq(address(poolManager).balance, ethBalanceBefore);
+        assertGt(USDC.balanceOf(address(poolManager)), usdcBalanceBefore);
+        assertGt(WETH.balanceOf(address(poolManager)), wethBalanceBefore);
 
         // old position burned, new position minted
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0, "V3 NOT BURNT");

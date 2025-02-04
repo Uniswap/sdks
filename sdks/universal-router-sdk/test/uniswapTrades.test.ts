@@ -1616,10 +1616,11 @@ describe('Uniswap', () => {
           tickLower: 200040,
           tickUpper: 300000,
         }),
+        // in range (current tick = 0)
         outputPosition: new V4Position({
           pool: ETH_USDC_V4,
           liquidity: 100000,
-          tickLower: 200040,
+          tickLower: -200040,
           tickUpper: 300000,
         }),
         v3RemoveLiquidityOptions: {
@@ -1679,10 +1680,11 @@ describe('Uniswap', () => {
           tickLower: 200040,
           tickUpper: 300000,
         }),
+        // in range (current tick = 0)
         outputPosition: new V4Position({
           pool: WETH_USDC_V4,
           liquidity: 100000,
-          tickLower: 200040,
+          tickLower: -200040,
           tickUpper: 300000,
         }),
         v3RemoveLiquidityOptions: {
@@ -1724,10 +1726,11 @@ describe('Uniswap', () => {
           tickLower: 200040,
           tickUpper: 300000,
         }),
+        // in range (current tick = 0)
         outputPosition: new V4Position({
           pool: ETH_USDC_V4,
           liquidity: 100000,
-          tickLower: 200040,
+          tickLower: -200040,
           tickUpper: 300000,
         }),
         v3RemoveLiquidityOptions: {
@@ -1763,10 +1766,11 @@ describe('Uniswap', () => {
           tickLower: 200040,
           tickUpper: 300000,
         }),
+        // in range (current tick = 0)
         outputPosition: new V4Position({
           pool: WETH_USDC_V4,
           liquidity: 100000,
-          tickLower: 200040,
+          tickLower: -200040,
           tickUpper: 300000,
         }),
         v3RemoveLiquidityOptions: {
@@ -1818,10 +1822,11 @@ describe('Uniswap', () => {
           tickLower: 200040,
           tickUpper: 300000,
         }),
+        // in range (current tick = 0)
         outputPosition: new V4Position({
           pool: ETH_USDC_V4_LOW_FEE,
           liquidity: 100000,
-          tickLower: 200040,
+          tickLower: -200040,
           tickUpper: 300000,
         }),
         v3RemoveLiquidityOptions: {
@@ -1882,10 +1887,11 @@ describe('Uniswap', () => {
           tickLower: 200040,
           tickUpper: 300000,
         }),
+        // in range (current tick = 0)
         outputPosition: new V4Position({
           pool: WETH_USDC_V4_LOW_FEE, // migrate to LOW pool, which hasn't been initialized
           liquidity: 100000,
-          tickLower: 200040,
+          tickLower: -200040,
           tickUpper: 300000,
         }),
         v3RemoveLiquidityOptions: {
