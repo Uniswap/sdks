@@ -39,7 +39,7 @@ export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
     invariant(pools[0].involvesToken(this.pathInput as Token), 'INPUT')
     const lastPool = pools[pools.length - 1]
     if (lastPool instanceof V4Pool) {
-      invariant(lastPool.involvesToken(output) || lastPool.involvesToken(output.wrapped), 'OUTPUT')
+      invariant(lastPool.v4InvolvesToken(output) || lastPool.v4InvolvesToken(output.wrapped), 'OUTPUT')
     } else {
       invariant(lastPool.involvesToken(output.wrapped as Token), 'OUTPUT')
     }
@@ -54,9 +54,17 @@ export class MixedRouteSDK<TInput extends Currency, TOutput extends Currency> {
       const prevPool = pools[i - 1]
       const pool = pools[i]
       const inputToken = tokenPath[i]
-      const outputToken = pool.token0.wrapped.equals(inputToken.wrapped) ? pool.token1 : pool.token0
 
-      invariant(isValidTokenPath(prevPool, pool, inputToken), 'PATH')
+      const outputToken =
+        pool instanceof V4Pool
+          ? pool.token0.equals(inputToken)
+            ? pool.token1
+            : pool.token0
+          : pool.token0.wrapped.equals(inputToken.wrapped)
+          ? pool.token1
+          : pool.token0
+
+      invariant(isValidTokenPath(prevPool, pool, inputToken), `PATH`)
       tokenPath.push(outputToken)
     }
 

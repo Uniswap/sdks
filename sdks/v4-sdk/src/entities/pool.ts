@@ -161,6 +161,20 @@ export class Pool {
   }
 
   /**
+   * v4-only involvesToken convenience method, used for mixed route ETH <-> WETH connection only
+   * @param currency
+   */
+  public v4InvolvesToken(currency: Currency): boolean {
+    return (
+      this.involvesCurrency(currency) ||
+      currency.wrapped.equals(this.currency0) ||
+      currency.wrapped.equals(this.currency1) ||
+      currency.wrapped.equals(this.currency0.wrapped) ||
+      currency.wrapped.equals(this.currency1.wrapped)
+    )
+  }
+
+  /**
    * Returns the current mid price of the pool in terms of currency0, i.e. the ratio of currency1 over currency0
    */
   public get currency0Price(): Price<Currency, Currency> {
