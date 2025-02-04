@@ -120,20 +120,6 @@ describe('PositionManager', () => {
       ).toThrow(NATIVE_NOT_SET)
     })
 
-    it('throws if pool has ether and useNative is set to incorrect native', () => {
-      expect(() =>
-        V4PositionManager.addCallParameters(
-          new Position({
-            pool: pool_0_1,
-            tickLower: -TICK_SPACINGS[FeeAmount.MEDIUM],
-            tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
-            liquidity: 8888888,
-          }),
-          { recipient, slippageTolerance, deadline, useNative: Ether.onChain(2) } // not the same as the pool currency
-        )
-      ).toThrow(NATIVE_NOT_SET)
-    })
-
     it('throws if pool involves ether and useNative is not set', () => {
       expect(() =>
         V4PositionManager.addCallParameters(

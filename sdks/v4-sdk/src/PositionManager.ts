@@ -1,4 +1,4 @@
-import { BigintIsh, Percent, validateAndParseAddress, NativeCurrency, Ether } from '@uniswap/sdk-core'
+import { BigintIsh, Percent, validateAndParseAddress, NativeCurrency } from '@uniswap/sdk-core'
 import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
 import JSBI from 'jsbi'
 import { Position } from './entities/position'
@@ -243,7 +243,7 @@ export abstract class V4PositionManager {
 
     // position.pool.currency0 is native if and only if options.useNative is set
     invariant(
-      (position.pool.currency0 === options.useNative && options.useNative === Ether.onChain(position.pool.chainId)) ||
+      position.pool.currency0 === options.useNative ||
         (!position.pool.currency0.isNative && options.useNative === undefined),
       NATIVE_NOT_SET
     )
