@@ -320,8 +320,8 @@ describe('PositionManager', () => {
 
       planner.addAction(Actions.SETTLE, [toAddress(pool_0_1.currency0), OPEN_DELTA, false])
       planner.addAction(Actions.SETTLE, [toAddress(pool_0_1.currency1), OPEN_DELTA, false])
-      planner.addAction(Actions.SWEEP, [toAddress(pool_0_1.currency0), MSG_SENDER])
-      planner.addAction(Actions.SWEEP, [toAddress(pool_0_1.currency1), MSG_SENDER])
+      planner.addAction(Actions.SWEEP, [toAddress(pool_0_1.currency0), recipient])
+      planner.addAction(Actions.SWEEP, [toAddress(pool_0_1.currency1), recipient])
       expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
 
       expect(value).toEqual('0x00')
@@ -360,8 +360,8 @@ describe('PositionManager', () => {
       planner.addAction(Actions.UNWRAP, [OPEN_DELTA])
       planner.addAction(Actions.SETTLE, [toAddress(pool_1_eth.currency0), OPEN_DELTA, false])
       planner.addAction(Actions.SETTLE, [toAddress(pool_1_eth.currency1), OPEN_DELTA, false])
-      planner.addAction(Actions.SWEEP, [toAddress(pool_1_eth.currency0.wrapped), MSG_SENDER])
-      planner.addAction(Actions.SWEEP, [toAddress(pool_1_eth.currency1), MSG_SENDER])
+      planner.addAction(Actions.SWEEP, [toAddress(pool_1_eth.currency0.wrapped), recipient])
+      planner.addAction(Actions.SWEEP, [toAddress(pool_1_eth.currency1), recipient])
       expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
 
       expect(value).toEqual('0x00')
