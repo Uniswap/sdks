@@ -8,13 +8,11 @@ import { Currency, Price, Token } from '@uniswap/sdk-core'
 import { MixedRouteSDK } from './mixedRoute/route'
 
 // Helper function to get the pathInput and pathOutput for a V2 / V3 route
-// Copied from V4-sdk, but modified to work with V2 / V3 as they only support tokens not NativeCurrency
+// currency could be native so we check against the wrapped version as they don't support native ETH in path
 export function getPathToken(currency: Currency, pool: Pair | V3Pool): Token {
-  if (pool.involvesToken(currency.wrapped)) {
-    return currency.wrapped
-  } else if (pool.token0.equals(currency)) {
+  if (pool.token0.wrapped.equals(currency.wrapped)) {
     return pool.token0
-  } else if (pool.token1.equals(currency)) {
+  } else if (pool.token1.wrapped.equals(currency.wrapped)) {
     return pool.token1
   } else {
     throw new Error(`Expected token ${currency.symbol} to be either ${pool.token0.symbol} or ${pool.token1.symbol}`)
