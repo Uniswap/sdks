@@ -282,6 +282,8 @@ export abstract class V4PositionManager {
       planner.addIncrease(options.tokenId, position.liquidity, amount0Max, amount1Max, options.hookData)
     }
 
+    let value: string = toHex(0)
+
     // If migrating, we need to settle and sweep both currencies individually
     if (isMint(options) && options.migrate) {
       if (options.useNative) {
@@ -303,15 +305,13 @@ export abstract class V4PositionManager {
     } else {
       // need to settle both currencies when minting / adding liquidity (user is the payer)
       planner.addSettlePair(position.pool.currency0, position.pool.currency1)
-    }
-
-    // Any sweeping must happen after the settling.
-    let value: string = toHex(0)
-    // When not migrating and adding native currency, add a final sweep
-    if (options.useNative && !(isMint(options) && options.migrate)) {
-      value = toHex(amount0Max)
-      // native currency will always be currency0 in v4
-      planner.addSweep(position.pool.currency0, MSG_SENDER)
+      // When not migrating and adding native currency, add a final sweep
+      if (options.useNative) {
+        // Any sweeping must happen after the settling.
+        // native currency will always be currency0 in v4
+        value = toHex(amount0Max)
+        planner.addSweep(position.pool.currency0, MSG_SENDER)
+      }
     }
 
     calldataList.push(V4PositionManager.encodeModifyLiquidities(planner.finalize(), options.deadline))
