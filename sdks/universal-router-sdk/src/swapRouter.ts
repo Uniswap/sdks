@@ -18,7 +18,7 @@ import {
   PoolKey,
 } from '@uniswap/v4-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
-import { Currency, TradeType, Percent, CHAIN_TO_ADDRESSES_MAP, SupportedChainsType, Ether } from '@uniswap/sdk-core'
+import { Currency, TradeType, Percent, CHAIN_TO_ADDRESSES_MAP, SupportedChainsType } from '@uniswap/sdk-core'
 import { UniswapTrade, SwapOptions } from './entities/actions/uniswap'
 import { RoutePlanner, CommandType } from './utils/routerCommands'
 import { encodePermit, encodeV3PositionPermit } from './utils/inputTokens'
@@ -87,10 +87,8 @@ export abstract class SwapRouter {
     const v4PositionManagerAddress =
       positionManagerOverride ?? CHAIN_TO_ADDRESSES_MAP[v4Pool.chainId as SupportedChainsType].v4PositionManagerAddress
 
-    const nativeCurrency = Ether.onChain(v4Pool.chainId)
-
     // validate the parameters
-    if (nativeCurrency.equals(v4Pool.currency0)) {
+    if (v4Pool.currency0.isNative) {
       invariant(
         (v4Pool.currency0.wrapped.equals(v3Token0) && v4Pool.currency1.equals(v3Token1)) ||
           (v4Pool.currency0.wrapped.equals(v3Token1) && v4Pool.currency1.equals(v3Token0)),
