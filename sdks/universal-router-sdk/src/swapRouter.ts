@@ -82,8 +82,8 @@ export abstract class SwapRouter {
     positionManagerOverride?: string
   ): MethodParameters {
     const v4Pool: V4Pool = options.outputPosition.pool
-    let v3Token0 = options.inputPosition.pool.token0
-    let v3Token1 = options.inputPosition.pool.token1
+    const v3Token0 = options.inputPosition.pool.token0
+    const v3Token1 = options.inputPosition.pool.token1
     const v4PositionManagerAddress =
       positionManagerOverride ?? CHAIN_TO_ADDRESSES_MAP[v4Pool.chainId as SupportedChainsType].v4PositionManagerAddress
 
