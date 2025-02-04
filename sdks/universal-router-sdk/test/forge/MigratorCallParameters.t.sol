@@ -47,10 +47,10 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         uint256 usdcBalanceBefore = USDC.balanceOf(address(poolManager));
         uint256 wethBalanceBefore = WETH.balanceOf(address(poolManager));
 
-        // sender balance before
-        uint256 senderBalanceBefore = address(from).balance;
-        uint256 senderUSDCBalanceBefore = USDC.balanceOf(from);
-        uint256 senderWETHBalanceBefore = WETH.balanceOf(from);
+        // recipient balance before
+        uint256 recipientBalanceBefore = address(RECIPIENT).balance;
+        uint256 recipientUSDCBalanceBefore = USDC.balanceOf(RECIPIENT);
+        uint256 recipientWETHBalanceBefore = WETH.balanceOf(RECIPIENT);
 
         assertEq(params.value, 0);
         vm.prank(from);
@@ -70,10 +70,10 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         assertGt(USDC.balanceOf(address(poolManager)), usdcBalanceBefore);
         assertEq(WETH.balanceOf(address(poolManager)), wethBalanceBefore);
 
-        // sender balance after
-        assertEq(address(from).balance, senderBalanceBefore);
-        assertGe(USDC.balanceOf(from), senderUSDCBalanceBefore);
-        assertGe(WETH.balanceOf(from), senderWETHBalanceBefore);
+        // recipient balance after
+        assertEq(address(RECIPIENT).balance, recipientBalanceBefore);
+        assertGe(USDC.balanceOf(RECIPIENT), recipientUSDCBalanceBefore);
+        assertGe(WETH.balanceOf(RECIPIENT), recipientWETHBalanceBefore);
 
         // old position burned, new position minted
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0, "V3 NOT BURNT");
@@ -98,10 +98,10 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         uint256 usdcBalanceBefore = USDC.balanceOf(address(poolManager));
         uint256 wethBalanceBefore = WETH.balanceOf(address(poolManager));
 
-        // sender balance before
-        uint256 senderBalanceBefore = address(from).balance;
-        uint256 senderUSDCBalanceBefore = USDC.balanceOf(from);
-        uint256 senderWETHBalanceBefore = WETH.balanceOf(from);
+        // recipient balance before
+        uint256 recipientBalanceBefore = address(RECIPIENT).balance;
+        uint256 recipientUSDCBalanceBefore = USDC.balanceOf(RECIPIENT);
+        uint256 recipientWETHBalanceBefore = WETH.balanceOf(RECIPIENT);
 
         assertEq(params.value, 0);
         vm.prank(from);
@@ -121,10 +121,10 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         assertGt(USDC.balanceOf(address(poolManager)), usdcBalanceBefore);
         assertGt(WETH.balanceOf(address(poolManager)), wethBalanceBefore);
 
-        // sender balance after
-        assertEq(address(from).balance, senderBalanceBefore);
-        assertGe(USDC.balanceOf(from), senderUSDCBalanceBefore);
-        assertGe(WETH.balanceOf(from), senderWETHBalanceBefore);
+        // recipient balance after
+        assertEq(address(RECIPIENT).balance, recipientBalanceBefore);
+        assertGe(USDC.balanceOf(RECIPIENT), recipientUSDCBalanceBefore);
+        assertGe(WETH.balanceOf(RECIPIENT), recipientWETHBalanceBefore);
 
         // old position burned, new position minted
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0, "V3 NOT BURNT");
@@ -145,10 +145,10 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         uint256 usdcBalanceBefore = USDC.balanceOf(address(poolManager));
         uint256 wethBalanceBefore = WETH.balanceOf(address(poolManager));
 
-        // sender balance before
-        uint256 senderBalanceBefore = address(from).balance;
-        uint256 senderUSDCBalanceBefore = USDC.balanceOf(from);
-        uint256 senderWETHBalanceBefore = WETH.balanceOf(from);
+        // recipient balance before
+        uint256 recipientBalanceBefore = address(RECIPIENT).balance;
+        uint256 recipientUSDCBalanceBefore = USDC.balanceOf(RECIPIENT);
+        uint256 recipientWETHBalanceBefore = WETH.balanceOf(RECIPIENT);
 
         assertEq(params.value, 0);
         vm.prank(from);
@@ -168,10 +168,10 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         assertGt(USDC.balanceOf(address(poolManager)), usdcBalanceBefore);
         assertEq(WETH.balanceOf(address(poolManager)), wethBalanceBefore);
 
-        // sender balance after
-        assertEq(address(from).balance, senderBalanceBefore);
-        assertGe(USDC.balanceOf(from), senderUSDCBalanceBefore);
-        assertGe(WETH.balanceOf(from), senderWETHBalanceBefore);
+        // recipient balance after
+        assertEq(address(RECIPIENT).balance, recipientBalanceBefore);
+        assertGe(USDC.balanceOf(RECIPIENT), recipientUSDCBalanceBefore);
+        assertGe(WETH.balanceOf(RECIPIENT), recipientWETHBalanceBefore);
 
         // old position burned, new position minted
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0, "V3 NOT BURNT");
@@ -192,10 +192,10 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         uint256 usdcBalanceBefore = USDC.balanceOf(address(poolManager));
         uint256 wethBalanceBefore = WETH.balanceOf(address(poolManager));
 
-        // sender balance before
-        uint256 senderBalanceBefore = address(from).balance;
-        uint256 senderUSDCBalanceBefore = USDC.balanceOf(from);
-        uint256 senderWETHBalanceBefore = WETH.balanceOf(from);
+        // recipient balance before
+        uint256 recipientBalanceBefore = address(RECIPIENT).balance;
+        uint256 recipientUSDCBalanceBefore = USDC.balanceOf(RECIPIENT);
+        uint256 recipientWETHBalanceBefore = WETH.balanceOf(RECIPIENT);
 
         assertEq(params.value, 0);
         vm.prank(from);
@@ -215,10 +215,10 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         assertGt(USDC.balanceOf(address(poolManager)), usdcBalanceBefore);
         assertGt(WETH.balanceOf(address(poolManager)), wethBalanceBefore);
 
-        // sender balance after
-        assertEq(address(from).balance, senderBalanceBefore);
-        assertGe(USDC.balanceOf(from), senderUSDCBalanceBefore);
-        assertGe(WETH.balanceOf(from), senderWETHBalanceBefore);
+        // recipient balance after
+        assertEq(address(RECIPIENT).balance, recipientBalanceBefore);
+        assertGe(USDC.balanceOf(RECIPIENT), recipientUSDCBalanceBefore);
+        assertGe(WETH.balanceOf(RECIPIENT), recipientWETHBalanceBefore);
 
         // old position burned, new position minted
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0, "V3 NOT BURNT");
@@ -239,10 +239,10 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         uint256 usdcBalanceBefore = USDC.balanceOf(address(poolManager));
         uint256 wethBalanceBefore = WETH.balanceOf(address(poolManager));
 
-        // sender balance before
-        uint256 senderBalanceBefore = address(from).balance;
-        uint256 senderUSDCBalanceBefore = USDC.balanceOf(from);
-        uint256 senderWETHBalanceBefore = WETH.balanceOf(from);
+        // recipient balance before
+        uint256 recipientBalanceBefore = address(RECIPIENT).balance;
+        uint256 recipientUSDCBalanceBefore = USDC.balanceOf(RECIPIENT);
+        uint256 recipientWETHBalanceBefore = WETH.balanceOf(RECIPIENT);
 
         assertEq(params.value, 0);
         vm.prank(from);
@@ -262,10 +262,10 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         assertGt(USDC.balanceOf(address(poolManager)), usdcBalanceBefore);
         assertEq(WETH.balanceOf(address(poolManager)), wethBalanceBefore);
 
-        // sender balance after
-        assertEq(address(from).balance, senderBalanceBefore);
-        assertGe(USDC.balanceOf(from), senderUSDCBalanceBefore);
-        assertGe(WETH.balanceOf(from), senderWETHBalanceBefore);
+        // recipient balance after
+        assertEq(address(RECIPIENT).balance, recipientBalanceBefore);
+        assertGe(USDC.balanceOf(RECIPIENT), recipientUSDCBalanceBefore);
+        assertGe(WETH.balanceOf(RECIPIENT), recipientWETHBalanceBefore);
 
         // old position burned, new position minted
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0, "V3 NOT BURNT");
@@ -286,10 +286,10 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         uint256 usdcBalanceBefore = USDC.balanceOf(address(poolManager));
         uint256 wethBalanceBefore = WETH.balanceOf(address(poolManager));
 
-        // sender balance before
-        uint256 senderBalanceBefore = address(from).balance;
-        uint256 senderUSDCBalanceBefore = USDC.balanceOf(from);
-        uint256 senderWETHBalanceBefore = WETH.balanceOf(from);
+        // recipient balance before
+        uint256 recipientBalanceBefore = address(RECIPIENT).balance;
+        uint256 recipientUSDCBalanceBefore = USDC.balanceOf(RECIPIENT);
+        uint256 recipientWETHBalanceBefore = WETH.balanceOf(RECIPIENT);
 
         assertEq(params.value, 0);
         vm.prank(from);
@@ -309,10 +309,10 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
         assertGt(USDC.balanceOf(address(poolManager)), usdcBalanceBefore);
         assertGt(WETH.balanceOf(address(poolManager)), wethBalanceBefore);
 
-        // sender balance after
-        assertEq(address(from).balance, senderBalanceBefore);
-        assertGe(USDC.balanceOf(from), senderUSDCBalanceBefore);
-        assertGe(WETH.balanceOf(from), senderWETHBalanceBefore);
+        // recipient balance after
+        assertEq(address(RECIPIENT).balance, recipientBalanceBefore);
+        assertGe(USDC.balanceOf(RECIPIENT), recipientUSDCBalanceBefore);
+        assertGe(WETH.balanceOf(RECIPIENT), recipientWETHBalanceBefore);
 
         // old position burned, new position minted
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0, "V3 NOT BURNT");
