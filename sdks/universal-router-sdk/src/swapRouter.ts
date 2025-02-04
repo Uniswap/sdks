@@ -87,6 +87,8 @@ export abstract class SwapRouter {
     const v4PositionManagerAddress =
       positionManagerOverride ?? CHAIN_TO_ADDRESSES_MAP[v4Pool.chainId as SupportedChainsType].v4PositionManagerAddress
 
+    // owner of the v3 nft must be the receiver of the v4 nft
+
     // validate the parameters
     if (v4Pool.currency0.isNative) {
       invariant(
