@@ -293,14 +293,16 @@ export abstract class V4PositionManager {
         planner.addSettle(position.pool.currency0, false)
         planner.addSettle(position.pool.currency1, false)
         // sweep any leftover wrapped native that was not unwrapped
-        planner.addSweep(position.pool.currency0.wrapped, MSG_SENDER)
-        planner.addSweep(position.pool.currency1, MSG_SENDER)
+        // recipient will be same as the v4 lp token recipient
+        planner.addSweep(position.pool.currency0.wrapped, options.recipient)
+        planner.addSweep(position.pool.currency1, options.recipient)
       } else {
         // payer is v4 position manager
         planner.addSettle(position.pool.currency0, false)
         planner.addSettle(position.pool.currency1, false)
-        planner.addSweep(position.pool.currency0, MSG_SENDER)
-        planner.addSweep(position.pool.currency1, MSG_SENDER)
+        // recipient will be same as the v4 lp token recipient
+        planner.addSweep(position.pool.currency0, options.recipient)
+        planner.addSweep(position.pool.currency1, options.recipient)
       }
     } else {
       // need to settle both currencies when minting / adding liquidity (user is the payer)
