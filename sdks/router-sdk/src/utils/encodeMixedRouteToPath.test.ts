@@ -74,7 +74,8 @@ describe('#encodeMixedRouteToPath', () => {
   const route_1_v2_weth_v0_eth_v4_token0 = new MixedRouteSDK(
     [pair_1_weth, fake_v4_eth_weth_pool, pool_V4_0_eth],
     token1,
-    token0
+    token0,
+    true
   )
 
   describe('pure V3', () => {
