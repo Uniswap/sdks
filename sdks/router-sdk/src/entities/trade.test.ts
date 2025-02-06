@@ -751,6 +751,48 @@ describe('Trade', () => {
       expect(trade.amounts.outputAmountNative).toBeUndefined()
     })
 
+    it('can be constructed with ETHER as input for exact output swap, with V4 eth route and V2 weth route', async () => {
+      const routeOriginalV2 = new V2RouteSDK([pair_weth_0, pair_0_1], ETHER, token1)
+      const routev2 = new RouteV2(routeOriginalV2)
+      const amountv2 = CurrencyAmount.fromRawAmount(token1, JSBI.BigInt(100))
+
+      const routeOriginalV4 = new V4RouteSDK([pool_v4_1_eth], ETHER, token1)
+      const routev4 = new RouteV4(routeOriginalV4)
+      const amountv4 = CurrencyAmount.fromRawAmount(token1, JSBI.BigInt(1000))
+
+      const trade = await Trade.fromRoutes(
+        [{ routev2, amount: amountv2 }],
+        [],
+        TradeType.EXACT_OUTPUT,
+        [],
+        [{ routev4, amount: amountv4 }]
+      )
+
+      expect(trade.tradeType).toEqual(TradeType.EXACT_OUTPUT)
+      expect(trade.inputAmount.currency).toEqual(ETHER)
+      expect(trade.outputAmount.currency).toEqual(token1)
+      expect(trade.swaps.length).toEqual(2)
+      expect(trade.routes.length).toEqual(2)
+      // Expect all swap input amounts to be native
+      expect(trade.swaps.every((swap) => swap.inputAmount.currency.isNative)).toBe(true)
+      // Expect all route inputs to be ETH
+      expect(trade.swaps.every((swap) => swap.route.input.isNative)).toBe(true)
+      // However, expect the routes to be preserved (v2 using WETH and v4 using ETH)
+      expect(trade.swaps[0].route.pathInput).toEqual(weth)
+      expect(trade.swaps[1].route.pathInput).toEqual(ETHER)
+
+      // Expect inputAmount to be the sum of the input amounts of the swaps
+      expect(trade.amounts.inputAmount.equalTo(trade.amounts.inputAmount)).toBe(true)
+      // Expect inputAmountNative to correctly track only the amount required for the ETH input V4 route
+      expect(trade.amounts.inputAmountNative).toBeDefined()
+      expect(trade.amounts.inputAmountNative?.greaterThan(0)).toBe(true)
+      // Expect outputAmount to be the sum of the output amounts of the swaps
+      expect(trade.amounts.outputAmount.equalTo(trade.amounts.outputAmount)).toBe(true)
+      expect(trade.amounts.outputAmount.equalTo(amountv2.add(amountv4))).toBe(true)
+      // Expect outputAmountNative to be undefined because there is no ETH output path
+      expect(trade.amounts.outputAmountNative).toBeUndefined()
+    })
+
     it('can be constructed with ETHER as output for exact input swap, with V4 eth route and V2 weth route', async () => {
       const routeOriginalV2 = new V2RouteSDK([pair_0_1, pair_weth_0], token1, ETHER)
       const routev2 = new RouteV2(routeOriginalV2)
@@ -791,6 +833,49 @@ describe('Trade', () => {
       // Expect outputAmountNative to correctly track only the amount required for the ETH output V4 route
       expect(trade.amounts.outputAmountNative).toBeDefined()
       expect(trade.amounts.outputAmountNative?.greaterThan(0)).toBe(true)
+    })
+
+    it('can be constructed with ETHER as output for exact output swap, with V4 eth route and V2 weth route', async () => {
+      const routeOriginalV2 = new V2RouteSDK([pair_0_1, pair_weth_0], token1, ETHER)
+      const routev2 = new RouteV2(routeOriginalV2)
+      const amountv2 = CurrencyAmount.fromRawAmount(ETHER, JSBI.BigInt(100))
+
+      const routeOriginalV4 = new V4RouteSDK([pool_v4_1_eth], token1, ETHER)
+      const routev4 = new RouteV4(routeOriginalV4)
+      const amountv4 = CurrencyAmount.fromRawAmount(ETHER, JSBI.BigInt(1000))
+
+      const trade = await Trade.fromRoutes(
+        [{ routev2, amount: amountv2 }],
+        [],
+        TradeType.EXACT_OUTPUT,
+        [],
+        [{ routev4, amount: amountv4 }]
+      )
+
+      expect(trade.tradeType).toEqual(TradeType.EXACT_OUTPUT)
+      expect(trade.inputAmount.currency).toEqual(token1)
+      expect(trade.outputAmount.currency).toEqual(ETHER)
+      expect(trade.swaps.length).toEqual(2)
+      expect(trade.routes.length).toEqual(2)
+      // Expect all swap output amounts to be native
+      expect(trade.swaps.every((swap) => swap.outputAmount.currency.isNative)).toBe(true)
+      // Expect all route outputs to be ETH
+      expect(trade.swaps.every((swap) => swap.route.output.isNative)).toBe(true)
+      // However, expect the routes to be preserved (v2 using WETH and v4 using ETH)
+      expect(trade.swaps[0].route.pathOutput).toEqual(weth)
+      expect(trade.swaps[1].route.pathOutput).toEqual(ETHER)
+
+      // Expect inputAmount to be the sum of the input amounts of the swaps
+      expect(trade.amounts.inputAmount.equalTo(trade.amounts.inputAmount)).toBe(true)
+      expect(trade.amounts.inputAmount.greaterThan(0)).toBe(true)
+      // Expect inputAmountNative to be undefined because there is no ETH input path
+      expect(trade.amounts.inputAmountNative).toBeUndefined()
+      // Expect outputAmount to be the sum of the output amounts of the swaps
+      expect(trade.amounts.outputAmount.equalTo(trade.amounts.outputAmount)).toBe(true)
+      expect(trade.amounts.outputAmount.equalTo(amountv2.add(amountv4))).toBe(true)
+      // Expect outputAmountNative to correctly track only the amount required for the ETH output V4 route
+      expect(trade.amounts.outputAmountNative).toBeDefined()
+      expect(trade.amounts.outputAmountNative?.equalTo(amountv4)).toBe(true)
     })
 
     it('throws if pools are re-used between V3 routes', async () => {
