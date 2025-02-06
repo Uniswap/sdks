@@ -739,9 +739,15 @@ describe('Trade', () => {
       expect(trade.swaps[0].route.pathInput).toEqual(weth)
       expect(trade.swaps[1].route.pathInput).toEqual(ETHER)
 
+      // Expect inputAmount to be the sum of the input amounts of the swaps
+      expect(trade.amounts.inputAmount.equalTo(trade.amounts.inputAmount)).toBe(true)
+      expect(trade.amounts.inputAmount.equalTo(amountv2.add(amountv4))).toBe(true)
       // Expect inputAmountNative to correctly track only the amount required for the ETH input V4 route
       expect(trade.amounts.inputAmountNative).toBeDefined()
       expect(trade.amounts.inputAmountNative?.equalTo(amountv4)).toBe(true)
+      // Expect outputAmount to be the sum of the output amounts of the swaps
+      expect(trade.amounts.outputAmount.equalTo(trade.amounts.outputAmount)).toBe(true)
+      // Expect outputAmountNative to be undefined because there is no ETH output path
       expect(trade.amounts.outputAmountNative).toBeUndefined()
     })
 
@@ -775,10 +781,16 @@ describe('Trade', () => {
       expect(trade.swaps[0].route.pathOutput).toEqual(weth)
       expect(trade.swaps[1].route.pathOutput).toEqual(ETHER)
 
+      // Expect inputAmount to be the sum of the input amounts of the swaps
+      expect(trade.amounts.inputAmount.equalTo(trade.amounts.inputAmount)).toBe(true)
+      expect(trade.amounts.inputAmount.equalTo(amountv2.add(amountv4))).toBe(true)
+      // Expect inputAmountNative to be undefined because there is no ETH input path
+      expect(trade.amounts.inputAmountNative).toBeUndefined()
+      // Expect outputAmount to be the sum of the output amounts of the swaps
+      expect(trade.amounts.outputAmount.equalTo(trade.amounts.outputAmount)).toBe(true)
       // Expect outputAmountNative to correctly track only the amount required for the ETH output V4 route
       expect(trade.amounts.outputAmountNative).toBeDefined()
       expect(trade.amounts.outputAmountNative?.greaterThan(0)).toBe(true)
-      expect(trade.amounts.inputAmountNative).toBeUndefined()
     })
 
     it('throws if pools are re-used between V3 routes', async () => {

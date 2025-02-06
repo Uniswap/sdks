@@ -163,12 +163,16 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
   }
 
   /**
-   * Returns the sum of all swaps within the trade where the pathInput/Output is native
+   * Returns the sum of all swaps within the trade
    * @returns
    * inputAmount: total input amount
    * inputAmountNative: total amount of native currency required for ETH input paths
+   *  - 0 if inputAmount is native but no native input paths
+   *  - undefined if inputAmount is not native
    * outputAmount: total output amount
    * outputAmountNative: total amount of native currency returned from ETH output paths
+   *  - 0 if outputAmount is native but no native output paths
+   *  - undefined if outputAmount is not native
    */
   public get amounts(): {
     inputAmount: CurrencyAmount<TInput>
