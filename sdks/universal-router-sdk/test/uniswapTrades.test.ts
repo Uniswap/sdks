@@ -2381,43 +2381,6 @@ describe('Uniswap', () => {
       expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('BURN_TOKEN_REQUIRED')
     })
 
-    it('throws if not minting when migrating', async () => {
-      const opts = Object.assign({
-        inputPosition: new Position({
-          pool: USDC_DAI_V3,
-          liquidity: 1,
-          tickLower: -USDC_DAI_V3.tickSpacing,
-          tickUpper: USDC_DAI_V3.tickSpacing,
-        }),
-        outputPosition: new V4Position({
-          pool: USDC_DAI_V4,
-          liquidity: 1,
-          tickLower: -USDC_DAI_V4.tickSpacing,
-          tickUpper: USDC_DAI_V4.tickSpacing,
-        }),
-        v3RemoveLiquidityOptions: {
-          tokenId: 1,
-          liquidityPercentage: new Percent(100, 100),
-          slippageTolerance: new Percent(5, 100),
-          deadline: 1,
-          burnToken: true,
-          collectOptions: {
-            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
-            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(WETH, 0),
-            recipient: CHAIN_TO_ADDRESSES_MAP[ChainId.MAINNET].v4PositionManagerAddress,
-          },
-        },
-        v4AddLiquidityOptions: {
-          migrate: true,
-          deadline: 1,
-          slippageTolerance: new Percent(5, 100),
-          sqrtPriceX96: encodeSqrtRatioX96(1, 1),
-          // no recipient option means not minting
-        },
-      })
-      expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('MINT_REQUIRED')
-    })
-
     it('throws if migrating weth to eth with token mismatch', async () => {
       const opts = Object.assign({
         inputPosition: new Position({
@@ -2445,7 +2408,7 @@ describe('Uniswap', () => {
           },
         },
         v4AddLiquidityOptions: {
-          migrate: true,
+          migrateOptions: { migrate: true },
           deadline: 1,
           slippageTolerance: new Percent(5, 100),
           sqrtPriceX96: encodeSqrtRatioX96(1, 1),
