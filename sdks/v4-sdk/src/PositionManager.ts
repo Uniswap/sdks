@@ -120,11 +120,11 @@ export interface MigrateOptions {
    */
   migrate?: boolean
   /**
-   * The additional currency that needs to be transferred
+   * The additional currency that needs to be transferred if migrating from out of range to in range or out of range to opposite side out of range
    */
   neededCurrency?: Currency
   /**
-   * The amount of additional currency that needs to be transferred
+   * The amount of additional currency that needs to be transferred if migrating from out of range to in range or out of range to opposite side out of range
    */
   neededAmount?: BigintIsh
 }
