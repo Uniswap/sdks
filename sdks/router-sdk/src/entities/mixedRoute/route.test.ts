@@ -20,6 +20,7 @@ describe('MixedRoute', () => {
   const pool_v4_0_weth = new V4Pool(token0, weth, FeeAmount.MEDIUM, 60, ADDRESS_ZERO, SQRT_RATIO_ONE, 0, 0, [])
   const pool_v4_1_eth = new V4Pool(token1, ETHER, FeeAmount.MEDIUM, 60, ADDRESS_ZERO, SQRT_RATIO_ONE, 0, 0, [])
   const pool_v4_0_1 = new V4Pool(token0, token1, FeeAmount.MEDIUM, 60, ADDRESS_ZERO, SQRT_RATIO_ONE, 0, 0, [])
+  const pool_v4_weth_eth = new V4Pool(weth, ETHER, 0, 0, ADDRESS_ZERO, SQRT_RATIO_ONE, 0, 0)
 
   const pool_v3_0_1 = new V3Pool(token0, token1, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
   const pool_v3_0_weth = new V3Pool(token0, weth, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
@@ -34,6 +35,18 @@ describe('MixedRoute', () => {
   const pair_2_3 = new Pair(CurrencyAmount.fromRawAmount(token2, '100'), CurrencyAmount.fromRawAmount(token3, '200'))
 
   describe('path', () => {
+    it('real v3 weth pool and fake v4 eth/weth pool', () => {
+      const route = new MixedRouteSDK([pool_v3_0_weth, pool_v4_weth_eth], token0, ETHER)
+      expect(route.path).toEqual([token0, weth])
+      expect(route.pools).toEqual([pool_v3_0_weth])
+    })
+
+    it('real v3 weth pool and real v4 eth pool', () => {
+      const route = new MixedRouteSDK([pool_v3_0_weth, pool_v4_weth_eth, pool_v4_1_eth], token0, token1)
+      expect(route.path).toEqual([token0, weth, token1])
+      expect(route.pools).toEqual([pool_v3_0_weth, pool_v4_1_eth])
+    })
+
     it('wraps pure v3 route object and successfully constructs a path from the tokens', () => {
       /// @dev since the MixedRoute sdk object lives here in router-sdk we don't need to wrap it
       const routeOriginal = new MixedRouteSDK([pool_v3_0_1], token0, token1)
@@ -84,9 +97,9 @@ describe('MixedRoute', () => {
     })
 
     it('wraps mixed route object with mixed v4 route that converts WETH -> ETH ', () => {
-      const route = new MixedRouteSDK([pool_v3_0_weth, pool_v4_1_eth], token0, token1)
-      expect(route.pools).toEqual([pool_v3_0_weth, pool_v4_1_eth])
-      expect(route.path).toEqual([token0, weth, token1])
+      const route = new MixedRouteSDK([pool_v3_0_weth, pool_v4_weth_eth, pool_v4_1_eth], token0, token1, true)
+      expect(route.pools).toEqual([pool_v3_0_weth, pool_v4_weth_eth, pool_v4_1_eth])
+      expect(route.path).toEqual([token0, weth, ETHER, token1])
       expect(route.input).toEqual(token0)
       expect(route.output).toEqual(token1)
       expect(route.pathInput).toEqual(token0)
@@ -104,11 +117,21 @@ describe('MixedRoute', () => {
     })
 
     it('cannot wrap mixed route object with pure v4 route that converts ETH -> WETH ', () => {
-      expect(() => new MixedRouteSDK([pool_v4_1_eth, pool_v4_0_weth], token1, token0)).toThrow('PATH')
+      const route = new MixedRouteSDK([pool_v4_1_eth, pool_v4_0_weth], token1, token0)
+      expect(route.pools).toEqual([pool_v4_1_eth, pool_v4_0_weth])
+      expect(route.path).toEqual([token1, ETHER, token0])
+      expect(route.input).toEqual(token1)
+      expect(route.output).toEqual(token0)
+      expect(route.chainId).toEqual(1)
     })
 
     it('cannot wrap mixed route object with pure v4 route that converts WETH -> ETH ', () => {
-      expect(() => new MixedRouteSDK([pool_v4_0_weth, pool_v4_1_eth], token0, token1)).toThrow('PATH')
+      const route = new MixedRouteSDK([pool_v4_0_weth, pool_v4_1_eth], token0, token1)
+      expect(route.pools).toEqual([pool_v4_0_weth, pool_v4_1_eth])
+      expect(route.path).toEqual([token0, weth, token1])
+      expect(route.input).toEqual(token0)
+      expect(route.output).toEqual(token1)
+      expect(route.chainId).toEqual(1)
     })
 
     it('wraps complex mixed route object and successfully constructs a path from the tokens', () => {

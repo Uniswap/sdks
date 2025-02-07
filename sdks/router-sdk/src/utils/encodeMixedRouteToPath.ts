@@ -34,14 +34,22 @@ export function encodeMixedRouteToPath(route: MixedRouteSDK<Currency, Currency>)
       const currencyOut = currencyIn.equals(pool.token0) ? pool.token1 : pool.token0
 
       if (pool instanceof V4Pool) {
-        const v4Fee = pool.fee + MIXED_QUOTER_V2_V4_FEE_PATH_PLACEHOLDER
-        path.push(
-          v4Fee,
-          pool.tickSpacing,
-          pool.hooks,
-          currencyOut.isNative ? ADDRESS_ZERO : currencyOut.wrapped.address
-        )
-        types.push('uint24', 'uint24', 'address', 'address')
+        // a tickSpacing of 0 indicates a "fake" v4 pool where the quote actually requires a wrap or unwrap
+        // the fake v4 pool will always have native as token0 and wrapped native as token1
+        if (pool.tickSpacing === 0) {
+          const wrapOrUnwrapEncoding = 0
+          path.push(wrapOrUnwrapEncoding, currencyOut.isNative ? ADDRESS_ZERO : currencyOut.wrapped.address)
+          types.push('uint8', 'address')
+        } else {
+          const v4Fee = pool.fee + MIXED_QUOTER_V2_V4_FEE_PATH_PLACEHOLDER
+          path.push(
+            v4Fee,
+            pool.tickSpacing,
+            pool.hooks,
+            currencyOut.isNative ? ADDRESS_ZERO : currencyOut.wrapped.address
+          )
+          types.push('uint24', 'uint24', 'address', 'address')
+        }
       } else if (pool instanceof V3Pool) {
         const v3Fee = pool.fee + MIXED_QUOTER_V2_V3_FEE_PATH_PLACEHOLDER
         path.push(v3Fee, currencyOut.wrapped.address)

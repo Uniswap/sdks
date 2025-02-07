@@ -31,6 +31,16 @@ describe('#encodeMixedRouteToPath', () => {
     0,
     []
   )
+  const fake_v4_eth_weth_pool = new V4Pool(
+    weth,
+    ETHER,
+    FeeAmount.MEDIUM,
+    0,
+    ADDRESS_ZERO,
+    encodeSqrtRatioX96(1, 1),
+    0,
+    0
+  )
 
   const pair_0_1 = new Pair(CurrencyAmount.fromRawAmount(token0, '100'), CurrencyAmount.fromRawAmount(token1, '200'))
   const pair_1_2 = new Pair(CurrencyAmount.fromRawAmount(token1, '150'), CurrencyAmount.fromRawAmount(token2, '150'))
@@ -60,6 +70,13 @@ describe('#encodeMixedRouteToPath', () => {
   const route_0_V3_weth_V4_1 = new MixedRouteSDK([pool_V3_0_weth, pool_V4_0_1], ETHER, token1)
   const route_eth_V4_0_V3_1 = new MixedRouteSDK([pool_V4_0_eth, pool_V3_0_1_medium], ETHER, token1)
   const route_eth_V3_0_V4_1 = new MixedRouteSDK([pool_V3_0_weth, pool_V4_0_1], ETHER, token1)
+
+  const route_1_v2_weth_v0_eth_v4_token0 = new MixedRouteSDK(
+    [pair_1_weth, fake_v4_eth_weth_pool, pool_V4_0_eth],
+    token1,
+    token0,
+    true
+  )
 
   describe('pure V3', () => {
     it('packs them for exact input single hop', () => {
@@ -180,6 +197,31 @@ describe('#encodeMixedRouteToPath', () => {
       expect(encodeMixedRouteToPath(route_eth_V3_0_V4_1)).toEqual(
         '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2300bb80000000000000000000000000000000000000001400bb800001e00000000000000000000000000000000000000000000000000000000000000000000000000000002'
       )
+    })
+
+    it('encodes the mixed route with an unwrap, token1 v2 -> v4 token0 through an unwrap', () => {
+      expect(encodeMixedRouteToPath(route_1_v2_weth_v0_eth_v4_token0)).toEqual(
+        '0x000000000000000000000000000000000000000220c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000000000000000000000400bb800001e00000000000000000000000000000000000000000000000000000000000000000000000000000001'
+      )
+      // comments left for future reference, to show special cased eth-weth v4 (version0) encoding in the mixed route quoter
+      // // first path address - token1
+      // 0x0000000000000000000000000000000000000002
+      // // first path fee - v2 "version"
+      // 0x20
+      // // first path second address - weth
+      // 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2
+      // // second path - fake v4 pool, "version"
+      // 0x00
+      // // second path - fake v4 pool, second address - eth
+      // 0x0000000000000000000000000000000000000000
+      // // last path - v4 pool, with Fee.MEDIUM
+      // 0x400bb8
+      // // last path - v4, tick spacing of 30
+      // 0x00001e
+      // // last path - v4, hook address
+      // 0x0000000000000000000000000000000000000000
+      // // last path address - v4 pool, token0
+      // 0x0000000000000000000000000000000000000001
     })
   })
 })

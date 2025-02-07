@@ -7,6 +7,18 @@ import { Protocol } from './protocol'
 import { Currency, Price, Token } from '@uniswap/sdk-core'
 import { MixedRouteSDK } from './mixedRoute/route'
 
+// Helper function to get the pathInput and pathOutput for a V2 / V3 route
+// currency could be native so we check against the wrapped version as they don't support native ETH in path
+export function getPathToken(currency: Currency, pool: Pair | V3Pool): Token {
+  if (pool.token0.wrapped.equals(currency.wrapped)) {
+    return pool.token0
+  } else if (pool.token1.wrapped.equals(currency.wrapped)) {
+    return pool.token1
+  } else {
+    throw new Error(`Expected token ${currency.symbol} to be either ${pool.token0.symbol} or ${pool.token1.symbol}`)
+  }
+}
+
 export interface IRoute<TInput extends Currency, TOutput extends Currency, TPool extends Pair | V3Pool | V4Pool> {
   protocol: Protocol
   // array of pools if v3 or pairs if v2
@@ -15,6 +27,8 @@ export interface IRoute<TInput extends Currency, TOutput extends Currency, TPool
   midPrice: Price<TInput, TOutput>
   input: TInput
   output: TOutput
+  pathInput: Currency
+  pathOutput: Currency
 }
 
 // V2 route wrapper
@@ -24,10 +38,14 @@ export class RouteV2<TInput extends Currency, TOutput extends Currency>
 {
   public readonly protocol: Protocol = Protocol.V2
   public readonly pools: Pair[]
+  public pathInput: Currency
+  public pathOutput: Currency
 
   constructor(v2Route: V2RouteSDK<TInput, TOutput>) {
     super(v2Route.pairs, v2Route.input, v2Route.output)
     this.pools = this.pairs
+    this.pathInput = getPathToken(v2Route.input, this.pairs[0])
+    this.pathOutput = getPathToken(v2Route.output, this.pairs[this.pairs.length - 1])
   }
 }
 
@@ -38,10 +56,14 @@ export class RouteV3<TInput extends Currency, TOutput extends Currency>
 {
   public readonly protocol: Protocol = Protocol.V3
   public readonly path: Token[]
+  public pathInput: Currency
+  public pathOutput: Currency
 
   constructor(v3Route: V3RouteSDK<TInput, TOutput>) {
     super(v3Route.pools, v3Route.input, v3Route.output)
     this.path = v3Route.tokenPath
+    this.pathInput = getPathToken(v3Route.input, this.pools[0])
+    this.pathOutput = getPathToken(v3Route.output, this.pools[this.pools.length - 1])
   }
 }
 
