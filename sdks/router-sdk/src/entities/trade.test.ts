@@ -1591,4 +1591,32 @@ describe('Trade', () => {
       expect(trade.executionPrice).toEqual(expectedPrice)
     })
   })
+
+  describe('split route', () => {
+    it('returns correct #numberOfSplitsRequiringUnwrap', async() => {
+      // TRADE OBJECT
+      // input  : protocol : path
+      // [WETH] :   v2     : [WETH - token1]
+      // [WETH] :   v4     : [ETH  - token1]
+
+      const routev2 = new V2RouteSDK([pair_weth_1], weth, token1)
+      const routev4 = new V4RouteSDK([pool_v4_1_eth], weth, token1)
+      const amountv2 = CurrencyAmount.fromRawAmount(weth, 100)
+      const amountv4 = CurrencyAmount.fromRawAmount(weth, 200)
+
+      const splitTrade = await Trade.fromRoutes(
+        [{ routev2, amount: amountv2 }],
+        [],
+        TradeType.EXACT_INPUT,
+        [],
+        [{ routev4, amount: amountv4 }]
+      )
+
+      expect(splitTrade.numberOfSplitsRequiringUnwrap).toEqual(1)
+      expect(splitTrade.nativeRoutes.length).toEqual(1)
+      expect(splitTrade.nativeRoutes[0]).toEqual(new RouteV4(routev4))
+      expect(splitTrade.wethRoutes.length).toEqual(1)
+      expect(splitTrade.wethRoutes[0]).toEqual(new RouteV2(routev2))
+    })
+  })
 })

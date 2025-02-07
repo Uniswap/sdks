@@ -1,4 +1,4 @@
-import { Currency, CurrencyAmount, Fraction, Percent, Price, TradeType } from '@uniswap/sdk-core'
+import { Currency, CurrencyAmount, Fraction, Percent, Price, TradeType, Ether } from '@uniswap/sdk-core'
 import { Pair, Route as V2RouteSDK, Trade as V2TradeSDK } from '@uniswap/v2-sdk'
 import { Pool as V3Pool, Route as V3RouteSDK, Trade as V3TradeSDK } from '@uniswap/v3-sdk'
 import { Pool as V4Pool, Route as V4RouteSDK, Trade as V4TradeSDK } from '@uniswap/v4-sdk'
@@ -13,6 +13,8 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
   public readonly tradeType: TTradeType
   private _outputAmount: CurrencyAmount<TOutput> | undefined
   private _inputAmount: CurrencyAmount<TInput> | undefined
+  private _nativeRoutes: IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>[] | undefined
+  private _wethRoutes: IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>[] | undefined
 
   /**
    * The swaps of the trade, i.e. which routes and how much is swapped in each that
@@ -202,6 +204,32 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     }
   }
 
+
+  public get numberOfSplitsRequiringUnwrap() : number {
+    // if the trade's input is weth, it may require an unwrap
+    if (this.isWrappedNative(this.inputAmount.currency)) {
+      return this.nativeRoutes.length
+    } else return 0
+  }
+
+  public get nativeRoutes() : IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>[] {
+    if (this._nativeRoutes) {
+      return this._nativeRoutes
+    }
+
+    this._nativeRoutes = this.routes.filter(route => route.pathInput.isNative)
+    return this._nativeRoutes
+  }
+
+  public get wethRoutes() : IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>[] {
+    if (this._wethRoutes) {
+      return this._wethRoutes
+    }
+
+    this._wethRoutes = this.routes.filter(route => this.isWrappedNative(route.pathInput))
+    return this._wethRoutes
+  }
+
   private _executionPrice: Price<TInput, TOutput> | undefined
 
   /**
@@ -238,6 +266,11 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
 
     return new Percent(outputCurrency.wrapped.buyFeeBps.toNumber(), 10000)
   }
+
+    private isWrappedNative(currency : Currency): boolean {
+      const chainId = currency.chainId
+      return currency.equals(Ether.onChain(chainId).wrapped)
+    }
 
   /**
    * The cached result of the price impact computation
