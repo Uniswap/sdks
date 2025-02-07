@@ -10,10 +10,10 @@ import {
   RemoveLiquidityOptions as V3RemoveLiquidityOptions,
 } from '@uniswap/v3-sdk'
 import {
-  MintOptions,
   Position as V4Position,
   V4PositionManager,
   AddLiquidityOptions as V4AddLiquidityOptions,
+  MintOptions,
   Pool as V4Pool,
   PoolKey,
 } from '@uniswap/v4-sdk'
@@ -36,9 +36,9 @@ export interface MigrateV3ToV4Options {
   v4AddLiquidityOptions: V4AddLiquidityOptions
 }
 
-function isMint(options: V4AddLiquidityOptions): options is MintOptions {
-  return 'recipient' in options
-}
+// function isMint(options: V4AddLiquidityOptions): options is MintOptions {
+//   return 'recipient' in options
+// }
 
 function isMigrate(options: V4AddLiquidityOptions): options is MintOptions {
   return 'migrateOptions' in options && options.migrateOptions?.migrate === true
@@ -119,7 +119,7 @@ export abstract class SwapRouter {
       'RECIPIENT_NOT_POSITION_MANAGER'
     )
     // Migration must be a mint operation, not an increase because the UR should not have permission to increase liquidity on a v4 position
-    invariant(isMint(options.v4AddLiquidityOptions), 'MINT_REQUIRED')
+    //invariant(isMint(options.v4AddLiquidityOptions), 'MINT_REQUIRED')
     invariant(isMigrate(options.v4AddLiquidityOptions), 'MIGRATE_REQUIRED')
 
     const planner = new RoutePlanner()

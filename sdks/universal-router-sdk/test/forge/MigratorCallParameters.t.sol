@@ -185,7 +185,8 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
 
         // add the position to v3 so we have something to migrate
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0);
-        // USDC < WETH
+        // USDC < WETH (USDC is token0, WETH is token1)
+        // in range v3 position, tickLower = 200040, tickUpper = 300000, tickCurrent = 205265
         mintV3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18, 200040, 300000);
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 1);
 
@@ -232,7 +233,8 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
 
         // add the position to v3 so we have something to migrate
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0);
-        // USDC < WETH
+        // USDC < WETH (USDC is token0, WETH is token1)
+        // in range v3 position, tickLower = 200040, tickUpper = 300000, tickCurrent = 205265
         mintV3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18, 200040, 300000);
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 1);
 
@@ -279,7 +281,8 @@ contract MigratorCallParametersTest is Test, Interop, DeployRouter {
 
         // add the position to v3 so we have something to migrate
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 0);
-        // USDC < WETH
+        // USDC < WETH (USDC is token0, WETH is token1)
+        // in range v3 position, tickLower = 200040, tickUpper = 300000, tickCurrent = 205265
         mintV3Position(address(USDC), address(WETH), 3000, 2500e6, 1e18, 200040, 300000);
         assertEq(INonfungiblePositionManager(V3_POSITION_MANAGER).balanceOf(from), 1);
 
