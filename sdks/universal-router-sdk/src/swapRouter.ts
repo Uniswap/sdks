@@ -165,15 +165,16 @@ export abstract class SwapRouter {
     // if migrate options has a currency, require a batch permit
     if (options.v4AddLiquidityOptions.migrateOptions?.neededCurrency) {
       // need to permit the UR to spend your currency on permit2
-      invariant(options.v4AddLiquidityOptions.batchPermit, 'PERMIT_REQUIRED')
-      invariant(
-        options.v4AddLiquidityOptions.batchPermit.permitBatch.spender == universalRouterAddress,
-        'INVALID_SPENDER'
-      )
-      planner.addCommand(CommandType.PERMIT2_PERMIT_BATCH, [
-        options.v4AddLiquidityOptions.batchPermit.permitBatch,
-        options.v4AddLiquidityOptions.batchPermit.signature,
-      ])
+      if (options.v4AddLiquidityOptions.batchPermit) {
+        invariant(
+          options.v4AddLiquidityOptions.batchPermit.permitBatch.spender == universalRouterAddress,
+          'INVALID_SPENDER'
+        )
+        planner.addCommand(CommandType.PERMIT2_PERMIT_BATCH, [
+          options.v4AddLiquidityOptions.batchPermit.permitBatch,
+          options.v4AddLiquidityOptions.batchPermit.signature,
+        ])
+      }
       planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [
         options.v4AddLiquidityOptions.migrateOptions.neededCurrency,
         options.v3RemoveLiquidityOptions.collectOptions.recipient,

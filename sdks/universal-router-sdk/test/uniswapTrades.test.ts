@@ -2007,7 +2007,7 @@ describe('Uniswap', () => {
           tickLower: 205320,
           tickUpper: 300000,
         }),
-        // below range (current tick = 0)
+        // above range (current tick = 0)
         outputPosition: new V4Position({
           pool: WETH_USDC_V4,
           liquidity: 100000,
