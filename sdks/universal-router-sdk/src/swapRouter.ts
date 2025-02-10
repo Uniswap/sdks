@@ -18,7 +18,7 @@ import {
   PoolKey,
 } from '@uniswap/v4-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
-import { Currency, TradeType, Percent, CHAIN_TO_ADDRESSES_MAP, SupportedChainsType } from '@uniswap/sdk-core'
+import { Currency, TradeType, Percent, CHAIN_TO_ADDRESSES_MAP, SupportedChainsType, Token } from '@uniswap/sdk-core'
 import { UniswapTrade, SwapOptions } from './entities/actions/uniswap'
 import { RoutePlanner, CommandType } from './utils/routerCommands'
 import { encodePermit, encodeV3PositionPermit } from './utils/inputTokens'
@@ -163,7 +163,10 @@ export abstract class SwapRouter {
     }
 
     // if migrate options has a currency, require a batch permit
-    if (options.v4AddLiquidityOptions.migrateOptions?.neededCurrency) {
+    if (
+      options.v4AddLiquidityOptions.migrateOptions?.neededCurrency &&
+      options.v4AddLiquidityOptions.migrateOptions?.neededCurrency instanceof Token
+    ) {
       // need to permit the UR to spend your currency on permit2
       if (options.v4AddLiquidityOptions.batchPermit) {
         invariant(
@@ -176,7 +179,7 @@ export abstract class SwapRouter {
         ])
       }
       planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [
-        options.v4AddLiquidityOptions.migrateOptions.neededCurrency,
+        options.v4AddLiquidityOptions.migrateOptions.neededCurrency.address,
         options.v3RemoveLiquidityOptions.collectOptions.recipient,
         options.v4AddLiquidityOptions.migrateOptions.neededAmount,
       ])
@@ -192,7 +195,13 @@ export abstract class SwapRouter {
 
     planner.addCommand(CommandType.V4_POSITION_MANAGER_CALL, [v4AddParams.calldata])
 
-    return SwapRouter.encodePlan(planner, BigNumber.from(0), {
+    let nativeCurrencyValue = BigNumber.from(0)
+
+    if (options.v4AddLiquidityOptions.migrateOptions?.neededCurrency?.isNative) {
+      nativeCurrencyValue = BigNumber.from(options.v4AddLiquidityOptions.migrateOptions?.neededAmount)
+    }
+
+    return SwapRouter.encodePlan(planner, nativeCurrencyValue, {
       deadline: BigNumber.from(options.v4AddLiquidityOptions.deadline),
     })
   }

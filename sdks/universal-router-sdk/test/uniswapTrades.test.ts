@@ -1,4 +1,4 @@
-import { expect } from 'chai'
+import { expect, use } from 'chai'
 import JSBI from 'jsbi'
 import { BigNumber, ethers, utils, Wallet, Signature } from 'ethers'
 import { expandTo18Decimals } from '../src/utils/numbers'
@@ -17,7 +17,13 @@ import {
   FeeAmount,
   NonfungiblePositionManager,
 } from '@uniswap/v3-sdk'
-import { Pool as V4Pool, Route as V4Route, Trade as V4Trade, Position as V4Position } from '@uniswap/v4-sdk'
+import {
+  Pool as V4Pool,
+  Route as V4Route,
+  Trade as V4Trade,
+  Position as V4Position,
+  V4PositionManager,
+} from '@uniswap/v4-sdk'
 import {
   generatePermitSignature,
   generatePermitSignatureFromBatch,
@@ -31,6 +37,7 @@ import {
   ChainId,
   CurrencyAmount,
   Ether,
+  Currency,
   NONFUNGIBLE_POSITION_MANAGER_ADDRESSES,
   Percent,
   Token,
@@ -1978,7 +1985,7 @@ describe('Uniswap', () => {
           deadline: MAX_UINT160,
           migrateOptions: {
             migrate: true,
-            neededCurrency: WETH.address,
+            neededCurrency: WETH,
             neededAmount: '1013935132270157186975',
           },
           slippageTolerance: new Percent(5, 100),
@@ -2007,7 +2014,7 @@ describe('Uniswap', () => {
           tickLower: 205320,
           tickUpper: 300000,
         }),
-        // above range (current tick = 0)
+        // below range (current tick = 0)
         outputPosition: new V4Position({
           pool: WETH_USDC_V4,
           liquidity: 100000,
@@ -2030,7 +2037,7 @@ describe('Uniswap', () => {
           deadline: MAX_UINT160,
           migrateOptions: {
             migrate: true,
-            neededCurrency: WETH.address,
+            neededCurrency: WETH,
             neededAmount: '1013935132270157186975',
           },
           slippageTolerance: new Percent(5, 100),
@@ -2084,6 +2091,51 @@ describe('Uniswap', () => {
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
+    it('encodes a migration from out of range v3 in usdc to out of range v4 in eth', async () => {
+      const opts = Object.assign({
+        // above range (current tick = 205265)
+        inputPosition: new Position({
+          pool: WETH_USDC_V3,
+          liquidity: 72446937194878,
+          tickLower: 205320,
+          tickUpper: 300000,
+        }),
+        // above range (current tick = 0)
+        outputPosition: new V4Position({
+          pool: ETH_USDC_V4,
+          liquidity: 100000,
+          tickLower: 60,
+          tickUpper: 300000,
+        }),
+        v3RemoveLiquidityOptions: {
+          tokenId: 377972,
+          liquidityPercentage: new Percent(100, 100),
+          slippageTolerance: new Percent(5, 100),
+          deadline: MAX_UINT160,
+          burnToken: true,
+          collectOptions: {
+            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(WETH, 0),
+            recipient: FORGE_V4_POSITION_MANAGER,
+          },
+        },
+        v4AddLiquidityOptions: {
+          deadline: MAX_UINT160,
+          migrateOptions: {
+            migrate: true,
+            neededCurrency: ETHER,
+            neededAmount: '9000000000000000000',
+          },
+          slippageTolerance: new Percent(5, 100),
+          recipient: TEST_RECIPIENT_ADDRESS,
+          useNative: ETHER,
+        },
+      })
+      const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
+      registerFixture('_MIGRATE_V3RANGE_USDC_TO_V4RANGE_ETH', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq(opts.v4AddLiquidityOptions.migrateOptions.neededAmount)
+    })
+
     it('encodes a migration from out of range v3 in token1 to in range v4', async () => {
       const permit = makePermitBatch(
         USDC.address,
@@ -2123,7 +2175,7 @@ describe('Uniswap', () => {
           deadline: MAX_UINT160,
           migrateOptions: {
             migrate: true,
-            neededCurrency: USDC.address,
+            neededCurrency: USDC,
             neededAmount: '1013935132270157186975',
           },
           slippageTolerance: new Percent(5, 100),
@@ -2175,7 +2227,7 @@ describe('Uniswap', () => {
           deadline: MAX_UINT160,
           migrateOptions: {
             migrate: true,
-            neededCurrency: USDC.address,
+            neededCurrency: USDC,
             neededAmount: '1013935132270157186975',
           },
           slippageTolerance: new Percent(5, 100),
@@ -2226,6 +2278,48 @@ describe('Uniswap', () => {
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
       registerFixture('_MIGRATE_V3RANGE1_TO_V4RANGE1', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+    })
+
+    it('encodes a migration from out of range v3 in weth to out of range v4 in eth', async () => {
+      const opts = Object.assign({
+        // below range (current tick = 205265)
+        inputPosition: new Position({
+          pool: WETH_USDC_V3,
+          liquidity: 2971776649834933,
+          tickLower: 204720,
+          tickUpper: 204960,
+        }),
+        // above range (current tick = 0); eth is now currency0
+        outputPosition: new V4Position({
+          pool: ETH_USDC_V4,
+          liquidity: 100000,
+          tickLower: 60,
+          tickUpper: 300000,
+        }),
+        v3RemoveLiquidityOptions: {
+          tokenId: 377972,
+          liquidityPercentage: new Percent(100, 100),
+          slippageTolerance: new Percent(5, 100),
+          deadline: MAX_UINT160,
+          burnToken: true,
+          collectOptions: {
+            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(WETH, 0),
+            recipient: FORGE_V4_POSITION_MANAGER,
+          },
+        },
+        v4AddLiquidityOptions: {
+          deadline: MAX_UINT160,
+          migrateOptions: { migrate: true },
+          // no need to transfer any additional currency because both positions are out of range on same side
+          slippageTolerance: new Percent(5, 100),
+          recipient: TEST_RECIPIENT_ADDRESS,
+          useNative: ETHER,
+        },
+      })
+      const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
+      registerFixture('_MIGRATE_V3RANGE_WETH_TO_V4RANGE_ETH', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
@@ -2568,7 +2662,7 @@ describe('Uniswap', () => {
           deadline: MAX_UINT160,
           migrateOptions: {
             migrate: true,
-            neededCurrency: USDC.address,
+            neededCurrency: USDC,
             neededAmount: '1013935132270157186975',
           },
           slippageTolerance: new Percent(5, 100),
