@@ -367,6 +367,45 @@ describe('PositionManager', () => {
       expect(value).toEqual('0x00')
     })
 
+    it('succeeds when migrating out of range and need to transfer eth', () => {
+      const position: Position = new Position({
+        pool: pool_1_eth,
+        tickLower: TICK_SPACINGS[FeeAmount.MEDIUM],
+        tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM] * 2,
+        liquidity: 1,
+      })
+      const { calldata, value } = V4PositionManager.addCallParameters(position, {
+        recipient,
+        slippageTolerance,
+        deadline,
+        migrateOptions: { migrate: true, neededCurrency: currency_native, neededAmount: 1 },
+        useNative: currency_native,
+      })
+
+      // Rebuild the data with the planner for the expected mint. MUST sweep since we are using the native currency.
+      const planner = new V4Planner()
+      const { amount0: amount0Max, amount1: amount1Max } = position.mintAmountsWithSlippage(slippageTolerance)
+      // Expect position to be minted correctly
+      planner.addAction(Actions.MINT_POSITION, [
+        pool_1_eth.poolKey,
+        TICK_SPACINGS[FeeAmount.MEDIUM],
+        TICK_SPACINGS[FeeAmount.MEDIUM] * 2,
+        1,
+        toHex(amount0Max),
+        toHex(amount1Max),
+        recipient,
+        EMPTY_BYTES,
+      ])
+
+      planner.addAction(Actions.SETTLE, [toAddress(pool_1_eth.currency0), OPEN_DELTA, false])
+      planner.addAction(Actions.SETTLE, [toAddress(pool_1_eth.currency1), OPEN_DELTA, false])
+      planner.addAction(Actions.SWEEP, [toAddress(pool_1_eth.currency0), recipient])
+      planner.addAction(Actions.SWEEP, [toAddress(pool_1_eth.currency1), recipient])
+      expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
+
+      expect(value).toEqual('0x00')
+    })
+
     it('succeeds for batchPermit', () => {
       const position: Position = new Position({
         pool: pool_0_1,

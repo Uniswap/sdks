@@ -282,9 +282,11 @@ export abstract class V4PositionManager {
 
     let value: string = toHex(0)
 
+    let needToSendEth = isMint(options) && options.migrateOptions?.neededCurrency?.isNative
+
     // If migrating, we need to settle and sweep both currencies individually
     if (isMint(options) && options.migrateOptions?.migrate) {
-      if (options.useNative) {
+      if (options.useNative && !needToSendEth) {
         // unwrap the exact amount needed to send to the pool manager
         planner.addUnwrap(OPEN_DELTA)
         // payer is v4 position manager
