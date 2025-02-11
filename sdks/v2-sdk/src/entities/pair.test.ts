@@ -451,5 +451,31 @@ describe('Pair', () => {
       expect(liquidityValue.currency.equals(tokenA)).toBe(true)
       expect(liquidityValue.quotient.toString()).toBe('917') // ceiling(1000 - (500 * (1 / 6)))
     })
+
+    it('getLiquidityValue:kLast', async () => {
+      const tokenA = new Token(3, '0x0000000000000000000000000000000000000001', 18)
+      const tokenB = new Token(3, '0x0000000000000000000000000000000000000002', 18)
+      const pair = new Pair(CurrencyAmount.fromRawAmount(tokenA, '1000'), CurrencyAmount.fromRawAmount(tokenB, '1000'))
+
+      expect(() => {
+        pair.getLiquidityValue(
+          tokenA,
+          CurrencyAmount.fromRawAmount(pair.liquidityToken, '1000'),
+          CurrencyAmount.fromRawAmount(pair.liquidityToken, '1000'),
+          true,
+          0       // kLast is explicitly 0, which is a valid value
+        )
+      }).not.toThrow()
+
+      expect(() => {
+        pair.getLiquidityValue(
+          tokenA,
+          CurrencyAmount.fromRawAmount(pair.liquidityToken, '1000'),
+          CurrencyAmount.fromRawAmount(pair.liquidityToken, '1000'),
+          true,
+          undefined   // kLast is undefined; should trigger the invariant
+        )
+      }).toThrow('K_LAST')
+    })
   })
 })
