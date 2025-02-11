@@ -125,24 +125,24 @@ export class RouterTradeAdapter {
       return {
         routev4: isOnlyV4
           ? new V4Route(
-            (subRoute as V4PoolInRoute[]).map(RouterTradeAdapter.toV4Pool),
-            parsedCurrencyIn,
-            parsedCurrencyOut
-          )
+              (subRoute as V4PoolInRoute[]).map(RouterTradeAdapter.toV4Pool),
+              parsedCurrencyIn,
+              parsedCurrencyOut
+            )
           : null,
         routev3: isOnlyV3
           ? new V3Route(
-            (subRoute as V3PoolInRoute[]).map(RouterTradeAdapter.toV3Pool),
-            parsedCurrencyIn,
-            parsedCurrencyOut
-          )
+              (subRoute as V3PoolInRoute[]).map(RouterTradeAdapter.toV3Pool),
+              parsedCurrencyIn,
+              parsedCurrencyOut
+            )
           : null,
         routev2: isOnlyV2
           ? new V2Route(
-            (subRoute as V2PoolInRoute[]).map(RouterTradeAdapter.toPair),
-            parsedCurrencyIn,
-            parsedCurrencyOut
-          )
+              (subRoute as V2PoolInRoute[]).map(RouterTradeAdapter.toPair),
+              parsedCurrencyIn,
+              parsedCurrencyOut
+            )
           : null,
         mixedRoute:
           !isOnlyV4 && !isOnlyV3 && !isOnlyV2
@@ -232,7 +232,6 @@ export class RouterTradeAdapter {
   }
 
   private static toV4Pool(pool: V4PoolInRoute): V4Pool {
-
     const parsedCurrencyIn = RouterTradeAdapter.toCurrency(isNativeCurrency(pool.tokenIn.address), pool.tokenIn)
     const parsedCurrencyOut = RouterTradeAdapter.toCurrency(isNativeCurrency(pool.tokenOut.address), pool.tokenOut)
     return new V4Pool(
@@ -243,7 +242,7 @@ export class RouterTradeAdapter {
       pool.hooks,
       pool.sqrtRatioX96,
       pool.liquidity,
-      parseInt(pool.tickCurrent),
+      parseInt(pool.tickCurrent)
     )
   }
 
