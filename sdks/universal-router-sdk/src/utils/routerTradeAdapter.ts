@@ -75,8 +75,8 @@ export type PartialClassicQuote = {
 }
 
 interface RouteResult {
-  routev3: V3Route<Currency, Currency> | null
   routev4: V4Route<Currency, Currency> | null
+  routev3: V3Route<Currency, Currency> | null
   routev2: V2Route<Currency, Currency> | null
   mixedRoute: MixedRouteSDK<Currency, Currency> | null
   inputAmount: CurrencyAmount<Currency>
@@ -232,9 +232,12 @@ export class RouterTradeAdapter {
   }
 
   private static toV4Pool(pool: V4PoolInRoute): V4Pool {
+
+    const parsedCurrencyIn = RouterTradeAdapter.toCurrency(isNativeCurrency(pool.tokenIn.address), pool.tokenIn)
+    const parsedCurrencyOut = RouterTradeAdapter.toCurrency(isNativeCurrency(pool.tokenOut.address), pool.tokenOut)
     return new V4Pool(
-      RouterTradeAdapter.toToken(pool.tokenIn),
-      RouterTradeAdapter.toToken(pool.tokenOut),
+      parsedCurrencyIn,
+      parsedCurrencyOut,
       parseInt(pool.fee) as FeeAmount,
       parseInt(pool.tickSpacing),
       pool.hooks,
