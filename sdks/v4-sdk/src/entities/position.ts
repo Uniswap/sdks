@@ -189,7 +189,7 @@ export class Position {
       tickLower: this.tickLower,
       tickUpper: this.tickUpper,
       ...this.mintAmounts, // the mint amounts are what will be passed as calldata
-      useFullPrecision: false,
+      useFullPrecision: true, // Liquidity is already calculated offchain using precise calculation
     })
 
     // Note: Slippage derivation in v4 is different from v3.
