@@ -25,14 +25,6 @@ describe('Pool', () => {
       }).toThrow('CHAIN_IDS')
     })
 
-    it('test pool creation', () => {
-
-      const sqrtRatio =[1037572283,1032371376,92959]
-      JSBI.BigInt()
-
-      const pool_test = new Pool(USDC, DAI, 10000, )
-    })
-
     it('fee must be integer', () => {
       expect(() => {
         new Pool(
