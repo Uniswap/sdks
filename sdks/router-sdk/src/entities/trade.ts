@@ -13,8 +13,8 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
   public readonly tradeType: TTradeType
   private _outputAmount: CurrencyAmount<TOutput> | undefined
   private _inputAmount: CurrencyAmount<TInput> | undefined
-  private _nativeRoutes: IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>[] | undefined
-  private _wethRoutes: IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>[] | undefined
+  private _nativeInputRoutes: IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>[] | undefined
+  private _wethInputRoutes: IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>[] | undefined
 
   /**
    * The swaps of the trade, i.e. which routes and how much is swapped in each that
@@ -204,29 +204,36 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     }
   }
 
-  public get numberOfSplitsRequiringUnwrap(): number {
-    // if the trade's input is weth, it may require an unwrap
-    if (this.isWrappedNative(this.inputAmount.currency)) {
-      return this.nativeRoutes.length
+  public get numberOfInputWraps(): number {
+    // if the trade's input is eth it may require a wrap
+    if (this.inputAmount.currency.isNative) {
+      return this.wethInputRoutes.length
     } else return 0
   }
 
-  public get nativeRoutes(): IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>[] {
-    if (this._nativeRoutes) {
-      return this._nativeRoutes
-    }
-
-    this._nativeRoutes = this.routes.filter((route) => route.pathInput.isNative)
-    return this._nativeRoutes
+  public get numberOfInputUnwraps(): number {
+    // if the trade's input is weth, it may require an unwrap
+    if (this.isWrappedNative(this.inputAmount.currency)) {
+      return this.nativeInputRoutes.length
+    } else return 0
   }
 
-  public get wethRoutes(): IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>[] {
-    if (this._wethRoutes) {
-      return this._wethRoutes
+  public get nativeInputRoutes(): IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>[] {
+    if (this._nativeInputRoutes) {
+      return this._nativeInputRoutes
     }
 
-    this._wethRoutes = this.routes.filter((route) => this.isWrappedNative(route.pathInput))
-    return this._wethRoutes
+    this._nativeInputRoutes = this.routes.filter((route) => route.pathInput.isNative)
+    return this._nativeInputRoutes
+  }
+
+  public get wethInputRoutes(): IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>[] {
+    if (this._wethInputRoutes) {
+      return this._wethInputRoutes
+    }
+
+    this._wethInputRoutes = this.routes.filter((route) => this.isWrappedNative(route.pathInput))
+    return this._wethInputRoutes
   }
 
   private _executionPrice: Price<TInput, TOutput> | undefined
