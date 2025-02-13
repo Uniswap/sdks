@@ -31,14 +31,14 @@
   "dependencies": {
     "@openzeppelin/contracts": "4.7.0",
     "@uniswap/permit2-sdk": "^1.3.0",
-    "@uniswap/router-sdk": "file:/tmp/router-sdk-price-impact-1.tgz",
+    "@uniswap/router-sdk": "^1.22.1",
     "@uniswap/sdk-core": "^7.5.0",
     "@uniswap/universal-router": "2.0.0-beta.2",
     "@uniswap/v2-core": "^1.0.1",
     "@uniswap/v2-sdk": "^4.13.0",
     "@uniswap/v3-core": "1.0.0",
     "@uniswap/v3-sdk": "^3.24.0",
-    "@uniswap/v4-sdk": "/tmp/v4-sdk-price-impact-1.tgz",
+    "@uniswap/v4-sdk": "^1.19.4",
     "bignumber.js": "^9.0.2",
     "ethers": "^5.7.0"
   },
