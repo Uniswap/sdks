@@ -1593,7 +1593,7 @@ describe('Trade', () => {
   })
 
   describe('split route', () => {
-    it('returns correct #numberOfSplitsRequiringUnwrap', async() => {
+    it('returns correct #numberOfSplitsRequiringUnwrap', async () => {
       // TRADE OBJECT
       // input  : protocol : path
       // [WETH] :   v2     : [WETH - token1]

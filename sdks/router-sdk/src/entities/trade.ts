@@ -204,29 +204,28 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     }
   }
 
-
-  public get numberOfSplitsRequiringUnwrap() : number {
+  public get numberOfSplitsRequiringUnwrap(): number {
     // if the trade's input is weth, it may require an unwrap
     if (this.isWrappedNative(this.inputAmount.currency)) {
       return this.nativeRoutes.length
     } else return 0
   }
 
-  public get nativeRoutes() : IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>[] {
+  public get nativeRoutes(): IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>[] {
     if (this._nativeRoutes) {
       return this._nativeRoutes
     }
 
-    this._nativeRoutes = this.routes.filter(route => route.pathInput.isNative)
+    this._nativeRoutes = this.routes.filter((route) => route.pathInput.isNative)
     return this._nativeRoutes
   }
 
-  public get wethRoutes() : IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>[] {
+  public get wethRoutes(): IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>[] {
     if (this._wethRoutes) {
       return this._wethRoutes
     }
 
-    this._wethRoutes = this.routes.filter(route => this.isWrappedNative(route.pathInput))
+    this._wethRoutes = this.routes.filter((route) => this.isWrappedNative(route.pathInput))
     return this._wethRoutes
   }
 
@@ -267,10 +266,10 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     return new Percent(outputCurrency.wrapped.buyFeeBps.toNumber(), 10000)
   }
 
-    private isWrappedNative(currency : Currency): boolean {
-      const chainId = currency.chainId
-      return currency.equals(Ether.onChain(chainId).wrapped)
-    }
+  private isWrappedNative(currency: Currency): boolean {
+    const chainId = currency.chainId
+    return currency.equals(Ether.onChain(chainId).wrapped)
+  }
 
   /**
    * The cached result of the price impact computation
