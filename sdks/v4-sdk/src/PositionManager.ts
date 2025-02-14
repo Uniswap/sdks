@@ -1,4 +1,4 @@
-import { BigintIsh, Percent, validateAndParseAddress, NativeCurrency } from '@uniswap/sdk-core'
+import { BigintIsh, Percent, validateAndParseAddress, NativeCurrency, Currency } from '@uniswap/sdk-core'
 import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
 import JSBI from 'jsbi'
 import { Position } from './entities/position'
@@ -62,9 +62,9 @@ export interface MintSpecificOptions {
   sqrtPriceX96?: BigintIsh
 
   /**
-   * Whether the mint is part of a migration from V3 to V4.
+   * Whether the mint is part of a migration from V3 to V4 and the additional currency and amount to send if needed
    */
-  migrate?: boolean
+  migrateOptions?: MigrateOptions
 }
 
 /**
@@ -114,21 +114,19 @@ export interface CollectSpecificOptions {
   recipient: string
 }
 
-export interface TransferOptions {
+export interface MigrateOptions {
   /**
-   * The account sending the NFT.
+   * Whether the mint is part of a migration from V3 to V4.
    */
-  sender: string
-
+  migrate?: boolean
   /**
-   * The account that should receive the NFT.
+   * The additional currency that needs to be transferred if migrating from out of range to in range or out of range to opposite side out of range
    */
-  recipient: string
-
+  neededCurrency?: Currency
   /**
-   * The id of the token being sent.
+   * The amount of additional currency that needs to be transferred if migrating from out of range to in range or out of range to opposite side out of range
    */
-  tokenId: BigintIsh
+  neededAmount?: BigintIsh
 }
 
 export interface PermitDetails {
@@ -285,7 +283,7 @@ export abstract class V4PositionManager {
     let value: string = toHex(0)
 
     // If migrating, we need to settle and sweep both currencies individually
-    if (isMint(options) && options.migrate) {
+    if (isMint(options) && options.migrateOptions?.migrate) {
       if (options.useNative) {
         // unwrap the exact amount needed to send to the pool manager
         planner.addUnwrap(OPEN_DELTA)
