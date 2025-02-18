@@ -403,18 +403,18 @@ const MONAD_TESTNET_ADDRESSES: ChainAddresses = {
 }
 
 const SONEIUM_ADDRESSES: ChainAddresses = {
-    v3CoreFactoryAddress: '0x42ae7ec7ff020412639d443e245d936429fbe717',
-    multicallAddress: '0x8ad5ef2f2508288d2de66f04dd883ad5f4ef62b2',
-    quoterAddress: '0x3e6c707d0125226ff60f291b6bd1404634f00aba',
-    v3MigratorAddress: '0xa107580f73bd797bd8b87ff24e98346d99f93ddb',
-    nonfungiblePositionManagerAddress: '0x56c1205b0244332011c1e866f4ea5384eb6bfa2c',
-    tickLensAddress: '0xcd08eefb928c86499e6235ac155906bb7c4dc41a',
-    swapRouter02Address: '0x7e40db01736f88464e5f4e42394f3d5bbb6705b9',
+  v3CoreFactoryAddress: '0x42ae7ec7ff020412639d443e245d936429fbe717',
+  multicallAddress: '0x8ad5ef2f2508288d2de66f04dd883ad5f4ef62b2',
+  quoterAddress: '0x3e6c707d0125226ff60f291b6bd1404634f00aba',
+  v3MigratorAddress: '0xa107580f73bd797bd8b87ff24e98346d99f93ddb',
+  nonfungiblePositionManagerAddress: '0x56c1205b0244332011c1e866f4ea5384eb6bfa2c',
+  tickLensAddress: '0xcd08eefb928c86499e6235ac155906bb7c4dc41a',
+  swapRouter02Address: '0x7e40db01736f88464e5f4e42394f3d5bbb6705b9',
 
-    v4PoolManagerAddress: '0x360e68faccca8ca495c1b759fd9eee466db9fb32',
-    v4PositionManagerAddress: '0x1b35d13a2e2528f192637f14b05f0dc0e7deb566',
-    v4StateView: '0x76fd297e2d437cd7f76d50f01afe6160f86e9990',
-    v4QuoterAddress: '0x3972c00f7ed4885e145823eb7c655375d275a1c5',
+  v4PoolManagerAddress: '0x360e68faccca8ca495c1b759fd9eee466db9fb32',
+  v4PositionManagerAddress: '0x1b35d13a2e2528f192637f14b05f0dc0e7deb566',
+  v4StateView: '0x76fd297e2d437cd7f76d50f01afe6160f86e9990',
+  v4QuoterAddress: '0x3972c00f7ed4885e145823eb7c655375d275a1c5',
 }
 
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
