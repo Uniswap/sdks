@@ -174,6 +174,52 @@ describe('Trade', () => {
     ]
   )
 
+  const pool_v4_0_eth = new V4Pool(
+    token0,
+    ETHER,
+    FeeAmount.MEDIUM,
+    60,
+    ADDRESS_ZERO,
+    SQRT_RATIO_ONE,
+    JSBI.BigInt(10000000000000),
+    0,
+    [
+      {
+        index: nearestUsableTick(TickMath.MIN_TICK, TICK_SPACINGS[FeeAmount.MEDIUM]),
+        liquidityNet: JSBI.BigInt(10000000000000),
+        liquidityGross: JSBI.BigInt(10000000000000),
+      },
+      {
+        index: nearestUsableTick(TickMath.MAX_TICK, TICK_SPACINGS[FeeAmount.MEDIUM]),
+        liquidityNet: JSBI.multiply(JSBI.BigInt(10000000000000), JSBI.BigInt(-1)),
+        liquidityGross: JSBI.BigInt(10000000000000),
+      },
+    ]
+  )
+
+  const pool_v4_1_weth = new V4Pool(
+    token1,
+    WETH9[1],
+    FeeAmount.MEDIUM,
+    60,
+    ADDRESS_ZERO,
+    SQRT_RATIO_ONE,
+    JSBI.BigInt(10000000000000),
+    0,
+    [
+      {
+        index: nearestUsableTick(TickMath.MIN_TICK, TICK_SPACINGS[FeeAmount.MEDIUM]),
+        liquidityNet: JSBI.BigInt(10000000000000),
+        liquidityGross: JSBI.BigInt(10000000000000),
+      },
+      {
+        index: nearestUsableTick(TickMath.MAX_TICK, TICK_SPACINGS[FeeAmount.MEDIUM]),
+        liquidityNet: JSBI.multiply(JSBI.BigInt(10000000000000), JSBI.BigInt(-1)),
+        liquidityGross: JSBI.BigInt(10000000000000),
+      },
+    ]
+  )
+
   describe('#fromRoute', () => {
     it('can contain only a v3 route', async () => {
       const routeOriginal = new V3RouteSDK([pool_0_1], token0, token1)
@@ -1589,6 +1635,137 @@ describe('Trade', () => {
         CurrencyAmount.fromRawAmount(token1, 200).quotient
       )
       expect(trade.executionPrice).toEqual(expectedPrice)
+    })
+  })
+
+  describe('eth-weth split routes', () => {
+    it('returns none for trade not involving eth-weth', async () => {
+      // TRADE OBJECT
+      // input  : protocol : path                : trade requirement
+      // [token0] :   v2     : [token0 - token1] : NONE
+      // [token0] :   v4     : [token0  - token1]: NONE
+
+      const routev2 = new V2RouteSDK([pair_0_1], token0, token1)
+      const routev3 = new V3RouteSDK([pool_0_1], token0, token1)
+      const amountv2 = CurrencyAmount.fromRawAmount(token0, 999)
+      const amountv3 = CurrencyAmount.fromRawAmount(token0, 101010)
+
+      const splitTrade = await Trade.fromRoutes(
+        [{ routev2, amount: amountv2 }],
+        [{ routev3, amount: amountv3 }],
+        TradeType.EXACT_INPUT,
+        [],
+        []
+      )
+
+      expect(splitTrade.numberOfInputUnwraps).toEqual(0)
+      expect(splitTrade.numberOfInputWraps).toEqual(0)
+      expect(splitTrade.nativeInputRoutes.length).toEqual(0)
+      expect(splitTrade.wethInputRoutes.length).toEqual(0)
+    })
+    it('WETH input exactIn, no unwraps', async () => {
+      // TRADE OBJECT
+      // input  : protocol : path            : trade requirement
+      // [WETH] :   v2     : [WETH - token1] : NONE
+      // [WETH] :   v4     : [WETH  - token1]: NONE
+
+      const routev2 = new V2RouteSDK([pair_weth_1], weth, token1)
+      const routev4 = new V4RouteSDK([pool_v4_1_weth], weth, token1)
+      const amountv2 = CurrencyAmount.fromRawAmount(weth, 100)
+      const amountv4 = CurrencyAmount.fromRawAmount(weth, 200)
+
+      const splitTrade = await Trade.fromRoutes(
+        [{ routev2, amount: amountv2 }],
+        [],
+        TradeType.EXACT_INPUT,
+        [],
+        [{ routev4, amount: amountv4 }]
+      )
+
+      expect(splitTrade.numberOfInputUnwraps).toEqual(0)
+      expect(splitTrade.numberOfInputWraps).toEqual(0)
+      expect(splitTrade.nativeInputRoutes.length).toEqual(0)
+      expect(splitTrade.wethInputRoutes.length).toEqual(2)
+      expect(splitTrade.wethInputRoutes[0]).toEqual(new RouteV2(routev2))
+      expect(splitTrade.wethInputRoutes[1]).toEqual(new RouteV4(routev4))
+    })
+    it('WETH input exactIn, 1 unwrap', async () => {
+      // TRADE OBJECT
+      // input  : protocol : path            : trade requirement
+      // [WETH] :   v2     : [WETH - token1] : NONE
+      // [WETH] :   v4     : [ETH  - token1] : UNWRAP
+
+      const routev2 = new V2RouteSDK([pair_weth_1], weth, token1)
+      const routev4 = new V4RouteSDK([pool_v4_1_eth], weth, token1)
+      const amountv2 = CurrencyAmount.fromRawAmount(weth, 100)
+      const amountv4 = CurrencyAmount.fromRawAmount(weth, 200)
+
+      const splitTrade = await Trade.fromRoutes(
+        [{ routev2, amount: amountv2 }],
+        [],
+        TradeType.EXACT_INPUT,
+        [],
+        [{ routev4, amount: amountv4 }]
+      )
+
+      expect(splitTrade.numberOfInputUnwraps).toEqual(1)
+      expect(splitTrade.numberOfInputWraps).toEqual(0)
+      expect(splitTrade.nativeInputRoutes.length).toEqual(1)
+      expect(splitTrade.nativeInputRoutes[0]).toEqual(new RouteV4(routev4))
+      expect(splitTrade.wethInputRoutes.length).toEqual(1)
+      expect(splitTrade.wethInputRoutes[0]).toEqual(new RouteV2(routev2))
+    })
+    it('ETH input exactIn, no wraps', async () => {
+      // TRADE OBJECT
+      // input  : protocol  : path                               : trade requirement
+      // [ETH]  :   v4      : [ETH - token1]                     : NONE
+      // [ETH]  :  mixed    : [ETH - token0], [token0 - token1]  : NONE
+
+      const routev4 = new V4RouteSDK([pool_v4_1_eth], ETHER, token1)
+      const mixedRoute = new MixedRouteSDK([pool_v4_0_eth, pool_0_1], ETHER, token1)
+      const amountv4 = CurrencyAmount.fromRawAmount(ETHER, 1111)
+      const amountMixed = CurrencyAmount.fromRawAmount(ETHER, 2222)
+
+      const splitTrade = await Trade.fromRoutes(
+        [],
+        [],
+        TradeType.EXACT_INPUT,
+        [{ mixedRoute, amount: amountMixed }],
+        [{ routev4, amount: amountv4 }]
+      )
+
+      expect(splitTrade.numberOfInputUnwraps).toEqual(0)
+      expect(splitTrade.numberOfInputWraps).toEqual(0)
+      expect(splitTrade.nativeInputRoutes.length).toEqual(2)
+      expect(splitTrade.wethInputRoutes.length).toEqual(0)
+      expect(splitTrade.nativeInputRoutes[0]).toEqual(new RouteV4(routev4))
+      expect(splitTrade.nativeInputRoutes[1]).toEqual(new MixedRoute(mixedRoute))
+    })
+    it('ETH input exactIn, 1 wrap', async () => {
+      // TRADE OBJECT
+      // input  : protocol  : path                                : trade requirement
+      // [ETH]  :   v4      : [ETH - token1]                      : NONE
+      // [ETH]  :  mixed    : [WETH - token0], [token0 - token1]  : WRAP
+
+      const routev4 = new V4RouteSDK([pool_v4_1_eth], ETHER, token1)
+      const mixedRoute = new MixedRouteSDK([pool_weth_0, pool_0_1], ETHER, token1)
+      const amountv4 = CurrencyAmount.fromRawAmount(ETHER, 1111)
+      const amountMixed = CurrencyAmount.fromRawAmount(ETHER, 2222)
+
+      const splitTrade = await Trade.fromRoutes(
+        [],
+        [],
+        TradeType.EXACT_INPUT,
+        [{ mixedRoute, amount: amountMixed }],
+        [{ routev4, amount: amountv4 }]
+      )
+
+      expect(splitTrade.numberOfInputUnwraps).toEqual(0)
+      expect(splitTrade.numberOfInputWraps).toEqual(1)
+      expect(splitTrade.nativeInputRoutes.length).toEqual(1)
+      expect(splitTrade.wethInputRoutes.length).toEqual(1)
+      expect(splitTrade.nativeInputRoutes[0]).toEqual(new RouteV4(routev4))
+      expect(splitTrade.wethInputRoutes[0]).toEqual(new MixedRoute(mixedRoute))
     })
   })
 })

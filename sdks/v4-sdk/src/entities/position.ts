@@ -183,15 +183,6 @@ export class Position {
       TickMath.getTickAtSqrtRatio(sqrtRatioX96Upper)
     )
 
-    // because the router is imprecise, we need to calculate the position (assuming no slippage) to get the estimated actual liquidity
-    const positionWithoutSlippage = Position.fromAmounts({
-      pool: this.pool,
-      tickLower: this.tickLower,
-      tickUpper: this.tickUpper,
-      ...this.mintAmounts, // the mint amounts are what will be passed as calldata
-      useFullPrecision: false,
-    })
-
     // Note: Slippage derivation in v4 is different from v3.
     // When creating a position (minting) or adding to a position (increasing) slippage is bounded by the MAXIMUM amount in in token0 and token1.
     // The largest amount of token1 will happen when the price slips up, so we use the poolUpper to get amount1.
@@ -199,14 +190,14 @@ export class Position {
     // Ie...We want the larger amounts, which occurs at the upper price for amount1...
     const { amount1 } = new Position({
       pool: poolUpper,
-      liquidity: positionWithoutSlippage.liquidity,
+      liquidity: this.liquidity, // The precise liquidity calculated offchain
       tickLower: this.tickLower,
       tickUpper: this.tickUpper,
     }).mintAmounts
     // ...and the lower for amount0
     const { amount0 } = new Position({
       pool: poolLower,
-      liquidity: positionWithoutSlippage.liquidity,
+      liquidity: this.liquidity, // The precise liquidity calculated offchain
       tickLower: this.tickLower,
       tickUpper: this.tickUpper,
     }).mintAmounts
