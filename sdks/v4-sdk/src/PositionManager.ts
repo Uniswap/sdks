@@ -62,9 +62,9 @@ export interface MintSpecificOptions {
   sqrtPriceX96?: BigintIsh
 
   /**
-   * Whether the mint is part of a migration from V3 to V4 and the additional currency and amount to send if needed
+   * Whether the mint is part of a migration from V3 to V4
    */
-  migrateOptions?: MigrateOptions
+  migrate?: boolean
 }
 
 /**
@@ -114,19 +114,22 @@ export interface CollectSpecificOptions {
   recipient: string
 }
 
-export interface MigrateOptions {
+export interface MigrateSpecificOptions {
   /**
-   * Whether the mint is part of a migration from V3 to V4.
+   * The additional currency and amount that needs to be transferred if migrating (a) from out-of-range to in-range, or (b) from out-of-range to out-of-range on the opposite side
    */
-  migrate?: boolean
+  currencyAmount?: CurrencyAmount
+}
+
+export interface CurrencyAmount {
   /**
-   * The additional currency that needs to be transferred if migrating (a) from out-of-range to in-range, or (b) from out-of-range to out-of-range on the opposite side
+   * The additional currency that needs to be transferred
    */
-  inputCurrency?: Currency
+  inputCurrency: Currency
   /**
-   * The amount of additional currency that needs to be transferred if migrating (a) from out-of-range to in-range, or (b) from out-of-range to out-of-range on the opposite side
+   * The amount of additional currency that needs to be transferred
    */
-  inputAmount?: BigintIsh
+  inputAmount: BigintIsh
 }
 
 export interface PermitDetails {
@@ -180,7 +183,7 @@ export interface NFTPermitData {
   values: NFTPermitValues
 }
 
-export type MintOptions = CommonOptions & CommonAddLiquidityOptions & MintSpecificOptions
+export type MintOptions = CommonOptions & CommonAddLiquidityOptions & MintSpecificOptions & MigrateSpecificOptions
 export type IncreaseLiquidityOptions = CommonOptions & CommonAddLiquidityOptions & ModifyPositionSpecificOptions
 
 export type AddLiquidityOptions = MintOptions | IncreaseLiquidityOptions
@@ -282,10 +285,10 @@ export abstract class V4PositionManager {
 
     let value: string = toHex(0)
 
-    let needToSendEth = isMint(options) && options.migrateOptions?.inputCurrency?.isNative
+    let needToSendEth = isMint(options) && options.migrate && options.currencyAmount?.inputCurrency.isNative
 
     // If migrating, we need to settle and sweep both currencies individually
-    if (isMint(options) && options.migrateOptions?.migrate) {
+    if (isMint(options) && options.migrate) {
       if (options.useNative && !needToSendEth) {
         // unwrap the exact amount needed to send to the pool manager
         planner.addUnwrap(OPEN_DELTA)
