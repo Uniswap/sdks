@@ -282,7 +282,7 @@ export abstract class V4PositionManager {
 
     let value: string = toHex(0)
 
-    let needToSendEth = isMint(options) && options.migrateOptions?.neededCurrency?.isNative
+    let needToSendEth = isMint(options) && options.migrateOptions?.inputCurrency?.isNative
 
     // If migrating, we need to settle and sweep both currencies individually
     if (isMint(options) && options.migrateOptions?.migrate) {

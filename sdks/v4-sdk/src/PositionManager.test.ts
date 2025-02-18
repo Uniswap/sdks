@@ -378,7 +378,7 @@ describe('PositionManager', () => {
         recipient,
         slippageTolerance,
         deadline,
-        migrateOptions: { migrate: true, neededCurrency: currency_native, neededAmount: 1 },
+        migrateOptions: { migrate: true, inputCurrency: currency_native, inputAmount: 1 },
         useNative: currency_native,
       })
 
