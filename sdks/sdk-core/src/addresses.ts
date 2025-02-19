@@ -60,6 +60,7 @@ export const V2_FACTORY_ADDRESSES: AddressMap = {
   [ChainId.UNICHAIN_SEPOLIA]: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
   [ChainId.UNICHAIN]: '0x1f98400000000000000000000000000000000002',
   [ChainId.MONAD_TESTNET]: '0x733e88f248b742db6c14c0b1713af5ad7fdd59d0',
+  [ChainId.SONEIUM]: '0x97febbc2adbd5644ba22736e962564b23f5828ce',
 }
 /**
  * @deprecated use V2_ROUTER_ADDRESSES instead
@@ -81,6 +82,7 @@ export const V2_ROUTER_ADDRESSES: AddressMap = {
   [ChainId.UNICHAIN_SEPOLIA]: '0x920b806E40A00E02E7D2b94fFc89860fDaEd3640',
   [ChainId.UNICHAIN]: '0x284f11109359a7e1306c3e447ef14d38400063ff',
   [ChainId.MONAD_TESTNET]: '0xfb8e1c3b833f9e67a71c859a132cf783b645e436',
+  [ChainId.SONEIUM]: '0x273f68c234fa55b550b40e563c4a488e0d334320',
 }
 
 // Networks that share most of the same addresses i.e. Mainnet, Goerli, Optimism, Arbitrum, Polygon
@@ -400,6 +402,21 @@ const MONAD_TESTNET_ADDRESSES: ChainAddresses = {
   swapRouter02Address: '0x4c4eabd5fb1d1a7234a48692551eaecff8194ca7',
 }
 
+const SONEIUM_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: '0x42ae7ec7ff020412639d443e245d936429fbe717',
+  multicallAddress: '0x8ad5ef2f2508288d2de66f04dd883ad5f4ef62b2',
+  quoterAddress: '0x3e6c707d0125226ff60f291b6bd1404634f00aba',
+  v3MigratorAddress: '0xa107580f73bd797bd8b87ff24e98346d99f93ddb',
+  nonfungiblePositionManagerAddress: '0x56c1205b0244332011c1e866f4ea5384eb6bfa2c',
+  tickLensAddress: '0xcd08eefb928c86499e6235ac155906bb7c4dc41a',
+  swapRouter02Address: '0x7e40db01736f88464e5f4e42394f3d5bbb6705b9',
+
+  v4PoolManagerAddress: '0x360e68faccca8ca495c1b759fd9eee466db9fb32',
+  v4PositionManagerAddress: '0x1b35d13a2e2528f192637f14b05f0dc0e7deb566',
+  v4StateView: '0x76fd297e2d437cd7f76d50f01afe6160f86e9990',
+  v4QuoterAddress: '0x3972c00f7ed4885e145823eb7c655375d275a1c5',
+}
+
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
   [ChainId.MAINNET]: MAINNET_ADDRESSES,
   [ChainId.OPTIMISM]: OPTIMISM_ADDRESSES,
@@ -428,6 +445,7 @@ export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses>
   [ChainId.UNICHAIN_SEPOLIA]: UNICHAIN_SEPOLIA_ADDRESSES,
   [ChainId.UNICHAIN]: UNICHAIN_ADDRESSES,
   [ChainId.MONAD_TESTNET]: MONAD_TESTNET_ADDRESSES,
+  [ChainId.SONEIUM]: SONEIUM_ADDRESSES,
 }
 
 /* V3 Contract Addresses */
