@@ -1,4 +1,4 @@
-import { Currency, CurrencyAmount, Fraction, Percent, Price, TradeType } from '@uniswap/sdk-core'
+import { Currency, CurrencyAmount, Fraction, Percent, Price, TradeType, Ether } from '@uniswap/sdk-core'
 import { Pair, Route as V2RouteSDK, Trade as V2TradeSDK } from '@uniswap/v2-sdk'
 import { Pool as V3Pool, Route as V3RouteSDK, Trade as V3TradeSDK } from '@uniswap/v3-sdk'
 import { Pool as V4Pool, Route as V4RouteSDK, Trade as V4TradeSDK } from '@uniswap/v4-sdk'
@@ -13,6 +13,8 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
   public readonly tradeType: TTradeType
   private _outputAmount: CurrencyAmount<TOutput> | undefined
   private _inputAmount: CurrencyAmount<TInput> | undefined
+  private _nativeInputRoutes: IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>[] | undefined
+  private _wethInputRoutes: IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>[] | undefined
 
   /**
    * The swaps of the trade, i.e. which routes and how much is swapped in each that
@@ -202,6 +204,38 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     }
   }
 
+  public get numberOfInputWraps(): number {
+    // if the trade's input is eth it may require a wrap
+    if (this.inputAmount.currency.isNative) {
+      return this.wethInputRoutes.length
+    } else return 0
+  }
+
+  public get numberOfInputUnwraps(): number {
+    // if the trade's input is weth, it may require an unwrap
+    if (this.isWrappedNative(this.inputAmount.currency)) {
+      return this.nativeInputRoutes.length
+    } else return 0
+  }
+
+  public get nativeInputRoutes(): IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>[] {
+    if (this._nativeInputRoutes) {
+      return this._nativeInputRoutes
+    }
+
+    this._nativeInputRoutes = this.routes.filter((route) => route.pathInput.isNative)
+    return this._nativeInputRoutes
+  }
+
+  public get wethInputRoutes(): IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>[] {
+    if (this._wethInputRoutes) {
+      return this._wethInputRoutes
+    }
+
+    this._wethInputRoutes = this.routes.filter((route) => this.isWrappedNative(route.pathInput))
+    return this._wethInputRoutes
+  }
+
   private _executionPrice: Price<TInput, TOutput> | undefined
 
   /**
@@ -237,6 +271,11 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     if (outputCurrency.isNative || !outputCurrency.wrapped.buyFeeBps) return ZERO_PERCENT
 
     return new Percent(outputCurrency.wrapped.buyFeeBps.toNumber(), 10000)
+  }
+
+  private isWrappedNative(currency: Currency): boolean {
+    const chainId = currency.chainId
+    return currency.equals(Ether.onChain(chainId).wrapped)
   }
 
   /**
