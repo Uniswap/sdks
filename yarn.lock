@@ -4556,6 +4556,23 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@uniswap/sdk-core@npm:^7.6.0":
+  version: 7.6.0
+  resolution: "@uniswap/sdk-core@npm:7.6.0"
+  dependencies:
+    "@ethersproject/address": ^5.0.2
+    "@ethersproject/bytes": ^5.7.0
+    "@ethersproject/keccak256": 5.7.0
+    "@ethersproject/strings": 5.7.0
+    big.js: ^5.2.2
+    decimal.js-light: ^2.5.0
+    jsbi: ^3.1.4
+    tiny-invariant: ^1.1.0
+    toformat: ^2.0.0
+  checksum: 78c8c7a1e7209907fa1d16eda740a24ac2e7d2c85b9c2dc124167f31e5717113a1fa5c3efec3cc20169078f85c347e1531d9a59957e0946fb1c45b6a71003c14
+  languageName: node
+  linkType: hard
+
 "@uniswap/sdk-core@workspace:sdks/sdk-core":
   version: 0.0.0-use.local
   resolution: "@uniswap/sdk-core@workspace:sdks/sdk-core"
@@ -4692,7 +4709,7 @@ __metadata:
     "@ethersproject/solidity": ^5.0.9
     "@types/big.js": ^4.0.5
     "@types/jest": ^24.0.25
-    "@uniswap/sdk-core": ^7.5.0
+    "@uniswap/sdk-core": ^7.6.0
     "@uniswap/v2-core": ^1.0.1
     eslint-config-react-app: 7.0.1
     tiny-invariant: ^1.1.0
