@@ -37,7 +37,7 @@ export interface MigrateV3ToV4Options {
 }
 
 function isMigrate(options: V4AddLiquidityOptions): options is MintOptions {
-  return 'migrateOptions' in options && options.migrateOptions?.migrate === true
+  return 'recipient' in options && options.migrate === true
 }
 
 export abstract class SwapRouter {
@@ -164,8 +164,8 @@ export abstract class SwapRouter {
 
     // if migrate options has a currency, require a batch permit
     if (
-      options.v4AddLiquidityOptions.migrateOptions?.neededCurrency &&
-      options.v4AddLiquidityOptions.migrateOptions?.neededCurrency instanceof Token
+      options.v4AddLiquidityOptions.currencyAmount &&
+      options.v4AddLiquidityOptions.currencyAmount.inputCurrency instanceof Token
     ) {
       // need to permit the UR to spend your currency on permit2
       if (options.v4AddLiquidityOptions.batchPermit) {
@@ -179,9 +179,9 @@ export abstract class SwapRouter {
         ])
       }
       planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [
-        options.v4AddLiquidityOptions.migrateOptions.neededCurrency.address,
+        options.v4AddLiquidityOptions.currencyAmount.inputCurrency.address,
         options.v3RemoveLiquidityOptions.collectOptions.recipient,
-        options.v4AddLiquidityOptions.migrateOptions.neededAmount,
+        options.v4AddLiquidityOptions.currencyAmount.inputAmount,
       ])
       // remove batchPermit so it doesn't get encoded again later
       delete options.v4AddLiquidityOptions.batchPermit
@@ -197,8 +197,8 @@ export abstract class SwapRouter {
 
     let nativeCurrencyValue = BigNumber.from(0)
 
-    if (options.v4AddLiquidityOptions.migrateOptions?.neededCurrency?.isNative) {
-      nativeCurrencyValue = BigNumber.from(options.v4AddLiquidityOptions.migrateOptions?.neededAmount)
+    if (options.v4AddLiquidityOptions.currencyAmount?.inputCurrency?.isNative) {
+      nativeCurrencyValue = BigNumber.from(options.v4AddLiquidityOptions.currencyAmount?.inputAmount)
     }
 
     return SwapRouter.encodePlan(planner, nativeCurrencyValue, {

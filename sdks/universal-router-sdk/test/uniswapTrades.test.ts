@@ -38,7 +38,6 @@ import {
   Currency,
   CurrencyAmount,
   Ether,
-  Currency,
   NONFUNGIBLE_POSITION_MANAGER_ADDRESSES,
   Percent,
   Token,
@@ -1879,7 +1878,7 @@ describe('Uniswap', () => {
         },
         v4AddLiquidityOptions: {
           deadline: MAX_UINT160,
-          migrateOptions: { migrate: true },
+          migrate: true,
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
           useNative: ETHER,
@@ -1943,7 +1942,7 @@ describe('Uniswap', () => {
         },
         v4AddLiquidityOptions: {
           deadline: MAX_UINT160,
-          migrateOptions: { migrate: true },
+          migrate: true,
           // no need to transfer any additional currency because v3 position is in range so both currencies are sent to pool and unused currency is swept
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
@@ -1984,7 +1983,7 @@ describe('Uniswap', () => {
         },
         v4AddLiquidityOptions: {
           deadline: MAX_UINT160,
-          migrateOptions: { migrate: true },
+          migrate: true,
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
           useNative: ETHER,
@@ -2024,7 +2023,7 @@ describe('Uniswap', () => {
         },
         v4AddLiquidityOptions: {
           deadline: MAX_UINT160,
-          migrateOptions: { migrate: true },
+          migrate: true,
           // no need to transfer any additional currency because v3 position is in range so both currencies are sent to pool and unused currency is swept
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
@@ -2089,7 +2088,7 @@ describe('Uniswap', () => {
         },
         v4AddLiquidityOptions: {
           deadline: MAX_UINT160,
-          migrateOptions: { migrate: true },
+          migrate: true,
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
           createPool: true, // boolean to signal pool creation
@@ -2154,7 +2153,7 @@ describe('Uniswap', () => {
         },
         v4AddLiquidityOptions: {
           deadline: MAX_UINT160,
-          migrateOptions: { migrate: true },
+          migrate: true,
           // no need to transfer any additional currency because v3 position is in range so both currencies are sent to pool and unused currency is swept
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
@@ -2203,10 +2202,10 @@ describe('Uniswap', () => {
         },
         v4AddLiquidityOptions: {
           deadline: MAX_UINT160,
-          migrateOptions: {
-            migrate: true,
-            neededCurrency: WETH,
-            neededAmount: '1013935132270157186975',
+          migrate: true,
+          currencyAmount: {
+            inputCurrency: WETH,
+            inputAmount: '1013935132270157186975',
           },
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
@@ -2255,10 +2254,10 @@ describe('Uniswap', () => {
         },
         v4AddLiquidityOptions: {
           deadline: MAX_UINT160,
-          migrateOptions: {
-            migrate: true,
-            neededCurrency: WETH,
-            neededAmount: '1013935132270157186975',
+          migrate: true,
+          currencyAmount: {
+            inputCurrency: WETH,
+            inputAmount: '1013935132270157186975',
           },
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
@@ -2300,7 +2299,7 @@ describe('Uniswap', () => {
         },
         v4AddLiquidityOptions: {
           deadline: MAX_UINT160,
-          migrateOptions: { migrate: true },
+          migrate: true,
           // no need to transfer any additional currency because both positions are out of range on same side
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
@@ -2341,10 +2340,10 @@ describe('Uniswap', () => {
         },
         v4AddLiquidityOptions: {
           deadline: MAX_UINT160,
-          migrateOptions: {
-            migrate: true,
-            neededCurrency: ETHER,
-            neededAmount: '9000000000000000000',
+          migrate: true,
+          currencyAmount: {
+            inputCurrency: ETHER,
+            inputAmount: '9000000000000000000',
           },
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
@@ -2353,7 +2352,7 @@ describe('Uniswap', () => {
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
       registerFixture('_MIGRATE_V3RANGE_USDC_TO_V4RANGE_ETH', methodParameters)
-      expect(hexToDecimalString(methodParameters.value)).to.eq(opts.v4AddLiquidityOptions.migrateOptions.neededAmount)
+      expect(hexToDecimalString(methodParameters.value)).to.eq(opts.v4AddLiquidityOptions.currencyAmount.inputAmount)
     })
 
     it('encodes a migration from out of range v3 in token1 to in range v4', async () => {
@@ -2393,10 +2392,10 @@ describe('Uniswap', () => {
         },
         v4AddLiquidityOptions: {
           deadline: MAX_UINT160,
-          migrateOptions: {
-            migrate: true,
-            neededCurrency: USDC,
-            neededAmount: '1013935132270157186975',
+          migrate: true,
+          currencyAmount: {
+            inputCurrency: USDC,
+            inputAmount: '1013935132270157186975',
           },
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
@@ -2445,10 +2444,10 @@ describe('Uniswap', () => {
         },
         v4AddLiquidityOptions: {
           deadline: MAX_UINT160,
-          migrateOptions: {
-            migrate: true,
-            neededCurrency: USDC,
-            neededAmount: '1013935132270157186975',
+          migrate: true,
+          currencyAmount: {
+            inputCurrency: USDC,
+            inputAmount: '1013935132270157186975',
           },
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
@@ -2490,7 +2489,7 @@ describe('Uniswap', () => {
         },
         v4AddLiquidityOptions: {
           deadline: MAX_UINT160,
-          migrateOptions: { migrate: true },
+          migrate: true,
           // no need to transfer any additional currency because both positions are out of range on the same side
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
@@ -2531,7 +2530,7 @@ describe('Uniswap', () => {
         },
         v4AddLiquidityOptions: {
           deadline: MAX_UINT160,
-          migrateOptions: { migrate: true },
+          migrate: true,
           // no need to transfer any additional currency because both positions are out of range on same side
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
@@ -2840,7 +2839,7 @@ describe('Uniswap', () => {
         },
         v4AddLiquidityOptions: {
           deadline: 1,
-          migrateOptions: { migrate: true },
+          migrate: true,
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
         },
@@ -2880,10 +2879,10 @@ describe('Uniswap', () => {
         },
         v4AddLiquidityOptions: {
           deadline: MAX_UINT160,
-          migrateOptions: {
-            migrate: true,
-            neededCurrency: USDC,
-            neededAmount: '1013935132270157186975',
+          migrate: true,
+          currencyAmount: {
+            inputCurrency: USDC,
+            inputAmount: '1013935132270157186975',
           },
           slippageTolerance: new Percent(5, 100),
           recipient: TEST_RECIPIENT_ADDRESS,
