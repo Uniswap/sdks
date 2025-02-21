@@ -146,9 +146,15 @@ contract DeployRouter is Test {
         }
     }
 
-    function mintV3Position(address token0, address token1, uint24 fee, uint256 amount0Desired, uint256 amount1Desired)
-        public
-    {
+    function mintV3Position(
+        address token0,
+        address token1,
+        uint24 fee,
+        uint256 amount0Desired,
+        uint256 amount1Desired,
+        int24 tickLower,
+        int24 tickUpper
+    ) public {
         if (token0 >= token1) revert InvalidTokenOrder();
 
         deal(token0, from, 2 * amount0Desired);
@@ -163,8 +169,8 @@ contract DeployRouter is Test {
                 token0: token0,
                 token1: token1,
                 fee: fee,
-                tickLower: 200040,
-                tickUpper: 300000,
+                tickLower: tickLower,
+                tickUpper: tickUpper,
                 amount0Desired: amount0Desired,
                 amount1Desired: amount1Desired,
                 amount0Min: 0,
