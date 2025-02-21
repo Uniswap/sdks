@@ -1,7 +1,8 @@
 import { MixedRouteSDK, Trade as RouterTrade } from '@uniswap/router-sdk'
 import { Currency, CurrencyAmount, Ether, Token, TradeType } from '@uniswap/sdk-core'
 import { Pair, Route as V2Route } from '@uniswap/v2-sdk'
-import { Pool, Route as V3Route, FeeAmount } from '@uniswap/v3-sdk'
+import { Pool as V3Pool, Route as V3Route, FeeAmount } from '@uniswap/v3-sdk'
+import { Pool as V4Pool, Route as V4Route } from '@uniswap/v4-sdk'
 import { BigNumber } from 'ethers'
 import { ETH_ADDRESS, E_ETH_ADDRESS } from './constants'
 
@@ -50,15 +51,31 @@ export type V3PoolInRoute = {
   amountOut?: string
 }
 
+export type V4PoolInRoute = {
+  type: PoolType.V4Pool
+  address?: string
+  tokenIn: TokenInRoute
+  tokenOut: TokenInRoute
+  fee: string
+  tickSpacing: string
+  hooks: string
+  liquidity: string
+  sqrtRatioX96: string
+  tickCurrent: string
+  amountIn?: string
+  amountOut?: string
+}
+
 export type PartialClassicQuote = {
   // We need tokenIn/Out to support native currency
   tokenIn: string
   tokenOut: string
   tradeType: TradeType
-  route: Array<(V3PoolInRoute | V2PoolInRoute)[]>
+  route: Array<(V4PoolInRoute | V3PoolInRoute | V2PoolInRoute)[]>
 }
 
 interface RouteResult {
+  routev4: V4Route<Currency, Currency> | null
   routev3: V3Route<Currency, Currency> | null
   routev2: V2Route<Currency, Currency> | null
   mixedRoute: MixedRouteSDK<Currency, Currency> | null
@@ -104,11 +121,18 @@ export class RouterTradeAdapter {
 
       const isOnlyV2 = RouterTradeAdapter.isVersionedRoute<V2PoolInRoute>(PoolType.V2Pool, subRoute)
       const isOnlyV3 = RouterTradeAdapter.isVersionedRoute<V3PoolInRoute>(PoolType.V3Pool, subRoute)
-
+      const isOnlyV4 = RouterTradeAdapter.isVersionedRoute<V4PoolInRoute>(PoolType.V4Pool, subRoute)
       return {
+        routev4: isOnlyV4
+          ? new V4Route(
+              (subRoute as V4PoolInRoute[]).map(RouterTradeAdapter.toV4Pool),
+              parsedCurrencyIn,
+              parsedCurrencyOut
+            )
+          : null,
         routev3: isOnlyV3
           ? new V3Route(
-              (subRoute as V3PoolInRoute[]).map(RouterTradeAdapter.toPool),
+              (subRoute as V3PoolInRoute[]).map(RouterTradeAdapter.toV3Pool),
               parsedCurrencyIn,
               parsedCurrencyOut
             )
@@ -121,7 +145,7 @@ export class RouterTradeAdapter {
             )
           : null,
         mixedRoute:
-          !isOnlyV3 && !isOnlyV2
+          !isOnlyV4 && !isOnlyV3 && !isOnlyV2
             ? new MixedRouteSDK(subRoute.map(RouterTradeAdapter.toPoolOrPair), parsedCurrencyIn, parsedCurrencyOut)
             : null,
         inputAmount,
@@ -144,8 +168,13 @@ export class RouterTradeAdapter {
           inputAmount: route.inputAmount,
           outputAmount: route.outputAmount,
         })),
-      // TODO: ROUTE-219 - Support v4 trade in universal-router sdk
-      v4Routes: [],
+      v4Routes: typedRoutes
+        .filter((route) => route.routev4)
+        .map((route) => ({
+          routev4: route.routev4 as V4Route<Currency, Currency>,
+          inputAmount: route.inputAmount,
+          outputAmount: route.outputAmount,
+        })),
       mixedRoutes: typedRoutes
         .filter((route) => route.mixedRoute)
         .map((route) => ({
@@ -164,8 +193,17 @@ export class RouterTradeAdapter {
     return this.toToken(token)
   }
 
-  private static toPoolOrPair = (pool: V3PoolInRoute | V2PoolInRoute): Pool | Pair => {
-    return pool.type === PoolType.V3Pool ? RouterTradeAdapter.toPool(pool) : RouterTradeAdapter.toPair(pool)
+  private static toPoolOrPair = (pool: V4PoolInRoute | V3PoolInRoute | V2PoolInRoute): V4Pool | V3Pool | Pair => {
+    switch (pool.type) {
+      case PoolType.V4Pool:
+        return RouterTradeAdapter.toV4Pool(pool)
+      case PoolType.V3Pool:
+        return RouterTradeAdapter.toV3Pool(pool)
+      case PoolType.V2Pool:
+        return RouterTradeAdapter.toPair(pool)
+      default:
+        throw new Error('Invalid pool type')
+    }
   }
 
   private static toToken(token: TokenInRoute): Token {
@@ -182,14 +220,29 @@ export class RouterTradeAdapter {
     )
   }
 
-  private static toPool({ fee, sqrtRatioX96, liquidity, tickCurrent, tokenIn, tokenOut }: V3PoolInRoute): Pool {
-    return new Pool(
+  private static toV3Pool({ fee, sqrtRatioX96, liquidity, tickCurrent, tokenIn, tokenOut }: V3PoolInRoute): V3Pool {
+    return new V3Pool(
       RouterTradeAdapter.toToken(tokenIn),
       RouterTradeAdapter.toToken(tokenOut),
       parseInt(fee) as FeeAmount,
       sqrtRatioX96,
       liquidity,
       parseInt(tickCurrent)
+    )
+  }
+
+  private static toV4Pool(pool: V4PoolInRoute): V4Pool {
+    const parsedCurrencyIn = RouterTradeAdapter.toCurrency(isNativeCurrency(pool.tokenIn.address), pool.tokenIn)
+    const parsedCurrencyOut = RouterTradeAdapter.toCurrency(isNativeCurrency(pool.tokenOut.address), pool.tokenOut)
+    return new V4Pool(
+      parsedCurrencyIn,
+      parsedCurrencyOut,
+      parseInt(pool.fee) as FeeAmount,
+      parseInt(pool.tickSpacing),
+      pool.hooks,
+      pool.sqrtRatioX96,
+      pool.liquidity,
+      parseInt(pool.tickCurrent)
     )
   }
 
@@ -200,9 +253,9 @@ export class RouterTradeAdapter {
     )
   }
 
-  private static isVersionedRoute<T extends V2PoolInRoute | V3PoolInRoute>(
+  private static isVersionedRoute<T extends V2PoolInRoute | V3PoolInRoute | V4PoolInRoute>(
     type: PoolType,
-    route: (V3PoolInRoute | V2PoolInRoute)[]
+    route: (V3PoolInRoute | V2PoolInRoute | V4PoolInRoute)[]
   ): route is T[] {
     return route.every((pool) => pool.type === type)
   }

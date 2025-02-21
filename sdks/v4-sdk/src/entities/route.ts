@@ -65,9 +65,28 @@ export class Route<TInput extends Currency, TOutput extends Currency> {
   public get midPrice(): Price<TInput, TOutput> {
     if (this._midPrice !== null) return this._midPrice
 
-    const price = this.pools.slice(1).reduce((price, pool) => {
-      return price.multiply(pool.priceOf(price.quoteCurrency))
-    }, this.pools[0].priceOf(this.pathInput))
+    const price = this.pools.slice(1).reduce(
+      ({ nextInput, price }, pool) => {
+        return nextInput.equals(pool.currency0)
+          ? {
+              nextInput: pool.currency1,
+              price: price.multiply(pool.currency0Price),
+            }
+          : {
+              nextInput: pool.currency0,
+              price: price.multiply(pool.currency1Price),
+            }
+      },
+      this.pools[0].currency0.equals(this.input)
+        ? {
+            nextInput: this.pools[0].currency1,
+            price: this.pools[0].currency0Price,
+          }
+        : {
+            nextInput: this.pools[0].currency0,
+            price: this.pools[0].currency1Price,
+          }
+    ).price
 
     return (this._midPrice = new Price(this.input, this.output, price.denominator, price.numerator))
   }

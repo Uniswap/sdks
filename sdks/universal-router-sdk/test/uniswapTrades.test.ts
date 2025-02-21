@@ -35,6 +35,7 @@ import {
 import {
   CHAIN_TO_ADDRESSES_MAP,
   ChainId,
+  Currency,
   CurrencyAmount,
   Ether,
   Currency,
@@ -58,6 +59,7 @@ import {
   RouterTradeAdapter,
   V2PoolInRoute,
   V3PoolInRoute,
+  V4PoolInRoute,
 } from '../src/utils/routerTradeAdapter'
 import {
   E_ETH_ADDRESS,
@@ -1068,6 +1070,38 @@ describe('Uniswap', () => {
     }
   }
 
+  const mockV4PoolInRoute = (
+    pool: V4Pool,
+    tokenIn: Currency,
+    tokenOut: Currency,
+    amountIn: string,
+    amountOut: string
+  ): V4PoolInRoute => {
+    return {
+      type: PoolType.V4Pool,
+      tokenIn: {
+        address: tokenIn.isNative ? ETH_ADDRESS : tokenIn.address,
+        chainId: 1,
+        symbol: tokenIn.symbol!,
+        decimals: String(tokenIn.decimals),
+      },
+      tokenOut: {
+        address: tokenOut.isNative ? ETH_ADDRESS : tokenOut.address,
+        chainId: 1,
+        symbol: tokenOut.symbol!,
+        decimals: String(tokenOut.decimals),
+      },
+      fee: pool.fee.toString(),
+      tickSpacing: pool.tickSpacing.toString(),
+      hooks: pool.hooks,
+      sqrtRatioX96: pool.sqrtRatioX96.toString(),
+      liquidity: pool.liquidity.toString(),
+      tickCurrent: pool.tickCurrent.toString(),
+      amountIn,
+      amountOut,
+    }
+  }
+
   for (let tradeType of [TradeType.EXACT_INPUT, TradeType.EXACT_OUTPUT]) {
     describe('RouterTradeAdapter ' + tradeType, () => {
       const getAmountToken = (tokenIn: Token | Ether, tokenOut: Token | Ether, tradeType: TradeType): Token | Ether => {
@@ -1149,6 +1183,37 @@ describe('Uniswap', () => {
         compareUniswapTrades(new UniswapTrade(buildTrade([trade]), opts), new UniswapTrade(routerTrade, opts))
       })
 
+      it('v4 - erc20 <> erc20', async () => {
+        const [tokenIn, tokenOut] = [DAI, USDC]
+        const inputAmount = ethers.utils
+          .parseUnits('1000', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
+          .toString()
+        const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
+
+        const opts = swapOptions({})
+        const trade = await V4Trade.fromRoute(new V4Route([USDC_DAI_V4], tokenIn, tokenOut), rawInputAmount, tradeType)
+
+        const classicQuote: PartialClassicQuote = {
+          tokenIn: DAI.address,
+          tokenOut: USDC.address,
+          tradeType,
+          route: [
+            [
+              mockV4PoolInRoute(
+                USDC_DAI_V4,
+                tokenIn,
+                tokenOut,
+                trade.inputAmount.quotient.toString(),
+                trade.outputAmount.quotient.toString()
+              ),
+            ],
+          ],
+        }
+        const routerTrade = RouterTradeAdapter.fromClassicQuote(classicQuote)
+
+        compareUniswapTrades(new UniswapTrade(buildTrade([trade]), opts), new UniswapTrade(routerTrade, opts))
+      })
+
       it('v2 - handles weth input properly', async () => {
         const [tokenIn, tokenOut] = [WETH, USDC]
         const inputAmount = ethers.utils
@@ -1198,6 +1263,37 @@ describe('Uniswap', () => {
             [
               mockV3PoolInRoute(
                 WETH_USDC_V3,
+                WETH,
+                USDC,
+                trade.inputAmount.quotient.toString(),
+                trade.outputAmount.quotient.toString()
+              ),
+            ],
+          ],
+        }
+        const routerTrade = RouterTradeAdapter.fromClassicQuote(classicQuote)
+
+        compareUniswapTrades(new UniswapTrade(buildTrade([trade]), opts), new UniswapTrade(routerTrade, opts))
+      })
+
+      it('v4 - handles weth input properly', async () => {
+        const [tokenIn, tokenOut] = [WETH, USDC]
+        const inputAmount = ethers.utils
+          .parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
+          .toString()
+        const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
+
+        const opts = swapOptions({})
+        const trade = await V4Trade.fromRoute(new V4Route([WETH_USDC_V4], WETH, USDC), rawInputAmount, tradeType)
+
+        const classicQuote: PartialClassicQuote = {
+          tokenIn: WETH.address,
+          tokenOut: USDC.address,
+          tradeType,
+          route: [
+            [
+              mockV4PoolInRoute(
+                WETH_USDC_V4,
                 WETH,
                 USDC,
                 trade.inputAmount.quotient.toString(),
@@ -1311,6 +1407,39 @@ describe('Uniswap', () => {
         compareUniswapTrades(new UniswapTrade(buildTrade([trade]), opts), new UniswapTrade(routerTrade, opts))
       })
 
+      it('v4 - handles eth input properly', async () => {
+        const [tokenIn, tokenOut] = [Ether.onChain(1), USDC]
+        const inputAmount = ethers.utils
+          .parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
+          .toString()
+        const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
+        const opts = swapOptions({})
+        const trade = await V4Trade.fromRoute(
+          new V4Route([ETH_USDC_V4], Ether.onChain(1), USDC),
+          rawInputAmount,
+          tradeType
+        )
+        const classicQuote: PartialClassicQuote = {
+          tokenIn: ETH_ADDRESS,
+          tokenOut: USDC.address,
+          tradeType,
+          route: [
+            [
+              // ETH_USDC_V4 pool uses ETH directly
+              mockV4PoolInRoute(
+                ETH_USDC_V4,
+                ETHER,
+                USDC,
+                trade.inputAmount.quotient.toString(),
+                trade.outputAmount.quotient.toString()
+              ),
+            ],
+          ],
+        }
+        const routerTrade = RouterTradeAdapter.fromClassicQuote(classicQuote)
+        compareUniswapTrades(new UniswapTrade(buildTrade([trade]), opts), new UniswapTrade(routerTrade, opts))
+      })
+
       it('v2 - handles eth output properly', async () => {
         const [tokenIn, tokenOut] = [USDC, Ether.onChain(1)]
         const inputAmount = ethers.utils
@@ -1417,6 +1546,48 @@ describe('Uniswap', () => {
         compareUniswapTrades(new UniswapTrade(buildTrade([trade]), opts), new UniswapTrade(routerTrade, opts))
       })
 
+      it('v4 - multi pool erc20 <> erc20', async () => {
+        const [tokenIn, tokenOut] = [DAI, WETH]
+        const inputAmount = ethers.utils
+          .parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
+          .toString()
+        const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
+
+        const opts = swapOptions({})
+        const trade = await V4Trade.fromRoute(
+          new V4Route([USDC_DAI_V4, WETH_USDC_V4], tokenIn, tokenOut),
+          rawInputAmount,
+          tradeType
+        )
+
+        const classicQuote: PartialClassicQuote = {
+          tokenIn: DAI.address,
+          tokenOut: WETH.address,
+          tradeType,
+          route: [
+            [
+              mockV4PoolInRoute(
+                USDC_DAI_V4,
+                DAI,
+                USDC,
+                trade.inputAmount.quotient.toString(),
+                trade.outputAmount.quotient.toString()
+              ),
+              mockV4PoolInRoute(
+                WETH_USDC_V4,
+                USDC,
+                WETH,
+                trade.inputAmount.quotient.toString(),
+                trade.outputAmount.quotient.toString()
+              ),
+            ],
+          ],
+        }
+        const routerTrade = RouterTradeAdapter.fromClassicQuote(classicQuote)
+
+        compareUniswapTrades(new UniswapTrade(buildTrade([trade]), opts), new UniswapTrade(routerTrade, opts))
+      })
+
       // Mixed routes are only supported for exact input
       if (tradeType === TradeType.EXACT_INPUT) {
         it('v2/v3 - mixed route erc20 <> erc20', async () => {
@@ -1450,6 +1621,55 @@ describe('Uniswap', () => {
                   WETH_USDC_V2,
                   USDC,
                   WETH,
+                  trade.inputAmount.quotient.toString(),
+                  trade.outputAmount.quotient.toString()
+                ),
+              ],
+            ],
+          }
+          const routerTrade = RouterTradeAdapter.fromClassicQuote(classicQuote)
+
+          compareUniswapTrades(new UniswapTrade(buildTrade([trade]), opts), new UniswapTrade(routerTrade, opts))
+        })
+
+        it('v2/v3/v4 - mixed route erc20 <> erc20', async () => {
+          const [tokenIn, tokenOut] = [DAI, WETH]
+          const inputAmount = ethers.utils
+            .parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
+            .toString()
+          const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
+
+          const opts = swapOptions({})
+          const trade = await MixedRouteTrade.fromRoute(
+            new MixedRouteSDK([USDC_DAI_V2, WETH_USDC_V3, WETH_USDC_V4], tokenIn, tokenOut),
+            rawInputAmount,
+            tradeType
+          )
+
+          const classicQuote: PartialClassicQuote = {
+            tokenIn: DAI.address,
+            tokenOut: WETH.address,
+            tradeType,
+            route: [
+              [
+                mockV2PoolInRoute(
+                  USDC_DAI_V2,
+                  DAI,
+                  USDC,
+                  trade.inputAmount.quotient.toString(),
+                  trade.outputAmount.quotient.toString()
+                ),
+                mockV3PoolInRoute(
+                  WETH_USDC_V3,
+                  USDC,
+                  WETH,
+                  trade.inputAmount.quotient.toString(),
+                  trade.outputAmount.quotient.toString()
+                ),
+                mockV4PoolInRoute(
+                  WETH_USDC_V4,
+                  WETH,
+                  USDC,
                   trade.inputAmount.quotient.toString(),
                   trade.outputAmount.quotient.toString()
                 ),
