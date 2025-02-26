@@ -8,7 +8,6 @@ import ProxyAbi from '../../abis/Proxy.json';
 import MockDSTokenInterfaceAbi from '../../abis/MockDSTokenInterface.json';
 
 describe('PermissionedTokenValidator', () => {
-  let validator: PermissionedTokenValidator;
   let mockDSToken: MockDSTokenInterface;
   let mockProxy: Proxy;
   let owner: SignerWithAddress;
@@ -36,9 +35,6 @@ describe('PermissionedTokenValidator', () => {
     );
     mockProxy = (await mockProxyFactory.deploy()) as Proxy;
     await mockProxy.deployed();
-    
-    // Initialize validator
-    validator = new PermissionedTokenValidator(ethers.provider);
 
     // Override PERMISSIONED_TOKENS for testing
     const originalTokens = [...PERMISSIONED_TOKENS];
@@ -55,9 +51,25 @@ describe('PermissionedTokenValidator', () => {
     });
   });
 
+  describe('isPermissionedToken', () => {
+    it('returns true for tokens in PERMISSIONED_TOKENS list', () => {
+      expect(PermissionedTokenValidator.isPermissionedToken(PERMISSIONED_TOKENS[0].address)).to.be.true;
+    });
+
+    it('returns false for non-permissioned tokens', () => {
+      const randomAddress = ethers.Wallet.createRandom().address;
+      expect(PermissionedTokenValidator.isPermissionedToken(randomAddress)).to.be.false;
+    });
+
+    it('is case-insensitive', () => {
+      expect(PermissionedTokenValidator.isPermissionedToken(PERMISSIONED_TOKENS[0].address.toUpperCase())).to.be.true;
+    });
+  });
+
   describe('preTransferCheck', () => {
     it('returns true for non-permissioned tokens', async () => {
-      const result = await validator.preTransferCheck(
+      const result = await PermissionedTokenValidator.preTransferCheck(
+        ethers.provider,
         ethers.Wallet.createRandom().address,
         user1.address,
         user2.address,
@@ -68,7 +80,8 @@ describe('PermissionedTokenValidator', () => {
 
     it('checks transfer permission for direct token', async () => {
       await mockDSToken.setPreTransferCheckResponse(20, "Wallet not in registry service");
-      const result = await validator.preTransferCheck(
+      const result = await PermissionedTokenValidator.preTransferCheck(
+        ethers.provider,
         mockDSToken.address,
         user1.address,
         user2.address,
@@ -81,7 +94,8 @@ describe('PermissionedTokenValidator', () => {
       await mockDSToken.setPreTransferCheckResponse(20, "Wallet not in registry service");
       await mockProxy.setTarget(mockDSToken.address);
       
-      const result = await validator.preTransferCheck(
+      const result = await PermissionedTokenValidator.preTransferCheck(
+        ethers.provider,
         mockProxy.address,
         user1.address,
         user2.address,
@@ -93,7 +107,8 @@ describe('PermissionedTokenValidator', () => {
     it('handles successful transfer checks', async () => {
       await mockDSToken.setPreTransferCheckResponse(0, "Valid");
 
-      const result = await validator.preTransferCheck(
+      const result = await PermissionedTokenValidator.preTransferCheck(
+        ethers.provider,
         mockDSToken.address,
         user1.address,
         user2.address,
@@ -118,7 +133,8 @@ describe('PermissionedTokenValidator', () => {
       // Update proxy target
       await mockProxy.setTarget(newmockDSToken.address);
       
-      const result = await validator.preTransferCheck(
+      const result = await PermissionedTokenValidator.preTransferCheck(
+        ethers.provider,
         mockProxy.address,
         user1.address,
         user2.address,

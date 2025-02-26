@@ -3,14 +3,19 @@ import { PERMISSIONED_TOKENS } from "../constants";
 import { Proxy__factory, DSTokenInterface__factory, DSTokenInterface } from "../contracts";
 
 export class PermissionedTokenValidator {
-  private provider: Provider;
 
-  constructor(provider: Provider) {
-    this.provider = provider;
-  }
+    /**
+     * Checks if a token is a permissioned token
+     * @param tokenAddress The address of the token
+     * @returns True if the token is a permissioned token, false otherwise
+     */
+    static isPermissionedToken(tokenAddress: string): boolean {
+        return PERMISSIONED_TOKENS.some(token => token.address.toLowerCase() === tokenAddress.toLowerCase());
+    }
 
   /**
    * Checks if a transfer would be allowed for a permissioned token
+   * @param provider The provider to use for the view call
    * @param tokenAddress The address of the permissioned token
    * @param from The sender's address
    * @param to The recipient's address 
@@ -18,7 +23,8 @@ export class PermissionedTokenValidator {
    * @returns True if the token is not a permissioned token or the transfer is 
    * allowed, false otherwise
    */
-  async preTransferCheck(
+  static async preTransferCheck(
+    provider: Provider,
     tokenAddress: string,
     from: string,
     to: string,
@@ -35,11 +41,11 @@ export class PermissionedTokenValidator {
     let tokenContract: DSTokenInterface;
     
     if (token.usesProxy) {
-      const proxyContract = Proxy__factory.connect(tokenAddress, this.provider);
+      const proxyContract = Proxy__factory.connect(tokenAddress, provider);
       const targetAddress = await proxyContract.target();
-      tokenContract = DSTokenInterface__factory.connect(targetAddress, this.provider);
+      tokenContract = DSTokenInterface__factory.connect(targetAddress, provider);
     } else {
-      tokenContract = DSTokenInterface__factory.connect(tokenAddress, this.provider);
+      tokenContract = DSTokenInterface__factory.connect(tokenAddress, provider);
     }
     
     const [code, _reason] = await tokenContract.preTransferCheck(from, to, value);
