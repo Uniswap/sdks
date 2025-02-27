@@ -24,7 +24,7 @@
     "test": "tsdx test"
   },
   "dependencies": {
-    "@ethersproject/abi": "^5.5.0",
+    "@ethersproject/abi": "^5.8.0",
     "@ethersproject/solidity": "^5.0.9",
     "@uniswap/sdk-core": "^6.0.0",
     "@uniswap/swap-router-contracts": "^1.3.0",
