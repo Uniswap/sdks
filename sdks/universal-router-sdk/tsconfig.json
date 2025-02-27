@@ -1,17 +1,23 @@
 {
   "compilerOptions": {
-    "target": "es2018",
-    "module": "esnext",
-    "moduleResolution": "node",
-    "strict": true,
+    "target": "es2024",
+    "module": "nodenext",
+    "strict": false,
     "esModuleInterop": true,
     "strictPropertyInitialization": false,
-    "resolveJsonModule": true,
     "outDir": "dist",
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "lib": ["esnext.string"],
-    "types": ["@types/mocha", "node"]
+    "lib": [
+      "esnext.string"
+    ],
+    "types": [
+      "@types/mocha",
+      "node"
+    ]
   },
-  "include": ["src", "test"]
+  "include": [
+    "src",
+    "test"
+  ]
 }

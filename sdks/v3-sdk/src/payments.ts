@@ -1,6 +1,6 @@
 import JSBI from 'jsbi'
 import { Interface } from '@ethersproject/abi'
-import IPeripheryPaymentsWithFee from '@uniswap/v3-periphery/artifacts/contracts/interfaces/IPeripheryPaymentsWithFee.sol/IPeripheryPaymentsWithFee.json'
+import IPeripheryPaymentsWithFee from '@uniswap/v3-periphery/artifacts/contracts/interfaces/IPeripheryPaymentsWithFee.sol/IPeripheryPaymentsWithFee.json' with { type: 'json' }
 import { Percent, Token, validateAndParseAddress } from '@uniswap/sdk-core'
 import { toHex } from './utils/calldata'
 
@@ -22,7 +22,7 @@ export abstract class Payments {
   /**
    * Cannot be constructed.
    */
-  private constructor() {}
+  private constructor() { }
 
   private static encodeFeeBips(fee: Percent): string {
     return toHex(fee.multiply(10_000).quotient)

@@ -16,7 +16,7 @@
     "node": ">=14"
   },
   "scripts": {
-    "build": "tsdx build",
+    "build": "tsup src/index.ts --format esm",
     "docs": "typedoc",
     "forge:fix": "forge fmt",
     "lint": "yarn prettier",
@@ -45,18 +45,18 @@
   "devDependencies": {
     "@types/chai": "^4.3.3",
     "@types/mocha": "^9.1.1",
-    "@types/node": "^18.7.16",
+    "@types/node": "^22.13.5",
     "@types/node-fetch": "^2.6.2",
     "chai": "^4.3.6",
     "dotenv": "^16.0.3",
     "eslint-plugin-prettier": "^3.4.1",
     "hardhat": "^2.22.15",
-    "prettier": "^2.4.1",
+    "prettier": "^3.5.2",
     "ts-node": "^10.9.1",
     "tsdx": "^0.14.1",
     "tslib": "^2.3.0",
-    "typedoc": "^0.21.2",
-    "typescript": "^4.3.3"
+    "typedoc": "^0.27.9",
+    "typescript": "^5.7.0"
   },
   "prettier": {
     "printWidth": 120,

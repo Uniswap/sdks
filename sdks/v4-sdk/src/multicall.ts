@@ -1,5 +1,5 @@
 import { Interface } from '@ethersproject/abi'
-import IMulticall from '@uniswap/v3-periphery/artifacts/contracts/interfaces/IMulticall.sol/IMulticall.json'
+import IMulticall from '@uniswap/v3-periphery/artifacts/contracts/interfaces/IMulticall.sol/IMulticall.json' with { type: 'json' }
 
 export abstract class Multicall {
   public static INTERFACE: Interface = new Interface(IMulticall.abi)
@@ -7,7 +7,7 @@ export abstract class Multicall {
   /**
    * Cannot be constructed.
    */
-  private constructor() {}
+  private constructor() { }
 
   public static encodeMulticall(calldataList: string | string[]): string {
     if (!Array.isArray(calldataList)) {

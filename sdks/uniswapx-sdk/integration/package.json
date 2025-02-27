@@ -1,6 +1,7 @@
 {
   "name": "uniswapx-integration",
   "version": "0.1.0",
+  "type": "module",
   "license": "MIT",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
@@ -8,7 +9,7 @@
     "dist"
   ],
   "engines": {
-    "node": ">=10"
+    "node": ">=14"
   },
   "scripts": {
     "test": "hardhat test"
@@ -20,7 +21,7 @@
     "@nomiclabs/hardhat-ethers": "^2.2.3",
     "@types/chai": "^4.3.3",
     "@types/mocha": "^9.1.1",
-    "@types/node": "^18.7.16",
+    "@types/node": "^22.13.5",
     "chai": "^4.3.6",
     "hardhat": "^2.22.15",
     "husky": "^8.0.3",

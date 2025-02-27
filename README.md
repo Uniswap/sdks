@@ -2,6 +2,16 @@
 
 A repository for many Uniswap SDK's. All SDK's can be found in `sdk/` and have more information in their individual README's.
 
+Install yarn:
+
+```sh
+npm install -g corepack
+corepack enable
+yarn set version stable
+yarn install
+```
+
+
 ## Development Commands
 
 ```markdown
@@ -10,6 +20,8 @@ git clone --recurse-submodules https://github.com/Uniswap/sdks.git
 # Install
 yarn
 # Build
+npx turbo run build
+OR
 yarn g:build
 # Typecheck
 yarn g:typecheck

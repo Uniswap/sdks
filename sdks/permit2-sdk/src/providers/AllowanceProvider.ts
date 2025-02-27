@@ -1,6 +1,6 @@
 import { BigNumber } from '@ethersproject/bignumber'
 import { Provider } from '@ethersproject/providers'
-import Permit2Abi from '../../abis/Permit2.json'
+import Permit2Abi from '../../abis/Permit2.json' with { type: 'json' }
 import { Contract } from '@ethersproject/contracts'
 
 export interface AllowanceData {

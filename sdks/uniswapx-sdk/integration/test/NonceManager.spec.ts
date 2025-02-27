@@ -1,133 +1,133 @@
-import hre, { ethers } from 'hardhat';
-import { expect } from 'chai';
+import hre, { ethers } from 'hardhat'
+import { expect } from 'chai'
 
-import { Signer, Wallet, BigNumber } from 'ethers';
-import { PermitTransferFrom, SignatureTransfer } from '@uniswap/permit2-sdk';
+import { Signer, Wallet, BigNumber } from 'ethers'
+import { PermitTransferFrom, SignatureTransfer } from '@uniswap/permit2-sdk'
 
-import Permit2Abi from '../../abis/Permit2.json';
+import Permit2Abi from '../../abis/Permit2.json' with { type: 'json' }
 
-import { Permit2 } from '../../src/contracts';
+import { Permit2 } from '../../src/contracts'
 import {
   NonceManager,
-} from '../../';
+} from '../../'
 
 describe('NonceManager', () => {
-  let permit2: Permit2;
-  let wallet: Wallet;
-  let nonceManager: NonceManager;
-  let chainId: number;
-  let admin: Signer;
+  let permit2: Permit2
+  let wallet: Wallet
+  let nonceManager: NonceManager
+  let chainId: number
+  let admin: Signer
 
   before(async () => {
-    [admin] = await ethers.getSigners();
-    chainId = hre.network.config.chainId || 1;
+    [admin] = await ethers.getSigners()
+    chainId = hre.network.config.chainId || 1
 
     const permit2Factory = await ethers.getContractFactory(
       Permit2Abi.abi,
       Permit2Abi.bytecode
-    );
-    permit2 = (await permit2Factory.deploy()) as Permit2;
+    )
+    permit2 = (await permit2Factory.deploy()) as Permit2
 
     nonceManager = new NonceManager(
       ethers.provider,
       chainId,
       permit2.address
-    );
+    )
 
-    wallet = ethers.Wallet.createRandom().connect(ethers.provider);
+    wallet = ethers.Wallet.createRandom().connect(ethers.provider)
     await admin.sendTransaction({
       to: await wallet.getAddress(),
       value: BigNumber.from(10).pow(18),
-    });
-  });
+    })
+  })
 
   it('fetches and increments nonces', async () => {
     for (let i = 0; i < 512; i++) {
       expect(
         (await nonceManager.useNonce(await wallet.getAddress())).toString()
-      ).to.equal(i.toString());
+      ).to.equal(i.toString())
     }
-  });
+  })
 
   it('fresh instance refetches 0', async () => {
     const newManager = new NonceManager(
       ethers.provider,
       chainId,
       permit2.address
-    );
+    )
     expect(
       (await newManager.useNonce(await wallet.getAddress())).toString()
-    ).to.equal('0');
-  });
+    ).to.equal('0')
+  })
 
   it('fetches on-chain used nonces', async () => {
-    await sendPermit(BigNumber.from(0));
+    await sendPermit(BigNumber.from(0))
     const newManager = new NonceManager(
       ethers.provider,
       chainId,
       permit2.address
-    );
+    )
     expect(
       (await newManager.useNonce(await wallet.getAddress())).toString()
-    ).to.equal('1');
-  });
+    ).to.equal('1')
+  })
 
   it('properly returns isUsed', async () => {
     const newManager = new NonceManager(
       ethers.provider,
       chainId,
       permit2.address
-    );
+    )
     expect(
       await newManager.isUsed(await wallet.getAddress(), BigNumber.from(1234))
-    ).to.equal(false);
+    ).to.equal(false)
 
     expect(
       await newManager.isUsed(await wallet.getAddress(), BigNumber.from(992343))
-    ).to.equal(false);
+    ).to.equal(false)
 
-    await sendPermit(BigNumber.from(1234));
+    await sendPermit(BigNumber.from(1234))
 
     expect(
       await newManager.isUsed(await wallet.getAddress(), BigNumber.from(1234))
-    ).to.equal(true);
+    ).to.equal(true)
 
     expect(
       await newManager.isUsed(await wallet.getAddress(), BigNumber.from(992343))
-    ).to.equal(false);
+    ).to.equal(false)
 
-    await sendPermit(BigNumber.from(992343));
+    await sendPermit(BigNumber.from(992343))
 
     expect(
       await newManager.isUsed(await wallet.getAddress(), BigNumber.from(992343))
-    ).to.equal(true);
-  });
+    ).to.equal(true)
+  })
 
   it('ignores high on-chain used nonces', async () => {
-    await sendPermit(BigNumber.from(512));
-    await sendPermit(BigNumber.from(513));
-    await sendPermit(BigNumber.from(514));
-    await sendPermit(BigNumber.from(3));
-    await sendPermit(BigNumber.from(4));
+    await sendPermit(BigNumber.from(512))
+    await sendPermit(BigNumber.from(513))
+    await sendPermit(BigNumber.from(514))
+    await sendPermit(BigNumber.from(3))
+    await sendPermit(BigNumber.from(4))
     const newManager = new NonceManager(
       ethers.provider,
       chainId,
       permit2.address
-    );
+    )
     expect(
       (await newManager.useNonce(await wallet.getAddress())).toString()
-    ).to.equal('1');
+    ).to.equal('1')
 
     expect(
       (await newManager.useNonce(await wallet.getAddress())).toString()
-    ).to.equal('2');
+    ).to.equal('2')
     expect(
       (await newManager.useNonce(await wallet.getAddress())).toString()
-    ).to.equal('5');
-  });
+    ).to.equal('5')
+  })
 
   const sendPermit = async (nonce: BigNumber) => {
-    const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+    const deadline = Math.floor(new Date().getTime() / 1000) + 1000
 
     // swapper fills their own order
     const permit: PermitTransferFrom = {
@@ -138,9 +138,9 @@ describe('NonceManager', () => {
       spender: await admin.getAddress(),
       nonce,
       deadline,
-    };
-    const { domain, types, values } = SignatureTransfer.getPermitData(permit, permit2.address, chainId);
-    const signature = await wallet._signTypedData(domain, types, values);
+    }
+    const { domain, types, values } = SignatureTransfer.getPermitData(permit, permit2.address, chainId)
+    const signature = await wallet._signTypedData(domain, types, values)
     await permit2["permitTransferFrom(((address,uint256),uint256,uint256),(address,uint256),address,bytes)"](
       permit,
       {
@@ -149,6 +149,6 @@ describe('NonceManager', () => {
       },
       await wallet.getAddress(),
       signature
-    );
-  };
-});
+    )
+  }
+})

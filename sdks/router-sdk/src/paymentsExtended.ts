@@ -1,6 +1,6 @@
 import { Interface } from '@ethersproject/abi'
 import { Percent, Token, validateAndParseAddress } from '@uniswap/sdk-core'
-import { abi } from '@uniswap/swap-router-contracts/artifacts/contracts/interfaces/IPeripheryPaymentsWithFeeExtended.sol/IPeripheryPaymentsWithFeeExtended.json'
+import { abi } from '@uniswap/swap-router-contracts/artifacts/contracts/interfaces/IPeripheryPaymentsWithFeeExtended.sol/IPeripheryPaymentsWithFeeExtended.json' with { type: 'json' }
 import { FeeOptions, Payments, toHex } from '@uniswap/v3-sdk'
 import JSBI from 'jsbi'
 
@@ -14,7 +14,7 @@ export abstract class PaymentsExtended {
   /**
    * Cannot be constructed.
    */
-  private constructor() {}
+  private constructor() { }
 
   public static encodeUnwrapWETH9(amountMinimum: JSBI, recipient?: string, feeOptions?: FeeOptions): string {
     // if there's a recipient, just pass it along

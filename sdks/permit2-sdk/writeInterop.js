@@ -91,4 +91,4 @@ const interop = {
   ),
 }
 
-fs.writeFileSync('./test/interop.json', JSON.stringify(interop))
+fs.writeFileSync('./test/interop.json' with { type: 'json' }, JSON.stringify(interop))

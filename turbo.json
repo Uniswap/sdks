@@ -1,9 +1,10 @@
 {
-  "pipeline": {
+  "tasks": {
     "lint": {
       "inputs": [
         "sdks/*/src/**.ts",
-        "sdks/*/src/**.tsx"
+        "sdks/*/src/**.tsx",
+        "!sdks/uniswapx-sdk"
       ]
     },
     "build": {
@@ -11,7 +12,8 @@
         "yarn.lock",
         "**/package.json",
         "sdks/*/src/**.ts",
-        "sdks/*/src/**.tsx"
+        "sdks/*/src/**.tsx",
+        "!sdks/uniswapx-sdk"
       ],
       "outputs": [
         "sdks/*/dist/**"
@@ -22,7 +24,8 @@
         "build"
       ],
       "inputs": [
-        "sdks/*/dist/**"
+        "sdks/*/dist/**",
+        "!sdks/uniswapx-sdk"
       ]
     },
     "release": {

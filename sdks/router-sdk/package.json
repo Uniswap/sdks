@@ -13,7 +13,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsdx build",
+    "build": "tsup src/index.ts --format esm",
     "lint": "tsdx lint src",
     "release": "semantic-release",
     "start": "tsdx watch",
@@ -28,8 +28,8 @@
     "@uniswap/v4-sdk": "^1.20.0"
   },
   "devDependencies": {
-    "@types/jest": "^24.0.25",
-    "prettier": "^2.4.1",
+    "@types/jest": "^29.5.14",
+    "prettier": "^3.5.2",
     "tsdx": "^0.14.1"
   },
   "prettier": {
