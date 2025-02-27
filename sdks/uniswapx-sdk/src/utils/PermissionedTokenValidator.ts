@@ -1,7 +1,8 @@
 import { Provider } from "@ethersproject/providers";
-import { PERMISSIONED_TOKENS } from "../constants";
-import { Proxy__factory, DSTokenInterface__factory, DSTokenInterface } from "../contracts";
 import { ChainId } from "@uniswap/sdk-core";
+
+import { PERMISSIONED_TOKENS } from "../constants";
+import { DSTokenInterface, DSTokenInterface__factory, Proxy__factory } from "../contracts";
 
 export class PermissionedTokenValidator {
 

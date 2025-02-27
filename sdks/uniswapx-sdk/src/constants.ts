@@ -163,5 +163,5 @@ export const PERMISSIONED_TOKENS: PermissionedToken[] = [
     chainId: ChainId.MAINNET,
     symbol: "BUIDL",
     usesProxy: true,
-  }
+  },
 ]
