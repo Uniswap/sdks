@@ -14,8 +14,9 @@ describe('PermissionedTokenValidator', () => {
   let user1: SignerWithAddress;
   let user2: SignerWithAddress;
   let chainId: number;
+  let originalTokens: typeof PERMISSIONED_TOKENS;
 
-  beforeEach(async () => {
+  before(async () => {
     [owner, user1, user2] = await ethers.getSigners();
     
     chainId = (await ethers.provider.getNetwork()).chainId;
@@ -37,18 +38,17 @@ describe('PermissionedTokenValidator', () => {
     await mockProxy.deployed();
 
     // Override PERMISSIONED_TOKENS for testing
-    const originalTokens = [...PERMISSIONED_TOKENS];
+    originalTokens = [...PERMISSIONED_TOKENS];
     PERMISSIONED_TOKENS.length = 0;
     PERMISSIONED_TOKENS.push(
       { address: mockDSToken.address, usesProxy: false, symbol: 'TEST1' },
       { address: mockProxy.address, usesProxy: true, symbol: 'TEST2' }
     );
+  });
 
-    // Cleanup after tests
-    after(() => {
-      PERMISSIONED_TOKENS.length = 0;
-      PERMISSIONED_TOKENS.push(...originalTokens);
-    });
+  after(() => {
+    PERMISSIONED_TOKENS.length = 0;
+    PERMISSIONED_TOKENS.push(...originalTokens);
   });
 
   describe('isPermissionedToken', () => {
