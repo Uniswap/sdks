@@ -149,3 +149,19 @@ export const REVERSE_REACTOR_MAPPING: ReverseReactorMapping = Object.entries(
 export const BPS = 10000;
 
 export const MPS = BigNumber.from(10).pow(7);
+
+type PermissionedToken = {
+  address: string;
+  chainId: ChainId;
+  symbol: string;
+  usesProxy: boolean;
+}
+
+export const PERMISSIONED_TOKENS: PermissionedToken[] = [
+  {
+    address: "0x7712c34205737192402172409a8F7ccef8aA2AEc",
+    chainId: ChainId.MAINNET,
+    symbol: "BUIDL",
+    usesProxy: true,
+  },
+]
