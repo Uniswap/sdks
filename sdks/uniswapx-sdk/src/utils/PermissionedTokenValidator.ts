@@ -1,6 +1,7 @@
 import { Provider } from "@ethersproject/providers";
 import { PERMISSIONED_TOKENS } from "../constants";
 import { Proxy__factory, DSTokenInterface__factory, DSTokenInterface } from "../contracts";
+import { ChainId } from "@uniswap/sdk-core";
 
 export class PermissionedTokenValidator {
 
@@ -9,8 +10,8 @@ export class PermissionedTokenValidator {
      * @param tokenAddress The address of the token
      * @returns True if the token is a permissioned token, false otherwise
      */
-    static isPermissionedToken(tokenAddress: string): boolean {
-        return PERMISSIONED_TOKENS.some(token => token.address.toLowerCase() === tokenAddress.toLowerCase());
+    static isPermissionedToken(tokenAddress: string, chainId: ChainId): boolean {
+        return PERMISSIONED_TOKENS.some(token => token.address.toLowerCase() === tokenAddress.toLowerCase() && token.chainId === chainId);
     }
 
   /**
@@ -22,6 +23,7 @@ export class PermissionedTokenValidator {
    * @param value The amount to transfer (in base units)
    * @returns True if the token is not a permissioned token or the transfer is 
    * allowed, false otherwise
+   * @throws Will throw an exception if there is an error with the provider
    */
   static async preTransferCheck(
     provider: Provider,

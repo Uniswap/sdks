@@ -152,6 +152,7 @@ export const MPS = BigNumber.from(10).pow(7);
 
 type PermissionedToken = {
   address: string;
+  chainId: ChainId;
   symbol: string;
   usesProxy: boolean;
 }
@@ -159,6 +160,7 @@ type PermissionedToken = {
 export const PERMISSIONED_TOKENS: PermissionedToken[] = [
   {
     address: "0x7712c34205737192402172409a8F7ccef8aA2AEc",
+    chainId: ChainId.MAINNET,
     symbol: "BUIDL",
     usesProxy: true,
   }

@@ -41,8 +41,8 @@ describe('PermissionedTokenValidator', () => {
     originalTokens = [...PERMISSIONED_TOKENS];
     PERMISSIONED_TOKENS.length = 0;
     PERMISSIONED_TOKENS.push(
-      { address: mockDSToken.address, usesProxy: false, symbol: 'TEST1' },
-      { address: mockProxy.address, usesProxy: true, symbol: 'TEST2' }
+      { address: mockDSToken.address, usesProxy: false, symbol: 'TEST1', chainId },
+      { address: mockProxy.address, usesProxy: true, symbol: 'TEST2', chainId }
     );
   });
 
@@ -53,16 +53,21 @@ describe('PermissionedTokenValidator', () => {
 
   describe('isPermissionedToken', () => {
     it('returns true for tokens in PERMISSIONED_TOKENS list', () => {
-      expect(PermissionedTokenValidator.isPermissionedToken(PERMISSIONED_TOKENS[0].address)).to.be.true;
+      expect(PermissionedTokenValidator.isPermissionedToken(PERMISSIONED_TOKENS[0].address, chainId)).to.be.true;
     });
 
     it('returns false for non-permissioned tokens', () => {
       const randomAddress = ethers.Wallet.createRandom().address;
-      expect(PermissionedTokenValidator.isPermissionedToken(randomAddress)).to.be.false;
+      expect(PermissionedTokenValidator.isPermissionedToken(randomAddress, chainId)).to.be.false;
+    });
+
+    it('returns false for tokens on different chain', () => {
+      const differentChainId = chainId + 1;
+      expect(PermissionedTokenValidator.isPermissionedToken(PERMISSIONED_TOKENS[0].address, differentChainId)).to.be.false;
     });
 
     it('is case-insensitive', () => {
-      expect(PermissionedTokenValidator.isPermissionedToken(PERMISSIONED_TOKENS[0].address.toUpperCase())).to.be.true;
+      expect(PermissionedTokenValidator.isPermissionedToken(PERMISSIONED_TOKENS[0].address.toUpperCase(), chainId)).to.be.true;
     });
   });
 
