@@ -1,9 +1,9 @@
 import { BigNumber } from '@ethersproject/bignumber'
-import { ModeType, SELF_CALL_TARGET } from '../constants'
+
 import { Call } from '../types'
 
 /**
- * CallPlanner is used to build a sequence of calls for an `executionData`
+ * ExecuteCallPlanner is used to build a sequence of calls for an `executionData`
  */
 export class ExecuteCallPlanner {
   calls: Call[]
@@ -36,9 +36,9 @@ export class ExecuteCallPlanner {
 
   /**
    * Add a command to authorize an operator
-    * @param operator The operator address to authorize
+   * @param key The key data to authorize
    */
-  addAuthorize(key: string): ExecuteCallPlanner {
+  addAuthorize(_key: string): ExecuteCallPlanner {
     throw new Error('Not implemented')
   }
 
@@ -46,7 +46,7 @@ export class ExecuteCallPlanner {
    * Add a command to revoke an operator
    * @param operator The operator address to revoke
    */
-  addRevoke(operator: string): ExecuteCallPlanner {
+  addRevoke(_operator: string): ExecuteCallPlanner {
     throw new Error('Not implemented')
   }
 }

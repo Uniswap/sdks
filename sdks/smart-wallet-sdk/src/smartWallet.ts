@@ -1,12 +1,11 @@
-import { ChainId } from '@uniswap/sdk-core'
 import { Interface } from '@ethersproject/abi'
-import { Call, MethodParameters, ExecuteOptions } from './types'
-import { ExecuteCallPlanner, ModeEncoder } from './utils'
-import { ModeType, SMART_WALLET_ADDRESSES } from './constants'
+import { ChainId } from '@uniswap/sdk-core'
+
 import { abi } from '../abis/MinimalDelegation.json'
 
-// This will be uncommented once typechain is run
-// import { SmartWalletABI } from './contracts'
+import { ModeType, SMART_WALLET_ADDRESSES } from './constants'
+import { Call, MethodParameters, ExecuteOptions } from './types'
+import { ExecuteCallPlanner, ModeEncoder } from './utils'
 
 /**
  * Main SDK class for interacting with ERC7821-compatible smart wallets
@@ -30,7 +29,9 @@ export class SmartWallet {
     for (const call of calls) {
       planner.add(call.to, call.data, call.value)
     }
-    const data = ModeEncoder.encode(mode, planner)
+    // Add dummy opData for modes that require it
+    const opData = options.senderIsUser ? '0x' : undefined
+    const data = ModeEncoder.encode(mode, planner, opData)
     const encoded = this.INTERFACE.encodeFunctionData('execute(bytes32,bytes)', [
       mode,
       data
@@ -48,11 +49,12 @@ export class SmartWallet {
    * @returns The call to execute
    */
   public static createExecute(methodParameters: MethodParameters, chainId: ChainId ): Call {
-    if(!SMART_WALLET_ADDRESSES[chainId]) {
+    const address = SMART_WALLET_ADDRESSES[chainId]
+    if(!address) {
       throw new Error(`Smart wallet not found for chainId: ${chainId}`)
     }
     return {
-      to: SMART_WALLET_ADDRESSES[chainId],
+      to: address,
       data: methodParameters.calldata,
       value: methodParameters.value
     }

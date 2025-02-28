@@ -1,6 +1,7 @@
 import { AbiCoder } from '@ethersproject/abi';
+
 import { MODE_TYPE_ABI_ENCODING, ModeType } from '../constants'
-import { Call } from '../types'
+
 import { ExecuteCallPlanner } from './callPlanner';
 
 /**
@@ -12,22 +13,27 @@ export abstract class ModeEncoder {
 
   public static encode(mode: ModeType, planner: ExecuteCallPlanner, opData?: string): string {
     const calls = planner.calls
+    // Transform calls into the expected format for ABI encoding
+    const formattedCalls = calls.map(call => [call.to, call.value, call.data]) as Array<[string, string, string]>
+    
     switch (mode) {
-      case ModeType.BATCHED_CALL || ModeType.BATCHED_CAN_REVERT_CALL:
-        return this.encodeBatchedCall(calls);
-      case ModeType.BATCHED_CALL_SUPPORTS_OPDATA || ModeType.BATCHED_CALL_SUPPORTS_OPDATA_AND_CAN_REVERT:
+      case ModeType.BATCHED_CALL:
+      case ModeType.BATCHED_CAN_REVERT_CALL:
+        return this.encodeBatchedCall(formattedCalls);
+      case ModeType.BATCHED_CALL_SUPPORTS_OPDATA:
+      case ModeType.BATCHED_CALL_SUPPORTS_OPDATA_AND_CAN_REVERT:
         if (!opData) throw new Error('opData is required for CALL_WITH_OPDATA mode');
-        return this.encodeBatchedCallSupportsOpdata(calls, opData);
+        return this.encodeBatchedCallSupportsOpdata(formattedCalls, opData);
       default:
         throw new Error(`Unsupported mode type: ${mode}`);
     }
   }
 
-  protected static encodeBatchedCall(calls: Call[]): string {
-    return this.abiEncoder.encode(MODE_TYPE_ABI_ENCODING[ModeType.BATCHED_CALL], calls)
+  protected static encodeBatchedCall(formattedCalls: Array<[string, string, string]>): string {
+    return this.abiEncoder.encode(MODE_TYPE_ABI_ENCODING[ModeType.BATCHED_CALL], [formattedCalls])
   }
 
-  protected static encodeBatchedCallSupportsOpdata(calls: Call[], opData: string): string {
-    return this.abiEncoder.encode(MODE_TYPE_ABI_ENCODING[ModeType.BATCHED_CALL_SUPPORTS_OPDATA], [calls, opData])
+  protected static encodeBatchedCallSupportsOpdata(formattedCalls: Array<[string, string, string]>, opData: string): string {
+    return this.abiEncoder.encode(MODE_TYPE_ABI_ENCODING[ModeType.BATCHED_CALL_SUPPORTS_OPDATA], [formattedCalls, opData])
   }
 }
