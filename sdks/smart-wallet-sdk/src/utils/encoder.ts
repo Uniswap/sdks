@@ -18,7 +18,7 @@ export abstract class ModeEncoder {
     
     switch (mode) {
       case ModeType.BATCHED_CALL:
-      case ModeType.BATCHED_CAN_REVERT_CALL:
+      case ModeType.BATCHED_CALL_CAN_REVERT:
         return this.encodeBatchedCall(formattedCalls);
       case ModeType.BATCHED_CALL_SUPPORTS_OPDATA:
       case ModeType.BATCHED_CALL_SUPPORTS_OPDATA_AND_CAN_REVERT:

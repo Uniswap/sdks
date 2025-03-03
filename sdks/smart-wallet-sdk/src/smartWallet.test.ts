@@ -19,7 +19,7 @@ describe('SmartWallet', () => {
         }
       ]
 
-      const result = SmartWallet.encodeExecute(calls)
+      const result = SmartWallet.encodeCalls(calls)
       expect(result).toBeDefined()
       expect(result.calldata).toBeDefined()
       expect(result.value).toBeDefined()
@@ -34,7 +34,7 @@ describe('SmartWallet', () => {
         }
       ]
       
-      const result = SmartWallet.encodeExecute(calls, { revertOnFailure: true })
+      const result = SmartWallet.encodeCalls(calls, { revertOnFailure: true })
       expect(result).toBeDefined()
       expect(result.calldata).toBeDefined()
       expect(result.value).toBeDefined()

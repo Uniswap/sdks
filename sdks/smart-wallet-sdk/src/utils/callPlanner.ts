@@ -1,17 +1,26 @@
 import { BigNumber } from '@ethersproject/bignumber'
 
 import { Call } from '../types'
+import { AbiCoder } from '@ethersproject/abi'
 
 /**
  * ExecuteCallPlanner is used to build a sequence of calls for an `executionData`
  */
 export class ExecuteCallPlanner {
+  abiEncoder: AbiCoder = new AbiCoder()
   calls: Call[]
 
-  constructor() {
-    this.calls = []
+  /**
+   * Create a new ExecuteCallPlanner
+   * @param calls optionally initialize with a list of calls
+   */
+  constructor(calls: Call[] = []) {
+    this.calls = calls
   }
 
+  /**
+   * Get the total value of the calls
+   */
   get value(): BigNumber {
     return this.calls.reduce((acc, call) =>  acc.add(call.value ?? 0), BigNumber.from(0))
   }
@@ -20,7 +29,7 @@ export class ExecuteCallPlanner {
    * abi encode the Calls[]
    */
   encode(): string {
-    return '0x'
+    return this.abiEncoder.encode(["(address,bytes,uint256)"], this.calls)
   }
 
   /**
@@ -32,21 +41,5 @@ export class ExecuteCallPlanner {
   add(to: string, data: string, value: string): ExecuteCallPlanner {
     this.calls.push({ to, data, value })
     return this
-  }
-
-  /**
-   * Add a command to authorize an operator
-   * @param key The key data to authorize
-   */
-  addAuthorize(_key: string): ExecuteCallPlanner {
-    throw new Error('Not implemented')
-  }
-
-  /**
-   * Add a command to revoke an operator
-   * @param operator The operator address to revoke
-   */
-  addRevoke(_operator: string): ExecuteCallPlanner {
-    throw new Error('Not implemented')
   }
 }
