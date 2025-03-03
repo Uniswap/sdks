@@ -67,7 +67,7 @@ export const MODE_TYPE_ABI_PARAMETERS = {
 /**
  * Mapping of chainId to Smart Wallet contract addresses
  */
-export const SMART_WALLET_ADDRESSES: { [chainId in ChainId]?: string } = {
+export const SMART_WALLET_ADDRESSES: { [chainId in ChainId]?: `0x${string}` } = {
   // Mainnet
   [ChainId.MAINNET]: '0x0000000000000000000000000000000000000000', // Placeholder - to be replaced
   // Optimism

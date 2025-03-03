@@ -1,5 +1,5 @@
-import { Interface } from '@ethersproject/abi'
 import { ChainId } from '@uniswap/sdk-core'
+import { encodeFunctionData } from 'viem'
 
 import { abi } from '../abis/MinimalDelegation.json'
 
@@ -8,14 +8,9 @@ import { Call, MethodParameters, ExecuteOptions, AdvancedCall } from './types'
 import { CallPlanner, ModeEncoder } from './utils'
 
 /**
- * Main SDK class for interacting with ERC7821-compatible smart wallets
+ * Main SDK class hashAuthorizationfor interacting with ERC7821-compatible smart wallets
  */
 export class SmartWallet {
-  /**
-   * Interface for the Smart Wallet contract generated from the ABI
-   */
-  public static INTERFACE: Interface = new Interface(abi)
-
   /**
    * Creates method parameters for executing a simple batch of calls through a smart wallet
    * @dev does not support opData
@@ -29,10 +24,14 @@ export class SmartWallet {
     }
     const planner = new CallPlanner(calls)
     const data = ModeEncoder.encode(mode, planner)
-    const encoded = this.INTERFACE.encodeFunctionData('execute(bytes32,bytes)', [
-      mode,
-      data
-    ])
+    const encoded = encodeFunctionData({
+      abi,
+      functionName: 'execute',
+      args: [
+        mode,
+        data
+      ]
+    })
     return {
       calldata: encoded,
       value: planner.value.toString()
