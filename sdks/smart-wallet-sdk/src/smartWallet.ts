@@ -8,7 +8,7 @@ import { Call, MethodParameters, ExecuteOptions, AdvancedCall } from './types'
 import { CallPlanner } from './utils'
 
 /**
- * Main SDK class hashAuthorizationfor interacting with ERC7821-compatible smart wallets
+ * Main SDK class for interacting with ERC7821-compatible smart wallets
  */
 export class SmartWallet {
   /**
@@ -39,6 +39,7 @@ export class SmartWallet {
 
   /**
    * Creates a call to execute a method through a smart wallet
+   * @dev can be refactored to return a Transaction object as well
    * @param methodParameters The method parameters to execute
    * @param chainId The chain ID for the smart wallet
    * @returns The call to execute
