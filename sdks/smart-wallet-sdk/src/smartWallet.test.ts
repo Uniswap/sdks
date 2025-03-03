@@ -1,7 +1,10 @@
 import { ChainId } from '@uniswap/sdk-core'
 
+import { ModeType, SMART_WALLET_ADDRESSES } from './constants';
 import { SmartWallet } from './smartWallet'
 import { Call } from './types'
+
+const EXECUTE_SELECTOR = "0xe9ae5c53";
 
 describe('SmartWallet', () => {
   describe('encodeExecute', () => {
@@ -43,19 +46,8 @@ describe('SmartWallet', () => {
 
   describe('createExecute', () => {
     it('creates an execute call for specific chain', () => {
-      // Simple test - just mock createExecute for simplicity
-      const originalMethod = SmartWallet.createExecute
-      
-      // Temporarily override the method for testing
-      SmartWallet.createExecute = jest.fn().mockReturnValue({
-        to: '0x1234567890123456789012345678901234567890',
-        data: '0xmocked_data',
-        value: '0'
-      })
-      
-      // Call the method
       const methodParams = {
-        calldata: '0xtest',
+        calldata: EXECUTE_SELECTOR,
         value: '0'
       }
       
@@ -63,12 +55,31 @@ describe('SmartWallet', () => {
       
       // Verify the result
       expect(call).toBeDefined()
-      expect(call.to).toBe('0x1234567890123456789012345678901234567890')
-      expect(call.data).toBe('0xmocked_data')
+      expect(call.to).toBe(SMART_WALLET_ADDRESSES[ChainId.MAINNET])
+      expect(call.data).toBe(EXECUTE_SELECTOR)
       expect(call.value).toBe('0')
-      
-      // Restore the original method
-      SmartWallet.createExecute = originalMethod
     })
+  })
+
+  describe('getModeFromOptions', () => {
+    for(const canRevert of [true, false]) {
+      for(const senderIsUser of [true, false]) {
+        it(`returns the correct mode type for canRevert: ${canRevert} and senderIsUser: ${senderIsUser}`, () => {
+          if(senderIsUser) {
+            if(canRevert) {
+              expect(SmartWallet.getModeFromOptions({ revertOnFailure: canRevert, senderIsUser })).toBe(ModeType.BATCHED_CALL_SUPPORTS_OPDATA_AND_CAN_REVERT)
+            } else {
+              expect(SmartWallet.getModeFromOptions({ revertOnFailure: canRevert, senderIsUser })).toBe(ModeType.BATCHED_CALL_SUPPORTS_OPDATA)
+            }
+          } else {
+            if(canRevert) {
+              expect(SmartWallet.getModeFromOptions({ revertOnFailure: canRevert, senderIsUser })).toBe(ModeType.BATCHED_CALL_CAN_REVERT)
+            } else {
+              expect(SmartWallet.getModeFromOptions({ revertOnFailure: canRevert, senderIsUser })).toBe(ModeType.BATCHED_CALL)
+            }
+          }
+        })
+      }
+    }
   })
 })

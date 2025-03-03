@@ -62,7 +62,10 @@ export class SmartWallet {
     }
   }
 
-  protected static getModeFromOptions(options: ExecuteOptions): ModeType {
+  /**
+   * Get the mode type from the options
+   */
+  public static getModeFromOptions(options: ExecuteOptions): ModeType {
     if(options.senderIsUser) {
       if(options.revertOnFailure) {
         return ModeType.BATCHED_CALL_SUPPORTS_OPDATA_AND_CAN_REVERT

@@ -1,4 +1,3 @@
-import { BigNumber } from '@ethersproject/bignumber'
 import { CallPlanner } from './callPlanner'
 
 // Test constants
