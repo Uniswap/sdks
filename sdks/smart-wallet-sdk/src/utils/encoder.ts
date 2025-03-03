@@ -2,7 +2,7 @@ import { AbiCoder } from '@ethersproject/abi';
 
 import { MODE_TYPE_ABI_ENCODING, ModeType } from '../constants'
 
-import { ExecuteCallPlanner } from './callPlanner';
+import { CallPlanner } from './callPlanner';
 
 /**
  * Utility functions for encoding execution data for different ERC-7579 modes
@@ -11,7 +11,7 @@ import { ExecuteCallPlanner } from './callPlanner';
 export abstract class ModeEncoder {
   protected static abiEncoder = new AbiCoder()
 
-  public static encode(mode: ModeType, planner: ExecuteCallPlanner, opData?: string): string {
+  public static encode(mode: ModeType, planner: CallPlanner, opData?: string): string {
     const calls = planner.calls
     // Transform calls into the expected format for ABI encoding
     const formattedCalls = calls.map(call => [call.to, call.value, call.data]) as Array<[string, string, string]>

@@ -5,7 +5,7 @@ import { abi } from '../abis/MinimalDelegation.json'
 
 import { ModeType, SMART_WALLET_ADDRESSES } from './constants'
 import { Call, MethodParameters, ExecuteOptions, AdvancedCall } from './types'
-import { ExecuteCallPlanner, ModeEncoder } from './utils'
+import { CallPlanner, ModeEncoder } from './utils'
 
 /**
  * Main SDK class for interacting with ERC7821-compatible smart wallets
@@ -27,7 +27,7 @@ export class SmartWallet {
     if(mode != ModeType.BATCHED_CALL && mode != ModeType.BATCHED_CALL_CAN_REVERT) {
       throw new Error(`Invalid mode: ${mode}`)
     }
-    const planner = new ExecuteCallPlanner(calls)
+    const planner = new CallPlanner(calls)
     const data = ModeEncoder.encode(mode, planner)
     const encoded = this.INTERFACE.encodeFunctionData('execute(bytes32,bytes)', [
       mode,

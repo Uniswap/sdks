@@ -3,15 +3,17 @@ import { BigNumber } from '@ethersproject/bignumber'
 import { Call } from '../types'
 import { AbiCoder } from '@ethersproject/abi'
 
+const CALL_TUPLE_ABI = "tuple(address,bytes,uint256)"
+
 /**
- * ExecuteCallPlanner is used to build a sequence of calls for an `executionData`
+ * CallPlanner is used to encode a series Calls
  */
-export class ExecuteCallPlanner {
+export class CallPlanner {
   abiEncoder: AbiCoder = new AbiCoder()
   calls: Call[]
 
   /**
-   * Create a new ExecuteCallPlanner
+   * Create a new CallPlanner
    * @param calls optionally initialize with a list of calls
    */
   constructor(calls: Call[] = []) {
@@ -29,7 +31,13 @@ export class ExecuteCallPlanner {
    * abi encode the Calls[]
    */
   encode(): string {
-    return this.abiEncoder.encode(["(address,bytes,uint256)"], this.calls)
+    if (this.calls.length === 0) {
+      throw new Error("No calls to encode")
+    }
+    const values = this.calls.map((call) => [call.to, call.data, call.value])
+    return this.abiEncoder.encode([
+      CALL_TUPLE_ABI
+    ], values)
   }
 
   /**
@@ -38,7 +46,7 @@ export class ExecuteCallPlanner {
    * @param data The calldata for the call
    * @param value The ETH value to send with the call
    */
-  add(to: string, data: string, value: string): ExecuteCallPlanner {
+  add(to: string, data: string, value: string): CallPlanner {
     this.calls.push({ to, data, value })
     return this
   }
