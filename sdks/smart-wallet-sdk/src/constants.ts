@@ -19,12 +19,50 @@ export enum ModeType {
 /**
  * ABI encoding for each mode type
  */
-export const MODE_TYPE_ABI_ENCODING = {
-  [ModeType.BATCHED_CALL]: ['(address,uint256,bytes)[]'],
-  [ModeType.BATCHED_CALL_CAN_REVERT]: ['(address,uint256,bytes)[]'],
-  [ModeType.BATCHED_CALL_SUPPORTS_OPDATA]: ['(address,uint256,bytes)[]', 'bytes'],
-  [ModeType.BATCHED_CALL_SUPPORTS_OPDATA_AND_CAN_REVERT]: ['(address,uint256,bytes)[]', 'bytes']
-}
+export const MODE_TYPE_ABI_PARAMETERS = {
+  [ModeType.BATCHED_CALL]: [
+    {
+      type: 'tuple[]',
+      components: [
+        { type: 'address', name: 'to' },
+        { type: 'uint256', name: 'value' },
+        { type: 'bytes', name: 'data' }
+      ]
+    }
+  ],
+  [ModeType.BATCHED_CALL_CAN_REVERT]: [
+    {
+      type: 'tuple[]',
+      components: [
+        { type: 'address', name: 'to' },
+        { type: 'uint256', name: 'value' },
+        { type: 'bytes', name: 'data' }
+      ]
+    }
+  ],
+  [ModeType.BATCHED_CALL_SUPPORTS_OPDATA]: [
+    {
+      type: 'tuple[]',
+      components: [
+        { type: 'address', name: 'to' },
+        { type: 'uint256', name: 'value' },
+        { type: 'bytes', name: 'data' }
+      ]
+    },
+    { type: 'bytes', name: 'opData' }
+  ],
+  [ModeType.BATCHED_CALL_SUPPORTS_OPDATA_AND_CAN_REVERT]: [
+    {
+      type: 'tuple[]',
+      components: [
+        { type: 'address', name: 'to' },
+        { type: 'uint256', name: 'value' },
+        { type: 'bytes', name: 'data' }
+      ]
+    },
+    { type: 'bytes', name: 'opData' }
+  ]
+} as const
 
 /**
  * Mapping of chainId to Smart Wallet contract addresses

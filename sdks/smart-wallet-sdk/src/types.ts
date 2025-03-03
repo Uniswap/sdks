@@ -3,13 +3,13 @@
  */
 export interface Call {
   /** The address of the contract to call */
-  to: string
+  to: `0x${string}` | string
   /** The encoded calldata for the call */
-  data: string
+  data: `0x${string}` | string
   /** The amount of ETH to send with the call */
-  value: string
+  value: string | bigint
   /** The chain ID for the call (for client-side use) */
-  chainId?: string
+  chainId?: number | string
 }
 
 /**
@@ -25,9 +25,9 @@ export interface AdvancedCall extends Call {
  */
 export interface MethodParameters {
   /** Encoded calldata to be sent to the user's delegated account */
-  calldata: string
+  calldata: `0x${string}` | string
   /** The amount of ETH to send with the transaction */
-  value: string
+  value: string | bigint
 }
 
 /**

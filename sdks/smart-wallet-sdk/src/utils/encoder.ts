@@ -1,20 +1,23 @@
-import { AbiCoder } from '@ethersproject/abi';
+import { encodeAbiParameters, type Address } from 'viem'
 
-import { MODE_TYPE_ABI_ENCODING, ModeType } from '../constants'
+import { MODE_TYPE_ABI_PARAMETERS, ModeType } from '../constants'
 
-import { CallPlanner } from './callPlanner';
+import { CallPlanner } from './callPlanner'
 
 /**
  * Utility functions for encoding execution data for different ERC-7579 modes
  * supports ERC-7821 modes
  */
 export abstract class ModeEncoder {
-  protected static abiEncoder = new AbiCoder()
-
   public static encode(mode: ModeType, planner: CallPlanner, opData?: string): string {
     const calls = planner.calls
-    // Transform calls into the expected format for ABI encoding
-    const formattedCalls = calls.map(call => [call.to, call.value, call.data]) as Array<[string, string, string]>
+    
+    // Transform calls into the expected format for viem encoding
+    const formattedCalls = calls.map(call => ({
+      to: call.to as Address,
+      value: typeof call.value === 'string' ? BigInt(call.value || "0") : (call.value || 0n),
+      data: call.data as `0x${string}`
+    }))
     
     switch (mode) {
       case ModeType.BATCHED_CALL:
@@ -29,11 +32,24 @@ export abstract class ModeEncoder {
     }
   }
 
-  protected static encodeBatchedCall(formattedCalls: Array<[string, string, string]>): string {
-    return this.abiEncoder.encode(MODE_TYPE_ABI_ENCODING[ModeType.BATCHED_CALL], [formattedCalls])
+  protected static encodeBatchedCall(formattedCalls: Array<{
+    to: Address, 
+    value: bigint, 
+    data: `0x${string}`
+  }>): string {
+    return encodeAbiParameters(
+      MODE_TYPE_ABI_PARAMETERS[ModeType.BATCHED_CALL],
+      [formattedCalls]
+    )
   }
 
-  protected static encodeBatchedCallSupportsOpdata(formattedCalls: Array<[string, string, string]>, opData: string): string {
-    return this.abiEncoder.encode(MODE_TYPE_ABI_ENCODING[ModeType.BATCHED_CALL_SUPPORTS_OPDATA], [formattedCalls, opData])
+  protected static encodeBatchedCallSupportsOpdata(
+    formattedCalls: Array<{ to: Address, value: bigint, data: `0x${string}` }>, 
+    opData: string
+  ): string {
+    return encodeAbiParameters(
+      MODE_TYPE_ABI_PARAMETERS[ModeType.BATCHED_CALL_SUPPORTS_OPDATA],
+      [formattedCalls, opData as `0x${string}`]
+    )
   }
 }

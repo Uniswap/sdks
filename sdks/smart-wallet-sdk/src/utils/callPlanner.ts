@@ -1,15 +1,23 @@
-import { AbiCoder } from '@ethersproject/abi'
-import { BigNumber } from '@ethersproject/bignumber'
+import { type Address, encodeAbiParameters } from 'viem'
 
 import { Call } from '../types'
 
-const CALL_TUPLE_ABI = "tuple(address,bytes,uint256)"
+// Define the ABI parameter type for the call tuple
+const CALL_ABI_PARAMS = [
+  {
+    type: 'tuple[]',
+    components: [
+      { type: 'address', name: 'to' },
+      { type: 'bytes', name: 'data' },
+      { type: 'uint256', name: 'value' }
+    ]
+  }
+] as const
 
 /**
  * CallPlanner is used to encode a series Calls
  */
 export class CallPlanner {
-  abiEncoder: AbiCoder = new AbiCoder()
   calls: Call[]
 
   /**
@@ -23,8 +31,15 @@ export class CallPlanner {
   /**
    * Get the total value of the calls
    */
-  get value(): BigNumber {
-    return this.calls.reduce((acc, call) =>  acc.add(call.value ?? 0), BigNumber.from(0))
+  get value(): bigint {
+    return this.calls.reduce((acc, call) => {
+      // Convert string values to bigint
+      const callValue = typeof call.value === 'string' 
+        ? BigInt(call.value || '0') 
+        : (call.value || 0n)
+      
+      return acc + callValue
+    }, 0n)
   }
 
   /**
@@ -34,10 +49,15 @@ export class CallPlanner {
     if (this.calls.length === 0) {
       throw new Error("No calls to encode")
     }
-    const values = this.calls.map((call) => [call.to, call.data, call.value])
-    return this.abiEncoder.encode([
-      CALL_TUPLE_ABI
-    ], values)
+    
+    // Format the calls for viem's encoder
+    const formattedCalls = this.calls.map(call => ({
+      to: call.to as Address,
+      data: call.data as `0x${string}`,
+      value: typeof call.value === 'string' ? BigInt(call.value || "0") : (call.value || 0n)
+    }))
+    
+    return encodeAbiParameters(CALL_ABI_PARAMS, [formattedCalls])
   }
 
   /**
@@ -46,7 +66,7 @@ export class CallPlanner {
    * @param data The calldata for the call
    * @param value The ETH value to send with the call
    */
-  add(to: string, data: string, value: string): CallPlanner {
+  add(to: string, data: string, value: string | bigint): CallPlanner {
     this.calls.push({ to, data, value })
     return this
   }
