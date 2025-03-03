@@ -63,23 +63,13 @@ describe('SmartWallet', () => {
 
   describe('getModeFromOptions', () => {
     for(const canRevert of [true, false]) {
-      for(const senderIsUser of [true, false]) {
-        it(`returns the correct mode type for canRevert: ${canRevert} and senderIsUser: ${senderIsUser}`, () => {
-          if(senderIsUser) {
-            if(canRevert) {
-              expect(SmartWallet.getModeFromOptions({ revertOnFailure: canRevert, senderIsUser })).toBe(ModeType.BATCHED_CALL_SUPPORTS_OPDATA_AND_CAN_REVERT)
-            } else {
-              expect(SmartWallet.getModeFromOptions({ revertOnFailure: canRevert, senderIsUser })).toBe(ModeType.BATCHED_CALL_SUPPORTS_OPDATA)
-            }
-          } else {
-            if(canRevert) {
-              expect(SmartWallet.getModeFromOptions({ revertOnFailure: canRevert, senderIsUser })).toBe(ModeType.BATCHED_CALL_CAN_REVERT)
-            } else {
-              expect(SmartWallet.getModeFromOptions({ revertOnFailure: canRevert, senderIsUser })).toBe(ModeType.BATCHED_CALL)
-            }
-          }
-        })
-      }
+      it(`returns the correct mode type for canRevert: ${canRevert}`, () => {
+        if(canRevert) {
+          expect(SmartWallet.getModeFromOptions({ revertOnFailure: canRevert })).toBe(ModeType.BATCHED_CALL_CAN_REVERT)
+        } else {
+          expect(SmartWallet.getModeFromOptions({ revertOnFailure: canRevert })).toBe(ModeType.BATCHED_CALL)
+        }
+      })
     }
   })
 })

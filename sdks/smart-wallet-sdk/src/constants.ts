@@ -16,52 +16,30 @@ export enum ModeType {
   BATCHED_CALL_SUPPORTS_OPDATA_AND_CAN_REVERT = '0x0101000000007821000100000000000000000000000000000000000000000000'
 }
 
+const BATCHED_CALL_EXECUTION_DATA_ABI = [
+  {
+    type: 'tuple[]',
+    components: [
+      { type: 'address', name: 'to' },
+      { type: 'uint256', name: 'value' },
+      { type: 'bytes', name: 'data' }
+    ]
+  }
+]
+
+const BATCHED_CALL_SUPPORTS_OPDATA_EXECUTION_DATA_ABI = [
+  ...BATCHED_CALL_EXECUTION_DATA_ABI,
+  { type: 'bytes', name: 'opData' }
+]
+
 /**
  * ABI encoding for each mode type
  */
 export const MODE_TYPE_ABI_PARAMETERS = {
-  [ModeType.BATCHED_CALL]: [
-    {
-      type: 'tuple[]',
-      components: [
-        { type: 'address', name: 'to' },
-        { type: 'uint256', name: 'value' },
-        { type: 'bytes', name: 'data' }
-      ]
-    }
-  ],
-  [ModeType.BATCHED_CALL_CAN_REVERT]: [
-    {
-      type: 'tuple[]',
-      components: [
-        { type: 'address', name: 'to' },
-        { type: 'uint256', name: 'value' },
-        { type: 'bytes', name: 'data' }
-      ]
-    }
-  ],
-  [ModeType.BATCHED_CALL_SUPPORTS_OPDATA]: [
-    {
-      type: 'tuple[]',
-      components: [
-        { type: 'address', name: 'to' },
-        { type: 'uint256', name: 'value' },
-        { type: 'bytes', name: 'data' }
-      ]
-    },
-    { type: 'bytes', name: 'opData' }
-  ],
-  [ModeType.BATCHED_CALL_SUPPORTS_OPDATA_AND_CAN_REVERT]: [
-    {
-      type: 'tuple[]',
-      components: [
-        { type: 'address', name: 'to' },
-        { type: 'uint256', name: 'value' },
-        { type: 'bytes', name: 'data' }
-      ]
-    },
-    { type: 'bytes', name: 'opData' }
-  ]
+  [ModeType.BATCHED_CALL]: BATCHED_CALL_EXECUTION_DATA_ABI,
+  [ModeType.BATCHED_CALL_CAN_REVERT]: BATCHED_CALL_EXECUTION_DATA_ABI,
+  [ModeType.BATCHED_CALL_SUPPORTS_OPDATA]: BATCHED_CALL_SUPPORTS_OPDATA_EXECUTION_DATA_ABI,
+  [ModeType.BATCHED_CALL_SUPPORTS_OPDATA_AND_CAN_REVERT]: BATCHED_CALL_SUPPORTS_OPDATA_EXECUTION_DATA_ABI
 } as const
 
 /**

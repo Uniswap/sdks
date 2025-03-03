@@ -1,11 +1,11 @@
 import { ChainId } from '@uniswap/sdk-core'
-import { encodeFunctionData } from 'viem'
+import { encodeAbiParameters, encodeFunctionData } from 'viem'
 
 import { abi } from '../abis/MinimalDelegation.json'
 
-import { ModeType, SMART_WALLET_ADDRESSES } from './constants'
+import { MODE_TYPE_ABI_PARAMETERS, ModeType, SMART_WALLET_ADDRESSES } from './constants'
 import { Call, MethodParameters, ExecuteOptions, AdvancedCall } from './types'
-import { CallPlanner, ModeEncoder } from './utils'
+import { CallPlanner } from './utils'
 
 /**
  * Main SDK class hashAuthorizationfor interacting with ERC7821-compatible smart wallets
@@ -23,15 +23,9 @@ export class SmartWallet {
       throw new Error(`Invalid mode: ${mode}`)
     }
     const planner = new CallPlanner(calls)
-    const data = ModeEncoder.encode(mode, planner)
-    const encoded = encodeFunctionData({
-      abi,
-      functionName: 'execute',
-      args: [
-        mode,
-        data
-      ]
-    })
+    
+    const executionData = planner.encode()
+    const encoded = this._encodeExecute(mode, executionData)
     return {
       calldata: encoded,
       value: planner.value.toString()
@@ -65,17 +59,33 @@ export class SmartWallet {
    * Get the mode type from the options
    */
   public static getModeFromOptions(options: ExecuteOptions): ModeType {
-    if(options.senderIsUser) {
-      if(options.revertOnFailure) {
-        return ModeType.BATCHED_CALL_SUPPORTS_OPDATA_AND_CAN_REVERT
-      }
-      return ModeType.BATCHED_CALL_SUPPORTS_OPDATA
-    }
-
     if(options.revertOnFailure) {
       return ModeType.BATCHED_CALL_CAN_REVERT
     }
 
     return ModeType.BATCHED_CALL
+  }
+
+  /** Internal methods */
+  
+  protected static _encodeExecute(mode: ModeType, data: string): string {
+    return encodeFunctionData({
+      abi,
+      functionName: 'execute',
+      args: [
+        mode,
+        data
+      ]
+    })
+  }
+
+  protected static _encodeBatchedCallSupportsOpdata(
+    planner: CallPlanner,
+    opData: string
+  ): string {
+    return encodeAbiParameters(
+      MODE_TYPE_ABI_PARAMETERS[ModeType.BATCHED_CALL_SUPPORTS_OPDATA],
+      [planner.encode(), opData as `0x${string}`]
+    )
   }
 }

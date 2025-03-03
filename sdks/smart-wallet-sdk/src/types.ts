@@ -36,6 +36,9 @@ export interface MethodParameters {
 export interface ExecuteOptions {
   /** Whether to allow the call to revert */
   revertOnFailure?: boolean
-  /** Whether the sender is the user */
+}
+
+export interface AdvancedExecuteOptions extends ExecuteOptions {
+  /** Whether the call supports opData */
   senderIsUser?: boolean
 }
