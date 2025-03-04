@@ -3800,7 +3800,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/jest@npm:^25.2.1, @types/jest@npm:^25.2.3":
+"@types/jest@npm:^25.2.1":
   version: 25.2.3
   resolution: "@types/jest@npm:25.2.3"
   dependencies:
@@ -4362,7 +4362,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@uniswap/smart-wallet-sdk@workspace:sdks/smart-wallet-sdk"
   dependencies:
-    "@types/jest": ^25.2.3
+    "@types/jest": ^24.0.25
     "@types/node": ^18.7.16
     "@uniswap/sdk-core": ^7.6.0
     eslint: ^7.8.0
