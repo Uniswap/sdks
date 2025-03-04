@@ -1,0 +1,18 @@
+{
+    "include": ["src", "abis"],
+    "compilerOptions": {
+      "rootDir": ".",
+      "baseUrl": ".",
+      "target": "es6",
+      "module": "esnext",
+      "importHelpers": true,
+      "declaration": true,
+      "sourceMap": true,
+      "strict": true,
+      "moduleResolution": "node",
+      "resolveJsonModule": true,
+      "esModuleInterop": true,
+      "skipLibCheck": true,
+      "isolatedModules": true
+    }
+  } 
