@@ -4375,7 +4375,6 @@ __metadata:
     ts-jest: ^25.5.1
     ts-node: ^10.9.1
     tslib: ^2.3.0
-    typechain: ^8.1.1
     typescript: ^5.6.2
     viem: ^2.23.5
   languageName: unknown
@@ -17031,7 +17030,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typechain@npm:^8.1.0, typechain@npm:^8.1.1":
+"typechain@npm:^8.1.0":
   version: 8.3.2
   resolution: "typechain@npm:8.3.2"
   dependencies:

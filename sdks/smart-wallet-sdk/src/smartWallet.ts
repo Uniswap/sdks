@@ -33,7 +33,7 @@ export class SmartWallet {
   }
 
   /// To be implemented
-  public static encodeAdvancedCalls(calls: AdvancedCall[], opData: string, options: ExecuteOptions = {}): MethodParameters {
+  public static encodeAdvancedCalls(calls: AdvancedCall[], opData: string, _options: ExecuteOptions = {}): MethodParameters {
     throw new Error('Not implemented')
   }
 

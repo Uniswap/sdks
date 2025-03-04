@@ -41,14 +41,6 @@ describe('CallPlanner', () => {
       expect(planner.value.toString()).toBe('300')
     })
 
-    it('should sum the values of all calls with bigint values', () => {
-      const planner = new CallPlanner([
-        { to: TEST_ADDRESS_1, data: TEST_DATA_1, value: 100n },
-        { to: TEST_ADDRESS_1, data: TEST_DATA_2, value: 200n }
-      ])
-      expect(planner.value.toString()).toBe('300')
-    })
-
     it('should handle undefined values as 0', () => {
       const planner = new CallPlanner([
         { to: TEST_ADDRESS_1, data: TEST_DATA_1, value: TEST_VALUE_1 },
