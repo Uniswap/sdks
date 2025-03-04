@@ -23,7 +23,8 @@
     "build:esm": "tsc -p tsconfig.esm.json",
     "build:types": "tsc -p tsconfig.types.json",
     "lint": "eslint src --ext .ts",
-    "test": "jest"
+    "test": "jest",
+    "release": "semantic-release"
   },
   "exports": {
     ".": {

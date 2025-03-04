@@ -24,7 +24,8 @@
     "build:types": "tsc -p tsconfig.types.json",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
-    "test": "jest"
+    "test": "jest",
+    "release": "semantic-release"
   },
   "dependencies": {
     "@ethersproject/address": "^5.0.2",
