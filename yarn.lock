@@ -14116,9 +14116,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ts-jest@npm:25.5.0":
-  version: 25.5.0
-  resolution: "ts-jest@npm:25.5.0"
+"ts-jest@npm:^25.5.1":
+  version: 25.5.1
+  resolution: "ts-jest@npm:25.5.1"
   dependencies:
     bs-logger: 0.x
     buffer-from: 1.x
@@ -14135,7 +14135,7 @@ __metadata:
     typescript: ">=3.4 <4.0"
   bin:
     ts-jest: cli.js
-  checksum: d4fc62f79c3e147189d42acf21edfaa87bfca7b34e872cdb15e1e0a7bce38ad6c23e01f9dfe80c9ed4a6cd920f80fcc472e8ff2a0031830b4136782e914b8ec4
+  checksum: 2bbb57f7add2181e6dbc5a9caca713ba65d0d76c26fc41d9d2ee72006c4926482238a5999a430720fe8907a935b54b2cb0454ef7346623f7ca8463f7f0d27eb4
   languageName: node
   linkType: hard
 
@@ -14522,6 +14522,16 @@ __metadata:
     tsc: bin/tsc
     tsserver: bin/tsserver
   checksum: ee000bc26848147ad423b581bd250075662a354d84f0e06eb76d3b892328d8d4440b7487b5a83e851b12b255f55d71835b008a66cbf8f255a11e4400159237db
+  languageName: node
+  linkType: hard
+
+"typescript@npm:typescript@^5.6.2":
+  version: 5.8.2
+  resolution: "typescript@npm:5.8.2"
+  bin:
+    tsc: bin/tsc
+    tsserver: bin/tsserver
+  checksum: 7f9e3d7ac15da6df713e439e785e51facd65d6450d5f51fab3e8d2f2e3f4eb317080d895480b8e305450cdbcb37e17383e8bf521e7395f8b556e2f2a4730ed86
   languageName: node
   linkType: hard
 
