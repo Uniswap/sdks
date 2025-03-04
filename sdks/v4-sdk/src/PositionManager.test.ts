@@ -300,7 +300,8 @@ describe('PositionManager', () => {
         recipient,
         slippageTolerance,
         deadline,
-        migrate: true,
+        additionalAmount0: 0,
+        additionalAmount1: 0,
       })
 
       // Rebuild the data with the planner for the expected mint. MUST sweep since we are using the native currency.
@@ -338,7 +339,8 @@ describe('PositionManager', () => {
         recipient,
         slippageTolerance,
         deadline,
-        migrate: true,
+        additionalAmount0: 0,
+        additionalAmount1: 0,
         useNative: currency_native,
       })
 
@@ -378,8 +380,8 @@ describe('PositionManager', () => {
         recipient,
         slippageTolerance,
         deadline,
-        migrate: true,
-        currencyAmount: { inputCurrency: currency_native, inputAmount: 1 },
+        additionalAmount0: 1,
+        additionalAmount1: 0,
         useNative: currency_native,
       })
 
@@ -418,8 +420,8 @@ describe('PositionManager', () => {
         recipient,
         slippageTolerance,
         deadline,
-        migrate: true,
-        currencyAmount: { inputCurrency: currency0, inputAmount: 1 },
+        additionalAmount0: 1,
+        additionalAmount1: 0,
       })
 
       // Rebuild the data with the planner for the expected mint. MUST sweep since we are using the native currency.

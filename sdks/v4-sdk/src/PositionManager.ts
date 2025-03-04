@@ -1,4 +1,4 @@
-import { BigintIsh, Percent, validateAndParseAddress, NativeCurrency, Currency } from '@uniswap/sdk-core'
+import { BigintIsh, Percent, validateAndParseAddress, NativeCurrency } from '@uniswap/sdk-core'
 import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
 import JSBI from 'jsbi'
 import { Position } from './entities/position'
@@ -60,11 +60,6 @@ export interface MintSpecificOptions {
    * Initial price to set on the pool if creating
    */
   sqrtPriceX96?: BigintIsh
-
-  /**
-   * Whether the mint is part of a migration from V3 to V4
-   */
-  migrate?: boolean
 }
 
 /**
@@ -116,20 +111,13 @@ export interface CollectSpecificOptions {
 
 export interface MigrateSpecificOptions {
   /**
-   * The additional currency and amount that needs to be transferred if migrating (a) from out-of-range to in-range, or (b) from out-of-range to out-of-range on the opposite side
+   * The additional amount of currency0 that needs to be transferred if needed
    */
-  currencyAmount?: CurrencyAmount
-}
-
-export interface CurrencyAmount {
+  additionalAmount0: BigintIsh
   /**
-   * The additional currency that needs to be transferred
+   * The additional amount of currency1 that needs to be transferred if needed
    */
-  inputCurrency: Currency
-  /**
-   * The amount of additional currency that needs to be transferred
-   */
-  inputAmount: BigintIsh
+  additionalAmount1: BigintIsh
 }
 
 export interface PermitDetails {
@@ -183,10 +171,11 @@ export interface NFTPermitData {
   values: NFTPermitValues
 }
 
-export type MintOptions = CommonOptions & CommonAddLiquidityOptions & MintSpecificOptions & MigrateSpecificOptions
+export type MintOptions = CommonOptions & CommonAddLiquidityOptions & MintSpecificOptions
+export type MigrateOptions = CommonOptions & CommonAddLiquidityOptions & MintSpecificOptions & MigrateSpecificOptions
 export type IncreaseLiquidityOptions = CommonOptions & CommonAddLiquidityOptions & ModifyPositionSpecificOptions
 
-export type AddLiquidityOptions = MintOptions | IncreaseLiquidityOptions
+export type AddLiquidityOptions = MintOptions | IncreaseLiquidityOptions | MigrateOptions
 
 export type RemoveLiquidityOptions = CommonOptions & RemoveLiquiditySpecificOptions & ModifyPositionSpecificOptions
 
@@ -195,6 +184,10 @@ export type CollectOptions = CommonOptions & CollectSpecificOptions
 // type guard
 function isMint(options: AddLiquidityOptions): options is MintOptions {
   return Object.keys(options).some((k) => k === 'recipient')
+}
+
+function isMigrate(options: AddLiquidityOptions): options is MigrateOptions {
+  return Object.keys(options).some((k) => k === 'additionalAmount0')
 }
 
 function shouldCreatePool(options: MintOptions): boolean {
@@ -285,10 +278,10 @@ export abstract class V4PositionManager {
 
     let value: string = toHex(0)
 
-    let needToSendEth = isMint(options) && options.migrate && options.currencyAmount?.inputCurrency.isNative
+    let needToSendEth = isMigrate(options) && options.useNative && options.additionalAmount0 > '0'
 
     // If migrating, we need to settle and sweep both currencies individually
-    if (isMint(options) && options.migrate) {
+    if (isMigrate(options)) {
       if (options.useNative && !needToSendEth) {
         // unwrap the exact amount needed to send to the pool manager
         planner.addUnwrap(OPEN_DELTA)
