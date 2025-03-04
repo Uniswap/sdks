@@ -1,4 +1,4 @@
-import { type Address, encodeAbiParameters } from 'viem'
+import { encodeAbiParameters } from 'viem'
 
 import { Call } from '../types'
 
@@ -45,19 +45,13 @@ export class CallPlanner {
   /**
    * abi encode the Calls[]
    */
-  encode(): string {
+  encode(): `0x${string}` {
     if (this.calls.length === 0) {
       throw new Error("No calls to encode")
     }
+
     
-    // Format the calls for viem's encoder
-    const formattedCalls = this.calls.map(call => ({
-      to: call.to as Address,
-      data: call.data as `0x${string}`,
-      value: typeof call.value === 'string' ? BigInt(call.value || "0") : (call.value || 0n)
-    }))
-    
-    return encodeAbiParameters(CALL_ABI_PARAMS, [formattedCalls])
+    return encodeAbiParameters(CALL_ABI_PARAMS, [this.calls])
   }
 
   /**
@@ -66,7 +60,7 @@ export class CallPlanner {
    * @param data The calldata for the call
    * @param value The ETH value to send with the call
    */
-  add(to: string, data: string, value: string | bigint): CallPlanner {
+  add(to: `0x${string}`, data: `0x${string}`, value: bigint): CallPlanner {
     this.calls.push({ to, data, value })
     return this
   }

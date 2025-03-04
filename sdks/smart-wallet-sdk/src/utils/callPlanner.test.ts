@@ -5,10 +5,10 @@ import { CallPlanner } from './callPlanner'
 
 // Test constants
 const TEST_ADDRESS_1 = zeroAddress
-const TEST_DATA_1 = '0x123456'
-const TEST_DATA_2 = '0xabcdef0123456789'
-const TEST_VALUE_1 = '100'
-const TEST_VALUE_2 = '200'
+const TEST_DATA_1 = '0x123456' as `0x${string}`
+const TEST_DATA_2 = '0xabcdef0123456789' as `0x${string}`
+const TEST_VALUE_1 = 100n
+const TEST_VALUE_2 = 200n
 
 describe('CallPlanner', () => {
   describe('constructor', () => {
@@ -52,7 +52,7 @@ describe('CallPlanner', () => {
     it('should handle undefined values as 0', () => {
       const planner = new CallPlanner([
         { to: TEST_ADDRESS_1, data: TEST_DATA_1, value: TEST_VALUE_1 },
-        { to: TEST_ADDRESS_1, data: TEST_DATA_2, value: undefined as unknown as string }
+        { to: TEST_ADDRESS_1, data: TEST_DATA_2, value: undefined as unknown as bigint }
       ])
       expect(planner.value.toString()).toBe('100')
     })

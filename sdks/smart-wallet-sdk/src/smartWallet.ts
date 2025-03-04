@@ -28,7 +28,7 @@ export class SmartWallet {
     const encoded = this._encodeExecute(mode, executionData)
     return {
       calldata: encoded,
-      value: planner.value.toString()
+      value: planner.value
     }
   }
 
@@ -69,7 +69,7 @@ export class SmartWallet {
 
   /** Internal methods */
   
-  protected static _encodeExecute(mode: ModeType, data: string): string {
+  protected static _encodeExecute(mode: ModeType, data: `0x${string}`): `0x${string}` {
     return encodeFunctionData({
       abi,
       functionName: 'execute',
@@ -82,11 +82,11 @@ export class SmartWallet {
 
   protected static _encodeBatchedCallSupportsOpdata(
     planner: CallPlanner,
-    opData: string
-  ): string {
+    opData: `0x${string}`
+  ): `0x${string}` {
     return encodeAbiParameters(
       MODE_TYPE_ABI_PARAMETERS[ModeType.BATCHED_CALL_SUPPORTS_OPDATA],
-      [planner.encode(), opData as `0x${string}`]
+      [planner.encode(), opData]
     )
   }
 }
