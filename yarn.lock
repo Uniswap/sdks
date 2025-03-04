@@ -4375,7 +4375,7 @@ __metadata:
     ts-jest: ^25.5.1
     ts-node: ^10.9.1
     tslib: ^2.3.0
-    typescript: ^5.6.2
+    typescript: "npm:typescript@^5.6.2"
     viem: ^2.23.5
   languageName: unknown
   linkType: soft
@@ -4418,7 +4418,7 @@ __metadata:
     jest-environment-node: 25.5.0
     npm-run-all: ^4.1.5
     prettier: ^2.4.1
-    ts-jest: 25.5.0
+    ts-jest: ^25.5.1
     ts-node: ^10.9.1
     typechain: ^8.1.0
     typescript: ^4.3.3
@@ -16640,29 +16640,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ts-jest@npm:25.5.0":
-  version: 25.5.0
-  resolution: "ts-jest@npm:25.5.0"
-  dependencies:
-    bs-logger: 0.x
-    buffer-from: 1.x
-    fast-json-stable-stringify: 2.x
-    json5: 2.x
-    lodash.memoize: 4.x
-    make-error: 1.x
-    micromatch: 4.x
-    mkdirp: 0.x
-    semver: 6.x
-    yargs-parser: 18.x
-  peerDependencies:
-    jest: ">=25 <26"
-    typescript: ">=3.4 <4.0"
-  bin:
-    ts-jest: cli.js
-  checksum: d4fc62f79c3e147189d42acf21edfaa87bfca7b34e872cdb15e1e0a7bce38ad6c23e01f9dfe80c9ed4a6cd920f80fcc472e8ff2a0031830b4136782e914b8ec4
-  languageName: node
-  linkType: hard
-
 "ts-jest@npm:^25.3.1, ts-jest@npm:^25.5.1":
   version: 25.5.1
   resolution: "ts-jest@npm:25.5.1"
@@ -17155,7 +17132,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typescript@npm:^5.6.2":
+"typescript@npm:typescript@^5.6.2":
   version: 5.8.2
   resolution: "typescript@npm:5.8.2"
   bin:
@@ -17185,7 +17162,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typescript@patch:typescript@^5.6.2#~builtin<compat/typescript>":
+"typescript@patch:typescript@npm%3Atypescript@^5.6.2#~builtin<compat/typescript>":
   version: 5.8.2
   resolution: "typescript@patch:typescript@npm%3A5.8.2#~builtin<compat/typescript>::version=5.8.2&hash=a1c5e5"
   bin:
