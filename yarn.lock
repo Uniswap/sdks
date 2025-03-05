@@ -3044,9 +3044,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@uniswap/router-sdk@npm:^1.23.0":
-  version: 1.23.0
-  resolution: "@uniswap/router-sdk@npm:1.23.0"
+"@uniswap/router-sdk@npm:^2.0.0":
+  version: 2.0.0
+  resolution: "@uniswap/router-sdk@npm:2.0.0"
   dependencies:
     "@ethersproject/abi": ^5.5.0
     "@uniswap/sdk-core": ^7.6.0
@@ -3054,7 +3054,7 @@ __metadata:
     "@uniswap/v2-sdk": ^4.14.0
     "@uniswap/v3-sdk": ^3.24.1
     "@uniswap/v4-sdk": ^1.20.0
-  checksum: 979c8ec291c4945992bc5f8d34bfc0ed5e11711719be8d9cb6dbf09b12f25e370325eb243d4d04d7b102b3fd132df0a5c837c6e992617d39d6f65c558a7544d6
+  checksum: 7bb13f080ed819e9c44890c8d705fd0ebd2e132c1063a2da41acb24f3cc74cb233c95f9ab928b0fc1780d1384025c47c120afad1d81b89f0f6e4e4ef33c7e5a3
   languageName: node
   linkType: hard
 
@@ -3180,14 +3180,14 @@ __metadata:
     "@types/node": ^18.7.16
     "@types/node-fetch": ^2.6.2
     "@uniswap/permit2-sdk": ^1.3.0
-    "@uniswap/router-sdk": ^1.23.0
+    "@uniswap/router-sdk": ^2.0.0
     "@uniswap/sdk-core": ^7.6.0
     "@uniswap/universal-router": 2.0.0-beta.2
     "@uniswap/v2-core": ^1.0.1
     "@uniswap/v2-sdk": ^4.14.0
     "@uniswap/v3-core": 1.0.0
-    "@uniswap/v3-sdk": ^3.24.1
-    "@uniswap/v4-sdk": ^1.20.0
+    "@uniswap/v3-sdk": ^3.25.0
+    "@uniswap/v4-sdk": ^1.21.0
     bignumber.js: ^9.0.2
     chai: ^4.3.6
     dotenv: ^16.0.3
@@ -3283,7 +3283,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v3-sdk@npm:3.24.1, @uniswap/v3-sdk@npm:^3.24.1":
+"@uniswap/v3-sdk@npm:3.24.1":
   version: 3.24.1
   resolution: "@uniswap/v3-sdk@npm:3.24.1"
   dependencies:
@@ -3296,6 +3296,22 @@ __metadata:
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
   checksum: 561b2859b116c0bbd80d436d68bf5338632ebe263d20057a75758d3d58086c03221ced4c46be8ec1adb200184e977a255552c8165edde97df74b238f2a99bf3e
+  languageName: node
+  linkType: hard
+
+"@uniswap/v3-sdk@npm:^3.24.1, @uniswap/v3-sdk@npm:^3.25.0":
+  version: 3.25.0
+  resolution: "@uniswap/v3-sdk@npm:3.25.0"
+  dependencies:
+    "@ethersproject/abi": ^5.5.0
+    "@ethersproject/solidity": ^5.0.9
+    "@uniswap/sdk-core": ^7.6.0
+    "@uniswap/swap-router-contracts": ^1.3.0
+    "@uniswap/v3-periphery": ^1.1.1
+    "@uniswap/v3-staker": 1.0.0
+    tiny-invariant: ^1.1.0
+    tiny-warning: ^1.0.3
+  checksum: fa94de2c29919dac836245cdee358075ab08d21484874299f9bb6ab7f7cd0d275bcaffdb416646104499e6a770dd46023bd7014c6464fbdd37fa1c3bf5b10155
   languageName: node
   linkType: hard
 
@@ -3335,16 +3351,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v4-sdk@npm:^1.20.0":
-  version: 1.20.0
-  resolution: "@uniswap/v4-sdk@npm:1.20.0"
+"@uniswap/v4-sdk@npm:^1.20.0, @uniswap/v4-sdk@npm:^1.21.0":
+  version: 1.21.0
+  resolution: "@uniswap/v4-sdk@npm:1.21.0"
   dependencies:
     "@ethersproject/solidity": ^5.0.9
     "@uniswap/sdk-core": ^7.6.0
     "@uniswap/v3-sdk": 3.24.1
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
-  checksum: 4b5be68b86ab816438961aacdfff8e9356abde8803e0f2833233916d7f9ef558b5b7bd343c6d88a592c6467baf628868f3a8d585c7d3e2b0cb7c61c77a46990f
+  checksum: 4ac0316ca8390138f4f2f68b2981bc57c02ce562cc8c526bbaf8c777f5a678d5aa99beb80eb50570da43c893bfbf8e23676d70e35004f0b66feee842609c4300
   languageName: node
   linkType: hard
 
