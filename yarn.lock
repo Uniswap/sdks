@@ -3099,6 +3099,23 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@uniswap/sdk-core@npm:^7.7.0":
+  version: 7.7.0
+  resolution: "@uniswap/sdk-core@npm:7.7.0"
+  dependencies:
+    "@ethersproject/address": ^5.0.2
+    "@ethersproject/bytes": ^5.7.0
+    "@ethersproject/keccak256": 5.7.0
+    "@ethersproject/strings": 5.7.0
+    big.js: ^5.2.2
+    decimal.js-light: ^2.5.0
+    jsbi: ^3.1.4
+    tiny-invariant: ^1.1.0
+    toformat: ^2.0.0
+  checksum: 1488b0e46065163a32970b6243431c914d0348a1da1a78d5fe8839eb9091408dd94513154f8b2dcab661f5b7822430f1c70ec2d2c555d60046ac64ddcd3c902f
+  languageName: node
+  linkType: hard
+
 "@uniswap/sdk-core@workspace:sdks/sdk-core":
   version: 0.0.0-use.local
   resolution: "@uniswap/sdk-core@workspace:sdks/sdk-core"
@@ -3241,7 +3258,7 @@ __metadata:
     "@ethersproject/solidity": ^5.0.9
     "@types/big.js": ^4.0.5
     "@types/jest": ^24.0.25
-    "@uniswap/sdk-core": ^7.6.0
+    "@uniswap/sdk-core": ^7.7.0
     "@uniswap/v2-core": ^1.0.1
     eslint: ^7.8.0
     eslint-config-prettier: ^6.11.0
@@ -3306,7 +3323,7 @@ __metadata:
     "@ethersproject/abi": ^5.5.0
     "@ethersproject/solidity": ^5.0.9
     "@types/jest": ^24.0.25
-    "@uniswap/sdk-core": ^7.6.0
+    "@uniswap/sdk-core": ^7.7.0
     "@uniswap/swap-router-contracts": ^1.3.0
     "@uniswap/v3-core": 1.0.0
     "@uniswap/v3-periphery": ^1.1.1
