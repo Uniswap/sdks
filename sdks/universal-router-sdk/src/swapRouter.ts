@@ -1,5 +1,5 @@
 import invariant from 'tiny-invariant'
-import { abi } from '@uniswap/universal-router/artifacts/contracts/UniversalRouter.sol/UniversalRouter.json'
+import UniversalRouter from '@uniswap/universal-router/artifacts/contracts/UniversalRouter.sol/UniversalRouter.json'
 import { Interface } from '@ethersproject/abi'
 import { BigNumber, BigNumberish } from 'ethers'
 import {
@@ -41,7 +41,7 @@ function isMint(options: V4AddLiquidityOptions): options is MintOptions {
 }
 
 export abstract class SwapRouter {
-  public static INTERFACE: Interface = new Interface(abi)
+  public static INTERFACE: Interface = new Interface(UniversalRouter.abi)
 
   public static swapCallParameters(
     trades: RouterTrade<Currency, Currency, TradeType>,
