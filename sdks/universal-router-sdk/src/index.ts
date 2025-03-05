@@ -13,4 +13,4 @@ export {
 } from './utils/constants'
 export { CommandParser, GenericCommandParser } from './utils/commandParser'
 export type { UniversalRouterCommand, UniversalRouterCall, Param, CommandsDefinition } from './utils/commandParser'
-export { Permit2Permit } from './utils/inputTokens'
+export type { Permit2Permit } from './utils/inputTokens'
