@@ -3066,11 +3066,11 @@ __metadata:
     "@types/jest": ^24.0.25
     "@typescript-eslint/eslint-plugin": ^5.62
     "@typescript-eslint/parser": ^5.62
-    "@uniswap/sdk-core": ^7.6.0
+    "@uniswap/sdk-core": ^7.7.0
     "@uniswap/swap-router-contracts": ^1.3.0
-    "@uniswap/v2-sdk": ^4.14.0
-    "@uniswap/v3-sdk": ^3.24.1
-    "@uniswap/v4-sdk": ^1.20.0
+    "@uniswap/v2-sdk": ^4.15.0
+    "@uniswap/v3-sdk": ^3.25.1
+    "@uniswap/v4-sdk": ^1.21.1
     eslint: ^7.8.0
     eslint-config-prettier: ^6.11.0
     eslint-plugin-eslint-comments: ^3.2.0
@@ -3250,6 +3250,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@uniswap/v2-sdk@npm:^4.15.0":
+  version: 4.15.1
+  resolution: "@uniswap/v2-sdk@npm:4.15.1"
+  dependencies:
+    "@ethersproject/address": ^5.0.2
+    "@ethersproject/solidity": ^5.0.9
+    "@uniswap/sdk-core": ^7.7.0
+    tiny-invariant: ^1.1.0
+    tiny-warning: ^1.0.3
+  checksum: 528550b3d9c45cf2a4ae9902b79dd1f7708ad33fb6c04e0337e418690357a9133112ec7280d99ca32aa77ece5a547c351d7ef2f4ea4522377d5b8f841f9ac8ef
+  languageName: node
+  linkType: hard
+
 "@uniswap/v2-sdk@workspace:sdks/v2-sdk":
   version: 0.0.0-use.local
   resolution: "@uniswap/v2-sdk@workspace:sdks/v2-sdk"
@@ -3316,7 +3329,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v3-sdk@npm:3.25.1":
+"@uniswap/v3-sdk@npm:3.25.1, @uniswap/v3-sdk@npm:^3.25.1":
   version: 3.25.1
   resolution: "@uniswap/v3-sdk@npm:3.25.1"
   dependencies:
@@ -3378,6 +3391,19 @@ __metadata:
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
   checksum: 4b5be68b86ab816438961aacdfff8e9356abde8803e0f2833233916d7f9ef558b5b7bd343c6d88a592c6467baf628868f3a8d585c7d3e2b0cb7c61c77a46990f
+  languageName: node
+  linkType: hard
+
+"@uniswap/v4-sdk@npm:^1.21.1":
+  version: 1.21.1
+  resolution: "@uniswap/v4-sdk@npm:1.21.1"
+  dependencies:
+    "@ethersproject/solidity": ^5.0.9
+    "@uniswap/sdk-core": ^7.7.0
+    "@uniswap/v3-sdk": 3.25.1
+    tiny-invariant: ^1.1.0
+    tiny-warning: ^1.0.3
+  checksum: a716d49fe4b8f8fd6ae872cef662c7955ee63a209b961829d2a57191e2708a034295a27d642a1b013b951b93fb78fb7ff0f992832c4488e12c24ca1a80643037
   languageName: node
   linkType: hard
 
