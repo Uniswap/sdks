@@ -4451,27 +4451,19 @@ __metadata:
   dependencies:
     "@ethersproject/abi": ^5.5.0
     "@types/jest": ^24.0.25
-    "@typescript-eslint/eslint-plugin": ^5.62
-    "@typescript-eslint/parser": ^5.62
-    "@uniswap/sdk-core": ^7.7.0
+    "@uniswap/sdk-core": ^7.7.2
     "@uniswap/swap-router-contracts": ^1.3.0
-    "@uniswap/v2-sdk": ^4.15.0
-    "@uniswap/v3-sdk": ^3.25.1
-    "@uniswap/v4-sdk": ^1.21.1
-    eslint: ^7.8.0
-    eslint-config-prettier: ^6.11.0
-    eslint-plugin-eslint-comments: ^3.2.0
-    eslint-plugin-functional: ^3.0.2
-    eslint-plugin-import: ^2.22.0
-    jest: 25.5.0
+    "@uniswap/v2-sdk": ^4.15.2
+    "@uniswap/v3-sdk": ^3.25.2
+    "@uniswap/v4-sdk": ^1.21.2
     prettier: ^2.4.1
-    typescript: ^4.3.3
+    tsdx: ^0.14.1
   languageName: unknown
   linkType: soft
 
-"@uniswap/sdk-core@npm:^7.5.0, @uniswap/sdk-core@npm:^7.7.0, @uniswap/sdk-core@npm:^7.7.1":
-  version: 7.7.1
-  resolution: "@uniswap/sdk-core@npm:7.7.1"
+"@uniswap/sdk-core@npm:^7.5.0, @uniswap/sdk-core@npm:^7.7.0, @uniswap/sdk-core@npm:^7.7.1, @uniswap/sdk-core@npm:^7.7.2":
+  version: 7.7.2
+  resolution: "@uniswap/sdk-core@npm:7.7.2"
   dependencies:
     "@ethersproject/address": ^5.0.2
     "@ethersproject/bytes": ^5.7.0
@@ -4482,7 +4474,7 @@ __metadata:
     jsbi: ^3.1.4
     tiny-invariant: ^1.1.0
     toformat: ^2.0.0
-  checksum: 88e2ac18507202f943a5729d7ca230b59b3396bb82e00f6731ff9a7f104f2a8950491de90536c074027f28cc3ba57163d13aa41d0301558794c274546f1f9893
+  checksum: 1ef25d96e3249909f5642ec048b175fc744f15e395a5e58f5e2b654bd01154e6de6945f5219cb7ab0d86cdffe9ab1a743251ad96f1df9cd48d7ec49d694f790f
   languageName: node
   linkType: hard
 
@@ -4606,16 +4598,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v2-sdk@npm:^4.15.0":
-  version: 4.15.1
-  resolution: "@uniswap/v2-sdk@npm:4.15.1"
+"@uniswap/v2-sdk@npm:^4.15.0, @uniswap/v2-sdk@npm:^4.15.2":
+  version: 4.15.2
+  resolution: "@uniswap/v2-sdk@npm:4.15.2"
   dependencies:
     "@ethersproject/address": ^5.0.2
     "@ethersproject/solidity": ^5.0.9
-    "@uniswap/sdk-core": ^7.7.0
+    "@uniswap/sdk-core": ^7.7.1
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
-  checksum: 528550b3d9c45cf2a4ae9902b79dd1f7708ad33fb6c04e0337e418690357a9133112ec7280d99ca32aa77ece5a547c351d7ef2f4ea4522377d5b8f841f9ac8ef
+  checksum: 0484786ef416a249afb219e6a6868ba7cc3591aafb49d3fc08e60b8cba6f0267214a60f4eca25c0bb347b17d3ef3b0e88ba32791cfa48b771d1b2d574a17b76b
   languageName: node
   linkType: hard
 
@@ -4671,23 +4663,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v3-sdk@npm:3.25.1":
-  version: 3.25.1
-  resolution: "@uniswap/v3-sdk@npm:3.25.1"
-  dependencies:
-    "@ethersproject/abi": ^5.5.0
-    "@ethersproject/solidity": ^5.0.9
-    "@uniswap/sdk-core": ^7.7.0
-    "@uniswap/swap-router-contracts": ^1.3.0
-    "@uniswap/v3-periphery": ^1.1.1
-    "@uniswap/v3-staker": 1.0.0
-    tiny-invariant: ^1.1.0
-    tiny-warning: ^1.0.3
-  checksum: dcd5ebfff2e0fb188302c38d4cfa6d338baf87f05a2d03a2c9a0c8069f8593efdace405b426ab4c7d84b429b24df13b37eeff7e261e39ca2f724aafe45cd4bfe
-  languageName: node
-  linkType: hard
-
-"@uniswap/v3-sdk@npm:3.25.2, @uniswap/v3-sdk@npm:^3.25.1":
+"@uniswap/v3-sdk@npm:3.25.2, @uniswap/v3-sdk@npm:^3.25.1, @uniswap/v3-sdk@npm:^3.25.2":
   version: 3.25.2
   resolution: "@uniswap/v3-sdk@npm:3.25.2"
   dependencies:
@@ -4741,16 +4717,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v4-sdk@npm:^1.21.1":
-  version: 1.21.1
-  resolution: "@uniswap/v4-sdk@npm:1.21.1"
+"@uniswap/v4-sdk@npm:^1.21.1, @uniswap/v4-sdk@npm:^1.21.2":
+  version: 1.21.2
+  resolution: "@uniswap/v4-sdk@npm:1.21.2"
   dependencies:
     "@ethersproject/solidity": ^5.0.9
-    "@uniswap/sdk-core": ^7.7.0
-    "@uniswap/v3-sdk": 3.25.1
+    "@uniswap/sdk-core": ^7.7.1
+    "@uniswap/v3-sdk": 3.25.2
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
-  checksum: a716d49fe4b8f8fd6ae872cef662c7955ee63a209b961829d2a57191e2708a034295a27d642a1b013b951b93fb78fb7ff0f992832c4488e12c24ca1a80643037
+  checksum: 6145f5dbdda2694db12b4f5195137b63428172307520457ab236adf28c794ae926eda68623e35ca8194292f5a29fa794beb2e81fc44618aaf141218932d10798
   languageName: node
   linkType: hard
 

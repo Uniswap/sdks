@@ -229,7 +229,8 @@ export abstract class SwapRouter {
     invariant(trade.tradeType === TradeType.EXACT_INPUT, 'TRADE_TYPE')
 
     for (const { route, inputAmount, outputAmount } of trade.swaps) {
-      if (route.pools.some((pool) => pool instanceof V4Pool)) throw 'Encoding mixed routes with V4 not supported'
+      if (route.pools.some((pool) => pool instanceof V4Pool))
+        throw new Error('Encoding mixed routes with V4 not supported')
       const amountIn: string = toHex(trade.maximumAmountIn(options.slippageTolerance, inputAmount).quotient)
       const amountOut: string = toHex(trade.minimumAmountOut(options.slippageTolerance, outputAmount).quotient)
 
