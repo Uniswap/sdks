@@ -1,8 +1,0 @@
-{
-    "extends": "./tsconfig.base.json",
-    "compilerOptions": {
-        "moduleResolution": "node",
-        "types": ["jest", "node"]
-    },
-    "include": ["src/**/*.ts", "src/**/*.test.ts"]
-}
