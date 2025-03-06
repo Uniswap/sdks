@@ -4431,17 +4431,17 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@uniswap/router-sdk@npm:^2.0.0":
-  version: 2.0.1
-  resolution: "@uniswap/router-sdk@npm:2.0.1"
+"@uniswap/router-sdk@npm:^2.0.2":
+  version: 2.0.2
+  resolution: "@uniswap/router-sdk@npm:2.0.2"
   dependencies:
     "@ethersproject/abi": ^5.5.0
-    "@uniswap/sdk-core": ^7.7.0
+    "@uniswap/sdk-core": ^7.7.2
     "@uniswap/swap-router-contracts": ^1.3.0
-    "@uniswap/v2-sdk": ^4.15.0
-    "@uniswap/v3-sdk": ^3.25.1
-    "@uniswap/v4-sdk": ^1.21.1
-  checksum: bac5989d21af9c9de4d9124c8147015ad5975821dfe466297649332b378106095d3acbea789576f64e9216ae0ace9b72b527265ae4e6bf6aea0d05ea47df40a6
+    "@uniswap/v2-sdk": ^4.15.2
+    "@uniswap/v3-sdk": ^3.25.2
+    "@uniswap/v4-sdk": ^1.21.2
+  checksum: f2339347cc6c4ef37089a5986f448f537b6822052c33aa7017c3bf2eddb020b9b903fa01d604084c1bd339987dd198e0a48f26f0b3b19aada75ba51d5937342d
   languageName: node
   linkType: hard
 
@@ -4461,7 +4461,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@uniswap/sdk-core@npm:^7.5.0, @uniswap/sdk-core@npm:^7.7.0, @uniswap/sdk-core@npm:^7.7.1, @uniswap/sdk-core@npm:^7.7.2":
+"@uniswap/sdk-core@npm:^7.5.0, @uniswap/sdk-core@npm:^7.7.1, @uniswap/sdk-core@npm:^7.7.2":
   version: 7.7.2
   resolution: "@uniswap/sdk-core@npm:7.7.2"
   dependencies:
@@ -4558,14 +4558,14 @@ __metadata:
     "@types/node": ^18.7.16
     "@types/node-fetch": ^2.6.2
     "@uniswap/permit2-sdk": ^1.3.0
-    "@uniswap/router-sdk": ^2.0.0
-    "@uniswap/sdk-core": ^7.7.0
+    "@uniswap/router-sdk": ^2.0.2
+    "@uniswap/sdk-core": ^7.7.1
     "@uniswap/universal-router": 2.0.0-beta.2
     "@uniswap/v2-core": ^1.0.1
-    "@uniswap/v2-sdk": ^4.15.0
+    "@uniswap/v2-sdk": ^4.15.2
     "@uniswap/v3-core": 1.0.0
-    "@uniswap/v3-sdk": ^3.25.1
-    "@uniswap/v4-sdk": ^1.21.1
+    "@uniswap/v3-sdk": ^3.25.2
+    "@uniswap/v4-sdk": ^1.21.2
     bignumber.js: ^9.0.2
     chai: ^4.3.6
     dotenv: ^16.0.3
@@ -4574,6 +4574,7 @@ __metadata:
     hardhat: ^2.22.15
     prettier: ^2.4.1
     ts-node: ^10.9.1
+    tsdx: ^0.14.1
     tslib: ^2.3.0
     typedoc: ^0.21.2
     typescript: ^4.3.3
@@ -4598,7 +4599,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v2-sdk@npm:^4.15.0, @uniswap/v2-sdk@npm:^4.15.2":
+"@uniswap/v2-sdk@npm:^4.15.2":
   version: 4.15.2
   resolution: "@uniswap/v2-sdk@npm:4.15.2"
   dependencies:
@@ -4663,7 +4664,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v3-sdk@npm:3.25.2, @uniswap/v3-sdk@npm:^3.25.1, @uniswap/v3-sdk@npm:^3.25.2":
+"@uniswap/v3-sdk@npm:3.25.2, @uniswap/v3-sdk@npm:^3.25.2":
   version: 3.25.2
   resolution: "@uniswap/v3-sdk@npm:3.25.2"
   dependencies:
@@ -4717,7 +4718,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v4-sdk@npm:^1.21.1, @uniswap/v4-sdk@npm:^1.21.2":
+"@uniswap/v4-sdk@npm:^1.21.2":
   version: 1.21.2
   resolution: "@uniswap/v4-sdk@npm:1.21.2"
   dependencies:
