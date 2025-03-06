@@ -1,6 +1,6 @@
 import { Interface } from '@ethersproject/abi'
 import { Currency, CurrencyAmount, Percent, TradeType, validateAndParseAddress, WETH9 } from '@uniswap/sdk-core'
-import { abi } from '@uniswap/swap-router-contracts/artifacts/contracts/interfaces/ISwapRouter02.sol/ISwapRouter02.json'
+import ISwapRouter02 from '@uniswap/swap-router-contracts/artifacts/contracts/interfaces/ISwapRouter02.sol/ISwapRouter02.json'
 import { Trade as V2Trade } from '@uniswap/v2-sdk'
 import {
   encodeRouteToPath,
@@ -84,7 +84,7 @@ type AnyTradeType =
  * Represents the Uniswap V2 + V3 SwapRouter02, and has static methods for helping execute trades.
  */
 export abstract class SwapRouter {
-  public static INTERFACE: Interface = new Interface(abi)
+  public static INTERFACE: Interface = new Interface(ISwapRouter02.abi)
 
   /**
    * Cannot be constructed.
@@ -229,7 +229,8 @@ export abstract class SwapRouter {
     invariant(trade.tradeType === TradeType.EXACT_INPUT, 'TRADE_TYPE')
 
     for (const { route, inputAmount, outputAmount } of trade.swaps) {
-      if (route.pools.some((pool) => pool instanceof V4Pool)) throw 'Encoding mixed routes with V4 not supported'
+      if (route.pools.some((pool) => pool instanceof V4Pool))
+        throw new Error('Encoding mixed routes with V4 not supported')
       const amountIn: string = toHex(trade.maximumAmountIn(options.slippageTolerance, inputAmount).quotient)
       const amountOut: string = toHex(trade.minimumAmountOut(options.slippageTolerance, outputAmount).quotient)
 

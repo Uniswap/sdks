@@ -1,6 +1,6 @@
 import { Interface } from '@ethersproject/abi'
 import invariant from 'tiny-invariant'
-import { abi } from '@uniswap/swap-router-contracts/artifacts/contracts/interfaces/IApproveAndCall.sol/IApproveAndCall.json'
+import IApproveAndCall from '@uniswap/swap-router-contracts/artifacts/contracts/interfaces/IApproveAndCall.sol/IApproveAndCall.json'
 import { Currency, Percent, Token } from '@uniswap/sdk-core'
 import {
   MintSpecificOptions,
@@ -28,7 +28,7 @@ export function isMint(options: CondensedAddLiquidityOptions): options is Omit<M
 }
 
 export abstract class ApproveAndCall {
-  public static INTERFACE: Interface = new Interface(abi)
+  public static INTERFACE: Interface = new Interface(IApproveAndCall.abi)
 
   /**
    * Cannot be constructed.
