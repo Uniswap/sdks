@@ -4671,7 +4671,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v3-sdk@npm:3.25.1, @uniswap/v3-sdk@npm:^3.25.1":
+"@uniswap/v3-sdk@npm:3.25.1":
   version: 3.25.1
   resolution: "@uniswap/v3-sdk@npm:3.25.1"
   dependencies:
@@ -4684,6 +4684,22 @@ __metadata:
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
   checksum: dcd5ebfff2e0fb188302c38d4cfa6d338baf87f05a2d03a2c9a0c8069f8593efdace405b426ab4c7d84b429b24df13b37eeff7e261e39ca2f724aafe45cd4bfe
+  languageName: node
+  linkType: hard
+
+"@uniswap/v3-sdk@npm:3.25.2, @uniswap/v3-sdk@npm:^3.25.1":
+  version: 3.25.2
+  resolution: "@uniswap/v3-sdk@npm:3.25.2"
+  dependencies:
+    "@ethersproject/abi": ^5.5.0
+    "@ethersproject/solidity": ^5.0.9
+    "@uniswap/sdk-core": ^7.7.1
+    "@uniswap/swap-router-contracts": ^1.3.0
+    "@uniswap/v3-periphery": ^1.1.1
+    "@uniswap/v3-staker": 1.0.0
+    tiny-invariant: ^1.1.0
+    tiny-warning: ^1.0.3
+  checksum: fafda7c48aef4d04a552ea770ea6c8e13f8f61ecb431ee09c35f800e10c18d7bf933b81178540c9a333949feaa4863d6800cc0f6d8ea468166aeb52a808728ce
   languageName: node
   linkType: hard
 
@@ -4747,8 +4763,8 @@ __metadata:
     "@types/mocha": ^9.1.1
     "@types/node": ^18.7.16
     "@types/node-fetch": ^2.6.2
-    "@uniswap/sdk-core": ^7.7.0
-    "@uniswap/v3-sdk": 3.25.1
+    "@uniswap/sdk-core": ^7.7.1
+    "@uniswap/v3-sdk": 3.25.2
     chai: ^4.3.6
     dotenv: ^16.0.3
     eslint: ^7.8.0
@@ -4761,6 +4777,7 @@ __metadata:
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
     ts-node: ^10.9.1
+    tsdx: ^0.14.1
     tslib: ^2.3.0
     typedoc: ^0.21.2
     typescript: ^4.3.3
