@@ -1,7 +1,7 @@
 {
   "name": "@kittycorn-labs/v4-sdk",
   "description": "⚒️ An SDK for building applications on top of Uniswap V4",
-  "repository": "https://github.com/Uniswap/sdks.git",
+  "repository": "https://github.com/Crown-Labs/sdks",
   "keywords": [
     "uniswap",
     "ethereum"
