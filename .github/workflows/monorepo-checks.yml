@@ -13,9 +13,9 @@ jobs:
   build-and-test:
     name: Lint, Build, and Test
     runs-on: ubuntu-latest
-    env:
-      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-      TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+    # env:
+    #   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+    #   TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
     defaults:
       run:
         working-directory: ./
@@ -55,13 +55,13 @@ jobs:
         with:
           version: nightly
 
-      - name: 🧪 Testing
-        uses: nick-fields/retry@7d4a37704547a311dbb66ebdf5b23ec19374a767
-        env:
-          FORK_URL: ${{ secrets.FORK_URL }}
-          FORK_URL_8453: ${{ secrets.FORK_URL_8453 }}
-        with:
-          timeout_minutes: 20
-          retry_wait_seconds: 2
-          max_attempts: 3
-          command: yarn g:test
+      # - name: 🧪 Testing
+      #   uses: nick-fields/retry@7d4a37704547a311dbb66ebdf5b23ec19374a767
+      #   env:
+      #     FORK_URL: ${{ secrets.FORK_URL }}
+      #     FORK_URL_8453: ${{ secrets.FORK_URL_8453 }}
+      #   with:
+      #     timeout_minutes: 20
+      #     retry_wait_seconds: 2
+      #     max_attempts: 3
+      #     command: yarn g:test

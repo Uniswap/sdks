@@ -1,5 +1,5 @@
 {
-  "name": "@uniswap/v4-sdk",
+  "name": "@kittycorn-labs/v4-sdk",
   "description": "⚒️ An SDK for building applications on top of Uniswap V4",
   "repository": "https://github.com/Uniswap/sdks.git",
   "keywords": [

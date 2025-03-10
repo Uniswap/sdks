@@ -25,7 +25,7 @@
     "g:check:deps:mismatch": "manypkg check",
     "g:build": "turbo run build",
     "g:lint": "turbo run lint",
-    "g:release": "turbo run release --concurrency=1 --continue",
+    "g:release": "turbo run release --concurrency=1 --continue --filter=universal-router-sdk --filter=v4-sdk",
     "g:test": "turbo run test",
     "g:typecheck": "turbo run typecheck",
     "sdk": "yarn workspace",
