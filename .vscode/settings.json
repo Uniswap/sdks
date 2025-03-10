@@ -15,5 +15,6 @@
     "./sdks/v3-sdk",
   ],
   "testing.openTesting": "neverOpen",
-  "testing.automaticallyOpenTestResults": "neverOpen"
+  "testing.automaticallyOpenTestResults": "neverOpen",
+  "wake.compiler.solc.remappings": []
 }
