@@ -8,7 +8,7 @@ import {
   TickMath,
   TICK_SPACINGS,
 } from '@uniswap/v3-sdk'
-import { Pool as V4Pool } from '@uniswap/v4-sdk'
+import { Pool as V4Pool } from '@kittycorn-labs/v4-sdk'
 import JSBI from 'jsbi'
 import { MixedRouteSDK } from './route'
 import { MixedRouteTrade } from './trade'

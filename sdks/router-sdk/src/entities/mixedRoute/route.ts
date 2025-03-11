@@ -1,6 +1,6 @@
 import invariant from 'tiny-invariant'
 import { Currency, Price, Token } from '@uniswap/sdk-core'
-import { Pool as V4Pool } from '@uniswap/v4-sdk'
+import { Pool as V4Pool } from '@kittycorn-labs/v4-sdk'
 import { getPathCurrency } from '../../utils/pathCurrency'
 import { TPool } from '../../utils/TPool'
 

@@ -14,7 +14,7 @@ import {
   toHex,
   Trade as V3Trade,
 } from '@uniswap/v3-sdk'
-import { Pool as V4Pool } from '@uniswap/v4-sdk'
+import { Pool as V4Pool } from '@kittycorn-labs/v4-sdk'
 import invariant from 'tiny-invariant'
 import JSBI from 'jsbi'
 import { ADDRESS_THIS, MSG_SENDER } from './constants'
