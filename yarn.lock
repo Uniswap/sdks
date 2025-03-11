@@ -2554,9 +2554,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@kittycorn-labs/smart-order-router@npm:4.17.12-6":
-  version: 4.17.12-6
-  resolution: "@kittycorn-labs/smart-order-router@npm:4.17.12-6"
+"@kittycorn-labs/smart-order-router@npm:4.17.12-7":
+  version: 4.17.12-7
+  resolution: "@kittycorn-labs/smart-order-router@npm:4.17.12-7"
   dependencies:
     "@eth-optimism/sdk": ^3.2.2
     "@types/brotli": ^1.3.4
@@ -2586,7 +2586,7 @@ __metadata:
     stats-lite: ^2.2.0
   peerDependencies:
     jsbi: ^3.2.0
-  checksum: d0439eb250bdfe3a64eec2e9f745c5aa5e0bc8ae42b855e7170b8dcfcf2064889e2b79d07e8120f65f058d420949e2ab9a54c9a21024e90778ae50825f1f3610
+  checksum: f5d4ad9ca9deb7a9265366a8b84ba0606e330e24396ebbab8747b55cdfa8960cd1b58a9bcb16f64bbea1cc66f4f186a898df8484091739d61e2c8da53a9d48e8
   languageName: node
   linkType: hard
 
@@ -2595,7 +2595,7 @@ __metadata:
   resolution: "@kittycorn-labs/universal-router-sdk@workspace:sdks/universal-router-sdk"
   dependencies:
     "@kittycorn-labs/router-sdk": ^1.0.0
-    "@kittycorn-labs/smart-order-router": 4.17.12-6
+    "@kittycorn-labs/smart-order-router": 4.17.12-7
     "@kittycorn-labs/v4-sdk": ^1.0.0
     "@openzeppelin/contracts": 4.7.0
     "@types/chai": ^4.3.3
@@ -2642,6 +2642,7 @@ __metadata:
   resolution: "@kittycorn-labs/v4-sdk@workspace:sdks/v4-sdk"
   dependencies:
     "@ethersproject/solidity": ^5.0.9
+    "@kittycorn-labs/smart-order-router": 4.17.12-7
     "@types/chai": ^4.3.3
     "@types/mocha": ^9.1.1
     "@types/node": ^18.7.16
