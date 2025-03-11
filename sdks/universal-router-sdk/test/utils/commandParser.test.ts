@@ -5,7 +5,7 @@ import { ethers, BigNumber } from 'ethers'
 import { CommandParser, UniversalRouterCall } from '../../src/utils/commandParser'
 import { RoutePlanner, CommandType } from '../../src/utils/routerCommands'
 import { SwapRouter } from '../../src/swapRouter'
-import { V4Planner, Actions, Pool } from '@uniswap/v4-sdk'
+import { V4Planner, Actions, Pool } from '@kittycorn-labs/v4-sdk'
 
 const addressOne = '0x0000000000000000000000000000000000000001'
 const addressTwo = '0x0000000000000000000000000000000000000002'

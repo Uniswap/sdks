@@ -10,7 +10,7 @@ warning: `swapERC20CallParameters()` to be deprecated in favor of `swapCallParam
 import { TradeType } from '@uniswap/sdk-core'
 import { Trade as V2TradeSDK } from '@uniswap/v2-sdk'
 import { Trade as V3TradeSDK } from '@uniswap/v3-sdk'
-import { MixedRouteTrade, MixedRouteSDK, Trade as RouterTrade } from '@uniswap/router-sdk'
+import { MixedRouteTrade, MixedRouteSDK, Trade as RouterTrade } from '@kittycorn-labs/router-sdk'
 
 const options = { slippageTolerance, recipient }
 const routerTrade = new RouterTrade({ v2Routes, v3Routes, mixedRoutes, tradeType: TradeType.EXACT_INPUT })
