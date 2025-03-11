@@ -2554,6 +2554,31 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@kittycorn-labs/sdk-core@workspace:sdks/sdk-core":
+  version: 0.0.0-use.local
+  resolution: "@kittycorn-labs/sdk-core@workspace:sdks/sdk-core"
+  dependencies:
+    "@ethersproject/address": ^5.0.2
+    "@ethersproject/bytes": ^5.7.0
+    "@ethersproject/keccak256": 5.7.0
+    "@ethersproject/strings": 5.7.0
+    "@types/big.js": ^4.0.5
+    "@types/jest": ^24.0.25
+    babel-eslint: 10.1.0
+    big.js: ^5.2.2
+    decimal.js-light: ^2.5.0
+    eslint-config-react-app: 7.0.1
+    eslint-plugin-flowtype: 8.0.3
+    eslint-plugin-jsx-a11y: 6.10.2
+    eslint-plugin-react: 7.37.4
+    eslint-plugin-react-hooks: 5.2.0
+    jsbi: ^3.1.4
+    tiny-invariant: ^1.1.0
+    toformat: ^2.0.0
+    tsdx: ^0.14.1
+  languageName: unknown
+  linkType: soft
+
 "@kittycorn-labs/smart-order-router@npm:4.17.12-7":
   version: 4.17.12-7
   resolution: "@kittycorn-labs/smart-order-router@npm:4.17.12-7"
@@ -4828,31 +4853,6 @@ __metadata:
   checksum: 1ef25d96e3249909f5642ec048b175fc744f15e395a5e58f5e2b654bd01154e6de6945f5219cb7ab0d86cdffe9ab1a743251ad96f1df9cd48d7ec49d694f790f
   languageName: node
   linkType: hard
-
-"@uniswap/sdk-core@workspace:sdks/sdk-core":
-  version: 0.0.0-use.local
-  resolution: "@uniswap/sdk-core@workspace:sdks/sdk-core"
-  dependencies:
-    "@ethersproject/address": ^5.0.2
-    "@ethersproject/bytes": ^5.7.0
-    "@ethersproject/keccak256": 5.7.0
-    "@ethersproject/strings": 5.7.0
-    "@types/big.js": ^4.0.5
-    "@types/jest": ^24.0.25
-    babel-eslint: 10.1.0
-    big.js: ^5.2.2
-    decimal.js-light: ^2.5.0
-    eslint-config-react-app: 7.0.1
-    eslint-plugin-flowtype: 8.0.3
-    eslint-plugin-jsx-a11y: 6.10.2
-    eslint-plugin-react: 7.37.4
-    eslint-plugin-react-hooks: 5.2.0
-    jsbi: ^3.1.4
-    tiny-invariant: ^1.1.0
-    toformat: ^2.0.0
-    tsdx: ^0.14.1
-  languageName: unknown
-  linkType: soft
 
 "@uniswap/smart-wallet-sdk@workspace:sdks/smart-wallet-sdk":
   version: 0.0.0-use.local
