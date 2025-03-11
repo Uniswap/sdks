@@ -36,7 +36,7 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@uniswap/sdk-core": "^7.6.0",
+    "@uniswap/sdk-core": "^7.7.1",
     "viem": "^2.23.5"
   },
   "devDependencies": {
