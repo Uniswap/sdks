@@ -8,10 +8,22 @@ const EXECUTE_SELECTOR = "0xe9ae5c53" as `0x${string}`
 
 describe('SmartWallet', () => {
   describe('parseAddressDelegation', () => {
+    const address = `1111111111111111111111111111111111111111`; // address length without 0x prefix
     it('parses out the delegation', () => {
-      const address = `1111111111111111111111111111111111111111`;
       const delegation = SmartWallet.parseAddressDelegation(`${DELEGATION_MAGIC_PREFIX}${address}`);
       expect(delegation).toBe(`0x${address}`)
+    })
+
+    it('throws an error if there is no delegation', () => {
+      const emptyDelegation = '' as `0x${string}`;
+      expect(() => SmartWallet.parseAddressDelegation(emptyDelegation)).toThrow()
+    })
+
+    it('throws an error if the magic prefix is incorrect', () => {
+      const incorrectMagicPrefix = '0x000000' as `0x${string}`;
+      expect(() => SmartWallet.parseAddressDelegation(`${incorrectMagicPrefix}${address}`)).toThrow(
+        `Invalid delegation magic prefix: ${incorrectMagicPrefix}`
+      )
     })
   })
 

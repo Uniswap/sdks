@@ -57,15 +57,15 @@ export class SmartWallet {
   }
 
   public static parseAddressDelegation(code: `0x${string}`): Address {
+    if(code.length !== 48) {
+      throw new Error(`Invalid delegation length: ${code.length}`)
+    }
     // parse out magic prefix which is 4 bytes
     const magicPrefix = code.slice(0, 8)
     if(magicPrefix !== DELEGATION_MAGIC_PREFIX) {
       throw new Error(`Invalid delegation magic prefix: ${magicPrefix}`)
     }
     const delegation = code.slice(8)
-    if(delegation.length !== 40) {
-      throw new Error(`Invalid delegation length: ${delegation.length}`)
-    }
     return `0x${delegation}` as Address
   }
 
