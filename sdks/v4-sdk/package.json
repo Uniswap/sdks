@@ -26,8 +26,8 @@
   "sideEffects": false,
   "dependencies": {
     "@ethersproject/solidity": "^5.0.9",
+    "@kittycorn-labs/sdk-core": "^1.0.0",
     "@kittycorn-labs/smart-order-router": "4.17.12-7",
-    "@uniswap/sdk-core": "^7.7.1",
     "@uniswap/v3-sdk": "3.25.2",
     "tiny-invariant": "^1.1.0",
     "tiny-warning": "^1.0.3"

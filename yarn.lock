@@ -2554,6 +2554,23 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@kittycorn-labs/sdk-core@npm:^1.0.0":
+  version: 1.0.0
+  resolution: "@kittycorn-labs/sdk-core@npm:1.0.0"
+  dependencies:
+    "@ethersproject/address": ^5.0.2
+    "@ethersproject/bytes": ^5.7.0
+    "@ethersproject/keccak256": 5.7.0
+    "@ethersproject/strings": 5.7.0
+    big.js: ^5.2.2
+    decimal.js-light: ^2.5.0
+    jsbi: ^3.1.4
+    tiny-invariant: ^1.1.0
+    toformat: ^2.0.0
+  checksum: 352c9480a96220e7646c5033d3a264ec854c84ceef8c54b84b57655c5b110125748a68d4dfc1c094d1584d6687fb78947b57596f0f7cd166eb9f07307e73d49f
+  languageName: node
+  linkType: hard
+
 "@kittycorn-labs/sdk-core@workspace:sdks/sdk-core":
   version: 0.0.0-use.local
   resolution: "@kittycorn-labs/sdk-core@workspace:sdks/sdk-core"
@@ -2620,6 +2637,7 @@ __metadata:
   resolution: "@kittycorn-labs/universal-router-sdk@workspace:sdks/universal-router-sdk"
   dependencies:
     "@kittycorn-labs/router-sdk": ^1.0.0
+    "@kittycorn-labs/sdk-core": ^1.0.0
     "@kittycorn-labs/smart-order-router": 4.17.12-7
     "@kittycorn-labs/v4-sdk": ^1.0.0
     "@openzeppelin/contracts": 4.7.0
@@ -2628,7 +2646,6 @@ __metadata:
     "@types/node": ^18.7.16
     "@types/node-fetch": ^2.6.2
     "@uniswap/permit2-sdk": ^1.3.0
-    "@uniswap/sdk-core": ^7.7.1
     "@uniswap/universal-router": 2.0.0-beta.2
     "@uniswap/v2-core": ^1.0.1
     "@uniswap/v2-sdk": ^4.15.2
