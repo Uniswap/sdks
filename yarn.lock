@@ -2545,11 +2545,36 @@ __metadata:
     "@ethersproject/abi": ^5.5.0
     "@kittycorn-labs/v4-sdk": ^1.0.0
     "@types/jest": ^24.0.25
-    "@uniswap/sdk-core": ^7.7.2
+    "@uniswap/sdk-core": ^7.7.1
     "@uniswap/swap-router-contracts": ^1.3.0
     "@uniswap/v2-sdk": ^4.15.2
     "@uniswap/v3-sdk": ^3.25.2
     prettier: ^2.4.1
+    tsdx: ^0.14.1
+  languageName: unknown
+  linkType: soft
+
+"@kittycorn-labs/sdk-core@workspace:sdks/sdk-core":
+  version: 0.0.0-use.local
+  resolution: "@kittycorn-labs/sdk-core@workspace:sdks/sdk-core"
+  dependencies:
+    "@ethersproject/address": ^5.0.2
+    "@ethersproject/bytes": ^5.7.0
+    "@ethersproject/keccak256": 5.7.0
+    "@ethersproject/strings": 5.7.0
+    "@types/big.js": ^4.0.5
+    "@types/jest": ^24.0.25
+    babel-eslint: 10.1.0
+    big.js: ^5.2.2
+    decimal.js-light: ^2.5.0
+    eslint-config-react-app: 7.0.1
+    eslint-plugin-flowtype: 8.0.3
+    eslint-plugin-jsx-a11y: 6.10.2
+    eslint-plugin-react: 7.37.4
+    eslint-plugin-react-hooks: 5.2.0
+    jsbi: ^3.1.4
+    tiny-invariant: ^1.1.0
+    toformat: ^2.0.0
     tsdx: ^0.14.1
   languageName: unknown
   linkType: soft
@@ -4812,7 +4837,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/sdk-core@npm:^7.1.0, @uniswap/sdk-core@npm:^7.5.0, @uniswap/sdk-core@npm:^7.6.0, @uniswap/sdk-core@npm:^7.7.1, @uniswap/sdk-core@npm:^7.7.2":
+"@uniswap/sdk-core@npm:^7.1.0, @uniswap/sdk-core@npm:^7.6.0, @uniswap/sdk-core@npm:^7.7.1, @uniswap/sdk-core@npm:^7.7.2":
   version: 7.7.2
   resolution: "@uniswap/sdk-core@npm:7.7.2"
   dependencies:
@@ -4829,38 +4854,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/sdk-core@workspace:sdks/sdk-core":
-  version: 0.0.0-use.local
-  resolution: "@uniswap/sdk-core@workspace:sdks/sdk-core"
-  dependencies:
-    "@ethersproject/address": ^5.0.2
-    "@ethersproject/bytes": ^5.7.0
-    "@ethersproject/keccak256": 5.7.0
-    "@ethersproject/strings": 5.7.0
-    "@types/big.js": ^4.0.5
-    "@types/jest": ^24.0.25
-    babel-eslint: 10.1.0
-    big.js: ^5.2.2
-    decimal.js-light: ^2.5.0
-    eslint-config-react-app: 7.0.1
-    eslint-plugin-flowtype: 8.0.3
-    eslint-plugin-jsx-a11y: 6.10.2
-    eslint-plugin-react: 7.37.4
-    eslint-plugin-react-hooks: 5.2.0
-    jsbi: ^3.1.4
-    tiny-invariant: ^1.1.0
-    toformat: ^2.0.0
-    tsdx: ^0.14.1
-  languageName: unknown
-  linkType: soft
-
 "@uniswap/smart-wallet-sdk@workspace:sdks/smart-wallet-sdk":
   version: 0.0.0-use.local
   resolution: "@uniswap/smart-wallet-sdk@workspace:sdks/smart-wallet-sdk"
   dependencies:
     "@types/jest": ^24.0.25
     "@types/node": ^18.7.16
-    "@uniswap/sdk-core": ^7.6.0
+    "@uniswap/sdk-core": ^7.7.1
     eslint: ^7.8.0
     eslint-config-prettier: ^6.11.0
     eslint-plugin-eslint-comments: ^3.2.0
@@ -4909,7 +4909,7 @@ __metadata:
     "@typescript-eslint/eslint-plugin": ^5.62
     "@typescript-eslint/parser": ^5.62
     "@uniswap/permit2-sdk": ^1.2.1
-    "@uniswap/sdk-core": ^7.5.0
+    "@uniswap/sdk-core": ^7.7.1
     eslint: ^7.8.0
     eslint-config-prettier: ^6.11.0
     eslint-plugin-eslint-comments: ^3.2.0
@@ -18649,7 +18649,7 @@ __metadata:
     "@types/chai": ^4.3.3
     "@types/mocha": ^9.1.1
     "@types/node": ^18.7.16
-    "@uniswap/sdk-core": ^7.5.0
+    "@uniswap/sdk-core": ^7.7.1
     chai: ^4.3.6
     dotenv: ^16.0.3
     ethers: ^5.7.0

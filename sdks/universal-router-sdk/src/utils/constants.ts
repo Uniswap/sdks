@@ -49,7 +49,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   },
   // sepolia
   [11155111]: {
-    weth: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14',
+    weth: '0xC558DBdd856501FCd9aaF1E62eae57A9F0629a3c',
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',

@@ -1,10 +1,11 @@
 {
-  "name": "@uniswap/sdk-core",
+  "name": "@kittycorn-labs/sdk-core",
   "description": "⚒️ An SDK for building applications on top of Uniswap V3",
-  "repository": "https://github.com/Uniswap/sdks.git",
+  "repository": "https://github.com/Crown-Labs/sdks.git",
   "keywords": [
     "uniswap",
-    "ethereum"
+    "ethereum",
+    "kittycorn-labs"
   ],
   "license": "MIT",
   "main": "dist/index.js",
