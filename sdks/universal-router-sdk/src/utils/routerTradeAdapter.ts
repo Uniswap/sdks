@@ -1,8 +1,8 @@
-import { MixedRouteSDK, Trade as RouterTrade } from '@uniswap/router-sdk'
+import { MixedRouteSDK, Trade as RouterTrade } from '@kittycorn-labs/router-sdk'
 import { Currency, CurrencyAmount, Ether, Token, TradeType } from '@uniswap/sdk-core'
 import { Pair, Route as V2Route } from '@uniswap/v2-sdk'
 import { Pool as V3Pool, Route as V3Route, FeeAmount } from '@uniswap/v3-sdk'
-import { Pool as V4Pool, Route as V4Route } from '@uniswap/v4-sdk'
+import { Pool as V4Pool, Route as V4Route } from '@kittycorn-labs/v4-sdk'
 import { BigNumber } from 'ethers'
 import { ETH_ADDRESS, E_ETH_ADDRESS } from './constants'
 

@@ -1,6 +1,6 @@
 import JSBI from 'jsbi'
 import { ethers } from 'ethers'
-import { MixedRouteTrade, MixedRouteSDK, Trade as RouterTrade } from '@uniswap/router-sdk'
+import { MixedRouteTrade, MixedRouteSDK, Trade as RouterTrade } from '@kittycorn-labs/router-sdk'
 import { Trade as V2Trade, Pair, Route as RouteV2, computePairAddress } from '@uniswap/v2-sdk'
 import {
   Trade as V3Trade,
@@ -12,7 +12,7 @@ import {
   FeeAmount,
   Position,
 } from '@uniswap/v3-sdk'
-import { Pool as V4Pool, Route as RouteV4, Trade as V4Trade, Position as V4Position } from '@uniswap/v4-sdk'
+import { Pool as V4Pool, Route as RouteV4, Trade as V4Trade, Position as V4Position } from '@kittycorn-labs/v4-sdk'
 import { SwapOptions } from '../../src'
 import { CurrencyAmount, TradeType, Ether, Token, Percent, Currency } from '@uniswap/sdk-core'
 import IUniswapV3Pool from '@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json'

@@ -3,7 +3,7 @@ import JSBI from 'jsbi'
 import { BigNumber, ethers, utils, Wallet, Signature } from 'ethers'
 import { expandTo18Decimals } from '../src/utils/numbers'
 import { SwapRouter, UniswapTrade, FlatFeeOptions } from '../src'
-import { MixedRouteTrade, MixedRouteSDK } from '@uniswap/router-sdk'
+import { MixedRouteTrade, MixedRouteSDK } from '@kittycorn-labs/router-sdk'
 import { Trade as V2Trade, Pair, Route as RouteV2 } from '@uniswap/v2-sdk'
 import {
   Trade as V3Trade,
@@ -17,7 +17,7 @@ import {
   FeeAmount,
   NonfungiblePositionManager,
 } from '@uniswap/v3-sdk'
-import { Pool as V4Pool, Route as V4Route, Trade as V4Trade, Position as V4Position } from '@uniswap/v4-sdk'
+import { Pool as V4Pool, Route as V4Route, Trade as V4Trade, Position as V4Position } from '@kittycorn-labs/v4-sdk'
 import { generatePermitSignature, toInputPermit, makePermit, generateEip2098PermitSignature } from './utils/permit2'
 import {
   CHAIN_TO_ADDRESSES_MAP,

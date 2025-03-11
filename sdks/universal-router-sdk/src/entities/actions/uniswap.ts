@@ -8,7 +8,7 @@ import {
   V4Planner,
   encodeRouteToPath as encodeV4RouteToPath,
   Actions,
-} from '@uniswap/v4-sdk'
+} from '@kittycorn-labs/v4-sdk'
 import {
   Trade as RouterTrade,
   MixedRouteTrade,
@@ -22,7 +22,7 @@ import {
   getOutputOfPools,
   encodeMixedRouteToPath,
   partitionMixedRouteByProtocol,
-} from '@uniswap/router-sdk'
+} from '@kittycorn-labs/router-sdk'
 import { Permit2Permit } from '../../utils/inputTokens'
 import { getPathCurrency } from '../../utils/pathCurrency'
 import { Currency, TradeType, Token, CurrencyAmount, Percent } from '@uniswap/sdk-core'
@@ -31,7 +31,7 @@ import { SENDER_AS_RECIPIENT, ROUTER_AS_RECIPIENT, CONTRACT_BALANCE, ETH_ADDRESS
 import { getCurrencyAddress } from '../../utils/getCurrencyAddress'
 import { encodeFeeBips } from '../../utils/numbers'
 import { BigNumber, BigNumberish } from 'ethers'
-import { TPool } from '@uniswap/router-sdk'
+import { TPool } from '@kittycorn-labs/router-sdk'
 
 export type FlatFeeOptions = {
   amount: BigNumberish
