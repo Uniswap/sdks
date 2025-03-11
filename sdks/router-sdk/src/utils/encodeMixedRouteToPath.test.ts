@@ -1,7 +1,7 @@
 import { CurrencyAmount, Ether, Token, WETH9 } from '@uniswap/sdk-core'
 import { Pair } from '@uniswap/v2-sdk'
 import { encodeSqrtRatioX96, FeeAmount, Pool as V3Pool } from '@uniswap/v3-sdk'
-import { Pool as V4Pool } from '@uniswap/v4-sdk'
+import { Pool as V4Pool } from '@kittycorn-labs/v4-sdk'
 import { MixedRouteSDK } from '../entities/mixedRoute/route'
 import { encodeMixedRouteToPath } from './encodeMixedRouteToPath'
 import { ADDRESS_ZERO } from '../constants'

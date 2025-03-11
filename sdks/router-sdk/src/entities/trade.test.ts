@@ -14,7 +14,7 @@ import {
 } from '@uniswap/v3-sdk'
 import { Pair, Route as V2RouteSDK } from '@uniswap/v2-sdk'
 import { MixedRouteSDK } from './mixedRoute/route'
-import { Route as V4RouteSDK, Pool as V4Pool } from '@uniswap/v4-sdk'
+import { Route as V4RouteSDK, Pool as V4Pool } from '@kittycorn-labs/v4-sdk'
 import { ADDRESS_ZERO } from '../constants'
 
 describe('Trade', () => {

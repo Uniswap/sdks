@@ -1,7 +1,7 @@
 import { Currency, CurrencyAmount, Fraction, Percent, Price, TradeType, Ether } from '@uniswap/sdk-core'
 import { Pair, Route as V2RouteSDK, Trade as V2TradeSDK } from '@uniswap/v2-sdk'
 import { Pool as V3Pool, Route as V3RouteSDK, Trade as V3TradeSDK } from '@uniswap/v3-sdk'
-import { Pool as V4Pool, Route as V4RouteSDK, Trade as V4TradeSDK } from '@uniswap/v4-sdk'
+import { Pool as V4Pool, Route as V4RouteSDK, Trade as V4TradeSDK } from '@kittycorn-labs/v4-sdk'
 import invariant from 'tiny-invariant'
 import { ONE, ONE_HUNDRED_PERCENT, ZERO, ZERO_PERCENT } from '../constants'
 import { MixedRouteSDK } from './mixedRoute/route'
