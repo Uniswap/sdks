@@ -1,32 +1,12 @@
 import { ChainId } from '@uniswap/sdk-core'
 
-import { DELEGATION_MAGIC_PREFIX, ModeType, SMART_WALLET_ADDRESSES } from './constants';
+import { ModeType, SMART_WALLET_ADDRESSES } from './constants';
 import { SmartWallet } from './smartWallet'
 import { Call } from './types'
 
 const EXECUTE_SELECTOR = "0xe9ae5c53" as `0x${string}`
 
 describe('SmartWallet', () => {
-  describe('parseAddressDelegation', () => {
-    const address = `1111111111111111111111111111111111111111`; // address length without 0x prefix
-    it('parses out the delegation', () => {
-      const delegation = SmartWallet.parseAddressDelegation(`${DELEGATION_MAGIC_PREFIX}${address}`);
-      expect(delegation).toBe(`0x${address}`)
-    })
-
-    it('throws an error if there is no delegation', () => {
-      const emptyDelegation = '' as `0x${string}`;
-      expect(() => SmartWallet.parseAddressDelegation(emptyDelegation)).toThrow()
-    })
-
-    it('throws an error if the magic prefix is incorrect', () => {
-      const incorrectMagicPrefix = '0x000000' as `0x${string}`;
-      expect(() => SmartWallet.parseAddressDelegation(`${incorrectMagicPrefix}${address}`)).toThrow(
-        `Invalid delegation magic prefix: ${incorrectMagicPrefix}`
-      )
-    })
-  })
-
   describe('encodeExecute', () => {
     it('encodes batch calls correctly', () => {
       const calls: Call[] = [
