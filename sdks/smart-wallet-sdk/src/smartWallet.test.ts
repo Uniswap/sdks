@@ -1,12 +1,20 @@
 import { ChainId } from '@uniswap/sdk-core'
 
-import { ModeType, SMART_WALLET_ADDRESSES } from './constants';
+import { DELEGATION_MAGIC_PREFIX, ModeType, SMART_WALLET_ADDRESSES } from './constants';
 import { SmartWallet } from './smartWallet'
 import { Call } from './types'
 
 const EXECUTE_SELECTOR = "0xe9ae5c53" as `0x${string}`
 
 describe('SmartWallet', () => {
+  describe('parseAddressDelegation', () => {
+    it('parses out the delegation', () => {
+      const address = `1111111111111111111111111111111111111111`;
+      const delegation = SmartWallet.parseAddressDelegation(`${DELEGATION_MAGIC_PREFIX}${address}`);
+      expect(delegation).toBe(`0x${address}`)
+    })
+  })
+
   describe('encodeExecute', () => {
     it('encodes batch calls correctly', () => {
       const calls: Call[] = [

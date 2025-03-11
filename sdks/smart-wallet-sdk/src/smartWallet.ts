@@ -1,9 +1,9 @@
 import { ChainId } from '@uniswap/sdk-core'
-import { encodeAbiParameters, encodeFunctionData } from 'viem'
+import { Address, encodeAbiParameters, encodeFunctionData } from 'viem'
 
 import { abi } from '../abis/MinimalDelegation.json'
 
-import { MODE_TYPE_ABI_PARAMETERS, ModeType, SMART_WALLET_ADDRESSES } from './constants'
+import { DELEGATION_MAGIC_PREFIX, MODE_TYPE_ABI_PARAMETERS, ModeType, SMART_WALLET_ADDRESSES } from './constants'
 import { Call, MethodParameters, ExecuteOptions, AdvancedCall } from './types'
 import { CallPlanner } from './utils'
 
@@ -54,6 +54,19 @@ export class SmartWallet {
       data: methodParameters.calldata,
       value: methodParameters.value
     }
+  }
+
+  public static parseAddressDelegation(code: `0x${string}`): Address {
+    // parse out magic prefix which is 4 bytes
+    const magicPrefix = code.slice(0, 8)
+    if(magicPrefix !== DELEGATION_MAGIC_PREFIX) {
+      throw new Error(`Invalid delegation magic prefix: ${magicPrefix}`)
+    }
+    const delegation = code.slice(8)
+    if(delegation.length !== 40) {
+      throw new Error(`Invalid delegation length: ${delegation.length}`)
+    }
+    return `0x${delegation}` as Address
   }
 
   /**
