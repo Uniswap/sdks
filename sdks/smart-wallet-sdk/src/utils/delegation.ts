@@ -7,7 +7,7 @@ export type RecoveredAuthorizationMap = Record<Address, SignedAuthorization>
 
 export class Delegation {
     /**
-     * Receovers the signers of each authorization within the list sent in the transaction
+     * Recovers the signers of each authorization within the list sent in the transaction
      * @dev this can also return just the contractAddress each signer is delegated to
      * @param transaction : TransactionEIP7702
      * @returns : Promise<RecoveredAuthorizationMap>
@@ -17,7 +17,7 @@ export class Delegation {
     }
 
     /**
-     * Receovers the signers of each authorization in the list
+     * Recovers the signers of each authorization in the list
      * @param authorizationList : SignedAuthorizationList
      * @returns : Promise<RecoveredAuthorizationMap>
      */
