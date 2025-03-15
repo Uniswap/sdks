@@ -815,20 +815,20 @@ describe('Trade', () => {
       expect(result[0].swaps[0].route.tokenPath).toEqual([token0, token2])
     })
 
-    it.skip('insufficient liquidity', () => {
-      const result = Trade.bestTradeExactOut(
+    it('insufficient liquidity', async () => {
+      const result = await Trade.bestTradeExactOut(
         [pool_0_1, pool_0_2, pool_1_2],
         token0,
-        CurrencyAmount.fromRawAmount(token2, 1200)
+        CurrencyAmount.fromRawAmount(token2, 120000)
       )
       expect(result).toHaveLength(0)
     })
 
-    it.skip('insufficient liquidity in one pool but not the other', () => {
-      const result = Trade.bestTradeExactOut(
+    it('insufficient liquidity in one pool but not the other', async () => {
+      const result = await Trade.bestTradeExactOut(
         [pool_0_1, pool_0_2, pool_1_2],
         token0,
-        CurrencyAmount.fromRawAmount(token2, JSBI.BigInt(1050))
+        CurrencyAmount.fromRawAmount(token2, JSBI.BigInt(105000))
       )
       expect(result).toHaveLength(1)
     })
