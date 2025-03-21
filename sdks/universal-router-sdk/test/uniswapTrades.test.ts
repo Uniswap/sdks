@@ -22,6 +22,7 @@ import { generatePermitSignature, toInputPermit, makePermit, generateEip2098Perm
 import {
   CHAIN_TO_ADDRESSES_MAP,
   ChainId,
+  Currency,
   CurrencyAmount,
   Ether,
   NONFUNGIBLE_POSITION_MANAGER_ADDRESSES,
@@ -44,6 +45,7 @@ import {
   RouterTradeAdapter,
   V2PoolInRoute,
   V3PoolInRoute,
+  V4PoolInRoute,
 } from '../src/utils/routerTradeAdapter'
 import {
   E_ETH_ADDRESS,
@@ -71,6 +73,7 @@ describe('Uniswap', () => {
   let ETH_USDC_V4: V4Pool
   let WETH_USDC_V4: V4Pool
   let WETH_USDC_V4_LOW_FEE: V4Pool
+  let ETH_USDC_V4_LOW_FEE: V4Pool
   let USDC_DAI_V4: V4Pool
 
   before(async () => {
@@ -107,6 +110,18 @@ describe('Uniswap', () => {
 
     WETH_USDC_V4_LOW_FEE = new V4Pool(
       WETH,
+      USDC,
+      FeeAmount.LOW,
+      tickSpacing,
+      ZERO_ADDRESS,
+      encodeSqrtRatioX96(1, 1),
+      liquidity,
+      0,
+      tickProviderMock
+    )
+
+    ETH_USDC_V4_LOW_FEE = new V4Pool(
+      ETHER,
       USDC,
       FeeAmount.LOW,
       tickSpacing,
@@ -1041,6 +1056,38 @@ describe('Uniswap', () => {
     }
   }
 
+  const mockV4PoolInRoute = (
+    pool: V4Pool,
+    tokenIn: Currency,
+    tokenOut: Currency,
+    amountIn: string,
+    amountOut: string
+  ): V4PoolInRoute => {
+    return {
+      type: PoolType.V4Pool,
+      tokenIn: {
+        address: tokenIn.isNative ? ETH_ADDRESS : tokenIn.address,
+        chainId: 1,
+        symbol: tokenIn.symbol!,
+        decimals: String(tokenIn.decimals),
+      },
+      tokenOut: {
+        address: tokenOut.isNative ? ETH_ADDRESS : tokenOut.address,
+        chainId: 1,
+        symbol: tokenOut.symbol!,
+        decimals: String(tokenOut.decimals),
+      },
+      fee: pool.fee.toString(),
+      tickSpacing: pool.tickSpacing.toString(),
+      hooks: pool.hooks,
+      sqrtRatioX96: pool.sqrtRatioX96.toString(),
+      liquidity: pool.liquidity.toString(),
+      tickCurrent: pool.tickCurrent.toString(),
+      amountIn,
+      amountOut,
+    }
+  }
+
   for (let tradeType of [TradeType.EXACT_INPUT, TradeType.EXACT_OUTPUT]) {
     describe('RouterTradeAdapter ' + tradeType, () => {
       const getAmountToken = (tokenIn: Token | Ether, tokenOut: Token | Ether, tradeType: TradeType): Token | Ether => {
@@ -1122,6 +1169,37 @@ describe('Uniswap', () => {
         compareUniswapTrades(new UniswapTrade(buildTrade([trade]), opts), new UniswapTrade(routerTrade, opts))
       })
 
+      it('v4 - erc20 <> erc20', async () => {
+        const [tokenIn, tokenOut] = [DAI, USDC]
+        const inputAmount = ethers.utils
+          .parseUnits('1000', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
+          .toString()
+        const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
+
+        const opts = swapOptions({})
+        const trade = await V4Trade.fromRoute(new V4Route([USDC_DAI_V4], tokenIn, tokenOut), rawInputAmount, tradeType)
+
+        const classicQuote: PartialClassicQuote = {
+          tokenIn: DAI.address,
+          tokenOut: USDC.address,
+          tradeType,
+          route: [
+            [
+              mockV4PoolInRoute(
+                USDC_DAI_V4,
+                tokenIn,
+                tokenOut,
+                trade.inputAmount.quotient.toString(),
+                trade.outputAmount.quotient.toString()
+              ),
+            ],
+          ],
+        }
+        const routerTrade = RouterTradeAdapter.fromClassicQuote(classicQuote)
+
+        compareUniswapTrades(new UniswapTrade(buildTrade([trade]), opts), new UniswapTrade(routerTrade, opts))
+      })
+
       it('v2 - handles weth input properly', async () => {
         const [tokenIn, tokenOut] = [WETH, USDC]
         const inputAmount = ethers.utils
@@ -1171,6 +1249,37 @@ describe('Uniswap', () => {
             [
               mockV3PoolInRoute(
                 WETH_USDC_V3,
+                WETH,
+                USDC,
+                trade.inputAmount.quotient.toString(),
+                trade.outputAmount.quotient.toString()
+              ),
+            ],
+          ],
+        }
+        const routerTrade = RouterTradeAdapter.fromClassicQuote(classicQuote)
+
+        compareUniswapTrades(new UniswapTrade(buildTrade([trade]), opts), new UniswapTrade(routerTrade, opts))
+      })
+
+      it('v4 - handles weth input properly', async () => {
+        const [tokenIn, tokenOut] = [WETH, USDC]
+        const inputAmount = ethers.utils
+          .parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
+          .toString()
+        const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
+
+        const opts = swapOptions({})
+        const trade = await V4Trade.fromRoute(new V4Route([WETH_USDC_V4], WETH, USDC), rawInputAmount, tradeType)
+
+        const classicQuote: PartialClassicQuote = {
+          tokenIn: WETH.address,
+          tokenOut: USDC.address,
+          tradeType,
+          route: [
+            [
+              mockV4PoolInRoute(
+                WETH_USDC_V4,
                 WETH,
                 USDC,
                 trade.inputAmount.quotient.toString(),
@@ -1284,6 +1393,39 @@ describe('Uniswap', () => {
         compareUniswapTrades(new UniswapTrade(buildTrade([trade]), opts), new UniswapTrade(routerTrade, opts))
       })
 
+      it('v4 - handles eth input properly', async () => {
+        const [tokenIn, tokenOut] = [Ether.onChain(1), USDC]
+        const inputAmount = ethers.utils
+          .parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
+          .toString()
+        const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
+        const opts = swapOptions({})
+        const trade = await V4Trade.fromRoute(
+          new V4Route([ETH_USDC_V4], Ether.onChain(1), USDC),
+          rawInputAmount,
+          tradeType
+        )
+        const classicQuote: PartialClassicQuote = {
+          tokenIn: ETH_ADDRESS,
+          tokenOut: USDC.address,
+          tradeType,
+          route: [
+            [
+              // ETH_USDC_V4 pool uses ETH directly
+              mockV4PoolInRoute(
+                ETH_USDC_V4,
+                ETHER,
+                USDC,
+                trade.inputAmount.quotient.toString(),
+                trade.outputAmount.quotient.toString()
+              ),
+            ],
+          ],
+        }
+        const routerTrade = RouterTradeAdapter.fromClassicQuote(classicQuote)
+        compareUniswapTrades(new UniswapTrade(buildTrade([trade]), opts), new UniswapTrade(routerTrade, opts))
+      })
+
       it('v2 - handles eth output properly', async () => {
         const [tokenIn, tokenOut] = [USDC, Ether.onChain(1)]
         const inputAmount = ethers.utils
@@ -1390,6 +1532,48 @@ describe('Uniswap', () => {
         compareUniswapTrades(new UniswapTrade(buildTrade([trade]), opts), new UniswapTrade(routerTrade, opts))
       })
 
+      it('v4 - multi pool erc20 <> erc20', async () => {
+        const [tokenIn, tokenOut] = [DAI, WETH]
+        const inputAmount = ethers.utils
+          .parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
+          .toString()
+        const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
+
+        const opts = swapOptions({})
+        const trade = await V4Trade.fromRoute(
+          new V4Route([USDC_DAI_V4, WETH_USDC_V4], tokenIn, tokenOut),
+          rawInputAmount,
+          tradeType
+        )
+
+        const classicQuote: PartialClassicQuote = {
+          tokenIn: DAI.address,
+          tokenOut: WETH.address,
+          tradeType,
+          route: [
+            [
+              mockV4PoolInRoute(
+                USDC_DAI_V4,
+                DAI,
+                USDC,
+                trade.inputAmount.quotient.toString(),
+                trade.outputAmount.quotient.toString()
+              ),
+              mockV4PoolInRoute(
+                WETH_USDC_V4,
+                USDC,
+                WETH,
+                trade.inputAmount.quotient.toString(),
+                trade.outputAmount.quotient.toString()
+              ),
+            ],
+          ],
+        }
+        const routerTrade = RouterTradeAdapter.fromClassicQuote(classicQuote)
+
+        compareUniswapTrades(new UniswapTrade(buildTrade([trade]), opts), new UniswapTrade(routerTrade, opts))
+      })
+
       // Mixed routes are only supported for exact input
       if (tradeType === TradeType.EXACT_INPUT) {
         it('v2/v3 - mixed route erc20 <> erc20', async () => {
@@ -1423,6 +1607,55 @@ describe('Uniswap', () => {
                   WETH_USDC_V2,
                   USDC,
                   WETH,
+                  trade.inputAmount.quotient.toString(),
+                  trade.outputAmount.quotient.toString()
+                ),
+              ],
+            ],
+          }
+          const routerTrade = RouterTradeAdapter.fromClassicQuote(classicQuote)
+
+          compareUniswapTrades(new UniswapTrade(buildTrade([trade]), opts), new UniswapTrade(routerTrade, opts))
+        })
+
+        it('v2/v3/v4 - mixed route erc20 <> erc20', async () => {
+          const [tokenIn, tokenOut] = [DAI, WETH]
+          const inputAmount = ethers.utils
+            .parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
+            .toString()
+          const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
+
+          const opts = swapOptions({})
+          const trade = await MixedRouteTrade.fromRoute(
+            new MixedRouteSDK([USDC_DAI_V2, WETH_USDC_V3, WETH_USDC_V4], tokenIn, tokenOut),
+            rawInputAmount,
+            tradeType
+          )
+
+          const classicQuote: PartialClassicQuote = {
+            tokenIn: DAI.address,
+            tokenOut: WETH.address,
+            tradeType,
+            route: [
+              [
+                mockV2PoolInRoute(
+                  USDC_DAI_V2,
+                  DAI,
+                  USDC,
+                  trade.inputAmount.quotient.toString(),
+                  trade.outputAmount.quotient.toString()
+                ),
+                mockV3PoolInRoute(
+                  WETH_USDC_V3,
+                  USDC,
+                  WETH,
+                  trade.inputAmount.quotient.toString(),
+                  trade.outputAmount.quotient.toString()
+                ),
+                mockV4PoolInRoute(
+                  WETH_USDC_V4,
+                  WETH,
+                  USDC,
                   trade.inputAmount.quotient.toString(),
                   trade.outputAmount.quotient.toString()
                 ),
@@ -1578,7 +1811,7 @@ describe('Uniswap', () => {
   })
 
   describe('migrate', () => {
-    it('encodes a migration', async () => {
+    it('encodes a migration to eth', async () => {
       // sign a permit for the token
       const tokenId = 377972
       const permit = {
@@ -1603,10 +1836,75 @@ describe('Uniswap', () => {
           tickLower: 200040,
           tickUpper: 300000,
         }),
+        // in range (current tick = 0)
+        outputPosition: new V4Position({
+          pool: ETH_USDC_V4,
+          liquidity: 100000,
+          tickLower: -200040,
+          tickUpper: 300000,
+        }),
+        v3RemoveLiquidityOptions: {
+          tokenId,
+          liquidityPercentage: new Percent(100, 100),
+          slippageTolerance: new Percent(5, 100),
+          deadline: MAX_UINT160,
+          burnToken: true,
+          collectOptions: {
+            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(WETH, 0),
+            recipient: FORGE_V4_POSITION_MANAGER,
+          },
+          permit: {
+            v: signature.v,
+            r: signature.r,
+            s: signature.s,
+            deadline: permit.deadline,
+            spender: permit.spender,
+          },
+        },
+        v4AddLiquidityOptions: {
+          deadline: MAX_UINT160,
+          migrate: true,
+          slippageTolerance: new Percent(5, 100),
+          recipient: TEST_RECIPIENT_ADDRESS,
+          useNative: ETHER,
+        },
+      })
+      const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
+      registerFixture('_MIGRATE_TO_ETH_WITH_PERMIT', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+    })
+
+    it('encodes a migration from erc20 to erc20', async () => {
+      // sign a permit for the token
+      const tokenId = 377972
+      const permit = {
+        spender: UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, 1),
+        tokenId,
+        deadline: MAX_UINT160.toString(),
+        nonce: 0,
+      }
+      const { domain, types, values } = NonfungiblePositionManager.getPermitData(
+        permit,
+        NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[ChainId.MAINNET],
+        ChainId.MAINNET
+      )
+
+      const signature: Signature = splitSignature(await wallet._signTypedData(domain, types, values))
+
+      // create migrate options
+      const opts = Object.assign({
+        inputPosition: new Position({
+          pool: WETH_USDC_V3,
+          liquidity: 72249373570746,
+          tickLower: 200040,
+          tickUpper: 300000,
+        }),
+        // in range (current tick = 0)
         outputPosition: new V4Position({
           pool: WETH_USDC_V4,
           liquidity: 100000,
-          tickLower: 200040,
+          tickLower: -200040,
           tickUpper: 300000,
         }),
         v3RemoveLiquidityOptions: {
@@ -1636,11 +1934,11 @@ describe('Uniswap', () => {
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
-      registerFixture('_MIGRATE_WITH_PERMIT', methodParameters)
+      registerFixture('_MIGRATE_TO_ERC20_WITH_PERMIT', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
-    it('encodes a migration if no v3 permit', async () => {
+    it('encodes a migration from erc20 to eth if no v3 permit', async () => {
       const opts = Object.assign({
         inputPosition: new Position({
           pool: WETH_USDC_V3,
@@ -1648,10 +1946,51 @@ describe('Uniswap', () => {
           tickLower: 200040,
           tickUpper: 300000,
         }),
+        // in range (current tick = 0)
+        outputPosition: new V4Position({
+          pool: ETH_USDC_V4,
+          liquidity: 100000,
+          tickLower: -200040,
+          tickUpper: 300000,
+        }),
+        v3RemoveLiquidityOptions: {
+          tokenId: 377972,
+          liquidityPercentage: new Percent(100, 100),
+          slippageTolerance: new Percent(5, 100),
+          deadline: MAX_UINT160,
+          burnToken: true,
+          collectOptions: {
+            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(WETH, 0),
+            recipient: FORGE_V4_POSITION_MANAGER,
+          },
+        },
+        v4AddLiquidityOptions: {
+          deadline: MAX_UINT160,
+          migrate: true,
+          slippageTolerance: new Percent(5, 100),
+          recipient: TEST_RECIPIENT_ADDRESS,
+          useNative: ETHER,
+        },
+      })
+      const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
+      registerFixture('_MIGRATE_TO_ETH_WITHOUT_PERMIT', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+    })
+
+    it('encodes a migration from erc20 to erc20 if no v3 permit', async () => {
+      const opts = Object.assign({
+        inputPosition: new Position({
+          pool: WETH_USDC_V3,
+          liquidity: 72249373570746,
+          tickLower: 200040,
+          tickUpper: 300000,
+        }),
+        // in range (current tick = 0)
         outputPosition: new V4Position({
           pool: WETH_USDC_V4,
           liquidity: 100000,
-          tickLower: 200040,
+          tickLower: -200040,
           tickUpper: 300000,
         }),
         v3RemoveLiquidityOptions: {
@@ -1674,11 +2013,11 @@ describe('Uniswap', () => {
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
-      registerFixture('_MIGRATE_WITHOUT_PERMIT', methodParameters)
+      registerFixture('_MIGRATE_TO_ERC20_WITHOUT_PERMIT', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
-    it('encodes a migration including pool initialization', async () => {
+    it('encodes a migration from erc20 to eth including pool initialization', async () => {
       // sign a permit for the token
       const tokenId = 377972
       const permit = {
@@ -1703,10 +2042,76 @@ describe('Uniswap', () => {
           tickLower: 200040,
           tickUpper: 300000,
         }),
+        // in range (current tick = 0)
+        outputPosition: new V4Position({
+          pool: ETH_USDC_V4_LOW_FEE,
+          liquidity: 100000,
+          tickLower: -200040,
+          tickUpper: 300000,
+        }),
+        v3RemoveLiquidityOptions: {
+          tokenId,
+          liquidityPercentage: new Percent(100, 100),
+          slippageTolerance: new Percent(5, 100),
+          deadline: MAX_UINT160,
+          burnToken: true,
+          collectOptions: {
+            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(WETH, 0),
+            recipient: FORGE_V4_POSITION_MANAGER,
+          },
+          permit: {
+            v: signature.v,
+            r: signature.r,
+            s: signature.s,
+            deadline: permit.deadline,
+            spender: permit.spender,
+          },
+        },
+        v4AddLiquidityOptions: {
+          deadline: MAX_UINT160,
+          migrate: true,
+          slippageTolerance: new Percent(5, 100),
+          recipient: TEST_RECIPIENT_ADDRESS,
+          createPool: true, // boolean to signal pool creation
+          useNative: ETHER,
+        },
+      })
+      const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
+      registerFixture('_MIGRATE_TO_ETH_WITH_PERMIT_AND_POOL_INITIALIZE', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+    })
+
+    it('encodes a migration from erc20 to erc20 including pool initialization', async () => {
+      // sign a permit for the token
+      const tokenId = 377972
+      const permit = {
+        spender: UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, 1),
+        tokenId,
+        deadline: MAX_UINT160.toString(),
+        nonce: 0,
+      }
+      const { domain, types, values } = NonfungiblePositionManager.getPermitData(
+        permit,
+        NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[ChainId.MAINNET],
+        ChainId.MAINNET
+      )
+
+      const signature: Signature = splitSignature(await wallet._signTypedData(domain, types, values))
+
+      // create migrate options
+      const opts = Object.assign({
+        inputPosition: new Position({
+          pool: WETH_USDC_V3,
+          liquidity: 72249373570746,
+          tickLower: 200040,
+          tickUpper: 300000,
+        }),
+        // in range (current tick = 0)
         outputPosition: new V4Position({
           pool: WETH_USDC_V4_LOW_FEE, // migrate to LOW pool, which hasn't been initialized
           liquidity: 100000,
-          tickLower: 200040,
+          tickLower: -200040,
           tickUpper: 300000,
         }),
         v3RemoveLiquidityOptions: {
@@ -1737,7 +2142,7 @@ describe('Uniswap', () => {
         },
       })
       const methodParameters = SwapRouter.migrateV3ToV4CallParameters(opts, FORGE_V4_POSITION_MANAGER)
-      registerFixture('_MIGRATE_WITH_PERMIT_AND_POOL_INITIALIZE', methodParameters)
+      registerFixture('_MIGRATE_TO_ERC20_WITH_PERMIT_AND_POOL_INITIALIZE', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
@@ -1896,16 +2301,16 @@ describe('Uniswap', () => {
     it('throws if not minting when migrating', async () => {
       const opts = Object.assign({
         inputPosition: new Position({
-          pool: WETH_USDC_V3,
+          pool: USDC_DAI_V3,
           liquidity: 1,
-          tickLower: -WETH_USDC_V3.tickSpacing,
-          tickUpper: WETH_USDC_V3.tickSpacing,
+          tickLower: -USDC_DAI_V3.tickSpacing,
+          tickUpper: USDC_DAI_V3.tickSpacing,
         }),
         outputPosition: new V4Position({
-          pool: WETH_USDC_V4,
+          pool: USDC_DAI_V4,
           liquidity: 1,
-          tickLower: -WETH_USDC_V4.tickSpacing,
-          tickUpper: WETH_USDC_V4.tickSpacing,
+          tickLower: -USDC_DAI_V4.tickSpacing,
+          tickUpper: USDC_DAI_V4.tickSpacing,
         }),
         v3RemoveLiquidityOptions: {
           tokenId: 1,
@@ -1920,7 +2325,7 @@ describe('Uniswap', () => {
           },
         },
         v4AddLiquidityOptions: {
-          tokenId: 1,
+          migrate: true,
           deadline: 1,
           slippageTolerance: new Percent(5, 100),
           sqrtPriceX96: encodeSqrtRatioX96(1, 1),
@@ -1929,7 +2334,7 @@ describe('Uniswap', () => {
       expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('MINT_REQUIRED')
     })
 
-    it('throws if migrating flag not set', async () => {
+    it('throws if migrating weth to eth with token mismatch', async () => {
       const opts = Object.assign({
         inputPosition: new Position({
           pool: WETH_USDC_V3,
@@ -1938,10 +2343,48 @@ describe('Uniswap', () => {
           tickUpper: WETH_USDC_V3.tickSpacing,
         }),
         outputPosition: new V4Position({
-          pool: WETH_USDC_V4,
+          pool: ETH_DAI_V4,
           liquidity: 1,
-          tickLower: -WETH_USDC_V4.tickSpacing,
-          tickUpper: WETH_USDC_V4.tickSpacing,
+          tickLower: -ETH_DAI_V4.tickSpacing,
+          tickUpper: ETH_DAI_V4.tickSpacing,
+        }),
+        v3RemoveLiquidityOptions: {
+          tokenId: 1,
+          liquidityPercentage: new Percent(100, 100),
+          slippageTolerance: new Percent(5, 100),
+          deadline: 1,
+          burnToken: true,
+          collectOptions: {
+            expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(USDC, 0),
+            expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(WETH, 0),
+            recipient: CHAIN_TO_ADDRESSES_MAP[ChainId.MAINNET].v4PositionManagerAddress,
+          },
+        },
+        v4AddLiquidityOptions: {
+          migrate: true,
+          deadline: 1,
+          slippageTolerance: new Percent(5, 100),
+          sqrtPriceX96: encodeSqrtRatioX96(1, 1),
+          useNative: ETHER,
+          recipient: TEST_RECIPIENT_ADDRESS,
+        },
+      })
+      expect(() => SwapRouter.migrateV3ToV4CallParameters(opts)).to.throw('TOKEN_MISMATCH')
+    })
+
+    it('throws if migrating flag not set', async () => {
+      const opts = Object.assign({
+        inputPosition: new Position({
+          pool: USDC_DAI_V3,
+          liquidity: 1,
+          tickLower: -USDC_DAI_V3.tickSpacing,
+          tickUpper: USDC_DAI_V3.tickSpacing,
+        }),
+        outputPosition: new V4Position({
+          pool: USDC_DAI_V4,
+          liquidity: 1,
+          tickLower: -USDC_DAI_V4.tickSpacing,
+          tickUpper: USDC_DAI_V4.tickSpacing,
         }),
         v3RemoveLiquidityOptions: {
           tokenId: 1,
@@ -1968,16 +2411,16 @@ describe('Uniswap', () => {
     it('throws if not permitting the Universal router', async () => {
       const opts = Object.assign({
         inputPosition: new Position({
-          pool: WETH_USDC_V3,
+          pool: USDC_DAI_V3,
           liquidity: 1,
-          tickLower: -WETH_USDC_V3.tickSpacing,
-          tickUpper: WETH_USDC_V3.tickSpacing,
+          tickLower: -USDC_DAI_V3.tickSpacing,
+          tickUpper: USDC_DAI_V3.tickSpacing,
         }),
         outputPosition: new V4Position({
-          pool: WETH_USDC_V4,
+          pool: USDC_DAI_V4,
           liquidity: 1,
-          tickLower: -WETH_USDC_V4.tickSpacing,
-          tickUpper: WETH_USDC_V4.tickSpacing,
+          tickLower: -USDC_DAI_V4.tickSpacing,
+          tickUpper: USDC_DAI_V4.tickSpacing,
         }),
         v3RemoveLiquidityOptions: {
           tokenId: 1,

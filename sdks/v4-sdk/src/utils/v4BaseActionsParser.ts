@@ -23,7 +23,6 @@ export type SwapExactInSingle = {
   readonly zeroForOne: boolean
   readonly amountIn: string
   readonly amountOutMinimum: string
-  readonly sqrtPriceLimitX96: string
   readonly hookData: string
 }
 
@@ -39,7 +38,6 @@ export type SwapExactOutSingle = {
   readonly zeroForOne: boolean
   readonly amountOut: string
   readonly amountInMaximum: string
-  readonly sqrtPriceLimitX96: string
   readonly hookData: string
 }
 
@@ -146,7 +144,7 @@ function parsePathKey(data: string): PathKey {
 }
 
 function parseV4ExactInSingle(data: any[]): SwapExactInSingle {
-  const [poolKey, zeroForOne, amountIn, amountOutMinimum, sqrtPriceLimitX96, hookData] = data
+  const [poolKey, zeroForOne, amountIn, amountOutMinimum, hookData] = data
   const [currency0, currency1, fee, tickSpacing, hooks] = poolKey
   return {
     poolKey: {
@@ -159,7 +157,6 @@ function parseV4ExactInSingle(data: any[]): SwapExactInSingle {
     zeroForOne,
     amountIn,
     amountOutMinimum,
-    sqrtPriceLimitX96,
     hookData,
   }
 }
@@ -177,7 +174,7 @@ function parseV4ExactIn(data: any[]): SwapExactIn {
 }
 
 function parseV4ExactOutSingle(data: any[]): SwapExactOutSingle {
-  const [poolKey, zeroForOne, amountOut, amountInMaximum, sqrtPriceLimitX96, hookData] = data
+  const [poolKey, zeroForOne, amountOut, amountInMaximum, hookData] = data
   const { currency0, currency1, fee, tickSpacing, hooks } = poolKey
 
   return {
@@ -191,7 +188,6 @@ function parseV4ExactOutSingle(data: any[]): SwapExactOutSingle {
     zeroForOne,
     amountOut,
     amountInMaximum,
-    sqrtPriceLimitX96,
     hookData,
   }
 }

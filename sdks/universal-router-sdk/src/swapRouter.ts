@@ -1,5 +1,5 @@
 import invariant from 'tiny-invariant'
-import { abi } from '@uniswap/universal-router/artifacts/contracts/UniversalRouter.sol/UniversalRouter.json'
+import UniversalRouter from '@uniswap/universal-router/artifacts/contracts/UniversalRouter.sol/UniversalRouter.json'
 import { Interface } from '@ethersproject/abi'
 import { BigNumber, BigNumberish } from 'ethers'
 import {
@@ -41,7 +41,7 @@ function isMint(options: V4AddLiquidityOptions): options is MintOptions {
 }
 
 export abstract class SwapRouter {
-  public static INTERFACE: Interface = new Interface(abi)
+  public static INTERFACE: Interface = new Interface(UniversalRouter.abi)
 
   public static swapCallParameters(
     trades: RouterTrade<Currency, Currency, TradeType>,
@@ -82,14 +82,25 @@ export abstract class SwapRouter {
     positionManagerOverride?: string
   ): MethodParameters {
     const v4Pool: V4Pool = options.outputPosition.pool
-    const token0 = options.inputPosition.pool.token0
-    const token1 = options.inputPosition.pool.token1
+    const v3Token0 = options.inputPosition.pool.token0
+    const v3Token1 = options.inputPosition.pool.token1
     const v4PositionManagerAddress =
       positionManagerOverride ?? CHAIN_TO_ADDRESSES_MAP[v4Pool.chainId as SupportedChainsType].v4PositionManagerAddress
 
+    // owner of the v3 nft must be the receiver of the v4 nft
+
     // validate the parameters
-    invariant(token0 === v4Pool.token0, 'TOKEN0_MISMATCH')
-    invariant(token1 === v4Pool.token1, 'TOKEN1_MISMATCH')
+    if (v4Pool.currency0.isNative) {
+      invariant(
+        (v4Pool.currency0.wrapped.equals(v3Token0) && v4Pool.currency1.equals(v3Token1)) ||
+          (v4Pool.currency0.wrapped.equals(v3Token1) && v4Pool.currency1.equals(v3Token0)),
+        'TOKEN_MISMATCH'
+      )
+    } else {
+      invariant(v3Token0 === v4Pool.token0, 'TOKEN0_MISMATCH')
+      invariant(v3Token1 === v4Pool.token1, 'TOKEN1_MISMATCH')
+    }
+
     invariant(
       options.v3RemoveLiquidityOptions.liquidityPercentage.equalTo(new Percent(100, 100)),
       'FULL_REMOVAL_REQUIRED'

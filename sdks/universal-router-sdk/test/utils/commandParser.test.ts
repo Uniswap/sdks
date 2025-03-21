@@ -266,7 +266,6 @@ describe('Command Parser', () => {
               zeroForOne: true,
               amountIn: amount,
               amountOutMinimum: amount,
-              sqrtPriceLimitX96: 0,
               hookData: '0x',
             },
           ])
@@ -288,7 +287,6 @@ describe('Command Parser', () => {
                       zeroForOne: true,
                       amountIn: amount,
                       amountOutMinimum: amount,
-                      sqrtPriceLimitX96: BigNumber.from(0),
                       hookData: '0x',
                     },
                   },

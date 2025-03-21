@@ -1,0 +1,9 @@
+{
+    "extends": "./tsconfig.base.json",
+    "compilerOptions": {
+      "module": "esnext",
+      "outDir": "dist/esm",
+      "target": "es2015"
+    },
+    "include": ["src/**/*", "abis/**/*"]
+  } 

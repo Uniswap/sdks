@@ -10,7 +10,7 @@ import Permit2Abi from "../../abis/Permit2.json";
 import MockERC20Abi from "../../abis/MockERC20.json";
 
 import { Permit2, PriorityOrderReactor, MockERC20 } from "../../src/contracts";
-import { PriorityOrderBuilder, PriorityCosignerData } from "../../dist/src";
+import { PriorityOrderBuilder, PriorityCosignerData } from "../../src";
 
 describe("PriorityOrder", () => {
   const FEE_RECIPIENT = "0x1111111111111111111111111111111111111111";

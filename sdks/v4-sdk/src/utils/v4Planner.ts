@@ -8,6 +8,7 @@ import { encodeRouteToPath } from './encodeRouteToPath'
 /**
  * Actions
  * @description Constants that define what action to perform
+ * Not all actions are supported yet.
  * @enum {number}
  */
 export enum Actions {
@@ -17,27 +18,35 @@ export enum Actions {
   DECREASE_LIQUIDITY = 0x01,
   MINT_POSITION = 0x02,
   BURN_POSITION = 0x03,
+
+  // for fee on transfer tokens
+  // INCREASE_LIQUIDITY_FROM_DELTAS = 0x04,
+  // MINT_POSITION_FROM_DELTAS = 0x05,
+
   // swapping
-  SWAP_EXACT_IN_SINGLE = 0x04,
-  SWAP_EXACT_IN = 0x05,
-  SWAP_EXACT_OUT_SINGLE = 0x06,
-  SWAP_EXACT_OUT = 0x07,
+  SWAP_EXACT_IN_SINGLE = 0x06,
+  SWAP_EXACT_IN = 0x07,
+  SWAP_EXACT_OUT_SINGLE = 0x08,
+  SWAP_EXACT_OUT = 0x09,
 
   // closing deltas on the pool manager
   // settling
-  SETTLE = 0x09,
-  SETTLE_ALL = 0x10,
-  SETTLE_PAIR = 0x11,
+  SETTLE = 0x0b,
+  SETTLE_ALL = 0x0c,
+  SETTLE_PAIR = 0x0d,
   // taking
-  TAKE = 0x12,
-  TAKE_ALL = 0x13,
-  TAKE_PORTION = 0x14,
-  TAKE_PAIR = 0x15,
+  TAKE = 0x0e,
+  TAKE_ALL = 0x0f,
+  TAKE_PORTION = 0x10,
+  TAKE_PAIR = 0x11,
 
-  SETTLE_TAKE_PAIR = 0x16,
+  CLOSE_CURRENCY = 0x12,
+  // CLEAR_OR_TAKE = 0x13,
+  SWEEP = 0x14,
 
-  CLOSE_CURRENCY = 0x17,
-  SWEEP = 0x19,
+  // for wrapping/unwrapping native
+  // WRAP = 0x15,
+  UNWRAP = 0x16,
 }
 
 export enum Subparser {
@@ -59,17 +68,13 @@ const POOL_KEY_STRUCT = '(address currency0,address currency1,uint24 fee,int24 t
 const PATH_KEY_STRUCT = '(address intermediateCurrency,uint256 fee,int24 tickSpacing,address hooks,bytes hookData)'
 
 const SWAP_EXACT_IN_SINGLE_STRUCT =
-  '(' +
-  POOL_KEY_STRUCT +
-  ' poolKey,bool zeroForOne,uint128 amountIn,uint128 amountOutMinimum,uint160 sqrtPriceLimitX96,bytes hookData)'
+  '(' + POOL_KEY_STRUCT + ' poolKey,bool zeroForOne,uint128 amountIn,uint128 amountOutMinimum,bytes hookData)'
 
 const SWAP_EXACT_IN_STRUCT =
   '(address currencyIn,' + PATH_KEY_STRUCT + '[] path,uint128 amountIn,uint128 amountOutMinimum)'
 
 const SWAP_EXACT_OUT_SINGLE_STRUCT =
-  '(' +
-  POOL_KEY_STRUCT +
-  ' poolKey,bool zeroForOne,uint128 amountOut,uint128 amountInMaximum,uint160 sqrtPriceLimitX96,bytes hookData)'
+  '(' + POOL_KEY_STRUCT + ' poolKey,bool zeroForOne,uint128 amountOut,uint128 amountInMaximum,bytes hookData)'
 
 const SWAP_EXACT_OUT_STRUCT =
   '(address currencyOut,' + PATH_KEY_STRUCT + '[] path,uint128 amountOut,uint128 amountInMaximum)'
@@ -150,15 +155,12 @@ export const V4_BASE_ACTIONS_ABI_DEFINITION: { [key in Actions]: readonly ParamT
     { name: 'currency1', type: 'address' },
     { name: 'recipient', type: 'address' },
   ],
-  [Actions.SETTLE_TAKE_PAIR]: [
-    { name: 'settleCurrency', type: 'address' },
-    { name: 'takeCurrency', type: 'address' },
-  ],
   [Actions.CLOSE_CURRENCY]: [{ name: 'currency', type: 'address' }],
   [Actions.SWEEP]: [
     { name: 'currency', type: 'address' },
     { name: 'recipient', type: 'address' },
   ],
+  [Actions.UNWRAP]: [{ name: 'amount', type: 'uint256' }],
 }
 
 const FULL_DELTA_AMOUNT = 0
@@ -217,6 +219,11 @@ export class V4Planner {
   addTake(currency: Currency, recipient: string, amount?: BigNumber): V4Planner {
     const takeAmount = amount ?? FULL_DELTA_AMOUNT
     this.addAction(Actions.TAKE, [currencyAddress(currency), recipient, takeAmount])
+    return this
+  }
+
+  addUnwrap(amount: BigNumber): V4Planner {
+    this.addAction(Actions.UNWRAP, [amount])
     return this
   }
 

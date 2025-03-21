@@ -31,7 +31,7 @@ import { SENDER_AS_RECIPIENT, ROUTER_AS_RECIPIENT, CONTRACT_BALANCE, ETH_ADDRESS
 import { getCurrencyAddress } from '../../utils/getCurrencyAddress'
 import { encodeFeeBips } from '../../utils/numbers'
 import { BigNumber, BigNumberish } from 'ethers'
-import { TPool } from '@uniswap/router-sdk/dist/utils/TPool'
+import { TPool } from '@uniswap/router-sdk'
 
 export type FlatFeeOptions = {
   amount: BigNumberish

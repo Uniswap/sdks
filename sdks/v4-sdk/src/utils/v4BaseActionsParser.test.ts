@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import { WETH9 } from '@uniswap/sdk-core'
-import { BigNumber, ethers } from 'ethers'
+import { ethers } from 'ethers'
 import { Route } from '../entities/route'
 import { encodeRouteToPath } from './encodeRouteToPath'
 import { V4BaseActionsParser, V4RouterCall } from './v4BaseActionsParser'
@@ -45,21 +45,7 @@ describe('Command Parser', () => {
         ],
       },
     },
-    {
-      input: new V4Planner().addAction(Actions.SETTLE_TAKE_PAIR, [addressOne, addressTwo]),
-      result: {
-        actions: [
-          {
-            actionName: 'SETTLE_TAKE_PAIR',
-            actionType: Actions.SETTLE_TAKE_PAIR,
-            params: [
-              { name: 'settleCurrency', value: addressOne },
-              { name: 'takeCurrency', value: addressTwo },
-            ],
-          },
-        ],
-      },
-    },
+
     {
       input: new V4Planner().addAction(Actions.TAKE_PAIR, [addressOne, addressTwo, addressOne]),
       result: {
@@ -161,7 +147,6 @@ describe('Command Parser', () => {
           zeroForOne: true,
           amountIn: amount,
           amountOutMinimum: amount,
-          sqrtPriceLimitX96: 0,
           hookData: '0x',
         },
       ]),
@@ -178,7 +163,6 @@ describe('Command Parser', () => {
                   zeroForOne: true,
                   amountIn: amount,
                   amountOutMinimum: amount,
-                  sqrtPriceLimitX96: BigNumber.from(0),
                   hookData: '0x',
                 },
               },
@@ -194,7 +178,6 @@ describe('Command Parser', () => {
           zeroForOne: true,
           amountOut: amount,
           amountInMaximum: amount,
-          sqrtPriceLimitX96: 0,
           hookData: '0x',
         },
       ]),
@@ -211,7 +194,6 @@ describe('Command Parser', () => {
                   zeroForOne: true,
                   amountOut: amount,
                   amountInMaximum: amount,
-                  sqrtPriceLimitX96: BigNumber.from(0),
                   hookData: '0x',
                 },
               },

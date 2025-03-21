@@ -7,9 +7,9 @@
     "ethereum"
   ],
   "license": "MIT",
-  "main": "dist/src/index.js",
-  "typings": "dist/src/index.d.ts",
-  "module": "dist/uniswapx-sdk.esm.js",
+  "main": "./dist/cjs/src/index.js",
+  "typings": "./dist/types/src/index.d.ts",
+  "module": "./dist/esm/src/index.js",
   "files": [
     "dist"
   ],
@@ -17,21 +17,24 @@
     "node": ">=10"
   },
   "scripts": {
-    "build": "yarn run typechain && tsc -p tsconfig.json",
+    "build": "yarn run typechain && yarn build:cjs && yarn build:esm && yarn build:types",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "build:types": "tsc -p tsconfig.types.json",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
     "prettier": "prettier \"src/**/*.ts\" --list-different",
     "release": "semantic-release",
-    "test": "run-s build test:unit test:integration",
+    "test": "run-s test:unit test:integration",
     "test:unit": "jest --testPathPattern src --detectOpenHandles --forceExit --testPathIgnorePatterns dist",
-    "test:integration": "yarn build && cd integration && yarn && yarn test",
+    "test:integration": "cd integration && yarn && yarn test",
     "typechain": "typechain --target=ethers-v5 --out-dir src/contracts --glob ./abis/**/*.json"
   },
   "dependencies": {
     "@ethersproject/bytes": "^5.7.0",
     "@ethersproject/providers": "^5.8.0",
     "@uniswap/permit2-sdk": "^1.2.1",
-    "@uniswap/sdk-core": "^5.0.0",
+    "@uniswap/sdk-core": "^7.5.0",
     "ethers": "^5.7.0"
   },
   "devDependencies": {
@@ -50,7 +53,7 @@
     "jest-environment-node": "25.5.0",
     "npm-run-all": "^4.1.5",
     "prettier": "^2.4.1",
-    "ts-jest": "25.5.0",
+    "ts-jest": "^25.5.1",
     "ts-node": "^10.9.1",
     "typechain": "^8.1.0",
     "typescript": "^4.3.3"
@@ -96,5 +99,13 @@
         }
       ]
     ]
-  }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/types/src/index.d.ts",
+      "import": "./dist/esm/src/index.js",
+      "require": "./dist/cjs/src/index.js"
+    }
+  },
+  "sideEffects": false
 }

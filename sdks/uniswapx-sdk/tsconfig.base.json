@@ -1,8 +1,9 @@
 {
-  "include": ["src"],
+  "include": ["src", "abis"],
   "compilerOptions": {
-    "target": "es2018",
-    "module": "esnext",
+    "rootDir": ".",
+    "baseUrl": ".",
+    "target": "es6",
     "importHelpers": true,
     "declaration": true,
     "sourceMap": true,
@@ -18,7 +19,9 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "moduleResolution": "node",
+    "resolveJsonModule": true,
     "esModuleInterop": true,
-    "resolveJsonModule": true
+    "skipLibCheck": true,
+    "isolatedModules": true
   }
-}
+} 

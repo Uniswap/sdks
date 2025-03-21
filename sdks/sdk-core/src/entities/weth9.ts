@@ -20,6 +20,7 @@ export const WETH9: { [chainId: number]: Token } = {
   421614: new Token(421614, '0x980B62Da83eFf3D4576C647993b0c1D7faf17c73', 18, 'WETH', 'Wrapped Ether'),
 
   8453: new Token(8453, '0x4200000000000000000000000000000000000006', 18, 'WETH', 'Wrapped Ether'),
+  84532: new Token(84532, '0x4200000000000000000000000000000000000006', 18, 'WETH', 'Wrapped Ether'),
 
   56: new Token(56, '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c', 18, 'WBNB', 'Wrapped BNB'),
   137: new Token(137, '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270', 18, 'WMATIC', 'Wrapped MATIC'),
@@ -30,4 +31,6 @@ export const WETH9: { [chainId: number]: Token } = {
   480: new Token(480, '0x4200000000000000000000000000000000000006', 18, 'WETH', 'Wrapped Ether'),
   1301: new Token(1301, '0x4200000000000000000000000000000000000006', 18, 'WETH', 'Wrapped Ether'),
   130: new Token(130, '0x4200000000000000000000000000000000000006', 18, 'WETH', 'Wrapped Ether'),
+  10143: new Token(10143, '0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701', 18, 'WMON', 'Wrapped Monad'),
+  1868: new Token(1868, '0x4200000000000000000000000000000000000006', 18, 'WETH', 'Wrapped Ether'),
 }

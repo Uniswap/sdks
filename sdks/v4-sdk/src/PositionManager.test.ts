@@ -5,7 +5,8 @@ import {
   EMPTY_HOOK,
   FeeAmount,
   CANNOT_BURN,
-  NO_NATIVE,
+  NATIVE_NOT_SET,
+  OPEN_DELTA,
   SQRT_PRICE_1_1,
   TICK_SPACINGS,
   ZERO_LIQUIDITY,
@@ -106,7 +107,7 @@ describe('PositionManager', () => {
       ).toThrow('ZERO_LIQUIDITY')
     })
 
-    it('throws if pool does not involve ether and useNative is true', () => {
+    it('throws if pool does not involve ether and useNative is set', () => {
       expect(() =>
         V4PositionManager.addCallParameters(
           new Position({
@@ -115,9 +116,23 @@ describe('PositionManager', () => {
             tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
             liquidity: 8888888,
           }),
-          { recipient, slippageTolerance, deadline, useNative: Ether.onChain(1) }
+          { recipient, slippageTolerance, deadline, useNative: currency_native }
         )
-      ).toThrow(NO_NATIVE)
+      ).toThrow(NATIVE_NOT_SET)
+    })
+
+    it('throws if pool involves ether and useNative is not set', () => {
+      expect(() =>
+        V4PositionManager.addCallParameters(
+          new Position({
+            pool: pool_1_eth,
+            tickLower: -TICK_SPACINGS[FeeAmount.MEDIUM],
+            tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
+            liquidity: 8888888,
+          }),
+          { recipient, slippageTolerance, deadline } // useNative not set
+        )
+      ).toThrow(NATIVE_NOT_SET)
     })
 
     it('throws if createPool is true but there is no sqrtPrice defined', () => {
@@ -237,7 +252,7 @@ describe('PositionManager', () => {
       expect(value).toEqual('0x00')
     })
 
-    it('succeeds when useNative is true', () => {
+    it('succeeds when useNative is set', () => {
       const position: Position = new Position({
         pool: pool_1_eth,
         tickLower: -TICK_SPACINGS[FeeAmount.MEDIUM],
@@ -248,7 +263,7 @@ describe('PositionManager', () => {
         recipient,
         slippageTolerance,
         deadline,
-        useNative: Ether.onChain(1),
+        useNative: currency_native,
       })
 
       // Rebuild the data with the planner for the expected mint. MUST sweep since we are using the native currency.
@@ -303,10 +318,50 @@ describe('PositionManager', () => {
         EMPTY_BYTES,
       ])
 
-      planner.addAction(Actions.SETTLE, [toAddress(pool_0_1.currency0), 0, false])
-      planner.addAction(Actions.SETTLE, [toAddress(pool_0_1.currency1), 0, false])
+      planner.addAction(Actions.SETTLE, [toAddress(pool_0_1.currency0), OPEN_DELTA, false])
+      planner.addAction(Actions.SETTLE, [toAddress(pool_0_1.currency1), OPEN_DELTA, false])
       planner.addAction(Actions.SWEEP, [toAddress(pool_0_1.currency0), recipient])
       planner.addAction(Actions.SWEEP, [toAddress(pool_0_1.currency1), recipient])
+      expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
+
+      expect(value).toEqual('0x00')
+    })
+
+    it('succeeds when migrating to an eth position', () => {
+      const position: Position = new Position({
+        pool: pool_1_eth,
+        tickLower: -TICK_SPACINGS[FeeAmount.MEDIUM],
+        tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
+        liquidity: 1,
+      })
+      const { calldata, value } = V4PositionManager.addCallParameters(position, {
+        recipient,
+        slippageTolerance,
+        deadline,
+        migrate: true,
+        useNative: currency_native,
+      })
+
+      // Rebuild the data with the planner for the expected mint. MUST sweep since we are using the native currency.
+      const planner = new V4Planner()
+      const { amount0: amount0Max, amount1: amount1Max } = position.mintAmountsWithSlippage(slippageTolerance)
+      // Expect position to be minted correctly
+      planner.addAction(Actions.MINT_POSITION, [
+        pool_1_eth.poolKey,
+        -TICK_SPACINGS[FeeAmount.MEDIUM],
+        TICK_SPACINGS[FeeAmount.MEDIUM],
+        1,
+        toHex(amount0Max),
+        toHex(amount1Max),
+        recipient,
+        EMPTY_BYTES,
+      ])
+
+      planner.addAction(Actions.UNWRAP, [OPEN_DELTA])
+      planner.addAction(Actions.SETTLE, [toAddress(pool_1_eth.currency0), OPEN_DELTA, false])
+      planner.addAction(Actions.SETTLE, [toAddress(pool_1_eth.currency1), OPEN_DELTA, false])
+      planner.addAction(Actions.SWEEP, [toAddress(pool_1_eth.currency0.wrapped), recipient])
+      planner.addAction(Actions.SWEEP, [toAddress(pool_1_eth.currency1), recipient])
       expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
 
       expect(value).toEqual('0x00')

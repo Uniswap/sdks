@@ -8,6 +8,7 @@ const NETWORKS_WITH_SAME_ADDRESS: ChainId[] = [
   ChainId.GOERLI,
   ChainId.POLYGON,
   ChainId.BASE,
+  ChainId.UNICHAIN,
 ];
 
 export function constructSameAddressMap<T>(
@@ -36,6 +37,7 @@ export const UNISWAPX_ORDER_QUOTER_MAPPING: AddressMap = {
   42161: "0x88440407634F89873c5D9439987Ac4BE9725fea8",
   12341234: "0xbea0901A41177811b099F787D753436b2c47690E",
   8453: "0x88440407634f89873c5d9439987ac4be9725fea8",
+  130: "0x88440407634F89873c5D9439987Ac4BE9725fea8",
 };
 
 export const EXCLUSIVE_FILLER_VALIDATION_MAPPING: AddressMap = {
@@ -103,6 +105,12 @@ export const REACTOR_ADDRESS_MAPPING: ReactorMapping = {
     [OrderType.Relay]: "0x0000000000000000000000000000000000000000",
     [OrderType.Priority]: "0x000000001Ec5656dcdB24D90DFa42742738De729",
   },
+  130: {
+    [OrderType.Dutch]: "0x0000000000000000000000000000000000000000",
+    [OrderType.Dutch_V2]: "0x0000000000000000000000000000000000000000",
+    [OrderType.Relay]: "0x0000000000000000000000000000000000000000",
+    [OrderType.Priority]: "0x00000006021a6Bce796be7ba509BBBA71e956e37",
+  },
 };
 
 // aliasing for backwards compatibility
@@ -141,3 +149,19 @@ export const REVERSE_REACTOR_MAPPING: ReverseReactorMapping = Object.entries(
 export const BPS = 10000;
 
 export const MPS = BigNumber.from(10).pow(7);
+
+type PermissionedToken = {
+  address: string;
+  chainId: ChainId;
+  symbol: string;
+  usesProxy: boolean;
+}
+
+export const PERMISSIONED_TOKENS: PermissionedToken[] = [
+  {
+    address: "0x7712c34205737192402172409a8F7ccef8aA2AEc",
+    chainId: ChainId.MAINNET,
+    symbol: "BUIDL",
+    usesProxy: true,
+  },
+]

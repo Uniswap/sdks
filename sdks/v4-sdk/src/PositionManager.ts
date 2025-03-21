@@ -1,4 +1,4 @@
-import { BigintIsh, Percent, validateAndParseAddress, Currency, NativeCurrency } from '@uniswap/sdk-core'
+import { BigintIsh, Percent, validateAndParseAddress, NativeCurrency } from '@uniswap/sdk-core'
 import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
 import JSBI from 'jsbi'
 import { Position } from './entities/position'
@@ -11,15 +11,16 @@ import invariant from 'tiny-invariant'
 import {
   EMPTY_BYTES,
   CANNOT_BURN,
-  NO_NATIVE,
+  NATIVE_NOT_SET,
   NO_SQRT_PRICE,
   ONE,
+  OPEN_DELTA,
   PositionFunctions,
   ZERO,
   ZERO_LIQUIDITY,
 } from './internalConstants'
 import { V4PositionPlanner } from './utils'
-import { abi } from './utils/abi'
+import { positionManagerAbi } from './utils/positionManagerAbi'
 
 export interface CommonOptions {
   /**
@@ -204,7 +205,7 @@ function shouldCreatePool(options: MintOptions): boolean {
 }
 
 export abstract class V4PositionManager {
-  public static INTERFACE: Interface = new Interface(abi)
+  public static INTERFACE: Interface = new Interface(positionManagerAbi)
 
   /**
    * Cannot be constructed.
@@ -240,6 +241,13 @@ export abstract class V4PositionManager {
       calldataList.push(V4PositionManager.encodeInitializePool(position.pool.poolKey, options.sqrtPriceX96!))
     }
 
+    // position.pool.currency0 is native if and only if options.useNative is set
+    invariant(
+      position.pool.currency0 === options.useNative ||
+        (!position.pool.currency0.isNative && options.useNative === undefined),
+      NATIVE_NOT_SET
+    )
+
     // adjust for slippage
     const maximumAmounts = position.mintAmountsWithSlippage(options.slippageTolerance)
     const amount0Max = toHex(maximumAmounts.amount0)
@@ -274,27 +282,38 @@ export abstract class V4PositionManager {
       planner.addIncrease(options.tokenId, position.liquidity, amount0Max, amount1Max, options.hookData)
     }
 
+    let value: string = toHex(0)
+
     // If migrating, we need to settle and sweep both currencies individually
     if (isMint(options) && options.migrate) {
-      // payer is v4 positiion manager
-      planner.addSettle(position.pool.currency0, false)
-      planner.addSettle(position.pool.currency1, false)
-      planner.addSweep(position.pool.currency0, options.recipient)
-      planner.addSweep(position.pool.currency1, options.recipient)
+      if (options.useNative) {
+        // unwrap the exact amount needed to send to the pool manager
+        planner.addUnwrap(OPEN_DELTA)
+        // payer is v4 position manager
+        planner.addSettle(position.pool.currency0, false)
+        planner.addSettle(position.pool.currency1, false)
+        // sweep any leftover wrapped native that was not unwrapped
+        // recipient will be same as the v4 lp token recipient
+        planner.addSweep(position.pool.currency0.wrapped, options.recipient)
+        planner.addSweep(position.pool.currency1, options.recipient)
+      } else {
+        // payer is v4 position manager
+        planner.addSettle(position.pool.currency0, false)
+        planner.addSettle(position.pool.currency1, false)
+        // recipient will be same as the v4 lp token recipient
+        planner.addSweep(position.pool.currency0, options.recipient)
+        planner.addSweep(position.pool.currency1, options.recipient)
+      }
     } else {
       // need to settle both currencies when minting / adding liquidity (user is the payer)
       planner.addSettlePair(position.pool.currency0, position.pool.currency1)
-    }
-
-    // Any sweeping must happen after the settling.
-    let value: string = toHex(0)
-    if (options.useNative) {
-      invariant(position.pool.currency0.isNative || position.pool.currency1.isNative, NO_NATIVE)
-      let nativeCurrency: Currency = position.pool.currency0.isNative
-        ? position.pool.currency0
-        : position.pool.currency1
-      value = position.pool.currency0.isNative ? toHex(amount0Max) : toHex(amount1Max)
-      planner.addSweep(nativeCurrency, MSG_SENDER)
+      // When not migrating and adding native currency, add a final sweep
+      if (options.useNative) {
+        // Any sweeping must happen after the settling.
+        // native currency will always be currency0 in v4
+        value = toHex(amount0Max)
+        planner.addSweep(position.pool.currency0, MSG_SENDER)
+      }
     }
 
     calldataList.push(V4PositionManager.encodeModifyLiquidities(planner.finalize(), options.deadline))
