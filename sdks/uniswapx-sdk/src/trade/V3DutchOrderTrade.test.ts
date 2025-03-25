@@ -215,7 +215,7 @@ describe("V3DutchOrderTrade", () => {
 	describe("Expected amounts", () => {
 		const expectedAmounts = {
 			expectedAmountIn: "800",
-			expectedAmountOut: "900"
+			expectedAmountOut: "900",
 		};
 
 		const tradeWithExpectedAmounts = new V3DutchOrderTrade<Currency, Currency, TradeType>({
@@ -223,7 +223,7 @@ describe("V3DutchOrderTrade", () => {
 			currenciesOut: [DAI],
 			orderInfo,
 			tradeType: TradeType.EXACT_INPUT,
-			expectedAmounts
+			expectedAmounts,
 		});
 
 		it("uses expectedAmountIn when provided", () => {
@@ -252,7 +252,7 @@ describe("V3DutchOrderTrade", () => {
 				currencyIn: USDC,
 				currenciesOut: [DAI],
 				orderInfo,
-				tradeType: TradeType.EXACT_INPUT
+				tradeType: TradeType.EXACT_INPUT,
 			});
 
 			// Using private method through any to test error case
@@ -266,7 +266,7 @@ describe("V3DutchOrderTrade", () => {
 				currencyIn: USDC,
 				currenciesOut: [DAI],
 				orderInfo,
-				tradeType: TradeType.EXACT_INPUT
+				tradeType: TradeType.EXACT_INPUT,
 			});
 
 			// Using private method through any to test error case
