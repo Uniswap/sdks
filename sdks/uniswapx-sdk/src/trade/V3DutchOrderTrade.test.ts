@@ -211,4 +211,68 @@ describe("V3DutchOrderTrade", () => {
 			expect(ethOutputTrade.outputAmount.currency).toEqual(Ether.onChain(1));
 		});
 	});
+
+	describe("Expected amounts", () => {
+		const expectedAmounts = {
+			expectedAmountIn: "800",
+			expectedAmountOut: "900",
+		};
+
+		const tradeWithExpectedAmounts = new V3DutchOrderTrade<Currency, Currency, TradeType>({
+			currencyIn: USDC,
+			currenciesOut: [DAI],
+			orderInfo,
+			tradeType: TradeType.EXACT_INPUT,
+			expectedAmounts,
+		});
+
+		it("uses expectedAmountIn when provided", () => {
+			expect(tradeWithExpectedAmounts.inputAmount.quotient.toString()).toEqual(
+				expectedAmounts.expectedAmountIn
+			);
+		});
+
+		it("uses expectedAmountOut when provided", () => {
+			expect(tradeWithExpectedAmounts.outputAmount.quotient.toString()).toEqual(
+				expectedAmounts.expectedAmountOut
+			);
+		});
+
+		it("falls back to order amounts when expectedAmounts is not provided", () => {
+			expect(trade.inputAmount.quotient.toString()).toEqual(
+				orderInfo.input.startAmount.toString()
+			);
+			expect(trade.outputAmount.quotient.toString()).toEqual(
+				NON_FEE_OUTPUT_AMOUNT.toString()
+			);
+		});
+
+		it("throws when accessing expectedAmountIn that wasn't provided", () => {
+			const tradeWithoutExpected = new V3DutchOrderTrade<Currency, Currency, TradeType>({
+				currencyIn: USDC,
+				currenciesOut: [DAI],
+				orderInfo,
+				tradeType: TradeType.EXACT_INPUT,
+			});
+
+			// Using private method through any to test error case
+			expect(() => {
+				(tradeWithoutExpected as any).getExpectedAmountIn();
+			}).toThrow("expectedAmountIn not set");
+		});
+
+		it("throws when accessing expectedAmountOut that wasn't provided", () => {
+			const tradeWithoutExpected = new V3DutchOrderTrade<Currency, Currency, TradeType>({
+				currencyIn: USDC,
+				currenciesOut: [DAI],
+				orderInfo,
+				tradeType: TradeType.EXACT_INPUT,
+			});
+
+			// Using private method through any to test error case
+			expect(() => {
+				(tradeWithoutExpected as any).getExpectedAmountOut();
+			}).toThrow("expectedAmountOut not set");
+		});
+	});
 });

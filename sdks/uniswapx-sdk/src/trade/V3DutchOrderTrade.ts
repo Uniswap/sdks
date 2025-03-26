@@ -13,6 +13,10 @@ export class V3DutchOrderTrade<
 > {
 	public readonly tradeType: TTradeType
 	public readonly order: UnsignedV3DutchOrder
+	public readonly expectedAmounts: {
+		expectedAmountIn: string;
+		expectedAmountOut: string;
+	} | undefined;
 
 	private _inputAmount: CurrencyAmount<TInput> | undefined
 	private _outputAmounts: CurrencyAmount<TOutput>[] | undefined
@@ -25,15 +29,21 @@ export class V3DutchOrderTrade<
 		currenciesOut,
 		orderInfo,
 		tradeType,
+		expectedAmounts,
 	}: {
 		currencyIn: TInput
 		currenciesOut: TOutput[]
 		orderInfo: UnsignedV3DutchOrderInfo
 		tradeType: TTradeType
+		expectedAmounts?: {
+			expectedAmountIn: string;
+			expectedAmountOut: string;
+		}
 	}) {
 		this._currencyIn = currencyIn
 		this._currenciesOut = currenciesOut
 		this.tradeType = tradeType
+		this.expectedAmounts = expectedAmounts;
 
 		// Assuming not cross-chain
 		this.order = new UnsignedV3DutchOrder(orderInfo, currencyIn.chainId)
@@ -42,10 +52,12 @@ export class V3DutchOrderTrade<
 	public get inputAmount(): CurrencyAmount<TInput> {
 		if (this._inputAmount) return this._inputAmount
 
-		const amount = CurrencyAmount.fromRawAmount(
-			this._currencyIn,
-			this.order.info.input.startAmount.toString()
-		)
+		const amount = this.expectedAmounts?.expectedAmountIn
+			? this.getExpectedAmountIn()
+			: CurrencyAmount.fromRawAmount(
+				this._currencyIn,
+				this.order.info.input.startAmount.toString()
+			)
 		this._inputAmount = amount
 		return amount
 	}
@@ -72,7 +84,9 @@ export class V3DutchOrderTrade<
 
 	// Same assumption as V2 that there is only one non-fee output at a time, and it exists at index 0
 	public get outputAmount(): CurrencyAmount<TOutput> {
-		return this.outputAmounts[0];
+		return this.expectedAmounts?.expectedAmountOut
+			? this.getExpectedAmountOut()
+			: this.outputAmounts[0];
 	}
 
 	public minimumAmountOut(): CurrencyAmount<TOutput> {
@@ -121,6 +135,28 @@ export class V3DutchOrderTrade<
 			this.outputAmount.currency,
 			this.maximumAmountIn().quotient,
 			this.minimumAmountOut().quotient
+		);
+	}
+
+	private getExpectedAmountIn(): CurrencyAmount<TInput> {
+		if (!this.expectedAmounts?.expectedAmountIn) {
+			throw new Error("expectedAmountIn not set");
+		}
+
+		return CurrencyAmount.fromRawAmount(
+			this._currencyIn,
+			this.expectedAmounts.expectedAmountIn
+		);
+	}
+
+	private getExpectedAmountOut(): CurrencyAmount<TOutput> {
+		if (!this.expectedAmounts?.expectedAmountOut) {
+			throw new Error("expectedAmountOut not set");
+		}
+
+		return CurrencyAmount.fromRawAmount(
+			this._currenciesOut[0],
+			this.expectedAmounts.expectedAmountOut
 		);
 	}
 }
