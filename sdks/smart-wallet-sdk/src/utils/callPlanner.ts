@@ -1,7 +1,7 @@
 import { encodeAbiParameters, hashTypedData } from 'viem'
 
-import { Call } from '../types'
 import { DOMAIN_NAME, DOMAIN_VERSION } from '../constants'
+import { Call } from '../types'
 
 // Define the ABI parameter type for the call tuple
 const CALL_ABI_PARAMS = [
