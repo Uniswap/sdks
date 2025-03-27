@@ -1,6 +1,7 @@
-import { encodeAbiParameters } from 'viem'
+import { encodeAbiParameters, hashTypedData } from 'viem'
 
 import { Call } from '../types'
+import { DOMAIN_NAME, DOMAIN_VERSION } from '../constants'
 
 // Define the ABI parameter type for the call tuple
 const CALL_ABI_PARAMS = [
@@ -13,6 +14,17 @@ const CALL_ABI_PARAMS = [
     ]
   }
 ] as const
+
+const TYPES = {
+  Call: [
+    { name: 'to', type: 'address' },
+    { name: 'value', type: 'uint256' },
+    { name: 'data', type: 'bytes' }
+  ],
+  Execute: [
+    { name: 'calls', type: 'Call[]' }
+  ]
+}
 
 /**
  * CallPlanner is used to encode a series Calls
@@ -52,6 +64,28 @@ export class CallPlanner {
 
     
     return encodeAbiParameters(CALL_ABI_PARAMS, [this.calls])
+  }
+
+  /**
+   * Hash the calls using EIP-712
+   * @param verifyingContract The verifying contract (should be the signer's account address)
+   * @param chainId The chain ID
+   * @returns The hash of the calls
+   */
+  hashTypedData(verifyingContract: `0x${string}`, chainId: number): `0x${string}` {
+    return hashTypedData({
+      domain: {
+        name: DOMAIN_NAME,
+        version: DOMAIN_VERSION,
+        chainId,
+        verifyingContract
+      },
+      types: TYPES,
+      primaryType: 'Execute',
+      message: {
+        calls : this.calls
+      }
+    })
   }
 
   /**

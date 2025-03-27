@@ -68,6 +68,14 @@ describe('CallPlanner', () => {
     })
   })
 
+  describe('hashTypedData', () => {
+    it('should hash the calls using EIP-712', () => {
+      const planner = new CallPlanner([{ to: TEST_ADDRESS_1, data: TEST_DATA_1, value: TEST_VALUE_1 }])
+      const hash = planner.hashTypedData(TEST_ADDRESS_1, 1)
+      expect(hash).toBeDefined()
+    })
+  })
+
   describe('add', () => {
     it('should add a new call to the calls array', () => {
       const planner = new CallPlanner()
