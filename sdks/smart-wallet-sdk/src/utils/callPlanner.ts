@@ -57,11 +57,11 @@ export class CallPlanner {
   /**
    * Add a command to execute a call
    * @param to The target address of the call
-   * @param data The calldata for the call
    * @param value The ETH value to send with the call
+   * @param data The calldata for the call
    */
-  add(to: `0x${string}`, data: `0x${string}`, value: bigint): CallPlanner {
-    this.calls.push({ to, data, value })
+  add(to: `0x${string}`, value: bigint, data: `0x${string}`): CallPlanner {
+    this.calls.push({ to, value, data })
     return this
   }
 }

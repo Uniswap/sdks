@@ -72,31 +72,31 @@ describe('CallPlanner', () => {
   describe('add', () => {
     it('should add a new call to the calls array', () => {
       const planner = new CallPlanner()
-      planner.add(TEST_ADDRESS_1, TEST_DATA_1, TEST_VALUE_1)
+      planner.add(TEST_ADDRESS_1, TEST_VALUE_1, TEST_DATA_1)
       expect(planner.calls).toEqual([{ to: TEST_ADDRESS_1, data: TEST_DATA_1, value: TEST_VALUE_1 }])
     })
 
     it('should add a new call with bigint value', () => {
       const planner = new CallPlanner()
-      planner.add(TEST_ADDRESS_1, TEST_DATA_1, 100n)
+      planner.add(TEST_ADDRESS_1, 100n, TEST_DATA_1)
       expect(planner.calls).toEqual([{ to: TEST_ADDRESS_1, data: TEST_DATA_1, value: 100n }])
     })
 
     it('should return the planner instance for chaining', () => {
       const planner = new CallPlanner()
-      const result = planner.add(TEST_ADDRESS_1, TEST_DATA_1, TEST_VALUE_1)
+      const result = planner.add(TEST_ADDRESS_1, TEST_VALUE_1, TEST_DATA_1)
       expect(result).toBe(planner)
     })
 
     it('should allow chaining multiple add calls', () => {
       const planner = new CallPlanner()
       planner
-        .add(TEST_ADDRESS_1, TEST_DATA_1, TEST_VALUE_1)
-        .add(TEST_ADDRESS_1, TEST_DATA_2, TEST_VALUE_2)
+        .add(TEST_ADDRESS_1, TEST_VALUE_1, TEST_DATA_1)
+        .add(TEST_ADDRESS_1, TEST_VALUE_2, TEST_DATA_2)
       
       expect(planner.calls).toEqual([
-        { to: TEST_ADDRESS_1, data: TEST_DATA_1, value: TEST_VALUE_1 },
-        { to: TEST_ADDRESS_1, data: TEST_DATA_2, value: TEST_VALUE_2 }
+        { to: TEST_ADDRESS_1, value: TEST_VALUE_1, data: TEST_DATA_1 },
+        { to: TEST_ADDRESS_1, value: TEST_VALUE_2, data: TEST_DATA_2 }
       ])
     })
   })
