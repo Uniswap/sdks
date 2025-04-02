@@ -1,6 +1,6 @@
-import { zeroAddress } from 'viem'
+import { decodeAbiParameters, zeroAddress } from 'viem'
 
-import { CallPlanner } from './callPlanner'
+import { CALL_ABI_PARAMS, CallPlanner } from './callPlanner'
 
 
 // Test constants
@@ -53,13 +53,14 @@ describe('CallPlanner', () => {
   describe('encode', () => {
     it('should correctly abi encode the calls', () => {
       const planner = new CallPlanner([
-        { to: TEST_ADDRESS_1, data: TEST_DATA_1, value: TEST_VALUE_1 }
+        { to: TEST_ADDRESS_1, value: TEST_VALUE_1, data: TEST_DATA_1 }
       ])
       
       const encoded = planner.encode()
-      // We're just checking that it returns a hex string and doesn't throw
-      expect(encoded).toMatch(/^0x/)
-      expect(typeof encoded).toBe('string')
+      
+      // decode the encoded data
+      const decoded = decodeAbiParameters(CALL_ABI_PARAMS, encoded)
+      expect(decoded).toEqual([[{ to: TEST_ADDRESS_1, value: TEST_VALUE_1, data: TEST_DATA_1 }]])
     })
 
     it('should throw an error if there are no calls to encode', () => {

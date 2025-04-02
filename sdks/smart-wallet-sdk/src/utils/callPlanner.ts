@@ -3,13 +3,13 @@ import { encodeAbiParameters } from 'viem'
 import { Call } from '../types'
 
 // Define the ABI parameter type for the call tuple
-const CALL_ABI_PARAMS = [
+export const CALL_ABI_PARAMS = [
   {
     type: 'tuple[]',
     components: [
       { type: 'address', name: 'to' },
-      { type: 'bytes', name: 'data' },
-      { type: 'uint256', name: 'value' }
+      { type: 'uint256', name: 'value' },
+      { type: 'bytes', name: 'data' }
     ]
   }
 ] as const
