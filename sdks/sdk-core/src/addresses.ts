@@ -20,7 +20,7 @@ type ChainAddresses = {
   v4QuoterAddress?: string
 }
 
-const DEFAULT_NETWORKS = [ChainId.MAINNET, ChainId.GOERLI, ChainId.SEPOLIA]
+const DEFAULT_NETWORKS = [ChainId.MAINNET, ChainId.GOERLI, ChainId.SEPOLIA, ChainId.UZH_POS]
 
 function constructSameAddressMap(address: string, additionalNetworks: ChainId[] = []): AddressMap {
   return DEFAULT_NETWORKS.concat(additionalNetworks).reduce<AddressMap>((memo, chainId) => {
@@ -417,6 +417,13 @@ const SONEIUM_ADDRESSES: ChainAddresses = {
   v4QuoterAddress: '0x3972c00f7ed4885e145823eb7c655375d275a1c5',
 }
 
+const UZH_CHAIN_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: '0x45480Cbcef7c1cEDe27A144bd46c60bb27d7aa05',
+  multicallAddress: '0x543c82108bbeca3E430d4C3654621Cb8cF83CaC0',
+  quoterAddress: '0x1695FD1FcD62939081914887d1A60C42364cD6FA',
+  nonfungiblePositionManagerAddress: '0x238E17650E035C075434F091449437f571ebd1b7',
+}
+
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
   [ChainId.MAINNET]: MAINNET_ADDRESSES,
   [ChainId.OPTIMISM]: OPTIMISM_ADDRESSES,
@@ -446,6 +453,8 @@ export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses>
   [ChainId.UNICHAIN]: UNICHAIN_ADDRESSES,
   [ChainId.MONAD_TESTNET]: MONAD_TESTNET_ADDRESSES,
   [ChainId.SONEIUM]: SONEIUM_ADDRESSES,
+  [ChainId.UZH_POS]: UZH_CHAIN_ADDRESSES,
+
 }
 
 /* V3 Contract Addresses */
