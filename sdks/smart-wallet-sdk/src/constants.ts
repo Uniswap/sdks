@@ -49,14 +49,5 @@ export const MODE_TYPE_ABI_PARAMETERS = {
  * Mapping of chainId to Smart Wallet contract addresses
  */
 export const SMART_WALLET_ADDRESSES: { [chainId in ChainId]?: `0x${string}` } = {
-  // Mainnet
-  [ChainId.MAINNET]: '0x0000000000000000000000000000000000000000', // Placeholder - to be replaced
-  // Optimism
-  [ChainId.OPTIMISM]: '0x0000000000000000000000000000000000000000', // Placeholder - to be replaced
-  // Polygon
-  [ChainId.POLYGON]: '0x0000000000000000000000000000000000000000', // Placeholder - to be replaced
-  // Arbitrum
-  [ChainId.ARBITRUM_ONE]: '0x0000000000000000000000000000000000000000', // Placeholder - to be replaced
-  // Base
-  [ChainId.BASE]: '0x0000000000000000000000000000000000000000', // Placeholder - to be replaced
+  [ChainId.SEPOLIA]: '0xB2cb3e92969828C2207367D9f4331a701B9464e6'
 }
