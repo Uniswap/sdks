@@ -13,5 +13,8 @@ export * from './utils'
 // Export main class
 export * from './smartWallet'
 
+// Export smart account functionality
+export * from './SmartAccount'
+
 // Export generated contracts (will be available after running typechain)
 // export * from './contracts'
