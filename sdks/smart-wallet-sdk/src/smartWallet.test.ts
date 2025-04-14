@@ -27,7 +27,7 @@ describe('SmartWallet', () => {
         }
       ]
 
-      const result = SmartWallet.encodeBatchedCall(calls)
+      const result = SmartWallet.encodeBatchedCall(calls, { shouldRevert: false })
       // decode the calldata
       const decoded = decodeFunctionData({
         abi,
@@ -41,7 +41,7 @@ describe('SmartWallet', () => {
         expect(decoded.args[0]).toBeDefined()
         expect((decoded.args[0] as BatchedCall).calls).toBeDefined()
         expect((decoded.args[0] as BatchedCall).calls.length).toBe(2)
-        expect((decoded.args[0] as BatchedCall).shouldRevert).toBe(true)
+        expect((decoded.args[0] as BatchedCall).shouldRevert).toBe(false)
       }
     })
   })
