@@ -6,6 +6,7 @@ import { abi } from '../abis/MinimalDelegationEntry.json'
 import { ModeType, SMART_WALLET_ADDRESSES } from './constants'
 import { Call, MethodParameters, ExecuteOptions, AdvancedCall } from './types'
 import { CallPlanner } from './utils'
+import { BatchedCallPlanner } from './utils/batchedCallPlanner'
 
 /**
  * Main SDK class for interacting with Uniswap smart wallet contracts
@@ -22,9 +23,29 @@ export class SmartWallet {
       throw new Error(`Invalid mode: ${mode}`)
     }
     const planner = new CallPlanner(calls)
+    const batchedCallPlanner = new BatchedCallPlanner(planner, options.shouldRevert)
+    
+    const encoded = encodeFunctionData({
+      abi,
+      functionName: '0x99e1d016', // execute(((address,uint256,bytes)[],bool))
+      args: [batchedCallPlanner.toBatchedCall()]
+    })
+    return {
+      calldata: encoded,
+      value: planner.value
+    }
+  }
+
+  public static encodeERC7821BatchedCall(calls: Call[], options: ExecuteOptions = {}): MethodParameters {
+    const mode = this.getModeFromOptions(options)
+    if(mode != ModeType.BATCHED_CALL && mode != ModeType.BATCHED_CALL_CAN_REVERT) {
+      throw new Error(`Invalid mode: ${mode}`)
+    }
+
+    const planner = new CallPlanner(calls)
     
     const executionData = planner.encode()
-    const encoded = this._encodeExecute(mode, executionData)
+    const encoded = this._encodeERC7821Execute(mode, executionData)
     return {
       calldata: encoded,
       value: planner.value
@@ -68,7 +89,7 @@ export class SmartWallet {
 
   /** Internal methods */
   
-  protected static _encodeExecute(mode: ModeType, data: `0x${string}`): `0x${string}` {
+  protected static _encodeERC7821Execute(mode: ModeType, data: `0x${string}`): `0x${string}` {
     return encodeFunctionData({
       abi,
       functionName: 'execute',

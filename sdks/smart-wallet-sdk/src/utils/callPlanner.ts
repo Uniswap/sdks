@@ -1,4 +1,5 @@
 import { encodeAbiParameters } from 'viem'
+
 import { Call } from '../types'
 
 // Define the ABI parameter type for the call tuple

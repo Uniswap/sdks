@@ -1,5 +1,7 @@
 import { encodeAbiParameters } from 'viem'
 
+import { BatchedCall } from '../types'
+
 import { CallPlanner } from './callPlanner'
 
 // Define the ABI parameter type for the call tuple
@@ -66,5 +68,12 @@ export class BatchedCallPlanner {
         shouldRevert: this.shouldRevert
       }
     ])
+  }
+
+  toBatchedCall(): BatchedCall {
+    return {
+      calls: this.callPlanner.calls,
+      shouldRevert: this.shouldRevert
+    }
   }
 }
