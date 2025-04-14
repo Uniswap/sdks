@@ -16,6 +16,14 @@ or
 yarn add @uniswap/smart-wallet-sdk
 ```
 
+## Deployment Addresses
+
+Below is a table of contract deployment addresses across various networks:
+
+| Network | Address | Commit Hash |
+|---------|---------|------------|
+| Sepolia | 0x85479d2AebeFf8445769a265763666c0d3dDC508 | 732247c5e3146b9340cb29e0f2b8f9e2f1df67a4 |
+
 ## Documentation
 
 Coming soon...
