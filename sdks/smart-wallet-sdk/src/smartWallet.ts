@@ -4,7 +4,7 @@ import { encodeFunctionData } from 'viem'
 import { abi } from '../abis/MinimalDelegationEntry.json'
 
 import { ModeType, SMART_WALLET_ADDRESSES } from './constants'
-import { Call, MethodParameters, ExecuteOptions, AdvancedCall } from './types'
+import { Call, MethodParameters, ExecuteOptions } from './types'
 import { CallPlanner } from './utils'
 import { BatchedCallPlanner } from './utils/batchedCallPlanner'
 
@@ -50,11 +50,6 @@ export class SmartWallet {
       calldata: encoded,
       value: planner.value
     }
-  }
-
-  /// To be implemented
-  public static encodeAdvancedCalls(calls: AdvancedCall[], opData: string, _options: ExecuteOptions = {}): MethodParameters {
-    throw new Error('Not implemented')
   }
 
   /**

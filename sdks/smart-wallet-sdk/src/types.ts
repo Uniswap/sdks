@@ -19,14 +19,6 @@ export interface Call {
 }
 
 /**
- * Represents a call with advanced options like partial failure handling
- */
-export interface AdvancedCall extends Call {
-  /** Whether to revert the entire transaction if this call fails */
-  revertOnFailure?: boolean
-}
-
-/**
  * Parameters for method execution
  */
 export interface MethodParameters {
@@ -42,9 +34,4 @@ export interface MethodParameters {
 export interface ExecuteOptions {
   /** Whether the execute call should revert if a call fails */
   shouldRevert?: boolean
-}
-
-export interface AdvancedExecuteOptions extends ExecuteOptions {
-  /** Whether the call supports opData */
-  senderIsUser?: boolean
 }
