@@ -33,7 +33,7 @@ export class BatchedCallPlanner {
    * @param callPlanner optionally initialize with a CallPlanner
    * @param shouldRevert optionally initialize with a boolean for shouldRevert
    */
-  constructor(callPlanner: CallPlanner, shouldRevert = false) {
+  constructor(callPlanner: CallPlanner, shouldRevert = true) {
     this.callPlanner = callPlanner
     this.shouldRevert = shouldRevert
   }

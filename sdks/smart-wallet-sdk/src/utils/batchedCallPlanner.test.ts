@@ -11,15 +11,15 @@ describe('BatchedCallPlanner', () => {
       const batchedPlanner = new BatchedCallPlanner(callPlanner)
       
       expect(batchedPlanner.callPlanner).toBe(callPlanner)
-      expect(batchedPlanner.shouldRevert).toBe(false)
+      expect(batchedPlanner.shouldRevert).toBe(true)
     })
 
     it('should initialize with the provided CallPlanner and shouldRevert value', () => {
       const callPlanner = new CallPlanner()
-      const batchedPlanner = new BatchedCallPlanner(callPlanner, true)
+      const batchedPlanner = new BatchedCallPlanner(callPlanner, false)
       
       expect(batchedPlanner.callPlanner).toBe(callPlanner)
-      expect(batchedPlanner.shouldRevert).toBe(true)
+      expect(batchedPlanner.shouldRevert).toBe(false)
     })
   })
 
@@ -81,6 +81,21 @@ describe('BatchedCallPlanner', () => {
       const callPlanner = new CallPlanner()
       callPlanner.add(TEST_ADDRESS_1, TEST_VALUE_1, TEST_DATA_1)
       
+      const batchedPlanner = new BatchedCallPlanner(callPlanner)
+      const encoded = batchedPlanner.encode()
+      
+      // decode the encoded data
+      const decoded = decodeAbiParameters(BATCHED_CALL_ABI_PARAMS, encoded)
+      expect(decoded).toEqual([{
+        calls: [{ to: TEST_ADDRESS_1, value: TEST_VALUE_1, data: TEST_DATA_1 }],
+        shouldRevert: true
+      }])
+    })
+
+    it('should correctly abi encode the batch call with shouldRevert=false', () => {
+      const callPlanner = new CallPlanner()
+      callPlanner.add(TEST_ADDRESS_1, TEST_VALUE_1, TEST_DATA_1)
+      
       const batchedPlanner = new BatchedCallPlanner(callPlanner, false)
       const encoded = batchedPlanner.encode()
       
@@ -89,21 +104,6 @@ describe('BatchedCallPlanner', () => {
       expect(decoded).toEqual([{
         calls: [{ to: TEST_ADDRESS_1, value: TEST_VALUE_1, data: TEST_DATA_1 }],
         shouldRevert: false
-      }])
-    })
-
-    it('should correctly abi encode the batch call with shouldRevert=true', () => {
-      const callPlanner = new CallPlanner()
-      callPlanner.add(TEST_ADDRESS_1, TEST_VALUE_1, TEST_DATA_1)
-      
-      const batchedPlanner = new BatchedCallPlanner(callPlanner, true)
-      const encoded = batchedPlanner.encode()
-      
-      // decode the encoded data
-      const decoded = decodeAbiParameters(BATCHED_CALL_ABI_PARAMS, encoded)
-      expect(decoded).toEqual([{
-        calls: [{ to: TEST_ADDRESS_1, value: TEST_VALUE_1, data: TEST_DATA_1 }],
-        shouldRevert: true
       }])
     })
 
@@ -123,7 +123,7 @@ describe('BatchedCallPlanner', () => {
           { to: TEST_ADDRESS_1, value: TEST_VALUE_1, data: TEST_DATA_1 },
           { to: TEST_ADDRESS_1, value: TEST_VALUE_2, data: TEST_DATA_2 }
         ],
-        shouldRevert: false
+        shouldRevert: true
       }])
     })
 
@@ -136,7 +136,7 @@ describe('BatchedCallPlanner', () => {
       const decoded = decodeAbiParameters(BATCHED_CALL_ABI_PARAMS, encoded)
       expect(decoded).toEqual([{
         calls: [],
-        shouldRevert: false
+        shouldRevert: true
       }])
     })
   })

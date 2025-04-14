@@ -22,13 +22,13 @@ describe('SmartWallet', () => {
         }
       ]
 
-      const result = SmartWallet.encodeCalls(calls)
+      const result = SmartWallet.encodeBatchedCall(calls)
       expect(result).toBeDefined()
       expect(result.calldata).toBeDefined()
       expect(result.value).toBeDefined()
     })
 
-    it('encodes batch calls with revertOnFailure option', () => {
+    it('encodes batch calls with shouldRevert option', () => {
       const calls: Call[] = [
         {
           to: '0x1111111111111111111111111111111111111111',
@@ -37,7 +37,7 @@ describe('SmartWallet', () => {
         }
       ]
       
-      const result = SmartWallet.encodeCalls(calls, { revertOnFailure: true })
+      const result = SmartWallet.encodeBatchedCall(calls, { shouldRevert: true })
       expect(result).toBeDefined()
       expect(result.calldata).toBeDefined()
       expect(result.value).toBeDefined()
@@ -53,7 +53,7 @@ describe('SmartWallet', () => {
           value: 0n
         }
       ]
-      expect(() => SmartWallet.encodeCalls(calls)).toThrow()
+      expect(() => SmartWallet.encodeBatchedCall(calls)).toThrow()
 
       jest.restoreAllMocks()
     })
@@ -77,12 +77,12 @@ describe('SmartWallet', () => {
   })
 
   describe('getModeFromOptions', () => {
-    for(const canRevert of [true, false]) {
-      it(`returns the correct mode type for canRevert: ${canRevert}`, () => {
-        if(canRevert) {
-          expect(SmartWallet.getModeFromOptions({ revertOnFailure: canRevert })).toBe(ModeType.BATCHED_CALL_CAN_REVERT)
+    for(const shouldRevert of [true, false]) {
+      it(`returns the correct mode type for shouldRevert: ${shouldRevert}`, () => {
+        if(shouldRevert) {
+          expect(SmartWallet.getModeFromOptions({ shouldRevert })).toBe(ModeType.BATCHED_CALL)
         } else {
-          expect(SmartWallet.getModeFromOptions({ revertOnFailure: canRevert })).toBe(ModeType.BATCHED_CALL)
+          expect(SmartWallet.getModeFromOptions({ shouldRevert })).toBe(ModeType.BATCHED_CALL_CAN_REVERT)
         }
       })
     }
