@@ -15,6 +15,7 @@ export class SmartWallet {
   /**
    * Creates method parameters for executing a simple batch of calls through a smart wallet
    * @param calls Array of calls to encode
+   * @param options Basic options for the execution
    * @returns Method parameters with calldata and value
    */
   public static encodeBatchedCall(calls: Call[], options: ExecuteOptions = {}): MethodParameters {
@@ -27,7 +28,7 @@ export class SmartWallet {
     
     const encoded = encodeFunctionData({
       abi,
-      functionName: '0x99e1d016', // execute(((address,uint256,bytes)[],bool))
+      functionName: 'execute', // execute(((address,uint256,bytes)[],bool))
       args: [batchedCallPlanner.toBatchedCall()]
     })
     return {
@@ -36,6 +37,9 @@ export class SmartWallet {
     }
   }
 
+  /**
+   * ERC7821 compatible entrypoint for executing batched calls through the contract
+   */
   public static encodeERC7821BatchedCall(calls: Call[], options: ExecuteOptions = {}): MethodParameters {
     const mode = this.getModeFromOptions(options)
     if(mode != ModeType.BATCHED_CALL && mode != ModeType.BATCHED_CALL_CAN_REVERT) {
