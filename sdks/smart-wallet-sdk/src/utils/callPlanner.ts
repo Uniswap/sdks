@@ -1,5 +1,4 @@
 import { encodeAbiParameters } from 'viem'
-
 import { Call } from '../types'
 
 // Define the ABI parameter type for the call tuple
@@ -49,7 +48,6 @@ export class CallPlanner {
     if (this.calls.length === 0) {
       throw new Error("No calls to encode")
     }
-
     
     return encodeAbiParameters(CALL_ABI_PARAMS, [this.calls])
   }

@@ -1,19 +1,18 @@
 import { ChainId } from '@uniswap/sdk-core'
-import { encodeAbiParameters, encodeFunctionData } from 'viem'
+import { encodeFunctionData } from 'viem'
 
-import { abi } from '../abis/MinimalDelegation.json'
+import { abi } from '../abis/MinimalDelegationEntry.json'
 
-import { MODE_TYPE_ABI_PARAMETERS, ModeType, SMART_WALLET_ADDRESSES } from './constants'
+import { ModeType, SMART_WALLET_ADDRESSES } from './constants'
 import { Call, MethodParameters, ExecuteOptions, AdvancedCall } from './types'
 import { CallPlanner } from './utils'
 
 /**
- * Main SDK class for interacting with ERC7821-compatible smart wallets
+ * Main SDK class for interacting with Uniswap smart wallet contracts
  */
 export class SmartWallet {
   /**
    * Creates method parameters for executing a simple batch of calls through a smart wallet
-   * @dev does not support opData
    * @param calls Array of calls to encode
    * @returns Method parameters with calldata and value
    */
@@ -78,15 +77,5 @@ export class SmartWallet {
         data
       ]
     })
-  }
-
-  protected static _encodeBatchedCallSupportsOpdata(
-    planner: CallPlanner,
-    opData: `0x${string}`
-  ): `0x${string}` {
-    return encodeAbiParameters(
-      MODE_TYPE_ABI_PARAMETERS[ModeType.BATCHED_CALL_SUPPORTS_OPDATA],
-      [planner.encode(), opData]
-    )
   }
 }

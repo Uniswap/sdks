@@ -45,7 +45,7 @@ describe('SmartWallet', () => {
 
     it('throws an error if the mode is not supported', () => {
       // mock getModeFromOptions
-      jest.spyOn(SmartWallet, 'getModeFromOptions').mockReturnValue(ModeType.BATCHED_CALL_SUPPORTS_OPDATA)
+      jest.spyOn(SmartWallet, 'getModeFromOptions').mockReturnValue('invalid' as ModeType)
       const calls: Call[] = [
         {
           to: '0x1111111111111111111111111111111111111111',
@@ -66,11 +66,11 @@ describe('SmartWallet', () => {
         value: 0n
       }
       
-      const call = SmartWallet.createExecute(methodParams, ChainId.MAINNET)
+      const call = SmartWallet.createExecute(methodParams, ChainId.SEPOLIA)
       
       // Verify the result
       expect(call).toBeDefined()
-      expect(call.to).toBe(SMART_WALLET_ADDRESSES[ChainId.MAINNET])
+      expect(call.to).toBe(SMART_WALLET_ADDRESSES[ChainId.SEPOLIA])
       expect(call.data).toBe(EXECUTE_SELECTOR)
       expect(call.value).toBe(0n)
     })
