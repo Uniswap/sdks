@@ -39,6 +39,7 @@ export class SmartWallet {
 
   /**
    * ERC7821 compatible entrypoint for executing batched calls through the contract
+   * @deprecated use encodeBatchedCall instead unless you need to use the ERC7821 entrypoint
    */
   public static encodeERC7821BatchedCall(calls: Call[], options: ExecuteOptions = {}): MethodParameters {
     const mode = this.getModeFromOptions(options)

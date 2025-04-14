@@ -17,25 +17,6 @@ export enum ModeType {
   BATCHED_CALL_CAN_REVERT = '0x0101000000000000000000000000000000000000000000000000000000000000'
 }
 
-const BATCHED_CALL_EXECUTION_DATA_ABI = [
-  {
-    type: 'tuple[]',
-    components: [
-      { type: 'address', name: 'to' },
-      { type: 'uint256', name: 'value' },
-      { type: 'bytes', name: 'data' }
-    ]
-  }
-]
-
-/**
- * ABI encoding for each mode type
- */
-export const MODE_TYPE_ABI_PARAMETERS = {
-  [ModeType.BATCHED_CALL]: BATCHED_CALL_EXECUTION_DATA_ABI,
-  [ModeType.BATCHED_CALL_CAN_REVERT]: BATCHED_CALL_EXECUTION_DATA_ABI
-} as const
-
 /**
  * Mapping of chainId to Smart Wallet contract addresses
  */
