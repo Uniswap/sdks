@@ -1,7 +1,7 @@
 import { ChainId } from '@uniswap/sdk-core'
 import { encodeFunctionData } from 'viem'
 
-import { abi } from '../abis/MinimalDelegationEntry.json'
+import abi from '../abis/MinimalDelegationEntry.json'
 
 import { ModeType, SMART_WALLET_ADDRESSES } from './constants'
 import { Call, MethodParameters, ExecuteOptions } from './types'
