@@ -149,6 +149,58 @@ export class Position {
     }
   }
 
+  public getAdjustedLiquidityForSlippage(slippageTolerance: Percent): JSBI {
+    const { sqrtRatioX96Upper, sqrtRatioX96Lower } = this.ratiosAfterSlippage(slippageTolerance)
+    // construct counterfactual pools from the lower bounded price and the upper bounded price
+    const poolLower = new Pool(
+      this.pool.token0,
+      this.pool.token1,
+      this.pool.fee,
+      this.pool.tickSpacing,
+      this.pool.hooks,
+      sqrtRatioX96Lower,
+      0 /* liquidity doesn't matter */,
+      TickMath.getTickAtSqrtRatio(sqrtRatioX96Lower)
+    )
+    const poolUpper = new Pool(
+      this.pool.token0,
+      this.pool.token1,
+      this.pool.fee,
+      this.pool.tickSpacing,
+      this.pool.hooks,
+      sqrtRatioX96Upper,
+      0 /* liquidity doesn't matter */,
+      TickMath.getTickAtSqrtRatio(sqrtRatioX96Upper)
+    )
+
+    const { amount0, amount1 } = this.mintAmounts
+    const positionUpper = Position.fromAmounts({
+      pool: poolUpper,
+      tickLower: this.tickLower,
+      tickUpper: this.tickUpper,
+      amount0,
+      amount1,
+      useFullPrecision: true,
+    })
+    const liquidityUpper = positionUpper.liquidity
+
+    const positionLower = Position.fromAmounts({
+      pool: poolLower,
+      tickLower: this.tickLower,
+      tickUpper: this.tickUpper,
+      amount0,
+      amount1,
+      useFullPrecision: true,
+    })
+    const liquidityLower = positionLower.liquidity
+
+    if (JSBI.lessThanOrEqual(liquidityUpper, liquidityLower)) {
+      return liquidityUpper
+    } else {
+      return liquidityLower
+    }
+  }
+
   /**
    * Returns the maximum amount of token0 and token1 that must be sent in order to safely mint the amount of liquidity held by the position
    * with the given slippage tolerance
