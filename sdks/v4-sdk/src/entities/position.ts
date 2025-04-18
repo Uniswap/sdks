@@ -151,7 +151,7 @@ export class Position {
 
   public maxAmountsAndLiquidityWithSlippage(slippageTolerance: Percent): Readonly<{ amount0: JSBI; amount1: JSBI; liquidity: JSBI }> {
     const adjustedLiquidity = this.getAdjustedLiquidityForSlippage(slippageTolerance)
-    const position = new Position({pool: this.pool, liquidity: adjustedLiquidity, tickLower: this.tickLower, tickUpper: this.tickUpper})
+    const position = new Position({ pool: this.pool, liquidity: adjustedLiquidity, tickLower: this.tickLower, tickUpper: this.tickUpper })
     const { amount0, amount1 } = position.mintAmountsWithSlippage(slippageTolerance)
     return { amount0, amount1, liquidity: adjustedLiquidity }
   }
@@ -211,6 +211,17 @@ export class Position {
   /**
    * Returns the maximum amount of token0 and token1 that must be sent in order to safely mint the amount of liquidity held by the position
    * with the given slippage tolerance
+   * @param slippageTolerance Tolerance of unfavorable slippage from the current price
+   * @returns The amounts, with slippage
+   * @dev In v4, minting and increasing is protected by maximum amounts of token0 and token1.
+   */
+  public getMintAmountsWithSlippage(slippageTolerance: Percent): Readonly<{ amount0: JSBI; amount1: JSBI }> {
+    return this.mintAmountsWithSlippage(slippageTolerance)
+  }
+
+  /**
+   * Internal helper method that calculates the maximum amounts of token0 and token1 needed for minting
+   * with slippage protection. This is used by the public getMintAmountsWithSlippage method.
    * @param slippageTolerance Tolerance of unfavorable slippage from the current price
    * @returns The amounts, with slippage
    * @dev In v4, minting and increasing is protected by maximum amounts of token0 and token1.
