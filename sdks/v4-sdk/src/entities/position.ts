@@ -149,6 +149,20 @@ export class Position {
     }
   }
 
+  /**
+   * Calculates the adjusted amounts and adjusted liquidity for the position given the slippage tolerance.
+   * The function:
+   * 1. Adjusts the liquidity based on the slippage tolerance
+   * 2. Creates a new position with the adjusted liquidity
+   * 3. Calculates the mint amounts for the adjusted position
+   *
+   * @param slippageTolerance The maximum acceptable slippage as a percentage
+   * @returns An object containing:
+   * - amount0: The adjusted amount of token0
+   * - amount1: The adjusted amount of token1
+   * - liquidity: The adjusted liquidity value
+   */
+
   public maxAmountsAndLiquidityWithSlippage(
     slippageTolerance: Percent
   ): Readonly<{ amount0: JSBI; amount1: JSBI; liquidity: JSBI }> {
@@ -163,6 +177,17 @@ export class Position {
     return { amount0, amount1, liquidity: adjustedLiquidity }
   }
 
+  /**
+   * Calculates the adjusted liquidity for a position given a slippage tolerance.
+   * The function:
+   * 1. Gets the upper and lower price bounds after slippage
+   * 2. Creates two counterfactual pools at these price bounds
+   * 3. Calculates the liquidity that would be obtained at each price bound
+   * 4. Returns the minimum liquidity to ensure the position can be created at either price bound
+   *
+   * @param slippageTolerance The maximum acceptable slippage as a percentage
+   * @returns The adjusted liquidity value that ensures the position can be created even with slippage
+   */
   private getAdjustedLiquidityForSlippage(slippageTolerance: Percent): JSBI {
     const { sqrtRatioX96Upper, sqrtRatioX96Lower } = this.ratiosAfterSlippage(slippageTolerance)
     // construct counterfactual pools from the lower bounded price and the upper bounded price

@@ -159,6 +159,7 @@ describe('PositionManager', () => {
         liquidity: 5000000,
       })
 
+      // These are the max amounts that the user can possibly add to the position
       const { amount0, amount1 } = position.mintAmounts
 
       const { calldata, value } = V4PositionManager.addCallParameters(position, {
@@ -190,6 +191,7 @@ describe('PositionManager', () => {
       expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
       expect(value).toEqual('0x00')
 
+      // The adjusted amounts are less than or equal to the max amounts
       expect(JSBI.lessThanOrEqual(adjustedAmount0, amount0)).toBe(true)
       expect(JSBI.lessThanOrEqual(adjustedAmount1, amount1)).toBe(true)
       expect(JSBI.equal(adjustedAmount0, amount0) || JSBI.equal(adjustedAmount1, amount1)).toBe(true)
@@ -203,6 +205,7 @@ describe('PositionManager', () => {
         liquidity: 666,
       })
 
+      // These are the max amounts that the user can possibly add to the position
       const { amount0, amount1 } = position.mintAmounts
 
       const { calldata, value } = V4PositionManager.addCallParameters(position, {
@@ -230,6 +233,7 @@ describe('PositionManager', () => {
       expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
       expect(value).toEqual('0x00')
 
+      // The adjusted amounts are less than or equal to the max amounts
       expect(JSBI.lessThanOrEqual(adjustedAmount0, amount0)).toBe(true)
       expect(JSBI.lessThanOrEqual(adjustedAmount1, amount1)).toBe(true)
       expect(JSBI.equal(adjustedAmount0, amount0) || JSBI.equal(adjustedAmount1, amount1)).toBe(true)
@@ -243,6 +247,7 @@ describe('PositionManager', () => {
         liquidity: 90000000000000,
       })
 
+      // These are the max amounts that the user can possibly add to the position
       const { amount0, amount1 } = position.mintAmounts
       const { calldata, value } = V4PositionManager.addCallParameters(position, {
         recipient,
@@ -279,6 +284,7 @@ describe('PositionManager', () => {
       expect(calldataList[1]).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
       expect(value).toEqual('0x00')
 
+      // The adjusted amounts are less than or equal to the max amounts
       expect(JSBI.lessThanOrEqual(adjustedAmount0, amount0)).toBe(true)
       expect(JSBI.lessThanOrEqual(adjustedAmount1, amount1)).toBe(true)
       expect(JSBI.equal(adjustedAmount0, amount0) || JSBI.equal(adjustedAmount1, amount1)).toBe(true)
@@ -292,6 +298,7 @@ describe('PositionManager', () => {
         liquidity: 1,
       })
 
+      // These are the max amounts that the user can possibly add to the position
       const { amount0, amount1 } = position.mintAmounts
       const { calldata, value } = V4PositionManager.addCallParameters(position, {
         recipient,
@@ -323,9 +330,9 @@ describe('PositionManager', () => {
       planner.addAction(Actions.SETTLE_PAIR, [toAddress(pool_1_eth.currency0), toAddress(pool_1_eth.currency1)])
       planner.addAction(Actions.SWEEP, [toAddress(pool_1_eth.currency0), MSG_SENDER])
       expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
-
       expect(value).toEqual(toHex(amount0))
 
+      // The adjusted amounts are less than or equal to the max amounts
       expect(JSBI.lessThanOrEqual(adjustedAmount0, amount0)).toBe(true)
       expect(JSBI.lessThanOrEqual(adjustedAmount1, amount1)).toBe(true)
       expect(JSBI.equal(adjustedAmount0, amount0) || JSBI.equal(adjustedAmount1, amount1)).toBe(true)
@@ -338,6 +345,8 @@ describe('PositionManager', () => {
         tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
         liquidity: 1,
       })
+
+      // These are the max amounts that the user can possibly add to the position
       const { amount0, amount1 } = position.mintAmounts
       const { calldata, value } = V4PositionManager.addCallParameters(position, {
         recipient,
@@ -373,6 +382,7 @@ describe('PositionManager', () => {
 
       expect(value).toEqual('0x00')
 
+      // The adjusted amounts are less than or equal to the max amounts
       expect(JSBI.lessThanOrEqual(adjustedAmount0, amount0)).toBe(true)
       expect(JSBI.lessThanOrEqual(adjustedAmount1, amount1)).toBe(true)
       expect(JSBI.equal(adjustedAmount0, amount0) || JSBI.equal(adjustedAmount1, amount1)).toBe(true)
@@ -385,6 +395,8 @@ describe('PositionManager', () => {
         tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
         liquidity: 1,
       })
+
+      // These are the max amounts that the user can possibly add to the position
       const { amount0, amount1 } = position.mintAmounts
       const { calldata, value } = V4PositionManager.addCallParameters(position, {
         recipient,
@@ -422,6 +434,7 @@ describe('PositionManager', () => {
 
       expect(value).toEqual('0x00')
 
+      // The adjusted amounts are less than or equal to the max amounts
       expect(JSBI.lessThanOrEqual(adjustedAmount0, amount0)).toBe(true)
       expect(JSBI.lessThanOrEqual(adjustedAmount1, amount1)).toBe(true)
       expect(JSBI.equal(adjustedAmount0, amount0) || JSBI.equal(adjustedAmount1, amount1)).toBe(true)
@@ -435,6 +448,7 @@ describe('PositionManager', () => {
         liquidity: 1,
       })
 
+      // These are the max amounts that the user can possibly add to the position
       const { amount0, amount1 } = position.mintAmounts
 
       const batchPermit: BatchPermitOptions = {
@@ -485,6 +499,7 @@ describe('PositionManager', () => {
       expect(calldataList[1]).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
       expect(value).toEqual('0x00')
 
+      // The adjusted amounts are less than or equal to the max amounts
       expect(JSBI.lessThanOrEqual(adjustedAmount0, amount0)).toBe(true)
       expect(JSBI.lessThanOrEqual(adjustedAmount1, amount1)).toBe(true)
       expect(JSBI.equal(adjustedAmount0, amount0) || JSBI.equal(adjustedAmount1, amount1)).toBe(true)
