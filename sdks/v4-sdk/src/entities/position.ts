@@ -150,13 +150,115 @@ export class Position {
   }
 
   /**
+   * Calculates the adjusted amounts and adjusted liquidity for the position given the slippage tolerance.
+   * The function:
+   * 1. Adjusts the liquidity based on the slippage tolerance
+   * 2. Creates a new position with the adjusted liquidity
+   * 3. Calculates the mint amounts for the adjusted position
+   *
+   * @param slippageTolerance The maximum acceptable slippage as a percentage
+   * @returns An object containing:
+   * - amount0: The adjusted amount of token0
+   * - amount1: The adjusted amount of token1
+   * - liquidity: The adjusted liquidity value
+   */
+
+  public maxAmountsAndLiquidityWithSlippage(
+    slippageTolerance: Percent
+  ): Readonly<{ amount0: JSBI; amount1: JSBI; liquidity: JSBI }> {
+    const adjustedLiquidity = this.getAdjustedLiquidityForSlippage(slippageTolerance)
+    const position = new Position({
+      pool: this.pool,
+      liquidity: adjustedLiquidity,
+      tickLower: this.tickLower,
+      tickUpper: this.tickUpper,
+    })
+    const { amount0, amount1 } = position.mintAmountsWithSlippage(slippageTolerance)
+    return { amount0, amount1, liquidity: adjustedLiquidity }
+  }
+
+  /**
+   * Calculates the adjusted liquidity for a position given a slippage tolerance.
+   * The function:
+   * 1. Gets the upper and lower price bounds after slippage
+   * 2. Creates two counterfactual pools at these price bounds
+   * 3. Calculates the liquidity that would be obtained at each price bound
+   * 4. Returns the minimum liquidity to ensure the position can be created at either price bound
+   *
+   * @param slippageTolerance The maximum acceptable slippage as a percentage
+   * @returns The adjusted liquidity value that ensures the position can be created even with slippage
+   */
+  private getAdjustedLiquidityForSlippage(slippageTolerance: Percent): JSBI {
+    const { sqrtRatioX96Upper, sqrtRatioX96Lower } = this.ratiosAfterSlippage(slippageTolerance)
+    // construct counterfactual pools from the lower bounded price and the upper bounded price
+    const poolLower = new Pool(
+      this.pool.token0,
+      this.pool.token1,
+      this.pool.fee,
+      this.pool.tickSpacing,
+      this.pool.hooks,
+      sqrtRatioX96Lower,
+      0 /* liquidity doesn't matter */,
+      TickMath.getTickAtSqrtRatio(sqrtRatioX96Lower)
+    )
+    const poolUpper = new Pool(
+      this.pool.token0,
+      this.pool.token1,
+      this.pool.fee,
+      this.pool.tickSpacing,
+      this.pool.hooks,
+      sqrtRatioX96Upper,
+      0 /* liquidity doesn't matter */,
+      TickMath.getTickAtSqrtRatio(sqrtRatioX96Upper)
+    )
+
+    const { amount0, amount1 } = this.mintAmounts
+    const positionUpper = Position.fromAmounts({
+      pool: poolUpper,
+      tickLower: this.tickLower,
+      tickUpper: this.tickUpper,
+      amount0,
+      amount1,
+      useFullPrecision: true,
+    })
+    const liquidityUpper = positionUpper.liquidity
+
+    const positionLower = Position.fromAmounts({
+      pool: poolLower,
+      tickLower: this.tickLower,
+      tickUpper: this.tickUpper,
+      amount0,
+      amount1,
+      useFullPrecision: true,
+    })
+    const liquidityLower = positionLower.liquidity
+
+    if (JSBI.lessThanOrEqual(liquidityUpper, liquidityLower)) {
+      return liquidityUpper
+    } else {
+      return liquidityLower
+    }
+  }
+
+  /**
    * Returns the maximum amount of token0 and token1 that must be sent in order to safely mint the amount of liquidity held by the position
    * with the given slippage tolerance
    * @param slippageTolerance Tolerance of unfavorable slippage from the current price
    * @returns The amounts, with slippage
    * @dev In v4, minting and increasing is protected by maximum amounts of token0 and token1.
    */
-  public mintAmountsWithSlippage(slippageTolerance: Percent): Readonly<{ amount0: JSBI; amount1: JSBI }> {
+  public getMintAmountsWithSlippage(slippageTolerance: Percent): Readonly<{ amount0: JSBI; amount1: JSBI }> {
+    return this.mintAmountsWithSlippage(slippageTolerance)
+  }
+
+  /**
+   * Internal helper method that calculates the maximum amounts of token0 and token1 needed for minting
+   * with slippage protection. This is used by the public getMintAmountsWithSlippage method.
+   * @param slippageTolerance Tolerance of unfavorable slippage from the current price
+   * @returns The amounts, with slippage
+   * @dev In v4, minting and increasing is protected by maximum amounts of token0 and token1.
+   */
+  private mintAmountsWithSlippage(slippageTolerance: Percent): Readonly<{ amount0: JSBI; amount1: JSBI }> {
     // get lower/upper prices
     // these represent the lowest and highest prices that the pool is allowed to "slip" to
     const { sqrtRatioX96Upper, sqrtRatioX96Lower } = this.ratiosAfterSlippage(slippageTolerance)
