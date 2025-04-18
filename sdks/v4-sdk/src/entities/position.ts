@@ -149,9 +149,16 @@ export class Position {
     }
   }
 
-  public maxAmountsAndLiquidityWithSlippage(slippageTolerance: Percent): Readonly<{ amount0: JSBI; amount1: JSBI; liquidity: JSBI }> {
+  public maxAmountsAndLiquidityWithSlippage(
+    slippageTolerance: Percent
+  ): Readonly<{ amount0: JSBI; amount1: JSBI; liquidity: JSBI }> {
     const adjustedLiquidity = this.getAdjustedLiquidityForSlippage(slippageTolerance)
-    const position = new Position({ pool: this.pool, liquidity: adjustedLiquidity, tickLower: this.tickLower, tickUpper: this.tickUpper })
+    const position = new Position({
+      pool: this.pool,
+      liquidity: adjustedLiquidity,
+      tickLower: this.tickLower,
+      tickUpper: this.tickUpper,
+    })
     const { amount0, amount1 } = position.mintAmountsWithSlippage(slippageTolerance)
     return { amount0, amount1, liquidity: adjustedLiquidity }
   }

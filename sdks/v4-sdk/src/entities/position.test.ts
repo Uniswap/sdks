@@ -15,7 +15,7 @@ describe('Position', () => {
   const pool_0_1 = new Pool(currency0, currency1, fee, tickSpacing, EMPTY_HOOK, SQRT_PRICE_1_1.toString(), 0, 0, [])
   const slippageTolerance = new Percent(1, 100) // 1% slippage
 
-  describe("bounds the maximum amounts", () => {
+  describe('bounds the maximum amounts', () => {
     it('in range', () => {
       const position = new Position({
         pool: pool_0_1,
@@ -25,13 +25,14 @@ describe('Position', () => {
       })
       const { amount0: initializedAmount0, amount1: initializedAmount1 } = position.mintAmounts
 
-      const { amount0: adjustedAmount0, amount1: adjustedAmount1 } = position.maxAmountsAndLiquidityWithSlippage(slippageTolerance)
+      const { amount0: adjustedAmount0, amount1: adjustedAmount1 } =
+        position.maxAmountsAndLiquidityWithSlippage(slippageTolerance)
 
       expect(JSBI.lessThanOrEqual(adjustedAmount0, initializedAmount0)).toBe(true)
       expect(JSBI.lessThanOrEqual(adjustedAmount1, initializedAmount1)).toBe(true)
-      expect(
-        JSBI.equal(adjustedAmount0, initializedAmount0) || JSBI.equal(adjustedAmount1, initializedAmount1)
-      ).toBe(true)
+      expect(JSBI.equal(adjustedAmount0, initializedAmount0) || JSBI.equal(adjustedAmount1, initializedAmount1)).toBe(
+        true
+      )
     })
 
     it('below range', () => {
@@ -43,13 +44,14 @@ describe('Position', () => {
       })
       const { amount0: initializedAmount0, amount1: initializedAmount1 } = position.mintAmounts
 
-      const { amount0: adjustedAmount0, amount1: adjustedAmount1 } = position.maxAmountsAndLiquidityWithSlippage(slippageTolerance)
+      const { amount0: adjustedAmount0, amount1: adjustedAmount1 } =
+        position.maxAmountsAndLiquidityWithSlippage(slippageTolerance)
 
       expect(JSBI.lessThanOrEqual(adjustedAmount0, initializedAmount0)).toBe(true)
       expect(JSBI.lessThanOrEqual(adjustedAmount1, initializedAmount1)).toBe(true)
-      expect(
-        JSBI.equal(adjustedAmount0, initializedAmount0) || JSBI.equal(adjustedAmount1, initializedAmount1)
-      ).toBe(true)
+      expect(JSBI.equal(adjustedAmount0, initializedAmount0) || JSBI.equal(adjustedAmount1, initializedAmount1)).toBe(
+        true
+      )
     })
 
     it('above range', () => {
@@ -61,17 +63,18 @@ describe('Position', () => {
       })
       const { amount0: initializedAmount0, amount1: initializedAmount1 } = position.mintAmounts
 
-      const { amount0: adjustedAmount0, amount1: adjustedAmount1 } = position.maxAmountsAndLiquidityWithSlippage(slippageTolerance)
+      const { amount0: adjustedAmount0, amount1: adjustedAmount1 } =
+        position.maxAmountsAndLiquidityWithSlippage(slippageTolerance)
 
       expect(JSBI.lessThanOrEqual(adjustedAmount0, initializedAmount0)).toBe(true)
       expect(JSBI.lessThanOrEqual(adjustedAmount1, initializedAmount1)).toBe(true)
-      expect(
-        JSBI.equal(adjustedAmount0, initializedAmount0) || JSBI.equal(adjustedAmount1, initializedAmount1)
-      ).toBe(true)
+      expect(JSBI.equal(adjustedAmount0, initializedAmount0) || JSBI.equal(adjustedAmount1, initializedAmount1)).toBe(
+        true
+      )
     })
   })
 
-  describe("#mintAmounts", () => {
+  describe('#mintAmounts', () => {
     const USDC = new Token(1, '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', 6, 'USDC', 'USD Coin')
     const DAI = new Token(1, '0x6B175474E89094C44Da98b954EedeAC495271d0F', 18, 'DAI', 'DAI Stablecoin')
 
@@ -91,10 +94,10 @@ describe('Position', () => {
       []
     )
 
-    describe("0 slippage", () => {
+    describe('0 slippage', () => {
       const slippageTolerance = new Percent(0)
 
-      it("is correct for positions below", () => {
+      it('is correct for positions below', () => {
         // amount0: 49949961958869841738198
         // amount1: 0
         // calculate liquidity from amount0 and amount1
@@ -120,7 +123,7 @@ describe('Position', () => {
         expect(amount1.toString()).toEqual('0')
       })
 
-      it("is correct for positions above", () => {
+      it('is correct for positions above', () => {
         // amount0: 0
         // amount1: 49970077053
         // calculate liquidity from amount0 and amount1
@@ -146,7 +149,7 @@ describe('Position', () => {
         expect(amount1.toString()).toEqual('49970077053')
       })
 
-      it("is correct for positions within", () => {
+      it('is correct for positions within', () => {
         // amount0: 120054069145287995740584
         // amount1: 79831926243
         // calculate liquidity from amount0 and amount1

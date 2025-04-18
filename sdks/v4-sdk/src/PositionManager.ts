@@ -249,7 +249,11 @@ export abstract class V4PositionManager {
     )
 
     // adjust for slippage
-    const {amount0: amount0Max, amount1: amount1Max,liquidity: liquidityMax} = position.maxAmountsAndLiquidityWithSlippage(options.slippageTolerance)
+    const {
+      amount0: amount0Max,
+      amount1: amount1Max,
+      liquidity: liquidityMax,
+    } = position.maxAmountsAndLiquidityWithSlippage(options.slippageTolerance)
 
     // We use permit2 to approve tokens to the position manager
     if (options.batchPermit) {
