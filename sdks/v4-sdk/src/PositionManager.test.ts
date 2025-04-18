@@ -187,11 +187,12 @@ describe('PositionManager', () => {
       // Expect there to be a settle pair call afterwards
       planner.addAction(Actions.SETTLE_PAIR, [toAddress(pool_0_1.currency0), toAddress(pool_0_1.currency1)])
 
-      expect(JSBI.lessThanOrEqual(adjustedAmount0, amount0)).toBe(true)
-      expect(JSBI.lessThanOrEqual(adjustedAmount1, amount1)).toBe(true)
-
       expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
       expect(value).toEqual('0x00')
+
+      expect(JSBI.lessThanOrEqual(adjustedAmount0, amount0)).toBe(true)
+      expect(JSBI.lessThanOrEqual(adjustedAmount1, amount1)).toBe(true)
+      expect(JSBI.equal(adjustedAmount0, amount0) || JSBI.equal(adjustedAmount1, amount1)).toBe(true)
     })
 
     it('succeeds for increase', () => {
@@ -226,10 +227,12 @@ describe('PositionManager', () => {
       ])
       // Expect there to be a settle pair call afterwards
       planner.addAction(Actions.SETTLE_PAIR, [toAddress(pool_0_1.currency0), toAddress(pool_0_1.currency1)])
-      expect(JSBI.lessThanOrEqual(adjustedAmount0, amount0)).toBe(true)
-      expect(JSBI.lessThanOrEqual(adjustedAmount1, amount1)).toBe(true)
       expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
       expect(value).toEqual('0x00')
+
+      expect(JSBI.lessThanOrEqual(adjustedAmount0, amount0)).toBe(true)
+      expect(JSBI.lessThanOrEqual(adjustedAmount1, amount1)).toBe(true)
+      expect(JSBI.equal(adjustedAmount0, amount0) || JSBI.equal(adjustedAmount1, amount1)).toBe(true)
     })
 
     it('succeeds when createPool is true', () => {
@@ -273,10 +276,12 @@ describe('PositionManager', () => {
         EMPTY_BYTES,
       ])
       planner.addAction(Actions.SETTLE_PAIR, [toAddress(pool_0_1.currency0), toAddress(pool_0_1.currency1)])
-      expect(JSBI.lessThanOrEqual(adjustedAmount0, amount0)).toBe(true)
-      expect(JSBI.lessThanOrEqual(adjustedAmount1, amount1)).toBe(true)
       expect(calldataList[1]).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
       expect(value).toEqual('0x00')
+
+      expect(JSBI.lessThanOrEqual(adjustedAmount0, amount0)).toBe(true)
+      expect(JSBI.lessThanOrEqual(adjustedAmount1, amount1)).toBe(true)
+      expect(JSBI.equal(adjustedAmount0, amount0) || JSBI.equal(adjustedAmount1, amount1)).toBe(true)
     })
 
     it('succeeds when useNative is set', () => {
@@ -319,10 +324,11 @@ describe('PositionManager', () => {
       planner.addAction(Actions.SWEEP, [toAddress(pool_1_eth.currency0), MSG_SENDER])
       expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
 
+      expect(value).toEqual(toHex(amount0))
+
       expect(JSBI.lessThanOrEqual(adjustedAmount0, amount0)).toBe(true)
       expect(JSBI.lessThanOrEqual(adjustedAmount1, amount1)).toBe(true)
-
-      expect(value).toEqual(toHex(amount0))
+      expect(JSBI.equal(adjustedAmount0, amount0) || JSBI.equal(adjustedAmount1, amount1)).toBe(true)
     })
 
     it('succeeds when migrate is true', () => {
@@ -365,10 +371,11 @@ describe('PositionManager', () => {
       planner.addAction(Actions.SWEEP, [toAddress(pool_0_1.currency1), recipient])
       expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
 
+      expect(value).toEqual('0x00')
+
       expect(JSBI.lessThanOrEqual(adjustedAmount0, amount0)).toBe(true)
       expect(JSBI.lessThanOrEqual(adjustedAmount1, amount1)).toBe(true)
-
-      expect(value).toEqual('0x00')
+      expect(JSBI.equal(adjustedAmount0, amount0) || JSBI.equal(adjustedAmount1, amount1)).toBe(true)
     })
 
     it('succeeds when migrating to an eth position', () => {
@@ -417,6 +424,7 @@ describe('PositionManager', () => {
 
       expect(JSBI.lessThanOrEqual(adjustedAmount0, amount0)).toBe(true)
       expect(JSBI.lessThanOrEqual(adjustedAmount1, amount1)).toBe(true)
+      expect(JSBI.equal(adjustedAmount0, amount0) || JSBI.equal(adjustedAmount1, amount1)).toBe(true)
     })
 
     it('succeeds for batchPermit', () => {
@@ -479,6 +487,7 @@ describe('PositionManager', () => {
 
       expect(JSBI.lessThanOrEqual(adjustedAmount0, amount0)).toBe(true)
       expect(JSBI.lessThanOrEqual(adjustedAmount1, amount1)).toBe(true)
+      expect(JSBI.equal(adjustedAmount0, amount0) || JSBI.equal(adjustedAmount1, amount1)).toBe(true)
     })
   })
 
