@@ -21,6 +21,7 @@ import { PoolKey } from './entities/pool'
 import { toAddress } from './utils/currencyMap'
 import { MSG_SENDER } from './actionConstants'
 import { V4PositionPlanner } from './utils'
+import JSBI from 'jsbi'
 
 describe('PositionManager', () => {
   const currency0 = new Token(1, '0x0000000000000000000000000000000000000001', 18, 't0', 'currency0')
@@ -157,6 +158,9 @@ describe('PositionManager', () => {
         tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
         liquidity: 5000000,
       })
+
+      const { amount0: amount0, amount1: amount1 } = position.mintAmounts
+
       const { calldata, value } = V4PositionManager.addCallParameters(position, {
         recipient,
         slippageTolerance,
@@ -165,19 +169,22 @@ describe('PositionManager', () => {
 
       // Rebuild the calldata with the planner for the expected mint.
       // Note that this test verifies that the applied logic in addCallParameters is correct but does not necessarily test the validity of the calldata itself.
-      const { amount0: amount0Max, amount1: amount1Max } = position.mintAmountsWithSlippage(slippageTolerance)
+      const { amount0: adjustedAmount0, amount1: adjustedAmount1, liquidity: liquidityMax } = position.maxAmountsAndLiquidityWithSlippage(slippageTolerance)
       planner.addAction(Actions.MINT_POSITION, [
         pool_0_1.poolKey,
         -TICK_SPACINGS[FeeAmount.MEDIUM],
         TICK_SPACINGS[FeeAmount.MEDIUM],
-        5000000,
-        toHex(amount0Max),
-        toHex(amount1Max),
+        toHex(liquidityMax),
+        toHex(amount0),
+        toHex(amount1),
         recipient,
         EMPTY_BYTES,
       ])
       // Expect there to be a settle pair call afterwards
       planner.addAction(Actions.SETTLE_PAIR, [toAddress(pool_0_1.currency0), toAddress(pool_0_1.currency1)])
+
+      expect(JSBI.lessThanOrEqual(adjustedAmount0, amount0)).toBe(true)
+      expect(JSBI.lessThanOrEqual(adjustedAmount1, amount1)).toBe(true)
 
       expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
       expect(value).toEqual('0x00')
@@ -191,6 +198,8 @@ describe('PositionManager', () => {
         liquidity: 666,
       })
 
+      const { amount0: amount0, amount1: amount1 } = position.mintAmounts
+
       const { calldata, value } = V4PositionManager.addCallParameters(position, {
         tokenId,
         slippageTolerance,
@@ -199,16 +208,18 @@ describe('PositionManager', () => {
 
       // Rebuild the calldata with the planner for increase
       const planner = new V4Planner()
-      const { amount0: amount0Max, amount1: amount1Max } = position.mintAmountsWithSlippage(slippageTolerance)
+      const { amount0: adjustedAmount0, amount1: adjustedAmount1, liquidity: liquidityMax } = position.maxAmountsAndLiquidityWithSlippage(slippageTolerance)
       planner.addAction(Actions.INCREASE_LIQUIDITY, [
         tokenId.toString(),
-        666,
-        toHex(amount0Max),
-        toHex(amount1Max),
+        toHex(liquidityMax),
+        toHex(amount0),
+        toHex(amount1),
         EMPTY_BYTES,
       ])
       // Expect there to be a settle pair call afterwards
       planner.addAction(Actions.SETTLE_PAIR, [toAddress(pool_0_1.currency0), toAddress(pool_0_1.currency1)])
+      expect(JSBI.lessThanOrEqual(adjustedAmount0, amount0)).toBe(true)
+      expect(JSBI.lessThanOrEqual(adjustedAmount1, amount1)).toBe(true)
       expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
       expect(value).toEqual('0x00')
     })
@@ -220,6 +231,8 @@ describe('PositionManager', () => {
         tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
         liquidity: 90000000000000,
       })
+
+      const { amount0: amount0, amount1: amount1 } = position.mintAmounts
       const { calldata, value } = V4PositionManager.addCallParameters(position, {
         recipient,
         slippageTolerance,
@@ -235,19 +248,21 @@ describe('PositionManager', () => {
         V4PositionManager.INTERFACE.encodeFunctionData('initializePool', [pool_0_1.poolKey, SQRT_PRICE_1_1.toString()])
       )
       const planner = new V4Planner()
-      const { amount0: amount0Max, amount1: amount1Max } = position.mintAmountsWithSlippage(slippageTolerance)
+      const { amount0: adjustedAmount0, amount1: adjustedAmount1, liquidity: liquidityMax } = position.maxAmountsAndLiquidityWithSlippage(slippageTolerance)
       // Expect position to be minted correctly
       planner.addAction(Actions.MINT_POSITION, [
         pool_0_1.poolKey,
         -TICK_SPACINGS[FeeAmount.MEDIUM],
         TICK_SPACINGS[FeeAmount.MEDIUM],
-        90000000000000,
-        toHex(amount0Max),
-        toHex(amount1Max),
+        toHex(liquidityMax),
+        toHex(amount0),
+        toHex(amount1),
         recipient,
         EMPTY_BYTES,
       ])
       planner.addAction(Actions.SETTLE_PAIR, [toAddress(pool_0_1.currency0), toAddress(pool_0_1.currency1)])
+      expect(JSBI.lessThanOrEqual(adjustedAmount0, amount0)).toBe(true)
+      expect(JSBI.lessThanOrEqual(adjustedAmount1, amount1)).toBe(true)
       expect(calldataList[1]).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
       expect(value).toEqual('0x00')
     })
@@ -259,6 +274,8 @@ describe('PositionManager', () => {
         tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
         liquidity: 1,
       })
+
+      const { amount0: amount0, amount1: amount1 } = position.mintAmounts
       const { calldata, value } = V4PositionManager.addCallParameters(position, {
         recipient,
         slippageTolerance,
@@ -269,15 +286,15 @@ describe('PositionManager', () => {
       // Rebuild the data with the planner for the expected mint. MUST sweep since we are using the native currency.
 
       const planner = new V4Planner()
-      const { amount0: amount0Max, amount1: amount1Max } = position.mintAmountsWithSlippage(slippageTolerance)
+      const { amount0: adjustedAmount0, amount1: adjustedAmount1, liquidity: liquidityMax } = position.maxAmountsAndLiquidityWithSlippage(slippageTolerance)
       // Expect position to be minted correctly
       planner.addAction(Actions.MINT_POSITION, [
         pool_1_eth.poolKey,
         -TICK_SPACINGS[FeeAmount.MEDIUM],
         TICK_SPACINGS[FeeAmount.MEDIUM],
-        1,
-        toHex(amount0Max),
-        toHex(amount1Max),
+        toHex(liquidityMax),
+        toHex(amount0),
+        toHex(amount1),
         recipient,
         EMPTY_BYTES,
       ])
@@ -286,7 +303,10 @@ describe('PositionManager', () => {
       planner.addAction(Actions.SWEEP, [toAddress(pool_1_eth.currency0), MSG_SENDER])
       expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
 
-      expect(value).toEqual(toHex(amount0Max))
+      expect(JSBI.lessThanOrEqual(adjustedAmount0, amount0)).toBe(true)
+      expect(JSBI.lessThanOrEqual(adjustedAmount1, amount1)).toBe(true)
+
+      expect(value).toEqual(toHex(amount0))
     })
 
     it('succeeds when migrate is true', () => {
@@ -296,6 +316,7 @@ describe('PositionManager', () => {
         tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
         liquidity: 1,
       })
+      const { amount0: amount0, amount1: amount1 } = position.mintAmounts
       const { calldata, value } = V4PositionManager.addCallParameters(position, {
         recipient,
         slippageTolerance,
@@ -305,15 +326,15 @@ describe('PositionManager', () => {
 
       // Rebuild the data with the planner for the expected mint. MUST sweep since we are using the native currency.
       const planner = new V4Planner()
-      const { amount0: amount0Max, amount1: amount1Max } = position.mintAmountsWithSlippage(slippageTolerance)
+      const { amount0: adjustedAmount0, amount1: adjustedAmount1, liquidity: liquidityMax } = position.maxAmountsAndLiquidityWithSlippage(slippageTolerance)
       // Expect position to be minted correctly
       planner.addAction(Actions.MINT_POSITION, [
         pool_0_1.poolKey,
         -TICK_SPACINGS[FeeAmount.MEDIUM],
         TICK_SPACINGS[FeeAmount.MEDIUM],
-        1,
-        toHex(amount0Max),
-        toHex(amount1Max),
+        toHex(liquidityMax),
+        toHex(amount0),
+        toHex(amount1),
         recipient,
         EMPTY_BYTES,
       ])
@@ -323,6 +344,9 @@ describe('PositionManager', () => {
       planner.addAction(Actions.SWEEP, [toAddress(pool_0_1.currency0), recipient])
       planner.addAction(Actions.SWEEP, [toAddress(pool_0_1.currency1), recipient])
       expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
+
+      expect(JSBI.lessThanOrEqual(adjustedAmount0, amount0)).toBe(true)
+      expect(JSBI.lessThanOrEqual(adjustedAmount1, amount1)).toBe(true)
 
       expect(value).toEqual('0x00')
     })
@@ -334,6 +358,7 @@ describe('PositionManager', () => {
         tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
         liquidity: 1,
       })
+      const { amount0: amount0, amount1: amount1 } = position.mintAmounts
       const { calldata, value } = V4PositionManager.addCallParameters(position, {
         recipient,
         slippageTolerance,
@@ -344,15 +369,15 @@ describe('PositionManager', () => {
 
       // Rebuild the data with the planner for the expected mint. MUST sweep since we are using the native currency.
       const planner = new V4Planner()
-      const { amount0: amount0Max, amount1: amount1Max } = position.mintAmountsWithSlippage(slippageTolerance)
+      const { amount0: adjustedAmount0, amount1: adjustedAmount1, liquidity: liquidityMax } = position.maxAmountsAndLiquidityWithSlippage(slippageTolerance)
       // Expect position to be minted correctly
       planner.addAction(Actions.MINT_POSITION, [
         pool_1_eth.poolKey,
         -TICK_SPACINGS[FeeAmount.MEDIUM],
         TICK_SPACINGS[FeeAmount.MEDIUM],
-        1,
-        toHex(amount0Max),
-        toHex(amount1Max),
+        toHex(liquidityMax),
+        toHex(amount0),
+        toHex(amount1),
         recipient,
         EMPTY_BYTES,
       ])
@@ -365,6 +390,9 @@ describe('PositionManager', () => {
       expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
 
       expect(value).toEqual('0x00')
+
+      expect(JSBI.lessThanOrEqual(adjustedAmount0, amount0)).toBe(true)
+      expect(JSBI.lessThanOrEqual(adjustedAmount1, amount1)).toBe(true)
     })
 
     it('succeeds for batchPermit', () => {
@@ -374,6 +402,8 @@ describe('PositionManager', () => {
         tickUpper: TICK_SPACINGS[FeeAmount.MEDIUM],
         liquidity: 1,
       })
+
+      const { amount0: amount0, amount1: amount1 } = position.mintAmounts
 
       const batchPermit: BatchPermitOptions = {
         owner: mockOwner,
@@ -403,21 +433,24 @@ describe('PositionManager', () => {
       )
 
       const planner = new V4Planner()
-      const { amount0: amount0Max, amount1: amount1Max } = position.mintAmountsWithSlippage(slippageTolerance)
+      const { amount0: adjustedAmount0, amount1: adjustedAmount1, liquidity: liquidityMax } = position.maxAmountsAndLiquidityWithSlippage(slippageTolerance)
 
       planner.addAction(Actions.MINT_POSITION, [
         pool_0_1.poolKey,
         -TICK_SPACINGS[FeeAmount.MEDIUM],
         TICK_SPACINGS[FeeAmount.MEDIUM],
-        1,
-        toHex(amount0Max),
-        toHex(amount1Max),
+        toHex(liquidityMax),
+        toHex(amount0),
+        toHex(amount1),
         recipient,
         EMPTY_BYTES,
       ])
       planner.addAction(Actions.SETTLE_PAIR, [toAddress(pool_0_1.currency0), toAddress(pool_0_1.currency1)])
       expect(calldataList[1]).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
       expect(value).toEqual('0x00')
+
+      expect(JSBI.lessThanOrEqual(adjustedAmount0, amount0)).toBe(true)
+      expect(JSBI.lessThanOrEqual(adjustedAmount1, amount1)).toBe(true)
     })
   })
 
