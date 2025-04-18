@@ -20,21 +20,12 @@ describe('Position', () => {
       tickLower: -180,
       tickUpper: 180,
     })
-    const { amount0: maxAmount0, amount1: maxAmount1 } = position.mintAmounts
+    const { amount0: initializedAmount0, amount1: initializedAmount1 } = position.mintAmounts
 
-    const adjustedLiquidity = position.getAdjustedLiquidityForSlippage(slippageTolerance)
+    const {amount0: adjustedAmount0, amount1: adjustedAmount1, liquidity: adjustedLiquidity} = position.maxAmountsAndLiquidityWithSlippage(slippageTolerance)
 
-    const positionAdjusted = new Position({
-      pool: pool_0_1,
-      liquidity: adjustedLiquidity,
-      tickLower: -180,
-      tickUpper: 180,
-    })
-    const { amount0: amount0Adjusted, amount1: amount1Adjusted } =
-      positionAdjusted.mintAmountsWithSlippage(slippageTolerance)
-
-    expect(JSBI.lessThanOrEqual(amount0Adjusted, maxAmount0)).toBe(true)
-    expect(JSBI.lessThanOrEqual(amount1Adjusted, maxAmount1)).toBe(true)
+    expect(JSBI.lessThanOrEqual(adjustedAmount0, initializedAmount0)).toBe(true)
+    expect(JSBI.lessThanOrEqual(adjustedAmount1, initializedAmount1)).toBe(true)
     expect(JSBI.lessThanOrEqual(adjustedLiquidity, position.liquidity)).toBe(true)
   })
 })

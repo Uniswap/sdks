@@ -149,7 +149,14 @@ export class Position {
     }
   }
 
-  public getAdjustedLiquidityForSlippage(slippageTolerance: Percent): JSBI {
+  public maxAmountsAndLiquidityWithSlippage(slippageTolerance: Percent): Readonly<{ amount0: JSBI; amount1: JSBI; liquidity: JSBI }> {
+    const adjustedLiquidity = this.getAdjustedLiquidityForSlippage(slippageTolerance)
+    const position = new Position({pool: this.pool, liquidity: adjustedLiquidity, tickLower: this.tickLower, tickUpper: this.tickUpper})
+    const { amount0, amount1 } = position.mintAmountsWithSlippage(slippageTolerance)
+    return { amount0, amount1, liquidity: adjustedLiquidity }
+  }
+
+  private getAdjustedLiquidityForSlippage(slippageTolerance: Percent): JSBI {
     const { sqrtRatioX96Upper, sqrtRatioX96Lower } = this.ratiosAfterSlippage(slippageTolerance)
     // construct counterfactual pools from the lower bounded price and the upper bounded price
     const poolLower = new Pool(
@@ -208,7 +215,7 @@ export class Position {
    * @returns The amounts, with slippage
    * @dev In v4, minting and increasing is protected by maximum amounts of token0 and token1.
    */
-  public mintAmountsWithSlippage(slippageTolerance: Percent): Readonly<{ amount0: JSBI; amount1: JSBI }> {
+  private mintAmountsWithSlippage(slippageTolerance: Percent): Readonly<{ amount0: JSBI; amount1: JSBI }> {
     // get lower/upper prices
     // these represent the lowest and highest prices that the pool is allowed to "slip" to
     const { sqrtRatioX96Upper, sqrtRatioX96Lower } = this.ratiosAfterSlippage(slippageTolerance)
