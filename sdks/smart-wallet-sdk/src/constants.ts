@@ -9,6 +9,12 @@ export const DELEGATION_MAGIC_PREFIX = '0xef0100';
 export const SELF_CALL_TARGET = "0x0000000000000000000000000000000000000000"
 
 /**
+ * EIP-712 domain name and version
+ */
+export const DOMAIN_NAME = "Uniswap Minimal Delegation"
+export const DOMAIN_VERSION = "1"
+
+/**
  * Call types for smart wallet calls
  * Follows ERC-7579
  */
