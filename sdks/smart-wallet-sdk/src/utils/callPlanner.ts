@@ -49,7 +49,6 @@ export class CallPlanner {
     if (this.calls.length === 0) {
       throw new Error("No calls to encode")
     }
-
     
     return encodeAbiParameters(CALL_ABI_PARAMS, [this.calls])
   }

@@ -1,14 +1,7 @@
-import { decodeAbiParameters, zeroAddress } from 'viem'
+import { decodeAbiParameters } from 'viem'
 
 import { CALL_ABI_PARAMS, CallPlanner } from './callPlanner'
-
-
-// Test constants
-const TEST_ADDRESS_1 = zeroAddress
-const TEST_DATA_1 = '0x123456' as `0x${string}`
-const TEST_DATA_2 = '0xabcdef0123456789' as `0x${string}`
-const TEST_VALUE_1 = 100n
-const TEST_VALUE_2 = 200n
+import { TEST_ADDRESS_1, TEST_DATA_1, TEST_DATA_2, TEST_VALUE_1, TEST_VALUE_2 } from './testConstants'
 
 describe('CallPlanner', () => {
   describe('constructor', () => {
