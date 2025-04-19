@@ -15,7 +15,7 @@ export const CALL_ABI_PARAMS = [
 ] as const
 
 /**
- * CallPlanner is used to encode a series Calls
+ * CallPlanner is used to encode a series of Calls
  */
 export class CallPlanner {
   calls: Call[]
@@ -50,8 +50,13 @@ export class CallPlanner {
       throw new Error("No calls to encode")
     }
 
-    
-    return encodeAbiParameters(CALL_ABI_PARAMS, [this.calls])
+    return encodeAbiParameters(CALL_ABI_PARAMS, [
+      this.calls.map(call => [
+        call.to,
+        call.value.toString(),
+        call.data
+      ])
+    ])
   }
 
   /**
