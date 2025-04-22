@@ -249,11 +249,9 @@ export abstract class V4PositionManager {
     )
 
     // adjust for slippage
-    const {
-      amount0: amount0Max,
-      amount1: amount1Max,
-      liquidity: liquidityMax,
-    } = position.maxAmountsAndLiquidityWithSlippage(options.slippageTolerance)
+    const maximumAmounts = position.mintAmountsWithSlippage(options.slippageTolerance)
+    const amount0Max = toHex(maximumAmounts.amount0)
+    const amount1Max = toHex(maximumAmounts.amount1)
 
     // We use permit2 to approve tokens to the position manager
     if (options.batchPermit) {
@@ -273,7 +271,7 @@ export abstract class V4PositionManager {
         position.pool,
         position.tickLower,
         position.tickUpper,
-        liquidityMax,
+        position.liquidity,
         amount0Max,
         amount1Max,
         recipient,
@@ -281,7 +279,7 @@ export abstract class V4PositionManager {
       )
     } else {
       // increase
-      planner.addIncrease(options.tokenId, liquidityMax, amount0Max, amount1Max, options.hookData)
+      planner.addIncrease(options.tokenId, position.liquidity, amount0Max, amount1Max, options.hookData)
     }
 
     let value: string = toHex(0)
