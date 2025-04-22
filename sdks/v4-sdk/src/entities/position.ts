@@ -156,17 +156,6 @@ export class Position {
    * @returns The amounts, with slippage
    * @dev In v4, minting and increasing is protected by maximum amounts of token0 and token1.
    */
-  public getMintAmountsWithSlippage(slippageTolerance: Percent): Readonly<{ amount0: JSBI; amount1: JSBI }> {
-    return this.mintAmountsWithSlippage(slippageTolerance)
-  }
-
-  /**
-   * Internal helper method that calculates the maximum amounts of token0 and token1 needed for minting
-   * with slippage protection. This is used by the public getMintAmountsWithSlippage method.
-   * @param slippageTolerance Tolerance of unfavorable slippage from the current price
-   * @returns The amounts, with slippage
-   * @dev In v4, minting and increasing is protected by maximum amounts of token0 and token1.
-   */
   public mintAmountsWithSlippage(slippageTolerance: Percent): Readonly<{ amount0: JSBI; amount1: JSBI }> {
     // get lower/upper prices
     // these represent the lowest and highest prices that the pool is allowed to "slip" to
