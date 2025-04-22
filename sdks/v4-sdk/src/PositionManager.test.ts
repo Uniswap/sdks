@@ -165,7 +165,7 @@ describe('PositionManager', () => {
 
       // Rebuild the calldata with the planner for the expected mint.
       // Note that this test verifies that the applied logic in addCallParameters is correct but does not necessarily test the validity of the calldata itself.
-      const { amount0: amount0Max, amount1: amount1Max } = position.mintAmountsWithSlippage(slippageTolerance)
+      const { amount0: amount0Max, amount1: amount1Max } = position.getMintAmountsWithSlippage(slippageTolerance)
       planner.addAction(Actions.MINT_POSITION, [
         pool_0_1.poolKey,
         -TICK_SPACINGS[FeeAmount.MEDIUM],
@@ -199,7 +199,7 @@ describe('PositionManager', () => {
 
       // Rebuild the calldata with the planner for increase
       const planner = new V4Planner()
-      const { amount0: amount0Max, amount1: amount1Max } = position.mintAmountsWithSlippage(slippageTolerance)
+      const { amount0: amount0Max, amount1: amount1Max } = position.getMintAmountsWithSlippage(slippageTolerance)
       planner.addAction(Actions.INCREASE_LIQUIDITY, [
         tokenId.toString(),
         666,
@@ -235,7 +235,7 @@ describe('PositionManager', () => {
         V4PositionManager.INTERFACE.encodeFunctionData('initializePool', [pool_0_1.poolKey, SQRT_PRICE_1_1.toString()])
       )
       const planner = new V4Planner()
-      const { amount0: amount0Max, amount1: amount1Max } = position.mintAmountsWithSlippage(slippageTolerance)
+      const { amount0: amount0Max, amount1: amount1Max } = position.getMintAmountsWithSlippage(slippageTolerance)
       // Expect position to be minted correctly
       planner.addAction(Actions.MINT_POSITION, [
         pool_0_1.poolKey,
@@ -269,7 +269,7 @@ describe('PositionManager', () => {
       // Rebuild the data with the planner for the expected mint. MUST sweep since we are using the native currency.
 
       const planner = new V4Planner()
-      const { amount0: amount0Max, amount1: amount1Max } = position.mintAmountsWithSlippage(slippageTolerance)
+      const { amount0: amount0Max, amount1: amount1Max } = position.getMintAmountsWithSlippage(slippageTolerance)
       // Expect position to be minted correctly
       planner.addAction(Actions.MINT_POSITION, [
         pool_1_eth.poolKey,
@@ -305,7 +305,7 @@ describe('PositionManager', () => {
 
       // Rebuild the data with the planner for the expected mint. MUST sweep since we are using the native currency.
       const planner = new V4Planner()
-      const { amount0: amount0Max, amount1: amount1Max } = position.mintAmountsWithSlippage(slippageTolerance)
+      const { amount0: amount0Max, amount1: amount1Max } = position.getMintAmountsWithSlippage(slippageTolerance)
       // Expect position to be minted correctly
       planner.addAction(Actions.MINT_POSITION, [
         pool_0_1.poolKey,
@@ -344,7 +344,7 @@ describe('PositionManager', () => {
 
       // Rebuild the data with the planner for the expected mint. MUST sweep since we are using the native currency.
       const planner = new V4Planner()
-      const { amount0: amount0Max, amount1: amount1Max } = position.mintAmountsWithSlippage(slippageTolerance)
+      const { amount0: amount0Max, amount1: amount1Max } = position.getMintAmountsWithSlippage(slippageTolerance)
       // Expect position to be minted correctly
       planner.addAction(Actions.MINT_POSITION, [
         pool_1_eth.poolKey,
@@ -403,7 +403,7 @@ describe('PositionManager', () => {
       )
 
       const planner = new V4Planner()
-      const { amount0: amount0Max, amount1: amount1Max } = position.mintAmountsWithSlippage(slippageTolerance)
+      const { amount0: amount0Max, amount1: amount1Max } = position.getMintAmountsWithSlippage(slippageTolerance)
 
       planner.addAction(Actions.MINT_POSITION, [
         pool_0_1.poolKey,
