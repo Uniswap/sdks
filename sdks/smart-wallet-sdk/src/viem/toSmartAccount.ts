@@ -1,7 +1,7 @@
 import { Address, BaseError, decodeAbiParameters, decodeFunctionData, PrivateKeyAccount, TypedData, TypedDataDefinition } from 'viem';
 import { entryPoint08Abi, entryPoint08Address, getUserOperationTypedData, SmartAccount, SmartAccountImplementation, toSmartAccount } from 'viem/account-abstraction'
 
-import abi from '../abis/MinimalDelegationEntry.json';
+import abi from '../../abis/MinimalDelegationEntry.json';
 import { SmartWallet } from '../smartWallet';
 import { BATCHED_CALL_ABI_PARAMS } from '../utils/batchedCallPlanner';
 
@@ -45,14 +45,18 @@ export async function toUniswapSmartAccount(
         entryPoint,
         getNonce,
     
-        async decodeCalls(data) {
+        async decodeCalls(data: `0x${string}`) {
           const result = decodeFunctionData({
-            abi,
-            data,
+            abi: abi,
+            data: data,
           })
+
+          if(!result.args) {
+            throw new BaseError(`unable to decode function args for "${result.functionName}"`)
+          }
     
           if (result.functionName === 'execute') {
-            const decoded = decodeAbiParameters(BATCHED_CALL_ABI_PARAMS, result.args[0])[0]
+            const decoded = decodeAbiParameters(BATCHED_CALL_ABI_PARAMS, result.args[0] as `0x${string}`)[0]
             return decoded.calls
           }
           throw new BaseError(`unable to decode calls for "${result.functionName}"`)
