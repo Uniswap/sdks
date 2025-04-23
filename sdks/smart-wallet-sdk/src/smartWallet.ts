@@ -18,7 +18,7 @@ export class SmartWallet {
    * @param options Basic options for the execution
    * @returns Method parameters with calldata and value
    */
-  public static encodeBatchedCall(calls: Call[], options: ExecuteOptions = {}): MethodParameters {
+  public static encodeBatchedCall(calls: readonly Call[], options: ExecuteOptions = {}): MethodParameters {
     const mode = this.getModeFromOptions(options)
     if(mode != ModeType.BATCHED_CALL && mode != ModeType.BATCHED_CALL_CAN_REVERT) {
       throw new Error(`Invalid mode: ${mode}`)

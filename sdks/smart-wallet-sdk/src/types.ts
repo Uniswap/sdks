@@ -11,11 +11,16 @@ export interface Call {
   /** The address of the contract to call */
   to: `0x${string}`
   /** The encoded calldata for the call */
-  data: `0x${string}`
+  data?: `0x${string}`
   /** The amount of ETH to send with the call */
-  value: bigint
+  value?: bigint
   /** The chain ID for the call (for client-side use) */
   chainId?: number | string
+}
+
+export type FormattedCall = Omit<Call, 'value' | 'data'> & {
+  value: bigint
+  data: `0x${string}`
 }
 
 /**

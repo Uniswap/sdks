@@ -1,6 +1,6 @@
 import { encodeAbiParameters } from 'viem'
 
-import { Call } from '../types'
+import { Call, FormattedCall } from '../types'
 
 // Define the ABI parameter type for the call tuple
 export const CALL_ABI_PARAMS = [
@@ -18,14 +18,25 @@ export const CALL_ABI_PARAMS = [
  * CallPlanner is used to encode a series Calls
  */
 export class CallPlanner {
-  calls: Call[]
+  calls: readonly Call[]
 
   /**
    * Create a new CallPlanner
    * @param calls optionally initialize with a list of calls
    */
-  constructor(calls: Call[] = []) {
+  constructor(calls: readonly Call[] = []) {
     this.calls = calls
+  }
+
+  /**
+   * Use default values for optional fields
+   */
+  toCalls(): FormattedCall[] {
+    return this.calls.map((call) => ({
+      to: call.to,
+      value: call.value ?? 0n,
+      data: call.data ?? '0x',
+    }))
   }
 
   /**
@@ -49,8 +60,7 @@ export class CallPlanner {
     if (this.calls.length === 0) {
       throw new Error("No calls to encode")
     }
-    
-    return encodeAbiParameters(CALL_ABI_PARAMS, [this.calls])
+    return encodeAbiParameters(CALL_ABI_PARAMS, [this.toCalls()])
   }
 
   /**
@@ -60,7 +70,7 @@ export class CallPlanner {
    * @param data The calldata for the call
    */
   add(to: `0x${string}`, value: bigint, data: `0x${string}`): CallPlanner {
-    this.calls.push({ to, value, data })
+    this.calls = [...this.calls, { to, value, data }]
     return this
   }
 }

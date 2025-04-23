@@ -64,7 +64,7 @@ export class BatchedCallPlanner {
   encode(): `0x${string}` {
     return encodeAbiParameters(BATCHED_CALL_ABI_PARAMS, [
       {
-        calls: this.callPlanner.calls,
+        calls: this.callPlanner.toCalls(),
         shouldRevert: this.shouldRevert
       }
     ])
@@ -72,7 +72,7 @@ export class BatchedCallPlanner {
 
   toBatchedCall(): BatchedCall {
     return {
-      calls: this.callPlanner.calls,
+      calls: this.callPlanner.toCalls(),
       shouldRevert: this.shouldRevert
     }
   }
