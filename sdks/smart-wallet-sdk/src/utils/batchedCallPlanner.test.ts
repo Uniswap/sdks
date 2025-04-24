@@ -6,20 +6,20 @@ import { TEST_ADDRESS_1, TEST_DATA_1, TEST_DATA_2, TEST_VALUE_1, TEST_VALUE_2 } 
 
 describe('BatchedCallPlanner', () => {
   describe('constructor', () => {
-    it('should initialize with the provided CallPlanner and default shouldRevert as false', () => {
+    it('should initialize with the provided CallPlanner and default revertOnFailure as false', () => {
       const callPlanner = new CallPlanner()
       const batchedPlanner = new BatchedCallPlanner(callPlanner)
       
       expect(batchedPlanner.callPlanner).toBe(callPlanner)
-      expect(batchedPlanner.shouldRevert).toBe(true)
+      expect(batchedPlanner.revertOnFailure).toBe(true)
     })
 
-    it('should initialize with the provided CallPlanner and shouldRevert value', () => {
+    it('should initialize with the provided CallPlanner and revertOnFailure value', () => {
       const callPlanner = new CallPlanner()
       const batchedPlanner = new BatchedCallPlanner(callPlanner, false)
       
       expect(batchedPlanner.callPlanner).toBe(callPlanner)
-      expect(batchedPlanner.shouldRevert).toBe(false)
+      expect(batchedPlanner.revertOnFailure).toBe(false)
     })
   })
 
@@ -77,7 +77,7 @@ describe('BatchedCallPlanner', () => {
   })
 
   describe('encode', () => {
-    it('should correctly abi encode the batch call with shouldRevert=false', () => {
+    it('should correctly abi encode the batch call with revertOnFailure=false', () => {
       const callPlanner = new CallPlanner()
       callPlanner.add(TEST_ADDRESS_1, TEST_VALUE_1, TEST_DATA_1)
       
@@ -88,11 +88,11 @@ describe('BatchedCallPlanner', () => {
       const decoded = decodeAbiParameters(BATCHED_CALL_ABI_PARAMS, encoded)
       expect(decoded).toEqual([{
         calls: [{ to: TEST_ADDRESS_1, value: TEST_VALUE_1, data: TEST_DATA_1 }],
-        shouldRevert: true
+        revertOnFailure: true
       }])
     })
 
-    it('should correctly abi encode the batch call with shouldRevert=false', () => {
+    it('should correctly abi encode the batch call with revertOnFailure=false', () => {
       const callPlanner = new CallPlanner()
       callPlanner.add(TEST_ADDRESS_1, TEST_VALUE_1, TEST_DATA_1)
       
@@ -103,7 +103,7 @@ describe('BatchedCallPlanner', () => {
       const decoded = decodeAbiParameters(BATCHED_CALL_ABI_PARAMS, encoded)
       expect(decoded).toEqual([{
         calls: [{ to: TEST_ADDRESS_1, value: TEST_VALUE_1, data: TEST_DATA_1 }],
-        shouldRevert: false
+        revertOnFailure: false
       }])
     })
 
@@ -123,7 +123,7 @@ describe('BatchedCallPlanner', () => {
           { to: TEST_ADDRESS_1, value: TEST_VALUE_1, data: TEST_DATA_1 },
           { to: TEST_ADDRESS_1, value: TEST_VALUE_2, data: TEST_DATA_2 }
         ],
-        shouldRevert: true
+        revertOnFailure: true
       }])
     })
 
@@ -136,7 +136,7 @@ describe('BatchedCallPlanner', () => {
       const decoded = decodeAbiParameters(BATCHED_CALL_ABI_PARAMS, encoded)
       expect(decoded).toEqual([{
         calls: [],
-        shouldRevert: true
+        revertOnFailure: true
       }])
     })
   })

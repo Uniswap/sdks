@@ -18,19 +18,13 @@ export class SmartWallet {
    * @param options Basic options for the execution
    * @returns Method parameters with calldata and value
    */
-  public static encodeBatchedCall(calls: readonly Call[], options: ExecuteOptions = {
-    shouldRevert: false
-  }): MethodParameters {
-    const mode = this.getModeFromOptions(options)
-    if(mode != ModeType.BATCHED_CALL && mode != ModeType.BATCHED_CALL_CAN_REVERT) {
-      throw new Error(`Invalid mode: ${mode}`)
-    }
+  public static encodeBatchedCall(calls: Call[], options: ExecuteOptions = {}): MethodParameters {
     const planner = new CallPlanner(calls)
-    const batchedCallPlanner = new BatchedCallPlanner(planner, options.shouldRevert)
+    const batchedCallPlanner = new BatchedCallPlanner(planner, options.revertOnFailure)
     
     const encoded = encodeFunctionData({
       abi,
-      functionName: 'execute', // execute(((address,uint256,bytes)[],bool))
+      functionName: '0x99e1d016', // execute(((address,uint256,bytes)[],bool))
       args: [batchedCallPlanner.toBatchedCall()]
     })
     return {
@@ -82,7 +76,7 @@ export class SmartWallet {
    * Get the mode type from the options
    */
   public static getModeFromOptions(options: ExecuteOptions): ModeType {
-    if(options.shouldRevert) {
+    if(options.revertOnFailure) {
       return ModeType.BATCHED_CALL;
     }
 
@@ -94,7 +88,7 @@ export class SmartWallet {
   protected static _encodeERC7821Execute(mode: ModeType, data: `0x${string}`): `0x${string}` {
     return encodeFunctionData({
       abi,
-      functionName: 'execute',
+      functionName: '0xe9ae5c53', // execute(bytes32,bytes)
       args: [
         mode,
         data

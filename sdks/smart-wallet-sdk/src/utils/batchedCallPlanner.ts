@@ -18,26 +18,26 @@ export const BATCHED_CALL_ABI_PARAMS = [
         ],
         name: 'calls'
       },
-      { type: 'bool', name: 'shouldRevert' }
+      { type: 'bool', name: 'revertOnFailure' }
     ]
   }
 ] as const
 
 /**
- * BatchedCallPlanner is used to encode a BatchedCall, which are `calls` and `shouldRevert`
+ * BatchedCallPlanner is used to encode a BatchedCall, which are `calls` and `revertOnFailure`
  */
 export class BatchedCallPlanner {
   callPlanner: CallPlanner
-  shouldRevert: boolean
+  revertOnFailure: boolean
 
   /**
    * Create a new BatchedCallPlanner
    * @param callPlanner optionally initialize with a CallPlanner
-   * @param shouldRevert optionally initialize with a boolean for shouldRevert
+   * @param revertOnFailure optionally initialize with a boolean for revertOnFailure
    */
-  constructor(callPlanner: CallPlanner, shouldRevert = true) {
+  constructor(callPlanner: CallPlanner, revertOnFailure = true) {
     this.callPlanner = callPlanner
-    this.shouldRevert = shouldRevert
+    this.revertOnFailure = revertOnFailure
   }
 
   /**
@@ -65,7 +65,7 @@ export class BatchedCallPlanner {
     return encodeAbiParameters(BATCHED_CALL_ABI_PARAMS, [
       {
         calls: this.callPlanner.toCalls(),
-        shouldRevert: this.shouldRevert
+        revertOnFailure: this.revertOnFailure
       }
     ])
   }
@@ -73,7 +73,7 @@ export class BatchedCallPlanner {
   toBatchedCall(): BatchedCall {
     return {
       calls: this.callPlanner.toCalls(),
-      shouldRevert: this.shouldRevert
+      revertOnFailure: this.revertOnFailure
     }
   }
 }
