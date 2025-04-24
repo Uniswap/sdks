@@ -1,12 +1,12 @@
 import { ChainId } from '@uniswap/sdk-core'
-import { encodeFunctionData } from 'viem'
+import { concatHex, encodeAbiParameters, encodeFunctionData } from 'viem'
 
 import abi from '../abis/MinimalDelegationEntry.json'
 
-import { ModeType, SMART_WALLET_ADDRESSES } from './constants'
+import { EXECUTE_USER_OP_SELECTOR, ModeType, SMART_WALLET_ADDRESSES } from './constants'
 import { Call, MethodParameters, ExecuteOptions } from './types'
 import { CallPlanner } from './utils'
-import { BatchedCallPlanner } from './utils/batchedCallPlanner'
+import { BATCHED_CALL_ABI_PARAMS, BatchedCallPlanner } from './utils/batchedCallPlanner'
 
 /**
  * Main SDK class for interacting with Uniswap smart wallet contracts
@@ -27,6 +27,20 @@ export class SmartWallet {
       functionName: '0x99e1d016', // execute(((address,uint256,bytes)[],bool))
       args: [batchedCallPlanner.toBatchedCall()]
     })
+    return {
+      calldata: encoded,
+      value: planner.value
+    }
+  }
+
+  /**
+   * Creates method parameters for executing a simply batch of calls via a ERC-4337 user operation
+   * @dev A quirk of our implementation is that you need to prepend abi-encoded BatchedCall with the `executeUserOp` selector
+   */
+  public static encodeBatchedCallUserOp(calls: Call[], options: ExecuteOptions = {}): MethodParameters {
+    const planner = new CallPlanner(calls)
+    const batchedCallPlanner = new BatchedCallPlanner(planner, options.revertOnFailure)
+    const encoded = concatHex([EXECUTE_USER_OP_SELECTOR, encodeAbiParameters(BATCHED_CALL_ABI_PARAMS, [batchedCallPlanner.toBatchedCall()])])
     return {
       calldata: encoded,
       value: planner.value

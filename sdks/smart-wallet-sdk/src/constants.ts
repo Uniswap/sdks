@@ -3,6 +3,8 @@ import { ChainId } from '@uniswap/sdk-core'
 // https://eips.ethereum.org/EIPS/eip-7702
 export const DELEGATION_MAGIC_PREFIX = '0xef0100';
 
+export const EXECUTE_USER_OP_SELECTOR = '0x8dd7712f'
+
 /**
  * The target address for self-calls is address(0)
  */

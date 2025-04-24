@@ -4,6 +4,11 @@ export interface BatchedCall {
   revertOnFailure: boolean
 }
 
+export interface FormattedBatchedCall {
+  calls: FormattedCall[]
+  revertOnFailure: boolean
+}
+
 /**
  * ERC 5792 style Call interface
  */

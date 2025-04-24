@@ -26,7 +26,7 @@ export async function toUniswapSmartAccount(
 ): Promise<ToSimple7702SmartAccountReturnType> {
     const {
         client,
-        implementation = '0x85479d2AebeFf8445769a265763666c0d3dDC508', // TODO update with new one
+        implementation = "0x964914430aAe3e6805675EcF648cEfaED9e546a7",
         getNonce,
         owner,
       } = parameters

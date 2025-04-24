@@ -1,6 +1,6 @@
 import { encodeAbiParameters } from 'viem'
 
-import { BatchedCall } from '../types'
+import { FormattedBatchedCall } from '../types'
 
 import { CallPlanner } from './callPlanner'
 
@@ -70,7 +70,7 @@ export class BatchedCallPlanner {
     ])
   }
 
-  toBatchedCall(): BatchedCall {
+  toBatchedCall(): FormattedBatchedCall {
     return {
       calls: this.callPlanner.toCalls(),
       revertOnFailure: this.revertOnFailure

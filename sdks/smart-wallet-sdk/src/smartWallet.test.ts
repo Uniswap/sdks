@@ -1,11 +1,12 @@
 import { ChainId } from '@uniswap/sdk-core'
-import { decodeFunctionData } from 'viem';
+import { concatHex, decodeAbiParameters, decodeFunctionData, encodeAbiParameters } from 'viem';
 
 import abi from "../abis/MinimalDelegationEntry.json"
 
-import { ModeType, SMART_WALLET_ADDRESSES } from './constants';
+import { EXECUTE_USER_OP_SELECTOR, ModeType, SMART_WALLET_ADDRESSES } from './constants';
 import { SmartWallet } from './smartWallet'
 import { BatchedCall, Call } from './types'
+import { BATCHED_CALL_ABI_PARAMS } from './utils/batchedCallPlanner';
 
 const EXECUTE_SELECTOR = "0xe9ae5c53" as `0x${string}`
 
@@ -42,6 +43,41 @@ describe('SmartWallet', () => {
         expect((decoded.args[0] as BatchedCall).calls).toBeDefined()
         expect((decoded.args[0] as BatchedCall).calls.length).toBe(2)
         expect((decoded.args[0] as BatchedCall).revertOnFailure).toBe(false)
+      }
+    })
+  })
+
+  describe('encodeBatchedCallUserOp', () => {
+    it('encodes batched call correctly', () => {
+      const calls: Call[] = [
+        {
+          to: '0x1111111111111111111111111111111111111111',
+          data: '0x1234',
+          value: 0n,
+          chainId: ChainId.SEPOLIA
+        },
+        {
+          to: '0x2222222222222222222222222222222222222222',
+          data: '0x5678',
+          value: 1n,
+          chainId: ChainId.SEPOLIA
+        }
+      ]
+
+      const result = SmartWallet.encodeBatchedCallUserOp(calls, { revertOnFailure: false })
+      expect(result).toBeDefined()
+      expect(result.calldata).toBeDefined()
+      // expect first 4 bytes to be the selector
+      expect(result.calldata.slice(0, 10)).toBe(EXECUTE_USER_OP_SELECTOR)
+      // decode the rest to be batchedCall
+      const decoded = decodeAbiParameters(BATCHED_CALL_ABI_PARAMS, `0x${result.calldata.slice(10)}`)
+      expect(decoded).toBeDefined()
+      expect(decoded.length).toBe(1)
+      expect(decoded[0]).toBeDefined()
+      if(decoded[0]) {
+        expect(decoded[0].calls).toBeDefined()
+        expect(decoded[0].calls.length).toBe(2)
+        expect(decoded[0].revertOnFailure).toBe(false)
       }
     })
   })
