@@ -1,5 +1,5 @@
 import { ChainId } from '@uniswap/sdk-core'
-import { concatHex, decodeAbiParameters, decodeFunctionData, encodeAbiParameters } from 'viem';
+import { decodeAbiParameters, decodeFunctionData } from 'viem';
 
 import abi from "../abis/MinimalDelegationEntry.json"
 
