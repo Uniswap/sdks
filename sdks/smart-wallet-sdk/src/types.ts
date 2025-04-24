@@ -1,7 +1,7 @@
 /// Contract specific batched call interface
 export interface BatchedCall {
   calls: Call[]
-  shouldRevert: boolean
+  revertOnFailure: boolean
 }
 
 /**
@@ -32,6 +32,6 @@ export interface MethodParameters {
  * Options for the execute method
  */
 export interface ExecuteOptions {
-  /** Whether the execute call should revert if a call fails */
-  shouldRevert?: boolean
+  // true means that the execute call will revert if any call fails
+  revertOnFailure?: boolean
 }
