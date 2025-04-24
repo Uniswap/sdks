@@ -25,7 +25,8 @@
     "build:types": "tsc -p tsconfig.types.json",
     "release": "semantic-release",
     "lint": "eslint src --ext .ts",
-    "test": "jest"
+    "test": "jest",
+    "tarball": "npm pkg set version=0.0.1 && npm pack && npm pkg delete version && mv uniswap-smart-wallet-sdk-0.0.1.tgz uniswap-smart-wallet-sdk-dev.tgz"
   },
   "exports": {
     ".": {
@@ -37,7 +38,7 @@
   "sideEffects": false,
   "dependencies": {
     "@uniswap/sdk-core": "^7.6.0",
-    "viem": "^2.28.0"
+    "viem": "2.28.0"
   },
   "devDependencies": {
     "@types/jest": "^24.0.25",
