@@ -18,7 +18,7 @@ export class SmartWallet {
    * @param options Basic options for the execution
    * @returns Method parameters with calldata and value
    */
-  public static encodeBatchedCall(calls: Call[], options: ExecuteOptions = {}): MethodParameters {
+  public static encodeBatchedCall(calls: readonly Call[], options: ExecuteOptions = {}): MethodParameters {
     const planner = new CallPlanner(calls)
     const batchedCallPlanner = new BatchedCallPlanner(planner, options.revertOnFailure)
     

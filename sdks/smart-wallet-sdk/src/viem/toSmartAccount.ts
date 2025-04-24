@@ -63,9 +63,7 @@ export async function toUniswapSmartAccount(
         },
     
         async encodeCalls(calls) {
-            return SmartWallet.encodeBatchedCall(calls, {
-                shouldRevert: true,
-            }).calldata;
+            return SmartWallet.encodeBatchedCall(calls).calldata;
         },
     
         async getAddress() {
