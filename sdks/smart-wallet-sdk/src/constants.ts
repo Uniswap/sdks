@@ -19,7 +19,8 @@ export enum ModeType {
 
 /**
  * Mapping of chainId to Smart Wallet contract addresses
+ * @dev See README for detailed deployment addresses along with the commit hash
  */
 export const SMART_WALLET_ADDRESSES: { [chainId in ChainId]?: `0x${string}` } = {
-  [ChainId.SEPOLIA]: '0x85479d2aebeff8445769a265763666c0d3ddc508' // Deployed on 04/14/2025
+  [ChainId.SEPOLIA]: '0x964914430aAe3e6805675EcF648cEfaED9e546a7'
 }
