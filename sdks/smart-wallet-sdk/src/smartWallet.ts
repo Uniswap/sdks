@@ -1,11 +1,18 @@
 import { ChainId } from '@uniswap/sdk-core'
-import { encodeAbiParameters, encodeFunctionData } from 'viem'
-
+import { encodeAbiParameters, encodeFunctionData, PublicClient, RpcUserOperation, RpcUserOperationRequest, toHex } from 'viem'
+import { 
+  createBundlerClient, 
+  toCoinbaseSmartAccount
+function toCoinbaseSmartAccount(parameters: ToCoinbaseSmartAccountParameters): Promise<ToCoinbaseSmartAccountReturnType>
+ 
+} from 'viem/account-abstraction'
 import { abi } from '../abis/MinimalDelegation.json'
 
 import { MODE_TYPE_ABI_PARAMETERS, ModeType, SMART_WALLET_ADDRESSES } from './constants'
 import { Call, MethodParameters, ExecuteOptions, AdvancedCall } from './types'
 import { CallPlanner } from './utils'
+
+const bundlerClient = createBundler
 
 /**
  * Main SDK class for interacting with ERC7821-compatible smart wallets
@@ -29,6 +36,41 @@ export class SmartWallet {
     return {
       calldata: encoded,
       value: planner.value
+    }
+  }
+
+  // Nonce is fetched using getNonce() on the user's account
+  // Signature must be 
+  public static async toUserOperation(client: , nonce: bigint, methodParameters: MethodParameters, paymasterAndData?: `0x${string}`): Promise<RpcUserOperation> {
+    const chainId = await client.getChainId()
+    const address = SMART_WALLET_ADDRESSES[chainId]
+    if(!address) {
+      throw new Error(`Smart wallet not found for chainId: ${chainId}`)
+    }
+    
+
+    // estimate gas
+    const gasLimit = await client.estimateGas({
+      to: address,
+      data: methodParameters.calldata,
+      value: methodParameters.value
+    })
+
+    const feeData = await client.estimateFeesPerGas()
+
+    const LARGE_LIMIT = 1_000_000n;
+
+    return {
+      sender: address,
+      callData: methodParameters.calldata,
+      callGasLimit: toHex(gasLimit),
+      maxFeePerGas: toHex(feeData.maxFeePerGas),
+      maxPriorityFeePerGas: toHex(feeData.maxPriorityFeePerGas),
+      nonce: toHex(nonce),
+      paymasterAndData,
+      preVerificationGas: toHex(LARGE_LIMIT),
+      verificationGasLimit: toHex(LARGE_LIMIT),
+      signature: '0x'
     }
   }
 
