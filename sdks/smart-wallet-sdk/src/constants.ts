@@ -18,9 +18,46 @@ export enum ModeType {
 }
 
 /**
- * Mapping of chainId to Smart Wallet contract addresses
- * @dev See README for detailed deployment addresses along with the commit hash
+ * Supported chain ids
  */
-export const SMART_WALLET_ADDRESSES: { [chainId in ChainId]?: `0x${string}` } = {
-  [ChainId.SEPOLIA]: '0x964914430aAe3e6805675EcF648cEfaED9e546a7'
+export enum SupportedChainIds {
+  SEPOLIA = ChainId.SEPOLIA,
+}
+
+/**
+ * Supported smart wallet versions
+ * @dev keyed by github release tag
+ */
+export enum SmartWalletVersion {
+  LATEST = 'latest',
+  v0_2_1_audit_2 = 'v0.2.1-audit.2',
+}
+
+/**
+ * Smart wallet versions for supported chains
+ */
+export const SMART_WALLET_VERSIONS : { [chainId in SupportedChainIds]: { [version in SmartWalletVersion]: `0x${string}` } } = {
+  [SupportedChainIds.SEPOLIA]: {
+    [SmartWalletVersion.LATEST]: '0x964914430aAe3e6805675EcF648cEfaED9e546a7',
+    [SmartWalletVersion.v0_2_1_audit_2]: '0x964914430aAe3e6805675EcF648cEfaED9e546a7',
+  }
+}
+
+/**
+ * Mapping of chainId to Smart Wallet contract addresses
+ * @dev Used to get the latest version of the smart wallet
+ *      See README for detailed deployment addresses along with the commit hash
+ */
+export const SMART_WALLET_ADDRESSES = Object.fromEntries(
+  Object.entries(SMART_WALLET_VERSIONS).map(([chainId, versions]) => [
+    chainId,
+    versions[SmartWalletVersion.LATEST]
+  ])
+)
+
+/**
+ * Get all historical smart wallet versions for a given chain id
+ */
+export const getAllSmartWalletVersions = (chainId: SupportedChainIds) => {
+  return Object.values(SMART_WALLET_VERSIONS[chainId])
 }
