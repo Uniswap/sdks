@@ -75,7 +75,8 @@ export async function toUniswapSmartAccount(
         },
     
         async getStubSignature() {
-          return '0xfffffffffffffffffffffffffffffff0000000000000000000000000000000007aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1c'
+          const zeroKeyHash = '0x0000000000000000000000000000000000000000000000000000000000000000'
+          return `${zeroKeyHash}fffffffffffffffffffffffffffffff0000000000000000000000000000000007aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1c`
         },
     
         async signMessage(parameters) {
