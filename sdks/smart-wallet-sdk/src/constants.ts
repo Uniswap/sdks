@@ -21,6 +21,7 @@ export enum ModeType {
  * Supported chain ids
  */
 export enum SupportedChainIds {
+  UNICHAIN_SEPOLIA = ChainId.UNICHAIN_SEPOLIA,
   SEPOLIA = ChainId.SEPOLIA,
 }
 
@@ -36,7 +37,11 @@ export enum SmartWalletVersion {
 /**
  * Smart wallet versions for supported chains
  */
-export const SMART_WALLET_VERSIONS : { [chainId in SupportedChainIds]: { [version in SmartWalletVersion]: `0x${string}` } } = {
+export const SMART_WALLET_VERSIONS: { [chainId in SupportedChainIds]: { [version in SmartWalletVersion]: `0x${string}` } } = {
+  [SupportedChainIds.UNICHAIN_SEPOLIA]: {
+    [SmartWalletVersion.LATEST]: '0x0c338ca25585035142A9a0a1EEebA267256f281f',
+    [SmartWalletVersion.v0_2_1_audit_2]: '0x964914430aAe3e6805675EcF648cEfaED9e546a7',
+  },
   [SupportedChainIds.SEPOLIA]: {
     [SmartWalletVersion.LATEST]: '0x964914430aAe3e6805675EcF648cEfaED9e546a7',
     [SmartWalletVersion.v0_2_1_audit_2]: '0x964914430aAe3e6805675EcF648cEfaED9e546a7',

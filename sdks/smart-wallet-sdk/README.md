@@ -22,6 +22,7 @@ Below is a table of contract deployment addresses across various networks:
 
 | Network | Address | Commit Hash | Version |
 |---------|---------|------------|---------|
+| Unichain Sepolia | 0x0c338ca25585035142A9a0a1EEebA267256f281f | 4925a8fecf283845a8444b88eefc13cadca0c9a9 | v0.2.1-audit.2 |
 | Sepolia | 0x964914430aAe3e6805675EcF648cEfaED9e546a7 | 4925a8fecf283845a8444b88eefc13cadca0c9a9 | v0.2.1-audit.2 |
 
 ## Documentation
