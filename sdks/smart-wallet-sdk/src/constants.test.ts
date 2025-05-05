@@ -2,7 +2,6 @@ import { getAllSmartWalletVersions, SMART_WALLET_ADDRESSES, SupportedChainIds, S
 
 describe('constants', () => {
   it('SMART_WALLET_ADDRESSES should be latest versions', () => {
-    // Since we only have one chain ID right now, test it directly
     let chainId = SupportedChainIds.UNICHAIN_SEPOLIA
     expect(SMART_WALLET_ADDRESSES[chainId]).toEqual(SMART_WALLET_VERSIONS[chainId][SmartWalletVersion.LATEST])
 
