@@ -2,13 +2,20 @@ import { getAllSmartWalletVersions, SMART_WALLET_ADDRESSES, SupportedChainIds, S
 
 describe('constants', () => {
   it('SMART_WALLET_ADDRESSES should be latest versions', () => {
-    // Since we only have one chain ID right now, test it directly
-    const chainId = SupportedChainIds.SEPOLIA
-    expect(SMART_WALLET_ADDRESSES[chainId]).toEqual(SMART_WALLET_VERSIONS[chainId][SmartWalletVersion.LATEST])
+    const chainIdValues = Object.values(SupportedChainIds)
+        .filter(value => typeof value === 'number');
+
+    for (const chainId of chainIdValues) {
+      expect(SMART_WALLET_ADDRESSES[chainId as SupportedChainIds]).toEqual(SMART_WALLET_VERSIONS[chainId as SupportedChainIds][SmartWalletVersion.LATEST])
+    }
   })
 
   it('getAllSmartWalletVersions should return all versions for a given chain id', () => {
-    const chainId = SupportedChainIds.SEPOLIA
-    expect(getAllSmartWalletVersions(chainId)).toEqual(Object.values(SMART_WALLET_VERSIONS[chainId]))
+    const chainIdValues = Object.values(SupportedChainIds)
+        .filter(value => typeof value === 'number');
+
+    for (const chainId of chainIdValues) {
+      expect(getAllSmartWalletVersions(chainId as SupportedChainIds)).toEqual(Object.values(SMART_WALLET_VERSIONS[chainId as SupportedChainIds]))
+    }
   })
 })
