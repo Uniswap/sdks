@@ -31,7 +31,9 @@ export enum SupportedChainIds {
   BNB = ChainId.BNB,
   BLAST = ChainId.BLAST,
   WORLDCHAIN = ChainId.WORLDCHAIN,
+  AVALANCHE = ChainId.AVALANCHE,
   ZORA = ChainId.ZORA,
+  SONEIUM = ChainId.SONEIUM,
 }
 
 /**
@@ -84,6 +86,14 @@ export const SMART_WALLET_VERSIONS: { [chainId in SupportedChainIds]: { [version
     [SmartWalletVersion.v0_2_1_audit_2]: '0x0c338ca25585035142A9a0a1EEebA267256f281f',
   },
   [SupportedChainIds.ZORA]: {
+    [SmartWalletVersion.LATEST]: '0x0c338ca25585035142A9a0a1EEebA267256f281f',
+    [SmartWalletVersion.v0_2_1_audit_2]: '0x0c338ca25585035142A9a0a1EEebA267256f281f',
+  },
+  [SupportedChainIds.AVALANCHE]: {
+    [SmartWalletVersion.LATEST]: '0x0c338ca25585035142A9a0a1EEebA267256f281f',
+    [SmartWalletVersion.v0_2_1_audit_2]: '0x0c338ca25585035142A9a0a1EEebA267256f281f',
+  },
+  [SupportedChainIds.SONEIUM]: {
     [SmartWalletVersion.LATEST]: '0x0c338ca25585035142A9a0a1EEebA267256f281f',
     [SmartWalletVersion.v0_2_1_audit_2]: '0x0c338ca25585035142A9a0a1EEebA267256f281f',
   },
