@@ -253,11 +253,12 @@ const BASE_ADDRESSES: ChainAddresses = {
   tickLensAddress: '0x0CdeE061c75D43c82520eD998C23ac2991c9ac6d',
   swapRouter02Address: '0x2626664c2603336E57B271c5C0b26F421741e481',
   mixedRouteQuoterV1Address: '0xe544efae946f0008ae9a8d64493efa7886b73776',
+  mixedRouteQuoterV2Address: '0x253ee8eb6551b47181b613461c15d699fe4a2e39',
 
   v4PoolManagerAddress: '0x498581ff718922c3f8e6a244956af099b2652b2b',
   v4PositionManagerAddress: '0x7c5f5a4bbd8fd63184577525326123b519429bdc',
   v4StateView: '0xa3c0c9b65bad0b08107aa264b0f3db444b867a71',
-  v4QuoterAddress: '0x0d5e0f971ed27fbff6c2837bf31316121532048d',
+  v4QuoterAddress: '0xe1a6c5803e3c44368b171bd680c7d32dfc92ca47',
 }
 
 // Base Goerli v3 addresses
