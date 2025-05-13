@@ -519,6 +519,8 @@ export const NONFUNGIBLE_POSITION_MANAGER_ADDRESSES: AddressMap = {
   }, {}),
 }
 
+// trigger build
+
 export const ENS_REGISTRAR_ADDRESSES: AddressMap = {
   ...constructSameAddressMap('0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e'),
 }
