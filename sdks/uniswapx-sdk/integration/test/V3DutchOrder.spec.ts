@@ -10,7 +10,7 @@ import { V3DutchOrderBuilder } from "../../src/builder/V3DutchOrderBuilder"
 import { expect } from "chai";
 import { UnsignedV3DutchOrder, V3CosignerData } from "../../src/order/V3DutchOrder";
 
-describe.only("DutchV3Order", () => {
+describe("DutchV3Order", () => {
     const FEE_RECIPIENT = "0x1111111111111111111111111111111111111111";
     const AMOUNT = BigNumber.from(10).pow(18);
     const SMALL_AMOUNT = BigNumber.from(10).pow(10);
