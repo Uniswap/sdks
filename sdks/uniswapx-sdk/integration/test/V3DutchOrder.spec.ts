@@ -34,7 +34,7 @@ describe("DutchV3Order", () => {
     
     before(async () => {
         futureDeadline = await new BlockchainTime().secondsFromNow(1000);
-        [ admin, filler, bot ] = await ethers.getSigners();
+        [ admin,, bot, filler ] = await ethers.getSigners();
         const permit2Factory = await ethers.getContractFactory(
             Permit2Abi.abi,
             Permit2Abi.bytecode
