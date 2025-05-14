@@ -10,7 +10,7 @@ import { V3DutchOrderBuilder } from "../../src/builder/V3DutchOrderBuilder"
 import { expect } from "chai";
 import { UnsignedV3DutchOrder, V3CosignerData } from "../../src/order/V3DutchOrder";
 
-describe("DutchV3Order", () => {
+describe.only("DutchV3Order", () => {
     const FEE_RECIPIENT = "0x1111111111111111111111111111111111111111";
     const AMOUNT = BigNumber.from(10).pow(18);
     const SMALL_AMOUNT = BigNumber.from(10).pow(10);
@@ -34,7 +34,7 @@ describe("DutchV3Order", () => {
     
     before(async () => {
         futureDeadline = await new BlockchainTime().secondsFromNow(1000);
-        [ admin, filler, bot ] = await ethers.getSigners();
+        [ admin,, bot, filler ] = await ethers.getSigners();
         const permit2Factory = await ethers.getContractFactory(
             Permit2Abi.abi,
             Permit2Abi.bytecode
