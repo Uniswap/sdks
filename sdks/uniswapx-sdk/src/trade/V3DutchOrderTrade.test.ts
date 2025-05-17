@@ -1,4 +1,4 @@
-import { Currency, Ether, Token, TradeType } from "@uniswap/sdk-core";
+import { Currency, CurrencyAmount, Ether, Price, Token, TradeType } from "@uniswap/sdk-core";
 import { BigNumber, constants, ethers } from "ethers";
 
 import { UnsignedV3DutchOrderInfo } from "../order/V3DutchOrder";
@@ -273,6 +273,207 @@ describe("V3DutchOrderTrade", () => {
 			expect(() => {
 				(tradeWithoutExpected as any).getExpectedAmountOut();
 			}).toThrow("expectedAmountOut not set");
+		});
+
+		describe("Execution price", () => {
+			it("expected amounts are used when provided", () => {
+				const inputAmount = BigNumber.from(1000);
+				const decay = 100000;
+				const outOrderInfo: UnsignedV3DutchOrderInfo = {
+					...orderInfo,
+					input: {
+						token: USDC.address,
+						startAmount: inputAmount,
+						curve: {
+							relativeBlocks: [],
+							relativeAmounts: [],
+						},
+						maxAmount: inputAmount,
+						adjustmentPerGweiBaseFee: BigNumber.from(0),
+					},
+					outputs: [
+						{
+							token: DAI.address,
+							startAmount: NON_FEE_OUTPUT_AMOUNT,
+							curve: {
+								relativeBlocks: [10],
+								relativeAmounts: [BigInt(decay)],
+							},
+							recipient: "0x0000000000000000000000000000000000000000",
+							minAmount: NON_FEE_OUTPUT_AMOUNT,
+							adjustmentPerGweiBaseFee: BigNumber.from(0),
+						}
+					],
+				};
+				const exactInputTrade = new V3DutchOrderTrade<Currency, Currency, TradeType>({
+					currencyIn: USDC,
+					currenciesOut: [DAI],
+					orderInfo: outOrderInfo,
+					tradeType: TradeType.EXACT_INPUT,
+					expectedAmounts: {
+						expectedAmountIn: inputAmount.toString(),
+						expectedAmountOut: NON_FEE_OUTPUT_AMOUNT.sub(BigNumber.from(decay).div(2)).toString(),
+					},
+				});
+				expect(exactInputTrade.inputAmount.quotient.toString()).toEqual(inputAmount.toString());
+				expect(exactInputTrade.outputAmount.quotient.toString()).toEqual(NON_FEE_OUTPUT_AMOUNT.sub(BigNumber.from(decay).div(2)).toString());
+				const executionPrice = exactInputTrade.executionPrice;
+				const inputCurrencyAmount = CurrencyAmount.fromRawAmount(USDC, inputAmount.toString());
+				const outputCurrencyAmount = CurrencyAmount.fromRawAmount(DAI, NON_FEE_OUTPUT_AMOUNT.sub(BigNumber.from(decay).div(2)).toString());
+				const expectedPrice = new Price(USDC, DAI, inputCurrencyAmount.quotient, outputCurrencyAmount.quotient);
+				expect(executionPrice.quotient.toString()).toEqual(expectedPrice.quotient.toString());
+			});
+
+			it("order amounts are used when expected amounts are not provided", () => {
+				
+				expect(trade.inputAmount.quotient.toString()).toEqual(trade.order.info.input.startAmount.toString());
+				expect(trade.outputAmount.quotient.toString()).toEqual(trade.order.info.outputs[0].startAmount.toString());
+			});
+			
+		});
+
+		describe("Worst execution price", () => {
+			it("calculates worst execution price correctly for exact input", () => {
+				const decay = 100000;
+				const exactInputOrderInfo: UnsignedV3DutchOrderInfo = {
+					...orderInfo,
+					input: {
+						token: USDC.address,
+						startAmount: BigNumber.from(1000),
+						curve: {
+							relativeBlocks: [],
+							relativeAmounts: [],
+						},
+						maxAmount: BigNumber.from(1000),
+						adjustmentPerGweiBaseFee: BigNumber.from(0),
+					},
+					outputs: [
+						{
+							token: DAI.address,
+							startAmount: NON_FEE_OUTPUT_AMOUNT,
+							curve: {
+								relativeBlocks: [10],
+								relativeAmounts: [BigInt(decay)],
+							},
+							recipient: "0x0000000000000000000000000000000000000000",
+							minAmount: NON_FEE_OUTPUT_AMOUNT.sub(BigNumber.from(decay)),
+							adjustmentPerGweiBaseFee: BigNumber.from(0),
+						}
+					],
+				};
+				const halfDecay = BigNumber.from(decay).div(2);
+				const exactInputTrade = new V3DutchOrderTrade<Currency, Currency, TradeType>({
+					currencyIn: USDC,
+					currenciesOut: [DAI],
+					orderInfo: exactInputOrderInfo,
+					tradeType: TradeType.EXACT_INPUT,
+					expectedAmounts: {
+						expectedAmountIn: "1000",
+						expectedAmountOut: NON_FEE_OUTPUT_AMOUNT.sub(halfDecay).toString(),
+					},
+				});
+				const worstPrice = exactInputTrade.worstExecutionPrice();
+				const maxAmountIn = 1000;
+				const minAmountOut = NON_FEE_OUTPUT_AMOUNT.sub(decay);
+
+				expect(worstPrice.quotient.toString()).toEqual(
+					minAmountOut.div(maxAmountIn).toString()
+				);
+
+				// Verify worst price is worse than execution price
+				expect(worstPrice.lessThan(exactInputTrade.executionPrice)).toBe(true);
+				expect(worstPrice.baseCurrency).toEqual(USDC);
+				expect(worstPrice.quoteCurrency).toEqual(DAI);
+			});
+
+			it("matches execution price when min/max amounts equal start amounts", () => {
+				const orderInfoNoSlippage = {
+					...orderInfo,
+					input: {
+						...orderInfo.input,
+						maxAmount: orderInfo.input.startAmount, // Same as start amount
+					},
+					outputs: [
+						{
+							...orderInfo.outputs[0],
+							minAmount: orderInfo.outputs[0].startAmount, // Same as start amount
+							curve: {
+								relativeBlocks: [],
+								relativeAmounts: [],
+							}
+						}
+					]
+				};
+
+				const tradeNoSlippage = new V3DutchOrderTrade<Currency, Currency, TradeType>({
+					currencyIn: USDC,
+					currenciesOut: [DAI],
+					orderInfo: orderInfoNoSlippage,
+					tradeType: TradeType.EXACT_INPUT,
+					expectedAmounts: {
+						expectedAmountIn: orderInfo.input.startAmount.toString(),
+						expectedAmountOut: orderInfo.outputs[0].startAmount.toString(),
+					},
+				});
+
+				expect(tradeNoSlippage.worstExecutionPrice().quotient.toString())
+					.toEqual(tradeNoSlippage.executionPrice.quotient.toString());
+			});
+		});
+	});
+
+	describe("Worst execution price", () => {
+		it("calculates worst execution price correctly for exact output", () => {
+			const outOrderInfo: UnsignedV3DutchOrderInfo = {
+				...orderInfo,
+				input: {
+					token: USDC.address,
+					startAmount: BigNumber.from(1000),
+					curve: {
+						relativeBlocks: [10],
+						relativeAmounts: [BigInt(-100)],
+					},
+					maxAmount: BigNumber.from(1100),
+					adjustmentPerGweiBaseFee: BigNumber.from(0),
+				},
+				outputs: [
+					{
+						token: DAI.address,
+						startAmount: NON_FEE_OUTPUT_AMOUNT,
+						curve: {
+							relativeBlocks: [],
+							relativeAmounts: [],
+						},
+						recipient: "0x0000000000000000000000000000000000000000",
+						minAmount: NON_FEE_OUTPUT_AMOUNT,
+						adjustmentPerGweiBaseFee: BigNumber.from(0),
+					}
+				],
+			};
+
+			const exactOutputTrade = new V3DutchOrderTrade<Currency, Currency, TradeType>({
+				currencyIn: USDC,
+				currenciesOut: [DAI],
+				orderInfo: outOrderInfo,
+				tradeType: TradeType.EXACT_OUTPUT,
+				expectedAmounts: {
+					expectedAmountIn: "1050",
+					expectedAmountOut: NON_FEE_OUTPUT_AMOUNT.toString(),
+				},
+			});
+
+			const worstPrice = exactOutputTrade.worstExecutionPrice();
+			const maxAmountIn = 1100;
+			const minAmountOut = NON_FEE_OUTPUT_AMOUNT;
+
+			expect(worstPrice.quotient.toString()).toEqual(
+				minAmountOut.div(maxAmountIn).toString()
+			);
+
+			// Verify worst price is worse than execution price
+			expect(worstPrice.lessThan(exactOutputTrade.executionPrice)).toBe(true);
+			expect(worstPrice.baseCurrency).toEqual(USDC);
+			expect(worstPrice.quoteCurrency).toEqual(DAI);
 		});
 	});
 });
