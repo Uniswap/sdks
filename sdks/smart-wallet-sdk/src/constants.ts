@@ -26,14 +26,11 @@ export enum SupportedChainIds {
   UNICHAIN_SEPOLIA = ChainId.UNICHAIN_SEPOLIA,
   SEPOLIA = ChainId.SEPOLIA,
   BASE = ChainId.BASE,
-  POLYGON = ChainId.POLYGON,
+  OPTIMISM = ChainId.OPTIMISM,
   ARBITRUM_ONE = ChainId.ARBITRUM_ONE,
   BNB = ChainId.BNB,
-  BLAST = ChainId.BLAST,
   WORLDCHAIN = ChainId.WORLDCHAIN,
-  AVALANCHE = ChainId.AVALANCHE,
   ZORA = ChainId.ZORA,
-  SONEIUM = ChainId.SONEIUM,
 }
 
 /**
@@ -42,78 +39,62 @@ export enum SupportedChainIds {
  */
 export enum SmartWalletVersion {
   LATEST = 'latest',
-  v0_3_0_audit_2 = 'v0.3.0-audit.2',
-  v0_2_1_audit_2 = 'v0.2.1-audit.2',
+  v1_0_0_staging = 'v1.0.0-staging',
+  v0_3_0_audit_2 = 'v0.3.0-audit.2'
 }
+
+// All smart wallet versions for a given chain id are optional except for the latest version
+type SmartWalletVersionMap = Partial<{ [version in SmartWalletVersion]: `0x${string}` }> & { [SmartWalletVersion.LATEST]: `0x${string}` }
 
 /**
  * Smart wallet versions for supported chains
  */
-export const SMART_WALLET_VERSIONS: { [chainId in SupportedChainIds]: { [version in SmartWalletVersion]: `0x${string}` } } = {
+export const SMART_WALLET_VERSIONS: { [chainId in SupportedChainIds]: SmartWalletVersionMap } = {
   [SupportedChainIds.MAINNET]: {
-    [SmartWalletVersion.LATEST]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
+    [SmartWalletVersion.LATEST]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+    [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
     [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
-    [SmartWalletVersion.v0_2_1_audit_2]: '0x0c338ca25585035142A9a0a1EEebA267256f281f',
   },
   [SupportedChainIds.UNICHAIN]: {
-    [SmartWalletVersion.LATEST]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
+    [SmartWalletVersion.LATEST]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+    [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
     [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
-    [SmartWalletVersion.v0_2_1_audit_2]: '0x0c338ca25585035142A9a0a1EEebA267256f281f',
-  },
-  [SupportedChainIds.UNICHAIN_SEPOLIA]: {
-    [SmartWalletVersion.LATEST]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
-    [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
-    [SmartWalletVersion.v0_2_1_audit_2]: '0x0c338ca25585035142A9a0a1EEebA267256f281f',
   },
   [SupportedChainIds.BASE]: {
-    [SmartWalletVersion.LATEST]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
+    [SmartWalletVersion.LATEST]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+    [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
     [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
-    [SmartWalletVersion.v0_2_1_audit_2]: '0x0c338ca25585035142A9a0a1EEebA267256f281f',
   },
-  [SupportedChainIds.POLYGON]: {
-    [SmartWalletVersion.LATEST]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
+  [SupportedChainIds.OPTIMISM]: {
+    [SmartWalletVersion.LATEST]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+    [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+  },
+  [SupportedChainIds.BNB]: {
+    [SmartWalletVersion.LATEST]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+    [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
     [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
-    [SmartWalletVersion.v0_2_1_audit_2]: '0x0c338ca25585035142A9a0a1EEebA267256f281f',
   },
   [SupportedChainIds.ARBITRUM_ONE]: {
     [SmartWalletVersion.LATEST]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
     [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
-    [SmartWalletVersion.v0_2_1_audit_2]: '0x0c338ca25585035142A9a0a1EEebA267256f281f',
-  },
-  [SupportedChainIds.BNB]: {
-    [SmartWalletVersion.LATEST]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
-    [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
-    [SmartWalletVersion.v0_2_1_audit_2]: '0x0c338ca25585035142A9a0a1EEebA267256f281f',
-  },
-  [SupportedChainIds.BLAST]: {
-    [SmartWalletVersion.LATEST]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
-    [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
-    [SmartWalletVersion.v0_2_1_audit_2]: '0x0c338ca25585035142A9a0a1EEebA267256f281f',
   },
   [SupportedChainIds.WORLDCHAIN]: {
     [SmartWalletVersion.LATEST]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
     [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
-    [SmartWalletVersion.v0_2_1_audit_2]: '0x0c338ca25585035142A9a0a1EEebA267256f281f',
   },
   [SupportedChainIds.ZORA]: {
     [SmartWalletVersion.LATEST]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
     [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
-    [SmartWalletVersion.v0_2_1_audit_2]: '0x0c338ca25585035142A9a0a1EEebA267256f281f',
   },
-  [SupportedChainIds.AVALANCHE]: {
-    [SmartWalletVersion.LATEST]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
+  [SupportedChainIds.UNICHAIN_SEPOLIA]: {
+    [SmartWalletVersion.LATEST]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+    [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
     [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
-    [SmartWalletVersion.v0_2_1_audit_2]: '0x0c338ca25585035142A9a0a1EEebA267256f281f',
-  },
-  [SupportedChainIds.SONEIUM]: {
-    [SmartWalletVersion.LATEST]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
-    [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
-    [SmartWalletVersion.v0_2_1_audit_2]: '0x0c338ca25585035142A9a0a1EEebA267256f281f',
   },
   [SupportedChainIds.SEPOLIA]: {
-    [SmartWalletVersion.LATEST]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
+    [SmartWalletVersion.LATEST]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+    [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
     [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
-    [SmartWalletVersion.v0_2_1_audit_2]: '0x964914430aAe3e6805675EcF648cEfaED9e546a7',
   }
 }
 
