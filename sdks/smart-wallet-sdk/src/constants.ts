@@ -43,10 +43,13 @@ export enum SmartWalletVersion {
   v0_3_0_audit_2 = 'v0.3.0-audit.2'
 }
 
+// All smart wallet versions for a given chain id are optional except for the latest version
+type SmartWalletVersionMap = Partial<{ [version in SmartWalletVersion]: `0x${string}` }> & { [SmartWalletVersion.LATEST]: `0x${string}` }
+
 /**
  * Smart wallet versions for supported chains
  */
-export const SMART_WALLET_VERSIONS: { [chainId in SupportedChainIds]: Partial<{ [version in SmartWalletVersion]: `0x${string}` }> } = {
+export const SMART_WALLET_VERSIONS: { [chainId in SupportedChainIds]: SmartWalletVersionMap } = {
   [SupportedChainIds.MAINNET]: {
     [SmartWalletVersion.LATEST]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
     [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
