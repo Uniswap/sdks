@@ -28,8 +28,9 @@ export enum SupportedChainIds {
   BASE = ChainId.BASE,
   OPTIMISM = ChainId.OPTIMISM,
   ARBITRUM_ONE = ChainId.ARBITRUM_ONE,
+  POLYGON = ChainId.POLYGON,
   BNB = ChainId.BNB,
-  WORLDCHAIN = ChainId.WORLDCHAIN,
+  SONEIUM = ChainId.SONEIUM,
   ZORA = ChainId.ZORA,
 }
 
@@ -75,15 +76,18 @@ export const SMART_WALLET_VERSIONS: { [chainId in SupportedChainIds]: SmartWalle
     [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
   },
   [SupportedChainIds.ARBITRUM_ONE]: {
-    [SmartWalletVersion.LATEST]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
+    [SmartWalletVersion.LATEST]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+    [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
     [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
   },
-  [SupportedChainIds.WORLDCHAIN]: {
-    [SmartWalletVersion.LATEST]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
+  [SupportedChainIds.POLYGON]: {
+    [SmartWalletVersion.LATEST]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+    [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
     [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
   },
   [SupportedChainIds.ZORA]: {
-    [SmartWalletVersion.LATEST]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
+    [SmartWalletVersion.LATEST]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+    [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
     [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
   },
   [SupportedChainIds.UNICHAIN_SEPOLIA]: {
@@ -95,7 +99,11 @@ export const SMART_WALLET_VERSIONS: { [chainId in SupportedChainIds]: SmartWalle
     [SmartWalletVersion.LATEST]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
     [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
     [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
-  }
+  },
+  [SupportedChainIds.SONEIUM]: {
+    [SmartWalletVersion.LATEST]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+    [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5'
+  },
 }
 
 /**
