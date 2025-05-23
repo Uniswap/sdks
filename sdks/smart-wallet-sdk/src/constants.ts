@@ -27,11 +27,7 @@ export enum SupportedChainIds {
   SEPOLIA = ChainId.SEPOLIA,
   BASE = ChainId.BASE,
   OPTIMISM = ChainId.OPTIMISM,
-  ARBITRUM_ONE = ChainId.ARBITRUM_ONE,
-  POLYGON = ChainId.POLYGON,
   BNB = ChainId.BNB,
-  SONEIUM = ChainId.SONEIUM,
-  ZORA = ChainId.ZORA,
 }
 
 /**
@@ -40,8 +36,8 @@ export enum SupportedChainIds {
  */
 export enum SmartWalletVersion {
   LATEST = 'latest',
-  v1_0_0_staging = 'v1.0.0-staging',
-  v0_3_0_audit_2 = 'v0.3.0-audit.2'
+  v1_0_0 = 'v1.0.0',
+  v1_0_0_staging = 'v1.0.0-staging'
 }
 
 // All smart wallet versions for a given chain id are optional except for the latest version
@@ -52,58 +48,40 @@ type SmartWalletVersionMap = Partial<{ [version in SmartWalletVersion]: `0x${str
  */
 export const SMART_WALLET_VERSIONS: { [chainId in SupportedChainIds]: SmartWalletVersionMap } = {
   [SupportedChainIds.MAINNET]: {
-    [SmartWalletVersion.LATEST]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+    [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
+    [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
     [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
-    [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
   },
   [SupportedChainIds.UNICHAIN]: {
-    [SmartWalletVersion.LATEST]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+    [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
+    [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
     [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
-    [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
   },
   [SupportedChainIds.BASE]: {
-    [SmartWalletVersion.LATEST]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+    [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
+    [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
     [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
-    [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
   },
   [SupportedChainIds.OPTIMISM]: {
-    [SmartWalletVersion.LATEST]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+    [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
+    [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
     [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
   },
   [SupportedChainIds.BNB]: {
-    [SmartWalletVersion.LATEST]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+    [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
+    [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
     [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
-    [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
-  },
-  [SupportedChainIds.ARBITRUM_ONE]: {
-    [SmartWalletVersion.LATEST]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
-    [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
-    [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
-  },
-  [SupportedChainIds.POLYGON]: {
-    [SmartWalletVersion.LATEST]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
-    [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
-    [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
-  },
-  [SupportedChainIds.ZORA]: {
-    [SmartWalletVersion.LATEST]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
-    [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
-    [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
   },
   [SupportedChainIds.UNICHAIN_SEPOLIA]: {
-    [SmartWalletVersion.LATEST]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+    [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
+    [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
     [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
-    [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
   },
   [SupportedChainIds.SEPOLIA]: {
-    [SmartWalletVersion.LATEST]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+    [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
+    [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
     [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
-    [SmartWalletVersion.v0_3_0_audit_2]: '0x458f5a9f47A01beA5d7A32662660559D9eD3312c',
-  },
-  [SupportedChainIds.SONEIUM]: {
-    [SmartWalletVersion.LATEST]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
-    [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5'
-  },
+  }
 }
 
 /**
