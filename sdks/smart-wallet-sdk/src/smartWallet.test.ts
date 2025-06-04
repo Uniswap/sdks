@@ -1,13 +1,52 @@
 import { ChainId } from '@uniswap/sdk-core'
+import { decodeFunctionData } from 'viem';
+
+import abi from "../abis/MinimalDelegationEntry.json"
 
 import { ModeType, SMART_WALLET_ADDRESSES } from './constants';
 import { SmartWallet } from './smartWallet'
-import { Call } from './types'
+import { BatchedCall, Call } from './types'
 
 const EXECUTE_SELECTOR = "0xe9ae5c53" as `0x${string}`
 
 describe('SmartWallet', () => {
-  describe('encodeExecute', () => {
+  describe('encodeBatchedCall', () => {
+    it('encodes batched call correctly', () => {
+      const calls: Call[] = [
+        {
+          to: '0x1111111111111111111111111111111111111111',
+          data: '0x1234',
+          value: 0n,
+          chainId: ChainId.SEPOLIA
+        },
+        {
+          to: '0x2222222222222222222222222222222222222222',
+          data: '0x5678',
+          value: 1n,
+          chainId: ChainId.SEPOLIA
+        }
+      ]
+
+      const result = SmartWallet.encodeBatchedCall(calls, { revertOnFailure: false })
+      // decode the calldata
+      const decoded = decodeFunctionData({
+        abi,
+        data: result.calldata
+      })
+      expect(decoded).toBeDefined()
+      expect(decoded.functionName).toBe('execute')
+      expect(decoded.args).toBeDefined()
+      if(decoded.args) {
+        expect(decoded.args.length).toBe(1)
+        expect(decoded.args[0]).toBeDefined()
+        expect((decoded.args[0] as BatchedCall).calls).toBeDefined()
+        expect((decoded.args[0] as BatchedCall).calls.length).toBe(2)
+        expect((decoded.args[0] as BatchedCall).revertOnFailure).toBe(false)
+      }
+    })
+  })
+
+  describe('encodeERC7821BatchedCall', () => {
     it('encodes batch calls correctly', () => {
       const calls: Call[] = [
         {
@@ -22,7 +61,7 @@ describe('SmartWallet', () => {
         }
       ]
 
-      const result = SmartWallet.encodeCalls(calls)
+      const result = SmartWallet.encodeERC7821BatchedCall(calls)
       expect(result).toBeDefined()
       expect(result.calldata).toBeDefined()
       expect(result.value).toBeDefined()
@@ -37,7 +76,7 @@ describe('SmartWallet', () => {
         }
       ]
       
-      const result = SmartWallet.encodeCalls(calls, { revertOnFailure: true })
+      const result = SmartWallet.encodeERC7821BatchedCall(calls, { revertOnFailure: true })
       expect(result).toBeDefined()
       expect(result.calldata).toBeDefined()
       expect(result.value).toBeDefined()
@@ -45,7 +84,7 @@ describe('SmartWallet', () => {
 
     it('throws an error if the mode is not supported', () => {
       // mock getModeFromOptions
-      jest.spyOn(SmartWallet, 'getModeFromOptions').mockReturnValue(ModeType.BATCHED_CALL_SUPPORTS_OPDATA)
+      jest.spyOn(SmartWallet, 'getModeFromOptions').mockReturnValue('invalid' as ModeType)
       const calls: Call[] = [
         {
           to: '0x1111111111111111111111111111111111111111',
@@ -53,7 +92,7 @@ describe('SmartWallet', () => {
           value: 0n
         }
       ]
-      expect(() => SmartWallet.encodeCalls(calls)).toThrow()
+      expect(() => SmartWallet.encodeERC7821BatchedCall(calls)).toThrow()
 
       jest.restoreAllMocks()
     })
@@ -66,23 +105,23 @@ describe('SmartWallet', () => {
         value: 0n
       }
       
-      const call = SmartWallet.createExecute(methodParams, ChainId.MAINNET)
+      const call = SmartWallet.createExecute(methodParams, ChainId.SEPOLIA)
       
       // Verify the result
       expect(call).toBeDefined()
-      expect(call.to).toBe(SMART_WALLET_ADDRESSES[ChainId.MAINNET])
+      expect(call.to).toBe(SMART_WALLET_ADDRESSES[ChainId.SEPOLIA])
       expect(call.data).toBe(EXECUTE_SELECTOR)
       expect(call.value).toBe(0n)
     })
   })
 
   describe('getModeFromOptions', () => {
-    for(const canRevert of [true, false]) {
-      it(`returns the correct mode type for canRevert: ${canRevert}`, () => {
-        if(canRevert) {
-          expect(SmartWallet.getModeFromOptions({ revertOnFailure: canRevert })).toBe(ModeType.BATCHED_CALL_CAN_REVERT)
+    for(const revertOnFailure of [true, false]) {
+      it(`returns the correct mode type for revertOnFailure: ${revertOnFailure}`, () => {
+        if(revertOnFailure) {
+          expect(SmartWallet.getModeFromOptions({ revertOnFailure })).toBe(ModeType.BATCHED_CALL)
         } else {
-          expect(SmartWallet.getModeFromOptions({ revertOnFailure: canRevert })).toBe(ModeType.BATCHED_CALL)
+          expect(SmartWallet.getModeFromOptions({ revertOnFailure })).toBe(ModeType.BATCHED_CALL_CAN_REVERT)
         }
       })
     }
