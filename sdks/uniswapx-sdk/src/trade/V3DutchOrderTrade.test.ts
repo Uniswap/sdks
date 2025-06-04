@@ -302,7 +302,7 @@ describe("V3DutchOrderTrade", () => {
 							recipient: "0x0000000000000000000000000000000000000000",
 							minAmount: NON_FEE_OUTPUT_AMOUNT,
 							adjustmentPerGweiBaseFee: BigNumber.from(0),
-						}
+						},
 					],
 				};
 				const exactInputTrade = new V3DutchOrderTrade<Currency, Currency, TradeType>({
@@ -358,7 +358,7 @@ describe("V3DutchOrderTrade", () => {
 							recipient: "0x0000000000000000000000000000000000000000",
 							minAmount: NON_FEE_OUTPUT_AMOUNT.sub(BigNumber.from(decay)),
 							adjustmentPerGweiBaseFee: BigNumber.from(0),
-						}
+						},
 					],
 				};
 				const halfDecay = BigNumber.from(decay).div(2);
@@ -400,9 +400,9 @@ describe("V3DutchOrderTrade", () => {
 							curve: {
 								relativeBlocks: [],
 								relativeAmounts: [],
-							}
-						}
-					]
+							},
+						},
+					],
 				};
 
 				const tradeNoSlippage = new V3DutchOrderTrade<Currency, Currency, TradeType>({
@@ -447,7 +447,7 @@ describe("V3DutchOrderTrade", () => {
 						recipient: "0x0000000000000000000000000000000000000000",
 						minAmount: NON_FEE_OUTPUT_AMOUNT,
 						adjustmentPerGweiBaseFee: BigNumber.from(0),
-					}
+					},
 				],
 			};
 
