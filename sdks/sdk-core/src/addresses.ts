@@ -1,4 +1,5 @@
 import { ChainId, SUPPORTED_CHAINS, SupportedChainsType } from './chains'
+import { GlueMainnetAddresses, GlueStagingAddresses } from './glue'
 
 type AddressMap = { [chainId: number]: string }
 
@@ -417,6 +418,26 @@ const SONEIUM_ADDRESSES: ChainAddresses = {
   v4QuoterAddress: '0x3972c00f7ed4885e145823eb7c655375d275a1c5',
 }
 
+const GLUE_STAGING_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: GlueStagingAddresses.v3CoreFactoryAddress,
+  multicallAddress: GlueStagingAddresses.multicallAddress,
+  quoterAddress: GlueStagingAddresses.quoterAddress,
+  v3MigratorAddress: GlueStagingAddresses.v3MigratorAddress,
+  nonfungiblePositionManagerAddress: GlueStagingAddresses.nonfungiblePositionManagerAddress,
+  tickLensAddress: GlueStagingAddresses.tickLensAddress,
+  swapRouter02Address: GlueStagingAddresses.swapRouter02Address,
+}
+
+const GLUE_MAINNET_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: GlueMainnetAddresses.v3CoreFactoryAddress,
+  multicallAddress: GlueMainnetAddresses.multicallAddress,
+  quoterAddress: GlueMainnetAddresses.quoterAddress,
+  v3MigratorAddress: GlueMainnetAddresses.v3MigratorAddress,
+  nonfungiblePositionManagerAddress: GlueMainnetAddresses.nonfungiblePositionManagerAddress,
+  tickLensAddress: GlueMainnetAddresses.tickLensAddress,
+  swapRouter02Address: GlueMainnetAddresses.swapRouter02Address,
+}
+
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
   [ChainId.MAINNET]: MAINNET_ADDRESSES,
   [ChainId.OPTIMISM]: OPTIMISM_ADDRESSES,
@@ -446,6 +467,8 @@ export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses>
   [ChainId.UNICHAIN]: UNICHAIN_ADDRESSES,
   [ChainId.MONAD_TESTNET]: MONAD_TESTNET_ADDRESSES,
   [ChainId.SONEIUM]: SONEIUM_ADDRESSES,
+  [ChainId.GLUE_MAINNET]: GLUE_MAINNET_ADDRESSES,
+  [ChainId.GLUE_STAGINGNET]: GLUE_STAGING_ADDRESSES,
 }
 
 /* V3 Contract Addresses */
