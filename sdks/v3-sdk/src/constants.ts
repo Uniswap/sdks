@@ -6,6 +6,11 @@ export const ADDRESS_ZERO = '0x0000000000000000000000000000000000000000'
 
 // @deprecated please use poolInitCodeHash(chainId: ChainId)
 export const POOL_INIT_CODE_HASH = '0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54'
+/**
+ * The pool init code hash is the hash of the Uniswap V3 pool contract. If that hasn't changed, the above value is valid.
+ * However, if it has changed, then we need to add an override to the below function, same as the ZKSYNC chain.
+ * See [Stackoverflow discussion](https://ethereum.stackexchange.com/questions/154591/uniswap-v3-pool-init-hash-calculations)
+ */
 
 export function poolInitCodeHash(chainId?: ChainId): string {
   switch (chainId) {
