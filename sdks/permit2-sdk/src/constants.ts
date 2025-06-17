@@ -5,6 +5,10 @@ export const PERMIT2_ADDRESS = '0x000000000022D473030F116dDEE9F6B43aC78BA3'
 
 export function permit2Address(chainId?: number): string {
   switch (chainId) {
+    case 1300:
+      return '0xb615b6dcE9d01C7C512234387Cbb2249B07C193b'
+    case 1296:
+      return '0x03E6d5AeD7Bc22AF6DF3b17f5083877c014520C4'
     case 324:
       return '0x0000000000225e31D15943971F47aD3022F714Fa'
     default:
