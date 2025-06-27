@@ -37,13 +37,13 @@ describe("DutchV3Order", () => {
         [ admin,, bot, filler ] = await ethers.getSigners();
         const permit2Factory = await ethers.getContractFactory(
             Permit2Abi.abi,
-            Permit2Abi.bytecode
+            Permit2Abi.bytecode.object
         );
         permit2 = (await permit2Factory.deploy()) as Permit2;
 
         const reactorFactory = await ethers.getContractFactory(
             V3DutchOrderReactorAbi.abi,
-            V3DutchOrderReactorAbi.bytecode
+            V3DutchOrderReactorAbi.bytecode.object
         );
         reactor = (await reactorFactory.deploy(
             permit2.address,
@@ -67,7 +67,7 @@ describe("DutchV3Order", () => {
 
         const tokenFactory = await ethers.getContractFactory(
             MockERC20Abi.abi,
-            MockERC20Abi.bytecode
+            MockERC20Abi.bytecode.object
         );
 
         tokenIn = (await tokenFactory.deploy("Token A", "A", 18)) as MockERC20;
