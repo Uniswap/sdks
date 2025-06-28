@@ -17,10 +17,14 @@ import { TPool } from './TPool'
  * Converts a route to a hex encoded path
  * @notice only supports exactIn route encodings
  * @param route the mixed path to convert to an encoded path
+ * @param useMixedRouterQuoteV2 if true, uses the Mixed Quoter V2 encoding for v4 pools. By default, we do not set it. This is only used in SOR for explicit setting during onchain quoting.
  * @returns the exactIn encoded path
  */
-export function encodeMixedRouteToPath(route: MixedRouteSDK<Currency, Currency>): string {
-  const containsV4Pool = route.pools.some((pool) => pool instanceof V4Pool)
+export function encodeMixedRouteToPath(
+  route: MixedRouteSDK<Currency, Currency>,
+  useMixedRouterQuoteV2?: boolean
+): string {
+  const containsV4Pool = useMixedRouterQuoteV2 ?? route.pools.some((pool) => pool instanceof V4Pool)
 
   let path: (string | number)[]
   let types: string[]
