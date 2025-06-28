@@ -21,8 +21,8 @@ import { TPool } from './TPool'
  * @returns the exactIn encoded path
  */
 export function encodeMixedRouteToPath(
-    route: MixedRouteSDK<Currency, Currency>,
-    useMixedRouterQuoteV2?: boolean
+  route: MixedRouteSDK<Currency, Currency>,
+  useMixedRouterQuoteV2?: boolean
 ): string {
   const containsV4Pool = useMixedRouterQuoteV2 ?? route.pools.some((pool) => pool instanceof V4Pool)
 
