@@ -53,7 +53,7 @@ jobs:
       - name: 🪨 Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: nightly-f9d8b9c53a431154bb48beac7f4496aed77fc95c
+          version: nightly
 
       - name: 🧪 Testing
         uses: nick-fields/retry@7d4a37704547a311dbb66ebdf5b23ec19374a767

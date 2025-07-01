@@ -6,22 +6,14 @@ import "@typechain/hardhat";
 import 'dotenv/config'
 
 const config: HardhatUserConfig = {
-  solidity: {
-    version: "0.8.19",
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200
-      }
-    }
-  },
+  solidity: "0.8.16",
   networks: {
     hardhat: {
       chainId: 1,
-      forking: process.env.FORK_URL ? {
+      forking: {
         enabled: true,
-        url: process.env.FORK_URL
-      } : undefined
+        url: process.env.FORK_URL!
+      }
     },
   },
 };
