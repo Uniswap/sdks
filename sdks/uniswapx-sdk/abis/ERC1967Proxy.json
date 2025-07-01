@@ -1,0 +1,259 @@
+{
+    "abi": [
+        {
+            "type": "constructor",
+            "inputs": [
+                {
+                    "name": "implementation",
+                    "type": "address",
+                    "internalType": "address"
+                },
+                {
+                    "name": "_data",
+                    "type": "bytes",
+                    "internalType": "bytes"
+                }
+            ],
+            "stateMutability": "payable"
+        },
+        {
+            "type": "fallback",
+            "stateMutability": "payable"
+        },
+        {
+            "type": "event",
+            "name": "Upgraded",
+            "inputs": [
+                {
+                    "name": "implementation",
+                    "type": "address",
+                    "indexed": true,
+                    "internalType": "address"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "error",
+            "name": "AddressEmptyCode",
+            "inputs": [
+                {
+                    "name": "target",
+                    "type": "address",
+                    "internalType": "address"
+                }
+            ]
+        },
+        {
+            "type": "error",
+            "name": "ERC1967InvalidImplementation",
+            "inputs": [
+                {
+                    "name": "implementation",
+                    "type": "address",
+                    "internalType": "address"
+                }
+            ]
+        },
+        {
+            "type": "error",
+            "name": "ERC1967NonPayable",
+            "inputs": []
+        },
+        {
+            "type": "error",
+            "name": "FailedCall",
+            "inputs": []
+        }
+    ],
+    "bytecode": {
+        "object": "0x60806040526040516103cf3803806103cf8339810160408190526100229161023b565b61002c8282610033565b5050610320565b61003c82610091565b6040516001600160a01b038316907fbc7cd75a20ee27fd9adebab32041f755214dbc6bffa90cc0225b39da2e5c2d3b905f90a280511561008557610080828261010c565b505050565b61008d61017f565b5050565b806001600160a01b03163b5f036100cb57604051634c9c8ce360e01b81526001600160a01b03821660048201526024015b60405180910390fd5b7f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc80546001600160a01b0319166001600160a01b0392909216919091179055565b60605f5f846001600160a01b031684604051610128919061030a565b5f60405180830381855af49150503d805f8114610160576040519150601f19603f3d011682016040523d82523d5f602084013e610165565b606091505b5090925090506101768583836101a0565b95945050505050565b341561019e5760405163b398979f60e01b815260040160405180910390fd5b565b6060826101b5576101b0826101ff565b6101f8565b81511580156101cc57506001600160a01b0384163b155b156101f557604051639996b31560e01b81526001600160a01b03851660048201526024016100c2565b50805b9392505050565b80511561020e57805160208201fd5b60405163d6bda27560e01b815260040160405180910390fd5b634e487b7160e01b5f52604160045260245ffd5b5f5f6040838503121561024c575f5ffd5b82516001600160a01b0381168114610262575f5ffd5b60208401519092506001600160401b0381111561027d575f5ffd5b8301601f8101851361028d575f5ffd5b80516001600160401b038111156102a6576102a6610227565b604051601f8201601f19908116603f011681016001600160401b03811182821017156102d4576102d4610227565b6040528181528282016020018710156102eb575f5ffd5b8160208401602083015e5f602083830101528093505050509250929050565b5f82518060208501845e5f920191825250919050565b60a38061032c5f395ff3fe6080604052600a600c565b005b60186014601a565b6050565b565b5f604b7f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc546001600160a01b031690565b905090565b365f5f375f5f365f845af43d5f5f3e8080156069573d5ff35b3d5ffdfea264697066735822122070f5897eb9502f578ed8893cbd4eca36ab9328296f3f7f6d7987e943af8ff20264736f6c634300081b0033",
+        "sourceMap": "600:1117:199:-:0;;;1081:133;;;;;;;;;;;;;;;;;;:::i;:::-;1155:52;1185:14;1201:5;1155:29;:52::i;:::-;1081:133;;600:1117;;2264:344:200;2355:37;2374:17;2355:18;:37::i;:::-;2407:36;;-1:-1:-1;;;;;2407:36:200;;;;;;;;2458:11;;:15;2454:148;;2489:53;2518:17;2537:4;2489:28;:53::i;:::-;;2264:344;;:::o;2454:148::-;2573:18;:16;:18::i;:::-;2264:344;;:::o;1671:281::-;1748:17;-1:-1:-1;;;;;1748:29:200;;1781:1;1748:34;1744:119;;1805:47;;-1:-1:-1;;;1805:47:200;;-1:-1:-1;;;;;1416:32:363;;1805:47:200;;;1398:51:363;1371:18;;1805:47:200;;;;;;;;1744:119;811:66;1872:73;;-1:-1:-1;;;;;;1872:73:200;-1:-1:-1;;;;;1872:73:200;;;;;;;;;;1671:281::o;3916:253:256:-;3999:12;4024;4038:23;4065:6;-1:-1:-1;;;;;4065:19:256;4085:4;4065:25;;;;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;4023:67:256;;-1:-1:-1;4023:67:256;-1:-1:-1;4107:55:256;4134:6;4023:67;;4107:26;:55::i;:::-;4100:62;3916:253;-1:-1:-1;;;;;3916:253:256:o;6113:122:200:-;6163:9;:13;6159:70;;6199:19;;-1:-1:-1;;;6199:19:200;;;;;;;;;;;6159:70;6113:122::o;4437:582:256:-;4581:12;4610:7;4605:408;;4633:19;4641:10;4633:7;:19::i;:::-;4605:408;;;4857:17;;:22;:49;;;;-1:-1:-1;;;;;;4883:18:256;;;:23;4857:49;4853:119;;;4933:24;;-1:-1:-1;;;4933:24:256;;-1:-1:-1;;;;;1416:32:363;;4933:24:256;;;1398:51:363;1371:18;;4933:24:256;1252:203:363;4853:119:256;-1:-1:-1;4992:10:256;4605:408;4437:582;;;;;:::o;5559:434::-;5690:17;;:21;5686:301;;5894:10;5888:17;5881:4;5869:10;5865:21;5858:48;5686:301;5957:19;;-1:-1:-1;;;5957:19:256;;;;;;;;;;;14:127:363;75:10;70:3;66:20;63:1;56:31;106:4;103:1;96:15;130:4;127:1;120:15;146:1101;234:6;242;295:2;283:9;274:7;270:23;266:32;263:52;;;311:1;308;301:12;263:52;337:16;;-1:-1:-1;;;;;382:31:363;;372:42;;362:70;;428:1;425;418:12;362:70;500:2;485:18;;479:25;451:5;;-1:-1:-1;;;;;;516:30:363;;513:50;;;559:1;556;549:12;513:50;582:22;;635:4;627:13;;623:27;-1:-1:-1;613:55:363;;664:1;661;654:12;613:55;691:9;;-1:-1:-1;;;;;712:30:363;;709:56;;;745:18;;:::i;:::-;794:2;788:9;886:2;848:17;;-1:-1:-1;;844:31:363;;;877:2;840:40;836:54;824:67;;-1:-1:-1;;;;;906:34:363;;942:22;;;903:62;900:88;;;968:18;;:::i;:::-;1004:2;997:22;1028;;;1069:15;;;1086:2;1065:24;1062:37;-1:-1:-1;1059:57:363;;;1112:1;1109;1102:12;1059:57;1161:6;1156:2;1152;1148:11;1143:2;1135:6;1131:15;1125:43;1214:1;1209:2;1200:6;1192;1188:19;1184:28;1177:39;1235:6;1225:16;;;;;146:1101;;;;;:::o;1460:301::-;1589:3;1627:6;1621:13;1673:6;1666:4;1658:6;1654:17;1649:3;1643:37;1735:1;1699:16;;1724:13;;;-1:-1:-1;1699:16:363;1460:301;-1:-1:-1;1460:301:363:o;:::-;600:1117:199;;;;;;",
+        "linkReferences": {}
+    },
+    "deployedBytecode": {
+        "object": "0x6080604052600a600c565b005b60186014601a565b6050565b565b5f604b7f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc546001600160a01b031690565b905090565b365f5f375f5f365f845af43d5f5f3e8080156069573d5ff35b3d5ffdfea264697066735822122070f5897eb9502f578ed8893cbd4eca36ab9328296f3f7f6d7987e943af8ff20264736f6c634300081b0033",
+        "sourceMap": "600:1117:199:-:0;;;2649:11:201;:9;:11::i;:::-;600:1117:199;2323:83:201;2371:28;2381:17;:15;:17::i;:::-;2371:9;:28::i;:::-;2323:83::o;1583:132:199:-;1650:7;1676:32;811:66:200;1519:53;-1:-1:-1;;;;;1519:53:200;;1441:138;1676:32:199;1669:39;;1583:132;:::o;949:895:201:-;1287:14;1284:1;1281;1268:34;1501:1;1498;1482:14;1479:1;1463:14;1456:5;1443:60;1577:16;1574:1;1571;1556:38;1615:6;1682:66;;;;1797:16;1794:1;1787:27;1682:66;1717:16;1714:1;1707:27",
+        "linkReferences": {}
+    },
+    "methodIdentifiers": {},
+    "rawMetadata": "{\"compiler\":{\"version\":\"0.8.27+commit.40a35a09\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"implementation\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"_data\",\"type\":\"bytes\"}],\"stateMutability\":\"payable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"target\",\"type\":\"address\"}],\"name\":\"AddressEmptyCode\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"implementation\",\"type\":\"address\"}],\"name\":\"ERC1967InvalidImplementation\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"ERC1967NonPayable\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"FailedCall\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"implementation\",\"type\":\"address\"}],\"name\":\"Upgraded\",\"type\":\"event\"},{\"stateMutability\":\"payable\",\"type\":\"fallback\"}],\"devdoc\":{\"details\":\"This contract implements an upgradeable proxy. It is upgradeable because calls are delegated to an implementation address that can be changed. This address is stored in storage in the location specified by https://eips.ethereum.org/EIPS/eip-1967[ERC-1967], so that it doesn't conflict with the storage layout of the implementation behind the proxy.\",\"errors\":{\"AddressEmptyCode(address)\":[{\"details\":\"There's no code at `target` (it is not a contract).\"}],\"ERC1967InvalidImplementation(address)\":[{\"details\":\"The `implementation` of the proxy is invalid.\"}],\"ERC1967NonPayable()\":[{\"details\":\"An upgrade function sees `msg.value > 0` that may be lost.\"}],\"FailedCall()\":[{\"details\":\"A call to an address target failed. The target may have reverted.\"}]},\"events\":{\"Upgraded(address)\":{\"details\":\"Emitted when the implementation is upgraded.\"}},\"kind\":\"dev\",\"methods\":{\"constructor\":{\"details\":\"Initializes the upgradeable proxy with an initial implementation specified by `implementation`. If `_data` is nonempty, it's used as data in a delegate call to `implementation`. This will typically be an encoded function call, and allows initializing the storage of the proxy like a Solidity constructor. Requirements: - If `data` is empty, `msg.value` must be zero.\"}},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/proxy/ERC1967/ERC1967Proxy.sol\":\"ERC1967Proxy\"},\"evmVersion\":\"prague\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[\":@openzeppelin/contracts/=contracts/\",\":erc4626-tests/=lib/erc4626-tests/\",\":forge-std/=lib/forge-std/src/\",\":halmos-cheatcodes/=lib/halmos-cheatcodes/src/\"]},\"sources\":{\"contracts/interfaces/IERC1967.sol\":{\"keccak256\":\"0x4baab1fac32bbb35f8fff58bfa766d5cdf46d2b3f9e0a9c019669516375b2e11\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://5086df4eb774143759240d88b0a27398cb5287ad20cc3dd0b7efffd9392490d8\",\"dweb:/ipfs/QmXjnRum2SUpPWDYCGRJ19unmF59L9LZaCY8aL3KTNYLLu\"]},\"contracts/proxy/ERC1967/ERC1967Proxy.sol\":{\"keccak256\":\"0xa3066ff86b94128a9d3956a63a0511fa1aae41bd455772ab587b32ff322acb2e\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://bf7b192fd82acf6187970c80548f624b1b9c80425b62fa49e7fdb538a52de049\",\"dweb:/ipfs/QmWXG1YCde1tqDYTbNwjkZDWVgPEjzaQGSDqWkyKLzaNua\"]},\"contracts/proxy/ERC1967/ERC1967Utils.sol\":{\"keccak256\":\"0x03f5d1fcbf36a510aa90080cda37805aa22bc3525bf038742683c8b6ea1b8566\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://43fbc77da90094d6dd9660248d60bf8c486ba4f86c717048c70d80891ecdf50f\",\"dweb:/ipfs/QmaWXadWeFuWs1QrAzJqzTdmUaXpM7YD1tQXLGx4mW3vUo\"]},\"contracts/proxy/Proxy.sol\":{\"keccak256\":\"0xc3f2ec76a3de8ed7a7007c46166f5550c72c7709e3fc7e8bb3111a7191cdedbd\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://e73efb4c2ca655882dc237c6b4f234a9bd36d97159d8fcaa837eb01171f726ac\",\"dweb:/ipfs/QmTNnnv7Gu5fs5G1ZMh7Fexp8N4XUs3XrNAngjcxgiss3e\"]},\"contracts/proxy/beacon/IBeacon.sol\":{\"keccak256\":\"0x77ec7f971392aad4657542c952ccb88d8bd05090645bb282c3d8bfa9b1662781\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://58c5b2f3961e6ee017a68cc94c8c2949b6bade20c3b2170cc25cafe66fc5924b\",\"dweb:/ipfs/QmacAUjdb1RtFjwVVzsJX5wvQTMsPsY9mKeaB93VRu3TSX\"]},\"contracts/utils/Address.sol\":{\"keccak256\":\"0x06871a0948d0fed9316ae59ee4368527e144911f5e284755312b5bfcde8b27ea\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://3c30e46d061d8a450c561935a1236b1885aa76ffab93a19b26dcb8868c839843\",\"dweb:/ipfs/QmZbWbeDyixTyYkVtJvuiQYfkQz12pS7zxWZF3Ju9PYwGH\"]},\"contracts/utils/Errors.sol\":{\"keccak256\":\"0x6afa713bfd42cf0f7656efa91201007ac465e42049d7de1d50753a373648c123\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://ba1d02f4847670a1b83dec9f7d37f0b0418d6043447b69f3a29a5f9efc547fcf\",\"dweb:/ipfs/QmQ7iH2keLNUKgq2xSWcRmuBE5eZ3F5whYAkAGzCNNoEWB\"]},\"contracts/utils/StorageSlot.sol\":{\"keccak256\":\"0xcf74f855663ce2ae00ed8352666b7935f6cddea2932fdf2c3ecd30a9b1cd0e97\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://9f660b1f351b757dfe01438e59888f31f33ded3afcf5cb5b0d9bf9aa6f320a8b\",\"dweb:/ipfs/QmarDJ5hZEgBtCmmrVzEZWjub9769eD686jmzb2XpSU1cM\"]}},\"version\":1}",
+    "metadata": {
+        "compiler": {
+            "version": "0.8.27+commit.40a35a09"
+        },
+        "language": "Solidity",
+        "output": {
+            "abi": [
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "implementation",
+                            "type": "address"
+                        },
+                        {
+                            "internalType": "bytes",
+                            "name": "_data",
+                            "type": "bytes"
+                        }
+                    ],
+                    "stateMutability": "payable",
+                    "type": "constructor"
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "target",
+                            "type": "address"
+                        }
+                    ],
+                    "type": "error",
+                    "name": "AddressEmptyCode"
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "implementation",
+                            "type": "address"
+                        }
+                    ],
+                    "type": "error",
+                    "name": "ERC1967InvalidImplementation"
+                },
+                {
+                    "inputs": [],
+                    "type": "error",
+                    "name": "ERC1967NonPayable"
+                },
+                {
+                    "inputs": [],
+                    "type": "error",
+                    "name": "FailedCall"
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "implementation",
+                            "type": "address",
+                            "indexed": true
+                        }
+                    ],
+                    "type": "event",
+                    "name": "Upgraded",
+                    "anonymous": false
+                },
+                {
+                    "inputs": [],
+                    "stateMutability": "payable",
+                    "type": "fallback"
+                }
+            ],
+            "devdoc": {
+                "kind": "dev",
+                "methods": {
+                    "constructor": {
+                        "details": "Initializes the upgradeable proxy with an initial implementation specified by `implementation`. If `_data` is nonempty, it's used as data in a delegate call to `implementation`. This will typically be an encoded function call, and allows initializing the storage of the proxy like a Solidity constructor. Requirements: - If `data` is empty, `msg.value` must be zero."
+                    }
+                },
+                "version": 1
+            },
+            "userdoc": {
+                "kind": "user",
+                "methods": {},
+                "version": 1
+            }
+        },
+        "settings": {
+            "remappings": [
+                "@openzeppelin/contracts/=contracts/",
+                "erc4626-tests/=lib/erc4626-tests/",
+                "forge-std/=lib/forge-std/src/",
+                "halmos-cheatcodes/=lib/halmos-cheatcodes/src/"
+            ],
+            "optimizer": {
+                "enabled": true,
+                "runs": 200
+            },
+            "metadata": {
+                "bytecodeHash": "ipfs"
+            },
+            "compilationTarget": {
+                "contracts/proxy/ERC1967/ERC1967Proxy.sol": "ERC1967Proxy"
+            },
+            "evmVersion": "prague",
+            "libraries": {}
+        },
+        "sources": {
+            "contracts/interfaces/IERC1967.sol": {
+                "keccak256": "0x4baab1fac32bbb35f8fff58bfa766d5cdf46d2b3f9e0a9c019669516375b2e11",
+                "urls": [
+                    "bzz-raw://5086df4eb774143759240d88b0a27398cb5287ad20cc3dd0b7efffd9392490d8",
+                    "dweb:/ipfs/QmXjnRum2SUpPWDYCGRJ19unmF59L9LZaCY8aL3KTNYLLu"
+                ],
+                "license": "MIT"
+            },
+            "contracts/proxy/ERC1967/ERC1967Proxy.sol": {
+                "keccak256": "0xa3066ff86b94128a9d3956a63a0511fa1aae41bd455772ab587b32ff322acb2e",
+                "urls": [
+                    "bzz-raw://bf7b192fd82acf6187970c80548f624b1b9c80425b62fa49e7fdb538a52de049",
+                    "dweb:/ipfs/QmWXG1YCde1tqDYTbNwjkZDWVgPEjzaQGSDqWkyKLzaNua"
+                ],
+                "license": "MIT"
+            },
+            "contracts/proxy/ERC1967/ERC1967Utils.sol": {
+                "keccak256": "0x03f5d1fcbf36a510aa90080cda37805aa22bc3525bf038742683c8b6ea1b8566",
+                "urls": [
+                    "bzz-raw://43fbc77da90094d6dd9660248d60bf8c486ba4f86c717048c70d80891ecdf50f",
+                    "dweb:/ipfs/QmaWXadWeFuWs1QrAzJqzTdmUaXpM7YD1tQXLGx4mW3vUo"
+                ],
+                "license": "MIT"
+            },
+            "contracts/proxy/Proxy.sol": {
+                "keccak256": "0xc3f2ec76a3de8ed7a7007c46166f5550c72c7709e3fc7e8bb3111a7191cdedbd",
+                "urls": [
+                    "bzz-raw://e73efb4c2ca655882dc237c6b4f234a9bd36d97159d8fcaa837eb01171f726ac",
+                    "dweb:/ipfs/QmTNnnv7Gu5fs5G1ZMh7Fexp8N4XUs3XrNAngjcxgiss3e"
+                ],
+                "license": "MIT"
+            },
+            "contracts/proxy/beacon/IBeacon.sol": {
+                "keccak256": "0x77ec7f971392aad4657542c952ccb88d8bd05090645bb282c3d8bfa9b1662781",
+                "urls": [
+                    "bzz-raw://58c5b2f3961e6ee017a68cc94c8c2949b6bade20c3b2170cc25cafe66fc5924b",
+                    "dweb:/ipfs/QmacAUjdb1RtFjwVVzsJX5wvQTMsPsY9mKeaB93VRu3TSX"
+                ],
+                "license": "MIT"
+            },
+            "contracts/utils/Address.sol": {
+                "keccak256": "0x06871a0948d0fed9316ae59ee4368527e144911f5e284755312b5bfcde8b27ea",
+                "urls": [
+                    "bzz-raw://3c30e46d061d8a450c561935a1236b1885aa76ffab93a19b26dcb8868c839843",
+                    "dweb:/ipfs/QmZbWbeDyixTyYkVtJvuiQYfkQz12pS7zxWZF3Ju9PYwGH"
+                ],
+                "license": "MIT"
+            },
+            "contracts/utils/Errors.sol": {
+                "keccak256": "0x6afa713bfd42cf0f7656efa91201007ac465e42049d7de1d50753a373648c123",
+                "urls": [
+                    "bzz-raw://ba1d02f4847670a1b83dec9f7d37f0b0418d6043447b69f3a29a5f9efc547fcf",
+                    "dweb:/ipfs/QmQ7iH2keLNUKgq2xSWcRmuBE5eZ3F5whYAkAGzCNNoEWB"
+                ],
+                "license": "MIT"
+            },
+            "contracts/utils/StorageSlot.sol": {
+                "keccak256": "0xcf74f855663ce2ae00ed8352666b7935f6cddea2932fdf2c3ecd30a9b1cd0e97",
+                "urls": [
+                    "bzz-raw://9f660b1f351b757dfe01438e59888f31f33ded3afcf5cb5b0d9bf9aa6f320a8b",
+                    "dweb:/ipfs/QmarDJ5hZEgBtCmmrVzEZWjub9769eD686jmzb2XpSU1cM"
+                ],
+                "license": "MIT"
+            }
+        },
+        "version": 1
+    },
+    "id": 199
+}
