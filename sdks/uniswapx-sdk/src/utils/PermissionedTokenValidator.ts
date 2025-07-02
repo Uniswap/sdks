@@ -2,8 +2,8 @@ import { Provider } from "@ethersproject/providers";
 import { ChainId } from "@uniswap/sdk-core";
 
 import { PERMISSIONED_TOKENS, PermissionedTokenInterface } from "../constants";
-import { DSTokenInterface, DSTokenInterface__factory, Proxy__factory, ISuperstateTokenV4__factory } from "../contracts";
 import { PermissionedTokenProxyType } from "../constants";
+import { DSTokenInterface, DSTokenInterface__factory, ISuperstateTokenV4__factory, Proxy__factory } from "../contracts";
 
 export class PermissionedTokenValidator {
 
@@ -74,7 +74,7 @@ export class PermissionedTokenValidator {
       const tokenContract = ISuperstateTokenV4__factory.connect(resolvedTokenAddress, provider);
       const [fromAllowed, toAllowed] = await Promise.all([
         tokenContract.isAllowed(from),
-        tokenContract.isAllowed(to)
+        tokenContract.isAllowed(to),
       ]);
       return fromAllowed && toAllowed;
     }
