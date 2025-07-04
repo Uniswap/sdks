@@ -1,0 +1,2134 @@
+{
+    "abi": [
+        {
+            "type": "function",
+            "name": "DOMAIN_SEPARATOR",
+            "inputs": [],
+            "outputs": [
+                {
+                    "name": "",
+                    "type": "bytes32",
+                    "internalType": "bytes32"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "accountingPause",
+            "inputs": [],
+            "outputs": [],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "function",
+            "name": "accountingPaused",
+            "inputs": [],
+            "outputs": [
+                {
+                    "name": "",
+                    "type": "bool",
+                    "internalType": "bool"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "accountingUnpause",
+            "inputs": [],
+            "outputs": [],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "function",
+            "name": "adminBurn",
+            "inputs": [
+                {
+                    "name": "src",
+                    "type": "address",
+                    "internalType": "address"
+                },
+                {
+                    "name": "amount",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                }
+            ],
+            "outputs": [],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "function",
+            "name": "allowListV2",
+            "inputs": [],
+            "outputs": [
+                {
+                    "name": "",
+                    "type": "address",
+                    "internalType": "contract IAllowListV2"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "allowance",
+            "inputs": [
+                {
+                    "name": "owner",
+                    "type": "address",
+                    "internalType": "address"
+                },
+                {
+                    "name": "spender",
+                    "type": "address",
+                    "internalType": "address"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "approve",
+            "inputs": [
+                {
+                    "name": "spender",
+                    "type": "address",
+                    "internalType": "address"
+                },
+                {
+                    "name": "amount",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "",
+                    "type": "bool",
+                    "internalType": "bool"
+                }
+            ],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "function",
+            "name": "balanceOf",
+            "inputs": [
+                {
+                    "name": "account",
+                    "type": "address",
+                    "internalType": "address"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "bridge",
+            "inputs": [
+                {
+                    "name": "amount",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                },
+                {
+                    "name": "ethDestinationAddress",
+                    "type": "address",
+                    "internalType": "address"
+                },
+                {
+                    "name": "otherDestinationAddress",
+                    "type": "string",
+                    "internalType": "string"
+                },
+                {
+                    "name": "chainId",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                }
+            ],
+            "outputs": [],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "function",
+            "name": "bridgeToBookEntry",
+            "inputs": [
+                {
+                    "name": "amount",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                }
+            ],
+            "outputs": [],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "function",
+            "name": "bulkMint",
+            "inputs": [
+                {
+                    "name": "dsts",
+                    "type": "address[]",
+                    "internalType": "address[]"
+                },
+                {
+                    "name": "amounts",
+                    "type": "uint256[]",
+                    "internalType": "uint256[]"
+                }
+            ],
+            "outputs": [],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "function",
+            "name": "initialize",
+            "inputs": [
+                {
+                    "name": "_name",
+                    "type": "string",
+                    "internalType": "string"
+                },
+                {
+                    "name": "_symbol",
+                    "type": "string",
+                    "internalType": "string"
+                }
+            ],
+            "outputs": [],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "function",
+            "name": "initializeV2",
+            "inputs": [],
+            "outputs": [],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "function",
+            "name": "initializeV3",
+            "inputs": [
+                {
+                    "name": "_allowList",
+                    "type": "address",
+                    "internalType": "contract AllowList"
+                }
+            ],
+            "outputs": [],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "function",
+            "name": "isAllowed",
+            "inputs": [
+                {
+                    "name": "addr",
+                    "type": "address",
+                    "internalType": "address"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "",
+                    "type": "bool",
+                    "internalType": "bool"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "mint",
+            "inputs": [
+                {
+                    "name": "dst",
+                    "type": "address",
+                    "internalType": "address"
+                },
+                {
+                    "name": "amount",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                }
+            ],
+            "outputs": [],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "function",
+            "name": "nonces",
+            "inputs": [
+                {
+                    "name": "toFind",
+                    "type": "address",
+                    "internalType": "address"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "offchainRedeem",
+            "inputs": [
+                {
+                    "name": "amount",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                }
+            ],
+            "outputs": [],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "function",
+            "name": "pause",
+            "inputs": [],
+            "outputs": [],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "function",
+            "name": "permit",
+            "inputs": [
+                {
+                    "name": "owner",
+                    "type": "address",
+                    "internalType": "address"
+                },
+                {
+                    "name": "spender",
+                    "type": "address",
+                    "internalType": "address"
+                },
+                {
+                    "name": "value",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                },
+                {
+                    "name": "deadline",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                },
+                {
+                    "name": "v",
+                    "type": "uint8",
+                    "internalType": "uint8"
+                },
+                {
+                    "name": "r",
+                    "type": "bytes32",
+                    "internalType": "bytes32"
+                },
+                {
+                    "name": "s",
+                    "type": "bytes32",
+                    "internalType": "bytes32"
+                }
+            ],
+            "outputs": [],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "function",
+            "name": "setChainIdSupport",
+            "inputs": [
+                {
+                    "name": "_chainId",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                },
+                {
+                    "name": "_supported",
+                    "type": "bool",
+                    "internalType": "bool"
+                }
+            ],
+            "outputs": [],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "function",
+            "name": "setRedemptionContract",
+            "inputs": [
+                {
+                    "name": "_newRedemptionContract",
+                    "type": "address",
+                    "internalType": "address"
+                }
+            ],
+            "outputs": [],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "function",
+            "name": "totalSupply",
+            "inputs": [],
+            "outputs": [
+                {
+                    "name": "",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "transfer",
+            "inputs": [
+                {
+                    "name": "to",
+                    "type": "address",
+                    "internalType": "address"
+                },
+                {
+                    "name": "amount",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "",
+                    "type": "bool",
+                    "internalType": "bool"
+                }
+            ],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "function",
+            "name": "transferFrom",
+            "inputs": [
+                {
+                    "name": "from",
+                    "type": "address",
+                    "internalType": "address"
+                },
+                {
+                    "name": "to",
+                    "type": "address",
+                    "internalType": "address"
+                },
+                {
+                    "name": "amount",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "",
+                    "type": "bool",
+                    "internalType": "bool"
+                }
+            ],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "function",
+            "name": "unpause",
+            "inputs": [],
+            "outputs": [],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "event",
+            "name": "AccountingPaused",
+            "inputs": [
+                {
+                    "name": "admin",
+                    "type": "address",
+                    "indexed": false,
+                    "internalType": "address"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "AccountingUnpaused",
+            "inputs": [
+                {
+                    "name": "admin",
+                    "type": "address",
+                    "indexed": false,
+                    "internalType": "address"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "AdminBurn",
+            "inputs": [
+                {
+                    "name": "burner",
+                    "type": "address",
+                    "indexed": true,
+                    "internalType": "address"
+                },
+                {
+                    "name": "src",
+                    "type": "address",
+                    "indexed": true,
+                    "internalType": "address"
+                },
+                {
+                    "name": "amount",
+                    "type": "uint256",
+                    "indexed": false,
+                    "internalType": "uint256"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "Approval",
+            "inputs": [
+                {
+                    "name": "owner",
+                    "type": "address",
+                    "indexed": true,
+                    "internalType": "address"
+                },
+                {
+                    "name": "spender",
+                    "type": "address",
+                    "indexed": true,
+                    "internalType": "address"
+                },
+                {
+                    "name": "value",
+                    "type": "uint256",
+                    "indexed": false,
+                    "internalType": "uint256"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "Bridge",
+            "inputs": [
+                {
+                    "name": "caller",
+                    "type": "address",
+                    "indexed": false,
+                    "internalType": "address"
+                },
+                {
+                    "name": "src",
+                    "type": "address",
+                    "indexed": true,
+                    "internalType": "address"
+                },
+                {
+                    "name": "amount",
+                    "type": "uint256",
+                    "indexed": false,
+                    "internalType": "uint256"
+                },
+                {
+                    "name": "ethDestinationAddress",
+                    "type": "address",
+                    "indexed": true,
+                    "internalType": "address"
+                },
+                {
+                    "name": "otherDestinationAddress",
+                    "type": "string",
+                    "indexed": true,
+                    "internalType": "string"
+                },
+                {
+                    "name": "chainId",
+                    "type": "uint256",
+                    "indexed": false,
+                    "internalType": "uint256"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "Mint",
+            "inputs": [
+                {
+                    "name": "minter",
+                    "type": "address",
+                    "indexed": true,
+                    "internalType": "address"
+                },
+                {
+                    "name": "to",
+                    "type": "address",
+                    "indexed": true,
+                    "internalType": "address"
+                },
+                {
+                    "name": "amount",
+                    "type": "uint256",
+                    "indexed": false,
+                    "internalType": "uint256"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "OffchainRedeem",
+            "inputs": [
+                {
+                    "name": "burner",
+                    "type": "address",
+                    "indexed": true,
+                    "internalType": "address"
+                },
+                {
+                    "name": "src",
+                    "type": "address",
+                    "indexed": true,
+                    "internalType": "address"
+                },
+                {
+                    "name": "amount",
+                    "type": "uint256",
+                    "indexed": false,
+                    "internalType": "uint256"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "SetChainIdSupport",
+            "inputs": [
+                {
+                    "name": "chainId",
+                    "type": "uint256",
+                    "indexed": true,
+                    "internalType": "uint256"
+                },
+                {
+                    "name": "oldSupported",
+                    "type": "bool",
+                    "indexed": false,
+                    "internalType": "bool"
+                },
+                {
+                    "name": "newSupported",
+                    "type": "bool",
+                    "indexed": false,
+                    "internalType": "bool"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "SetMaximumOracleDelay",
+            "inputs": [
+                {
+                    "name": "oldMaxOracleDelay",
+                    "type": "uint256",
+                    "indexed": false,
+                    "internalType": "uint256"
+                },
+                {
+                    "name": "newMaxOracleDelay",
+                    "type": "uint256",
+                    "indexed": false,
+                    "internalType": "uint256"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "SetOracle",
+            "inputs": [
+                {
+                    "name": "oldOracle",
+                    "type": "address",
+                    "indexed": false,
+                    "internalType": "address"
+                },
+                {
+                    "name": "newOracle",
+                    "type": "address",
+                    "indexed": false,
+                    "internalType": "address"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "SetRedemptionContract",
+            "inputs": [
+                {
+                    "name": "oldRedemptionContract",
+                    "type": "address",
+                    "indexed": false,
+                    "internalType": "address"
+                },
+                {
+                    "name": "newRedemptionContract",
+                    "type": "address",
+                    "indexed": false,
+                    "internalType": "address"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "SetStablecoinConfig",
+            "inputs": [
+                {
+                    "name": "stablecoin",
+                    "type": "address",
+                    "indexed": true,
+                    "internalType": "address"
+                },
+                {
+                    "name": "oldSweepDestination",
+                    "type": "address",
+                    "indexed": false,
+                    "internalType": "address"
+                },
+                {
+                    "name": "newSweepDestination",
+                    "type": "address",
+                    "indexed": false,
+                    "internalType": "address"
+                },
+                {
+                    "name": "oldFee",
+                    "type": "uint96",
+                    "indexed": false,
+                    "internalType": "uint96"
+                },
+                {
+                    "name": "newFee",
+                    "type": "uint96",
+                    "indexed": false,
+                    "internalType": "uint96"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "Subscribe",
+            "inputs": [
+                {
+                    "name": "subscriber",
+                    "type": "address",
+                    "indexed": true,
+                    "internalType": "address"
+                },
+                {
+                    "name": "stablecoin",
+                    "type": "address",
+                    "indexed": false,
+                    "internalType": "address"
+                },
+                {
+                    "name": "stablecoinInAmount",
+                    "type": "uint256",
+                    "indexed": false,
+                    "internalType": "uint256"
+                },
+                {
+                    "name": "stablecoinInAmountAfterFee",
+                    "type": "uint256",
+                    "indexed": false,
+                    "internalType": "uint256"
+                },
+                {
+                    "name": "superstateTokenOutAmount",
+                    "type": "uint256",
+                    "indexed": false,
+                    "internalType": "uint256"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "Transfer",
+            "inputs": [
+                {
+                    "name": "from",
+                    "type": "address",
+                    "indexed": true,
+                    "internalType": "address"
+                },
+                {
+                    "name": "to",
+                    "type": "address",
+                    "indexed": true,
+                    "internalType": "address"
+                },
+                {
+                    "name": "value",
+                    "type": "uint256",
+                    "indexed": false,
+                    "internalType": "uint256"
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "error",
+            "name": "AccountingIsNotPaused",
+            "inputs": []
+        },
+        {
+            "type": "error",
+            "name": "AccountingIsPaused",
+            "inputs": []
+        },
+        {
+            "type": "error",
+            "name": "BadArgs",
+            "inputs": []
+        },
+        {
+            "type": "error",
+            "name": "BadChainlinkData",
+            "inputs": []
+        },
+        {
+            "type": "error",
+            "name": "BadSignatory",
+            "inputs": []
+        },
+        {
+            "type": "error",
+            "name": "BridgeChainIdDestinationNotSupported",
+            "inputs": []
+        },
+        {
+            "type": "error",
+            "name": "FeeTooHigh",
+            "inputs": []
+        },
+        {
+            "type": "error",
+            "name": "InsufficientPermissions",
+            "inputs": []
+        },
+        {
+            "type": "error",
+            "name": "InvalidArgumentLengths",
+            "inputs": []
+        },
+        {
+            "type": "error",
+            "name": "InvalidSignatureS",
+            "inputs": []
+        },
+        {
+            "type": "error",
+            "name": "OnchainDestinationSetForBridgeToBookEntry",
+            "inputs": []
+        },
+        {
+            "type": "error",
+            "name": "OnchainSubscriptionsDisabled",
+            "inputs": []
+        },
+        {
+            "type": "error",
+            "name": "RenounceOwnershipDisabled",
+            "inputs": []
+        },
+        {
+            "type": "error",
+            "name": "SignatureExpired",
+            "inputs": []
+        },
+        {
+            "type": "error",
+            "name": "StablecoinNotSupported",
+            "inputs": []
+        },
+        {
+            "type": "error",
+            "name": "TwoDestinationsInvalid",
+            "inputs": []
+        },
+        {
+            "type": "error",
+            "name": "Unauthorized",
+            "inputs": []
+        },
+        {
+            "type": "error",
+            "name": "ZeroSuperstateTokensOut",
+            "inputs": []
+        }
+    ],
+    "bytecode": {
+        "object": "0x",
+        "sourceMap": "",
+        "linkReferences": {}
+    },
+    "deployedBytecode": {
+        "object": "0x",
+        "sourceMap": "",
+        "linkReferences": {}
+    },
+    "methodIdentifiers": {
+        "DOMAIN_SEPARATOR()": "3644e515",
+        "accountingPause()": "e228db9e",
+        "accountingPaused()": "0b9a59ea",
+        "accountingUnpause()": "c3d0773d",
+        "adminBurn(address,uint256)": "06dd0419",
+        "allowListV2()": "78048253",
+        "allowance(address,address)": "dd62ed3e",
+        "approve(address,uint256)": "095ea7b3",
+        "balanceOf(address)": "70a08231",
+        "bridge(uint256,address,string,uint256)": "774e522c",
+        "bridgeToBookEntry(uint256)": "a32da3c7",
+        "bulkMint(address[],uint256[])": "6ae459bd",
+        "initialize(string,string)": "4cd88b76",
+        "initializeV2()": "5cd8a76b",
+        "initializeV3(address)": "3101cfcb",
+        "isAllowed(address)": "babcc539",
+        "mint(address,uint256)": "40c10f19",
+        "nonces(address)": "7ecebe00",
+        "offchainRedeem(uint256)": "a1bee8f1",
+        "pause()": "8456cb59",
+        "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)": "d505accf",
+        "setChainIdSupport(uint256,bool)": "bf4f6c6a",
+        "setRedemptionContract(address)": "d028139c",
+        "totalSupply()": "18160ddd",
+        "transfer(address,uint256)": "a9059cbb",
+        "transferFrom(address,address,uint256)": "23b872dd",
+        "unpause()": "3f4ba83a"
+    },
+    "rawMetadata": "{\"compiler\":{\"version\":\"0.8.28+commit.7893614a\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[],\"name\":\"AccountingIsNotPaused\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"AccountingIsPaused\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"BadArgs\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"BadChainlinkData\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"BadSignatory\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"BridgeChainIdDestinationNotSupported\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"FeeTooHigh\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InsufficientPermissions\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidArgumentLengths\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidSignatureS\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"OnchainDestinationSetForBridgeToBookEntry\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"OnchainSubscriptionsDisabled\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"RenounceOwnershipDisabled\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"SignatureExpired\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"StablecoinNotSupported\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"TwoDestinationsInvalid\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"Unauthorized\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"ZeroSuperstateTokensOut\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"admin\",\"type\":\"address\"}],\"name\":\"AccountingPaused\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"admin\",\"type\":\"address\"}],\"name\":\"AccountingUnpaused\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"burner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"src\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"AdminBurn\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"spender\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"Approval\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"caller\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"src\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"ethDestinationAddress\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"string\",\"name\":\"otherDestinationAddress\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"chainId\",\"type\":\"uint256\"}],\"name\":\"Bridge\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"minter\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"Mint\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"burner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"src\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"OffchainRedeem\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"chainId\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"oldSupported\",\"type\":\"bool\"},{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"newSupported\",\"type\":\"bool\"}],\"name\":\"SetChainIdSupport\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"oldMaxOracleDelay\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"newMaxOracleDelay\",\"type\":\"uint256\"}],\"name\":\"SetMaximumOracleDelay\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"oldOracle\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"newOracle\",\"type\":\"address\"}],\"name\":\"SetOracle\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"oldRedemptionContract\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"newRedemptionContract\",\"type\":\"address\"}],\"name\":\"SetRedemptionContract\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"stablecoin\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"oldSweepDestination\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"newSweepDestination\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint96\",\"name\":\"oldFee\",\"type\":\"uint96\"},{\"indexed\":false,\"internalType\":\"uint96\",\"name\":\"newFee\",\"type\":\"uint96\"}],\"name\":\"SetStablecoinConfig\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"subscriber\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"stablecoin\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"stablecoinInAmount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"stablecoinInAmountAfterFee\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"superstateTokenOutAmount\",\"type\":\"uint256\"}],\"name\":\"Subscribe\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"Transfer\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"DOMAIN_SEPARATOR\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"accountingPause\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"accountingPaused\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"accountingUnpause\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"src\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"adminBurn\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"allowListV2\",\"outputs\":[{\"internalType\":\"contract IAllowListV2\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"spender\",\"type\":\"address\"}],\"name\":\"allowance\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"spender\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"approve\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"balanceOf\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"ethDestinationAddress\",\"type\":\"address\"},{\"internalType\":\"string\",\"name\":\"otherDestinationAddress\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"chainId\",\"type\":\"uint256\"}],\"name\":\"bridge\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"bridgeToBookEntry\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"dsts\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"amounts\",\"type\":\"uint256[]\"}],\"name\":\"bulkMint\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"_name\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"_symbol\",\"type\":\"string\"}],\"name\":\"initialize\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"initializeV2\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contract AllowList\",\"name\":\"_allowList\",\"type\":\"address\"}],\"name\":\"initializeV3\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"isAllowed\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"dst\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"mint\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"toFind\",\"type\":\"address\"}],\"name\":\"nonces\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"offchainRedeem\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"pause\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"spender\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"deadline\",\"type\":\"uint256\"},{\"internalType\":\"uint8\",\"name\":\"v\",\"type\":\"uint8\"},{\"internalType\":\"bytes32\",\"name\":\"r\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"s\",\"type\":\"bytes32\"}],\"name\":\"permit\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_chainId\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"_supported\",\"type\":\"bool\"}],\"name\":\"setChainIdSupport\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_newRedemptionContract\",\"type\":\"address\"}],\"name\":\"setRedemptionContract\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"totalSupply\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"transfer\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"transferFrom\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"unpause\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}],\"devdoc\":{\"errors\":{\"AccountingIsNotPaused()\":[{\"details\":\"Thrown if accounting pause is already off\"}],\"AccountingIsPaused()\":[{\"details\":\"Thrown if accounting pause is already on\"}],\"BadArgs()\":[{\"details\":\"Thrown when an argument is invalid\"}],\"BadChainlinkData()\":[{\"details\":\"Thrown when Chainlink Oracle data is bad\"}],\"BadSignatory()\":[{\"details\":\"Thrown if the signature is invalid or its signer does not match the expected singer\"}],\"BridgeChainIdDestinationNotSupported()\":[{\"details\":\"Thrown when bridge function chainId is not supported\"}],\"FeeTooHigh()\":[{\"details\":\"Thrown when owner tries to set the fee for a stablecoin too high\"}],\"InsufficientPermissions()\":[{\"details\":\"Thrown when an address does not have sufficient permissions, as dictated by the AllowList\"}],\"InvalidArgumentLengths()\":[{\"details\":\"Thrown if array length arguments aren't equal\"}],\"InvalidSignatureS()\":[{\"details\":\"Thrown if the signature has an S value that is in the upper half order.\"}],\"OnchainDestinationSetForBridgeToBookEntry()\":[{\"details\":\"Thrown when bridge function chainId is set to 0 but onchain destination arguments are provided\"}],\"OnchainSubscriptionsDisabled()\":[{\"details\":\"Thrown when the superstateUstbOracle is the 0 address\"}],\"RenounceOwnershipDisabled()\":[{\"details\":\"Thrown if an attempt to call `renounceOwnership` is made\"}],\"SignatureExpired()\":[{\"details\":\"Thrown when the current timestamp has surpassed the expiration time for a signature\"}],\"StablecoinNotSupported()\":[{\"details\":\"Thrown when trying to calculate amount of Superstate Tokens you'd get for an unsupported stablecoin\"}],\"TwoDestinationsInvalid()\":[{\"details\":\"Thrown when bridge function arguments have two destinations\"}],\"Unauthorized()\":[{\"details\":\"Thrown when a request is not sent by the authorized admin\"}],\"ZeroSuperstateTokensOut()\":[{\"details\":\"Thrown when the msg.sender would receive 0 Superstate tokens out for their call to subscribe, or trying to bridge 0 tokens\"}]},\"events\":{\"AccountingPaused(address)\":{\"details\":\"Emitted when the accounting pause is triggered by `admin`.\"},\"AccountingUnpaused(address)\":{\"details\":\"Emitted when the accounting pause is lifted by `admin`.\"},\"AdminBurn(address,address,uint256)\":{\"details\":\"Event emitted when the admin burns tokens\"},\"Approval(address,address,uint256)\":{\"details\":\"Emitted when the allowance of a `spender` for an `owner` is set by a call to {approve}. `value` is the new allowance.\"},\"Bridge(address,address,uint256,address,string,uint256)\":{\"details\":\"Event emitted when the user wants to bridge their tokens to another chain or book entry\"},\"Mint(address,address,uint256)\":{\"details\":\"Event emitted when tokens are minted\"},\"OffchainRedeem(address,address,uint256)\":{\"details\":\"Event emitted when the users wants to redeem their shares with an offchain payout\"},\"SetMaximumOracleDelay(uint256,uint256)\":{\"details\":\"Emitted when the max oracle delay is set\"},\"SetOracle(address,address)\":{\"details\":\"Event emitted when the address for the pricing oracle changes\"},\"SetRedemptionContract(address,address)\":{\"details\":\"Event emitted when the owner changes the redemption contract address\"},\"SetStablecoinConfig(address,address,address,uint96,uint96)\":{\"details\":\"Event emitted when the configuration for a supported stablecoin changes\"},\"Subscribe(address,address,uint256,uint256,uint256)\":{\"details\":\"Event emitted when stablecoins are used to Subscribe to a Superstate fund\"},\"Transfer(address,address,uint256)\":{\"details\":\"Emitted when `value` tokens are moved from one account (`from`) to another (`to`). Note that `value` may be zero.\"}},\"kind\":\"dev\",\"methods\":{\"DOMAIN_SEPARATOR()\":{\"returns\":{\"_0\":\"bytes32 The domain separator\"}},\"accountingPause()\":{\"details\":\"Can only be called by the admin\"},\"accountingPaused()\":{\"returns\":{\"_0\":\"bool True if the accounting is currently paused, false otherwise\"}},\"accountingUnpause()\":{\"details\":\"Can only be called by the admin\"},\"adminBurn(address,uint256)\":{\"details\":\"Only callable by the admin\",\"params\":{\"amount\":\"Amount of tokens to burn\",\"src\":\"Source address from which tokens will be burned\"}},\"allowance(address,address)\":{\"details\":\"Returns the remaining number of tokens that `spender` will be allowed to spend on behalf of `owner` through {transferFrom}. This is zero by default. This value changes when {approve} or {transferFrom} are called.\"},\"approve(address,uint256)\":{\"details\":\"Sets `amount` as the allowance of `spender` over the caller's tokens. Returns a boolean value indicating whether the operation succeeded. IMPORTANT: Beware that changing an allowance with this method brings the risk that someone may use both the old and the new allowance by unfortunate transaction ordering. One possible solution to mitigate this race condition is to first reduce the spender's allowance to 0 and set the desired value afterwards: https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729 Emits an {Approval} event.\"},\"balanceOf(address)\":{\"details\":\"Returns the amount of tokens owned by `account`.\"},\"bridge(uint256,address,string,uint256)\":{\"details\":\"If destination address on chainId isn't on allowlist, or chainID isn't supported, tokens wind up in book entry\",\"params\":{\"amount\":\"Amount of tokens to burn\",\"chainId\":\"Numerical identifier of destination chain to send tokens to\",\"ethDestinationAddress\":\"ETH address to send to on another chain\",\"otherDestinationAddress\":\"Non-EVM addresses to send to on another chain\"}},\"bridgeToBookEntry(uint256)\":{\"params\":{\"amount\":\"Amount of tokens to burn\"}},\"bulkMint(address[],uint256[])\":{\"details\":\"Only callable by the admin\",\"params\":{\"amounts\":\"Amounts of tokens to mint\",\"dsts\":\"Recipients of the minted tokens\"}},\"initialize(string,string)\":{\"params\":{\"_name\":\"The token name\",\"_symbol\":\"The token symbol\"}},\"isAllowed(address)\":{\"params\":{\"addr\":\"Address to check permissions for\"},\"returns\":{\"_0\":\"bool True if the address has sufficient permission, false otherwise\"}},\"mint(address,uint256)\":{\"details\":\"Only callable by the admin\",\"params\":{\"amount\":\"Amount of tokens to mint\",\"dst\":\"Recipient of the minted tokens\"}},\"offchainRedeem(uint256)\":{\"params\":{\"amount\":\"Amount of tokens to burn\"}},\"pause()\":{\"details\":\"Can only be called by the admin\"},\"permit(address,address,uint256,uint256,uint8,bytes32,bytes32)\":{\"params\":{\"deadline\":\"Expiration time for the signature\",\"owner\":\"The address that signed the signature\",\"r\":\"Half of the ECDSA signature pair\",\"s\":\"Half of the ECDSA signature pair\",\"spender\":\"The address to authorize (or rescind authorization from)\",\"v\":\"The recovery byte of the signature\",\"value\":\"Amount that `owner` is approving for `spender`\"}},\"setChainIdSupport(uint256,bool)\":{\"params\":{\"_chainId\":\"The chain ID to update\",\"_supported\":\"Whether the chain ID should be supported\"}},\"setRedemptionContract(address)\":{\"details\":\"Used for convenience for devsSet to address(0) if no such contract exists for the token\",\"params\":{\"_newRedemptionContract\":\"New contract address\"}},\"totalSupply()\":{\"details\":\"Returns the amount of tokens in existence.\"},\"transfer(address,uint256)\":{\"details\":\"Moves `amount` tokens from the caller's account to `to`. Returns a boolean value indicating whether the operation succeeded. Emits a {Transfer} event.\"},\"transferFrom(address,address,uint256)\":{\"details\":\"Moves `amount` tokens from `from` to `to` using the allowance mechanism. `amount` is then deducted from the caller's allowance. Returns a boolean value indicating whether the operation succeeded. Emits a {Transfer} event.\"},\"unpause()\":{\"details\":\"Can only be called by the admin\"}},\"version\":1},\"userdoc\":{\"events\":{\"SetChainIdSupport(uint256,bool,bool)\":{\"notice\":\"Emitted when a chain ID's support status is updated\"}},\"kind\":\"user\",\"methods\":{\"DOMAIN_SEPARATOR()\":{\"notice\":\"Returns the domain separator used in the encoding of the signature for permit\"},\"accountingPause()\":{\"notice\":\"Pauses mint and burn\"},\"accountingUnpause()\":{\"notice\":\"Unpauses mint and burn\"},\"adminBurn(address,uint256)\":{\"notice\":\"Burn tokens from a given source address\"},\"bridge(uint256,address,string,uint256)\":{\"notice\":\"Burn tokens from the caller's address to bridge to another chain\"},\"bridgeToBookEntry(uint256)\":{\"notice\":\"Burn tokens from the caller's address to bridge to Superstate book entry\"},\"bulkMint(address[],uint256[])\":{\"notice\":\"Mint new tokens to many recipients\"},\"initialize(string,string)\":{\"notice\":\"Initialize the contract\"},\"initializeV2()\":{\"notice\":\"Initialize version 2 of the contract.If creating an entirely new contract, the original `initialize` method still needs to be called.\"},\"initializeV3(address)\":{\"notice\":\"Initialize version 3 of the contractIf creating an entirely new contract, the original `initialize` method still needs to be called.\"},\"isAllowed(address)\":{\"notice\":\"Check permissions of an address for transferring\"},\"mint(address,uint256)\":{\"notice\":\"Mint new tokens to a recipient\"},\"nonces(address)\":{\"notice\":\"The next expected nonce for an address, for validating authorizations via signature\"},\"offchainRedeem(uint256)\":{\"notice\":\"Burn tokens from the caller's address for offchain redemption\"},\"pause()\":{\"notice\":\"Invokes the {Pausable-_pause} internal function\"},\"permit(address,address,uint256,uint256,uint8,bytes32,bytes32)\":{\"notice\":\"Sets approval amount for a spender via signature from signatory\"},\"setChainIdSupport(uint256,bool)\":{\"notice\":\"Sets support status for a specific chain ID\"},\"setRedemptionContract(address)\":{\"notice\":\"Sets redemption contract address\"},\"unpause()\":{\"notice\":\"Invokes the {Pausable-_unpause} internal function\"}},\"version\":1}},\"settings\":{\"compilationTarget\":{\"src/interfaces/ISuperstateTokenV4.sol\":\"ISuperstateTokenV4\"},\"evmVersion\":\"cancun\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":false,\"runs\":200},\"remappings\":[\":@openzeppelin/contracts-upgradeable/=lib/onchain-redemptions/lib/openzeppelin-contracts-upgradeable/contracts/\",\":@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/\",\":chainlink/=lib/onchain-redemptions/lib/chainlink/contracts/\",\":ds-test/=lib/forge-std/lib/ds-test/src/\",\":erc4626-tests/=lib/openzeppelin-contracts-upgradeable/lib/erc4626-tests/\",\":forge-std/=lib/forge-std/src/\",\":halmos-cheatcodes/=lib/openzeppelin-contracts/lib/halmos-cheatcodes/src/\",\":onchain-redemptions/=lib/onchain-redemptions/\",\":openzeppelin-contracts-upgradable/=lib/onchain-redemptions/lib/openzeppelin-contracts-upgradable/\",\":openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/\",\":openzeppelin-contracts-v4/=lib/openzeppelin-contracts-v4/\",\":openzeppelin-contracts/=lib/openzeppelin-contracts/\",\":openzeppelin/=lib/openzeppelin-contracts-upgradeable/contracts/\",\":ustb/=lib/onchain-redemptions/lib/ustb/\"]},\"sources\":{\"lib/openzeppelin-contracts-upgradeable/contracts/access/Ownable2StepUpgradeable.sol\":{\"keccak256\":\"0x84efb8889801b0ac817324aff6acc691d07bbee816b671817132911d287a8c63\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://ec6df2255fadc251ea905043c47bf55170ee6cb5d7ca8b5c8ed54c84eac9d09e\",\"dweb:/ipfs/QmaokWfuL59uarki5yoDGbPzh4cErzEfnAzfmesTNJNXE9\"]},\"lib/openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol\":{\"keccak256\":\"0x4075622496acc77fd6d4de4cc30a8577a744d5c75afad33fdeacf1704d6eda98\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://99c8cb3cd19a44bbfb6612605affb7d8b06cee1f6aa9362a37a8672b4f7eeaf8\",\"dweb:/ipfs/QmasyxFDBUp7k5KFgfDWEzM8PYSKEq7GVznzMJ1VxVRF4B\"]},\"lib/openzeppelin-contracts-upgradeable/contracts/interfaces/IERC20Upgradeable.sol\":{\"keccak256\":\"0xe73087c5001a37cf7186b3709377c7ceb01a0d38fb908723d1464cea66b4958c\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://b835a1929ca2c7c978085e58f08f48855df8a82ef6a426ac71393cf032ea0fc5\",\"dweb:/ipfs/QmUMXRN9g8u9wm63wc7PMaSs7oG2nqnM1VVvktaWkvF68v\"]},\"lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol\":{\"keccak256\":\"0x89be10e757d242e9b18d5a32c9fbe2019f6d63052bbe46397a430a1d60d7f794\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://f103ee2e4aecd37aac6ceefe670709cdd7613dee25fa2d4d9feaf7fc0aaa155e\",\"dweb:/ipfs/QmRiNZLoJk5k3HPMYGPGjZFd2ke1ZxjhJZkM45Ec9GH9hv\"]},\"lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/IERC20Upgradeable.sol\":{\"keccak256\":\"0x0e1f0f5f62f67a881cd1a9597acbc0a5e4071f3c2c10449a183b922ae7272e3f\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://c25f742ff154998d19a669e2508c3597b363e123ce9144cd0fcf6521229f401f\",\"dweb:/ipfs/QmQXRuFzStEWqeEPbhQU6cAg9PaSowxJVo4PDKyRod7dco\"]},\"lib/openzeppelin-contracts-upgradeable/contracts/utils/AddressUpgradeable.sol\":{\"keccak256\":\"0x9c80f545915582e63fe206c6ce27cbe85a86fc10b9cd2a0e8c9488fb7c2ee422\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://310136ad60820af4177a11a61d77a3686faf5fca4942b600e08fc940db38396b\",\"dweb:/ipfs/QmbCzMNSTL7Zi7M4UCSqBrkHtp4jjxUnGbkneCZKdR1qeq\"]},\"lib/openzeppelin-contracts-upgradeable/contracts/utils/ContextUpgradeable.sol\":{\"keccak256\":\"0x963ea7f0b48b032eef72fe3a7582edf78408d6f834115b9feadd673a4d5bd149\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://d6520943ea55fdf5f0bafb39ed909f64de17051bc954ff3e88c9e5621412c79c\",\"dweb:/ipfs/QmWZ4rAKTQbNG2HxGs46AcTXShsVytKeLs7CUCdCSv5N7a\"]},\"src/allowlist/AllowList.sol\":{\"keccak256\":\"0x1f9e5302a0589bd88d37559af136dce44f376966994300184a89b5971d2b7363\",\"license\":\"BUSL-1.1\",\"urls\":[\"bzz-raw://ccdc8a93aedb6028a43624484a106268d2e30c6655947faafabeca8772ac5d03\",\"dweb:/ipfs/Qme1D5jkK61W8Fg6ZgPyaKDQMs1V2tQEpMH3696vk36AqX\"]},\"src/interfaces/ISuperstateTokenV4.sol\":{\"keccak256\":\"0x24f33c1755ea55c4312ca43201b4823a5a6dae2f6d573b33263efce5969a26cb\",\"license\":\"BUSL-1.1\",\"urls\":[\"bzz-raw://5d99233d583b45806b0d9fe873cf42075b04247e80f5b661536ef94ab69d31ef\",\"dweb:/ipfs/QmaVWem3eNSnxTwXMXGaieLPSAzLfz2D2FDukGUDzTvGsC\"]},\"src/interfaces/allowlist/IAllowListV2.sol\":{\"keccak256\":\"0x9fe1a48fa1cc88d62f9276909a34579d06e399264c01204b84708339af2cb541\",\"license\":\"BUSL-1.1\",\"urls\":[\"bzz-raw://a0b64ab826adb1f29d06baf2a82d4f10fed4092628b76a36ffc8ef813cf5b2f2\",\"dweb:/ipfs/QmfCBLhzTZ1zGwDaxCr4yz9vAJvPPzEPvgUbYpT9bRiAgD\"]}},\"version\":1}",
+    "metadata": {
+        "compiler": {
+            "version": "0.8.28+commit.7893614a"
+        },
+        "language": "Solidity",
+        "output": {
+            "abi": [
+                {
+                    "inputs": [],
+                    "type": "error",
+                    "name": "AccountingIsNotPaused"
+                },
+                {
+                    "inputs": [],
+                    "type": "error",
+                    "name": "AccountingIsPaused"
+                },
+                {
+                    "inputs": [],
+                    "type": "error",
+                    "name": "BadArgs"
+                },
+                {
+                    "inputs": [],
+                    "type": "error",
+                    "name": "BadChainlinkData"
+                },
+                {
+                    "inputs": [],
+                    "type": "error",
+                    "name": "BadSignatory"
+                },
+                {
+                    "inputs": [],
+                    "type": "error",
+                    "name": "BridgeChainIdDestinationNotSupported"
+                },
+                {
+                    "inputs": [],
+                    "type": "error",
+                    "name": "FeeTooHigh"
+                },
+                {
+                    "inputs": [],
+                    "type": "error",
+                    "name": "InsufficientPermissions"
+                },
+                {
+                    "inputs": [],
+                    "type": "error",
+                    "name": "InvalidArgumentLengths"
+                },
+                {
+                    "inputs": [],
+                    "type": "error",
+                    "name": "InvalidSignatureS"
+                },
+                {
+                    "inputs": [],
+                    "type": "error",
+                    "name": "OnchainDestinationSetForBridgeToBookEntry"
+                },
+                {
+                    "inputs": [],
+                    "type": "error",
+                    "name": "OnchainSubscriptionsDisabled"
+                },
+                {
+                    "inputs": [],
+                    "type": "error",
+                    "name": "RenounceOwnershipDisabled"
+                },
+                {
+                    "inputs": [],
+                    "type": "error",
+                    "name": "SignatureExpired"
+                },
+                {
+                    "inputs": [],
+                    "type": "error",
+                    "name": "StablecoinNotSupported"
+                },
+                {
+                    "inputs": [],
+                    "type": "error",
+                    "name": "TwoDestinationsInvalid"
+                },
+                {
+                    "inputs": [],
+                    "type": "error",
+                    "name": "Unauthorized"
+                },
+                {
+                    "inputs": [],
+                    "type": "error",
+                    "name": "ZeroSuperstateTokensOut"
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "admin",
+                            "type": "address",
+                            "indexed": false
+                        }
+                    ],
+                    "type": "event",
+                    "name": "AccountingPaused",
+                    "anonymous": false
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "admin",
+                            "type": "address",
+                            "indexed": false
+                        }
+                    ],
+                    "type": "event",
+                    "name": "AccountingUnpaused",
+                    "anonymous": false
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "burner",
+                            "type": "address",
+                            "indexed": true
+                        },
+                        {
+                            "internalType": "address",
+                            "name": "src",
+                            "type": "address",
+                            "indexed": true
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "amount",
+                            "type": "uint256",
+                            "indexed": false
+                        }
+                    ],
+                    "type": "event",
+                    "name": "AdminBurn",
+                    "anonymous": false
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "owner",
+                            "type": "address",
+                            "indexed": true
+                        },
+                        {
+                            "internalType": "address",
+                            "name": "spender",
+                            "type": "address",
+                            "indexed": true
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "value",
+                            "type": "uint256",
+                            "indexed": false
+                        }
+                    ],
+                    "type": "event",
+                    "name": "Approval",
+                    "anonymous": false
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "caller",
+                            "type": "address",
+                            "indexed": false
+                        },
+                        {
+                            "internalType": "address",
+                            "name": "src",
+                            "type": "address",
+                            "indexed": true
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "amount",
+                            "type": "uint256",
+                            "indexed": false
+                        },
+                        {
+                            "internalType": "address",
+                            "name": "ethDestinationAddress",
+                            "type": "address",
+                            "indexed": true
+                        },
+                        {
+                            "internalType": "string",
+                            "name": "otherDestinationAddress",
+                            "type": "string",
+                            "indexed": true
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "chainId",
+                            "type": "uint256",
+                            "indexed": false
+                        }
+                    ],
+                    "type": "event",
+                    "name": "Bridge",
+                    "anonymous": false
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "minter",
+                            "type": "address",
+                            "indexed": true
+                        },
+                        {
+                            "internalType": "address",
+                            "name": "to",
+                            "type": "address",
+                            "indexed": true
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "amount",
+                            "type": "uint256",
+                            "indexed": false
+                        }
+                    ],
+                    "type": "event",
+                    "name": "Mint",
+                    "anonymous": false
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "burner",
+                            "type": "address",
+                            "indexed": true
+                        },
+                        {
+                            "internalType": "address",
+                            "name": "src",
+                            "type": "address",
+                            "indexed": true
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "amount",
+                            "type": "uint256",
+                            "indexed": false
+                        }
+                    ],
+                    "type": "event",
+                    "name": "OffchainRedeem",
+                    "anonymous": false
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "uint256",
+                            "name": "chainId",
+                            "type": "uint256",
+                            "indexed": true
+                        },
+                        {
+                            "internalType": "bool",
+                            "name": "oldSupported",
+                            "type": "bool",
+                            "indexed": false
+                        },
+                        {
+                            "internalType": "bool",
+                            "name": "newSupported",
+                            "type": "bool",
+                            "indexed": false
+                        }
+                    ],
+                    "type": "event",
+                    "name": "SetChainIdSupport",
+                    "anonymous": false
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "uint256",
+                            "name": "oldMaxOracleDelay",
+                            "type": "uint256",
+                            "indexed": false
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "newMaxOracleDelay",
+                            "type": "uint256",
+                            "indexed": false
+                        }
+                    ],
+                    "type": "event",
+                    "name": "SetMaximumOracleDelay",
+                    "anonymous": false
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "oldOracle",
+                            "type": "address",
+                            "indexed": false
+                        },
+                        {
+                            "internalType": "address",
+                            "name": "newOracle",
+                            "type": "address",
+                            "indexed": false
+                        }
+                    ],
+                    "type": "event",
+                    "name": "SetOracle",
+                    "anonymous": false
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "oldRedemptionContract",
+                            "type": "address",
+                            "indexed": false
+                        },
+                        {
+                            "internalType": "address",
+                            "name": "newRedemptionContract",
+                            "type": "address",
+                            "indexed": false
+                        }
+                    ],
+                    "type": "event",
+                    "name": "SetRedemptionContract",
+                    "anonymous": false
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "stablecoin",
+                            "type": "address",
+                            "indexed": true
+                        },
+                        {
+                            "internalType": "address",
+                            "name": "oldSweepDestination",
+                            "type": "address",
+                            "indexed": false
+                        },
+                        {
+                            "internalType": "address",
+                            "name": "newSweepDestination",
+                            "type": "address",
+                            "indexed": false
+                        },
+                        {
+                            "internalType": "uint96",
+                            "name": "oldFee",
+                            "type": "uint96",
+                            "indexed": false
+                        },
+                        {
+                            "internalType": "uint96",
+                            "name": "newFee",
+                            "type": "uint96",
+                            "indexed": false
+                        }
+                    ],
+                    "type": "event",
+                    "name": "SetStablecoinConfig",
+                    "anonymous": false
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "subscriber",
+                            "type": "address",
+                            "indexed": true
+                        },
+                        {
+                            "internalType": "address",
+                            "name": "stablecoin",
+                            "type": "address",
+                            "indexed": false
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "stablecoinInAmount",
+                            "type": "uint256",
+                            "indexed": false
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "stablecoinInAmountAfterFee",
+                            "type": "uint256",
+                            "indexed": false
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "superstateTokenOutAmount",
+                            "type": "uint256",
+                            "indexed": false
+                        }
+                    ],
+                    "type": "event",
+                    "name": "Subscribe",
+                    "anonymous": false
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "from",
+                            "type": "address",
+                            "indexed": true
+                        },
+                        {
+                            "internalType": "address",
+                            "name": "to",
+                            "type": "address",
+                            "indexed": true
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "value",
+                            "type": "uint256",
+                            "indexed": false
+                        }
+                    ],
+                    "type": "event",
+                    "name": "Transfer",
+                    "anonymous": false
+                },
+                {
+                    "inputs": [],
+                    "stateMutability": "view",
+                    "type": "function",
+                    "name": "DOMAIN_SEPARATOR",
+                    "outputs": [
+                        {
+                            "internalType": "bytes32",
+                            "name": "",
+                            "type": "bytes32"
+                        }
+                    ]
+                },
+                {
+                    "inputs": [],
+                    "stateMutability": "nonpayable",
+                    "type": "function",
+                    "name": "accountingPause"
+                },
+                {
+                    "inputs": [],
+                    "stateMutability": "view",
+                    "type": "function",
+                    "name": "accountingPaused",
+                    "outputs": [
+                        {
+                            "internalType": "bool",
+                            "name": "",
+                            "type": "bool"
+                        }
+                    ]
+                },
+                {
+                    "inputs": [],
+                    "stateMutability": "nonpayable",
+                    "type": "function",
+                    "name": "accountingUnpause"
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "src",
+                            "type": "address"
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "amount",
+                            "type": "uint256"
+                        }
+                    ],
+                    "stateMutability": "nonpayable",
+                    "type": "function",
+                    "name": "adminBurn"
+                },
+                {
+                    "inputs": [],
+                    "stateMutability": "view",
+                    "type": "function",
+                    "name": "allowListV2",
+                    "outputs": [
+                        {
+                            "internalType": "contract IAllowListV2",
+                            "name": "",
+                            "type": "address"
+                        }
+                    ]
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "owner",
+                            "type": "address"
+                        },
+                        {
+                            "internalType": "address",
+                            "name": "spender",
+                            "type": "address"
+                        }
+                    ],
+                    "stateMutability": "view",
+                    "type": "function",
+                    "name": "allowance",
+                    "outputs": [
+                        {
+                            "internalType": "uint256",
+                            "name": "",
+                            "type": "uint256"
+                        }
+                    ]
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "spender",
+                            "type": "address"
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "amount",
+                            "type": "uint256"
+                        }
+                    ],
+                    "stateMutability": "nonpayable",
+                    "type": "function",
+                    "name": "approve",
+                    "outputs": [
+                        {
+                            "internalType": "bool",
+                            "name": "",
+                            "type": "bool"
+                        }
+                    ]
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "account",
+                            "type": "address"
+                        }
+                    ],
+                    "stateMutability": "view",
+                    "type": "function",
+                    "name": "balanceOf",
+                    "outputs": [
+                        {
+                            "internalType": "uint256",
+                            "name": "",
+                            "type": "uint256"
+                        }
+                    ]
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "uint256",
+                            "name": "amount",
+                            "type": "uint256"
+                        },
+                        {
+                            "internalType": "address",
+                            "name": "ethDestinationAddress",
+                            "type": "address"
+                        },
+                        {
+                            "internalType": "string",
+                            "name": "otherDestinationAddress",
+                            "type": "string"
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "chainId",
+                            "type": "uint256"
+                        }
+                    ],
+                    "stateMutability": "nonpayable",
+                    "type": "function",
+                    "name": "bridge"
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "uint256",
+                            "name": "amount",
+                            "type": "uint256"
+                        }
+                    ],
+                    "stateMutability": "nonpayable",
+                    "type": "function",
+                    "name": "bridgeToBookEntry"
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address[]",
+                            "name": "dsts",
+                            "type": "address[]"
+                        },
+                        {
+                            "internalType": "uint256[]",
+                            "name": "amounts",
+                            "type": "uint256[]"
+                        }
+                    ],
+                    "stateMutability": "nonpayable",
+                    "type": "function",
+                    "name": "bulkMint"
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "string",
+                            "name": "_name",
+                            "type": "string"
+                        },
+                        {
+                            "internalType": "string",
+                            "name": "_symbol",
+                            "type": "string"
+                        }
+                    ],
+                    "stateMutability": "nonpayable",
+                    "type": "function",
+                    "name": "initialize"
+                },
+                {
+                    "inputs": [],
+                    "stateMutability": "nonpayable",
+                    "type": "function",
+                    "name": "initializeV2"
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "contract AllowList",
+                            "name": "_allowList",
+                            "type": "address"
+                        }
+                    ],
+                    "stateMutability": "nonpayable",
+                    "type": "function",
+                    "name": "initializeV3"
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "addr",
+                            "type": "address"
+                        }
+                    ],
+                    "stateMutability": "view",
+                    "type": "function",
+                    "name": "isAllowed",
+                    "outputs": [
+                        {
+                            "internalType": "bool",
+                            "name": "",
+                            "type": "bool"
+                        }
+                    ]
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "dst",
+                            "type": "address"
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "amount",
+                            "type": "uint256"
+                        }
+                    ],
+                    "stateMutability": "nonpayable",
+                    "type": "function",
+                    "name": "mint"
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "toFind",
+                            "type": "address"
+                        }
+                    ],
+                    "stateMutability": "view",
+                    "type": "function",
+                    "name": "nonces",
+                    "outputs": [
+                        {
+                            "internalType": "uint256",
+                            "name": "",
+                            "type": "uint256"
+                        }
+                    ]
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "uint256",
+                            "name": "amount",
+                            "type": "uint256"
+                        }
+                    ],
+                    "stateMutability": "nonpayable",
+                    "type": "function",
+                    "name": "offchainRedeem"
+                },
+                {
+                    "inputs": [],
+                    "stateMutability": "nonpayable",
+                    "type": "function",
+                    "name": "pause"
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "owner",
+                            "type": "address"
+                        },
+                        {
+                            "internalType": "address",
+                            "name": "spender",
+                            "type": "address"
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "value",
+                            "type": "uint256"
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "deadline",
+                            "type": "uint256"
+                        },
+                        {
+                            "internalType": "uint8",
+                            "name": "v",
+                            "type": "uint8"
+                        },
+                        {
+                            "internalType": "bytes32",
+                            "name": "r",
+                            "type": "bytes32"
+                        },
+                        {
+                            "internalType": "bytes32",
+                            "name": "s",
+                            "type": "bytes32"
+                        }
+                    ],
+                    "stateMutability": "nonpayable",
+                    "type": "function",
+                    "name": "permit"
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "uint256",
+                            "name": "_chainId",
+                            "type": "uint256"
+                        },
+                        {
+                            "internalType": "bool",
+                            "name": "_supported",
+                            "type": "bool"
+                        }
+                    ],
+                    "stateMutability": "nonpayable",
+                    "type": "function",
+                    "name": "setChainIdSupport"
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "_newRedemptionContract",
+                            "type": "address"
+                        }
+                    ],
+                    "stateMutability": "nonpayable",
+                    "type": "function",
+                    "name": "setRedemptionContract"
+                },
+                {
+                    "inputs": [],
+                    "stateMutability": "view",
+                    "type": "function",
+                    "name": "totalSupply",
+                    "outputs": [
+                        {
+                            "internalType": "uint256",
+                            "name": "",
+                            "type": "uint256"
+                        }
+                    ]
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "to",
+                            "type": "address"
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "amount",
+                            "type": "uint256"
+                        }
+                    ],
+                    "stateMutability": "nonpayable",
+                    "type": "function",
+                    "name": "transfer",
+                    "outputs": [
+                        {
+                            "internalType": "bool",
+                            "name": "",
+                            "type": "bool"
+                        }
+                    ]
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "from",
+                            "type": "address"
+                        },
+                        {
+                            "internalType": "address",
+                            "name": "to",
+                            "type": "address"
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "amount",
+                            "type": "uint256"
+                        }
+                    ],
+                    "stateMutability": "nonpayable",
+                    "type": "function",
+                    "name": "transferFrom",
+                    "outputs": [
+                        {
+                            "internalType": "bool",
+                            "name": "",
+                            "type": "bool"
+                        }
+                    ]
+                },
+                {
+                    "inputs": [],
+                    "stateMutability": "nonpayable",
+                    "type": "function",
+                    "name": "unpause"
+                }
+            ],
+            "devdoc": {
+                "kind": "dev",
+                "methods": {
+                    "DOMAIN_SEPARATOR()": {
+                        "returns": {
+                            "_0": "bytes32 The domain separator"
+                        }
+                    },
+                    "accountingPause()": {
+                        "details": "Can only be called by the admin"
+                    },
+                    "accountingPaused()": {
+                        "returns": {
+                            "_0": "bool True if the accounting is currently paused, false otherwise"
+                        }
+                    },
+                    "accountingUnpause()": {
+                        "details": "Can only be called by the admin"
+                    },
+                    "adminBurn(address,uint256)": {
+                        "details": "Only callable by the admin",
+                        "params": {
+                            "amount": "Amount of tokens to burn",
+                            "src": "Source address from which tokens will be burned"
+                        }
+                    },
+                    "allowance(address,address)": {
+                        "details": "Returns the remaining number of tokens that `spender` will be allowed to spend on behalf of `owner` through {transferFrom}. This is zero by default. This value changes when {approve} or {transferFrom} are called."
+                    },
+                    "approve(address,uint256)": {
+                        "details": "Sets `amount` as the allowance of `spender` over the caller's tokens. Returns a boolean value indicating whether the operation succeeded. IMPORTANT: Beware that changing an allowance with this method brings the risk that someone may use both the old and the new allowance by unfortunate transaction ordering. One possible solution to mitigate this race condition is to first reduce the spender's allowance to 0 and set the desired value afterwards: https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729 Emits an {Approval} event."
+                    },
+                    "balanceOf(address)": {
+                        "details": "Returns the amount of tokens owned by `account`."
+                    },
+                    "bridge(uint256,address,string,uint256)": {
+                        "details": "If destination address on chainId isn't on allowlist, or chainID isn't supported, tokens wind up in book entry",
+                        "params": {
+                            "amount": "Amount of tokens to burn",
+                            "chainId": "Numerical identifier of destination chain to send tokens to",
+                            "ethDestinationAddress": "ETH address to send to on another chain",
+                            "otherDestinationAddress": "Non-EVM addresses to send to on another chain"
+                        }
+                    },
+                    "bridgeToBookEntry(uint256)": {
+                        "params": {
+                            "amount": "Amount of tokens to burn"
+                        }
+                    },
+                    "bulkMint(address[],uint256[])": {
+                        "details": "Only callable by the admin",
+                        "params": {
+                            "amounts": "Amounts of tokens to mint",
+                            "dsts": "Recipients of the minted tokens"
+                        }
+                    },
+                    "initialize(string,string)": {
+                        "params": {
+                            "_name": "The token name",
+                            "_symbol": "The token symbol"
+                        }
+                    },
+                    "isAllowed(address)": {
+                        "params": {
+                            "addr": "Address to check permissions for"
+                        },
+                        "returns": {
+                            "_0": "bool True if the address has sufficient permission, false otherwise"
+                        }
+                    },
+                    "mint(address,uint256)": {
+                        "details": "Only callable by the admin",
+                        "params": {
+                            "amount": "Amount of tokens to mint",
+                            "dst": "Recipient of the minted tokens"
+                        }
+                    },
+                    "offchainRedeem(uint256)": {
+                        "params": {
+                            "amount": "Amount of tokens to burn"
+                        }
+                    },
+                    "pause()": {
+                        "details": "Can only be called by the admin"
+                    },
+                    "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)": {
+                        "params": {
+                            "deadline": "Expiration time for the signature",
+                            "owner": "The address that signed the signature",
+                            "r": "Half of the ECDSA signature pair",
+                            "s": "Half of the ECDSA signature pair",
+                            "spender": "The address to authorize (or rescind authorization from)",
+                            "v": "The recovery byte of the signature",
+                            "value": "Amount that `owner` is approving for `spender`"
+                        }
+                    },
+                    "setChainIdSupport(uint256,bool)": {
+                        "params": {
+                            "_chainId": "The chain ID to update",
+                            "_supported": "Whether the chain ID should be supported"
+                        }
+                    },
+                    "setRedemptionContract(address)": {
+                        "details": "Used for convenience for devsSet to address(0) if no such contract exists for the token",
+                        "params": {
+                            "_newRedemptionContract": "New contract address"
+                        }
+                    },
+                    "totalSupply()": {
+                        "details": "Returns the amount of tokens in existence."
+                    },
+                    "transfer(address,uint256)": {
+                        "details": "Moves `amount` tokens from the caller's account to `to`. Returns a boolean value indicating whether the operation succeeded. Emits a {Transfer} event."
+                    },
+                    "transferFrom(address,address,uint256)": {
+                        "details": "Moves `amount` tokens from `from` to `to` using the allowance mechanism. `amount` is then deducted from the caller's allowance. Returns a boolean value indicating whether the operation succeeded. Emits a {Transfer} event."
+                    },
+                    "unpause()": {
+                        "details": "Can only be called by the admin"
+                    }
+                },
+                "version": 1
+            },
+            "userdoc": {
+                "kind": "user",
+                "methods": {
+                    "DOMAIN_SEPARATOR()": {
+                        "notice": "Returns the domain separator used in the encoding of the signature for permit"
+                    },
+                    "accountingPause()": {
+                        "notice": "Pauses mint and burn"
+                    },
+                    "accountingUnpause()": {
+                        "notice": "Unpauses mint and burn"
+                    },
+                    "adminBurn(address,uint256)": {
+                        "notice": "Burn tokens from a given source address"
+                    },
+                    "bridge(uint256,address,string,uint256)": {
+                        "notice": "Burn tokens from the caller's address to bridge to another chain"
+                    },
+                    "bridgeToBookEntry(uint256)": {
+                        "notice": "Burn tokens from the caller's address to bridge to Superstate book entry"
+                    },
+                    "bulkMint(address[],uint256[])": {
+                        "notice": "Mint new tokens to many recipients"
+                    },
+                    "initialize(string,string)": {
+                        "notice": "Initialize the contract"
+                    },
+                    "initializeV2()": {
+                        "notice": "Initialize version 2 of the contract.If creating an entirely new contract, the original `initialize` method still needs to be called."
+                    },
+                    "initializeV3(address)": {
+                        "notice": "Initialize version 3 of the contractIf creating an entirely new contract, the original `initialize` method still needs to be called."
+                    },
+                    "isAllowed(address)": {
+                        "notice": "Check permissions of an address for transferring"
+                    },
+                    "mint(address,uint256)": {
+                        "notice": "Mint new tokens to a recipient"
+                    },
+                    "nonces(address)": {
+                        "notice": "The next expected nonce for an address, for validating authorizations via signature"
+                    },
+                    "offchainRedeem(uint256)": {
+                        "notice": "Burn tokens from the caller's address for offchain redemption"
+                    },
+                    "pause()": {
+                        "notice": "Invokes the {Pausable-_pause} internal function"
+                    },
+                    "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)": {
+                        "notice": "Sets approval amount for a spender via signature from signatory"
+                    },
+                    "setChainIdSupport(uint256,bool)": {
+                        "notice": "Sets support status for a specific chain ID"
+                    },
+                    "setRedemptionContract(address)": {
+                        "notice": "Sets redemption contract address"
+                    },
+                    "unpause()": {
+                        "notice": "Invokes the {Pausable-_unpause} internal function"
+                    }
+                },
+                "version": 1
+            }
+        },
+        "settings": {
+            "remappings": [
+                "@openzeppelin/contracts-upgradeable/=lib/onchain-redemptions/lib/openzeppelin-contracts-upgradeable/contracts/",
+                "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+                "chainlink/=lib/onchain-redemptions/lib/chainlink/contracts/",
+                "ds-test/=lib/forge-std/lib/ds-test/src/",
+                "erc4626-tests/=lib/openzeppelin-contracts-upgradeable/lib/erc4626-tests/",
+                "forge-std/=lib/forge-std/src/",
+                "halmos-cheatcodes/=lib/openzeppelin-contracts/lib/halmos-cheatcodes/src/",
+                "onchain-redemptions/=lib/onchain-redemptions/",
+                "openzeppelin-contracts-upgradable/=lib/onchain-redemptions/lib/openzeppelin-contracts-upgradable/",
+                "openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+                "openzeppelin-contracts-v4/=lib/openzeppelin-contracts-v4/",
+                "openzeppelin-contracts/=lib/openzeppelin-contracts/",
+                "openzeppelin/=lib/openzeppelin-contracts-upgradeable/contracts/",
+                "ustb/=lib/onchain-redemptions/lib/ustb/"
+            ],
+            "optimizer": {
+                "enabled": false,
+                "runs": 200
+            },
+            "metadata": {
+                "bytecodeHash": "ipfs"
+            },
+            "compilationTarget": {
+                "src/interfaces/ISuperstateTokenV4.sol": "ISuperstateTokenV4"
+            },
+            "evmVersion": "cancun",
+            "libraries": {}
+        },
+        "sources": {
+            "lib/openzeppelin-contracts-upgradeable/contracts/access/Ownable2StepUpgradeable.sol": {
+                "keccak256": "0x84efb8889801b0ac817324aff6acc691d07bbee816b671817132911d287a8c63",
+                "urls": [
+                    "bzz-raw://ec6df2255fadc251ea905043c47bf55170ee6cb5d7ca8b5c8ed54c84eac9d09e",
+                    "dweb:/ipfs/QmaokWfuL59uarki5yoDGbPzh4cErzEfnAzfmesTNJNXE9"
+                ],
+                "license": "MIT"
+            },
+            "lib/openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol": {
+                "keccak256": "0x4075622496acc77fd6d4de4cc30a8577a744d5c75afad33fdeacf1704d6eda98",
+                "urls": [
+                    "bzz-raw://99c8cb3cd19a44bbfb6612605affb7d8b06cee1f6aa9362a37a8672b4f7eeaf8",
+                    "dweb:/ipfs/QmasyxFDBUp7k5KFgfDWEzM8PYSKEq7GVznzMJ1VxVRF4B"
+                ],
+                "license": "MIT"
+            },
+            "lib/openzeppelin-contracts-upgradeable/contracts/interfaces/IERC20Upgradeable.sol": {
+                "keccak256": "0xe73087c5001a37cf7186b3709377c7ceb01a0d38fb908723d1464cea66b4958c",
+                "urls": [
+                    "bzz-raw://b835a1929ca2c7c978085e58f08f48855df8a82ef6a426ac71393cf032ea0fc5",
+                    "dweb:/ipfs/QmUMXRN9g8u9wm63wc7PMaSs7oG2nqnM1VVvktaWkvF68v"
+                ],
+                "license": "MIT"
+            },
+            "lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol": {
+                "keccak256": "0x89be10e757d242e9b18d5a32c9fbe2019f6d63052bbe46397a430a1d60d7f794",
+                "urls": [
+                    "bzz-raw://f103ee2e4aecd37aac6ceefe670709cdd7613dee25fa2d4d9feaf7fc0aaa155e",
+                    "dweb:/ipfs/QmRiNZLoJk5k3HPMYGPGjZFd2ke1ZxjhJZkM45Ec9GH9hv"
+                ],
+                "license": "MIT"
+            },
+            "lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/IERC20Upgradeable.sol": {
+                "keccak256": "0x0e1f0f5f62f67a881cd1a9597acbc0a5e4071f3c2c10449a183b922ae7272e3f",
+                "urls": [
+                    "bzz-raw://c25f742ff154998d19a669e2508c3597b363e123ce9144cd0fcf6521229f401f",
+                    "dweb:/ipfs/QmQXRuFzStEWqeEPbhQU6cAg9PaSowxJVo4PDKyRod7dco"
+                ],
+                "license": "MIT"
+            },
+            "lib/openzeppelin-contracts-upgradeable/contracts/utils/AddressUpgradeable.sol": {
+                "keccak256": "0x9c80f545915582e63fe206c6ce27cbe85a86fc10b9cd2a0e8c9488fb7c2ee422",
+                "urls": [
+                    "bzz-raw://310136ad60820af4177a11a61d77a3686faf5fca4942b600e08fc940db38396b",
+                    "dweb:/ipfs/QmbCzMNSTL7Zi7M4UCSqBrkHtp4jjxUnGbkneCZKdR1qeq"
+                ],
+                "license": "MIT"
+            },
+            "lib/openzeppelin-contracts-upgradeable/contracts/utils/ContextUpgradeable.sol": {
+                "keccak256": "0x963ea7f0b48b032eef72fe3a7582edf78408d6f834115b9feadd673a4d5bd149",
+                "urls": [
+                    "bzz-raw://d6520943ea55fdf5f0bafb39ed909f64de17051bc954ff3e88c9e5621412c79c",
+                    "dweb:/ipfs/QmWZ4rAKTQbNG2HxGs46AcTXShsVytKeLs7CUCdCSv5N7a"
+                ],
+                "license": "MIT"
+            },
+            "src/allowlist/AllowList.sol": {
+                "keccak256": "0x1f9e5302a0589bd88d37559af136dce44f376966994300184a89b5971d2b7363",
+                "urls": [
+                    "bzz-raw://ccdc8a93aedb6028a43624484a106268d2e30c6655947faafabeca8772ac5d03",
+                    "dweb:/ipfs/Qme1D5jkK61W8Fg6ZgPyaKDQMs1V2tQEpMH3696vk36AqX"
+                ],
+                "license": "BUSL-1.1"
+            },
+            "src/interfaces/ISuperstateTokenV4.sol": {
+                "keccak256": "0x24f33c1755ea55c4312ca43201b4823a5a6dae2f6d573b33263efce5969a26cb",
+                "urls": [
+                    "bzz-raw://5d99233d583b45806b0d9fe873cf42075b04247e80f5b661536ef94ab69d31ef",
+                    "dweb:/ipfs/QmaVWem3eNSnxTwXMXGaieLPSAzLfz2D2FDukGUDzTvGsC"
+                ],
+                "license": "BUSL-1.1"
+            },
+            "src/interfaces/allowlist/IAllowListV2.sol": {
+                "keccak256": "0x9fe1a48fa1cc88d62f9276909a34579d06e399264c01204b84708339af2cb541",
+                "urls": [
+                    "bzz-raw://a0b64ab826adb1f29d06baf2a82d4f10fed4092628b76a36ffc8ef813cf5b2f2",
+                    "dweb:/ipfs/QmfCBLhzTZ1zGwDaxCr4yz9vAJvPPzEPvgUbYpT9bRiAgD"
+                ],
+                "license": "BUSL-1.1"
+            }
+        },
+        "version": 1
+    },
+    "id": 83
+}

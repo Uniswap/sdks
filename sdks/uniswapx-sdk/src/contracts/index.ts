@@ -2,8 +2,10 @@
 /* tslint:disable */
 /* eslint-disable */
 export type { DSTokenInterface } from "./DSTokenInterface";
+export type { ERC1967Proxy } from "./ERC1967Proxy";
 export type { ExclusiveDutchOrderReactor } from "./ExclusiveDutchOrderReactor";
 export type { ExclusiveFillerValidation } from "./ExclusiveFillerValidation";
+export type { ISuperstateTokenV4 } from "./ISuperstateTokenV4";
 export type { MockDSTokenInterface } from "./MockDSTokenInterface";
 export type { MockERC20 } from "./MockERC20";
 export type { OrderQuoter } from "./OrderQuoter";
@@ -18,8 +20,10 @@ export type { DeploylessMulticall2 } from "./DeploylessMulticall2";
 export type { Multicall2 } from "./Multicall2";
 export * as factories from "./factories";
 export { DSTokenInterface__factory } from "./factories/DSTokenInterface__factory";
+export { ERC1967Proxy__factory } from "./factories/ERC1967Proxy__factory";
 export { ExclusiveDutchOrderReactor__factory } from "./factories/ExclusiveDutchOrderReactor__factory";
 export { ExclusiveFillerValidation__factory } from "./factories/ExclusiveFillerValidation__factory";
+export { ISuperstateTokenV4__factory } from "./factories/ISuperstateTokenV4__factory";
 export { MockDSTokenInterface__factory } from "./factories/MockDSTokenInterface__factory";
 export { MockERC20__factory } from "./factories/MockERC20__factory";
 export { OrderQuoter__factory } from "./factories/OrderQuoter__factory";

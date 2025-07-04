@@ -150,11 +150,23 @@ export const BPS = 10000;
 
 export const MPS = BigNumber.from(10).pow(7);
 
-type PermissionedToken = {
+export enum PermissionedTokenInterface {
+  DSTokenInterface = "DSTokenInterface",
+  ISuperstateTokenV4 = "ISuperstateTokenV4",
+}
+
+export enum PermissionedTokenProxyType {
+  None = "None",
+  Standard = "Standard", // for the current Proxy
+  ERC1967 = "ERC1967",
+}
+
+export type PermissionedToken = {
   address: string;
   chainId: ChainId;
   symbol: string;
-  usesProxy: boolean;
+  proxyType?: PermissionedTokenProxyType;
+  interface: PermissionedTokenInterface;
 }
 
 export const PERMISSIONED_TOKENS: PermissionedToken[] = [
@@ -162,6 +174,14 @@ export const PERMISSIONED_TOKENS: PermissionedToken[] = [
     address: "0x7712c34205737192402172409a8F7ccef8aA2AEc",
     chainId: ChainId.MAINNET,
     symbol: "BUIDL",
-    usesProxy: true,
+    proxyType: PermissionedTokenProxyType.Standard,
+    interface: PermissionedTokenInterface.DSTokenInterface,
+  },
+  {
+    address: "0x14d60E7FDC0D71d8611742720E4C50E7a974020c",
+    chainId: ChainId.MAINNET,
+    symbol: "USCC",
+    proxyType: PermissionedTokenProxyType.ERC1967,
+    interface: PermissionedTokenInterface.ISuperstateTokenV4,
   },
 ]
