@@ -2,8 +2,10 @@
 /* tslint:disable */
 /* eslint-disable */
 export { DSTokenInterface__factory } from "./DSTokenInterface__factory";
+export { ERC1967Proxy__factory } from "./ERC1967Proxy__factory";
 export { ExclusiveDutchOrderReactor__factory } from "./ExclusiveDutchOrderReactor__factory";
 export { ExclusiveFillerValidation__factory } from "./ExclusiveFillerValidation__factory";
+export { ISuperstateTokenV4__factory } from "./ISuperstateTokenV4__factory";
 export { MockDSTokenInterface__factory } from "./MockDSTokenInterface__factory";
 export { MockERC20__factory } from "./MockERC20__factory";
 export { OrderQuoter__factory } from "./OrderQuoter__factory";
