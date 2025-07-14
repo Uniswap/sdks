@@ -471,7 +471,7 @@ export abstract class V4PositionManager {
   public static getPermitData(permit: NFTPermitValues, positionManagerAddress: string, chainId: number): NFTPermitData {
     return {
       domain: {
-        name: 'Uniswap V4 Positions NFT',
+        name: 'Uniswap v4 Positions NFT',
         chainId,
         verifyingContract: positionManagerAddress,
       },
