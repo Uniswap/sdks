@@ -117,14 +117,15 @@ contract DeployRouter is Test {
                     PoolKey(eth, usdc, 3000, 60, IHooks(address(0))),
                     PoolKey(eth, dai, 3000, 60, IHooks(address(0))),
                     PoolKey(dai, usdc, 3000, 60, IHooks(address(0))),
-                    PoolKey(usdc, weth, 3000, 60, IHooks(address(0)))
+                    PoolKey(usdc, weth, 3000, 60, IHooks(address(0))),
+                    PoolKey(eth, weth, 3000, 60, IHooks(address(0)))
                 ]
             )
         );
     }
 
     function unlockCallback(bytes calldata data) external returns (bytes memory) {
-        PoolKey[4] memory poolKeys = abi.decode(data, (PoolKey[4]));
+        PoolKey[5] memory poolKeys = abi.decode(data, (PoolKey[5]));
 
         for (uint256 i = 0; i < poolKeys.length; i++) {
             PoolKey memory poolKey = poolKeys[i];
