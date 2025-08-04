@@ -99,10 +99,9 @@ export class UniswapTrade implements Command {
         this.trade.inputAmount.currency.isNative &&
         !(this.trade.swaps[0].route as unknown as V4Route<Currency, Currency>).pathInput.isNative
       )
-    } else {
-      // If first pool is not a v4 pool and input currency is native, we need to wrap
-      return this.trade.inputAmount.currency.isNative
-    }
+    } 
+    // If first pool is not a v4 pool and input currency is native, we need to wrap
+    return this.trade.inputAmount.currency.isNative
   }
 
   get inputRequiresUnwrap(): boolean {
@@ -116,10 +115,10 @@ export class UniswapTrade implements Command {
         !this.trade.inputAmount.currency.isNative &&
         (this.trade.swaps[0].route as unknown as V4Route<Currency, Currency>).pathInput.isNative
       )
-    } else {
-      // If the first pool is not a v4 pool, we don't need to unwrap.
-      return false
-    }
+    } 
+    // If the first pool is not a v4 pool, we don't need to unwrap.
+    return false
+
   }
 
   get outputRequiresWrap(): boolean {
@@ -134,11 +133,10 @@ export class UniswapTrade implements Command {
         !this.trade.outputAmount.currency.isNative &&
         (lastRoute as unknown as V4Route<Currency, Currency>).pathOutput.isNative
       )
-    } else {
-      // if last pool is not v4:
-      // we do not need to wrap because v2 and v3 pools already require wrapped tokens
-      return false
-    }
+    } 
+    // if last pool is not v4:
+    // we do not need to wrap because v2 and v3 pools already require wrapped tokens
+    return false
   }
 
   get outputRequiresUnwrap(): boolean {
@@ -153,10 +151,9 @@ export class UniswapTrade implements Command {
         this.trade.outputAmount.currency.isNative &&
         !(this.trade.swaps[0].route as unknown as V4Route<Currency, Currency>).pathOutput.isNative
       )
-    } else {
-      // else: if path output currency is native, we need to unwrap because v2 and v3 pools already require wrapped tokens
-      return this.trade.outputAmount.currency.isNative
-    }
+    } 
+    // else: if path output currency is native, we need to unwrap because v2 and v3 pools already require wrapped tokens
+    return this.trade.outputAmount.currency.isNative
   }
 
   get outputRequiresTransition(): boolean {
