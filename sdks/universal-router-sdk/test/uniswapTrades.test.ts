@@ -878,7 +878,7 @@ describe('Uniswap', () => {
     it('encodes a mixed exactInput v2DAI->v3USDC->ETH swap', async () => {
       const inputDai = utils.parseEther('1000').toString()
       const trade = await MixedRouteTrade.fromRoute(
-        new MixedRouteSDK([USDC_DAI_V2, WETH_USDC_V3], DAI, ETHER),
+        new MixedRouteSDK([USDC_DAI_V2, WETH_USDC_V3], DAI, ETHER), // tests mixed route unwrap weth to eth
         CurrencyAmount.fromRawAmount(DAI, inputDai),
         TradeType.EXACT_INPUT
       )
@@ -1003,6 +1003,32 @@ describe('Uniswap', () => {
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_MIXED_WETH_USDC_V4_TO_DAI_V3', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+    })
+
+    it('encodes a mixed exactInput v2DAI->v4USDC->ETH swap unwrap', async () => {
+      const inputDai = utils.parseEther('1000').toString()
+      const trade = await MixedRouteTrade.fromRoute(
+        new MixedRouteSDK([USDC_DAI_V2, WETH_USDC_V4], DAI, ETHER), // tests mixed route unwrap weth to eth
+        CurrencyAmount.fromRawAmount(DAI, inputDai),
+        TradeType.EXACT_INPUT
+      )
+      const opts = swapOptions({})
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
+      registerFixture('_UNISWAP_MIXED_DAI_FOR_ETH_UNWRAP', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+    })
+
+    it('encodes a mixed exactInput v2DAI->v4USDC->WETH swap wrap', async () => {
+      const inputDai = utils.parseEther('1000').toString()
+      const trade = await MixedRouteTrade.fromRoute(
+        new MixedRouteSDK([USDC_DAI_V2, ETH_USDC_V4], DAI, WETH), // tests mixed route wrap eth to weth
+        CurrencyAmount.fromRawAmount(DAI, inputDai),
+        TradeType.EXACT_INPUT
+      )
+      const opts = swapOptions({})
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
+      registerFixture('_UNISWAP_MIXED_DAI_FOR_WETH_WRAP', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
   })

@@ -81,10 +81,17 @@ export class UniswapTrade implements Command {
     return result
   }
 
+  // this.trade.swaps is an array of swaps / trades.
+  // we are iterating over one swap (trade) at a time so length is 1
+  // route is either v2, v3, v4, or mixed
+  // pathInput and pathOutput are the currencies of the input and output of the route
+  // this.trade.inputAmount is the input currency of the trade (could be different from pathInput)
+  // this.trade.outputAmount is the output currency of the trade (could be different from pathOutput)
+  // each route can have multiple pools
   get inputRequiresWrap(): boolean {
     if (this.isAllV4) {
-      // If the input is native, and the first pool in the route is not native, we need to wrap.
-      // this works because there will never be a fake ETH-WETH pool in v4 route
+      // If the input currency is native, and the path input currency in the route is not native, we need to wrap.
+      // there will never be a fake ETH-WETH pool in v4 route
       return (
         this.trade.inputAmount.currency.isNative &&
         !(this.trade.swaps[0].route as unknown as V4Route<Currency, Currency>).pathInput.isNative
@@ -95,7 +102,7 @@ export class UniswapTrade implements Command {
         return false
       }
 
-      // if input currency is native:
+      // if input currency is native...
 
       // Get the first pool in the route to check its type
       // V2 and V3 pools require wrapped tokens, so wrapping is needed
@@ -103,8 +110,8 @@ export class UniswapTrade implements Command {
         return true
       }
 
-      // if input currency is native and currency0 is not native, return true
-      // else return false.
+      // if the path input currency is not native, need to wrap
+      // else do not need to wrap
 
       // Ex:
       // input is eth, first pool is [WETH, DAI]? - would need to wrap
@@ -119,28 +126,26 @@ export class UniswapTrade implements Command {
 
   get inputRequiresUnwrap(): boolean {
     if (this.isAllV4) {
-      // if input currency is not native, and the first pool in the route contains native, we need to unwrap
+      // If the input currency is not native, and the path input currency is native, we need to unwrap
       return (
         !this.trade.inputAmount.currency.isNative &&
         (this.trade.swaps[0].route as unknown as V4Route<Currency, Currency>).pathInput.isNative
       )
-    }
-    // for mixed route, if first pool is v4 and native, we need to unwrap
-    else {
-      // For mixed routes or other protocols, check if the input is native. If it is, we don't need to unwrap.
+    } else {
+      // For mixed routes or other protocols, check if the input currency is native. If it is, we don't need to unwrap.
       if (this.trade.inputAmount.currency.isNative) {
         return false
       }
 
-      // if input currency is not native:
+      // if input currency is not native...
 
       // V2 and V3 pools require wrapped tokens, so unwrapping is not needed
       if (!(this.trade.swaps[0].route.pools[0] instanceof V4Pool)) {
         return false
       }
 
-      // if input currency is not native and currency0 is native, return true
-      // else return false.
+      // if the path input currency is native, need to unwrap
+      // else do not need to unwrap
 
       // Ex:
       // input is weth, first pool is [ETH, DAI]? - would need to unwrap
@@ -154,23 +159,38 @@ export class UniswapTrade implements Command {
   }
 
   get outputRequiresWrap(): boolean {
-    if (this.isAllV4) {
-      // if output currency is not native but path output is native, we need to wrap
+    const swap = this.trade.swaps[0]
+    const lastRoute = swap.route
+    const lastPool = lastRoute.pools[lastRoute.pools.length - 1]
+
+    // if all pools are v4 or last pool is v4:
+    if (this.isAllV4 || lastPool instanceof V4Pool) {
+      // If output currency is not native but path currency output is native, we need to wrap
       return (
         !this.trade.outputAmount.currency.isNative &&
-        (this.trade.swaps[0].route as unknown as V4Route<Currency, Currency>).pathOutput.isNative
+        (lastRoute as unknown as V4Route<Currency, Currency>).pathOutput.isNative
       )
+    } else {
+      // For mixed routes or other protocols where last pool is not v4:
+      // we do not need to wrap because v2 and v3 pools already require wrapped tokens
+      return false
     }
-    return false
   }
 
   get outputRequiresUnwrap(): boolean {
-    if (this.isAllV4) {
+    const swap = this.trade.swaps[0]
+    const lastRoute = swap.route
+    const lastPool = lastRoute.pools[lastRoute.pools.length - 1]
+
+    // if all pools are v4 or last pool is v4:
+    if (this.isAllV4 || lastPool instanceof V4Pool) {
+      // If output currency is native and path currency output is not native, we need to unwrap
       return (
         this.trade.outputAmount.currency.isNative &&
         !(this.trade.swaps[0].route as unknown as V4Route<Currency, Currency>).pathOutput.isNative
       )
     } else {
+      // else: if path output currency is native, we need to unwrap because v2 and v3 pools already require wrapped tokens
       return this.trade.outputAmount.currency.isNative
     }
   }
