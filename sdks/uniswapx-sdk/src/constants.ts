@@ -174,7 +174,7 @@ export const PERMISSIONED_TOKENS: PermissionedToken[] = [
     address: "0x7712c34205737192402172409a8F7ccef8aA2AEc",
     chainId: ChainId.MAINNET,
     symbol: "BUIDL",
-    proxyType: PermissionedTokenProxyType.Standard,
+    proxyType: PermissionedTokenProxyType.None,
     interface: PermissionedTokenInterface.DSTokenInterface,
   },
   {
