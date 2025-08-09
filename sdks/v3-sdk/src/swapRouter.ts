@@ -26,7 +26,7 @@ export interface SwapOptions {
   recipient: string
 
   /**
-   * When the transaction expires, in epoch seconds.
+   * When the transaction expires, in epoch seconds. Will be ignored if chainId==ChainId.BNB
    */
   deadline: BigintIsh
 
