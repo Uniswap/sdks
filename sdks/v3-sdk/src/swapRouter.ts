@@ -140,7 +140,7 @@ export abstract class SwapRouter {
               amountOutMinimum: amountOut,
               sqrtPriceLimitX96: toHex(options.sqrtPriceLimitX96 ?? 0),
             }
-            if (options.chainId !== ChainId.BNB) {
+            if (options.chainId != ChainId.BNB) {
               exactInputSingleParams.deadline = deadline;
             }
 
@@ -155,7 +155,7 @@ export abstract class SwapRouter {
               amountInMaximum: amountIn,
               sqrtPriceLimitX96: toHex(options.sqrtPriceLimitX96 ?? 0),
             }
-            if (options.chainId !== ChainId.BNB) {
+            if (options.chainId != ChainId.BNB) {
               exactOutputSingleParams.deadline = deadline;
             }
 
@@ -173,7 +173,7 @@ export abstract class SwapRouter {
               amountIn,
               amountOutMinimum: amountOut,
             }
-            if (options.chainId !== ChainId.BNB) {
+            if (options.chainId != ChainId.BNB) {
               exactInputParams.deadline = deadline;
             }
 
@@ -185,7 +185,7 @@ export abstract class SwapRouter {
               amountOut,
               amountInMaximum: amountIn,
             }
-            if (options.chainId !== ChainId.BNB) {
+            if (options.chainId != ChainId.BNB) {
               exactOutputParams.deadline = deadline;
             }
 
