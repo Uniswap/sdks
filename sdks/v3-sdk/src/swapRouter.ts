@@ -9,6 +9,7 @@ import { MethodParameters, toHex } from './utils/calldata'
 import ISwapRouter from '@uniswap/v3-periphery/artifacts/contracts/SwapRouter.sol/SwapRouter.json'
 import { Multicall } from './multicall'
 import { FeeOptions, Payments } from './payments'
+import { ChainId } from '../../sdk-core/src/chains';
 
 /**
  * Options for producing the arguments to send calls to the router.
@@ -43,6 +44,13 @@ export interface SwapOptions {
    * Optional information for taking a fee on output.
    */
   fee?: FeeOptions
+
+  /**
+   * Optional chainId to fit to a given network contract deployment
+   */
+  chainId?: ChainId
+
+
 }
 
 /**
@@ -54,7 +62,7 @@ export abstract class SwapRouter {
   /**
    * Cannot be constructed.
    */
-  private constructor() {}
+  private constructor() { }
 
   /**
    * Produces the on-chain method name to call and the hex encoded parameters to pass as arguments for a given trade.
@@ -123,28 +131,32 @@ export abstract class SwapRouter {
 
         if (singleHop) {
           if (trade.tradeType === TradeType.EXACT_INPUT) {
-            const exactInputSingleParams = {
+            const exactInputSingleParams: any = {
               tokenIn: route.tokenPath[0].address,
               tokenOut: route.tokenPath[1].address,
               fee: route.pools[0].fee,
               recipient: routerMustCustody ? ADDRESS_ZERO : recipient,
-              deadline,
               amountIn,
               amountOutMinimum: amountOut,
               sqrtPriceLimitX96: toHex(options.sqrtPriceLimitX96 ?? 0),
             }
+            if (options.chainId === undefined || options.chainId !== ChainId.BNB) {
+              exactInputSingleParams.deadline = deadline;
+            }
 
             calldatas.push(SwapRouter.INTERFACE.encodeFunctionData('exactInputSingle', [exactInputSingleParams]))
           } else {
-            const exactOutputSingleParams = {
+            const exactOutputSingleParams: any = {
               tokenIn: route.tokenPath[0].address,
               tokenOut: route.tokenPath[1].address,
               fee: route.pools[0].fee,
               recipient: routerMustCustody ? ADDRESS_ZERO : recipient,
-              deadline,
               amountOut,
               amountInMaximum: amountIn,
               sqrtPriceLimitX96: toHex(options.sqrtPriceLimitX96 ?? 0),
+            }
+            if (options.chainId === undefined || options.chainId !== ChainId.BNB) {
+              exactOutputSingleParams.deadline = deadline;
             }
 
             calldatas.push(SwapRouter.INTERFACE.encodeFunctionData('exactOutputSingle', [exactOutputSingleParams]))
@@ -155,22 +167,26 @@ export abstract class SwapRouter {
           const path: string = encodeRouteToPath(route, trade.tradeType === TradeType.EXACT_OUTPUT)
 
           if (trade.tradeType === TradeType.EXACT_INPUT) {
-            const exactInputParams = {
+            const exactInputParams: any = {
               path,
               recipient: routerMustCustody ? ADDRESS_ZERO : recipient,
-              deadline,
               amountIn,
               amountOutMinimum: amountOut,
+            }
+            if (options.chainId === undefined || options.chainId !== ChainId.BNB) {
+              exactInputParams.deadline = deadline;
             }
 
             calldatas.push(SwapRouter.INTERFACE.encodeFunctionData('exactInput', [exactInputParams]))
           } else {
-            const exactOutputParams = {
+            const exactOutputParams: any = {
               path,
               recipient: routerMustCustody ? ADDRESS_ZERO : recipient,
-              deadline,
               amountOut,
               amountInMaximum: amountIn,
+            }
+            if (options.chainId === undefined || options.chainId !== ChainId.BNB) {
+              exactOutputParams.deadline = deadline;
             }
 
             calldatas.push(SwapRouter.INTERFACE.encodeFunctionData('exactOutput', [exactOutputParams]))
