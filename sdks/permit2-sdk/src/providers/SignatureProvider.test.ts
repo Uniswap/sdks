@@ -218,6 +218,28 @@ describe('SignatureProvider', () => {
         expect(typeof result).toBe('boolean')
       })
     })
+
+    it('should check specific nonces for known swapper', async () => {
+      const swapper = '0xa7152Fad7467857dC2D4060FEcaAdf9f6B8227d3'
+      const usedNonce = BigNumber.from('1993349591429988950323706171037443285812821323100932422320925456272859199745')
+      
+      // Test with the specific nonce and some additional nonces
+      const nonces = [
+        usedNonce,
+        BigNumber.from(1234567890), // Different nonce
+        BigNumber.from(9876543210)  // Another different nonce
+      ]
+      
+      const results = await signatureProvider.batchCheckNonces(swapper, nonces)
+      
+      expect(results).toHaveLength(nonces.length)
+      results.forEach(result => {
+        expect(typeof result).toBe('boolean')
+      })
+      
+      // The first nonce should be used (true), others likely unused (false)
+      expect(results[0]).toBe(true) // The specific nonce should be used
+    })
   })
 
   describe('getCurrentTimestamp', () => {

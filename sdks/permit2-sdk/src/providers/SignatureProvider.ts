@@ -114,21 +114,16 @@ export class SignatureProvider {
    * @returns Array of boolean results indicating if each nonce is used
    */
   async batchCheckNonces(owner: string, nonces: BigNumberish[]): Promise<boolean[]> {
-    // Group nonces by word position to minimize contract calls
-    const nonceGroups = new Map<string, number[]>()
+    // Get unique word positions to minimize contract calls
+    const wordPositions = new Set<string>()
     
-    nonces.forEach((nonce, index) => {
+    nonces.forEach((nonce) => {
       const { wordPos } = SignatureProvider.getNoncePositions(nonce)
-      const wordPosKey = wordPos.toString()
-      
-      if (!nonceGroups.has(wordPosKey)) {
-        nonceGroups.set(wordPosKey, [])
-      }
-      nonceGroups.get(wordPosKey)!.push(index)
+      wordPositions.add(wordPos.toString())
     })
 
     // Fetch all required bitmaps
-    const bitmapPromises = Array.from(nonceGroups.keys()).map(async (wordPosKey) => {
+    const bitmapPromises = Array.from(wordPositions).map(async (wordPosKey) => {
       const wordPos = BigNumber.from(wordPosKey)
       const bitmap = await this.getNonceBitmap(owner, wordPos)
       return { wordPos, bitmap }
@@ -140,7 +135,10 @@ export class SignatureProvider {
     // Check each nonce
     return nonces.map((nonce) => {
       const { wordPos, bitPos } = SignatureProvider.getNoncePositions(nonce)
-      const bitmap = bitmapMap.get(wordPos.toString())!
+      const bitmap = bitmapMap.get(wordPos.toString())
+      if (!bitmap) {
+        throw new Error(`Bitmap not found for word position ${wordPos.toString()}`)
+      }
       return SignatureProvider.isBitSet(bitmap, bitPos)
     })
   }
