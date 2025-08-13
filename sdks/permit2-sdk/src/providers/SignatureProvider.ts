@@ -26,10 +26,9 @@ export class SignatureProvider {
    */
   async isNonceUsed(owner: string, nonce: BigNumberish): Promise<boolean> {
     const { wordPos, bitPos } = SignatureProvider.getNoncePositions(nonce)
-    const mask = BigNumber.from(1).shl(bitPos)
     
     const bitmap = await this.permit2.nonceBitmap(owner, wordPos)
-    return bitmap.and(mask).gt(0)
+    return SignatureProvider.isBitSet(bitmap, bitPos)
   }
 
   /**
