@@ -25,9 +25,8 @@ export class SignatureProvider {
    * @returns true if the nonce has been used, false otherwise
    */
   async isNonceUsed(owner: string, nonce: BigNumberish): Promise<boolean> {
-    const wordPos = BigNumber.from(nonce).shr(8)
-    const bitPos = BigNumber.from(nonce).and(255)
-    const mask = BigNumber.from(1).shl(bitPos.toNumber())
+    const { wordPos, bitPos } = SignatureProvider.getNoncePositions(nonce)
+    const mask = BigNumber.from(1).shl(bitPos)
     
     const bitmap = await this.permit2.nonceBitmap(owner, wordPos)
     return bitmap.and(mask).gt(0)
@@ -52,13 +51,7 @@ export class SignatureProvider {
   async isPermitValid(
     permit: PermitTransferFrom | PermitBatchTransferFrom
   ): Promise<boolean> {
-    const isExpiredResult = await this.isExpired(permit.deadline)
-    if (isExpiredResult) {
-      return false
-    }
-
-    const isNonceUsedResult = await this.isNonceUsed(permit.spender, permit.nonce)
-    return !isNonceUsedResult
+    return (await this.validatePermit(permit)).isValid
   }
 
   /**

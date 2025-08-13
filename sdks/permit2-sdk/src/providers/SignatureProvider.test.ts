@@ -49,7 +49,7 @@ describe('SignatureProvider', () => {
 
     it('should check specific unused nonce for known swapper', async () => {
       const unusedNonce = BigNumber.from('1234567890')
-      const swapper = '0xa7152Fad7467857dC2D4060FEcaAdf9f6B8227d3'
+      const swapper = '0x54539967a06Fc0E3C3ED0ee320Eb67362D13C5fF'
       
       const isUsed = await signatureProvider.isNonceUsed(swapper, unusedNonce)
       expect(isUsed).toBe(false) // Nonce should be unused
