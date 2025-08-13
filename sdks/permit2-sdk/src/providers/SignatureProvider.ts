@@ -37,8 +37,7 @@ export class SignatureProvider {
    * @returns true if the permit has expired, false otherwise
    */
   async isExpired(deadline: BigNumberish): Promise<boolean> {
-    const currentBlock = await this.provider.getBlock('latest')
-    const currentTimestamp = currentBlock.timestamp
+    const currentTimestamp = await this.getCurrentTimestamp()
     return BigNumber.from(deadline).lt(currentTimestamp)
   }
 
