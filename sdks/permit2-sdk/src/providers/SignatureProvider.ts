@@ -26,7 +26,7 @@ export class SignatureProvider {
    */
   async isNonceUsed(owner: string, nonce: BigNumberish): Promise<boolean> {
     const { wordPos, bitPos } = SignatureProvider.getNoncePositions(nonce)
-    
+
     const bitmap = await this.permit2.nonceBitmap(owner, wordPos)
     return SignatureProvider.isBitSet(bitmap, bitPos)
   }
@@ -46,9 +46,7 @@ export class SignatureProvider {
    * @param permit The permit data to validate
    * @returns true if the permit is valid, false otherwise
    */
-  async isPermitValid(
-    permit: PermitTransferFrom | PermitBatchTransferFrom
-  ): Promise<boolean> {
+  async isPermitValid(permit: PermitTransferFrom | PermitBatchTransferFrom): Promise<boolean> {
     return (await this.validatePermit(permit)).isValid
   }
 
@@ -57,18 +55,16 @@ export class SignatureProvider {
    * @param permit The permit data to validate
    * @returns Object containing validation results
    */
-  async validatePermit(
-    permit: PermitTransferFrom | PermitBatchTransferFrom
-  ): Promise<NonceValidationResult> {
+  async validatePermit(permit: PermitTransferFrom | PermitBatchTransferFrom): Promise<NonceValidationResult> {
     const [isExpiredResult, isNonceUsedResult] = await Promise.all([
       this.isExpired(permit.deadline),
-      this.isNonceUsed(permit.spender, permit.nonce)
+      this.isNonceUsed(permit.spender, permit.nonce),
     ])
 
     return {
       isUsed: isNonceUsedResult,
       isExpired: isExpiredResult,
-      isValid: !isExpiredResult && !isNonceUsedResult
+      isValid: !isExpiredResult && !isNonceUsedResult,
     }
   }
 
@@ -103,7 +99,7 @@ export class SignatureProvider {
     const nonceBN = BigNumber.from(nonce)
     return {
       wordPos: nonceBN.shr(8),
-      bitPos: nonceBN.and(255).toNumber()
+      bitPos: nonceBN.and(255).toNumber(),
     }
   }
 
@@ -116,7 +112,7 @@ export class SignatureProvider {
   async batchCheckNonces(owner: string, nonces: BigNumberish[]): Promise<boolean[]> {
     // Get unique word positions to minimize contract calls
     const wordPositions = new Set<string>()
-    
+
     nonces.forEach((nonce) => {
       const { wordPos } = SignatureProvider.getNoncePositions(nonce)
       wordPositions.add(wordPos.toString())
