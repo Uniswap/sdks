@@ -1,12 +1,12 @@
 import { ChainId } from '@uniswap/sdk-core'
 
 // https://eips.ethereum.org/EIPS/eip-7702
-export const DELEGATION_MAGIC_PREFIX = '0xef0100';
+export const DELEGATION_MAGIC_PREFIX = '0xef0100'
 
 /**
  * The target address for self-calls is address(0)
  */
-export const SELF_CALL_TARGET = "0x0000000000000000000000000000000000000000"
+export const SELF_CALL_TARGET = '0x0000000000000000000000000000000000000000'
 
 /**
  * Call types for smart wallet calls
@@ -14,7 +14,7 @@ export const SELF_CALL_TARGET = "0x0000000000000000000000000000000000000000"
  */
 export enum ModeType {
   BATCHED_CALL = '0x0100000000000000000000000000000000000000000000000000000000000000',
-  BATCHED_CALL_CAN_REVERT = '0x0101000000000000000000000000000000000000000000000000000000000000'
+  BATCHED_CALL_CAN_REVERT = '0x0101000000000000000000000000000000000000000000000000000000000000',
 }
 
 /**
@@ -37,11 +37,13 @@ export enum SupportedChainIds {
 export enum SmartWalletVersion {
   LATEST = 'latest',
   v1_0_0 = 'v1.0.0',
-  v1_0_0_staging = 'v1.0.0-staging'
+  v1_0_0_staging = 'v1.0.0-staging',
 }
 
 // All smart wallet versions for a given chain id are optional except for the latest version
-type SmartWalletVersionMap = Partial<{ [version in SmartWalletVersion]: `0x${string}` }> & { [SmartWalletVersion.LATEST]: `0x${string}` }
+type SmartWalletVersionMap = Partial<{ [version in SmartWalletVersion]: `0x${string}` }> & {
+  [SmartWalletVersion.LATEST]: `0x${string}`
+}
 
 /**
  * Smart wallet versions for supported chains
@@ -81,7 +83,7 @@ export const SMART_WALLET_VERSIONS: { [chainId in SupportedChainIds]: SmartWalle
     [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
     [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
     [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
-  }
+  },
 }
 
 /**
@@ -89,12 +91,17 @@ export const SMART_WALLET_VERSIONS: { [chainId in SupportedChainIds]: SmartWalle
  * @dev Used to get the latest version of the smart wallet
  *      See README for detailed deployment addresses along with the commit hash
  */
-export const SMART_WALLET_ADDRESSES = Object.fromEntries(
-  Object.entries(SMART_WALLET_VERSIONS).map(([chainId, versions]) => [
+// Build address map with a null prototype to avoid inherited property lookups
+export const SMART_WALLET_ADDRESSES = (() => {
+  const entries = Object.entries(SMART_WALLET_VERSIONS).map(([chainId, versions]) => [
     chainId,
-    versions[SmartWalletVersion.LATEST]
+    versions[SmartWalletVersion.LATEST],
   ])
-)
+  const map = Object.fromEntries(entries) as Record<string | number, `0x${string}`>
+  // Explicitly remove prototype to prevent access via __proto__/constructor, etc.
+  Object.setPrototypeOf(map, null)
+  return map
+})()
 
 /**
  * Get all historical smart wallet versions for a given chain id

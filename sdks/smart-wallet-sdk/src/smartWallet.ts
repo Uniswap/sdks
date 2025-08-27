@@ -21,15 +21,15 @@ export class SmartWallet {
   public static encodeBatchedCall(calls: Call[], options: ExecuteOptions = {}): MethodParameters {
     const planner = new CallPlanner(calls)
     const batchedCallPlanner = new BatchedCallPlanner(planner, options.revertOnFailure)
-    
+
     const encoded = encodeFunctionData({
       abi,
       functionName: '0x99e1d016', // execute(((address,uint256,bytes)[],bool))
-      args: [batchedCallPlanner.toBatchedCall()]
+      args: [batchedCallPlanner.toBatchedCall()],
     })
     return {
       calldata: encoded,
-      value: planner.value
+      value: planner.value,
     }
   }
 
@@ -39,17 +39,17 @@ export class SmartWallet {
    */
   public static encodeERC7821BatchedCall(calls: Call[], options: ExecuteOptions = {}): MethodParameters {
     const mode = this.getModeFromOptions(options)
-    if(mode != ModeType.BATCHED_CALL && mode != ModeType.BATCHED_CALL_CAN_REVERT) {
+    if (mode != ModeType.BATCHED_CALL && mode != ModeType.BATCHED_CALL_CAN_REVERT) {
       throw new Error(`Invalid mode: ${mode}`)
     }
 
     const planner = new CallPlanner(calls)
-    
+
     const executionData = planner.encode()
     const encoded = this._encodeERC7821Execute(mode, executionData)
     return {
       calldata: encoded,
-      value: planner.value
+      value: planner.value,
     }
   }
 
@@ -60,15 +60,21 @@ export class SmartWallet {
    * @param chainId The chain ID for the smart wallet
    * @returns The call to execute
    */
-  public static createExecute(methodParameters: MethodParameters, chainId: ChainId ): Call {
-    const address = SMART_WALLET_ADDRESSES[chainId]
-    if(!address) {
+  public static createExecute(methodParameters: MethodParameters, chainId: ChainId): Call {
+    // Normalize and validate chainId prior to lookup to avoid prototype pollution and inherited keys
+    const normalizedChainId = typeof (chainId as unknown) === 'string' ? Number(chainId) : chainId
+    const isValidNumericChainId =
+      typeof normalizedChainId === 'number' && Number.isFinite(normalizedChainId) && Number.isInteger(normalizedChainId)
+
+    if (!isValidNumericChainId || !Object.prototype.hasOwnProperty.call(SMART_WALLET_ADDRESSES, normalizedChainId)) {
       throw new Error(`Smart wallet not found for chainId: ${chainId}`)
     }
+
+    const address = (SMART_WALLET_ADDRESSES as Record<number, `0x${string}`>)[normalizedChainId as number]
     return {
       to: address,
       data: methodParameters.calldata,
-      value: methodParameters.value
+      value: methodParameters.value,
     }
   }
 
@@ -76,23 +82,20 @@ export class SmartWallet {
    * Get the mode type from the options
    */
   public static getModeFromOptions(options: ExecuteOptions): ModeType {
-    if(options.revertOnFailure) {
-      return ModeType.BATCHED_CALL;
+    if (options.revertOnFailure) {
+      return ModeType.BATCHED_CALL
     }
 
     return ModeType.BATCHED_CALL_CAN_REVERT
   }
 
   /** Internal methods */
-  
+
   protected static _encodeERC7821Execute(mode: ModeType, data: `0x${string}`): `0x${string}` {
     return encodeFunctionData({
       abi,
       functionName: '0xe9ae5c53', // execute(bytes32,bytes)
-      args: [
-        mode,
-        data
-      ]
+      args: [mode, data],
     })
   }
 }
