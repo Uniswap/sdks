@@ -76,7 +76,7 @@ export const SMART_WALLET_VERSIONS: { [chainId in SupportedChainIds]: SmartWalle
   [SupportedChainIds.ARBITRUM_ONE]: {
     [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
     [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
-  }
+  },
   [SupportedChainIds.UNICHAIN_SEPOLIA]: {
     [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
     [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
