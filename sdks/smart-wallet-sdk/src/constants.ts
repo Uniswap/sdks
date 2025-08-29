@@ -28,6 +28,7 @@ export enum SupportedChainIds {
   BASE = ChainId.BASE,
   OPTIMISM = ChainId.OPTIMISM,
   BNB = ChainId.BNB,
+  ARBITRUM_ONE = ChainId.ARBITRUM_ONE
 }
 
 /**
@@ -72,6 +73,10 @@ export const SMART_WALLET_VERSIONS: { [chainId in SupportedChainIds]: SmartWalle
     [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
     [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
   },
+  [SupportedChainIds.ARBITRUM_ONE]: {
+    [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
+    [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
+  }
   [SupportedChainIds.UNICHAIN_SEPOLIA]: {
     [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
     [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
