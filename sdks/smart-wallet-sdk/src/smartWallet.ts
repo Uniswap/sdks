@@ -3,7 +3,7 @@ import { encodeFunctionData } from 'viem'
 
 import abi from '../abis/MinimalDelegationEntry.json'
 
-import { ModeType, SMART_WALLET_ADDRESSES } from './constants'
+import { ModeType, getSmartWalletAddress } from './constants'
 import { Call, MethodParameters, ExecuteOptions } from './types'
 import { CallPlanner } from './utils'
 import { BatchedCallPlanner } from './utils/batchedCallPlanner'
@@ -61,16 +61,7 @@ export class SmartWallet {
    * @returns The call to execute
    */
   public static createExecute(methodParameters: MethodParameters, chainId: ChainId): Call {
-    // Normalize and validate chainId prior to lookup to avoid prototype pollution and inherited keys
-    const normalizedChainId = typeof (chainId as unknown) === 'string' ? Number(chainId) : chainId
-    const isValidNumericChainId =
-      typeof normalizedChainId === 'number' && Number.isFinite(normalizedChainId) && Number.isInteger(normalizedChainId)
-
-    if (!isValidNumericChainId || !Object.prototype.hasOwnProperty.call(SMART_WALLET_ADDRESSES, normalizedChainId)) {
-      throw new Error(`Smart wallet not found for chainId: ${chainId}`)
-    }
-
-    const address = (SMART_WALLET_ADDRESSES as Record<number, `0x${string}`>)[normalizedChainId as number]
+    const address = getSmartWalletAddress(chainId)
     return {
       to: address,
       data: methodParameters.calldata,

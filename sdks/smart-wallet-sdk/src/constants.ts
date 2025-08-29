@@ -90,8 +90,8 @@ export const SMART_WALLET_VERSIONS: { [chainId in SupportedChainIds]: SmartWalle
  * Mapping of chainId to Smart Wallet contract addresses
  * @dev Used to get the latest version of the smart wallet
  *      See README for detailed deployment addresses along with the commit hash
+ * @deprecated Use getSmartWalletAddress() instead of indexing this map directly.
  */
-// Build address map with a null prototype to avoid inherited property lookups
 export const SMART_WALLET_ADDRESSES = (() => {
   const entries = Object.entries(SMART_WALLET_VERSIONS).map(([chainId, versions]) => [
     chainId,
@@ -108,4 +108,17 @@ export const SMART_WALLET_ADDRESSES = (() => {
  */
 export const getAllSmartWalletVersions = (chainId: SupportedChainIds) => {
   return Object.values(SMART_WALLET_VERSIONS[chainId])
+}
+
+/**
+ * Get the latest Smart Wallet address for a given chain id.
+ * Normalizes string ids to numbers and guards against prototype pollution.
+ */
+export function getSmartWalletAddress(chainIdLike: number | string | ChainId): `0x${string}` {
+  const normalized = typeof chainIdLike === 'string' ? Number(chainIdLike) : chainIdLike
+  const isValid = typeof normalized === 'number' && Number.isFinite(normalized) && Number.isInteger(normalized)
+  if (!isValid || !Object.prototype.hasOwnProperty.call(SMART_WALLET_ADDRESSES, normalized)) {
+    throw new Error(`Smart wallet not found for chainId: ${chainIdLike}`)
+  }
+  return (SMART_WALLET_ADDRESSES as Record<number, `0x${string}`>)[normalized]
 }
