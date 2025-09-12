@@ -29,6 +29,7 @@ export enum ChainId {
   UNICHAIN = 130,
   MONAD_TESTNET = 10143,
   SONEIUM = 1868,
+  CITREA_TESTNET = 5115,
 }
 
 export const SUPPORTED_CHAINS = [
@@ -60,6 +61,7 @@ export const SUPPORTED_CHAINS = [
   ChainId.UNICHAIN,
   ChainId.MONAD_TESTNET,
   ChainId.SONEIUM,
+  ChainId.CITREA_TESTNET,
 ] as const
 export type SupportedChainsType = (typeof SUPPORTED_CHAINS)[number]
 
@@ -73,4 +75,5 @@ export enum NativeCurrencyName {
   BNB = 'BNB',
   AVAX = 'AVAX',
   ROOTSTOCK = 'RBTC',
+  CITREA_BTC = 'cBTC',
 }
