@@ -1,6 +1,6 @@
 {
 	"name": "@gfxlabs/uniswap-universal-router-sdk",
-	"version": "4.19.7-2",
+	"version": "4.19.7-3",
 	"description": "sdk for integrating with the Universal Router contracts",
 	"repository": "https://github.com/Uniswap/sdks.git",
 	"keywords": [
