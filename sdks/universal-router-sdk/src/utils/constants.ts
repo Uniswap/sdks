@@ -1,5 +1,15 @@
 import { BigNumber } from "ethers";
 
+export const CONTRACT_BALANCE = BigNumber.from(2).pow(255);
+export const ETH_ADDRESS = "0x0000000000000000000000000000000000000000";
+export const E_ETH_ADDRESS = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+export const MAX_UINT256 = BigNumber.from(2).pow(256).sub(1);
+export const MAX_UINT160 = BigNumber.from(2).pow(160).sub(1);
+
+export const SENDER_AS_RECIPIENT = "0x0000000000000000000000000000000000000001";
+export const ROUTER_AS_RECIPIENT = "0x0000000000000000000000000000000000000002";
+
 export enum UniversalRouterVersion {
   V1_2 = "1.2",
   V2_0 = "2.0",
@@ -351,6 +361,453 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
   },
+  //moonbeam
+  [1284]: {
+    weth: "0x30d2a9f5fdf90ace8c17952cbb4ee48a55d916a7",
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x1F56F4e1648e96633c7FE79002036E967403CDfF",
+        creationBlock: 3340490,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+  },
+  // boba
+  [288]: {
+    weth: "0xdeaddeaddeaddeaddeaddeaddeaddeaddead0000",
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x4ba622997559f9b5ac68751d7fc3deecc23a0e88",
+        creationBlock: 969351,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+  },
+  //lens
+  [232]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0xAA904d497e42608C014BE83a026E984aFc16129b",
+        creationBlock: 184116,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0x6bDc36E20D267Ff0dd6097799f82e78907105e2F",
+  },
+  //xlayer
+  [196]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x1b35fbA9357fD9bda7ed0429C8BbAbe1e8CC88fc",
+        creationBlock: 4346684,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0xe538905cf8410324e03a5a23c1c177a474d59b2b",
+  },
+  //gnosis
+  [100]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x75FC67473A91335B5b8F8821277262a13B38c9b3",
+        creationBlock: 35719251,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d",
+  },
+  //bob
+  [60808]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x346239972d1fa486FC4a521031BC81bFB7D6e8a4",
+        creationBlock: 5369968,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0x4200000000000000000000000000000000000006",
+  },
+  //lisk
+  [1135]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x447B8E40B0CdA8e55F405C86bC635D02d0540aB8",
+        creationBlock: 578844,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0x4200000000000000000000000000000000000006",
+  },
+  //zklink
+  [810180]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x2274bDE50218DDB955e7f60e4f2344e3Bff9D193",
+        creationBlock: 4404950,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0x8280a4e7D5B3B658ec4580d3Bc30f5e50454F169",
+  },
+  //taiko
+  [167000]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x346239972d1fa486FC4a521031BC81bFB7D6e8a4",
+        creationBlock: 2382,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0xA51894664A773981C6C112C43ce576f315d5b1B6",
+  },
+  // sei
+  [1329]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0xa683c66045ad16abb1bCE5ad46A64d95f9A25785",
+        creationBlock: 79447543,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0xE30feDd158A2e3b13e9badaeABaFc5516e95e8C7",
+  },
+  //mantle
+  [5000]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x447B8E40B0CdA8e55F405C86bC635D02d0540aB8",
+        creationBlock: 63841377,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0x78c1b0C915c4FAA5FffA6CAbf0219DA63d7f4cb8",
+  },
+  //sei testnet
+  [713715]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x61a27a55f72bbCba64554246BCE2da43C164543B",
+        creationBlock: 16342547,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0x57eE725BEeB991c70c53f9642f36755EC6eb2139",
+  },
+  //linea
+  [59144]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0xd7c7d7f18dd5388d5217c9696c7e799fcd75c6bd",
+        creationBlock: 3609803,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0xe5d7c2a44ffddf6b295a15c148167daaaf5cf34f",
+  },
+  //polygon zkevm
+  [1101]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x32454e81d065FAA95Ec0d0Ab6Fe326599Af30fd7",
+        creationBlock: 8467040,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0x4F9A0e7FD2Bf6067db6994CF12E4495Df938E6e9",
+  },
+  //scroll
+  [534352]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x595E7160858b1AdA94Bda790D8699C85e595117E",
+        creationBlock: 1380,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0x5300000000000000000000000000000000000004",
+  },
+  //manta
+  [169]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x42Bff1f6b647462fcD8c28a488Be9C9988830ef6",
+        creationBlock: 1199217,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0x0Dc808adcE2099A9F62AA87D9670745AbA741746",
+  },
+  //rootstock
+  [30]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x244f68e77357f86a8522323eBF80b5FC2F814d3E",
+        creationBlock: 5830624,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0x542fDA317318eBF1d3DEAf76E0b632741A7e677d",
+  },
+  //filecoin
+  [314]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x83702C6356A1028A900F83d446D189a31646a16b",
+        creationBlock: 3255833,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0x60E1773636CF5E4A227d9AC24F20fEca034ee25A",
+  },
+  //corn
+  [21000000]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x9db70E29712Cc8Af10c2B597BaDA6784544FF407",
+        creationBlock: 10939,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0xda5dDd7270381A7C2717aD10D1c0ecB19e3CDFb2",
+  },
+  //etherlink
+  [42793]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x9db70E29712Cc8Af10c2B597BaDA6784544FF407",
+        creationBlock: 14585098,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0xc9B53AB2679f573e480d01e0f49e2B5CFB7a3EAb",
+  },
+  //metal
+  [1750]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x346239972d1fa486FC4a521031BC81bFB7D6e8a4",
+        creationBlock: 10815185,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0x4200000000000000000000000000000000000006",
+  },
+  //sonic
+  [146]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x738fD6d10bCc05c230388B4027CAd37f82fe2AF2",
+        creationBlock: 322921,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0x039e2fB66102314Ce7b64Ce5Ce3E5183bc94aD38",
+  },
+  [50]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x738fD6d10bCc05c230388B4027CAd37f82fe2AF2",
+        creationBlock: 87231190,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0x951857744785e80e2de051c32ee7b25f9c458c42",
+  },
+  //telos
+  [40]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x738fD6d10bCc05c230388B4027CAd37f82fe2AF2",
+        creationBlock: 386636864,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0xD102cE6A4dB07D247fcc28F366A623Df0938CA9E",
+  },
+  //hemi
+  [43111]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x533c7A53389e0538AB6aE1D7798D6C1213eAc28B",
+        creationBlock: 1293665,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0x4200000000000000000000000000000000000006",
+  },
+  //goat
+  [2345]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x738fD6d10bCc05c230388B4027CAd37f82fe2AF2",
+        creationBlock: 964033,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0xbC10000000000000000000000000000000000000",
+  },
+  //redbelly
+  [151]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x1b35fbA9357fD9bda7ed0429C8BbAbe1e8CC88fc",
+        creationBlock: 2286087,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0x6ed1F491e2d31536D6561f6bdB2AdC8F092a6076",
+  },
+  //saga
+  [5464]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0xa683c66045ad16abb1bCE5ad46A64d95f9A25785",
+        creationBlock: 19318,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0xE3dbcD53f4Ce1b06Ab200f4912BD35672e68f1FA",
+  },
+  //lightlink
+  [1890]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x738fD6d10bCc05c230388B4027CAd37f82fe2AF2",
+        creationBlock: 131406742,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0xa683c66045ad16abb1bCE5ad46A64d95f9A25785",
+  },
+  //nibiru
+  [6900]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0xA7E6cB0A6B1BE8b779022A6aFcb097cF0d3Ff4A2",
+        creationBlock: 23658719,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0x0CaCF669f8446BeCA826913a3c6B96aCD4b02a97",
+  },
+  // Matchain
+  [698]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x9db70E29712Cc8Af10c2B597BaDA6784544FF407",
+        creationBlock: 37614238,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0x4200000000000000000000000000000000000006",
+  },
+  // plasma
+  [9745]: {
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: "0x1b35fbA9357fD9bda7ed0429C8BbAbe1e8CC88fc",
+        creationBlock: 430782,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: ZERO_ADDRESS,
+        creationBlock: 0,
+      },
+    },
+    weth: "0x6100E367285b01F48D07953803A2d8dCA5D19873",
+  },
 };
 
 export const UNIVERSAL_ROUTER_ADDRESS = (
@@ -380,13 +837,3 @@ export const WETH_ADDRESS = (chainId: number): string => {
 
   return CHAIN_CONFIGS[chainId].weth;
 };
-
-export const CONTRACT_BALANCE = BigNumber.from(2).pow(255);
-export const ETH_ADDRESS = "0x0000000000000000000000000000000000000000";
-export const E_ETH_ADDRESS = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
-export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-export const MAX_UINT256 = BigNumber.from(2).pow(256).sub(1);
-export const MAX_UINT160 = BigNumber.from(2).pow(160).sub(1);
-
-export const SENDER_AS_RECIPIENT = "0x0000000000000000000000000000000000000001";
-export const ROUTER_AS_RECIPIENT = "0x0000000000000000000000000000000000000002";
