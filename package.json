@@ -36,6 +36,7 @@
     "sdks/uniswapx-sdk/integration"
   ],
   "resolutions": {
-    "@manypkg/cli@^0.19.2": "patch:@manypkg/cli@npm%3A0.19.2#./.yarn/patches/@manypkg-cli-npm-0.19.2-ea52ff91d4.patch"
+    "@manypkg/cli@^0.19.2": "patch:@manypkg/cli@npm%3A0.19.2#./.yarn/patches/@manypkg-cli-npm-0.19.2-ea52ff91d4.patch",
+    "@uniswap/sdk-core": "npm:@gfxlabs/uniswap-sdk-core@7.7.2-1"
   }
 }

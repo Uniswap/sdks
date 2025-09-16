@@ -1,6 +1,7 @@
 {
-  "name": "@uniswap/sdk-core",
-  "description": "⚒️ An SDK for building applications on top of Uniswap V3",
+  "name": "@gfxlabs/uniswap-sdk-core",
+  "description": "⚒ An SDK for building applications on top of Uniswap V3",
+  "version": "7.7.2-1",
   "repository": "https://github.com/Uniswap/sdks.git",
   "keywords": [
     "uniswap",
