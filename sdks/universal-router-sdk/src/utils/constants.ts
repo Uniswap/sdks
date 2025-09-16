@@ -9,6 +9,7 @@ export const MAX_UINT160 = BigNumber.from(2).pow(160).sub(1);
 
 export const SENDER_AS_RECIPIENT = "0x0000000000000000000000000000000000000001";
 export const ROUTER_AS_RECIPIENT = "0x0000000000000000000000000000000000000002";
+export const PERMIT2_ADDRESS = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
 
 export enum UniversalRouterVersion {
   V1_2 = "1.2",
@@ -23,6 +24,7 @@ export type RouterConfig = {
 type ChainConfig = {
   weth: string;
   routerConfigs: { [key in UniversalRouterVersion]: RouterConfig };
+  permit2?: string;
 };
 
 const WETH_NOT_SUPPORTED_ON_CHAIN =
@@ -270,6 +272,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   },
   [324]: {
     weth: "0x5aea5775959fbc2557cc8789bc1bf90a239d9a91",
+    permit2: "0x0000000000225e31d15943971f47ad3022f714fa",
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: "0x28731BCC616B5f51dD52CF2e4dF0E78dD1136C06",
@@ -364,6 +367,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   //moonbeam
   [1284]: {
     weth: "0x30d2a9f5fdf90ace8c17952cbb4ee48a55d916a7",
+    permit2: "0xe96e30e92e01dc8a880f701b2d2160f93da18df7",
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: "0x1F56F4e1648e96633c7FE79002036E967403CDfF",
@@ -378,6 +382,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
   // boba
   [288]: {
     weth: "0xdeaddeaddeaddeaddeaddeaddeaddeaddead0000",
+    permit2: "0xF80c91442D3EF66632958C0d395667075FC82fB0",
     routerConfigs: {
       [UniversalRouterVersion.V1_2]: {
         address: "0x4ba622997559f9b5ac68751d7fc3deecc23a0e88",
@@ -402,6 +407,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
     weth: "0x6bDc36E20D267Ff0dd6097799f82e78907105e2F",
+    permit2: "0x0000000000225e31d15943971f47ad3022f714fa",
   },
   //xlayer
   [196]: {
@@ -444,6 +450,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
     weth: "0x4200000000000000000000000000000000000006",
+    permit2: "0xCbe9Be2C87b24b063A21369b6AB0Aa9f149c598F",
   },
   //lisk
   [1135]: {
@@ -458,6 +465,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
     weth: "0x4200000000000000000000000000000000000006",
+    permit2: "0xB952578f3520EE8Ea45b7914994dcf4702cEe578",
   },
   //zklink
   [810180]: {
@@ -472,6 +480,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
     weth: "0x8280a4e7D5B3B658ec4580d3Bc30f5e50454F169",
+    permit2: "0xc9fd50fc93f2a82d07d2b8c09ebe904317d5f7f6",
   },
   //taiko
   [167000]: {
@@ -486,6 +495,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
     weth: "0xA51894664A773981C6C112C43ce576f315d5b1B6",
+    permit2: "0x1b35fbA9357fD9bda7ed0429C8BbAbe1e8CC88fc",
   },
   // sei
   [1329]: {
@@ -500,6 +510,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
     weth: "0xE30feDd158A2e3b13e9badaeABaFc5516e95e8C7",
+    permit2: "0xB952578f3520EE8Ea45b7914994dcf4702cEe578",
   },
   //mantle
   [5000]: {
@@ -514,6 +525,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
     weth: "0x78c1b0C915c4FAA5FffA6CAbf0219DA63d7f4cb8",
+    permit2: "0x5d6b0f5335ec95cD2aB7E52f2A0750dd86502435",
   },
   //sei testnet
   [713715]: {
@@ -528,6 +540,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
     weth: "0x57eE725BEeB991c70c53f9642f36755EC6eb2139",
+    permit2: "0x0C88d2842Bf80B7728486D5a02F6BC222d50d45B",
   },
   //linea
   [59144]: {
@@ -556,6 +569,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
     weth: "0x4F9A0e7FD2Bf6067db6994CF12E4495Df938E6e9",
+    permit2: "0xCEc9e219281B78E1946b6b894f75ae89Bc10FEb6",
   },
   //scroll
   [534352]: {
@@ -570,6 +584,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
     weth: "0x5300000000000000000000000000000000000004",
+    permit2: "0xD75ca8A1F18DB1f48e500269111071308cFe718A",
   },
   //manta
   [169]: {
@@ -584,6 +599,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
     weth: "0x0Dc808adcE2099A9F62AA87D9670745AbA741746",
+    permit2: "0x83986Ff655A54ee061F6B7F476B92f4Fed111B93",
   },
   //rootstock
   [30]: {
@@ -598,6 +614,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
     weth: "0x542fDA317318eBF1d3DEAf76E0b632741A7e677d",
+    permit2: "0xFcf5986450E4A014fFE7ad4Ae24921B589D039b5",
   },
   //filecoin
   [314]: {
@@ -612,6 +629,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
     weth: "0x60E1773636CF5E4A227d9AC24F20fEca034ee25A",
+    permit2: "0xb81363578d377F8DA3902e9e705FD60198a9cEc2",
   },
   //corn
   [21000000]: {
@@ -626,6 +644,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
     weth: "0xda5dDd7270381A7C2717aD10D1c0ecB19e3CDFb2",
+    permit2: "0xB952578f3520EE8Ea45b7914994dcf4702cEe578",
   },
   //etherlink
   [42793]: {
@@ -640,6 +659,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
     weth: "0xc9B53AB2679f573e480d01e0f49e2B5CFB7a3EAb",
+    permit2: "0xB952578f3520EE8Ea45b7914994dcf4702cEe578",
   },
   //metal
   [1750]: {
@@ -654,6 +674,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
     weth: "0x4200000000000000000000000000000000000006",
+    permit2: "0xB952578f3520EE8Ea45b7914994dcf4702cEe578",
   },
   //sonic
   [146]: {
@@ -681,6 +702,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
     weth: "0x951857744785e80e2de051c32ee7b25f9c458c42",
+    permit2: "0xB952578f3520EE8Ea45b7914994dcf4702cEe578",
   },
   //telos
   [40]: {
@@ -695,6 +717,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
     weth: "0xD102cE6A4dB07D247fcc28F366A623Df0938CA9E",
+    permit2: "0xB952578f3520EE8Ea45b7914994dcf4702cEe578",
   },
   //hemi
   [43111]: {
@@ -709,6 +732,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
     weth: "0x4200000000000000000000000000000000000006",
+    permit2: "0xB952578f3520EE8Ea45b7914994dcf4702cEe578",
   },
   //goat
   [2345]: {
@@ -723,6 +747,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
     weth: "0xbC10000000000000000000000000000000000000",
+    permit2: "0xB952578f3520EE8Ea45b7914994dcf4702cEe578",
   },
   //redbelly
   [151]: {
@@ -737,6 +762,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
     weth: "0x6ed1F491e2d31536D6561f6bdB2AdC8F092a6076",
+    permit2: "0xdD489C75be1039ec7d843A6aC2Fd658350B067Cf",
   },
   //saga
   [5464]: {
@@ -751,6 +777,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
     weth: "0xE3dbcD53f4Ce1b06Ab200f4912BD35672e68f1FA",
+    permit2: "0x447B8E40B0CdA8e55F405C86bC635D02d0540aB8",
   },
   //lightlink
   [1890]: {
@@ -765,6 +792,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
     weth: "0xa683c66045ad16abb1bCE5ad46A64d95f9A25785",
+    permit2: "0x807F4E281B7A3B324825C64ca53c69F0b418dE40",
   },
   //nibiru
   [6900]: {
@@ -779,6 +807,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
     weth: "0x0CaCF669f8446BeCA826913a3c6B96aCD4b02a97",
+    permit2: "0xB952578f3520EE8Ea45b7914994dcf4702cEe578",
   },
   // Matchain
   [698]: {
@@ -793,6 +822,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
     weth: "0x4200000000000000000000000000000000000006",
+    permit2: "0xB952578f3520EE8Ea45b7914994dcf4702cEe578",
   },
   // plasma
   [9745]: {
@@ -836,4 +866,10 @@ export const WETH_ADDRESS = (chainId: number): string => {
     throw new Error(`Chain ${chainId} does not have WETH`);
 
   return CHAIN_CONFIGS[chainId].weth;
+};
+
+export const RESOLVE_PERMIT2_ADDRESS = (chainId: number): string => {
+  if (!(chainId in CHAIN_CONFIGS)) return PERMIT2_ADDRESS;
+  if (CHAIN_CONFIGS[chainId].permit2 === undefined) return PERMIT2_ADDRESS;
+  return CHAIN_CONFIGS[chainId].permit2!;
 };
