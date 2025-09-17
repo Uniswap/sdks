@@ -1,6 +1,6 @@
 {
 	"name": "@gfxlabs/uniswap-universal-router-sdk",
-	"version": "4.19.7-3",
+	"version": "4.19.7-4",
 	"description": "sdk for integrating with the Universal Router contracts",
 	"repository": "https://github.com/Uniswap/sdks.git",
 	"keywords": [
@@ -30,13 +30,13 @@
 		"test:hardhat": "env TS_NODE_COMPILER_OPTIONS='{\"module\": \"commonjs\" }' hardhat test"
 	},
 	"resolutions": {
-		"@uniswap/sdk-core": "npm:@gfxlabs/uniswap-sdk-core@7.7.2-1"
+		"@uniswap/sdk-core": "npm:@gfxlabs/uniswap-sdk-core@7.7.2-2"
 	},
 	"dependencies": {
 		"@openzeppelin/contracts": "4.7.0",
 		"@uniswap/permit2-sdk": "^1.3.0",
 		"@uniswap/router-sdk": "^2.0.2",
-		"@uniswap/sdk-core": "npm:@gfxlabs/uniswap-sdk-core@7.7.2-1",
+		"@uniswap/sdk-core": "npm:@gfxlabs/uniswap-sdk-core@7.7.2-2",
 		"@uniswap/universal-router": "2.0.0-beta.2",
 		"@uniswap/v2-core": "^1.0.1",
 		"@uniswap/v2-sdk": "^4.15.2",
