@@ -22,7 +22,11 @@ export function isValidHex(value: string, expectedLength?: number): boolean {
 /**
  * Validates hex string and throws ValidationError if invalid
  */
-export function validateHex(value: string, expectedLength: number, fieldName: string): void {
+export function validateHex(
+  value: string,
+  expectedLength: number,
+  fieldName: string
+): void {
   if (!isValidHex(value, expectedLength)) {
     const cleanHex = value.startsWith('0x') ? value.slice(2) : value;
     throw new ValidationError(
@@ -35,7 +39,9 @@ export function validateHex(value: string, expectedLength: number, fieldName: st
 /**
  * Validates WorkloadMeasureRegisters structure and field formats
  */
-export function validateWorkloadMeasureRegisters(registers: WorkloadMeasureRegisters): void {
+export function validateWorkloadMeasureRegisters(
+  registers: WorkloadMeasureRegisters
+): void {
   // Validate tdAttributes (8 bytes = 16 hex chars)
   validateHex(registers.tdAttributes, 16, 'tdAttributes');
 

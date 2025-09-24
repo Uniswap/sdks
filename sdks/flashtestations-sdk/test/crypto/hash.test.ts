@@ -4,13 +4,19 @@ describe('Hash utilities', () => {
   describe('keccak256', () => {
     it('should hash known test vectors correctly', () => {
       // Test vector 1: Empty string
-      expect(keccak256('')).toBe('0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470');
+      expect(keccak256('')).toBe(
+        '0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470'
+      );
 
       // Test vector 2: "hello" string
-      expect(keccak256('hello')).toBe('0x1c8aff950685c2ed4bc3174f3472287b56d9517b9c948127319a09a7a36deac8');
+      expect(keccak256('hello')).toBe(
+        '0x1c8aff950685c2ed4bc3174f3472287b56d9517b9c948127319a09a7a36deac8'
+      );
 
       // Test vector 3: "Hello, World!" string
-      expect(keccak256('Hello, World!')).toBe('0xacaf3289d7b601cbd114fb36c4d29c85bbfd5e133f14cb355c3fd8d99367964f');
+      expect(keccak256('Hello, World!')).toBe(
+        '0xacaf3289d7b601cbd114fb36c4d29c85bbfd5e133f14cb355c3fd8d99367964f'
+      );
     });
 
     it('should handle hex string input', () => {
