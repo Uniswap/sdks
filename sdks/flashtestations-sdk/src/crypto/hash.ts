@@ -26,7 +26,7 @@ export function keccak256(data: string | Uint8Array): string {
  */
 export function keccak256Concat(...hexStrings: string[]): string {
   const concatenated = hexStrings
-    .map(hex => hex.startsWith('0x') ? hex.slice(2) : hex)
+    .map((hex) => (hex.startsWith('0x') ? hex.slice(2) : hex))
     .join('');
 
   return keccak256(concatenated);

@@ -19,7 +19,7 @@ describe('Workload ID computation', () => {
     rtMr0: createHex96('abcdef0123456789'),
     rtMr1: createHex96('fedcba9876543210'),
     rtMr2: createHex96('111111'),
-    rtMr3: createHex96('222222')
+    rtMr3: createHex96('222222'),
   };
 
   describe('computeWorkloadId', () => {
@@ -40,7 +40,7 @@ describe('Workload ID computation', () => {
     it('should produce different results for different inputs', () => {
       const modifiedRegisters = {
         ...validRegisters,
-        mrTd: createHex96('0xdf0123456789abcdef')
+        mrTd: createHex96('0xdf0123456789abcdef'),
       };
 
       const result1 = computeWorkloadId(validRegisters);
@@ -53,7 +53,7 @@ describe('Workload ID computation', () => {
       const prefixedRegisters = {
         ...validRegisters,
         tdAttributes: '0x0000000000000000',
-        xFAM: '0x0000000000000003'
+        xFAM: '0x0000000000000003',
       };
 
       const result1 = computeWorkloadId(validRegisters);
@@ -66,7 +66,7 @@ describe('Workload ID computation', () => {
       // Test that xFAM XOR with expectedXfamBits (0000000000000003) works
       const registersWithDifferentXFAM = {
         ...validRegisters,
-        xFAM: '0000000000000001' // Different from expected 0000000000000003
+        xFAM: '0000000000000001', // Different from expected 0000000000000003
       };
 
       const result1 = computeWorkloadId(validRegisters);
@@ -79,16 +79,18 @@ describe('Workload ID computation', () => {
     it('should validate input registers', () => {
       const invalidRegisters = {
         ...validRegisters,
-        tdAttributes: 'invalid' // Invalid hex
+        tdAttributes: 'invalid', // Invalid hex
       };
 
-      expect(() => computeWorkloadId(invalidRegisters)).toThrow('Invalid tdAttributes');
+      expect(() => computeWorkloadId(invalidRegisters)).toThrow(
+        'Invalid tdAttributes'
+      );
     });
 
     it('should validate register lengths', () => {
       const shortRegister = {
         ...validRegisters,
-        mrTd: '123456' // Too short (should be 96 hex chars)
+        mrTd: '123456', // Too short (should be 96 hex chars)
       };
 
       expect(() => computeWorkloadId(shortRegister)).toThrow('Invalid mrTd');
@@ -101,13 +103,16 @@ describe('Workload ID computation', () => {
 
       expect(result.tdAttributes).toBe('0000000000000000');
       expect(result.xFAM).toBe('0000000000000003');
-      expect(result.mrConfigId).toBe('000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000');
+      expect(result.mrConfigId).toBe(
+        '000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
+      );
     });
 
     it('should allow overriding specific registers', () => {
-      const customMrTd = '999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999';
+      const customMrTd =
+        '999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999';
       const result = createWorkloadMeasureRegisters({
-        mrTd: customMrTd
+        mrTd: customMrTd,
       });
 
       expect(result.mrTd).toBe(customMrTd);
@@ -116,7 +121,7 @@ describe('Workload ID computation', () => {
 
     it('should create valid registers that can be used for computation', () => {
       const registers = createWorkloadMeasureRegisters({
-        mrTd: createHex96('deadbeef1')
+        mrTd: createHex96('deadbeef1'),
       });
 
       // Should not throw
@@ -133,7 +138,7 @@ describe('Workload ID computation', () => {
       const registers = createWorkloadMeasureRegisters({
         mrTd: createHex96('deadbeef1'),
         rtMr0: createHex96('deadbeef2'),
-        rtMr1: createHex96('deadbeef3')
+        rtMr1: createHex96('deadbeef3'),
       });
 
       const workloadId = computeWorkloadId(registers);

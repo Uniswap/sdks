@@ -1,5 +1,8 @@
 import type { WorkloadMeasureRegisters } from '../types/index';
-import { validateWorkloadMeasureRegisters, normalizeHex } from '../types/validation';
+import {
+  validateWorkloadMeasureRegisters,
+  normalizeHex,
+} from '../types/validation';
 import { keccak256Concat } from './hash';
 
 /**
@@ -11,7 +14,8 @@ export const TDX_CONSTANTS = {
   /** TD attributes mask to ignore certain bits (8 bytes) */
   ignoredTdAttributesBitmask: '0000000000000000',
   /** Expected mrConfigId for TDX (48 bytes) */
-  expectedMrConfigId: '000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
+  expectedMrConfigId:
+    '000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
 };
 
 /**
@@ -22,7 +26,9 @@ function hexXor(hex1: string, hex2: string): string {
   const clean2 = normalizeHex(hex2);
 
   if (clean1.length !== clean2.length) {
-    throw new Error(`Cannot XOR hex strings of different lengths: ${clean1.length} vs ${clean2.length}`);
+    throw new Error(
+      `Cannot XOR hex strings of different lengths: ${clean1.length} vs ${clean2.length}`
+    );
   }
 
   let result = '';
@@ -44,14 +50,16 @@ function hexAndNot(hex: string, mask: string): string {
   const cleanMask = normalizeHex(mask);
 
   if (cleanHex.length !== cleanMask.length) {
-    throw new Error(`Cannot AND hex strings of different lengths: ${cleanHex.length} vs ${cleanMask.length}`);
+    throw new Error(
+      `Cannot AND hex strings of different lengths: ${cleanHex.length} vs ${cleanMask.length}`
+    );
   }
 
   let result = '';
   for (let i = 0; i < cleanHex.length; i += 2) {
     const byte = parseInt(cleanHex.substr(i, 2), 16);
     const maskByte = parseInt(cleanMask.substr(i, 2), 16);
-    const andByte = byte & (~maskByte);
+    const andByte = byte & ~maskByte;
     result += andByte.toString(16).padStart(2, '0');
   }
 
@@ -76,7 +84,10 @@ export function computeWorkloadId(registers: WorkloadMeasureRegisters): string {
 
   // Apply bitwise operations with hardcoded values
   const xfamXor = hexXor(registers.xFAM, TDX_CONSTANTS.expectedXfamBits);
-  const tdAttributesAnd = hexAndNot(registers.tdAttributes, TDX_CONSTANTS.ignoredTdAttributesBitmask);
+  const tdAttributesAnd = hexAndNot(
+    registers.tdAttributes,
+    TDX_CONSTANTS.ignoredTdAttributesBitmask
+  );
 
   // Concatenate all components and hash
   return keccak256Concat(

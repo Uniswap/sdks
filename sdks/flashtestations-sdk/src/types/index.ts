@@ -75,8 +75,8 @@ export type BlockParameter =
   | 'safe'
   | 'finalized'
   | 'pending'
-  | string   // hex block number
-  | number;  // decimal block number
+  | string // hex block number
+  | number; // decimal block number
 
 /**
  * Custom error classes for specific error scenarios
@@ -104,7 +104,11 @@ export class ValidationError extends Error {
 
 export class ChainNotSupportedError extends Error {
   constructor(public chainId: number, public supportedChains: number[]) {
-    super(`Chain ${chainId} not supported. Supported chains: ${supportedChains.join(', ')}`);
+    super(
+      `Chain ${chainId} not supported. Supported chains: ${supportedChains.join(
+        ', '
+      )}`
+    );
     this.name = 'ChainNotSupportedError';
   }
 }
