@@ -125,4 +125,7 @@ export const WETH9: { [chainId: number]: Token } = {
 
   // plasma
   9745: new Token(9745, '0x6100E367285b01F48D07953803A2d8dCA5D19873', 18, 'WXPL', 'Wrapped XPL'),
+
+  // 0g
+  16661: new Token(16661, '0x1cd0690ff9a693f5ef2dd976660a8dafc81a109c', 18, 'W0G', 'Wrapped 0G'),
 }

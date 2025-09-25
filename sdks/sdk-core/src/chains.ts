@@ -58,6 +58,7 @@ export enum ChainId {
   ETHERLINK = 42793,
   MATCHAIN = 698,
   PLASMA = 9745,
+  ZEROG = 16661,
 }
 
 export const SUPPORTED_CHAINS = [
@@ -120,6 +121,7 @@ export const SUPPORTED_CHAINS = [
   ChainId.NIBIRU,
   ChainId.MATCHAIN,
   ChainId.PLASMA,
+  ChainId.ZEROG,
 ] as const
 export type SupportedChainsType = (typeof SUPPORTED_CHAINS)[number]
 
@@ -150,4 +152,5 @@ export enum NativeCurrencyName {
   NIBIRU = 'NIBI',
   MATCHAIN = 'BNB',
   PLASMA = 'XPL',
+  ZEROG = '0G',
 }
