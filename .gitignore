@@ -11,3 +11,7 @@ node_modules
 
 # Intellij IDEA artifacts
 .idea/
+
+# spec workflow mcp from Uniswap
+.spec-workflow/
+.claude/

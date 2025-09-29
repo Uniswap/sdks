@@ -1,0 +1,56 @@
+{
+  "name": "flashtestations-sdk",
+  "description": "⚒️ An SDK for working with Flashteststations",
+  "repository": "https://github.com/Uniswap/sdks.git",
+  "keywords": [
+    "flashteststations",
+    "ethereum",
+    "flashbots"
+  ],
+  "version": "0.1.0",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "engines": {
+    "node": ">=10"
+  },
+  "scripts": {
+    "start": "tsdx watch",
+    "build": "tsdx build",
+    "test": "tsdx test",
+    "lint": "tsdx lint",
+    "prepare": "tsdx build"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "tsdx lint"
+    }
+  },
+  "prettier": {
+    "printWidth": 80,
+    "semi": true,
+    "singleQuote": true,
+    "trailingComma": "es5"
+  },
+  "author": "Melvillian",
+  "module": "dist/flashtestations-sdk.esm.js",
+  "dependencies": {
+    "viem": "^2.23.5"
+  },
+  "devDependencies": {
+    "eslint": "^7.8.0",
+    "eslint-config-prettier": "^6.11.0",
+    "eslint-plugin-eslint-comments": "^3.2.0",
+    "eslint-plugin-functional": "^3.0.2",
+    "eslint-plugin-import": "^2.22.0",
+    "husky": "^8.0.3",
+    "jest": "25.5.0",
+    "tsdx": "^0.14.1",
+    "tslib": "^2.3.0",
+    "typescript": "^4.3.3"
+  }
+}
