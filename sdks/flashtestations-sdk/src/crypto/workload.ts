@@ -69,6 +69,8 @@ function hexAndNot(hex: string, mask: string): string {
 /**
  * Computes workload ID from TEE measurement registers
  * Formula: keccak256(mrTd + rtMr0 + rtMr1 + rtMr2 + rtMr3 + mrConfigId + (xFAM ^ expectedXfamBits) + (tdAttributes & ~ignoredTdAttributesBitmask))
+ * This is copied from the Solidity implementation of the workload ID computation at:
+ * https://github.com/flashbots/flashtestations/blob/97600245bc59a8b362b9363a44cef2e4a0fa0cfd/src/BlockBuilderPolicy.sol#L224
  */
 export function computeWorkloadId(registers: WorkloadMeasureRegisters): string {
   // Validate input registers

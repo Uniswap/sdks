@@ -4,7 +4,7 @@ import { keccak256 as viemKeccak256, toBytes } from 'viem';
  * Cross-platform keccak256 hash function using viem
  * Supports both Node.js and browser environments
  */
-export function keccak256(data: string | Uint8Array): string {
+export function keccak256(data: string | Uint8Array): `0x${string}` {
   if (typeof data === 'string') {
     // If it's a hex string, use as-is
     if (data.startsWith('0x') || /^[0-9a-fA-F]+$/.test(data)) {

@@ -1,6 +1,5 @@
 import { computeWorkloadId } from '../../src/crypto/workload';
 import { WorkloadMeasureRegisters } from '../../src/types/index';
-import { createWorkloadMeasureRegisters } from '../utils/util';
 
 describe('Workload ID computation', () => {
   // Helper to create exactly 96 character hex strings
@@ -97,54 +96,32 @@ describe('Workload ID computation', () => {
     });
   });
 
-  describe('createWorkloadMeasureRegisters', () => {
-    it('should create registers with default values', () => {
-      const result = createWorkloadMeasureRegisters({});
-
-      expect(result.tdAttributes).toBe('0000000000000000');
-      expect(result.xFAM).toBe('0000000000000003');
-      expect(result.mrConfigId).toBe(
-        '000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
-      );
-    });
-
-    it('should allow overriding specific registers', () => {
-      const customMrTd =
-        '999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999';
-      const result = createWorkloadMeasureRegisters({
-        mrTd: customMrTd,
-      });
-
-      expect(result.mrTd).toBe(customMrTd);
-      expect(result.xFAM).toBe('0000000000000003'); // Should keep default
-    });
-
-    it('should create valid registers that can be used for computation', () => {
-      const registers = createWorkloadMeasureRegisters({
-        mrTd: createHex96('deadbeef1'),
-      });
-
-      // Should not throw
-      expect(() => computeWorkloadId(registers)).not.toThrow();
-
-      const result = computeWorkloadId(registers);
-      expect(result).toMatch(/^0x[0-9a-f]{64}$/);
-    });
-  });
-
   describe('integration tests', () => {
     it('should handle complete workload ID computation flow', () => {
+      // this example workloadId is the same as the one from an actual TDX report in the solidity test code
+      // here: https://github.com/flashbots/flashtestations/blob/97600245bc59a8b362b9363a44cef2e4a0fa0cfd/test/BlockBuilderPolicy.t.sol#L611
+      const expectedWorkloadId =
+        '0xf724e7d117f5655cf33beefdfc7d31e930278fcb65cf6d1de632595e97ca82b2';
       // Create registers with some custom values
-      const registers = createWorkloadMeasureRegisters({
-        mrTd: createHex96('deadbeef1'),
-        rtMr0: createHex96('deadbeef2'),
-        rtMr1: createHex96('deadbeef3'),
-      });
+      const registers = {
+        tdAttributes: '0x0000001000000000',
+        xFAM: '0xe702060000000000',
+        mrTd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
+        mrConfigId:
+          '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+        rtMr0:
+          '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
+        rtMr1:
+          '0xa7157e7c5f932e9babac9209d4527ec9ed837b8e335a931517677fa746db51ee56062e3324e266e3f39ec26a516f4f71',
+        rtMr2:
+          '0xe63560e50830e22fbc9b06cdce8afe784bf111e4251256cf104050f1347cd4ad9f30da408475066575145da0b098a124',
+        rtMr3:
+          '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+      };
 
       const workloadId = computeWorkloadId(registers);
 
-      expect(workloadId).toMatch(/^0x[0-9a-f]{64}$/);
-      expect(workloadId.length).toBe(66);
+      expect(workloadId).toMatch(expectedWorkloadId);
 
       // Verify reproducibility
       const workloadId2 = computeWorkloadId(registers);
