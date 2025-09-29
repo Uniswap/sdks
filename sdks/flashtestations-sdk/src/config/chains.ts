@@ -9,17 +9,17 @@ export const CHAIN_CONFIGS: Record<number, ChainConfig> = {
     chainId: 130,
     name: 'Unichain Mainnet',
     contractAddress: '0x0000000000000000000000000000000000000000', // TODO: Replace with actual contract address
-    defaultRpcUrl: 'https://rpc.unichain.org',
-    blockExplorerUrl: 'https://explorer.unichain.org',
+    defaultRpcUrl: process.env.RPC_URL || 'https://mainnet.unichain.org',
+    blockExplorerUrl: 'https://uniscan.xyz',
   },
 
   // Unichain Sepolia (Testnet)
   1301: {
     chainId: 1301,
     name: 'Unichain Sepolia',
-    contractAddress: '0x0000000000000000000000000000000000000000', // TODO: Replace with actual contract address
-    defaultRpcUrl: 'https://sepolia.unichain.org',
-    blockExplorerUrl: 'https://sepolia.explorer.unichain.org',
+    contractAddress: '0x3b03b3caabd49ca12de9eba46a6a2950700b1db4',
+    defaultRpcUrl: process.env.RPC_URL || 'https://sepolia.unichain.org',
+    blockExplorerUrl: 'https://sepolia.uniscan.xyz',
   },
 };
 
@@ -38,12 +38,12 @@ export function getContractAddress(chainId: number): string {
 }
 
 /**
- * Get the default RPC URL for a given chain ID
+ * Get the RPC URL for a given chain ID
  * @param chainId - The chain ID
- * @returns The default RPC URL for the chain
+ * @returns The RPC URL for the chain
  * @throws ChainNotSupportedError if chain is not supported
  */
-export function getDefaultRpcUrl(chainId: number): string {
+export function getRpcUrl(chainId: number): string {
   const config = CHAIN_CONFIGS[chainId];
   if (!config) {
     throw new ChainNotSupportedError(chainId, getSupportedChains());

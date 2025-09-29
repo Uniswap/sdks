@@ -1,7 +1,7 @@
 import {
   CHAIN_CONFIGS,
   getContractAddress,
-  getDefaultRpcUrl,
+  getRpcUrl,
   getBlockExplorerUrl,
   getChainConfig,
   getSupportedChains,
@@ -16,8 +16,8 @@ describe('Chain Configuration', () => {
       expect(config.chainId).toBe(130);
       expect(config.name).toBe('Unichain Mainnet');
       expect(config.contractAddress).toBeDefined();
-      expect(config.defaultRpcUrl).toBe('https://rpc.unichain.org');
-      expect(config.blockExplorerUrl).toBe('https://explorer.unichain.org');
+      expect(config.defaultRpcUrl).toBe('https://mainnet.unichain.org');
+      expect(config.blockExplorerUrl).toBe('https://uniscan.xyz');
     });
 
     it('should contain Unichain Sepolia configuration', () => {
@@ -27,7 +27,7 @@ describe('Chain Configuration', () => {
       expect(config.name).toBe('Unichain Sepolia');
       expect(config.contractAddress).toBeDefined();
       expect(config.defaultRpcUrl).toBe('https://sepolia.unichain.org');
-      expect(config.blockExplorerUrl).toBe('https://sepolia.explorer.unichain.org');
+      expect(config.blockExplorerUrl).toBe('https://sepolia.uniscan.xyz');
     });
   });
 
@@ -61,32 +61,32 @@ describe('Chain Configuration', () => {
     });
   });
 
-  describe('getDefaultRpcUrl', () => {
+  describe('getRpcUrl', () => {
     it('should return RPC URL for Unichain Mainnet', () => {
-      const rpcUrl = getDefaultRpcUrl(130);
-      expect(rpcUrl).toBe('https://rpc.unichain.org');
+      const rpcUrl = getRpcUrl(130);
+      expect(rpcUrl).toBe('https://mainnet.unichain.org');
     });
 
     it('should return RPC URL for Unichain Sepolia', () => {
-      const rpcUrl = getDefaultRpcUrl(1301);
+      const rpcUrl = getRpcUrl(1301);
       expect(rpcUrl).toBe('https://sepolia.unichain.org');
     });
 
     it('should throw ChainNotSupportedError for unsupported chain', () => {
-      expect(() => getDefaultRpcUrl(9999)).toThrow('Chain 9999 not supported');
-      expect(() => getDefaultRpcUrl(42)).toThrow('Chain 42 not supported');
+      expect(() => getRpcUrl(9999)).toThrow('Chain 9999 not supported');
+      expect(() => getRpcUrl(42)).toThrow('Chain 42 not supported');
     });
   });
 
   describe('getBlockExplorerUrl', () => {
     it('should return block explorer URL for Unichain Mainnet', () => {
       const explorerUrl = getBlockExplorerUrl(130);
-      expect(explorerUrl).toBe('https://explorer.unichain.org');
+      expect(explorerUrl).toBe('https://uniscan.xyz');
     });
 
     it('should return block explorer URL for Unichain Sepolia', () => {
       const explorerUrl = getBlockExplorerUrl(1301);
-      expect(explorerUrl).toBe('https://sepolia.explorer.unichain.org');
+      expect(explorerUrl).toBe('https://sepolia.uniscan.xyz');
     });
 
     it('should throw ChainNotSupportedError for unsupported chain', () => {
@@ -171,7 +171,7 @@ describe('Chain Configuration', () => {
       };
 
       testError(() => getContractAddress(unsupportedChainId));
-      testError(() => getDefaultRpcUrl(unsupportedChainId));
+      testError(() => getRpcUrl(unsupportedChainId));
       testError(() => getBlockExplorerUrl(unsupportedChainId));
       testError(() => getChainConfig(unsupportedChainId));
     });
