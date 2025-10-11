@@ -222,6 +222,12 @@ export class V4Planner {
     return this
   }
 
+  addTakeAll(currency: Currency, minAmount?: BigNumber): V4Planner {
+    const takeAmount = minAmount ?? FULL_DELTA_AMOUNT
+    this.addAction(Actions.TAKE_ALL, [currencyAddress(currency), takeAmount])
+    return this
+  }
+
   addUnwrap(amount: BigNumber): V4Planner {
     this.addAction(Actions.UNWRAP, [amount])
     return this
@@ -242,7 +248,7 @@ type RouterAction = {
 }
 
 function createAction(action: Actions, parameters: any[]): RouterAction {
-  const encodedInput = defaultAbiCoder.encode(
+    const encodedInput = defaultAbiCoder.encode(
     V4_BASE_ACTIONS_ABI_DEFINITION[action].map((v) => v.type),
     parameters
   )
