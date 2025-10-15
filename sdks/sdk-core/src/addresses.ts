@@ -135,7 +135,7 @@ const POLYGON_ADDRESSES: ChainAddresses = {
   v4QuoterAddress: '0xb3d5c3dfc3a7aebff71895a7191796bffc2c81b9',
 }
 
-// celo v3 addresses
+// celo v3 and v4 addresses
 const CELO_ADDRESSES: ChainAddresses = {
   v3CoreFactoryAddress: '0xAfE208a311B21f13EF87E33A90049fC17A7acDEc',
   multicallAddress: '0x633987602DE5C4F337e3DbF265303A1080324204',
@@ -143,6 +143,11 @@ const CELO_ADDRESSES: ChainAddresses = {
   v3MigratorAddress: '0x3cFd4d48EDfDCC53D3f173F596f621064614C582',
   nonfungiblePositionManagerAddress: '0x3d79EdAaBC0EaB6F08ED885C05Fc0B014290D95A',
   tickLensAddress: '0x5f115D9113F88e0a0Db1b5033D90D4a9690AcD3D',
+
+  v4PoolManagerAddress: '0x288dc841A52FCA2707c6947B3A777c5E56cd87BC',
+  v4PositionManagerAddress: '0xf7965f3981e4d5bc383bfbcb61501763e9068ca9',
+  v4StateView: '0xbc21f8720babf4b20d195ee5c6e99c52b76f2bfb',
+  v4QuoterAddress: '0x28566da1093609182dff2cb2a91cfd72e61d66cd',
 }
 
 // BNB v3 addresses
