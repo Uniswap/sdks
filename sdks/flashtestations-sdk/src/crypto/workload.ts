@@ -3,6 +3,7 @@ import {
   validateWorkloadMeasureRegisters,
   normalizeHex,
 } from '../types/validation';
+
 import { keccak256Concat } from './hash';
 
 /**
