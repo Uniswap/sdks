@@ -38,16 +38,16 @@ export interface WorkloadMeasureRegisters {
  * Parsed flashtestation event from BlockBuilderProofVerified
  */
 export interface FlashtestationEvent {
-  /** Address that called the verification function */
-  caller: string;
-  /** Workload ID (bytes32 hex) */
-  workloadId: string;
-  /** Version of the proof (uint8) */
-  version: number;
-  /** Block content hash (bytes32 hex) */
-  blockContentHash: string;
-  /** Commit hash of the workload source code */
-  commitHash: string;
+  /** Address of the block builder */
+  blockBuilder: string;
+  /** Hash of the block (bytes32 hex) */
+  blockHash: string;
+  /** Chain ID (uint8) */
+  chainId: number;
+  /** Transaction hash (bytes32 hex) */
+  txHash: string;
+  /** Proof string */
+  proof: string;
 }
 
 /**
@@ -75,8 +75,9 @@ export type BlockParameter =
   | 'safe'
   | 'finalized'
   | 'pending'
-  | string // hex block number
-  | number; // decimal block number
+  | string // hex block number or block hash
+  | number // decimal block number
+  | bigint; // bigint block number
 
 /**
  * Custom error classes for specific error scenarios
@@ -85,6 +86,8 @@ export class NetworkError extends Error {
   constructor(message: string, public cause?: Error) {
     super(message);
     this.name = 'NetworkError';
+    // Maintains proper prototype chain for instanceof checks
+    Object.setPrototypeOf(this, NetworkError.prototype);
   }
 }
 
@@ -92,6 +95,8 @@ export class BlockNotFoundError extends Error {
   constructor(public blockParameter: BlockParameter) {
     super(`Block not found: ${blockParameter}`);
     this.name = 'BlockNotFoundError';
+    // Maintains proper prototype chain for instanceof checks
+    Object.setPrototypeOf(this, BlockNotFoundError.prototype);
   }
 }
 
@@ -99,6 +104,8 @@ export class ValidationError extends Error {
   constructor(message: string, public field?: string) {
     super(message);
     this.name = 'ValidationError';
+    // Maintains proper prototype chain for instanceof checks
+    Object.setPrototypeOf(this, ValidationError.prototype);
   }
 }
 
@@ -110,5 +117,7 @@ export class ChainNotSupportedError extends Error {
       )}`
     );
     this.name = 'ChainNotSupportedError';
+    // Maintains proper prototype chain for instanceof checks
+    Object.setPrototypeOf(this, ChainNotSupportedError.prototype);
   }
 }
