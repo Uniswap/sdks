@@ -1,23 +1,18 @@
 import { RpcClient, createRpcClient } from '../../src/rpc/client';
 import { BlockNotFoundError, NetworkError } from '../../src/types';
+import {
+  mockCreatePublicClient,
+  mockParseEventLogs,
+} from '../__mocks__/viem';
 
-// Mock viem
-jest.mock('viem', () => ({
-  createPublicClient: jest.fn(),
-  http: jest.fn(),
-  parseAbiItem: jest.fn((_signature: string) => ({
-    type: 'event',
-    name: 'BlockBuilderProofVerified',
-    inputs: [],
-  })),
-  parseEventLogs: jest.fn(() => []),
-}));
+// Use doMock to avoid hoisting issues with ts-jest
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+jest.doMock('viem', () => require('../__mocks__/viem'));
 
 describe('RpcClient', () => {
   let mockClient: any;
   let mockGetBlock: jest.Mock;
   let mockGetTransactionReceipt: jest.Mock;
-  let mockParseEventLogs: jest.Mock;
 
   beforeEach(() => {
     // Clear cache before each test
@@ -31,9 +26,8 @@ describe('RpcClient', () => {
       getTransactionReceipt: mockGetTransactionReceipt,
     };
 
-    const { createPublicClient, parseEventLogs } = require('viem');
-    createPublicClient.mockReturnValue(mockClient);
-    mockParseEventLogs = parseEventLogs as jest.Mock;
+    // Setup mocks
+    mockCreatePublicClient.mockReturnValue(mockClient);
     mockParseEventLogs.mockReturnValue([]);
   });
 
@@ -216,27 +210,21 @@ describe('RpcClient', () => {
 
   describe('client caching', () => {
     it('should reuse clients for the same chain and RPC URL', () => {
-      const { createPublicClient } = require('viem');
-
       new RpcClient({ chainId: 1301 });
       new RpcClient({ chainId: 1301 });
 
       // Should only create one client
-      expect(createPublicClient).toHaveBeenCalledTimes(1);
+      expect(mockCreatePublicClient).toHaveBeenCalledTimes(1);
     });
 
     it('should create separate clients for different chains', () => {
-      const { createPublicClient } = require('viem');
-
       new RpcClient({ chainId: 1301 });
       new RpcClient({ chainId: 130 });
 
-      expect(createPublicClient).toHaveBeenCalledTimes(2);
+      expect(mockCreatePublicClient).toHaveBeenCalledTimes(2);
     });
 
     it('should create separate clients for different RPC URLs', () => {
-      const { createPublicClient } = require('viem');
-
       new RpcClient({
         chainId: 1301,
         rpcUrl: 'https://rpc1.example.com',
@@ -246,7 +234,7 @@ describe('RpcClient', () => {
         rpcUrl: 'https://rpc2.example.com',
       });
 
-      expect(createPublicClient).toHaveBeenCalledTimes(2);
+      expect(mockCreatePublicClient).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -292,7 +280,7 @@ describe('RpcClient', () => {
       };
 
       mockGetTransactionReceipt.mockResolvedValue(mockReceipt);
-      mockParseEventLogs.mockReturnValue([mockLog]); // Mock parseEventLogs to return the log
+      mockParseEventLogs.mockReturnValue([mockLog]);
 
       const result = await client.getFlashtestationTx(txHash);
 
@@ -334,7 +322,7 @@ describe('RpcClient', () => {
       };
 
       mockGetTransactionReceipt.mockResolvedValue(mockReceipt);
-      mockParseEventLogs.mockReturnValue([]); // No logs found
+      mockParseEventLogs.mockReturnValue([]);
 
       const result = await client.getFlashtestationTx(txHash);
 
@@ -354,7 +342,7 @@ describe('RpcClient', () => {
       };
 
       mockGetTransactionReceipt.mockResolvedValue(mockReceipt);
-      mockParseEventLogs.mockReturnValue([]); // parseEventLogs returns empty for different tx
+      mockParseEventLogs.mockReturnValue([]);
 
       const result = await client.getFlashtestationTx(txHash);
 
