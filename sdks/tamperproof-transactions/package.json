@@ -1,0 +1,69 @@
+{
+  "name": "@uniswap/tamperproof-transactions",
+  "version": "2.0.0",
+  "type": "module",
+  "main": "./lib/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist/**",
+    "lib/**"
+  ],
+  "repository": "git@github.com:Uniswap/tamperproof-transactions.git",
+  "author": "Uniswap Labs Security <security@uniswap.org>",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jest": "^24.0.25",
+    "@types/node": "^18.7.16",
+    "@typescript-eslint/eslint-plugin": "^5.62",
+    "@typescript-eslint/parser": "^8.38.0",
+    "browserify": "^17.0.1",
+    "eslint": "^7.8.0",
+    "eslint-config-prettier": "^6.11.0",
+    "eslint-plugin-prettier": "^3.4.1",
+    "husky": "^8.0.3",
+    "jest": "25.5.0",
+    "lint-staged": "^16.1.2",
+    "prettier": "^2.4.1",
+    "terser": "^5.44.0",
+    "ts-jest": "^25.5.1",
+    "typescript": "^4.3.3"
+  },
+  "scripts": {
+    "build:cjs": "tsc -p tsconfig.browserify.json",
+    "build:esm": "tsc -p tsconfig.json",
+    "build:browser": "browserify lib/index.js --standalone twist -o dist/twist.js && terser dist/twist.js --compress --mangle --output=dist/twist.min.js",
+    "build": "yarn build:cjs && yarn build:esm && yarn build:browser",
+    "test": "jest",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "format": "prettier --write src/**/*.ts",
+    "prepare": "husky",
+    "prepack": "npm run build"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./lib/index.js"
+    }
+  },
+  "browser": {
+    "./lib/utils/webcrypto.js": "./lib/utils/crypto-browser-shim.js",
+    "node:crypto": false
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "lint-staged": {
+    "src/**/*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  },
+  "dependencies": {
+    "dohjs": "^0.3.3"
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+}
