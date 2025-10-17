@@ -290,7 +290,7 @@ describe("verify.ts", () => {
         false,
         ["sign", "verify"]
       );
-    });
+    }, 10000); // Increase timeout to 10 seconds for RSA key generation
 
     it("throws if URL is not HTTPS", async () => {
       const httpUrl = new URL("http://example.com/manifest.json");
@@ -614,7 +614,7 @@ describe("verify.ts", () => {
         false,
         ["sign", "verify"]
       );
-    });
+    }, 30000); // Increase timeout to 30 seconds for RSA key generation
 
     describe("returns true for correct public key", () => {
       it("is successful with ES256 (ECDSA P-256)", async () => {
