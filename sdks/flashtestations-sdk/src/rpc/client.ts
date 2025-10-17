@@ -16,6 +16,7 @@ import {
   BlockNotFoundError,
   FlashtestationEvent,
 } from '../types';
+
 import { flashtestationAbi } from './abi';
 
 /**
