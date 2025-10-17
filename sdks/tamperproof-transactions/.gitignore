@@ -1,0 +1,28 @@
+# Compiled output
+/dist
+/build
+/lib
+*.tsbuildinfo
+
+# Dependencies
+/node_modules
+
+# IDE and OS files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs and temp files
+*.log
+/.eslintcache
+coverage/
+tmp/
+temp/
+
+# Environment variables
+.env
+
+# Package files
+*.tgz
