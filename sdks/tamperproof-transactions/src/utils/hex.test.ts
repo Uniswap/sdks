@@ -1,5 +1,5 @@
 import { fromHex, toHex, fromBase64 } from "./hex";
-import { Buffer as NodeBuffer } from "node:buffer";
+import { Buffer as NodeBuffer } from "buffer";
 
 describe("fromHex", () => {
   describe("valid hex strings", () => {

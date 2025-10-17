@@ -547,13 +547,13 @@ describe("verify.ts", () => {
         false,
         ["sign", "verify"],
       );
-      ed25519KeyPair = await webcrypto.subtle.generateKey(
+      ed25519KeyPair = (await webcrypto.subtle.generateKey(
         {
           name: "Ed25519",
         },
         false,
         ["sign", "verify"],
-      );
+      )) as CryptoKeyPair;
       rsaSSAKeyPair = await webcrypto.subtle.generateKey(
         {
           name: "RSASSA-PKCS1-v1_5",
