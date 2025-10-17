@@ -1,4 +1,5 @@
-import { keccak256 as viemKeccak256, toBytes } from 'viem';
+import { keccak256 as viemKeccak256 } from 'viem/utils';
+import { toBytes } from 'viem/utils';
 
 /**
  * Cross-platform keccak256 hash function using viem
