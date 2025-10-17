@@ -42,14 +42,14 @@ export enum SmartWalletVersion {
 }
 
 // All smart wallet versions for a given chain id are optional except for the latest version
-type SmartWalletVersionMap = Partial<{ [version in SmartWalletVersion]: `0x${string}` }> & {
+type SmartWalletVersionMap = Partial<{ [_version in SmartWalletVersion]: `0x${string}` }> & {
   [SmartWalletVersion.LATEST]: `0x${string}`
 }
 
 /**
  * Smart wallet versions for supported chains
  */
-export const SMART_WALLET_VERSIONS: { [chainId in SupportedChainIds]: SmartWalletVersionMap } = {
+export const SMART_WALLET_VERSIONS: { [_chainId in SupportedChainIds]: SmartWalletVersionMap } = {
   [SupportedChainIds.MAINNET]: {
     [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
     [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
