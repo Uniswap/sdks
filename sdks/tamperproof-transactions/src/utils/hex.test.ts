@@ -72,13 +72,13 @@ describe("fromHex", () => {
 
     it("should throw error for odd length hex string with 0x prefix", () => {
       expect(() => fromHex("0x48656c6c6")).toThrow(
-        "Invalid hex string: length must be even",
+        "Invalid hex string: length must be even"
       );
     });
 
     it("should throw error for partially invalid hex characters with 0x prefix", () => {
       expect(() => fromHex("0x48656g6c6f")).toThrow(
-        "Invalid hex string: 48656g6c6f",
+        "Invalid hex string: 48656g6c6f"
       );
     });
   });
@@ -86,19 +86,19 @@ describe("fromHex", () => {
   describe("invalid hex strings", () => {
     it("should throw error for odd length hex string", () => {
       expect(() => fromHex("48656c6c6")).toThrow(
-        "Invalid hex string: length must be even",
+        "Invalid hex string: length must be even"
       );
     });
 
     it("should throw error for odd length hex string after cleaning whitespace", () => {
       expect(() => fromHex("48 65 6c 6c 6")).toThrow(
-        "Invalid hex string: length must be even",
+        "Invalid hex string: length must be even"
       );
     });
 
     it("should throw error for partially invalid hex characters", () => {
       expect(() => fromHex("48656g6c6f")).toThrow(
-        "Invalid hex string: 48656g6c6f",
+        "Invalid hex string: 48656g6c6f"
       );
     });
 
@@ -108,7 +108,7 @@ describe("fromHex", () => {
 
     it("should throw error for mixed valid/invalid hex characters", () => {
       expect(() => fromHex("48656c6x6f")).toThrow(
-        "Invalid hex string: 48656c6x6f",
+        "Invalid hex string: 48656c6x6f"
       );
     });
   });
@@ -246,7 +246,7 @@ describe("fromBase64", () => {
       undefined;
     // Ensure Buffer exists (Node environment)
     expect(typeof (globalThis as { Buffer?: BufferType }).Buffer).toBe(
-      "function",
+      "function"
     );
 
     const bytes = fromBase64("SGVsbG8="); // "Hello"
@@ -264,7 +264,7 @@ describe("fromBase64", () => {
   it("uses atob when available (browser-like environment)", () => {
     // Provide an atob stub that decodes base64 to a binary string
     (globalThis as { atob?: (s: string) => string }).atob = (
-      s: string,
+      s: string
     ): string => NodeBuffer.from(s, "base64").toString("binary");
 
     const bytes = fromBase64("SGVsbG8=");
@@ -276,7 +276,7 @@ describe("fromBase64", () => {
       undefined;
     (globalThis as { Buffer?: BufferType | undefined }).Buffer = undefined;
     expect(() => fromBase64("SGVsbG8=")).toThrow(
-      "No base64 decoder available in this environment",
+      "No base64 decoder available in this environment"
     );
   });
 });

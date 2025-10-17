@@ -28,7 +28,7 @@ describe("canonicalJson utilities", () => {
     it("preserves null, boolean, number, and string values", () => {
       const input = { n: null, t: true, f: false, num: 42, s: "x" };
       expect(canonicalStringify(input)).toBe(
-        '{"f":false,"n":null,"num":42,"s":"x","t":true}',
+        '{"f":false,"n":null,"num":42,"s":"x","t":true}'
       );
     });
   });

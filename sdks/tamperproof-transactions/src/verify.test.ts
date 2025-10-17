@@ -35,7 +35,7 @@ describe("verify.ts", () => {
       mockQuery.mockRejectedValue(new Error("DNS resolution failed"));
 
       await expect(
-        verifyAsyncDns("data", "signature", "example.com", "1"),
+        verifyAsyncDns("data", "signature", "example.com", "1")
       ).rejects.toThrow("DNS resolution failed");
     });
 
@@ -43,7 +43,7 @@ describe("verify.ts", () => {
       mockQuery.mockResolvedValue({ answers: [] });
 
       await expect(
-        verifyAsyncDns("data", "signature", "example.com", "1"),
+        verifyAsyncDns("data", "signature", "example.com", "1")
       ).rejects.toThrow("No TXT records found for host example.com");
     });
 
@@ -53,9 +53,9 @@ describe("verify.ts", () => {
       });
 
       await expect(
-        verifyAsyncDns("data", "signature", "example.com", "1"),
+        verifyAsyncDns("data", "signature", "example.com", "1")
       ).rejects.toThrow(
-        `No TXT record found with prefix ${PREFIX} for host example.com`,
+        `No TXT record found with prefix ${PREFIX} for host example.com`
       );
     });
   });
@@ -86,7 +86,7 @@ describe("verify.ts", () => {
       });
 
       await expect(
-        verifyAsyncDns("data", "signature", "example.com", "1"),
+        verifyAsyncDns("data", "signature", "example.com", "1")
       ).rejects.toThrow(); // Will fail at crypto step, but parsing succeeded
     });
 
@@ -123,7 +123,7 @@ describe("verify.ts", () => {
 
       // Should parse buffer as "TWIST=test-endpoint" and continue processing
       await expect(
-        verifyAsyncDns("data", "signature", "example.com", "1"),
+        verifyAsyncDns("data", "signature", "example.com", "1")
       ).rejects.toThrow(); // Will fail at crypto step, but parsing succeeded
     });
 
@@ -156,7 +156,7 @@ describe("verify.ts", () => {
 
       // Should parse as "TWIST=data"
       await expect(
-        verifyAsyncDns("data", "signature", "example.com", "1"),
+        verifyAsyncDns("data", "signature", "example.com", "1")
       ).rejects.toThrow(); // Will fail at crypto step, but parsing succeeded
     });
 
@@ -174,9 +174,9 @@ describe("verify.ts", () => {
       });
 
       await expect(
-        verifyAsyncDns("data", "signature", "example.com", "1"),
+        verifyAsyncDns("data", "signature", "example.com", "1")
       ).rejects.toThrow(
-        "Invalid TXT record format: length exceeds buffer size",
+        "Invalid TXT record format: length exceeds buffer size"
       );
     });
 
@@ -211,7 +211,7 @@ describe("verify.ts", () => {
       });
 
       await expect(
-        verifyAsyncDns("data", "signature", "example.com", "1"),
+        verifyAsyncDns("data", "signature", "example.com", "1")
       ).rejects.toThrow(); // Will fail at crypto step, but parsing succeeded
     });
 
@@ -221,9 +221,9 @@ describe("verify.ts", () => {
       });
 
       await expect(
-        verifyAsyncDns("data", "signature", "example.com", "1"),
+        verifyAsyncDns("data", "signature", "example.com", "1")
       ).rejects.toThrow(
-        `Multiple TXT records found with prefix ${PREFIX} for host example.com. Only one is allowed.`,
+        `Multiple TXT records found with prefix ${PREFIX} for host example.com. Only one is allowed.`
       );
     });
 
@@ -246,7 +246,7 @@ describe("verify.ts", () => {
       });
 
       await expect(
-        verifyAsyncDns("data", "signature", "example.com", "1"),
+        verifyAsyncDns("data", "signature", "example.com", "1")
       ).rejects.toThrow();
 
       expect(global.fetch).toHaveBeenCalled();
@@ -255,7 +255,7 @@ describe("verify.ts", () => {
       expect(urlArg).toBeInstanceOf(URL);
       // Leading slashes removed, segments encoded
       expect(urlArg.href).toBe(
-        "https://example.com/api%20v1/%C6%99eys%3Fbad%23frag",
+        "https://example.com/api%20v1/%C6%99eys%3Fbad%23frag"
       );
     });
 
@@ -268,7 +268,7 @@ describe("verify.ts", () => {
       global.fetch = jest.fn();
 
       await expect(
-        verifyAsyncDns("data", "signature", "example.com", "1"),
+        verifyAsyncDns("data", "signature", "example.com", "1")
       ).rejects.toThrow("TWIST path too long");
 
       expect(global.fetch).not.toHaveBeenCalled();
@@ -288,14 +288,14 @@ describe("verify.ts", () => {
           modulusLength: 2048,
         },
         false,
-        ["sign", "verify"],
+        ["sign", "verify"]
       );
     });
 
     it("throws if URL is not HTTPS", async () => {
       const httpUrl = new URL("http://example.com/manifest.json");
       await expect(
-        verifyAsyncJson("data", "signature", httpUrl, "1"),
+        verifyAsyncJson("data", "signature", httpUrl, "1")
       ).rejects.toThrow("Manifest must be fetched over HTTPS");
     });
 
@@ -308,7 +308,7 @@ describe("verify.ts", () => {
       });
 
       await expect(
-        verifyAsyncJson("data", "signature", httpsUrl, "1"),
+        verifyAsyncJson("data", "signature", httpsUrl, "1")
       ).rejects.toThrow("Failed to fetch manifest: HTTP 404");
     });
 
@@ -321,7 +321,7 @@ describe("verify.ts", () => {
       });
 
       await expect(
-        verifyAsyncJson("data", "signature", httpsUrl, "1"),
+        verifyAsyncJson("data", "signature", httpsUrl, "1")
       ).rejects.toThrow("Manifest Content-Type must be application/json");
     });
 
@@ -334,14 +334,14 @@ describe("verify.ts", () => {
             name === "content-type"
               ? "application/json"
               : name === "content-length"
-                ? "0"
-                : null,
+              ? "0"
+              : null,
         },
         json: () => Promise.resolve({ publicKeys: [] }),
       });
 
       await expect(
-        verifyAsyncJson("data", "signature", httpsUrl, "1"),
+        verifyAsyncJson("data", "signature", httpsUrl, "1")
       ).rejects.toThrow("Public key with id 1 not found");
     });
 
@@ -354,8 +354,8 @@ describe("verify.ts", () => {
             name === "content-type"
               ? "application/json"
               : name === "content-length"
-                ? "0"
-                : null,
+              ? "0"
+              : null,
         },
         json: () =>
           Promise.resolve({
@@ -367,9 +367,9 @@ describe("verify.ts", () => {
       });
 
       await expect(
-        verifyAsyncJson("data", "signature", httpsUrl, "1"),
+        verifyAsyncJson("data", "signature", httpsUrl, "1")
       ).rejects.toThrow(
-        "Multiple public keys found with id 1. Key IDs must be unique.",
+        "Multiple public keys found with id 1. Key IDs must be unique."
       );
     });
 
@@ -382,8 +382,8 @@ describe("verify.ts", () => {
             name === "content-type"
               ? "application/json"
               : name === "content-length"
-                ? "0"
-                : null,
+              ? "0"
+              : null,
         },
         json: () =>
           Promise.resolve({
@@ -392,7 +392,7 @@ describe("verify.ts", () => {
       });
 
       await expect(
-        verifyAsyncJson("data", "signature", httpsUrl, "1"),
+        verifyAsyncJson("data", "signature", httpsUrl, "1")
       ).rejects.toThrow("Algorithm is not supported: UNSUPPORTED");
     });
 
@@ -403,7 +403,7 @@ describe("verify.ts", () => {
       const signature = await webcrypto.subtle.sign(
         SIGNING_ALGORITHM_CONFIG.RS256,
         privateKey,
-        new TextEncoder().encode(data),
+        new TextEncoder().encode(data)
       );
 
       const signatureHex = toHex(signature);
@@ -419,8 +419,8 @@ describe("verify.ts", () => {
             name === "content-type"
               ? "application/json"
               : name === "content-length"
-                ? "0"
-                : null,
+              ? "0"
+              : null,
         },
         json: () =>
           Promise.resolve({
@@ -429,7 +429,7 @@ describe("verify.ts", () => {
       });
 
       await expect(
-        verifyAsyncJson(data, signatureHex, httpsUrl, "1"),
+        verifyAsyncJson(data, signatureHex, httpsUrl, "1")
       ).resolves.toBe(true);
     });
 
@@ -440,7 +440,7 @@ describe("verify.ts", () => {
       const signature = await webcrypto.subtle.sign(
         SIGNING_ALGORITHM_CONFIG.RS256,
         privateKey,
-        new TextEncoder().encode(data),
+        new TextEncoder().encode(data)
       );
 
       const signatureHex = toHex(signature);
@@ -462,7 +462,7 @@ describe("verify.ts", () => {
       });
 
       await expect(
-        verifyAsyncJson(data, signatureHex, httpsUrl, "1"),
+        verifyAsyncJson(data, signatureHex, httpsUrl, "1")
       ).resolves.toBe(true);
     });
 
@@ -475,14 +475,14 @@ describe("verify.ts", () => {
             name === "content-type"
               ? "application/json"
               : name === "content-length"
-                ? String(64 * 1024 + 1)
-                : null,
+              ? String(64 * 1024 + 1)
+              : null,
         },
         json: () => Promise.resolve({ publicKeys: [] }),
       });
 
       await expect(
-        verifyAsyncJson("data", "signature", httpsUrl, "1"),
+        verifyAsyncJson("data", "signature", httpsUrl, "1")
       ).rejects.toThrow("Manifest too large");
     });
 
@@ -493,7 +493,7 @@ describe("verify.ts", () => {
       const signature = await webcrypto.subtle.sign(
         SIGNING_ALGORITHM_CONFIG.RS256,
         localRsaSSAKeyPair.privateKey,
-        new TextEncoder().encode(data),
+        new TextEncoder().encode(data)
       );
       const signatureHex = toHex(signature);
 
@@ -529,7 +529,7 @@ describe("verify.ts", () => {
           namedCurve: "P-256",
         },
         false,
-        ["sign", "verify"],
+        ["sign", "verify"]
       );
       ecdsa384KeyPair = await webcrypto.subtle.generateKey(
         {
@@ -537,7 +537,7 @@ describe("verify.ts", () => {
           namedCurve: "P-384",
         },
         false,
-        ["sign", "verify"],
+        ["sign", "verify"]
       );
       ecdsa521KeyPair = await webcrypto.subtle.generateKey(
         {
@@ -545,14 +545,14 @@ describe("verify.ts", () => {
           namedCurve: "P-521",
         },
         false,
-        ["sign", "verify"],
+        ["sign", "verify"]
       );
       ed25519KeyPair = (await webcrypto.subtle.generateKey(
         {
           name: "Ed25519",
         },
         false,
-        ["sign", "verify"],
+        ["sign", "verify"]
       )) as CryptoKeyPair;
       rsaSSAKeyPair = await webcrypto.subtle.generateKey(
         {
@@ -562,7 +562,7 @@ describe("verify.ts", () => {
           modulusLength: 2048,
         },
         false,
-        ["sign", "verify"],
+        ["sign", "verify"]
       );
       rsaSSA384KeyPair = await webcrypto.subtle.generateKey(
         {
@@ -572,7 +572,7 @@ describe("verify.ts", () => {
           modulusLength: 2048,
         },
         false,
-        ["sign", "verify"],
+        ["sign", "verify"]
       );
       rsaSSA512KeyPair = await webcrypto.subtle.generateKey(
         {
@@ -582,7 +582,7 @@ describe("verify.ts", () => {
           modulusLength: 2048,
         },
         false,
-        ["sign", "verify"],
+        ["sign", "verify"]
       );
       rsaPSSKeyPair = await webcrypto.subtle.generateKey(
         {
@@ -592,7 +592,7 @@ describe("verify.ts", () => {
           modulusLength: 2048,
         },
         false,
-        ["sign", "verify"],
+        ["sign", "verify"]
       );
       rsaPSS384KeyPair = await webcrypto.subtle.generateKey(
         {
@@ -602,7 +602,7 @@ describe("verify.ts", () => {
           modulusLength: 2048,
         },
         false,
-        ["sign", "verify"],
+        ["sign", "verify"]
       );
       rsaPSS512KeyPair = await webcrypto.subtle.generateKey(
         {
@@ -612,7 +612,7 @@ describe("verify.ts", () => {
           modulusLength: 2048,
         },
         false,
-        ["sign", "verify"],
+        ["sign", "verify"]
       );
     });
 
@@ -623,12 +623,12 @@ describe("verify.ts", () => {
         const signature = await webcrypto.subtle.sign(
           SIGNING_ALGORITHM_CONFIG.ES256,
           privateKey,
-          new TextEncoder().encode(data),
+          new TextEncoder().encode(data)
         );
         const signatureString = toHex(signature);
 
         expect(await verify(data, signatureString, publicKey, "ES256")).toBe(
-          true,
+          true
         );
       });
       it("is successful with EdDSA (Ed25519)", async () => {
@@ -637,12 +637,12 @@ describe("verify.ts", () => {
         const signature = await webcrypto.subtle.sign(
           SIGNING_ALGORITHM_CONFIG.EdDSA,
           privateKey,
-          new TextEncoder().encode(data),
+          new TextEncoder().encode(data)
         );
         const signatureString = toHex(signature);
 
         expect(await verify(data, signatureString, publicKey, "EdDSA")).toBe(
-          true,
+          true
         );
       });
       it("is successful with ES384 (ECDSA P-384)", async () => {
@@ -651,12 +651,12 @@ describe("verify.ts", () => {
         const signature = await webcrypto.subtle.sign(
           SIGNING_ALGORITHM_CONFIG.ES384,
           privateKey,
-          new TextEncoder().encode(data),
+          new TextEncoder().encode(data)
         );
         const signatureString = toHex(signature);
 
         expect(await verify(data, signatureString, publicKey, "ES384")).toBe(
-          true,
+          true
         );
       });
       it("is successful with ES512 (ECDSA P-521)", async () => {
@@ -665,12 +665,12 @@ describe("verify.ts", () => {
         const signature = await webcrypto.subtle.sign(
           SIGNING_ALGORITHM_CONFIG.ES512,
           privateKey,
-          new TextEncoder().encode(data),
+          new TextEncoder().encode(data)
         );
         const signatureString = toHex(signature);
 
         expect(await verify(data, signatureString, publicKey, "ES512")).toBe(
-          true,
+          true
         );
       });
       it("is successful with RS384 (RSASSA-PKCS1-v1_5)", async () => {
@@ -679,12 +679,12 @@ describe("verify.ts", () => {
         const signature = await webcrypto.subtle.sign(
           SIGNING_ALGORITHM_CONFIG.RS384,
           privateKey,
-          new TextEncoder().encode(data),
+          new TextEncoder().encode(data)
         );
         const signatureString = toHex(signature);
 
         expect(await verify(data, signatureString, publicKey, "RS384")).toBe(
-          true,
+          true
         );
       });
       it("is successful with RS512 (RSASSA-PKCS1-v1_5)", async () => {
@@ -693,12 +693,12 @@ describe("verify.ts", () => {
         const signature = await webcrypto.subtle.sign(
           SIGNING_ALGORITHM_CONFIG.RS512,
           privateKey,
-          new TextEncoder().encode(data),
+          new TextEncoder().encode(data)
         );
         const signatureString = toHex(signature);
 
         expect(await verify(data, signatureString, publicKey, "RS512")).toBe(
-          true,
+          true
         );
       });
       it("is successful with PS384 (RSA-PSS)", async () => {
@@ -707,12 +707,12 @@ describe("verify.ts", () => {
         const signature = await webcrypto.subtle.sign(
           SIGNING_ALGORITHM_CONFIG.PS384,
           privateKey,
-          new TextEncoder().encode(data),
+          new TextEncoder().encode(data)
         );
         const signatureString = toHex(signature);
 
         expect(await verify(data, signatureString, publicKey, "PS384")).toBe(
-          true,
+          true
         );
       });
       it("is successful with PS512 (RSA-PSS)", async () => {
@@ -721,12 +721,12 @@ describe("verify.ts", () => {
         const signature = await webcrypto.subtle.sign(
           SIGNING_ALGORITHM_CONFIG.PS512,
           privateKey,
-          new TextEncoder().encode(data),
+          new TextEncoder().encode(data)
         );
         const signatureString = toHex(signature);
 
         expect(await verify(data, signatureString, publicKey, "PS512")).toBe(
-          true,
+          true
         );
       });
       it("is successful with RS256 (RSASSA-PKCS1-v1_5)", async () => {
@@ -735,12 +735,12 @@ describe("verify.ts", () => {
         const signature = await webcrypto.subtle.sign(
           SIGNING_ALGORITHM_CONFIG.RS256,
           privateKey,
-          new TextEncoder().encode(data),
+          new TextEncoder().encode(data)
         );
         const signatureString = toHex(signature);
 
         expect(await verify(data, signatureString, publicKey, "RS256")).toBe(
-          true,
+          true
         );
       });
       it("is successful with PS256 (RSA-PSS)", async () => {
@@ -749,12 +749,12 @@ describe("verify.ts", () => {
         const signature = await webcrypto.subtle.sign(
           SIGNING_ALGORITHM_CONFIG.PS256,
           privateKey,
-          new TextEncoder().encode(data),
+          new TextEncoder().encode(data)
         );
         const signatureString = toHex(signature);
 
         expect(await verify(data, signatureString, publicKey, "PS256")).toBe(
-          true,
+          true
         );
       });
     });
@@ -766,12 +766,12 @@ describe("verify.ts", () => {
       const signature = await webcrypto.subtle.sign(
         SIGNING_ALGORITHM_CONFIG.RS256,
         rsaSSAKeyPair.privateKey,
-        new TextEncoder().encode(canonical),
+        new TextEncoder().encode(canonical)
       );
       const signatureHex = toHex(signature);
 
       await expect(
-        verify(canonical, signatureHex, rsaSSAKeyPair.publicKey, "RS256"),
+        verify(canonical, signatureHex, rsaSSAKeyPair.publicKey, "RS256")
       ).resolves.toBe(true);
     });
 
@@ -780,7 +780,7 @@ describe("verify.ts", () => {
       const signature = await webcrypto.subtle.sign(
         SIGNING_ALGORITHM_CONFIG.RS256,
         privateKey1,
-        new TextEncoder().encode(data),
+        new TextEncoder().encode(data)
       );
       const signatureString = toHex(signature);
 
@@ -792,12 +792,12 @@ describe("verify.ts", () => {
           modulusLength: 2048,
         },
         false,
-        ["sign", "verify"],
+        ["sign", "verify"]
       );
       const publicKey2 = rsaSSAKeyPair2.publicKey;
 
       expect(await verify(data, signatureString, publicKey2, "RS256")).toBe(
-        false,
+        false
       );
     });
 
@@ -805,7 +805,7 @@ describe("verify.ts", () => {
       const publicKey = ecdsaKeyPair.publicKey;
       const invalidLengthHex = "aa".repeat(63); // 63 bytes instead of 64
       await expect(
-        verify(data, invalidLengthHex, publicKey, "ES256"),
+        verify(data, invalidLengthHex, publicKey, "ES256")
       ).resolves.toBe(false);
     });
   });

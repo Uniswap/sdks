@@ -34,7 +34,7 @@ export async function verifyAsyncDns(
   signature: string,
   host: string,
   id: string,
-  thisResolver: InstanceType<typeof DohResolver> = quadOneResolver,
+  thisResolver: InstanceType<typeof DohResolver> = quadOneResolver
 ): Promise<boolean> {
   // Use DNS over HTTPS to resolve TXT records
   const response = await thisResolver.query(
@@ -44,7 +44,7 @@ export async function verifyAsyncDns(
     {
       Accept: "application/dns-message",
     },
-    TIMEOUT,
+    TIMEOUT
   );
 
   if (!response.answers || response.answers.length === 0) {
@@ -89,7 +89,7 @@ export async function verifyAsyncJson(
   calldata: string,
   signature: string,
   url: URL,
-  id: string,
+  id: string
 ): Promise<boolean> {
   if (url.protocol !== "https:") {
     throw new Error(ERROR_MANIFEST_HTTPS_ONLY);
@@ -144,7 +144,7 @@ export async function verifyAsyncJson(
   if (
     !Object.prototype.hasOwnProperty.call(
       SIGNING_ALGORITHM_IMPORT_PARAMS,
-      publicKey.alg,
+      publicKey.alg
     )
   ) {
     throw new Error(ERROR_ALGORITHM_NOT_SUPPORTED(publicKey.alg));
@@ -157,7 +157,7 @@ export async function verifyAsyncJson(
     fromHex(publicKey.publicKey) as BufferSource,
     SIGNING_ALGORITHM_IMPORT_PARAMS[algorithmKey],
     false,
-    ["verify"],
+    ["verify"]
   );
 
   return await verify(calldata, signature, publicKeyObject, algorithmKey);
@@ -167,7 +167,7 @@ export async function verify(
   calldata: string,
   signature: string,
   publicKey: CryptoKey,
-  alg: keyof typeof SIGNING_ALGORITHM_CONFIG,
+  alg: keyof typeof SIGNING_ALGORITHM_CONFIG
 ): Promise<boolean> {
   const bufferData = new TextEncoder().encode(calldata);
 
@@ -187,7 +187,10 @@ export async function verify(
   let signatureForVerify: Uint8Array = signatureBytes;
   if (algConfig.name === "ECDSA") {
     // Only accept raw r||s for ECDSA signatures and pass raw to verify
-    const coordLen = algConfig.ecdsaCoordinateLength!;
+    const coordLen = algConfig.ecdsaCoordinateLength;
+    if (!coordLen) {
+      throw new Error("ECDSA algorithm missing ecdsaCoordinateLength");
+    }
     if (signatureBytes.length !== coordLen * 2) {
       return false;
     }
@@ -198,7 +201,7 @@ export async function verify(
     verifyParams,
     publicKey,
     signatureForVerify as BufferSource,
-    bufferData as BufferSource,
+    bufferData as BufferSource
   );
   return verified;
 }

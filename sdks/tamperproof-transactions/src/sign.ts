@@ -13,7 +13,7 @@ const PRIVATE_KEY_FORMAT = "pkcs8";
 export async function sign(
   data: string | object,
   privateKey: string,
-  algorithm: keyof typeof SIGNING_ALGORITHM_CONFIG,
+  algorithm: keyof typeof SIGNING_ALGORITHM_CONFIG
 ): Promise<string> {
   if (
     typeof algorithm !== "string" ||
@@ -32,13 +32,13 @@ export async function sign(
     fromHex(privateKey) as BufferSource,
     SIGNING_ALGORITHM_IMPORT_PARAMS[algorithm],
     false,
-    ["sign"],
+    ["sign"]
   );
 
   const signature = await webcrypto.subtle.sign(
     SIGNING_ALGORITHM_CONFIG[algorithm],
     key,
-    bufferData as BufferSource,
+    bufferData as BufferSource
   );
 
   return `0x${toHex(signature)}`;

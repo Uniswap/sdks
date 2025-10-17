@@ -11,7 +11,7 @@ export function generate(...publicKeys: PublicKey[]): string {
     if (
       !Object.prototype.hasOwnProperty.call(
         SIGNING_ALGORITHM_CONFIG,
-        publicKey.algorithm,
+        publicKey.algorithm
       )
     ) {
       throw new Error(ERROR_ALGORITHM_NOT_SUPPORTED(publicKey.algorithm));

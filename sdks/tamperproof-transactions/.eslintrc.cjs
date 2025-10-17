@@ -3,13 +3,13 @@ module.exports = {
   parserOptions: {
     ecmaVersion: 2020,
     sourceType: 'module',
-    project: './tsconfig.json',
+    project: './tsconfig.lint.json',
   },
   plugins: ['@typescript-eslint', 'prettier'],
   extends: [
     'eslint:recommended',
-    '@typescript-eslint/recommended',
-    '@typescript-eslint/recommended-requiring-type-checking',
+    'plugin:@typescript-eslint/recommended',
+    'plugin:@typescript-eslint/recommended-requiring-type-checking',
     'prettier',
     'plugin:prettier/recommended',
   ],
@@ -18,7 +18,7 @@ module.exports = {
     node: true,
     jest: true,
   },
-  ignorePatterns: ['.eslintrc.js', 'dist/**', 'node_modules/**'],
+  ignorePatterns: ['.eslintrc.cjs', 'dist/**', 'node_modules/**'],
   rules: {
     // Prettier formatting
     'prettier/prettier': 'error',
@@ -29,7 +29,6 @@ module.exports = {
     '@typescript-eslint/explicit-module-boundary-types': 'error',
     '@typescript-eslint/no-explicit-any': 'error',
     '@typescript-eslint/no-unused-vars': 'error',
-    '@typescript-eslint/prefer-const': 'error',
     '@typescript-eslint/no-inferrable-types': 'off',
 
     // Security and crypto-specific rules

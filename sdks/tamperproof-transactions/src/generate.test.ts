@@ -203,7 +203,7 @@ describe("generate", () => {
         {
           key: testKeys.ecdsa,
           algorithm: "ES256",
-        },
+        }
       );
 
       const parsed = JSON.parse(result) as ParsedResult;
@@ -233,7 +233,7 @@ describe("generate", () => {
         {
           key: testKeys.ed25519,
           algorithm: "EdDSA",
-        },
+        }
       );
 
       const parsed = JSON.parse(result) as ParsedResult;
@@ -272,7 +272,7 @@ describe("generate", () => {
         {
           key: testKeys.ed25519,
           algorithm: "EdDSA",
-        },
+        }
       );
 
       const parsed = JSON.parse(result) as ParsedResult;
@@ -311,7 +311,7 @@ describe("generate", () => {
         {
           key: alternateEcdsaKey,
           algorithm: "ES256",
-        },
+        }
       );
 
       const parsed = JSON.parse(result) as ParsedResult;
@@ -361,7 +361,7 @@ describe("generate", () => {
         {
           key: testKeys.ecdsa,
           algorithm: "ES256",
-        },
+        }
       );
 
       const parsed = JSON.parse(result) as ParsedResult;
@@ -388,7 +388,7 @@ describe("generate", () => {
         {
           key: testKeys.ecdsa,
           algorithm: "ES256",
-        },
+        }
       );
 
       const parsed = JSON.parse(result) as ParsedResult;
@@ -445,7 +445,7 @@ describe("generate", () => {
         {
           key: keyWithoutPrefix,
           algorithm: "ES256",
-        },
+        }
       );
 
       const parsed = JSON.parse(result) as ParsedResult;
@@ -481,7 +481,7 @@ describe("generate", () => {
         generate({
           key: "not-hex",
           algorithm: "ES256",
-        }),
+        })
       ).toThrow(/Invalid hex string/);
     });
 
@@ -490,7 +490,7 @@ describe("generate", () => {
         generate({
           key: "0xzzzz",
           algorithm: "ES256",
-        }),
+        })
       ).toThrow(/Invalid hex string/);
     });
   });

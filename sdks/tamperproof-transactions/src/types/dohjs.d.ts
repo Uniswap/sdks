@@ -53,7 +53,7 @@ declare module "dohjs" {
       qtype?: string,
       method?: "GET" | "POST",
       headers?: Record<string, string>,
-      timeout?: number,
+      timeout?: number
     ): Promise<DnsResponse>;
   }
 

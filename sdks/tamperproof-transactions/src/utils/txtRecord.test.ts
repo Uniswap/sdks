@@ -92,7 +92,7 @@ describe("txtRecord utils", () => {
       ]);
 
       expect(() => parseTxtRecord(buffer)).toThrow(
-        "Invalid TXT record format: length exceeds buffer size",
+        "Invalid TXT record format: length exceeds buffer size"
       );
     });
 
@@ -106,7 +106,7 @@ describe("txtRecord utils", () => {
       ]);
 
       expect(() => parseTxtRecord(buffer)).toThrow(
-        "Invalid TXT record format: length exceeds buffer size",
+        "Invalid TXT record format: length exceeds buffer size"
       );
     });
 
@@ -205,7 +205,7 @@ describe("txtRecord utils", () => {
       ]);
 
       expect(() => processTxtRecordData(invalidBuffer)).toThrow(
-        "Invalid TXT record format: length exceeds buffer size",
+        "Invalid TXT record format: length exceeds buffer size"
       );
     });
 
