@@ -96,7 +96,8 @@ export class Hook {
   }
 
   private static _hasPermission(address: string, hookOption: HookOptions) {
-    return !!(parseInt(address, 16) & (1 << hookFlagIndex[hookOption]))
+    const addrBigInt = BigInt(address)
+    return Boolean(addrBigInt & (1n << BigInt(hookFlagIndex[hookOption])))
   }
 
   private static _checkAddress(address: string) {
