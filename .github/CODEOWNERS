@@ -1,1 +1,11 @@
-* @uniswap/protocols @Uniswap/apis @Uniswap/Routing
+sdks/flashtestations-sdk/ @Uniswap/Unichain
+sdks/permit2-sdk/ @Uniswap/protocols
+sdks/router-sdk/ @Uniswap/protocols
+sdks/sdk-core/ @Uniswap/protocols
+sdks/smart-wallet-sdk/ @Uniswap/protocols
+sdks/tamperproof-transactions/ @Uniswap/security
+sdks/uniswapx-sdk/ @Uniswap/protocols
+sdks/universal-router-sdk/ @Uniswap/protocols
+sdks/v2-sdk/ @Uniswap/protocols
+sdks/v3-sdk/ @Uniswap/protocols
+sdks/v4-sdk/ @Uniswap/protocols
