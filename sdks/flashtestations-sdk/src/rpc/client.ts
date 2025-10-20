@@ -295,19 +295,19 @@ export class RpcClient {
           }
           const log = parsedLogs[0];
           const args = log.args as {
-            blockBuilder: `0x${string}`;
-            blockHash: `0x${string}`;
-            chainId: number;
-            txHash: `0x${string}`;
-            proof: string;
+            caller: `0x${string}`;
+            workloadId: `0x${string}`;
+            version: number;
+            blockContentHash: `0x${string}`;
+            commitHash: string;
           };
 
           return {
-            blockBuilder: args.blockBuilder,
-            blockHash: args.blockHash,
-            chainId: args.chainId,
-            txHash: args.txHash,
-            proof: args.proof,
+            caller: args.caller,
+            workloadId: args.workloadId,
+            version: args.version,
+            blockContentHash: args.blockContentHash,
+            commitHash: args.commitHash,
           };
         }
 

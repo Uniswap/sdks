@@ -7,28 +7,28 @@ export const flashtestationAbi = [
     name: 'BlockBuilderProofVerified',
     inputs: [
       {
-        indexed: true,
-        name: 'blockBuilder',
+        indexed: false,
+        name: 'caller',
         type: 'address',
       },
       {
-        indexed: true,
-        name: 'blockHash',
+        indexed: false,
+        name: 'workloadId',
         type: 'bytes32',
       },
       {
         indexed: false,
-        name: 'chainId',
+        name: 'version',
         type: 'uint8',
       },
       {
         indexed: false,
-        name: 'txHash',
+        name: 'blockContentHash',
         type: 'bytes32',
       },
       {
         indexed: false,
-        name: 'proof',
+        name: 'commitHash',
         type: 'string',
       },
     ],

@@ -23,6 +23,7 @@ async function main() {
 
     // Example transaction hash to check
     // Replace this with an actual flashtestation transaction hash to test
+    // TODO: use actual flashtestation transaction hash once we have one on sepolia
     const txHash = '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`;
 
     console.log(`Checking if transaction is a flashtestation: ${txHash}`);
@@ -36,24 +37,11 @@ async function main() {
       console.log('\n✓ This is a flashtestation transaction!\n');
       console.log('Transaction Details:');
       console.log('====================');
-      console.log(`Hash: ${tx.hash}`);
-      console.log(`Block Number: ${tx.blockNumber}`);
-      console.log(`Block Hash: ${tx.blockHash}`);
-      console.log(`From: ${tx.from}`);
-      console.log(`To: ${tx.to ?? 'Contract Creation'}`);
-      console.log(`Value: ${tx.value} wei`);
-      console.log(`Gas: ${tx.gas}`);
-      console.log(`Gas Price: ${tx.gasPrice ?? 'N/A'}`);
-      console.log(`Nonce: ${tx.nonce}`);
-      console.log(`Transaction Index: ${tx.transactionIndex}`);
-
-      // Display input data (truncated)
-      const inputPreview = tx.input.slice(0, 66) + (tx.input.length > 66 ? '...' : '');
-      console.log(`Input Data: ${inputPreview}`);
-      console.log(`Input Length: ${tx.input.length} bytes`);
-
-      console.log('\nThis transaction emitted the BlockBuilderProofVerified event.');
-      console.log('Event signature: BlockBuilderProofVerified(address,bytes32,uint8,bytes32,string)');
+      console.log(`Caller: ${tx.caller}`);
+      console.log(`Workload ID: ${tx.workloadId}`);
+      console.log(`Version: ${tx.version}`);
+      console.log(`Block Content Hash: ${tx.blockContentHash}`);
+      console.log(`Commit Hash: ${tx.commitHash}`);
     } else {
       // This is not a flashtestation transaction
       console.log('\n✗ This is not a flashtestation transaction.');

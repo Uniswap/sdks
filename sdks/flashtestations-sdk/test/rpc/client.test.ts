@@ -271,11 +271,11 @@ describe('RpcClient', () => {
       };
       const mockLog = {
         args: {
-          blockBuilder: '0xbuilder123' as `0x${string}`,
-          blockHash: '0xblockhash456' as `0x${string}`,
-          chainId: 1,
-          txHash: txHash,
-          proof: 'proof-string',
+          caller: '0xcaBBa9e7f4b3A885C5aa069f88469ac711Dd4aCC' as `0x${string}`,
+          workloadId: '0x71d62ba17902d590dad932310a7ec12feffa25454d7009c2084aa6f4c488953f' as `0x${string}`,
+          version: 1,
+          blockContentHash: '0x846604baa7db2297b9c4058106cc5869bcdbb753760981dbcd6d345d3d5f3e0f' as `0x${string}`,
+          commitHash: '490fb2be109f0c2626c347bb3e43e97826c8f844',
         },
       };
 
@@ -292,11 +292,11 @@ describe('RpcClient', () => {
         })
       );
       expect(result).toEqual({
-        blockBuilder: '0xbuilder123',
-        blockHash: '0xblockhash456',
-        chainId: 1,
-        txHash: txHash,
-        proof: 'proof-string',
+        caller: '0xcaBBa9e7f4b3A885C5aa069f88469ac711Dd4aCC',
+        workloadId: '0x71d62ba17902d590dad932310a7ec12feffa25454d7009c2084aa6f4c488953f',
+        version: 1,
+        blockContentHash: '0x846604baa7db2297b9c4058106cc5869bcdbb753760981dbcd6d345d3d5f3e0f',
+        commitHash: '490fb2be109f0c2626c347bb3e43e97826c8f844',
       });
     });
 

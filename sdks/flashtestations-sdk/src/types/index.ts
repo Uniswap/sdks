@@ -39,15 +39,15 @@ export interface WorkloadMeasureRegisters {
  */
 export interface FlashtestationEvent {
   /** Address of the block builder */
-  blockBuilder: string;
-  /** Hash of the block (bytes32 hex) */
-  blockHash: string;
-  /** Chain ID (uint8) */
-  chainId: number;
-  /** Transaction hash (bytes32 hex) */
-  txHash: string;
-  /** Proof string */
-  proof: string;
+  caller: string;
+  /** Hash indentifier for the workload (bytes32 hex) */
+  workloadId: string;
+  /** Version of the flashtestation protocol */
+  version: number;
+  /** Hash of the block content (i.e. all of the block's transactions, except the flashtestation transaction itself) (bytes32 hex) */
+  blockContentHash: `0x${string}`;
+  /** git commit ID of the code used to reproducibly build the workload (string) */
+  commitHash: string;
 }
 
 /**
