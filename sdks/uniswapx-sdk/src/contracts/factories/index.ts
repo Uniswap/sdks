@@ -8,6 +8,7 @@ export { ExclusiveFillerValidation__factory } from "./ExclusiveFillerValidation_
 export { ISuperstateTokenV4__factory } from "./ISuperstateTokenV4__factory";
 export { MockDSTokenInterface__factory } from "./MockDSTokenInterface__factory";
 export { MockERC20__factory } from "./MockERC20__factory";
+export { MockSuperstateTokenV4__factory } from "./MockSuperstateTokenV4__factory";
 export { OrderQuoter__factory } from "./OrderQuoter__factory";
 export { Permit2__factory } from "./Permit2__factory";
 export { PriorityOrderReactor__factory } from "./PriorityOrderReactor__factory";

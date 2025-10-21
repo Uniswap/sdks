@@ -109,7 +109,8 @@ abstract class EventWatcher<TReactor extends BaseContract> {
           });
         }
         return logAcc;
-      } catch (e) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (_e) {
         return logAcc;
       }
     }, [] as { token: string; amount: BigNumber }[]);
