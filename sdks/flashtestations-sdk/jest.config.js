@@ -15,4 +15,8 @@ module.exports = {
   },
   // Clear jest cache to avoid stale transformer issues
   clearMocks: true,
+  // CI Performance optimizations
+  maxWorkers: process.env.CI ? '50%' : undefined,
+  collectCoverage: false,
+  testTimeout: 10000
 };

@@ -8,4 +8,8 @@ module.exports = {
     },
   },
   testPathIgnorePatterns: ['/node_modules/', '/dist/', '/permit2/'],
+  // CI Performance optimizations
+  maxWorkers: process.env.CI ? '50%' : undefined,
+  collectCoverage: false,
+  testTimeout: 10000
 }

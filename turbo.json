@@ -4,7 +4,9 @@
       "inputs": [
         "sdks/*/src/**.ts",
         "sdks/*/src/**.tsx"
-      ]
+      ],
+      "outputs": [],
+      "cache": true
     },
     "build": {
       "inputs": [
@@ -15,21 +17,30 @@
       ],
       "outputs": [
         "sdks/*/dist/**"
-      ]
+      ],
+      "cache": true,
+      "dependsOn": ["^build"]
     },
     "test": {
       "dependsOn": [
         "build"
       ],
       "inputs": [
-        "sdks/*/dist/**"
-      ]
+        "sdks/*/dist/**",
+        "sdks/*/test/**",
+        "sdks/*/src/**"
+      ],
+      "outputs": [],
+      "cache": true
     },
     "release": {
-      "dependsOn": []
+      "dependsOn": [],
+      "cache": false
     },
     "typecheck": {
-      "dependsOn": []
+      "dependsOn": [],
+      "outputs": [],
+      "cache": true
     }
   }
 }

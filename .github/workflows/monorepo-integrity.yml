@@ -8,6 +8,11 @@ on:
     branches:
       - main
 
+# Cancel outdated runs when new commits are pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   monorepo-integrity:
     name: Check monorepo integrity
@@ -43,15 +48,28 @@ jobs:
           cache: yarn
           node-version: 22
 
+      - name: 📦 Cache node_modules
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9
+        id: cache-node-modules
+        with:
+          path: |
+            node_modules
+            sdks/*/node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
       - name: 📥 yarn install
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
         shell: bash
         working-directory: ./
         run: |
-          yarn --immutable
+          yarn --immutable --inline-builds
         env:
           # CI optimizations. Overrides yarnrc.yml options (or their defaults) in the CI action.
           YARN_ENABLE_GLOBAL_CACHE: "false" # Use local cache folder to keep downloaded archives
           YARN_NM_MODE: "hardlinks-local" # Hardlinks-local reduces io / node_modules size
+          YARN_COMPRESSION_LEVEL: "0" # Disable compression for faster installs
           HUSKY: "0" # By default do not run HUSKY install
 
       - name: 👬🏽 Check for conflicting versions across the monorepo

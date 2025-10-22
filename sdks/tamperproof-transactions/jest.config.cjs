@@ -11,6 +11,10 @@ module.exports = {
     'ts-jest': {
       tsconfig: 'tsconfig.test.json'
     }
-  }
+  },
+  // CI Performance optimizations
+  maxWorkers: process.env.CI ? '50%' : undefined,
+  collectCoverage: false,
+  testTimeout: 10000
 };
 

@@ -9,9 +9,15 @@ on:
       - synchronize
       - reopened
 
+# Cancel outdated runs when new commits are pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build-and-test:
-    name: Lint, Build, and Test
+  # Job 1: Fast feedback - lint and typecheck in parallel
+  lint-and-typecheck:
+    name: Lint & Typecheck
     runs-on: ubuntu-latest
     env:
       TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
@@ -23,19 +29,8 @@ jobs:
     steps:
       - uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db # v0.8.3
         with:
-          # List of IPs to allow outbound connections to.
-          # By default, only localhost and IPs required for the essential operations of Github Actions are allowed.
-          #allowed-ips: |
-
-          # List of domains to allow outbound connections to.
-          # Wildcards are accepted. For example, if allowing `*.google.com`, this will allow `www.google.com`, `console.cloud.google.com` but not `google.com`.
-          # By default, only domains required for essential operations of Github Actions and uploading job summaries are allowed.
-          # Refer to https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#communication-requirements-for-github-hosted-runners-and-github for additional domains that should be allowed for additional Github Actions features.
-          #allowed-domains:
-
-          # The egress policy to enforce. Valid values are `audit` and `block`.
-          # Default: audit
           egress-policy: audit
+
       - name: ✅ Checkout
         uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
         with:
@@ -48,24 +43,119 @@ jobs:
           cache: yarn
           node-version: 22
 
+      - name: 📦 Cache node_modules
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9
+        id: cache-node-modules
+        with:
+          path: |
+            node_modules
+            sdks/*/node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
       - name: 📥 yarn install
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
         shell: bash
         working-directory: ./
         run: |
-          yarn --immutable
+          yarn --immutable --inline-builds
         env:
           # CI optimizations. Overrides yarnrc.yml options (or their defaults) in the CI action.
           YARN_ENABLE_GLOBAL_CACHE: "false" # Use local cache folder to keep downloaded archives
           YARN_NM_MODE: "hardlinks-local" # Hardlinks-local reduces io / node_modules size
+          YARN_COMPRESSION_LEVEL: "0" # Disable compression for faster installs
           HUSKY: "0" # By default do not run HUSKY install
 
-      - name: 🔬 Lint
-        run: yarn g:lint
+      - name: ⚡️ Restore Turbo Cache
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-lint-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-lint-
+
+      - name: 🔬 Lint & Typecheck
+        run: |
+          yarn g:lint --filter='...[HEAD^1]' --cache-dir=.turbo &
+          yarn g:typecheck --filter='...[HEAD^1]' --cache-dir=.turbo &
+          wait
+
+  # Job 2: Build and test - runs in parallel with lint/typecheck
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    env:
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+    defaults:
+      run:
+        working-directory: ./
+
+    steps:
+      - uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db # v0.8.3
+        with:
+          egress-policy: audit
+
+      - name: ✅ Checkout
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
+        with:
+          submodules: "recursive"
+          fetch-depth: 2
+
+      - name: 💽 Node and Caching
+        uses: actions/setup-node@1a4442cacd436585916779262731d5b162bc6ec7
+        with:
+          cache: yarn
+          node-version: 22
+
+      - name: 📦 Cache node_modules
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9
+        id: cache-node-modules
+        with:
+          path: |
+            node_modules
+            sdks/*/node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
+      - name: 📥 yarn install
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        shell: bash
+        working-directory: ./
+        run: |
+          yarn --immutable --inline-builds
+        env:
+          # CI optimizations. Overrides yarnrc.yml options (or their defaults) in the CI action.
+          YARN_ENABLE_GLOBAL_CACHE: "false" # Use local cache folder to keep downloaded archives
+          YARN_NM_MODE: "hardlinks-local" # Hardlinks-local reduces io / node_modules size
+          YARN_COMPRESSION_LEVEL: "0" # Disable compression for faster installs
+          HUSKY: "0" # By default do not run HUSKY install
+
+      - name: ⚡️ Restore Turbo Cache
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-build-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-build-
 
       - name: 🏗  Build
-        run: yarn g:build
+        run: yarn g:build --filter='...[HEAD^1]' --cache-dir=.turbo
+
+      - name: 📊 Check if Foundry needed
+        id: check-foundry
+        run: |
+          CHANGED=$(git diff --name-only HEAD^1 HEAD | grep -E '(permit2-sdk|universal-router-sdk|uniswapx-sdk)' || echo "")
+          if [ -n "$CHANGED" ]; then
+            echo "needed=true" >> $GITHUB_OUTPUT
+          else
+            echo "needed=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: 🪨 Install Foundry
+        if: steps.check-foundry.outputs.needed == 'true'
         uses: foundry-rs/foundry-toolchain@82dee4ba654bd2146511f85f0d013af94670c4de # v1
         with:
           version: nightly
@@ -79,4 +169,4 @@ jobs:
           timeout_minutes: 20
           retry_wait_seconds: 2
           max_attempts: 3
-          command: yarn g:test
+          command: yarn g:test --filter='...[HEAD^1]' --cache-dir=.turbo

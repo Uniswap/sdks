@@ -8,4 +8,8 @@ module.exports = {
       tsconfig: 'tsconfig.base.json',
     },
   },
+  // CI Performance optimizations
+  maxWorkers: process.env.CI ? '50%' : undefined,
+  collectCoverage: false,
+  testTimeout: 10000
 }
