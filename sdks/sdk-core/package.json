@@ -18,7 +18,7 @@
   },
   "scripts": {
     "build": "tsdx build",
-    "lint": "tsdx lint src",
+    "lint": "eslint 'src/**/*.{js,ts,tsx}' --max-warnings 0",
     "release": "semantic-release",
     "start": "tsdx watch",
     "test": "tsdx test"
@@ -38,9 +38,11 @@
     "@types/big.js": "^4.0.5",
     "@types/jest": "^24.0.25",
     "babel-eslint": "10.1.0",
+    "eslint-config-prettier": "^9.1.0",
     "eslint-config-react-app": "7.0.1",
     "eslint-plugin-flowtype": "8.0.3",
     "eslint-plugin-jsx-a11y": "6.10.2",
+    "eslint-plugin-prettier": "^3.4.1",
     "eslint-plugin-react": "7.37.4",
     "eslint-plugin-react-hooks": "5.2.0",
     "tsdx": "^0.14.1"
