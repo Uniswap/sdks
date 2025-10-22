@@ -79,6 +79,7 @@ const SWAP_EXACT_OUT_SINGLE_STRUCT =
 const SWAP_EXACT_OUT_STRUCT =
   '(address currencyOut,' + PATH_KEY_STRUCT + '[] path,uint128 amountOut,uint128 amountInMaximum)'
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const V4_BASE_ACTIONS_ABI_DEFINITION: { [key in Actions]: readonly ParamType[] } = {
   // Liquidity commands
   [Actions.INCREASE_LIQUIDITY]: [

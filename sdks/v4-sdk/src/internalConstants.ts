@@ -64,6 +64,7 @@ export enum FeeAmount {
 /**
  * The default factory tick spacings by fee amount.
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const TICK_SPACINGS: { [amount in FeeAmount]: number } = {
   [FeeAmount.LOWEST]: 1,
   [FeeAmount.LOW]: 10,

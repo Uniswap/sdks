@@ -67,6 +67,7 @@ export class PermissionedTokenValidator {
     // Use the appropriate interface to perform the approval check
     if (token.interface === PermissionedTokenInterface.DSTokenInterface) {
       const tokenContract: DSTokenInterface = DSTokenInterface__factory.connect(resolvedTokenAddress, provider);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const [code, _reason] = await tokenContract.preTransferCheck(from, to, value);
       return code.toNumber() === 0;
     }

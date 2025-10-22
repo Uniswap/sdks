@@ -5,9 +5,9 @@
     "@babel/runtime": "7.18.9",
     "@manypkg/cli": "^0.19.2",
     "@semantic-release/exec": "6.0.3",
-    "@typescript-eslint/eslint-plugin": "^5.62",
+    "@typescript-eslint/eslint-plugin": "^8.38.0",
     "danger": "11.2.6",
-    "eslint": "^7.8.0",
+    "eslint": "^8.57.0",
     "eslint-plugin-prettier": "^3.4.1",
     "husky": "^8.0.3",
     "semantic-release": "^25.0.1",
@@ -36,6 +36,7 @@
     "sdks/uniswapx-sdk/integration"
   ],
   "resolutions": {
-    "@manypkg/cli@^0.19.2": "patch:@manypkg/cli@npm%3A0.19.2#./.yarn/patches/@manypkg-cli-npm-0.19.2-ea52ff91d4.patch"
+    "@manypkg/cli@^0.19.2": "patch:@manypkg/cli@npm%3A0.19.2#./.yarn/patches/@manypkg-cli-npm-0.19.2-ea52ff91d4.patch",
+    "eslint-config-prettier": "^9.1.0"
   }
 }

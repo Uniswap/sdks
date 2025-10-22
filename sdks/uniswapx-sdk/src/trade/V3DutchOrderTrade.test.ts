@@ -255,10 +255,11 @@ describe("V3DutchOrderTrade", () => {
 				tradeType: TradeType.EXACT_INPUT,
 			});
 
-			// Using private method through any to test error case
-			expect(() => {
-				(tradeWithoutExpected as any).getExpectedAmountIn();
-			}).toThrow("expectedAmountIn not set");
+		// Using private method through any to test error case
+		expect(() => {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			(tradeWithoutExpected as any).getExpectedAmountIn();
+		}).toThrow("expectedAmountIn not set");
 		});
 
 		it("throws when accessing expectedAmountOut that wasn't provided", () => {
@@ -269,10 +270,11 @@ describe("V3DutchOrderTrade", () => {
 				tradeType: TradeType.EXACT_INPUT,
 			});
 
-			// Using private method through any to test error case
-			expect(() => {
-				(tradeWithoutExpected as any).getExpectedAmountOut();
-			}).toThrow("expectedAmountOut not set");
+		// Using private method through any to test error case
+		expect(() => {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			(tradeWithoutExpected as any).getExpectedAmountOut();
+		}).toThrow("expectedAmountOut not set");
 		});
 	});
 });
