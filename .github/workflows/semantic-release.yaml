@@ -52,3 +52,5 @@ jobs:
 
       - name: Release Needed SDK's
         run: yarn g:release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
