@@ -12,7 +12,7 @@ jobs:
   conventional-commit:
     runs-on: ubuntu-latest
     steps:
-      - uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db # v0.8.3
+      - uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3 # v0.8.4
         with:
           # List of IPs to allow outbound connections to.
           # By default, only localhost and IPs required for the essential operations of Github Actions are allowed.

@@ -12,7 +12,7 @@ jobs:
       name: main
     runs-on: ubuntu-latest
     steps:
-      - uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db # v0.8.3
+      - uses: bullfrogsec/bullfrog@1831f79cce8ad602eef14d2163873f27081ebfb3 # v0.8.4
         with:
           # List of IPs to allow outbound connections to.
           # By default, only localhost and IPs required for the essential operations of Github Actions are allowed.
@@ -27,7 +27,7 @@ jobs:
           # The egress policy to enforce. Valid values are `audit` and `block`.
           # Default: audit
           egress-policy: audit
-      - uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
         with:
           token: ${{ secrets.SERVICE_ACCOUNT_PAT }}
           ref: main
