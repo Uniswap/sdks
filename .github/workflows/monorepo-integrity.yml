@@ -41,7 +41,7 @@ jobs:
         uses: actions/setup-node@1a4442cacd436585916779262731d5b162bc6ec7
         with:
           cache: yarn
-          node-version: 20
+          node-version: 22
 
       - name: 📥 yarn install
         shell: bash
