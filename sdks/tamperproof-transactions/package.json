@@ -39,7 +39,8 @@
     "lint:fix": "eslint src --ext .ts --fix",
     "format": "prettier --write src/**/*.ts",
     "prepare": "husky",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "release": "semantic-release"
   },
   "exports": {
     ".": {
@@ -65,5 +66,34 @@
   "dependencies": {
     "dohjs": "^0.3.3"
   },
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
+  "release": {
+    "extends": "semantic-release-monorepo",
+    "branches": [
+      {
+        "name": "main",
+        "prerelease": false
+      }
+    ],
+    "plugins": [
+      [
+        "@semantic-release/commit-analyzer",
+        {
+          "preset": "angular",
+          "releaseRules": "../../publishing/release-rules.cjs"
+        }
+      ],
+      "@semantic-release/release-notes-generator",
+      "@semantic-release/npm",
+      "@semantic-release/github",
+      [
+        "@semantic-release/exec",
+        {
+          "successCmd": "git restore yarn.lock && yarn",
+          "failCmd": "git restore yarn.lock && yarn",
+          "execCwd": "../.."
+        }
+      ]
+    ]
+  }
 }
