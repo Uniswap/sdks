@@ -9,7 +9,7 @@
     "dist/**",
     "lib/**"
   ],
-  "repository": "git@github.com:Uniswap/tamperproof-transactions.git",
+  "repository": "https://github.com/Uniswap/sdks.git",
   "author": "Uniswap Labs Security <security@uniswap.org>",
   "license": "MIT",
   "devDependencies": {
