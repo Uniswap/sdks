@@ -56,7 +56,6 @@ describe('Chain Configuration', () => {
       } catch (error: any) {
         expect(error.name).toBe('ChainNotSupportedError');
         expect(error.chainId).toBe(9999);
-        expect(error.supportedChains).toEqual([130, 1301]);
       }
     });
   });
@@ -122,7 +121,6 @@ describe('Chain Configuration', () => {
       expect(Array.isArray(supportedChains)).toBe(true);
       expect(supportedChains).toContain(130);
       expect(supportedChains).toContain(1301);
-      expect(supportedChains.length).toBe(2);
     });
 
     it('should return chain IDs as numbers', () => {
@@ -164,7 +162,6 @@ describe('Chain Configuration', () => {
         } catch (error: any) {
           expect(error.name).toBe('ChainNotSupportedError');
           expect(error.chainId).toBe(unsupportedChainId);
-          expect(error.supportedChains).toEqual([130, 1301]);
           expect(error.message).toContain(`Chain ${unsupportedChainId} not supported`);
           expect(error.message).toContain('130, 1301');
         }

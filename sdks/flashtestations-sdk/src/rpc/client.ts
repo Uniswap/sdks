@@ -173,6 +173,11 @@ export class RpcClient {
       maxRetries: config.maxRetries ?? 3,
       initialRetryDelay: config.initialRetryDelay ?? 1000,
     };
+  
+    // this will only execute for alphanet and experimental because we don't include the RPC URL in the ChainConfig
+    if (!this.config.rpcUrl) {
+      throw new Error('rpcUrl argument is required in RpcClient constructor, but was not provided');
+    }
 
     // Check for cached client
     const cacheKey = getClientKey(this.config.chainId, this.config.rpcUrl);
