@@ -21,6 +21,22 @@ export const CHAIN_CONFIGS: Record<number, ChainConfig> = {
     defaultRpcUrl: process.env.RPC_URL || 'https://sepolia.unichain.org',
     blockExplorerUrl: 'https://sepolia.uniscan.xyz',
   },
+  // Unichain Alphanet (Testnet)
+  22444422: {
+    chainId: 22444422,
+    name: 'Unichain Alphanet',
+    contractAddress: '0x8d0e3f57052f33CEF1e6BE98B65aad1794dc95a5',
+    defaultRpcUrl: process.env.RPC_URL || '', // note, we don't include the RPC URL for alphanet because Unichain doesn't want to expose it to the public
+    blockExplorerUrl: '',
+  },
+  // Unichain Experimental (Testnet)
+  33611633: {
+    chainId: 33611633,
+    name: 'Unichain Experimental',
+    contractAddress: '0x2E41cb0D68D8dB7ebd16cef81D7eD82e7E1fbA40',
+    defaultRpcUrl: process.env.RPC_URL || '', // note, we don't include the RPC URL for experimental because Unichain doesn't want to expose it to the public
+    blockExplorerUrl: '',
+  },
 };
 
 /**
