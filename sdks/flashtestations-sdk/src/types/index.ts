@@ -4,12 +4,16 @@
 export interface VerificationResult {
   /** Whether the block was built by a TEE running the specified workload */
   isBuiltByExpectedTee: boolean;
+  /** workload ID of the TEE workload, null if not TEE-built */
+  workloadId: string | null;
   /** Commit hash of the TEE workload source code, null if not TEE-built */
   commitHash: string | null;
   /** Block explorer link for the block, null if not TEE-built */
   blockExplorerLink: string | null;
   /** Address of the block builder, optional */
   builderAddress?: string;
+  /** Version of the flashtestation protocol, optional */
+  version: number;
 }
 
 /**
@@ -17,21 +21,21 @@ export interface VerificationResult {
  */
 export interface WorkloadMeasureRegisters {
   /** TD attributes (8 bytes hex) */
-  tdAttributes: string;
+  tdAttributes: `0x${string}`;
   /** xFAM (8 bytes hex) */
-  xFAM: string;
+  xFAM: `0x${string}`;
   /** MRTD - Measurement of the TD (48 bytes hex) */
-  mrTd: string;
+  mrTd: `0x${string}`;
   /** MR Config ID - VMM configuration (48 bytes hex) */
-  mrConfigId: string;
+  mrConfigId: `0x${string}`;
   /** Runtime Measurement Register 0 (48 bytes hex) */
-  rtMr0: string;
+  rtMr0: `0x${string}`;
   /** Runtime Measurement Register 1 (48 bytes hex) */
-  rtMr1: string;
+  rtMr1: `0x${string}`;
   /** Runtime Measurement Register 2 (48 bytes hex) */
-  rtMr2: string;
+  rtMr2: `0x${string}`;
   /** Runtime Measurement Register 3 (48 bytes hex) */
-  rtMr3: string;
+  rtMr3: `0x${string}`;
 }
 
 /**

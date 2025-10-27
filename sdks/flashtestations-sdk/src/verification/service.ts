@@ -93,8 +93,10 @@ export async function verifyFlashtestationInBlock(
   if (!flashtestationEvent) {
     return {
       isBuiltByExpectedTee: false,
+      workloadId: null,
       commitHash: null,
       blockExplorerLink: null,
+      version: 0,
     };
   }
 
@@ -108,8 +110,10 @@ export async function verifyFlashtestationInBlock(
     // Block was built by a TEE, but not the one we're looking for
     return {
       isBuiltByExpectedTee: false,
+      workloadId: null,
       commitHash: null,
       blockExplorerLink: null,
+      version: 0,
     };
   }
 
@@ -131,8 +135,10 @@ export async function verifyFlashtestationInBlock(
   // Block was built by the specified TEE workload
   return {
     isBuiltByExpectedTee: true,
+    workloadId: flashtestationEvent.workloadId,
     commitHash: flashtestationEvent.commitHash,
     blockExplorerLink: blockExplorerLink,
     builderAddress: flashtestationEvent.caller,
+    version: flashtestationEvent.version,
   };
 }
