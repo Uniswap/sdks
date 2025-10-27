@@ -1,6 +1,11 @@
 # tamperproof-transactions
 
-Implementation of EIP-7754
+[![npm version](https://img.shields.io/npm/v/@uniswap/tamperproof-transactions.svg)](https://www.npmjs.com/package/@uniswap/tamperproof-transactions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+Implementation of [EIP-7754](https://eips.ethereum.org/EIPS/eip-7754)
+
+**Repository:** [https://github.com/Uniswap/sdks](https://github.com/Uniswap/sdks)
 
 ## Installation
 
