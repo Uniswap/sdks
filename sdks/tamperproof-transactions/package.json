@@ -21,9 +21,7 @@
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^3.4.1",
-    "husky": "^8.0.3",
     "jest": "25.5.0",
-    "lint-staged": "^16.1.2",
     "prettier": "^2.4.1",
     "terser": "^5.44.0",
     "ts-jest": "^25.5.1",
@@ -38,8 +36,7 @@
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
     "format": "prettier --write src/**/*.ts",
-    "prepare": "husky",
-    "prepack": "npm run build",
+    "prepack": "yarn build",
     "release": "semantic-release"
   },
   "exports": {
@@ -57,16 +54,9 @@
     "access": "public",
     "provenance": true
   },
-  "lint-staged": {
-    "src/**/*.ts": [
-      "eslint --fix",
-      "prettier --write"
-    ]
-  },
   "dependencies": {
     "dohjs": "^0.3.3"
   },
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
   "release": {
     "extends": "semantic-release-monorepo",
     "branches": [
