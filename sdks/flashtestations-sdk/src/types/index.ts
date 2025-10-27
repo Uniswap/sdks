@@ -3,13 +3,13 @@
  */
 export interface VerificationResult {
   /** Whether the block was built by a TEE running the specified workload */
-  is_built_by_TEE: boolean;
+  isBuiltByExpectedTee: boolean;
   /** Commit hash of the TEE workload source code, null if not TEE-built */
-  commit_hash: string | null;
+  commitHash: string | null;
   /** Block explorer link for the block, null if not TEE-built */
-  block_explorer_link: string | null;
+  blockExplorerLink: string | null;
   /** Address of the block builder, optional */
-  builder_address?: string;
+  builderAddress?: string;
 }
 
 /**
