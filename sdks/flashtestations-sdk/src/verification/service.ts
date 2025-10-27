@@ -1,11 +1,11 @@
+import { getBlockExplorerUrl } from '../config/chains';
+import { computeWorkloadId } from '../crypto/workload';
+import { RpcClient } from '../rpc/client';
 import {
   BlockParameter,
   VerificationResult,
   WorkloadMeasureRegisters,
 } from '../types';
-import { RpcClient } from '../rpc/client';
-import { computeWorkloadId } from '../crypto/workload';
-import { getBlockExplorerUrl } from '../config/chains';
 
 /**
  * Configuration options for verification

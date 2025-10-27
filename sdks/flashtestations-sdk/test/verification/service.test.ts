@@ -1,12 +1,12 @@
-import { verifyFlashtestationInBlock } from '../../src/verification/service';
-import * as rpcClientModule from '../../src/rpc/client';
-import * as workloadModule from '../../src/crypto/workload';
 import * as chainsModule from '../../src/config/chains';
+import * as workloadModule from '../../src/crypto/workload';
+import * as rpcClientModule from '../../src/rpc/client';
 import {
   BlockNotFoundError,
   NetworkError,
   WorkloadMeasureRegisters,
 } from '../../src/types';
+import { verifyFlashtestationInBlock } from '../../src/verification/service';
 
 describe('verifyFlashtestationInBlock', () => {
   let mockGetFlashtestationTx: jest.Mock;
@@ -264,17 +264,17 @@ describe('verifyFlashtestationInBlock', () => {
 
   describe('with WorkloadMeasureRegisters', () => {
     const registers: WorkloadMeasureRegisters = {
-      tdAttributes: '0x0000000000000000',
-      xFAM: '0x0000000000000003',
-      mrTd: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12',
-      mrConfigId: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
-      rtMr0: '0x1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111',
-      rtMr1: '0x2222222222222222222222222222222222222222222222222222222222222222222222222222222222222222',
-      rtMr2: '0x3333333333333333333333333333333333333333333333333333333333333333333333333333333333333333',
-      rtMr3: '0x4444444444444444444444444444444444444444444444444444444444444444444444444444444444444444',
+      tdAttributes: '0x0000001000000000',
+      xFAM: '0xe702060000000000',
+      mrTd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
+      mrConfigId: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
+      rtMr0: '0xa7157e7c5f932e9babac9209d4527ec9ed837b8e335a931517677fa746db51ee56062e3324e266e3f39ec26a516f4f71',
+      rtMr1: '0xe63560e50830e22fbc9b06cdce8afe784bf111e4251256cf104050f1347cd4ad9f30da408475066575145da0b098a124',
+      rtMr2: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+      rtMr3: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
     };
 
-    const computedWorkloadId = '0xdeadbeef1234567890deadbeef1234567890deadbeef1234567890deadbeef12';
+    const computedWorkloadId = '0xeee0d5f864e6d46d6da790c7d60baac5c8478eb89e86667336d3f17655e9164e';
     const config = { chainId: 1301 };
 
     beforeEach(() => {
