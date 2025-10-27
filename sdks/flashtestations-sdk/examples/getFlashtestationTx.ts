@@ -21,16 +21,8 @@ async function main() {
       // initialRetryDelay: 1000,
     });
 
-    // Example transaction hash to check
-    // Replace this with an actual flashtestation transaction hash to test
-    // TODO: use actual flashtestation transaction hash once we have one on sepolia
-    const txHash = '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`;
-
-    console.log(`Checking if transaction is a flashtestation: ${txHash}`);
-    console.log('='.repeat(80));
-
     // Check if this transaction is a flashtestation
-    const tx = await client.getFlashtestationTx(txHash);
+    const tx = await client.getFlashtestationTx('latest');
 
     if (tx) {
       // This is a flashtestation transaction

@@ -262,9 +262,15 @@ describe('RpcClient', () => {
 
     it('should return FlashtestationEvent when BlockBuilderProofVerified event exists', async () => {
       const txHash = '0xabc123def456' as `0x${string}`;
+      const blockNumber = 100;
+      const mockBlock = {
+        number: BigInt(blockNumber),
+        hash: '0xblockhash123',
+        transactions: [txHash],
+      };
       const mockReceipt = {
         transactionHash: txHash,
-        blockNumber: BigInt(100),
+        blockNumber: BigInt(blockNumber),
         to: '0xcontract123',
         status: 'success',
         logs: [],
@@ -279,11 +285,13 @@ describe('RpcClient', () => {
         },
       };
 
+      mockGetBlock.mockResolvedValue(mockBlock);
       mockGetTransactionReceipt.mockResolvedValue(mockReceipt);
       mockParseEventLogs.mockReturnValue([mockLog]);
 
-      const result = await client.getFlashtestationTx(txHash);
+      const result = await client.getFlashtestationTx(blockNumber);
 
+      expect(mockGetBlock).toHaveBeenCalledWith({ blockNumber: BigInt(blockNumber) });
       expect(mockGetTransactionReceipt).toHaveBeenCalledWith({ hash: txHash });
       expect(mockParseEventLogs).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -301,11 +309,20 @@ describe('RpcClient', () => {
     });
 
     it('should return null when transaction receipt is not found', async () => {
-      const txHash = '0xinvalid' as `0x${string}`;
+      const txHash = '0xabc123def456' as `0x${string}`;
+      const blockNumber = 100;
+      const mockBlock = {
+        number: BigInt(blockNumber),
+        hash: '0xblockhash123',
+        transactions: [txHash],
+      };
+
+      mockGetBlock.mockResolvedValue(mockBlock);
       mockGetTransactionReceipt.mockResolvedValue(null);
 
-      const result = await client.getFlashtestationTx(txHash);
+      const result = await client.getFlashtestationTx(blockNumber);
 
+      expect(mockGetBlock).toHaveBeenCalledWith({ blockNumber: BigInt(blockNumber) });
       expect(mockGetTransactionReceipt).toHaveBeenCalledWith({ hash: txHash });
       expect(mockParseEventLogs).not.toHaveBeenCalled();
       expect(result).toBeNull();
@@ -313,19 +330,27 @@ describe('RpcClient', () => {
 
     it('should return null when BlockBuilderProofVerified event is not found', async () => {
       const txHash = '0xabc123def456' as `0x${string}`;
+      const blockNumber = 100;
+      const mockBlock = {
+        number: BigInt(blockNumber),
+        hash: '0xblockhash123',
+        transactions: [txHash],
+      };
       const mockReceipt = {
         transactionHash: txHash,
-        blockNumber: BigInt(100),
+        blockNumber: BigInt(blockNumber),
         to: '0xcontract123',
         status: 'success',
         logs: [],
       };
 
+      mockGetBlock.mockResolvedValue(mockBlock);
       mockGetTransactionReceipt.mockResolvedValue(mockReceipt);
       mockParseEventLogs.mockReturnValue([]);
 
-      const result = await client.getFlashtestationTx(txHash);
+      const result = await client.getFlashtestationTx(blockNumber);
 
+      expect(mockGetBlock).toHaveBeenCalledWith({ blockNumber: BigInt(blockNumber) });
       expect(mockGetTransactionReceipt).toHaveBeenCalledWith({ hash: txHash });
       expect(mockParseEventLogs).toHaveBeenCalled();
       expect(result).toBeNull();
@@ -333,19 +358,27 @@ describe('RpcClient', () => {
 
     it('should return null when logs exist but not for the specified transaction', async () => {
       const txHash = '0xabc123def456' as `0x${string}`;
+      const blockNumber = 100;
+      const mockBlock = {
+        number: BigInt(blockNumber),
+        hash: '0xblockhash123',
+        transactions: [txHash],
+      };
       const mockReceipt = {
         transactionHash: txHash,
-        blockNumber: BigInt(100),
+        blockNumber: BigInt(blockNumber),
         to: '0xcontract123',
         status: 'success',
         logs: [],
       };
 
+      mockGetBlock.mockResolvedValue(mockBlock);
       mockGetTransactionReceipt.mockResolvedValue(mockReceipt);
       mockParseEventLogs.mockReturnValue([]);
 
-      const result = await client.getFlashtestationTx(txHash);
+      const result = await client.getFlashtestationTx(blockNumber);
 
+      expect(mockGetBlock).toHaveBeenCalledWith({ blockNumber: BigInt(blockNumber) });
       expect(mockGetTransactionReceipt).toHaveBeenCalledWith({ hash: txHash });
       expect(mockParseEventLogs).toHaveBeenCalled();
       expect(result).toBeNull();
@@ -353,19 +386,27 @@ describe('RpcClient', () => {
 
     it('should handle receipt with no "to" address', async () => {
       const txHash = '0xabc123def456' as `0x${string}`;
+      const blockNumber = 100;
+      const mockBlock = {
+        number: BigInt(blockNumber),
+        hash: '0xblockhash123',
+        transactions: [txHash],
+      };
       const mockReceipt = {
         transactionHash: txHash,
-        blockNumber: BigInt(100),
+        blockNumber: BigInt(blockNumber),
         to: null, // Contract creation transaction
         status: 'success',
         logs: [],
       };
 
+      mockGetBlock.mockResolvedValue(mockBlock);
       mockGetTransactionReceipt.mockResolvedValue(mockReceipt);
       mockParseEventLogs.mockReturnValue([]);
 
-      const result = await client.getFlashtestationTx(txHash);
+      const result = await client.getFlashtestationTx(blockNumber);
 
+      expect(mockGetBlock).toHaveBeenCalledWith({ blockNumber: BigInt(blockNumber) });
       expect(mockGetTransactionReceipt).toHaveBeenCalledWith({ hash: txHash });
       expect(mockParseEventLogs).toHaveBeenCalledWith(
         expect.objectContaining({

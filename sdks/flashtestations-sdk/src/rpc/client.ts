@@ -273,11 +273,18 @@ export class RpcClient {
    * @throws NetworkError if RPC connection fails
    */
   async getFlashtestationTx(
-    txHash: `0x${string}`
+    blockParameter: BlockParameter = 'latest'
   ): Promise<FlashtestationEvent | null> {
     return retry(
       async () => {
-        // First, get the transaction receipt to get the block number and logs
+        // First, get the transaction hash from the block
+        const block = await this.getBlock(blockParameter);
+        if (!block.transactions || block.transactions.length === 0) {
+          return null;
+        }
+        const txHash = block.transactions[block.transactions.length - 1] as `0x${string}`;
+        
+        // Then, get the transaction receipt to parse the logs for the BlockBuilderProofVerified event
         const receipt = await this.client.getTransactionReceipt({
           hash: txHash,
         });
@@ -307,6 +314,10 @@ export class RpcClient {
             commitHash: string;
           };
 
+          // TODO(melvillian): the event does not include the sourceLocator because of gas optimizations reasons,
+          // so we need to get the sourceLocator from the block
+          
+          
           return {
             caller: args.caller,
             workloadId: args.workloadId,
