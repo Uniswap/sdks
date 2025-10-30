@@ -450,7 +450,7 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
 
     if (routePool instanceof V4Pool) {
       const v4Planner = new V4Planner()
-      const v4SubRoute = new V4Route(section as unknown as V4Pool[], subRoute.input, subRoute.output)
+      const v4SubRoute = new V4Route(section as V4Pool[], subRoute.input, subRoute.output)
 
       v4Planner.addSettle(inputToken, payerIsUser && i === 0, (i == 0 ? amountIn : CONTRACT_BALANCE) as BigNumber)
       v4Planner.addAction(Actions.SWAP_EXACT_IN, [
