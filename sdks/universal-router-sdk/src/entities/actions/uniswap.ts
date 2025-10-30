@@ -358,7 +358,7 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
   routerMustCustody: boolean
 ): void {
   // create a deep copy of pools since v4Planner encoding tampers with array
-  const pools = route.pools.map((p) => p) as V4Pool[]
+  const pools = route.pools.map((p) => p) as unknown as V4Pool[]
   const v4Route = new V4Route(pools, inputAmount.currency, outputAmount.currency)
   const trade = V4Trade.createUncheckedTrade({
     route: v4Route,
@@ -371,12 +371,24 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
     routerMustCustody && tradeType == TradeType.EXACT_INPUT ? undefined : options.slippageTolerance
 
   const v4Planner = new V4Planner()
-  v4Planner.addTrade(trade, slippageToleranceOnSwap)
-  v4Planner.addSettle(trade.route.pathInput, payerIsUser)
-  v4Planner.addTake(
-    trade.route.pathOutput,
-    routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient ?? SENDER_AS_RECIPIENT
-  )
+  const isInputTokenRebase = trade.route.pathInput.wrapped.address.toLowerCase() === '0xae7ab96520de3a18e5e111b5eaab095312d7fe84'
+
+  if (isInputTokenRebase) {
+    v4Planner.addSettle(trade.route.pathInput, payerIsUser, BigNumber.from(inputAmount.quotient.toString()))
+    v4Planner.addTrade(trade, slippageToleranceOnSwap)
+    v4Planner.addTakeAll(
+      trade.route.pathOutput,
+      BigNumber.from(trade.minimumAmountOut(slippageToleranceOnSwap ?? new Percent(0)).quotient.toString())
+    )
+  } else {
+    v4Planner.addTrade(trade, slippageToleranceOnSwap)
+    v4Planner.addSettle(trade.route.pathInput, payerIsUser)
+    v4Planner.addTake(
+      trade.route.pathOutput,
+      routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient ?? SENDER_AS_RECIPIENT
+    )
+  }
+
   planner.addCommand(CommandType.V4_SWAP, [v4Planner.finalize()])
 }
 
@@ -450,7 +462,7 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
 
     if (routePool instanceof V4Pool) {
       const v4Planner = new V4Planner()
-      const v4SubRoute = new V4Route(section as V4Pool[], subRoute.input, subRoute.output)
+      const v4SubRoute = new V4Route(section as unknown as V4Pool[], subRoute.input, subRoute.output)
 
       v4Planner.addSettle(inputToken, payerIsUser && i === 0, (i == 0 ? amountIn : CONTRACT_BALANCE) as BigNumber)
       v4Planner.addAction(Actions.SWAP_EXACT_IN, [
