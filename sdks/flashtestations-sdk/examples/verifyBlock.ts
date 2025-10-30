@@ -47,6 +47,7 @@ async function main() {
       console.log(`Commit Hash: ${result.commitHash}`);
       console.log(`Builder Address: ${result.builderAddress}`);
       console.log(`Version: ${result.version}`);
+      console.log(`Source Locators: ${result.sourceLocators && result.sourceLocators.length > 0 ? result.sourceLocators.join(', ') : 'None'}`)
       if (result.blockExplorerLink) {
         console.log(`Block Explorer: ${result.blockExplorerLink}`);
       }
