@@ -4840,11 +4840,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-<<<<<<< Updated upstream
-"@uniswap/router-sdk@npm:^2.0.2":
-=======
 "@uniswap/router-sdk@npm:^2.1.0":
->>>>>>> Stashed changes
   version: 2.1.0
   resolution: "@uniswap/router-sdk@npm:2.1.0"
   dependencies:
