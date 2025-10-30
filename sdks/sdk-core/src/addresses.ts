@@ -61,6 +61,7 @@ export const V2_FACTORY_ADDRESSES: AddressMap = {
   [ChainId.UNICHAIN]: '0x1f98400000000000000000000000000000000002',
   [ChainId.MONAD_TESTNET]: '0x733e88f248b742db6c14c0b1713af5ad7fdd59d0',
   [ChainId.SONEIUM]: '0x97febbc2adbd5644ba22736e962564b23f5828ce',
+  [ChainId.MONAD]: '0x182a927119d56008d921126764bf884221b10f59',
 }
 /**
  * @deprecated use V2_ROUTER_ADDRESSES instead
@@ -83,6 +84,7 @@ export const V2_ROUTER_ADDRESSES: AddressMap = {
   [ChainId.UNICHAIN]: '0x284f11109359a7e1306c3e447ef14d38400063ff',
   [ChainId.MONAD_TESTNET]: '0xfb8e1c3b833f9e67a71c859a132cf783b645e436',
   [ChainId.SONEIUM]: '0x273f68c234fa55b550b40e563c4a488e0d334320',
+  [ChainId.MONAD]: '0x4b2ab38dbf28d31d467aa8993f6c2585981d6804',
 }
 
 // Networks that share most of the same addresses i.e. Mainnet, Goerli, Optimism, Arbitrum, Polygon
@@ -135,7 +137,7 @@ const POLYGON_ADDRESSES: ChainAddresses = {
   v4QuoterAddress: '0xb3d5c3dfc3a7aebff71895a7191796bffc2c81b9',
 }
 
-// celo v3 addresses
+// celo v3 and v4 addresses
 const CELO_ADDRESSES: ChainAddresses = {
   v3CoreFactoryAddress: '0xAfE208a311B21f13EF87E33A90049fC17A7acDEc',
   multicallAddress: '0x633987602DE5C4F337e3DbF265303A1080324204',
@@ -143,6 +145,11 @@ const CELO_ADDRESSES: ChainAddresses = {
   v3MigratorAddress: '0x3cFd4d48EDfDCC53D3f173F596f621064614C582',
   nonfungiblePositionManagerAddress: '0x3d79EdAaBC0EaB6F08ED885C05Fc0B014290D95A',
   tickLensAddress: '0x5f115D9113F88e0a0Db1b5033D90D4a9690AcD3D',
+
+  v4PoolManagerAddress: '0x288dc841A52FCA2707c6947B3A777c5E56cd87BC',
+  v4PositionManagerAddress: '0xf7965f3981e4d5bc383bfbcb61501763e9068ca9',
+  v4StateView: '0xbc21f8720babf4b20d195ee5c6e99c52b76f2bfb',
+  v4QuoterAddress: '0x28566da1093609182dff2cb2a91cfd72e61d66cd',
 }
 
 // BNB v3 addresses
@@ -402,6 +409,16 @@ const MONAD_TESTNET_ADDRESSES: ChainAddresses = {
   swapRouter02Address: '0x4c4eabd5fb1d1a7234a48692551eaecff8194ca7',
 }
 
+const MONAD_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: '0x204faca1764b154221e35c0d20abb3c525710498',
+  multicallAddress: '0xd1b797d92d87b688193a2b976efc8d577d204343',
+  quoterAddress: '0x2d01411773c8c24805306e89a41f7855c3c4fe65',
+  v3MigratorAddress: '0x7078c4537c04c2b2e52ddba06074dbdacf23ca15',
+  nonfungiblePositionManagerAddress: '0x7197e214c0b767cfb76fb734ab638e2c192f4e53',
+  tickLensAddress: '0xf025e0fe9e331a0ef05c2ad3c4e9c64b625cda6f',
+  swapRouter02Address: '0xfe31f71c1b106eac32f1a19239c9a9a72ddfb900',
+}
+
 const SONEIUM_ADDRESSES: ChainAddresses = {
   v3CoreFactoryAddress: '0x42ae7ec7ff020412639d443e245d936429fbe717',
   multicallAddress: '0x8ad5ef2f2508288d2de66f04dd883ad5f4ef62b2',
@@ -446,6 +463,7 @@ export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses>
   [ChainId.UNICHAIN]: UNICHAIN_ADDRESSES,
   [ChainId.MONAD_TESTNET]: MONAD_TESTNET_ADDRESSES,
   [ChainId.SONEIUM]: SONEIUM_ADDRESSES,
+  [ChainId.MONAD]: MONAD_ADDRESSES,
 }
 
 /* V3 Contract Addresses */

@@ -294,6 +294,7 @@ export class UnsignedPriorityOrder implements OffChainOrder {
    * Returns the resolved order with the given options
    * @return The resolved order
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   resolve(_options: PriorityOrderResolutionOptions): ResolvedUniswapXOrder {
     // no cosigner data so no resolution possible
     throw new Error("Method not implemented.");
