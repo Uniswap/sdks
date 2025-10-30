@@ -14,6 +14,8 @@ export interface VerificationResult {
   builderAddress?: string;
   /** Version of the flashtestation protocol, optional */
   version: number;
+  /** Source locators (e.g., GitHub URLs) for the workload source code, optional for backwards compatibility */
+  sourceLocators?: string[];
 }
 
 /**
@@ -52,6 +54,8 @@ export interface FlashtestationEvent {
   blockContentHash: `0x${string}`;
   /** git commit ID of the code used to reproducibly build the workload (string) */
   commitHash: string;
+  /** Source locators (e.g., GitHub URLs) for the workload source code */
+  sourceLocators: string[];
 }
 
 /**

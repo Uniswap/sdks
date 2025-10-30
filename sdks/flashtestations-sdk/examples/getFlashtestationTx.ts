@@ -34,6 +34,7 @@ async function main() {
       console.log(`Version: ${tx.version}`);
       console.log(`Block Content Hash: ${tx.blockContentHash}`);
       console.log(`Commit Hash: ${tx.commitHash}`);
+      console.log(`Source Locators: ${tx.sourceLocators.length > 0 ? tx.sourceLocators.join(', ') : 'None'}`);
     } else {
       // This is not a flashtestation transaction
       console.log('\n✗ This is not a flashtestation transaction.');
