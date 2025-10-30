@@ -248,7 +248,7 @@ type RouterAction = {
 }
 
 function createAction(action: Actions, parameters: any[]): RouterAction {
-    const encodedInput = defaultAbiCoder.encode(
+  const encodedInput = defaultAbiCoder.encode(
     V4_BASE_ACTIONS_ABI_DEFINITION[action].map((v) => v.type),
     parameters
   )
