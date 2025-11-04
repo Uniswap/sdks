@@ -338,7 +338,7 @@ describe('RpcClient', () => {
     });
   });
 
-  describe('getFlashtestationTx', () => {
+  describe('getFlashtestationEvent', () => {
     let client: RpcClient;
 
     beforeEach(() => {
@@ -379,7 +379,7 @@ describe('RpcClient', () => {
       mockParseEventLogs.mockReturnValue([mockLog]);
       mockClient.readContract.mockResolvedValue(mockMetadata);
 
-      const result = await client.getFlashtestationTx(blockNumber);
+      const result = await client.getFlashtestationEvent(blockNumber);
 
       expect(mockGetBlock).toHaveBeenCalledWith({ blockNumber: BigInt(blockNumber) });
       expect(mockGetTransactionReceipt).toHaveBeenCalledWith({ hash: txHash });
@@ -417,7 +417,7 @@ describe('RpcClient', () => {
       mockGetBlock.mockResolvedValue(mockBlock);
       mockGetTransactionReceipt.mockResolvedValue(null);
 
-      const result = await client.getFlashtestationTx(blockNumber);
+      const result = await client.getFlashtestationEvent(blockNumber);
 
       expect(mockGetBlock).toHaveBeenCalledWith({ blockNumber: BigInt(blockNumber) });
       expect(mockGetTransactionReceipt).toHaveBeenCalledWith({ hash: txHash });
@@ -445,7 +445,7 @@ describe('RpcClient', () => {
       mockGetTransactionReceipt.mockResolvedValue(mockReceipt);
       mockParseEventLogs.mockReturnValue([]);
 
-      const result = await client.getFlashtestationTx(blockNumber);
+      const result = await client.getFlashtestationEvent(blockNumber);
 
       expect(mockGetBlock).toHaveBeenCalledWith({ blockNumber: BigInt(blockNumber) });
       expect(mockGetTransactionReceipt).toHaveBeenCalledWith({ hash: txHash });
@@ -473,7 +473,7 @@ describe('RpcClient', () => {
       mockGetTransactionReceipt.mockResolvedValue(mockReceipt);
       mockParseEventLogs.mockReturnValue([]);
 
-      const result = await client.getFlashtestationTx(blockNumber);
+      const result = await client.getFlashtestationEvent(blockNumber);
 
       expect(mockGetBlock).toHaveBeenCalledWith({ blockNumber: BigInt(blockNumber) });
       expect(mockGetTransactionReceipt).toHaveBeenCalledWith({ hash: txHash });
@@ -501,7 +501,7 @@ describe('RpcClient', () => {
       mockGetTransactionReceipt.mockResolvedValue(mockReceipt);
       mockParseEventLogs.mockReturnValue([]);
 
-      const result = await client.getFlashtestationTx(blockNumber);
+      const result = await client.getFlashtestationEvent(blockNumber);
 
       expect(mockGetBlock).toHaveBeenCalledWith({ blockNumber: BigInt(blockNumber) });
       expect(mockGetTransactionReceipt).toHaveBeenCalledWith({ hash: txHash });

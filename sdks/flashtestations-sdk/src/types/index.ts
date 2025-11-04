@@ -1,22 +1,31 @@
-/**
- * Result of flashtestation verification
- */
-export interface VerificationResult {
-  /** Whether the block was built by a TEE running the specified workload */
-  isBuiltByExpectedTee: boolean;
-  /** workload ID of the TEE workload, null if not TEE-built */
-  workloadId: string | null;
-  /** Commit hash of the TEE workload source code, null if not TEE-built */
-  commitHash: string | null;
-  /** Block explorer link for the block, null if not TEE-built */
-  blockExplorerLink: string | null;
+export type WorkloadMetadata = {
+  /** workload ID of the TEE workload*/
+  workloadId: string;
+  /** Commit hash of the TEE workload source code */
+  commitHash: string;
   /** Address of the block builder, optional */
-  builderAddress?: string;
+  builderAddress: string;
   /** Version of the flashtestation protocol, optional */
   version: number;
   /** Source locators (e.g., GitHub URLs) for the workload source code, optional for backwards compatibility */
-  sourceLocators?: string[];
+  sourceLocators: string[];
 }
+
+/**
+ * Result of flashtestation verification
+ */
+export type VerificationResult = | {
+  /** Block was built by the expected TEE workload */
+  isBuiltByExpectedTee: true;
+  blockExplorerLink: string | null;
+  workloadMetadata: WorkloadMetadata;
+}
+| {
+  /** Block was NOT built by the expected TEE workload */
+  isBuiltByExpectedTee: false;
+  blockExplorerLink: string | null;
+  workloadMetadata: WorkloadMetadata | null;
+};
 
 /**
  * TEE workload measurement registers used for workload ID computation
@@ -72,6 +81,16 @@ export interface ChainConfig {
   defaultRpcUrl: string;
   /** Block explorer base URL */
   blockExplorerUrl: string;
+}
+
+/**
+ * Minimal configuration options for the JSON-RPC client to interact with the blockchain
+ */
+export interface ClientConfig {
+  /** Chain ID to network */
+  chainId: number;
+  /** Optional custom RPC URL (overrides default) */
+  rpcUrl?: string;
 }
 
 /**

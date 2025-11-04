@@ -1,4 +1,4 @@
-import { verifyFlashtestationInBlock } from '../src/verification/service';
+import { verifyFlashtestationInBlock } from '../src/index';
 
 /**
  * Example: Verify if a block was built by a specific TEE workload
@@ -43,19 +43,27 @@ async function main() {
 
     if (result.isBuiltByExpectedTee) {
       console.log('\n✓ Block was built by the specified TEE workload!\n');
-      console.log(`Workload ID: ${result.workloadId}`);
-      console.log(`Commit Hash: ${result.commitHash}`);
-      console.log(`Builder Address: ${result.builderAddress}`);
-      console.log(`Version: ${result.version}`);
-      console.log(`Source Locators: ${result.sourceLocators && result.sourceLocators.length > 0 ? result.sourceLocators.join(', ') : 'None'}`)
+      console.log(`Workload ID: ${result.workloadMetadata.workloadId}`);
+      console.log(`Commit Hash: ${result.workloadMetadata.commitHash}`);
+      console.log(`Builder Address: ${result.workloadMetadata.builderAddress}`);
+      console.log(`Version: ${result.workloadMetadata.version}`);
+      console.log(`Source Locators: ${result.workloadMetadata.sourceLocators && result.workloadMetadata.sourceLocators.length > 0 ? result.workloadMetadata.sourceLocators.join(', ') : 'None'}`)
       if (result.blockExplorerLink) {
         console.log(`Block Explorer: ${result.blockExplorerLink}`);
       }
     } else {
-      console.log('\n✗ Block was NOT built by the specified TEE workload.\n');
-      console.log('The block either:');
-      console.log('  1. Does not contain a flashtestation transaction');
-      console.log('  2. Contains a flashtestation from a different workload');
+      console.log('\n✗ Block was NOT built by the specified TEE workload\n');
+
+      if (result.workloadMetadata) {
+        console.log('Block was built by a different TEE workload:');
+        console.log(`Workload ID: ${result.workloadMetadata.workloadId}`);
+        console.log(`Commit Hash: ${result.workloadMetadata.commitHash}`);
+        console.log(`Builder Address: ${result.workloadMetadata.builderAddress}`);
+        console.log(`Version: ${result.workloadMetadata.version}`);
+        console.log(`Source Locators: ${result.workloadMetadata.sourceLocators.length > 0 ? result.workloadMetadata.sourceLocators.join(', ') : 'None'}`)
+      } else {
+        console.log('The block does not contain a flashtestation transaction')
+      }
     }
 
     // You can also verify specific blocks:

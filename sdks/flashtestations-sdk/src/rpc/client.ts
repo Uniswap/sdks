@@ -304,7 +304,7 @@ export class RpcClient {
    * @returns FlashtestationEvent data if it's a flashtestation tx, null otherwise
    * @throws NetworkError if RPC connection fails
    */
-  async getFlashtestationTx(
+  async getFlashtestationEvent(
     blockParameter: BlockParameter = 'latest'
   ): Promise<FlashtestationEvent | null> {
     return retry(
