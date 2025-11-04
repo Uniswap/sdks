@@ -130,8 +130,6 @@ export async function verifyFlashtestationInBlock(
     blockExplorerLink = `${blockExplorerBaseUrl}/block/${block.number}`;
   }
 
-  // TODO(melvillian): get the sourceLocator from the block
-
   // Block was built by the specified TEE workload
   return {
     isBuiltByExpectedTee: true,
@@ -140,5 +138,6 @@ export async function verifyFlashtestationInBlock(
     blockExplorerLink: blockExplorerLink,
     builderAddress: flashtestationEvent.caller,
     version: flashtestationEvent.version,
+    sourceLocators: flashtestationEvent.sourceLocators,
   };
 }

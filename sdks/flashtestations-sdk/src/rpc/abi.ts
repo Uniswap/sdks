@@ -33,4 +33,35 @@ export const flashtestationAbi = [
       },
     ],
   },
+  {
+    type: 'function',
+    name: 'getWorkloadMetadata',
+    inputs: [
+      {
+        name: 'workloadId',
+        type: 'bytes32',
+        internalType: 'WorkloadId',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'tuple',
+        internalType: 'struct IBlockBuilderPolicy.WorkloadMetadata',
+        components: [
+          {
+            name: 'commitHash',
+            type: 'string',
+            internalType: 'string',
+          },
+          {
+            name: 'sourceLocators',
+            type: 'string[]',
+            internalType: 'string[]',
+          },
+        ],
+      },
+    ],
+    stateMutability: 'view',
+  },
 ] as const;

@@ -20,10 +20,12 @@ describe('RpcClient', () => {
 
     mockGetBlock = jest.fn();
     mockGetTransactionReceipt = jest.fn();
+    const mockReadContract = jest.fn();
 
     mockClient = {
       getBlock: mockGetBlock,
       getTransactionReceipt: mockGetTransactionReceipt,
+      readContract: mockReadContract,
     };
 
     // Setup mocks
@@ -175,6 +177,89 @@ describe('RpcClient', () => {
     });
   });
 
+  describe('getSourceLocators', () => {
+    let client: RpcClient;
+    let mockReadContract: jest.Mock;
+
+    beforeEach(() => {
+      client = new RpcClient({ chainId: 1301, maxRetries: 0 });
+      mockReadContract = mockClient.readContract;
+    });
+
+    it('should fetch source locators for a workload ID', async () => {
+      const workloadId = '0x71d62ba17902d590dad932310a7ec12feffa25454d7009c2084aa6f4c488953f' as `0x${string}`;
+      const mockMetadata = {
+        commitHash: '490fb2be109f0c2626c347bb3e43e97826c8f844',
+        sourceLocators: ['https://github.com/example/repo1/c41fa4d500f6fb4e4fe46c23b34b26367e10beb4', 'https://github.com/example/repo2/86ebf9de12466aaae1485eb6fc80ae3c78954edf']
+      };
+      mockReadContract.mockResolvedValue(mockMetadata);
+
+      const result = await client.getSourceLocators(workloadId);
+
+      expect(mockReadContract).toHaveBeenCalledWith(
+        expect.objectContaining({
+          address: '0x3b03b3caabd49ca12de9eba46a6a2950700b1db4',
+          functionName: 'getWorkloadMetadata',
+          args: [workloadId],
+        })
+      );
+      expect(result).toEqual(['https://github.com/example/repo1/c41fa4d500f6fb4e4fe46c23b34b26367e10beb4', 'https://github.com/example/repo2/86ebf9de12466aaae1485eb6fc80ae3c78954edf']);
+    });
+
+    it('should handle empty source locators', async () => {
+      const workloadId = '0x71d62ba17902d590dad932310a7ec12feffa25454d7009c2084aa6f4c488953f' as `0x${string}`;
+      const mockMetadata = {
+        commitHash: '490fb2be109f0c2626c347bb3e43e97826c8f844',
+        sourceLocators: []
+      };
+      mockReadContract.mockResolvedValue(mockMetadata);
+
+      const result = await client.getSourceLocators(workloadId);
+
+      expect(result).toEqual([]);
+    });
+
+    it('should retry on transient failures', async () => {
+      const workloadId = '0x71d62ba17902d590dad932310a7ec12feffa25454d7009c2084aa6f4c488953f' as `0x${string}`;
+      const mockMetadata = {
+        commitHash: '490fb2be109f0c2626c347bb3e43e97826c8f844',
+        sourceLocators: ['https://github.com/example/repo/86ebf9de12466aaae1485eb6fc80ae3c78954edf']
+      };
+
+      const clientWithRetry = new RpcClient({
+        chainId: 1301,
+        maxRetries: 2,
+        initialRetryDelay: 10
+      });
+      const mockReadContractWithRetry = clientWithRetry.getClient().readContract as jest.Mock;
+
+      mockReadContractWithRetry
+        .mockRejectedValueOnce(new Error('Network error'))
+        .mockResolvedValueOnce(mockMetadata);
+
+      const result = await clientWithRetry.getSourceLocators(workloadId);
+
+      expect(mockReadContractWithRetry).toHaveBeenCalledTimes(2);
+      expect(result).toEqual(['https://github.com/example/repo/86ebf9de12466aaae1485eb6fc80ae3c78954edf']);
+    });
+
+    it('should throw NetworkError after max retries', async () => {
+      const workloadId = '0x71d62ba17902d590dad932310a7ec12feffa25454d7009c2084aa6f4c488953f' as `0x${string}`;
+
+      const clientWithRetry = new RpcClient({
+        chainId: 1301,
+        maxRetries: 1,
+        initialRetryDelay: 10
+      });
+      const mockReadContractWithRetry = clientWithRetry.getClient().readContract as jest.Mock;
+
+      mockReadContractWithRetry.mockRejectedValue(new Error('Network error'));
+
+      await expect(clientWithRetry.getSourceLocators(workloadId)).rejects.toThrow(NetworkError);
+      expect(mockReadContractWithRetry).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe('retry logic', () => {
     it('should retry failed requests with exponential backoff', async () => {
       const client = new RpcClient({
@@ -284,10 +369,15 @@ describe('RpcClient', () => {
           commitHash: '490fb2be109f0c2626c347bb3e43e97826c8f844',
         },
       };
+      const mockMetadata = {
+        commitHash: '490fb2be109f0c2626c347bb3e43e97826c8f844',
+        sourceLocators: ['https://github.com/example/repo1/86ebf9de12466aaae1485eb6fc80ae3c78954edf', 'https://github.com/example/repo2/f6cf154d5a26c632548d85998c2a7dab40d8ef02']
+      };
 
       mockGetBlock.mockResolvedValue(mockBlock);
       mockGetTransactionReceipt.mockResolvedValue(mockReceipt);
       mockParseEventLogs.mockReturnValue([mockLog]);
+      mockClient.readContract.mockResolvedValue(mockMetadata);
 
       const result = await client.getFlashtestationTx(blockNumber);
 
@@ -299,12 +389,19 @@ describe('RpcClient', () => {
           logs: mockReceipt.logs,
         })
       );
+      expect(mockClient.readContract).toHaveBeenCalledWith(
+        expect.objectContaining({
+          functionName: 'getWorkloadMetadata',
+          args: ['0x71d62ba17902d590dad932310a7ec12feffa25454d7009c2084aa6f4c488953f'],
+        })
+      );
       expect(result).toEqual({
         caller: '0xcaBBa9e7f4b3A885C5aa069f88469ac711Dd4aCC',
         workloadId: '0x71d62ba17902d590dad932310a7ec12feffa25454d7009c2084aa6f4c488953f',
         version: 1,
         blockContentHash: '0x846604baa7db2297b9c4058106cc5869bcdbb753760981dbcd6d345d3d5f3e0f',
         commitHash: '490fb2be109f0c2626c347bb3e43e97826c8f844',
+        sourceLocators: ['https://github.com/example/repo1/86ebf9de12466aaae1485eb6fc80ae3c78954edf', 'https://github.com/example/repo2/f6cf154d5a26c632548d85998c2a7dab40d8ef02'],
       });
     });
 
