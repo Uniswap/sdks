@@ -417,6 +417,11 @@ const MONAD_ADDRESSES: ChainAddresses = {
   nonfungiblePositionManagerAddress: '0x7197e214c0b767cfb76fb734ab638e2c192f4e53',
   tickLensAddress: '0xf025e0fe9e331a0ef05c2ad3c4e9c64b625cda6f',
   swapRouter02Address: '0xfe31f71c1b106eac32f1a19239c9a9a72ddfb900',
+  // v4
+  v4PoolManagerAddress: '0x188d586ddcf52439676ca21a244753fa19f9ea8e',
+  v4PositionManagerAddress: '0x5b7ec4a94ff9bedb700fb82ab09d5846972f4016',
+  v4StateView : '0x77395f3b2e73ae90843717371294fa97cc419d64',
+  v4QuoterAddress : '0xa222dd357a9076d1091ed6aa2e16c9742dd26891',
 }
 
 const SONEIUM_ADDRESSES: ChainAddresses = {
