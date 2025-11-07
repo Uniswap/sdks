@@ -188,3 +188,128 @@ const payload = SwapRouter.getExecuteSignedPayload(
 - **Skip verification**: Pass `'0x0000000000000000000000000000000000000000'`
 
 The SDK automatically sets `verifySender` based on whether sender is address(0).
+
+## Cross-Chain Bridging with Across (Universal Router v2.1)
+
+Universal Router v2.1 integrates with Across Protocol V3 to enable seamless cross-chain bridging after swaps. This allows you to swap tokens on one chain and automatically bridge them to another chain in a single transaction.
+
+### Basic Usage
+
+```typescript
+import { SwapRouter } from '@uniswap/universal-router-sdk'
+import { BigNumber } from 'ethers'
+
+// 1. Prepare your swap (e.g., USDC → WETH on mainnet)
+const { calldata, value } = SwapRouter.swapCallParameters(
+  trade,
+  swapOptions,
+  [
+    {
+      // Bridge configuration
+      depositor: userAddress,
+      recipient: userAddress,  // Recipient on destination chain
+      inputToken: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',  // WETH mainnet
+      outputToken: '0x4200000000000000000000000000000000000006',   // WETH optimism
+      inputAmount: BigNumber.from('1000000000000000000'),  // 1 WETH
+      outputAmount: BigNumber.from('990000000000000000'),  // 0.99 WETH (with fees)
+      destinationChainId: 10,  // Optimism
+      exclusiveRelayer: '0x0000000000000000000000000000000000000000',
+      quoteTimestamp: Math.floor(Date.now() / 1000),
+      fillDeadline: Math.floor(Date.now() / 1000) + 3600,
+      exclusivityDeadline: 0,
+      message: '0x',
+      useNative: false,
+    }
+  ]
+)
+```
+
+### Swap + Bridge Example
+
+```typescript
+// Swap USDC to WETH, then bridge WETH to Optimism
+const bridgeParams = {
+  depositor: userAddress,
+  recipient: userAddress,  // Can be different address on destination
+  inputToken: WETH_MAINNET,
+  outputToken: WETH_OPTIMISM,
+  inputAmount: CONTRACT_BALANCE,  // Use entire swap output
+  outputAmount: expectedOutputAmount,
+  destinationChainId: 10,
+  exclusiveRelayer: '0x0000000000000000000000000000000000000000',
+  quoteTimestamp: Math.floor(Date.now() / 1000),
+  fillDeadline: Math.floor(Date.now() / 1000) + 3600,
+  exclusivityDeadline: 0,
+  message: '0x',  // Optional message to execute on destination
+  useNative: false,  // Set to true to bridge native ETH
+}
+
+const { calldata, value } = SwapRouter.swapCallParameters(
+  trade,
+  swapOptions,
+  [bridgeParams]  // Array of bridge operations
+)
+```
+
+### Using CONTRACT_BALANCE
+
+When bridging after a swap, you often don't know the exact output amount. Use `CONTRACT_BALANCE` to bridge the entire contract balance:
+
+```typescript
+import { CONTRACT_BALANCE } from '@uniswap/universal-router-sdk'
+
+const bridgeParams = {
+  // ... other params
+  inputAmount: CONTRACT_BALANCE,  // Bridge entire balance after swap
+  // ... other params
+}
+```
+
+### Multiple Bridge Operations
+
+You can perform multiple bridge operations after a swap:
+
+```typescript
+const { calldata, value } = SwapRouter.swapCallParameters(
+  trade,
+  swapOptions,
+  [
+    {
+      // Bridge 50% to Optimism
+      inputToken: WETH_MAINNET,
+      outputToken: WETH_OPTIMISM,
+      inputAmount: BigNumber.from('500000000000000000'),
+      destinationChainId: 10,
+      // ... other params
+    },
+    {
+      // Bridge remaining USDC to Arbitrum
+      inputToken: USDC_MAINNET,
+      outputToken: USDC_ARBITRUM,
+      inputAmount: CONTRACT_BALANCE,
+      destinationChainId: 42161,
+      // ... other params
+    }
+  ]
+)
+```
+
+### Native ETH Bridging
+
+To bridge native ETH instead of WETH:
+
+```typescript
+const bridgeParams = {
+  inputToken: WETH_ADDRESS,  // Must be WETH address
+  outputToken: WETH_ON_DESTINATION,
+  useNative: true,  // Bridge as native ETH
+  // ... other params
+}
+```
+
+### Important Notes
+
+1. **Across Quote**: Bridge parameters (especially `outputAmount`, `quoteTimestamp`, `fillDeadline`) should come from the Across API quote
+2. **Recipient Address**: Can be different from the sender, allowing cross-chain transfers to other addresses
+3. **Message Passing**: The `message` field allows executing arbitrary calls on the destination chain
+4. **Slippage**: The `outputAmount` already accounts for bridge fees and slippage

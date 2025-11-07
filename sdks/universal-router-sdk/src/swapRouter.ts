@@ -20,6 +20,7 @@ import {
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
 import { Currency, TradeType, Percent, CHAIN_TO_ADDRESSES_MAP, SupportedChainsType } from '@uniswap/sdk-core'
 import { UniswapTrade, SwapOptions } from './entities/actions/uniswap'
+import { AcrossV4DepositV3Params } from './entities/actions/across'
 import { RoutePlanner, CommandType } from './utils/routerCommands'
 import { encodePermit, encodeV3PositionPermit } from './utils/inputTokens'
 import { UNIVERSAL_ROUTER_ADDRESS, UniversalRouterVersion } from './utils/constants'
@@ -68,7 +69,8 @@ export abstract class SwapRouter {
 
   public static swapCallParameters(
     trades: RouterTrade<Currency, Currency, TradeType>,
-    options: SwapOptions
+    options: SwapOptions,
+    bridgeOptions?: AcrossV4DepositV3Params[]  // Optional bridge parameters
   ): MethodParameters {
     // TODO: use permit if signature included in swapOptions
     const planner = new RoutePlanner()
@@ -87,6 +89,14 @@ export abstract class SwapRouter {
       : BigNumber.from(0)
 
     trade.encode(planner, { allowRevert: false })
+
+    // Add bridge commands if provided
+    if (bridgeOptions) {
+      for (const bridge of bridgeOptions) {
+        planner.addAcrossBridge(bridge)
+      }
+    }
+
     return SwapRouter.encodePlan(planner, nativeCurrencyValue, {
       deadline: options.deadlineOrPreviousBlockhash ? BigNumber.from(options.deadlineOrPreviousBlockhash) : undefined,
     })
