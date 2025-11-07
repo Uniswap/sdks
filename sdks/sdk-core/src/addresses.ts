@@ -439,6 +439,16 @@ const SONEIUM_ADDRESSES: ChainAddresses = {
   v4QuoterAddress: '0x3972c00f7ed4885e145823eb7c655375d275a1c5',
 }
 
+const BLOCKDAG_AWAKENING_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: '0x3554fF0232a5f5315651B07783d40DDEa5fB1635',
+  multicallAddress: '0x33713842D3AEa5C4401153Bf333A18F0AEbe675C',
+  quoterAddress: '0x45a05B1e370EC9d73c5D8E588dD038b975B1ee36',
+  v3MigratorAddress: '0x4A9403D922D33422ac8d961dA9CCDbAa0031c327',
+  nonfungiblePositionManagerAddress: '0xd36aaE88283aD096526F695aD9d8BDC6Ba2EED93',
+  tickLensAddress: '0x658769766598D14A6e81ffFb49D76b605ab54b50',
+  swapRouter02Address: '0x1cD236e7DAda17051159a73d6505D036fC9dE861',
+}
+
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
   [ChainId.MAINNET]: MAINNET_ADDRESSES,
   [ChainId.OPTIMISM]: OPTIMISM_ADDRESSES,
@@ -469,6 +479,7 @@ export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses>
   [ChainId.MONAD_TESTNET]: MONAD_TESTNET_ADDRESSES,
   [ChainId.SONEIUM]: SONEIUM_ADDRESSES,
   [ChainId.MONAD]: MONAD_ADDRESSES,
+  [ChainId.BLOCKDAG_AWAKENING]: BLOCKDAG_AWAKENING_ADDRESSES,
 }
 
 /* V3 Contract Addresses */
