@@ -25,7 +25,7 @@
     "@uniswap/swap-router-contracts": "^1.3.0",
     "@uniswap/v2-sdk": "^4.16.0",
     "@uniswap/v3-sdk": "^3.26.0",
-    "@uniswap/v4-sdk": "^1.22.0"
+    "@uniswap/v4-sdk": "workspace:*"
   },
   "devDependencies": {
     "@types/jest": "^24.0.25",

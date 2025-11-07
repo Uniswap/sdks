@@ -4841,30 +4841,13 @@ __metadata:
     "@uniswap/swap-router-contracts": ^1.3.0
     "@uniswap/v2-sdk": ^4.16.0
     "@uniswap/v3-sdk": ^3.26.0
-    "@uniswap/v4-sdk": ^1.22.0
+    "@uniswap/v4-sdk": "workspace:*"
     eslint-config-prettier: ^9.1.0
     eslint-plugin-prettier: ^3.4.1
     prettier: ^2.4.1
     tsdx: ^0.14.1
   languageName: unknown
   linkType: soft
-
-"@uniswap/sdk-core@npm:^7.5.0, @uniswap/sdk-core@npm:^7.6.0, @uniswap/sdk-core@npm:^7.8.0":
-  version: 7.8.0
-  resolution: "@uniswap/sdk-core@npm:7.8.0"
-  dependencies:
-    "@ethersproject/address": ^5.0.2
-    "@ethersproject/bytes": ^5.7.0
-    "@ethersproject/keccak256": 5.7.0
-    "@ethersproject/strings": 5.7.0
-    big.js: ^5.2.2
-    decimal.js-light: ^2.5.0
-    jsbi: ^3.1.4
-    tiny-invariant: ^1.1.0
-    toformat: ^2.0.0
-  checksum: 228b830fab2b165467b1e099762cf608126af4ee34daccaf6ba80ea68208ab8c705551d1056939236e83609a45e51459ea635868da847e2ea61c856d0be9e22b
-  languageName: node
-  linkType: hard
 
 "@uniswap/sdk-core@workspace:sdks/sdk-core":
   version: 0.0.0-use.local
@@ -5002,7 +4985,7 @@ __metadata:
     "@uniswap/v2-sdk": ^4.16.0
     "@uniswap/v3-core": 1.0.0
     "@uniswap/v3-sdk": ^3.26.0
-    "@uniswap/v4-sdk": ^1.22.0
+    "@uniswap/v4-sdk": "workspace:*"
     bignumber.js: ^9.0.2
     chai: ^4.3.6
     dotenv: ^16.0.3
@@ -5154,19 +5137,6 @@ __metadata:
     "@uniswap/v3-core": 1.0.0
     "@uniswap/v3-periphery": ^1.0.1
   checksum: 5a68e59f33d4761956ad735c8ce5ea6e566076bd260ea0a0bb4b3a0db237719e39f21a22eb0a5a231141efdf0154bfe03f690612d632898f33192b4442c888b3
-  languageName: node
-  linkType: hard
-
-"@uniswap/v4-sdk@npm:^1.22.0":
-  version: 1.22.0
-  resolution: "@uniswap/v4-sdk@npm:1.22.0"
-  dependencies:
-    "@ethersproject/solidity": ^5.0.9
-    "@uniswap/sdk-core": ^7.8.0
-    "@uniswap/v3-sdk": 3.26.0
-    tiny-invariant: ^1.1.0
-    tiny-warning: ^1.0.3
-  checksum: 6e590ed4f7cc1f8c86e27cec2837308b74a7dc0288c813809aafd5c08b3906ef9c425f6bc1acbbab68b62c75b218e28b270a4afb519a1c92feddeedc4d118054
   languageName: node
   linkType: hard
 

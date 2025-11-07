@@ -37,6 +37,8 @@
   ],
   "resolutions": {
     "@manypkg/cli@^0.19.2": "patch:@manypkg/cli@npm%3A0.19.2#./.yarn/patches/@manypkg-cli-npm-0.19.2-ea52ff91d4.patch",
-    "eslint-config-prettier": "^9.1.0"
+    "eslint-config-prettier": "^9.1.0",
+    "@uniswap/v4-sdk": "workspace:sdks/v4-sdk",
+    "@uniswap/sdk-core": "workspace:sdks/sdk-core"
   }
 }
