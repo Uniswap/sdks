@@ -9,7 +9,7 @@ import {
 import { verifyFlashtestationInBlock } from '../../src/verification/service';
 
 describe('verifyFlashtestationInBlock', () => {
-  let mockGetFlashtestationTx: jest.Mock;
+  let mockgetFlashtestationEvent: jest.Mock;
   let mockGetBlock: jest.Mock;
   let mockRpcClientConstructor: jest.SpyInstance;
   let mockComputeWorkloadId: jest.SpyInstance;
@@ -17,7 +17,7 @@ describe('verifyFlashtestationInBlock', () => {
 
   beforeEach(() => {
     // Setup mocks
-    mockGetFlashtestationTx = jest.fn();
+    mockgetFlashtestationEvent = jest.fn();
     mockGetBlock = jest.fn();
 
     // Mock RpcClient constructor
@@ -26,7 +26,7 @@ describe('verifyFlashtestationInBlock', () => {
       .mockImplementation(
         () =>
           ({
-            getFlashtestationTx: mockGetFlashtestationTx,
+            getFlashtestationEvent: mockgetFlashtestationEvent,
             getBlock: mockGetBlock,
           } as any)
       );
@@ -55,6 +55,7 @@ describe('verifyFlashtestationInBlock', () => {
         version: 1,
         blockContentHash: '0xblockhash' as `0x${string}`,
         commitHash: 'abc123def456',
+        sourceLocators: ['https://github.com/flashbots/flashbots-images/commit/b7c707667393cc4c0173786ee32ec3a79009b04f'],
       };
 
       const mockBlock = {
@@ -62,7 +63,7 @@ describe('verifyFlashtestationInBlock', () => {
         hash: '0xblockhash',
       };
 
-      mockGetFlashtestationTx.mockResolvedValue(mockEvent);
+      mockgetFlashtestationEvent.mockResolvedValue(mockEvent);
       mockGetBlock.mockResolvedValue(mockBlock);
 
       const result = await verifyFlashtestationInBlock(
@@ -73,12 +74,17 @@ describe('verifyFlashtestationInBlock', () => {
 
       expect(result).toEqual({
         isBuiltByExpectedTee: true,
-        commitHash: 'abc123def456',
         blockExplorerLink: 'https://sepolia.uniscan.xyz/block/12345',
-        builderAddress: '0xbuilder123',
+        workloadMetadata: {
+          workloadId: workloadId,
+          commitHash: 'abc123def456',
+          builderAddress: '0xbuilder123',
+          version: 1,
+          sourceLocators: ['https://github.com/flashbots/flashbots-images/commit/b7c707667393cc4c0173786ee32ec3a79009b04f'],
+        },
       });
 
-      expect(mockGetFlashtestationTx).toHaveBeenCalledWith('latest');
+      expect(mockgetFlashtestationEvent).toHaveBeenCalledWith('latest');
       expect(mockGetBlock).toHaveBeenCalledWith('latest');
     });
 
@@ -90,6 +96,7 @@ describe('verifyFlashtestationInBlock', () => {
         version: 1,
         blockContentHash: '0xblockhash' as `0x${string}`,
         commitHash: 'abc123def456',
+        sourceLocators: ['https://github.com/flashbots/flashbots-images/commit/b7c707667393cc4c0173786ee32ec3a79009b04f'],
       };
 
       const mockBlock = {
@@ -97,7 +104,7 @@ describe('verifyFlashtestationInBlock', () => {
         hash: '0xblockhash',
       };
 
-      mockGetFlashtestationTx.mockResolvedValue(mockEvent);
+      mockgetFlashtestationEvent.mockResolvedValue(mockEvent);
       mockGetBlock.mockResolvedValue(mockBlock);
 
       const result = await verifyFlashtestationInBlock(
@@ -117,6 +124,7 @@ describe('verifyFlashtestationInBlock', () => {
         version: 1,
         blockContentHash: '0xblockhash' as `0x${string}`,
         commitHash: 'abc123def456',
+        sourceLocators: ['https://github.com/flashbots/flashbots-images/commit/b7c707667393cc4c0173786ee32ec3a79009b04f'],
       };
 
       const mockBlock = {
@@ -124,7 +132,7 @@ describe('verifyFlashtestationInBlock', () => {
         hash: '0xblockhash',
       };
 
-      mockGetFlashtestationTx.mockResolvedValue(mockEvent);
+      mockgetFlashtestationEvent.mockResolvedValue(mockEvent);
       mockGetBlock.mockResolvedValue(mockBlock);
 
       const result = await verifyFlashtestationInBlock(
@@ -137,7 +145,7 @@ describe('verifyFlashtestationInBlock', () => {
     });
 
     it('should return isBuiltByExpectedTee: false when no flashtestation transaction found', async () => {
-      mockGetFlashtestationTx.mockResolvedValue(null);
+      mockgetFlashtestationEvent.mockResolvedValue(null);
 
       const result = await verifyFlashtestationInBlock(
         workloadId,
@@ -147,11 +155,11 @@ describe('verifyFlashtestationInBlock', () => {
 
       expect(result).toEqual({
         isBuiltByExpectedTee: false,
-        commitHash: null,
         blockExplorerLink: null,
+        workloadMetadata: null,
       });
 
-      expect(mockGetFlashtestationTx).toHaveBeenCalledWith('latest');
+      expect(mockgetFlashtestationEvent).toHaveBeenCalledWith('latest');
       expect(mockGetBlock).not.toHaveBeenCalled();
     });
 
@@ -163,9 +171,17 @@ describe('verifyFlashtestationInBlock', () => {
         version: 1,
         blockContentHash: '0xblockhash' as `0x${string}`,
         commitHash: 'abc123def456',
+        sourceLocators: ['https://github.com/flashbots/flashbots-images/commit/b7c707667393cc4c0173786ee32ec3a79009b04f'],
+
       };
 
-      mockGetFlashtestationTx.mockResolvedValue(mockEvent);
+      const mockBlock = {
+        number: BigInt(12345),
+        hash: '0xblockhash',
+      };
+
+      mockgetFlashtestationEvent.mockResolvedValue(mockEvent);
+      mockGetBlock.mockResolvedValue(mockBlock);
 
       const result = await verifyFlashtestationInBlock(
         workloadId,
@@ -175,12 +191,18 @@ describe('verifyFlashtestationInBlock', () => {
 
       expect(result).toEqual({
         isBuiltByExpectedTee: false,
-        commitHash: null,
-        blockExplorerLink: null,
+        blockExplorerLink: 'https://sepolia.uniscan.xyz/block/12345',
+        workloadMetadata: {
+          workloadId: differentWorkloadId,
+          commitHash: 'abc123def456',
+          builderAddress: '0xbuilder123',
+          version: 1,
+          sourceLocators: ['https://github.com/flashbots/flashbots-images/commit/b7c707667393cc4c0173786ee32ec3a79009b04f'],
+        },
       });
 
-      expect(mockGetFlashtestationTx).toHaveBeenCalledWith('latest');
-      expect(mockGetBlock).not.toHaveBeenCalled();
+      expect(mockgetFlashtestationEvent).toHaveBeenCalledWith('latest');
+      expect(mockGetBlock).toHaveBeenCalledWith('latest');
     });
 
     it('should handle null block explorer URL', async () => {
@@ -199,7 +221,7 @@ describe('verifyFlashtestationInBlock', () => {
         hash: '0xblockhash',
       };
 
-      mockGetFlashtestationTx.mockResolvedValue(mockEvent);
+      mockgetFlashtestationEvent.mockResolvedValue(mockEvent);
       mockGetBlock.mockResolvedValue(mockBlock);
 
       const result = await verifyFlashtestationInBlock(
@@ -225,24 +247,24 @@ describe('verifyFlashtestationInBlock', () => {
         hash: '0xblockhash',
       };
 
-      mockGetFlashtestationTx.mockResolvedValue(mockEvent);
+      mockgetFlashtestationEvent.mockResolvedValue(mockEvent);
       mockGetBlock.mockResolvedValue(mockBlock);
 
       // Test with block number
       await verifyFlashtestationInBlock(workloadId, 54321, config);
-      expect(mockGetFlashtestationTx).toHaveBeenCalledWith(54321);
+      expect(mockgetFlashtestationEvent).toHaveBeenCalledWith(54321);
 
       // Test with finalized tag
       await verifyFlashtestationInBlock(workloadId, 'finalized', config);
-      expect(mockGetFlashtestationTx).toHaveBeenCalledWith('finalized');
+      expect(mockgetFlashtestationEvent).toHaveBeenCalledWith('finalized');
 
       // Test with hex block number
       await verifyFlashtestationInBlock(workloadId, '0xd431', config);
-      expect(mockGetFlashtestationTx).toHaveBeenCalledWith('0xd431');
+      expect(mockgetFlashtestationEvent).toHaveBeenCalledWith('0xd431');
     });
 
     it('should propagate BlockNotFoundError', async () => {
-      mockGetFlashtestationTx.mockRejectedValue(
+      mockgetFlashtestationEvent.mockRejectedValue(
         new BlockNotFoundError('latest')
       );
 
@@ -252,7 +274,7 @@ describe('verifyFlashtestationInBlock', () => {
     });
 
     it('should propagate NetworkError', async () => {
-      mockGetFlashtestationTx.mockRejectedValue(
+      mockgetFlashtestationEvent.mockRejectedValue(
         new NetworkError('Connection failed')
       );
 
@@ -267,19 +289,16 @@ describe('verifyFlashtestationInBlock', () => {
       tdAttributes: '0x0000001000000000',
       xFAM: '0xe702060000000000',
       mrTd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
-      mrConfigId: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
-      rtMr0: '0xa7157e7c5f932e9babac9209d4527ec9ed837b8e335a931517677fa746db51ee56062e3324e266e3f39ec26a516f4f71',
-      rtMr1: '0xe63560e50830e22fbc9b06cdce8afe784bf111e4251256cf104050f1347cd4ad9f30da408475066575145da0b098a124',
-      rtMr2: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+      mrConfigId: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+      rtMr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
+      rtMr1: '0xa7157e7c5f932e9babac9209d4527ec9ed837b8e335a931517677fa746db51ee56062e3324e266e3f39ec26a516f4f71',
+      rtMr2: '0xe63560e50830e22fbc9b06cdce8afe784bf111e4251256cf104050f1347cd4ad9f30da408475066575145da0b098a124',
       rtMr3: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
     };
 
-    const computedWorkloadId = '0xeee0d5f864e6d46d6da790c7d60baac5c8478eb89e86667336d3f17655e9164e';
+    const computedWorkloadId = '0xf724e7d117f5655cf33beefdfc7d31e930278fcb65cf6d1de632595e97ca82b2';
+    
     const config = { chainId: 1301 };
-
-    beforeEach(() => {
-      mockComputeWorkloadId.mockReturnValue(computedWorkloadId);
-    });
 
     it('should compute workload ID from registers and verify', async () => {
       const mockEvent = {
@@ -288,6 +307,7 @@ describe('verifyFlashtestationInBlock', () => {
         version: 1,
         blockContentHash: '0xblockhash' as `0x${string}`,
         commitHash: 'register-commit',
+        sourceLocators: ['https://github.com/flashbots/flashbots-images/commit/b7c707667393cc4c0173786ee32ec3a79009b04f'],
       };
 
       const mockBlock = {
@@ -295,7 +315,7 @@ describe('verifyFlashtestationInBlock', () => {
         hash: '0xblockhash',
       };
 
-      mockGetFlashtestationTx.mockResolvedValue(mockEvent);
+      mockgetFlashtestationEvent.mockResolvedValue(mockEvent);
       mockGetBlock.mockResolvedValue(mockBlock);
 
       const result = await verifyFlashtestationInBlock(
@@ -307,9 +327,63 @@ describe('verifyFlashtestationInBlock', () => {
       expect(mockComputeWorkloadId).toHaveBeenCalledWith(registers);
       expect(result).toEqual({
         isBuiltByExpectedTee: true,
-        commitHash: 'register-commit',
         blockExplorerLink: 'https://sepolia.uniscan.xyz/block/99999',
-        builderAddress: '0xbuilder456',
+        workloadMetadata: {
+          workloadId: computedWorkloadId,
+          commitHash: 'register-commit',
+          builderAddress: '0xbuilder456',
+          version: 1,
+          sourceLocators: ['https://github.com/flashbots/flashbots-images/commit/b7c707667393cc4c0173786ee32ec3a79009b04f'],
+        },
+      });
+    });
+
+    it('should compute workload ID from registers and verify when registers have a different case', async () => {
+      const uppercaseRegisters: WorkloadMeasureRegisters = {
+        tdAttributes: `0x${registers.tdAttributes.substring(2).toUpperCase()}`,
+        xFAM: `0x${registers.xFAM.substring(2).toUpperCase()}`,
+        mrTd: `0x${registers.mrTd.substring(2).toUpperCase()}`,
+        mrConfigId: `0x${registers.mrConfigId.substring(2).toUpperCase()}`,
+        rtMr0: `0x${registers.rtMr0.substring(2).toUpperCase()}`,
+        rtMr1: `0x${registers.rtMr1.substring(2).toUpperCase()}`,
+        rtMr2: `0x${registers.rtMr2.substring(2).toUpperCase()}`,
+        rtMr3: `0x${registers.rtMr3.substring(2).toUpperCase()}`,
+      };
+
+      const mockEvent = {
+        caller: '0xbuilder456',
+        workloadId: computedWorkloadId, // same workload ID as the one from the original registers
+        version: 1,
+        blockContentHash: '0xblockhash' as `0x${string}`,
+        commitHash: 'register-commit',
+        sourceLocators: ['https://github.com/flashbots/flashbots-images/commit/b7c707667393cc4c0173786ee32ec3a79009b04f'],
+      };
+
+      const mockBlock = {
+        number: BigInt(99999),
+        hash: '0xblockhash',
+      };
+
+      mockgetFlashtestationEvent.mockResolvedValue(mockEvent);
+      mockGetBlock.mockResolvedValue(mockBlock);
+
+      const result = await verifyFlashtestationInBlock(
+        uppercaseRegisters,
+        'latest',
+        config
+      );
+
+      expect(mockComputeWorkloadId).toHaveBeenCalledWith(uppercaseRegisters);
+      expect(result).toEqual({
+        isBuiltByExpectedTee: true,
+        blockExplorerLink: 'https://sepolia.uniscan.xyz/block/99999',
+        workloadMetadata: {
+          workloadId: computedWorkloadId,
+          commitHash: 'register-commit',
+          builderAddress: '0xbuilder456',
+          version: 1,
+          sourceLocators: ['https://github.com/flashbots/flashbots-images/commit/b7c707667393cc4c0173786ee32ec3a79009b04f'],
+        },
       });
     });
 
@@ -321,9 +395,16 @@ describe('verifyFlashtestationInBlock', () => {
         version: 1,
         blockContentHash: '0xblockhash' as `0x${string}`,
         commitHash: 'register-commit',
+        sourceLocators: ['https://github.com/flashbots/flashbots-images/commit/b7c707667393cc4c0173786ee32ec3a79009b04f'],
       };
 
-      mockGetFlashtestationTx.mockResolvedValue(mockEvent);
+      const mockBlock = {
+        number: BigInt(99999),
+        hash: '0xblockhash',
+      };
+
+      mockgetFlashtestationEvent.mockResolvedValue(mockEvent);
+      mockGetBlock.mockResolvedValue(mockBlock);
 
       const result = await verifyFlashtestationInBlock(
         registers,
@@ -334,25 +415,32 @@ describe('verifyFlashtestationInBlock', () => {
       expect(mockComputeWorkloadId).toHaveBeenCalledWith(registers);
       expect(result).toEqual({
         isBuiltByExpectedTee: false,
-        commitHash: null,
-        blockExplorerLink: null,
+        blockExplorerLink: 'https://sepolia.uniscan.xyz/block/99999',
+        workloadMetadata: {
+          workloadId: differentWorkloadId,
+          commitHash: 'register-commit',
+          builderAddress: '0xbuilder456',
+          version: 1,
+          sourceLocators: ['https://github.com/flashbots/flashbots-images/commit/b7c707667393cc4c0173786ee32ec3a79009b04f'],
+        },
       });
     });
 
     it('should propagate validation errors from computeWorkloadId', async () => {
-      mockComputeWorkloadId.mockImplementation(() => {
-        throw new Error('Invalid measurement registers');
-      });
+      const alteredRegisters: WorkloadMeasureRegisters = {
+        ...registers,
+        tdAttributes: '0x000000100000000', // invalid hex, because there's an odd number of characters
+      };
 
       await expect(
-        verifyFlashtestationInBlock(registers, 'latest', config)
-      ).rejects.toThrow('Invalid measurement registers');
+        verifyFlashtestationInBlock(alteredRegisters, 'latest', config)
+      ).rejects.toThrow('Invalid tdAttributes: expected 16 hex characters, got 15');
     });
   });
 
   describe('RpcClient configuration', () => {
     it('should pass chainId to RpcClient', async () => {
-      mockGetFlashtestationTx.mockResolvedValue(null);
+      mockgetFlashtestationEvent.mockResolvedValue(null);
 
       await verifyFlashtestationInBlock(
         '0xabc',
@@ -367,7 +455,7 @@ describe('verifyFlashtestationInBlock', () => {
     });
 
     it('should pass custom rpcUrl to RpcClient', async () => {
-      mockGetFlashtestationTx.mockResolvedValue(null);
+      mockgetFlashtestationEvent.mockResolvedValue(null);
 
       await verifyFlashtestationInBlock(
         '0xabc',

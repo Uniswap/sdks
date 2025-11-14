@@ -1,28 +1,21 @@
-import { createRpcClient } from '../src/rpc/client';
+import { getFlashtestationEvent } from '../src/index';
 
 /**
- * Example: Check if a transaction is a flashtestation transaction
+ * Example: Check if a block contains a flashtestation transaction
  *
  * This example demonstrates how to:
- * 1. Create an RPC client for Unichain Sepolia (chain ID 1301)
- * 2. Check if a transaction emitted the BlockBuilderProofVerified event
- * 3. Retrieve the full transaction data if it's a flashtestation transaction
- * 4. Handle the case where the transaction is not a flashtestation
+ * 1. Use the getFlashtestationEvent function to fetch flashtestation data from a block
+ * 2. Retrieve the full flashtestation event data if present
+ * 3. Handle the case where the block does not contain a flashtestation transaction
  */
 async function main() {
   try {
-    // Create RPC client for Unichain Sepolia (chain ID 1301)
-    const client = createRpcClient({
+    // Fetch flashtestation transaction from the latest block on Unichain Sepolia
+    const tx = await getFlashtestationEvent('latest', {
       chainId: 1301, // Unichain Sepolia testnet
       // Optional: provide custom RPC URL
       // rpcUrl: 'https://sepolia.unichain.org',
-      // Optional: configure retry behavior
-      // maxRetries: 3,
-      // initialRetryDelay: 1000,
     });
-
-    // Check if this transaction is a flashtestation
-    const tx = await client.getFlashtestationTx('latest');
 
     if (tx) {
       // This is a flashtestation transaction
@@ -34,12 +27,11 @@ async function main() {
       console.log(`Version: ${tx.version}`);
       console.log(`Block Content Hash: ${tx.blockContentHash}`);
       console.log(`Commit Hash: ${tx.commitHash}`);
+      console.log(`Source Locators: ${tx.sourceLocators.length > 0 ? tx.sourceLocators.join(', ') : 'None'}`);
     } else {
       // This is not a flashtestation transaction
-      console.log('\n✗ This is not a flashtestation transaction.');
-      console.log('\nThe transaction either:');
-      console.log('  1. Does not exist');
-      console.log('  2. Did not emit the BlockBuilderProofVerified event');
+      console.log('\n✗ This is not a flashtestation transaction');
+      console.log('\nThe transaction did not emit the BlockBuilderProofVerified event');
     }
 
   } catch (error) {

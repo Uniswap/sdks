@@ -9,7 +9,7 @@ import {
   parseEventLogs,
 } from 'viem';
 
-import { getRpcUrl, getChainConfig } from '../config/chains';
+import { getRpcUrl, getChainConfig, getContractAddress } from '../config/chains';
 import {
   BlockParameter,
   NetworkError,
@@ -31,6 +31,11 @@ export interface RpcClientConfig {
   maxRetries?: number;
   /** Initial retry delay in milliseconds (default: 1000) */
   initialRetryDelay?: number;
+}
+
+type WorkloadMetadata = {
+  commitHash: string;
+  sourceLocators: string[];
 }
 
 /**
@@ -266,13 +271,40 @@ export class RpcClient {
   }
 
   /**
+   * Get source locators for a workload ID from the BlockBuilderPolicy contract
+   * @param workloadId - The workload ID (bytes32 hex string)
+   * @returns Array of source locator strings
+   * @throws NetworkError if RPC connection fails
+   */
+  async getSourceLocators(workloadId: `0x${string}`): Promise<string[]> {
+    return retry(
+      async () => {
+        const contractAddress = getContractAddress(this.config.chainId);
+
+        const result = await this.client.readContract({
+          address: contractAddress as `0x${string}`,
+          abi: flashtestationAbi,
+          functionName: 'getWorkloadMetadata',
+          args: [workloadId],
+        });
+
+        // result is an object with commitHash and sourceLocators
+        // We only need the sourceLocators array
+        return (result as WorkloadMetadata).sourceLocators as string[];
+      },
+      this.config.maxRetries,
+      this.config.initialRetryDelay
+    );
+  }
+
+  /**
    * Get a flashtestation event by transaction hash
    * Checks if the transaction emitted a BlockBuilderProofVerified event
    * @param txHash - Transaction hash
    * @returns FlashtestationEvent data if it's a flashtestation tx, null otherwise
    * @throws NetworkError if RPC connection fails
    */
-  async getFlashtestationTx(
+  async getFlashtestationEvent(
     blockParameter: BlockParameter = 'latest'
   ): Promise<FlashtestationEvent | null> {
     return retry(
@@ -314,16 +346,16 @@ export class RpcClient {
             commitHash: string;
           };
 
-          // TODO(melvillian): the event does not include the sourceLocator because of gas optimizations reasons,
-          // so we need to get the sourceLocator from the block
-          
-          
+          // Fetch source locators from contract
+          const sourceLocators = await this.getSourceLocators(args.workloadId);
+
           return {
             caller: args.caller,
             workloadId: args.workloadId,
             version: args.version,
             blockContentHash: args.blockContentHash,
             commitHash: args.commitHash,
+            sourceLocators,
           };
         }
 

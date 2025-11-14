@@ -5,24 +5,55 @@ import {
   BlockParameter,
   VerificationResult,
   WorkloadMeasureRegisters,
+  ClientConfig,
+  FlashtestationEvent,
 } from '../types';
 
 /**
- * Configuration options for verification
+ * Fetch the event data of the flashtestation transaction from a specific block
+ *
+ * This function retrieves the flashtestation event (if any) from the specified block.
+ * Unlike verifyFlashtestationInBlock, this does not perform any workload verification - it
+ * simply returns the raw flashtestation event data.
+ *
+ * @param blockParameter - Block identifier (tag, number, or hash), defaults to 'latest'
+ * @param config - Configuration for chain and RPC connection
+ * @returns FlashtestationEvent if the block contains a flashtestation transaction, null otherwise
+ * @throws NetworkError if RPC connection fails
+ * @throws BlockNotFoundError if block doesn't exist
+ *
+ * @example
+ * // Get flashtestation event from the latest block
+ * const flashtestationEvent = await getFlashtestationEvent('latest', { chainId: 1301 });
+ * if (flashtestationEvent) {
+ *   console.log('Workload ID:', flashtestationEvent.workloadId);
+ *   console.log('Commit Hash:', flashtestationEvent.commitHash);
+ * }
+ *
+ * @example
+ * // Get flashtestation event data from a specific block number
+ * const flashtestationEvent = await getFlashtestationEvent(12345, { chainId: 1301 });
  */
-export interface VerificationConfig {
-  /** Chain ID to verify on */
-  chainId: number;
-  /** Optional custom RPC URL (overrides default) */
-  rpcUrl?: string;
+export async function getFlashtestationEvent(
+  blockParameter: BlockParameter = 'latest',
+  config: ClientConfig
+): Promise<FlashtestationEvent | null> {
+  // Create RPC client
+  const client = new RpcClient({
+    chainId: config.chainId,
+    rpcUrl: config.rpcUrl,
+  });
+
+  // Get the flashtestation transaction's event data from the block
+  return await client.getFlashtestationEvent(blockParameter);
 }
 
 /**
  * Verify if a block was built by a TEE running a specific workload
  *
  * This is the main entry point for flashtestation verification. It checks if
- * the specified block contains a flashtestation transaction that matches the
- * provided workload identifier.
+ * the specified block contains a flashtestation transaction whose event data matches the
+ * provided workload ID or measurement registers.
  *
  * @param workloadIdOrRegisters - Either a workload ID string or measurement registers to compute the ID
  * @param blockParameter - Block identifier (tag, number, or hash)
@@ -61,7 +92,7 @@ export interface VerificationConfig {
 export async function verifyFlashtestationInBlock(
   workloadIdOrRegisters: string | WorkloadMeasureRegisters,
   blockParameter: BlockParameter,
-  config: VerificationConfig
+  config: ClientConfig
 ): Promise<VerificationResult> {
   // Determine if we need to compute workload ID from registers
   let workloadId: string;
@@ -86,30 +117,15 @@ export async function verifyFlashtestationInBlock(
     rpcUrl: config.rpcUrl,
   });
 
-  // Get the flashtestation transaction from the block
-  const flashtestationEvent = await client.getFlashtestationTx(blockParameter);
+  // Get the flashtestation event data from the block
+  const flashtestationEvent = await client.getFlashtestationEvent(blockParameter);
 
-  // If no flashtestation transaction found, block was not TEE-built
+  // If no flashtestation event data found, block was not TEE-built
   if (!flashtestationEvent) {
     return {
       isBuiltByExpectedTee: false,
-      commitHash: null,
       blockExplorerLink: null,
-    };
-  }
-
-  // Normalize event workload ID for comparison
-  const eventWorkloadId = flashtestationEvent.workloadId.toLowerCase();
-
-  // Compare workload IDs (byte-wise comparison)
-  const workloadMatches = workloadId === eventWorkloadId;
-
-  if (!workloadMatches) {
-    // Block was built by a TEE, but not the one we're looking for
-    return {
-      isBuiltByExpectedTee: false,
-      commitHash: null,
-      blockExplorerLink: null,
+      workloadMetadata: null,
     };
   }
 
@@ -126,13 +142,37 @@ export async function verifyFlashtestationInBlock(
     blockExplorerLink = `${blockExplorerBaseUrl}/block/${block.number}`;
   }
 
-  // TODO(melvillian): get the sourceLocator from the block
+  // Normalize event workload ID for comparison
+  const eventWorkloadId = flashtestationEvent.workloadId.toLowerCase();
+
+  // Compare workload IDs (byte-wise comparison)
+  const workloadMatches = workloadId === eventWorkloadId;
+
+  if (!workloadMatches) {
+    // Block was built by a TEE, but not the one we're looking for
+    return {
+      isBuiltByExpectedTee: false,
+      blockExplorerLink: blockExplorerLink,
+      workloadMetadata: {
+        workloadId: flashtestationEvent.workloadId,
+        commitHash: flashtestationEvent.commitHash,
+        builderAddress: flashtestationEvent.caller,
+        version: flashtestationEvent.version,
+        sourceLocators: flashtestationEvent.sourceLocators,
+      }
+    };
+  }
 
   // Block was built by the specified TEE workload
   return {
     isBuiltByExpectedTee: true,
-    commitHash: flashtestationEvent.commitHash,
     blockExplorerLink: blockExplorerLink,
-    builderAddress: flashtestationEvent.caller,
+    workloadMetadata: {
+      workloadId: flashtestationEvent.workloadId,
+      commitHash: flashtestationEvent.commitHash,
+      builderAddress: flashtestationEvent.caller,
+      version: flashtestationEvent.version,
+      sourceLocators: flashtestationEvent.sourceLocators,
+    }
   };
 }

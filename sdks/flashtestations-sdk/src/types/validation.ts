@@ -22,7 +22,7 @@ export function isValidHex(value: string, expectedLength?: number): boolean {
 /**
  * Validates hex string and throws ValidationError if invalid
  */
-export function validateHex(
+function validateHex(
   value: string,
   expectedLength: number,
   fieldName: string
@@ -69,9 +69,3 @@ export function normalizeHex(value: string): string {
   return cleanHex.toLowerCase();
 }
 
-/**
- * Validates workload ID format (32 bytes = 64 hex chars)
- */
-export function validateWorkloadId(workloadId: string): void {
-  validateHex(workloadId, 64, 'workloadId');
-}
