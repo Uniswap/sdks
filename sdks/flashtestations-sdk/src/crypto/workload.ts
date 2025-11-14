@@ -1,8 +1,9 @@
 import { keccak256 } from 'viem/utils';
 
-import type { WorkloadMeasureRegisters } from '../types/index';
+import type { WorkloadMeasurementRegisters, SingularWorkloadMeasurementRegisters } from '../types/index';
 import {
-  validateWorkloadMeasureRegisters,
+  validateWorkloadMeasurementRegisters,
+  validateSingularWorkloadMeasurementRegisters,
 } from '../types/validation';
 
 
@@ -115,10 +116,17 @@ function concatBytes(...arrays: Uint8Array[]): Uint8Array {
  * Formula: keccak256(mrTd + rtMr0 + rtMr1 + rtMr2 + rtMr3 + mrConfigId + (xFAM ^ expectedXfamBits) + (tdAttributes & ~ignoredTdAttributesBitmask))
  * This is copied from the Solidity implementation of the workload ID computation at:
  * https://github.com/flashbots/flashtestations/blob/7cc7f68492fe672a823dd2dead649793aac1f216/src/BlockBuilderPolicy.sol#L236
+ *
+ * @param registers - Singular workload measurement registers
+ * @returns The computed workload ID as a hex string
+ *
+ * @remarks
+ * This function only accepts singular registers. If you have registers with multiple
+ * possible values (arrays), use `computeAllWorkloadIds()` or `expandToSingularRegisters()` first.
  */
-export function computeWorkloadId(registers: WorkloadMeasureRegisters): string {
-  // Validate input registers
-  validateWorkloadMeasureRegisters(registers);
+export function computeWorkloadId(registers: SingularWorkloadMeasurementRegisters): string {
+  // Validate input registers (ensures no arrays)
+  validateSingularWorkloadMeasurementRegisters(registers);
 
   // Convert hex strings to Uint8Arrays for bitwise operations
   const mrTd = hexToBytes(registers.mrTd);
@@ -141,4 +149,104 @@ export function computeWorkloadId(registers: WorkloadMeasureRegisters): string {
   return keccak256(
     concatBytes(mrTd, rtMr0, rtMr1, rtMr2, rtMr3, mrConfigId, xfamPreprocessed, tdAttributesPreprocessed)
   );
+}
+
+/**
+ * Expands WorkloadMeasurementRegisters with array fields into all possible
+ * singular register combinations (cartesian product of mrTd and rtMr0 values)
+ *
+ * @param registers - Flexible registers that may contain arrays
+ * @returns Array of all possible singular register combinations
+ *
+ * @example
+ * ```typescript
+ * const input = {
+ *   // ... other fields
+ *   mrTd: ['0xaaa...', '0xbbb...'],
+ *   rtMr0: ['0xccc...', '0xddd...']
+ * };
+ * // Returns 4 combinations: (aaa,ccc), (aaa,ddd), (bbb,ccc), (bbb,ddd)
+ * const singularRegisters = expandToSingularRegisters(input);
+ * ```
+ */
+export function expandToSingularRegisters(
+  registers: WorkloadMeasurementRegisters
+): SingularWorkloadMeasurementRegisters[] {
+  // Validate input first
+  validateWorkloadMeasurementRegisters(registers);
+
+  // Normalize mrTd and rtMr0 to arrays
+  const mrTdValues = Array.isArray(registers.mrTd) ? registers.mrTd : [registers.mrTd];
+  const rtMr0Values = Array.isArray(registers.rtMr0) ? registers.rtMr0 : [registers.rtMr0];
+
+  // Generate cartesian product
+  const result: SingularWorkloadMeasurementRegisters[] = [];
+  for (const mrTd of mrTdValues) {
+    for (const rtMr0 of rtMr0Values) {
+      result.push({
+        tdAttributes: registers.tdAttributes,
+        xFAM: registers.xFAM,
+        mrTd,
+        mrConfigId: registers.mrConfigId,
+        rtMr0,
+        rtMr1: registers.rtMr1,
+        rtMr2: registers.rtMr2,
+        rtMr3: registers.rtMr3,
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Computes all possible workload IDs for the given registers.
+ * If registers contain arrays, computes the ID for each combination.
+ *
+ * @param registers - Flexible registers that may contain arrays
+ * @returns Array of all possible workload IDs
+ *
+ * @example
+ * ```typescript
+ * const registers = {
+ *   // ... other fields
+ *   mrTd: ['0xaaa...', '0xbbb...'],
+ *   rtMr0: ['0xccc...', '0xddd...']
+ * };
+ * // Returns 4 workload IDs, one for each combination
+ * const ids = computeAllWorkloadIds(registers);
+ * ```
+ */
+export function computeAllWorkloadIds(
+  registers: WorkloadMeasurementRegisters
+): string[] {
+  const singularRegisters = expandToSingularRegisters(registers);
+  return singularRegisters.map(singular => computeWorkloadId(singular));
+}
+
+/**
+ * Checks if any of the possible workload IDs from the given registers
+ * match the expected workload ID.
+ *
+ * @param registers - Flexible registers that may contain arrays
+ * @param expectedWorkloadId - The workload ID to match against
+ * @returns true if any combination matches the expected ID
+ *
+ * @example
+ * ```typescript
+ * const registers = {
+ *   // ... other fields
+ *   mrTd: ['0xaaa...', '0xbbb...'],
+ *   rtMr0: ['0xccc...', '0xddd...']
+ * };
+ * // Returns true if any of the 4 possible IDs matches
+ * const matches = matchesAnyWorkloadId(registers, expectedId);
+ * ```
+ */
+export function matchesAnyWorkloadId(
+  registers: WorkloadMeasurementRegisters,
+  expectedWorkloadId: string
+): boolean {
+  const allIds = computeAllWorkloadIds(registers);
+  return allIds.includes(expectedWorkloadId);
 }
