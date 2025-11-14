@@ -1,0 +1,603 @@
+import { hexStripZeros, SignatureLike } from "@ethersproject/bytes";
+import {
+  PermitTransferFrom,
+  PermitTransferFromData,
+} from "@uniswap/permit2-sdk";
+import { BigNumber, ethers } from "ethers";
+
+import { getPermit2 } from "../../utils";
+import { ResolvedUniswapXOrder } from "../../utils/OrderQuoter";
+import { TokenAmount } from "../types";
+import {
+  BlockOverridesV4,
+  HybridOrder,
+  HybridOrderJSON,
+  HybridOrderResolutionOptions,
+} from "./types";
+import { hashHybridCosignerData, hashHybridOrder } from "./hashing";
+
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const BASE_SCALING_FACTOR = ethers.constants.WeiPerEther;
+const WAD = ethers.constants.WeiPerEther;
+const MAX_UINT_240 = BigNumber.from(1).shl(240).sub(1);
+const PRICE_CURVE_DURATION_SHIFT = 240;
+
+const HYBRID_ORDER_ABI = [
+  "tuple(" +
+    [
+      "tuple(address,address,uint256,uint256,address,bytes,address,bytes,address)",
+      "address",
+      "tuple(address,uint256)",
+      "tuple(address,uint256,address)[]",
+      "uint256",
+      "uint256",
+      "uint256",
+      "uint256[]",
+      "tuple(uint256,uint256[])",
+      "bytes",
+    ].join(",") +
+    ")",
+];
+
+export class OrderNotFillableV4 extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "OrderNotFillableV4";
+  }
+}
+
+export class HybridOrderPriceCurveError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "HybridOrderPriceCurveError";
+  }
+}
+
+export class HybridOrderCosignatureError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "HybridOrderCosignatureError";
+  }
+}
+
+export class HybridOrderClass {
+  public readonly resolver: string;
+  public readonly permit2Address: string;
+
+  constructor(
+    public readonly order: HybridOrder,
+    public readonly chainId: number,
+    resolver: string,
+    _permit2Address?: string
+  ) {
+    this.resolver = resolver;
+    this.permit2Address = getPermit2(chainId, _permit2Address);
+  }
+
+  static fromJSON(
+    json: HybridOrderJSON,
+    chainId: number,
+    resolver: string,
+    _permit2Address?: string
+  ): HybridOrderClass {
+    return new HybridOrderClass(
+      {
+        info: {
+          reactor: json.info.reactor,
+          swapper: json.info.swapper,
+          nonce: BigNumber.from(json.info.nonce),
+          deadline: json.info.deadline,
+          preExecutionHook: json.info.preExecutionHook,
+          preExecutionHookData: json.info.preExecutionHookData,
+          postExecutionHook: json.info.postExecutionHook,
+          postExecutionHookData: json.info.postExecutionHookData,
+          auctionResolver: json.info.auctionResolver,
+        },
+        cosigner: json.cosigner,
+        input: {
+          token: json.input.token,
+          maxAmount: BigNumber.from(json.input.maxAmount),
+        },
+        outputs: json.outputs.map((output) => ({
+          token: output.token,
+          minAmount: BigNumber.from(output.minAmount),
+          recipient: output.recipient,
+        })),
+        auctionStartBlock: BigNumber.from(json.auctionStartBlock),
+        baselinePriorityFeeWei: BigNumber.from(json.baselinePriorityFeeWei),
+        scalingFactor: BigNumber.from(json.scalingFactor),
+        priceCurve: json.priceCurve.map((value) => BigNumber.from(value)),
+        cosignerData: {
+          auctionTargetBlock: BigNumber.from(
+            json.cosignerData.auctionTargetBlock
+          ),
+          supplementalPriceCurve: json.cosignerData.supplementalPriceCurve.map(
+            (value) => BigNumber.from(value)
+          ),
+        },
+        cosignature: json.cosignature,
+      },
+      chainId,
+      resolver,
+      _permit2Address
+    );
+  }
+
+  hash(): string {
+    return hashHybridOrder(this.order);
+  }
+
+  serialize(): string {
+    const abiCoder = new ethers.utils.AbiCoder();
+    const orderData = abiCoder.encode(HYBRID_ORDER_ABI, [
+      [
+        [
+          this.order.info.reactor,
+          this.order.info.swapper,
+          this.order.info.nonce,
+          this.order.info.deadline,
+          this.order.info.preExecutionHook,
+          this.order.info.preExecutionHookData,
+          this.order.info.postExecutionHook,
+          this.order.info.postExecutionHookData,
+          this.order.info.auctionResolver,
+        ],
+        this.order.cosigner,
+        [this.order.input.token, this.order.input.maxAmount],
+        this.order.outputs.map((output) => [
+          output.token,
+          output.minAmount,
+          output.recipient,
+        ]),
+        this.order.auctionStartBlock,
+        this.order.baselinePriorityFeeWei,
+        this.order.scalingFactor,
+        this.order.priceCurve,
+        [
+          this.order.cosignerData.auctionTargetBlock,
+          this.order.cosignerData.supplementalPriceCurve,
+        ],
+        this.order.cosignature,
+      ],
+    ]);
+    return abiCoder.encode(["address", "bytes"], [this.resolver, orderData]);
+  }
+
+  permitData(): PermitTransferFromData {
+    const permit: PermitTransferFrom = {
+      permitted: {
+        token: this.order.input.token,
+        amount: this.order.input.maxAmount,
+      },
+      spender: this.order.info.preExecutionHook,
+      nonce: this.order.info.nonce,
+      deadline: this.order.info.deadline,
+    };
+
+    return {
+      domain: {
+        name: "Permit2",
+        chainId: this.chainId,
+        verifyingContract: this.permit2Address,
+      },
+      types: {
+        PermitTransferFrom: [
+          { name: "permitted", type: "TokenPermissions" },
+          { name: "spender", type: "address" },
+          { name: "nonce", type: "uint256" },
+          { name: "deadline", type: "uint256" },
+        ],
+        TokenPermissions: [
+          { name: "token", type: "address" },
+          { name: "amount", type: "uint256" },
+        ],
+      },
+      values: permit,
+    };
+  }
+
+  getSigner(_signature: SignatureLike): string {
+    throw new Error("Use signing module to recover signer");
+  }
+
+  get blockOverrides(): BlockOverridesV4 {
+    const block =
+      !this.order.cosignerData.auctionTargetBlock.isZero()
+        ? this.order.cosignerData.auctionTargetBlock
+        : this.order.auctionStartBlock;
+
+    if (block.isZero()) {
+      return undefined;
+    }
+
+    return {
+      number: hexStripZeros(block.toHexString()),
+    };
+  }
+
+  resolve(options: HybridOrderResolutionOptions): ResolvedUniswapXOrder {
+    if (!options.currentBlock) {
+      throw new OrderNotFillableV4("currentBlock is required");
+    }
+
+    let auctionTargetBlock = this.order.auctionStartBlock;
+    let effectivePriceCurve = this.order.priceCurve.map((value) =>
+      BigNumber.from(value)
+    );
+
+    if (this.order.cosigner !== ZERO_ADDRESS) {
+      const recovered = this.recoverCosigner();
+      if (
+        ethers.utils.getAddress(recovered) !==
+        ethers.utils.getAddress(this.order.cosigner)
+      ) {
+        throw new HybridOrderCosignatureError("Invalid cosignature");
+      }
+
+      if (!this.order.cosignerData.auctionTargetBlock.isZero()) {
+        auctionTargetBlock = this.order.cosignerData.auctionTargetBlock;
+      }
+
+      if (this.order.cosignerData.supplementalPriceCurve.length > 0) {
+        effectivePriceCurve = applySupplementalPriceCurve(
+          effectivePriceCurve,
+          this.order.cosignerData.supplementalPriceCurve
+        );
+      }
+    }
+
+    if (
+      !auctionTargetBlock.isZero() &&
+      options.currentBlock.lt(auctionTargetBlock)
+    ) {
+      throw new OrderNotFillableV4("Target block in the future");
+    }
+
+    const currentScalingFactor = deriveCurrentScalingFactor(
+      this.order,
+      effectivePriceCurve,
+      auctionTargetBlock,
+      options.currentBlock
+    );
+
+    const priorityFeeAboveBaseline =
+      options.priorityFeeWei.gt(this.order.baselinePriorityFeeWei)
+        ? options.priorityFeeWei.sub(this.order.baselinePriorityFeeWei)
+        : BigNumber.from(0);
+
+    const useExactIn =
+      this.order.scalingFactor.gt(BASE_SCALING_FACTOR) ||
+      (this.order.scalingFactor.eq(BASE_SCALING_FACTOR) &&
+        currentScalingFactor.gte(BASE_SCALING_FACTOR));
+
+    if (useExactIn) {
+      const scalingMultiplier = currentScalingFactor.add(
+        this.order.scalingFactor.sub(BASE_SCALING_FACTOR).mul(
+          priorityFeeAboveBaseline
+        )
+      );
+      return {
+        input: {
+          token: this.order.input.token,
+          amount: this.order.input.maxAmount,
+        },
+        outputs: scaleOutputs(this.order.outputs, scalingMultiplier),
+      };
+    }
+
+    const scalingMultiplier = currentScalingFactor.sub(
+      BASE_SCALING_FACTOR.sub(this.order.scalingFactor).mul(
+        priorityFeeAboveBaseline
+      )
+    );
+
+    return {
+      input: scaleInput(this.order.input, scalingMultiplier),
+      outputs: this.order.outputs.map((output) => ({
+        token: output.token,
+        amount: output.minAmount,
+      })),
+    };
+  }
+
+  toJSON(): HybridOrderJSON & {
+    chainId: number;
+    resolver: string;
+    permit2Address: string;
+  } {
+    return {
+      chainId: this.chainId,
+      resolver: this.resolver,
+      permit2Address: this.permit2Address,
+      info: {
+        reactor: this.order.info.reactor,
+        swapper: this.order.info.swapper,
+        nonce: this.order.info.nonce.toString(),
+        deadline: this.order.info.deadline,
+        preExecutionHook: this.order.info.preExecutionHook,
+        preExecutionHookData: this.order.info.preExecutionHookData,
+        postExecutionHook: this.order.info.postExecutionHook,
+        postExecutionHookData: this.order.info.postExecutionHookData,
+        auctionResolver: this.order.info.auctionResolver,
+      },
+      cosigner: this.order.cosigner,
+      input: {
+        token: this.order.input.token,
+        maxAmount: this.order.input.maxAmount.toString(),
+      },
+      outputs: this.order.outputs.map((output) => ({
+        token: output.token,
+        minAmount: output.minAmount.toString(),
+        recipient: output.recipient,
+      })),
+      auctionStartBlock: this.order.auctionStartBlock.toString(),
+      baselinePriorityFeeWei: this.order.baselinePriorityFeeWei.toString(),
+      scalingFactor: this.order.scalingFactor.toString(),
+      priceCurve: this.order.priceCurve.map((value) => value.toString()),
+      cosignerData: {
+        auctionTargetBlock:
+          this.order.cosignerData.auctionTargetBlock.toString(),
+        supplementalPriceCurve:
+          this.order.cosignerData.supplementalPriceCurve.map((value) =>
+            value.toString()
+          ),
+      },
+      cosignature: this.order.cosignature,
+    };
+  }
+
+  cosignatureHash(): string {
+    return hashHybridCosignerData(
+      this.hash(),
+      this.order.cosignerData,
+      this.chainId
+    );
+  }
+
+  recoverCosigner(): string {
+    return ethers.utils.recoverAddress(
+      this.cosignatureHash(),
+      this.order.cosignature
+    );
+  }
+}
+
+function applySupplementalPriceCurve(
+  priceCurve: BigNumber[],
+  supplemental: BigNumber[]
+): BigNumber[] {
+  if (supplemental.length === 0) {
+    return priceCurve.map((value) => BigNumber.from(value));
+  }
+
+  if (priceCurve.length === 0) {
+    throw new HybridOrderPriceCurveError(
+      "Supplemental curve provided without base curve"
+    );
+  }
+
+  const combined = priceCurve.map((value) => BigNumber.from(value));
+  const length = Math.min(priceCurve.length, supplemental.length);
+  for (let i = 0; i < length; i++) {
+    const { duration, scalingFactor } = decodePriceCurveElement(priceCurve[i]);
+    const supplementalScaling = BigNumber.from(supplemental[i]);
+    if (!sharesScalingDirection(scalingFactor, supplementalScaling)) {
+      throw new HybridOrderPriceCurveError(
+        "Supplemental scaling direction mismatch"
+      );
+    }
+    const mergedScaling = scalingFactor
+      .add(supplementalScaling)
+      .sub(BASE_SCALING_FACTOR);
+    if (mergedScaling.lt(0) || mergedScaling.gt(MAX_UINT_240)) {
+      throw new HybridOrderPriceCurveError(
+        "Supplemental scaling factor out of range"
+      );
+    }
+    combined[i] = encodePriceCurveElement(duration, mergedScaling);
+  }
+  return combined;
+}
+
+function deriveCurrentScalingFactor(
+  order: HybridOrder,
+  priceCurve: BigNumber[],
+  targetBlock: BigNumber,
+  fillBlock: BigNumber
+): BigNumber {
+  if (targetBlock.isZero()) {
+    if (priceCurve.length !== 0) {
+      throw new HybridOrderPriceCurveError(
+        "Invalid target block designation"
+      );
+    }
+    return BASE_SCALING_FACTOR;
+  }
+
+  if (targetBlock.gt(fillBlock)) {
+    throw new OrderNotFillableV4("Invalid target block");
+  }
+
+  const blocksPassed = fillBlock.sub(targetBlock).toNumber();
+  const currentScalingFactor = getCalculatedScalingFactor(
+    priceCurve,
+    blocksPassed
+  );
+
+  if (!sharesScalingDirection(order.scalingFactor, currentScalingFactor)) {
+    throw new HybridOrderPriceCurveError("Scaling direction mismatch");
+  }
+
+  return currentScalingFactor;
+}
+
+function getCalculatedScalingFactor(
+  parameters: BigNumber[],
+  blocksPassed: number
+): BigNumber {
+  if (parameters.length === 0) {
+    return BASE_SCALING_FACTOR;
+  }
+
+  let blocksCounted = 0;
+  let lastZeroDurationScaling: BigNumber | null = null;
+  let previousDuration = 0;
+
+  for (let i = 0; i < parameters.length; i++) {
+    const { duration, scalingFactor } = decodePriceCurveElement(parameters[i]);
+
+    if (duration === 0) {
+      if (blocksPassed >= blocksCounted) {
+        lastZeroDurationScaling = scalingFactor;
+        if (blocksPassed === blocksCounted) {
+          return scalingFactor;
+        }
+      }
+      previousDuration = duration;
+      continue;
+    }
+
+    const segmentEnd = blocksCounted + duration;
+    if (blocksPassed < segmentEnd) {
+      if (previousDuration === 0 && lastZeroDurationScaling) {
+        if (
+          !sharesScalingDirection(lastZeroDurationScaling, scalingFactor)
+        ) {
+          throw new HybridOrderPriceCurveError(
+            "Zero duration scaling mismatch"
+          );
+        }
+        return locateCurrentAmount(
+          lastZeroDurationScaling,
+          scalingFactor,
+          blocksCounted,
+          blocksPassed,
+          segmentEnd,
+          lastZeroDurationScaling.gt(BASE_SCALING_FACTOR)
+        );
+      }
+
+      const endScalingFactor =
+        i + 1 < parameters.length
+          ? decodePriceCurveElement(parameters[i + 1]).scalingFactor
+          : BASE_SCALING_FACTOR;
+
+      if (!sharesScalingDirection(scalingFactor, endScalingFactor)) {
+        throw new HybridOrderPriceCurveError("Scaling direction mismatch");
+      }
+
+      return locateCurrentAmount(
+        scalingFactor,
+        endScalingFactor,
+        blocksCounted,
+        blocksPassed,
+        segmentEnd,
+        scalingFactor.gt(BASE_SCALING_FACTOR)
+      );
+    }
+
+    blocksCounted = segmentEnd;
+    previousDuration = duration;
+  }
+
+  if (blocksPassed >= blocksCounted) {
+    throw new HybridOrderPriceCurveError("Price curve blocks exceeded");
+  }
+
+  throw new HybridOrderPriceCurveError("Unable to derive scaling factor");
+}
+
+function locateCurrentAmount(
+  startAmount: BigNumber,
+  endAmount: BigNumber,
+  startBlock: number,
+  currentBlock: number,
+  endBlock: number,
+  roundUp: boolean
+): BigNumber {
+  if (startAmount.eq(endAmount)) {
+    return endAmount;
+  }
+
+  const duration = endBlock - startBlock;
+  const elapsed = currentBlock - startBlock;
+  const remaining = duration - elapsed;
+
+  const durationBN = BigNumber.from(duration);
+  const elapsedBN = BigNumber.from(elapsed);
+  const remainingBN = BigNumber.from(remaining);
+
+  const totalBeforeDivision = startAmount
+    .mul(remainingBN)
+    .add(endAmount.mul(elapsedBN));
+
+  if (totalBeforeDivision.isZero()) {
+    return BigNumber.from(0);
+  }
+
+  if (roundUp) {
+    return totalBeforeDivision.sub(1).div(durationBN).add(1);
+  }
+
+  return totalBeforeDivision.div(durationBN);
+}
+
+function scaleOutputs(
+  outputs: HybridOrder["outputs"],
+  scalingMultiplier: BigNumber
+): TokenAmount[] {
+  return outputs.map((output) => ({
+    token: output.token,
+    amount: mulWadUp(output.minAmount, scalingMultiplier),
+  }));
+}
+
+function scaleInput(
+  input: HybridOrder["input"],
+  scalingMultiplier: BigNumber
+): TokenAmount {
+  return {
+    token: input.token,
+    amount: mulWad(input.maxAmount, scalingMultiplier),
+  };
+}
+
+function mulWad(a: BigNumber, b: BigNumber): BigNumber {
+  if (a.isZero() || b.isZero()) {
+    return BigNumber.from(0);
+  }
+  return a.mul(b).div(WAD);
+}
+
+function mulWadUp(a: BigNumber, b: BigNumber): BigNumber {
+  if (a.isZero() || b.isZero()) {
+    return BigNumber.from(0);
+  }
+  return a.mul(b).add(WAD).sub(1).div(WAD);
+}
+
+function decodePriceCurveElement(value: BigNumber): {
+  duration: number;
+  scalingFactor: BigNumber;
+} {
+  const scalingFactor = value.and(MAX_UINT_240);
+  const duration = value.shr(PRICE_CURVE_DURATION_SHIFT).toNumber();
+  return { duration, scalingFactor };
+}
+
+function encodePriceCurveElement(
+  duration: number,
+  scalingFactor: BigNumber
+): BigNumber {
+  return BigNumber.from(duration)
+    .shl(PRICE_CURVE_DURATION_SHIFT)
+    .or(scalingFactor);
+}
+
+function sharesScalingDirection(a: BigNumber, b: BigNumber): boolean {
+  if (a.eq(BASE_SCALING_FACTOR) || b.eq(BASE_SCALING_FACTOR)) {
+    return true;
+  }
+  return a.gt(BASE_SCALING_FACTOR) === b.gt(BASE_SCALING_FACTOR);
+}
+
