@@ -1,5 +1,5 @@
 export { SwapRouter } from './swapRouter'
-export type { MigrateV3ToV4Options } from './swapRouter'
+export type { MigrateV3ToV4Options, SignedRouteOptions, EIP712Payload } from './swapRouter'
 export * from './entities'
 export * from './utils/routerTradeAdapter'
 export { RoutePlanner, CommandType, COMMAND_DEFINITION, Parser, Subparser } from './utils/routerCommands'
@@ -14,3 +14,4 @@ export {
 export { CommandParser, GenericCommandParser } from './utils/commandParser'
 export type { UniversalRouterCommand, UniversalRouterCall, Param, CommandsDefinition } from './utils/commandParser'
 export type { Permit2Permit } from './utils/inputTokens'
+export { NONCE_SKIP_CHECK, generateNonce, EXECUTE_SIGNED_TYPES, getUniversalRouterDomain } from './utils/eip712'

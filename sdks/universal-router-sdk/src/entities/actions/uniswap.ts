@@ -47,6 +47,7 @@ export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit'> & {
   inputTokenPermit?: Permit2Permit
   flatFee?: FlatFeeOptions
   safeMode?: boolean
+  maxHopSlippage?: BigNumber[] // Optional per-hop slippage protection for V4 routes
 }
 
 const REFUND_ETH_PRICE_IMPACT_THRESHOLD = new Percent(50, 100)
@@ -371,7 +372,8 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
     routerMustCustody && tradeType == TradeType.EXACT_INPUT ? undefined : options.slippageTolerance
 
   const v4Planner = new V4Planner()
-  v4Planner.addTrade(trade, slippageToleranceOnSwap)
+  v4Planner.addTrade(trade, slippageToleranceOnSwap, options.maxHopSlippage)
+
   v4Planner.addSettle(trade.route.pathInput, payerIsUser)
   v4Planner.addTake(
     trade.route.pathOutput,
@@ -457,6 +459,7 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
         {
           currencyIn: inputToken.isNative ? ETH_ADDRESS : inputToken.address,
           path: encodeV4RouteToPath(v4SubRoute),
+          maxHopSlippage: options.maxHopSlippage || [],
           amountIn: 0, // denotes open delta, amount set in v4Planner.addSettle()
           amountOutMinimum: !isLastSectionInRoute(i) ? 0 : amountOut,
         },
