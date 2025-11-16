@@ -39,10 +39,10 @@ const HYBRID_ORDER_ABI = [
     ")",
 ];
 
-export class OrderNotFillableV4 extends Error {
+export class OrderResolutionError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "OrderNotFillableV4";
+    this.name = "OrderResolutionError";
   }
 }
 
@@ -72,6 +72,39 @@ export class HybridOrderClass {
   ) {
     this.resolver = resolver;
     this.permit2Address = getPermit2(chainId, _permit2Address);
+  }
+
+  /**
+   * Encode a price curve element from duration and scaling factor
+   * @param duration The duration in blocks for this curve segment
+   * @param scalingFactor The scaling factor (as a BigNumber, typically with 18 decimals)
+   * @returns The encoded price curve element
+   */
+  static encodePriceCurveElement(
+    duration: number,
+    scalingFactor: BigNumber
+  ): BigNumber {
+    if (duration < 0) {
+      throw new HybridOrderPriceCurveError("Duration must be non-negative");
+    }
+    if (scalingFactor.lt(0) || scalingFactor.gt(MAX_UINT_240)) {
+      throw new HybridOrderPriceCurveError(
+        "Scaling factor must be between 0 and 2^240-1"
+      );
+    }
+    return encodePriceCurveElement(duration, scalingFactor);
+  }
+
+  /**
+   * Decode a price curve element into duration and scaling factor
+   * @param value The encoded price curve element
+   * @returns Object containing duration (in blocks) and scalingFactor
+   */
+  static decodePriceCurveElement(value: BigNumber): {
+    duration: number;
+    scalingFactor: BigNumber;
+  } {
+    return decodePriceCurveElement(value);
   }
 
   static fromJSON(
@@ -216,10 +249,6 @@ export class HybridOrderClass {
   }
 
   resolve(options: HybridOrderResolutionOptions): ResolvedUniswapXOrder {
-    if (!options.currentBlock) {
-      throw new OrderNotFillableV4("currentBlock is required");
-    }
-
     let auctionTargetBlock = this.order.auctionStartBlock;
     let effectivePriceCurve = this.order.priceCurve.map((value) =>
       BigNumber.from(value)
@@ -250,7 +279,7 @@ export class HybridOrderClass {
       !auctionTargetBlock.isZero() &&
       options.currentBlock.lt(auctionTargetBlock)
     ) {
-      throw new OrderNotFillableV4("Target block in the future");
+      throw new OrderResolutionError("Target block in the future");
     }
 
     const currentScalingFactor = deriveCurrentScalingFactor(
@@ -415,7 +444,7 @@ function deriveCurrentScalingFactor(
   }
 
   if (targetBlock.gt(fillBlock)) {
-    throw new OrderNotFillableV4("Invalid target block");
+    throw new OrderResolutionError("Invalid target block");
   }
 
   const blocksPassed = fillBlock.sub(targetBlock).toNumber();
