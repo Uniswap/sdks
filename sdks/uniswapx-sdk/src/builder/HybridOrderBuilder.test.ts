@@ -1,0 +1,920 @@
+import { BigNumber, constants } from "ethers";
+
+import { HybridOrderClass } from "../order/v4/HybridOrder";
+import { HybridOrderBuilder } from "./HybridOrderBuilder";
+
+const INPUT_TOKEN = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
+const OUTPUT_TOKEN = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2";
+const REACTOR_ADDRESS = "0x0000000000000000000000000000000000000001";
+const RESOLVER_ADDRESS = "0x0000000000000000000000000000000000000002";
+
+const INPUT_MAX_AMOUNT = BigNumber.from("1000000");
+const OUTPUT_MIN_AMOUNT = BigNumber.from("1000000000000000000");
+const BASE_SCALING_FACTOR = BigNumber.from("1000000000000000000"); // 1e18
+const VALID_COSIGNATURE =
+  "0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890";
+
+describe("HybridOrderBuilder", () => {
+  let builder: HybridOrderBuilder;
+
+  beforeEach(() => {
+    builder = new HybridOrderBuilder(1, REACTOR_ADDRESS, RESOLVER_ADDRESS);
+  });
+
+  describe("Build valid orders", () => {
+    it("Build a valid exact-in order", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const order = builder
+        .cosigner(constants.AddressZero)
+        .cosignature(VALID_COSIGNATURE)
+        .input({
+          token: INPUT_TOKEN,
+          maxAmount: INPUT_MAX_AMOUNT,
+        })
+        .output({
+          token: OUTPUT_TOKEN,
+          minAmount: OUTPUT_MIN_AMOUNT,
+          recipient: constants.AddressZero,
+        })
+        .auctionStartBlock(100)
+        .baselinePriorityFeeWei(0)
+        .scalingFactor(BASE_SCALING_FACTOR.mul(101).div(100)) // 1.01e18 (exact-in)
+        .priceCurve([])
+        .deadline(deadline)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .auctionTargetBlock(100)
+        .supplementalPriceCurve([])
+        .build();
+
+      expect(order.order.info.reactor).toEqual(REACTOR_ADDRESS);
+      expect(order.order.info.swapper).toEqual(constants.AddressZero);
+      expect(order.order.outputs.length).toEqual(1);
+      expect(order.order.scalingFactor).toEqual(
+        BASE_SCALING_FACTOR.mul(101).div(100)
+      );
+    });
+
+    it("Build a valid exact-out order", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const order = builder
+        .cosigner(constants.AddressZero)
+        .cosignature(VALID_COSIGNATURE)
+        .input({
+          token: INPUT_TOKEN,
+          maxAmount: INPUT_MAX_AMOUNT,
+        })
+        .output({
+          token: OUTPUT_TOKEN,
+          minAmount: OUTPUT_MIN_AMOUNT,
+          recipient: constants.AddressZero,
+        })
+        .auctionStartBlock(100)
+        .baselinePriorityFeeWei(0)
+        .scalingFactor(BASE_SCALING_FACTOR.mul(99).div(100)) // 0.99e18 (exact-out)
+        .priceCurve([])
+        .deadline(deadline)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .auctionTargetBlock(100)
+        .supplementalPriceCurve([])
+        .build();
+
+      expect(order.order.outputs.length).toEqual(1);
+      expect(order.order.scalingFactor).toEqual(
+        BASE_SCALING_FACTOR.mul(99).div(100)
+      );
+    });
+
+    it("Build a valid order with multiple outputs", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const order = builder
+        .cosigner(constants.AddressZero)
+        .cosignature(VALID_COSIGNATURE)
+        .deadline(deadline)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .input({
+          token: INPUT_TOKEN,
+          maxAmount: INPUT_MAX_AMOUNT,
+        })
+        .output({
+          token: OUTPUT_TOKEN,
+          minAmount: OUTPUT_MIN_AMOUNT,
+          recipient: constants.AddressZero,
+        })
+        .output({
+          token: OUTPUT_TOKEN,
+          minAmount: OUTPUT_MIN_AMOUNT.div(2),
+          recipient: "0x0000000000000000000000000000000000000003",
+        })
+        .auctionStartBlock(100)
+        .baselinePriorityFeeWei(BigNumber.from("1000000000"))
+        .scalingFactor(BASE_SCALING_FACTOR)
+        .priceCurve([])
+        .auctionTargetBlock(100)
+        .supplementalPriceCurve([])
+        .build();
+
+      expect(order.order.outputs.length).toEqual(2);
+      expect(order.order.baselinePriorityFeeWei).toEqual(
+        BigNumber.from("1000000000")
+      );
+    });
+
+    it("Build a valid order with price curve", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      // Price curve: duration=10 blocks, scaling factor=1.1e18
+      const PRICE_CURVE_DURATION_SHIFT = 240;
+      const priceCurveElement = BigNumber.from(10)
+        .shl(PRICE_CURVE_DURATION_SHIFT)
+        .or(BASE_SCALING_FACTOR.mul(11).div(10));
+
+      const order = builder
+        .cosigner(constants.AddressZero)
+        .cosignature(VALID_COSIGNATURE)
+        .input({
+          token: INPUT_TOKEN,
+          maxAmount: INPUT_MAX_AMOUNT,
+        })
+        .output({
+          token: OUTPUT_TOKEN,
+          minAmount: OUTPUT_MIN_AMOUNT,
+          recipient: constants.AddressZero,
+        })
+        .auctionStartBlock(100)
+        .baselinePriorityFeeWei(0)
+        .scalingFactor(BASE_SCALING_FACTOR)
+        .priceCurve([priceCurveElement])
+        .deadline(deadline)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .auctionTargetBlock(100)
+        .supplementalPriceCurve([])
+        .build();
+
+      expect(order.order.priceCurve.length).toEqual(1);
+      expect(order.order.priceCurve[0]).toEqual(priceCurveElement);
+    });
+
+    it("Build a valid order with supplemental price curve", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const supplemental = [
+        BASE_SCALING_FACTOR.mul(105).div(100),
+        BASE_SCALING_FACTOR.mul(102).div(100),
+      ];
+
+      const order = builder
+        .cosigner(constants.AddressZero)
+        .cosignature(VALID_COSIGNATURE)
+        .input({
+          token: INPUT_TOKEN,
+          maxAmount: INPUT_MAX_AMOUNT,
+        })
+        .output({
+          token: OUTPUT_TOKEN,
+          minAmount: OUTPUT_MIN_AMOUNT,
+          recipient: constants.AddressZero,
+        })
+        .auctionStartBlock(100)
+        .baselinePriorityFeeWei(0)
+        .scalingFactor(BASE_SCALING_FACTOR)
+        .priceCurve([])
+        .deadline(deadline)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .auctionTargetBlock(110)
+        .supplementalPriceCurve(supplemental)
+        .build();
+
+      expect(order.order.cosignerData.supplementalPriceCurve).toEqual(
+        supplemental
+      );
+      expect(order.order.cosignerData.auctionTargetBlock).toEqual(
+        BigNumber.from(110)
+      );
+    });
+
+    it("Build a valid order with hooks", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const hookAddress = "0x0000000000000000000000000000000000000123";
+      const hookData = "0x1234";
+
+      const order = builder
+        .cosigner(constants.AddressZero)
+        .cosignature(VALID_COSIGNATURE)
+        .input({
+          token: INPUT_TOKEN,
+          maxAmount: INPUT_MAX_AMOUNT,
+        })
+        .output({
+          token: OUTPUT_TOKEN,
+          minAmount: OUTPUT_MIN_AMOUNT,
+          recipient: constants.AddressZero,
+        })
+        .preExecutionHook(hookAddress, hookData)
+        .postExecutionHook(hookAddress, hookData)
+        .auctionResolver(RESOLVER_ADDRESS)
+        .auctionStartBlock(100)
+        .baselinePriorityFeeWei(0)
+        .scalingFactor(BASE_SCALING_FACTOR)
+        .priceCurve([])
+        .deadline(deadline)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .auctionTargetBlock(100)
+        .supplementalPriceCurve([])
+        .build();
+
+      expect(order.order.info.preExecutionHook).toEqual(hookAddress);
+      expect(order.order.info.preExecutionHookData).toEqual(hookData);
+      expect(order.order.info.postExecutionHook).toEqual(hookAddress);
+      expect(order.order.info.postExecutionHookData).toEqual(hookData);
+      expect(order.order.info.auctionResolver).toEqual(RESOLVER_ADDRESS);
+    });
+  });
+
+  describe("Error cases", () => {
+    it("Reactor is set in constructor", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const builderWithReactor = new HybridOrderBuilder(
+        1,
+        REACTOR_ADDRESS,
+        RESOLVER_ADDRESS
+      );
+
+      const order = builderWithReactor
+        .cosigner(constants.AddressZero)
+        .cosignature(VALID_COSIGNATURE)
+        .input({
+          token: INPUT_TOKEN,
+          maxAmount: INPUT_MAX_AMOUNT,
+        })
+        .output({
+          token: OUTPUT_TOKEN,
+          minAmount: OUTPUT_MIN_AMOUNT,
+          recipient: constants.AddressZero,
+        })
+        .auctionStartBlock(100)
+        .baselinePriorityFeeWei(0)
+        .scalingFactor(BASE_SCALING_FACTOR)
+        .priceCurve([])
+        .deadline(deadline)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .auctionTargetBlock(100)
+        .supplementalPriceCurve([])
+        .build();
+
+      expect(order.order.info.reactor).toEqual(REACTOR_ADDRESS);
+    });
+
+    it("Throw if swapper is not set", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      expect(() =>
+        builder
+          .cosigner(constants.AddressZero)
+          .cosignature(VALID_COSIGNATURE)
+          .input({
+            token: INPUT_TOKEN,
+            maxAmount: INPUT_MAX_AMOUNT,
+          })
+          .output({
+            token: OUTPUT_TOKEN,
+            minAmount: OUTPUT_MIN_AMOUNT,
+            recipient: constants.AddressZero,
+          })
+          .auctionStartBlock(100)
+          .baselinePriorityFeeWei(0)
+          .scalingFactor(BASE_SCALING_FACTOR)
+          .priceCurve([])
+          .deadline(deadline)
+          .nonce(BigNumber.from(100))
+          .auctionTargetBlock(100)
+          .supplementalPriceCurve([])
+          .build()
+      ).toThrow("Invariant failed: swapper not set");
+    });
+
+    it("Throw if nonce is not set", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      expect(() =>
+        builder
+          .cosigner(constants.AddressZero)
+          .cosignature(VALID_COSIGNATURE)
+          .input({
+            token: INPUT_TOKEN,
+            maxAmount: INPUT_MAX_AMOUNT,
+          })
+          .output({
+            token: OUTPUT_TOKEN,
+            minAmount: OUTPUT_MIN_AMOUNT,
+            recipient: constants.AddressZero,
+          })
+          .auctionStartBlock(100)
+          .baselinePriorityFeeWei(0)
+          .scalingFactor(BASE_SCALING_FACTOR)
+          .priceCurve([])
+          .deadline(deadline)
+          .swapper(constants.AddressZero)
+          .auctionTargetBlock(100)
+          .supplementalPriceCurve([])
+          .build()
+      ).toThrow("Invariant failed: nonce not set");
+    });
+
+    it("Throw if deadline is not set", () => {
+      expect(() =>
+        builder
+          .cosigner(constants.AddressZero)
+          .cosignature(VALID_COSIGNATURE)
+          .input({
+            token: INPUT_TOKEN,
+            maxAmount: INPUT_MAX_AMOUNT,
+          })
+          .output({
+            token: OUTPUT_TOKEN,
+            minAmount: OUTPUT_MIN_AMOUNT,
+            recipient: constants.AddressZero,
+          })
+          .auctionStartBlock(100)
+          .baselinePriorityFeeWei(0)
+          .scalingFactor(BASE_SCALING_FACTOR)
+          .priceCurve([])
+          .swapper(constants.AddressZero)
+          .nonce(BigNumber.from(100))
+          .auctionTargetBlock(100)
+          .supplementalPriceCurve([])
+          .build()
+      ).toThrow("Invariant failed: deadline not set");
+    });
+
+    it("Throw if deadline already passed", () => {
+      const deadline = 2121;
+      expect(() =>
+        builder
+          .cosigner(constants.AddressZero)
+          .cosignature(VALID_COSIGNATURE)
+          .input({
+            token: INPUT_TOKEN,
+            maxAmount: INPUT_MAX_AMOUNT,
+          })
+          .output({
+            token: OUTPUT_TOKEN,
+            minAmount: OUTPUT_MIN_AMOUNT,
+            recipient: constants.AddressZero,
+          })
+          .auctionStartBlock(100)
+          .baselinePriorityFeeWei(0)
+          .scalingFactor(BASE_SCALING_FACTOR)
+          .priceCurve([])
+          .deadline(deadline)
+          .swapper(constants.AddressZero)
+          .nonce(BigNumber.from(100))
+          .auctionTargetBlock(100)
+          .supplementalPriceCurve([])
+          .build()
+      ).toThrow("Invariant failed: Deadline must be in the future: 2121");
+    });
+
+    it("Cosigner defaults to zero address if not set", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const order = builder
+        .input({
+          token: INPUT_TOKEN,
+          maxAmount: INPUT_MAX_AMOUNT,
+        })
+        .output({
+          token: OUTPUT_TOKEN,
+          minAmount: OUTPUT_MIN_AMOUNT,
+          recipient: constants.AddressZero,
+        })
+        .auctionStartBlock(100)
+        .baselinePriorityFeeWei(0)
+        .scalingFactor(BASE_SCALING_FACTOR)
+        .priceCurve([])
+        .deadline(deadline)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .buildPartial();
+
+      expect(order.order.cosigner).toEqual(constants.AddressZero);
+    });
+
+    it("Throw if input is not set", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      expect(() =>
+        builder
+          .cosigner(constants.AddressZero)
+          .cosignature(VALID_COSIGNATURE)
+          .output({
+            token: OUTPUT_TOKEN,
+            minAmount: OUTPUT_MIN_AMOUNT,
+            recipient: constants.AddressZero,
+          })
+          .auctionStartBlock(100)
+          .baselinePriorityFeeWei(0)
+          .scalingFactor(BASE_SCALING_FACTOR)
+          .priceCurve([])
+          .deadline(deadline)
+          .swapper(constants.AddressZero)
+          .nonce(BigNumber.from(100))
+          .auctionTargetBlock(100)
+          .supplementalPriceCurve([])
+          .build()
+      ).toThrow("Invariant failed: input not set");
+    });
+
+    it("Throw if outputs are not set", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      expect(() =>
+        builder
+          .cosigner(constants.AddressZero)
+          .cosignature(VALID_COSIGNATURE)
+          .input({
+            token: INPUT_TOKEN,
+            maxAmount: INPUT_MAX_AMOUNT,
+          })
+          .auctionStartBlock(100)
+          .baselinePriorityFeeWei(0)
+          .scalingFactor(BASE_SCALING_FACTOR)
+          .priceCurve([])
+          .deadline(deadline)
+          .swapper(constants.AddressZero)
+          .nonce(BigNumber.from(100))
+          .auctionTargetBlock(100)
+          .supplementalPriceCurve([])
+          .build()
+      ).toThrow("Invariant failed: outputs not set");
+    });
+
+    it("Throw if auctionStartBlock is not set", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      expect(() =>
+        builder
+          .cosigner(constants.AddressZero)
+          .cosignature(VALID_COSIGNATURE)
+          .input({
+            token: INPUT_TOKEN,
+            maxAmount: INPUT_MAX_AMOUNT,
+          })
+          .output({
+            token: OUTPUT_TOKEN,
+            minAmount: OUTPUT_MIN_AMOUNT,
+            recipient: constants.AddressZero,
+          })
+          .baselinePriorityFeeWei(0)
+          .scalingFactor(BASE_SCALING_FACTOR)
+          .priceCurve([])
+          .deadline(deadline)
+          .swapper(constants.AddressZero)
+          .nonce(BigNumber.from(100))
+          .auctionTargetBlock(100)
+          .supplementalPriceCurve([])
+          .build()
+      ).toThrow("Invariant failed: auctionStartBlock not set");
+    });
+
+    it("Throw if baselinePriorityFeeWei is not set", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      expect(() =>
+        builder
+          .cosigner(constants.AddressZero)
+          .cosignature(VALID_COSIGNATURE)
+          .input({
+            token: INPUT_TOKEN,
+            maxAmount: INPUT_MAX_AMOUNT,
+          })
+          .output({
+            token: OUTPUT_TOKEN,
+            minAmount: OUTPUT_MIN_AMOUNT,
+            recipient: constants.AddressZero,
+          })
+          .auctionStartBlock(100)
+          .scalingFactor(BASE_SCALING_FACTOR)
+          .priceCurve([])
+          .deadline(deadline)
+          .swapper(constants.AddressZero)
+          .nonce(BigNumber.from(100))
+          .auctionTargetBlock(100)
+          .supplementalPriceCurve([])
+          .build()
+      ).toThrow("Invariant failed: baselinePriorityFeeWei not set");
+    });
+
+    it("Throw if scalingFactor is not set", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      expect(() =>
+        builder
+          .cosigner(constants.AddressZero)
+          .cosignature(VALID_COSIGNATURE)
+          .input({
+            token: INPUT_TOKEN,
+            maxAmount: INPUT_MAX_AMOUNT,
+          })
+          .output({
+            token: OUTPUT_TOKEN,
+            minAmount: OUTPUT_MIN_AMOUNT,
+            recipient: constants.AddressZero,
+          })
+          .auctionStartBlock(100)
+          .baselinePriorityFeeWei(0)
+          .priceCurve([])
+          .deadline(deadline)
+          .swapper(constants.AddressZero)
+          .nonce(BigNumber.from(100))
+          .auctionTargetBlock(100)
+          .supplementalPriceCurve([])
+          .build()
+      ).toThrow("Invariant failed: scalingFactor not set");
+    });
+
+    it("Throw if priceCurve is not set", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      expect(() =>
+        builder
+          .cosigner(constants.AddressZero)
+          .cosignature(VALID_COSIGNATURE)
+          .input({
+            token: INPUT_TOKEN,
+            maxAmount: INPUT_MAX_AMOUNT,
+          })
+          .output({
+            token: OUTPUT_TOKEN,
+            minAmount: OUTPUT_MIN_AMOUNT,
+            recipient: constants.AddressZero,
+          })
+          .auctionStartBlock(100)
+          .baselinePriorityFeeWei(0)
+          .scalingFactor(BASE_SCALING_FACTOR)
+          .deadline(deadline)
+          .swapper(constants.AddressZero)
+          .nonce(BigNumber.from(100))
+          .auctionTargetBlock(100)
+          .supplementalPriceCurve([])
+          .build()
+      ).toThrow("Invariant failed: priceCurve not set");
+    });
+
+    it("Throw if cosignature is not set when calling build()", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      expect(() =>
+        builder
+          .cosigner(constants.AddressZero)
+          .input({
+            token: INPUT_TOKEN,
+            maxAmount: INPUT_MAX_AMOUNT,
+          })
+          .output({
+            token: OUTPUT_TOKEN,
+            minAmount: OUTPUT_MIN_AMOUNT,
+            recipient: constants.AddressZero,
+          })
+          .auctionStartBlock(100)
+          .baselinePriorityFeeWei(0)
+          .scalingFactor(BASE_SCALING_FACTOR)
+          .priceCurve([])
+          .deadline(deadline)
+          .swapper(constants.AddressZero)
+          .nonce(BigNumber.from(100))
+          .auctionTargetBlock(100)
+          .supplementalPriceCurve([])
+          .build()
+      ).toThrow("Invariant failed: cosignature not set");
+    });
+  });
+
+  describe("buildPartial", () => {
+    it("Build a partial order without cosignature", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const order = builder
+        .cosigner(constants.AddressZero)
+        .input({
+          token: INPUT_TOKEN,
+          maxAmount: INPUT_MAX_AMOUNT,
+        })
+        .output({
+          token: OUTPUT_TOKEN,
+          minAmount: OUTPUT_MIN_AMOUNT,
+          recipient: constants.AddressZero,
+        })
+        .auctionStartBlock(100)
+        .baselinePriorityFeeWei(0)
+        .scalingFactor(BASE_SCALING_FACTOR)
+        .priceCurve([])
+        .deadline(deadline)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .buildPartial();
+
+      expect(order.order.info.reactor).toEqual(REACTOR_ADDRESS);
+      expect(order.order.outputs.length).toEqual(1);
+      expect(order.chainId).toEqual(1);
+    });
+  });
+
+  describe("fromOrder", () => {
+    it("Regenerate builder from order", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const cosignature =
+        "0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890";
+      const order = builder
+        .cosigner(constants.AddressZero)
+        .cosignature(cosignature)
+        .input({
+          token: INPUT_TOKEN,
+          maxAmount: INPUT_MAX_AMOUNT,
+        })
+        .output({
+          token: OUTPUT_TOKEN,
+          minAmount: OUTPUT_MIN_AMOUNT,
+          recipient: constants.AddressZero,
+        })
+        .auctionStartBlock(100)
+        .baselinePriorityFeeWei(0)
+        .scalingFactor(BASE_SCALING_FACTOR)
+        .priceCurve([])
+        .deadline(deadline)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .auctionTargetBlock(100)
+        .supplementalPriceCurve([])
+        .build();
+
+      const regeneratedBuilder = HybridOrderBuilder.fromOrder(order);
+      const regeneratedOrder = regeneratedBuilder.build();
+
+      expect(regeneratedOrder.toJSON()).toMatchObject(order.toJSON());
+    });
+
+    it("Regenerate builder from order and modify", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const cosignature =
+        "0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890";
+      const order = builder
+        .cosigner(constants.AddressZero)
+        .cosignature(cosignature)
+        .input({
+          token: INPUT_TOKEN,
+          maxAmount: INPUT_MAX_AMOUNT,
+        })
+        .output({
+          token: OUTPUT_TOKEN,
+          minAmount: OUTPUT_MIN_AMOUNT,
+          recipient: constants.AddressZero,
+        })
+        .auctionStartBlock(100)
+        .baselinePriorityFeeWei(0)
+        .scalingFactor(BASE_SCALING_FACTOR)
+        .priceCurve([])
+        .deadline(deadline)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .auctionTargetBlock(100)
+        .supplementalPriceCurve([])
+        .build();
+
+      const regeneratedBuilder = HybridOrderBuilder.fromOrder(order);
+      regeneratedBuilder.auctionStartBlock(200);
+      const regeneratedOrder = regeneratedBuilder.build();
+
+      expect(regeneratedOrder.order.auctionStartBlock).toEqual(
+        BigNumber.from(200)
+      );
+      expect(regeneratedOrder.order.info.swapper).toEqual(
+        constants.AddressZero
+      );
+    });
+
+    it("Regenerate builder from order JSON", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const cosignature =
+        "0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890";
+      const order = builder
+        .cosigner(constants.AddressZero)
+        .cosignature(cosignature)
+        .input({
+          token: INPUT_TOKEN,
+          maxAmount: INPUT_MAX_AMOUNT,
+        })
+        .output({
+          token: OUTPUT_TOKEN,
+          minAmount: OUTPUT_MIN_AMOUNT,
+          recipient: constants.AddressZero,
+        })
+        .auctionStartBlock(100)
+        .baselinePriorityFeeWei(0)
+        .scalingFactor(BASE_SCALING_FACTOR)
+        .priceCurve([])
+        .deadline(deadline)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .auctionTargetBlock(100)
+        .supplementalPriceCurve([])
+        .build();
+
+      const json = order.toJSON();
+      const orderFromJSON = HybridOrderClass.fromJSON(
+        json,
+        json.chainId,
+        json.resolver
+      );
+      const regeneratedBuilder = HybridOrderBuilder.fromOrder(orderFromJSON);
+      const regeneratedOrder = regeneratedBuilder.build();
+
+      expect(regeneratedOrder.toJSON()).toMatchObject(order.toJSON());
+    });
+  });
+
+  describe("Utility methods", () => {
+    it("Does not throw before an order has been finished building", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      expect(() =>
+        builder.deadline(deadline).auctionStartBlock(100)
+      ).not.toThrowError();
+    });
+
+    it("Supports number inputs for BigNumber fields", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const order = builder
+        .cosigner(constants.AddressZero)
+        .cosignature(VALID_COSIGNATURE)
+        .input({
+          token: INPUT_TOKEN,
+          maxAmount: INPUT_MAX_AMOUNT,
+        })
+        .output({
+          token: OUTPUT_TOKEN,
+          minAmount: OUTPUT_MIN_AMOUNT,
+          recipient: constants.AddressZero,
+        })
+        .auctionStartBlock(100) // number instead of BigNumber
+        .baselinePriorityFeeWei(1000000000) // number instead of BigNumber
+        .scalingFactor(BASE_SCALING_FACTOR)
+        .priceCurve([])
+        .deadline(deadline)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .auctionTargetBlock(110) // number instead of BigNumber
+        .supplementalPriceCurve([])
+        .build();
+
+      expect(order.order.auctionStartBlock).toEqual(BigNumber.from(100));
+      expect(order.order.baselinePriorityFeeWei).toEqual(
+        BigNumber.from(1000000000)
+      );
+      expect(order.order.cosignerData.auctionTargetBlock).toEqual(
+        BigNumber.from(110)
+      );
+    });
+  });
+
+  describe("Edge cases", () => {
+    it("Build order with zero baseline priority fee", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const order = builder
+        .cosigner(constants.AddressZero)
+        .cosignature(VALID_COSIGNATURE)
+        .input({
+          token: INPUT_TOKEN,
+          maxAmount: INPUT_MAX_AMOUNT,
+        })
+        .output({
+          token: OUTPUT_TOKEN,
+          minAmount: OUTPUT_MIN_AMOUNT,
+          recipient: constants.AddressZero,
+        })
+        .auctionStartBlock(0)
+        .baselinePriorityFeeWei(0)
+        .scalingFactor(BASE_SCALING_FACTOR)
+        .priceCurve([])
+        .deadline(deadline)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .auctionTargetBlock(0)
+        .supplementalPriceCurve([])
+        .build();
+
+      expect(order.order.auctionStartBlock).toEqual(BigNumber.from(0));
+      expect(order.order.baselinePriorityFeeWei).toEqual(BigNumber.from(0));
+    });
+
+    it("Build order with neutral scaling factor (1e18)", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const order = builder
+        .cosigner(constants.AddressZero)
+        .cosignature(VALID_COSIGNATURE)
+        .input({
+          token: INPUT_TOKEN,
+          maxAmount: INPUT_MAX_AMOUNT,
+        })
+        .output({
+          token: OUTPUT_TOKEN,
+          minAmount: OUTPUT_MIN_AMOUNT,
+          recipient: constants.AddressZero,
+        })
+        .auctionStartBlock(100)
+        .baselinePriorityFeeWei(0)
+        .scalingFactor(BASE_SCALING_FACTOR) // neutral 1e18
+        .priceCurve([])
+        .deadline(deadline)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .auctionTargetBlock(100)
+        .supplementalPriceCurve([])
+        .build();
+
+      expect(order.order.scalingFactor).toEqual(BASE_SCALING_FACTOR);
+    });
+
+    it("Build order with empty price curve", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const order = builder
+        .cosigner(constants.AddressZero)
+        .cosignature(VALID_COSIGNATURE)
+        .input({
+          token: INPUT_TOKEN,
+          maxAmount: INPUT_MAX_AMOUNT,
+        })
+        .output({
+          token: OUTPUT_TOKEN,
+          minAmount: OUTPUT_MIN_AMOUNT,
+          recipient: constants.AddressZero,
+        })
+        .auctionStartBlock(0)
+        .baselinePriorityFeeWei(0)
+        .scalingFactor(BASE_SCALING_FACTOR)
+        .priceCurve([])
+        .deadline(deadline)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .auctionTargetBlock(0)
+        .supplementalPriceCurve([])
+        .build();
+
+      expect(order.order.priceCurve).toEqual([]);
+      expect(order.order.auctionStartBlock).toEqual(BigNumber.from(0));
+    });
+
+    it("Build order with very high scaling factor for exact-in", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const highScalingFactor = BASE_SCALING_FACTOR.mul(2); // 2e18
+
+      const order = builder
+        .cosigner(constants.AddressZero)
+        .cosignature(VALID_COSIGNATURE)
+        .input({
+          token: INPUT_TOKEN,
+          maxAmount: INPUT_MAX_AMOUNT,
+        })
+        .output({
+          token: OUTPUT_TOKEN,
+          minAmount: OUTPUT_MIN_AMOUNT,
+          recipient: constants.AddressZero,
+        })
+        .auctionStartBlock(100)
+        .baselinePriorityFeeWei(0)
+        .scalingFactor(highScalingFactor)
+        .priceCurve([])
+        .deadline(deadline)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .auctionTargetBlock(100)
+        .supplementalPriceCurve([])
+        .build();
+
+      expect(order.order.scalingFactor).toEqual(highScalingFactor);
+    });
+
+    it("Build order with very low scaling factor for exact-out", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const lowScalingFactor = BASE_SCALING_FACTOR.div(2); // 0.5e18
+
+      const order = builder
+        .cosigner(constants.AddressZero)
+        .cosignature(VALID_COSIGNATURE)
+        .input({
+          token: INPUT_TOKEN,
+          maxAmount: INPUT_MAX_AMOUNT,
+        })
+        .output({
+          token: OUTPUT_TOKEN,
+          minAmount: OUTPUT_MIN_AMOUNT,
+          recipient: constants.AddressZero,
+        })
+        .auctionStartBlock(100)
+        .baselinePriorityFeeWei(0)
+        .scalingFactor(lowScalingFactor)
+        .priceCurve([])
+        .deadline(deadline)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .auctionTargetBlock(100)
+        .supplementalPriceCurve([])
+        .build();
+
+      expect(order.order.scalingFactor).toEqual(lowScalingFactor);
+    });
+  });
+});
+

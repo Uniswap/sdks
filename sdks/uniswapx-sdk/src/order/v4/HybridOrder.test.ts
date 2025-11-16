@@ -1,6 +1,6 @@
 import { BigNumber, ethers, Wallet } from "ethers";
 
-import { HybridOrderClass, OrderNotFillableV4 } from "./HybridOrder";
+import { HybridOrderClass, OrderResolutionError } from "./HybridOrder";
 import { hashHybridCosignerData, hashHybridOrder } from "./hashing";
 import { HybridOrder, HybridOrderJSON } from "./types";
 
@@ -337,7 +337,7 @@ describe("HybridOrderClass", () => {
         currentBlock: BigNumber.from(400),
         priorityFeeWei: order.baselinePriorityFeeWei,
       })
-    ).toThrow(OrderNotFillableV4);
+    ).toThrow(OrderResolutionError);
   });
 });
 

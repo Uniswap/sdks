@@ -258,7 +258,7 @@ export type DCAIntentJSON = Omit<
  * Resolution options for a HybridOrder when simulating fills
  */
 export type HybridOrderResolutionOptions = {
-  currentBlock?: BigNumber;
+  currentBlock: BigNumber;
   priorityFeeWei: BigNumber;
 };
 
