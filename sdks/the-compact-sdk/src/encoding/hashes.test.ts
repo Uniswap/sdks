@@ -8,14 +8,218 @@
  */
 
 import { keccak256, encodeAbiParameters, encodePacked } from 'viem'
-import { componentsHash, idsAndAmountsHash } from './hashes'
-import { Component } from '../types/claims'
+import { componentsHash, idsAndAmountsHash, claimHash, batchClaimHash } from './hashes'
+import { Component, Claim, BatchClaim } from '../types/claims'
 
 // Type hash constants from The Compact
 // From EIP712Types.sol
 const LOCK_TYPEHASH = keccak256('0x4c6f636b28627974657331322 lockTag2c6164647265737320746f6b656e2c75696e7432353620616d6f756e7429' as `0x${string}`) // "Lock(bytes12 lockTag,address token,uint256 amount)"
 
 describe('hash computation', () => {
+  describe('claimHash', () => {
+    it('should compute hash for a basic claim', () => {
+      const claim: Claim = {
+        allocatorData: '0x',
+        sponsorSignature: '0x',
+        sponsor: '0x1234567890123456789012345678901234567890' as `0x${string}`,
+        nonce: 1n,
+        expires: BigInt(Date.now() + 3600000),
+        witness: '0x0000000000000000000000000000000000000000000000000000000000000000',
+        witnessTypestring: '',
+        id: 12345n,
+        allocatedAmount: 1000000n,
+        claimants: [],
+      }
+
+      const hash = claimHash(claim)
+
+      // Verify it produces a valid hash
+      expect(hash).toMatch(/^0x[0-9a-f]{64}$/)
+
+      // Verify it matches manual computation
+      const expected = keccak256(
+        encodeAbiParameters(
+          [
+            { name: 'sponsor', type: 'address' },
+            { name: 'nonce', type: 'uint256' },
+            { name: 'expires', type: 'uint256' },
+            { name: 'witness', type: 'bytes32' },
+            { name: 'id', type: 'uint256' },
+            { name: 'allocatedAmount', type: 'uint256' },
+          ],
+          [claim.sponsor, claim.nonce, claim.expires, claim.witness, claim.id, claim.allocatedAmount]
+        )
+      )
+      expect(hash).toBe(expected)
+    })
+
+    it('should produce different hashes for different nonces', () => {
+      const baseClaim: Claim = {
+        allocatorData: '0x',
+        sponsorSignature: '0x',
+        sponsor: '0x1234567890123456789012345678901234567890' as `0x${string}`,
+        nonce: 1n,
+        expires: BigInt(Date.now() + 3600000),
+        witness: '0x0000000000000000000000000000000000000000000000000000000000000000',
+        witnessTypestring: '',
+        id: 12345n,
+        allocatedAmount: 1000000n,
+        claimants: [],
+      }
+
+      const claim2 = { ...baseClaim, nonce: 2n }
+
+      const hash1 = claimHash(baseClaim)
+      const hash2 = claimHash(claim2)
+
+      expect(hash1).not.toBe(hash2)
+    })
+
+    it('should handle claims with different witness values', () => {
+      const claim1: Claim = {
+        allocatorData: '0x',
+        sponsorSignature: '0x',
+        sponsor: '0x1234567890123456789012345678901234567890' as `0x${string}`,
+        nonce: 1n,
+        expires: BigInt(Date.now() + 3600000),
+        witness: '0x1111111111111111111111111111111111111111111111111111111111111111',
+        witnessTypestring: '',
+        id: 12345n,
+        allocatedAmount: 1000000n,
+        claimants: [],
+      }
+
+      const claim2 = {
+        ...claim1,
+        witness: '0x2222222222222222222222222222222222222222222222222222222222222222' as `0x${string}`,
+      }
+
+      const hash1 = claimHash(claim1)
+      const hash2 = claimHash(claim2)
+
+      expect(hash1).not.toBe(hash2)
+    })
+  })
+
+  describe('batchClaimHash', () => {
+    it('should compute hash for a batch claim with single id', () => {
+      const claim: BatchClaim = {
+        allocatorData: '0x',
+        sponsorSignature: '0x',
+        sponsor: '0x1234567890123456789012345678901234567890' as `0x${string}`,
+        nonce: 1n,
+        expires: BigInt(Date.now() + 3600000),
+        witness: '0x0000000000000000000000000000000000000000000000000000000000000000',
+        witnessTypestring: '',
+        idsAndAmounts: [{ id: 12345n, amount: 1000000n }],
+        claimants: [],
+      }
+
+      const hash = batchClaimHash(claim)
+
+      // Verify it produces a valid hash
+      expect(hash).toMatch(/^0x[0-9a-f]{64}$/)
+
+      // Verify it matches manual computation
+      const idsAndAmountsHashValue = idsAndAmountsHash(claim.idsAndAmounts)
+      const expected = keccak256(
+        encodeAbiParameters(
+          [
+            { name: 'sponsor', type: 'address' },
+            { name: 'nonce', type: 'uint256' },
+            { name: 'expires', type: 'uint256' },
+            { name: 'witness', type: 'bytes32' },
+            { name: 'idsAndAmountsHash', type: 'bytes32' },
+          ],
+          [claim.sponsor, claim.nonce, claim.expires, claim.witness, idsAndAmountsHashValue]
+        )
+      )
+      expect(hash).toBe(expected)
+    })
+
+    it('should compute hash for batch claim with multiple ids', () => {
+      const claim: BatchClaim = {
+        allocatorData: '0x',
+        sponsorSignature: '0x',
+        sponsor: '0xabcdef1234567890abcdef1234567890abcdef12' as `0x${string}`,
+        nonce: 5n,
+        expires: BigInt(Date.now() + 7200000),
+        witness: '0x3333333333333333333333333333333333333333333333333333333333333333',
+        witnessTypestring: '',
+        idsAndAmounts: [
+          { id: 100n, amount: 500000n },
+          { id: 200n, amount: 750000n },
+          { id: 300n, amount: 1000000n },
+        ],
+        claimants: [],
+      }
+
+      const hash = batchClaimHash(claim)
+
+      // Verify it produces a valid hash
+      expect(hash).toMatch(/^0x[0-9a-f]{64}$/)
+
+      // Manually compute and verify
+      const idsAndAmountsHashValue = idsAndAmountsHash(claim.idsAndAmounts)
+      const expected = keccak256(
+        encodeAbiParameters(
+          [
+            { name: 'sponsor', type: 'address' },
+            { name: 'nonce', type: 'uint256' },
+            { name: 'expires', type: 'uint256' },
+            { name: 'witness', type: 'bytes32' },
+            { name: 'idsAndAmountsHash', type: 'bytes32' },
+          ],
+          [claim.sponsor, claim.nonce, claim.expires, claim.witness, idsAndAmountsHashValue]
+        )
+      )
+      expect(hash).toBe(expected)
+    })
+
+    it('should produce different hashes for different idsAndAmounts', () => {
+      const baseClaim: BatchClaim = {
+        allocatorData: '0x',
+        sponsorSignature: '0x',
+        sponsor: '0x1234567890123456789012345678901234567890' as `0x${string}`,
+        nonce: 1n,
+        expires: BigInt(Date.now() + 3600000),
+        witness: '0x0000000000000000000000000000000000000000000000000000000000000000',
+        witnessTypestring: '',
+        idsAndAmounts: [{ id: 100n, amount: 500000n }],
+        claimants: [],
+      }
+
+      const claim2 = {
+        ...baseClaim,
+        idsAndAmounts: [{ id: 200n, amount: 500000n }], // Different id
+      }
+
+      const hash1 = batchClaimHash(baseClaim)
+      const hash2 = batchClaimHash(claim2)
+
+      expect(hash1).not.toBe(hash2)
+    })
+
+    it('should handle empty idsAndAmounts array', () => {
+      const claim: BatchClaim = {
+        allocatorData: '0x',
+        sponsorSignature: '0x',
+        sponsor: '0x1234567890123456789012345678901234567890' as `0x${string}`,
+        nonce: 1n,
+        expires: BigInt(Date.now() + 3600000),
+        witness: '0x0000000000000000000000000000000000000000000000000000000000000000',
+        witnessTypestring: '',
+        idsAndAmounts: [],
+        claimants: [],
+      }
+
+      const hash = batchClaimHash(claim)
+
+      // Should still produce a valid hash (with empty array hash)
+      expect(hash).toMatch(/^0x[0-9a-f]{64}$/)
+    })
+  })
+
   describe('componentsHash', () => {
     it('should hash empty components array', () => {
       const components: Component[] = []

@@ -1,15 +1,16 @@
 /**
  * Price Curve Library for Tribunal auctions
  *
- * Provides functionality for creating, manipulating, and evaluating price curves that define
- * how auction prices evolve over time.
+ * Price curves enable time-based Dutch auctions where fill amounts change over time.
+ * Each curve element packs a block duration (16 bits) and scaling factor (240 bits).
  *
  * Key concepts:
- * - PriceCurveElement: Packs block duration (16 bits) + scaling factor (240 bits) into uint256
- * - Scaling factor: 1e18 = neutral/100%. >1e18 = exact-in mode, <1e18 = exact-out mode
- * - Zero-duration segments: Enable instant price jumps at specific blocks
+ * - Exact-in mode (scaling > 1e18): Filler receives more tokens for providing the fill
+ * - Exact-out mode (scaling < 1e18): Filler receives fewer tokens for providing the fill
+ * - Neutral (scaling = 1e18): No scaling applied
+ * - Zero-duration segments: Create instant price jumps (steps) at specific block numbers
  * - Linear interpolation: Smooth transitions between curve points
- * - Supplemental curves: Adjusters can modify base curves by adding scaling factors
+ * - Supplemental curves: Adjusters can modify base curves (combined = base + supplemental - 1e18)
  *
  * Based on: tribunal/src/lib/PriceCurveLib.sol
  */
@@ -73,6 +74,8 @@ export function createPriceCurveElement(blockDuration: number, scalingFactor: bi
 
 /**
  * Extract block duration from a packed PriceCurveElement
+ * @param element - Packed PriceCurveElement uint256
+ * @returns Block duration (0-65535)
  */
 export function getBlockDuration(element: bigint): number {
   return Number(element >> BigInt(BLOCK_DURATION_SHIFT))
@@ -80,6 +83,8 @@ export function getBlockDuration(element: bigint): number {
 
 /**
  * Extract scaling factor from a packed PriceCurveElement
+ * @param element - Packed PriceCurveElement uint256
+ * @returns Scaling factor (240-bit value, 1e18 = neutral)
  */
 export function getScalingFactor(element: bigint): bigint {
   return element & SCALING_FACTOR_MASK
@@ -87,6 +92,8 @@ export function getScalingFactor(element: bigint): bigint {
 
 /**
  * Extract both components from a packed PriceCurveElement
+ * @param element - Packed PriceCurveElement uint256
+ * @returns Unpacked PriceCurveElement with blockDuration and scalingFactor
  */
 export function unpackPriceCurveElement(element: bigint): PriceCurveElement {
   return {
@@ -98,6 +105,9 @@ export function unpackPriceCurveElement(element: bigint): PriceCurveElement {
 /**
  * Check if two scaling factors scale in the same direction
  * Returns true if both are exact-in (>1e18) or both exact-out (<1e18), or either is neutral (=1e18)
+ * @param a - First scaling factor
+ * @param b - Second scaling factor
+ * @returns True if scaling factors are compatible (same direction or one is neutral)
  */
 export function sharesScalingDirection(a: bigint, b: bigint): boolean {
   const threshold = 1000000000000000000n // 1e18
@@ -108,7 +118,7 @@ export function sharesScalingDirection(a: bigint, b: bigint): boolean {
   }
 
   // Both values are on the same side of 1e18
-  return (a > threshold) === (b > threshold)
+  return a > threshold === b > threshold
 }
 
 /**
@@ -317,7 +327,9 @@ function locateCurrentAmount(
 }
 
 /**
- * Convenience function to create a simple price curve from an array of elements
+ * Convenience function to create a packed price curve from an array of elements
+ * @param elements - Array of unpacked PriceCurveElements
+ * @returns Array of packed uint256 values ready for on-chain use
  */
 export function createPriceCurve(elements: PriceCurveElement[]): bigint[] {
   return elements.map((el) => createPriceCurveElement(el.blockDuration, el.scalingFactor))
@@ -325,6 +337,8 @@ export function createPriceCurve(elements: PriceCurveElement[]): bigint[] {
 
 /**
  * Convenience function to unpack an entire price curve
+ * @param curve - Array of packed PriceCurveElement uint256 values
+ * @returns Array of unpacked PriceCurveElements
  */
 export function unpackPriceCurve(curve: bigint[]): PriceCurveElement[] {
   return curve.map(unpackPriceCurveElement)

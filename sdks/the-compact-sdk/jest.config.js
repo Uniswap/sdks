@@ -9,5 +9,15 @@ module.exports = {
       tsconfig: 'tsconfig.base.json',
     },
   },
+  collectCoverageFrom: [
+    '**/*.ts',
+    '!**/*.test.ts',
+    '!**/node_modules/**',
+  ],
+  coverageReporters: ['text', 'text-summary', 'html'],
+  coveragePathIgnorePatterns: [
+    '/node_modules/',
+    '/__tests__/',
+  ],
 }
 

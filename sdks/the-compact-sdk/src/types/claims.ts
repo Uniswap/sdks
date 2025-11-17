@@ -44,16 +44,18 @@ export interface BatchClaim {
 }
 
 /**
- * A multichain claim element
+ * A batch claim component for batch multichain claims
+ * Named "portions" in Solidity
  */
-export interface MultichainClaimElement {
-  chainId: bigint // uint256
-  idsAndAmounts: Array<{ id: bigint; amount: bigint }> // IdAndAmount[]
-  claimants: Component[] // Component[]
+export interface BatchClaimComponent {
+  id: bigint // uint256
+  allocatedAmount: bigint // uint256
+  portions: Component[] // Component[]
 }
 
 /**
- * A multichain claim
+ * A multichain claim against a single compact
+ * Uses hash references (additionalChains) to coordinate cross-chain claims
  */
 export interface MultichainClaim {
   allocatorData: `0x${string}` // bytes
@@ -63,11 +65,15 @@ export interface MultichainClaim {
   expires: bigint // uint256
   witness: `0x${string}` // bytes32
   witnessTypestring: string // string
-  elements: MultichainClaimElement[] // Element[]
+  id: bigint // uint256 (single resource ID)
+  allocatedAmount: bigint // uint256 (single amount)
+  claimants: Component[] // Component[] (for this chain)
+  additionalChains: `0x${string}`[] // bytes32[] (hashes to other chain elements)
 }
 
 /**
- * A batch multichain claim
+ * A batch multichain claim against multiple compacts
+ * Uses hash references (additionalChains) to coordinate cross-chain batch claims
  */
 export interface BatchMultichainClaim {
   allocatorData: `0x${string}` // bytes
@@ -77,7 +83,8 @@ export interface BatchMultichainClaim {
   expires: bigint // uint256
   witness: `0x${string}` // bytes32
   witnessTypestring: string // string
-  elements: MultichainClaimElement[] // Element[]
+  claims: BatchClaimComponent[] // BatchClaimComponent[]
+  additionalChains: `0x${string}`[] // bytes32[] (hashes to other chain elements)
 }
 
 /**
