@@ -26,7 +26,49 @@ export interface BuiltClaim {
 }
 
 /**
- * Builder for single Claim messages
+ * Fluent builder for creating single Claim messages
+ *
+ * A Claim is submitted by an arbiter to process a compact and distribute locked tokens
+ * to one or more recipients. Claims specify how the locked amount should be allocated
+ * among claimants through transfers, conversions, or withdrawals.
+ *
+ * @example
+ * ```typescript
+ * import { CompactClient } from '@uniswap/the-compact-sdk'
+ *
+ * const client = new CompactClient({ chainId: 1, address: '0x...' })
+ *
+ * // Build a claim from a signed compact
+ * const claim = client.arbiter.claim()
+ *   .fromCompact({
+ *     compact: signedCompact.struct,
+ *     signature: sponsorSignature,
+ *   })
+ *   .addTransfer({
+ *     recipient: '0xRecipient1...',
+ *     amount: 600000n
+ *   })
+ *   .addTransfer({
+ *     recipient: '0xRecipient2...',
+ *     amount: 400000n
+ *   })
+ *   .build()
+ *
+ * // Submit the claim
+ * const hash = await client.arbiter.submitClaim(claim)
+ *
+ * // Or build manually
+ * const claim2 = client.arbiter.claim()
+ *   .sponsor('0xSponsor...')
+ *   .nonce(1n)
+ *   .expires(BigInt(Date.now() / 1000 + 3600))
+ *   .id(12345n)
+ *   .allocatedAmount(1000000n)
+ *   .lockTag('0x000000000000000000000001')
+ *   .addTransfer({ recipient: '0x...', amount: 500000n })
+ *   .addWithdraw({ recipient: '0x...', amount: 500000n })
+ *   .build()
+ * ```
  */
 export class SingleClaimBuilder {
   private domain: CompactDomain
@@ -85,12 +127,6 @@ export class SingleClaimBuilder {
 
   expires(expires: bigint): this {
     this._expires = expires
-    return this
-  }
-
-  allocator(allocator: `0x${string}`): this {
-    // Allocator address could be encoded in allocatorData
-    // For now, this is a no-op placeholder
     return this
   }
 
@@ -236,10 +272,10 @@ export class SingleClaimBuilder {
       domain: this.domain,
       types,
       primaryType: 'Claim' as const,
-      message,
+      message: message as unknown as Record<string, unknown>,
     }
 
-    const hash = (hashTypedData as any)(typedData as any)
+    const hash = hashTypedData(typedData)
 
     return {
       struct,
@@ -250,7 +286,40 @@ export class SingleClaimBuilder {
 }
 
 /**
- * Builder for batch claims (multiple IDs from a single compact)
+ * Fluent builder for creating batch Claim messages
+ *
+ * A BatchClaim allows processing multiple resource locks from a single compact
+ * in one transaction. This is useful when a BatchCompact locked multiple tokens
+ * and you want to claim them all efficiently.
+ *
+ * @example
+ * ```typescript
+ * import { CompactClient } from '@uniswap/the-compact-sdk'
+ *
+ * const client = new CompactClient({ chainId: 1, address: '0x...' })
+ *
+ * // Build a batch claim from a signed batch compact
+ * const batchClaim = client.arbiter.batchClaim()
+ *   .fromBatchCompact({
+ *     compact: signedBatchCompact.struct,
+ *     signature: sponsorSignature,
+ *     idsAndAmounts: [
+ *       { lockTag: '0x...01', token: '0xUSDC...', amount: 1000000n },
+ *       { lockTag: '0x...02', token: '0xWETH...', amount: 5000000000000000000n }
+ *     ]
+ *   })
+ *   .addClaimant('0x...01', {
+ *     kind: 'transfer',
+ *     recipient: '0xRecipient1...',
+ *     amount: 1000000n
+ *   })
+ *   .addClaimant('0x...02', {
+ *     kind: 'transfer',
+ *     recipient: '0xRecipient2...',
+ *     amount: 5000000000000000000n
+ *   })
+ *   .build()
+ * ```
  */
 export class BatchClaimBuilder {
   private domain: CompactDomain
@@ -394,17 +463,41 @@ export class BatchClaimBuilder {
       domain: this.domain,
       types,
       primaryType: 'BatchClaim' as const,
-      message,
+      message: message as unknown as Record<string, unknown>,
     }
 
-    const hash = (hashTypedData as any)(typedData as any)
+    const hash = hashTypedData(typedData)
 
     return { struct, hash, typedData }
   }
 }
 
 /**
- * Builder for batch claim component portions
+ * Fluent builder for individual components within a batch multichain claim
+ *
+ * Each component represents a single resource ID with its allocated amount and
+ * the portions (claimants) that will receive the funds. This builder is accessed
+ * through BatchMultichainClaimBuilder.addClaim() and uses done() to return to
+ * the parent builder.
+ *
+ * @example
+ * ```typescript
+ * // Used as part of BatchMultichainClaimBuilder
+ * const batchMultichainClaim = client.arbiter.batchMultichainClaim()
+ *   .sponsor('0xSponsor...')
+ *   .nonce(1n)
+ *   .expires(expires)
+ *   .addClaim()
+ *     .id(12345n)
+ *     .allocatedAmount(1000000n)
+ *     .addPortion('0x...01', {
+ *       kind: 'transfer',
+ *       recipient: '0xRecipient...',
+ *       amount: 1000000n
+ *     })
+ *     .done()
+ *   .build()
+ * ```
  */
 export class BatchClaimComponentBuilder {
   private _id?: bigint
@@ -487,7 +580,36 @@ export class BatchClaimComponentBuilder {
 }
 
 /**
- * Builder for multichain claims (single resource, multiple chains)
+ * Fluent builder for creating multichain Claim messages
+ *
+ * A MultichainClaim allows claiming a single resource that's locked across multiple
+ * chains. This is useful for cross-chain operations where a sponsor has locked tokens
+ * on multiple chains and the arbiter needs to coordinate the claim across all chains.
+ *
+ * The additionalChains field contains hashes of claim elements on other chains,
+ * creating a linked claim that can be validated across chains.
+ *
+ * @example
+ * ```typescript
+ * import { CompactClient } from '@uniswap/the-compact-sdk'
+ *
+ * const client = new CompactClient({ chainId: 1, address: '0x...' })
+ *
+ * // Build a multichain claim for Ethereum
+ * const multichainClaim = client.arbiter.multichainClaim()
+ *   .sponsor('0xSponsor...')
+ *   .nonce(1n)
+ *   .expires(BigInt(Date.now() / 1000 + 3600))
+ *   .id(12345n)
+ *   .allocatedAmount(1000000n)
+ *   .lockTag('0x000000000000000000000001')
+ *   .addTransfer({
+ *     recipient: '0xRecipient...',
+ *     amount: 1000000n
+ *   })
+ *   .addAdditionalChainHash('0x...') // Hash of the claim on Optimism
+ *   .build()
+ * ```
  */
 export class MultichainClaimBuilder {
   private domain: CompactDomain
@@ -732,17 +854,58 @@ export class MultichainClaimBuilder {
       domain: this.domain,
       types,
       primaryType: 'MultichainClaim' as const,
-      message,
+      message: message as unknown as Record<string, unknown>,
     }
 
-    const hash = (hashTypedData as any)(typedData as any)
+    const hash = hashTypedData(typedData)
 
     return { struct, hash, typedData }
   }
 }
 
 /**
- * Builder for batch multichain claims (multiple resources, multiple chains)
+ * Fluent builder for creating batch multichain Claim messages
+ *
+ * A BatchMultichainClaim allows claiming multiple resources across multiple chains
+ * in a single coordinated transaction. This is the most complex claim type, useful
+ * when dealing with cross-chain operations involving multiple token locks.
+ *
+ * Each claim component represents a different resource ID with its own allocated
+ * amount and portions (claimants). The additionalChains field links this claim
+ * to corresponding claims on other chains.
+ *
+ * @example
+ * ```typescript
+ * import { CompactClient } from '@uniswap/the-compact-sdk'
+ *
+ * const client = new CompactClient({ chainId: 1, address: '0x...' })
+ *
+ * // Build a batch multichain claim
+ * const batchMultichainClaim = client.arbiter.batchMultichainClaim()
+ *   .sponsor('0xSponsor...')
+ *   .nonce(1n)
+ *   .expires(BigInt(Date.now() / 1000 + 3600))
+ *   .addClaim()
+ *     .id(12345n)
+ *     .allocatedAmount(1000000n)
+ *     .addPortion('0x...01', {
+ *       kind: 'transfer',
+ *       recipient: '0xRecipient1...',
+ *       amount: 1000000n
+ *     })
+ *     .done()
+ *   .addClaim()
+ *     .id(67890n)
+ *     .allocatedAmount(5000000000000000000n)
+ *     .addPortion('0x...02', {
+ *       kind: 'withdraw',
+ *       recipient: '0xRecipient2...',
+ *       amount: 5000000000000000000n
+ *     })
+ *     .done()
+ *   .addAdditionalChainHash('0x...') // Hash of claim on another chain
+ *   .build()
+ * ```
  */
 export class BatchMultichainClaimBuilder {
   private domain: CompactDomain
@@ -902,10 +1065,10 @@ export class BatchMultichainClaimBuilder {
       domain: this.domain,
       types,
       primaryType: 'BatchMultichainClaim' as const,
-      message,
+      message: message as unknown as Record<string, unknown>,
     }
 
-    const hash = (hashTypedData as any)(typedData as any)
+    const hash = hashTypedData(typedData)
 
     return { struct, hash, typedData }
   }

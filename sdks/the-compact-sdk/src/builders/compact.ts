@@ -9,6 +9,32 @@ import invariant from 'tiny-invariant'
 import { hashTypedData } from 'viem'
 
 /**
+ * EIP-712 message type for compacts with optional mandate
+ */
+type CompactMessage<TMandate extends object | undefined> = TMandate extends object
+  ? Compact & { mandate: TMandate }
+  : Compact
+
+/**
+ * EIP-712 message type for batch compacts with optional mandate
+ */
+type BatchCompactMessage<TMandate extends object | undefined> = TMandate extends object
+  ? BatchCompact & { mandate: TMandate }
+  : BatchCompact
+
+/**
+ * EIP-712 message type for multichain elements with mandate
+ */
+type MultichainElementMessage = MultichainElement & { mandate: any }
+
+/**
+ * EIP-712 message type for multichain compacts
+ */
+type MultichainCompactMessage = Omit<MultichainCompact, 'elements'> & {
+  elements: MultichainElementMessage[]
+}
+
+/**
  * Result of building a compact
  */
 export interface BuiltCompact<TMandate extends object | undefined = undefined> {
@@ -55,7 +81,51 @@ export interface BuiltMultichainCompact<TMandate extends object | undefined = un
 }
 
 /**
- * Builder for single Compact messages
+ * Fluent builder for creating single Compact messages
+ *
+ * A Compact is a signed intent to lock tokens that can be later claimed by arbiters.
+ * Use this builder to construct valid Compact structs with type-safe validation.
+ *
+ * @example
+ * ```typescript
+ * import { CompactClient } from '@uniswap/the-compact-sdk'
+ *
+ * const client = new CompactClient({ chainId: 1, address: '0x...' })
+ *
+ * // Build a simple compact
+ * const compact = client.sponsor.compact()
+ *   .arbiter('0xArbiterAddress...')
+ *   .sponsor('0xSponsorAddress...')
+ *   .nonce(1n)
+ *   .expiresIn('1 hour')
+ *   .lockTag('0x000000000000000000000001')
+ *   .token('0xTokenAddress...')
+ *   .amount(1000000n)
+ *   .build()
+ *
+ * console.log('Compact hash:', compact.hash)
+ * console.log('Struct:', compact.struct)
+ *
+ * // With a witness (mandate)
+ * import { simpleMandate } from '@uniswap/the-compact-sdk'
+ *
+ * const mandateType = simpleMandate<{ maxAmount: bigint }>([
+ *   { name: 'maxAmount', type: 'uint256' }
+ * ])
+ *
+ * const compactWithWitness = client.sponsor.compact()
+ *   .arbiter('0xArbiter...')
+ *   .sponsor('0xSponsor...')
+ *   .nonce(1n)
+ *   .expiresIn('1 day')
+ *   .lockTag('0x000000000000000000000001')
+ *   .token('0xUSDC...')
+ *   .amount(1000000n)
+ *   .witness(mandateType, { maxAmount: 2000000n })
+ *   .build()
+ * ```
+ *
+ * @template TMandate - Optional witness data type for mandate constraints
  */
 export class SingleCompactBuilder<TMandate extends object | undefined = undefined> {
   private domain: CompactDomain
@@ -93,10 +163,23 @@ export class SingleCompactBuilder<TMandate extends object | undefined = undefine
     return this
   }
 
+  /**
+   * Set expiration timestamp (alias for expires())
+   * @param timestamp - Unix timestamp in seconds
+   */
   expiresAt(timestamp: bigint): this {
     return this.expires(timestamp)
   }
 
+  /**
+   * Set expiration relative to now
+   * @param duration - Duration string (e.g., '1 hour', '30 minutes') or seconds as bigint/number
+   * @example
+   * ```typescript
+   * builder.expiresIn('1 hour')  // Expires 1 hour from now
+   * builder.expiresIn(3600)      // Expires in 3600 seconds
+   * ```
+   */
   expiresIn(duration: string | number): this {
     const seconds = typeof duration === 'string' ? parseDuration(duration) : BigInt(duration)
     const now = BigInt(Math.floor(Date.now() / 1000))
@@ -118,6 +201,32 @@ export class SingleCompactBuilder<TMandate extends object | undefined = undefine
     return this
   }
 
+  /**
+   * Attach a witness (mandate) to this compact
+   *
+   * Mandates are additional constraints on how the compact can be claimed,
+   * defined as typed EIP-712 witness data.
+   *
+   * @template T - The mandate data type
+   * @param mandateType - The mandate type definition created with simpleMandate()
+   * @param mandate - The actual mandate data matching the type
+   * @returns A new builder instance typed with the mandate
+   *
+   * @example
+   * ```typescript
+   * import { simpleMandate } from '@uniswap/the-compact-sdk'
+   *
+   * const mandateType = simpleMandate<{ maxAmount: bigint }>([
+   *   { name: 'maxAmount', type: 'uint256' }
+   * ])
+   *
+   * const compact = builder
+   *   .arbiter('0x...')
+   *   .sponsor('0x...')
+   *   .witness(mandateType, { maxAmount: 1000000n })
+   *   .build()
+   * ```
+   */
   witness<T extends object>(mandateType: MandateType<T>, mandate: T): SingleCompactBuilder<T> {
     const builder = this as any as SingleCompactBuilder<T>
     builder._mandateType = mandateType
@@ -125,6 +234,23 @@ export class SingleCompactBuilder<TMandate extends object | undefined = undefine
     return builder
   }
 
+  /**
+   * Build the final Compact struct with EIP-712 hash
+   *
+   * Validates that all required fields are set and constructs the complete
+   * Compact struct along with its EIP-712 typed data and hash.
+   *
+   * @returns Object containing the struct, hash, typed data, and optional mandate
+   * @throws {Error} If any required field is missing
+   *
+   * @example
+   * ```typescript
+   * const result = builder.build()
+   * console.log('Hash:', result.hash)
+   * console.log('Struct:', result.struct)
+   * console.log('TypedData:', result.typedData)
+   * ```
+   */
   build(): BuiltCompact<TMandate> {
     // Validate required fields
     invariant(this._arbiter, 'arbiter is required')
@@ -158,7 +284,7 @@ export class SingleCompactBuilder<TMandate extends object | undefined = undefine
       ],
     }
 
-    let message: any = { ...struct }
+    let message: CompactMessage<TMandate> = { ...struct } as CompactMessage<TMandate>
 
     // Add mandate if present
     if (this._mandateType && this._mandate) {
@@ -172,17 +298,17 @@ export class SingleCompactBuilder<TMandate extends object | undefined = undefine
         }
       }
 
-      message.mandate = this._mandate
+      ;(message as Compact & { mandate: TMandate }).mandate = this._mandate
     }
 
     const typedData = {
       domain: this.domain,
       types,
       primaryType: 'Compact' as const,
-      message,
+      message: message as unknown as Record<string, unknown>,
     }
 
-    const hash = (hashTypedData as any)(typedData as any)
+    const hash = hashTypedData(typedData)
 
     return {
       struct,
@@ -195,7 +321,41 @@ export class SingleCompactBuilder<TMandate extends object | undefined = undefine
 }
 
 /**
- * Builder for BatchCompact messages
+ * Fluent builder for creating batch Compact messages
+ *
+ * A BatchCompact allows locking multiple tokens with different lock tags in a single
+ * signed message, saving gas and simplifying coordination when dealing with multiple
+ * token locks for the same sponsor.
+ *
+ * @example
+ * ```typescript
+ * import { CompactClient } from '@uniswap/the-compact-sdk'
+ *
+ * const client = new CompactClient({ chainId: 1, address: '0x...' })
+ *
+ * // Build a batch compact with multiple token locks
+ * const batchCompact = client.sponsor.batchCompact()
+ *   .arbiter('0xArbiterAddress...')
+ *   .sponsor('0xSponsorAddress...')
+ *   .nonce(1n)
+ *   .expiresIn('1 hour')
+ *   .addLock({
+ *     lockTag: '0x000000000000000000000001',
+ *     token: '0xUSDC...',
+ *     amount: 1000000n
+ *   })
+ *   .addLock({
+ *     lockTag: '0x000000000000000000000002',
+ *     token: '0xWETH...',
+ *     amount: 5000000000000000000n
+ *   })
+ *   .build()
+ *
+ * console.log('Batch compact hash:', batchCompact.hash)
+ * console.log('Struct:', batchCompact.struct)
+ * ```
+ *
+ * @template TMandate - Optional witness data type for mandate constraints
  */
 export class BatchCompactBuilder<TMandate extends object | undefined = undefined> {
   private domain: CompactDomain
@@ -241,15 +401,42 @@ export class BatchCompactBuilder<TMandate extends object | undefined = undefined
     return this.expires(now + seconds)
   }
 
+  /**
+   * Add a token lock to the batch
+   * @param lock - Lock containing lockTag, token address, and amount
+   * @example
+   * ```typescript
+   * builder.addLock({
+   *   lockTag: '0x000000000000000000000001',
+   *   token: '0xUSDC...',
+   *   amount: 1000000n
+   * })
+   * ```
+   */
   addLock(lock: Lock): this {
     this._commitments.push(lock)
     return this
   }
 
+  /**
+   * Alias for addLock()
+   * @param lock - Lock containing lockTag, token address, and amount
+   */
   addCommitment(lock: Lock): this {
     return this.addLock(lock)
   }
 
+  /**
+   * Attach a witness (mandate) to this batch compact
+   *
+   * Mandates are additional constraints on how the compact can be claimed,
+   * defined as typed EIP-712 witness data.
+   *
+   * @template T - The mandate data type
+   * @param mandateType - The mandate type definition created with simpleMandate()
+   * @param mandate - The actual mandate data matching the type
+   * @returns A new builder instance typed with the mandate
+   */
   witness<T extends object>(mandateType: MandateType<T>, mandate: T): BatchCompactBuilder<T> {
     const builder = this as any as BatchCompactBuilder<T>
     builder._mandateType = mandateType
@@ -257,6 +444,15 @@ export class BatchCompactBuilder<TMandate extends object | undefined = undefined
     return builder
   }
 
+  /**
+   * Build the final BatchCompact struct with EIP-712 hash
+   *
+   * Validates that all required fields are set and constructs the complete
+   * BatchCompact struct along with its EIP-712 typed data and hash.
+   *
+   * @returns Object containing the struct, hash, typed data, and optional mandate
+   * @throws {Error} If any required field is missing or no locks have been added
+   */
   build(): BuiltBatchCompact<TMandate> {
     // Validate required fields
     invariant(this._arbiter, 'arbiter is required')
@@ -289,7 +485,7 @@ export class BatchCompactBuilder<TMandate extends object | undefined = undefined
       ],
     }
 
-    let message: any = { ...struct }
+    let message: BatchCompactMessage<TMandate> = { ...struct } as BatchCompactMessage<TMandate>
 
     // Add mandate if present
     if (this._mandateType && this._mandate) {
@@ -302,17 +498,17 @@ export class BatchCompactBuilder<TMandate extends object | undefined = undefined
         }
       }
 
-      message.mandate = this._mandate
+      ;(message as BatchCompact & { mandate: TMandate }).mandate = this._mandate
     }
 
     const typedData = {
       domain: this.domain,
       types,
       primaryType: 'BatchCompact' as const,
-      message,
+      message: message as unknown as Record<string, unknown>,
     }
 
-    const hash = (hashTypedData as any)(typedData as any)
+    const hash = hashTypedData(typedData)
 
     return {
       struct,
@@ -325,7 +521,27 @@ export class BatchCompactBuilder<TMandate extends object | undefined = undefined
 }
 
 /**
- * Builder for multichain element
+ * Fluent builder for creating individual multichain compact elements
+ *
+ * Each element represents a set of token locks on a specific chain with its own
+ * arbiter and mandate. This builder is accessed through MultichainCompactBuilder.addElement()
+ * and uses the done() method to return to the parent builder for chaining.
+ *
+ * @example
+ * ```typescript
+ * // Used as part of MultichainCompactBuilder
+ * const multichain = client.sponsor.multichainCompact()
+ *   .sponsor('0xSponsor...')
+ *   .nonce(1n)
+ *   .expiresIn('1 hour')
+ *   .addElement()
+ *     .arbiter('0xArbiter1...')
+ *     .chainId(1n)
+ *     .addCommitment({ lockTag: '0x...', token: '0xUSDC...', amount: 1000000n })
+ *     .witness(mandateType, mandateData)
+ *     .done()
+ *   .build()
+ * ```
  */
 export class MultichainElementBuilder {
   private _arbiter?: `0x${string}`
@@ -354,6 +570,16 @@ export class MultichainElementBuilder {
     return this
   }
 
+  /**
+   * Attach a witness (mandate) to this element
+   *
+   * Mandates are required for multichain elements and define constraints
+   * on how this element can be claimed.
+   *
+   * @template T - The mandate data type
+   * @param mandateType - The mandate type definition created with simpleMandate()
+   * @param mandate - The actual mandate data matching the type
+   */
   witness<T extends object>(mandateType: MandateType<T>, mandate: T): this {
     this._mandateType = mandateType
     this._mandate = mandate
@@ -362,7 +588,27 @@ export class MultichainElementBuilder {
 
   /**
    * Finish building this element and return to the parent multichain compact builder
-   * This allows for fluent chaining: builder.addElement()...done().addElement()...done().build()
+   *
+   * This method validates that the element is complete and allows for fluent chaining
+   * when building multiple elements.
+   *
+   * @returns The parent MultichainCompactBuilder for further chaining
+   * @throws {Error} If any required field is missing
+   *
+   * @example
+   * ```typescript
+   * builder
+   *   .addElement()
+   *     .arbiter('0x...')
+   *     .chainId(1n)
+   *     .addCommitment(...)
+   *     .witness(...)
+   *     .done()  // Returns to parent builder
+   *   .addElement()  // Add another element
+   *     ...
+   *     .done()
+   *   .build()  // Build the complete multichain compact
+   * ```
    */
   done(): MultichainCompactBuilder {
     // Validate element is complete before returning to parent
@@ -393,7 +639,53 @@ export class MultichainElementBuilder {
 }
 
 /**
- * Builder for MultichainCompact messages
+ * Fluent builder for creating multichain Compact messages
+ *
+ * A MultichainCompact allows coordinating token locks across multiple chains in a single
+ * signed message. Each chain has its own arbiter, lock commitments, and mandate constraints.
+ * This is useful for cross-chain operations where a sponsor wants to lock tokens on multiple
+ * chains simultaneously with a single signature.
+ *
+ * @example
+ * ```typescript
+ * import { CompactClient, simpleMandate } from '@uniswap/the-compact-sdk'
+ *
+ * const client = new CompactClient({ chainId: 1, address: '0x...' })
+ *
+ * const mandateType = simpleMandate<{ maxAmount: bigint }>([
+ *   { name: 'maxAmount', type: 'uint256' }
+ * ])
+ *
+ * // Build a multichain compact across Ethereum and Optimism
+ * const multichainCompact = client.sponsor.multichainCompact()
+ *   .sponsor('0xSponsorAddress...')
+ *   .nonce(1n)
+ *   .expiresIn('1 hour')
+ *   .addElement()
+ *     .arbiter('0xEthereumArbiter...')
+ *     .chainId(1n)  // Ethereum mainnet
+ *     .addCommitment({
+ *       lockTag: '0x000000000000000000000001',
+ *       token: '0xUSDC...',
+ *       amount: 1000000n
+ *     })
+ *     .witness(mandateType, { maxAmount: 2000000n })
+ *     .done()
+ *   .addElement()
+ *     .arbiter('0xOptimismArbiter...')
+ *     .chainId(10n)  // Optimism
+ *     .addCommitment({
+ *       lockTag: '0x000000000000000000000001',
+ *       token: '0xUSDC...',
+ *       amount: 500000n
+ *     })
+ *     .witness(mandateType, { maxAmount: 1000000n })
+ *     .done()
+ *   .build()
+ *
+ * console.log('Multichain compact hash:', multichainCompact.hash)
+ * console.log('Struct:', multichainCompact.struct)
+ * ```
  */
 export class MultichainCompactBuilder {
   private domain: CompactDomain
@@ -431,12 +723,41 @@ export class MultichainCompactBuilder {
     return this.expires(now + seconds)
   }
 
+  /**
+   * Add a new chain element to the multichain compact
+   *
+   * Returns a MultichainElementBuilder for configuring this chain's arbiter,
+   * lock commitments, and mandate. Call done() on the element builder to
+   * return to this builder for chaining.
+   *
+   * @returns A new element builder for configuring this chain
+   *
+   * @example
+   * ```typescript
+   * builder
+   *   .addElement()
+   *     .arbiter('0x...')
+   *     .chainId(1n)
+   *     .addCommitment(...)
+   *     .witness(...)
+   *     .done()
+   * ```
+   */
   addElement(): MultichainElementBuilder {
     const builder = new MultichainElementBuilder(this)
     this.elementBuilders.push(builder)
     return builder
   }
 
+  /**
+   * Build the final MultichainCompact struct with EIP-712 hash
+   *
+   * Validates that all required fields are set and constructs the complete
+   * MultichainCompact struct along with its EIP-712 typed data and hash.
+   *
+   * @returns Object containing the struct, hash, and typed data
+   * @throws {Error} If any required field is missing or no elements have been added
+   */
   build(): BuiltMultichainCompact {
     invariant(this._sponsor, 'sponsor is required')
     invariant(this._nonce !== undefined, 'nonce is required')
@@ -488,7 +809,7 @@ export class MultichainCompactBuilder {
     }
 
     // Build message with mandates
-    const message = {
+    const message: MultichainCompactMessage = {
       sponsor: struct.sponsor,
       nonce: struct.nonce,
       expires: struct.expires,
@@ -502,10 +823,10 @@ export class MultichainCompactBuilder {
       domain: this.domain,
       types,
       primaryType: 'MultichainCompact' as const,
-      message,
+      message: message as unknown as Record<string, unknown>,
     }
 
-    const hash = (hashTypedData as any)(typedData as any)
+    const hash = hashTypedData(typedData)
 
     return {
       struct,

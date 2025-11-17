@@ -11,7 +11,7 @@ const SimpleMandateType = simpleMandate([{ name: 'fillerAddress', type: 'address
 
 describe('Compact Builders', () => {
   const domain: CompactDomain = {
-    name: 'TheCompact',
+    name: 'The Compact',
     version: '1',
     chainId: 1,
     verifyingContract: '0x00000000000000171ede64904551eeDF3C6C9788',
@@ -646,7 +646,11 @@ describe('Compact Builders', () => {
 
     it('should throw if no elements are added', () => {
       expect(() =>
-        CompactBuilder.multichain(domain).sponsor(sponsorAddress).nonce(1n).expires(BigInt(Date.now() + 3600000)).build()
+        CompactBuilder.multichain(domain)
+          .sponsor(sponsorAddress)
+          .nonce(1n)
+          .expires(BigInt(Date.now() + 3600000))
+          .build()
       ).toThrow('at least one element is required')
     })
 

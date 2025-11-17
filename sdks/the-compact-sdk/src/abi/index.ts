@@ -1,3 +1,2 @@
 export * from './theCompact'
-export * from './theCompactClaims'
-
+export * from './attestableAllocator'

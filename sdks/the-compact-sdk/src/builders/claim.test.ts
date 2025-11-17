@@ -9,7 +9,7 @@ import { encodeLockId } from '../encoding/locks'
 
 describe('Claim Builders', () => {
   const domain: CompactDomain = {
-    name: 'TheCompact',
+    name: 'The Compact',
     version: '1',
     chainId: 1,
     verifyingContract: '0x00000000000000171ede64904551eeDF3C6C9788',

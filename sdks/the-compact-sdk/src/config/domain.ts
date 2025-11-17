@@ -41,7 +41,7 @@ const EIP712_DOMAIN_TYPEHASH = '0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffa
  * The domain separator is computed as:
  * keccak256(abi.encode(
  *   EIP712_DOMAIN_TYPEHASH,
- *   keccak256("TheCompact"),
+ *   keccak256("The Compact"),
  *   keccak256("1"),
  *   chainId,
  *   verifyingContract
