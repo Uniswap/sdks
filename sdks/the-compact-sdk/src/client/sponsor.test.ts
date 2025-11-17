@@ -4,8 +4,9 @@
 
 import { SponsorClient } from './sponsor'
 import { CompactClientConfig } from './coreClient'
-import { parseEther, encodeEventTopics } from 'viem'
+import { parseEther, encodeEventTopics, encodeAbiParameters } from 'viem'
 import { simpleMandate } from '../builders/mandate'
+import { theCompactAbi } from '../abi/theCompact'
 
 // Mock viem clients
 const mockPublicClient = {
@@ -20,6 +21,76 @@ const testAddress = '0x00000000000000171ede64904551eeDF3C6C9788' as `0x${string}
 const sponsorAddress = '0x1234567890123456789012345678901234567890' as `0x${string}`
 const tokenAddress = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as `0x${string}`
 const lockTag = '0x000000000000000000000001' as `0x${string}`
+
+// Helper to create a realistic Transfer event log
+function createTransferEvent(params: {
+  from: `0x${string}`
+  to: `0x${string}`
+  id: bigint
+  by: `0x${string}`
+  amount: bigint
+}) {
+  const transferEvent = theCompactAbi.find((item) => item.type === 'event' && item.name === 'Transfer')!
+
+  const topics = encodeEventTopics({
+    abi: [transferEvent],
+    eventName: 'Transfer',
+    args: {
+      from: params.from,
+      to: params.to,
+      id: params.id,
+    },
+  })
+
+  const data = encodeAbiParameters(
+    [
+      { type: 'address', name: 'by' },
+      { type: 'uint256', name: 'amount' },
+    ],
+    [params.by, params.amount]
+  )
+
+  return {
+    address: testAddress,
+    topics,
+    data,
+  }
+}
+
+// Helper to create a realistic ForcedWithdrawalStatusUpdated event log
+function createForcedWithdrawalStatusUpdatedEvent(params: {
+  account: `0x${string}`
+  id: bigint
+  activating: boolean
+  withdrawableAt: bigint
+}) {
+  const event = theCompactAbi.find(
+    (item) => item.type === 'event' && item.name === 'ForcedWithdrawalStatusUpdated'
+  )!
+
+  const topics = encodeEventTopics({
+    abi: [event],
+    eventName: 'ForcedWithdrawalStatusUpdated',
+    args: {
+      account: params.account,
+      id: params.id,
+    },
+  })
+
+  const data = encodeAbiParameters(
+    [
+      { type: 'bool', name: 'activating' },
+      { type: 'uint256', name: 'withdrawableAt' },
+    ],
+    [params.activating, params.withdrawableAt]
+  )
+
+  return {
+    address: testAddress,
+    topics,
+    data,
+  }
+}
 
 describe('SponsorClient', () => {
   let config: CompactClientConfig
@@ -37,33 +108,30 @@ describe('SponsorClient', () => {
   })
 
   describe('depositNative()', () => {
-    it('should deposit native tokens and extract lock ID', async () => {
-      const txHash = '0xabcdef' as `0x${string}`
+    it('should deposit native tokens and extract lock ID from Transfer event', async () => {
+      const txHash = '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890' as `0x${string}`
       const lockId = 123n
+      const depositAmount = parseEther('1.0')
 
-      // Mock transaction hash
       mockWalletClient.writeContract.mockResolvedValue(txHash)
 
-      // Mock transaction receipt with Deposit event
-      mockPublicClient.waitForTransactionReceipt.mockResolvedValue({
-        logs: [
-          {
-            address: testAddress,
-            topics: [
-              '0x1234567890123456789012345678901234567890123456789012345678901234', // Deposit event signature
-            ],
-            data: '0x',
-            // This would be a proper Deposit event
-          },
-        ],
+      // Mock receipt with realistic Transfer event (minting from address(0))
+      const transferEvent = createTransferEvent({
+        from: '0x0000000000000000000000000000000000000000', // Minting from zero address
+        to: sponsorAddress,
+        id: lockId,
+        by: sponsorAddress,
+        amount: depositAmount,
       })
 
-      // For simplicity, we'll mock the actual event extraction
-      // In reality, the event would contain the lock ID
+      mockPublicClient.waitForTransactionReceipt.mockResolvedValue({
+        logs: [transferEvent],
+      })
+
       const result = await client.depositNative({
         lockTag,
         recipient: sponsorAddress,
-        value: parseEther('1.0'),
+        value: depositAmount,
       })
 
       expect(mockWalletClient.writeContract).toHaveBeenCalledWith({
@@ -71,13 +139,13 @@ describe('SponsorClient', () => {
         abi: expect.any(Array),
         functionName: 'depositNative',
         args: [lockTag, sponsorAddress],
-        value: parseEther('1.0'),
+        value: depositAmount,
         chain: null,
         account: null,
       })
 
       expect(result.txHash).toBe(txHash)
-      expect(result.id).toBeDefined()
+      expect(result.id).toBe(lockId)
     })
 
     it('should throw if walletClient is missing', async () => {
@@ -124,20 +192,24 @@ describe('SponsorClient', () => {
   })
 
   describe('depositERC20()', () => {
-    it('should deposit ERC20 tokens and extract lock ID', async () => {
-      const txHash = '0xabcdef' as `0x${string}`
+    it('should deposit ERC20 tokens and extract lock ID from Transfer event', async () => {
+      const txHash = '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890' as `0x${string}`
       const amount = 1000000n
+      const lockId = 456n
 
       mockWalletClient.writeContract.mockResolvedValue(txHash)
 
+      // Mock receipt with realistic Transfer event (minting from address(0))
+      const transferEvent = createTransferEvent({
+        from: '0x0000000000000000000000000000000000000000', // Minting from zero address
+        to: sponsorAddress,
+        id: lockId,
+        by: sponsorAddress,
+        amount,
+      })
+
       mockPublicClient.waitForTransactionReceipt.mockResolvedValue({
-        logs: [
-          {
-            address: testAddress,
-            topics: [],
-            data: '0x',
-          },
-        ],
+        logs: [transferEvent],
       })
 
       const result = await client.depositERC20({
@@ -157,7 +229,7 @@ describe('SponsorClient', () => {
       })
 
       expect(result.txHash).toBe(txHash)
-      expect(result.id).toBeDefined()
+      expect(result.id).toBe(lockId)
     })
 
     it('should throw if walletClient is missing', async () => {
@@ -195,7 +267,7 @@ describe('SponsorClient', () => {
 
   describe('register()', () => {
     it('should register a claim hash', async () => {
-      const txHash = '0xabcdef' as `0x${string}`
+      const txHash = '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890' as `0x${string}`
       const claimHash = '0x1111111111111111111111111111111111111111111111111111111111111111' as `0x${string}`
       const typehash = '0x2222222222222222222222222222222222222222222222222222222222222222' as `0x${string}`
 
@@ -234,23 +306,23 @@ describe('SponsorClient', () => {
   })
 
   describe('enableForcedWithdrawal()', () => {
-    it('should enable forced withdrawal and extract withdrawableAt', async () => {
-      const txHash = '0xabcdef' as `0x${string}`
+    it('should enable forced withdrawal and extract withdrawableAt timestamp', async () => {
+      const txHash = '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890' as `0x${string}`
       const lockId = 100n
       const withdrawableAt = BigInt(Date.now() + 86400000) // 24 hours from now
 
       mockWalletClient.writeContract.mockResolvedValue(txHash)
 
-      // Mock receipt with ForcedWithdrawalEnabled event
+      // Mock receipt with realistic ForcedWithdrawalStatusUpdated event
+      const statusEvent = createForcedWithdrawalStatusUpdatedEvent({
+        account: sponsorAddress,
+        id: lockId,
+        activating: true,
+        withdrawableAt,
+      })
+
       mockPublicClient.waitForTransactionReceipt.mockResolvedValue({
-        logs: [
-          {
-            address: testAddress,
-            topics: [],
-            data: '0x',
-            // In reality, this would decode to ForcedWithdrawalEnabled with withdrawableAt
-          },
-        ],
+        logs: [statusEvent],
       })
 
       const result = await client.enableForcedWithdrawal(lockId)
@@ -265,7 +337,7 @@ describe('SponsorClient', () => {
       })
 
       expect(result.txHash).toBe(txHash)
-      expect(result.withdrawableAt).toBeDefined()
+      expect(result.withdrawableAt).toBe(withdrawableAt)
     })
 
     it('should throw if walletClient is missing', async () => {
@@ -289,7 +361,7 @@ describe('SponsorClient', () => {
 
   describe('disableForcedWithdrawal()', () => {
     it('should disable forced withdrawal', async () => {
-      const txHash = '0xabcdef' as `0x${string}`
+      const txHash = '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890' as `0x${string}`
       const lockId = 100n
 
       mockWalletClient.writeContract.mockResolvedValue(txHash)
@@ -334,39 +406,26 @@ describe('SponsorClient', () => {
   })
 
   describe('forcedWithdrawal()', () => {
-    it('should execute forced withdrawal and extract amount', async () => {
-      const txHash = '0xabcdef' as `0x${string}`
+    it('should execute forced withdrawal with specified amount', async () => {
+      const txHash = '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890' as `0x${string}`
       const lockId = 100n
       const recipient = '0xfedcbafedcbafedcbafedcbafedcbafedcbafedd' as `0x${string}`
-      const withdrawnAmount = 1000000n
+      const amount = 5000000n
 
       mockWalletClient.writeContract.mockResolvedValue(txHash)
 
-      // Mock receipt with ForcedWithdrawal event
-      mockPublicClient.waitForTransactionReceipt.mockResolvedValue({
-        logs: [
-          {
-            address: testAddress,
-            topics: [],
-            data: '0x',
-            // In reality, this would decode to ForcedWithdrawal with amount
-          },
-        ],
-      })
-
-      const result = await client.forcedWithdrawal(lockId, recipient)
+      const result = await client.forcedWithdrawal(lockId, recipient, amount)
 
       expect(mockWalletClient.writeContract).toHaveBeenCalledWith({
         address: testAddress,
         abi: expect.any(Array),
         functionName: 'forcedWithdrawal',
-        args: [lockId, recipient],
+        args: [lockId, recipient, amount],
         chain: null,
         account: null,
       })
 
-      expect(result.txHash).toBe(txHash)
-      expect(result.amount).toBeDefined()
+      expect(result).toBe(txHash)
     })
 
     it('should throw if walletClient is missing', async () => {
@@ -376,7 +435,11 @@ describe('SponsorClient', () => {
       })
 
       await expect(
-        clientWithoutWallet.forcedWithdrawal(100n, '0xfedcbafedcbafedcbafedcbafedcbafedcbafedd' as `0x${string}`)
+        clientWithoutWallet.forcedWithdrawal(
+          100n,
+          '0xfedcbafedcbafedcbafedcbafedcbafedcbafedd' as `0x${string}`,
+          5000000n
+        )
       ).rejects.toThrow('walletClient is required')
     })
 
@@ -387,7 +450,11 @@ describe('SponsorClient', () => {
       })
 
       await expect(
-        clientWithoutAddress.forcedWithdrawal(100n, '0xfedcbafedcbafedcbafedcbafedcbafedcbafedd' as `0x${string}`)
+        clientWithoutAddress.forcedWithdrawal(
+          100n,
+          '0xfedcbafedcbafedcbafedcbafedcbafedcbafedd' as `0x${string}`,
+          5000000n
+        )
       ).rejects.toThrow('contract address is required')
     })
 
@@ -395,7 +462,7 @@ describe('SponsorClient', () => {
       mockWalletClient.writeContract.mockRejectedValue(new Error('Delay not elapsed'))
 
       await expect(
-        client.forcedWithdrawal(100n, '0xfedcbafedcbafedcbafedcbafedcbafedcbafedd' as `0x${string}`)
+        client.forcedWithdrawal(100n, '0xfedcbafedcbafedcbafedcbafedcbafedd' as `0x${string}`, 5000000n)
       ).rejects.toThrow('Delay not elapsed')
     })
   })

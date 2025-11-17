@@ -1,73 +1,54 @@
 /**
- * Hash computation utilities for claims and compacts
- * These functions compute hashes consistent with the on-chain Solidity implementations
+ * Hash computation utilities for The Compact protocol
  *
- * NOTE: These implementations follow the general patterns from the contract but should
- * be validated against the actual on-chain implementations in ClaimProcessorLib.sol
+ * This module provides hash computation functions for claims and their components.
+ * These are content hashes used for claim identification, not EIP-712 signature hashes.
+ *
+ * For EIP-712 structured data signing, use viem's `hashTypedData` function with
+ * the appropriate type definitions from `../types/eip712`.
+ *
+ * @example
+ * ```typescript
+ * import { hashTypedData } from 'viem'
+ * import { createDomain } from '../config/domain'
+ *
+ * // For EIP-712 signature hashing, use viem's hashTypedData:
+ * const domain = createDomain({ chainId: 1, contractAddress: '0x...' })
+ * const compactHash = hashTypedData({
+ *   domain,
+ *   types: compactTypes,
+ *   primaryType: 'Compact',
+ *   message: compact
+ * })
+ *
+ * // For claim content hashes (identification), use the functions in this module:
+ * const claim = { sponsor, nonce, expires, witness, id, allocatedAmount, ... }
+ * const contentHash = claimHash(claim)
+ * ```
  */
 
-import { keccak256, encodeAbiParameters, encodePacked, concat } from 'viem'
-import { Claim, BatchClaim, Component, IdAndAmount } from '../types/claims'
-import { Compact, BatchCompact, MultichainCompact } from '../types/eip712'
+import { keccak256, encodeAbiParameters, concat, type Hex } from 'viem'
+import type { Component, Claim, BatchClaim } from '../types/claims'
 
 /**
- * Compute the hash of a claim
- * This should match the on-chain claimHash computation
- * @param claim - The claim to hash
- * @returns The claim hash
- */
-export function claimHash(claim: Claim): `0x${string}` {
-  // Hash the claim parameters following the contract's pattern
-  // The contract hashes: sponsor, nonce, expires, witness, id, allocatedAmount
-  const encoded = encodeAbiParameters(
-    [
-      { name: 'sponsor', type: 'address' },
-      { name: 'nonce', type: 'uint256' },
-      { name: 'expires', type: 'uint256' },
-      { name: 'witness', type: 'bytes32' },
-      { name: 'id', type: 'uint256' },
-      { name: 'allocatedAmount', type: 'uint256' },
-    ],
-    [claim.sponsor, claim.nonce, claim.expires, claim.witness, claim.id, claim.allocatedAmount]
-  )
-  return keccak256(encoded)
-}
-
-/**
- * Compute the hash of a batch claim
- * @param claim - The batch claim to hash
- * @returns The batch claim hash
- */
-export function batchClaimHash(claim: BatchClaim): `0x${string}` {
-  // Compute hash of idsAndAmounts array
-  const idsAndAmountsHashValue = idsAndAmountsHash(claim.idsAndAmounts)
-
-  // Hash the batch claim parameters
-  const encoded = encodeAbiParameters(
-    [
-      { name: 'sponsor', type: 'address' },
-      { name: 'nonce', type: 'uint256' },
-      { name: 'expires', type: 'uint256' },
-      { name: 'witness', type: 'bytes32' },
-      { name: 'idsAndAmountsHash', type: 'bytes32' },
-    ],
-    [claim.sponsor, claim.nonce, claim.expires, claim.witness, idsAndAmountsHashValue]
-  )
-  return keccak256(encoded)
-}
-
-/**
- * Compute the hash of an array of components
- * Hashes each component and then hashes the concatenated hashes
- * @param components - The components to hash
+ * Compute hash of component array (claimants with amounts)
+ *
+ * Used internally by claim builders. Matches Solidity's componentsHash computation:
+ * - Hash each component: keccak256(abi.encode(claimant, amount))
+ * - Concatenate all hashes
+ * - Hash the concatenation
+ *
+ * @param components - Array of components to hash
  * @returns The components hash
+ *
+ * @internal
  */
-export function componentsHash(components: Component[]): `0x${string}` {
+export function componentsHash(components: readonly Component[]): Hex {
   if (components.length === 0) {
     return keccak256('0x')
   }
 
-  // Hash each component: keccak256(abi.encode(component.claimant, component.amount))
+  // Hash each component: keccak256(abi.encode(claimant, amount))
   const componentHashes = components.map((component) => {
     const encoded = encodeAbiParameters(
       [
@@ -80,17 +61,23 @@ export function componentsHash(components: Component[]): `0x${string}` {
   })
 
   // Concatenate all hashes and hash the result
-  const concatenated = concat(componentHashes as `0x${string}`[])
-  return keccak256(concatenated)
+  return keccak256(concat(componentHashes))
 }
 
 /**
- * Compute the hash of an array of id and amount pairs
- * Hashes each pair and then hashes the concatenated hashes
- * @param idsAndAmounts - The id and amount pairs to hash
+ * Compute hash of id and amount pairs
+ *
+ * Used internally for batch claims. Matches Solidity's idsAndAmountsHash computation:
+ * - Hash each pair: keccak256(abi.encode(id, amount))
+ * - Concatenate all hashes
+ * - Hash the concatenation
+ *
+ * @param idsAndAmounts - Array of {id, amount} pairs to hash
  * @returns The hash
+ *
+ * @internal
  */
-export function idsAndAmountsHash(idsAndAmounts: Array<{ id: bigint; amount: bigint }>): `0x${string}` {
+export function idsAndAmountsHash(idsAndAmounts: readonly { id: bigint; amount: bigint }[]): Hex {
   if (idsAndAmounts.length === 0) {
     return keccak256('0x')
   }
@@ -108,37 +95,83 @@ export function idsAndAmountsHash(idsAndAmounts: Array<{ id: bigint; amount: big
   })
 
   // Concatenate all hashes and hash the result
-  const concatenated = concat(pairHashes as `0x${string}`[])
-  return keccak256(concatenated)
+  return keccak256(concat(pairHashes))
 }
 
 /**
- * Compute the EIP-712 struct hash for a Compact
- * Note: This is a placeholder - actual implementation would use viem's hashTypedData
- * @param compact - The compact to hash
- * @returns The struct hash
+ * Compute content hash for a single claim
+ *
+ * This is a simplified hash used for claim identification, not the full EIP-712 hash.
+ * Hashes the core claim parameters: sponsor, nonce, expires, witness, id, and allocatedAmount.
+ *
+ * @param claim - The claim to hash
+ * @returns The claim content hash
+ *
+ * @example
+ * ```typescript
+ * const claim = {
+ *   sponsor: '0x...',
+ *   nonce: 1n,
+ *   expires: BigInt(Date.now() + 3600000),
+ *   witness: '0x0000000000000000000000000000000000000000000000000000000000000000',
+ *   id: 12345n,
+ *   allocatedAmount: 1000000n,
+ *   // ... other fields
+ * }
+ * const hash = claimHash(claim)
+ * ```
  */
-export function compactStructHash(compact: Compact): `0x${string}` {
-  // This would use the full EIP-712 hashing with domain separator
-  // For now, this is a placeholder
-  throw new Error('compactStructHash not yet implemented - use viem hashTypedData')
+export function claimHash(claim: Claim): Hex {
+  return keccak256(
+    encodeAbiParameters(
+      [
+        { name: 'sponsor', type: 'address' },
+        { name: 'nonce', type: 'uint256' },
+        { name: 'expires', type: 'uint256' },
+        { name: 'witness', type: 'bytes32' },
+        { name: 'id', type: 'uint256' },
+        { name: 'allocatedAmount', type: 'uint256' },
+      ],
+      [claim.sponsor, claim.nonce, claim.expires, claim.witness, claim.id, claim.allocatedAmount]
+    )
+  )
 }
 
 /**
- * Compute the EIP-712 struct hash for a BatchCompact
- * @param compact - The batch compact to hash
- * @returns The struct hash
+ * Compute content hash for a batch claim
+ *
+ * This is a simplified hash used for claim identification, not the full EIP-712 hash.
+ * Hashes the core batch claim parameters: sponsor, nonce, expires, witness, and idsAndAmountsHash.
+ *
+ * @param claim - The batch claim to hash
+ * @returns The batch claim content hash
+ *
+ * @example
+ * ```typescript
+ * const claim = {
+ *   sponsor: '0x...',
+ *   nonce: 1n,
+ *   expires: BigInt(Date.now() + 3600000),
+ *   witness: '0x0000000000000000000000000000000000000000000000000000000000000000',
+ *   idsAndAmounts: [{ id: 100n, amount: 1000000n }],
+ *   // ... other fields
+ * }
+ * const hash = batchClaimHash(claim)
+ * ```
  */
-export function batchCompactStructHash(compact: BatchCompact): `0x${string}` {
-  throw new Error('batchCompactStructHash not yet implemented - use viem hashTypedData')
-}
+export function batchClaimHash(claim: BatchClaim): Hex {
+  const idsAndAmountsHashValue = idsAndAmountsHash(claim.idsAndAmounts)
 
-/**
- * Compute the EIP-712 struct hash for a MultichainCompact
- * @param compact - The multichain compact to hash
- * @returns The struct hash
- */
-export function multichainCompactStructHash(compact: MultichainCompact): `0x${string}` {
-  throw new Error('multichainCompactStructHash not yet implemented - use viem hashTypedData')
+  return keccak256(
+    encodeAbiParameters(
+      [
+        { name: 'sponsor', type: 'address' },
+        { name: 'nonce', type: 'uint256' },
+        { name: 'expires', type: 'uint256' },
+        { name: 'witness', type: 'bytes32' },
+        { name: 'idsAndAmountsHash', type: 'bytes32' },
+      ],
+      [claim.sponsor, claim.nonce, claim.expires, claim.witness, idsAndAmountsHashValue]
+    )
+  )
 }
-

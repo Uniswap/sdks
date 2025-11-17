@@ -8,7 +8,7 @@ import { keccak256, encodeAbiParameters } from 'viem'
  * EIP-712 domain for The Compact v1
  */
 export interface CompactDomain {
-  name: 'TheCompact'
+  name: 'The Compact'
   version: '1'
   chainId: number
   verifyingContract: `0x${string}`
@@ -21,7 +21,7 @@ export interface CompactDomain {
  */
 export function createDomain(params: { chainId: number; contractAddress: `0x${string}` }): CompactDomain {
   return {
-    name: 'TheCompact',
+    name: 'The Compact',
     version: '1',
     chainId: params.chainId,
     verifyingContract: params.contractAddress,
@@ -67,4 +67,3 @@ export function getDomainSeparator(domain: CompactDomain): `0x${string}` {
 
   return keccak256(encoded)
 }
-

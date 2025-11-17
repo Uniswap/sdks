@@ -19,10 +19,19 @@ export interface LockDetails {
 }
 
 /**
+ * Forced withdrawal status enum values
+ */
+export enum ForcedWithdrawalStatusEnum {
+  Disabled = 0,
+  Pending = 1,
+  Enabled = 2,
+}
+
+/**
  * Forced withdrawal status for a lock
  */
 export interface ForcedWithdrawalStatus {
-  enabled: boolean
+  status: ForcedWithdrawalStatusEnum
   withdrawableAt: bigint
 }
 
@@ -93,15 +102,15 @@ export class ViewClient {
   async getLockDetails(id: bigint): Promise<LockDetails> {
     invariant(this.config.address, 'contract address is required')
 
-    const result = await (this.config.publicClient as any).readContract({
+    const result = await this.config.publicClient.readContract({
       address: this.config.address,
       abi: theCompactAbi,
       functionName: 'getLockDetails',
       args: [id],
     })
 
-    // Parse result (assuming it returns [token, allocator, resetPeriod, scope])
-    const [token, allocator, resetPeriod, scope] = result as unknown as [`0x${string}`, `0x${string}`, number, number]
+    // Viem returns a tuple matching the contract's return values
+    const [token, allocator, resetPeriod, scope] = result
 
     // Compute lockTag from id (upper 96 bits)
     const lockTag = (id >> 160n).toString(16).padStart(24, '0')
@@ -109,8 +118,8 @@ export class ViewClient {
     return {
       token,
       allocator,
-      resetPeriod: resetPeriod as ResetPeriod,
-      scope: scope as Scope,
+      resetPeriod,
+      scope,
       lockTag: `0x${lockTag}` as `0x${string}`,
     }
   }
@@ -154,14 +163,14 @@ export class ViewClient {
   }): Promise<boolean> {
     invariant(this.config.address, 'contract address is required')
 
-    const result = await (this.config.publicClient as any).readContract({
+    const result = await this.config.publicClient.readContract({
       address: this.config.address,
       abi: theCompactAbi,
       functionName: 'isRegistered',
       args: [params.sponsor, params.claimHash, params.typehash],
     })
 
-    return result as boolean
+    return result
   }
 
   /**
@@ -190,58 +199,16 @@ export class ViewClient {
   async balanceOf(params: { account: `0x${string}`; id: bigint }): Promise<bigint> {
     invariant(this.config.address, 'contract address is required')
 
-    const result = await (this.config.publicClient as any).readContract({
+    const result = await this.config.publicClient.readContract({
       address: this.config.address,
       abi: theCompactAbi,
       functionName: 'balanceOf',
       args: [params.account, params.id],
     })
 
-    return result as bigint
+    return result
   }
 
-  /**
-   * Get balances for multiple accounts and lock IDs in a single call
-   *
-   * Batch version of balanceOf that returns balances for multiple account/id pairs.
-   * More efficient than making multiple individual balanceOf calls.
-   *
-   * @param params - Batch balance query parameters
-   * @param params.accounts - Array of account addresses to check
-   * @param params.ids - Array of lock IDs to query (must match accounts length)
-   * @returns Array of balances corresponding to each account/id pair
-   *
-   * @throws {Error} If contract address is not set
-   * @throws {Error} If accounts and ids arrays have different lengths
-   *
-   * @example
-   * ```typescript
-   * const balances = await client.view.balanceOfBatch({
-   *   accounts: [user1, user2, user3],
-   *   ids: [lockId1, lockId2, lockId3]
-   * })
-   *
-   * balances.forEach((balance, i) => {
-   *   console.log(`Account ${i} balance: ${balance}`)
-   * })
-   * ```
-   */
-  async balanceOfBatch(params: {
-    accounts: `0x${string}`[]
-    ids: bigint[]
-  }): Promise<bigint[]> {
-    invariant(this.config.address, 'contract address is required')
-    invariant(params.accounts.length === params.ids.length, 'accounts and ids must have the same length')
-
-    const result = await (this.config.publicClient as any).readContract({
-      address: this.config.address,
-      abi: theCompactAbi,
-      functionName: 'balanceOfBatch',
-      args: [params.accounts, params.ids],
-    })
-
-    return result as bigint[]
-  }
 
   /**
    * Check if a specific nonce has been consumed by an allocator
@@ -250,8 +217,8 @@ export class ViewClient {
    * whether a specific nonce has already been consumed.
    *
    * @param params - Nonce query parameters
-   * @param params.allocator - The allocator address to check
    * @param params.nonce - The nonce value to check
+   * @param params.allocator - The allocator address to check
    * @returns True if the nonce has been consumed, false otherwise
    *
    * @throws {Error} If contract address is not set
@@ -259,8 +226,8 @@ export class ViewClient {
    * @example
    * ```typescript
    * const consumed = await client.view.hasConsumedAllocatorNonce({
-   *   allocator: allocatorAddress,
-   *   nonce: 42n
+   *   nonce: 42n,
+   *   allocator: allocatorAddress
    * })
    *
    * if (consumed) {
@@ -271,84 +238,40 @@ export class ViewClient {
    * ```
    */
   async hasConsumedAllocatorNonce(params: {
-    allocator: `0x${string}`
     nonce: bigint
+    allocator: `0x${string}`
   }): Promise<boolean> {
     invariant(this.config.address, 'contract address is required')
 
-    const result = await (this.config.publicClient as any).readContract({
+    const result = await this.config.publicClient.readContract({
       address: this.config.address,
       abi: theCompactAbi,
       functionName: 'hasConsumedAllocatorNonce',
-      args: [params.allocator, params.nonce],
+      args: [params.nonce, params.allocator],
     })
 
-    return result as boolean
+    return result
   }
 
-  /**
-   * Get the current registered nonce for a sponsor/claimHash/typehash combination
-   *
-   * Returns the nonce value that was registered for a specific claim. This is used
-   * to track which nonce a sponsor pre-approved for a particular claim.
-   *
-   * @param params - Registered nonce query parameters
-   * @param params.sponsor - The sponsor address
-   * @param params.claimHash - Hash of the registered claim
-   * @param params.typehash - EIP-712 typehash of the claim structure
-   * @returns The registered nonce value, or 0 if not registered
-   *
-   * @throws {Error} If contract address is not set
-   *
-   * @example
-   * ```typescript
-   * const nonce = await client.view.getRegisteredNonce({
-   *   sponsor: sponsorAddress,
-   *   claimHash: claim.hash,
-   *   typehash: getClaimTypehash()
-   * })
-   *
-   * if (nonce > 0n) {
-   *   console.log('Registered with nonce:', nonce)
-   * } else {
-   *   console.log('Not registered')
-   * }
-   * ```
-   */
-  async getRegisteredNonce(params: {
-    sponsor: `0x${string}`
-    claimHash: `0x${string}`
-    typehash: `0x${string}`
-  }): Promise<bigint> {
-    invariant(this.config.address, 'contract address is required')
-
-    const result = await (this.config.publicClient as any).readContract({
-      address: this.config.address,
-      abi: theCompactAbi,
-      functionName: 'getRegisteredNonce',
-      args: [params.sponsor, params.claimHash, params.typehash],
-    })
-
-    return result as bigint
-  }
 
   /**
    * Get forced withdrawal status for a resource lock
    *
-   * Returns whether forced withdrawal is enabled for a lock and when it becomes
-   * withdrawable. Forced withdrawals are safety mechanisms allowing lock holders
-   * to reclaim funds if allocators become unresponsive.
+   * Returns the forced withdrawal status and when it becomes withdrawable.
+   * Forced withdrawals are safety mechanisms allowing lock holders to reclaim
+   * funds if allocators become unresponsive.
    *
+   * @param account - The account address to check
    * @param id - The lock ID to query
-   * @returns Object containing enabled status and withdrawableAt timestamp
+   * @returns Object containing status enum (Disabled/Pending/Enabled) and withdrawableAt timestamp
    *
    * @throws {Error} If contract address is not set
    *
    * @example
    * ```typescript
-   * const status = await client.view.getForcedWithdrawalStatus(lockId)
+   * const status = await client.view.getForcedWithdrawalStatus(accountAddress, lockId)
    *
-   * if (status.enabled) {
+   * if (status.status === ForcedWithdrawalStatusEnum.Enabled) {
    *   const now = BigInt(Math.floor(Date.now() / 1000))
    *   if (now >= status.withdrawableAt) {
    *     console.log('Can withdraw now!')
@@ -356,26 +279,28 @@ export class ViewClient {
    *     const remainingSeconds = status.withdrawableAt - now
    *     console.log(`Can withdraw in ${remainingSeconds} seconds`)
    *   }
+   * } else if (status.status === ForcedWithdrawalStatusEnum.Pending) {
+   *   console.log('Forced withdrawal pending')
    * } else {
-   *   console.log('Forced withdrawal not enabled')
+   *   console.log('Forced withdrawal disabled')
    * }
    * ```
    */
-  async getForcedWithdrawalStatus(id: bigint): Promise<ForcedWithdrawalStatus> {
+  async getForcedWithdrawalStatus(account: `0x${string}`, id: bigint): Promise<ForcedWithdrawalStatus> {
     invariant(this.config.address, 'contract address is required')
 
-    const result = await (this.config.publicClient as any).readContract({
+    const result = await this.config.publicClient.readContract({
       address: this.config.address,
       abi: theCompactAbi,
       functionName: 'getForcedWithdrawalStatus',
-      args: [id],
+      args: [account, id],
     })
 
-    // Assuming the contract returns [enabled, withdrawableAt]
-    const [enabled, withdrawableAt] = result as unknown as [boolean, bigint]
+    // Viem returns a tuple matching the contract's return values [status enum, withdrawableAt]
+    const [status, withdrawableAt] = result
 
     return {
-      enabled,
+      status,
       withdrawableAt,
     }
   }
@@ -401,12 +326,12 @@ export class ViewClient {
   async getDomainSeparator(): Promise<`0x${string}`> {
     invariant(this.config.address, 'contract address is required')
 
-    const result = await (this.config.publicClient as any).readContract({
+    const result = await this.config.publicClient.readContract({
       address: this.config.address,
       abi: theCompactAbi,
       functionName: 'DOMAIN_SEPARATOR',
     })
 
-    return result as `0x${string}`
+    return result
   }
 }

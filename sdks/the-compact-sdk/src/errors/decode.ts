@@ -76,7 +76,7 @@ for (const item of theCompactAbi) {
  * @param abi - Optional ABI to use for decoding
  * @returns A CompactError or null if not recognized
  */
-export function decodeCompactError(revertData: `0x${string}`, abi?: any[]): CompactError | null {
+export function decodeCompactError(revertData: `0x${string}`, abi?: readonly any[]): CompactError | null {
   if (!revertData || revertData === '0x') {
     return null
   }
@@ -114,7 +114,7 @@ export function decodeCompactError(revertData: `0x${string}`, abi?: any[]): Comp
  * @param abi - Optional ABI to use for decoding
  * @returns A CompactError or null
  */
-export function extractCompactError(error: any, abi?: any[]): CompactError | null {
+export function extractCompactError(error: any, abi?: readonly any[]): CompactError | null {
   // Check if error has revert data
   if (error?.data?.data) {
     return decodeCompactError(error.data.data, abi)

@@ -87,7 +87,7 @@ export class SponsorClient {
     invariant(this.config.address, 'contract address is required')
 
     try {
-      const hash = await (this.config.walletClient as any).writeContract({
+      const hash = await this.config.walletClient.writeContract({
         address: this.config.address,
         abi: theCompactAbi,
         functionName: 'depositNative',
@@ -98,20 +98,21 @@ export class SponsorClient {
       })
 
       // Wait for transaction and extract id from Transfer event
-      const receipt = await (this.config.publicClient as any).waitForTransactionReceipt({ hash })
+      const receipt = await this.config.publicClient.waitForTransactionReceipt({ hash })
 
       // Find the Transfer event where tokens were minted (from address(0) to recipient)
       let id = 0n
       for (const log of receipt.logs) {
         try {
-          const decoded = (decodeEventLog as any)({
+          const decoded = decodeEventLog({
             abi: theCompactAbi,
             data: log.data,
             topics: log.topics,
           })
 
           if (decoded.eventName === 'Transfer' && decoded.args.from === '0x0000000000000000000000000000000000000000') {
-            id = decoded.args.id as bigint
+            // Type guard ensures decoded.args has Transfer event shape
+            id = decoded.args.id
             break
           }
         } catch (e) {
@@ -122,7 +123,7 @@ export class SponsorClient {
 
       return { txHash: hash, id }
     } catch (error) {
-      const compactError = extractCompactError(error, theCompactAbi as any)
+      const compactError = extractCompactError(error, theCompactAbi)
       if (compactError) {
         throw compactError
       }
@@ -176,7 +177,7 @@ export class SponsorClient {
     invariant(this.config.address, 'contract address is required')
 
     try {
-      const hash = await (this.config.walletClient as any).writeContract({
+      const hash = await this.config.walletClient.writeContract({
         address: this.config.address,
         abi: theCompactAbi,
         functionName: 'depositERC20',
@@ -186,20 +187,21 @@ export class SponsorClient {
       })
 
       // Wait for transaction and extract id from Transfer event
-      const receipt = await (this.config.publicClient as any).waitForTransactionReceipt({ hash })
+      const receipt = await this.config.publicClient.waitForTransactionReceipt({ hash })
 
       // Find the Transfer event where tokens were minted (from address(0) to recipient)
       let id = 0n
       for (const log of receipt.logs) {
         try {
-          const decoded = (decodeEventLog as any)({
+          const decoded = decodeEventLog({
             abi: theCompactAbi,
             data: log.data,
             topics: log.topics,
           })
 
           if (decoded.eventName === 'Transfer' && decoded.args.from === '0x0000000000000000000000000000000000000000') {
-            id = decoded.args.id as bigint
+            // Type guard ensures decoded.args has Transfer event shape
+            id = decoded.args.id
             break
           }
         } catch (e) {
@@ -210,7 +212,7 @@ export class SponsorClient {
 
       return { txHash: hash, id }
     } catch (error) {
-      const compactError = extractCompactError(error, theCompactAbi as any)
+      const compactError = extractCompactError(error, theCompactAbi)
       if (compactError) {
         throw compactError
       }
@@ -253,7 +255,7 @@ export class SponsorClient {
     invariant(this.config.address, 'contract address is required')
 
     try {
-      const hash = await (this.config.walletClient as any).writeContract({
+      const hash = await this.config.walletClient.writeContract({
         address: this.config.address,
         abi: theCompactAbi,
         functionName: 'register',
@@ -264,7 +266,7 @@ export class SponsorClient {
 
       return hash
     } catch (error) {
-      const compactError = extractCompactError(error, theCompactAbi as any)
+      const compactError = extractCompactError(error, theCompactAbi)
       if (compactError) {
         throw compactError
       }
@@ -301,7 +303,7 @@ export class SponsorClient {
     invariant(this.config.address, 'contract address is required')
 
     try {
-      const hash = await (this.config.walletClient as any).writeContract({
+      const hash = await this.config.walletClient.writeContract({
         address: this.config.address,
         abi: theCompactAbi,
         functionName: 'enableForcedWithdrawal',
@@ -311,20 +313,21 @@ export class SponsorClient {
       })
 
       // Wait for transaction to get the actual withdrawable time
-      const receipt = await (this.config.publicClient as any).waitForTransactionReceipt({ hash })
+      const receipt = await this.config.publicClient.waitForTransactionReceipt({ hash })
 
-      // Extract withdrawableAt from ForcedWithdrawalEnabled event
+      // Extract withdrawableAt from ForcedWithdrawalStatusUpdated event
       let withdrawableAt = 0n
       for (const log of receipt.logs) {
         try {
-          const decoded = (decodeEventLog as any)({
+          const decoded = decodeEventLog({
             abi: theCompactAbi,
             data: log.data,
             topics: log.topics,
           })
 
-          if (decoded.eventName === 'ForcedWithdrawalEnabled') {
-            withdrawableAt = decoded.args.withdrawableAt as bigint
+          if (decoded.eventName === 'ForcedWithdrawalStatusUpdated' && decoded.args.activating === true) {
+            // Type guard ensures decoded.args has ForcedWithdrawalStatusUpdated event shape
+            withdrawableAt = decoded.args.withdrawableAt
             break
           }
         } catch (e) {
@@ -334,7 +337,7 @@ export class SponsorClient {
 
       return { txHash: hash, withdrawableAt }
     } catch (error) {
-      const compactError = extractCompactError(error, theCompactAbi as any)
+      const compactError = extractCompactError(error, theCompactAbi)
       if (compactError) {
         throw compactError
       }
@@ -367,7 +370,7 @@ export class SponsorClient {
     invariant(this.config.address, 'contract address is required')
 
     try {
-      const hash = await (this.config.walletClient as any).writeContract({
+      const hash = await this.config.walletClient.writeContract({
         address: this.config.address,
         abi: theCompactAbi,
         functionName: 'disableForcedWithdrawal',
@@ -378,7 +381,7 @@ export class SponsorClient {
 
       return hash
     } catch (error) {
-      const compactError = extractCompactError(error, theCompactAbi as any)
+      const compactError = extractCompactError(error, theCompactAbi)
       if (compactError) {
         throw compactError
       }
@@ -389,69 +392,53 @@ export class SponsorClient {
   /**
    * Execute a forced withdrawal after the delay period
    *
-   * Withdraws the underlying tokens from a lock after forced withdrawal has been enabled
-   * and the delay period has elapsed.
+   * Withdraws the specified amount of underlying tokens from a lock after forced withdrawal
+   * has been enabled and the delay period has elapsed.
+   *
+   * You must specify the amount to withdraw, which cannot exceed your balance for that lock.
    *
    * @param id - The lock ID to withdraw from
    * @param recipient - Address to receive the withdrawn tokens
-   * @returns Object containing transaction hash and the amount withdrawn
+   * @param amount - Amount to withdraw (must not exceed your balance for this lock)
+   * @returns Transaction hash
    *
    * @throws {Error} If walletClient is not configured
    * @throws {Error} If contract address is not set
-   * @throws {CompactError} If forced withdrawal fails (e.g., delay not elapsed)
+   * @throws {CompactError} If forced withdrawal fails (e.g., delay not elapsed, insufficient balance)
    *
    * @example
    * ```typescript
-   * // First enable forced withdrawal
+   * // First check your balance
+   * const balance = await client.view.balanceOf({ account: myAddress, id: lockId })
+   *
+   * // Enable forced withdrawal
    * const enableResult = await client.sponsor.enableForcedWithdrawal(lockId)
    *
    * // Wait for the delay period
    * await waitUntil(enableResult.withdrawableAt)
    *
    * // Execute the withdrawal
-   * const result = await client.sponsor.forcedWithdrawal(lockId, recipientAddress)
-   * console.log('Withdrawn amount:', result.amount)
+   * const txHash = await client.sponsor.forcedWithdrawal(lockId, recipientAddress, balance)
+   * console.log('Withdrawal transaction:', txHash)
    * ```
    */
-  async forcedWithdrawal(id: bigint, recipient: `0x${string}`): Promise<{ txHash: `0x${string}`; amount: bigint }> {
+  async forcedWithdrawal(id: bigint, recipient: `0x${string}`, amount: bigint): Promise<`0x${string}`> {
     invariant(this.config.walletClient, 'walletClient is required')
     invariant(this.config.address, 'contract address is required')
 
     try {
-      const hash = await (this.config.walletClient as any).writeContract({
+      const hash = await this.config.walletClient.writeContract({
         address: this.config.address,
         abi: theCompactAbi,
         functionName: 'forcedWithdrawal',
-        args: [id, recipient],
+        args: [id, recipient, amount],
         chain: null,
         account: null,
       })
 
-      // Wait for transaction to extract the withdrawn amount
-      const receipt = await (this.config.publicClient as any).waitForTransactionReceipt({ hash })
-
-      // Extract amount from ForcedWithdrawal event
-      let amount = 0n
-      for (const log of receipt.logs) {
-        try {
-          const decoded = (decodeEventLog as any)({
-            abi: theCompactAbi,
-            data: log.data,
-            topics: log.topics,
-          })
-
-          if (decoded.eventName === 'ForcedWithdrawal') {
-            amount = decoded.args.amount as bigint
-            break
-          }
-        } catch (e) {
-          continue
-        }
-      }
-
-      return { txHash: hash, amount }
+      return hash
     } catch (error) {
-      const compactError = extractCompactError(error, theCompactAbi as any)
+      const compactError = extractCompactError(error, theCompactAbi)
       if (compactError) {
         throw compactError
       }

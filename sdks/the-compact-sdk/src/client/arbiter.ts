@@ -75,7 +75,7 @@ export class ArbiterClient {
     invariant(this.config.address, 'contract address is required')
 
     try {
-      const hash = await (this.config.walletClient as any).writeContract({
+      const hash = await this.config.walletClient.writeContract({
         address: this.config.address,
         abi: theCompactAbi,
         functionName: 'claim',
@@ -90,7 +90,7 @@ export class ArbiterClient {
       return { txHash: hash, claimHash: computedClaimHash }
     } catch (error) {
       // Try to extract and throw a more informative error
-      const compactError = extractCompactError(error, theCompactAbi as any)
+      const compactError = extractCompactError(error, theCompactAbi)
       if (compactError) {
         throw compactError
       }
@@ -130,7 +130,7 @@ export class ArbiterClient {
     invariant(this.config.address, 'contract address is required')
 
     try {
-      const hash = await (this.config.walletClient as any).writeContract({
+      const hash = await this.config.walletClient.writeContract({
         address: this.config.address,
         abi: theCompactAbi,
         functionName: 'batchClaim',
@@ -144,7 +144,7 @@ export class ArbiterClient {
 
       return { txHash: hash, claimHash: computedClaimHash }
     } catch (error) {
-      const compactError = extractCompactError(error, theCompactAbi as any)
+      const compactError = extractCompactError(error, theCompactAbi)
       if (compactError) {
         throw compactError
       }
@@ -185,7 +185,7 @@ export class ArbiterClient {
     invariant(this.config.address, 'contract address is required')
 
     try {
-      const hash = await (this.config.walletClient as any).writeContract({
+      const hash = await this.config.walletClient.writeContract({
         address: this.config.address,
         abi: theCompactAbi,
         functionName: 'multichainClaim',
@@ -211,7 +211,7 @@ export class ArbiterClient {
 
       return { txHash: hash, claimHash: computedClaimHash }
     } catch (error) {
-      const compactError = extractCompactError(error, theCompactAbi as any)
+      const compactError = extractCompactError(error, theCompactAbi)
       if (compactError) {
         throw compactError
       }
@@ -253,7 +253,7 @@ export class ArbiterClient {
     invariant(this.config.address, 'contract address is required')
 
     try {
-      const hash = await (this.config.walletClient as any).writeContract({
+      const hash = await this.config.walletClient.writeContract({
         address: this.config.address,
         abi: theCompactAbi,
         functionName: 'batchMultichainClaim',
@@ -283,7 +283,7 @@ export class ArbiterClient {
 
       return { txHash: hash, claimHash: computedClaimHash }
     } catch (error) {
-      const compactError = extractCompactError(error, theCompactAbi as any)
+      const compactError = extractCompactError(error, theCompactAbi)
       if (compactError) {
         throw compactError
       }

@@ -160,56 +160,6 @@ describe('ViewClient', () => {
     })
   })
 
-  describe('balanceOfBatch()', () => {
-    it('should get balances for multiple accounts and ids', async () => {
-      const accounts = [
-        '0x1111111111111111111111111111111111111111' as `0x${string}`,
-        '0x2222222222222222222222222222222222222222' as `0x${string}`,
-        '0x3333333333333333333333333333333333333333' as `0x${string}`,
-      ]
-      const ids = [100n, 200n, 300n]
-      const balances = [1000000n, 2000000n, 3000000n]
-
-      mockPublicClient.readContract.mockResolvedValue(balances)
-
-      const result = await client.balanceOfBatch({ accounts, ids })
-
-      expect(mockPublicClient.readContract).toHaveBeenCalledWith({
-        address: testAddress,
-        abi: expect.any(Array),
-        functionName: 'balanceOfBatch',
-        args: [accounts, ids],
-      })
-
-      expect(result).toEqual(balances)
-    })
-
-    it('should throw if accounts and ids have different lengths', async () => {
-      const accounts = [
-        '0x1111111111111111111111111111111111111111' as `0x${string}`,
-        '0x2222222222222222222222222222222222222222' as `0x${string}`,
-      ]
-      const ids = [100n]
-
-      await expect(client.balanceOfBatch({ accounts, ids })).rejects.toThrow(
-        'accounts and ids must have the same length'
-      )
-    })
-
-    it('should throw if contract address is missing', async () => {
-      const clientWithoutAddress = new ViewClient({
-        ...config,
-        address: undefined,
-      })
-
-      await expect(
-        clientWithoutAddress.balanceOfBatch({
-          accounts: [sponsorAddress],
-          ids: [100n],
-        })
-      ).rejects.toThrow('contract address is required')
-    })
-  })
 
   describe('hasConsumedAllocatorNonce()', () => {
     it('should check if allocator nonce is consumed', async () => {
@@ -218,15 +168,15 @@ describe('ViewClient', () => {
       mockPublicClient.readContract.mockResolvedValue(true)
 
       const result = await client.hasConsumedAllocatorNonce({
-        allocator: allocatorAddress,
         nonce,
+        allocator: allocatorAddress,
       })
 
       expect(mockPublicClient.readContract).toHaveBeenCalledWith({
         address: testAddress,
         abi: expect.any(Array),
         functionName: 'hasConsumedAllocatorNonce',
-        args: [allocatorAddress, nonce],
+        args: [nonce, allocatorAddress],
       })
 
       expect(result).toBe(true)
@@ -238,8 +188,8 @@ describe('ViewClient', () => {
       mockPublicClient.readContract.mockResolvedValue(false)
 
       const result = await client.hasConsumedAllocatorNonce({
-        allocator: allocatorAddress,
         nonce,
+        allocator: allocatorAddress,
       })
 
       expect(result).toBe(false)
@@ -253,98 +203,57 @@ describe('ViewClient', () => {
 
       await expect(
         clientWithoutAddress.hasConsumedAllocatorNonce({
-          allocator: allocatorAddress,
           nonce: 42n,
+          allocator: allocatorAddress,
         })
       ).rejects.toThrow('contract address is required')
     })
   })
 
-  describe('getRegisteredNonce()', () => {
-    it('should get registered nonce for claim', async () => {
-      const claimHash = '0x1111111111111111111111111111111111111111111111111111111111111111' as `0x${string}`
-      const typehash = '0x2222222222222222222222222222222222222222222222222222222222222222' as `0x${string}`
-      const nonce = 123n
-
-      mockPublicClient.readContract.mockResolvedValue(nonce)
-
-      const result = await client.getRegisteredNonce({
-        sponsor: sponsorAddress,
-        claimHash,
-        typehash,
-      })
-
-      expect(mockPublicClient.readContract).toHaveBeenCalledWith({
-        address: testAddress,
-        abi: expect.any(Array),
-        functionName: 'getRegisteredNonce',
-        args: [sponsorAddress, claimHash, typehash],
-      })
-
-      expect(result).toBe(nonce)
-    })
-
-    it('should return 0 for unregistered claim', async () => {
-      const claimHash = '0x1111111111111111111111111111111111111111111111111111111111111111' as `0x${string}`
-      const typehash = '0x2222222222222222222222222222222222222222222222222222222222222222' as `0x${string}`
-
-      mockPublicClient.readContract.mockResolvedValue(0n)
-
-      const result = await client.getRegisteredNonce({
-        sponsor: sponsorAddress,
-        claimHash,
-        typehash,
-      })
-
-      expect(result).toBe(0n)
-    })
-
-    it('should throw if contract address is missing', async () => {
-      const clientWithoutAddress = new ViewClient({
-        ...config,
-        address: undefined,
-      })
-
-      await expect(
-        clientWithoutAddress.getRegisteredNonce({
-          sponsor: sponsorAddress,
-          claimHash: '0x1111111111111111111111111111111111111111111111111111111111111111' as `0x${string}`,
-          typehash: '0x2222222222222222222222222222222222222222222222222222222222222222' as `0x${string}`,
-        })
-      ).rejects.toThrow('contract address is required')
-    })
-  })
 
   describe('getForcedWithdrawalStatus()', () => {
     it('should get forced withdrawal status when enabled', async () => {
       const lockId = 100n
       const withdrawableAt = BigInt(Date.now() + 86400000) // 24 hours from now
 
-      // Mock contract returns [enabled, withdrawableAt]
-      mockPublicClient.readContract.mockResolvedValue([true, withdrawableAt])
+      // Mock contract returns [status enum, withdrawableAt]
+      mockPublicClient.readContract.mockResolvedValue([2, withdrawableAt]) // 2 = Enabled
 
-      const result = await client.getForcedWithdrawalStatus(lockId)
+      const result = await client.getForcedWithdrawalStatus(sponsorAddress, lockId)
 
       expect(mockPublicClient.readContract).toHaveBeenCalledWith({
         address: testAddress,
         abi: expect.any(Array),
         functionName: 'getForcedWithdrawalStatus',
-        args: [lockId],
+        args: [sponsorAddress, lockId],
       })
 
-      expect(result.enabled).toBe(true)
+      expect(result.status).toBe(2) // ForcedWithdrawalStatusEnum.Enabled
+      expect(result.withdrawableAt).toBe(withdrawableAt)
+    })
+
+    it('should get forced withdrawal status when pending', async () => {
+      const lockId = 100n
+      const withdrawableAt = BigInt(Date.now() + 86400000) // 24 hours from now
+
+      // Mock contract returns [status enum, withdrawableAt]
+      mockPublicClient.readContract.mockResolvedValue([1, withdrawableAt]) // 1 = Pending
+
+      const result = await client.getForcedWithdrawalStatus(sponsorAddress, lockId)
+
+      expect(result.status).toBe(1) // ForcedWithdrawalStatusEnum.Pending
       expect(result.withdrawableAt).toBe(withdrawableAt)
     })
 
     it('should get forced withdrawal status when disabled', async () => {
       const lockId = 100n
 
-      // Mock contract returns [enabled, withdrawableAt]
-      mockPublicClient.readContract.mockResolvedValue([false, 0n])
+      // Mock contract returns [status enum, withdrawableAt]
+      mockPublicClient.readContract.mockResolvedValue([0, 0n]) // 0 = Disabled
 
-      const result = await client.getForcedWithdrawalStatus(lockId)
+      const result = await client.getForcedWithdrawalStatus(sponsorAddress, lockId)
 
-      expect(result.enabled).toBe(false)
+      expect(result.status).toBe(0) // ForcedWithdrawalStatusEnum.Disabled
       expect(result.withdrawableAt).toBe(0n)
     })
 
@@ -354,7 +263,9 @@ describe('ViewClient', () => {
         address: undefined,
       })
 
-      await expect(clientWithoutAddress.getForcedWithdrawalStatus(100n)).rejects.toThrow('contract address is required')
+      await expect(clientWithoutAddress.getForcedWithdrawalStatus(sponsorAddress, 100n)).rejects.toThrow(
+        'contract address is required'
+      )
     })
   })
 

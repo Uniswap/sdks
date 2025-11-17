@@ -12,7 +12,7 @@ describe('createDomain', () => {
     })
 
     expect(domain).toEqual({
-      name: 'TheCompact',
+      name: 'The Compact',
       version: '1',
       chainId: 1,
       verifyingContract: '0x00000000000000171ede64904551eeDF3C6C9788',
@@ -51,7 +51,7 @@ describe('createDomain', () => {
 })
 
 describe('getDomainSeparator', () => {
-  it('should produce a valid 32-byte hash', () => {
+  it('should produce the correct hash for mainnet', () => {
     const domain = createDomain({
       chainId: 1,
       contractAddress: '0x00000000000000171ede64904551eeDF3C6C9788',
@@ -59,8 +59,17 @@ describe('getDomainSeparator', () => {
 
     const separator = getDomainSeparator(domain)
 
-    // Should be a 0x-prefixed 64-character hex string (32 bytes)
-    expect(separator).toMatch(/^0x[0-9a-f]{64}$/)
+    expect(separator).toBe('0x4ac11bdf0eb5972bae47825af851d20c342d88f466669ec58827be03650df019')
+  })
+
+  it('should produce the correct hash for base', () => {
+    const domain = createDomain({
+      chainId: 8453,
+      contractAddress: '0x00000000000000171ede64904551eeDF3C6C9788',
+    })
+
+    const separator = getDomainSeparator(domain)
+    expect(separator).toBe('0xf789cd452b2f29c8246379d5e071e2ac39d194045691ef1f9dddfa1f276d905a')
   })
 
   it('should produce different hashes for different chain IDs', () => {
@@ -109,35 +118,6 @@ describe('getDomainSeparator', () => {
     expect(separator1).toBe(separator2)
   })
 
-  it('should compute the correct domain separator for a known domain', () => {
-    // This test uses a known domain and expected separator to verify correctness
-    // The expected value would need to match the on-chain DOMAIN_SEPARATOR() result
-    const domain = createDomain({
-      chainId: 1,
-      contractAddress: '0x00000000000000171ede64904551eeDF3C6C9788',
-    })
-
-    const separator = getDomainSeparator(domain)
-
-    // This should match keccak256(abi.encode(
-    //   EIP712_DOMAIN_TYPEHASH,
-    //   keccak256("TheCompact"),
-    //   keccak256("1"),
-    //   1,
-    //   0x00000000000000171ede64904551eeDF3C6C9788
-    // ))
-
-    // Verify it's a valid hash format
-    expect(separator).toMatch(/^0x[0-9a-f]{64}$/)
-
-    // Note: To fully verify correctness, this should be compared against
-    // the actual on-chain DOMAIN_SEPARATOR() result for this specific domain.
-    // That would require either:
-    // 1. A known test vector from the contract tests
-    // 2. A call to the on-chain contract
-    // 3. Computing it using the same Solidity code path
-  })
-
   it('should follow EIP-712 domain separator specification', () => {
     const domain = createDomain({
       chainId: 42161, // Arbitrum
@@ -147,7 +127,7 @@ describe('getDomainSeparator', () => {
     const separator = getDomainSeparator(domain)
 
     // The separator should be deterministic and unique per domain
-    expect(separator).toBeDefined()
+    expect(separator).toBe('0xab8806a0244da8971031f23596e36722df1c75f6fd1b3715f84fa3d2904cc77b')
     expect(typeof separator).toBe('string')
     expect(separator.startsWith('0x')).toBe(true)
     expect(separator.length).toBe(66) // '0x' + 64 hex chars
