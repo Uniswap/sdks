@@ -70,7 +70,7 @@ describe('locks encoding', () => {
       it('should handle allocator addresses with many leading zeros', () => {
         // Test case from TheCompact.t.sol test_allocatorId_leadingZeroes
         // Address with 9 leading zero nibbles
-        const allocator1 = '0x00000000000018DF021Ff2467dF97ff846E09f48' as `0x${string}`
+        const allocator1 = '0x00000000000000171ede64904551eeDF3C6C9788' as `0x${string}`
 
         // The allocator ID is extracted from the last 88 bits of the address
         // Plus 4 bits for the compact flag (which is derived from leading zeros)

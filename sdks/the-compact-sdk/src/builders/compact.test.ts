@@ -14,7 +14,7 @@ describe('Compact Builders', () => {
     name: 'TheCompact',
     version: '1',
     chainId: 1,
-    verifyingContract: '0x00000000000018DF021Ff2467dF97ff846E09f48',
+    verifyingContract: '0x00000000000000171ede64904551eeDF3C6C9788',
   }
 
   const arbiterAddress = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as `0x${string}`
