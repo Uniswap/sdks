@@ -91,7 +91,7 @@ class SponsorClient {
                 args: [params.lockTag, params.recipient],
                 value: params.value,
                 chain: null,
-                account: null,
+                account: this.config.walletClient.account,
             });
             // Wait for transaction and extract id from Transfer event
             const receipt = await this.config.publicClient.waitForTransactionReceipt({ hash });
@@ -171,7 +171,7 @@ class SponsorClient {
                 functionName: 'depositERC20',
                 args: [params.token, params.lockTag, params.amount, params.recipient],
                 chain: null,
-                account: null,
+                account: this.config.walletClient.account,
             });
             // Wait for transaction and extract id from Transfer event
             const receipt = await this.config.publicClient.waitForTransactionReceipt({ hash });
@@ -245,7 +245,7 @@ class SponsorClient {
                 functionName: 'register',
                 args: [params.claimHash, params.typehash],
                 chain: null,
-                account: null,
+                account: this.config.walletClient.account,
             });
             return hash;
         }
@@ -291,7 +291,7 @@ class SponsorClient {
                 functionName: 'enableForcedWithdrawal',
                 args: [id],
                 chain: null,
-                account: null,
+                account: this.config.walletClient.account,
             });
             // Wait for transaction to get the actual withdrawable time
             const receipt = await this.config.publicClient.waitForTransactionReceipt({ hash });
@@ -354,7 +354,7 @@ class SponsorClient {
                 functionName: 'disableForcedWithdrawal',
                 args: [id],
                 chain: null,
-                account: null,
+                account: this.config.walletClient.account,
             });
             return hash;
         }
@@ -409,7 +409,7 @@ class SponsorClient {
                 functionName: 'forcedWithdrawal',
                 args: [id, recipient, amount],
                 chain: null,
-                account: null,
+                account: this.config.walletClient.account,
             });
             return hash;
         }

@@ -1,6 +1,7 @@
 /**
  * Fluent builders for creating Claim payloads
  */
+import type { Address, Hex } from 'viem';
 import { Claim, BatchClaim, Component } from '../types/claims';
 import { Compact, BatchCompact } from '../types/eip712';
 import { CompactDomain } from '../config/domain';
@@ -97,6 +98,7 @@ export declare class SingleClaimBuilder {
     allocatedAmount(amount: bigint): this;
     id(id: bigint): this;
     lockTag(lockTag: `0x${string}`): this;
+    sponsorSignature(signature: `0x${string}` | ''): this;
     witness<T extends object>(mandateType: MandateType<T>, mandate: T): this;
     /**
      * Add a transfer claimant (same lock tag)
@@ -166,45 +168,99 @@ export declare class SingleClaimBuilder {
  *   .build()
  * ```
  */
-export declare class BatchClaimBuilder {
-    private domain;
-    private _allocatorData;
-    private _sponsorSignature;
-    private _sponsor?;
-    private _nonce?;
-    private _expires?;
-    private _witness;
-    private _witnessTypestring;
-    private claimComponentBuilders;
+/**
+ * Abstract base class for all batch claim builders
+ * Contains common fields and methods shared across BatchClaim, BatchMultichainClaim, and ExogenousBatchMultichainClaim
+ */
+declare abstract class BaseBatchClaimBuilder implements IBatchClaimParentBuilder {
+    protected domain: CompactDomain;
+    protected _allocatorData: Hex;
+    protected _sponsorSignature: Hex;
+    protected _sponsor?: Address;
+    protected _nonce?: bigint;
+    protected _expires?: bigint;
+    protected _witness: Hex;
+    protected _witnessTypestring: string;
+    protected claimComponentBuilders: BatchClaimComponentBuilder[];
     constructor(domain: CompactDomain);
+    /**
+     * Set the sponsor address
+     */
+    sponsor(sponsor: Address): this;
+    /**
+     * Set the nonce
+     */
+    nonce(nonce: bigint): this;
+    /**
+     * Set the expiration timestamp
+     */
+    expires(expires: bigint): this;
+    /**
+     * Set allocator data
+     */
+    allocatorData(data: Hex): this;
+    /**
+     * Set sponsor signature
+     */
+    sponsorSignature(signature: Hex): this;
+    /**
+     * Set witness mandate
+     */
+    witness<T extends object>(mandateType: MandateType<T>, mandate: T): this;
+    /**
+     * Add a new claim component to the batch
+     */
+    addClaim(): BatchClaimComponentBuilder;
+    /**
+     * Add an additional chain hash (only available on multichain builders)
+     * Default implementation throws error, overridden by BatchMultichainClaimBuilder
+     */
+    addAdditionalChainHash(_hash: Hex): this;
+    /**
+     * Build method must be implemented by subclasses
+     */
+    abstract build(): any;
+}
+export declare class BatchClaimBuilder extends BaseBatchClaimBuilder {
     /**
      * Pre-fill claim data from a batch compact
      * Creates claim components with empty portions (claimants must be added separately)
      */
     fromBatchCompact(params: {
         compact: BatchCompact;
-        signature: `0x${string}`;
+        signature: Hex;
         idsAndAmounts: Array<{
-            lockTag: `0x${string}`;
-            token: `0x${string}`;
+            lockTag: Hex;
+            token: Address;
             amount: bigint;
         }>;
     }): this;
-    sponsor(sponsor: `0x${string}`): this;
-    nonce(nonce: bigint): this;
-    expires(expires: bigint): this;
-    allocatorData(data: `0x${string}`): this;
-    witness<T extends object>(mandateType: MandateType<T>, mandate: T): this;
-    /**
-     * Add a new claim component to the batch
-     * @returns A new BatchClaimComponentBuilder
-     */
-    addClaim(): BatchClaimComponentBuilder;
     build(): {
         struct: BatchClaim;
         hash: `0x${string}`;
         typedData: any;
     };
+}
+/**
+ * Parent builder interface for BatchClaimComponentBuilder
+ * This allows the component builder to work with any batch claim builder type
+ * without exposing private implementation details
+ */
+/**
+ * Interface for batch claim parent builders
+ * Declares all methods available on batch claim builders for type safety
+ * Some methods (like addAdditionalChainHash) are only available on multichain builders
+ */
+interface IBatchClaimParentBuilder {
+    sponsor(sponsor: Address): this;
+    nonce(nonce: bigint): this;
+    expires(expires: bigint): this;
+    allocatorData(data: Hex): this;
+    sponsorSignature(signature: Hex): this;
+    witness<T extends object>(mandateType: MandateType<T>, mandate: T): this;
+    addClaim(): BatchClaimComponentBuilder;
+    addAdditionalChainHash(hash: Hex): this;
+    build(): any;
 }
 /**
  * Fluent builder for individual components within a batch multichain claim
@@ -238,7 +294,7 @@ export declare class BatchClaimComponentBuilder {
     private _allocatedAmount?;
     private _portions;
     private parent;
-    constructor(parent: any);
+    constructor(parent: IBatchClaimParentBuilder);
     /**
      * Set the resource ID for this component
      * @param id - Resource ID
@@ -268,7 +324,7 @@ export declare class BatchClaimComponentBuilder {
      * Finish building this component and return to the parent builder
      * @returns The parent builder (BatchClaimBuilder, BatchMultichainClaimBuilder, or ExogenousBatchMultichainClaimBuilder)
      */
-    done(): any;
+    done(): IBatchClaimParentBuilder;
     /**
      * Build the component (called internally by parent builder)
      * @returns The built BatchClaimComponent
@@ -467,66 +523,14 @@ export declare class MultichainClaimBuilder {
  *   .build()
  * ```
  */
-export declare class BatchMultichainClaimBuilder {
-    private domain;
-    private _allocatorData;
-    private _sponsorSignature;
-    private _sponsor?;
-    private _nonce?;
-    private _expires?;
-    private _witness;
-    private _witnessTypestring;
-    private claimComponentBuilders;
-    private _additionalChains;
-    constructor(domain: CompactDomain);
-    /**
-     * Set the sponsor address
-     * @param sponsor - Sponsor address
-     * @returns This builder for chaining
-     */
-    sponsor(sponsor: `0x${string}`): this;
-    /**
-     * Set the nonce
-     * @param nonce - Nonce value
-     * @returns This builder for chaining
-     */
-    nonce(nonce: bigint): this;
-    /**
-     * Set the expiration timestamp
-     * @param expires - Expiration timestamp
-     * @returns This builder for chaining
-     */
-    expires(expires: bigint): this;
-    /**
-     * Set allocator data
-     * @param data - Allocator-specific data
-     * @returns This builder for chaining
-     */
-    allocatorData(data: `0x${string}`): this;
-    /**
-     * Set sponsor signature
-     * @param signature - Sponsor signature
-     * @returns This builder for chaining
-     */
-    sponsorSignature(signature: `0x${string}`): this;
-    /**
-     * Set witness mandate
-     * @param mandateType - Mandate type definition
-     * @param mandate - Mandate data
-     * @returns This builder for chaining
-     */
-    witness<T extends object>(mandateType: MandateType<T>, mandate: T): this;
-    /**
-     * Add a new claim component to the batch
-     * @returns A new BatchClaimComponentBuilder
-     */
-    addClaim(): BatchClaimComponentBuilder;
+export declare class BatchMultichainClaimBuilder extends BaseBatchClaimBuilder {
+    protected _additionalChains: Hex[];
     /**
      * Add a hash reference to another chain's element
      * @param hash - Hash of the element on another chain
      * @returns This builder for chaining
      */
-    addAdditionalChainHash(hash: `0x${string}`): this;
+    addAdditionalChainHash(hash: Hex): this;
     /**
      * Build the final batch multichain claim
      * @returns The built batch multichain claim struct
@@ -605,26 +609,9 @@ export declare class ExogenousMultichainClaimBuilder {
  * Builder for exogenous batch multichain claims
  * Similar to BatchMultichainClaimBuilder but includes explicit chain identification
  */
-export declare class ExogenousBatchMultichainClaimBuilder {
-    private domain;
-    private _allocatorData;
-    private _sponsorSignature;
-    private _sponsor?;
-    private _nonce?;
-    private _expires?;
-    private _witness;
-    private _witnessTypestring;
-    private claimComponentBuilders;
-    private _additionalChains;
+export declare class ExogenousBatchMultichainClaimBuilder extends BatchMultichainClaimBuilder {
     private _chainIndex?;
     private _notarizedChainId?;
-    constructor(domain: CompactDomain);
-    sponsor(sponsor: `0x${string}`): this;
-    nonce(nonce: bigint): this;
-    expires(expires: bigint): this;
-    allocatorData(data: `0x${string}`): this;
-    sponsorSignature(signature: `0x${string}`): this;
-    witness<T extends object>(mandateType: MandateType<T>, mandate: T): this;
     /**
      * Set the chain index for this exogenous claim
      * @param chainIndex - Index of this chain in the multichain set
@@ -637,8 +624,6 @@ export declare class ExogenousBatchMultichainClaimBuilder {
      * @returns This builder for chaining
      */
     notarizedChainId(notarizedChainId: bigint): this;
-    addClaim(): BatchClaimComponentBuilder;
-    addAdditionalChainHash(hash: `0x${string}`): this;
     build(): {
         struct: import('../types/claims').ExogenousBatchMultichainClaim;
         hash: `0x${string}`;
@@ -676,3 +661,4 @@ export declare class ClaimBuilder {
      */
     static exogenousBatchMultichain(domain: CompactDomain): ExogenousBatchMultichainClaimBuilder;
 }
+export {};

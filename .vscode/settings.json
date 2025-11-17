@@ -12,8 +12,15 @@
     "./sdks/uniswapx-sdk",
     "./sdks/universal-router-sdk",
     "./sdks/v2-sdk",
-    "./sdks/v3-sdk",
+    "./sdks/v3-sdk"
   ],
   "testing.openTesting": "neverOpen",
-  "testing.automaticallyOpenTestResults": "neverOpen"
+  "testing.automaticallyOpenTestResults": "neverOpen",
+  "wake.compiler.solc.remappings": [
+    "@openzeppelin/=node_modules/@openzeppelin/",
+    "@uniswap/=node_modules/@uniswap/",
+    "base64-sol/=node_modules/base64-sol/",
+    "hardhat/=node_modules/hardhat/",
+    "uniswapx-integration/=node_modules/uniswapx-integration/"
+  ]
 }

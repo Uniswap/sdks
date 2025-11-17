@@ -81,7 +81,7 @@ class ArbiterClient {
                 functionName: 'claim',
                 args: [claim],
                 chain: null,
-                account: null,
+                account: this.config.walletClient.account,
             });
             // Compute claim hash
             const computedClaimHash = (0, hashes_1.claimHash)(claim);
@@ -133,7 +133,7 @@ class ArbiterClient {
                 functionName: 'batchClaim',
                 args: [claim],
                 chain: null,
-                account: null,
+                account: this.config.walletClient.account,
             });
             // Compute batch claim hash
             const computedClaimHash = (0, hashes_1.batchClaimHash)(claim);
@@ -185,7 +185,7 @@ class ArbiterClient {
                 functionName: 'multichainClaim',
                 args: [claim],
                 chain: null,
-                account: null,
+                account: this.config.walletClient.account,
             });
             // For multichain claims, use the base claim hash
             // (additionalChains are used for coordination but not hashed the same way)
@@ -250,7 +250,7 @@ class ArbiterClient {
                 functionName: 'batchMultichainClaim',
                 args: [claim],
                 chain: null,
-                account: null,
+                account: this.config.walletClient.account,
             });
             // For batch multichain claims, use the claims array directly for hashing
             // BatchClaim now has the same structure as BatchMultichainClaim (minus additionalChains)
@@ -400,7 +400,7 @@ class ArbiterClient {
                 functionName: 'exogenousClaim',
                 args: [claim],
                 chain: null,
-                account: null,
+                account: this.config.walletClient.account,
             });
             // Use base claim hash (same structure as MultichainClaim for the core fields)
             const computedClaimHash = (0, hashes_1.claimHash)({
@@ -448,7 +448,7 @@ class ArbiterClient {
                 functionName: 'exogenousBatchClaim',
                 args: [claim],
                 chain: null,
-                account: null,
+                account: this.config.walletClient.account,
             });
             // Use batch claim hash (same structure as BatchMultichainClaim for the core fields)
             const computedClaimHash = (0, hashes_1.batchClaimHash)({

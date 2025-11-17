@@ -2,7 +2,7 @@
  * Fluent builders for creating Claim payloads
  */
 import { buildComponent } from '../encoding/claimants';
-import { encodeLockId } from '../encoding/locks';
+import { decodeLockId, encodeLockId } from '../encoding/locks';
 import invariant from 'tiny-invariant';
 import { hashTypedData } from 'viem';
 /**
@@ -106,6 +106,10 @@ export class SingleClaimBuilder {
     }
     lockTag(lockTag) {
         this._lockTag = lockTag;
+        return this;
+    }
+    sponsorSignature(signature) {
+        this._sponsorSignature = signature;
         return this;
     }
     witness(mandateType, mandate) {
@@ -266,7 +270,11 @@ export class SingleClaimBuilder {
  *   .build()
  * ```
  */
-export class BatchClaimBuilder {
+/**
+ * Abstract base class for all batch claim builders
+ * Contains common fields and methods shared across BatchClaim, BatchMultichainClaim, and ExogenousBatchMultichainClaim
+ */
+class BaseBatchClaimBuilder {
     constructor(domain) {
         this._allocatorData = '0x';
         this._sponsorSignature = '0x';
@@ -275,6 +283,66 @@ export class BatchClaimBuilder {
         this.claimComponentBuilders = [];
         this.domain = domain;
     }
+    /**
+     * Set the sponsor address
+     */
+    sponsor(sponsor) {
+        this._sponsor = sponsor;
+        return this;
+    }
+    /**
+     * Set the nonce
+     */
+    nonce(nonce) {
+        this._nonce = nonce;
+        return this;
+    }
+    /**
+     * Set the expiration timestamp
+     */
+    expires(expires) {
+        this._expires = expires;
+        return this;
+    }
+    /**
+     * Set allocator data
+     */
+    allocatorData(data) {
+        this._allocatorData = data;
+        return this;
+    }
+    /**
+     * Set sponsor signature
+     */
+    sponsorSignature(signature) {
+        this._sponsorSignature = signature;
+        return this;
+    }
+    /**
+     * Set witness mandate
+     */
+    witness(mandateType, mandate) {
+        this._witness = mandateType.hash(mandate);
+        this._witnessTypestring = mandateType.witnessTypestring;
+        return this;
+    }
+    /**
+     * Add a new claim component to the batch
+     */
+    addClaim() {
+        const builder = new BatchClaimComponentBuilder(this);
+        this.claimComponentBuilders.push(builder);
+        return builder;
+    }
+    /**
+     * Add an additional chain hash (only available on multichain builders)
+     * Default implementation throws error, overridden by BatchMultichainClaimBuilder
+     */
+    addAdditionalChainHash(_hash) {
+        throw new Error('addAdditionalChainHash is only available on multichain claim builders');
+    }
+}
+export class BatchClaimBuilder extends BaseBatchClaimBuilder {
     /**
      * Pre-fill claim data from a batch compact
      * Creates claim components with empty portions (claimants must be added separately)
@@ -292,36 +360,6 @@ export class BatchClaimBuilder {
             this.claimComponentBuilders.push(builder);
         });
         return this;
-    }
-    sponsor(sponsor) {
-        this._sponsor = sponsor;
-        return this;
-    }
-    nonce(nonce) {
-        this._nonce = nonce;
-        return this;
-    }
-    expires(expires) {
-        this._expires = expires;
-        return this;
-    }
-    allocatorData(data) {
-        this._allocatorData = data;
-        return this;
-    }
-    witness(mandateType, mandate) {
-        this._witness = mandateType.hash(mandate);
-        this._witnessTypestring = mandateType.witnessTypestring;
-        return this;
-    }
-    /**
-     * Add a new claim component to the batch
-     * @returns A new BatchClaimComponentBuilder
-     */
-    addClaim() {
-        const builder = new BatchClaimComponentBuilder(this);
-        this.claimComponentBuilders.push(builder);
-        return builder;
     }
     build() {
         // Validate required fields
@@ -770,80 +808,10 @@ export class MultichainClaimBuilder {
  *   .build()
  * ```
  */
-export class BatchMultichainClaimBuilder {
-    constructor(domain) {
-        this._allocatorData = '0x';
-        this._sponsorSignature = '0x';
-        this._witness = '0x0000000000000000000000000000000000000000000000000000000000000000';
-        this._witnessTypestring = '';
-        this.claimComponentBuilders = [];
+export class BatchMultichainClaimBuilder extends BaseBatchClaimBuilder {
+    constructor() {
+        super(...arguments);
         this._additionalChains = [];
-        this.domain = domain;
-    }
-    /**
-     * Set the sponsor address
-     * @param sponsor - Sponsor address
-     * @returns This builder for chaining
-     */
-    sponsor(sponsor) {
-        this._sponsor = sponsor;
-        return this;
-    }
-    /**
-     * Set the nonce
-     * @param nonce - Nonce value
-     * @returns This builder for chaining
-     */
-    nonce(nonce) {
-        this._nonce = nonce;
-        return this;
-    }
-    /**
-     * Set the expiration timestamp
-     * @param expires - Expiration timestamp
-     * @returns This builder for chaining
-     */
-    expires(expires) {
-        this._expires = expires;
-        return this;
-    }
-    /**
-     * Set allocator data
-     * @param data - Allocator-specific data
-     * @returns This builder for chaining
-     */
-    allocatorData(data) {
-        this._allocatorData = data;
-        return this;
-    }
-    /**
-     * Set sponsor signature
-     * @param signature - Sponsor signature
-     * @returns This builder for chaining
-     */
-    sponsorSignature(signature) {
-        this._sponsorSignature = signature;
-        return this;
-    }
-    /**
-     * Set witness mandate
-     * @param mandateType - Mandate type definition
-     * @param mandate - Mandate data
-     * @returns This builder for chaining
-     */
-    witness(mandateType, mandate) {
-        this._witness = mandateType.hash(mandate);
-        this._witnessTypestring = mandateType.witnessTypestring;
-        return this;
-    }
-    /**
-     * Add a new claim component to the batch
-     * @returns A new BatchClaimComponentBuilder
-     */
-    addClaim() {
-        const builder = new BatchClaimComponentBuilder(this);
-        this.claimComponentBuilders.push(builder);
-        return builder;
     }
     /**
      * Add a hash reference to another chain's element
@@ -947,6 +915,7 @@ export class ExogenousMultichainClaimBuilder {
     }
     id(id) {
         this._id = id;
+        this._lockTag = decodeLockId(id).lockTag;
         return this;
     }
     lockTag(lockTag) {
@@ -1099,41 +1068,7 @@ export class ExogenousMultichainClaimBuilder {
  * Builder for exogenous batch multichain claims
  * Similar to BatchMultichainClaimBuilder but includes explicit chain identification
  */
-export class ExogenousBatchMultichainClaimBuilder {
-    constructor(domain) {
-        this._allocatorData = '0x';
-        this._sponsorSignature = '0x';
-        this._witness = '0x0000000000000000000000000000000000000000000000000000000000000000';
-        this._witnessTypestring = '';
-        this.claimComponentBuilders = [];
-        this._additionalChains = [];
-        this.domain = domain;
-    }
-    sponsor(sponsor) {
-        this._sponsor = sponsor;
-        return this;
-    }
-    nonce(nonce) {
-        this._nonce = nonce;
-        return this;
-    }
-    expires(expires) {
-        this._expires = expires;
-        return this;
-    }
-    allocatorData(data) {
-        this._allocatorData = data;
-        return this;
-    }
-    sponsorSignature(signature) {
-        this._sponsorSignature = signature;
-        return this;
-    }
-    witness(mandateType, mandate) {
-        this._witness = mandateType.hash(mandate);
-        this._witnessTypestring = mandateType.witnessTypestring;
-        return this;
-    }
+export class ExogenousBatchMultichainClaimBuilder extends BatchMultichainClaimBuilder {
     /**
      * Set the chain index for this exogenous claim
      * @param chainIndex - Index of this chain in the multichain set
@@ -1150,15 +1085,6 @@ export class ExogenousBatchMultichainClaimBuilder {
      */
     notarizedChainId(notarizedChainId) {
         this._notarizedChainId = notarizedChainId;
-        return this;
-    }
-    addClaim() {
-        const builder = new BatchClaimComponentBuilder(this);
-        this.claimComponentBuilders.push(builder);
-        return builder;
-    }
-    addAdditionalChainHash(hash) {
-        this._additionalChains.push(hash);
         return this;
     }
     build() {

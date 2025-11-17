@@ -88,7 +88,7 @@ export class ArbiterClient {
         functionName: 'claim',
         args: [claim] as any,
         chain: null,
-        account: null,
+        account: this.config.walletClient.account!,
       })
 
       // Compute claim hash
@@ -143,7 +143,7 @@ export class ArbiterClient {
         functionName: 'batchClaim',
         args: [claim] as any,
         chain: null,
-        account: null,
+        account: this.config.walletClient.account!,
       })
 
       // Compute batch claim hash
@@ -198,7 +198,7 @@ export class ArbiterClient {
         functionName: 'multichainClaim',
         args: [claim] as any,
         chain: null,
-        account: null,
+        account: this.config.walletClient.account!,
       })
 
       // For multichain claims, use the base claim hash
@@ -266,7 +266,7 @@ export class ArbiterClient {
         functionName: 'batchMultichainClaim',
         args: [claim] as any,
         chain: null,
-        account: null,
+        account: this.config.walletClient.account!,
       })
 
       // For batch multichain claims, use the claims array directly for hashing
@@ -425,7 +425,7 @@ export class ArbiterClient {
         functionName: 'exogenousClaim',
         args: [claim] as any,
         chain: null,
-        account: null,
+        account: this.config.walletClient.account!,
       })
 
       // Use base claim hash (same structure as MultichainClaim for the core fields)
@@ -478,7 +478,7 @@ export class ArbiterClient {
         functionName: 'exogenousBatchClaim',
         args: [claim] as any,
         chain: null,
-        account: null,
+        account: this.config.walletClient.account!,
       })
 
       // Use batch claim hash (same structure as BatchMultichainClaim for the core fields)

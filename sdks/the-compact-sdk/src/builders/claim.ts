@@ -8,7 +8,7 @@ import { Compact, BatchCompact } from '../types/eip712'
 import { CompactDomain } from '../config/domain'
 import { MandateType } from './mandate'
 import { ClaimantInput, buildComponent } from '../encoding/claimants'
-import { encodeLockId } from '../encoding/locks'
+import { decodeLockId, encodeLockId } from '../encoding/locks'
 import invariant from 'tiny-invariant'
 import { hashTypedData } from 'viem'
 
@@ -92,12 +92,7 @@ export class SingleClaimBuilder {
   /**
    * Pre-fill claim data from a compact
    */
-  fromCompact(params: {
-    compact: Compact
-    signature: `0x${string}`
-    id?: bigint
-    token?: `0x${string}`
-  }): this {
+  fromCompact(params: { compact: Compact; signature: `0x${string}`; id?: bigint; token?: `0x${string}` }): this {
     this._sponsor = params.compact.sponsor
     this._nonce = params.compact.nonce
     this._expires = params.compact.expires
@@ -148,6 +143,11 @@ export class SingleClaimBuilder {
 
   lockTag(lockTag: `0x${string}`): this {
     this._lockTag = lockTag
+    return this
+  }
+
+  sponsorSignature(signature: `0x${string}` | ''): this {
+    this._sponsorSignature = signature as `0x${string}`
     return this
   }
 
@@ -1089,6 +1089,7 @@ export class ExogenousMultichainClaimBuilder {
 
   id(id: bigint): this {
     this._id = id
+    this._lockTag = decodeLockId(id).lockTag
     return this
   }
 
@@ -1405,4 +1406,3 @@ export class ClaimBuilder {
     return new ExogenousBatchMultichainClaimBuilder(domain)
   }
 }
-

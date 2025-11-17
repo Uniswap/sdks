@@ -27,7 +27,8 @@
     "build:types": "tsc -p tsconfig.types.json",
     "release": "semantic-release",
     "lint": "prettier --check src/",
-    "test": "jest"
+    "test": "jest",
+    "test:e2e": "E2E_TESTS=1 jest --testPathPattern=e2e"
   },
   "exports": {
     ".": {

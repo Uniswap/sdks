@@ -1001,6 +1001,280 @@ describe('Claim Builders', () => {
                 expect(claim.typedData.types.Component).toBeDefined();
             });
         });
+        describe('ExogenousMultichainClaimBuilder', () => {
+            it('should generate valid EIP-712 hash', () => {
+                const claim = claim_1.ClaimBuilder.exogenousMultichain(domain)
+                    .sponsor(sponsorAddress)
+                    .nonce(1n)
+                    .expires(BigInt(Date.now() + 3600000))
+                    .id((0, locks_1.encodeLockId)(lockTag, usdcAddress))
+                    .lockTag(lockTag)
+                    .allocatedAmount(1000000n)
+                    .chainIndex(0n)
+                    .notarizedChainId(1n)
+                    .addTransfer({ recipient: recipientAddress, amount: 1000000n })
+                    .build();
+                expect(claim.hash).toBeDefined();
+                expect(claim.hash).toMatch(/^0x[0-9a-f]{64}$/);
+            });
+            it('should generate valid EIP-712 typed data', () => {
+                const claim = claim_1.ClaimBuilder.exogenousMultichain(domain)
+                    .sponsor(sponsorAddress)
+                    .nonce(1n)
+                    .expires(BigInt(Date.now() + 3600000))
+                    .id((0, locks_1.encodeLockId)(lockTag, usdcAddress))
+                    .lockTag(lockTag)
+                    .allocatedAmount(1000000n)
+                    .chainIndex(0n)
+                    .notarizedChainId(1n)
+                    .addTransfer({ recipient: recipientAddress, amount: 1000000n })
+                    .build();
+                expect(claim.typedData).toBeDefined();
+                expect(claim.typedData.domain).toEqual(domain);
+                expect(claim.typedData.primaryType).toBe('ExogenousMultichainClaim');
+                expect(claim.typedData.types.ExogenousMultichainClaim).toBeDefined();
+                expect(claim.typedData.types.Component).toBeDefined();
+            });
+        });
+        describe('ExogenousBatchMultichainClaimBuilder', () => {
+            it('should generate valid EIP-712 hash', () => {
+                const claim = claim_1.ClaimBuilder.exogenousBatchMultichain(domain)
+                    .sponsor(sponsorAddress)
+                    .nonce(1n)
+                    .expires(BigInt(Date.now() + 3600000))
+                    .chainIndex(0n)
+                    .notarizedChainId(1n)
+                    .addClaim()
+                    .id((0, locks_1.encodeLockId)(lockTag, usdcAddress))
+                    .allocatedAmount(1000000n)
+                    .addPortion(lockTag, {
+                    kind: 'transfer',
+                    recipient: recipientAddress,
+                    amount: 1000000n,
+                })
+                    .done()
+                    .build();
+                expect(claim.hash).toBeDefined();
+                expect(claim.hash).toMatch(/^0x[0-9a-f]{64}$/);
+            });
+            it('should generate valid EIP-712 typed data', () => {
+                const claim = claim_1.ClaimBuilder.exogenousBatchMultichain(domain)
+                    .sponsor(sponsorAddress)
+                    .nonce(1n)
+                    .expires(BigInt(Date.now() + 3600000))
+                    .chainIndex(0n)
+                    .notarizedChainId(1n)
+                    .addClaim()
+                    .id((0, locks_1.encodeLockId)(lockTag, usdcAddress))
+                    .allocatedAmount(1000000n)
+                    .addPortion(lockTag, {
+                    kind: 'transfer',
+                    recipient: recipientAddress,
+                    amount: 1000000n,
+                })
+                    .done()
+                    .build();
+                expect(claim.typedData).toBeDefined();
+                expect(claim.typedData.domain).toEqual(domain);
+                expect(claim.typedData.primaryType).toBe('ExogenousBatchMultichainClaim');
+                expect(claim.typedData.types.ExogenousBatchMultichainClaim).toBeDefined();
+                expect(claim.typedData.types.BatchClaimComponent).toBeDefined();
+                expect(claim.typedData.types.Component).toBeDefined();
+            });
+        });
+    });
+    describe('ExogenousMultichainClaimBuilder', () => {
+        it('should build an exogenous multichain claim with chain identification', () => {
+            const expires = BigInt(Date.now() + 3600000);
+            const resourceId = (0, locks_1.encodeLockId)(lockTag, usdcAddress);
+            const chainHash1 = '0x1111111111111111111111111111111111111111111111111111111111111111';
+            const claim = claim_1.ClaimBuilder.exogenousMultichain(domain)
+                .sponsor(sponsorAddress)
+                .nonce(1n)
+                .expires(expires)
+                .id(resourceId)
+                .lockTag(lockTag)
+                .allocatedAmount(1000000n)
+                .chainIndex(0n)
+                .notarizedChainId(1n)
+                .addTransfer({ recipient: recipientAddress, amount: 1000000n })
+                .addAdditionalChainHash(chainHash1)
+                .build();
+            expect(claim.struct.sponsor).toBe(sponsorAddress);
+            expect(claim.struct.nonce).toBe(1n);
+            expect(claim.struct.expires).toBe(expires);
+            expect(claim.struct.id).toBe(resourceId);
+            expect(claim.struct.allocatedAmount).toBe(1000000n);
+            expect(claim.struct.chainIndex).toBe(0n);
+            expect(claim.struct.notarizedChainId).toBe(1n);
+            expect(claim.struct.additionalChains.length).toBe(1);
+            expect(claim.struct.additionalChains[0]).toBe(chainHash1);
+            expect(claim.struct.claimants.length).toBe(1);
+        });
+        it('should throw if chainIndex is not set', () => {
+            expect(() => claim_1.ClaimBuilder.exogenousMultichain(domain)
+                .sponsor(sponsorAddress)
+                .nonce(1n)
+                .expires(BigInt(Date.now() + 3600000))
+                .id((0, locks_1.encodeLockId)(lockTag, usdcAddress))
+                .lockTag(lockTag)
+                .allocatedAmount(1000000n)
+                .notarizedChainId(1n)
+                .addTransfer({ recipient: recipientAddress, amount: 1000000n })
+                .build()).toThrow('chainIndex is required');
+        });
+        it('should throw if notarizedChainId is not set', () => {
+            expect(() => claim_1.ClaimBuilder.exogenousMultichain(domain)
+                .sponsor(sponsorAddress)
+                .nonce(1n)
+                .expires(BigInt(Date.now() + 3600000))
+                .id((0, locks_1.encodeLockId)(lockTag, usdcAddress))
+                .lockTag(lockTag)
+                .allocatedAmount(1000000n)
+                .chainIndex(0n)
+                .addTransfer({ recipient: recipientAddress, amount: 1000000n })
+                .build()).toThrow('notarizedChainId is required');
+        });
+    });
+    describe('ExogenousBatchMultichainClaimBuilder', () => {
+        it('should build an exogenous batch multichain claim with chain identification', () => {
+            const expires = BigInt(Date.now() + 3600000);
+            const resourceId1 = (0, locks_1.encodeLockId)(lockTag, usdcAddress);
+            const resourceId2 = (0, locks_1.encodeLockId)('0x000000000000000000000002', usdcAddress);
+            const chainHash1 = '0x1111111111111111111111111111111111111111111111111111111111111111';
+            const chainHash2 = '0x2222222222222222222222222222222222222222222222222222222222222222';
+            const claim = claim_1.ClaimBuilder.exogenousBatchMultichain(domain)
+                .sponsor(sponsorAddress)
+                .nonce(1n)
+                .expires(expires)
+                .chainIndex(0n)
+                .notarizedChainId(1n)
+                .addClaim()
+                .id(resourceId1)
+                .allocatedAmount(1000000n)
+                .addPortion(lockTag, {
+                kind: 'transfer',
+                recipient: recipientAddress,
+                amount: 1000000n,
+            })
+                .done()
+                .addClaim()
+                .id(resourceId2)
+                .allocatedAmount(2000000n)
+                .addPortion('0x000000000000000000000002', {
+                kind: 'withdraw',
+                recipient: recipientAddress,
+                amount: 2000000n,
+            })
+                .done()
+                .addAdditionalChainHash(chainHash1)
+                .addAdditionalChainHash(chainHash2)
+                .build();
+            expect(claim.struct.sponsor).toBe(sponsorAddress);
+            expect(claim.struct.nonce).toBe(1n);
+            expect(claim.struct.expires).toBe(expires);
+            expect(claim.struct.chainIndex).toBe(0n);
+            expect(claim.struct.notarizedChainId).toBe(1n);
+            expect(claim.struct.claims.length).toBe(2);
+            expect(claim.struct.claims[0].id).toBe(resourceId1);
+            expect(claim.struct.claims[1].id).toBe(resourceId2);
+            expect(claim.struct.additionalChains.length).toBe(2);
+            expect(claim.struct.additionalChains[0]).toBe(chainHash1);
+            expect(claim.struct.additionalChains[1]).toBe(chainHash2);
+        });
+        it('should support multiple portions per claim', () => {
+            const resourceId = (0, locks_1.encodeLockId)(lockTag, usdcAddress);
+            const lockTag2 = '0x000000000000000000000002';
+            const claim = claim_1.ClaimBuilder.exogenousBatchMultichain(domain)
+                .sponsor(sponsorAddress)
+                .nonce(1n)
+                .expires(BigInt(Date.now() + 3600000))
+                .chainIndex(0n)
+                .notarizedChainId(1n)
+                .addClaim()
+                .id(resourceId)
+                .allocatedAmount(1000000n)
+                .addPortion(lockTag, {
+                kind: 'transfer',
+                recipient: recipientAddress,
+                amount: 600000n,
+            })
+                .addPortion(lockTag2, {
+                kind: 'withdraw',
+                recipient: recipientAddress,
+                amount: 400000n,
+            })
+                .done()
+                .build();
+            expect(claim.struct.claims[0].portions.length).toBe(2);
+            expect(claim.struct.claims[0].portions[0].amount).toBe(600000n);
+            expect(claim.struct.claims[0].portions[1].amount).toBe(400000n);
+        });
+        it('should throw if chainIndex is not set', () => {
+            expect(() => claim_1.ClaimBuilder.exogenousBatchMultichain(domain)
+                .sponsor(sponsorAddress)
+                .nonce(1n)
+                .expires(BigInt(Date.now() + 3600000))
+                .notarizedChainId(1n)
+                .addClaim()
+                .id(100n)
+                .allocatedAmount(1000000n)
+                .addPortion(lockTag, {
+                kind: 'transfer',
+                recipient: recipientAddress,
+                amount: 1000000n,
+            })
+                .done()
+                .build()).toThrow('chainIndex is required');
+        });
+        it('should throw if notarizedChainId is not set', () => {
+            expect(() => claim_1.ClaimBuilder.exogenousBatchMultichain(domain)
+                .sponsor(sponsorAddress)
+                .nonce(1n)
+                .expires(BigInt(Date.now() + 3600000))
+                .chainIndex(0n)
+                .addClaim()
+                .id(100n)
+                .allocatedAmount(1000000n)
+                .addPortion(lockTag, {
+                kind: 'transfer',
+                recipient: recipientAddress,
+                amount: 1000000n,
+            })
+                .done()
+                .build()).toThrow('notarizedChainId is required');
+        });
+        it('should throw if no claims are added', () => {
+            expect(() => claim_1.ClaimBuilder.exogenousBatchMultichain(domain)
+                .sponsor(sponsorAddress)
+                .nonce(1n)
+                .expires(BigInt(Date.now() + 3600000))
+                .chainIndex(0n)
+                .notarizedChainId(1n)
+                .build()).toThrow('at least one claim component is required');
+        });
+        it('should inherit addAdditionalChainHash from parent', () => {
+            const chainHash = '0x1111111111111111111111111111111111111111111111111111111111111111';
+            const claim = claim_1.ClaimBuilder.exogenousBatchMultichain(domain)
+                .sponsor(sponsorAddress)
+                .nonce(1n)
+                .expires(BigInt(Date.now() + 3600000))
+                .chainIndex(0n)
+                .notarizedChainId(1n)
+                .addClaim()
+                .id(100n)
+                .allocatedAmount(1000000n)
+                .addPortion(lockTag, {
+                kind: 'transfer',
+                recipient: recipientAddress,
+                amount: 1000000n,
+            })
+                .done()
+                .addAdditionalChainHash(chainHash)
+                .build();
+            expect(claim.struct.additionalChains.length).toBe(1);
+            expect(claim.struct.additionalChains[0]).toBe(chainHash);
+        });
     });
 });
 //# sourceMappingURL=claim.test.js.map

@@ -41,8 +41,10 @@ export function buildComponent(lockTagOfClaim, claimant) {
             break;
         }
         case 'withdraw': {
-            // Lock tag is zero for withdrawal
-            claimantValue = recipientBits;
+            // Lock tag is zero for withdrawal - pack as bytes12(0) | address
+            // Explicitly set the upper 96 bits to zero and OR with recipient
+            const lockTagBits = 0n << 160n;
+            claimantValue = lockTagBits | recipientBits;
             break;
         }
         default:
