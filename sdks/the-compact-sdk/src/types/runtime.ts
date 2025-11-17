@@ -15,8 +15,8 @@ export enum CompactCategory {
  * Scope of a resource lock
  */
 export enum Scope {
-  SingleChain = 0,
-  Multichain = 1,
+  Multichain = 0,
+  ChainSpecific = 1,
 }
 
 /**
@@ -77,4 +77,3 @@ export function secondsToResetPeriod(seconds: bigint): ResetPeriod {
   if (seconds <= 608400n) return ResetPeriod.SevenDaysAndOneHour
   return ResetPeriod.ThirtyDays
 }
-

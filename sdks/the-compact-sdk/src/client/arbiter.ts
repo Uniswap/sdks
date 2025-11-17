@@ -4,7 +4,14 @@
 
 import { CompactClientConfig } from './coreClient'
 import { theCompactAbi } from '../abi/theCompact'
-import { Claim, BatchClaim, MultichainClaim, BatchMultichainClaim } from '../types/claims'
+import {
+  Claim,
+  BatchClaim,
+  MultichainClaim,
+  BatchMultichainClaim,
+  ExogenousMultichainClaim,
+  ExogenousBatchMultichainClaim,
+} from '../types/claims'
 import { ClaimBuilder } from '../builders/claim'
 import { createDomain } from '../config/domain'
 import { extractCompactError } from '../errors/decode'
@@ -262,13 +269,8 @@ export class ArbiterClient {
         account: null,
       })
 
-      // For batch multichain claims, convert to batch claim format for hashing
-      const idsAndAmounts = claim.claims.map((c) => ({
-        id: c.id,
-        amount: c.allocatedAmount,
-      }))
-      const claimants = claim.claims.flatMap((c) => c.portions)
-
+      // For batch multichain claims, use the claims array directly for hashing
+      // BatchClaim now has the same structure as BatchMultichainClaim (minus additionalChains)
       const computedClaimHash = batchClaimHash({
         allocatorData: claim.allocatorData,
         sponsorSignature: claim.sponsorSignature,
@@ -277,8 +279,7 @@ export class ArbiterClient {
         expires: claim.expires,
         witness: claim.witness,
         witnessTypestring: claim.witnessTypestring,
-        idsAndAmounts,
-        claimants,
+        claims: claim.claims,
       })
 
       return { txHash: hash, claimHash: computedClaimHash }
@@ -396,5 +397,168 @@ export class ArbiterClient {
       contractAddress: this.config.address,
     })
     return ClaimBuilder.batchMultichain(domain)
+  }
+
+  /**
+   * Submit an exogenous multichain claim
+   *
+   * Exogenous multichain claims are similar to multichain claims but include explicit
+   * chain identification through chainIndex and notarizedChainId fields.
+   *
+   * @param claim - The exogenous multichain claim struct
+   * @returns Object containing transaction hash and computed claim hash
+   *
+   * @throws {Error} If walletClient is not configured
+   * @throws {Error} If contract address is not set
+   * @throws {CompactError} If the claim is invalid or processing fails
+   */
+  async exogenousMultichainClaim(
+    claim: ExogenousMultichainClaim
+  ): Promise<{ txHash: `0x${string}`; claimHash: `0x${string}` }> {
+    invariant(this.config.walletClient, 'walletClient is required for claims')
+    invariant(this.config.address, 'contract address is required')
+
+    try {
+      const hash = await this.config.walletClient.writeContract({
+        address: this.config.address,
+        abi: theCompactAbi,
+        functionName: 'exogenousClaim',
+        args: [claim] as any,
+        chain: null,
+        account: null,
+      })
+
+      // Use base claim hash (same structure as MultichainClaim for the core fields)
+      const computedClaimHash = claimHash({
+        allocatorData: claim.allocatorData,
+        sponsorSignature: claim.sponsorSignature,
+        sponsor: claim.sponsor,
+        nonce: claim.nonce,
+        expires: claim.expires,
+        witness: claim.witness,
+        witnessTypestring: claim.witnessTypestring,
+        id: claim.id,
+        allocatedAmount: claim.allocatedAmount,
+        claimants: claim.claimants,
+      })
+
+      return { txHash: hash, claimHash: computedClaimHash }
+    } catch (error) {
+      const compactError = extractCompactError(error, theCompactAbi)
+      if (compactError) {
+        throw compactError
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Submit an exogenous batch multichain claim
+   *
+   * Exogenous batch multichain claims are similar to batch multichain claims but include
+   * explicit chain identification through chainIndex and notarizedChainId fields.
+   *
+   * @param claim - The exogenous batch multichain claim struct
+   * @returns Object containing transaction hash and computed claim hash
+   *
+   * @throws {Error} If walletClient is not configured
+   * @throws {Error} If contract address is not set
+   * @throws {CompactError} If the claim is invalid or processing fails
+   */
+  async exogenousBatchMultichainClaim(
+    claim: ExogenousBatchMultichainClaim
+  ): Promise<{ txHash: `0x${string}`; claimHash: `0x${string}` }> {
+    invariant(this.config.walletClient, 'walletClient is required for claims')
+    invariant(this.config.address, 'contract address is required')
+
+    try {
+      const hash = await this.config.walletClient.writeContract({
+        address: this.config.address,
+        abi: theCompactAbi,
+        functionName: 'exogenousBatchClaim',
+        args: [claim] as any,
+        chain: null,
+        account: null,
+      })
+
+      // Use batch claim hash (same structure as BatchMultichainClaim for the core fields)
+      const computedClaimHash = batchClaimHash({
+        allocatorData: claim.allocatorData,
+        sponsorSignature: claim.sponsorSignature,
+        sponsor: claim.sponsor,
+        nonce: claim.nonce,
+        expires: claim.expires,
+        witness: claim.witness,
+        witnessTypestring: claim.witnessTypestring,
+        claims: claim.claims,
+      })
+
+      return { txHash: hash, claimHash: computedClaimHash }
+    } catch (error) {
+      const compactError = extractCompactError(error, theCompactAbi)
+      if (compactError) {
+        throw compactError
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Get an exogenous multichain claim builder
+   *
+   * @returns An ExogenousMultichainClaimBuilder instance configured with this chain's domain
+   *
+   * @example
+   * ```typescript
+   * const builder = client.arbiter.exogenousMultichainClaimBuilder()
+   * const claim = builder
+   *   .sponsor('0x...')
+   *   .nonce(1n)
+   *   .chainIndex(0n)
+   *   .notarizedChainId(1n)
+   *   .id(lockId)
+   *   .allocatedAmount(1000000n)
+   *   .lockTag(lockTag)
+   *   .addTransfer({ recipient: '0x...', amount: 1000000n })
+   *   .build()
+   * ```
+   */
+  exogenousMultichainClaimBuilder() {
+    invariant(this.config.address, 'contract address is required')
+    const domain = createDomain({
+      chainId: this.config.chainId,
+      contractAddress: this.config.address,
+    })
+    return ClaimBuilder.exogenousMultichain(domain)
+  }
+
+  /**
+   * Get an exogenous batch multichain claim builder
+   *
+   * @returns An ExogenousBatchMultichainClaimBuilder instance configured with this chain's domain
+   *
+   * @example
+   * ```typescript
+   * const builder = client.arbiter.exogenousBatchMultichainClaimBuilder()
+   * const claim = builder
+   *   .sponsor('0x...')
+   *   .nonce(1n)
+   *   .chainIndex(0n)
+   *   .notarizedChainId(1n)
+   *   .addClaim()
+   *     .id(lockId1)
+   *     .allocatedAmount(1000000n)
+   *     .addPortion(lockTag1, { kind: 'transfer', recipient: '0x...', amount: 1000000n })
+   *     .done()
+   *   .build()
+   * ```
+   */
+  exogenousBatchMultichainClaimBuilder() {
+    invariant(this.config.address, 'contract address is required')
+    const domain = createDomain({
+      chainId: this.config.chainId,
+      contractAddress: this.config.address,
+    })
+    return ClaimBuilder.exogenousBatchMultichain(domain)
   }
 }

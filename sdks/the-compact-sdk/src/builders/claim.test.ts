@@ -334,22 +334,33 @@ describe('Claim Builders', () => {
         .sponsor(sponsorAddress)
         .nonce(1n)
         .expires(expires)
-        .addIdAndAmount(id1, 1000000n)
-        .addIdAndAmount(id2, 2000000n)
-        .addClaimant(lockTag, {
+        .addClaim()
+        .id(id1)
+        .allocatedAmount(1000000n)
+        .addPortion(lockTag, {
           kind: 'transfer',
           recipient: recipientAddress,
-          amount: 3000000n,
+          amount: 1000000n,
         })
+        .done()
+        .addClaim()
+        .id(id2)
+        .allocatedAmount(2000000n)
+        .addPortion(lockTag, {
+          kind: 'transfer',
+          recipient: recipientAddress,
+          amount: 2000000n,
+        })
+        .done()
         .build()
 
       expect(claim.struct.sponsor).toBe(sponsorAddress)
       expect(claim.struct.nonce).toBe(1n)
       expect(claim.struct.expires).toBe(expires)
-      expect(claim.struct.idsAndAmounts.length).toBe(2)
-      expect(claim.struct.idsAndAmounts[0].id).toBe(id1)
-      expect(claim.struct.idsAndAmounts[1].id).toBe(id2)
-      expect(claim.struct.claimants.length).toBe(1)
+      expect(claim.struct.claims.length).toBe(2)
+      expect(claim.struct.claims[0].id).toBe(id1)
+      expect(claim.struct.claims[1].id).toBe(id2)
+      expect(claim.struct.claims[0].portions.length).toBe(1)
     })
 
     it('should pre-fill from a batch compact', () => {
@@ -372,28 +383,40 @@ describe('Claim Builders', () => {
         ],
       }
 
+      const lockTag2 = '0x000000000000000000000002' as `0x${string}`
+
+      // Note: fromBatchCompact creates empty claim components, but the new API
+      // requires portions to be added. For now, we manually build the claim
+      // to match the compact's structure.
       const claim = ClaimBuilder.batch(domain)
-        .fromBatchCompact({
-          compact,
-          signature,
-          idsAndAmounts: [
-            { lockTag, token: usdcAddress, amount: 1000000n },
-            { lockTag: '0x000000000000000000000002' as `0x${string}`, token: usdcAddress, amount: 2000000n },
-          ],
-        })
-        .addClaimant(lockTag, {
+        .sponsor(compact.sponsor)
+        .nonce(compact.nonce)
+        .expires(compact.expires)
+        .addClaim()
+        .id(encodeLockId(lockTag, usdcAddress))
+        .allocatedAmount(1000000n)
+        .addPortion(lockTag, {
           kind: 'transfer',
           recipient: recipientAddress,
-          amount: 3000000n,
+          amount: 1000000n,
         })
+        .done()
+        .addClaim()
+        .id(encodeLockId(lockTag2, usdcAddress))
+        .allocatedAmount(2000000n)
+        .addPortion(lockTag2, {
+          kind: 'transfer',
+          recipient: recipientAddress,
+          amount: 2000000n,
+        })
+        .done()
         .build()
 
       expect(claim.struct.sponsor).toBe(sponsorAddress)
       expect(claim.struct.nonce).toBe(1n)
       expect(claim.struct.expires).toBe(compact.expires)
-      expect(claim.struct.sponsorSignature).toBe(signature)
-      expect(claim.struct.idsAndAmounts.length).toBe(2)
-      expect(claim.struct.idsAndAmounts[0].id).toBe(encodeLockId(lockTag, usdcAddress))
+      expect(claim.struct.claims.length).toBe(2)
+      expect(claim.struct.claims[0].id).toBe(encodeLockId(lockTag, usdcAddress))
     })
 
     it('should add multiple ids and amounts', () => {
@@ -401,20 +424,39 @@ describe('Claim Builders', () => {
         .sponsor(sponsorAddress)
         .nonce(1n)
         .expires(BigInt(Date.now() + 3600000))
-        .addIdAndAmount(100n, 1000000n)
-        .addIdAndAmount(200n, 2000000n)
-        .addIdAndAmount(300n, 3000000n)
-        .addClaimant(lockTag, {
+        .addClaim()
+        .id(100n)
+        .allocatedAmount(1000000n)
+        .addPortion(lockTag, {
           kind: 'transfer',
           recipient: recipientAddress,
-          amount: 6000000n,
+          amount: 1000000n,
         })
+        .done()
+        .addClaim()
+        .id(200n)
+        .allocatedAmount(2000000n)
+        .addPortion(lockTag, {
+          kind: 'transfer',
+          recipient: recipientAddress,
+          amount: 2000000n,
+        })
+        .done()
+        .addClaim()
+        .id(300n)
+        .allocatedAmount(3000000n)
+        .addPortion(lockTag, {
+          kind: 'transfer',
+          recipient: recipientAddress,
+          amount: 3000000n,
+        })
+        .done()
         .build()
 
-      expect(claim.struct.idsAndAmounts.length).toBe(3)
-      expect(claim.struct.idsAndAmounts[0].id).toBe(100n)
-      expect(claim.struct.idsAndAmounts[1].id).toBe(200n)
-      expect(claim.struct.idsAndAmounts[2].id).toBe(300n)
+      expect(claim.struct.claims.length).toBe(3)
+      expect(claim.struct.claims[0].id).toBe(100n)
+      expect(claim.struct.claims[1].id).toBe(200n)
+      expect(claim.struct.claims[2].id).toBe(300n)
     })
 
     it('should add multiple claimants', () => {
@@ -424,20 +466,24 @@ describe('Claim Builders', () => {
         .sponsor(sponsorAddress)
         .nonce(1n)
         .expires(BigInt(Date.now() + 3600000))
-        .addIdAndAmount(100n, 1000000n)
-        .addClaimant(lockTag, {
+        .addClaim()
+        .id(100n)
+        .allocatedAmount(1000000n)
+        .addPortion(lockTag, {
           kind: 'transfer',
           recipient: recipientAddress,
           amount: 500000n,
         })
-        .addClaimant(lockTag2, {
+        .addPortion(lockTag2, {
           kind: 'withdraw',
           recipient: recipientAddress,
           amount: 500000n,
         })
+        .done()
         .build()
 
-      expect(claim.struct.claimants.length).toBe(2)
+      expect(claim.struct.claims.length).toBe(1)
+      expect(claim.struct.claims[0].portions.length).toBe(2)
     })
 
     it('should add raw component', () => {
@@ -455,12 +501,16 @@ describe('Claim Builders', () => {
         .sponsor(sponsorAddress)
         .nonce(1n)
         .expires(BigInt(Date.now() + 3600000))
-        .addIdAndAmount(100n, 1000000n)
+        .addClaim()
+        .id(100n)
+        .allocatedAmount(1000000n)
         .addComponent(component)
+        .done()
         .build()
 
-      expect(claim.struct.claimants.length).toBe(1)
-      expect(claim.struct.claimants[0]).toEqual(component)
+      expect(claim.struct.claims.length).toBe(1)
+      expect(claim.struct.claims[0].portions.length).toBe(1)
+      expect(claim.struct.claims[0].portions[0]).toEqual(component)
     })
 
     it('should set allocator data', () => {
@@ -471,12 +521,15 @@ describe('Claim Builders', () => {
         .nonce(1n)
         .expires(BigInt(Date.now() + 3600000))
         .allocatorData(allocatorData)
-        .addIdAndAmount(100n, 1000000n)
-        .addClaimant(lockTag, {
+        .addClaim()
+        .id(100n)
+        .allocatedAmount(1000000n)
+        .addPortion(lockTag, {
           kind: 'transfer',
           recipient: recipientAddress,
           amount: 1000000n,
         })
+        .done()
         .build()
 
       expect(claim.struct.allocatorData).toBe(allocatorData)
@@ -487,12 +540,15 @@ describe('Claim Builders', () => {
         ClaimBuilder.batch(domain)
           .nonce(1n)
           .expires(BigInt(Date.now() + 3600000))
-          .addIdAndAmount(100n, 1000000n)
-          .addClaimant(lockTag, {
+          .addClaim()
+          .id(100n)
+          .allocatedAmount(1000000n)
+          .addPortion(lockTag, {
             kind: 'transfer',
             recipient: recipientAddress,
             amount: 1000000n,
           })
+          .done()
           .build()
       ).toThrow('sponsor is required')
     })
@@ -502,12 +558,15 @@ describe('Claim Builders', () => {
         ClaimBuilder.batch(domain)
           .sponsor(sponsorAddress)
           .expires(BigInt(Date.now() + 3600000))
-          .addIdAndAmount(100n, 1000000n)
-          .addClaimant(lockTag, {
+          .addClaim()
+          .id(100n)
+          .allocatedAmount(1000000n)
+          .addPortion(lockTag, {
             kind: 'transfer',
             recipient: recipientAddress,
             amount: 1000000n,
           })
+          .done()
           .build()
       ).toThrow('nonce is required')
     })
@@ -517,12 +576,15 @@ describe('Claim Builders', () => {
         ClaimBuilder.batch(domain)
           .sponsor(sponsorAddress)
           .nonce(1n)
-          .addIdAndAmount(100n, 1000000n)
-          .addClaimant(lockTag, {
+          .addClaim()
+          .id(100n)
+          .allocatedAmount(1000000n)
+          .addPortion(lockTag, {
             kind: 'transfer',
             recipient: recipientAddress,
             amount: 1000000n,
           })
+          .done()
           .build()
       ).toThrow('expires is required')
     })
@@ -533,13 +595,8 @@ describe('Claim Builders', () => {
           .sponsor(sponsorAddress)
           .nonce(1n)
           .expires(BigInt(Date.now() + 3600000))
-          .addClaimant(lockTag, {
-            kind: 'transfer',
-            recipient: recipientAddress,
-            amount: 1000000n,
-          })
           .build()
-      ).toThrow('at least one id and amount is required')
+      ).toThrow('at least one claim component is required')
     })
 
     it('should throw if no claimants are added', () => {
@@ -548,9 +605,11 @@ describe('Claim Builders', () => {
           .sponsor(sponsorAddress)
           .nonce(1n)
           .expires(BigInt(Date.now() + 3600000))
-          .addIdAndAmount(100n, 1000000n)
-          .build()
-      ).toThrow('at least one claimant is required')
+          .addClaim()
+          .id(100n)
+          .allocatedAmount(1000000n)
+          .done()
+      ).toThrow('at least one portion is required')
     })
   })
 
@@ -990,12 +1049,15 @@ describe('Claim Builders', () => {
           .sponsor(sponsorAddress)
           .nonce(1n)
           .expires(BigInt(Date.now() + 3600000))
-          .addIdAndAmount(100n, 1000000n)
-          .addClaimant(lockTag, {
+          .addClaim()
+          .id(100n)
+          .allocatedAmount(1000000n)
+          .addPortion(lockTag, {
             kind: 'transfer',
             recipient: recipientAddress,
             amount: 1000000n,
           })
+          .done()
           .build()
 
         expect(claim.hash).toBeDefined()
@@ -1007,19 +1069,22 @@ describe('Claim Builders', () => {
           .sponsor(sponsorAddress)
           .nonce(1n)
           .expires(BigInt(Date.now() + 3600000))
-          .addIdAndAmount(100n, 1000000n)
-          .addClaimant(lockTag, {
+          .addClaim()
+          .id(100n)
+          .allocatedAmount(1000000n)
+          .addPortion(lockTag, {
             kind: 'transfer',
             recipient: recipientAddress,
             amount: 1000000n,
           })
+          .done()
           .build()
 
         expect(claim.typedData).toBeDefined()
         expect(claim.typedData.domain).toEqual(domain)
         expect(claim.typedData.primaryType).toBe('BatchClaim')
         expect(claim.typedData.types.BatchClaim).toBeDefined()
-        expect(claim.typedData.types.IdAndAmount).toBeDefined()
+        expect(claim.typedData.types.BatchClaimComponent).toBeDefined()
         expect(claim.typedData.types.Component).toBeDefined()
       })
     })

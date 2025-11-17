@@ -122,14 +122,26 @@ describe('ArbiterClient', () => {
         expires: BigInt(Date.now() + 3600000),
         witness: '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`,
         witnessTypestring: '',
-        idsAndAmounts: [
-          { id: 100n, amount: 1000000n },
-          { id: 200n, amount: 2000000n },
-        ],
-        claimants: [
+        claims: [
           {
-            claimant: (BigInt(lockTag) << 160n) | BigInt(recipientAddress),
-            amount: 3000000n,
+            id: 100n,
+            allocatedAmount: 1000000n,
+            portions: [
+              {
+                claimant: (BigInt(lockTag) << 160n) | BigInt(recipientAddress),
+                amount: 1000000n,
+              },
+            ],
+          },
+          {
+            id: 200n,
+            allocatedAmount: 2000000n,
+            portions: [
+              {
+                claimant: (BigInt(lockTag) << 160n) | BigInt(recipientAddress),
+                amount: 2000000n,
+              },
+            ],
           },
         ],
       }
@@ -324,12 +336,15 @@ describe('ArbiterClient', () => {
           .sponsor(sponsorAddress)
           .nonce(1n)
           .expires(BigInt(Date.now() + 3600000))
-          .addIdAndAmount(100n, 1000000n)
-          .addClaimant(lockTag, {
+          .addClaim()
+          .id(100n)
+          .allocatedAmount(1000000n)
+          .addPortion(lockTag, {
             kind: 'transfer',
             recipient: recipientAddress,
             amount: 1000000n,
           })
+          .done()
           .build()
 
         expect(claim.struct.sponsor).toBe(sponsorAddress)

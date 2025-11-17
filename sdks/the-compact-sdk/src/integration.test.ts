@@ -42,7 +42,7 @@ describeIntegration('The Compact SDK - Mainnet Integration', () => {
       const decoded = decodeLockTag(KNOWN_LOCK_TAG)
 
       expect(decoded.allocatorId).toBe(KNOWN_ALLOCATOR_ID)
-      expect(decoded.scope).toBe(Scope.SingleChain)
+      expect(decoded.scope).toBe(Scope.Multichain)
       expect(decoded.resetPeriod).toBe(ResetPeriod.OneSecond)
 
       // Re-encode it and verify we get the same value back
@@ -141,10 +141,10 @@ describeIntegration('The Compact SDK - Mainnet Integration', () => {
     it('should correctly round-trip encode/decode various lock tags', () => {
       const testCases = [
         {
-          name: 'SingleChain with OneDay reset',
+          name: 'ChainSpecific with OneDay reset',
           parts: {
             allocatorId: 123456789n,
-            scope: Scope.SingleChain,
+            scope: Scope.ChainSpecific,
             resetPeriod: ResetPeriod.OneDay,
           },
         },
@@ -160,7 +160,7 @@ describeIntegration('The Compact SDK - Mainnet Integration', () => {
           name: 'Maximum allocator ID',
           parts: {
             allocatorId: (1n << 92n) - 1n, // Max 92-bit value
-            scope: Scope.SingleChain,
+            scope: Scope.ChainSpecific,
             resetPeriod: ResetPeriod.ThirtyDays,
           },
         },
@@ -179,7 +179,7 @@ describeIntegration('The Compact SDK - Mainnet Integration', () => {
     it('should correctly round-trip encode/decode lock IDs with various tokens', () => {
       const testLockTag = encodeLockTag({
         allocatorId: KNOWN_ALLOCATOR_ID,
-        scope: Scope.SingleChain,
+        scope: Scope.ChainSpecific,
         resetPeriod: ResetPeriod.OneDay,
       })
 

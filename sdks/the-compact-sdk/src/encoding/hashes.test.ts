@@ -111,8 +111,7 @@ describe('hash computation', () => {
         expires: BigInt(Date.now() + 3600000),
         witness: '0x0000000000000000000000000000000000000000000000000000000000000000',
         witnessTypestring: '',
-        idsAndAmounts: [{ id: 12345n, amount: 1000000n }],
-        claimants: [],
+        claims: [{ id: 12345n, allocatedAmount: 1000000n, portions: [] }],
       }
 
       const hash = batchClaimHash(claim)
@@ -121,7 +120,8 @@ describe('hash computation', () => {
       expect(hash).toMatch(/^0x[0-9a-f]{64}$/)
 
       // Verify it matches manual computation
-      const idsAndAmountsHashValue = idsAndAmountsHash(claim.idsAndAmounts)
+      const idsAndAmounts = claim.claims.map((c) => ({ id: c.id, amount: c.allocatedAmount }))
+      const idsAndAmountsHashValue = idsAndAmountsHash(idsAndAmounts)
       const expected = keccak256(
         encodeAbiParameters(
           [
@@ -146,12 +146,11 @@ describe('hash computation', () => {
         expires: BigInt(Date.now() + 7200000),
         witness: '0x3333333333333333333333333333333333333333333333333333333333333333',
         witnessTypestring: '',
-        idsAndAmounts: [
-          { id: 100n, amount: 500000n },
-          { id: 200n, amount: 750000n },
-          { id: 300n, amount: 1000000n },
+        claims: [
+          { id: 100n, allocatedAmount: 500000n, portions: [] },
+          { id: 200n, allocatedAmount: 750000n, portions: [] },
+          { id: 300n, allocatedAmount: 1000000n, portions: [] },
         ],
-        claimants: [],
       }
 
       const hash = batchClaimHash(claim)
@@ -160,7 +159,8 @@ describe('hash computation', () => {
       expect(hash).toMatch(/^0x[0-9a-f]{64}$/)
 
       // Manually compute and verify
-      const idsAndAmountsHashValue = idsAndAmountsHash(claim.idsAndAmounts)
+      const idsAndAmounts = claim.claims.map((c) => ({ id: c.id, amount: c.allocatedAmount }))
+      const idsAndAmountsHashValue = idsAndAmountsHash(idsAndAmounts)
       const expected = keccak256(
         encodeAbiParameters(
           [
@@ -185,13 +185,12 @@ describe('hash computation', () => {
         expires: BigInt(Date.now() + 3600000),
         witness: '0x0000000000000000000000000000000000000000000000000000000000000000',
         witnessTypestring: '',
-        idsAndAmounts: [{ id: 100n, amount: 500000n }],
-        claimants: [],
+        claims: [{ id: 100n, allocatedAmount: 500000n, portions: [] }],
       }
 
       const claim2 = {
         ...baseClaim,
-        idsAndAmounts: [{ id: 200n, amount: 500000n }], // Different id
+        claims: [{ id: 200n, allocatedAmount: 500000n, portions: [] }], // Different id
       }
 
       const hash1 = batchClaimHash(baseClaim)
@@ -209,8 +208,7 @@ describe('hash computation', () => {
         expires: BigInt(Date.now() + 3600000),
         witness: '0x0000000000000000000000000000000000000000000000000000000000000000',
         witnessTypestring: '',
-        idsAndAmounts: [],
-        claimants: [],
+        claims: [],
       }
 
       const hash = batchClaimHash(claim)

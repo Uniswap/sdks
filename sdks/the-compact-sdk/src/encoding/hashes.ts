@@ -153,14 +153,19 @@ export function claimHash(claim: Claim): Hex {
  *   nonce: 1n,
  *   expires: BigInt(Date.now() + 3600000),
  *   witness: '0x0000000000000000000000000000000000000000000000000000000000000000',
- *   idsAndAmounts: [{ id: 100n, amount: 1000000n }],
+ *   claims: [{ id: 100n, allocatedAmount: 1000000n, portions: [...] }],
  *   // ... other fields
  * }
  * const hash = batchClaimHash(claim)
  * ```
  */
 export function batchClaimHash(claim: BatchClaim): Hex {
-  const idsAndAmountsHashValue = idsAndAmountsHash(claim.idsAndAmounts)
+  // Extract id and allocatedAmount from claim components
+  const idsAndAmounts = claim.claims.map((c) => ({
+    id: c.id,
+    amount: c.allocatedAmount,
+  }))
+  const idsAndAmountsHashValue = idsAndAmountsHash(idsAndAmounts)
 
   return keccak256(
     encodeAbiParameters(

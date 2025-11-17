@@ -2,6 +2,7 @@
  * Lock tag and lock ID encoding/decoding utilities
  */
 
+import type { Address, Hex } from 'viem'
 import { Scope, ResetPeriod } from '../types/runtime'
 import invariant from 'tiny-invariant'
 
@@ -30,14 +31,14 @@ export interface LockTagParts {
  * @param parts - The lock tag components
  * @returns The encoded lock tag as bytes12
  */
-export function encodeLockTag(parts: LockTagParts): `0x${string}` {
+export function encodeLockTag(parts: LockTagParts): Hex {
   const { allocatorId, scope, resetPeriod } = parts
 
   // Validate allocatorId fits in 92 bits (4 bits for compact flag + 88 bits from address)
   invariant(allocatorId >= 0n && allocatorId < 2n ** 92n, 'allocatorId must fit in 92 bits')
 
   // Validate scope and resetPeriod
-  invariant(scope === Scope.SingleChain || scope === Scope.Multichain, 'Invalid scope')
+  invariant(scope === Scope.ChainSpecific || scope === Scope.Multichain, 'Invalid scope')
   invariant(resetPeriod >= 0 && resetPeriod <= 7, 'Invalid reset period')
 
   // Pack according to contract layout:
@@ -50,7 +51,7 @@ export function encodeLockTag(parts: LockTagParts): `0x${string}` {
 
   // Convert to hex and pad to 12 bytes (24 hex chars)
   const hex = packed.toString(16).padStart(24, '0')
-  return `0x${hex}` as `0x${string}`
+  return `0x${hex}` as Hex
 }
 
 /**
@@ -58,7 +59,7 @@ export function encodeLockTag(parts: LockTagParts): `0x${string}` {
  * @param lockTag - The lock tag to decode (bytes12)
  * @returns The decoded lock tag parts
  */
-export function decodeLockTag(lockTag: `0x${string}`): LockTagParts {
+export function decodeLockTag(lockTag: Hex): LockTagParts {
   // Remove 0x prefix and validate length
   const hex = lockTag.slice(2)
   invariant(hex.length === 24, 'lockTag must be 12 bytes (24 hex chars)')
@@ -83,12 +84,12 @@ export function decodeLockTag(lockTag: `0x${string}`): LockTagParts {
 /**
  * Encode a lock ID from a lock tag and token address
  * Lock ID is the ERC6909 token ID: lockTag (12 bytes) || token (20 bytes) = 32 bytes
- * 
+ *
  * @param lockTag - The lock tag (bytes12)
  * @param token - The token address (address)
  * @returns The lock ID as uint256
  */
-export function encodeLockId(lockTag: `0x${string}`, token: `0x${string}`): bigint {
+export function encodeLockId(lockTag: Hex, token: Address): bigint {
   // Validate inputs
   const lockTagHex = lockTag.slice(2)
   invariant(lockTagHex.length === 24, 'lockTag must be 12 bytes')
@@ -108,7 +109,7 @@ export function encodeLockId(lockTag: `0x${string}`, token: `0x${string}`): bigi
  * @param id - The lock ID (uint256)
  * @returns The lock tag and token address
  */
-export function decodeLockId(id: bigint): { lockTag: `0x${string}`; token: `0x${string}` } {
+export function decodeLockId(id: bigint): { lockTag: Hex; token: Address } {
   // Extract token (lower 160 bits / 20 bytes)
   const token = id & ((1n << 160n) - 1n)
   const tokenHex = token.toString(16).padStart(40, '0')
@@ -118,8 +119,8 @@ export function decodeLockId(id: bigint): { lockTag: `0x${string}`; token: `0x${
   const lockTagHex = lockTag.toString(16).padStart(24, '0')
 
   return {
-    lockTag: `0x${lockTagHex}` as `0x${string}`,
-    token: `0x${tokenHex}` as `0x${string}`,
+    lockTag: `0x${lockTagHex}` as Hex,
+    token: `0x${tokenHex}` as Address,
   }
 }
 

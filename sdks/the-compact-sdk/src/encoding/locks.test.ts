@@ -6,7 +6,7 @@ describe('locks encoding', () => {
     it('should encode a lock tag correctly', () => {
       const lockTag = encodeLockTag({
         allocatorId: 123n,
-        scope: Scope.SingleChain,
+        scope: Scope.ChainSpecific,
         resetPeriod: ResetPeriod.OneDay,
       })
 
@@ -17,7 +17,7 @@ describe('locks encoding', () => {
       expect(() =>
         encodeLockTag({
           allocatorId: 2n ** 96n,
-          scope: Scope.SingleChain,
+          scope: Scope.ChainSpecific,
           resetPeriod: ResetPeriod.OneDay,
         })
       ).toThrow()
@@ -82,7 +82,7 @@ describe('locks encoding', () => {
 
         const lockTag1 = encodeLockTag({
           allocatorId: allocatorId1,
-          scope: Scope.SingleChain,
+          scope: Scope.ChainSpecific,
           resetPeriod: ResetPeriod.OneDay,
         })
 
@@ -101,7 +101,7 @@ describe('locks encoding', () => {
 
         const lockTag = encodeLockTag({
           allocatorId,
-          scope: Scope.SingleChain,
+          scope: Scope.ChainSpecific,
           resetPeriod: ResetPeriod.OneDay,
         })
 
@@ -120,7 +120,7 @@ describe('locks encoding', () => {
 
         const lockTag = encodeLockTag({
           allocatorId,
-          scope: Scope.SingleChain,
+          scope: Scope.ChainSpecific,
           resetPeriod: ResetPeriod.OneDay,
         })
 
@@ -135,7 +135,7 @@ describe('locks encoding', () => {
         const allocatorId = 287803669127211327350859520n
         const lockTag = encodeLockTag({
           allocatorId,
-          scope: Scope.SingleChain,
+          scope: Scope.ChainSpecific,
           resetPeriod: ResetPeriod.OneSecond,
         })
 
@@ -180,7 +180,7 @@ describe('locks encoding', () => {
 
         const lockTag = encodeLockTag({
           allocatorId: minAllocatorId,
-          scope: Scope.SingleChain,
+          scope: Scope.ChainSpecific,
           resetPeriod: ResetPeriod.OneSecond,
         })
 
