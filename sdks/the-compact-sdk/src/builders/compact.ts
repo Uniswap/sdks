@@ -6,7 +6,7 @@ import { Compact, BatchCompact, MultichainCompact, Lock, MultichainElement } fro
 import { CompactDomain } from '../config/domain'
 import { MandateType } from './mandate'
 import invariant from 'tiny-invariant'
-import { hashTypedData } from 'viem'
+import { Address, hashTypedData, Hex } from 'viem'
 
 /**
  * EIP-712 message type for compacts with optional mandate
@@ -36,12 +36,18 @@ type MultichainCompactMessage = Omit<MultichainCompact, 'elements'> & {
 
 /**
  * Result of building a compact
+ * Contains all data needed to sign and submit a compact
  */
 export interface BuiltCompact<TMandate extends object | undefined = undefined> {
+  /** The compact struct ready to be submitted on-chain */
   struct: Compact
+  /** Optional witness data (mandate) attached to this compact */
   mandate?: TMandate
+  /** Type definition for the mandate (if present) */
   mandateType?: MandateType<TMandate extends object ? TMandate : any>
-  hash: `0x${string}`
+  /** EIP-712 hash of the compact for signature verification */
+  hash: Hex
+  /** Complete EIP-712 typed data structure for signing */
   typedData: {
     domain: CompactDomain
     types: Record<string, Array<{ name: string; type: string }>>
@@ -52,12 +58,18 @@ export interface BuiltCompact<TMandate extends object | undefined = undefined> {
 
 /**
  * Result of building a batch compact
+ * Contains all data needed to sign and submit a batch compact covering multiple locks
  */
 export interface BuiltBatchCompact<TMandate extends object | undefined = undefined> {
+  /** The batch compact struct ready to be submitted on-chain */
   struct: BatchCompact
+  /** Optional witness data (mandate) attached to this batch compact */
   mandate?: TMandate
+  /** Type definition for the mandate (if present) */
   mandateType?: MandateType<TMandate extends object ? TMandate : any>
-  hash: `0x${string}`
+  /** EIP-712 hash of the batch compact for signature verification */
+  hash: Hex
+  /** Complete EIP-712 typed data structure for signing */
   typedData: {
     domain: CompactDomain
     types: Record<string, Array<{ name: string; type: string }>>
@@ -68,10 +80,14 @@ export interface BuiltBatchCompact<TMandate extends object | undefined = undefin
 
 /**
  * Result of building a multichain compact
+ * Contains all data needed to sign and submit a multichain compact across multiple chains
  */
 export interface BuiltMultichainCompact<TMandate extends object | undefined = undefined> {
+  /** The multichain compact struct ready to be submitted on-chain */
   struct: MultichainCompact
-  hash: `0x${string}`
+  /** EIP-712 hash of the multichain compact for signature verification */
+  hash: Hex
+  /** Complete EIP-712 typed data structure for signing */
   typedData: {
     domain: CompactDomain
     types: Record<string, Array<{ name: string; type: string }>>
@@ -129,12 +145,12 @@ export interface BuiltMultichainCompact<TMandate extends object | undefined = un
  */
 export class SingleCompactBuilder<TMandate extends object | undefined = undefined> {
   private domain: CompactDomain
-  private _arbiter?: `0x${string}`
-  private _sponsor?: `0x${string}`
+  private _arbiter?: Address
+  private _sponsor?: Address
   private _nonce?: bigint
   private _expires?: bigint
-  private _lockTag?: `0x${string}`
-  private _token?: `0x${string}`
+  private _lockTag?: Hex
+  private _token?: Address
   private _amount?: bigint
   private _mandate?: TMandate
   private _mandateType?: MandateType<TMandate extends object ? TMandate : any>
@@ -143,21 +159,41 @@ export class SingleCompactBuilder<TMandate extends object | undefined = undefine
     this.domain = domain
   }
 
-  arbiter(arbiter: `0x${string}`): this {
+  /**
+   * Set the arbiter address who will process the claim
+   * @param arbiter - Address authorized to process claims for this compact
+   * @returns This builder for chaining
+   */
+  arbiter(arbiter: Address): this {
     this._arbiter = arbiter
     return this
   }
 
-  sponsor(sponsor: `0x${string}`): this {
+  /**
+   * Set the sponsor address who is locking the tokens
+   * @param sponsor - Address that owns and is locking the tokens
+   * @returns This builder for chaining
+   */
+  sponsor(sponsor: Address): this {
     this._sponsor = sponsor
     return this
   }
 
+  /**
+   * Set the nonce for replay protection
+   * @param nonce - Unique nonce value (typically incremental)
+   * @returns This builder for chaining
+   */
   nonce(nonce: bigint): this {
     this._nonce = nonce
     return this
   }
 
+  /**
+   * Set the expiration timestamp
+   * @param timestamp - Unix timestamp in seconds when the compact expires
+   * @returns This builder for chaining
+   */
   expires(timestamp: bigint): this {
     this._expires = timestamp
     return this
@@ -186,16 +222,31 @@ export class SingleCompactBuilder<TMandate extends object | undefined = undefine
     return this.expires(now + seconds)
   }
 
-  lockTag(lockTag: `0x${string}`): this {
+  /**
+   * Set the lock tag for the resource lock
+   * @param lockTag - 12-byte lock tag identifying the lock configuration
+   * @returns This builder for chaining
+   */
+  lockTag(lockTag: Hex): this {
     this._lockTag = lockTag
     return this
   }
 
-  token(token: `0x${string}`): this {
+  /**
+   * Set the token address being locked
+   * @param token - Address of the ERC20 token to lock
+   * @returns This builder for chaining
+   */
+  token(token: Address): this {
     this._token = token
     return this
   }
 
+  /**
+   * Set the amount of tokens to lock
+   * @param amount - Amount in wei to lock
+   * @returns This builder for chaining
+   */
   amount(amount: bigint): this {
     this._amount = amount
     return this
@@ -359,8 +410,8 @@ export class SingleCompactBuilder<TMandate extends object | undefined = undefine
  */
 export class BatchCompactBuilder<TMandate extends object | undefined = undefined> {
   private domain: CompactDomain
-  private _arbiter?: `0x${string}`
-  private _sponsor?: `0x${string}`
+  private _arbiter?: Address
+  private _sponsor?: Address
   private _nonce?: bigint
   private _expires?: bigint
   private _commitments: Lock[] = []
@@ -371,30 +422,60 @@ export class BatchCompactBuilder<TMandate extends object | undefined = undefined
     this.domain = domain
   }
 
-  arbiter(arbiter: `0x${string}`): this {
+  /**
+   * Set the arbiter address who will process the claims
+   * @param arbiter - Address authorized to process claims for this batch compact
+   * @returns This builder for chaining
+   */
+  arbiter(arbiter: Address): this {
     this._arbiter = arbiter
     return this
   }
 
-  sponsor(sponsor: `0x${string}`): this {
+  /**
+   * Set the sponsor address who is locking the tokens
+   * @param sponsor - Address that owns and is locking the tokens
+   * @returns This builder for chaining
+   */
+  sponsor(sponsor: Address): this {
     this._sponsor = sponsor
     return this
   }
 
+  /**
+   * Set the nonce for replay protection
+   * @param nonce - Unique nonce value (typically incremental)
+   * @returns This builder for chaining
+   */
   nonce(nonce: bigint): this {
     this._nonce = nonce
     return this
   }
 
+  /**
+   * Set the expiration timestamp
+   * @param timestamp - Unix timestamp in seconds when the batch compact expires
+   * @returns This builder for chaining
+   */
   expires(timestamp: bigint): this {
     this._expires = timestamp
     return this
   }
 
+  /**
+   * Set expiration timestamp (alias for expires())
+   * @param timestamp - Unix timestamp in seconds
+   * @returns This builder for chaining
+   */
   expiresAt(timestamp: bigint): this {
     return this.expires(timestamp)
   }
 
+  /**
+   * Set expiration relative to now
+   * @param duration - Duration string (e.g., '1 hour', '30 minutes') or seconds as number
+   * @returns This builder for chaining
+   */
   expiresIn(duration: string | number): this {
     const seconds = typeof duration === 'string' ? parseDuration(duration) : BigInt(duration)
     const now = BigInt(Math.floor(Date.now() / 1000))
@@ -544,7 +625,7 @@ export class BatchCompactBuilder<TMandate extends object | undefined = undefined
  * ```
  */
 export class MultichainElementBuilder {
-  private _arbiter?: `0x${string}`
+  private _arbiter?: Address
   private _chainId?: bigint
   private _commitments: Lock[] = []
   private _mandate?: any
@@ -555,16 +636,31 @@ export class MultichainElementBuilder {
     this.parent = parent
   }
 
-  arbiter(arbiter: `0x${string}`): this {
+  /**
+   * Set the arbiter address for this chain
+   * @param arbiter - Address authorized to process claims on this chain
+   * @returns This builder for chaining
+   */
+  arbiter(arbiter: Address): this {
     this._arbiter = arbiter
     return this
   }
 
+  /**
+   * Set the chain ID for this element
+   * @param chainId - EVM chain ID (e.g., 1 for Ethereum, 10 for Optimism)
+   * @returns This builder for chaining
+   */
   chainId(chainId: bigint): this {
     this._chainId = chainId
     return this
   }
 
+  /**
+   * Add a token lock commitment to this chain element
+   * @param lock - Lock containing lockTag, token address, and amount
+   * @returns This builder for chaining
+   */
   addCommitment(lock: Lock): this {
     this._commitments.push(lock)
     return this
@@ -689,7 +785,7 @@ export class MultichainElementBuilder {
  */
 export class MultichainCompactBuilder {
   private domain: CompactDomain
-  private _sponsor?: `0x${string}`
+  private _sponsor?: Address
   private _nonce?: bigint
   private _expires?: bigint
   private elementBuilders: MultichainElementBuilder[] = []
@@ -698,25 +794,50 @@ export class MultichainCompactBuilder {
     this.domain = domain
   }
 
-  sponsor(sponsor: `0x${string}`): this {
+  /**
+   * Set the sponsor address who is locking tokens across chains
+   * @param sponsor - Address that owns and is locking the tokens on all chains
+   * @returns This builder for chaining
+   */
+  sponsor(sponsor: Address): this {
     this._sponsor = sponsor
     return this
   }
 
+  /**
+   * Set the nonce for replay protection
+   * @param nonce - Unique nonce value (typically incremental)
+   * @returns This builder for chaining
+   */
   nonce(nonce: bigint): this {
     this._nonce = nonce
     return this
   }
 
+  /**
+   * Set the expiration timestamp
+   * @param timestamp - Unix timestamp in seconds when the multichain compact expires
+   * @returns This builder for chaining
+   */
   expires(timestamp: bigint): this {
     this._expires = timestamp
     return this
   }
 
+  /**
+   * Set expiration timestamp (alias for expires())
+   * @param timestamp - Unix timestamp in seconds
+   * @returns This builder for chaining
+   */
   expiresAt(timestamp: bigint): this {
     return this.expires(timestamp)
   }
 
+  /**
+   * Set expiration relative to now
+   * @param duration - Duration string (e.g., '1 hour', '30 minutes') or seconds as number
+   * @returns This builder for chaining
+   */
   expiresIn(duration: string | number): this {
     const seconds = typeof duration === 'string' ? parseDuration(duration) : BigInt(duration)
     const now = BigInt(Math.floor(Date.now() / 1000))
@@ -838,16 +959,33 @@ export class MultichainCompactBuilder {
 
 /**
  * Main CompactBuilder class with static factory methods
+ *
+ * Provides convenience methods for creating compact builders with proper domain configuration.
  */
 export class CompactBuilder {
+  /**
+   * Create a single compact builder
+   * @param domain - EIP-712 domain configuration
+   * @returns A new SingleCompactBuilder instance
+   */
   static single(domain: CompactDomain): SingleCompactBuilder {
     return new SingleCompactBuilder(domain)
   }
 
+  /**
+   * Create a batch compact builder
+   * @param domain - EIP-712 domain configuration
+   * @returns A new BatchCompactBuilder instance
+   */
   static batch(domain: CompactDomain): BatchCompactBuilder {
     return new BatchCompactBuilder(domain)
   }
 
+  /**
+   * Create a multichain compact builder
+   * @param domain - EIP-712 domain configuration
+   * @returns A new MultichainCompactBuilder instance
+   */
   static multichain(domain: CompactDomain): MultichainCompactBuilder {
     return new MultichainCompactBuilder(domain)
   }
@@ -856,6 +994,16 @@ export class CompactBuilder {
 /**
  * Parse a duration string into seconds
  * Supports: "15s", "5m", "2h", "1d"
+ * @param duration - Duration string in format: number + unit (s/m/h/d)
+ * @returns Duration in seconds as bigint
+ * @throws {Error} If duration format is invalid or unit is unknown
+ * @example
+ * ```typescript
+ * parseDuration('30s')  // 30n
+ * parseDuration('5m')   // 300n
+ * parseDuration('2h')   // 7200n
+ * parseDuration('1d')   // 86400n
+ * ```
  */
 function parseDuration(duration: string): bigint {
   const match = duration.match(/^(\d+)([smhd])$/)
@@ -877,4 +1025,3 @@ function parseDuration(duration: string): bigint {
       throw new Error(`Unknown duration unit: ${unit}`)
   }
 }
-

@@ -64,9 +64,7 @@ function createForcedWithdrawalStatusUpdatedEvent(params: {
   activating: boolean
   withdrawableAt: bigint
 }) {
-  const event = theCompactAbi.find(
-    (item) => item.type === 'event' && item.name === 'ForcedWithdrawalStatusUpdated'
-  )!
+  const event = theCompactAbi.find((item) => item.type === 'event' && item.name === 'ForcedWithdrawalStatusUpdated')!
 
   const topics = encodeEventTopics({
     abi: [event],
@@ -141,7 +139,7 @@ describe('SponsorClient', () => {
         args: [lockTag, sponsorAddress],
         value: depositAmount,
         chain: null,
-        account: null,
+        account: undefined,
       })
 
       expect(result.txHash).toBe(txHash)
@@ -225,7 +223,7 @@ describe('SponsorClient', () => {
         functionName: 'depositERC20',
         args: [tokenAddress, lockTag, amount, sponsorAddress],
         chain: null,
-        account: null,
+        account: undefined,
       })
 
       expect(result.txHash).toBe(txHash)
@@ -284,7 +282,7 @@ describe('SponsorClient', () => {
         functionName: 'register',
         args: [claimHash, typehash],
         chain: null,
-        account: null,
+        account: undefined,
       })
 
       expect(result).toBe(txHash)
@@ -333,7 +331,7 @@ describe('SponsorClient', () => {
         functionName: 'enableForcedWithdrawal',
         args: [lockId],
         chain: null,
-        account: null,
+        account: undefined,
       })
 
       expect(result.txHash).toBe(txHash)
@@ -374,7 +372,7 @@ describe('SponsorClient', () => {
         functionName: 'disableForcedWithdrawal',
         args: [lockId],
         chain: null,
-        account: null,
+        account: undefined,
       })
 
       expect(result).toBe(txHash)
@@ -422,7 +420,7 @@ describe('SponsorClient', () => {
         functionName: 'forcedWithdrawal',
         args: [lockId, recipient, amount],
         chain: null,
-        account: null,
+        account: undefined,
       })
 
       expect(result).toBe(txHash)

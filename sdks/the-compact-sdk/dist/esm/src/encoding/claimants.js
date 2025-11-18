@@ -94,6 +94,10 @@ export function decodeComponent(component, lockTagOfClaim) {
 }
 /**
  * Helper to create a transfer claimant
+ * Transfers ERC6909 tokens to recipient with the same lock tag
+ * @param recipient - Address to receive the transferred tokens
+ * @param amount - Amount to transfer in wei
+ * @returns TransferClaimant object for use with buildComponent
  */
 export function transfer(recipient, amount) {
     return {
@@ -104,6 +108,11 @@ export function transfer(recipient, amount) {
 }
 /**
  * Helper to create a convert claimant
+ * Converts ERC6909 tokens to a different lock tag and transfers to recipient
+ * @param recipient - Address to receive the converted tokens
+ * @param amount - Amount to convert in wei
+ * @param targetLockTag - The target lock tag (12 bytes) for the converted tokens
+ * @returns ConvertClaimant object for use with buildComponent
  */
 export function convert(recipient, amount, targetLockTag) {
     return {
@@ -115,6 +124,10 @@ export function convert(recipient, amount, targetLockTag) {
 }
 /**
  * Helper to create a withdraw claimant
+ * Extracts underlying tokens from The Compact and sends to recipient
+ * @param recipient - Address to receive the underlying tokens
+ * @param amount - Amount to withdraw in wei
+ * @returns WithdrawClaimant object for use with buildComponent
  */
 export function withdraw(recipient, amount) {
     return {

@@ -17,7 +17,6 @@ const coreClient_1 = require("./client/coreClient");
 // Known mainnet values
 const MAINNET_COMPACT_ADDRESS = '0x00000000000000171ede64904551eeDF3C6C9788';
 const DOMAIN_SEPARATOR = '0x4ac11bdf0eb5972bae47825af851d20c342d88f466669ec58827be03650df019';
-const KNOWN_ALLOCATOR = '0x060471752Be4DB56AaEe10CC2a753794795b6700';
 const KNOWN_ALLOCATOR_ID = 287803669127211327350859520n;
 const KNOWN_DEPOSITOR = '0x0734d56DA60852A03e2Aafae8a36FFd8c12B32f1';
 const KNOWN_LOCK_TAG = '0x00ee10cc2a753794795b6700';
@@ -26,7 +25,7 @@ const KNOWN_TOKEN_ID_HEX = '0x00ee10cc2a753794795b670000000000000000000000000000
 const KNOWN_TOKEN_ID_DECIMAL = 420625533659260790152146045461395372006532003561106597619092546332938731520n;
 // Skip integration tests by default (require RPC connection)
 // Run with: npm test -- --testPathPattern=integration
-const describeIntegration = process.env.RPC_URL ? globals_1.describe : globals_1.describe.skip;
+const describeIntegration = process.env.RPC_URL || process.env.E2E_TESTS ? globals_1.describe : globals_1.describe.skip;
 describeIntegration('The Compact SDK - Mainnet Integration', () => {
     // Create a public client for mainnet queries
     const publicClient = (0, viem_1.createPublicClient)({

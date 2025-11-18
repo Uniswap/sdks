@@ -54,18 +54,38 @@ export class SingleCompactBuilder {
     constructor(domain) {
         this.domain = domain;
     }
+    /**
+     * Set the arbiter address who will process the claim
+     * @param arbiter - Address authorized to process claims for this compact
+     * @returns This builder for chaining
+     */
     arbiter(arbiter) {
         this._arbiter = arbiter;
         return this;
     }
+    /**
+     * Set the sponsor address who is locking the tokens
+     * @param sponsor - Address that owns and is locking the tokens
+     * @returns This builder for chaining
+     */
     sponsor(sponsor) {
         this._sponsor = sponsor;
         return this;
     }
+    /**
+     * Set the nonce for replay protection
+     * @param nonce - Unique nonce value (typically incremental)
+     * @returns This builder for chaining
+     */
     nonce(nonce) {
         this._nonce = nonce;
         return this;
     }
+    /**
+     * Set the expiration timestamp
+     * @param timestamp - Unix timestamp in seconds when the compact expires
+     * @returns This builder for chaining
+     */
     expires(timestamp) {
         this._expires = timestamp;
         return this;
@@ -91,14 +111,29 @@ export class SingleCompactBuilder {
         const now = BigInt(Math.floor(Date.now() / 1000));
         return this.expires(now + seconds);
     }
+    /**
+     * Set the lock tag for the resource lock
+     * @param lockTag - 12-byte lock tag identifying the lock configuration
+     * @returns This builder for chaining
+     */
     lockTag(lockTag) {
         this._lockTag = lockTag;
         return this;
     }
+    /**
+     * Set the token address being locked
+     * @param token - Address of the ERC20 token to lock
+     * @returns This builder for chaining
+     */
     token(token) {
         this._token = token;
         return this;
     }
+    /**
+     * Set the amount of tokens to lock
+     * @param amount - Amount in wei to lock
+     * @returns This builder for chaining
+     */
     amount(amount) {
         this._amount = amount;
         return this;
@@ -254,25 +289,55 @@ export class BatchCompactBuilder {
         this._commitments = [];
         this.domain = domain;
     }
+    /**
+     * Set the arbiter address who will process the claims
+     * @param arbiter - Address authorized to process claims for this batch compact
+     * @returns This builder for chaining
+     */
     arbiter(arbiter) {
         this._arbiter = arbiter;
         return this;
     }
+    /**
+     * Set the sponsor address who is locking the tokens
+     * @param sponsor - Address that owns and is locking the tokens
+     * @returns This builder for chaining
+     */
     sponsor(sponsor) {
         this._sponsor = sponsor;
         return this;
     }
+    /**
+     * Set the nonce for replay protection
+     * @param nonce - Unique nonce value (typically incremental)
+     * @returns This builder for chaining
+     */
     nonce(nonce) {
         this._nonce = nonce;
         return this;
     }
+    /**
+     * Set the expiration timestamp
+     * @param timestamp - Unix timestamp in seconds when the batch compact expires
+     * @returns This builder for chaining
+     */
     expires(timestamp) {
         this._expires = timestamp;
         return this;
     }
+    /**
+     * Set expiration timestamp (alias for expires())
+     * @param timestamp - Unix timestamp in seconds
+     * @returns This builder for chaining
+     */
     expiresAt(timestamp) {
         return this.expires(timestamp);
     }
+    /**
+     * Set expiration relative to now
+     * @param duration - Duration string (e.g., '1 hour', '30 minutes') or seconds as number
+     * @returns This builder for chaining
+     */
     expiresIn(duration) {
         const seconds = typeof duration === 'string' ? parseDuration(duration) : BigInt(duration);
         const now = BigInt(Math.floor(Date.now() / 1000));
@@ -413,14 +478,29 @@ export class MultichainElementBuilder {
         this._commitments = [];
         this.parent = parent;
     }
+    /**
+     * Set the arbiter address for this chain
+     * @param arbiter - Address authorized to process claims on this chain
+     * @returns This builder for chaining
+     */
     arbiter(arbiter) {
         this._arbiter = arbiter;
         return this;
     }
+    /**
+     * Set the chain ID for this element
+     * @param chainId - EVM chain ID (e.g., 1 for Ethereum, 10 for Optimism)
+     * @returns This builder for chaining
+     */
     chainId(chainId) {
         this._chainId = chainId;
         return this;
     }
+    /**
+     * Add a token lock commitment to this chain element
+     * @param lock - Lock containing lockTag, token address, and amount
+     * @returns This builder for chaining
+     */
     addCommitment(lock) {
         this._commitments.push(lock);
         return this;
@@ -542,21 +622,46 @@ export class MultichainCompactBuilder {
         this.elementBuilders = [];
         this.domain = domain;
     }
+    /**
+     * Set the sponsor address who is locking tokens across chains
+     * @param sponsor - Address that owns and is locking the tokens on all chains
+     * @returns This builder for chaining
+     */
     sponsor(sponsor) {
         this._sponsor = sponsor;
         return this;
     }
+    /**
+     * Set the nonce for replay protection
+     * @param nonce - Unique nonce value (typically incremental)
+     * @returns This builder for chaining
+     */
     nonce(nonce) {
         this._nonce = nonce;
         return this;
     }
+    /**
+     * Set the expiration timestamp
+     * @param timestamp - Unix timestamp in seconds when the multichain compact expires
+     * @returns This builder for chaining
+     */
     expires(timestamp) {
         this._expires = timestamp;
         return this;
     }
+    /**
+     * Set expiration timestamp (alias for expires())
+     * @param timestamp - Unix timestamp in seconds
+     * @returns This builder for chaining
+     */
     expiresAt(timestamp) {
         return this.expires(timestamp);
     }
+    /**
+     * Set expiration relative to now
+     * @param duration - Duration string (e.g., '1 hour', '30 minutes') or seconds as number
+     * @returns This builder for chaining
+     */
     expiresIn(duration) {
         const seconds = typeof duration === 'string' ? parseDuration(duration) : BigInt(duration);
         const now = BigInt(Math.floor(Date.now() / 1000));
@@ -666,14 +771,31 @@ export class MultichainCompactBuilder {
 }
 /**
  * Main CompactBuilder class with static factory methods
+ *
+ * Provides convenience methods for creating compact builders with proper domain configuration.
  */
 export class CompactBuilder {
+    /**
+     * Create a single compact builder
+     * @param domain - EIP-712 domain configuration
+     * @returns A new SingleCompactBuilder instance
+     */
     static single(domain) {
         return new SingleCompactBuilder(domain);
     }
+    /**
+     * Create a batch compact builder
+     * @param domain - EIP-712 domain configuration
+     * @returns A new BatchCompactBuilder instance
+     */
     static batch(domain) {
         return new BatchCompactBuilder(domain);
     }
+    /**
+     * Create a multichain compact builder
+     * @param domain - EIP-712 domain configuration
+     * @returns A new MultichainCompactBuilder instance
+     */
     static multichain(domain) {
         return new MultichainCompactBuilder(domain);
     }
@@ -681,6 +803,16 @@ export class CompactBuilder {
 /**
  * Parse a duration string into seconds
  * Supports: "15s", "5m", "2h", "1d"
+ * @param duration - Duration string in format: number + unit (s/m/h/d)
+ * @returns Duration in seconds as bigint
+ * @throws {Error} If duration format is invalid or unit is unknown
+ * @example
+ * ```typescript
+ * parseDuration('30s')  // 30n
+ * parseDuration('5m')   // 300n
+ * parseDuration('2h')   // 7200n
+ * parseDuration('1d')   // 86400n
+ * ```
  */
 function parseDuration(duration) {
     const match = duration.match(/^(\d+)([smhd])$/);

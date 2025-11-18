@@ -13,11 +13,15 @@ import invariant from 'tiny-invariant'
 import { hashTypedData } from 'viem'
 
 /**
- * Result of building a claim
+ * Result of building a Claim with the claim builder
+ * Contains the claim struct, its EIP-712 hash, and typed data for verification
  */
 export interface BuiltClaim {
+  /** The claim struct ready to be submitted on-chain */
   struct: Claim
+  /** EIP-712 hash of the claim for verification */
   hash?: `0x${string}`
+  /** EIP-712 typed data structure for signature verification */
   typedData?: {
     domain: CompactDomain
     types: Record<string, Array<{ name: string; type: string }>>
@@ -90,7 +94,14 @@ export class SingleClaimBuilder {
   }
 
   /**
-   * Pre-fill claim data from a compact
+   * Pre-fill claim data from a compact and sponsor signature
+   * Automatically extracts sponsor, nonce, expires, and lockTag from the compact
+   * @param params - Object containing compact struct, signature, and optional id/token
+   * @param params.compact - The compact struct to extract data from
+   * @param params.signature - The sponsor's signature on the compact
+   * @param params.id - Optional lock ID (computed from lockTag and token if not provided)
+   * @param params.token - Optional token address for lock ID computation (uses compact.token if not provided)
+   * @returns This builder for chaining
    */
   fromCompact(params: { compact: Compact; signature: `0x${string}`; id?: bigint; token?: `0x${string}` }): this {
     this._sponsor = params.compact.sponsor
@@ -111,46 +122,100 @@ export class SingleClaimBuilder {
     return this
   }
 
+  /**
+   * Set the sponsor address who authorized this claim
+   * @param sponsor - The sponsor's Ethereum address
+   * @returns This builder for chaining
+   */
   sponsor(sponsor: `0x${string}`): this {
     this._sponsor = sponsor
     return this
   }
 
+  /**
+   * Set the nonce for replay protection
+   * Must match the nonce from the corresponding compact
+   * @param nonce - Unique nonce value
+   * @returns This builder for chaining
+   */
   nonce(nonce: bigint): this {
     this._nonce = nonce
     return this
   }
 
+  /**
+   * Set the expiration timestamp
+   * Must match the expiration from the corresponding compact
+   * @param expires - Unix timestamp when this claim expires
+   * @returns This builder for chaining
+   */
   expires(expires: bigint): this {
     this._expires = expires
     return this
   }
 
+  /**
+   * Set allocator-specific data
+   * This is typically the allocator's signature authorizing the claim
+   * @param data - Allocator data (usually a signature)
+   * @returns This builder for chaining
+   */
   allocatorData(data: `0x${string}`): this {
     this._allocatorData = data
     return this
   }
 
+  /**
+   * Set the total amount allocated from the resource lock for this claim
+   * This is the sum of all claimant amounts
+   * @param amount - Total allocated amount in wei
+   * @returns This builder for chaining
+   */
   allocatedAmount(amount: bigint): this {
     this._allocatedAmount = amount
     return this
   }
 
+  /**
+   * Set the resource lock ID being claimed
+   * This identifies which specific lock the claim is processing
+   * @param id - The lock ID (ERC6909 token ID)
+   * @returns This builder for chaining
+   */
   id(id: bigint): this {
     this._id = id
     return this
   }
 
+  /**
+   * Set the lock tag for building claimants
+   * Must be set before adding any claimants (transfers, converts, withdrawals)
+   * @param lockTag - 12-byte lock tag identifying allocator, scope, and reset period
+   * @returns This builder for chaining
+   */
   lockTag(lockTag: `0x${string}`): this {
     this._lockTag = lockTag
     return this
   }
 
+  /**
+   * Set the sponsor's signature on the compact
+   * Use empty string ('') for registered claims where hash was pre-registered on-chain
+   * @param signature - Sponsor's EIP-712 signature or empty string for registered claims
+   * @returns This builder for chaining
+   */
   sponsorSignature(signature: `0x${string}` | ''): this {
     this._sponsorSignature = signature as `0x${string}`
     return this
   }
 
+  /**
+   * Set witness mandate data for compact verification
+   * The witness provides additional authorization context for the claim
+   * @param mandateType - The mandate type definition with hash and typestring
+   * @param mandate - The mandate data object
+   * @returns This builder for chaining
+   */
   witness<T extends object>(mandateType: MandateType<T>, mandate: T): this {
     this._witness = mandateType.hash(mandate)
     this._witnessTypestring = mandateType.witnessTypestring
@@ -158,7 +223,13 @@ export class SingleClaimBuilder {
   }
 
   /**
-   * Add a transfer claimant (same lock tag)
+   * Add a transfer claimant that receives ERC6909 tokens with the same lock tag
+   * Tokens remain within The Compact as ERC6909s
+   * @param params - Transfer parameters
+   * @param params.recipient - Address to receive the transferred tokens
+   * @param params.amount - Amount to transfer in wei
+   * @returns This builder for chaining
+   * @throws {Error} If lockTag is not set before calling this method
    */
   addTransfer(params: { recipient: `0x${string}`; amount: bigint }): this {
     invariant(this._lockTag, 'lockTag must be set before adding claimants')
@@ -172,7 +243,14 @@ export class SingleClaimBuilder {
   }
 
   /**
-   * Add a convert claimant (different lock tag)
+   * Add a convert claimant that converts tokens to a different lock tag
+   * Tokens remain as ERC6909 but with different reset period or scope
+   * @param params - Convert parameters
+   * @param params.recipient - Address to receive the converted tokens
+   * @param params.amount - Amount to convert in wei
+   * @param params.targetLockTag - The lock tag to convert to (different reset period or scope)
+   * @returns This builder for chaining
+   * @throws {Error} If lockTag is not set before calling this method
    */
   addConvert(params: { recipient: `0x${string}`; amount: bigint; targetLockTag: `0x${string}` }): this {
     invariant(this._lockTag, 'lockTag must be set before adding claimants')
@@ -187,7 +265,13 @@ export class SingleClaimBuilder {
   }
 
   /**
-   * Add a withdraw claimant (withdraw underlying)
+   * Add a withdrawal claimant that extracts underlying tokens from The Compact
+   * Converts ERC6909 tokens back to native tokens and sends to recipient
+   * @param params - Withdrawal parameters
+   * @param params.recipient - Address to receive the underlying tokens
+   * @param params.amount - Amount to withdraw in wei
+   * @returns This builder for chaining
+   * @throws {Error} If lockTag is not set before calling this method
    */
   addWithdraw(params: { recipient: `0x${string}`; amount: bigint }): this {
     invariant(this._lockTag, 'lockTag must be set before adding claimants')
@@ -202,6 +286,10 @@ export class SingleClaimBuilder {
 
   /**
    * Add a claimant using the generic ClaimantInput interface
+   * Provides flexibility to use any claimant type (transfer, convert, withdraw)
+   * @param claimant - Claimant specification with kind, recipient, amount, and optional targetLockTag
+   * @returns This builder for chaining
+   * @throws {Error} If lockTag is not set before calling this method
    */
   addClaimant(claimant: ClaimantInput): this {
     invariant(this._lockTag, 'lockTag must be set before adding claimants')
@@ -211,7 +299,10 @@ export class SingleClaimBuilder {
   }
 
   /**
-   * Add a raw component
+   * Add a pre-built Component directly to the claimants list
+   * Use this for advanced scenarios where you need full control over component structure
+   * @param component - Pre-built Component with claimant value and amount
+   * @returns This builder for chaining
    */
   addComponent(component: Component): this {
     this._claimants.push(component)
@@ -327,7 +418,7 @@ export class SingleClaimBuilder {
  * Abstract base class for all batch claim builders
  * Contains common fields and methods shared across BatchClaim, BatchMultichainClaim, and ExogenousBatchMultichainClaim
  */
-abstract class BaseBatchClaimBuilder implements IBatchClaimParentBuilder {
+abstract class BaseBatchClaimBuilder implements IBatchClaimBuilder {
   protected domain: CompactDomain
   protected _allocatorData: Hex = '0x'
   protected _sponsorSignature: Hex = '0x'
@@ -513,7 +604,7 @@ export class BatchClaimBuilder extends BaseBatchClaimBuilder {
  * Declares all methods available on batch claim builders for type safety
  * Some methods (like addAdditionalChainHash) are only available on multichain builders
  */
-interface IBatchClaimParentBuilder {
+interface IBatchClaimBuilder {
   sponsor(sponsor: Address): this
   nonce(nonce: bigint): this
   expires(expires: bigint): this
@@ -556,9 +647,9 @@ export class BatchClaimComponentBuilder {
   private _id?: bigint
   private _allocatedAmount?: bigint
   private _portions: Component[] = []
-  private parent: IBatchClaimParentBuilder
+  private parent: IBatchClaimBuilder
 
-  constructor(parent: IBatchClaimParentBuilder) {
+  constructor(parent: IBatchClaimBuilder) {
     this.parent = parent
   }
 
@@ -608,7 +699,7 @@ export class BatchClaimComponentBuilder {
    * Finish building this component and return to the parent builder
    * @returns The parent builder (BatchClaimBuilder, BatchMultichainClaimBuilder, or ExogenousBatchMultichainClaimBuilder)
    */
-  done(): IBatchClaimParentBuilder {
+  done(): IBatchClaimBuilder {
     invariant(this._id !== undefined, 'id is required')
     invariant(this._allocatedAmount !== undefined, 'allocatedAmount is required')
     invariant(this._portions.length > 0, 'at least one portion is required')

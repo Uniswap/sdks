@@ -64,7 +64,7 @@ describe('ArbiterClient', () => {
         functionName: 'claim',
         args: [claim],
         chain: null,
-        account: null,
+        account: undefined,
       })
 
       expect(result.txHash).toBe(txHash)
@@ -157,7 +157,7 @@ describe('ArbiterClient', () => {
         functionName: 'batchClaim',
         args: [claim],
         chain: null,
-        account: null,
+        account: undefined,
       })
 
       expect(result.txHash).toBe(txHash)
@@ -197,9 +197,7 @@ describe('ArbiterClient', () => {
             amount: 1000000n,
           },
         ],
-        additionalChains: [
-          '0x1111111111111111111111111111111111111111111111111111111111111111' as `0x${string}`,
-        ],
+        additionalChains: ['0x1111111111111111111111111111111111111111111111111111111111111111' as `0x${string}`],
       }
 
       const txHash = '0xabcdef' as `0x${string}`
@@ -213,7 +211,7 @@ describe('ArbiterClient', () => {
         functionName: 'multichainClaim',
         args: [claim],
         chain: null,
-        account: null,
+        account: undefined,
       })
 
       expect(result.txHash).toBe(txHash)
@@ -256,9 +254,7 @@ describe('ArbiterClient', () => {
             ],
           },
         ],
-        additionalChains: [
-          '0x1111111111111111111111111111111111111111111111111111111111111111' as `0x${string}`,
-        ],
+        additionalChains: ['0x1111111111111111111111111111111111111111111111111111111111111111' as `0x${string}`],
       }
 
       const txHash = '0xabcdef' as `0x${string}`
@@ -272,7 +268,7 @@ describe('ArbiterClient', () => {
         functionName: 'batchMultichainClaim',
         args: [claim],
         chain: null,
-        account: null,
+        account: undefined,
       })
 
       expect(result.txHash).toBe(txHash)

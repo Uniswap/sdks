@@ -4,14 +4,21 @@
 import { Compact, BatchCompact, MultichainCompact, Lock, MultichainElement } from '../types/eip712';
 import { CompactDomain } from '../config/domain';
 import { MandateType } from './mandate';
+import { Address, Hex } from 'viem';
 /**
  * Result of building a compact
+ * Contains all data needed to sign and submit a compact
  */
 export interface BuiltCompact<TMandate extends object | undefined = undefined> {
+    /** The compact struct ready to be submitted on-chain */
     struct: Compact;
+    /** Optional witness data (mandate) attached to this compact */
     mandate?: TMandate;
+    /** Type definition for the mandate (if present) */
     mandateType?: MandateType<TMandate extends object ? TMandate : any>;
-    hash: `0x${string}`;
+    /** EIP-712 hash of the compact for signature verification */
+    hash: Hex;
+    /** Complete EIP-712 typed data structure for signing */
     typedData: {
         domain: CompactDomain;
         types: Record<string, Array<{
@@ -24,12 +31,18 @@ export interface BuiltCompact<TMandate extends object | undefined = undefined> {
 }
 /**
  * Result of building a batch compact
+ * Contains all data needed to sign and submit a batch compact covering multiple locks
  */
 export interface BuiltBatchCompact<TMandate extends object | undefined = undefined> {
+    /** The batch compact struct ready to be submitted on-chain */
     struct: BatchCompact;
+    /** Optional witness data (mandate) attached to this batch compact */
     mandate?: TMandate;
+    /** Type definition for the mandate (if present) */
     mandateType?: MandateType<TMandate extends object ? TMandate : any>;
-    hash: `0x${string}`;
+    /** EIP-712 hash of the batch compact for signature verification */
+    hash: Hex;
+    /** Complete EIP-712 typed data structure for signing */
     typedData: {
         domain: CompactDomain;
         types: Record<string, Array<{
@@ -42,10 +55,14 @@ export interface BuiltBatchCompact<TMandate extends object | undefined = undefin
 }
 /**
  * Result of building a multichain compact
+ * Contains all data needed to sign and submit a multichain compact across multiple chains
  */
 export interface BuiltMultichainCompact<TMandate extends object | undefined = undefined> {
+    /** The multichain compact struct ready to be submitted on-chain */
     struct: MultichainCompact;
-    hash: `0x${string}`;
+    /** EIP-712 hash of the multichain compact for signature verification */
+    hash: Hex;
+    /** Complete EIP-712 typed data structure for signing */
     typedData: {
         domain: CompactDomain;
         types: Record<string, Array<{
@@ -115,9 +132,29 @@ export declare class SingleCompactBuilder<TMandate extends object | undefined = 
     private _mandate?;
     private _mandateType?;
     constructor(domain: CompactDomain);
-    arbiter(arbiter: `0x${string}`): this;
-    sponsor(sponsor: `0x${string}`): this;
+    /**
+     * Set the arbiter address who will process the claim
+     * @param arbiter - Address authorized to process claims for this compact
+     * @returns This builder for chaining
+     */
+    arbiter(arbiter: Address): this;
+    /**
+     * Set the sponsor address who is locking the tokens
+     * @param sponsor - Address that owns and is locking the tokens
+     * @returns This builder for chaining
+     */
+    sponsor(sponsor: Address): this;
+    /**
+     * Set the nonce for replay protection
+     * @param nonce - Unique nonce value (typically incremental)
+     * @returns This builder for chaining
+     */
     nonce(nonce: bigint): this;
+    /**
+     * Set the expiration timestamp
+     * @param timestamp - Unix timestamp in seconds when the compact expires
+     * @returns This builder for chaining
+     */
     expires(timestamp: bigint): this;
     /**
      * Set expiration timestamp (alias for expires())
@@ -134,8 +171,23 @@ export declare class SingleCompactBuilder<TMandate extends object | undefined = 
      * ```
      */
     expiresIn(duration: string | number): this;
-    lockTag(lockTag: `0x${string}`): this;
-    token(token: `0x${string}`): this;
+    /**
+     * Set the lock tag for the resource lock
+     * @param lockTag - 12-byte lock tag identifying the lock configuration
+     * @returns This builder for chaining
+     */
+    lockTag(lockTag: Hex): this;
+    /**
+     * Set the token address being locked
+     * @param token - Address of the ERC20 token to lock
+     * @returns This builder for chaining
+     */
+    token(token: Address): this;
+    /**
+     * Set the amount of tokens to lock
+     * @param amount - Amount in wei to lock
+     * @returns This builder for chaining
+     */
     amount(amount: bigint): this;
     /**
      * Attach a witness (mandate) to this compact
@@ -230,11 +282,41 @@ export declare class BatchCompactBuilder<TMandate extends object | undefined = u
     private _mandate?;
     private _mandateType?;
     constructor(domain: CompactDomain);
-    arbiter(arbiter: `0x${string}`): this;
-    sponsor(sponsor: `0x${string}`): this;
+    /**
+     * Set the arbiter address who will process the claims
+     * @param arbiter - Address authorized to process claims for this batch compact
+     * @returns This builder for chaining
+     */
+    arbiter(arbiter: Address): this;
+    /**
+     * Set the sponsor address who is locking the tokens
+     * @param sponsor - Address that owns and is locking the tokens
+     * @returns This builder for chaining
+     */
+    sponsor(sponsor: Address): this;
+    /**
+     * Set the nonce for replay protection
+     * @param nonce - Unique nonce value (typically incremental)
+     * @returns This builder for chaining
+     */
     nonce(nonce: bigint): this;
+    /**
+     * Set the expiration timestamp
+     * @param timestamp - Unix timestamp in seconds when the batch compact expires
+     * @returns This builder for chaining
+     */
     expires(timestamp: bigint): this;
+    /**
+     * Set expiration timestamp (alias for expires())
+     * @param timestamp - Unix timestamp in seconds
+     * @returns This builder for chaining
+     */
     expiresAt(timestamp: bigint): this;
+    /**
+     * Set expiration relative to now
+     * @param duration - Duration string (e.g., '1 hour', '30 minutes') or seconds as number
+     * @returns This builder for chaining
+     */
     expiresIn(duration: string | number): this;
     /**
      * Add a token lock to the batch
@@ -308,8 +390,23 @@ export declare class MultichainElementBuilder {
     private _mandateType?;
     private parent;
     constructor(parent: MultichainCompactBuilder);
-    arbiter(arbiter: `0x${string}`): this;
+    /**
+     * Set the arbiter address for this chain
+     * @param arbiter - Address authorized to process claims on this chain
+     * @returns This builder for chaining
+     */
+    arbiter(arbiter: Address): this;
+    /**
+     * Set the chain ID for this element
+     * @param chainId - EVM chain ID (e.g., 1 for Ethereum, 10 for Optimism)
+     * @returns This builder for chaining
+     */
     chainId(chainId: bigint): this;
+    /**
+     * Add a token lock commitment to this chain element
+     * @param lock - Lock containing lockTag, token address, and amount
+     * @returns This builder for chaining
+     */
     addCommitment(lock: Lock): this;
     /**
      * Attach a witness (mandate) to this element
@@ -409,10 +506,35 @@ export declare class MultichainCompactBuilder {
     private _expires?;
     private elementBuilders;
     constructor(domain: CompactDomain);
-    sponsor(sponsor: `0x${string}`): this;
+    /**
+     * Set the sponsor address who is locking tokens across chains
+     * @param sponsor - Address that owns and is locking the tokens on all chains
+     * @returns This builder for chaining
+     */
+    sponsor(sponsor: Address): this;
+    /**
+     * Set the nonce for replay protection
+     * @param nonce - Unique nonce value (typically incremental)
+     * @returns This builder for chaining
+     */
     nonce(nonce: bigint): this;
+    /**
+     * Set the expiration timestamp
+     * @param timestamp - Unix timestamp in seconds when the multichain compact expires
+     * @returns This builder for chaining
+     */
     expires(timestamp: bigint): this;
+    /**
+     * Set expiration timestamp (alias for expires())
+     * @param timestamp - Unix timestamp in seconds
+     * @returns This builder for chaining
+     */
     expiresAt(timestamp: bigint): this;
+    /**
+     * Set expiration relative to now
+     * @param duration - Duration string (e.g., '1 hour', '30 minutes') or seconds as number
+     * @returns This builder for chaining
+     */
     expiresIn(duration: string | number): this;
     /**
      * Add a new chain element to the multichain compact
@@ -448,9 +570,26 @@ export declare class MultichainCompactBuilder {
 }
 /**
  * Main CompactBuilder class with static factory methods
+ *
+ * Provides convenience methods for creating compact builders with proper domain configuration.
  */
 export declare class CompactBuilder {
+    /**
+     * Create a single compact builder
+     * @param domain - EIP-712 domain configuration
+     * @returns A new SingleCompactBuilder instance
+     */
     static single(domain: CompactDomain): SingleCompactBuilder;
+    /**
+     * Create a batch compact builder
+     * @param domain - EIP-712 domain configuration
+     * @returns A new BatchCompactBuilder instance
+     */
     static batch(domain: CompactDomain): BatchCompactBuilder;
+    /**
+     * Create a multichain compact builder
+     * @param domain - EIP-712 domain configuration
+     * @returns A new MultichainCompactBuilder instance
+     */
     static multichain(domain: CompactDomain): MultichainCompactBuilder;
 }

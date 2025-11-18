@@ -330,7 +330,7 @@ describeE2E('The Compact SDK - End-to-End Tests', () => {
                 value: depositAmount,
             });
             (0, globals_1.expect)(depositResult.txHash).toMatch(/^0x[0-9a-f]{64}$/);
-            (0, globals_1.expect)(depositResult.id).toBe(98575058371901870806543959447231493336736387527704818531417781600817281761280n);
+            (0, globals_1.expect)(depositResult.id).toBe(94501698038978669571803571365020320502788394544394064879678379552762356563968n);
             // Use the lock ID returned from the deposit
             lockId = depositResult.id;
             console.log('  Step 2: Deposited', depositAmount.toString(), 'wei');
@@ -532,7 +532,7 @@ describeE2E('The Compact SDK - End-to-End Tests', () => {
             (0, globals_1.expect)(compact.struct.sponsor).toBe(sponsorAccount.address);
             (0, globals_1.expect)(compact.struct.token).toBe(nativeToken);
             (0, globals_1.expect)(compact.struct.amount).toBe((0, viem_1.parseEther)('0.01'));
-            (0, globals_1.expect)(compact.hash).toBe('0x01c4f330691a93a8ef8c2b29db3e1d2cc3570e3db1d9d7f2fa50fa3a3695ce77');
+            (0, globals_1.expect)(compact.hash).toBe('0xe56491ce4e3847363b1823df9aab875d21ab6fa17c6bd18712b4fc635194ff38');
             console.log('  ✓ Compact with multichain scope created');
             console.log('    Hash:', compact.hash);
         });
@@ -717,7 +717,10 @@ describeE2E('The Compact SDK - End-to-End Tests', () => {
             console.log('  ⓘ CompactWithWitness typehash:', compactWithWitnessTypehash);
             // Compute witness hash: keccak256(abi.encode(MANDATE_TYPEHASH, witnessArgument))
             // For no witness, use witnessArgument = 0
-            const witnessHash = keccak256(encodeAbiParameters([{ name: 'typehash', type: 'bytes32' }, { name: 'witnessArgument', type: 'uint256' }], [mandateTypehash, 0n]));
+            const witnessHash = keccak256(encodeAbiParameters([
+                { name: 'typehash', type: 'bytes32' },
+                { name: 'witnessArgument', type: 'uint256' },
+            ], [mandateTypehash, 0n]));
             console.log('  ⓘ Witness hash:', witnessHash);
             // Compute registration hash: keccak256(abi.encode(typehash, arbiter, sponsor, nonce, expires, lockTag, token, amount, witness))
             const registrationHash = keccak256(encodeAbiParameters([
@@ -832,7 +835,7 @@ describeE2E('The Compact SDK - End-to-End Tests', () => {
             if (receipt.status === 'reverted') {
                 console.log('\n  ⚠️  Transaction reverted!');
                 console.log('    Transaction hash:', claimResult.txHash);
-                console.log('    Receipt:', JSON.stringify(receipt, (key, value) => typeof value === 'bigint' ? value.toString() : value, 2));
+                console.log('    Receipt:', JSON.stringify(receipt, (key, value) => (typeof value === 'bigint' ? value.toString() : value), 2));
             }
             // Step 6: Verify results
             console.log('\n✅ Step 6: Verifying results...');
@@ -1011,7 +1014,7 @@ describeE2E('The Compact SDK - End-to-End Tests', () => {
             if (receipt.status === 'reverted') {
                 console.log('\n  ⚠️  Transaction reverted!');
                 console.log('    Transaction hash:', claimResult.txHash);
-                console.log('    Receipt:', JSON.stringify(receipt, (key, value) => typeof value === 'bigint' ? value.toString() : value, 2));
+                console.log('    Receipt:', JSON.stringify(receipt, (key, value) => (typeof value === 'bigint' ? value.toString() : value), 2));
             }
             // Step 5: Verify results
             console.log('\n✅ Step 5: Verifying results...');
@@ -1108,6 +1111,10 @@ describeE2E('The Compact SDK - End-to-End Tests', () => {
             const transferAmount = (0, viem_1.parseEther)('0.5'); // Transfer to recipient1 with same lock tag
             const convertAmount = (0, viem_1.parseEther)('0.5'); // Convert to recipient2 with different lock tag
             const withdrawAmount = (0, viem_1.parseEther)('0.5'); // Withdraw to recipient3 as native ETH
+            // Use fixed addresses like the Solidity tests (these won't have contracts deployed)
+            const withdrawRecipient = {
+                address: '0x3333333333333333333333333333333333333333',
+            };
             const claimBuilder = arbiterClient.arbiter
                 .singleClaimBuilder()
                 .fromCompact({
@@ -1126,7 +1133,7 @@ describeE2E('The Compact SDK - End-to-End Tests', () => {
                 targetLockTag,
             })
                 .addWithdraw({
-                recipient: recipient1Account.address, // Withdraw native ETH to recipient1
+                recipient: withdrawRecipient.address, // Withdraw native ETH to fresh account
                 amount: withdrawAmount,
             });
             const claim = claimBuilder.build();
@@ -1137,9 +1144,9 @@ describeE2E('The Compact SDK - End-to-End Tests', () => {
             });
             claim.struct.allocatorData = allocatorSignature;
             console.log('  ✓ Claim built with 3 claimants:');
-            console.log('    - Transfer:', transferAmount.toString(), 'wei');
-            console.log('    - Convert:', convertAmount.toString(), 'wei');
-            console.log('    - Withdraw:', withdrawAmount.toString(), 'wei');
+            console.log('    - Transfer:', transferAmount.toString(), 'wei to', recipient1Account.address);
+            console.log('    - Convert:', convertAmount.toString(), 'wei to', recipient2Account.address);
+            console.log('    - Withdraw:', withdrawAmount.toString(), 'wei to', withdrawRecipient.address);
             // Get initial balances
             const recipient1InitialERC6909 = await sponsorClient.view.balanceOf({
                 account: recipient1Account.address,
@@ -1150,8 +1157,11 @@ describeE2E('The Compact SDK - End-to-End Tests', () => {
                 account: recipient2Account.address,
                 id: targetLockId,
             });
-            const recipient3InitialNative = await mainnetPublicClient.getBalance({
-                address: recipient1Account.address,
+            const withdrawRecipientInitialNative = await mainnetPublicClient.getBalance({
+                address: withdrawRecipient.address,
+            });
+            const compactInitialBalance = await mainnetPublicClient.getBalance({
+                address: CHAINS.mainnet.compactAddress,
             });
             // Step 4: Submit claim
             console.log('\n🚀 Step 4: Submitting claim...');
@@ -1182,16 +1192,203 @@ describeE2E('The Compact SDK - End-to-End Tests', () => {
             const recipient2Increase = recipient2FinalERC6909 - recipient2InitialERC6909;
             (0, globals_1.expect)(recipient2Increase).toBe(convertAmount);
             console.log('  ✓ Convert verified: recipient2 received', recipient2Increase.toString(), 'wei of ERC6909 (target lock)');
-            // Verify withdrawal: recipient1 should have received native ETH
-            const recipient3FinalNative = await mainnetPublicClient.getBalance({
-                address: recipient1Account.address,
+            // Verify withdrawal: withdrawRecipient should have received native ETH
+            const withdrawRecipientFinalNative = await mainnetPublicClient.getBalance({
+                address: withdrawRecipient.address,
             });
-            const recipient3Increase = recipient3FinalNative - recipient3InitialNative;
-            (0, globals_1.expect)(recipient3Increase).toBe(withdrawAmount);
-            console.log('  ✓ Withdraw verified: recipient3 received', recipient3Increase.toString(), 'wei of native ETH');
+            const withdrawRecipientIncrease = withdrawRecipientFinalNative - withdrawRecipientInitialNative;
+            (0, globals_1.expect)(withdrawRecipientIncrease).toBe(withdrawAmount);
+            console.log('  ✓ Withdraw verified: withdrawal recipient received', withdrawRecipientIncrease.toString(), 'wei of native ETH');
+            // Verify Compact contract sent out the withdrawal
+            const compactFinalBalance = await mainnetPublicClient.getBalance({
+                address: CHAINS.mainnet.compactAddress,
+            });
+            const compactBalanceChange = compactFinalBalance - compactInitialBalance;
+            (0, globals_1.expect)(compactBalanceChange).toBe(-withdrawAmount);
+            console.log('  ✓ Compact contract balance decreased by', (-compactBalanceChange).toString(), 'wei');
             console.log('\n🎉 Comprehensive claim component types test passed!');
             console.log('   SDK successfully demonstrated all three claim component types in a single claim');
         }, 60000);
+        (0, globals_1.it)('should handle batch compact with different reset periods', async () => {
+            console.log('\n🔄 Starting batch compact test with different reset periods...');
+            console.log('ⓘ  This test demonstrates:');
+            console.log('   - Multiple resource locks with different reset periods');
+            console.log('   - Batch compact covering multiple locks');
+            console.log('   - Batch claim processing all locks in one transaction');
+            // Setup clients
+            const sponsorClient = (0, coreClient_1.createCompactClient)({
+                chainId: CHAINS.mainnet.id,
+                address: CHAINS.mainnet.compactAddress,
+                publicClient: mainnetPublicClient,
+                walletClient: mainnetWalletClient,
+            });
+            const arbiterClient = (0, coreClient_1.createCompactClient)({
+                chainId: CHAINS.mainnet.id,
+                address: CHAINS.mainnet.compactAddress,
+                publicClient: mainnetPublicClient,
+                walletClient: arbiterWalletClient,
+            });
+            const nativeToken = '0x0000000000000000000000000000000000000000';
+            // Step 1: Create two lock tags with different reset periods
+            const lockTag1 = (0, locks_1.encodeLockTag)({
+                allocatorId: TEST_ALLOCATOR.allocatorId,
+                scope: runtime_1.Scope.ChainSpecific,
+                resetPeriod: runtime_1.ResetPeriod.OneDay,
+            });
+            const lockTag2 = (0, locks_1.encodeLockTag)({
+                allocatorId: TEST_ALLOCATOR.allocatorId,
+                scope: runtime_1.Scope.ChainSpecific,
+                resetPeriod: runtime_1.ResetPeriod.SevenDaysAndOneHour,
+            });
+            console.log('\n📥 Step 1: Depositing to two different locks...');
+            const amount1 = (0, viem_1.parseEther)('1.0');
+            const amount2 = (0, viem_1.parseEther)('0.5');
+            const deposit1 = await sponsorClient.sponsor.depositNative({
+                lockTag: lockTag1,
+                value: amount1,
+                recipient: sponsorAccount.address,
+            });
+            const lockId1 = deposit1.id;
+            const deposit2 = await sponsorClient.sponsor.depositNative({
+                lockTag: lockTag2,
+                value: amount2,
+                recipient: sponsorAccount.address,
+            });
+            const lockId2 = deposit2.id;
+            console.log('  ✓ Deposited to lock 1:', amount1.toString(), 'wei (OneDay)');
+            console.log('    Lock ID:', lockId1.toString());
+            console.log('  ✓ Deposited to lock 2:', amount2.toString(), 'wei (SevenDaysAndOneHour)');
+            console.log('    Lock ID:', lockId2.toString());
+            // Step 2: Create and sign batch compact
+            console.log('\n📝 Step 2: Creating batch compact...');
+            const nonce = BigInt(Date.now()) + 20n;
+            const batchCompact = sponsorClient.sponsor
+                .batchCompact()
+                .arbiter(arbiterAccount.address)
+                .sponsor(sponsorAccount.address)
+                .nonce(nonce)
+                .expires(FIXED_EXPIRY)
+                .addLock({
+                lockTag: lockTag1,
+                token: nativeToken,
+                amount: amount1,
+            })
+                .addLock({
+                lockTag: lockTag2,
+                token: nativeToken,
+                amount: amount2,
+            })
+                .build();
+            const signature = await mainnetWalletClient.signTypedData({
+                account: sponsorAccount,
+                ...batchCompact.typedData,
+            });
+            console.log('  ✓ Batch compact created and signed');
+            console.log('    Covering 2 locks with different reset periods');
+            // Step 3: Build batch claim with different component types for each lock
+            console.log('\n🎯 Step 3: Building batch claim...');
+            // Recipients
+            const recipient1 = {
+                address: '0x1111111111111111111111111111111111111111',
+            };
+            const recipient2 = {
+                address: '0x2222222222222222222222222222222222222222',
+            };
+            const batchClaim = arbiterClient.arbiter
+                .batchClaimBuilder()
+                .sponsor(batchCompact.struct.sponsor)
+                .nonce(batchCompact.struct.nonce)
+                .expires(batchCompact.struct.expires)
+                .sponsorSignature(signature)
+                // Lock 1: split between transfer and withdrawal
+                .addClaim()
+                .id(lockId1)
+                .allocatedAmount(amount1)
+                .addPortion(lockTag1, {
+                kind: 'transfer',
+                recipient: recipient1.address,
+                amount: (0, viem_1.parseEther)('0.7'),
+            })
+                .addPortion(lockTag1, {
+                kind: 'withdraw',
+                recipient: recipient1.address,
+                amount: (0, viem_1.parseEther)('0.3'),
+            })
+                .done()
+                // Lock 2: all transferred
+                .addClaim()
+                .id(lockId2)
+                .allocatedAmount(amount2)
+                .addPortion(lockTag2, {
+                kind: 'transfer',
+                recipient: recipient2.address,
+                amount: amount2,
+            })
+                .done()
+                .build();
+            // Sign with allocator
+            const allocatorSignature = await mainnetWalletClient.signMessage({
+                account: allocatorAccount,
+                message: { raw: batchClaim.hash },
+            });
+            batchClaim.struct.allocatorData = allocatorSignature;
+            console.log('  ✓ Batch claim built:');
+            console.log('    Lock 1: 0.7 ETH transfer + 0.3 ETH withdrawal');
+            console.log('    Lock 2: 0.5 ETH transfer');
+            // Get initial balances
+            const recipient1InitialERC6909Lock1 = await sponsorClient.view.balanceOf({
+                account: recipient1.address,
+                id: lockId1,
+            });
+            const recipient1InitialNative = await mainnetPublicClient.getBalance({
+                address: recipient1.address,
+            });
+            const recipient2InitialERC6909Lock2 = await sponsorClient.view.balanceOf({
+                account: recipient2.address,
+                id: lockId2,
+            });
+            // Step 4: Submit batch claim
+            console.log('\n🚀 Step 4: Submitting batch claim...');
+            const claimResult = await arbiterClient.arbiter.batchClaim(batchClaim.struct);
+            console.log('  ✓ Batch claim submitted');
+            console.log('    Tx hash:', claimResult.txHash);
+            const receipt = await mainnetPublicClient.waitForTransactionReceipt({
+                hash: claimResult.txHash,
+            });
+            console.log('  ✓ Transaction mined');
+            console.log('    Status:', receipt.status);
+            console.log('    Gas used:', receipt.gasUsed.toString());
+            // Step 5: Verify all claims
+            console.log('\n✅ Step 5: Verifying batch claim results...');
+            // Verify lock 1 transfer
+            const recipient1FinalERC6909Lock1 = await sponsorClient.view.balanceOf({
+                account: recipient1.address,
+                id: lockId1,
+            });
+            const recipient1ERC6909Increase = recipient1FinalERC6909Lock1 - recipient1InitialERC6909Lock1;
+            (0, globals_1.expect)(recipient1ERC6909Increase).toBe((0, viem_1.parseEther)('0.7'));
+            console.log('  ✓ Lock 1 transfer verified:', recipient1ERC6909Increase.toString(), 'wei ERC6909');
+            // Verify lock 1 withdrawal
+            const recipient1FinalNative = await mainnetPublicClient.getBalance({
+                address: recipient1.address,
+            });
+            const recipient1NativeIncrease = recipient1FinalNative - recipient1InitialNative;
+            (0, globals_1.expect)(recipient1NativeIncrease).toBe((0, viem_1.parseEther)('0.3'));
+            console.log('  ✓ Lock 1 withdrawal verified:', recipient1NativeIncrease.toString(), 'wei native ETH');
+            // Verify lock 2 transfer
+            const recipient2FinalERC6909Lock2 = await sponsorClient.view.balanceOf({
+                account: recipient2.address,
+                id: lockId2,
+            });
+            const recipient2ERC6909Increase = recipient2FinalERC6909Lock2 - recipient2InitialERC6909Lock2;
+            (0, globals_1.expect)(recipient2ERC6909Increase).toBe(amount2);
+            console.log('  ✓ Lock 2 transfer verified:', recipient2ERC6909Increase.toString(), 'wei ERC6909');
+            console.log('\n🎉 Batch compact test passed!');
+            console.log('   SDK successfully processed multiple locks with different reset periods in a single batch claim');
+        }, 60000);
+        // TODO: Add multichain compact test
+        // This would require setting up Unichain public/wallet clients in the test environment
+        // Skipping for now as it requires additional infrastructure setup
     });
 });
 //# sourceMappingURL=e2e.test.js.map

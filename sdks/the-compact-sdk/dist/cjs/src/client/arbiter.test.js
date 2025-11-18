@@ -55,7 +55,7 @@ describe('ArbiterClient', () => {
                 functionName: 'claim',
                 args: [claim],
                 chain: null,
-                account: null,
+                account: undefined,
             });
             expect(result.txHash).toBe(txHash);
             expect(result.claimHash).toMatch(/^0x[0-9a-f]{64}$/);
@@ -134,7 +134,7 @@ describe('ArbiterClient', () => {
                 functionName: 'batchClaim',
                 args: [claim],
                 chain: null,
-                account: null,
+                account: undefined,
             });
             expect(result.txHash).toBe(txHash);
             expect(result.claimHash).toMatch(/^0x[0-9a-f]{64}$/);
@@ -169,9 +169,7 @@ describe('ArbiterClient', () => {
                         amount: 1000000n,
                     },
                 ],
-                additionalChains: [
-                    '0x1111111111111111111111111111111111111111111111111111111111111111',
-                ],
+                additionalChains: ['0x1111111111111111111111111111111111111111111111111111111111111111'],
             };
             const txHash = '0xabcdef';
             mockWalletClient.writeContract.mockResolvedValue(txHash);
@@ -182,7 +180,7 @@ describe('ArbiterClient', () => {
                 functionName: 'multichainClaim',
                 args: [claim],
                 chain: null,
-                account: null,
+                account: undefined,
             });
             expect(result.txHash).toBe(txHash);
             expect(result.claimHash).toMatch(/^0x[0-9a-f]{64}$/);
@@ -220,9 +218,7 @@ describe('ArbiterClient', () => {
                         ],
                     },
                 ],
-                additionalChains: [
-                    '0x1111111111111111111111111111111111111111111111111111111111111111',
-                ],
+                additionalChains: ['0x1111111111111111111111111111111111111111111111111111111111111111'],
             };
             const txHash = '0xabcdef';
             mockWalletClient.writeContract.mockResolvedValue(txHash);
@@ -233,7 +229,7 @@ describe('ArbiterClient', () => {
                 functionName: 'batchMultichainClaim',
                 args: [claim],
                 chain: null,
-                account: null,
+                account: undefined,
             });
             expect(result.txHash).toBe(txHash);
             expect(result.claimHash).toMatch(/^0x[0-9a-f]{64}$/);
