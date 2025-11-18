@@ -390,26 +390,30 @@ export class SingleClaimBuilder {
  *
  * const client = new CompactClient({ chainId: 1, address: '0x...' })
  *
- * // Build a batch claim from a signed batch compact
- * const batchClaim = client.arbiter.batchClaim()
- *   .fromBatchCompact({
+ * // Build a batch claim from a signed batch compact using fromCompact()
+ * const batchClaim = client.arbiter.batchClaimBuilder()
+ *   .fromCompact({
  *     compact: signedBatchCompact.struct,
- *     signature: sponsorSignature,
- *     idsAndAmounts: [
- *       { lockTag: '0x...01', token: '0xUSDC...', amount: 1000000n },
- *       { lockTag: '0x...02', token: '0xWETH...', amount: 5000000000000000000n }
- *     ]
+ *     signature: sponsorSignature
  *   })
- *   .addClaimant('0x...01', {
- *     kind: 'transfer',
- *     recipient: '0xRecipient1...',
- *     amount: 1000000n
- *   })
- *   .addClaimant('0x...02', {
- *     kind: 'transfer',
- *     recipient: '0xRecipient2...',
- *     amount: 5000000000000000000n
- *   })
+ *   .addClaim()
+ *     .id(lockId1)
+ *     .allocatedAmount(1000000n)
+ *     .addPortion(lockTag1, {
+ *       kind: 'transfer',
+ *       recipient: '0xRecipient1...',
+ *       amount: 1000000n
+ *     })
+ *     .done()
+ *   .addClaim()
+ *     .id(lockId2)
+ *     .allocatedAmount(5000000000000000000n)
+ *     .addPortion(lockTag2, {
+ *       kind: 'transfer',
+ *       recipient: '0xRecipient2...',
+ *       amount: 5000000000000000000n
+ *     })
+ *     .done()
  *   .build()
  * ```
  */
@@ -479,6 +483,22 @@ abstract class BaseBatchClaimBuilder implements IBatchClaimBuilder {
   witness<T extends object>(mandateType: MandateType<T>, mandate: T): this {
     this._witness = mandateType.hash(mandate)
     this._witnessTypestring = mandateType.witnessTypestring
+    return this
+  }
+
+  /**
+   * Pre-fill claim data from a batch compact
+   * Automatically extracts sponsor, nonce, and expires from the compact
+   * @param params - Object containing compact struct and signature
+   * @param params.compact - The batch compact struct to extract data from
+   * @param params.signature - The sponsor's signature on the compact
+   * @returns This builder for chaining
+   */
+  fromCompact(params: { compact: BatchCompact; signature: Hex }): this {
+    this._sponsor = params.compact.sponsor
+    this._nonce = params.compact.nonce
+    this._expires = params.compact.expires
+    this._sponsorSignature = params.signature
     return this
   }
 

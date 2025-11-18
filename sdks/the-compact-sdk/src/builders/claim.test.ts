@@ -384,14 +384,11 @@ describe('Claim Builders', () => {
       }
 
       const lockTag2 = '0x000000000000000000000002' as `0x${string}`
+      const signature = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12' as `0x${string}`
 
-      // Note: fromBatchCompact creates empty claim components, but the new API
-      // requires portions to be added. For now, we manually build the claim
-      // to match the compact's structure.
+      // Use fromCompact to pre-fill sponsor, nonce, expires, and signature
       const claim = ClaimBuilder.batch(domain)
-        .sponsor(compact.sponsor)
-        .nonce(compact.nonce)
-        .expires(compact.expires)
+        .fromCompact({ compact, signature })
         .addClaim()
         .id(encodeLockId(lockTag, usdcAddress))
         .allocatedAmount(1000000n)
@@ -415,6 +412,7 @@ describe('Claim Builders', () => {
       expect(claim.struct.sponsor).toBe(sponsorAddress)
       expect(claim.struct.nonce).toBe(1n)
       expect(claim.struct.expires).toBe(compact.expires)
+      expect(claim.struct.sponsorSignature).toBe(signature)
       expect(claim.struct.claims.length).toBe(2)
       expect(claim.struct.claims[0].id).toBe(encodeLockId(lockTag, usdcAddress))
     })

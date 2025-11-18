@@ -1347,10 +1347,6 @@ describeE2E('The Compact SDK - End-to-End Tests', () => {
       const withdrawRecipientInitialNative = await mainnetPublicClient.getBalance({
         address: withdrawRecipient.address,
       })
-      const sponsorInitialERC6909 = await sponsorClient.view.balanceOf({
-        account: sponsorAccount.address,
-        id: sourceLockId,
-      })
 
       const compactInitialBalance = await mainnetPublicClient.getBalance({
         address: CHAINS.mainnet.compactAddress,
