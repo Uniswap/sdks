@@ -1,0 +1,4 @@
+/**
+ * Tests for SponsorClient
+ */
+export {};

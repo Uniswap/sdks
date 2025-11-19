@@ -86,21 +86,21 @@ const CHAINS = {
   },
   op: {
     id: 10,
-    name: 'OP Mainnet (Supersim Fork)',
+    name: 'OP (Supersim Fork)',
     rpcUrl: 'http://localhost:9545',
-    compactAddress: '0x00000000000000171ede64904551eeDF3C6C9788' as Address, // Check if deployed
+    compactAddress: '0x00000000000000171ede64904551eeDF3C6C9788' as Address,
   },
   base: {
     id: 8453,
-    name: 'Base Mainnet (Supersim Fork)',
+    name: 'Base (Supersim Fork)',
     rpcUrl: 'http://localhost:9546',
-    compactAddress: '0x00000000000000171ede64904551eeDF3C6C9788' as Address, // Check if deployed
+    compactAddress: '0x00000000000000171ede64904551eeDF3C6C9788' as Address,
   },
   unichain: {
-    id: 1301, // Unichain chain ID
+    id: 130, // Unichain chain ID
     name: 'Unichain (Supersim Fork)',
     rpcUrl: 'http://localhost:9547',
-    compactAddress: '0x00000000000000171ede64904551eeDF3C6C9788' as Address, // Check if deployed
+    compactAddress: '0x00000000000000171ede64904551eeDF3C6C9788' as Address,
   },
 }
 

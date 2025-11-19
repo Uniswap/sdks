@@ -449,10 +449,10 @@ const claim = await client.arbiter
 
 ### Tribunal Allocator Mandates
 
-The SDK includes the official Tribunal allocator mandate type, which supports cross-chain fills with dynamic pricing curves:
+The SDK includes the official Tribunal allocator mandate type with a fluent builder for constructing cross-chain fills with dynamic pricing:
 
 ```typescript
-import { TribunalMandate, createDutchAuction } from '@uniswap/the-compact-sdk'
+import { TribunalMandate, TribunalBuilder, createDutchAuction } from '@uniswap/the-compact-sdk'
 
 // Create a Dutch auction price curve (150% → 100% over 1000 blocks)
 const priceCurve = createDutchAuction({
@@ -461,7 +461,29 @@ const priceCurve = createDutchAuction({
   durationBlocks: 1000,
 })
 
-// Build compact with Tribunal mandate
+// Build Tribunal mandate using fluent builder
+const mandate = TribunalBuilder.mandate()
+  .adjuster('0xAdjusterAddress...')
+  .fill((f) =>
+    f
+      .chainId(1n)
+      .tribunal('0xTribunalAddress...')
+      .expires(BigInt(Math.floor(Date.now() / 1000) + 3600))
+      .component((c) =>
+        c
+          .fillToken('0xUSDC...')
+          .minimumFillAmount(900000n) // Min 0.9 USDC
+          .recipient('0xRecipient...')
+          .applyScaling()
+      )
+      .priceCurve(priceCurve)
+      .scalingFactor(1000000000000000000n) // 100% (1e18)
+      .baselinePriorityFee(1000000n)
+      .salt('0x0000000000000000000000000000000000000000000000000000000000000001')
+  )
+  .build()
+
+// Attach mandate to compact
 const compact = await client.sponsor
   .compact()
   .arbiter(arbiterAddress)
@@ -471,6 +493,24 @@ const compact = await client.sponsor
   .lockTag(lockTag)
   .token(tokenAddress)
   .amount(1000000n)
+  .witness(TribunalMandate, mandate)
+  .build()
+```
+
+The Tribunal builder supports:
+
+- **Fluent API** for composing complex mandates with type safety
+- **Dynamic pricing** via price curve arrays (compatible with price curve calculators)
+- **Multiple fills** across different chains with `.fill()` chaining
+- **Multiple components** per fill with `.component()` chaining
+- **Recipient callbacks** for cross-chain bridge operations
+
+You can also pass mandate objects directly if preferred:
+
+```typescript
+const compact = await client.sponsor
+  .compact()
+  // ... other fields
   .witness(TribunalMandate, {
     adjuster: '0xAdjusterAddress...',
     fills: [
@@ -481,14 +521,14 @@ const compact = await client.sponsor
         components: [
           {
             fillToken: '0xUSDC...',
-            minimumFillAmount: 900000n, // Min 0.9 USDC
+            minimumFillAmount: 900000n,
             recipient: '0xRecipient...',
             applyScaling: true,
           },
         ],
         baselinePriorityFee: 1000000n,
-        scalingFactor: 1000000000000000000n, // 100% (1e18)
-        priceCurve, // Dutch auction curve elements
+        scalingFactor: 1000000000000000000n,
+        priceCurve,
         recipientCallback: [],
         salt: '0x0000000000000000000000000000000000000000000000000000000000000001',
       },
@@ -496,13 +536,6 @@ const compact = await client.sponsor
   })
   .build()
 ```
-
-The Tribunal mandate structure supports:
-
-- **Dynamic pricing** via price curve arrays (compatible with price curve calculators)
-- **Cross-chain fills** with per-chain tribunal addresses
-- **Fill validation** with minimum amounts and scaling factors
-- **Callbacks** for post-fill operations on recipient addresses
 
 ## TypeScript Types
 
