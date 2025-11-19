@@ -25,3 +25,6 @@ export * from './abi'
 
 // Export errors
 export * from './errors'
+
+// Export price curve utilities
+export * from './lib'
