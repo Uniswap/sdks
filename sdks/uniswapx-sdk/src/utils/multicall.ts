@@ -44,13 +44,14 @@ type Call = {
 // return all results including errors
 // Uses deployless method to function properly even on chains with no multicall contract deployed
 export async function multicallSameContractManyFunctions<
-  // eslint-disable-next-line
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   TFunctionParams extends any[] | undefined
 >(
   provider: StaticJsonRpcProvider,
   params: MulticallSameContractParams<TFunctionParams>,
   stateOverrrides?: {
     code?: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     state?: any
   },
   blockOverrides?: BlockOverrides
@@ -74,13 +75,14 @@ export async function multicallSameContractManyFunctions<
 }
 
 export async function multicallSameFunctionManyContracts<
-  // eslint-disable-next-line
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   TFunctionParams extends any[] | undefined
 >(
   provider: StaticJsonRpcProvider,
   params: MulticallSameFunctionParams<TFunctionParams>,
   stateOverrrides?: {
     code?: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     state?: any
   },
   blockOverrides?: BlockOverrides
@@ -107,6 +109,7 @@ export async function multicall(
   calls: Call[],
   stateOverrides?: {
     code?: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     state?: any
   },
   blockOverrides?: BlockOverrides
@@ -116,6 +119,7 @@ export async function multicall(
   let response;
   if (code.length > 2) {
     const multicall = Multicall2__factory.connect(multicallAddressOn(chainId), provider);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const params: any[] = [
       {
         from: ethers.constants.AddressZero,
@@ -133,6 +137,7 @@ export async function multicall(
     const args = deploylessInterface.encodeDeploy([false, calls]);
     const data = hexConcat([DEPLOYLESS_MULTICALL_BYTECODE, args]);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const params: any[] = [
       {
         from: ethers.constants.AddressZero,

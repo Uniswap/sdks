@@ -21,8 +21,7 @@
     "plugin:eslint-comments/recommended",
     "plugin:@typescript-eslint/recommended",
     "plugin:import/typescript",
-    "prettier",
-    "prettier/@typescript-eslint"
+    "prettier"
   ],
   "globals": {
     "BigInt": true,

@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+
+# Package files
+package-lock.json
+yarn.lock
+
+# Git
+.git/
+
+# IDE
+.vscode/
+.idea/ 
