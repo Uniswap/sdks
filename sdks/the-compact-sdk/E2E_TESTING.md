@@ -67,115 +67,17 @@ E2E_TESTS=1 npm test -- --testPathPattern="Compact Creation"
 
 ## Test Accounts
 
-The e2e tests use pre-funded accounts from Supersim:
+The e2e tests use pre-funded, well-known test accounts from Anvil:
 
 | Role       | Address                                      | Purpose                             |
 | ---------- | -------------------------------------------- | ----------------------------------- |
 | Sponsor    | `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266` | Creates compacts and deposits funds |
-| Arbiter    | `0x70997970C51812dc3A010C7d01b50e0d17dc79C8` | Submits claims                      |
-| Allocator  | `0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC` | Allocator role                      |
+| Arbiter    | `0x70997970C51812dc3A010C7d01b50e0d17dc79C8` | Submits claims (would usually be a contract, not an EOA, but this greatly simplifies testing) |
+| Allocator  | `0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC` | Allocator signer (for attestations) |
 | Recipient1 | `0x90F79bf6EB2c4f870365E785982E1f101E93b906` | Claim recipient                     |
 | Recipient2 | `0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65` | Claim recipient                     |
 
 All accounts start with 10,000 ETH on each forked chain.
-
-## Test Coverage
-
-### ✅ Implemented Tests
-
-1. **Setup and Contract Discovery** (4 tests)
-
-   - Connect to Supersim mainnet fork
-   - Verify funded test accounts
-   - Verify The Compact contract exists
-   - Query domain separator
-
-2. **Basic Deposit and Withdrawal Flow** (3 tests)
-
-   - Deposit native ETH with lock tag
-   - Query balance after deposit
-   - Withdraw funds
-
-3. **Compact Creation and Signing** (2 tests)
-
-   - Create and sign a single compact
-   - Create and sign a batch compact
-   - Verify EIP-712 signatures
-
-4. **Full Compact Lifecycle** (2 tests)
-
-   - Complete sponsor flow: deposit → allocate → compact
-   - Query lock details
-
-5. **Claim Builder Tests** (2 tests)
-
-   - Build single claims with transfers
-   - Build batch claims with multiple portions
-
-6. **Allocator Operations** (2 tests)
-
-   - Extract allocator address from lock details
-   - Decode allocator ID from lock tag
-
-7. **Lock Tag and Lock ID Encoding** (2 tests)
-
-   - Encode/decode lock tags
-   - Compute lock IDs
-
-8. **Multichain Operations** (2 tests)
-
-   - Create multichain compacts with multichain scope
-   - Create multichain claims with additional chain hashes
-
-9. **Error Handling** (3 tests)
-   - Handle expired compacts
-   - Handle insufficient balance errors
-   - Validate compact builder inputs
-
-**Total: 22 functional e2e tests**
-
-### 🚧 Future Enhancements
-
-1. **Claim Submission to Chain** (requires allocator setup and additional coordination)
-
-   - Submit single claims to contract
-   - Submit batch claims to contract
-   - Verify fund distribution on-chain
-
-2. **Cross-Chain Coordination** (requires multi-chain synchronization)
-   - Coordinate multichain claims across OP, Base, and Unichain
-   - Verify synchronized claim processing
-
-## Test Architecture
-
-```typescript
-// Test structure
-describeE2E('The Compact SDK - End-to-End Tests', () => {
-  beforeAll(async () => {
-    // Set up accounts and clients
-  })
-
-  describe('Setup and Contract Discovery', () => {
-    // Verify environment
-  })
-
-  describe('Basic Deposit and Withdrawal Flow', () => {
-    // Test deposit/withdraw operations
-  })
-
-  describe('Compact Creation and Signing', () => {
-    // Test compact builders
-  })
-
-  describe('Claim Submission', () => {
-    // Test claim submission (TODO)
-  })
-})
-```
-
-## Debugging
-
-### View Supersim logs
 
 Supersim outputs logs for each transaction:
 
@@ -212,6 +114,10 @@ console.log('Transaction:', result.txHash)
 - Supersim accounts should have 10,000 ETH
 - Check balance with: `await publicClient.getBalance({ address })`
 
+**Error: Pre-funded account not behaving as expected**
+
+- These are well-known test accounts and sometimes people delegate them to 7702 implementations which might not work as expected. Either undelegagte them in your setup or use fresh keys.
+
 ## Environment Variables
 
 | Variable    | Description      | Default                     |
@@ -234,7 +140,7 @@ jobs:
       - name: Start Supersim
         run: supersim &
       - name: Wait for Supersim
-        run: sleep 5
+        run: sleep 30
       - name: Run E2E tests
         run: npm run test:e2e
 ```
