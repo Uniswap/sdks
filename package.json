@@ -37,6 +37,14 @@
   ],
   "resolutions": {
     "@manypkg/cli@^0.19.2": "patch:@manypkg/cli@npm%3A0.19.2#./.yarn/patches/@manypkg-cli-npm-0.19.2-ea52ff91d4.patch",
-    "eslint-config-prettier": "^9.1.0"
+    "eslint-config-prettier": "^9.1.0",
+    "expect": "25.5.0",
+    "jest-haste-map": "25.5.1",
+    "@jest/core": "25.5.4",
+    "jest-cli": "25.5.4",
+    "jest-runner": "25.5.1"
+  },
+  "devDependencies": {
+    "sane": "5.0.1"
   }
 }
