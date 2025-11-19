@@ -249,10 +249,7 @@ export function createDutchAuction(config: DutchAuctionConfig): bigint[] {
       return [createPriceCurveElement(durationBlocks, startScaling)]
     } else {
       // Need two elements: duration segment + zero-duration end target for interpolation
-      return [
-        createPriceCurveElement(durationBlocks, startScaling),
-        createPriceCurveElement(0, endScaling),
-      ]
+      return [createPriceCurveElement(durationBlocks, startScaling), createPriceCurveElement(0, endScaling)]
     }
   }
 
@@ -355,10 +352,7 @@ export function createReverseDutchAuction(config: ReverseDutchAuctionConfig): bi
       return [createPriceCurveElement(durationBlocks, startScaling)]
     } else {
       // Need two elements: duration segment + zero-duration end target for interpolation
-      return [
-        createPriceCurveElement(durationBlocks, startScaling),
-        createPriceCurveElement(0, endScaling),
-      ]
+      return [createPriceCurveElement(durationBlocks, startScaling), createPriceCurveElement(0, endScaling)]
     }
   }
 

@@ -349,3 +349,110 @@ export const MandateFields = {
     return { name, type: 'string' }
   },
 }
+
+/**
+ * Tribunal allocator mandate type definition
+ *
+ * This is the official mandate structure used by the Tribunal allocator for
+ * managing cross-chain fills with dynamic pricing curves and callbacks.
+ *
+ * @see https://github.com/Uniswap/tribunal
+ *
+ * @example
+ * ```typescript
+ * import { TribunalMandate } from '@uniswap/the-compact-sdk'
+ *
+ * const mandate = {
+ *   adjuster: '0xAdjusterAddress...',
+ *   fills: [{
+ *     chainId: 1n,
+ *     tribunal: '0xTribunalAddress...',
+ *     expires: BigInt(Math.floor(Date.now() / 1000) + 3600),
+ *     components: [{
+ *       fillToken: '0xUSDC...',
+ *       minimumFillAmount: 1000000n,
+ *       recipient: '0xRecipient...',
+ *       applyScaling: true
+ *     }],
+ *     baselinePriorityFee: 1000000n,
+ *     scalingFactor: 1000000000000000000n, // 1e18 = 100%
+ *     priceCurve: [1500000000000000000n, 1000000000000000000n], // 150% -> 100%
+ *     recipientCallback: [],
+ *     salt: '0x0000000000000000000000000000000000000000000000000000000000000001'
+ *   }]
+ * }
+ * ```
+ */
+export const TribunalMandate = defineMandateType<{
+  adjuster: `0x${string}`
+  fills: Array<{
+    chainId: bigint
+    tribunal: `0x${string}`
+    expires: bigint
+    components: Array<{
+      fillToken: `0x${string}`
+      minimumFillAmount: bigint
+      recipient: `0x${string}`
+      applyScaling: boolean
+    }>
+    baselinePriorityFee: bigint
+    scalingFactor: bigint
+    priceCurve: bigint[]
+    recipientCallback: Array<{
+      chainId: bigint
+      compact: {
+        arbiter: `0x${string}`
+        sponsor: `0x${string}`
+        nonce: bigint
+        expires: bigint
+        commitments: Array<{
+          lockTag: `0x${string}`
+          token: `0x${string}`
+          amount: bigint
+        }>
+        mandate: any
+      }
+      context: `0x${string}`
+    }>
+    salt: `0x${string}`
+  }>
+}>({
+  fields: [MandateFields.address('adjuster'), { name: 'fills', type: 'Mandate_Fill[]' }],
+  nestedTypes: {
+    Mandate_Fill: [
+      MandateFields.uint256('chainId'),
+      MandateFields.address('tribunal'),
+      MandateFields.uint256('expires'),
+      { name: 'components', type: 'Mandate_FillComponent[]' },
+      MandateFields.uint256('baselinePriorityFee'),
+      MandateFields.uint256('scalingFactor'),
+      { name: 'priceCurve', type: 'uint256[]' },
+      { name: 'recipientCallback', type: 'Mandate_RecipientCallback[]' },
+      MandateFields.bytes32('salt'),
+    ],
+    Mandate_FillComponent: [
+      MandateFields.address('fillToken'),
+      MandateFields.uint256('minimumFillAmount'),
+      MandateFields.address('recipient'),
+      MandateFields.bool('applyScaling'),
+    ],
+    Mandate_Lock: [
+      { name: 'lockTag', type: 'bytes12' },
+      MandateFields.address('token'),
+      MandateFields.uint256('amount'),
+    ],
+    Mandate_BatchCompact: [
+      MandateFields.address('arbiter'),
+      MandateFields.address('sponsor'),
+      MandateFields.uint256('nonce'),
+      MandateFields.uint256('expires'),
+      { name: 'commitments', type: 'Mandate_Lock[]' },
+      { name: 'mandate', type: 'Mandate' },
+    ],
+    Mandate_RecipientCallback: [
+      MandateFields.uint256('chainId'),
+      { name: 'compact', type: 'Mandate_BatchCompact' },
+      MandateFields.bytes('context'),
+    ],
+  },
+})

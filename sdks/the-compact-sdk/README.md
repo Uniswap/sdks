@@ -7,7 +7,7 @@ A comprehensive TypeScript SDK for building and interacting with [The Compact v1
 
 ## Overview
 
-The Compact is an on-chain protocol that allows users (sponsors) to lock tokens that can later be claimed in exchange for fulfilling some condition (the mandate). This SDK provides type-safe, ergonomic tools to:
+The Compact is an on-chain protocol that allows users (sponsors) to lock tokens that can be credibly committed and subsequently claimed in exchange for fulfilling some condition (the mandate). This SDK provides type-safe, ergonomic tools to:
 
 - **Build EIP-712 signed compacts** for token locks
 - **Create claim payloads** to process locked tokens
@@ -38,6 +38,7 @@ yarn add @uniswap/the-compact-sdk viem
 ```
 
 **Peer Dependencies:**
+
 - `viem` ^2.0.0
 
 ## Quick Start
@@ -56,7 +57,7 @@ const publicClient = createPublicClient({
 const walletClient = createWalletClient({
   chain: mainnet,
   transport: http(),
-  account: '0x...' // Your account
+  account: '0x...', // Your account
 })
 
 // Create CompactClient
@@ -66,92 +67,92 @@ const client = new CompactClient({
   walletClient,
 })
 
-// Build and submit a compact
-const compact = await client.sponsor.compact()
+// Build and sign a compact
+const compact = await client.sponsor
+  .compact()
   .arbiter('0xArbiterAddress...')
   .sponsor(walletClient.account.address)
   .nonce(1n)
-  .expiresIn('1 hour')
+  .expiresIn('1h')
   .lockTag('0x000000000000000000000001')
   .token('0xUSDC...')
   .amount(1000000n) // 1 USDC
   .build()
 
-// Sign and submit
-const hash = await client.sponsor.allocate(compact.struct)
-console.log('Compact submitted:', hash)
+// Sign the compact with wallet
+const signature = await walletClient.signTypedData(compact.typedData)
+console.log('Compact signed:', compact.hash)
 ```
 
 ## Core Concepts
 
 ### Resource Locks
 
-Resource locks are the fundamental unit of state in The Compact. They’re created whenever a depositor places tokens (ERC20 or native) into the protocol and are represented as fungible ERC‑6909 tokens.
+Resource locks are the fundamental accounting unit in The Compact. They’re created whenever a depositor places tokens (ERC20 or native) into the protocol and are represented as fungible ERC‑6909 tokens.
 
 Each resource lock is defined by four properties:
 
-- **Underlying token** – the ERC20 or native token held in the lock  
-- **Allocator** – infrastructure that prevents double‑spends and authorizes use of the lock  
-- **Scope** – whether the lock can be spent on a single chain or across chains  
-- **Reset period** – a timelock used for forced withdrawals and emissary changes  
+- **Underlying token** – the ERC20 or native token held in the lock
+- **Allocator** – infrastructure that prevents double‑spends and authorizes use of the lock
+- **Scope** – whether the lock can be spent on a single chain or across chains
+- **Reset period** – a timelock used for forced withdrawals and emissary changes
 
 These properties are packed into a 12‑byte **lock tag** (`bytes12 lockTag`). The ERC‑6909 token id for a given lock is:
 
 > `lockId = (lockTag << 160) | tokenAddress`
 
-So each unique `(lockTag, token)` pair corresponds to one fungible ERC‑6909 id. Whoever holds that ERC‑6909 balance is the **sponsor** for that lock and can create compacts backed by it.
+So each unique `(lockTag, token)` pair corresponds to one fungible ERC‑6909 id. Anyone holding these ERC‑6909 tokens can create compacts backed by them.
 
 ---
 
 ### Compacts
 
-A **Compact** is an EIP‑712 typed commitment created by a sponsor that allows an **arbiter** to claim from one or more resource locks under specified conditions. Compacts **do not** move funds by themselves; they just define what an arbiter is allowed to do later via a claim.
+A **Compact** is an EIP‑712 typed commitment signed by a sponsor that defines an **arbiter** to verify that some specified condition has been met and process a claim releasing the committed assets from the associated resource lock(s). Compacts **do not** move funds by themselves; they just define the conditions under which the committed tokens can be released.
 
-The protocol defines three EIP‑712 payload shapes:
+The protocol defines three EIP‑712 Compact payload shapes:
 
 - **Single Compact**  
-  Commits an amount of a single resource lock on a single chain.  
-  Conceptually: “arbiter X may claim up to `amount` from `lockTag` / `token` for sponsor Y before `expires`.”
+  Commits an amount of a single resource lock on a single chain. Conceptually: “upon proving to `arbiter` that my `mandate` has been fulfilled, a claim can be made for up to `amount` from `resourceLock` before `expires`.”
 
 - **Batch Compact**  
-  Commits multiple `(lockTag, token, amount)` tuples on the same chain in one payload.  
-  Conceptually: “arbiter X may claim from this set of locks, each up to its own `amount`, for sponsor Y before `expires`.”
+  Commits multiple locks from the same chain in one "batch" compact. An arbitrary number of resource locks, each with their own specific allocated amount, can be committed using this type of compact.
 
 - **Multichain Compact**  
-  Commits locks across multiple chains. Each element binds:
-  - a `chainId`  
-  - a per‑chain `arbiter`  
-  - one or more `(lockTag, token, amount)` commitments  
-  - a **Mandate** witness (see below)  
+  Commits multiple locks across multiple chains in one compact. Each element binds:
+  - a `chainId`
+  - an `arbiter` for that chain
+  - one or more `(lock, amount)` commitments
+  - a **Mandate** witness (see below)
 
-Single and batch compacts may optionally include a Mandate. Multichain compacts always include a Mandate per element.
+Single and batch compacts _may optionally_ include a Mandate. Multichain compacts **must always** include a Mandate per element.
 
 ---
 
 ### Claims
 
-A **Claim** is what an arbiter submits to actually spend a compact against one or more resource locks.
+A **Claim** is what an arbiter submits to The Compact to authorize a claim against one or more resource locks.
 
 At a high level, a claim:
 
-- Proves allocator authorization for a specific lock id and `allocatedAmount`
-- Proves sponsor authorization (via signature, EIP‑1271, emissary, or direct call)
 - Binds to a particular compact (or registered compact hash) and its `nonce` / `expires`
-- Specifies how to distribute the committed value via an array of **components**
+- Verifies sponsor authorization of the compact in question (via signature, registration, or emissary)
+- Specifies how The Compact should distribute the committed asset(s) via an array of **components**
 
-Each component is an encoded `(lockTag, recipient, amount)` triple. How The Compact interprets a component depends on the `lockTag` embedded in it:
+Each component is an encoded as `(lockTag, recipient, amount)`. How The Compact interprets a component depends on the `lockTag` embedded in it:
 
-1. **Direct transfer (keep the lock as‑is)**  
-   - Component’s `lockTag` == original lock’s `lockTag`  
+1. **Direct transfer (keep the lock as‑is)**
+
+   - Component’s `lockTag` == original lock’s `lockTag`
    - The claim transfers ERC‑6909 tokens for that lock id to the recipient.
 
-2. **Convert to a new resource lock**  
-   - Component’s `lockTag` is non‑zero and different from the original  
-   - The claim burns from the original lock and mints into a new lock with the new `lockTag` for the recipient.  
-   - This changes allocator / scope / reset period while keeping the funds locked in The Compact.
+2. **Convert to a new resource lock**
 
-3. **Withdraw underlying tokens**  
-   - Component’s `lockTag` is zero  
+   - Component’s `lockTag` is non‑zero and different from the original
+   - The claim burns from the original lock and mints into a new lock with the new `lockTag` for the recipient.
+   - This changes allocator / scope / reset period while keeping the funds in The Compact protocol.
+
+3. **Withdraw underlying tokens**
+   - Component’s `lockTag` is zero
    - The claim burns ERC‑6909 and withdraws the underlying ERC20 or native tokens to the recipient, exiting The Compact.
 
 The TS SDK focuses on helping construct these claim payloads correctly (including component encoding) and leaves allocator- and arbiter-specific logic to the integrator.
@@ -162,22 +163,22 @@ The TS SDK focuses on helping construct these claim payloads correctly (includin
 
 **Mandates** are typed witness data used to add arbitrary, domain‑specific conditions to a compact and its eventual claims.
 
-On-chain, a Mandate is an extra struct appended to the end of the compact’s EIP‑712 payload. The Compact itself treats this as an **opaque blob**; it only cares about:
+On-chain, a Mandate is an extra struct appended to the end of the compact’s EIP‑712 payload. The Compact itself essentially treats this as an **opaque blob**; it really only cares about:
 
-- `witness` – the `bytes32` hash of the encoded Mandate data  
-- `witnessTypestring` – the EIP‑712 typestring describing the Mandate struct (and any nested Mandate* structs)
+- `witness` – the `bytes32` hash of the encoded Mandate data
+- `witnessTypestring` – the EIP‑712 typestring describing the Mandate struct (and any nested Mandate\* structs)
 
-During a claim, the arbiter provides `witness` and `witnessTypestring`. The Compact rebuilds the full EIP‑712 typestring, recomputes the claim hash, and passes that into the allocator’s authorization logic. This ties allocator approval to both:
+During a claim, the arbiter provides the `witness` hash and `witnessTypestring`. The Compact dynamically rebuilds the full EIP‑712 typestring, recomputes the claim hash, and passes that into the allocator’s authorization logic. This ties allocator approval to both:
 
-- the compact’s core fields (arbiter, sponsor, lockTag(s), token(s), amount(s), nonce, expires), and  
+- the compact’s core fields (arbiter, sponsor, lockTag(s), token(s), amount(s), nonce, expires), and
 - the Mandate payload, without needing to understand the Mandate’s semantics.
 
 Typical Mandate uses:
 
-- Routing / fill parameters for RFQ or auction flows  
-- Price / slippage bounds  
-- Deadlines and validity conditions  
-- Cross‑chain message or proof references  
+- Routing / fill parameters for RFQ or auction flows
+- Price / slippage bounds
+- Deadlines and validity conditions
+- Cross‑chain message or proof references
 - Any other constraints arbiters and allocators want to enforce
 
 ## API Reference
@@ -221,22 +222,23 @@ console.log('Lock ID:', result.id)
 console.log('Transaction hash:', result.txHash)
 ```
 
-#### Build and Allocate a Compact
+#### Build and Sign a Compact
 
 ```typescript
 // Build compact
-const compact = await client.sponsor.compact()
+const compact = await client.sponsor
+  .compact()
   .arbiter(arbiterAddress)
   .sponsor(sponsorAddress)
   .nonce(1n)
-  .expiresIn('15 minutes')
+  .expiresIn('15m')
   .lockTag('0x000000000000000000000001')
   .token('0xTokenAddress...')
   .amount(1000000n)
   .build()
 
-// Submit to chain
-const hash = await client.sponsor.allocate(compact.struct)
+// Sign the compact
+const signature = await walletClient.signTypedData(compact.typedData)
 ```
 
 #### Batch Compact
@@ -244,11 +246,12 @@ const hash = await client.sponsor.allocate(compact.struct)
 Lock multiple tokens in a single signature:
 
 ```typescript
-const batchCompact = await client.sponsor.batchCompact()
+const batchCompact = await client.sponsor
+  .batchCompact()
   .arbiter(arbiterAddress)
   .sponsor(sponsorAddress)
   .nonce(1n)
-  .expiresIn('1 hour')
+  .expiresIn('1h')
   .addLock({
     lockTag: '0x000000000000000000000001',
     token: '0xUSDC...',
@@ -261,7 +264,7 @@ const batchCompact = await client.sponsor.batchCompact()
   })
   .build()
 
-const hash = await client.sponsor.allocateBatch(batchCompact.struct)
+const signature = await walletClient.signTypedData(batchCompact.typedData)
 ```
 
 ### Arbiter Client
@@ -272,7 +275,8 @@ Handles operations for authorized processors.
 
 ```typescript
 // Build claim from a compact
-const claim = await client.arbiter.claim()
+const claim = await client.arbiter
+  .claim()
   .fromCompact({
     compact: signedCompact.struct,
     signature: sponsorSignature,
@@ -288,7 +292,7 @@ const claim = await client.arbiter.claim()
   .build()
 
 // Submit claim
-const result = await client.arbiter.submitClaim(claim.struct)
+const result = await client.arbiter.claim(claim.struct)
 console.log('Claim hash:', result.claimHash)
 console.log('Transaction hash:', result.txHash)
 ```
@@ -296,7 +300,8 @@ console.log('Transaction hash:', result.txHash)
 #### Different Claimant Types
 
 ```typescript
-const claim = await client.arbiter.claim()
+const claim = await client.arbiter
+  .claim()
   .fromCompact({ compact, signature })
   // Transfer: Same lock tag
   .addTransfer({
@@ -343,10 +348,7 @@ const isRegistered = await client.view.isRegistered({
 })
 
 // Get forced withdrawal status
-const status = await client.view.getForcedWithdrawalStatus(
-  accountAddress,
-  lockId
-)
+const status = await client.view.getForcedWithdrawalStatus(accountAddress, lockId)
 if (status.status === ForcedWithdrawalStatusEnum.Enabled) {
   console.log('Can withdraw at:', status.withdrawableAt)
 }
@@ -362,40 +364,39 @@ Coordinate token locks across multiple chains:
 import { simpleMandate } from '@uniswap/the-compact-sdk'
 
 // Define mandate type
-const mandateType = simpleMandate<{ maxAmount: bigint }>([
-  { name: 'maxAmount', type: 'uint256' },
-])
+const mandateType = simpleMandate<{ maxAmount: bigint }>([{ name: 'maxAmount', type: 'uint256' }])
 
 // Build multichain compact
-const multichainCompact = await client.sponsor.multichainCompact()
+const multichainCompact = await client.sponsor
+  .multichainCompact()
   .sponsor(sponsorAddress)
   .nonce(1n)
-  .expiresIn('1 hour')
+  .expiresIn('1h')
   // Ethereum element
   .addElement()
-    .arbiter(ethereumArbiter)
-    .chainId(1n)
-    .addCommitment({
-      lockTag: '0x000000000000000000000001',
-      token: '0xUSDC...',
-      amount: 1000000n,
-    })
-    .witness(mandateType, { maxAmount: 2000000n })
-    .done()
+  .arbiter(ethereumArbiter)
+  .chainId(1n)
+  .addCommitment({
+    lockTag: '0x000000000000000000000001',
+    token: '0xUSDC...',
+    amount: 1000000n,
+  })
+  .witness(mandateType, { maxAmount: 2000000n })
+  .done()
   // Base element
   .addElement()
-    .arbiter(baseArbiter)
-    .chainId(8453n)
-    .addCommitment({
-      lockTag: '0x000000000000000000000001',
-      token: '0xUSDC...',
-      amount: 500000n,
-    })
-    .witness(mandateType, { maxAmount: 1000000n })
-    .done()
+  .arbiter(baseArbiter)
+  .chainId(8453n)
+  .addCommitment({
+    lockTag: '0x000000000000000000000001',
+    token: '0xUSDC...',
+    amount: 500000n,
+  })
+  .witness(mandateType, { maxAmount: 1000000n })
+  .done()
   .build()
 
-const hash = await client.sponsor.allocateMultichain(multichainCompact.struct)
+const signature = await walletClient.signTypedData(multichainCompact.typedData)
 ```
 
 ### Using Mandates
@@ -417,7 +418,8 @@ const OrderMandate = simpleMandate<{
 ])
 
 // Use in compact
-const compact = await client.sponsor.compact()
+const compact = await client.sponsor
+  .compact()
   .arbiter(arbiterAddress)
   .sponsor(sponsorAddress)
   .nonce(1n)
@@ -433,7 +435,8 @@ const compact = await client.sponsor.compact()
   .build()
 
 // Use in claim
-const claim = await client.arbiter.claim()
+const claim = await client.arbiter
+  .claim()
   .fromCompact({ compact: compact.struct, signature })
   .witness(OrderMandate, {
     orderId: '0x123...',
@@ -444,43 +447,62 @@ const claim = await client.arbiter.claim()
   .build()
 ```
 
-### Complex Mandate Types
+### Tribunal Allocator Mandates
 
-For nested structures:
+The SDK includes the official Tribunal allocator mandate type, which supports cross-chain fills with dynamic pricing curves:
 
 ```typescript
-import { tribunalMandate } from '@uniswap/the-compact-sdk'
+import { TribunalMandate, createDutchAuction } from '@uniswap/the-compact-sdk'
 
-const TribunalMandate = tribunalMandate<{
-  allocatorId: bigint
-  priceCurve: {
-    startPrice: bigint
-    endPrice: bigint
-    duration: bigint
-  }
-  conditions: Array<{
-    token: `0x${string}`
-    minAmount: bigint
-  }>
-}>({
-  fields: [
-    { name: 'allocatorId', type: 'uint256' },
-    { name: 'priceCurve', type: 'PriceCurve' },
-    { name: 'conditions', type: 'Condition[]' },
-  ],
-  nestedTypes: {
-    PriceCurve: [
-      { name: 'startPrice', type: 'uint256' },
-      { name: 'endPrice', type: 'uint256' },
-      { name: 'duration', type: 'uint256' },
-    ],
-    Condition: [
-      { name: 'token', type: 'address' },
-      { name: 'minAmount', type: 'uint256' },
-    ],
-  },
+// Create a Dutch auction price curve (150% → 100% over 1000 blocks)
+const priceCurve = createDutchAuction({
+  startPricePercent: 1.5,
+  endPricePercent: 1.0,
+  durationBlocks: 1000,
 })
+
+// Build compact with Tribunal mandate
+const compact = await client.sponsor
+  .compact()
+  .arbiter(arbiterAddress)
+  .sponsor(sponsorAddress)
+  .nonce(1n)
+  .expiresIn('1h')
+  .lockTag(lockTag)
+  .token(tokenAddress)
+  .amount(1000000n)
+  .witness(TribunalMandate, {
+    adjuster: '0xAdjusterAddress...',
+    fills: [
+      {
+        chainId: 1n,
+        tribunal: '0xTribunalAddress...',
+        expires: BigInt(Math.floor(Date.now() / 1000) + 3600),
+        components: [
+          {
+            fillToken: '0xUSDC...',
+            minimumFillAmount: 900000n, // Min 0.9 USDC
+            recipient: '0xRecipient...',
+            applyScaling: true,
+          },
+        ],
+        baselinePriorityFee: 1000000n,
+        scalingFactor: 1000000000000000000n, // 100% (1e18)
+        priceCurve, // Dutch auction curve elements
+        recipientCallback: [],
+        salt: '0x0000000000000000000000000000000000000000000000000000000000000001',
+      },
+    ],
+  })
+  .build()
 ```
+
+The Tribunal mandate structure supports:
+
+- **Dynamic pricing** via price curve arrays (compatible with price curve calculators)
+- **Cross-chain fills** with per-chain tribunal addresses
+- **Fill validation** with minimum amounts and scaling factors
+- **Callbacks** for post-fill operations on recipient addresses
 
 ## TypeScript Types
 
@@ -508,15 +530,11 @@ import type {
 ### Builder Return Types
 
 ```typescript
-import type {
-  BuiltCompact,
-  BuiltBatchCompact,
-  BuiltMultichainCompact,
-  BuiltClaim,
-} from '@uniswap/the-compact-sdk'
+import type { BuiltCompact, BuiltBatchCompact, BuiltMultichainCompact, BuiltClaim } from '@uniswap/the-compact-sdk'
 
 // Example usage
-const compact: BuiltCompact = await client.sponsor.compact()
+const compact: BuiltCompact = await client.sponsor
+  .compact()
   .arbiter(arbiterAddress)
   .sponsor(sponsorAddress)
   .nonce(1n)
@@ -527,10 +545,10 @@ const compact: BuiltCompact = await client.sponsor.compact()
   .build()
 
 // Access built properties
-compact.struct    // Compact struct
-compact.hash      // EIP-712 hash
+compact.struct // Compact struct
+compact.hash // EIP-712 hash
 compact.typedData // Full typed data for signing
-compact.mandate   // Optional mandate data
+compact.mandate // Optional mandate data
 ```
 
 ## Error Handling
@@ -541,7 +559,7 @@ The SDK provides detailed error types:
 import { decodeCompactError, type CompactError } from '@uniswap/the-compact-sdk'
 
 try {
-  await client.arbiter.submitClaim(claim.struct)
+  await client.arbiter.claim(claim.struct)
 } catch (error) {
   // Try to decode as CompactError
   const compactError = decodeCompactError(error)
@@ -577,7 +595,8 @@ const currentNonce = await client.view.getCurrentNonce(sponsorAddress)
 const nextNonce = currentNonce + 1n
 
 // Use sequential nonces for compacts
-const compact = await client.sponsor.compact()
+const compact = await client.sponsor
+  .compact()
   .nonce(nextNonce)
   // ... other fields
   .build()
@@ -587,14 +606,16 @@ const compact = await client.sponsor.compact()
 
 ```typescript
 // Use relative expiration for better UX
-const compact = await client.sponsor.compact()
-  .expiresIn('15 minutes') // or '1h', '30s', '1d'
+const compact = await client.sponsor
+  .compact()
+  .expiresIn('15m') // or '1h', '30s', '1d'
   // ...
   .build()
 
 // Or set absolute timestamp
 const expirationTimestamp = BigInt(Math.floor(Date.now() / 1000) + 900)
-const compact = await client.sponsor.compact()
+const compact = await client.sponsor
+  .compact()
   .expires(expirationTimestamp)
   // ...
   .build()
@@ -609,10 +630,7 @@ const WETH_SWAP_TAG = '0x000000000000574554485357' // "WETHSW" encoded
 
 // Create semantic lock tags
 function createLockTag(protocol: string, operation: string): `0x${string}` {
-  const bytes = Buffer.concat([
-    Buffer.from(protocol.slice(0, 6)),
-    Buffer.from(operation.slice(0, 6)),
-  ])
+  const bytes = Buffer.concat([Buffer.from(protocol.slice(0, 6)), Buffer.from(operation.slice(0, 6))])
   return `0x${bytes.toString('hex').padEnd(24, '0')}` as `0x${string}`
 }
 ```
@@ -621,7 +639,8 @@ function createLockTag(protocol: string, operation: string): `0x${string}` {
 
 ```typescript
 // Use batch compacts for multiple locks
-const batchCompact = await client.sponsor.batchCompact()
+const batchCompact = await client.sponsor
+  .batchCompact()
   .arbiter(arbiterAddress)
   .sponsor(sponsorAddress)
   .nonce(1n)
@@ -638,7 +657,8 @@ const batchCompact = await client.sponsor.batchCompact()
 
 ```typescript
 // Always use TypeScript for compile-time safety
-const compact = await client.sponsor.compact()
+const compact = await client.sponsor
+  .compact()
   .arbiter(arbiterAddress) // Type-checked as `0x${string}`
   .sponsor(sponsorAddress)
   .nonce(1n) // Type-checked as bigint
@@ -652,13 +672,7 @@ const compact = await client.sponsor.compact()
 
 ## Supported Chains
 
-The Compact v1 is deployed at `0x00000000000000171ede64904551eeDF3C6C9788` on:
-
-| Chain | Chain ID | Status |
-|-------|----------|--------|
-| Ethereum Mainnet | 1 | ✅ Supported |
-| Base | 8453 | ✅ Supported |
-| Unichain Sepolia | 1301 | ✅ Supported |
+The Compact v1 is deployed at `0x00000000000000171ede64904551eeDF3C6C9788` on various chains. The SDK surfaces current known deployments (Ethereum Mainnet, Unichain, Base, Arbitrum), and can support custom deployments across other chains and/or at different addresses.
 
 ### Using Custom Deployments
 
@@ -670,20 +684,6 @@ const client = new CompactClient({
   walletClient,
 })
 ```
-
-## Examples
-
-See the [examples](./examples) directory for complete working examples:
-
-- [Basic Compact](./examples/basic-compact.ts) - Simple token lock and claim
-- [Batch Operations](./examples/batch-compact.ts) - Multiple locks in one signature
-- [Multichain Compact](./examples/multichain-compact.ts) - Cross-chain coordination
-- [Using Mandates](./examples/mandates.ts) - Custom witness data
-- [Intent-based Trading](./examples/intent-trading.ts) - Order flow with compacts
-
-## Contributing
-
-Contributions are welcome! Please read our [Contributing Guide](./CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
 
 ### Development Setup
 

@@ -816,7 +816,8 @@ describe('Price Curve Calculators', () => {
           const scalingFactor = getCalculatedScalingFactor(curve, block)
           const expectedScaling = BigInt(Math.round(expectedPrice * 1e18))
           // Allow for rounding in interpolation (within 0.0001%)
-          const diff = scalingFactor > expectedScaling ? scalingFactor - expectedScaling : expectedScaling - scalingFactor
+          const diff =
+            scalingFactor > expectedScaling ? scalingFactor - expectedScaling : expectedScaling - scalingFactor
           expect(diff <= 1000000000000n).toBe(true) // 1e12 tolerance
         })
       })
@@ -842,7 +843,8 @@ describe('Price Curve Calculators', () => {
         testPoints.forEach(({ block, expectedPrice }) => {
           const scalingFactor = getCalculatedScalingFactor(curve, block)
           const expectedScaling = BigInt(Math.round(expectedPrice * 1e18))
-          const diff = scalingFactor > expectedScaling ? scalingFactor - expectedScaling : expectedScaling - scalingFactor
+          const diff =
+            scalingFactor > expectedScaling ? scalingFactor - expectedScaling : expectedScaling - scalingFactor
           expect(diff).toBeLessThanOrEqual(1)
         })
       })
@@ -908,9 +910,7 @@ describe('Price Curve Calculators', () => {
           const expectedScaling = BigInt(Math.round(expectedPrice * 1e18))
           // Allow for rounding in interpolation (within 0.0001%)
           const diff =
-            scalingFactor > expectedScaling
-              ? scalingFactor - expectedScaling
-              : expectedScaling - scalingFactor
+            scalingFactor > expectedScaling ? scalingFactor - expectedScaling : expectedScaling - scalingFactor
           expect(diff <= 1000000000000n).toBe(true) // 1e12 tolerance
         })
       })
@@ -938,9 +938,7 @@ describe('Price Curve Calculators', () => {
           const expectedScaling = BigInt(Math.round(expectedPrice * 1e18))
           // Allow for rounding in interpolation
           const diff =
-            scalingFactor > expectedScaling
-              ? scalingFactor - expectedScaling
-              : expectedScaling - scalingFactor
+            scalingFactor > expectedScaling ? scalingFactor - expectedScaling : expectedScaling - scalingFactor
           expect(diff <= 1n).toBe(true)
         })
       })

@@ -9,7 +9,7 @@
 
 import { keccak256 } from 'viem'
 
-import { defineMandateType, MandateFields } from './mandate'
+import { defineMandateType, MandateFields, TribunalMandate } from './mandate'
 
 // Type hash constants from Tribunal's TribunalTypeHashes.sol
 const MANDATE_TYPESTRING =
@@ -35,7 +35,7 @@ describe('Tribunal mandate type compatibility', () => {
   describe('full Tribunal mandate structure', () => {
     it('should produce the exact witness typestring that Tribunal uses', () => {
       // Define the Tribunal mandate type
-      const TribunalMandate = defineMandateType({
+      const mandate = defineMandateType({
         fields: [MandateFields.address('adjuster'), { name: 'fills', type: 'Mandate_Fill[]' }],
         nestedTypes: {
           Mandate_Fill: [
@@ -75,100 +75,20 @@ describe('Tribunal mandate type compatibility', () => {
           ],
         },
       })
+
+      // Verify this definition matches the exported TribunalMandate
+      expect(mandate.toString()).toBe(TribunalMandate.toString())
 
       // Verify witness typestring matches Tribunal exactly
       expect(TribunalMandate.witnessTypestring).toBe(WITNESS_TYPESTRING)
     })
 
     it('should produce the exact mandate typestring that Tribunal uses', () => {
-      const TribunalMandate = defineMandateType({
-        fields: [MandateFields.address('adjuster'), { name: 'fills', type: 'Mandate_Fill[]' }],
-        nestedTypes: {
-          Mandate_Fill: [
-            MandateFields.uint256('chainId'),
-            MandateFields.address('tribunal'),
-            MandateFields.uint256('expires'),
-            { name: 'components', type: 'Mandate_FillComponent[]' },
-            MandateFields.uint256('baselinePriorityFee'),
-            MandateFields.uint256('scalingFactor'),
-            { name: 'priceCurve', type: 'uint256[]' },
-            { name: 'recipientCallback', type: 'Mandate_RecipientCallback[]' },
-            MandateFields.bytes32('salt'),
-          ],
-          Mandate_FillComponent: [
-            MandateFields.address('fillToken'),
-            MandateFields.uint256('minimumFillAmount'),
-            MandateFields.address('recipient'),
-            MandateFields.bool('applyScaling'),
-          ],
-          Mandate_Lock: [
-            { name: 'lockTag', type: 'bytes12' },
-            MandateFields.address('token'),
-            MandateFields.uint256('amount'),
-          ],
-          Mandate_BatchCompact: [
-            MandateFields.address('arbiter'),
-            MandateFields.address('sponsor'),
-            MandateFields.uint256('nonce'),
-            MandateFields.uint256('expires'),
-            { name: 'commitments', type: 'Mandate_Lock[]' },
-            { name: 'mandate', type: 'Mandate' },
-          ],
-          Mandate_RecipientCallback: [
-            MandateFields.uint256('chainId'),
-            { name: 'compact', type: 'Mandate_BatchCompact' },
-            MandateFields.bytes('context'),
-          ],
-        },
-      })
-
       // Verify full typestring matches Tribunal exactly
       expect(TribunalMandate.typestring()).toBe(MANDATE_TYPESTRING)
     })
 
     it('should produce the exact mandate typehash that Tribunal uses', () => {
-      const TribunalMandate = defineMandateType({
-        fields: [MandateFields.address('adjuster'), { name: 'fills', type: 'Mandate_Fill[]' }],
-        nestedTypes: {
-          Mandate_Fill: [
-            MandateFields.uint256('chainId'),
-            MandateFields.address('tribunal'),
-            MandateFields.uint256('expires'),
-            { name: 'components', type: 'Mandate_FillComponent[]' },
-            MandateFields.uint256('baselinePriorityFee'),
-            MandateFields.uint256('scalingFactor'),
-            { name: 'priceCurve', type: 'uint256[]' },
-            { name: 'recipientCallback', type: 'Mandate_RecipientCallback[]' },
-            MandateFields.bytes32('salt'),
-          ],
-          Mandate_FillComponent: [
-            MandateFields.address('fillToken'),
-            MandateFields.uint256('minimumFillAmount'),
-            MandateFields.address('recipient'),
-            MandateFields.bool('applyScaling'),
-          ],
-          Mandate_Lock: [
-            { name: 'lockTag', type: 'bytes12' },
-            MandateFields.address('token'),
-            MandateFields.uint256('amount'),
-          ],
-          Mandate_BatchCompact: [
-            MandateFields.address('arbiter'),
-            MandateFields.address('sponsor'),
-            MandateFields.uint256('nonce'),
-            MandateFields.uint256('expires'),
-            { name: 'commitments', type: 'Mandate_Lock[]' },
-            { name: 'mandate', type: 'Mandate' },
-          ],
-          Mandate_RecipientCallback: [
-            MandateFields.uint256('chainId'),
-            { name: 'compact', type: 'Mandate_BatchCompact' },
-            MandateFields.bytes('context'),
-          ],
-        },
-      })
-
-      // Verify typehash matches Tribunal exactly
       const computedTypehash = TribunalMandate.typehash()
       expect(computedTypehash).toBe(MANDATE_TYPEHASH)
     })
@@ -197,47 +117,6 @@ describe('Tribunal mandate type compatibility', () => {
 
   describe('typestring structure validation', () => {
     it('should not have leading Mandate( in witness typestring', () => {
-      const TribunalMandate = defineMandateType({
-        fields: [MandateFields.address('adjuster'), { name: 'fills', type: 'Mandate_Fill[]' }],
-        nestedTypes: {
-          Mandate_Fill: [
-            MandateFields.uint256('chainId'),
-            MandateFields.address('tribunal'),
-            MandateFields.uint256('expires'),
-            { name: 'components', type: 'Mandate_FillComponent[]' },
-            MandateFields.uint256('baselinePriorityFee'),
-            MandateFields.uint256('scalingFactor'),
-            { name: 'priceCurve', type: 'uint256[]' },
-            { name: 'recipientCallback', type: 'Mandate_RecipientCallback[]' },
-            MandateFields.bytes32('salt'),
-          ],
-          Mandate_FillComponent: [
-            MandateFields.address('fillToken'),
-            MandateFields.uint256('minimumFillAmount'),
-            MandateFields.address('recipient'),
-            MandateFields.bool('applyScaling'),
-          ],
-          Mandate_Lock: [
-            { name: 'lockTag', type: 'bytes12' },
-            MandateFields.address('token'),
-            MandateFields.uint256('amount'),
-          ],
-          Mandate_BatchCompact: [
-            MandateFields.address('arbiter'),
-            MandateFields.address('sponsor'),
-            MandateFields.uint256('nonce'),
-            MandateFields.uint256('expires'),
-            { name: 'commitments', type: 'Mandate_Lock[]' },
-            { name: 'mandate', type: 'Mandate' },
-          ],
-          Mandate_RecipientCallback: [
-            MandateFields.uint256('chainId'),
-            { name: 'compact', type: 'Mandate_BatchCompact' },
-            MandateFields.bytes('context'),
-          ],
-        },
-      })
-
       // Witness typestring should NOT start with "Mandate("
       expect(TribunalMandate.witnessTypestring.startsWith('Mandate(')).toBe(false)
 
@@ -246,47 +125,6 @@ describe('Tribunal mandate type compatibility', () => {
     })
 
     it('should not have trailing ) in witness typestring', () => {
-      const TribunalMandate = defineMandateType({
-        fields: [MandateFields.address('adjuster'), { name: 'fills', type: 'Mandate_Fill[]' }],
-        nestedTypes: {
-          Mandate_Fill: [
-            MandateFields.uint256('chainId'),
-            MandateFields.address('tribunal'),
-            MandateFields.uint256('expires'),
-            { name: 'components', type: 'Mandate_FillComponent[]' },
-            MandateFields.uint256('baselinePriorityFee'),
-            MandateFields.uint256('scalingFactor'),
-            { name: 'priceCurve', type: 'uint256[]' },
-            { name: 'recipientCallback', type: 'Mandate_RecipientCallback[]' },
-            MandateFields.bytes32('salt'),
-          ],
-          Mandate_FillComponent: [
-            MandateFields.address('fillToken'),
-            MandateFields.uint256('minimumFillAmount'),
-            MandateFields.address('recipient'),
-            MandateFields.bool('applyScaling'),
-          ],
-          Mandate_Lock: [
-            { name: 'lockTag', type: 'bytes12' },
-            MandateFields.address('token'),
-            MandateFields.uint256('amount'),
-          ],
-          Mandate_BatchCompact: [
-            MandateFields.address('arbiter'),
-            MandateFields.address('sponsor'),
-            MandateFields.uint256('nonce'),
-            MandateFields.uint256('expires'),
-            { name: 'commitments', type: 'Mandate_Lock[]' },
-            { name: 'mandate', type: 'Mandate' },
-          ],
-          Mandate_RecipientCallback: [
-            MandateFields.uint256('chainId'),
-            { name: 'compact', type: 'Mandate_BatchCompact' },
-            MandateFields.bytes('context'),
-          ],
-        },
-      })
-
       // Witness typestring should NOT end with ")"
       expect(TribunalMandate.witnessTypestring.endsWith(')')).toBe(false)
 
@@ -296,47 +134,6 @@ describe('Tribunal mandate type compatibility', () => {
     })
 
     it('should have alphabetically sorted nested types', () => {
-      const TribunalMandate = defineMandateType({
-        fields: [MandateFields.address('adjuster'), { name: 'fills', type: 'Mandate_Fill[]' }],
-        nestedTypes: {
-          Mandate_Fill: [
-            MandateFields.uint256('chainId'),
-            MandateFields.address('tribunal'),
-            MandateFields.uint256('expires'),
-            { name: 'components', type: 'Mandate_FillComponent[]' },
-            MandateFields.uint256('baselinePriorityFee'),
-            MandateFields.uint256('scalingFactor'),
-            { name: 'priceCurve', type: 'uint256[]' },
-            { name: 'recipientCallback', type: 'Mandate_RecipientCallback[]' },
-            MandateFields.bytes32('salt'),
-          ],
-          Mandate_FillComponent: [
-            MandateFields.address('fillToken'),
-            MandateFields.uint256('minimumFillAmount'),
-            MandateFields.address('recipient'),
-            MandateFields.bool('applyScaling'),
-          ],
-          Mandate_Lock: [
-            { name: 'lockTag', type: 'bytes12' },
-            MandateFields.address('token'),
-            MandateFields.uint256('amount'),
-          ],
-          Mandate_BatchCompact: [
-            MandateFields.address('arbiter'),
-            MandateFields.address('sponsor'),
-            MandateFields.uint256('nonce'),
-            MandateFields.uint256('expires'),
-            { name: 'commitments', type: 'Mandate_Lock[]' },
-            { name: 'mandate', type: 'Mandate' },
-          ],
-          Mandate_RecipientCallback: [
-            MandateFields.uint256('chainId'),
-            { name: 'compact', type: 'Mandate_BatchCompact' },
-            MandateFields.bytes('context'),
-          ],
-        },
-      })
-
       // Check that nested types appear in alphabetical order in the typestring
       const typestring = TribunalMandate.witnessTypestring
 
