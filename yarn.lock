@@ -5023,7 +5023,7 @@ __metadata:
     "@uniswap/v2-sdk": ^4.16.0
     "@uniswap/v3-core": 1.0.0
     "@uniswap/v3-sdk": ^3.26.0
-    "@uniswap/v4-sdk": ^1.22.0
+    "@uniswap/v4-sdk": ^1.23.0
     bignumber.js: ^9.0.2
     chai: ^4.3.6
     dotenv: ^16.0.3
@@ -5178,20 +5178,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v4-sdk@npm:^1.22.0":
-  version: 1.22.0
-  resolution: "@uniswap/v4-sdk@npm:1.22.0"
-  dependencies:
-    "@ethersproject/solidity": ^5.0.9
-    "@uniswap/sdk-core": ^7.8.0
-    "@uniswap/v3-sdk": 3.26.0
-    tiny-invariant: ^1.1.0
-    tiny-warning: ^1.0.3
-  checksum: 6e590ed4f7cc1f8c86e27cec2837308b74a7dc0288c813809aafd5c08b3906ef9c425f6bc1acbbab68b62c75b218e28b270a4afb519a1c92feddeedc4d118054
-  languageName: node
-  linkType: hard
-
-"@uniswap/v4-sdk@npm:^1.23.0":
+"@uniswap/v4-sdk@npm:^1.22.0, @uniswap/v4-sdk@npm:^1.23.0":
   version: 1.23.0
   resolution: "@uniswap/v4-sdk@npm:1.23.0"
   dependencies:
