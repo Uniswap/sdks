@@ -457,6 +457,7 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
         {
           currencyIn: inputToken.isNative ? ETH_ADDRESS : inputToken.address,
           path: encodeV4RouteToPath(v4SubRoute),
+          maxHopSlippage: [],
           amountIn: 0, // denotes open delta, amount set in v4Planner.addSettle()
           amountOutMinimum: !isLastSectionInRoute(i) ? 0 : amountOut,
         },
