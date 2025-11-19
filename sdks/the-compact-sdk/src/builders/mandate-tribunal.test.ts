@@ -8,6 +8,7 @@
  */
 
 import { keccak256 } from 'viem'
+
 import { defineMandateType, MandateFields } from './mandate'
 
 // Type hash constants from Tribunal's TribunalTypeHashes.sol
@@ -16,28 +17,11 @@ const MANDATE_TYPESTRING =
 
 const MANDATE_TYPEHASH = '0xd98eceb6e5c7770b3b664a99c269855402fe5255294a30970d25376caea662c6' as `0x${string}`
 
-const MANDATE_FILL_TYPESTRING =
-  'Mandate_Fill(uint256 chainId,address tribunal,uint256 expires,Mandate_FillComponent[] components,uint256 baselinePriorityFee,uint256 scalingFactor,uint256[] priceCurve,Mandate_RecipientCallback[] recipientCallback,bytes32 salt)Mandate(address adjuster,Mandate_Fill[] fills)Mandate_BatchCompact(address arbiter,address sponsor,uint256 nonce,uint256 expires,Mandate_Lock[] commitments,Mandate mandate)Mandate_FillComponent(address fillToken,uint256 minimumFillAmount,address recipient,bool applyScaling)Mandate_Lock(bytes12 lockTag,address token,uint256 amount)Mandate_RecipientCallback(uint256 chainId,Mandate_BatchCompact compact,bytes context)'
-
-const MANDATE_FILL_TYPEHASH = '0x1d0ee69a7bc1ac54d9a6b38f32ab156fbfe09a9098843d54f89e7b1033533d33' as `0x${string}`
-
 const MANDATE_FILL_COMPONENT_TYPESTRING =
   'Mandate_FillComponent(address fillToken,uint256 minimumFillAmount,address recipient,bool applyScaling)'
 
 const MANDATE_FILL_COMPONENT_TYPEHASH =
   '0x97a135285706d21a6b74ac159b77b16cea827acc358fc6c33e430ce0a85fe9d6' as `0x${string}`
-
-const MANDATE_RECIPIENT_CALLBACK_TYPESTRING =
-  'Mandate_RecipientCallback(uint256 chainId,Mandate_BatchCompact compact,bytes context)Mandate(address adjuster,Mandate_Fill[] fills)Mandate_BatchCompact(address arbiter,address sponsor,uint256 nonce,uint256 expires,Mandate_Lock[] commitments,Mandate mandate)Mandate_Fill(uint256 chainId,address tribunal,uint256 expires,Mandate_FillComponent[] components,uint256 baselinePriorityFee,uint256 scalingFactor,uint256[] priceCurve,Mandate_RecipientCallback[] recipientCallback,bytes32 salt)Mandate_FillComponent(address fillToken,uint256 minimumFillAmount,address recipient,bool applyScaling)Mandate_Lock(bytes12 lockTag,address token,uint256 amount)'
-
-const MANDATE_RECIPIENT_CALLBACK_TYPEHASH =
-  '0xb60a17eb6828a433f2f2fcbeb119166fa25e1fb6ae3866e33952bb74f5055031' as `0x${string}`
-
-const MANDATE_BATCH_COMPACT_TYPESTRING =
-  'Mandate_BatchCompact(address arbiter,address sponsor,uint256 nonce,uint256 expires,Mandate_Lock[] commitments,Mandate mandate)Mandate(address adjuster,Mandate_Fill[] fills)Mandate_Fill(uint256 chainId,address tribunal,uint256 expires,Mandate_FillComponent[] components,uint256 baselinePriorityFee,uint256 scalingFactor,uint256[] priceCurve,Mandate_RecipientCallback[] recipientCallback,bytes32 salt)Mandate_FillComponent(address fillToken,uint256 minimumFillAmount,address recipient,bool applyScaling)Mandate_Lock(bytes12 lockTag,address token,uint256 amount)Mandate_RecipientCallback(uint256 chainId,Mandate_BatchCompact compact,bytes context)'
-
-const MANDATE_BATCH_COMPACT_TYPEHASH =
-  '0x75d7205b7ec9e9b203d9161387d95a46c8440f4530dceab1bb28d4194a586227' as `0x${string}`
 
 const MANDATE_LOCK_TYPESTRING = 'Mandate_Lock(bytes12 lockTag,address token,uint256 amount)'
 
@@ -194,7 +178,8 @@ describe('Tribunal mandate type compatibility', () => {
     it('should match Mandate_FillComponent typestring and typehash', () => {
       // Note: We're testing that a standalone MandateFillComponent would have the right structure
       // even though in practice it's always part of the full mandate structure
-      const computedTypestring = 'Mandate_FillComponent(address fillToken,uint256 minimumFillAmount,address recipient,bool applyScaling)'
+      const computedTypestring =
+        'Mandate_FillComponent(address fillToken,uint256 minimumFillAmount,address recipient,bool applyScaling)'
       const computedTypehash = keccak256(computedTypestring as `0x${string}`)
 
       expect(computedTypestring).toBe(MANDATE_FILL_COMPONENT_TYPESTRING)

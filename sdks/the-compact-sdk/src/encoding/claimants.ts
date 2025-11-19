@@ -3,8 +3,9 @@
  * Handles packing and unpacking of claimant values in Component structs
  */
 
-import { Component } from '../types/claims'
 import invariant from 'tiny-invariant'
+
+import { Component } from '../types/claims'
 
 /**
  * Type of claimant operation

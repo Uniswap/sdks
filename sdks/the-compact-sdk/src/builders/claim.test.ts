@@ -2,10 +2,11 @@
  * Tests for Claim builders
  */
 
-import { ClaimBuilder, SingleClaimBuilder, BatchClaimBuilder } from './claim'
 import { CompactDomain } from '../config/domain'
-import { Compact, BatchCompact } from '../types/eip712'
 import { encodeLockId } from '../encoding/locks'
+import { Compact, BatchCompact } from '../types/eip712'
+
+import { ClaimBuilder, SingleClaimBuilder, BatchClaimBuilder } from './claim'
 
 describe('Claim Builders', () => {
   const domain: CompactDomain = {
@@ -384,7 +385,8 @@ describe('Claim Builders', () => {
       }
 
       const lockTag2 = '0x000000000000000000000002' as `0x${string}`
-      const signature = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12' as `0x${string}`
+      const signature =
+        '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12' as `0x${string}`
 
       // Use fromCompact to pre-fill sponsor, nonce, expires, and signature
       const claim = ClaimBuilder.batch(domain)

@@ -2,9 +2,10 @@
  * Lock tag and lock ID encoding/decoding utilities
  */
 
-import type { Address, Hex } from 'viem'
-import { Scope, ResetPeriod } from '../types/runtime'
 import invariant from 'tiny-invariant'
+import type { Address, Hex } from 'viem'
+
+import { Scope, ResetPeriod } from '../types/runtime'
 
 /**
  * Parts of a lock tag

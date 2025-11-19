@@ -2,15 +2,17 @@
  * Fluent builders for creating Claim payloads
  */
 
+import invariant from 'tiny-invariant'
 import type { Address, Hex } from 'viem'
-import { Claim, BatchClaim, Component } from '../types/claims'
-import { Compact, BatchCompact } from '../types/eip712'
+import { hashTypedData } from 'viem'
+
 import { CompactDomain } from '../config/domain'
-import { MandateType } from './mandate'
 import { ClaimantInput, buildComponent } from '../encoding/claimants'
 import { decodeLockId, encodeLockId } from '../encoding/locks'
-import invariant from 'tiny-invariant'
-import { hashTypedData } from 'viem'
+import { Claim, BatchClaim, Component } from '../types/claims'
+import { Compact, BatchCompact } from '../types/eip712'
+
+import { MandateType } from './mandate'
 
 /**
  * Result of building a Claim with the claim builder
@@ -83,7 +85,7 @@ export class SingleClaimBuilder {
   private _nonce?: bigint
   private _expires?: bigint
   private _witness: `0x${string}` = '0x0000000000000000000000000000000000000000000000000000000000000000'
-  private _witnessTypestring: string = ''
+  private _witnessTypestring = ''
   private _id?: bigint
   private _allocatedAmount?: bigint
   private _claimants: Component[] = []
@@ -430,7 +432,7 @@ abstract class BaseBatchClaimBuilder implements IBatchClaimBuilder {
   protected _nonce?: bigint
   protected _expires?: bigint
   protected _witness: Hex = '0x0000000000000000000000000000000000000000000000000000000000000000'
-  protected _witnessTypestring: string = ''
+  protected _witnessTypestring = ''
   protected claimComponentBuilders: BatchClaimComponentBuilder[] = []
 
   constructor(domain: CompactDomain) {
@@ -783,7 +785,7 @@ export class MultichainClaimBuilder {
   private _nonce?: bigint
   private _expires?: bigint
   private _witness: `0x${string}` = '0x0000000000000000000000000000000000000000000000000000000000000000'
-  private _witnessTypestring: string = ''
+  private _witnessTypestring = ''
   private _id?: bigint
   private _allocatedAmount?: bigint
   private _claimants: Component[] = []
@@ -1165,7 +1167,7 @@ export class ExogenousMultichainClaimBuilder {
   private _nonce?: bigint
   private _expires?: bigint
   private _witness: `0x${string}` = '0x0000000000000000000000000000000000000000000000000000000000000000'
-  private _witnessTypestring: string = ''
+  private _witnessTypestring = ''
   private _id?: bigint
   private _allocatedAmount?: bigint
   private _claimants: Component[] = []

@@ -2,13 +2,15 @@
  * Sponsor client for deposit and registration operations
  */
 
-import { CompactClientConfig } from './coreClient'
+import invariant from 'tiny-invariant'
+import { Account, decodeEventLog } from 'viem'
+
 import { theCompactAbi } from '../abi/theCompact'
 import { CompactBuilder } from '../builders/compact'
 import { createDomain } from '../config/domain'
 import { extractCompactError } from '../errors/decode'
-import { decodeEventLog } from 'viem'
-import invariant from 'tiny-invariant'
+
+import { CompactClientConfig } from './coreClient'
 
 /**
  * Client for sponsor operations (deposits, registrations, compact creation)
@@ -94,7 +96,7 @@ export class SponsorClient {
         args: [params.lockTag, params.recipient],
         value: params.value,
         chain: null,
-        account: this.config.walletClient.account!,
+        account: this.config.walletClient.account as Account,
       })
 
       // Wait for transaction and extract id from Transfer event
@@ -183,7 +185,7 @@ export class SponsorClient {
         functionName: 'depositERC20',
         args: [params.token, params.lockTag, params.amount, params.recipient],
         chain: null,
-        account: this.config.walletClient.account!,
+        account: this.config.walletClient.account as Account,
       })
 
       // Wait for transaction and extract id from Transfer event
@@ -261,7 +263,7 @@ export class SponsorClient {
         functionName: 'register',
         args: [params.claimHash, params.typehash],
         chain: null,
-        account: this.config.walletClient.account!,
+        account: this.config.walletClient.account as Account,
       })
 
       return hash
@@ -309,7 +311,7 @@ export class SponsorClient {
         functionName: 'enableForcedWithdrawal',
         args: [id],
         chain: null,
-        account: this.config.walletClient.account!,
+        account: this.config.walletClient.account as Account,
       })
 
       // Wait for transaction to get the actual withdrawable time
@@ -376,7 +378,7 @@ export class SponsorClient {
         functionName: 'disableForcedWithdrawal',
         args: [id],
         chain: null,
-        account: this.config.walletClient.account!,
+        account: this.config.walletClient.account as Account,
       })
 
       return hash
@@ -433,7 +435,7 @@ export class SponsorClient {
         functionName: 'forcedWithdrawal',
         args: [id, recipient, amount],
         chain: null,
-        account: this.config.walletClient.account!,
+        account: this.config.walletClient.account as Account,
       })
 
       return hash

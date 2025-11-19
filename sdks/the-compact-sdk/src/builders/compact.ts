@@ -2,11 +2,13 @@
  * Fluent builders for creating Compact, BatchCompact, and MultichainCompact messages
  */
 
-import { Compact, BatchCompact, MultichainCompact, Lock, MultichainElement } from '../types/eip712'
-import { CompactDomain } from '../config/domain'
-import { MandateType } from './mandate'
 import invariant from 'tiny-invariant'
 import { Address, hashTypedData, Hex } from 'viem'
+
+import { CompactDomain } from '../config/domain'
+import { Compact, BatchCompact, MultichainCompact, Lock, MultichainElement } from '../types/eip712'
+
+import { MandateType } from './mandate'
 
 /**
  * EIP-712 message type for compacts with optional mandate
@@ -82,7 +84,7 @@ export interface BuiltBatchCompact<TMandate extends object | undefined = undefin
  * Result of building a multichain compact
  * Contains all data needed to sign and submit a multichain compact across multiple chains
  */
-export interface BuiltMultichainCompact<TMandate extends object | undefined = undefined> {
+export interface BuiltMultichainCompact {
   /** The multichain compact struct ready to be submitted on-chain */
   struct: MultichainCompact
   /** EIP-712 hash of the multichain compact for signature verification */
@@ -335,7 +337,7 @@ export class SingleCompactBuilder<TMandate extends object | undefined = undefine
       ],
     }
 
-    let message: CompactMessage<TMandate> = { ...struct } as CompactMessage<TMandate>
+    const message: CompactMessage<TMandate> = { ...struct } as CompactMessage<TMandate>
 
     // Add mandate if present
     if (this._mandateType && this._mandate) {
@@ -566,7 +568,7 @@ export class BatchCompactBuilder<TMandate extends object | undefined = undefined
       ],
     }
 
-    let message: BatchCompactMessage<TMandate> = { ...struct } as BatchCompactMessage<TMandate>
+    const message: BatchCompactMessage<TMandate> = { ...struct } as BatchCompactMessage<TMandate>
 
     // Add mandate if present
     if (this._mandateType && this._mandate) {

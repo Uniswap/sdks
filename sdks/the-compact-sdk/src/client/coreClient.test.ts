@@ -2,9 +2,9 @@
  * Tests for coreClient
  */
 
+import { ArbiterClient } from './arbiter'
 import { createCompactClient, CompactClientConfig } from './coreClient'
 import { SponsorClient } from './sponsor'
-import { ArbiterClient } from './arbiter'
 import { ViewClient } from './view'
 
 // Mock viem clients

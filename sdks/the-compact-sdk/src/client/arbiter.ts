@@ -2,8 +2,14 @@
  * Arbiter client for claim submission operations
  */
 
-import { CompactClientConfig } from './coreClient'
+import invariant from 'tiny-invariant'
+import { Account } from 'viem'
+
 import { theCompactAbi } from '../abi/theCompact'
+import { ClaimBuilder } from '../builders/claim'
+import { createDomain } from '../config/domain'
+import { claimHash, batchClaimHash } from '../encoding/hashes'
+import { extractCompactError } from '../errors/decode'
 import {
   Claim,
   BatchClaim,
@@ -12,11 +18,8 @@ import {
   ExogenousMultichainClaim,
   ExogenousBatchMultichainClaim,
 } from '../types/claims'
-import { ClaimBuilder } from '../builders/claim'
-import { createDomain } from '../config/domain'
-import { extractCompactError } from '../errors/decode'
-import { claimHash, batchClaimHash } from '../encoding/hashes'
-import invariant from 'tiny-invariant'
+
+import { CompactClientConfig } from './coreClient'
 
 /**
  * Client for arbiter operations (claim submissions)
@@ -88,7 +91,7 @@ export class ArbiterClient {
         functionName: 'claim',
         args: [claim] as any,
         chain: null,
-        account: this.config.walletClient.account!,
+        account: this.config.walletClient.account as Account,
       })
 
       // Compute claim hash
@@ -143,7 +146,7 @@ export class ArbiterClient {
         functionName: 'batchClaim',
         args: [claim] as any,
         chain: null,
-        account: this.config.walletClient.account!,
+        account: this.config.walletClient.account as Account,
       })
 
       // Compute batch claim hash
@@ -198,7 +201,7 @@ export class ArbiterClient {
         functionName: 'multichainClaim',
         args: [claim] as any,
         chain: null,
-        account: this.config.walletClient.account!,
+        account: this.config.walletClient.account as Account,
       })
 
       // For multichain claims, use the base claim hash
@@ -255,7 +258,9 @@ export class ArbiterClient {
    * const result = await client.arbiter.batchMultichainClaim(claim.struct)
    * ```
    */
-  async batchMultichainClaim(claim: BatchMultichainClaim): Promise<{ txHash: `0x${string}`; claimHash: `0x${string}` }> {
+  async batchMultichainClaim(
+    claim: BatchMultichainClaim
+  ): Promise<{ txHash: `0x${string}`; claimHash: `0x${string}` }> {
     invariant(this.config.walletClient, 'walletClient is required for claims')
     invariant(this.config.address, 'contract address is required')
 
@@ -266,7 +271,7 @@ export class ArbiterClient {
         functionName: 'batchMultichainClaim',
         args: [claim] as any,
         chain: null,
-        account: this.config.walletClient.account!,
+        account: this.config.walletClient.account as Account,
       })
 
       // For batch multichain claims, use the claims array directly for hashing
@@ -425,7 +430,7 @@ export class ArbiterClient {
         functionName: 'exogenousClaim',
         args: [claim] as any,
         chain: null,
-        account: this.config.walletClient.account!,
+        account: this.config.walletClient.account as Account,
       })
 
       // Use base claim hash (same structure as MultichainClaim for the core fields)
@@ -478,7 +483,7 @@ export class ArbiterClient {
         functionName: 'exogenousBatchClaim',
         args: [claim] as any,
         chain: null,
-        account: this.config.walletClient.account!,
+        account: this.config.walletClient.account as Account,
       })
 
       // Use batch claim hash (same structure as BatchMultichainClaim for the core fields)

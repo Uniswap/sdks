@@ -2,8 +2,9 @@
  * Tests for Tribunal builders
  */
 
-import { TribunalBuilder, createSameChainFill, createCrossChainFill } from './tribunal'
 import { SCALING_FACTOR } from '../lib/priceCurve'
+
+import { TribunalBuilder, createSameChainFill, createCrossChainFill } from './tribunal'
 
 describe('Tribunal Builders', () => {
   const tribunalAddress = '0x1234567890123456789012345678901234567890' as `0x${string}`

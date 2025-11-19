@@ -2,9 +2,11 @@
  * Tests for ViewClient
  */
 
-import { ViewClient } from './view'
-import { CompactClientConfig } from './coreClient'
+import { encodeLockId } from '../encoding/locks'
 import { ResetPeriod, Scope } from '../types/runtime'
+
+import { CompactClientConfig } from './coreClient'
+import { ViewClient } from './view'
 
 // Mock viem clients
 const mockPublicClient = {
@@ -32,8 +34,7 @@ describe('ViewClient', () => {
 
   describe('getLockDetails()', () => {
     it('should get lock details', async () => {
-      const lockId = 100n
-      const lockTag = '0x000000000000000000000001' as `0x${string}`
+      const lockId = encodeLockId('0x123456789012345678901234', tokenAddress)
 
       // Mock contract response [token, allocator, resetPeriod, scope]
       mockPublicClient.readContract.mockResolvedValue([
@@ -56,7 +57,7 @@ describe('ViewClient', () => {
       expect(result.allocator).toBe(allocatorAddress)
       expect(result.resetPeriod).toBe(ResetPeriod.TenMinutes)
       expect(result.scope).toBe(Scope.Multichain)
-      expect(result.lockTag).toMatch(/^0x[0-9a-f]{24}$/)
+      expect(result.lockTag).toBe('0x123456789012345678901234')
     })
 
     it('should throw if contract address is missing', async () => {
@@ -160,7 +161,6 @@ describe('ViewClient', () => {
     })
   })
 
-
   describe('hasConsumedAllocatorNonce()', () => {
     it('should check if allocator nonce is consumed', async () => {
       const nonce = 42n
@@ -209,7 +209,6 @@ describe('ViewClient', () => {
       ).rejects.toThrow('contract address is required')
     })
   })
-
 
   describe('getForcedWithdrawalStatus()', () => {
     it('should get forced withdrawal status when enabled', async () => {
@@ -271,8 +270,7 @@ describe('ViewClient', () => {
 
   describe('getDomainSeparator()', () => {
     it('should get domain separator', async () => {
-      const domainSeparator =
-        '0x3333333333333333333333333333333333333333333333333333333333333333' as `0x${string}`
+      const domainSeparator = '0x3333333333333333333333333333333333333333333333333333333333333333' as `0x${string}`
 
       mockPublicClient.readContract.mockResolvedValue(domainSeparator)
 

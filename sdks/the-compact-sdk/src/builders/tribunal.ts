@@ -2,9 +2,10 @@
  * Fluent builders for creating Tribunal mandates and fill parameters
  */
 
-import { FillComponent, FillParameters, Mandate, RecipientCallback } from '../types/tribunal'
-import { createPriceCurve, PriceCurveElement } from '../lib/priceCurve'
 import invariant from 'tiny-invariant'
+
+import { createPriceCurve, PriceCurveElement } from '../lib/priceCurve'
+import { FillComponent, FillParameters, Mandate, RecipientCallback } from '../types/tribunal'
 
 /**
  * Builder for FillComponent

@@ -14,6 +14,7 @@
  */
 
 import { describe, it, expect, beforeAll } from '@jest/globals'
+import invariant from 'tiny-invariant'
 import {
   createPublicClient,
   createWalletClient,
@@ -26,6 +27,7 @@ import {
   zeroAddress,
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
+
 import { createCompactClient } from './client/coreClient'
 import { encodeLockTag, encodeLockId, decodeLockTag } from './encoding/locks'
 import { Scope, ResetPeriod } from './types/runtime'
@@ -65,10 +67,10 @@ const TEST_ALLOCATOR = {
 }
 
 // Real allocator registered on mainnet (rejects unauthorized claims)
-const REAL_ALLOCATOR = {
-  address: '0x00000000000014E936Ef81802C9eEe5cBa81Cb8e' as Address,
-  allocatorId: 3074909908954802876355562382n,
-}
+// const ATTESTABLE_ALLOCATOR = {
+//   address: '0x00000000000014E936Ef81802C9eEe5cBa81Cb8e' as Address,
+//   allocatorId: 3074909908954802876355562382n,
+// }
 
 // Fixed timestamps for deterministic EIP-712 hash generation
 const FIXED_EXPIRY = 1893456000n // January 1, 2030 00:00:00 GMT
@@ -255,7 +257,6 @@ describeE2E('The Compact SDK - End-to-End Tests', () => {
   describe('Compact Creation and Signing', () => {
     let singleCompact: any
     let batchCompact: any
-    const compactLockId = 123n
 
     it('should create and sign a single compact', async () => {
       const compactClient = createCompactClient({
@@ -900,7 +901,8 @@ describeE2E('The Compact SDK - End-to-End Tests', () => {
 
       // Sign the claim with the allocator
       // AlwaysOKAllocator implements IERC1271 and accepts any signature
-      const claimDigest = claim.hash!
+      const claimDigest = claim.hash
+      invariant(claimDigest, 'Claim hash is required')
       const allocatorSignature = await mainnetWalletClient.signMessage({
         account: allocatorAccount,
         message: { raw: claimDigest },
@@ -1084,7 +1086,7 @@ describeE2E('The Compact SDK - End-to-End Tests', () => {
       // Sponsor signs the compact
       const signature = await mainnetWalletClient.signTypedData({
         account: sponsorAccount,
-        ...compact.typedData!,
+        ...compact.typedData,
       })
 
       expect(signature).toMatch(/^0x[0-9a-f]+$/)
@@ -1117,7 +1119,8 @@ describeE2E('The Compact SDK - End-to-End Tests', () => {
 
       // Sign the claim with the allocator
       // AlwaysOKAllocator implements IERC1271 and accepts any signature
-      const claimDigest = claim.hash!
+      const claimDigest = claim.hash
+      invariant(claimDigest, 'Claim hash is required')
       const allocatorSignature = await mainnetWalletClient.signMessage({
         account: allocatorAccount,
         message: { raw: claimDigest },
@@ -1283,7 +1286,7 @@ describeE2E('The Compact SDK - End-to-End Tests', () => {
 
       const signature = await mainnetWalletClient.signTypedData({
         account: sponsorAccount,
-        ...compact.typedData!,
+        ...compact.typedData,
       })
       console.log('  ✓ Compact created and signed')
 
@@ -1325,7 +1328,7 @@ describeE2E('The Compact SDK - End-to-End Tests', () => {
       // Sign with allocator
       const allocatorSignature = await mainnetWalletClient.signMessage({
         account: allocatorAccount,
-        message: { raw: claim.hash! },
+        message: { raw: claim.hash as Hex },
       })
       claim.struct.allocatorData = allocatorSignature
 
@@ -1501,7 +1504,7 @@ describeE2E('The Compact SDK - End-to-End Tests', () => {
 
       const signature = await mainnetWalletClient.signTypedData({
         account: sponsorAccount,
-        ...batchCompact.typedData!,
+        ...batchCompact.typedData,
       })
       console.log('  ✓ Batch compact created and signed')
       console.log('    Covering 2 locks with different reset periods')

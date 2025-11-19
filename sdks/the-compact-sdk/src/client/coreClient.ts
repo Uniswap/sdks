@@ -3,9 +3,11 @@
  */
 
 import { PublicClient, WalletClient } from 'viem'
+
 import { getDefaultAddress } from '../config/chains'
-import { SponsorClient } from './sponsor'
+
 import { ArbiterClient } from './arbiter'
+import { SponsorClient } from './sponsor'
 import { ViewClient } from './view'
 
 /**

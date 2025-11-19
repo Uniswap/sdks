@@ -10,9 +10,10 @@
 import { describe, it, expect } from '@jest/globals'
 import { createPublicClient, http } from 'viem'
 import { mainnet } from 'viem/chains'
+
+import { createCompactClient } from './client/coreClient'
 import { encodeLockTag, decodeLockTag, encodeLockId, decodeLockId } from './encoding/locks'
 import { Scope, ResetPeriod } from './types/runtime'
-import { createCompactClient } from './client/coreClient'
 
 // Known mainnet values
 const MAINNET_COMPACT_ADDRESS = '0x00000000000000171ede64904551eeDF3C6C9788' as const

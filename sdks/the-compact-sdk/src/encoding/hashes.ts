@@ -28,6 +28,7 @@
  */
 
 import { keccak256, encodeAbiParameters, concat, type Hex } from 'viem'
+
 import type { Component, Claim, BatchClaim } from '../types/claims'
 
 /**

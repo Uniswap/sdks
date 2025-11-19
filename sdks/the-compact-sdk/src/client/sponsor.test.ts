@@ -2,11 +2,14 @@
  * Tests for SponsorClient
  */
 
-import { SponsorClient } from './sponsor'
-import { CompactClientConfig } from './coreClient'
+import invariant from 'tiny-invariant'
 import { parseEther, encodeEventTopics, encodeAbiParameters } from 'viem'
-import { simpleMandate } from '../builders/mandate'
+
 import { theCompactAbi } from '../abi/theCompact'
+import { simpleMandate } from '../builders/mandate'
+
+import { CompactClientConfig } from './coreClient'
+import { SponsorClient } from './sponsor'
 
 // Mock viem clients
 const mockPublicClient = {
@@ -30,7 +33,8 @@ function createTransferEvent(params: {
   by: `0x${string}`
   amount: bigint
 }) {
-  const transferEvent = theCompactAbi.find((item) => item.type === 'event' && item.name === 'Transfer')!
+  const transferEvent = theCompactAbi.find((item) => item.type === 'event' && item.name === 'Transfer')
+  invariant(transferEvent, 'Transfer event not found')
 
   const topics = encodeEventTopics({
     abi: [transferEvent],
@@ -64,7 +68,8 @@ function createForcedWithdrawalStatusUpdatedEvent(params: {
   activating: boolean
   withdrawableAt: bigint
 }) {
-  const event = theCompactAbi.find((item) => item.type === 'event' && item.name === 'ForcedWithdrawalStatusUpdated')!
+  const event = theCompactAbi.find((item) => item.type === 'event' && item.name === 'ForcedWithdrawalStatusUpdated')
+  invariant(event, 'ForcedWithdrawalStatusUpdated event not found')
 
   const topics = encodeEventTopics({
     abi: [event],

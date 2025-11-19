@@ -3,8 +3,8 @@
  * Handles the complex EIP-712 witness mechanism for Compacts
  */
 
-import { keccak256, encodeAbiParameters, concat } from 'viem'
 import invariant from 'tiny-invariant'
+import { keccak256, encodeAbiParameters, concat } from 'viem'
 
 /**
  * EIP-712 field definition
@@ -112,7 +112,7 @@ export function defineMandateType<TValue extends object>(config: MandateTypeConf
       // Check if any field is an array or a custom type
       // Note: Check for arrays BEFORE checking isPrimitiveType, since isPrimitiveType
       // strips array suffix and would return true for "uint256[]"
-      const hasComplexTypes = fields.some(f => {
+      const hasComplexTypes = fields.some((f) => {
         if (f.type.endsWith('[]')) return true // Any array needs EIP-712 encoding
         const baseType = f.type.replace(/\[\]$/, '')
         return !isPrimitiveType(baseType) // Custom types need EIP-712 encoding
@@ -131,7 +131,7 @@ export function defineMandateType<TValue extends object>(config: MandateTypeConf
       })
 
       const params = fields.map((f) => ({ name: f.name, type: f.type }))
-      return (encodeAbiParameters as any)(params, values)
+      return encodeAbiParameters(params, values)
     },
 
     hash(value: TValue): `0x${string}` {
@@ -232,7 +232,8 @@ function encodeStructValue(
       const structHashes: `0x${string}`[] = []
       for (const item of fieldValue) {
         const itemEncoded = encodeStructValue(nestedTypes[baseType], item, nestedTypes, typeHashes)
-        const typeHash = typeHashes.get(baseType)!
+        const typeHash = typeHashes.get(baseType)
+        invariant(typeHash, `Type hash not found for ${baseType}`)
         // EIP-712: hashStruct(s) = keccak256(typeHash || encodeData(s))
         const structHash = keccak256(concat([typeHash, itemEncoded]))
         structHashes.push(structHash)
@@ -243,7 +244,8 @@ function encodeStructValue(
     } else if (nestedTypes[baseType]) {
       // Single nested struct: encode recursively and hash with typehash
       const itemEncoded = encodeStructValue(nestedTypes[baseType], fieldValue, nestedTypes, typeHashes)
-      const typeHash = typeHashes.get(baseType)!
+      const typeHash = typeHashes.get(baseType)
+      invariant(typeHash, `Type hash not found for ${baseType}`)
       // EIP-712: hashStruct(s) = keccak256(typeHash || encodeData(s))
       const structHash = keccak256(concat([typeHash, itemEncoded]))
       encodedValues.push(structHash)
@@ -347,4 +349,3 @@ export const MandateFields = {
     return { name, type: 'string' }
   },
 }
-

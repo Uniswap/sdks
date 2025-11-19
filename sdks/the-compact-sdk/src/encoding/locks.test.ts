@@ -1,5 +1,6 @@
-import { encodeLockTag, decodeLockTag, encodeLockId, decodeLockId } from './locks'
 import { Scope, ResetPeriod } from '../types/runtime'
+
+import { encodeLockTag, decodeLockTag, encodeLockId, decodeLockId } from './locks'
 
 describe('locks encoding', () => {
   describe('encodeLockTag', () => {

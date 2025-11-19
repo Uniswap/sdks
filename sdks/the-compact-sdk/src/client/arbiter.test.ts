@@ -2,10 +2,11 @@
  * Tests for ArbiterClient
  */
 
+import { claimHash, batchClaimHash } from '../encoding/hashes'
+import { Claim, BatchClaim, MultichainClaim, BatchMultichainClaim } from '../types/claims'
+
 import { ArbiterClient } from './arbiter'
 import { CompactClientConfig } from './coreClient'
-import { Claim, BatchClaim, MultichainClaim, BatchMultichainClaim } from '../types/claims'
-import { claimHash, batchClaimHash } from '../encoding/hashes'
 
 // Mock viem clients
 const mockPublicClient = {} as any

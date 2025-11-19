@@ -7,13 +7,11 @@
  * - the-compact/test/lib/HashLib.t.sol
  */
 
-import { keccak256, encodeAbiParameters, encodePacked } from 'viem'
-import { componentsHash, idsAndAmountsHash, claimHash, batchClaimHash } from './hashes'
+import { keccak256, encodeAbiParameters, encodePacked, Hex, Address } from 'viem'
+
 import { Component, Claim, BatchClaim } from '../types/claims'
 
-// Type hash constants from The Compact
-// From EIP712Types.sol
-const LOCK_TYPEHASH = keccak256('0x4c6f636b28627974657331322 lockTag2c6164647265737320746f6b656e2c75696e7432353620616d6f756e7429' as `0x${string}`) // "Lock(bytes12 lockTag,address token,uint256 amount)"
+import { componentsHash, idsAndAmountsHash, claimHash, batchClaimHash } from './hashes'
 
 describe('hash computation', () => {
   describe('claimHash', () => {
@@ -232,9 +230,7 @@ describe('hash computation', () => {
       const claimant = 0x1234567890123456789012345678901234567890n
       const amount = 100n
 
-      const components: Component[] = [
-        { claimant, amount }
-      ]
+      const components: Component[] = [{ claimant, amount }]
 
       const hash = componentsHash(components)
 
@@ -243,7 +239,7 @@ describe('hash computation', () => {
         encodeAbiParameters(
           [
             { name: 'claimant', type: 'uint256' },
-            { name: 'amount', type: 'uint256' }
+            { name: 'amount', type: 'uint256' },
           ],
           [claimant, amount]
         )
@@ -257,7 +253,7 @@ describe('hash computation', () => {
       const components: Component[] = [
         { claimant: 0x1111111111111111111111111111111111111111n, amount: 100n },
         { claimant: 0x2222222222222222222222222222222222222222n, amount: 200n },
-        { claimant: 0x3333333333333333333333333333333333333333n, amount: 300n }
+        { claimant: 0x3333333333333333333333333333333333333333n, amount: 300n },
       ]
 
       const hash = componentsHash(components)
@@ -265,24 +261,39 @@ describe('hash computation', () => {
       // Expected: keccak256(concat(hash1, hash2, hash3))
       const hash1 = keccak256(
         encodeAbiParameters(
-          [{ name: 'claimant', type: 'uint256' }, { name: 'amount', type: 'uint256' }],
+          [
+            { name: 'claimant', type: 'uint256' },
+            { name: 'amount', type: 'uint256' },
+          ],
           [components[0].claimant, components[0].amount]
         )
       )
       const hash2 = keccak256(
         encodeAbiParameters(
-          [{ name: 'claimant', type: 'uint256' }, { name: 'amount', type: 'uint256' }],
+          [
+            { name: 'claimant', type: 'uint256' },
+            { name: 'amount', type: 'uint256' },
+          ],
           [components[1].claimant, components[1].amount]
         )
       )
       const hash3 = keccak256(
         encodeAbiParameters(
-          [{ name: 'claimant', type: 'uint256' }, { name: 'amount', type: 'uint256' }],
+          [
+            { name: 'claimant', type: 'uint256' },
+            { name: 'amount', type: 'uint256' },
+          ],
           [components[2].claimant, components[2].amount]
         )
       )
 
-      const expected = keccak256(encodePacked(['bytes32', 'bytes32', 'bytes32'], [hash1, hash2, hash3] as [`0x${string}`, `0x${string}`, `0x${string}`]))
+      const expected = keccak256(
+        encodePacked(['bytes32', 'bytes32', 'bytes32'], [hash1, hash2, hash3] as [
+          `0x${string}`,
+          `0x${string}`,
+          `0x${string}`
+        ])
+      )
 
       expect(hash).toBe(expected)
     })
@@ -310,7 +321,7 @@ describe('hash computation', () => {
         encodeAbiParameters(
           [
             { name: 'id', type: 'uint256' },
-            { name: 'amount', type: 'uint256' }
+            { name: 'amount', type: 'uint256' },
           ],
           [id, amount]
         )
@@ -324,7 +335,7 @@ describe('hash computation', () => {
       const idsAndAmounts = [
         { id: 1n, amount: 100n },
         { id: 2n, amount: 200n },
-        { id: 3n, amount: 300n }
+        { id: 3n, amount: 300n },
       ]
 
       const hash = idsAndAmountsHash(idsAndAmounts)
@@ -332,24 +343,39 @@ describe('hash computation', () => {
       // Expected: keccak256(concat(hash1, hash2, hash3))
       const hash1 = keccak256(
         encodeAbiParameters(
-          [{ name: 'id', type: 'uint256' }, { name: 'amount', type: 'uint256' }],
+          [
+            { name: 'id', type: 'uint256' },
+            { name: 'amount', type: 'uint256' },
+          ],
           [idsAndAmounts[0].id, idsAndAmounts[0].amount]
         )
       )
       const hash2 = keccak256(
         encodeAbiParameters(
-          [{ name: 'id', type: 'uint256' }, { name: 'amount', type: 'uint256' }],
+          [
+            { name: 'id', type: 'uint256' },
+            { name: 'amount', type: 'uint256' },
+          ],
           [idsAndAmounts[1].id, idsAndAmounts[1].amount]
         )
       )
       const hash3 = keccak256(
         encodeAbiParameters(
-          [{ name: 'id', type: 'uint256' }, { name: 'amount', type: 'uint256' }],
+          [
+            { name: 'id', type: 'uint256' },
+            { name: 'amount', type: 'uint256' },
+          ],
           [idsAndAmounts[2].id, idsAndAmounts[2].amount]
         )
       )
 
-      const expected = keccak256(encodePacked(['bytes32', 'bytes32', 'bytes32'], [hash1, hash2, hash3] as [`0x${string}`, `0x${string}`, `0x${string}`]))
+      const expected = keccak256(
+        encodePacked(['bytes32', 'bytes32', 'bytes32'], [hash1, hash2, hash3] as [
+          `0x${string}`,
+          `0x${string}`,
+          `0x${string}`
+        ])
+      )
 
       expect(hash).toBe(expected)
     })
@@ -373,7 +399,10 @@ describe('hash computation', () => {
       // Verify the hash is computed correctly
       const pairHash = keccak256(
         encodeAbiParameters(
-          [{ name: 'id', type: 'uint256' }, { name: 'amount', type: 'uint256' }],
+          [
+            { name: 'id', type: 'uint256' },
+            { name: 'amount', type: 'uint256' },
+          ],
           [id, amount]
         )
       )
@@ -394,24 +423,29 @@ describe('hash computation', () => {
         { name: 'WETH', address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', amount: 2000000000000000000n }, // 2 WETH
       ]
 
-      const idsAndAmounts = tokens.map(token => ({
+      const idsAndAmounts = tokens.map((token) => ({
         id: (lockTagBigInt << 160n) | BigInt(token.address),
-        amount: token.amount
+        amount: token.amount,
       }))
 
       const hash = idsAndAmountsHash(idsAndAmounts)
 
       // Compute expected hash
-      const hashes = idsAndAmounts.map(pair =>
+      const hashes = idsAndAmounts.map((pair) =>
         keccak256(
           encodeAbiParameters(
-            [{ name: 'id', type: 'uint256' }, { name: 'amount', type: 'uint256' }],
+            [
+              { name: 'id', type: 'uint256' },
+              { name: 'amount', type: 'uint256' },
+            ],
             [pair.id, pair.amount]
           )
         )
       )
 
-      const expected = keccak256(encodePacked(['bytes32', 'bytes32', 'bytes32'], hashes as [`0x${string}`, `0x${string}`, `0x${string}`]))
+      const expected = keccak256(
+        encodePacked(['bytes32', 'bytes32', 'bytes32'], hashes as [`0x${string}`, `0x${string}`, `0x${string}`])
+      )
       expect(hash).toBe(expected)
     })
   })
@@ -420,9 +454,7 @@ describe('hash computation', () => {
     it('should handle maximum uint256 values', () => {
       const maxUint256 = (1n << 256n) - 1n
 
-      const components: Component[] = [
-        { claimant: maxUint256, amount: maxUint256 }
-      ]
+      const components: Component[] = [{ claimant: maxUint256, amount: maxUint256 }]
 
       const hash = componentsHash(components)
 
@@ -431,15 +463,16 @@ describe('hash computation', () => {
     })
 
     it('should handle zero values', () => {
-      const components: Component[] = [
-        { claimant: 0n, amount: 0n }
-      ]
+      const components: Component[] = [{ claimant: 0n, amount: 0n }]
 
       const hash = componentsHash(components)
 
       const componentHash = keccak256(
         encodeAbiParameters(
-          [{ name: 'claimant', type: 'uint256' }, { name: 'amount', type: 'uint256' }],
+          [
+            { name: 'claimant', type: 'uint256' },
+            { name: 'amount', type: 'uint256' },
+          ],
           [0n, 0n]
         )
       )
@@ -452,7 +485,7 @@ describe('hash computation', () => {
       // Create an array with 100 elements
       const components: Component[] = Array.from({ length: 100 }, (_, i) => ({
         claimant: BigInt(i + 1),
-        amount: BigInt((i + 1) * 100)
+        amount: BigInt((i + 1) * 100),
       }))
 
       const hash = componentsHash(components)
@@ -468,9 +501,7 @@ describe('hash computation', () => {
 
   describe('hash consistency', () => {
     it('should produce consistent hashes for identical inputs', () => {
-      const components: Component[] = [
-        { claimant: 0xabcdef123456n, amount: 999n }
-      ]
+      const components: Component[] = [{ claimant: 0xabcdef123456n, amount: 999n }]
 
       const hash1 = componentsHash(components)
       const hash2 = componentsHash(components)
@@ -481,14 +512,12 @@ describe('hash computation', () => {
     })
 
     it('should produce different hashes for different inputs', () => {
-      const components1: Component[] = [
-        { claimant: 100n, amount: 200n }
-      ]
+      const components1: Component[] = [{ claimant: 100n, amount: 200n }]
       const components2: Component[] = [
-        { claimant: 100n, amount: 201n } // Different amount
+        { claimant: 100n, amount: 201n }, // Different amount
       ]
       const components3: Component[] = [
-        { claimant: 101n, amount: 200n } // Different claimant
+        { claimant: 101n, amount: 200n }, // Different claimant
       ]
 
       const hash1 = componentsHash(components1)
@@ -503,11 +532,11 @@ describe('hash computation', () => {
     it('should be order-dependent', () => {
       const components1: Component[] = [
         { claimant: 100n, amount: 200n },
-        { claimant: 300n, amount: 400n }
+        { claimant: 300n, amount: 400n },
       ]
       const components2: Component[] = [
         { claimant: 300n, amount: 400n },
-        { claimant: 100n, amount: 200n } // Reversed order
+        { claimant: 100n, amount: 200n }, // Reversed order
       ]
 
       const hash1 = componentsHash(components1)
@@ -532,11 +561,11 @@ describe('hash computation', () => {
       // From ClaimHashLib.t.sol, locks are hashed as:
       // keccak256(abi.encode(lockTypehash, lockTag, token, amount))
 
-      const lockTag = '0x000000000000000000000001' as `0x${string}`
-      const token = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as `0x${string}`
+      const lockTag = '0x000000000000000000000001' as Hex
+      const token = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as Address
       const amount = 1000000n
 
-      const lockTypehash = keccak256('0x4c6f636b28627974657331322 lockTag2c6164647265737320746f6b656e2c75696e7432353620616d6f756e7429' as `0x${string}`)
+      const lockTypehash = keccak256('0xfb7744571d97aa61eb9c2bc3c67b9b1ba047ac9e95afb2ef02bc5b3d9e64fbe5' as Hex)
 
       const lockHash = keccak256(
         encodeAbiParameters(
@@ -544,7 +573,7 @@ describe('hash computation', () => {
             { name: 'typehash', type: 'bytes32' },
             { name: 'lockTag', type: 'bytes12' },
             { name: 'token', type: 'address' },
-            { name: 'amount', type: 'uint256' }
+            { name: 'amount', type: 'uint256' },
           ],
           [lockTypehash, lockTag, token, amount]
         )

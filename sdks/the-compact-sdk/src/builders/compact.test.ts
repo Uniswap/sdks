@@ -2,8 +2,9 @@
  * Tests for Compact builders
  */
 
-import { CompactBuilder, SingleCompactBuilder, BatchCompactBuilder, MultichainCompactBuilder } from './compact'
 import { CompactDomain } from '../config/domain'
+
+import { CompactBuilder, SingleCompactBuilder, BatchCompactBuilder, MultichainCompactBuilder } from './compact'
 import { simpleMandate } from './mandate'
 
 // Create a simple mandate type for testing
@@ -746,7 +747,7 @@ describe('Compact Builders', () => {
       const result = CompactBuilder.multichain(domain)
         .sponsor(sponsorAddress)
         .nonce(1n)
-        .expiresIn('1h')
+        .expiresAt(expires)
         .addElement()
         .arbiter(arbiterAddress)
         .chainId(1n) // Mainnet

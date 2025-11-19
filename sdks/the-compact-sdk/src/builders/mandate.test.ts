@@ -1,4 +1,5 @@
-import { Address, concat, encodeAbiParameters, Hex, keccak256, toHex } from 'viem'
+import { Address, concat, encodeAbiParameters, Hex, keccak256 } from 'viem'
+
 import { defineMandateType, MandateFields, simpleMandate } from './mandate'
 
 describe('mandate', () => {

@@ -2,10 +2,13 @@
  * View client for read-only operations
  */
 
-import { CompactClientConfig } from './coreClient'
+import invariant from 'tiny-invariant'
+
 import { theCompactAbi } from '../abi/theCompact'
 import { Scope, ResetPeriod } from '../types/runtime'
-import invariant from 'tiny-invariant'
+
+import { CompactClientConfig } from './coreClient'
+
 
 /**
  * Lock details returned from the contract

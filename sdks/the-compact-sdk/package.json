@@ -53,8 +53,7 @@
     "ts-jest": "^29.2.5",
     "ts-node": "^10.9.1",
     "tslib": "^2.3.0",
-    "typescript": "^5.6.2",
-    "undici": "^7.16.0"
+    "typescript": "^5.6.2"
   },
   "prettier": {
     "printWidth": 120,

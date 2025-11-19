@@ -4,8 +4,10 @@
  */
 
 import { decodeErrorResult, keccak256, toHex } from 'viem'
-import { CompactError, CompactErrorKind, createCompactError } from './types'
+
 import { theCompactAbi } from '../abi/theCompact'
+
+import { CompactError, CompactErrorKind, createCompactError } from './types'
 
 /**
  * Generate error selector from error signature
@@ -126,4 +128,3 @@ export function extractCompactError(error: any, abi?: readonly any[]): CompactEr
 
   return null
 }
-
