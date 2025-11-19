@@ -7,7 +7,7 @@ A comprehensive TypeScript SDK for building and interacting with [The Compact v1
 
 ## Overview
 
-The Compact is an on-chain protocol that allows users (sponsors) to lock tokens that can later be claimed by authorized processors (arbiters) with flexible distribution rules. This SDK provides type-safe, ergonomic tools to:
+The Compact is an on-chain protocol that allows users (sponsors) to lock tokens that can later be claimed in exchange for fulfilling some condition (the mandate). This SDK provides type-safe, ergonomic tools to:
 
 - **Build EIP-712 signed compacts** for token locks
 - **Create claim payloads** to process locked tokens
