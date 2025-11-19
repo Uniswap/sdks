@@ -43,9 +43,7 @@ describe('Price Curve Library', () => {
     })
 
     it('should throw on block duration overflow', () => {
-      expect(() => createPriceCurveElement(65536, SCALING_FACTOR.NEUTRAL)).toThrow(
-        InvalidPriceCurveParametersError
-      )
+      expect(() => createPriceCurveElement(65536, SCALING_FACTOR.NEUTRAL)).toThrow(InvalidPriceCurveParametersError)
     })
 
     it('should unpack element components', () => {
@@ -59,9 +57,7 @@ describe('Price Curve Library', () => {
 
   describe('scaling direction validation', () => {
     it('should allow both exact-in (>1e18)', () => {
-      expect(sharesScalingDirection(SCALING_FACTOR.ONE_FIFTY_PERCENT, SCALING_FACTOR.ONE_TWENTY_PERCENT)).toBe(
-        true
-      )
+      expect(sharesScalingDirection(SCALING_FACTOR.ONE_FIFTY_PERCENT, SCALING_FACTOR.ONE_TWENTY_PERCENT)).toBe(true)
     })
 
     it('should allow both exact-out (<1e18)', () => {
@@ -270,9 +266,7 @@ describe('Price Curve Library', () => {
 
       const supplementalCurve = [SCALING_FACTOR.HALF] // Exact-out
 
-      expect(() => applySupplementalPriceCurve(baseCurve, supplementalCurve)).toThrow(
-        InvalidPriceCurveParametersError
-      )
+      expect(() => applySupplementalPriceCurve(baseCurve, supplementalCurve)).toThrow(InvalidPriceCurveParametersError)
     })
 
     it('should reject combined scaling factor overflow', () => {

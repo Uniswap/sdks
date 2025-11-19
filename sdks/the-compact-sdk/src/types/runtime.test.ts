@@ -29,4 +29,3 @@ describe('runtime types', () => {
     })
   })
 })
-

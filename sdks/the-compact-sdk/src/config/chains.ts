@@ -47,4 +47,3 @@ export function getDefaultAddress(chainId: number): `0x${string}` | undefined {
 export function hasDefaultDeployment(chainId: number): boolean {
   return defaultDeployments.some((d) => d.chainId === chainId)
 }
-

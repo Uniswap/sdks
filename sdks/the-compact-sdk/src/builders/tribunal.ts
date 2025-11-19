@@ -353,7 +353,9 @@ export function createSameChainFill(params: {
     .chainId(params.chainId)
     .tribunal(params.tribunal)
     .expires(params.expires)
-    .component((c) => c.fillToken(params.fillToken).minimumFillAmount(params.minimumFillAmount).recipient(params.recipient))
+    .component((c) =>
+      c.fillToken(params.fillToken).minimumFillAmount(params.minimumFillAmount).recipient(params.recipient)
+    )
     .priceCurve(params.priceCurve || [])
     .scalingFactor(params.scalingFactor || 1000000000000000000n)
     .build()

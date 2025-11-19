@@ -124,4 +124,3 @@ export function decodeLockId(id: bigint): { lockTag: Hex; token: Address } {
     token: `0x${tokenHex}` as Address,
   }
 }
-

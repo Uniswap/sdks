@@ -64,4 +64,3 @@ export function createCompactError(
 export function isCompactError(error: any): error is CompactError {
   return error && error.name === 'CompactError' && 'kind' in error
 }
-

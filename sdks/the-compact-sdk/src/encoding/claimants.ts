@@ -51,12 +51,12 @@ export type ClaimantInput = TransferClaimant | ConvertClaimant | WithdrawClaiman
 
 /**
  * Build a Component from a lock tag and claimant input
- * 
+ *
  * Claimant packing rules:
  * - Transfer: claimant = (lockTag << 160) | recipient (same lockTag as claim)
  * - Convert: claimant = (targetLockTag << 160) | recipient (different lockTag)
  * - Withdraw: claimant = (0 << 160) | recipient (lockTag = 0)
- * 
+ *
  * @param lockTagOfClaim - The lock tag of the claim being built
  * @param claimant - The claimant input
  * @returns The Component struct
@@ -181,11 +181,7 @@ export function transfer(recipient: `0x${string}`, amount: bigint): TransferClai
  * @param targetLockTag - The target lock tag (12 bytes) for the converted tokens
  * @returns ConvertClaimant object for use with buildComponent
  */
-export function convert(
-  recipient: `0x${string}`,
-  amount: bigint,
-  targetLockTag: `0x${string}`
-): ConvertClaimant {
+export function convert(recipient: `0x${string}`, amount: bigint, targetLockTag: `0x${string}`): ConvertClaimant {
   return {
     kind: 'convert',
     recipient,
@@ -208,4 +204,3 @@ export function withdraw(recipient: `0x${string}`, amount: bigint): WithdrawClai
     amount,
   }
 }
-

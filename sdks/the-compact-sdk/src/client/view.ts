@@ -9,7 +9,6 @@ import { Scope, ResetPeriod } from '../types/runtime'
 
 import { CompactClientConfig } from './coreClient'
 
-
 /**
  * Lock details returned from the contract
  */
@@ -212,7 +211,6 @@ export class ViewClient {
     return result
   }
 
-
   /**
    * Check if a specific nonce has been consumed by an allocator
    *
@@ -240,10 +238,7 @@ export class ViewClient {
    * }
    * ```
    */
-  async hasConsumedAllocatorNonce(params: {
-    nonce: bigint
-    allocator: `0x${string}`
-  }): Promise<boolean> {
+  async hasConsumedAllocatorNonce(params: { nonce: bigint; allocator: `0x${string}` }): Promise<boolean> {
     invariant(this.config.address, 'contract address is required')
 
     const result = await this.config.publicClient.readContract({
@@ -255,7 +250,6 @@ export class ViewClient {
 
     return result
   }
-
 
   /**
    * Get forced withdrawal status for a resource lock

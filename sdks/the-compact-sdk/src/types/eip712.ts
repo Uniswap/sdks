@@ -98,4 +98,3 @@ export function isMultichainCompact(value: any): value is MultichainCompact {
     Array.isArray(value.elements)
   )
 }
-
