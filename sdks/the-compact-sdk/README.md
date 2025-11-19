@@ -84,39 +84,101 @@ console.log('Compact submitted:', hash)
 
 ## Core Concepts
 
+### Resource Locks
+
+Resource locks are the fundamental unit of state in The Compact. They’re created whenever a depositor places tokens (ERC20 or native) into the protocol and are represented as fungible ERC‑6909 tokens.
+
+Each resource lock is defined by four properties:
+
+- **Underlying token** – the ERC20 or native token held in the lock  
+- **Allocator** – infrastructure that prevents double‑spends and authorizes use of the lock  
+- **Scope** – whether the lock can be spent on a single chain or across chains  
+- **Reset period** – a timelock used for forced withdrawals and emissary changes  
+
+These properties are packed into a 12‑byte **lock tag** (`bytes12 lockTag`). The ERC‑6909 token id for a given lock is:
+
+> `lockId = (lockTag << 160) | tokenAddress`
+
+So each unique `(lockTag, token)` pair corresponds to one fungible ERC‑6909 id. Whoever holds that ERC‑6909 balance is the **sponsor** for that lock and can create compacts backed by it.
+
+---
+
 ### Compacts
 
-A **Compact** is a signed authorization for a sponsor to lock tokens that can later be claimed by a designated arbiter. The protocol supports three types:
+A **Compact** is an EIP‑712 typed commitment created by a sponsor that allows an **arbiter** to claim from one or more resource locks under specified conditions. Compacts **do not** move funds by themselves; they just define what an arbiter is allowed to do later via a claim.
 
-- **Single Compact**: Locks one token amount with one lock tag
-- **Batch Compact**: Locks multiple tokens with different lock tags in one signature
-- **Multichain Compact**: Coordinates token locks across multiple chains
+The protocol defines three EIP‑712 payload shapes:
+
+- **Single Compact**  
+  Commits an amount of a single resource lock on a single chain.  
+  Conceptually: “arbiter X may claim up to `amount` from `lockTag` / `token` for sponsor Y before `expires`.”
+
+- **Batch Compact**  
+  Commits multiple `(lockTag, token, amount)` tuples on the same chain in one payload.  
+  Conceptually: “arbiter X may claim from this set of locks, each up to its own `amount`, for sponsor Y before `expires`.”
+
+- **Multichain Compact**  
+  Commits locks across multiple chains. Each element binds:
+  - a `chainId`  
+  - a per‑chain `arbiter`  
+  - one or more `(lockTag, token, amount)` commitments  
+  - a **Mandate** witness (see below)  
+
+Single and batch compacts may optionally include a Mandate. Multichain compacts always include a Mandate per element.
+
+---
 
 ### Claims
 
-A **Claim** is submitted by an arbiter to process a compact and distribute the locked tokens. Claims specify:
+A **Claim** is what an arbiter submits to actually spend a compact against one or more resource locks.
 
-- **Allocator**: The address processing the claim (usually the arbiter)
-- **Claimants**: Recipients and amounts (as packed components)
-- **Operations**: Transfer, convert (to different lock tag), or withdraw
+At a high level, a claim:
 
-### Resource Locks
+- Proves allocator authorization for a specific lock id and `allocatedAmount`
+- Proves sponsor authorization (via signature, EIP‑1271, emissary, or direct call)
+- Binds to a particular compact (or registered compact hash) and its `nonce` / `expires`
+- Specifies how to distribute the committed value via an array of **components**
 
-When tokens are locked, they become **resources** identified by:
+Each component is an encoded `(lockTag, recipient, amount)` triple. How The Compact interprets a component depends on the `lockTag` embedded in it:
 
-- **Lock Tag**: 12-byte identifier (`bytes12`) for the lock category
-- **Token**: ERC20 token address (or zero address for native tokens)
-- **Lock ID**: Computed as `uint256(lockTag) << 160 | uint160(token)`
+1. **Direct transfer (keep the lock as‑is)**  
+   - Component’s `lockTag` == original lock’s `lockTag`  
+   - The claim transfers ERC‑6909 tokens for that lock id to the recipient.
+
+2. **Convert to a new resource lock**  
+   - Component’s `lockTag` is non‑zero and different from the original  
+   - The claim burns from the original lock and mints into a new lock with the new `lockTag` for the recipient.  
+   - This changes allocator / scope / reset period while keeping the funds locked in The Compact.
+
+3. **Withdraw underlying tokens**  
+   - Component’s `lockTag` is zero  
+   - The claim burns ERC‑6909 and withdraws the underlying ERC20 or native tokens to the recipient, exiting The Compact.
+
+The TS SDK focuses on helping construct these claim payloads correctly (including component encoding) and leaves allocator- and arbiter-specific logic to the integrator.
+
+---
 
 ### Mandates (Witness Data)
 
-**Mandates** are typed witness data that add constraints to compacts and claims. They enable:
+**Mandates** are typed witness data used to add arbitrary, domain‑specific conditions to a compact and its eventual claims.
 
-- Custom validation logic
-- Order routing parameters
-- Price limits
-- Deadline enforcement
-- Any domain-specific constraints
+On-chain, a Mandate is an extra struct appended to the end of the compact’s EIP‑712 payload. The Compact itself treats this as an **opaque blob**; it only cares about:
+
+- `witness` – the `bytes32` hash of the encoded Mandate data  
+- `witnessTypestring` – the EIP‑712 typestring describing the Mandate struct (and any nested Mandate* structs)
+
+During a claim, the arbiter provides `witness` and `witnessTypestring`. The Compact rebuilds the full EIP‑712 typestring, recomputes the claim hash, and passes that into the allocator’s authorization logic. This ties allocator approval to both:
+
+- the compact’s core fields (arbiter, sponsor, lockTag(s), token(s), amount(s), nonce, expires), and  
+- the Mandate payload, without needing to understand the Mandate’s semantics.
+
+Typical Mandate uses:
+
+- Routing / fill parameters for RFQ or auction flows  
+- Price / slippage bounds  
+- Deadlines and validity conditions  
+- Cross‑chain message or proof references  
+- Any other constraints arbiters and allocators want to enforce
 
 ## API Reference
 
