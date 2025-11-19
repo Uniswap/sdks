@@ -10,6 +10,7 @@
     "eslint": "^8.57.0",
     "eslint-plugin-prettier": "^3.4.1",
     "husky": "^8.0.3",
+    "sane": "5.0.1",
     "semantic-release": "^25.0.1",
     "semantic-release-monorepo": "8.0.2",
     "syncpack": "^8.5.14",
@@ -43,8 +44,5 @@
     "@jest/core": "25.5.4",
     "jest-cli": "25.5.4",
     "jest-runner": "25.5.1"
-  },
-  "devDependencies": {
-    "sane": "5.0.1"
   }
 }
