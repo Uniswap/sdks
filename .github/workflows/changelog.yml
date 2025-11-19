@@ -1,0 +1,35 @@
+name: Release Notifications
+
+on:
+  push:
+    tags:
+      - "@uniswap/*" # Trigger on package release tags
+  pull_request_target:
+    types:
+      - opened
+      - edited
+      - synchronize
+
+jobs:
+  # Generate AI-powered changelog
+  generate-changelog:
+    uses: uniswap/ai-toolkit/.github/workflows/_generate-changelog.yml@main
+    with:
+      from_ref: ${{ github.event.before }}
+      to_ref: ${{ github.sha }}
+      output_formats: "slack,markdown"
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  # Send notification to Slack
+  notify:
+    needs: generate-changelog
+    uses: uniswap/ai-toolkit/.github/workflows/_notify-release.yml@main
+    with:
+      changelog_slack: ${{ needs.generate-changelog.outputs.changelog_slack }}
+      destinations: "slack"
+      from_ref: ${{ github.event.before }}
+      to_ref: ${{ github.sha }}
+      branch: "main"
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
