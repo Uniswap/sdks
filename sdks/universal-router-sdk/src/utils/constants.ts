@@ -52,7 +52,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
       [UniversalRouterVersion.V2_1]: {
         address: '0x0000000000000000000000000000000000000000',
-        creationBlock: 0,
+        creationBlock: 1,
       },
     },
   },
@@ -106,7 +106,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
       [UniversalRouterVersion.V2_1]: {
         address: '0x0000000000000000000000000000000000000000',
-        creationBlock: 0,
+        creationBlock: 1,
       },
     },
   },
@@ -142,7 +142,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
       [UniversalRouterVersion.V2_1]: {
         address: '0x0000000000000000000000000000000000000000',
-        creationBlock: 0,
+        creationBlock: 1,
       },
     },
   },
@@ -178,7 +178,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
       [UniversalRouterVersion.V2_1]: {
         address: '0x0000000000000000000000000000000000000000',
-        creationBlock: 0,
+        creationBlock: 1,
       },
     },
   },
@@ -214,7 +214,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
       [UniversalRouterVersion.V2_1]: {
         address: '0x0000000000000000000000000000000000000000',
-        creationBlock: 0,
+        creationBlock: 1,
       },
     },
   },
@@ -268,7 +268,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
       [UniversalRouterVersion.V2_1]: {
         address: '0x0000000000000000000000000000000000000000',
-        creationBlock: 0,
+        creationBlock: 1,
       },
     },
   },
@@ -339,7 +339,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
       [UniversalRouterVersion.V2_1]: {
         address: '0x0000000000000000000000000000000000000000',
-        creationBlock: 0,
+        creationBlock: 1,
       },
     },
   },
@@ -409,7 +409,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
       [UniversalRouterVersion.V2_1]: {
         address: '0x0000000000000000000000000000000000000000',
-        creationBlock: 0,
+        creationBlock: 1,
       },
     },
   },
@@ -426,7 +426,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
       [UniversalRouterVersion.V2_1]: {
         address: '0x0000000000000000000000000000000000000000',
-        creationBlock: 0,
+        creationBlock: 1,
       },
     },
   },
