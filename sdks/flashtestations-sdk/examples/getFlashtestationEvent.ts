@@ -11,23 +11,23 @@ import { getFlashtestationEvent } from '../src/index';
 async function main() {
   try {
     // Fetch flashtestation transaction from the latest block on Unichain Sepolia
-    const tx = await getFlashtestationEvent('latest', {
+    const event = await getFlashtestationEvent('latest', {
       chainId: 1301, // Unichain Sepolia testnet
       // Optional: provide custom RPC URL
       // rpcUrl: 'https://sepolia.unichain.org',
     });
 
-    if (tx) {
+    if (event) {
       // This is a flashtestation transaction
       console.log('\n✓ This is a flashtestation transaction!\n');
       console.log('Transaction Details:');
       console.log('====================');
-      console.log(`Caller: ${tx.caller}`);
-      console.log(`Workload ID: ${tx.workloadId}`);
-      console.log(`Version: ${tx.version}`);
-      console.log(`Block Content Hash: ${tx.blockContentHash}`);
-      console.log(`Commit Hash: ${tx.commitHash}`);
-      console.log(`Source Locators: ${tx.sourceLocators.length > 0 ? tx.sourceLocators.join(', ') : 'None'}`);
+      console.log(`Caller: ${event.caller}`);
+      console.log(`Workload ID: ${event.workloadId}`);
+      console.log(`Version: ${event.version}`);
+      console.log(`Block Content Hash: ${event.blockContentHash}`);
+      console.log(`Commit Hash: ${event.commitHash}`);
+      console.log(`Source Locators: ${event.sourceLocators.length > 0 ? event.sourceLocators.join(', ') : 'None'}`);
     } else {
       // This is not a flashtestation transaction
       console.log('\n✗ This is not a flashtestation transaction');

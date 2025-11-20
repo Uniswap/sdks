@@ -86,7 +86,7 @@ Verify if a block was built by a TEE running a specific workload.
 
 ```typescript
 async function verifyFlashtestationInBlock(
-  workloadIdOrRegisters: string | WorkloadMeasureRegisters,
+  workloadIdOrRegisters: string | WorkloadMeasurementRegisters,
   blockParameter: BlockParameter,
   config: ClientConfig
 ): Promise<VerificationResult>;
@@ -96,7 +96,7 @@ async function verifyFlashtestationInBlock(
 
 | Parameter             | Type                                 | Description                                                                 |
 | --------------------- | ------------------------------------ | --------------------------------------------------------------------------- |
-| workloadIdOrRegisters | `string \| WorkloadMeasureRegisters` | Workload ID (32-byte hex string) or measurement registers to compute the ID |
+| workloadIdOrRegisters | `string \| WorkloadMeasurementRegisters` | Workload ID (32-byte hex string) or measurement registers to compute the ID |
 | blockParameter        | `BlockParameter`                     | Block identifier: tag ('latest', 'earliest', etc.), number, or hash         |
 | config                | `ClientConfig`                       | Configuration object with `chainId` and optional `rpcUrl`                   |
 
@@ -128,7 +128,7 @@ async function verifyFlashtestationInBlock(
 Compute a workload ID from TEE measurement registers. Useful for debugging or pre-computing IDs.
 
 ```typescript
-function computeWorkloadId(registers: WorkloadMeasureRegisters): string;
+function computeWorkloadId(registers: WorkloadMeasurementRegisters): string;
 ```
 
 Returns the workload ID as a hex string.
@@ -271,10 +271,10 @@ If you need to compute workload IDs separately (e.g., for caching or debugging),
 ```typescript
 import {
   computeWorkloadId,
-  WorkloadMeasureRegisters,
+  WorkloadMeasurementRegisters,
 } from 'flashtestations-sdk';
 
-const registers: WorkloadMeasureRegisters = {
+const registers: WorkloadMeasurementRegisters = {
   tdAttributes: '0x0000000000000000',
   xFAM: '0x0000000000000003',
   mrTd: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
