@@ -1,4 +1,4 @@
-import { generate } from "./generate";
+import { generate, EnforcementMode } from "./generate";
 import { normalizeHex } from "./utils/hex";
 
 interface ParsedResult {
@@ -7,6 +7,7 @@ interface ParsedResult {
     alg: string;
     publicKey: string;
   }[];
+  enforcement: EnforcementMode;
 }
 
 describe("generate", () => {
@@ -24,10 +25,13 @@ describe("generate", () => {
   describe("single algorithm tests", () => {
     describe("RS256 (RSASSA-PKCS1-v1_5)", () => {
       it("should generate correct JSON for single key", () => {
-        const result = generate({
-          key: testKeys.rsassa,
-          algorithm: "RS256",
-        });
+        const result = generate(
+          "strict",
+          {
+            key: testKeys.rsassa,
+            algorithm: "RS256",
+          }
+        );
 
         const parsed = JSON.parse(result) as ParsedResult;
         expect(parsed.publicKeys).toHaveLength(1);
@@ -36,15 +40,19 @@ describe("generate", () => {
           alg: "RS256",
           publicKey: `0x${testKeys.rsassa}`,
         });
+        expect(parsed.enforcement).toBe("strict");
       });
     });
 
     describe("PS256 (RSA-PSS)", () => {
       it("should generate correct JSON for single key", () => {
-        const result = generate({
-          key: testKeys.rsaPss,
-          algorithm: "PS256",
-        });
+        const result = generate(
+          "strict",
+          {
+            key: testKeys.rsaPss,
+            algorithm: "PS256",
+          }
+        );
 
         const parsed = JSON.parse(result) as ParsedResult;
         expect(parsed.publicKeys).toHaveLength(1);
@@ -53,15 +61,19 @@ describe("generate", () => {
           alg: "PS256",
           publicKey: normalizeHex(testKeys.rsaPss),
         });
+        expect(parsed.enforcement).toBe("strict");
       });
     });
 
     describe("ES256 (ECDSA)", () => {
       it("should generate correct JSON for single key", () => {
-        const result = generate({
-          key: testKeys.ecdsa,
-          algorithm: "ES256",
-        });
+        const result = generate(
+          "strict",
+          {
+            key: testKeys.ecdsa,
+            algorithm: "ES256",
+          }
+        );
 
         const parsed = JSON.parse(result) as ParsedResult;
         expect(parsed.publicKeys).toHaveLength(1);
@@ -70,15 +82,19 @@ describe("generate", () => {
           alg: "ES256",
           publicKey: `0x${testKeys.ecdsa}`,
         });
+        expect(parsed.enforcement).toBe("strict");
       });
     });
 
     describe("EdDSA (Ed25519)", () => {
       it("should generate correct JSON for single key", () => {
-        const result = generate({
-          key: testKeys.ed25519,
-          algorithm: "EdDSA",
-        });
+        const result = generate(
+          "strict",
+          {
+            key: testKeys.ed25519,
+            algorithm: "EdDSA",
+          }
+        );
 
         const parsed = JSON.parse(result) as ParsedResult;
         expect(parsed.publicKeys).toHaveLength(1);
@@ -87,15 +103,19 @@ describe("generate", () => {
           alg: "EdDSA",
           publicKey: `0x${testKeys.ed25519}`,
         });
+        expect(parsed.enforcement).toBe("strict");
       });
     });
 
     describe("RS384 (RSASSA-PKCS1-v1_5)", () => {
       it("should generate correct JSON for single key", () => {
-        const result = generate({
-          key: testKeys.rsassa,
-          algorithm: "RS384",
-        });
+        const result = generate(
+          "strict",
+          {
+            key: testKeys.rsassa,
+            algorithm: "RS384",
+          }
+        );
 
         const parsed = JSON.parse(result) as ParsedResult;
         expect(parsed.publicKeys).toHaveLength(1);
@@ -104,15 +124,19 @@ describe("generate", () => {
           alg: "RS384",
           publicKey: `0x${testKeys.rsassa}`,
         });
+        expect(parsed.enforcement).toBe("strict");
       });
     });
 
     describe("RS512 (RSASSA-PKCS1-v1_5)", () => {
       it("should generate correct JSON for single key", () => {
-        const result = generate({
-          key: testKeys.rsassa,
-          algorithm: "RS512",
-        });
+        const result = generate(
+          "strict",
+          {
+            key: testKeys.rsassa,
+            algorithm: "RS512",
+          }
+        );
 
         const parsed = JSON.parse(result) as ParsedResult;
         expect(parsed.publicKeys).toHaveLength(1);
@@ -121,15 +145,19 @@ describe("generate", () => {
           alg: "RS512",
           publicKey: `0x${testKeys.rsassa}`,
         });
+        expect(parsed.enforcement).toBe("strict");
       });
     });
 
     describe("PS384 (RSA-PSS)", () => {
       it("should generate correct JSON for single key", () => {
-        const result = generate({
-          key: testKeys.rsaPss,
-          algorithm: "PS384",
-        });
+        const result = generate(
+          "strict",
+          {
+            key: testKeys.rsaPss,
+            algorithm: "PS384",
+          }
+        );
 
         const parsed = JSON.parse(result) as ParsedResult;
         expect(parsed.publicKeys).toHaveLength(1);
@@ -138,15 +166,19 @@ describe("generate", () => {
           alg: "PS384",
           publicKey: normalizeHex(testKeys.rsaPss),
         });
+        expect(parsed.enforcement).toBe("strict");
       });
     });
 
     describe("PS512 (RSA-PSS)", () => {
       it("should generate correct JSON for single key", () => {
-        const result = generate({
-          key: testKeys.rsaPss,
-          algorithm: "PS512",
-        });
+        const result = generate(
+          "strict",
+          {
+            key: testKeys.rsaPss,
+            algorithm: "PS512",
+          }
+        );
 
         const parsed = JSON.parse(result) as ParsedResult;
         expect(parsed.publicKeys).toHaveLength(1);
@@ -155,15 +187,19 @@ describe("generate", () => {
           alg: "PS512",
           publicKey: normalizeHex(testKeys.rsaPss),
         });
+        expect(parsed.enforcement).toBe("strict");
       });
     });
 
     describe("ES384 (ECDSA)", () => {
       it("should generate correct JSON for single key", () => {
-        const result = generate({
-          key: testKeys.ecdsa,
-          algorithm: "ES384",
-        });
+        const result = generate(
+          "strict",
+          {
+            key: testKeys.ecdsa,
+            algorithm: "ES384",
+          }
+        );
 
         const parsed = JSON.parse(result) as ParsedResult;
         expect(parsed.publicKeys).toHaveLength(1);
@@ -172,15 +208,19 @@ describe("generate", () => {
           alg: "ES384",
           publicKey: `0x${testKeys.ecdsa}`,
         });
+        expect(parsed.enforcement).toBe("strict");
       });
     });
 
     describe("ES512 (ECDSA)", () => {
       it("should generate correct JSON for single key", () => {
-        const result = generate({
-          key: testKeys.ecdsa,
-          algorithm: "ES512",
-        });
+        const result = generate(
+          "strict",
+          {
+            key: testKeys.ecdsa,
+            algorithm: "ES512",
+          }
+        );
 
         const parsed = JSON.parse(result) as ParsedResult;
         expect(parsed.publicKeys).toHaveLength(1);
@@ -189,6 +229,7 @@ describe("generate", () => {
           alg: "ES512",
           publicKey: `0x${testKeys.ecdsa}`,
         });
+        expect(parsed.enforcement).toBe("strict");
       });
     });
   });
@@ -196,6 +237,7 @@ describe("generate", () => {
   describe("multiple algorithms tests", () => {
     it("should generate correct JSON for two different algorithms", () => {
       const result = generate(
+        "lax",
         {
           key: testKeys.rsassa,
           algorithm: "RS256",
@@ -218,10 +260,12 @@ describe("generate", () => {
         alg: "ES256",
         publicKey: `0x${testKeys.ecdsa}`,
       });
+      expect(parsed.enforcement).toBe("lax");
     });
 
     it("should generate correct JSON for three different algorithms", () => {
       const result = generate(
+        "lax",
         {
           key: testKeys.rsassa,
           algorithm: "RS256",
@@ -253,10 +297,12 @@ describe("generate", () => {
         alg: "EdDSA",
         publicKey: `0x${testKeys.ed25519}`,
       });
+      expect(parsed.enforcement).toBe("lax");
     });
 
     it("should generate correct JSON for all four algorithms", () => {
       const result = generate(
+        "lax",
         {
           key: testKeys.rsassa,
           algorithm: "RS256",
@@ -297,6 +343,7 @@ describe("generate", () => {
         alg: "EdDSA",
         publicKey: `0x${testKeys.ed25519}`,
       });
+      expect(parsed.enforcement).toBe("lax");
     });
 
     it("should handle duplicate algorithms with different keys", () => {
@@ -304,6 +351,7 @@ describe("generate", () => {
         "3059301306072a8648ce3d020106082a8648ce3d030107034200040987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba";
 
       const result = generate(
+        "none",
         {
           key: testKeys.ecdsa,
           algorithm: "ES256",
@@ -326,30 +374,36 @@ describe("generate", () => {
         alg: "ES256",
         publicKey: `0x${alternateEcdsaKey}`,
       });
+      expect(parsed.enforcement).toBe("none");
     });
   });
 
   describe("edge cases", () => {
     it("should handle empty input gracefully", () => {
-      const result = generate();
+      const result = generate("none");
 
       const parsed = JSON.parse(result) as ParsedResult;
       expect(parsed.publicKeys).toHaveLength(0);
       expect(parsed.publicKeys).toEqual([]);
+      expect(parsed.enforcement).toBe("none");
     });
 
     it("should fail with invalid algorithm", () => {
       expect(() => {
-        generate({
-          key: testKeys.rsassa,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
-          algorithm: "INVALID_ALGORITHM" as any,
-        });
+        generate(
+          "strict",
+          {
+            key: testKeys.rsassa,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+            algorithm: "INVALID_ALGORITHM" as any,
+          }
+        );
       }).toThrow();
     });
 
     it("should preserve key order in output", () => {
       const result = generate(
+        "strict",
         {
           key: testKeys.ed25519,
           algorithm: "EdDSA",
@@ -369,10 +423,12 @@ describe("generate", () => {
       expect(parsed.publicKeys[0].alg).toBe("EdDSA");
       expect(parsed.publicKeys[1].alg).toBe("RS256");
       expect(parsed.publicKeys[2].alg).toBe("ES256");
+      expect(parsed.enforcement).toBe("strict");
     });
 
     it("should assign sequential IDs regardless of algorithm type", () => {
       const result = generate(
+        "strict",
         {
           key: testKeys.ed25519,
           algorithm: "EdDSA",
@@ -399,15 +455,19 @@ describe("generate", () => {
         "3",
         "4",
       ]);
+      expect(parsed.enforcement).toBe("strict");
     });
 
     it("should preserve existing 0x prefix in keys", () => {
       const keyWithPrefix = `0x${testKeys.ecdsa}`;
 
-      const result = generate({
-        key: keyWithPrefix,
-        algorithm: "ES256",
-      });
+      const result = generate(
+        "lax",
+        {
+          key: keyWithPrefix,
+          algorithm: "ES256",
+        }
+      );
 
       const parsed = JSON.parse(result) as ParsedResult;
       expect(parsed.publicKeys).toHaveLength(1);
@@ -416,13 +476,17 @@ describe("generate", () => {
         alg: "ES256",
         publicKey: keyWithPrefix, // Should remain unchanged
       });
+      expect(parsed.enforcement).toBe("lax");
     });
 
     it("should add 0x prefix to keys without prefix", () => {
-      const result = generate({
-        key: testKeys.ecdsa,
-        algorithm: "ES256",
-      });
+      const result = generate(
+        "lax",
+        {
+          key: testKeys.ecdsa,
+          algorithm: "ES256",
+        }
+      );
 
       const parsed = JSON.parse(result) as ParsedResult;
       expect(parsed.publicKeys).toHaveLength(1);
@@ -431,6 +495,7 @@ describe("generate", () => {
         alg: "ES256",
         publicKey: `0x${testKeys.ecdsa}`,
       });
+      expect(parsed.enforcement).toBe("lax");
     });
 
     it("should handle mixed keys with and without 0x prefix", () => {
@@ -438,6 +503,7 @@ describe("generate", () => {
       const keyWithoutPrefix = testKeys.ecdsa;
 
       const result = generate(
+        "lax",
         {
           key: keyWithPrefix,
           algorithm: "RS256",
@@ -465,7 +531,7 @@ describe("generate", () => {
     it("should not create double 0x prefix", () => {
       const keyWithPrefix = `0x${testKeys.ed25519}`;
 
-      const result = generate({
+      const result = generate("lax", {
         key: keyWithPrefix,
         algorithm: "EdDSA",
       });
@@ -474,11 +540,12 @@ describe("generate", () => {
       expect(parsed.publicKeys).toHaveLength(1);
       expect(parsed.publicKeys[0].publicKey).toBe(keyWithPrefix);
       expect(parsed.publicKeys[0].publicKey).not.toContain("0x0x");
+      expect(parsed.enforcement).toBe("lax");
     });
 
     it("should throw for non-hex characters", () => {
       expect(() =>
-        generate({
+        generate("strict", {
           key: "not-hex",
           algorithm: "ES256",
         })
@@ -487,11 +554,84 @@ describe("generate", () => {
 
     it("should throw for invalid hex with 0x prefix", () => {
       expect(() =>
-        generate({
+        generate("strict", {
           key: "0xzzzz",
           algorithm: "ES256",
         })
       ).toThrow(/Invalid hex string/);
+    });
+  });
+
+  describe("enforcement mode tests", () => {
+
+    it("should generate manifest with enforcement: none", () => {
+      const result = generate(
+        "none",
+        {
+          key: testKeys.ecdsa,
+          algorithm: "ES256",
+        }
+      );
+
+      const parsed = JSON.parse(result) as ParsedResult;
+      expect(parsed.publicKeys).toHaveLength(1);
+      expect(parsed.enforcement).toBe("none");
+    });
+
+    it("should generate manifest with enforcement: lax", () => {
+      const result = generate(
+        "lax",
+        {
+          key: testKeys.ecdsa,
+          algorithm: "ES256",
+        }
+      );
+
+      const parsed = JSON.parse(result) as ParsedResult;
+      expect(parsed.publicKeys).toHaveLength(1);
+      expect(parsed.enforcement).toBe("lax");
+    });
+
+    it("should generate manifest with enforcement: strict", () => {
+      const result = generate(
+        "strict",
+        {
+          key: testKeys.ecdsa,
+          algorithm: "ES256",
+        }
+      );
+
+      const parsed = JSON.parse(result) as ParsedResult;
+      expect(parsed.publicKeys).toHaveLength(1);
+      expect(parsed.enforcement).toBe("strict");
+    });
+
+    it("should generate manifest with multiple keys and enforcement mode", () => {
+      const result = generate(
+        "strict",
+        {
+          key: testKeys.ecdsa,
+          algorithm: "ES256",
+        },
+        {
+          key: testKeys.rsassa,
+          algorithm: "RS256",
+        }
+      );
+
+      const parsed = JSON.parse(result) as ParsedResult;
+      expect(parsed.publicKeys).toHaveLength(2);
+      expect(parsed.enforcement).toBe("strict");
+      expect(parsed.publicKeys[0]).toEqual({
+        id: "1",
+        alg: "ES256",
+        publicKey: `0x${testKeys.ecdsa}`,
+      });
+      expect(parsed.publicKeys[1]).toEqual({
+        id: "2",
+        alg: "RS256",
+        publicKey: `0x${testKeys.rsassa}`,
+      });
     });
   });
 });
