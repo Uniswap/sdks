@@ -8,6 +8,84 @@ import type { Address, Hex } from 'viem'
 import { Scope, ResetPeriod } from '../types/runtime'
 
 /**
+ * Compute the compact flag for an allocator address
+ *
+ * The compact flag is a 4-bit value (0-15) that encodes information about
+ * the position of significant bits in the upper portion of an address.
+ * This Compact uses this flag to "compress" allocator addresses.
+ *
+ * @param allocator - The allocator address
+ * @returns The 4-bit compact flag (0-15)
+ *
+ * @example
+ * '0x0000000000000000000000000000000000000000' → flag = 15 (all zeros)
+ * '0x00000000000000171ede64904551eeDF3C6C9788' → flag ≈ 14 (many leading zeros)
+ * '0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF' → flag = 0 (no leading zeros)
+ */
+export function toCompactFlag(allocator: Address): number {
+  // An address is 160 bits = 40 hex nibbles
+  // We examine the upper portion, excluding the lower 88 bits (22 nibbles)
+  // Upper portion = 40 - 22 = 18 nibbles (72 bits)
+  const upperNibbles = allocator.slice(2, 20)
+
+  // Count consecutive leading zeros in the upper portion using regex
+  const leadingZeroCount = upperNibbles.match(/^0*/)?.[0]?.length ?? 0
+
+  // Map leading zeros to compact flag (0-15)
+  // Formula: (leadingZeros / 18) * 16, capped at 15
+  // Linear mapping: 0 zeros → flag 0, 18 zeros → flag 15
+  const compactFlag = leadingZeroCount < 4 ? 0 : Math.min(leadingZeroCount - 3, 15)
+  return compactFlag
+}
+
+/**
+ * Convert an allocator address to its allocator ID representation
+ * The allocator ID is a uint96 value that combines:
+ * - Upper 4 bits: compact flag (computed from address)
+ * - Lower 92 bits: lower 88 bits of the address
+ *
+ * When used in a lock tag, only the lower 92 bits are stored (the compact flag
+ * can be recomputed from the address when needed).
+ *
+ * Matches the Solidity implementation in IdLib.sol:toAllocatorId
+ *
+ * @param allocator - The allocator address
+ * @returns The allocator ID as a uint96 (bigint with max 96 bits)
+ *
+ * @example
+ * ```typescript
+ * const allocatorId = allocatorToAllocatorId('0x1234567890123456789012345678901234567890')
+ * // Use in lock tag encoding
+ * const lockTag = encodeLockTag({
+ *   allocatorId,
+ *   scope: Scope.Multichain,
+ *   resetPeriod: ResetPeriod.TenMinutes
+ * })
+ * ```
+ */
+export function allocatorToAllocatorId(allocator: Address): bigint {
+  // Validate input
+  const allocatorHex = allocator.slice(2).toLowerCase()
+  invariant(allocatorHex.length === 40, 'allocator must be a valid address (20 bytes)')
+
+  const compactFlag = BigInt(toCompactFlag(allocator))
+  const addressBits = BigInt(allocator)
+
+  // Extract lower 88 bits of address
+  // In Solidity: shr(168, shl(168, allocator))
+  const lower88Bits = addressBits & ((1n << 88n) - 1n)
+
+  // Combine: (compactFlag << 88) | lower88Bits
+  // In Solidity: or(shl(88, compactFlag), shr(168, shl(168, allocator)))
+  const allocatorId = (compactFlag << 88n) | lower88Bits
+
+  // Validate result fits in 96 bits
+  invariant(allocatorId < 2n ** 96n, 'allocatorId must fit in 96 bits')
+
+  return allocatorId
+}
+
+/**
  * Parts of a lock tag
  */
 export interface LockTagParts {
