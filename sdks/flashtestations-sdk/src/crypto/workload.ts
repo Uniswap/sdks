@@ -9,16 +9,18 @@ import {
 /**
  * Converts a hex string to a Uint8Array
  * This is a helper function to convert a hex string to a Uint8Array
+ * Accepts both 0x-prefixed and non-prefixed hex strings
  * @example:
  * - '0x123456789abcde' -> Uint8Array([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde])
- * @param hex - The hex string to convert
+ * - '123456789abcde' -> Uint8Array([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde])
+ * @param hex - The hex string to convert (with or without 0x prefix)
  * @returns The Uint8Array
  * @throws If the hex string is invalid
- * 
+ *
  */
-function hexToBytes(hex: `0x${string}`): Uint8Array {
-  if (hex.length % 2 !== 0) throw new Error("Invalid hex string");
-  const unprefixedHex = hex.slice(2);
+function hexToBytes(hex: string): Uint8Array {
+  const unprefixedHex = hex.startsWith('0x') ? hex.slice(2) : hex;
+  if (unprefixedHex.length % 2 !== 0) throw new Error("Invalid hex string");
   return Uint8Array.from(unprefixedHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
 }
 
@@ -58,14 +60,14 @@ export function computeWorkloadId(registers: SingularWorkloadMeasurementRegister
   validateSingularWorkloadMeasurementRegisters(registers);
 
   // Convert hex strings to Uint8Arrays for bitwise operations
-  const mrTd = hexToBytes(registers.mrTd);
-  const rtMr0 = hexToBytes(registers.rtMr0);
-  const rtMr1 = hexToBytes(registers.rtMr1);
-  const rtMr2 = hexToBytes(registers.rtMr2);
-  const rtMr3 = hexToBytes(registers.rtMr3);
-  const mrConfigId = hexToBytes(registers.mrConfigId);
-  const xFAM = hexToBytes(registers.xFAM);
-  const tdAttributes = hexToBytes(registers.tdAttributes);
+  const mrTd = hexToBytes(registers.mrtd);
+  const rtMr0 = hexToBytes(registers.rtmr0);
+  const rtMr1 = hexToBytes(registers.rtmr1);
+  const rtMr2 = hexToBytes(registers.rtmr2);
+  const rtMr3 = hexToBytes(registers.rtmr3);
+  const mrConfigId = hexToBytes(registers.mrconfigid);
+  const xFAM = hexToBytes(registers.xfam);
+  const tdAttributes = hexToBytes(registers.tdattributes);
 
   // Concatenate all components and hash
   return keccak256(
@@ -84,8 +86,8 @@ export function computeWorkloadId(registers: SingularWorkloadMeasurementRegister
  * ```typescript
  * const input = {
  *   // ... other fields
- *   mrTd: ['0xaaa...', '0xbbb...'],
- *   rtMr0: ['0xccc...', '0xddd...']
+ *   mrtd: ['0xaaa...', '0xbbb...'],
+ *   rtmr0: ['0xccc...', '0xddd...']
  * };
  * // Returns 4 combinations: (aaa,ccc), (aaa,ddd), (bbb,ccc), (bbb,ddd)
  * const singularRegisters = expandToSingularRegisters(input);
@@ -97,23 +99,23 @@ export function expandToSingularRegisters(
   // Validate input first
   validateWorkloadMeasurementRegisters(registers);
 
-  // Normalize mrTd and rtMr0 to arrays
-  const mrTdValues = Array.isArray(registers.mrTd) ? registers.mrTd : [registers.mrTd];
-  const rtMr0Values = Array.isArray(registers.rtMr0) ? registers.rtMr0 : [registers.rtMr0];
+  // Normalize mrtd and rtmr0 to arrays
+  const mrTdValues = Array.isArray(registers.mrtd) ? registers.mrtd : [registers.mrtd];
+  const rtMr0Values = Array.isArray(registers.rtmr0) ? registers.rtmr0 : [registers.rtmr0];
 
   // Generate cartesian product
   const result: SingularWorkloadMeasurementRegisters[] = [];
-  for (const mrTd of mrTdValues) {
-    for (const rtMr0 of rtMr0Values) {
+  for (const mrtd of mrTdValues) {
+    for (const rtmr0 of rtMr0Values) {
       result.push({
-        tdAttributes: registers.tdAttributes,
-        xFAM: registers.xFAM,
-        mrTd,
-        mrConfigId: registers.mrConfigId,
-        rtMr0,
-        rtMr1: registers.rtMr1,
-        rtMr2: registers.rtMr2,
-        rtMr3: registers.rtMr3,
+        tdattributes: registers.tdattributes,
+        xfam: registers.xfam,
+        mrtd: mrtd,
+        mrconfigid: registers.mrconfigid,
+        rtmr0: rtmr0,
+        rtmr1: registers.rtmr1,
+        rtmr2: registers.rtmr2,
+        rtmr3: registers.rtmr3,
       });
     }
   }
@@ -132,8 +134,8 @@ export function expandToSingularRegisters(
  * ```typescript
  * const registers = {
  *   // ... other fields
- *   mrTd: ['0xaaa...', '0xbbb...'],
- *   rtMr0: ['0xccc...', '0xddd...']
+ *   mrtd: ['0xaaa...', '0xbbb...'],
+ *   rtmr0: ['0xccc...', '0xddd...']
  * };
  * // Returns 4 workload IDs, one for each combination
  * const ids = computeAllWorkloadIds(registers);
@@ -158,8 +160,8 @@ export function computeAllWorkloadIds(
  * ```typescript
  * const registers = {
  *   // ... other fields
- *   mrTd: ['0xaaa...', '0xbbb...'],
- *   rtMr0: ['0xccc...', '0xddd...']
+ *   mrtd: ['0xaaa...', '0xbbb...'],
+ *   rtmr0: ['0xccc...', '0xddd...']
  * };
  * // Returns true if any of the 4 possible IDs matches
  * const matches = matchesAnyWorkloadId(registers, expectedId);

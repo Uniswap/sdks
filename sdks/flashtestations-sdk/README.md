@@ -218,8 +218,8 @@ import { ValidationError } from 'flashtestations-sdk';
 
 try {
   const invalidRegisters = {
-    tdAttributes: '0x00', // Too short!
-    xFAM: '0x0000000000000003',
+    tdattributes: '0x00', // Too short!
+    xfam: '0x0000000000000003',
     // ... other fields
   };
   const result = await verifyFlashtestationInBlock(invalidRegisters, 'latest', {
@@ -275,15 +275,15 @@ import {
 } from 'flashtestations-sdk';
 
 const registers: WorkloadMeasurementRegisters = {
-  tdAttributes: '0x0000000000000000',
-  xFAM: '0x0000000000000003',
-  mrTd: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
-  mrConfigId:
+  tdattributes: '0x0000000000000000',
+  xfam: '0x0000000000000003',
+  mrtd: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+  mrconfigid:
     '0x0000000000000000000000000000000000000000000000000000000000000000',
-  rtMr0: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-  rtMr1: '0xef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abab',
-  rtMr2: '0x234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdeff',
-  rtMr3: '0x67890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234d',
+  rtmr0: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+  rtmr1: '0xef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abab',
+  rtmr2: '0x234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdeff',
+  rtmr3: '0x67890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234d',
 };
 
 const workloadId = computeWorkloadId(registers);
