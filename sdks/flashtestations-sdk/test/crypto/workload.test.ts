@@ -82,9 +82,9 @@ describe('Workload ID computation', () => {
   describe('integration tests', () => {
     it('should handle complete workload ID computation flow', () => {
       // this example workloadId is the same as the one from an actual TDX report in the solidity test code
-      // here: https://github.com/flashbots/flashtestations/blob/7cc7f68492fe672a823dd2dead649793aac1f216/test/BlockBuilderPolicy.t.sol#L302
+      // here: https://github.com/flashbots/flashtestations/blob/38594f37b5f6d1b1f5f6ad4203a4770c10f72a22/test/BlockBuilderPolicy.t.sol#L300
       const expectedWorkloadId =
-        '0xf724e7d117f5655cf33beefdfc7d31e930278fcb65cf6d1de632595e97ca82b2';
+        '0x952569f637f3f7e36cd8f5a7578ae4d03a1cb05ddaf33b35d3054464bb1c862e';
       // Create registers with some custom values
       const registers: SingularWorkloadMeasurementRegisters = {
         tdAttributes: '0x0000001000000000',
@@ -113,7 +113,7 @@ describe('Workload ID computation', () => {
 
     it('should handle workload ID computation with a different set of registers', () => {
       const expectedWorkloadId =
-        '0xc85f03aebad8acae79c876cbad92cd1da26c0555a383146132b3dbf5709e8662';
+        '0xc1978eb1e3db791ebcdf41be6577209cb1a555f9fff06b65abe4d3baf92811a3';
       // Create registers with some custom values
       const registers: SingularWorkloadMeasurementRegisters = {
         tdAttributes: '0x0000001000000000',
