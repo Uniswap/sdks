@@ -187,7 +187,7 @@ describe('RpcClient', () => {
     });
 
     it('should fetch source locators for a workload ID', async () => {
-      const workloadId = '0x71d62ba17902d590dad932310a7ec12feffa25454d7009c2084aa6f4c488953f' as `0x${string}`;
+      const workloadId = '0x71d62ba17902d590dad932310a7ec12feffa25454d7009c2084aa6f4c488953f';
       const mockMetadata = {
         commitHash: '490fb2be109f0c2626c347bb3e43e97826c8f844',
         sourceLocators: ['https://github.com/example/repo1/c41fa4d500f6fb4e4fe46c23b34b26367e10beb4', 'https://github.com/example/repo2/86ebf9de12466aaae1485eb6fc80ae3c78954edf']
@@ -207,7 +207,7 @@ describe('RpcClient', () => {
     });
 
     it('should handle empty source locators', async () => {
-      const workloadId = '0x71d62ba17902d590dad932310a7ec12feffa25454d7009c2084aa6f4c488953f' as `0x${string}`;
+      const workloadId = '0x71d62ba17902d590dad932310a7ec12feffa25454d7009c2084aa6f4c488953f';
       const mockMetadata = {
         commitHash: '490fb2be109f0c2626c347bb3e43e97826c8f844',
         sourceLocators: []
@@ -220,7 +220,7 @@ describe('RpcClient', () => {
     });
 
     it('should retry on transient failures', async () => {
-      const workloadId = '0x71d62ba17902d590dad932310a7ec12feffa25454d7009c2084aa6f4c488953f' as `0x${string}`;
+      const workloadId = '0x71d62ba17902d590dad932310a7ec12feffa25454d7009c2084aa6f4c488953f';
       const mockMetadata = {
         commitHash: '490fb2be109f0c2626c347bb3e43e97826c8f844',
         sourceLocators: ['https://github.com/example/repo/86ebf9de12466aaae1485eb6fc80ae3c78954edf']
@@ -244,7 +244,7 @@ describe('RpcClient', () => {
     });
 
     it('should throw NetworkError after max retries', async () => {
-      const workloadId = '0x71d62ba17902d590dad932310a7ec12feffa25454d7009c2084aa6f4c488953f' as `0x${string}`;
+      const workloadId = '0x71d62ba17902d590dad932310a7ec12feffa25454d7009c2084aa6f4c488953f';
 
       const clientWithRetry = new RpcClient({
         chainId: 1301,
@@ -346,7 +346,7 @@ describe('RpcClient', () => {
     });
 
     it('should return FlashtestationEvent when BlockBuilderProofVerified event exists', async () => {
-      const txHash = '0xabc123def456' as `0x${string}`;
+      const txHash = '0xabc123def456';
       const blockNumber = 100;
       const mockBlock = {
         number: BigInt(blockNumber),

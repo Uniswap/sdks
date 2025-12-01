@@ -19,14 +19,14 @@ describe('Workload ID computation', () => {
   };
 
   const validRegisters: SingularWorkloadMeasurementRegisters = {
-    tdAttributes: '0x0000001000000000',
-    xFAM: '0xe702060000000000',
-    mrTd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
-    mrConfigId: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
-    rtMr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
-    rtMr1: '0xa7157e7c5f932e9babac9209d4527ec9ed837b8e335a931517677fa746db51ee56062e3324e266e3f39ec26a516f4f71',
-    rtMr2: '0xe63560e50830e22fbc9b06cdce8afe784bf111e4251256cf104050f1347cd4ad9f30da408475066575145da0b098a124',
-    rtMr3: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+    tdattributes: '0x0000001000000000',
+    xfam: '0xe702060000000000',
+    mrtd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
+    mrconfigid: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+    rtmr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
+    rtmr1: '0xa7157e7c5f932e9babac9209d4527ec9ed837b8e335a931517677fa746db51ee56062e3324e266e3f39ec26a516f4f71',
+    rtmr2: '0xe63560e50830e22fbc9b06cdce8afe784bf111e4251256cf104050f1347cd4ad9f30da408475066575145da0b098a124',
+    rtmr3: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
   };
 
   describe('computeWorkloadId', () => {
@@ -47,7 +47,7 @@ describe('Workload ID computation', () => {
     it('should produce different results for different inputs', () => {
       const modifiedRegisters = {
         ...validRegisters,
-        mrTd: createHex96('0xdf0123456789abcdef'),
+        mrtd: createHex96('0xdf0123456789abcdef'),
       };
 
       const result1 = computeWorkloadId(validRegisters);
@@ -59,22 +59,22 @@ describe('Workload ID computation', () => {
     it('should validate input registers', () => {
       const invalidRegisters = {
         ...validRegisters,
-        tdAttributes: '0xinvalid' as `0x${string}`, // Invalid hex
+        tdattributes: '0xinvalid', // Invalid hex
       };
 
       expect(() => computeWorkloadId(invalidRegisters)).toThrow(
-        'Invalid tdAttributes: expected 16 hex characters, got 7'
+        'Invalid tdattributes: expected 16 hex characters, got 7'
       );
     });
 
     it('should validate register lengths', () => {
       const invalidRegisters = {
         ...validRegisters,
-        tdAttributes: '0x0' as `0x${string}`, // Invalid hex
+        tdattributes: '0x0', // Invalid hex
       };
 
       expect(() => computeWorkloadId(invalidRegisters)).toThrow(
-        'Invalid tdAttributes: expected 16 hex characters, got 1'
+        'Invalid tdattributes: expected 16 hex characters, got 1'
       );
     });
   });
@@ -85,21 +85,21 @@ describe('Workload ID computation', () => {
       // here: https://github.com/flashbots/flashtestations/blob/38594f37b5f6d1b1f5f6ad4203a4770c10f72a22/test/BlockBuilderPolicy.t.sol#L300
       const expectedWorkloadId =
         '0x952569f637f3f7e36cd8f5a7578ae4d03a1cb05ddaf33b35d3054464bb1c862e';
-      // Create registers with some custom values
+      // Create registers with non-0x prefix
       const registers: SingularWorkloadMeasurementRegisters = {
-        tdAttributes: '0x0000001000000000',
-        xFAM: '0xe702060000000000',
-        mrTd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
-        mrConfigId:
-          '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
-        rtMr0:
-          '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
-        rtMr1:
-          '0xa7157e7c5f932e9babac9209d4527ec9ed837b8e335a931517677fa746db51ee56062e3324e266e3f39ec26a516f4f71',
-        rtMr2:
-          '0xe63560e50830e22fbc9b06cdce8afe784bf111e4251256cf104050f1347cd4ad9f30da408475066575145da0b098a124',
-        rtMr3:
-          '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+        tdattributes: '0000001000000000',
+        xfam: 'e702060000000000',
+        mrtd: '47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
+        mrconfigid:
+          '000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+        rtmr0:
+          '00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
+        rtmr1:
+          'a7157e7c5f932e9babac9209d4527ec9ed837b8e335a931517677fa746db51ee56062e3324e266e3f39ec26a516f4f71',
+        rtmr2:
+          'e63560e50830e22fbc9b06cdce8afe784bf111e4251256cf104050f1347cd4ad9f30da408475066575145da0b098a124',
+        rtmr3:
+          '000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
       };
 
       const workloadId = computeWorkloadId(registers);
@@ -116,18 +116,18 @@ describe('Workload ID computation', () => {
         '0xc1978eb1e3db791ebcdf41be6577209cb1a555f9fff06b65abe4d3baf92811a3';
       // Create registers with some custom values
       const registers: SingularWorkloadMeasurementRegisters = {
-        tdAttributes: '0x0000001000000000',
-        xFAM: '0xe702060000000000',
-        mrTd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
-        mrConfigId:
+        tdattributes: '0x0000001000000000',
+        xfam: '0xe702060000000000',
+        mrtd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
+        mrconfigid:
           '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
-        rtMr0:
+        rtmr0:
           '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
-        rtMr1:
+        rtmr1:
           '0xa7157e7c5f932e9babac9209d4527ec9ed837b8e335a931517677fa746db51ee56062f3324e266e3f39ec26a516f4f71',
-        rtMr2:
+        rtmr2:
           '0xe63561e50830e22fbc9b06cdce8afe784bf112e4251256cf104050f1347cd4ad9f30da408475066575145da0b098a124',
-        rtMr3:
+        rtmr3:
           '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
       };
 
@@ -143,19 +143,19 @@ describe('Workload ID computation', () => {
 
   describe('expandToSingularRegisters', () => {
     const baseRegisters = {
-      tdAttributes: '0x0000001000000000' as `0x${string}`,
-      xFAM: '0xe702060000000000' as `0x${string}`,
-      mrConfigId: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`,
-      rtMr1: '0xa7157e7c5f932e9babac9209d4527ec9ed837b8e335a931517677fa746db51ee56062e3324e266e3f39ec26a516f4f71' as `0x${string}`,
-      rtMr2: '0xe63560e50830e22fbc9b06cdce8afe784bf111e4251256cf104050f1347cd4ad9f30da408475066575145da0b098a124' as `0x${string}`,
-      rtMr3: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`,
+      tdattributes: '0x0000001000000000',
+      xfam: '0xe702060000000000',
+      mrconfigid: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+      rtmr1: '0xa7157e7c5f932e9babac9209d4527ec9ed837b8e335a931517677fa746db51ee56062e3324e266e3f39ec26a516f4f71',
+      rtmr2: '0xe63560e50830e22fbc9b06cdce8afe784bf111e4251256cf104050f1347cd4ad9f30da408475066575145da0b098a124',
+      rtmr3: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
     };
 
-    it('should return single register when both mrTd and rtMr0 are single values', () => {
+    it('should return single register when both mrtd and rtmr0 are single values', () => {
       const registers: WorkloadMeasurementRegisters = {
         ...baseRegisters,
-        mrTd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
-        rtMr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
+        mrtd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
+        rtmr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
       };
 
       const result = expandToSingularRegisters(registers);
@@ -163,35 +163,35 @@ describe('Workload ID computation', () => {
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({
         ...baseRegisters,
-        mrTd: registers.mrTd,
-        rtMr0: registers.rtMr0,
+        mrtd: registers.mrtd,
+        rtmr0: registers.rtmr0,
       });
     });
 
-    it('should expand mrTd array with single rtMr0', () => {
+    it('should expand mrtd array with single rtmr0', () => {
       const registers: WorkloadMeasurementRegisters = {
         ...baseRegisters,
-        mrTd: [
+        mrtd: [
           '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
           '0x202c7d38558f7cfa086feca5a23d62fa071cceb0bd55dbd06eeb4cebbd3c204c209f5551914d41ce433fb7fd67cc7136',
         ],
-        rtMr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
+        rtmr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
       };
 
       const result = expandToSingularRegisters(registers);
 
       expect(result).toHaveLength(2);
-      expect(result[0].mrTd).toBe(registers.mrTd[0]);
-      expect(result[0].rtMr0).toBe(registers.rtMr0);
-      expect(result[1].mrTd).toBe(registers.mrTd[1]);
-      expect(result[1].rtMr0).toBe(registers.rtMr0);
+      expect(result[0].mrtd).toBe(registers.mrtd[0]);
+      expect(result[0].rtmr0).toBe(registers.rtmr0);
+      expect(result[1].mrtd).toBe(registers.mrtd[1]);
+      expect(result[1].rtmr0).toBe(registers.rtmr0);
     });
 
-    it('should expand rtMr0 array with single mrTd', () => {
+    it('should expand rtmr0 array with single mrtd', () => {
       const registers: WorkloadMeasurementRegisters = {
         ...baseRegisters,
-        mrTd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
-        rtMr0: [
+        mrtd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
+        rtmr0: [
           '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
           '0x6da49936a0649f6970be5df8bf7ba0d2efb66a96216c11cc65ac348432a07cfaab037b173e22c54d3f10d59327e7fbc9',
         ],
@@ -200,20 +200,20 @@ describe('Workload ID computation', () => {
       const result = expandToSingularRegisters(registers);
 
       expect(result).toHaveLength(2);
-      expect(result[0].mrTd).toBe(registers.mrTd);
-      expect(result[0].rtMr0).toBe(registers.rtMr0[0]);
-      expect(result[1].mrTd).toBe(registers.mrTd);
-      expect(result[1].rtMr0).toBe(registers.rtMr0[1]);
+      expect(result[0].mrtd).toBe(registers.mrtd);
+      expect(result[0].rtmr0).toBe(registers.rtmr0[0]);
+      expect(result[1].mrtd).toBe(registers.mrtd);
+      expect(result[1].rtmr0).toBe(registers.rtmr0[1]);
     });
 
-    it('should generate cartesian product when both mrTd and rtMr0 are arrays', () => {
+    it('should generate cartesian product when both mrtd and rtmr0 are arrays', () => {
       const registers: WorkloadMeasurementRegisters = {
         ...baseRegisters,
-        mrTd: [
+        mrtd: [
           '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
           '0x202c7d38558f7cfa086feca5a23d62fa071cceb0bd55dbd06eeb4cebbd3c204c209f5551914d41ce433fb7fd67cc7136',
         ],
-        rtMr0: [
+        rtmr0: [
           '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
           '0x6da49936a0649f6970be5df8bf7ba0d2efb66a96216c11cc65ac348432a07cfaab037b173e22c54d3f10d59327e7fbc9',
         ],
@@ -224,39 +224,39 @@ describe('Workload ID computation', () => {
       // Should generate 2 x 2 = 4 combinations
       expect(result).toHaveLength(4);
 
-      // Verify all combinations exist (mrTd[0], rtMr0[0])
-      expect(result[0].mrTd).toBe(registers.mrTd[0]);
-      expect(result[0].rtMr0).toBe(registers.rtMr0[0]);
+      // Verify all combinations exist (mrtd[0], rtmr0[0])
+      expect(result[0].mrtd).toBe(registers.mrtd[0]);
+      expect(result[0].rtmr0).toBe(registers.rtmr0[0]);
 
-      // (mrTd[0], rtMr0[1])
-      expect(result[1].mrTd).toBe(registers.mrTd[0]);
-      expect(result[1].rtMr0).toBe(registers.rtMr0[1]);
+      // (mrtd[0], rtmr0[1])
+      expect(result[1].mrtd).toBe(registers.mrtd[0]);
+      expect(result[1].rtmr0).toBe(registers.rtmr0[1]);
 
-      // (mrTd[1], rtMr0[0])
-      expect(result[2].mrTd).toBe(registers.mrTd[1]);
-      expect(result[2].rtMr0).toBe(registers.rtMr0[0]);
+      // (mrtd[1], rtmr0[0])
+      expect(result[2].mrtd).toBe(registers.mrtd[1]);
+      expect(result[2].rtmr0).toBe(registers.rtmr0[0]);
 
-      // (mrTd[1], rtMr0[1])
-      expect(result[3].mrTd).toBe(registers.mrTd[1]);
-      expect(result[3].rtMr0).toBe(registers.rtMr0[1]);
+      // (mrtd[1], rtmr0[1])
+      expect(result[3].mrtd).toBe(registers.mrtd[1]);
+      expect(result[3].rtmr0).toBe(registers.rtmr0[1]);
 
       // Verify all combinations have correct base fields
       result.forEach(singular => {
-        expect(singular.tdAttributes).toBe(baseRegisters.tdAttributes);
-        expect(singular.xFAM).toBe(baseRegisters.xFAM);
-        expect(singular.rtMr1).toBe(baseRegisters.rtMr1);
+        expect(singular.tdattributes).toBe(baseRegisters.tdattributes);
+        expect(singular.xfam).toBe(baseRegisters.xfam);
+        expect(singular.rtmr1).toBe(baseRegisters.rtmr1);
       });
     });
 
     it('should handle large cartesian products (3x3)', () => {
       const registers: WorkloadMeasurementRegisters = {
         ...baseRegisters,
-        mrTd: [
+        mrtd: [
           '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
           '0x202c7d38558f7cfa086feca5a23d62fa071cceb0bd55dbd06eeb4cebbd3c204c209f5551914d41ce433fb7fd67cc7136',
           '0x3c372ef16cb892bffd91163b8b92322abee6be34473b845bc63075072c2c0d5ba805f314afaddade64437f50018cfbd5',
         ],
-        rtMr0: [
+        rtmr0: [
           '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
           '0x6da49936a0649f6970be5df8bf7ba0d2efb66a96216c11cc65ac348432a07cfaab037b173e22c54d3f10d59327e7fbc9',
           '0xf5cea78565e130d0e2e93429f20d269fa60aaa6bee68dd27afec0f85e3ccb885f4681ba9885b06a2ae8d202f356785a9',
@@ -269,85 +269,85 @@ describe('Workload ID computation', () => {
       expect(result).toHaveLength(9);
 
       // Verify all are unique combinations
-      const combinations = result.map(r => `${r.mrTd}_${r.rtMr0}`);
+      const combinations = result.map(r => `${r.mrtd}_${r.rtmr0}`);
       const uniqueCombinations = new Set(combinations);
       expect(uniqueCombinations.size).toBe(9);
     });
 
-    it('should throw ValidationError for empty mrTd array', () => {
+    it('should throw ValidationError for empty mrtd array', () => {
       const registers: WorkloadMeasurementRegisters = {
         ...baseRegisters,
-        mrTd: [],
-        rtMr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
+        mrtd: [],
+        rtmr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
       };
 
-      expect(() => expandToSingularRegisters(registers)).toThrow('mrTd array cannot be empty');
+      expect(() => expandToSingularRegisters(registers)).toThrow('mrtd array cannot be empty');
     });
 
-    it('should throw ValidationError for empty rtMr0 array', () => {
+    it('should throw ValidationError for empty rtmr0 array', () => {
       const registers: WorkloadMeasurementRegisters = {
         ...baseRegisters,
-        mrTd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
-        rtMr0: [],
+        mrtd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
+        rtmr0: [],
       };
 
-      expect(() => expandToSingularRegisters(registers)).toThrow('rtMr0 array cannot be empty');
+      expect(() => expandToSingularRegisters(registers)).toThrow('rtmr0 array cannot be empty');
     });
 
     it('should validate all array elements have correct length', () => {
       const registers: WorkloadMeasurementRegisters = {
         ...baseRegisters,
-        mrTd: [
+        mrtd: [
           '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
           '0xinvalid', // Invalid length
         ],
-        rtMr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
+        rtmr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
       };
 
-      expect(() => expandToSingularRegisters(registers)).toThrow(/Invalid mrTd\[1\]/);
+      expect(() => expandToSingularRegisters(registers)).toThrow(/Invalid mrtd\[1\]/);
     });
 
     it('should validate all array elements are hex strings', () => {
       const registers: WorkloadMeasurementRegisters = {
         ...baseRegisters,
-        mrTd: [
+        mrtd: [
           '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
-          'invalid' as `0x${string}`,
+          'invalid',
         ],
-        rtMr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
+        rtmr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
       };
 
-      expect(() => expandToSingularRegisters(registers)).toThrow(/Invalid mrTd\[1\]/);
+      expect(() => expandToSingularRegisters(registers)).toThrow(/Invalid mrtd\[1\]/);
 
       const invalidRegisters: WorkloadMeasurementRegisters = {
         ...baseRegisters,
-        rtMr0: [
+        rtmr0: [
           '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
-          'invalid' as `0x${string}`,
+          'invalid',
         ],
-        mrTd: [
+        mrtd: [
           '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
         ],
       };
-      expect(() => expandToSingularRegisters(invalidRegisters)).toThrow(/Invalid rtMr0\[1\]/);
+      expect(() => expandToSingularRegisters(invalidRegisters)).toThrow(/Invalid rtmr0\[1\]/);
     });
   });
 
   describe('computeAllWorkloadIds', () => {
     const baseRegisters = {
-      tdAttributes: '0x0000001000000000' as `0x${string}`,
-      xFAM: '0xe702060000000000' as `0x${string}`,
-      mrConfigId: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`,
-      rtMr1: '0xa7157e7c5f932e9babac9209d4527ec9ed837b8e335a931517677fa746db51ee56062e3324e266e3f39ec26a516f4f71' as `0x${string}`,
-      rtMr2: '0xe63560e50830e22fbc9b06cdce8afe784bf111e4251256cf104050f1347cd4ad9f30da408475066575145da0b098a124' as `0x${string}`,
-      rtMr3: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`,
+      tdattributes: '0x0000001000000000',
+      xfam: '0xe702060000000000',
+      mrconfigid: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+      rtmr1: '0xa7157e7c5f932e9babac9209d4527ec9ed837b8e335a931517677fa746db51ee56062e3324e266e3f39ec26a516f4f71',
+      rtmr2: '0xe63560e50830e22fbc9b06cdce8afe784bf111e4251256cf104050f1347cd4ad9f30da408475066575145da0b098a124',
+      rtmr3: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
     };
 
     it('should return single ID for singular registers', () => {
       const registers: WorkloadMeasurementRegisters = {
         ...baseRegisters,
-        mrTd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
-        rtMr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
+        mrtd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
+        rtmr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
       };
 
       const result = computeAllWorkloadIds(registers);
@@ -359,11 +359,11 @@ describe('Workload ID computation', () => {
     it('should return multiple IDs for array registers', () => {
       const registers: WorkloadMeasurementRegisters = {
         ...baseRegisters,
-        mrTd: [
+        mrtd: [
           '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
           '0x202c7d38558f7cfa086feca5a23d62fa071cceb0bd55dbd06eeb4cebbd3c204c209f5551914d41ce433fb7fd67cc7136',
         ],
-        rtMr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
+        rtmr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
       };
 
       const result = computeAllWorkloadIds(registers);
@@ -377,11 +377,11 @@ describe('Workload ID computation', () => {
     it('should generate all IDs for cartesian product', () => {
       const registers: WorkloadMeasurementRegisters = {
         ...baseRegisters,
-        mrTd: [
+        mrtd: [
           '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
           '0x202c7d38558f7cfa086feca5a23d62fa071cceb0bd55dbd06eeb4cebbd3c204c209f5551914d41ce433fb7fd67cc7136',
         ],
-        rtMr0: [
+        rtmr0: [
           '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
           '0x6da49936a0649f6970be5df8bf7ba0d2efb66a96216c11cc65ac348432a07cfaab037b173e22c54d3f10d59327e7fbc9',
         ],
@@ -389,7 +389,7 @@ describe('Workload ID computation', () => {
 
       const result = computeAllWorkloadIds(registers);
 
-      // 2 mrTd × 2 rtMr0 = 4 IDs
+      // 2 mrtd × 2 rtmr0 = 4 IDs
       expect(result).toHaveLength(4);
 
       // All should be valid workload IDs
@@ -405,11 +405,11 @@ describe('Workload ID computation', () => {
     it('should compute deterministic IDs', () => {
       const registers: WorkloadMeasurementRegisters = {
         ...baseRegisters,
-        mrTd: [
+        mrtd: [
           '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
           '0x202c7d38558f7cfa086feca5a23d62fa071cceb0bd55dbd06eeb4cebbd3c204c209f5551914d41ce433fb7fd67cc7136',
         ],
-        rtMr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
+        rtmr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
       };
 
       const result1 = computeAllWorkloadIds(registers);
@@ -421,25 +421,25 @@ describe('Workload ID computation', () => {
 
   describe('matchesAnyWorkloadId', () => {
     const baseRegisters = {
-      tdAttributes: '0x0000001000000000' as `0x${string}`,
-      xFAM: '0xe702060000000000' as `0x${string}`,
-      mrConfigId: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`,
-      rtMr1: '0xa7157e7c5f932e9babac9209d4527ec9ed837b8e335a931517677fa746db51ee56062e3324e266e3f39ec26a516f4f71' as `0x${string}`,
-      rtMr2: '0xe63560e50830e22fbc9b06cdce8afe784bf111e4251256cf104050f1347cd4ad9f30da408475066575145da0b098a124' as `0x${string}`,
-      rtMr3: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`,
+      tdattributes: '0x0000001000000000',
+      xfam: '0xe702060000000000',
+      mrconfigid: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+      rtmr1: '0xa7157e7c5f932e9babac9209d4527ec9ed837b8e335a931517677fa746db51ee56062e3324e266e3f39ec26a516f4f71',
+      rtmr2: '0xe63560e50830e22fbc9b06cdce8afe784bf111e4251256cf104050f1347cd4ad9f30da408475066575145da0b098a124',
+      rtmr3: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
     };
 
     it('should return true when single register matches', () => {
       const registers: WorkloadMeasurementRegisters = {
         ...baseRegisters,
-        mrTd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323' as `0x${string}`,
-        rtMr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391' as `0x${string}`,
+        mrtd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
+        rtmr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
       };
 
       const singularRegisters: SingularWorkloadMeasurementRegisters = {
         ...baseRegisters,
-        mrTd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323' as `0x${string}`,
-        rtMr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391' as `0x${string}`,
+        mrtd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
+        rtmr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
       };
       const workloadId = computeWorkloadId(singularRegisters);
       const result = matchesAnyWorkloadId(registers, workloadId);
@@ -450,8 +450,8 @@ describe('Workload ID computation', () => {
     it('should return false when single register does not match', () => {
       const registers: WorkloadMeasurementRegisters = {
         ...baseRegisters,
-        mrTd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
-        rtMr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
+        mrtd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
+        rtmr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
       };
 
       const result = matchesAnyWorkloadId(registers, '0x0000000000000000000000000000000000000000000000000000000000000000');
@@ -462,11 +462,11 @@ describe('Workload ID computation', () => {
     it('should return true when any array register matches', () => {
       const registers: WorkloadMeasurementRegisters = {
         ...baseRegisters,
-        mrTd: [
+        mrtd: [
           '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
           '0x202c7d38558f7cfa086feca5a23d62fa071cceb0bd55dbd06eeb4cebbd3c204c209f5551914d41ce433fb7fd67cc7136',
         ],
-        rtMr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
+        rtmr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
       };
 
       const allIds = computeAllWorkloadIds(registers);
@@ -481,11 +481,11 @@ describe('Workload ID computation', () => {
     it('should return false when no array register matches', () => {
       const registers: WorkloadMeasurementRegisters = {
         ...baseRegisters,
-        mrTd: [
+        mrtd: [
           '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
           '0x202c7d38558f7cfa086feca5a23d62fa071cceb0bd55dbd06eeb4cebbd3c204c209f5551914d41ce433fb7fd67cc7136',
         ],
-        rtMr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
+        rtmr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
       };
 
       const result = matchesAnyWorkloadId(registers, '0x0000000000000000000000000000000000000000000000000000000000000000');
@@ -496,11 +496,11 @@ describe('Workload ID computation', () => {
     it('should handle cartesian product matching', () => {
       const registers: WorkloadMeasurementRegisters = {
         ...baseRegisters,
-        mrTd: [
+        mrtd: [
           '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
           '0x202c7d38558f7cfa086feca5a23d62fa071cceb0bd55dbd06eeb4cebbd3c204c209f5551914d41ce433fb7fd67cc7136',
         ],
-        rtMr0: [
+        rtmr0: [
           '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
           '0x6da49936a0649f6970be5df8bf7ba0d2efb66a96216c11cc65ac348432a07cfaab037b173e22c54d3f10d59327e7fbc9',
         ],
@@ -520,46 +520,46 @@ describe('Workload ID computation', () => {
 
   describe('validation edge cases', () => {
     const baseRegisters = {
-      tdAttributes: '0x0000001000000000' as `0x${string}`,
-      xFAM: '0xe702060000000000' as `0x${string}`,
-      mrConfigId: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`,
-      rtMr1: '0xa7157e7c5f932e9babac9209d4527ec9ed837b8e335a931517677fa746db51ee56062e3324e266e3f39ec26a516f4f71' as `0x${string}`,
-      rtMr2: '0xe63560e50830e22fbc9b06cdce8afe784bf111e4251256cf104050f1347cd4ad9f30da408475066575145da0b098a124' as `0x${string}`,
-      rtMr3: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`,
+      tdattributes: '0x0000001000000000',
+      xfam: '0xe702060000000000',
+      mrconfigid: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+      rtmr1: '0xa7157e7c5f932e9babac9209d4527ec9ed837b8e335a931517677fa746db51ee56062e3324e266e3f39ec26a516f4f71',
+      rtmr2: '0xe63560e50830e22fbc9b06cdce8afe784bf111e4251256cf104050f1347cd4ad9f30da408475066575145da0b098a124',
+      rtmr3: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
     };
 
-    it('should reject computeWorkloadId with array mrTd', () => {
+    it('should reject computeWorkloadId with array mrtd', () => {
       const registers = {
         ...baseRegisters,
-        mrTd: [
+        mrtd: [
           '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
         ],
-        rtMr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
+        rtmr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
       } as any; // Cast to bypass TypeScript check for runtime validation test
 
-      expect(() => computeWorkloadId(registers)).toThrow('mrTd must be a single value, not an array');
+      expect(() => computeWorkloadId(registers)).toThrow('mrtd must be a single value, not an array');
     });
 
-    it('should reject computeWorkloadId with array rtMr0', () => {
+    it('should reject computeWorkloadId with array rtmr0', () => {
       const registers = {
         ...baseRegisters,
-        mrTd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
-        rtMr0: [
+        mrtd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
+        rtmr0: [
           '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
         ],
       } as any; // Cast to bypass TypeScript check for runtime validation test
 
-      expect(() => computeWorkloadId(registers)).toThrow('rtMr0 must be a single value, not an array');
+      expect(() => computeWorkloadId(registers)).toThrow('rtmr0 must be a single value, not an array');
     });
 
     it('should validate mixed case hex in arrays', () => {
       const registers: WorkloadMeasurementRegisters = {
         ...baseRegisters,
-        mrTd: [
-          '0x47A1CC074B914DF8596BAD0ED13D50D561AD1EFFC7F7CC530AB86DA7EA49FFC03E57E7DA829F8CBA9C629C3970505323' as `0x${string}`,
-          '0x202c7d38558f7cfa086feca5a23d62fa071cceb0bd55dbd06eeb4cebbd3c204c209f5551914d41ce433fb7fd67cc7136' as `0x${string}`,
+        mrtd: [
+          '0x47A1CC074B914DF8596BAD0ED13D50D561AD1EFFC7F7CC530AB86DA7EA49FFC03E57E7DA829F8CBA9C629C3970505323',
+          '0x202c7d38558f7cfa086feca5a23d62fa071cceb0bd55dbd06eeb4cebbd3c204c209f5551914d41ce433fb7fd67cc7136',
         ],
-        rtMr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391' as `0x${string}`,
+        rtmr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
       };
 
       // Should not throw - mixed case is valid hex

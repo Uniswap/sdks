@@ -74,14 +74,14 @@ export async function getFlashtestationEvent(
  * @example
  * // Verify using measurement registers
  * const registers = {
- *   tdAttributes: '0x0000000000000000',
- *   xFAM: '0x0000000000000003',
- *   mrTd: '0x1234...',
- *   mrConfigId: '0x0000...',
- *   rtMr0: '0xabcd...',
- *   rtMr1: '0xef01...',
- *   rtMr2: '0x2345...',
- *   rtMr3: '0x6789...',
+ *   tdattributes: '0x0000000000000000',
+ *   xfam: '0x0000000000000003',
+ *   mrtd: '0x1234...',
+ *   mrconfigid: '0x0000...',
+ *   rtmr0: '0xabcd...',
+ *   rtmr1: '0xef01...',
+ *   rtmr2: '0x2345...',
+ *   rtmr3: '0x6789...',
  * };
  * const result = await verifyFlashtestationInBlock(
  *   registers,
@@ -102,7 +102,7 @@ export async function verifyFlashtestationInBlock(
     workloadIds = [workloadIdOrRegisters];
   } else {
     // Compute all possible workload IDs from measurement registers
-    // (handles arrays in mrTd and rtMr0 fields)
+    // (handles arrays in mrtd and rtmr0 fields)
     workloadIds = computeAllWorkloadIds(workloadIdOrRegisters);
   }
 
