@@ -1,5 +1,5 @@
 {
-  "name": "flashtestations-sdk",
+  "name": "@uniswap/flashtestations-sdk",
   "author": "Melvillian",
   "description": "⚒️ An SDK for working with Flashteststations",
   "repository": "https://github.com/Uniswap/sdks.git",
@@ -9,7 +9,6 @@
     "flashbots",
     "unichain"
   ],
-  "version": "0.1.0",
   "license": "MIT",
   "main": "./dist/cjs/src/index.js",
   "module": "./dist/esm/src/index.js",
@@ -27,7 +26,8 @@
     "build:esm": "tsc -p tsconfig.esm.json",
     "build:types": "tsc -p tsconfig.types.json",
     "lint": "eslint src --ext .ts",
-    "test": "jest"
+    "test": "jest",
+    "release": "semantic-release"
   },
   "exports": {
     ".": {
@@ -36,6 +36,40 @@
       "require": "./dist/cjs/src/index.js"
     }
   },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "release": {
+    "extends": "semantic-release-monorepo",
+    "branches": [
+      {
+        "name": "main",
+        "prerelease": false
+      }
+    ],
+    "plugins": [
+      [
+        "@semantic-release/commit-analyzer",
+        {
+          "preset": "angular",
+          "releaseRules": "../../publishing/release-rules.cjs"
+        }
+      ],
+      "@semantic-release/release-notes-generator",
+      "@semantic-release/npm",
+      "@semantic-release/github",
+      [
+        "@semantic-release/exec",
+        {
+          "successCmd": "git restore yarn.lock && yarn",
+          "failCmd": "git restore yarn.lock && yarn",
+          "execCwd": "../.."
+        }
+      ]
+    ]
+  },
+  "sideEffects": false,
   "prettier": {
     "printWidth": 80,
     "semi": true,
