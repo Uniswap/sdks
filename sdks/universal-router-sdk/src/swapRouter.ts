@@ -255,7 +255,7 @@ export abstract class SwapRouter {
 
     const data = signedOptions.data
 
-    const deadline = BigNumber.from(deadline).toString()
+    deadline = BigNumber.from(deadline).toString()
 
     const value = {
       commands,
