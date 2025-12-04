@@ -250,11 +250,11 @@ export abstract class SwapRouter {
     const sender = signedOptions.sender
 
     const domain = getUniversalRouterDomain(chainId, routerAddress)
-    
+
     const intent = signedOptions.intent
-    
+
     const data = signedOptions.data
-    
+
     const deadline = BigNumber.from(deadline).toString()
 
     const value = {
