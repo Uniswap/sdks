@@ -247,14 +247,17 @@ export class UniswapXOrderQuoter
         for (const key of Object.keys(KNOWN_ERRORS)) {
           if (returnData.includes(key)) {
             if (key === "0a0b0d79") {
-              const fillerValidation = parseExclusiveFillerData(
-                orders[idx].order.info.additionalValidationData
-              );
-              if (
-                fillerValidation.type === ValidationType.ExclusiveFiller &&
-                fillerValidation.data.filler !== ethers.constants.AddressZero
-              ) {
-                return OrderValidation.ExclusivityPeriod;
+              // V4 orders use hooks instead of additionalValidationData
+              if ("additionalValidationData" in orders[idx].order.info) {
+                const fillerValidation = parseExclusiveFillerData(
+                  (orders[idx].order.info as any).additionalValidationData
+                );
+                if (
+                  fillerValidation.type === ValidationType.ExclusiveFiller &&
+                  fillerValidation.data.filler !== ethers.constants.AddressZero
+                ) {
+                  return OrderValidation.ExclusivityPeriod;
+                }
               }
               return OrderValidation.ValidationFailed;
             }

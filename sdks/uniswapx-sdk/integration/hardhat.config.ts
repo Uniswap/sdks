@@ -6,7 +6,7 @@ import "@typechain/hardhat";
 import 'dotenv/config'
 
 const config: HardhatUserConfig = {
-  solidity: "0.8.16",
+  solidity: "0.8.29",
   networks: {
     hardhat: {
       chainId: 1,
