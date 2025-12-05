@@ -74,6 +74,10 @@ export class HybridOrderClass {
     this.permit2Address = getPermit2(chainId, _permit2Address);
   }
 
+  public get info() {
+    return this.order.info;
+  }
+
   /**
    * Encode a price curve element from duration and scaling factor
    * @param duration The duration in blocks for this curve segment
