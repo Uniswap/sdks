@@ -1,4 +1,4 @@
-import { BigNumber } from "ethers";
+import { BigNumber, constants } from "ethers";
 import invariant from "tiny-invariant";
 
 import { HybridOrderClass } from "../order/v4/HybridOrder";
@@ -10,7 +10,7 @@ import {
   OrderInfoV4,
 } from "../order/v4/types";
 
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const ZERO_ADDRESS = constants.AddressZero;
 
 export class HybridOrderBuilder {
   static fromOrder(

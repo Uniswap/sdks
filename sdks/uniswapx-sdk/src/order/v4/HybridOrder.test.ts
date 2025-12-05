@@ -4,7 +4,7 @@ import { HybridOrderClass, OrderResolutionError } from "./HybridOrder";
 import { hashHybridCosignerData, hashHybridOrder } from "./hashing";
 import { HybridOrder, HybridOrderJSON } from "./types";
 
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const ZERO_ADDRESS = ethers.constants.AddressZero;
 const RESOLVER = "0x0000000000000000000000000000000000000210";
 const REACTOR = "0x0000000000000000000000000000000000000456";
 const SWAPPER = "0x0000000000000000000000000000000000000789";
