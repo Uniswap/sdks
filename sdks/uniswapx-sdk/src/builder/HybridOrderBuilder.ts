@@ -83,7 +83,7 @@ export class HybridOrderBuilder {
       preExecutionHookData: "0x",
       postExecutionHook: ZERO_ADDRESS,
       postExecutionHookData: "0x",
-      auctionResolver: ZERO_ADDRESS,
+      auctionResolver: resolver,
     };
     this.orderData = {
       outputs: [],
