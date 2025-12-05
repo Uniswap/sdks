@@ -10,10 +10,12 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       chainId: 1,
-      forking: {
-        enabled: true,
-        url: process.env.FORK_URL!
-      }
+      ...(process.env.FORK_URL && {
+        forking: {
+          enabled: true,
+          url: process.env.FORK_URL
+        }
+      })
     },
   },
 };
