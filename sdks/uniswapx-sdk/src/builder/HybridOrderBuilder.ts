@@ -270,6 +270,52 @@ export class HybridOrderBuilder {
       "scalingFactor not set"
     );
     invariant(this.orderData.priceCurve !== undefined, "priceCurve not set");
+
+    // Validate price curve consistency
+    if (this.orderData.priceCurve && this.orderData.priceCurve.length > 0) {
+      const BASE_SCALING_FACTOR = BigNumber.from(10).pow(18);
+      const firstScaling = this.extractScalingFactor(this.orderData.priceCurve[0]);
+      const isIncreasing = firstScaling.gt(BASE_SCALING_FACTOR);
+      const isDecreasing = firstScaling.lt(BASE_SCALING_FACTOR);
+
+      // All scaling factors must be in same direction (all >1e18 or all <1e18)
+      for (let i = 1; i < this.orderData.priceCurve.length; i++) {
+        const scaling = this.extractScalingFactor(this.orderData.priceCurve[i]);
+        invariant(
+          (isIncreasing && scaling.gt(BASE_SCALING_FACTOR)) ||
+          (isDecreasing && scaling.lt(BASE_SCALING_FACTOR)) ||
+          scaling.eq(BASE_SCALING_FACTOR),
+          `Price curve scaling factors must all be in same direction (all >1e18 or all <1e18). Element ${i} violates this.`
+        );
+      }
+    }
+
+    // Validate input amounts
+    invariant(
+      this.orderData.input.maxAmount.gt(0),
+      "input maxAmount must be greater than 0"
+    );
+
+    // Validate output amounts
+    this.orderData.outputs.forEach((output, i) => {
+      invariant(
+        output.minAmount.gt(0),
+        `output ${i} minAmount must be greater than 0`
+      );
+    });
+
+    // Validate baseline priority fee is non-negative
+    invariant(
+      this.orderData.baselinePriorityFeeWei.gte(0),
+      "baselinePriorityFeeWei must be non-negative"
+    );
+  }
+
+  private extractScalingFactor(curveElement: BigNumber): BigNumber {
+    // Price curve element format: (duration << 240) | scalingFactor
+    // Extract lower 240 bits for scaling factor
+    const mask = BigNumber.from(2).pow(240).sub(1);
+    return curveElement.and(mask);
   }
 
   private checkCosignedInvariants(): void {
