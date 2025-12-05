@@ -12,7 +12,8 @@ export { verifyFlashtestationInBlock, getFlashtestationEvent } from './verificat
 // Core types
 export type {
   VerificationResult,
-  WorkloadMeasureRegisters,
+  WorkloadMeasurementRegisters,
+  SingularWorkloadMeasurementRegisters,
   BlockParameter,
   FlashtestationEvent,
   ChainConfig,
@@ -34,5 +35,8 @@ export {
   getChainConfig,
 } from './config/chains';
 
-// Workload ID computation utility
-export { computeWorkloadId } from './crypto/workload';
+// Workload ID computation utilities
+export {
+  computeWorkloadId,
+  expandToSingularRegisters,
+} from './crypto/workload';

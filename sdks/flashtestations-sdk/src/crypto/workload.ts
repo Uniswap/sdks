@@ -1,95 +1,27 @@
 import { keccak256 } from 'viem/utils';
 
-import type { WorkloadMeasureRegisters } from '../types/index';
+import type { WorkloadMeasurementRegisters, SingularWorkloadMeasurementRegisters } from '../types/index';
 import {
-  validateWorkloadMeasureRegisters,
+  validateWorkloadMeasurementRegisters,
+  validateSingularWorkloadMeasurementRegisters,
 } from '../types/validation';
-
-
-
-/**
- * Hardcoded TDX measurement register values that aren't tied to OS image hash
- */
-export const TDX_CONSTANTS = {
-  /** Expected xFAM value (8 bytes) */
-  /** Copied from https://github.com/flashbots/flashtestations/blob/7cc7f68492fe672a823dd2dead649793aac1f216/src/BlockBuilderPolicy.sol#L231 */
-  expectedXfamBits: xorBytes(hexToBytes('0x0000000000000001'), hexToBytes('0x0000000000000002')),
-  /** TD attributes mask to ignore certain bits (8 bytes) */
-  /** Copied from https://github.com/flashbots/flashtestations/blob/7cc7f68492fe672a823dd2dead649793aac1f216/src/BlockBuilderPolicy.sol#L234 */
-  ignoredTdAttributesBitmask: orBytes(orBytes(hexToBytes('0x0000000010000000'), hexToBytes('0x0000000040000000')), hexToBytes('0x0000000080000000')),
-};
 
 /**
  * Converts a hex string to a Uint8Array
  * This is a helper function to convert a hex string to a Uint8Array
+ * Accepts both 0x-prefixed and non-prefixed hex strings
  * @example:
  * - '0x123456789abcde' -> Uint8Array([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde])
- * @param hex - The hex string to convert
+ * - '123456789abcde' -> Uint8Array([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde])
+ * @param hex - The hex string to convert (with or without 0x prefix)
  * @returns The Uint8Array
  * @throws If the hex string is invalid
- * 
+ *
  */
-function hexToBytes(hex: `0x${string}`): Uint8Array {
-  if (hex.length % 2 !== 0) throw new Error("Invalid hex string");
-  const unprefixedHex = hex.slice(2);
+function hexToBytes(hex: string): Uint8Array {
+  const unprefixedHex = hex.startsWith('0x') ? hex.slice(2) : hex;
+  if (unprefixedHex.length % 2 !== 0) throw new Error("Invalid hex string");
   return Uint8Array.from(unprefixedHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
-}
-
-/**
- * Performs bitwise XOR operation on two Uint8Arrays
- * This is a helper function to perform a bitwise XOR operation on two Uint8Arrays
- * @example:
- * - Uint8Array([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde]) XOR Uint8Array([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde]) -> Uint8Array([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
- * @param a - The first Uint8Array
- * @param b - The second Uint8Array
- * @returns The result of the XOR operation
- * @throws If the lengths of the Uint8Arrays are mismatched
- */
-function xorBytes(a: Uint8Array, b: Uint8Array): Uint8Array {
-  if (a.length !== b.length) throw new Error("Mismatched lengths");
-  return Uint8Array.from(a.map((x, i) => x ^ b[i]));
-}
-
-/**
- * Performs bitwise OR operation on two Uint8Arrays
- * This is a helper function to perform a bitwise OR operation on two Uint8Arrays
- * @example:
- * - Uint8Array([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde]) OR Uint8Array([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0x00]) -> Uint8Array([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde])
- * @param a - The first Uint8Array
- * @param b - The second Uint8Array
- * @returns The result of the OR operation
- * @throws If the lengths of the Uint8Arrays are mismatched
- */
-function orBytes(a: Uint8Array, b: Uint8Array): Uint8Array {
-  if (a.length !== b.length) throw new Error("Mismatched lengths");
-  return Uint8Array.from(a.map((x, i) => x | b[i]));
-}
-
-/**
- * Performs bitwise AND operation on two Uint8Arrays
- * This is a helper function to perform a bitwise AND operation on two Uint8Arrays
- * @example:
- * - Uint8Array([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde]) AND Uint8Array([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0x00]) -> Uint8Array([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0x00])
- * @param a - The first Uint8Array
- * @param b - The second Uint8Array
- * @returns The result of the AND operation
- * @throws If the lengths of the Uint8Arrays are mismatched
- */
-function andBytes(a: Uint8Array, b: Uint8Array): Uint8Array {
-  if (a.length !== b.length) throw new Error("Mismatched lengths");
-  return Uint8Array.from(a.map((x, i) => x & b[i]));
-}
-
-/**
- * Performs bitwise NOT operation on a Uint8Array
- * This is a helper function to perform a bitwise NOT operation on a Uint8Array
- * @example:
- * - Uint8Array([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde]) -> Uint8Array([0xed, 0xcb, 0xa9, 0x87, 0x75, 0x43, 0x21])
- * @param bytes - The Uint8Array to perform the NOT operation on
- * @returns The result of the NOT operation
- */
-function notBytes(bytes: Uint8Array): Uint8Array {
-  return Uint8Array.from(bytes.map(x => ~x));
 }
 
 /**
@@ -114,31 +46,131 @@ function concatBytes(...arrays: Uint8Array[]): Uint8Array {
  * Computes workload ID from TEE measurement registers
  * Formula: keccak256(mrTd + rtMr0 + rtMr1 + rtMr2 + rtMr3 + mrConfigId + (xFAM ^ expectedXfamBits) + (tdAttributes & ~ignoredTdAttributesBitmask))
  * This is copied from the Solidity implementation of the workload ID computation at:
- * https://github.com/flashbots/flashtestations/blob/7cc7f68492fe672a823dd2dead649793aac1f216/src/BlockBuilderPolicy.sol#L236
+ * https://github.com/flashbots/flashtestations/blob/38594f37b5f6d1b1f5f6ad4203a4770c10f72a22/src/BlockBuilderPolicy.sol#L208
+ *
+ * @param registers - Singular workload measurement registers
+ * @returns The computed workload ID as a hex string
+ *
+ * @remarks
+ * This function only accepts singular registers. If you have registers with multiple
+ * possible values (arrays), use `computeAllWorkloadIds()` or `expandToSingularRegisters()` first.
  */
-export function computeWorkloadId(registers: WorkloadMeasureRegisters): string {
-  // Validate input registers
-  validateWorkloadMeasureRegisters(registers);
+export function computeWorkloadId(registers: SingularWorkloadMeasurementRegisters): string {
+  // Validate input registers (ensures no arrays)
+  validateSingularWorkloadMeasurementRegisters(registers);
 
   // Convert hex strings to Uint8Arrays for bitwise operations
-  const mrTd = hexToBytes(registers.mrTd);
-  const rtMr0 = hexToBytes(registers.rtMr0);
-  const rtMr1 = hexToBytes(registers.rtMr1);
-  const rtMr2 = hexToBytes(registers.rtMr2);
-  const rtMr3 = hexToBytes(registers.rtMr3);
-  const mrConfigId = hexToBytes(registers.mrConfigId);
-  const xFAM = hexToBytes(registers.xFAM);
-  const tdAttributes = hexToBytes(registers.tdAttributes);
-
-  // Apply bitwise operations with hardcoded values
-  const xfamPreprocessed = xorBytes(xFAM, TDX_CONSTANTS.expectedXfamBits);
-  const tdAttributesPreprocessed = andBytes(
-    tdAttributes,
-    notBytes(TDX_CONSTANTS.ignoredTdAttributesBitmask)
-  );
+  const mrTd = hexToBytes(registers.mrtd);
+  const rtMr0 = hexToBytes(registers.rtmr0);
+  const rtMr1 = hexToBytes(registers.rtmr1);
+  const rtMr2 = hexToBytes(registers.rtmr2);
+  const rtMr3 = hexToBytes(registers.rtmr3);
+  const mrConfigId = hexToBytes(registers.mrconfigid);
+  const xFAM = hexToBytes(registers.xfam);
+  const tdAttributes = hexToBytes(registers.tdattributes);
 
   // Concatenate all components and hash
   return keccak256(
-    concatBytes(mrTd, rtMr0, rtMr1, rtMr2, rtMr3, mrConfigId, xfamPreprocessed, tdAttributesPreprocessed)
+    concatBytes(mrTd, rtMr0, rtMr1, rtMr2, rtMr3, mrConfigId, xFAM, tdAttributes)
   );
+}
+
+/**
+ * Expands WorkloadMeasurementRegisters with array fields into all possible
+ * singular register combinations (cartesian product of mrTd and rtMr0 values)
+ *
+ * @param registers - Flexible registers that may contain arrays
+ * @returns Array of all possible singular register combinations
+ *
+ * @example
+ * ```typescript
+ * const input = {
+ *   // ... other fields
+ *   mrtd: ['0xaaa...', '0xbbb...'],
+ *   rtmr0: ['0xccc...', '0xddd...']
+ * };
+ * // Returns 4 combinations: (aaa,ccc), (aaa,ddd), (bbb,ccc), (bbb,ddd)
+ * const singularRegisters = expandToSingularRegisters(input);
+ * ```
+ */
+export function expandToSingularRegisters(
+  registers: WorkloadMeasurementRegisters
+): SingularWorkloadMeasurementRegisters[] {
+  // Validate input first
+  validateWorkloadMeasurementRegisters(registers);
+
+  // Normalize mrtd and rtmr0 to arrays
+  const mrTdValues = Array.isArray(registers.mrtd) ? registers.mrtd : [registers.mrtd];
+  const rtMr0Values = Array.isArray(registers.rtmr0) ? registers.rtmr0 : [registers.rtmr0];
+
+  // Generate cartesian product
+  const result: SingularWorkloadMeasurementRegisters[] = [];
+  for (const mrtd of mrTdValues) {
+    for (const rtmr0 of rtMr0Values) {
+      result.push({
+        tdattributes: registers.tdattributes,
+        xfam: registers.xfam,
+        mrtd: mrtd,
+        mrconfigid: registers.mrconfigid,
+        rtmr0: rtmr0,
+        rtmr1: registers.rtmr1,
+        rtmr2: registers.rtmr2,
+        rtmr3: registers.rtmr3,
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Computes all possible workload IDs for the given registers.
+ * If registers contain arrays, computes the ID for each combination.
+ *
+ * @param registers - Flexible registers that may contain arrays
+ * @returns Array of all possible workload IDs
+ *
+ * @example
+ * ```typescript
+ * const registers = {
+ *   // ... other fields
+ *   mrtd: ['0xaaa...', '0xbbb...'],
+ *   rtmr0: ['0xccc...', '0xddd...']
+ * };
+ * // Returns 4 workload IDs, one for each combination
+ * const ids = computeAllWorkloadIds(registers);
+ * ```
+ */
+export function computeAllWorkloadIds(
+  registers: WorkloadMeasurementRegisters
+): string[] {
+  const singularRegisters = expandToSingularRegisters(registers);
+  return singularRegisters.map(singular => computeWorkloadId(singular));
+}
+
+/**
+ * Checks if any of the possible workload IDs from the given registers
+ * match the expected workload ID.
+ *
+ * @param registers - Flexible registers that may contain arrays
+ * @param expectedWorkloadId - The workload ID to match against
+ * @returns true if any combination matches the expected ID
+ *
+ * @example
+ * ```typescript
+ * const registers = {
+ *   // ... other fields
+ *   mrtd: ['0xaaa...', '0xbbb...'],
+ *   rtmr0: ['0xccc...', '0xddd...']
+ * };
+ * // Returns true if any of the 4 possible IDs matches
+ * const matches = matchesAnyWorkloadId(registers, expectedId);
+ * ```
+ */
+export function matchesAnyWorkloadId(
+  registers: WorkloadMeasurementRegisters,
+  expectedWorkloadId: string
+): boolean {
+  const allIds = computeAllWorkloadIds(registers);
+  return allIds.includes(expectedWorkloadId);
 }

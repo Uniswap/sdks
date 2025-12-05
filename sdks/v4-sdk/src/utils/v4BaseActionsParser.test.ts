@@ -207,6 +207,7 @@ describe('Command Parser', () => {
         {
           currencyIn: DAI.address,
           path: encodeRouteToPath(new Route([DAI_USDC, USDC_WETH], DAI, WETH9[1])),
+          maxHopSlippage: [],
           amountIn: amount,
           amountOutMinimum: amount,
         },
@@ -237,6 +238,7 @@ describe('Command Parser', () => {
                       hookData: '0x',
                     },
                   ],
+                  maxHopSlippage: [],
                   amountIn: amount,
                   amountOutMinimum: amount,
                 },
@@ -251,6 +253,7 @@ describe('Command Parser', () => {
         {
           currencyOut: DAI.address,
           path: encodeRouteToPath(new Route([DAI_USDC, USDC_WETH], DAI, WETH9[1])),
+          maxHopSlippage: [],
           amountOut: amount,
           amountInMaximum: amount,
         },
@@ -281,6 +284,7 @@ describe('Command Parser', () => {
                       hookData: '0x',
                     },
                   ],
+                  maxHopSlippage: [],
                   amountOut: amount,
                   amountInMaximum: amount,
                 },

@@ -30,8 +30,8 @@ export const CHAIN_CONFIGS: Record<number, ChainConfig> = {
     blockExplorerUrl: '',
   },
   // Unichain Experimental (Testnet)
-  33611633: {
-    chainId: 33611633,
+  420120005: {
+    chainId: 420120005,
     name: 'Unichain Experimental',
     contractAddress: '0x2E41cb0D68D8dB7ebd16cef81D7eD82e7E1fbA40',
     defaultRpcUrl: process.env.RPC_URL || '', // note, we don't include the RPC URL for experimental because Unichain doesn't want to expose it to the public

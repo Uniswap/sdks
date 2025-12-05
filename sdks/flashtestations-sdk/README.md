@@ -72,7 +72,7 @@ main();
 
 ## How Do I Acquire a Particular op-rbuilder's Workload ID?
 
-The Flashtestations protocol exists to let you cryptographically verify that a particular version of op-rbuilder is in fact building the latest block's on Unichain. To cryptographically identify these op-rbuilder versions across all of the various components (the TEE, the smart contracts, and SDK) we use a 32-byte workload ID, which is a [hash of the important components of the TEE attestation](https://github.com/flashbots/flashtestations/blob/7cc7f68492fe672a823dd2dead649793aac1f216/src/BlockBuilderPolicy.sol#L224). But this workload ID tells us nothing about what op-rbuilder source code the builder operators used to build the final Linux OS image that runs on the TEE. We need a trustless (i.e. locally verifiable) method for calculating the workload ID, given a version of op-rbuilder.
+The Flashtestations protocol exists to let you cryptographically verify that a particular version of op-rbuilder is in fact building the latest block's on Unichain. To cryptographically identify these op-rbuilder versions across all of the various components (the TEE, the smart contracts, and SDK) we use a 32-byte workload ID, which is a [hash of the important components of the TEE attestation](https://github.com/flashbots/flashtestations/blob/38594f37b5f6d1b1f5f6ad4203a4770c10f72a22/src/BlockBuilderPolicy.sol#L208). But this workload ID tells us nothing about what op-rbuilder source code the builder operators used to build the final Linux OS image that runs on the TEE. We need a trustless (i.e. locally verifiable) method for calculating the workload ID, given a version of op-rbuilder.
 
 With a small caveat we'll explain shortly, that process is what the [flashbots-images](https://github.com/flashbots/flashbots-images/commits/main/) repo is for. Using this repo and a simple bash command, we build a Linux OS image containing a specific version of op-rbuilder (identified by its git commit hash), and then calculate the workload ID directly from this Linux OS image. This completes the full chain of trustless verification; given a particular commit hash of flashbots-images (which has hardcoded into it a particular version of op-rbuilder), we can locally build and compute the workload ID, and then pass that to the SDK's `verifyFlashtestationInBlock` function to verify "is Unichain building blocks with the latest version of op-rbuilder?".
 
@@ -86,7 +86,7 @@ Verify if a block was built by a TEE running a specific workload.
 
 ```typescript
 async function verifyFlashtestationInBlock(
-  workloadIdOrRegisters: string | WorkloadMeasureRegisters,
+  workloadIdOrRegisters: string | WorkloadMeasurementRegisters,
   blockParameter: BlockParameter,
   config: ClientConfig
 ): Promise<VerificationResult>;
@@ -96,7 +96,7 @@ async function verifyFlashtestationInBlock(
 
 | Parameter             | Type                                 | Description                                                                 |
 | --------------------- | ------------------------------------ | --------------------------------------------------------------------------- |
-| workloadIdOrRegisters | `string \| WorkloadMeasureRegisters` | Workload ID (32-byte hex string) or measurement registers to compute the ID |
+| workloadIdOrRegisters | `string \| WorkloadMeasurementRegisters` | Workload ID (32-byte hex string) or measurement registers to compute the ID |
 | blockParameter        | `BlockParameter`                     | Block identifier: tag ('latest', 'earliest', etc.), number, or hash         |
 | config                | `ClientConfig`                       | Configuration object with `chainId` and optional `rpcUrl`                   |
 
@@ -128,7 +128,7 @@ async function verifyFlashtestationInBlock(
 Compute a workload ID from TEE measurement registers. Useful for debugging or pre-computing IDs.
 
 ```typescript
-function computeWorkloadId(registers: WorkloadMeasureRegisters): string;
+function computeWorkloadId(registers: WorkloadMeasurementRegisters): string;
 ```
 
 Returns the workload ID as a hex string.
@@ -218,8 +218,8 @@ import { ValidationError } from 'flashtestations-sdk';
 
 try {
   const invalidRegisters = {
-    tdAttributes: '0x00', // Too short!
-    xFAM: '0x0000000000000003',
+    tdattributes: '0x00', // Too short!
+    xfam: '0x0000000000000003',
     // ... other fields
   };
   const result = await verifyFlashtestationInBlock(invalidRegisters, 'latest', {
@@ -271,19 +271,19 @@ If you need to compute workload IDs separately (e.g., for caching or debugging),
 ```typescript
 import {
   computeWorkloadId,
-  WorkloadMeasureRegisters,
+  WorkloadMeasurementRegisters,
 } from 'flashtestations-sdk';
 
-const registers: WorkloadMeasureRegisters = {
-  tdAttributes: '0x0000000000000000',
-  xFAM: '0x0000000000000003',
-  mrTd: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
-  mrConfigId:
+const registers: WorkloadMeasurementRegisters = {
+  tdattributes: '0x0000000000000000',
+  xfam: '0x0000000000000003',
+  mrtd: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+  mrconfigid:
     '0x0000000000000000000000000000000000000000000000000000000000000000',
-  rtMr0: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-  rtMr1: '0xef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abab',
-  rtMr2: '0x234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdeff',
-  rtMr3: '0x67890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234d',
+  rtmr0: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+  rtmr1: '0xef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abab',
+  rtmr2: '0x234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdeff',
+  rtmr3: '0x67890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234d',
 };
 
 const workloadId = computeWorkloadId(registers);

@@ -97,7 +97,10 @@ export class Hook {
   }
 
   private static _hasPermission(address: string, hookOption: HookOptions) {
-    return !!(parseInt(address, 16) & (1 << hookFlagIndex[hookOption]))
+    // Use only the last 4 bytes (32 bits) to avoid JavaScript precision issues
+    // All hook flags are in bits 0-13, which fit comfortably in 32 bits
+    const last4Bytes = '0x' + address.slice(-8)
+    return !!(parseInt(last4Bytes, 16) & (1 << hookFlagIndex[hookOption]))
   }
 
   private static _checkAddress(address: string) {

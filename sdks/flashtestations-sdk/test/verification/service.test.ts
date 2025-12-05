@@ -4,7 +4,7 @@ import * as rpcClientModule from '../../src/rpc/client';
 import {
   BlockNotFoundError,
   NetworkError,
-  WorkloadMeasureRegisters,
+  WorkloadMeasurementRegisters,
 } from '../../src/types';
 import { verifyFlashtestationInBlock } from '../../src/verification/service';
 
@@ -12,7 +12,7 @@ describe('verifyFlashtestationInBlock', () => {
   let mockgetFlashtestationEvent: jest.Mock;
   let mockGetBlock: jest.Mock;
   let mockRpcClientConstructor: jest.SpyInstance;
-  let mockComputeWorkloadId: jest.SpyInstance;
+  let mockComputeAllWorkloadIds: jest.SpyInstance;
   let mockGetBlockExplorerUrl: jest.SpyInstance;
 
   beforeEach(() => {
@@ -25,14 +25,14 @@ describe('verifyFlashtestationInBlock', () => {
       .spyOn(rpcClientModule, 'RpcClient')
       .mockImplementation(
         () =>
-          ({
-            getFlashtestationEvent: mockgetFlashtestationEvent,
-            getBlock: mockGetBlock,
-          } as any)
+        ({
+          getFlashtestationEvent: mockgetFlashtestationEvent,
+          getBlock: mockGetBlock,
+        } as any)
       );
 
     // Mock crypto functions
-    mockComputeWorkloadId = jest.spyOn(workloadModule, 'computeWorkloadId');
+    mockComputeAllWorkloadIds = jest.spyOn(workloadModule, 'computeAllWorkloadIds');
 
     // Mock chain config functions
     mockGetBlockExplorerUrl = jest
@@ -284,20 +284,20 @@ describe('verifyFlashtestationInBlock', () => {
     });
   });
 
-  describe('with WorkloadMeasureRegisters', () => {
-    const registers: WorkloadMeasureRegisters = {
-      tdAttributes: '0x0000001000000000',
-      xFAM: '0xe702060000000000',
-      mrTd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
-      mrConfigId: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
-      rtMr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
-      rtMr1: '0xa7157e7c5f932e9babac9209d4527ec9ed837b8e335a931517677fa746db51ee56062e3324e266e3f39ec26a516f4f71',
-      rtMr2: '0xe63560e50830e22fbc9b06cdce8afe784bf111e4251256cf104050f1347cd4ad9f30da408475066575145da0b098a124',
-      rtMr3: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+  describe('with WorkloadMeasurementRegisters', () => {
+    const registers: WorkloadMeasurementRegisters = {
+      tdattributes: '0x0000001000000000',
+      xfam: '0xe702060000000000',
+      mrtd: '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
+      mrconfigid: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+      rtmr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
+      rtmr1: '0xa7157e7c5f932e9babac9209d4527ec9ed837b8e335a931517677fa746db51ee56062e3324e266e3f39ec26a516f4f71',
+      rtmr2: '0xe63560e50830e22fbc9b06cdce8afe784bf111e4251256cf104050f1347cd4ad9f30da408475066575145da0b098a124',
+      rtmr3: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
     };
 
     const computedWorkloadId = '0xf724e7d117f5655cf33beefdfc7d31e930278fcb65cf6d1de632595e97ca82b2';
-    
+
     const config = { chainId: 1301 };
 
     it('should compute workload ID from registers and verify', async () => {
@@ -315,6 +315,7 @@ describe('verifyFlashtestationInBlock', () => {
         hash: '0xblockhash',
       };
 
+      mockComputeAllWorkloadIds.mockReturnValue([computedWorkloadId]);
       mockgetFlashtestationEvent.mockResolvedValue(mockEvent);
       mockGetBlock.mockResolvedValue(mockBlock);
 
@@ -324,7 +325,7 @@ describe('verifyFlashtestationInBlock', () => {
         config
       );
 
-      expect(mockComputeWorkloadId).toHaveBeenCalledWith(registers);
+      expect(mockComputeAllWorkloadIds).toHaveBeenCalledWith(registers);
       expect(result).toEqual({
         isBuiltByExpectedTee: true,
         blockExplorerLink: 'https://sepolia.uniscan.xyz/block/99999',
@@ -339,15 +340,15 @@ describe('verifyFlashtestationInBlock', () => {
     });
 
     it('should compute workload ID from registers and verify when registers have a different case', async () => {
-      const uppercaseRegisters: WorkloadMeasureRegisters = {
-        tdAttributes: `0x${registers.tdAttributes.substring(2).toUpperCase()}`,
-        xFAM: `0x${registers.xFAM.substring(2).toUpperCase()}`,
-        mrTd: `0x${registers.mrTd.substring(2).toUpperCase()}`,
-        mrConfigId: `0x${registers.mrConfigId.substring(2).toUpperCase()}`,
-        rtMr0: `0x${registers.rtMr0.substring(2).toUpperCase()}`,
-        rtMr1: `0x${registers.rtMr1.substring(2).toUpperCase()}`,
-        rtMr2: `0x${registers.rtMr2.substring(2).toUpperCase()}`,
-        rtMr3: `0x${registers.rtMr3.substring(2).toUpperCase()}`,
+      const uppercaseRegisters: WorkloadMeasurementRegisters = {
+        tdattributes: `0x${registers.tdattributes.substring(2).toUpperCase()}`,
+        xfam: `0x${registers.xfam.substring(2).toUpperCase()}`,
+        mrtd: `0x${registers.mrtd.substring(2).toUpperCase()}`,
+        mrconfigid: `0x${registers.mrconfigid.substring(2).toUpperCase()}`,
+        rtmr0: `0x${registers.rtmr0.substring(2).toUpperCase()}`,
+        rtmr1: `0x${registers.rtmr1.substring(2).toUpperCase()}`,
+        rtmr2: `0x${registers.rtmr2.substring(2).toUpperCase()}`,
+        rtmr3: `0x${registers.rtmr3.substring(2).toUpperCase()}`,
       };
 
       const mockEvent = {
@@ -364,6 +365,7 @@ describe('verifyFlashtestationInBlock', () => {
         hash: '0xblockhash',
       };
 
+      mockComputeAllWorkloadIds.mockReturnValue([computedWorkloadId]);
       mockgetFlashtestationEvent.mockResolvedValue(mockEvent);
       mockGetBlock.mockResolvedValue(mockBlock);
 
@@ -373,7 +375,7 @@ describe('verifyFlashtestationInBlock', () => {
         config
       );
 
-      expect(mockComputeWorkloadId).toHaveBeenCalledWith(uppercaseRegisters);
+      expect(mockComputeAllWorkloadIds).toHaveBeenCalledWith(uppercaseRegisters);
       expect(result).toEqual({
         isBuiltByExpectedTee: true,
         blockExplorerLink: 'https://sepolia.uniscan.xyz/block/99999',
@@ -403,6 +405,7 @@ describe('verifyFlashtestationInBlock', () => {
         hash: '0xblockhash',
       };
 
+      mockComputeAllWorkloadIds.mockReturnValue([computedWorkloadId]);
       mockgetFlashtestationEvent.mockResolvedValue(mockEvent);
       mockGetBlock.mockResolvedValue(mockBlock);
 
@@ -412,7 +415,7 @@ describe('verifyFlashtestationInBlock', () => {
         config
       );
 
-      expect(mockComputeWorkloadId).toHaveBeenCalledWith(registers);
+      expect(mockComputeAllWorkloadIds).toHaveBeenCalledWith(registers);
       expect(result).toEqual({
         isBuiltByExpectedTee: false,
         blockExplorerLink: 'https://sepolia.uniscan.xyz/block/99999',
@@ -426,15 +429,15 @@ describe('verifyFlashtestationInBlock', () => {
       });
     });
 
-    it('should propagate validation errors from computeWorkloadId', async () => {
-      const alteredRegisters: WorkloadMeasureRegisters = {
+    it('should propagate validation errors from computeAllWorkloadIds', async () => {
+      const alteredRegisters: WorkloadMeasurementRegisters = {
         ...registers,
-        tdAttributes: '0x000000100000000', // invalid hex, because there's an odd number of characters
+        tdattributes: '0x000000100000000', // invalid hex, because there's an odd number of characters
       };
 
       await expect(
         verifyFlashtestationInBlock(alteredRegisters, 'latest', config)
-      ).rejects.toThrow('Invalid tdAttributes: expected 16 hex characters, got 15');
+      ).rejects.toThrow('Invalid tdattributes: expected 16 hex characters, got 15');
     });
   });
 
@@ -466,6 +469,192 @@ describe('verifyFlashtestationInBlock', () => {
       expect(mockRpcClientConstructor).toHaveBeenCalledWith({
         chainId: 1301,
         rpcUrl: 'https://custom.rpc',
+      });
+    });
+  });
+
+  describe('with WorkloadMeasurementRegisters with multiple values', () => {
+    const config = { chainId: 1301 };
+
+    it('should match when any combination of array registers matches event workloadId', async () => {
+      const eventWorkloadId = '0xf724e7d117f5655cf33beefdfc7d31e930278fcb65cf6d1de632595e97ca82b2';
+
+      const registers: WorkloadMeasurementRegisters = {
+        tdattributes: '0x0000001000000000',
+        xfam: '0xe702060000000000',
+        mrtd: [
+          '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323', // This one matches
+          '0x202c7d38558f7cfa086feca5a23d62fa071cceb0bd55dbd06eeb4cebbd3c204c209f5551914d41ce433fb7fd67cc7136', // This one doesn't
+        ],
+        mrconfigid: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+        rtmr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
+        rtmr1: '0xa7157e7c5f932e9babac9209d4527ec9ed837b8e335a931517677fa746db51ee56062e3324e266e3f39ec26a516f4f71',
+        rtmr2: '0xe63560e50830e22fbc9b06cdce8afe784bf111e4251256cf104050f1347cd4ad9f30da408475066575145da0b098a124',
+        rtmr3: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+      };
+
+      const mockEvent = {
+        caller: '0xbuilder789',
+        workloadId: eventWorkloadId,
+        version: 1,
+        blockContentHash: '0xblockhash' as `0x${string}`,
+        commitHash: 'array-test-commit',
+        sourceLocators: ['https://github.com/flashbots/flashbots-images/commit/b7c707667393cc4c0173786ee32ec3a79009b04f'],
+      };
+
+      const mockBlock = {
+        number: BigInt(88888),
+        hash: '0xblockhash',
+      };
+
+      // Mock computeAllWorkloadIds to return multiple IDs, one matching the event
+      mockComputeAllWorkloadIds.mockReturnValue([
+        eventWorkloadId, // First combination matches
+        '0x9999999999999999999999999999999999999999999999999999999999999999', // Second doesn't
+      ]);
+      mockgetFlashtestationEvent.mockResolvedValue(mockEvent);
+      mockGetBlock.mockResolvedValue(mockBlock);
+
+      const result = await verifyFlashtestationInBlock(
+        registers,
+        'latest',
+        config
+      );
+
+      expect(mockComputeAllWorkloadIds).toHaveBeenCalledWith(registers);
+      expect(result).toEqual({
+        isBuiltByExpectedTee: true,
+        blockExplorerLink: 'https://sepolia.uniscan.xyz/block/88888',
+        workloadMetadata: {
+          workloadId: eventWorkloadId,
+          commitHash: 'array-test-commit',
+          builderAddress: '0xbuilder789',
+          version: 1,
+          sourceLocators: ['https://github.com/flashbots/flashbots-images/commit/b7c707667393cc4c0173786ee32ec3a79009b04f'],
+        },
+      });
+    });
+
+    it('should not match when no combination of array registers matches event workloadId', async () => {
+      const eventWorkloadId = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+
+      const registers: WorkloadMeasurementRegisters = {
+        tdattributes: '0x0000001000000000',
+        xfam: '0xe702060000000000',
+        mrtd: [
+          '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
+          '0x202c7d38558f7cfa086feca5a23d62fa071cceb0bd55dbd06eeb4cebbd3c204c209f5551914d41ce433fb7fd67cc7136',
+        ],
+        mrconfigid: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+        rtmr0: '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
+        rtmr1: '0xa7157e7c5f932e9babac9209d4527ec9ed837b8e335a931517677fa746db51ee56062e3324e266e3f39ec26a516f4f71',
+        rtmr2: '0xe63560e50830e22fbc9b06cdce8afe784bf111e4251256cf104050f1347cd4ad9f30da408475066575145da0b098a124',
+        rtmr3: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+      };
+
+      const mockEvent = {
+        caller: '0xbuilder789',
+        workloadId: eventWorkloadId,
+        version: 1,
+        blockContentHash: '0xblockhash' as `0x${string}`,
+        commitHash: 'array-test-commit',
+        sourceLocators: ['https://github.com/flashbots/flashbots-images/commit/b7c707667393cc4c0173786ee32ec3a79009b04f'],
+      };
+
+      const mockBlock = {
+        number: BigInt(88888),
+        hash: '0xblockhash',
+      };
+
+      // Mock computeAllWorkloadIds to return IDs that don't match the event
+      mockComputeAllWorkloadIds.mockReturnValue([
+        '0x1111111111111111111111111111111111111111111111111111111111111111',
+        '0x2222222222222222222222222222222222222222222222222222222222222222',
+      ]);
+      mockgetFlashtestationEvent.mockResolvedValue(mockEvent);
+      mockGetBlock.mockResolvedValue(mockBlock);
+
+      const result = await verifyFlashtestationInBlock(
+        registers,
+        'latest',
+        config
+      );
+
+      expect(mockComputeAllWorkloadIds).toHaveBeenCalledWith(registers);
+      expect(result).toEqual({
+        isBuiltByExpectedTee: false,
+        blockExplorerLink: 'https://sepolia.uniscan.xyz/block/88888',
+        workloadMetadata: {
+          workloadId: eventWorkloadId,
+          commitHash: 'array-test-commit',
+          builderAddress: '0xbuilder789',
+          version: 1,
+          sourceLocators: ['https://github.com/flashbots/flashbots-images/commit/b7c707667393cc4c0173786ee32ec3a79009b04f'],
+        },
+      });
+    });
+
+    it('should handle cartesian product of both mrtd and rtmr0 arrays', async () => {
+      const eventWorkloadId = '0xc85f03aebad8acae79c876cbad92cd1da26c0555a383146132b3dbf5709e8662';
+
+      const registers: WorkloadMeasurementRegisters = {
+        tdattributes: '0x0000001000000000',
+        xfam: '0xe702060000000000',
+        mrtd: [
+          '0x47a1cc074b914df8596bad0ed13d50d561ad1effc7f7cc530ab86da7ea49ffc03e57e7da829f8cba9c629c3970505323',
+          '0x202c7d38558f7cfa086feca5a23d62fa071cceb0bd55dbd06eeb4cebbd3c204c209f5551914d41ce433fb7fd67cc7136',
+        ],
+        mrconfigid: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+        rtmr0: [
+          '0x00e1dad5455e5fa87974edb69e13296dd1ba9fa86356d70b68be15dd5d36767643904de1893c1b4d47fc8d3a90675391',
+          '0x6da49936a0649f6970be5df8bf7ba0d2efb66a96216c11cc65ac348432a07cfaab037b173e22c54d3f10d59327e7fbc9',
+        ],
+        rtmr1: '0xa7157e7c5f932e9babac9209d4527ec9ed837b8e335a931517677fa746db51ee56062e3324e266e3f39ec26a516f4f71',
+        rtmr2: '0xe63560e50830e22fbc9b06cdce8afe784bf111e4251256cf104050f1347cd4ad9f30da408475066575145da0b098a124',
+        rtmr3: '0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+      };
+
+      const mockEvent = {
+        caller: '0xbuilder999',
+        workloadId: eventWorkloadId,
+        version: 1,
+        blockContentHash: '0xblockhash' as `0x${string}`,
+        commitHash: 'cartesian-commit',
+        sourceLocators: ['https://github.com/flashbots/flashbots-images/commit/b7c707667393cc4c0173786ee32ec3a79009b04f'],
+      };
+
+      const mockBlock = {
+        number: BigInt(77777),
+        hash: '0xblockhash',
+      };
+
+      // Mock computeAllWorkloadIds to return 4 IDs (2x2 cartesian product), last one matches
+      mockComputeAllWorkloadIds.mockReturnValue([
+        '0x1111111111111111111111111111111111111111111111111111111111111111',
+        '0x2222222222222222222222222222222222222222222222222222222222222222',
+        '0x3333333333333333333333333333333333333333333333333333333333333333',
+        eventWorkloadId, // Last combination matches
+      ]);
+      mockgetFlashtestationEvent.mockResolvedValue(mockEvent);
+      mockGetBlock.mockResolvedValue(mockBlock);
+
+      const result = await verifyFlashtestationInBlock(
+        registers,
+        'latest',
+        config
+      );
+
+      expect(mockComputeAllWorkloadIds).toHaveBeenCalledWith(registers);
+      expect(result).toEqual({
+        isBuiltByExpectedTee: true,
+        blockExplorerLink: 'https://sepolia.uniscan.xyz/block/77777',
+        workloadMetadata: {
+          workloadId: eventWorkloadId,
+          commitHash: 'cartesian-commit',
+          builderAddress: '0xbuilder999',
+          version: 1,
+          sourceLocators: ['https://github.com/flashbots/flashbots-images/commit/b7c707667393cc4c0173786ee32ec3a79009b04f'],
+        },
       });
     });
   });
