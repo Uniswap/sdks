@@ -22,7 +22,7 @@ import {
   HYBRID_ORDER_TYPES,
 } from "./hashing";
 
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const ZERO_ADDRESS = ethers.constants.AddressZero;
 const BASE_SCALING_FACTOR = ethers.constants.WeiPerEther;
 const WAD = ethers.constants.WeiPerEther;
 const MAX_UINT_240 = BigNumber.from(1).shl(240).sub(1);
