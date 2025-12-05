@@ -101,6 +101,43 @@ export const HYBRID_PERMIT2_ORDER_TYPE = [
 ].join("");
 
 /**
+ * EIP-712 witness types for HybridOrder (for Permit2 signature)
+ * NOTE: Types must be in alphabetical order for EIP-712 spec compliance
+ */
+export const HYBRID_ORDER_TYPES = {
+  HybridInput: [
+    { name: "token", type: "address" },
+    { name: "maxAmount", type: "uint256" },
+  ],
+  HybridOrder: [
+    { name: "info", type: "OrderInfo" },
+    { name: "cosigner", type: "address" },
+    { name: "input", type: "HybridInput" },
+    { name: "outputs", type: "HybridOutput[]" },
+    { name: "auctionStartBlock", type: "uint256" },
+    { name: "baselinePriorityFee", type: "uint256" },
+    { name: "scalingFactor", type: "uint256" },
+    { name: "priceCurve", type: "uint256[]" },
+  ],
+  HybridOutput: [
+    { name: "token", type: "address" },
+    { name: "minAmount", type: "uint256" },
+    { name: "recipient", type: "address" },
+  ],
+  OrderInfo: [
+    { name: "reactor", type: "address" },
+    { name: "swapper", type: "address" },
+    { name: "nonce", type: "uint256" },
+    { name: "deadline", type: "uint256" },
+    { name: "preExecutionHook", type: "address" },
+    { name: "preExecutionHookData", type: "bytes" },
+    { name: "postExecutionHook", type: "address" },
+    { name: "postExecutionHookData", type: "bytes" },
+    { name: "auctionResolver", type: "address" },
+  ],
+};
+
+/**
  * Hash OrderInfoV4 structure
  * @param info The OrderInfoV4 to hash
  * @returns The keccak256 hash

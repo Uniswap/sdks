@@ -2,6 +2,8 @@ import { hexStripZeros, SignatureLike } from "@ethersproject/bytes";
 import {
   PermitTransferFrom,
   PermitTransferFromData,
+  SignatureTransfer,
+  Witness,
 } from "@uniswap/permit2-sdk";
 import { BigNumber, ethers } from "ethers";
 
@@ -14,7 +16,11 @@ import {
   HybridOrderJSON,
   HybridOrderResolutionOptions,
 } from "./types";
-import { hashHybridCosignerData, hashHybridOrder } from "./hashing";
+import {
+  hashHybridCosignerData,
+  hashHybridOrder,
+  HYBRID_ORDER_TYPES,
+} from "./hashing";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const BASE_SCALING_FACTOR = ethers.constants.WeiPerEther;
@@ -211,26 +217,27 @@ export class HybridOrderClass {
       deadline: this.order.info.deadline,
     };
 
-    return {
-      domain: {
-        name: "Permit2",
-        chainId: this.chainId,
-        verifyingContract: this.permit2Address,
+    const witness: Witness = {
+      witness: {
+        info: this.order.info,
+        cosigner: this.order.cosigner,
+        input: this.order.input,
+        outputs: this.order.outputs,
+        auctionStartBlock: this.order.auctionStartBlock,
+        baselinePriorityFee: this.order.baselinePriorityFeeWei,
+        scalingFactor: this.order.scalingFactor,
+        priceCurve: this.order.priceCurve,
       },
-      types: {
-        PermitTransferFrom: [
-          { name: "permitted", type: "TokenPermissions" },
-          { name: "spender", type: "address" },
-          { name: "nonce", type: "uint256" },
-          { name: "deadline", type: "uint256" },
-        ],
-        TokenPermissions: [
-          { name: "token", type: "address" },
-          { name: "amount", type: "uint256" },
-        ],
-      },
-      values: permit,
+      witnessTypeName: "HybridOrder",
+      witnessType: HYBRID_ORDER_TYPES,
     };
+
+    return SignatureTransfer.getPermitData(
+      permit,
+      this.permit2Address,
+      this.chainId,
+      witness
+    ) as PermitTransferFromData;
   }
 
   getSigner(_signature: SignatureLike): string {
