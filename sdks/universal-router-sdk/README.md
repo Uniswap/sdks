@@ -5,7 +5,10 @@ This SDK facilitates interactions with the contracts in [Universal Router](https
 Install latest version of universal-router-sdk. Then import the corresponding Trade class and Data object for each protocol you'd like to interact with.
 
 ### Trading on Uniswap
-warning: `swapERC20CallParameters()` to be deprecated in favor of `swapCallParameters()`
+
+> [!WARNING]
+> `swapERC20CallParameters()` to be deprecated in favor of `swapCallParameters()`
+
 ```typescript
 import { TradeType } from '@uniswap/sdk-core'
 import { Trade as V2TradeSDK } from '@uniswap/v2-sdk'
