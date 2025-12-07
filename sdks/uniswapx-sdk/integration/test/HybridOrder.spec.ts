@@ -253,8 +253,7 @@ describe("HybridOrder", () => {
         .priceCurve([])
         .buildPartial();
 
-      const { domain, types, values } = orderClass.permitData();
-      const signature = await swapper._signTypedData(domain, types, values);
+      const signature = await orderClass.signPermitData(swapper, permit2);
 
       const swapperTokenInBalanceBefore = await tokenIn.balanceOf(swapperAddress);
       const fillerTokenInBalanceBefore = await tokenIn.balanceOf(fillerAddress);
@@ -323,8 +322,7 @@ describe("HybridOrder", () => {
         .priceCurve(priceCurve)
         .buildPartial();
 
-      const { domain, types, values } = orderClass.permitData();
-      const signature = await swapper._signTypedData(domain, types, values);
+      const signature = await orderClass.signPermitData(swapper, permit2);
 
       // Advance 49 blocks so that the execute() transaction will be at block +50
       const targetBlock = auctionStartBlock + 49;
@@ -408,8 +406,7 @@ describe("HybridOrder", () => {
         .priceCurve(priceCurve)
         .buildPartial();
 
-      const { domain, types, values } = orderClass.permitData();
-      const signature = await swapper._signTypedData(domain, types, values);
+      const signature = await orderClass.signPermitData(swapper, permit2);
 
       // Advance 49 blocks so that the execute() transaction will be at block +50
       const targetBlock = auctionStartBlock + 49;
@@ -510,8 +507,8 @@ describe("HybridOrder", () => {
         .cosignature(cosignature)
         .build();
 
-      const { domain, types, values } = orderClass.permitData();
-      const signature = await swapper._signTypedData(domain, types, values);
+      // FIX #3: Use signPermitData() instead of _signTypedData() to match contract's Permit2 validation
+      const signature = await orderClass.signPermitData(swapper, permit2);
       const res = await reactor
         .connect(filler)
         .execute({ order: orderClass.serialize(), sig: signature });
@@ -565,8 +562,7 @@ describe("HybridOrder", () => {
         .cosignature(wrongCosignature)
         .build();
 
-      const { domain, types, values } = orderClass.permitData();
-      const signature = await swapper._signTypedData(domain, types, values);
+      const signature = await orderClass.signPermitData(swapper, permit2);
 
       await expect(
         reactor.connect(filler).execute({ order: orderClass.serialize(), sig: signature })
@@ -621,8 +617,7 @@ describe("HybridOrder", () => {
         .priceCurve([])
         .buildPartial();
 
-      const { domain, types, values } = orderClass.permitData();
-      const signature = await swapper._signTypedData(domain, types, values);
+      const signature = await orderClass.signPermitData(swapper, permit2);
 
       const swapperTokenOut1Before = await tokenOut.balanceOf(swapperAddress);
       const swapperTokenOut2Before = await tokenOut2.balanceOf(swapperAddress);
@@ -682,8 +677,7 @@ describe("HybridOrder", () => {
         .priceCurve(priceCurve)
         .buildPartial();
 
-      const { domain, types, values } = orderClass.permitData();
-      const signature = await swapper._signTypedData(domain, types, values);
+      const signature = await orderClass.signPermitData(swapper, permit2);
 
       const res = await reactor
         .connect(filler)
@@ -731,8 +725,7 @@ describe("HybridOrder", () => {
         .priceCurve(priceCurve)
         .buildPartial();
 
-      const { domain, types, values } = orderClass.permitData();
-      const signature = await swapper._signTypedData(domain, types, values);
+      const signature = await orderClass.signPermitData(swapper, permit2);
 
       const res = await reactor
         .connect(filler)

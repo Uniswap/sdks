@@ -81,9 +81,9 @@ const HYBRID_ORDER_TYPE = [
 const HYBRID_ORDER_TYPE_HASH = ethers.utils.keccak256(
   ethers.utils.toUtf8Bytes(
     HYBRID_ORDER_TYPE +
-      HYBRID_INPUT_TYPE +
-      HYBRID_OUTPUT_TYPE +
-      ORDER_INFO_V4_TYPE
+    HYBRID_INPUT_TYPE +
+    HYBRID_OUTPUT_TYPE +
+    ORDER_INFO_V4_TYPE
   )
 );
 
@@ -143,6 +143,14 @@ export const HYBRID_ORDER_TYPES = {
  * @returns The keccak256 hash
  */
 export function hashOrderInfoV4(info: OrderInfoV4): string {
+  // FIX #1: Hash hook data before encoding (matches contract)
+  const preExecutionHookDataHash = ethers.utils.keccak256(
+    ethers.utils.hexlify(info.preExecutionHookData)
+  );
+  const postExecutionHookDataHash = ethers.utils.keccak256(
+    ethers.utils.hexlify(info.postExecutionHookData)
+  );
+
   return ethers.utils.keccak256(
     ethers.utils.defaultAbiCoder.encode(
       [
@@ -152,9 +160,9 @@ export function hashOrderInfoV4(info: OrderInfoV4): string {
         "uint256",
         "uint256",
         "address",
-        "bytes",
+        "bytes32",
         "address",
-        "bytes",
+        "bytes32",
         "address",
       ],
       [
@@ -164,9 +172,9 @@ export function hashOrderInfoV4(info: OrderInfoV4): string {
         info.nonce,
         info.deadline,
         info.preExecutionHook,
-        ethers.utils.hexlify(info.preExecutionHookData),
+        preExecutionHookDataHash,
         info.postExecutionHook,
-        ethers.utils.hexlify(info.postExecutionHookData),
+        postExecutionHookDataHash,
         info.auctionResolver,
       ]
     )
@@ -204,11 +212,15 @@ function hashHybridOutput(output: HybridOutput): string {
 
 /**
  * Hash array of HybridOutputs
+ * FIX #2: Use solidityPack to match contract's abi.encodePacked
  */
 function hashHybridOutputs(outputs: HybridOutput[]): string {
   const hashes = outputs.map(hashHybridOutput);
   return ethers.utils.keccak256(
-    ethers.utils.defaultAbiCoder.encode(["bytes32[]"], [hashes])
+    ethers.utils.solidityPack(
+      new Array(hashes.length).fill("bytes32"),
+      hashes
+    )
   );
 }
 
