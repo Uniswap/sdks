@@ -20,6 +20,7 @@ import {
   hashHybridCosignerData,
   hashHybridOrder,
   HYBRID_ORDER_TYPES,
+  HYBRID_PERMIT2_ORDER_TYPE,
 } from "./hashing";
 
 const ZERO_ADDRESS = ethers.constants.AddressZero;
@@ -30,19 +31,19 @@ const PRICE_CURVE_DURATION_SHIFT = 240;
 
 const HYBRID_ORDER_ABI = [
   "tuple(" +
-    [
-      "tuple(address,address,uint256,uint256,address,bytes,address,bytes,address)",
-      "address",
-      "tuple(address,uint256)",
-      "tuple(address,uint256,address)[]",
-      "uint256",
-      "uint256",
-      "uint256",
-      "uint256[]",
-      "tuple(uint256,uint256[])",
-      "bytes",
-    ].join(",") +
-    ")",
+  [
+    "tuple(address,address,uint256,uint256,address,bytes,address,bytes,address)",
+    "address",
+    "tuple(address,uint256)",
+    "tuple(address,uint256,address)[]",
+    "uint256",
+    "uint256",
+    "uint256",
+    "uint256[]",
+    "tuple(uint256,uint256[])",
+    "bytes",
+  ].join(",") +
+  ")",
 ];
 
 export class OrderResolutionError extends Error {
@@ -242,6 +243,101 @@ export class HybridOrderClass {
 
   getSigner(_signature: SignatureLike): string {
     throw new Error("Use signing module to recover signer");
+  }
+
+  /**
+   * Get the Permit2 message hash matching the contract's validation logic
+   * FIX #3: Manually construct hash to match contract's custom EIP-712 type hash
+   */
+  getPermitMessageHash(permit2DomainSeparator?: string): string {
+    const permit: PermitTransferFrom = {
+      permitted: {
+        token: this.order.input.token,
+        amount: this.order.input.maxAmount,
+      },
+      spender: this.order.info.preExecutionHook,
+      nonce: this.order.info.nonce,
+      deadline: this.order.info.deadline,
+    };
+
+    // Contract uses custom type hash: keccak256(abi.encodePacked(TYPEHASH_STUB, PERMIT2_ORDER_TYPE))
+    const TYPEHASH_STUB =
+      "PermitWitnessTransferFrom(TokenPermissions permitted,address spender,uint256 nonce,uint256 deadline,";
+    const permit2OrderTypeString = Array.isArray(HYBRID_PERMIT2_ORDER_TYPE)
+      ? HYBRID_PERMIT2_ORDER_TYPE.join("")
+      : HYBRID_PERMIT2_ORDER_TYPE;
+    const HYBRID_ORDER_TYPE_HASH = ethers.utils.keccak256(
+      ethers.utils.toUtf8Bytes(TYPEHASH_STUB + permit2OrderTypeString)
+    );
+
+    const TOKEN_PERMISSIONS_TYPE_HASH = ethers.utils.keccak256(
+      ethers.utils.toUtf8Bytes("TokenPermissions(address token,uint256 amount)")
+    );
+
+    const tokenPermissionsHash = ethers.utils.keccak256(
+      ethers.utils.defaultAbiCoder.encode(
+        ["bytes32", "address", "uint256"],
+        [TOKEN_PERMISSIONS_TYPE_HASH, permit.permitted.token, permit.permitted.amount]
+      )
+    );
+
+    const orderHash = this.hash();
+
+    // Struct hash matching contract's manual encoding
+    const structHash = ethers.utils.keccak256(
+      ethers.utils.defaultAbiCoder.encode(
+        ["bytes32", "bytes32", "address", "uint256", "uint256", "bytes32"],
+        [
+          HYBRID_ORDER_TYPE_HASH,
+          tokenPermissionsHash,
+          permit.spender,
+          permit.nonce,
+          permit.deadline,
+          orderHash,
+        ]
+      )
+    );
+
+    // Use provided domain separator or calculate it
+    const domainSeparator = permit2DomainSeparator || ethers.utils._TypedDataEncoder.hashDomain({
+      name: "Permit2",
+      chainId: this.chainId,
+      verifyingContract: this.permit2Address,
+    });
+
+    const messageHash = ethers.utils.keccak256(
+      ethers.utils.hexConcat([
+        "0x1901", // EIP-712 prefix as hex
+        domainSeparator,
+        structHash,
+      ])
+    );
+    return messageHash;
+  }
+
+  /**
+   * Sign Permit2 data matching the contract's validation logic
+   * FIX #3: Manually sign hash to match contract's custom EIP-712 type hash
+   */
+  async signPermitData(signer: ethers.Signer, permit2Contract?: ethers.Contract): Promise<string> {
+    let permit2DomainSeparator: string | undefined;
+    if (permit2Contract) {
+      permit2DomainSeparator = await permit2Contract.DOMAIN_SEPARATOR();
+    }
+    const messageHash = this.getPermitMessageHash(permit2DomainSeparator);
+
+    let privateKey: string;
+    if ((signer as any)._signingKey) {
+      privateKey = (signer as any)._signingKey().privateKey;
+    } else if ((signer as any).privateKey) {
+      privateKey = (signer as any).privateKey;
+    } else {
+      throw new Error("Cannot access private key from signer");
+    }
+
+    const signingKey = new ethers.utils.SigningKey(privateKey);
+    const signature = signingKey.signDigest(messageHash);
+    return ethers.utils.joinSignature(signature);
   }
 
   get blockOverrides(): BlockOverridesV4 {
