@@ -293,7 +293,7 @@ describe("HybridOrder", () => {
       ];
 
       const baselinePriorityFee = ethers.utils.parseUnits("10", "gwei");
-      const scalingFactor = BigNumber.from("1000000000010000000"); // 1.00000000001e18
+      const scalingFactor = BigNumber.from("10").pow(18).add(BigNumber.from("10").pow(7)); // 1.00000000001e18
 
       const orderClass = new HybridOrderBuilder(
         chainId,
