@@ -3,9 +3,9 @@ import invariant from "tiny-invariant";
 
 import { HybridOrderClass } from "../order/v4/HybridOrder";
 import {
-  HybridOrder,
   HybridCosignerData,
   HybridInput,
+  HybridOrder,
   HybridOutput,
   OrderInfoV4,
 } from "../order/v4/types";

@@ -10,17 +10,18 @@ import { BigNumber, ethers } from "ethers";
 import { getPermit2 } from "../../utils";
 import { ResolvedUniswapXOrder } from "../../utils/OrderQuoter";
 import { TokenAmount } from "../types";
+
+import {
+  hashHybridCosignerData,
+  hashHybridOrder,
+  HYBRID_ORDER_TYPES,
+} from "./hashing";
 import {
   BlockOverridesV4,
   HybridOrder,
   HybridOrderJSON,
   HybridOrderResolutionOptions,
 } from "./types";
-import {
-  hashHybridCosignerData,
-  hashHybridOrder,
-  HYBRID_ORDER_TYPES,
-} from "./hashing";
 
 const ZERO_ADDRESS = ethers.constants.AddressZero;
 const BASE_SCALING_FACTOR = ethers.constants.WeiPerEther;
@@ -207,7 +208,30 @@ export class HybridOrderClass {
   }
 
   permitData(): PermitTransferFromData {
-    const permit: PermitTransferFrom = {
+    return SignatureTransfer.getPermitData(
+      this.toPermit(),
+      this.permit2Address,
+      this.chainId,
+      this.witness()
+    ) as PermitTransferFromData;
+  }
+
+  getSigner(signature: SignatureLike): string {
+    return ethers.utils.computeAddress(
+      ethers.utils.recoverPublicKey(
+        SignatureTransfer.hash(
+          this.toPermit(),
+          this.permit2Address,
+          this.chainId,
+          this.witness()
+        ),
+        signature
+      )
+    );
+  }
+
+  private toPermit(): PermitTransferFrom {
+    return {
       permitted: {
         token: this.order.input.token,
         amount: this.order.input.maxAmount,
@@ -216,8 +240,10 @@ export class HybridOrderClass {
       nonce: this.order.info.nonce,
       deadline: this.order.info.deadline,
     };
+  }
 
-    const witness: Witness = {
+  private witness(): Witness {
+    return {
       witness: {
         info: this.order.info,
         cosigner: this.order.cosigner,
@@ -231,17 +257,6 @@ export class HybridOrderClass {
       witnessTypeName: "HybridOrder",
       witnessType: HYBRID_ORDER_TYPES,
     };
-
-    return SignatureTransfer.getPermitData(
-      permit,
-      this.permit2Address,
-      this.chainId,
-      witness
-    ) as PermitTransferFromData;
-  }
-
-  getSigner(_signature: SignatureLike): string {
-    throw new Error("Use signing module to recover signer");
   }
 
   get blockOverrides(): BlockOverridesV4 {
