@@ -560,6 +560,12 @@ function locateCurrentAmount(
   }
 
   const duration = endBlock - startBlock;
+
+  if (duration === 0) {
+    throw new HybridOrderPriceCurveError(
+      "Invalid duration: zero duration when it shouldn't be"
+    );
+  }
   const elapsed = currentBlock - startBlock;
   const remaining = duration - elapsed;
 
