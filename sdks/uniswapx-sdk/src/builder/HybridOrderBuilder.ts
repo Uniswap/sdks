@@ -236,18 +236,6 @@ export class HybridOrderBuilder {
       "preExecutionHook not set"
     );
     invariant(
-      this.info.preExecutionHookData !== undefined,
-      "preExecutionHookData not set"
-    );
-    invariant(
-      this.info.postExecutionHook !== undefined,
-      "postExecutionHook not set"
-    );
-    invariant(
-      this.info.postExecutionHookData !== undefined,
-      "postExecutionHookData not set"
-    );
-    invariant(
       this.info.auctionResolver !== undefined,
       "auctionResolver not set"
     );
