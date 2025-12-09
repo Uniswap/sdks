@@ -16,7 +16,7 @@ import {
 /**
  * EIP-712 type string for OrderInfoV4
  */
-export const ORDER_INFO_V4_TYPE =
+export const ORDER_INFO_V4_TYPE_STRING =
   "OrderInfo(" +
   "address reactor," +
   "address swapper," +
@@ -32,38 +32,38 @@ export const ORDER_INFO_V4_TYPE =
  * EIP-712 type hash for OrderInfoV4
  */
 export const ORDER_INFO_V4_TYPE_HASH = ethers.utils.keccak256(
-  ethers.utils.toUtf8Bytes(ORDER_INFO_V4_TYPE)
+  ethers.utils.toUtf8Bytes(ORDER_INFO_V4_TYPE_STRING)
 );
 
 /**
  * EIP-712 type string for HybridInput
  */
-const HYBRID_INPUT_TYPE = "HybridInput(address token,uint256 maxAmount)";
+const HYBRID_INPUT_TYPE_STRING = "HybridInput(address token,uint256 maxAmount)";
 
 /**
  * EIP-712 type hash for HybridInput
  */
 const HYBRID_INPUT_TYPE_HASH = ethers.utils.keccak256(
-  ethers.utils.toUtf8Bytes(HYBRID_INPUT_TYPE)
+  ethers.utils.toUtf8Bytes(HYBRID_INPUT_TYPE_STRING)
 );
 
 /**
  * EIP-712 type string for HybridOutput
  */
-const HYBRID_OUTPUT_TYPE =
+const HYBRID_OUTPUT_TYPE_STRING =
   "HybridOutput(address token,uint256 minAmount,address recipient)";
 
 /**
  * EIP-712 type hash for HybridOutput
  */
 const HYBRID_OUTPUT_TYPE_HASH = ethers.utils.keccak256(
-  ethers.utils.toUtf8Bytes(HYBRID_OUTPUT_TYPE)
+  ethers.utils.toUtf8Bytes(HYBRID_OUTPUT_TYPE_STRING)
 );
 
 /**
  * EIP-712 type string for HybridOrder (matches HybridOrderLib)
  */
-const HYBRID_ORDER_TYPE = [
+const HYBRID_ORDER_TYPE_STRING = [
   "HybridOrder(",
   "OrderInfo info,",
   "address cosigner,",
@@ -80,10 +80,10 @@ const HYBRID_ORDER_TYPE = [
  */
 const HYBRID_ORDER_TYPE_HASH = ethers.utils.keccak256(
   ethers.utils.toUtf8Bytes(
-    HYBRID_ORDER_TYPE +
-      HYBRID_INPUT_TYPE +
-      HYBRID_OUTPUT_TYPE +
-      ORDER_INFO_V4_TYPE
+    HYBRID_ORDER_TYPE_STRING +
+      HYBRID_INPUT_TYPE_STRING +
+      HYBRID_OUTPUT_TYPE_STRING +
+      ORDER_INFO_V4_TYPE_STRING
   )
 );
 
@@ -93,10 +93,10 @@ const HYBRID_ORDER_TYPE_HASH = ethers.utils.keccak256(
  */
 export const HYBRID_PERMIT2_ORDER_TYPE = [
   "HybridOrder witness)",
-  HYBRID_INPUT_TYPE,
-  HYBRID_ORDER_TYPE,
-  HYBRID_OUTPUT_TYPE,
-  ORDER_INFO_V4_TYPE,
+  HYBRID_INPUT_TYPE_STRING,
+  HYBRID_ORDER_TYPE_STRING,
+  HYBRID_OUTPUT_TYPE_STRING,
+  ORDER_INFO_V4_TYPE_STRING,
   "TokenPermissions(address token,uint256 amount)",
 ].join("");
 
@@ -152,9 +152,9 @@ export function hashOrderInfoV4(info: OrderInfoV4): string {
         "uint256",
         "uint256",
         "address",
-        "bytes",
+        "bytes32",
         "address",
-        "bytes",
+        "bytes32",
         "address",
       ],
       [
@@ -164,9 +164,9 @@ export function hashOrderInfoV4(info: OrderInfoV4): string {
         info.nonce,
         info.deadline,
         info.preExecutionHook,
-        ethers.utils.hexlify(info.preExecutionHookData),
+        ethers.utils.keccak256(info.preExecutionHookData),
         info.postExecutionHook,
-        ethers.utils.hexlify(info.postExecutionHookData),
+        ethers.utils.keccak256(info.postExecutionHookData),
         info.auctionResolver,
       ]
     )
@@ -204,12 +204,15 @@ function hashHybridOutput(output: HybridOutput): string {
 
 /**
  * Hash array of HybridOutputs
+ * Uses encodePacked to match contract's gas-optimized hashing
  */
 function hashHybridOutputs(outputs: HybridOutput[]): string {
   const hashes = outputs.map(hashHybridOutput);
-  return ethers.utils.keccak256(
-    ethers.utils.defaultAbiCoder.encode(["bytes32[]"], [hashes])
-  );
+  if (hashes.length === 0) {
+    return ethers.utils.keccak256("0x");
+  }
+  const types = new Array(hashes.length).fill("bytes32");
+  return ethers.utils.keccak256(ethers.utils.solidityPack(types, hashes));
 }
 
 /**

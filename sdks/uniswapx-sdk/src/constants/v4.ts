@@ -50,7 +50,7 @@ export const TOKEN_PERMISSIONS_TYPE_HASH = ethers.utils.keccak256(
  */
 export {
   ORDER_INFO_V4_TYPE_HASH,
-  ORDER_INFO_V4_TYPE,
+  ORDER_INFO_V4_TYPE_STRING,
 } from "../order/v4/hashing";
 
 /**
