@@ -770,6 +770,201 @@ describe("HybridOrderBuilder", () => {
     });
   });
 
+  describe("Price curve direction validation", () => {
+    const PRICE_CURVE_DURATION_SHIFT = 240;
+
+    const encodePriceCurveElement = (
+      duration: number,
+      scalingFactor: BigNumber
+    ): BigNumber => {
+      return BigNumber.from(duration).shl(PRICE_CURVE_DURATION_SHIFT).or(scalingFactor);
+    };
+
+    it("Allows multi-segment price curve with all elements > 1e18", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const priceCurve = [
+        encodePriceCurveElement(5, BASE_SCALING_FACTOR.mul(102).div(100)), // 1.02e18
+        encodePriceCurveElement(5, BASE_SCALING_FACTOR.mul(105).div(100)), // 1.05e18
+      ];
+
+      const order = builder
+        .cosigner(constants.AddressZero)
+        .cosignature(VALID_COSIGNATURE)
+        .input({ token: INPUT_TOKEN, maxAmount: INPUT_MAX_AMOUNT })
+        .output({ token: OUTPUT_TOKEN, minAmount: OUTPUT_MIN_AMOUNT, recipient: constants.AddressZero })
+        .auctionStartBlock(100)
+        .baselinePriorityFeeWei(0)
+        .scalingFactor(BASE_SCALING_FACTOR.mul(102).div(100))
+        .priceCurve(priceCurve)
+        .deadline(deadline)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .auctionTargetBlock(100)
+        .supplementalPriceCurve([])
+        .build();
+
+      expect(order.order.priceCurve.length).toEqual(2);
+    });
+
+    it("Allows multi-segment price curve with all elements < 1e18", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const priceCurve = [
+        encodePriceCurveElement(5, BASE_SCALING_FACTOR.mul(98).div(100)), // 0.98e18
+        encodePriceCurveElement(5, BASE_SCALING_FACTOR.mul(95).div(100)), // 0.95e18
+      ];
+
+      const order = builder
+        .cosigner(constants.AddressZero)
+        .cosignature(VALID_COSIGNATURE)
+        .input({ token: INPUT_TOKEN, maxAmount: INPUT_MAX_AMOUNT })
+        .output({ token: OUTPUT_TOKEN, minAmount: OUTPUT_MIN_AMOUNT, recipient: constants.AddressZero })
+        .auctionStartBlock(100)
+        .baselinePriorityFeeWei(0)
+        .scalingFactor(BASE_SCALING_FACTOR.mul(98).div(100))
+        .priceCurve(priceCurve)
+        .deadline(deadline)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .auctionTargetBlock(100)
+        .supplementalPriceCurve([])
+        .build();
+
+      expect(order.order.priceCurve.length).toEqual(2);
+    });
+
+    it("Allows neutral (1e18) element between elements on same side", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const priceCurve = [
+        encodePriceCurveElement(5, BASE_SCALING_FACTOR.mul(102).div(100)), // 1.02e18
+        encodePriceCurveElement(5, BASE_SCALING_FACTOR), // 1e18 (neutral)
+        encodePriceCurveElement(5, BASE_SCALING_FACTOR.mul(105).div(100)), // 1.05e18
+      ];
+
+      const order = builder
+        .cosigner(constants.AddressZero)
+        .cosignature(VALID_COSIGNATURE)
+        .input({ token: INPUT_TOKEN, maxAmount: INPUT_MAX_AMOUNT })
+        .output({ token: OUTPUT_TOKEN, minAmount: OUTPUT_MIN_AMOUNT, recipient: constants.AddressZero })
+        .auctionStartBlock(100)
+        .baselinePriorityFeeWei(0)
+        .scalingFactor(BASE_SCALING_FACTOR)
+        .priceCurve(priceCurve)
+        .deadline(deadline)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .auctionTargetBlock(100)
+        .supplementalPriceCurve([])
+        .build();
+
+      expect(order.order.priceCurve.length).toEqual(3);
+    });
+
+    it("Allows price curve starting with neutral (1e18) followed by > 1e18", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const priceCurve = [
+        encodePriceCurveElement(5, BASE_SCALING_FACTOR), // 1e18 (neutral)
+        encodePriceCurveElement(5, BASE_SCALING_FACTOR.mul(105).div(100)), // 1.05e18
+      ];
+
+      const order = builder
+        .cosigner(constants.AddressZero)
+        .cosignature(VALID_COSIGNATURE)
+        .input({ token: INPUT_TOKEN, maxAmount: INPUT_MAX_AMOUNT })
+        .output({ token: OUTPUT_TOKEN, minAmount: OUTPUT_MIN_AMOUNT, recipient: constants.AddressZero })
+        .auctionStartBlock(100)
+        .baselinePriorityFeeWei(0)
+        .scalingFactor(BASE_SCALING_FACTOR)
+        .priceCurve(priceCurve)
+        .deadline(deadline)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .auctionTargetBlock(100)
+        .supplementalPriceCurve([])
+        .build();
+
+      expect(order.order.priceCurve.length).toEqual(2);
+    });
+
+    it("Throws if price curve mixes directions (> 1e18 followed by < 1e18)", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const priceCurve = [
+        encodePriceCurveElement(5, BASE_SCALING_FACTOR.mul(102).div(100)), // 1.02e18
+        encodePriceCurveElement(5, BASE_SCALING_FACTOR.mul(98).div(100)), // 0.98e18 - different direction!
+      ];
+
+      expect(() =>
+        builder
+          .cosigner(constants.AddressZero)
+          .cosignature(VALID_COSIGNATURE)
+          .input({ token: INPUT_TOKEN, maxAmount: INPUT_MAX_AMOUNT })
+          .output({ token: OUTPUT_TOKEN, minAmount: OUTPUT_MIN_AMOUNT, recipient: constants.AddressZero })
+          .auctionStartBlock(100)
+          .baselinePriorityFeeWei(0)
+          .scalingFactor(BASE_SCALING_FACTOR)
+          .priceCurve(priceCurve)
+          .deadline(deadline)
+          .swapper(constants.AddressZero)
+          .nonce(BigNumber.from(100))
+          .auctionTargetBlock(100)
+          .supplementalPriceCurve([])
+          .build()
+      ).toThrow("Price curve scaling factors must share direction");
+    });
+
+    it("Throws if price curve has neutral then mixes directions", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const priceCurve = [
+        encodePriceCurveElement(5, BASE_SCALING_FACTOR), // 1e18 (neutral)
+        encodePriceCurveElement(5, BASE_SCALING_FACTOR.mul(102).div(100)), // 1.02e18
+        encodePriceCurveElement(5, BASE_SCALING_FACTOR.mul(98).div(100)), // 0.98e18 - different direction!
+      ];
+
+      expect(() =>
+        builder
+          .cosigner(constants.AddressZero)
+          .cosignature(VALID_COSIGNATURE)
+          .input({ token: INPUT_TOKEN, maxAmount: INPUT_MAX_AMOUNT })
+          .output({ token: OUTPUT_TOKEN, minAmount: OUTPUT_MIN_AMOUNT, recipient: constants.AddressZero })
+          .auctionStartBlock(100)
+          .baselinePriorityFeeWei(0)
+          .scalingFactor(BASE_SCALING_FACTOR)
+          .priceCurve(priceCurve)
+          .deadline(deadline)
+          .swapper(constants.AddressZero)
+          .nonce(BigNumber.from(100))
+          .auctionTargetBlock(100)
+          .supplementalPriceCurve([])
+          .build()
+      ).toThrow("Price curve scaling factors must share direction");
+    });
+
+    it("Allows all neutral (1e18) elements", () => {
+      const deadline = Math.floor(Date.now() / 1000) + 1000;
+      const priceCurve = [
+        encodePriceCurveElement(5, BASE_SCALING_FACTOR), // 1e18
+        encodePriceCurveElement(5, BASE_SCALING_FACTOR), // 1e18
+      ];
+
+      const order = builder
+        .cosigner(constants.AddressZero)
+        .cosignature(VALID_COSIGNATURE)
+        .input({ token: INPUT_TOKEN, maxAmount: INPUT_MAX_AMOUNT })
+        .output({ token: OUTPUT_TOKEN, minAmount: OUTPUT_MIN_AMOUNT, recipient: constants.AddressZero })
+        .auctionStartBlock(100)
+        .baselinePriorityFeeWei(0)
+        .scalingFactor(BASE_SCALING_FACTOR)
+        .priceCurve(priceCurve)
+        .deadline(deadline)
+        .swapper(constants.AddressZero)
+        .nonce(BigNumber.from(100))
+        .auctionTargetBlock(100)
+        .supplementalPriceCurve([])
+        .build();
+
+      expect(order.order.priceCurve.length).toEqual(2);
+    });
+  });
+
   describe("Edge cases", () => {
     it("Build order with zero baseline priority fee", () => {
       const deadline = Math.floor(Date.now() / 1000) + 1000;

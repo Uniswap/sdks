@@ -272,18 +272,22 @@ export class HybridOrderBuilder {
     // Validate price curve consistency
     if (this.orderData.priceCurve && this.orderData.priceCurve.length > 0) {
       const BASE_SCALING_FACTOR = BigNumber.from(10).pow(18);
-      const firstScaling = this.extractScalingFactor(this.orderData.priceCurve[0]);
-      const isIncreasing = firstScaling.gt(BASE_SCALING_FACTOR);
-      const isDecreasing = firstScaling.lt(BASE_SCALING_FACTOR);
 
-      // All scaling factors must be in same direction (all >1e18 or all <1e18)
+      // All scaling factors must share direction
+      // Compare each pair of adjacent elements
       for (let i = 1; i < this.orderData.priceCurve.length; i++) {
+        const prevScaling = this.extractScalingFactor(this.orderData.priceCurve[i - 1]);
         const scaling = this.extractScalingFactor(this.orderData.priceCurve[i]);
+
+        // Either value is 1e18 (neutral), or both on same side of 1e18
+        const sharesDirection =
+          prevScaling.eq(BASE_SCALING_FACTOR) ||
+          scaling.eq(BASE_SCALING_FACTOR) ||
+          prevScaling.gt(BASE_SCALING_FACTOR) === scaling.gt(BASE_SCALING_FACTOR);
+
         invariant(
-          (isIncreasing && scaling.gt(BASE_SCALING_FACTOR)) ||
-          (isDecreasing && scaling.lt(BASE_SCALING_FACTOR)) ||
-          scaling.eq(BASE_SCALING_FACTOR),
-          `Price curve scaling factors must all be in same direction (all >1e18 or all <1e18). Element ${i} violates this.`
+          sharesDirection,
+          `Price curve scaling factors must share direction. Element ${i} violates this.`
         );
       }
     }
