@@ -271,7 +271,7 @@ export class HybridOrderBuilder {
 
     // Validate price curve consistency
     if (this.orderData.priceCurve && this.orderData.priceCurve.length > 0) {
-      const BASE_SCALING_FACTOR = BigNumber.from(10).pow(18);
+      const BASE_SCALING_FACTOR = constants.WeiPerEther;
 
       // All scaling factors must share direction
       // Compare each pair of adjacent elements

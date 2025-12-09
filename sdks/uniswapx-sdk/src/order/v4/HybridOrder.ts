@@ -15,6 +15,7 @@ import {
   hashHybridCosignerData,
   hashHybridOrder,
   HYBRID_ORDER_TYPES,
+  HYBRID_PERMIT2_ORDER_TYPE,
 } from "./hashing";
 import {
   BlockOverridesV4,
@@ -27,7 +28,15 @@ const ZERO_ADDRESS = ethers.constants.AddressZero;
 const BASE_SCALING_FACTOR = ethers.constants.WeiPerEther;
 const WAD = ethers.constants.WeiPerEther;
 const MAX_UINT_240 = BigNumber.from(1).shl(240).sub(1);
+const MAX_UINT_16 = 65535; // 2^16 - 1, max duration that fits in 16 bits
 const PRICE_CURVE_DURATION_SHIFT = 240;
+
+// Permit2 constants matching contract
+const PERMIT_TRANSFER_FROM_WITNESS_TYPEHASH_STUB =
+  "PermitWitnessTransferFrom(TokenPermissions permitted,address spender,uint256 nonce,uint256 deadline,";
+const TOKEN_PERMISSIONS_TYPEHASH = ethers.utils.keccak256(
+  ethers.utils.toUtf8Bytes("TokenPermissions(address token,uint256 amount)")
+);
 
 const HYBRID_ORDER_ABI = [
   "tuple(" +
@@ -95,8 +104,10 @@ export class HybridOrderClass {
     duration: number,
     scalingFactor: BigNumber
   ): BigNumber {
-    if (duration < 0) {
-      throw new HybridOrderPriceCurveError("Duration must be non-negative");
+    if (duration < 0 || duration > MAX_UINT_16) {
+      throw new HybridOrderPriceCurveError(
+        `Duration must be between 0 and ${MAX_UINT_16} (fits in 16 bits)`
+      );
     }
     if (scalingFactor.lt(0) || scalingFactor.gt(MAX_UINT_240)) {
       throw new HybridOrderPriceCurveError(
@@ -214,6 +225,57 @@ export class HybridOrderClass {
       this.chainId,
       this.witness()
     ) as PermitTransferFromData;
+  }
+
+  /**
+   * Get the EIP-712 signing hash for Permit2 that matches the contract's custom hash.
+   * This should be used instead of permitData() when signing, as the contract uses
+   * a gas-optimized hash that doesn't match standard EIP-712.
+   * @param permit2DomainSeparator The Permit2 contract's domain separator
+   * @returns The hash to sign
+   */
+  getPermitSigningHash(permit2DomainSeparator: string): string {
+    // Build the full type hash: stub + witness type string
+    const typeHash = ethers.utils.keccak256(
+      ethers.utils.toUtf8Bytes(
+        PERMIT_TRANSFER_FROM_WITNESS_TYPEHASH_STUB + HYBRID_PERMIT2_ORDER_TYPE
+      )
+    );
+
+    // Hash token permissions
+    const tokenPermissionsHash = ethers.utils.keccak256(
+      ethers.utils.defaultAbiCoder.encode(
+        ["bytes32", "address", "uint256"],
+        [
+          TOKEN_PERMISSIONS_TYPEHASH,
+          this.order.input.token,
+          this.order.input.maxAmount,
+        ]
+      )
+    );
+
+    // Build struct hash using the custom order hash
+    const structHash = ethers.utils.keccak256(
+      ethers.utils.defaultAbiCoder.encode(
+        ["bytes32", "bytes32", "address", "uint256", "uint256", "bytes32"],
+        [
+          typeHash,
+          tokenPermissionsHash,
+          this.order.info.preExecutionHook, // spender
+          this.order.info.nonce,
+          this.order.info.deadline,
+          this.hash(), // Custom order hash
+        ]
+      )
+    );
+
+    // Build final EIP-712 hash
+    return ethers.utils.keccak256(
+      ethers.utils.solidityPack(
+        ["string", "bytes32", "bytes32"],
+        ["\x19\x01", permit2DomainSeparator, structHash]
+      )
+    );
   }
 
   getSigner(signature: SignatureLike): string {
