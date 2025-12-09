@@ -504,8 +504,7 @@ export function hashDCAIntent(
  * EIP-712 type string for DCAOrderCosignerData
  */
 const DCA_COSIGNER_DATA_TYPE =
-  "DCAOrderCosignerData(address swapper,uint96 nonce," +
-  "uint160 execAmount,uint96 orderNonce,uint160 limitAmount)";
+  "DCAOrderCosignerData(address swapper,uint96 nonce,uint160 execAmount,uint96 orderNonce,uint160 limitAmount)";
 
 /**
  * EIP-712 type hash for DCAOrderCosignerData
