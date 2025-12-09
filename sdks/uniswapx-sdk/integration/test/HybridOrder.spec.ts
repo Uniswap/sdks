@@ -335,7 +335,6 @@ describe("HybridOrder", () => {
 
       const swapperTokenOutBalanceBefore = await tokenOut.balanceOf(swapperAddress);
 
-      // Set basefee to 1 gwei (matches vm.fee(1 gwei) in contract test)
       await ethers.provider.send("hardhat_setNextBlockBaseFeePerGas", [
         ethers.utils.parseUnits("1", "gwei").toHexString()
       ]);
@@ -364,7 +363,6 @@ describe("HybridOrder", () => {
       // mulWadUp: (amount * scaling + 1e18 - 1) / 1e18
       const expectedOutput = AMOUNT.mul(expectedScaling).add(BASE_SCALING_FACTOR).sub(1).div(BASE_SCALING_FACTOR);
 
-      // Use 0.1% tolerance like contract test (assertApproxEqRel with 0.001e18)
       expectThreshold(actualOutput, expectedOutput, AMOUNT.div(1000));
     });
   });
@@ -422,7 +420,6 @@ describe("HybridOrder", () => {
       const swapperTokenOutBalanceBefore = await tokenOut.balanceOf(swapperAddress);
       const fillerTokenInBalanceBefore = await tokenIn.balanceOf(fillerAddress);
 
-      // Set basefee to 1 gwei (matches vm.fee(1 gwei) in contract test)
       await ethers.provider.send("hardhat_setNextBlockBaseFeePerGas", [
         ethers.utils.parseUnits("1", "gwei").toHexString()
       ]);
@@ -461,7 +458,6 @@ describe("HybridOrder", () => {
       // Verify filler received the input
       expect(fillerTokenInBalanceAfter).to.equal(fillerTokenInBalanceBefore.add(actualInput));
 
-      // Use 0.1% tolerance like contract test (assertApproxEqRel with 0.001e18)
       expectThreshold(actualInput, expectedInput, AMOUNT.div(1000));
     });
   });
@@ -510,8 +506,11 @@ describe("HybridOrder", () => {
         .cosignature(cosignature)
         .build();
 
-      const { domain, types, values } = orderClass.permitData();
-      const signature = await swapper._signTypedData(domain, types, values);
+      const permit2DomainSeparator = await permit2.DOMAIN_SEPARATOR();
+      const signingHash = orderClass.getPermitSigningHash(permit2DomainSeparator);
+      const signatureObj = await swapper._signingKey().signDigest(signingHash);
+      const signature = ethers.utils.joinSignature(signatureObj);
+
       const res = await reactor
         .connect(filler)
         .execute({ order: orderClass.serialize(), sig: signature });
@@ -694,15 +693,24 @@ describe("HybridOrder", () => {
     });
 
     it("executes order with multi-segment price curve", async () => {
-      const currentBlock = await ethers.provider.getBlockNumber();
-      const targetBlock = currentBlock + 1;
+      // Price curve: 3 segments, all > 1e18 (exact-in mode)
+      // priceCurve[0] = (30 << 240) | 1.5e18  -> 30 blocks starting at 1.5x
+      // priceCurve[1] = (40 << 240) | 1.3e18  -> 40 blocks to 1.3x
+      // priceCurve[2] = (30 << 240) | 1.1e18  -> 30 blocks to 1.1x (ends at 1.0x)
+      // Total duration: 100 blocks
 
-      // Multi-segment curve: 5 blocks @ 1.02, then 5 blocks @ 1.05
       const priceCurve = [
-        encodePriceCurveElement(5, BASE_SCALING_FACTOR.mul(102).div(100)),
-        encodePriceCurveElement(5, BASE_SCALING_FACTOR.mul(105).div(100)),
+        encodePriceCurveElement(30, BASE_SCALING_FACTOR.mul(15).div(10)), // 1.5e18
+        encodePriceCurveElement(40, BASE_SCALING_FACTOR.mul(13).div(10)), // 1.3e18
+        encodePriceCurveElement(30, BASE_SCALING_FACTOR.mul(11).div(10)), // 1.1e18
       ];
 
+      const inputAmount = AMOUNT;
+      const outputMinAmount = AMOUNT;
+      const auctionStartBlock = await ethers.provider.getBlockNumber();
+
+      // Test at block 15: interpolating from 1.5 to 1.3 within first segment
+      // Expected: 1.5 - (1.5 - 1.3) * (15/30) = 1.4
       const orderClass = new HybridOrderBuilder(
         chainId,
         reactor.address,
@@ -718,21 +726,29 @@ describe("HybridOrder", () => {
         .postExecutionHook(ethers.constants.AddressZero, "0x")
         .input({
           token: tokenIn.address,
-          maxAmount: AMOUNT,
+          maxAmount: inputAmount,
         })
         .output({
           token: tokenOut.address,
-          minAmount: AMOUNT,
+          minAmount: outputMinAmount,
           recipient: swapperAddress,
         })
-        .auctionStartBlock(BigNumber.from(targetBlock))
+        .auctionStartBlock(BigNumber.from(auctionStartBlock))
         .baselinePriorityFeeWei(BigNumber.from(0))
-        .scalingFactor(BASE_SCALING_FACTOR.mul(102).div(100))
+        .scalingFactor(BASE_SCALING_FACTOR) // Neutral - no priority fee adjustment
         .priceCurve(priceCurve)
         .buildPartial();
 
       const { domain, types, values } = orderClass.permitData();
       const signature = await swapper._signTypedData(domain, types, values);
+
+      // Advance 14 blocks so execute() is at block +15
+      const currentBlock = await ethers.provider.getBlockNumber();
+      for (let i = currentBlock; i < auctionStartBlock + 14; i++) {
+        await ethers.provider.send("evm_mine", []);
+      }
+
+      const swapperTokenOutBefore = await tokenOut.balanceOf(swapperAddress);
 
       const res = await reactor
         .connect(filler)
@@ -740,6 +756,15 @@ describe("HybridOrder", () => {
 
       const receipt = await res.wait();
       expect(receipt.status).to.equal(1);
+
+      // Verify output: expected scaling at block 15 is 1.4e18
+      // mulWadUp(outputMinAmount, 1.4e18)
+      const expectedScaling = BASE_SCALING_FACTOR.mul(14).div(10); // 1.4e18
+      const expectedOutput = outputMinAmount.mul(expectedScaling).add(BASE_SCALING_FACTOR).sub(1).div(BASE_SCALING_FACTOR);
+      const swapperTokenOutAfter = await tokenOut.balanceOf(swapperAddress);
+      const actualOutput = swapperTokenOutAfter.sub(swapperTokenOutBefore);
+
+      expect(actualOutput).to.equal(expectedOutput);
     });
   });
 });
