@@ -99,6 +99,14 @@ export class HybridOrderBuilder {
     };
   }
 
+  private validatePriceCurve(curve: BigNumber[], prefix: string): void {
+    curve.forEach((elem, i) => {
+      if (elem.lt(0)) {
+        throw new Error(`${prefix} curve element ${i} must be non-negative`);
+      }
+    });
+  }
+
   reactor(reactor: string): this {
     this.info.reactor = reactor;
     return this;
@@ -179,11 +187,7 @@ export class HybridOrderBuilder {
 
   priceCurve(curve: BigNumber[]): this {
     // Validate each price curve element
-    curve.forEach((elem, i) => {
-      if (elem.lt(0)) {
-        throw new Error(`Price curve element ${i} must be non-negative`);
-      }
-    });
+    this.validatePriceCurve(curve, "Price");
     this.orderData.priceCurve = curve;
     return this;
   }
@@ -208,13 +212,7 @@ export class HybridOrderBuilder {
 
   supplementalPriceCurve(curve: BigNumber[]): this {
     // Validate each supplemental price curve element
-    curve.forEach((elem, i) => {
-      if (elem.lt(0)) {
-        throw new Error(
-          `Supplemental price curve element ${i} must be non-negative`
-        );
-      }
-    });
+    this.validatePriceCurve(curve, "Supplemental price");
     if (!this.orderData.cosignerData) {
       this.initializeCosignerData({ supplementalPriceCurve: curve });
     } else {
@@ -321,7 +319,7 @@ export class HybridOrderBuilder {
   private checkCosignedInvariants(): void {
     invariant(
       this.orderData.cosignature !== undefined &&
-        this.orderData.cosignature !== "0x",
+      this.orderData.cosignature !== "0x",
       "cosignature not set"
     );
     invariant(
