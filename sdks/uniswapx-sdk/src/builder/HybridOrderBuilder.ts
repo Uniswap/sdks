@@ -1,6 +1,7 @@
 import { BigNumber, constants } from "ethers";
 import invariant from "tiny-invariant";
 
+import { BASE_SCALING_FACTOR } from "../constants/v4";
 import { HybridOrderClass } from "../order/v4/HybridOrder";
 import {
   HybridCosignerData,
@@ -271,8 +272,6 @@ export class HybridOrderBuilder {
 
     // Validate price curve consistency
     if (this.orderData.priceCurve && this.orderData.priceCurve.length > 0) {
-      const BASE_SCALING_FACTOR = constants.WeiPerEther;
-
       // All scaling factors must share direction
       // Compare each pair of adjacent elements
       for (let i = 1; i < this.orderData.priceCurve.length; i++) {

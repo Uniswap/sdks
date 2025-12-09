@@ -1,5 +1,6 @@
 import { BigNumber, constants } from "ethers";
 
+import { BASE_SCALING_FACTOR } from "../constants/v4";
 import { HybridOrderClass } from "../order/v4/HybridOrder";
 
 import { HybridOrderBuilder } from "./HybridOrderBuilder";
@@ -11,7 +12,6 @@ const RESOLVER_ADDRESS = "0x0000000000000000000000000000000000000002";
 
 const INPUT_MAX_AMOUNT = BigNumber.from("1000000");
 const OUTPUT_MIN_AMOUNT = BigNumber.from("1000000000000000000");
-const BASE_SCALING_FACTOR = BigNumber.from("1000000000000000000"); // 1e18
 const VALID_COSIGNATURE =
   "0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890";
 

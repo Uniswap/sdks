@@ -7,6 +7,7 @@ import {
 } from "@uniswap/permit2-sdk";
 import { BigNumber, ethers } from "ethers";
 
+import { BASE_SCALING_FACTOR } from "../../constants/v4";
 import { getPermit2 } from "../../utils";
 import { ResolvedUniswapXOrder } from "../../utils/OrderQuoter";
 import { TokenAmount } from "../types";
@@ -25,7 +26,6 @@ import {
 } from "./types";
 
 const ZERO_ADDRESS = ethers.constants.AddressZero;
-const BASE_SCALING_FACTOR = ethers.constants.WeiPerEther;
 const WAD = ethers.constants.WeiPerEther;
 const MAX_UINT_240 = BigNumber.from(1).shl(240).sub(1);
 const MAX_UINT_16 = 65535; // 2^16 - 1, max duration that fits in 16 bits

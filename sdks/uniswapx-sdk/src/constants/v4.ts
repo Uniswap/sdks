@@ -72,3 +72,8 @@ export const DCA_HOOK_DOMAIN_VERSION = "1";
  * Permit2 domain name
  */
 export const PERMIT2_DOMAIN_NAME = "Permit2";
+
+/**
+ * Neutral scaling factor (1e18) for hybrid auction; based on Tribunal's implementation
+ */
+export const BASE_SCALING_FACTOR = ethers.constants.WeiPerEther;
