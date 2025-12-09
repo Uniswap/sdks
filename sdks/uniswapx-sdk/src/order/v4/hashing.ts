@@ -88,19 +88,6 @@ const HYBRID_ORDER_TYPE_HASH = ethers.utils.keccak256(
 );
 
 /**
- * Permit2 witness type string for HybridOrder
- * Matches HybridOrderLib.PERMIT2_ORDER_TYPE
- */
-export const HYBRID_PERMIT2_ORDER_TYPE = [
-  "HybridOrder witness)",
-  HYBRID_INPUT_TYPE_STRING,
-  HYBRID_ORDER_TYPE_STRING,
-  HYBRID_OUTPUT_TYPE_STRING,
-  ORDER_INFO_V4_TYPE_STRING,
-  "TokenPermissions(address token,uint256 amount)",
-].join("");
-
-/**
  * EIP-712 witness types for HybridOrder (for Permit2 signature)
  * NOTE: Types must be in alphabetical order for EIP-712 spec compliance
  */

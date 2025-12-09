@@ -21,7 +21,8 @@ export class HybridOrderBuilder {
     const builder = new HybridOrderBuilder(
       order.chainId,
       order.order.info.reactor,
-      resolver || order.resolver
+      resolver || order.resolver,
+      order.permit2Address
     );
 
     builder

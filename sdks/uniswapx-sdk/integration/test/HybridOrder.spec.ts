@@ -506,10 +506,8 @@ describe("HybridOrder", () => {
         .cosignature(cosignature)
         .build();
 
-      const permit2DomainSeparator = await permit2.DOMAIN_SEPARATOR();
-      const signingHash = orderClass.getPermitSigningHash(permit2DomainSeparator);
-      const signatureObj = await swapper._signingKey().signDigest(signingHash);
-      const signature = ethers.utils.joinSignature(signatureObj);
+      const { domain, types, values } = orderClass.permitData();
+      const signature = await swapper._signTypedData(domain, types, values);
 
       const res = await reactor
         .connect(filler)
