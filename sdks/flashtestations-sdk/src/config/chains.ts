@@ -8,7 +8,7 @@ export const CHAIN_CONFIGS: Record<number, ChainConfig> = {
   130: {
     chainId: 130,
     name: 'Unichain Mainnet',
-    contractAddress: '0x0000000000000000000000000000000000000000', // TODO: Replace with actual contract address
+    contractAddress: '0xd44f9d1331659F417a3E22C9e29529D498B66A29',
     defaultRpcUrl: process.env.RPC_URL || 'https://mainnet.unichain.org',
     blockExplorerUrl: 'https://uniscan.xyz',
   },
@@ -33,7 +33,7 @@ export const CHAIN_CONFIGS: Record<number, ChainConfig> = {
   420120005: {
     chainId: 420120005,
     name: 'Unichain Experimental',
-    contractAddress: '0x2E41cb0D68D8dB7ebd16cef81D7eD82e7E1fbA40',
+    contractAddress: '0x80dcdE10eE31E0A32B8944b39e8AE21d47984b4e',
     defaultRpcUrl: process.env.RPC_URL || '', // note, we don't include the RPC URL for experimental because Unichain doesn't want to expose it to the public
     blockExplorerUrl: '',
   },
