@@ -6,6 +6,10 @@ import {
   getChainConfig,
   getSupportedChains,
   isChainSupported,
+  getChainBySlug,
+  getSupportedChainSlugs,
+  isValidChainSlug,
+  getDefaultChainSlug,
 } from '../../src/config/chains';
 
 describe('Chain Configuration', () => {
@@ -15,6 +19,7 @@ describe('Chain Configuration', () => {
       expect(config).toBeDefined();
       expect(config.chainId).toBe(130);
       expect(config.name).toBe('Unichain Mainnet');
+      expect(config.slug).toBe('unichain-mainnet');
       expect(config.contractAddress).toBeDefined();
       expect(config.defaultRpcUrl).toBe('https://mainnet.unichain.org');
       expect(config.blockExplorerUrl).toBe('https://uniscan.xyz');
@@ -25,9 +30,16 @@ describe('Chain Configuration', () => {
       expect(config).toBeDefined();
       expect(config.chainId).toBe(1301);
       expect(config.name).toBe('Unichain Sepolia');
+      expect(config.slug).toBe('unichain-sepolia');
       expect(config.contractAddress).toBeDefined();
       expect(config.defaultRpcUrl).toBe('https://sepolia.unichain.org');
       expect(config.blockExplorerUrl).toBe('https://sepolia.uniscan.xyz');
+    });
+
+    it('should have unique slugs for all chains', () => {
+      const slugs = Object.values(CHAIN_CONFIGS).map(config => config.slug);
+      const uniqueSlugs = new Set(slugs);
+      expect(slugs.length).toBe(uniqueSlugs.size);
     });
   });
 
@@ -171,6 +183,74 @@ describe('Chain Configuration', () => {
       testError(() => getRpcUrl(unsupportedChainId));
       testError(() => getBlockExplorerUrl(unsupportedChainId));
       testError(() => getChainConfig(unsupportedChainId));
+    });
+  });
+
+  describe('getChainBySlug', () => {
+    it('should return chain config for valid slug', () => {
+      const config = getChainBySlug('unichain-mainnet');
+      expect(config).toBeDefined();
+      expect(config?.chainId).toBe(130);
+      expect(config?.name).toBe('Unichain Mainnet');
+    });
+
+    it('should return chain config for unichain-sepolia', () => {
+      const config = getChainBySlug('unichain-sepolia');
+      expect(config).toBeDefined();
+      expect(config?.chainId).toBe(1301);
+      expect(config?.name).toBe('Unichain Sepolia');
+    });
+
+    it('should return undefined for invalid slug', () => {
+      expect(getChainBySlug('invalid-chain')).toBeUndefined();
+      expect(getChainBySlug('')).toBeUndefined();
+      expect(getChainBySlug('ethereum-mainnet')).toBeUndefined();
+    });
+  });
+
+  describe('getSupportedChainSlugs', () => {
+    it('should return array of chain slugs', () => {
+      const slugs = getSupportedChainSlugs();
+      expect(Array.isArray(slugs)).toBe(true);
+      expect(slugs).toContain('unichain-mainnet');
+      expect(slugs).toContain('unichain-sepolia');
+      expect(slugs).toContain('unichain-alphanet');
+      expect(slugs).toContain('unichain-experimental');
+    });
+
+    it('should return slugs as strings', () => {
+      const slugs = getSupportedChainSlugs();
+      slugs.forEach(slug => {
+        expect(typeof slug).toBe('string');
+        expect(slug.length).toBeGreaterThan(0);
+      });
+    });
+  });
+
+  describe('isValidChainSlug', () => {
+    it('should return true for valid slugs', () => {
+      expect(isValidChainSlug('unichain-mainnet')).toBe(true);
+      expect(isValidChainSlug('unichain-sepolia')).toBe(true);
+      expect(isValidChainSlug('unichain-alphanet')).toBe(true);
+      expect(isValidChainSlug('unichain-experimental')).toBe(true);
+    });
+
+    it('should return false for invalid slugs', () => {
+      expect(isValidChainSlug('invalid')).toBe(false);
+      expect(isValidChainSlug('')).toBe(false);
+      expect(isValidChainSlug('ethereum')).toBe(false);
+      expect(isValidChainSlug('UNICHAIN-MAINNET')).toBe(false); // case sensitive
+    });
+  });
+
+  describe('getDefaultChainSlug', () => {
+    it('should return unichain-mainnet as default', () => {
+      expect(getDefaultChainSlug()).toBe('unichain-mainnet');
+    });
+
+    it('should return a valid chain slug', () => {
+      const defaultSlug = getDefaultChainSlug();
+      expect(isValidChainSlug(defaultSlug)).toBe(true);
     });
   });
 });
