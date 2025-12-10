@@ -1,12 +1,12 @@
 import { BigNumber, ethers } from "ethers";
 
 import {
+  CosignedHybridOrderInfo,
   DCAIntent,
   DCAOrderCosignerData,
   FeedInfo,
   HybridCosignerData,
   HybridInput,
-  HybridOrder,
   HybridOutput,
   OrderInfoV4,
   OutputAllocation,
@@ -217,8 +217,8 @@ function hashPriceCurve(curve: BigNumber[]): string {
 /**
  * Hash HybridOrder structure (resolver-specific order hash)
  */
-export function hashHybridOrder(order: HybridOrder): string {
-  const infoHash = hashOrderInfoV4(order.info);
+export function hashHybridOrder(order: CosignedHybridOrderInfo): string {
+  const infoHash = hashOrderInfoV4(order);
   const inputHash = hashHybridInput(order.input);
   const outputsHash = hashHybridOutputs(order.outputs);
   const priceCurveHash = hashPriceCurve(order.priceCurve);

@@ -19,9 +19,12 @@ import {
 } from "./hashing";
 import {
   BlockOverridesV4,
-  HybridOrder,
-  HybridOrderJSON,
+  CosignedHybridOrderInfo,
+  CosignedHybridOrderInfoJSON,
+  HybridCosignerData,
   HybridOrderResolutionOptions,
+  UnsignedHybridOrderInfo,
+  UnsignedHybridOrderInfoJSON,
 } from "./types";
 
 const ZERO_ADDRESS = ethers.constants.AddressZero;
@@ -68,29 +71,168 @@ export class HybridOrderCosignatureError extends Error {
   }
 }
 
-export class HybridOrderClass {
-  public readonly resolver: string;
+/**
+ * Parse a serialized HybridOrder
+ */
+function parseSerializedHybridOrder(encoded: string): {
+  resolver: string;
+  info: CosignedHybridOrderInfo;
+} {
+  const abiCoder = new ethers.utils.AbiCoder();
+
+  // Step 1: Decode outer wrapper (resolver + orderData)
+  const [resolver, orderData] = abiCoder.decode(
+    ["address", "bytes"],
+    encoded
+  );
+
+  // Step 2: Decode order structure
+  const decoded = abiCoder.decode(HYBRID_ORDER_ABI, orderData);
+  const [
+    [
+      [
+        reactor,
+        swapper,
+        nonce,
+        deadline,
+        preExecutionHook,
+        preExecutionHookData,
+        postExecutionHook,
+        postExecutionHookData,
+        auctionResolver,
+      ],
+      cosigner,
+      [inputToken, inputMaxAmount],
+      outputs,
+      auctionStartBlock,
+      baselinePriorityFeeWei,
+      scalingFactor,
+      priceCurve,
+      [auctionTargetBlock, supplementalPriceCurve],
+      cosignature,
+    ],
+  ] = decoded;
+
+  return {
+    resolver,
+    info: {
+      reactor,
+      swapper,
+      nonce,
+      deadline: deadline.toNumber(),
+      preExecutionHook,
+      preExecutionHookData,
+      postExecutionHook,
+      postExecutionHookData,
+      auctionResolver,
+      cosigner,
+      input: { token: inputToken, maxAmount: inputMaxAmount },
+      outputs: outputs.map(
+        ([token, minAmount, recipient]: [string, BigNumber, string]) => ({
+          token,
+          minAmount,
+          recipient,
+        })
+      ),
+      auctionStartBlock,
+      baselinePriorityFeeWei,
+      scalingFactor,
+      priceCurve: [...priceCurve],
+      cosignerData: {
+        auctionTargetBlock,
+        supplementalPriceCurve: [...supplementalPriceCurve],
+      },
+      cosignature,
+    },
+  };
+}
+
+/**
+ * Unsigned HybridOrder - base class without cosigner data
+ */
+export class UnsignedHybridOrder {
   public readonly permit2Address: string;
 
   constructor(
-    public readonly order: HybridOrder,
+    public readonly info: UnsignedHybridOrderInfo,
     public readonly chainId: number,
-    resolver: string,
+    public readonly resolver: string,
     _permit2Address?: string
   ) {
-    this.resolver = resolver;
     this.permit2Address = getPermit2(chainId, _permit2Address);
   }
 
-  public get info() {
-    return this.order.info;
+  /**
+   * Parse a serialized HybridOrder into an UnsignedHybridOrder
+   */
+  static parse(
+    encoded: string,
+    chainId: number,
+    permit2?: string
+  ): UnsignedHybridOrder {
+    const { resolver, info } = parseSerializedHybridOrder(encoded);
+    // Strip cosigner data for unsigned order
+    const unsignedInfo: UnsignedHybridOrderInfo = {
+      reactor: info.reactor,
+      swapper: info.swapper,
+      nonce: info.nonce,
+      deadline: info.deadline,
+      preExecutionHook: info.preExecutionHook,
+      preExecutionHookData: info.preExecutionHookData,
+      postExecutionHook: info.postExecutionHook,
+      postExecutionHookData: info.postExecutionHookData,
+      auctionResolver: info.auctionResolver,
+      cosigner: info.cosigner,
+      input: info.input,
+      outputs: info.outputs,
+      auctionStartBlock: info.auctionStartBlock,
+      baselinePriorityFeeWei: info.baselinePriorityFeeWei,
+      scalingFactor: info.scalingFactor,
+      priceCurve: info.priceCurve,
+    };
+    return new UnsignedHybridOrder(unsignedInfo, chainId, resolver, permit2);
+  }
+
+  static fromJSON(
+    json: UnsignedHybridOrderInfoJSON,
+    chainId: number,
+    resolver: string,
+    _permit2Address?: string
+  ): UnsignedHybridOrder {
+    return new UnsignedHybridOrder(
+      {
+        reactor: json.reactor,
+        swapper: json.swapper,
+        nonce: BigNumber.from(json.nonce),
+        deadline: json.deadline,
+        preExecutionHook: json.preExecutionHook,
+        preExecutionHookData: json.preExecutionHookData,
+        postExecutionHook: json.postExecutionHook,
+        postExecutionHookData: json.postExecutionHookData,
+        auctionResolver: json.auctionResolver,
+        cosigner: json.cosigner,
+        input: {
+          token: json.input.token,
+          maxAmount: BigNumber.from(json.input.maxAmount),
+        },
+        outputs: json.outputs.map((output) => ({
+          token: output.token,
+          minAmount: BigNumber.from(output.minAmount),
+          recipient: output.recipient,
+        })),
+        auctionStartBlock: BigNumber.from(json.auctionStartBlock),
+        baselinePriorityFeeWei: BigNumber.from(json.baselinePriorityFeeWei),
+        scalingFactor: BigNumber.from(json.scalingFactor),
+        priceCurve: json.priceCurve.map((value) => BigNumber.from(value)),
+      },
+      chainId,
+      resolver,
+      _permit2Address
+    );
   }
 
   /**
    * Encode a price curve element from duration and scaling factor
-   * @param duration The duration in blocks for this curve segment
-   * @param scalingFactor The scaling factor (as a BigNumber, typically with 18 decimals)
-   * @returns The encoded price curve element
    */
   static encodePriceCurveElement(
     duration: number,
@@ -111,8 +253,6 @@ export class HybridOrderClass {
 
   /**
    * Decode a price curve element into duration and scaling factor
-   * @param value The encoded price curve element
-   * @returns Object containing duration (in blocks) and scalingFactor
    */
   static decodePriceCurveElement(value: BigNumber): {
     duration: number;
@@ -121,25 +261,224 @@ export class HybridOrderClass {
     return decodePriceCurveElement(value);
   }
 
+  hash(): string {
+    // For unsigned orders, we hash with empty cosigner data
+    return hashHybridOrder({
+      ...this.info,
+      cosignerData: {
+        auctionTargetBlock: BigNumber.from(0),
+        supplementalPriceCurve: [],
+      },
+      cosignature: "0x",
+    });
+  }
+
+  serialize(): string {
+    const abiCoder = new ethers.utils.AbiCoder();
+    const orderData = abiCoder.encode(HYBRID_ORDER_ABI, [
+      [
+        [
+          this.info.reactor,
+          this.info.swapper,
+          this.info.nonce,
+          this.info.deadline,
+          this.info.preExecutionHook,
+          this.info.preExecutionHookData,
+          this.info.postExecutionHook,
+          this.info.postExecutionHookData,
+          this.info.auctionResolver,
+        ],
+        this.info.cosigner,
+        [this.info.input.token, this.info.input.maxAmount],
+        this.info.outputs.map((output) => [
+          output.token,
+          output.minAmount,
+          output.recipient,
+        ]),
+        this.info.auctionStartBlock,
+        this.info.baselinePriorityFeeWei,
+        this.info.scalingFactor,
+        this.info.priceCurve,
+        [BigNumber.from(0), []], // Empty cosignerData
+        "0x", // Empty cosignature
+      ],
+    ]);
+    return abiCoder.encode(["address", "bytes"], [this.resolver, orderData]);
+  }
+
+  permitData(): PermitTransferFromData {
+    return SignatureTransfer.getPermitData(
+      this.toPermit(),
+      this.permit2Address,
+      this.chainId,
+      this.witness()
+    ) as PermitTransferFromData;
+  }
+
+  getSigner(signature: SignatureLike): string {
+    return ethers.utils.computeAddress(
+      ethers.utils.recoverPublicKey(
+        SignatureTransfer.hash(
+          this.toPermit(),
+          this.permit2Address,
+          this.chainId,
+          this.witness()
+        ),
+        signature
+      )
+    );
+  }
+
+  protected toPermit(): PermitTransferFrom {
+    return {
+      permitted: {
+        token: this.info.input.token,
+        amount: this.info.input.maxAmount,
+      },
+      spender: this.info.preExecutionHook,
+      nonce: this.info.nonce,
+      deadline: this.info.deadline,
+    };
+  }
+
+  protected witness(): Witness {
+    return {
+      witness: {
+        info: {
+          reactor: this.info.reactor,
+          swapper: this.info.swapper,
+          nonce: this.info.nonce,
+          deadline: this.info.deadline,
+          preExecutionHook: this.info.preExecutionHook,
+          preExecutionHookData: this.info.preExecutionHookData,
+          postExecutionHook: this.info.postExecutionHook,
+          postExecutionHookData: this.info.postExecutionHookData,
+          auctionResolver: this.info.auctionResolver,
+        },
+        cosigner: this.info.cosigner,
+        input: this.info.input,
+        outputs: this.info.outputs,
+        auctionStartBlock: this.info.auctionStartBlock,
+        baselinePriorityFee: this.info.baselinePriorityFeeWei,
+        scalingFactor: this.info.scalingFactor,
+        priceCurve: this.info.priceCurve,
+      },
+      witnessTypeName: "HybridOrder",
+      witnessType: HYBRID_ORDER_TYPES,
+    };
+  }
+
+  get blockOverrides(): BlockOverridesV4 {
+    if (this.info.auctionStartBlock.isZero()) {
+      return undefined;
+    }
+    return {
+      number: hexStripZeros(this.info.auctionStartBlock.toHexString()),
+    };
+  }
+
+  resolve(_options: HybridOrderResolutionOptions): ResolvedUniswapXOrder {
+    throw new Error("Cannot resolve unsigned order - cosigner data required");
+  }
+
+  toJSON(): UnsignedHybridOrderInfoJSON & {
+    chainId: number;
+    resolver: string;
+    permit2Address: string;
+  } {
+    return {
+      chainId: this.chainId,
+      resolver: this.resolver,
+      permit2Address: this.permit2Address,
+      reactor: this.info.reactor,
+      swapper: this.info.swapper,
+      nonce: this.info.nonce.toString(),
+      deadline: this.info.deadline,
+      preExecutionHook: this.info.preExecutionHook,
+      preExecutionHookData: this.info.preExecutionHookData,
+      postExecutionHook: this.info.postExecutionHook,
+      postExecutionHookData: this.info.postExecutionHookData,
+      auctionResolver: this.info.auctionResolver,
+      cosigner: this.info.cosigner,
+      input: {
+        token: this.info.input.token,
+        maxAmount: this.info.input.maxAmount.toString(),
+      },
+      outputs: this.info.outputs.map((output) => ({
+        token: output.token,
+        minAmount: output.minAmount.toString(),
+        recipient: output.recipient,
+      })),
+      auctionStartBlock: this.info.auctionStartBlock.toString(),
+      baselinePriorityFeeWei: this.info.baselinePriorityFeeWei.toString(),
+      scalingFactor: this.info.scalingFactor.toString(),
+      priceCurve: this.info.priceCurve.map((value) => value.toString()),
+    };
+  }
+}
+
+/**
+ * Cosigned HybridOrder - includes cosigner data and signature
+ */
+export class CosignedHybridOrder extends UnsignedHybridOrder {
+  constructor(
+    public readonly info: CosignedHybridOrderInfo,
+    public readonly chainId: number,
+    public readonly resolver: string,
+    _permit2Address?: string
+  ) {
+    super(info, chainId, resolver, _permit2Address);
+  }
+
+  /**
+   * Parse a serialized HybridOrder into a CosignedHybridOrder
+   */
+  static parse(
+    encoded: string,
+    chainId: number,
+    permit2?: string
+  ): CosignedHybridOrder {
+    const { resolver, info } = parseSerializedHybridOrder(encoded);
+    return new CosignedHybridOrder(info, chainId, resolver, permit2);
+  }
+
+  /**
+   * Create a CosignedHybridOrder from an UnsignedHybridOrder
+   */
+  static fromUnsignedOrder(
+    order: UnsignedHybridOrder,
+    cosignerData: HybridCosignerData,
+    cosignature: string
+  ): CosignedHybridOrder {
+    return new CosignedHybridOrder(
+      {
+        ...order.info,
+        cosignerData,
+        cosignature,
+      },
+      order.chainId,
+      order.resolver,
+      order.permit2Address
+    );
+  }
+
   static fromJSON(
-    json: HybridOrderJSON,
+    json: CosignedHybridOrderInfoJSON,
     chainId: number,
     resolver: string,
     _permit2Address?: string
-  ): HybridOrderClass {
-    return new HybridOrderClass(
+  ): CosignedHybridOrder {
+    return new CosignedHybridOrder(
       {
-        info: {
-          reactor: json.info.reactor,
-          swapper: json.info.swapper,
-          nonce: BigNumber.from(json.info.nonce),
-          deadline: json.info.deadline,
-          preExecutionHook: json.info.preExecutionHook,
-          preExecutionHookData: json.info.preExecutionHookData,
-          postExecutionHook: json.info.postExecutionHook,
-          postExecutionHookData: json.info.postExecutionHookData,
-          auctionResolver: json.info.auctionResolver,
-        },
+        reactor: json.reactor,
+        swapper: json.swapper,
+        nonce: BigNumber.from(json.nonce),
+        deadline: json.deadline,
+        preExecutionHook: json.preExecutionHook,
+        preExecutionHookData: json.preExecutionHookData,
+        postExecutionHook: json.postExecutionHook,
+        postExecutionHookData: json.postExecutionHookData,
+        auctionResolver: json.auctionResolver,
         cosigner: json.cosigner,
         input: {
           token: json.input.token,
@@ -171,7 +510,7 @@ export class HybridOrderClass {
   }
 
   hash(): string {
-    return hashHybridOrder(this.order);
+    return hashHybridOrder(this.info);
   }
 
   serialize(): string {
@@ -179,94 +518,41 @@ export class HybridOrderClass {
     const orderData = abiCoder.encode(HYBRID_ORDER_ABI, [
       [
         [
-          this.order.info.reactor,
-          this.order.info.swapper,
-          this.order.info.nonce,
-          this.order.info.deadline,
-          this.order.info.preExecutionHook,
-          this.order.info.preExecutionHookData,
-          this.order.info.postExecutionHook,
-          this.order.info.postExecutionHookData,
-          this.order.info.auctionResolver,
+          this.info.reactor,
+          this.info.swapper,
+          this.info.nonce,
+          this.info.deadline,
+          this.info.preExecutionHook,
+          this.info.preExecutionHookData,
+          this.info.postExecutionHook,
+          this.info.postExecutionHookData,
+          this.info.auctionResolver,
         ],
-        this.order.cosigner,
-        [this.order.input.token, this.order.input.maxAmount],
-        this.order.outputs.map((output) => [
+        this.info.cosigner,
+        [this.info.input.token, this.info.input.maxAmount],
+        this.info.outputs.map((output) => [
           output.token,
           output.minAmount,
           output.recipient,
         ]),
-        this.order.auctionStartBlock,
-        this.order.baselinePriorityFeeWei,
-        this.order.scalingFactor,
-        this.order.priceCurve,
+        this.info.auctionStartBlock,
+        this.info.baselinePriorityFeeWei,
+        this.info.scalingFactor,
+        this.info.priceCurve,
         [
-          this.order.cosignerData.auctionTargetBlock,
-          this.order.cosignerData.supplementalPriceCurve,
+          this.info.cosignerData.auctionTargetBlock,
+          this.info.cosignerData.supplementalPriceCurve,
         ],
-        this.order.cosignature,
+        this.info.cosignature,
       ],
     ]);
     return abiCoder.encode(["address", "bytes"], [this.resolver, orderData]);
   }
 
-  permitData(): PermitTransferFromData {
-    return SignatureTransfer.getPermitData(
-      this.toPermit(),
-      this.permit2Address,
-      this.chainId,
-      this.witness()
-    ) as PermitTransferFromData;
-  }
-
-  getSigner(signature: SignatureLike): string {
-    return ethers.utils.computeAddress(
-      ethers.utils.recoverPublicKey(
-        SignatureTransfer.hash(
-          this.toPermit(),
-          this.permit2Address,
-          this.chainId,
-          this.witness()
-        ),
-        signature
-      )
-    );
-  }
-
-  private toPermit(): PermitTransferFrom {
-    return {
-      permitted: {
-        token: this.order.input.token,
-        amount: this.order.input.maxAmount,
-      },
-      spender: this.order.info.preExecutionHook,
-      nonce: this.order.info.nonce,
-      deadline: this.order.info.deadline,
-    };
-  }
-
-  private witness(): Witness {
-    return {
-      witness: {
-        info: this.order.info,
-        cosigner: this.order.cosigner,
-        input: this.order.input,
-        outputs: this.order.outputs,
-        auctionStartBlock: this.order.auctionStartBlock,
-        baselinePriorityFee: this.order.baselinePriorityFeeWei,
-        scalingFactor: this.order.scalingFactor,
-        priceCurve: this.order.priceCurve,
-      },
-      witnessTypeName: "HybridOrder",
-      witnessType: HYBRID_ORDER_TYPES,
-    };
-  }
-
   get blockOverrides(): BlockOverridesV4 {
-    const block =
-      !this.order.cosignerData.auctionTargetBlock.isZero()
-        ? this.order.cosignerData.auctionTargetBlock
-        : this.order.auctionStartBlock;
+    const block = !this.info.cosignerData.auctionTargetBlock.isZero()
+      ? this.info.cosignerData.auctionTargetBlock
+      : this.info.auctionStartBlock;
 
     if (block.isZero()) {
       return undefined;
@@ -278,28 +564,28 @@ export class HybridOrderClass {
   }
 
   resolve(options: HybridOrderResolutionOptions): ResolvedUniswapXOrder {
-    let auctionTargetBlock = this.order.auctionStartBlock;
-    let effectivePriceCurve = this.order.priceCurve.map((value) =>
+    let auctionTargetBlock = this.info.auctionStartBlock;
+    let effectivePriceCurve = this.info.priceCurve.map((value) =>
       BigNumber.from(value)
     );
 
-    if (this.order.cosigner !== ZERO_ADDRESS) {
+    if (this.info.cosigner !== ZERO_ADDRESS) {
       const recovered = this.recoverCosigner();
       if (
         ethers.utils.getAddress(recovered) !==
-        ethers.utils.getAddress(this.order.cosigner)
+        ethers.utils.getAddress(this.info.cosigner)
       ) {
         throw new HybridOrderCosignatureError("Invalid cosignature");
       }
 
-      if (!this.order.cosignerData.auctionTargetBlock.isZero()) {
-        auctionTargetBlock = this.order.cosignerData.auctionTargetBlock;
+      if (!this.info.cosignerData.auctionTargetBlock.isZero()) {
+        auctionTargetBlock = this.info.cosignerData.auctionTargetBlock;
       }
 
-      if (this.order.cosignerData.supplementalPriceCurve.length > 0) {
+      if (this.info.cosignerData.supplementalPriceCurve.length > 0) {
         effectivePriceCurve = applySupplementalPriceCurve(
           effectivePriceCurve,
-          this.order.cosignerData.supplementalPriceCurve
+          this.info.cosignerData.supplementalPriceCurve
         );
       }
     }
@@ -312,53 +598,54 @@ export class HybridOrderClass {
     }
 
     const currentScalingFactor = deriveCurrentScalingFactor(
-      this.order,
+      this.info,
       effectivePriceCurve,
       auctionTargetBlock,
       options.currentBlock
     );
 
-    const priorityFeeAboveBaseline =
-      options.priorityFeeWei.gt(this.order.baselinePriorityFeeWei)
-        ? options.priorityFeeWei.sub(this.order.baselinePriorityFeeWei)
-        : BigNumber.from(0);
+    const priorityFeeAboveBaseline = options.priorityFeeWei.gt(
+      this.info.baselinePriorityFeeWei
+    )
+      ? options.priorityFeeWei.sub(this.info.baselinePriorityFeeWei)
+      : BigNumber.from(0);
 
     const useExactIn =
-      this.order.scalingFactor.gt(BASE_SCALING_FACTOR) ||
-      (this.order.scalingFactor.eq(BASE_SCALING_FACTOR) &&
+      this.info.scalingFactor.gt(BASE_SCALING_FACTOR) ||
+      (this.info.scalingFactor.eq(BASE_SCALING_FACTOR) &&
         currentScalingFactor.gte(BASE_SCALING_FACTOR));
 
     if (useExactIn) {
       const scalingMultiplier = currentScalingFactor.add(
-        this.order.scalingFactor.sub(BASE_SCALING_FACTOR).mul(
-          priorityFeeAboveBaseline
-        )
+        this.info.scalingFactor
+          .sub(BASE_SCALING_FACTOR)
+          .mul(priorityFeeAboveBaseline)
       );
       return {
         input: {
-          token: this.order.input.token,
-          amount: this.order.input.maxAmount,
+          token: this.info.input.token,
+          amount: this.info.input.maxAmount,
         },
-        outputs: scaleOutputs(this.order.outputs, scalingMultiplier),
+        outputs: scaleOutputs(this.info.outputs, scalingMultiplier),
       };
     }
 
     const scalingMultiplier = currentScalingFactor.sub(
-      BASE_SCALING_FACTOR.sub(this.order.scalingFactor).mul(
+      BASE_SCALING_FACTOR.sub(this.info.scalingFactor).mul(
         priorityFeeAboveBaseline
       )
     );
 
     return {
-      input: scaleInput(this.order.input, scalingMultiplier),
-      outputs: this.order.outputs.map((output) => ({
+      input: scaleInput(this.info.input, scalingMultiplier),
+      outputs: this.info.outputs.map((output) => ({
         token: output.token,
         amount: output.minAmount,
       })),
     };
   }
 
-  toJSON(): HybridOrderJSON & {
+  toJSON(): CosignedHybridOrderInfoJSON & {
     chainId: number;
     resolver: string;
     permit2Address: string;
@@ -367,47 +654,45 @@ export class HybridOrderClass {
       chainId: this.chainId,
       resolver: this.resolver,
       permit2Address: this.permit2Address,
-      info: {
-        reactor: this.order.info.reactor,
-        swapper: this.order.info.swapper,
-        nonce: this.order.info.nonce.toString(),
-        deadline: this.order.info.deadline,
-        preExecutionHook: this.order.info.preExecutionHook,
-        preExecutionHookData: this.order.info.preExecutionHookData,
-        postExecutionHook: this.order.info.postExecutionHook,
-        postExecutionHookData: this.order.info.postExecutionHookData,
-        auctionResolver: this.order.info.auctionResolver,
-      },
-      cosigner: this.order.cosigner,
+      reactor: this.info.reactor,
+      swapper: this.info.swapper,
+      nonce: this.info.nonce.toString(),
+      deadline: this.info.deadline,
+      preExecutionHook: this.info.preExecutionHook,
+      preExecutionHookData: this.info.preExecutionHookData,
+      postExecutionHook: this.info.postExecutionHook,
+      postExecutionHookData: this.info.postExecutionHookData,
+      auctionResolver: this.info.auctionResolver,
+      cosigner: this.info.cosigner,
       input: {
-        token: this.order.input.token,
-        maxAmount: this.order.input.maxAmount.toString(),
+        token: this.info.input.token,
+        maxAmount: this.info.input.maxAmount.toString(),
       },
-      outputs: this.order.outputs.map((output) => ({
+      outputs: this.info.outputs.map((output) => ({
         token: output.token,
         minAmount: output.minAmount.toString(),
         recipient: output.recipient,
       })),
-      auctionStartBlock: this.order.auctionStartBlock.toString(),
-      baselinePriorityFeeWei: this.order.baselinePriorityFeeWei.toString(),
-      scalingFactor: this.order.scalingFactor.toString(),
-      priceCurve: this.order.priceCurve.map((value) => value.toString()),
+      auctionStartBlock: this.info.auctionStartBlock.toString(),
+      baselinePriorityFeeWei: this.info.baselinePriorityFeeWei.toString(),
+      scalingFactor: this.info.scalingFactor.toString(),
+      priceCurve: this.info.priceCurve.map((value) => value.toString()),
       cosignerData: {
         auctionTargetBlock:
-          this.order.cosignerData.auctionTargetBlock.toString(),
+          this.info.cosignerData.auctionTargetBlock.toString(),
         supplementalPriceCurve:
-          this.order.cosignerData.supplementalPriceCurve.map((value) =>
+          this.info.cosignerData.supplementalPriceCurve.map((value) =>
             value.toString()
           ),
       },
-      cosignature: this.order.cosignature,
+      cosignature: this.info.cosignature,
     };
   }
 
   cosignatureHash(): string {
     return hashHybridCosignerData(
       this.hash(),
-      this.order.cosignerData,
+      this.info.cosignerData,
       this.chainId
     );
   }
@@ -415,10 +700,13 @@ export class HybridOrderClass {
   recoverCosigner(): string {
     return ethers.utils.recoverAddress(
       this.cosignatureHash(),
-      this.order.cosignature
+      this.info.cosignature
     );
   }
 }
+
+
+// Helper functions
 
 function applySupplementalPriceCurve(
   priceCurve: BigNumber[],
@@ -458,16 +746,14 @@ function applySupplementalPriceCurve(
 }
 
 function deriveCurrentScalingFactor(
-  order: HybridOrder,
+  order: UnsignedHybridOrderInfo | CosignedHybridOrderInfo,
   priceCurve: BigNumber[],
   targetBlock: BigNumber,
   fillBlock: BigNumber
 ): BigNumber {
   if (targetBlock.isZero()) {
     if (priceCurve.length !== 0) {
-      throw new HybridOrderPriceCurveError(
-        "Invalid target block designation"
-      );
+      throw new HybridOrderPriceCurveError("Invalid target block designation");
     }
     return BASE_SCALING_FACTOR;
   }
@@ -518,9 +804,7 @@ function getCalculatedScalingFactor(
     const segmentEnd = blocksCounted + duration;
     if (blocksPassed < segmentEnd) {
       if (previousDuration === 0 && lastZeroDurationScaling) {
-        if (
-          !sharesScalingDirection(lastZeroDurationScaling, scalingFactor)
-        ) {
+        if (!sharesScalingDirection(lastZeroDurationScaling, scalingFactor)) {
           throw new HybridOrderPriceCurveError(
             "Zero duration scaling mismatch"
           );
@@ -607,7 +891,7 @@ function locateCurrentAmount(
 }
 
 function scaleOutputs(
-  outputs: HybridOrder["outputs"],
+  outputs: CosignedHybridOrderInfo["outputs"],
   scalingMultiplier: BigNumber
 ): TokenAmount[] {
   return outputs.map((output) => ({
@@ -617,7 +901,7 @@ function scaleOutputs(
 }
 
 function scaleInput(
-  input: HybridOrder["input"],
+  input: CosignedHybridOrderInfo["input"],
   scalingMultiplier: BigNumber
 ): TokenAmount {
   return {
@@ -664,4 +948,3 @@ function sharesScalingDirection(a: BigNumber, b: BigNumber): boolean {
   }
   return a.gt(BASE_SCALING_FACTOR) === b.gt(BASE_SCALING_FACTOR);
 }
-

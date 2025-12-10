@@ -3,7 +3,10 @@ import { CosignedPriorityOrder, UnsignedPriorityOrder } from "./PriorityOrder";
 import { RelayOrder } from "./RelayOrder";
 import { CosignedV2DutchOrder, UnsignedV2DutchOrder } from "./V2DutchOrder";
 import { CosignedV3DutchOrder, UnsignedV3DutchOrder } from "./V3DutchOrder";
-import { HybridOrderClass } from "./v4/HybridOrder";
+import {
+  CosignedHybridOrder,
+  UnsignedHybridOrder,
+} from "./v4/HybridOrder";
 
 export * from "./DutchOrder";
 export * from "./PriorityOrder";
@@ -17,8 +20,14 @@ export type {
   HybridInput,
   HybridOutput,
   HybridCosignerData,
-  HybridOrder,
-  HybridOrderJSON,
+  UnsignedHybridOrderInfo,
+  CosignedHybridOrderInfo,
+  UnsignedHybridOrderInfoJSON,
+  CosignedHybridOrderInfoJSON,
+  HybridCosignerDataJSON,
+  OrderInfoV4JSON,
+  HybridInputJSON,
+  HybridOutputJSON,
   InputToken,
   OutputToken,
   ResolvedOrder,
@@ -44,6 +53,7 @@ export type UniswapXOrder =
   | CosignedV3DutchOrder
   | UnsignedPriorityOrder
   | CosignedPriorityOrder
-  | HybridOrderClass;
+  | UnsignedHybridOrder
+  | CosignedHybridOrder;
 
 export type Order = UniswapXOrder | RelayOrder;

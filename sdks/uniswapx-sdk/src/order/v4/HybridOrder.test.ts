@@ -1,8 +1,8 @@
 import { BigNumber, ethers, Wallet } from "ethers";
 
-import { HybridOrderClass, OrderResolutionError } from "./HybridOrder";
+import { CosignedHybridOrder, OrderResolutionError } from "./HybridOrder";
 import { hashHybridCosignerData, hashHybridOrder } from "./hashing";
-import { HybridOrder, HybridOrderJSON } from "./types";
+import { CosignedHybridOrderInfo, CosignedHybridOrderInfoJSON } from "./types";
 
 const ZERO_ADDRESS = ethers.constants.AddressZero;
 const RESOLVER = "0x0000000000000000000000000000000000000210";
@@ -35,7 +35,7 @@ const HYBRID_ORDER_ABI = [
     ")",
 ];
 
-describe("HybridOrderClass", () => {
+describe("CosignedHybridOrder", () => {
   const chainId = 1;
 
   function packPriceCurveElement(
@@ -45,24 +45,22 @@ describe("HybridOrderClass", () => {
     return BigNumber.from(duration).shl(240).or(scalingFactor);
   }
 
-  function buildOrder(overrides: Partial<HybridOrder> = {}): HybridOrder {
+  function buildOrder(overrides: Partial<CosignedHybridOrderInfo> = {}): CosignedHybridOrderInfo {
     const basePriceCurve = [
       packPriceCurveElement(0, WAD),
       packPriceCurveElement(5, WAD.add(BigNumber.from("50000000000000000"))),
     ];
 
-    const baseOrder: HybridOrder = {
-      info: {
-        reactor: REACTOR,
-        swapper: SWAPPER,
-        nonce: BigNumber.from(1),
-        deadline: Math.floor(Date.now() / 1000 + 3600),
-        preExecutionHook: PRE_HOOK,
-        preExecutionHookData: "0x1234",
-        postExecutionHook: POST_HOOK,
-        postExecutionHookData: "0x",
-        auctionResolver: RESOLVER,
-      },
+    const baseOrder: CosignedHybridOrderInfo = {
+      reactor: REACTOR,
+      swapper: SWAPPER,
+      nonce: BigNumber.from(1),
+      deadline: Math.floor(Date.now() / 1000 + 3600),
+      preExecutionHook: PRE_HOOK,
+      preExecutionHookData: "0x1234",
+      postExecutionHook: POST_HOOK,
+      postExecutionHookData: "0x",
+      auctionResolver: RESOLVER,
       cosigner: COSIGNER.address,
       input: {
         token: INPUT_TOKEN,
@@ -86,14 +84,10 @@ describe("HybridOrderClass", () => {
       cosignature: "0x",
     };
 
-    const merged: HybridOrder = {
+    const merged: CosignedHybridOrderInfo = {
       ...baseOrder,
       ...overrides,
-      info: {
-        ...baseOrder.info,
-        ...(overrides.info ?? {}),
-        nonce: BigNumber.from(overrides.info?.nonce ?? baseOrder.info.nonce),
-      },
+      nonce: BigNumber.from(overrides.nonce ?? baseOrder.nonce),
       input: {
         ...baseOrder.input,
         ...(overrides.input ?? {}),
@@ -114,7 +108,7 @@ describe("HybridOrderClass", () => {
       scalingFactor: BigNumber.from(
         overrides.scalingFactor ?? baseOrder.scalingFactor
       ),
-      priceCurve: (overrides.priceCurve ?? baseOrder.priceCurve).map((value) =>
+      priceCurve: (overrides.priceCurve ?? baseOrder.priceCurve).map((value: BigNumber) =>
         BigNumber.from(value)
       ),
       cosignerData: {
@@ -125,7 +119,7 @@ describe("HybridOrderClass", () => {
         supplementalPriceCurve: (
           overrides.cosignerData?.supplementalPriceCurve ??
           baseOrder.cosignerData.supplementalPriceCurve
-        ).map((value) => BigNumber.from(value)),
+        ).map((value: BigNumber) => BigNumber.from(value)),
       },
       cosignature: overrides.cosignature ?? "0x",
     };
@@ -146,7 +140,7 @@ describe("HybridOrderClass", () => {
     return merged;
   }
 
-  function signCosignerDigest(order: HybridOrder): string {
+  function signCosignerDigest(order: CosignedHybridOrderInfo): string {
     const digest = hashHybridCosignerData(
       hashHybridOrder({
         ...order,
@@ -162,13 +156,13 @@ describe("HybridOrderClass", () => {
 
   it("hashes HybridOrder via helper", () => {
     const order = buildOrder();
-    const hybrid = new HybridOrderClass(order, chainId, RESOLVER);
+    const hybrid = new CosignedHybridOrder(order, chainId, RESOLVER);
     expect(hybrid.hash()).toEqual(hashHybridOrder(order));
   });
 
   it("serializes to resolver-prefixed bytes", () => {
     const order = buildOrder();
-    const hybrid = new HybridOrderClass(order, chainId, RESOLVER);
+    const hybrid = new CosignedHybridOrder(order, chainId, RESOLVER);
     const serialized = hybrid.serialize();
 
     const abiCoder = new ethers.utils.AbiCoder();
@@ -181,15 +175,15 @@ describe("HybridOrderClass", () => {
     const manualEncoding = abiCoder.encode(HYBRID_ORDER_ABI, [
       [
         [
-          order.info.reactor,
-          order.info.swapper,
-          order.info.nonce,
-          order.info.deadline,
-          order.info.preExecutionHook,
-          order.info.preExecutionHookData,
-          order.info.postExecutionHook,
-          order.info.postExecutionHookData,
-          order.info.auctionResolver,
+          order.reactor,
+          order.swapper,
+          order.nonce,
+          order.deadline,
+          order.preExecutionHook,
+          order.preExecutionHookData,
+          order.postExecutionHook,
+          order.postExecutionHookData,
+          order.auctionResolver,
         ],
         order.cosigner,
         [order.input.token, order.input.maxAmount],
@@ -215,21 +209,21 @@ describe("HybridOrderClass", () => {
 
   it("round-trips via JSON serialization", () => {
     const order = buildOrder();
-    const hybrid = new HybridOrderClass(order, chainId, RESOLVER);
+    const hybrid = new CosignedHybridOrder(order, chainId, RESOLVER);
     const json = hybrid.toJSON();
-    const revived = HybridOrderClass.fromJSON(
-      json as HybridOrderJSON,
+    const revived = CosignedHybridOrder.fromJSON(
+      json as CosignedHybridOrderInfoJSON,
       chainId,
       RESOLVER
     );
-    expect(revived.order).toEqual(order);
+    expect(revived.info).toEqual(order);
     expect(json.chainId).toEqual(chainId);
     expect(json.resolver).toEqual(RESOLVER);
   });
 
   it("computes cosigner digest and recovers signer", () => {
     const order = buildOrder();
-    const hybrid = new HybridOrderClass(order, chainId, RESOLVER);
+    const hybrid = new CosignedHybridOrder(order, chainId, RESOLVER);
     const digest = hashHybridCosignerData(
       hashHybridOrder(order),
       order.cosignerData,
@@ -248,7 +242,7 @@ describe("HybridOrderClass", () => {
         supplementalPriceCurve: [],
       },
     });
-    const hybrid = new HybridOrderClass(order, chainId, RESOLVER);
+    const hybrid = new CosignedHybridOrder(order, chainId, RESOLVER);
     expect(hybrid.blockOverrides).toEqual({
       number: ethers.utils.hexStripZeros(order.auctionStartBlock.toHexString()),
     });
@@ -261,7 +255,7 @@ describe("HybridOrderClass", () => {
         supplementalPriceCurve: [],
       },
     });
-    const hybrid = new HybridOrderClass(order, chainId, RESOLVER);
+    const hybrid = new CosignedHybridOrder(order, chainId, RESOLVER);
     expect(hybrid.blockOverrides).toEqual({
       number: ethers.utils.hexStripZeros(
         order.cosignerData.auctionTargetBlock.toHexString()
@@ -271,9 +265,9 @@ describe("HybridOrderClass", () => {
 
   it("exposes Permit2 data pointing to TokenTransferHook", () => {
     const order = buildOrder();
-    const hybrid = new HybridOrderClass(order, chainId, RESOLVER);
+    const hybrid = new CosignedHybridOrder(order, chainId, RESOLVER);
     const permit = hybrid.permitData();
-    expect(permit.values.spender).toEqual(order.info.preExecutionHook);
+    expect(permit.values.spender).toEqual(order.preExecutionHook);
     expect(permit.values.permitted.amount).toEqual(order.input.maxAmount);
   });
 
@@ -287,7 +281,7 @@ describe("HybridOrderClass", () => {
       auctionStartBlock: BigNumber.from(0),
       scalingFactor: WAD.add(5),
     });
-    const hybrid = new HybridOrderClass(order, chainId, RESOLVER);
+    const hybrid = new CosignedHybridOrder(order, chainId, RESOLVER);
     const result = hybrid.resolve({
       currentBlock: BigNumber.from(10),
       priorityFeeWei: order.baselinePriorityFeeWei.add(1),
@@ -312,7 +306,7 @@ describe("HybridOrderClass", () => {
       auctionStartBlock: BigNumber.from(0),
       scalingFactor: WAD.sub(5),
     });
-    const hybrid = new HybridOrderClass(order, chainId, RESOLVER);
+    const hybrid = new CosignedHybridOrder(order, chainId, RESOLVER);
     const result = hybrid.resolve({
       currentBlock: BigNumber.from(10),
       priorityFeeWei: order.baselinePriorityFeeWei.add(1),
@@ -331,7 +325,7 @@ describe("HybridOrderClass", () => {
         supplementalPriceCurve: [],
       },
     });
-    const hybrid = new HybridOrderClass(order, chainId, RESOLVER);
+    const hybrid = new CosignedHybridOrder(order, chainId, RESOLVER);
     expect(() =>
       hybrid.resolve({
         currentBlock: BigNumber.from(400),

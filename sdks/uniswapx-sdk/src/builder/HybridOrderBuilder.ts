@@ -2,59 +2,62 @@ import { BigNumber, constants } from "ethers";
 import invariant from "tiny-invariant";
 
 import { BASE_SCALING_FACTOR } from "../constants/v4";
-import { HybridOrderClass } from "../order/v4/HybridOrder";
 import {
+  CosignedHybridOrder,
+  UnsignedHybridOrder,
+} from "../order/v4/HybridOrder";
+import {
+  CosignedHybridOrderInfo,
   HybridCosignerData,
   HybridInput,
-  HybridOrder,
   HybridOutput,
   OrderInfoV4,
+  UnsignedHybridOrderInfo,
 } from "../order/v4/types";
 
 const ZERO_ADDRESS = constants.AddressZero;
 
 export class HybridOrderBuilder {
   static fromOrder(
-    order: HybridOrderClass,
+    order: UnsignedHybridOrder | CosignedHybridOrder,
     resolver?: string
   ): HybridOrderBuilder {
     const builder = new HybridOrderBuilder(
       order.chainId,
-      order.order.info.reactor,
+      order.info.reactor,
       resolver || order.resolver,
       order.permit2Address
     );
 
     builder
-      .cosigner(order.order.cosigner)
-      .input(order.order.input)
-      .deadline(order.order.info.deadline)
-      .nonce(order.order.info.nonce)
-      .swapper(order.order.info.swapper)
-      .auctionStartBlock(order.order.auctionStartBlock)
-      .baselinePriorityFeeWei(order.order.baselinePriorityFeeWei)
-      .scalingFactor(order.order.scalingFactor)
-      .priceCurve(order.order.priceCurve)
-      .preExecutionHook(
-        order.order.info.preExecutionHook,
-        order.order.info.preExecutionHookData
-      )
+      .cosigner(order.info.cosigner)
+      .input(order.info.input)
+      .deadline(order.info.deadline)
+      .nonce(order.info.nonce)
+      .swapper(order.info.swapper)
+      .auctionStartBlock(order.info.auctionStartBlock)
+      .baselinePriorityFeeWei(order.info.baselinePriorityFeeWei)
+      .scalingFactor(order.info.scalingFactor)
+      .priceCurve(order.info.priceCurve)
+      .preExecutionHook(order.info.preExecutionHook, order.info.preExecutionHookData)
       .postExecutionHook(
-        order.order.info.postExecutionHook,
-        order.order.info.postExecutionHookData
+        order.info.postExecutionHook,
+        order.info.postExecutionHookData
       )
-      .auctionResolver(order.order.info.auctionResolver);
+      .auctionResolver(order.info.auctionResolver);
 
-    order.order.outputs.forEach((output) => {
+    order.info.outputs.forEach((output) => {
       builder.output(output);
     });
 
-    // Copy cosigner data
-    builder.cosignerData(order.order.cosignerData);
+    // Copy cosigner data and signature if it's a cosigned order
+    if ("cosignerData" in order.info && "cosignature" in order.info) {
+      const cosignedInfo = order.info as CosignedHybridOrderInfo;
+      builder.cosignerData(cosignedInfo.cosignerData);
 
-    // Copy cosignature if it exists and is not empty
-    if (order.order.cosignature && order.order.cosignature !== "0x") {
-      builder.cosignature(order.order.cosignature);
+      if (cosignedInfo.cosignature && cosignedInfo.cosignature !== "0x") {
+        builder.cosignature(cosignedInfo.cosignature);
+      }
     }
 
     return builder;
@@ -328,11 +331,11 @@ export class HybridOrderBuilder {
     );
   }
 
-  buildPartial(): HybridOrderClass {
+  buildPartial(): UnsignedHybridOrder {
     this.checkUnsignedInvariants();
 
-    const order: HybridOrder = {
-      info: this.info as OrderInfoV4,
+    const orderInfo: UnsignedHybridOrderInfo = {
+      ...(this.info as OrderInfoV4),
       cosigner: this.orderData.cosigner || ZERO_ADDRESS,
       input: this.orderData.input!,
       outputs: this.orderData.outputs,
@@ -340,27 +343,22 @@ export class HybridOrderBuilder {
       baselinePriorityFeeWei: this.orderData.baselinePriorityFeeWei!,
       scalingFactor: this.orderData.scalingFactor!,
       priceCurve: this.orderData.priceCurve!,
-      cosignerData: this.orderData.cosignerData || {
-        auctionTargetBlock: BigNumber.from(0),
-        supplementalPriceCurve: [],
-      },
-      cosignature: this.orderData.cosignature || "0x",
     };
 
-    return new HybridOrderClass(
-      order,
+    return new UnsignedHybridOrder(
+      orderInfo,
       this.chainId,
       this.resolver,
       this.permit2Address
     );
   }
 
-  build(): HybridOrderClass {
+  build(): CosignedHybridOrder {
     this.checkUnsignedInvariants();
     this.checkCosignedInvariants();
 
-    const order: HybridOrder = {
-      info: this.info as OrderInfoV4,
+    const orderInfo: CosignedHybridOrderInfo = {
+      ...(this.info as OrderInfoV4),
       cosigner: this.orderData.cosigner!,
       input: this.orderData.input!,
       outputs: this.orderData.outputs,
@@ -372,8 +370,8 @@ export class HybridOrderBuilder {
       cosignature: this.orderData.cosignature!,
     };
 
-    return new HybridOrderClass(
-      order,
+    return new CosignedHybridOrder(
+      orderInfo,
       this.chainId,
       this.resolver,
       this.permit2Address

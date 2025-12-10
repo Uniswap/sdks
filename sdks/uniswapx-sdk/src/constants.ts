@@ -61,6 +61,7 @@ export enum OrderType {
   Dutch_V3 = "Dutch_V3",
   Limit = "Limit",
   Priority = "Priority",
+  Hybrid = "Hybrid",
 }
 
 type Reactors = Partial<{
@@ -187,3 +188,27 @@ export const PERMISSIONED_TOKENS: PermissionedToken[] = [
     interface: PermissionedTokenInterface.ISuperstateTokenV4,
   },
 ]
+
+/**
+ * V4 Resolver address mapping for resolver-based order type detection
+ * Maps chainId to resolver contract addresses
+ */
+type ResolverMapping = { readonly [chainId: number]: string };
+
+export const HYBRID_RESOLVER_ADDRESS_MAPPING: ResolverMapping = {
+  // Placeholder addresses - will be updated when resolvers are deployed
+  1: "0x0000000000000000000000000000000000000000",
+  8453: "0x0000000000000000000000000000000000000000",
+  130: "0x0000000000000000000000000000000000000000",
+};
+
+type ReverseResolverMapping = {
+  [address: string]: { orderType: OrderType };
+};
+
+export const REVERSE_RESOLVER_MAPPING: ReverseResolverMapping = Object.entries(
+  HYBRID_RESOLVER_ADDRESS_MAPPING
+).reduce((acc: ReverseResolverMapping, [, resolverAddress]) => {
+  acc[resolverAddress.toLowerCase()] = { orderType: OrderType.Hybrid };
+  return acc;
+}, {});

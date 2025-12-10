@@ -1,8 +1,8 @@
 import { Currency, CurrencyAmount, Price, TradeType } from "@uniswap/sdk-core";
 import { BigNumber } from "ethers";
 
-import { HybridOrderClass } from "../order/v4/HybridOrder";
-import { HybridOrder, HybridOutput } from "../order/v4/types";
+import { CosignedHybridOrder } from "../order/v4/HybridOrder";
+import { CosignedHybridOrderInfo, HybridOutput } from "../order/v4/types";
 
 import { areCurrenciesEqual } from "./utils";
 
@@ -14,7 +14,7 @@ export class HybridOrderTrade<
   TTradeType extends TradeType
 > {
   public readonly tradeType: TTradeType;
-  public readonly orderClass: HybridOrderClass;
+  public readonly order: CosignedHybridOrder;
   public readonly expectedAmounts:
     | {
         expectedAmountIn: string;
@@ -31,7 +31,7 @@ export class HybridOrderTrade<
   public constructor({
     currencyIn,
     currenciesOut,
-    order,
+    orderInfo,
     chainId,
     resolver,
     permit2Address,
@@ -40,7 +40,7 @@ export class HybridOrderTrade<
   }: {
     currencyIn: TInput;
     currenciesOut: TOutput[];
-    order: HybridOrder;
+    orderInfo: CosignedHybridOrderInfo;
     chainId: number;
     resolver: string;
     permit2Address?: string;
@@ -55,16 +55,12 @@ export class HybridOrderTrade<
     this.tradeType = tradeType;
     this.expectedAmounts = expectedAmounts;
 
-    this.orderClass = new HybridOrderClass(
-      order,
+    this.order = new CosignedHybridOrder(
+      orderInfo,
       chainId,
       resolver,
       permit2Address
     );
-  }
-
-  public get order(): HybridOrder {
-    return this.orderClass.order;
   }
 
   public get inputAmount(): CurrencyAmount<TInput> {
@@ -74,7 +70,7 @@ export class HybridOrderTrade<
       ? this.getExpectedAmountIn()
       : CurrencyAmount.fromRawAmount(
           this._currencyIn,
-          this.order.input.maxAmount.toString()
+          this.order.info.input.maxAmount.toString()
         );
     this._inputAmount = amount;
     return amount;
@@ -83,7 +79,7 @@ export class HybridOrderTrade<
   public get outputAmounts(): CurrencyAmount<TOutput>[] {
     if (this._outputAmounts) return this._outputAmounts;
 
-    const amounts = this.order.outputs.map((output: HybridOutput) => {
+    const amounts = this.order.info.outputs.map((output: HybridOutput) => {
       const currencyOut = this._currenciesOut.find((currency) =>
         areCurrenciesEqual(currency, output.token, currency.chainId)
       );
@@ -114,7 +110,7 @@ export class HybridOrderTrade<
    * For exact-out orders: minimum amount out is the fixed output amount
    */
   public minimumAmountOut(): CurrencyAmount<TOutput> {
-    const firstOutput = this.order.outputs[0];
+    const firstOutput = this.order.info.outputs[0];
     return CurrencyAmount.fromRawAmount(
       this.outputAmount.currency,
       firstOutput.minAmount.toString()
@@ -128,7 +124,7 @@ export class HybridOrderTrade<
   public maximumAmountIn(): CurrencyAmount<TInput> {
     return CurrencyAmount.fromRawAmount(
       this._currencyIn,
-      this.order.input.maxAmount.toString()
+      this.order.info.input.maxAmount.toString()
     );
   }
 
@@ -167,8 +163,8 @@ export class HybridOrderTrade<
    */
   public isExactIn(): boolean {
     return (
-      this.order.scalingFactor.gt(BASE_SCALING_FACTOR) ||
-      this.order.scalingFactor.eq(BASE_SCALING_FACTOR)
+      this.order.info.scalingFactor.gt(BASE_SCALING_FACTOR) ||
+      this.order.info.scalingFactor.eq(BASE_SCALING_FACTOR)
     );
   }
 
@@ -176,7 +172,7 @@ export class HybridOrderTrade<
    * Determine if this is an exact-out order based on the scalingFactor
    */
   public isExactOut(): boolean {
-    return this.order.scalingFactor.lt(BASE_SCALING_FACTOR);
+    return this.order.info.scalingFactor.lt(BASE_SCALING_FACTOR);
   }
 
   private getExpectedAmountIn(): CurrencyAmount<TInput> {

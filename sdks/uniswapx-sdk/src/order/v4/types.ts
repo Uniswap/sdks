@@ -85,10 +85,18 @@ export type HybridCosignerData = {
 };
 
 /**
- * Hybrid auction order
+ * JSON serialization format for HybridCosignerData
  */
-export type HybridOrder = {
-  info: OrderInfoV4;
+export type HybridCosignerDataJSON = {
+  auctionTargetBlock: string;
+  supplementalPriceCurve: string[];
+};
+
+/**
+ * Unsigned hybrid order info (base fields without cosigner data or signature)
+ * Extends OrderInfoV4 to maintain SDK pattern compatibility
+ */
+export type UnsignedHybridOrderInfo = OrderInfoV4 & {
   cosigner: string;
   input: HybridInput;
   outputs: HybridOutput[];
@@ -96,43 +104,62 @@ export type HybridOrder = {
   baselinePriorityFeeWei: BigNumber;
   scalingFactor: BigNumber;
   priceCurve: BigNumber[];
+};
+
+/**
+ * Cosigned hybrid order info (includes cosigner data and signature)
+ */
+export type CosignedHybridOrderInfo = UnsignedHybridOrderInfo & {
   cosignerData: HybridCosignerData;
   cosignature: string;
 };
 
 /**
- * JSON serialization format for HybridOrder
+ * JSON serialization format for OrderInfoV4
  */
-export type HybridOrderJSON = Omit<
-  HybridOrder,
-  | "info"
-  | "input"
-  | "outputs"
-  | "auctionStartBlock"
-  | "baselinePriorityFeeWei"
-  | "scalingFactor"
-  | "priceCurve"
-  | "cosignerData"
+export type OrderInfoV4JSON = Omit<OrderInfoV4, "nonce"> & { nonce: string };
+
+/**
+ * JSON serialization format for HybridInput
+ */
+export type HybridInputJSON = {
+  token: string;
+  maxAmount: string;
+};
+
+/**
+ * JSON serialization format for HybridOutput
+ */
+export type HybridOutputJSON = {
+  token: string;
+  minAmount: string;
+  recipient: string;
+};
+
+/**
+ * JSON serialization format for UnsignedHybridOrderInfo
+ */
+export type UnsignedHybridOrderInfoJSON = Omit<
+  UnsignedHybridOrderInfo,
+  "nonce" | "input" | "outputs" | "auctionStartBlock" | "baselinePriorityFeeWei" | "scalingFactor" | "priceCurve"
 > & {
-  info: Omit<OrderInfoV4, "nonce"> & { nonce: string };
+  nonce: string;
+  input: HybridInputJSON;
+  outputs: HybridOutputJSON[];
   auctionStartBlock: string;
   baselinePriorityFeeWei: string;
   scalingFactor: string;
   priceCurve: string[];
-  input: {
-    token: string;
-    maxAmount: string;
-  };
-  outputs: Array<{
-    token: string;
-    minAmount: string;
-    recipient: string;
-  }>;
-  cosignerData: {
-    auctionTargetBlock: string;
-    supplementalPriceCurve: string[];
-  };
 };
+
+/**
+ * JSON serialization format for CosignedHybridOrderInfo
+ */
+export type CosignedHybridOrderInfoJSON = UnsignedHybridOrderInfoJSON & {
+  cosignerData: HybridCosignerDataJSON;
+  cosignature: string;
+};
+
 
 /**
  * DCA Intent structure

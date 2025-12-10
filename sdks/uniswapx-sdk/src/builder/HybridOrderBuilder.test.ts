@@ -1,7 +1,7 @@
 import { BigNumber, constants } from "ethers";
 
 import { BASE_SCALING_FACTOR } from "../constants/v4";
-import { HybridOrderClass } from "../order/v4/HybridOrder";
+import { CosignedHybridOrder } from "../order/v4/HybridOrder";
 
 import { HybridOrderBuilder } from "./HybridOrderBuilder";
 
@@ -48,10 +48,10 @@ describe("HybridOrderBuilder", () => {
         .supplementalPriceCurve([])
         .build();
 
-      expect(order.order.info.reactor).toEqual(REACTOR_ADDRESS);
-      expect(order.order.info.swapper).toEqual(constants.AddressZero);
-      expect(order.order.outputs.length).toEqual(1);
-      expect(order.order.scalingFactor).toEqual(
+      expect(order.info.reactor).toEqual(REACTOR_ADDRESS);
+      expect(order.info.swapper).toEqual(constants.AddressZero);
+      expect(order.info.outputs.length).toEqual(1);
+      expect(order.info.scalingFactor).toEqual(
         BASE_SCALING_FACTOR.mul(101).div(100)
       );
     });
@@ -81,8 +81,8 @@ describe("HybridOrderBuilder", () => {
         .supplementalPriceCurve([])
         .build();
 
-      expect(order.order.outputs.length).toEqual(1);
-      expect(order.order.scalingFactor).toEqual(
+      expect(order.info.outputs.length).toEqual(1);
+      expect(order.info.scalingFactor).toEqual(
         BASE_SCALING_FACTOR.mul(99).div(100)
       );
     });
@@ -117,8 +117,8 @@ describe("HybridOrderBuilder", () => {
         .supplementalPriceCurve([])
         .build();
 
-      expect(order.order.outputs.length).toEqual(2);
-      expect(order.order.baselinePriorityFeeWei).toEqual(
+      expect(order.info.outputs.length).toEqual(2);
+      expect(order.info.baselinePriorityFeeWei).toEqual(
         BigNumber.from("1000000000")
       );
     });
@@ -154,8 +154,8 @@ describe("HybridOrderBuilder", () => {
         .supplementalPriceCurve([])
         .build();
 
-      expect(order.order.priceCurve.length).toEqual(1);
-      expect(order.order.priceCurve[0]).toEqual(priceCurveElement);
+      expect(order.info.priceCurve.length).toEqual(1);
+      expect(order.info.priceCurve[0]).toEqual(priceCurveElement);
     });
 
     it("Build a valid order with supplemental price curve", () => {
@@ -188,10 +188,10 @@ describe("HybridOrderBuilder", () => {
         .supplementalPriceCurve(supplemental)
         .build();
 
-      expect(order.order.cosignerData.supplementalPriceCurve).toEqual(
+      expect(order.info.cosignerData.supplementalPriceCurve).toEqual(
         supplemental
       );
-      expect(order.order.cosignerData.auctionTargetBlock).toEqual(
+      expect(order.info.cosignerData.auctionTargetBlock).toEqual(
         BigNumber.from(110)
       );
     });
@@ -227,11 +227,11 @@ describe("HybridOrderBuilder", () => {
         .supplementalPriceCurve([])
         .build();
 
-      expect(order.order.info.preExecutionHook).toEqual(hookAddress);
-      expect(order.order.info.preExecutionHookData).toEqual(hookData);
-      expect(order.order.info.postExecutionHook).toEqual(hookAddress);
-      expect(order.order.info.postExecutionHookData).toEqual(hookData);
-      expect(order.order.info.auctionResolver).toEqual(RESOLVER_ADDRESS);
+      expect(order.info.preExecutionHook).toEqual(hookAddress);
+      expect(order.info.preExecutionHookData).toEqual(hookData);
+      expect(order.info.postExecutionHook).toEqual(hookAddress);
+      expect(order.info.postExecutionHookData).toEqual(hookData);
+      expect(order.info.auctionResolver).toEqual(RESOLVER_ADDRESS);
     });
   });
 
@@ -267,7 +267,7 @@ describe("HybridOrderBuilder", () => {
         .supplementalPriceCurve([])
         .build();
 
-      expect(order.order.info.reactor).toEqual(REACTOR_ADDRESS);
+      expect(order.info.reactor).toEqual(REACTOR_ADDRESS);
     });
 
     it("Throw if swapper is not set", () => {
@@ -399,7 +399,7 @@ describe("HybridOrderBuilder", () => {
         .nonce(BigNumber.from(100))
         .buildPartial();
 
-      expect(order.order.cosigner).toEqual(constants.AddressZero);
+      expect(order.info.cosigner).toEqual(constants.AddressZero);
     });
 
     it("Throw if input is not set", () => {
@@ -608,8 +608,8 @@ describe("HybridOrderBuilder", () => {
         .nonce(BigNumber.from(100))
         .buildPartial();
 
-      expect(order.order.info.reactor).toEqual(REACTOR_ADDRESS);
-      expect(order.order.outputs.length).toEqual(1);
+      expect(order.info.reactor).toEqual(REACTOR_ADDRESS);
+      expect(order.info.outputs.length).toEqual(1);
       expect(order.chainId).toEqual(1);
     });
   });
@@ -679,10 +679,10 @@ describe("HybridOrderBuilder", () => {
       regeneratedBuilder.auctionStartBlock(200);
       const regeneratedOrder = regeneratedBuilder.build();
 
-      expect(regeneratedOrder.order.auctionStartBlock).toEqual(
+      expect(regeneratedOrder.info.auctionStartBlock).toEqual(
         BigNumber.from(200)
       );
-      expect(regeneratedOrder.order.info.swapper).toEqual(
+      expect(regeneratedOrder.info.swapper).toEqual(
         constants.AddressZero
       );
     });
@@ -715,7 +715,7 @@ describe("HybridOrderBuilder", () => {
         .build();
 
       const json = order.toJSON();
-      const orderFromJSON = HybridOrderClass.fromJSON(
+      const orderFromJSON = CosignedHybridOrder.fromJSON(
         json,
         json.chainId,
         json.resolver
@@ -760,11 +760,11 @@ describe("HybridOrderBuilder", () => {
         .supplementalPriceCurve([])
         .build();
 
-      expect(order.order.auctionStartBlock).toEqual(BigNumber.from(100));
-      expect(order.order.baselinePriorityFeeWei).toEqual(
+      expect(order.info.auctionStartBlock).toEqual(BigNumber.from(100));
+      expect(order.info.baselinePriorityFeeWei).toEqual(
         BigNumber.from(1000000000)
       );
-      expect(order.order.cosignerData.auctionTargetBlock).toEqual(
+      expect(order.info.cosignerData.auctionTargetBlock).toEqual(
         BigNumber.from(110)
       );
     });
@@ -803,7 +803,7 @@ describe("HybridOrderBuilder", () => {
         .supplementalPriceCurve([])
         .build();
 
-      expect(order.order.priceCurve.length).toEqual(2);
+      expect(order.info.priceCurve.length).toEqual(2);
     });
 
     it("Allows multi-segment price curve with all elements < 1e18", () => {
@@ -829,7 +829,7 @@ describe("HybridOrderBuilder", () => {
         .supplementalPriceCurve([])
         .build();
 
-      expect(order.order.priceCurve.length).toEqual(2);
+      expect(order.info.priceCurve.length).toEqual(2);
     });
 
     it("Allows neutral (1e18) element between elements on same side", () => {
@@ -856,7 +856,7 @@ describe("HybridOrderBuilder", () => {
         .supplementalPriceCurve([])
         .build();
 
-      expect(order.order.priceCurve.length).toEqual(3);
+      expect(order.info.priceCurve.length).toEqual(3);
     });
 
     it("Allows price curve starting with neutral (1e18) followed by > 1e18", () => {
@@ -882,7 +882,7 @@ describe("HybridOrderBuilder", () => {
         .supplementalPriceCurve([])
         .build();
 
-      expect(order.order.priceCurve.length).toEqual(2);
+      expect(order.info.priceCurve.length).toEqual(2);
     });
 
     it("Throws if price curve mixes directions (> 1e18 followed by < 1e18)", () => {
@@ -961,7 +961,7 @@ describe("HybridOrderBuilder", () => {
         .supplementalPriceCurve([])
         .build();
 
-      expect(order.order.priceCurve.length).toEqual(2);
+      expect(order.info.priceCurve.length).toEqual(2);
     });
   });
 
@@ -991,8 +991,8 @@ describe("HybridOrderBuilder", () => {
         .supplementalPriceCurve([])
         .build();
 
-      expect(order.order.auctionStartBlock).toEqual(BigNumber.from(0));
-      expect(order.order.baselinePriorityFeeWei).toEqual(BigNumber.from(0));
+      expect(order.info.auctionStartBlock).toEqual(BigNumber.from(0));
+      expect(order.info.baselinePriorityFeeWei).toEqual(BigNumber.from(0));
     });
 
     it("Build order with neutral scaling factor (1e18)", () => {
@@ -1020,7 +1020,7 @@ describe("HybridOrderBuilder", () => {
         .supplementalPriceCurve([])
         .build();
 
-      expect(order.order.scalingFactor).toEqual(BASE_SCALING_FACTOR);
+      expect(order.info.scalingFactor).toEqual(BASE_SCALING_FACTOR);
     });
 
     it("Build order with empty price curve", () => {
@@ -1048,8 +1048,8 @@ describe("HybridOrderBuilder", () => {
         .supplementalPriceCurve([])
         .build();
 
-      expect(order.order.priceCurve).toEqual([]);
-      expect(order.order.auctionStartBlock).toEqual(BigNumber.from(0));
+      expect(order.info.priceCurve).toEqual([]);
+      expect(order.info.auctionStartBlock).toEqual(BigNumber.from(0));
     });
 
     it("Build order with very high scaling factor for exact-in", () => {
@@ -1079,7 +1079,7 @@ describe("HybridOrderBuilder", () => {
         .supplementalPriceCurve([])
         .build();
 
-      expect(order.order.scalingFactor).toEqual(highScalingFactor);
+      expect(order.info.scalingFactor).toEqual(highScalingFactor);
     });
 
     it("Build order with very low scaling factor for exact-out", () => {
@@ -1109,7 +1109,7 @@ describe("HybridOrderBuilder", () => {
         .supplementalPriceCurve([])
         .build();
 
-      expect(order.order.scalingFactor).toEqual(lowScalingFactor);
+      expect(order.info.scalingFactor).toEqual(lowScalingFactor);
     });
   });
 });
