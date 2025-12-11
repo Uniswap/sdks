@@ -2,6 +2,9 @@ import { getFlashtestationEvent } from '../src/index';
 
 /**
  * Example: Check if a block contains a flashtestation transaction
+ * 
+ * Usage:
+ *   npx tsx examples/getFlashtestationEvent.ts
  *
  * This example demonstrates how to:
  * 1. Use the getFlashtestationEvent function to fetch flashtestation data from a block
