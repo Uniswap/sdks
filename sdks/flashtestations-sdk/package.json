@@ -13,6 +13,9 @@
   "main": "./dist/cjs/src/index.js",
   "module": "./dist/esm/src/index.js",
   "types": "./dist/types/src/index.d.ts",
+  "bin": {
+    "flashtestations": "./dist/cjs/src/cli/index.js"
+  },
   "files": [
     "dist"
   ],
@@ -77,6 +80,7 @@
     "trailingComma": "es5"
   },
   "dependencies": {
+    "commander": "^14.0.2",
     "viem": "^2.23.5"
   },
   "devDependencies": {
