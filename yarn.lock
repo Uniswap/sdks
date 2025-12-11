@@ -4832,7 +4832,7 @@ __metadata:
     typescript: "npm:typescript@^5.6.2"
     viem: ^2.23.5
   bin:
-    flashtestations: ./dist/cjs/src/cli/index.js
+    flashtestations-sdk: ./dist/cjs/src/cli/index.js
   languageName: unknown
   linkType: soft
 
