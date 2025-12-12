@@ -15,30 +15,22 @@ This SDK simplifies the verification process by providing a single function to c
 ### Quick Start (No Installation Needed)
 
 ```bash
-# print the latest flashtestation event data on Unichain Sepolia
+# print the latest flashtestation event data on Unichain Mainnet
 npx @uniswap/flashtestations-sdk get-event
 ```
 
 ### Installation
 
 ```bash
-npm install flashtestations-sdk
+npm install @uniswap/flashtestations-sdk
 # or
-yarn add flashtestations-sdk
-```
-
-
-### Quick Start (Using the CLI)
-
-```
-# print the latest flashtestation event data from Unichain Sepolia to stdout
-yarn flashtestations verify -w 0x05dcaf224f061f956e4c2df39220a3c17faba5552cf7228a0d571511c251fbfc --unichain-mainnet
+yarn add @uniswap/flashtestations-sdk
 ```
 
 ### Quick Start (Importing the SDK)
 
 ```typescript
-import { verifyFlashtestationInBlock } from 'flashtestations-sdk';
+import { verifyFlashtestationInBlock } from '@uniswap/flashtestations-sdk';
 
 async function main() {
   // Verify if the latest block on Unichain Mainnet was built by a specific TEE workload
@@ -193,7 +185,7 @@ The SDK provides custom error classes for specific failure scenarios.
 Thrown when RPC connection fails or network requests error out.
 
 ```typescript
-import { verifyFlashtestationInBlock, NetworkError } from 'flashtestations-sdk';
+import { verifyFlashtestationInBlock, NetworkError } from '@uniswap/flashtestations-sdk';
 
 try {
   const result = await verifyFlashtestationInBlock('0xabcd...', 'latest', {
@@ -214,7 +206,7 @@ try {
 Thrown when the specified block does not exist on the chain.
 
 ```typescript
-import { BlockNotFoundError } from 'flashtestations-sdk';
+import { BlockNotFoundError } from '@uniswap/flashtestations-sdk';
 
 try {
   const result = await verifyFlashtestationInBlock('0xabcd...', 999999999, {
@@ -233,7 +225,7 @@ try {
 Thrown when measurement registers are invalid (wrong format or length).
 
 ```typescript
-import { ValidationError } from 'flashtestations-sdk';
+import { ValidationError } from '@uniswap/flashtestations-sdk';
 
 try {
   const invalidRegisters = {
@@ -258,7 +250,7 @@ try {
 Thrown when trying to use an unsupported chain ID.
 
 ```typescript
-import { ChainNotSupportedError } from 'flashtestations-sdk';
+import { ChainNotSupportedError } from '@uniswap/flashtestations-sdk';
 
 try {
   const result = await verifyFlashtestationInBlock('0xabcd...', 'latest', {
@@ -286,17 +278,17 @@ try {
 The SDK includes a CLI for quick verification from the terminal. Run commands using `npx`:
 
 ```bash
-npx flashtestations <command> [options]
+npx . <command> [options]
 ```
 
 ### List Supported Chains
 
 ```bash
 # View all supported chains and their configuration
-npx flashtestations chains
+npx . chains
 
 # Output as JSON
-npx flashtestations chains --json
+npx . chains --json
 ```
 
 ### Verify a Block
@@ -304,22 +296,17 @@ npx flashtestations chains --json
 Verify if a block was built by an expected TEE workload:
 
 ```bash
-# Verify latest block on Unichain Sepolia (default) with a workload ID
-npx flashtestations verify --workload-id 0x306ab4fe782dde50a97584b6d4cad9375f7b5d02199c4c78821ad6622670c6b7
-
-# Verify a specific block number on Unichain Mainnet
-npx flashtestations verify -w 0x306ab4fe782dde50a97584b6d4cad9375f7b5d02199c4c78821ad6622670c6b7 \
-  --block 12345678 \
-  --unichain-mainnet
+# Verify latest block on Unichain Mainnet (default) with a workload ID
+npx . verify --workload-id 0x306ab4fe782dde50a97584b6d4cad9375f7b5d02199c4c78821ad6622670c6b7
 
 # Verify using measurement registers from a JSON file
-npx flashtestations verify --measurements ./measurements.json --block latest
+npx . verify --measurements ./example-measurements.json --block latest
 
 # Use a custom RPC URL
-npx flashtestations verify -w 0xabc123... --rpc-url https://my-rpc.example.com --chain-id 130
+npx . verify -w 0x05dcaf224f061f956e4c2df39220a3c17faba5552cf7228a0d571511c251fbfc --rpc-url https://my-rpc.example.com --chain-id 130
 
 # Output as JSON (useful for scripting)
-npx flashtestations verify -w 0xabc123... --json
+npx . verify -w 0x05dcaf224f061f956e4c2df39220a3c17faba5552cf7228a0d571511c251fbfc --json
 ```
 
 **Exit codes:**
@@ -333,13 +320,10 @@ Retrieve flashtestation transaction data from a block without verification:
 
 ```bash
 # Get event from the latest block on Unichain Sepolia
-npx flashtestations get-event
-
-# Get event from a specific block on Unichain Mainnet
-npx flashtestations get-event --block 12345678 --unichain-mainnet
+npx . get-event
 
 # Output as JSON
-npx flashtestations get-event --block latest --json
+npx . get-event --block latest --json
 ```
 
 ### Compute Workload ID
@@ -348,10 +332,10 @@ Compute a workload ID from TEE measurement registers:
 
 ```bash
 # Compute workload ID from a measurements JSON file
-npx flashtestations compute-workload-id --measurements ./measurements.json
+npx . compute-workload-id --measurements ./example-measurements.json
 
 # Output as JSON
-npx flashtestations compute-workload-id -m ./measurements.json --json
+npx . compute-workload-id -m ./measurements.json --json
 ```
 
 The measurements JSON file should contain the TDX measurement registers:
@@ -374,8 +358,8 @@ The measurements JSON file should contain the TDX measurement registers:
 | Option | Description |
 | ------ | ----------- |
 | `-c, --chain-id <id>` | Specify chain ID directly |
-| `--unichain-mainnet` | Use Unichain Mainnet (chain ID 130) [default] |
-| `--unichain-sepolia` | Use Unichain Sepolia (chain ID 1301) |
+| `--chain unichain-mainnet` | Use Unichain Mainnet (chain ID 130) [default] |
+| `--chain unichain-sepolia` | Use Unichain Sepolia (chain ID 1301) |
 | `-r, --rpc-url <url>` | Use a custom RPC URL |
 | `--json` | Output results as JSON |
 | `-V, --version` | Show CLI version |
