@@ -5,7 +5,7 @@ import { verifyFlashtestationInBlock } from '../src/index';
  *
  * This example demonstrates how to:
  * 1. Read a workload ID from environment variables
- * 2. Verify if the latest block on Unichain Sepolia was built by that workload
+ * 2. Verify if the latest block on Unichain Mainnet was built by that workload
  * 3. Display verification results
  *
  * Usage:
@@ -23,17 +23,19 @@ async function main() {
       process.exit(1);
     }
 
-    console.log('Verifying latest block on Unichain Sepolia...\n');
+    console.log('Verifying latest block on Unichain Mainnet...\n');
     console.log(`Workload ID: ${workloadId}\n`);
+
+    const chainId = parseInt(process.env.CHAIN_ID || '130'); // default to Unichain Mainnet
 
     // Verify if the latest block was built by the specified TEE workload
     const result = await verifyFlashtestationInBlock(
       workloadId,
       'latest', // Use 'latest' to check the most recent block
       {
-        chainId: 1301, // Unichain Sepolia testnet
+        chainId: chainId,
         // Optional: provide custom RPC URL
-        // rpcUrl: 'https://sepolia.unichain.org',
+        // rpcUrl: 'https://mainnet.unichain.org',
       }
     );
 
@@ -67,10 +69,10 @@ async function main() {
     }
 
     // You can also verify specific blocks:
-    // - By block number: await verifyFlashtestationInBlock(workloadId, 12345, { chainId: 1301 })
-    // - By bigint number: await verifyFlashtestationInBlock(workloadId, BigInt(12345), { chainId: 1301 })
-    // - By block hash: await verifyFlashtestationInBlock(workloadId, '0x...', { chainId: 1301 })
-    // - By hex number: await verifyFlashtestationInBlock(workloadId, '0x3039', { chainId: 1301 })
+    // - By block number: await verifyFlashtestationInBlock(workloadId, 12345, { chainId: 130 })
+    // - By bigint number: await verifyFlashtestationInBlock(workloadId, BigInt(12345), { chainId: 130 })
+    // - By block hash: await verifyFlashtestationInBlock(workloadId, '0x...', { chainId: 130 })
+    // - By hex number: await verifyFlashtestationInBlock(workloadId, '0x3039', { chainId: 130 })
     // - Other tags: 'earliest', 'finalized', 'safe', 'pending'
 
   } catch (error) {

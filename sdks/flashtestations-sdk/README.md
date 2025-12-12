@@ -1,5 +1,7 @@
 # Flashtestations SDK
 
+A Typescript SDK for interacting (programmatically as well as via CLI) with the [Flashtestations protocol](https://github.com/flashbots/flashtestations)
+
 ## Overview
 
 Flashtestations are cryptographic proofs that blockchain blocks were built by Trusted Execution Environments (TEEs) running a specific version of [Flashbot's op-rbuilder](https://github.com/flashbots/op-rbuilder/tree/main), which is the TEE-based builder used to build blocks on Unichain. This SDK allows you to verify whether blocks on Unichain networks were built by the expected versions of op-rbuilder running in a TEE. Unlike on other blockchains where you have no guarantee and thus must trust the block builder to build blocks [fairly](https://www.paradigm.xyz/2024/06/priority-is-all-you-need), with flashtestations you can cryptographically verify that a Unichain block has been built with a particular version of op-rbuilder.
@@ -10,23 +12,30 @@ This SDK simplifies the verification process by providing a single function to c
 
 ## Getting Started
 
+### Quick Start (No Installation Needed)
+
+```bash
+# print the latest flashtestation event data on Unichain Mainnet
+npx @uniswap/flashtestations-sdk get-event
+```
+
 ### Installation
 
 ```bash
-npm install flashtestations-sdk
+npm install @uniswap/flashtestations-sdk
 # or
-yarn add flashtestations-sdk
+yarn add @uniswap/flashtestations-sdk
 ```
 
-### Quick Start
+### Quick Start (Importing the SDK)
 
 ```typescript
-import { verifyFlashtestationInBlock } from 'flashtestations-sdk';
+import { verifyFlashtestationInBlock } from '@uniswap/flashtestations-sdk';
 
 async function main() {
   // Verify if the latest block on Unichain Mainnet was built by a specific TEE workload
   const result = await verifyFlashtestationInBlock(
-    '0x306ab4fe782dde50a97584b6d4cad9375f7b5d02199c4c78821ad6622670c6b7', // Your expected workload ID
+    '0x05dcaf224f061f956e4c2df39220a3c17faba5552cf7228a0d571511c251fbfc', // An example workload ID
     'latest', // Block to verify (can be 'latest', 'pending', 'safe', 'finalized', number, or hash)
     { chainId: 130 } // Unichain Mainnet
   );
@@ -65,18 +74,20 @@ main();
 
 ## Supported Chains
 
-| Chain            | Chain ID | Status     | RPC Configuration |
-| ---------------- | -------- | ---------- | ----------------- |
-| Unichain Mainnet | 130      | Production | Auto-configured   |
-| Unichain Sepolia | 1301     | Testnet    | Auto-configured   |
+| Chain                 | Chain ID  | Status     | RPC Configuration |
+| ----------------      | --------- | ---------- | ----------------- |
+| Unichain Mainnet      | 130       | Production | Auto-configured   |
+| Unichain Sepolia      | 1301      | Testnet    | Auto-configured   |
+| Unichain Alphanet     | 22444422  | Testnet    | Manually-provided |
+| Unichain Experimental | 420120005 | Testnet    | Manually-provided |
 
 ## How Do I Acquire a Particular op-rbuilder's Workload ID?
 
-The Flashtestations protocol exists to let you cryptographically verify that a particular version of op-rbuilder is in fact building the latest block's on Unichain. To cryptographically identify these op-rbuilder versions across all of the various components (the TEE, the smart contracts, and SDK) we use a 32-byte workload ID, which is a [hash of the important components of the TEE attestation](https://github.com/flashbots/flashtestations/blob/7cc7f68492fe672a823dd2dead649793aac1f216/src/BlockBuilderPolicy.sol#L224). But this workload ID tells us nothing about what op-rbuilder source code the builder operators used to build the final Linux OS image that runs on the TEE. We need a trustless (i.e. locally verifiable) method for calculating the workload ID, given a version of op-rbuilder.
+The Flashtestations protocol exists to let you cryptographically verify that a particular version of op-rbuilder is in fact building the latest block's on Unichain. To cryptographically identify these op-rbuilder versions across all of the various components (the TEE, the smart contracts, and SDK) we use a 32-byte workload ID, which is a [hash of the measurement registers of the TEE attestation](https://github.com/flashbots/flashtestations/blob/38594f37b5f6d1b1f5f6ad4203a4770c10f72a22/src/BlockBuilderPolicy.sol#L208). But this workload ID tells us nothing about what op-rbuilder source code the builder operators used to build the final Linux OS image that runs on the TEE. We need a trustless (i.e. locally verifiable) method for calculating the workload ID, given a version of op-rbuilder.
 
-With a small caveat we'll explain shortly, that process is what the [flashbots-images](https://github.com/flashbots/flashbots-images/commits/main/) repo is for. Using this repo and a simple bash command, we build a Linux OS image containing a specific version of op-rbuilder (identified by its git commit hash), and then calculate the workload ID directly from this Linux OS image. This completes the full chain of trustless verification; given a particular commit hash of flashbots-images (which has hardcoded into it a particular version of op-rbuilder), we can locally build and compute the workload ID, and then pass that to the SDK's `verifyFlashtestationInBlock` function to verify "is Unichain building blocks with the latest version of op-rbuilder?".
+That process is what the [flashbots-images](https://github.com/flashbots/flashbots-images) repo is for. Using this repo and a simple bash command, we build a Linux OS image containing a specific version of op-rbuilder (identified by its git commit hash), and then generate TDX attestation measurement registers from that image. We can then use those measurements to calculate the workload ID. This completes the full chain of trustless verification; given a particular commit hash of flashbots-images (which has hardcoded into it a particular version of op-rbuilder), we can locally build and measure the Linux OS image, pass those measurements to the flashtestations-sdk which computes the workload ID and uses the SDK's `verifyFlashtestationInBlock` function to verify "is Unichain building blocks with the latest version of op-rbuilder?".
 
-Please see the [flashbots-images](https://github.com/flashbots/flashbots-images/commits/main/) repo instructions on how to calculate a workload ID.
+Please see the [flashbots-images](https://github.com/flashbots/flashbots-images) repo instructions on how to locally build and measure a Linux OS image running op-rbuilder.
 
 ## API Reference
 
@@ -86,7 +97,7 @@ Verify if a block was built by a TEE running a specific workload.
 
 ```typescript
 async function verifyFlashtestationInBlock(
-  workloadIdOrRegisters: string | WorkloadMeasureRegisters,
+  workloadIdOrRegisters: string | WorkloadMeasurementRegisters,
   blockParameter: BlockParameter,
   config: ClientConfig
 ): Promise<VerificationResult>;
@@ -96,7 +107,7 @@ async function verifyFlashtestationInBlock(
 
 | Parameter             | Type                                 | Description                                                                 |
 | --------------------- | ------------------------------------ | --------------------------------------------------------------------------- |
-| workloadIdOrRegisters | `string \| WorkloadMeasureRegisters` | Workload ID (32-byte hex string) or measurement registers to compute the ID |
+| workloadIdOrRegisters | `string \| WorkloadMeasurementRegisters` | Workload ID (32-byte hex string) or measurement registers to compute the ID |
 | blockParameter        | `BlockParameter`                     | Block identifier: tag ('latest', 'earliest', etc.), number, or hash         |
 | config                | `ClientConfig`                       | Configuration object with `chainId` and optional `rpcUrl`                   |
 
@@ -128,7 +139,7 @@ async function verifyFlashtestationInBlock(
 Compute a workload ID from TEE measurement registers. Useful for debugging or pre-computing IDs.
 
 ```typescript
-function computeWorkloadId(registers: WorkloadMeasureRegisters): string;
+function computeWorkloadId(registers: WorkloadMeasurementRegisters): string;
 ```
 
 Returns the workload ID as a hex string.
@@ -174,7 +185,7 @@ The SDK provides custom error classes for specific failure scenarios.
 Thrown when RPC connection fails or network requests error out.
 
 ```typescript
-import { verifyFlashtestationInBlock, NetworkError } from 'flashtestations-sdk';
+import { verifyFlashtestationInBlock, NetworkError } from '@uniswap/flashtestations-sdk';
 
 try {
   const result = await verifyFlashtestationInBlock('0xabcd...', 'latest', {
@@ -195,7 +206,7 @@ try {
 Thrown when the specified block does not exist on the chain.
 
 ```typescript
-import { BlockNotFoundError } from 'flashtestations-sdk';
+import { BlockNotFoundError } from '@uniswap/flashtestations-sdk';
 
 try {
   const result = await verifyFlashtestationInBlock('0xabcd...', 999999999, {
@@ -214,12 +225,12 @@ try {
 Thrown when measurement registers are invalid (wrong format or length).
 
 ```typescript
-import { ValidationError } from 'flashtestations-sdk';
+import { ValidationError } from '@uniswap/flashtestations-sdk';
 
 try {
   const invalidRegisters = {
-    tdAttributes: '0x00', // Too short!
-    xFAM: '0x0000000000000003',
+    tdattributes: '0x00', // Too short!
+    xfam: '0x0000000000000003',
     // ... other fields
   };
   const result = await verifyFlashtestationInBlock(invalidRegisters, 'latest', {
@@ -239,7 +250,7 @@ try {
 Thrown when trying to use an unsupported chain ID.
 
 ```typescript
-import { ChainNotSupportedError } from 'flashtestations-sdk';
+import { ChainNotSupportedError } from '@uniswap/flashtestations-sdk';
 
 try {
   const result = await verifyFlashtestationInBlock('0xabcd...', 'latest', {
@@ -262,47 +273,105 @@ try {
 - **Log error context**: All custom errors include additional context properties for debugging
 - **Use fallback RPC endpoints**: Provide alternative `rpcUrl` options for better reliability
 
-## Advanced Usage
+## CLI Examples
 
-### Computing Workload IDs
+The SDK includes a CLI for quick verification from the terminal. Run commands using `npx`:
 
-If you need to compute workload IDs separately (e.g., for caching or debugging), use the `computeWorkloadId` utility:
-
-```typescript
-import {
-  computeWorkloadId,
-  WorkloadMeasureRegisters,
-} from 'flashtestations-sdk';
-
-const registers: WorkloadMeasureRegisters = {
-  tdAttributes: '0x0000000000000000',
-  xFAM: '0x0000000000000003',
-  mrTd: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
-  mrConfigId:
-    '0x0000000000000000000000000000000000000000000000000000000000000000',
-  rtMr0: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-  rtMr1: '0xef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abab',
-  rtMr2: '0x234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdeff',
-  rtMr3: '0x67890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234d',
-};
-
-const workloadId = computeWorkloadId(registers);
-console.log('Computed workload ID:', workloadId);
-
-// Use the computed ID for verification
-const result = await verifyFlashtestationInBlock(workloadId, 'latest', {
-  chainId: 1301,
-});
+```bash
+npx . <command> [options]
 ```
 
-The `computeWorkloadId` function implements the same keccak256 hashing algorithm used on-chain, ensuring consistency between off-chain computation and on-chain verification.
+### List Supported Chains
 
-## Examples
+```bash
+# View all supported chains and their configuration
+npx . chains
+
+# Output as JSON
+npx . chains --json
+```
+
+### Verify a Block
+
+Verify if a block was built by an expected TEE workload:
+
+```bash
+# Verify latest block on Unichain Mainnet (default) with a workload ID
+npx . verify --workload-id 0x306ab4fe782dde50a97584b6d4cad9375f7b5d02199c4c78821ad6622670c6b7
+
+# Verify using measurement registers from a JSON file
+npx . verify --measurements ./example-measurements.json --block latest
+
+# Use a custom RPC URL
+npx . verify -w 0x05dcaf224f061f956e4c2df39220a3c17faba5552cf7228a0d571511c251fbfc --rpc-url https://my-rpc.example.com --chain-id 130
+
+# Output as JSON (useful for scripting)
+npx . verify -w 0x05dcaf224f061f956e4c2df39220a3c17faba5552cf7228a0d571511c251fbfc --json
+```
+
+**Exit codes:**
+- `0` - Block was built by the expected TEE workload
+- `1` - Error occurred (network error, invalid input, etc.)
+- `2` - Block was NOT built by the expected TEE workload
+
+### Get Flashtestation Event
+
+Retrieve flashtestation transaction data from a block without verification:
+
+```bash
+# Get event from the latest block on Unichain Sepolia
+npx . get-event
+
+# Output as JSON
+npx . get-event --block latest --json
+```
+
+### Compute Workload ID
+
+Compute a workload ID from TEE measurement registers:
+
+```bash
+# Compute workload ID from a measurements JSON file
+npx . compute-workload-id --measurements ./example-measurements.json
+
+# Output as JSON
+npx . compute-workload-id -m ./measurements.json --json
+```
+
+The measurements JSON file should contain the TDX measurement registers:
+
+```json
+{
+  "tdattributes": "0x0000000000000000",
+  "xfam": "0x0000000000000003",
+  "mrtd": "0x1234567890abcdef...",
+  "mrconfigid": "0x0000000000000000...",
+  "rtmr0": "0xabcdef1234567890...",
+  "rtmr1": "0xef0123456789abcd...",
+  "rtmr2": "0x234567890abcdef1...",
+  "rtmr3": "0x67890abcdef12345..."
+}
+```
+
+### Common Options
+
+| Option | Description |
+| ------ | ----------- |
+| `-c, --chain-id <id>` | Specify chain ID directly |
+| `--chain unichain-mainnet` | Use Unichain Mainnet (chain ID 130) [default] |
+| `--chain unichain-sepolia` | Use Unichain Sepolia (chain ID 1301) |
+| `-r, --rpc-url <url>` | Use a custom RPC URL |
+| `--json` | Output results as JSON |
+| `-V, --version` | Show CLI version |
+| `-h, --help` | Show help for a command |
+
+## Programmatic Examples
 
 See the [examples/](./examples) directory for complete runnable examples:
 
 - `verifyBlock.ts` - Verify blocks with workload ID
 - `getFlashtestationEvent.ts` - Retrieve flashtestation transaction data
+- `computeWorkloadIdWithMeasurements.ts` - Compute a 32-byte workload ID given a TDX measurement registers in JSON format
 
 **Running examples:**
 

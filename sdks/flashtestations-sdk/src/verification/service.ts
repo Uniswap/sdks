@@ -1,10 +1,10 @@
 import { getBlockExplorerUrl } from '../config/chains';
-import { computeWorkloadId } from '../crypto/workload';
+import { computeAllWorkloadIds } from '../crypto/workload';
 import { RpcClient } from '../rpc/client';
 import {
   BlockParameter,
   VerificationResult,
-  WorkloadMeasureRegisters,
+  WorkloadMeasurementRegisters,
   ClientConfig,
   FlashtestationEvent,
 } from '../types';
@@ -74,14 +74,14 @@ export async function getFlashtestationEvent(
  * @example
  * // Verify using measurement registers
  * const registers = {
- *   tdAttributes: '0x0000000000000000',
- *   xFAM: '0x0000000000000003',
- *   mrTd: '0x1234...',
- *   mrConfigId: '0x0000...',
- *   rtMr0: '0xabcd...',
- *   rtMr1: '0xef01...',
- *   rtMr2: '0x2345...',
- *   rtMr3: '0x6789...',
+ *   tdattributes: '0x0000000000000000',
+ *   xfam: '0x0000000000000003',
+ *   mrtd: '0x1234...',
+ *   mrconfigid: '0x0000...',
+ *   rtmr0: '0xabcd...',
+ *   rtmr1: '0xef01...',
+ *   rtmr2: '0x2345...',
+ *   rtmr3: '0x6789...',
  * };
  * const result = await verifyFlashtestationInBlock(
  *   registers,
@@ -90,26 +90,29 @@ export async function getFlashtestationEvent(
  * );
  */
 export async function verifyFlashtestationInBlock(
-  workloadIdOrRegisters: string | WorkloadMeasureRegisters,
+  workloadIdOrRegisters: string | WorkloadMeasurementRegisters,
   blockParameter: BlockParameter,
   config: ClientConfig
 ): Promise<VerificationResult> {
-  // Determine if we need to compute workload ID from registers
-  let workloadId: string;
+  // Determine if we need to compute workload ID(s) from registers
+  let workloadIds: string[];
 
   if (typeof workloadIdOrRegisters === 'string') {
     // Direct workload ID provided
-    workloadId = workloadIdOrRegisters;
+    workloadIds = [workloadIdOrRegisters];
   } else {
-    // Compute workload ID from measurement registers
-    workloadId = computeWorkloadId(workloadIdOrRegisters);
+    // Compute all possible workload IDs from measurement registers
+    // (handles arrays in mrtd and rtmr0 fields)
+    workloadIds = computeAllWorkloadIds(workloadIdOrRegisters);
   }
 
-  // Normalize workload ID (ensure it has 0x prefix and is lowercase)
-  if (!workloadId.startsWith('0x')) {
-    workloadId = '0x' + workloadId;
-  }
-  workloadId = workloadId.toLowerCase();
+  // Normalize workload IDs (ensure they have 0x prefix and are lowercase)
+  workloadIds = workloadIds.map(id => {
+    if (!id.startsWith('0x')) {
+      id = '0x' + id;
+    }
+    return id.toLowerCase();
+  });
 
   // Create RPC client
   const client = new RpcClient({
@@ -145,8 +148,8 @@ export async function verifyFlashtestationInBlock(
   // Normalize event workload ID for comparison
   const eventWorkloadId = flashtestationEvent.workloadId.toLowerCase();
 
-  // Compare workload IDs (byte-wise comparison)
-  const workloadMatches = workloadId === eventWorkloadId;
+  // Compare workload IDs - check if any of the possible IDs match
+  const workloadMatches = workloadIds.includes(eventWorkloadId);
 
   if (!workloadMatches) {
     // Block was built by a TEE, but not the one we're looking for
