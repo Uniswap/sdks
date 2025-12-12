@@ -2,6 +2,9 @@ import { getFlashtestationEvent } from '../src/index';
 
 /**
  * Example: Check if a block contains a flashtestation transaction
+ * 
+ * Usage:
+ *   npx tsx examples/getFlashtestationEvent.ts
  *
  * This example demonstrates how to:
  * 1. Use the getFlashtestationEvent function to fetch flashtestation data from a block
@@ -10,11 +13,13 @@ import { getFlashtestationEvent } from '../src/index';
  */
 async function main() {
   try {
-    // Fetch flashtestation transaction from the latest block on Unichain Sepolia
+    const chainId = parseInt(process.env.CHAIN_ID || '130'); // default to Unichain Mainnet
+
+    // Fetch flashtestation transaction from the latest block on the specified chain
     const event = await getFlashtestationEvent('latest', {
-      chainId: 1301, // Unichain Sepolia testnet
+      chainId: chainId,
       // Optional: provide custom RPC URL
-      // rpcUrl: 'https://sepolia.unichain.org',
+      // rpcUrl: 'https://mainnet.unichain.org',
     });
 
     if (event) {

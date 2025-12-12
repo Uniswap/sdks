@@ -2,13 +2,17 @@ import { ChainConfig, ChainNotSupportedError } from '../types/index';
 
 /**
  * Chain configuration for supported chains
+ *
+ * To add a new chain, simply add a new entry here with a unique slug.
+ * The slug will be available as a CLI argument: --chain <slug>
  */
 export const CHAIN_CONFIGS: Record<number, ChainConfig> = {
   // Unichain Mainnet
   130: {
     chainId: 130,
     name: 'Unichain Mainnet',
-    contractAddress: '0x0000000000000000000000000000000000000000', // TODO: Replace with actual contract address
+    slug: 'unichain-mainnet',
+    contractAddress: '0xd44f9d1331659F417a3E22C9e29529D498B66A29',
     defaultRpcUrl: process.env.RPC_URL || 'https://mainnet.unichain.org',
     blockExplorerUrl: 'https://uniscan.xyz',
   },
@@ -17,23 +21,28 @@ export const CHAIN_CONFIGS: Record<number, ChainConfig> = {
   1301: {
     chainId: 1301,
     name: 'Unichain Sepolia',
+    slug: 'unichain-sepolia',
     contractAddress: '0x3b03b3caabd49ca12de9eba46a6a2950700b1db4',
     defaultRpcUrl: process.env.RPC_URL || 'https://sepolia.unichain.org',
     blockExplorerUrl: 'https://sepolia.uniscan.xyz',
   },
+
   // Unichain Alphanet (Testnet)
   22444422: {
     chainId: 22444422,
     name: 'Unichain Alphanet',
+    slug: 'unichain-alphanet',
     contractAddress: '0x8d0e3f57052f33CEF1e6BE98B65aad1794dc95a5',
     defaultRpcUrl: process.env.RPC_URL || '', // note, we don't include the RPC URL for alphanet because Unichain doesn't want to expose it to the public
     blockExplorerUrl: '',
   },
+
   // Unichain Experimental (Testnet)
   420120005: {
     chainId: 420120005,
     name: 'Unichain Experimental',
-    contractAddress: '0x2E41cb0D68D8dB7ebd16cef81D7eD82e7E1fbA40',
+    slug: 'unichain-experimental',
+    contractAddress: '0x80dcdE10eE31E0A32B8944b39e8AE21d47984b4e',
     defaultRpcUrl: process.env.RPC_URL || '', // note, we don't include the RPC URL for experimental because Unichain doesn't want to expose it to the public
     blockExplorerUrl: '',
   },
@@ -110,4 +119,38 @@ export function getSupportedChains(): number[] {
  */
 export function isChainSupported(chainId: number): boolean {
   return chainId in CHAIN_CONFIGS;
+}
+
+/**
+ * Get chain configuration by slug
+ * @param slug - The chain slug (e.g., 'unichain-mainnet')
+ * @returns The chain configuration, or undefined if not found
+ */
+export function getChainBySlug(slug: string): ChainConfig | undefined {
+  return Object.values(CHAIN_CONFIGS).find((config) => config.slug === slug);
+}
+
+/**
+ * Get list of all supported chain slugs
+ * @returns Array of supported chain slugs
+ */
+export function getSupportedChainSlugs(): string[] {
+  return Object.values(CHAIN_CONFIGS).map((config) => config.slug);
+}
+
+/**
+ * Check if a chain slug is valid
+ * @param slug - The chain slug to check
+ * @returns True if the slug is valid, false otherwise
+ */
+export function isValidChainSlug(slug: string): boolean {
+  return Object.values(CHAIN_CONFIGS).some((config) => config.slug === slug);
+}
+
+/**
+ * Get the default chain slug
+ * @returns The default chain slug (unichain-mainnet)
+ */
+export function getDefaultChainSlug(): string {
+  return 'unichain-mainnet';
 }
