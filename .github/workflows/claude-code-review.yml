@@ -20,12 +20,12 @@ jobs:
         github.event.action == 'ready_for_review'
       )
 
-    uses: Uniswap/ai-toolkit/.github/workflows/_claude-code-review.yml@083295b735909c21d4be78c7ceda92a8f4f5a1fd
+    uses: Uniswap/ai-toolkit/.github/workflows/_claude-code-review.yml@9aa3cf98744a2b4e1aac51cd2d26144ea337ab3b
     with:
       pr_number: ${{ github.event.pull_request.number }}
       base_ref: ${{ github.base_ref }}
       force_review: false
-      toolkit_ref: 083295b735909c21d4be78c7ceda92a8f4f5a1fd
+      toolkit_ref: 9aa3cf98744a2b4e1aac51cd2d26144ea337ab3b
       custom_prompt_path: ".claude/prompts/claude-pr-review.md"
 
       model: "claude-opus-4-5"
