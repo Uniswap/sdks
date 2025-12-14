@@ -133,6 +133,8 @@ export interface ChainConfig {
   chainId: number;
   /** Human readable chain name */
   name: string;
+  /** CLI-friendly slug for --chain argument (e.g., 'unichain-mainnet') */
+  slug: string;
   /** BlockBuilderPolicy contract address */
   contractAddress: string;
   /** Default RPC URL for this chain */

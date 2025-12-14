@@ -62,6 +62,7 @@ export const V2_FACTORY_ADDRESSES: AddressMap = {
   [ChainId.MONAD_TESTNET]: '0x733e88f248b742db6c14c0b1713af5ad7fdd59d0',
   [ChainId.SONEIUM]: '0x97febbc2adbd5644ba22736e962564b23f5828ce',
   [ChainId.MONAD]: '0x182a927119d56008d921126764bf884221b10f59',
+  [ChainId.XLAYER]: '0xdf38f24fe153761634be942f9d859f3dba857e95',
 }
 /**
  * @deprecated use V2_ROUTER_ADDRESSES instead
@@ -85,6 +86,7 @@ export const V2_ROUTER_ADDRESSES: AddressMap = {
   [ChainId.MONAD_TESTNET]: '0xfb8e1c3b833f9e67a71c859a132cf783b645e436',
   [ChainId.SONEIUM]: '0x273f68c234fa55b550b40e563c4a488e0d334320',
   [ChainId.MONAD]: '0x4b2ab38dbf28d31d467aa8993f6c2585981d6804',
+  [ChainId.XLAYER]: '0x182a927119d56008d921126764bf884221b10f59',
 }
 
 // Networks that share most of the same addresses i.e. Mainnet, Goerli, Optimism, Arbitrum, Polygon
@@ -439,6 +441,22 @@ const SONEIUM_ADDRESSES: ChainAddresses = {
   v4QuoterAddress: '0x3972c00f7ed4885e145823eb7c655375d275a1c5',
 }
 
+const XLAYER_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: '0x4b2ab38dbf28d31d467aa8993f6c2585981d6804',
+  multicallAddress: '0xe2023f3fa515cf070e07fd9d51c1d236e07843f4',
+  quoterAddress: '0x976183ac3d09840d243a88c0268badb3b3e3259f',
+  v3MigratorAddress: '0x7197e214c0b767cfb76fb734ab638e2c192f4e53',
+  nonfungiblePositionManagerAddress: '0x315e413a11ab0df498ef83873012430ca36638ae',
+  tickLensAddress: '0x661e93cca42afacb172121ef892830ca3b70f08d',
+  swapRouter02Address: '0x4f0c28f5926afda16bf2506d5d9e57ea190f9bca',
+  mixedRouteQuoterV2Address: '0x2d01411773c8c24805306e89a41f7855c3c4fe65',
+
+  v4PoolManagerAddress: '0x360e68faccca8ca495c1b759fd9eee466db9fb32',
+  v4PositionManagerAddress: '0xbc9f3a5d767dd46e040f1ca48ab17f29f59dc806',
+  v4StateView: '0x76fd297e2d437cd7f76d50f01afe6160f86e9990',
+  v4QuoterAddress: '0x8928074ca1b241d8ec02815881c1af11e8bc5219',
+}
+
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
   [ChainId.MAINNET]: MAINNET_ADDRESSES,
   [ChainId.OPTIMISM]: OPTIMISM_ADDRESSES,
@@ -469,6 +487,7 @@ export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses>
   [ChainId.MONAD_TESTNET]: MONAD_TESTNET_ADDRESSES,
   [ChainId.SONEIUM]: SONEIUM_ADDRESSES,
   [ChainId.MONAD]: MONAD_ADDRESSES,
+  [ChainId.XLAYER]: XLAYER_ADDRESSES,
 }
 
 /* V3 Contract Addresses */
