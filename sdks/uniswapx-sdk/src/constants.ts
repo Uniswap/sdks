@@ -116,6 +116,9 @@ export const REACTOR_ADDRESS_MAPPING: ReactorMapping = {
     [OrderType.Relay]: "0x0000000000000000000000000000000000000000",
     [OrderType.Priority]: "0x00000006021a6Bce796be7ba509BBBA71e956e37",
   },
+  1301: {
+    [OrderType.V4]: "0x000000c40Fe6C03a7A1111D0a66Ce522BDc9fC8f",
+  },
 };
 
 // aliasing for backwards compatibility
