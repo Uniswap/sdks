@@ -4898,9 +4898,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@uniswap/sdk-core@npm:^7.5.0, @uniswap/sdk-core@npm:^7.6.0, @uniswap/sdk-core@npm:^7.8.0":
-  version: 7.8.0
-  resolution: "@uniswap/sdk-core@npm:7.8.0"
+"@uniswap/sdk-core@npm:^7.10.0, @uniswap/sdk-core@npm:^7.5.0, @uniswap/sdk-core@npm:^7.6.0, @uniswap/sdk-core@npm:^7.8.0":
+  version: 7.10.0
+  resolution: "@uniswap/sdk-core@npm:7.10.0"
   dependencies:
     "@ethersproject/address": ^5.0.2
     "@ethersproject/bytes": ^5.7.0
@@ -4911,7 +4911,7 @@ __metadata:
     jsbi: ^3.1.4
     tiny-invariant: ^1.1.0
     toformat: ^2.0.0
-  checksum: 228b830fab2b165467b1e099762cf608126af4ee34daccaf6ba80ea68208ab8c705551d1056939236e83609a45e51459ea635868da847e2ea61c856d0be9e22b
+  checksum: f6386a3905b757cdd0c340d2840cbebc51d39d29556de31c757a7973839aa925cfa9240f364097609b7dd7c1b0d3acbe0808b09202e698e7a94d0d69df56f866
   languageName: node
   linkType: hard
 
@@ -5104,7 +5104,7 @@ __metadata:
     "@ethersproject/solidity": ^5.0.9
     "@types/big.js": ^4.0.5
     "@types/jest": ^24.0.25
-    "@uniswap/sdk-core": ^7.8.0
+    "@uniswap/sdk-core": ^7.10.0
     "@uniswap/v2-core": ^1.0.1
     eslint: ^8.57.0
     eslint-config-prettier: ^9.1.0
