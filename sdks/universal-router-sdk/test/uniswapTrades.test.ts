@@ -1052,6 +1052,78 @@ describe('Uniswap', () => {
       expect(hexToDecimalString(methodParameters.value)).to.eq(JSBI.multiply(inputEther, JSBI.BigInt(2)).toString())
     })
 
+    it('encodes a split exactInput with 2 routes v3USDC->v3ETH & v4USDC->v4ETH swap', async () => {
+      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const v3Trade = await V3Trade.fromRoute(
+        new V3Route([WETH_USDC_V3], USDC, ETHER),
+        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
+        TradeType.EXACT_INPUT
+      )
+      const v4Trade = await V4Trade.fromRoute(
+        new V4Route([ETH_USDC_V4, ETH_WETH_V4], USDC, ETHER),
+        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
+        TradeType.EXACT_INPUT
+      )
+      const opts = swapOptions({})
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([v3Trade, v4Trade]), opts)
+      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+    })
+
+    it('encodes a split exactInput with 2 routes mixed v2DAI->v3ETH & v4 v4DAI->v4USDC->v4ETH swap', async () => {
+      const inputDAI = utils.parseUnits('1000', 18).toString()
+      const mixedTrade = await MixedRouteTrade.fromRoute(
+        new MixedRouteSDK([USDC_DAI_V2, WETH_USDC_V3], DAI, ETHER),
+        CurrencyAmount.fromRawAmount(DAI, inputDAI),
+        TradeType.EXACT_INPUT
+      )
+      const v4Trade = await V4Trade.fromRoute(
+        new V4Route([USDC_DAI_V4, ETH_USDC_V4, ETH_WETH_V4], DAI, ETHER),
+        CurrencyAmount.fromRawAmount(DAI, inputDAI),
+        TradeType.EXACT_INPUT
+      )
+      const opts = swapOptions({})
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([mixedTrade, v4Trade]), opts)
+      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4_MIXED', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+    })
+
+    it('encodes a split exactInput with 2 routes mixed v2DAI->v4ETH & v4 v4DAI->v4USDC->v4ETH swap', async () => {
+      const inputDAI = utils.parseUnits('1000', 18).toString()
+      const mixedTrade = await MixedRouteTrade.fromRoute(
+        new MixedRouteSDK([USDC_DAI_V2, ETH_USDC_V4_LOW_FEE], DAI, ETHER),
+        CurrencyAmount.fromRawAmount(DAI, inputDAI),
+        TradeType.EXACT_INPUT
+      )
+      const v4Trade = await V4Trade.fromRoute(
+        new V4Route([USDC_DAI_V4, ETH_USDC_V4], DAI, ETHER),
+        CurrencyAmount.fromRawAmount(DAI, inputDAI),
+        TradeType.EXACT_INPUT
+      )
+      const opts = swapOptions({})
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([mixedTrade, v4Trade]), opts)
+      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4_MIXED_ENDING_WITH_ETH', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+    })
+
+    it('encodes a split exactInput with 2 routes mixed v2DAI->v4WETH & v4 v4DAI->v4USDC->v4WETH swap', async () => {
+      const inputDAI = utils.parseUnits('1000', 18).toString()
+      const mixedTrade = await MixedRouteTrade.fromRoute(
+        new MixedRouteSDK([USDC_DAI_V2, WETH_USDC_V4_LOW_FEE], DAI, ETHER),
+        CurrencyAmount.fromRawAmount(DAI, inputDAI),
+        TradeType.EXACT_INPUT
+      )
+      const v4Trade = await V4Trade.fromRoute(
+        new V4Route([USDC_DAI_V4, WETH_USDC_V4], DAI, ETHER),
+        CurrencyAmount.fromRawAmount(DAI, inputDAI),
+        TradeType.EXACT_INPUT
+      )
+      const opts = swapOptions({})
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([mixedTrade, v4Trade]), opts)
+      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4_MIXED_ENDING_WITH_WETH', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+    })
+
     it('encodes a split exactInput with 3 routes v3ETH->v3USDC & v2ETH->v2USDC swap', async () => {
       const inputEther = expandTo18Decimals(1)
       const v2Trade = new V2Trade(
@@ -2165,6 +2237,8 @@ describe('Uniswap', () => {
 
       const signature: Signature = splitSignature(await wallet._signTypedData(domain, types, values))
 
+      let superLowFeePool = new V4Pool(ETHER, USDC, 100, 10, ZERO_ADDRESS, encodeSqrtRatioX96(1, 1), 100000, 0)
+
       // create migrate options
       const opts = Object.assign({
         inputPosition: new Position({
@@ -2175,7 +2249,7 @@ describe('Uniswap', () => {
         }),
         // in range (current tick = 0)
         outputPosition: new V4Position({
-          pool: ETH_USDC_V4_LOW_FEE,
+          pool: superLowFeePool,
           liquidity: 100000,
           tickLower: -200040,
           tickUpper: 300000,
@@ -2230,6 +2304,8 @@ describe('Uniswap', () => {
 
       const signature: Signature = splitSignature(await wallet._signTypedData(domain, types, values))
 
+      let superLowFeePool = new V4Pool(USDC, WETH, 100, 10, ZERO_ADDRESS, encodeSqrtRatioX96(1, 1), 100000, 0)
+
       // create migrate options
       const opts = Object.assign({
         inputPosition: new Position({
@@ -2240,7 +2316,7 @@ describe('Uniswap', () => {
         }),
         // in range (current tick = 0)
         outputPosition: new V4Position({
-          pool: WETH_USDC_V4_LOW_FEE, // migrate to LOW pool, which hasn't been initialized
+          pool: superLowFeePool, // migrate to LOW pool, which hasn't been initialized
           liquidity: 100000,
           tickLower: -200040,
           tickUpper: 300000,
