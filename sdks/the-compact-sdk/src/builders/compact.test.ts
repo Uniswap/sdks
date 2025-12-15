@@ -2,6 +2,7 @@
  * Tests for Compact builders
  */
 
+import { Address, Hex } from 'viem'
 import { CompactDomain } from '../config/domain'
 
 import { CompactBuilder, SingleCompactBuilder, BatchCompactBuilder, MultichainCompactBuilder } from './compact'
@@ -18,10 +19,10 @@ describe('Compact Builders', () => {
     verifyingContract: '0x00000000000000171ede64904551eeDF3C6C9788',
   }
 
-  const arbiterAddress = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as `0x${string}`
-  const sponsorAddress = '0x1234567890123456789012345678901234567890' as `0x${string}`
-  const tokenAddress = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48' as `0x${string}`
-  const lockTag = '0x000000000000000000000001' as `0x${string}`
+  const arbiterAddress = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as Address
+  const sponsorAddress = '0x1234567890123456789012345678901234567890' as Address
+  const tokenAddress = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48' as Address
+  const lockTag = '0x000000000000000000000001' as Hex
 
   describe('CompactBuilder factory', () => {
     it('should create a SingleCompactBuilder', () => {
@@ -182,7 +183,7 @@ describe('Compact Builders', () => {
     it('should build a compact with witness', () => {
       const mandateType = SimpleMandateType
       const mandate = {
-        fillerAddress: '0x9876543210987654321098765432109876543210' as `0x${string}`,
+        fillerAddress: '0x9876543210987654321098765432109876543210' as Address,
       }
 
       const result = CompactBuilder.single(domain)
@@ -328,7 +329,7 @@ describe('Compact Builders', () => {
         .nonce(1n)
         .expires(expires)
         .addLock({ lockTag, token: tokenAddress, amount: 1000000n })
-        .addLock({ lockTag: '0x000000000000000000000002' as `0x${string}`, token: tokenAddress, amount: 2000000n })
+        .addLock({ lockTag: '0x000000000000000000000002' as Hex, token: tokenAddress, amount: 2000000n })
         .build()
 
       expect(result.struct.arbiter).toBe(arbiterAddress)
@@ -385,7 +386,7 @@ describe('Compact Builders', () => {
     it('should build a batch compact with witness', () => {
       const mandateType = SimpleMandateType
       const mandate = {
-        fillerAddress: '0x9876543210987654321098765432109876543210' as `0x${string}`,
+        fillerAddress: '0x9876543210987654321098765432109876543210' as Address,
       }
 
       const result = CompactBuilder.batch(domain)
@@ -487,8 +488,8 @@ describe('Compact Builders', () => {
     it('should build a multichain compact with elements', () => {
       const expires = BigInt(Date.now() + 3600000)
       const mandateType = SimpleMandateType
-      const mandate1 = { fillerAddress: '0x9876543210987654321098765432109876543210' as `0x${string}` }
-      const mandate2 = { fillerAddress: '0xfedcbafedcbafedcbafedcbafedcbafedcbafedd' as `0x${string}` }
+      const mandate1 = { fillerAddress: '0x9876543210987654321098765432109876543210' as Address }
+      const mandate2 = { fillerAddress: '0xfedcbafedcbafedcbafedcbafedcbafedcbafedd' as Address }
 
       const result = CompactBuilder.multichain(domain)
         .sponsor(sponsorAddress)
@@ -522,7 +523,7 @@ describe('Compact Builders', () => {
     it('should support expiresAt and expiresIn', () => {
       const expires = BigInt(Date.now() + 3600000)
       const mandateType = SimpleMandateType
-      const mandate = { fillerAddress: '0x9876543210987654321098765432109876543210' as `0x${string}` }
+      const mandate = { fillerAddress: '0x9876543210987654321098765432109876543210' as Hex }
 
       const result1 = CompactBuilder.multichain(domain)
         .sponsor(sponsorAddress)
@@ -557,7 +558,7 @@ describe('Compact Builders', () => {
 
     it('should generate valid EIP-712 typed data', () => {
       const mandateType = SimpleMandateType
-      const mandate = { fillerAddress: '0x9876543210987654321098765432109876543210' as `0x${string}` }
+      const mandate = { fillerAddress: '0x9876543210987654321098765432109876543210' as Address }
 
       const result = CompactBuilder.multichain(domain)
         .sponsor(sponsorAddress)
@@ -593,7 +594,7 @@ describe('Compact Builders', () => {
 
     it('should throw if sponsor is missing', () => {
       const mandateType = SimpleMandateType
-      const mandate = { fillerAddress: '0x9876543210987654321098765432109876543210' as `0x${string}` }
+      const mandate = { fillerAddress: '0x9876543210987654321098765432109876543210' as Address }
 
       expect(() =>
         CompactBuilder.multichain(domain)
@@ -611,7 +612,7 @@ describe('Compact Builders', () => {
 
     it('should throw if nonce is missing', () => {
       const mandateType = SimpleMandateType
-      const mandate = { fillerAddress: '0x9876543210987654321098765432109876543210' as `0x${string}` }
+      const mandate = { fillerAddress: '0x9876543210987654321098765432109876543210' as Address }
 
       expect(() =>
         CompactBuilder.multichain(domain)
@@ -629,7 +630,7 @@ describe('Compact Builders', () => {
 
     it('should throw if expires is missing', () => {
       const mandateType = SimpleMandateType
-      const mandate = { fillerAddress: '0x9876543210987654321098765432109876543210' as `0x${string}` }
+      const mandate = { fillerAddress: '0x9876543210987654321098765432109876543210' as Address }
 
       expect(() =>
         CompactBuilder.multichain(domain)
@@ -669,7 +670,7 @@ describe('Compact Builders', () => {
 
     it('should throw if element arbiter is missing', () => {
       const mandateType = SimpleMandateType
-      const mandate = { fillerAddress: '0x9876543210987654321098765432109876543210' as `0x${string}` }
+      const mandate = { fillerAddress: '0x9876543210987654321098765432109876543210' as Address }
 
       expect(() =>
         CompactBuilder.multichain(domain)
@@ -687,7 +688,7 @@ describe('Compact Builders', () => {
 
     it('should throw if element chainId is missing', () => {
       const mandateType = SimpleMandateType
-      const mandate = { fillerAddress: '0x9876543210987654321098765432109876543210' as `0x${string}` }
+      const mandate = { fillerAddress: '0x9876543210987654321098765432109876543210' as Address }
 
       expect(() =>
         CompactBuilder.multichain(domain)
@@ -705,7 +706,7 @@ describe('Compact Builders', () => {
 
     it('should throw if element has no commitments', () => {
       const mandateType = SimpleMandateType
-      const mandate = { fillerAddress: '0x9876543210987654321098765432109876543210' as `0x${string}` }
+      const mandate = { fillerAddress: '0x9876543210987654321098765432109876543210' as Address }
 
       expect(() =>
         CompactBuilder.multichain(domain)
@@ -741,8 +742,8 @@ describe('Compact Builders', () => {
     it('should build a multichain swap with multiple chains', () => {
       const expires = BigInt(Date.now() + 3600000)
       const mandateType = SimpleMandateType
-      const mandate1 = { fillerAddress: '0x9876543210987654321098765432109876543210' as `0x${string}` }
-      const mandate2 = { fillerAddress: '0xfedcbafedcbafedcbafedcbafedcbafedcbafedd' as `0x${string}` }
+      const mandate1 = { fillerAddress: '0x9876543210987654321098765432109876543210' as Address }
+      const mandate2 = { fillerAddress: '0xfedcbafedcbafedcbafedcbafedcbafedcbafedd' as Address }
 
       const result = CompactBuilder.multichain(domain)
         .sponsor(sponsorAddress)
@@ -759,7 +760,7 @@ describe('Compact Builders', () => {
         .chainId(137n) // Polygon
         .addCommitment({ lockTag, token: tokenAddress, amount: 2000000n })
         .addCommitment({
-          lockTag: '0x000000000000000000000002' as `0x${string}`,
+          lockTag: '0x000000000000000000000002' as Hex,
           token: tokenAddress,
           amount: 3000000n,
         })

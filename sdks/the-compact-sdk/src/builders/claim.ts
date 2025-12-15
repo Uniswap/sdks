@@ -516,7 +516,7 @@ export class BatchClaimBuilder extends BaseBatchClaimBuilder {
     return this
   }
 
-  build(): { struct: BatchClaim; hash: `0x${string}`; typedData: any } {
+  build(): { struct: BatchClaim; hash: Hex; typedData: any } {
     // Validate required fields
     invariant(this._sponsor, 'sponsor is required')
     invariant(this._nonce !== undefined, 'nonce is required')

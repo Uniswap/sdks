@@ -2,6 +2,7 @@
  * Tests for ViewClient
  */
 
+import { Address, Hex } from 'viem'
 import { encodeLockId } from '../encoding/locks'
 import { ResetPeriod, Scope } from '../types/runtime'
 
@@ -13,10 +14,10 @@ const mockPublicClient = {
   readContract: jest.fn(),
 } as any
 
-const testAddress = '0x00000000000000171ede64904551eeDF3C6C9788' as `0x${string}`
-const sponsorAddress = '0x1234567890123456789012345678901234567890' as `0x${string}`
-const allocatorAddress = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as `0x${string}`
-const tokenAddress = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as `0x${string}`
+const testAddress = '0x00000000000000171ede64904551eeDF3C6C9788' as Address
+const sponsorAddress = '0x1234567890123456789012345678901234567890' as Address
+const allocatorAddress = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as Address
+const tokenAddress = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as Address
 
 describe('ViewClient', () => {
   let config: CompactClientConfig
@@ -34,7 +35,7 @@ describe('ViewClient', () => {
 
   describe('getLockDetails()', () => {
     it('should get lock details', async () => {
-      const lockId = encodeLockId('0x123456789012345678901234', tokenAddress)
+      const lockId = encodeLockId('0x123456789012345678901234' as Hex, tokenAddress)
 
       // Mock contract response [token, allocator, resetPeriod, scope]
       mockPublicClient.readContract.mockResolvedValue([
@@ -72,7 +73,7 @@ describe('ViewClient', () => {
 
   describe('isRegistered()', () => {
     it('should check if claim is registered', async () => {
-      const claimHash = '0x1111111111111111111111111111111111111111111111111111111111111111' as `0x${string}`
+      const claimHash = '0x1111111111111111111111111111111111111111111111111111111111111111' as Hex
       const typehash = '0x2222222222222222222222222222222222222222222222222222222222222222' as `0x${string}`
 
       mockPublicClient.readContract.mockResolvedValue(true)
@@ -94,8 +95,8 @@ describe('ViewClient', () => {
     })
 
     it('should return false for unregistered claim', async () => {
-      const claimHash = '0x1111111111111111111111111111111111111111111111111111111111111111' as `0x${string}`
-      const typehash = '0x2222222222222222222222222222222222222222222222222222222222222222' as `0x${string}`
+      const claimHash = '0x1111111111111111111111111111111111111111111111111111111111111111' as Hex
+      const typehash = '0x2222222222222222222222222222222222222222222222222222222222222222' as Hex
 
       mockPublicClient.readContract.mockResolvedValue(false)
 

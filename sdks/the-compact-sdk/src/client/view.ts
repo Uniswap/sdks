@@ -8,16 +8,17 @@ import { theCompactAbi } from '../abi/theCompact'
 import { Scope, ResetPeriod } from '../types/runtime'
 
 import { CompactClientConfig } from './coreClient'
+import { Address, Hex } from 'viem'
 
 /**
  * Lock details returned from the contract
  */
 export interface LockDetails {
-  token: `0x${string}`
-  allocator: `0x${string}`
+  token: Address
+  allocator: Address
   resetPeriod: ResetPeriod
   scope: Scope
-  lockTag: `0x${string}`
+  lockTag: Hex
 }
 
 /**
@@ -122,7 +123,7 @@ export class ViewClient {
       allocator,
       resetPeriod,
       scope,
-      lockTag: `0x${lockTag}` as `0x${string}`,
+      lockTag: `0x${lockTag}` as Hex,
     }
   }
 
@@ -158,11 +159,7 @@ export class ViewClient {
    * }
    * ```
    */
-  async isRegistered(params: {
-    sponsor: `0x${string}`
-    claimHash: `0x${string}`
-    typehash: `0x${string}`
-  }): Promise<boolean> {
+  async isRegistered(params: { sponsor: Address; claimHash: Hex; typehash: Hex }): Promise<boolean> {
     invariant(this.config.address, 'contract address is required')
 
     const result = await this.config.publicClient.readContract({
@@ -198,7 +195,7 @@ export class ViewClient {
    * console.log('Locked amount:', balance)
    * ```
    */
-  async balanceOf(params: { account: `0x${string}`; id: bigint }): Promise<bigint> {
+  async balanceOf(params: { account: Address; id: bigint }): Promise<bigint> {
     invariant(this.config.address, 'contract address is required')
 
     const result = await this.config.publicClient.readContract({
@@ -238,7 +235,7 @@ export class ViewClient {
    * }
    * ```
    */
-  async hasConsumedAllocatorNonce(params: { nonce: bigint; allocator: `0x${string}` }): Promise<boolean> {
+  async hasConsumedAllocatorNonce(params: { nonce: bigint; allocator: Address }): Promise<boolean> {
     invariant(this.config.address, 'contract address is required')
 
     const result = await this.config.publicClient.readContract({
@@ -283,7 +280,7 @@ export class ViewClient {
    * }
    * ```
    */
-  async getForcedWithdrawalStatus(account: `0x${string}`, id: bigint): Promise<ForcedWithdrawalStatus> {
+  async getForcedWithdrawalStatus(account: Address, id: bigint): Promise<ForcedWithdrawalStatus> {
     invariant(this.config.address, 'contract address is required')
 
     const result = await this.config.publicClient.readContract({
@@ -320,7 +317,7 @@ export class ViewClient {
    * // Can be used to verify signatures match this contract
    * ```
    */
-  async getDomainSeparator(): Promise<`0x${string}`> {
+  async getDomainSeparator(): Promise<Hex> {
     invariant(this.config.address, 'contract address is required')
 
     const result = await this.config.publicClient.readContract({

@@ -3,7 +3,7 @@
  */
 
 import invariant from 'tiny-invariant'
-import { Account } from 'viem'
+import { Account, Hex } from 'viem'
 
 import { theCompactAbi } from '../abi/theCompact'
 import { ClaimBuilder } from '../builders/claim'
@@ -80,7 +80,7 @@ export class ArbiterClient {
    * console.log('Claim hash:', result.claimHash)
    * ```
    */
-  async claim(claim: Claim): Promise<{ txHash: `0x${string}`; claimHash: `0x${string}` }> {
+  async claim(claim: Claim): Promise<{ txHash: Hex; claimHash: Hex }> {
     invariant(this.config.walletClient, 'walletClient is required for claims')
     invariant(this.config.address, 'contract address is required')
 
@@ -135,7 +135,7 @@ export class ArbiterClient {
    * const result = await client.arbiter.batchClaim(claim.struct)
    * ```
    */
-  async batchClaim(claim: BatchClaim): Promise<{ txHash: `0x${string}`; claimHash: `0x${string}` }> {
+  async batchClaim(claim: BatchClaim): Promise<{ txHash: Hex; claimHash: Hex }> {
     invariant(this.config.walletClient, 'walletClient is required for claims')
     invariant(this.config.address, 'contract address is required')
 
@@ -190,7 +190,7 @@ export class ArbiterClient {
    * const result = await client.arbiter.multichainClaim(claim.struct)
    * ```
    */
-  async multichainClaim(claim: MultichainClaim): Promise<{ txHash: `0x${string}`; claimHash: `0x${string}` }> {
+  async multichainClaim(claim: MultichainClaim): Promise<{ txHash: Hex; claimHash: Hex }> {
     invariant(this.config.walletClient, 'walletClient is required for claims')
     invariant(this.config.address, 'contract address is required')
 
@@ -258,9 +258,7 @@ export class ArbiterClient {
    * const result = await client.arbiter.batchMultichainClaim(claim.struct)
    * ```
    */
-  async batchMultichainClaim(
-    claim: BatchMultichainClaim
-  ): Promise<{ txHash: `0x${string}`; claimHash: `0x${string}` }> {
+  async batchMultichainClaim(claim: BatchMultichainClaim): Promise<{ txHash: Hex; claimHash: Hex }> {
     invariant(this.config.walletClient, 'walletClient is required for claims')
     invariant(this.config.address, 'contract address is required')
 
@@ -417,9 +415,7 @@ export class ArbiterClient {
    * @throws {Error} If contract address is not set
    * @throws {CompactError} If the claim is invalid or processing fails
    */
-  async exogenousMultichainClaim(
-    claim: ExogenousMultichainClaim
-  ): Promise<{ txHash: `0x${string}`; claimHash: `0x${string}` }> {
+  async exogenousMultichainClaim(claim: ExogenousMultichainClaim): Promise<{ txHash: Hex; claimHash: Hex }> {
     invariant(this.config.walletClient, 'walletClient is required for claims')
     invariant(this.config.address, 'contract address is required')
 
@@ -470,9 +466,7 @@ export class ArbiterClient {
    * @throws {Error} If contract address is not set
    * @throws {CompactError} If the claim is invalid or processing fails
    */
-  async exogenousBatchMultichainClaim(
-    claim: ExogenousBatchMultichainClaim
-  ): Promise<{ txHash: `0x${string}`; claimHash: `0x${string}` }> {
+  async exogenousBatchMultichainClaim(claim: ExogenousBatchMultichainClaim): Promise<{ txHash: Hex; claimHash: Hex }> {
     invariant(this.config.walletClient, 'walletClient is required for claims')
     invariant(this.config.address, 'contract address is required')
 

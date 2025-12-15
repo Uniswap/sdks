@@ -2,6 +2,7 @@
  * Tests for Claim builders
  */
 
+import { Address, Hex } from 'viem'
 import { CompactDomain } from '../config/domain'
 import { encodeLockId } from '../encoding/locks'
 import { Compact, BatchCompact } from '../types/eip712'
@@ -16,12 +17,12 @@ describe('Claim Builders', () => {
     verifyingContract: '0x00000000000000171ede64904551eeDF3C6C9788',
   }
 
-  const sponsorAddress = '0x1234567890123456789012345678901234567890' as `0x${string}`
-  const recipientAddress = '0xfedcbafedcbafedcbafedcbafedcbafedcbafedd' as `0x${string}`
-  const usdcAddress = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48' as `0x${string}`
-  const lockTag = '0x000000000000000000000001' as `0x${string}`
+  const sponsorAddress = '0x1234567890123456789012345678901234567890' as Address
+  const recipientAddress = '0xfedcbafedcbafedcbafedcbafedcbafedcbafedd' as Address
+  const usdcAddress = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48' as Address
+  const lockTag = '0x000000000000000000000001' as Hex
   const signature =
-    '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12' as `0x${string}`
+    '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12' as Hex
 
   describe('ClaimBuilder factory', () => {
     it('should create a SingleClaimBuilder', () => {
@@ -60,7 +61,7 @@ describe('Claim Builders', () => {
 
     it('should pre-fill from a compact', () => {
       const compact: Compact = {
-        arbiter: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as `0x${string}`,
+        arbiter: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as Address,
         sponsor: sponsorAddress,
         nonce: 1n,
         expires: BigInt(Date.now() + 3600000),
@@ -84,7 +85,7 @@ describe('Claim Builders', () => {
 
     it('should allow explicit id in fromCompact', () => {
       const compact: Compact = {
-        arbiter: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as `0x${string}`,
+        arbiter: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as Address,
         sponsor: sponsorAddress,
         nonce: 1n,
         expires: BigInt(Date.now() + 3600000),
@@ -106,7 +107,7 @@ describe('Claim Builders', () => {
 
     it('should allow different token in fromCompact', () => {
       const compact: Compact = {
-        arbiter: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as `0x${string}`,
+        arbiter: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as Address,
         sponsor: sponsorAddress,
         nonce: 1n,
         expires: BigInt(Date.now() + 3600000),
@@ -115,7 +116,7 @@ describe('Claim Builders', () => {
         amount: 1000000n,
       }
 
-      const daiAddress = '0x6b175474e89094c44da98b954eedeac495271d0f' as `0x${string}`
+      const daiAddress = '0x6b175474e89094c44da98b954eedeac495271d0f' as Address
 
       const claim = ClaimBuilder.single(domain)
         .fromCompact({ compact, signature, token: daiAddress })
@@ -143,7 +144,7 @@ describe('Claim Builders', () => {
     })
 
     it('should add convert claimant', () => {
-      const targetLockTag = '0x000000000000000000000002' as `0x${string}`
+      const targetLockTag = '0x000000000000000000000002' as Hex
 
       const claim = ClaimBuilder.single(domain)
         .sponsor(sponsorAddress)
@@ -218,7 +219,7 @@ describe('Claim Builders', () => {
     })
 
     it('should set allocator data', () => {
-      const allocatorData = '0x1234' as `0x${string}`
+      const allocatorData = '0x1234' as Hex
 
       const claim = ClaimBuilder.single(domain)
         .sponsor(sponsorAddress)
@@ -329,7 +330,7 @@ describe('Claim Builders', () => {
     it('should build a batch claim with manual field setting', () => {
       const expires = BigInt(Date.now() + 3600000)
       const id1 = encodeLockId(lockTag, usdcAddress)
-      const id2 = encodeLockId(lockTag, '0x6b175474e89094c44da98b954eedeac495271d0f' as `0x${string}`)
+      const id2 = encodeLockId(lockTag, '0x6b175474e89094c44da98b954eedeac495271d0f' as Address)
 
       const claim = ClaimBuilder.batch(domain)
         .sponsor(sponsorAddress)
@@ -366,7 +367,7 @@ describe('Claim Builders', () => {
 
     it('should pre-fill from a batch compact', () => {
       const compact: BatchCompact = {
-        arbiter: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as `0x${string}`,
+        arbiter: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as Address,
         sponsor: sponsorAddress,
         nonce: 1n,
         expires: BigInt(Date.now() + 3600000),
@@ -377,16 +378,16 @@ describe('Claim Builders', () => {
             amount: 1000000n,
           },
           {
-            lockTag: '0x000000000000000000000002' as `0x${string}`,
+            lockTag: '0x000000000000000000000002' as Hex,
             token: usdcAddress,
             amount: 2000000n,
           },
         ],
       }
 
-      const lockTag2 = '0x000000000000000000000002' as `0x${string}`
+      const lockTag2 = '0x000000000000000000000002' as Hex
       const signature =
-        '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12' as `0x${string}`
+        '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12' as Hex
 
       // Use fromCompact to pre-fill sponsor, nonce, expires, and signature
       const claim = ClaimBuilder.batch(domain)
@@ -460,7 +461,7 @@ describe('Claim Builders', () => {
     })
 
     it('should add multiple claimants', () => {
-      const lockTag2 = '0x000000000000000000000002' as `0x${string}`
+      const lockTag2 = '0x000000000000000000000002' as Hex
 
       const claim = ClaimBuilder.batch(domain)
         .sponsor(sponsorAddress)
@@ -514,7 +515,7 @@ describe('Claim Builders', () => {
     })
 
     it('should set allocator data', () => {
-      const allocatorData = '0x1234' as `0x${string}`
+      const allocatorData = '0x1234' as Hex
 
       const claim = ClaimBuilder.batch(domain)
         .sponsor(sponsorAddress)
@@ -658,8 +659,8 @@ describe('Claim Builders', () => {
 
     it('should support additional chain hashes', () => {
       const resourceId = encodeLockId(lockTag, usdcAddress)
-      const chainHash1 = '0x1111111111111111111111111111111111111111111111111111111111111111' as `0x${string}`
-      const chainHash2 = '0x2222222222222222222222222222222222222222222222222222222222222222' as `0x${string}`
+      const chainHash1 = '0x1111111111111111111111111111111111111111111111111111111111111111' as Hex
+      const chainHash2 = '0x2222222222222222222222222222222222222222222222222222222222222222' as Hex
 
       const claim = ClaimBuilder.multichain(domain)
         .sponsor(sponsorAddress)
@@ -679,7 +680,7 @@ describe('Claim Builders', () => {
     })
 
     it('should set allocator data', () => {
-      const allocatorData = '0x1234' as `0x${string}`
+      const allocatorData = '0x1234' as Hex
       const resourceId = encodeLockId(lockTag, usdcAddress)
 
       const claim = ClaimBuilder.multichain(domain)
@@ -779,7 +780,7 @@ describe('Claim Builders', () => {
     it('should build a batch multichain claim with multiple resources', () => {
       const expires = BigInt(Date.now() + 3600000)
       const resourceId1 = encodeLockId(lockTag, usdcAddress)
-      const resourceId2 = encodeLockId('0x000000000000000000000002' as `0x${string}`, usdcAddress)
+      const resourceId2 = encodeLockId('0x000000000000000000000002' as Hex, usdcAddress)
 
       const claim = ClaimBuilder.batchMultichain(domain)
         .sponsor(sponsorAddress)
@@ -797,7 +798,7 @@ describe('Claim Builders', () => {
         .addClaim()
         .id(resourceId2)
         .allocatedAmount(2000000n)
-        .addPortion('0x000000000000000000000002' as `0x${string}`, {
+        .addPortion('0x000000000000000000000002' as Hex, {
           kind: 'withdraw',
           recipient: recipientAddress,
           amount: 2000000n,
@@ -818,7 +819,7 @@ describe('Claim Builders', () => {
 
     it('should support multiple portions per claim', () => {
       const resourceId = encodeLockId(lockTag, usdcAddress)
-      const lockTag2 = '0x000000000000000000000002' as `0x${string}`
+      const lockTag2 = '0x000000000000000000000002' as Hex
 
       const claim = ClaimBuilder.batchMultichain(domain)
         .sponsor(sponsorAddress)
@@ -847,7 +848,7 @@ describe('Claim Builders', () => {
 
     it('should support additional chain hashes', () => {
       const resourceId = encodeLockId(lockTag, usdcAddress)
-      const chainHash1 = '0x1111111111111111111111111111111111111111111111111111111111111111' as `0x${string}`
+      const chainHash1 = '0x1111111111111111111111111111111111111111111111111111111111111111' as Hex
 
       const claim = ClaimBuilder.batchMultichain(domain)
         .sponsor(sponsorAddress)
@@ -930,7 +931,7 @@ describe('Claim Builders', () => {
   describe('complex claim example', () => {
     it('should build a multi-recipient claim with convert and withdraw', () => {
       const compact: Compact = {
-        arbiter: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as `0x${string}`,
+        arbiter: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as Address,
         sponsor: sponsorAddress,
         nonce: 1n,
         expires: BigInt(Date.now() + 3600000),
@@ -939,8 +940,8 @@ describe('Claim Builders', () => {
         amount: 1000000n,
       }
 
-      const recipient2 = '0x9876543210987654321098765432109876543210' as `0x${string}`
-      const targetLockTag = '0x000000000000000000000002' as `0x${string}`
+      const recipient2 = '0x9876543210987654321098765432109876543210' as Address
+      const targetLockTag = '0x000000000000000000000002' as Hex
 
       const claim = ClaimBuilder.single(domain)
         .fromCompact({ compact, signature })
@@ -959,7 +960,7 @@ describe('Claim Builders', () => {
     it('should build a cross-chain multichain claim with hash references', () => {
       const expires = BigInt(Date.now() + 3600000)
       const resourceId = encodeLockId(lockTag, usdcAddress)
-      const polygonChainHash = '0x1234567890123456789012345678901234567890123456789012345678901234' as `0x${string}`
+      const polygonChainHash = '0x1234567890123456789012345678901234567890123456789012345678901234' as Hex
 
       const claim = ClaimBuilder.multichain(domain)
         .sponsor(sponsorAddress)
@@ -1264,7 +1265,7 @@ describe('Claim Builders', () => {
     it('should build an exogenous multichain claim with chain identification', () => {
       const expires = BigInt(Date.now() + 3600000)
       const resourceId = encodeLockId(lockTag, usdcAddress)
-      const chainHash1 = '0x1111111111111111111111111111111111111111111111111111111111111111' as `0x${string}`
+      const chainHash1 = '0x1111111111111111111111111111111111111111111111111111111111111111' as Hex
 
       const claim = ClaimBuilder.exogenousMultichain(domain)
         .sponsor(sponsorAddress)
@@ -1326,9 +1327,9 @@ describe('Claim Builders', () => {
     it('should build an exogenous batch multichain claim with chain identification', () => {
       const expires = BigInt(Date.now() + 3600000)
       const resourceId1 = encodeLockId(lockTag, usdcAddress)
-      const resourceId2 = encodeLockId('0x000000000000000000000002' as `0x${string}`, usdcAddress)
-      const chainHash1 = '0x1111111111111111111111111111111111111111111111111111111111111111' as `0x${string}`
-      const chainHash2 = '0x2222222222222222222222222222222222222222222222222222222222222222' as `0x${string}`
+      const resourceId2 = encodeLockId('0x000000000000000000000002' as Hex, usdcAddress)
+      const chainHash1 = '0x1111111111111111111111111111111111111111111111111111111111111111' as Hex
+      const chainHash2 = '0x2222222222222222222222222222222222222222222222222222222222222222' as Hex
 
       const claim = ClaimBuilder.exogenousBatchMultichain(domain)
         .sponsor(sponsorAddress)
@@ -1348,7 +1349,7 @@ describe('Claim Builders', () => {
         .addClaim()
         .id(resourceId2)
         .allocatedAmount(2000000n)
-        .addPortion('0x000000000000000000000002' as `0x${string}`, {
+        .addPortion('0x000000000000000000000002' as Hex, {
           kind: 'withdraw',
           recipient: recipientAddress,
           amount: 2000000n,
@@ -1373,7 +1374,7 @@ describe('Claim Builders', () => {
 
     it('should support multiple portions per claim', () => {
       const resourceId = encodeLockId(lockTag, usdcAddress)
-      const lockTag2 = '0x000000000000000000000002' as `0x${string}`
+      const lockTag2 = '0x000000000000000000000002' as Hex
 
       const claim = ClaimBuilder.exogenousBatchMultichain(domain)
         .sponsor(sponsorAddress)
@@ -1455,7 +1456,7 @@ describe('Claim Builders', () => {
     })
 
     it('should inherit addAdditionalChainHash from parent', () => {
-      const chainHash = '0x1111111111111111111111111111111111111111111111111111111111111111' as `0x${string}`
+      const chainHash = '0x1111111111111111111111111111111111111111111111111111111111111111' as Hex
 
       const claim = ClaimBuilder.exogenousBatchMultichain(domain)
         .sponsor(sponsorAddress)

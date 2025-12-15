@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from '@jest/globals'
-import { createPublicClient, http } from 'viem'
+import { Address, createPublicClient, http } from 'viem'
 import { mainnet } from 'viem/chains'
 
 import { createCompactClient } from './client/coreClient'
@@ -191,7 +191,7 @@ describeIntegration('The Compact SDK - Mainnet Integration', () => {
       ]
 
       for (const token of testTokens) {
-        const lockId = encodeLockId(testLockTag, token as `0x${string}`)
+        const lockId = encodeLockId(testLockTag, token as Address)
         const decoded = decodeLockId(lockId)
 
         expect(decoded.lockTag.toLowerCase()).toBe(testLockTag.toLowerCase())

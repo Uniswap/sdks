@@ -3,12 +3,14 @@
  * These mirror the Solidity structs exactly
  */
 
+import { Address, Hex } from 'viem'
+
 /**
  * A commitment to lock a specific amount of a token
  */
 export interface Lock {
-  lockTag: `0x${string}` // bytes12
-  token: `0x${string}` // address (or zero address for native)
+  lockTag: Hex // bytes12
+  token: Address // address (or zero address for native)
   amount: bigint // uint256
 }
 
@@ -16,12 +18,12 @@ export interface Lock {
  * A single compact - commits to locking tokens for a specific arbiter
  */
 export interface Compact {
-  arbiter: `0x${string}` // address
-  sponsor: `0x${string}` // address
+  arbiter: Address // address
+  sponsor: Address // address
   nonce: bigint // uint256
   expires: bigint // uint256 (timestamp)
-  lockTag: `0x${string}` // bytes12
-  token: `0x${string}` // address
+  lockTag: Hex // bytes12
+  token: Address // address
   amount: bigint // uint256
 }
 
@@ -29,8 +31,8 @@ export interface Compact {
  * A batch compact - commits to multiple locks for a specific arbiter
  */
 export interface BatchCompact {
-  arbiter: `0x${string}` // address
-  sponsor: `0x${string}` // address
+  arbiter: Address // address
+  sponsor: Address // address
   nonce: bigint // uint256
   expires: bigint // uint256 (timestamp)
   commitments: Lock[] // Lock[]
@@ -41,7 +43,7 @@ export interface BatchCompact {
  * Each element represents commitments on a specific chain with a specific arbiter
  */
 export interface MultichainElement {
-  arbiter: `0x${string}` // address
+  arbiter: Address // address
   chainId: bigint // uint256
   commitments: Lock[] // Lock[]
 }
@@ -50,7 +52,7 @@ export interface MultichainElement {
  * A multichain compact - commits to locks across multiple chains
  */
 export interface MultichainCompact {
-  sponsor: `0x${string}` // address
+  sponsor: Address // address
   nonce: bigint // uint256
   expires: bigint // uint256 (timestamp)
   elements: MultichainElement[] // Element[]

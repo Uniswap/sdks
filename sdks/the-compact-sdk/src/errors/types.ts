@@ -2,6 +2,8 @@
  * Error types for The Compact
  */
 
+import { Hex } from 'viem'
+
 /**
  * Known error kinds from The Compact contract
  */
@@ -38,18 +40,13 @@ export interface CompactError extends Error {
   kind: CompactErrorKind
   data?: any
   selector?: string
-  rawData?: `0x${string}`
+  rawData?: Hex
 }
 
 /**
  * Create a CompactError
  */
-export function createCompactError(
-  kind: CompactErrorKind,
-  message?: string,
-  data?: any,
-  rawData?: `0x${string}`
-): CompactError {
+export function createCompactError(kind: CompactErrorKind, message?: string, data?: any, rawData?: Hex): CompactError {
   const error = new Error(message || kind) as CompactError
   error.kind = kind
   error.data = data

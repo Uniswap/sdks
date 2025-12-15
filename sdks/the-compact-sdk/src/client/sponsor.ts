@@ -3,7 +3,7 @@
  */
 
 import invariant from 'tiny-invariant'
-import { Account, decodeEventLog } from 'viem'
+import { Account, Address, decodeEventLog, Hex } from 'viem'
 
 import { theCompactAbi } from '../abi/theCompact'
 import { CompactBuilder } from '../builders/compact'
@@ -81,10 +81,10 @@ export class SponsorClient {
    * ```
    */
   async depositNative(params: {
-    lockTag: `0x${string}`
-    recipient: `0x${string}`
+    lockTag: Hex
+    recipient: Address
     value: bigint
-  }): Promise<{ txHash: `0x${string}`; id: bigint }> {
+  }): Promise<{ txHash: Hex; id: bigint }> {
     invariant(this.config.walletClient, 'walletClient is required for deposits')
     invariant(this.config.address, 'contract address is required')
 
@@ -170,11 +170,11 @@ export class SponsorClient {
    * ```
    */
   async depositERC20(params: {
-    token: `0x${string}`
-    lockTag: `0x${string}`
+    token: Address
+    lockTag: Hex
     amount: bigint
-    recipient: `0x${string}`
-  }): Promise<{ txHash: `0x${string}`; id: bigint }> {
+    recipient: Address
+  }): Promise<{ txHash: Hex; id: bigint }> {
     invariant(this.config.walletClient, 'walletClient is required for deposits')
     invariant(this.config.address, 'contract address is required')
 
@@ -252,7 +252,7 @@ export class SponsorClient {
    * console.log('Registered claim:', txHash)
    * ```
    */
-  async register(params: { claimHash: `0x${string}`; typehash: `0x${string}` }): Promise<`0x${string}`> {
+  async register(params: { claimHash: Hex; typehash: Hex }): Promise<Hex> {
     invariant(this.config.walletClient, 'walletClient is required for registration')
     invariant(this.config.address, 'contract address is required')
 
@@ -300,7 +300,7 @@ export class SponsorClient {
    * // Wait for the delay period, then call forcedWithdrawal()
    * ```
    */
-  async enableForcedWithdrawal(id: bigint): Promise<{ txHash: `0x${string}`; withdrawableAt: bigint }> {
+  async enableForcedWithdrawal(id: bigint): Promise<{ txHash: Hex; withdrawableAt: bigint }> {
     invariant(this.config.walletClient, 'walletClient is required')
     invariant(this.config.address, 'contract address is required')
 
@@ -367,7 +367,7 @@ export class SponsorClient {
    * console.log('Forced withdrawal disabled:', txHash)
    * ```
    */
-  async disableForcedWithdrawal(id: bigint): Promise<`0x${string}`> {
+  async disableForcedWithdrawal(id: bigint): Promise<Hex> {
     invariant(this.config.walletClient, 'walletClient is required')
     invariant(this.config.address, 'contract address is required')
 
@@ -424,7 +424,7 @@ export class SponsorClient {
    * console.log('Withdrawal transaction:', txHash)
    * ```
    */
-  async forcedWithdrawal(id: bigint, recipient: `0x${string}`, amount: bigint): Promise<`0x${string}`> {
+  async forcedWithdrawal(id: bigint, recipient: Address, amount: bigint): Promise<Hex> {
     invariant(this.config.walletClient, 'walletClient is required')
     invariant(this.config.address, 'contract address is required')
 

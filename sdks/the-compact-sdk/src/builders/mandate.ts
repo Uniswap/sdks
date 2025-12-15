@@ -4,7 +4,7 @@
  */
 
 import invariant from 'tiny-invariant'
-import { keccak256, encodeAbiParameters, concat } from 'viem'
+import { keccak256, encodeAbiParameters, concat, Hex, toHex, Address } from 'viem'
 
 /**
  * EIP-712 field definition
@@ -33,17 +33,17 @@ export interface MandateType<TValue extends object = any> {
   /**
    * Get the EIP-712 typehash (keccak256 of the typestring)
    */
-  typehash(): `0x${string}`
+  typehash(): Hex
 
   /**
    * Encode a mandate value to ABI-encoded bytes
    */
-  encode(value: TValue): `0x${string}`
+  encode(value: TValue): Hex
 
   /**
    * Hash a mandate value to bytes32
    */
-  hash(value: TValue): `0x${string}`
+  hash(value: TValue): Hex
 }
 
 /**
@@ -85,11 +85,11 @@ export function defineMandateType<TValue extends object>(config: MandateTypeConf
   const witnessTypestring = buildWitnessTypestring(fields, nestedTypes)
 
   // Precompute type hashes for nested types (EIP-712 struct hashing)
-  const typeHashes = new Map<string, `0x${string}`>()
+  const typeHashes = new Map<string, Hex>()
   if (nestedTypes) {
     for (const [typeName, typeFields] of Object.entries(nestedTypes)) {
       const typestring = buildFullTypestring(typeName, typeFields, nestedTypes)
-      typeHashes.set(typeName, keccak256(typestring as `0x${string}`))
+      typeHashes.set(typeName, keccak256(toHex(typestring)))
     }
   }
 
@@ -104,11 +104,11 @@ export function defineMandateType<TValue extends object>(config: MandateTypeConf
       return `Mandate(${witnessTypestring})`
     },
 
-    typehash(): `0x${string}` {
-      return keccak256(this.typestring() as `0x${string}`)
+    typehash(): Hex {
+      return keccak256(toHex(this.typestring()))
     },
 
-    encode(value: TValue): `0x${string}` {
+    encode(value: TValue): Hex {
       // Check if any field is an array or a custom type
       // Note: Check for arrays BEFORE checking isPrimitiveType, since isPrimitiveType
       // strips array suffix and would return true for "uint256[]"
@@ -134,7 +134,7 @@ export function defineMandateType<TValue extends object>(config: MandateTypeConf
       return encodeAbiParameters(params, values)
     },
 
-    hash(value: TValue): `0x${string}` {
+    hash(value: TValue): Hex {
       const encoded = this.encode(value)
       return keccak256(encoded)
     },
@@ -212,9 +212,9 @@ function encodeStructValue(
   fields: readonly Eip712Field[],
   value: any,
   nestedTypes: Record<string, readonly Eip712Field[]>,
-  typeHashes: Map<string, `0x${string}`>
-): `0x${string}` {
-  const encodedValues: `0x${string}`[] = []
+  typeHashes: Map<string, Hex>
+): Hex {
+  const encodedValues: Hex[] = []
 
   for (const field of fields) {
     const fieldValue = value[field.name]
@@ -229,7 +229,7 @@ function encodeStructValue(
       encodedValues.push(keccak256(encoded))
     } else if (isArray && nestedTypes[baseType]) {
       // Array of structs: hash each struct, concatenate, then hash
-      const structHashes: `0x${string}`[] = []
+      const structHashes: Hex[] = []
       for (const item of fieldValue) {
         const itemEncoded = encodeStructValue(nestedTypes[baseType], item, nestedTypes, typeHashes)
         const typeHash = typeHashes.get(baseType)
@@ -384,15 +384,15 @@ export const MandateFields = {
  * ```
  */
 export const TribunalMandate = defineMandateType<{
-  adjuster: `0x${string}`
+  adjuster: Address
   fills: Array<{
     chainId: bigint
-    tribunal: `0x${string}`
+    tribunal: Address
     expires: bigint
     components: Array<{
-      fillToken: `0x${string}`
+      fillToken: Address
       minimumFillAmount: bigint
-      recipient: `0x${string}`
+      recipient: Address
       applyScaling: boolean
     }>
     baselinePriorityFee: bigint
@@ -401,20 +401,20 @@ export const TribunalMandate = defineMandateType<{
     recipientCallback: Array<{
       chainId: bigint
       compact: {
-        arbiter: `0x${string}`
-        sponsor: `0x${string}`
+        arbiter: Address
+        sponsor: Address
         nonce: bigint
         expires: bigint
         commitments: Array<{
-          lockTag: `0x${string}`
-          token: `0x${string}`
+          lockTag: Hex
+          token: Address
           amount: bigint
         }>
         mandate: any
       }
-      context: `0x${string}`
+      context: Hex
     }>
-    salt: `0x${string}`
+    salt: Hex
   }>
 }>({
   fields: [MandateFields.address('adjuster'), { name: 'fills', type: 'Mandate_Fill[]' }],

@@ -2,7 +2,7 @@
  * EIP-712 domain configuration for The Compact
  */
 
-import { keccak256, encodeAbiParameters } from 'viem'
+import { keccak256, encodeAbiParameters, Address, Hex, toHex } from 'viem'
 
 /**
  * EIP-712 domain for The Compact v1
@@ -11,7 +11,7 @@ export interface CompactDomain {
   name: 'The Compact'
   version: '1'
   chainId: number
-  verifyingContract: `0x${string}`
+  verifyingContract: Address
 }
 
 /**
@@ -19,7 +19,7 @@ export interface CompactDomain {
  * @param params - Chain ID and contract address
  * @returns The EIP-712 domain object
  */
-export function createDomain(params: { chainId: number; contractAddress: `0x${string}` }): CompactDomain {
+export function createDomain(params: { chainId: number; contractAddress: Address }): CompactDomain {
   return {
     name: 'The Compact',
     version: '1',
@@ -32,7 +32,7 @@ export function createDomain(params: { chainId: number; contractAddress: `0x${st
  * EIP-712 domain type hash
  * keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
  */
-const EIP712_DOMAIN_TYPEHASH = '0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f' as `0x${string}`
+const EIP712_DOMAIN_TYPEHASH = '0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f' as Hex
 
 /**
  * Get the domain separator hash for a given domain
@@ -50,9 +50,9 @@ const EIP712_DOMAIN_TYPEHASH = '0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffa
  * @param domain - The domain to hash
  * @returns The domain separator hash
  */
-export function getDomainSeparator(domain: CompactDomain): `0x${string}` {
-  const nameHash = keccak256(Buffer.from(domain.name))
-  const versionHash = keccak256(Buffer.from(domain.version))
+export function getDomainSeparator(domain: CompactDomain): Hex {
+  const nameHash = keccak256(toHex(domain.name))
+  const versionHash = keccak256(toHex(domain.version))
 
   const encoded = encodeAbiParameters(
     [

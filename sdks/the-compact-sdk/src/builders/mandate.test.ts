@@ -1,4 +1,4 @@
-import { Address, concat, encodeAbiParameters, Hex, keccak256 } from 'viem'
+import { Address, concat, encodeAbiParameters, Hex, keccak256, toHex } from 'viem'
 
 import { defineMandateType, MandateFields, simpleMandate } from './mandate'
 
@@ -322,7 +322,7 @@ describe('mandate', () => {
       // Manually compute expected encoding to validate EIP-712 compliance
       // Per EIP-712: hashStruct(s) = keccak256(typeHash || encodeData(s))
       const itemTypestring = 'Mandate_Item(uint256 id,uint256 amount)'
-      const itemTypehash = keccak256(itemTypestring as `0x${string}`)
+      const itemTypehash = keccak256(toHex(itemTypestring))
 
       // Encode first item: abi.encode(1, 100)
       const item1Encoded = encodeAbiParameters(
@@ -385,7 +385,7 @@ describe('mandate', () => {
       // Step 1: Encode Mandate_Meta (innermost struct)
       const metaTypestring = 'Mandate_Meta(address token,uint256 amount)'
       expect(Mandate.witnessTypestring).toMatch(metaTypestring.slice(0, -1))
-      const metaTypehash = keccak256(metaTypestring as `0x${string}`)
+      const metaTypehash = keccak256(toHex(metaTypestring))
       const metaEncoded = encodeAbiParameters(
         [
           { name: 'token', type: 'address' },
@@ -397,7 +397,7 @@ describe('mandate', () => {
 
       // Step 2: Encode Mandate_Data (includes metaHash)
       const dataTypestring = 'Mandate_Data(uint256 value,Mandate_Meta meta)Mandate_Meta(address token,uint256 amount)'
-      const dataTypehash = keccak256(dataTypestring as `0x${string}`)
+      const dataTypehash = keccak256(toHex(dataTypestring))
       const dataEncoded = concat([
         encodeAbiParameters([{ name: 'value', type: 'uint256' }] as any, [witnessValue.data.value]),
         metaHash,
@@ -467,7 +467,7 @@ describe('mandate', () => {
       const Mandate = simpleMandate([MandateFields.uint256('witnessArgument')])
 
       const typehash = Mandate.typehash()
-      const expectedTypehash = keccak256('Mandate(uint256 witnessArgument)' as `0x${string}`)
+      const expectedTypehash = keccak256(toHex('Mandate(uint256 witnessArgument)'))
 
       expect(typehash).toBe(expectedTypehash)
     })

@@ -2,6 +2,7 @@
  * Tests for ArbiterClient
  */
 
+import { Address, Hex } from 'viem'
 import { claimHash, batchClaimHash } from '../encoding/hashes'
 import { Claim, BatchClaim, MultichainClaim, BatchMultichainClaim } from '../types/claims'
 
@@ -14,10 +15,10 @@ const mockWalletClient = {
   writeContract: jest.fn(),
 } as any
 
-const testAddress = '0x00000000000000171ede64904551eeDF3C6C9788' as `0x${string}`
-const sponsorAddress = '0x1234567890123456789012345678901234567890' as `0x${string}`
-const recipientAddress = '0xfedcbafedcbafedcbafedcbafedcbafedcbafedd' as `0x${string}`
-const lockTag = '0x000000000000000000000001' as `0x${string}`
+const testAddress = '0x00000000000000171ede64904551eeDF3C6C9788' as Address
+const sponsorAddress = '0x1234567890123456789012345678901234567890' as Address
+const recipientAddress = '0xfedcbafedcbafedcbafedcbafedcbafedcbafedd' as Address
+const lockTag = '0x000000000000000000000001' as Hex
 
 describe('ArbiterClient', () => {
   let config: CompactClientConfig
@@ -37,12 +38,12 @@ describe('ArbiterClient', () => {
   describe('claim()', () => {
     it('should submit a valid claim', async () => {
       const claim: Claim = {
-        allocatorData: '0x' as `0x${string}`,
-        sponsorSignature: '0x' as `0x${string}`,
+        allocatorData: '0x' as Hex,
+        sponsorSignature: '0x' as Hex,
         sponsor: sponsorAddress,
         nonce: 1n,
         expires: BigInt(Date.now() + 3600000),
-        witness: '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`,
+        witness: '0x0000000000000000000000000000000000000000000000000000000000000000' as Hex,
         witnessTypestring: '',
         id: 100n,
         allocatedAmount: 1000000n,
@@ -54,7 +55,7 @@ describe('ArbiterClient', () => {
         ],
       }
 
-      const txHash = '0xabcdef' as `0x${string}`
+      const txHash = '0xabcdef' as Hex
       mockWalletClient.writeContract.mockResolvedValue(txHash)
 
       const result = await client.claim(claim)
@@ -116,12 +117,12 @@ describe('ArbiterClient', () => {
   describe('batchClaim()', () => {
     it('should submit a valid batch claim', async () => {
       const claim: BatchClaim = {
-        allocatorData: '0x' as `0x${string}`,
-        sponsorSignature: '0x' as `0x${string}`,
+        allocatorData: '0x' as Hex,
+        sponsorSignature: '0x' as Hex,
         sponsor: sponsorAddress,
         nonce: 1n,
         expires: BigInt(Date.now() + 3600000),
-        witness: '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`,
+        witness: '0x0000000000000000000000000000000000000000000000000000000000000000' as Hex,
         witnessTypestring: '',
         claims: [
           {
@@ -147,7 +148,7 @@ describe('ArbiterClient', () => {
         ],
       }
 
-      const txHash = '0xabcdef' as `0x${string}`
+      const txHash = '0xabcdef' as Hex
       mockWalletClient.writeContract.mockResolvedValue(txHash)
 
       const result = await client.batchClaim(claim)
@@ -183,12 +184,12 @@ describe('ArbiterClient', () => {
   describe('multichainClaim()', () => {
     it('should submit a valid multichain claim', async () => {
       const claim: MultichainClaim = {
-        allocatorData: '0x' as `0x${string}`,
-        sponsorSignature: '0x' as `0x${string}`,
+        allocatorData: '0x' as Hex,
+        sponsorSignature: '0x' as Hex,
         sponsor: sponsorAddress,
         nonce: 1n,
         expires: BigInt(Date.now() + 3600000),
-        witness: '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`,
+        witness: '0x0000000000000000000000000000000000000000000000000000000000000000' as Hex,
         witnessTypestring: '',
         id: 100n,
         allocatedAmount: 1000000n,
@@ -198,10 +199,10 @@ describe('ArbiterClient', () => {
             amount: 1000000n,
           },
         ],
-        additionalChains: ['0x1111111111111111111111111111111111111111111111111111111111111111' as `0x${string}`],
+        additionalChains: ['0x1111111111111111111111111111111111111111111111111111111111111111' as Hex],
       }
 
-      const txHash = '0xabcdef' as `0x${string}`
+      const txHash = '0xabcdef' as Hex
       mockWalletClient.writeContract.mockResolvedValue(txHash)
 
       const result = await client.multichainClaim(claim)
@@ -236,12 +237,12 @@ describe('ArbiterClient', () => {
   describe('batchMultichainClaim()', () => {
     it('should submit a valid batch multichain claim', async () => {
       const claim: BatchMultichainClaim = {
-        allocatorData: '0x' as `0x${string}`,
-        sponsorSignature: '0x' as `0x${string}`,
+        allocatorData: '0x' as Hex,
+        sponsorSignature: '0x' as Hex,
         sponsor: sponsorAddress,
         nonce: 1n,
         expires: BigInt(Date.now() + 3600000),
-        witness: '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`,
+        witness: '0x0000000000000000000000000000000000000000000000000000000000000000' as Hex,
         witnessTypestring: '',
         claims: [
           {
@@ -255,10 +256,10 @@ describe('ArbiterClient', () => {
             ],
           },
         ],
-        additionalChains: ['0x1111111111111111111111111111111111111111111111111111111111111111' as `0x${string}`],
+        additionalChains: ['0x1111111111111111111111111111111111111111111111111111111111111111' as Hex],
       }
 
-      const txHash = '0xabcdef' as `0x${string}`
+      const txHash = '0xabcdef' as Hex
       mockWalletClient.writeContract.mockResolvedValue(txHash)
 
       const result = await client.batchMultichainClaim(claim)

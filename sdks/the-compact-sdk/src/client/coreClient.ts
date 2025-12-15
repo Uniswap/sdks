@@ -2,7 +2,7 @@
  * Core client for interacting with The Compact
  */
 
-import { PublicClient, WalletClient } from 'viem'
+import { Address, PublicClient, WalletClient } from 'viem'
 
 import { getDefaultAddress } from '../config/chains'
 
@@ -55,7 +55,7 @@ export interface CompactClientConfig {
    * Optional contract address to use instead of the default deployment
    * @example '0x00000000000000171ede64904551eeDF3C6C9788'
    */
-  address?: `0x${string}`
+  address?: Address
 
   /**
    * Viem PublicClient for read-only operations

@@ -6,15 +6,17 @@ import invariant from 'tiny-invariant'
 
 import { createPriceCurve, PriceCurveElement } from '../lib/priceCurve'
 import { FillComponent, FillParameters, Mandate, RecipientCallback } from '../types/tribunal'
+import { Address, Hex, toHex } from 'viem'
+import { randomBytes } from 'crypto'
 
 /**
  * Builder for FillComponent
  * Provides a fluent interface for constructing fill component specifications
  */
 export class FillComponentBuilder {
-  private _fillToken?: `0x${string}`
+  private _fillToken?: Address
   private _minimumFillAmount?: bigint
-  private _recipient?: `0x${string}`
+  private _recipient?: Address
   private _applyScaling = false
 
   /**
@@ -22,7 +24,7 @@ export class FillComponentBuilder {
    * @param token - ERC20 token address or address(0) for native token
    * @returns This builder for chaining
    */
-  fillToken(token: `0x${string}`): this {
+  fillToken(token: Address): this {
     this._fillToken = token
     return this
   }
@@ -42,7 +44,7 @@ export class FillComponentBuilder {
    * @param recipient - Address that will receive the fill tokens
    * @returns This builder for chaining
    */
-  recipient(recipient: `0x${string}`): this {
+  recipient(recipient: Address): this {
     this._recipient = recipient
     return this
   }
@@ -82,14 +84,14 @@ export class FillComponentBuilder {
  */
 export class FillParametersBuilder {
   private _chainId?: bigint
-  private _tribunal?: `0x${string}`
+  private _tribunal?: Address
   private _expires?: bigint
   private _components: FillComponent[] = []
   private _baselinePriorityFee = 0n
   private _scalingFactor = 1000000000000000000n // 1e18 (neutral)
   private _priceCurve: bigint[] = []
   private _recipientCallback: RecipientCallback[] = []
-  private _salt: `0x${string}` = '0x0000000000000000000000000000000000000000000000000000000000000000'
+  private _salt: Hex = toHex(randomBytes(32))
 
   /**
    * Set the chain ID for this fill
@@ -106,7 +108,7 @@ export class FillParametersBuilder {
    * @param tribunal - Address of the Tribunal contract on the target chain
    * @returns This builder for chaining
    */
-  tribunal(tribunal: `0x${string}`): this {
+  tribunal(tribunal: Address): this {
     this._tribunal = tribunal
     return this
   }
@@ -194,12 +196,21 @@ export class FillParametersBuilder {
   }
 
   /**
-   * Set the salt for uniqueness
+   * Set the salt for this fill
    * @param salt - 32-byte salt for making fills unique
    * @returns This builder for chaining
    */
-  salt(salt: `0x${string}`): this {
+  salt(salt: Hex): this {
     this._salt = salt
+    return this
+  }
+
+  /**
+   * Generate a random salt for this fill
+   * @returns This builder for chaining
+   */
+  randomSalt(): this {
+    this._salt = toHex(randomBytes(32))
     return this
   }
 
@@ -233,7 +244,7 @@ export class FillParametersBuilder {
  * Provides a fluent interface for constructing mandates with multiple fills
  */
 export class MandateBuilder {
-  private _adjuster?: `0x${string}`
+  private _adjuster?: Address
   private _fills: FillParameters[] = []
 
   /**
@@ -241,7 +252,7 @@ export class MandateBuilder {
    * @param adjuster - Address of the adjuster who can modify fills
    * @returns This builder for chaining
    */
-  adjuster(adjuster: `0x${string}`): this {
+  adjuster(adjuster: Address): this {
     this._adjuster = adjuster
     return this
   }
@@ -341,11 +352,11 @@ export class TribunalBuilder {
  */
 export function createSameChainFill(params: {
   chainId: bigint
-  tribunal: `0x${string}`
+  tribunal: Address
   expires: bigint
-  fillToken: `0x${string}`
+  fillToken: Address
   minimumFillAmount: bigint
-  recipient: `0x${string}`
+  recipient: Address
   priceCurve?: PriceCurveElement[]
   scalingFactor?: bigint
 }): FillParameters {
@@ -381,13 +392,13 @@ export function createSameChainFill(params: {
 export function createCrossChainFill(params: {
   sourceChainId: bigint
   targetChainId: bigint
-  sourceTribunal: `0x${string}`
+  sourceTribunal: Address
   expires: bigint
-  fillToken: `0x${string}`
+  fillToken: Address
   minimumFillAmount: bigint
-  bridgeRecipient: `0x${string}`
+  bridgeRecipient: Address
   targetCompact: import('../types/eip712').BatchCompact
-  targetMandateHash: `0x${string}`
+  targetMandateHash: Hex
   priceCurve?: PriceCurveElement[]
 }): FillParameters {
   const recipientCallback: RecipientCallback = {

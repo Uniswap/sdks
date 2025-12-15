@@ -6,6 +6,7 @@
 import invariant from 'tiny-invariant'
 
 import { Component } from '../types/claims'
+import { Address, Hex } from 'viem'
 
 /**
  * Type of claimant operation
@@ -24,7 +25,7 @@ export interface ClaimantInputBase {
  */
 export interface TransferClaimant extends ClaimantInputBase {
   kind: 'transfer'
-  recipient: `0x${string}`
+  recipient: Address
 }
 
 /**
@@ -32,8 +33,8 @@ export interface TransferClaimant extends ClaimantInputBase {
  */
 export interface ConvertClaimant extends ClaimantInputBase {
   kind: 'convert'
-  recipient: `0x${string}`
-  targetLockTag: `0x${string}` // bytes12
+  recipient: Address
+  targetLockTag: Hex // bytes12
 }
 
 /**
@@ -41,7 +42,7 @@ export interface ConvertClaimant extends ClaimantInputBase {
  */
 export interface WithdrawClaimant extends ClaimantInputBase {
   kind: 'withdraw'
-  recipient: `0x${string}`
+  recipient: Address
 }
 
 /**
@@ -61,7 +62,7 @@ export type ClaimantInput = TransferClaimant | ConvertClaimant | WithdrawClaiman
  * @param claimant - The claimant input
  * @returns The Component struct
  */
-export function buildComponent(lockTagOfClaim: `0x${string}`, claimant: ClaimantInput): Component {
+export function buildComponent(lockTagOfClaim: Hex, claimant: ClaimantInput): Component {
   // Validate recipient address
   const recipientHex = claimant.recipient.slice(2).toLowerCase()
   invariant(recipientHex.length === 40, 'recipient must be a valid address')
@@ -118,11 +119,11 @@ export function buildComponent(lockTagOfClaim: `0x${string}`, claimant: Claimant
  */
 export function decodeComponent(
   component: Component,
-  lockTagOfClaim?: `0x${string}`
+  lockTagOfClaim?: Hex
 ): {
   kind: ClaimantKind
-  recipient: `0x${string}`
-  lockTag?: `0x${string}`
+  recipient: Address
+  lockTag?: Hex
   amount: bigint
 } {
   // Extract recipient (lower 160 bits)
@@ -135,7 +136,7 @@ export function decodeComponent(
 
   // Determine kind
   let kind: ClaimantKind
-  let lockTagValue: `0x${string}` | undefined
+  let lockTagValue: Hex | undefined
 
   if (lockTag === 0n) {
     // Withdraw
@@ -143,16 +144,16 @@ export function decodeComponent(
   } else if (lockTagOfClaim && lockTag === BigInt(lockTagOfClaim)) {
     // Transfer (same lock tag)
     kind = 'transfer'
-    lockTagValue = `0x${lockTagHex}` as `0x${string}`
+    lockTagValue = `0x${lockTagHex}` as Hex
   } else {
     // Convert (different lock tag)
     kind = 'convert'
-    lockTagValue = `0x${lockTagHex}` as `0x${string}`
+    lockTagValue = `0x${lockTagHex}` as Hex
   }
 
   return {
     kind,
-    recipient: `0x${recipientHex}` as `0x${string}`,
+    recipient: `0x${recipientHex}` as Address,
     lockTag: lockTagValue,
     amount: component.amount,
   }
@@ -165,7 +166,7 @@ export function decodeComponent(
  * @param amount - Amount to transfer in wei
  * @returns TransferClaimant object for use with buildComponent
  */
-export function transfer(recipient: `0x${string}`, amount: bigint): TransferClaimant {
+export function transfer(recipient: Address, amount: bigint): TransferClaimant {
   return {
     kind: 'transfer',
     recipient,
@@ -181,7 +182,7 @@ export function transfer(recipient: `0x${string}`, amount: bigint): TransferClai
  * @param targetLockTag - The target lock tag (12 bytes) for the converted tokens
  * @returns ConvertClaimant object for use with buildComponent
  */
-export function convert(recipient: `0x${string}`, amount: bigint, targetLockTag: `0x${string}`): ConvertClaimant {
+export function convert(recipient: Address, amount: bigint, targetLockTag: Hex): ConvertClaimant {
   return {
     kind: 'convert',
     recipient,
@@ -197,7 +198,7 @@ export function convert(recipient: `0x${string}`, amount: bigint, targetLockTag:
  * @param amount - Amount to withdraw in wei
  * @returns WithdrawClaimant object for use with buildComponent
  */
-export function withdraw(recipient: `0x${string}`, amount: bigint): WithdrawClaimant {
+export function withdraw(recipient: Address, amount: bigint): WithdrawClaimant {
   return {
     kind: 'withdraw',
     recipient,

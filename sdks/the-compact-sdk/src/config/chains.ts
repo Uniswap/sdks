@@ -2,9 +2,11 @@
  * Chain and deployment configuration for The Compact v1
  */
 
+import { Address } from 'viem'
+
 export interface CompactDeployment {
   chainId: number
-  address: `0x${string}`
+  address: Address
   name: string
 }
 
@@ -35,7 +37,7 @@ export const defaultDeployments: CompactDeployment[] = [
  * @param chainId - The chain ID to look up
  * @returns The contract address, or undefined if not found
  */
-export function getDefaultAddress(chainId: number): `0x${string}` | undefined {
+export function getDefaultAddress(chainId: number): Address | undefined {
   return defaultDeployments.find((d) => d.chainId === chainId)?.address
 }
 

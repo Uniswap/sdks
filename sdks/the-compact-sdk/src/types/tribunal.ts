@@ -4,6 +4,8 @@
  * Based on: tribunal/src/types/TribunalStructs.sol
  */
 
+import { Address, Hex } from 'viem'
+
 import { BatchCompact } from './eip712'
 
 /**
@@ -11,11 +13,11 @@ import { BatchCompact } from './eip712'
  */
 export interface FillComponent {
   /** Token to be provided (address(0) for native) */
-  fillToken: `0x${string}`
+  fillToken: Address
   /** Minimum fill amount */
   minimumFillAmount: bigint
   /** Recipient of the tokens */
-  recipient: `0x${string}`
+  recipient: Address
   /** Whether to apply priority fee scaling to the minimum amount */
   applyScaling: boolean
 }
@@ -27,7 +29,7 @@ export interface FillParameters {
   /** Chain ID where fill occurs (same as current if same-chain, otherwise cross-chain) */
   chainId: bigint
   /** Tribunal contract address where the fill is performed */
-  tribunal: `0x${string}`
+  tribunal: Address
   /** Fill expiration timestamp */
   expires: bigint
   /** Fill components defining output requirements */
@@ -41,7 +43,7 @@ export interface FillParameters {
   /** Optional recipient callback for bridge operations */
   recipientCallback: RecipientCallback[]
   /** Salt for uniqueness */
-  salt: `0x${string}`
+  salt: Hex
 }
 
 /**
@@ -54,9 +56,9 @@ export interface RecipientCallback {
   /** Compact to be registered on target chain */
   compact: BatchCompact
   /** Hash of the mandate for the target chain compact */
-  mandateHash: `0x${string}`
+  mandateHash: Hex
   /** Arbitrary context data */
-  context: `0x${string}`
+  context: Hex
 }
 
 /**
@@ -65,7 +67,7 @@ export interface RecipientCallback {
  */
 export interface Mandate {
   /** Address of the adjuster who can modify fills */
-  adjuster: `0x${string}`
+  adjuster: Address
   /** Array of fill operations */
   fills: FillParameters[]
 }
@@ -75,7 +77,7 @@ export interface Mandate {
  */
 export interface Adjustment {
   /** Adjuster address (not in EIP-712 payload) */
-  adjuster: `0x${string}`
+  adjuster: Address
   /** Index of the fill to adjust */
   fillIndex: bigint
   /** Target block for price curve evaluation */
@@ -83,9 +85,9 @@ export interface Adjustment {
   /** Supplemental price curve to apply */
   supplementalPriceCurve: bigint[]
   /** Optional validity conditions (blocks past target + exclusive filler) */
-  validityConditions: `0x${string}`
+  validityConditions: Hex
   /** Adjuster's signature (not in EIP-712 payload) */
-  adjustmentAuthorization: `0x${string}`
+  adjustmentAuthorization: Hex
 }
 
 /**
@@ -93,7 +95,7 @@ export interface Adjustment {
  */
 export interface FillRecipient {
   fillAmount: bigint
-  recipient: `0x${string}`
+  recipient: Address
 }
 
 /**
@@ -101,7 +103,7 @@ export interface FillRecipient {
  */
 export interface FillRequirement {
   /** Token to be provided */
-  fillToken: `0x${string}`
+  fillToken: Address
   /** Minimum specified fill amount */
   minimumFillAmount: bigint
   /** Actual fill amount that must be provided */
@@ -115,11 +117,11 @@ export interface DispatchParameters {
   /** Chain ID for the dispatch */
   chainId: bigint
   /** Target address for the callback */
-  target: `0x${string}`
+  target: Address
   /** Amount of native tokens to send */
   value: bigint
   /** Arbitrary context data */
-  context: `0x${string}`
+  context: Hex
 }
 
 /**
@@ -128,7 +130,7 @@ export interface DispatchParameters {
  */
 export interface DispositionDetails {
   /** Claimant to receive the claim */
-  claimant: `0x${string}`
+  claimant: Address
   /** Scaling factor to apply */
   scalingFactor: bigint
 }

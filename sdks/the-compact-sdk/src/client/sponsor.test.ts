@@ -3,7 +3,7 @@
  */
 
 import invariant from 'tiny-invariant'
-import { parseEther, encodeEventTopics, encodeAbiParameters } from 'viem'
+import { parseEther, encodeEventTopics, encodeAbiParameters, Address, Hex } from 'viem'
 
 import { theCompactAbi } from '../abi/theCompact'
 import { simpleMandate } from '../builders/mandate'
@@ -20,19 +20,13 @@ const mockWalletClient = {
   writeContract: jest.fn(),
 } as any
 
-const testAddress = '0x00000000000000171ede64904551eeDF3C6C9788' as `0x${string}`
-const sponsorAddress = '0x1234567890123456789012345678901234567890' as `0x${string}`
-const tokenAddress = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as `0x${string}`
-const lockTag = '0x000000000000000000000001' as `0x${string}`
+const testAddress = '0x00000000000000171ede64904551eeDF3C6C9788' as Address
+const sponsorAddress = '0x1234567890123456789012345678901234567890' as Address
+const tokenAddress = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as Address
+const lockTag = '0x000000000000000000000001' as Hex
 
 // Helper to create a realistic Transfer event log
-function createTransferEvent(params: {
-  from: `0x${string}`
-  to: `0x${string}`
-  id: bigint
-  by: `0x${string}`
-  amount: bigint
-}) {
+function createTransferEvent(params: { from: Address; to: Address; id: bigint; by: Address; amount: bigint }) {
   const transferEvent = theCompactAbi.find((item) => item.type === 'event' && item.name === 'Transfer')
   invariant(transferEvent, 'Transfer event not found')
 
@@ -63,7 +57,7 @@ function createTransferEvent(params: {
 
 // Helper to create a realistic ForcedWithdrawalStatusUpdated event log
 function createForcedWithdrawalStatusUpdatedEvent(params: {
-  account: `0x${string}`
+  account: Address
   id: bigint
   activating: boolean
   withdrawableAt: bigint
@@ -112,7 +106,7 @@ describe('SponsorClient', () => {
 
   describe('depositNative()', () => {
     it('should deposit native tokens and extract lock ID from Transfer event', async () => {
-      const txHash = '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890' as `0x${string}`
+      const txHash = '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890' as Hex
       const lockId = 123n
       const depositAmount = parseEther('1.0')
 
@@ -196,7 +190,7 @@ describe('SponsorClient', () => {
 
   describe('depositERC20()', () => {
     it('should deposit ERC20 tokens and extract lock ID from Transfer event', async () => {
-      const txHash = '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890' as `0x${string}`
+      const txHash = '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890' as Hex
       const amount = 1000000n
       const lockId = 456n
 
@@ -270,9 +264,9 @@ describe('SponsorClient', () => {
 
   describe('register()', () => {
     it('should register a claim hash', async () => {
-      const txHash = '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890' as `0x${string}`
-      const claimHash = '0x1111111111111111111111111111111111111111111111111111111111111111' as `0x${string}`
-      const typehash = '0x2222222222222222222222222222222222222222222222222222222222222222' as `0x${string}`
+      const txHash = '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890' as Hex
+      const claimHash = '0x1111111111111111111111111111111111111111111111111111111111111111' as Hex
+      const typehash = '0x2222222222222222222222222222222222222222222222222222222222222222' as Hex
 
       mockWalletClient.writeContract.mockResolvedValue(txHash)
 
@@ -301,8 +295,8 @@ describe('SponsorClient', () => {
 
       await expect(
         clientWithoutWallet.register({
-          claimHash: '0x1111111111111111111111111111111111111111111111111111111111111111' as `0x${string}`,
-          typehash: '0x2222222222222222222222222222222222222222222222222222222222222222' as `0x${string}`,
+          claimHash: '0x1111111111111111111111111111111111111111111111111111111111111111' as Hex,
+          typehash: '0x2222222222222222222222222222222222222222222222222222222222222222' as Hex,
         })
       ).rejects.toThrow('walletClient is required')
     })
@@ -310,7 +304,7 @@ describe('SponsorClient', () => {
 
   describe('enableForcedWithdrawal()', () => {
     it('should enable forced withdrawal and extract withdrawableAt timestamp', async () => {
-      const txHash = '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890' as `0x${string}`
+      const txHash = '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890' as Hex
       const lockId = 100n
       const withdrawableAt = BigInt(Date.now() + 86400000) // 24 hours from now
 
@@ -364,7 +358,7 @@ describe('SponsorClient', () => {
 
   describe('disableForcedWithdrawal()', () => {
     it('should disable forced withdrawal', async () => {
-      const txHash = '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890' as `0x${string}`
+      const txHash = '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890' as Hex
       const lockId = 100n
 
       mockWalletClient.writeContract.mockResolvedValue(txHash)
@@ -410,9 +404,9 @@ describe('SponsorClient', () => {
 
   describe('forcedWithdrawal()', () => {
     it('should execute forced withdrawal with specified amount', async () => {
-      const txHash = '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890' as `0x${string}`
+      const txHash = '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890' as Hex
       const lockId = 100n
-      const recipient = '0xfedcbafedcbafedcbafedcbafedcbafedcbafedd' as `0x${string}`
+      const recipient = '0xfedcbafedcbafedcbafedcbafedcbafedcbafedd' as Address
       const amount = 5000000n
 
       mockWalletClient.writeContract.mockResolvedValue(txHash)
@@ -438,11 +432,7 @@ describe('SponsorClient', () => {
       })
 
       await expect(
-        clientWithoutWallet.forcedWithdrawal(
-          100n,
-          '0xfedcbafedcbafedcbafedcbafedcbafedcbafedd' as `0x${string}`,
-          5000000n
-        )
+        clientWithoutWallet.forcedWithdrawal(100n, '0xfedcbafedcbafedcbafedcbafedcbafedcbafedd' as Address, 5000000n)
       ).rejects.toThrow('walletClient is required')
     })
 
@@ -453,11 +443,7 @@ describe('SponsorClient', () => {
       })
 
       await expect(
-        clientWithoutAddress.forcedWithdrawal(
-          100n,
-          '0xfedcbafedcbafedcbafedcbafedcbafedcbafedd' as `0x${string}`,
-          5000000n
-        )
+        clientWithoutAddress.forcedWithdrawal(100n, '0xfedcbafedcbafedcbafedcbafedcbafedcbafedd' as Address, 5000000n)
       ).rejects.toThrow('contract address is required')
     })
 
@@ -465,7 +451,7 @@ describe('SponsorClient', () => {
       mockWalletClient.writeContract.mockRejectedValue(new Error('Delay not elapsed'))
 
       await expect(
-        client.forcedWithdrawal(100n, '0xfedcbafedcbafedcbafedcbafedcbafedd' as `0x${string}`, 5000000n)
+        client.forcedWithdrawal(100n, '0xfedcbafedcbafedcbafedcbafedcbafedd' as Address, 5000000n)
       ).rejects.toThrow('Delay not elapsed')
     })
   })
@@ -473,7 +459,7 @@ describe('SponsorClient', () => {
   describe('builder factories', () => {
     describe('compact()', () => {
       it('should create a CompactBuilder with correct domain', () => {
-        const arbiterAddress = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as `0x${string}`
+        const arbiterAddress = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as Address
         const builder = client.compact()
 
         expect(builder).toBeDefined()
@@ -504,7 +490,7 @@ describe('SponsorClient', () => {
 
     describe('batchCompact()', () => {
       it('should create a BatchCompactBuilder with correct domain', () => {
-        const arbiterAddress = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as `0x${string}`
+        const arbiterAddress = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as Address
         const builder = client.batchCompact()
 
         expect(builder).toBeDefined()
@@ -533,9 +519,9 @@ describe('SponsorClient', () => {
 
     describe('multichainCompact()', () => {
       it('should create a MultichainCompactBuilder with correct domain', () => {
-        const arbiterAddress = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as `0x${string}`
+        const arbiterAddress = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as Address
         const mandateType = simpleMandate([{ name: 'fillerAddress', type: 'address' }])
-        const mandate = { fillerAddress: '0x9876543210987654321098765432109876543210' as `0x${string}` }
+        const mandate = { fillerAddress: '0x9876543210987654321098765432109876543210' as Address }
         const builder = client.multichainCompact()
 
         expect(builder).toBeDefined()

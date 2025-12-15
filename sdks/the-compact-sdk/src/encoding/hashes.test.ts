@@ -19,7 +19,7 @@ describe('hash computation', () => {
       const claim: Claim = {
         allocatorData: '0x',
         sponsorSignature: '0x',
-        sponsor: '0x1234567890123456789012345678901234567890' as `0x${string}`,
+        sponsor: '0x1234567890123456789012345678901234567890' as Address,
         nonce: 1n,
         expires: BigInt(Date.now() + 3600000),
         witness: '0x0000000000000000000000000000000000000000000000000000000000000000',
@@ -89,7 +89,7 @@ describe('hash computation', () => {
 
       const claim2 = {
         ...claim1,
-        witness: '0x2222222222222222222222222222222222222222222222222222222222222222' as `0x${string}`,
+        witness: '0x2222222222222222222222222222222222222222222222222222222222222222' as Hex,
       }
 
       const hash1 = claimHash(claim1)
@@ -104,7 +104,7 @@ describe('hash computation', () => {
       const claim: BatchClaim = {
         allocatorData: '0x',
         sponsorSignature: '0x',
-        sponsor: '0x1234567890123456789012345678901234567890' as `0x${string}`,
+        sponsor: '0x1234567890123456789012345678901234567890' as Address,
         nonce: 1n,
         expires: BigInt(Date.now() + 3600000),
         witness: '0x0000000000000000000000000000000000000000000000000000000000000000',
@@ -139,7 +139,7 @@ describe('hash computation', () => {
       const claim: BatchClaim = {
         allocatorData: '0x',
         sponsorSignature: '0x',
-        sponsor: '0xabcdef1234567890abcdef1234567890abcdef12' as `0x${string}`,
+        sponsor: '0xabcdef1234567890abcdef1234567890abcdef12' as Address,
         nonce: 5n,
         expires: BigInt(Date.now() + 7200000),
         witness: '0x3333333333333333333333333333333333333333333333333333333333333333',
@@ -178,7 +178,7 @@ describe('hash computation', () => {
       const baseClaim: BatchClaim = {
         allocatorData: '0x',
         sponsorSignature: '0x',
-        sponsor: '0x1234567890123456789012345678901234567890' as `0x${string}`,
+        sponsor: '0x1234567890123456789012345678901234567890' as Address,
         nonce: 1n,
         expires: BigInt(Date.now() + 3600000),
         witness: '0x0000000000000000000000000000000000000000000000000000000000000000',
@@ -201,7 +201,7 @@ describe('hash computation', () => {
       const claim: BatchClaim = {
         allocatorData: '0x',
         sponsorSignature: '0x',
-        sponsor: '0x1234567890123456789012345678901234567890' as `0x${string}`,
+        sponsor: '0x1234567890123456789012345678901234567890' as Address,
         nonce: 1n,
         expires: BigInt(Date.now() + 3600000),
         witness: '0x0000000000000000000000000000000000000000000000000000000000000000',
@@ -288,11 +288,7 @@ describe('hash computation', () => {
       )
 
       const expected = keccak256(
-        encodePacked(['bytes32', 'bytes32', 'bytes32'], [hash1, hash2, hash3] as [
-          `0x${string}`,
-          `0x${string}`,
-          `0x${string}`
-        ])
+        encodePacked(['bytes32', 'bytes32', 'bytes32'], [hash1, hash2, hash3] as [Hex, Hex, Hex])
       )
 
       expect(hash).toBe(expected)
@@ -370,11 +366,7 @@ describe('hash computation', () => {
       )
 
       const expected = keccak256(
-        encodePacked(['bytes32', 'bytes32', 'bytes32'], [hash1, hash2, hash3] as [
-          `0x${string}`,
-          `0x${string}`,
-          `0x${string}`
-        ])
+        encodePacked(['bytes32', 'bytes32', 'bytes32'], [hash1, hash2, hash3] as [Hex, Hex, Hex])
       )
 
       expect(hash).toBe(expected)
@@ -384,8 +376,8 @@ describe('hash computation', () => {
       // Test with realistic lock IDs that combine lockTag and token address
       // lockTag: 0x000000000000000000000001
       // token: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48 (USDC)
-      const lockTag = '0x000000000000000000000001' as `0x${string}`
-      const usdcAddress = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as `0x${string}`
+      const lockTag = '0x000000000000000000000001' as Hex
+      const usdcAddress = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as Address
 
       // Construct ID: lockTag (96 bits) in upper bits, token address (160 bits) in lower bits
       const lockTagBigInt = BigInt(lockTag)
@@ -413,7 +405,7 @@ describe('hash computation', () => {
     })
 
     it('should handle multiple well-known tokens (from ClaimHashLib.t.sol)', () => {
-      const lockTag = '0x000000000000000000000001' as `0x${string}`
+      const lockTag = '0x000000000000000000000001' as Hex
       const lockTagBigInt = BigInt(lockTag)
 
       // Well-known mainnet tokens
@@ -443,9 +435,7 @@ describe('hash computation', () => {
         )
       )
 
-      const expected = keccak256(
-        encodePacked(['bytes32', 'bytes32', 'bytes32'], hashes as [`0x${string}`, `0x${string}`, `0x${string}`])
-      )
+      const expected = keccak256(encodePacked(['bytes32', 'bytes32', 'bytes32'], hashes as [Hex, Hex, Hex]))
       expect(hash).toBe(expected)
     })
   })

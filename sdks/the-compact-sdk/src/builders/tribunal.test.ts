@@ -2,15 +2,17 @@
  * Tests for Tribunal builders
  */
 
+import { Address, Hex } from 'viem'
+
 import { SCALING_FACTOR } from '../lib/priceCurve'
 
 import { TribunalBuilder, createSameChainFill, createCrossChainFill } from './tribunal'
 
 describe('Tribunal Builders', () => {
-  const tribunalAddress = '0x1234567890123456789012345678901234567890' as `0x${string}`
-  const adjusterAddress = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as `0x${string}`
-  const recipientAddress = '0xfedcbafedcbafedcbafedcbafedcbafedcbafedd' as `0x${string}`
-  const usdcAddress = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as `0x${string}`
+  const tribunalAddress = '0x1234567890123456789012345678901234567890' as Address
+  const adjusterAddress = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as Address
+  const recipientAddress = '0xfedcbafedcbafedcbafedcbafedcbafedcbafedd' as Address
+  const usdcAddress = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as Address
 
   describe('FillComponentBuilder', () => {
     it('should build a fill component', () => {
@@ -71,7 +73,7 @@ describe('Tribunal Builders', () => {
         .component((c) => c.fillToken(usdcAddress).minimumFillAmount(1000000n).recipient(recipientAddress))
         .component((c) =>
           c
-            .fillToken('0x0000000000000000000000000000000000000000' as `0x${string}`)
+            .fillToken('0x0000000000000000000000000000000000000000' as Address)
             .minimumFillAmount(1000000000000000000n)
             .recipient(recipientAddress)
         )
@@ -181,7 +183,7 @@ describe('Tribunal Builders', () => {
         expires: BigInt(Date.now() + 3600000),
         commitments: [
           {
-            lockTag: '0x000000000000000000000001' as `0x${string}`,
+            lockTag: '0x000000000000000000000001' as Hex,
             token: usdcAddress,
             amount: 1000000n,
           },
@@ -242,7 +244,7 @@ describe('Tribunal Builders', () => {
             .expires(expires + 3600n)
             .component((c) =>
               c
-                .fillToken('0x0000000000000000000000000000000000000000' as `0x${string}`)
+                .fillToken('0x0000000000000000000000000000000000000000' as Address)
                 .minimumFillAmount(1000000000000000000n) // 1 ETH
                 .recipient(recipientAddress)
             )
