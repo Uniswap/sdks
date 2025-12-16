@@ -1,12 +1,10 @@
 import { Currency, CurrencyAmount, Price, TradeType } from "@uniswap/sdk-core";
-import { BigNumber } from "ethers";
 
+import { BASE_SCALING_FACTOR } from "../constants/v4";
 import { CosignedHybridOrder } from "../order/v4/HybridOrder";
 import { CosignedHybridOrderInfo, HybridOutput } from "../order/v4/types";
 
 import { areCurrenciesEqual } from "./utils";
-
-const BASE_SCALING_FACTOR = BigNumber.from("1000000000000000000"); // 1e18
 
 export class HybridOrderTrade<
   TInput extends Currency,
