@@ -857,6 +857,111 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         assertEq(address(router).balance, 0);
     }
 
+    function testV4ExactInMultiHop2RoutesETHWETH() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_SPLIT_TWO_ROUTES_V4_ETH_WETH");
+
+        uint256 usdcAmount = 1000 ether;
+        deal(address(USDC), from, usdcAmount);
+        USDC.approve(address(permit2), usdcAmount);
+        permit2.approve(address(USDC), address(router), uint160(usdcAmount), uint48(block.timestamp + 1000));
+        assertEq(USDC.balanceOf(from), usdcAmount);
+        uint256 startingRecipientBalance = RECIPIENT.balance;
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertEq(WETH.balanceOf(RECIPIENT), 0);
+        assertGt(RECIPIENT.balance, startingRecipientBalance);
+        assertEq(address(router).balance, 0);
+    }
+
+    function testV4ExactInMultiHop2RoutesETHWETHMixed() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_SPLIT_TWO_ROUTES_V4_ETH_WETH_MIXED");
+
+        uint256 daiAmount = 2000 ether;
+        deal(address(DAI), from, daiAmount);
+        DAI.approve(address(permit2), daiAmount);
+        permit2.approve(address(DAI), address(router), uint160(daiAmount), uint48(block.timestamp + 1000));
+        assertEq(DAI.balanceOf(from), daiAmount);
+        uint256 startingRecipientBalance = RECIPIENT.balance;
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertEq(WETH.balanceOf(RECIPIENT), 0);
+        assertGt(RECIPIENT.balance, startingRecipientBalance);
+        assertEq(address(router).balance, 0);
+    }
+
+    function testV4ExactInMultiHop2RoutesWETHMixedETHWETH() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_SPLIT_TWO_ROUTES_V4_WETH_MIXED_ETH_WETH");
+
+        uint256 daiAmount = 2000 ether;
+        deal(address(DAI), from, daiAmount);
+        DAI.approve(address(permit2), daiAmount);
+        permit2.approve(address(DAI), address(router), uint160(daiAmount), uint48(block.timestamp + 1000));
+        assertEq(DAI.balanceOf(from), daiAmount);
+        uint256 startingRecipientBalance = RECIPIENT.balance;
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertEq(WETH.balanceOf(RECIPIENT), 0);
+        assertGt(RECIPIENT.balance, startingRecipientBalance);
+        assertEq(address(router).balance, 0);
+    }
+
+    function testV4ExactInMultiHop2Routesv4ETHWETHv3WETH() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_SPLIT_TWO_ROUTES_V4_WETH");
+
+        uint256 usdcAmount = 2000 ether;
+        deal(address(USDC), from, usdcAmount);
+        USDC.approve(address(permit2), usdcAmount);
+        permit2.approve(address(USDC), address(router), uint160(usdcAmount), uint48(block.timestamp + 1000));
+        assertEq(USDC.balanceOf(from), usdcAmount);
+        uint256 startingRecipientWETHBalance = WETH.balanceOf(RECIPIENT);
+        uint256 startingRecipientBalance = RECIPIENT.balance;
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertGt(WETH.balanceOf(RECIPIENT), startingRecipientWETHBalance);
+        assertEq(RECIPIENT.balance, startingRecipientBalance);
+        assertEq(address(router).balance, 0);
+    }
+
+    function testV4ExactInMultiHop2Routesv4WETHv4ETHWETH() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_SPLIT_TWO_ROUTES_V4_WETH");
+
+        uint256 usdcAmount = 2000 ether;
+        deal(address(USDC), from, usdcAmount);
+        USDC.approve(address(permit2), usdcAmount);
+        permit2.approve(address(USDC), address(router), uint160(usdcAmount), uint48(block.timestamp + 1000));
+        assertEq(USDC.balanceOf(from), usdcAmount);
+        uint256 startingRecipientWETHBalance = WETH.balanceOf(RECIPIENT);
+        uint256 startingRecipientBalance = RECIPIENT.balance;
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertGt(WETH.balanceOf(RECIPIENT), startingRecipientWETHBalance);
+        assertEq(RECIPIENT.balance, startingRecipientBalance);
+        assertEq(address(router).balance, 0);
+    }
+
+    function testV4ExactInMultiHop2Routesv4ETHv4ETH() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_SPLIT_TWO_ROUTES_V4_ETH_V4_ETH");
+
+        uint256 usdcAmount = 2000 ether;
+        deal(address(USDC), from, usdcAmount);
+        USDC.approve(address(permit2), usdcAmount);
+        permit2.approve(address(USDC), address(router), uint160(usdcAmount), uint48(block.timestamp + 1000));
+        assertEq(USDC.balanceOf(from), usdcAmount);
+        uint256 startingRecipientWETHBalance = WETH.balanceOf(RECIPIENT);
+        uint256 startingRecipientBalance = RECIPIENT.balance;
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertGt(WETH.balanceOf(RECIPIENT), startingRecipientWETHBalance);
+        assertEq(RECIPIENT.balance, startingRecipientBalance);
+        assertEq(address(router).balance, 0);
+    }
+
     function testMixedExactInputNative() public {
         MethodParameters memory params = readFixture(json, "._UNISWAP_MIXED_1_ETH_FOR_DAI");
 
