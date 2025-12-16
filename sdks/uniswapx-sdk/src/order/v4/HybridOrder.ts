@@ -377,6 +377,7 @@ export class UnsignedHybridOrder {
     };
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   resolve(_options: HybridOrderResolutionOptions): ResolvedUniswapXOrder {
     throw new Error("Cannot resolve unsigned order - cosigner data required");
   }
