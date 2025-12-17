@@ -1034,6 +1034,18 @@ describe('Uniswap', () => {
   })
 
   describe('multi-route', async () => {
+    // =================================================================================
+    // Standard Split Route Tests (No ETH-WETH Pool Complexity)
+    // =================================================================================
+    // Basic split route tests that don't involve ETH-WETH pool edge cases
+    // =================================================================================
+
+    /**
+     * Test: Basic V2 + V3 split route
+     * - V2 route: ETH -> USDC
+     * - V3 route: ETH -> USDC
+     * Verifies: Standard split route encoding with ETH input
+     */
     it('encodes a split exactInput with 2 routes v3ETH->v3USDC & v2ETH->v2USDC swap', async () => {
       const inputEther = expandTo18Decimals(1)
       const v2Trade = new V2Trade(
@@ -1052,205 +1064,13 @@ describe('Uniswap', () => {
       expect(hexToDecimalString(methodParameters.value)).to.eq(JSBI.multiply(inputEther, JSBI.BigInt(2)).toString())
     })
 
-    /// The following test split routes that use the ETH-WETH pool at the end of the route
-
-    // Split route: v4 - ends in eth-weth, v3 - ends in weth, output is eth
-    // This ensures that the v4 swap takes WETH, not ETH. All the WETH is unwrapped at the end.
-    it('encodes a split exactInput with 2 routes v3USDC->v3ETH & v4USDC->v4ETH swap', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
-      const v3Trade = await V3Trade.fromRoute(
-        new V3Route([WETH_USDC_V3], USDC, ETHER),
-        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
-        TradeType.EXACT_INPUT
-      )
-      const v4Trade = await V4Trade.fromRoute(
-        new V4Route([ETH_USDC_V4, ETH_WETH_V4], USDC, ETHER),
-        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
-        TradeType.EXACT_INPUT
-      )
-      const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapCallParameters(buildTrade([v3Trade, v4Trade]), opts)
-      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4', methodParameters)
-      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
-    })
-
-    // Split route: v4 - ends in eth-weth, mixed - ends in weth, output is eth
-    // This ensures that the v4 swap takes WETH, not ETH. All the WETH is unwrapped at the end.
-    it('encodes a split exactInput with 2 routes mixed v2DAI->v3ETH & v4 v4DAI->v4USDC->v4ETH swap', async () => {
-      const inputDAI = utils.parseUnits('1000', 18).toString()
-      const mixedTrade = await MixedRouteTrade.fromRoute(
-        new MixedRouteSDK([USDC_DAI_V2, WETH_USDC_V3], DAI, ETHER),
-        CurrencyAmount.fromRawAmount(DAI, inputDAI),
-        TradeType.EXACT_INPUT
-      )
-      const v4Trade = await V4Trade.fromRoute(
-        new V4Route([USDC_DAI_V4, ETH_USDC_V4, ETH_WETH_V4], DAI, ETHER),
-        CurrencyAmount.fromRawAmount(DAI, inputDAI),
-        TradeType.EXACT_INPUT
-      )
-      const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapCallParameters(buildTrade([mixedTrade, v4Trade]), opts)
-      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4_MIXED', methodParameters)
-      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
-    })
-
-    // Split route: v4 - ends in eth, mixed - ends in eth, output is eth
-    it('encodes a split exactInput with 2 routes mixed v2DAI->v4ETH & v4 v4DAI->v4USDC->v4ETH swap', async () => {
-      const inputDAI = utils.parseUnits('1000', 18).toString()
-      const mixedTrade = await MixedRouteTrade.fromRoute(
-        new MixedRouteSDK([USDC_DAI_V2, ETH_USDC_V4_LOW_FEE], DAI, ETHER),
-        CurrencyAmount.fromRawAmount(DAI, inputDAI),
-        TradeType.EXACT_INPUT
-      )
-      const v4Trade = await V4Trade.fromRoute(
-        new V4Route([USDC_DAI_V4, ETH_USDC_V4], DAI, ETHER),
-        CurrencyAmount.fromRawAmount(DAI, inputDAI),
-        TradeType.EXACT_INPUT
-      )
-      const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapCallParameters(buildTrade([mixedTrade, v4Trade]), opts)
-      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4_MIXED_ENDING_WITH_ETH', methodParameters)
-      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
-    })
-
-    // Split route: v4 - ends in weth, mixed - ends in v4 weth, output is eth
-    it('encodes a split exactInput with 2 routes mixed v2DAI->v4WETH & v4 v4DAI->v4USDC->v4WETH swap', async () => {
-      const inputDAI = utils.parseUnits('1000', 18).toString()
-      const mixedTrade = await MixedRouteTrade.fromRoute(
-        new MixedRouteSDK([USDC_DAI_V2, WETH_USDC_V4_LOW_FEE], DAI, ETHER),
-        CurrencyAmount.fromRawAmount(DAI, inputDAI),
-        TradeType.EXACT_INPUT
-      )
-      const v4Trade = await V4Trade.fromRoute(
-        new V4Route([USDC_DAI_V4, WETH_USDC_V4], DAI, ETHER),
-        CurrencyAmount.fromRawAmount(DAI, inputDAI),
-        TradeType.EXACT_INPUT
-      )
-      const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapCallParameters(buildTrade([mixedTrade, v4Trade]), opts)
-      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4_MIXED_ENDING_WITH_WETH', methodParameters)
-      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
-    })
-
-    // Split route: v4 - ends in eth-weth, v4 - ends in weth, output is eth
-    // This ensures that the v4 swap takes WETH, not ETH. All the WETH is unwrapped at the end.
-    it('encodes a split exactInput with 2 routes v4 eth-weth & v4 weth swap', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
-      const v4Trade1 = await V4Trade.fromRoute(
-        new V4Route([ETH_USDC_V4, ETH_WETH_V4], USDC, ETHER),
-        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
-        TradeType.EXACT_INPUT
-      )
-      const v4Trade2 = await V4Trade.fromRoute(
-        new V4Route([WETH_USDC_V4], USDC, ETHER),
-        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
-        TradeType.EXACT_INPUT
-      )
-      const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapCallParameters(buildTrade([v4Trade1, v4Trade2]), opts)
-      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4_ETH_WETH', methodParameters)
-      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
-    })
-
-    // Split route: v4 - ends in eth-weth, mixed - ends in weth, output is eth
-    // This ensures that the v4 swap takes WETH, not ETH. All the WETH is unwrapped at the end.
-    it('encodes a split exactInput with 2 routes v4 eth-weth & mixed weth swap', async () => {
-      const inputDAI = utils.parseUnits('1000', 18).toString()
-      const v4Trade = await V4Trade.fromRoute(
-        new V4Route([USDC_DAI_V4, ETH_USDC_V4, ETH_WETH_V4], DAI, ETHER),
-        CurrencyAmount.fromRawAmount(DAI, inputDAI),
-        TradeType.EXACT_INPUT
-      )
-      const mixedTrade = await MixedRouteTrade.fromRoute(
-        new MixedRouteSDK([USDC_DAI_V2, WETH_USDC_V4_LOW_FEE], DAI, ETHER),
-        CurrencyAmount.fromRawAmount(DAI, inputDAI),
-        TradeType.EXACT_INPUT
-      )
-      const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapCallParameters(buildTrade([v4Trade, mixedTrade]), opts)
-      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4_ETH_WETH_MIXED', methodParameters)
-      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
-    })
-
-    // Split route: v4 - ends in weth, mixed - ends in v4 eth-weth, output is eth
-    // This ensures that the v4 swap takes WETH, not ETH. All the WETH is unwrapped at the end.
-    it('encodes a split exactInput with 2 routes v4 weth & mixed eth-weth swap', async () => {
-      const inputDAI = utils.parseUnits('1000', 18).toString()
-      const v4Trade = await V4Trade.fromRoute(
-        new V4Route([USDC_DAI_V4, WETH_USDC_V4], DAI, ETHER),
-        CurrencyAmount.fromRawAmount(DAI, inputDAI),
-        TradeType.EXACT_INPUT
-      )
-      const mixedTrade = await MixedRouteTrade.fromRoute(
-        new MixedRouteSDK([USDC_DAI_V2, ETH_USDC_V4, ETH_WETH_V4], DAI, ETHER),
-        CurrencyAmount.fromRawAmount(DAI, inputDAI),
-        TradeType.EXACT_INPUT
-      )
-      const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapCallParameters(buildTrade([v4Trade, mixedTrade]), opts)
-      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4_WETH_MIXED_ETH_WETH', methodParameters)
-      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
-    })
-
-    // The following are outputs that end in weth
-
-    // Split route: v4 - ends in eth-weth, v3 - ends in weth, output is weth
-    it('encodes a split exactInput with 2 routes v3USDC->v3ETH & v4USDC->v4ETH swap ending in weth', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
-      const v3Trade = await V3Trade.fromRoute(
-        new V3Route([WETH_USDC_V3], USDC, WETH),
-        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
-        TradeType.EXACT_INPUT
-      )
-      const v4Trade = await V4Trade.fromRoute(
-        new V4Route([ETH_USDC_V4, ETH_WETH_V4], USDC, WETH),
-        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
-        TradeType.EXACT_INPUT
-      )
-      const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapCallParameters(buildTrade([v3Trade, v4Trade]), opts)
-      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4_WETH', methodParameters)
-      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
-    })
-
-    // Split route: v4 - ends in eth-weth, v4 - ends in weth, output is weth
-    it('encodes a split exactInput with 2 routes v4 ending in weth & v4 ending in eth-weth swap', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
-      const v4Trade1 = await V4Trade.fromRoute(
-        new V4Route([WETH_USDC_V4], USDC, WETH),
-        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
-        TradeType.EXACT_INPUT
-      )
-      const v4Trade2 = await V4Trade.fromRoute(
-        new V4Route([ETH_USDC_V4, ETH_WETH_V4], USDC, WETH),
-        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
-        TradeType.EXACT_INPUT
-      )
-      const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapCallParameters(buildTrade([v4Trade1, v4Trade2]), opts)
-      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4_WETH_V4_ETH_WETH', methodParameters)
-      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
-    })
-
-    // Split route: v4 - ends in eth, v4 - ends in eth, output is weth
-    it('encodes a split exactInput with 2 routes v4 ending in eth & v4 ending in eth swap', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
-      const v4Trade1 = await V4Trade.fromRoute(
-        new V4Route([ETH_USDC_V4], USDC, WETH),
-        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
-        TradeType.EXACT_INPUT
-      )
-      const v4Trade2 = await V4Trade.fromRoute(
-        new V4Route([ETH_USDC_V4_LOW_FEE], USDC, WETH),
-        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
-        TradeType.EXACT_INPUT
-      )
-      const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapCallParameters(buildTrade([v4Trade1, v4Trade2]), opts)
-      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4_ETH_V4_ETH', methodParameters)
-      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
-    })
-
+    /**
+     * Test: Three-way split route (V2 + V3 + V3)
+     * - V2 route: ETH -> USDC
+     * - V3 route 1: ETH -> USDC (standard fee)
+     * - V3 route 2: ETH -> USDC (low fee)
+     * Verifies: Multi-route split with 3 paths
+     */
     it('encodes a split exactInput with 3 routes v3ETH->v3USDC & v2ETH->v2USDC swap', async () => {
       const inputEther = expandTo18Decimals(1)
       const v2Trade = new V2Trade(
@@ -1274,6 +1094,261 @@ describe('Uniswap', () => {
       registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_ETH_TO_USDC', methodParameters)
       registerFixture('_UNISWAP_SPLIT_THREE_ROUTES_ETH_TO_USDC', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq(JSBI.multiply(inputEther, JSBI.BigInt(3)).toString())
+    })
+
+    // =================================================================================
+    // Split Route Tests with ETH-WETH Pool Handling
+    // =================================================================================
+    // These tests verify correct handling of split routes that involve the ETH-WETH pool.
+    // Key scenarios tested:
+    // - Routes ending in ETH (unwrapped output)
+    // - Routes ending in WETH (wrapped output)
+    // - Routes with ETH-WETH pool interactions
+    //
+    // =================================================================================
+
+    // ----- SECTION A: Split routes with ETH output -----
+
+    /**
+     * Test: V3 + V4 split route with ETH output
+     * - V3 route: USDC -> WETH (direct)
+     * - V4 route: USDC -> ETH -> ETH-WETH pool
+     * Verifies: V4 correctly uses WETH in ETH-WETH pool, then unwraps all WETH to ETH
+     */
+    it('encodes a split exactInput with 2 routes v3USDC->v3ETH & v4USDC->v4ETH swap', async () => {
+      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const v3Trade = await V3Trade.fromRoute(
+        new V3Route([WETH_USDC_V3], USDC, ETHER),
+        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
+        TradeType.EXACT_INPUT
+      )
+      const v4Trade = await V4Trade.fromRoute(
+        new V4Route([ETH_USDC_V4, ETH_WETH_V4], USDC, ETHER),
+        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
+        TradeType.EXACT_INPUT
+      )
+      const opts = swapOptions({})
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([v3Trade, v4Trade]), opts)
+      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+    })
+
+    /**
+     * Test: Mixed + V4 split route with ETH output
+     * - Mixed route: V2 DAI-USDC -> V3 USDC-WETH
+     * - V4 route: DAI -> USDC -> ETH -> ETH-WETH pool
+     * Verifies: V4 correctly uses WETH in ETH-WETH pool, then unwraps all WETH to ETH
+     */
+    it('encodes a split exactInput with 2 routes mixed v2DAI->v3ETH & v4 v4DAI->v4USDC->v4ETH swap', async () => {
+      const inputDAI = utils.parseUnits('1000', 18).toString()
+      const mixedTrade = await MixedRouteTrade.fromRoute(
+        new MixedRouteSDK([USDC_DAI_V2, WETH_USDC_V3], DAI, ETHER),
+        CurrencyAmount.fromRawAmount(DAI, inputDAI),
+        TradeType.EXACT_INPUT
+      )
+      const v4Trade = await V4Trade.fromRoute(
+        new V4Route([USDC_DAI_V4, ETH_USDC_V4, ETH_WETH_V4], DAI, ETHER),
+        CurrencyAmount.fromRawAmount(DAI, inputDAI),
+        TradeType.EXACT_INPUT
+      )
+      const opts = swapOptions({})
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([mixedTrade, v4Trade]), opts)
+      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4_MIXED', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+    })
+
+    /**
+     * Test: Mixed + V4 split route both ending in ETH pools
+     * - Mixed route: V2 DAI-USDC -> V4 USDC-ETH (low fee)
+     * - V4 route: DAI -> USDC -> ETH
+     * Verifies: Both routes end in ETH pools, output is unwrapped ETH
+     */
+    it('encodes a split exactInput with 2 routes mixed v2DAI->v4ETH & v4 v4DAI->v4USDC->v4ETH swap', async () => {
+      const inputDAI = utils.parseUnits('1000', 18).toString()
+      const mixedTrade = await MixedRouteTrade.fromRoute(
+        new MixedRouteSDK([USDC_DAI_V2, ETH_USDC_V4_LOW_FEE], DAI, ETHER),
+        CurrencyAmount.fromRawAmount(DAI, inputDAI),
+        TradeType.EXACT_INPUT
+      )
+      const v4Trade = await V4Trade.fromRoute(
+        new V4Route([USDC_DAI_V4, ETH_USDC_V4], DAI, ETHER),
+        CurrencyAmount.fromRawAmount(DAI, inputDAI),
+        TradeType.EXACT_INPUT
+      )
+      const opts = swapOptions({})
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([mixedTrade, v4Trade]), opts)
+      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4_MIXED_ENDING_WITH_ETH', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+    })
+
+    /**
+     * Test: Mixed + V4 split route both ending in WETH pools
+     * - Mixed route: V2 DAI-USDC -> V4 USDC-WETH (low fee)
+     * - V4 route: DAI -> USDC -> WETH
+     * Verifies: Both routes end in WETH pools, then unwrap to ETH output
+     */
+    it('encodes a split exactInput with 2 routes mixed v2DAI->v4WETH & v4 v4DAI->v4USDC->v4WETH swap', async () => {
+      const inputDAI = utils.parseUnits('1000', 18).toString()
+      const mixedTrade = await MixedRouteTrade.fromRoute(
+        new MixedRouteSDK([USDC_DAI_V2, WETH_USDC_V4_LOW_FEE], DAI, ETHER),
+        CurrencyAmount.fromRawAmount(DAI, inputDAI),
+        TradeType.EXACT_INPUT
+      )
+      const v4Trade = await V4Trade.fromRoute(
+        new V4Route([USDC_DAI_V4, WETH_USDC_V4], DAI, ETHER),
+        CurrencyAmount.fromRawAmount(DAI, inputDAI),
+        TradeType.EXACT_INPUT
+      )
+      const opts = swapOptions({})
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([mixedTrade, v4Trade]), opts)
+      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4_MIXED_ENDING_WITH_WETH', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+    })
+
+    /**
+     * Test: V4 + V4 split route with ETH output
+     * - V4 route 1: USDC -> ETH -> ETH-WETH pool
+     * - V4 route 2: USDC -> WETH (direct)
+     * Verifies: Route 1 uses WETH in ETH-WETH pool, all WETH unwrapped to ETH
+     */
+    it('encodes a split exactInput with 2 routes v4 eth-weth & v4 weth swap', async () => {
+      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const v4Trade1 = await V4Trade.fromRoute(
+        new V4Route([ETH_USDC_V4, ETH_WETH_V4], USDC, ETHER),
+        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
+        TradeType.EXACT_INPUT
+      )
+      const v4Trade2 = await V4Trade.fromRoute(
+        new V4Route([WETH_USDC_V4], USDC, ETHER),
+        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
+        TradeType.EXACT_INPUT
+      )
+      const opts = swapOptions({})
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([v4Trade1, v4Trade2]), opts)
+      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4_ETH_WETH', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+    })
+
+    /**
+     * Test: V4 + Mixed split route with ETH output
+     * - V4 route: DAI -> USDC -> ETH -> ETH-WETH pool
+     * - Mixed route: V2 DAI-USDC -> V4 USDC-WETH (low fee)
+     * Verifies: V4 uses WETH in ETH-WETH pool, all WETH unwrapped to ETH
+     */
+    it('encodes a split exactInput with 2 routes v4 eth-weth & mixed weth swap', async () => {
+      const inputDAI = utils.parseUnits('1000', 18).toString()
+      const v4Trade = await V4Trade.fromRoute(
+        new V4Route([USDC_DAI_V4, ETH_USDC_V4, ETH_WETH_V4], DAI, ETHER),
+        CurrencyAmount.fromRawAmount(DAI, inputDAI),
+        TradeType.EXACT_INPUT
+      )
+      const mixedTrade = await MixedRouteTrade.fromRoute(
+        new MixedRouteSDK([USDC_DAI_V2, WETH_USDC_V4_LOW_FEE], DAI, ETHER),
+        CurrencyAmount.fromRawAmount(DAI, inputDAI),
+        TradeType.EXACT_INPUT
+      )
+      const opts = swapOptions({})
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([v4Trade, mixedTrade]), opts)
+      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4_ETH_WETH_MIXED', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+    })
+
+    /**
+     * Test: V4 + Mixed split route with ETH output (reversed order)
+     * - V4 route: DAI -> USDC -> WETH (direct)
+     * - Mixed route: V2 DAI-USDC -> V4 USDC-ETH -> ETH-WETH pool
+     * Verifies: Mixed route uses WETH in ETH-WETH pool, all WETH unwrapped to ETH
+     */
+    it('encodes a split exactInput with 2 routes v4 weth & mixed eth-weth swap', async () => {
+      const inputDAI = utils.parseUnits('1000', 18).toString()
+      const v4Trade = await V4Trade.fromRoute(
+        new V4Route([USDC_DAI_V4, WETH_USDC_V4], DAI, ETHER),
+        CurrencyAmount.fromRawAmount(DAI, inputDAI),
+        TradeType.EXACT_INPUT
+      )
+      const mixedTrade = await MixedRouteTrade.fromRoute(
+        new MixedRouteSDK([USDC_DAI_V2, ETH_USDC_V4, ETH_WETH_V4], DAI, ETHER),
+        CurrencyAmount.fromRawAmount(DAI, inputDAI),
+        TradeType.EXACT_INPUT
+      )
+      const opts = swapOptions({})
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([v4Trade, mixedTrade]), opts)
+      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4_WETH_MIXED_ETH_WETH', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+    })
+
+    // ----- SECTION B: Split routes with WETH output (wrapped) -----
+
+    /**
+     * Test: V3 + V4 split route with WETH output
+     * - V3 route: USDC -> WETH (direct)
+     * - V4 route: USDC -> ETH -> ETH-WETH pool
+     * Verifies: Both routes output WETH (no unwrapping)
+     */
+    it('encodes a split exactInput with 2 routes v3USDC->v3ETH & v4USDC->v4ETH swap ending in weth', async () => {
+      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const v3Trade = await V3Trade.fromRoute(
+        new V3Route([WETH_USDC_V3], USDC, WETH),
+        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
+        TradeType.EXACT_INPUT
+      )
+      const v4Trade = await V4Trade.fromRoute(
+        new V4Route([ETH_USDC_V4, ETH_WETH_V4], USDC, WETH),
+        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
+        TradeType.EXACT_INPUT
+      )
+      const opts = swapOptions({})
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([v3Trade, v4Trade]), opts)
+      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4_WETH', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+    })
+
+    /**
+     * Test: V4 + V4 split route with WETH output
+     * - V4 route 1: USDC -> WETH (direct)
+     * - V4 route 2: USDC -> ETH -> ETH-WETH pool
+     * Verifies: Both routes output WETH (no unwrapping)
+     */
+    it('encodes a split exactInput with 2 routes v4 ending in weth & v4 ending in eth-weth swap', async () => {
+      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const v4Trade1 = await V4Trade.fromRoute(
+        new V4Route([WETH_USDC_V4], USDC, WETH),
+        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
+        TradeType.EXACT_INPUT
+      )
+      const v4Trade2 = await V4Trade.fromRoute(
+        new V4Route([ETH_USDC_V4, ETH_WETH_V4], USDC, WETH),
+        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
+        TradeType.EXACT_INPUT
+      )
+      const opts = swapOptions({})
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([v4Trade1, v4Trade2]), opts)
+      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4_WETH_V4_ETH_WETH', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+    })
+
+    /**
+     * Test: V4 + V4 split route with ETH pools but WETH output
+     * - V4 route 1: USDC -> ETH (standard fee)
+     * - V4 route 2: USDC -> ETH (low fee)
+     * Verifies: Both routes use ETH pools but wrap to WETH for output
+     */
+    it('encodes a split exactInput with 2 routes v4 ending in eth & v4 ending in eth swap', async () => {
+      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const v4Trade1 = await V4Trade.fromRoute(
+        new V4Route([ETH_USDC_V4], USDC, WETH),
+        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
+        TradeType.EXACT_INPUT
+      )
+      const v4Trade2 = await V4Trade.fromRoute(
+        new V4Route([ETH_USDC_V4_LOW_FEE], USDC, WETH),
+        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
+        TradeType.EXACT_INPUT
+      )
+      const opts = swapOptions({})
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([v4Trade1, v4Trade2]), opts)
+      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4_ETH_V4_ETH', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
   })
 
