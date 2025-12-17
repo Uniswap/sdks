@@ -36,7 +36,7 @@ export class HybridOrderBuilder {
       .nonce(order.info.nonce)
       .swapper(order.info.swapper)
       .auctionStartBlock(order.info.auctionStartBlock)
-      .baselinePriorityFeeWei(order.info.baselinePriorityFeeWei)
+      .baselinePriorityFee(order.info.baselinePriorityFee)
       .scalingFactor(order.info.scalingFactor)
       .priceCurve(order.info.priceCurve)
       .preExecutionHook(order.info.preExecutionHook, order.info.preExecutionHookData)
@@ -69,7 +69,7 @@ export class HybridOrderBuilder {
     input?: HybridInput;
     outputs: HybridOutput[];
     auctionStartBlock?: BigNumber;
-    baselinePriorityFeeWei?: BigNumber;
+    baselinePriorityFee?: BigNumber;
     scalingFactor?: BigNumber;
     priceCurve?: BigNumber[];
     cosignerData?: HybridCosignerData;
@@ -179,8 +179,8 @@ export class HybridOrderBuilder {
     return this;
   }
 
-  baselinePriorityFeeWei(fee: BigNumber | number): this {
-    this.orderData.baselinePriorityFeeWei =
+  baselinePriorityFee(fee: BigNumber | number): this {
+    this.orderData.baselinePriorityFee =
       typeof fee === "number" ? BigNumber.from(fee) : fee;
     return this;
   }
@@ -253,8 +253,8 @@ export class HybridOrderBuilder {
       "auctionStartBlock not set"
     );
     invariant(
-      this.orderData.baselinePriorityFeeWei !== undefined,
-      "baselinePriorityFeeWei not set"
+      this.orderData.baselinePriorityFee !== undefined,
+      "baselinePriorityFee not set"
     );
     invariant(
       this.orderData.scalingFactor !== undefined,
@@ -299,8 +299,8 @@ export class HybridOrderBuilder {
 
     // Validate baseline priority fee is non-negative
     invariant(
-      this.orderData.baselinePriorityFeeWei.gte(0),
-      "baselinePriorityFeeWei must be non-negative"
+      this.orderData.baselinePriorityFee.gte(0),
+      "baselinePriorityFee must be non-negative"
     );
   }
 
@@ -340,7 +340,7 @@ export class HybridOrderBuilder {
       input: this.orderData.input!,
       outputs: this.orderData.outputs,
       auctionStartBlock: this.orderData.auctionStartBlock!,
-      baselinePriorityFeeWei: this.orderData.baselinePriorityFeeWei!,
+      baselinePriorityFee: this.orderData.baselinePriorityFee!,
       scalingFactor: this.orderData.scalingFactor!,
       priceCurve: this.orderData.priceCurve!,
     };
@@ -363,7 +363,7 @@ export class HybridOrderBuilder {
       input: this.orderData.input!,
       outputs: this.orderData.outputs,
       auctionStartBlock: this.orderData.auctionStartBlock!,
-      baselinePriorityFeeWei: this.orderData.baselinePriorityFeeWei!,
+      baselinePriorityFee: this.orderData.baselinePriorityFee!,
       scalingFactor: this.orderData.scalingFactor!,
       priceCurve: this.orderData.priceCurve!,
       cosignerData: this.orderData.cosignerData!,

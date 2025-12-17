@@ -38,7 +38,7 @@ describe("HybridOrderBuilder", () => {
           recipient: constants.AddressZero,
         })
         .auctionStartBlock(100)
-        .baselinePriorityFeeWei(0)
+        .baselinePriorityFee(0)
         .scalingFactor(BASE_SCALING_FACTOR.mul(101).div(100)) // 1.01e18 (exact-in)
         .priceCurve([])
         .deadline(deadline)
@@ -71,7 +71,7 @@ describe("HybridOrderBuilder", () => {
           recipient: constants.AddressZero,
         })
         .auctionStartBlock(100)
-        .baselinePriorityFeeWei(0)
+        .baselinePriorityFee(0)
         .scalingFactor(BASE_SCALING_FACTOR.mul(99).div(100)) // 0.99e18 (exact-out)
         .priceCurve([])
         .deadline(deadline)
@@ -110,7 +110,7 @@ describe("HybridOrderBuilder", () => {
           recipient: "0x0000000000000000000000000000000000000003",
         })
         .auctionStartBlock(100)
-        .baselinePriorityFeeWei(BigNumber.from("1000000000"))
+        .baselinePriorityFee(BigNumber.from("1000000000"))
         .scalingFactor(BASE_SCALING_FACTOR)
         .priceCurve([])
         .auctionTargetBlock(100)
@@ -118,7 +118,7 @@ describe("HybridOrderBuilder", () => {
         .build();
 
       expect(order.info.outputs.length).toEqual(2);
-      expect(order.info.baselinePriorityFeeWei).toEqual(
+      expect(order.info.baselinePriorityFee).toEqual(
         BigNumber.from("1000000000")
       );
     });
@@ -144,7 +144,7 @@ describe("HybridOrderBuilder", () => {
           recipient: constants.AddressZero,
         })
         .auctionStartBlock(100)
-        .baselinePriorityFeeWei(0)
+        .baselinePriorityFee(0)
         .scalingFactor(BASE_SCALING_FACTOR)
         .priceCurve([priceCurveElement])
         .deadline(deadline)
@@ -178,7 +178,7 @@ describe("HybridOrderBuilder", () => {
           recipient: constants.AddressZero,
         })
         .auctionStartBlock(100)
-        .baselinePriorityFeeWei(0)
+        .baselinePriorityFee(0)
         .scalingFactor(BASE_SCALING_FACTOR)
         .priceCurve([])
         .deadline(deadline)
@@ -217,7 +217,7 @@ describe("HybridOrderBuilder", () => {
         .postExecutionHook(hookAddress, hookData)
         .auctionResolver(RESOLVER_ADDRESS)
         .auctionStartBlock(100)
-        .baselinePriorityFeeWei(0)
+        .baselinePriorityFee(0)
         .scalingFactor(BASE_SCALING_FACTOR)
         .priceCurve([])
         .deadline(deadline)
@@ -257,7 +257,7 @@ describe("HybridOrderBuilder", () => {
           recipient: constants.AddressZero,
         })
         .auctionStartBlock(100)
-        .baselinePriorityFeeWei(0)
+        .baselinePriorityFee(0)
         .scalingFactor(BASE_SCALING_FACTOR)
         .priceCurve([])
         .deadline(deadline)
@@ -286,7 +286,7 @@ describe("HybridOrderBuilder", () => {
             recipient: constants.AddressZero,
           })
           .auctionStartBlock(100)
-          .baselinePriorityFeeWei(0)
+          .baselinePriorityFee(0)
           .scalingFactor(BASE_SCALING_FACTOR)
           .priceCurve([])
           .deadline(deadline)
@@ -313,7 +313,7 @@ describe("HybridOrderBuilder", () => {
             recipient: constants.AddressZero,
           })
           .auctionStartBlock(100)
-          .baselinePriorityFeeWei(0)
+          .baselinePriorityFee(0)
           .scalingFactor(BASE_SCALING_FACTOR)
           .priceCurve([])
           .deadline(deadline)
@@ -339,7 +339,7 @@ describe("HybridOrderBuilder", () => {
             recipient: constants.AddressZero,
           })
           .auctionStartBlock(100)
-          .baselinePriorityFeeWei(0)
+          .baselinePriorityFee(0)
           .scalingFactor(BASE_SCALING_FACTOR)
           .priceCurve([])
           .swapper(constants.AddressZero)
@@ -366,7 +366,7 @@ describe("HybridOrderBuilder", () => {
             recipient: constants.AddressZero,
           })
           .auctionStartBlock(100)
-          .baselinePriorityFeeWei(0)
+          .baselinePriorityFee(0)
           .scalingFactor(BASE_SCALING_FACTOR)
           .priceCurve([])
           .deadline(deadline)
@@ -391,7 +391,7 @@ describe("HybridOrderBuilder", () => {
           recipient: constants.AddressZero,
         })
         .auctionStartBlock(100)
-        .baselinePriorityFeeWei(0)
+        .baselinePriorityFee(0)
         .scalingFactor(BASE_SCALING_FACTOR)
         .priceCurve([])
         .deadline(deadline)
@@ -414,7 +414,7 @@ describe("HybridOrderBuilder", () => {
             recipient: constants.AddressZero,
           })
           .auctionStartBlock(100)
-          .baselinePriorityFeeWei(0)
+          .baselinePriorityFee(0)
           .scalingFactor(BASE_SCALING_FACTOR)
           .priceCurve([])
           .deadline(deadline)
@@ -437,7 +437,7 @@ describe("HybridOrderBuilder", () => {
             maxAmount: INPUT_MAX_AMOUNT,
           })
           .auctionStartBlock(100)
-          .baselinePriorityFeeWei(0)
+          .baselinePriorityFee(0)
           .scalingFactor(BASE_SCALING_FACTOR)
           .priceCurve([])
           .deadline(deadline)
@@ -464,7 +464,7 @@ describe("HybridOrderBuilder", () => {
             minAmount: OUTPUT_MIN_AMOUNT,
             recipient: constants.AddressZero,
           })
-          .baselinePriorityFeeWei(0)
+          .baselinePriorityFee(0)
           .scalingFactor(BASE_SCALING_FACTOR)
           .priceCurve([])
           .deadline(deadline)
@@ -476,7 +476,7 @@ describe("HybridOrderBuilder", () => {
       ).toThrow("Invariant failed: auctionStartBlock not set");
     });
 
-    it("Throw if baselinePriorityFeeWei is not set", () => {
+    it("Throw if baselinePriorityFee is not set", () => {
       const deadline = Math.floor(Date.now() / 1000) + 1000;
       expect(() =>
         builder
@@ -500,7 +500,7 @@ describe("HybridOrderBuilder", () => {
           .auctionTargetBlock(100)
           .supplementalPriceCurve([])
           .build()
-      ).toThrow("Invariant failed: baselinePriorityFeeWei not set");
+      ).toThrow("Invariant failed: baselinePriorityFee not set");
     });
 
     it("Throw if scalingFactor is not set", () => {
@@ -519,7 +519,7 @@ describe("HybridOrderBuilder", () => {
             recipient: constants.AddressZero,
           })
           .auctionStartBlock(100)
-          .baselinePriorityFeeWei(0)
+          .baselinePriorityFee(0)
           .priceCurve([])
           .deadline(deadline)
           .swapper(constants.AddressZero)
@@ -546,7 +546,7 @@ describe("HybridOrderBuilder", () => {
             recipient: constants.AddressZero,
           })
           .auctionStartBlock(100)
-          .baselinePriorityFeeWei(0)
+          .baselinePriorityFee(0)
           .scalingFactor(BASE_SCALING_FACTOR)
           .deadline(deadline)
           .swapper(constants.AddressZero)
@@ -572,7 +572,7 @@ describe("HybridOrderBuilder", () => {
             recipient: constants.AddressZero,
           })
           .auctionStartBlock(100)
-          .baselinePriorityFeeWei(0)
+          .baselinePriorityFee(0)
           .scalingFactor(BASE_SCALING_FACTOR)
           .priceCurve([])
           .deadline(deadline)
@@ -600,7 +600,7 @@ describe("HybridOrderBuilder", () => {
           recipient: constants.AddressZero,
         })
         .auctionStartBlock(100)
-        .baselinePriorityFeeWei(0)
+        .baselinePriorityFee(0)
         .scalingFactor(BASE_SCALING_FACTOR)
         .priceCurve([])
         .deadline(deadline)
@@ -632,7 +632,7 @@ describe("HybridOrderBuilder", () => {
           recipient: constants.AddressZero,
         })
         .auctionStartBlock(100)
-        .baselinePriorityFeeWei(0)
+        .baselinePriorityFee(0)
         .scalingFactor(BASE_SCALING_FACTOR)
         .priceCurve([])
         .deadline(deadline)
@@ -665,7 +665,7 @@ describe("HybridOrderBuilder", () => {
           recipient: constants.AddressZero,
         })
         .auctionStartBlock(100)
-        .baselinePriorityFeeWei(0)
+        .baselinePriorityFee(0)
         .scalingFactor(BASE_SCALING_FACTOR)
         .priceCurve([])
         .deadline(deadline)
@@ -704,7 +704,7 @@ describe("HybridOrderBuilder", () => {
           recipient: constants.AddressZero,
         })
         .auctionStartBlock(100)
-        .baselinePriorityFeeWei(0)
+        .baselinePriorityFee(0)
         .scalingFactor(BASE_SCALING_FACTOR)
         .priceCurve([])
         .deadline(deadline)
@@ -750,7 +750,7 @@ describe("HybridOrderBuilder", () => {
           recipient: constants.AddressZero,
         })
         .auctionStartBlock(100) // number instead of BigNumber
-        .baselinePriorityFeeWei(1000000000) // number instead of BigNumber
+        .baselinePriorityFee(1000000000) // number instead of BigNumber
         .scalingFactor(BASE_SCALING_FACTOR)
         .priceCurve([])
         .deadline(deadline)
@@ -761,7 +761,7 @@ describe("HybridOrderBuilder", () => {
         .build();
 
       expect(order.info.auctionStartBlock).toEqual(BigNumber.from(100));
-      expect(order.info.baselinePriorityFeeWei).toEqual(
+      expect(order.info.baselinePriorityFee).toEqual(
         BigNumber.from(1000000000)
       );
       expect(order.info.cosignerData.auctionTargetBlock).toEqual(
@@ -793,7 +793,7 @@ describe("HybridOrderBuilder", () => {
         .input({ token: INPUT_TOKEN, maxAmount: INPUT_MAX_AMOUNT })
         .output({ token: OUTPUT_TOKEN, minAmount: OUTPUT_MIN_AMOUNT, recipient: constants.AddressZero })
         .auctionStartBlock(100)
-        .baselinePriorityFeeWei(0)
+        .baselinePriorityFee(0)
         .scalingFactor(BASE_SCALING_FACTOR.mul(102).div(100))
         .priceCurve(priceCurve)
         .deadline(deadline)
@@ -819,7 +819,7 @@ describe("HybridOrderBuilder", () => {
         .input({ token: INPUT_TOKEN, maxAmount: INPUT_MAX_AMOUNT })
         .output({ token: OUTPUT_TOKEN, minAmount: OUTPUT_MIN_AMOUNT, recipient: constants.AddressZero })
         .auctionStartBlock(100)
-        .baselinePriorityFeeWei(0)
+        .baselinePriorityFee(0)
         .scalingFactor(BASE_SCALING_FACTOR.mul(98).div(100))
         .priceCurve(priceCurve)
         .deadline(deadline)
@@ -846,7 +846,7 @@ describe("HybridOrderBuilder", () => {
         .input({ token: INPUT_TOKEN, maxAmount: INPUT_MAX_AMOUNT })
         .output({ token: OUTPUT_TOKEN, minAmount: OUTPUT_MIN_AMOUNT, recipient: constants.AddressZero })
         .auctionStartBlock(100)
-        .baselinePriorityFeeWei(0)
+        .baselinePriorityFee(0)
         .scalingFactor(BASE_SCALING_FACTOR)
         .priceCurve(priceCurve)
         .deadline(deadline)
@@ -872,7 +872,7 @@ describe("HybridOrderBuilder", () => {
         .input({ token: INPUT_TOKEN, maxAmount: INPUT_MAX_AMOUNT })
         .output({ token: OUTPUT_TOKEN, minAmount: OUTPUT_MIN_AMOUNT, recipient: constants.AddressZero })
         .auctionStartBlock(100)
-        .baselinePriorityFeeWei(0)
+        .baselinePriorityFee(0)
         .scalingFactor(BASE_SCALING_FACTOR)
         .priceCurve(priceCurve)
         .deadline(deadline)
@@ -899,7 +899,7 @@ describe("HybridOrderBuilder", () => {
           .input({ token: INPUT_TOKEN, maxAmount: INPUT_MAX_AMOUNT })
           .output({ token: OUTPUT_TOKEN, minAmount: OUTPUT_MIN_AMOUNT, recipient: constants.AddressZero })
           .auctionStartBlock(100)
-          .baselinePriorityFeeWei(0)
+          .baselinePriorityFee(0)
           .scalingFactor(BASE_SCALING_FACTOR)
           .priceCurve(priceCurve)
           .deadline(deadline)
@@ -926,7 +926,7 @@ describe("HybridOrderBuilder", () => {
           .input({ token: INPUT_TOKEN, maxAmount: INPUT_MAX_AMOUNT })
           .output({ token: OUTPUT_TOKEN, minAmount: OUTPUT_MIN_AMOUNT, recipient: constants.AddressZero })
           .auctionStartBlock(100)
-          .baselinePriorityFeeWei(0)
+          .baselinePriorityFee(0)
           .scalingFactor(BASE_SCALING_FACTOR)
           .priceCurve(priceCurve)
           .deadline(deadline)
@@ -951,7 +951,7 @@ describe("HybridOrderBuilder", () => {
         .input({ token: INPUT_TOKEN, maxAmount: INPUT_MAX_AMOUNT })
         .output({ token: OUTPUT_TOKEN, minAmount: OUTPUT_MIN_AMOUNT, recipient: constants.AddressZero })
         .auctionStartBlock(100)
-        .baselinePriorityFeeWei(0)
+        .baselinePriorityFee(0)
         .scalingFactor(BASE_SCALING_FACTOR)
         .priceCurve(priceCurve)
         .deadline(deadline)
@@ -981,7 +981,7 @@ describe("HybridOrderBuilder", () => {
           recipient: constants.AddressZero,
         })
         .auctionStartBlock(0)
-        .baselinePriorityFeeWei(0)
+        .baselinePriorityFee(0)
         .scalingFactor(BASE_SCALING_FACTOR)
         .priceCurve([])
         .deadline(deadline)
@@ -992,7 +992,7 @@ describe("HybridOrderBuilder", () => {
         .build();
 
       expect(order.info.auctionStartBlock).toEqual(BigNumber.from(0));
-      expect(order.info.baselinePriorityFeeWei).toEqual(BigNumber.from(0));
+      expect(order.info.baselinePriorityFee).toEqual(BigNumber.from(0));
     });
 
     it("Build order with neutral scaling factor (1e18)", () => {
@@ -1010,7 +1010,7 @@ describe("HybridOrderBuilder", () => {
           recipient: constants.AddressZero,
         })
         .auctionStartBlock(100)
-        .baselinePriorityFeeWei(0)
+        .baselinePriorityFee(0)
         .scalingFactor(BASE_SCALING_FACTOR) // neutral 1e18
         .priceCurve([])
         .deadline(deadline)
@@ -1038,7 +1038,7 @@ describe("HybridOrderBuilder", () => {
           recipient: constants.AddressZero,
         })
         .auctionStartBlock(0)
-        .baselinePriorityFeeWei(0)
+        .baselinePriorityFee(0)
         .scalingFactor(BASE_SCALING_FACTOR)
         .priceCurve([])
         .deadline(deadline)
@@ -1069,7 +1069,7 @@ describe("HybridOrderBuilder", () => {
           recipient: constants.AddressZero,
         })
         .auctionStartBlock(100)
-        .baselinePriorityFeeWei(0)
+        .baselinePriorityFee(0)
         .scalingFactor(highScalingFactor)
         .priceCurve([])
         .deadline(deadline)
@@ -1099,7 +1099,7 @@ describe("HybridOrderBuilder", () => {
           recipient: constants.AddressZero,
         })
         .auctionStartBlock(100)
-        .baselinePriorityFeeWei(0)
+        .baselinePriorityFee(0)
         .scalingFactor(lowScalingFactor)
         .priceCurve([])
         .deadline(deadline)

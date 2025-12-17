@@ -92,69 +92,47 @@ export type HybridCosignerDataJSON = {
   supplementalPriceCurve: string[];
 };
 
-/**
- * Unsigned hybrid order info (base fields without cosigner data or signature)
- * Extends OrderInfoV4 to maintain SDK pattern compatibility
- */
 export type UnsignedHybridOrderInfo = OrderInfoV4 & {
   cosigner: string;
   input: HybridInput;
   outputs: HybridOutput[];
   auctionStartBlock: BigNumber;
-  baselinePriorityFeeWei: BigNumber;
+  baselinePriorityFee: BigNumber;
   scalingFactor: BigNumber;
   priceCurve: BigNumber[];
 };
 
-/**
- * Cosigned hybrid order info (includes cosigner data and signature)
- */
 export type CosignedHybridOrderInfo = UnsignedHybridOrderInfo & {
   cosignerData: HybridCosignerData;
   cosignature: string;
 };
 
-/**
- * JSON serialization format for OrderInfoV4
- */
 export type OrderInfoV4JSON = Omit<OrderInfoV4, "nonce"> & { nonce: string };
 
-/**
- * JSON serialization format for HybridInput
- */
 export type HybridInputJSON = {
   token: string;
   maxAmount: string;
 };
 
-/**
- * JSON serialization format for HybridOutput
- */
 export type HybridOutputJSON = {
   token: string;
   minAmount: string;
   recipient: string;
 };
 
-/**
- * JSON serialization format for UnsignedHybridOrderInfo
- */
 export type UnsignedHybridOrderInfoJSON = Omit<
   UnsignedHybridOrderInfo,
-  "nonce" | "input" | "outputs" | "auctionStartBlock" | "baselinePriorityFeeWei" | "scalingFactor" | "priceCurve"
+  "nonce" | "input" | "outputs" | "auctionStartBlock" | "baselinePriorityFee" | "scalingFactor" | "priceCurve"
 > & {
   nonce: string;
   input: HybridInputJSON;
   outputs: HybridOutputJSON[];
   auctionStartBlock: string;
-  baselinePriorityFeeWei: string;
+  baselinePriorityFee: string;
   scalingFactor: string;
   priceCurve: string[];
 };
 
-/**
- * JSON serialization format for CosignedHybridOrderInfo
- */
 export type CosignedHybridOrderInfoJSON = UnsignedHybridOrderInfoJSON & {
   cosignerData: HybridCosignerDataJSON;
   cosignature: string;

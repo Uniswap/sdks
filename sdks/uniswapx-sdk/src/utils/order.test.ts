@@ -247,7 +247,7 @@ describe("order utils", () => {
         recipient: constants.AddressZero,
       })
       .auctionStartBlock(100)
-      .baselinePriorityFeeWei(BigNumber.from(0))
+      .baselinePriorityFee(BigNumber.from(0))
       .scalingFactor(BASE_SCALING_FACTOR)
       .priceCurve([]);
 

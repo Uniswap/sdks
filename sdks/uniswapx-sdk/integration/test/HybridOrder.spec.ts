@@ -9,8 +9,7 @@ import { Permit2, Reactor, HybridAuctionResolver, TokenTransferHook, MockERC20 }
 import { BlockchainTime } from "./utils/time";
 import { HybridOrderBuilder } from "../../src/builder/HybridOrderBuilder";
 import { expect } from "chai";
-import { HybridOrderClass } from "../../src/order/v4/HybridOrder";
-import { HybridOrder, HybridCosignerData } from "../../src/order/v4/types";
+import { HybridCosignerData } from "../../src/order/v4/types";
 
 describe("HybridOrder", () => {
   const AMOUNT = BigNumber.from(10).pow(18);
@@ -167,22 +166,22 @@ describe("HybridOrder", () => {
           recipient: swapperAddress,
         })
         .auctionStartBlock(BigNumber.from(futureBlock))
-        .baselinePriorityFeeWei(BigNumber.from(0))
+        .baselinePriorityFee(BigNumber.from(0))
         .scalingFactor(BASE_SCALING_FACTOR) // Neutral scaling
         .priceCurve([])
         .buildPartial();
 
-      expect(order.order.info.deadline).to.eq(futureDeadline);
-      expect(order.order.info.swapper).to.eq(swapperAddress);
-      expect(order.order.info.nonce).to.eq(NONCE);
-      expect(order.order.info.auctionResolver).to.eq(resolverAddress);
-      expect(order.order.info.preExecutionHook).to.eq(hookAddress);
-      expect(order.order.cosigner).to.eq(ethers.constants.AddressZero);
-      expect(order.order.input.token).to.eq(tokenIn.address);
-      expect(order.order.input.maxAmount).to.eq(AMOUNT);
-      expect(order.order.outputs[0].token).to.eq(tokenOut.address);
-      expect(order.order.outputs[0].minAmount).to.eq(AMOUNT);
-      expect(order.order.scalingFactor).to.eq(BASE_SCALING_FACTOR);
+      expect(order.info.deadline).to.eq(futureDeadline);
+      expect(order.info.swapper).to.eq(swapperAddress);
+      expect(order.info.nonce).to.eq(NONCE);
+      expect(order.info.auctionResolver).to.eq(resolverAddress);
+      expect(order.info.preExecutionHook).to.eq(hookAddress);
+      expect(order.info.cosigner).to.eq(ethers.constants.AddressZero);
+      expect(order.info.input.token).to.eq(tokenIn.address);
+      expect(order.info.input.maxAmount).to.eq(AMOUNT);
+      expect(order.info.outputs[0].token).to.eq(tokenOut.address);
+      expect(order.info.outputs[0].minAmount).to.eq(AMOUNT);
+      expect(order.info.scalingFactor).to.eq(BASE_SCALING_FACTOR);
     });
 
     it("correctly builds an order with price curve", async () => {
@@ -213,13 +212,13 @@ describe("HybridOrder", () => {
           recipient: swapperAddress,
         })
         .auctionStartBlock(BigNumber.from(futureBlock))
-        .baselinePriorityFeeWei(BigNumber.from(0))
+        .baselinePriorityFee(BigNumber.from(0))
         .scalingFactor(BASE_SCALING_FACTOR.mul(105).div(100))
         .priceCurve(priceCurve)
         .buildPartial();
 
-      expect(order.order.priceCurve.length).to.eq(1);
-      expect(order.order.priceCurve[0]).to.eq(priceCurve[0]);
+      expect(order.info.priceCurve.length).to.eq(1);
+      expect(order.info.priceCurve[0]).to.eq(priceCurve[0]);
     });
   });
 
@@ -248,7 +247,7 @@ describe("HybridOrder", () => {
           recipient: swapperAddress,
         })
         .auctionStartBlock(BigNumber.from(0)) // No target block
-        .baselinePriorityFeeWei(BigNumber.from(0))
+        .baselinePriorityFee(BigNumber.from(0))
         .scalingFactor(BASE_SCALING_FACTOR) // 1e18 = neutral
         .priceCurve([])
         .buildPartial();
@@ -318,7 +317,7 @@ describe("HybridOrder", () => {
           recipient: swapperAddress,
         })
         .auctionStartBlock(BigNumber.from(auctionStartBlock))
-        .baselinePriorityFeeWei(baselinePriorityFee)
+        .baselinePriorityFee(baselinePriorityFee)
         .scalingFactor(scalingFactor)
         .priceCurve(priceCurve)
         .buildPartial();
@@ -401,7 +400,7 @@ describe("HybridOrder", () => {
           recipient: swapperAddress,
         })
         .auctionStartBlock(BigNumber.from(auctionStartBlock))
-        .baselinePriorityFeeWei(baselinePriorityFee)
+        .baselinePriorityFee(baselinePriorityFee)
         .scalingFactor(scalingFactor)
         .priceCurve(priceCurve)
         .buildPartial();
@@ -487,7 +486,7 @@ describe("HybridOrder", () => {
           recipient: swapperAddress,
         })
         .auctionStartBlock(BigNumber.from(futureBlock))
-        .baselinePriorityFeeWei(BigNumber.from(0))
+        .baselinePriorityFee(BigNumber.from(0))
         .scalingFactor(BASE_SCALING_FACTOR)
         .priceCurve([]);
 
@@ -498,11 +497,12 @@ describe("HybridOrder", () => {
         .cosignerData(cosignerData)
         .buildPartial();
 
-      const cosignerHash = order.cosignatureHash();
+      const cosignerHash = order.cosignatureHash(cosignerData);
       const cosignatureObj = await cosigner._signingKey().signDigest(cosignerHash);
       const cosignature = ethers.utils.joinSignature(cosignatureObj);
 
       const orderClass = HybridOrderBuilder.fromOrder(order)
+        .cosignerData(cosignerData)
         .cosignature(cosignature)
         .build();
 
@@ -541,7 +541,7 @@ describe("HybridOrder", () => {
           recipient: swapperAddress,
         })
         .auctionStartBlock(BigNumber.from(futureBlock))
-        .baselinePriorityFeeWei(BigNumber.from(0))
+        .baselinePriorityFee(BigNumber.from(0))
         .scalingFactor(BASE_SCALING_FACTOR)
         .priceCurve([])
         .buildPartial();
@@ -554,11 +554,12 @@ describe("HybridOrder", () => {
         .buildPartial();
 
       // Sign with WRONG cosigner (swapper instead of cosigner)
-      const cosignerHash = partialWithCosignerData.cosignatureHash();
+      const cosignerHash = partialWithCosignerData.cosignatureHash(cosignerData);
       const wrongCosignatureObj = await swapper._signingKey().signDigest(cosignerHash);
       const wrongCosignature = ethers.utils.joinSignature(wrongCosignatureObj);
 
       const orderClass = HybridOrderBuilder.fromOrder(partialWithCosignerData)
+        .cosignerData(cosignerData)
         .cosignature(wrongCosignature)
         .build();
 
@@ -613,7 +614,7 @@ describe("HybridOrder", () => {
           recipient: swapperAddress,
         })
         .auctionStartBlock(BigNumber.from(0))
-        .baselinePriorityFeeWei(BigNumber.from(0))
+        .baselinePriorityFee(BigNumber.from(0))
         .scalingFactor(BASE_SCALING_FACTOR)
         .priceCurve([])
         .buildPartial();
@@ -674,7 +675,7 @@ describe("HybridOrder", () => {
           recipient: swapperAddress,
         })
         .auctionStartBlock(BigNumber.from(targetBlock))
-        .baselinePriorityFeeWei(BigNumber.from(0))
+        .baselinePriorityFee(BigNumber.from(0))
         .scalingFactor(BASE_SCALING_FACTOR)
         .priceCurve(priceCurve)
         .buildPartial();
@@ -732,7 +733,7 @@ describe("HybridOrder", () => {
           recipient: swapperAddress,
         })
         .auctionStartBlock(BigNumber.from(auctionStartBlock))
-        .baselinePriorityFeeWei(BigNumber.from(0))
+        .baselinePriorityFee(BigNumber.from(0))
         .scalingFactor(BASE_SCALING_FACTOR) // Neutral - no priority fee adjustment
         .priceCurve(priceCurve)
         .buildPartial();
@@ -805,7 +806,7 @@ describe("HybridOrder", () => {
           recipient: swapperAddress,
         })
         .auctionStartBlock(BigNumber.from(auctionStartBlock))
-        .baselinePriorityFeeWei(BigNumber.from(0))
+        .baselinePriorityFee(BigNumber.from(0))
         .scalingFactor(BASE_SCALING_FACTOR)
         .priceCurve(priceCurve)
         .buildPartial();
@@ -865,7 +866,7 @@ describe("HybridOrder", () => {
           recipient: swapperAddress,
         })
         .auctionStartBlock(BigNumber.from(auctionStartBlock2))
-        .baselinePriorityFeeWei(BigNumber.from(0))
+        .baselinePriorityFee(BigNumber.from(0))
         .scalingFactor(BASE_SCALING_FACTOR)
         .priceCurve(priceCurve2)
         .buildPartial();
@@ -926,7 +927,7 @@ describe("HybridOrder", () => {
           recipient: swapperAddress,
         })
         .auctionStartBlock(BigNumber.from(auctionStartBlock))
-        .baselinePriorityFeeWei(BigNumber.from(0))
+        .baselinePriorityFee(BigNumber.from(0))
         .scalingFactor(BASE_SCALING_FACTOR)
         .priceCurve(priceCurve)
         .buildPartial();
@@ -972,7 +973,7 @@ describe("HybridOrder", () => {
           recipient: swapperAddress,
         })
         .auctionStartBlock(BigNumber.from(futureStartBlock))
-        .baselinePriorityFeeWei(BigNumber.from(0))
+        .baselinePriorityFee(BigNumber.from(0))
         .scalingFactor(BASE_SCALING_FACTOR)
         .priceCurve([])
         .buildPartial();
@@ -1028,7 +1029,7 @@ describe("HybridOrder", () => {
             recipient: swapperAddress,
           })
           .auctionStartBlock(BigNumber.from(auctionStart))
-          .baselinePriorityFeeWei(BigNumber.from(0))
+          .baselinePriorityFee(BigNumber.from(0))
           .scalingFactor(BASE_SCALING_FACTOR)
           .priceCurve(priceCurve)
           .buildPartial();
@@ -1138,7 +1139,7 @@ describe("HybridOrder", () => {
             recipient: swapperAddress,
           })
           .auctionStartBlock(BigNumber.from(auctionStart))
-          .baselinePriorityFeeWei(BigNumber.from(0))
+          .baselinePriorityFee(BigNumber.from(0))
           .scalingFactor(BASE_SCALING_FACTOR)
           .priceCurve(priceCurve)
           .buildPartial();
@@ -1274,7 +1275,7 @@ describe("HybridOrder", () => {
           recipient: swapperAddress,
         })
         .auctionStartBlock(BigNumber.from(farFutureBlock))
-        .baselinePriorityFeeWei(BigNumber.from(0))
+        .baselinePriorityFee(BigNumber.from(0))
         .scalingFactor(BASE_SCALING_FACTOR) // Neutral
         .priceCurve(baseCurve);
 
@@ -1283,11 +1284,12 @@ describe("HybridOrder", () => {
       const cosignerData = getCosignerData(BigNumber.from(auctionTargetBlock), supplementalCurve);
       const order = partialOrder.cosignerData(cosignerData).buildPartial();
 
-      const cosignerHash = order.cosignatureHash();
+      const cosignerHash = order.cosignatureHash(cosignerData);
       const cosignatureObj = await cosigner._signingKey().signDigest(cosignerHash);
       const cosignature = ethers.utils.joinSignature(cosignatureObj);
 
       const orderClass = HybridOrderBuilder.fromOrder(order)
+        .cosignerData(cosignerData)
         .cosignature(cosignature)
         .build();
 

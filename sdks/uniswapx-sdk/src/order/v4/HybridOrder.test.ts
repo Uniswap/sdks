@@ -74,7 +74,7 @@ describe("CosignedHybridOrder", () => {
         },
       ],
       auctionStartBlock: BigNumber.from(100),
-      baselinePriorityFeeWei: BigNumber.from("1000000000"),
+      baselinePriorityFee: BigNumber.from("1000000000"),
       scalingFactor: WAD.add(1),
       priceCurve: basePriceCurve,
       cosignerData: {
@@ -102,8 +102,8 @@ describe("CosignedHybridOrder", () => {
       auctionStartBlock: BigNumber.from(
         overrides.auctionStartBlock ?? baseOrder.auctionStartBlock
       ),
-      baselinePriorityFeeWei: BigNumber.from(
-        overrides.baselinePriorityFeeWei ?? baseOrder.baselinePriorityFeeWei
+      baselinePriorityFee: BigNumber.from(
+        overrides.baselinePriorityFee ?? baseOrder.baselinePriorityFee
       ),
       scalingFactor: BigNumber.from(
         overrides.scalingFactor ?? baseOrder.scalingFactor
@@ -193,7 +193,7 @@ describe("CosignedHybridOrder", () => {
           output.recipient,
         ]),
         order.auctionStartBlock,
-        order.baselinePriorityFeeWei,
+        order.baselinePriorityFee,
         order.scalingFactor,
         order.priceCurve,
         [
@@ -284,7 +284,7 @@ describe("CosignedHybridOrder", () => {
     const hybrid = new CosignedHybridOrder(order, chainId, RESOLVER);
     const result = hybrid.resolve({
       currentBlock: BigNumber.from(10),
-      priorityFeeWei: order.baselinePriorityFeeWei.add(1),
+      priorityFeeWei: order.baselinePriorityFee.add(1),
     });
 
     const expectedMultiplier = WAD.add(5);
@@ -309,7 +309,7 @@ describe("CosignedHybridOrder", () => {
     const hybrid = new CosignedHybridOrder(order, chainId, RESOLVER);
     const result = hybrid.resolve({
       currentBlock: BigNumber.from(10),
-      priorityFeeWei: order.baselinePriorityFeeWei.add(1),
+      priorityFeeWei: order.baselinePriorityFee.add(1),
     });
 
     const expectedMultiplier = WAD.sub(5);
@@ -329,7 +329,7 @@ describe("CosignedHybridOrder", () => {
     expect(() =>
       hybrid.resolve({
         currentBlock: BigNumber.from(400),
-        priorityFeeWei: order.baselinePriorityFeeWei,
+        priorityFeeWei: order.baselinePriorityFee,
       })
     ).toThrow(OrderResolutionError);
   });

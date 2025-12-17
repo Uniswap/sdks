@@ -214,9 +214,6 @@ function hashPriceCurve(curve: BigNumber[]): string {
   return ethers.utils.keccak256(ethers.utils.solidityPack(types, values));
 }
 
-/**
- * Hash HybridOrder structure (resolver-specific order hash)
- */
 export function hashHybridOrder(order: CosignedHybridOrderInfo): string {
   const infoHash = hashOrderInfoV4(order);
   const inputHash = hashHybridInput(order.input);
@@ -243,7 +240,7 @@ export function hashHybridOrder(order: CosignedHybridOrderInfo): string {
         inputHash,
         outputsHash,
         order.auctionStartBlock,
-        order.baselinePriorityFeeWei,
+        order.baselinePriorityFee,
         order.scalingFactor,
         priceCurveHash,
       ]

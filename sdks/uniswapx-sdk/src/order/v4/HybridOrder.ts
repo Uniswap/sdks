@@ -105,7 +105,7 @@ function parseSerializedHybridOrder(encoded: string): {
       [inputToken, inputMaxAmount],
       outputs,
       auctionStartBlock,
-      baselinePriorityFeeWei,
+      baselinePriorityFee,
       scalingFactor,
       priceCurve,
       [auctionTargetBlock, supplementalPriceCurve],
@@ -135,7 +135,7 @@ function parseSerializedHybridOrder(encoded: string): {
         })
       ),
       auctionStartBlock,
-      baselinePriorityFeeWei,
+      baselinePriorityFee,
       scalingFactor,
       priceCurve: [...priceCurve],
       cosignerData: {
@@ -186,7 +186,7 @@ export class UnsignedHybridOrder {
       input: info.input,
       outputs: info.outputs,
       auctionStartBlock: info.auctionStartBlock,
-      baselinePriorityFeeWei: info.baselinePriorityFeeWei,
+      baselinePriorityFee: info.baselinePriorityFee,
       scalingFactor: info.scalingFactor,
       priceCurve: info.priceCurve,
     };
@@ -221,7 +221,7 @@ export class UnsignedHybridOrder {
           recipient: output.recipient,
         })),
         auctionStartBlock: BigNumber.from(json.auctionStartBlock),
-        baselinePriorityFeeWei: BigNumber.from(json.baselinePriorityFeeWei),
+        baselinePriorityFee: BigNumber.from(json.baselinePriorityFee),
         scalingFactor: BigNumber.from(json.scalingFactor),
         priceCurve: json.priceCurve.map((value) => BigNumber.from(value)),
       },
@@ -296,7 +296,7 @@ export class UnsignedHybridOrder {
           output.recipient,
         ]),
         this.info.auctionStartBlock,
-        this.info.baselinePriorityFeeWei,
+        this.info.baselinePriorityFee,
         this.info.scalingFactor,
         this.info.priceCurve,
         [BigNumber.from(0), []], // Empty cosignerData
@@ -359,7 +359,7 @@ export class UnsignedHybridOrder {
         input: this.info.input,
         outputs: this.info.outputs,
         auctionStartBlock: this.info.auctionStartBlock,
-        baselinePriorityFee: this.info.baselinePriorityFeeWei,
+        baselinePriorityFee: this.info.baselinePriorityFee,
         scalingFactor: this.info.scalingFactor,
         priceCurve: this.info.priceCurve,
       },
@@ -377,9 +377,13 @@ export class UnsignedHybridOrder {
     };
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
   resolve(_options: HybridOrderResolutionOptions): ResolvedUniswapXOrder {
     throw new Error("Cannot resolve unsigned order - cosigner data required");
+  }
+
+  cosignatureHash(cosignerData: HybridCosignerData): string {
+    return hashHybridCosignerData(this.hash(), cosignerData, this.chainId);
   }
 
   toJSON(): UnsignedHybridOrderInfoJSON & {
@@ -411,7 +415,7 @@ export class UnsignedHybridOrder {
         recipient: output.recipient,
       })),
       auctionStartBlock: this.info.auctionStartBlock.toString(),
-      baselinePriorityFeeWei: this.info.baselinePriorityFeeWei.toString(),
+      baselinePriorityFee: this.info.baselinePriorityFee.toString(),
       scalingFactor: this.info.scalingFactor.toString(),
       priceCurve: this.info.priceCurve.map((value) => value.toString()),
     };
@@ -491,7 +495,7 @@ export class CosignedHybridOrder extends UnsignedHybridOrder {
           recipient: output.recipient,
         })),
         auctionStartBlock: BigNumber.from(json.auctionStartBlock),
-        baselinePriorityFeeWei: BigNumber.from(json.baselinePriorityFeeWei),
+        baselinePriorityFee: BigNumber.from(json.baselinePriorityFee),
         scalingFactor: BigNumber.from(json.scalingFactor),
         priceCurve: json.priceCurve.map((value) => BigNumber.from(value)),
         cosignerData: {
@@ -537,7 +541,7 @@ export class CosignedHybridOrder extends UnsignedHybridOrder {
           output.recipient,
         ]),
         this.info.auctionStartBlock,
-        this.info.baselinePriorityFeeWei,
+        this.info.baselinePriorityFee,
         this.info.scalingFactor,
         this.info.priceCurve,
         [
@@ -606,9 +610,9 @@ export class CosignedHybridOrder extends UnsignedHybridOrder {
     );
 
     const priorityFeeAboveBaseline = options.priorityFeeWei.gt(
-      this.info.baselinePriorityFeeWei
+      this.info.baselinePriorityFee
     )
-      ? options.priorityFeeWei.sub(this.info.baselinePriorityFeeWei)
+      ? options.priorityFeeWei.sub(this.info.baselinePriorityFee)
       : BigNumber.from(0);
 
     const useExactIn =
@@ -675,7 +679,7 @@ export class CosignedHybridOrder extends UnsignedHybridOrder {
         recipient: output.recipient,
       })),
       auctionStartBlock: this.info.auctionStartBlock.toString(),
-      baselinePriorityFeeWei: this.info.baselinePriorityFeeWei.toString(),
+      baselinePriorityFee: this.info.baselinePriorityFee.toString(),
       scalingFactor: this.info.scalingFactor.toString(),
       priceCurve: this.info.priceCurve.map((value) => value.toString()),
       cosignerData: {
