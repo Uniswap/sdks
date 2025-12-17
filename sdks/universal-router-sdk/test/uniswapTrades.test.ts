@@ -1052,6 +1052,10 @@ describe('Uniswap', () => {
       expect(hexToDecimalString(methodParameters.value)).to.eq(JSBI.multiply(inputEther, JSBI.BigInt(2)).toString())
     })
 
+    /// The following test split routes that use the ETH-WETH pool at the end of the route
+
+    // Split route: v4 - ends in eth-weth, v3 - ends in weth, output is eth
+    // This ensures that the v4 swap takes WETH, not ETH. All the WETH is unwrapped at the end.
     it('encodes a split exactInput with 2 routes v3USDC->v3ETH & v4USDC->v4ETH swap', async () => {
       const inputUSDC = utils.parseUnits('1000', 6).toString()
       const v3Trade = await V3Trade.fromRoute(
@@ -1070,6 +1074,8 @@ describe('Uniswap', () => {
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
+    // Split route: v4 - ends in eth-weth, mixed - ends in weth, output is eth
+    // This ensures that the v4 swap takes WETH, not ETH. All the WETH is unwrapped at the end.
     it('encodes a split exactInput with 2 routes mixed v2DAI->v3ETH & v4 v4DAI->v4USDC->v4ETH swap', async () => {
       const inputDAI = utils.parseUnits('1000', 18).toString()
       const mixedTrade = await MixedRouteTrade.fromRoute(
@@ -1088,6 +1094,7 @@ describe('Uniswap', () => {
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
+    // Split route: v4 - ends in eth, mixed - ends in eth, output is eth
     it('encodes a split exactInput with 2 routes mixed v2DAI->v4ETH & v4 v4DAI->v4USDC->v4ETH swap', async () => {
       const inputDAI = utils.parseUnits('1000', 18).toString()
       const mixedTrade = await MixedRouteTrade.fromRoute(
@@ -1106,6 +1113,7 @@ describe('Uniswap', () => {
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
+    // Split route: v4 - ends in weth, mixed - ends in v4 weth, output is eth
     it('encodes a split exactInput with 2 routes mixed v2DAI->v4WETH & v4 v4DAI->v4USDC->v4WETH swap', async () => {
       const inputDAI = utils.parseUnits('1000', 18).toString()
       const mixedTrade = await MixedRouteTrade.fromRoute(
@@ -1124,6 +1132,8 @@ describe('Uniswap', () => {
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
+    // Split route: v4 - ends in eth-weth, v4 - ends in weth, output is eth
+    // This ensures that the v4 swap takes WETH, not ETH. All the WETH is unwrapped at the end.
     it('encodes a split exactInput with 2 routes v4 eth-weth & v4 weth swap', async () => {
       const inputUSDC = utils.parseUnits('1000', 6).toString()
       const v4Trade1 = await V4Trade.fromRoute(
@@ -1142,6 +1152,8 @@ describe('Uniswap', () => {
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
+    // Split route: v4 - ends in eth-weth, mixed - ends in weth, output is eth
+    // This ensures that the v4 swap takes WETH, not ETH. All the WETH is unwrapped at the end.
     it('encodes a split exactInput with 2 routes v4 eth-weth & mixed weth swap', async () => {
       const inputDAI = utils.parseUnits('1000', 18).toString()
       const v4Trade = await V4Trade.fromRoute(
@@ -1160,6 +1172,8 @@ describe('Uniswap', () => {
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
+    // Split route: v4 - ends in weth, mixed - ends in v4 eth-weth, output is eth
+    // This ensures that the v4 swap takes WETH, not ETH. All the WETH is unwrapped at the end.
     it('encodes a split exactInput with 2 routes v4 weth & mixed eth-weth swap', async () => {
       const inputDAI = utils.parseUnits('1000', 18).toString()
       const v4Trade = await V4Trade.fromRoute(
@@ -1178,7 +1192,9 @@ describe('Uniswap', () => {
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
-    // ending in weth
+    // The following are outputs that end in weth
+
+    // Split route: v4 - ends in eth-weth, v3 - ends in weth, output is weth
     it('encodes a split exactInput with 2 routes v3USDC->v3ETH & v4USDC->v4ETH swap ending in weth', async () => {
       const inputUSDC = utils.parseUnits('1000', 6).toString()
       const v3Trade = await V3Trade.fromRoute(
@@ -1197,6 +1213,7 @@ describe('Uniswap', () => {
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
+    // Split route: v4 - ends in eth-weth, v4 - ends in weth, output is weth
     it('encodes a split exactInput with 2 routes v4 ending in weth & v4 ending in eth-weth swap', async () => {
       const inputUSDC = utils.parseUnits('1000', 6).toString()
       const v4Trade1 = await V4Trade.fromRoute(
@@ -1215,6 +1232,7 @@ describe('Uniswap', () => {
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
+    // Split route: v4 - ends in eth, v4 - ends in eth, output is weth
     it('encodes a split exactInput with 2 routes v4 ending in eth & v4 ending in eth swap', async () => {
       const inputUSDC = utils.parseUnits('1000', 6).toString()
       const v4Trade1 = await V4Trade.fromRoute(
