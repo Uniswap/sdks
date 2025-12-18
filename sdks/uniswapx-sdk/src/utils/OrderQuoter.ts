@@ -15,11 +15,18 @@ import {
 } from "../contracts";
 import { MissingConfiguration } from "../errors";
 import {
+  CosignedPriorityOrderInfo,
+  CosignedV2DutchOrderInfo,
+  CosignedV3DutchOrderInfo,
+  DutchOrderInfo,
   Order,
   RelayOrder,
   ResolvedRelayFee,
   TokenAmount,
   UniswapXOrder,
+  UnsignedPriorityOrderInfo,
+  UnsignedV2DutchOrderInfo,
+  UnsignedV3DutchOrderInfo,
 } from "../order";
 import { parseExclusiveFillerData, ValidationType } from "../order/validation";
 
@@ -64,6 +71,8 @@ export interface RelayOrderQuote {
   // not specified if validation is not OK
   quote: ResolvedRelayOrder | undefined;
 }
+
+export type LegacyOrderInfoTypes = DutchOrderInfo | UnsignedV2DutchOrderInfo | CosignedV2DutchOrderInfo | UnsignedV3DutchOrderInfo | CosignedV3DutchOrderInfo | UnsignedPriorityOrderInfo | CosignedPriorityOrderInfo;
 
 const BASIC_ERROR = "0x08c379a0";
 
@@ -246,15 +255,19 @@ export class UniswapXOrderQuoter
 
         for (const key of Object.keys(KNOWN_ERRORS)) {
           if (returnData.includes(key)) {
+            // OrderValidation.ValidationFailed
             if (key === "0a0b0d79") {
-              const fillerValidation = parseExclusiveFillerData(
-                orders[idx].order.info.additionalValidationData
-              );
-              if (
-                fillerValidation.type === ValidationType.ExclusiveFiller &&
-                fillerValidation.data.filler !== ethers.constants.AddressZero
-              ) {
-                return OrderValidation.ExclusivityPeriod;
+              // V4 orders use hooks instead of additionalValidationData
+              if ("additionalValidationData" in orders[idx].order.info) {
+                const fillerValidation = parseExclusiveFillerData(
+                  (orders[idx].order.info as LegacyOrderInfoTypes).additionalValidationData
+                );
+                if (
+                  fillerValidation.type === ValidationType.ExclusiveFiller &&
+                  fillerValidation.data.filler !== ethers.constants.AddressZero
+                ) {
+                  return OrderValidation.ExclusivityPeriod;
+                }
               }
               return OrderValidation.ValidationFailed;
             }

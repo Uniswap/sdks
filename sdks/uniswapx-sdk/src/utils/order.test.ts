@@ -2,24 +2,31 @@ import { BigNumber, constants } from "ethers";
 
 import {
   DutchOrderBuilder,
+  HybridOrderBuilder,
   PriorityOrderBuilder,
   RelayOrderBuilder,
   V2DutchOrderBuilder,
   V3DutchOrderBuilder,
 } from "../builder";
-import { OrderType } from "../constants";
+import { OrderType, REVERSE_RESOLVER_MAPPING } from "../constants";
+import { BASE_SCALING_FACTOR } from "../constants/v4";
 import {
+  CosignedHybridOrder,
   CosignedPriorityOrder,
   CosignedV2DutchOrder,
   CosignedV3DutchOrder,
   DutchOrder,
   RelayOrder,
+  UnsignedHybridOrder,
   UnsignedPriorityOrder,
   UnsignedV2DutchOrder,
   UnsignedV3DutchOrder,
 } from "../order";
 
 import { RelayOrderParser, UniswapXOrderParser } from "./order";
+
+// Random resolver address for V4 Hybrid order tests
+const TEST_HYBRID_RESOLVER = "0x1234567890123456789012345678901234567890";
 
 describe("order utils", () => {
   let dutchOrder: DutchOrder;
@@ -30,6 +37,8 @@ describe("order utils", () => {
   let cosignedV3DutchOrder: CosignedV3DutchOrder;
   let unsignedPriorityOrder: UnsignedPriorityOrder;
   let cosignedPriorityOrder: CosignedPriorityOrder;
+  let unsignedHybridOrder: UnsignedHybridOrder;
+  let cosignedHybridOrder: CosignedHybridOrder;
   let limitOrder: DutchOrder;
   let relayOrder: RelayOrder;
   let chainId: number;
@@ -217,6 +226,39 @@ describe("order utils", () => {
         "0x88a3d425308d71431b514826cbf9c74f713b57946b0a29f7d7e094ccf0ab562e270216a537b59210f1b5c87f5cc5662cd87dea5df7e699d92b061191bd2499c71b"
       )
       .build();
+
+    // Build Hybrid orders using the test resolver address
+    const hybridBuilder = new HybridOrderBuilder(
+      chainId,
+      "0x0000000000000000000000000000000000000001", // reactor
+      TEST_HYBRID_RESOLVER
+    )
+      .cosigner(constants.AddressZero)
+      .deadline(deadline)
+      .swapper(constants.AddressZero)
+      .nonce(BigNumber.from(100))
+      .input({
+        token: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        maxAmount: BigNumber.from("1000000"),
+      })
+      .output({
+        token: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        minAmount: BigNumber.from("1000000000000000000"),
+        recipient: constants.AddressZero,
+      })
+      .auctionStartBlock(100)
+      .baselinePriorityFee(BigNumber.from(0))
+      .scalingFactor(BASE_SCALING_FACTOR)
+      .priceCurve([]);
+
+    unsignedHybridOrder = hybridBuilder.buildPartial();
+    cosignedHybridOrder = hybridBuilder
+      .auctionTargetBlock(100)
+      .supplementalPriceCurve([])
+      .cosignature(
+        "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      )
+      .build();
   });
 
   describe("parseOrder", () => {
@@ -343,6 +385,90 @@ describe("order utils", () => {
         uniswapXOrderParser.parseOrder(encodedOrder, priorityChainId)
       ).toMatchObject(unsignedPriorityOrder);
     });
+
+    describe("V4 Hybrid order detection", () => {
+      beforeAll(() => {
+        // Add test resolver to the mapping for V4 detection
+        REVERSE_RESOLVER_MAPPING[TEST_HYBRID_RESOLVER.toLowerCase()] = {
+          orderType: OrderType.Hybrid,
+        };
+      });
+
+      afterAll(() => {
+        // Clean up test resolver from mapping
+        delete REVERSE_RESOLVER_MAPPING[TEST_HYBRID_RESOLVER.toLowerCase()];
+      });
+
+      it("parses CosignedHybridOrder via resolver-based detection", () => {
+        const encodedOrder = cosignedHybridOrder.serialize();
+        const parsed = uniswapXOrderParser.parseOrder(encodedOrder, chainId);
+        expect(parsed).toBeInstanceOf(CosignedHybridOrder);
+        expect((parsed as CosignedHybridOrder).info).toEqual(
+          cosignedHybridOrder.info
+        );
+      });
+
+      it("parses UnsignedHybridOrder via resolver-based detection", () => {
+        const encodedOrder = unsignedHybridOrder.serialize();
+        const parsed = uniswapXOrderParser.parseOrder(encodedOrder, chainId);
+        expect(parsed).toBeInstanceOf(UnsignedHybridOrder);
+        expect((parsed as UnsignedHybridOrder).info).toEqual(
+          unsignedHybridOrder.info
+        );
+      });
+
+      it("round-trips CosignedHybridOrder through serialize/parse", () => {
+        const encodedOrder = cosignedHybridOrder.serialize();
+        const parsed = uniswapXOrderParser.parseOrder(
+          encodedOrder,
+          chainId
+        ) as CosignedHybridOrder;
+        expect(parsed.serialize()).toEqual(encodedOrder);
+      });
+
+      it("round-trips UnsignedHybridOrder through serialize/parse", () => {
+        const encodedOrder = unsignedHybridOrder.serialize();
+        const parsed = uniswapXOrderParser.parseOrder(
+          encodedOrder,
+          chainId
+        ) as UnsignedHybridOrder;
+        expect(parsed.serialize()).toEqual(encodedOrder);
+      });
+    });
+
+    it("falls back to reactor-based detection when resolver is not in mapping", () => {
+      // Hybrid order with unknown resolver should fail V4 detection
+      // and fall back to reactor-based detection, which will fail since
+      // the reactor is not a known reactor address
+      const encodedOrder = unsignedHybridOrder.serialize();
+
+      // Temporarily remove test resolver from mapping to simulate unknown resolver
+      const savedMapping =
+        REVERSE_RESOLVER_MAPPING[TEST_HYBRID_RESOLVER.toLowerCase()];
+      delete REVERSE_RESOLVER_MAPPING[TEST_HYBRID_RESOLVER.toLowerCase()];
+
+      try {
+        // Should throw MissingConfiguration since fallback to reactor lookup
+        // will fail (reactor address 0x0...01 is not in REVERSE_REACTOR_MAPPING)
+        expect(() =>
+          uniswapXOrderParser.parseOrder(encodedOrder, chainId)
+        ).toThrow();
+      } finally {
+        // Restore mapping
+        if (savedMapping) {
+          REVERSE_RESOLVER_MAPPING[TEST_HYBRID_RESOLVER.toLowerCase()] =
+            savedMapping;
+        }
+      }
+    });
+
+    it("parses legacy DutchOrder even though it starts with address bytes", () => {
+      // DutchOrder serialization also starts with an address (reactor),
+      // but detectV4OrderType should return null since it's not a known resolver
+      const encodedOrder = dutchOrder.serialize();
+      const parsed = uniswapXOrderParser.parseOrder(encodedOrder, chainId);
+      expect(parsed).toEqual(dutchOrder);
+    });
   });
 
   describe("getOrderType", () => {
@@ -394,6 +520,16 @@ describe("order utils", () => {
     it("parses CosignedV3DutchOrder type", () => {
       expect(uniswapXOrderParser.getOrderType(cosignedV3DutchOrder)).toEqual(
         OrderType.Dutch_V3
+      );
+    });
+    it("parses UnsignedHybridOrder type", () => {
+      expect(uniswapXOrderParser.getOrderType(unsignedHybridOrder)).toEqual(
+        OrderType.Hybrid
+      );
+    });
+    it("parses CosignedHybridOrder type", () => {
+      expect(uniswapXOrderParser.getOrderType(cosignedHybridOrder)).toEqual(
+        OrderType.Hybrid
       );
     });
   });
@@ -478,6 +614,38 @@ describe("order utils", () => {
           priorityChainId
         )
       ).toEqual(OrderType.Priority);
+    });
+
+    describe("V4 Hybrid order type detection", () => {
+      beforeAll(() => {
+        // Add test resolver to the mapping for V4 detection
+        REVERSE_RESOLVER_MAPPING[TEST_HYBRID_RESOLVER.toLowerCase()] = {
+          orderType: OrderType.Hybrid,
+        };
+      });
+
+      afterAll(() => {
+        // Clean up test resolver from mapping
+        delete REVERSE_RESOLVER_MAPPING[TEST_HYBRID_RESOLVER.toLowerCase()];
+      });
+
+      it("parses UnsignedHybridOrder type from encoded", () => {
+        expect(
+          uniswapXOrderParser.getOrderTypeFromEncoded(
+            unsignedHybridOrder.serialize(),
+            chainId
+          )
+        ).toEqual(OrderType.Hybrid);
+      });
+
+      it("parses CosignedHybridOrder type from encoded", () => {
+        expect(
+          uniswapXOrderParser.getOrderTypeFromEncoded(
+            cosignedHybridOrder.serialize(),
+            chainId
+          )
+        ).toEqual(OrderType.Hybrid);
+      });
     });
   });
 });
