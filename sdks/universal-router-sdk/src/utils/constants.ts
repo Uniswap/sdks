@@ -182,6 +182,12 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
   },
+  // arbitrum sepolia
+  [421614]: {
+    router: '0x0B29eBd54F37665923B1D6d3a7DafC1C2B4177ec',
+    weth: '0x980B62Da83eFf3D4576C647993b0c1D7faf17c73',
+    creationBlock: 17593807,
+  },
   // celo
   [42220]: {
     weth: WETH_NOT_SUPPORTED_ON_CHAIN,
