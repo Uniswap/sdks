@@ -71,17 +71,13 @@ const SWAP_EXACT_IN_SINGLE_STRUCT =
   '(' + POOL_KEY_STRUCT + ' poolKey,bool zeroForOne,uint128 amountIn,uint128 amountOutMinimum,bytes hookData)'
 
 const SWAP_EXACT_IN_STRUCT =
-  '(address currencyIn,' +
-  PATH_KEY_STRUCT +
-  '[] path,uint256[] maxHopSlippage,uint128 amountIn,uint128 amountOutMinimum)'
+  '(address currencyIn,' + PATH_KEY_STRUCT + '[] path,uint128 amountIn,uint128 amountOutMinimum)'
 
 const SWAP_EXACT_OUT_SINGLE_STRUCT =
   '(' + POOL_KEY_STRUCT + ' poolKey,bool zeroForOne,uint128 amountOut,uint128 amountInMaximum,bytes hookData)'
 
 const SWAP_EXACT_OUT_STRUCT =
-  '(address currencyOut,' +
-  PATH_KEY_STRUCT +
-  '[] path,uint256[] maxHopSlippage,uint128 amountOut,uint128 amountInMaximum)'
+  '(address currencyOut,' + PATH_KEY_STRUCT + '[] path,uint128 amountOut,uint128 amountInMaximum)'
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const V4_BASE_ACTIONS_ABI_DEFINITION: { [key in Actions]: readonly ParamType[] } = {
@@ -186,11 +182,7 @@ export class V4Planner {
     return this
   }
 
-  addTrade(
-    trade: Trade<Currency, Currency, TradeType>,
-    slippageTolerance?: Percent,
-    maxHopSlippage?: BigNumber[]
-  ): V4Planner {
+  addTrade(trade: Trade<Currency, Currency, TradeType>, slippageTolerance?: Percent): V4Planner {
     const exactOutput = trade.tradeType === TradeType.EXACT_OUTPUT
 
     // exactInput we sometimes perform aggregated slippage checks, but not with exactOutput
@@ -202,22 +194,17 @@ export class V4Planner {
     const currencyIn = currencyAddress(trade.route.pathInput)
     const currencyOut = currencyAddress(trade.route.pathOutput)
 
-    // If no per-hop slippage limits provided, use empty array (no per-hop checks)
-    const maxHopSlippageArray = maxHopSlippage ?? []
-
     this.addAction(actionType, [
       exactOutput
         ? {
             currencyOut,
             path: encodeRouteToPath(trade.route, exactOutput),
-            maxHopSlippage: maxHopSlippageArray,
             amountInMaximum: trade.maximumAmountIn(slippageTolerance ?? new Percent(0)).quotient.toString(),
             amountOut: trade.outputAmount.quotient.toString(),
           }
         : {
             currencyIn,
             path: encodeRouteToPath(trade.route, exactOutput),
-            maxHopSlippage: maxHopSlippageArray,
             amountIn: trade.inputAmount.quotient.toString(),
             amountOutMinimum: slippageTolerance ? trade.minimumAmountOut(slippageTolerance).quotient.toString() : 0,
           },

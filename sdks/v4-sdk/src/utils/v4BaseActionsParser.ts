@@ -29,7 +29,6 @@ export type SwapExactInSingle = {
 export type SwapExactIn = {
   readonly currencyIn: string
   readonly path: readonly PathKey[]
-  readonly maxHopSlippage: readonly string[]
   readonly amountIn: string
   readonly amountOutMinimum: string
 }
@@ -45,7 +44,6 @@ export type SwapExactOutSingle = {
 export type SwapExactOut = {
   readonly currencyOut: string
   readonly path: readonly PathKey[]
-  readonly maxHopSlippage: readonly string[]
   readonly amountOut: string
   readonly amountInMaximum: string
 }
@@ -164,13 +162,12 @@ function parseV4ExactInSingle(data: any[]): SwapExactInSingle {
 }
 
 function parseV4ExactIn(data: any[]): SwapExactIn {
-  const [currencyIn, path, maxHopSlippage, amountIn, amountOutMinimum] = data
+  const [currencyIn, path, amountIn, amountOutMinimum] = data
   const paths: readonly PathKey[] = path.map((pathKey: string) => parsePathKey(pathKey))
 
   return {
     path: paths,
     currencyIn,
-    maxHopSlippage,
     amountIn,
     amountOutMinimum,
   }
@@ -196,13 +193,12 @@ function parseV4ExactOutSingle(data: any[]): SwapExactOutSingle {
 }
 
 function parseV4ExactOut(data: any[]): SwapExactOut {
-  const [currencyOut, path, maxHopSlippage, amountOut, amountInMaximum] = data
+  const [currencyOut, path, amountOut, amountInMaximum] = data
   const paths: readonly PathKey[] = path.map((pathKey: string) => parsePathKey(pathKey))
 
   return {
     path: paths,
     currencyOut,
-    maxHopSlippage,
     amountOut,
     amountInMaximum,
   }
