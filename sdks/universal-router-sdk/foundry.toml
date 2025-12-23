@@ -4,6 +4,3 @@ fs_permissions = [{ access = "read", path = "./permit2/out/Permit2.sol/Permit2.j
 src = "./test/forge"
 via_ir = true
 evm_version = "cancun"
-
-[lint]
-lint_on_build = false
