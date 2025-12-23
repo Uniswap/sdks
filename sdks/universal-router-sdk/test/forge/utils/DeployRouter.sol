@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
 import {IUniversalRouter} from "universal-router/interfaces/IUniversalRouter.sol";
 import {UniversalRouter} from "universal-router/UniversalRouter.sol";
-import {PoolManager, ModifyLiquidityParams} from "@uniswap/v4-core/src/PoolManager.sol";
+import {PoolManager} from "@uniswap/v4-core/src/PoolManager.sol";
 import {IERC20Minimal} from "@uniswap/v4-core/src/interfaces/external/IERC20Minimal.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
@@ -72,8 +72,7 @@ contract DeployRouter is Test {
                 poolInitCodeHash: POOL_INIT_CODE_HASH,
                 v4PoolManager: address(poolManager),
                 v3NFTPositionManager: V3_POSITION_MANAGER,
-                v4PositionManager: address(v4PositionManager),
-                spokePool: address(0)
+                v4PositionManager: address(v4PositionManager)
             })
         );
 
@@ -134,7 +133,12 @@ contract DeployRouter is Test {
 
             (BalanceDelta delta,) = poolManager.modifyLiquidity(
                 poolKey,
-                ModifyLiquidityParams({tickLower: -60, tickUpper: 60, liquidityDelta: 1000000 ether, salt: 0}),
+                IPoolManager.ModifyLiquidityParams({
+                    tickLower: -60,
+                    tickUpper: 60,
+                    liquidityDelta: 1000000 ether,
+                    salt: 0
+                }),
                 bytes("")
             );
 
@@ -155,22 +159,21 @@ contract DeployRouter is Test {
         ERC20(token0).approve(V3_POSITION_MANAGER, type(uint256).max);
         ERC20(token1).approve(V3_POSITION_MANAGER, type(uint256).max);
 
-        INonfungiblePositionManager(V3_POSITION_MANAGER)
-            .mint(
-                INonfungiblePositionManager.MintParams({
-                    token0: token0,
-                    token1: token1,
-                    fee: fee,
-                    tickLower: 200040,
-                    tickUpper: 300000,
-                    amount0Desired: amount0Desired,
-                    amount1Desired: amount1Desired,
-                    amount0Min: 0,
-                    amount1Min: 0,
-                    recipient: from,
-                    deadline: type(uint256).max
-                })
-            );
+        INonfungiblePositionManager(V3_POSITION_MANAGER).mint(
+            INonfungiblePositionManager.MintParams({
+                token0: token0,
+                token1: token1,
+                fee: fee,
+                tickLower: 200040,
+                tickUpper: 300000,
+                amount0Desired: amount0Desired,
+                amount1Desired: amount1Desired,
+                amount0Min: 0,
+                amount1Min: 0,
+                recipient: from,
+                deadline: type(uint256).max
+            })
+        );
 
         vm.stopPrank();
     }
