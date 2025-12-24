@@ -4866,17 +4866,17 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@uniswap/router-sdk@npm:^2.3.0":
-  version: 2.3.0
-  resolution: "@uniswap/router-sdk@npm:2.3.0"
+"@uniswap/router-sdk@npm:^2.3.1":
+  version: 2.3.1
+  resolution: "@uniswap/router-sdk@npm:2.3.1"
   dependencies:
     "@ethersproject/abi": ^5.5.0
     "@uniswap/sdk-core": ^7.8.0
     "@uniswap/swap-router-contracts": ^1.3.0
     "@uniswap/v2-sdk": ^4.17.0
     "@uniswap/v3-sdk": ^3.27.0
-    "@uniswap/v4-sdk": ^1.24.0
-  checksum: 8a1da45aa73e7e8b2416d8191bf6ffd3885fc7e8adfa891df08ccc08797c313d98392b073c9ed6d86c38460f2034c8aad3c1d734c6a599c2c5edd043f54eb4e1
+    "@uniswap/v4-sdk": ^1.25.0
+  checksum: 313526b47e92c458325fee7b1a575270aad1e605747998433ef649910acc270f6f948899c1f077f335750a2e9f14cc46a4097e040b457a8c2a64e14390d5d4d9
   languageName: node
   linkType: hard
 
@@ -5042,7 +5042,7 @@ __metadata:
     "@types/node": ^18.7.16
     "@types/node-fetch": ^2.6.2
     "@uniswap/permit2-sdk": ^1.3.0
-    "@uniswap/router-sdk": ^2.3.0
+    "@uniswap/router-sdk": ^2.3.1
     "@uniswap/sdk-core": ^7.10.0
     "@uniswap/universal-router": 2.0.0-beta.2
     "@uniswap/v2-core": ^1.0.1
@@ -5220,7 +5220,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v4-sdk@npm:^1.24.0, @uniswap/v4-sdk@npm:^1.25.0":
+"@uniswap/v4-sdk@npm:^1.25.0":
   version: 1.25.0
   resolution: "@uniswap/v4-sdk@npm:1.25.0"
   dependencies:
