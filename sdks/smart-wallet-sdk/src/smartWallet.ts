@@ -1,5 +1,5 @@
 import { ChainId } from '@uniswap/sdk-core'
-import { encodeFunctionData } from 'viem'
+import { concatHex, encodeFunctionData } from 'viem'
 
 import abi from '../abis/MinimalDelegationEntry.json'
 
@@ -12,6 +12,34 @@ import { BatchedCallPlanner } from './utils/batchedCallPlanner'
  * Main SDK class for interacting with Uniswap smart wallet contracts
  */
 export class SmartWallet {
+  /**
+   * Creates method parameters for a UserOperation to be executed through a smart wallet
+   * @dev Compatible with EntryPoint versions v0.7.0 and v0.8.0 (not v0.6.0)
+   * 
+   * @param calls Array of calls to encode
+   * @param options Basic options for the execution
+   * @returns Method parameters with userOp calldata and value
+   */
+  public static encodeUserOp(calls: Call[], options: ExecuteOptions = {}): MethodParameters {
+    const planner = new CallPlanner(calls)
+    const batchedCallPlanner = new BatchedCallPlanner(planner, options.revertOnFailure)
+
+    // UserOp callData format: executeUserOp selector (0x8dd7712f) + abi.encode(abi.encode(Call[]), revertOnFailure)
+
+    // The EntryPoint recognizes this selector and calls executeUserOp(userOp, userOpHash) on the account.
+    // The account then extracts the execution data from userOp.callData (slicing off the selector).
+    
+    // We manually concat the selector + encoded data rather than using encodeFunctionData because
+    // the callData is not a standard ABI-encoded function call to executeUserOp.
+    const EXECUTE_USER_OP_SELECTOR = '0x8dd7712f'
+    const calldata = concatHex([EXECUTE_USER_OP_SELECTOR, batchedCallPlanner.encode()])
+
+    return {
+      calldata,
+      value: planner.value,
+    }
+  }
+
   /**
    * Creates method parameters for executing a simple batch of calls through a smart wallet
    * @param calls Array of calls to encode
