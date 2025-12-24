@@ -3,7 +3,7 @@ module.exports = {
   parserOptions: {
     ecmaVersion: 2020,
     sourceType: 'module',
-    project: './tsconfig.lint.json',
+    project: __dirname + '/tsconfig.lint.json',
   },
   plugins: ['@typescript-eslint', 'prettier'],
   extends: [
