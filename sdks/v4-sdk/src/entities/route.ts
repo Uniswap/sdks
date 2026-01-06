@@ -77,7 +77,7 @@ export class Route<TInput extends Currency, TOutput extends Currency> {
               price: price.multiply(pool.currency1Price),
             }
       },
-      this.pools[0].currency0.equals(this.input)
+      this.pools[0].currency0.equals(this.pathInput)
         ? {
             nextInput: this.pools[0].currency1,
             price: this.pools[0].currency0Price,

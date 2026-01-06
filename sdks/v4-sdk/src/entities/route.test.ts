@@ -9,6 +9,7 @@ describe('Route', () => {
   const currency0 = new Token(1, '0x0000000000000000000000000000000000000001', 18, 't0')
   const currency1 = new Token(1, '0x0000000000000000000000000000000000000002', 18, 't1')
   const currency2 = new Token(1, '0x0000000000000000000000000000000000000003', 18, 't2')
+  const currency3 = new Token(1, '0xD000000000000000000000000000000000000000', 18, 't3')
   const weth = WETH9[1]
 
   const pool_0_1 = new Pool(
@@ -166,6 +167,30 @@ describe('Route', () => {
       []
     )
 
+    const pool_3_weth = new Pool(
+      weth,
+      currency3,
+      FEE_AMOUNT_MEDIUM,
+      TICK_SPACING_TEN,
+      ADDRESS_ZERO,
+      encodeSqrtRatioX96(1, 5),
+      0,
+      TickMath.getTickAtSqrtRatio(encodeSqrtRatioX96(1, 5)),
+      []
+    )
+
+    const pool_0_3 = new Pool(
+      currency0,
+      currency3,
+      FEE_AMOUNT_MEDIUM,
+      TICK_SPACING_TEN,
+      ADDRESS_ZERO,
+      encodeSqrtRatioX96(1, 5),
+      0,
+      TickMath.getTickAtSqrtRatio(encodeSqrtRatioX96(1, 5)),
+      []
+    )
+
     it('correct for 0 -> 1', () => {
       const price = new Route([pool_0_1], currency0, currency1).midPrice
       expect(price.toFixed(4)).toEqual('0.2000')
@@ -225,6 +250,20 @@ describe('Route', () => {
       expect(price.toSignificant(4)).toEqual('4.2')
       expect(price.baseCurrency.equals(eth)).toEqual(true)
       expect(price.quoteCurrency.equals(eth)).toEqual(true)
+    })
+
+    it('correct for eth as input and weth as path input', () => {
+      const price = new Route([pool_3_weth], eth, currency3).midPrice
+      expect(price.toSignificant(4)).toEqual('0.2')
+      expect(price.baseCurrency.equals(eth)).toEqual(true)
+      expect(price.quoteCurrency.equals(currency3)).toEqual(true)
+    })
+
+    it('correct for eth as input and weth as path input with multiple pools', () => {
+      const price = new Route([pool_3_weth, pool_0_3], eth, currency0).midPrice
+      expect(price.toSignificant(4)).toEqual('1')
+      expect(price.baseCurrency.equals(eth)).toEqual(true)
+      expect(price.quoteCurrency.equals(currency0)).toEqual(true)
     })
 
     it('can be constructed with ETHER as input on a WETH Pool', async () => {
