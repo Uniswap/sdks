@@ -44,6 +44,16 @@ export const UNISWAPX_ORDER_QUOTER_MAPPING: AddressMap = {
   1301: "0xBFE64A14130054E1C3aB09287bc69E7148471636",
 };
 
+export const UNISWAPX_V4_ORDER_QUOTER_MAPPING: AddressMap = {
+  ...constructSameAddressMap("0x0000000000000000000000000000000000000000"),
+  1301: "0x8166d8286Ec24E1D17A054088B2a71470527BFf8",
+};
+
+export const UNISWAPX_V4_TOKEN_TRANSFER_HOOK_MAPPING: AddressMap = {
+  ...constructSameAddressMap("0x0000000000000000000000000000000000000000"),
+  1301: "0xd70467c1dA526491CFb790A2F84dfe0E10aa6D00",
+};
+
 export const EXCLUSIVE_FILLER_VALIDATION_MAPPING: AddressMap = {
   ...constructSameAddressMap("0x8A66A74e15544db9688B68B06E116f5d19e5dF90"),
   5: "0x0000000000000000000000000000000000000000",
@@ -180,7 +190,7 @@ export type PermissionedToken = {
   symbol: string;
   proxyType?: PermissionedTokenProxyType;
   interface: PermissionedTokenInterface;
-}
+};
 
 export const PERMISSIONED_TOKENS: PermissionedToken[] = [
   {
@@ -197,7 +207,7 @@ export const PERMISSIONED_TOKENS: PermissionedToken[] = [
     proxyType: PermissionedTokenProxyType.ERC1967,
     interface: PermissionedTokenInterface.ISuperstateTokenV4,
   },
-]
+];
 
 /**
  * V4 Resolver address mapping for resolver-based order type detection
