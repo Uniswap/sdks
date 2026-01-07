@@ -353,7 +353,8 @@ describe("V4OrderValidator", () => {
     });
 
     it("validates an order before and after expiry", async () => {
-      const deadline = Math.floor(new Date().getTime() / 1000) + 1000;
+      const currentBlock = await ethers.provider.getBlock("latest");
+      const deadline = currentBlock.timestamp + 1000;
       const info = new HybridOrderBuilder(
         chainId,
         reactor.address,
