@@ -11,6 +11,7 @@ export type { MockDSTokenInterface } from "./MockDSTokenInterface";
 export type { MockERC20 } from "./MockERC20";
 export type { MockSuperstateTokenV4 } from "./MockSuperstateTokenV4";
 export type { OrderQuoter } from "./OrderQuoter";
+export type { OrderQuoterV4 } from "./OrderQuoterV4";
 export type { Permit2 } from "./Permit2";
 export type { PriorityOrderReactor } from "./PriorityOrderReactor";
 export type { Proxy } from "./Proxy";
@@ -33,6 +34,7 @@ export { MockDSTokenInterface__factory } from "./factories/MockDSTokenInterface_
 export { MockERC20__factory } from "./factories/MockERC20__factory";
 export { MockSuperstateTokenV4__factory } from "./factories/MockSuperstateTokenV4__factory";
 export { OrderQuoter__factory } from "./factories/OrderQuoter__factory";
+export { OrderQuoterV4__factory } from "./factories/OrderQuoterV4__factory";
 export { Permit2__factory } from "./factories/Permit2__factory";
 export { PriorityOrderReactor__factory } from "./factories/PriorityOrderReactor__factory";
 export { Proxy__factory } from "./factories/Proxy__factory";

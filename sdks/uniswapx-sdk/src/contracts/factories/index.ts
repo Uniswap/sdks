@@ -11,6 +11,7 @@ export { MockDSTokenInterface__factory } from "./MockDSTokenInterface__factory";
 export { MockERC20__factory } from "./MockERC20__factory";
 export { MockSuperstateTokenV4__factory } from "./MockSuperstateTokenV4__factory";
 export { OrderQuoter__factory } from "./OrderQuoter__factory";
+export { OrderQuoterV4__factory } from "./OrderQuoterV4__factory";
 export { Permit2__factory } from "./Permit2__factory";
 export { PriorityOrderReactor__factory } from "./PriorityOrderReactor__factory";
 export { Proxy__factory } from "./Proxy__factory";
