@@ -5220,7 +5220,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v4-sdk@npm:^1.25.0, @uniswap/v4-sdk@npm:^1.25.1":
+"@uniswap/v4-sdk@npm:^1.25.1":
   version: 1.25.1
   resolution: "@uniswap/v4-sdk@npm:1.25.1"
   dependencies:
