@@ -536,6 +536,15 @@ export interface ResolvedV4Order {
 export interface V4OrderQuote {
   validation: OrderValidation;
   quote: ResolvedV4Order | undefined;
+  /**
+   * Debug info when `validation !== OK`.
+   * This is the raw revert data returned by multicall (hex string, usually starting with `0x`).
+   */
+  validationErrorData?: string;
+  /**
+   * Best-effort decoded error text (e.g. `Error(string)` / `Panic(uint256)` / custom error selector).
+   */
+  validationErrorText?: string;
 }
 
 /**
@@ -544,6 +553,44 @@ export interface V4OrderQuote {
 export interface SignedV4Order {
   order: UniswapXOrder;
   signature: string;
+}
+
+const V4_PANIC_ERROR = "0x4e487b71";
+
+function decodeV4RevertData(returnData: string): { raw: string; text?: string } {
+  const raw = returnData;
+  if (!raw || raw === "0x" || raw === "0x0") {
+    return { raw, text: "Empty revert data" };
+  }
+
+  try {
+    // Error(string)
+    if (raw.startsWith(BASIC_ERROR)) {
+      const decoded = new ethers.utils.AbiCoder().decode(
+        ["string"],
+        "0x" + raw.slice(10)
+      )[0] as string;
+      return { raw, text: decoded };
+    }
+
+    // Panic(uint256)
+    if (raw.startsWith(V4_PANIC_ERROR)) {
+      const code = new ethers.utils.AbiCoder().decode(
+        ["uint256"],
+        "0x" + raw.slice(10)
+      )[0] as ethers.BigNumber;
+      return { raw, text: `Panic(${code.toHexString()})` };
+    }
+
+    // Custom errors: first 4 bytes are selector
+    if (raw.startsWith("0x") && raw.length >= 10) {
+      return { raw, text: `CustomError(${raw.slice(0, 10)})` };
+    }
+  } catch {
+    // best-effort decoding only
+  }
+
+  return { raw };
 }
 
 /**
@@ -579,6 +626,9 @@ export class V4OrderQuoter implements OrderQuoter<SignedV4Order, V4OrderQuote> {
   async quoteBatch(orders: SignedV4Order[]): Promise<V4OrderQuote[]> {
     const results = await this.getMulticallResults("quote", orders);
     const validations = await this.getValidations(orders, results);
+    const validationErrors = results.map((r) =>
+      r.success ? undefined : decodeV4RevertData(r.returnData)
+    );
 
     const quotes: (ResolvedV4Order | undefined)[] = results.map(
       ({ success, returnData }) => {
@@ -612,6 +662,8 @@ export class V4OrderQuoter implements OrderQuoter<SignedV4Order, V4OrderQuote> {
       return {
         validation,
         quote: quotes[i],
+        validationErrorData: validationErrors[i]?.raw,
+        validationErrorText: validationErrors[i]?.text,
       };
     });
   }
