@@ -533,6 +533,19 @@ export interface ResolvedV4Order {
 /**
  * V4 order quote result
  */
+export type V4RpcCallTrace = {
+  method: string;
+  params: unknown[];
+  result?: unknown;
+  error?: {
+    message?: string;
+    code?: unknown;
+    data?: unknown;
+    body?: unknown;
+    error?: unknown;
+  };
+};
+
 export interface V4OrderQuote {
   validation: OrderValidation;
   quote: ResolvedV4Order | undefined;
@@ -545,6 +558,11 @@ export interface V4OrderQuote {
    * Best-effort decoded error text (e.g. `Error(string)` / `Panic(uint256)` / custom error selector).
    */
   validationErrorText?: string;
+  /**
+   * Optional debug trace of the underlying `eth_call` performed by the quoter (URL, payload params, and raw RPC result/error).
+   * Present only when `validation !== OK`.
+   */
+  rpcCalls?: V4RpcCallTrace[];
 }
 
 /**
@@ -593,6 +611,40 @@ function decodeV4RevertData(returnData: string): { raw: string; text?: string } 
   return { raw };
 }
 
+function withRpcCapture(
+  provider: StaticJsonRpcProvider,
+  traces: V4RpcCallTrace[]
+): StaticJsonRpcProvider {
+  // Create a shallow wrapper so we don't mutate the caller's provider instance.
+  const wrapped = Object.create(provider) as StaticJsonRpcProvider;
+  wrapped.send = (async (method: string, params: Array<unknown>) => {
+    // The quoter call we care about is the multicall eth_call.
+    const shouldTrace = method === "eth_call";
+    const trace: V4RpcCallTrace | undefined = shouldTrace
+      ? { method, params }
+      : undefined;
+    if (trace) traces.push(trace);
+
+    try {
+      const result = await provider.send(method, params as any[]);
+      if (trace) trace.result = result;
+      return result;
+    } catch (e: any) {
+      if (trace) {
+        trace.error = {
+          message: e?.message,
+          code: e?.code,
+          data: e?.data,
+          body: e?.body ?? e?.error?.body,
+          error: e?.error,
+        };
+      }
+      throw e;
+    }
+  }) as any;
+  return wrapped;
+}
+
 /**
  * V4 order quoter for Hybrid orders
  */
@@ -607,7 +659,7 @@ export class V4OrderQuoter implements OrderQuoter<SignedV4Order, V4OrderQuote> {
     if (orderQuoterAddress) {
       this.quoter = OrderQuoterV4__factory.connect(
         orderQuoterAddress,
-        provider
+        this.provider
       );
     } else if (UNISWAPX_V4_ORDER_QUOTER_MAPPING[chainId]) {
       this.quoter = OrderQuoterV4__factory.connect(
@@ -624,7 +676,13 @@ export class V4OrderQuoter implements OrderQuoter<SignedV4Order, V4OrderQuote> {
   }
 
   async quoteBatch(orders: SignedV4Order[]): Promise<V4OrderQuote[]> {
-    const results = await this.getMulticallResults("quote", orders);
+    const rpcCalls: V4RpcCallTrace[] = [];
+    const providerForQuote = withRpcCapture(this.provider, rpcCalls);
+    const results = await this.getMulticallResults(
+      providerForQuote,
+      "quote",
+      orders
+    );
     const validations = await this.getValidations(orders, results);
     const validationErrors = results.map((r) =>
       r.success ? undefined : decodeV4RevertData(r.returnData)
@@ -664,6 +722,7 @@ export class V4OrderQuoter implements OrderQuoter<SignedV4Order, V4OrderQuote> {
         quote: quotes[i],
         validationErrorData: validationErrors[i]?.raw,
         validationErrorText: validationErrors[i]?.text,
+        rpcCalls: validation === OrderValidation.OK ? undefined : rpcCalls,
       };
     });
   }
@@ -710,6 +769,7 @@ export class V4OrderQuoter implements OrderQuoter<SignedV4Order, V4OrderQuote> {
   /// Get the results of a multicall for a given function
   /// V4 quote requires (reactor, order, sig) instead of (order, sig)
   private async getMulticallResults(
+    provider: StaticJsonRpcProvider,
     functionName: string,
     orders: SignedV4Order[]
   ): Promise<MulticallResult[]> {
@@ -721,7 +781,7 @@ export class V4OrderQuoter implements OrderQuoter<SignedV4Order, V4OrderQuote> {
     ordersWithBlockOverrides.map((order) => {
       promises.push(
         multicallSameContractManyFunctions(
-          this.provider,
+          provider,
           {
             address: this.quoter.address,
             contractInterface: this.quoter.interface,
@@ -754,7 +814,7 @@ export class V4OrderQuoter implements OrderQuoter<SignedV4Order, V4OrderQuote> {
 
     if (calls.length > 0) {
       promises.push(
-        multicallSameContractManyFunctions(this.provider, {
+        multicallSameContractManyFunctions(provider, {
           address: this.quoter.address,
           contractInterface: this.quoter.interface,
           functionName: functionName,
