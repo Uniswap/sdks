@@ -533,19 +533,6 @@ export interface ResolvedV4Order {
 /**
  * V4 order quote result
  */
-export type V4RpcCallTrace = {
-  method: string;
-  params: unknown[];
-  result?: unknown;
-  error?: {
-    message?: string;
-    code?: unknown;
-    data?: unknown;
-    body?: unknown;
-    error?: unknown;
-  };
-};
-
 export interface V4OrderQuote {
   validation: OrderValidation;
   quote: ResolvedV4Order | undefined;
@@ -559,7 +546,7 @@ export interface V4OrderQuote {
    */
   validationErrorText?: string;
   /**
-   * Optional debug trace of the underlying `eth_call` performed by the quoter (URL, payload params, and raw RPC result/error).
+   * Optional debug trace of the underlying `eth_call` performed by the quoter (payload params, and raw RPC result/error).
    * Present only when `validation !== OK`.
    */
   rpcCalls?: V4RpcCallTrace[];
@@ -572,6 +559,19 @@ export interface SignedV4Order {
   order: UniswapXOrder;
   signature: string;
 }
+
+export type V4RpcCallTrace = {
+  method: string;
+  params: unknown[];
+  result?: unknown;
+  error?: {
+    message?: string;
+    code?: unknown;
+    data?: unknown;
+    body?: unknown;
+    error?: unknown;
+  };
+};
 
 const V4_PANIC_ERROR = "0x4e487b71";
 
@@ -611,52 +611,56 @@ function decodeV4RevertData(returnData: string): { raw: string; text?: string } 
   return { raw };
 }
 
-function withRpcCapture(
+function createV4SendCapturingProvider(
   provider: StaticJsonRpcProvider,
   traces: V4RpcCallTrace[]
 ): StaticJsonRpcProvider {
-  // Create a shallow wrapper so we don't mutate the caller's provider instance.
-  const wrapped = Object.create(provider) as StaticJsonRpcProvider;
-  const originalSend = provider.send.bind(provider) as (
+  const originalSend = (provider.send as unknown as (
     method: string,
-    params: Array<unknown>
-  ) => Promise<unknown>;
+    params: unknown[]
+  ) => Promise<unknown>).bind(provider);
 
-  wrapped.send = (async (method: string, params: Array<unknown>) => {
-    // The quoter call we care about is the multicall eth_call.
-    const shouldTrace = method === "eth_call";
-    const trace: V4RpcCallTrace | undefined = shouldTrace
-      ? { method, params }
-      : undefined;
-    if (trace) traces.push(trace);
+  const proxy = new Proxy(provider as unknown as object, {
+    get(target, prop, receiver) {
+      if (prop === "send") {
+        return async (method: string, params: unknown[]) => {
+          const trace: V4RpcCallTrace | undefined =
+            method === "eth_call" ? { method, params } : undefined;
+          if (trace) traces.push(trace);
 
-    try {
-      const result = await originalSend(method, params);
-      if (trace) trace.result = result;
-      return result;
-    } catch (e: unknown) {
-      if (trace) {
-        const err = e as {
-          message?: string;
-          code?: unknown;
-          data?: unknown;
-          body?: unknown;
-          error?: { body?: unknown } | unknown;
-        };
-        trace.error = {
-          message: err?.message,
-          code: err?.code,
-          data: err?.data,
-          body:
-            err?.body ??
-            ((err?.error as { body?: unknown } | undefined)?.body ?? undefined),
-          error: err?.error,
+          try {
+            const result = await originalSend(method, params);
+            if (trace) trace.result = result;
+            return result;
+          } catch (e: unknown) {
+            if (trace) {
+              const err = e as {
+                message?: string;
+                code?: unknown;
+                data?: unknown;
+                body?: unknown;
+                error?: { body?: unknown } | unknown;
+              };
+              trace.error = {
+                message: err?.message,
+                code: err?.code,
+                data: err?.data,
+                body:
+                  err?.body ??
+                  ((err?.error as { body?: unknown } | undefined)?.body ??
+                    undefined),
+                error: err?.error,
+              };
+            }
+            throw e;
+          }
         };
       }
-      throw e;
-    }
-  }) as unknown as StaticJsonRpcProvider["send"];
-  return wrapped;
+      return Reflect.get(target, prop, receiver);
+    },
+  });
+
+  return proxy as unknown as StaticJsonRpcProvider;
 }
 
 /**
@@ -691,12 +695,11 @@ export class V4OrderQuoter implements OrderQuoter<SignedV4Order, V4OrderQuote> {
 
   async quoteBatch(orders: SignedV4Order[]): Promise<V4OrderQuote[]> {
     const rpcCalls: V4RpcCallTrace[] = [];
-    const providerForQuote = withRpcCapture(this.provider, rpcCalls);
-    const results = await this.getMulticallResults(
-      providerForQuote,
-      "quote",
-      orders
+    const providerForQuote = createV4SendCapturingProvider(
+      this.provider,
+      rpcCalls
     );
+    const results = await this.getMulticallResults(providerForQuote, "quote", orders);
     const validations = await this.getValidations(orders, results);
     const validationErrors = results.map((r) =>
       r.success ? undefined : decodeV4RevertData(r.returnData)
@@ -828,12 +831,16 @@ export class V4OrderQuoter implements OrderQuoter<SignedV4Order, V4OrderQuote> {
 
     if (calls.length > 0) {
       promises.push(
-        multicallSameContractManyFunctions(provider, {
-          address: this.quoter.address,
-          contractInterface: this.quoter.interface,
-          functionName: functionName,
-          functionParams: calls,
-        })
+        multicallSameContractManyFunctions(
+          provider,
+          {
+            address: this.quoter.address,
+            contractInterface: this.quoter.interface,
+            functionName: functionName,
+            functionParams: calls,
+          },
+          undefined
+        )
       );
     }
 
