@@ -546,7 +546,8 @@ export interface V4OrderQuote {
    */
   validationErrorText?: string;
   /**
-   * Optional debug trace of the underlying `eth_call` performed by the quoter (payload params, and raw RPC result/error).
+   * Optional debug trace of the underlying `eth_call` performed by the quoter.
+   * Captures the JSON-RPC method + params (payload), and the raw RPC result/error (when available).
    * Present only when `validation !== OK`.
    */
   rpcCalls?: V4RpcCallTrace[];
@@ -573,6 +574,8 @@ export type V4RpcCallTrace = {
   };
 };
 
+// Solidity `Panic(uint256)` selector. If revert data starts with this, we decode it as a panic
+// (e.g. overflow/out-of-bounds/assert) instead of treating it as an unknown error.
 const V4_PANIC_ERROR = "0x4e487b71";
 
 function decodeV4RevertData(returnData: string): { raw: string; text?: string } {
