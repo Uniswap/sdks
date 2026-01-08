@@ -15,12 +15,12 @@ describe("DutchV3Order", () => {
     const AMOUNT = BigNumber.from(10).pow(18);
     const SMALL_AMOUNT = BigNumber.from(10).pow(10);
     let NONCE = BigNumber.from(100);
-    let futureDeadline : number;
-    let bot : Signer;
+    let futureDeadline: number;
+    let bot: Signer;
     let admin: Signer;
     let filler: Signer;
-    let permit2 : Permit2;
-    let reactor : V3DutchOrderReactor;
+    let permit2: Permit2;
+    let reactor: V3DutchOrderReactor;
     const chainId = hre.network.config.chainId || 42161;
     let swapper: Wallet;
     let cosigner: Wallet;
@@ -28,13 +28,13 @@ describe("DutchV3Order", () => {
     let tokenOut: MockERC20;
     let swapperAddress: string;
     let fillerAddress: string;
-    let cosignerAddress : string;
-    let botAddress : string;
-    let validPartialOrder : UnsignedV3DutchOrder;
-    
+    let cosignerAddress: string;
+    let botAddress: string;
+    let validPartialOrder: UnsignedV3DutchOrder;
+
     before(async () => {
         futureDeadline = await new BlockchainTime().secondsFromNow(1000);
-        [ admin, filler, bot ] = await ethers.getSigners();
+        [admin, , bot, filler] = await ethers.getSigners();
         const permit2Factory = await ethers.getContractFactory(
             Permit2Abi.abi,
             Permit2Abi.bytecode
@@ -133,7 +133,7 @@ describe("DutchV3Order", () => {
     afterEach(() => {
         NONCE = NONCE.add(1);
     });
-    
+
     it("Partial V3 Order", async () => {
         const preBuildOrder = validPartialOrder;
         expect(preBuildOrder.info.deadline).to.eq(futureDeadline);
@@ -184,29 +184,29 @@ describe("DutchV3Order", () => {
                 minAmount: AMOUNT.sub(4),
                 adjustmentPerGweiBaseFee: BigNumber.from(0),
             })
-            const partialOrder = orderbuilder.buildPartial();
-            const cosignerData = await getCosignerData();
-            const cosignature = await cosigner.signMessage(
-                partialOrder.cosignatureHash(cosignerData)
-            );
-            const cosignedOrder = orderbuilder
-                .cosignature(cosignature)
-                .cosignerData(cosignerData)
-                .build();
+        const partialOrder = orderbuilder.buildPartial();
+        const cosignerData = await getCosignerData();
+        const cosignature = await cosigner.signMessage(
+            partialOrder.cosignatureHash(cosignerData)
+        );
+        const cosignedOrder = orderbuilder
+            .cosignature(cosignature)
+            .cosignerData(cosignerData)
+            .build();
 
-            expect(cosignedOrder.info.deadline).to.eq(deadline);
-            expect(cosignedOrder.info.swapper).to.eq(swapperAddress);
-            expect(cosignedOrder.info.cosigner).to.eq(cosignerAddress);
-            expect(cosignedOrder.info.cosignature).to.eq(cosignature);
-            expect(cosignedOrder.info.nonce.toNumber()).to.eq(NONCE);
+        expect(cosignedOrder.info.deadline).to.eq(deadline);
+        expect(cosignedOrder.info.swapper).to.eq(swapperAddress);
+        expect(cosignedOrder.info.cosigner).to.eq(cosignerAddress);
+        expect(cosignedOrder.info.cosignature).to.eq(cosignature);
+        expect(cosignedOrder.info.nonce.toNumber()).to.eq(NONCE);
 
-            expect(cosignedOrder.info.input.token).to.eq(tokenIn.address);
-            expect(cosignedOrder.info.input.startAmount).to.eq(AMOUNT);
-            const builtOutput = cosignedOrder.info.outputs[0];
+        expect(cosignedOrder.info.input.token).to.eq(tokenIn.address);
+        expect(cosignedOrder.info.input.startAmount).to.eq(AMOUNT);
+        const builtOutput = cosignedOrder.info.outputs[0];
 
-            expect(builtOutput.token).to.eq(tokenOut.address);
-            expect(builtOutput.startAmount).to.eq(AMOUNT);
-            expect(builtOutput.recipient).to.eq(swapperAddress);
+        expect(builtOutput.token).to.eq(tokenOut.address);
+        expect(builtOutput.startAmount).to.eq(AMOUNT);
+        expect(builtOutput.recipient).to.eq(swapperAddress);
     });
 
     it("reverts if cosignature is invalid", async () => {
@@ -216,20 +216,20 @@ describe("DutchV3Order", () => {
         const cosignerData = await getCosignerData();
         const cosignerHash = order.cosignatureHash(cosignerData);
         let cosignature = ethers.utils.joinSignature(
-          cosigner._signingKey().signDigest(cosignerHash)
+            cosigner._signingKey().signDigest(cosignerHash)
         );
         const fullOrder = V3DutchOrderBuilder.fromOrder(order)
-        //use the cosignature of the other one that doesn't match this sub(1) order
-          .cosignerData({ ...cosignerData, inputOverride: AMOUNT.sub(1) })
-          .cosignature(cosignature) 
-          .build();
-        
+            //use the cosignature of the other one that doesn't match this sub(1) order
+            .cosignerData({ ...cosignerData, inputOverride: AMOUNT.sub(1) })
+            .cosignature(cosignature)
+            .build();
+
         await expect(
             reactor
                 .connect(filler)
                 .execute({ order: fullOrder.serialize(), sig: signature })
         ).to.be.revertedWithCustomError(reactor, "InvalidCosignature");
-    }); 
+    });
 
     it("executes a serialized order with no decay", async () => {
         const deadline = await new BlockchainTime().secondsFromNow(1000);
@@ -288,8 +288,8 @@ describe("DutchV3Order", () => {
         const res = await reactor
             .connect(filler)
             .execute(
-                { 
-                    order: fullOrder.serialize(), 
+                {
+                    order: fullOrder.serialize(),
                     sig: signature
                 }
             );
@@ -370,8 +370,8 @@ describe("DutchV3Order", () => {
         const res = await reactor
             .connect(filler)
             .execute(
-                { 
-                    order: fullOrder.serialize(), 
+                {
+                    order: fullOrder.serialize(),
                     sig: signature
                 }
             );
@@ -452,8 +452,8 @@ describe("DutchV3Order", () => {
         const res = await reactor
             .connect(filler)
             .execute(
-                { 
-                    order: fullOrder.serialize(), 
+                {
+                    order: fullOrder.serialize(),
                     sig: signature
                 }
             );
@@ -534,8 +534,8 @@ describe("DutchV3Order", () => {
         const res = await reactor
             .connect(filler)
             .execute(
-                { 
-                    order: fullOrder.serialize(), 
+                {
+                    order: fullOrder.serialize(),
                     sig: signature
                 }
             );
@@ -620,8 +620,8 @@ describe("DutchV3Order", () => {
         const res = await reactor
             .connect(filler)
             .execute(
-                { 
-                    order: fullOrder.serialize(), 
+                {
+                    order: fullOrder.serialize(),
                     sig: signature
                 }
             );
@@ -703,7 +703,7 @@ describe("DutchV3Order", () => {
 
         const swapperTokenInBalanceBefore = await tokenIn.balanceOf(
             swapperAddress
-            );
+        );
         const fillerTokenInBalanceBefore = await tokenIn.balanceOf(fillerAddress);
         const botTokenInBalanceBefore = await tokenIn.balanceOf(
             botAddress
@@ -721,8 +721,8 @@ describe("DutchV3Order", () => {
         const res = await reactor
             .connect(bot)
             .execute(
-                { 
-                    order: fullOrder.serialize(), 
+                {
+                    order: fullOrder.serialize(),
                     sig: signature
                 }
             );
@@ -809,8 +809,8 @@ describe("DutchV3Order", () => {
             reactor
                 .connect(bot)
                 .execute(
-                    { 
-                        order: fullOrder.serialize(), 
+                    {
+                        order: fullOrder.serialize(),
                         sig: signature
                     }
                 )
@@ -820,7 +820,7 @@ describe("DutchV3Order", () => {
 
 const getCosignerData = async (
     overrides: Partial<V3CosignerData> = {}
-    ): Promise<V3CosignerData> => {
+): Promise<V3CosignerData> => {
     const defaultData: V3CosignerData = {
         decayStartBlock: 29000000,
         exclusiveFiller: ethers.constants.AddressZero,

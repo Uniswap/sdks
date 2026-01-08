@@ -13,7 +13,7 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
     using stdJson for string;
 
     // starting eth balance
-    uint256 constant BALANCE = 10 ether;
+    uint256 constant BALANCE = 3000 ether;
 
     function setUp() public {
         fromPrivateKey = 0x1234;
@@ -530,6 +530,7 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
     }
 
     function testV4ExactInputETH() public {
+        // swapping 1 ETH for 1 USDC
         MethodParameters memory params = readFixture(json, "._UNISWAP_V4_1_ETH_FOR_USDC");
         assertEq(from.balance, BALANCE);
         assertEq(USDC.balanceOf(RECIPIENT), 0);
@@ -539,6 +540,7 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         require(success, "call failed");
 
         assertLe(from.balance, BALANCE - params.value);
+        // 1e18 > 2000 ^ 10 ** 6
         assertGt(USDC.balanceOf(RECIPIENT), 2000 * ONE_USDC);
     }
 
@@ -726,6 +728,38 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         assertGe(from.balance, startingRecipientBalance);
     }
 
+    function testV4ExactInNativeOutputWithWrap() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_V4_1000_USDC_FOR_ETH_WITH_WRAP");
+
+        deal(address(USDC), from, BALANCE);
+        USDC.approve(address(permit2), BALANCE);
+        permit2.approve(address(USDC), address(router), uint160(BALANCE), uint48(block.timestamp + 1000));
+        assertEq(USDC.balanceOf(from), BALANCE);
+        uint256 startingWETHBalance = WETH.balanceOf(RECIPIENT);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+
+        assertEq(USDC.balanceOf(from), BALANCE - 1000 * ONE_USDC);
+        assertGt(WETH.balanceOf(RECIPIENT), startingWETHBalance);
+    }
+
+    function testV4ExactInNativeOutputWithWrap2Hop() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_V4_1000_USDC_FOR_ETH_WITH_WRAP_2_HOP");
+
+        deal(address(USDC), from, BALANCE);
+        USDC.approve(address(permit2), BALANCE);
+        permit2.approve(address(USDC), address(router), uint160(BALANCE), uint48(block.timestamp + 1000));
+        assertEq(USDC.balanceOf(from), BALANCE);
+        uint256 startingWETHBalance = WETH.balanceOf(RECIPIENT);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+
+        assertEq(USDC.balanceOf(from), BALANCE - 1000 * ONE_USDC);
+        assertGt(WETH.balanceOf(RECIPIENT), startingWETHBalance);
+    }
+
     function testV4ExactOutNativeOutput() public {
         MethodParameters memory params = readFixture(json, "._UNISWAP_V4_DAI_FOR_1_ETH_2_HOP");
 
@@ -816,6 +850,117 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         require(success, "call failed");
         assertLe(DAI.balanceOf(from), 0);
         assertGe(RECIPIENT.balance, startingRecipientBalance + 0.1 ether);
+    }
+
+    function testMixedExactInputERC20V2ToV4Unwrap() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_MIXED_DAI_FOR_ETH_UNWRAP");
+
+        uint256 daiAmount = 1000 ether;
+        deal(address(DAI), from, daiAmount);
+        DAI.approve(address(permit2), daiAmount);
+        permit2.approve(address(DAI), address(router), uint160(daiAmount), uint48(block.timestamp + 1000));
+        assertEq(DAI.balanceOf(from), daiAmount);
+        uint256 startingRecipientBalance = RECIPIENT.balance;
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertEq(DAI.balanceOf(from), 0);
+        assertLe(RECIPIENT.balance, startingRecipientBalance + 1000e6); // WETH/USDC v4 is 1:1 in tests
+    }
+
+    function testMixedExactInputNativeV2ToV4Wrap() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_MIXED_DAI_FOR_WETH_WRAP");
+
+        uint256 daiAmount = 1000 ether;
+        deal(address(DAI), from, daiAmount);
+        DAI.approve(address(permit2), daiAmount);
+        permit2.approve(address(DAI), address(router), uint160(daiAmount), uint48(block.timestamp + 1000));
+        assertEq(DAI.balanceOf(from), daiAmount);
+        uint256 startingWethRecipientBalance = WETH.balanceOf(RECIPIENT);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+
+        assertEq(DAI.balanceOf(from), 0);
+        assertGt(WETH.balanceOf(RECIPIENT), startingWethRecipientBalance);
+    }
+
+    function testMixedExactInputETHtoDAItoUSDC() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_MIXED_ETH_DAI_V4_TO_USDC_V3");
+
+        assertEq(from.balance, BALANCE);
+        assertEq(USDC.balanceOf(RECIPIENT), 0);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertLe(from.balance, BALANCE - params.value);
+        assertLe(USDC.balanceOf(RECIPIENT), 1e18); // 1 ETH = 1 USDC in test
+        assertEq(USDC.balanceOf(address(router)), 0);
+        assertEq(address(router).balance, 0);
+    }
+
+    function testMixedExactInputETHtoWETHtoUSDC() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_MIXED_ETH_WETH_V4_TO_USDC_V3");
+
+        assertEq(from.balance, BALANCE);
+        assertEq(USDC.balanceOf(RECIPIENT), 0);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertLe(from.balance, BALANCE - params.value);
+        assertGt(USDC.balanceOf(RECIPIENT), 1000 * ONE_USDC);
+        assertEq(USDC.balanceOf(address(router)), 0);
+        assertEq(address(router).balance, 0);
+    }
+
+    function testMixedExactInputWrapWETHtoUSDCtoDAI() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_MIXED_WRAP_WETH_USDC_V4_TO_DAI_V3");
+
+        assertEq(from.balance, BALANCE);
+        assertEq(USDC.balanceOf(RECIPIENT), 0);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertLe(from.balance, BALANCE - params.value);
+        assertGt(DAI.balanceOf(RECIPIENT), 2 * ONE_DAI);
+        assertEq(DAI.balanceOf(address(router)), 0);
+        assertEq(address(router).balance, 0);
+    }
+
+    function testMixedExactInputUnwrapWETHtoUSDCtoDAI() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_MIXED_UNWRAP_ETH_USDC_V4_TO_DAI_V3");
+
+        deal(address(WETH), from, BALANCE);
+        WETH.approve(address(permit2), BALANCE);
+        permit2.approve(address(WETH), address(router), uint160(BALANCE), uint48(block.timestamp + 1000));
+
+        uint256 startingRecipientBalance = DAI.balanceOf(RECIPIENT);
+        uint256 startingFromBalance = WETH.balanceOf(from);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertGt(DAI.balanceOf(RECIPIENT), 2 * ONE_DAI);
+        assertEq(DAI.balanceOf(address(router)), 0);
+        assertEq(address(router).balance, 0);
+        assertLt(WETH.balanceOf(from), startingFromBalance);
+    }
+
+    function testMixedExactInputWETHtoUSDCtoDAI() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_MIXED_WETH_USDC_V4_TO_DAI_V3");
+
+        deal(address(WETH), from, BALANCE);
+        WETH.approve(address(permit2), BALANCE);
+        permit2.approve(address(WETH), address(router), uint160(BALANCE), uint48(block.timestamp + 1000));
+
+        uint256 startingRecipientBalance = DAI.balanceOf(RECIPIENT);
+        uint256 startingFromBalance = WETH.balanceOf(from);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertGt(DAI.balanceOf(RECIPIENT), 2 * ONE_DAI);
+        assertEq(DAI.balanceOf(address(router)), 0);
+        assertEq(address(router).balance, 0);
+        assertLt(WETH.balanceOf(from), startingFromBalance);
     }
 
     function testTwoRoutesExactInputETHtoUSDC() public {

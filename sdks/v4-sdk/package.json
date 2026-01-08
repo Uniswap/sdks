@@ -18,7 +18,7 @@
   },
   "scripts": {
     "build": "tsdx build",
-    "lint": "tsdx lint src",
+    "lint": "eslint 'src/**/*.{js,ts,tsx}' --max-warnings 0",
     "release": "semantic-release",
     "start": "tsdx watch",
     "test": "tsdx test"
@@ -26,8 +26,8 @@
   "sideEffects": false,
   "dependencies": {
     "@ethersproject/solidity": "^5.0.9",
-    "@uniswap/sdk-core": "^7.7.1",
-    "@uniswap/v3-sdk": "3.25.2",
+    "@uniswap/sdk-core": "^7.10.0",
+    "@uniswap/v3-sdk": "3.26.0",
     "tiny-invariant": "^1.1.0",
     "tiny-warning": "^1.0.3"
   },
@@ -38,11 +38,12 @@
     "@types/node-fetch": "^2.6.2",
     "chai": "^4.3.6",
     "dotenv": "^16.0.3",
-    "eslint": "^7.8.0",
-    "eslint-config-prettier": "^6.11.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-eslint-comments": "^3.2.0",
     "eslint-plugin-functional": "^3.0.2",
     "eslint-plugin-import": "^2.22.0",
+    "eslint-plugin-prettier": "^3.4.1",
     "jest": "25.5.0",
     "prettier": "^2.4.1",
     "ts-node": "^10.9.1",
