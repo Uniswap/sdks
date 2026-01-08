@@ -617,6 +617,11 @@ function withRpcCapture(
 ): StaticJsonRpcProvider {
   // Create a shallow wrapper so we don't mutate the caller's provider instance.
   const wrapped = Object.create(provider) as StaticJsonRpcProvider;
+  const originalSend = provider.send.bind(provider) as (
+    method: string,
+    params: Array<unknown>
+  ) => Promise<unknown>;
+
   wrapped.send = (async (method: string, params: Array<unknown>) => {
     // The quoter call we care about is the multicall eth_call.
     const shouldTrace = method === "eth_call";
@@ -626,22 +631,31 @@ function withRpcCapture(
     if (trace) traces.push(trace);
 
     try {
-      const result = await provider.send(method, params as any[]);
+      const result = await originalSend(method, params);
       if (trace) trace.result = result;
       return result;
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (trace) {
+        const err = e as {
+          message?: string;
+          code?: unknown;
+          data?: unknown;
+          body?: unknown;
+          error?: { body?: unknown } | unknown;
+        };
         trace.error = {
-          message: e?.message,
-          code: e?.code,
-          data: e?.data,
-          body: e?.body ?? e?.error?.body,
-          error: e?.error,
+          message: err?.message,
+          code: err?.code,
+          data: err?.data,
+          body:
+            err?.body ??
+            ((err?.error as { body?: unknown } | undefined)?.body ?? undefined),
+          error: err?.error,
         };
       }
       throw e;
     }
-  }) as any;
+  }) as unknown as StaticJsonRpcProvider["send"];
   return wrapped;
 }
 
