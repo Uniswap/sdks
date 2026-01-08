@@ -1,0 +1,35 @@
+{
+  "name": "@uniswap/v4-sdk",
+  "version": "2.0.0",
+  "description": "DEPRECATED: Use @uniswap/sdk/v4 instead",
+  "repository": "https://github.com/Uniswap/sdks.git",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@uniswap/sdk": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "deprecated": "This package is deprecated. Please use @uniswap/sdk/v4 instead."
+}

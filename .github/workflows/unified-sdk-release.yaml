@@ -1,0 +1,53 @@
+name: Unified SDK Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'sdks/sdk/**'
+      - '.github/workflows/unified-sdk-release.yaml'
+
+jobs:
+  release:
+    name: Release @uniswap/sdk
+    environment:
+      name: production
+    runs-on:
+      group: npm-deploy
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db # v0.8.3
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          cache: yarn
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: yarn --immutable
+
+      - name: Build unified SDK
+        run: yarn workspace @uniswap/sdk build
+
+      - name: Run tests
+        run: yarn workspace @uniswap/sdk test
+
+      - name: Release
+        working-directory: sdks/sdk
+        run: npx semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
