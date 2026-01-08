@@ -1,5 +1,5 @@
 import { Ether, Token, WETH9, CurrencyAmount } from '@uniswap/sdk-core'
-import { Route as V3RouteSDK, Pool, FeeAmount, TickMath, encodeSqrtRatioX96 } from '@uniswap/v3-sdk'
+import { Route as V3RouteSDK, Pool as V3Pool, FeeAmount, TickMath, encodeSqrtRatioX96 } from '@uniswap/v3-sdk'
 import { RouteV3 } from './route'
 import { Protocol } from './protocol'
 import { Route as V2RouteSDK, Pair } from '@uniswap/v2-sdk'
@@ -12,9 +12,9 @@ describe('RouteV3', () => {
   const token2 = new Token(1, '0x0000000000000000000000000000000000000003', 18, 't2')
   const weth = WETH9[1]
 
-  const pool_0_1 = new Pool(token0, token1, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
-  const pool_0_weth = new Pool(token0, weth, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
-  const pool_1_weth = new Pool(token1, weth, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
+  const pool_0_1 = new V3Pool(token0, token1, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
+  const pool_0_weth = new V3Pool(token0, weth, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
+  const pool_1_weth = new V3Pool(token1, weth, FeeAmount.MEDIUM, encodeSqrtRatioX96(1, 1), 0, 0, [])
 
   describe('path', () => {
     it('wraps original v3 route object and successfully constructs a path from the tokens', () => {
@@ -70,7 +70,7 @@ describe('RouteV3', () => {
   })
 
   describe('#midPrice', () => {
-    const pool_0_1 = new Pool(
+    const pool_0_1 = new V3Pool(
       token0,
       token1,
       FeeAmount.MEDIUM,
@@ -79,7 +79,7 @@ describe('RouteV3', () => {
       TickMath.getTickAtSqrtRatio(encodeSqrtRatioX96(1, 5)),
       []
     )
-    const pool_1_2 = new Pool(
+    const pool_1_2 = new V3Pool(
       token1,
       token2,
       FeeAmount.MEDIUM,
@@ -88,7 +88,7 @@ describe('RouteV3', () => {
       TickMath.getTickAtSqrtRatio(encodeSqrtRatioX96(15, 30)),
       []
     )
-    const pool_0_weth = new Pool(
+    const pool_0_weth = new V3Pool(
       token0,
       weth,
       FeeAmount.MEDIUM,
@@ -97,7 +97,7 @@ describe('RouteV3', () => {
       TickMath.getTickAtSqrtRatio(encodeSqrtRatioX96(3, 1)),
       []
     )
-    const pool_1_weth = new Pool(
+    const pool_1_weth = new V3Pool(
       token1,
       weth,
       FeeAmount.MEDIUM,
@@ -236,5 +236,12 @@ describe('RouteV2', () => {
     expect(route.pairs).toEqual([pair_0_weth])
     expect(route.input).toEqual(token0)
     expect(route.output).toEqual(ETHER)
+  })
+
+  it('assigns pathInput and pathOutput correctly', () => {
+    const routeOriginal = new V2RouteSDK([pair_0_weth], token0, ETHER)
+    const route = new RouteV2(routeOriginal)
+    expect(route.pathInput).toEqual(token0)
+    expect(route.pathOutput).toEqual(weth)
   })
 })

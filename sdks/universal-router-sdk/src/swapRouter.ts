@@ -1,148 +1,49 @@
 import invariant from 'tiny-invariant'
-import { abi } from '@uniswap/universal-router/artifacts/contracts/UniversalRouter.sol/UniversalRouter.json'
+import UniversalRouter from '@uniswap/universal-router/artifacts/contracts/UniversalRouter.sol/UniversalRouter.json'
 import { Interface } from '@ethersproject/abi'
 import { BigNumber, BigNumberish } from 'ethers'
-import { MethodParameters } from '@uniswap/v3-sdk'
+import {
+  MethodParameters,
+  Multicall,
+  Position as V3Position,
+  NonfungiblePositionManager as V3PositionManager,
+  RemoveLiquidityOptions as V3RemoveLiquidityOptions,
+} from '@uniswap/v3-sdk'
+import {
+  Position as V4Position,
+  V4PositionManager,
+  AddLiquidityOptions as V4AddLiquidityOptions,
+  MintOptions,
+  Pool as V4Pool,
+  PoolKey,
+} from '@uniswap/v4-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
-import { Currency, TradeType } from '@uniswap/sdk-core'
-import { Command, RouterTradeType } from './entities/Command'
-import { Market, NFTTrade, SupportedProtocolsData } from './entities/NFTTrade'
-import { UniswapTrade, SwapOptions } from './entities/protocols/uniswap'
-import { UnwrapWETH } from './entities/protocols/unwrapWETH'
-import { CommandType, RoutePlanner } from './utils/routerCommands'
-import { encodePermit } from './utils/inputTokens'
-import { ROUTER_AS_RECIPIENT, SENDER_AS_RECIPIENT, ETH_ADDRESS } from './utils/constants'
-import { SeaportTrade } from './entities'
+import { Currency, TradeType, Percent, CHAIN_TO_ADDRESSES_MAP, SupportedChainsType } from '@uniswap/sdk-core'
+import { UniswapTrade, SwapOptions } from './entities/actions/uniswap'
+import { RoutePlanner, CommandType } from './utils/routerCommands'
+import { encodePermit, encodeV3PositionPermit } from './utils/inputTokens'
+import { UNIVERSAL_ROUTER_ADDRESS, UniversalRouterVersion } from './utils/constants'
 
 export type SwapRouterConfig = {
   sender?: string // address
   deadline?: BigNumberish
 }
 
-type SupportedNFTTrade = NFTTrade<SupportedProtocolsData>
+export interface MigrateV3ToV4Options {
+  inputPosition: V3Position
+  outputPosition: V4Position
+  v3RemoveLiquidityOptions: V3RemoveLiquidityOptions
+  v4AddLiquidityOptions: V4AddLiquidityOptions
+}
+
+function isMint(options: V4AddLiquidityOptions): options is MintOptions {
+  return Object.keys(options).some((k) => k === 'recipient')
+}
 
 export abstract class SwapRouter {
-  public static INTERFACE: Interface = new Interface(abi)
+  public static INTERFACE: Interface = new Interface(UniversalRouter.abi)
 
-  public static swapCallParameters(trades: Command[] | Command, config: SwapRouterConfig = {}): MethodParameters {
-    if (!Array.isArray(trades)) trades = [trades]
-
-    const nftTrades = trades.filter((trade, _, []) => trade.hasOwnProperty('market')) as SupportedNFTTrade[]
-    const allowRevert = nftTrades.length == 1 && nftTrades[0].orders.length == 1 ? false : true
-    const planner = new RoutePlanner()
-
-    // track value flow to require the right amount of native value
-    let currentNativeValueInRouter = BigNumber.from(0)
-    let transactionValue = BigNumber.from(0)
-
-    // tracks the input tokens (and ETH) used to buy NFTs to allow us to sweep
-    let nftInputTokens = new Set<string>()
-
-    for (const trade of trades) {
-      /**
-       * is NFTTrade
-       */
-      if (trade.tradeType == RouterTradeType.NFTTrade) {
-        const nftTrade = trade as SupportedNFTTrade
-        nftTrade.encode(planner, { allowRevert })
-        const tradePrice = nftTrade.getTotalPrice()
-
-        if (nftTrade.market == Market.Seaport) {
-          const seaportTrade = nftTrade as SeaportTrade
-          const seaportInputTokens = seaportTrade.getInputTokens()
-          seaportInputTokens.forEach((inputToken) => {
-            nftInputTokens.add(inputToken)
-          })
-        } else {
-          nftInputTokens.add(ETH_ADDRESS)
-        }
-
-        // send enough native value to contract for NFT purchase
-        if (currentNativeValueInRouter.lt(tradePrice)) {
-          transactionValue = transactionValue.add(tradePrice.sub(currentNativeValueInRouter))
-          currentNativeValueInRouter = BigNumber.from(0)
-        } else {
-          currentNativeValueInRouter = currentNativeValueInRouter.sub(tradePrice)
-        }
-        /**
-         * is UniswapTrade
-         */
-      } else if (trade.tradeType == RouterTradeType.UniswapTrade) {
-        const uniswapTrade = trade as UniswapTrade
-        const inputIsNative = uniswapTrade.trade.inputAmount.currency.isNative
-        const outputIsNative = uniswapTrade.trade.outputAmount.currency.isNative
-        const swapOptions = uniswapTrade.options
-
-        invariant(!(inputIsNative && !!swapOptions.inputTokenPermit), 'NATIVE_INPUT_PERMIT')
-
-        if (!!swapOptions.inputTokenPermit) {
-          encodePermit(planner, swapOptions.inputTokenPermit)
-        }
-
-        if (inputIsNative) {
-          transactionValue = transactionValue.add(
-            BigNumber.from(uniswapTrade.trade.maximumAmountIn(swapOptions.slippageTolerance).quotient.toString())
-          )
-        }
-        // track amount of native currency in the router
-        if (outputIsNative && swapOptions.recipient == ROUTER_AS_RECIPIENT) {
-          currentNativeValueInRouter = currentNativeValueInRouter.add(
-            BigNumber.from(uniswapTrade.trade.minimumAmountOut(swapOptions.slippageTolerance).quotient.toString())
-          )
-        }
-        uniswapTrade.encode(planner, { allowRevert: false })
-        /**
-         * is UnwrapWETH
-         */
-      } else if (trade.tradeType == RouterTradeType.UnwrapWETH) {
-        const UnwrapWETH = trade as UnwrapWETH
-        trade.encode(planner, { allowRevert: false })
-        currentNativeValueInRouter = currentNativeValueInRouter.add(UnwrapWETH.amount)
-        /**
-         * else
-         */
-      } else {
-        throw 'trade must be of instance: UniswapTrade or NFTTrade'
-      }
-    }
-
-    // TODO: matches current logic for now, but should eventually only sweep for multiple NFT trades
-    // or NFT trades with potential slippage (i.e. sudo).
-    // Note: NFTXV2 sends excess ETH to the caller (router), not the specified recipient
-    nftInputTokens.forEach((inputToken) => {
-      planner.addCommand(CommandType.SWEEP, [inputToken, SENDER_AS_RECIPIENT, 0])
-    })
-    return SwapRouter.encodePlan(planner, transactionValue, config)
-  }
-
-  /**
-   * @deprecated in favor of swapCallParameters. Update before next major version 2.0.0
-   * This version does not work correctly for Seaport ERC20->NFT purchases
-   * Produces the on-chain method name to call and the hex encoded parameters to pass as arguments for a given swap.
-   * @param trades to produce call parameters for
-   */
-  public static swapNFTCallParameters(trades: SupportedNFTTrade[], config: SwapRouterConfig = {}): MethodParameters {
-    let planner = new RoutePlanner()
-    let totalPrice = BigNumber.from(0)
-
-    const allowRevert = trades.length == 1 && trades[0].orders.length == 1 ? false : true
-
-    for (const trade of trades) {
-      trade.encode(planner, { allowRevert })
-      totalPrice = totalPrice.add(trade.getTotalPrice())
-    }
-
-    planner.addCommand(CommandType.SWEEP, [ETH_ADDRESS, SENDER_AS_RECIPIENT, 0])
-    return SwapRouter.encodePlan(planner, totalPrice, config)
-  }
-
-  /**
-   * @deprecated in favor of swapCallParameters. Update before next major version 2.0.0
-   * Produces the on-chain method name to call and the hex encoded parameters to pass as arguments for a given trade.
-   * @param trades to produce call parameters for
-   * @param options options for the call parameters
-   */
-  public static swapERC20CallParameters(
+  public static swapCallParameters(
     trades: RouterTrade<Currency, Currency, TradeType>,
     options: SwapOptions
   ): MethodParameters {
@@ -165,6 +66,112 @@ export abstract class SwapRouter {
     trade.encode(planner, { allowRevert: false })
     return SwapRouter.encodePlan(planner, nativeCurrencyValue, {
       deadline: options.deadlineOrPreviousBlockhash ? BigNumber.from(options.deadlineOrPreviousBlockhash) : undefined,
+    })
+  }
+
+  /**
+   * Builds the call parameters for a migration from a V3 position to a V4 position.
+   * Some requirements of the parameters:
+   *   - v3RemoveLiquidityOptions.collectOptions.recipient must equal v4PositionManager
+   *   - v3RemoveLiquidityOptions.liquidityPercentage must be 100%
+   *   - input pool and output pool must have the same tokens
+   *   - V3 NFT must be approved, or valid inputV3NFTPermit must be provided with UR as spender
+   */
+  public static migrateV3ToV4CallParameters(
+    options: MigrateV3ToV4Options,
+    positionManagerOverride?: string
+  ): MethodParameters {
+    const v4Pool: V4Pool = options.outputPosition.pool
+    const v3Token0 = options.inputPosition.pool.token0
+    const v3Token1 = options.inputPosition.pool.token1
+    const v4PositionManagerAddress =
+      positionManagerOverride ?? CHAIN_TO_ADDRESSES_MAP[v4Pool.chainId as SupportedChainsType].v4PositionManagerAddress
+
+    // owner of the v3 nft must be the receiver of the v4 nft
+
+    // validate the parameters
+    if (v4Pool.currency0.isNative) {
+      invariant(
+        (v4Pool.currency0.wrapped.equals(v3Token0) && v4Pool.currency1.equals(v3Token1)) ||
+          (v4Pool.currency0.wrapped.equals(v3Token1) && v4Pool.currency1.equals(v3Token0)),
+        'TOKEN_MISMATCH'
+      )
+    } else {
+      invariant(v3Token0 === v4Pool.token0, 'TOKEN0_MISMATCH')
+      invariant(v3Token1 === v4Pool.token1, 'TOKEN1_MISMATCH')
+    }
+
+    invariant(
+      options.v3RemoveLiquidityOptions.liquidityPercentage.equalTo(new Percent(100, 100)),
+      'FULL_REMOVAL_REQUIRED'
+    )
+    invariant(options.v3RemoveLiquidityOptions.burnToken == true, 'BURN_TOKEN_REQUIRED')
+    invariant(
+      options.v3RemoveLiquidityOptions.collectOptions.recipient === v4PositionManagerAddress,
+      'RECIPIENT_NOT_POSITION_MANAGER'
+    )
+    invariant(isMint(options.v4AddLiquidityOptions), 'MINT_REQUIRED')
+    invariant(options.v4AddLiquidityOptions.migrate, 'MIGRATE_REQUIRED')
+
+    const planner = new RoutePlanner()
+
+    // to prevent reentrancy by the pool hook, we initialize the v4 pool before moving funds
+    if (options.v4AddLiquidityOptions.createPool) {
+      const poolKey: PoolKey = V4Pool.getPoolKey(
+        v4Pool.currency0,
+        v4Pool.currency1,
+        v4Pool.fee,
+        v4Pool.tickSpacing,
+        v4Pool.hooks
+      )
+      planner.addCommand(CommandType.V4_INITIALIZE_POOL, [poolKey, v4Pool.sqrtRatioX96.toString()])
+      // remove createPool setting, so that it doesnt get encoded again later
+      delete options.v4AddLiquidityOptions.createPool
+    }
+
+    // add position permit to the universal router planner
+    if (options.v3RemoveLiquidityOptions.permit) {
+      // permit spender should be UR
+      const universalRouterAddress = UNIVERSAL_ROUTER_ADDRESS(
+        UniversalRouterVersion.V2_0,
+        options.inputPosition.pool.chainId as SupportedChainsType
+      )
+      invariant(universalRouterAddress == options.v3RemoveLiquidityOptions.permit.spender, 'INVALID_SPENDER')
+      // don't need to transfer it because v3posm uses isApprovedOrOwner()
+      encodeV3PositionPermit(planner, options.v3RemoveLiquidityOptions.permit, options.v3RemoveLiquidityOptions.tokenId)
+      // remove permit so that multicall doesnt add it again
+      delete options.v3RemoveLiquidityOptions.permit
+    }
+
+    // encode v3 withdraw
+    const v3RemoveParams: MethodParameters = V3PositionManager.removeCallParameters(
+      options.inputPosition,
+      options.v3RemoveLiquidityOptions
+    )
+    const v3Calls: string[] = Multicall.decodeMulticall(v3RemoveParams.calldata)
+
+    for (const v3Call of v3Calls) {
+      // slice selector - 0x + 4 bytes = 10 characters
+      const selector = v3Call.slice(0, 10)
+      invariant(
+        selector == V3PositionManager.INTERFACE.getSighash('collect') ||
+          selector == V3PositionManager.INTERFACE.getSighash('decreaseLiquidity') ||
+          selector == V3PositionManager.INTERFACE.getSighash('burn'),
+        'INVALID_V3_CALL: ' + selector
+      )
+      planner.addCommand(CommandType.V3_POSITION_MANAGER_CALL, [v3Call])
+    }
+
+    // encode v4 mint
+    const v4AddParams = V4PositionManager.addCallParameters(options.outputPosition, options.v4AddLiquidityOptions)
+    // only modifyLiquidities can be called by the UniversalRouter
+    const selector = v4AddParams.calldata.slice(0, 10)
+    invariant(selector == V4PositionManager.INTERFACE.getSighash('modifyLiquidities'), 'INVALID_V4_CALL: ' + selector)
+
+    planner.addCommand(CommandType.V4_POSITION_MANAGER_CALL, [v4AddParams.calldata])
+
+    return SwapRouter.encodePlan(planner, BigNumber.from(0), {
+      deadline: BigNumber.from(options.v4AddLiquidityOptions.deadline),
     })
   }
 

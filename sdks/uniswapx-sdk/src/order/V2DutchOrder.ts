@@ -10,8 +10,12 @@ import { BigNumber, ethers } from "ethers";
 import { getPermit2 } from "../utils";
 import { ResolvedUniswapXOrder } from "../utils/OrderQuoter";
 import { getDecayedAmount } from "../utils/dutchDecay";
+import { originalIfZero } from "../utils/order";
 
 import {
+  BlockOverrides,
+  CosignerData,
+  CosignerDataJSON,
   DutchInput,
   DutchInputJSON,
   DutchOutput,
@@ -21,24 +25,6 @@ import {
   OrderResolutionOptions,
 } from "./types";
 import { CustomOrderValidation, parseValidation } from "./validation";
-
-export type CosignerData = {
-  decayStartTime: number;
-  decayEndTime: number;
-  exclusiveFiller: string;
-  exclusivityOverrideBps: BigNumber;
-  inputOverride: BigNumber;
-  outputOverrides: BigNumber[];
-};
-
-export type CosignerDataJSON = {
-  decayStartTime: number;
-  decayEndTime: number;
-  exclusiveFiller: string;
-  exclusivityOverrideBps: number;
-  inputOverride: string;
-  outputOverrides: string[];
-};
 
 export type UnsignedV2DutchOrderInfo = OrderInfo & {
   cosigner: string;
@@ -193,6 +179,13 @@ export class UnsignedV2DutchOrder implements OffChainOrder {
       })),
       cosigner: this.info.cosigner,
     };
+  }
+
+  /**
+   * @inheritdoc order
+   */
+  get blockOverrides(): BlockOverrides {
+      return undefined
   }
 
   /**
@@ -547,10 +540,6 @@ export class CosignedV2DutchOrder extends UnsignedV2DutchOrder {
       this.info.cosignature
     );
   }
-}
-
-function originalIfZero(value: BigNumber, original: BigNumber): BigNumber {
-  return value.isZero() ? original : value;
 }
 
 function parseSerializedOrder(serialized: string): CosignedV2DutchOrderInfo {

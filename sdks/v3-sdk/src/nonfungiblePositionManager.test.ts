@@ -1,4 +1,5 @@
 import { Percent, Token, CurrencyAmount, WETH9, Ether } from '@uniswap/sdk-core'
+import { ethers } from 'ethers'
 import { FeeAmount, TICK_SPACINGS } from './constants'
 import { Pool } from './entities/pool'
 import { Position } from './entities/position'
@@ -375,6 +376,41 @@ describe('NonfungiblePositionManager', () => {
         '0xb88d4fde000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000140000000000000000000000000000000000009004000000000000000000000000'
       )
       expect(value).toEqual('0x00')
+    })
+  })
+
+  describe('#getPermitData', () => {
+    it('succeeds', () => {
+      const mockPositionManager = '0x0000000000000000000000000000000000000001'
+      const permit = {
+        spender: '0x0000000000000000000000000000000000000002',
+        tokenId: 1,
+        deadline: 123,
+        nonce: 1,
+      }
+      const { domain, types, values } = NonfungiblePositionManager.getPermitData(permit, mockPositionManager, 1)
+      expect(domain).toEqual({
+        name: 'Uniswap V3 Positions NFT-V1',
+        chainId: 1,
+        version: '1',
+        verifyingContract: mockPositionManager,
+      })
+      expect(types).toEqual({
+        Permit: [
+          { name: 'spender', type: 'address' },
+          { name: 'tokenId', type: 'uint256' },
+          { name: 'nonce', type: 'uint256' },
+          { name: 'deadline', type: 'uint256' },
+        ],
+      })
+      expect(values).toEqual(permit)
+      // get typehash
+      const encodedType = ethers.utils._TypedDataEncoder.from(types).encodeType('Permit')
+
+      // Compute the type hash by hashing the encoded type
+      const typeHash = ethers.utils.id(encodedType)
+      // ref https://github.com/Uniswap/v3-periphery/blob/main/contracts/base/ERC721Permit.sol
+      expect(typeHash).toEqual('0x49ecf333e5b8c95c40fdafc95c1ad136e8914a8fb55e9dc8bb01eaa83a2df9ad')
     })
   })
 })

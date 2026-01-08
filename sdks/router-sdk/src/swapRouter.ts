@@ -1,6 +1,6 @@
 import { Interface } from '@ethersproject/abi'
 import { Currency, CurrencyAmount, Percent, TradeType, validateAndParseAddress, WETH9 } from '@uniswap/sdk-core'
-import { abi } from '@uniswap/swap-router-contracts/artifacts/contracts/interfaces/ISwapRouter02.sol/ISwapRouter02.json'
+import ISwapRouter02 from '@uniswap/swap-router-contracts/artifacts/contracts/interfaces/ISwapRouter02.sol/ISwapRouter02.json'
 import { Trade as V2Trade } from '@uniswap/v2-sdk'
 import {
   encodeRouteToPath,
@@ -8,12 +8,13 @@ import {
   MethodParameters,
   Payments,
   PermitOptions,
-  Pool,
+  Pool as V3Pool,
   Position,
   SelfPermit,
   toHex,
   Trade as V3Trade,
 } from '@uniswap/v3-sdk'
+import { Pool as V4Pool } from '@uniswap/v4-sdk'
 import invariant from 'tiny-invariant'
 import JSBI from 'jsbi'
 import { ADDRESS_THIS, MSG_SENDER } from './constants'
@@ -83,7 +84,7 @@ type AnyTradeType =
  * Represents the Uniswap V2 + V3 SwapRouter02, and has static methods for helping execute trades.
  */
 export abstract class SwapRouter {
-  public static INTERFACE: Interface = new Interface(abi)
+  public static INTERFACE: Interface = new Interface(ISwapRouter02.abi)
 
   /**
    * Cannot be constructed.
@@ -228,6 +229,8 @@ export abstract class SwapRouter {
     invariant(trade.tradeType === TradeType.EXACT_INPUT, 'TRADE_TYPE')
 
     for (const { route, inputAmount, outputAmount } of trade.swaps) {
+      if (route.pools.some((pool) => pool instanceof V4Pool))
+        throw new Error('Encoding mixed routes with V4 not supported')
       const amountIn: string = toHex(trade.maximumAmountIn(options.slippageTolerance, inputAmount).quotient)
       const amountOut: string = toHex(trade.minimumAmountOut(options.slippageTolerance, outputAmount).quotient)
 
@@ -241,7 +244,7 @@ export abstract class SwapRouter {
         : validateAndParseAddress(options.recipient)
 
       const mixedRouteIsAllV3 = (route: MixedRouteSDK<Currency, Currency>) => {
-        return route.pools.every((pool) => pool instanceof Pool)
+        return route.pools.every((pool) => pool instanceof V3Pool)
       }
 
       if (singleHop) {
@@ -249,9 +252,9 @@ export abstract class SwapRouter {
         /// We don't use encodeV3Swap() or encodeV2Swap() because casting the trade to a V3Trade or V2Trade is overcomplex
         if (mixedRouteIsAllV3(route)) {
           const exactInputSingleParams = {
-            tokenIn: route.path[0].address,
-            tokenOut: route.path[1].address,
-            fee: (route.pools as Pool[])[0].fee,
+            tokenIn: route.path[0].wrapped.address,
+            tokenOut: route.path[1].wrapped.address,
+            fee: (route.pools as V3Pool[])[0].fee,
             recipient,
             amountIn,
             amountOutMinimum: performAggregatedSlippageCheck ? 0 : amountOut,
@@ -260,7 +263,7 @@ export abstract class SwapRouter {
 
           calldatas.push(SwapRouter.INTERFACE.encodeFunctionData('exactInputSingle', [exactInputSingleParams]))
         } else {
-          const path = route.path.map((token) => token.address)
+          const path = route.path.map((token) => token.wrapped.address)
 
           const exactInputParams = [amountIn, performAggregatedSlippageCheck ? 0 : amountOut, path, recipient]
 
@@ -289,7 +292,7 @@ export abstract class SwapRouter {
           const newRoute = new MixedRoute(newRouteOriginal)
 
           /// Previous output is now input
-          inputToken = outputToken
+          inputToken = outputToken.wrapped
 
           if (mixedRouteIsAllV3(newRoute)) {
             const path: string = encodeMixedRouteToPath(newRoute)
@@ -308,7 +311,7 @@ export abstract class SwapRouter {
             const exactInputParams = [
               i === 0 ? amountIn : 0, // amountIn
               !isLastSectionInRoute(i) ? 0 : amountOut, // amountOutMin
-              newRoute.path.map((token) => token.address), // path
+              newRoute.path.map((token) => token.wrapped.address),
               isLastSectionInRoute(i) ? recipient : ADDRESS_THIS, // to
             ]
 
@@ -347,7 +350,7 @@ export abstract class SwapRouter {
             swap.route.protocol === Protocol.V2 ||
             swap.route.protocol === Protocol.MIXED
         ),
-        'UNSUPPORTED_PROTOCOL'
+        'UNSUPPORTED_PROTOCOL (encoding routes with v4 not supported)'
       )
 
       let individualTrades: (
