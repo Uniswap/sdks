@@ -31,3 +31,6 @@ export * from './lib'
 
 // Export validation utilities
 export * from './validation'
+
+// Export indexer utilities (GraphQL queries, fetch helpers)
+export * from './indexer'

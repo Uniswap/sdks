@@ -159,3 +159,13 @@ export function getTribunalAddress(chainId: number): Address | undefined {
 export function isTribunalDeployed(chainId: number): boolean {
   return chainId in TRIBUNAL_ADDRESSES
 }
+
+// =============================================================================
+// Indexer Configuration
+// =============================================================================
+
+/**
+ * Default Tribunal Indexer endpoint
+ * This GraphQL API provides historical data for Tribunal fills, mandates, etc.
+ */
+export const DEFAULT_TRIBUNAL_INDEXER_ENDPOINT = 'https://tribunal-indexer.marble.live/'
