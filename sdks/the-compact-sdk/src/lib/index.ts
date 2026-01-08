@@ -7,3 +7,6 @@ export * from './priceCurve'
 
 // Export price curve calculators and utilities
 export * from './priceCurveCalculators'
+
+// Export Tribunal amount derivation utilities
+export * from './tribunalAmounts'

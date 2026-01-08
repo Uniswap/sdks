@@ -3,6 +3,7 @@
  */
 
 import { Address, Hex } from 'viem'
+
 import { encodeLockId } from '../encoding/locks'
 import { ResetPeriod, Scope } from '../types/runtime'
 
@@ -37,12 +38,13 @@ describe('ViewClient', () => {
     it('should get lock details', async () => {
       const lockId = encodeLockId('0x123456789012345678901234' as Hex, tokenAddress)
 
-      // Mock contract response [token, allocator, resetPeriod, scope]
+      // Mock contract response [token, allocator, resetPeriod, scope, lockTag]
       mockPublicClient.readContract.mockResolvedValue([
         tokenAddress,
         allocatorAddress,
         ResetPeriod.TenMinutes,
         Scope.Multichain,
+        '0x123456789012345678901234',
       ])
 
       const result = await client.getLockDetails(lockId)
@@ -293,6 +295,53 @@ describe('ViewClient', () => {
       })
 
       await expect(clientWithoutAddress.getDomainSeparator()).rejects.toThrow('contract address is required')
+    })
+  })
+
+  describe('getEmissaryStatus()', () => {
+    it('should get emissary status', async () => {
+      const lockTag = '0x000000000000000000000001' as Hex
+      const emissary = '0x1111111111111111111111111111111111111111' as Address
+      const availableAt = 123n
+
+      mockPublicClient.readContract.mockResolvedValue([2, availableAt, emissary])
+
+      const result = await client.getEmissaryStatus(sponsorAddress, lockTag)
+
+      expect(mockPublicClient.readContract).toHaveBeenCalledWith({
+        address: testAddress,
+        abi: expect.any(Array),
+        functionName: 'getEmissaryStatus',
+        args: [sponsorAddress, lockTag],
+      })
+
+      expect(result.status).toBe(2)
+      expect(result.emissaryAssignmentAvailableAt).toBe(availableAt)
+      expect(result.currentEmissary).toBe(emissary)
+    })
+  })
+
+  describe('allowance()', () => {
+    it('should return allowance for owner/spender/id', async () => {
+      mockPublicClient.readContract.mockResolvedValue(123n)
+      const result = await client.allowance({ owner: sponsorAddress, spender: allocatorAddress, id: 1n })
+      expect(result).toBe(123n)
+    })
+  })
+
+  describe('isOperator()', () => {
+    it('should return operator status', async () => {
+      mockPublicClient.readContract.mockResolvedValue(true)
+      const result = await client.isOperator({ owner: sponsorAddress, operator: allocatorAddress })
+      expect(result).toBe(true)
+    })
+  })
+
+  describe('getRequiredWithdrawalFallbackStipends()', () => {
+    it('should return stipend tuple', async () => {
+      mockPublicClient.readContract.mockResolvedValue([1n, 2n])
+      const result = await client.getRequiredWithdrawalFallbackStipends()
+      expect(result).toEqual({ nativeTokenStipend: 1n, erc20TokenStipend: 2n })
     })
   })
 })

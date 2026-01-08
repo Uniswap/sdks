@@ -1,13 +1,15 @@
 /**
- * Fluent builders for creating Tribunal mandates and fill parameters
+ * Fluent builders for creating Tribunal mandates, fill parameters, and adjustments
  */
 
 import invariant from 'tiny-invariant'
+import { Address, Hex, keccak256, encodePacked, encodeAbiParameters, TypedDataDefinition } from 'viem'
 
+import { TribunalDomain } from '../config/tribunal'
+import { TRIBUNAL_ADJUSTMENT_TYPEHASH } from '../encoding/tribunal'
 import { createPriceCurve, PriceCurveElement } from '../lib/priceCurve'
-import { FillComponent, FillParameters, Mandate, RecipientCallback } from '../types/tribunal'
-import { Address, Hex, toHex } from 'viem'
-import { randomBytes } from 'crypto'
+import { FillComponent, FillParameters, Mandate, RecipientCallback, Adjustment } from '../types/tribunal'
+import { randomHex32 } from '../utils/random'
 
 /**
  * Builder for FillComponent
@@ -91,7 +93,7 @@ export class FillParametersBuilder {
   private _scalingFactor = 1000000000000000000n // 1e18 (neutral)
   private _priceCurve: bigint[] = []
   private _recipientCallback: RecipientCallback[] = []
-  private _salt: Hex = toHex(randomBytes(32))
+  private _salt: Hex = randomHex32()
 
   /**
    * Set the chain ID for this fill
@@ -210,7 +212,7 @@ export class FillParametersBuilder {
    * @returns This builder for chaining
    */
   randomSalt(): this {
-    this._salt = toHex(randomBytes(32))
+    this._salt = randomHex32()
     return this
   }
 
@@ -418,4 +420,249 @@ export function createCrossChainFill(params: {
     .priceCurve(params.priceCurve || [])
     .addRecipientCallback(recipientCallback)
     .build()
+}
+
+// ============ EIP-712 Types for Adjustment ============
+
+/**
+ * EIP-712 type definition for Tribunal Adjustment
+ *
+ * IMPORTANT: Unlike Exarch, Tribunal's adjustment does NOT include:
+ * - adjuster address (recovered from signature instead)
+ * - nonce (replay protection is via claim hash uniqueness)
+ */
+const TRIBUNAL_ADJUSTMENT_TYPES = {
+  Adjustment: [
+    { name: 'claimHash', type: 'bytes32' },
+    { name: 'fillIndex', type: 'uint256' },
+    { name: 'targetBlock', type: 'uint256' },
+    { name: 'supplementalPriceCurve', type: 'uint256[]' },
+    { name: 'validityConditions', type: 'bytes32' },
+  ],
+} as const
+
+/**
+ * Builder for Tribunal Adjustment
+ * Provides a fluent interface for constructing and signing adjustments
+ *
+ * IMPORTANT: Unlike Exarch, Tribunal adjustments:
+ * - Do NOT include adjuster address in the signed message (recovered from signature)
+ * - Do NOT have a nonce field (replay protection is via claim hash uniqueness)
+ *
+ * Adjustments are signed using the Tribunal domain, not The Compact domain.
+ *
+ * @example
+ * ```typescript
+ * const domain = createTribunalDomain({ chainId: 1, tribunalAddress: '0x...' })
+ * const builder = new TribunalAdjustmentBuilder(domain)
+ *   .adjuster(adjusterAddress)
+ *   .fillIndex(0n)
+ *   .targetBlock(currentBlock)
+ *   .supplementalPriceCurve([])
+ *
+ * const { typedData, hash } = builder.build(claimHash)
+ * const signature = await walletClient.signTypedData(typedData)
+ * const adjustment = builder.buildWithSignature(claimHash, signature)
+ * ```
+ */
+export class TribunalAdjustmentBuilder {
+  private _domain: TribunalDomain
+  private _adjuster?: Address
+  private _fillIndex?: bigint
+  private _targetBlock?: bigint
+  private _supplementalPriceCurve: bigint[] = []
+  private _validityConditions: Hex = '0x0000000000000000000000000000000000000000000000000000000000000000'
+
+  /**
+   * Create a new TribunalAdjustmentBuilder
+   * @param domain - The Tribunal EIP-712 domain for signing
+   */
+  constructor(domain: TribunalDomain) {
+    this._domain = domain
+  }
+
+  /**
+   * Set the adjuster address
+   *
+   * NOTE: This address is NOT included in the signed message (unlike Exarch).
+   * It is stored in the Adjustment struct but the address is recovered from the signature.
+   *
+   * @param adjuster - Address of the adjuster signing this adjustment
+   * @returns This builder for chaining
+   */
+  adjuster(adjuster: Address): this {
+    this._adjuster = adjuster
+    return this
+  }
+
+  /**
+   * Set the fill index
+   * @param index - Index of the fill from the mandate's fills array
+   * @returns This builder for chaining
+   */
+  fillIndex(index: bigint): this {
+    this._fillIndex = index
+    return this
+  }
+
+  /**
+   * Set the target block (auction start block)
+   * @param block - Block number where the auction begins
+   * @returns This builder for chaining
+   */
+  targetBlock(block: bigint): this {
+    this._targetBlock = block
+    return this
+  }
+
+  /**
+   * Set the supplemental price curve from an array of elements
+   * @param elements - Array of PriceCurveElements to overlay on base curve
+   * @returns This builder for chaining
+   */
+  supplementalPriceCurve(elements: PriceCurveElement[]): this {
+    this._supplementalPriceCurve = createPriceCurve(elements)
+    return this
+  }
+
+  /**
+   * Set the supplemental price curve from packed elements
+   * @param curve - Array of pre-packed uint256 price curve elements
+   * @returns This builder for chaining
+   */
+  supplementalPriceCurveRaw(curve: bigint[]): this {
+    this._supplementalPriceCurve = curve
+    return this
+  }
+
+  /**
+   * Set an exclusive filler for this adjustment
+   * @param filler - Address of the exclusive filler (lower 160 bits of validityConditions)
+   * @returns This builder for chaining
+   */
+  exclusiveFiller(filler: Address): this {
+    const upper96 = BigInt(this._validityConditions) >> 160n
+    const newConditions = (upper96 << 160n) | BigInt(filler)
+    this._validityConditions = ('0x' + newConditions.toString(16).padStart(64, '0')) as Hex
+    return this
+  }
+
+  /**
+   * Set the block window for this adjustment
+   * @param blocks - Number of blocks the adjustment is valid for (0 = no limit, 1 = exact block)
+   * @returns This builder for chaining
+   */
+  blockWindow(blocks: number): this {
+    const lower160 = BigInt(this._validityConditions) & ((1n << 160n) - 1n)
+    const newConditions = (BigInt(blocks) << 160n) | lower160
+    this._validityConditions = ('0x' + newConditions.toString(16).padStart(64, '0')) as Hex
+    return this
+  }
+
+  /**
+   * Set the raw validity conditions
+   * @param conditions - 32-byte validity conditions
+   * @returns This builder for chaining
+   */
+  validityConditionsRaw(conditions: Hex): this {
+    this._validityConditions = conditions
+    return this
+  }
+
+  /**
+   * Build the adjustment without signature
+   * Returns typed data for signing
+   *
+   * @param claimHash - The claim hash this adjustment applies to
+   * @returns Adjustment data, typed data definition for signing, and the message hash
+   */
+  build(claimHash: Hex): {
+    adjustment: Omit<Adjustment, 'adjustmentAuthorization'>
+    typedData: TypedDataDefinition
+    hash: Hex
+  } {
+    invariant(this._adjuster, 'adjuster is required')
+    invariant(this._fillIndex !== undefined, 'fillIndex is required')
+    invariant(this._targetBlock !== undefined, 'targetBlock is required')
+
+    const adjustment: Omit<Adjustment, 'adjustmentAuthorization'> = {
+      adjuster: this._adjuster,
+      fillIndex: this._fillIndex,
+      targetBlock: this._targetBlock,
+      supplementalPriceCurve: this._supplementalPriceCurve,
+      validityConditions: this._validityConditions,
+    }
+
+    // NOTE: Tribunal's typed data does NOT include adjuster (unlike Exarch)
+    const typedData: TypedDataDefinition = {
+      domain: this._domain,
+      types: TRIBUNAL_ADJUSTMENT_TYPES,
+      primaryType: 'Adjustment',
+      message: {
+        claimHash,
+        fillIndex: this._fillIndex,
+        targetBlock: this._targetBlock,
+        supplementalPriceCurve: this._supplementalPriceCurve,
+        validityConditions: this._validityConditions,
+      },
+    }
+
+    // Compute the message hash for verification
+    const hash = computeTribunalAdjustmentHash(adjustment, claimHash)
+
+    return { adjustment, typedData, hash }
+  }
+
+  /**
+   * Build the adjustment with signature
+   *
+   * @param claimHash - The claim hash this adjustment applies to
+   * @param signature - The adjuster's signature
+   * @returns Complete Adjustment with signature
+   */
+  buildWithSignature(claimHash: Hex, signature: Hex): Adjustment {
+    const { adjustment } = this.build(claimHash)
+    return {
+      ...adjustment,
+      adjustmentAuthorization: signature,
+    }
+  }
+}
+
+/**
+ * Compute the adjustment hash for signing verification
+ * Matches Solidity _toAdjustmentHash
+ *
+ * NOTE: Unlike Exarch, this does NOT include adjuster address or nonce
+ */
+function computeTribunalAdjustmentHash(adjustment: Omit<Adjustment, 'adjustmentAuthorization'>, claimHash: Hex): Hex {
+  // Encode the supplemental price curve array
+  const curveHash = keccak256(
+    encodePacked(
+      adjustment.supplementalPriceCurve.map(() => 'uint256'),
+      adjustment.supplementalPriceCurve
+    )
+  )
+
+  // Encode the adjustment struct
+  return keccak256(
+    encodeAbiParameters(
+      [
+        { name: 'typehash', type: 'bytes32' },
+        { name: 'claimHash', type: 'bytes32' },
+        { name: 'fillIndex', type: 'uint256' },
+        { name: 'targetBlock', type: 'uint256' },
+        { name: 'curveHash', type: 'bytes32' },
+        { name: 'validityConditions', type: 'bytes32' },
+      ],
+      [
+        TRIBUNAL_ADJUSTMENT_TYPEHASH,
+        claimHash,
+        adjustment.fillIndex,
+        adjustment.targetBlock,
+        curveHash,
+        adjustment.validityConditions,
+      ]
+    )
+  )
 }

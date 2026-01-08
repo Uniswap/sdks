@@ -3,12 +3,12 @@
  */
 
 import invariant from 'tiny-invariant'
+import { Address, Hex } from 'viem'
 
 import { theCompactAbi } from '../abi/theCompact'
 import { Scope, ResetPeriod } from '../types/runtime'
 
 import { CompactClientConfig } from './coreClient'
-import { Address, Hex } from 'viem'
 
 /**
  * Lock details returned from the contract
@@ -19,6 +19,21 @@ export interface LockDetails {
   resetPeriod: ResetPeriod
   scope: Scope
   lockTag: Hex
+}
+
+/**
+ * Emissary status enum values (matches contract `EmissaryStatus`)
+ */
+export enum EmissaryStatusEnum {
+  Disabled = 0,
+  Pending = 1,
+  Enabled = 2,
+}
+
+export interface EmissaryStatus {
+  status: EmissaryStatusEnum
+  emissaryAssignmentAvailableAt: bigint
+  currentEmissary: Address
 }
 
 /**
@@ -113,18 +128,143 @@ export class ViewClient {
     })
 
     // Viem returns a tuple matching the contract's return values
-    const [token, allocator, resetPeriod, scope] = result
-
-    // Compute lockTag from id (upper 96 bits)
-    const lockTag = (id >> 160n).toString(16).padStart(24, '0')
+    const [token, allocator, resetPeriod, scope, lockTag] = result
 
     return {
       token,
       allocator,
       resetPeriod,
       scope,
-      lockTag: `0x${lockTag}` as Hex,
+      lockTag,
     }
+  }
+
+  /**
+   * Get the current emissary status for a sponsor + lockTag pair.
+   */
+  async getEmissaryStatus(sponsor: Address, lockTag: Hex): Promise<EmissaryStatus> {
+    invariant(this.config.address, 'contract address is required')
+
+    const result = await this.config.publicClient.readContract({
+      address: this.config.address,
+      abi: theCompactAbi,
+      functionName: 'getEmissaryStatus',
+      args: [sponsor, lockTag],
+    })
+
+    const [status, emissaryAssignmentAvailableAt, currentEmissary] = result
+
+    return {
+      status,
+      emissaryAssignmentAvailableAt,
+      currentEmissary,
+    }
+  }
+
+  /**
+   * Get the allowance (ERC-6909) for an owner/spender pair and lock id.
+   */
+  async allowance(params: { owner: Address; spender: Address; id: bigint }): Promise<bigint> {
+    invariant(this.config.address, 'contract address is required')
+
+    const result = await this.config.publicClient.readContract({
+      address: this.config.address,
+      abi: theCompactAbi,
+      functionName: 'allowance',
+      args: [params.owner, params.spender, params.id],
+    })
+
+    return result
+  }
+
+  /**
+   * Check whether `operator` is an operator for `owner` (ERC-6909 operator approvals).
+   */
+  async isOperator(params: { owner: Address; operator: Address }): Promise<boolean> {
+    invariant(this.config.address, 'contract address is required')
+
+    const result = await this.config.publicClient.readContract({
+      address: this.config.address,
+      abi: theCompactAbi,
+      functionName: 'isOperator',
+      args: [params.owner, params.operator],
+    })
+
+    return result
+  }
+
+  /**
+   * Read the required withdrawal fallback stipends from the contract.
+   */
+  async getRequiredWithdrawalFallbackStipends(): Promise<{ nativeTokenStipend: bigint; erc20TokenStipend: bigint }> {
+    invariant(this.config.address, 'contract address is required')
+
+    const result = await this.config.publicClient.readContract({
+      address: this.config.address,
+      abi: theCompactAbi,
+      functionName: 'getRequiredWithdrawalFallbackStipends',
+    })
+
+    const [nativeTokenStipend, erc20TokenStipend] = result
+    return { nativeTokenStipend, erc20TokenStipend }
+  }
+
+  /**
+   * Get token metadata for a specific ERC-6909 id.
+   */
+  async name(id: bigint): Promise<string> {
+    invariant(this.config.address, 'contract address is required')
+
+    return await this.config.publicClient.readContract({
+      address: this.config.address,
+      abi: theCompactAbi,
+      functionName: 'name',
+      args: [id],
+    })
+  }
+
+  async symbol(id: bigint): Promise<string> {
+    invariant(this.config.address, 'contract address is required')
+
+    return await this.config.publicClient.readContract({
+      address: this.config.address,
+      abi: theCompactAbi,
+      functionName: 'symbol',
+      args: [id],
+    })
+  }
+
+  async decimals(id: bigint): Promise<number> {
+    invariant(this.config.address, 'contract address is required')
+
+    return await this.config.publicClient.readContract({
+      address: this.config.address,
+      abi: theCompactAbi,
+      functionName: 'decimals',
+      args: [id],
+    })
+  }
+
+  async tokenURI(id: bigint): Promise<string> {
+    invariant(this.config.address, 'contract address is required')
+
+    return await this.config.publicClient.readContract({
+      address: this.config.address,
+      abi: theCompactAbi,
+      functionName: 'tokenURI',
+      args: [id],
+    })
+  }
+
+  async supportsInterface(interfaceId: Hex): Promise<boolean> {
+    invariant(this.config.address, 'contract address is required')
+
+    return await this.config.publicClient.readContract({
+      address: this.config.address,
+      abi: theCompactAbi,
+      functionName: 'supportsInterface',
+      args: [interfaceId],
+    })
   }
 
   /**
@@ -327,5 +467,44 @@ export class ViewClient {
     })
 
     return result
+  }
+
+  /**
+   * Read arbitrary storage slots using `extsload` (EIP-2330 style).
+   */
+  async extsload(slot: Hex): Promise<Hex> {
+    invariant(this.config.address, 'contract address is required')
+
+    return await this.config.publicClient.readContract({
+      address: this.config.address,
+      abi: theCompactAbi,
+      functionName: 'extsload',
+      args: [slot],
+    })
+  }
+
+  async extsloadMany(slots: readonly Hex[]): Promise<Hex[]> {
+    invariant(this.config.address, 'contract address is required')
+
+    return (await this.config.publicClient.readContract({
+      address: this.config.address,
+      abi: theCompactAbi,
+      functionName: 'extsload',
+      args: [slots as any],
+    })) as Hex[]
+  }
+
+  /**
+   * Read a transient storage slot (EIP-1153).
+   */
+  async exttload(slot: Hex): Promise<Hex> {
+    invariant(this.config.address, 'contract address is required')
+
+    return await this.config.publicClient.readContract({
+      address: this.config.address,
+      abi: theCompactAbi,
+      functionName: 'exttload',
+      args: [slot],
+    })
   }
 }

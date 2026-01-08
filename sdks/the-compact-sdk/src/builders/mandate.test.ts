@@ -24,7 +24,18 @@ describe('mandate', () => {
 
       const hash = Mandate.hash({ orderId, minFill })
       expect(hash).toEqual(
-        keccak256(concat([orderId, encodeAbiParameters([{ name: 'minFill', type: 'uint256' }], [minFill])]))
+        keccak256(
+          concat([
+            Mandate.typehash(),
+            encodeAbiParameters(
+              [
+                { name: 'orderId', type: 'bytes32' },
+                { name: 'minFill', type: 'uint256' },
+              ],
+              [orderId, minFill]
+            ),
+          ])
+        )
       )
     })
 
@@ -297,7 +308,8 @@ describe('mandate', () => {
 
       expect(encoded).toBeDefined()
       expect(hash).toBeDefined()
-      expect(hash).toEqual(keccak256(encoded))
+      // EIP-712 struct hash: keccak256(typehash || encodeData)
+      expect(hash).toEqual(keccak256(concat([Mandate.typehash(), encoded])))
     })
 
     it('should encode complex nested structures with arrays', () => {
@@ -354,7 +366,7 @@ describe('mandate', () => {
       ])
 
       expect(encoded).toEqual(expectedEncoded)
-      expect(hash).toEqual(keccak256(encoded))
+      expect(hash).toEqual(keccak256(concat([Mandate.typehash(), encoded])))
     })
 
     it('should handle deeply nested structures with multiple levels', () => {
@@ -411,7 +423,7 @@ describe('mandate', () => {
       ])
 
       expect(encoded).toEqual(expectedEncoded)
-      expect(hash).toEqual(keccak256(encoded))
+      expect(hash).toEqual(keccak256(concat([Mandate.typehash(), encoded])))
     })
 
     it('should match EIP-712 encoding for arrays of primitives', () => {
@@ -662,7 +674,7 @@ describe('mandate', () => {
       expect(encoded).toEqual(
         '0x000000000000000000000000f39fd6e51aad88f6f4ce6ab8827279cfffb92266a1645b0f8a53506f3892756697cdf6020c84da13b4d5b08e07aea6902d7d3aa7'
       )
-      expect(hash).toEqual(keccak256(encoded))
+      expect(hash).toEqual(keccak256(concat([Mandate.typehash(), encoded])))
     })
   })
 })

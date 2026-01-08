@@ -6,7 +6,7 @@
 
 import { Address, Hex } from 'viem'
 
-import { BatchCompact } from './eip712'
+import { BatchCompact, Lock } from './eip712'
 
 /**
  * Fill component specifying output requirements
@@ -129,8 +129,127 @@ export interface DispatchParameters {
  * Indicates a successful fill with optional claim modifications
  */
 export interface DispositionDetails {
-  /** Claimant to receive the claim */
-  claimant: Address
+  /** Claimant to receive the claim (bytes32: lockTag || address) */
+  claimant: Hex
   /** Scaling factor to apply */
   scalingFactor: bigint
+}
+
+// ============ BatchClaim for claimAndFill ============
+
+/**
+ * Batch claim structure for claimAndFill operations
+ * Combines compact with signatures needed to claim directly
+ */
+export interface TribunalBatchClaim {
+  /** The batch compact defining the claim */
+  compact: BatchCompact
+  /** Sponsor's signature authorizing the compact */
+  sponsorSignature: Hex
+  /** Allocator's signature (if required by the lock type) */
+  allocatorSignature: Hex
+}
+
+// ============ Callback Interface Types ============
+
+/**
+ * Parameters for the ITribunalCallback.tribunalCallback function
+ * Implementers receive these parameters when a fill completes
+ */
+export interface TribunalCallbackParams {
+  /** The claim hash identifying this fill */
+  claimHash: Hex
+  /** The commitments being claimed */
+  commitments: Lock[]
+  /** The amounts actually claimed (after scaling) */
+  claimedAmounts: bigint[]
+  /** Fill requirements for the filler */
+  fillRequirements: FillRequirement[]
+}
+
+/**
+ * Parameters for the IDispatchCallback.dispatchCallback function
+ * Used for cross-chain message relaying
+ */
+export interface DispatchCallbackParams {
+  /** Chain ID of the destination chain */
+  chainId: bigint
+  /** The original compact */
+  compact: BatchCompact
+  /** The mandate hash */
+  mandateHash: Hex
+  /** The claim hash */
+  claimHash: Hex
+  /** The claimant (bytes32: lockTag || address) */
+  claimant: Hex
+  /** Scaling factor applied to claims */
+  claimReductionScalingFactor: bigint
+  /** The claim amounts after scaling */
+  claimAmounts: bigint[]
+  /** Arbitrary context data */
+  context: Hex
+}
+
+/**
+ * Parameters for the IRecipientCallback.recipientCallback function
+ * Used for bridge operations where filler receives tokens + compact to register
+ */
+export interface RecipientCallbackParams {
+  /** Source chain ID */
+  chainId: bigint
+  /** Claim hash from source chain */
+  sourceClaimHash: Hex
+  /** Mandate hash from source chain */
+  sourceMandateHash: Hex
+  /** Fill token address */
+  fillToken: Address
+  /** Fill amount received */
+  fillAmount: bigint
+  /** Compact to register on target chain */
+  targetCompact: BatchCompact
+  /** Mandate hash for target compact */
+  targetMandateHash: Hex
+  /** Arbitrary context data */
+  context: Hex
+}
+
+// ============ ERC-7683 Types ============
+
+/**
+ * Origin data for ERC7683Tribunal.fill
+ * Encoded using abi.encode(claim, mandate, fillHashes)
+ */
+export interface ERC7683OriginData {
+  /** The batch claim with signatures */
+  claim: TribunalBatchClaim
+  /** The fill parameters for this fill */
+  mandate: FillParameters
+  /** Array of fill hashes from the mandate */
+  fillHashes: Hex[]
+}
+
+/**
+ * Filler data for ERC7683Tribunal.fill
+ * Encoded using abi.encode(adjustment, claimant, fillBlock)
+ */
+export interface ERC7683FillerData {
+  /** Adjustment from the adjuster */
+  adjustment: Adjustment
+  /** Claimant (bytes32: lockTag || address) */
+  claimant: Hex
+  /** Block number for fill (0 = current block) */
+  fillBlock: bigint
+}
+
+// ============ Arg Detail for Callbacks ============
+
+/**
+ * Argument detail for callback encoding
+ * Used in tribunal callback context data
+ */
+export interface ArgDetail {
+  /** Index where data starts */
+  offset: bigint
+  /** Length of the data */
+  length: bigint
 }

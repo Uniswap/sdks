@@ -135,8 +135,9 @@ export function defineMandateType<TValue extends object>(config: MandateTypeConf
     },
 
     hash(value: TValue): Hex {
+      // EIP-712 struct hash: keccak256(typeHash || encodeData(value))
       const encoded = this.encode(value)
-      return keccak256(encoded)
+      return keccak256(concat([this.typehash(), encoded]))
     },
   }
 }
@@ -452,6 +453,136 @@ export const TribunalMandate = defineMandateType<{
     Mandate_RecipientCallback: [
       MandateFields.uint256('chainId'),
       { name: 'compact', type: 'Mandate_BatchCompact' },
+      MandateFields.bytes('context'),
+    ],
+  },
+})
+
+/**
+ * Exarch allocator mandate type definition
+ *
+ * This is the official mandate structure used by the Exarch allocator for
+ * bonded source-chain auctions with cross-chain fill execution.
+ *
+ * Key differences from Tribunal:
+ * - Includes `legate` field for cross-chain proof verification
+ * - Uses `exarch` instead of `tribunal` in fills
+ * - Includes bonding parameters: `bondAmount`, `earnestAmount`, `holdPeriod`
+ * - RecipientCallback includes `mandateHash`
+ *
+ * @see https://github.com/Uniswap/exarch
+ *
+ * @example
+ * ```typescript
+ * import { ExarchMandate } from '@uniswap/the-compact-sdk'
+ *
+ * const mandate = {
+ *   adjuster: '0xAdjusterAddress...',
+ *   legate: '0xLegateAddress...', // NEW: Cross-chain proof verifier
+ *   fills: [{
+ *     chainId: 1n,
+ *     exarch: '0xExarchAddress...',
+ *     expires: BigInt(Math.floor(Date.now() / 1000) + 3600),
+ *     components: [{
+ *       fillToken: '0xUSDC...',
+ *       minimumFillAmount: 1000000n,
+ *       recipient: '0xRecipient...',
+ *       applyScaling: true
+ *     }],
+ *     bondAmount: parseEther('0.1'),      // NEW
+ *     earnestAmount: parseEther('0.01'),  // NEW
+ *     holdPeriod: 100n,                   // NEW
+ *     baselinePriorityFee: 1000000n,
+ *     scalingFactor: 1000000000000000000n,
+ *     priceCurve: [1500000000000000000n, 1000000000000000000n],
+ *     recipientCallback: [],
+ *     salt: '0x0000000000000000000000000000000000000000000000000000000000000001'
+ *   }]
+ * }
+ * ```
+ */
+export const ExarchMandateType = defineMandateType<{
+  adjuster: Address
+  legate: Address
+  fills: Array<{
+    chainId: bigint
+    exarch: Address
+    expires: bigint
+    components: Array<{
+      fillToken: Address
+      minimumFillAmount: bigint
+      recipient: Address
+      applyScaling: boolean
+    }>
+    bondAmount: bigint
+    earnestAmount: bigint
+    holdPeriod: bigint
+    baselinePriorityFee: bigint
+    scalingFactor: bigint
+    priceCurve: bigint[]
+    recipientCallback: Array<{
+      chainId: bigint
+      compact: {
+        arbiter: Address
+        sponsor: Address
+        nonce: bigint
+        expires: bigint
+        commitments: Array<{
+          lockTag: Hex
+          token: Address
+          amount: bigint
+        }>
+        mandate: any
+      }
+      mandateHash: Hex
+      context: Hex
+    }>
+    salt: Hex
+  }>
+}>({
+  fields: [
+    MandateFields.address('adjuster'),
+    MandateFields.address('legate'),
+    { name: 'fills', type: 'Mandate_Fill[]' },
+  ],
+  nestedTypes: {
+    Mandate_Fill: [
+      MandateFields.uint256('chainId'),
+      MandateFields.address('exarch'),
+      MandateFields.uint256('expires'),
+      { name: 'components', type: 'Mandate_FillComponent[]' },
+      MandateFields.uint256('bondAmount'),
+      MandateFields.uint256('earnestAmount'),
+      MandateFields.uint256('holdPeriod'),
+      MandateFields.uint256('baselinePriorityFee'),
+      MandateFields.uint256('scalingFactor'),
+      { name: 'priceCurve', type: 'uint256[]' },
+      { name: 'recipientCallback', type: 'Mandate_RecipientCallback[]' },
+      MandateFields.bytes32('salt'),
+    ],
+    Mandate_FillComponent: [
+      MandateFields.address('fillToken'),
+      MandateFields.uint256('minimumFillAmount'),
+      MandateFields.address('recipient'),
+      MandateFields.bool('applyScaling'),
+    ],
+    Mandate_Lock: [
+      { name: 'lockTag', type: 'bytes12' },
+      MandateFields.address('token'),
+      MandateFields.uint256('amount'),
+    ],
+    Mandate_BatchCompact: [
+      MandateFields.address('arbiter'),
+      MandateFields.address('sponsor'),
+      MandateFields.uint256('nonce'),
+      MandateFields.uint256('expires'),
+      { name: 'commitments', type: 'Mandate_Lock[]' },
+      { name: 'mandate', type: 'Mandate' },
+    ],
+    Mandate_RecipientCallback: [
+      MandateFields.uint256('chainId'),
+      { name: 'compact', type: 'Mandate_BatchCompact' },
+      MandateFields.bytes32('mandateHash'),
       MandateFields.bytes('context'),
     ],
   },

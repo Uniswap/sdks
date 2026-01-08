@@ -3,12 +3,26 @@
  */
 
 import invariant from 'tiny-invariant'
-import { Account, Address, decodeEventLog, Hex } from 'viem'
+import { Account, Address, decodeEventLog, Hex, zeroAddress } from 'viem'
 
 import { theCompactAbi } from '../abi/theCompact'
 import { CompactBuilder } from '../builders/compact'
 import { createDomain } from '../config/domain'
+import { encodeLockId } from '../encoding/locks'
+import {
+  batchCompactTypehash,
+  commitmentsHashFromLocks,
+  compactTypehash,
+  multichainCompactTypehash,
+  multichainElementHash,
+  multichainElementTypehash,
+  multichainElementsHash,
+  registrationBatchClaimHash,
+  registrationCompactClaimHash,
+  registrationMultichainClaimHash,
+} from '../encoding/registration'
 import { extractCompactError } from '../errors/decode'
+import { CompactCategory } from '../types/runtime'
 
 import { CompactClientConfig } from './coreClient'
 
@@ -48,6 +62,30 @@ import { CompactClientConfig } from './coreClient'
  */
 export class SponsorClient {
   constructor(private config: CompactClientConfig) {}
+
+  private async waitAndExtractEvent<TEventName extends string>(hash: Hex, eventName: TEventName): Promise<any | null> {
+    const receipt = await this.config.publicClient.waitForTransactionReceipt({ hash })
+    for (const log of receipt.logs) {
+      try {
+        const decoded = decodeEventLog({
+          abi: theCompactAbi,
+          data: log.data,
+          topics: log.topics,
+        })
+        if (decoded.eventName === eventName) return decoded
+      } catch {
+        continue
+      }
+    }
+    return null
+  }
+
+  private async assertObservedTransfer(params: { txHash: Hex; recipient: Address; expectedId: bigint }): Promise<void> {
+    const decoded = await this.waitAndExtractEvent(params.txHash, 'Transfer')
+    invariant(decoded, 'Transfer event not found in receipt')
+    invariant(decoded.args.to === params.recipient, 'Unexpected Transfer recipient in receipt')
+    invariant(decoded.args.id === params.expectedId, 'Unexpected lock id in Transfer event (computed != observed)')
+  }
 
   /**
    * Deposit native tokens (ETH) and create a resource lock
@@ -89,6 +127,7 @@ export class SponsorClient {
     invariant(this.config.address, 'contract address is required')
 
     try {
+      const id = encodeLockId(params.lockTag, zeroAddress)
       const hash = await this.config.walletClient.writeContract({
         address: this.config.address,
         abi: theCompactAbi,
@@ -99,29 +138,8 @@ export class SponsorClient {
         account: this.config.walletClient.account as Account,
       })
 
-      // Wait for transaction and extract id from Transfer event
-      const receipt = await this.config.publicClient.waitForTransactionReceipt({ hash })
-
-      // Find the Transfer event where tokens were minted (from address(0) to recipient)
-      let id = 0n
-      for (const log of receipt.logs) {
-        try {
-          const decoded = decodeEventLog({
-            abi: theCompactAbi,
-            data: log.data,
-            topics: log.topics,
-          })
-
-          if (decoded.eventName === 'Transfer' && decoded.args.from === '0x0000000000000000000000000000000000000000') {
-            // Type guard ensures decoded.args has Transfer event shape
-            id = decoded.args.id
-            break
-          }
-        } catch (e) {
-          // Not a Transfer event or couldn't decode, skip
-          continue
-        }
-      }
+      // Validate receipt logs match the computed lock id (observed effect)
+      await this.assertObservedTransfer({ txHash: hash, recipient: params.recipient, expectedId: id })
 
       return { txHash: hash, id }
     } catch (error) {
@@ -179,6 +197,7 @@ export class SponsorClient {
     invariant(this.config.address, 'contract address is required')
 
     try {
+      const id = encodeLockId(params.lockTag, params.token)
       const hash = await this.config.walletClient.writeContract({
         address: this.config.address,
         abi: theCompactAbi,
@@ -188,29 +207,8 @@ export class SponsorClient {
         account: this.config.walletClient.account as Account,
       })
 
-      // Wait for transaction and extract id from Transfer event
-      const receipt = await this.config.publicClient.waitForTransactionReceipt({ hash })
-
-      // Find the Transfer event where tokens were minted (from address(0) to recipient)
-      let id = 0n
-      for (const log of receipt.logs) {
-        try {
-          const decoded = decodeEventLog({
-            abi: theCompactAbi,
-            data: log.data,
-            topics: log.topics,
-          })
-
-          if (decoded.eventName === 'Transfer' && decoded.args.from === '0x0000000000000000000000000000000000000000') {
-            // Type guard ensures decoded.args has Transfer event shape
-            id = decoded.args.id
-            break
-          }
-        } catch (e) {
-          // Not a Transfer event or couldn't decode, skip
-          continue
-        }
-      }
+      // Validate receipt logs match the computed lock id (observed effect)
+      await this.assertObservedTransfer({ txHash: hash, recipient: params.recipient, expectedId: id })
 
       return { txHash: hash, id }
     } catch (error) {
@@ -218,6 +216,790 @@ export class SponsorClient {
       if (compactError) {
         throw compactError
       }
+      throw error
+    }
+  }
+
+  /**
+   * Deposit native tokens and register a claim hash in the same transaction.
+   * Returns the deterministic lock ID and (when present) the CompactRegistered event data.
+   */
+  async depositNativeAndRegister(params: {
+    lockTag: Hex
+    claimHash: Hex
+    typehash: Hex
+    value: bigint
+  }): Promise<{ txHash: Hex; id: bigint; registered?: { sponsor: Address; claimHash: Hex; typehash: Hex } }> {
+    invariant(this.config.walletClient, 'walletClient is required for deposits')
+    invariant(this.config.address, 'contract address is required')
+
+    const id = encodeLockId(params.lockTag, zeroAddress)
+    try {
+      const hash = await this.config.walletClient.writeContract({
+        address: this.config.address,
+        abi: theCompactAbi,
+        functionName: 'depositNativeAndRegister',
+        args: [params.lockTag, params.claimHash, params.typehash],
+        value: params.value,
+        chain: null,
+        account: this.config.walletClient.account as Account,
+      })
+
+      const decoded = await this.waitAndExtractEvent(hash, 'CompactRegistered')
+      const registered = decoded
+        ? {
+            sponsor: decoded.args.sponsor as Address,
+            claimHash: decoded.args.claimHash as Hex,
+            typehash: decoded.args.typehash as Hex,
+          }
+        : undefined
+
+      return { txHash: hash, id, registered }
+    } catch (error) {
+      const compactError = extractCompactError(error, theCompactAbi)
+      if (compactError) throw compactError
+      throw error
+    }
+  }
+
+  /**
+   * Deposit ERC20 and register a claim hash in the same transaction.
+   * Returns the deterministic lock ID and (when present) the CompactRegistered event data.
+   */
+  async depositERC20AndRegister(params: {
+    token: Address
+    lockTag: Hex
+    amount: bigint
+    claimHash: Hex
+    typehash: Hex
+  }): Promise<{ txHash: Hex; id: bigint; registered?: { sponsor: Address; claimHash: Hex; typehash: Hex } }> {
+    invariant(this.config.walletClient, 'walletClient is required for deposits')
+    invariant(this.config.address, 'contract address is required')
+
+    const id = encodeLockId(params.lockTag, params.token)
+    try {
+      const hash = await this.config.walletClient.writeContract({
+        address: this.config.address,
+        abi: theCompactAbi,
+        functionName: 'depositERC20AndRegister',
+        args: [params.token, params.lockTag, params.amount, params.claimHash, params.typehash],
+        chain: null,
+        account: this.config.walletClient.account as Account,
+      })
+
+      const decoded = await this.waitAndExtractEvent(hash, 'CompactRegistered')
+      const registered = decoded
+        ? {
+            sponsor: decoded.args.sponsor as Address,
+            claimHash: decoded.args.claimHash as Hex,
+            typehash: decoded.args.typehash as Hex,
+          }
+        : undefined
+
+      return { txHash: hash, id, registered }
+    } catch (error) {
+      const compactError = extractCompactError(error, theCompactAbi)
+      if (compactError) throw compactError
+      throw error
+    }
+  }
+
+  /**
+   * Schedule a future emissary assignment for a lockTag.
+   * Returns the `assignableAt` timestamp from the EmissaryAssignmentScheduled event.
+   */
+  async scheduleEmissaryAssignment(lockTag: Hex): Promise<{ txHash: Hex; assignableAt: bigint }> {
+    invariant(this.config.walletClient, 'walletClient is required')
+    invariant(this.config.address, 'contract address is required')
+
+    try {
+      const hash = await this.config.walletClient.writeContract({
+        address: this.config.address,
+        abi: theCompactAbi,
+        functionName: 'scheduleEmissaryAssignment',
+        args: [lockTag],
+        chain: null,
+        account: this.config.walletClient.account as Account,
+      })
+
+      const decoded = await this.waitAndExtractEvent(hash, 'EmissaryAssignmentScheduled')
+      invariant(decoded, 'EmissaryAssignmentScheduled event not found in receipt')
+
+      return { txHash: hash, assignableAt: decoded.args.assignableAt as bigint }
+    } catch (error) {
+      const compactError = extractCompactError(error, theCompactAbi)
+      if (compactError) throw compactError
+      throw error
+    }
+  }
+
+  /**
+   * Assign an emissary for a lockTag after scheduling.
+   */
+  async assignEmissary(lockTag: Hex, emissary: Address): Promise<Hex> {
+    invariant(this.config.walletClient, 'walletClient is required')
+    invariant(this.config.address, 'contract address is required')
+
+    try {
+      const hash = await this.config.walletClient.writeContract({
+        address: this.config.address,
+        abi: theCompactAbi,
+        functionName: 'assignEmissary',
+        args: [lockTag, emissary],
+        chain: null,
+        account: this.config.walletClient.account as Account,
+      })
+
+      await this.config.publicClient.waitForTransactionReceipt({ hash })
+      return hash
+    } catch (error) {
+      const compactError = extractCompactError(error, theCompactAbi)
+      if (compactError) throw compactError
+      throw error
+    }
+  }
+
+  /**
+   * Set an operator for ERC-6909 style approvals.
+   */
+  async setOperator(operator: Address, approved: boolean): Promise<Hex> {
+    invariant(this.config.walletClient, 'walletClient is required')
+    invariant(this.config.address, 'contract address is required')
+
+    try {
+      const hash = await this.config.walletClient.writeContract({
+        address: this.config.address,
+        abi: theCompactAbi,
+        functionName: 'setOperator',
+        args: [operator, approved],
+        chain: null,
+        account: this.config.walletClient.account as Account,
+      })
+
+      await this.config.publicClient.waitForTransactionReceipt({ hash })
+      return hash
+    } catch (error) {
+      const compactError = extractCompactError(error, theCompactAbi)
+      if (compactError) throw compactError
+      throw error
+    }
+  }
+
+  /**
+   * Approve a spender for a specific ERC-6909 lock ID.
+   */
+  async approve(spender: Address, id: bigint, amount: bigint): Promise<Hex> {
+    invariant(this.config.walletClient, 'walletClient is required')
+    invariant(this.config.address, 'contract address is required')
+
+    try {
+      const hash = await this.config.walletClient.writeContract({
+        address: this.config.address,
+        abi: theCompactAbi,
+        functionName: 'approve',
+        args: [spender, id, amount],
+        chain: null,
+        account: this.config.walletClient.account as Account,
+      })
+
+      await this.config.publicClient.waitForTransactionReceipt({ hash })
+      return hash
+    } catch (error) {
+      const compactError = extractCompactError(error, theCompactAbi)
+      if (compactError) throw compactError
+      throw error
+    }
+  }
+
+  /**
+   * Batch deposit ERC-6909 ids and amounts (payable for native deposits).
+   * `idsAndAmounts` is a list of [id, amount] pairs.
+   */
+  async batchDeposit(params: {
+    recipient: Address
+    idsAndAmounts: readonly [bigint, bigint][]
+    value?: bigint
+  }): Promise<{ txHash: Hex }> {
+    invariant(this.config.walletClient, 'walletClient is required')
+    invariant(this.config.address, 'contract address is required')
+
+    try {
+      const hash = await this.config.walletClient.writeContract({
+        address: this.config.address,
+        abi: theCompactAbi,
+        functionName: 'batchDeposit',
+        args: [params.idsAndAmounts as any, params.recipient],
+        value: params.value,
+        chain: null,
+        account: this.config.walletClient.account as Account,
+      })
+
+      await this.config.publicClient.waitForTransactionReceipt({ hash })
+      return { txHash: hash }
+    } catch (error) {
+      const compactError = extractCompactError(error, theCompactAbi)
+      if (compactError) throw compactError
+      throw error
+    }
+  }
+
+  /**
+   * Register multiple claim hashes in one transaction.
+   * `claimHashesAndTypehashes` is a list of [claimHash, typehash] pairs.
+   */
+  async registerMultiple(params: { claimHashesAndTypehashes: readonly [Hex, Hex][] }): Promise<Hex> {
+    invariant(this.config.walletClient, 'walletClient is required')
+    invariant(this.config.address, 'contract address is required')
+
+    try {
+      const hash = await this.config.walletClient.writeContract({
+        address: this.config.address,
+        abi: theCompactAbi,
+        functionName: 'registerMultiple',
+        args: [params.claimHashesAndTypehashes as any],
+        chain: null,
+        account: this.config.walletClient.account as Account,
+      })
+
+      await this.config.publicClient.waitForTransactionReceipt({ hash })
+      return hash
+    } catch (error) {
+      const compactError = extractCompactError(error, theCompactAbi)
+      if (compactError) throw compactError
+      throw error
+    }
+  }
+
+  /**
+   * Deposit and register multiple hashes in one tx (payable for native deposits).
+   */
+  async batchDepositAndRegisterMultiple(params: {
+    idsAndAmounts: readonly [bigint, bigint][]
+    claimHashesAndTypehashes: readonly [Hex, Hex][]
+    value?: bigint
+  }): Promise<Hex> {
+    invariant(this.config.walletClient, 'walletClient is required')
+    invariant(this.config.address, 'contract address is required')
+
+    try {
+      const hash = await this.config.walletClient.writeContract({
+        address: this.config.address,
+        abi: theCompactAbi,
+        functionName: 'batchDepositAndRegisterMultiple',
+        args: [params.idsAndAmounts as any, params.claimHashesAndTypehashes as any],
+        value: params.value,
+        chain: null,
+        account: this.config.walletClient.account as Account,
+      })
+
+      await this.config.publicClient.waitForTransactionReceipt({ hash })
+      return hash
+    } catch (error) {
+      const compactError = extractCompactError(error, theCompactAbi)
+      if (compactError) throw compactError
+      throw error
+    }
+  }
+
+  /**
+   * Deposit native and register-for (returns id + claimHash).
+   */
+  async depositNativeAndRegisterFor(params: {
+    recipient: Address
+    lockTag: Hex
+    arbiter: Address
+    nonce: bigint
+    expires: bigint
+    typehash: Hex
+    witness: Hex
+    value: bigint
+  }): Promise<{ txHash: Hex; id: bigint; claimHash: Hex }> {
+    invariant(this.config.walletClient, 'walletClient is required for deposits')
+    invariant(this.config.address, 'contract address is required')
+
+    const id = encodeLockId(params.lockTag, zeroAddress)
+    try {
+      const hash = await this.config.walletClient.writeContract({
+        address: this.config.address,
+        abi: theCompactAbi,
+        functionName: 'depositNativeAndRegisterFor',
+        args: [
+          params.recipient,
+          params.lockTag,
+          params.arbiter,
+          params.nonce,
+          params.expires,
+          params.typehash,
+          params.witness,
+        ],
+        value: params.value,
+        chain: null,
+        account: this.config.walletClient.account as Account,
+      })
+
+      const receipt = await this.config.publicClient.waitForTransactionReceipt({ hash })
+      // Claim hash is returned by the function, but viem's writeContract returns only tx hash; derive from event if present.
+      const decoded = receipt.logs
+        .map((log) => {
+          try {
+            return decodeEventLog({ abi: theCompactAbi, data: log.data, topics: log.topics })
+          } catch {
+            return null
+          }
+        })
+        .find((d) => d?.eventName === 'Claim')
+
+      return { txHash: hash, id, claimHash: (decoded?.args.claimHash as Hex) || (('0x' + '0'.repeat(64)) as Hex) }
+    } catch (error) {
+      const compactError = extractCompactError(error, theCompactAbi)
+      if (compactError) throw compactError
+      throw error
+    }
+  }
+
+  /**
+   * Deposit ERC20 and register-for (returns id + claimHash + registeredAmount).
+   */
+  async depositERC20AndRegisterFor(params: {
+    recipient: Address
+    token: Address
+    lockTag: Hex
+    amount: bigint
+    arbiter: Address
+    nonce: bigint
+    expires: bigint
+    typehash: Hex
+    witness: Hex
+  }): Promise<{ txHash: Hex; id: bigint; claimHash: Hex }> {
+    invariant(this.config.walletClient, 'walletClient is required for deposits')
+    invariant(this.config.address, 'contract address is required')
+
+    const id = encodeLockId(params.lockTag, params.token)
+    try {
+      const hash = await this.config.walletClient.writeContract({
+        address: this.config.address,
+        abi: theCompactAbi,
+        functionName: 'depositERC20AndRegisterFor',
+        args: [
+          params.recipient,
+          params.token,
+          params.lockTag,
+          params.amount,
+          params.arbiter,
+          params.nonce,
+          params.expires,
+          params.typehash,
+          params.witness,
+        ],
+        chain: null,
+        account: this.config.walletClient.account as Account,
+      })
+
+      const receipt = await this.config.publicClient.waitForTransactionReceipt({ hash })
+      const decoded = receipt.logs
+        .map((log) => {
+          try {
+            return decodeEventLog({ abi: theCompactAbi, data: log.data, topics: log.topics })
+          } catch {
+            return null
+          }
+        })
+        .find((d) => d?.eventName === 'Claim')
+
+      return { txHash: hash, id, claimHash: (decoded?.args.claimHash as Hex) || (('0x' + '0'.repeat(64)) as Hex) }
+    } catch (error) {
+      const compactError = extractCompactError(error, theCompactAbi)
+      if (compactError) throw compactError
+      throw error
+    }
+  }
+
+  /**
+   * Batch deposit and register-for (payable for native deposits).
+   * Returns tx hash; claimHash is emitted in Claim event.
+   */
+  async batchDepositAndRegisterFor(params: {
+    recipient: Address
+    idsAndAmounts: readonly [bigint, bigint][]
+    arbiter: Address
+    nonce: bigint
+    expires: bigint
+    typehash: Hex
+    witness: Hex
+    value?: bigint
+  }): Promise<{ txHash: Hex; claimHash?: Hex }> {
+    invariant(this.config.walletClient, 'walletClient is required')
+    invariant(this.config.address, 'contract address is required')
+
+    try {
+      const hash = await this.config.walletClient.writeContract({
+        address: this.config.address,
+        abi: theCompactAbi,
+        functionName: 'batchDepositAndRegisterFor',
+        args: [
+          params.recipient,
+          params.idsAndAmounts as any,
+          params.arbiter,
+          params.nonce,
+          params.expires,
+          params.typehash,
+          params.witness,
+        ],
+        value: params.value,
+        chain: null,
+        account: this.config.walletClient.account as Account,
+      })
+
+      const receipt = await this.config.publicClient.waitForTransactionReceipt({ hash })
+      const decoded = receipt.logs
+        .map((log) => {
+          try {
+            return decodeEventLog({ abi: theCompactAbi, data: log.data, topics: log.topics })
+          } catch {
+            return null
+          }
+        })
+        .find((d) => d?.eventName === 'Claim')
+
+      return { txHash: hash, claimHash: decoded?.args.claimHash as Hex | undefined }
+    } catch (error) {
+      const compactError = extractCompactError(error, theCompactAbi)
+      if (compactError) throw compactError
+      throw error
+    }
+  }
+
+  /**
+   * Permit2 structs used by The Compact.
+   */
+  // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
+  async depositERC20ViaPermit2(params: {
+    permit: {
+      permitted: { token: Address; amount: bigint }
+      nonce: bigint
+      deadline: bigint
+    }
+    depositor: Address
+    lockTag: Hex
+    recipient: Address
+    signature: Hex
+  }): Promise<{ txHash: Hex }> {
+    invariant(this.config.walletClient, 'walletClient is required for deposits')
+    invariant(this.config.address, 'contract address is required')
+
+    try {
+      const hash = await this.config.walletClient.writeContract({
+        address: this.config.address,
+        abi: theCompactAbi,
+        functionName: 'depositERC20ViaPermit2',
+        args: [params.permit, params.depositor, params.lockTag, params.recipient, params.signature] as any,
+        chain: null,
+        account: this.config.walletClient.account as Account,
+      })
+
+      await this.config.publicClient.waitForTransactionReceipt({ hash })
+      return { txHash: hash }
+    } catch (error) {
+      const compactError = extractCompactError(error, theCompactAbi)
+      if (compactError) throw compactError
+      throw error
+    }
+  }
+
+  async depositERC20AndRegisterViaPermit2(params: {
+    permit: {
+      permitted: { token: Address; amount: bigint }
+      nonce: bigint
+      deadline: bigint
+    }
+    depositor: Address
+    lockTag: Hex
+    claimHash: Hex
+    category: CompactCategory
+    witness: string
+    signature: Hex
+  }): Promise<{ txHash: Hex }> {
+    invariant(this.config.walletClient, 'walletClient is required for deposits')
+    invariant(this.config.address, 'contract address is required')
+
+    try {
+      const hash = await this.config.walletClient.writeContract({
+        address: this.config.address,
+        abi: theCompactAbi,
+        functionName: 'depositERC20AndRegisterViaPermit2',
+        args: [
+          params.permit,
+          params.depositor,
+          params.lockTag,
+          params.claimHash,
+          params.category,
+          params.witness,
+          params.signature,
+        ] as any,
+        chain: null,
+        account: this.config.walletClient.account as Account,
+      })
+
+      await this.config.publicClient.waitForTransactionReceipt({ hash })
+      return { txHash: hash }
+    } catch (error) {
+      const compactError = extractCompactError(error, theCompactAbi)
+      if (compactError) throw compactError
+      throw error
+    }
+  }
+
+  async batchDepositViaPermit2(params: {
+    depositor: Address
+    permitted: readonly { token: Address; amount: bigint }[]
+    depositDetails: { nonce: bigint; deadline: bigint; lockTag: Hex }
+    recipient: Address
+    signature: Hex
+  }): Promise<{ txHash: Hex }> {
+    invariant(this.config.walletClient, 'walletClient is required for deposits')
+    invariant(this.config.address, 'contract address is required')
+
+    try {
+      const hash = await this.config.walletClient.writeContract({
+        address: this.config.address,
+        abi: theCompactAbi,
+        functionName: 'batchDepositViaPermit2',
+        args: [params.depositor, params.permitted, params.depositDetails, params.recipient, params.signature] as any,
+        chain: null,
+        account: this.config.walletClient.account as Account,
+      })
+
+      await this.config.publicClient.waitForTransactionReceipt({ hash })
+      return { txHash: hash }
+    } catch (error) {
+      const compactError = extractCompactError(error, theCompactAbi)
+      if (compactError) throw compactError
+      throw error
+    }
+  }
+
+  async batchDepositAndRegisterViaPermit2(params: {
+    depositor: Address
+    permitted: readonly { token: Address; amount: bigint }[]
+    depositDetails: { nonce: bigint; deadline: bigint; lockTag: Hex }
+    claimHash: Hex
+    category: CompactCategory
+    witness: string
+    signature: Hex
+  }): Promise<{ txHash: Hex }> {
+    invariant(this.config.walletClient, 'walletClient is required for deposits')
+    invariant(this.config.address, 'contract address is required')
+
+    try {
+      const hash = await this.config.walletClient.writeContract({
+        address: this.config.address,
+        abi: theCompactAbi,
+        functionName: 'batchDepositAndRegisterViaPermit2',
+        args: [
+          params.depositor,
+          params.permitted,
+          params.depositDetails,
+          params.claimHash,
+          params.category,
+          params.witness,
+          params.signature,
+        ] as any,
+        chain: null,
+        account: this.config.walletClient.account as Account,
+      })
+
+      await this.config.publicClient.waitForTransactionReceipt({ hash })
+      return { txHash: hash }
+    } catch (error) {
+      const compactError = extractCompactError(error, theCompactAbi)
+      if (compactError) throw compactError
+      throw error
+    }
+  }
+
+  /**
+   * Transfer ERC-6909 tokens.
+   */
+  async transfer(params: { to: Address; id: bigint; amount: bigint; value?: bigint }): Promise<Hex> {
+    invariant(this.config.walletClient, 'walletClient is required')
+    invariant(this.config.address, 'contract address is required')
+
+    try {
+      const hash = await this.config.walletClient.writeContract({
+        address: this.config.address,
+        abi: theCompactAbi,
+        functionName: 'transfer',
+        args: [params.to, params.id, params.amount],
+        value: params.value,
+        chain: null,
+        account: this.config.walletClient.account as Account,
+      })
+      await this.config.publicClient.waitForTransactionReceipt({ hash })
+      return hash
+    } catch (error) {
+      const compactError = extractCompactError(error, theCompactAbi)
+      if (compactError) throw compactError
+      throw error
+    }
+  }
+
+  /**
+   * Transfer ERC-6909 tokens from another owner (requires approval).
+   */
+  async transferFrom(params: { from: Address; to: Address; id: bigint; amount: bigint; value?: bigint }): Promise<Hex> {
+    invariant(this.config.walletClient, 'walletClient is required')
+    invariant(this.config.address, 'contract address is required')
+
+    try {
+      const hash = await this.config.walletClient.writeContract({
+        address: this.config.address,
+        abi: theCompactAbi,
+        functionName: 'transferFrom',
+        args: [params.from, params.to, params.id, params.amount],
+        value: params.value,
+        chain: null,
+        account: this.config.walletClient.account as Account,
+      })
+      await this.config.publicClient.waitForTransactionReceipt({ hash })
+      return hash
+    } catch (error) {
+      const compactError = extractCompactError(error, theCompactAbi)
+      if (compactError) throw compactError
+      throw error
+    }
+  }
+
+  /**
+   * Register a single-compact style authorization on behalf of a sponsor.
+   *
+   * NOTE: This is a low-level wrapper around the contract function. If you want an ergonomic
+   * API, we should add a canonical "compute registration hash + typehash" helper next.
+   */
+  async registerFor(params: {
+    typehash: Hex
+    arbiter: Address
+    sponsor: Address
+    nonce: bigint
+    expires: bigint
+    lockTag: Hex
+    token: Address
+    amount: bigint
+    witness: Hex
+    sponsorSignature: Hex
+  }): Promise<{ txHash: Hex }> {
+    invariant(this.config.walletClient, 'walletClient is required for registration')
+    invariant(this.config.address, 'contract address is required')
+
+    try {
+      const hash = await this.config.walletClient.writeContract({
+        address: this.config.address,
+        abi: theCompactAbi,
+        functionName: 'registerFor',
+        args: [
+          params.typehash,
+          params.arbiter,
+          params.sponsor,
+          params.nonce,
+          params.expires,
+          params.lockTag,
+          params.token,
+          params.amount,
+          params.witness,
+          params.sponsorSignature,
+        ] as any,
+        chain: null,
+        account: this.config.walletClient.account as Account,
+      })
+      await this.config.publicClient.waitForTransactionReceipt({ hash })
+      return { txHash: hash }
+    } catch (error) {
+      const compactError = extractCompactError(error, theCompactAbi)
+      if (compactError) throw compactError
+      throw error
+    }
+  }
+
+  /**
+   * Register a batch-compact style authorization on behalf of a sponsor.
+   * `commitmentsHash` and `witness` are bytes32 values used by the contract.
+   */
+  async registerBatchFor(params: {
+    typehash: Hex
+    arbiter: Address
+    sponsor: Address
+    nonce: bigint
+    expires: bigint
+    commitmentsHash: Hex
+    witness: Hex
+    sponsorSignature: Hex
+  }): Promise<{ txHash: Hex }> {
+    invariant(this.config.walletClient, 'walletClient is required for registration')
+    invariant(this.config.address, 'contract address is required')
+
+    try {
+      const hash = await this.config.walletClient.writeContract({
+        address: this.config.address,
+        abi: theCompactAbi,
+        functionName: 'registerBatchFor',
+        args: [
+          params.typehash,
+          params.arbiter,
+          params.sponsor,
+          params.nonce,
+          params.expires,
+          params.commitmentsHash,
+          params.witness,
+          params.sponsorSignature,
+        ] as any,
+        chain: null,
+        account: this.config.walletClient.account as Account,
+      })
+      await this.config.publicClient.waitForTransactionReceipt({ hash })
+      return { txHash: hash }
+    } catch (error) {
+      const compactError = extractCompactError(error, theCompactAbi)
+      if (compactError) throw compactError
+      throw error
+    }
+  }
+
+  /**
+   * Register a multichain-compact style authorization on behalf of a sponsor.
+   */
+  async registerMultichainFor(params: {
+    typehash: Hex
+    sponsor: Address
+    nonce: bigint
+    expires: bigint
+    witness: Hex
+    notarizedChainId: bigint
+    sponsorSignature: Hex
+  }): Promise<{ txHash: Hex }> {
+    invariant(this.config.walletClient, 'walletClient is required for registration')
+    invariant(this.config.address, 'contract address is required')
+
+    try {
+      const hash = await this.config.walletClient.writeContract({
+        address: this.config.address,
+        abi: theCompactAbi,
+        functionName: 'registerMultichainFor',
+        args: [
+          params.typehash,
+          params.sponsor,
+          params.nonce,
+          params.expires,
+          params.witness,
+          params.notarizedChainId,
+          params.sponsorSignature,
+        ] as any,
+        chain: null,
+        account: this.config.walletClient.account as Account,
+      })
+      await this.config.publicClient.waitForTransactionReceipt({ hash })
+      return { txHash: hash }
+    } catch (error) {
+      const compactError = extractCompactError(error, theCompactAbi)
+      if (compactError) throw compactError
       throw error
     }
   }
@@ -274,6 +1056,170 @@ export class SponsorClient {
       }
       throw error
     }
+  }
+
+  /**
+   * Compute the canonical registration inputs (claimHash + typehash) for a built Compact.
+   * This matches The Compact's `register` preimage hashing (NOT the EIP-712 digest).
+   */
+  registrationForCompact(built: {
+    struct: {
+      arbiter: Address
+      sponsor: Address
+      nonce: bigint
+      expires: bigint
+      lockTag: Hex
+      token: Address
+      amount: bigint
+    }
+    mandateType?: any
+    mandate?: any
+  }): {
+    claimHash: Hex
+    typehash: Hex
+  } {
+    const typehash = compactTypehash(built.mandateType)
+    const witness = built.mandateType && built.mandate ? built.mandateType.hash(built.mandate) : undefined
+    const claimHash = registrationCompactClaimHash({
+      typehash,
+      arbiter: built.struct.arbiter,
+      sponsor: built.struct.sponsor,
+      nonce: built.struct.nonce,
+      expires: built.struct.expires,
+      lockTag: built.struct.lockTag,
+      token: built.struct.token,
+      amount: built.struct.amount,
+      witness,
+    })
+    return { claimHash, typehash }
+  }
+
+  /**
+   * Convenience: register a built Compact (from `singleCompactBuilder().build()`).
+   */
+  async registerCompact(built: {
+    struct: {
+      arbiter: Address
+      sponsor: Address
+      nonce: bigint
+      expires: bigint
+      lockTag: Hex
+      token: Address
+      amount: bigint
+    }
+    mandateType?: any
+    mandate?: any
+  }): Promise<Hex> {
+    const { claimHash, typehash } = this.registrationForCompact(built)
+    return await this.register({ claimHash, typehash })
+  }
+
+  /**
+   * Compute canonical registration inputs for a built BatchCompact.
+   */
+  registrationForBatchCompact(built: {
+    struct: {
+      arbiter: Address
+      sponsor: Address
+      nonce: bigint
+      expires: bigint
+      commitments: readonly { lockTag: Hex; token: Address; amount: bigint }[]
+    }
+    mandateType?: any
+    mandate?: any
+  }): { claimHash: Hex; typehash: Hex } {
+    const typehash = batchCompactTypehash(built.mandateType)
+    const witness = built.mandateType && built.mandate ? built.mandateType.hash(built.mandate) : undefined
+    const idsAndAmountsHash = commitmentsHashFromLocks(built.struct.commitments)
+    const claimHash = registrationBatchClaimHash({
+      typehash,
+      arbiter: built.struct.arbiter,
+      sponsor: built.struct.sponsor,
+      nonce: built.struct.nonce,
+      expires: built.struct.expires,
+      idsAndAmountsHash,
+      witness,
+    })
+    return { claimHash, typehash }
+  }
+
+  async registerBatchCompact(built: {
+    struct: {
+      arbiter: Address
+      sponsor: Address
+      nonce: bigint
+      expires: bigint
+      commitments: readonly { lockTag: Hex; token: Address; amount: bigint }[]
+    }
+    mandateType?: any
+    mandate?: any
+  }): Promise<Hex> {
+    const { claimHash, typehash } = this.registrationForBatchCompact(built)
+    return await this.register({ claimHash, typehash })
+  }
+
+  /**
+   * Compute canonical registration inputs for a built MultichainCompact.
+   *
+   * NOTE: This uses the element hashing from The Compact test helpers:
+   * `elementHash = keccak256(abi.encode(elementTypehash, arbiter, chainId, commitmentsHash, witness?))`,
+   * `elementsHash = keccak256(abi.encodePacked(elementHashes))`,
+   * `claimHash = keccak256(abi.encode(multichainTypehash, sponsor, nonce, expires, elementsHash))`.
+   */
+  registrationForMultichainCompact(built: {
+    struct: { sponsor: Address; nonce: bigint; expires: bigint }
+    elements: readonly {
+      element: {
+        arbiter: Address
+        chainId: bigint
+        commitments: readonly { lockTag: Hex; token: Address; amount: bigint }[]
+      }
+      mandateType?: any
+      mandate?: any
+    }[]
+  }): { claimHash: Hex; typehash: Hex } {
+    // assume all elements share the same mandate typestring (enforced by builder semantics)
+    const firstMandateType = built.elements[0]?.mandateType
+    const typehash = multichainCompactTypehash(firstMandateType)
+    const elementTypehash = multichainElementTypehash(firstMandateType)
+
+    const elementHashes = built.elements.map((el) => {
+      const commitmentsHash = commitmentsHashFromLocks(el.element.commitments)
+      const witness = el.mandateType && el.mandate ? el.mandateType.hash(el.mandate) : undefined
+      return multichainElementHash({
+        typehash: elementTypehash,
+        arbiter: el.element.arbiter,
+        chainId: el.element.chainId,
+        commitmentsHash,
+        witness,
+      })
+    })
+
+    const elementsHash = multichainElementsHash(elementHashes)
+    const claimHash = registrationMultichainClaimHash({
+      typehash,
+      sponsor: built.struct.sponsor,
+      nonce: built.struct.nonce,
+      expires: built.struct.expires,
+      elementsHash,
+    })
+    return { claimHash, typehash }
+  }
+
+  async registerMultichainCompact(built: {
+    struct: { sponsor: Address; nonce: bigint; expires: bigint }
+    elements: readonly {
+      element: {
+        arbiter: Address
+        chainId: bigint
+        commitments: readonly { lockTag: Hex; token: Address; amount: bigint }[]
+      }
+      mandateType?: any
+      mandate?: any
+    }[]
+  }): Promise<Hex> {
+    const { claimHash, typehash } = this.registrationForMultichainCompact(built)
+    return await this.register({ claimHash, typehash })
   }
 
   /**

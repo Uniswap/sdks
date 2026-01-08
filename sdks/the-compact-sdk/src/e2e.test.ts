@@ -25,15 +25,22 @@ import {
   type Address,
   type Hex,
   zeroAddress,
+  erc20Abi,
+  encodeAbiParameters,
+  encodeFunctionData,
+  decodeFunctionResult,
+  keccak256,
+  concat,
+  toHex,
 } from 'viem'
-import { privateKeyToAccount } from 'viem/accounts'
+import { privateKeyToAccount, sign, serializeSignature } from 'viem/accounts'
 
 import { createCompactClient } from './client/coreClient'
 import { encodeLockTag, encodeLockId, decodeLockTag } from './encoding/locks'
+import { compactTypehash, registrationCompactClaimHash } from './encoding/registration'
 import { Scope, ResetPeriod } from './types/runtime'
 
-// Skip e2e tests by default (require Supersim running)
-// Run with: npm test -- --testPathPattern=e2e
+// Skip e2e tests by default
 const describeE2E = process.env.E2E_TESTS ? describe : describe.skip
 
 // Test accounts from Supersim
@@ -76,6 +83,21 @@ const TEST_ALLOCATOR = {
 const FIXED_EXPIRY = 1893456000n // January 1, 2030 00:00:00 GMT
 const FIXED_EXPIRED = 1577836800n // January 1, 2020 00:00:00 GMT
 
+// Mainnet addresses used in e2e fork testing
+const WETH_ADDRESS = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2' as Address
+const PERMIT2_ADDRESS = '0x000000000022D473030F116dDEE9F6B43aC78BA3' as Address
+
+const wethAbi = [
+  ...erc20Abi,
+  {
+    type: 'function',
+    name: 'deposit',
+    stateMutability: 'payable',
+    inputs: [],
+    outputs: [],
+  },
+] as const
+
 // Chain configurations for Supersim
 const CHAINS = {
   mainnet: {
@@ -113,6 +135,7 @@ describeE2E('The Compact SDK - End-to-End Tests', () => {
   let allocatorAccount: ReturnType<typeof privateKeyToAccount>
   let recipient1Account: ReturnType<typeof privateKeyToAccount>
   let recipient2Account: ReturnType<typeof privateKeyToAccount>
+  let nonceCounter: bigint
 
   beforeAll(async () => {
     // Create accounts from private keys
@@ -137,6 +160,18 @@ describeE2E('The Compact SDK - End-to-End Tests', () => {
       transport: http(CHAINS.mainnet.rpcUrl),
     })
 
+    // Supersim forks can persist state across runs; make tests resilient by re-funding fixed accounts.
+    // (This avoids “dirty instance” failures when prior runs have spent down balances.)
+    const RICH_BALANCE = toHex(1000n * 10n ** 18n) // 1000 ETH
+    await rpc('anvil_setBalance', [sponsorAccount.address, RICH_BALANCE])
+    await rpc('anvil_setBalance', [arbiterAccount.address, RICH_BALANCE])
+    await rpc('anvil_setBalance', [allocatorAccount.address, RICH_BALANCE])
+    await rpc('anvil_setBalance', [recipient1Account.address, RICH_BALANCE])
+    await rpc('anvil_setBalance', [recipient2Account.address, RICH_BALANCE])
+
+    // Nonces must be unique so we use a timestamp-based rng to reduce the likelihood of collisions
+    nonceCounter = BigInt(Date.now()) * 1_000_000n + BigInt(Math.floor(Math.random() * 1_000_000))
+
     console.log('✓ Test environment initialized')
     console.log('  - Chain:', CHAINS.mainnet.name)
     console.log('  - Compact:', CHAINS.mainnet.compactAddress)
@@ -145,10 +180,24 @@ describeE2E('The Compact SDK - End-to-End Tests', () => {
     console.log('  - Test Allocator (AlwaysOK):', TEST_ALLOCATOR.address, 'with ID:', TEST_ALLOCATOR.allocatorId)
   })
 
+  function nextNonce(): bigint {
+    return ++nonceCounter
+  }
+
+  async function rpc(method: string, params: any[] = []) {
+    // viem's PublicClient exposes request() for raw JSON-RPC
+    return await (mainnetPublicClient as any).request({ method, params })
+  }
+
+  async function increaseTime(seconds: number) {
+    await rpc('evm_increaseTime', [seconds])
+    await rpc('evm_mine', [])
+  }
+
   describe('Setup and Contract Discovery', () => {
     it('should connect to Supersim mainnet fork', async () => {
       const blockNumber = await mainnetPublicClient.getBlockNumber()
-      expect(blockNumber).toBeGreaterThan(0n)
+      expect(blockNumber).toBeGreaterThanOrEqual(24170000n)
     })
 
     it('should have funded test accounts', async () => {
@@ -252,6 +301,1070 @@ describeE2E('The Compact SDK - End-to-End Tests', () => {
       console.log('  ✓ Forced withdrawal enabled')
       console.log('    Withdrawable at:', new Date(Number(result.withdrawableAt) * 1000).toISOString())
     }, 30000)
+  })
+
+  describe('Emissary lifecycle', () => {
+    it('should schedule and then assign an emissary for a lockTag', async () => {
+      const compactClient = createCompactClient({
+        chainId: CHAINS.mainnet.id,
+        address: CHAINS.mainnet.compactAddress,
+        publicClient: mainnetPublicClient,
+        walletClient: mainnetWalletClient,
+      })
+
+      const lockTag = encodeLockTag({
+        allocatorId: TEST_ALLOCATOR.allocatorId,
+        scope: Scope.ChainSpecific,
+        resetPeriod: ResetPeriod.OneSecond,
+      })
+
+      const sched = await compactClient.sponsor.scheduleEmissaryAssignment(lockTag)
+      expect(sched.assignableAt).toBeGreaterThan(0n)
+
+      const statusAfterSchedule = await compactClient.view.getEmissaryStatus(sponsorAccount.address, lockTag)
+      expect(statusAfterSchedule.emissaryAssignmentAvailableAt).toBe(sched.assignableAt)
+
+      // Travel to after assignableAt
+      const now = BigInt(Math.floor(Date.now() / 1000))
+      const delta = Number(
+        statusAfterSchedule.emissaryAssignmentAvailableAt > now
+          ? statusAfterSchedule.emissaryAssignmentAvailableAt - now
+          : 1n
+      )
+      await increaseTime(Math.max(delta + 1, 2))
+
+      const emissary = recipient1Account.address
+      const assignTx = await compactClient.sponsor.assignEmissary(lockTag, emissary)
+      expect(assignTx).toMatch(/^0x[0-9a-f]{64}$/)
+
+      const statusAfterAssign = await compactClient.view.getEmissaryStatus(sponsorAccount.address, lockTag)
+      expect(statusAfterAssign.currentEmissary.toLowerCase()).toBe(emissary.toLowerCase())
+    }, 30000)
+  })
+
+  describe('Approvals/operators and transferFrom', () => {
+    it('should support approve + transferFrom and operator approvals', async () => {
+      const compactClient = createCompactClient({
+        chainId: CHAINS.mainnet.id,
+        address: CHAINS.mainnet.compactAddress,
+        publicClient: mainnetPublicClient,
+        walletClient: mainnetWalletClient,
+      })
+
+      const lockTag = encodeLockTag({
+        allocatorId: TEST_ALLOCATOR.allocatorId,
+        scope: Scope.ChainSpecific,
+        resetPeriod: ResetPeriod.OneDay,
+      })
+
+      const depositAmount = parseEther('0.05')
+      const { id } = await compactClient.sponsor.depositNative({
+        lockTag,
+        recipient: sponsorAccount.address,
+        value: depositAmount,
+      })
+
+      // Approve arbiter for a partial amount and transferFrom
+      const approveAmount = parseEther('0.02')
+      await compactClient.sponsor.approve(arbiterAccount.address, id, approveAmount)
+      const allowance = await compactClient.view.allowance({
+        owner: sponsorAccount.address,
+        spender: arbiterAccount.address,
+        id,
+      })
+      expect(allowance).toBe(approveAmount)
+
+      const arbiterClient = createCompactClient({
+        chainId: CHAINS.mainnet.id,
+        address: CHAINS.mainnet.compactAddress,
+        publicClient: mainnetPublicClient,
+        walletClient: arbiterWalletClient,
+      })
+      const beforeRecipient1 = await compactClient.view.balanceOf({ account: recipient1Account.address, id })
+      const tx1 = await arbiterClient.sponsor.transferFrom({
+        from: sponsorAccount.address,
+        to: recipient1Account.address,
+        id,
+        amount: approveAmount,
+      })
+      await mainnetPublicClient.waitForTransactionReceipt({ hash: tx1 })
+
+      const afterRecipient1 = await compactClient.view.balanceOf({ account: recipient1Account.address, id })
+      expect(afterRecipient1 - beforeRecipient1).toBe(approveAmount)
+
+      // Operator approval should allow transferFrom without per-id allowance
+      await compactClient.sponsor.setOperator(arbiterAccount.address, true)
+      const isOp = await compactClient.view.isOperator({
+        owner: sponsorAccount.address,
+        operator: arbiterAccount.address,
+      })
+      expect(isOp).toBe(true)
+
+      const remaining = depositAmount - approveAmount
+      const beforeRecipient2 = await compactClient.view.balanceOf({ account: recipient2Account.address, id })
+      const tx2 = await arbiterClient.sponsor.transferFrom({
+        from: sponsorAccount.address,
+        to: recipient2Account.address,
+        id,
+        amount: remaining,
+      })
+      await mainnetPublicClient.waitForTransactionReceipt({ hash: tx2 })
+      const afterRecipient2 = await compactClient.view.balanceOf({ account: recipient2Account.address, id })
+      expect(afterRecipient2 - beforeRecipient2).toBe(remaining)
+    }, 120000)
+  })
+
+  describe('Forced withdrawal end-to-end', () => {
+    it('should enable forced withdrawal, time travel, then withdraw to recipient', async () => {
+      const compactClient = createCompactClient({
+        chainId: CHAINS.mainnet.id,
+        address: CHAINS.mainnet.compactAddress,
+        publicClient: mainnetPublicClient,
+        walletClient: mainnetWalletClient,
+      })
+
+      const lockTag = encodeLockTag({
+        allocatorId: TEST_ALLOCATOR.allocatorId,
+        scope: Scope.ChainSpecific,
+        resetPeriod: ResetPeriod.OneSecond,
+      })
+      const amount = parseEther('0.02')
+      const { id } = await compactClient.sponsor.depositNative({
+        lockTag,
+        recipient: sponsorAccount.address,
+        value: amount,
+      })
+
+      await compactClient.sponsor.enableForcedWithdrawal(id)
+      const status = await compactClient.view.getForcedWithdrawalStatus(sponsorAccount.address, id)
+      expect(status.withdrawableAt).toBeGreaterThan(0n)
+
+      // Warp past withdrawableAt deterministically (delay can vary by deployment/config).
+      const latest = await mainnetPublicClient.getBlock()
+      const now = BigInt(latest.timestamp)
+      const delta = Number(status.withdrawableAt > now ? status.withdrawableAt - now : 1n)
+      await increaseTime(Math.max(delta + 1, 2))
+
+      const compactBefore = await mainnetPublicClient.getBalance({ address: CHAINS.mainnet.compactAddress })
+      const sponsorBefore = await compactClient.view.balanceOf({ account: sponsorAccount.address, id })
+      const withdrawTx = await compactClient.sponsor.forcedWithdrawal(id, recipient1Account.address, amount)
+      await mainnetPublicClient.waitForTransactionReceipt({ hash: withdrawTx })
+      const compactAfter = await mainnetPublicClient.getBalance({ address: CHAINS.mainnet.compactAddress })
+      const sponsorAfter = await compactClient.view.balanceOf({ account: sponsorAccount.address, id })
+
+      // Underlying native ETH should leave The Compact and the ERC-6909 balance should drop.
+      expect(compactBefore - compactAfter).toBe(amount)
+      expect(sponsorBefore - sponsorAfter).toBe(amount)
+    }, 60000)
+  })
+
+  describe('RegisterFor + DepositAndRegisterFor flows', () => {
+    it('should execute depositNativeAndRegisterFor and verify returned registration matches canonical hash', async () => {
+      // We call the contract directly via simulate/write to capture return values.
+      const lockTag = encodeLockTag({
+        allocatorId: TEST_ALLOCATOR.allocatorId,
+        scope: Scope.ChainSpecific,
+        resetPeriod: ResetPeriod.OneDay,
+      })
+      const amount = parseEther('0.03')
+      const arbiter = arbiterAccount.address
+      const nonce = nextNonce()
+      const expires = FIXED_EXPIRY
+
+      // no witness case: COMPACT_TYPEHASH and witness = 0
+      const typehash = compactTypehash()
+      const witness = ('0x' + '0'.repeat(64)) as Hex
+
+      const { request, result } = await mainnetPublicClient.simulateContract({
+        address: CHAINS.mainnet.compactAddress,
+        abi: (await import('./abi/theCompact')).theCompactAbi as any,
+        functionName: 'depositNativeAndRegisterFor',
+        args: [sponsorAccount.address, lockTag, arbiter, nonce, expires, typehash, witness],
+        value: amount,
+        account: sponsorAccount,
+      } as any)
+
+      const txHash = await mainnetWalletClient.writeContract({ ...(request as any), account: sponsorAccount })
+      await mainnetPublicClient.waitForTransactionReceipt({ hash: txHash })
+
+      const [id, returnedClaimHash] = result as unknown as [bigint, Hex]
+      const expectedClaimHash = registrationCompactClaimHash({
+        typehash: typehash,
+        arbiter,
+        sponsor: sponsorAccount.address,
+        nonce,
+        expires,
+        lockTag,
+        token: zeroAddress,
+        amount,
+      })
+
+      expect(returnedClaimHash).toBe(expectedClaimHash)
+      // Registration should be active
+      const viewClient = createCompactClient({
+        chainId: CHAINS.mainnet.id,
+        address: CHAINS.mainnet.compactAddress,
+        publicClient: mainnetPublicClient,
+      })
+      const isReg = await viewClient.view.isRegistered({
+        sponsor: sponsorAccount.address,
+        claimHash: returnedClaimHash,
+        typehash,
+      })
+      expect(isReg).toBe(true)
+      // sanity: id should match deterministic lockId
+      expect(id).toBe(encodeLockId(lockTag, zeroAddress))
+    }, 30000)
+
+    it('should registerFor using sponsor signature over canonical digest', async () => {
+      const compactClient = createCompactClient({
+        chainId: CHAINS.mainnet.id,
+        address: CHAINS.mainnet.compactAddress,
+        publicClient: mainnetPublicClient,
+        walletClient: mainnetWalletClient,
+      })
+
+      const lockTag = encodeLockTag({
+        allocatorId: TEST_ALLOCATOR.allocatorId,
+        scope: Scope.ChainSpecific,
+        resetPeriod: ResetPeriod.OneDay,
+      })
+      const amount = parseEther('0.01')
+      const arbiter = arbiterAccount.address
+      const sponsor = sponsorAccount.address
+      const nonce = nextNonce()
+      const expires = FIXED_EXPIRY
+
+      // No-witness typehash.
+      const typehash = compactTypehash()
+      const claimHash = registrationCompactClaimHash({
+        typehash,
+        arbiter,
+        sponsor,
+        nonce,
+        expires,
+        lockTag,
+        token: zeroAddress,
+        amount,
+      })
+
+      const domainSeparator = await compactClient.view.getDomainSeparator()
+      const digest = keccak256(concat(['0x1901', domainSeparator, claimHash] as any))
+
+      const sigObj = await sign({ hash: digest, privateKey: ACCOUNTS.sponsor.privateKey as Hex })
+      const sponsorSignature = serializeSignature(sigObj)
+
+      const txHash = await compactClient.sponsor.registerFor({
+        typehash,
+        arbiter,
+        sponsor,
+        nonce,
+        expires,
+        lockTag,
+        token: zeroAddress,
+        amount,
+        witness: ('0x' + '0'.repeat(64)) as Hex,
+        sponsorSignature,
+      } as any)
+
+      expect(txHash.txHash).toMatch(/^0x[0-9a-f]{64}$/)
+      const isReg = await compactClient.view.isRegistered({ sponsor, claimHash, typehash })
+      expect(isReg).toBe(true)
+    }, 30000)
+  })
+
+  describe('Registration convenience flows (deposit*AndRegister / registerMultiple)', () => {
+    it('should depositNativeAndRegister and activate registration for a canonical compact claimHash', async () => {
+      const compactClient = createCompactClient({
+        chainId: CHAINS.mainnet.id,
+        address: CHAINS.mainnet.compactAddress,
+        publicClient: mainnetPublicClient,
+        walletClient: mainnetWalletClient,
+      })
+
+      const lockTag = encodeLockTag({
+        allocatorId: TEST_ALLOCATOR.allocatorId,
+        scope: Scope.ChainSpecific,
+        resetPeriod: ResetPeriod.OneDay,
+      })
+      const amount = parseEther('0.02')
+
+      const arbiter = arbiterAccount.address
+      const sponsor = sponsorAccount.address
+      const nonce = nextNonce()
+      const expires = FIXED_EXPIRY
+      const typehash = compactTypehash()
+
+      const claimHash = registrationCompactClaimHash({
+        typehash,
+        arbiter,
+        sponsor,
+        nonce,
+        expires,
+        lockTag,
+        token: zeroAddress,
+        amount,
+      })
+
+      const res = await compactClient.sponsor.depositNativeAndRegister({
+        lockTag,
+        claimHash,
+        typehash,
+        value: amount,
+      })
+
+      expect(res.id).toBe(encodeLockId(lockTag, zeroAddress))
+      const active = await compactClient.view.isRegistered({ sponsor, claimHash, typehash })
+      expect(active).toBe(true)
+    }, 60000)
+
+    it('should registerMultiple (two claimHash/typehash pairs)', async () => {
+      const compactClient = createCompactClient({
+        chainId: CHAINS.mainnet.id,
+        address: CHAINS.mainnet.compactAddress,
+        publicClient: mainnetPublicClient,
+        walletClient: mainnetWalletClient,
+      })
+
+      const sponsor = sponsorAccount.address
+      const arbiter = arbiterAccount.address
+      const expires = FIXED_EXPIRY
+      const typehash = compactTypehash()
+      const lockTag = encodeLockTag({
+        allocatorId: TEST_ALLOCATOR.allocatorId,
+        scope: Scope.ChainSpecific,
+        resetPeriod: ResetPeriod.OneDay,
+      })
+
+      const claimHash1 = registrationCompactClaimHash({
+        typehash,
+        arbiter,
+        sponsor,
+        nonce: nextNonce(),
+        expires,
+        lockTag,
+        token: zeroAddress,
+        amount: 1n,
+      })
+      const claimHash2 = registrationCompactClaimHash({
+        typehash,
+        arbiter,
+        sponsor,
+        nonce: nextNonce(),
+        expires,
+        lockTag,
+        token: zeroAddress,
+        amount: 2n,
+      })
+
+      const txHash = await compactClient.sponsor.registerMultiple({
+        claimHashesAndTypehashes: [
+          [claimHash1, typehash],
+          [claimHash2, typehash],
+        ],
+      })
+      expect(txHash).toMatch(/^0x[0-9a-f]{64}$/)
+      await mainnetPublicClient.waitForTransactionReceipt({ hash: txHash })
+
+      expect(await compactClient.view.isRegistered({ sponsor, claimHash: claimHash1, typehash })).toBe(true)
+      expect(await compactClient.view.isRegistered({ sponsor, claimHash: claimHash2, typehash })).toBe(true)
+    }, 60000)
+  })
+
+  describe('Permit2 deposit flows', () => {
+    function serializeCompactSignature(sig: { r: Hex; s: Hex; v?: bigint; yParity?: number }): Hex {
+      // Permit2 accepts EIP-2098 "compact" signatures (r, vs) where vs has yParity in the top bit.
+      const s = BigInt(sig.s)
+      const yParity =
+        sig.yParity !== undefined
+          ? sig.yParity
+          : sig.v !== undefined
+          ? sig.v === 27n || sig.v === 28n
+            ? Number(sig.v - 27n)
+            : Number(sig.v)
+          : 0
+      const vs = yParity === 1 ? s | (1n << 255n) : s
+      const vsHex = toHex(vs, { size: 32 })
+      return (sig.r + vsHex.slice(2)) as Hex
+    }
+
+    function permit2DomainSeparator(chainId: bigint): Hex {
+      const DOMAIN_TYPEHASH = keccak256(toHex('EIP712Domain(string name,uint256 chainId,address verifyingContract)'))
+      const nameHash = keccak256(toHex('Permit2'))
+      return keccak256(
+        encodeAbiParameters(
+          [
+            { name: 'typehash', type: 'bytes32' },
+            { name: 'nameHash', type: 'bytes32' },
+            { name: 'chainId', type: 'uint256' },
+            { name: 'verifyingContract', type: 'address' },
+          ],
+          [DOMAIN_TYPEHASH, nameHash, chainId, PERMIT2_ADDRESS]
+        )
+      )
+    }
+
+    async function freshPermit2Depositor() {
+      const privateKey = keccak256(toHex(`permit2-${Date.now()}-${Math.random()}`)) as Hex
+      const account = privateKeyToAccount(privateKey)
+      // fund with 100 ETH so we can wrap + transact
+      await rpc('anvil_setBalance', [account.address, '0x56BC75E2D63100000'])
+      const walletClient = createWalletClient({
+        account,
+        transport: http(CHAINS.mainnet.rpcUrl),
+      })
+      return { account, privateKey, walletClient }
+    }
+
+    function tokenPermissionsHash(token: Address, amount: bigint): Hex {
+      const TYPEHASH = keccak256(toHex('TokenPermissions(address token,uint256 amount)'))
+      return keccak256(
+        encodeAbiParameters(
+          [
+            { name: 'typehash', type: 'bytes32' },
+            { name: 'token', type: 'address' },
+            { name: 'amount', type: 'uint256' },
+          ],
+          [TYPEHASH, token, amount]
+        )
+      )
+    }
+
+    function compactDepositWitnessHash(lockTag: Hex, recipient: Address): Hex {
+      const TYPEHASH = keccak256(toHex('CompactDeposit(bytes12 lockTag,address recipient)'))
+      return keccak256(
+        encodeAbiParameters(
+          [
+            { name: 'typehash', type: 'bytes32' },
+            { name: 'lockTag', type: 'bytes12' },
+            { name: 'recipient', type: 'address' },
+          ],
+          [TYPEHASH, lockTag, recipient]
+        )
+      )
+    }
+
+    function permitWitnessTransferFromDigest(params: {
+      chainId: bigint
+      token: Address
+      amount: bigint
+      spender: Address
+      nonce: bigint
+      deadline: bigint
+      lockTag: Hex
+      recipient: Address
+    }): Hex {
+      const domainSeparator = permit2DomainSeparator(params.chainId)
+      const permittedHash = tokenPermissionsHash(params.token, params.amount)
+      const witnessHash = compactDepositWitnessHash(params.lockTag, params.recipient)
+      const typehash = keccak256(
+        toHex(
+          'PermitWitnessTransferFrom(TokenPermissions permitted,address spender,uint256 nonce,uint256 deadline,CompactDeposit witness)' +
+            'CompactDeposit(bytes12 lockTag,address recipient)' +
+            'TokenPermissions(address token,uint256 amount)'
+        )
+      )
+      const structHash = keccak256(
+        encodeAbiParameters(
+          [
+            { name: 'typehash', type: 'bytes32' },
+            { name: 'permittedHash', type: 'bytes32' },
+            { name: 'spender', type: 'address' },
+            { name: 'nonce', type: 'uint256' },
+            { name: 'deadline', type: 'uint256' },
+            { name: 'witnessHash', type: 'bytes32' },
+          ],
+          [typehash, permittedHash, params.spender, params.nonce, params.deadline, witnessHash]
+        )
+      )
+      return keccak256(concat(['0x1901', domainSeparator, structHash] as any))
+    }
+
+    function permitWitnessTransferFromDigestWithActivation(params: {
+      chainId: bigint
+      token: Address
+      amount: bigint
+      spender: Address
+      nonce: bigint
+      deadline: bigint
+      activator: Address
+      id: bigint
+      claimHash: Hex
+      compactWitnessTypestring: string
+    }): { digest: Hex; activationHash: Hex; witnessString: string } {
+      const domainSeparator = permit2DomainSeparator(params.chainId)
+
+      // Activation typehash: keccak256("Activation(...)"+Compact witness typestring)
+      const activationTypehash = keccak256(
+        toHex(`Activation(address activator,uint256 id,Compact compact)${params.compactWitnessTypestring}`)
+      )
+
+      const activationHash = keccak256(
+        encodeAbiParameters(
+          [
+            { name: 'typehash', type: 'bytes32' },
+            { name: 'activator', type: 'address' },
+            { name: 'id', type: 'uint256' },
+            { name: 'claimHash', type: 'bytes32' },
+          ],
+          [activationTypehash, params.activator, params.id, params.claimHash]
+        )
+      )
+
+      // witnessTypeString passed to Permit2 (copied from The Compact Permit2DepositAndRegister.t.sol pattern)
+      const witnessString =
+        'Activation witness)Activation(address activator,uint256 id,Compact compact)' +
+        params.compactWitnessTypestring +
+        'TokenPermissions(address token,uint256 amount)'
+
+      const tokenPermHash = tokenPermissionsHash(params.token, params.amount)
+      // Permit2 computes the full typestring as:
+      // "PermitWitnessTransferFrom(..., " + witnessTypeString
+      const typehash = keccak256(
+        toHex(
+          `PermitWitnessTransferFrom(TokenPermissions permitted,address spender,uint256 nonce,uint256 deadline,${witnessString}`
+        )
+      )
+
+      const structHash = keccak256(
+        encodeAbiParameters(
+          [
+            { name: 'typehash', type: 'bytes32' },
+            { name: 'tokenPermissionsHash', type: 'bytes32' },
+            { name: 'spender', type: 'address' },
+            { name: 'nonce', type: 'uint256' },
+            { name: 'deadline', type: 'uint256' },
+            { name: 'activationHash', type: 'bytes32' },
+          ],
+          [typehash, tokenPermHash, params.spender, params.nonce, params.deadline, activationHash]
+        )
+      )
+
+      const digest = keccak256(concat(['0x1901', domainSeparator, structHash] as any))
+      return { digest, activationHash, witnessString }
+    }
+
+    function permitBatchWitnessTransferFromDigest(params: {
+      chainId: bigint
+      permitted: readonly { token: Address; amount: bigint }[]
+      spender: Address
+      nonce: bigint
+      deadline: bigint
+      lockTag: Hex
+      recipient: Address
+    }): Hex {
+      const domainSeparator = permit2DomainSeparator(params.chainId)
+      const witnessHash = compactDepositWitnessHash(params.lockTag, params.recipient)
+      const permittedHashes = params.permitted.map((p) => tokenPermissionsHash(p.token, p.amount))
+      const permittedArrayHash = keccak256(concat(permittedHashes))
+      const typehash = keccak256(
+        toHex(
+          'PermitBatchWitnessTransferFrom(TokenPermissions[] permitted,address spender,uint256 nonce,uint256 deadline,CompactDeposit witness)' +
+            'CompactDeposit(bytes12 lockTag,address recipient)' +
+            'TokenPermissions(address token,uint256 amount)'
+        )
+      )
+      const structHash = keccak256(
+        encodeAbiParameters(
+          [
+            { name: 'typehash', type: 'bytes32' },
+            { name: 'permittedArrayHash', type: 'bytes32' },
+            { name: 'spender', type: 'address' },
+            { name: 'nonce', type: 'uint256' },
+            { name: 'deadline', type: 'uint256' },
+            { name: 'witnessHash', type: 'bytes32' },
+          ],
+          [typehash, permittedArrayHash, params.spender, params.nonce, params.deadline, witnessHash]
+        )
+      )
+      return keccak256(concat(['0x1901', domainSeparator, structHash] as any))
+    }
+
+    it('should deposit ERC20 via Permit2 (using WETH)', async () => {
+      const compactClient = createCompactClient({
+        chainId: CHAINS.mainnet.id,
+        address: CHAINS.mainnet.compactAddress,
+        publicClient: mainnetPublicClient,
+        walletClient: mainnetWalletClient,
+      })
+
+      const {
+        account: depositor,
+        privateKey: depositorPk,
+        walletClient: depositorWallet,
+      } = await freshPermit2Depositor()
+
+      // Wrap ETH into WETH for the sponsor
+      const wrapAmount = parseEther('0.2')
+      const wrapHash = await depositorWallet.writeContract({
+        address: WETH_ADDRESS,
+        abi: wethAbi,
+        functionName: 'deposit',
+        value: wrapAmount,
+      } as any)
+      await mainnetPublicClient.waitForTransactionReceipt({ hash: wrapHash })
+
+      // Approve Permit2 to spend WETH
+      const approveHash = await depositorWallet.writeContract({
+        address: WETH_ADDRESS,
+        abi: erc20Abi,
+        functionName: 'approve',
+        args: [PERMIT2_ADDRESS, wrapAmount],
+      } as any)
+      await mainnetPublicClient.waitForTransactionReceipt({ hash: approveHash })
+
+      const lockTag = encodeLockTag({
+        allocatorId: TEST_ALLOCATOR.allocatorId,
+        scope: Scope.ChainSpecific,
+        resetPeriod: ResetPeriod.OneDay,
+      })
+
+      // Permit2 typed data (PermitWitnessTransferFrom with CompactDeposit witness)
+      const nonce = nextNonce()
+      const deadline = FIXED_EXPIRY
+      const digest = permitWitnessTransferFromDigest({
+        chainId: 1n,
+        token: WETH_ADDRESS,
+        amount: wrapAmount,
+        spender: CHAINS.mainnet.compactAddress,
+        nonce,
+        deadline,
+        lockTag,
+        recipient: depositor.address,
+      })
+      const sigObj = await sign({ hash: digest, privateKey: depositorPk as Hex })
+      const signature = serializeSignature(sigObj)
+
+      const id = await compactClient.sponsor.depositERC20ViaPermit2({
+        permit: { permitted: { token: WETH_ADDRESS, amount: wrapAmount }, nonce, deadline },
+        depositor: depositor.address,
+        lockTag,
+        recipient: depositor.address,
+        signature,
+      } as any)
+
+      // Verify ERC-6909 balance was minted
+      const lockId = encodeLockId(lockTag, WETH_ADDRESS)
+      const bal = await compactClient.view.balanceOf({ account: depositor.address, id: lockId })
+      expect(bal).toBe(wrapAmount)
+
+      // Verify underlying WETH moved into The Compact
+      const compactWeth = await mainnetPublicClient.readContract({
+        address: WETH_ADDRESS,
+        abi: erc20Abi,
+        functionName: 'balanceOf',
+        args: [CHAINS.mainnet.compactAddress],
+      } as any)
+      expect(compactWeth).toBeGreaterThan(0n)
+
+      // function returns id, ensure it matches expectation
+      expect(id.txHash).toMatch(/^0x[0-9a-f]{64}$/)
+    }, 60000)
+
+    it('should batchDeposit via Permit2 (single token entry)', async () => {
+      const compactClient = createCompactClient({
+        chainId: CHAINS.mainnet.id,
+        address: CHAINS.mainnet.compactAddress,
+        publicClient: mainnetPublicClient,
+        walletClient: mainnetWalletClient,
+      })
+
+      const {
+        account: depositor,
+        privateKey: depositorPk,
+        walletClient: depositorWallet,
+      } = await freshPermit2Depositor()
+
+      const amount = parseEther('0.05')
+      // ensure sponsor has at least `amount` WETH
+      const wrapHash = await depositorWallet.writeContract({
+        address: WETH_ADDRESS,
+        abi: wethAbi,
+        functionName: 'deposit',
+        value: amount,
+      } as any)
+      await mainnetPublicClient.waitForTransactionReceipt({ hash: wrapHash })
+
+      // Approve Permit2 to spend WETH
+      const approveHash = await depositorWallet.writeContract({
+        address: WETH_ADDRESS,
+        abi: erc20Abi,
+        functionName: 'approve',
+        args: [PERMIT2_ADDRESS, amount],
+      } as any)
+      await mainnetPublicClient.waitForTransactionReceipt({ hash: approveHash })
+
+      const lockTag = encodeLockTag({
+        allocatorId: TEST_ALLOCATOR.allocatorId,
+        scope: Scope.ChainSpecific,
+        resetPeriod: ResetPeriod.OneDay,
+      })
+      const nonce = nextNonce()
+      const deadline = FIXED_EXPIRY
+
+      const digest = permitBatchWitnessTransferFromDigest({
+        chainId: 1n,
+        permitted: [{ token: WETH_ADDRESS, amount }],
+        spender: CHAINS.mainnet.compactAddress,
+        nonce,
+        deadline,
+        lockTag,
+        recipient: depositor.address,
+      })
+      const sigObj = await sign({ hash: digest, privateKey: depositorPk as Hex })
+      const signature = serializeSignature(sigObj)
+
+      const res = await compactClient.sponsor.batchDepositViaPermit2({
+        depositor: depositor.address,
+        permitted: [{ token: WETH_ADDRESS, amount }],
+        depositDetails: { nonce, deadline, lockTag },
+        recipient: depositor.address,
+        signature,
+      } as any)
+
+      expect(res.txHash).toMatch(/^0x[0-9a-f]{64}$/)
+
+      const lockId = encodeLockId(lockTag, WETH_ADDRESS)
+      const bal = await compactClient.view.balanceOf({ account: depositor.address, id: lockId })
+      expect(bal).toBeGreaterThan(0n)
+    }, 60000)
+
+    it('should depositERC20AndRegisterViaPermit2 (Activation witness) and activate registration', async () => {
+      const compactClient = createCompactClient({
+        chainId: CHAINS.mainnet.id,
+        address: CHAINS.mainnet.compactAddress,
+        publicClient: mainnetPublicClient,
+        walletClient: mainnetWalletClient,
+      })
+
+      const {
+        account: depositor,
+        privateKey: depositorPk,
+        walletClient: depositorWallet,
+      } = await freshPermit2Depositor()
+
+      // Wrap ETH into WETH for the sponsor
+      const amount = parseEther('0.03')
+      const wrapHash = await depositorWallet.writeContract({
+        address: WETH_ADDRESS,
+        abi: wethAbi,
+        functionName: 'deposit',
+        value: amount,
+      } as any)
+      await mainnetPublicClient.waitForTransactionReceipt({ hash: wrapHash })
+
+      // Approve Permit2 to spend WETH
+      const approveHash = await depositorWallet.writeContract({
+        address: WETH_ADDRESS,
+        abi: erc20Abi,
+        functionName: 'approve',
+        args: [PERMIT2_ADDRESS, amount],
+      } as any)
+      await mainnetPublicClient.waitForTransactionReceipt({ hash: approveHash })
+
+      const lockTag = encodeLockTag({
+        allocatorId: TEST_ALLOCATOR.allocatorId,
+        scope: Scope.Multichain,
+        resetPeriod: ResetPeriod.TenMinutes,
+      })
+
+      // Match upstream Permit2DepositAndRegister.t.sol exactly (Activation witness path).
+      const witnessTypestring = 'uint256 witnessArgument'
+      const mandateTypehash = keccak256(toHex('Mandate(uint256 witnessArgument)'))
+      const witnessHash = keccak256(
+        encodeAbiParameters(
+          [
+            { name: 'typehash', type: 'bytes32' },
+            { name: 'witnessArgument', type: 'uint256' },
+          ],
+          [mandateTypehash, 234n]
+        )
+      )
+      const compactWitnessTypestring =
+        'Compact(address arbiter,address sponsor,uint256 nonce,uint256 expires,bytes12 lockTag,address token,uint256 amount,Mandate mandate)Mandate(uint256 witnessArgument)'
+
+      const arbiter = '0x2222222222222222222222222222222222222222' as Address
+      const sponsor = depositor.address
+      const nonce = 0n
+      const deadline = FIXED_EXPIRY
+
+      const id = encodeLockId(lockTag, WETH_ADDRESS)
+      // Sanity: id encoding should match Solidity `uint256(bytes32(lockTag)) | uint256(uint160(token))`
+      expect(id).toBe((BigInt(lockTag) << 160n) | BigInt(WETH_ADDRESS))
+      const compactWithWitnessTypehash = keccak256(toHex(compactWitnessTypestring))
+      const compactClaimHash = keccak256(
+        encodeAbiParameters(
+          [
+            { name: 'typehash', type: 'bytes32' },
+            { name: 'arbiter', type: 'address' },
+            { name: 'sponsor', type: 'address' },
+            { name: 'nonce', type: 'uint256' },
+            { name: 'expires', type: 'uint256' },
+            { name: 'lockTag', type: 'bytes12' },
+            { name: 'token', type: 'address' },
+            { name: 'amount', type: 'uint256' },
+            { name: 'witness', type: 'bytes32' },
+          ],
+          [compactWithWitnessTypehash, arbiter, sponsor, nonce, deadline, lockTag, WETH_ADDRESS, amount, witnessHash]
+        )
+      )
+
+      // Activator = address(1010) used in upstream tests.
+      const activator = '0x00000000000000000000000000000000000003f2' as Address
+      await rpc('anvil_setBalance', [activator, '0x56BC75E2D63100000']) // 100 ETH
+      await rpc('anvil_impersonateAccount', [activator])
+
+      const activationTypehash = keccak256(
+        toHex(`Activation(address activator,uint256 id,Compact compact)${compactWitnessTypestring}`)
+      )
+      const activationHash = keccak256(
+        encodeAbiParameters(
+          [
+            { name: 'typehash', type: 'bytes32' },
+            { name: 'activator', type: 'address' },
+            { name: 'id', type: 'uint256' },
+            { name: 'claimHash', type: 'bytes32' },
+          ],
+          [activationTypehash, activator, id, compactClaimHash]
+        )
+      )
+
+      const permitTypeString =
+        'PermitWitnessTransferFrom(TokenPermissions permitted,address spender,uint256 nonce,uint256 deadline,Activation witness)' +
+        'Activation(address activator,uint256 id,Compact compact)' +
+        compactWitnessTypestring +
+        'TokenPermissions(address token,uint256 amount)'
+      const permitTypehash = keccak256(toHex(permitTypeString))
+      const tokenPermHash = tokenPermissionsHash(WETH_ADDRESS, amount)
+      const permitWitnessHash = keccak256(
+        encodeAbiParameters(
+          [
+            { name: 'typehash', type: 'bytes32' },
+            { name: 'tokenPermissionsHash', type: 'bytes32' },
+            { name: 'spender', type: 'address' },
+            { name: 'nonce', type: 'uint256' },
+            { name: 'deadline', type: 'uint256' },
+            { name: 'activationHash', type: 'bytes32' },
+          ],
+          [permitTypehash, tokenPermHash, CHAINS.mainnet.compactAddress, nonce, deadline, activationHash]
+        )
+      )
+      const digest = keccak256(concat(['0x1901', permit2DomainSeparator(1n), permitWitnessHash] as any))
+
+      const sigObj = await sign({ hash: digest, privateKey: depositorPk as Hex })
+      const signature = serializeSignature(sigObj)
+
+      // Build calldata explicitly (avoids simulateContract request encoding differences for string/bytes offsets).
+      const data = encodeFunctionData({
+        abi: [
+          {
+            type: 'function',
+            name: 'depositERC20AndRegisterViaPermit2',
+            stateMutability: 'nonpayable',
+            inputs: [
+              {
+                name: 'permit',
+                type: 'tuple',
+                components: [
+                  {
+                    name: 'permitted',
+                    type: 'tuple',
+                    components: [
+                      { name: 'token', type: 'address' },
+                      { name: 'amount', type: 'uint256' },
+                    ],
+                  },
+                  { name: 'nonce', type: 'uint256' },
+                  { name: 'deadline', type: 'uint256' },
+                ],
+              },
+              { name: 'depositor', type: 'address' },
+              { name: 'lockTag', type: 'bytes12' },
+              { name: 'claimHash', type: 'bytes32' },
+              { name: 'category', type: 'uint8' },
+              { name: 'witness', type: 'string' },
+              { name: 'signature', type: 'bytes' },
+            ],
+            outputs: [{ type: 'uint256' }],
+          },
+        ] as const,
+        functionName: 'depositERC20AndRegisterViaPermit2',
+        args: [
+          { permitted: { token: WETH_ADDRESS, amount }, nonce, deadline },
+          sponsor,
+          lockTag,
+          compactClaimHash,
+          0,
+          witnessTypestring,
+          signature,
+        ],
+      })
+
+      // Never “yolo” a tx: ensure the *exact calldata* we’re about to send succeeds in a call/sim first.
+      const callResult = await mainnetPublicClient.call({
+        account: activator,
+        to: CHAINS.mainnet.compactAddress,
+        data,
+      } as any)
+      if (!callResult.data) throw new Error('Preflight eth_call returned empty data')
+      const returnedId = decodeFunctionResult({
+        abi: [
+          {
+            type: 'function',
+            name: 'depositERC20AndRegisterViaPermit2',
+            stateMutability: 'nonpayable',
+            inputs: [
+              {
+                name: 'permit',
+                type: 'tuple',
+                components: [
+                  {
+                    name: 'permitted',
+                    type: 'tuple',
+                    components: [
+                      { name: 'token', type: 'address' },
+                      { name: 'amount', type: 'uint256' },
+                    ],
+                  },
+                  { name: 'nonce', type: 'uint256' },
+                  { name: 'deadline', type: 'uint256' },
+                ],
+              },
+              { name: 'depositor', type: 'address' },
+              { name: 'lockTag', type: 'bytes12' },
+              { name: 'claimHash', type: 'bytes32' },
+              { name: 'category', type: 'uint8' },
+              { name: 'witness', type: 'string' },
+              { name: 'signature', type: 'bytes' },
+            ],
+            outputs: [{ type: 'uint256' }],
+          },
+        ] as const,
+        functionName: 'depositERC20AndRegisterViaPermit2',
+        data: callResult.data as Hex,
+      }) as bigint
+      expect(returnedId).toBe(id)
+
+      // Send as the activator (impersonated) using eth_sendTransaction.
+      const txHash = await rpc('eth_sendTransaction', [
+        {
+          from: activator,
+          to: CHAINS.mainnet.compactAddress,
+          data,
+          gas: '0x4c4b40', // 5,000,000
+        },
+      ])
+      const sentTx = await mainnetPublicClient.getTransaction({ hash: txHash })
+      expect(sentTx.from.toLowerCase()).toBe(activator.toLowerCase())
+      const receipt = await mainnetPublicClient.waitForTransactionReceipt({ hash: txHash })
+      expect(receipt.status).toBe('success')
+      await rpc('anvil_stopImpersonatingAccount', [activator])
+
+      // Verify deposit minted ERC-6909 balance and registration is active
+      const bal = await compactClient.view.balanceOf({ account: sponsor, id })
+      expect(bal).toBeGreaterThanOrEqual(amount)
+
+      const isReg = await compactClient.view.isRegistered({
+        sponsor,
+        claimHash: compactClaimHash,
+        typehash: compactWithWitnessTypehash,
+      })
+      expect(isReg).toBe(true)
+
+      expect(activationHash).toMatch(/^0x[0-9a-f]{64}$/)
+    }, 90000)
+  })
+
+  describe('Direct ERC20 + batchDeposit flows (non-Permit2)', () => {
+    it('should deposit ERC20 directly (approve + depositERC20) using WETH', async () => {
+      const compactClient = createCompactClient({
+        chainId: CHAINS.mainnet.id,
+        address: CHAINS.mainnet.compactAddress,
+        publicClient: mainnetPublicClient,
+        walletClient: mainnetWalletClient,
+      })
+
+      const amount = parseEther('0.05')
+      // Wrap ETH into WETH for the sponsor
+      const wrapHash = await mainnetWalletClient.writeContract({
+        address: WETH_ADDRESS,
+        abi: wethAbi,
+        functionName: 'deposit',
+        value: amount,
+      } as any)
+      await mainnetPublicClient.waitForTransactionReceipt({ hash: wrapHash })
+
+      // Approve The Compact to spend WETH
+      const approveHash = await mainnetWalletClient.writeContract({
+        address: WETH_ADDRESS,
+        abi: erc20Abi,
+        functionName: 'approve',
+        args: [CHAINS.mainnet.compactAddress, amount],
+      } as any)
+      await mainnetPublicClient.waitForTransactionReceipt({ hash: approveHash })
+
+      const lockTag = encodeLockTag({
+        allocatorId: TEST_ALLOCATOR.allocatorId,
+        scope: Scope.ChainSpecific,
+        resetPeriod: ResetPeriod.OneDay,
+      })
+
+      const res = await compactClient.sponsor.depositERC20({
+        token: WETH_ADDRESS,
+        lockTag,
+        amount,
+        recipient: sponsorAccount.address,
+      })
+      expect(res.id).toBe(encodeLockId(lockTag, WETH_ADDRESS))
+
+      const bal = await compactClient.view.balanceOf({ account: sponsorAccount.address, id: res.id })
+      expect(bal).toBeGreaterThanOrEqual(amount)
+    }, 60000)
+
+    it('should batchDeposit ERC20 lock ids (approve + batchDeposit) using WETH', async () => {
+      const compactClient = createCompactClient({
+        chainId: CHAINS.mainnet.id,
+        address: CHAINS.mainnet.compactAddress,
+        publicClient: mainnetPublicClient,
+        walletClient: mainnetWalletClient,
+      })
+
+      const amount = parseEther('0.04')
+      // Wrap ETH into WETH for the sponsor
+      const wrapHash = await mainnetWalletClient.writeContract({
+        address: WETH_ADDRESS,
+        abi: wethAbi,
+        functionName: 'deposit',
+        value: amount,
+      } as any)
+      await mainnetPublicClient.waitForTransactionReceipt({ hash: wrapHash })
+
+      // Approve The Compact to spend WETH
+      const approveHash = await mainnetWalletClient.writeContract({
+        address: WETH_ADDRESS,
+        abi: erc20Abi,
+        functionName: 'approve',
+        args: [CHAINS.mainnet.compactAddress, amount],
+      } as any)
+      await mainnetPublicClient.waitForTransactionReceipt({ hash: approveHash })
+
+      const lockTag = encodeLockTag({
+        allocatorId: TEST_ALLOCATOR.allocatorId,
+        scope: Scope.ChainSpecific,
+        resetPeriod: ResetPeriod.OneDay,
+      })
+
+      const id = encodeLockId(lockTag, WETH_ADDRESS)
+      const before = await compactClient.view.balanceOf({ account: sponsorAccount.address, id })
+
+      await compactClient.sponsor.batchDeposit({
+        recipient: sponsorAccount.address,
+        idsAndAmounts: [[id, amount]],
+      })
+
+      const after = await compactClient.view.balanceOf({ account: sponsorAccount.address, id })
+      expect(after - before).toBe(amount)
+    }, 60000)
   })
 
   describe('Compact Creation and Signing', () => {
@@ -799,61 +1912,24 @@ describeE2E('The Compact SDK - End-to-End Tests', () => {
       // Step 3: Sponsor registers the compact hash on-chain
       console.log('\n📋 Step 3: Registering compact hash on-chain...')
 
-      // Compute the hash for registration
-      // This is NOT the EIP-712 hash - it's a simpler hash that includes arbiter and witness
-      // Based on The Compact's Register.t.sol test implementation
-      const { keccak256, toHex, encodeAbiParameters } = await import('viem')
+      // Compute canonical registration inputs (NOT the EIP-712 digest)
+      const { simpleMandate, MandateFields, compactTypehash, registrationCompactClaimHash } = await import('./index')
 
-      // CompactWithWitness typestring (includes mandate/witness)
-      const mandateTypeString = 'Mandate(uint256 witnessArgument)'
-      const mandateTypehash = keccak256(toHex(mandateTypeString))
-
-      const compactWithWitnessTypeString =
-        'Compact(address arbiter,address sponsor,uint256 nonce,uint256 expires,bytes12 lockTag,address token,uint256 amount,Mandate mandate)Mandate(uint256 witnessArgument)'
-      const compactWithWitnessTypehash = keccak256(toHex(compactWithWitnessTypeString))
-      console.log('  ⓘ CompactWithWitness typehash:', compactWithWitnessTypehash)
-
-      // Compute witness hash: keccak256(abi.encode(MANDATE_TYPEHASH, witnessArgument))
-      // For no witness, use witnessArgument = 0
-      const witnessHash = keccak256(
-        encodeAbiParameters(
-          [
-            { name: 'typehash', type: 'bytes32' },
-            { name: 'witnessArgument', type: 'uint256' },
-          ],
-          [mandateTypehash, 0n]
-        )
-      )
-      console.log('  ⓘ Witness hash:', witnessHash)
-
-      // Compute registration hash: keccak256(abi.encode(typehash, arbiter, sponsor, nonce, expires, lockTag, token, amount, witness))
-      const registrationHash = keccak256(
-        encodeAbiParameters(
-          [
-            { name: 'typehash', type: 'bytes32' },
-            { name: 'arbiter', type: 'address' },
-            { name: 'sponsor', type: 'address' },
-            { name: 'nonce', type: 'uint256' },
-            { name: 'expires', type: 'uint256' },
-            { name: 'lockTag', type: 'bytes12' },
-            { name: 'token', type: 'address' },
-            { name: 'amount', type: 'uint256' },
-            { name: 'witness', type: 'bytes32' },
-          ],
-          [
-            compactWithWitnessTypehash,
-            arbiterAccount.address,
-            sponsorAccount.address,
-            nonce,
-            FIXED_EXPIRY,
-            lockTag,
-            nativeToken,
-            depositAmount,
-            witnessHash, // Use computed witness hash
-          ]
-        )
-      )
-      console.log('  ⓘ Registration hash:', registrationHash)
+      const Mandate = simpleMandate<{ witnessArgument: bigint }>([MandateFields.uint256('witnessArgument')])
+      const mandate = { witnessArgument: 0n }
+      const witnessHash = Mandate.hash(mandate)
+      const compactWithWitnessTypehash = compactTypehash(Mandate)
+      const registrationHash = registrationCompactClaimHash({
+        typehash: compactWithWitnessTypehash,
+        arbiter: arbiterAccount.address,
+        sponsor: sponsorAccount.address,
+        nonce,
+        expires: FIXED_EXPIRY,
+        lockTag,
+        token: nativeToken,
+        amount: depositAmount,
+        witness: witnessHash,
+      })
 
       const registerTxHash = await sponsorClient.sponsor.register({
         claimHash: registrationHash,
@@ -1623,8 +2699,62 @@ describeE2E('The Compact SDK - End-to-End Tests', () => {
       console.log('   SDK successfully processed multiple locks with different reset periods in a single batch claim')
     }, 60000)
 
-    // TODO: Add multichain compact test
-    // This would require setting up Unichain public/wallet clients in the test environment
-    // Skipping for now as it requires additional infrastructure setup
+    it('should build and register a multichain compact (canonical multichain registration hash)', async () => {
+      const sponsorClient = createCompactClient({
+        chainId: CHAINS.mainnet.id,
+        address: CHAINS.mainnet.compactAddress,
+        publicClient: mainnetPublicClient,
+        walletClient: mainnetWalletClient,
+      })
+
+      const Mandate = (await import('./builders/mandate')).simpleMandate<{ witnessArgument: bigint }>([
+        { name: 'witnessArgument', type: 'uint256' },
+      ])
+      const mandate = { witnessArgument: 123n }
+
+      const lockTagMainnet = encodeLockTag({
+        allocatorId: TEST_ALLOCATOR.allocatorId,
+        scope: Scope.Multichain,
+        resetPeriod: ResetPeriod.OneDay,
+      })
+      const lockTagBase = encodeLockTag({
+        allocatorId: TEST_ALLOCATOR.allocatorId,
+        scope: Scope.Multichain,
+        resetPeriod: ResetPeriod.OneDay,
+      })
+
+      // Build multichain compact with two elements (mainnet + base), both with same mandate type
+      const built = sponsorClient.sponsor
+        .multichainCompact()
+        .sponsor(sponsorAccount.address)
+        .nonce(nextNonce())
+        .expires(FIXED_EXPIRY)
+        .addElement()
+        .arbiter(arbiterAccount.address)
+        .chainId(1n)
+        .addCommitment({ lockTag: lockTagMainnet, token: zeroAddress, amount: parseEther('0.01') })
+        .witness(Mandate, mandate)
+        .done()
+        .addElement()
+        .arbiter(arbiterAccount.address)
+        .chainId(8453n)
+        .addCommitment({ lockTag: lockTagBase, token: zeroAddress, amount: parseEther('0.02') })
+        .witness(Mandate, mandate)
+        .done()
+        .build()
+
+      expect(built.hash).toMatch(/^0x[0-9a-f]{64}$/)
+      expect(built.struct.elements.length).toBe(2)
+      expect(built.elements.length).toBe(2)
+
+      // Register on mainnet for this sponsor (note: multichain compacts must be registered per-chain if desired)
+      const { claimHash, typehash } = sponsorClient.sponsor.registrationForMultichainCompact(built as any)
+      const txHash = await sponsorClient.sponsor.register({ claimHash, typehash })
+      expect(txHash).toMatch(/^0x[0-9a-f]{64}$/)
+      await mainnetPublicClient.waitForTransactionReceipt({ hash: txHash })
+
+      const active = await sponsorClient.view.isRegistered({ sponsor: sponsorAccount.address, claimHash, typehash })
+      expect(active).toBe(true)
+    }, 60000)
   })
 })

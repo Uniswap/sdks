@@ -7,6 +7,8 @@ import { parseEther, encodeEventTopics, encodeAbiParameters, Address, Hex } from
 
 import { theCompactAbi } from '../abi/theCompact'
 import { simpleMandate } from '../builders/mandate'
+import { encodeLockId } from '../encoding/locks'
+import { compactTypehash, registrationCompactClaimHash } from '../encoding/registration'
 
 import { CompactClientConfig } from './coreClient'
 import { SponsorClient } from './sponsor'
@@ -105,18 +107,18 @@ describe('SponsorClient', () => {
   })
 
   describe('depositNative()', () => {
-    it('should deposit native tokens and extract lock ID from Transfer event', async () => {
+    it('should deposit native tokens, observe Transfer event, and return deterministic lock ID', async () => {
       const txHash = '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890' as Hex
-      const lockId = 123n
       const depositAmount = parseEther('1.0')
+      const expectedId = encodeLockId(lockTag, '0x0000000000000000000000000000000000000000')
 
       mockWalletClient.writeContract.mockResolvedValue(txHash)
 
       // Mock receipt with realistic Transfer event (minting from address(0))
       const transferEvent = createTransferEvent({
-        from: '0x0000000000000000000000000000000000000000', // Minting from zero address
+        from: '0x0000000000000000000000000000000000000000',
         to: sponsorAddress,
-        id: lockId,
+        id: expectedId,
         by: sponsorAddress,
         amount: depositAmount,
       })
@@ -142,7 +144,39 @@ describe('SponsorClient', () => {
       })
 
       expect(result.txHash).toBe(txHash)
-      expect(result.id).toBe(lockId)
+      expect(result.id).toBe(expectedId)
+    })
+
+    it('should throw if observed Transfer id does not match computed id', async () => {
+      const txHash = '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890' as Hex
+      const depositAmount = parseEther('1.0')
+      const expectedId = encodeLockId(lockTag, '0x0000000000000000000000000000000000000000')
+      const wrongId = 123n
+
+      mockWalletClient.writeContract.mockResolvedValue(txHash)
+
+      const transferEvent = createTransferEvent({
+        from: '0x0000000000000000000000000000000000000000',
+        to: sponsorAddress,
+        id: wrongId,
+        by: sponsorAddress,
+        amount: depositAmount,
+      })
+
+      mockPublicClient.waitForTransactionReceipt.mockResolvedValue({
+        logs: [transferEvent],
+      })
+
+      await expect(
+        client.depositNative({
+          lockTag,
+          recipient: sponsorAddress,
+          value: depositAmount,
+        })
+      ).rejects.toThrow('Unexpected lock id in Transfer event (computed != observed)')
+
+      // sanity: our computed id is not the wrong one
+      expect(expectedId).not.toBe(wrongId)
     })
 
     it('should throw if walletClient is missing', async () => {
@@ -189,18 +223,17 @@ describe('SponsorClient', () => {
   })
 
   describe('depositERC20()', () => {
-    it('should deposit ERC20 tokens and extract lock ID from Transfer event', async () => {
+    it('should deposit ERC20 tokens, observe Transfer event, and return deterministic lock ID', async () => {
       const txHash = '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890' as Hex
       const amount = 1000000n
-      const lockId = 456n
+      const expectedId = encodeLockId(lockTag, tokenAddress)
 
       mockWalletClient.writeContract.mockResolvedValue(txHash)
 
-      // Mock receipt with realistic Transfer event (minting from address(0))
       const transferEvent = createTransferEvent({
-        from: '0x0000000000000000000000000000000000000000', // Minting from zero address
+        from: '0x0000000000000000000000000000000000000000',
         to: sponsorAddress,
-        id: lockId,
+        id: expectedId,
         by: sponsorAddress,
         amount,
       })
@@ -226,7 +259,7 @@ describe('SponsorClient', () => {
       })
 
       expect(result.txHash).toBe(txHash)
-      expect(result.id).toBe(lockId)
+      expect(result.id).toBe(expectedId)
     })
 
     it('should throw if walletClient is missing', async () => {
@@ -299,6 +332,55 @@ describe('SponsorClient', () => {
           typehash: '0x2222222222222222222222222222222222222222222222222222222222222222' as Hex,
         })
       ).rejects.toThrow('walletClient is required')
+    })
+  })
+
+  describe('registerCompact()', () => {
+    it('should compute registration inputs and call register()', async () => {
+      const txHash = '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890' as Hex
+      mockWalletClient.writeContract.mockResolvedValue(txHash)
+      mockPublicClient.waitForTransactionReceipt.mockResolvedValue({ logs: [] })
+
+      const mandateType = simpleMandate<{ witnessArgument: bigint }>([{ name: 'witnessArgument', type: 'uint256' }])
+      const mandate = { witnessArgument: 123n }
+
+      const built = {
+        struct: {
+          arbiter: sponsorAddress,
+          sponsor: sponsorAddress,
+          nonce: 1n,
+          expires: 2n,
+          lockTag,
+          token: tokenAddress,
+          amount: 3n,
+        },
+        mandateType,
+        mandate,
+      }
+
+      const typehash = compactTypehash(mandateType)
+      const witness = mandateType.hash(mandate)
+      const expectedClaimHash = registrationCompactClaimHash({
+        typehash,
+        arbiter: built.struct.arbiter,
+        sponsor: built.struct.sponsor,
+        nonce: built.struct.nonce,
+        expires: built.struct.expires,
+        lockTag: built.struct.lockTag,
+        token: built.struct.token,
+        amount: built.struct.amount,
+        witness,
+      })
+
+      const result = await client.registerCompact(built as any)
+
+      expect(mockWalletClient.writeContract).toHaveBeenCalledWith(
+        expect.objectContaining({
+          functionName: 'register',
+          args: [expectedClaimHash, typehash],
+        })
+      )
+      expect(result).toBe(txHash)
     })
   })
 

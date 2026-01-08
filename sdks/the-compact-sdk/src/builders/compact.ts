@@ -87,6 +87,15 @@ export interface BuiltBatchCompact<TMandate extends object | undefined = undefin
 export interface BuiltMultichainCompact {
   /** The multichain compact struct ready to be submitted on-chain */
   struct: MultichainCompact
+  /**
+   * Per-element build outputs including the mandate and mandate type.
+   * This is useful for canonical registration hashing helpers which require witness hashes.
+   */
+  elements: Array<{
+    element: MultichainElement
+    mandate?: any
+    mandateType?: MandateType<any>
+  }>
   /** EIP-712 hash of the multichain compact for signature verification */
   hash: Hex
   /** Complete EIP-712 typed data structure for signing */
@@ -953,6 +962,7 @@ export class MultichainCompactBuilder {
 
     return {
       struct,
+      elements: builtElements,
       hash,
       typedData,
     }
