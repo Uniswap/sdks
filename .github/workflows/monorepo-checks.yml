@@ -39,7 +39,6 @@ jobs:
       - name: ✅ Checkout
         uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
         with:
-          submodules: "recursive"
           fetch-depth: 2
 
       - name: 💽 Node and Caching
@@ -64,11 +63,6 @@ jobs:
 
       - name: 🏗  Build
         run: yarn g:build
-
-      - name: 🪨 Install Foundry
-        uses: foundry-rs/foundry-toolchain@82dee4ba654bd2146511f85f0d013af94670c4de # v1
-        with:
-          version: nightly
 
       - name: 🧪 Testing
         uses: nick-fields/retry@7d4a37704547a311dbb66ebdf5b23ec19374a767

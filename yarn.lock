@@ -2463,37 +2463,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/permit2-sdk@workspace:sdks/compat/permit2-sdk":
-  version: 0.0.0-use.local
-  resolution: "@uniswap/permit2-sdk@workspace:sdks/compat/permit2-sdk"
-  dependencies:
-    "@uniswap/sdk": "workspace:*"
-    tsup: ^8.0.0
-    typescript: ^5.3.0
-  languageName: unknown
-  linkType: soft
-
-"@uniswap/router-sdk@workspace:sdks/compat/router-sdk":
-  version: 0.0.0-use.local
-  resolution: "@uniswap/router-sdk@workspace:sdks/compat/router-sdk"
-  dependencies:
-    "@uniswap/sdk": "workspace:*"
-    tsup: ^8.0.0
-    typescript: ^5.3.0
-  languageName: unknown
-  linkType: soft
-
-"@uniswap/sdk-core@workspace:sdks/compat/sdk-core":
-  version: 0.0.0-use.local
-  resolution: "@uniswap/sdk-core@workspace:sdks/compat/sdk-core"
-  dependencies:
-    "@uniswap/sdk": "workspace:*"
-    tsup: ^8.0.0
-    typescript: ^5.3.0
-  languageName: unknown
-  linkType: soft
-
-"@uniswap/sdk@workspace:*, @uniswap/sdk@workspace:sdks/sdk":
+"@uniswap/sdk@workspace:sdks/sdk":
   version: 0.0.0-use.local
   resolution: "@uniswap/sdk@workspace:sdks/sdk"
   dependencies:
@@ -2534,16 +2504,6 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@uniswap/smart-wallet-sdk@workspace:sdks/compat/smart-wallet-sdk":
-  version: 0.0.0-use.local
-  resolution: "@uniswap/smart-wallet-sdk@workspace:sdks/compat/smart-wallet-sdk"
-  dependencies:
-    "@uniswap/sdk": "workspace:*"
-    tsup: ^8.0.0
-    typescript: ^5.3.0
-  languageName: unknown
-  linkType: soft
-
 "@uniswap/swap-router-contracts@npm:^1.3.0":
   version: 1.3.1
   resolution: "@uniswap/swap-router-contracts@npm:1.3.1"
@@ -2557,26 +2517,6 @@ __metadata:
   checksum: cf2e94464077d02af0041ef0971a0b54194970b57bd04bcf114f898724604750fe09fcd12ccc50309e3bb22ea9a513405f226b9ea236e5b53edb252e5cedef8b
   languageName: node
   linkType: hard
-
-"@uniswap/uniswapx-sdk@workspace:sdks/compat/uniswapx-sdk":
-  version: 0.0.0-use.local
-  resolution: "@uniswap/uniswapx-sdk@workspace:sdks/compat/uniswapx-sdk"
-  dependencies:
-    "@uniswap/sdk": "workspace:*"
-    tsup: ^8.0.0
-    typescript: ^5.3.0
-  languageName: unknown
-  linkType: soft
-
-"@uniswap/universal-router-sdk@workspace:sdks/compat/universal-router-sdk":
-  version: 0.0.0-use.local
-  resolution: "@uniswap/universal-router-sdk@workspace:sdks/compat/universal-router-sdk"
-  dependencies:
-    "@uniswap/sdk": "workspace:*"
-    tsup: ^8.0.0
-    typescript: ^5.3.0
-  languageName: unknown
-  linkType: soft
 
 "@uniswap/universal-router@npm:2.0.0-beta.2":
   version: 2.0.0-beta.2
@@ -2595,16 +2535,6 @@ __metadata:
   checksum: eaa118fe45eac2e80b7468547ce2cde12bd3c8157555d2e40e0462a788c9506c6295247b511382da85e44a89ad92aff7bb3433b23bfbd2eeea23942ecd46e979
   languageName: node
   linkType: hard
-
-"@uniswap/v2-sdk@workspace:sdks/compat/v2-sdk":
-  version: 0.0.0-use.local
-  resolution: "@uniswap/v2-sdk@workspace:sdks/compat/v2-sdk"
-  dependencies:
-    "@uniswap/sdk": "workspace:*"
-    tsup: ^8.0.0
-    typescript: ^5.3.0
-  languageName: unknown
-  linkType: soft
 
 "@uniswap/v3-core@npm:1.0.0":
   version: 1.0.0
@@ -2633,16 +2563,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v3-sdk@workspace:sdks/compat/v3-sdk":
-  version: 0.0.0-use.local
-  resolution: "@uniswap/v3-sdk@workspace:sdks/compat/v3-sdk"
-  dependencies:
-    "@uniswap/sdk": "workspace:*"
-    tsup: ^8.0.0
-    typescript: ^5.3.0
-  languageName: unknown
-  linkType: soft
-
 "@uniswap/v3-staker@npm:1.0.0":
   version: 1.0.0
   resolution: "@uniswap/v3-staker@npm:1.0.0"
@@ -2653,16 +2573,6 @@ __metadata:
   checksum: 5a68e59f33d4761956ad735c8ce5ea6e566076bd260ea0a0bb4b3a0db237719e39f21a22eb0a5a231141efdf0154bfe03f690612d632898f33192b4442c888b3
   languageName: node
   linkType: hard
-
-"@uniswap/v4-sdk@workspace:sdks/compat/v4-sdk":
-  version: 0.0.0-use.local
-  resolution: "@uniswap/v4-sdk@workspace:sdks/compat/v4-sdk"
-  dependencies:
-    "@uniswap/sdk": "workspace:*"
-    tsup: ^8.0.0
-    typescript: ^5.3.0
-  languageName: unknown
-  linkType: soft
 
 "@vitest/expect@npm:1.6.1":
   version: 1.6.1

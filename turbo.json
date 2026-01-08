@@ -3,12 +3,12 @@
   "pipeline": {
     "build": {
       "dependsOn": ["^build"],
-      "inputs": ["src/**/*.ts", "tsconfig.json", "tsup.config.ts", "package.json"],
+      "inputs": ["src/**/*.ts", "src/**/*.json", "tsconfig.json", "tsup.config.ts", "package.json"],
       "outputs": ["dist/**"]
     },
     "test": {
       "dependsOn": ["build"],
-      "inputs": ["src/**/*.ts", "src/**/*.test.ts"]
+      "inputs": ["src/**/*.ts", "src/**/*.test.ts", "vitest.config.ts"]
     },
     "lint": {
       "inputs": ["src/**/*.ts"]
@@ -16,6 +16,10 @@
     "typecheck": {
       "dependsOn": ["^build"],
       "inputs": ["src/**/*.ts", "tsconfig.json"]
+    },
+    "release": {
+      "dependsOn": ["build", "test"],
+      "cache": false
     }
   }
 }

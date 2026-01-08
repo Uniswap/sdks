@@ -7,9 +7,16 @@ on:
     paths:
       - 'sdks/sdk/**'
       - '.github/workflows/unified-sdk-release.yaml'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run in dry-run mode (no actual publish)'
+        required: false
+        default: 'false'
+        type: boolean
 
 jobs:
-  release:
+  release-sdk:
     name: Release @uniswap/sdk
     environment:
       name: production
@@ -18,6 +25,9 @@ jobs:
     permissions:
       contents: write
       id-token: write
+    outputs:
+      new_release_published: ${{ steps.release.outputs.new_release_published }}
+      new_release_version: ${{ steps.release.outputs.new_release_version }}
     steps:
       - uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db # v0.8.3
         with:
@@ -43,11 +53,31 @@ jobs:
 
       - name: Run tests
         run: yarn workspace @uniswap/sdk test
+        env:
+          FORK_URL: ${{ secrets.FORK_URL }}
+          FORK_URL_8453: ${{ secrets.FORK_URL_8453 }}
+
+      - name: Release (Dry Run)
+        if: ${{ github.event.inputs.dry_run == 'true' }}
+        working-directory: sdks/sdk
+        run: npx semantic-release --dry-run
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Release
+        id: release
+        if: ${{ github.event.inputs.dry_run != 'true' }}
         working-directory: sdks/sdk
         run: npx semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # Note: Compat packages (@uniswap/sdk-core, @uniswap/v2-sdk, etc.) are published
+  # manually via the compat-packages-release.yaml workflow when needed.
+  # They only require updates when:
+  # 1. The main SDK has a breaking change (major version bump)
+  # 2. The compat package wrapper code needs changes

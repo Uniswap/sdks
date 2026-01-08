@@ -1,3 +1,4 @@
+import { vi } from 'vitest'
 import { ChainId } from '../core'
 import { decodeFunctionData } from 'viem'
 
@@ -84,7 +85,7 @@ describe('SmartWallet', () => {
 
     it('throws an error if the mode is not supported', () => {
       // mock getModeFromOptions
-      jest.spyOn(SmartWallet, 'getModeFromOptions').mockReturnValue('invalid' as ModeType)
+      vi.spyOn(SmartWallet, 'getModeFromOptions').mockReturnValue('invalid' as ModeType)
       const calls: Call[] = [
         {
           to: '0x1111111111111111111111111111111111111111',
@@ -94,7 +95,7 @@ describe('SmartWallet', () => {
       ]
       expect(() => SmartWallet.encodeERC7821BatchedCall(calls)).toThrow()
 
-      jest.restoreAllMocks()
+      vi.restoreAllMocks()
     })
   })
 

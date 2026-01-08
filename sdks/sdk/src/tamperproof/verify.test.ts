@@ -1,9 +1,14 @@
-// Move mock before imports
-const mockQuery = jest.fn();
-jest.mock("dohjs", () => ({
-  DohResolver: jest.fn().mockImplementation(() => ({
-    query: mockQuery,
-  })),
+import { vi, Mock } from 'vitest'
+
+// Hoist the mock function so it's available before vi.mock runs
+const mockQuery = vi.hoisted(() => vi.fn());
+
+vi.mock("dohjs", () => ({
+  default: {
+    DohResolver: vi.fn().mockImplementation(() => ({
+      query: mockQuery,
+    })),
+  },
 }));
 
 import { verify, verifyAsyncDns, verifyAsyncJson, PREFIX } from "./verify";
@@ -72,7 +77,7 @@ describe("verify.ts", () => {
       });
 
       // Mock the JSON fetch to avoid making real HTTP requests
-      global.fetch = jest.fn().mockResolvedValue({
+      global.fetch = vi.fn().mockResolvedValue({
         json: () =>
           Promise.resolve({
             publicKeys: [
@@ -108,7 +113,7 @@ describe("verify.ts", () => {
       });
 
       // Mock the JSON fetch
-      global.fetch = jest.fn().mockResolvedValue({
+      global.fetch = vi.fn().mockResolvedValue({
         json: () =>
           Promise.resolve({
             publicKeys: [
@@ -141,7 +146,7 @@ describe("verify.ts", () => {
         answers: [{ data: buffer }],
       });
 
-      global.fetch = jest.fn().mockResolvedValue({
+      global.fetch = vi.fn().mockResolvedValue({
         json: () =>
           Promise.resolve({
             publicKeys: [
@@ -197,7 +202,7 @@ describe("verify.ts", () => {
         ],
       });
 
-      global.fetch = jest.fn().mockResolvedValue({
+      global.fetch = vi.fn().mockResolvedValue({
         json: () =>
           Promise.resolve({
             publicKeys: [
@@ -232,7 +237,7 @@ describe("verify.ts", () => {
         answers: [{ data: `${PREFIX}//api v1/ƙeys?bad#frag` }],
       });
 
-      global.fetch = jest.fn().mockResolvedValue({
+      global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
         headers: {
@@ -250,7 +255,7 @@ describe("verify.ts", () => {
       ).rejects.toThrow();
 
       expect(global.fetch).toHaveBeenCalled();
-      const call = (global.fetch as jest.Mock).mock.calls[0] as unknown[];
+      const call = (global.fetch as Mock).mock.calls[0] as unknown[];
       const urlArg = call[0] as URL;
       expect(urlArg).toBeInstanceOf(URL);
       // Leading slashes removed, segments encoded
@@ -265,7 +270,7 @@ describe("verify.ts", () => {
         answers: [{ data: `${PREFIX}${longPath}` }],
       });
 
-      global.fetch = jest.fn();
+      global.fetch = vi.fn();
 
       await expect(
         verifyAsyncDns("data", "signature", "example.com", "1")
@@ -300,7 +305,7 @@ describe("verify.ts", () => {
     });
 
     it("throws if HTTP status is not ok", async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      global.fetch = vi.fn().mockResolvedValue({
         ok: false,
         status: 404,
         headers: { get: () => null },
@@ -313,7 +318,7 @@ describe("verify.ts", () => {
     });
 
     it("throws if Content-Type is not application/json", async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
         headers: { get: () => "text/plain" },
@@ -326,7 +331,7 @@ describe("verify.ts", () => {
     });
 
     it("throws if key id is not found", async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
         headers: {
@@ -346,7 +351,7 @@ describe("verify.ts", () => {
     });
 
     it("throws if duplicate key ids are found", async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
         headers: {
@@ -374,7 +379,7 @@ describe("verify.ts", () => {
     });
 
     it("throws if algorithm is unsupported", async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
         headers: {
@@ -411,7 +416,7 @@ describe("verify.ts", () => {
       const spki = await webcrypto.subtle.exportKey("spki", publicKey);
       const spkiHex = toHex(spki);
 
-      global.fetch = jest.fn().mockResolvedValue({
+      global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
         headers: {
@@ -448,7 +453,7 @@ describe("verify.ts", () => {
       const spki = await webcrypto.subtle.exportKey("spki", publicKey);
       const spkiHex = toHex(spki);
 
-      global.fetch = jest.fn().mockResolvedValue({
+      global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
         headers: {
@@ -467,7 +472,7 @@ describe("verify.ts", () => {
     });
 
     it("throws if manifest exceeds maximum size", async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
         headers: {
@@ -497,7 +502,7 @@ describe("verify.ts", () => {
       );
       const signatureHex = toHex(signature);
 
-      global.fetch = jest.fn().mockResolvedValue({
+      global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
         headers: {
@@ -513,7 +518,7 @@ describe("verify.ts", () => {
       await verifyAsyncJson(data, signatureHex, httpsUrl, "1");
 
       expect(global.fetch).toHaveBeenCalled();
-      const call = (global.fetch as jest.Mock).mock.calls[0] as unknown[];
+      const call = (global.fetch as Mock).mock.calls[0] as unknown[];
       const options = call[1] as RequestInit;
       expect(options.redirect).toBe("error");
       expect(options.headers).toEqual({ Accept: "application/json" });

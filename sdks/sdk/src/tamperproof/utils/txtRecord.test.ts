@@ -1,3 +1,4 @@
+import { vi } from "vitest";
 import { parseTxtRecord, processTxtRecordData } from "./txtRecord";
 
 describe("txtRecord utils", () => {
@@ -176,7 +177,7 @@ describe("txtRecord utils", () => {
 
     it("should call toString() on unknown types", () => {
       const mockData = {
-        toString: jest.fn().mockReturnValue("mocked-string"),
+        toString: vi.fn().mockReturnValue("mocked-string"),
       };
 
       const result = processTxtRecordData(mockData);
