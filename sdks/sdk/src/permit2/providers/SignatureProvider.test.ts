@@ -3,6 +3,10 @@ import { PermitTransferFrom, PermitBatchTransferFrom } from '../signatureTransfe
 import { BigNumber } from '@ethersproject/bignumber'
 import { ethers } from 'ethers'
 
+// Skip network-dependent tests when no RPC URL is available
+const RPC_URL = process.env.FORK_URL
+const describeIfRpc = RPC_URL ? describe : describe.skip
+
 describe('SignatureProvider', () => {
   let provider: ethers.providers.JsonRpcProvider
   let permit2Address: string
@@ -13,16 +17,18 @@ describe('SignatureProvider', () => {
 
   beforeEach(() => {
     // Setup test environment
-    const forkUrl = process.env.FORK_URL || 'http://localhost:8545'
-    provider = new ethers.providers.JsonRpcProvider(forkUrl)
     permit2Address = '0x000000000022D473030F116dDEE9F6B43aC78BA3' // Mainnet Permit2 address
     owner = '0x1234567890123456789012345678901234567890'
     spender = '0x0987654321098765432109876543210987654321'
     token = '0xA0b86a33E6441b8C4C8C8C8C8C8C8C8C8C8C8C8C'
-    signatureProvider = new SignatureProvider(provider, permit2Address)
+    if (RPC_URL) {
+      provider = new ethers.providers.JsonRpcProvider(RPC_URL)
+      signatureProvider = new SignatureProvider(provider, permit2Address)
+    }
   })
 
-  describe('isNonceUsed', () => {
+  // Network-dependent tests - only run when FORK_URL is provided
+  describeIfRpc('isNonceUsed', () => {
     it('should check if a nonce has been used', async () => {
       const nonce = BigNumber.from(123)
 
@@ -56,7 +62,7 @@ describe('SignatureProvider', () => {
     })
   })
 
-  describe('isExpired', () => {
+  describeIfRpc('isExpired', () => {
     it('should check if a deadline has expired', async () => {
       const futureDeadline = BigNumber.from(Math.floor(Date.now() / 1000) + 3600) // 1 hour from now
       const pastDeadline = BigNumber.from(Math.floor(Date.now() / 1000) - 3600) // 1 hour ago
@@ -71,7 +77,7 @@ describe('SignatureProvider', () => {
     })
   })
 
-  describe('isPermitValid', () => {
+  describeIfRpc('isPermitValid', () => {
     it('should validate a single permit', async () => {
       const permit: PermitTransferFrom = {
         permitted: {
@@ -124,7 +130,7 @@ describe('SignatureProvider', () => {
     })
   })
 
-  describe('validatePermit', () => {
+  describeIfRpc('validatePermit', () => {
     it('should return detailed validation results', async () => {
       const permit: PermitTransferFrom = {
         permitted: {
@@ -147,7 +153,7 @@ describe('SignatureProvider', () => {
     })
   })
 
-  describe('getNonceBitmap', () => {
+  describeIfRpc('getNonceBitmap', () => {
     it('should get the nonce bitmap for an owner', async () => {
       const wordPos = BigNumber.from(0)
 
@@ -207,7 +213,7 @@ describe('SignatureProvider', () => {
     })
   })
 
-  describe('batchCheckNonces', () => {
+  describeIfRpc('batchCheckNonces', () => {
     it('should check multiple nonces efficiently', async () => {
       const nonces = [BigNumber.from(1), BigNumber.from(2), BigNumber.from(256), BigNumber.from(257)]
 
@@ -242,7 +248,7 @@ describe('SignatureProvider', () => {
     })
   })
 
-  describe('getCurrentTimestamp', () => {
+  describeIfRpc('getCurrentTimestamp', () => {
     it('should get the current block timestamp', async () => {
       const currentTime = Math.floor(Date.now() / 1000)
       const timestamp = await signatureProvider.getCurrentTimestamp()
@@ -256,7 +262,7 @@ describe('SignatureProvider', () => {
     })
   })
 
-  describe('Integration Tests', () => {
+  describeIfRpc('Integration Tests', () => {
     it('should work together to validate a complete permit flow', async () => {
       const nonce = BigNumber.from(789)
       const deadline = BigNumber.from(Math.floor(Date.now() / 1000) + 7200) // 2 hours from now
