@@ -1,17 +1,12 @@
-import { SignatureLike } from "@ethersproject/bytes";
-import {
-  PermitTransferFrom,
-  PermitTransferFromData,
-  SignatureTransfer,
-  Witness,
-} from '../../permit2';
-import { BigNumber, ethers } from "ethers";
-import { keccak256, toUtf8Bytes } from "ethers/lib/utils";
+import { SignatureLike } from '@ethersproject/bytes'
+import { PermitTransferFrom, PermitTransferFromData, SignatureTransfer, Witness } from '../../permit2'
+import { BigNumber, ethers } from 'ethers'
+import { keccak256, toUtf8Bytes } from 'ethers/lib/utils'
 
-import { BPS, PERMIT2_MAPPING } from "../constants";
-import { MissingConfiguration } from "../errors";
-import { ResolvedUniswapXOrder } from "../utils/OrderQuoter";
-import { getDecayedAmount } from "../utils/dutchDecay";
+import { BPS, PERMIT2_MAPPING } from '../constants'
+import { MissingConfiguration } from '../errors'
+import { ResolvedUniswapXOrder } from '../utils/OrderQuoter'
+import { getDecayedAmount } from '../utils/dutchDecay'
 
 import {
   BlockOverrides,
@@ -22,90 +17,87 @@ import {
   OffChainOrder,
   OrderInfo,
   OrderResolutionOptions,
-} from "./types";
-import { CustomOrderValidation, parseValidation } from "./validation";
+} from './types'
+import { CustomOrderValidation, parseValidation } from './validation'
 
 export function id(text: string): string {
-  return keccak256(toUtf8Bytes(text));
+  return keccak256(toUtf8Bytes(text))
 }
 
 export type DutchOrderInfo = OrderInfo & {
-  decayStartTime: number;
-  decayEndTime: number;
-  exclusiveFiller: string;
-  exclusivityOverrideBps: BigNumber;
-  input: DutchInput;
-  outputs: DutchOutput[];
-};
+  decayStartTime: number
+  decayEndTime: number
+  exclusiveFiller: string
+  exclusivityOverrideBps: BigNumber
+  input: DutchInput
+  outputs: DutchOutput[]
+}
 
-const STRICT_EXCLUSIVITY = BigNumber.from(0);
+const STRICT_EXCLUSIVITY = BigNumber.from(0)
 
-export type DutchOrderInfoJSON = Omit<
-  DutchOrderInfo,
-  "nonce" | "input" | "outputs" | "exclusivityOverrideBps"
-> & {
-  nonce: string;
-  exclusivityOverrideBps: string;
-  input: DutchInputJSON;
-  outputs: DutchOutputJSON[];
-};
+export type DutchOrderInfoJSON = Omit<DutchOrderInfo, 'nonce' | 'input' | 'outputs' | 'exclusivityOverrideBps'> & {
+  nonce: string
+  exclusivityOverrideBps: string
+  input: DutchInputJSON
+  outputs: DutchOutputJSON[]
+}
 
 type WitnessInfo = {
-  info: OrderInfo;
-  decayStartTime: number;
-  decayEndTime: number;
-  exclusiveFiller: string;
-  exclusivityOverrideBps: BigNumber;
-  inputToken: string;
-  inputStartAmount: BigNumber;
-  inputEndAmount: BigNumber;
-  outputs: DutchOutput[];
-};
+  info: OrderInfo
+  decayStartTime: number
+  decayEndTime: number
+  exclusiveFiller: string
+  exclusivityOverrideBps: BigNumber
+  inputToken: string
+  inputStartAmount: BigNumber
+  inputEndAmount: BigNumber
+  outputs: DutchOutput[]
+}
 
 const DUTCH_ORDER_TYPES = {
   ExclusiveDutchOrder: [
-    { name: "info", type: "OrderInfo" },
-    { name: "decayStartTime", type: "uint256" },
-    { name: "decayEndTime", type: "uint256" },
-    { name: "exclusiveFiller", type: "address" },
-    { name: "exclusivityOverrideBps", type: "uint256" },
-    { name: "inputToken", type: "address" },
-    { name: "inputStartAmount", type: "uint256" },
-    { name: "inputEndAmount", type: "uint256" },
-    { name: "outputs", type: "DutchOutput[]" },
+    { name: 'info', type: 'OrderInfo' },
+    { name: 'decayStartTime', type: 'uint256' },
+    { name: 'decayEndTime', type: 'uint256' },
+    { name: 'exclusiveFiller', type: 'address' },
+    { name: 'exclusivityOverrideBps', type: 'uint256' },
+    { name: 'inputToken', type: 'address' },
+    { name: 'inputStartAmount', type: 'uint256' },
+    { name: 'inputEndAmount', type: 'uint256' },
+    { name: 'outputs', type: 'DutchOutput[]' },
   ],
   OrderInfo: [
-    { name: "reactor", type: "address" },
-    { name: "swapper", type: "address" },
-    { name: "nonce", type: "uint256" },
-    { name: "deadline", type: "uint256" },
-    { name: "additionalValidationContract", type: "address" },
-    { name: "additionalValidationData", type: "bytes" },
+    { name: 'reactor', type: 'address' },
+    { name: 'swapper', type: 'address' },
+    { name: 'nonce', type: 'uint256' },
+    { name: 'deadline', type: 'uint256' },
+    { name: 'additionalValidationContract', type: 'address' },
+    { name: 'additionalValidationData', type: 'bytes' },
   ],
   DutchOutput: [
-    { name: "token", type: "address" },
-    { name: "startAmount", type: "uint256" },
-    { name: "endAmount", type: "uint256" },
-    { name: "recipient", type: "address" },
+    { name: 'token', type: 'address' },
+    { name: 'startAmount', type: 'uint256' },
+    { name: 'endAmount', type: 'uint256' },
+    { name: 'recipient', type: 'address' },
   ],
-};
+}
 
 const DUTCH_ORDER_ABI = [
-  "tuple(" +
+  'tuple(' +
     [
-      "tuple(address,address,uint256,uint256,address,bytes)",
-      "uint256",
-      "uint256",
-      "address",
-      "uint256",
-      "tuple(address,uint256,uint256)",
-      "tuple(address,uint256,uint256,address)[]",
-    ].join(",") +
-    ")",
-];
+      'tuple(address,address,uint256,uint256,address,bytes)',
+      'uint256',
+      'uint256',
+      'address',
+      'uint256',
+      'tuple(address,uint256,uint256)',
+      'tuple(address,uint256,uint256,address)[]',
+    ].join(',') +
+    ')',
+]
 
 export class DutchOrder implements OffChainOrder {
-  public permit2Address: string;
+  public permit2Address: string
 
   constructor(
     public readonly info: DutchOrderInfo,
@@ -113,19 +105,15 @@ export class DutchOrder implements OffChainOrder {
     readonly _permit2Address?: string
   ) {
     if (_permit2Address) {
-      this.permit2Address = _permit2Address;
+      this.permit2Address = _permit2Address
     } else if (PERMIT2_MAPPING[chainId]) {
-      this.permit2Address = PERMIT2_MAPPING[chainId];
+      this.permit2Address = PERMIT2_MAPPING[chainId]
     } else {
-      throw new MissingConfiguration("permit2", chainId.toString());
+      throw new MissingConfiguration('permit2', chainId.toString())
     }
   }
 
-  static fromJSON(
-    json: DutchOrderInfoJSON,
-    chainId: number,
-    _permit2Address?: string
-  ): DutchOrder {
+  static fromJSON(json: DutchOrderInfoJSON, chainId: number, _permit2Address?: string): DutchOrder {
     return new DutchOrder(
       {
         ...json,
@@ -145,22 +133,15 @@ export class DutchOrder implements OffChainOrder {
       },
       chainId,
       _permit2Address
-    );
+    )
   }
 
   static parse(encoded: string, chainId: number, permit2?: string): DutchOrder {
-    const abiCoder = new ethers.utils.AbiCoder();
-    const decoded = abiCoder.decode(DUTCH_ORDER_ABI, encoded);
+    const abiCoder = new ethers.utils.AbiCoder()
+    const decoded = abiCoder.decode(DUTCH_ORDER_ABI, encoded)
     const [
       [
-        [
-          reactor,
-          swapper,
-          nonce,
-          deadline,
-          additionalValidationContract,
-          additionalValidationData,
-        ],
+        [reactor, swapper, nonce, deadline, additionalValidationContract, additionalValidationData],
         decayStartTime,
         decayEndTime,
         exclusiveFiller,
@@ -168,7 +149,7 @@ export class DutchOrder implements OffChainOrder {
         [inputToken, inputStartAmount, inputEndAmount],
         outputs,
       ],
-    ] = decoded;
+    ] = decoded
     return new DutchOrder(
       {
         reactor,
@@ -187,30 +168,24 @@ export class DutchOrder implements OffChainOrder {
           endAmount: inputEndAmount,
         },
         outputs: outputs.map(
-          ([token, startAmount, endAmount, recipient]: [
-            string,
-            number,
-            number,
-            string,
-            boolean
-          ]) => {
+          ([token, startAmount, endAmount, recipient]: [string, number, number, string, boolean]) => {
             return {
               token,
               startAmount,
               endAmount,
               recipient,
-            };
+            }
           }
         ),
       },
       chainId,
       permit2
-    );
+    )
   }
 
   toJSON(): DutchOrderInfoJSON & {
-    permit2Address: string;
-    chainId: number;
+    permit2Address: string
+    chainId: number
   } {
     return {
       chainId: this.chainId,
@@ -236,7 +211,7 @@ export class DutchOrder implements OffChainOrder {
         endAmount: output.endAmount.toString(),
         recipient: output.recipient,
       })),
-    };
+    }
   }
 
   /**
@@ -250,7 +225,7 @@ export class DutchOrder implements OffChainOrder {
    * @inheritdoc order
    */
   serialize(): string {
-    const abiCoder = new ethers.utils.AbiCoder();
+    const abiCoder = new ethers.utils.AbiCoder()
     return abiCoder.encode(DUTCH_ORDER_ABI, [
       [
         [
@@ -265,19 +240,10 @@ export class DutchOrder implements OffChainOrder {
         this.info.decayEndTime,
         this.info.exclusiveFiller,
         this.info.exclusivityOverrideBps,
-        [
-          this.info.input.token,
-          this.info.input.startAmount,
-          this.info.input.endAmount,
-        ],
-        this.info.outputs.map((output) => [
-          output.token,
-          output.startAmount,
-          output.endAmount,
-          output.recipient,
-        ]),
+        [this.info.input.token, this.info.input.startAmount, this.info.input.endAmount],
+        this.info.outputs.map((output) => [output.token, output.startAmount, output.endAmount, output.recipient]),
       ],
-    ]);
+    ])
   }
 
   /**
@@ -286,15 +252,10 @@ export class DutchOrder implements OffChainOrder {
   getSigner(signature: SignatureLike): string {
     return ethers.utils.computeAddress(
       ethers.utils.recoverPublicKey(
-        SignatureTransfer.hash(
-          this.toPermit(),
-          this.permit2Address,
-          this.chainId,
-          this.witness()
-        ),
+        SignatureTransfer.hash(this.toPermit(), this.permit2Address, this.chainId, this.witness()),
         signature
       )
-    );
+    )
   }
 
   /**
@@ -306,16 +267,14 @@ export class DutchOrder implements OffChainOrder {
       this.permit2Address,
       this.chainId,
       this.witness()
-    ) as PermitTransferFromData;
+    ) as PermitTransferFromData
   }
 
   /**
    * @inheritDoc OrderInterface
    */
   hash(): string {
-    return ethers.utils._TypedDataEncoder
-      .from(DUTCH_ORDER_TYPES)
-      .hash(this.witnessInfo());
+    return ethers.utils._TypedDataEncoder.from(DUTCH_ORDER_TYPES).hash(this.witnessInfo())
   }
 
   /**
@@ -326,7 +285,7 @@ export class DutchOrder implements OffChainOrder {
     const useOverride =
       this.info.exclusiveFiller !== ethers.constants.AddressZero &&
       options.timestamp <= this.info.decayStartTime &&
-      options.filler !== this.info.exclusiveFiller;
+      options.filler !== this.info.exclusiveFiller
     return {
       input: {
         token: this.info.input.token,
@@ -349,24 +308,22 @@ export class DutchOrder implements OffChainOrder {
             endAmount: output.endAmount,
           },
           options.timestamp
-        );
-        let amount = baseAmount;
+        )
+        let amount = baseAmount
         // strict exclusivity means the order cant be resolved filled at any price
         if (useOverride) {
           if (this.info.exclusivityOverrideBps.eq(STRICT_EXCLUSIVITY)) {
-            amount = ethers.constants.MaxUint256;
+            amount = ethers.constants.MaxUint256
           } else {
-            amount = baseAmount
-              .mul(this.info.exclusivityOverrideBps.add(BPS))
-              .div(BPS);
+            amount = baseAmount.mul(this.info.exclusivityOverrideBps.add(BPS)).div(BPS)
           }
         }
         return {
           token: output.token,
           amount,
-        };
+        }
       }),
-    };
+    }
   }
 
   /**
@@ -374,7 +331,7 @@ export class DutchOrder implements OffChainOrder {
    * @return The parsed validation data for the order
    */
   get validation(): CustomOrderValidation {
-    return parseValidation(this.info);
+    return parseValidation(this.info)
   }
 
   private toPermit(): PermitTransferFrom {
@@ -386,7 +343,7 @@ export class DutchOrder implements OffChainOrder {
       spender: this.info.reactor,
       nonce: this.info.nonce,
       deadline: this.info.deadline,
-    };
+    }
   }
 
   private witnessInfo(): WitnessInfo {
@@ -407,15 +364,15 @@ export class DutchOrder implements OffChainOrder {
       inputStartAmount: this.info.input.startAmount,
       inputEndAmount: this.info.input.endAmount,
       outputs: this.info.outputs,
-    };
+    }
   }
 
   private witness(): Witness {
     return {
       witness: this.witnessInfo(),
       // TODO: remove "Limit"
-      witnessTypeName: "ExclusiveDutchOrder",
+      witnessTypeName: 'ExclusiveDutchOrder',
       witnessType: DUTCH_ORDER_TYPES,
-    };
+    }
   }
 }

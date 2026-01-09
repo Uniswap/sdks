@@ -31,7 +31,7 @@ export abstract class Payments {
   public static encodeUnwrapWETH9(amountMinimum: JSBI, recipient: string, feeOptions?: FeeOptions): string {
     recipient = validateAndParseAddress(recipient)
 
-    if (!!feeOptions) {
+    if (feeOptions) {
       const feeBips = this.encodeFeeBips(feeOptions.fee)
       const feeRecipient: string = validateAndParseAddress(feeOptions.recipient)
 
@@ -54,7 +54,7 @@ export abstract class Payments {
   ): string {
     recipient = validateAndParseAddress(recipient)
 
-    if (!!feeOptions) {
+    if (feeOptions) {
       const feeBips = this.encodeFeeBips(feeOptions.fee)
       const feeRecipient: string = validateAndParseAddress(feeOptions.recipient)
 

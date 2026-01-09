@@ -63,7 +63,10 @@ export class UniswapTrade implements Command {
   readonly tradeType: RouterActionType = RouterActionType.UniswapTrade
   readonly payerIsUser: boolean
 
-  constructor(public trade: RouterTrade<Currency, Currency, TradeType>, public options: SwapOptions) {
+  constructor(
+    public trade: RouterTrade<Currency, Currency, TradeType>,
+    public options: SwapOptions
+  ) {
     if (!!options.fee && !!options.flatFee) throw new Error('Only one fee option permitted')
 
     if (this.inputRequiresWrap || this.inputRequiresUnwrap || this.options.useRouterBalance) {
@@ -279,7 +282,7 @@ export class UniswapTrade implements Command {
 
       // If there is a fee, that percentage is sent to the fee recipient
       // In the case where ETH is the output currency, the fee is taken in WETH (for gas reasons)
-      if (!!this.options.fee) {
+      if (this.options.fee) {
         const feeBips = encodeFeeBips(this.options.fee.fee)
         planner.addCommand(CommandType.PAY_PORTION, [pathOutputCurrencyAddress, this.options.fee.recipient, feeBips])
 
@@ -292,7 +295,7 @@ export class UniswapTrade implements Command {
 
       // If there is a flat fee, that absolute amount is sent to the fee recipient
       // In the case where ETH is the output currency, the fee is taken in WETH (for gas reasons)
-      if (!!this.options.flatFee) {
+      if (this.options.flatFee) {
         const feeAmount = this.options.flatFee.amount
         if (minimumAmountOut.lt(feeAmount)) throw new Error('Flat fee amount greater than minimumAmountOut')
 
@@ -444,7 +447,7 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
 
   v4Planner.addTake(
     pathOutputForTake,
-    routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient ?? SENDER_AS_RECIPIENT
+    routerMustCustody ? ROUTER_AS_RECIPIENT : (options.recipient ?? SENDER_AS_RECIPIENT)
   )
   planner.addCommand(CommandType.V4_SWAP, [v4Planner.finalize()])
 }
@@ -462,7 +465,7 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
   const route = swap.route as MixedRoute<TInput, TOutput>
   const inputAmount = swap.inputAmount
   const outputAmount = swap.outputAmount
-  const tradeRecipient = routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient ?? SENDER_AS_RECIPIENT
+  const tradeRecipient = routerMustCustody ? ROUTER_AS_RECIPIENT : (options.recipient ?? SENDER_AS_RECIPIENT)
 
   // single hop, so it can be reduced to plain swap logic for one protocol version
   if (route.pools.length === 1) {

@@ -1,10 +1,10 @@
-import { BigNumber } from "ethers";
+import { BigNumber } from 'ethers'
 
-import { getDecayedAmount } from "./dutchDecay";
+import { getDecayedAmount } from './dutchDecay'
 
-describe("Dutch Decay", () => {
-  it("Returns endAmount if decay is over", () => {
-    const endAmount = BigNumber.from("100000000");
+describe('Dutch Decay', () => {
+  it('Returns endAmount if decay is over', () => {
+    const endAmount = BigNumber.from('100000000')
     expect(
       getDecayedAmount(
         {
@@ -15,11 +15,11 @@ describe("Dutch Decay", () => {
         },
         11
       )
-    ).toEqual(endAmount);
-  });
+    ).toEqual(endAmount)
+  })
 
-  it("Returns endAmount if eq to decayEndTime", () => {
-    const endAmount = BigNumber.from("100000000");
+  it('Returns endAmount if eq to decayEndTime', () => {
+    const endAmount = BigNumber.from('100000000')
     expect(
       getDecayedAmount(
         {
@@ -30,11 +30,11 @@ describe("Dutch Decay", () => {
         },
         10
       )
-    ).toEqual(endAmount);
-  });
+    ).toEqual(endAmount)
+  })
 
-  it("Returns startAmount if decay hasnt started", () => {
-    const startAmount = BigNumber.from("100000000");
+  it('Returns startAmount if decay hasnt started', () => {
+    const startAmount = BigNumber.from('100000000')
     expect(
       getDecayedAmount(
         {
@@ -45,11 +45,11 @@ describe("Dutch Decay", () => {
         },
         9
       )
-    ).toEqual(startAmount);
-  });
+    ).toEqual(startAmount)
+  })
 
-  it("Returns startAmount if eq to decayStartTime", () => {
-    const startAmount = BigNumber.from("100000000");
+  it('Returns startAmount if eq to decayStartTime', () => {
+    const startAmount = BigNumber.from('100000000')
     expect(
       getDecayedAmount(
         {
@@ -60,11 +60,11 @@ describe("Dutch Decay", () => {
         },
         10
       )
-    ).toEqual(startAmount);
-  });
+    ).toEqual(startAmount)
+  })
 
-  it("Decays linearly upwards", () => {
-    const startAmount = BigNumber.from("100000000");
+  it('Decays linearly upwards', () => {
+    const startAmount = BigNumber.from('100000000')
     expect(
       getDecayedAmount(
         {
@@ -75,11 +75,11 @@ describe("Dutch Decay", () => {
         },
         15
       )
-    ).toEqual(startAmount.mul(3).div(2));
-  });
+    ).toEqual(startAmount.mul(3).div(2))
+  })
 
-  it("Decays linearly downwrads", () => {
-    const endAmount = BigNumber.from("100000000");
+  it('Decays linearly downwrads', () => {
+    const endAmount = BigNumber.from('100000000')
     expect(
       getDecayedAmount(
         {
@@ -90,6 +90,6 @@ describe("Dutch Decay", () => {
         },
         15
       )
-    ).toEqual(endAmount.mul(3).div(2));
-  });
-});
+    ).toEqual(endAmount.mul(3).div(2))
+  })
+})

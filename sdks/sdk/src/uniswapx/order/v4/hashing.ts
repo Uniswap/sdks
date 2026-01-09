@@ -1,4 +1,4 @@
-import { BigNumber, ethers } from "ethers";
+import { BigNumber, ethers } from 'ethers'
 
 import {
   CosignedHybridOrderInfo,
@@ -11,81 +11,71 @@ import {
   OrderInfoV4,
   OutputAllocation,
   PrivateIntent,
-} from "./types";
+} from './types'
 
 /**
  * EIP-712 type string for OrderInfoV4
  */
 export const ORDER_INFO_V4_TYPE_STRING =
-  "OrderInfo(" +
-  "address reactor," +
-  "address swapper," +
-  "uint256 nonce," +
-  "uint256 deadline," +
-  "address preExecutionHook," +
-  "bytes preExecutionHookData," +
-  "address postExecutionHook," +
-  "bytes postExecutionHookData," +
-  "address auctionResolver)";
+  'OrderInfo(' +
+  'address reactor,' +
+  'address swapper,' +
+  'uint256 nonce,' +
+  'uint256 deadline,' +
+  'address preExecutionHook,' +
+  'bytes preExecutionHookData,' +
+  'address postExecutionHook,' +
+  'bytes postExecutionHookData,' +
+  'address auctionResolver)'
 
 /**
  * EIP-712 type hash for OrderInfoV4
  */
-export const ORDER_INFO_V4_TYPE_HASH = ethers.utils.keccak256(
-  ethers.utils.toUtf8Bytes(ORDER_INFO_V4_TYPE_STRING)
-);
+export const ORDER_INFO_V4_TYPE_HASH = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(ORDER_INFO_V4_TYPE_STRING))
 
 /**
  * EIP-712 type string for HybridInput
  */
-const HYBRID_INPUT_TYPE_STRING = "HybridInput(address token,uint256 maxAmount)";
+const HYBRID_INPUT_TYPE_STRING = 'HybridInput(address token,uint256 maxAmount)'
 
 /**
  * EIP-712 type hash for HybridInput
  */
-const HYBRID_INPUT_TYPE_HASH = ethers.utils.keccak256(
-  ethers.utils.toUtf8Bytes(HYBRID_INPUT_TYPE_STRING)
-);
+const HYBRID_INPUT_TYPE_HASH = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(HYBRID_INPUT_TYPE_STRING))
 
 /**
  * EIP-712 type string for HybridOutput
  */
-const HYBRID_OUTPUT_TYPE_STRING =
-  "HybridOutput(address token,uint256 minAmount,address recipient)";
+const HYBRID_OUTPUT_TYPE_STRING = 'HybridOutput(address token,uint256 minAmount,address recipient)'
 
 /**
  * EIP-712 type hash for HybridOutput
  */
-const HYBRID_OUTPUT_TYPE_HASH = ethers.utils.keccak256(
-  ethers.utils.toUtf8Bytes(HYBRID_OUTPUT_TYPE_STRING)
-);
+const HYBRID_OUTPUT_TYPE_HASH = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(HYBRID_OUTPUT_TYPE_STRING))
 
 /**
  * EIP-712 type string for HybridOrder (matches HybridOrderLib)
  */
 const HYBRID_ORDER_TYPE_STRING = [
-  "HybridOrder(",
-  "OrderInfo info,",
-  "address cosigner,",
-  "HybridInput input,",
-  "HybridOutput[] outputs,",
-  "uint256 auctionStartBlock,",
-  "uint256 baselinePriorityFee,",
-  "uint256 scalingFactor,",
-  "uint256[] priceCurve)",
-].join("");
+  'HybridOrder(',
+  'OrderInfo info,',
+  'address cosigner,',
+  'HybridInput input,',
+  'HybridOutput[] outputs,',
+  'uint256 auctionStartBlock,',
+  'uint256 baselinePriorityFee,',
+  'uint256 scalingFactor,',
+  'uint256[] priceCurve)',
+].join('')
 
 /**
  * EIP-712 type hash for HybridOrder
  */
 const HYBRID_ORDER_TYPE_HASH = ethers.utils.keccak256(
   ethers.utils.toUtf8Bytes(
-    HYBRID_ORDER_TYPE_STRING +
-      HYBRID_INPUT_TYPE_STRING +
-      HYBRID_OUTPUT_TYPE_STRING +
-      ORDER_INFO_V4_TYPE_STRING
+    HYBRID_ORDER_TYPE_STRING + HYBRID_INPUT_TYPE_STRING + HYBRID_OUTPUT_TYPE_STRING + ORDER_INFO_V4_TYPE_STRING
   )
-);
+)
 
 /**
  * EIP-712 witness types for HybridOrder (for Permit2 signature)
@@ -93,36 +83,36 @@ const HYBRID_ORDER_TYPE_HASH = ethers.utils.keccak256(
  */
 export const HYBRID_ORDER_TYPES = {
   HybridInput: [
-    { name: "token", type: "address" },
-    { name: "maxAmount", type: "uint256" },
+    { name: 'token', type: 'address' },
+    { name: 'maxAmount', type: 'uint256' },
   ],
   HybridOrder: [
-    { name: "info", type: "OrderInfo" },
-    { name: "cosigner", type: "address" },
-    { name: "input", type: "HybridInput" },
-    { name: "outputs", type: "HybridOutput[]" },
-    { name: "auctionStartBlock", type: "uint256" },
-    { name: "baselinePriorityFee", type: "uint256" },
-    { name: "scalingFactor", type: "uint256" },
-    { name: "priceCurve", type: "uint256[]" },
+    { name: 'info', type: 'OrderInfo' },
+    { name: 'cosigner', type: 'address' },
+    { name: 'input', type: 'HybridInput' },
+    { name: 'outputs', type: 'HybridOutput[]' },
+    { name: 'auctionStartBlock', type: 'uint256' },
+    { name: 'baselinePriorityFee', type: 'uint256' },
+    { name: 'scalingFactor', type: 'uint256' },
+    { name: 'priceCurve', type: 'uint256[]' },
   ],
   HybridOutput: [
-    { name: "token", type: "address" },
-    { name: "minAmount", type: "uint256" },
-    { name: "recipient", type: "address" },
+    { name: 'token', type: 'address' },
+    { name: 'minAmount', type: 'uint256' },
+    { name: 'recipient', type: 'address' },
   ],
   OrderInfo: [
-    { name: "reactor", type: "address" },
-    { name: "swapper", type: "address" },
-    { name: "nonce", type: "uint256" },
-    { name: "deadline", type: "uint256" },
-    { name: "preExecutionHook", type: "address" },
-    { name: "preExecutionHookData", type: "bytes" },
-    { name: "postExecutionHook", type: "address" },
-    { name: "postExecutionHookData", type: "bytes" },
-    { name: "auctionResolver", type: "address" },
+    { name: 'reactor', type: 'address' },
+    { name: 'swapper', type: 'address' },
+    { name: 'nonce', type: 'uint256' },
+    { name: 'deadline', type: 'uint256' },
+    { name: 'preExecutionHook', type: 'address' },
+    { name: 'preExecutionHookData', type: 'bytes' },
+    { name: 'postExecutionHook', type: 'address' },
+    { name: 'postExecutionHookData', type: 'bytes' },
+    { name: 'auctionResolver', type: 'address' },
   ],
-};
+}
 
 /**
  * Hash OrderInfoV4 structure
@@ -132,18 +122,7 @@ export const HYBRID_ORDER_TYPES = {
 export function hashOrderInfoV4(info: OrderInfoV4): string {
   return ethers.utils.keccak256(
     ethers.utils.defaultAbiCoder.encode(
-      [
-        "bytes32",
-        "address",
-        "address",
-        "uint256",
-        "uint256",
-        "address",
-        "bytes32",
-        "address",
-        "bytes32",
-        "address",
-      ],
+      ['bytes32', 'address', 'address', 'uint256', 'uint256', 'address', 'bytes32', 'address', 'bytes32', 'address'],
       [
         ORDER_INFO_V4_TYPE_HASH,
         info.reactor,
@@ -157,7 +136,7 @@ export function hashOrderInfoV4(info: OrderInfoV4): string {
         info.auctionResolver,
       ]
     )
-  );
+  )
 }
 
 /**
@@ -166,10 +145,10 @@ export function hashOrderInfoV4(info: OrderInfoV4): string {
 function hashHybridInput(input: HybridInput): string {
   return ethers.utils.keccak256(
     ethers.utils.defaultAbiCoder.encode(
-      ["bytes32", "address", "uint256"],
+      ['bytes32', 'address', 'uint256'],
       [HYBRID_INPUT_TYPE_HASH, input.token, input.maxAmount]
     )
-  );
+  )
 }
 
 /**
@@ -178,15 +157,10 @@ function hashHybridInput(input: HybridInput): string {
 function hashHybridOutput(output: HybridOutput): string {
   return ethers.utils.keccak256(
     ethers.utils.defaultAbiCoder.encode(
-      ["bytes32", "address", "uint256", "address"],
-      [
-        HYBRID_OUTPUT_TYPE_HASH,
-        output.token,
-        output.minAmount,
-        output.recipient,
-      ]
+      ['bytes32', 'address', 'uint256', 'address'],
+      [HYBRID_OUTPUT_TYPE_HASH, output.token, output.minAmount, output.recipient]
     )
-  );
+  )
 }
 
 /**
@@ -194,12 +168,12 @@ function hashHybridOutput(output: HybridOutput): string {
  * Uses encodePacked to match contract's gas-optimized hashing
  */
 function hashHybridOutputs(outputs: HybridOutput[]): string {
-  const hashes = outputs.map(hashHybridOutput);
+  const hashes = outputs.map(hashHybridOutput)
   if (hashes.length === 0) {
-    return ethers.utils.keccak256("0x");
+    return ethers.utils.keccak256('0x')
   }
-  const types = new Array(hashes.length).fill("bytes32");
-  return ethers.utils.keccak256(ethers.utils.solidityPack(types, hashes));
+  const types = new Array(hashes.length).fill('bytes32')
+  return ethers.utils.keccak256(ethers.utils.solidityPack(types, hashes))
 }
 
 /**
@@ -207,32 +181,22 @@ function hashHybridOutputs(outputs: HybridOutput[]): string {
  */
 function hashPriceCurve(curve: BigNumber[]): string {
   if (curve.length === 0) {
-    return ethers.utils.keccak256("0x");
+    return ethers.utils.keccak256('0x')
   }
-  const types = new Array(curve.length).fill("uint256");
-  const values = curve.map((value) => BigNumber.from(value));
-  return ethers.utils.keccak256(ethers.utils.solidityPack(types, values));
+  const types = new Array(curve.length).fill('uint256')
+  const values = curve.map((value) => BigNumber.from(value))
+  return ethers.utils.keccak256(ethers.utils.solidityPack(types, values))
 }
 
 export function hashHybridOrder(order: CosignedHybridOrderInfo): string {
-  const infoHash = hashOrderInfoV4(order);
-  const inputHash = hashHybridInput(order.input);
-  const outputsHash = hashHybridOutputs(order.outputs);
-  const priceCurveHash = hashPriceCurve(order.priceCurve);
+  const infoHash = hashOrderInfoV4(order)
+  const inputHash = hashHybridInput(order.input)
+  const outputsHash = hashHybridOutputs(order.outputs)
+  const priceCurveHash = hashPriceCurve(order.priceCurve)
 
   return ethers.utils.keccak256(
     ethers.utils.defaultAbiCoder.encode(
-      [
-        "bytes32",
-        "bytes32",
-        "address",
-        "bytes32",
-        "bytes32",
-        "uint256",
-        "uint256",
-        "uint256",
-        "bytes32",
-      ],
+      ['bytes32', 'bytes32', 'address', 'bytes32', 'bytes32', 'uint256', 'uint256', 'uint256', 'bytes32'],
       [
         HYBRID_ORDER_TYPE_HASH,
         infoHash,
@@ -245,64 +209,45 @@ export function hashHybridOrder(order: CosignedHybridOrderInfo): string {
         priceCurveHash,
       ]
     )
-  );
+  )
 }
 
 /**
  * Compute cosigner digest (orderHash || chainId || cosignerData encoding)
  */
-export function hashHybridCosignerData(
-  orderHash: string,
-  cosignerData: HybridCosignerData,
-  chainId: number
-): string {
+export function hashHybridCosignerData(orderHash: string, cosignerData: HybridCosignerData, chainId: number): string {
   const encodedCosignerData = ethers.utils.defaultAbiCoder.encode(
-    ["tuple(uint256 auctionTargetBlock,uint256[] supplementalPriceCurve)"],
-    [
-      [
-        cosignerData.auctionTargetBlock,
-        cosignerData.supplementalPriceCurve.map((value) =>
-          BigNumber.from(value)
-        ),
-      ],
-    ]
-  );
+    ['tuple(uint256 auctionTargetBlock,uint256[] supplementalPriceCurve)'],
+    [[cosignerData.auctionTargetBlock, cosignerData.supplementalPriceCurve.map((value) => BigNumber.from(value))]]
+  )
 
   return ethers.utils.keccak256(
-    ethers.utils.solidityPack(
-      ["bytes32", "uint256", "bytes"],
-      [orderHash, chainId, encodedCosignerData]
-    )
-  );
+    ethers.utils.solidityPack(['bytes32', 'uint256', 'bytes'], [orderHash, chainId, encodedCosignerData])
+  )
 }
 
 /**
  * EIP-712 type string for FeedInfo
  */
-const FEED_INFO_TYPE =
-  "FeedInfo(bytes32 feedId,address feed_address,string feedType)";
+const FEED_INFO_TYPE = 'FeedInfo(bytes32 feedId,address feed_address,string feedType)'
 
 /**
  * EIP-712 type hash for FeedInfo
  */
-const FEED_INFO_TYPE_HASH = ethers.utils.keccak256(
-  ethers.utils.toUtf8Bytes(FEED_INFO_TYPE)
-);
+const FEED_INFO_TYPE_HASH = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(FEED_INFO_TYPE))
 
 /**
  * EIP-712 type string for PrivateIntent
  */
 const PRIVATE_INTENT_TYPE =
-  "PrivateIntent(uint256 totalAmount,uint256 exactFrequency," +
-  "uint256 numChunks,bytes32 salt,FeedInfo[] oracleFeeds)" +
-  FEED_INFO_TYPE;
+  'PrivateIntent(uint256 totalAmount,uint256 exactFrequency,' +
+  'uint256 numChunks,bytes32 salt,FeedInfo[] oracleFeeds)' +
+  FEED_INFO_TYPE
 
 /**
  * EIP-712 type hash for PrivateIntent
  */
-const PRIVATE_INTENT_TYPE_HASH = ethers.utils.keccak256(
-  ethers.utils.toUtf8Bytes(PRIVATE_INTENT_TYPE)
-);
+const PRIVATE_INTENT_TYPE_HASH = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(PRIVATE_INTENT_TYPE))
 
 /**
  * Hash FeedInfo structure
@@ -312,10 +257,10 @@ const PRIVATE_INTENT_TYPE_HASH = ethers.utils.keccak256(
 function hashFeedInfo(feed: FeedInfo): string {
   return ethers.utils.keccak256(
     ethers.utils.defaultAbiCoder.encode(
-      ["bytes32", "bytes32", "address", "string"],
+      ['bytes32', 'bytes32', 'address', 'string'],
       [FEED_INFO_TYPE_HASH, feed.feedId, feed.feed_address, feed.feedType]
     )
-  );
+  )
 }
 
 /**
@@ -324,10 +269,8 @@ function hashFeedInfo(feed: FeedInfo): string {
  * @returns The keccak256 hash of the array
  */
 function hashFeedInfoArray(feeds: FeedInfo[]): string {
-  const hashes = feeds.map(hashFeedInfo);
-  return ethers.utils.keccak256(
-    ethers.utils.defaultAbiCoder.encode(["bytes32[]"], [hashes])
-  );
+  const hashes = feeds.map(hashFeedInfo)
+  return ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(['bytes32[]'], [hashes]))
 }
 
 /**
@@ -336,11 +279,11 @@ function hashFeedInfoArray(feeds: FeedInfo[]): string {
  * @returns The keccak256 hash
  */
 export function hashPrivateIntent(privateIntent: PrivateIntent): string {
-  const oracleFeedsHash = hashFeedInfoArray(privateIntent.oracleFeeds);
+  const oracleFeedsHash = hashFeedInfoArray(privateIntent.oracleFeeds)
 
   return ethers.utils.keccak256(
     ethers.utils.defaultAbiCoder.encode(
-      ["bytes32", "uint256", "uint256", "uint256", "bytes32", "bytes32"],
+      ['bytes32', 'uint256', 'uint256', 'uint256', 'bytes32', 'bytes32'],
       [
         PRIVATE_INTENT_TYPE_HASH,
         privateIntent.totalAmount,
@@ -350,21 +293,18 @@ export function hashPrivateIntent(privateIntent: PrivateIntent): string {
         oracleFeedsHash,
       ]
     )
-  );
+  )
 }
 
 /**
  * EIP-712 type string for OutputAllocation
  */
-const OUTPUT_ALLOCATION_TYPE =
-  "OutputAllocation(address recipient,uint16 basisPoints)";
+const OUTPUT_ALLOCATION_TYPE = 'OutputAllocation(address recipient,uint16 basisPoints)'
 
 /**
  * EIP-712 type hash for OutputAllocation
  */
-const OUTPUT_ALLOCATION_TYPE_HASH = ethers.utils.keccak256(
-  ethers.utils.toUtf8Bytes(OUTPUT_ALLOCATION_TYPE)
-);
+const OUTPUT_ALLOCATION_TYPE_HASH = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(OUTPUT_ALLOCATION_TYPE))
 
 /**
  * Hash OutputAllocation structure
@@ -374,14 +314,10 @@ const OUTPUT_ALLOCATION_TYPE_HASH = ethers.utils.keccak256(
 function hashOutputAllocation(allocation: OutputAllocation): string {
   return ethers.utils.keccak256(
     ethers.utils.defaultAbiCoder.encode(
-      ["bytes32", "address", "uint16"],
-      [
-        OUTPUT_ALLOCATION_TYPE_HASH,
-        allocation.recipient,
-        allocation.basisPoints,
-      ]
+      ['bytes32', 'address', 'uint16'],
+      [OUTPUT_ALLOCATION_TYPE_HASH, allocation.recipient, allocation.basisPoints]
     )
-  );
+  )
 }
 
 /**
@@ -390,42 +326,38 @@ function hashOutputAllocation(allocation: OutputAllocation): string {
  * @returns The keccak256 hash of the array
  */
 function hashOutputAllocations(allocations: OutputAllocation[]): string {
-  const hashes = allocations.map(hashOutputAllocation);
-  return ethers.utils.keccak256(
-    ethers.utils.defaultAbiCoder.encode(["bytes32[]"], [hashes])
-  );
+  const hashes = allocations.map(hashOutputAllocation)
+  return ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(['bytes32[]'], [hashes]))
 }
 
 /**
  * EIP-712 type string for DCAIntent
  */
 const DCA_INTENT_TYPE =
-  "DCAIntent(" +
-  "address swapper," +
-  "uint256 nonce," +
-  "uint256 chainId," +
-  "address hookAddress," +
-  "bool isExactIn," +
-  "address inputToken," +
-  "address outputToken," +
-  "address cosigner," +
-  "uint256 minPeriod," +
-  "uint256 maxPeriod," +
-  "uint256 minChunkSize," +
-  "uint256 maxChunkSize," +
-  "uint256 minPrice," +
-  "uint256 deadline," +
-  "OutputAllocation[] outputAllocations," +
-  "PrivateIntent privateIntent)" +
+  'DCAIntent(' +
+  'address swapper,' +
+  'uint256 nonce,' +
+  'uint256 chainId,' +
+  'address hookAddress,' +
+  'bool isExactIn,' +
+  'address inputToken,' +
+  'address outputToken,' +
+  'address cosigner,' +
+  'uint256 minPeriod,' +
+  'uint256 maxPeriod,' +
+  'uint256 minChunkSize,' +
+  'uint256 maxChunkSize,' +
+  'uint256 minPrice,' +
+  'uint256 deadline,' +
+  'OutputAllocation[] outputAllocations,' +
+  'PrivateIntent privateIntent)' +
   OUTPUT_ALLOCATION_TYPE +
-  PRIVATE_INTENT_TYPE;
+  PRIVATE_INTENT_TYPE
 
 /**
  * EIP-712 type hash for DCAIntent
  */
-const DCA_INTENT_TYPE_HASH = ethers.utils.keccak256(
-  ethers.utils.toUtf8Bytes(DCA_INTENT_TYPE)
-);
+const DCA_INTENT_TYPE_HASH = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(DCA_INTENT_TYPE))
 
 /**
  * Hash DCAIntent structure
@@ -434,32 +366,29 @@ const DCA_INTENT_TYPE_HASH = ethers.utils.keccak256(
  * @param privateIntentHash The hash of the PrivateIntent
  * @returns The keccak256 hash
  */
-export function hashDCAIntent(
-  intent: DCAIntent,
-  privateIntentHash: string
-): string {
-  const outputAllocationsHash = hashOutputAllocations(intent.outputAllocations);
+export function hashDCAIntent(intent: DCAIntent, privateIntentHash: string): string {
+  const outputAllocationsHash = hashOutputAllocations(intent.outputAllocations)
 
   return ethers.utils.keccak256(
     ethers.utils.defaultAbiCoder.encode(
       [
-        "bytes32",
-        "address",
-        "uint256",
-        "uint256",
-        "address",
-        "bool",
-        "address",
-        "address",
-        "address",
-        "uint256",
-        "uint256",
-        "uint256",
-        "uint256",
-        "uint256",
-        "uint256",
-        "bytes32",
-        "bytes32",
+        'bytes32',
+        'address',
+        'uint256',
+        'uint256',
+        'address',
+        'bool',
+        'address',
+        'address',
+        'address',
+        'uint256',
+        'uint256',
+        'uint256',
+        'uint256',
+        'uint256',
+        'uint256',
+        'bytes32',
+        'bytes32',
       ],
       [
         DCA_INTENT_TYPE_HASH,
@@ -481,33 +410,29 @@ export function hashDCAIntent(
         privateIntentHash,
       ]
     )
-  );
+  )
 }
 
 /**
  * EIP-712 type string for DCAOrderCosignerData
  */
 const DCA_COSIGNER_DATA_TYPE =
-  "DCAOrderCosignerData(address swapper,uint96 nonce,uint160 execAmount,uint96 orderNonce,uint160 limitAmount)";
+  'DCAOrderCosignerData(address swapper,uint96 nonce,uint160 execAmount,uint96 orderNonce,uint160 limitAmount)'
 
 /**
  * EIP-712 type hash for DCAOrderCosignerData
  */
-export const DCA_COSIGNER_DATA_TYPE_HASH = ethers.utils.keccak256(
-  ethers.utils.toUtf8Bytes(DCA_COSIGNER_DATA_TYPE)
-);
+export const DCA_COSIGNER_DATA_TYPE_HASH = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(DCA_COSIGNER_DATA_TYPE))
 
 /**
  * Hash DCAOrderCosignerData structure
  * @param cosignerData The DCAOrderCosignerData to hash
  * @returns The keccak256 hash
  */
-export function hashDCACosignerData(
-  cosignerData: DCAOrderCosignerData
-): string {
+export function hashDCACosignerData(cosignerData: DCAOrderCosignerData): string {
   return ethers.utils.keccak256(
     ethers.utils.defaultAbiCoder.encode(
-      ["bytes32", "address", "uint96", "uint160", "uint96", "uint160"],
+      ['bytes32', 'address', 'uint96', 'uint160', 'uint96', 'uint160'],
       [
         DCA_COSIGNER_DATA_TYPE_HASH,
         cosignerData.swapper,
@@ -517,7 +442,7 @@ export function hashDCACosignerData(
         cosignerData.limitAmount,
       ]
     )
-  );
+  )
 }
 
 /**
@@ -525,37 +450,37 @@ export function hashDCACosignerData(
  */
 export const DCA_INTENT_TYPES = {
   DCAIntent: [
-    { name: "swapper", type: "address" },
-    { name: "nonce", type: "uint256" },
-    { name: "chainId", type: "uint256" },
-    { name: "hookAddress", type: "address" },
-    { name: "isExactIn", type: "bool" },
-    { name: "inputToken", type: "address" },
-    { name: "outputToken", type: "address" },
-    { name: "cosigner", type: "address" },
-    { name: "minPeriod", type: "uint256" },
-    { name: "maxPeriod", type: "uint256" },
-    { name: "minChunkSize", type: "uint256" },
-    { name: "maxChunkSize", type: "uint256" },
-    { name: "minPrice", type: "uint256" },
-    { name: "deadline", type: "uint256" },
-    { name: "outputAllocations", type: "OutputAllocation[]" },
-    { name: "privateIntent", type: "PrivateIntent" },
+    { name: 'swapper', type: 'address' },
+    { name: 'nonce', type: 'uint256' },
+    { name: 'chainId', type: 'uint256' },
+    { name: 'hookAddress', type: 'address' },
+    { name: 'isExactIn', type: 'bool' },
+    { name: 'inputToken', type: 'address' },
+    { name: 'outputToken', type: 'address' },
+    { name: 'cosigner', type: 'address' },
+    { name: 'minPeriod', type: 'uint256' },
+    { name: 'maxPeriod', type: 'uint256' },
+    { name: 'minChunkSize', type: 'uint256' },
+    { name: 'maxChunkSize', type: 'uint256' },
+    { name: 'minPrice', type: 'uint256' },
+    { name: 'deadline', type: 'uint256' },
+    { name: 'outputAllocations', type: 'OutputAllocation[]' },
+    { name: 'privateIntent', type: 'PrivateIntent' },
   ],
   OutputAllocation: [
-    { name: "recipient", type: "address" },
-    { name: "basisPoints", type: "uint16" },
+    { name: 'recipient', type: 'address' },
+    { name: 'basisPoints', type: 'uint16' },
   ],
   PrivateIntent: [
-    { name: "totalAmount", type: "uint256" },
-    { name: "exactFrequency", type: "uint256" },
-    { name: "numChunks", type: "uint256" },
-    { name: "salt", type: "bytes32" },
-    { name: "oracleFeeds", type: "FeedInfo[]" },
+    { name: 'totalAmount', type: 'uint256' },
+    { name: 'exactFrequency', type: 'uint256' },
+    { name: 'numChunks', type: 'uint256' },
+    { name: 'salt', type: 'bytes32' },
+    { name: 'oracleFeeds', type: 'FeedInfo[]' },
   ],
   FeedInfo: [
-    { name: "feedId", type: "bytes32" },
-    { name: "feed_address", type: "address" },
-    { name: "feedType", type: "string" },
+    { name: 'feedId', type: 'bytes32' },
+    { name: 'feed_address', type: 'address' },
+    { name: 'feedType', type: 'string' },
   ],
-};
+}

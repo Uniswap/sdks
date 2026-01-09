@@ -9,18 +9,18 @@ export const BATCHED_CALL_ABI_PARAMS = [
   {
     type: 'tuple',
     components: [
-      { 
+      {
         type: 'tuple[]',
         components: [
           { type: 'address', name: 'to' },
           { type: 'uint256', name: 'value' },
-          { type: 'bytes', name: 'data' }
+          { type: 'bytes', name: 'data' },
         ],
-        name: 'calls'
+        name: 'calls',
       },
-      { type: 'bool', name: 'revertOnFailure' }
-    ]
-  }
+      { type: 'bool', name: 'revertOnFailure' },
+    ],
+  },
 ] as const
 
 /**
@@ -65,15 +65,15 @@ export class BatchedCallPlanner {
     return encodeAbiParameters(BATCHED_CALL_ABI_PARAMS, [
       {
         calls: this.callPlanner.calls,
-        revertOnFailure: this.revertOnFailure
-      }
+        revertOnFailure: this.revertOnFailure,
+      },
     ])
   }
 
   toBatchedCall(): BatchedCall {
     return {
       calls: this.callPlanner.calls,
-      revertOnFailure: this.revertOnFailure
+      revertOnFailure: this.revertOnFailure,
     }
   }
 }

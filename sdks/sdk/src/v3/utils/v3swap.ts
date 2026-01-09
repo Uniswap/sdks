@@ -54,7 +54,7 @@ export async function v3Swap(
 
   // start swap while loop
   while (JSBI.notEqual(state.amountSpecifiedRemaining, ZERO) && state.sqrtPriceX96 !== sqrtPriceLimitX96) {
-    let step: Partial<StepComputations> = {}
+    const step: Partial<StepComputations> = {}
     step.sqrtPriceStartX96 = state.sqrtPriceX96
 
     // because each iteration of the while loop rounds, we can't optimize this code (relative to the smart contract)

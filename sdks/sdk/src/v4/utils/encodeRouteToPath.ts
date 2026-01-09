@@ -15,9 +15,9 @@ export const encodeRouteToPath = (route: Route<Currency, Currency>, exactOutput?
   let pools = route.pools.map((p) => p)
   if (exactOutput) pools = pools.reverse()
   let startingCurrency = exactOutput ? route.pathOutput : route.pathInput
-  let pathKeys: PathKey[] = []
+  const pathKeys: PathKey[] = []
 
-  for (let pool of pools) {
+  for (const pool of pools) {
     const nextCurrency = startingCurrency.equals(pool.currency0) ? pool.currency1 : pool.currency0
 
     pathKeys.push({

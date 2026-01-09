@@ -1,110 +1,99 @@
-import { SignatureLike } from "@ethersproject/bytes";
-import {
-  PermitBatchTransferFrom,
-  PermitBatchTransferFromData,
-  SignatureTransfer,
-  Witness,
-} from '../../permit2';
-import { BigNumber, ethers } from "ethers";
+import { SignatureLike } from '@ethersproject/bytes'
+import { PermitBatchTransferFrom, PermitBatchTransferFromData, SignatureTransfer, Witness } from '../../permit2'
+import { BigNumber, ethers } from 'ethers'
 
-import { PERMIT2_MAPPING } from "../constants";
-import { MissingConfiguration } from "../errors";
-import { ResolvedRelayOrder } from "../utils/OrderQuoter";
-import { getDecayedAmount } from "../utils/dutchDecay";
+import { PERMIT2_MAPPING } from '../constants'
+import { MissingConfiguration } from '../errors'
+import { ResolvedRelayOrder } from '../utils/OrderQuoter'
+import { getDecayedAmount } from '../utils/dutchDecay'
 
-import { BlockOverrides, OffChainOrder, OrderInfo, OrderResolutionOptions } from "./types";
+import { BlockOverrides, OffChainOrder, OrderInfo, OrderResolutionOptions } from './types'
 
 export type RelayInput = {
-  readonly token: string;
-  readonly amount: BigNumber;
-  readonly recipient: string;
-};
+  readonly token: string
+  readonly amount: BigNumber
+  readonly recipient: string
+}
 
 export type RelayFee = {
-  readonly token: string;
-  readonly startAmount: BigNumber;
-  readonly endAmount: BigNumber;
-  readonly startTime: number;
-  readonly endTime: number;
-};
+  readonly token: string
+  readonly startAmount: BigNumber
+  readonly endAmount: BigNumber
+  readonly startTime: number
+  readonly endTime: number
+}
 
-export type RelayInputJSON = Omit<RelayInput, "amount"> & {
-  amount: string;
-};
+export type RelayInputJSON = Omit<RelayInput, 'amount'> & {
+  amount: string
+}
 
-export type RelayFeeJSON = Omit<RelayFee, "startAmount" | "endAmount"> & {
-  startAmount: string;
-  endAmount: string;
-};
+export type RelayFeeJSON = Omit<RelayFee, 'startAmount' | 'endAmount'> & {
+  startAmount: string
+  endAmount: string
+}
 
-type RelayOrderNestedOrderInfo = Omit<
-  OrderInfo,
-  "additionalValidationContract" | "additionalValidationData"
->;
+type RelayOrderNestedOrderInfo = Omit<OrderInfo, 'additionalValidationContract' | 'additionalValidationData'>
 
 export type RelayOrderInfo = RelayOrderNestedOrderInfo & {
-  input: RelayInput;
-  fee: RelayFee;
-  universalRouterCalldata: string;
-};
+  input: RelayInput
+  fee: RelayFee
+  universalRouterCalldata: string
+}
 
-export type RelayOrderInfoJSON = Omit<
-  RelayOrderInfo,
-  "nonce" | "input" | "fee"
-> & {
-  nonce: string;
-  input: RelayInputJSON;
-  fee: RelayFeeJSON;
-  universalRouterCalldata: string;
-};
+export type RelayOrderInfoJSON = Omit<RelayOrderInfo, 'nonce' | 'input' | 'fee'> & {
+  nonce: string
+  input: RelayInputJSON
+  fee: RelayFeeJSON
+  universalRouterCalldata: string
+}
 
 type WitnessInfo = {
-  info: RelayOrderNestedOrderInfo;
-  input: RelayInput;
-  fee: RelayFee;
-  universalRouterCalldata: string;
-};
+  info: RelayOrderNestedOrderInfo
+  input: RelayInput
+  fee: RelayFee
+  universalRouterCalldata: string
+}
 
 const RELAY_WITNESS_TYPES = {
   RelayOrder: [
-    { name: "info", type: "RelayOrderInfo" },
-    { name: "input", type: "Input" },
-    { name: "fee", type: "FeeEscalator" },
-    { name: "universalRouterCalldata", type: "bytes" },
+    { name: 'info', type: 'RelayOrderInfo' },
+    { name: 'input', type: 'Input' },
+    { name: 'fee', type: 'FeeEscalator' },
+    { name: 'universalRouterCalldata', type: 'bytes' },
   ],
   RelayOrderInfo: [
-    { name: "reactor", type: "address" },
-    { name: "swapper", type: "address" },
-    { name: "nonce", type: "uint256" },
-    { name: "deadline", type: "uint256" },
+    { name: 'reactor', type: 'address' },
+    { name: 'swapper', type: 'address' },
+    { name: 'nonce', type: 'uint256' },
+    { name: 'deadline', type: 'uint256' },
   ],
   Input: [
-    { name: "token", type: "address" },
-    { name: "amount", type: "uint256" },
-    { name: "recipient", type: "address" },
+    { name: 'token', type: 'address' },
+    { name: 'amount', type: 'uint256' },
+    { name: 'recipient', type: 'address' },
   ],
   FeeEscalator: [
-    { name: "token", type: "address" },
-    { name: "startAmount", type: "uint256" },
-    { name: "endAmount", type: "uint256" },
-    { name: "startTime", type: "uint256" },
-    { name: "endTime", type: "uint256" },
+    { name: 'token', type: 'address' },
+    { name: 'startAmount', type: 'uint256' },
+    { name: 'endAmount', type: 'uint256' },
+    { name: 'startTime', type: 'uint256' },
+    { name: 'endTime', type: 'uint256' },
   ],
-};
+}
 
 const RELAY_ORDER_ABI = [
-  "tuple(" +
+  'tuple(' +
     [
-      "tuple(address,address,uint256,uint256)",
-      "tuple(address,uint256,address)",
-      "tuple(address,uint256,uint256,uint256,uint256)",
-      "bytes",
-    ].join(",") +
-    ")",
-];
+      'tuple(address,address,uint256,uint256)',
+      'tuple(address,uint256,address)',
+      'tuple(address,uint256,uint256,uint256,uint256)',
+      'bytes',
+    ].join(',') +
+    ')',
+]
 
 export class RelayOrder implements OffChainOrder {
-  public permit2Address: string;
+  public permit2Address: string
 
   constructor(
     public readonly info: RelayOrderInfo,
@@ -112,19 +101,15 @@ export class RelayOrder implements OffChainOrder {
     readonly _permit2Address?: string
   ) {
     if (_permit2Address) {
-      this.permit2Address = _permit2Address;
+      this.permit2Address = _permit2Address
     } else if (PERMIT2_MAPPING[chainId]) {
-      this.permit2Address = PERMIT2_MAPPING[chainId];
+      this.permit2Address = PERMIT2_MAPPING[chainId]
     } else {
-      throw new MissingConfiguration("permit2", chainId.toString());
+      throw new MissingConfiguration('permit2', chainId.toString())
     }
   }
 
-  static fromJSON(
-    json: RelayOrderInfoJSON,
-    chainId: number,
-    _permit2Address?: string
-  ): RelayOrder {
+  static fromJSON(json: RelayOrderInfoJSON, chainId: number, _permit2Address?: string): RelayOrder {
     return new RelayOrder(
       {
         ...json,
@@ -144,12 +129,12 @@ export class RelayOrder implements OffChainOrder {
       },
       chainId,
       _permit2Address
-    );
+    )
   }
 
   static parse(encoded: string, chainId: number, permit2?: string): RelayOrder {
-    const abiCoder = new ethers.utils.AbiCoder();
-    const decoded = abiCoder.decode(RELAY_ORDER_ABI, encoded);
+    const abiCoder = new ethers.utils.AbiCoder()
+    const decoded = abiCoder.decode(RELAY_ORDER_ABI, encoded)
     const [
       [
         [reactor, swapper, nonce, deadline],
@@ -157,7 +142,7 @@ export class RelayOrder implements OffChainOrder {
         [feeToken, feeStartAmount, feeEndAmount, feeStartTime, feeEndTime],
         universalRouterCalldata,
       ],
-    ] = decoded;
+    ] = decoded
     return new RelayOrder(
       {
         reactor,
@@ -180,12 +165,12 @@ export class RelayOrder implements OffChainOrder {
       },
       chainId,
       permit2
-    );
+    )
   }
 
   toJSON(): RelayOrderInfoJSON & {
-    permit2Address: string;
-    chainId: number;
+    permit2Address: string
+    chainId: number
   } {
     return {
       chainId: this.chainId,
@@ -207,7 +192,7 @@ export class RelayOrder implements OffChainOrder {
         startTime: this.info.fee.startTime,
         endTime: this.info.fee.endTime,
       },
-    };
+    }
   }
 
   /**
@@ -218,20 +203,11 @@ export class RelayOrder implements OffChainOrder {
   }
 
   serialize(): string {
-    const abiCoder = new ethers.utils.AbiCoder();
+    const abiCoder = new ethers.utils.AbiCoder()
     return abiCoder.encode(RELAY_ORDER_ABI, [
       [
-        [
-          this.info.reactor,
-          this.info.swapper,
-          this.info.nonce,
-          this.info.deadline,
-        ],
-        [
-          this.info.input.token,
-          this.info.input.amount,
-          this.info.input.recipient,
-        ],
+        [this.info.reactor, this.info.swapper, this.info.nonce, this.info.deadline],
+        [this.info.input.token, this.info.input.amount, this.info.input.recipient],
         [
           this.info.fee.token,
           this.info.fee.startAmount,
@@ -241,7 +217,7 @@ export class RelayOrder implements OffChainOrder {
         ],
         this.info.universalRouterCalldata,
       ],
-    ]);
+    ])
   }
 
   /**
@@ -250,15 +226,10 @@ export class RelayOrder implements OffChainOrder {
   getSigner(signature: SignatureLike): string {
     return ethers.utils.computeAddress(
       ethers.utils.recoverPublicKey(
-        SignatureTransfer.hash(
-          this.toPermit(),
-          this.permit2Address,
-          this.chainId,
-          this.witness()
-        ),
+        SignatureTransfer.hash(this.toPermit(), this.permit2Address, this.chainId, this.witness()),
         signature
       )
-    );
+    )
   }
 
   /**
@@ -270,16 +241,14 @@ export class RelayOrder implements OffChainOrder {
       this.permit2Address,
       this.chainId,
       this.witness()
-    ) as PermitBatchTransferFromData;
+    ) as PermitBatchTransferFromData
   }
 
   /**
    * @inheritdoc OrderInterface
    */
   hash(): string {
-    return ethers.utils._TypedDataEncoder
-      .from(RELAY_WITNESS_TYPES)
-      .hash(this.witnessInfo());
+    return ethers.utils._TypedDataEncoder.from(RELAY_WITNESS_TYPES).hash(this.witnessInfo())
   }
 
   /**
@@ -300,7 +269,7 @@ export class RelayOrder implements OffChainOrder {
           options.timestamp
         ),
       },
-    };
+    }
   }
 
   private toPermit(): PermitBatchTransferFrom {
@@ -318,7 +287,7 @@ export class RelayOrder implements OffChainOrder {
       spender: this.info.reactor,
       nonce: this.info.nonce,
       deadline: this.info.deadline,
-    };
+    }
   }
 
   private witnessInfo(): WitnessInfo {
@@ -332,14 +301,14 @@ export class RelayOrder implements OffChainOrder {
       input: this.info.input,
       fee: this.info.fee,
       universalRouterCalldata: this.info.universalRouterCalldata,
-    };
+    }
   }
 
   private witness(): Witness {
     return {
       witness: this.witnessInfo(),
-      witnessTypeName: "RelayOrder",
+      witnessTypeName: 'RelayOrder',
       witnessType: RELAY_WITNESS_TYPES,
-    };
+    }
   }
 }

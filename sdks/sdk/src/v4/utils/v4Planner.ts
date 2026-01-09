@@ -176,7 +176,7 @@ export class V4Planner {
   }
 
   addAction(type: Actions, parameters: any[]): V4Planner {
-    let command = createAction(type, parameters)
+    const command = createAction(type, parameters)
     this.params.push(command.encodedInput)
     this.actions = this.actions.concat(command.action.toString(16).padStart(2, '0'))
     return this

@@ -64,4 +64,4 @@ export const flashtestationAbi = [
     ],
     stateMutability: 'view',
   },
-] as const;
+] as const

@@ -1,13 +1,6 @@
 import { Percent, Price, sqrt, Token, CurrencyAmount, TradeType, WETH9, Ether, Currency } from '../../../core'
 import { Pair } from '../../../v2'
-import {
-  encodeSqrtRatioX96,
-  FeeAmount,
-  nearestUsableTick,
-  Pool as V3Pool,
-  TickMath,
-  TICK_SPACINGS,
-} from '../../../v3'
+import { encodeSqrtRatioX96, FeeAmount, nearestUsableTick, Pool as V3Pool, TickMath, TICK_SPACINGS } from '../../../v3'
 import { Pool as V4Pool } from '../../../v4'
 import JSBI from 'jsbi'
 import { MixedRouteSDK } from './route'

@@ -13,7 +13,7 @@ describe('CallPlanner', () => {
     it('should initialize with a provided array of calls', () => {
       const calls = [
         { to: TEST_ADDRESS_1, data: TEST_DATA_1, value: TEST_VALUE_1 },
-        { to: TEST_ADDRESS_1, data: TEST_DATA_2, value: TEST_VALUE_2 }
+        { to: TEST_ADDRESS_1, data: TEST_DATA_2, value: TEST_VALUE_2 },
       ]
       const planner = new CallPlanner(calls)
       expect(planner.calls).toEqual(calls)
@@ -29,7 +29,7 @@ describe('CallPlanner', () => {
     it('should sum the values of all calls', () => {
       const planner = new CallPlanner([
         { to: TEST_ADDRESS_1, data: TEST_DATA_1, value: TEST_VALUE_1 },
-        { to: TEST_ADDRESS_1, data: TEST_DATA_2, value: TEST_VALUE_2 }
+        { to: TEST_ADDRESS_1, data: TEST_DATA_2, value: TEST_VALUE_2 },
       ])
       expect(planner.value.toString()).toBe('300')
     })
@@ -37,7 +37,7 @@ describe('CallPlanner', () => {
     it('should handle undefined values as 0', () => {
       const planner = new CallPlanner([
         { to: TEST_ADDRESS_1, data: TEST_DATA_1, value: TEST_VALUE_1 },
-        { to: TEST_ADDRESS_1, data: TEST_DATA_2, value: undefined as unknown as bigint }
+        { to: TEST_ADDRESS_1, data: TEST_DATA_2, value: undefined as unknown as bigint },
       ])
       expect(planner.value.toString()).toBe('100')
     })
@@ -45,12 +45,10 @@ describe('CallPlanner', () => {
 
   describe('encode', () => {
     it('should correctly abi encode the calls', () => {
-      const planner = new CallPlanner([
-        { to: TEST_ADDRESS_1, value: TEST_VALUE_1, data: TEST_DATA_1 }
-      ])
-      
+      const planner = new CallPlanner([{ to: TEST_ADDRESS_1, value: TEST_VALUE_1, data: TEST_DATA_1 }])
+
       const encoded = planner.encode()
-      
+
       // decode the encoded data
       const decoded = decodeAbiParameters(CALL_ABI_PARAMS, encoded)
       expect(decoded).toEqual([[{ to: TEST_ADDRESS_1, value: TEST_VALUE_1, data: TEST_DATA_1 }]])
@@ -58,7 +56,7 @@ describe('CallPlanner', () => {
 
     it('should throw an error if there are no calls to encode', () => {
       const planner = new CallPlanner()
-      expect(() => planner.encode()).toThrow("No calls to encode")
+      expect(() => planner.encode()).toThrow('No calls to encode')
     })
   })
 
@@ -83,13 +81,11 @@ describe('CallPlanner', () => {
 
     it('should allow chaining multiple add calls', () => {
       const planner = new CallPlanner()
-      planner
-        .add(TEST_ADDRESS_1, TEST_VALUE_1, TEST_DATA_1)
-        .add(TEST_ADDRESS_1, TEST_VALUE_2, TEST_DATA_2)
-      
+      planner.add(TEST_ADDRESS_1, TEST_VALUE_1, TEST_DATA_1).add(TEST_ADDRESS_1, TEST_VALUE_2, TEST_DATA_2)
+
       expect(planner.calls).toEqual([
         { to: TEST_ADDRESS_1, value: TEST_VALUE_1, data: TEST_DATA_1 },
-        { to: TEST_ADDRESS_1, value: TEST_VALUE_2, data: TEST_DATA_2 }
+        { to: TEST_ADDRESS_1, value: TEST_VALUE_2, data: TEST_DATA_2 },
       ])
     })
   })

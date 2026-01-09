@@ -236,7 +236,7 @@ export class RoutePlanner {
   }
 
   addCommand(type: CommandType, parameters: any[], allowRevert = false): RoutePlanner {
-    let command = createCommand(type, parameters)
+    const command = createCommand(type, parameters)
     this.inputs.push(command.encodedInput)
     if (allowRevert) {
       if (!REVERTIBLE_COMMANDS.has(command.type)) {

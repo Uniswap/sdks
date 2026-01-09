@@ -112,8 +112,8 @@ export abstract class SwapRouter {
     const recipient = routerMustCustody
       ? ADDRESS_THIS
       : typeof options.recipient === 'undefined'
-      ? MSG_SENDER
-      : validateAndParseAddress(options.recipient)
+        ? MSG_SENDER
+        : validateAndParseAddress(options.recipient)
 
     if (trade.tradeType === TradeType.EXACT_INPUT) {
       const exactInputParams = [amountIn, performAggregatedSlippageCheck ? 0 : amountOut, path, recipient]
@@ -152,8 +152,8 @@ export abstract class SwapRouter {
       const recipient = routerMustCustody
         ? ADDRESS_THIS
         : typeof options.recipient === 'undefined'
-        ? MSG_SENDER
-        : validateAndParseAddress(options.recipient)
+          ? MSG_SENDER
+          : validateAndParseAddress(options.recipient)
 
       if (singleHop) {
         if (trade.tradeType === TradeType.EXACT_INPUT) {
@@ -240,8 +240,8 @@ export abstract class SwapRouter {
       const recipient = routerMustCustody
         ? ADDRESS_THIS
         : typeof options.recipient === 'undefined'
-        ? MSG_SENDER
-        : validateAndParseAddress(options.recipient)
+          ? MSG_SENDER
+          : validateAndParseAddress(options.recipient)
 
       const mixedRouteIsAllV3 = (route: MixedRouteSDK<Currency, Currency>) => {
         return route.pools.every((pool) => pool instanceof V3Pool)
@@ -353,7 +353,7 @@ export abstract class SwapRouter {
         'UNSUPPORTED_PROTOCOL (encoding routes with v4 not supported)'
       )
 
-      let individualTrades: (
+      const individualTrades: (
         | V2Trade<Currency, Currency, TradeType>
         | V3Trade<Currency, Currency, TradeType>
         | MixedRouteTrade<Currency, Currency, TradeType>

@@ -1,31 +1,32 @@
 export type WorkloadMetadata = {
   /** workload ID of the TEE workload*/
-  workloadId: string;
+  workloadId: string
   /** Commit hash of the TEE workload source code */
-  commitHash: string;
+  commitHash: string
   /** Address of the block builder, optional */
-  builderAddress: string;
+  builderAddress: string
   /** Version of the flashtestation protocol, optional */
-  version: number;
+  version: number
   /** Source locators (e.g., GitHub URLs) for the workload source code, optional for backwards compatibility */
-  sourceLocators: string[];
+  sourceLocators: string[]
 }
 
 /**
  * Result of flashtestation verification
  */
-export type VerificationResult = | {
-  /** Block was built by the expected TEE workload */
-  isBuiltByExpectedTee: true;
-  blockExplorerLink: string | null;
-  workloadMetadata: WorkloadMetadata;
-}
+export type VerificationResult =
   | {
-    /** Block was NOT built by the expected TEE workload */
-    isBuiltByExpectedTee: false;
-    blockExplorerLink: string | null;
-    workloadMetadata: WorkloadMetadata | null;
-  };
+      /** Block was built by the expected TEE workload */
+      isBuiltByExpectedTee: true
+      blockExplorerLink: string | null
+      workloadMetadata: WorkloadMetadata
+    }
+  | {
+      /** Block was NOT built by the expected TEE workload */
+      isBuiltByExpectedTee: false
+      blockExplorerLink: string | null
+      workloadMetadata: WorkloadMetadata | null
+    }
 
 /**
  * TEE workload measurement registers used for workload ID computation
@@ -48,9 +49,9 @@ export type VerificationResult = | {
  */
 export interface WorkloadMeasurementRegisters {
   /** TD attributes (8 bytes hex) */
-  tdattributes: string;
+  tdattributes: string
   /** xfam (8 bytes hex) */
-  xfam: string;
+  xfam: string
   /** MRTD - Measurement of the TD (48 bytes hex)
    * It can also be an array of 48 byte hex strings. We do this as a workaround for the
    * following problem: the mrtd value on GCP's TEE's is not 100% reproducible from the
@@ -59,9 +60,9 @@ export interface WorkloadMeasurementRegisters {
    * and when verifying measurement registers against a given workload ID, we check if any of the
    * provided mrtd values result in a matching workload ID
    */
-  mrtd: string | string[];
+  mrtd: string | string[]
   /** MR Config ID - VMM configuration (48 bytes hex) */
-  mrconfigid: string;
+  mrconfigid: string
   /** Runtime Measurement Register 0 (48 bytes hex)
    * It can also be an array of 48 byte hex strings. We do this as a workaround for the
    * following problem: the rtmr0 value on GCP's TEE's is not 100% reproducible from the
@@ -70,13 +71,13 @@ export interface WorkloadMeasurementRegisters {
    * and when verifying measurement registers against a given workload ID, we check if any of the
    * provided rtmr0 values result in a matching workload ID
    */
-  rtmr0: string | string[];
+  rtmr0: string | string[]
   /** Runtime Measurement Register 1 (48 bytes hex) */
-  rtmr1: string;
+  rtmr1: string
   /** Runtime Measurement Register 2 (48 bytes hex) */
-  rtmr2: string;
+  rtmr2: string
   /** Runtime Measurement Register 3 (48 bytes hex) */
-  rtmr3: string;
+  rtmr3: string
 }
 
 /**
@@ -90,21 +91,21 @@ export interface WorkloadMeasurementRegisters {
  */
 export interface SingularWorkloadMeasurementRegisters {
   /** TD attributes (8 bytes hex) */
-  tdattributes: string;
+  tdattributes: string
   /** xfam (8 bytes hex) */
-  xfam: string;
+  xfam: string
   /** MRTD - Measurement of the TD (48 bytes hex) - single value only */
-  mrtd: string;
+  mrtd: string
   /** MR Config ID - VMM configuration (48 bytes hex) */
-  mrconfigid: string;
+  mrconfigid: string
   /** Runtime Measurement Register 0 (48 bytes hex) - single value only */
-  rtmr0: string;
+  rtmr0: string
   /** Runtime Measurement Register 1 (48 bytes hex) */
-  rtmr1: string;
+  rtmr1: string
   /** Runtime Measurement Register 2 (48 bytes hex) */
-  rtmr2: string;
+  rtmr2: string
   /** Runtime Measurement Register 3 (48 bytes hex) */
-  rtmr3: string;
+  rtmr3: string
 }
 
 /**
@@ -112,17 +113,17 @@ export interface SingularWorkloadMeasurementRegisters {
  */
 export interface FlashtestationEvent {
   /** Address of the block builder */
-  caller: string;
+  caller: string
   /** Hash indentifier for the workload (bytes32 hex) */
-  workloadId: string;
+  workloadId: string
   /** Version of the flashtestation protocol */
-  version: number;
+  version: number
   /** Hash of the block content (i.e. all of the block's transactions, except the flashtestation transaction itself) (bytes32 hex) */
-  blockContentHash: string;
+  blockContentHash: string
   /** git commit ID of the code used to reproducibly build the workload (string) */
-  commitHash: string;
+  commitHash: string
   /** Source locators (e.g., GitHub URLs) for the workload source code */
-  sourceLocators: string[];
+  sourceLocators: string[]
 }
 
 /**
@@ -130,17 +131,17 @@ export interface FlashtestationEvent {
  */
 export interface ChainConfig {
   /** Chain ID */
-  chainId: number;
+  chainId: number
   /** Human readable chain name */
-  name: string;
+  name: string
   /** CLI-friendly slug for --chain argument (e.g., 'unichain-mainnet') */
-  slug: string;
+  slug: string
   /** BlockBuilderPolicy contract address */
-  contractAddress: string;
+  contractAddress: string
   /** Default RPC URL for this chain */
-  defaultRpcUrl: string;
+  defaultRpcUrl: string
   /** Block explorer base URL */
-  blockExplorerUrl: string;
+  blockExplorerUrl: string
 }
 
 /**
@@ -148,9 +149,9 @@ export interface ChainConfig {
  */
 export interface ClientConfig {
   /** Chain ID to network */
-  chainId: number;
+  chainId: number
   /** Optional custom RPC URL (overrides default) */
-  rpcUrl?: string;
+  rpcUrl?: string
 }
 
 /**
@@ -164,47 +165,52 @@ export type BlockParameter =
   | 'pending'
   | string // hex block number or block hash
   | number // decimal block number
-  | bigint; // bigint block number
+  | bigint // bigint block number
 
 /**
  * Custom error classes for specific error scenarios
  */
 export class NetworkError extends Error {
-  constructor(message: string, public cause?: Error) {
-    super(message);
-    this.name = 'NetworkError';
+  constructor(
+    message: string,
+    public cause?: Error
+  ) {
+    super(message)
+    this.name = 'NetworkError'
     // Maintains proper prototype chain for instanceof checks
-    Object.setPrototypeOf(this, NetworkError.prototype);
+    Object.setPrototypeOf(this, NetworkError.prototype)
   }
 }
 
 export class BlockNotFoundError extends Error {
   constructor(public blockParameter: BlockParameter) {
-    super(`Block not found: ${blockParameter}`);
-    this.name = 'BlockNotFoundError';
+    super(`Block not found: ${blockParameter}`)
+    this.name = 'BlockNotFoundError'
     // Maintains proper prototype chain for instanceof checks
-    Object.setPrototypeOf(this, BlockNotFoundError.prototype);
+    Object.setPrototypeOf(this, BlockNotFoundError.prototype)
   }
 }
 
 export class ValidationError extends Error {
-  constructor(message: string, public field?: string) {
-    super(message);
-    this.name = 'ValidationError';
+  constructor(
+    message: string,
+    public field?: string
+  ) {
+    super(message)
+    this.name = 'ValidationError'
     // Maintains proper prototype chain for instanceof checks
-    Object.setPrototypeOf(this, ValidationError.prototype);
+    Object.setPrototypeOf(this, ValidationError.prototype)
   }
 }
 
 export class ChainNotSupportedError extends Error {
-  constructor(public chainId: number, public supportedChains: number[]) {
-    super(
-      `Chain ${chainId} not supported. Supported chains: ${supportedChains.join(
-        ', '
-      )}`
-    );
-    this.name = 'ChainNotSupportedError';
+  constructor(
+    public chainId: number,
+    public supportedChains: number[]
+  ) {
+    super(`Chain ${chainId} not supported. Supported chains: ${supportedChains.join(', ')}`)
+    this.name = 'ChainNotSupportedError'
     // Maintains proper prototype chain for instanceof checks
-    Object.setPrototypeOf(this, ChainNotSupportedError.prototype);
+    Object.setPrototypeOf(this, ChainNotSupportedError.prototype)
   }
 }

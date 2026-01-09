@@ -1,36 +1,26 @@
-import { Currency, Ether, Token, TradeType } from '../../core';
-import { BigNumber, constants, ethers } from "ethers";
+import { Currency, Ether, Token, TradeType } from '../../core'
+import { BigNumber, constants, ethers } from 'ethers'
 
-import { UnsignedPriorityOrderInfo } from "../order";
+import { UnsignedPriorityOrderInfo } from '../order'
 
-import { NativeAssets } from "./utils";
+import { NativeAssets } from './utils'
 
-import { PriorityOrderTrade } from ".";
+import { PriorityOrderTrade } from '.'
 
-const USDC = new Token(
-  1,
-  "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-  6,
-  "USDC"
-);
-const DAI = new Token(
-  1,
-  "0x6B175474E89094C44Da98b954EedeAC495271d0F",
-  18,
-  "DAI"
-);
+const USDC = new Token(1, '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', 6, 'USDC')
+const DAI = new Token(1, '0x6B175474E89094C44Da98b954EedeAC495271d0F', 18, 'DAI')
 
-describe("PriorityOrderTrade", () => {
-  const NON_FEE_OUTPUT_AMOUNT = BigNumber.from("1000000000000000000");
+describe('PriorityOrderTrade', () => {
+  const NON_FEE_OUTPUT_AMOUNT = BigNumber.from('1000000000000000000')
 
   const orderInfo: UnsignedPriorityOrderInfo = {
     deadline: Math.floor(new Date().getTime() / 1000) + 1000,
-    reactor: "0x0000000000000000000000000000000000000000",
-    swapper: "0x0000000000000000000000000000000000000000",
+    reactor: '0x0000000000000000000000000000000000000000',
+    swapper: '0x0000000000000000000000000000000000000000',
     nonce: BigNumber.from(10),
-    cosigner: "0x0000000000000000000000000000000000000000",
+    cosigner: '0x0000000000000000000000000000000000000000',
     additionalValidationContract: ethers.constants.AddressZero,
-    additionalValidationData: "0x",
+    additionalValidationData: '0x',
     auctionStartBlock: BigNumber.from(100000),
     baselinePriorityFeeWei: BigNumber.from(2),
     input: {
@@ -43,43 +33,37 @@ describe("PriorityOrderTrade", () => {
         token: DAI.address,
         amount: NON_FEE_OUTPUT_AMOUNT,
         mpsPerPriorityFeeWei: BigNumber.from(5),
-        recipient: "0x0000000000000000000000000000000000000000",
+        recipient: '0x0000000000000000000000000000000000000000',
       },
       {
         token: DAI.address,
-        amount: BigNumber.from("1000"),
+        amount: BigNumber.from('1000'),
         mpsPerPriorityFeeWei: BigNumber.from(5),
-        recipient: "0x0000000000000000000000000000000000000000",
+        recipient: '0x0000000000000000000000000000000000000000',
       },
     ],
-  };
+  }
 
   const trade = new PriorityOrderTrade<Currency, Currency, TradeType>({
     currencyIn: USDC,
     currenciesOut: [DAI],
     orderInfo,
     tradeType: TradeType.EXACT_INPUT,
-  });
+  })
 
-  it("returns the right input amount for an exact-in trade", () => {
-    expect(trade.inputAmount.quotient.toString()).toEqual(
-      orderInfo.input.amount.toString()
-    );
-  });
+  it('returns the right input amount for an exact-in trade', () => {
+    expect(trade.inputAmount.quotient.toString()).toEqual(orderInfo.input.amount.toString())
+  })
 
-  it("returns the correct non-fee output amount", () => {
-    expect(trade.outputAmount.quotient.toString()).toEqual(
-      NON_FEE_OUTPUT_AMOUNT.toString()
-    );
-  });
+  it('returns the correct non-fee output amount', () => {
+    expect(trade.outputAmount.quotient.toString()).toEqual(NON_FEE_OUTPUT_AMOUNT.toString())
+  })
 
-  it("returns the correct minimum amount out", () => {
-    expect(trade.minimumAmountOut().quotient.toString()).toEqual(
-      NON_FEE_OUTPUT_AMOUNT.toString()
-    );
-  });
+  it('returns the correct minimum amount out', () => {
+    expect(trade.minimumAmountOut().quotient.toString()).toEqual(NON_FEE_OUTPUT_AMOUNT.toString())
+  })
 
-  it("works for native output trades", () => {
+  it('works for native output trades', () => {
     const ethOutputOrderInfo = {
       ...orderInfo,
       outputs: [
@@ -87,22 +71,20 @@ describe("PriorityOrderTrade", () => {
           token: NativeAssets.ETH,
           amount: NON_FEE_OUTPUT_AMOUNT,
           mpsPerPriorityFeeWei: BigNumber.from(5),
-          recipient: "0x0000000000000000000000000000000000000000",
+          recipient: '0x0000000000000000000000000000000000000000',
         },
       ],
-    };
-    const ethOutputTrade = new PriorityOrderTrade<Currency, Currency, TradeType>(
-      {
-        currencyIn: USDC,
-        currenciesOut: [Ether.onChain(1)],
-        orderInfo: ethOutputOrderInfo,
-        tradeType: TradeType.EXACT_INPUT,
-      }
-    );
-    expect(ethOutputTrade.outputAmount.currency).toEqual(Ether.onChain(1));
-  });
+    }
+    const ethOutputTrade = new PriorityOrderTrade<Currency, Currency, TradeType>({
+      currencyIn: USDC,
+      currenciesOut: [Ether.onChain(1)],
+      orderInfo: ethOutputOrderInfo,
+      tradeType: TradeType.EXACT_INPUT,
+    })
+    expect(ethOutputTrade.outputAmount.currency).toEqual(Ether.onChain(1))
+  })
 
-  it("works for native output trades where order info has 0 address", () => {
+  it('works for native output trades where order info has 0 address', () => {
     const ethOutputOrderInfo = {
       ...orderInfo,
       outputs: [
@@ -110,42 +92,32 @@ describe("PriorityOrderTrade", () => {
           token: constants.AddressZero,
           amount: NON_FEE_OUTPUT_AMOUNT,
           mpsPerPriorityFeeWei: BigNumber.from(5),
-          recipient: "0x0000000000000000000000000000000000000000",
+          recipient: '0x0000000000000000000000000000000000000000',
         },
       ],
-    };
-    const ethOutputTrade = new PriorityOrderTrade<Currency, Currency, TradeType>(
-      {
-        currencyIn: USDC,
-        currenciesOut: [Ether.onChain(1)],
-        orderInfo: ethOutputOrderInfo,
-        tradeType: TradeType.EXACT_INPUT,
-      }
-    );
-    expect(ethOutputTrade.outputAmount.currency).toEqual(Ether.onChain(1));
-  });
+    }
+    const ethOutputTrade = new PriorityOrderTrade<Currency, Currency, TradeType>({
+      currencyIn: USDC,
+      currenciesOut: [Ether.onChain(1)],
+      orderInfo: ethOutputOrderInfo,
+      tradeType: TradeType.EXACT_INPUT,
+    })
+    expect(ethOutputTrade.outputAmount.currency).toEqual(Ether.onChain(1))
+  })
 
-  it("returns the correct amountIn and amountOut with expected quote data", () => {
+  it('returns the correct amountIn and amountOut with expected quote data', () => {
     const expectedAmounts = {
-      expectedAmountIn: "1",
-      expectedAmountOut: "1",
-    };
-    const expectedAmountTrade = new PriorityOrderTrade<
-      Currency,
-      Currency,
-      TradeType
-    >({
+      expectedAmountIn: '1',
+      expectedAmountOut: '1',
+    }
+    const expectedAmountTrade = new PriorityOrderTrade<Currency, Currency, TradeType>({
       currencyIn: USDC,
       currenciesOut: [DAI],
       orderInfo,
       tradeType: TradeType.EXACT_INPUT,
       expectedAmounts,
-    });
-    expect(expectedAmountTrade.inputAmount.quotient.toString()).toEqual(
-      expectedAmounts.expectedAmountIn
-    );
-    expect(expectedAmountTrade.outputAmount.quotient.toString()).toEqual(
-      expectedAmounts.expectedAmountOut
-    );
-  });
-});
+    })
+    expect(expectedAmountTrade.inputAmount.quotient.toString()).toEqual(expectedAmounts.expectedAmountIn)
+    expect(expectedAmountTrade.outputAmount.quotient.toString()).toEqual(expectedAmounts.expectedAmountOut)
+  })
+})

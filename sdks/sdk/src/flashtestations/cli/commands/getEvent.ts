@@ -2,16 +2,11 @@
  * CLI command: get-event - Get flashtestation event from a block
  */
 
-import { Command } from 'commander';
+import { Command } from 'commander'
 
-import { FlashtestationEvent } from '../../types';
-import { getFlashtestationEvent } from '../../verification/service';
-import {
-  addChainFlags,
-  resolveChainConfig,
-  getChainDisplayName,
-  ChainOptions,
-} from '../utils/chainFlags';
+import { FlashtestationEvent } from '../../types'
+import { getFlashtestationEvent } from '../../verification/service'
+import { addChainFlags, resolveChainConfig, getChainDisplayName, ChainOptions } from '../utils/chainFlags'
 import {
   handleError,
   outputJson,
@@ -20,77 +15,77 @@ import {
   printFailure,
   printLabeledValue,
   printSection,
-} from '../utils/output';
+} from '../utils/output'
 
 interface GetEventOptions extends ChainOptions {
-  block?: string;
-  json?: boolean;
+  block?: string
+  json?: boolean
 }
 
 export function createGetEventCommand(): Command {
   let command = new Command('get-event')
     .description('Retrieve flashtestation event data from a block (no verification)')
-    .option('-b, --block <param>', 'Block parameter: latest, earliest, finalized, safe, pending, block number, or block hash', 'latest')
-    .option('--json', 'Output as JSON');
+    .option(
+      '-b, --block <param>',
+      'Block parameter: latest, earliest, finalized, safe, pending, block number, or block hash',
+      'latest'
+    )
+    .option('--json', 'Output as JSON')
 
-  command = addChainFlags(command);
+  command = addChainFlags(command)
 
   command.action(async (options: GetEventOptions) => {
     try {
-      await runGetEvent(options);
+      await runGetEvent(options)
     } catch (error) {
-      handleError(error, options.json ?? false);
-      process.exit(1);
+      handleError(error, options.json ?? false)
+      process.exit(1)
     }
-  });
+  })
 
-  return command;
+  return command
 }
 
 async function runGetEvent(options: GetEventOptions): Promise<void> {
-  const chainConfig = resolveChainConfig(options);
-  const blockParam = options.block ?? 'latest';
-  const chainName = getChainDisplayName(chainConfig.chainId);
+  const chainConfig = resolveChainConfig(options)
+  const blockParam = options.block ?? 'latest'
+  const chainName = getChainDisplayName(chainConfig.chainId)
 
   if (!options.json) {
-    printInfo(`Fetching flashtestation event from block '${blockParam}' on ${chainName} (${chainConfig.chainId})...`);
+    printInfo(`Fetching flashtestation event from block '${blockParam}' on ${chainName} (${chainConfig.chainId})...`)
   }
 
   // Fetch the flashtestation event
   const event = await getFlashtestationEvent(blockParam, {
     chainId: chainConfig.chainId,
     rpcUrl: chainConfig.rpcUrl,
-  });
+  })
 
   if (options.json) {
-    outputGetEventJson(event, chainConfig.chainId, blockParam);
+    outputGetEventJson(event, chainConfig.chainId, blockParam)
   } else {
-    outputGetEventHuman(event);
+    outputGetEventHuman(event)
   }
 }
 
 function outputGetEventHuman(event: FlashtestationEvent | null): void {
   if (!event) {
-    printFailure('No flashtestation transaction found in this block.');
-    return;
+    printFailure('No flashtestation transaction found in this block.')
+    return
   }
 
-  printSuccess('This is a flashtestation transaction!');
+  printSuccess('This is a flashtestation transaction!')
 
-  printSection('Transaction Details');
-  printLabeledValue('Caller:', event.caller);
-  printLabeledValue('Workload ID:', event.workloadId);
-  printLabeledValue('Version:', String(event.version));
-  printLabeledValue('Block Content Hash:', event.blockContentHash);
-  printLabeledValue('Commit Hash:', event.commitHash);
-  printLabeledValue('Source Locators:', event.sourceLocators.length > 0 ? event.sourceLocators.join(', ') : 'None');
+  printSection('Transaction Details')
+  printLabeledValue('Caller:', event.caller)
+  printLabeledValue('Workload ID:', event.workloadId)
+  printLabeledValue('Version:', String(event.version))
+  printLabeledValue('Block Content Hash:', event.blockContentHash)
+  printLabeledValue('Commit Hash:', event.commitHash)
+  printLabeledValue('Source Locators:', event.sourceLocators.length > 0 ? event.sourceLocators.join(', ') : 'None')
 }
 
-function outputGetEventJson(
-  event: FlashtestationEvent | null,
-  chainId: number,
-  blockParam: string
-): void {
+function outputGetEventJson(event: FlashtestationEvent | null, chainId: number, blockParam: string): void {
   if (!event) {
     outputJson({
       success: true,
@@ -98,8 +93,8 @@ function outputGetEventJson(
       chainId,
       blockParameter: blockParam,
       event: null,
-    });
-    return;
+    })
+    return
   }
 
   outputJson({
@@ -115,5 +110,5 @@ function outputGetEventJson(
       commitHash: event.commitHash,
       sourceLocators: event.sourceLocators,
     },
-  });
+  })
 }

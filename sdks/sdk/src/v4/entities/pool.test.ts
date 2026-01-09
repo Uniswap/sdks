@@ -157,14 +157,34 @@ describe('Pool', () => {
 
   describe('#poolId', () => {
     it('returns the correct poolId', () => {
-      let pool = new Pool(USDC, DAI, FEE_AMOUNT_LOW, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
+      const pool = new Pool(
+        USDC,
+        DAI,
+        FEE_AMOUNT_LOW,
+        TICK_SPACING_TEN,
+        ADDRESS_ZERO,
+        encodeSqrtRatioX96(1, 1),
+        0,
+        0,
+        []
+      )
       expect(pool.poolId).toEqual('0x503fb8d73fd2351c645ae9fea85381bac6b16ea0c2038e14dc1e96d447c8ffbb')
     })
   })
 
   describe('#poolKey', () => {
     it('returns the correct poolKey', () => {
-      let pool = new Pool(USDC, DAI, FEE_AMOUNT_LOW, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
+      const pool = new Pool(
+        USDC,
+        DAI,
+        FEE_AMOUNT_LOW,
+        TICK_SPACING_TEN,
+        ADDRESS_ZERO,
+        encodeSqrtRatioX96(1, 1),
+        0,
+        0,
+        []
+      )
       expect(pool.poolKey).toEqual({
         currency0: DAI.address,
         currency1: USDC.address,
@@ -433,7 +453,7 @@ describe('Pool', () => {
   })
 
   describe('backwards compatibility', () => {
-    let pool = new Pool(USDC, DAI, FEE_AMOUNT_LOW, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
+    const pool = new Pool(USDC, DAI, FEE_AMOUNT_LOW, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
 
     describe('#token0', () => {
       it('equals currency0', () => {

@@ -78,7 +78,7 @@ export abstract class SqrtPriceMath {
     const numerator1 = JSBI.leftShift(liquidity, JSBI.BigInt(96))
 
     if (add) {
-      let product = multiplyIn256(amount, sqrtPX96)
+      const product = multiplyIn256(amount, sqrtPX96)
       if (JSBI.equal(JSBI.divide(product, amount), sqrtPX96)) {
         const denominator = addIn256(numerator1, product)
         if (JSBI.greaterThanOrEqual(denominator, numerator1)) {
@@ -88,7 +88,7 @@ export abstract class SqrtPriceMath {
 
       return FullMath.mulDivRoundingUp(numerator1, ONE, JSBI.add(JSBI.divide(numerator1, sqrtPX96), amount))
     } else {
-      let product = multiplyIn256(amount, sqrtPX96)
+      const product = multiplyIn256(amount, sqrtPX96)
 
       invariant(JSBI.equal(JSBI.divide(product, amount), sqrtPX96))
       invariant(JSBI.greaterThan(numerator1, product))

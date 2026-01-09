@@ -66,11 +66,11 @@ export function encodeInputTokenOptions(planner: RoutePlanner, options: InputTok
     invariant(options.permit2TransferFrom.token === options.permit2Permit.details.token, `inconsistent token`)
 
   // if this order has a options.permit2Permit, encode it
-  if (!!options.permit2Permit) {
+  if (options.permit2Permit) {
     encodePermit(planner, options.permit2Permit)
   }
 
-  if (!!options.permit2TransferFrom) {
+  if (options.permit2TransferFrom) {
     planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [
       options.permit2TransferFrom.token,
       options.permit2TransferFrom.recipient ? options.permit2TransferFrom.recipient : ROUTER_AS_RECIPIENT,

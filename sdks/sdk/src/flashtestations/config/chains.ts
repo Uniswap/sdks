@@ -1,4 +1,4 @@
-import { ChainConfig, ChainNotSupportedError } from '../types/index';
+import { ChainConfig, ChainNotSupportedError } from '../types/index'
 
 /**
  * Chain configuration for supported chains
@@ -46,7 +46,7 @@ export const CHAIN_CONFIGS: Record<number, ChainConfig> = {
     defaultRpcUrl: process.env.RPC_URL || '', // note, we don't include the RPC URL for experimental because Unichain doesn't want to expose it to the public
     blockExplorerUrl: '',
   },
-};
+}
 
 /**
  * Get the contract address for a given chain ID
@@ -55,11 +55,11 @@ export const CHAIN_CONFIGS: Record<number, ChainConfig> = {
  * @throws ChainNotSupportedError if chain is not supported
  */
 export function getContractAddress(chainId: number): string {
-  const config = CHAIN_CONFIGS[chainId];
+  const config = CHAIN_CONFIGS[chainId]
   if (!config) {
-    throw new ChainNotSupportedError(chainId, getSupportedChains());
+    throw new ChainNotSupportedError(chainId, getSupportedChains())
   }
-  return config.contractAddress;
+  return config.contractAddress
 }
 
 /**
@@ -69,11 +69,11 @@ export function getContractAddress(chainId: number): string {
  * @throws ChainNotSupportedError if chain is not supported
  */
 export function getRpcUrl(chainId: number): string {
-  const config = CHAIN_CONFIGS[chainId];
+  const config = CHAIN_CONFIGS[chainId]
   if (!config) {
-    throw new ChainNotSupportedError(chainId, getSupportedChains());
+    throw new ChainNotSupportedError(chainId, getSupportedChains())
   }
-  return config.defaultRpcUrl;
+  return config.defaultRpcUrl
 }
 
 /**
@@ -83,11 +83,11 @@ export function getRpcUrl(chainId: number): string {
  * @throws ChainNotSupportedError if chain is not supported
  */
 export function getBlockExplorerUrl(chainId: number): string {
-  const config = CHAIN_CONFIGS[chainId];
+  const config = CHAIN_CONFIGS[chainId]
   if (!config) {
-    throw new ChainNotSupportedError(chainId, getSupportedChains());
+    throw new ChainNotSupportedError(chainId, getSupportedChains())
   }
-  return config.blockExplorerUrl;
+  return config.blockExplorerUrl
 }
 
 /**
@@ -97,11 +97,11 @@ export function getBlockExplorerUrl(chainId: number): string {
  * @throws ChainNotSupportedError if chain is not supported
  */
 export function getChainConfig(chainId: number): ChainConfig {
-  const config = CHAIN_CONFIGS[chainId];
+  const config = CHAIN_CONFIGS[chainId]
   if (!config) {
-    throw new ChainNotSupportedError(chainId, getSupportedChains());
+    throw new ChainNotSupportedError(chainId, getSupportedChains())
   }
-  return config;
+  return config
 }
 
 /**
@@ -109,7 +109,7 @@ export function getChainConfig(chainId: number): ChainConfig {
  * @returns Array of supported chain IDs
  */
 export function getSupportedChains(): number[] {
-  return Object.keys(CHAIN_CONFIGS).map(Number);
+  return Object.keys(CHAIN_CONFIGS).map(Number)
 }
 
 /**
@@ -118,7 +118,7 @@ export function getSupportedChains(): number[] {
  * @returns True if the chain is supported, false otherwise
  */
 export function isChainSupported(chainId: number): boolean {
-  return chainId in CHAIN_CONFIGS;
+  return chainId in CHAIN_CONFIGS
 }
 
 /**
@@ -127,7 +127,7 @@ export function isChainSupported(chainId: number): boolean {
  * @returns The chain configuration, or undefined if not found
  */
 export function getChainBySlug(slug: string): ChainConfig | undefined {
-  return Object.values(CHAIN_CONFIGS).find((config) => config.slug === slug);
+  return Object.values(CHAIN_CONFIGS).find((config) => config.slug === slug)
 }
 
 /**
@@ -135,7 +135,7 @@ export function getChainBySlug(slug: string): ChainConfig | undefined {
  * @returns Array of supported chain slugs
  */
 export function getSupportedChainSlugs(): string[] {
-  return Object.values(CHAIN_CONFIGS).map((config) => config.slug);
+  return Object.values(CHAIN_CONFIGS).map((config) => config.slug)
 }
 
 /**
@@ -144,7 +144,7 @@ export function getSupportedChainSlugs(): string[] {
  * @returns True if the slug is valid, false otherwise
  */
 export function isValidChainSlug(slug: string): boolean {
-  return Object.values(CHAIN_CONFIGS).some((config) => config.slug === slug);
+  return Object.values(CHAIN_CONFIGS).some((config) => config.slug === slug)
 }
 
 /**
@@ -152,5 +152,5 @@ export function isValidChainSlug(slug: string): boolean {
  * @returns The default chain slug (unichain-mainnet)
  */
 export function getDefaultChainSlug(): string {
-  return 'unichain-mainnet';
+  return 'unichain-mainnet'
 }

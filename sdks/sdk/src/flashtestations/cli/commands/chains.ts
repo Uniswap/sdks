@@ -2,14 +2,14 @@
  * CLI command: chains - List supported chains
  */
 
-import { Command } from 'commander';
+import { Command } from 'commander'
 
-import { CHAIN_CONFIGS } from '../../config/chains';
-import { DEFAULT_CHAIN_ID } from '../utils/chainFlags';
-import { outputJson, printInfo } from '../utils/output';
+import { CHAIN_CONFIGS } from '../../config/chains'
+import { DEFAULT_CHAIN_ID } from '../utils/chainFlags'
+import { outputJson, printInfo } from '../utils/output'
 
 interface ChainsOptions {
-  json?: boolean;
+  json?: boolean
 }
 
 export function createChainsCommand(): Command {
@@ -18,27 +18,27 @@ export function createChainsCommand(): Command {
     .option('--json', 'Output as JSON')
     .action(async (options: ChainsOptions) => {
       if (options.json) {
-        outputChainsJson();
+        outputChainsJson()
       } else {
-        outputChainsHuman();
+        outputChainsHuman()
       }
-    });
+    })
 
-  return command;
+  return command
 }
 
 function outputChainsHuman(): void {
-  printInfo('Supported Chains:\n');
+  printInfo('Supported Chains:\n')
 
   for (const config of Object.values(CHAIN_CONFIGS)) {
-    const isDefault = config.chainId === DEFAULT_CHAIN_ID;
-    const defaultLabel = isDefault ? ' [default]' : '';
+    const isDefault = config.chainId === DEFAULT_CHAIN_ID
+    const defaultLabel = isDefault ? ' [default]' : ''
 
-    printInfo(`  ${config.name} (${config.chainId})${defaultLabel}`);
-    printInfo(`    RPC:                         ${config.defaultRpcUrl || 'must be provided'}`);
-    printInfo(`    Explorer:                    ${config.blockExplorerUrl || 'none'}`);
-    printInfo(`    BlockBuilderPolicy Contract: ${config.contractAddress}`);
-    printInfo('');
+    printInfo(`  ${config.name} (${config.chainId})${defaultLabel}`)
+    printInfo(`    RPC:                         ${config.defaultRpcUrl || 'must be provided'}`)
+    printInfo(`    Explorer:                    ${config.blockExplorerUrl || 'none'}`)
+    printInfo(`    BlockBuilderPolicy Contract: ${config.contractAddress}`)
+    printInfo('')
   }
 }
 
@@ -50,7 +50,7 @@ function outputChainsJson(): void {
     rpcUrl: config.defaultRpcUrl || null,
     blockExplorerUrl: config.blockExplorerUrl || null,
     contractAddress: config.contractAddress,
-  }));
+  }))
 
-  outputJson({ success: true, chains });
+  outputJson({ success: true, chains })
 }

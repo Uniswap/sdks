@@ -1,18 +1,18 @@
-import { BigNumber, ethers } from "ethers";
-import invariant from "tiny-invariant";
+import { BigNumber, ethers } from 'ethers'
+import invariant from 'tiny-invariant'
 
-import { OrderType, REACTOR_ADDRESS_MAPPING } from "../constants";
-import { MissingConfiguration } from "../errors";
-import { DutchInput, DutchOrder, DutchOrderInfo, DutchOutput } from "../order";
-import { ValidationInfo } from "../order/validation";
+import { OrderType, REACTOR_ADDRESS_MAPPING } from '../constants'
+import { MissingConfiguration } from '../errors'
+import { DutchInput, DutchOrder, DutchOrderInfo, DutchOutput } from '../order'
+import { ValidationInfo } from '../order/validation'
 
-import { OrderBuilder } from "./OrderBuilder";
+import { OrderBuilder } from './OrderBuilder'
 
 /**
  * Helper builder for generating dutch limit orders
  */
 export class DutchOrderBuilder extends OrderBuilder {
-  private info: Partial<DutchOrderInfo>;
+  private info: Partial<DutchOrderInfo>
 
   static fromOrder(order: DutchOrder): DutchOrderBuilder {
     // note chainId not used if passing in true reactor address
@@ -23,19 +23,16 @@ export class DutchOrderBuilder extends OrderBuilder {
       .swapper(order.info.swapper)
       .nonce(order.info.nonce)
       .input(order.info.input)
-      .exclusiveFiller(
-        order.info.exclusiveFiller,
-        order.info.exclusivityOverrideBps
-      )
+      .exclusiveFiller(order.info.exclusiveFiller, order.info.exclusivityOverrideBps)
       .validation({
         additionalValidationContract: order.info.additionalValidationContract,
         additionalValidationData: order.info.additionalValidationData,
-      });
+      })
 
     for (const output of order.info.outputs) {
-      builder.output(output);
+      builder.output(output)
     }
-    return builder;
+    return builder
   }
 
   constructor(
@@ -43,152 +40,128 @@ export class DutchOrderBuilder extends OrderBuilder {
     reactorAddress?: string,
     private permit2Address?: string
   ) {
-    super();
+    super()
 
     const mappedReactorAddress = REACTOR_ADDRESS_MAPPING[chainId]
       ? REACTOR_ADDRESS_MAPPING[chainId][OrderType.Dutch]
-      : undefined;
+      : undefined
 
     if (reactorAddress) {
-      this.reactor(reactorAddress);
+      this.reactor(reactorAddress)
     } else if (mappedReactorAddress) {
-      this.reactor(mappedReactorAddress);
+      this.reactor(mappedReactorAddress)
     } else {
-      throw new MissingConfiguration("reactor", chainId.toString());
+      throw new MissingConfiguration('reactor', chainId.toString())
     }
 
     this.info = {
       outputs: [],
       exclusiveFiller: ethers.constants.AddressZero,
       exclusivityOverrideBps: BigNumber.from(0),
-    };
+    }
   }
 
   decayStartTime(decayStartTime: number): DutchOrderBuilder {
-    this.info.decayStartTime = decayStartTime;
-    return this;
+    this.info.decayStartTime = decayStartTime
+    return this
   }
 
   decayEndTime(decayEndTime: number): DutchOrderBuilder {
     if (this.orderInfo.deadline === undefined) {
-      super.deadline(decayEndTime);
+      super.deadline(decayEndTime)
     }
 
-    this.info.decayEndTime = decayEndTime;
-    return this;
+    this.info.decayEndTime = decayEndTime
+    return this
   }
 
   input(input: DutchInput): DutchOrderBuilder {
-    this.info.input = input;
-    return this;
+    this.info.input = input
+    return this
   }
 
   output(output: DutchOutput): DutchOrderBuilder {
     if (!this.info.outputs) {
-      this.info.outputs = [];
+      this.info.outputs = []
     }
     invariant(
       output.startAmount.gte(output.endAmount),
       `startAmount must be greater than endAmount: ${output.startAmount.toString()}`
-    );
-    this.info.outputs.push(output);
-    return this;
+    )
+    this.info.outputs.push(output)
+    return this
   }
 
   deadline(deadline: number): DutchOrderBuilder {
-    super.deadline(deadline);
+    super.deadline(deadline)
 
     if (this.info.decayEndTime === undefined) {
-      this.decayEndTime(deadline);
+      this.decayEndTime(deadline)
     }
 
-    return this;
+    return this
   }
 
   swapper(swapper: string): DutchOrderBuilder {
-    super.swapper(swapper);
-    return this;
+    super.swapper(swapper)
+    return this
   }
 
   nonce(nonce: BigNumber): DutchOrderBuilder {
-    super.nonce(nonce);
-    return this;
+    super.nonce(nonce)
+    return this
   }
 
   validation(info: ValidationInfo): DutchOrderBuilder {
-    super.validation(info);
-    return this;
+    super.validation(info)
+    return this
   }
 
   // ensures that we only change non fee outputs
-  nonFeeRecipient(
-    newRecipient: string,
-    feeRecipient?: string
-  ): DutchOrderBuilder {
-    invariant(
-      newRecipient !== feeRecipient,
-      `newRecipient must be different from feeRecipient: ${newRecipient}`
-    );
+  nonFeeRecipient(newRecipient: string, feeRecipient?: string): DutchOrderBuilder {
+    invariant(newRecipient !== feeRecipient, `newRecipient must be different from feeRecipient: ${newRecipient}`)
     if (!this.info.outputs) {
-      return this;
+      return this
     }
     this.info.outputs = this.info.outputs.map((output) => {
       // if fee output then pass through
-      if (
-        feeRecipient &&
-        output.recipient.toLowerCase() === feeRecipient.toLowerCase()
-      ) {
-        return output;
+      if (feeRecipient && output.recipient.toLowerCase() === feeRecipient.toLowerCase()) {
+        return output
       }
 
       return {
         ...output,
         recipient: newRecipient,
-      };
-    });
-    return this;
+      }
+    })
+    return this
   }
 
-  exclusiveFiller(
-    exclusiveFiller: string,
-    exclusivityOverrideBps: BigNumber
-  ): DutchOrderBuilder {
-    this.info.exclusiveFiller = exclusiveFiller;
-    this.info.exclusivityOverrideBps = exclusivityOverrideBps;
-    return this;
+  exclusiveFiller(exclusiveFiller: string, exclusivityOverrideBps: BigNumber): DutchOrderBuilder {
+    this.info.exclusiveFiller = exclusiveFiller
+    this.info.exclusivityOverrideBps = exclusivityOverrideBps
+    return this
   }
 
   build(): DutchOrder {
-    invariant(this.info.decayStartTime !== undefined, "decayStartTime not set");
-    invariant(this.info.input !== undefined, "input not set");
-    invariant(this.info.decayEndTime !== undefined, "decayEndTime not set");
+    invariant(this.info.decayStartTime !== undefined, 'decayStartTime not set')
+    invariant(this.info.input !== undefined, 'input not set')
+    invariant(this.info.decayEndTime !== undefined, 'decayEndTime not set')
+    invariant(this.info.exclusiveFiller !== undefined, 'exclusiveFiller not set')
+    invariant(this.info.exclusivityOverrideBps !== undefined, 'exclusivityOverrideBps not set')
+    invariant(this.info.outputs !== undefined && this.info.outputs.length !== 0, 'outputs not set')
     invariant(
-      this.info.exclusiveFiller !== undefined,
-      "exclusiveFiller not set"
-    );
+      this.info.decayEndTime !== undefined || this.getOrderInfo().deadline !== undefined,
+      'Must set either deadline or decayEndTime'
+    )
     invariant(
-      this.info.exclusivityOverrideBps !== undefined,
-      "exclusivityOverrideBps not set"
-    );
-    invariant(
-      this.info.outputs !== undefined && this.info.outputs.length !== 0,
-      "outputs not set"
-    );
-    invariant(
-      this.info.decayEndTime !== undefined ||
-        this.getOrderInfo().deadline !== undefined,
-      "Must set either deadline or decayEndTime"
-    );
-    invariant(
-      !this.orderInfo.deadline ||
-        this.info.decayStartTime <= this.orderInfo.deadline,
+      !this.orderInfo.deadline || this.info.decayStartTime <= this.orderInfo.deadline,
       `decayStartTime must be before or same as deadline: ${this.info.decayStartTime}`
-    );
+    )
     invariant(
-      !this.orderInfo.deadline ||
-        this.info.decayEndTime <= this.orderInfo.deadline,
+      !this.orderInfo.deadline || this.info.decayEndTime <= this.orderInfo.deadline,
       `decayEndTime must be before or same as deadline: ${this.info.decayEndTime}`
-    );
+    )
 
     return new DutchOrder(
       Object.assign(this.getOrderInfo(), {
@@ -201,6 +174,6 @@ export class DutchOrderBuilder extends OrderBuilder {
       }),
       this.chainId,
       this.permit2Address
-    );
+    )
   }
 }

@@ -1,13 +1,13 @@
-import { getBlockExplorerUrl } from '../config/chains';
-import { computeAllWorkloadIds } from '../crypto/workload';
-import { RpcClient } from '../rpc/client';
+import { getBlockExplorerUrl } from '../config/chains'
+import { computeAllWorkloadIds } from '../crypto/workload'
+import { RpcClient } from '../rpc/client'
 import {
   BlockParameter,
   VerificationResult,
   WorkloadMeasurementRegisters,
   ClientConfig,
   FlashtestationEvent,
-} from '../types';
+} from '../types'
 
 /**
  * Fetch the event data of the flashtestation transaction from a specific block
@@ -42,10 +42,10 @@ export async function getFlashtestationEvent(
   const client = new RpcClient({
     chainId: config.chainId,
     rpcUrl: config.rpcUrl,
-  });
+  })
 
   // Get the flashtestation transaction's event data from the block
-  return await client.getFlashtestationEvent(blockParameter);
+  return await client.getFlashtestationEvent(blockParameter)
 }
 
 /**
@@ -95,33 +95,33 @@ export async function verifyFlashtestationInBlock(
   config: ClientConfig
 ): Promise<VerificationResult> {
   // Determine if we need to compute workload ID(s) from registers
-  let workloadIds: string[];
+  let workloadIds: string[]
 
   if (typeof workloadIdOrRegisters === 'string') {
     // Direct workload ID provided
-    workloadIds = [workloadIdOrRegisters];
+    workloadIds = [workloadIdOrRegisters]
   } else {
     // Compute all possible workload IDs from measurement registers
     // (handles arrays in mrtd and rtmr0 fields)
-    workloadIds = computeAllWorkloadIds(workloadIdOrRegisters);
+    workloadIds = computeAllWorkloadIds(workloadIdOrRegisters)
   }
 
   // Normalize workload IDs (ensure they have 0x prefix and are lowercase)
-  workloadIds = workloadIds.map(id => {
+  workloadIds = workloadIds.map((id) => {
     if (!id.startsWith('0x')) {
-      id = '0x' + id;
+      id = '0x' + id
     }
-    return id.toLowerCase();
-  });
+    return id.toLowerCase()
+  })
 
   // Create RPC client
   const client = new RpcClient({
     chainId: config.chainId,
     rpcUrl: config.rpcUrl,
-  });
+  })
 
   // Get the flashtestation event data from the block
-  const flashtestationEvent = await client.getFlashtestationEvent(blockParameter);
+  const flashtestationEvent = await client.getFlashtestationEvent(blockParameter)
 
   // If no flashtestation event data found, block was not TEE-built
   if (!flashtestationEvent) {
@@ -129,27 +129,27 @@ export async function verifyFlashtestationInBlock(
       isBuiltByExpectedTee: false,
       blockExplorerLink: null,
       workloadMetadata: null,
-    };
+    }
   }
 
   // Get block explorer URL for this chain
-  const blockExplorerBaseUrl = getBlockExplorerUrl(config.chainId);
+  const blockExplorerBaseUrl = getBlockExplorerUrl(config.chainId)
 
   // Get the block to construct the explorer link
-  const block = await client.getBlock(blockParameter);
+  const block = await client.getBlock(blockParameter)
 
   // Construct block explorer link if available
-  let blockExplorerLink: string | null = null;
+  let blockExplorerLink: string | null = null
   if (blockExplorerBaseUrl) {
     // Use block number for the explorer link
-    blockExplorerLink = `${blockExplorerBaseUrl}/block/${block.number}`;
+    blockExplorerLink = `${blockExplorerBaseUrl}/block/${block.number}`
   }
 
   // Normalize event workload ID for comparison
-  const eventWorkloadId = flashtestationEvent.workloadId.toLowerCase();
+  const eventWorkloadId = flashtestationEvent.workloadId.toLowerCase()
 
   // Compare workload IDs - check if any of the possible IDs match
-  const workloadMatches = workloadIds.includes(eventWorkloadId);
+  const workloadMatches = workloadIds.includes(eventWorkloadId)
 
   if (!workloadMatches) {
     // Block was built by a TEE, but not the one we're looking for
@@ -162,8 +162,8 @@ export async function verifyFlashtestationInBlock(
         builderAddress: flashtestationEvent.caller,
         version: flashtestationEvent.version,
         sourceLocators: flashtestationEvent.sourceLocators,
-      }
-    };
+      },
+    }
   }
 
   // Block was built by the specified TEE workload
@@ -176,6 +176,6 @@ export async function verifyFlashtestationInBlock(
       builderAddress: flashtestationEvent.caller,
       version: flashtestationEvent.version,
       sourceLocators: flashtestationEvent.sourceLocators,
-    }
-  };
+    },
+  }
 }

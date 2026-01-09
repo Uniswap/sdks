@@ -1,7 +1,7 @@
-import { REACTOR_ADDRESS_MAPPING } from "./constants";
+import { REACTOR_ADDRESS_MAPPING } from './constants'
 
-describe("REACTOR_ADDRESS_MAPPING", () => {
-  it("matches the existing reactor mapping snapshot", () => {
+describe('REACTOR_ADDRESS_MAPPING', () => {
+  it('matches the existing reactor mapping snapshot', () => {
     expect(REACTOR_ADDRESS_MAPPING).toMatchInlineSnapshot(`
       {
         "1": {
@@ -56,6 +56,6 @@ describe("REACTOR_ADDRESS_MAPPING", () => {
           "Relay": "0x0000000000000000000000000000000000000000",
         },
       }
-    `);
-  });
-});
+    `)
+  })
+})

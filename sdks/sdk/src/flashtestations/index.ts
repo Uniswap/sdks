@@ -6,8 +6,7 @@
  */
 
 // Main verification function
-export { verifyFlashtestationInBlock, getFlashtestationEvent } from './verification/service';
-
+export { verifyFlashtestationInBlock, getFlashtestationEvent } from './verification/service'
 
 // Core types
 export type {
@@ -18,25 +17,13 @@ export type {
   FlashtestationEvent,
   ChainConfig,
   ClientConfig,
-} from './types';
+} from './types'
 
 // Error classes for programmatic error handling
-export {
-  NetworkError,
-  BlockNotFoundError,
-  ValidationError,
-  ChainNotSupportedError,
-} from './types';
+export { NetworkError, BlockNotFoundError, ValidationError, ChainNotSupportedError } from './types'
 
 // Chain configuration utilities
-export {
-  getSupportedChains,
-  isChainSupported,
-  getChainConfig,
-} from './config/chains';
+export { getSupportedChains, isChainSupported, getChainConfig } from './config/chains'
 
 // Workload ID computation utilities
-export {
-  computeWorkloadId,
-  expandToSingularRegisters,
-} from './crypto/workload';
+export { computeWorkloadId, expandToSingularRegisters } from './crypto/workload'

@@ -124,7 +124,7 @@ export abstract class TickMath {
     return tickLow === tickHigh
       ? tickLow
       : JSBI.lessThanOrEqual(TickMath.getSqrtRatioAtTick(tickHigh), sqrtRatioX96)
-      ? tickHigh
-      : tickLow
+        ? tickHigh
+        : tickLow
   }
 }

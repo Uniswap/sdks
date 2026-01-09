@@ -48,8 +48,8 @@ describe('#computePoolAddress', () => {
   it('should correctly compute zkevm pool address', () => {
     const USDCE = new Token(324, '0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4', 6, 'USDC.e', 'Bridged USDC (zkSync)')
     const WETH = new Token(324, '0x5AEa5775959fBC2557Cc8789bC1bf90A239D9a91', 18, 'WETH', 'Wrapped Ether')
-    let tokenA = USDCE
-    let tokenB = WETH
+    const tokenA = USDCE
+    const tokenB = WETH
     const salt = solKeccak256(
       ['bytes'],
       [defaultAbiCoder.encode(['address', 'address', 'uint24'], [tokenA.address, tokenB.address, FeeAmount.MEDIUM])]

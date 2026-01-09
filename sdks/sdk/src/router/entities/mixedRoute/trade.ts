@@ -197,8 +197,6 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
     tradeType: TTradeType
   ): Promise<MixedRouteTrade<TInput, TOutput, TTradeType>> {
     const amounts: CurrencyAmount<Currency>[] = new Array(route.path.length)
-    let inputAmount: CurrencyAmount<TInput>
-    let outputAmount: CurrencyAmount<TOutput>
 
     invariant(tradeType === TradeType.EXACT_INPUT, 'TRADE_TYPE')
     invariant(amount.currency.equals(route.input), 'INPUT')
@@ -206,14 +204,12 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
     amounts[0] = amountWithPathCurrency(amount, route.pools[0])
     for (let i = 0; i < route.path.length - 1; i++) {
       const pool = route.pools[i]
-      const [outputAmount] = await pool.getOutputAmount(
-        amountWithPathCurrency(amounts[i], pool) as CurrencyAmount<Token>
-      )
-      amounts[i + 1] = outputAmount
+      const [outputAmt] = await pool.getOutputAmount(amountWithPathCurrency(amounts[i], pool) as CurrencyAmount<Token>)
+      amounts[i + 1] = outputAmt
     }
 
-    inputAmount = CurrencyAmount.fromFractionalAmount(route.input, amount.numerator, amount.denominator)
-    outputAmount = CurrencyAmount.fromFractionalAmount(
+    const inputAmount = CurrencyAmount.fromFractionalAmount(route.input, amount.numerator, amount.denominator)
+    const outputAmount = CurrencyAmount.fromFractionalAmount(
       route.output,
       amounts[amounts.length - 1].numerator,
       amounts[amounts.length - 1].denominator
@@ -252,22 +248,20 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
 
     for (const { route, amount } of routes) {
       const amounts: CurrencyAmount<Currency>[] = new Array(route.path.length)
-      let inputAmount: CurrencyAmount<TInput>
-      let outputAmount: CurrencyAmount<TOutput>
 
       invariant(amount.currency.equals(route.input), 'INPUT')
-      inputAmount = CurrencyAmount.fromFractionalAmount(route.input, amount.numerator, amount.denominator)
+      const inputAmount = CurrencyAmount.fromFractionalAmount(route.input, amount.numerator, amount.denominator)
       amounts[0] = CurrencyAmount.fromFractionalAmount(route.pathInput, amount.numerator, amount.denominator)
 
       for (let i = 0; i < route.path.length - 1; i++) {
         const pool = route.pools[i]
-        const [outputAmount] = await pool.getOutputAmount(
+        const [outputAmt] = await pool.getOutputAmount(
           amountWithPathCurrency(amounts[i], pool) as CurrencyAmount<Token>
         )
-        amounts[i + 1] = outputAmount
+        amounts[i + 1] = outputAmt
       }
 
-      outputAmount = CurrencyAmount.fromFractionalAmount(
+      const outputAmount = CurrencyAmount.fromFractionalAmount(
         route.output,
         amounts[amounts.length - 1].numerator,
         amounts[amounts.length - 1].denominator
@@ -294,7 +288,7 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
   public static createUncheckedTrade<
     TInput extends Currency,
     TOutput extends Currency,
-    TTradeType extends TradeType
+    TTradeType extends TradeType,
   >(constructorArguments: {
     route: MixedRouteSDK<TInput, TOutput>
     inputAmount: CurrencyAmount<TInput>
@@ -325,7 +319,7 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
   public static createUncheckedTradeWithMultipleRoutes<
     TInput extends Currency,
     TOutput extends Currency,
-    TTradeType extends TradeType
+    TTradeType extends TradeType,
   >(constructorArguments: {
     routes: {
       route: MixedRouteSDK<TInput, TOutput>

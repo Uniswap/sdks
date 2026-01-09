@@ -1,12 +1,4 @@
-import {
-  BigintIsh,
-  Percent,
-  Token,
-  CurrencyAmount,
-  validateAndParseAddress,
-  Currency,
-  NativeCurrency,
-} from '../core'
+import { BigintIsh, Percent, Token, CurrencyAmount, validateAndParseAddress, Currency, NativeCurrency } from '../core'
 import JSBI from 'jsbi'
 import invariant from 'tiny-invariant'
 import { Position } from './entities/position'

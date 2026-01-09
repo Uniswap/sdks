@@ -22,7 +22,7 @@ export abstract class PaymentsExtended {
       return Payments.encodeUnwrapWETH9(amountMinimum, recipient, feeOptions)
     }
 
-    if (!!feeOptions) {
+    if (feeOptions) {
       const feeBips = encodeFeeBips(feeOptions.fee)
       const feeRecipient = validateAndParseAddress(feeOptions.recipient)
 
@@ -47,7 +47,7 @@ export abstract class PaymentsExtended {
       return Payments.encodeSweepToken(token, amountMinimum, recipient, feeOptions)
     }
 
-    if (!!feeOptions) {
+    if (feeOptions) {
       const feeBips = encodeFeeBips(feeOptions.fee)
       const feeRecipient = validateAndParseAddress(feeOptions.recipient)
 

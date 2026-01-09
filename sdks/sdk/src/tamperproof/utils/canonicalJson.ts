@@ -1,20 +1,13 @@
-export type JsonPrimitive = null | boolean | number | string;
-export type JsonValue =
-  | JsonPrimitive
-  | JsonValue[]
-  | { [key: string]: JsonValue };
+export type JsonPrimitive = null | boolean | number | string
+export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue }
 
 export type RequestPayload<Params = Record<string, unknown>> = {
-  method: string;
-  params: Params;
-};
+  method: string
+  params: Params
+}
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    Object.getPrototypeOf(value) === Object.prototype
-  );
+  return typeof value === 'object' && value !== null && Object.getPrototypeOf(value) === Object.prototype
 }
 
 /**
@@ -30,28 +23,28 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  */
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) {
-    return value.map((item) => canonicalize(item));
+    return value.map((item) => canonicalize(item))
   }
 
   if (isPlainObject(value)) {
-    const sortedKeys = Object.keys(value).sort();
-    const result: Record<string, unknown> = {};
+    const sortedKeys = Object.keys(value).sort()
+    const result: Record<string, unknown> = {}
     for (const key of sortedKeys) {
-      const v = value[key];
-      if (v === undefined) continue; // drop undefined values
-      result[key] = canonicalize(v);
+      const v = value[key]
+      if (v === undefined) continue // drop undefined values
+      result[key] = canonicalize(v)
     }
-    return result;
+    return result
   }
 
   // For primitives (including null) and non-plain objects, return as-is
-  return value;
+  return value
 }
 
 export function canonicalStringify(value: unknown): string {
-  return JSON.stringify(canonicalize(value));
+  return JSON.stringify(canonicalize(value))
 }
 
 export function serializeRequestPayload<T>(requestPayload: T): Uint8Array {
-  return new TextEncoder().encode(canonicalStringify(requestPayload));
+  return new TextEncoder().encode(canonicalStringify(requestPayload))
 }

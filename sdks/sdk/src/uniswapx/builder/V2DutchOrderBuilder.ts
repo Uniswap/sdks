@@ -1,7 +1,7 @@
-import { BigNumber, ethers } from "ethers";
-import invariant from "tiny-invariant";
+import { BigNumber, ethers } from 'ethers'
+import invariant from 'tiny-invariant'
 
-import { OrderType } from "../constants";
+import { OrderType } from '../constants'
 import {
   CosignedV2DutchOrder,
   CosignedV2DutchOrderInfo,
@@ -9,22 +9,20 @@ import {
   DutchInput,
   DutchOutput,
   UnsignedV2DutchOrder,
-} from "../order";
-import { ValidationInfo } from "../order/validation";
-import { getPermit2, getReactor } from "../utils";
+} from '../order'
+import { ValidationInfo } from '../order/validation'
+import { getPermit2, getReactor } from '../utils'
 
-import { OrderBuilder } from "./OrderBuilder";
+import { OrderBuilder } from './OrderBuilder'
 
 /**
  * Helper builder for generating dutch limit orders
  */
 export class V2DutchOrderBuilder extends OrderBuilder {
-  private info: Partial<CosignedV2DutchOrderInfo>;
-  private permit2Address: string;
+  private info: Partial<CosignedV2DutchOrderInfo>
+  private permit2Address: string
 
-  static fromOrder<O extends UnsignedV2DutchOrder>(
-    order: O
-  ): V2DutchOrderBuilder {
+  static fromOrder<O extends UnsignedV2DutchOrder>(order: O): V2DutchOrderBuilder {
     const builder = new V2DutchOrderBuilder(order.chainId, order.info.reactor)
       .deadline(order.info.deadline)
       .swapper(order.info.swapper)
@@ -34,20 +32,20 @@ export class V2DutchOrderBuilder extends OrderBuilder {
       .validation({
         additionalValidationContract: order.info.additionalValidationContract,
         additionalValidationData: order.info.additionalValidationData,
-      });
+      })
 
     for (const output of order.info.outputs) {
-      builder.output(output);
+      builder.output(output)
     }
 
     if (order instanceof CosignedV2DutchOrder) {
-      builder.cosignature(order.info.cosignature);
-      builder.decayEndTime(order.info.cosignerData.decayEndTime);
-      builder.decayStartTime(order.info.cosignerData.decayStartTime);
-      builder.cosignerData(order.info.cosignerData);
+      builder.cosignature(order.info.cosignature)
+      builder.decayEndTime(order.info.cosignerData.decayEndTime)
+      builder.decayStartTime(order.info.cosignerData.decayStartTime)
+      builder.cosignerData(order.info.cosignerData)
     }
 
-    return builder;
+    return builder
   }
 
   constructor(
@@ -55,10 +53,10 @@ export class V2DutchOrderBuilder extends OrderBuilder {
     reactorAddress?: string,
     _permit2Address?: string
   ) {
-    super();
+    super()
 
-    this.reactor(getReactor(chainId, OrderType.Dutch_V2, reactorAddress));
-    this.permit2Address = getPermit2(chainId, _permit2Address);
+    this.reactor(getReactor(chainId, OrderType.Dutch_V2, reactorAddress))
+    this.permit2Address = getPermit2(chainId, _permit2Address)
 
     this.info = {
       outputs: [],
@@ -70,94 +68,88 @@ export class V2DutchOrderBuilder extends OrderBuilder {
         inputOverride: BigNumber.from(0),
         outputOverrides: [],
       },
-    };
+    }
   }
 
   decayStartTime(decayStartTime: number): this {
     if (!this.info.cosignerData) {
-      this.initializeCosignerData({ decayStartTime });
+      this.initializeCosignerData({ decayStartTime })
     } else {
-      this.info.cosignerData.decayStartTime = decayStartTime;
+      this.info.cosignerData.decayStartTime = decayStartTime
     }
-    return this;
+    return this
   }
 
   decayEndTime(decayEndTime: number): this {
     if (!this.info.cosignerData) {
-      this.initializeCosignerData({ decayEndTime });
+      this.initializeCosignerData({ decayEndTime })
     } else {
-      this.info.cosignerData.decayEndTime = decayEndTime;
+      this.info.cosignerData.decayEndTime = decayEndTime
     }
     if (!this.orderInfo.deadline) {
-      super.deadline(decayEndTime);
+      super.deadline(decayEndTime)
     }
-    return this;
+    return this
   }
 
   input(input: DutchInput): this {
-    this.info.input = input;
-    return this;
+    this.info.input = input
+    return this
   }
 
   output(output: DutchOutput): this {
     invariant(
       output.startAmount.gte(output.endAmount),
       `startAmount must be greater than endAmount: ${output.startAmount.toString()}`
-    );
-    this.info.outputs?.push(output);
-    return this;
+    )
+    this.info.outputs?.push(output)
+    return this
   }
 
   deadline(deadline: number): this {
-    super.deadline(deadline);
+    super.deadline(deadline)
 
     if (!this.info.cosignerData) {
-      this.initializeCosignerData({ decayEndTime: deadline });
+      this.initializeCosignerData({ decayEndTime: deadline })
     } else if (!this.info.cosignerData.decayEndTime) {
-      this.decayEndTime(deadline);
+      this.decayEndTime(deadline)
     }
-    return this;
+    return this
   }
 
   swapper(swapper: string): this {
-    super.swapper(swapper);
-    return this;
+    super.swapper(swapper)
+    return this
   }
 
   nonce(nonce: BigNumber): this {
-    super.nonce(nonce);
-    return this;
+    super.nonce(nonce)
+    return this
   }
 
   validation(info: ValidationInfo): this {
-    super.validation(info);
-    return this;
+    super.validation(info)
+    return this
   }
 
   // ensures that we only change non fee outputs
   nonFeeRecipient(newRecipient: string, feeRecipient?: string): this {
-    invariant(
-      newRecipient !== feeRecipient,
-      `newRecipient must be different from feeRecipient: ${newRecipient}`
-    );
+    invariant(newRecipient !== feeRecipient, `newRecipient must be different from feeRecipient: ${newRecipient}`)
     if (!this.info.outputs) {
-      return this;
+      return this
     }
     this.info.outputs = this.info.outputs.map((output) => {
       // if fee output then pass through
-      if (
-        feeRecipient &&
-        output.recipient.toLowerCase() === feeRecipient.toLowerCase()
-      ) {
-        return output;
+      if (feeRecipient && output.recipient.toLowerCase() === feeRecipient.toLowerCase()) {
+        return output
       }
 
       return {
         ...output,
         recipient: newRecipient,
-      };
-    });
-    return this;
+      }
+    })
+    return this
   }
 
   exclusiveFiller(exclusiveFiller: string): this {
@@ -169,10 +161,10 @@ export class V2DutchOrderBuilder extends OrderBuilder {
         exclusivityOverrideBps: BigNumber.from(0),
         inputOverride: BigNumber.from(0),
         outputOverrides: [],
-      };
+      }
     }
-    this.info.cosignerData.exclusiveFiller = exclusiveFiller;
-    return this;
+    this.info.cosignerData.exclusiveFiller = exclusiveFiller
+    return this
   }
 
   exclusivityOverrideBps(exclusivityOverrideBps: BigNumber): this {
@@ -184,70 +176,65 @@ export class V2DutchOrderBuilder extends OrderBuilder {
         exclusivityOverrideBps: exclusivityOverrideBps,
         inputOverride: BigNumber.from(0),
         outputOverrides: [],
-      };
+      }
     }
-    this.info.cosignerData.exclusivityOverrideBps = exclusivityOverrideBps;
-    return this;
+    this.info.cosignerData.exclusivityOverrideBps = exclusivityOverrideBps
+    return this
   }
 
   inputOverride(inputOverride: BigNumber): this {
     if (!this.info.cosignerData) {
-      this.initializeCosignerData({ inputOverride });
+      this.initializeCosignerData({ inputOverride })
     } else {
-      this.info.cosignerData.inputOverride = inputOverride;
+      this.info.cosignerData.inputOverride = inputOverride
     }
-    return this;
+    return this
   }
 
   outputOverrides(outputOverrides: BigNumber[]): this {
     if (!this.info.cosignerData) {
-      this.initializeCosignerData({ outputOverrides });
+      this.initializeCosignerData({ outputOverrides })
     } else {
-      this.info.cosignerData.outputOverrides = outputOverrides;
+      this.info.cosignerData.outputOverrides = outputOverrides
     }
-    return this;
+    return this
   }
 
   cosigner(cosigner: string): this {
-    this.info.cosigner = cosigner;
-    return this;
+    this.info.cosigner = cosigner
+    return this
   }
 
   cosignature(cosignature: string | undefined): this {
-    this.info.cosignature = cosignature;
-    return this;
+    this.info.cosignature = cosignature
+    return this
   }
 
   cosignerData(cosignerData: CosignerData): this {
-    this.decayStartTime(cosignerData.decayStartTime);
-    this.decayEndTime(cosignerData.decayEndTime);
-    this.exclusiveFiller(cosignerData.exclusiveFiller);
-    this.exclusivityOverrideBps(cosignerData.exclusivityOverrideBps);
-    this.inputOverride(cosignerData.inputOverride);
-    this.outputOverrides(cosignerData.outputOverrides);
-    return this;
+    this.decayStartTime(cosignerData.decayStartTime)
+    this.decayEndTime(cosignerData.decayEndTime)
+    this.exclusiveFiller(cosignerData.exclusiveFiller)
+    this.exclusivityOverrideBps(cosignerData.exclusivityOverrideBps)
+    this.inputOverride(cosignerData.inputOverride)
+    this.outputOverrides(cosignerData.outputOverrides)
+    return this
   }
 
   buildPartial(): UnsignedV2DutchOrder {
-    invariant(this.info.cosigner !== undefined, "cosigner not set");
-    invariant(this.info.input !== undefined, "input not set");
-    invariant(
-      this.info.outputs && this.info.outputs.length > 0,
-      "outputs not set"
-    );
-    invariant(this.info.input !== undefined, "original input not set");
+    invariant(this.info.cosigner !== undefined, 'cosigner not set')
+    invariant(this.info.input !== undefined, 'input not set')
+    invariant(this.info.outputs && this.info.outputs.length > 0, 'outputs not set')
+    invariant(this.info.input !== undefined, 'original input not set')
     invariant(
       !this.orderInfo.deadline ||
-        (this.info.cosignerData &&
-          this.info.cosignerData.decayStartTime <= this.orderInfo.deadline),
+        (this.info.cosignerData && this.info.cosignerData.decayStartTime <= this.orderInfo.deadline),
       `if present, decayStartTime must be before or same as deadline: ${this.info.cosignerData?.decayStartTime}`
-    );
+    )
     invariant(
       !this.orderInfo.deadline ||
-        (this.info.cosignerData &&
-          this.info.cosignerData.decayEndTime <= this.orderInfo.deadline),
+        (this.info.cosignerData && this.info.cosignerData.decayEndTime <= this.orderInfo.deadline),
       `if present, decayEndTime must be before or same as deadline: ${this.info.cosignerData?.decayEndTime}`
-    );
+    )
 
     return new UnsignedV2DutchOrder(
       Object.assign(this.getOrderInfo(), {
@@ -257,61 +244,43 @@ export class V2DutchOrderBuilder extends OrderBuilder {
       }),
       this.chainId,
       this.permit2Address
-    );
+    )
   }
 
   build(): CosignedV2DutchOrder {
-    invariant(this.info.cosigner !== undefined, "cosigner not set");
-    invariant(this.info.cosignature !== undefined, "cosignature not set");
-    invariant(this.info.input !== undefined, "input not set");
+    invariant(this.info.cosigner !== undefined, 'cosigner not set')
+    invariant(this.info.cosignature !== undefined, 'cosignature not set')
+    invariant(this.info.input !== undefined, 'input not set')
+    invariant(this.info.outputs && this.info.outputs.length > 0, 'outputs not set')
+    invariant(this.info.cosignerData !== undefined, 'cosignerData not set')
+    invariant(this.info.cosignerData.decayStartTime !== undefined, 'decayStartTime not set')
     invariant(
-      this.info.outputs && this.info.outputs.length > 0,
-      "outputs not set"
-    );
-    invariant(this.info.cosignerData !== undefined, "cosignerData not set");
+      this.info.cosignerData.decayEndTime !== undefined || this.orderInfo.deadline !== undefined,
+      'Neither decayEndTime or deadline not set'
+    )
+    invariant(this.info.cosignerData.exclusiveFiller !== undefined, 'exclusiveFiller not set')
+    invariant(this.info.cosignerData.exclusivityOverrideBps !== undefined, 'exclusivityOverrideBps not set')
     invariant(
-      this.info.cosignerData.decayStartTime !== undefined,
-      "decayStartTime not set"
-    );
-    invariant(
-      this.info.cosignerData.decayEndTime !== undefined ||
-        this.orderInfo.deadline !== undefined,
-      "Neither decayEndTime or deadline not set"
-    );
-    invariant(
-      this.info.cosignerData.exclusiveFiller !== undefined,
-      "exclusiveFiller not set"
-    );
-    invariant(
-      this.info.cosignerData.exclusivityOverrideBps !== undefined,
-      "exclusivityOverrideBps not set"
-    );
-    invariant(
-        this.info.cosignerData.inputOverride.lte(this.info.input.startAmount),
-      "inputOverride larger than original input"
-    );
-    invariant(
-      this.info.cosignerData.outputOverrides.length > 0,
-      "outputOverrides not set"
-    );
+      this.info.cosignerData.inputOverride.lte(this.info.input.startAmount),
+      'inputOverride larger than original input'
+    )
+    invariant(this.info.cosignerData.outputOverrides.length > 0, 'outputOverrides not set')
     this.info.cosignerData.outputOverrides.forEach((override, idx) => {
       invariant(
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         override.gte(this.info.outputs![idx].startAmount),
-        "outputOverride must be larger than or equal to original output"
-      );
-    });
-    invariant(this.info.input !== undefined, "original input not set");
+        'outputOverride must be larger than or equal to original output'
+      )
+    })
+    invariant(this.info.input !== undefined, 'original input not set')
     invariant(
-      !this.orderInfo.deadline ||
-        this.info.cosignerData.decayStartTime <= this.orderInfo.deadline,
+      !this.orderInfo.deadline || this.info.cosignerData.decayStartTime <= this.orderInfo.deadline,
       `decayStartTime must be before or same as deadline: ${this.info.cosignerData.decayStartTime}`
-    );
+    )
     invariant(
-      !this.orderInfo.deadline ||
-        this.info.cosignerData.decayEndTime <= this.orderInfo.deadline,
+      !this.orderInfo.deadline || this.info.cosignerData.decayEndTime <= this.orderInfo.deadline,
       `decayEndTime must be before or same as deadline: ${this.info.cosignerData.decayEndTime}`
-    );
+    )
 
     return new CosignedV2DutchOrder(
       Object.assign(this.getOrderInfo(), {
@@ -323,7 +292,7 @@ export class V2DutchOrderBuilder extends OrderBuilder {
       }),
       this.chainId,
       this.permit2Address
-    );
+    )
   }
 
   private initializeCosignerData(overrides: Partial<CosignerData>): void {
@@ -335,6 +304,6 @@ export class V2DutchOrderBuilder extends OrderBuilder {
       inputOverride: BigNumber.from(0),
       outputOverrides: [],
       ...overrides,
-    };
+    }
   }
 }

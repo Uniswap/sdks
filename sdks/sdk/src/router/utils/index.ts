@@ -11,7 +11,7 @@ import { TPool } from './TPool'
  * @returns a nested array of Pools or Pairs in the order of the route
  */
 export const partitionMixedRouteByProtocol = (route: MixedRouteSDK<Currency, Currency>): TPool[][] => {
-  let acc = []
+  const acc = []
 
   let left = 0
   let right = 0

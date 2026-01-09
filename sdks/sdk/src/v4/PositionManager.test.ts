@@ -76,8 +76,8 @@ describe('PositionManager', () => {
     })
 
     it('succeeds with nonzero hook', () => {
-      let hook = '0x1100000000000000000000000000000000002401'
-      let poolKey: PoolKey = Pool.getPoolKey(currency0, currency1, fee, tickSpacing, hook)
+      const hook = '0x1100000000000000000000000000000000002401'
+      const poolKey: PoolKey = Pool.getPoolKey(currency0, currency1, fee, tickSpacing, hook)
 
       const { calldata, value } = V4PositionManager.createCallParameters(poolKey, SQRT_PRICE_1_1)
       /**
@@ -136,7 +136,7 @@ describe('PositionManager', () => {
     })
 
     it('throws if createPool is true but there is no sqrtPrice defined', () => {
-      let createPool: boolean = true
+      const createPool: boolean = true
       expect(() =>
         V4PositionManager.addCallParameters(
           new Position({
@@ -476,7 +476,7 @@ describe('PositionManager', () => {
         liquidity: 999,
       })
 
-      let invalidBurnLiqOptions = {
+      const invalidBurnLiqOptions = {
         burnToken: true,
         liquidityPercentage: new Percent(1, 100),
         tokenId,
@@ -510,7 +510,7 @@ describe('PositionManager', () => {
 
     it('succeeds for remove partial liquidity', () => {
       // remove 1% of 100, 1
-      let amountToRemove = '1'
+      const amountToRemove = '1'
       const { calldata, value } = V4PositionManager.removeCallParameters(position, partialRemoveOptions)
       const { amount0: amount0Min, amount1: amount1Min } = position.burnAmountsWithSlippage(slippageTolerance)
 

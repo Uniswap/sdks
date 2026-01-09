@@ -1,20 +1,17 @@
-import { DutchOrder } from "./DutchOrder";
-import { CosignedPriorityOrder, UnsignedPriorityOrder } from "./PriorityOrder";
-import { RelayOrder } from "./RelayOrder";
-import { CosignedV2DutchOrder, UnsignedV2DutchOrder } from "./V2DutchOrder";
-import { CosignedV3DutchOrder, UnsignedV3DutchOrder } from "./V3DutchOrder";
-import {
-  CosignedHybridOrder,
-  UnsignedHybridOrder,
-} from "./v4/HybridOrder";
+import { DutchOrder } from './DutchOrder'
+import { CosignedPriorityOrder, UnsignedPriorityOrder } from './PriorityOrder'
+import { RelayOrder } from './RelayOrder'
+import { CosignedV2DutchOrder, UnsignedV2DutchOrder } from './V2DutchOrder'
+import { CosignedV3DutchOrder, UnsignedV3DutchOrder } from './V3DutchOrder'
+import { CosignedHybridOrder, UnsignedHybridOrder } from './v4/HybridOrder'
 
-export * from "./DutchOrder";
-export * from "./PriorityOrder";
-export * from "./RelayOrder";
-export * from "./types";
-export * from "./validation";
-export * from "./V2DutchOrder";
-export * from "./V3DutchOrder";
+export * from './DutchOrder'
+export * from './PriorityOrder'
+export * from './RelayOrder'
+export * from './types'
+export * from './validation'
+export * from './V2DutchOrder'
+export * from './V3DutchOrder'
 export type {
   OrderInfoV4,
   HybridInput,
@@ -41,9 +38,9 @@ export type {
   OutputAllocation,
   FeedInfo,
   PermitData,
-} from "./v4/types";
-export * from "./v4/HybridOrder";
-export * from "./v4/hashing";
+} from './v4/types'
+export * from './v4/HybridOrder'
+export * from './v4/hashing'
 
 export type UniswapXOrder =
   | DutchOrder
@@ -54,6 +51,6 @@ export type UniswapXOrder =
   | UnsignedPriorityOrder
   | CosignedPriorityOrder
   | UnsignedHybridOrder
-  | CosignedHybridOrder;
+  | CosignedHybridOrder
 
-export type Order = UniswapXOrder | RelayOrder;
+export type Order = UniswapXOrder | RelayOrder

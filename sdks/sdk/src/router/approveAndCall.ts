@@ -2,13 +2,7 @@ import { Interface } from '@ethersproject/abi'
 import invariant from 'tiny-invariant'
 import IApproveAndCall from '@uniswap/swap-router-contracts/artifacts/contracts/interfaces/IApproveAndCall.sol/IApproveAndCall.json'
 import { Currency, Percent, Token } from '../core'
-import {
-  MintSpecificOptions,
-  IncreaseSpecificOptions,
-  NonfungiblePositionManager,
-  Position,
-  toHex,
-} from '../v3'
+import { MintSpecificOptions, IncreaseSpecificOptions, NonfungiblePositionManager, Position, toHex } from '../v3'
 import JSBI from 'jsbi'
 
 // condensed version of v3-sdk AddLiquidityOptions containing only necessary swap + add attributes

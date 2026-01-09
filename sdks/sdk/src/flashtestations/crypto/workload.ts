@@ -1,10 +1,7 @@
-import { keccak256 } from 'viem/utils';
+import { keccak256 } from 'viem/utils'
 
-import type { WorkloadMeasurementRegisters, SingularWorkloadMeasurementRegisters } from '../types/index';
-import {
-  validateWorkloadMeasurementRegisters,
-  validateSingularWorkloadMeasurementRegisters,
-} from '../types/validation';
+import type { WorkloadMeasurementRegisters, SingularWorkloadMeasurementRegisters } from '../types/index'
+import { validateWorkloadMeasurementRegisters, validateSingularWorkloadMeasurementRegisters } from '../types/validation'
 
 /**
  * Converts a hex string to a Uint8Array
@@ -19,9 +16,9 @@ import {
  *
  */
 function hexToBytes(hex: string): Uint8Array {
-  const unprefixedHex = hex.startsWith('0x') ? hex.slice(2) : hex;
-  if (unprefixedHex.length % 2 !== 0) throw new Error("Invalid hex string");
-  return Uint8Array.from(unprefixedHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+  const unprefixedHex = hex.startsWith('0x') ? hex.slice(2) : hex
+  if (unprefixedHex.length % 2 !== 0) throw new Error('Invalid hex string')
+  return Uint8Array.from(unprefixedHex.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16)))
 }
 
 /**
@@ -32,14 +29,14 @@ function hexToBytes(hex: string): Uint8Array {
  * @returns The result of the concatenation
  */
 function concatBytes(...arrays: Uint8Array[]): Uint8Array {
-  const totalLength = arrays.reduce((sum, arr) => sum + arr.length, 0);
-  const result = new Uint8Array(totalLength);
-  let offset = 0;
+  const totalLength = arrays.reduce((sum, arr) => sum + arr.length, 0)
+  const result = new Uint8Array(totalLength)
+  let offset = 0
   for (const arr of arrays) {
-    result.set(arr, offset);
-    offset += arr.length;
+    result.set(arr, offset)
+    offset += arr.length
   }
-  return result;
+  return result
 }
 
 /**
@@ -57,22 +54,20 @@ function concatBytes(...arrays: Uint8Array[]): Uint8Array {
  */
 export function computeWorkloadId(registers: SingularWorkloadMeasurementRegisters): string {
   // Validate input registers (ensures no arrays)
-  validateSingularWorkloadMeasurementRegisters(registers);
+  validateSingularWorkloadMeasurementRegisters(registers)
 
   // Convert hex strings to Uint8Arrays for bitwise operations
-  const mrTd = hexToBytes(registers.mrtd);
-  const rtMr0 = hexToBytes(registers.rtmr0);
-  const rtMr1 = hexToBytes(registers.rtmr1);
-  const rtMr2 = hexToBytes(registers.rtmr2);
-  const rtMr3 = hexToBytes(registers.rtmr3);
-  const mrConfigId = hexToBytes(registers.mrconfigid);
-  const xFAM = hexToBytes(registers.xfam);
-  const tdAttributes = hexToBytes(registers.tdattributes);
+  const mrTd = hexToBytes(registers.mrtd)
+  const rtMr0 = hexToBytes(registers.rtmr0)
+  const rtMr1 = hexToBytes(registers.rtmr1)
+  const rtMr2 = hexToBytes(registers.rtmr2)
+  const rtMr3 = hexToBytes(registers.rtmr3)
+  const mrConfigId = hexToBytes(registers.mrconfigid)
+  const xFAM = hexToBytes(registers.xfam)
+  const tdAttributes = hexToBytes(registers.tdattributes)
 
   // Concatenate all components and hash
-  return keccak256(
-    concatBytes(mrTd, rtMr0, rtMr1, rtMr2, rtMr3, mrConfigId, xFAM, tdAttributes)
-  );
+  return keccak256(concatBytes(mrTd, rtMr0, rtMr1, rtMr2, rtMr3, mrConfigId, xFAM, tdAttributes))
 }
 
 /**
@@ -97,14 +92,14 @@ export function expandToSingularRegisters(
   registers: WorkloadMeasurementRegisters
 ): SingularWorkloadMeasurementRegisters[] {
   // Validate input first
-  validateWorkloadMeasurementRegisters(registers);
+  validateWorkloadMeasurementRegisters(registers)
 
   // Normalize mrtd and rtmr0 to arrays
-  const mrTdValues = Array.isArray(registers.mrtd) ? registers.mrtd : [registers.mrtd];
-  const rtMr0Values = Array.isArray(registers.rtmr0) ? registers.rtmr0 : [registers.rtmr0];
+  const mrTdValues = Array.isArray(registers.mrtd) ? registers.mrtd : [registers.mrtd]
+  const rtMr0Values = Array.isArray(registers.rtmr0) ? registers.rtmr0 : [registers.rtmr0]
 
   // Generate cartesian product
-  const result: SingularWorkloadMeasurementRegisters[] = [];
+  const result: SingularWorkloadMeasurementRegisters[] = []
   for (const mrtd of mrTdValues) {
     for (const rtmr0 of rtMr0Values) {
       result.push({
@@ -116,11 +111,11 @@ export function expandToSingularRegisters(
         rtmr1: registers.rtmr1,
         rtmr2: registers.rtmr2,
         rtmr3: registers.rtmr3,
-      });
+      })
     }
   }
 
-  return result;
+  return result
 }
 
 /**
@@ -141,11 +136,9 @@ export function expandToSingularRegisters(
  * const ids = computeAllWorkloadIds(registers);
  * ```
  */
-export function computeAllWorkloadIds(
-  registers: WorkloadMeasurementRegisters
-): string[] {
-  const singularRegisters = expandToSingularRegisters(registers);
-  return singularRegisters.map(singular => computeWorkloadId(singular));
+export function computeAllWorkloadIds(registers: WorkloadMeasurementRegisters): string[] {
+  const singularRegisters = expandToSingularRegisters(registers)
+  return singularRegisters.map((singular) => computeWorkloadId(singular))
 }
 
 /**
@@ -167,10 +160,7 @@ export function computeAllWorkloadIds(
  * const matches = matchesAnyWorkloadId(registers, expectedId);
  * ```
  */
-export function matchesAnyWorkloadId(
-  registers: WorkloadMeasurementRegisters,
-  expectedWorkloadId: string
-): boolean {
-  const allIds = computeAllWorkloadIds(registers);
-  return allIds.includes(expectedWorkloadId);
+export function matchesAnyWorkloadId(registers: WorkloadMeasurementRegisters, expectedWorkloadId: string): boolean {
+  const allIds = computeAllWorkloadIds(registers)
+  return allIds.includes(expectedWorkloadId)
 }

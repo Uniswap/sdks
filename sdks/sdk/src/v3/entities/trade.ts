@@ -346,7 +346,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
   public static createUncheckedTrade<
     TInput extends Currency,
     TOutput extends Currency,
-    TTradeType extends TradeType
+    TTradeType extends TradeType,
   >(constructorArguments: {
     route: Route<TInput, TOutput>
     inputAmount: CurrencyAmount<TInput>
@@ -377,7 +377,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
   public static createUncheckedTradeWithMultipleRoutes<
     TInput extends Currency,
     TOutput extends Currency,
-    TTradeType extends TradeType
+    TTradeType extends TradeType,
   >(constructorArguments: {
     routes: {
       route: Route<TInput, TOutput>
