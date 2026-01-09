@@ -98,7 +98,7 @@ contract DeployRouter is Test {
         Currency usdc = Currency.wrap(address(USDC));
         Currency dai = Currency.wrap(address(DAI));
 
-        uint256 amount = 10000 ether;
+        uint256 amount = 20000 ether;
 
         deal(address(USDC), address(this), amount);
         USDC.approve(address(poolManager), amount);
@@ -118,6 +118,8 @@ contract DeployRouter is Test {
                     PoolKey(eth, dai, 3000, 60, IHooks(address(0))),
                     PoolKey(dai, usdc, 3000, 60, IHooks(address(0))),
                     PoolKey(usdc, weth, 3000, 60, IHooks(address(0))),
+                    PoolKey(usdc, weth, 500, 60, IHooks(address(0))), // low fee USDC-WETH pool
+                    PoolKey(eth, usdc, 500, 60, IHooks(address(0))), // low fee USDC-ETH pool
                     PoolKey(eth, weth, 3000, 60, IHooks(address(0)))
                 ]
             )
@@ -125,7 +127,7 @@ contract DeployRouter is Test {
     }
 
     function unlockCallback(bytes calldata data) external returns (bytes memory) {
-        PoolKey[5] memory poolKeys = abi.decode(data, (PoolKey[5]));
+        PoolKey[7] memory poolKeys = abi.decode(data, (PoolKey[7]));
 
         for (uint256 i = 0; i < poolKeys.length; i++) {
             PoolKey memory poolKey = poolKeys[i];
@@ -159,21 +161,22 @@ contract DeployRouter is Test {
         ERC20(token0).approve(V3_POSITION_MANAGER, type(uint256).max);
         ERC20(token1).approve(V3_POSITION_MANAGER, type(uint256).max);
 
-        INonfungiblePositionManager(V3_POSITION_MANAGER).mint(
-            INonfungiblePositionManager.MintParams({
-                token0: token0,
-                token1: token1,
-                fee: fee,
-                tickLower: 200040,
-                tickUpper: 300000,
-                amount0Desired: amount0Desired,
-                amount1Desired: amount1Desired,
-                amount0Min: 0,
-                amount1Min: 0,
-                recipient: from,
-                deadline: type(uint256).max
-            })
-        );
+        INonfungiblePositionManager(V3_POSITION_MANAGER)
+            .mint(
+                INonfungiblePositionManager.MintParams({
+                    token0: token0,
+                    token1: token1,
+                    fee: fee,
+                    tickLower: 200040,
+                    tickUpper: 300000,
+                    amount0Desired: amount0Desired,
+                    amount1Desired: amount1Desired,
+                    amount0Min: 0,
+                    amount1Min: 0,
+                    recipient: from,
+                    deadline: type(uint256).max
+                })
+            );
 
         vm.stopPrank();
     }
