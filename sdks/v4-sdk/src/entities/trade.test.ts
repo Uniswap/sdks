@@ -172,7 +172,7 @@ describe('Trade', () => {
     })
     it('can be constructed with ETHER as output for exact output with ETH-WETH pool', async () => {
       const trade = await Trade.fromRoute(
-        new Route([pool_eth_0,pool_weth_eth], token0, ETHER),
+        new Route([pool_eth_0, pool_weth_eth], token0, ETHER),
         CurrencyAmount.fromRawAmount(ETHER, 10000),
         TradeType.EXACT_OUTPUT
       )
@@ -768,11 +768,11 @@ describe('Trade', () => {
       let exactIn: Trade<Token, Token, TradeType.EXACT_INPUT>
       beforeEach(
         async () =>
-          (exactIn = await Trade.fromRoute(
-            new Route([pool_0_1, pool_1_2], token0, token2),
-            CurrencyAmount.fromRawAmount(token0, 10000),
-            TradeType.EXACT_INPUT
-          ))
+        (exactIn = await Trade.fromRoute(
+          new Route([pool_0_1, pool_1_2], token0, token2),
+          CurrencyAmount.fromRawAmount(token0, 10000),
+          TradeType.EXACT_INPUT
+        ))
       )
 
       it('throws if less than 0', () => {

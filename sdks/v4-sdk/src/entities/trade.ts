@@ -237,7 +237,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       let tokenAmount: CurrencyAmount<Currency> = amountWithPathCurrency(amount, route.pools[0])
       for (let i = 0; i < route.pools.length; i++) {
         const pool = route.pools[i]
-        ;[tokenAmount] = await pool.getOutputAmount(tokenAmount)
+          ;[tokenAmount] = await pool.getOutputAmount(tokenAmount)
       }
       inputAmount = CurrencyAmount.fromFractionalAmount(route.input, amount.numerator, amount.denominator)
       outputAmount = CurrencyAmount.fromFractionalAmount(route.output, tokenAmount.numerator, tokenAmount.denominator)
@@ -247,21 +247,18 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       let tokenAmount: CurrencyAmount<Currency> = amountWithPathCurrency(amount, route.pools[route.pools.length - 1])
       for (let i = route.pools.length - 1; i >= 0; i--) {
         const pool = route.pools[i]
-        ;[tokenAmount] = await pool.getInputAmount(tokenAmount)
-        
+          ;[tokenAmount] = await pool.getInputAmount(tokenAmount)
         // Special case: if this is the last pool (first in backward iteration) and it's an ETH-WETH pool
         // with ETH as the route output, we need to convert the WETH amount back to ETH
         // so the next pool in the iteration can work with ETH
         if (i === route.pools.length - 1) {
           // Check if this is an ETH-WETH pool
-          const isEthWethPool = (pool.currency0.isNative && pool.currency1.equals(pool.currency0.wrapped)) ||
-                                (pool.currency1.isNative && pool.currency0.equals(pool.currency1.wrapped))
+          const isEthWethPool = pool.currency1.equals(pool.currency0.wrapped)
 
           if (isEthWethPool && route.output.isNative) {
             // Convert WETH amount to ETH for the next pool
-            const ethCurrency = pool.currency0.isNative ? pool.currency0 : pool.currency1
             tokenAmount = CurrencyAmount.fromFractionalAmount(
-              ethCurrency,
+              pool.currency0, // native currency
               tokenAmount.numerator,
               tokenAmount.denominator
             )
