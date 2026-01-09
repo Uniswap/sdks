@@ -99,9 +99,7 @@ export class UniswapTrade implements Command {
       if (swap.route.protocol === Protocol.V4) {
         const v4Route = swap.route as unknown as V4Route<Currency, Currency>
         const lastPool = v4Route.pools[v4Route.pools.length - 1]
-        const isEthWethPool =
-          (lastPool.currency0.isNative && lastPool.currency1.equals(lastPool.currency0.wrapped)) ||
-          (lastPool.currency1.isNative && lastPool.currency0.equals(lastPool.currency1.wrapped))
+        const isEthWethPool = lastPool.currency1.equals(lastPool.currency0.wrapped)
         if (isEthWethPool) {
           return true
         }
@@ -110,9 +108,7 @@ export class UniswapTrade implements Command {
         const lastPool = mixedRoute.pools[mixedRoute.pools.length - 1]
         // Check if the last pool in the mixed route is a V4 ETH-WETH pool
         if (lastPool instanceof V4Pool) {
-          const isEthWethPool =
-            (lastPool.currency0.isNative && lastPool.currency1.equals(lastPool.currency0.wrapped)) ||
-            (lastPool.currency1.isNative && lastPool.currency0.equals(lastPool.currency1.wrapped))
+          const isEthWethPool = lastPool.currency1.equals(lastPool.currency0.wrapped)
           if (isEthWethPool) {
             return true
           }
