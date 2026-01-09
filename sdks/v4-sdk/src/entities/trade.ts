@@ -248,6 +248,25 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       for (let i = route.pools.length - 1; i >= 0; i--) {
         const pool = route.pools[i]
         ;[tokenAmount] = await pool.getInputAmount(tokenAmount)
+        
+        // Special case: if this is the last pool (first in backward iteration) and it's an ETH-WETH pool
+        // with ETH as the route output, we need to convert the WETH amount back to ETH
+        // so the next pool in the iteration can work with ETH
+        if (i === route.pools.length - 1) {
+          // Check if this is an ETH-WETH pool
+          const isEthWethPool = (pool.currency0.isNative && pool.currency1.equals(pool.currency0.wrapped)) ||
+                                (pool.currency1.isNative && pool.currency0.equals(pool.currency1.wrapped))
+
+          if (isEthWethPool && route.output.isNative) {
+            // Convert WETH amount to ETH for the next pool
+            const ethCurrency = pool.currency0.isNative ? pool.currency0 : pool.currency1
+            tokenAmount = CurrencyAmount.fromFractionalAmount(
+              ethCurrency,
+              tokenAmount.numerator,
+              tokenAmount.denominator
+            )
+          }
+        }
       }
       inputAmount = CurrencyAmount.fromFractionalAmount(route.input, tokenAmount.numerator, tokenAmount.denominator)
       outputAmount = CurrencyAmount.fromFractionalAmount(route.output, amount.numerator, amount.denominator)
