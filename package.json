@@ -8,10 +8,9 @@
     "@typescript-eslint/eslint-plugin": "^8.38.0",
     "danger": "11.2.6",
     "eslint": "^8.57.0",
-    "eslint-plugin-prettier": "^3.4.1",
+    "eslint-plugin-prettier": "^5.0.0",
     "husky": "^8.0.3",
     "semantic-release": "^25.0.1",
-    "semantic-release-monorepo": "8.0.2",
     "syncpack": "^8.5.14",
     "turbo": "1.10.16"
   },
@@ -32,8 +31,7 @@
     "postinstall": "husky"
   },
   "workspaces": [
-    "sdks/*",
-    "sdks/uniswapx-sdk/integration"
+    "sdks/sdk"
   ],
   "resolutions": {
     "@manypkg/cli@^0.19.2": "patch:@manypkg/cli@npm%3A0.19.2#./.yarn/patches/@manypkg-cli-npm-0.19.2-ea52ff91d4.patch",

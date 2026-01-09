@@ -1,0 +1,195 @@
+{
+  "name": "@uniswap/sdk",
+  "version": "1.0.0",
+  "description": "Unified Uniswap SDK - Core, V2, V3, V4, Router, and utility packages",
+  "repository": "https://github.com/Uniswap/sdks.git",
+  "keywords": [
+    "uniswap",
+    "ethereum",
+    "defi",
+    "sdk"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "exports": {
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js",
+      "require": "./dist/core/index.cjs"
+    },
+    "./v2": {
+      "types": "./dist/v2/index.d.ts",
+      "import": "./dist/v2/index.js",
+      "require": "./dist/v2/index.cjs"
+    },
+    "./v3": {
+      "types": "./dist/v3/index.d.ts",
+      "import": "./dist/v3/index.js",
+      "require": "./dist/v3/index.cjs"
+    },
+    "./v4": {
+      "types": "./dist/v4/index.d.ts",
+      "import": "./dist/v4/index.js",
+      "require": "./dist/v4/index.cjs"
+    },
+    "./router": {
+      "types": "./dist/router/index.d.ts",
+      "import": "./dist/router/index.js",
+      "require": "./dist/router/index.cjs"
+    },
+    "./universal-router": {
+      "types": "./dist/universal-router/index.d.ts",
+      "import": "./dist/universal-router/index.js",
+      "require": "./dist/universal-router/index.cjs"
+    },
+    "./permit2": {
+      "types": "./dist/permit2/index.d.ts",
+      "import": "./dist/permit2/index.js",
+      "require": "./dist/permit2/index.cjs"
+    },
+    "./uniswapx": {
+      "types": "./dist/uniswapx/index.d.ts",
+      "import": "./dist/uniswapx/index.js",
+      "require": "./dist/uniswapx/index.cjs"
+    },
+    "./smart-wallet": {
+      "types": "./dist/smart-wallet/index.d.ts",
+      "import": "./dist/smart-wallet/index.js",
+      "require": "./dist/smart-wallet/index.cjs"
+    },
+    "./flashtestations": {
+      "types": "./dist/flashtestations/index.d.ts",
+      "import": "./dist/flashtestations/index.js",
+      "require": "./dist/flashtestations/index.cjs"
+    },
+    "./tamperproof": {
+      "types": "./dist/tamperproof/index.d.ts",
+      "import": "./dist/tamperproof/index.js",
+      "require": "./dist/tamperproof/index.cjs"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "core": [
+        "dist/core/index.d.ts"
+      ],
+      "v2": [
+        "dist/v2/index.d.ts"
+      ],
+      "v3": [
+        "dist/v3/index.d.ts"
+      ],
+      "v4": [
+        "dist/v4/index.d.ts"
+      ],
+      "router": [
+        "dist/router/index.d.ts"
+      ],
+      "universal-router": [
+        "dist/universal-router/index.d.ts"
+      ],
+      "permit2": [
+        "dist/permit2/index.d.ts"
+      ],
+      "uniswapx": [
+        "dist/uniswapx/index.d.ts"
+      ],
+      "smart-wallet": [
+        "dist/smart-wallet/index.d.ts"
+      ],
+      "flashtestations": [
+        "dist/flashtestations/index.d.ts"
+      ],
+      "tamperproof": [
+        "dist/tamperproof/index.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "clean": "rm -rf dist",
+    "lint": "eslint 'src/**/*.ts' --max-warnings 0",
+    "lint:fix": "eslint 'src/**/*.ts' --fix",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "release": "semantic-release"
+  },
+  "dependencies": {
+    "@ethersproject/abi": "^5.5.0",
+    "@ethersproject/address": "^5.0.2",
+    "@ethersproject/bytes": "^5.7.0",
+    "@ethersproject/keccak256": "5.7.0",
+    "@ethersproject/providers": "^5.7.0",
+    "@ethersproject/solidity": "^5.0.9",
+    "@ethersproject/strings": "5.7.0",
+    "@openzeppelin/contracts": "4.7.0",
+    "@uniswap/swap-router-contracts": "^1.3.0",
+    "@uniswap/universal-router": "2.0.0-beta.2",
+    "@uniswap/v2-core": "^1.0.1",
+    "@uniswap/v3-core": "1.0.0",
+    "@uniswap/v3-periphery": "^1.1.1",
+    "@uniswap/v3-staker": "1.0.0",
+    "big.js": "^5.2.2",
+    "bignumber.js": "^9.0.2",
+    "commander": "^14.0.2",
+    "decimal.js-light": "^2.5.0",
+    "dohjs": "^0.3.3",
+    "ethers": "^5.7.0",
+    "jsbi": "^3.1.4",
+    "tiny-invariant": "^1.1.0",
+    "tiny-warning": "^1.0.3",
+    "toformat": "^2.0.0",
+    "viem": "^2.23.5"
+  },
+  "devDependencies": {
+    "@types/big.js": "^4.0.5",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.38.0",
+    "@typescript-eslint/parser": "^8.38.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "prettier": "^3.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "prettier": {
+    "printWidth": 120,
+    "semi": false,
+    "singleQuote": true,
+    "trailingComma": "es5"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "release": {
+    "branches": [
+      {
+        "name": "main",
+        "prerelease": false
+      }
+    ],
+    "plugins": [
+      [
+        "@semantic-release/commit-analyzer",
+        {
+          "preset": "angular",
+          "releaseRules": "../../publishing/release-rules.cjs"
+        }
+      ],
+      "@semantic-release/release-notes-generator",
+      "@semantic-release/npm",
+      "@semantic-release/github"
+    ]
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2020", "DOM"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "resolveJsonModule": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "isolatedModules": false,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "baseUrl": ".",
+    "paths": {
+      "@uniswap/sdk/core": ["./src/core"],
+      "@uniswap/sdk/v2": ["./src/v2"],
+      "@uniswap/sdk/v3": ["./src/v3"],
+      "@uniswap/sdk/v4": ["./src/v4"],
+      "@uniswap/sdk/router": ["./src/router"],
+      "@uniswap/sdk/universal-router": ["./src/universal-router"],
+      "@uniswap/sdk/permit2": ["./src/permit2"],
+      "@uniswap/sdk/uniswapx": ["./src/uniswapx"],
+      "@uniswap/sdk/smart-wallet": ["./src/smart-wallet"],
+      "@uniswap/sdk/flashtestations": ["./src/flashtestations"],
+      "@uniswap/sdk/tamperproof": ["./src/tamperproof"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+}
