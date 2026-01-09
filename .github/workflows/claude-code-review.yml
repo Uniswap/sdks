@@ -20,18 +20,30 @@ jobs:
         github.event.action == 'ready_for_review'
       )
 
-    uses: Uniswap/ai-toolkit/.github/workflows/_claude-code-review.yml@9aa3cf98744a2b4e1aac51cd2d26144ea337ab3b
+    uses: Uniswap/ai-toolkit/.github/workflows/_claude-code-review.yml@01e6451c223af33f574ca6fcfae2ae3bc9137a63
     with:
       pr_number: ${{ github.event.pull_request.number }}
       base_ref: ${{ github.base_ref }}
       force_review: false
-      toolkit_ref: 9aa3cf98744a2b4e1aac51cd2d26144ea337ab3b
-      custom_prompt_path: ".claude/prompts/claude-pr-review.md"
+      toolkit_ref: 01e6451c223af33f574ca6fcfae2ae3bc9137a63
 
       model: "claude-opus-4-5"
 
       # Standard timeout for most PRs
       timeout_minutes: 20
 
+      # Custom prompt overrides
+      prompt_override_review_priorities: '.claude/prompts/pr-review/review-priorities.md'
+      prompt_override_files_to_skip: '.claude/prompts/pr-review/files-to-skip.md'
+      prompt_override_communication_style: '.claude/prompts/pr-review/communication-style.md'
+      prompt_override_pattern_recognition: '.claude/prompts/pr-review/pattern-recognition.md'
+      prompt_override_initial_review_process: '.claude/prompts/pr-review/initial-review-process.md'
+      prompt_override_avoid_patterns: '.claude/prompts/pr-review/avoid-patterns.md'
+      prompt_override_verdict_approve: '.claude/prompts/pr-review/verdict-approve.md'
+      prompt_override_verdict_request_changes: '.claude/prompts/pr-review/verdict-request-changes.md'
+      prompt_override_verdict_comment: '.claude/prompts/pr-review/verdict-comment.md'
+      prompt_override_re_review_process: '.claude/prompts/pr-review/re-review-process.md'
+
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
