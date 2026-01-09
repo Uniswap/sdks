@@ -1133,6 +1133,24 @@ describe('Uniswap', () => {
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
+    it('encodes an exact output ending in ETH-WETH', async () => {
+      const outputEther = utils.parseEther('1').toString()
+      const v3Trade = await V3Trade.fromRoute(
+        new V3Route([WETH_USDC_V3], USDC, ETHER),
+        CurrencyAmount.fromRawAmount(ETHER, outputEther),
+        TradeType.EXACT_OUTPUT
+      )
+      const v4Trade = await V4Trade.fromRoute(
+        new V4Route([ETH_USDC_V4, ETH_WETH_V4], USDC, ETHER),
+        CurrencyAmount.fromRawAmount(ETHER, outputEther),
+        TradeType.EXACT_OUTPUT
+      )
+      const opts = swapOptions({})
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([v3Trade, v4Trade]), opts)
+      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_ENDING_IN_ETH_WETH', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+    })
+
     /**
      * Test: Mixed + V4 split route with ETH output
      * - Mixed route: V2 DAI-USDC -> V3 USDC-WETH
