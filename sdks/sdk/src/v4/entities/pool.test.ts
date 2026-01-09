@@ -156,18 +156,22 @@ describe('Pool', () => {
   })
 
   describe('#poolId', () => {
-    let pool = new Pool(USDC, DAI, FEE_AMOUNT_LOW, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
-    expect(pool.poolId).toEqual('0x503fb8d73fd2351c645ae9fea85381bac6b16ea0c2038e14dc1e96d447c8ffbb')
+    it('returns the correct poolId', () => {
+      let pool = new Pool(USDC, DAI, FEE_AMOUNT_LOW, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
+      expect(pool.poolId).toEqual('0x503fb8d73fd2351c645ae9fea85381bac6b16ea0c2038e14dc1e96d447c8ffbb')
+    })
   })
 
   describe('#poolKey', () => {
-    let pool = new Pool(USDC, DAI, FEE_AMOUNT_LOW, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
-    expect(pool.poolKey).toEqual({
-      currency0: DAI.address,
-      currency1: USDC.address,
-      fee: FEE_AMOUNT_LOW,
-      tickSpacing: TICK_SPACING_TEN,
-      hooks: ADDRESS_ZERO,
+    it('returns the correct poolKey', () => {
+      let pool = new Pool(USDC, DAI, FEE_AMOUNT_LOW, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
+      expect(pool.poolKey).toEqual({
+        currency0: DAI.address,
+        currency1: USDC.address,
+        fee: FEE_AMOUNT_LOW,
+        tickSpacing: TICK_SPACING_TEN,
+        hooks: ADDRESS_ZERO,
+      })
     })
   })
 
@@ -256,41 +260,49 @@ describe('Pool', () => {
 
   describe('#involvesCurrency', () => {
     const pool = new Pool(USDC, DAI, FEE_AMOUNT_LOW, TICK_SPACING_TEN, ADDRESS_ZERO, encodeSqrtRatioX96(1, 1), 0, 0, [])
-    expect(pool.involvesCurrency(USDC)).toEqual(true)
-    expect(pool.involvesCurrency(DAI)).toEqual(true)
-    expect(pool.involvesCurrency(WETH9[1])).toEqual(false)
+    it('returns true for currencies in the pool', () => {
+      expect(pool.involvesCurrency(USDC)).toEqual(true)
+      expect(pool.involvesCurrency(DAI)).toEqual(true)
+    })
+    it('returns false for currencies not in the pool', () => {
+      expect(pool.involvesCurrency(WETH9[1])).toEqual(false)
+    })
   })
 
   describe('#v4InvolvesToken', () => {
-    const pool = new Pool(
-      Ether.onChain(ChainId.MAINNET),
-      DAI,
-      FEE_AMOUNT_LOW,
-      TICK_SPACING_TEN,
-      ADDRESS_ZERO,
-      encodeSqrtRatioX96(1, 1),
-      0,
-      0,
-      []
-    )
-    expect(pool.v4InvolvesToken(Ether.onChain(ChainId.MAINNET))).toEqual(true)
-    expect(pool.v4InvolvesToken(DAI)).toEqual(true)
-    expect(pool.v4InvolvesToken(WETH9[1])).toEqual(true)
+    it('returns true for native ETH pool with ETH, DAI, and WETH', () => {
+      const pool = new Pool(
+        Ether.onChain(ChainId.MAINNET),
+        DAI,
+        FEE_AMOUNT_LOW,
+        TICK_SPACING_TEN,
+        ADDRESS_ZERO,
+        encodeSqrtRatioX96(1, 1),
+        0,
+        0,
+        []
+      )
+      expect(pool.v4InvolvesToken(Ether.onChain(ChainId.MAINNET))).toEqual(true)
+      expect(pool.v4InvolvesToken(DAI)).toEqual(true)
+      expect(pool.v4InvolvesToken(WETH9[1])).toEqual(true)
+    })
 
-    const pool2 = new Pool(
-      Ether.onChain(ChainId.MAINNET).wrapped,
-      DAI,
-      FEE_AMOUNT_LOW,
-      TICK_SPACING_TEN,
-      ADDRESS_ZERO,
-      encodeSqrtRatioX96(1, 1),
-      0,
-      0,
-      []
-    )
-    expect(pool2.v4InvolvesToken(Ether.onChain(ChainId.MAINNET))).toEqual(true)
-    expect(pool2.v4InvolvesToken(DAI)).toEqual(true)
-    expect(pool2.v4InvolvesToken(WETH9[1])).toEqual(true)
+    it('returns true for WETH pool with ETH, DAI, and WETH', () => {
+      const pool2 = new Pool(
+        Ether.onChain(ChainId.MAINNET).wrapped,
+        DAI,
+        FEE_AMOUNT_LOW,
+        TICK_SPACING_TEN,
+        ADDRESS_ZERO,
+        encodeSqrtRatioX96(1, 1),
+        0,
+        0,
+        []
+      )
+      expect(pool2.v4InvolvesToken(Ether.onChain(ChainId.MAINNET))).toEqual(true)
+      expect(pool2.v4InvolvesToken(DAI)).toEqual(true)
+      expect(pool2.v4InvolvesToken(WETH9[1])).toEqual(true)
+    })
   })
 
   describe('swaps', () => {

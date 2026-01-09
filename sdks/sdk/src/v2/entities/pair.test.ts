@@ -174,17 +174,21 @@ describe('Pair', () => {
     })
   })
   describe('#involvesToken', () => {
-    expect(
-      new Pair(CurrencyAmount.fromRawAmount(USDC, '100'), CurrencyAmount.fromRawAmount(DAI, '100')).involvesToken(USDC)
-    ).toEqual(true)
-    expect(
-      new Pair(CurrencyAmount.fromRawAmount(USDC, '100'), CurrencyAmount.fromRawAmount(DAI, '100')).involvesToken(DAI)
-    ).toEqual(true)
-    expect(
-      new Pair(CurrencyAmount.fromRawAmount(USDC, '100'), CurrencyAmount.fromRawAmount(DAI, '100')).involvesToken(
-        WETH9[1]
-      )
-    ).toEqual(false)
+    it('returns true for tokens in the pair', () => {
+      expect(
+        new Pair(CurrencyAmount.fromRawAmount(USDC, '100'), CurrencyAmount.fromRawAmount(DAI, '100')).involvesToken(USDC)
+      ).toEqual(true)
+      expect(
+        new Pair(CurrencyAmount.fromRawAmount(USDC, '100'), CurrencyAmount.fromRawAmount(DAI, '100')).involvesToken(DAI)
+      ).toEqual(true)
+    })
+    it('returns false for tokens not in the pair', () => {
+      expect(
+        new Pair(CurrencyAmount.fromRawAmount(USDC, '100'), CurrencyAmount.fromRawAmount(DAI, '100')).involvesToken(
+          WETH9[1]
+        )
+      ).toEqual(false)
+    })
   })
   describe('getInputAmount and getOutputAmount', () => {
     const BLASTBuyFeeBps = BigNumber.from(400)
