@@ -26,7 +26,6 @@ jobs:
       base_ref: ${{ github.base_ref }}
       force_review: false
       toolkit_ref: 01e6451c223af33f574ca6fcfae2ae3bc9137a63
-      custom_prompt_path: ".claude/prompts/claude-pr-review.md"
 
       model: "claude-opus-4-5"
 
