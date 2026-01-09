@@ -172,7 +172,7 @@ describe('Trade', () => {
     })
     it('can be constructed with ETHER as output for exact output with ETH-WETH pool', async () => {
       const trade = await Trade.fromRoute(
-        new Route([pool_eth_0,pool_weth_eth], token0, ETHER),
+        new Route([pool_eth_0, pool_weth_eth], token0, ETHER),
         CurrencyAmount.fromRawAmount(ETHER, 10000),
         TradeType.EXACT_OUTPUT
       )
