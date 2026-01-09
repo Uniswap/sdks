@@ -254,15 +254,12 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
         // so the next pool in the iteration can work with ETH
         if (i === route.pools.length - 1) {
           // Check if this is an ETH-WETH pool
-          const isEthWethPool =
-            (pool.currency0.isNative && pool.currency1.equals(pool.currency0.wrapped)) ||
-            (pool.currency1.isNative && pool.currency0.equals(pool.currency1.wrapped))
+          const isEthWethPool = pool.currency1.equals(pool.currency0.wrapped)
 
           if (isEthWethPool && route.output.isNative) {
             // Convert WETH amount to ETH for the next pool
-            const ethCurrency = pool.currency0.isNative ? pool.currency0 : pool.currency1
             tokenAmount = CurrencyAmount.fromFractionalAmount(
-              ethCurrency,
+              pool.currency0, // native currency
               tokenAmount.numerator,
               tokenAmount.denominator
             )
