@@ -75,9 +75,3 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-  # Note: Compat packages (@uniswap/sdk-core, @uniswap/v2-sdk, etc.) are published
-  # manually via the compat-packages-release.yaml workflow when needed.
-  # They only require updates when:
-  # 1. The main SDK has a breaking change (major version bump)
-  # 2. The compat package wrapper code needs changes
