@@ -20,12 +20,12 @@ jobs:
         github.event.action == 'ready_for_review'
       )
 
-    uses: Uniswap/ai-toolkit/.github/workflows/_claude-code-review.yml@9aa3cf98744a2b4e1aac51cd2d26144ea337ab3b
+    uses: Uniswap/ai-toolkit/.github/workflows/_claude-code-review.yml@01e6451c223af33f574ca6fcfae2ae3bc9137a63
     with:
       pr_number: ${{ github.event.pull_request.number }}
       base_ref: ${{ github.base_ref }}
       force_review: false
-      toolkit_ref: 9aa3cf98744a2b4e1aac51cd2d26144ea337ab3b
+      toolkit_ref: 01e6451c223af33f574ca6fcfae2ae3bc9137a63
       custom_prompt_path: ".claude/prompts/claude-pr-review.md"
 
       model: "claude-opus-4-5"
@@ -35,3 +35,4 @@ jobs:
 
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
