@@ -38,6 +38,10 @@ export class Route<TInput extends Currency, TOutput extends Currency> {
     this.pathInput = getPathCurrency(input, pools[0])
     this.pathOutput = getPathCurrency(output, pools[pools.length - 1])
 
+    if (this.pathInput.isNative && pools[0].currency0.wrapped.equals(pools[0].currency1)) {
+      this.pathInput = pools[0].currency1
+    }
+
     /**
      * Normalizes currency0-currency1 order and selects the next currency/fee step to add to the path
      * */
