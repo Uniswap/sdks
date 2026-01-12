@@ -4810,7 +4810,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/flashtestations-sdk@workspace:sdks/flashtestations-sdk":
+"@uniswap/flashtestations-sdk@workspace:*, @uniswap/flashtestations-sdk@workspace:sdks/flashtestations-sdk":
   version: 0.0.0-use.local
   resolution: "@uniswap/flashtestations-sdk@workspace:sdks/flashtestations-sdk"
   dependencies:
@@ -4843,17 +4843,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/permit2-sdk@npm:^1.2.1, @uniswap/permit2-sdk@npm:^1.3.0":
-  version: 1.4.0
-  resolution: "@uniswap/permit2-sdk@npm:1.4.0"
-  dependencies:
-    ethers: ^5.7.0
-    tiny-invariant: ^1.1.0
-  checksum: 1aecbebdd0026b6e504581c2ee85967b2ee1f0f6d4ed9eef50aee7bf9738266a9df823f6cbe9a3c2ea66a73cac62fbcd08f4731754d0e9a36193b8d5bc1e7b9e
-  languageName: node
-  linkType: hard
-
-"@uniswap/permit2-sdk@workspace:sdks/permit2-sdk":
+"@uniswap/permit2-sdk@workspace:*, @uniswap/permit2-sdk@workspace:sdks/permit2-sdk":
   version: 0.0.0-use.local
   resolution: "@uniswap/permit2-sdk@workspace:sdks/permit2-sdk"
   dependencies:
@@ -4866,31 +4856,17 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@uniswap/router-sdk@npm:^2.3.3":
-  version: 2.3.3
-  resolution: "@uniswap/router-sdk@npm:2.3.3"
-  dependencies:
-    "@ethersproject/abi": ^5.5.0
-    "@uniswap/sdk-core": ^7.8.0
-    "@uniswap/swap-router-contracts": ^1.3.0
-    "@uniswap/v2-sdk": ^4.17.0
-    "@uniswap/v3-sdk": ^3.27.0
-    "@uniswap/v4-sdk": ^1.25.2
-  checksum: bda77d9d206c57fff7e7f3302a361a3eb4180a4481d076c4ef9e3a7ecc86f6b823925ae87305b817c891a22c2cf8eae1668a3620f55a44670d91478151b21f3f
-  languageName: node
-  linkType: hard
-
-"@uniswap/router-sdk@workspace:sdks/router-sdk":
+"@uniswap/router-sdk@workspace:*, @uniswap/router-sdk@workspace:sdks/router-sdk":
   version: 0.0.0-use.local
   resolution: "@uniswap/router-sdk@workspace:sdks/router-sdk"
   dependencies:
     "@ethersproject/abi": ^5.5.0
     "@types/jest": ^24.0.25
-    "@uniswap/sdk-core": ^7.8.0
+    "@uniswap/sdk-core": "workspace:*"
     "@uniswap/swap-router-contracts": ^1.3.0
-    "@uniswap/v2-sdk": ^4.17.0
-    "@uniswap/v3-sdk": ^3.27.0
-    "@uniswap/v4-sdk": ^1.25.2
+    "@uniswap/v2-sdk": "workspace:*"
+    "@uniswap/v3-sdk": "workspace:*"
+    "@uniswap/v4-sdk": "workspace:*"
     eslint-config-prettier: ^9.1.0
     eslint-plugin-prettier: ^3.4.1
     prettier: ^2.4.1
@@ -4898,7 +4874,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@uniswap/sdk-core@npm:^7.10.0, @uniswap/sdk-core@npm:^7.5.0, @uniswap/sdk-core@npm:^7.6.0, @uniswap/sdk-core@npm:^7.8.0":
+"@uniswap/sdk-core@npm:^7.5.0":
   version: 7.10.0
   resolution: "@uniswap/sdk-core@npm:7.10.0"
   dependencies:
@@ -4915,7 +4891,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/sdk-core@workspace:sdks/sdk-core":
+"@uniswap/sdk-core@workspace:*, @uniswap/sdk-core@workspace:sdks/sdk-core":
   version: 0.0.0-use.local
   resolution: "@uniswap/sdk-core@workspace:sdks/sdk-core"
   dependencies:
@@ -4942,7 +4918,32 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@uniswap/smart-wallet-sdk@workspace:sdks/smart-wallet-sdk":
+"@uniswap/sdk@workspace:sdks/sdk":
+  version: 0.0.0-use.local
+  resolution: "@uniswap/sdk@workspace:sdks/sdk"
+  dependencies:
+    "@types/node": ^18.7.16
+    "@typescript-eslint/eslint-plugin": ^8.38.0
+    "@typescript-eslint/parser": ^8.38.0
+    "@uniswap/flashtestations-sdk": "workspace:*"
+    "@uniswap/permit2-sdk": "workspace:*"
+    "@uniswap/router-sdk": "workspace:*"
+    "@uniswap/sdk-core": "workspace:*"
+    "@uniswap/smart-wallet-sdk": "workspace:*"
+    "@uniswap/tamperproof-transactions": "workspace:*"
+    "@uniswap/uniswapx-sdk": "workspace:*"
+    "@uniswap/universal-router-sdk": "workspace:*"
+    "@uniswap/v2-sdk": "workspace:*"
+    "@uniswap/v3-sdk": "workspace:*"
+    "@uniswap/v4-sdk": "workspace:*"
+    eslint: ^8.57.0
+    eslint-config-prettier: ^9.1.0
+    prettier: ^2.4.1
+    typescript: "npm:typescript@^5.6.2"
+  languageName: unknown
+  linkType: soft
+
+"@uniswap/smart-wallet-sdk@workspace:*, @uniswap/smart-wallet-sdk@workspace:sdks/smart-wallet-sdk":
   version: 0.0.0-use.local
   resolution: "@uniswap/smart-wallet-sdk@workspace:sdks/smart-wallet-sdk"
   dependencies:
@@ -4950,7 +4951,7 @@ __metadata:
     "@types/node": ^18.7.16
     "@typescript-eslint/eslint-plugin": ^8.38.0
     "@typescript-eslint/parser": ^8.38.0
-    "@uniswap/sdk-core": ^7.6.0
+    "@uniswap/sdk-core": "workspace:*"
     eslint: ^8.57.0
     eslint-config-prettier: ^9.1.0
     eslint-plugin-eslint-comments: ^3.2.0
@@ -4980,7 +4981,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/tamperproof-transactions@workspace:sdks/tamperproof-transactions":
+"@uniswap/tamperproof-transactions@workspace:*, @uniswap/tamperproof-transactions@workspace:sdks/tamperproof-transactions":
   version: 0.0.0-use.local
   resolution: "@uniswap/tamperproof-transactions@workspace:sdks/tamperproof-transactions"
   dependencies:
@@ -5001,7 +5002,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@uniswap/uniswapx-sdk@workspace:sdks/uniswapx-sdk":
+"@uniswap/uniswapx-sdk@workspace:*, @uniswap/uniswapx-sdk@workspace:sdks/uniswapx-sdk":
   version: 0.0.0-use.local
   resolution: "@uniswap/uniswapx-sdk@workspace:sdks/uniswapx-sdk"
   dependencies:
@@ -5012,8 +5013,8 @@ __metadata:
     "@types/node": ^18.7.16
     "@typescript-eslint/eslint-plugin": ^8.38.0
     "@typescript-eslint/parser": ^8.38.0
-    "@uniswap/permit2-sdk": ^1.2.1
-    "@uniswap/sdk-core": ^7.5.0
+    "@uniswap/permit2-sdk": "workspace:*"
+    "@uniswap/sdk-core": "workspace:*"
     eslint: ^8.57.0
     eslint-config-prettier: ^9.1.0
     eslint-plugin-eslint-comments: ^3.2.0
@@ -5032,7 +5033,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@uniswap/universal-router-sdk@workspace:sdks/universal-router-sdk":
+"@uniswap/universal-router-sdk@workspace:*, @uniswap/universal-router-sdk@workspace:sdks/universal-router-sdk":
   version: 0.0.0-use.local
   resolution: "@uniswap/universal-router-sdk@workspace:sdks/universal-router-sdk"
   dependencies:
@@ -5041,15 +5042,15 @@ __metadata:
     "@types/mocha": ^9.1.1
     "@types/node": ^18.7.16
     "@types/node-fetch": ^2.6.2
-    "@uniswap/permit2-sdk": ^1.3.0
-    "@uniswap/router-sdk": ^2.3.3
-    "@uniswap/sdk-core": ^7.10.0
+    "@uniswap/permit2-sdk": "workspace:*"
+    "@uniswap/router-sdk": "workspace:*"
+    "@uniswap/sdk-core": "workspace:*"
     "@uniswap/universal-router": 2.0.0-beta.2
     "@uniswap/v2-core": ^1.0.1
-    "@uniswap/v2-sdk": ^4.17.0
+    "@uniswap/v2-sdk": "workspace:*"
     "@uniswap/v3-core": 1.0.0
-    "@uniswap/v3-sdk": ^3.27.0
-    "@uniswap/v4-sdk": ^1.25.2
+    "@uniswap/v3-sdk": "workspace:*"
+    "@uniswap/v4-sdk": "workspace:*"
     bignumber.js: ^9.0.2
     chai: ^4.3.6
     dotenv: ^16.0.3
@@ -5083,20 +5084,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v2-sdk@npm:^4.17.0":
-  version: 4.17.0
-  resolution: "@uniswap/v2-sdk@npm:4.17.0"
-  dependencies:
-    "@ethersproject/address": ^5.0.2
-    "@ethersproject/solidity": ^5.0.9
-    "@uniswap/sdk-core": ^7.10.0
-    tiny-invariant: ^1.1.0
-    tiny-warning: ^1.0.3
-  checksum: 43dd7b2f7b03d40763ad7145654c91c3b590ddfd37d2c11dfc5ad80b1ab9642406ca49ecdc9b259a16582d7ee97a67f19493239d67415cd7c089fc3d9c070659
-  languageName: node
-  linkType: hard
-
-"@uniswap/v2-sdk@workspace:sdks/v2-sdk":
+"@uniswap/v2-sdk@workspace:*, @uniswap/v2-sdk@workspace:sdks/v2-sdk":
   version: 0.0.0-use.local
   resolution: "@uniswap/v2-sdk@workspace:sdks/v2-sdk"
   dependencies:
@@ -5104,7 +5092,7 @@ __metadata:
     "@ethersproject/solidity": ^5.0.9
     "@types/big.js": ^4.0.5
     "@types/jest": ^24.0.25
-    "@uniswap/sdk-core": ^7.10.0
+    "@uniswap/sdk-core": "workspace:*"
     "@uniswap/v2-core": ^1.0.1
     eslint: ^8.57.0
     eslint-config-prettier: ^9.1.0
@@ -5149,46 +5137,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v3-sdk@npm:3.26.0":
-  version: 3.26.0
-  resolution: "@uniswap/v3-sdk@npm:3.26.0"
-  dependencies:
-    "@ethersproject/abi": ^5.5.0
-    "@ethersproject/solidity": ^5.0.9
-    "@uniswap/sdk-core": ^7.8.0
-    "@uniswap/swap-router-contracts": ^1.3.0
-    "@uniswap/v3-periphery": ^1.1.1
-    "@uniswap/v3-staker": 1.0.0
-    tiny-invariant: ^1.1.0
-    tiny-warning: ^1.0.3
-  checksum: 4e08fd5013b4ba780a4b1c2954aeecc6473daba3947d94671c3b5aa7ff8a596cf58321120b03418dd7078e45b4e4c6a3284af750eba4821b50a7a99918858935
-  languageName: node
-  linkType: hard
-
-"@uniswap/v3-sdk@npm:^3.27.0":
-  version: 3.27.0
-  resolution: "@uniswap/v3-sdk@npm:3.27.0"
-  dependencies:
-    "@ethersproject/abi": ^5.5.0
-    "@ethersproject/solidity": ^5.0.9
-    "@uniswap/sdk-core": ^7.10.0
-    "@uniswap/swap-router-contracts": ^1.3.0
-    "@uniswap/v3-periphery": ^1.1.1
-    "@uniswap/v3-staker": 1.0.0
-    tiny-invariant: ^1.1.0
-    tiny-warning: ^1.0.3
-  checksum: 93c72fb45557b8d86ee00ee15c16d0f2bb543eace88664491de791cc36dbb7ba9326de397eb9292b2b4718de90fdd64982e911bc1bce90a7b57a6298395bfd2f
-  languageName: node
-  linkType: hard
-
-"@uniswap/v3-sdk@workspace:sdks/v3-sdk":
+"@uniswap/v3-sdk@workspace:*, @uniswap/v3-sdk@workspace:sdks/v3-sdk":
   version: 0.0.0-use.local
   resolution: "@uniswap/v3-sdk@workspace:sdks/v3-sdk"
   dependencies:
     "@ethersproject/abi": ^5.5.0
     "@ethersproject/solidity": ^5.0.9
     "@types/jest": ^24.0.25
-    "@uniswap/sdk-core": ^7.10.0
+    "@uniswap/sdk-core": "workspace:*"
     "@uniswap/swap-router-contracts": ^1.3.0
     "@uniswap/v3-core": 1.0.0
     "@uniswap/v3-periphery": ^1.1.1
@@ -5220,20 +5176,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v4-sdk@npm:^1.25.2":
-  version: 1.25.2
-  resolution: "@uniswap/v4-sdk@npm:1.25.2"
-  dependencies:
-    "@ethersproject/solidity": ^5.0.9
-    "@uniswap/sdk-core": ^7.10.0
-    "@uniswap/v3-sdk": 3.26.0
-    tiny-invariant: ^1.1.0
-    tiny-warning: ^1.0.3
-  checksum: 39616f794e83643f6eef545d07c3bb5f5ae0c1439e82a1c6cf8054d82ed2d3ebe8802026a86204bb877b309736df2e56374558395dfbac33f4505f17a37ebd02
-  languageName: node
-  linkType: hard
-
-"@uniswap/v4-sdk@workspace:sdks/v4-sdk":
+"@uniswap/v4-sdk@workspace:*, @uniswap/v4-sdk@workspace:sdks/v4-sdk":
   version: 0.0.0-use.local
   resolution: "@uniswap/v4-sdk@workspace:sdks/v4-sdk"
   dependencies:
@@ -5242,8 +5185,8 @@ __metadata:
     "@types/mocha": ^9.1.1
     "@types/node": ^18.7.16
     "@types/node-fetch": ^2.6.2
-    "@uniswap/sdk-core": ^7.10.0
-    "@uniswap/v3-sdk": 3.26.0
+    "@uniswap/sdk-core": "workspace:*"
+    "@uniswap/v3-sdk": "workspace:*"
     chai: ^4.3.6
     dotenv: ^16.0.3
     eslint: ^8.57.0

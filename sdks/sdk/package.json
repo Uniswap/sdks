@@ -1,11 +1,11 @@
 {
-  "name": "@uniswap/smart-wallet-sdk",
-  "description": "⚒️ An SDK for building applications with smart wallets on Uniswap",
+  "name": "@uniswap/sdk",
+  "description": "Umbrella SDK that re-exports all Uniswap SDKs for simplified internal usage",
   "repository": "https://github.com/Uniswap/sdks.git",
   "keywords": [
     "uniswap",
     "ethereum",
-    "smart-wallet"
+    "sdk"
   ],
   "license": "MIT",
   "main": "./dist/cjs/src/index.js",
@@ -18,14 +18,14 @@
     "node": ">=14"
   },
   "scripts": {
-    "clean": "rm -rf dist src/contracts",
+    "clean": "rm -rf dist",
     "build": "yarn clean && yarn build:cjs && yarn build:esm && yarn build:types",
     "build:cjs": "tsc -p tsconfig.cjs.json",
     "build:esm": "tsc -p tsconfig.esm.json",
     "build:types": "tsc -p tsconfig.types.json",
     "release": "semantic-release",
     "lint": "eslint src --ext .ts",
-    "test": "jest"
+    "test": "echo 'No tests - umbrella package only re-exports'"
   },
   "exports": {
     ".": {
@@ -36,24 +36,25 @@
   },
   "sideEffects": false,
   "dependencies": {
+    "@uniswap/flashtestations-sdk": "workspace:*",
+    "@uniswap/permit2-sdk": "workspace:*",
+    "@uniswap/router-sdk": "workspace:*",
     "@uniswap/sdk-core": "workspace:*",
-    "viem": "^2.23.5"
+    "@uniswap/smart-wallet-sdk": "workspace:*",
+    "@uniswap/tamperproof-transactions": "workspace:*",
+    "@uniswap/uniswapx-sdk": "workspace:*",
+    "@uniswap/universal-router-sdk": "workspace:*",
+    "@uniswap/v2-sdk": "workspace:*",
+    "@uniswap/v3-sdk": "workspace:*",
+    "@uniswap/v4-sdk": "workspace:*"
   },
   "devDependencies": {
-    "@types/jest": "^24.0.25",
     "@types/node": "^18.7.16",
     "@typescript-eslint/eslint-plugin": "^8.38.0",
     "@typescript-eslint/parser": "^8.38.0",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-eslint-comments": "^3.2.0",
-    "eslint-plugin-functional": "^3.0.2",
-    "eslint-plugin-import": "^2.22.0",
-    "jest": "25.5.0",
     "prettier": "^2.4.1",
-    "ts-jest": "^25.5.1",
-    "ts-node": "^10.9.1",
-    "tslib": "^2.3.0",
     "typescript": "npm:typescript@^5.6.2"
   },
   "prettier": {
