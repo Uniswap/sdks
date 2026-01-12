@@ -1165,6 +1165,36 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         assertEq(address(router).balance, 0);
     }
 
+    function testThreeRoutesExactOutputETHtoUSDC() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_SPLIT_THREE_ROUTES_ETH_TO_USDC_EXACT_OUTPUT");
+
+        assertEq(from.balance, BALANCE);
+        assertEq(USDC.balanceOf(RECIPIENT), 0);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+        assertLe(from.balance, BALANCE - params.value);
+        assertEq(USDC.balanceOf(RECIPIENT), 3000 * ONE_USDC);
+        assertEq(USDC.balanceOf(address(router)), 0);
+        assertEq(address(router).balance, 0);
+    }
+
+    function testThreeRoutesExactOutputWithV4ETHtoUSDC() public {
+        MethodParameters memory params =
+            readFixture(json, "._UNISWAP_SPLIT_THREE_ROUTES_WITH_V4_ETH_TO_USDC_EXACT_OUTPUT");
+
+        assertEq(from.balance, BALANCE);
+        assertEq(USDC.balanceOf(RECIPIENT), 0);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+
+        assertLe(from.balance, BALANCE - params.value);
+        assertEq(USDC.balanceOf(RECIPIENT), 3000 * ONE_USDC);
+        assertEq(USDC.balanceOf(address(router)), 0);
+        assertEq(address(router).balance, 0);
+    }
+
     function testMixedV3ToV4UnwrapWETH() public {
         MethodParameters memory params = readFixture(json, "._UNISWAP_MIXED_USDC_DAI_UNWRAP_WETH_V3_TO_V4");
 

@@ -1096,6 +1096,52 @@ describe('Uniswap', () => {
       expect(hexToDecimalString(methodParameters.value)).to.eq(JSBI.multiply(inputEther, JSBI.BigInt(3)).toString())
     })
 
+    it('encodes a split exactOutput with 3 routes v3ETH->v3USDC & v2ETH->v2USDC swap', async () => {
+      const outputUSDC = utils.parseUnits('1000', 6).toString()
+      const v2Trade = new V2Trade(
+        new RouteV2([WETH_USDC_V2], ETHER, USDC),
+        CurrencyAmount.fromRawAmount(USDC, outputUSDC),
+        TradeType.EXACT_OUTPUT
+      )
+      const v3Trade1 = await V3Trade.fromRoute(
+        new V3Route([WETH_USDC_V3], ETHER, USDC),
+        CurrencyAmount.fromRawAmount(USDC, outputUSDC),
+        TradeType.EXACT_OUTPUT
+      )
+      const v3Trade2 = await V3Trade.fromRoute(
+        new V3Route([WETH_USDC_V3_LOW_FEE], ETHER, USDC),
+        CurrencyAmount.fromRawAmount(USDC, outputUSDC),
+        TradeType.EXACT_OUTPUT
+      )
+
+      const opts = swapOptions({})
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([v2Trade, v3Trade1, v3Trade2]), opts)
+      registerFixture('_UNISWAP_SPLIT_THREE_ROUTES_ETH_TO_USDC_EXACT_OUTPUT', methodParameters)
+    })
+
+    it('encodes a split exactOutput with 3 routes v3ETH->v3USDC & v2ETH->v2USDC swap', async () => {
+      const outputUSDC = utils.parseUnits('1000', 6).toString()
+      const v2Trade = new V2Trade(
+        new RouteV2([WETH_USDC_V2], ETHER, USDC),
+        CurrencyAmount.fromRawAmount(USDC, outputUSDC),
+        TradeType.EXACT_OUTPUT
+      )
+      const v3Trade1 = await V3Trade.fromRoute(
+        new V3Route([WETH_USDC_V3], ETHER, USDC),
+        CurrencyAmount.fromRawAmount(USDC, outputUSDC),
+        TradeType.EXACT_OUTPUT
+      )
+      const v4Trade = await V4Trade.fromRoute(
+        new V4Route([ETH_WETH_V4, ETH_USDC_V4], ETHER, USDC),
+        CurrencyAmount.fromRawAmount(USDC, outputUSDC),
+        TradeType.EXACT_OUTPUT
+      )
+
+      const opts = swapOptions({})
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([v2Trade, v3Trade1, v4Trade]), opts)
+      registerFixture('_UNISWAP_SPLIT_THREE_ROUTES_WITH_V4_ETH_TO_USDC_EXACT_OUTPUT', methodParameters)
+    })
+
     // =================================================================================
     // Split Route Tests with ETH-WETH Pool Handling
     // =================================================================================
