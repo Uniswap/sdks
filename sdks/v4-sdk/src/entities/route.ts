@@ -38,6 +38,10 @@ export class Route<TInput extends Currency, TOutput extends Currency> {
     this.pathInput = getPathCurrency(input, pools[0])
     this.pathOutput = getPathCurrency(output, pools[pools.length - 1])
 
+    if (this.pathInput.isNative && pools[0].currency0.wrapped.equals(pools[0].currency1)) {
+      this.pathInput = pools[0].currency1
+    }
+
     /**
      * Normalizes currency0-currency1 order and selects the next currency/fee step to add to the path
      * */
@@ -69,23 +73,23 @@ export class Route<TInput extends Currency, TOutput extends Currency> {
       ({ nextInput, price }, pool) => {
         return nextInput.equals(pool.currency0)
           ? {
-              nextInput: pool.currency1,
-              price: price.multiply(pool.currency0Price),
-            }
+            nextInput: pool.currency1,
+            price: price.multiply(pool.currency0Price),
+          }
           : {
-              nextInput: pool.currency0,
-              price: price.multiply(pool.currency1Price),
-            }
+            nextInput: pool.currency0,
+            price: price.multiply(pool.currency1Price),
+          }
       },
       this.pools[0].currency0.equals(this.pathInput)
         ? {
-            nextInput: this.pools[0].currency1,
-            price: this.pools[0].currency0Price,
-          }
+          nextInput: this.pools[0].currency1,
+          price: this.pools[0].currency0Price,
+        }
         : {
-            nextInput: this.pools[0].currency0,
-            price: this.pools[0].currency1Price,
-          }
+          nextInput: this.pools[0].currency0,
+          price: this.pools[0].currency1Price,
+        }
     ).price
 
     return (this._midPrice = new Price(this.input, this.output, price.denominator, price.numerator))

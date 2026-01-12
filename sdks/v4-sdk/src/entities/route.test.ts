@@ -99,6 +99,13 @@ describe('Route', () => {
     expect(route.output).toEqual(currency0)
   })
 
+  it('supports ether input with eth-weth first pool', () => {
+    const route = new Route([pool_eth_weth, pool_0_eth], eth, currency0)
+    expect(route.pools).toEqual([pool_eth_weth, pool_0_eth])
+    expect(route.input).toEqual(eth)
+    expect(route.output).toEqual(currency0)
+  })
+
   it('supports ether output', () => {
     const route = new Route([pool_0_eth], currency0, eth)
     expect(route.pools).toEqual([pool_0_eth])
