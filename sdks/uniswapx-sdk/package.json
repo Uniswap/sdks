@@ -33,8 +33,8 @@
   "dependencies": {
     "@ethersproject/bytes": "^5.7.0",
     "@ethersproject/providers": "^5.7.0",
-    "@uniswap/permit2-sdk": "^1.2.1",
-    "@uniswap/sdk-core": "^7.5.0",
+    "@uniswap/permit2-sdk": "workspace:*",
+    "@uniswap/sdk-core": "workspace:*",
     "ethers": "^5.7.0"
   },
   "devDependencies": {
@@ -88,7 +88,18 @@
         }
       ],
       "@semantic-release/release-notes-generator",
-      "@semantic-release/npm",
+      [
+        "@semantic-release/npm",
+        {
+          "npmPublish": false
+        }
+      ],
+      [
+        "@semantic-release/exec",
+        {
+          "publishCmd": "yarn npm publish"
+        }
+      ],
       "@semantic-release/github",
       [
         "@semantic-release/exec",

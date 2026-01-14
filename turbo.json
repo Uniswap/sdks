@@ -7,6 +7,7 @@
       ]
     },
     "build": {
+      "dependsOn": ["^build"],
       "inputs": [
         "yarn.lock",
         "**/package.json",
@@ -26,7 +27,7 @@
       ]
     },
     "release": {
-      "dependsOn": []
+      "dependsOn": ["^release"]
     },
     "typecheck": {
       "dependsOn": []
