@@ -99,11 +99,46 @@ describe('Route', () => {
     expect(route.output).toEqual(currency0)
   })
 
-  it('supports ether input with eth-weth first pool', () => {
+  it('supports ether input with eth-weth first pool, eth second pool', () => {
     const route = new Route([pool_eth_weth, pool_0_eth], eth, currency0)
     expect(route.pools).toEqual([pool_eth_weth, pool_0_eth])
     expect(route.input).toEqual(eth)
     expect(route.output).toEqual(currency0)
+  })
+
+  it('supports weth input with eth-weth first pool, weth second pool', () => {
+    const route = new Route([pool_eth_weth, pool_0_weth], weth, currency0)
+    expect(route.pools).toEqual([pool_eth_weth, pool_0_weth])
+    expect(route.input).toEqual(weth)
+    expect(route.output).toEqual(currency0)
+  })
+
+  it('supports ether input with eth-weth first pool, weth second pool', () => {
+    const route = new Route([pool_eth_weth, pool_0_weth], eth, currency0)
+    expect(route.pools).toEqual([pool_eth_weth, pool_0_weth])
+    expect(route.input).toEqual(eth)
+    expect(route.output).toEqual(currency0)
+  })
+
+  it('supports weth input with eth-weth first pool, eth second pool', () => {
+    const route = new Route([pool_eth_weth, pool_0_eth], weth, currency0)
+    expect(route.pools).toEqual([pool_eth_weth, pool_0_eth])
+    expect(route.input).toEqual(weth)
+    expect(route.output).toEqual(currency0)
+  })
+
+  it('eth-weth, eth input', () => {
+    const route = new Route([pool_eth_weth], eth, weth)
+    expect(route.pools).toEqual([pool_eth_weth])
+    expect(route.input).toEqual(eth)
+    expect(route.output).toEqual(weth)
+  })
+
+  it('eth-weth, weth input', () => {
+    const route = new Route([pool_eth_weth], weth, eth)
+    expect(route.pools).toEqual([pool_eth_weth])
+    expect(route.input).toEqual(weth)
+    expect(route.output).toEqual(eth)
   })
 
   it('supports ether output', () => {
