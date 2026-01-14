@@ -43,7 +43,7 @@ export class Route<TInput extends Currency, TOutput extends Currency> {
     if (pools[0].currency0.wrapped.equals(pools[0].currency1)) {
       if (this.pathInput.isNative && pools[1]?.currency0.isNative) {
         this.pathInput = pools[0].currency1
-      } else if (this.pathInput.equals(pools[0].currency1) && !pools[1]?.currency0.isNative) {
+      } else if (this.pathInput.equals(pools[0].currency1) && pools[1] && !pools[1].currency0.isNative) {
         this.pathInput = pools[0].currency0
       }
     }

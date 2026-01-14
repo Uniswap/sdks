@@ -265,7 +265,11 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
                 tokenAmount.numerator,
                 tokenAmount.denominator
               )
-            } else if (route.output.equals(pool.currency1) && !route.pools[i - 1]?.currency0.isNative) {
+            } else if (
+              route.output.equals(pool.currency1) &&
+              route.pools[i - 1] &&
+              !route.pools[i - 1].currency0.isNative
+            ) {
               // Convert ETH amount to WETH for the next pool
               tokenAmount = CurrencyAmount.fromFractionalAmount(
                 pool.currency1, // wrapped currency
