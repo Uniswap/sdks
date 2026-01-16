@@ -128,7 +128,7 @@ export const REACTOR_ADDRESS_MAPPING: ReactorMapping = {
     [OrderType.Priority]: "0x00000006021a6Bce796be7ba509BBBA71e956e37",
   },
   1301: {
-    [OrderType.Hybrid]: "0x000000c40Fe6C03a7A1111D0a66Ce522BDc9fC8f",
+    [OrderType.Hybrid]: "0x9EdfA4d04fB12a5cBF04Cca9a9F9c174aD0f92d4",
     [OrderType.Dutch]: "0x0000000000000000000000000000000000000000",
     [OrderType.Dutch_V2]: "0x0000000000000000000000000000000000000000",
     [OrderType.Relay]: "0x0000000000000000000000000000000000000000",
@@ -216,7 +216,7 @@ export const PERMISSIONED_TOKENS: PermissionedToken[] = [
 type ResolverMapping = { readonly [chainId: number]: string };
 
 export const HYBRID_RESOLVER_ADDRESS_MAPPING: ResolverMapping = {
-  1301: "0x000000B380393337109C04e3e29eD993667E0f89",
+  1301: "0x464cB0DF13010154b5395B61A5a6e46d7284f1EF",
 };
 
 type ReverseResolverMapping = {
