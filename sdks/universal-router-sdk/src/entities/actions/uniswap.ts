@@ -96,7 +96,6 @@ export class UniswapTrade implements Command {
     }
 
     const isNativeOutput = this.trade.outputAmount.currency.isNative
-    let hasEthWethPool = false
     let hasRegularWethOutput = false
     let hasRegularEthOutput = false
 
@@ -105,14 +104,11 @@ export class UniswapTrade implements Command {
       if (swap.route.protocol === Protocol.V4) {
         const v4Route = swap.route as unknown as V4Route<Currency, Currency>
         const lastPool = v4Route.pools[v4Route.pools.length - 1]
-        const isEthWethPool = lastPool.currency1.equals(lastPool.currency0.wrapped)
 
-        if (isEthWethPool) {
-          hasEthWethPool = true
-        } else if (!lastPool.currency0.isNative) {
+        if (!lastPool.currency0.isNative) {
           // V4 pool with WETH (not ETH-WETH)
           hasRegularWethOutput = true
-        } else if (lastPool.currency0.isNative) {
+        } else if (lastPool.currency0.isNative && !lastPool.currency0.wrapped.equals(lastPool.currency1)) {
           hasRegularEthOutput = true
         }
       } else if (swap.route.protocol === Protocol.MIXED) {
@@ -120,12 +116,9 @@ export class UniswapTrade implements Command {
         const lastPool = mixedRoute.pools[mixedRoute.pools.length - 1]
 
         if (lastPool instanceof V4Pool) {
-          const isEthWethPool = lastPool.currency1.equals(lastPool.currency0.wrapped)
-          if (isEthWethPool) {
-            hasEthWethPool = true
-          } else if (!lastPool.currency0.isNative) {
+          if (!lastPool.currency0.isNative) {
             hasRegularWethOutput = true
-          } else if (lastPool.currency0.isNative) {
+          } else if (lastPool.currency0.isNative && !lastPool.currency0.wrapped.equals(lastPool.currency1)) {
             hasRegularEthOutput = true
           }
         } else {
@@ -141,12 +134,12 @@ export class UniswapTrade implements Command {
     }
 
     // For ETH output: need ETH-WETH pool + regular WETH output
-    if (isNativeOutput && hasEthWethPool && hasRegularWethOutput) {
+    if (isNativeOutput && hasRegularWethOutput) {
       return 'unwrap'
     }
 
     // For WETH output: need ETH-WETH pool + regular ETH output
-    if (!isNativeOutput && hasEthWethPool && hasRegularEthOutput) {
+    if (!isNativeOutput && hasRegularEthOutput) {
       return 'wrap'
     }
 
@@ -196,9 +189,20 @@ export class UniswapTrade implements Command {
     // If output is WETH and we have split routes with ETH outputs,
     // we force ALL routes to output ETH, so we need to wrap at the end
     if (this.splitRouteWrapType === 'wrap') {
-      return true
+      // Only wrap if the output is actually WETH (not other tokens like USDC)
+      const outputCurrency = this.trade.outputAmount.currency
+      if (!outputCurrency.isNative) {
+        // Check if output is WETH by comparing with wrapped native
+        const chainId = this.trade.swaps[0]?.route.pools[0]?.chainId
+        if (chainId) {
+          const nativeCurrency = Ether.onChain(chainId)
+          return outputCurrency.equals(nativeCurrency.wrapped)
+        }
+      }
+      return false
     }
 
+    // For non-split scenarios:
     const swap = this.trade.swaps[0]
     const lastRoute = swap.route
     const lastPool = lastRoute.pools[lastRoute.pools.length - 1]
@@ -223,6 +227,7 @@ export class UniswapTrade implements Command {
       return true
     }
 
+    // For non-split scenarios:
     const swap = this.trade.swaps[0]
     const lastRoute = swap.route
     const lastPool = lastRoute.pools[lastRoute.pools.length - 1]
@@ -479,12 +484,15 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
   // - If output is ETH and some routes output WETH: force all to output WETH, then unwrap
   // - If output is WETH and some routes output ETH: force all to output ETH, then wrap
   let pathOutputForTake = trade.route.pathOutput
-  if (splitRouteWrapType === 'unwrap') {
-    // Force WETH output for later unwrapping
-    pathOutputForTake = pathOutputForTake.wrapped
-  } else if (splitRouteWrapType === 'wrap') {
-    // Force ETH output for later wrapping
-    pathOutputForTake = trade.route.pools[0].currency0
+  let ethWethPool = v4Route.pools[v4Route.pools.length - 1].currency1.equals(
+    v4Route.pools[v4Route.pools.length - 1].currency0.wrapped
+  )
+  if (ethWethPool) {
+    if (splitRouteWrapType === 'unwrap') {
+      pathOutputForTake = pathOutputForTake.wrapped
+    } else if (splitRouteWrapType === 'wrap') {
+      pathOutputForTake = v4Route.pools[v4Route.pools.length - 1].currency0
+    }
   }
 
   v4Planner.addTake(
