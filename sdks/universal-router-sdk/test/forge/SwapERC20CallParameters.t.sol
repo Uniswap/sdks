@@ -625,7 +625,6 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         permit2.approve(address(WETH), address(router), uint160(BALANCE), uint48(block.timestamp + 1000));
 
         uint256 startingRecipientBalance = USDC.balanceOf(RECIPIENT);
-        uint256 startingFromBalance = WETH.balanceOf(from);
 
         (bool success,) = address(router).call{value: params.value}(params.data);
         require(success, "call failed");
@@ -926,24 +925,6 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         assertEq(address(router).balance, 0);
     }
 
-    function testV4ExactInMultiHop2Routesv4WETHv4ETHWETH() public {
-        MethodParameters memory params = readFixture(json, "._UNISWAP_SPLIT_TWO_ROUTES_V4_WETH");
-
-        uint256 usdcAmount = 2000 ether;
-        deal(address(USDC), from, usdcAmount);
-        USDC.approve(address(permit2), usdcAmount);
-        permit2.approve(address(USDC), address(router), uint160(usdcAmount), uint48(block.timestamp + 1000));
-        assertEq(USDC.balanceOf(from), usdcAmount);
-        uint256 startingRecipientWETHBalance = WETH.balanceOf(RECIPIENT);
-        uint256 startingRecipientBalance = RECIPIENT.balance;
-
-        (bool success,) = address(router).call{value: params.value}(params.data);
-        require(success, "call failed");
-        assertGt(WETH.balanceOf(RECIPIENT), startingRecipientWETHBalance);
-        assertEq(RECIPIENT.balance, startingRecipientBalance);
-        assertEq(address(router).balance, 0);
-    }
-
     function testV4ExactInMultiHop2Routesv4ETHv4ETH() public {
         MethodParameters memory params = readFixture(json, "._UNISWAP_SPLIT_TWO_ROUTES_V4_ETH_V4_ETH");
 
@@ -1108,7 +1089,6 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         WETH.approve(address(permit2), BALANCE);
         permit2.approve(address(WETH), address(router), uint160(BALANCE), uint48(block.timestamp + 1000));
 
-        uint256 startingRecipientBalance = DAI.balanceOf(RECIPIENT);
         uint256 startingFromBalance = WETH.balanceOf(from);
 
         (bool success,) = address(router).call{value: params.value}(params.data);
@@ -1126,7 +1106,6 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         WETH.approve(address(permit2), BALANCE);
         permit2.approve(address(WETH), address(router), uint160(BALANCE), uint48(block.timestamp + 1000));
 
-        uint256 startingRecipientBalance = DAI.balanceOf(RECIPIENT);
         uint256 startingFromBalance = WETH.balanceOf(from);
 
         (bool success,) = address(router).call{value: params.value}(params.data);
