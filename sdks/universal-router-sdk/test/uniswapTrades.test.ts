@@ -78,7 +78,7 @@ describe('Uniswap', () => {
   let ETH_WETH_V4: V4Pool
 
   before(async () => {
-    ;({ WETH_USDC_V2, USDC_DAI_V2, WETH_USDC_V3, USDC_DAI_V3, WETH_USDC_V3_LOW_FEE } = await getUniswapPools(
+    ; ({ WETH_USDC_V2, USDC_DAI_V2, WETH_USDC_V3, USDC_DAI_V3, WETH_USDC_V3_LOW_FEE } = await getUniswapPools(
       FORK_BLOCK
     ))
 
@@ -1118,7 +1118,7 @@ describe('Uniswap', () => {
       registerFixture('_UNISWAP_SPLIT_THREE_ROUTES_ETH_TO_USDC_EXACT_OUTPUT', methodParameters)
     })
 
-    it('encodes a split exactOutput with 3 routes v3ETH->v3USDC & v2ETH->v2USDC swap', async () => {
+    it('encodes a split exactOutput with 3 routes v2ETH->v2USDC & v3ETH->v3USDC & v4ETH->v4USDC swap', async () => {
       const outputUSDC = utils.parseUnits('1000', 6).toString()
       const v2Trade = new V2Trade(
         new RouteV2([WETH_USDC_V2], ETHER, USDC),
@@ -1572,7 +1572,7 @@ describe('Uniswap', () => {
           : CurrencyAmount.fromRawAmount(tokenOut, amount)
       }
 
-      function compareUniswapTrades(left: UniswapTrade, right: UniswapTrade): void {}
+      function compareUniswapTrades(left: UniswapTrade, right: UniswapTrade): void { }
 
       it('v2 - erc20 <> erc20', async () => {
         const [tokenIn, tokenOut] = [DAI, USDC]
