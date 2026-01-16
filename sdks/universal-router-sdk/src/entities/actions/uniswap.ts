@@ -112,8 +112,6 @@ export class UniswapTrade implements Command {
         } else if (!lastPool.currency0.isNative) {
           // V4 pool with WETH (not ETH-WETH)
           hasRegularWethOutput = true
-          // Note: Original wrap function also sets hasRegularEthOutput here, which seems like a bug
-          hasRegularEthOutput = true
         }
       } else if (swap.route.protocol === Protocol.MIXED) {
         const mixedRoute = swap.route as MixedRoute<Currency, Currency>
@@ -125,7 +123,6 @@ export class UniswapTrade implements Command {
             hasEthWethPool = true
           } else if (!lastPool.currency0.isNative) {
             hasRegularWethOutput = true
-            hasRegularEthOutput = true
           }
         } else {
           // V2/V3 pools always output WETH for unwrap case
@@ -482,6 +479,7 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
     // Force WETH output for later unwrapping
     pathOutputForTake = pathOutputForTake.wrapped
   } else if (splitRouteWrapType === 'wrap') {
+    console.log(trade.route.pools[0].currency0)
     // Force ETH output for later wrapping
     pathOutputForTake = trade.route.pools[0].currency0
   }
