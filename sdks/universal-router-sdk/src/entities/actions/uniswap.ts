@@ -132,7 +132,7 @@ export class UniswapTrade implements Command {
         if ((lastRoute as unknown as V4Route<Currency, Currency>).pathOutput.isNative) {
           // this means path output is native and we need to wrap
           return true
-        } else if (lastPool.currency1.equals(lastPool.currency0.wrapped)) {
+        } else if (lastPool.currency1.equals(lastPool.currency0.wrapped) && lastRoute.pools.length > 1) {
           let poolBefore = lastRoute.pools[lastRoute.pools.length - 2]
           // this means last pool is eth-weth and pool before contains weth
           if (
@@ -163,13 +163,13 @@ export class UniswapTrade implements Command {
     if (lastPool instanceof V4Pool) {
       // If output currency is native and path currency output is not native, we need to unwrap
       if (this.trade.outputAmount.currency.isNative) {
-        let poolBefore = lastRoute.pools[lastRoute.pools.length - 2]
         if (!(this.trade.swaps[0].route as unknown as V4Route<Currency, Currency>).pathOutput.isNative) {
           // this means path output is weth and we need to unwrap
           return true
         } else if (
-          poolBefore instanceof V4Pool &&
-          poolBefore.currency0.isNative &&
+          lastRoute.pools.length > 1 &&
+          lastRoute.pools[lastRoute.pools.length - 2] instanceof V4Pool &&
+          (lastRoute.pools[lastRoute.pools.length - 2] as V4Pool).currency0.isNative &&
           lastPool.currency1.equals(lastPool.currency0.wrapped)
         ) {
           // this means last pool is eth-weth and we need to unwrap
@@ -409,7 +409,7 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
   let lastPool = v4Route.pools[v4Route.pools.length - 1]
   let ethWethPool = lastPool.currency1.equals(lastPool.currency0.wrapped)
 
-  if (ethWethPool) {
+  if (ethWethPool && v4Route.pools.length > 1) {
     let poolBefore = v4Route.pools[v4Route.pools.length - 2]
     if (pathOutputForTake.isNative && poolBefore.currency0.isNative) {
       pathOutputForTake = pathOutputForTake.wrapped
