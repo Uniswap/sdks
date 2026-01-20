@@ -144,8 +144,6 @@ export class UniswapTrade implements Command {
             // same for v2 and v3 pools
             return true
           }
-        } else {
-          return false
         }
       }
     }
