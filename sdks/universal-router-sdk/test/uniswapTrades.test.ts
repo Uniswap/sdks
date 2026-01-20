@@ -746,7 +746,7 @@ describe('Uniswap', () => {
       expect(hexToDecimalString(methodParameters.value)).to.equal('0')
     })
 
-    it('encodes an exactOuput USDC->DAI->ETH swap with a wrap to recieve WETH', async () => {
+    it('encodes an exactOuput USDC->DAI->ETH swap with a wrap to recieve WETH, no eth-weth', async () => {
       const outputEther = utils.parseEther('1')
       const trade = await V4Trade.fromRoute(
         new V4Route([USDC_DAI_V4, ETH_DAI_V4], USDC, WETH),
@@ -756,7 +756,7 @@ describe('Uniswap', () => {
 
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
-      registerFixture('_UNISWAP_V4_USDC_FOR_1_ETH_WITH_WRAP', methodParameters)
+      registerFixture('_UNISWAP_V4_USDC_FOR_1_ETH_WITH_WRAP_NO_ETH_WETH', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.equal('0')
     })
 
@@ -1091,9 +1091,54 @@ describe('Uniswap', () => {
 
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([v2Trade, v3Trade1, v3Trade2]), opts)
-      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_ETH_TO_USDC', methodParameters)
       registerFixture('_UNISWAP_SPLIT_THREE_ROUTES_ETH_TO_USDC', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq(JSBI.multiply(inputEther, JSBI.BigInt(3)).toString())
+    })
+
+    it('encodes a split exactOutput with 3 routes v3ETH->v3USDC & v2ETH->v2USDC swap', async () => {
+      const outputUSDC = utils.parseUnits('1000', 6).toString()
+      const v2Trade = new V2Trade(
+        new RouteV2([WETH_USDC_V2], ETHER, USDC),
+        CurrencyAmount.fromRawAmount(USDC, outputUSDC),
+        TradeType.EXACT_OUTPUT
+      )
+      const v3Trade1 = await V3Trade.fromRoute(
+        new V3Route([WETH_USDC_V3], ETHER, USDC),
+        CurrencyAmount.fromRawAmount(USDC, outputUSDC),
+        TradeType.EXACT_OUTPUT
+      )
+      const v3Trade2 = await V3Trade.fromRoute(
+        new V3Route([WETH_USDC_V3_LOW_FEE], ETHER, USDC),
+        CurrencyAmount.fromRawAmount(USDC, outputUSDC),
+        TradeType.EXACT_OUTPUT
+      )
+
+      const opts = swapOptions({})
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([v2Trade, v3Trade1, v3Trade2]), opts)
+      registerFixture('_UNISWAP_SPLIT_THREE_ROUTES_ETH_TO_USDC_EXACT_OUTPUT', methodParameters)
+    })
+
+    it('encodes a split exactOutput with 3 routes v2ETH->v2USDC & v3ETH->v3USDC & v4ETH->v4USDC swap', async () => {
+      const outputUSDC = utils.parseUnits('1000', 6).toString()
+      const v2Trade = new V2Trade(
+        new RouteV2([WETH_USDC_V2], ETHER, USDC),
+        CurrencyAmount.fromRawAmount(USDC, outputUSDC),
+        TradeType.EXACT_OUTPUT
+      )
+      const v3Trade1 = await V3Trade.fromRoute(
+        new V3Route([WETH_USDC_V3], ETHER, USDC),
+        CurrencyAmount.fromRawAmount(USDC, outputUSDC),
+        TradeType.EXACT_OUTPUT
+      )
+      const v4Trade = await V4Trade.fromRoute(
+        new V4Route([ETH_WETH_V4, ETH_USDC_V4], ETHER, USDC),
+        CurrencyAmount.fromRawAmount(USDC, outputUSDC),
+        TradeType.EXACT_OUTPUT
+      )
+
+      const opts = swapOptions({})
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([v2Trade, v3Trade1, v4Trade]), opts)
+      registerFixture('_UNISWAP_SPLIT_THREE_ROUTES_WITH_V4_ETH_TO_USDC_EXACT_OUTPUT', methodParameters)
     })
 
     // =================================================================================
@@ -1117,37 +1162,19 @@ describe('Uniswap', () => {
      */
     it('encodes a split exactInput with 2 routes v3USDC->v3ETH & v4USDC->v4ETH swap', async () => {
       const inputUSDC = utils.parseUnits('1000', 6).toString()
-      const v3Trade = await V3Trade.fromRoute(
-        new V3Route([WETH_USDC_V3], USDC, ETHER),
-        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
-        TradeType.EXACT_INPUT
-      )
       const v4Trade = await V4Trade.fromRoute(
         new V4Route([ETH_USDC_V4, ETH_WETH_V4], USDC, ETHER),
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
         TradeType.EXACT_INPUT
       )
+      const v3Trade = await V3Trade.fromRoute(
+        new V3Route([WETH_USDC_V3], USDC, ETHER),
+        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
+        TradeType.EXACT_INPUT
+      )
       const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapCallParameters(buildTrade([v3Trade, v4Trade]), opts)
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([v4Trade, v3Trade]), opts)
       registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4', methodParameters)
-      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
-    })
-
-    it('encodes an exact output ending in ETH-WETH', async () => {
-      const outputEther = utils.parseEther('1').toString()
-      const v3Trade = await V3Trade.fromRoute(
-        new V3Route([WETH_USDC_V3], USDC, ETHER),
-        CurrencyAmount.fromRawAmount(ETHER, outputEther),
-        TradeType.EXACT_OUTPUT
-      )
-      const v4Trade = await V4Trade.fromRoute(
-        new V4Route([ETH_USDC_V4, ETH_WETH_V4], USDC, ETHER),
-        CurrencyAmount.fromRawAmount(ETHER, outputEther),
-        TradeType.EXACT_OUTPUT
-      )
-      const opts = swapOptions({})
-      const methodParameters = SwapRouter.swapCallParameters(buildTrade([v3Trade, v4Trade]), opts)
-      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_ENDING_IN_ETH_WETH', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
@@ -1342,6 +1369,24 @@ describe('Uniswap', () => {
       const opts = swapOptions({})
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([v4Trade1, v4Trade2]), opts)
       registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4_WETH_V4_ETH_WETH', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq('0')
+    })
+
+    it('encodes a split exactInput with 2 routes v4 ending in eth & v4 ending in eth-weth swap with weth output', async () => {
+      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const v4Trade1 = await V4Trade.fromRoute(
+        new V4Route([ETH_USDC_V4], USDC, WETH),
+        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
+        TradeType.EXACT_INPUT
+      )
+      const v4Trade2 = await V4Trade.fromRoute(
+        new V4Route([WETH_USDC_V4, ETH_WETH_V4], USDC, WETH),
+        CurrencyAmount.fromRawAmount(USDC, inputUSDC),
+        TradeType.EXACT_INPUT
+      )
+      const opts = swapOptions({})
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([v4Trade1, v4Trade2]), opts)
+      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4_ETH_V4_ETH_WETH', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq('0')
     })
 
