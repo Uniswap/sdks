@@ -296,7 +296,6 @@ export class UniswapTrade implements Command {
       } else if (this.inputRequiresUnwrap) {
         planner.addCommand(CommandType.WRAP_ETH, [this.options.recipient, CONTRACT_BALANCE])
       } else if (this.trade.inputAmount.currency.isNative) {
-        console.log('input is native')
         // must refund extra native currency sent along for native v4 trades (no input transition)
         planner.addCommand(CommandType.SWEEP, [ETH_ADDRESS, this.options.recipient, 0])
       }
