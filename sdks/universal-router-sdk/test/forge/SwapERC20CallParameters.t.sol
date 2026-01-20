@@ -544,18 +544,18 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         assertGt(USDC.balanceOf(RECIPIENT), 2000 * ONE_USDC);
     }
 
-    // function testV4ExactInputEthWithWrap() public {
-    //     MethodParameters memory params = readFixture(json, "._UNISWAP_V4_1_ETH_FOR_USDC_WITH_WRAP");
-    //     assertEq(from.balance, BALANCE);
-    //     assertEq(USDC.balanceOf(RECIPIENT), 0);
-    //     assertEq(params.value, 1e18);
-    //
-    //     (bool success,) = address(router).call{value: params.value}(params.data);
-    //     require(success, "call failed");
-    //
-    //     assertLe(from.balance, BALANCE - params.value);
-    //     assertGt(USDC.balanceOf(RECIPIENT), 2000 * ONE_USDC);
-    // }
+    function testV4ExactInputEthWithWrap() public {
+        MethodParameters memory params = readFixture(json, "._UNISWAP_V4_1_ETH_FOR_USDC_WITH_WRAP");
+        assertEq(from.balance, BALANCE);
+        assertEq(USDC.balanceOf(RECIPIENT), 0);
+        assertEq(params.value, 1e18);
+
+        (bool success,) = address(router).call{value: params.value}(params.data);
+        require(success, "call failed");
+
+        assertLe(from.balance, BALANCE - params.value);
+        assertGt(USDC.balanceOf(RECIPIENT), 2000 * ONE_USDC);
+    }
 
     function testV4ExactInputUSDCForETHwithETHFee() public {
         MethodParameters memory params = readFixture(json, "._UNISWAP_V4_USDC_FOR_1_ETH_2_HOP_WITH_ETH_FEE");
@@ -582,8 +582,43 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         assertEq(address(router).balance, 0);
     }
 
+    // function testV4ExactOutputUSDCForETHWithWrap() public {
+    //     MethodParameters memory params = readFixture(json, "._UNISWAP_V4_USDC_FOR_1_ETH_WITH_WRAP");
+    //     deal(address(USDC), from, BALANCE);
+    //     USDC.approve(address(permit2), BALANCE);
+    //     permit2.approve(address(USDC), address(router), uint160(BALANCE), uint48(block.timestamp + 1000));
+    //     assertEq(USDC.balanceOf(from), BALANCE);
+    //     uint256 startingWETHBalance = WETH.balanceOf(RECIPIENT);
+    //     uint256 startingETHBalance = RECIPIENT.balance;
+
+    //     (bool success,) = address(router).call{value: params.value}(params.data);
+    //     require(success, "call failed");
+
+    //     assertLt(USDC.balanceOf(from), BALANCE);
+    //     assertGt(RECIPIENT.balance, startingETHBalance);
+    //     assertEq(WETH.balanceOf(RECIPIENT), startingWETHBalance);
+    //     assertEq(address(router).balance, 0);
+    // }
+
+    // function testV4ExactOutputUSDCForWETHWithWrap() public {
+    //     MethodParameters memory params = readFixture(json, "._UNISWAP_V4_USDC_FOR_1_WETH_WITH_WRAP");
+    //     deal(address(USDC), from, BALANCE);
+    //     USDC.approve(address(permit2), BALANCE);
+    //     permit2.approve(address(USDC), address(router), uint160(BALANCE), uint48(block.timestamp + 1000));
+    //     assertEq(USDC.balanceOf(from), BALANCE);
+    //     uint256 startingWETHBalance = WETH.balanceOf(RECIPIENT);
+    //     uint256 startingETHBalance = RECIPIENT.balance;
+    //     (bool success,) = address(router).call{value: params.value}(params.data);
+    //     require(success, "call failed");
+
+    //     assertLt(USDC.balanceOf(from), BALANCE);
+    //     assertEq(RECIPIENT.balance, startingETHBalance);
+    //     assertGt(WETH.balanceOf(RECIPIENT), startingWETHBalance);
+    //     assertEq(address(router).balance, 0);
+    // }
+
     function testV4ExactOutNativeOutputWithUnwrap() public {
-        MethodParameters memory params = readFixture(json, "._UNISWAP_V4_USDC_FOR_1_ETH_WITH_WRAP");
+        MethodParameters memory params = readFixture(json, "._UNISWAP_V4_USDC_FOR_1_ETH_WITH_WRAP_NO_ETH_WETH");
 
         deal(address(USDC), from, BALANCE);
         USDC.approve(address(permit2), BALANCE);
@@ -711,7 +746,7 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         assertGt(totalOut, 1000 * ONE_USDC);
     }
 
-    function testV4ExactInNativeOutput() public {
+    function testV4ExactInNativeOutput1() public {
         MethodParameters memory params = readFixture(json, "._UNISWAP_V4_1000_USDC_FOR_ETH");
 
         deal(address(USDC), from, BALANCE);
@@ -719,12 +754,14 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         permit2.approve(address(USDC), address(router), uint160(BALANCE), uint48(block.timestamp + 1000));
         assertEq(USDC.balanceOf(from), BALANCE);
         uint256 startingRecipientBalance = from.balance;
+        uint256 startingWETHBalance = WETH.balanceOf(RECIPIENT);
 
         (bool success,) = address(router).call{value: params.value}(params.data);
         require(success, "call failed");
 
         assertEq(USDC.balanceOf(from), BALANCE - 1000 * ONE_USDC);
         assertGe(from.balance, startingRecipientBalance);
+        assertEq(WETH.balanceOf(RECIPIENT), startingWETHBalance);
     }
 
     function testV4ExactInNativeOutputWithWrap() public {
@@ -804,6 +841,24 @@ contract SwapERC20CallParametersTest is Test, Interop, DeployRouter {
         assertEq(address(router).balance, 0);
         assertEq(USDC.balanceOf(from), BALANCE - 2000 * ONE_USDC);
     }
+
+    // function testV4ExactInMultiHop2RoutesEndingInETHWETH() public {
+    //     MethodParameters memory params = readFixture(json, "._UNISWAP_SPLIT_TWO_ROUTES_ENDING_IN_ETH_WETH");
+
+    //     uint256 usdcAmount = 1000 ether;
+    //     deal(address(USDC), from, usdcAmount);
+    //     USDC.approve(address(permit2), usdcAmount);
+    //     permit2.approve(address(USDC), address(router), uint160(usdcAmount), uint48(block.timestamp + 1000));
+    //     assertEq(USDC.balanceOf(from), usdcAmount);
+    //     uint256 startingRecipientBalance = RECIPIENT.balance;
+    //     uint256 startingWETHBalance = WETH.balanceOf(RECIPIENT);
+
+    //     (bool success,) = address(router).call{value: params.value}(params.data);
+    //     require(success, "call failed");
+    //     assertEq(WETH.balanceOf(RECIPIENT), startingWETHBalance);
+    //     assertGt(RECIPIENT.balance, startingRecipientBalance);
+    //     assertEq(address(router).balance, 0);
+    // }
 
     function testV4ExactInMultiHop2RoutesMixed1() public {
         MethodParameters memory params = readFixture(json, "._UNISWAP_SPLIT_TWO_ROUTES_V4_MIXED");

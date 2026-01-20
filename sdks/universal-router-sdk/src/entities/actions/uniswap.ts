@@ -33,12 +33,6 @@ import { encodeFeeBips } from '../../utils/numbers'
 import { BigNumber, BigNumberish } from 'ethers'
 import { TPool } from '@uniswap/router-sdk'
 
-export enum SplitRouteWrapType {
-  WRAP = 'wrap',
-  UNWRAP = 'unwrap',
-  NONE = 'none',
-}
-
 export type FlatFeeOptions = {
   amount: BigNumberish
   recipient: string
@@ -87,71 +81,6 @@ export class UniswapTrade implements Command {
     return result
   }
 
-  /**
-   * Determines if split routes need forced wrapping/unwrapping for ETH-WETH consistency.
-   *
-   * Returns:
-   * - SplitRouteWrapType.UNWRAP if ETH output and ETH-WETH pools need to output WETH for unwrapping
-   * - SplitRouteWrapType.WRAP if WETH output and ETH-WETH pools need to output ETH for wrapping
-   * - SplitRouteWrapType.NONE if no forcing is needed
-   */
-  get splitRouteWrapType(): SplitRouteWrapType {
-    // Only relevant if we have split routes
-    if (this.trade.swaps.length <= 1) {
-      return SplitRouteWrapType.NONE
-    }
-
-    const isNativeOutput = this.trade.outputAmount.currency.isNative
-    let hasRegularWethOutput = false
-    let hasRegularEthOutput = false
-
-    // Check each route to see what type of output it has
-    for (const swap of this.trade.swaps) {
-      if (swap.route.protocol === Protocol.V4) {
-        const v4Route = swap.route as unknown as V4Route<Currency, Currency>
-        const lastPool = v4Route.pools[v4Route.pools.length - 1]
-
-        if (!lastPool.currency0.isNative) {
-          // V4 pool with WETH (not ETH-WETH)
-          hasRegularWethOutput = true
-        } else if (lastPool.currency0.isNative && !lastPool.currency0.wrapped.equals(lastPool.currency1)) {
-          hasRegularEthOutput = true
-        }
-      } else if (swap.route.protocol === Protocol.MIXED) {
-        const mixedRoute = swap.route as MixedRoute<Currency, Currency>
-        const lastPool = mixedRoute.pools[mixedRoute.pools.length - 1]
-
-        if (lastPool instanceof V4Pool) {
-          if (!lastPool.currency0.isNative) {
-            hasRegularWethOutput = true
-          } else if (lastPool.currency0.isNative && !lastPool.currency0.wrapped.equals(lastPool.currency1)) {
-            hasRegularEthOutput = true
-          }
-        } else {
-          // V2/V3 pools always output WETH for unwrap case
-          hasRegularWethOutput = true
-          // But don't count for wrap case
-        }
-      } else {
-        // V2/V3 routes always output WETH for unwrap case
-        hasRegularWethOutput = true
-        // But don't count for wrap case
-      }
-    }
-
-    // For ETH output: need ETH-WETH pool + regular WETH output
-    if (isNativeOutput && hasRegularWethOutput) {
-      return SplitRouteWrapType.UNWRAP
-    }
-
-    // For WETH output: need ETH-WETH pool + regular ETH output
-    if (!isNativeOutput && hasRegularEthOutput) {
-      return SplitRouteWrapType.WRAP
-    }
-
-    return SplitRouteWrapType.NONE
-  }
-
   // this.trade.swaps is an array of swaps / trades.
   // we are iterating over one swap (trade) at a time so length is 1
   // route is either v2, v3, v4, or mixed
@@ -192,23 +121,6 @@ export class UniswapTrade implements Command {
   }
 
   get outputRequiresWrap(): boolean {
-    // If output is WETH and we have split routes with ETH outputs,
-    // we force ALL routes to output ETH, so we need to wrap at the end
-    if (this.splitRouteWrapType === SplitRouteWrapType.WRAP) {
-      // Only wrap if the output is actually WETH (not other tokens like USDC)
-      const outputCurrency = this.trade.outputAmount.currency
-      if (!outputCurrency.isNative) {
-        // Check if output is WETH by comparing with wrapped native
-        const chainId = this.trade.swaps[0]?.route.pools[0]?.chainId
-        if (chainId) {
-          const nativeCurrency = Ether.onChain(chainId)
-          return outputCurrency.equals(nativeCurrency.wrapped)
-        }
-      }
-      return false
-    }
-
-    // For non-split scenarios:
     const swap = this.trade.swaps[0]
     const lastRoute = swap.route
     const lastPool = lastRoute.pools[lastRoute.pools.length - 1]
@@ -216,10 +128,26 @@ export class UniswapTrade implements Command {
     // if last pool is v4:
     if (lastPool instanceof V4Pool) {
       // If output currency is not native but path currency output is native, we need to wrap
-      return (
-        !this.trade.outputAmount.currency.isNative &&
-        (lastRoute as unknown as V4Route<Currency, Currency>).pathOutput.isNative
-      )
+      if (!this.trade.outputAmount.currency.isNative) {
+        if ((lastRoute as unknown as V4Route<Currency, Currency>).pathOutput.isNative) {
+          // this means path output is native and we need to wrap
+          return true
+        } else if (lastPool.currency1.equals(lastPool.currency0.wrapped)) {
+          let poolBefore = lastRoute.pools[lastRoute.pools.length - 2]
+          // this means last pool is eth-weth and pool before contains weth
+          if (
+            poolBefore instanceof V4Pool &&
+            (poolBefore.currency0.equals(lastPool.currency1) || poolBefore.currency1.equals(lastPool.currency1))
+          ) {
+            return true
+          } else if (poolBefore.token0.equals(lastPool.currency1) || poolBefore.token1.equals(lastPool.currency1)) {
+            // same for v2 and v3 pools
+            return true
+          }
+        } else {
+          return false
+        }
+      }
     }
     // if last pool is not v4:
     // we do not need to wrap because v2 and v3 pools already require wrapped tokens
@@ -227,13 +155,6 @@ export class UniswapTrade implements Command {
   }
 
   get outputRequiresUnwrap(): boolean {
-    // If output is ETH and any V4 route has ETH-WETH last pool,
-    // we force ALL V4 routes to take WETH, so we need to unwrap at the end
-    if (this.splitRouteWrapType === SplitRouteWrapType.UNWRAP) {
-      return true
-    }
-
-    // For non-split scenarios:
     const swap = this.trade.swaps[0]
     const lastRoute = swap.route
     const lastPool = lastRoute.pools[lastRoute.pools.length - 1]
@@ -241,10 +162,22 @@ export class UniswapTrade implements Command {
     // if last pool is v4:
     if (lastPool instanceof V4Pool) {
       // If output currency is native and path currency output is not native, we need to unwrap
-      return (
-        this.trade.outputAmount.currency.isNative &&
-        !(this.trade.swaps[0].route as unknown as V4Route<Currency, Currency>).pathOutput.isNative
-      )
+      if (this.trade.outputAmount.currency.isNative) {
+        let poolBefore = lastRoute.pools[lastRoute.pools.length - 2]
+        if (!(this.trade.swaps[0].route as unknown as V4Route<Currency, Currency>).pathOutput.isNative) {
+          // this means path output is weth and we need to unwrap
+          return true
+        } else if (
+          poolBefore instanceof V4Pool &&
+          poolBefore.currency0.isNative &&
+          lastPool.currency1.equals(lastPool.currency0.wrapped)
+        ) {
+          // this means last pool is eth-weth and we need to unwrap
+          return true
+        } else {
+          return false
+        }
+      }
     }
     // else: if path output currency is native, we need to unwrap because v2 and v3 pools already require wrapped tokens
     return this.trade.outputAmount.currency.isNative
@@ -292,26 +225,10 @@ export class UniswapTrade implements Command {
           addV3Swap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
           break
         case Protocol.V4:
-          addV4Swap(
-            planner,
-            swap,
-            this.trade.tradeType,
-            this.options,
-            this.payerIsUser,
-            routerMustCustody,
-            this.splitRouteWrapType
-          )
+          addV4Swap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
           break
         case Protocol.MIXED:
-          addMixedSwap(
-            planner,
-            swap,
-            this.trade.tradeType,
-            this.options,
-            this.payerIsUser,
-            routerMustCustody,
-            this.splitRouteWrapType
-          )
+          addMixedSwap(planner, swap, this.trade.tradeType, this.options, this.payerIsUser, routerMustCustody)
           break
         default:
           throw new Error('UNSUPPORTED_TRADE_PROTOCOL')
@@ -379,6 +296,7 @@ export class UniswapTrade implements Command {
       } else if (this.inputRequiresUnwrap) {
         planner.addCommand(CommandType.WRAP_ETH, [this.options.recipient, CONTRACT_BALANCE])
       } else if (this.trade.inputAmount.currency.isNative) {
+        console.log('input is native')
         // must refund extra native currency sent along for native v4 trades (no input transition)
         planner.addCommand(CommandType.SWEEP, [ETH_ADDRESS, this.options.recipient, 0])
       }
@@ -466,8 +384,7 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
   tradeType: TradeType,
   options: SwapOptions,
   payerIsUser: boolean,
-  routerMustCustody: boolean,
-  splitRouteWrapType: SplitRouteWrapType
+  routerMustCustody: boolean
 ): void {
   // create a deep copy of pools since v4Planner encoding tampers with array
   const pools = route.pools.map((p) => p) as V4Pool[]
@@ -490,14 +407,18 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
   // - If output is ETH and some routes output WETH: force all to output WETH, then unwrap
   // - If output is WETH and some routes output ETH: force all to output ETH, then wrap
   let pathOutputForTake = trade.route.pathOutput
-  let ethWethPool = v4Route.pools[v4Route.pools.length - 1].currency1.equals(
-    v4Route.pools[v4Route.pools.length - 1].currency0.wrapped
-  )
+  let lastPool = v4Route.pools[v4Route.pools.length - 1]
+  let ethWethPool = lastPool.currency1.equals(lastPool.currency0.wrapped)
+
   if (ethWethPool) {
-    if (splitRouteWrapType === SplitRouteWrapType.UNWRAP) {
+    let poolBefore = v4Route.pools[v4Route.pools.length - 2]
+    if (pathOutputForTake.isNative && poolBefore.currency0.isNative) {
       pathOutputForTake = pathOutputForTake.wrapped
-    } else if (splitRouteWrapType === SplitRouteWrapType.WRAP) {
-      pathOutputForTake = v4Route.pools[v4Route.pools.length - 1].currency0
+    } else if (
+      !pathOutputForTake.isNative &&
+      (poolBefore.currency0.equals(lastPool.currency1) || poolBefore.currency1.equals(lastPool.currency1))
+    ) {
+      pathOutputForTake = lastPool.currency0
     }
   }
 
@@ -515,8 +436,7 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
   tradeType: TradeType,
   options: SwapOptions,
   payerIsUser: boolean,
-  routerMustCustody: boolean,
-  splitRouteWrapType: SplitRouteWrapType
+  routerMustCustody: boolean
 ): void {
   const route = swap.route as MixedRoute<TInput, TOutput>
   const inputAmount = swap.inputAmount
@@ -526,7 +446,7 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
   // single hop, so it can be reduced to plain swap logic for one protocol version
   if (route.pools.length === 1) {
     if (route.pools[0] instanceof V4Pool) {
-      return addV4Swap(planner, swap, tradeType, options, payerIsUser, routerMustCustody, splitRouteWrapType)
+      return addV4Swap(planner, swap, tradeType, options, payerIsUser, routerMustCustody)
     } else if (route.pools[0] instanceof V3Pool) {
       return addV3Swap(planner, swap, tradeType, options, payerIsUser, routerMustCustody)
     } else if (route.pools[0] instanceof Pair) {
@@ -594,12 +514,20 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
       // Handle split route output consistency for V4 sections in mixed routes
       let outputTokenForTake = outputToken
       if (isLastSectionInRoute(i)) {
-        if (splitRouteWrapType === SplitRouteWrapType.UNWRAP) {
-          // Force WETH output for later unwrapping
-          outputTokenForTake = outputToken.wrapped
-        } else if (splitRouteWrapType === SplitRouteWrapType.WRAP) {
-          // Force ETH output for later wrapping
-          outputTokenForTake = Ether.onChain(outputToken.chainId)
+        let lastPool = route.pools[route.pools.length - 1]
+        let v4Pool = lastPool instanceof V4Pool
+        let ethWethPool = v4Pool ? (lastPool as V4Pool).currency1.equals((lastPool as V4Pool).currency0.wrapped) : false
+        let poolBefore = route.pools[route.pools.length - 2]
+
+        if (ethWethPool) {
+          if (outputToken.isNative && poolBefore.token0.isNative) {
+            outputTokenForTake = outputToken.wrapped
+          } else if (
+            !outputToken.isNative &&
+            (poolBefore.token0.equals(lastPool.token1) || poolBefore.token1.equals(lastPool.token1))
+          ) {
+            outputTokenForTake = lastPool.token0
+          }
         }
       }
 
