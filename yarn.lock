@@ -4898,9 +4898,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@uniswap/sdk-core@npm:^7.10.0, @uniswap/sdk-core@npm:^7.5.0, @uniswap/sdk-core@npm:^7.6.0, @uniswap/sdk-core@npm:^7.8.0":
-  version: 7.10.0
-  resolution: "@uniswap/sdk-core@npm:7.10.0"
+"@uniswap/sdk-core@npm:^7.10.0, @uniswap/sdk-core@npm:^7.10.1, @uniswap/sdk-core@npm:^7.5.0, @uniswap/sdk-core@npm:^7.6.0, @uniswap/sdk-core@npm:^7.8.0":
+  version: 7.10.1
+  resolution: "@uniswap/sdk-core@npm:7.10.1"
   dependencies:
     "@ethersproject/address": ^5.0.2
     "@ethersproject/bytes": ^5.7.0
@@ -4911,7 +4911,7 @@ __metadata:
     jsbi: ^3.1.4
     tiny-invariant: ^1.1.0
     toformat: ^2.0.0
-  checksum: f6386a3905b757cdd0c340d2840cbebc51d39d29556de31c757a7973839aa925cfa9240f364097609b7dd7c1b0d3acbe0808b09202e698e7a94d0d69df56f866
+  checksum: fbe11b459d2e3d1813a4ed82ce08fd8d2ba4f6eab5a27cb4fdb28c294f569bfc7e9092a6bbe7b6d31062f01315e907acbe1be71e156ea8edf72b3fc513f697e2
   languageName: node
   linkType: hard
 
@@ -5165,7 +5165,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v3-sdk@npm:^3.27.0":
+"@uniswap/v3-sdk@npm:3.27.0, @uniswap/v3-sdk@npm:^3.27.0":
   version: 3.27.0
   resolution: "@uniswap/v3-sdk@npm:3.27.0"
   dependencies:
@@ -5242,8 +5242,8 @@ __metadata:
     "@types/mocha": ^9.1.1
     "@types/node": ^18.7.16
     "@types/node-fetch": ^2.6.2
-    "@uniswap/sdk-core": ^7.10.0
-    "@uniswap/v3-sdk": 3.26.0
+    "@uniswap/sdk-core": ^7.10.1
+    "@uniswap/v3-sdk": 3.27.0
     chai: ^4.3.6
     dotenv: ^16.0.3
     eslint: ^8.57.0
