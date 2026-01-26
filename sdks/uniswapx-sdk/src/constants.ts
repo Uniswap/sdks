@@ -216,7 +216,7 @@ export const PERMISSIONED_TOKENS: PermissionedToken[] = [
 type ResolverMapping = { readonly [chainId: number]: string };
 
 export const HYBRID_RESOLVER_ADDRESS_MAPPING: ResolverMapping = {
-  1301: "0x464cB0DF13010154b5395B61A5a6e46d7284f1EF",
+  1301: "0x57c48a70bd9f34fd902dde5bb4dbe25d2c931c62",
 };
 
 type ReverseResolverMapping = {

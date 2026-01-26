@@ -257,13 +257,18 @@ export function hashHybridCosignerData(
   chainId: number
 ): string {
   const encodedCosignerData = ethers.utils.defaultAbiCoder.encode(
-    ["tuple(uint256 auctionTargetBlock,uint256[] supplementalPriceCurve)"],
+    [
+      "tuple(uint256 auctionTargetBlock,uint256[] supplementalPriceCurve,address exclusiveFiller,uint256 exclusivityOverrideBps,uint256 exclusivityEndBlock)",
+    ],
     [
       [
         cosignerData.auctionTargetBlock,
         cosignerData.supplementalPriceCurve.map((value) =>
           BigNumber.from(value)
         ),
+        cosignerData.exclusiveFiller,
+        BigNumber.from(cosignerData.exclusivityOverrideBps),
+        BigNumber.from(cosignerData.exclusivityEndBlock ?? 0),
       ],
     ]
   );

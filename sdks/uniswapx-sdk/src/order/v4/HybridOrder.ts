@@ -44,7 +44,7 @@ const HYBRID_ORDER_ABI = [
       "uint256",
       "uint256",
       "uint256[]",
-      "tuple(uint256,uint256[])",
+      "tuple(uint256,uint256[],address,uint256,uint256)",
       "bytes",
     ].join(",") +
     ")",
@@ -81,10 +81,7 @@ function parseSerializedHybridOrder(encoded: string): {
   const abiCoder = new ethers.utils.AbiCoder();
 
   // Step 1: Decode outer wrapper (resolver + orderData)
-  const [resolver, orderData] = abiCoder.decode(
-    ["address", "bytes"],
-    encoded
-  );
+  const [resolver, orderData] = abiCoder.decode(["address", "bytes"], encoded);
 
   // Step 2: Decode order structure
   const decoded = abiCoder.decode(HYBRID_ORDER_ABI, orderData);
@@ -108,7 +105,13 @@ function parseSerializedHybridOrder(encoded: string): {
       baselinePriorityFee,
       scalingFactor,
       priceCurve,
-      [auctionTargetBlock, supplementalPriceCurve],
+      [
+        auctionTargetBlock,
+        supplementalPriceCurve,
+        exclusiveFiller,
+        exclusivityOverrideBps,
+        exclusivityEndBlock,
+      ],
       cosignature,
     ],
   ] = decoded;
@@ -141,6 +144,9 @@ function parseSerializedHybridOrder(encoded: string): {
       cosignerData: {
         auctionTargetBlock,
         supplementalPriceCurve: [...supplementalPriceCurve],
+        exclusiveFiller,
+        exclusivityOverrideBps,
+        exclusivityEndBlock,
       },
       cosignature,
     },
@@ -268,6 +274,9 @@ export class UnsignedHybridOrder {
       cosignerData: {
         auctionTargetBlock: BigNumber.from(0),
         supplementalPriceCurve: [],
+        exclusiveFiller: ZERO_ADDRESS,
+        exclusivityOverrideBps: BigNumber.from(0),
+        exclusivityEndBlock: BigNumber.from(0),
       },
       cosignature: "0x",
     });
@@ -299,7 +308,7 @@ export class UnsignedHybridOrder {
         this.info.baselinePriorityFee,
         this.info.scalingFactor,
         this.info.priceCurve,
-        [BigNumber.from(0), []], // Empty cosignerData
+        [BigNumber.from(0), [], ZERO_ADDRESS, BigNumber.from(0), BigNumber.from(0)], // Empty cosignerData
         "0x", // Empty cosignature
       ],
     ]);
@@ -377,7 +386,7 @@ export class UnsignedHybridOrder {
     };
   }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   resolve(_options: HybridOrderResolutionOptions): ResolvedUniswapXOrder {
     throw new Error("Cannot resolve unsigned order - cosigner data required");
   }
@@ -505,6 +514,13 @@ export class CosignedHybridOrder extends UnsignedHybridOrder {
           supplementalPriceCurve: json.cosignerData.supplementalPriceCurve.map(
             (value) => BigNumber.from(value)
           ),
+          exclusiveFiller: json.cosignerData.exclusiveFiller ?? ZERO_ADDRESS,
+          exclusivityOverrideBps: BigNumber.from(
+            json.cosignerData.exclusivityOverrideBps ?? 0
+          ),
+          exclusivityEndBlock: BigNumber.from(
+            json.cosignerData.exclusivityEndBlock ?? 0
+          ),
         },
         cosignature: json.cosignature,
       },
@@ -547,6 +563,9 @@ export class CosignedHybridOrder extends UnsignedHybridOrder {
         [
           this.info.cosignerData.auctionTargetBlock,
           this.info.cosignerData.supplementalPriceCurve,
+          this.info.cosignerData.exclusiveFiller,
+          this.info.cosignerData.exclusivityOverrideBps,
+          this.info.cosignerData.exclusivityEndBlock,
         ],
         this.info.cosignature,
       ],
@@ -689,6 +708,11 @@ export class CosignedHybridOrder extends UnsignedHybridOrder {
           this.info.cosignerData.supplementalPriceCurve.map((value) =>
             value.toString()
           ),
+        exclusiveFiller: this.info.cosignerData.exclusiveFiller,
+        exclusivityOverrideBps:
+          this.info.cosignerData.exclusivityOverrideBps.toNumber(),
+        exclusivityEndBlock:
+          this.info.cosignerData.exclusivityEndBlock.toString(),
       },
       cosignature: this.info.cosignature,
     };
@@ -709,7 +733,6 @@ export class CosignedHybridOrder extends UnsignedHybridOrder {
     );
   }
 }
-
 
 // Helper functions
 
