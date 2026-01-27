@@ -121,6 +121,9 @@ describe("HybridOrder", () => {
     return {
       auctionTargetBlock: targetBlock || BigNumber.from(0),
       supplementalPriceCurve: supplementalCurve,
+      exclusiveFiller: ethers.constants.AddressZero,
+      exclusivityOverrideBps: BigNumber.from(0),
+      exclusivityEndBlock: BigNumber.from(0),
     };
   };
 
