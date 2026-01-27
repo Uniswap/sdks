@@ -100,6 +100,9 @@ export class HybridOrderBuilder {
     this.orderData.cosignerData = {
       auctionTargetBlock: BigNumber.from(0),
       supplementalPriceCurve: [],
+      exclusiveFiller: ZERO_ADDRESS,
+      exclusivityOverrideBps: BigNumber.from(0),
+      exclusivityEndBlock: BigNumber.from(0),
       ...data,
     };
   }
@@ -226,6 +229,34 @@ export class HybridOrderBuilder {
     return this;
   }
 
+  exclusiveFiller(exclusiveFiller: string): this {
+    if (!this.orderData.cosignerData) {
+      this.initializeCosignerData({ exclusiveFiller });
+    } else {
+      this.orderData.cosignerData.exclusiveFiller = exclusiveFiller;
+    }
+    return this;
+  }
+
+  exclusivityOverrideBps(exclusivityOverrideBps: BigNumber): this {
+    if (!this.orderData.cosignerData) {
+      this.initializeCosignerData({ exclusivityOverrideBps });
+    } else {
+      this.orderData.cosignerData.exclusivityOverrideBps = exclusivityOverrideBps;
+    }
+    return this;
+  }
+
+  exclusivityEndBlock(block: BigNumber | number): this {
+    const value = typeof block === "number" ? BigNumber.from(block) : block;
+    if (!this.orderData.cosignerData) {
+      this.initializeCosignerData({ exclusivityEndBlock: value });
+    } else {
+      this.orderData.cosignerData.exclusivityEndBlock = value;
+    }
+    return this;
+  }
+
   private checkUnsignedInvariants(): void {
     invariant(this.info.reactor !== undefined, "reactor not set");
     invariant(this.info.swapper !== undefined, "swapper not set");
@@ -329,6 +360,18 @@ export class HybridOrderBuilder {
       this.orderData.cosignerData.supplementalPriceCurve !== undefined,
       "supplementalPriceCurve not set"
     );
+    invariant(
+      this.orderData.cosignerData.exclusiveFiller !== undefined,
+      "exclusiveFiller not set"
+    );
+    invariant(
+      this.orderData.cosignerData.exclusivityOverrideBps !== undefined,
+      "exclusivityOverrideBps not set"
+    );
+    invariant(
+      this.orderData.cosignerData.exclusivityEndBlock !== undefined,
+      "exclusivityEndBlock not set"
+    );
   }
 
   buildPartial(): UnsignedHybridOrder {
@@ -378,4 +421,3 @@ export class HybridOrderBuilder {
     );
   }
 }
-

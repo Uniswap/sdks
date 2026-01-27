@@ -15,7 +15,7 @@ const INPUT_TOKEN = "0x0000000000000000000000000000000000000c10";
 const OUTPUT_TOKEN = "0x0000000000000000000000000000000000000d10";
 const WAD = ethers.constants.WeiPerEther;
 const COSIGNER = new Wallet(
-  "0x59c6995e998f97a5a0044976f7d75e7b7d6f4b6b55bdbb1c0cfd43a3d6ab1e31"
+  "0x59c6995e998f97a5a0044976f7d75e7b7d6f4b6b55bdbb1c0cfd43a3d6ab1e31",
 );
 
 const HYBRID_ORDER_ABI = [
@@ -29,7 +29,7 @@ const HYBRID_ORDER_ABI = [
       "uint256",
       "uint256",
       "uint256[]",
-      "tuple(uint256,uint256[])",
+      "tuple(uint256,uint256[],address,uint256,uint256)",
       "bytes",
     ].join(",") +
     ")",
@@ -40,12 +40,14 @@ describe("CosignedHybridOrder", () => {
 
   function packPriceCurveElement(
     duration: number,
-    scalingFactor: BigNumber
+    scalingFactor: BigNumber,
   ): BigNumber {
     return BigNumber.from(duration).shl(240).or(scalingFactor);
   }
 
-  function buildOrder(overrides: Partial<CosignedHybridOrderInfo> = {}): CosignedHybridOrderInfo {
+  function buildOrder(
+    overrides: Partial<CosignedHybridOrderInfo> = {},
+  ): CosignedHybridOrderInfo {
     const basePriceCurve = [
       packPriceCurveElement(0, WAD),
       packPriceCurveElement(5, WAD.add(BigNumber.from("50000000000000000"))),
@@ -80,6 +82,9 @@ describe("CosignedHybridOrder", () => {
       cosignerData: {
         auctionTargetBlock: BigNumber.from(105),
         supplementalPriceCurve: [WAD.add(BigNumber.from("10000000000000000"))],
+        exclusiveFiller: ZERO_ADDRESS,
+        exclusivityOverrideBps: BigNumber.from(0),
+        exclusivityEndBlock: BigNumber.from(0),
       },
       cosignature: "0x",
     };
@@ -92,7 +97,7 @@ describe("CosignedHybridOrder", () => {
         ...baseOrder.input,
         ...(overrides.input ?? {}),
         maxAmount: BigNumber.from(
-          overrides.input?.maxAmount ?? baseOrder.input.maxAmount
+          overrides.input?.maxAmount ?? baseOrder.input.maxAmount,
         ),
       },
       outputs: (overrides.outputs ?? baseOrder.outputs).map((output) => ({
@@ -100,26 +105,37 @@ describe("CosignedHybridOrder", () => {
         minAmount: BigNumber.from(output.minAmount),
       })),
       auctionStartBlock: BigNumber.from(
-        overrides.auctionStartBlock ?? baseOrder.auctionStartBlock
+        overrides.auctionStartBlock ?? baseOrder.auctionStartBlock,
       ),
       baselinePriorityFee: BigNumber.from(
-        overrides.baselinePriorityFee ?? baseOrder.baselinePriorityFee
+        overrides.baselinePriorityFee ?? baseOrder.baselinePriorityFee,
       ),
       scalingFactor: BigNumber.from(
-        overrides.scalingFactor ?? baseOrder.scalingFactor
+        overrides.scalingFactor ?? baseOrder.scalingFactor,
       ),
-      priceCurve: (overrides.priceCurve ?? baseOrder.priceCurve).map((value: BigNumber) =>
-        BigNumber.from(value)
+      priceCurve: (overrides.priceCurve ?? baseOrder.priceCurve).map(
+        (value: BigNumber) => BigNumber.from(value),
       ),
       cosignerData: {
         auctionTargetBlock: BigNumber.from(
           overrides.cosignerData?.auctionTargetBlock ??
-            baseOrder.cosignerData.auctionTargetBlock
+            baseOrder.cosignerData.auctionTargetBlock,
         ),
         supplementalPriceCurve: (
           overrides.cosignerData?.supplementalPriceCurve ??
           baseOrder.cosignerData.supplementalPriceCurve
         ).map((value: BigNumber) => BigNumber.from(value)),
+        exclusiveFiller:
+          overrides.cosignerData?.exclusiveFiller ??
+          baseOrder.cosignerData.exclusiveFiller,
+        exclusivityOverrideBps: BigNumber.from(
+          overrides.cosignerData?.exclusivityOverrideBps ??
+            baseOrder.cosignerData.exclusivityOverrideBps,
+        ),
+        exclusivityEndBlock: BigNumber.from(
+          overrides.cosignerData?.exclusivityEndBlock ??
+            baseOrder.cosignerData.exclusivityEndBlock,
+        ),
       },
       cosignature: overrides.cosignature ?? "0x",
     };
@@ -148,7 +164,7 @@ describe("CosignedHybridOrder", () => {
         cosignature: "0x",
       }),
       order.cosignerData,
-      chainId
+      chainId,
     );
     const signature = COSIGNER._signingKey().signDigest(digest);
     return ethers.utils.joinSignature(signature);
@@ -168,7 +184,7 @@ describe("CosignedHybridOrder", () => {
     const abiCoder = new ethers.utils.AbiCoder();
     const [resolver, encoded] = abiCoder.decode(
       ["address", "bytes"],
-      serialized
+      serialized,
     );
     expect(resolver).toEqual(RESOLVER);
 
@@ -199,6 +215,9 @@ describe("CosignedHybridOrder", () => {
         [
           order.cosignerData.auctionTargetBlock,
           order.cosignerData.supplementalPriceCurve,
+          order.cosignerData.exclusiveFiller,
+          order.cosignerData.exclusivityOverrideBps,
+          order.cosignerData.exclusivityEndBlock,
         ],
         order.cosignature,
       ],
@@ -214,7 +233,7 @@ describe("CosignedHybridOrder", () => {
     const revived = CosignedHybridOrder.fromJSON(
       json as CosignedHybridOrderInfoJSON,
       chainId,
-      RESOLVER
+      RESOLVER,
     );
     expect(revived.info).toEqual(order);
     expect(json.chainId).toEqual(chainId);
@@ -227,11 +246,11 @@ describe("CosignedHybridOrder", () => {
     const digest = hashHybridCosignerData(
       hashHybridOrder(order),
       order.cosignerData,
-      chainId
+      chainId,
     );
     expect(hybrid.cosignatureHash()).toEqual(digest);
     expect(ethers.utils.getAddress(hybrid.recoverCosigner())).toEqual(
-      ethers.utils.getAddress(COSIGNER.address)
+      ethers.utils.getAddress(COSIGNER.address),
     );
   });
 
@@ -240,6 +259,9 @@ describe("CosignedHybridOrder", () => {
       cosignerData: {
         auctionTargetBlock: BigNumber.from(0),
         supplementalPriceCurve: [],
+        exclusiveFiller: ZERO_ADDRESS,
+        exclusivityOverrideBps: BigNumber.from(0),
+        exclusivityEndBlock: BigNumber.from(0),
       },
     });
     const hybrid = new CosignedHybridOrder(order, chainId, RESOLVER);
@@ -253,12 +275,15 @@ describe("CosignedHybridOrder", () => {
       cosignerData: {
         auctionTargetBlock: BigNumber.from(222),
         supplementalPriceCurve: [],
+        exclusiveFiller: ZERO_ADDRESS,
+        exclusivityOverrideBps: BigNumber.from(0),
+        exclusivityEndBlock: BigNumber.from(0),
       },
     });
     const hybrid = new CosignedHybridOrder(order, chainId, RESOLVER);
     expect(hybrid.blockOverrides).toEqual({
       number: ethers.utils.hexStripZeros(
-        order.cosignerData.auctionTargetBlock.toHexString()
+        order.cosignerData.auctionTargetBlock.toHexString(),
       ),
     });
   });
@@ -277,6 +302,9 @@ describe("CosignedHybridOrder", () => {
       cosignerData: {
         auctionTargetBlock: BigNumber.from(0),
         supplementalPriceCurve: [],
+        exclusiveFiller: ZERO_ADDRESS,
+        exclusivityOverrideBps: BigNumber.from(0),
+        exclusivityEndBlock: BigNumber.from(0),
       },
       auctionStartBlock: BigNumber.from(0),
       scalingFactor: WAD.add(5),
@@ -290,7 +318,7 @@ describe("CosignedHybridOrder", () => {
     const expectedMultiplier = WAD.add(5);
     const expectedOutput = mulWadUp(
       order.outputs[0].minAmount,
-      expectedMultiplier
+      expectedMultiplier,
     );
     expect(result.input.amount).toEqual(order.input.maxAmount);
     expect(result.outputs[0].amount).toEqual(expectedOutput);
@@ -302,6 +330,9 @@ describe("CosignedHybridOrder", () => {
       cosignerData: {
         auctionTargetBlock: BigNumber.from(0),
         supplementalPriceCurve: [],
+        exclusiveFiller: ZERO_ADDRESS,
+        exclusivityOverrideBps: BigNumber.from(0),
+        exclusivityEndBlock: BigNumber.from(0),
       },
       auctionStartBlock: BigNumber.from(0),
       scalingFactor: WAD.sub(5),
@@ -318,11 +349,82 @@ describe("CosignedHybridOrder", () => {
     expect(result.outputs[0].amount).toEqual(order.outputs[0].minAmount);
   });
 
+  it("resolves when filler has exclusivity", () => {
+    const exclusiveFiller = "0x0000000000000000000000000000000000000aaa";
+    const order = buildOrder({
+      priceCurve: [],
+      cosignerData: {
+        auctionTargetBlock: BigNumber.from(0),
+        supplementalPriceCurve: [],
+        exclusiveFiller,
+        exclusivityOverrideBps: BigNumber.from(0),
+        exclusivityEndBlock: BigNumber.from(0),
+      },
+      auctionStartBlock: BigNumber.from(0),
+      scalingFactor: WAD.add(5),
+    });
+    const hybrid = new CosignedHybridOrder(order, chainId, RESOLVER);
+    const result = hybrid.resolve({
+      currentBlock: BigNumber.from(0),
+      priorityFeeWei: order.baselinePriorityFee,
+      filler: exclusiveFiller,
+    });
+    expect(result.outputs[0].amount).toEqual(order.outputs[0].minAmount);
+  });
+
+  it("resolves when filler lacks exclusivity", () => {
+    const exclusiveFiller = "0x0000000000000000000000000000000000000aaa";
+    const order = buildOrder({
+      priceCurve: [],
+      cosignerData: {
+        auctionTargetBlock: BigNumber.from(0),
+        supplementalPriceCurve: [],
+        exclusiveFiller,
+        exclusivityOverrideBps: BigNumber.from(0),
+        exclusivityEndBlock: BigNumber.from(0),
+      },
+      auctionStartBlock: BigNumber.from(0),
+      scalingFactor: WAD.add(5),
+    });
+    const hybrid = new CosignedHybridOrder(order, chainId, RESOLVER);
+    const result = hybrid.resolve({
+      currentBlock: BigNumber.from(0),
+      priorityFeeWei: order.baselinePriorityFee,
+      filler: "0x0000000000000000000000000000000000000bbb",
+    });
+    expect(result.outputs[0].amount).toEqual(order.outputs[0].minAmount);
+  });
+
+  it("resolves when filler not set but exclusivity exists", () => {
+    const exclusiveFiller = "0x0000000000000000000000000000000000000aaa";
+    const order = buildOrder({
+      priceCurve: [],
+      cosignerData: {
+        auctionTargetBlock: BigNumber.from(0),
+        supplementalPriceCurve: [],
+        exclusiveFiller,
+        exclusivityOverrideBps: BigNumber.from(0),
+        exclusivityEndBlock: BigNumber.from(0),
+      },
+      auctionStartBlock: BigNumber.from(0),
+      scalingFactor: WAD.add(5),
+    });
+    const hybrid = new CosignedHybridOrder(order, chainId, RESOLVER);
+    const result = hybrid.resolve({
+      currentBlock: BigNumber.from(0),
+      priorityFeeWei: order.baselinePriorityFee,
+    });
+    expect(result.outputs[0].amount).toEqual(order.outputs[0].minAmount);
+  });
+
   it("throws when current block precedes target block", () => {
     const order = buildOrder({
       cosignerData: {
         auctionTargetBlock: BigNumber.from(500),
         supplementalPriceCurve: [],
+        exclusiveFiller: ZERO_ADDRESS,
+        exclusivityOverrideBps: BigNumber.from(0),
+        exclusivityEndBlock: BigNumber.from(0),
       },
     });
     const hybrid = new CosignedHybridOrder(order, chainId, RESOLVER);
@@ -330,7 +432,7 @@ describe("CosignedHybridOrder", () => {
       hybrid.resolve({
         currentBlock: BigNumber.from(400),
         priorityFeeWei: order.baselinePriorityFee,
-      })
+      }),
     ).toThrow(OrderResolutionError);
   });
 });

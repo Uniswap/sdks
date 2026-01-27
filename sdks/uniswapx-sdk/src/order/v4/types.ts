@@ -82,6 +82,9 @@ export type HybridOutput = {
 export type HybridCosignerData = {
   auctionTargetBlock: BigNumber;
   supplementalPriceCurve: BigNumber[];
+  exclusiveFiller: string;
+  exclusivityOverrideBps: BigNumber;
+  exclusivityEndBlock: BigNumber;
 };
 
 /**
@@ -90,6 +93,9 @@ export type HybridCosignerData = {
 export type HybridCosignerDataJSON = {
   auctionTargetBlock: string;
   supplementalPriceCurve: string[];
+  exclusiveFiller: string;
+  exclusivityOverrideBps: number;
+  exclusivityEndBlock: string;
 };
 
 export type UnsignedHybridOrderInfo = OrderInfoV4 & {
@@ -122,7 +128,13 @@ export type HybridOutputJSON = {
 
 export type UnsignedHybridOrderInfoJSON = Omit<
   UnsignedHybridOrderInfo,
-  "nonce" | "input" | "outputs" | "auctionStartBlock" | "baselinePriorityFee" | "scalingFactor" | "priceCurve"
+  | "nonce"
+  | "input"
+  | "outputs"
+  | "auctionStartBlock"
+  | "baselinePriorityFee"
+  | "scalingFactor"
+  | "priceCurve"
 > & {
   nonce: string;
   input: HybridInputJSON;
@@ -137,7 +149,6 @@ export type CosignedHybridOrderInfoJSON = UnsignedHybridOrderInfoJSON & {
   cosignerData: HybridCosignerDataJSON;
   cosignature: string;
 };
-
 
 /**
  * DCA Intent structure
@@ -265,6 +276,7 @@ export type DCAIntentJSON = Omit<
 export type HybridOrderResolutionOptions = {
   currentBlock: BigNumber;
   priorityFeeWei: BigNumber;
+  filler?: string;
 };
 
 /**
