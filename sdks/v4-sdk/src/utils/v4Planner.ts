@@ -83,6 +83,13 @@ const SWAP_EXACT_OUT_STRUCT =
   PATH_KEY_STRUCT +
   '[] path,uint256[] maxHopSlippage,uint128 amountOut,uint128 amountInMaximum)'
 
+// UR 2.0 struct definitions (without maxHopSlippage)
+const SWAP_EXACT_IN_STRUCT_V2_0 =
+  '(address currencyIn,' + PATH_KEY_STRUCT + '[] path,uint128 amountIn,uint128 amountOutMinimum)'
+
+const SWAP_EXACT_OUT_STRUCT_V2_0 =
+  '(address currencyOut,' + PATH_KEY_STRUCT + '[] path,uint128 amountOut,uint128 amountInMaximum)'
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const V4_BASE_ACTIONS_ABI_DEFINITION: { [key in Actions]: readonly ParamType[] } = {
   // Liquidity commands
@@ -168,6 +175,12 @@ export const V4_BASE_ACTIONS_ABI_DEFINITION: { [key in Actions]: readonly ParamT
   [Actions.UNWRAP]: [{ name: 'amount', type: 'uint256' }],
 }
 
+// UR 2.0 ABI definitions (without maxHopSlippage for swap actions)
+export const V4_BASE_ACTIONS_ABI_DEFINITION_V2_0: { [key in Actions]?: readonly ParamType[] } = {
+  [Actions.SWAP_EXACT_IN]: [{ name: 'swap', type: SWAP_EXACT_IN_STRUCT_V2_0, subparser: Subparser.V4SwapExactIn }],
+  [Actions.SWAP_EXACT_OUT]: [{ name: 'swap', type: SWAP_EXACT_OUT_STRUCT_V2_0, subparser: Subparser.V4SwapExactOut }],
+}
+
 const FULL_DELTA_AMOUNT = 0
 
 export class V4Planner {
@@ -186,10 +199,18 @@ export class V4Planner {
     return this
   }
 
+  addActionV2_0(type: Actions, parameters: any[]): V4Planner {
+    let command = createActionV2_0(type, parameters)
+    this.params.push(command.encodedInput)
+    this.actions = this.actions.concat(command.action.toString(16).padStart(2, '0'))
+    return this
+  }
+
   addTrade(
     trade: Trade<Currency, Currency, TradeType>,
     slippageTolerance?: Percent,
-    maxHopSlippage?: BigNumber[]
+    maxHopSlippage?: BigNumber[],
+    useMaxHopSlippage: boolean = true
   ): V4Planner {
     const exactOutput = trade.tradeType === TradeType.EXACT_OUTPUT
 
@@ -202,26 +223,45 @@ export class V4Planner {
     const currencyIn = currencyAddress(trade.route.pathInput)
     const currencyOut = currencyAddress(trade.route.pathOutput)
 
-    // If no per-hop slippage limits provided, use empty array (no per-hop checks)
-    const maxHopSlippageArray = maxHopSlippage ?? []
+    if (useMaxHopSlippage) {
+      // UR 2.1: include maxHopSlippage in the struct
+      const maxHopSlippageArray = maxHopSlippage ?? []
 
-    this.addAction(actionType, [
-      exactOutput
-        ? {
-            currencyOut,
-            path: encodeRouteToPath(trade.route, exactOutput),
-            maxHopSlippage: maxHopSlippageArray,
-            amountInMaximum: trade.maximumAmountIn(slippageTolerance ?? new Percent(0)).quotient.toString(),
-            amountOut: trade.outputAmount.quotient.toString(),
-          }
-        : {
-            currencyIn,
-            path: encodeRouteToPath(trade.route, exactOutput),
-            maxHopSlippage: maxHopSlippageArray,
-            amountIn: trade.inputAmount.quotient.toString(),
-            amountOutMinimum: slippageTolerance ? trade.minimumAmountOut(slippageTolerance).quotient.toString() : 0,
-          },
-    ])
+      this.addAction(actionType, [
+        exactOutput
+          ? {
+              currencyOut,
+              path: encodeRouteToPath(trade.route, exactOutput),
+              maxHopSlippage: maxHopSlippageArray,
+              amountInMaximum: trade.maximumAmountIn(slippageTolerance ?? new Percent(0)).quotient.toString(),
+              amountOut: trade.outputAmount.quotient.toString(),
+            }
+          : {
+              currencyIn,
+              path: encodeRouteToPath(trade.route, exactOutput),
+              maxHopSlippage: maxHopSlippageArray,
+              amountIn: trade.inputAmount.quotient.toString(),
+              amountOutMinimum: slippageTolerance ? trade.minimumAmountOut(slippageTolerance).quotient.toString() : 0,
+            },
+      ])
+    } else {
+      // UR 2.0: exclude maxHopSlippage from the struct
+      this.addActionV2_0(actionType, [
+        exactOutput
+          ? {
+              currencyOut,
+              path: encodeRouteToPath(trade.route, exactOutput),
+              amountInMaximum: trade.maximumAmountIn(slippageTolerance ?? new Percent(0)).quotient.toString(),
+              amountOut: trade.outputAmount.quotient.toString(),
+            }
+          : {
+              currencyIn,
+              path: encodeRouteToPath(trade.route, exactOutput),
+              amountIn: trade.inputAmount.quotient.toString(),
+              amountOutMinimum: slippageTolerance ? trade.minimumAmountOut(slippageTolerance).quotient.toString() : 0,
+            },
+      ])
+    }
     return this
   }
 
@@ -258,6 +298,16 @@ type RouterAction = {
 function createAction(action: Actions, parameters: any[]): RouterAction {
   const encodedInput = defaultAbiCoder.encode(
     V4_BASE_ACTIONS_ABI_DEFINITION[action].map((v) => v.type),
+    parameters
+  )
+  return { action, encodedInput }
+}
+
+function createActionV2_0(action: Actions, parameters: any[]): RouterAction {
+  // Use V2_0 ABI definition if available, otherwise fall back to default
+  const abiDef = V4_BASE_ACTIONS_ABI_DEFINITION_V2_0[action] ?? V4_BASE_ACTIONS_ABI_DEFINITION[action]
+  const encodedInput = defaultAbiCoder.encode(
+    abiDef.map((v) => v.type),
     parameters
   )
   return { action, encodedInput }

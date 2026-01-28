@@ -8,7 +8,7 @@ import { Route } from '../entities/route'
 import { encodeRouteToPath } from './encodeRouteToPath'
 import { ADDRESS_ZERO, FEE_AMOUNT_MEDIUM, TICK_SPACING_TEN, ONE_ETHER, NEGATIVE_ONE } from '../internalConstants'
 
-import { Actions, V4Planner, V4_BASE_ACTIONS_ABI_DEFINITION } from './v4Planner'
+import { Actions, V4Planner, V4_BASE_ACTIONS_ABI_DEFINITION, V4_BASE_ACTIONS_ABI_DEFINITION_V2_0 } from './v4Planner'
 
 const { defaultAbiCoder } = utils
 
@@ -301,6 +301,82 @@ describe('RouterPlanner', () => {
 
       expect(decoded[0].currencyIn).toEqual(DAI.address)
       expect(decoded[0].maxHopSlippage).toHaveLength(0)
+    })
+
+    it('completes a v4 exactIn swap with UR 2.0 encoding (without maxHopSlippage)', async () => {
+      const route = new Route([DAI_USDC, USDC_WETH], DAI, WETH9[1])
+      const trade = await Trade.fromRoute(
+        route,
+        CurrencyAmount.fromRawAmount(DAI, ONE_ETHER.toString()),
+        TradeType.EXACT_INPUT
+      )
+
+      // Use UR 2.0 encoding by setting useMaxHopSlippage to false
+      planner.addTrade(trade, undefined, undefined, false)
+
+      expect(planner.actions).toEqual('0x07')
+
+      // Decode the params using UR 2.0 ABI (without maxHopSlippage)
+      const decoded = defaultAbiCoder.decode(
+        V4_BASE_ACTIONS_ABI_DEFINITION_V2_0[Actions.SWAP_EXACT_IN]!.map((v) => v.type),
+        planner.params[0]
+      )
+
+      expect(decoded[0].currencyIn).toEqual(DAI.address)
+      expect(decoded[0].amountIn.toString()).toEqual(ONE_ETHER.toString())
+      expect(decoded[0].amountOutMinimum.toString()).toEqual('0')
+      // Verify maxHopSlippage is NOT in the struct
+      expect(decoded[0].maxHopSlippage).toBeUndefined()
+    })
+
+    it('completes a v4 exactOut swap with UR 2.0 encoding (without maxHopSlippage)', async () => {
+      const route = new Route([DAI_USDC, USDC_WETH], DAI, WETH9[1])
+      const slippageTolerance = new Percent('5')
+      const trade = await Trade.fromRoute(
+        route,
+        CurrencyAmount.fromRawAmount(WETH9[1], ONE_ETHER.toString()),
+        TradeType.EXACT_OUTPUT
+      )
+
+      // Use UR 2.0 encoding by setting useMaxHopSlippage to false
+      planner.addTrade(trade, slippageTolerance, undefined, false)
+
+      expect(planner.actions).toEqual('0x09')
+
+      // Decode the params using UR 2.0 ABI (without maxHopSlippage)
+      const decoded = defaultAbiCoder.decode(
+        V4_BASE_ACTIONS_ABI_DEFINITION_V2_0[Actions.SWAP_EXACT_OUT]!.map((v) => v.type),
+        planner.params[0]
+      )
+
+      expect(decoded[0].currencyOut).toEqual(WETH9[1].address)
+      expect(decoded[0].amountOut.toString()).toEqual(ONE_ETHER.toString())
+      // Verify maxHopSlippage is NOT in the struct
+      expect(decoded[0].maxHopSlippage).toBeUndefined()
+    })
+
+    it('UR 2.0 encoding produces different calldata than UR 2.1 encoding', async () => {
+      const route = new Route([DAI_USDC, USDC_WETH], DAI, WETH9[1])
+      const trade = await Trade.fromRoute(
+        route,
+        CurrencyAmount.fromRawAmount(DAI, ONE_ETHER.toString()),
+        TradeType.EXACT_INPUT
+      )
+
+      // Create two planners - one for UR 2.0 and one for UR 2.1
+      const plannerV2_0 = new V4Planner()
+      const plannerV2_1 = new V4Planner()
+
+      plannerV2_0.addTrade(trade, undefined, undefined, false)
+      plannerV2_1.addTrade(trade, undefined, undefined, true)
+
+      // Both should have same action type
+      expect(plannerV2_0.actions).toEqual(plannerV2_1.actions)
+      expect(plannerV2_0.actions).toEqual('0x07')
+
+      // But the encoded params should be different (V2.0 is shorter without maxHopSlippage)
+      expect(plannerV2_0.params[0]).not.toEqual(plannerV2_1.params[0])
+      expect(plannerV2_0.params[0].length).toBeLessThan(plannerV2_1.params[0].length)
     })
   })
 
