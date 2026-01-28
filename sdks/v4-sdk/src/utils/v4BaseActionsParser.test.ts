@@ -315,7 +315,7 @@ describe('Version-aware Parser', () => {
       const trade = await Trade.fromRoute(
         route,
         CurrencyAmount.fromRawAmount(DAI, ONE_ETHER.toString()),
-        TradeType.EXACT_INPUT,
+        TradeType.EXACT_INPUT
       )
 
       const planner = new V4Planner()
@@ -338,7 +338,7 @@ describe('Version-aware Parser', () => {
       const trade = await Trade.fromRoute(
         route,
         CurrencyAmount.fromRawAmount(WETH9[1], ONE_ETHER.toString()),
-        TradeType.EXACT_OUTPUT,
+        TradeType.EXACT_OUTPUT
       )
 
       const planner = new V4Planner()
@@ -363,7 +363,7 @@ describe('Version-aware Parser', () => {
       const trade = await Trade.fromRoute(
         route,
         CurrencyAmount.fromRawAmount(DAI, ONE_ETHER.toString()),
-        TradeType.EXACT_INPUT,
+        TradeType.EXACT_INPUT
       )
 
       const maxHopSlippage = [BigNumber.from('10000'), BigNumber.from('20000')]
@@ -391,7 +391,7 @@ describe('Version-aware Parser', () => {
       const trade = await Trade.fromRoute(
         route,
         CurrencyAmount.fromRawAmount(WETH9[1], ONE_ETHER.toString()),
-        TradeType.EXACT_OUTPUT,
+        TradeType.EXACT_OUTPUT
       )
 
       const maxHopSlippage = [BigNumber.from('15000'), BigNumber.from('25000')]
@@ -419,7 +419,7 @@ describe('Version-aware Parser', () => {
       const trade = await Trade.fromRoute(
         route,
         CurrencyAmount.fromRawAmount(DAI, ONE_ETHER.toString()),
-        TradeType.EXACT_INPUT,
+        TradeType.EXACT_INPUT
       )
 
       const planner = new V4Planner()
@@ -443,7 +443,7 @@ describe('Version-aware Parser', () => {
       const trade = await Trade.fromRoute(
         route,
         CurrencyAmount.fromRawAmount(DAI, ONE_ETHER.toString()),
-        TradeType.EXACT_INPUT,
+        TradeType.EXACT_INPUT
       )
 
       const planner = new V4Planner()
@@ -462,7 +462,7 @@ describe('Version-aware Parser', () => {
       const trade = await Trade.fromRoute(
         route,
         CurrencyAmount.fromRawAmount(DAI, ONE_ETHER.toString()),
-        TradeType.EXACT_INPUT,
+        TradeType.EXACT_INPUT
       )
 
       const maxHopSlippage = [BigNumber.from('12345'), BigNumber.from('67890')]
