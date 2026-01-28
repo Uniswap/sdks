@@ -330,6 +330,7 @@ describe('Version-aware Parser', () => {
       const swapValue = result.actions[0].params[0].value as SwapExactIn
       expect(swapValue.currencyIn).to.equal(DAI.address)
       expect(swapValue.path).to.have.length(2)
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       expect(swapValue.maxHopSlippage).to.be.undefined // V2.0 does not have maxHopSlippage
     })
 
@@ -353,6 +354,7 @@ describe('Version-aware Parser', () => {
       const swapValue = result.actions[0].params[0].value as SwapExactOut
       expect(swapValue.currencyOut).to.equal(WETH9[1].address)
       expect(swapValue.path).to.have.length(2)
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       expect(swapValue.maxHopSlippage).to.be.undefined // V2.0 does not have maxHopSlippage
     })
   })
@@ -380,6 +382,7 @@ describe('Version-aware Parser', () => {
       const swapValue = result.actions[0].params[0].value as SwapExactIn
       expect(swapValue.currencyIn).to.equal(DAI.address)
       expect(swapValue.path).to.have.length(2)
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       expect(swapValue.maxHopSlippage).to.not.be.undefined
       expect(swapValue.maxHopSlippage).to.have.length(2)
       expect(swapValue.maxHopSlippage![0].toString()).to.equal('10000')
@@ -408,6 +411,7 @@ describe('Version-aware Parser', () => {
       const swapValue = result.actions[0].params[0].value as SwapExactOut
       expect(swapValue.currencyOut).to.equal(WETH9[1].address)
       expect(swapValue.path).to.have.length(2)
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       expect(swapValue.maxHopSlippage).to.not.be.undefined
       expect(swapValue.maxHopSlippage).to.have.length(2)
       expect(swapValue.maxHopSlippage![0].toString()).to.equal('15000')
@@ -432,6 +436,7 @@ describe('Version-aware Parser', () => {
       expect(result.actions[0].actionName).to.equal('SWAP_EXACT_IN')
 
       const swapValue = result.actions[0].params[0].value as SwapExactIn
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       expect(swapValue.maxHopSlippage).to.not.be.undefined
       expect(swapValue.maxHopSlippage).to.have.length(0) // Empty array
     })
