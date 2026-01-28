@@ -372,6 +372,7 @@ function addV3Swap<TInput extends Currency, TOutput extends Currency>(
       path,
       payerIsUser,
     ])
+    console.log()
   }
 }
 
