@@ -87,6 +87,72 @@ describe('RouterPlanner', () => {
         '0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000de0b6b3a764000000000000000000000000000000000000000000000000000006f05b59d3b2000000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000000'
       )
     })
+
+    it('encodes a v4 exactIn swap with V2.1 (includes maxHopSlippage)', async () => {
+      const route = new Route([DAI_USDC, USDC_WETH], DAI, WETH9[1])
+      const maxHopSlippage = [BigNumber.from('10000'), BigNumber.from('20000')]
+
+      planner.addAction(
+        Actions.SWAP_EXACT_IN,
+        [
+          {
+            currencyIn: DAI.address,
+            path: encodeRouteToPath(route),
+            maxHopSlippage: maxHopSlippage,
+            amountIn: ONE_ETHER_BN.toString(),
+            amountOutMinimum: 0,
+          },
+        ],
+        URVersion.V2_1
+      )
+
+      expect(planner.actions).toEqual('0x07')
+
+      // Decode with V2.1 ABI to verify maxHopSlippage values
+      const decoded = defaultAbiCoder.decode(
+        V4_SWAP_ACTIONS_V2_1[Actions.SWAP_EXACT_IN].map((v) => v.type),
+        planner.params[0]
+      )
+
+      expect(decoded[0].currencyIn).toEqual(DAI.address)
+      expect(decoded[0].maxHopSlippage).toHaveLength(2)
+      expect(decoded[0].maxHopSlippage[0].toString()).toEqual('10000')
+      expect(decoded[0].maxHopSlippage[1].toString()).toEqual('20000')
+      expect(decoded[0].amountIn.toString()).toEqual(ONE_ETHER_BN.toString())
+    })
+
+    it('encodes a v4 exactOut swap with V2.1 (includes maxHopSlippage)', async () => {
+      const route = new Route([DAI_USDC, USDC_WETH], DAI, WETH9[1])
+      const maxHopSlippage = [BigNumber.from('15000'), BigNumber.from('25000')]
+
+      planner.addAction(
+        Actions.SWAP_EXACT_OUT,
+        [
+          {
+            currencyOut: WETH9[1].address,
+            path: encodeRouteToPath(route, true),
+            maxHopSlippage: maxHopSlippage,
+            amountOut: ONE_ETHER_BN.toString(),
+            amountInMaximum: ONE_ETHER_BN.mul(2).toString(),
+          },
+        ],
+        URVersion.V2_1
+      )
+
+      expect(planner.actions).toEqual('0x09')
+
+      // Decode with V2.1 ABI to verify maxHopSlippage values
+      const decoded = defaultAbiCoder.decode(
+        V4_SWAP_ACTIONS_V2_1[Actions.SWAP_EXACT_OUT].map((v) => v.type),
+        planner.params[0]
+      )
+
+      expect(decoded[0].currencyOut).toEqual(WETH9[1].address)
+      expect(decoded[0].maxHopSlippage).toHaveLength(2)
+      expect(decoded[0].maxHopSlippage[0].toString()).toEqual('15000')
+      expect(decoded[0].maxHopSlippage[1].toString()).toEqual('25000')
+      expect(decoded[0].amountOut.toString()).toEqual(ONE_ETHER_BN.toString())
+    })
   })
 
   describe('addTrade', () => {
