@@ -5204,20 +5204,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v4-sdk@npm:^1.25.6":
-  version: 1.25.6
-  resolution: "@uniswap/v4-sdk@npm:1.25.6"
-  dependencies:
-    "@ethersproject/solidity": ^5.0.9
-    "@uniswap/sdk-core": ^7.10.1
-    "@uniswap/v3-sdk": 3.27.0
-    tiny-invariant: ^1.1.0
-    tiny-warning: ^1.0.3
-  checksum: e99901cd17c4446b2536e740577ce03d99445bdbb882179a139c3be765d699805ddfd7b22bbca1420e20fc4f2b190a7842457225890a0a1a662d666043f57dda
-  languageName: node
-  linkType: hard
-
-"@uniswap/v4-sdk@npm:^1.27.0":
+"@uniswap/v4-sdk@npm:^1.25.6, @uniswap/v4-sdk@npm:^1.27.0":
   version: 1.27.0
   resolution: "@uniswap/v4-sdk@npm:1.27.0"
   dependencies:
