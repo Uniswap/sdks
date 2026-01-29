@@ -38,6 +38,16 @@ export class Route<TInput extends Currency, TOutput extends Currency> {
     this.pathInput = getPathCurrency(input, pools[0])
     this.pathOutput = getPathCurrency(output, pools[pools.length - 1])
 
+    // If the input is native and the first pool is an eth-weth pool, that means we already wrapped the input to weth
+    // so we need to set the path input to be the wrapped input
+    if (pools[0].currency0.wrapped.equals(pools[0].currency1)) {
+      if (this.pathInput.isNative && pools[1]?.currency0.isNative) {
+        this.pathInput = pools[0].currency1
+      } else if (this.pathInput.equals(pools[0].currency1) && pools[1] && !pools[1].currency0.isNative) {
+        this.pathInput = pools[0].currency0
+      }
+    }
+
     /**
      * Normalizes currency0-currency1 order and selects the next currency/fee step to add to the path
      * */

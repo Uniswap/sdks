@@ -485,6 +485,9 @@ describe("V4OrderValidator", () => {
         .cosignerData({
           auctionTargetBlock: BigNumber.from(0),
           supplementalPriceCurve: [],
+          exclusiveFiller: ethers.constants.AddressZero,
+          exclusivityOverrideBps: BigNumber.from(0),
+          exclusivityEndBlock: BigNumber.from(0),
         })
         .cosignature(invalidCosignature)
         .build();
