@@ -203,7 +203,11 @@ export abstract class SwapRouter {
     }
 
     // Use provided nonce (must match what was signed)
-    const nonce = signedOptions.nonce || generateNonce()
+// Nonce must match what was signed - require it to be provided
+if (!signedOptions.nonce) {
+  throw new Error('Nonce is required for encodeExecuteSigned - use the nonce from getExecuteSignedPayload')
+}
+const nonce = signedOptions.nonce
 
     // Determine verifySender based on sender address
     const verifySender = signedOptions.sender !== '0x0000000000000000000000000000000000000000'
