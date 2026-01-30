@@ -54,15 +54,15 @@ export type ParamType = {
 
 export type CommandDefinition =
   | {
-    parser: Parser.Abi
-    params: ParamType[]
-  }
+      parser: Parser.Abi
+      params: ParamType[]
+    }
   | {
-    parser: Parser.V4Actions
-  }
+      parser: Parser.V4Actions
+    }
   | {
-    parser: Parser.V3Actions
-  }
+      parser: Parser.V3Actions
+    }
 
 const ALLOW_REVERT_FLAG = 0x80
 const REVERTIBLE_COMMANDS = new Set<CommandType>([CommandType.EXECUTE_SUB_PLAN])
