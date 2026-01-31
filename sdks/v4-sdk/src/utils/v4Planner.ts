@@ -207,8 +207,8 @@ export class V4Planner {
     this.params = []
   }
 
-  addAction(type: Actions, parameters: any[]): V4Planner {
-    let command = createAction(type, parameters)
+  addAction(type: Actions, parameters: any[], urVersion: URVersion = URVersion.V2_0): V4Planner {
+    let command = createAction(type, parameters, urVersion)
     this.params.push(command.encodedInput)
     this.actions = this.actions.concat(command.action.toString(16).padStart(2, '0'))
     return this
@@ -324,9 +324,13 @@ type RouterAction = {
   encodedInput: string
 }
 
-function createAction(action: Actions, parameters: any[]): RouterAction {
+function createAction(action: Actions, parameters: any[], urVersion: URVersion = URVersion.V2_0): RouterAction {
+  // Use V2.1 ABI for swap actions if V2.1, otherwise use base ABI (V2.0)
+  const isSwapAction = action === Actions.SWAP_EXACT_IN || action === Actions.SWAP_EXACT_OUT
+  const abiDef =
+    urVersion === URVersion.V2_1 && isSwapAction ? V4_SWAP_ACTIONS_V2_1[action] : V4_BASE_ACTIONS_ABI_DEFINITION[action]
   const encodedInput = defaultAbiCoder.encode(
-    V4_BASE_ACTIONS_ABI_DEFINITION[action].map((v) => v.type),
+    abiDef.map((v) => v.type),
     parameters
   )
   return { action, encodedInput }

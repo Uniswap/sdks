@@ -4890,7 +4890,7 @@ __metadata:
     "@uniswap/swap-router-contracts": ^1.3.0
     "@uniswap/v2-sdk": ^4.17.0
     "@uniswap/v3-sdk": ^3.27.0
-    "@uniswap/v4-sdk": ^1.25.6
+    "@uniswap/v4-sdk": ^1.27.0
     eslint-config-prettier: ^9.1.0
     eslint-plugin-prettier: ^3.4.1
     prettier: ^2.4.1
@@ -5204,16 +5204,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v4-sdk@npm:^1.25.6":
-  version: 1.25.6
-  resolution: "@uniswap/v4-sdk@npm:1.25.6"
+"@uniswap/v4-sdk@npm:^1.25.6, @uniswap/v4-sdk@npm:^1.27.0":
+  version: 1.27.0
+  resolution: "@uniswap/v4-sdk@npm:1.27.0"
   dependencies:
     "@ethersproject/solidity": ^5.0.9
     "@uniswap/sdk-core": ^7.10.1
     "@uniswap/v3-sdk": 3.27.0
     tiny-invariant: ^1.1.0
     tiny-warning: ^1.0.3
-  checksum: e99901cd17c4446b2536e740577ce03d99445bdbb882179a139c3be765d699805ddfd7b22bbca1420e20fc4f2b190a7842457225890a0a1a662d666043f57dda
+  checksum: 190dae1da1275c033135c13273140c75a246773469ef5e6cea184ad8b45a091892727715412be04f504cf0c1cf610ad534df07787b5150df01d7744175e4bb75
   languageName: node
   linkType: hard
 
