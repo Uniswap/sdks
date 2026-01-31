@@ -32,7 +32,7 @@
   },
   "dependencies": {
     "@ethersproject/bytes": "^5.7.0",
-    "@ethersproject/providers": "^5.7.0",
+    "@ethersproject/providers": "^5.8.0",
     "@uniswap/permit2-sdk": "^1.2.1",
     "@uniswap/sdk-core": "^7.5.0",
     "ethers": "^5.7.0"
@@ -49,11 +49,11 @@
     "eslint-plugin-functional": "^3.0.2",
     "eslint-plugin-import": "^2.22.0",
     "husky": "^8.0.3",
-    "jest": "25.5.0",
-    "jest-environment-node": "25.5.0",
+    "jest": "26.0.0",
+    "jest-environment-node": "26.0.0",
     "npm-run-all": "^4.1.5",
     "prettier": "^2.4.1",
-    "ts-jest": "^25.5.1",
+    "ts-jest": "^26.0.0",
     "ts-node": "^10.9.1",
     "typechain": "^8.1.0",
     "typescript": "^4.3.3"
