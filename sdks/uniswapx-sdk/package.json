@@ -35,7 +35,7 @@
     "@ethersproject/providers": "^5.8.0",
     "@uniswap/permit2-sdk": "^1.2.1",
     "@uniswap/sdk-core": "^7.5.0",
-    "ethers": "^5.7.0"
+    "ethers": "^6.0.0"
   },
   "devDependencies": {
     "@typechain/ethers-v5": "^10.1.0",
