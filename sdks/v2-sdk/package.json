@@ -43,7 +43,7 @@
     "eslint-plugin-prettier": "^3.4.1",
     "jest": "25.5.0",
     "prettier": "^2.4.1",
-    "tsdx": "^0.14.1",
+    "tsdx": "^2.0.0",
     "typescript": "^4.3.3"
   },
   "prettier": {
