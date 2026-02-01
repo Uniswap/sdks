@@ -452,7 +452,7 @@ const XLAYER_ADDRESSES: ChainAddresses = {
   mixedRouteQuoterV2Address: '0x2d01411773c8c24805306e89a41f7855c3c4fe65',
 
   v4PoolManagerAddress: '0x360e68faccca8ca495c1b759fd9eee466db9fb32',
-  v4PositionManagerAddress: '0xbc9f3a5d767dd46e040f1ca48ab17f29f59dc806',
+  v4PositionManagerAddress: '0xcF1EAFC6928dC385A342E7C6491d371d2871458b',
   v4StateView: '0x76fd297e2d437cd7f76d50f01afe6160f86e9990',
   v4QuoterAddress: '0x8928074ca1b241d8ec02815881c1af11e8bc5219',
 }
