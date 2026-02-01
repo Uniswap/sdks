@@ -45,7 +45,7 @@
     "eslint-plugin-prettier": "^3.4.1",
     "eslint-plugin-react": "7.37.4",
     "eslint-plugin-react-hooks": "5.2.0",
-    "tsdx": "^0.14.1"
+    "tsdx": "^2.0.0"
   },
   "prettier": {
     "printWidth": 120,
