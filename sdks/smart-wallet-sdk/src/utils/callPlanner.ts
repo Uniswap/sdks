@@ -3,13 +3,13 @@ import { encodeAbiParameters } from 'viem'
 import { Call } from '../types'
 
 // Define the ABI parameter type for the call tuple
-const CALL_ABI_PARAMS = [
+export const CALL_ABI_PARAMS = [
   {
     type: 'tuple[]',
     components: [
       { type: 'address', name: 'to' },
-      { type: 'bytes', name: 'data' },
-      { type: 'uint256', name: 'value' }
+      { type: 'uint256', name: 'value' },
+      { type: 'bytes', name: 'data' }
     ]
   }
 ] as const
@@ -49,7 +49,6 @@ export class CallPlanner {
     if (this.calls.length === 0) {
       throw new Error("No calls to encode")
     }
-
     
     return encodeAbiParameters(CALL_ABI_PARAMS, [this.calls])
   }
@@ -57,11 +56,11 @@ export class CallPlanner {
   /**
    * Add a command to execute a call
    * @param to The target address of the call
-   * @param data The calldata for the call
    * @param value The ETH value to send with the call
+   * @param data The calldata for the call
    */
-  add(to: `0x${string}`, data: `0x${string}`, value: bigint): CallPlanner {
-    this.calls.push({ to, data, value })
+  add(to: `0x${string}`, value: bigint, data: `0x${string}`): CallPlanner {
+    this.calls.push({ to, value, data })
     return this
   }
 }

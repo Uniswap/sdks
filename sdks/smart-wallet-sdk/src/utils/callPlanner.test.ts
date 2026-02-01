@@ -1,14 +1,7 @@
-import { zeroAddress } from 'viem'
+import { decodeAbiParameters } from 'viem'
 
-import { CallPlanner } from './callPlanner'
-
-
-// Test constants
-const TEST_ADDRESS_1 = zeroAddress
-const TEST_DATA_1 = '0x123456' as `0x${string}`
-const TEST_DATA_2 = '0xabcdef0123456789' as `0x${string}`
-const TEST_VALUE_1 = 100n
-const TEST_VALUE_2 = 200n
+import { CALL_ABI_PARAMS, CallPlanner } from './callPlanner'
+import { TEST_ADDRESS_1, TEST_DATA_1, TEST_DATA_2, TEST_VALUE_1, TEST_VALUE_2 } from './testConstants'
 
 describe('CallPlanner', () => {
   describe('constructor', () => {
@@ -53,13 +46,14 @@ describe('CallPlanner', () => {
   describe('encode', () => {
     it('should correctly abi encode the calls', () => {
       const planner = new CallPlanner([
-        { to: TEST_ADDRESS_1, data: TEST_DATA_1, value: TEST_VALUE_1 }
+        { to: TEST_ADDRESS_1, value: TEST_VALUE_1, data: TEST_DATA_1 }
       ])
       
       const encoded = planner.encode()
-      // We're just checking that it returns a hex string and doesn't throw
-      expect(encoded).toMatch(/^0x/)
-      expect(typeof encoded).toBe('string')
+      
+      // decode the encoded data
+      const decoded = decodeAbiParameters(CALL_ABI_PARAMS, encoded)
+      expect(decoded).toEqual([[{ to: TEST_ADDRESS_1, value: TEST_VALUE_1, data: TEST_DATA_1 }]])
     })
 
     it('should throw an error if there are no calls to encode', () => {
@@ -71,31 +65,31 @@ describe('CallPlanner', () => {
   describe('add', () => {
     it('should add a new call to the calls array', () => {
       const planner = new CallPlanner()
-      planner.add(TEST_ADDRESS_1, TEST_DATA_1, TEST_VALUE_1)
+      planner.add(TEST_ADDRESS_1, TEST_VALUE_1, TEST_DATA_1)
       expect(planner.calls).toEqual([{ to: TEST_ADDRESS_1, data: TEST_DATA_1, value: TEST_VALUE_1 }])
     })
 
     it('should add a new call with bigint value', () => {
       const planner = new CallPlanner()
-      planner.add(TEST_ADDRESS_1, TEST_DATA_1, 100n)
+      planner.add(TEST_ADDRESS_1, 100n, TEST_DATA_1)
       expect(planner.calls).toEqual([{ to: TEST_ADDRESS_1, data: TEST_DATA_1, value: 100n }])
     })
 
     it('should return the planner instance for chaining', () => {
       const planner = new CallPlanner()
-      const result = planner.add(TEST_ADDRESS_1, TEST_DATA_1, TEST_VALUE_1)
+      const result = planner.add(TEST_ADDRESS_1, TEST_VALUE_1, TEST_DATA_1)
       expect(result).toBe(planner)
     })
 
     it('should allow chaining multiple add calls', () => {
       const planner = new CallPlanner()
       planner
-        .add(TEST_ADDRESS_1, TEST_DATA_1, TEST_VALUE_1)
-        .add(TEST_ADDRESS_1, TEST_DATA_2, TEST_VALUE_2)
+        .add(TEST_ADDRESS_1, TEST_VALUE_1, TEST_DATA_1)
+        .add(TEST_ADDRESS_1, TEST_VALUE_2, TEST_DATA_2)
       
       expect(planner.calls).toEqual([
-        { to: TEST_ADDRESS_1, data: TEST_DATA_1, value: TEST_VALUE_1 },
-        { to: TEST_ADDRESS_1, data: TEST_DATA_2, value: TEST_VALUE_2 }
+        { to: TEST_ADDRESS_1, value: TEST_VALUE_1, data: TEST_DATA_1 },
+        { to: TEST_ADDRESS_1, value: TEST_VALUE_2, data: TEST_DATA_2 }
       ])
     })
   })

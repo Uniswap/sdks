@@ -1,5 +1,11 @@
+/// Contract specific batched call interface
+export interface BatchedCall {
+  calls: Call[]
+  revertOnFailure: boolean
+}
+
 /**
- * Represents a call to a smart contract
+ * ERC 5792 style Call interface
  */
 export interface Call {
   /** The address of the contract to call */
@@ -10,14 +16,6 @@ export interface Call {
   value: bigint
   /** The chain ID for the call (for client-side use) */
   chainId?: number | string
-}
-
-/**
- * Represents a call with advanced options like partial failure handling
- */
-export interface AdvancedCall extends Call {
-  /** Whether to revert the entire transaction if this call fails */
-  revertOnFailure?: boolean
 }
 
 /**
@@ -34,11 +32,6 @@ export interface MethodParameters {
  * Options for the execute method
  */
 export interface ExecuteOptions {
-  /** Whether to allow the call to revert */
+  // true means that the execute call will revert if any call fails
   revertOnFailure?: boolean
-}
-
-export interface AdvancedExecuteOptions extends ExecuteOptions {
-  /** Whether the call supports opData */
-  senderIsUser?: boolean
 }
