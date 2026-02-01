@@ -20,12 +20,9 @@ import {
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
 import { Currency, TradeType, Percent, CHAIN_TO_ADDRESSES_MAP, SupportedChainsType } from '@uniswap/sdk-core'
 import { UniswapTrade, SwapOptions } from './entities/actions/uniswap'
-import { AcrossV4DepositV3Params } from './entities/actions/across'
 import { RoutePlanner, CommandType } from './utils/routerCommands'
 import { encodePermit, encodeV3PositionPermit } from './utils/inputTokens'
 import { UNIVERSAL_ROUTER_ADDRESS, UniversalRouterVersion } from './utils/constants'
-import { getUniversalRouterDomain, EXECUTE_SIGNED_TYPES, generateNonce } from './utils/eip712'
-import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
 
 export type SwapRouterConfig = {
   sender?: string // address
@@ -39,27 +36,6 @@ export interface MigrateV3ToV4Options {
   v4AddLiquidityOptions: V4AddLiquidityOptions
 }
 
-export type SignedRouteOptions = {
-  intent: string // bytes32 - application-specific intent identifier
-  data: string // bytes32 - application-specific data
-  sender: string // msg.sender to verify, or address(0) to skip sender verification
-  nonce?: string // bytes32 - optional nonce. If not provided, random nonce is generated. Use NONCE_SKIP_CHECK to skip nonce verification
-}
-
-export type EIP712Payload = {
-  domain: TypedDataDomain
-  types: Record<string, TypedDataField[]>
-  value: {
-    commands: string
-    inputs: string[]
-    intent: string
-    data: string
-    sender: string
-    nonce: string
-    deadline: string
-  }
-}
-
 function isMint(options: V4AddLiquidityOptions): options is MintOptions {
   return Object.keys(options).some((k) => k === 'recipient')
 }
@@ -69,8 +45,7 @@ export abstract class SwapRouter {
 
   public static swapCallParameters(
     trades: RouterTrade<Currency, Currency, TradeType>,
-    options: SwapOptions,
-    bridgeOptions?: AcrossV4DepositV3Params[] // Optional bridge parameters
+    options: SwapOptions
   ): MethodParameters {
     // TODO: use permit if signature included in swapOptions
     const planner = new RoutePlanner()
@@ -89,14 +64,6 @@ export abstract class SwapRouter {
       : BigNumber.from(0)
 
     trade.encode(planner, { allowRevert: false })
-
-    // Add bridge commands if provided
-    if (bridgeOptions) {
-      for (const bridge of bridgeOptions) {
-        planner.addAcrossBridge(bridge)
-      }
-    }
-
     return SwapRouter.encodePlan(planner, nativeCurrencyValue, {
       deadline: options.deadlineOrPreviousBlockhash ? BigNumber.from(options.deadlineOrPreviousBlockhash) : undefined,
     })
@@ -206,127 +173,6 @@ export abstract class SwapRouter {
     return SwapRouter.encodePlan(planner, BigNumber.from(0), {
       deadline: BigNumber.from(options.v4AddLiquidityOptions.deadline),
     })
-  }
-
-  /**
-   * Generate EIP712 payload for signed execution (no signing performed)
-   * Decodes existing execute() calldata and prepares it for signing
-   *
-   * @param calldata The calldata from swapCallParameters() or similar
-   * @param signedOptions Options for signed execution (intent, data, sender, nonce)
-   * @param deadline The deadline timestamp
-   * @param chainId The chain ID
-   * @param routerAddress The Universal Router contract address
-   * @returns EIP712 payload ready to be signed externally
-   */
-  public static getExecuteSignedPayload(
-    calldata: string,
-    signedOptions: SignedRouteOptions,
-    deadline: BigNumberish,
-    chainId: number,
-    routerAddress: string
-  ): EIP712Payload {
-    // Decode the execute() calldata to extract commands and inputs
-    // Try to decode with deadline first, then without
-    let decoded: any
-    let commands: string
-    let inputs: string[]
-
-    try {
-      decoded = SwapRouter.INTERFACE.decodeFunctionData('execute(bytes,bytes[],uint256)', calldata)
-      commands = decoded.commands as string
-      inputs = decoded.inputs as string[]
-    } catch (e) {
-      // Try without deadline
-      decoded = SwapRouter.INTERFACE.decodeFunctionData('execute(bytes,bytes[])', calldata)
-      commands = decoded.commands as string
-      inputs = decoded.inputs as string[]
-    }
-
-    // Use provided nonce or generate random one
-    const nonce = signedOptions.nonce || generateNonce()
-
-    // sender is provided directly (address(0) = skip verification)
-    const sender = signedOptions.sender
-
-    const domain = getUniversalRouterDomain(chainId, routerAddress)
-
-    const intent = signedOptions.intent
-
-    const data = signedOptions.data
-
-    deadline = BigNumber.from(deadline).toString()
-
-    const value = {
-      commands,
-      inputs,
-      intent,
-      data,
-      sender,
-      nonce,
-      deadline,
-    }
-
-    return {
-      domain,
-      types: EXECUTE_SIGNED_TYPES,
-      value,
-    }
-  }
-
-  /**
-   * Encode executeSigned() call with signature
-   *
-   * @param calldata The original calldata from swapCallParameters()
-   * @param signature The signature obtained from external signing
-   * @param signedOptions The same options used in getExecuteSignedPayload()
-   * @param deadline The deadline timestamp
-   * @param nativeCurrencyValue The native currency value (ETH) to send
-   * @returns Method parameters for executeSigned()
-   */
-  public static encodeExecuteSigned(
-    calldata: string,
-    signature: string,
-    signedOptions: SignedRouteOptions,
-    deadline: BigNumberish,
-    nativeCurrencyValue: BigNumber = BigNumber.from(0)
-  ): MethodParameters {
-    // Decode the execute() calldata to extract commands and inputs
-    // Try to decode with deadline first, then without
-    let decoded: any
-    let commands: string
-    let inputs: string[]
-
-    try {
-      decoded = SwapRouter.INTERFACE.decodeFunctionData('execute(bytes,bytes[],uint256)', calldata)
-      commands = decoded.commands as string
-      inputs = decoded.inputs as string[]
-    } catch (e) {
-      // Try without deadline
-      decoded = SwapRouter.INTERFACE.decodeFunctionData('execute(bytes,bytes[])', calldata)
-      commands = decoded.commands as string
-      inputs = decoded.inputs as string[]
-    }
-
-    // Use provided nonce (must match what was signed)
-    const nonce = signedOptions.nonce || generateNonce()
-
-    // Determine verifySender based on sender address
-    const verifySender = signedOptions.sender !== '0x0000000000000000000000000000000000000000'
-
-    // Encode executeSigned function call using the Universal Router v2.1 ABI
-    const signedCalldata = SwapRouter.INTERFACE.encodeFunctionData('executeSigned', [
-      commands,
-      inputs,
-      signedOptions.intent,
-      signedOptions.data,
-      verifySender,
-      nonce,
-      signature,
-      deadline,
-    ])
-
-    return { calldata: signedCalldata, value: nativeCurrencyValue.toHexString() }
   }
 
   /**
