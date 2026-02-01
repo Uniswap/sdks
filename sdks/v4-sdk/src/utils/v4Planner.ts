@@ -11,6 +11,16 @@ import { encodeRouteToPath } from './encodeRouteToPath'
  * Not all actions are supported yet.
  * @enum {number}
  */
+/**
+ * UniversalRouter version
+ * @description Version of the UniversalRouter contract
+ * @enum {string}
+ */
+export enum URVersion {
+  V2_0 = '2.0',
+  V2_1 = '2.1',
+}
+
 export enum Actions {
   // pool actions
   // liquidity actions
@@ -70,14 +80,30 @@ const PATH_KEY_STRUCT = '(address intermediateCurrency,uint256 fee,int24 tickSpa
 const SWAP_EXACT_IN_SINGLE_STRUCT =
   '(' + POOL_KEY_STRUCT + ' poolKey,bool zeroForOne,uint128 amountIn,uint128 amountOutMinimum,bytes hookData)'
 
-const SWAP_EXACT_IN_STRUCT =
+// UR 2.0 swap structs (without maxHopSlippage)
+const SWAP_EXACT_IN_STRUCT_V2_0 =
   '(address currencyIn,' + PATH_KEY_STRUCT + '[] path,uint128 amountIn,uint128 amountOutMinimum)'
+
+const SWAP_EXACT_OUT_STRUCT_V2_0 =
+  '(address currencyOut,' + PATH_KEY_STRUCT + '[] path,uint128 amountOut,uint128 amountInMaximum)'
+
+// UR 2.1 swap structs (with maxHopSlippage)
+const SWAP_EXACT_IN_STRUCT_V2_1 =
+  '(address currencyIn,' +
+  PATH_KEY_STRUCT +
+  '[] path,uint256[] maxHopSlippage,uint128 amountIn,uint128 amountOutMinimum)'
 
 const SWAP_EXACT_OUT_SINGLE_STRUCT =
   '(' + POOL_KEY_STRUCT + ' poolKey,bool zeroForOne,uint128 amountOut,uint128 amountInMaximum,bytes hookData)'
 
-const SWAP_EXACT_OUT_STRUCT =
-  '(address currencyOut,' + PATH_KEY_STRUCT + '[] path,uint128 amountOut,uint128 amountInMaximum)'
+const SWAP_EXACT_OUT_STRUCT_V2_1 =
+  '(address currencyOut,' +
+  PATH_KEY_STRUCT +
+  '[] path,uint256[] maxHopSlippage,uint128 amountOut,uint128 amountInMaximum)'
+
+// V4_BASE_ACTIONS_ABI_DEFINITION uses V2.0 structs (default, without maxHopSlippage)
+const SWAP_EXACT_IN_STRUCT = SWAP_EXACT_IN_STRUCT_V2_0
+const SWAP_EXACT_OUT_STRUCT = SWAP_EXACT_OUT_STRUCT_V2_0
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const V4_BASE_ACTIONS_ABI_DEFINITION: { [key in Actions]: readonly ParamType[] } = {
@@ -164,6 +190,12 @@ export const V4_BASE_ACTIONS_ABI_DEFINITION: { [key in Actions]: readonly ParamT
   [Actions.UNWRAP]: [{ name: 'amount', type: 'uint256' }],
 }
 
+// UR 2.1 specific ABI definitions for swap actions (with maxHopSlippage)
+export const V4_SWAP_ACTIONS_V2_1: { [key: number]: readonly ParamType[] } = {
+  [Actions.SWAP_EXACT_IN]: [{ name: 'swap', type: SWAP_EXACT_IN_STRUCT_V2_1, subparser: Subparser.V4SwapExactIn }],
+  [Actions.SWAP_EXACT_OUT]: [{ name: 'swap', type: SWAP_EXACT_OUT_STRUCT_V2_1, subparser: Subparser.V4SwapExactOut }],
+}
+
 const FULL_DELTA_AMOUNT = 0
 
 export class V4Planner {
@@ -175,14 +207,19 @@ export class V4Planner {
     this.params = []
   }
 
-  addAction(type: Actions, parameters: any[]): V4Planner {
-    let command = createAction(type, parameters)
+  addAction(type: Actions, parameters: any[], urVersion: URVersion = URVersion.V2_0): V4Planner {
+    let command = createAction(type, parameters, urVersion)
     this.params.push(command.encodedInput)
     this.actions = this.actions.concat(command.action.toString(16).padStart(2, '0'))
     return this
   }
 
-  addTrade(trade: Trade<Currency, Currency, TradeType>, slippageTolerance?: Percent): V4Planner {
+  addTrade(
+    trade: Trade<Currency, Currency, TradeType>,
+    slippageTolerance?: Percent,
+    maxHopSlippage?: BigNumber[],
+    urVersion: URVersion = URVersion.V2_0
+  ): V4Planner {
     const exactOutput = trade.tradeType === TradeType.EXACT_OUTPUT
 
     // exactInput we sometimes perform aggregated slippage checks, but not with exactOutput
@@ -194,21 +231,54 @@ export class V4Planner {
     const currencyIn = currencyAddress(trade.route.pathInput)
     const currencyOut = currencyAddress(trade.route.pathOutput)
 
-    this.addAction(actionType, [
-      exactOutput
-        ? {
-            currencyOut,
-            path: encodeRouteToPath(trade.route, exactOutput),
-            amountInMaximum: trade.maximumAmountIn(slippageTolerance ?? new Percent(0)).quotient.toString(),
-            amountOut: trade.outputAmount.quotient.toString(),
-          }
-        : {
-            currencyIn,
-            path: encodeRouteToPath(trade.route, exactOutput),
-            amountIn: trade.inputAmount.quotient.toString(),
-            amountOutMinimum: slippageTolerance ? trade.minimumAmountOut(slippageTolerance).quotient.toString() : 0,
-          },
-    ])
+    // Build the swap struct based on UR version
+    if (urVersion === URVersion.V2_1) {
+      // UR 2.1: includes maxHopSlippage field
+      const maxHopSlippageArray = maxHopSlippage ?? []
+
+      this.addSwapAction(
+        actionType,
+        [
+          exactOutput
+            ? {
+                currencyOut,
+                path: encodeRouteToPath(trade.route, exactOutput),
+                maxHopSlippage: maxHopSlippageArray,
+                amountOut: trade.outputAmount.quotient.toString(),
+                amountInMaximum: trade.maximumAmountIn(slippageTolerance ?? new Percent(0)).quotient.toString(),
+              }
+            : {
+                currencyIn,
+                path: encodeRouteToPath(trade.route, exactOutput),
+                maxHopSlippage: maxHopSlippageArray,
+                amountIn: trade.inputAmount.quotient.toString(),
+                amountOutMinimum: slippageTolerance ? trade.minimumAmountOut(slippageTolerance).quotient.toString() : 0,
+              },
+        ],
+        urVersion
+      )
+    } else {
+      // UR 2.0: no maxHopSlippage field (default for backwards compatibility)
+      this.addSwapAction(
+        actionType,
+        [
+          exactOutput
+            ? {
+                currencyOut,
+                path: encodeRouteToPath(trade.route, exactOutput),
+                amountOut: trade.outputAmount.quotient.toString(),
+                amountInMaximum: trade.maximumAmountIn(slippageTolerance ?? new Percent(0)).quotient.toString(),
+              }
+            : {
+                currencyIn,
+                path: encodeRouteToPath(trade.route, exactOutput),
+                amountIn: trade.inputAmount.quotient.toString(),
+                amountOutMinimum: slippageTolerance ? trade.minimumAmountOut(slippageTolerance).quotient.toString() : 0,
+              },
+        ],
+        urVersion
+      )
+    }
     return this
   }
 
@@ -231,6 +301,18 @@ export class V4Planner {
   finalize(): string {
     return defaultAbiCoder.encode(['bytes', 'bytes[]'], [this.actions, this.params])
   }
+
+  private addSwapAction(type: Actions, parameters: any[], urVersion: URVersion): V4Planner {
+    // Use V2.1 ABI (with maxHopSlippage) for V2.1, otherwise default to V2.0 ABI (without maxHopSlippage)
+    const abiDef = urVersion === URVersion.V2_1 ? V4_SWAP_ACTIONS_V2_1[type] : V4_BASE_ACTIONS_ABI_DEFINITION[type]
+    const encodedInput = defaultAbiCoder.encode(
+      abiDef.map((v) => v.type),
+      parameters
+    )
+    this.params.push(encodedInput)
+    this.actions = this.actions.concat(type.toString(16).padStart(2, '0'))
+    return this
+  }
 }
 
 function currencyAddress(currency: Currency): string {
@@ -242,9 +324,13 @@ type RouterAction = {
   encodedInput: string
 }
 
-function createAction(action: Actions, parameters: any[]): RouterAction {
+function createAction(action: Actions, parameters: any[], urVersion: URVersion = URVersion.V2_0): RouterAction {
+  // Use V2.1 ABI for swap actions if V2.1, otherwise use base ABI (V2.0)
+  const isSwapAction = action === Actions.SWAP_EXACT_IN || action === Actions.SWAP_EXACT_OUT
+  const abiDef =
+    urVersion === URVersion.V2_1 && isSwapAction ? V4_SWAP_ACTIONS_V2_1[action] : V4_BASE_ACTIONS_ABI_DEFINITION[action]
   const encodedInput = defaultAbiCoder.encode(
-    V4_BASE_ACTIONS_ABI_DEFINITION[action].map((v) => v.type),
+    abiDef.map((v) => v.type),
     parameters
   )
   return { action, encodedInput }

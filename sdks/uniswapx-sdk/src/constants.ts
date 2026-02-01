@@ -51,7 +51,7 @@ export const UNISWAPX_V4_ORDER_QUOTER_MAPPING: AddressMap = {
 
 export const UNISWAPX_V4_TOKEN_TRANSFER_HOOK_MAPPING: AddressMap = {
   ...constructSameAddressMap("0x0000000000000000000000000000000000000000"),
-  1301: "0xd70467c1dA526491CFb790A2F84dfe0E10aa6D00",
+  1301: "0xBc879Fa59f5F99eb7C3FA0F87c41457773C4adB3",
 };
 
 export const EXCLUSIVE_FILLER_VALIDATION_MAPPING: AddressMap = {
@@ -128,7 +128,7 @@ export const REACTOR_ADDRESS_MAPPING: ReactorMapping = {
     [OrderType.Priority]: "0x00000006021a6Bce796be7ba509BBBA71e956e37",
   },
   1301: {
-    [OrderType.Hybrid]: "0x000000c40Fe6C03a7A1111D0a66Ce522BDc9fC8f",
+    [OrderType.Hybrid]: "0x000000000C75276D956cc35218ca8f132D877957",
     [OrderType.Dutch]: "0x0000000000000000000000000000000000000000",
     [OrderType.Dutch_V2]: "0x0000000000000000000000000000000000000000",
     [OrderType.Relay]: "0x0000000000000000000000000000000000000000",
@@ -216,7 +216,7 @@ export const PERMISSIONED_TOKENS: PermissionedToken[] = [
 type ResolverMapping = { readonly [chainId: number]: string };
 
 export const HYBRID_RESOLVER_ADDRESS_MAPPING: ResolverMapping = {
-  1301: "0x000000B380393337109C04e3e29eD993667E0f89",
+  1301: "0x57c48a70bd9f34fd902dde5bb4dbe25d2c931c62",
 };
 
 type ReverseResolverMapping = {
