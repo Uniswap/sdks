@@ -38,7 +38,7 @@
     "@types/node-fetch": "^2.6.2",
     "chai": "^4.3.6",
     "dotenv": "^16.0.3",
-    "eslint": "^8.57.0",
+    "eslint": "^9.26.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-eslint-comments": "^3.2.0",
     "eslint-plugin-functional": "^3.0.2",
