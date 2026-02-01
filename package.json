@@ -2,7 +2,7 @@
   "name": "sdks",
   "version": "0.0.0",
   "dependencies": {
-    "@babel/runtime": "7.18.9",
+    "@babel/runtime": "7.26.10",
     "@manypkg/cli": "^0.19.2",
     "@semantic-release/exec": "6.0.3",
     "@typescript-eslint/eslint-plugin": "^8.38.0",
