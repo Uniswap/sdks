@@ -14,11 +14,3 @@ node_modules
 
 # spec workflow mcp from Uniswap
 .spec-workflow/
-.claude/
-
-# OS files
-.DS_Store
-
-# Build and test artifacts
-build/
-coverage/
