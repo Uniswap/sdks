@@ -3,17 +3,12 @@ module.exports = {
   parser: '@typescript-eslint/parser',
   parserOptions: {
     ecmaVersion: 2020,
-    sourceType: 'module'
+    sourceType: 'module',
   },
-  extends: [
-    'react-app',
-    'prettier',
-    'plugin:prettier/recommended'
-  ],
+  extends: ['react-app', 'prettier', 'plugin:prettier/recommended'],
   settings: {
     react: {
-      version: '999.999.999'
-    }
-  }
-};
-
+      version: '999.999.999',
+    },
+  },
+}

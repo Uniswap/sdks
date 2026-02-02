@@ -17,6 +17,9 @@ on:
   pull_request:
     types: [opened, synchronize, ready_for_review]
 
+permissions:
+  contents: read
+
 # Concurrency: Cancel in-flight runs for the same PR
 concurrency:
   group: pr-metadata-${{ github.event.pull_request.number }}
