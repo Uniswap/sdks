@@ -381,6 +381,21 @@ describe('Command Parser', () => {
     },
   ]
 
+  // Helper to convert BigNumbers to strings for comparison
+  function normalizeBigNumbers(obj: any): any {
+    if (obj == null) return obj
+    if (BigNumber.isBigNumber(obj)) return obj.toString()
+    if (Array.isArray(obj)) return obj.map(normalizeBigNumbers)
+    if (typeof obj === 'object') {
+      const normalized: any = {}
+      for (const key in obj) {
+        normalized[key] = normalizeBigNumbers(obj[key])
+      }
+      return normalized
+    }
+    return obj
+  }
+
   for (const test of tests) {
     it(`should parse calldata ${test.input.commands}`, () => {
       const { commands, inputs } = test.input
@@ -388,7 +403,8 @@ describe('Command Parser', () => {
       const calldata = SwapRouter.INTERFACE.encodeFunctionData(functionSignature, [commands, inputs])
 
       const result = CommandParser.parseCalldata(calldata)
-      expect(result).to.deep.equal(test.result)
+      // Normalize BigNumbers in both objects for comparison
+      expect(normalizeBigNumbers(result)).to.deep.equal(normalizeBigNumbers(test.result))
     })
   }
 })
