@@ -519,6 +519,96 @@ describe("verify.ts", () => {
       expect(options.headers).toEqual({ Accept: "application/json" });
       expect(options.signal).toBeDefined();
     });
+
+    it("should accept manifest with enforcement: none", async () => {
+      const publicKey = localRsaSSAKeyPair.publicKey;
+      const spki = await webcrypto.subtle.exportKey("spki", publicKey);
+      const spkiHex = toHex(spki);
+      const signature = await webcrypto.subtle.sign(
+        SIGNING_ALGORITHM_CONFIG.RS256,
+        localRsaSSAKeyPair.privateKey,
+        new TextEncoder().encode(data)
+      );
+      const signatureHex = toHex(signature);
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: {
+          get: (name: string) =>
+            name === "content-type" ? "application/json" : "0",
+        },
+        json: () =>
+          Promise.resolve({
+            publicKeys: [{ id: "1", alg: "RS256", publicKey: spkiHex }],
+            enforcement: "none",
+          }),
+      });
+
+      await expect(
+        verifyAsyncJson(data, signatureHex, httpsUrl, "1")
+      ).resolves.toBe(true);
+    });
+
+    it("should accept manifest with enforcement: lax", async () => {
+      const publicKey = localRsaSSAKeyPair.publicKey;
+      const spki = await webcrypto.subtle.exportKey("spki", publicKey);
+      const spkiHex = toHex(spki);
+      const signature = await webcrypto.subtle.sign(
+        SIGNING_ALGORITHM_CONFIG.RS256,
+        localRsaSSAKeyPair.privateKey,
+        new TextEncoder().encode(data)
+      );
+      const signatureHex = toHex(signature);
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: {
+          get: (name: string) =>
+            name === "content-type" ? "application/json" : "0",
+        },
+        json: () =>
+          Promise.resolve({
+            publicKeys: [{ id: "1", alg: "RS256", publicKey: spkiHex }],
+            enforcement: "lax",
+          }),
+      });
+
+      await expect(
+        verifyAsyncJson(data, signatureHex, httpsUrl, "1")
+      ).resolves.toBe(true);
+    });
+
+    it("should accept manifest with enforcement: strict", async () => {
+      const publicKey = localRsaSSAKeyPair.publicKey;
+      const spki = await webcrypto.subtle.exportKey("spki", publicKey);
+      const spkiHex = toHex(spki);
+      const signature = await webcrypto.subtle.sign(
+        SIGNING_ALGORITHM_CONFIG.RS256,
+        localRsaSSAKeyPair.privateKey,
+        new TextEncoder().encode(data)
+      );
+      const signatureHex = toHex(signature);
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: {
+          get: (name: string) =>
+            name === "content-type" ? "application/json" : "0",
+        },
+        json: () =>
+          Promise.resolve({
+            publicKeys: [{ id: "1", alg: "RS256", publicKey: spkiHex }],
+            enforcement: "strict",
+          }),
+      });
+
+      await expect(
+        verifyAsyncJson(data, signatureHex, httpsUrl, "1")
+      ).resolves.toBe(true);
+    });
   });
 
   describe("verify", () => {
