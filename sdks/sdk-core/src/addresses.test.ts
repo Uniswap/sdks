@@ -47,5 +47,9 @@ describe('addresses', () => {
       const address = SWAP_ROUTER_02_ADDRESSES(ChainId.XLAYER)
       expect(address).toEqual('0x4f0c28f5926afda16bf2506d5d9e57ea190f9bca')
     })
+    it('should return the correct address for MegaETH', () => {
+      const address = SWAP_ROUTER_02_ADDRESSES(ChainId.MEGAETH)
+      expect(address).toEqual('0x4f0c28f5926afda16bf2506d5d9e57ea190f9bca')
+    })
   })
 })
