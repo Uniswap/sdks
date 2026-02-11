@@ -219,18 +219,6 @@ describe('Uniswap', () => {
       0,
       tickProviderMock
     )
-
-    UNI_USDT_V4 = new V4Pool(
-      UNI,
-      USDT,
-      FeeAmount.MEDIUM,
-      tickSpacing,
-      ZERO_ADDRESS,
-      encodeSqrtRatioX96(1, 1),
-      liquidity,
-      0,
-      tickProviderMock
-    )
   })
 
   describe('v2', () => {
