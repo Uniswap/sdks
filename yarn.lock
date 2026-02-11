@@ -4866,23 +4866,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@uniswap/router-sdk@npm:^2.4.0":
-  version: 2.4.0
-  resolution: "@uniswap/router-sdk@npm:2.4.0"
-  dependencies:
-    "@ethersproject/abi": ^5.5.0
-    "@uniswap/sdk-core": ^7.10.1
-    "@uniswap/swap-router-contracts": ^1.3.0
-    "@uniswap/v2-sdk": ^4.17.0
-    "@uniswap/v3-sdk": ^3.27.0
-    "@uniswap/v4-sdk": ^1.27.0
-  checksum: 0e3771ab799c716d2dc8dd10882babe8ad090a665094b886c67eed669af2f6016ac77d389f83b6811f5f4ebd567474f4c60a0b89fce2a410857e794072779b6b
-  languageName: node
-  linkType: hard
-
-"@uniswap/router-sdk@workspace:sdks/router-sdk":
+"@uniswap/router-sdk-guidestar-routes-1@workspace:sdks/router-sdk":
   version: 0.0.0-use.local
-  resolution: "@uniswap/router-sdk@workspace:sdks/router-sdk"
+  resolution: "@uniswap/router-sdk-guidestar-routes-1@workspace:sdks/router-sdk"
   dependencies:
     "@ethersproject/abi": ^5.5.0
     "@types/jest": ^24.0.25
@@ -4897,6 +4883,20 @@ __metadata:
     tsdx: ^0.14.1
   languageName: unknown
   linkType: soft
+
+"@uniswap/router-sdk@file:tmp/router-sdk-guidestar-routes-1.tgz::locator=%40uniswap%2Funiversal-router-sdk%40workspace%3Asdks%2Funiversal-router-sdk":
+  version: 0.0.0
+  resolution: "@uniswap/router-sdk@file:tmp/router-sdk-guidestar-routes-1.tgz::locator=%40uniswap%2Funiversal-router-sdk%40workspace%3Asdks%2Funiversal-router-sdk"
+  dependencies:
+    "@ethersproject/abi": ^5.5.0
+    "@uniswap/sdk-core": ^7.10.1
+    "@uniswap/swap-router-contracts": ^1.3.0
+    "@uniswap/v2-sdk": ^4.17.0
+    "@uniswap/v3-sdk": ^3.27.0
+    "@uniswap/v4-sdk": ^1.27.0
+  checksum: 8e32c7e253bce508a5713dece1c635052bb8a5e23e816f3b3eb2b30fa35cb055ac914df4c1f8dee3118c2db3995bc05169092d96eefc356fc9c07bbdd1bef35c
+  languageName: node
+  linkType: hard
 
 "@uniswap/sdk-core@npm:^7.10.0, @uniswap/sdk-core@npm:^7.10.1, @uniswap/sdk-core@npm:^7.5.0, @uniswap/sdk-core@npm:^7.6.0":
   version: 7.10.1
@@ -5042,7 +5042,7 @@ __metadata:
     "@types/node": ^18.7.16
     "@types/node-fetch": ^2.6.2
     "@uniswap/permit2-sdk": ^1.3.0
-    "@uniswap/router-sdk": ^2.4.0
+    "@uniswap/router-sdk": "file:tmp/router-sdk-guidestar-routes-1.tgz"
     "@uniswap/sdk-core": ^7.10.0
     "@uniswap/universal-router": 2.1.0
     "@uniswap/v2-core": ^1.0.1
