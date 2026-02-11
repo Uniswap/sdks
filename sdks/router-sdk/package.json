@@ -1,5 +1,5 @@
 {
-  "name": "@uniswap/router-sdk",
+  "name": "@uniswap/router-sdk-guidestar-routes-1",
   "description": "An sdk for routing swaps using Uniswap v2 and Uniswap v3.",
   "repository": "https://github.com/Uniswap/sdks.git",
   "keywords": [
