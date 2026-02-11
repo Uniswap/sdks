@@ -63,6 +63,7 @@ export const V2_FACTORY_ADDRESSES: AddressMap = {
   [ChainId.SONEIUM]: '0x97febbc2adbd5644ba22736e962564b23f5828ce',
   [ChainId.MONAD]: '0x182a927119d56008d921126764bf884221b10f59',
   [ChainId.XLAYER]: '0xdf38f24fe153761634be942f9d859f3dba857e95',
+  [ChainId.MEGAETH]: '0xbf56488c857a881ae7e3bed27cf99c10a7ab7e50',
 }
 /**
  * @deprecated use V2_ROUTER_ADDRESSES instead
@@ -87,6 +88,7 @@ export const V2_ROUTER_ADDRESSES: AddressMap = {
   [ChainId.SONEIUM]: '0x273f68c234fa55b550b40e563c4a488e0d334320',
   [ChainId.MONAD]: '0x4b2ab38dbf28d31d467aa8993f6c2585981d6804',
   [ChainId.XLAYER]: '0x182a927119d56008d921126764bf884221b10f59',
+  [ChainId.MEGAETH]: '0xb73055db2B3A3EaE87a331DD88e4a80b43602690',
 }
 
 // Networks that share most of the same addresses i.e. Mainnet, Goerli, Optimism, Arbitrum, Polygon
@@ -457,6 +459,22 @@ const XLAYER_ADDRESSES: ChainAddresses = {
   v4QuoterAddress: '0x8928074ca1b241d8ec02815881c1af11e8bc5219',
 }
 
+const MEGAETH_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: '0x3a5f0cd7d62452b7f899b2a5758bfa57be0de478',
+  multicallAddress: '0x61f3272a3619d9f20788c6822fed2e5471bfc477',
+  quoterAddress: '0x5affda77bc34d945f9632bd080ebfcf24133b90e',
+  v3MigratorAddress: '0xed30f6c25fe915dc710f168fa3ab66199ee84454',
+  nonfungiblePositionManagerAddress: '0xcdc86e98184e96436f733a8bf31bd4f0214e6d7d',
+  tickLensAddress: '0xe7a2d824722addcb21e7a203ae7b372bf3a29ec5',
+  swapRouter02Address: '0x48020de9208bafc183f5cad5118ffbe8f0f913f5',
+  mixedRouteQuoterV2Address: '0xacb7e78fa05d562e0a5d3089ec896d57d057d38e',
+
+  v4PoolManagerAddress: '0xacb7e78fa05d562e0a5d3089ec896d57d057d38e',
+  v4PositionManagerAddress: '0x9ae0921e981aaa7308f176f8d4f9129b9247c89d',
+  v4StateView: '0x726f84e1dfb8d375a365e0808282f40d52d3e4e8',
+  v4QuoterAddress: '0x94bdc671f0c35f44a1daa53143fd1f868d1623b9',
+}
+
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
   [ChainId.MAINNET]: MAINNET_ADDRESSES,
   [ChainId.OPTIMISM]: OPTIMISM_ADDRESSES,
@@ -488,6 +506,7 @@ export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses>
   [ChainId.SONEIUM]: SONEIUM_ADDRESSES,
   [ChainId.MONAD]: MONAD_ADDRESSES,
   [ChainId.XLAYER]: XLAYER_ADDRESSES,
+  [ChainId.MEGAETH]: MEGAETH_ADDRESSES,
 }
 
 /* V3 Contract Addresses */
