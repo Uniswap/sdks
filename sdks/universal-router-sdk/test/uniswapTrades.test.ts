@@ -68,11 +68,9 @@ describe('Uniswap', () => {
   let WETH_USDC_V3: V3Pool
   let WETH_USDC_V3_LOW_FEE: V3Pool
   let USDC_DAI_V3: V3Pool
-
   let ETH_DAI_V4: V4Pool
-  let ETH_UNI_V4: V4Pool
   let ETH_USDC_V4: V4Pool
-  let UNI_USDC_V4: V4Pool
+  let ETH_USDT_V4: V4Pool
   let USDC_USDT_V4: V4Pool
   let WETH_USDC_V4: V4Pool
   let WETH_USDC_V4_LOW_FEE: V4Pool
@@ -148,9 +146,9 @@ describe('Uniswap', () => {
       tickProviderMock
     )
 
-    UNI_USDC_V4 = new V4Pool(
-      USDC,
-      UNI,
+    ETH_USDT_V4 = new V4Pool(
+      ETHER,
+      USDT,
       FeeAmount.MEDIUM,
       tickSpacing,
       ZERO_ADDRESS,
@@ -199,18 +197,6 @@ describe('Uniswap', () => {
     ETH_WETH_V4 = new V4Pool(
       ETHER,
       WETH,
-      FeeAmount.MEDIUM,
-      tickSpacing,
-      ZERO_ADDRESS,
-      encodeSqrtRatioX96(1, 1),
-      liquidity,
-      0,
-      tickProviderMock
-    )
-
-    ETH_UNI_V4 = new V4Pool(
-      UNI,
-      ETHER,
       FeeAmount.MEDIUM,
       tickSpacing,
       ZERO_ADDRESS,
@@ -1106,13 +1092,13 @@ describe('Uniswap', () => {
     it('encodes a split exactInput with 2 routes v4 ETH -> USDC -> USDT, v4 ETH -> UNI -> USDC -> USDT', async () => {
       const inputEther = expandTo18Decimals(1)
       const v4Trade1 = await V4Trade.fromRoute(
-        new V4Route([ETH_USDC_V4, USDC_USDT_V4], ETHER, USDT),
-        CurrencyAmount.fromRawAmount(ETHER, inputEther),
+        new V4Route([USDC_USDT_V4], USDC, USDT),
+        CurrencyAmount.fromRawAmount(USDC, inputEther),
         TradeType.EXACT_INPUT
       )
       const v4Trade2 = await V4Trade.fromRoute(
-        new V4Route([ETH_UNI_V4, UNI_USDC_V4, USDC_USDT_V4], ETHER, USDT),
-        CurrencyAmount.fromRawAmount(ETHER, inputEther),
+        new V4Route([ETH_USDC_V4, ETH_USDT_V4], USDC, USDT),
+        CurrencyAmount.fromRawAmount(USDC, inputEther),
         TradeType.EXACT_INPUT
       )
       const opts = swapOptions({})
