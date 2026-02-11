@@ -1089,7 +1089,7 @@ describe('Uniswap', () => {
       expect(hexToDecimalString(methodParameters.value)).to.eq(JSBI.multiply(inputEther, JSBI.BigInt(2)).toString())
     })
 
-    it('encodes a split exactInput with 2 routes v4 ETH -> USDC -> USDT, v4 ETH -> UNI -> USDC -> USDT', async () => {
+    it('encodes a split exactInput with 2 routes v4 USDC -> USDT, v4 USDC -> ETH -> USDT', async () => {
       const inputEther = expandTo18Decimals(1)
       const v4Trade1 = await V4Trade.fromRoute(
         new V4Route([USDC_USDT_V4], USDC, USDT),
