@@ -31,7 +31,7 @@ import {
   TradeType,
 } from '@uniswap/sdk-core'
 import { registerFixture } from './forge/writeInterop'
-import { buildTrade, getUniswapPools, swapOptions, ETHER, DAI, USDC, WETH } from './utils/uniswapData'
+import { buildTrade, getUniswapPools, swapOptions, ETHER, DAI, USDC, WETH, USDT, UNI } from './utils/uniswapData'
 import { hexToDecimalString } from './utils/hexToDecimalString'
 import {
   FORGE_V4_POSITION_MANAGER,
@@ -55,7 +55,7 @@ import {
   UniversalRouterVersion,
   ZERO_ADDRESS,
 } from '../src/utils/constants'
-import { parseUnits, parseUnits, splitSignature } from 'ethers/lib/utils'
+import { splitSignature } from 'ethers/lib/utils'
 
 const FORK_BLOCK = 16075500
 
@@ -68,9 +68,10 @@ describe('Uniswap', () => {
   let WETH_USDC_V3: V3Pool
   let WETH_USDC_V3_LOW_FEE: V3Pool
   let USDC_DAI_V3: V3Pool
-
   let ETH_DAI_V4: V4Pool
   let ETH_USDC_V4: V4Pool
+  let ETH_USDT_V4: V4Pool
+  let USDC_USDT_V4: V4Pool
   let WETH_USDC_V4: V4Pool
   let WETH_USDC_V4_LOW_FEE: V4Pool
   let ETH_USDC_V4_LOW_FEE: V4Pool
@@ -136,6 +137,30 @@ describe('Uniswap', () => {
     ETH_USDC_V4 = new V4Pool(
       ETHER,
       USDC,
+      FeeAmount.MEDIUM,
+      tickSpacing,
+      ZERO_ADDRESS,
+      encodeSqrtRatioX96(1, 1),
+      liquidity,
+      0,
+      tickProviderMock
+    )
+
+    ETH_USDT_V4 = new V4Pool(
+      ETHER,
+      USDT,
+      FeeAmount.MEDIUM,
+      tickSpacing,
+      ZERO_ADDRESS,
+      encodeSqrtRatioX96(1, 1),
+      liquidity,
+      0,
+      tickProviderMock
+    )
+
+    USDC_USDT_V4 = new V4Pool(
+      USDC,
+      USDT,
       FeeAmount.MEDIUM,
       tickSpacing,
       ZERO_ADDRESS,
@@ -1062,6 +1087,25 @@ describe('Uniswap', () => {
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([v2Trade, v3Trade]), opts)
       registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_ETH_TO_USDC', methodParameters)
       expect(hexToDecimalString(methodParameters.value)).to.eq(JSBI.multiply(inputEther, JSBI.BigInt(2)).toString())
+    })
+
+    it('encodes a split exactInput with 2 routes v4 USDC -> USDT, v4 USDC -> ETH -> USDT', async () => {
+      const inputEther = expandTo18Decimals(1)
+      const v4Trade1 = await V4Trade.fromRoute(
+        new V4Route([USDC_USDT_V4], USDC, USDT),
+        CurrencyAmount.fromRawAmount(USDC, inputEther),
+        TradeType.EXACT_INPUT
+      )
+      const v4Trade2 = await V4Trade.fromRoute(
+        new V4Route([ETH_USDC_V4, ETH_USDT_V4], USDC, USDT),
+        CurrencyAmount.fromRawAmount(USDC, inputEther),
+        TradeType.EXACT_INPUT
+      )
+      const opts = swapOptions({})
+      const methodParameters = SwapRouter.swapCallParameters(buildTrade([v4Trade1, v4Trade2]), opts)
+      registerFixture('_UNISWAP_SPLIT_TWO_ROUTES_V4_ETH_TO_USDT_AND_UNI', methodParameters)
+      expect(hexToDecimalString(methodParameters.value)).to.eq(inputEther)
+      console.log('my calldata is ' + methodParameters.calldata)
     })
 
     /**
