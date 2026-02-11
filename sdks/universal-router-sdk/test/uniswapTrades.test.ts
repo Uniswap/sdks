@@ -150,7 +150,7 @@ describe('Uniswap', () => {
 
     UNI_USDC_V4 = new V4Pool(
       USDC,
-      USDT,
+      UNI,
       FeeAmount.MEDIUM,
       tickSpacing,
       ZERO_ADDRESS,
@@ -1111,7 +1111,7 @@ describe('Uniswap', () => {
         TradeType.EXACT_INPUT
       )
       const v4Trade2 = await V4Trade.fromRoute(
-        new V4Route([ETH_USDC_V4, USDC_USDT_V4], ETHER, USDT),
+        new V4Route([ETH_UNI_V4, UNI_USDC_V4, USDC_USDT_V4], ETHER, USDT),
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
         TradeType.EXACT_INPUT
       )
