@@ -5,6 +5,8 @@ on:
     branches:
       - main
 
+permissions: {}
+
 jobs:
   dev-branch-push:
     name: "Push to beta and alpha branches"
@@ -31,6 +33,7 @@ jobs:
         with:
           token: ${{ secrets.SERVICE_ACCOUNT_PAT }}
           ref: main
+          persist-credentials: false
 
       - name: Setup git
         run: |
