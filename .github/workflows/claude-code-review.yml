@@ -8,6 +8,8 @@ on:
   pull_request:
     types: [opened, synchronize, ready_for_review, labeled, unlabeled]
 
+permissions: {}
+
 jobs:
   claude-review-auto:
     if: |

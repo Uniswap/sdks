@@ -8,6 +8,8 @@ on:
     branches:
       - main
 
+permissions: {}
+
 jobs:
   monorepo-integrity:
     name: Check monorepo integrity
@@ -36,6 +38,7 @@ jobs:
         with:
           fetch-depth: 2
           submodules: "true"
+          persist-credentials: false
 
       - name: 💽 Node and Caching
         uses: actions/setup-node@1a4442cacd436585916779262731d5b162bc6ec7

@@ -7,6 +7,8 @@ on:
       - edited
       - synchronize
 
+permissions: {}
+
 jobs:
   # Ensures that the PR title adheres to [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/).
   conventional-commit:

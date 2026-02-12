@@ -37,6 +37,7 @@ jobs:
         with:
           submodules: "true"
           fetch-depth: 2
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@1a4442cacd436585916779262731d5b162bc6ec7
