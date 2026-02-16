@@ -1,4 +1,5 @@
 import { defaultAbiCoder } from 'ethers/lib/utils'
+import { AcrossV4DepositV3Params } from '../entities/actions/across'
 
 /**
  * CommandTypes
@@ -29,6 +30,9 @@ export enum CommandType {
   V4_POSITION_MANAGER_CALL = 0x14,
 
   EXECUTE_SUB_PLAN = 0x21,
+
+  // 3rd party integrations (0x40-0x5f range)
+  ACROSS_V4_DEPOSIT_V3 = 0x40,
 }
 
 export enum Subparser {
@@ -219,6 +223,26 @@ export const COMMAND_DEFINITION: { [key in CommandType]: CommandDefinition } = {
   [CommandType.V3_POSITION_MANAGER_PERMIT]: { parser: Parser.V3Actions },
   [CommandType.V3_POSITION_MANAGER_CALL]: { parser: Parser.V3Actions },
   [CommandType.V4_POSITION_MANAGER_CALL]: { parser: Parser.V4Actions },
+
+  // 3rd Party Integrations
+  [CommandType.ACROSS_V4_DEPOSIT_V3]: {
+    parser: Parser.Abi,
+    params: [
+      { name: 'depositor', type: 'address' },
+      { name: 'recipient', type: 'address' },
+      { name: 'inputToken', type: 'address' },
+      { name: 'outputToken', type: 'address' },
+      { name: 'inputAmount', type: 'uint256' },
+      { name: 'outputAmount', type: 'uint256' },
+      { name: 'destinationChainId', type: 'uint256' },
+      { name: 'exclusiveRelayer', type: 'address' },
+      { name: 'quoteTimestamp', type: 'uint32' },
+      { name: 'fillDeadline', type: 'uint32' },
+      { name: 'exclusivityDeadline', type: 'uint32' },
+      { name: 'message', type: 'bytes' },
+      { name: 'useNative', type: 'bool' },
+    ],
+  },
 }
 
 export class RoutePlanner {
@@ -246,6 +270,30 @@ export class RoutePlanner {
     }
 
     this.commands = this.commands.concat(command.type.toString(16).padStart(2, '0'))
+    return this
+  }
+
+  /**
+   * Add Across bridge deposit command for cross-chain bridging
+   * @param params AcrossV4DepositV3Params containing bridge parameters
+   * @returns RoutePlanner instance for chaining
+   */
+  addAcrossBridge(params: AcrossV4DepositV3Params): RoutePlanner {
+    this.addCommand(CommandType.ACROSS_V4_DEPOSIT_V3, [
+      params.depositor,
+      params.recipient,
+      params.inputToken,
+      params.outputToken,
+      params.inputAmount,
+      params.outputAmount,
+      params.destinationChainId,
+      params.exclusiveRelayer,
+      params.quoteTimestamp,
+      params.fillDeadline,
+      params.exclusivityDeadline,
+      params.message,
+      params.useNative,
+    ])
     return this
   }
 }
