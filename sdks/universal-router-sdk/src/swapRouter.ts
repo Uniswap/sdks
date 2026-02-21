@@ -18,7 +18,15 @@ import {
   PoolKey,
 } from '@uniswap/v4-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
-import { Currency, Token, TradeType, Percent, CHAIN_TO_ADDRESSES_MAP, SupportedChainsType } from '@uniswap/sdk-core'
+import {
+  Currency,
+  Token,
+  TradeType,
+  Percent,
+  Fraction,
+  CHAIN_TO_ADDRESSES_MAP,
+  SupportedChainsType,
+} from '@uniswap/sdk-core'
 import { UniswapTrade, SwapOptions } from './entities/actions/uniswap'
 import { AcrossV4DepositV3Params } from './entities/actions/across'
 import { RoutePlanner, CommandType } from './utils/routerCommands'
@@ -238,22 +246,25 @@ export abstract class SwapRouter {
    * @returns Method parameters (calldata + value) for the Universal Router
    */
   public static encodeSwaps(intent: SwapIntent, swapSteps: SwapStep[]): MethodParameters {
+    invariant(swapSteps.length > 0, 'EMPTY_SWAP_STEPS')
+
     const planner = new RoutePlanner()
     const recipient = intent.recipient ?? SENDER_AS_RECIPIENT
     const isExactInput = intent.tradeType === TradeType.EXACT_INPUT
 
-    // Compute slippage-adjusted amounts
+    // Compute slippage-adjusted amounts using SDK-standard formulas:
+    // EXACT_INPUT minAmountOut = floor(outputAmount / (1 + slippage))
+    // EXACT_OUTPUT maxAmountIn = floor(inputAmount * (1 + slippage))
+    const onePlusSlippage = new Fraction(1).add(intent.slippageTolerance)
     let maxAmountIn: string
     let minAmountOut: string
 
     if (isExactInput) {
       maxAmountIn = intent.inputAmount.quotient.toString()
-      const slippageAdjustment = intent.outputAmount.multiply(intent.slippageTolerance)
-      minAmountOut = intent.outputAmount.subtract(slippageAdjustment).quotient.toString()
+      minAmountOut = onePlusSlippage.invert().multiply(intent.outputAmount.quotient).quotient.toString()
     } else {
       // EXACT_OUTPUT: slippage on input side
-      const slippageAdjustment = intent.inputAmount.multiply(intent.slippageTolerance)
-      maxAmountIn = intent.inputAmount.add(slippageAdjustment).quotient.toString()
+      maxAmountIn = onePlusSlippage.multiply(intent.inputAmount.quotient).quotient.toString()
       minAmountOut = intent.outputAmount.quotient.toString()
     }
 

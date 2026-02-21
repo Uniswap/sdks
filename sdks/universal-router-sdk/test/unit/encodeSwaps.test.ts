@@ -17,8 +17,7 @@ import {
   V4Swap,
   WrapEth,
 } from '../../src/types/encodeSwaps'
-
-const ROUTER_AS_RECIPIENT = '0x0000000000000000000000000000000000000002'
+import { ROUTER_AS_RECIPIENT } from '../../src/utils/constants'
 
 describe('encodeV4Action', () => {
   describe('v4ActionToParams', () => {
@@ -375,6 +374,51 @@ describe('SwapRouter.encodeSwaps', () => {
       const commands = decoded.commands as string
       // WRAP_ETH (0x0b) + V3_SWAP_EXACT_OUT (0x01) + SWEEP output (0x04) + UNWRAP_WETH refund (0x0c)
       expect(commands).to.equal('0x0b01040c')
+    })
+  })
+
+  describe('with Permit2 permit', () => {
+    it('prepends PERMIT2_PERMIT command', () => {
+      const mockPermit = {
+        details: {
+          token: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+          amount: '1000000',
+          expiration: '1000000000',
+          nonce: 0,
+        },
+        spender: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
+        sigDeadline: '1000000000',
+        signature: '0x' + '00'.repeat(65),
+      }
+
+      const intent: SwapIntent = {
+        tradeType: TradeType.EXACT_INPUT,
+        inputToken: USDC,
+        outputToken: WETH,
+        inputAmount: CurrencyAmount.fromRawAmount(USDC, '1000000'),
+        outputAmount: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+        slippageTolerance: new Percent(50, 10_000),
+        permit: mockPermit,
+      }
+
+      const swapSteps = [
+        {
+          type: 'V3_SWAP_EXACT_IN' as const,
+          recipient: ROUTER,
+          amountIn: '1000000',
+          amountOutMin: '0',
+          path: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB480001f4C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+          payerIsUser: false,
+        },
+      ]
+
+      const result = SwapRouter.encodeSwaps(intent, swapSteps)
+
+      const decoded = SwapRouter.INTERFACE.decodeFunctionData('execute(bytes,bytes[])', result.calldata)
+      const commands = decoded.commands as string
+      // PERMIT2_PERMIT (0x0a) + PERMIT2_TRANSFER_FROM (0x02) + V3_SWAP_EXACT_IN (0x00) + SWEEP (0x04)
+      expect(commands).to.equal('0x0a020004')
+      expect(decoded.inputs).to.have.length(4)
     })
   })
 
