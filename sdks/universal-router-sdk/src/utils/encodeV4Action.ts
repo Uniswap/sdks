@@ -1,22 +1,11 @@
 import { Actions, URVersion } from '@uniswap/v4-sdk'
 import { V4Action, V4SwapExactIn, V4SwapExactOut } from '../types/encodeSwaps'
 
-const ACTION_NAME_TO_ENUM: { [key: string]: Actions } = {
-  SWAP_EXACT_IN_SINGLE: Actions.SWAP_EXACT_IN_SINGLE,
-  SWAP_EXACT_IN: Actions.SWAP_EXACT_IN,
-  SWAP_EXACT_OUT_SINGLE: Actions.SWAP_EXACT_OUT_SINGLE,
-  SWAP_EXACT_OUT: Actions.SWAP_EXACT_OUT,
-  SETTLE: Actions.SETTLE,
-  SETTLE_ALL: Actions.SETTLE_ALL,
-  SETTLE_PAIR: Actions.SETTLE_PAIR,
-  TAKE: Actions.TAKE,
-  TAKE_ALL: Actions.TAKE_ALL,
-  TAKE_PORTION: Actions.TAKE_PORTION,
-  TAKE_PAIR: Actions.TAKE_PAIR,
-  CLOSE_CURRENCY: Actions.CLOSE_CURRENCY,
-  SWEEP: Actions.SWEEP,
-  UNWRAP: Actions.UNWRAP,
-}
+// Derive name→enum mapping from Actions enum (numeric enums have reverse mappings,
+// so filter to only the string keys). Stays in sync when v4-sdk adds new actions.
+const ACTION_NAME_TO_ENUM: { [key: string]: Actions } = Object.fromEntries(
+  Object.entries(Actions).filter(([key]) => isNaN(Number(key)))
+) as { [key: string]: Actions }
 
 /**
  * Maps a typed V4Action to the (Actions enum, params[]) pair that V4Planner.addAction expects.

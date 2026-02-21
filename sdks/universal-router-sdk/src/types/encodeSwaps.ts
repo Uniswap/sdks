@@ -1,7 +1,9 @@
 import { Currency, CurrencyAmount, TradeType, Percent } from '@uniswap/sdk-core'
 import { BigNumber, BigNumberish } from 'ethers'
 import { Permit2Permit } from '../utils/inputTokens'
-import { URVersion } from '@uniswap/v4-sdk'
+import { type PoolKey, type PathKey, URVersion } from '@uniswap/v4-sdk'
+
+export type { PoolKey, PathKey }
 
 // === Intent (SDK-owned safety metadata) ===
 
@@ -83,22 +85,7 @@ export type SwapStep =
   | UnwrapWeth
 
 // === V4 actions (typed, used inside V4Swap.v4Actions) ===
-
-export type PoolKey = {
-  currency0: string
-  currency1: string
-  fee: number
-  tickSpacing: number
-  hooks: string
-}
-
-export type PathKey = {
-  intermediateCurrency: string
-  fee: BigNumberish
-  tickSpacing: number
-  hooks: string
-  hookData: string
-}
+// PoolKey and PathKey are re-exported from @uniswap/v4-sdk above.
 
 export type V4SwapExactIn = {
   action: 'SWAP_EXACT_IN'

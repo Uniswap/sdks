@@ -41,6 +41,6 @@ export type {
   V4CloseCurrency,
   V4Sweep,
   V4Unwrap,
-  PoolKey as SwapStepPoolKey,
+  PoolKey,
   PathKey,
 } from './types/encodeSwaps'
