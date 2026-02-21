@@ -1,9 +1,12 @@
 import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import { Actions, URVersion } from '@uniswap/v4-sdk'
+import { Currency, CurrencyAmount, Ether, Token, TradeType, Percent } from '@uniswap/sdk-core'
 import { v4ActionToParams } from '../../src/utils/encodeV4Action'
 import { RoutePlanner, CommandType } from '../../src/utils/routerCommands'
 import { encodeSwapStep } from '../../src/utils/encodeSwapStep'
+import { SwapRouter } from '../../src/swapRouter'
+import { SwapIntent } from '../../src/types/encodeSwaps'
 import {
   V4Settle,
   V4Take,
@@ -206,5 +209,202 @@ describe('encodeSwapStep', () => {
     encodeSwapStep(planner, step2)
     expect(planner.commands).to.equal('0x0b00')
     expect(planner.inputs).to.have.length(2)
+  })
+})
+
+describe('SwapRouter.encodeSwaps', () => {
+  const USDC = new Token(1, '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', 6, 'USDC')
+  const WETH = new Token(1, '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', 18, 'WETH')
+  const ETH = Ether.onChain(1)
+  const ROUTER = '0x0000000000000000000000000000000000000002'
+
+  describe('EXACT_INPUT: ERC20 -> ERC20', () => {
+    it('wraps swap steps with permit2 transfer and sweep', () => {
+      const intent: SwapIntent = {
+        tradeType: TradeType.EXACT_INPUT,
+        inputToken: USDC,
+        outputToken: WETH,
+        inputAmount: CurrencyAmount.fromRawAmount(USDC, '1000000'),
+        outputAmount: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+        slippageTolerance: new Percent(50, 10_000), // 0.5%
+      }
+
+      const swapSteps = [
+        {
+          type: 'V3_SWAP_EXACT_IN' as const,
+          recipient: ROUTER,
+          amountIn: '1000000',
+          amountOutMin: '0',
+          path: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB480001f4C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+          payerIsUser: false,
+        },
+      ]
+
+      const result = SwapRouter.encodeSwaps(intent, swapSteps)
+      expect(result.calldata).to.be.a('string')
+      expect(result.value).to.equal('0x00')
+
+      // Decode and verify command sequence
+      const decoded = SwapRouter.INTERFACE.decodeFunctionData('execute(bytes,bytes[])', result.calldata)
+      const commands = decoded.commands as string
+      // PERMIT2_TRANSFER_FROM (0x02) + V3_SWAP_EXACT_IN (0x00) + SWEEP (0x04)
+      expect(commands).to.equal('0x020004')
+      expect(decoded.inputs).to.have.length(3)
+    })
+  })
+
+  describe('EXACT_INPUT: Native ETH -> ERC20', () => {
+    it('wraps with WRAP_ETH and SWEEP', () => {
+      const intent: SwapIntent = {
+        tradeType: TradeType.EXACT_INPUT,
+        inputToken: ETH,
+        outputToken: USDC,
+        inputAmount: CurrencyAmount.fromRawAmount(ETH, '1000000000000000000'),
+        outputAmount: CurrencyAmount.fromRawAmount(USDC, '2000000000'),
+        slippageTolerance: new Percent(50, 10_000),
+      }
+
+      const swapSteps = [
+        {
+          type: 'V3_SWAP_EXACT_IN' as const,
+          recipient: ROUTER,
+          amountIn: '1000000000000000000',
+          amountOutMin: '0',
+          path: '0xabcdef',
+          payerIsUser: false,
+        },
+      ]
+
+      const result = SwapRouter.encodeSwaps(intent, swapSteps)
+      expect(BigNumber.from(result.value).gt(0)).to.be.true
+
+      const decoded = SwapRouter.INTERFACE.decodeFunctionData('execute(bytes,bytes[])', result.calldata)
+      const commands = decoded.commands as string
+      // WRAP_ETH (0x0b) + V3_SWAP_EXACT_IN (0x00) + SWEEP (0x04)
+      expect(commands).to.equal('0x0b0004')
+    })
+  })
+
+  describe('EXACT_INPUT: ERC20 -> Native ETH', () => {
+    it('uses UNWRAP_WETH for output', () => {
+      const intent: SwapIntent = {
+        tradeType: TradeType.EXACT_INPUT,
+        inputToken: USDC,
+        outputToken: ETH,
+        inputAmount: CurrencyAmount.fromRawAmount(USDC, '2000000000'),
+        outputAmount: CurrencyAmount.fromRawAmount(ETH, '1000000000000000000'),
+        slippageTolerance: new Percent(50, 10_000),
+      }
+
+      const swapSteps = [
+        {
+          type: 'V3_SWAP_EXACT_IN' as const,
+          recipient: ROUTER,
+          amountIn: '2000000000',
+          amountOutMin: '0',
+          path: '0xabcdef',
+          payerIsUser: false,
+        },
+      ]
+
+      const result = SwapRouter.encodeSwaps(intent, swapSteps)
+
+      const decoded = SwapRouter.INTERFACE.decodeFunctionData('execute(bytes,bytes[])', result.calldata)
+      const commands = decoded.commands as string
+      // PERMIT2_TRANSFER_FROM (0x02) + V3_SWAP_EXACT_IN (0x00) + UNWRAP_WETH (0x0c)
+      expect(commands).to.equal('0x02000c')
+    })
+  })
+
+  describe('EXACT_OUTPUT: ERC20 -> ERC20', () => {
+    it('adds refund sweep for excess input', () => {
+      const intent: SwapIntent = {
+        tradeType: TradeType.EXACT_OUTPUT,
+        inputToken: USDC,
+        outputToken: WETH,
+        inputAmount: CurrencyAmount.fromRawAmount(USDC, '1000000'),
+        outputAmount: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+        slippageTolerance: new Percent(50, 10_000),
+      }
+
+      const swapSteps = [
+        {
+          type: 'V3_SWAP_EXACT_OUT' as const,
+          recipient: ROUTER,
+          amountOut: '500000000000000000',
+          amountInMax: '1005000',
+          path: '0xabcdef',
+          payerIsUser: false,
+        },
+      ]
+
+      const result = SwapRouter.encodeSwaps(intent, swapSteps)
+
+      const decoded = SwapRouter.INTERFACE.decodeFunctionData('execute(bytes,bytes[])', result.calldata)
+      const commands = decoded.commands as string
+      // PERMIT2_TRANSFER_FROM (0x02) + V3_SWAP_EXACT_OUT (0x01) + SWEEP output (0x04) + SWEEP refund (0x04)
+      expect(commands).to.equal('0x02010404')
+    })
+  })
+
+  describe('EXACT_OUTPUT: Native ETH -> ERC20', () => {
+    it('refunds excess ETH via UNWRAP_WETH', () => {
+      const intent: SwapIntent = {
+        tradeType: TradeType.EXACT_OUTPUT,
+        inputToken: ETH,
+        outputToken: USDC,
+        inputAmount: CurrencyAmount.fromRawAmount(ETH, '1000000000000000000'),
+        outputAmount: CurrencyAmount.fromRawAmount(USDC, '2000000000'),
+        slippageTolerance: new Percent(50, 10_000),
+      }
+
+      const swapSteps = [
+        {
+          type: 'V3_SWAP_EXACT_OUT' as const,
+          recipient: ROUTER,
+          amountOut: '2000000000',
+          amountInMax: '1005000000000000000',
+          path: '0xabcdef',
+          payerIsUser: false,
+        },
+      ]
+
+      const result = SwapRouter.encodeSwaps(intent, swapSteps)
+
+      const decoded = SwapRouter.INTERFACE.decodeFunctionData('execute(bytes,bytes[])', result.calldata)
+      const commands = decoded.commands as string
+      // WRAP_ETH (0x0b) + V3_SWAP_EXACT_OUT (0x01) + SWEEP output (0x04) + UNWRAP_WETH refund (0x0c)
+      expect(commands).to.equal('0x0b01040c')
+    })
+  })
+
+  describe('with deadline', () => {
+    it('encodes execute with deadline', () => {
+      const intent: SwapIntent = {
+        tradeType: TradeType.EXACT_INPUT,
+        inputToken: USDC,
+        outputToken: WETH,
+        inputAmount: CurrencyAmount.fromRawAmount(USDC, '1000000'),
+        outputAmount: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+        slippageTolerance: new Percent(50, 10_000),
+        deadline: 1700000000,
+      }
+
+      const swapSteps = [
+        {
+          type: 'V3_SWAP_EXACT_IN' as const,
+          recipient: ROUTER,
+          amountIn: '1000000',
+          amountOutMin: '0',
+          path: '0xabcdef',
+          payerIsUser: false,
+        },
+      ]
+
+      const result = SwapRouter.encodeSwaps(intent, swapSteps)
+      // Should decode with deadline variant
+      const decoded = SwapRouter.INTERFACE.decodeFunctionData('execute(bytes,bytes[],uint256)', result.calldata)
+      expect(decoded.deadline).to.not.be.undefined
+    })
   })
 })

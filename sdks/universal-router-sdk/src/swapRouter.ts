@@ -18,12 +18,14 @@ import {
   PoolKey,
 } from '@uniswap/v4-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
-import { Currency, TradeType, Percent, CHAIN_TO_ADDRESSES_MAP, SupportedChainsType } from '@uniswap/sdk-core'
+import { Currency, Token, TradeType, Percent, CHAIN_TO_ADDRESSES_MAP, SupportedChainsType } from '@uniswap/sdk-core'
 import { UniswapTrade, SwapOptions } from './entities/actions/uniswap'
 import { AcrossV4DepositV3Params } from './entities/actions/across'
 import { RoutePlanner, CommandType } from './utils/routerCommands'
 import { encodePermit, encodeV3PositionPermit } from './utils/inputTokens'
-import { UNIVERSAL_ROUTER_ADDRESS, UniversalRouterVersion } from './utils/constants'
+import { UNIVERSAL_ROUTER_ADDRESS, UniversalRouterVersion, SENDER_AS_RECIPIENT, ROUTER_AS_RECIPIENT } from './utils/constants'
+import { SwapIntent, SwapStep } from './types/encodeSwaps'
+import { encodeSwapStep } from './utils/encodeSwapStep'
 import { getUniversalRouterDomain, EXECUTE_SIGNED_TYPES, generateNonce } from './utils/eip712'
 import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
 
@@ -225,6 +227,85 @@ export abstract class SwapRouter {
     ])
 
     return { calldata: signedCalldata, value: nativeCurrencyValue.toHexString() }
+  }
+
+  /**
+   * Encodes swap steps from routing into Universal Router calldata,
+   * wrapped in a safety envelope (permit, token pull, slippage sweep).
+   *
+   * @param intent The swap intent with safety metadata (tokens, amounts, slippage)
+   * @param swapSteps Routing's swap commands as typed SwapStep objects
+   * @returns Method parameters (calldata + value) for the Universal Router
+   */
+  public static encodeSwaps(intent: SwapIntent, swapSteps: SwapStep[]): MethodParameters {
+    const planner = new RoutePlanner()
+    const recipient = intent.recipient ?? SENDER_AS_RECIPIENT
+    const isExactInput = intent.tradeType === TradeType.EXACT_INPUT
+
+    // Compute slippage-adjusted amounts
+    let maxAmountIn: string
+    let minAmountOut: string
+
+    if (isExactInput) {
+      maxAmountIn = intent.inputAmount.quotient.toString()
+      const slippageAdjustment = intent.outputAmount.multiply(intent.slippageTolerance)
+      minAmountOut = intent.outputAmount.subtract(slippageAdjustment).quotient.toString()
+    } else {
+      // EXACT_OUTPUT: slippage on input side
+      const slippageAdjustment = intent.inputAmount.multiply(intent.slippageTolerance)
+      maxAmountIn = intent.inputAmount.add(slippageAdjustment).quotient.toString()
+      minAmountOut = intent.outputAmount.quotient.toString()
+    }
+
+    // --- SAFETY: SDK-owned ---
+
+    // 1. Permit2 permit (if provided)
+    if (intent.permit) {
+      encodePermit(planner, intent.permit)
+    }
+
+    // 2. Pull input tokens into router
+    if (intent.inputToken.isNative) {
+      planner.addCommand(CommandType.WRAP_ETH, [ROUTER_AS_RECIPIENT, maxAmountIn])
+    } else {
+      planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [
+        (intent.inputToken as Token).address,
+        ROUTER_AS_RECIPIENT,
+        maxAmountIn,
+      ])
+    }
+
+    // --- SWAPS: Routing-owned (typesafe, SDK encodes) ---
+
+    // 3. Encode routing's swap steps
+    for (const step of swapSteps) {
+      encodeSwapStep(planner, step, intent.urVersion)
+    }
+
+    // --- SAFETY: SDK-owned ---
+
+    // 4. Deliver output to user with slippage protection
+    if (intent.outputToken.isNative) {
+      planner.addCommand(CommandType.UNWRAP_WETH, [recipient, minAmountOut])
+    } else {
+      planner.addCommand(CommandType.SWEEP, [(intent.outputToken as Token).address, recipient, minAmountOut])
+    }
+
+    // 5. Refund excess (EXACT_OUTPUT only)
+    if (!isExactInput) {
+      if (intent.inputToken.isNative) {
+        planner.addCommand(CommandType.UNWRAP_WETH, [recipient, 0])
+      } else {
+        planner.addCommand(CommandType.SWEEP, [(intent.inputToken as Token).address, recipient, 0])
+      }
+    }
+
+    // Compute native currency value to send with the transaction
+    const nativeCurrencyValue = intent.inputToken.isNative ? BigNumber.from(maxAmountIn) : BigNumber.from(0)
+
+    return SwapRouter.encodePlan(planner, nativeCurrencyValue, {
+      deadline: intent.deadline ? BigNumber.from(intent.deadline) : undefined,
+    })
   }
 
   /**
