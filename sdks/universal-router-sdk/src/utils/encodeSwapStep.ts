@@ -3,10 +3,22 @@ import { RoutePlanner, CommandType, COMMAND_DEFINITION, Parser } from './routerC
 import { SwapStep } from '../types/encodeSwaps'
 import { v4ActionToParams } from './encodeV4Action'
 
-// Derive step type string → CommandType mapping from enum.
-// Stays in sync when new commands are added to CommandType.
+// SwapStep types that map to CommandType by name.
+// Only swap-relevant commands are included; other CommandTypes (PERMIT2_PERMIT,
+// EXECUTE_SUB_PLAN, etc.) are not valid swap steps.
+const SWAP_STEP_COMMANDS = new Set<string>([
+  'V2_SWAP_EXACT_IN',
+  'V2_SWAP_EXACT_OUT',
+  'V3_SWAP_EXACT_IN',
+  'V3_SWAP_EXACT_OUT',
+  'V4_SWAP',
+  'WRAP_ETH',
+  'UNWRAP_WETH',
+])
+
+// Derive step type string → CommandType mapping from enum, restricted to swap-relevant commands.
 const STEP_TYPE_TO_COMMAND: { [key: string]: CommandType } = Object.fromEntries(
-  Object.entries(CommandType).filter(([key]) => isNaN(Number(key)))
+  Object.entries(CommandType).filter(([key]) => isNaN(Number(key)) && SWAP_STEP_COMMANDS.has(key))
 ) as { [key: string]: CommandType }
 
 /**
@@ -40,6 +52,10 @@ export function encodeSwapStep(
   const definition = COMMAND_DEFINITION[commandType]
   if (definition.parser !== Parser.Abi) throw new Error(`Unexpected parser for command: ${step.type}`)
 
-  const params = definition.params.map((p) => (step as Record<string, unknown>)[p.name])
+  const params = definition.params.map((p) => {
+    const value = (step as Record<string, unknown>)[p.name]
+    if (value === undefined) throw new Error(`Missing field '${p.name}' on swap step type '${step.type}'`)
+    return value
+  })
   planner.addCommand(commandType, params)
 }
