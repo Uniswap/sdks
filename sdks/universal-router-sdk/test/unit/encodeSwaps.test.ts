@@ -1,9 +1,9 @@
 import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import { Actions, URVersion } from '@uniswap/v4-sdk'
-import { Currency, CurrencyAmount, Ether, Token, TradeType, Percent } from '@uniswap/sdk-core'
+import { CurrencyAmount, Ether, Token, TradeType, Percent } from '@uniswap/sdk-core'
 import { v4ActionToParams } from '../../src/utils/encodeV4Action'
-import { RoutePlanner, CommandType } from '../../src/utils/routerCommands'
+import { RoutePlanner } from '../../src/utils/routerCommands'
 import { encodeSwapStep } from '../../src/utils/encodeSwapStep'
 import { SwapRouter } from '../../src/swapRouter'
 import { SwapIntent } from '../../src/types/encodeSwaps'
@@ -11,7 +11,6 @@ import {
   V4Settle,
   V4Take,
   V4SwapExactIn,
-  SwapStep,
   V2SwapExactIn,
   V3SwapExactIn,
   V4Swap,
