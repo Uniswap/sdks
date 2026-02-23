@@ -252,21 +252,16 @@ export abstract class SwapRouter {
     const recipient = spec.recipient ?? SENDER_AS_RECIPIENT
     const isExactInput = spec.tradeType === TradeType.EXACT_INPUT
 
-    // Compute slippage-adjusted amounts using SDK-standard formulas:
-    // EXACT_INPUT minAmountOut = floor(outputAmount / (1 + slippage))
-    // EXACT_OUTPUT maxAmountIn = floor(inputAmount * (1 + slippage))
+    // Compute slippage-adjusted amounts:
+    // `amount` is the exact/fixed side, `quote` is the routing estimate.
+    // Slippage is always applied to `quote` to derive the safety bound.
     const onePlusSlippage = new Fraction(1).add(spec.slippageTolerance)
-    let maxAmountIn: string
-    let minAmountOut: string
+    const slippageAdjustedQuote = isExactInput
+      ? onePlusSlippage.invert().multiply(spec.quote.quotient).quotient.toString() // minAmountOut
+      : onePlusSlippage.multiply(spec.quote.quotient).quotient.toString() // maxAmountIn
 
-    if (isExactInput) {
-      maxAmountIn = spec.inputAmount.quotient.toString()
-      minAmountOut = onePlusSlippage.invert().multiply(spec.outputAmount.quotient).quotient.toString()
-    } else {
-      // EXACT_OUTPUT: slippage on input side
-      maxAmountIn = onePlusSlippage.multiply(spec.inputAmount.quotient).quotient.toString()
-      minAmountOut = spec.outputAmount.quotient.toString()
-    }
+    const maxAmountIn = isExactInput ? spec.amount.quotient.toString() : slippageAdjustedQuote
+    const minAmountOut = isExactInput ? slippageAdjustedQuote : spec.amount.quotient.toString()
 
     // --- SAFETY: SDK-owned ---
 

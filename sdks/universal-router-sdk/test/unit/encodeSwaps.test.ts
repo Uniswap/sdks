@@ -217,12 +217,12 @@ describe('SwapRouter.encodeSwaps', () => {
 
   describe('EXACT_INPUT: ERC20 -> ERC20', () => {
     it('wraps swap steps with permit2 transfer and sweep', () => {
-      const intent: SwapSpecification = {
+      const spec: SwapSpecification = {
         tradeType: TradeType.EXACT_INPUT,
         inputToken: USDC,
         outputToken: WETH,
-        inputAmount: CurrencyAmount.fromRawAmount(USDC, '1000000'),
-        outputAmount: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+        amount: CurrencyAmount.fromRawAmount(USDC, '1000000'),
+        quote: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
         slippageTolerance: new Percent(50, 10_000), // 0.5%
       }
 
@@ -237,7 +237,7 @@ describe('SwapRouter.encodeSwaps', () => {
         },
       ]
 
-      const result = SwapRouter.encodeSwaps(intent, swapSteps)
+      const result = SwapRouter.encodeSwaps(spec, swapSteps)
       expect(result.calldata).to.be.a('string')
       expect(result.value).to.equal('0x00')
 
@@ -252,12 +252,12 @@ describe('SwapRouter.encodeSwaps', () => {
 
   describe('EXACT_INPUT: Native ETH -> ERC20', () => {
     it('wraps with WRAP_ETH and SWEEP', () => {
-      const intent: SwapSpecification = {
+      const spec: SwapSpecification = {
         tradeType: TradeType.EXACT_INPUT,
         inputToken: ETH,
         outputToken: USDC,
-        inputAmount: CurrencyAmount.fromRawAmount(ETH, '1000000000000000000'),
-        outputAmount: CurrencyAmount.fromRawAmount(USDC, '2000000000'),
+        amount: CurrencyAmount.fromRawAmount(ETH, '1000000000000000000'),
+        quote: CurrencyAmount.fromRawAmount(USDC, '2000000000'),
         slippageTolerance: new Percent(50, 10_000),
       }
 
@@ -272,7 +272,7 @@ describe('SwapRouter.encodeSwaps', () => {
         },
       ]
 
-      const result = SwapRouter.encodeSwaps(intent, swapSteps)
+      const result = SwapRouter.encodeSwaps(spec, swapSteps)
       expect(BigNumber.from(result.value).gt(0)).to.be.true
 
       const decoded = SwapRouter.INTERFACE.decodeFunctionData('execute(bytes,bytes[])', result.calldata)
@@ -284,12 +284,12 @@ describe('SwapRouter.encodeSwaps', () => {
 
   describe('EXACT_INPUT: ERC20 -> Native ETH', () => {
     it('uses UNWRAP_WETH for output', () => {
-      const intent: SwapSpecification = {
+      const spec: SwapSpecification = {
         tradeType: TradeType.EXACT_INPUT,
         inputToken: USDC,
         outputToken: ETH,
-        inputAmount: CurrencyAmount.fromRawAmount(USDC, '2000000000'),
-        outputAmount: CurrencyAmount.fromRawAmount(ETH, '1000000000000000000'),
+        amount: CurrencyAmount.fromRawAmount(USDC, '2000000000'),
+        quote: CurrencyAmount.fromRawAmount(ETH, '1000000000000000000'),
         slippageTolerance: new Percent(50, 10_000),
       }
 
@@ -304,7 +304,7 @@ describe('SwapRouter.encodeSwaps', () => {
         },
       ]
 
-      const result = SwapRouter.encodeSwaps(intent, swapSteps)
+      const result = SwapRouter.encodeSwaps(spec, swapSteps)
 
       const decoded = SwapRouter.INTERFACE.decodeFunctionData('execute(bytes,bytes[])', result.calldata)
       const commands = decoded.commands as string
@@ -315,12 +315,12 @@ describe('SwapRouter.encodeSwaps', () => {
 
   describe('EXACT_OUTPUT: ERC20 -> ERC20', () => {
     it('adds refund sweep for excess input', () => {
-      const intent: SwapSpecification = {
+      const spec: SwapSpecification = {
         tradeType: TradeType.EXACT_OUTPUT,
         inputToken: USDC,
         outputToken: WETH,
-        inputAmount: CurrencyAmount.fromRawAmount(USDC, '1000000'),
-        outputAmount: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+        amount: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+        quote: CurrencyAmount.fromRawAmount(USDC, '1000000'),
         slippageTolerance: new Percent(50, 10_000),
       }
 
@@ -335,7 +335,7 @@ describe('SwapRouter.encodeSwaps', () => {
         },
       ]
 
-      const result = SwapRouter.encodeSwaps(intent, swapSteps)
+      const result = SwapRouter.encodeSwaps(spec, swapSteps)
 
       const decoded = SwapRouter.INTERFACE.decodeFunctionData('execute(bytes,bytes[])', result.calldata)
       const commands = decoded.commands as string
@@ -346,12 +346,12 @@ describe('SwapRouter.encodeSwaps', () => {
 
   describe('EXACT_OUTPUT: Native ETH -> ERC20', () => {
     it('refunds excess ETH via UNWRAP_WETH', () => {
-      const intent: SwapSpecification = {
+      const spec: SwapSpecification = {
         tradeType: TradeType.EXACT_OUTPUT,
         inputToken: ETH,
         outputToken: USDC,
-        inputAmount: CurrencyAmount.fromRawAmount(ETH, '1000000000000000000'),
-        outputAmount: CurrencyAmount.fromRawAmount(USDC, '2000000000'),
+        amount: CurrencyAmount.fromRawAmount(USDC, '2000000000'),
+        quote: CurrencyAmount.fromRawAmount(ETH, '1000000000000000000'),
         slippageTolerance: new Percent(50, 10_000),
       }
 
@@ -366,7 +366,7 @@ describe('SwapRouter.encodeSwaps', () => {
         },
       ]
 
-      const result = SwapRouter.encodeSwaps(intent, swapSteps)
+      const result = SwapRouter.encodeSwaps(spec, swapSteps)
 
       const decoded = SwapRouter.INTERFACE.decodeFunctionData('execute(bytes,bytes[])', result.calldata)
       const commands = decoded.commands as string
@@ -389,12 +389,12 @@ describe('SwapRouter.encodeSwaps', () => {
         signature: '0x' + '00'.repeat(65),
       }
 
-      const intent: SwapSpecification = {
+      const spec: SwapSpecification = {
         tradeType: TradeType.EXACT_INPUT,
         inputToken: USDC,
         outputToken: WETH,
-        inputAmount: CurrencyAmount.fromRawAmount(USDC, '1000000'),
-        outputAmount: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+        amount: CurrencyAmount.fromRawAmount(USDC, '1000000'),
+        quote: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
         slippageTolerance: new Percent(50, 10_000),
         permit: mockPermit,
       }
@@ -410,7 +410,7 @@ describe('SwapRouter.encodeSwaps', () => {
         },
       ]
 
-      const result = SwapRouter.encodeSwaps(intent, swapSteps)
+      const result = SwapRouter.encodeSwaps(spec, swapSteps)
 
       const decoded = SwapRouter.INTERFACE.decodeFunctionData('execute(bytes,bytes[])', result.calldata)
       const commands = decoded.commands as string
@@ -422,12 +422,12 @@ describe('SwapRouter.encodeSwaps', () => {
 
   describe('with deadline', () => {
     it('encodes execute with deadline', () => {
-      const intent: SwapSpecification = {
+      const spec: SwapSpecification = {
         tradeType: TradeType.EXACT_INPUT,
         inputToken: USDC,
         outputToken: WETH,
-        inputAmount: CurrencyAmount.fromRawAmount(USDC, '1000000'),
-        outputAmount: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+        amount: CurrencyAmount.fromRawAmount(USDC, '1000000'),
+        quote: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
         slippageTolerance: new Percent(50, 10_000),
         deadline: 1700000000,
       }
@@ -443,7 +443,7 @@ describe('SwapRouter.encodeSwaps', () => {
         },
       ]
 
-      const result = SwapRouter.encodeSwaps(intent, swapSteps)
+      const result = SwapRouter.encodeSwaps(spec, swapSteps)
       // Should decode with deadline variant
       const decoded = SwapRouter.INTERFACE.decodeFunctionData('execute(bytes,bytes[],uint256)', result.calldata)
       expect(decoded.deadline).to.not.be.undefined

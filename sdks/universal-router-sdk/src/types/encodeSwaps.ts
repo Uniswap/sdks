@@ -11,8 +11,8 @@ export type SwapSpecification = {
   tradeType: TradeType
   inputToken: Currency
   outputToken: Currency
-  inputAmount: CurrencyAmount<Currency> // exact for EXACT_INPUT, max for EXACT_OUTPUT
-  outputAmount: CurrencyAmount<Currency> // expected for EXACT_INPUT, exact for EXACT_OUTPUT
+  amount: CurrencyAmount<Currency> // the exact/fixed amount (input for EXACT_INPUT, output for EXACT_OUTPUT)
+  quote: CurrencyAmount<Currency> // the routing estimate (slippage applied to derive min/max)
   slippageTolerance: Percent
   recipient?: string // defaults to SENDER_AS_RECIPIENT
   permit?: Permit2Permit
