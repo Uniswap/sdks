@@ -6,7 +6,7 @@ import { v4ActionToParams } from '../../src/utils/encodeV4Action'
 import { RoutePlanner } from '../../src/utils/routerCommands'
 import { encodeSwapStep } from '../../src/utils/encodeSwapStep'
 import { SwapRouter } from '../../src/swapRouter'
-import { SwapIntent } from '../../src/types/encodeSwaps'
+import { SwapSpecification } from '../../src/types/encodeSwaps'
 import {
   V4Settle,
   V4Take,
@@ -218,7 +218,7 @@ describe('SwapRouter.encodeSwaps', () => {
 
   describe('EXACT_INPUT: ERC20 -> ERC20', () => {
     it('wraps swap steps with permit2 transfer and sweep', () => {
-      const intent: SwapIntent = {
+      const intent: SwapSpecification = {
         tradeType: TradeType.EXACT_INPUT,
         inputToken: USDC,
         outputToken: WETH,
@@ -253,7 +253,7 @@ describe('SwapRouter.encodeSwaps', () => {
 
   describe('EXACT_INPUT: Native ETH -> ERC20', () => {
     it('wraps with WRAP_ETH and SWEEP', () => {
-      const intent: SwapIntent = {
+      const intent: SwapSpecification = {
         tradeType: TradeType.EXACT_INPUT,
         inputToken: ETH,
         outputToken: USDC,
@@ -285,7 +285,7 @@ describe('SwapRouter.encodeSwaps', () => {
 
   describe('EXACT_INPUT: ERC20 -> Native ETH', () => {
     it('uses UNWRAP_WETH for output', () => {
-      const intent: SwapIntent = {
+      const intent: SwapSpecification = {
         tradeType: TradeType.EXACT_INPUT,
         inputToken: USDC,
         outputToken: ETH,
@@ -316,7 +316,7 @@ describe('SwapRouter.encodeSwaps', () => {
 
   describe('EXACT_OUTPUT: ERC20 -> ERC20', () => {
     it('adds refund sweep for excess input', () => {
-      const intent: SwapIntent = {
+      const intent: SwapSpecification = {
         tradeType: TradeType.EXACT_OUTPUT,
         inputToken: USDC,
         outputToken: WETH,
@@ -347,7 +347,7 @@ describe('SwapRouter.encodeSwaps', () => {
 
   describe('EXACT_OUTPUT: Native ETH -> ERC20', () => {
     it('refunds excess ETH via UNWRAP_WETH', () => {
-      const intent: SwapIntent = {
+      const intent: SwapSpecification = {
         tradeType: TradeType.EXACT_OUTPUT,
         inputToken: ETH,
         outputToken: USDC,
@@ -390,7 +390,7 @@ describe('SwapRouter.encodeSwaps', () => {
         signature: '0x' + '00'.repeat(65),
       }
 
-      const intent: SwapIntent = {
+      const intent: SwapSpecification = {
         tradeType: TradeType.EXACT_INPUT,
         inputToken: USDC,
         outputToken: WETH,
@@ -423,7 +423,7 @@ describe('SwapRouter.encodeSwaps', () => {
 
   describe('with deadline', () => {
     it('encodes execute with deadline', () => {
-      const intent: SwapIntent = {
+      const intent: SwapSpecification = {
         tradeType: TradeType.EXACT_INPUT,
         inputToken: USDC,
         outputToken: WETH,

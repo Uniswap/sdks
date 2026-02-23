@@ -17,7 +17,7 @@ export type { Permit2Permit } from './utils/inputTokens'
 export { NONCE_SKIP_CHECK, generateNonce, EXECUTE_SIGNED_TYPES, getUniversalRouterDomain } from './utils/eip712'
 export { URVersion } from '@uniswap/v4-sdk'
 export type {
-  SwapIntent,
+  SwapSpecification,
   SwapStep,
   V2SwapExactIn,
   V2SwapExactOut,

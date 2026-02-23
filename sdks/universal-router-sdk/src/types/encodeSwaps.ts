@@ -7,7 +7,7 @@ export type { PoolKey, PathKey }
 
 // === Intent (SDK-owned safety metadata) ===
 
-export type SwapIntent = {
+export type SwapSpecification = {
   tradeType: TradeType
   inputToken: Currency
   outputToken: Currency

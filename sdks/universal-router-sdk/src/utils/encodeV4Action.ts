@@ -1,5 +1,5 @@
 import { Actions, URVersion } from '@uniswap/v4-sdk'
-import { V4Action, V4SwapExactIn, V4SwapExactOut } from '../types/encodeSwaps'
+import { V4Action } from '../types/encodeSwaps'
 
 // Derive name→enum mapping from Actions enum (numeric enums have reverse mappings,
 // so filter to only the string keys). Stays in sync when v4-sdk adds new actions.
@@ -18,19 +18,17 @@ export function v4ActionToParams(
   if (action === undefined) throw new Error(`Unknown V4 action: ${v4Action.action}`)
 
   switch (v4Action.action) {
-    case 'SWAP_EXACT_IN': {
-      const a = v4Action as V4SwapExactIn
-      const struct: any = {
-        currencyIn: a.currencyIn,
-        path: a.path,
-        amountIn: a.amountIn,
-        amountOutMinimum: a.amountOutMinimum,
+    case 'SWAP_EXACT_IN':
+      return {
+        action,
+        params: [{
+          currencyIn: v4Action.currencyIn,
+          path: v4Action.path,
+          amountIn: v4Action.amountIn,
+          amountOutMinimum: v4Action.amountOutMinimum,
+          ...(urVersion === URVersion.V2_1 && { maxHopSlippage: v4Action.maxHopSlippage ?? [] }),
+        }],
       }
-      if (urVersion === URVersion.V2_1) {
-        struct.maxHopSlippage = a.maxHopSlippage ?? []
-      }
-      return { action, params: [struct] }
-    }
     case 'SWAP_EXACT_IN_SINGLE':
       return {
         action,
@@ -44,19 +42,17 @@ export function v4ActionToParams(
           },
         ],
       }
-    case 'SWAP_EXACT_OUT': {
-      const a = v4Action as V4SwapExactOut
-      const struct: any = {
-        currencyOut: a.currencyOut,
-        path: a.path,
-        amountOut: a.amountOut,
-        amountInMaximum: a.amountInMaximum,
+    case 'SWAP_EXACT_OUT':
+      return {
+        action,
+        params: [{
+          currencyOut: v4Action.currencyOut,
+          path: v4Action.path,
+          amountOut: v4Action.amountOut,
+          amountInMaximum: v4Action.amountInMaximum,
+          ...(urVersion === URVersion.V2_1 && { maxHopSlippage: v4Action.maxHopSlippage ?? [] }),
+        }],
       }
-      if (urVersion === URVersion.V2_1) {
-        struct.maxHopSlippage = a.maxHopSlippage ?? []
-      }
-      return { action, params: [struct] }
-    }
     case 'SWAP_EXACT_OUT_SINGLE':
       return {
         action,
