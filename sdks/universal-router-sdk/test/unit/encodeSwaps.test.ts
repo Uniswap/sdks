@@ -6,8 +6,8 @@ import { v4ActionToParams } from '../../src/utils/encodeV4Action'
 import { RoutePlanner } from '../../src/utils/routerCommands'
 import { encodeSwapStep } from '../../src/utils/encodeSwapStep'
 import { SwapRouter } from '../../src/swapRouter'
-import { SwapSpecification } from '../../src/types/encodeSwaps'
 import {
+  SwapSpecification,
   V4Settle,
   V4Take,
   V4SwapExactIn,
@@ -214,7 +214,6 @@ describe('SwapRouter.encodeSwaps', () => {
   const USDC = new Token(1, '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', 6, 'USDC')
   const WETH = new Token(1, '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', 18, 'WETH')
   const ETH = Ether.onChain(1)
-  const ROUTER = '0x0000000000000000000000000000000000000002'
 
   describe('EXACT_INPUT: ERC20 -> ERC20', () => {
     it('wraps swap steps with permit2 transfer and sweep', () => {
@@ -230,7 +229,7 @@ describe('SwapRouter.encodeSwaps', () => {
       const swapSteps = [
         {
           type: 'V3_SWAP_EXACT_IN' as const,
-          recipient: ROUTER,
+          recipient: ROUTER_AS_RECIPIENT,
           amountIn: '1000000',
           amountOutMin: '0',
           path: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB480001f4C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
@@ -265,7 +264,7 @@ describe('SwapRouter.encodeSwaps', () => {
       const swapSteps = [
         {
           type: 'V3_SWAP_EXACT_IN' as const,
-          recipient: ROUTER,
+          recipient: ROUTER_AS_RECIPIENT,
           amountIn: '1000000000000000000',
           amountOutMin: '0',
           path: '0xabcdef',
@@ -297,7 +296,7 @@ describe('SwapRouter.encodeSwaps', () => {
       const swapSteps = [
         {
           type: 'V3_SWAP_EXACT_IN' as const,
-          recipient: ROUTER,
+          recipient: ROUTER_AS_RECIPIENT,
           amountIn: '2000000000',
           amountOutMin: '0',
           path: '0xabcdef',
@@ -328,7 +327,7 @@ describe('SwapRouter.encodeSwaps', () => {
       const swapSteps = [
         {
           type: 'V3_SWAP_EXACT_OUT' as const,
-          recipient: ROUTER,
+          recipient: ROUTER_AS_RECIPIENT,
           amountOut: '500000000000000000',
           amountInMax: '1005000',
           path: '0xabcdef',
@@ -359,7 +358,7 @@ describe('SwapRouter.encodeSwaps', () => {
       const swapSteps = [
         {
           type: 'V3_SWAP_EXACT_OUT' as const,
-          recipient: ROUTER,
+          recipient: ROUTER_AS_RECIPIENT,
           amountOut: '2000000000',
           amountInMax: '1005000000000000000',
           path: '0xabcdef',
@@ -403,7 +402,7 @@ describe('SwapRouter.encodeSwaps', () => {
       const swapSteps = [
         {
           type: 'V3_SWAP_EXACT_IN' as const,
-          recipient: ROUTER,
+          recipient: ROUTER_AS_RECIPIENT,
           amountIn: '1000000',
           amountOutMin: '0',
           path: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB480001f4C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
@@ -436,7 +435,7 @@ describe('SwapRouter.encodeSwaps', () => {
       const swapSteps = [
         {
           type: 'V3_SWAP_EXACT_IN' as const,
-          recipient: ROUTER,
+          recipient: ROUTER_AS_RECIPIENT,
           amountIn: '1000000',
           amountOutMin: '0',
           path: '0xabcdef',

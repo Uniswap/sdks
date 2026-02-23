@@ -241,7 +241,7 @@ export abstract class SwapRouter {
    * Encodes swap steps from routing into Universal Router calldata,
    * wrapped in a safety envelope (permit, token pull, slippage sweep).
    *
-   * @param intent The swap intent with safety metadata (tokens, amounts, slippage)
+   * @param spec The swap specification with safety metadata (tokens, amounts, slippage)
    * @param swapSteps Routing's swap commands as typed SwapStep objects
    * @returns Method parameters (calldata + value) for the Universal Router
    */

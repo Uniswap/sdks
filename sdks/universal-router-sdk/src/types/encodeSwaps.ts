@@ -5,7 +5,7 @@ import { type PoolKey, type PathKey, URVersion } from '@uniswap/v4-sdk'
 
 export type { PoolKey, PathKey }
 
-// === Intent (SDK-owned safety metadata) ===
+// === Specification (SDK-owned safety metadata) ===
 
 export type SwapSpecification = {
   tradeType: TradeType
