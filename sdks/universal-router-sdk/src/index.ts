@@ -7,6 +7,7 @@ export type { CommandDefinition, ParamType } from './utils/routerCommands'
 export {
   UNIVERSAL_ROUTER_CREATION_BLOCK,
   UNIVERSAL_ROUTER_ADDRESS,
+  SWAP_PROXY_ADDRESS,
   ROUTER_AS_RECIPIENT,
   WETH_ADDRESS,
   UniversalRouterVersion,
