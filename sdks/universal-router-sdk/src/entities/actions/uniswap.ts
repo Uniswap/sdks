@@ -50,6 +50,8 @@ export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit'> & {
   safeMode?: boolean
   maxHopSlippage?: BigNumber[] // Optional per-hop slippage protection for V4 routes (UR 2.1+)
   urVersion?: URVersion // Universal Router version for encoding (defaults to V2_0 for backward compatibility)
+  useProxy?: boolean // When true, encode for SwapProxy (no-Permit2 approve+swap flow). Requires explicit recipient and chainId.
+  chainId?: number // Required when useProxy is true, used to resolve UR address for the proxy
 }
 
 const REFUND_ETH_PRICE_IMPACT_THRESHOLD = new Percent(50, 100)
@@ -66,10 +68,20 @@ export class UniswapTrade implements Command {
   readonly tradeType: RouterActionType = RouterActionType.UniswapTrade
   readonly payerIsUser: boolean
 
-  constructor(public trade: RouterTrade<Currency, Currency, TradeType>, public options: SwapOptions) {
+  constructor(
+    public trade: RouterTrade<Currency, Currency, TradeType>,
+    public options: SwapOptions
+  ) {
     if (!!options.fee && !!options.flatFee) throw new Error('Only one fee option permitted')
 
-    if (this.inputRequiresWrap || this.inputRequiresUnwrap || this.options.useRouterBalance) {
+    if (options.useProxy) {
+      if (!options.recipient || options.recipient === SENDER_AS_RECIPIENT) {
+        throw new Error(
+          'Explicit recipient address required when using SwapProxy (SENDER_AS_RECIPIENT resolves to proxy)'
+        )
+      }
+      this.payerIsUser = false
+    } else if (this.inputRequiresWrap || this.inputRequiresUnwrap || this.options.useRouterBalance) {
       this.payerIsUser = false
     } else {
       this.payerIsUser = true
@@ -197,12 +209,15 @@ export class UniswapTrade implements Command {
         this.trade.maximumAmountIn(this.options.slippageTolerance).quotient.toString(),
       ])
     } else if (this.inputRequiresUnwrap) {
-      // send wrapped token to router to unwrap
-      planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [
-        (this.trade.inputAmount.currency as Token).address,
-        ROUTER_AS_RECIPIENT,
-        this.trade.maximumAmountIn(this.options.slippageTolerance).quotient.toString(),
-      ])
+      if (!this.options.useProxy) {
+        // send wrapped token to router to unwrap via Permit2
+        planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [
+          (this.trade.inputAmount.currency as Token).address,
+          ROUTER_AS_RECIPIENT,
+          this.trade.maximumAmountIn(this.options.slippageTolerance).quotient.toString(),
+        ])
+      }
+      // In proxy mode, the proxy already transferred tokens to the UR; just unwrap
       planner.addCommand(CommandType.UNWRAP_WETH, [ROUTER_AS_RECIPIENT, 0])
     }
     // The overall recipient at the end of the trade, SENDER_AS_RECIPIENT uses the msg.sender
@@ -424,7 +439,7 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
 
   v4Planner.addTake(
     pathOutputForTake,
-    routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient ?? SENDER_AS_RECIPIENT
+    routerMustCustody ? ROUTER_AS_RECIPIENT : (options.recipient ?? SENDER_AS_RECIPIENT)
   )
   planner.addCommand(CommandType.V4_SWAP, [v4Planner.finalize()])
 }
@@ -441,7 +456,7 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
   const route = swap.route as MixedRoute<TInput, TOutput>
   const inputAmount = swap.inputAmount
   const outputAmount = swap.outputAmount
-  const tradeRecipient = routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient ?? SENDER_AS_RECIPIENT
+  const tradeRecipient = routerMustCustody ? ROUTER_AS_RECIPIENT : (options.recipient ?? SENDER_AS_RECIPIENT)
 
   // single hop, so it can be reduced to plain swap logic for one protocol version
   if (route.pools.length === 1) {
