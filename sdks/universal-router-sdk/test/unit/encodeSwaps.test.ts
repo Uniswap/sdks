@@ -1,5 +1,6 @@
 import { expect } from 'chai'
 import { BigNumber } from 'ethers'
+import { defaultAbiCoder } from 'ethers/lib/utils'
 import { Actions, URVersion } from '@uniswap/v4-sdk'
 import { CurrencyAmount, Ether, Token, TradeType, Percent } from '@uniswap/sdk-core'
 import { v4ActionToParams } from '../../src/utils/encodeV4Action'
@@ -25,7 +26,6 @@ describe('encodeV4Action', () => {
         action: 'SETTLE',
         currency: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
         amount: '1000000',
-        payerIsUser: false,
       }
       const result = v4ActionToParams(action)
       expect(result.action).to.equal(Actions.SETTLE)
@@ -119,7 +119,6 @@ describe('encodeSwapStep', () => {
         '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
         '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
       ],
-      payerIsUser: false,
     }
     encodeSwapStep(planner, step)
     expect(planner.commands).to.equal('0x08')
@@ -133,11 +132,26 @@ describe('encodeSwapStep', () => {
       amountIn: '1000000',
       amountOutMin: '0',
       path: '0xabcdef',
-      payerIsUser: false,
     }
     encodeSwapStep(planner, step)
     expect(planner.commands).to.equal('0x00')
     expect(planner.inputs).to.have.length(1)
+  })
+
+  it('hardcodes payerIsUser to false in V3_SWAP_EXACT_IN output', () => {
+    const step: V3SwapExactIn = {
+      type: 'V3_SWAP_EXACT_IN',
+      recipient: ROUTER_AS_RECIPIENT,
+      amountIn: '1000000',
+      amountOutMin: '0',
+      path: '0xabcdef',
+    }
+    encodeSwapStep(planner, step)
+    const decoded = defaultAbiCoder.decode(
+      ['address', 'uint256', 'uint256', 'bytes', 'bool'],
+      planner.inputs[0]
+    )
+    expect(decoded[4]).to.equal(false)
   })
 
   it('encodes V4_SWAP with actions', () => {
@@ -148,7 +162,6 @@ describe('encodeSwapStep', () => {
           action: 'SETTLE' as const,
           currency: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
           amount: '1000000',
-          payerIsUser: false,
         },
         {
           action: 'SWAP_EXACT_IN' as const,
@@ -201,7 +214,6 @@ describe('encodeSwapStep', () => {
       amountIn: '1000000',
       amountOutMin: '0',
       path: '0xabcdef',
-      payerIsUser: false,
     }
     encodeSwapStep(planner, step1)
     encodeSwapStep(planner, step2)
@@ -233,7 +245,6 @@ describe('SwapRouter.encodeSwaps', () => {
           amountIn: '1000000',
           amountOutMin: '0',
           path: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB480001f4C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
-          payerIsUser: false,
         },
       ]
 
@@ -268,7 +279,6 @@ describe('SwapRouter.encodeSwaps', () => {
           amountIn: '1000000000000000000',
           amountOutMin: '0',
           path: '0xabcdef',
-          payerIsUser: false,
         },
       ]
 
@@ -300,7 +310,6 @@ describe('SwapRouter.encodeSwaps', () => {
           amountIn: '2000000000',
           amountOutMin: '0',
           path: '0xabcdef',
-          payerIsUser: false,
         },
       ]
 
@@ -331,7 +340,6 @@ describe('SwapRouter.encodeSwaps', () => {
           amountOut: '500000000000000000',
           amountInMax: '1005000',
           path: '0xabcdef',
-          payerIsUser: false,
         },
       ]
 
@@ -362,7 +370,6 @@ describe('SwapRouter.encodeSwaps', () => {
           amountOut: '2000000000',
           amountInMax: '1005000000000000000',
           path: '0xabcdef',
-          payerIsUser: false,
         },
       ]
 
@@ -406,7 +413,6 @@ describe('SwapRouter.encodeSwaps', () => {
           amountIn: '1000000',
           amountOutMin: '0',
           path: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB480001f4C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
-          payerIsUser: false,
         },
       ]
 
@@ -439,7 +445,6 @@ describe('SwapRouter.encodeSwaps', () => {
           amountIn: '1000000',
           amountOutMin: '0',
           path: '0xabcdef',
-          payerIsUser: false,
         },
       ]
 

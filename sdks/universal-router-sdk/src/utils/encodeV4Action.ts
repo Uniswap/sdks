@@ -67,7 +67,7 @@ export function v4ActionToParams(
         ],
       }
     case 'SETTLE':
-      return { action, params: [v4Action.currency, v4Action.amount, v4Action.payerIsUser] }
+      return { action, params: [v4Action.currency, v4Action.amount, false] }
     case 'SETTLE_ALL':
       return { action, params: [v4Action.currency, v4Action.maxAmount] }
     case 'SETTLE_PAIR':

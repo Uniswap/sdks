@@ -53,6 +53,7 @@ export function encodeSwapStep(
   if (definition.parser !== Parser.Abi) throw new Error(`Unexpected parser for command: ${step.type}`)
 
   const params = definition.params.map((p) => {
+    if (p.name === 'payerIsUser') return false
     const value = (step as Record<string, unknown>)[p.name]
     if (value === undefined) throw new Error(`Missing field '${p.name}' on swap step type '${step.type}'`)
     return value

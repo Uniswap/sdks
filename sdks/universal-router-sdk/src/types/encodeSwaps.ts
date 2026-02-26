@@ -28,7 +28,6 @@ export type V2SwapExactIn = {
   amountIn: BigNumberish
   amountOutMin: BigNumberish
   path: string[]
-  payerIsUser: boolean
 }
 
 export type V2SwapExactOut = {
@@ -37,7 +36,6 @@ export type V2SwapExactOut = {
   amountOut: BigNumberish
   amountInMax: BigNumberish
   path: string[]
-  payerIsUser: boolean
 }
 
 export type V3SwapExactIn = {
@@ -46,7 +44,6 @@ export type V3SwapExactIn = {
   amountIn: BigNumberish
   amountOutMin: BigNumberish
   path: string
-  payerIsUser: boolean
 }
 
 export type V3SwapExactOut = {
@@ -55,7 +52,6 @@ export type V3SwapExactOut = {
   amountOut: BigNumberish
   amountInMax: BigNumberish
   path: string
-  payerIsUser: boolean
 }
 
 export type V4Swap = {
@@ -127,7 +123,6 @@ export type V4Settle = {
   action: 'SETTLE'
   currency: string
   amount: BigNumberish
-  payerIsUser: boolean
 }
 
 export type V4SettleAll = {
