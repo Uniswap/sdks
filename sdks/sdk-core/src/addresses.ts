@@ -471,7 +471,7 @@ const LINEA_ADDRESSES: ChainAddresses = {
   v4PoolManagerAddress: '0x248083fb965359d82b06c1f5322480dcfc1ad857',
   v4PositionManagerAddress: '0xddcad5775b2816a87495f207731b3571d7ee3c76',
   v4StateView: '0xe861de206e460a8b936b05ad3816520b58ccdf9b',
-  v4QuoterAddress: '0x58ead433ea99708604c4dd7c9b7e80c70976e202',
+  v4QuoterAddress: '0x2c125569c0bee20a66e33e5491c552b37ebd9934',
 }
 
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
