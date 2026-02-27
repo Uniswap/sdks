@@ -467,6 +467,7 @@ const LINEA_ADDRESSES: ChainAddresses = {
   nonfungiblePositionManagerAddress: '0x4615C383F85D0a2BbED973d83ccecf5CB7121463',
   tickLensAddress: '0x3334d83e224aF5ef9C2E7DDA7c7C98Efd9621fA9',
   swapRouter02Address: '0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a',
+  mixedRouteQuoterV2Address: '0xe2023f3fa515cf070e07fd9d51c1d236e07843f4',
 
   v4PoolManagerAddress: '0x248083fb965359d82b06c1f5322480dcfc1ad857',
   v4PositionManagerAddress: '0xddcad5775b2816a87495f207731b3571d7ee3c76',
