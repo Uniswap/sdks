@@ -47,5 +47,10 @@ describe('addresses', () => {
       const address = SWAP_ROUTER_02_ADDRESSES(ChainId.XLAYER)
       expect(address).toEqual('0x4f0c28f5926afda16bf2506d5d9e57ea190f9bca')
     })
+
+    it('should return the correct address for linea', () => {
+      const address = SWAP_ROUTER_02_ADDRESSES(ChainId.LINEA)
+      expect(address).toEqual('0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a')
+    })
   })
 })
