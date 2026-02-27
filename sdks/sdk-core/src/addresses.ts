@@ -462,7 +462,7 @@ const XLAYER_ADDRESSES: ChainAddresses = {
 const LINEA_ADDRESSES: ChainAddresses = {
   v3CoreFactoryAddress: '0x31FAfd4889FA1269F7a13A66eE0fB458f27D72A9',
   multicallAddress: '0x93e253D101519578A8DF0BCe2A43D8292BFb3A1F',
-  quoterAddress: '0x42bE4D6527829FeFA1493e1fb9F3676d2425C3C1',
+  quoterAddress: '0x58ead433ea99708604c4dd7c9b7e80c70976e202',
   v3MigratorAddress: '0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1',
   nonfungiblePositionManagerAddress: '0x4615C383F85D0a2BbED973d83ccecf5CB7121463',
   tickLensAddress: '0x3334d83e224aF5ef9C2E7DDA7c7C98Efd9621fA9',
