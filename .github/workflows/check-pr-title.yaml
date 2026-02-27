@@ -30,3 +30,4 @@ jobs:
       - uses: amannn/action-semantic-pull-request@db6e259b93f286e3416eef27aaae88935d16cf2e # v3.4.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
