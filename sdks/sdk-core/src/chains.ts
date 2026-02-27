@@ -31,6 +31,7 @@ export enum ChainId {
   SONEIUM = 1868,
   MONAD = 143,
   XLAYER = 196,
+  LINEA = 59144,
 }
 
 export const SUPPORTED_CHAINS = [
@@ -64,6 +65,7 @@ export const SUPPORTED_CHAINS = [
   ChainId.SONEIUM,
   ChainId.MONAD,
   ChainId.XLAYER,
+  ChainId.LINEA,
 ] as const
 export type SupportedChainsType = (typeof SUPPORTED_CHAINS)[number]
 
