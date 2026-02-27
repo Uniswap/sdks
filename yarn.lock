@@ -4898,9 +4898,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@uniswap/sdk-core@npm:^7.10.0, @uniswap/sdk-core@npm:^7.10.1, @uniswap/sdk-core@npm:^7.5.0, @uniswap/sdk-core@npm:^7.6.0":
-  version: 7.10.1
-  resolution: "@uniswap/sdk-core@npm:7.10.1"
+"@uniswap/sdk-core@npm:^7.10.0, @uniswap/sdk-core@npm:^7.10.1, @uniswap/sdk-core@npm:^7.11.0, @uniswap/sdk-core@npm:^7.5.0, @uniswap/sdk-core@npm:^7.6.0":
+  version: 7.11.0
+  resolution: "@uniswap/sdk-core@npm:7.11.0"
   dependencies:
     "@ethersproject/address": ^5.0.2
     "@ethersproject/bytes": ^5.7.0
@@ -4911,7 +4911,7 @@ __metadata:
     jsbi: ^3.1.4
     tiny-invariant: ^1.1.0
     toformat: ^2.0.0
-  checksum: fbe11b459d2e3d1813a4ed82ce08fd8d2ba4f6eab5a27cb4fdb28c294f569bfc7e9092a6bbe7b6d31062f01315e907acbe1be71e156ea8edf72b3fc513f697e2
+  checksum: 672d80d9b77b3419054d991cf925f2e79795fb4e5adbddb3a7c3342409141e4bf77fdb563385ee1c304b75dc97d40b8dfbf8cf741a2ec538f2c324153f0dfd16
   languageName: node
   linkType: hard
 
@@ -5172,7 +5172,7 @@ __metadata:
     "@ethersproject/abi": ^5.5.0
     "@ethersproject/solidity": ^5.0.9
     "@types/jest": ^24.0.25
-    "@uniswap/sdk-core": ^7.10.0
+    "@uniswap/sdk-core": ^7.11.0
     "@uniswap/swap-router-contracts": ^1.3.0
     "@uniswap/v3-core": 1.0.0
     "@uniswap/v3-periphery": ^1.1.1
