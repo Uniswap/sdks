@@ -16,3 +16,4 @@ export type { UniversalRouterCommand, UniversalRouterCall, Param, CommandsDefini
 export type { Permit2Permit } from './utils/inputTokens'
 export { NONCE_SKIP_CHECK, generateNonce, EXECUTE_SIGNED_TYPES, getUniversalRouterDomain } from './utils/eip712'
 export { URVersion } from '@uniswap/v4-sdk'
+export * from './types/encodeSwaps'

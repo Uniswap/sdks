@@ -18,12 +18,22 @@ import {
   PoolKey,
 } from '@uniswap/v4-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
-import { Currency, TradeType, Percent, CHAIN_TO_ADDRESSES_MAP, SupportedChainsType } from '@uniswap/sdk-core'
+import {
+  Currency,
+  Token,
+  TradeType,
+  Percent,
+  Fraction,
+  CHAIN_TO_ADDRESSES_MAP,
+  SupportedChainsType,
+} from '@uniswap/sdk-core'
 import { UniswapTrade, SwapOptions } from './entities/actions/uniswap'
 import { AcrossV4DepositV3Params } from './entities/actions/across'
 import { RoutePlanner, CommandType } from './utils/routerCommands'
 import { encodePermit, encodeV3PositionPermit } from './utils/inputTokens'
-import { UNIVERSAL_ROUTER_ADDRESS, UniversalRouterVersion } from './utils/constants'
+import { UNIVERSAL_ROUTER_ADDRESS, UniversalRouterVersion, SENDER_AS_RECIPIENT, ROUTER_AS_RECIPIENT } from './utils/constants'
+import { SwapSpecification, SwapStep } from './types/encodeSwaps'
+import { encodeSwapStep } from './utils/encodeSwapStep'
 import { getUniversalRouterDomain, EXECUTE_SIGNED_TYPES, generateNonce } from './utils/eip712'
 import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
 
@@ -225,6 +235,83 @@ export abstract class SwapRouter {
     ])
 
     return { calldata: signedCalldata, value: nativeCurrencyValue.toHexString() }
+  }
+
+  /**
+   * Encodes swap steps from routing into Universal Router calldata,
+   * wrapped in a safety envelope (permit, token pull, slippage sweep).
+   *
+   * @param spec The swap specification with safety metadata (tokens, amounts, slippage)
+   * @param swapSteps Routing's swap commands as typed SwapStep objects
+   * @returns Method parameters (calldata + value) for the Universal Router
+   */
+  public static encodeSwaps(spec: SwapSpecification, swapSteps: SwapStep[]): MethodParameters {
+    invariant(swapSteps.length > 0, 'EMPTY_SWAP_STEPS')
+
+    const planner = new RoutePlanner()
+    const recipient = spec.recipient ?? SENDER_AS_RECIPIENT
+    const isExactInput = spec.tradeType === TradeType.EXACT_INPUT
+
+    // Compute slippage-adjusted amounts:
+    // `amount` is the exact/fixed side, `quote` is the routing estimate.
+    // Slippage is always applied to `quote` to derive the safety bound.
+    const onePlusSlippage = new Fraction(1).add(spec.slippageTolerance)
+    const slippageAdjustedQuote = isExactInput
+      ? onePlusSlippage.invert().multiply(spec.quote.quotient).quotient.toString() // minAmountOut
+      : onePlusSlippage.multiply(spec.quote.quotient).quotient.toString() // maxAmountIn
+
+    const maxAmountIn = isExactInput ? spec.amount.quotient.toString() : slippageAdjustedQuote
+    const minAmountOut = isExactInput ? slippageAdjustedQuote : spec.amount.quotient.toString()
+
+    // --- SAFETY: SDK-owned ---
+
+    // 1. Permit2 permit (if provided)
+    if (spec.permit) {
+      encodePermit(planner, spec.permit)
+    }
+
+    // 2. Pull input tokens into router
+    if (spec.inputToken.isNative) {
+      planner.addCommand(CommandType.WRAP_ETH, [ROUTER_AS_RECIPIENT, maxAmountIn])
+    } else {
+      planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [
+        (spec.inputToken as Token).address,
+        ROUTER_AS_RECIPIENT,
+        maxAmountIn,
+      ])
+    }
+
+    // --- SWAPS: Routing-owned (typesafe, SDK encodes) ---
+
+    // 3. Encode routing's swap steps
+    for (const step of swapSteps) {
+      encodeSwapStep(planner, step, spec.urVersion)
+    }
+
+    // --- SAFETY: SDK-owned ---
+
+    // 4. Deliver output to user with slippage protection
+    if (spec.outputToken.isNative) {
+      planner.addCommand(CommandType.UNWRAP_WETH, [recipient, minAmountOut])
+    } else {
+      planner.addCommand(CommandType.SWEEP, [(spec.outputToken as Token).address, recipient, minAmountOut])
+    }
+
+    // 5. Refund excess (EXACT_OUTPUT only)
+    if (!isExactInput) {
+      if (spec.inputToken.isNative) {
+        planner.addCommand(CommandType.UNWRAP_WETH, [recipient, 0])
+      } else {
+        planner.addCommand(CommandType.SWEEP, [(spec.inputToken as Token).address, recipient, 0])
+      }
+    }
+
+    // Compute native currency value to send with the transaction
+    const nativeCurrencyValue = spec.inputToken.isNative ? BigNumber.from(maxAmountIn) : BigNumber.from(0)
+
+    return SwapRouter.encodePlan(planner, nativeCurrencyValue, {
+      deadline: spec.deadline ? BigNumber.from(spec.deadline) : undefined,
+    })
   }
 
   /**
