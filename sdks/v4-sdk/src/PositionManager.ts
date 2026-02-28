@@ -438,7 +438,10 @@ export abstract class V4PositionManager {
 
   // Encode a modify liquidities call
   public static encodeModifyLiquidities(unlockData: string, deadline: BigintIsh): string {
-    return V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.MODIFY_LIQUIDITIES, [unlockData, deadline])
+    return V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.MODIFY_LIQUIDITIES, [
+      unlockData,
+      deadline.toString(),
+    ])
   }
 
   // Encode a permit batch call
@@ -460,9 +463,9 @@ export abstract class V4PositionManager {
   ): string {
     return V4PositionManager.INTERFACE.encodeFunctionData(PositionFunctions.ERC721PERMIT_PERMIT, [
       spender,
-      tokenId,
-      deadline,
-      nonce,
+      tokenId.toString(),
+      deadline.toString(),
+      nonce.toString(),
       signature,
     ])
   }
