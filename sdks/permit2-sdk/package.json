@@ -38,7 +38,7 @@
   },
   "devDependencies": {
     "@types/jest": "^24.0.25",
-    "jest": "25.5.0",
+    "jest": "28.0.0",
     "prettier": "^2.4.1",
     "typescript": "^4.3.3"
   },
