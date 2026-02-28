@@ -230,7 +230,7 @@ const SEPOLIA_ADDRESSES: ChainAddresses = {
   swapRouter02Address: '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E',
 
   // TODO: update mixedRouteQuoterV2Address once v4 on sepolia redeployed
-  mixedRouteQuoterV2Address: '0x4745f77b56a0e2294426e3936dc4fab68d9543cd',
+  mixedRouteQuoterV2Address: '0xEB626A8A94BB76ED37AF021CD2FdB960e3eaaE44',
 
   // TODO: update all below once v4 on sepolia redeployed
   v4PoolManagerAddress: '0xE03A1074c86CFeDd5C142C4F04F1a1536e203543',
