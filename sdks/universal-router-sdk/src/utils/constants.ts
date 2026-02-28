@@ -14,6 +14,7 @@ export type RouterConfig = {
 type ChainConfig = {
   weth: string
   routerConfigs: { [key in UniversalRouterVersion]: RouterConfig }
+  swapProxy?: string
 }
 
 const WETH_NOT_SUPPORTED_ON_CHAIN = '0x0000000000000000000000000000000000000000'
@@ -37,6 +38,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 23836348,
       },
     },
+    swapProxy: '0x0000000000000000000000000000000000000000', // TODO: update after SWAP-2046 deployment
   },
   // goerli
   [5]: {
@@ -73,6 +75,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 9664766,
       },
     },
+    swapProxy: '0x0000000000000000000000000000000000000000', // TODO: update after SWAP-2046 deployment
   },
   // polygon
   [137]: {
@@ -91,6 +94,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 79245524,
       },
     },
+    swapProxy: '0x0000000000000000000000000000000000000000', // TODO: update after SWAP-2046 deployment
   },
   //polygon mumbai
   [80001]: {
@@ -127,6 +131,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 143998769,
       },
     },
+    swapProxy: '0x0000000000000000000000000000000000000000', // TODO: update after SWAP-2046 deployment
   },
   // optimism goerli
   [420]: {
@@ -163,6 +168,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 402060097,
       },
     },
+    swapProxy: '0x0000000000000000000000000000000000000000', // TODO: update after SWAP-2046 deployment
   },
   // arbitrum goerli
   [421613]: {
@@ -289,6 +295,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 38404211,
       },
     },
+    swapProxy: '0x0000000000000000000000000000000000000000', // TODO: update after SWAP-2046 deployment
   },
   // blast
   [81457]: {
@@ -395,6 +402,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 32850661,
       },
     },
+    swapProxy: '0x0000000000000000000000000000000000000000', // TODO: update after SWAP-2046 deployment
   },
   [10143]: {
     weth: '0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701',
@@ -503,6 +511,13 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
 export const UNIVERSAL_ROUTER_ADDRESS = (version: UniversalRouterVersion, chainId: number): string => {
   if (!(chainId in CHAIN_CONFIGS)) throw new Error(`Universal Router not deployed on chain ${chainId}`)
   return CHAIN_CONFIGS[chainId].routerConfigs[version].address
+}
+
+export const SWAP_PROXY_ADDRESS = (chainId: number): string => {
+  if (!(chainId in CHAIN_CONFIGS)) throw new Error(`SwapProxy not deployed on chain ${chainId}`)
+  const proxy = CHAIN_CONFIGS[chainId].swapProxy
+  if (!proxy) throw new Error(`SwapProxy not configured for chain ${chainId}`)
+  return proxy
 }
 
 export const UNIVERSAL_ROUTER_CREATION_BLOCK = (version: UniversalRouterVersion, chainId: number): number => {
