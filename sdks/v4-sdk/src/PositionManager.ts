@@ -60,11 +60,6 @@ export interface MintSpecificOptions {
    * Initial price to set on the pool if creating
    */
   sqrtPriceX96?: BigintIsh
-
-  /**
-   * Whether the mint is part of a migration from V3 to V4.
-   */
-  migrate?: boolean
 }
 
 /**
@@ -114,21 +109,15 @@ export interface CollectSpecificOptions {
   recipient: string
 }
 
-export interface TransferOptions {
+export interface MigrateSpecificOptions {
   /**
-   * The account sending the NFT.
+   * The additional amount of currency0 that needs to be transferred if needed
    */
-  sender: string
-
+  additionalAmount0: BigintIsh
   /**
-   * The account that should receive the NFT.
+   * The additional amount of currency1 that needs to be transferred if needed
    */
-  recipient: string
-
-  /**
-   * The id of the token being sent.
-   */
-  tokenId: BigintIsh
+  additionalAmount1: BigintIsh
 }
 
 export interface PermitDetails {
@@ -183,9 +172,10 @@ export interface NFTPermitData {
 }
 
 export type MintOptions = CommonOptions & CommonAddLiquidityOptions & MintSpecificOptions
+export type MigrateOptions = CommonOptions & CommonAddLiquidityOptions & MintSpecificOptions & MigrateSpecificOptions
 export type IncreaseLiquidityOptions = CommonOptions & CommonAddLiquidityOptions & ModifyPositionSpecificOptions
 
-export type AddLiquidityOptions = MintOptions | IncreaseLiquidityOptions
+export type AddLiquidityOptions = MintOptions | IncreaseLiquidityOptions | MigrateOptions
 
 export type RemoveLiquidityOptions = CommonOptions & RemoveLiquiditySpecificOptions & ModifyPositionSpecificOptions
 
@@ -194,6 +184,10 @@ export type CollectOptions = CommonOptions & CollectSpecificOptions
 // type guard
 function isMint(options: AddLiquidityOptions): options is MintOptions {
   return Object.keys(options).some((k) => k === 'recipient')
+}
+
+function isMigrate(options: AddLiquidityOptions): options is MigrateOptions {
+  return Object.keys(options).some((k) => k === 'additionalAmount0')
 }
 
 function shouldCreatePool(options: MintOptions): boolean {
@@ -284,9 +278,11 @@ export abstract class V4PositionManager {
 
     let value: string = toHex(0)
 
+    let needToSendEth = isMigrate(options) && options.useNative && options.additionalAmount0 > '0'
+
     // If migrating, we need to settle and sweep both currencies individually
-    if (isMint(options) && options.migrate) {
-      if (options.useNative) {
+    if (isMigrate(options)) {
+      if (options.useNative && !needToSendEth) {
         // unwrap the exact amount needed to send to the pool manager
         planner.addUnwrap(OPEN_DELTA)
         // payer is v4 position manager
