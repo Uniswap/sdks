@@ -227,8 +227,13 @@ export abstract class V4PositionManager {
      * Cases:
      * - if pool does not exist yet, encode initializePool
      * then,
-     * - if is mint, encode MINT_POSITION. If migrating, encode a SETTLE and SWEEP for both currencies. Else, encode a SETTLE_PAIR. If on a NATIVE pool, encode a SWEEP.
+     * - if is mint, encode MINT_POSITION.
+     *    - If migrating into a native pool, encode an UNWRAP, SETTLE on the unwrapped currency and other currency, and a SWEEP on both currencies.
+     *    - If migrating into a non-native pool, encode a SETTLE on both currencies and a SWEEP on both currencies.
+     *        - when migrating, the recipient of the SWEEP is the recipient of the minted NFT. It is not the caller since that is the universal router.
+     *    - If not migrating, encode a SETTLE_PAIR. If it is on a NATIVE pool, encode a SWEEP.
      * - else, encode INCREASE_LIQUIDITY and SETTLE_PAIR. If it is on a NATIVE pool, encode a SWEEP.
+     *    - when not migrating, the recipient of the SWEEP is the caller of the transaction
      */
     invariant(JSBI.greaterThan(position.liquidity, ZERO), ZERO_LIQUIDITY)
 
@@ -293,14 +298,14 @@ export abstract class V4PositionManager {
         planner.addSettle(position.pool.currency0, false)
         planner.addSettle(position.pool.currency1, false)
         // sweep any leftover wrapped native that was not unwrapped
-        // recipient will be same as the v4 lp token recipient
+        // recipient will be same as the v4 lp token recipient since the msg.sender is the universal router
         planner.addSweep(position.pool.currency0.wrapped, options.recipient)
         planner.addSweep(position.pool.currency1, options.recipient)
       } else {
         // payer is v4 position manager
         planner.addSettle(position.pool.currency0, false)
         planner.addSettle(position.pool.currency1, false)
-        // recipient will be same as the v4 lp token recipient
+        // recipient will be same as the v4 lp token recipient since the msg.sender is the universal router
         planner.addSweep(position.pool.currency0, options.recipient)
         planner.addSweep(position.pool.currency1, options.recipient)
       }
