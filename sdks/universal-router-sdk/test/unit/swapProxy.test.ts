@@ -1,74 +1,21 @@
 import { expect } from 'chai'
-import JSBI from 'jsbi'
-import { BigNumber, utils } from 'ethers'
+import { BigNumber } from 'ethers'
 import { Interface } from '@ethersproject/abi'
-import {
-  Trade as V3Trade,
-  Pool as V3Pool,
-  Route as V3Route,
-  FeeAmount,
-  nearestUsableTick,
-  TickMath,
-  TICK_SPACINGS,
-} from '@uniswap/v3-sdk'
+import { Trade as V3Trade, Pool as V3Pool, Route as V3Route } from '@uniswap/v3-sdk'
 import { Pool as V4Pool, Route as V4Route, Trade as V4Trade } from '@uniswap/v4-sdk'
-import { CurrencyAmount, Ether, Token, TradeType, Percent } from '@uniswap/sdk-core'
+import { CurrencyAmount, Token, TradeType, Percent } from '@uniswap/sdk-core'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
 import { SwapRouter } from '../../src/swapRouter'
 import { UniswapTrade, SwapOptions, TokenTransferMode } from '../../src/entities/actions/uniswap'
-import {
-  SENDER_AS_RECIPIENT,
-  ZERO_ADDRESS,
-  UNIVERSAL_ROUTER_ADDRESS,
-  UniversalRouterVersion,
-} from '../../src/utils/constants'
-import { encodeSqrtRatioX96 } from '@uniswap/v3-sdk'
+import { SENDER_AS_RECIPIENT, UNIVERSAL_ROUTER_ADDRESS, UniversalRouterVersion } from '../../src/utils/constants'
+import { ETHER, WETH, USDC, makeV3Pool, makeV4Pool } from '../utils/uniswapData'
 
-const ETHER = Ether.onChain(1)
-const WETH = new Token(1, '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', 18, 'WETH', 'Wrapped Ether')
-const USDC = new Token(1, '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', 6, 'USDC', 'USD Coin')
 const TEST_RECIPIENT = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 
 const PROXY_ABI = [
   'function execute(address router, address token, uint256 amount, bytes commands, bytes[] inputs, uint256 deadline) external payable',
 ]
 const PROXY_INTERFACE = new Interface(PROXY_ABI)
-
-function makeV4Pool(tokenA: any, tokenB: any, fee: FeeAmount = FeeAmount.MEDIUM): V4Pool {
-  const liquidity = JSBI.BigInt(utils.parseEther('1000000').toString())
-  const tickSpacing = 60
-  const ticks = [
-    {
-      index: nearestUsableTick(TickMath.MIN_TICK, tickSpacing),
-      liquidityNet: liquidity,
-      liquidityGross: liquidity,
-    },
-    {
-      index: nearestUsableTick(TickMath.MAX_TICK, tickSpacing),
-      liquidityNet: JSBI.multiply(liquidity, JSBI.BigInt('-1')),
-      liquidityGross: liquidity,
-    },
-  ]
-  return new V4Pool(tokenA, tokenB, fee, tickSpacing, ZERO_ADDRESS, encodeSqrtRatioX96(1, 1), liquidity, 0, ticks)
-}
-
-function makeV3Pool(tokenA: Token, tokenB: Token, fee: FeeAmount = FeeAmount.MEDIUM): V3Pool {
-  const liquidity = JSBI.BigInt(utils.parseEther('1000000').toString())
-  const tickSpacing = TICK_SPACINGS[fee]
-  const ticks = [
-    {
-      index: nearestUsableTick(TickMath.MIN_TICK, tickSpacing),
-      liquidityNet: liquidity,
-      liquidityGross: liquidity,
-    },
-    {
-      index: nearestUsableTick(TickMath.MAX_TICK, tickSpacing),
-      liquidityNet: JSBI.multiply(liquidity, JSBI.BigInt('-1')),
-      liquidityGross: liquidity,
-    },
-  ]
-  return new V3Pool(tokenA, tokenB, fee, encodeSqrtRatioX96(1, 1), liquidity, 0, ticks)
-}
 
 function buildV4Trade(
   pool: V4Pool,
