@@ -30,7 +30,7 @@ import { Currency, TradeType, Token, CurrencyAmount, Percent } from '@uniswap/sd
 import { Command, RouterActionType, TradeConfig } from '../Command'
 import { SENDER_AS_RECIPIENT, ROUTER_AS_RECIPIENT, CONTRACT_BALANCE, ETH_ADDRESS } from '../../utils/constants'
 import { getCurrencyAddress } from '../../utils/getCurrencyAddress'
-import { encodeFeeBips } from '../../utils/numbers'
+import { encodeFee1e18 } from '../../utils/numbers'
 import { BigNumber, BigNumberish } from 'ethers'
 import { TPool } from '@uniswap/router-sdk'
 
@@ -249,13 +249,19 @@ export class UniswapTrade implements Command {
       // If there is a fee, that percentage is sent to the fee recipient
       // In the case where ETH is the output currency, the fee is taken in WETH (for gas reasons)
       if (!!this.options.fee) {
-        const feeBips = encodeFeeBips(this.options.fee.fee)
-        planner.addCommand(CommandType.PAY_PORTION, [pathOutputCurrencyAddress, this.options.fee.recipient, feeBips])
+        const fee1e18 = encodeFee1e18(this.options.fee.fee)
+        planner.addCommand(CommandType.PAY_PORTION_FULL_PRECISION, [
+          pathOutputCurrencyAddress,
+          this.options.fee.recipient,
+          fee1e18,
+        ])
 
         // If the trade is exact output, and a fee was taken, we must adjust the amount out to be the amount after the fee
         // Otherwise we continue as expected with the trade's normal expected output
         if (this.trade.tradeType === TradeType.EXACT_OUTPUT) {
-          minimumAmountOut = minimumAmountOut.sub(minimumAmountOut.mul(feeBips).div(10000))
+          minimumAmountOut = minimumAmountOut.sub(
+            minimumAmountOut.mul(fee1e18).div(BigNumber.from(10).pow(18))
+          )
         }
       }
 

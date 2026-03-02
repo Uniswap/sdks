@@ -121,6 +121,22 @@ describe('Command Parser', () => {
       },
     },
     {
+      input: new RoutePlanner().addCommand(CommandType.PAY_PORTION_FULL_PRECISION, [addressOne, addressTwo, amount]),
+      result: {
+        commands: [
+          {
+            commandName: 'PAY_PORTION_FULL_PRECISION',
+            commandType: CommandType.PAY_PORTION_FULL_PRECISION,
+            params: [
+              { name: 'token', value: addressOne },
+              { name: 'recipient', value: addressTwo },
+              { name: 'portion', value: amount },
+            ],
+          },
+        ],
+      },
+    },
+    {
       input: new RoutePlanner().addCommand(CommandType.BALANCE_CHECK_ERC20, [addressOne, addressTwo, amount]),
       result: {
         commands: [
