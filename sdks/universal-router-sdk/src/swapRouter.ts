@@ -67,7 +67,7 @@ function isMint(options: V4AddLiquidityOptions): options is MintOptions {
 
 const UR_VERSION_MAP: Record<string, UniversalRouterVersion> = {
   [URVersion.V2_0]: UniversalRouterVersion.V2_0,
-  [URVersion.V2_1]: UniversalRouterVersion.V2_1,
+  // [URVersion.V2_1_1]: UniversalRouterVersion.V2_1_1, -- See next PR
 }
 
 function toUniversalRouterVersion(urVersion?: URVersion): UniversalRouterVersion | undefined {
