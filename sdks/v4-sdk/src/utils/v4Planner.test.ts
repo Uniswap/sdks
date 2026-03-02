@@ -8,7 +8,7 @@ import { Route } from '../entities/route'
 import { encodeRouteToPath } from './encodeRouteToPath'
 import { ADDRESS_ZERO, FEE_AMOUNT_MEDIUM, TICK_SPACING_TEN, ONE_ETHER, NEGATIVE_ONE } from '../internalConstants'
 
-import { Actions, V4Planner, V4_BASE_ACTIONS_ABI_DEFINITION, V4_SWAP_ACTIONS_V2_1, URVersion } from './v4Planner'
+import { Actions, V4Planner, V4_BASE_ACTIONS_ABI_DEFINITION, V4_SWAP_ACTIONS_V2_1_1, URVersion } from './v4Planner'
 
 const { defaultAbiCoder } = utils
 
@@ -103,14 +103,14 @@ describe('RouterPlanner', () => {
             amountOutMinimum: 0,
           },
         ],
-        URVersion.V2_1
+        URVersion.V2_1_1
       )
 
       expect(planner.actions).toEqual('0x07')
 
       // Decode with V2.1 ABI to verify maxHopSlippage values
       const decoded = defaultAbiCoder.decode(
-        V4_SWAP_ACTIONS_V2_1[Actions.SWAP_EXACT_IN].map((v) => v.type),
+        V4_SWAP_ACTIONS_V2_1_1[Actions.SWAP_EXACT_IN].map((v) => v.type),
         planner.params[0]
       )
 
@@ -136,14 +136,14 @@ describe('RouterPlanner', () => {
             amountInMaximum: ONE_ETHER_BN.mul(2).toString(),
           },
         ],
-        URVersion.V2_1
+        URVersion.V2_1_1
       )
 
       expect(planner.actions).toEqual('0x09')
 
       // Decode with V2.1 ABI to verify maxHopSlippage values
       const decoded = defaultAbiCoder.decode(
-        V4_SWAP_ACTIONS_V2_1[Actions.SWAP_EXACT_OUT].map((v) => v.type),
+        V4_SWAP_ACTIONS_V2_1_1[Actions.SWAP_EXACT_OUT].map((v) => v.type),
         planner.params[0]
       )
 
@@ -319,13 +319,13 @@ describe('RouterPlanner', () => {
       const maxHopSlippage = [BigNumber.from('10000'), BigNumber.from('20000')]
 
       // V2.1 includes maxHopSlippage
-      planner.addTrade(trade, undefined, maxHopSlippage, URVersion.V2_1)
+      planner.addTrade(trade, undefined, maxHopSlippage, URVersion.V2_1_1)
 
       expect(planner.actions).toEqual('0x07')
 
       // Decode the params to verify the maxHopSlippage values (V2.1 ABI)
       const decoded = defaultAbiCoder.decode(
-        V4_SWAP_ACTIONS_V2_1[Actions.SWAP_EXACT_IN].map((v) => v.type),
+        V4_SWAP_ACTIONS_V2_1_1[Actions.SWAP_EXACT_IN].map((v) => v.type),
         planner.params[0]
       )
 
@@ -348,13 +348,13 @@ describe('RouterPlanner', () => {
       const maxHopSlippage = [BigNumber.from('10000'), BigNumber.from('20000')]
 
       // V2.1 includes maxHopSlippage
-      planner.addTrade(trade, slippageTolerance, maxHopSlippage, URVersion.V2_1)
+      planner.addTrade(trade, slippageTolerance, maxHopSlippage, URVersion.V2_1_1)
 
       expect(planner.actions).toEqual('0x09')
 
       // Decode the params to verify the maxHopSlippage values (V2.1 ABI)
       const decoded = defaultAbiCoder.decode(
-        V4_SWAP_ACTIONS_V2_1[Actions.SWAP_EXACT_OUT].map((v) => v.type),
+        V4_SWAP_ACTIONS_V2_1_1[Actions.SWAP_EXACT_OUT].map((v) => v.type),
         planner.params[0]
       )
 
@@ -373,13 +373,13 @@ describe('RouterPlanner', () => {
       )
 
       // Using V2.1 with no maxHopSlippage provided defaults to empty array
-      planner.addTrade(trade, undefined, undefined, URVersion.V2_1)
+      planner.addTrade(trade, undefined, undefined, URVersion.V2_1_1)
 
       expect(planner.actions).toEqual('0x07')
 
       // Decode the params to verify the maxHopSlippage is empty array (V2.1 ABI)
       const decoded = defaultAbiCoder.decode(
-        V4_SWAP_ACTIONS_V2_1[Actions.SWAP_EXACT_IN].map((v) => v.type),
+        V4_SWAP_ACTIONS_V2_1_1[Actions.SWAP_EXACT_IN].map((v) => v.type),
         planner.params[0]
       )
 
