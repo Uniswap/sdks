@@ -16,3 +16,9 @@ export function expandTo18Decimals(n: number): JSBI {
 export function encodeFeeBips(fee: Percent): string {
   return toHex(fee.multiply(10_000).quotient)
 }
+
+const FULL_PRECISION = JSBI.exponentiate(JSBI.BigInt(10), JSBI.BigInt(18))
+
+export function encodeFee1e18(fee: Percent): string {
+  return toHex(fee.multiply(FULL_PRECISION).quotient)
+}
