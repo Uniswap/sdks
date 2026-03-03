@@ -4794,7 +4794,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/v3-sdk@workspace:*, @uniswap/v3-sdk@workspace:^, @uniswap/v3-sdk@workspace:sdks/v3-sdk":
+"@uniswap/v3-sdk@workspace:^, @uniswap/v3-sdk@workspace:sdks/v3-sdk":
   version: 0.0.0-use.local
   resolution: "@uniswap/v3-sdk@workspace:sdks/v3-sdk"
   dependencies:
@@ -4843,7 +4843,7 @@ __metadata:
     "@types/node": ^18.7.16
     "@types/node-fetch": ^2.6.2
     "@uniswap/sdk-core": "workspace:^"
-    "@uniswap/v3-sdk": "workspace:*"
+    "@uniswap/v3-sdk": "workspace:^"
     chai: ^4.3.6
     dotenv: ^16.0.3
     eslint: ^8.57.0

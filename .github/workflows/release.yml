@@ -42,7 +42,7 @@ jobs:
 
       - name: Create Release Pull Request or Publish
         id: changesets
-        uses: changesets/action@v1
+        uses: changesets/action@70b8f42bea198d6c9323eb37781844e8498e3766 # v1
         with:
           version: yarn version-packages
           publish: yarn g:release
