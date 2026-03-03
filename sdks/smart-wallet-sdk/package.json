@@ -23,7 +23,7 @@
     "build:cjs": "tsc -p tsconfig.cjs.json",
     "build:esm": "tsc -p tsconfig.esm.json",
     "build:types": "tsc -p tsconfig.types.json",
-    "release": "semantic-release",
+    "release": "changeset publish",
     "lint": "eslint src --ext .ts",
     "test": "jest"
   },
@@ -36,7 +36,7 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@uniswap/sdk-core": "^7.6.0",
+    "@uniswap/sdk-core": "workspace:^",
     "viem": "^2.23.5"
   },
   "devDependencies": {
@@ -64,34 +64,5 @@
   "publishConfig": {
     "access": "public",
     "provenance": true
-  },
-  "release": {
-    "extends": "semantic-release-monorepo",
-    "branches": [
-      {
-        "name": "main",
-        "prerelease": false
-      }
-    ],
-    "plugins": [
-      [
-        "@semantic-release/commit-analyzer",
-        {
-          "preset": "angular",
-          "releaseRules": "../../publishing/release-rules.cjs"
-        }
-      ],
-      "@semantic-release/release-notes-generator",
-      "@semantic-release/npm",
-      "@semantic-release/github",
-      [
-        "@semantic-release/exec",
-        {
-          "successCmd": "git restore yarn.lock && yarn",
-          "failCmd": "git restore yarn.lock && yarn",
-          "execCwd": "../.."
-        }
-      ]
-    ]
   }
 }
