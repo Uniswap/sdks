@@ -4898,9 +4898,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@uniswap/sdk-core@npm:^7.10.0, @uniswap/sdk-core@npm:^7.11.0, @uniswap/sdk-core@npm:^7.12.0, @uniswap/sdk-core@npm:^7.5.0, @uniswap/sdk-core@npm:^7.6.0":
-  version: 7.12.0
-  resolution: "@uniswap/sdk-core@npm:7.12.0"
+"@uniswap/sdk-core@npm:^7.10.0, @uniswap/sdk-core@npm:^7.11.0, @uniswap/sdk-core@npm:^7.12.0, @uniswap/sdk-core@npm:^7.12.1, @uniswap/sdk-core@npm:^7.5.0, @uniswap/sdk-core@npm:^7.6.0":
+  version: 7.12.1
+  resolution: "@uniswap/sdk-core@npm:7.12.1"
   dependencies:
     "@ethersproject/address": ^5.0.2
     "@ethersproject/bytes": ^5.7.0
@@ -4911,7 +4911,7 @@ __metadata:
     jsbi: ^3.1.4
     tiny-invariant: ^1.1.0
     toformat: ^2.0.0
-  checksum: c92d128f16fe9d9e98c6d473b88ddb63dd7b6f1ba383de53cd5ef803525e3fa5185a82b624cf15b8df313219a0c83edaa11723872d33e1dca7a4e3215d8955b4
+  checksum: 17d382abe9e3fdd398128d38ec2aad9dff487f7006d121d7ddf1e5f45b882a08dba18dd714fa963dbe8f32879a2694030c90e299a846591fd8b288707486e40e
   languageName: node
   linkType: hard
 
@@ -5104,7 +5104,7 @@ __metadata:
     "@ethersproject/solidity": ^5.0.9
     "@types/big.js": ^4.0.5
     "@types/jest": ^24.0.25
-    "@uniswap/sdk-core": ^7.12.0
+    "@uniswap/sdk-core": ^7.12.1
     "@uniswap/v2-core": ^1.0.1
     eslint: ^8.57.0
     eslint-config-prettier: ^9.1.0
@@ -5172,7 +5172,7 @@ __metadata:
     "@ethersproject/abi": ^5.5.0
     "@ethersproject/solidity": ^5.0.9
     "@types/jest": ^24.0.25
-    "@uniswap/sdk-core": ^7.12.0
+    "@uniswap/sdk-core": ^7.12.1
     "@uniswap/swap-router-contracts": ^1.3.0
     "@uniswap/v3-core": 1.0.0
     "@uniswap/v3-periphery": ^1.1.1
