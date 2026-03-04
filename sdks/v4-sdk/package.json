@@ -1,5 +1,6 @@
 {
   "name": "@uniswap/v4-sdk",
+  "version": "1.29.1",
   "description": "⚒️ An SDK for building applications on top of Uniswap V4",
   "repository": "https://github.com/Uniswap/sdks.git",
   "keywords": [
@@ -19,15 +20,14 @@
   "scripts": {
     "build": "tsdx build",
     "lint": "eslint 'src/**/*.{js,ts,tsx}' --max-warnings 0",
-    "release": "semantic-release",
     "start": "tsdx watch",
     "test": "tsdx test"
   },
   "sideEffects": false,
   "dependencies": {
     "@ethersproject/solidity": "^5.0.9",
-    "@uniswap/sdk-core": "^7.12.1",
-    "@uniswap/v3-sdk": "3.29.1",
+    "@uniswap/sdk-core": "workspace:^",
+    "@uniswap/v3-sdk": "workspace:*",
     "tiny-invariant": "^1.1.0",
     "tiny-warning": "^1.0.3"
   },
@@ -66,34 +66,5 @@
   "publishConfig": {
     "access": "public",
     "provenance": true
-  },
-  "release": {
-    "extends": "semantic-release-monorepo",
-    "branches": [
-      {
-        "name": "main",
-        "prerelease": false
-      }
-    ],
-    "plugins": [
-      [
-        "@semantic-release/commit-analyzer",
-        {
-          "preset": "angular",
-          "releaseRules": "../../publishing/release-rules.cjs"
-        }
-      ],
-      "@semantic-release/release-notes-generator",
-      "@semantic-release/npm",
-      "@semantic-release/github",
-      [
-        "@semantic-release/exec",
-        {
-          "successCmd": "git restore yarn.lock && yarn",
-          "failCmd": "git restore yarn.lock && yarn",
-          "execCwd": "../.."
-        }
-      ]
-    ]
   }
 }
