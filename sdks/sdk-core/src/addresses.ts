@@ -63,6 +63,8 @@ export const V2_FACTORY_ADDRESSES: AddressMap = {
   [ChainId.SONEIUM]: '0x97febbc2adbd5644ba22736e962564b23f5828ce',
   [ChainId.MONAD]: '0x182a927119d56008d921126764bf884221b10f59',
   [ChainId.XLAYER]: '0xdf38f24fe153761634be942f9d859f3dba857e95',
+  [ChainId.LINEA]: '0x114A43DF6C5f54EBB8A9d70Cd1951D3dD68004c7',
+  [ChainId.TEMPO]: '0xf9ec577a4e45b5278bb7cf60fcbc20c3acaef68f',
 }
 /**
  * @deprecated use V2_ROUTER_ADDRESSES instead
@@ -87,6 +89,8 @@ export const V2_ROUTER_ADDRESSES: AddressMap = {
   [ChainId.SONEIUM]: '0x273f68c234fa55b550b40e563c4a488e0d334320',
   [ChainId.MONAD]: '0x4b2ab38dbf28d31d467aa8993f6c2585981d6804',
   [ChainId.XLAYER]: '0x182a927119d56008d921126764bf884221b10f59',
+  [ChainId.LINEA]: '0x8702463e73f74d0b6765abceb314ef07acb92650',
+  [ChainId.TEMPO]: '0x0fbac3c46f6f83b44c7fb4ea986d7309c701d73e',
 }
 
 // Networks that share most of the same addresses i.e. Mainnet, Goerli, Optimism, Arbitrum, Polygon
@@ -457,6 +461,38 @@ const XLAYER_ADDRESSES: ChainAddresses = {
   v4QuoterAddress: '0x8928074ca1b241d8ec02815881c1af11e8bc5219',
 }
 
+const LINEA_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: '0x31FAfd4889FA1269F7a13A66eE0fB458f27D72A9',
+  multicallAddress: '0x93e253D101519578A8DF0BCe2A43D8292BFb3A1F',
+  quoterAddress: '0x58ead433ea99708604c4dd7c9b7e80c70976e202',
+  v3MigratorAddress: '0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1',
+  nonfungiblePositionManagerAddress: '0x4615C383F85D0a2BbED973d83ccecf5CB7121463',
+  tickLensAddress: '0x3334d83e224aF5ef9C2E7DDA7c7C98Efd9621fA9',
+  swapRouter02Address: '0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a',
+  mixedRouteQuoterV2Address: '0xe2023f3fa515cf070e07fd9d51c1d236e07843f4',
+
+  v4PoolManagerAddress: '0x248083fb965359d82b06c1f5322480dcfc1ad857',
+  v4PositionManagerAddress: '0xddcad5775b2816a87495f207731b3571d7ee3c76',
+  v4StateView: '0xe861de206e460a8b936b05ad3816520b58ccdf9b',
+  v4QuoterAddress: '0x2c125569c0bee20a66e33e5491c552b37ebd9934',
+}
+
+const TEMPO_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: '0x24a3d4757e330890a8b8978028c9e58e04611fd6',
+  multicallAddress: '0x64eb6294fd6072b2c20d31a54e39d5d3bf69d982',
+  quoterAddress: '0x53ab5d7a69db158f621b43ee70423da1e1403c2a',
+  v3MigratorAddress: '0x2352328bd3313549d6d908646c82c2b7136901a9',
+  nonfungiblePositionManagerAddress: '0xb71c33f096ceabdc0229110e0d76a6382d01c633',
+  tickLensAddress: '0x95cb27f323a03b03528096a527ee75704db28ef5',
+  swapRouter02Address: '0x7e9d53081e961201837336bcd81f52ae92691a8f',
+  mixedRouteQuoterV2Address: '0x741abcaeb95da1b0766c8db7819bb6c4fed27e3d',
+
+  v4PoolManagerAddress: '0x33620f62c5b9b2086dd6b62f4a297a9f30347029',
+  v4PositionManagerAddress: '0x3fc79444f8eacc1894775493ff3fa41f1e35ce11',
+  v4StateView: '0x21b954fba3f5ddebe77ef2d47a3100c066908b2a',
+  v4QuoterAddress: '0x20e6487c371a2086f841ef453f85378223df4f4e',
+}
+
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
   [ChainId.MAINNET]: MAINNET_ADDRESSES,
   [ChainId.OPTIMISM]: OPTIMISM_ADDRESSES,
@@ -488,6 +524,8 @@ export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses>
   [ChainId.SONEIUM]: SONEIUM_ADDRESSES,
   [ChainId.MONAD]: MONAD_ADDRESSES,
   [ChainId.XLAYER]: XLAYER_ADDRESSES,
+  [ChainId.LINEA]: LINEA_ADDRESSES,
+  [ChainId.TEMPO]: TEMPO_ADDRESSES,
 }
 
 /* V3 Contract Addresses */
