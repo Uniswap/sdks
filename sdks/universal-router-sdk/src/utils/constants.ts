@@ -506,6 +506,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 1,
       },
     },
+    swapProxy: '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9',
   },
   // tempo
   [4217]: {
@@ -524,6 +525,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 1,
       },
     },
+    swapProxy: '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9',
   },
   // xlayer
   [196]: {
