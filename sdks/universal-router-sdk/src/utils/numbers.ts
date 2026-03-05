@@ -17,8 +17,8 @@ export function encodeFeeBips(fee: Percent): string {
   return toHex(fee.multiply(10_000).quotient)
 }
 
-const FULL_PRECISION = JSBI.exponentiate(JSBI.BigInt(10), JSBI.BigInt(18))
+const FULL_PORTION_PRECISION = JSBI.exponentiate(JSBI.BigInt(10), JSBI.BigInt(18))
 
 export function encodeFee1e18(fee: Percent): string {
-  return toHex(fee.multiply(FULL_PRECISION).quotient)
+  return toHex(fee.multiply(FULL_PORTION_PRECISION).quotient)
 }
