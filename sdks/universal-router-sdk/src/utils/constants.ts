@@ -464,6 +464,58 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       },
     },
   },
+  [59144]: {
+    weth: '0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f',
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: '0x0000000000000000000000000000000000000000',
+        creationBlock: 1,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: '0x661e93cca42afacb172121ef892830ca3b70f08d',
+        creationBlock: 1,
+      },
+      [UniversalRouterVersion.V2_1]: {
+        address: '0xba548ce7a95f87bc66a0c7c6eab1e428735f8b57',
+        creationBlock: 1,
+      },
+    },
+  },
+  // tempo
+  [4217]: {
+    weth: WETH_NOT_SUPPORTED_ON_CHAIN,
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: '0x0000000000000000000000000000000000000000',
+        creationBlock: 1,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: '0x1febb76be10aaf3a1402f04e8e835f2c382f7914',
+        creationBlock: 1,
+      },
+      [UniversalRouterVersion.V2_1]: {
+        address: '0xa2dc7d0266f0cc50b3eeaf36c9bfcecff1beea91',
+        creationBlock: 1,
+      },
+    },
+  },
+  [196]: {
+    weth: '0xe538905cf8410324e03A5A23C1c177a474D59b2b',
+    routerConfigs: {
+      [UniversalRouterVersion.V1_2]: {
+        address: '0x0000000000000000000000000000000000000000',
+        creationBlock: 1,
+      },
+      [UniversalRouterVersion.V2_0]: {
+        address: '0x5507749f2c558bb3e162c6e90c314c092e7372ff',
+        creationBlock: 47680350,
+      },
+      [UniversalRouterVersion.V2_1]: {
+        address: '0x0000000000000000000000000000000000000000',
+        creationBlock: 1,
+      },
+    },
+  },
 }
 
 export const UNIVERSAL_ROUTER_ADDRESS = (version: UniversalRouterVersion, chainId: number): string => {

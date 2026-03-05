@@ -1,11 +1,15 @@
 # universal-router-sdk
+
 This SDK facilitates interactions with the contracts in [Universal Router](https://github.com/Uniswap/universal-router)
 
 ## Usage
+
 Install latest version of universal-router-sdk. Then import the corresponding Trade class and Data object for each protocol you'd like to interact with.
 
 ### Trading on Uniswap
+
 warning: `swapERC20CallParameters()` to be deprecated in favor of `swapCallParameters()`
+
 ```typescript
 import { TradeType } from '@uniswap/sdk-core'
 import { Trade as V2TradeSDK } from '@uniswap/v2-sdk'
@@ -19,14 +23,17 @@ const { calldata, value } = SwapRouter.swapCallParameters(routerTrade, options)
 ```
 
 ## Running this package
+
 Make sure you are running `node v18`
 Install dependencies and run typescript unit tests
+
 ```bash
 yarn install
 yarn test:hardhat
 ```
 
 Run forge integration tests
+
 ```bash
 forge install
 yarn test:forge
@@ -62,10 +69,12 @@ const { calldata, value } = SwapRouter.swapCallParameters(trade, swapOptions)
 ### Price Calculation
 
 The slippage is expressed as a **price** with 18 decimals of precision:
+
 - **For Exact Input**: `price = amountIn * 1e18 / amountOut`
 - **For Exact Output**: `price = amountIn * 1e18 / amountOut`
 
 If the calculated price exceeds `maxHopSlippage[i]`, the transaction will revert with:
+
 - `V4TooLittleReceivedPerHop` for exact input swaps
 - `V4TooMuchRequestedPerHop` for exact output swaps
 
