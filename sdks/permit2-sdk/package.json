@@ -33,12 +33,12 @@
     "test": "jest"
   },
   "dependencies": {
-    "ethers": "^5.7.0",
+    "ethers": "^6.0.0",
     "tiny-invariant": "^1.1.0"
   },
   "devDependencies": {
     "@types/jest": "^24.0.25",
-    "jest": "25.5.0",
+    "jest": "28.0.0",
     "prettier": "^2.4.1",
     "typescript": "^4.3.3"
   },
