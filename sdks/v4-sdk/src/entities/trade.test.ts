@@ -86,6 +86,11 @@ describe('Trade', () => {
     CurrencyAmount.fromRawAmount(token0, JSBI.BigInt(100000))
   )
 
+  const pool_weth_eth = v2StylePool(
+    CurrencyAmount.fromRawAmount(ETHER, JSBI.BigInt(100000)),
+    CurrencyAmount.fromRawAmount(weth, JSBI.BigInt(100000))
+  )
+
   describe('#fromRoute', () => {
     it('can be constructed with ETHER as input', async () => {
       const trade = await Trade.fromRoute(
@@ -164,6 +169,24 @@ describe('Trade', () => {
       )
       expect(trade.inputAmount.currency).toEqual(token0)
       expect(trade.outputAmount.currency).toEqual(ETHER)
+    })
+    it('can be constructed with ETHER as output for exact output with ETH-WETH pool', async () => {
+      const trade = await Trade.fromRoute(
+        new Route([pool_eth_0, pool_weth_eth], token0, ETHER),
+        CurrencyAmount.fromRawAmount(ETHER, 10000),
+        TradeType.EXACT_OUTPUT
+      )
+      expect(trade.inputAmount.currency).toEqual(token0)
+      expect(trade.outputAmount.currency).toEqual(ETHER)
+    })
+    it('can be constructed with weth as output for exact output with ETH-WETH pool', async () => {
+      const trade = await Trade.fromRoute(
+        new Route([pool_weth_0, pool_weth_eth], token0, weth),
+        CurrencyAmount.fromRawAmount(weth, 10000),
+        TradeType.EXACT_OUTPUT
+      )
+      expect(trade.inputAmount.currency).toEqual(token0)
+      expect(trade.outputAmount.currency).toEqual(weth)
     })
   })
 

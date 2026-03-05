@@ -14,3 +14,5 @@ node_modules
 
 # spec workflow mcp from Uniswap
 .spec-workflow/
+.vercel
+.env*.local
