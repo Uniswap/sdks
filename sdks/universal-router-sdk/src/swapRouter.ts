@@ -16,6 +16,7 @@ import {
   MintOptions,
   Pool as V4Pool,
   PoolKey,
+  URVersion,
 } from '@uniswap/v4-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
 import { Currency, TradeType, Percent, CHAIN_TO_ADDRESSES_MAP, SupportedChainsType } from '@uniswap/sdk-core'
@@ -64,8 +65,24 @@ function isMint(options: V4AddLiquidityOptions): options is MintOptions {
   return Object.keys(options).some((k) => k === 'recipient')
 }
 
+const UR_VERSION_MAP: Record<string, UniversalRouterVersion> = {
+  [URVersion.V2_0]: UniversalRouterVersion.V2_0,
+  [URVersion.V2_1]: UniversalRouterVersion.V2_1,
+}
+
+function toUniversalRouterVersion(urVersion?: URVersion): UniversalRouterVersion | undefined {
+  if (urVersion === undefined) return undefined
+  const mapped = UR_VERSION_MAP[urVersion]
+  if (!mapped) throw new Error(`Unsupported URVersion: ${urVersion}`)
+  return mapped
+}
+
 export abstract class SwapRouter {
   public static INTERFACE: Interface = new Interface(UniversalRouter.abi)
+
+  public static PROXY_INTERFACE: Interface = new Interface([
+    'function execute(address router, address token, uint256 amount, bytes calldata commands, bytes[] calldata inputs, uint256 deadline) external',
+  ])
 
   public static swapCallParameters(
     trades: RouterTrade<Currency, Currency, TradeType>,
@@ -78,10 +95,17 @@ export abstract class SwapRouter {
     const trade: UniswapTrade = new UniswapTrade(trades, options)
 
     const inputCurrency = trade.trade.inputAmount.currency
-    invariant(!(inputCurrency.isNative && !!options.inputTokenPermit), 'NATIVE_INPUT_PERMIT')
 
-    if (options.inputTokenPermit) {
-      encodePermit(planner, options.inputTokenPermit)
+    if (options.useProxy) {
+      invariant(!inputCurrency.isNative, 'PROXY_NATIVE_INPUT: SwapProxy only supports ERC20 input')
+      invariant(!!options.chainId, 'PROXY_MISSING_CHAIN_ID: chainId required when useProxy is true')
+      invariant(!options.inputTokenPermit, 'PROXY_PERMIT_CONFLICT: Permit2 not used with SwapProxy')
+    } else {
+      invariant(!(inputCurrency.isNative && !!options.inputTokenPermit), 'NATIVE_INPUT_PERMIT')
+
+      if (options.inputTokenPermit) {
+        encodePermit(planner, options.inputTokenPermit)
+      }
     }
 
     const nativeCurrencyValue = inputCurrency.isNative
@@ -95,6 +119,10 @@ export abstract class SwapRouter {
       for (const bridge of bridgeOptions) {
         planner.addAcrossBridge(bridge)
       }
+    }
+
+    if (options.useProxy) {
+      return SwapRouter.encodeProxyPlan(planner, trade, options)
     }
 
     return SwapRouter.encodePlan(planner, nativeCurrencyValue, {
@@ -349,5 +377,32 @@ export abstract class SwapRouter {
     const parameters = !!config.deadline ? [commands, inputs, config.deadline] : [commands, inputs]
     const calldata = SwapRouter.INTERFACE.encodeFunctionData(functionSignature, parameters)
     return { calldata, value: nativeCurrencyValue.toHexString() }
+  }
+
+  /**
+   * Encodes a planned route into calldata targeting the SwapProxy contract.
+   * The proxy pulls ERC20 tokens from the user into the UR, then executes commands.
+   */
+  private static encodeProxyPlan(planner: RoutePlanner, trade: UniswapTrade, options: SwapOptions): MethodParameters {
+    const { commands, inputs } = planner
+
+    const urVersion = toUniversalRouterVersion(options.urVersion) ?? UniversalRouterVersion.V2_0
+    const routerAddress = UNIVERSAL_ROUTER_ADDRESS(urVersion, options.chainId!)
+    const inputToken = (trade.trade.inputAmount.currency as { address: string }).address
+    const inputAmount = BigNumber.from(trade.trade.maximumAmountIn(options.slippageTolerance).quotient.toString())
+    const deadline = options.deadlineOrPreviousBlockhash
+      ? BigNumber.from(options.deadlineOrPreviousBlockhash)
+      : BigNumber.from(Math.floor(Date.now() / 1000) + 1800) // 30 min default
+
+    const calldata = SwapRouter.PROXY_INTERFACE.encodeFunctionData('execute', [
+      routerAddress,
+      inputToken,
+      inputAmount,
+      commands,
+      inputs,
+      deadline,
+    ])
+
+    return { calldata, value: BigNumber.from(0).toHexString() }
   }
 }
