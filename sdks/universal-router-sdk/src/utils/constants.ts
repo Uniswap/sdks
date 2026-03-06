@@ -18,6 +18,7 @@ type ChainConfig = {
 }
 
 const WETH_NOT_SUPPORTED_ON_CHAIN = '0x0000000000000000000000000000000000000000'
+const SWAP_PROXY_DEPLOY_ADDRESS = '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9'
 
 // Todo: Change `CHAIN_CONFIGS` to pull the UR address with v4
 export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
@@ -38,7 +39,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 23836348,
       },
     },
-    swapProxy: '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9',
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // goerli
   [5]: {
@@ -75,7 +76,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 9664766,
       },
     },
-    swapProxy: '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9',
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // polygon
   [137]: {
@@ -94,7 +95,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 79245524,
       },
     },
-    swapProxy: '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9',
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   //polygon mumbai
   [80001]: {
@@ -131,7 +132,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 143998769,
       },
     },
-    swapProxy: '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9',
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // optimism goerli
   [420]: {
@@ -168,7 +169,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 402060097,
       },
     },
-    swapProxy: '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9',
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // arbitrum goerli
   [421613]: {
@@ -205,7 +206,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 51696199,
       },
     },
-    swapProxy: '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9',
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // celo alfajores
   [44787]: {
@@ -242,7 +243,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 68794488,
       },
     },
-    swapProxy: '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9',
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // avalanche
   [43114]: {
@@ -261,7 +262,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 72254439,
       },
     },
-    swapProxy: '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9',
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // base goerli
   [84531]: {
@@ -298,7 +299,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 38404211,
       },
     },
-    swapProxy: '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9',
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // blast
   [81457]: {
@@ -317,7 +318,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 27394047,
       },
     },
-    swapProxy: '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9',
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // zora
   [7777777]: {
@@ -336,7 +337,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 38452170,
       },
     },
-    swapProxy: '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9',
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // zksync
   [324]: {
@@ -355,7 +356,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 1,
       },
     },
-    swapProxy: '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9',
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // worldchain
   [480]: {
@@ -374,7 +375,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 22131418,
       },
     },
-    swapProxy: '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9',
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // unichain sepolia
   [1301]: {
@@ -393,7 +394,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 36746405,
       },
     },
-    swapProxy: '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9',
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // unichain mainnet
   [130]: {
@@ -412,7 +413,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 32850661,
       },
     },
-    swapProxy: '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9',
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // monad testnet
   [10143]: {
@@ -431,7 +432,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 1,
       },
     },
-    swapProxy: '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9',
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // base sepolia
   [84532]: {
@@ -450,7 +451,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 1,
       },
     },
-    swapProxy: '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9',
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // soneium
   [1868]: {
@@ -469,7 +470,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 15232223,
       },
     },
-    swapProxy: '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9',
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // monad
   [143]: {
@@ -488,8 +489,9 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 36720825,
       },
     },
-    swapProxy: '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9',
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
+  // linea
   [59144]: {
     weth: '0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f',
     routerConfigs: {
@@ -506,7 +508,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 1,
       },
     },
-    swapProxy: '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9',
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // tempo
   [4217]: {
@@ -525,7 +527,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 1,
       },
     },
-    swapProxy: '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9',
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // xlayer
   [196]: {
@@ -544,7 +546,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 1,
       },
     },
-    swapProxy: '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9',
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
 }
 

@@ -311,6 +311,13 @@ export class UniswapTrade implements Command {
         planner.addCommand(CommandType.UNWRAP_WETH, [this.options.recipient, 0])
       } else if (this.inputRequiresUnwrap) {
         planner.addCommand(CommandType.WRAP_ETH, [this.options.recipient, CONTRACT_BALANCE])
+      } else if (this.options.useProxy) {
+        // Proxy pulled maximumAmountIn into the UR; sweep any unused input back to the user
+        planner.addCommand(CommandType.SWEEP, [
+          getCurrencyAddress(this.trade.inputAmount.currency),
+          this.options.recipient,
+          0,
+        ])
       } else if (this.trade.inputAmount.currency.isNative) {
         // must refund extra native currency sent along for native v4 trades (no input transition)
         planner.addCommand(CommandType.SWEEP, [ETH_ADDRESS, this.options.recipient, 0])

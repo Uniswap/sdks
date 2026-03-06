@@ -81,7 +81,7 @@ export abstract class SwapRouter {
   public static INTERFACE: Interface = new Interface(UniversalRouter.abi)
 
   public static PROXY_INTERFACE: Interface = new Interface([
-    'function execute(address router, address token, uint256 amount, bytes calldata commands, bytes[] calldata inputs, uint256 deadline) external payable',
+    'function execute(address router, address token, uint256 amount, bytes calldata commands, bytes[] calldata inputs, uint256 deadline) external',
   ])
 
   public static swapCallParameters(
