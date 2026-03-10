@@ -1,5 +1,6 @@
 {
   "name": "@uniswap/v4-sdk",
+  "version": "1.29.1",
   "description": "⚒️ An SDK for building applications on top of Uniswap V4",
   "repository": "https://github.com/Uniswap/sdks.git",
   "keywords": [
