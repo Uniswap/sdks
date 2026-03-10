@@ -32,6 +32,7 @@ export enum ChainId {
   MONAD = 143,
   XLAYER = 196,
   LINEA = 59144,
+  NEW_CHAIN = 100000,
 }
 
 export const SUPPORTED_CHAINS = [
