@@ -205,15 +205,17 @@ describe('SwapProxy', () => {
       expect(decoded.token.toLowerCase()).to.equal(USDC.address.toLowerCase())
     })
 
-    it('does not include PERMIT2_PERMIT command in proxy calldata', () => {
+    it('does not include any permit2 commands in proxy calldata', () => {
       const trade = buildV4Trade(WETH_USDC_V4, USDC, WETH, '1000000', '500000000000000000')
       const opts = proxySwapOptions()
       const { calldata } = SwapRouter.swapCallParameters(trade, opts)
 
       const decoded = PROXY_INTERFACE.decodeFunctionData('execute', calldata)
       const commands = decoded.commands as string
-      // 0x0a = PERMIT2_PERMIT -- should not appear
-      expect(commands).to.not.include('0a')
+      expect(commands).to.not.include('02') // PERMIT2_TRANSFER_FROM
+      expect(commands).to.not.include('03') // PERMIT2_PERMIT_BATCH
+      expect(commands).to.not.include('0a') // PERMIT2_PERMIT
+      expect(commands).to.not.include('0d') // PERMIT2_TRANSFER_FROM_BATCH
     })
 
     it('throws when input currency is native ETH', () => {
