@@ -280,9 +280,7 @@ export class UniswapTrade implements Command {
           // If the trade is exact output, and a fee was taken, we must adjust the amount out to be the amount after the fee
           // Otherwise we continue as expected with the trade's normal expected output
           if (this.trade.tradeType === TradeType.EXACT_OUTPUT) {
-            minimumAmountOut = minimumAmountOut.sub(
-              minimumAmountOut.mul(fee1e18).div(BigNumber.from(10).pow(18))
-            )
+            minimumAmountOut = minimumAmountOut.sub(minimumAmountOut.mul(fee1e18).div(BigNumber.from(10).pow(18)))
           }
         } else {
           const feeBips = encodeFeeBips(this.options.fee.fee)
