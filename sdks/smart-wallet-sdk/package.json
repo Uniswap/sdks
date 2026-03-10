@@ -37,7 +37,7 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@uniswap/sdk-core": "workspace:^",
+    "@uniswap/sdk-core": "workspace:~",
     "viem": "^2.23.5"
   },
   "devDependencies": {

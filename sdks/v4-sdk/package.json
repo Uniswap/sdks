@@ -27,8 +27,8 @@
   "sideEffects": false,
   "dependencies": {
     "@ethersproject/solidity": "^5.0.9",
-    "@uniswap/sdk-core": "workspace:^",
-    "@uniswap/v3-sdk": "workspace:^",
+    "@uniswap/sdk-core": "workspace:~",
+    "@uniswap/v3-sdk": "workspace:~",
     "tiny-invariant": "^1.1.0",
     "tiny-warning": "^1.0.3"
   },
