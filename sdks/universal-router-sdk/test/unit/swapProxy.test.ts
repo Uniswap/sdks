@@ -15,7 +15,7 @@ import { Pool as V4Pool, Route as V4Route, Trade as V4Trade } from '@uniswap/v4-
 import { CurrencyAmount, Ether, Token, TradeType, Percent } from '@uniswap/sdk-core'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
 import { SwapRouter } from '../../src/swapRouter'
-import { UniswapTrade, SwapOptions } from '../../src/entities/actions/uniswap'
+import { UniswapTrade, SwapOptions, TokenTransferMode } from '../../src/entities/actions/uniswap'
 import {
   SENDER_AS_RECIPIENT,
   ZERO_ADDRESS,
@@ -134,7 +134,7 @@ function proxySwapOptions(overrides: Partial<SwapOptions> = {}): SwapOptions {
   return {
     slippageTolerance: new Percent(5, 100),
     recipient: TEST_RECIPIENT,
-    useProxy: true,
+    tokenTransferMode: TokenTransferMode.ApproveProxy,
     chainId: 1,
     deadlineOrPreviousBlockhash: Math.floor(Date.now() / 1000) + 1800,
     ...overrides,
@@ -150,7 +150,7 @@ describe('SwapProxy', () => {
     WETH_USDC_V3 = makeV3Pool(WETH, USDC)
   })
 
-  describe('UniswapTrade with useProxy', () => {
+  describe('UniswapTrade with ApproveProxy', () => {
     it('forces payerIsUser to false', () => {
       const trade = buildV4Trade(WETH_USDC_V4, USDC, WETH, '1000000', '500000000000000000')
       const uniTrade = new UniswapTrade(trade, proxySwapOptions())
@@ -172,7 +172,7 @@ describe('SwapProxy', () => {
     })
   })
 
-  describe('SwapRouter.swapCallParameters with useProxy', () => {
+  describe('SwapRouter.swapCallParameters with ApproveProxy', () => {
     it('encodes calldata targeting the proxy execute function (V4 trade)', () => {
       const trade = buildV4Trade(WETH_USDC_V4, USDC, WETH, '1000000', '500000000000000000')
       const opts = proxySwapOptions()
@@ -231,7 +231,7 @@ describe('SwapProxy', () => {
       expect(() => SwapRouter.swapCallParameters(trade, opts)).to.throw('PROXY_MISSING_CHAIN_ID')
     })
 
-    it('throws when inputTokenPermit is provided with useProxy', () => {
+    it('throws when inputTokenPermit is provided with ApproveProxy', () => {
       const trade = buildV4Trade(WETH_USDC_V4, USDC, WETH, '1000000', '500000000000000000')
       const opts = proxySwapOptions({
         inputTokenPermit: {
@@ -271,7 +271,7 @@ describe('SwapProxy', () => {
       )
     })
 
-    it('returns normal UR calldata when useProxy is false', () => {
+    it('returns normal UR calldata when approvalMode is default (Permit2)', () => {
       const trade = buildV4Trade(WETH_USDC_V4, USDC, WETH, '1000000', '500000000000000000')
       const opts: SwapOptions = {
         slippageTolerance: new Percent(5, 100),

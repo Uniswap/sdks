@@ -20,7 +20,7 @@ import {
 } from '@uniswap/v4-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
 import { Currency, TradeType, Percent, CHAIN_TO_ADDRESSES_MAP, SupportedChainsType } from '@uniswap/sdk-core'
-import { UniswapTrade, SwapOptions } from './entities/actions/uniswap'
+import { UniswapTrade, SwapOptions, TokenTransferMode } from './entities/actions/uniswap'
 import { AcrossV4DepositV3Params } from './entities/actions/across'
 import { RoutePlanner, CommandType } from './utils/routerCommands'
 import { encodePermit, encodeV3PositionPermit } from './utils/inputTokens'
@@ -96,9 +96,9 @@ export abstract class SwapRouter {
 
     const inputCurrency = trade.trade.inputAmount.currency
 
-    if (options.useProxy) {
+    if (options.tokenTransferMode === TokenTransferMode.ApproveProxy) {
       invariant(!inputCurrency.isNative, 'PROXY_NATIVE_INPUT: SwapProxy only supports ERC20 input')
-      invariant(!!options.chainId, 'PROXY_MISSING_CHAIN_ID: chainId required when useProxy is true')
+      invariant(!!options.chainId, 'PROXY_MISSING_CHAIN_ID: chainId required when tokenTransferMode is ApproveProxy')
       invariant(!options.inputTokenPermit, 'PROXY_PERMIT_CONFLICT: Permit2 not used with SwapProxy')
     } else {
       invariant(!(inputCurrency.isNative && !!options.inputTokenPermit), 'NATIVE_INPUT_PERMIT')
@@ -121,7 +121,7 @@ export abstract class SwapRouter {
       }
     }
 
-    if (options.useProxy) {
+    if (options.tokenTransferMode === TokenTransferMode.ApproveProxy) {
       return SwapRouter.encodeProxyPlan(planner, trade, options)
     }
 

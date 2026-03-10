@@ -43,6 +43,11 @@ export type FlatFeeOptions = {
 // so we extend swap options with the permit2 permit
 // when safe mode is enabled, the SDK will add an extra ETH sweep for security
 // when useRouterBalance is enabled the SDK will use the balance in the router for the swap
+export enum TokenTransferMode {
+  Permit2 = 'Permit2',
+  ApproveProxy = 'ApproveProxy',
+}
+
 export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit'> & {
   useRouterBalance?: boolean
   inputTokenPermit?: Permit2Permit
@@ -50,8 +55,8 @@ export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit'> & {
   safeMode?: boolean
   maxHopSlippage?: BigNumber[] // Optional per-hop slippage protection for V4 routes (UR 2.1+)
   urVersion?: URVersion // Universal Router version for encoding (defaults to V2_0 for backward compatibility)
-  useProxy?: boolean // When true, encode for SwapProxy (no-Permit2 approve+swap flow). Requires explicit recipient and chainId.
-  chainId?: number // Required when useProxy is true, used to resolve UR address for the proxy
+  tokenTransferMode?: TokenTransferMode // How input tokens are transferred to the UR (defaults to Permit2). ApproveProxy uses the SwapProxy contract.
+  chainId?: number // Required when tokenTransferMode is ApproveProxy, used to resolve UR address for the proxy
 }
 
 const REFUND_ETH_PRICE_IMPACT_THRESHOLD = new Percent(50, 100)
@@ -71,7 +76,7 @@ export class UniswapTrade implements Command {
   constructor(public trade: RouterTrade<Currency, Currency, TradeType>, public options: SwapOptions) {
     if (!!options.fee && !!options.flatFee) throw new Error('Only one fee option permitted')
 
-    if (options.useProxy) {
+    if (options.tokenTransferMode === TokenTransferMode.ApproveProxy) {
       if (!options.recipient || options.recipient === SENDER_AS_RECIPIENT) {
         throw new Error(
           'Explicit recipient address required when using SwapProxy (SENDER_AS_RECIPIENT resolves to proxy)'
@@ -206,7 +211,7 @@ export class UniswapTrade implements Command {
         this.trade.maximumAmountIn(this.options.slippageTolerance).quotient.toString(),
       ])
     } else if (this.inputRequiresUnwrap) {
-      if (!this.options.useProxy) {
+      if (this.options.tokenTransferMode !== TokenTransferMode.ApproveProxy) {
         // send wrapped token to router to unwrap via Permit2
         planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [
           (this.trade.inputAmount.currency as Token).address,
@@ -308,7 +313,7 @@ export class UniswapTrade implements Command {
         planner.addCommand(CommandType.UNWRAP_WETH, [this.options.recipient, 0])
       } else if (this.inputRequiresUnwrap) {
         planner.addCommand(CommandType.WRAP_ETH, [this.options.recipient, CONTRACT_BALANCE])
-      } else if (this.options.useProxy) {
+      } else if (this.options.tokenTransferMode === TokenTransferMode.ApproveProxy) {
         // Proxy pulled maximumAmountIn into the UR; sweep any unused input back to the user
         planner.addCommand(CommandType.SWEEP, [
           getCurrencyAddress(this.trade.inputAmount.currency),
