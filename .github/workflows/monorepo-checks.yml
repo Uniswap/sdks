@@ -9,6 +9,8 @@ on:
       - synchronize
       - reopened
 
+permissions: {}
+
 jobs:
   build-and-test:
     name: Lint, Build, and Test
@@ -41,6 +43,7 @@ jobs:
         with:
           submodules: "recursive"
           fetch-depth: 2
+          persist-credentials: false
 
       - name: 💽 Node and Caching
         uses: actions/setup-node@1a4442cacd436585916779262731d5b162bc6ec7
