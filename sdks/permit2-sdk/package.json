@@ -1,5 +1,6 @@
 {
   "name": "@uniswap/permit2-sdk",
+  "version": "1.4.0",
   "description": "An sdk for interacting with permit2.",
   "repository": "https://github.com/Uniswap/sdks.git",
   "keywords": [

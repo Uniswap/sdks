@@ -1,5 +1,6 @@
 {
   "name": "@uniswap/flashtestations-sdk",
+  "version": "1.1.0",
   "author": "Melvillian",
   "description": "⚒️ An SDK for working with Flashteststations",
   "repository": "https://github.com/Uniswap/sdks.git",
