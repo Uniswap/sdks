@@ -1,5 +1,6 @@
 {
   "name": "@uniswap/permit2-sdk",
+  "version": "1.4.0",
   "description": "An sdk for interacting with permit2.",
   "repository": "https://github.com/Uniswap/sdks.git",
   "keywords": [
@@ -29,7 +30,7 @@
     "clean": "rm -rf ./dist",
     "interop": "yarn node writeInterop.js",
     "lint": "prettier --check src/",
-    "release": "semantic-release",
+    "release": "changeset publish",
     "test": "jest"
   },
   "dependencies": {
@@ -50,34 +51,5 @@
   "publishConfig": {
     "access": "public",
     "provenance": true
-  },
-  "release": {
-    "extends": "semantic-release-monorepo",
-    "branches": [
-      {
-        "name": "main",
-        "prerelease": false
-      }
-    ],
-    "plugins": [
-      [
-        "@semantic-release/commit-analyzer",
-        {
-          "preset": "angular",
-          "releaseRules": "../../publishing/release-rules.cjs"
-        }
-      ],
-      "@semantic-release/release-notes-generator",
-      "@semantic-release/npm",
-      "@semantic-release/github",
-      [
-        "@semantic-release/exec",
-        {
-          "successCmd": "git restore yarn.lock && yarn",
-          "failCmd": "git restore yarn.lock && yarn",
-          "execCwd": "../.."
-        }
-      ]
-    ]
   }
 }

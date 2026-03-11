@@ -25,7 +25,7 @@
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
     "prettier": "prettier \"src/**/*.ts\" --list-different",
-    "release": "semantic-release",
+    "release": "changeset publish",
     "test": "run-s test:unit test:integration",
     "test:unit": "jest --testPathPattern src --detectOpenHandles --forceExit --testPathIgnorePatterns dist",
     "test:integration": "cd integration && yarn && yarn test",
@@ -34,8 +34,8 @@
   "dependencies": {
     "@ethersproject/bytes": "^5.7.0",
     "@ethersproject/providers": "^5.7.0",
-    "@uniswap/permit2-sdk": "^1.2.1",
-    "@uniswap/sdk-core": "^7.5.0",
+    "@uniswap/permit2-sdk": "workspace:~",
+    "@uniswap/sdk-core": "workspace:~",
     "ethers": "^5.7.0"
   },
   "devDependencies": {
@@ -67,39 +67,6 @@
   "publishConfig": {
     "access": "public",
     "provenance": true
-  },
-  "release": {
-    "extends": "semantic-release-monorepo",
-    "branches": [
-      {
-        "name": "still-in-alpha",
-        "prerelease": false
-      },
-      {
-        "name": "beta",
-        "prerelease": true
-      }
-    ],
-    "plugins": [
-      [
-        "@semantic-release/commit-analyzer",
-        {
-          "preset": "angular",
-          "releaseRules": "../../publishing/release-rules.cjs"
-        }
-      ],
-      "@semantic-release/release-notes-generator",
-      "@semantic-release/npm",
-      "@semantic-release/github",
-      [
-        "@semantic-release/exec",
-        {
-          "successCmd": "git restore yarn.lock && yarn",
-          "failCmd": "git restore yarn.lock && yarn",
-          "execCwd": "../.."
-        }
-      ]
-    ]
   },
   "exports": {
     ".": {

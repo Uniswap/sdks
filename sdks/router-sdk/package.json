@@ -1,5 +1,6 @@
 {
   "name": "@uniswap/router-sdk",
+  "version": "2.7.1",
   "description": "An sdk for routing swaps using Uniswap v2 and Uniswap v3.",
   "repository": "https://github.com/Uniswap/sdks.git",
   "keywords": [
@@ -15,17 +16,17 @@
   "scripts": {
     "build": "tsdx build",
     "lint": "eslint 'src/**/*.{js,ts,tsx}' --max-warnings 0",
-    "release": "semantic-release",
+    "release": "changeset publish",
     "start": "tsdx watch",
     "test": "tsdx test"
   },
   "dependencies": {
     "@ethersproject/abi": "^5.5.0",
-    "@uniswap/sdk-core": "^7.12.1",
+    "@uniswap/sdk-core": "workspace:~",
     "@uniswap/swap-router-contracts": "^1.3.0",
-    "@uniswap/v2-sdk": "^4.19.1",
-    "@uniswap/v3-sdk": "^3.29.1",
-    "@uniswap/v4-sdk": "^1.29.1"
+    "@uniswap/v2-sdk": "workspace:~",
+    "@uniswap/v3-sdk": "workspace:~",
+    "@uniswap/v4-sdk": "workspace:~"
   },
   "devDependencies": {
     "@types/jest": "^24.0.25",
@@ -42,34 +43,5 @@
   "publishConfig": {
     "access": "public",
     "provenance": true
-  },
-  "release": {
-    "extends": "semantic-release-monorepo",
-    "branches": [
-      {
-        "name": "main",
-        "prerelease": false
-      }
-    ],
-    "plugins": [
-      [
-        "@semantic-release/commit-analyzer",
-        {
-          "preset": "angular",
-          "releaseRules": "../../publishing/release-rules.cjs"
-        }
-      ],
-      "@semantic-release/release-notes-generator",
-      "@semantic-release/npm",
-      "@semantic-release/github",
-      [
-        "@semantic-release/exec",
-        {
-          "successCmd": "git restore yarn.lock && yarn",
-          "failCmd": "git restore yarn.lock && yarn",
-          "execCwd": "../.."
-        }
-      ]
-    ]
   }
 }
