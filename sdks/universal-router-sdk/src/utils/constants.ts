@@ -14,9 +14,11 @@ export type RouterConfig = {
 type ChainConfig = {
   weth: string
   routerConfigs: { [key in UniversalRouterVersion]: RouterConfig }
+  swapProxy?: string
 }
 
 const WETH_NOT_SUPPORTED_ON_CHAIN = '0x0000000000000000000000000000000000000000'
+const SWAP_PROXY_DEPLOY_ADDRESS = '0x02E5be68D46DAc0B524905bfF209cf47EE6dB2a9'
 
 // Todo: Change `CHAIN_CONFIGS` to pull the UR address with v4
 export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
@@ -37,6 +39,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 23836348,
       },
     },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // goerli
   [5]: {
@@ -73,6 +76,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 9664766,
       },
     },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // polygon
   [137]: {
@@ -91,6 +95,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 79245524,
       },
     },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   //polygon mumbai
   [80001]: {
@@ -127,6 +132,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 143998769,
       },
     },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // optimism goerli
   [420]: {
@@ -163,6 +169,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 402060097,
       },
     },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // arbitrum goerli
   [421613]: {
@@ -199,6 +206,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 51696199,
       },
     },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // celo alfajores
   [44787]: {
@@ -235,6 +243,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 68794488,
       },
     },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // avalanche
   [43114]: {
@@ -253,6 +262,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 72254439,
       },
     },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // base goerli
   [84531]: {
@@ -289,6 +299,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 38404211,
       },
     },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // blast
   [81457]: {
@@ -307,6 +318,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 27394047,
       },
     },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // zora
   [7777777]: {
@@ -325,7 +337,9 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 38452170,
       },
     },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
+  // zksync
   [324]: {
     weth: '0x5aea5775959fbc2557cc8789bc1bf90a239d9a91',
     routerConfigs: {
@@ -342,6 +356,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 1,
       },
     },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // worldchain
   [480]: {
@@ -360,7 +375,9 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 22131418,
       },
     },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
+  // unichain sepolia
   [1301]: {
     weth: '0x4200000000000000000000000000000000000006',
     routerConfigs: {
@@ -377,6 +394,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 36746405,
       },
     },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // unichain mainnet
   [130]: {
@@ -395,7 +413,9 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 32850661,
       },
     },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
+  // monad testnet
   [10143]: {
     weth: '0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701',
     routerConfigs: {
@@ -412,7 +432,9 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 1,
       },
     },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
+  // base sepolia
   [84532]: {
     weth: '0x4200000000000000000000000000000000000006',
     routerConfigs: {
@@ -429,7 +451,9 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 1,
       },
     },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
+  // soneium
   [1868]: {
     weth: '0x4200000000000000000000000000000000000006',
     routerConfigs: {
@@ -446,7 +470,9 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 15232223,
       },
     },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
+  // monad
   [143]: {
     weth: '0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A',
     routerConfigs: {
@@ -463,7 +489,9 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 36720825,
       },
     },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
+  // linea
   [59144]: {
     weth: '0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f',
     routerConfigs: {
@@ -480,6 +508,7 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 1,
       },
     },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // tempo
   [4217]: {
@@ -498,7 +527,9 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 1,
       },
     },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
+  // xlayer
   [196]: {
     weth: '0xe538905cf8410324e03A5A23C1c177a474D59b2b',
     routerConfigs: {
@@ -515,12 +546,20 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 1,
       },
     },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
 }
 
 export const UNIVERSAL_ROUTER_ADDRESS = (version: UniversalRouterVersion, chainId: number): string => {
   if (!(chainId in CHAIN_CONFIGS)) throw new Error(`Universal Router not deployed on chain ${chainId}`)
   return CHAIN_CONFIGS[chainId].routerConfigs[version].address
+}
+
+export const SWAP_PROXY_ADDRESS = (chainId: number): string => {
+  if (!(chainId in CHAIN_CONFIGS)) throw new Error(`SwapProxy not deployed on chain ${chainId}`)
+  const proxy = CHAIN_CONFIGS[chainId].swapProxy
+  if (!proxy) throw new Error(`SwapProxy not configured for chain ${chainId}`)
+  return proxy
 }
 
 export const UNIVERSAL_ROUTER_CREATION_BLOCK = (version: UniversalRouterVersion, chainId: number): number => {
