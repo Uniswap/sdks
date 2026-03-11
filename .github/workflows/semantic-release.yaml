@@ -36,7 +36,7 @@ jobs:
       group: npm-deploy
     permissions:
       contents: write # needed to create the "Version Packages" PR and push tags
-      id-token: write # needed for npm provenance
+      id-token: write # needed for npm trusted publishing (OIDC) and provenance
       pull-requests: write # needed to create/update the "Version Packages" PR
     steps:
       - uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db # v0.8.3
@@ -71,4 +71,4 @@ jobs:
           publish: yarn g:release
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # No NPM_TOKEN needed — npm auth uses trusted publishing (OIDC via id-token)
