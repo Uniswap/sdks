@@ -1,3 +1,23 @@
+# Release Workflow
+#
+# This workflow runs on every push to main and uses the changesets/action to
+# handle versioning and publishing. It operates in two modes:
+#
+# 1. When changeset files exist (.changeset/*.md):
+#    - Runs `yarn version-packages` (changeset version) to consume changesets,
+#      bump versions in package.json files, and update CHANGELOGs
+#    - Creates or updates a "Version Packages" PR with those changes
+#    - Does NOT publish to npm
+#
+# 2. When no changeset files exist (e.g., the "Version Packages" PR was just merged):
+#    - Runs `yarn g:release` (changeset publish) to publish all packages
+#      with new versions to npm
+#    - If all packages are already published, this is a no-op
+#
+# Typical flow:
+#   Feature PR (with changeset) merges → this workflow creates "Version Packages" PR
+#   → team approves & merges → this workflow publishes to npm
+
 name: Release
 
 on:
@@ -15,9 +35,9 @@ jobs:
     runs-on:
       group: npm-deploy
     permissions:
-      contents: write
-      id-token: write
-      pull-requests: write
+      contents: write # needed to create the "Version Packages" PR and push tags
+      id-token: write # needed for npm provenance
+      pull-requests: write # needed to create/update the "Version Packages" PR
     steps:
       - uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db # v0.8.3
         with:
@@ -40,6 +60,9 @@ jobs:
       - name: Build SDK's
         run: yarn g:build
 
+      # The changesets/action automatically detects which mode to run:
+      # - version: runs when there are pending changeset files (creates/updates PR)
+      # - publish: runs when there are no pending changesets (publishes to npm)
       - name: Create Release Pull Request or Publish
         id: changesets
         uses: changesets/action@70b8f42bea198d6c9323eb37781844e8498e3766 # v1
