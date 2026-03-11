@@ -1,10 +1,31 @@
+# Release Workflow
+#
+# This workflow runs on every push to main and uses the changesets/action to
+# handle versioning and publishing. It operates in two modes:
+#
+# 1. When changeset files exist (.changeset/*.md):
+#    - Runs `yarn version-packages` (changeset version) to consume changesets,
+#      bump versions in package.json files, and update CHANGELOGs
+#    - Creates or updates a "Version Packages" PR with those changes
+#    - Does NOT publish to npm
+#
+# 2. When no changeset files exist (e.g., the "Version Packages" PR was just merged):
+#    - Runs `yarn g:release` (changeset publish) to publish all packages
+#      with new versions to npm
+#    - If all packages are already published, this is a no-op
+#
+# Typical flow:
+#   Feature PR (with changeset) merges → this workflow creates "Version Packages" PR
+#   → team approves & merges → this workflow publishes to npm
+
 name: Release
 
 on:
   push:
     branches:
-      - beta
       - main
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
   release:
@@ -14,30 +35,18 @@ jobs:
     runs-on:
       group: npm-deploy
     permissions:
-      contents: write
-      id-token: write
+      contents: write # needed to create the "Version Packages" PR and push tags
+      id-token: write # needed for npm trusted publishing (OIDC) and provenance
+      pull-requests: write # needed to create/update the "Version Packages" PR
     steps:
       - uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db # v0.8.3
         with:
-          # List of IPs to allow outbound connections to.
-          # By default, only localhost and IPs required for the essential operations of Github Actions are allowed.
-          #allowed-ips: |
-
-          # List of domains to allow outbound connections to.
-          # Wildcards are accepted. For example, if allowing `*.google.com`, this will allow `www.google.com`, `console.cloud.google.com` but not `google.com`.
-          # By default, only domains required for essential operations of Github Actions and uploading job summaries are allowed.
-          # Refer to https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#communication-requirements-for-github-hosted-runners-and-github for additional domains that should be allowed for additional Github Actions features.
-          #allowed-domains:
-
-          # The egress policy to enforce. Valid values are `audit` and `block`.
-          # Default: audit
           egress-policy: audit
       - name: Checkout
         uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
         with:
           submodules: "true"
-          fetch-depth: 2
-          persist-credentials: false
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@1a4442cacd436585916779262731d5b162bc6ec7
@@ -51,7 +60,15 @@ jobs:
       - name: Build SDK's
         run: yarn g:build
 
-      - name: Release Needed SDK's
-        run: yarn g:release
+      # The changesets/action automatically detects which mode to run:
+      # - version: runs when there are pending changeset files (creates/updates PR)
+      # - publish: runs when there are no pending changesets (publishes to npm)
+      - name: Create Release Pull Request or Publish
+        id: changesets
+        uses: changesets/action@70b8f42bea198d6c9323eb37781844e8498e3766 # v1
+        with:
+          version: yarn version-packages
+          publish: yarn g:release
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          # No NPM_TOKEN needed — npm auth uses trusted publishing (OIDC via id-token)
