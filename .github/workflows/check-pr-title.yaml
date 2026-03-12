@@ -12,6 +12,7 @@ permissions: {}
 jobs:
   # Ensures that the PR title adheres to [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/).
   conventional-commit:
+    if: "!startsWith(github.head_ref, 'changeset-release/')"
     runs-on: ubuntu-latest
     steps:
       - uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db # v0.8.3
