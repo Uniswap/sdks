@@ -36,7 +36,7 @@
     "@ethersproject/address": "^5.0.2",
     "@ethersproject/bignumber": "^5.5.0",
     "@ethersproject/solidity": "^5.0.9",
-    "@uniswap/sdk-core": "workspace:~",
+    "@uniswap/sdk-core": "workspace:*",
     "jsbi": "^3.1.4",
     "tiny-invariant": "^1.1.0",
     "tiny-warning": "^1.0.3"
