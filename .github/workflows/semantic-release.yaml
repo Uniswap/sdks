@@ -66,9 +66,6 @@ jobs:
       - name: Build SDK's
         run: yarn g:build
 
-      - name: Verify npm auth
-        run: npm whoami --registry https://registry.npmjs.org 2>&1 || echo "npm OIDC auth not yet active (expected before publish)"
-
       # The changesets/action automatically detects which mode to run:
       # - version: runs when there are pending changeset files (creates/updates PR)
       # - publish: runs when there are no pending changesets (publishes to npm)
@@ -80,5 +77,4 @@ jobs:
           publish: yarn g:release
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          NPM_CONFIG_PROVENANCE: "true"
           # No NPM_TOKEN needed — npm auth uses trusted publishing (OIDC via id-token)
