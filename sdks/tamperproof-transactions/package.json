@@ -25,8 +25,8 @@
   "scripts": {
     "build:cjs": "tsc -p tsconfig.browserify.json",
     "build:esm": "tsc -p tsconfig.json",
-    "build:browser:unminified": "bun build ./lib/index.js --outfile=dist/twist.js --target=browser --global-name=twist",
-    "build:browser:minified": "bun build ./lib/index.js --outfile=dist/twist.min.js --target=browser --global-name=twist --minify",
+    "build:browser:unminified": "bun build ./lib/index.js --outfile=dist/_twist.cjs --target=browser --format=cjs && node scripts/wrap-umd.cjs dist/_twist.cjs dist/twist.js twist && rm dist/_twist.cjs",
+    "build:browser:minified": "bun build ./lib/index.js --outfile=dist/_twist.min.cjs --target=browser --format=cjs --minify && node scripts/wrap-umd.cjs dist/_twist.min.cjs dist/twist.min.js twist && rm dist/_twist.min.cjs",
     "build:browser": "bun run build:browser:unminified && bun run build:browser:minified",
     "build": "bun run build:cjs && bun run build:esm && bun run build:browser",
     "test": "bun test",
