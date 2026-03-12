@@ -31,7 +31,7 @@
     "interop": "bun run node writeInterop.js",
     "lint": "prettier --check src/",
     "release": "changeset publish",
-    "test": "bun test"
+    "test": "bun test src/"
   },
   "dependencies": {
     "@ethersproject/abstract-signer": "^5.7.0",
