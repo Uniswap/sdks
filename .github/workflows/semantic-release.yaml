@@ -53,13 +53,18 @@ jobs:
         with:
           cache: yarn
           node-version: 22
-          registry-url: 'https://registry.npmjs.org'
+          # Do not set registry-url here — it creates .npmrc with
+          # _authToken=${NODE_AUTH_TOKEN} which, when unset, prevents npm
+          # from falling through to OIDC-based Trusted Publishing auth.
 
       - name: Install dependencies
         run: yarn --immutable
 
       - name: Build SDK's
         run: yarn g:build
+
+      - name: Verify npm auth
+        run: npm whoami --registry https://registry.npmjs.org 2>&1 || echo "npm OIDC auth not yet active (expected before publish)"
 
       # The changesets/action automatically detects which mode to run:
       # - version: runs when there are pending changeset files (creates/updates PR)
@@ -72,4 +77,5 @@ jobs:
           publish: yarn g:release
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          NPM_CONFIG_PROVENANCE: "true"
           # No NPM_TOKEN needed — npm auth uses trusted publishing (OIDC via id-token)
