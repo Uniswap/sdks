@@ -77,7 +77,7 @@ describe('Uniswap', () => {
   let USDC_DAI_V4: V4Pool
   let ETH_WETH_V4: V4Pool
 
-  before(async () => {
+  beforeAll(async () => {
     ;({ WETH_USDC_V2, USDC_DAI_V2, WETH_USDC_V3, USDC_DAI_V3, WETH_USDC_V3_LOW_FEE } = await getUniswapPools(
       FORK_BLOCK
     ))

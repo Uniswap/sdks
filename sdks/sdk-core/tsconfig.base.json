@@ -1,9 +1,10 @@
 {
-    "include": [
-        "src"
-    ],
+    "include": ["src"],
+    "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts"],
     "compilerOptions": {
-        "target": "es2020",
+        "rootDir": ".",
+        "baseUrl": ".",
+        "target": "es2018",
         "module": "esnext",
         "importHelpers": true,
         "declaration": true,
@@ -21,6 +22,7 @@
         "noFallthroughCasesInSwitch": true,
         "moduleResolution": "node",
         "esModuleInterop": true,
-        "resolveJsonModule": true
+        "resolveJsonModule": true,
+        "skipLibCheck": true
     }
 }

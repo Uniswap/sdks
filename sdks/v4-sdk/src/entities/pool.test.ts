@@ -335,9 +335,9 @@ describe('Pool', () => {
     })
 
     describe('#getOutputAmount', () => {
-      it('throws if pool has beforeSwap hooks', async () => {
+      it('throws if pool has beforeSwap hooks', () => {
         const inputAmount = CurrencyAmount.fromRawAmount(USDC, 100)
-        await expect(() => poolWithSwapHook.getOutputAmount(inputAmount)).rejects.toThrow('Unsupported hook')
+        expect(() => poolWithSwapHook.getOutputAmount(inputAmount)).toThrow('Unsupported hook')
       })
 
       it('USDC -> DAI', async () => {
@@ -356,9 +356,9 @@ describe('Pool', () => {
     })
 
     describe('#getInputAmount', () => {
-      it('throws if pool has beforeSwap hooks', async () => {
+      it('throws if pool has beforeSwap hooks', () => {
         const outputAmount = CurrencyAmount.fromRawAmount(DAI, 98)
-        await expect(() => poolWithSwapHook.getInputAmount(outputAmount)).rejects.toThrow('Unsupported hook')
+        expect(() => poolWithSwapHook.getInputAmount(outputAmount)).toThrow('Unsupported hook')
       })
 
       it('USDC -> DAI', async () => {

@@ -15,5 +15,6 @@
     "skipLibCheck": true,
     "isolatedModules": true,
     "lib": ["es2020", "dom"]
-  }
+  },
+  "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts"]
 }

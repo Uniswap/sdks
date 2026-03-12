@@ -1,7 +1,9 @@
+import { mock } from 'bun:test';
+
 // Manual mock for viem module
-export const mockCreatePublicClient = jest.fn();
-export const mockParseEventLogs = jest.fn();
-export const mockHttp = jest.fn();
+export const mockCreatePublicClient = mock();
+export const mockParseEventLogs = mock();
+export const mockHttp = mock();
 
 export const createPublicClient = mockCreatePublicClient;
 export const parseEventLogs = mockParseEventLogs;

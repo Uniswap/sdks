@@ -145,7 +145,7 @@ describe('SwapProxy', () => {
   let WETH_USDC_V4: V4Pool
   let WETH_USDC_V3: V3Pool
 
-  before(() => {
+  beforeAll(() => {
     WETH_USDC_V4 = makeV4Pool(WETH, USDC)
     WETH_USDC_V3 = makeV3Pool(WETH, USDC)
   })

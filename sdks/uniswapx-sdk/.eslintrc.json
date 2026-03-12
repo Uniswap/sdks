@@ -10,7 +10,9 @@
     "node_modules",
     "build",
     "coverage",
-    "jest.config.js"
+    "jest.config.js",
+    "**/*.test.ts",
+    "**/*.spec.ts"
   ],
   "plugins": [
     "import",

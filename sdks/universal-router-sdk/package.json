@@ -8,40 +8,54 @@
     "ethereum"
   ],
   "license": "MIT",
-  "main": "dist/index.js",
-  "typings": "dist/index.d.ts",
+  "main": "./dist/cjs/src/index.js",
+  "typings": "./dist/types/src/index.d.ts",
+  "module": "./dist/esm/src/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/types/src/index.d.ts",
+      "import": "./dist/esm/src/index.js",
+      "require": "./dist/cjs/src/index.js"
+    }
+  },
+  "sideEffects": false,
   "files": [
     "dist"
   ],
   "engines": {
-    "node": ">=14"
+    "node": ">=18"
   },
   "scripts": {
-    "build": "tsdx build",
+    "build": "bun run clean && tsc -p tsconfig.cjs.json && tsc -p tsconfig.esm.json && tsc -p tsconfig.types.json",
+    "clean": "rm -rf dist",
     "docs": "typedoc",
     "forge:fix": "forge fmt",
-    "lint": "yarn prettier",
-    "lint:fix": "yarn prettier:fix && yarn forge:fix",
+    "lint": "bun run prettier",
+    "lint:fix": "bun run prettier:fix && bun run forge:fix",
     "prettier": "prettier --check '**/*.ts' && prettier --check '**/*.json'",
     "prettier:fix": "prettier --write '**/*.ts' && prettier --write '**/*.json'",
     "release": "changeset publish",
-    "test": "yarn test:hardhat && yarn test:forge",
+    "test": "bun run test:hardhat && bun run test:forge",
     "test:forge": "forge test",
     "test:hardhat": "env TS_NODE_COMPILER_OPTIONS='{\"module\": \"commonjs\" }' hardhat test"
   },
   "dependencies": {
+    "@ethersproject/abi": "^5.5.0",
+    "@ethersproject/abstract-signer": "^5.7.0",
     "@openzeppelin/contracts": "4.7.0",
-    "@uniswap/permit2-sdk": "workspace:*",
-    "@uniswap/router-sdk": "workspace:*",
-    "@uniswap/sdk-core": "workspace:*",
+    "@uniswap/permit2-sdk": "workspace:~",
+    "@uniswap/router-sdk": "workspace:~",
+    "@uniswap/sdk-core": "workspace:~",
     "@uniswap/universal-router": "2.1.0",
     "@uniswap/v2-core": "^1.0.1",
-    "@uniswap/v2-sdk": "workspace:*",
+    "@uniswap/v2-sdk": "workspace:~",
     "@uniswap/v3-core": "1.0.0",
-    "@uniswap/v3-sdk": "workspace:*",
-    "@uniswap/v4-sdk": "workspace:*",
+    "@uniswap/v3-sdk": "workspace:~",
+    "@uniswap/v4-sdk": "workspace:~",
     "bignumber.js": "^9.0.2",
-    "ethers": "^5.7.0"
+    "ethers": "^5.7.0",
+    "jsbi": "^3.1.4",
+    "tiny-invariant": "^1.1.0"
   },
   "devDependencies": {
     "@types/chai": "^4.3.3",
@@ -54,7 +68,6 @@
     "hardhat": "^2.25.0",
     "prettier": "^2.4.1",
     "ts-node": "^10.9.1",
-    "tsdx": "^0.14.1",
     "tslib": "^2.3.0",
     "typedoc": "^0.21.2",
     "typescript": "^4.3.3"
@@ -71,6 +84,5 @@
   },
   "installConfig": {
     "hoistingLimits": "workspaces"
-  },
-  "sideEffects": false
+  }
 }
