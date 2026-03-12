@@ -1,10 +1,10 @@
 ---
-"@uniswap/sdk-core": major
-"@uniswap/v2-sdk": major
-"@uniswap/v3-sdk": major
-"@uniswap/v4-sdk": major
-"@uniswap/router-sdk": major
-"@uniswap/universal-router-sdk": major
+"@uniswap/sdk-core": patch
+"@uniswap/v2-sdk": patch
+"@uniswap/v3-sdk": patch
+"@uniswap/v4-sdk": patch
+"@uniswap/router-sdk": patch
+"@uniswap/universal-router-sdk": patch
 ---
 
-Migrate build system from TSDX to tsc. Output paths changed from `dist/index.js` to `dist/cjs/src/index.js` (CJS), `dist/esm/src/index.js` (ESM), and `dist/types/src/index.d.ts` (types). The `exports` field in package.json ensures correct resolution for all modern bundlers and Node.js versions. `tslib` is now a runtime dependency (required by `importHelpers`).
+Migrate build system from TSDX to tsc. Internal output paths changed but the `exports` field ensures correct resolution for all consumers. `tslib` is now a runtime dependency (required by `importHelpers`).
