@@ -27,7 +27,7 @@
   "dependencies": {
     "@ethersproject/address": "^5.0.2",
     "@ethersproject/solidity": "^5.0.9",
-    "@uniswap/sdk-core": "workspace:~",
+    "@uniswap/sdk-core": "workspace:*",
     "tiny-invariant": "^1.1.0",
     "tiny-warning": "^1.0.3"
   },
