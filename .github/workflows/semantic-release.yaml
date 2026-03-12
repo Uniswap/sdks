@@ -76,5 +76,7 @@ jobs:
           version: yarn version-packages
           publish: yarn g:release
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          # Use GitHub App token so the changeset PR triggers downstream CI workflows.
+          # (PRs created with the default GITHUB_TOKEN don't trigger other workflows.)
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           # No NPM_TOKEN needed — npm auth uses trusted publishing (OIDC via id-token)
