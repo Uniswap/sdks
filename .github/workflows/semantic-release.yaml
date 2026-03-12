@@ -52,8 +52,13 @@ jobs:
         uses: actions/setup-node@1a4442cacd436585916779262731d5b162bc6ec7
         with:
           cache: yarn
-          node-version: 22
-          registry-url: 'https://registry.npmjs.org'
+          node-version: 24
+          # Node 24 ships with npm 11.x which has full Trusted Publishing
+          # OIDC support (Node 22's npm 10.x lacks the OIDC token exchange
+          # needed for publish auth).
+          # Do not set registry-url here — it creates .npmrc with
+          # _authToken=${NODE_AUTH_TOKEN} which, when unset, prevents npm
+          # from falling through to OIDC-based Trusted Publishing auth.
 
       - name: Install dependencies
         run: yarn --immutable
