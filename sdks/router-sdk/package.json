@@ -41,7 +41,8 @@
     "@uniswap/v3-sdk": "workspace:*",
     "@uniswap/v4-sdk": "workspace:*",
     "jsbi": "^3.1.4",
-    "tiny-invariant": "^1.1.0"
+    "tiny-invariant": "^1.1.0",
+    "tslib": "^2.3.0"
   },
   "devDependencies": {
     "@ethersproject/bignumber": "^5.5.0",
@@ -51,7 +52,6 @@
     "eslint-config-react-app": "7.0.1",
     "eslint-plugin-prettier": "^3.4.1",
     "prettier": "^2.4.1",
-    "tslib": "^2.3.0",
     "typescript": "^4.3.3"
   },
   "prettier": {

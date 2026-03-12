@@ -42,7 +42,8 @@
     "decimal.js-light": "^2.5.0",
     "jsbi": "^3.1.4",
     "tiny-invariant": "^1.1.0",
-    "toformat": "^2.0.0"
+    "toformat": "^2.0.0",
+    "tslib": "^2.3.0"
   },
   "devDependencies": {
     "@types/big.js": "^4.0.5",
@@ -55,7 +56,6 @@
     "eslint-plugin-prettier": "^3.4.1",
     "eslint-plugin-react": "7.37.4",
     "eslint-plugin-react-hooks": "5.2.0",
-    "tslib": "^2.3.0",
     "typescript": "^4.3.3"
   },
   "prettier": {
