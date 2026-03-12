@@ -22,11 +22,11 @@
   },
   "dependencies": {
     "@ethersproject/abi": "^5.5.0",
-    "@uniswap/sdk-core": "workspace:~",
+    "@uniswap/sdk-core": "workspace:*",
     "@uniswap/swap-router-contracts": "^1.3.0",
-    "@uniswap/v2-sdk": "workspace:~",
-    "@uniswap/v3-sdk": "workspace:~",
-    "@uniswap/v4-sdk": "workspace:~"
+    "@uniswap/v2-sdk": "workspace:*",
+    "@uniswap/v3-sdk": "workspace:*",
+    "@uniswap/v4-sdk": "workspace:*"
   },
   "devDependencies": {
     "@types/jest": "^24.0.25",
