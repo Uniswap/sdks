@@ -1,6 +1,6 @@
 {
   "name": "@uniswap/universal-router-sdk",
-  "version": "4.34.0",
+  "version": "4.34.1",
   "description": "sdk for integrating with the Universal Router contracts",
   "repository": "https://github.com/Uniswap/sdks.git",
   "keywords": [
