@@ -228,7 +228,7 @@ export abstract class V4PositionManager {
      * - if pool does not exist yet, encode initializePool
      * then,
      * - if is mint, encode MINT_POSITION. If migrating, encode a SETTLE and SWEEP for both currencies. Else, encode a SETTLE_PAIR. If on a NATIVE pool, encode a SWEEP.
-     * - else, encode INCREASE_LIQUIDITY and SETTLE_PAIR. If it is on a NATIVE pool, encode a SWEEP.
+     * - else, encode INCREASE_LIQUIDITY and CLOSE_CURRENCY for each token (handles accrued fees). If on a NATIVE pool, encode a SWEEP.
      */
     invariant(JSBI.greaterThan(position.liquidity, ZERO), ZERO_LIQUIDITY)
 
@@ -284,32 +284,29 @@ export abstract class V4PositionManager {
 
     let value: string = toHex(0)
 
-    // If migrating, we need to settle and sweep both currencies individually
     if (isMint(options) && options.migrate) {
+      // Migration: payer is the v4 position manager, not the user
       if (options.useNative) {
-        // unwrap the exact amount needed to send to the pool manager
         planner.addUnwrap(OPEN_DELTA)
-        // payer is v4 position manager
-        planner.addSettle(position.pool.currency0, false)
-        planner.addSettle(position.pool.currency1, false)
-        // sweep any leftover wrapped native that was not unwrapped
-        // recipient will be same as the v4 lp token recipient
-        planner.addSweep(position.pool.currency0.wrapped, options.recipient)
-        planner.addSweep(position.pool.currency1, options.recipient)
-      } else {
-        // payer is v4 position manager
-        planner.addSettle(position.pool.currency0, false)
-        planner.addSettle(position.pool.currency1, false)
-        // recipient will be same as the v4 lp token recipient
-        planner.addSweep(position.pool.currency0, options.recipient)
-        planner.addSweep(position.pool.currency1, options.recipient)
       }
+      planner.addSettle(position.pool.currency0, false)
+      planner.addSettle(position.pool.currency1, false)
+      // sweep leftover tokens to the LP recipient
+      planner.addSweep(options.useNative ? position.pool.currency0.wrapped : position.pool.currency0, options.recipient)
+      planner.addSweep(position.pool.currency1, options.recipient)
     } else {
-      // need to settle both currencies when minting / adding liquidity (user is the payer)
-      planner.addSettlePair(position.pool.currency0, position.pool.currency1)
-      // When not migrating and adding native currency, add a final sweep
+      if (isMint(options)) {
+        // Mint: user always owes both tokens, so SETTLE_PAIR is safe
+        planner.addSettlePair(position.pool.currency0, position.pool.currency1)
+      } else {
+        // Increase: use CLOSE_CURRENCY instead of SETTLE_PAIR because accrued fees on
+        // existing positions can flip the delta positive on one side (e.g. single-sided
+        // positions with fees), causing SETTLE_PAIR to revert. CLOSE_CURRENCY handles
+        // both directions — settles if the user owes, takes if the user is owed.
+        planner.addCloseCurrency(position.pool.currency0)
+        planner.addCloseCurrency(position.pool.currency1)
+      }
       if (options.useNative) {
-        // Any sweeping must happen after the settling.
         // native currency will always be currency0 in v4
         value = toHex(amount0Max)
         planner.addSweep(position.pool.currency0, MSG_SENDER)
