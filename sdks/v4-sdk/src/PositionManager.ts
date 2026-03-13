@@ -284,14 +284,17 @@ export abstract class V4PositionManager {
 
     let value: string = toHex(0)
 
+    // If migrating, we need to settle and sweep both currencies individually
     if (isMint(options) && options.migrate) {
-      // Migration: payer is the v4 position manager, not the user
       if (options.useNative) {
+        // unwrap the exact amount needed to send to the pool manager
         planner.addUnwrap(OPEN_DELTA)
       }
+      // payer is v4 position manager
       planner.addSettle(position.pool.currency0, false)
       planner.addSettle(position.pool.currency1, false)
-      // sweep leftover tokens to the LP recipient
+      // sweep any leftover wrapped native that was not unwrapped
+      // recipient will be same as the v4 lp token recipient
       planner.addSweep(options.useNative ? position.pool.currency0.wrapped : position.pool.currency0, options.recipient)
       planner.addSweep(position.pool.currency1, options.recipient)
     } else {
@@ -307,6 +310,7 @@ export abstract class V4PositionManager {
         planner.addCloseCurrency(position.pool.currency1)
       }
       if (options.useNative) {
+        // Any sweeping must happen after the settling.
         // native currency will always be currency0 in v4
         value = toHex(amount0Max)
         planner.addSweep(position.pool.currency0, MSG_SENDER)
