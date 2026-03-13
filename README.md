@@ -54,16 +54,28 @@ Add support for Soneium chain
 
 You **only need to list the packages you directly changed**. Changesets automatically bumps dependents (e.g., bumping `sdk-core` will also bump `v2-sdk`, `v3-sdk`, `v4-sdk`, `router-sdk`, `universal-router-sdk`, etc.).
 
-### 3. Open your PR
+### 3. (Optional) Version packages locally
 
-Commit the changeset file alongside your code changes. Reviewers can see exactly what version bumps are planned.
+If you want your version bumps included in the same PR as your code changes, run:
 
-### 4. What happens on merge to `main`
+```
+yarn release-prep
+```
+
+This runs `yarn changeset` followed by `yarn version-packages` in one step — generating the changeset and immediately applying version bumps, changelog updates, and dependent package bumps.
+
+If you skip this step, version bumps will be handled automatically via a separate PR after merge (see below).
+
+### 4. Open your PR
+
+Commit the changeset file (and version bumps, if you ran `yarn release-prep`) alongside your code changes. Reviewers can see exactly what version bumps are planned.
+
+### 5. What happens on merge to `main`
 
 The CI workflow (`changesets/action`) runs automatically and does one of two things:
 
 - **If there are pending changeset files:** It opens (or updates) a **"Version Packages" PR** that bumps versions in every affected `package.json`, updates changelogs, and removes the consumed changeset files.
-- **If the "Version Packages" PR is merged:** It publishes all packages with new versions to npm.
+- **If versions are already bumped (e.g., via `yarn release-prep`):** It publishes all packages with new versions to npm directly — no extra PR needed.
 
 ### Example: Adding a new chain
 
@@ -83,4 +95,5 @@ Previously this required 4 sequential PRs with publish-wait-bump cycles. Now it'
 |---|---|
 | `yarn changeset` | Create a changeset file (run before opening your PR) |
 | `yarn version-packages` | Apply pending changesets to bump versions (CI does this) |
+| `yarn release-prep` | Run `changeset` + `version-packages` together (one-PR workflow) |
 | `yarn g:release` | Publish all bumped packages to npm (CI does this) |
