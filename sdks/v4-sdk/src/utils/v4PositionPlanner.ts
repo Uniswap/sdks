@@ -66,6 +66,12 @@ export class V4PositionPlanner extends V4Planner {
     this.addAction(Actions.SETTLE_PAIR, inputs)
   }
 
+  // CLOSE_CURRENCY
+  addCloseCurrency(currency: Currency): void {
+    const inputs = [toAddress(currency)]
+    this.addAction(Actions.CLOSE_CURRENCY, inputs)
+  }
+
   // TAKE_PAIR
   addTakePair(currency0: Currency, currency1: Currency, recipient: string): void {
     const inputs = [toAddress(currency0), toAddress(currency1), recipient]
