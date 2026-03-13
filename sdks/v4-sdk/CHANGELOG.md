@@ -1,5 +1,11 @@
 # @uniswap/v4-sdk
 
+## 1.29.3
+
+### Patch Changes
+
+- fix increase liquidity to use
+
 ## 1.29.2
 
 ### Patch Changes
