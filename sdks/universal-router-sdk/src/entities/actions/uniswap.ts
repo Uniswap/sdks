@@ -264,6 +264,8 @@ export class UniswapTrade implements Command {
         getPathCurrency(this.trade.outputAmount.currency, pools[pools.length - 1])
       )
 
+      let feeDeduction = BigNumber.from(0)
+
       // If there is a fee, that percentage is sent to the fee recipient
       // In the case where ETH is the output currency, the fee is taken in WETH (for gas reasons)
       if (!!this.options.fee) {
@@ -276,21 +278,11 @@ export class UniswapTrade implements Command {
             this.options.fee.recipient,
             fee1e18,
           ])
-
-          // If the trade is exact output, and a fee was taken, we must adjust the amount out to be the amount after the fee
-          // Otherwise we continue as expected with the trade's normal expected output
-          if (this.trade.tradeType === TradeType.EXACT_OUTPUT) {
-            minimumAmountOut = minimumAmountOut.sub(minimumAmountOut.mul(fee1e18).div(BigNumber.from(10).pow(18)))
-          }
+          feeDeduction = minimumAmountOut.mul(fee1e18).div(BigNumber.from(10).pow(18))
         } else {
           const feeBips = encodeFeeBips(this.options.fee.fee)
           planner.addCommand(CommandType.PAY_PORTION, [pathOutputCurrencyAddress, this.options.fee.recipient, feeBips])
-
-          // If the trade is exact output, and a fee was taken, we must adjust the amount out to be the amount after the fee
-          // Otherwise we continue as expected with the trade's normal expected output
-          if (this.trade.tradeType === TradeType.EXACT_OUTPUT) {
-            minimumAmountOut = minimumAmountOut.sub(minimumAmountOut.mul(feeBips).div(10000))
-          }
+          feeDeduction = minimumAmountOut.mul(feeBips).div(10000)
         }
       }
 
@@ -301,12 +293,13 @@ export class UniswapTrade implements Command {
         if (minimumAmountOut.lt(feeAmount)) throw new Error('Flat fee amount greater than minimumAmountOut')
 
         planner.addCommand(CommandType.TRANSFER, [pathOutputCurrencyAddress, this.options.flatFee.recipient, feeAmount])
+        feeDeduction = BigNumber.from(feeAmount)
+      }
 
-        // If the trade is exact output, and a fee was taken, we must adjust the amount out to be the amount after the fee
-        // Otherwise we continue as expected with the trade's normal expected output
-        if (this.trade.tradeType === TradeType.EXACT_OUTPUT) {
-          minimumAmountOut = minimumAmountOut.sub(feeAmount)
-        }
+      // If the trade is exact output, and a fee was taken, we must adjust the amount out to be the amount after the fee
+      // Otherwise we continue as expected with the trade's normal expected output
+      if (this.trade.tradeType === TradeType.EXACT_OUTPUT) {
+        minimumAmountOut = minimumAmountOut.sub(feeDeduction)
       }
 
       // The remaining tokens that need to be sent to the user after the fee is taken will be caught
