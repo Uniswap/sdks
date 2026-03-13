@@ -299,7 +299,7 @@ export abstract class V4PositionManager {
       planner.addSweep(position.pool.currency1, options.recipient)
     } else {
       if (isMint(options)) {
-        // Mint: user always owes both tokens, so SETTLE_PAIR is safe
+        // Mint: the user can never be owed a token when minting (delta is always >= 0), so SETTLE_PAIR is safe
         planner.addSettlePair(position.pool.currency0, position.pool.currency1)
       } else {
         // Increase: use CLOSE_CURRENCY instead of SETTLE_PAIR because accrued fees on
