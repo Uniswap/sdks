@@ -36,7 +36,7 @@ jobs:
       - name: 💽 Setup Node
         uses: actions/setup-node@1a4442cacd436585916779262731d5b162bc6ec7
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@ecf28ddc73e819eb6fa29df6b34ef8921c743461 # v2
