@@ -1,5 +1,16 @@
 # @uniswap/router-sdk
 
+## 2.9.0
+
+### Minor Changes
+
+- 1726505: Optional **`maxHopSlippage`** (`bigint[]` per swap leg) on **`Trade.swaps`** for per-hop slippage (e.g. UR 2.1.1+).
+
+### Patch Changes
+
+- Updated dependencies [1726505]
+  - @uniswap/v4-sdk@2.0.0
+
 ## 2.8.0
 
 ### Minor Changes
