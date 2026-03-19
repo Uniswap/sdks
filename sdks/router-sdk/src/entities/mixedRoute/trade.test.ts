@@ -683,10 +683,10 @@ describe('MixedRouteTrade', () => {
             CurrencyAmount.fromRawAmount(token2, 7004)
           )
           expect(exactIn.minimumAmountOut(new Percent(JSBI.BigInt(5), 100))).toEqual(
-            CurrencyAmount.fromRawAmount(token2, 6670)
+            CurrencyAmount.fromRawAmount(token2, 6653)
           )
           expect(exactIn.minimumAmountOut(new Percent(JSBI.BigInt(200), 100))).toEqual(
-            CurrencyAmount.fromRawAmount(token2, 2334)
+            CurrencyAmount.fromRawAmount(token2, 0)
           )
         })
       })
@@ -889,7 +889,7 @@ describe('MixedRouteTrade', () => {
             CurrencyAmount.fromRawAmount(token2, JSBI.BigInt(65))
           )
           expect(exactIn.minimumAmountOut(new Percent(JSBI.BigInt(200), JSBI.BigInt(100)))).toEqual(
-            CurrencyAmount.fromRawAmount(token2, JSBI.BigInt(23))
+            CurrencyAmount.fromRawAmount(token2, JSBI.BigInt(0))
           )
         })
       })
@@ -1375,10 +1375,10 @@ describe('MixedRouteTrade', () => {
             CurrencyAmount.fromRawAmount(token2, 7004)
           )
           expect(exactIn.minimumAmountOut(new Percent(JSBI.BigInt(5), 100))).toEqual(
-            CurrencyAmount.fromRawAmount(token2, 6670)
+            CurrencyAmount.fromRawAmount(token2, 6653)
           )
           expect(exactIn.minimumAmountOut(new Percent(JSBI.BigInt(200), 100))).toEqual(
-            CurrencyAmount.fromRawAmount(token2, 2334)
+            CurrencyAmount.fromRawAmount(token2, 0)
           )
         })
       })

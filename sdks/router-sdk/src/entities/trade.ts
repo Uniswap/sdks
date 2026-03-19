@@ -2,6 +2,7 @@ import { Currency, CurrencyAmount, Fraction, Percent, Price, TradeType, Ether } 
 import { Pair, Route as V2RouteSDK, Trade as V2TradeSDK } from '@uniswap/v2-sdk'
 import { Pool as V3Pool, Route as V3RouteSDK, Trade as V3TradeSDK } from '@uniswap/v3-sdk'
 import { Pool as V4Pool, Route as V4RouteSDK, Trade as V4TradeSDK } from '@uniswap/v4-sdk'
+import JSBI from 'jsbi'
 import invariant from 'tiny-invariant'
 import { ONE, ONE_HUNDRED_PERCENT, ZERO, ZERO_PERCENT } from '../constants'
 import { MixedRouteSDK } from './mixedRoute/route'
@@ -326,10 +327,12 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       return amountOut
     } else {
       const slippageAdjustedAmountOut = new Fraction(ONE)
-        .add(slippageTolerance)
-        .invert()
+        .subtract(slippageTolerance)
         .multiply(amountOut.quotient).quotient
-      return CurrencyAmount.fromRawAmount(amountOut.currency, slippageAdjustedAmountOut)
+      const clampedAmount = JSBI.greaterThan(slippageAdjustedAmountOut, JSBI.BigInt(0))
+        ? slippageAdjustedAmountOut
+        : JSBI.BigInt(0)
+      return CurrencyAmount.fromRawAmount(amountOut.currency, clampedAmount)
     }
   }
 
