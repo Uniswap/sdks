@@ -4,23 +4,22 @@
   "dependencies": {
     "@babel/runtime": "7.18.9",
     "@changesets/cli": "2.30.0",
-    "@manypkg/cli": "^0.19.2",
     "@typescript-eslint/eslint-plugin": "^8.38.0",
     "danger": "11.2.6",
     "eslint": "^8.57.0",
     "eslint-plugin-prettier": "^3.4.1",
     "husky": "^8.0.3",
+    "check-dependency-version-consistency": "^4.1.0",
     "syncpack": "^8.5.14",
     "turbo": "1.10.16"
   },
   "engines": {
-    "node": ">=10",
-    "yarn": ">=3.2.3"
+    "node": ">=18"
   },
-  "packageManager": "yarn@3.2.3",
+  "packageManager": "bun@1.3.10",
   "private": true,
   "scripts": {
-    "g:check:deps:mismatch": "manypkg check",
+    "g:check:deps:mismatch": "check-dependency-version-consistency --ignore-dep @typescript-eslint/parser --ignore-dep typescript",
     "g:build": "turbo run build",
     "g:lint": "turbo run lint",
     "g:release": "changeset publish",
@@ -28,15 +27,14 @@
     "g:typecheck": "turbo run typecheck",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "sdk": "yarn workspace",
+    "sdk": "bun run --filter",
     "postinstall": "husky"
   },
   "workspaces": [
     "sdks/*",
     "sdks/uniswapx-sdk/integration"
   ],
-  "resolutions": {
-    "@manypkg/cli@^0.19.2": "patch:@manypkg/cli@npm%3A0.19.2#./.yarn/patches/@manypkg-cli-npm-0.19.2-ea52ff91d4.patch",
+  "overrides": {
     "eslint-config-prettier": "^9.1.0"
   }
 }

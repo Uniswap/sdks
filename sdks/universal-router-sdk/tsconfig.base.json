@@ -1,9 +1,11 @@
 {
-  "include": ["src", "abis"],
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts"],
   "compilerOptions": {
     "rootDir": ".",
     "baseUrl": ".",
-    "target": "es6",
+    "target": "es2018",
+    "module": "esnext",
     "importHelpers": true,
     "declaration": true,
     "sourceMap": true,
@@ -19,10 +21,8 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "moduleResolution": "node",
-    "resolveJsonModule": true,
     "esModuleInterop": true,
-    "skipLibCheck": true,
-    "isolatedModules": true
-  },
-  "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts"]
+    "resolveJsonModule": true,
+    "skipLibCheck": true
+  }
 }

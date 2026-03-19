@@ -1,8 +1,9 @@
 {
-    "include": [
-        "src"
-    ],
+    "include": ["src"],
+    "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts"],
     "compilerOptions": {
+        "rootDir": ".",
+        "baseUrl": ".",
         "target": "es2018",
         "module": "esnext",
         "importHelpers": true,
@@ -20,6 +21,8 @@
         "noImplicitReturns": true,
         "noFallthroughCasesInSwitch": true,
         "moduleResolution": "node",
-        "esModuleInterop": true
+        "esModuleInterop": true,
+        "resolveJsonModule": true,
+        "skipLibCheck": true
     }
 }

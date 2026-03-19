@@ -24,6 +24,7 @@ export type { V3DutchOrderReactor } from "./V3DutchOrderReactor";
 export type { DeploylessMulticall2 } from "./DeploylessMulticall2";
 export type { Multicall2 } from "./Multicall2";
 export * as factories from "./factories";
+export { DeploylessMulticall2__factory } from "./factories/DeploylessMulticall2__factory";
 export { DSTokenInterface__factory } from "./factories/DSTokenInterface__factory";
 export { ERC1967Proxy__factory } from "./factories/ERC1967Proxy__factory";
 export { ExclusiveDutchOrderReactor__factory } from "./factories/ExclusiveDutchOrderReactor__factory";
@@ -33,6 +34,7 @@ export { ISuperstateTokenV4__factory } from "./factories/ISuperstateTokenV4__fac
 export { MockDSTokenInterface__factory } from "./factories/MockDSTokenInterface__factory";
 export { MockERC20__factory } from "./factories/MockERC20__factory";
 export { MockSuperstateTokenV4__factory } from "./factories/MockSuperstateTokenV4__factory";
+export { Multicall2__factory } from "./factories/Multicall2__factory";
 export { OrderQuoter__factory } from "./factories/OrderQuoter__factory";
 export { OrderQuoterV4__factory } from "./factories/OrderQuoterV4__factory";
 export { Permit2__factory } from "./factories/Permit2__factory";
@@ -44,5 +46,3 @@ export { SwapRouter02Executor__factory } from "./factories/SwapRouter02Executor_
 export { TokenTransferHook__factory } from "./factories/TokenTransferHook__factory";
 export { V2DutchOrderReactor__factory } from "./factories/V2DutchOrderReactor__factory";
 export { V3DutchOrderReactor__factory } from "./factories/V3DutchOrderReactor__factory";
-export { DeploylessMulticall2__factory } from "./factories/DeploylessMulticall2__factory";
-export { Multicall2__factory } from "./factories/Multicall2__factory";
