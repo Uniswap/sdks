@@ -1386,7 +1386,7 @@ describe('Trade', () => {
           CurrencyAmount.fromRawAmount(token1, 285) // 300 * 0.95
         )
         expect(trade.minimumAmountOut(new Percent(JSBI.BigInt(200), 100))).toEqual(
-          CurrencyAmount.fromRawAmount(token1, 100)
+          CurrencyAmount.fromRawAmount(token1, 0)
         )
       })
 

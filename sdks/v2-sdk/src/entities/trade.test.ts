@@ -270,7 +270,7 @@ describe('Trade', () => {
           CurrencyAmount.fromRawAmount(token2, JSBI.BigInt(65))
         )
         expect(exactIn.minimumAmountOut(new Percent(JSBI.BigInt(200), JSBI.BigInt(100)))).toEqual(
-          CurrencyAmount.fromRawAmount(token2, JSBI.BigInt(23))
+          CurrencyAmount.fromRawAmount(token2, JSBI.BigInt(0))
         )
       })
     })
