@@ -248,7 +248,7 @@ export class V4Planner {
     if (exactOutput) invariant(!!slippageTolerance, 'ExactOut requires slippageTolerance')
     invariant(trade.swaps.length === 1, 'Only accepts Trades with 1 swap (must break swaps into individual trades)')
     invariant(
-      urVersion === URVersion.V2_0 || !maxHopSlippage || maxHopSlippage.length === trade.route.pools.length,
+      urVersion === URVersion.V2_0 || !maxHopSlippage?.length || maxHopSlippage.length === trade.route.pools.length,
       `maxHopSlippage length (${maxHopSlippage?.length}) must equal route.pools.length (${trade.route.pools.length})`
     )
 
