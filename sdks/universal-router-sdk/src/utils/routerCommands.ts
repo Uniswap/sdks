@@ -15,6 +15,7 @@ export enum CommandType {
   SWEEP = 0x04,
   TRANSFER = 0x05,
   PAY_PORTION = 0x06,
+  PAY_PORTION_FULL_PRECISION = 0x07,
 
   V2_SWAP_EXACT_IN = 0x08,
   V2_SWAP_EXACT_OUT = 0x09,
@@ -202,6 +203,14 @@ export const COMMAND_DEFINITION: { [key in CommandType]: CommandDefinition } = {
       { name: 'token', type: 'address' },
       { name: 'recipient', type: 'address' },
       { name: 'bips', type: 'uint256' },
+    ],
+  },
+  [CommandType.PAY_PORTION_FULL_PRECISION]: {
+    parser: Parser.Abi,
+    params: [
+      { name: 'token', type: 'address' },
+      { name: 'recipient', type: 'address' },
+      { name: 'portion', type: 'uint256' },
     ],
   },
   [CommandType.BALANCE_CHECK_ERC20]: {
