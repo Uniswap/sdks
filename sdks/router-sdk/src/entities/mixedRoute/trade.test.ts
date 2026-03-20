@@ -422,13 +422,13 @@ describe('MixedRouteTrade', () => {
         it('returns exact if nonzero', () => {
           expect(exactIn.worstExecutionPrice(new Percent(0, 100))).toEqual(new Price(token0, token2, 100, 69))
           expect(exactIn.worstExecutionPrice(new Percent(5, 100))).toEqual(new Price(token0, token2, 100, 65))
-          expect(exactIn.worstExecutionPrice(new Percent(200, 100))).toEqual(new Price(token0, token2, 100, 23))
+          expect(exactIn.worstExecutionPrice(new Percent(200, 100))).toEqual(new Price(token0, token2, 100, 0))
         })
         it('returns exact if nonzero with multiple routes', () => {
           expect(exactInMultiRoute.worstExecutionPrice(new Percent(0, 100))).toEqual(new Price(token0, token2, 100, 69))
           expect(exactInMultiRoute.worstExecutionPrice(new Percent(5, 100))).toEqual(new Price(token0, token2, 100, 65))
           expect(exactInMultiRoute.worstExecutionPrice(new Percent(200, 100))).toEqual(
-            new Price(token0, token2, 100, 23)
+            new Price(token0, token2, 100, 0)
           )
         })
       })
@@ -683,10 +683,10 @@ describe('MixedRouteTrade', () => {
             CurrencyAmount.fromRawAmount(token2, 7004)
           )
           expect(exactIn.minimumAmountOut(new Percent(JSBI.BigInt(5), 100))).toEqual(
-            CurrencyAmount.fromRawAmount(token2, 6670)
+            CurrencyAmount.fromRawAmount(token2, 6653)
           )
           expect(exactIn.minimumAmountOut(new Percent(JSBI.BigInt(200), 100))).toEqual(
-            CurrencyAmount.fromRawAmount(token2, 2334)
+            CurrencyAmount.fromRawAmount(token2, 0)
           )
         })
       })
@@ -889,7 +889,7 @@ describe('MixedRouteTrade', () => {
             CurrencyAmount.fromRawAmount(token2, JSBI.BigInt(65))
           )
           expect(exactIn.minimumAmountOut(new Percent(JSBI.BigInt(200), JSBI.BigInt(100)))).toEqual(
-            CurrencyAmount.fromRawAmount(token2, JSBI.BigInt(23))
+            CurrencyAmount.fromRawAmount(token2, JSBI.BigInt(0))
           )
         })
       })
@@ -914,7 +914,7 @@ describe('MixedRouteTrade', () => {
         it('returns exact if nonzero', () => {
           expect(exactIn.worstExecutionPrice(new Percent(0, 100))).toEqual(new Price(token0, token2, 100, 69))
           expect(exactIn.worstExecutionPrice(new Percent(5, 100))).toEqual(new Price(token0, token2, 100, 65))
-          expect(exactIn.worstExecutionPrice(new Percent(200, 100))).toEqual(new Price(token0, token2, 100, 23))
+          expect(exactIn.worstExecutionPrice(new Percent(200, 100))).toEqual(new Price(token0, token2, 100, 0))
         })
       })
     })
@@ -1145,13 +1145,13 @@ describe('MixedRouteTrade', () => {
         it('returns exact if nonzero', () => {
           expect(exactIn.worstExecutionPrice(new Percent(0, 100))).toEqual(new Price(token0, token2, 100, 69))
           expect(exactIn.worstExecutionPrice(new Percent(5, 100))).toEqual(new Price(token0, token2, 100, 65))
-          expect(exactIn.worstExecutionPrice(new Percent(200, 100))).toEqual(new Price(token0, token2, 100, 23))
+          expect(exactIn.worstExecutionPrice(new Percent(200, 100))).toEqual(new Price(token0, token2, 100, 0))
         })
         it('returns exact if nonzero with multiple routes', () => {
           expect(exactInMultiRoute.worstExecutionPrice(new Percent(0, 100))).toEqual(new Price(token0, token2, 100, 69))
           expect(exactInMultiRoute.worstExecutionPrice(new Percent(5, 100))).toEqual(new Price(token0, token2, 100, 65))
           expect(exactInMultiRoute.worstExecutionPrice(new Percent(200, 100))).toEqual(
-            new Price(token0, token2, 100, 23)
+            new Price(token0, token2, 100, 0)
           )
         })
       })
@@ -1375,10 +1375,10 @@ describe('MixedRouteTrade', () => {
             CurrencyAmount.fromRawAmount(token2, 7004)
           )
           expect(exactIn.minimumAmountOut(new Percent(JSBI.BigInt(5), 100))).toEqual(
-            CurrencyAmount.fromRawAmount(token2, 6670)
+            CurrencyAmount.fromRawAmount(token2, 6653)
           )
           expect(exactIn.minimumAmountOut(new Percent(JSBI.BigInt(200), 100))).toEqual(
-            CurrencyAmount.fromRawAmount(token2, 2334)
+            CurrencyAmount.fromRawAmount(token2, 0)
           )
         })
       })
