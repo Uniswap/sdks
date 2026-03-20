@@ -28,6 +28,7 @@
     "g:typecheck": "turbo run typecheck",
     "changeset": "changeset",
     "version-packages": "changeset version",
+    "release-prep": "changeset && changeset version",
     "sdk": "yarn workspace",
     "postinstall": "husky"
   },
