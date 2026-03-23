@@ -10,8 +10,8 @@
 #    - Does NOT publish to npm
 #
 # 2. When no changeset files exist (e.g., the "Version Packages" PR was just merged):
-#    - Runs `bun run g:release` (changeset publish) to publish all packages
-#      with new versions to npm
+#    - Runs `bun run g:release` which first resolves workspace:* to real versions,
+#      then runs changeset publish to publish packages with new versions to npm
 #    - If all packages are already published, this is a no-op
 #
 # Typical flow:
