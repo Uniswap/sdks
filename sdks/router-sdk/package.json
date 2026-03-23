@@ -1,6 +1,6 @@
 {
   "name": "@uniswap/router-sdk",
-  "version": "2.8.0",
+  "version": "2.9.0",
   "description": "An sdk for routing swaps using Uniswap v2 and Uniswap v3.",
   "repository": "https://github.com/Uniswap/sdks.git",
   "keywords": [
