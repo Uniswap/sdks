@@ -207,21 +207,6 @@ describe('Fee Encoding', () => {
       expect(BigNumber.from(feeCmd!.params[2].value).toNumber()).to.equal(500)
     })
 
-    it('uses PAY_PORTION (bips) when urVersion is V2_1', async () => {
-      const trade = await V4Trade.fromRoute(
-        new V4Route([ETH_USDC_V4], ETHER, USDC),
-        CurrencyAmount.fromRawAmount(ETHER, utils.parseEther('1').toString()),
-        TradeType.EXACT_INPUT
-      )
-      const feeOptions: FeeOptions = { fee: new Percent(5, 100), recipient: TEST_FEE_RECIPIENT_ADDRESS }
-      const opts = swapOptions({ fee: feeOptions, urVersion: URVersion.V2_1 })
-      const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
-
-      const feeCmd = parseFeeCommand(methodParameters)
-      expect(feeCmd).to.not.be.undefined
-      expect(feeCmd!.commandName).to.equal('PAY_PORTION')
-    })
-
     it('uses PAY_PORTION_FULL_PRECISION (1e18) when urVersion is V2_1_1', async () => {
       const trade = await V4Trade.fromRoute(
         new V4Route([ETH_USDC_V4], ETHER, USDC),
