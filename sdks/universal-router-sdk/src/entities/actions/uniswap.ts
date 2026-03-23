@@ -269,7 +269,13 @@ export class UniswapTrade implements Command {
       // If there is a fee, that percentage is sent to the fee recipient
       // In the case where ETH is the output currency, the fee is taken in WETH (for gas reasons)
       if (!!this.options.fee) {
+        // UR >= V2_1_1 supports PAY_PORTION_FULL_PRECISION (1e18 precision), older versions only support PAY_PORTION (bips)
         const useFullPrecision = this.options.urVersion !== undefined && this.options.urVersion >= URVersion.V2_1_1
+
+        // Reject fractional bips fees on older UR versions to prevent silent precision loss
+        if (!useFullPrecision && !this.options.fee.fee.multiply(10_000).remainder.equalTo(0)) {
+          throw new Error('Fractional fee bips require Universal Router version V2_1_1 or higher')
+        }
 
         if (useFullPrecision) {
           const fee1e18 = encodeFee1e18(this.options.fee.fee)
@@ -277,7 +283,7 @@ export class UniswapTrade implements Command {
             pathOutputCurrencyAddress,
             this.options.fee.recipient,
             fee1e18,
-          ])
+          ], false, this.options.urVersion)
           feeDeduction = minimumAmountOut.mul(fee1e18).div(BigNumber.from(10).pow(18))
         } else {
           const feeBips = encodeFeeBips(this.options.fee.fee)
