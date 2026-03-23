@@ -31,7 +31,7 @@ import { Currency, TradeType, Token, CurrencyAmount, Percent } from '@uniswap/sd
 import { Command, RouterActionType, TradeConfig } from '../Command'
 import { SENDER_AS_RECIPIENT, ROUTER_AS_RECIPIENT, CONTRACT_BALANCE, ETH_ADDRESS } from '../../utils/constants'
 import { getCurrencyAddress } from '../../utils/getCurrencyAddress'
-import { encodeFeeBips } from '../../utils/numbers'
+import { encodeFeeBips, encodeFee1e18 } from '../../utils/numbers'
 import { BigNumber, BigNumberish } from 'ethers'
 import { TPool } from '@uniswap/router-sdk'
 
@@ -264,16 +264,33 @@ export class UniswapTrade implements Command {
         getPathCurrency(this.trade.outputAmount.currency, pools[pools.length - 1])
       )
 
+      let feeDeduction = BigNumber.from(0)
+
       // If there is a fee, that percentage is sent to the fee recipient
       // In the case where ETH is the output currency, the fee is taken in WETH (for gas reasons)
       if (!!this.options.fee) {
-        const feeBips = encodeFeeBips(this.options.fee.fee)
-        planner.addCommand(CommandType.PAY_PORTION, [pathOutputCurrencyAddress, this.options.fee.recipient, feeBips])
+        // UR >= V2_1_1 supports PAY_PORTION_FULL_PRECISION (1e18 precision),
+        // older versions only support PAY_PORTION (bips)
+        const useFullPrecision = this.options.urVersion !== undefined && this.options.urVersion >= URVersion.V2_1_1
 
-        // If the trade is exact output, and a fee was taken, we must adjust the amount out to be the amount after the fee
-        // Otherwise we continue as expected with the trade's normal expected output
-        if (this.trade.tradeType === TradeType.EXACT_OUTPUT) {
-          minimumAmountOut = minimumAmountOut.sub(minimumAmountOut.mul(feeBips).div(10000))
+        // Reject fractional bips fees on older UR versions to prevent silent precision loss
+        if (!useFullPrecision && !this.options.fee.fee.multiply(10_000).remainder.equalTo(0)) {
+          throw new Error('Fractional fee bips require Universal Router version V2_1_1 or higher')
+        }
+
+        if (useFullPrecision) {
+          const fee1e18 = encodeFee1e18(this.options.fee.fee)
+          planner.addCommand(
+            CommandType.PAY_PORTION_FULL_PRECISION,
+            [pathOutputCurrencyAddress, this.options.fee.recipient, fee1e18],
+            false,
+            this.options.urVersion
+          )
+          feeDeduction = minimumAmountOut.mul(fee1e18).div(BigNumber.from(10).pow(18))
+        } else {
+          const feeBips = encodeFeeBips(this.options.fee.fee)
+          planner.addCommand(CommandType.PAY_PORTION, [pathOutputCurrencyAddress, this.options.fee.recipient, feeBips])
+          feeDeduction = minimumAmountOut.mul(feeBips).div(10000)
         }
       }
 
@@ -284,12 +301,13 @@ export class UniswapTrade implements Command {
         if (minimumAmountOut.lt(feeAmount)) throw new Error('Flat fee amount greater than minimumAmountOut')
 
         planner.addCommand(CommandType.TRANSFER, [pathOutputCurrencyAddress, this.options.flatFee.recipient, feeAmount])
+        feeDeduction = BigNumber.from(feeAmount)
+      }
 
-        // If the trade is exact output, and a fee was taken, we must adjust the amount out to be the amount after the fee
-        // Otherwise we continue as expected with the trade's normal expected output
-        if (this.trade.tradeType === TradeType.EXACT_OUTPUT) {
-          minimumAmountOut = minimumAmountOut.sub(feeAmount)
-        }
+      // If the trade is exact output, and a fee was taken, we must adjust the amount out to be the amount after the fee
+      // Otherwise we continue as expected with the trade's normal expected output
+      if (this.trade.tradeType === TradeType.EXACT_OUTPUT) {
+        minimumAmountOut = minimumAmountOut.sub(feeDeduction)
       }
 
       // The remaining tokens that need to be sent to the user after the fee is taken will be caught
