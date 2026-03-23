@@ -9,7 +9,7 @@
     "build": {
       "dependsOn": ["^build"],
       "inputs": [
-        "yarn.lock",
+        "bun.lock",
         "**/package.json",
         "sdks/*/src/**.ts",
         "sdks/*/src/**.tsx"

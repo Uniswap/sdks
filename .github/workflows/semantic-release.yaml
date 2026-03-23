@@ -4,13 +4,13 @@
 # handle versioning and publishing. It operates in two modes:
 #
 # 1. When changeset files exist (.changeset/*.md):
-#    - Runs `yarn version-packages` (changeset version) to consume changesets,
+#    - Runs `bun run version-packages` (changeset version) to consume changesets,
 #      bump versions in package.json files, and update CHANGELOGs
 #    - Creates or updates a "Version Packages" PR with those changes
 #    - Does NOT publish to npm
 #
 # 2. When no changeset files exist (e.g., the "Version Packages" PR was just merged):
-#    - Runs `yarn g:release` (changeset publish) to publish all packages
+#    - Runs `bun run g:release` (changeset publish) to publish all packages
 #      with new versions to npm
 #    - If all packages are already published, this is a no-op
 #
@@ -51,7 +51,6 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@1a4442cacd436585916779262731d5b162bc6ec7
         with:
-          cache: yarn
           node-version: 24
           # Node 24 ships with npm 11.x which has full Trusted Publishing
           # OIDC support (Node 22's npm 10.x lacks the OIDC token exchange
@@ -60,11 +59,16 @@ jobs:
           # _authToken=${NODE_AUTH_TOKEN} which, when unset, prevents npm
           # from falling through to OIDC-based Trusted Publishing auth.
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@ecf28ddc73e819eb6fa29df6b34ef8921c743461 # v2
+        with:
+          bun-version: 1.3.10
+
       - name: Install dependencies
-        run: yarn --immutable
+        run: bun install --frozen-lockfile
 
       - name: Build SDK's
-        run: yarn g:build
+        run: bun run g:build
 
       # The changesets/action automatically detects which mode to run:
       # - version: runs when there are pending changeset files (creates/updates PR)
@@ -73,8 +77,8 @@ jobs:
         id: changesets
         uses: changesets/action@6a0a831ff30acef54f2c6aa1cbbc1096b066edaf # v1.7.0
         with:
-          version: yarn version-packages
-          publish: yarn g:release
+          version: bun run version-packages
+          publish: bun run g:release
         env:
           GITHUB_TOKEN: ${{ github.token }}
           # No NPM_TOKEN needed — npm auth uses trusted publishing (OIDC via id-token)

@@ -1,26 +1,32 @@
+import { mock, describe, it, expect, beforeEach, afterEach } from 'bun:test';
+
+// Create mock functions BEFORE mock.module
+const mockCreatePublicClient = mock();
+const mockParseEventLogs = mock();
+const mockHttp = mock(() => 'mock-transport');
+
+// Mock viem module - bun hoists this before imports
+mock.module('viem', () => ({
+  createPublicClient: mockCreatePublicClient,
+  parseEventLogs: mockParseEventLogs,
+  http: mockHttp,
+}));
+
 import { RpcClient, createRpcClient } from '../../src/rpc/client';
 import { BlockNotFoundError, NetworkError } from '../../src/types';
-import {
-  mockCreatePublicClient,
-  mockParseEventLogs,
-} from '../__mocks__/viem';
-
-// Use doMock to avoid hoisting issues with ts-jest
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-jest.doMock('viem', () => require('../__mocks__/viem'));
 
 describe('RpcClient', () => {
   let mockClient: any;
-  let mockGetBlock: jest.Mock;
-  let mockGetTransactionReceipt: jest.Mock;
+  let mockGetBlock: ReturnType<typeof mock>;
+  let mockGetTransactionReceipt: ReturnType<typeof mock>;
 
   beforeEach(() => {
     // Clear cache before each test
     RpcClient.clearCache();
 
-    mockGetBlock = jest.fn();
-    mockGetTransactionReceipt = jest.fn();
-    const mockReadContract = jest.fn();
+    mockGetBlock = mock();
+    mockGetTransactionReceipt = mock();
+    const mockReadContract = mock();
 
     mockClient = {
       getBlock: mockGetBlock,
@@ -34,7 +40,10 @@ describe('RpcClient', () => {
   });
 
   afterEach(() => {
-    jest.clearAllMocks();
+    mockCreatePublicClient.mockClear();
+    mockParseEventLogs.mockClear();
+    mockGetBlock.mockClear();
+    mockGetTransactionReceipt.mockClear();
   });
 
   describe('constructor', () => {
@@ -179,7 +188,7 @@ describe('RpcClient', () => {
 
   describe('getSourceLocators', () => {
     let client: RpcClient;
-    let mockReadContract: jest.Mock;
+    let mockReadContract: ReturnType<typeof mock>;
 
     beforeEach(() => {
       client = new RpcClient({ chainId: 1301, maxRetries: 0 });
@@ -231,7 +240,7 @@ describe('RpcClient', () => {
         maxRetries: 2,
         initialRetryDelay: 10
       });
-      const mockReadContractWithRetry = clientWithRetry.getClient().readContract as jest.Mock;
+      const mockReadContractWithRetry = clientWithRetry.getClient().readContract as ReturnType<typeof mock>;
 
       mockReadContractWithRetry
         .mockRejectedValueOnce(new Error('Network error'))
@@ -251,7 +260,7 @@ describe('RpcClient', () => {
         maxRetries: 1,
         initialRetryDelay: 10
       });
-      const mockReadContractWithRetry = clientWithRetry.getClient().readContract as jest.Mock;
+      const mockReadContractWithRetry = clientWithRetry.getClient().readContract as ReturnType<typeof mock>;
 
       mockReadContractWithRetry.mockRejectedValue(new Error('Network error'));
 
