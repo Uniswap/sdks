@@ -22,7 +22,7 @@
     "g:check:deps:mismatch": "check-dependency-version-consistency --ignore-dep @typescript-eslint/parser --ignore-dep typescript",
     "g:build": "turbo run build",
     "g:lint": "turbo run lint",
-    "g:release": "changeset publish",
+    "g:release": "node scripts/resolve-workspace-protocol.js && changeset publish",
     "g:test": "turbo run test",
     "g:typecheck": "turbo run typecheck",
     "changeset": "changeset",
