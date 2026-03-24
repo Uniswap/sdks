@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import JSBI from 'jsbi'
-import { BigNumber, utils } from 'ethers'
+import { parseEther, parseUnits } from 'ethers'
 import { CurrencyAmount, Ether, Percent, Token, TradeType } from '@uniswap/sdk-core'
 import { FeeOptions, encodeSqrtRatioX96, nearestUsableTick, TickMath, FeeAmount } from '@uniswap/v3-sdk'
 import { Pool as V4Pool, Route as V4Route, Trade as V4Trade, URVersion } from '@uniswap/v4-sdk'
@@ -21,31 +21,31 @@ describe('Fee Encoding', () => {
     it('encodes 5% as 500 bips', () => {
       const fee = new Percent(5, 100)
       const encoded = encodeFeeBips(fee)
-      expect(BigNumber.from(encoded).toNumber()).to.equal(500)
+      expect(Number(BigInt(encoded))).to.equal(500)
     })
 
     it('encodes 1% as 100 bips', () => {
       const fee = new Percent(1, 100)
       const encoded = encodeFeeBips(fee)
-      expect(BigNumber.from(encoded).toNumber()).to.equal(100)
+      expect(Number(BigInt(encoded))).to.equal(100)
     })
 
     it('encodes 0.3% as 30 bips', () => {
       const fee = new Percent(3, 1000)
       const encoded = encodeFeeBips(fee)
-      expect(BigNumber.from(encoded).toNumber()).to.equal(30)
+      expect(Number(BigInt(encoded))).to.equal(30)
     })
 
     it('encodes 100% as 10000 bips', () => {
       const fee = new Percent(100, 100)
       const encoded = encodeFeeBips(fee)
-      expect(BigNumber.from(encoded).toNumber()).to.equal(10000)
+      expect(Number(BigInt(encoded))).to.equal(10000)
     })
 
     it('cannot represent 1/3 exactly (truncates to 3333 bips)', () => {
       const fee = new Percent(1, 3)
       const encoded = encodeFeeBips(fee)
-      expect(BigNumber.from(encoded).toNumber()).to.equal(3333)
+      expect(Number(BigInt(encoded))).to.equal(3333)
     })
   })
 
@@ -53,19 +53,19 @@ describe('Fee Encoding', () => {
     it('encodes 5% with 1e18 precision', () => {
       const fee = new Percent(5, 100)
       const encoded = encodeFee1e18(fee)
-      expect(BigNumber.from(encoded).toString()).to.equal(BigNumber.from(10).pow(18).mul(5).div(100).toString())
+      expect(BigInt(encoded).toString()).to.equal((10n ** 18n * 5n / 100n).toString())
     })
 
     it('encodes 1% with 1e18 precision', () => {
       const fee = new Percent(1, 100)
       const encoded = encodeFee1e18(fee)
-      expect(BigNumber.from(encoded).toString()).to.equal(BigNumber.from(10).pow(16).toString())
+      expect(BigInt(encoded).toString()).to.equal((10n ** 16n).toString())
     })
 
     it('encodes 0.3% with 1e18 precision', () => {
       const fee = new Percent(3, 1000)
       const encoded = encodeFee1e18(fee)
-      expect(BigNumber.from(encoded).toString()).to.equal(BigNumber.from(10).pow(15).mul(3).toString())
+      expect(BigInt(encoded).toString()).to.equal((10n ** 15n * 3n).toString())
     })
 
     it('can represent 1/3 with higher precision than bips', () => {
@@ -75,16 +75,16 @@ describe('Fee Encoding', () => {
 
       // 1/3 in bips: 3333 out of 10000 = 0.3333
       // 1/3 in 1e18: 333333333333333333 out of 1e18 = 0.333333333333333333
-      expect(BigNumber.from(encoded1e18).toString()).to.equal('333333333333333333')
-      expect(BigNumber.from(encodedBips).toNumber()).to.equal(3333)
+      expect(BigInt(encoded1e18).toString()).to.equal('333333333333333333')
+      expect(Number(BigInt(encodedBips))).to.equal(3333)
     })
   })
 
   describe('PAY_PORTION vs PAY_PORTION_FULL_PRECISION command encoding', () => {
     const token = '0x0000000000000000000000000000000000000001'
     const recipient = '0x0000000000000000000000000000000000000002'
-    const bips = BigNumber.from(500)
-    const portion1e18 = BigNumber.from(10).pow(16).mul(5) // 5% in 1e18
+    const bips = 500n
+    const portion1e18 = 10n ** 16n * 5n // 5% in 1e18
 
     it('PAY_PORTION encodes with bips parameter', () => {
       const planner = new RoutePlanner()
@@ -99,7 +99,7 @@ describe('Fee Encoding', () => {
       expect(parsed.commands).to.have.length(1)
       expect(parsed.commands[0].commandName).to.equal('PAY_PORTION')
       expect(parsed.commands[0].params[2].name).to.equal('bips')
-      expect(BigNumber.from(parsed.commands[0].params[2].value).toNumber()).to.equal(500)
+      expect(Number(BigInt(parsed.commands[0].params[2].value))).to.equal(500)
     })
 
     it('PAY_PORTION_FULL_PRECISION encodes with portion parameter', () => {
@@ -115,7 +115,7 @@ describe('Fee Encoding', () => {
       expect(parsed.commands).to.have.length(1)
       expect(parsed.commands[0].commandName).to.equal('PAY_PORTION_FULL_PRECISION')
       expect(parsed.commands[0].params[2].name).to.equal('portion')
-      expect(BigNumber.from(parsed.commands[0].params[2].value).toString()).to.equal(portion1e18.toString())
+      expect(BigInt(parsed.commands[0].params[2].value).toString()).to.equal(portion1e18.toString())
     })
 
     it('PAY_PORTION command byte is 0x06', () => {
@@ -135,7 +135,7 @@ describe('Fee Encoding', () => {
     let ETH_USDC_V4: V4Pool
 
     before(() => {
-      const liquidity = JSBI.BigInt(utils.parseEther('1000000').toString())
+      const liquidity = JSBI.BigInt(parseEther('1000000').toString())
       const tickSpacing = 60
       const tickProviderMock = [
         {
@@ -176,7 +176,7 @@ describe('Fee Encoding', () => {
     it('uses PAY_PORTION (bips) when urVersion is undefined (default)', async () => {
       const trade = await V4Trade.fromRoute(
         new V4Route([ETH_USDC_V4], ETHER, USDC),
-        CurrencyAmount.fromRawAmount(ETHER, utils.parseEther('1').toString()),
+        CurrencyAmount.fromRawAmount(ETHER, parseEther('1').toString()),
         TradeType.EXACT_INPUT
       )
       const feeOptions: FeeOptions = { fee: new Percent(5, 100), recipient: TEST_FEE_RECIPIENT_ADDRESS }
@@ -187,13 +187,13 @@ describe('Fee Encoding', () => {
       expect(feeCmd).to.not.be.undefined
       expect(feeCmd!.commandName).to.equal('PAY_PORTION')
       expect(feeCmd!.params[2].name).to.equal('bips')
-      expect(BigNumber.from(feeCmd!.params[2].value).toNumber()).to.equal(500)
+      expect(Number(BigInt(feeCmd!.params[2].value))).to.equal(500)
     })
 
     it('uses PAY_PORTION (bips) when urVersion is V2_0', async () => {
       const trade = await V4Trade.fromRoute(
         new V4Route([ETH_USDC_V4], ETHER, USDC),
-        CurrencyAmount.fromRawAmount(ETHER, utils.parseEther('1').toString()),
+        CurrencyAmount.fromRawAmount(ETHER, parseEther('1').toString()),
         TradeType.EXACT_INPUT
       )
       const feeOptions: FeeOptions = { fee: new Percent(5, 100), recipient: TEST_FEE_RECIPIENT_ADDRESS }
@@ -204,13 +204,13 @@ describe('Fee Encoding', () => {
       expect(feeCmd).to.not.be.undefined
       expect(feeCmd!.commandName).to.equal('PAY_PORTION')
       expect(feeCmd!.params[2].name).to.equal('bips')
-      expect(BigNumber.from(feeCmd!.params[2].value).toNumber()).to.equal(500)
+      expect(Number(BigInt(feeCmd!.params[2].value))).to.equal(500)
     })
 
     it('uses PAY_PORTION_FULL_PRECISION (1e18) when urVersion is V2_1_1', async () => {
       const trade = await V4Trade.fromRoute(
         new V4Route([ETH_USDC_V4], ETHER, USDC),
-        CurrencyAmount.fromRawAmount(ETHER, utils.parseEther('1').toString()),
+        CurrencyAmount.fromRawAmount(ETHER, parseEther('1').toString()),
         TradeType.EXACT_INPUT
       )
       const feeOptions: FeeOptions = { fee: new Percent(5, 100), recipient: TEST_FEE_RECIPIENT_ADDRESS }
@@ -222,13 +222,13 @@ describe('Fee Encoding', () => {
       expect(feeCmd!.commandName).to.equal('PAY_PORTION_FULL_PRECISION')
       expect(feeCmd!.params[2].name).to.equal('portion')
       // 5% in 1e18 = 5 * 10^16
-      expect(BigNumber.from(feeCmd!.params[2].value).toString()).to.equal(BigNumber.from(10).pow(16).mul(5).toString())
+      expect(BigInt(feeCmd!.params[2].value).toString()).to.equal((10n ** 16n * 5n).toString())
     })
 
     it('encodes correct fee recipient in PAY_PORTION_FULL_PRECISION', async () => {
       const trade = await V4Trade.fromRoute(
         new V4Route([ETH_USDC_V4], ETHER, USDC),
-        CurrencyAmount.fromRawAmount(ETHER, utils.parseEther('1').toString()),
+        CurrencyAmount.fromRawAmount(ETHER, parseEther('1').toString()),
         TradeType.EXACT_INPUT
       )
       const feeOptions: FeeOptions = { fee: new Percent(5, 100), recipient: TEST_FEE_RECIPIENT_ADDRESS }
@@ -243,10 +243,10 @@ describe('Fee Encoding', () => {
     it('uses TRANSFER for flat fees regardless of urVersion', async () => {
       const trade = await V4Trade.fromRoute(
         new V4Route([ETH_USDC_V4], ETHER, USDC),
-        CurrencyAmount.fromRawAmount(ETHER, utils.parseEther('1').toString()),
+        CurrencyAmount.fromRawAmount(ETHER, parseEther('1').toString()),
         TradeType.EXACT_INPUT
       )
-      const feeOptions: FlatFeeOptions = { amount: utils.parseUnits('50', 6), recipient: TEST_FEE_RECIPIENT_ADDRESS }
+      const feeOptions: FlatFeeOptions = { amount: parseUnits('50', 6), recipient: TEST_FEE_RECIPIENT_ADDRESS }
       const opts = swapOptions({ flatFee: feeOptions, urVersion: URVersion.V2_1_1 })
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
 
@@ -256,11 +256,9 @@ describe('Fee Encoding', () => {
     })
 
     it('exact output adjusts minimumAmountOut with 1e18 precision for V2_1_1', async () => {
-      const outputUSDC = utils.parseUnits('1000', 6)
+      const outputUSDC = parseUnits('1000', 6)
       // Adjust output to account for 5% fee: outputUSDC / (1 - 0.05)
-      const adjustedOutput = outputUSDC
-        .mul(BigNumber.from(10).pow(18))
-        .div(BigNumber.from(10).pow(18).sub(BigNumber.from(10).pow(16).mul(5)))
+      const adjustedOutput = outputUSDC * 10n ** 18n / (10n ** 18n - 10n ** 16n * 5n)
       const trade = await V4Trade.fromRoute(
         new V4Route([ETH_USDC_V4], ETHER, USDC),
         CurrencyAmount.fromRawAmount(USDC, adjustedOutput.toString()),
@@ -277,14 +275,14 @@ describe('Fee Encoding', () => {
       const parsed = CommandParser.parseCalldata(methodParameters.calldata)
       const sweepCmd = parsed.commands.find((cmd) => cmd.commandName === 'SWEEP')
       expect(sweepCmd).to.not.be.undefined
-      const sweepMinAmount = BigNumber.from(sweepCmd!.params[2].value)
+      const sweepMinAmount = BigInt(sweepCmd!.params[2].value)
       // After 5% fee deduction from minimumAmountOut, the sweep amount should be less than the trade output
-      expect(sweepMinAmount.gt(0)).to.be.true
+      expect(sweepMinAmount > 0n).to.be.true
     })
 
     it('exact output adjusts minimumAmountOut with bips precision for V2_0', async () => {
-      const outputUSDC = utils.parseUnits('1000', 6)
-      const adjustedOutput = outputUSDC.mul(10000).div(10000 - 500)
+      const outputUSDC = parseUnits('1000', 6)
+      const adjustedOutput = outputUSDC * 10000n / (10000n - 500n)
       const trade = await V4Trade.fromRoute(
         new V4Route([ETH_USDC_V4], ETHER, USDC),
         CurrencyAmount.fromRawAmount(USDC, adjustedOutput.toString()),
@@ -300,8 +298,8 @@ describe('Fee Encoding', () => {
       const parsed = CommandParser.parseCalldata(methodParameters.calldata)
       const sweepCmd = parsed.commands.find((cmd) => cmd.commandName === 'SWEEP')
       expect(sweepCmd).to.not.be.undefined
-      const sweepMinAmount = BigNumber.from(sweepCmd!.params[2].value)
-      expect(sweepMinAmount.gt(0)).to.be.true
+      const sweepMinAmount = BigInt(sweepCmd!.params[2].value)
+      expect(sweepMinAmount > 0n).to.be.true
     })
   })
 })
