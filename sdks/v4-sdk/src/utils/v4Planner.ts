@@ -1,6 +1,5 @@
 import invariant from 'tiny-invariant'
-import { defaultAbiCoder } from 'ethers/lib/utils'
-import { BigNumber } from 'ethers'
+import { AbiCoder } from 'ethers'
 import { Currency, Percent, TradeType } from '@uniswap/sdk-core'
 import { Trade } from '../entities/trade'
 import { ADDRESS_ZERO, EMPTY_BYTES } from '../internalConstants'
@@ -239,7 +238,7 @@ export class V4Planner {
   addTrade(
     trade: Trade<Currency, Currency, TradeType>,
     slippageTolerance?: Percent,
-    maxHopSlippage?: BigNumber[],
+    maxHopSlippage?: bigint[],
     urVersion: URVersion = URVersion.V2_0
   ): V4Planner {
     const exactOutput = trade.tradeType === TradeType.EXACT_OUTPUT
@@ -277,30 +276,30 @@ export class V4Planner {
     return this
   }
 
-  addSettle(currency: Currency, payerIsUser: boolean, amount?: BigNumber): V4Planner {
+  addSettle(currency: Currency, payerIsUser: boolean, amount?: bigint): V4Planner {
     this.addAction(Actions.SETTLE, [currencyAddress(currency), amount ?? FULL_DELTA_AMOUNT, payerIsUser])
     return this
   }
 
-  addTake(currency: Currency, recipient: string, amount?: BigNumber): V4Planner {
+  addTake(currency: Currency, recipient: string, amount?: bigint): V4Planner {
     const takeAmount = amount ?? FULL_DELTA_AMOUNT
     this.addAction(Actions.TAKE, [currencyAddress(currency), recipient, takeAmount])
     return this
   }
 
-  addUnwrap(amount: BigNumber): V4Planner {
+  addUnwrap(amount: bigint): V4Planner {
     this.addAction(Actions.UNWRAP, [amount])
     return this
   }
 
   finalize(): string {
-    return defaultAbiCoder.encode(['bytes', 'bytes[]'], [this.actions, this.params])
+    return AbiCoder.defaultAbiCoder().encode(['bytes', 'bytes[]'], [this.actions, this.params])
   }
 
   private addSwapAction(type: Actions, parameters: any[], urVersion: URVersion): V4Planner {
     // Use V2.1.1 ABI (with maxHopSlippage) for V2.1.1, otherwise default to V2.0 ABI (without maxHopSlippage)
     const abiDef = isAtLeastV2_1_1(urVersion) ? V4_SWAP_ACTIONS_V2_1_1[type] : V4_BASE_ACTIONS_ABI_DEFINITION[type]
-    const encodedInput = defaultAbiCoder.encode(
+    const encodedInput = AbiCoder.defaultAbiCoder().encode(
       abiDef.map((v) => v.type),
       parameters
     )
@@ -324,7 +323,7 @@ function createAction(action: Actions, parameters: any[], urVersion: URVersion =
     isAtLeastV2_1_1(urVersion) && action in V4_SWAP_ACTIONS_V2_1_1
       ? V4_SWAP_ACTIONS_V2_1_1[action]
       : V4_BASE_ACTIONS_ABI_DEFINITION[action]
-  const encodedInput = defaultAbiCoder.encode(
+  const encodedInput = AbiCoder.defaultAbiCoder().encode(
     abiDef.map((v) => v.type),
     parameters
   )
