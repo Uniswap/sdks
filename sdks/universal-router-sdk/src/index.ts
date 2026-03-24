@@ -11,9 +11,9 @@ export {
   ROUTER_AS_RECIPIENT,
   WETH_ADDRESS,
   UniversalRouterVersion,
+  isAtLeastV2_1_1,
 } from './utils/constants'
 export { CommandParser, GenericCommandParser } from './utils/commandParser'
 export type { UniversalRouterCommand, UniversalRouterCall, Param, CommandsDefinition } from './utils/commandParser'
 export type { Permit2Permit } from './utils/inputTokens'
 export { NONCE_SKIP_CHECK, generateNonce, EXECUTE_SIGNED_TYPES, getUniversalRouterDomain } from './utils/eip712'
-export { URVersion, isAtLeastV2_1_1 } from '@uniswap/v4-sdk'

@@ -16,7 +16,6 @@ import {
   MintOptions,
   Pool as V4Pool,
   PoolKey,
-  URVersion,
 } from '@uniswap/v4-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
 import { Currency, TradeType, Percent, CHAIN_TO_ADDRESSES_MAP, SupportedChainsType } from '@uniswap/sdk-core'
@@ -63,18 +62,6 @@ export interface MigrateV3ToV4Options {
 
 function isMint(options: V4AddLiquidityOptions): options is MintOptions {
   return Object.keys(options).some((k) => k === 'recipient')
-}
-
-const UR_VERSION_MAP: Record<string, UniversalRouterVersion> = {
-  [URVersion.V2_0]: UniversalRouterVersion.V2_0,
-  [URVersion.V2_1_1]: UniversalRouterVersion.V2_1_1,
-}
-
-function toUniversalRouterVersion(urVersion?: URVersion): UniversalRouterVersion | undefined {
-  if (urVersion === undefined) return undefined
-  const mapped = UR_VERSION_MAP[urVersion]
-  if (!mapped) throw new Error(`Unsupported URVersion: ${urVersion}`)
-  return mapped
 }
 
 export abstract class SwapRouter {
@@ -386,8 +373,7 @@ export abstract class SwapRouter {
   private static encodeProxyPlan(planner: RoutePlanner, trade: UniswapTrade, options: SwapOptions): MethodParameters {
     const { commands, inputs } = planner
 
-    const urVersion = toUniversalRouterVersion(options.urVersion) ?? UniversalRouterVersion.V2_0
-    const routerAddress = UNIVERSAL_ROUTER_ADDRESS(urVersion, options.chainId!)
+    const routerAddress = UNIVERSAL_ROUTER_ADDRESS(options.urVersion ?? UniversalRouterVersion.V2_0, options.chainId!)
     const inputToken = (trade.trade.inputAmount.currency as { address: string }).address
     const inputAmount = BigNumber.from(trade.trade.maximumAmountIn(options.slippageTolerance).quotient.toString())
     const deadline = options.deadlineOrPreviousBlockhash

@@ -3,6 +3,7 @@ import { BigNumber, utils } from 'ethers'
 import { defaultAbiCoder } from 'ethers/lib/utils'
 import { RoutePlanner, CommandType, createCommand } from '../../src/utils/routerCommands'
 import { URVersion, Route as V4Route, Trade as V4Trade, V4BaseActionsParser } from '@uniswap/v4-sdk'
+import { UniversalRouterVersion } from '../../src/utils/constants'
 import { Trade as RouterTrade, MixedRouteSDK } from '@uniswap/router-sdk'
 import { Route as V3RouteSDK } from '@uniswap/v3-sdk'
 import { Pair, Route as V2RouteSDK } from '@uniswap/v2-sdk'
@@ -54,7 +55,7 @@ describe('Per-Hop Slippage', () => {
       })
 
       const { commandTypes, inputs } = parseCommands(
-        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: URVersion.V2_1_1 })).calldata
+        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: UniversalRouterVersion.V2_1_1 })).calldata
       )
 
       const v2Idx = commandTypes.indexOf(CommandType.V2_SWAP_EXACT_IN)
@@ -82,7 +83,7 @@ describe('Per-Hop Slippage', () => {
       })
 
       const { commandTypes, inputs } = parseCommands(
-        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: URVersion.V2_1_1 })).calldata
+        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: UniversalRouterVersion.V2_1_1 })).calldata
       )
 
       const v2Idx = commandTypes.indexOf(CommandType.V2_SWAP_EXACT_OUT)
@@ -116,7 +117,7 @@ describe('Per-Hop Slippage', () => {
       })
 
       const { commandTypes, inputs } = parseCommands(
-        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: URVersion.V2_1_1 })).calldata
+        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: UniversalRouterVersion.V2_1_1 })).calldata
       )
 
       const v3Idx = commandTypes.indexOf(CommandType.V3_SWAP_EXACT_IN)
@@ -144,7 +145,7 @@ describe('Per-Hop Slippage', () => {
       })
 
       const { commandTypes, inputs } = parseCommands(
-        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: URVersion.V2_1_1 })).calldata
+        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: UniversalRouterVersion.V2_1_1 })).calldata
       )
 
       const v3Idx = commandTypes.indexOf(CommandType.V3_SWAP_EXACT_OUT)
@@ -185,7 +186,7 @@ describe('Per-Hop Slippage', () => {
       })
 
       const { commandTypes, inputs } = parseCommands(
-        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: URVersion.V2_1_1 })).calldata
+        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: UniversalRouterVersion.V2_1_1 })).calldata
       )
 
       const v4Idx = commandTypes.indexOf(CommandType.V4_SWAP)
@@ -220,7 +221,7 @@ describe('Per-Hop Slippage', () => {
       })
 
       const { commandTypes, inputs } = parseCommands(
-        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: URVersion.V2_1_1 })).calldata
+        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: UniversalRouterVersion.V2_1_1 })).calldata
       )
 
       const v4Idx = commandTypes.indexOf(CommandType.V4_SWAP)
@@ -254,7 +255,7 @@ describe('Per-Hop Slippage', () => {
       })
 
       const { commandTypes, inputs } = parseCommands(
-        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: URVersion.V2_1_1 })).calldata
+        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: UniversalRouterVersion.V2_1_1 })).calldata
       )
 
       const v3Idx = commandTypes.indexOf(CommandType.V3_SWAP_EXACT_IN)
@@ -290,7 +291,7 @@ describe('Per-Hop Slippage', () => {
       })
 
       const { commandTypes, inputs } = parseCommands(
-        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: URVersion.V2_1_1 })).calldata
+        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: UniversalRouterVersion.V2_1_1 })).calldata
       )
 
       const v3Idx = commandTypes.indexOf(CommandType.V3_SWAP_EXACT_IN)
@@ -330,7 +331,7 @@ describe('Per-Hop Slippage', () => {
       })
 
       const { commandTypes, inputs } = parseCommands(
-        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: URVersion.V2_0 })).calldata
+        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: UniversalRouterVersion.V2_0 })).calldata
       )
 
       const v2Idx = commandTypes.indexOf(CommandType.V2_SWAP_EXACT_IN)
@@ -355,7 +356,7 @@ describe('Per-Hop Slippage', () => {
       })
 
       const { commandTypes, inputs } = parseCommands(
-        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: URVersion.V2_0 })).calldata
+        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: UniversalRouterVersion.V2_0 })).calldata
       )
 
       const v3Idx = commandTypes.indexOf(CommandType.V3_SWAP_EXACT_IN)
@@ -380,7 +381,7 @@ describe('Per-Hop Slippage', () => {
       })
 
       const { commandTypes, inputs } = parseCommands(
-        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: URVersion.V2_0 })).calldata
+        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: UniversalRouterVersion.V2_0 })).calldata
       )
 
       const v3Idx = commandTypes.indexOf(CommandType.V3_SWAP_EXACT_OUT)
@@ -405,7 +406,7 @@ describe('Per-Hop Slippage', () => {
       })
 
       const { commandTypes, inputs } = parseCommands(
-        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: URVersion.V2_0 })).calldata
+        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: UniversalRouterVersion.V2_0 })).calldata
       )
 
       const v3Idx = commandTypes.indexOf(CommandType.V3_SWAP_EXACT_IN)
@@ -458,7 +459,7 @@ describe('Per-Hop Slippage', () => {
         CommandType.V2_SWAP_EXACT_IN,
         [RECIPIENT, utils.parseEther('1'), utils.parseEther('1'), [WETH.address, USDC.address], true],
         false,
-        URVersion.V2_0
+        UniversalRouterVersion.V2_0
       )
 
       expect(planner1.inputs[0]).to.equal(planner2.inputs[0])
@@ -485,7 +486,7 @@ describe('Per-Hop Slippage', () => {
       })
 
       const { commandTypes, inputs } = parseCommands(
-        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: URVersion.V2_1_1 })).calldata
+        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: UniversalRouterVersion.V2_1_1 })).calldata
       )
 
       const v2Idx = commandTypes.indexOf(CommandType.V2_SWAP_EXACT_IN)
@@ -512,7 +513,7 @@ describe('Per-Hop Slippage', () => {
       })
 
       const { commandTypes, inputs } = parseCommands(
-        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: URVersion.V2_1_1 })).calldata
+        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: UniversalRouterVersion.V2_1_1 })).calldata
       )
 
       const v3Idx = commandTypes.indexOf(CommandType.V3_SWAP_EXACT_IN)
@@ -540,7 +541,7 @@ describe('Per-Hop Slippage', () => {
       })
 
       const { commandTypes, inputs } = parseCommands(
-        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: URVersion.V2_1_1 })).calldata
+        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: UniversalRouterVersion.V2_1_1 })).calldata
       )
 
       const v4Idx = commandTypes.indexOf(CommandType.V4_SWAP)
@@ -567,7 +568,7 @@ describe('Per-Hop Slippage', () => {
       })
 
       const { commandTypes, inputs } = parseCommands(
-        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: URVersion.V2_1_1 })).calldata
+        SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: UniversalRouterVersion.V2_1_1 })).calldata
       )
 
       const v3Idx = commandTypes.indexOf(CommandType.V3_SWAP_EXACT_IN)
@@ -602,7 +603,7 @@ describe('Per-Hop Slippage', () => {
         CommandType.V2_SWAP_EXACT_IN,
         [RECIPIENT, amount, amount, [WETH.address, USDC.address], true, hopSlippage],
         false,
-        URVersion.V2_1_1
+        UniversalRouterVersion.V2_1_1
       )
 
       expect(planner.inputs.length).to.equal(1)
@@ -621,7 +622,7 @@ describe('Per-Hop Slippage', () => {
         CommandType.V3_SWAP_EXACT_IN,
         [RECIPIENT, amount, amount, v3Path, true, hopSlippage],
         false,
-        URVersion.V2_1_1
+        UniversalRouterVersion.V2_1_1
       )
 
       const decoded = defaultAbiCoder.decode(
@@ -644,7 +645,7 @@ describe('Per-Hop Slippage', () => {
       const command = createCommand(
         CommandType.V2_SWAP_EXACT_IN,
         [RECIPIENT, amount, amount, [WETH.address, USDC.address], true, hopSlippage],
-        URVersion.V2_1_1
+        UniversalRouterVersion.V2_1_1
       )
 
       expect(command.type).to.equal(CommandType.V2_SWAP_EXACT_IN)
@@ -672,7 +673,7 @@ describe('Per-Hop Slippage', () => {
     })
 
     it('non-swap commands are unaffected by V2_1_1', () => {
-      const command = createCommand(CommandType.WRAP_ETH, [RECIPIENT, amount], URVersion.V2_1_1)
+      const command = createCommand(CommandType.WRAP_ETH, [RECIPIENT, amount], UniversalRouterVersion.V2_1_1)
 
       const decoded = defaultAbiCoder.decode(['address', 'uint256'], command.encodedInput)
       expect(decoded.length).to.equal(2)
