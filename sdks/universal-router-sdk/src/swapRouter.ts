@@ -1,7 +1,6 @@
 import invariant from 'tiny-invariant'
 import UniversalRouter from '@uniswap/universal-router/artifacts/contracts/UniversalRouter.sol/UniversalRouter.json'
-import { Interface } from '@ethersproject/abi'
-import { BigNumber, BigNumberish } from 'ethers'
+import { BigNumberish, Interface, toBeHex } from 'ethers'
 import {
   MethodParameters,
   Multicall,
@@ -26,7 +25,7 @@ import { RoutePlanner, CommandType } from './utils/routerCommands'
 import { encodePermit, encodeV3PositionPermit } from './utils/inputTokens'
 import { UNIVERSAL_ROUTER_ADDRESS, UniversalRouterVersion } from './utils/constants'
 import { getUniversalRouterDomain, EXECUTE_SIGNED_TYPES, generateNonce } from './utils/eip712'
-import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
+import { TypedDataDomain, TypedDataField } from 'ethers'
 
 export type SwapRouterConfig = {
   sender?: string // address
@@ -109,8 +108,8 @@ export abstract class SwapRouter {
     }
 
     const nativeCurrencyValue = inputCurrency.isNative
-      ? BigNumber.from(trade.trade.maximumAmountIn(options.slippageTolerance).quotient.toString())
-      : BigNumber.from(0)
+      ? BigInt(trade.trade.maximumAmountIn(options.slippageTolerance).quotient.toString())
+      : 0n
 
     trade.encode(planner, { allowRevert: false })
 
@@ -126,7 +125,7 @@ export abstract class SwapRouter {
     }
 
     return SwapRouter.encodePlan(planner, nativeCurrencyValue, {
-      deadline: options.deadlineOrPreviousBlockhash ? BigNumber.from(options.deadlineOrPreviousBlockhash) : undefined,
+      deadline: options.deadlineOrPreviousBlockhash ? BigInt(options.deadlineOrPreviousBlockhash.toString()) : undefined,
     })
   }
 
@@ -177,7 +176,7 @@ export abstract class SwapRouter {
 
     const data = signedOptions.data
 
-    const deadlineStr = BigNumber.from(deadline).toString()
+    const deadlineStr = BigInt(deadline).toString()
 
     const value = {
       commands,
@@ -211,7 +210,7 @@ export abstract class SwapRouter {
     signature: string,
     signedOptions: SignedRouteOptions,
     deadline: BigNumberish,
-    nativeCurrencyValue: BigNumber = BigNumber.from(0)
+    nativeCurrencyValue: bigint = 0n
   ): MethodParameters {
     // Decode the execute() calldata to extract commands and inputs
     // Try to decode with deadline first, then without
@@ -252,7 +251,7 @@ export abstract class SwapRouter {
       deadline,
     ])
 
-    return { calldata: signedCalldata, value: nativeCurrencyValue.toHexString() }
+    return { calldata: signedCalldata, value: toBeHex(nativeCurrencyValue) }
   }
 
   /**
@@ -330,9 +329,15 @@ export abstract class SwapRouter {
     }
 
     // encode v3 withdraw
+    // Convert bigint values to strings for v3-sdk compatibility (v3-sdk uses JSBI, not native bigint)
+    const v3RemoveLiquidityOptions = {
+      ...options.v3RemoveLiquidityOptions,
+      deadline: options.v3RemoveLiquidityOptions.deadline.toString(),
+      tokenId: options.v3RemoveLiquidityOptions.tokenId.toString(),
+    }
     const v3RemoveParams: MethodParameters = V3PositionManager.removeCallParameters(
       options.inputPosition,
-      options.v3RemoveLiquidityOptions
+      v3RemoveLiquidityOptions
     )
     const v3Calls: string[] = Multicall.decodeMulticall(v3RemoveParams.calldata)
 
@@ -352,12 +357,12 @@ export abstract class SwapRouter {
     const v4AddParams = V4PositionManager.addCallParameters(options.outputPosition, options.v4AddLiquidityOptions)
     // only modifyLiquidities can be called by the UniversalRouter
     const selector = v4AddParams.calldata.slice(0, 10)
-    invariant(selector == V4PositionManager.INTERFACE.getSighash('modifyLiquidities'), 'INVALID_V4_CALL: ' + selector)
+    invariant(selector == V4PositionManager.INTERFACE.getFunction('modifyLiquidities')!.selector, 'INVALID_V4_CALL: ' + selector)
 
     planner.addCommand(CommandType.V4_POSITION_MANAGER_CALL, [v4AddParams.calldata])
 
-    return SwapRouter.encodePlan(planner, BigNumber.from(0), {
-      deadline: BigNumber.from(options.v4AddLiquidityOptions.deadline),
+    return SwapRouter.encodePlan(planner, 0n, {
+      deadline: BigInt(options.v4AddLiquidityOptions.deadline!.toString()),
     })
   }
 
@@ -369,14 +374,14 @@ export abstract class SwapRouter {
    */
   private static encodePlan(
     planner: RoutePlanner,
-    nativeCurrencyValue: BigNumber,
+    nativeCurrencyValue: bigint,
     config: SwapRouterConfig = {}
   ): MethodParameters {
     const { commands, inputs } = planner
     const functionSignature = !!config.deadline ? 'execute(bytes,bytes[],uint256)' : 'execute(bytes,bytes[])'
     const parameters = !!config.deadline ? [commands, inputs, config.deadline] : [commands, inputs]
     const calldata = SwapRouter.INTERFACE.encodeFunctionData(functionSignature, parameters)
-    return { calldata, value: nativeCurrencyValue.toHexString() }
+    return { calldata, value: toBeHex(nativeCurrencyValue) }
   }
 
   /**
@@ -389,10 +394,10 @@ export abstract class SwapRouter {
     const urVersion = toUniversalRouterVersion(options.urVersion) ?? UniversalRouterVersion.V2_0
     const routerAddress = UNIVERSAL_ROUTER_ADDRESS(urVersion, options.chainId!)
     const inputToken = (trade.trade.inputAmount.currency as { address: string }).address
-    const inputAmount = BigNumber.from(trade.trade.maximumAmountIn(options.slippageTolerance).quotient.toString())
+    const inputAmount = BigInt(trade.trade.maximumAmountIn(options.slippageTolerance).quotient.toString())
     const deadline = options.deadlineOrPreviousBlockhash
-      ? BigNumber.from(options.deadlineOrPreviousBlockhash)
-      : BigNumber.from(Math.floor(Date.now() / 1000) + 1800) // 30 min default
+      ? BigInt(options.deadlineOrPreviousBlockhash.toString())
+      : BigInt(Math.floor(Date.now() / 1000) + 1800) // 30 min default
 
     const calldata = SwapRouter.PROXY_INTERFACE.encodeFunctionData('execute', [
       routerAddress,
@@ -403,6 +408,6 @@ export abstract class SwapRouter {
       deadline,
     ])
 
-    return { calldata, value: BigNumber.from(0).toHexString() }
+    return { calldata, value: toBeHex(0n) }
   }
 }
