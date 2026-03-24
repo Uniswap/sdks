@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import { BigNumber } from 'ethers'
+
 import { AcrossV4DepositV3Params, CONTRACT_BALANCE } from '../../src/entities/actions/across'
 import { RoutePlanner, CommandType } from '../../src/utils/routerCommands'
 
@@ -17,8 +17,8 @@ describe('Across Bridge Integration', () => {
         recipient: '0x0000000000000000000000000000000000000001',
         inputToken: WETH_MAINNET,
         outputToken: WETH_OPTIMISM,
-        inputAmount: BigNumber.from('1000000000000000000'), // 1 WETH
-        outputAmount: BigNumber.from('990000000000000000'), // 0.99 WETH
+        inputAmount: BigInt('1000000000000000000'), // 1 WETH
+        outputAmount: BigInt('990000000000000000'), // 0.99 WETH
         destinationChainId: 10, // Optimism
         exclusiveRelayer: '0x0000000000000000000000000000000000000000',
         quoteTimestamp: Math.floor(Date.now() / 1000),
@@ -41,7 +41,7 @@ describe('Across Bridge Integration', () => {
       // Simulate adding a swap command first (just for testing)
       planner.addCommand(CommandType.WRAP_ETH, [
         '0x0000000000000000000000000000000000000002', // recipient
-        BigNumber.from('1000000000000000000'), // amount
+        BigInt('1000000000000000000'), // amount
       ])
 
       // Add bridge that uses CONTRACT_BALANCE
@@ -51,7 +51,7 @@ describe('Across Bridge Integration', () => {
         inputToken: WETH_MAINNET,
         outputToken: WETH_OPTIMISM,
         inputAmount: CONTRACT_BALANCE, // Use entire contract balance
-        outputAmount: BigNumber.from('990000000000000000'),
+        outputAmount: BigInt('990000000000000000'),
         destinationChainId: 10,
         exclusiveRelayer: '0x0000000000000000000000000000000000000000',
         quoteTimestamp: Math.floor(Date.now() / 1000),
@@ -76,8 +76,8 @@ describe('Across Bridge Integration', () => {
         recipient: '0x0000000000000000000000000000000000000001',
         inputToken: WETH_MAINNET, // Must be WETH when useNative is true
         outputToken: WETH_OPTIMISM,
-        inputAmount: BigNumber.from('1000000000000000000'),
-        outputAmount: BigNumber.from('990000000000000000'),
+        inputAmount: BigInt('1000000000000000000'),
+        outputAmount: BigInt('990000000000000000'),
         destinationChainId: 10,
         exclusiveRelayer: '0x0000000000000000000000000000000000000000',
         quoteTimestamp: Math.floor(Date.now() / 1000),
@@ -102,7 +102,7 @@ describe('Across Bridge Integration', () => {
       // Add a simple swap simulation first
       planner.addCommand(CommandType.WRAP_ETH, [
         '0x0000000000000000000000000000000000000002',
-        BigNumber.from('1000000000000000000'),
+        BigInt('1000000000000000000'),
       ])
 
       const bridgeParams: AcrossV4DepositV3Params = {
@@ -111,7 +111,7 @@ describe('Across Bridge Integration', () => {
         inputToken: WETH_MAINNET,
         outputToken: WETH_OPTIMISM,
         inputAmount: CONTRACT_BALANCE,
-        outputAmount: BigNumber.from('990000000000000000'),
+        outputAmount: BigInt('990000000000000000'),
         destinationChainId: 10,
         exclusiveRelayer: '0x0000000000000000000000000000000000000000',
         quoteTimestamp: Math.floor(Date.now() / 1000),
@@ -141,8 +141,8 @@ describe('Across Bridge Integration', () => {
         recipient: '0x0000000000000000000000000000000000000001',
         inputToken: WETH_MAINNET,
         outputToken: WETH_OPTIMISM,
-        inputAmount: BigNumber.from('500000000000000000'),
-        outputAmount: BigNumber.from('495000000000000000'),
+        inputAmount: BigInt('500000000000000000'),
+        outputAmount: BigInt('495000000000000000'),
         destinationChainId: 10,
         exclusiveRelayer: '0x0000000000000000000000000000000000000000',
         quoteTimestamp: Math.floor(Date.now() / 1000),
@@ -157,8 +157,8 @@ describe('Across Bridge Integration', () => {
         recipient: '0x0000000000000000000000000000000000000001',
         inputToken: USDC_MAINNET,
         outputToken: '0x7F5c764cBc14f9669B88837ca1490cCa17c31607', // USDC on Optimism
-        inputAmount: BigNumber.from('500000000'), // 500 USDC
-        outputAmount: BigNumber.from('495000000'), // 495 USDC
+        inputAmount: BigInt('500000000'), // 500 USDC
+        outputAmount: BigInt('495000000'), // 495 USDC
         destinationChainId: 10,
         exclusiveRelayer: '0x0000000000000000000000000000000000000000',
         quoteTimestamp: Math.floor(Date.now() / 1000),
