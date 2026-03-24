@@ -1,5 +1,5 @@
 import { Ether, Percent, Token } from '@uniswap/sdk-core'
-import { ethers } from 'ethers'
+import { TypedDataEncoder, id } from 'ethers'
 import {
   EMPTY_BYTES,
   EMPTY_HOOK,
@@ -622,10 +622,10 @@ describe('PositionManager', () => {
       })
       expect(values).toEqual(permit)
       // get typehash
-      const encodedType = ethers.utils._TypedDataEncoder.from(types).encodeType('Permit')
+      const encodedType = TypedDataEncoder.from(types).encodeType('Permit')
 
       // Compute the type hash by hashing the encoded type
-      const typeHash = ethers.utils.id(encodedType)
+      const typeHash = id(encodedType)
       // ref https://github.com/Uniswap/v3-periphery/blob/main/contracts/base/ERC721Permit.sol
       expect(typeHash).toEqual('0x49ecf333e5b8c95c40fdafc95c1ad136e8914a8fb55e9dc8bb01eaa83a2df9ad')
     })
