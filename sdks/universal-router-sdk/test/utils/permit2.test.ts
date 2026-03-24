@@ -1,7 +1,6 @@
 import { expect } from 'chai'
-import { BigNumber, utils, Wallet } from 'ethers'
+import { Wallet, Signature, parseUnits, zeroPadValue, AbiCoder } from 'ethers'
 import { PermitSingle } from '@uniswap/permit2-sdk'
-import { defaultAbiCoder } from 'ethers/lib/utils'
 import { encodePermit } from '../../src/utils/inputTokens'
 import { RoutePlanner } from '../../src/utils/routerCommands'
 import { USDC } from './uniswapData'
@@ -13,11 +12,11 @@ const PERMIT_STRUCT =
 // note: these tests aren't testing much but registering calldata to interop file
 // for use in forge fork tests
 describe('Permit2', () => {
-  const wallet = new Wallet(utils.zeroPad('0x1234', 32))
+  const wallet = new Wallet(zeroPadValue('0x1234', 32))
 
   describe('v2', () => {
     it('does not sanitize a normal permit', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const inputUSDC = parseUnits('1000', 6).toString()
       const permit = makePermit(USDC.address, inputUSDC)
       const signature = await generatePermitSignature(permit, wallet, 1)
       const sanitized = getSanitizedSignature(permit, signature)
@@ -25,7 +24,7 @@ describe('Permit2', () => {
     })
 
     it('does not sanitize a triple length permit', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const inputUSDC = parseUnits('1000', 6).toString()
       const permit = makePermit(USDC.address, inputUSDC)
       const signature = await generatePermitSignature(permit, wallet, 1)
       const multisigSignature = signature + signature.slice(2) + signature.slice(2)
@@ -34,7 +33,7 @@ describe('Permit2', () => {
     })
 
     it('does not sanitize a short permit', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const inputUSDC = parseUnits('1000', 6).toString()
       const permit = makePermit(USDC.address, inputUSDC)
       const tinySignature = '0x12341234132412341344'
       const sanitized = getSanitizedSignature(permit, tinySignature)
@@ -42,15 +41,15 @@ describe('Permit2', () => {
     })
 
     it('sanitizes a malformed permit', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const inputUSDC = parseUnits('1000', 6).toString()
       const permit = makePermit(USDC.address, inputUSDC)
       const originalSignature = await generatePermitSignature(permit, wallet, 1)
 
-      const { recoveryParam } = utils.splitSignature(originalSignature)
+      const { yParity } = Signature.from(originalSignature)
       // slice off current v
       let signature = originalSignature.substring(0, originalSignature.length - 2)
       // append recoveryParam as v
-      signature += BigNumber.from(recoveryParam).toHexString().slice(2)
+      signature += yParity.toString(16).padStart(2, '0')
       const sanitized = getSanitizedSignature(permit, signature)
       expect(sanitized).to.equal(originalSignature)
     })
@@ -59,7 +58,7 @@ describe('Permit2', () => {
   function getSanitizedSignature(permit: PermitSingle, signature: string): string {
     const planner = new RoutePlanner()
     encodePermit(planner, Object.assign({}, permit, { signature: signature }))
-    const decoded = defaultAbiCoder.decode([PERMIT_STRUCT, 'bytes'], planner.inputs[0])
+    const decoded = AbiCoder.defaultAbiCoder().decode([PERMIT_STRUCT, 'bytes'], planner.inputs[0])
     return decoded[1]
   }
 })
