@@ -1,4 +1,4 @@
-import { defaultAbiCoder } from 'ethers/lib/utils'
+import { AbiCoder } from 'ethers'
 import { URVersion, isAtLeastV2_1_1 } from '@uniswap/v4-sdk'
 import { AcrossV4DepositV3Params } from '../entities/actions/across'
 
@@ -368,7 +368,7 @@ export function createCommand(type: CommandType, parameters: any[], urVersion?: 
       : COMMAND_DEFINITION[type]
   switch (commandDef.parser) {
     case Parser.Abi:
-      const encodedInput = defaultAbiCoder.encode(
+      const encodedInput = AbiCoder.defaultAbiCoder().encode(
         commandDef.params.map((abi) => abi.type),
         parameters
       )
