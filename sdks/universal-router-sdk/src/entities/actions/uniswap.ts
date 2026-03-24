@@ -9,7 +9,6 @@ import {
   encodeRouteToPath as encodeV4RouteToPath,
   Actions,
   URVersion,
-  isAtLeastV2_1_1,
 } from '@uniswap/v4-sdk'
 import {
   Trade as RouterTrade,
@@ -29,7 +28,14 @@ import { Permit2Permit } from '../../utils/inputTokens'
 import { getPathCurrency } from '../../utils/pathCurrency'
 import { Currency, TradeType, Token, CurrencyAmount, Percent } from '@uniswap/sdk-core'
 import { Command, RouterActionType, TradeConfig } from '../Command'
-import { SENDER_AS_RECIPIENT, ROUTER_AS_RECIPIENT, CONTRACT_BALANCE, ETH_ADDRESS } from '../../utils/constants'
+import {
+  SENDER_AS_RECIPIENT,
+  ROUTER_AS_RECIPIENT,
+  CONTRACT_BALANCE,
+  ETH_ADDRESS,
+  UniversalRouterVersion,
+  isAtLeastV2_1_1,
+} from '../../utils/constants'
 import { getCurrencyAddress } from '../../utils/getCurrencyAddress'
 import { encodeFeeBips, encodeFee1e18 } from '../../utils/numbers'
 import { BigNumber, BigNumberish } from 'ethers'
@@ -54,9 +60,22 @@ export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit'> & {
   inputTokenPermit?: Permit2Permit
   flatFee?: FlatFeeOptions
   safeMode?: boolean
-  urVersion?: URVersion // Universal Router version for encoding (defaults to V2_0 for backward compatibility)
+  urVersion?: UniversalRouterVersion // Universal Router version for encoding (defaults to V2_0 for backward compatibility)
   tokenTransferMode?: TokenTransferMode // How input tokens are transferred to the UR (defaults to Permit2). ApproveProxy uses the SwapProxy contract.
   chainId?: number // Required when tokenTransferMode is ApproveProxy, used to resolve UR address for the proxy
+}
+
+/** Map from UniversalRouterVersion to v4-sdk's URVersion for v4 planner calls */
+const UR_VERSION_MAP: Record<string, URVersion> = {
+  [UniversalRouterVersion.V2_0]: URVersion.V2_0,
+  [UniversalRouterVersion.V2_1_1]: URVersion.V2_1_1,
+}
+
+function toURVersion(version?: UniversalRouterVersion): URVersion {
+  if (version === undefined) return URVersion.V2_0
+  const mapped = UR_VERSION_MAP[version]
+  if (!mapped) throw new Error(`No v4-sdk URVersion mapping for UniversalRouterVersion: ${version}`)
+  return mapped
 }
 
 const REFUND_ETH_PRICE_IMPACT_THRESHOLD = new Percent(50, 100)
@@ -271,7 +290,7 @@ export class UniswapTrade implements Command {
       if (!!this.options.fee) {
         // UR >= V2_1_1 supports PAY_PORTION_FULL_PRECISION (1e18 precision),
         // older versions only support PAY_PORTION (bips)
-        const useFullPrecision = this.options.urVersion !== undefined && this.options.urVersion >= URVersion.V2_1_1
+        const useFullPrecision = isAtLeastV2_1_1(this.options.urVersion)
 
         // Reject fractional bips fees on older UR versions to prevent silent precision loss
         if (!useFullPrecision && !this.options.fee.fee.multiply(10_000).remainder.equalTo(0)) {
@@ -475,7 +494,7 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
   const perHopSlippage = maxHopSlippage?.map((s) => BigNumber.from(s)) ?? []
 
   const v4Planner = new V4Planner()
-  v4Planner.addTrade(trade, slippageToleranceOnSwap, perHopSlippage, options.urVersion)
+  v4Planner.addTrade(trade, slippageToleranceOnSwap, perHopSlippage, toURVersion(options.urVersion))
   v4Planner.addSettle(trade.route.pathInput, payerIsUser)
 
   // Handle split route output consistency:
@@ -600,7 +619,7 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
             amountOutMinimum: !isLastSectionInRoute(i) ? 0 : amountOut,
           },
         ],
-        options.urVersion
+        toURVersion(options.urVersion)
       )
 
       // Handle split route output consistency for V4 sections in mixed routes
