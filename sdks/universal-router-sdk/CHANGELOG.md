@@ -1,5 +1,11 @@
 # @uniswap/universal-router-sdk
 
+## 5.1.0
+
+### Minor Changes
+
+- c603b90: Use `UniversalRouterVersion` for `SwapOptions.urVersion` instead of v4-sdk's `URVersion`. Version logic (`isAtLeastV2_1_1`) is now local to universal-router-sdk. Consumers should use `UniversalRouterVersion` from this package.
+
 ## 5.0.0
 
 ### Major Changes
