@@ -1,4 +1,4 @@
-import { ethers } from 'ethers'
+import { AbiCoder } from 'ethers'
 import { PoolKey } from '../entities/pool'
 import { PathKey } from './encodeRouteToPath'
 import {
@@ -62,7 +62,7 @@ export type SwapExactOut = {
 // Parses V4Router actions
 export abstract class V4BaseActionsParser {
   public static parseCalldata(calldata: string, urVersion: URVersion = URVersion.V2_0): V4RouterCall {
-    const [actions, inputs] = ethers.utils.defaultAbiCoder.decode(['bytes', 'bytes[]'], calldata)
+    const [actions, inputs] = AbiCoder.defaultAbiCoder().decode(['bytes', 'bytes[]'], calldata)
 
     const actionTypes = V4BaseActionsParser.getActions(actions)
 
@@ -73,7 +73,7 @@ export abstract class V4BaseActionsParser {
           isAtLeastV2_1_1(urVersion) && actionType in V4_SWAP_ACTIONS_V2_1_1
             ? V4_SWAP_ACTIONS_V2_1_1[actionType]
             : V4_BASE_ACTIONS_ABI_DEFINITION[actionType]
-        const rawParams = ethers.utils.defaultAbiCoder.decode(
+        const rawParams = AbiCoder.defaultAbiCoder().decode(
           abiDef.map((command) => command.type),
           inputs[i]
         )
@@ -160,7 +160,7 @@ function parsePathKey(data: string): PathKey {
 
 function parseV4ExactInSingle(data: any[], urVersion: URVersion): SwapExactInSingle {
   const [currency0, currency1, fee, tickSpacing, hooks] = data[0]
-  const poolKey: PoolKey = { currency0, currency1, fee, tickSpacing, hooks }
+  const poolKey: PoolKey = { currency0, currency1, fee: Number(fee), tickSpacing: Number(tickSpacing), hooks }
 
   if (urVersion === URVersion.V2_0) {
     // V2.0: [poolKey, zeroForOne, amountIn, amountOutMinimum, hookData]
@@ -213,7 +213,7 @@ function parseV4ExactIn(data: any[], urVersion: URVersion): SwapExactIn {
 
 function parseV4ExactOutSingle(data: any[], urVersion: URVersion): SwapExactOutSingle {
   const [currency0, currency1, fee, tickSpacing, hooks] = data[0]
-  const poolKey: PoolKey = { currency0, currency1, fee, tickSpacing, hooks }
+  const poolKey: PoolKey = { currency0, currency1, fee: Number(fee), tickSpacing: Number(tickSpacing), hooks }
 
   if (urVersion === URVersion.V2_0) {
     // V2.0: [poolKey, zeroForOne, amountOut, amountInMaximum, hookData]
