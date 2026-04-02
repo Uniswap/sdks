@@ -3,7 +3,8 @@ import JSBI from 'jsbi'
 import { parseEther, parseUnits } from 'ethers'
 import { CurrencyAmount, Ether, Percent, Token, TradeType } from '@uniswap/sdk-core'
 import { FeeOptions, encodeSqrtRatioX96, nearestUsableTick, TickMath, FeeAmount } from '@uniswap/v3-sdk'
-import { Pool as V4Pool, Route as V4Route, Trade as V4Trade, URVersion } from '@uniswap/v4-sdk'
+import { Pool as V4Pool, Route as V4Route, Trade as V4Trade } from '@uniswap/v4-sdk'
+import { UniversalRouterVersion } from '../../src/utils/constants'
 import { encodeFeeBips, encodeFee1e18 } from '../../src/utils/numbers'
 import { RoutePlanner, CommandType } from '../../src/utils/routerCommands'
 import { CommandParser } from '../../src/utils/commandParser'
@@ -197,7 +198,7 @@ describe('Fee Encoding', () => {
         TradeType.EXACT_INPUT
       )
       const feeOptions: FeeOptions = { fee: new Percent(5, 100), recipient: TEST_FEE_RECIPIENT_ADDRESS }
-      const opts = swapOptions({ fee: feeOptions, urVersion: URVersion.V2_0 })
+      const opts = swapOptions({ fee: feeOptions, urVersion: UniversalRouterVersion.V2_0 })
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
 
       const feeCmd = parseFeeCommand(methodParameters)
@@ -214,7 +215,7 @@ describe('Fee Encoding', () => {
         TradeType.EXACT_INPUT
       )
       const feeOptions: FeeOptions = { fee: new Percent(5, 100), recipient: TEST_FEE_RECIPIENT_ADDRESS }
-      const opts = swapOptions({ fee: feeOptions, urVersion: URVersion.V2_1_1 })
+      const opts = swapOptions({ fee: feeOptions, urVersion: UniversalRouterVersion.V2_1_1 })
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
 
       const feeCmd = parseFeeCommand(methodParameters)
@@ -232,7 +233,7 @@ describe('Fee Encoding', () => {
         TradeType.EXACT_INPUT
       )
       const feeOptions: FeeOptions = { fee: new Percent(5, 100), recipient: TEST_FEE_RECIPIENT_ADDRESS }
-      const opts = swapOptions({ fee: feeOptions, urVersion: URVersion.V2_1_1 })
+      const opts = swapOptions({ fee: feeOptions, urVersion: UniversalRouterVersion.V2_1_1 })
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
 
       const feeCmd = parseFeeCommand(methodParameters)
@@ -247,7 +248,7 @@ describe('Fee Encoding', () => {
         TradeType.EXACT_INPUT
       )
       const feeOptions: FlatFeeOptions = { amount: parseUnits('50', 6), recipient: TEST_FEE_RECIPIENT_ADDRESS }
-      const opts = swapOptions({ flatFee: feeOptions, urVersion: URVersion.V2_1_1 })
+      const opts = swapOptions({ flatFee: feeOptions, urVersion: UniversalRouterVersion.V2_1_1 })
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
 
       const feeCmd = parseFeeCommand(methodParameters)
@@ -265,7 +266,7 @@ describe('Fee Encoding', () => {
         TradeType.EXACT_OUTPUT
       )
       const feeOptions: FeeOptions = { fee: new Percent(5, 100), recipient: TEST_FEE_RECIPIENT_ADDRESS }
-      const opts = swapOptions({ fee: feeOptions, urVersion: URVersion.V2_1_1 })
+      const opts = swapOptions({ fee: feeOptions, urVersion: UniversalRouterVersion.V2_1_1 })
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
 
       const feeCmd = parseFeeCommand(methodParameters)

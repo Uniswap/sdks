@@ -1,5 +1,5 @@
 import { AbiCoder } from 'ethers'
-import { URVersion, isAtLeastV2_1_1 } from '@uniswap/v4-sdk'
+import { UniversalRouterVersion, isAtLeastV2_1_1 } from './constants'
 import { AcrossV4DepositV3Params } from '../entities/actions/across'
 
 /**
@@ -317,7 +317,12 @@ export class RoutePlanner {
     return this
   }
 
-  addCommand(type: CommandType, parameters: any[], allowRevert = false, urVersion?: URVersion): RoutePlanner {
+  addCommand(
+    type: CommandType,
+    parameters: any[],
+    allowRevert = false,
+    urVersion?: UniversalRouterVersion
+  ): RoutePlanner {
     let command = createCommand(type, parameters, urVersion)
     this.inputs.push(command.encodedInput)
     if (allowRevert) {
@@ -361,7 +366,7 @@ export type RouterCommand = {
   encodedInput: string
 }
 
-export function createCommand(type: CommandType, parameters: any[], urVersion?: URVersion): RouterCommand {
+export function createCommand(type: CommandType, parameters: any[], urVersion?: UniversalRouterVersion): RouterCommand {
   const commandDef =
     isAtLeastV2_1_1(urVersion) && type in V2V3_SWAP_COMMANDS_V2_1_1
       ? V2V3_SWAP_COMMANDS_V2_1_1[type]
