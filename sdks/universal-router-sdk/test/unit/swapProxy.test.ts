@@ -1,6 +1,5 @@
 import { expect } from 'chai'
-import { BigNumber } from 'ethers'
-import { Interface } from '@ethersproject/abi'
+import { Interface } from 'ethers'
 import { Trade as V3Trade, Pool as V3Pool, Route as V3Route } from '@uniswap/v3-sdk'
 import { Pool as V4Pool, Route as V4Route, Trade as V4Trade } from '@uniswap/v4-sdk'
 import { CurrencyAmount, Token, TradeType, Percent } from '@uniswap/sdk-core'
@@ -184,12 +183,12 @@ describe('SwapProxy', () => {
         inputTokenPermit: {
           details: {
             token: USDC.address,
-            amount: BigNumber.from('1000000') as any,
-            expiration: BigNumber.from(0) as any,
-            nonce: BigNumber.from(0) as any,
+            amount: BigInt('1000000') as any,
+            expiration: BigInt(0) as any,
+            nonce: BigInt(0) as any,
           },
           spender: '0x0000000000000000000000000000000000000000',
-          sigDeadline: BigNumber.from(0) as any,
+          sigDeadline: BigInt(0) as any,
           signature: '0x',
         },
       })

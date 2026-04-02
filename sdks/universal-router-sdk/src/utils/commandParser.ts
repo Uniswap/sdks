@@ -1,6 +1,5 @@
-import { ethers } from 'ethers'
+import { AbiCoder, getAddress, Interface } from 'ethers'
 import UniversalRouter from '@uniswap/universal-router/artifacts/contracts/UniversalRouter.sol/UniversalRouter.json'
-import { Interface } from '@ethersproject/abi'
 import { V4BaseActionsParser, V4RouterAction } from '@uniswap/v4-sdk'
 import { CommandType, CommandDefinition, COMMAND_DEFINITION, Subparser, Parser } from '../utils/routerCommands'
 
@@ -36,7 +35,7 @@ export abstract class CommandParser {
   public static parseCalldata(calldata: string): UniversalRouterCall {
     const genericParser = new GenericCommandParser(COMMAND_DEFINITION)
     const txDescription = CommandParser.INTERFACE.parseTransaction({ data: calldata })
-    const { commands, inputs } = txDescription.args
+    const { commands, inputs } = txDescription!.args
     return genericParser.parse(commands, inputs)
   }
 }
@@ -61,7 +60,7 @@ export class GenericCommandParser {
           }
         } else if (commandDef.parser === Parser.Abi) {
           const abiDef = commandDef.params
-          const rawParams = ethers.utils.defaultAbiCoder.decode(
+          const rawParams = AbiCoder.defaultAbiCoder().decode(
             abiDef.map((command) => command.type),
             inputs[i]
           )
@@ -119,13 +118,13 @@ export class GenericCommandParser {
 
 export function parseV3PathExactIn(path: string): readonly V3PathItem[] {
   const strippedPath = path.replace('0x', '')
-  let tokenIn = ethers.utils.getAddress(strippedPath.substring(0, 40))
+  let tokenIn = getAddress('0x' + strippedPath.substring(0, 40))
   let loc = 40
   const res: V3PathItem[] = []
   while (loc < strippedPath.length) {
     const feeAndTokenOut = strippedPath.substring(loc, loc + 46)
     const fee = parseInt(feeAndTokenOut.substring(0, 6), 16)
-    const tokenOut = ethers.utils.getAddress(feeAndTokenOut.substring(6, 46))
+    const tokenOut = getAddress('0x' + feeAndTokenOut.substring(6, 46))
 
     res.push({
       tokenIn,
@@ -141,12 +140,12 @@ export function parseV3PathExactIn(path: string): readonly V3PathItem[] {
 
 export function parseV3PathExactOut(path: string): readonly V3PathItem[] {
   const strippedPath = path.replace('0x', '')
-  let tokenIn = ethers.utils.getAddress(strippedPath.substring(strippedPath.length - 40))
+  let tokenIn = getAddress('0x' + strippedPath.substring(strippedPath.length - 40))
   let loc = strippedPath.length - 86 // 86 = (20 addr + 3 fee + 20 addr) * 2 (for hex characters)
   const res: V3PathItem[] = []
   while (loc >= 0) {
     const feeAndTokenOut = strippedPath.substring(loc, loc + 46)
-    const tokenOut = ethers.utils.getAddress(feeAndTokenOut.substring(0, 40))
+    const tokenOut = getAddress('0x' + feeAndTokenOut.substring(0, 40))
     const fee = parseInt(feeAndTokenOut.substring(40, 46), 16)
 
     res.push({

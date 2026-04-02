@@ -33,13 +33,10 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@ethersproject/abi": "^5.5.0",
-    "@ethersproject/abstract-signer": "^5.7.0",
-    "@ethersproject/solidity": "^5.0.9",
     "@uniswap/sdk-core": "workspace:*",
     "@uniswap/v3-periphery": "^1.1.1",
     "@uniswap/v3-sdk": "workspace:*",
-    "ethers": "^5.7.0",
+    "ethers": "^6.13.0",
     "jsbi": "^3.1.4",
     "tiny-invariant": "^1.1.0",
     "tiny-warning": "^1.0.3",
