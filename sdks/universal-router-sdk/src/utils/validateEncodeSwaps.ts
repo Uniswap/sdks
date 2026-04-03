@@ -1,7 +1,7 @@
 import { BigNumber } from 'ethers'
 import { TradeType } from '@uniswap/sdk-core'
 import { TokenTransferMode } from '../entities/actions/uniswap'
-import { SENDER_AS_RECIPIENT, UniversalRouterVersion } from './constants'
+import { ROUTER_AS_RECIPIENT, SENDER_AS_RECIPIENT, UniversalRouterVersion } from './constants'
 import { SwapSpecification, SwapStep, V4Action } from '../types/encodeSwaps'
 
 function getV3HopCount(path: string): number | undefined {
@@ -37,6 +37,33 @@ function validateV4HopCounts(actions: V4Action[]): void {
         if (action.maxHopSlippage && action.maxHopSlippage.length !== action.path.length) {
           throw new Error('V4_MAX_HOP_SLIPPAGE_LENGTH_MISMATCH')
         }
+        break
+      default:
+        break
+    }
+  }
+}
+
+function assertRouterRecipient(recipient: string): void {
+  if (recipient !== ROUTER_AS_RECIPIENT) {
+    throw new Error('STEP_RECIPIENT_MUST_BE_ROUTER')
+  }
+}
+
+function assertRouterActionRecipient(recipient: string): void {
+  if (recipient !== ROUTER_AS_RECIPIENT) {
+    throw new Error('V4_ACTION_RECIPIENT_MUST_BE_ROUTER')
+  }
+}
+
+function validateV4Recipients(actions: V4Action[]): void {
+  for (const action of actions) {
+    switch (action.action) {
+      case 'TAKE':
+      case 'TAKE_PAIR':
+      case 'TAKE_PORTION':
+      case 'SWEEP':
+        assertRouterActionRecipient(action.recipient)
         break
       default:
         break
@@ -101,20 +128,27 @@ export function validateEncodeSwaps(spec: SwapSpecification, swapSteps: SwapStep
     switch (step.type) {
       case 'V2_SWAP_EXACT_IN':
       case 'V2_SWAP_EXACT_OUT':
+        assertRouterRecipient(step.recipient)
         if (step.maxHopSlippage && step.maxHopSlippage.length !== step.path.length - 1) {
           throw new Error('V2_MAX_HOP_SLIPPAGE_LENGTH_MISMATCH')
         }
         break
       case 'V3_SWAP_EXACT_IN':
       case 'V3_SWAP_EXACT_OUT': {
+        assertRouterRecipient(step.recipient)
         const hopCount = getV3HopCount(step.path)
         if (hopCount !== undefined && step.maxHopSlippage && step.maxHopSlippage.length !== hopCount) {
           throw new Error('V3_MAX_HOP_SLIPPAGE_LENGTH_MISMATCH')
         }
         break
       }
+      case 'WRAP_ETH':
+      case 'UNWRAP_WETH':
+        assertRouterRecipient(step.recipient)
+        break
       case 'V4_SWAP':
         validateV4HopCounts(step.v4Actions)
+        validateV4Recipients(step.v4Actions)
         break
       default:
         break

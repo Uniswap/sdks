@@ -141,7 +141,10 @@ function buildV3ExactInStep(
     recipient: ROUTER_AS_RECIPIENT,
     amountIn: '1000000',
     amountOutMin: '0',
-    path: packV3Path(tokens.map((token) => token.wrapped.address), fees),
+    path: packV3Path(
+      tokens.map((token) => token.wrapped.address),
+      fees
+    ),
     ...overrides,
   }
 }
@@ -156,7 +159,10 @@ function buildV3ExactOutStep(
     recipient: ROUTER_AS_RECIPIENT,
     amountOut: '500000000000000000',
     amountInMax: '1050000',
-    path: packV3Path(tokens.map((token) => token.wrapped.address), fees),
+    path: packV3Path(
+      tokens.map((token) => token.wrapped.address),
+      fees
+    ),
     ...overrides,
   }
 }
@@ -233,6 +239,86 @@ describe('encodeSwaps', () => {
       ).to.throw('NATIVE_INPUT_PERMIT')
     })
 
+    it('rejects V3 swap recipients that are not router custody', () => {
+      expect(() =>
+        validateEncodeSwaps(buildSpec(), [
+          buildV3ExactInStep({
+            recipient: TEST_RECIPIENT,
+          }),
+        ])
+      ).to.throw('STEP_RECIPIENT_MUST_BE_ROUTER')
+    })
+
+    it('rejects V2 swap recipients that use SENDER_AS_RECIPIENT', () => {
+      const step: V2SwapExactIn = {
+        type: 'V2_SWAP_EXACT_IN',
+        recipient: SENDER_AS_RECIPIENT,
+        amountIn: '1000',
+        amountOutMin: '0',
+        path: [USDC.address, WETH.address],
+      }
+
+      expect(() => validateEncodeSwaps(buildSpec(), [step])).to.throw('STEP_RECIPIENT_MUST_BE_ROUTER')
+    })
+
+    it('rejects wrap recipients that are not router custody', () => {
+      expect(() =>
+        validateEncodeSwaps(
+          buildSpec(
+            {},
+            {
+              inputToken: ETH,
+              amount: CurrencyAmount.fromRawAmount(ETH, '1000000000000000000'),
+              quote: CurrencyAmount.fromRawAmount(USDC, '2000000000'),
+            }
+          ),
+          [
+            {
+              type: 'WRAP_ETH',
+              recipient: TEST_RECIPIENT,
+              amount: '1000000000000000000',
+            },
+            buildV3ExactInStep({ amountIn: '1000000000000000000' }, [WETH, USDC]),
+          ]
+        )
+      ).to.throw('STEP_RECIPIENT_MUST_BE_ROUTER')
+    })
+
+    it('rejects V4 TAKE recipients that are not router custody', () => {
+      const step: V4Swap = {
+        type: 'V4_SWAP',
+        v4Actions: [
+          {
+            action: 'TAKE',
+            currency: USDC.address,
+            recipient: TEST_RECIPIENT,
+            amount: '1000',
+          },
+        ],
+      }
+
+      expect(() => validateEncodeSwaps(buildSpec(), [step])).to.throw('V4_ACTION_RECIPIENT_MUST_BE_ROUTER')
+    })
+
+    it('rejects V4 SWEEP recipients that are not router custody', () => {
+      const step: V4Swap = {
+        type: 'V4_SWAP',
+        v4Actions: [
+          {
+            action: 'SWEEP',
+            currency: USDC.address,
+            recipient: TEST_RECIPIENT,
+          },
+        ],
+      }
+
+      expect(() => validateEncodeSwaps(buildSpec(), [step])).to.throw('V4_ACTION_RECIPIENT_MUST_BE_ROUTER')
+    })
+
+    it('allows router-custody recipients in swap steps', () => {
+      expect(() => validateEncodeSwaps(buildSpec(), [buildV3ExactInStep()])).not.to.throw()
+    })
+
     it('rejects portion fees on non exact-input trades', () => {
       const fee: Fee = { kind: 'portion', recipient: FEE_RECIPIENT, fee: new Percent(5, 100) }
       expect(() =>
@@ -302,9 +388,9 @@ describe('encodeSwaps', () => {
         ],
       }
 
-      expect(() =>
-        validateEncodeSwaps(buildSpec({ urVersion: UniversalRouterVersion.V2_0 }), [v4Step])
-      ).to.throw('MAX_HOP_SLIPPAGE_UNSUPPORTED_ON_V2_0')
+      expect(() => validateEncodeSwaps(buildSpec({ urVersion: UniversalRouterVersion.V2_0 }), [v4Step])).to.throw(
+        'MAX_HOP_SLIPPAGE_UNSUPPORTED_ON_V2_0'
+      )
     })
 
     it('rejects fractional-bps portion fees on UR 2.0', () => {
@@ -324,9 +410,9 @@ describe('encodeSwaps', () => {
         maxHopSlippage: ['10', '20'],
       }
 
-      expect(() =>
-        validateEncodeSwaps(buildSpec({ urVersion: UniversalRouterVersion.V2_1_1 }), [step])
-      ).to.throw('V2_MAX_HOP_SLIPPAGE_LENGTH_MISMATCH')
+      expect(() => validateEncodeSwaps(buildSpec({ urVersion: UniversalRouterVersion.V2_1_1 }), [step])).to.throw(
+        'V2_MAX_HOP_SLIPPAGE_LENGTH_MISMATCH'
+      )
     })
 
     it('rejects V4 path hop-count mismatches', () => {
@@ -352,9 +438,9 @@ describe('encodeSwaps', () => {
         ],
       }
 
-      expect(() =>
-        validateEncodeSwaps(buildSpec({ urVersion: UniversalRouterVersion.V2_1_1 }), [step])
-      ).to.throw('V4_MAX_HOP_SLIPPAGE_LENGTH_MISMATCH')
+      expect(() => validateEncodeSwaps(buildSpec({ urVersion: UniversalRouterVersion.V2_1_1 }), [step])).to.throw(
+        'V4_MAX_HOP_SLIPPAGE_LENGTH_MISMATCH'
+      )
     })
 
     it('rejects V3 path-count mismatches when the path can be counted', () => {
@@ -362,9 +448,9 @@ describe('encodeSwaps', () => {
         maxHopSlippage: ['10', '20'],
       })
 
-      expect(() =>
-        validateEncodeSwaps(buildSpec({ urVersion: UniversalRouterVersion.V2_1_1 }), [step])
-      ).to.throw('V3_MAX_HOP_SLIPPAGE_LENGTH_MISMATCH')
+      expect(() => validateEncodeSwaps(buildSpec({ urVersion: UniversalRouterVersion.V2_1_1 }), [step])).to.throw(
+        'V3_MAX_HOP_SLIPPAGE_LENGTH_MISMATCH'
+      )
     })
   })
 
@@ -520,7 +606,10 @@ describe('encodeSwaps', () => {
       expect(transfer[2].toString()).to.equal('1000000')
 
       const sweep = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[2])
-      const expectedGrossMin = exactInputGrossMin(BigNumber.from(spec.routing.quote.quotient.toString()), spec.slippageTolerance)
+      const expectedGrossMin = exactInputGrossMin(
+        BigNumber.from(spec.routing.quote.quotient.toString()),
+        spec.slippageTolerance
+      )
       expect(sweep[0].toLowerCase()).to.equal(WETH.address.toLowerCase())
       expect(sweep[1].toLowerCase()).to.equal(TEST_RECIPIENT.toLowerCase())
       expect(sweep[2].toString()).to.equal(expectedGrossMin.toString())
@@ -597,16 +686,19 @@ describe('encodeSwaps', () => {
         }
       )
 
-      const result = SwapRouter.encodeSwaps(
-        spec,
-        [buildV3ExactOutStep({ amountInMax: exactOutputMaxIn(BigNumber.from('1000000'), spec.slippageTolerance).toString() })]
-      )
+      const result = SwapRouter.encodeSwaps(spec, [
+        buildV3ExactOutStep({
+          amountInMax: exactOutputMaxIn(BigNumber.from('1000000'), spec.slippageTolerance).toString(),
+        }),
+      ])
       const { commands, inputs } = decodeExecute(result.calldata)
 
       expect(commands).to.equal('0x02010404')
 
       const transfer = defaultAbiCoder.decode(['address', 'address', 'uint160'], inputs[0])
-      expect(transfer[2].toString()).to.equal(exactOutputMaxIn(BigNumber.from('1000000'), spec.slippageTolerance).toString())
+      expect(transfer[2].toString()).to.equal(
+        exactOutputMaxIn(BigNumber.from('1000000'), spec.slippageTolerance).toString()
+      )
 
       const settlement = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[2])
       expect(settlement[0].toLowerCase()).to.equal(WETH.address.toLowerCase())
@@ -631,7 +723,10 @@ describe('encodeSwaps', () => {
         }
       )
 
-      const maxAmountIn = exactOutputMaxIn(BigNumber.from(spec.routing.quote.quotient.toString()), spec.slippageTolerance)
+      const maxAmountIn = exactOutputMaxIn(
+        BigNumber.from(spec.routing.quote.quotient.toString()),
+        spec.slippageTolerance
+      )
       const swapSteps: SwapStep[] = [
         { type: 'WRAP_ETH', recipient: ROUTER_AS_RECIPIENT, amount: maxAmountIn.toString() },
         buildV3ExactOutStep({ amountOut: '2000000000', amountInMax: maxAmountIn.toString() }, [WETH, USDC]),
@@ -710,10 +805,11 @@ describe('encodeSwaps', () => {
         }
       )
 
-      const result = SwapRouter.encodeSwaps(
-        spec,
-        [buildV3ExactOutStep({ amountInMax: exactOutputMaxIn(BigNumber.from('1000000'), spec.slippageTolerance).toString() })]
-      )
+      const result = SwapRouter.encodeSwaps(spec, [
+        buildV3ExactOutStep({
+          amountInMax: exactOutputMaxIn(BigNumber.from('1000000'), spec.slippageTolerance).toString(),
+        }),
+      ])
       const { commands, inputs } = decodeExecute(result.calldata)
 
       expect(commands).to.equal('0x0201050404')
@@ -774,7 +870,9 @@ describe('encodeSwaps', () => {
       const decoded = PROXY_INTERFACE.decodeFunctionData('execute', result.calldata)
 
       expect(result.value).to.equal('0x00')
-      expect(decoded.router.toLowerCase()).to.equal(UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, 1).toLowerCase())
+      expect(decoded.router.toLowerCase()).to.equal(
+        UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, 1).toLowerCase()
+      )
       expect(decoded.token.toLowerCase()).to.equal(USDC.address.toLowerCase())
       expect(decoded.amount.toString()).to.equal('1000000')
       expect(decoded.deadline.toString()).to.equal(deadline.toString())
@@ -795,12 +893,23 @@ describe('encodeSwaps', () => {
         }
       )
 
-      const result = SwapRouter.encodeSwaps(
-        spec,
-        [buildV3ExactOutStep({ amountInMax: exactOutputMaxIn(BigNumber.from('1000000'), spec.slippageTolerance).toString() })]
-      )
+      const result = SwapRouter.encodeSwaps(spec, [
+        buildV3ExactOutStep({
+          amountInMax: exactOutputMaxIn(BigNumber.from('1000000'), spec.slippageTolerance).toString(),
+        }),
+      ])
       const decoded = PROXY_INTERFACE.decodeFunctionData('execute', result.calldata)
       expect(decoded.commands).to.equal('0x010404')
+    })
+
+    it('rejects non-router step recipients before calldata encoding', () => {
+      expect(() =>
+        SwapRouter.encodeSwaps(buildSpec(), [
+          buildV3ExactInStep({
+            recipient: TEST_RECIPIENT,
+          }),
+        ])
+      ).to.throw('STEP_RECIPIENT_MUST_BE_ROUTER')
     })
   })
 
@@ -824,10 +933,18 @@ describe('encodeSwaps', () => {
         tradeType: TradeType.EXACT_INPUT,
       })
 
-      const legacy = decodeExecute(SwapRouter.swapCallParameters(trade, swapOptions({ slippageTolerance, recipient: TEST_RECIPIENT })).calldata)
+      const legacy = decodeExecute(
+        SwapRouter.swapCallParameters(trade, swapOptions({ slippageTolerance, recipient: TEST_RECIPIENT })).calldata
+      )
       const next = decodeExecute(
         SwapRouter.encodeSwaps(
-          buildSpec({ slippageTolerance }, { amount: CurrencyAmount.fromRawAmount(USDC, '1000000'), quote: CurrencyAmount.fromRawAmount(WETH, '500000000000000000') }),
+          buildSpec(
+            { slippageTolerance },
+            {
+              amount: CurrencyAmount.fromRawAmount(USDC, '1000000'),
+              quote: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+            }
+          ),
           [buildV3ExactInStep({ amountIn: '1000000' })]
         ).calldata
       )
@@ -856,7 +973,9 @@ describe('encodeSwaps', () => {
         tradeType: TradeType.EXACT_OUTPUT,
       })
 
-      const legacy = decodeExecute(SwapRouter.swapCallParameters(trade, swapOptions({ slippageTolerance, recipient: TEST_RECIPIENT })).calldata)
+      const legacy = decodeExecute(
+        SwapRouter.swapCallParameters(trade, swapOptions({ slippageTolerance, recipient: TEST_RECIPIENT })).calldata
+      )
       const next = decodeExecute(
         SwapRouter.encodeSwaps(
           buildSpec(
@@ -866,7 +985,12 @@ describe('encodeSwaps', () => {
               quote: CurrencyAmount.fromRawAmount(USDC, '1050000'),
             }
           ),
-          [buildV3ExactOutStep({ amountOut: '500000000000000000', amountInMax: exactOutputMaxIn(BigNumber.from('1050000'), slippageTolerance).toString() })]
+          [
+            buildV3ExactOutStep({
+              amountOut: '500000000000000000',
+              amountInMax: exactOutputMaxIn(BigNumber.from('1050000'), slippageTolerance).toString(),
+            }),
+          ]
         ).calldata
       )
 

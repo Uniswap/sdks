@@ -82,14 +82,7 @@ export type UnwrapWeth = {
   amountMin: BigNumberish
 }
 
-export type SwapStep =
-  | V2SwapExactIn
-  | V2SwapExactOut
-  | V3SwapExactIn
-  | V3SwapExactOut
-  | V4Swap
-  | WrapEth
-  | UnwrapWeth
+export type SwapStep = V2SwapExactIn | V2SwapExactOut | V3SwapExactIn | V3SwapExactOut | V4Swap | WrapEth | UnwrapWeth
 
 export type V4SwapExactIn = {
   action: 'SWAP_EXACT_IN'
