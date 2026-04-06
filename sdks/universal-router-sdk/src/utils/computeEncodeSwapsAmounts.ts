@@ -21,9 +21,7 @@ export function computeEncodeSwapsAmounts(spec: SwapSpecification): EncodeSwapsA
 
     if (spec.fee?.kind === 'portion') {
       const feeAmount = isAtLeastV2_1_1(spec.urVersion)
-        ? grossMinOrExactOut
-            .mul(BigNumber.from(encodeFee1e18(spec.fee.fee)))
-            .div(BigNumber.from(10).pow(18))
+        ? grossMinOrExactOut.mul(BigNumber.from(encodeFee1e18(spec.fee.fee))).div(BigNumber.from(10).pow(18))
         : grossMinOrExactOut.mul(BigNumber.from(encodeFeeBips(spec.fee.fee))).div(10_000)
 
       return {

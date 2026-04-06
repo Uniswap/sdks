@@ -243,23 +243,24 @@ describe('encodeSwaps', () => {
     })
 
     it('rejects negative slippage', () => {
-      expect(() => validateEncodeSwaps(buildSpec({ slippageTolerance: new Percent(-1, 100) }), [buildV3ExactInStep()])).to.throw(
-        'SLIPPAGE_TOLERANCE'
-      )
+      expect(() =>
+        validateEncodeSwaps(buildSpec({ slippageTolerance: new Percent(-1, 100) }), [buildV3ExactInStep()])
+      ).to.throw('SLIPPAGE_TOLERANCE')
     })
 
     it('rejects exact-input routing amounts with the wrong currency', () => {
       expect(() =>
-        validateEncodeSwaps(
-          buildSpec({}, { amount: CurrencyAmount.fromRawAmount(WETH, '500000000000000000') }),
-          [buildV3ExactInStep()]
-        )
+        validateEncodeSwaps(buildSpec({}, { amount: CurrencyAmount.fromRawAmount(WETH, '500000000000000000') }), [
+          buildV3ExactInStep(),
+        ])
       ).to.throw('INVALID_ROUTING_AMOUNT_CURRENCY')
     })
 
     it('rejects exact-input routing quotes with the wrong currency', () => {
       expect(() =>
-        validateEncodeSwaps(buildSpec({}, { quote: CurrencyAmount.fromRawAmount(USDC, '1000000') }), [buildV3ExactInStep()])
+        validateEncodeSwaps(buildSpec({}, { quote: CurrencyAmount.fromRawAmount(USDC, '1000000') }), [
+          buildV3ExactInStep(),
+        ])
       ).to.throw('INVALID_ROUTING_QUOTE_CURRENCY')
     })
 
@@ -559,11 +560,7 @@ describe('encodeSwaps', () => {
     })
 
     it('encodes V3 exact-output paths in reverse pool order', () => {
-      encodeSwapStep(
-        planner,
-        buildV3ExactOutStep({}, [USDC, WETH, DAI], [500, 3000]),
-        UniversalRouterVersion.V2_0
-      )
+      encodeSwapStep(planner, buildV3ExactOutStep({}, [USDC, WETH, DAI], [500, 3000]), UniversalRouterVersion.V2_0)
 
       const decoded = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], planner.inputs[0])
       expect(decoded[3]).to.equal(packV3ExactOutPath([USDC.address, WETH.address, DAI.address], [500, 3000]))
@@ -761,9 +758,13 @@ describe('encodeSwaps', () => {
       )
 
       const result = SwapRouter.encodeSwaps(spec, [
-        buildV3ExactOutStep({
-          amountInMax: exactOutputMaxIn(BigNumber.from('1000000'), spec.slippageTolerance).toString(),
-        }, [USDC, WETH, DAI], [500, 3000]),
+        buildV3ExactOutStep(
+          {
+            amountInMax: exactOutputMaxIn(BigNumber.from('1000000'), spec.slippageTolerance).toString(),
+          },
+          [USDC, WETH, DAI],
+          [500, 3000]
+        ),
       ])
       const { commands, inputs } = decodeExecute(result.calldata)
 

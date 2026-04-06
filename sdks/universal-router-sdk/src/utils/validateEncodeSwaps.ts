@@ -97,7 +97,10 @@ export function validateEncodeSwaps(spec: SwapSpecification, swapSteps: SwapStep
     invariant(!!spec.recipient && recipient !== SENDER_AS_RECIPIENT, 'PROXY_EXPLICIT_RECIPIENT_REQUIRED')
   }
   invariant(!(spec.routing.inputToken.isNative && spec.permit), 'NATIVE_INPUT_PERMIT')
-  invariant(!(spec.fee?.kind === 'portion' && spec.tradeType !== TradeType.EXACT_INPUT), 'INVALID_PORTION_FEE_TRADE_TYPE')
+  invariant(
+    !(spec.fee?.kind === 'portion' && spec.tradeType !== TradeType.EXACT_INPUT),
+    'INVALID_PORTION_FEE_TRADE_TYPE'
+  )
   invariant(!(spec.fee?.kind === 'flat' && spec.tradeType !== TradeType.EXACT_OUTPUT), 'INVALID_FLAT_FEE_TRADE_TYPE')
   invariant(
     !(
@@ -118,8 +121,14 @@ export function validateEncodeSwaps(spec: SwapSpecification, swapSteps: SwapStep
 
   for (const step of swapSteps) {
     if (urVersion === UniversalRouterVersion.V2_0) {
-      invariant(!('maxHopSlippage' in step) || step.maxHopSlippage === undefined, 'MAX_HOP_SLIPPAGE_UNSUPPORTED_ON_V2_0')
-      invariant(!(step.type === 'V4_SWAP' && step.v4Actions.some(hasV4MaxHopSlippage)), 'MAX_HOP_SLIPPAGE_UNSUPPORTED_ON_V2_0')
+      invariant(
+        !('maxHopSlippage' in step) || step.maxHopSlippage === undefined,
+        'MAX_HOP_SLIPPAGE_UNSUPPORTED_ON_V2_0'
+      )
+      invariant(
+        !(step.type === 'V4_SWAP' && step.v4Actions.some(hasV4MaxHopSlippage)),
+        'MAX_HOP_SLIPPAGE_UNSUPPORTED_ON_V2_0'
+      )
     }
 
     switch (step.type) {
