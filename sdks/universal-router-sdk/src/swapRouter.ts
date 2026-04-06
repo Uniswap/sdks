@@ -137,6 +137,23 @@ export abstract class SwapRouter {
     })
   }
 
+  /**
+   * Encodes router-provided swap steps inside the SDK safety envelope.
+   *
+   * Routers own `swapSteps`, including any route-dependent `WRAP_ETH` / `UNWRAP_WETH`
+   * commands needed to execute the route and normalize balances for settlement/refund.
+   * The SDK owns ingress, fees, final settlement, and exact-output refund.
+   *
+   * After the last router step, gross output must be held in UR as `spec.routing.outputToken`.
+   * For `EXACT_OUTPUT`, unused input must be normalized into the SDK's expected refund asset before
+   * control returns to the envelope.
+   *
+   * For ERC20 input, that refund asset is `spec.routing.inputToken`.
+   * For native input on the non-proxy path, that refund asset is wrapped native in UR so the SDK can refund with
+   * `UNWRAP_WETH(recipient, 0)`.
+   *
+   * The SDK does not infer route topology or add transition commands on behalf of routers.
+   */
   public static encodeSwaps(spec: SwapSpecification, swapSteps: SwapStep[]): MethodParameters {
     const normalizedSpec = SwapRouter.normalizeEncodeSwapsSpec(spec)
     const planner = new RoutePlanner()
@@ -190,6 +207,7 @@ export abstract class SwapRouter {
       )
     }
 
+    // Assumes routers already normalized final gross output into `routing.outputToken`.
     planner.addCommand(
       CommandType.SWEEP,
       [getCurrencyAddress(outputToken), normalizedSpec.recipient, netMinOrExactOut],
@@ -197,6 +215,7 @@ export abstract class SwapRouter {
       normalizedSpec.urVersion
     )
 
+    // Assumes routers already normalized unused input into the canonical refund asset.
     if (normalizedSpec.tradeType === TradeType.EXACT_OUTPUT) {
       if (inputToken.isNative && normalizedSpec.tokenTransferMode === TokenTransferMode.Permit2) {
         planner.addCommand(CommandType.UNWRAP_WETH, [normalizedSpec.recipient, 0], false, normalizedSpec.urVersion)

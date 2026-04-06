@@ -3,7 +3,7 @@ import { BigNumber, utils } from 'ethers'
 import { defaultAbiCoder } from 'ethers/lib/utils'
 import { Route as V3RouteSDK } from '@uniswap/v3-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
-import { Currency, CurrencyAmount, Ether, Percent, Token, TradeType } from '@uniswap/sdk-core'
+import { Currency, CurrencyAmount, Percent, TradeType } from '@uniswap/sdk-core'
 import { URVersion, V4BaseActionsParser } from '@uniswap/v4-sdk'
 import { SwapRouter } from '../../src/swapRouter'
 import { TokenTransferMode } from '../../src/entities/actions/uniswap'
@@ -20,6 +20,7 @@ import {
 import { encodeSwapStep } from '../../src/utils/encodeSwapStep'
 import { validateEncodeSwaps } from '../../src/utils/validateEncodeSwaps'
 import {
+  CONTRACT_BALANCE,
   ETH_ADDRESS,
   ROUTER_AS_RECIPIENT,
   SENDER_AS_RECIPIENT,
@@ -27,10 +28,11 @@ import {
   UniversalRouterVersion,
 } from '../../src/utils/constants'
 import { CommandType, RoutePlanner } from '../../src/utils/routerCommands'
-import { makeV3Pool, swapOptions } from '../utils/uniswapData'
+import { TEST_FEE_RECIPIENT_ADDRESS, TEST_RECIPIENT_ADDRESS } from '../utils/addresses'
+import { DAI, ETHER as ETH, USDC, WETH, makeV3Pool, parseCommands, swapOptions } from '../utils/uniswapData'
 
-const TEST_RECIPIENT = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-const FEE_RECIPIENT = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+const TEST_RECIPIENT = TEST_RECIPIENT_ADDRESS
+const FEE_RECIPIENT = TEST_FEE_RECIPIENT_ADDRESS
 const TEST_PERMIT = {
   details: {
     token: '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',
@@ -42,11 +44,6 @@ const TEST_PERMIT = {
   sigDeadline: '1000000000',
   signature: '0x' + '00'.repeat(65),
 }
-
-const ETH = Ether.onChain(1)
-const USDC = new Token(1, '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48', 6, 'USDC', 'USD Coin')
-const WETH = new Token(1, '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2', 18, 'WETH', 'Wrapped Ether')
-const DAI = new Token(1, '0x6b175474e89094c44da98b954eedeac495271d0f', 18, 'DAI', 'Dai')
 
 const PROXY_INTERFACE = new utils.Interface([
   'function execute(address router, address token, uint256 amount, bytes commands, bytes[] inputs, uint256 deadline) external payable',
@@ -79,14 +76,6 @@ function decodeExecute(calldata: string): { commands: string; inputs: string[]; 
       inputs: decoded.inputs as string[],
     }
   }
-}
-
-function getCommandTypes(commands: string): number[] {
-  const result: number[] = []
-  for (let i = 2; i < commands.length; i += 2) {
-    result.push(parseInt(commands.slice(i, i + 2), 16) & 0x3f)
-  }
-  return result
 }
 
 function exactInputGrossMin(quote: BigNumber, slippageTolerance: Percent): BigNumber {
@@ -644,7 +633,7 @@ describe('encodeSwaps', () => {
       expect(wrap[1].toString()).to.equal('1000000000000000000')
     })
 
-    it('encodes exact-input ERC20 to native with router-owned unwrap before settlement', () => {
+    it('encodes exact-input ERC20 to native with router-owned output normalization before settlement', () => {
       const spec = buildSpec(
         {
           slippageTolerance: new Percent(25, 1000),
@@ -666,8 +655,15 @@ describe('encodeSwaps', () => {
 
       const result = SwapRouter.encodeSwaps(spec, swapSteps)
       const { commands, inputs } = decodeExecute(result.calldata)
+      const { commandTypes } = parseCommands(result.calldata)
 
       expect(commands).to.equal('0x02000c04')
+      expect(commandTypes).to.deep.equal([
+        CommandType.PERMIT2_TRANSFER_FROM,
+        CommandType.V3_SWAP_EXACT_IN,
+        CommandType.UNWRAP_WETH,
+        CommandType.SWEEP,
+      ])
 
       const sweep = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[3])
       expect(sweep[0].toLowerCase()).to.equal(ETH_ADDRESS.toLowerCase())
@@ -709,7 +705,82 @@ describe('encodeSwaps', () => {
       expect(refund[2].toString()).to.equal('0')
     })
 
-    it('encodes exact-output native to ERC20 with native refund unwrap', () => {
+    it('encodes exact-output wrapped-native input with router-owned normalization before refund', () => {
+      const spec = buildSpec(
+        {
+          tradeType: TradeType.EXACT_OUTPUT,
+          slippageTolerance: new Percent(5, 100),
+        },
+        {
+          inputToken: WETH,
+          outputToken: USDC,
+          amount: CurrencyAmount.fromRawAmount(USDC, '2000000000'),
+          quote: CurrencyAmount.fromRawAmount(WETH, '1000000000000000000'),
+        }
+      )
+
+      const maxAmountIn = exactOutputMaxIn(
+        BigNumber.from(spec.routing.quote.quotient.toString()),
+        spec.slippageTolerance
+      )
+
+      const swapSteps: SwapStep[] = [
+        {
+          type: 'UNWRAP_WETH',
+          recipient: ROUTER_AS_RECIPIENT,
+          amountMin: '0',
+        },
+        {
+          type: 'V4_SWAP',
+          v4Actions: [
+            {
+              action: 'SWAP_EXACT_OUT_SINGLE',
+              poolKey: {
+                currency0: ETH_ADDRESS,
+                currency1: USDC.address,
+                fee: 500,
+                tickSpacing: 10,
+                hooks: ETH_ADDRESS,
+              },
+              zeroForOne: true,
+              amountOut: '2000000000',
+              amountInMaximum: maxAmountIn.toString(),
+              hookData: '0x',
+            },
+          ],
+        },
+        {
+          type: 'WRAP_ETH',
+          recipient: ROUTER_AS_RECIPIENT,
+          amount: CONTRACT_BALANCE.toString(),
+        },
+      ]
+
+      const result = SwapRouter.encodeSwaps(spec, swapSteps)
+      const { commands, inputs } = decodeExecute(result.calldata)
+      const { commandTypes } = parseCommands(result.calldata)
+
+      expect(commandTypes).to.deep.equal([
+        CommandType.PERMIT2_TRANSFER_FROM,
+        CommandType.UNWRAP_WETH,
+        CommandType.V4_SWAP,
+        CommandType.WRAP_ETH,
+        CommandType.SWEEP,
+        CommandType.SWEEP,
+      ])
+      expect(commandTypes[commandTypes.length - 1]).to.equal(CommandType.SWEEP)
+      expect(commandTypes.filter((type) => type === CommandType.SWEEP)).to.have.length(2)
+
+      const settlement = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[4])
+      expect(settlement[0].toLowerCase()).to.equal(USDC.address.toLowerCase())
+
+      const refund = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[5])
+      expect(refund[0].toLowerCase()).to.equal(WETH.address.toLowerCase())
+      expect(refund[1].toLowerCase()).to.equal(TEST_RECIPIENT.toLowerCase())
+      expect(refund[2].toString()).to.equal('0')
+    })
+
+    it('encodes exact-output native input with router-owned wrapped-native refund normalization', () => {
       const spec = buildSpec(
         {
           tradeType: TradeType.EXACT_OUTPUT,
@@ -733,10 +804,16 @@ describe('encodeSwaps', () => {
       ]
 
       const result = SwapRouter.encodeSwaps(spec, swapSteps)
-      const { commands } = decodeExecute(result.calldata)
+      const { commands, inputs } = decodeExecute(result.calldata)
+      const { commandTypes } = parseCommands(result.calldata)
 
       expect(commands).to.equal('0x0b01040c')
       expect(result.value).to.equal(maxAmountIn.toHexString())
+      expect(commandTypes[commandTypes.length - 1]).to.equal(CommandType.UNWRAP_WETH)
+      expect(commandTypes.filter((type) => type === CommandType.SWEEP)).to.have.length(1)
+
+      const settlement = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[2])
+      expect(settlement[0].toLowerCase()).to.equal(USDC.address.toLowerCase())
     })
 
     it('uses PAY_PORTION on UR 2.0 exact-input fees', () => {

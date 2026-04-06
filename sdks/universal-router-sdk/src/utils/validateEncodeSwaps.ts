@@ -1,4 +1,5 @@
 import { BigNumber } from 'ethers'
+import invariant from 'tiny-invariant'
 import { TradeType } from '@uniswap/sdk-core'
 import { TokenTransferMode } from '../entities/actions/uniswap'
 import { ROUTER_AS_RECIPIENT, SENDER_AS_RECIPIENT, UniversalRouterVersion } from './constants'
@@ -34,9 +35,10 @@ function validateV4HopCounts(actions: V4Action[]): void {
     switch (action.action) {
       case 'SWAP_EXACT_IN':
       case 'SWAP_EXACT_OUT':
-        if (action.maxHopSlippage && action.maxHopSlippage.length !== action.path.length) {
-          throw new Error('V4_MAX_HOP_SLIPPAGE_LENGTH_MISMATCH')
-        }
+        invariant(
+          !action.maxHopSlippage || action.maxHopSlippage.length === action.path.length,
+          'V4_MAX_HOP_SLIPPAGE_LENGTH_MISMATCH'
+        )
         break
       default:
         break
@@ -45,15 +47,11 @@ function validateV4HopCounts(actions: V4Action[]): void {
 }
 
 function assertRouterRecipient(recipient: string): void {
-  if (recipient !== ROUTER_AS_RECIPIENT) {
-    throw new Error('STEP_RECIPIENT_MUST_BE_ROUTER')
-  }
+  invariant(recipient === ROUTER_AS_RECIPIENT, 'STEP_RECIPIENT_MUST_BE_ROUTER')
 }
 
 function assertRouterActionRecipient(recipient: string): void {
-  if (recipient !== ROUTER_AS_RECIPIENT) {
-    throw new Error('V4_ACTION_RECIPIENT_MUST_BE_ROUTER')
-  }
+  invariant(recipient === ROUTER_AS_RECIPIENT, 'V4_ACTION_RECIPIENT_MUST_BE_ROUTER')
 }
 
 function validateV4Recipients(actions: V4Action[]): void {
@@ -72,74 +70,61 @@ function validateV4Recipients(actions: V4Action[]): void {
 }
 
 export function validateEncodeSwaps(spec: SwapSpecification, swapSteps: SwapStep[]): void {
-  if (swapSteps.length === 0) {
-    throw new Error('EMPTY_SWAP_STEPS')
-  }
+  invariant(swapSteps.length > 0, 'EMPTY_SWAP_STEPS')
 
   const recipient = spec.recipient ?? SENDER_AS_RECIPIENT
   const tokenTransferMode = spec.tokenTransferMode ?? TokenTransferMode.Permit2
   const urVersion = spec.urVersion ?? UniversalRouterVersion.V2_0
 
   if (tokenTransferMode === TokenTransferMode.ApproveProxy) {
-    if (!spec.chainId) throw new Error('PROXY_MISSING_CHAIN_ID')
-    if (spec.routing.inputToken.isNative) throw new Error('PROXY_NATIVE_INPUT')
-    if (spec.permit) throw new Error('PROXY_PERMIT_CONFLICT')
-    if (!spec.recipient || recipient === SENDER_AS_RECIPIENT) throw new Error('PROXY_EXPLICIT_RECIPIENT_REQUIRED')
+    invariant(!!spec.chainId, 'PROXY_MISSING_CHAIN_ID')
+    invariant(!spec.routing.inputToken.isNative, 'PROXY_NATIVE_INPUT')
+    invariant(!spec.permit, 'PROXY_PERMIT_CONFLICT')
+    invariant(!!spec.recipient && recipient !== SENDER_AS_RECIPIENT, 'PROXY_EXPLICIT_RECIPIENT_REQUIRED')
   }
+  invariant(!(spec.routing.inputToken.isNative && spec.permit), 'NATIVE_INPUT_PERMIT')
+  invariant(!(spec.fee?.kind === 'portion' && spec.tradeType !== TradeType.EXACT_INPUT), 'INVALID_PORTION_FEE_TRADE_TYPE')
+  invariant(!(spec.fee?.kind === 'flat' && spec.tradeType !== TradeType.EXACT_OUTPUT), 'INVALID_FLAT_FEE_TRADE_TYPE')
+  invariant(
+    !(
+      spec.fee?.kind === 'flat' &&
+      BigNumber.from(spec.fee.amount).gt(BigNumber.from(spec.routing.amount.quotient.toString()))
+    ),
+    'FLAT_FEE_GT_AMOUNT'
+  )
 
-  if (spec.routing.inputToken.isNative && spec.permit) {
-    throw new Error('NATIVE_INPUT_PERMIT')
-  }
-
-  if (spec.fee?.kind === 'portion' && spec.tradeType !== TradeType.EXACT_INPUT) {
-    throw new Error('INVALID_PORTION_FEE_TRADE_TYPE')
-  }
-
-  if (spec.fee?.kind === 'flat' && spec.tradeType !== TradeType.EXACT_OUTPUT) {
-    throw new Error('INVALID_FLAT_FEE_TRADE_TYPE')
-  }
-
-  if (
-    spec.fee?.kind === 'flat' &&
-    BigNumber.from(spec.fee.amount).gt(BigNumber.from(spec.routing.amount.quotient.toString()))
-  ) {
-    throw new Error('FLAT_FEE_GT_AMOUNT')
-  }
-
-  if (
-    spec.fee?.kind === 'portion' &&
-    urVersion === UniversalRouterVersion.V2_0 &&
-    !spec.fee.fee.multiply(10_000).remainder.equalTo(0)
-  ) {
-    throw new Error('FRACTIONAL_BPS_PORTION_FEE_UNSUPPORTED_ON_V2_0')
-  }
+  invariant(
+    !(
+      spec.fee?.kind === 'portion' &&
+      urVersion === UniversalRouterVersion.V2_0 &&
+      !spec.fee.fee.multiply(10_000).remainder.equalTo(0)
+    ),
+    'FRACTIONAL_BPS_PORTION_FEE_UNSUPPORTED_ON_V2_0'
+  )
 
   for (const step of swapSteps) {
     if (urVersion === UniversalRouterVersion.V2_0) {
-      if ('maxHopSlippage' in step && step.maxHopSlippage !== undefined) {
-        throw new Error('MAX_HOP_SLIPPAGE_UNSUPPORTED_ON_V2_0')
-      }
-
-      if (step.type === 'V4_SWAP' && step.v4Actions.some(hasV4MaxHopSlippage)) {
-        throw new Error('MAX_HOP_SLIPPAGE_UNSUPPORTED_ON_V2_0')
-      }
+      invariant(!('maxHopSlippage' in step) || step.maxHopSlippage === undefined, 'MAX_HOP_SLIPPAGE_UNSUPPORTED_ON_V2_0')
+      invariant(!(step.type === 'V4_SWAP' && step.v4Actions.some(hasV4MaxHopSlippage)), 'MAX_HOP_SLIPPAGE_UNSUPPORTED_ON_V2_0')
     }
 
     switch (step.type) {
       case 'V2_SWAP_EXACT_IN':
       case 'V2_SWAP_EXACT_OUT':
         assertRouterRecipient(step.recipient)
-        if (step.maxHopSlippage && step.maxHopSlippage.length !== step.path.length - 1) {
-          throw new Error('V2_MAX_HOP_SLIPPAGE_LENGTH_MISMATCH')
-        }
+        invariant(
+          !step.maxHopSlippage || step.maxHopSlippage.length === step.path.length - 1,
+          'V2_MAX_HOP_SLIPPAGE_LENGTH_MISMATCH'
+        )
         break
       case 'V3_SWAP_EXACT_IN':
       case 'V3_SWAP_EXACT_OUT': {
         assertRouterRecipient(step.recipient)
         const hopCount = getV3HopCount(step.path)
-        if (hopCount !== undefined && step.maxHopSlippage && step.maxHopSlippage.length !== hopCount) {
-          throw new Error('V3_MAX_HOP_SLIPPAGE_LENGTH_MISMATCH')
-        }
+        invariant(
+          hopCount === undefined || !step.maxHopSlippage || step.maxHopSlippage.length === hopCount,
+          'V3_MAX_HOP_SLIPPAGE_LENGTH_MISMATCH'
+        )
         break
       }
       case 'WRAP_ETH':
