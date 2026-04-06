@@ -1,5 +1,7 @@
 import { BigNumber } from 'ethers'
 import { TradeType } from '@uniswap/sdk-core'
+import { isAtLeastV2_1_1 } from './constants'
+import { encodeFee1e18, encodeFeeBips } from './numbers'
 import { SwapSpecification } from '../types/encodeSwaps'
 
 export type EncodeSwapsAmounts = {
@@ -18,9 +20,11 @@ export function computeEncodeSwapsAmounts(spec: SwapSpecification): EncodeSwapsA
     const grossMinOrExactOut = routingQuote.mul(slippageDenominator).div(slippageDenominator.add(slippageNumerator))
 
     if (spec.fee?.kind === 'portion') {
-      const feeAmount = grossMinOrExactOut
-        .mul(spec.fee.fee.numerator.toString())
-        .div(spec.fee.fee.denominator.toString())
+      const feeAmount = isAtLeastV2_1_1(spec.urVersion)
+        ? grossMinOrExactOut
+            .mul(BigNumber.from(encodeFee1e18(spec.fee.fee)))
+            .div(BigNumber.from(10).pow(18))
+        : grossMinOrExactOut.mul(BigNumber.from(encodeFeeBips(spec.fee.fee))).div(10_000)
 
       return {
         maxAmountIn: routingAmount,

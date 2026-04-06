@@ -75,6 +75,20 @@ export function validateEncodeSwaps(spec: SwapSpecification, swapSteps: SwapStep
   const recipient = spec.recipient ?? SENDER_AS_RECIPIENT
   const tokenTransferMode = spec.tokenTransferMode ?? TokenTransferMode.Permit2
   const urVersion = spec.urVersion ?? UniversalRouterVersion.V2_0
+  const amountCurrency = spec.routing.amount.currency.wrapped
+  const quoteCurrency = spec.routing.quote.currency.wrapped
+  const inputCurrency = spec.routing.inputToken.wrapped
+  const outputCurrency = spec.routing.outputToken.wrapped
+
+  invariant(!spec.slippageTolerance.lessThan(0), 'SLIPPAGE_TOLERANCE')
+
+  if (spec.tradeType === TradeType.EXACT_INPUT) {
+    invariant(amountCurrency.equals(inputCurrency), 'INVALID_ROUTING_AMOUNT_CURRENCY')
+    invariant(quoteCurrency.equals(outputCurrency), 'INVALID_ROUTING_QUOTE_CURRENCY')
+  } else {
+    invariant(amountCurrency.equals(outputCurrency), 'INVALID_ROUTING_AMOUNT_CURRENCY')
+    invariant(quoteCurrency.equals(inputCurrency), 'INVALID_ROUTING_QUOTE_CURRENCY')
+  }
 
   if (tokenTransferMode === TokenTransferMode.ApproveProxy) {
     invariant(!!spec.chainId, 'PROXY_MISSING_CHAIN_ID')
