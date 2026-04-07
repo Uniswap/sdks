@@ -947,7 +947,7 @@ describe('encodeSwaps', () => {
       expect(refund[2].toString()).to.equal('0')
     })
 
-    it('encodes exact-output native input with router-owned wrapped-native refund normalization', () => {
+    it('encodes exact-output native input with router-owned native refund normalization', () => {
       const spec = buildSpec(
         {
           tradeType: TradeType.EXACT_OUTPUT,
@@ -968,19 +968,70 @@ describe('encodeSwaps', () => {
       const swapSteps: SwapStep[] = [
         { type: 'WRAP_ETH', recipient: ROUTER_AS_RECIPIENT, amount: maxAmountIn.toString() },
         buildV3ExactOutStep({ amountOut: '2000000000', amountInMax: maxAmountIn.toString() }, [WETH, USDC]),
+        { type: 'UNWRAP_WETH', recipient: ROUTER_AS_RECIPIENT, amountMin: '0' },
       ]
 
       const result = SwapRouter.encodeSwaps(spec, swapSteps)
-      const { commands, inputs } = decodeExecute(result.calldata)
+      const { inputs } = decodeExecute(result.calldata)
       const { commandTypes } = parseCommands(result.calldata)
 
-      expect(commands).to.equal('0x0b01040c')
       expect(result.value).to.equal(maxAmountIn.toHexString())
-      expect(commandTypes[commandTypes.length - 1]).to.equal(CommandType.UNWRAP_WETH)
-      expect(commandTypes.filter((type) => type === CommandType.SWEEP)).to.have.length(1)
+      expect(commandTypes).to.deep.equal([
+        CommandType.WRAP_ETH,
+        CommandType.V3_SWAP_EXACT_OUT,
+        CommandType.UNWRAP_WETH,
+        CommandType.SWEEP,
+        CommandType.SWEEP,
+      ])
+      expect(commandTypes[commandTypes.length - 1]).to.equal(CommandType.SWEEP)
+      expect(commandTypes.filter((type) => type === CommandType.SWEEP)).to.have.length(2)
 
-      const settlement = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[2])
+      const settlement = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[3])
       expect(settlement[0].toLowerCase()).to.equal(USDC.address.toLowerCase())
+
+      const refund = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[4])
+      expect(refund[0].toLowerCase()).to.equal(ETH_ADDRESS.toLowerCase())
+      expect(refund[1].toLowerCase()).to.equal(TEST_RECIPIENT.toLowerCase())
+      expect(refund[2].toString()).to.equal('0')
+    })
+
+    it('refunds exact-output native input with SWEEP on ETH after router normalization', () => {
+      const spec = buildSpec(
+        {
+          tradeType: TradeType.EXACT_OUTPUT,
+          slippageTolerance: new Percent(5, 100),
+        },
+        {
+          inputToken: ETH,
+          outputToken: USDC,
+          amount: CurrencyAmount.fromRawAmount(USDC, '2000000000'),
+          quote: CurrencyAmount.fromRawAmount(ETH, '1000000000000000000'),
+        }
+      )
+
+      const maxAmountIn = exactOutputMaxIn(
+        BigNumber.from(spec.routing.quote.quotient.toString()),
+        spec.slippageTolerance
+      )
+      const swapSteps: SwapStep[] = [
+        { type: 'WRAP_ETH', recipient: ROUTER_AS_RECIPIENT, amount: maxAmountIn.toString() },
+        buildV3ExactOutStep({ amountOut: '2000000000', amountInMax: maxAmountIn.toString() }, [WETH, USDC]),
+        { type: 'UNWRAP_WETH', recipient: ROUTER_AS_RECIPIENT, amountMin: '0' },
+      ]
+
+      const result = SwapRouter.encodeSwaps(spec, swapSteps)
+      const { inputs } = decodeExecute(result.calldata)
+      const { commandTypes } = parseCommands(result.calldata)
+
+      expect(commandTypes[commandTypes.length - 1]).to.equal(CommandType.SWEEP)
+      expect(commandTypes[commandTypes.length - 1]).not.to.equal(CommandType.UNWRAP_WETH)
+      expect(commandTypes.filter((type) => type === CommandType.UNWRAP_WETH)).to.have.length(1)
+      expect(commandTypes.slice(-2)).to.deep.equal([CommandType.SWEEP, CommandType.SWEEP])
+
+      const refund = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[4])
+      expect(refund[0].toLowerCase()).to.equal(ETH_ADDRESS.toLowerCase())
+      expect(refund[1].toLowerCase()).to.equal(TEST_RECIPIENT.toLowerCase())
+      expect(refund[2].toString()).to.equal('0')
     })
 
     it('uses PAY_PORTION on UR 2.0 exact-input fees', () => {

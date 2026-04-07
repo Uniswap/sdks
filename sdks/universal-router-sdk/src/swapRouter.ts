@@ -145,12 +145,9 @@ export abstract class SwapRouter {
    * The SDK owns ingress, fees, final settlement, and exact-output refund.
    *
    * After the last router step, gross output must be held in UR as `spec.routing.outputToken`.
-   * For `EXACT_OUTPUT`, unused input must be normalized into the SDK's expected refund asset before
+   * For `EXACT_OUTPUT`, routers must normalize unused input into `spec.routing.inputToken` before
    * control returns to the envelope.
-   *
-   * For ERC20 input, that refund asset is `spec.routing.inputToken`.
-   * For native input on the non-proxy path, that refund asset is wrapped native in UR so the SDK can refund with
-   * `UNWRAP_WETH(recipient, 0)`.
+   * The SDK refunds unused input with `SWEEP(getCurrencyAddress(inputToken), recipient, 0)`.
    *
    * The SDK does not infer route topology or add transition commands on behalf of routers.
    */
@@ -215,18 +212,14 @@ export abstract class SwapRouter {
       normalizedSpec.urVersion
     )
 
-    // Assumes routers already normalized unused input into the canonical refund asset.
+    // Assumes routers already normalized unused input into `routing.inputToken`.
     if (normalizedSpec.tradeType === TradeType.EXACT_OUTPUT) {
-      if (inputToken.isNative && normalizedSpec.tokenTransferMode === TokenTransferMode.Permit2) {
-        planner.addCommand(CommandType.UNWRAP_WETH, [normalizedSpec.recipient, 0], false, normalizedSpec.urVersion)
-      } else {
-        planner.addCommand(
-          CommandType.SWEEP,
-          [getCurrencyAddress(inputToken), normalizedSpec.recipient, 0],
-          false,
-          normalizedSpec.urVersion
-        )
-      }
+      planner.addCommand(
+        CommandType.SWEEP,
+        [getCurrencyAddress(inputToken), normalizedSpec.recipient, 0],
+        false,
+        normalizedSpec.urVersion
+      )
     }
 
     if (normalizedSpec.tokenTransferMode === TokenTransferMode.ApproveProxy) {
