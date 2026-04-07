@@ -711,7 +711,10 @@ describe('encodeSwaps', () => {
       expect(result.value).to.equal('0x00')
 
       const permitInput = defaultAbiCoder.decode(
-        ['((address token,uint160 amount,uint48 expiration,uint48 nonce) details,address spender,uint256 sigDeadline)', 'bytes'],
+        [
+          '((address token,uint160 amount,uint48 expiration,uint48 nonce) details,address spender,uint256 sigDeadline)',
+          'bytes',
+        ],
         inputs[0]
       )
       expect(permitInput[0][0][0].toLowerCase()).to.equal(TEST_PERMIT.details.token.toLowerCase())
@@ -747,7 +750,10 @@ describe('encodeSwaps', () => {
       ])
 
       const permitInput = defaultAbiCoder.decode(
-        ['((address token,uint160 amount,uint48 expiration,uint48 nonce) details,address spender,uint256 sigDeadline)', 'bytes'],
+        [
+          '((address token,uint160 amount,uint48 expiration,uint48 nonce) details,address spender,uint256 sigDeadline)',
+          'bytes',
+        ],
         inputs[0]
       )
       expect(permitInput[0][0][0].toLowerCase()).to.equal(permit.details.token.toLowerCase())
@@ -1239,10 +1245,7 @@ describe('encodeSwaps', () => {
       )
 
       const maxAmountIn = exactOutputMaxIn(BigNumber.from('1000000'), spec.slippageTolerance)
-      const result = SwapRouter.encodeSwaps(
-        spec,
-        [buildV3ExactOutStep({ amountInMax: maxAmountIn.toString() })]
-      )
+      const result = SwapRouter.encodeSwaps(spec, [buildV3ExactOutStep({ amountInMax: maxAmountIn.toString() })])
       const decoded = PROXY_INTERFACE.decodeFunctionData('execute', result.calldata)
 
       expect(result.value).to.equal('0x00')
@@ -1303,7 +1306,9 @@ describe('encodeSwaps', () => {
         CommandType.SWEEP,
         CommandType.SWEEP,
       ])
-      expect(commandTypes.indexOf(CommandType.TRANSFER)).to.be.greaterThan(commandTypes.indexOf(CommandType.V2_SWAP_EXACT_OUT))
+      expect(commandTypes.indexOf(CommandType.TRANSFER)).to.be.greaterThan(
+        commandTypes.indexOf(CommandType.V2_SWAP_EXACT_OUT)
+      )
       expect(commandTypes.indexOf(CommandType.SWEEP)).to.be.greaterThan(commandTypes.indexOf(CommandType.TRANSFER))
       expect(commandTypes[commandTypes.length - 1]).to.equal(CommandType.SWEEP)
     })
@@ -1438,7 +1443,8 @@ describe('encodeSwaps', () => {
       })
 
       const legacy = decodeExecute(
-        SwapRouter.swapCallParameters(trade, swapOptions({ slippageTolerance, recipient: TEST_RECIPIENT, fee })).calldata
+        SwapRouter.swapCallParameters(trade, swapOptions({ slippageTolerance, recipient: TEST_RECIPIENT, fee }))
+          .calldata
       )
       const next = decodeExecute(
         SwapRouter.encodeSwaps(
@@ -1487,7 +1493,8 @@ describe('encodeSwaps', () => {
       })
 
       const legacy = decodeExecute(
-        SwapRouter.swapCallParameters(trade, swapOptions({ slippageTolerance, recipient: TEST_RECIPIENT, flatFee })).calldata
+        SwapRouter.swapCallParameters(trade, swapOptions({ slippageTolerance, recipient: TEST_RECIPIENT, flatFee }))
+          .calldata
       )
       const next = decodeExecute(
         SwapRouter.encodeSwaps(
