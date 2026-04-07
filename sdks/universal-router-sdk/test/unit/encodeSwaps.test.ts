@@ -566,6 +566,21 @@ describe('encodeSwaps', () => {
       expect(decoded[3]).to.equal(packV3ExactOutPath([USDC.address, WETH.address, DAI.address], [500, 3000]))
     })
 
+    it('encodes V3 exact-output maxHopSlippage on UR 2.1.1', () => {
+      const step = buildV3ExactOutStep({ maxHopSlippage: ['750'] }, [WETH, USDC], [500])
+
+      encodeSwapStep(planner, step, UniversalRouterVersion.V2_1_1)
+
+      const decoded = defaultAbiCoder.decode(
+        ['address', 'uint256', 'uint256', 'bytes', 'bool', 'uint256[]'],
+        planner.inputs[0]
+      )
+
+      expect(decoded[3]).to.equal(packV3ExactOutPath([WETH.address, USDC.address], [500]))
+      expect(decoded[4]).to.equal(false)
+      expect(decoded[5].map((value: BigNumber) => value.toString())).to.deep.equal(['750'])
+    })
+
     it('encodes V4 path maxHopSlippage on UR 2.1.1', () => {
       const step: V4Swap = {
         type: 'V4_SWAP',
@@ -676,6 +691,70 @@ describe('encodeSwaps', () => {
       expect(sweep[0].toLowerCase()).to.equal(WETH.address.toLowerCase())
       expect(sweep[1].toLowerCase()).to.equal(TEST_RECIPIENT.toLowerCase())
       expect(sweep[2].toString()).to.equal(expectedGrossMin.toString())
+    })
+
+    it('encodes ERC20 permit ingress with permit before transfer-from', () => {
+      const spec = buildSpec({
+        permit: TEST_PERMIT,
+      })
+
+      const result = SwapRouter.encodeSwaps(spec, [buildV3ExactInStep()])
+      const { commands, inputs } = decodeExecute(result.calldata)
+      const { commandTypes } = parseCommands(result.calldata)
+
+      expect(commandTypes).to.deep.equal([
+        CommandType.PERMIT2_PERMIT,
+        CommandType.PERMIT2_TRANSFER_FROM,
+        CommandType.V3_SWAP_EXACT_IN,
+        CommandType.SWEEP,
+      ])
+      expect(result.value).to.equal('0x00')
+
+      const permitInput = defaultAbiCoder.decode(
+        ['((address token,uint160 amount,uint48 expiration,uint48 nonce) details,address spender,uint256 sigDeadline)', 'bytes'],
+        inputs[0]
+      )
+      expect(permitInput[0][0][0].toLowerCase()).to.equal(TEST_PERMIT.details.token.toLowerCase())
+
+      const transfer = defaultAbiCoder.decode(['address', 'address', 'uint160'], inputs[1])
+      expect(transfer[0].toLowerCase()).to.equal(USDC.address.toLowerCase())
+      expect(transfer[1]).to.equal(ROUTER_AS_RECIPIENT)
+      expect(transfer[2].toString()).to.equal(spec.routing.amount.quotient.toString())
+
+      const sweep = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[3])
+      expect(sweep[0].toLowerCase()).to.equal(WETH.address.toLowerCase())
+      expect(sweep[1].toLowerCase()).to.equal(TEST_RECIPIENT.toLowerCase())
+    })
+
+    it('encodes ERC20 permit ingress with an EIP-2098 permit signature', () => {
+      const permit = {
+        ...TEST_PERMIT,
+        signature: `0x${'11'.repeat(32)}${'22'.repeat(32)}`,
+      }
+      const spec = buildSpec({
+        permit,
+      })
+
+      const result = SwapRouter.encodeSwaps(spec, [buildV3ExactInStep()])
+      const { inputs } = decodeExecute(result.calldata)
+      const { commandTypes } = parseCommands(result.calldata)
+
+      expect(commandTypes).to.deep.equal([
+        CommandType.PERMIT2_PERMIT,
+        CommandType.PERMIT2_TRANSFER_FROM,
+        CommandType.V3_SWAP_EXACT_IN,
+        CommandType.SWEEP,
+      ])
+
+      const permitInput = defaultAbiCoder.decode(
+        ['((address token,uint160 amount,uint48 expiration,uint48 nonce) details,address spender,uint256 sigDeadline)', 'bytes'],
+        inputs[0]
+      )
+      expect(permitInput[0][0][0].toLowerCase()).to.equal(permit.details.token.toLowerCase())
+
+      const transfer = defaultAbiCoder.decode(['address', 'address', 'uint160'], inputs[1])
+      expect(transfer[0].toLowerCase()).to.equal(USDC.address.toLowerCase())
+      expect(transfer[2].toString()).to.equal('1000000')
     })
 
     it('encodes exact-input native to ERC20 with wrap step and tx value', () => {
@@ -1011,6 +1090,59 @@ describe('encodeSwaps', () => {
       expect(settlement[2].toString()).to.equal('400000000000000000')
     })
 
+    it('uses flat exact-output fees against ETH when the router outputs ETH', () => {
+      const fee: Fee = { kind: 'flat', recipient: FEE_RECIPIENT, amount: '100000000000000000' }
+      const spec = buildSpec(
+        {
+          tradeType: TradeType.EXACT_OUTPUT,
+          fee,
+          slippageTolerance: new Percent(5, 100),
+        },
+        {
+          outputToken: ETH,
+          amount: CurrencyAmount.fromRawAmount(ETH, '500000000000000000'),
+          quote: CurrencyAmount.fromRawAmount(USDC, '1000000'),
+        }
+      )
+
+      const maxAmountIn = exactOutputMaxIn(BigNumber.from('1000000'), spec.slippageTolerance)
+      const swapSteps: SwapStep[] = [
+        buildV3ExactOutStep({ amountOut: '500000000000000000', amountInMax: maxAmountIn.toString() }, [USDC, WETH]),
+        {
+          type: 'UNWRAP_WETH',
+          recipient: ROUTER_AS_RECIPIENT,
+          amountMin: '0',
+        },
+      ]
+
+      const result = SwapRouter.encodeSwaps(spec, swapSteps)
+      const { inputs } = decodeExecute(result.calldata)
+      const { commandTypes } = parseCommands(result.calldata)
+
+      expect(commandTypes).to.deep.equal([
+        CommandType.PERMIT2_TRANSFER_FROM,
+        CommandType.V3_SWAP_EXACT_OUT,
+        CommandType.UNWRAP_WETH,
+        CommandType.TRANSFER,
+        CommandType.SWEEP,
+        CommandType.SWEEP,
+      ])
+
+      const feeTransfer = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[3])
+      expect(feeTransfer[0].toLowerCase()).to.equal(ETH_ADDRESS.toLowerCase())
+      expect(feeTransfer[1].toLowerCase()).to.equal(FEE_RECIPIENT.toLowerCase())
+      expect(feeTransfer[2].toString()).to.equal('100000000000000000')
+
+      const settlement = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[4])
+      expect(settlement[0].toLowerCase()).to.equal(ETH_ADDRESS.toLowerCase())
+      expect(settlement[1].toLowerCase()).to.equal(TEST_RECIPIENT.toLowerCase())
+      expect(settlement[2].toString()).to.equal('400000000000000000')
+
+      const refund = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[5])
+      expect(refund[0].toLowerCase()).to.equal(USDC.address.toLowerCase())
+      expect(refund[2].toString()).to.equal('0')
+    })
+
     it('takes native output fees from ETH when the router outputs ETH', () => {
       const feePercent = new Percent(20, 10_000)
       const fee: Fee = { kind: 'portion', recipient: FEE_RECIPIENT, fee: feePercent }
@@ -1088,6 +1220,92 @@ describe('encodeSwaps', () => {
       ])
       const decoded = PROXY_INTERFACE.decodeFunctionData('execute', result.calldata)
       expect(decoded.commands).to.equal('0x010404')
+    })
+
+    it('wraps proxy execution with flat exact-output fees in the inner UR plan', () => {
+      const fee: Fee = { kind: 'flat', recipient: FEE_RECIPIENT, amount: '100000000000000000' }
+      const spec = buildSpec(
+        {
+          tradeType: TradeType.EXACT_OUTPUT,
+          tokenTransferMode: TokenTransferMode.ApproveProxy,
+          chainId: 1,
+          fee,
+          slippageTolerance: new Percent(5, 100),
+        },
+        {
+          amount: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+          quote: CurrencyAmount.fromRawAmount(USDC, '1000000'),
+        }
+      )
+
+      const maxAmountIn = exactOutputMaxIn(BigNumber.from('1000000'), spec.slippageTolerance)
+      const result = SwapRouter.encodeSwaps(
+        spec,
+        [buildV3ExactOutStep({ amountInMax: maxAmountIn.toString() })]
+      )
+      const decoded = PROXY_INTERFACE.decodeFunctionData('execute', result.calldata)
+
+      expect(result.value).to.equal('0x00')
+      expect(decoded.router.toLowerCase()).to.equal(
+        UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, 1).toLowerCase()
+      )
+      expect(decoded.token.toLowerCase()).to.equal(USDC.address.toLowerCase())
+      expect(decoded.amount.toString()).to.equal(maxAmountIn.toString())
+      expect(decoded.commands).to.equal('0x01050404')
+
+      const feeTransfer = defaultAbiCoder.decode(['address', 'address', 'uint256'], decoded.inputs[1])
+      expect(feeTransfer[0].toLowerCase()).to.equal(WETH.address.toLowerCase())
+      expect(feeTransfer[1].toLowerCase()).to.equal(FEE_RECIPIENT.toLowerCase())
+      expect(feeTransfer[2].toString()).to.equal('100000000000000000')
+
+      const settlement = defaultAbiCoder.decode(['address', 'address', 'uint256'], decoded.inputs[2])
+      expect(settlement[0].toLowerCase()).to.equal(WETH.address.toLowerCase())
+      expect(settlement[1].toLowerCase()).to.equal(TEST_RECIPIENT.toLowerCase())
+      expect(settlement[2].toString()).to.equal('400000000000000000')
+    })
+
+    it('encodes multi-step exact-output swaps with router steps before fee settlement and refund', () => {
+      const fee: Fee = { kind: 'flat', recipient: FEE_RECIPIENT, amount: '100000000000000000' }
+      const spec = buildSpec(
+        {
+          tradeType: TradeType.EXACT_OUTPUT,
+          fee,
+          slippageTolerance: new Percent(5, 100),
+        },
+        {
+          inputToken: USDC,
+          outputToken: DAI,
+          amount: CurrencyAmount.fromRawAmount(DAI, '500000000000000000'),
+          quote: CurrencyAmount.fromRawAmount(USDC, '1000000'),
+        }
+      )
+
+      const maxAmountIn = exactOutputMaxIn(BigNumber.from('1000000'), spec.slippageTolerance)
+      const swapSteps: SwapStep[] = [
+        buildV3ExactOutStep({ amountOut: '300000000000000000', amountInMax: maxAmountIn.toString() }, [USDC, WETH]),
+        {
+          type: 'V2_SWAP_EXACT_OUT',
+          recipient: ROUTER_AS_RECIPIENT,
+          amountOut: '500000000000000000',
+          amountInMax: '300000000000000000',
+          path: [WETH.address, DAI.address],
+        },
+      ]
+
+      const result = SwapRouter.encodeSwaps(spec, swapSteps)
+      const { commandTypes } = parseCommands(result.calldata)
+
+      expect(commandTypes).to.deep.equal([
+        CommandType.PERMIT2_TRANSFER_FROM,
+        CommandType.V3_SWAP_EXACT_OUT,
+        CommandType.V2_SWAP_EXACT_OUT,
+        CommandType.TRANSFER,
+        CommandType.SWEEP,
+        CommandType.SWEEP,
+      ])
+      expect(commandTypes.indexOf(CommandType.TRANSFER)).to.be.greaterThan(commandTypes.indexOf(CommandType.V2_SWAP_EXACT_OUT))
+      expect(commandTypes.indexOf(CommandType.SWEEP)).to.be.greaterThan(commandTypes.indexOf(CommandType.TRANSFER))
+      expect(commandTypes[commandTypes.length - 1]).to.equal(CommandType.SWEEP)
     })
 
     it('rejects non-router step recipients before calldata encoding', () => {
@@ -1188,6 +1406,122 @@ describe('encodeSwaps', () => {
 
       expect(nextIngress[2].toString()).to.equal(legacySwap[2].toString())
       expect(nextSettlement[2].toString()).to.equal(legacySwap[1].toString())
+    })
+
+    it('matches exact-input fee settlement bounds for a simple V3 route', () => {
+      const feePercent = new Percent(20, 10_000)
+      const fee = { fee: feePercent, recipient: FEE_RECIPIENT }
+      const grossQuote = BigNumber.from('500000000000000000')
+      const slippageNumerator = BigNumber.from(slippageTolerance.numerator.toString())
+      const slippageDenominator = BigNumber.from(slippageTolerance.denominator.toString())
+      const expectedSettlement = exactInputGrossMin(grossQuote, slippageTolerance).sub(
+        portionAmount(exactInputGrossMin(grossQuote, slippageTolerance), feePercent)
+      )
+      const legacyNetQuote = expectedSettlement
+        .mul(slippageDenominator.add(slippageNumerator))
+        .add(slippageDenominator)
+        .sub(1)
+        .div(slippageDenominator)
+      const route = new V3RouteSDK([pool], USDC, WETH)
+      const trade = new RouterTrade({
+        v2Routes: [],
+        v3Routes: [
+          {
+            routev3: route,
+            inputAmount: CurrencyAmount.fromRawAmount(USDC, '1000000'),
+            outputAmount: CurrencyAmount.fromRawAmount(WETH, legacyNetQuote.toString()),
+          },
+        ],
+        v4Routes: [],
+        mixedRoutes: [],
+        tradeType: TradeType.EXACT_INPUT,
+      })
+
+      const legacy = decodeExecute(
+        SwapRouter.swapCallParameters(trade, swapOptions({ slippageTolerance, recipient: TEST_RECIPIENT, fee })).calldata
+      )
+      const next = decodeExecute(
+        SwapRouter.encodeSwaps(
+          buildSpec(
+            {
+              slippageTolerance,
+              fee: { kind: 'portion', recipient: FEE_RECIPIENT, fee: feePercent },
+            },
+            {
+              amount: CurrencyAmount.fromRawAmount(USDC, '1000000'),
+              quote: CurrencyAmount.fromRawAmount(WETH, grossQuote.toString()),
+            }
+          ),
+          [buildV3ExactInStep({ amountIn: '1000000' })]
+        ).calldata
+      )
+
+      const legacySwap = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], legacy.inputs[0])
+      const legacyFee = defaultAbiCoder.decode(['address', 'address', 'uint256'], legacy.inputs[1])
+      const legacySettlement = defaultAbiCoder.decode(['address', 'address', 'uint256'], legacy.inputs[2])
+
+      const nextIngress = defaultAbiCoder.decode(['address', 'address', 'uint160'], next.inputs[0])
+      const nextFee = defaultAbiCoder.decode(['address', 'address', 'uint256'], next.inputs[2])
+      const nextSettlement = defaultAbiCoder.decode(['address', 'address', 'uint256'], next.inputs[3])
+
+      expect(nextIngress[2].toString()).to.equal(legacySwap[1].toString())
+      expect(nextFee[2].toString()).to.equal(legacyFee[2].toString())
+      expect(nextSettlement[2].toString()).to.equal(legacySettlement[2].toString())
+    })
+
+    it('matches exact-output flat-fee settlement bounds for a simple V3 route', () => {
+      const flatFee = { amount: '100000000000000000', recipient: FEE_RECIPIENT }
+      const route = new V3RouteSDK([pool], USDC, WETH)
+      const trade = new RouterTrade({
+        v2Routes: [],
+        v3Routes: [
+          {
+            routev3: route,
+            inputAmount: CurrencyAmount.fromRawAmount(USDC, '1050000'),
+            outputAmount: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+          },
+        ],
+        v4Routes: [],
+        mixedRoutes: [],
+        tradeType: TradeType.EXACT_OUTPUT,
+      })
+
+      const legacy = decodeExecute(
+        SwapRouter.swapCallParameters(trade, swapOptions({ slippageTolerance, recipient: TEST_RECIPIENT, flatFee })).calldata
+      )
+      const next = decodeExecute(
+        SwapRouter.encodeSwaps(
+          buildSpec(
+            {
+              tradeType: TradeType.EXACT_OUTPUT,
+              slippageTolerance,
+              fee: { kind: 'flat', recipient: FEE_RECIPIENT, amount: flatFee.amount },
+            },
+            {
+              amount: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+              quote: CurrencyAmount.fromRawAmount(USDC, '1050000'),
+            }
+          ),
+          [
+            buildV3ExactOutStep({
+              amountOut: '500000000000000000',
+              amountInMax: exactOutputMaxIn(BigNumber.from('1050000'), slippageTolerance).toString(),
+            }),
+          ]
+        ).calldata
+      )
+
+      const legacySwap = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], legacy.inputs[0])
+      const legacyFee = defaultAbiCoder.decode(['address', 'address', 'uint256'], legacy.inputs[1])
+      const legacySettlement = defaultAbiCoder.decode(['address', 'address', 'uint256'], legacy.inputs[2])
+
+      const nextIngress = defaultAbiCoder.decode(['address', 'address', 'uint160'], next.inputs[0])
+      const nextFee = defaultAbiCoder.decode(['address', 'address', 'uint256'], next.inputs[2])
+      const nextSettlement = defaultAbiCoder.decode(['address', 'address', 'uint256'], next.inputs[3])
+
+      expect(nextIngress[2].toString()).to.equal(legacySwap[2].toString())
+      expect(nextFee[2].toString()).to.equal(legacyFee[2].toString())
+      expect(nextSettlement[2].toString()).to.equal(legacySettlement[2].toString())
     })
   })
 })
