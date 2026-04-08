@@ -380,7 +380,7 @@ See the [examples/](./examples) directory for complete runnable examples:
 export WORKLOAD_ID=0x1234567890abcdef...
 
 # Run the verification example
-npx tsx examples/verifyBlock.ts
+bun run examples/verifyBlock.ts
 ```
 
 ## Development
