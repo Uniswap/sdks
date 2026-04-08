@@ -6,8 +6,16 @@ const ACTION_NAME_TO_ENUM: { [key: string]: Actions } = Object.fromEntries(
   Object.entries(Actions).filter(([key]) => isNaN(Number(key)))
 ) as { [key: string]: Actions }
 
+const V4_UR_VERSION_MAP: Record<string, URVersion> = {
+  [UniversalRouterVersion.V2_0]: URVersion.V2_0,
+  [UniversalRouterVersion.V2_1_1]: URVersion.V2_1_1,
+}
+
 export function toV4URVersion(version?: UniversalRouterVersion): URVersion {
-  return version === UniversalRouterVersion.V2_1_1 ? URVersion.V2_1_1 : URVersion.V2_0
+  if (version === undefined) return URVersion.V2_0
+  const mapped = V4_UR_VERSION_MAP[version]
+  if (!mapped) throw new Error(`No v4-sdk URVersion mapping for UniversalRouterVersion: ${version}`)
+  return mapped
 }
 
 export function encodeV4Action(
