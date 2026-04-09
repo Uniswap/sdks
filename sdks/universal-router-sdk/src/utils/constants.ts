@@ -1,4 +1,4 @@
-import { BigNumber } from 'ethers'
+
 
 export enum UniversalRouterVersion {
   V1_2 = '1.2',
@@ -544,12 +544,12 @@ export const WETH_ADDRESS = (chainId: number): string => {
   return CHAIN_CONFIGS[chainId].weth
 }
 
-export const CONTRACT_BALANCE = BigNumber.from(2).pow(255)
+export const CONTRACT_BALANCE = 2n ** 255n
 export const ETH_ADDRESS = '0x0000000000000000000000000000000000000000'
 export const E_ETH_ADDRESS = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
 export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
-export const MAX_UINT256 = BigNumber.from(2).pow(256).sub(1)
-export const MAX_UINT160 = BigNumber.from(2).pow(160).sub(1)
+export const MAX_UINT256 = 2n ** 256n - 1n
+export const MAX_UINT160 = 2n ** 160n - 1n
 
 export const SENDER_AS_RECIPIENT = '0x0000000000000000000000000000000000000001'
 export const ROUTER_AS_RECIPIENT = '0x0000000000000000000000000000000000000002'

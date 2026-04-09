@@ -1,11 +1,11 @@
 import { expect } from 'chai'
-import { BigNumber, utils, Wallet } from 'ethers'
+import { Wallet, zeroPadValue } from 'ethers'
 import { SwapRouter, SignedRouteOptions } from '../../src/swapRouter'
 import { generateNonce, NONCE_SKIP_CHECK } from '../../src/utils/eip712'
 import { UNIVERSAL_ROUTER_ADDRESS, UniversalRouterVersion } from '../../src/utils/constants'
 
 describe('Signed Routes', () => {
-  const wallet = new Wallet(utils.zeroPad('0x1234', 32))
+  const wallet = new Wallet(zeroPadValue('0x1234', 32))
   const chainId = 1
   const routerAddress = UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, chainId)
   const deadline = Math.floor(Date.now() / 1000) + 60 * 20
@@ -86,7 +86,7 @@ describe('Signed Routes', () => {
         signature,
         signedOptions,
         deadline,
-        BigNumber.from(0)
+        0n
       )
 
       expect(signedCalldata).to.match(/^0x[0-9a-f]+$/)
@@ -94,7 +94,7 @@ describe('Signed Routes', () => {
 
       // Verify the function selector for executeSigned
       const selector = signedCalldata.slice(0, 10)
-      expect(selector).to.equal(SwapRouter.INTERFACE.getSighash('executeSigned'))
+      expect(selector).to.equal(SwapRouter.INTERFACE.getFunction('executeSigned')!.selector)
     })
 
     it('should set verifySender based on sender address', () => {
@@ -113,7 +113,7 @@ describe('Signed Routes', () => {
         signature,
         signedOptions1,
         deadline,
-        BigNumber.from(0)
+        0n
       )
       const decoded1 = SwapRouter.INTERFACE.decodeFunctionData('executeSigned', result1.calldata)
       expect(decoded1.verifySender).to.equal(false)
@@ -131,7 +131,7 @@ describe('Signed Routes', () => {
         signature,
         signedOptions2,
         deadline,
-        BigNumber.from(0)
+        0n
       )
       const decoded2 = SwapRouter.INTERFACE.decodeFunctionData('executeSigned', result2.calldata)
       expect(decoded2.verifySender).to.equal(true)
@@ -152,7 +152,7 @@ describe('Signed Routes', () => {
       const payload = SwapRouter.getExecuteSignedPayload(mockCalldata, signedOptions, deadline, chainId, routerAddress)
 
       // Encode with same nonce
-      const result = SwapRouter.encodeExecuteSigned(mockCalldata, signature, signedOptions, deadline, BigNumber.from(0))
+      const result = SwapRouter.encodeExecuteSigned(mockCalldata, signature, signedOptions, deadline, 0n)
       const decoded = SwapRouter.INTERFACE.decodeFunctionData('executeSigned', result.calldata)
 
       expect(decoded.nonce).to.equal(customNonce)
