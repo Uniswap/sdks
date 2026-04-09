@@ -13,7 +13,7 @@ import type { WorkloadMeasurementRegisters } from '../src/types/index';
  * 4. Display all possible workload IDs
  *
  * Usage:
- *   npx tsx examples/computeWorkloadIdWithMeasurements.ts <path-to-measurements.json>
+ *   bun run examples/computeWorkloadIdWithMeasurements.ts <path-to-measurements.json>
  *
  * Example measurements.json format:
 {
@@ -40,9 +40,9 @@ async function main() {
         if (!filePath) {
             console.error('Error: File path is required');
             console.error('\nUsage:');
-            console.error('  npx tsx examples/computeWorkloadIdWithMeasurements.ts <path-to-measurements.json>');
+            console.error('  bun run examples/computeWorkloadIdWithMeasurements.ts <path-to-measurements.json>');
             console.error('\nExample:');
-            console.error('  npx tsx examples/computeWorkloadIdWithMeasurements.ts ./measurements.json');
+            console.error('  bun run examples/computeWorkloadIdWithMeasurements.ts ./measurements.json');
             process.exit(1);
         }
 
