@@ -11,6 +11,7 @@ import { encodeRouteToPath } from './encodeRouteToPath'
  * Not all actions are supported yet.
  * @enum {number}
  */
+<<<<<<< Updated upstream
 /**
  * UniversalRouter version
  * @description Version of the UniversalRouter contract
@@ -25,6 +26,8 @@ export function isAtLeastV2_1_1(version?: string): boolean {
   return !!version && version.localeCompare(URVersion.V2_1_1, undefined, { numeric: true }) >= 0
 }
 
+=======
+>>>>>>> Stashed changes
 export enum Actions {
   // pool actions
   // liquidity actions
@@ -85,6 +88,7 @@ const PATH_KEY_STRUCT = '(address intermediateCurrency,uint256 fee,int24 tickSpa
 const SWAP_EXACT_IN_SINGLE_STRUCT_V2_0 =
   '(' + POOL_KEY_STRUCT + ' poolKey,bool zeroForOne,uint128 amountIn,uint128 amountOutMinimum,bytes hookData)'
 
+<<<<<<< Updated upstream
 const SWAP_EXACT_IN_STRUCT_V2_0 =
   '(address currencyIn,' + PATH_KEY_STRUCT + '[] path,uint128 amountIn,uint128 amountOutMinimum)'
 
@@ -101,6 +105,9 @@ const SWAP_EXACT_IN_SINGLE_STRUCT_V2_1_1 =
   ' poolKey,bool zeroForOne,uint128 amountIn,uint128 amountOutMinimum,uint256 maxHopSlippage,bytes hookData)'
 
 const SWAP_EXACT_IN_STRUCT_V2_1_1 =
+=======
+const SWAP_EXACT_IN_STRUCT =
+>>>>>>> Stashed changes
   '(address currencyIn,' +
   PATH_KEY_STRUCT +
   '[] path,uint256[] maxHopSlippage,uint128 amountIn,uint128 amountOutMinimum)'
@@ -110,17 +117,24 @@ const SWAP_EXACT_OUT_SINGLE_STRUCT_V2_1_1 =
   POOL_KEY_STRUCT +
   ' poolKey,bool zeroForOne,uint128 amountOut,uint128 amountInMaximum,uint256 maxHopSlippage,bytes hookData)'
 
+<<<<<<< Updated upstream
 const SWAP_EXACT_OUT_STRUCT_V2_1_1 =
+=======
+const SWAP_EXACT_OUT_STRUCT =
+>>>>>>> Stashed changes
   '(address currencyOut,' +
   PATH_KEY_STRUCT +
   '[] path,uint256[] maxHopSlippage,uint128 amountOut,uint128 amountInMaximum)'
 
+<<<<<<< Updated upstream
 // V4_BASE_ACTIONS_ABI_DEFINITION uses V2.0 structs (default, without maxHopSlippage)
 const SWAP_EXACT_IN_SINGLE_STRUCT = SWAP_EXACT_IN_SINGLE_STRUCT_V2_0
 const SWAP_EXACT_IN_STRUCT = SWAP_EXACT_IN_STRUCT_V2_0
 const SWAP_EXACT_OUT_SINGLE_STRUCT = SWAP_EXACT_OUT_SINGLE_STRUCT_V2_0
 const SWAP_EXACT_OUT_STRUCT = SWAP_EXACT_OUT_STRUCT_V2_0
 
+=======
+>>>>>>> Stashed changes
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const V4_BASE_ACTIONS_ABI_DEFINITION: { [key in Actions]: readonly ParamType[] } = {
   // Liquidity commands
@@ -206,6 +220,7 @@ export const V4_BASE_ACTIONS_ABI_DEFINITION: { [key in Actions]: readonly ParamT
   [Actions.UNWRAP]: [{ name: 'amount', type: 'uint256' }],
 }
 
+<<<<<<< Updated upstream
 // UR 2.1.1 specific ABI definitions for swap actions (with maxHopSlippage)
 export const V4_SWAP_ACTIONS_V2_1_1: { [key: number]: readonly ParamType[] } = {
   [Actions.SWAP_EXACT_IN_SINGLE]: [
@@ -218,6 +233,8 @@ export const V4_SWAP_ACTIONS_V2_1_1: { [key: number]: readonly ParamType[] } = {
   [Actions.SWAP_EXACT_OUT]: [{ name: 'swap', type: SWAP_EXACT_OUT_STRUCT_V2_1_1, subparser: Subparser.V4SwapExactOut }],
 }
 
+=======
+>>>>>>> Stashed changes
 const FULL_DELTA_AMOUNT = 0
 
 export class V4Planner {
@@ -229,8 +246,8 @@ export class V4Planner {
     this.params = []
   }
 
-  addAction(type: Actions, parameters: any[], urVersion: URVersion = URVersion.V2_0): V4Planner {
-    let command = createAction(type, parameters, urVersion)
+  addAction(type: Actions, parameters: any[]): V4Planner {
+    let command = createAction(type, parameters)
     this.params.push(command.encodedInput)
     this.actions = this.actions.concat(command.action.toString(16).padStart(2, '0'))
     return this
@@ -239,8 +256,7 @@ export class V4Planner {
   addTrade(
     trade: Trade<Currency, Currency, TradeType>,
     slippageTolerance?: Percent,
-    maxHopSlippage?: BigNumber[],
-    urVersion: URVersion = URVersion.V2_0
+    maxHopSlippage?: BigNumber[]
   ): V4Planner {
     const exactOutput = trade.tradeType === TradeType.EXACT_OUTPUT
 
@@ -257,6 +273,7 @@ export class V4Planner {
     const currencyIn = currencyAddress(trade.route.pathInput)
     const currencyOut = currencyAddress(trade.route.pathOutput)
 
+<<<<<<< Updated upstream
     const swapStruct = exactOutput
       ? {
           currencyOut,
@@ -274,6 +291,28 @@ export class V4Planner {
         }
 
     this.addSwapAction(actionType, [swapStruct], urVersion)
+=======
+    // If no per-hop slippage limits provided, use empty array (no per-hop checks)
+    const maxHopSlippageArray = maxHopSlippage ?? []
+
+    this.addAction(actionType, [
+      exactOutput
+        ? {
+            currencyOut,
+            path: encodeRouteToPath(trade.route, exactOutput),
+            maxHopSlippage: maxHopSlippageArray,
+            amountInMaximum: trade.maximumAmountIn(slippageTolerance ?? new Percent(0)).quotient.toString(),
+            amountOut: trade.outputAmount.quotient.toString(),
+          }
+        : {
+            currencyIn,
+            path: encodeRouteToPath(trade.route, exactOutput),
+            maxHopSlippage: maxHopSlippageArray,
+            amountIn: trade.inputAmount.quotient.toString(),
+            amountOutMinimum: slippageTolerance ? trade.minimumAmountOut(slippageTolerance).quotient.toString() : 0,
+          },
+    ])
+>>>>>>> Stashed changes
     return this
   }
 
@@ -296,6 +335,7 @@ export class V4Planner {
   finalize(): string {
     return defaultAbiCoder.encode(['bytes', 'bytes[]'], [this.actions, this.params])
   }
+<<<<<<< Updated upstream
 
   private addSwapAction(type: Actions, parameters: any[], urVersion: URVersion): V4Planner {
     // Use V2.1.1 ABI (with maxHopSlippage) for V2.1.1, otherwise default to V2.0 ABI (without maxHopSlippage)
@@ -308,6 +348,8 @@ export class V4Planner {
     this.actions = this.actions.concat(type.toString(16).padStart(2, '0'))
     return this
   }
+=======
+>>>>>>> Stashed changes
 }
 
 function currencyAddress(currency: Currency): string {
@@ -319,13 +361,17 @@ type RouterAction = {
   encodedInput: string
 }
 
+<<<<<<< Updated upstream
 function createAction(action: Actions, parameters: any[], urVersion: URVersion = URVersion.V2_0): RouterAction {
   const abiDef =
     isAtLeastV2_1_1(urVersion) && action in V4_SWAP_ACTIONS_V2_1_1
       ? V4_SWAP_ACTIONS_V2_1_1[action]
       : V4_BASE_ACTIONS_ABI_DEFINITION[action]
+=======
+function createAction(action: Actions, parameters: any[]): RouterAction {
+>>>>>>> Stashed changes
   const encodedInput = defaultAbiCoder.encode(
-    abiDef.map((v) => v.type),
+    V4_BASE_ACTIONS_ABI_DEFINITION[action].map((v) => v.type),
     parameters
   )
   return { action, encodedInput }

@@ -1,14 +1,11 @@
 import { expect } from 'chai'
-import { CurrencyAmount, WETH9 } from '@uniswap/sdk-core'
-import { ethers, BigNumber } from 'ethers'
+import { WETH9 } from '@uniswap/sdk-core'
+import { ethers } from 'ethers'
 import { Route } from '../entities/route'
-import { Trade } from '../entities/trade'
 import { encodeRouteToPath } from './encodeRouteToPath'
-import { V4BaseActionsParser, V4RouterCall, SwapExactIn, SwapExactOut } from './v4BaseActionsParser'
-import { V4Planner, Actions, URVersion } from './v4Planner'
+import { V4BaseActionsParser, V4RouterCall } from './v4BaseActionsParser'
+import { V4Planner, Actions } from './v4Planner'
 import { USDC_WETH, DAI_USDC, DAI, USDC } from './v4Planner.test'
-import { TradeType } from '@uniswap/sdk-core'
-import JSBI from 'jsbi'
 
 const addressOne = '0x0000000000000000000000000000000000000001'
 const addressTwo = '0x0000000000000000000000000000000000000002'
@@ -205,12 +202,12 @@ describe('Command Parser', () => {
         ],
       },
     },
-    // V2.0: SWAP_EXACT_IN without maxHopSlippage
     {
       input: new V4Planner().addAction(Actions.SWAP_EXACT_IN, [
         {
           currencyIn: DAI.address,
           path: encodeRouteToPath(new Route([DAI_USDC, USDC_WETH], DAI, WETH9[1])),
+          maxHopSlippage: [],
           amountIn: amount,
           amountOutMinimum: amount,
         },
@@ -241,6 +238,7 @@ describe('Command Parser', () => {
                       hookData: '0x',
                     },
                   ],
+                  maxHopSlippage: [],
                   amountIn: amount,
                   amountOutMinimum: amount,
                 },
@@ -250,12 +248,12 @@ describe('Command Parser', () => {
         ],
       },
     },
-    // V2.0: SWAP_EXACT_OUT without maxHopSlippage
     {
       input: new V4Planner().addAction(Actions.SWAP_EXACT_OUT, [
         {
           currencyOut: DAI.address,
           path: encodeRouteToPath(new Route([DAI_USDC, USDC_WETH], DAI, WETH9[1])),
+          maxHopSlippage: [],
           amountOut: amount,
           amountInMaximum: amount,
         },
@@ -286,6 +284,7 @@ describe('Command Parser', () => {
                       hookData: '0x',
                     },
                   ],
+                  maxHopSlippage: [],
                   amountOut: amount,
                   amountInMaximum: amount,
                 },
@@ -305,6 +304,7 @@ describe('Command Parser', () => {
     })
   }
 })
+<<<<<<< Updated upstream
 
 describe('Version-aware Parser', () => {
   const ONE_ETHER = JSBI.exponentiate(JSBI.BigInt(10), JSBI.BigInt(18))
@@ -486,3 +486,5 @@ describe('Version-aware Parser', () => {
     })
   })
 })
+=======
+>>>>>>> Stashed changes

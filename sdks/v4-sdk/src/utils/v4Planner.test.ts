@@ -8,7 +8,11 @@ import { Route } from '../entities/route'
 import { encodeRouteToPath } from './encodeRouteToPath'
 import { ADDRESS_ZERO, FEE_AMOUNT_MEDIUM, TICK_SPACING_TEN, ONE_ETHER, NEGATIVE_ONE } from '../internalConstants'
 
+<<<<<<< Updated upstream
 import { Actions, V4Planner, V4_BASE_ACTIONS_ABI_DEFINITION, V4_SWAP_ACTIONS_V2_1_1, URVersion } from './v4Planner'
+=======
+import { Actions, V4Planner, V4_BASE_ACTIONS_ABI_DEFINITION } from './v4Planner'
+>>>>>>> Stashed changes
 
 const { defaultAbiCoder } = utils
 
@@ -87,6 +91,7 @@ describe('RouterPlanner', () => {
         '0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000de0b6b3a764000000000000000000000000000000000000000000000000000006f05b59d3b2000000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000000'
       )
     })
+<<<<<<< Updated upstream
 
     it('encodes a v4 exactIn swap with V2.1 (includes maxHopSlippage)', async () => {
       const route = new Route([DAI_USDC, USDC_WETH], DAI, WETH9[1])
@@ -153,23 +158,26 @@ describe('RouterPlanner', () => {
       expect(decoded[0].maxHopSlippage[1].toString()).toEqual('25000')
       expect(decoded[0].amountOut.toString()).toEqual(ONE_ETHER_BN.toString())
     })
+=======
+>>>>>>> Stashed changes
   })
 
   describe('addTrade', () => {
-    it('completes a v4 exactIn 2 hop swap with same results as same addAction (V2.0)', async () => {
+    it('completes a v4 exactIn 2 hop swap with same results as same addAction', async () => {
       const route = new Route([DAI_USDC, USDC_WETH], DAI, WETH9[1])
 
-      // encode with addAction function (uses V2.0 ABI without maxHopSlippage)
+      // encode with addAction function
       planner.addAction(Actions.SWAP_EXACT_IN, [
         {
           currencyIn: DAI.address,
           path: encodeRouteToPath(route),
+          maxHopSlippage: [],
           amountIn: ONE_ETHER_BN.toString(),
           amountOutMinimum: 0,
         },
       ])
 
-      // encode with addTrade function using default V2.0 to match addAction
+      // encode with addTrade function
       const tradePlanner = new V4Planner()
       const trade = await Trade.fromRoute(
         route,
@@ -179,34 +187,12 @@ describe('RouterPlanner', () => {
       tradePlanner.addTrade(trade)
 
       expect(planner.actions).toEqual('0x07')
+      expect(planner.params[0]).toEqual(
+        '0x00000000000000000000000000000000000000000000000000000000000000200000000000000000000000006b175474e89094c44da98b954eedeac495271d0f00000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000002800000000000000000000000000000000000000000000000000de0b6b3a76400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000100000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb480000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
+      )
 
       expect(planner.actions).toEqual(tradePlanner.actions)
       expect(planner.params[0]).toEqual(tradePlanner.params[0])
-    })
-
-    it('completes a v4 exactIn 2 hop swap with V2.0 (no maxHopSlippage)', async () => {
-      const route = new Route([DAI_USDC, USDC_WETH], DAI, WETH9[1])
-
-      const trade = await Trade.fromRoute(
-        route,
-        CurrencyAmount.fromRawAmount(DAI, ONE_ETHER.toString()),
-        TradeType.EXACT_INPUT
-      )
-      // Default is V2.0
-      planner.addTrade(trade)
-
-      expect(planner.actions).toEqual('0x07')
-
-      // Decode with V2.0 ABI (no maxHopSlippage)
-      const decoded = defaultAbiCoder.decode(
-        V4_BASE_ACTIONS_ABI_DEFINITION[Actions.SWAP_EXACT_IN].map((v) => v.type),
-        planner.params[0]
-      )
-
-      expect(decoded[0].currencyIn).toEqual(DAI.address)
-      // V2.0 struct does not have maxHopSlippage field
-      expect(decoded[0].maxHopSlippage).toBeUndefined()
-      expect(decoded[0].amountIn.toString()).toEqual(ONE_ETHER_BN.toString())
     })
 
     it('completes a v4 exactOut 2 hop swap', async () => {
@@ -220,16 +206,9 @@ describe('RouterPlanner', () => {
       planner.addTrade(trade, slippageTolerance)
 
       expect(planner.actions).toEqual('0x09')
-
-      // Decode with V2.0 ABI (no maxHopSlippage) since that's the default
-      const decoded = defaultAbiCoder.decode(
-        V4_BASE_ACTIONS_ABI_DEFINITION[Actions.SWAP_EXACT_OUT].map((v) => v.type),
-        planner.params[0]
+      expect(planner.params[0]).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc200000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000002800000000000000000000000000000000000000000000000000de0b6b3a764000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000001000000000000000000000000006b175474e89094c44da98b954eedeac495271d0f0000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb480000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
       )
-
-      expect(decoded[0].currencyOut).toEqual(WETH9[1].address)
-      expect(decoded[0].path).toHaveLength(2)
-      expect(decoded[0].amountOut.toString()).toEqual(ONE_ETHER_BN.toString())
     })
 
     it('completes a v4 exactOut 2 hop swap where route.pathOutput is different than route.output', async () => {
@@ -243,17 +222,9 @@ describe('RouterPlanner', () => {
       planner.addTrade(trade, slippageTolerance)
 
       expect(planner.actions).toEqual('0x09')
-
-      // Decode with V2.0 ABI (no maxHopSlippage) since that's the default
-      const decoded = defaultAbiCoder.decode(
-        V4_BASE_ACTIONS_ABI_DEFINITION[Actions.SWAP_EXACT_OUT].map((v) => v.type),
-        planner.params[0]
+      expect(planner.params[0]).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc200000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000002800000000000000000000000000000000000000000000000000de0b6b3a764000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000001000000000000000000000000006b175474e89094c44da98b954eedeac495271d0f0000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb480000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
       )
-
-      // route.pathOutput is WETH9, different from route.output which is ETHER
-      expect(decoded[0].currencyOut).toEqual(WETH9[1].address)
-      expect(decoded[0].path).toHaveLength(2)
-      expect(decoded[0].amountOut.toString()).toEqual(ONE_ETHER_BN.toString())
     })
 
     it('completes a v4 exactIn 2 hop swap where route.pathInput is different than route.input', async () => {
@@ -267,17 +238,9 @@ describe('RouterPlanner', () => {
       planner.addTrade(trade, slippageTolerance)
 
       expect(planner.actions).toEqual('0x07')
-
-      // Decode with V2.0 ABI (no maxHopSlippage) since that's the default
-      const decoded = defaultAbiCoder.decode(
-        V4_BASE_ACTIONS_ABI_DEFINITION[Actions.SWAP_EXACT_IN].map((v) => v.type),
-        planner.params[0]
+      expect(planner.params[0]).toEqual(
+        '0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc200000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000002800000000000000000000000000000000000000000000000000de0b6b3a76400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000100000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb480000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006b175474e89094c44da98b954eedeac495271d0f0000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
       )
-
-      // route.pathInput is WETH9, different from route.input which is ETHER
-      expect(decoded[0].currencyIn).toEqual(WETH9[1].address)
-      expect(decoded[0].path).toHaveLength(2)
-      expect(decoded[0].amountIn.toString()).toEqual(ONE_ETHER_BN.toString())
     })
 
     it('throws an error if adding exactOut trade without slippage tolerance', async () => {
@@ -307,7 +270,7 @@ describe('RouterPlanner', () => {
       )
     })
 
-    it('completes a v4 exactIn 2 hop swap with per-hop slippage limits (V2.1)', async () => {
+    it('completes a v4 exactIn 2 hop swap with per-hop slippage limits', async () => {
       const route = new Route([DAI_USDC, USDC_WETH], DAI, WETH9[1])
       const trade = await Trade.fromRoute(
         route,
@@ -318,14 +281,22 @@ describe('RouterPlanner', () => {
       // Set per-hop slippage limits: 10000 for first hop, 20000 for second hop
       const maxHopSlippage = [BigNumber.from('10000'), BigNumber.from('20000')]
 
+<<<<<<< Updated upstream
       // V2.1 includes maxHopSlippage
       planner.addTrade(trade, undefined, maxHopSlippage, URVersion.V2_1_1)
+=======
+      planner.addTrade(trade, undefined, maxHopSlippage)
+>>>>>>> Stashed changes
 
       expect(planner.actions).toEqual('0x07')
 
-      // Decode the params to verify the maxHopSlippage values (V2.1 ABI)
+      // Decode the params to verify the maxHopSlippage values
       const decoded = defaultAbiCoder.decode(
+<<<<<<< Updated upstream
         V4_SWAP_ACTIONS_V2_1_1[Actions.SWAP_EXACT_IN].map((v) => v.type),
+=======
+        V4_BASE_ACTIONS_ABI_DEFINITION[Actions.SWAP_EXACT_IN].map((v) => v.type),
+>>>>>>> Stashed changes
         planner.params[0]
       )
 
@@ -335,7 +306,7 @@ describe('RouterPlanner', () => {
       expect(decoded[0].maxHopSlippage[1].toString()).toEqual('20000')
     })
 
-    it('completes a v4 exactOut 2 hop swap with per-hop slippage limits (V2.1)', async () => {
+    it('completes a v4 exactOut 2 hop swap with per-hop slippage limits', async () => {
       const route = new Route([DAI_USDC, USDC_WETH], DAI, WETH9[1])
       const slippageTolerance = new Percent('5')
       const trade = await Trade.fromRoute(
@@ -347,14 +318,22 @@ describe('RouterPlanner', () => {
       // Set per-hop slippage limits: 10000 for first hop, 20000 for second hop
       const maxHopSlippage = [BigNumber.from('10000'), BigNumber.from('20000')]
 
+<<<<<<< Updated upstream
       // V2.1 includes maxHopSlippage
       planner.addTrade(trade, slippageTolerance, maxHopSlippage, URVersion.V2_1_1)
+=======
+      planner.addTrade(trade, slippageTolerance, maxHopSlippage)
+>>>>>>> Stashed changes
 
       expect(planner.actions).toEqual('0x09')
 
-      // Decode the params to verify the maxHopSlippage values (V2.1 ABI)
+      // Decode the params to verify the maxHopSlippage values
       const decoded = defaultAbiCoder.decode(
+<<<<<<< Updated upstream
         V4_SWAP_ACTIONS_V2_1_1[Actions.SWAP_EXACT_OUT].map((v) => v.type),
+=======
+        V4_BASE_ACTIONS_ABI_DEFINITION[Actions.SWAP_EXACT_OUT].map((v) => v.type),
+>>>>>>> Stashed changes
         planner.params[0]
       )
 
@@ -364,7 +343,36 @@ describe('RouterPlanner', () => {
       expect(decoded[0].maxHopSlippage[1].toString()).toEqual('20000')
     })
 
-    it('completes a v4 exactIn swap with empty maxHopSlippage when not provided (V2.1)', async () => {
+    it('completes a v4 exactIn 2 hop swap using addAction with per-hop slippage limits', async () => {
+      const route = new Route([DAI_USDC, USDC_WETH], DAI, WETH9[1])
+      const maxHopSlippage = [BigNumber.from('10000').toString(), BigNumber.from('20000').toString()]
+
+      planner.addAction(Actions.SWAP_EXACT_IN, [
+        {
+          currencyIn: DAI.address,
+          path: encodeRouteToPath(route),
+          maxHopSlippage: maxHopSlippage,
+          amountIn: ONE_ETHER_BN.toString(),
+          amountOutMinimum: 0,
+        },
+      ])
+
+      expect(planner.actions).toEqual('0x07')
+
+      // Decode the params to verify the maxHopSlippage values
+      const decoded = defaultAbiCoder.decode(
+        V4_BASE_ACTIONS_ABI_DEFINITION[Actions.SWAP_EXACT_IN].map((v) => v.type),
+        planner.params[0]
+      )
+
+      expect(decoded[0].currencyIn).toEqual(DAI.address)
+      expect(decoded[0].maxHopSlippage).toHaveLength(2)
+      expect(decoded[0].maxHopSlippage[0].toString()).toEqual('10000')
+      expect(decoded[0].maxHopSlippage[1].toString()).toEqual('20000')
+      expect(decoded[0].amountIn.toString()).toEqual(ONE_ETHER_BN.toString())
+    })
+
+    it('completes a v4 exactIn swap with empty maxHopSlippage when not provided', async () => {
       const route = new Route([DAI_USDC, USDC_WETH], DAI, WETH9[1])
       const trade = await Trade.fromRoute(
         route,
@@ -372,14 +380,22 @@ describe('RouterPlanner', () => {
         TradeType.EXACT_INPUT
       )
 
+<<<<<<< Updated upstream
       // Using V2.1 with no maxHopSlippage provided defaults to empty array
       planner.addTrade(trade, undefined, undefined, URVersion.V2_1_1)
+=======
+      planner.addTrade(trade)
+>>>>>>> Stashed changes
 
       expect(planner.actions).toEqual('0x07')
 
-      // Decode the params to verify the maxHopSlippage is empty array (V2.1 ABI)
+      // Decode the params to verify the maxHopSlippage is empty array
       const decoded = defaultAbiCoder.decode(
+<<<<<<< Updated upstream
         V4_SWAP_ACTIONS_V2_1_1[Actions.SWAP_EXACT_IN].map((v) => v.type),
+=======
+        V4_BASE_ACTIONS_ABI_DEFINITION[Actions.SWAP_EXACT_IN].map((v) => v.type),
+>>>>>>> Stashed changes
         planner.params[0]
       )
 
