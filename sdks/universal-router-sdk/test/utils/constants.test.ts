@@ -14,7 +14,8 @@ describe('Universal Router Constants', () => {
   describe('UNIVERSAL_ROUTER_ADDRESS', () => {
     versions.forEach((version) => {
       chainIds.forEach((chainId) => {
-        it(`should return a valid address for version ${UniversalRouterVersion[version]} on chain ${chainId}`, () => {
+        if (!CHAIN_CONFIGS[chainId].routerConfigs[version]) return
+        it(`should return a valid address for version ${version} on chain ${chainId}`, () => {
           const address = UNIVERSAL_ROUTER_ADDRESS(version, chainId)
           expect(address).to.be.a('string')
           expect(address).to.match(/^0x[a-fA-F0-9]{40}$/)
@@ -28,12 +29,20 @@ describe('Universal Router Constants', () => {
         'Universal Router not deployed on chain 999999'
       )
     })
+
+    it('should throw an error for a version not deployed on an existing chain', () => {
+      // Linea (59144) has no V1_2
+      expect(() => UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V1_2, 59144)).to.throw(
+        'Universal Router version 1.2 not deployed on chain 59144'
+      )
+    })
   })
 
   describe('UNIVERSAL_ROUTER_CREATION_BLOCK', () => {
     versions.forEach((version) => {
       chainIds.forEach((chainId) => {
-        it(`should return a valid block number for version ${UniversalRouterVersion[version]} on chain ${chainId}`, () => {
+        if (!CHAIN_CONFIGS[chainId].routerConfigs[version]) return
+        it(`should return a valid block number for version ${version} on chain ${chainId}`, () => {
           const blockNumber = UNIVERSAL_ROUTER_CREATION_BLOCK(version, chainId)
           expect(blockNumber).to.be.a('number')
           expect(blockNumber).to.be.greaterThan(0)
@@ -45,6 +54,13 @@ describe('Universal Router Constants', () => {
     it('should throw an error for an unsupported chain', () => {
       expect(() => UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V1_2, 999999)).to.throw(
         'Universal Router not deployed on chain 999999'
+      )
+    })
+
+    it('should throw an error for a version not deployed on an existing chain', () => {
+      // Linea (59144) has no V1_2
+      expect(() => UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V1_2, 59144)).to.throw(
+        'Universal Router version 1.2 not deployed on chain 59144'
       )
     })
   })

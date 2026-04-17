@@ -371,10 +371,10 @@ describe('Version-aware Parser', () => {
       const maxHopSlippage = [BigNumber.from('10000'), BigNumber.from('20000')]
 
       const planner = new V4Planner()
-      planner.addTrade(trade, undefined, maxHopSlippage, URVersion.V2_1)
+      planner.addTrade(trade, undefined, maxHopSlippage, URVersion.V2_1_1)
 
       const calldata = planner.finalize()
-      const result = V4BaseActionsParser.parseCalldata(calldata, URVersion.V2_1)
+      const result = V4BaseActionsParser.parseCalldata(calldata, URVersion.V2_1_1)
 
       expect(result.actions).to.have.length(1)
       expect(result.actions[0].actionName).to.equal('SWAP_EXACT_IN')
@@ -400,10 +400,10 @@ describe('Version-aware Parser', () => {
       const maxHopSlippage = [BigNumber.from('15000'), BigNumber.from('25000')]
 
       const planner = new V4Planner()
-      planner.addTrade(trade, new (await import('@uniswap/sdk-core')).Percent('5'), maxHopSlippage, URVersion.V2_1)
+      planner.addTrade(trade, new (await import('@uniswap/sdk-core')).Percent('5'), maxHopSlippage, URVersion.V2_1_1)
 
       const calldata = planner.finalize()
-      const result = V4BaseActionsParser.parseCalldata(calldata, URVersion.V2_1)
+      const result = V4BaseActionsParser.parseCalldata(calldata, URVersion.V2_1_1)
 
       expect(result.actions).to.have.length(1)
       expect(result.actions[0].actionName).to.equal('SWAP_EXACT_OUT')
@@ -427,10 +427,10 @@ describe('Version-aware Parser', () => {
       )
 
       const planner = new V4Planner()
-      planner.addTrade(trade, undefined, undefined, URVersion.V2_1) // No maxHopSlippage provided, defaults to []
+      planner.addTrade(trade, undefined, undefined, URVersion.V2_1_1) // No maxHopSlippage provided, defaults to []
 
       const calldata = planner.finalize()
-      const result = V4BaseActionsParser.parseCalldata(calldata, URVersion.V2_1)
+      const result = V4BaseActionsParser.parseCalldata(calldata, URVersion.V2_1_1)
 
       expect(result.actions).to.have.length(1)
       expect(result.actions[0].actionName).to.equal('SWAP_EXACT_IN')
@@ -473,10 +473,10 @@ describe('Version-aware Parser', () => {
       const maxHopSlippage = [BigNumber.from('12345'), BigNumber.from('67890')]
 
       const planner = new V4Planner()
-      planner.addTrade(trade, undefined, maxHopSlippage, URVersion.V2_1)
+      planner.addTrade(trade, undefined, maxHopSlippage, URVersion.V2_1_1)
 
       const calldata = planner.finalize()
-      const result = V4BaseActionsParser.parseCalldata(calldata, URVersion.V2_1)
+      const result = V4BaseActionsParser.parseCalldata(calldata, URVersion.V2_1_1)
 
       const swapValue = result.actions[0].params[0].value as SwapExactIn
       expect(swapValue.currencyIn).to.equal(DAI.address)

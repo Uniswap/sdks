@@ -2,47 +2,40 @@
   "name": "sdks",
   "version": "0.0.0",
   "dependencies": {
-    "@babel/runtime": "7.26.10",
-    "@manypkg/cli": "^0.19.2",
-    "@semantic-release/exec": "6.0.3",
+    "@babel/runtime": "7.18.9",
+    "@changesets/cli": "2.30.0",
     "@typescript-eslint/eslint-plugin": "^8.38.0",
     "danger": "11.2.6",
-    "eslint": "^9.26.0",
+    "eslint": "^8.57.0",
     "eslint-plugin-prettier": "^3.4.1",
     "husky": "^8.0.3",
-    "sane": "5.0.1",
-    "semantic-release": "^25.0.1",
-    "semantic-release-monorepo": "8.0.2",
+    "check-dependency-version-consistency": "^4.1.0",
     "syncpack": "^8.5.14",
     "turbo": "1.10.16"
   },
   "engines": {
-    "node": ">=10",
-    "yarn": ">=3.2.3"
+    "node": ">=18"
   },
-  "packageManager": "yarn@3.2.3",
+  "packageManager": "bun@1.3.10",
   "private": true,
+  "trustedDependencies": [],
   "scripts": {
-    "g:check:deps:mismatch": "manypkg check",
+    "g:check:deps:mismatch": "check-dependency-version-consistency --ignore-dep @typescript-eslint/parser --ignore-dep typescript",
     "g:build": "turbo run build",
     "g:lint": "turbo run lint",
-    "g:release": "turbo run release --concurrency=1 --continue",
+    "g:release": "node scripts/resolve-workspace-protocol.js && changeset publish",
     "g:test": "turbo run test",
     "g:typecheck": "turbo run typecheck",
-    "sdk": "yarn workspace",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "sdk": "bun run --filter",
     "postinstall": "husky"
   },
   "workspaces": [
     "sdks/*",
     "sdks/uniswapx-sdk/integration"
   ],
-  "resolutions": {
-    "@manypkg/cli@^0.19.2": "patch:@manypkg/cli@npm%3A0.19.2#./.yarn/patches/@manypkg-cli-npm-0.19.2-ea52ff91d4.patch",
-    "eslint-config-prettier": "^9.1.0",
-    "expect": "25.5.0",
-    "jest-haste-map": "25.5.1",
-    "@jest/core": "25.5.4",
-    "jest-cli": "25.5.4",
-    "jest-runner": "25.5.1"
+  "overrides": {
+    "eslint-config-prettier": "^9.1.0"
   }
 }
