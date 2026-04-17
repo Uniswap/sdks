@@ -31,7 +31,7 @@ export class SmartWallet {
     
     // We manually concat the selector + encoded data rather than using encodeFunctionData because
     // the callData is not a standard ABI-encoded function call to executeUserOp.
-    const EXECUTE_USER_OP_SELECTOR = '0x8dd7712f'
+    const EXECUTE_USER_OP_SELECTOR = '0x8dd7712f' as const
     const calldata = concatHex([EXECUTE_USER_OP_SELECTOR, batchedCallPlanner.encode()])
 
     return {
