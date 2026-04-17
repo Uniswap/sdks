@@ -1,16 +1,13 @@
-// Move mock before imports
-const mockQuery = jest.fn();
-jest.mock("dohjs", () => ({
-  DohResolver: jest.fn().mockImplementation(() => ({
-    query: mockQuery,
-  })),
-}));
+import { mock, spyOn, describe, it, expect, beforeAll, beforeEach } from "bun:test";
 
 import { verify, verifyAsyncDns, verifyAsyncJson, PREFIX } from "./verify";
 import { canonicalStringify } from "./utils/canonicalJson";
 import { toHex } from "./utils/hex";
 import { SIGNING_ALGORITHM_CONFIG } from "./algorithms";
 import { webcrypto } from "./utils/webcrypto";
+
+const mockQuery = mock();
+const mockResolver = { query: mockQuery } as any;
 
 const data = "data";
 let ecdsaKeyPair: CryptoKeyPair;
@@ -35,7 +32,7 @@ describe("verify.ts", () => {
       mockQuery.mockRejectedValue(new Error("DNS resolution failed"));
 
       await expect(
-        verifyAsyncDns("data", "signature", "example.com", "1")
+        verifyAsyncDns("data", "signature", "example.com", "1", mockResolver)
       ).rejects.toThrow("DNS resolution failed");
     });
 
@@ -43,7 +40,7 @@ describe("verify.ts", () => {
       mockQuery.mockResolvedValue({ answers: [] });
 
       await expect(
-        verifyAsyncDns("data", "signature", "example.com", "1")
+        verifyAsyncDns("data", "signature", "example.com", "1", mockResolver)
       ).rejects.toThrow("No TXT records found for host example.com");
     });
 
@@ -53,7 +50,7 @@ describe("verify.ts", () => {
       });
 
       await expect(
-        verifyAsyncDns("data", "signature", "example.com", "1")
+        verifyAsyncDns("data", "signature", "example.com", "1", mockResolver)
       ).rejects.toThrow(
         `No TXT record found with prefix ${PREFIX} for host example.com`
       );
@@ -72,21 +69,23 @@ describe("verify.ts", () => {
       });
 
       // Mock the JSON fetch to avoid making real HTTP requests
-      global.fetch = jest.fn().mockResolvedValue({
-        json: () =>
-          Promise.resolve({
-            publicKeys: [
-              {
-                id: "1",
-                alg: "ES256",
-                publicKey: "0x123456789abcdef",
-              },
-            ],
-          }),
-      });
+      global.fetch = mock(() =>
+        Promise.resolve({
+          json: () =>
+            Promise.resolve({
+              publicKeys: [
+                {
+                  id: "1",
+                  alg: "ES256",
+                  publicKey: "0x123456789abcdef",
+                },
+              ],
+            }),
+        })
+      ) as any;
 
       await expect(
-        verifyAsyncDns("data", "signature", "example.com", "1")
+        verifyAsyncDns("data", "signature", "example.com", "1", mockResolver)
       ).rejects.toThrow(); // Will fail at crypto step, but parsing succeeded
     });
 
@@ -108,22 +107,24 @@ describe("verify.ts", () => {
       });
 
       // Mock the JSON fetch
-      global.fetch = jest.fn().mockResolvedValue({
-        json: () =>
-          Promise.resolve({
-            publicKeys: [
-              {
-                id: "1",
-                alg: "ES256",
-                publicKey: "0x123456789abcdef",
-              },
-            ],
-          }),
-      });
+      global.fetch = mock(() =>
+        Promise.resolve({
+          json: () =>
+            Promise.resolve({
+              publicKeys: [
+                {
+                  id: "1",
+                  alg: "ES256",
+                  publicKey: "0x123456789abcdef",
+                },
+              ],
+            }),
+        })
+      ) as any;
 
       // Should parse buffer as "TWIST=test-endpoint" and continue processing
       await expect(
-        verifyAsyncDns("data", "signature", "example.com", "1")
+        verifyAsyncDns("data", "signature", "example.com", "1", mockResolver)
       ).rejects.toThrow(); // Will fail at crypto step, but parsing succeeded
     });
 
@@ -141,22 +142,24 @@ describe("verify.ts", () => {
         answers: [{ data: buffer }],
       });
 
-      global.fetch = jest.fn().mockResolvedValue({
-        json: () =>
-          Promise.resolve({
-            publicKeys: [
-              {
-                id: "1",
-                alg: "ES256",
-                publicKey: "0x123456789abcdef",
-              },
-            ],
-          }),
-      });
+      global.fetch = mock(() =>
+        Promise.resolve({
+          json: () =>
+            Promise.resolve({
+              publicKeys: [
+                {
+                  id: "1",
+                  alg: "ES256",
+                  publicKey: "0x123456789abcdef",
+                },
+              ],
+            }),
+        })
+      ) as any;
 
       // Should parse as "TWIST=data"
       await expect(
-        verifyAsyncDns("data", "signature", "example.com", "1")
+        verifyAsyncDns("data", "signature", "example.com", "1", mockResolver)
       ).rejects.toThrow(); // Will fail at crypto step, but parsing succeeded
     });
 
@@ -174,7 +177,7 @@ describe("verify.ts", () => {
       });
 
       await expect(
-        verifyAsyncDns("data", "signature", "example.com", "1")
+        verifyAsyncDns("data", "signature", "example.com", "1", mockResolver)
       ).rejects.toThrow(
         "Invalid TXT record format: length exceeds buffer size"
       );
@@ -197,21 +200,23 @@ describe("verify.ts", () => {
         ],
       });
 
-      global.fetch = jest.fn().mockResolvedValue({
-        json: () =>
-          Promise.resolve({
-            publicKeys: [
-              {
-                id: "1",
-                alg: "ES256",
-                publicKey: "0x123456789abcdef",
-              },
-            ],
-          }),
-      });
+      global.fetch = mock(() =>
+        Promise.resolve({
+          json: () =>
+            Promise.resolve({
+              publicKeys: [
+                {
+                  id: "1",
+                  alg: "ES256",
+                  publicKey: "0x123456789abcdef",
+                },
+              ],
+            }),
+        })
+      ) as any;
 
       await expect(
-        verifyAsyncDns("data", "signature", "example.com", "1")
+        verifyAsyncDns("data", "signature", "example.com", "1", mockResolver)
       ).rejects.toThrow(); // Will fail at crypto step, but parsing succeeded
     });
 
@@ -221,7 +226,7 @@ describe("verify.ts", () => {
       });
 
       await expect(
-        verifyAsyncDns("data", "signature", "example.com", "1")
+        verifyAsyncDns("data", "signature", "example.com", "1", mockResolver)
       ).rejects.toThrow(
         `Multiple TXT records found with prefix ${PREFIX} for host example.com. Only one is allowed.`
       );
@@ -232,25 +237,27 @@ describe("verify.ts", () => {
         answers: [{ data: `${PREFIX}//api v1/ƙeys?bad#frag` }],
       });
 
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        headers: {
-          get: (name: string) =>
-            name === "content-type" ? "application/json" : "0",
-        },
-        json: () =>
-          Promise.resolve({
-            publicKeys: [{ id: "1", alg: "RS256", publicKey: "00" }],
-          }),
-      });
+      global.fetch = mock(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: {
+            get: (name: string) =>
+              name === "content-type" ? "application/json" : "0",
+          },
+          json: () =>
+            Promise.resolve({
+              publicKeys: [{ id: "1", alg: "RS256", publicKey: "00" }],
+            }),
+        })
+      ) as any;
 
       await expect(
-        verifyAsyncDns("data", "signature", "example.com", "1")
+        verifyAsyncDns("data", "signature", "example.com", "1", mockResolver)
       ).rejects.toThrow();
 
       expect(global.fetch).toHaveBeenCalled();
-      const call = (global.fetch as jest.Mock).mock.calls[0] as unknown[];
+      const call = (global.fetch as ReturnType<typeof mock>).mock.calls[0] as unknown[];
       const urlArg = call[0] as URL;
       expect(urlArg).toBeInstanceOf(URL);
       // Leading slashes removed, segments encoded
@@ -265,10 +272,10 @@ describe("verify.ts", () => {
         answers: [{ data: `${PREFIX}${longPath}` }],
       });
 
-      global.fetch = jest.fn();
+      global.fetch = mock() as any;
 
       await expect(
-        verifyAsyncDns("data", "signature", "example.com", "1")
+        verifyAsyncDns("data", "signature", "example.com", "1", mockResolver)
       ).rejects.toThrow("TWIST path too long");
 
       expect(global.fetch).not.toHaveBeenCalled();
@@ -300,12 +307,12 @@ describe("verify.ts", () => {
     });
 
     it("throws if HTTP status is not ok", async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      global.fetch = mock(() => Promise.resolve({
         ok: false,
         status: 404,
         headers: { get: () => null },
         json: () => Promise.resolve({ publicKeys: [] }),
-      });
+      })) as any;
 
       await expect(
         verifyAsyncJson("data", "signature", httpsUrl, "1")
@@ -313,12 +320,12 @@ describe("verify.ts", () => {
     });
 
     it("throws if Content-Type is not application/json", async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      global.fetch = mock(() => Promise.resolve({
         ok: true,
         status: 200,
         headers: { get: () => "text/plain" },
         json: () => Promise.resolve({ publicKeys: [] }),
-      });
+      })) as any;
 
       await expect(
         verifyAsyncJson("data", "signature", httpsUrl, "1")
@@ -326,7 +333,7 @@ describe("verify.ts", () => {
     });
 
     it("throws if key id is not found", async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      global.fetch = mock(() => Promise.resolve({
         ok: true,
         status: 200,
         headers: {
@@ -338,7 +345,7 @@ describe("verify.ts", () => {
               : null,
         },
         json: () => Promise.resolve({ publicKeys: [] }),
-      });
+      })) as any;
 
       await expect(
         verifyAsyncJson("data", "signature", httpsUrl, "1")
@@ -346,7 +353,7 @@ describe("verify.ts", () => {
     });
 
     it("throws if duplicate key ids are found", async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      global.fetch = mock(() => Promise.resolve({
         ok: true,
         status: 200,
         headers: {
@@ -364,7 +371,7 @@ describe("verify.ts", () => {
               { id: "1", alg: "RS256", publicKey: "00" },
             ],
           }),
-      });
+      })) as any;
 
       await expect(
         verifyAsyncJson("data", "signature", httpsUrl, "1")
@@ -374,7 +381,7 @@ describe("verify.ts", () => {
     });
 
     it("throws if algorithm is unsupported", async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      global.fetch = mock(() => Promise.resolve({
         ok: true,
         status: 200,
         headers: {
@@ -389,7 +396,7 @@ describe("verify.ts", () => {
           Promise.resolve({
             publicKeys: [{ id: "1", alg: "UNSUPPORTED", publicKey: "00" }],
           }),
-      });
+      })) as any;
 
       await expect(
         verifyAsyncJson("data", "signature", httpsUrl, "1")
@@ -411,7 +418,7 @@ describe("verify.ts", () => {
       const spki = await webcrypto.subtle.exportKey("spki", publicKey);
       const spkiHex = toHex(spki);
 
-      global.fetch = jest.fn().mockResolvedValue({
+      global.fetch = mock(() => Promise.resolve({
         ok: true,
         status: 200,
         headers: {
@@ -426,7 +433,7 @@ describe("verify.ts", () => {
           Promise.resolve({
             publicKeys: [{ id: "1", alg: "RS256", publicKey: spkiHex }],
           }),
-      });
+      })) as any;
 
       await expect(
         verifyAsyncJson(data, signatureHex, httpsUrl, "1")
@@ -448,7 +455,7 @@ describe("verify.ts", () => {
       const spki = await webcrypto.subtle.exportKey("spki", publicKey);
       const spkiHex = toHex(spki);
 
-      global.fetch = jest.fn().mockResolvedValue({
+      global.fetch = mock(() => Promise.resolve({
         ok: true,
         status: 200,
         headers: {
@@ -459,7 +466,7 @@ describe("verify.ts", () => {
           Promise.resolve({
             publicKeys: [{ id: "1", alg: "RS256", publicKey: spkiHex }],
           }),
-      });
+      })) as any;
 
       await expect(
         verifyAsyncJson(data, signatureHex, httpsUrl, "1")
@@ -467,7 +474,7 @@ describe("verify.ts", () => {
     });
 
     it("throws if manifest exceeds maximum size", async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      global.fetch = mock(() => Promise.resolve({
         ok: true,
         status: 200,
         headers: {
@@ -479,7 +486,7 @@ describe("verify.ts", () => {
               : null,
         },
         json: () => Promise.resolve({ publicKeys: [] }),
-      });
+      })) as any;
 
       await expect(
         verifyAsyncJson("data", "signature", httpsUrl, "1")
@@ -497,7 +504,7 @@ describe("verify.ts", () => {
       );
       const signatureHex = toHex(signature);
 
-      global.fetch = jest.fn().mockResolvedValue({
+      global.fetch = mock(() => Promise.resolve({
         ok: true,
         status: 200,
         headers: {
@@ -508,12 +515,12 @@ describe("verify.ts", () => {
           Promise.resolve({
             publicKeys: [{ id: "1", alg: "RS256", publicKey: spkiHex }],
           }),
-      });
+      })) as any;
 
       await verifyAsyncJson(data, signatureHex, httpsUrl, "1");
 
       expect(global.fetch).toHaveBeenCalled();
-      const call = (global.fetch as jest.Mock).mock.calls[0] as unknown[];
+      const call = (global.fetch as ReturnType<typeof mock>).mock.calls[0] as unknown[];
       const options = call[1] as RequestInit;
       expect(options.redirect).toBe("error");
       expect(options.headers).toEqual({ Accept: "application/json" });

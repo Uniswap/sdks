@@ -1,0 +1,12 @@
+# Bun configuration file
+
+[install]
+# Save exact versions
+save = "exact"
+
+# Supply chain protection: reject package versions published less than 3 days ago
+# To bypass for specific packages: minimumReleaseAgeExcludes = ["package-name"]
+minimumReleaseAge = 259200
+
+# Pin the default registry explicitly to prevent registry confusion attacks
+registry = "https://registry.npmjs.org"

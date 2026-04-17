@@ -1,7 +1,14 @@
 import { ethers } from 'ethers'
 import { PoolKey } from '../entities/pool'
 import { PathKey } from './encodeRouteToPath'
-import { Actions, Subparser, URVersion, V4_BASE_ACTIONS_ABI_DEFINITION, V4_SWAP_ACTIONS_V2_1 } from './v4Planner'
+import {
+  Actions,
+  Subparser,
+  URVersion,
+  isAtLeastV2_1_1,
+  V4_BASE_ACTIONS_ABI_DEFINITION,
+  V4_SWAP_ACTIONS_V2_1_1,
+} from './v4Planner'
 
 export type Param = {
   readonly name: string
@@ -23,13 +30,14 @@ export type SwapExactInSingle = {
   readonly zeroForOne: boolean
   readonly amountIn: string
   readonly amountOutMinimum: string
+  readonly maxHopSlippage?: string // Only present in V2.1.1
   readonly hookData: string
 }
 
 export type SwapExactIn = {
   readonly currencyIn: string
   readonly path: readonly PathKey[]
-  readonly maxHopSlippage?: readonly string[] // Only present in V2.1
+  readonly maxHopSlippage?: readonly string[] // Only present in V2.1.1
   readonly amountIn: string
   readonly amountOutMinimum: string
 }
@@ -39,13 +47,14 @@ export type SwapExactOutSingle = {
   readonly zeroForOne: boolean
   readonly amountOut: string
   readonly amountInMaximum: string
+  readonly maxHopSlippage?: string // Only present in V2.1.1
   readonly hookData: string
 }
 
 export type SwapExactOut = {
   readonly currencyOut: string
   readonly path: readonly PathKey[]
-  readonly maxHopSlippage?: readonly string[] // Only present in V2.1
+  readonly maxHopSlippage?: readonly string[] // Only present in V2.1.1
   readonly amountOut: string
   readonly amountInMaximum: string
 }
@@ -59,11 +68,10 @@ export abstract class V4BaseActionsParser {
 
     return {
       actions: actionTypes.map((actionType: Actions, i: number) => {
-        // Use V2.1 ABI for swap actions if V2.1, otherwise use base ABI (V2.0)
-        const isSwapAction = actionType === Actions.SWAP_EXACT_IN || actionType === Actions.SWAP_EXACT_OUT
+        // Use V2.1.1 ABI for swap actions if V2.1.1, otherwise use base ABI (V2.0)
         const abiDef =
-          urVersion === URVersion.V2_1 && isSwapAction
-            ? V4_SWAP_ACTIONS_V2_1[actionType]
+          isAtLeastV2_1_1(urVersion) && actionType in V4_SWAP_ACTIONS_V2_1_1
+            ? V4_SWAP_ACTIONS_V2_1_1[actionType]
             : V4_BASE_ACTIONS_ABI_DEFINITION[actionType]
         const rawParams = ethers.utils.defaultAbiCoder.decode(
           abiDef.map((command) => command.type),
@@ -74,7 +82,7 @@ export abstract class V4BaseActionsParser {
             case Subparser.V4SwapExactInSingle:
               return {
                 name: abiDef[j].name,
-                value: parseV4ExactInSingle(param),
+                value: parseV4ExactInSingle(param, urVersion),
               }
             case Subparser.V4SwapExactIn:
               return {
@@ -84,7 +92,7 @@ export abstract class V4BaseActionsParser {
             case Subparser.V4SwapExactOutSingle:
               return {
                 name: abiDef[j].name,
-                value: parseV4ExactOutSingle(param),
+                value: parseV4ExactOutSingle(param, urVersion),
               }
             case Subparser.V4SwapExactOut:
               return {
@@ -150,38 +158,38 @@ function parsePathKey(data: string): PathKey {
   }
 }
 
-function parseV4ExactInSingle(data: any[]): SwapExactInSingle {
-  const [poolKey, zeroForOne, amountIn, amountOutMinimum, hookData] = data
-  const [currency0, currency1, fee, tickSpacing, hooks] = poolKey
-  return {
-    poolKey: {
-      currency0,
-      currency1,
-      fee,
-      tickSpacing,
-      hooks,
-    },
-    zeroForOne,
-    amountIn,
-    amountOutMinimum,
-    hookData,
+function parseV4ExactInSingle(data: any[], urVersion: URVersion): SwapExactInSingle {
+  const [currency0, currency1, fee, tickSpacing, hooks] = data[0]
+  const poolKey: PoolKey = { currency0, currency1, fee, tickSpacing, hooks }
+
+  if (urVersion === URVersion.V2_0) {
+    // V2.0: [poolKey, zeroForOne, amountIn, amountOutMinimum, hookData]
+    const [, zeroForOne, amountIn, amountOutMinimum, hookData] = data
+    return {
+      poolKey,
+      zeroForOne,
+      amountIn,
+      amountOutMinimum,
+      hookData,
+    }
+  } else {
+    // V2.1.1: [poolKey, zeroForOne, amountIn, amountOutMinimum, maxHopSlippage, hookData]
+    const [, zeroForOne, amountIn, amountOutMinimum, maxHopSlippage, hookData] = data
+    return {
+      poolKey,
+      zeroForOne,
+      amountIn,
+      amountOutMinimum,
+      maxHopSlippage,
+      hookData,
+    }
   }
 }
 
 function parseV4ExactIn(data: any[], urVersion: URVersion): SwapExactIn {
   const paths: readonly PathKey[] = data[1].map((pathKey: string) => parsePathKey(pathKey))
 
-  if (urVersion === URVersion.V2_1) {
-    // V2.1: [currencyIn, path, maxHopSlippage, amountIn, amountOutMinimum]
-    const [currencyIn, , maxHopSlippage, amountIn, amountOutMinimum] = data
-    return {
-      currencyIn,
-      path: paths,
-      maxHopSlippage,
-      amountIn,
-      amountOutMinimum,
-    }
-  } else {
+  if (urVersion === URVersion.V2_0) {
     // V2.0: [currencyIn, path, amountIn, amountOutMinimum]
     const [currencyIn, , amountIn, amountOutMinimum] = data
     return {
@@ -190,47 +198,66 @@ function parseV4ExactIn(data: any[], urVersion: URVersion): SwapExactIn {
       amountIn,
       amountOutMinimum,
     }
+  } else {
+    // V2.1.1: [currencyIn, path, maxHopSlippage, amountIn, amountOutMinimum]
+    const [currencyIn, , maxHopSlippage, amountIn, amountOutMinimum] = data
+    return {
+      currencyIn,
+      path: paths,
+      maxHopSlippage,
+      amountIn,
+      amountOutMinimum,
+    }
   }
 }
 
-function parseV4ExactOutSingle(data: any[]): SwapExactOutSingle {
-  const [poolKey, zeroForOne, amountOut, amountInMaximum, hookData] = data
-  const { currency0, currency1, fee, tickSpacing, hooks } = poolKey
+function parseV4ExactOutSingle(data: any[], urVersion: URVersion): SwapExactOutSingle {
+  const [currency0, currency1, fee, tickSpacing, hooks] = data[0]
+  const poolKey: PoolKey = { currency0, currency1, fee, tickSpacing, hooks }
 
-  return {
-    poolKey: {
-      currency0,
-      currency1,
-      fee,
-      tickSpacing,
-      hooks,
-    },
-    zeroForOne,
-    amountOut,
-    amountInMaximum,
-    hookData,
+  if (urVersion === URVersion.V2_0) {
+    // V2.0: [poolKey, zeroForOne, amountOut, amountInMaximum, hookData]
+    const [, zeroForOne, amountOut, amountInMaximum, hookData] = data
+    return {
+      poolKey,
+      zeroForOne,
+      amountOut,
+      amountInMaximum,
+      hookData,
+    }
+  } else {
+    // V2.1.1: [poolKey, zeroForOne, amountOut, amountInMaximum, maxHopSlippage, hookData]
+    const [, zeroForOne, amountOut, amountInMaximum, maxHopSlippage, hookData] = data
+    return {
+      poolKey,
+      zeroForOne,
+      amountOut,
+      amountInMaximum,
+      maxHopSlippage,
+      hookData,
+    }
   }
 }
 
 function parseV4ExactOut(data: any[], urVersion: URVersion): SwapExactOut {
   const paths: readonly PathKey[] = data[1].map((pathKey: string) => parsePathKey(pathKey))
 
-  if (urVersion === URVersion.V2_1) {
-    // V2.1: [currencyOut, path, maxHopSlippage, amountOut, amountInMaximum]
-    const [currencyOut, , maxHopSlippage, amountOut, amountInMaximum] = data
-    return {
-      currencyOut,
-      path: paths,
-      maxHopSlippage,
-      amountOut,
-      amountInMaximum,
-    }
-  } else {
+  if (urVersion === URVersion.V2_0) {
     // V2.0: [currencyOut, path, amountOut, amountInMaximum]
     const [currencyOut, , amountOut, amountInMaximum] = data
     return {
       currencyOut,
       path: paths,
+      amountOut,
+      amountInMaximum,
+    }
+  } else {
+    // V2.1.1: [currencyOut, path, maxHopSlippage, amountOut, amountInMaximum]
+    const [currencyOut, , maxHopSlippage, amountOut, amountInMaximum] = data
+    return {
+      currencyOut,
+      path: paths,
+      maxHopSlippage,
       amountOut,
       amountInMaximum,
     }

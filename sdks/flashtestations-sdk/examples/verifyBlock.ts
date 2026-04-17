@@ -9,7 +9,7 @@ import { verifyFlashtestationInBlock } from '../src/index';
  * 3. Display verification results
  *
  * Usage:
- *   WORKLOAD_ID=0x1234... npx tsx examples/verifyBlock.ts
+ *   WORKLOAD_ID=0x1234... bun run examples/verifyBlock.ts
  */
 async function main() {
   try {
@@ -19,7 +19,7 @@ async function main() {
     if (!workloadId) {
       console.error('Error: WORKLOAD_ID environment variable is required');
       console.error('\nUsage:');
-      console.error('  WORKLOAD_ID=0x1234... npx tsx examples/verifyBlock.ts');
+      console.error('  WORKLOAD_ID=0x1234... bun run examples/verifyBlock.ts');
       process.exit(1);
     }
 

@@ -1,5 +1,5 @@
 import { Interface } from '@ethersproject/abi'
-import { Currency, CurrencyAmount, Percent, TradeType, validateAndParseAddress, WETH9 } from '@uniswap/sdk-core'
+import { Currency, CurrencyAmount, Percent, Token, TradeType, validateAndParseAddress, WETH9 } from '@uniswap/sdk-core'
 import ISwapRouter02 from '@uniswap/swap-router-contracts/artifacts/contracts/interfaces/ISwapRouter02.sol/ISwapRouter02.json'
 import { Trade as V2Trade } from '@uniswap/v2-sdk'
 import {
@@ -440,7 +440,7 @@ export abstract class SwapRouter {
     // encode permit if necessary
     if (options.inputTokenPermit) {
       invariant(sampleTrade.inputAmount.currency.isToken, 'NON_TOKEN_PERMIT')
-      calldatas.push(SelfPermit.encodePermit(sampleTrade.inputAmount.currency, options.inputTokenPermit))
+      calldatas.push(SelfPermit.encodePermit(sampleTrade.inputAmount.currency as Token, options.inputTokenPermit))
     }
 
     for (const trade of trades) {
@@ -581,7 +581,7 @@ export abstract class SwapRouter {
     // encode output token permit if necessary
     if (options.outputTokenPermit) {
       invariant(quoteAmountOut.currency.isToken, 'NON_TOKEN_PERMIT_OUTPUT')
-      calldatas.push(SelfPermit.encodePermit(quoteAmountOut.currency, options.outputTokenPermit))
+      calldatas.push(SelfPermit.encodePermit(quoteAmountOut.currency as Token, options.outputTokenPermit))
     }
 
     const chainId = sampleTrade.route.chainId

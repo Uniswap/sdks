@@ -1,3 +1,4 @@
+// Supported chain IDs for Uniswap deployments
 export enum ChainId {
   MAINNET = 1,
   GOERLI = 5,

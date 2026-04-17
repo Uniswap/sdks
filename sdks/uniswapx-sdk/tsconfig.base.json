@@ -23,5 +23,6 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "isolatedModules": true
-  }
-} 
+  },
+  "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts"]
+}
