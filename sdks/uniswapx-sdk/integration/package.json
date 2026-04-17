@@ -23,7 +23,7 @@
     "@types/mocha": "^9.1.1",
     "@types/node": "^18.7.16",
     "chai": "^4.3.6",
-    "hardhat": "^3.0.0",
+    "hardhat": "^2.25.0",
     "husky": "^8.0.3",
     "ts-node": "^10.9.1"
   },
