@@ -10,15 +10,15 @@ import {
   TickMath,
   TICK_SPACINGS,
   FeeAmount,
-  Position,
 } from '@uniswap/v3-sdk'
-import { Pool as V4Pool, Route as RouteV4, Trade as V4Trade, Position as V4Position } from '@uniswap/v4-sdk'
+import { Pool as V4Pool, Route as RouteV4, Trade as V4Trade } from '@uniswap/v4-sdk'
 import { SwapOptions } from '../../src'
 import { CurrencyAmount, TradeType, Ether, Token, Percent, Currency } from '@uniswap/sdk-core'
 import IUniswapV3Pool from '@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json'
-import { TEST_RECIPIENT_ADDRESS, ROUTER_ADDRESS } from './addresses'
-import { MigrateV3ToV4Options } from '../../src/swapRouter'
+import { TEST_RECIPIENT_ADDRESS } from './addresses'
 import { encodeSqrtRatioX96 } from '@uniswap/v3-sdk'
+import { ZERO_ADDRESS } from '../../src/utils/constants'
+import { SwapRouter } from '../../src/swapRouter'
 
 const V2_FACTORY = '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f'
 const V2_ABI = [
@@ -172,4 +172,46 @@ export function buildTrade(
       })),
     tradeType: trades[0].tradeType,
   })
+}
+
+// ─── Shared unit-test pool factories (no RPC needed) ─────────────────────────
+
+export function makeV3Pool(tokenA: Token, tokenB: Token, fee: FeeAmount = FeeAmount.MEDIUM): Pool {
+  const liquidity = JSBI.BigInt(ethers.utils.parseEther('1000000').toString())
+  const tickSpacing = TICK_SPACINGS[fee]
+  const ticks = [
+    { index: nearestUsableTick(TickMath.MIN_TICK, tickSpacing), liquidityNet: liquidity, liquidityGross: liquidity },
+    {
+      index: nearestUsableTick(TickMath.MAX_TICK, tickSpacing),
+      liquidityNet: JSBI.multiply(liquidity, JSBI.BigInt('-1')),
+      liquidityGross: liquidity,
+    },
+  ]
+  return new Pool(tokenA, tokenB, fee, encodeSqrtRatioX96(1, 1), liquidity, 0, ticks)
+}
+
+export function makeV4Pool(tokenA: Currency, tokenB: Currency, fee: FeeAmount = FeeAmount.MEDIUM): V4Pool {
+  const liquidity = JSBI.BigInt(ethers.utils.parseEther('1000000').toString())
+  const tickSpacing = 60
+  const ticks = [
+    { index: nearestUsableTick(TickMath.MIN_TICK, tickSpacing), liquidityNet: liquidity, liquidityGross: liquidity },
+    {
+      index: nearestUsableTick(TickMath.MAX_TICK, tickSpacing),
+      liquidityNet: JSBI.multiply(liquidity, JSBI.BigInt('-1')),
+      liquidityGross: liquidity,
+    },
+  ]
+  return new V4Pool(tokenA, tokenB, fee, tickSpacing, ZERO_ADDRESS, encodeSqrtRatioX96(1, 1), liquidity, 0, ticks)
+}
+
+export function parseCommands(calldata: string) {
+  const decoded = SwapRouter.INTERFACE.decodeFunctionData('execute(bytes,bytes[])', calldata)
+  const commands = decoded[0] as string
+  const inputs = decoded[1] as string[]
+  const cmdHex = commands.slice(2)
+  const commandTypes: number[] = []
+  for (let j = 0; j < cmdHex.length; j += 2) {
+    commandTypes.push(parseInt(cmdHex.slice(j, j + 2), 16) & 0x3f)
+  }
+  return { commandTypes, inputs }
 }
