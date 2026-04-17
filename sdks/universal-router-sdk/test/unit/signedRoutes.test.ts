@@ -78,10 +78,7 @@ describe('Signed Routes', () => {
         intent: '0x' + '0'.repeat(64),
         data: '0x' + '1'.repeat(64),
         sender: '0x1234567890123456789012345678901234567890',
-<<<<<<< Updated upstream
         nonce: generateNonce(), // Nonce is required for encodeExecuteSigned
-=======
->>>>>>> Stashed changes
       }
 
       const { calldata: signedCalldata, value: signedValue } = SwapRouter.encodeExecuteSigned(
@@ -108,10 +105,7 @@ describe('Signed Routes', () => {
         intent: '0x' + '0'.repeat(64),
         data: '0x' + '1'.repeat(64),
         sender: '0x0000000000000000000000000000000000000000',
-<<<<<<< Updated upstream
         nonce: generateNonce(), // Nonce is required for encodeExecuteSigned
-=======
->>>>>>> Stashed changes
       }
 
       const result1 = SwapRouter.encodeExecuteSigned(
@@ -129,10 +123,7 @@ describe('Signed Routes', () => {
         intent: '0x' + '0'.repeat(64),
         data: '0x' + '1'.repeat(64),
         sender: '0x1234567890123456789012345678901234567890',
-<<<<<<< Updated upstream
         nonce: generateNonce(), // Nonce is required for encodeExecuteSigned
-=======
->>>>>>> Stashed changes
       }
 
       const result2 = SwapRouter.encodeExecuteSigned(

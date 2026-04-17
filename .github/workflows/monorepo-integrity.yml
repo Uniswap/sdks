@@ -42,11 +42,7 @@ jobs:
         shell: bash
         working-directory: ./
         run: |
-<<<<<<< Updated upstream
           bun install --frozen-lockfile
-=======
-          yarn --immutable
->>>>>>> Stashed changes
         env:
           HUSKY: "0" # By default do not run HUSKY install
 

@@ -39,7 +39,6 @@ forge install
 yarn test:forge
 ```
 
-<<<<<<< Updated upstream
 ## Per-Hop Slippage Protection
 
 Universal Router v2.1.1 adds granular slippage protection for multi-hop swaps across all protocol versions (V2, V3, V4, and mixed routes). In addition to the overall trade-level slippage check, the contract can verify that each individual pool hop doesn't exceed a maximum price limit.
@@ -79,38 +78,10 @@ const { calldata, value } = SwapRouter.swapCallParameters(trade, {
   recipient: '0x...',
   urVersion: URVersion.V2_1_1, // required for per-hop encoding
 })
-=======
-## Per-Hop Slippage Protection (V4 Routes)
-
-Universal Router v2.1 adds granular slippage protection for multi-hop V4 swaps. Additionally to checking slippage at the end of a route, you can now verify that each individual hop doesn't exceed a maximum price limit.
-
-### How It Works
-
-For V4 multi-hop swaps, you can provide a `maxHopSlippage` array in your swap options:
-
-```typescript
-import { SwapRouter } from '@uniswap/universal-router-sdk'
-import { BigNumber } from 'ethers'
-import { Percent } from '@uniswap/sdk-core'
-
-const swapOptions = {
-  slippageTolerance: new Percent(50, 10000), // 0.5% overall slippage
-  recipient: '0x...',
-  deadline: Math.floor(Date.now() / 1000) + 60 * 20,
-  // Optional: per-hop slippage protection for V4 routes
-  maxHopSlippage: [
-    BigNumber.from('1010000000000000000'),    // Hop 0: max price 1.01 (1% slippage)
-    BigNumber.from('2500000000000000000000'),  // Hop 1: max price 2500
-  ]
-}
-
-const { calldata, value } = SwapRouter.swapCallParameters(trade, swapOptions)
->>>>>>> Stashed changes
 ```
 
 ### Price Calculation
 
-<<<<<<< Updated upstream
 Slippage is expressed as a **price** with 18 decimals of precision:
 
 - `price = amountIn * 1e18 / amountOut`
@@ -137,34 +108,10 @@ const trade = new RouterTrade({
   ],
   tradeType: TradeType.EXACT_INPUT,
 })
-=======
-The slippage is expressed as a **price** with 18 decimals of precision:
-- **For Exact Input**: `price = amountIn * 1e18 / amountOut`
-- **For Exact Output**: `price = amountIn * 1e18 / amountOut`
-
-If the calculated price exceeds `maxHopSlippage[i]`, the transaction will revert with:
-- `V4TooLittleReceivedPerHop` for exact input swaps
-- `V4TooMuchRequestedPerHop` for exact output swaps
-
-### Example: USDC → DAI → WETH
-
-```typescript
-// 2-hop swap: USDC → DAI → WETH
-const swapOptions = {
-  slippageTolerance: new Percent(100, 10000), // 1% overall
-  recipient: userAddress,
-  deadline,
-  maxHopSlippage: [
-    BigNumber.from('1010000000000000000'),     // Hop 0: USDC→DAI, max 1% slippage
-    BigNumber.from('2500000000000000000000'),  // Hop 1: DAI→WETH, max price 2500 DAI/WETH
-  ]
-}
->>>>>>> Stashed changes
 ```
 
 ### Benefits
 
-<<<<<<< Updated upstream
 1. **MEV Protection**: Prevents sandwich attacks on individual pool hops
 2. **Route Quality**: Ensures each segment of a multi-hop route meets price expectations
 3. **Granular Control**: Different slippage tolerances for different pairs (e.g. tighter bounds on stablecoin hops)
@@ -173,17 +120,6 @@ const swapOptions = {
 
 - If `maxHopSlippage` is omitted or is an empty array, only the overall trade-level slippage is checked
 - If `urVersion` is not set (defaults to V2.0), commands use the standard ABI without `maxHopSlippage`
-=======
-1. **MEV Protection**: Prevents sandwich attacks on individual hops
-2. **Route Quality**: Ensures each segment of a multi-hop route meets expectations
-3. **Granular Control**: Different slippage tolerance for different pairs in a route
-
-### Backward Compatibility
-
-- If `maxHopSlippage` is not provided or is an empty array, only overall slippage is checked (backward compatible)
-- The feature only applies to V4 routes; V2 and V3 routes ignore this parameter
-- Mixed routes with V4 sections will apply per-hop checks only to the V4 portions
->>>>>>> Stashed changes
 
 ## Signed Routes (Universal Router v2.1)
 
@@ -213,15 +149,9 @@ const { calldata, value } = SwapRouter.swapCallParameters(trade, {
 const payload = SwapRouter.getExecuteSignedPayload(
   calldata,
   {
-<<<<<<< Updated upstream
     intent: '0x' + '0'.repeat(64), // Application-specific intent
     data: '0x' + '0'.repeat(64), // Application-specific data
     sender: wallet.address, // Or address(0) to skip sender verification
-=======
-    intent: '0x' + '0'.repeat(64),  // Application-specific intent
-    data: '0x' + '0'.repeat(64),    // Application-specific data
-    sender: wallet.address,          // Or address(0) to skip sender verification
->>>>>>> Stashed changes
   },
   deadline,
   chainId,
@@ -239,11 +169,7 @@ const { calldata: signedCalldata, value: signedValue } = SwapRouter.encodeExecut
     intent: payload.value.intent,
     data: payload.value.data,
     sender: payload.value.sender,
-<<<<<<< Updated upstream
     nonce: payload.value.nonce, // Must match what was signed
-=======
-    nonce: payload.value.nonce,  // Must match what was signed
->>>>>>> Stashed changes
   },
   deadline,
   BigNumber.from(value)
@@ -272,13 +198,8 @@ const payload = SwapRouter.getExecuteSignedPayload(
   {
     intent: '0x...',
     data: '0x...',
-<<<<<<< Updated upstream
     sender: '0x0000000000000000000000000000000000000000', // Skip sender verification too
     nonce: NONCE_SKIP_CHECK, // Allow signature reuse
-=======
-    sender: '0x0000000000000000000000000000000000000000',  // Skip sender verification too
-    nonce: NONCE_SKIP_CHECK,  // Allow signature reuse
->>>>>>> Stashed changes
   },
   deadline,
   chainId,
@@ -304,7 +225,6 @@ import { SwapRouter } from '@uniswap/universal-router-sdk'
 import { BigNumber } from 'ethers'
 
 // 1. Prepare your swap (e.g., USDC → WETH on mainnet)
-<<<<<<< Updated upstream
 const { calldata, value } = SwapRouter.swapCallParameters(trade, swapOptions, [
   {
     // Bridge configuration
@@ -323,30 +243,6 @@ const { calldata, value } = SwapRouter.swapCallParameters(trade, swapOptions, [
     useNative: false,
   },
 ])
-=======
-const { calldata, value } = SwapRouter.swapCallParameters(
-  trade,
-  swapOptions,
-  [
-    {
-      // Bridge configuration
-      depositor: userAddress,
-      recipient: userAddress,  // Recipient on destination chain
-      inputToken: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',  // WETH mainnet
-      outputToken: '0x4200000000000000000000000000000000000006',   // WETH optimism
-      inputAmount: BigNumber.from('1000000000000000000'),  // 1 WETH
-      outputAmount: BigNumber.from('990000000000000000'),  // 0.99 WETH (with fees)
-      destinationChainId: 10,  // Optimism
-      exclusiveRelayer: '0x0000000000000000000000000000000000000000',
-      quoteTimestamp: Math.floor(Date.now() / 1000),
-      fillDeadline: Math.floor(Date.now() / 1000) + 3600,
-      exclusivityDeadline: 0,
-      message: '0x',
-      useNative: false,
-    }
-  ]
-)
->>>>>>> Stashed changes
 ```
 
 ### Swap + Bridge Example
@@ -355,40 +251,24 @@ const { calldata, value } = SwapRouter.swapCallParameters(
 // Swap USDC to WETH, then bridge WETH to Optimism
 const bridgeParams = {
   depositor: userAddress,
-<<<<<<< Updated upstream
   recipient: userAddress, // Can be different address on destination
   inputToken: WETH_MAINNET,
   outputToken: WETH_OPTIMISM,
   inputAmount: CONTRACT_BALANCE, // Use entire swap output
-=======
-  recipient: userAddress,  // Can be different address on destination
-  inputToken: WETH_MAINNET,
-  outputToken: WETH_OPTIMISM,
-  inputAmount: CONTRACT_BALANCE,  // Use entire swap output
->>>>>>> Stashed changes
   outputAmount: expectedOutputAmount,
   destinationChainId: 10,
   exclusiveRelayer: '0x0000000000000000000000000000000000000000',
   quoteTimestamp: Math.floor(Date.now() / 1000),
   fillDeadline: Math.floor(Date.now() / 1000) + 3600,
   exclusivityDeadline: 0,
-<<<<<<< Updated upstream
   message: '0x', // Optional message to execute on destination
   useNative: false, // Set to true to bridge native ETH
-=======
-  message: '0x',  // Optional message to execute on destination
-  useNative: false,  // Set to true to bridge native ETH
->>>>>>> Stashed changes
 }
 
 const { calldata, value } = SwapRouter.swapCallParameters(
   trade,
   swapOptions,
-<<<<<<< Updated upstream
   [bridgeParams] // Array of bridge operations
-=======
-  [bridgeParams]  // Array of bridge operations
->>>>>>> Stashed changes
 )
 ```
 
@@ -401,11 +281,7 @@ import { CONTRACT_BALANCE } from '@uniswap/universal-router-sdk'
 
 const bridgeParams = {
   // ... other params
-<<<<<<< Updated upstream
   inputAmount: CONTRACT_BALANCE, // Bridge entire balance after swap
-=======
-  inputAmount: CONTRACT_BALANCE,  // Bridge entire balance after swap
->>>>>>> Stashed changes
   // ... other params
 }
 ```
@@ -415,7 +291,6 @@ const bridgeParams = {
 You can perform multiple bridge operations after a swap:
 
 ```typescript
-<<<<<<< Updated upstream
 const { calldata, value } = SwapRouter.swapCallParameters(trade, swapOptions, [
   {
     // Bridge 50% to Optimism
@@ -434,30 +309,6 @@ const { calldata, value } = SwapRouter.swapCallParameters(trade, swapOptions, [
     // ... other params
   },
 ])
-=======
-const { calldata, value } = SwapRouter.swapCallParameters(
-  trade,
-  swapOptions,
-  [
-    {
-      // Bridge 50% to Optimism
-      inputToken: WETH_MAINNET,
-      outputToken: WETH_OPTIMISM,
-      inputAmount: BigNumber.from('500000000000000000'),
-      destinationChainId: 10,
-      // ... other params
-    },
-    {
-      // Bridge remaining USDC to Arbitrum
-      inputToken: USDC_MAINNET,
-      outputToken: USDC_ARBITRUM,
-      inputAmount: CONTRACT_BALANCE,
-      destinationChainId: 42161,
-      // ... other params
-    }
-  ]
-)
->>>>>>> Stashed changes
 ```
 
 ### Native ETH Bridging
@@ -466,15 +317,9 @@ To bridge native ETH instead of WETH:
 
 ```typescript
 const bridgeParams = {
-<<<<<<< Updated upstream
   inputToken: WETH_ADDRESS, // Must be WETH address
   outputToken: WETH_ON_DESTINATION,
   useNative: true, // Bridge as native ETH
-=======
-  inputToken: WETH_ADDRESS,  // Must be WETH address
-  outputToken: WETH_ON_DESTINATION,
-  useNative: true,  // Bridge as native ETH
->>>>>>> Stashed changes
   // ... other params
 }
 ```

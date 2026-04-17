@@ -3,7 +3,6 @@ import { BigNumber } from 'ethers'
 export enum UniversalRouterVersion {
   V1_2 = '1.2',
   V2_0 = '2.0',
-<<<<<<< Updated upstream
   V2_1_1 = '2.1.1',
 }
 
@@ -14,9 +13,6 @@ export enum UniversalRouterVersion {
  */
 export function isAtLeastV2_1_1(version?: UniversalRouterVersion): boolean {
   return !!version && version.localeCompare(UniversalRouterVersion.V2_1_1, undefined, { numeric: true }) >= 0
-=======
-  V2_1 = '2.1',
->>>>>>> Stashed changes
 }
 
 export type RouterConfig = {
@@ -47,15 +43,9 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x66a9893cc07d91d95644aedd05d03f95e1dba8af',
         creationBlock: 21689092,
       },
-<<<<<<< Updated upstream
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x4C82D1fBFe28C977cBB58D8C7FF8FCF9F70a2cCA',
         creationBlock: 24680568,
-=======
-      [UniversalRouterVersion.V2_1]: {
-        address: '0xd92a36b0000531ef3063ded4de20a0783308446c',
-        creationBlock: 23836348,
->>>>>>> Stashed changes
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -72,10 +62,6 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
         creationBlock: 8940568,
       },
-      [UniversalRouterVersion.V2_1]: {
-        address: '0x0000000000000000000000000000000000000000',
-        creationBlock: 1,
-      },
     },
   },
   // sepolia
@@ -90,15 +76,9 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x3a9d48ab9751398bbfa63ad67599bb04e4bdf98b', // only update here and creation block below
         creationBlock: 7259601,
       },
-<<<<<<< Updated upstream
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 10470160,
-=======
-      [UniversalRouterVersion.V2_1]: {
-        address: '0x470FFC67b1feEEC31D16C46AC7545C98716a194c',
-        creationBlock: 9664766,
->>>>>>> Stashed changes
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -115,15 +95,9 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x1095692a6237d83c6a72f3f5efedb9a670c49223',
         creationBlock: 66980401,
       },
-<<<<<<< Updated upstream
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 84336468,
-=======
-      [UniversalRouterVersion.V2_1]: {
-        address: '0xE27610fD9dD05FC061366bc9dA414CA6F948f204',
-        creationBlock: 79245524,
->>>>>>> Stashed changes
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -140,10 +114,6 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
         creationBlock: 35176052,
       },
-      [UniversalRouterVersion.V2_1]: {
-        address: '0x0000000000000000000000000000000000000000',
-        creationBlock: 1,
-      },
     },
   },
   //optimism
@@ -158,15 +128,9 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x851116d9223fabed8e56c0e6b8ad0c31d98b3507',
         creationBlock: 130947687,
       },
-<<<<<<< Updated upstream
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 149097062,
-=======
-      [UniversalRouterVersion.V2_1]: {
-        address: '0xde20EEE5398D3790a4D356e8925bD21Ea65D99Af',
-        creationBlock: 143998769,
->>>>>>> Stashed changes
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -183,10 +147,6 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
         creationBlock: 8887728,
       },
-      [UniversalRouterVersion.V2_1]: {
-        address: '0x0000000000000000000000000000000000000000',
-        creationBlock: 1,
-      },
     },
   },
   // arbitrum
@@ -201,15 +161,9 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0xa51afafe0263b40edaef0df8781ea9aa03e381a3',
         creationBlock: 297842906,
       },
-<<<<<<< Updated upstream
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 442902181,
-=======
-      [UniversalRouterVersion.V2_1]: {
-        address: '0x96b2FD2F80e9428Daa65d859653117D453981AB4',
-        creationBlock: 402060097,
->>>>>>> Stashed changes
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -226,10 +180,6 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
         creationBlock: 18815277,
       },
-      [UniversalRouterVersion.V2_1]: {
-        address: '0x0000000000000000000000000000000000000000',
-        creationBlock: 1,
-      },
     },
   },
   // celo
@@ -244,15 +194,9 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0xcb695bc5D3Aa22cAD1E6DF07801b061a05A0233A',
         creationBlock: 47387857,
       },
-<<<<<<< Updated upstream
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 61893766,
-=======
-      [UniversalRouterVersion.V2_1]: {
-        address: '0xBB8Ed9bF0BFF210652AE5f473a849F82e990DDf6',
-        creationBlock: 51696199,
->>>>>>> Stashed changes
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -269,10 +213,6 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
         creationBlock: 17566658,
       },
-      [UniversalRouterVersion.V2_1]: {
-        address: '0x0000000000000000000000000000000000000000',
-        creationBlock: 1,
-      },
     },
   },
   // binance smart chain
@@ -287,15 +227,9 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x1906c1d672b88cd1b9ac7593301ca990f94eae07',
         creationBlock: 45970616,
       },
-<<<<<<< Updated upstream
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 87208607,
-=======
-      [UniversalRouterVersion.V2_1]: {
-        address: '0x91BF3bfAEf8D771A74E1A8fE460b3EE646b2e588',
-        creationBlock: 68794488,
->>>>>>> Stashed changes
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -312,15 +246,9 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x94b75331ae8d42c1b61065089b7d48fe14aa73b7',
         creationBlock: 56195395,
       },
-<<<<<<< Updated upstream
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 80616324,
-=======
-      [UniversalRouterVersion.V2_1]: {
-        address: '0x0Cf1f86B331A03179646341D10A2A87515087221',
-        creationBlock: 72254439,
->>>>>>> Stashed changes
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -337,10 +265,6 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0xd0872d928672ae2ff74bdb2f5130ac12229cafaf',
         creationBlock: 6915289,
       },
-      [UniversalRouterVersion.V2_1]: {
-        address: '0x0000000000000000000000000000000000000000',
-        creationBlock: 1,
-      },
     },
   },
   // base mainnet
@@ -355,15 +279,9 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x6ff5693b99212da76ad316178a184ab56d299b43',
         creationBlock: 25350999,
       },
-<<<<<<< Updated upstream
       [UniversalRouterVersion.V2_1_1]: {
         address: '0xfdf682f51fe81aa4898f0ae2163d8a55c127fbc7',
         creationBlock: 43501203,
-=======
-      [UniversalRouterVersion.V2_1]: {
-        address: '0xf3a4f4094bd2c6c06ca2f61789d8727b8d1e7259',
-        creationBlock: 38404211,
->>>>>>> Stashed changes
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -380,15 +298,9 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0xeabbcb3e8e415306207ef514f660a3f820025be3',
         creationBlock: 14377319,
       },
-<<<<<<< Updated upstream
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 32492192,
-=======
-      [UniversalRouterVersion.V2_1]: {
-        address: '0x77c0097c1acf6fd84878d3f7c0603e3f04e8bec7',
-        creationBlock: 27394047,
->>>>>>> Stashed changes
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -405,15 +317,9 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x3315ef7ca28db74abadc6c44570efdf06b04b020',
         creationBlock: 25434544,
       },
-<<<<<<< Updated upstream
       [UniversalRouterVersion.V2_1_1]: {
         address: '0xFdf682F51FE81Aa4898F0AE2163d8A55c127fbC7',
         creationBlock: 43550401,
-=======
-      [UniversalRouterVersion.V2_1]: {
-        address: '0x880853091b60f80301a0c1d2f9893c4993041295',
-        creationBlock: 38452170,
->>>>>>> Stashed changes
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -430,10 +336,6 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x28731BCC616B5f51dD52CF2e4dF0E78dD1136C06',
         creationBlock: 12640979,
       },
-      [UniversalRouterVersion.V2_1]: {
-        address: '0x0000000000000000000000000000000000000000',
-        creationBlock: 1,
-      },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
@@ -449,15 +351,9 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x8ac7bee993bb44dab564ea4bc9ea67bf9eb5e743',
         creationBlock: 9111895,
       },
-<<<<<<< Updated upstream
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 27228771,
-=======
-      [UniversalRouterVersion.V2_1]: {
-        address: '0x03c4f6b55733cdf3caa07c01e5b83ddee3381f60',
-        creationBlock: 22131418,
->>>>>>> Stashed changes
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -474,15 +370,9 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0xf70536b3bcc1bd1a972dc186a2cf84cc6da6be5d',
         creationBlock: 7100543,
       },
-<<<<<<< Updated upstream
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 46987997,
-=======
-      [UniversalRouterVersion.V2_1]: {
-        address: '0x7F9B8D606E0F35E5073ABf93695814530b28a37b',
-        creationBlock: 36746405,
->>>>>>> Stashed changes
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -499,15 +389,9 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0xef740bf23acae26f6492b10de645d6b98dc8eaf3',
         creationBlock: 6819690,
       },
-<<<<<<< Updated upstream
       [UniversalRouterVersion.V2_1_1]: {
         address: '0xFdf682F51FE81Aa4898F0AE2163d8A55c127fbC7',
         creationBlock: 43044663,
-=======
-      [UniversalRouterVersion.V2_1]: {
-        address: '0xe6039ae5b44f90d56c6b029354fb22999861a9a0',
-        creationBlock: 32850661,
->>>>>>> Stashed changes
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -524,10 +408,6 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x3ae6d8a282d67893e17aa70ebffb33ee5aa65893',
         creationBlock: 23678,
       },
-      [UniversalRouterVersion.V2_1]: {
-        address: '0x0000000000000000000000000000000000000000',
-        creationBlock: 1,
-      },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
@@ -543,15 +423,9 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x492e6456d9528771018deb9e87ef7750ef184104',
         creationBlock: 20216585,
       },
-<<<<<<< Updated upstream
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 39035624,
-=======
-      [UniversalRouterVersion.V2_1]: {
-        address: '0x0000000000000000000000000000000000000000',
-        creationBlock: 1,
->>>>>>> Stashed changes
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -568,15 +442,9 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x0e2850543f69f678257266e0907ff9a58b3f13de',
         creationBlock: 3254782,
       },
-<<<<<<< Updated upstream
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 20352508,
-=======
-      [UniversalRouterVersion.V2_1]: {
-        address: '0xdb1d5986551c820bd0f3b1caca3e77ce03acb5ef',
-        creationBlock: 15232223,
->>>>>>> Stashed changes
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -593,7 +461,6 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x0d97dc33264bfc1c226207428a79b26757fb9dc3',
         creationBlock: 29255937,
       },
-<<<<<<< Updated upstream
       [UniversalRouterVersion.V2_1_1]: {
         address: '0xFdf682F51FE81Aa4898F0AE2163d8A55c127fbC7',
         creationBlock: 62239835,
@@ -638,11 +505,6 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       [UniversalRouterVersion.V2_0]: {
         address: '0x5507749f2c558bb3e162c6e90c314c092e7372ff',
         creationBlock: 47680350,
-=======
-      [UniversalRouterVersion.V2_1]: {
-        address: '0xBC2A036E5027b9AE57BbA847eF88E1b14823F7B1',
-        creationBlock: 36720825,
->>>>>>> Stashed changes
       },
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',

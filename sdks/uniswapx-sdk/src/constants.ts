@@ -29,6 +29,7 @@ export const PERMIT2_MAPPING: AddressMap = {
     [11155111, 42161]
   ),
   12341234: "0x000000000022d473030f116ddee9f6b43ac78ba3",
+  1301: "0x000000000022d473030f116ddee9f6b43ac78ba3",
 };
 
 export const UNISWAPX_ORDER_QUOTER_MAPPING: AddressMap = {
@@ -40,6 +41,17 @@ export const UNISWAPX_ORDER_QUOTER_MAPPING: AddressMap = {
   8453: "0xc6ef4C96Ee89e48Eff1C35545DBEED4Ad8dAC9D4",
   130: "0xc6ef4C96Ee89e48Eff1C35545DBEED4Ad8dAC9D4",
   42161: "0xc6ef4C96Ee89e48Eff1C35545DBEED4Ad8dAC9D4",
+  1301: "0xBFE64A14130054E1C3aB09287bc69E7148471636",
+};
+
+export const UNISWAPX_V4_ORDER_QUOTER_MAPPING: AddressMap = {
+  ...constructSameAddressMap("0x0000000000000000000000000000000000000000"),
+  1301: "0x8166d8286Ec24E1D17A054088B2a71470527BFf8",
+};
+
+export const UNISWAPX_V4_TOKEN_TRANSFER_HOOK_MAPPING: AddressMap = {
+  ...constructSameAddressMap("0x0000000000000000000000000000000000000000"),
+  1301: "0xBc879Fa59f5F99eb7C3FA0F87c41457773C4adB3",
 };
 
 export const EXCLUSIVE_FILLER_VALIDATION_MAPPING: AddressMap = {
@@ -61,6 +73,8 @@ export enum OrderType {
   Dutch_V3 = "Dutch_V3",
   Limit = "Limit",
   Priority = "Priority",
+  V4 = "V4",
+  Hybrid = "Hybrid",
 }
 
 type Reactors = Partial<{
@@ -112,6 +126,13 @@ export const REACTOR_ADDRESS_MAPPING: ReactorMapping = {
     [OrderType.Dutch_V2]: "0x0000000000000000000000000000000000000000",
     [OrderType.Relay]: "0x0000000000000000000000000000000000000000",
     [OrderType.Priority]: "0x00000006021a6Bce796be7ba509BBBA71e956e37",
+  },
+  1301: {
+    [OrderType.Hybrid]: "0x000000000C75276D956cc35218ca8f132D877957",
+    [OrderType.Dutch]: "0x0000000000000000000000000000000000000000",
+    [OrderType.Dutch_V2]: "0x0000000000000000000000000000000000000000",
+    [OrderType.Relay]: "0x0000000000000000000000000000000000000000",
+    [OrderType.Priority]: "0x0000000000000000000000000000000000000000",
   },
 };
 
@@ -169,7 +190,7 @@ export type PermissionedToken = {
   symbol: string;
   proxyType?: PermissionedTokenProxyType;
   interface: PermissionedTokenInterface;
-}
+};
 
 export const PERMISSIONED_TOKENS: PermissionedToken[] = [
   {
@@ -186,4 +207,25 @@ export const PERMISSIONED_TOKENS: PermissionedToken[] = [
     proxyType: PermissionedTokenProxyType.ERC1967,
     interface: PermissionedTokenInterface.ISuperstateTokenV4,
   },
-]
+];
+
+/**
+ * V4 Resolver address mapping for resolver-based order type detection
+ * Maps chainId to resolver contract addresses
+ */
+type ResolverMapping = { readonly [chainId: number]: string };
+
+export const HYBRID_RESOLVER_ADDRESS_MAPPING: ResolverMapping = {
+  1301: "0x57c48a70bd9f34fd902dde5bb4dbe25d2c931c62",
+};
+
+type ReverseResolverMapping = {
+  [address: string]: { orderType: OrderType };
+};
+
+export const REVERSE_RESOLVER_MAPPING: ReverseResolverMapping = Object.entries(
+  HYBRID_RESOLVER_ADDRESS_MAPPING
+).reduce((acc: ReverseResolverMapping, [, resolverAddress]) => {
+  acc[resolverAddress.toLowerCase()] = { orderType: OrderType.Hybrid };
+  return acc;
+}, {});

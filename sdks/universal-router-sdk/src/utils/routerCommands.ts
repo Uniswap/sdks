@@ -1,8 +1,5 @@
 import { defaultAbiCoder } from 'ethers/lib/utils'
-<<<<<<< Updated upstream
 import { UniversalRouterVersion, isAtLeastV2_1_1 } from './constants'
-=======
->>>>>>> Stashed changes
 import { AcrossV4DepositV3Params } from '../entities/actions/across'
 
 /**
@@ -256,7 +253,6 @@ export const COMMAND_DEFINITION: { [key in CommandType]: CommandDefinition } = {
       { name: 'useNative', type: 'bool' },
     ],
   },
-<<<<<<< Updated upstream
 }
 
 // V2.1.1 ABI definitions for V2/V3 swap commands (extended with maxHopSlippage)
@@ -305,8 +301,6 @@ export const V2V3_SWAP_COMMANDS_V2_1_1: { [key: number]: CommandDefinition } = {
       { name: 'maxHopSlippage', type: 'uint256[]' },
     ],
   },
-=======
->>>>>>> Stashed changes
 }
 
 export class RoutePlanner {
