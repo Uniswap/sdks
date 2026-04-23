@@ -2,7 +2,7 @@ import { BigNumber } from 'ethers'
 import invariant from 'tiny-invariant'
 import { TradeType } from '@uniswap/sdk-core'
 import { TokenTransferMode } from '../entities/actions/uniswap'
-import { ROUTER_AS_RECIPIENT, SENDER_AS_RECIPIENT, UniversalRouterVersion } from './constants'
+import { ROUTER_AS_RECIPIENT, SENDER_AS_RECIPIENT, UniversalRouterVersion, ZERO_ADDRESS } from './constants'
 import { SwapSpecification, SwapStep, V4Action } from '../types/encodeSwaps'
 
 function getV3HopCount(path: string): number | undefined {
@@ -81,6 +81,8 @@ export function validateEncodeSwaps(spec: SwapSpecification, swapSteps: SwapStep
   const outputCurrency = spec.routing.outputToken.wrapped
 
   invariant(!spec.slippageTolerance.lessThan(0), 'SLIPPAGE_TOLERANCE')
+  invariant(recipient !== ZERO_ADDRESS, 'RECIPIENT_CANNOT_BE_ZERO')
+  invariant(recipient !== ROUTER_AS_RECIPIENT, 'RECIPIENT_CANNOT_BE_ROUTER')
 
   if (spec.tradeType === TradeType.EXACT_INPUT) {
     invariant(amountCurrency.equals(inputCurrency), 'INVALID_ROUTING_AMOUNT_CURRENCY')

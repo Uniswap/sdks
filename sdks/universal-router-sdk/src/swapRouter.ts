@@ -25,6 +25,7 @@ import { SwapSpecification, SwapStep } from './types/encodeSwaps'
 import { RoutePlanner, CommandType } from './utils/routerCommands'
 import { encodePermit, encodeV3PositionPermit } from './utils/inputTokens'
 import {
+  ETH_ADDRESS,
   ROUTER_AS_RECIPIENT,
   SENDER_AS_RECIPIENT,
   UNIVERSAL_ROUTER_ADDRESS,
@@ -72,10 +73,14 @@ export interface MigrateV3ToV4Options {
   v4AddLiquidityOptions: V4AddLiquidityOptions
 }
 
-type NormalizedSwapSpecification = Omit<SwapSpecification, 'recipient' | 'tokenTransferMode' | 'urVersion'> & {
+type NormalizedSwapSpecification = Omit<
+  SwapSpecification,
+  'recipient' | 'tokenTransferMode' | 'urVersion' | 'safeMode'
+> & {
   recipient: string
   tokenTransferMode: TokenTransferMode
   urVersion: UniversalRouterVersion
+  safeMode: boolean
 }
 
 const DEFAULT_PROXY_DEADLINE_BUFFER_SECONDS = 30 * 60
@@ -142,14 +147,16 @@ export abstract class SwapRouter {
    *
    * Routers own `swapSteps`, including any route-dependent `WRAP_ETH` / `UNWRAP_WETH`
    * commands needed to execute the route and normalize balances for settlement/refund.
-   * The SDK owns ingress, fees, final settlement, and exact-output refund.
+   * The SDK owns ingress, fees, final settlement, exact-output refund, and optional `safeMode`.
    *
-   * After the last router step, gross output must be held in UR as `spec.routing.outputToken`.
-   * For `EXACT_OUTPUT`, routers must normalize unused input into `spec.routing.inputToken` before
-   * control returns to the envelope.
-   * The SDK refunds unused input with `SWEEP(getCurrencyAddress(inputToken), recipient, 0)`.
+   * Routers must end with final output in `spec.routing.outputToken`.
+   * For `EXACT_OUTPUT`, unused input must end in `spec.routing.inputToken`.
+   * Exact-input plans are expected to fully consume or normalize away non-boundary leftovers before control returns.
+   * Top-level `SWEEP` is intentionally not part of `SwapStep[]`; the SDK appends final settlement,
+   * exact-output input refund when applicable, and `safeMode`'s trailing `SWEEP(ETH, recipient, 0)`.
    *
-   * The SDK does not infer route topology or add transition commands on behalf of routers.
+   * Router custody with `payerIsUser = false` is deliberate for safety, even if it can cost an extra
+   * command or transfer. The SDK does not infer route topology or add transition commands on behalf of routers.
    */
   public static encodeSwaps(spec: SwapSpecification, swapSteps: SwapStep[]): MethodParameters {
     const normalizedSpec = SwapRouter.normalizeEncodeSwapsSpec(spec)
@@ -220,6 +227,10 @@ export abstract class SwapRouter {
         false,
         normalizedSpec.urVersion
       )
+    }
+
+    if (normalizedSpec.safeMode) {
+      planner.addCommand(CommandType.SWEEP, [ETH_ADDRESS, normalizedSpec.recipient, 0], false, normalizedSpec.urVersion)
     }
 
     if (normalizedSpec.tokenTransferMode === TokenTransferMode.ApproveProxy) {
@@ -534,6 +545,7 @@ export abstract class SwapRouter {
       recipient: spec.recipient ?? SENDER_AS_RECIPIENT,
       tokenTransferMode: spec.tokenTransferMode ?? TokenTransferMode.Permit2,
       urVersion: spec.urVersion ?? UniversalRouterVersion.V2_0,
+      safeMode: spec.safeMode ?? false,
     }
   }
 }

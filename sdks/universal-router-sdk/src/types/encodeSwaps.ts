@@ -27,6 +27,7 @@ export type SwapSpecification = {
   slippageTolerance: Percent
   deadline?: BigNumberish
   urVersion?: UniversalRouterVersion
+  safeMode?: boolean
 }
 
 export type V2SwapExactIn = {

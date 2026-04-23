@@ -27,6 +27,7 @@ import {
   SENDER_AS_RECIPIENT,
   UNIVERSAL_ROUTER_ADDRESS,
   UniversalRouterVersion,
+  ZERO_ADDRESS,
 } from '../../src/utils/constants'
 import { CommandType, RoutePlanner } from '../../src/utils/routerCommands'
 import { TEST_FEE_RECIPIENT_ADDRESS, TEST_RECIPIENT_ADDRESS } from '../utils/addresses'
@@ -240,6 +241,31 @@ describe('encodeSwaps', () => {
           [buildV3ExactInStep({ amountIn: '1000000000000000000' }, [WETH, USDC])]
         )
       ).to.throw('NATIVE_INPUT_PERMIT')
+    })
+
+    it('rejects zero address as the final recipient', () => {
+      expect(() => validateEncodeSwaps(buildSpec({ recipient: ZERO_ADDRESS }), [buildV3ExactInStep()])).to.throw(
+        'RECIPIENT_CANNOT_BE_ZERO'
+      )
+    })
+
+    it('rejects router as the final recipient in Permit2 mode', () => {
+      expect(() => validateEncodeSwaps(buildSpec({ recipient: ROUTER_AS_RECIPIENT }), [buildV3ExactInStep()])).to.throw(
+        'RECIPIENT_CANNOT_BE_ROUTER'
+      )
+    })
+
+    it('rejects router as the final recipient in ApproveProxy mode', () => {
+      expect(() =>
+        validateEncodeSwaps(
+          buildSpec({
+            recipient: ROUTER_AS_RECIPIENT,
+            tokenTransferMode: TokenTransferMode.ApproveProxy,
+            chainId: 1,
+          }),
+          [buildV3ExactInStep()]
+        )
+      ).to.throw('RECIPIENT_CANNOT_BE_ROUTER')
     })
 
     it('rejects negative slippage', () => {
@@ -693,6 +719,55 @@ describe('encodeSwaps', () => {
       expect(sweep[2].toString()).to.equal(expectedGrossMin.toString())
     })
 
+    it('appends a final SWEEP(ETH, recipient, 0) when safeMode is enabled on exact-input plans', () => {
+      const spec = buildSpec({
+        slippageTolerance: new Percent(25, 1000),
+        safeMode: true,
+      })
+
+      const result = SwapRouter.encodeSwaps(spec, [buildV3ExactInStep()])
+      const { inputs } = decodeExecute(result.calldata)
+      const { commandTypes } = parseCommands(result.calldata)
+
+      expect(commandTypes).to.deep.equal([
+        CommandType.PERMIT2_TRANSFER_FROM,
+        CommandType.V3_SWAP_EXACT_IN,
+        CommandType.SWEEP,
+        CommandType.SWEEP,
+      ])
+      expect(commandTypes[commandTypes.length - 1]).to.equal(CommandType.SWEEP)
+
+      const settlement = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[2])
+      expect(settlement[0].toLowerCase()).to.equal(WETH.address.toLowerCase())
+
+      const safeSweep = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[inputs.length - 1])
+      expect(safeSweep[0].toLowerCase()).to.equal(ETH_ADDRESS.toLowerCase())
+      expect(safeSweep[1].toLowerCase()).to.equal(TEST_RECIPIENT.toLowerCase())
+      expect(safeSweep[2].toString()).to.equal('0')
+    })
+
+    it('treats primitive zero deadlines as absent on direct UR plans', () => {
+      const result = SwapRouter.encodeSwaps(buildSpec({ deadline: 0 }), [buildV3ExactInStep()])
+      const decoded = decodeExecute(result.calldata)
+
+      expect(decoded.deadline).to.equal(undefined)
+    })
+
+    it('treats BigNumber zero deadlines as explicit on direct UR plans', () => {
+      const result = SwapRouter.encodeSwaps(buildSpec({ deadline: BigNumber.from(0) }), [buildV3ExactInStep()])
+      const decoded = decodeExecute(result.calldata)
+
+      expect(decoded.deadline?.toString()).to.equal('0')
+    })
+
+    it('passes through nonzero deadlines on direct UR plans', () => {
+      const deadline = 1700000000
+      const result = SwapRouter.encodeSwaps(buildSpec({ deadline }), [buildV3ExactInStep()])
+      const decoded = decodeExecute(result.calldata)
+
+      expect(decoded.deadline?.toString()).to.equal(deadline.toString())
+    })
+
     it('encodes ERC20 permit ingress with permit before transfer-from', () => {
       const spec = buildSpec({
         permit: TEST_PERMIT,
@@ -870,6 +945,49 @@ describe('encodeSwaps', () => {
       const refund = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[3])
       expect(refund[0].toLowerCase()).to.equal(USDC.address.toLowerCase())
       expect(refund[2].toString()).to.equal('0')
+    })
+
+    it('appends safeMode ETH sweep after exact-output settlement and refund', () => {
+      const spec = buildSpec(
+        {
+          tradeType: TradeType.EXACT_OUTPUT,
+          slippageTolerance: new Percent(5, 100),
+          safeMode: true,
+        },
+        {
+          outputToken: DAI,
+          amount: CurrencyAmount.fromRawAmount(DAI, '500000000000000000'),
+          quote: CurrencyAmount.fromRawAmount(USDC, '1000000'),
+        }
+      )
+
+      const result = SwapRouter.encodeSwaps(spec, [
+        buildV3ExactOutStep({
+          amountInMax: exactOutputMaxIn(BigNumber.from('1000000'), spec.slippageTolerance).toString(),
+        }),
+      ])
+      const { inputs } = decodeExecute(result.calldata)
+      const { commandTypes } = parseCommands(result.calldata)
+
+      expect(commandTypes).to.deep.equal([
+        CommandType.PERMIT2_TRANSFER_FROM,
+        CommandType.V3_SWAP_EXACT_OUT,
+        CommandType.SWEEP,
+        CommandType.SWEEP,
+        CommandType.SWEEP,
+      ])
+      expect(commandTypes[commandTypes.length - 1]).to.equal(CommandType.SWEEP)
+
+      const settlement = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[2])
+      expect(settlement[0].toLowerCase()).to.equal(DAI.address.toLowerCase())
+
+      const refund = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[3])
+      expect(refund[0].toLowerCase()).to.equal(USDC.address.toLowerCase())
+
+      const safeSweep = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[inputs.length - 1])
+      expect(safeSweep[0].toLowerCase()).to.equal(ETH_ADDRESS.toLowerCase())
+      expect(safeSweep[1].toLowerCase()).to.equal(TEST_RECIPIENT.toLowerCase())
+      expect(safeSweep[2].toString()).to.equal('0')
     })
 
     it('encodes exact-output wrapped-native input with router-owned normalization before refund', () => {
@@ -1256,6 +1374,30 @@ describe('encodeSwaps', () => {
       expect(decoded.commands).to.equal('0x0004')
     })
 
+    it('treats primitive zero deadlines as absent on proxy plans', () => {
+      const spec = buildSpec({
+        tokenTransferMode: TokenTransferMode.ApproveProxy,
+        chainId: 1,
+        deadline: 0,
+      })
+
+      const result = SwapRouter.encodeSwaps(spec, [buildV3ExactInStep()])
+      const decoded = PROXY_INTERFACE.decodeFunctionData('execute', result.calldata)
+      expect(BigNumber.from(decoded.deadline).isZero()).to.equal(false)
+    })
+
+    it('treats BigNumber zero deadlines as explicit on proxy plans', () => {
+      const spec = buildSpec({
+        tokenTransferMode: TokenTransferMode.ApproveProxy,
+        chainId: 1,
+        deadline: BigNumber.from(0),
+      })
+
+      const result = SwapRouter.encodeSwaps(spec, [buildV3ExactInStep()])
+      const decoded = PROXY_INTERFACE.decodeFunctionData('execute', result.calldata)
+      expect(BigNumber.from(decoded.deadline).toString()).to.equal('0')
+    })
+
     it('uses a sweep refund on exact-output proxy flows', () => {
       const spec = buildSpec(
         {
@@ -1277,6 +1419,40 @@ describe('encodeSwaps', () => {
       ])
       const decoded = PROXY_INTERFACE.decodeFunctionData('execute', result.calldata)
       expect(decoded.commands).to.equal('0x010404')
+    })
+
+    it('appends safeMode ETH sweep to proxy inner plans', () => {
+      const spec = buildSpec(
+        {
+          tradeType: TradeType.EXACT_OUTPUT,
+          tokenTransferMode: TokenTransferMode.ApproveProxy,
+          chainId: 1,
+          safeMode: true,
+          slippageTolerance: new Percent(5, 100),
+        },
+        {
+          amount: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+          quote: CurrencyAmount.fromRawAmount(USDC, '1000000'),
+        }
+      )
+
+      const result = SwapRouter.encodeSwaps(spec, [
+        buildV3ExactOutStep({
+          amountInMax: exactOutputMaxIn(BigNumber.from('1000000'), spec.slippageTolerance).toString(),
+        }),
+      ])
+      const decoded = PROXY_INTERFACE.decodeFunctionData('execute', result.calldata)
+
+      expect(decoded.commands).to.equal('0x01040404')
+      expect(decoded.inputs).to.have.length(4)
+
+      const safeSweep = defaultAbiCoder.decode(
+        ['address', 'address', 'uint256'],
+        decoded.inputs[decoded.inputs.length - 1]
+      )
+      expect(safeSweep[0].toLowerCase()).to.equal(ETH_ADDRESS.toLowerCase())
+      expect(safeSweep[1].toLowerCase()).to.equal(TEST_RECIPIENT.toLowerCase())
+      expect(safeSweep[2].toString()).to.equal('0')
     })
 
     it('wraps proxy execution with flat exact-output fees in the inner UR plan', () => {
