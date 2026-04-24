@@ -7,9 +7,11 @@ export type { CommandDefinition, ParamType } from './utils/routerCommands'
 export {
   UNIVERSAL_ROUTER_CREATION_BLOCK,
   UNIVERSAL_ROUTER_ADDRESS,
+  SWAP_PROXY_ADDRESS,
   ROUTER_AS_RECIPIENT,
   WETH_ADDRESS,
   UniversalRouterVersion,
+  isAtLeastV2_1_1,
 } from './utils/constants'
 export { CommandParser, GenericCommandParser } from './utils/commandParser'
 export type { UniversalRouterCommand, UniversalRouterCall, Param, CommandsDefinition } from './utils/commandParser'

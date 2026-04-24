@@ -8,6 +8,7 @@ import {
   V4Planner,
   encodeRouteToPath as encodeV4RouteToPath,
   Actions,
+  URVersion,
 } from '@uniswap/v4-sdk'
 import {
   Trade as RouterTrade,
@@ -27,9 +28,16 @@ import { Permit2Permit } from '../../utils/inputTokens'
 import { getPathCurrency } from '../../utils/pathCurrency'
 import { Currency, TradeType, Token, CurrencyAmount, Percent } from '@uniswap/sdk-core'
 import { Command, RouterActionType, TradeConfig } from '../Command'
-import { SENDER_AS_RECIPIENT, ROUTER_AS_RECIPIENT, CONTRACT_BALANCE, ETH_ADDRESS } from '../../utils/constants'
+import {
+  SENDER_AS_RECIPIENT,
+  ROUTER_AS_RECIPIENT,
+  CONTRACT_BALANCE,
+  ETH_ADDRESS,
+  UniversalRouterVersion,
+  isAtLeastV2_1_1,
+} from '../../utils/constants'
 import { getCurrencyAddress } from '../../utils/getCurrencyAddress'
-import { encodeFeeBips } from '../../utils/numbers'
+import { encodeFeeBips, encodeFee1e18 } from '../../utils/numbers'
 import { BigNumber, BigNumberish } from 'ethers'
 import { TPool } from '@uniswap/router-sdk'
 
@@ -42,12 +50,32 @@ export type FlatFeeOptions = {
 // so we extend swap options with the permit2 permit
 // when safe mode is enabled, the SDK will add an extra ETH sweep for security
 // when useRouterBalance is enabled the SDK will use the balance in the router for the swap
+export enum TokenTransferMode {
+  Permit2 = 'Permit2',
+  ApproveProxy = 'ApproveProxy',
+}
+
 export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit'> & {
   useRouterBalance?: boolean
   inputTokenPermit?: Permit2Permit
   flatFee?: FlatFeeOptions
   safeMode?: boolean
-  maxHopSlippage?: BigNumber[] // Optional per-hop slippage protection for V4 routes
+  urVersion?: UniversalRouterVersion // Universal Router version for encoding (defaults to V2_0 for backward compatibility)
+  tokenTransferMode?: TokenTransferMode // How input tokens are transferred to the UR (defaults to Permit2). ApproveProxy uses the SwapProxy contract.
+  chainId?: number // Required when tokenTransferMode is ApproveProxy, used to resolve UR address for the proxy
+}
+
+/** Map from UniversalRouterVersion to v4-sdk's URVersion for v4 planner calls */
+const UR_VERSION_MAP: Record<string, URVersion> = {
+  [UniversalRouterVersion.V2_0]: URVersion.V2_0,
+  [UniversalRouterVersion.V2_1_1]: URVersion.V2_1_1,
+}
+
+function toURVersion(version?: UniversalRouterVersion): URVersion {
+  if (version === undefined) return URVersion.V2_0
+  const mapped = UR_VERSION_MAP[version]
+  if (!mapped) throw new Error(`No v4-sdk URVersion mapping for UniversalRouterVersion: ${version}`)
+  return mapped
 }
 
 const REFUND_ETH_PRICE_IMPACT_THRESHOLD = new Percent(50, 100)
@@ -56,6 +84,7 @@ interface Swap<TInput extends Currency, TOutput extends Currency> {
   route: IRoute<TInput, TOutput, TPool>
   inputAmount: CurrencyAmount<TInput>
   outputAmount: CurrencyAmount<TOutput>
+  maxHopSlippage?: bigint[] // Optional per-hop slippage protection (UR 2.1.1+)
 }
 
 // Wrapper for uniswap router-sdk trade entity to encode swaps for Universal Router
@@ -67,7 +96,14 @@ export class UniswapTrade implements Command {
   constructor(public trade: RouterTrade<Currency, Currency, TradeType>, public options: SwapOptions) {
     if (!!options.fee && !!options.flatFee) throw new Error('Only one fee option permitted')
 
-    if (this.inputRequiresWrap || this.inputRequiresUnwrap || this.options.useRouterBalance) {
+    if (options.tokenTransferMode === TokenTransferMode.ApproveProxy) {
+      if (!options.recipient || options.recipient === SENDER_AS_RECIPIENT) {
+        throw new Error(
+          'Explicit recipient address required when using SwapProxy (SENDER_AS_RECIPIENT resolves to proxy)'
+        )
+      }
+      this.payerIsUser = false
+    } else if (this.inputRequiresWrap || this.inputRequiresUnwrap || this.options.useRouterBalance) {
       this.payerIsUser = false
     } else {
       this.payerIsUser = true
@@ -129,10 +165,24 @@ export class UniswapTrade implements Command {
     // if last pool is v4:
     if (lastPool instanceof V4Pool) {
       // If output currency is not native but path currency output is native, we need to wrap
-      return (
-        !this.trade.outputAmount.currency.isNative &&
-        (lastRoute as unknown as V4Route<Currency, Currency>).pathOutput.isNative
-      )
+      if (!this.trade.outputAmount.currency.isNative) {
+        if ((lastRoute as unknown as V4Route<Currency, Currency>).pathOutput.isNative) {
+          // this means path output is native and we need to wrap
+          return true
+        } else if (lastPool.currency1.equals(lastPool.currency0.wrapped) && lastRoute.pools.length > 1) {
+          let poolBefore = lastRoute.pools[lastRoute.pools.length - 2]
+          // this means last pool is eth-weth and pool before contains weth
+          if (
+            poolBefore instanceof V4Pool &&
+            (poolBefore.currency0.equals(lastPool.currency1) || poolBefore.currency1.equals(lastPool.currency1))
+          ) {
+            return true
+          } else if (poolBefore.token0.equals(lastPool.currency1) || poolBefore.token1.equals(lastPool.currency1)) {
+            // same for v2 and v3 pools
+            return true
+          }
+        }
+      }
     }
     // if last pool is not v4:
     // we do not need to wrap because v2 and v3 pools already require wrapped tokens
@@ -147,10 +197,22 @@ export class UniswapTrade implements Command {
     // if last pool is v4:
     if (lastPool instanceof V4Pool) {
       // If output currency is native and path currency output is not native, we need to unwrap
-      return (
-        this.trade.outputAmount.currency.isNative &&
-        !(this.trade.swaps[0].route as unknown as V4Route<Currency, Currency>).pathOutput.isNative
-      )
+      if (this.trade.outputAmount.currency.isNative) {
+        if (!(this.trade.swaps[0].route as unknown as V4Route<Currency, Currency>).pathOutput.isNative) {
+          // this means path output is weth and we need to unwrap
+          return true
+        } else if (
+          lastRoute.pools.length > 1 &&
+          lastRoute.pools[lastRoute.pools.length - 2] instanceof V4Pool &&
+          (lastRoute.pools[lastRoute.pools.length - 2] as V4Pool).currency0.isNative &&
+          lastPool.currency1.equals(lastPool.currency0.wrapped)
+        ) {
+          // this means last pool is eth-weth and we need to unwrap
+          return true
+        } else {
+          return false
+        }
+      }
     }
     // else: if path output currency is native, we need to unwrap because v2 and v3 pools already require wrapped tokens
     return this.trade.outputAmount.currency.isNative
@@ -169,12 +231,15 @@ export class UniswapTrade implements Command {
         this.trade.maximumAmountIn(this.options.slippageTolerance).quotient.toString(),
       ])
     } else if (this.inputRequiresUnwrap) {
-      // send wrapped token to router to unwrap
-      planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [
-        (this.trade.inputAmount.currency as Token).address,
-        ROUTER_AS_RECIPIENT,
-        this.trade.maximumAmountIn(this.options.slippageTolerance).quotient.toString(),
-      ])
+      if (this.options.tokenTransferMode !== TokenTransferMode.ApproveProxy) {
+        // send wrapped token to router to unwrap via Permit2
+        planner.addCommand(CommandType.PERMIT2_TRANSFER_FROM, [
+          (this.trade.inputAmount.currency as Token).address,
+          ROUTER_AS_RECIPIENT,
+          this.trade.maximumAmountIn(this.options.slippageTolerance).quotient.toString(),
+        ])
+      }
+      // In proxy mode, the proxy already transferred tokens to the UR; just unwrap
       planner.addCommand(CommandType.UNWRAP_WETH, [ROUTER_AS_RECIPIENT, 0])
     }
     // The overall recipient at the end of the trade, SENDER_AS_RECIPIENT uses the msg.sender
@@ -218,16 +283,33 @@ export class UniswapTrade implements Command {
         getPathCurrency(this.trade.outputAmount.currency, pools[pools.length - 1])
       )
 
+      let feeDeduction = BigNumber.from(0)
+
       // If there is a fee, that percentage is sent to the fee recipient
       // In the case where ETH is the output currency, the fee is taken in WETH (for gas reasons)
       if (!!this.options.fee) {
-        const feeBips = encodeFeeBips(this.options.fee.fee)
-        planner.addCommand(CommandType.PAY_PORTION, [pathOutputCurrencyAddress, this.options.fee.recipient, feeBips])
+        // UR >= V2_1_1 supports PAY_PORTION_FULL_PRECISION (1e18 precision),
+        // older versions only support PAY_PORTION (bips)
+        const useFullPrecision = isAtLeastV2_1_1(this.options.urVersion)
 
-        // If the trade is exact output, and a fee was taken, we must adjust the amount out to be the amount after the fee
-        // Otherwise we continue as expected with the trade's normal expected output
-        if (this.trade.tradeType === TradeType.EXACT_OUTPUT) {
-          minimumAmountOut = minimumAmountOut.sub(minimumAmountOut.mul(feeBips).div(10000))
+        // Reject fractional bips fees on older UR versions to prevent silent precision loss
+        if (!useFullPrecision && !this.options.fee.fee.multiply(10_000).remainder.equalTo(0)) {
+          throw new Error('Fractional fee bips require Universal Router version V2_1_1 or higher')
+        }
+
+        if (useFullPrecision) {
+          const fee1e18 = encodeFee1e18(this.options.fee.fee)
+          planner.addCommand(
+            CommandType.PAY_PORTION_FULL_PRECISION,
+            [pathOutputCurrencyAddress, this.options.fee.recipient, fee1e18],
+            false,
+            this.options.urVersion
+          )
+          feeDeduction = minimumAmountOut.mul(fee1e18).div(BigNumber.from(10).pow(18))
+        } else {
+          const feeBips = encodeFeeBips(this.options.fee.fee)
+          planner.addCommand(CommandType.PAY_PORTION, [pathOutputCurrencyAddress, this.options.fee.recipient, feeBips])
+          feeDeduction = minimumAmountOut.mul(feeBips).div(10000)
         }
       }
 
@@ -238,12 +320,13 @@ export class UniswapTrade implements Command {
         if (minimumAmountOut.lt(feeAmount)) throw new Error('Flat fee amount greater than minimumAmountOut')
 
         planner.addCommand(CommandType.TRANSFER, [pathOutputCurrencyAddress, this.options.flatFee.recipient, feeAmount])
+        feeDeduction = BigNumber.from(feeAmount)
+      }
 
-        // If the trade is exact output, and a fee was taken, we must adjust the amount out to be the amount after the fee
-        // Otherwise we continue as expected with the trade's normal expected output
-        if (this.trade.tradeType === TradeType.EXACT_OUTPUT) {
-          minimumAmountOut = minimumAmountOut.sub(feeAmount)
-        }
+      // If the trade is exact output, and a fee was taken, we must adjust the amount out to be the amount after the fee
+      // Otherwise we continue as expected with the trade's normal expected output
+      if (this.trade.tradeType === TradeType.EXACT_OUTPUT) {
+        minimumAmountOut = minimumAmountOut.sub(feeDeduction)
       }
 
       // The remaining tokens that need to be sent to the user after the fee is taken will be caught
@@ -268,6 +351,13 @@ export class UniswapTrade implements Command {
         planner.addCommand(CommandType.UNWRAP_WETH, [this.options.recipient, 0])
       } else if (this.inputRequiresUnwrap) {
         planner.addCommand(CommandType.WRAP_ETH, [this.options.recipient, CONTRACT_BALANCE])
+      } else if (this.options.tokenTransferMode === TokenTransferMode.ApproveProxy) {
+        // Proxy pulled maximumAmountIn into the UR; sweep any unused input back to the user
+        planner.addCommand(CommandType.SWEEP, [
+          getCurrencyAddress(this.trade.inputAmount.currency),
+          this.options.recipient,
+          0,
+        ])
       } else if (this.trade.inputAmount.currency.isNative) {
         // must refund extra native currency sent along for native v4 trades (no input transition)
         planner.addCommand(CommandType.SWEEP, [ETH_ADDRESS, this.options.recipient, 0])
@@ -281,20 +371,28 @@ export class UniswapTrade implements Command {
 // encode a uniswap v2 swap
 function addV2Swap<TInput extends Currency, TOutput extends Currency>(
   planner: RoutePlanner,
-  { route, inputAmount, outputAmount }: Swap<TInput, TOutput>,
+  { route, inputAmount, outputAmount, maxHopSlippage }: Swap<TInput, TOutput>,
   tradeType: TradeType,
   options: SwapOptions,
   payerIsUser: boolean,
   routerMustCustody: boolean
 ): void {
+  if (maxHopSlippage?.length && maxHopSlippage.length !== route.pools.length) {
+    throw new Error(
+      `maxHopSlippage length (${maxHopSlippage.length}) must equal route.pools.length (${route.pools.length})`
+    )
+  }
+
   const trade = new V2Trade(
     route as RouteV2<TInput, TOutput>,
     tradeType == TradeType.EXACT_INPUT ? inputAmount : outputAmount,
     tradeType
   )
 
+  const useV2_1_1 = isAtLeastV2_1_1(options.urVersion)
+
   if (tradeType == TradeType.EXACT_INPUT) {
-    planner.addCommand(CommandType.V2_SWAP_EXACT_IN, [
+    const params: any[] = [
       // if native, we have to unwrap so keep in the router for now
       routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient,
       trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
@@ -302,27 +400,37 @@ function addV2Swap<TInput extends Currency, TOutput extends Currency>(
       routerMustCustody ? 0 : trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
       route.path.map((token) => token.wrapped.address),
       payerIsUser,
-    ])
+    ]
+    if (useV2_1_1) params.push(maxHopSlippage ?? [])
+    planner.addCommand(CommandType.V2_SWAP_EXACT_IN, params, false, options.urVersion)
   } else if (tradeType == TradeType.EXACT_OUTPUT) {
-    planner.addCommand(CommandType.V2_SWAP_EXACT_OUT, [
+    const params: any[] = [
       routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient,
       trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
       trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
       route.path.map((token) => token.wrapped.address),
       payerIsUser,
-    ])
+    ]
+    if (useV2_1_1) params.push(maxHopSlippage ?? [])
+    planner.addCommand(CommandType.V2_SWAP_EXACT_OUT, params, false, options.urVersion)
   }
 }
 
 // encode a uniswap v3 swap
 function addV3Swap<TInput extends Currency, TOutput extends Currency>(
   planner: RoutePlanner,
-  { route, inputAmount, outputAmount }: Swap<TInput, TOutput>,
+  { route, inputAmount, outputAmount, maxHopSlippage }: Swap<TInput, TOutput>,
   tradeType: TradeType,
   options: SwapOptions,
   payerIsUser: boolean,
   routerMustCustody: boolean
 ): void {
+  if (maxHopSlippage?.length && maxHopSlippage.length !== route.pools.length) {
+    throw new Error(
+      `maxHopSlippage length (${maxHopSlippage.length}) must equal route.pools.length (${route.pools.length})`
+    )
+  }
+
   const trade = V3Trade.createUncheckedTrade({
     route: route as RouteV3<TInput, TOutput>,
     inputAmount,
@@ -330,34 +438,46 @@ function addV3Swap<TInput extends Currency, TOutput extends Currency>(
     tradeType,
   })
 
+  const useV2_1_1 = isAtLeastV2_1_1(options.urVersion)
   const path = encodeRouteToPath(route as RouteV3<TInput, TOutput>, trade.tradeType === TradeType.EXACT_OUTPUT)
+
   if (tradeType == TradeType.EXACT_INPUT) {
-    planner.addCommand(CommandType.V3_SWAP_EXACT_IN, [
+    const params: any[] = [
       routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient,
       trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
       routerMustCustody ? 0 : trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
       path,
       payerIsUser,
-    ])
+    ]
+    if (useV2_1_1) params.push(maxHopSlippage ?? [])
+    planner.addCommand(CommandType.V3_SWAP_EXACT_IN, params, false, options.urVersion)
   } else if (tradeType == TradeType.EXACT_OUTPUT) {
-    planner.addCommand(CommandType.V3_SWAP_EXACT_OUT, [
+    const params: any[] = [
       routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient,
       trade.minimumAmountOut(options.slippageTolerance).quotient.toString(),
       trade.maximumAmountIn(options.slippageTolerance).quotient.toString(),
       path,
       payerIsUser,
-    ])
+    ]
+    if (useV2_1_1) params.push(maxHopSlippage ?? [])
+    planner.addCommand(CommandType.V3_SWAP_EXACT_OUT, params, false, options.urVersion)
   }
 }
 
 function addV4Swap<TInput extends Currency, TOutput extends Currency>(
   planner: RoutePlanner,
-  { inputAmount, outputAmount, route }: Swap<TInput, TOutput>,
+  { inputAmount, outputAmount, route, maxHopSlippage }: Swap<TInput, TOutput>,
   tradeType: TradeType,
   options: SwapOptions,
   payerIsUser: boolean,
   routerMustCustody: boolean
 ): void {
+  if (maxHopSlippage?.length && maxHopSlippage.length !== route.pools.length) {
+    throw new Error(
+      `maxHopSlippage length (${maxHopSlippage.length}) must equal route.pools.length (${route.pools.length})`
+    )
+  }
+
   // create a deep copy of pools since v4Planner encoding tampers with array
   const pools = route.pools.map((p) => p) as V4Pool[]
   const v4Route = new V4Route(pools, inputAmount.currency, outputAmount.currency)
@@ -371,12 +491,33 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
   const slippageToleranceOnSwap =
     routerMustCustody && tradeType == TradeType.EXACT_INPUT ? undefined : options.slippageTolerance
 
-  const v4Planner = new V4Planner()
-  v4Planner.addTrade(trade, slippageToleranceOnSwap, options.maxHopSlippage)
+  const perHopSlippage = maxHopSlippage?.map((s) => BigNumber.from(s)) ?? []
 
+  const v4Planner = new V4Planner()
+  v4Planner.addTrade(trade, slippageToleranceOnSwap, perHopSlippage, toURVersion(options.urVersion))
   v4Planner.addSettle(trade.route.pathInput, payerIsUser)
+
+  // Handle split route output consistency:
+  // - If output is ETH and some routes output WETH: force all to output WETH, then unwrap
+  // - If output is WETH and some routes output ETH: force all to output ETH, then wrap
+  let pathOutputForTake = trade.route.pathOutput
+  let lastPool = v4Route.pools[v4Route.pools.length - 1]
+  let ethWethPool = lastPool.currency1.equals(lastPool.currency0.wrapped)
+
+  if (ethWethPool && v4Route.pools.length > 1) {
+    let poolBefore = v4Route.pools[v4Route.pools.length - 2]
+    if (pathOutputForTake.isNative && poolBefore.currency0.isNative) {
+      pathOutputForTake = pathOutputForTake.wrapped
+    } else if (
+      !pathOutputForTake.isNative &&
+      (poolBefore.currency0.equals(lastPool.currency1) || poolBefore.currency1.equals(lastPool.currency1))
+    ) {
+      pathOutputForTake = lastPool.currency0
+    }
+  }
+
   v4Planner.addTake(
-    trade.route.pathOutput,
+    pathOutputForTake,
     routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient ?? SENDER_AS_RECIPIENT
   )
   planner.addCommand(CommandType.V4_SWAP, [v4Planner.finalize()])
@@ -392,6 +533,11 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
   routerMustCustody: boolean
 ): void {
   const route = swap.route as MixedRoute<TInput, TOutput>
+  if (swap.maxHopSlippage?.length && swap.maxHopSlippage.length !== route.pools.length) {
+    throw new Error(
+      `maxHopSlippage length (${swap.maxHopSlippage.length}) must equal route.pools.length (${route.pools.length})`
+    )
+  }
   const inputAmount = swap.inputAmount
   const outputAmount = swap.outputAmount
   const tradeRecipient = routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient ?? SENDER_AS_RECIPIENT
@@ -428,13 +574,19 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
     return i === sections.length - 1
   }
 
+  const useV2_1_1 = isAtLeastV2_1_1(options.urVersion)
+
   let inputToken = route.pathInput
+  let hopOffset = 0
 
   for (let i = 0; i < sections.length; i++) {
     const section = sections[i]
     const routePool = section[0]
     const outputToken = getOutputOfPools(section, inputToken)
     const subRoute = new MixedRoute(new MixedRouteSDK([...section], inputToken, outputToken))
+
+    // Slice this section's portion of maxHopSlippage from the flat array
+    const sectionHopSlippage = swap.maxHopSlippage?.slice(hopOffset, hopOffset + section.length)
 
     let nextInputToken
     let swapRecipient
@@ -453,36 +605,66 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
     if (routePool instanceof V4Pool) {
       const v4Planner = new V4Planner()
       const v4SubRoute = new V4Route(section as V4Pool[], subRoute.input, subRoute.output)
+      const v4SectionSlippage: BigNumber[] = sectionHopSlippage?.map((s) => BigNumber.from(s)) ?? []
 
       v4Planner.addSettle(inputToken, payerIsUser && i === 0, (i == 0 ? amountIn : CONTRACT_BALANCE) as BigNumber)
-      v4Planner.addAction(Actions.SWAP_EXACT_IN, [
-        {
-          currencyIn: inputToken.isNative ? ETH_ADDRESS : inputToken.address,
-          path: encodeV4RouteToPath(v4SubRoute),
-          maxHopSlippage: options.maxHopSlippage || [],
-          amountIn: 0, // denotes open delta, amount set in v4Planner.addSettle()
-          amountOutMinimum: !isLastSectionInRoute(i) ? 0 : amountOut,
-        },
-      ])
-      v4Planner.addTake(outputToken, swapRecipient)
+      v4Planner.addAction(
+        Actions.SWAP_EXACT_IN,
+        [
+          {
+            currencyIn: inputToken.isNative ? ETH_ADDRESS : inputToken.address,
+            path: encodeV4RouteToPath(v4SubRoute),
+            maxHopSlippage: v4SectionSlippage,
+            amountIn: 0, // denotes open delta, amount set in v4Planner.addSettle()
+            amountOutMinimum: !isLastSectionInRoute(i) ? 0 : amountOut,
+          },
+        ],
+        toURVersion(options.urVersion)
+      )
+
+      // Handle split route output consistency for V4 sections in mixed routes
+      let outputTokenForTake = outputToken
+      if (isLastSectionInRoute(i)) {
+        let lastPool = route.pools[route.pools.length - 1]
+        let v4Pool = lastPool instanceof V4Pool
+        let ethWethPool = v4Pool ? (lastPool as V4Pool).currency1.equals((lastPool as V4Pool).currency0.wrapped) : false
+        let poolBefore = route.pools[route.pools.length - 2]
+
+        if (ethWethPool) {
+          if (outputToken.isNative && poolBefore.token0.isNative) {
+            outputTokenForTake = outputToken.wrapped
+          } else if (
+            !outputToken.isNative &&
+            (poolBefore.token0.equals(lastPool.token1) || poolBefore.token1.equals(lastPool.token1))
+          ) {
+            outputTokenForTake = lastPool.token0
+          }
+        }
+      }
+
+      v4Planner.addTake(outputTokenForTake, swapRecipient)
 
       planner.addCommand(CommandType.V4_SWAP, [v4Planner.finalize()])
     } else if (routePool instanceof V3Pool) {
-      planner.addCommand(CommandType.V3_SWAP_EXACT_IN, [
+      const v3Params: any[] = [
         swapRecipient, // recipient
         i == 0 ? amountIn : CONTRACT_BALANCE, // amountIn
         !isLastSectionInRoute(i) ? 0 : amountOut, // amountOut
         encodeMixedRouteToPath(subRoute), // path
         payerIsUser && i === 0, // payerIsUser
-      ])
+      ]
+      if (useV2_1_1) v3Params.push(sectionHopSlippage ?? [])
+      planner.addCommand(CommandType.V3_SWAP_EXACT_IN, v3Params, false, options.urVersion)
     } else if (routePool instanceof Pair) {
-      planner.addCommand(CommandType.V2_SWAP_EXACT_IN, [
+      const v2Params: any[] = [
         swapRecipient, // recipient
         i === 0 ? amountIn : CONTRACT_BALANCE, // amountIn
         !isLastSectionInRoute(i) ? 0 : amountOut, // amountOutMin
         subRoute.path.map((token) => token.wrapped.address), // path
         payerIsUser && i === 0,
-      ])
+      ]
+      if (useV2_1_1) v2Params.push(sectionHopSlippage ?? [])
+      planner.addCommand(CommandType.V2_SWAP_EXACT_IN, v2Params, false, options.urVersion)
     } else {
       throw new Error('Unexpected Pool Type')
     }
@@ -496,6 +678,7 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
       }
     }
 
+    hopOffset += section.length
     inputToken = nextInputToken
   }
 }

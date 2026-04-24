@@ -1,3 +1,4 @@
+import { mock, describe, it, expect } from "bun:test";
 import { parseTxtRecord, processTxtRecordData } from "./txtRecord";
 
 describe("txtRecord utils", () => {
@@ -175,13 +176,14 @@ describe("txtRecord utils", () => {
     });
 
     it("should call toString() on unknown types", () => {
+      const toStringMock = mock(() => "mocked-string");
       const mockData = {
-        toString: jest.fn().mockReturnValue("mocked-string"),
+        toString: toStringMock,
       };
 
       const result = processTxtRecordData(mockData);
       expect(result).toBe("mocked-string");
-      expect(mockData.toString).toHaveBeenCalledTimes(1);
+      expect(toStringMock).toHaveBeenCalledTimes(1);
     });
 
     it("should handle null and undefined by calling toString", () => {

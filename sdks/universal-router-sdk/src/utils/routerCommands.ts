@@ -1,4 +1,5 @@
 import { defaultAbiCoder } from 'ethers/lib/utils'
+import { UniversalRouterVersion, isAtLeastV2_1_1 } from './constants'
 import { AcrossV4DepositV3Params } from '../entities/actions/across'
 
 /**
@@ -14,6 +15,7 @@ export enum CommandType {
   SWEEP = 0x04,
   TRANSFER = 0x05,
   PAY_PORTION = 0x06,
+  PAY_PORTION_FULL_PRECISION = 0x07,
 
   V2_SWAP_EXACT_IN = 0x08,
   V2_SWAP_EXACT_OUT = 0x09,
@@ -203,6 +205,14 @@ export const COMMAND_DEFINITION: { [key in CommandType]: CommandDefinition } = {
       { name: 'bips', type: 'uint256' },
     ],
   },
+  [CommandType.PAY_PORTION_FULL_PRECISION]: {
+    parser: Parser.Abi,
+    params: [
+      { name: 'token', type: 'address' },
+      { name: 'recipient', type: 'address' },
+      { name: 'portion', type: 'uint256' },
+    ],
+  },
   [CommandType.BALANCE_CHECK_ERC20]: {
     parser: Parser.Abi,
     params: [
@@ -245,6 +255,54 @@ export const COMMAND_DEFINITION: { [key in CommandType]: CommandDefinition } = {
   },
 }
 
+// V2.1.1 ABI definitions for V2/V3 swap commands (extended with maxHopSlippage)
+export const V2V3_SWAP_COMMANDS_V2_1_1: { [key: number]: CommandDefinition } = {
+  [CommandType.V3_SWAP_EXACT_IN]: {
+    parser: Parser.Abi,
+    params: [
+      { name: 'recipient', type: 'address' },
+      { name: 'amountIn', type: 'uint256' },
+      { name: 'amountOutMin', type: 'uint256' },
+      { name: 'path', subparser: Subparser.V3PathExactIn, type: 'bytes' },
+      { name: 'payerIsUser', type: 'bool' },
+      { name: 'maxHopSlippage', type: 'uint256[]' },
+    ],
+  },
+  [CommandType.V3_SWAP_EXACT_OUT]: {
+    parser: Parser.Abi,
+    params: [
+      { name: 'recipient', type: 'address' },
+      { name: 'amountOut', type: 'uint256' },
+      { name: 'amountInMax', type: 'uint256' },
+      { name: 'path', subparser: Subparser.V3PathExactOut, type: 'bytes' },
+      { name: 'payerIsUser', type: 'bool' },
+      { name: 'maxHopSlippage', type: 'uint256[]' },
+    ],
+  },
+  [CommandType.V2_SWAP_EXACT_IN]: {
+    parser: Parser.Abi,
+    params: [
+      { name: 'recipient', type: 'address' },
+      { name: 'amountIn', type: 'uint256' },
+      { name: 'amountOutMin', type: 'uint256' },
+      { name: 'path', type: 'address[]' },
+      { name: 'payerIsUser', type: 'bool' },
+      { name: 'maxHopSlippage', type: 'uint256[]' },
+    ],
+  },
+  [CommandType.V2_SWAP_EXACT_OUT]: {
+    parser: Parser.Abi,
+    params: [
+      { name: 'recipient', type: 'address' },
+      { name: 'amountOut', type: 'uint256' },
+      { name: 'amountInMax', type: 'uint256' },
+      { name: 'path', type: 'address[]' },
+      { name: 'payerIsUser', type: 'bool' },
+      { name: 'maxHopSlippage', type: 'uint256[]' },
+    ],
+  },
+}
+
 export class RoutePlanner {
   commands: string
   inputs: string[]
@@ -259,8 +317,13 @@ export class RoutePlanner {
     return this
   }
 
-  addCommand(type: CommandType, parameters: any[], allowRevert = false): RoutePlanner {
-    let command = createCommand(type, parameters)
+  addCommand(
+    type: CommandType,
+    parameters: any[],
+    allowRevert = false,
+    urVersion?: UniversalRouterVersion
+  ): RoutePlanner {
+    let command = createCommand(type, parameters, urVersion)
     this.inputs.push(command.encodedInput)
     if (allowRevert) {
       if (!REVERTIBLE_COMMANDS.has(command.type)) {
@@ -303,8 +366,11 @@ export type RouterCommand = {
   encodedInput: string
 }
 
-export function createCommand(type: CommandType, parameters: any[]): RouterCommand {
-  const commandDef = COMMAND_DEFINITION[type]
+export function createCommand(type: CommandType, parameters: any[], urVersion?: UniversalRouterVersion): RouterCommand {
+  const commandDef =
+    isAtLeastV2_1_1(urVersion) && type in V2V3_SWAP_COMMANDS_V2_1_1
+      ? V2V3_SWAP_COMMANDS_V2_1_1[type]
+      : COMMAND_DEFINITION[type]
   switch (commandDef.parser) {
     case Parser.Abi:
       const encodedInput = defaultAbiCoder.encode(
@@ -316,7 +382,7 @@ export function createCommand(type: CommandType, parameters: any[]): RouterComma
       // v4 swap data comes pre-encoded at index 0
       return { type, encodedInput: parameters[0] }
     case Parser.V3Actions:
-      // v4 swap data comes pre-encoded at index 0
+      // v3 swap data comes pre-encoded at index 0
       return { type, encodedInput: parameters[0] }
   }
 }

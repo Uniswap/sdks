@@ -1,11 +1,15 @@
 # universal-router-sdk
+
 This SDK facilitates interactions with the contracts in [Universal Router](https://github.com/Uniswap/universal-router)
 
 ## Usage
+
 Install latest version of universal-router-sdk. Then import the corresponding Trade class and Data object for each protocol you'd like to interact with.
 
 ### Trading on Uniswap
+
 warning: `swapERC20CallParameters()` to be deprecated in favor of `swapCallParameters()`
+
 ```typescript
 import { TradeType } from '@uniswap/sdk-core'
 import { Trade as V2TradeSDK } from '@uniswap/v2-sdk'
@@ -19,82 +23,103 @@ const { calldata, value } = SwapRouter.swapCallParameters(routerTrade, options)
 ```
 
 ## Running this package
+
 Make sure you are running `node v18`
 Install dependencies and run typescript unit tests
+
 ```bash
 yarn install
 yarn test:hardhat
 ```
 
 Run forge integration tests
+
 ```bash
 forge install
 yarn test:forge
 ```
 
-## Per-Hop Slippage Protection (V4 Routes)
+## Per-Hop Slippage Protection
 
-Universal Router v2.1 adds granular slippage protection for multi-hop V4 swaps. Additionally to checking slippage at the end of a route, you can now verify that each individual hop doesn't exceed a maximum price limit.
+Universal Router v2.1.1 adds granular slippage protection for multi-hop swaps across all protocol versions (V2, V3, V4, and mixed routes). In addition to the overall trade-level slippage check, the contract can verify that each individual pool hop doesn't exceed a maximum price limit.
 
 ### How It Works
 
-For V4 multi-hop swaps, you can provide a `maxHopSlippage` array in your swap options:
+Per-hop slippage bounds live on each swap's route data (via `RouterTrade`). The `maxHopSlippage` array on each route maps 1:1 to the route's pools: `maxHopSlippage[i]` constrains `route.pools[i]`.
+
+To enable the V2.1.1 ABI encoding (which includes the `maxHopSlippage` parameter), set `urVersion: URVersion.V2_1_1` on your swap options.
 
 ```typescript
 import { SwapRouter } from '@uniswap/universal-router-sdk'
-import { BigNumber } from 'ethers'
-import { Percent } from '@uniswap/sdk-core'
+import { Trade as RouterTrade } from '@uniswap/router-sdk'
+import { URVersion } from '@uniswap/v4-sdk'
+import { Percent, TradeType } from '@uniswap/sdk-core'
 
-const swapOptions = {
+// 1. Build a trade with per-hop slippage on each route
+const trade = new RouterTrade({
+  v3Routes: [
+    {
+      routev3: myV3Route, // e.g. USDC → DAI → WETH
+      inputAmount,
+      outputAmount,
+      maxHopSlippage: [
+        // one entry per pool in the route
+        BigInt('1010000000000000000'), // Hop 0: USDC→DAI, max price 1.01
+        BigInt('2500000000000000000000'), // Hop 1: DAI→WETH, max price 2500
+      ],
+    },
+  ],
+  tradeType: TradeType.EXACT_INPUT,
+})
+
+// 2. Encode with V2.1.1 ABI
+const { calldata, value } = SwapRouter.swapCallParameters(trade, {
   slippageTolerance: new Percent(50, 10000), // 0.5% overall slippage
   recipient: '0x...',
-  deadline: Math.floor(Date.now() / 1000) + 60 * 20,
-  // Optional: per-hop slippage protection for V4 routes
-  maxHopSlippage: [
-    BigNumber.from('1010000000000000000'),    // Hop 0: max price 1.01 (1% slippage)
-    BigNumber.from('2500000000000000000000'),  // Hop 1: max price 2500
-  ]
-}
-
-const { calldata, value } = SwapRouter.swapCallParameters(trade, swapOptions)
+  urVersion: URVersion.V2_1_1, // required for per-hop encoding
+})
 ```
 
 ### Price Calculation
 
-The slippage is expressed as a **price** with 18 decimals of precision:
-- **For Exact Input**: `price = amountIn * 1e18 / amountOut`
-- **For Exact Output**: `price = amountIn * 1e18 / amountOut`
+Slippage is expressed as a **price** with 18 decimals of precision:
 
-If the calculated price exceeds `maxHopSlippage[i]`, the transaction will revert with:
-- `V4TooLittleReceivedPerHop` for exact input swaps
-- `V4TooMuchRequestedPerHop` for exact output swaps
+- `price = amountIn * 1e18 / amountOut`
 
-### Example: USDC → DAI → WETH
+If the calculated price for hop `i` exceeds `maxHopSlippage[i]`, the transaction reverts.
+
+### Mixed Routes
+
+For mixed routes that span multiple protocol versions (e.g. V3 pool → V4 pool → V2 pool), the SDK automatically slices the flat `maxHopSlippage` array by section. Each protocol section receives the corresponding slice of hop bounds:
 
 ```typescript
-// 2-hop swap: USDC → DAI → WETH
-const swapOptions = {
-  slippageTolerance: new Percent(100, 10000), // 1% overall
-  recipient: userAddress,
-  deadline,
-  maxHopSlippage: [
-    BigNumber.from('1010000000000000000'),     // Hop 0: USDC→DAI, max 1% slippage
-    BigNumber.from('2500000000000000000000'),  // Hop 1: DAI→WETH, max price 2500 DAI/WETH
-  ]
-}
+const trade = new RouterTrade({
+  mixedRoutes: [
+    {
+      mixedRoute: myMixedRoute, // V3 pool, V3 pool, V2 pool
+      inputAmount,
+      outputAmount,
+      maxHopSlippage: [
+        BigInt('1010000000000000000'), // Hop 0 (V3 section)
+        BigInt('2500000000000000000000'), // Hop 1 (V3 section)
+        BigInt('1005000000000000000'), // Hop 2 (V2 section)
+      ],
+    },
+  ],
+  tradeType: TradeType.EXACT_INPUT,
+})
 ```
 
 ### Benefits
 
-1. **MEV Protection**: Prevents sandwich attacks on individual hops
-2. **Route Quality**: Ensures each segment of a multi-hop route meets expectations
-3. **Granular Control**: Different slippage tolerance for different pairs in a route
+1. **MEV Protection**: Prevents sandwich attacks on individual pool hops
+2. **Route Quality**: Ensures each segment of a multi-hop route meets price expectations
+3. **Granular Control**: Different slippage tolerances for different pairs (e.g. tighter bounds on stablecoin hops)
 
 ### Backward Compatibility
 
-- If `maxHopSlippage` is not provided or is an empty array, only overall slippage is checked (backward compatible)
-- The feature only applies to V4 routes; V2 and V3 routes ignore this parameter
-- Mixed routes with V4 sections will apply per-hop checks only to the V4 portions
+- If `maxHopSlippage` is omitted or is an empty array, only the overall trade-level slippage is checked
+- If `urVersion` is not set (defaults to V2.0), commands use the standard ABI without `maxHopSlippage`
 
 ## Signed Routes (Universal Router v2.1)
 
@@ -124,9 +149,9 @@ const { calldata, value } = SwapRouter.swapCallParameters(trade, {
 const payload = SwapRouter.getExecuteSignedPayload(
   calldata,
   {
-    intent: '0x' + '0'.repeat(64),  // Application-specific intent
-    data: '0x' + '0'.repeat(64),    // Application-specific data
-    sender: wallet.address,          // Or address(0) to skip sender verification
+    intent: '0x' + '0'.repeat(64), // Application-specific intent
+    data: '0x' + '0'.repeat(64), // Application-specific data
+    sender: wallet.address, // Or address(0) to skip sender verification
   },
   deadline,
   chainId,
@@ -144,7 +169,7 @@ const { calldata: signedCalldata, value: signedValue } = SwapRouter.encodeExecut
     intent: payload.value.intent,
     data: payload.value.data,
     sender: payload.value.sender,
-    nonce: payload.value.nonce,  // Must match what was signed
+    nonce: payload.value.nonce, // Must match what was signed
   },
   deadline,
   BigNumber.from(value)
@@ -173,8 +198,8 @@ const payload = SwapRouter.getExecuteSignedPayload(
   {
     intent: '0x...',
     data: '0x...',
-    sender: '0x0000000000000000000000000000000000000000',  // Skip sender verification too
-    nonce: NONCE_SKIP_CHECK,  // Allow signature reuse
+    sender: '0x0000000000000000000000000000000000000000', // Skip sender verification too
+    nonce: NONCE_SKIP_CHECK, // Allow signature reuse
   },
   deadline,
   chainId,
@@ -200,28 +225,24 @@ import { SwapRouter } from '@uniswap/universal-router-sdk'
 import { BigNumber } from 'ethers'
 
 // 1. Prepare your swap (e.g., USDC → WETH on mainnet)
-const { calldata, value } = SwapRouter.swapCallParameters(
-  trade,
-  swapOptions,
-  [
-    {
-      // Bridge configuration
-      depositor: userAddress,
-      recipient: userAddress,  // Recipient on destination chain
-      inputToken: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',  // WETH mainnet
-      outputToken: '0x4200000000000000000000000000000000000006',   // WETH optimism
-      inputAmount: BigNumber.from('1000000000000000000'),  // 1 WETH
-      outputAmount: BigNumber.from('990000000000000000'),  // 0.99 WETH (with fees)
-      destinationChainId: 10,  // Optimism
-      exclusiveRelayer: '0x0000000000000000000000000000000000000000',
-      quoteTimestamp: Math.floor(Date.now() / 1000),
-      fillDeadline: Math.floor(Date.now() / 1000) + 3600,
-      exclusivityDeadline: 0,
-      message: '0x',
-      useNative: false,
-    }
-  ]
-)
+const { calldata, value } = SwapRouter.swapCallParameters(trade, swapOptions, [
+  {
+    // Bridge configuration
+    depositor: userAddress,
+    recipient: userAddress, // Recipient on destination chain
+    inputToken: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', // WETH mainnet
+    outputToken: '0x4200000000000000000000000000000000000006', // WETH optimism
+    inputAmount: BigNumber.from('1000000000000000000'), // 1 WETH
+    outputAmount: BigNumber.from('990000000000000000'), // 0.99 WETH (with fees)
+    destinationChainId: 10, // Optimism
+    exclusiveRelayer: '0x0000000000000000000000000000000000000000',
+    quoteTimestamp: Math.floor(Date.now() / 1000),
+    fillDeadline: Math.floor(Date.now() / 1000) + 3600,
+    exclusivityDeadline: 0,
+    message: '0x',
+    useNative: false,
+  },
+])
 ```
 
 ### Swap + Bridge Example
@@ -230,24 +251,24 @@ const { calldata, value } = SwapRouter.swapCallParameters(
 // Swap USDC to WETH, then bridge WETH to Optimism
 const bridgeParams = {
   depositor: userAddress,
-  recipient: userAddress,  // Can be different address on destination
+  recipient: userAddress, // Can be different address on destination
   inputToken: WETH_MAINNET,
   outputToken: WETH_OPTIMISM,
-  inputAmount: CONTRACT_BALANCE,  // Use entire swap output
+  inputAmount: CONTRACT_BALANCE, // Use entire swap output
   outputAmount: expectedOutputAmount,
   destinationChainId: 10,
   exclusiveRelayer: '0x0000000000000000000000000000000000000000',
   quoteTimestamp: Math.floor(Date.now() / 1000),
   fillDeadline: Math.floor(Date.now() / 1000) + 3600,
   exclusivityDeadline: 0,
-  message: '0x',  // Optional message to execute on destination
-  useNative: false,  // Set to true to bridge native ETH
+  message: '0x', // Optional message to execute on destination
+  useNative: false, // Set to true to bridge native ETH
 }
 
 const { calldata, value } = SwapRouter.swapCallParameters(
   trade,
   swapOptions,
-  [bridgeParams]  // Array of bridge operations
+  [bridgeParams] // Array of bridge operations
 )
 ```
 
@@ -260,7 +281,7 @@ import { CONTRACT_BALANCE } from '@uniswap/universal-router-sdk'
 
 const bridgeParams = {
   // ... other params
-  inputAmount: CONTRACT_BALANCE,  // Bridge entire balance after swap
+  inputAmount: CONTRACT_BALANCE, // Bridge entire balance after swap
   // ... other params
 }
 ```
@@ -270,28 +291,24 @@ const bridgeParams = {
 You can perform multiple bridge operations after a swap:
 
 ```typescript
-const { calldata, value } = SwapRouter.swapCallParameters(
-  trade,
-  swapOptions,
-  [
-    {
-      // Bridge 50% to Optimism
-      inputToken: WETH_MAINNET,
-      outputToken: WETH_OPTIMISM,
-      inputAmount: BigNumber.from('500000000000000000'),
-      destinationChainId: 10,
-      // ... other params
-    },
-    {
-      // Bridge remaining USDC to Arbitrum
-      inputToken: USDC_MAINNET,
-      outputToken: USDC_ARBITRUM,
-      inputAmount: CONTRACT_BALANCE,
-      destinationChainId: 42161,
-      // ... other params
-    }
-  ]
-)
+const { calldata, value } = SwapRouter.swapCallParameters(trade, swapOptions, [
+  {
+    // Bridge 50% to Optimism
+    inputToken: WETH_MAINNET,
+    outputToken: WETH_OPTIMISM,
+    inputAmount: BigNumber.from('500000000000000000'),
+    destinationChainId: 10,
+    // ... other params
+  },
+  {
+    // Bridge remaining USDC to Arbitrum
+    inputToken: USDC_MAINNET,
+    outputToken: USDC_ARBITRUM,
+    inputAmount: CONTRACT_BALANCE,
+    destinationChainId: 42161,
+    // ... other params
+  },
+])
 ```
 
 ### Native ETH Bridging
@@ -300,9 +317,9 @@ To bridge native ETH instead of WETH:
 
 ```typescript
 const bridgeParams = {
-  inputToken: WETH_ADDRESS,  // Must be WETH address
+  inputToken: WETH_ADDRESS, // Must be WETH address
   outputToken: WETH_ON_DESTINATION,
-  useNative: true,  // Bridge as native ETH
+  useNative: true, // Bridge as native ETH
   // ... other params
 }
 ```

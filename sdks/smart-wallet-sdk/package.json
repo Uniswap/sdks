@@ -1,5 +1,6 @@
 {
   "name": "@uniswap/smart-wallet-sdk",
+  "version": "2.6.0",
   "description": "⚒️ An SDK for building applications with smart wallets on Uniswap",
   "repository": "https://github.com/Uniswap/sdks.git",
   "keywords": [
@@ -15,17 +16,17 @@
     "dist"
   ],
   "engines": {
-    "node": ">=14"
+    "node": ">=18"
   },
   "scripts": {
     "clean": "rm -rf dist src/contracts",
-    "build": "yarn clean && yarn build:cjs && yarn build:esm && yarn build:types",
+    "build": "bun run clean && bun run build:cjs && bun run build:esm && bun run build:types",
     "build:cjs": "tsc -p tsconfig.cjs.json",
     "build:esm": "tsc -p tsconfig.esm.json",
     "build:types": "tsc -p tsconfig.types.json",
-    "release": "semantic-release",
+    "release": "changeset publish",
     "lint": "eslint src --ext .ts",
-    "test": "jest"
+    "test": "bun test"
   },
   "exports": {
     ".": {
@@ -36,11 +37,10 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@uniswap/sdk-core": "^7.6.0",
+    "@uniswap/sdk-core": "workspace:*",
     "viem": "^2.23.5"
   },
   "devDependencies": {
-    "@types/jest": "^24.0.25",
     "@types/node": "^18.7.16",
     "@typescript-eslint/eslint-plugin": "^8.38.0",
     "@typescript-eslint/parser": "^8.38.0",
@@ -49,9 +49,7 @@
     "eslint-plugin-eslint-comments": "^3.2.0",
     "eslint-plugin-functional": "^3.0.2",
     "eslint-plugin-import": "^2.22.0",
-    "jest": "25.5.0",
     "prettier": "^2.4.1",
-    "ts-jest": "^25.5.1",
     "ts-node": "^10.9.1",
     "tslib": "^2.3.0",
     "typescript": "npm:typescript@^5.6.2"
@@ -64,34 +62,5 @@
   "publishConfig": {
     "access": "public",
     "provenance": true
-  },
-  "release": {
-    "extends": "semantic-release-monorepo",
-    "branches": [
-      {
-        "name": "main",
-        "prerelease": false
-      }
-    ],
-    "plugins": [
-      [
-        "@semantic-release/commit-analyzer",
-        {
-          "preset": "angular",
-          "releaseRules": "../../publishing/release-rules.cjs"
-        }
-      ],
-      "@semantic-release/release-notes-generator",
-      "@semantic-release/npm",
-      "@semantic-release/github",
-      [
-        "@semantic-release/exec",
-        {
-          "successCmd": "git restore yarn.lock && yarn",
-          "failCmd": "git restore yarn.lock && yarn",
-          "execCwd": "../.."
-        }
-      ]
-    ]
   }
 }

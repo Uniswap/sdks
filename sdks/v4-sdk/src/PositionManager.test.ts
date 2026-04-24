@@ -207,8 +207,9 @@ describe('PositionManager', () => {
         toHex(amount1Max),
         EMPTY_BYTES,
       ])
-      // Expect there to be a settle pair call afterwards
-      planner.addAction(Actions.SETTLE_PAIR, [toAddress(pool_0_1.currency0), toAddress(pool_0_1.currency1)])
+      // Expect CLOSE_CURRENCY for each token (handles both settle and take directions)
+      planner.addAction(Actions.CLOSE_CURRENCY, [toAddress(pool_0_1.currency0)])
+      planner.addAction(Actions.CLOSE_CURRENCY, [toAddress(pool_0_1.currency1)])
       expect(calldata).toEqual(V4PositionManager.encodeModifyLiquidities(planner.finalize(), deadline))
       expect(value).toEqual('0x00')
     })
