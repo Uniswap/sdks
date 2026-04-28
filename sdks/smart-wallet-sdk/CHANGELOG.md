@@ -1,5 +1,11 @@
 # @uniswap/smart-wallet-sdk
 
+## 2.6.0
+
+### Minor Changes
+
+- Add `encodeUserOp` method for encoding UserOperation calldata compatible with EntryPoint v0.7 and v0.8.
+
 ## 2.5.2
 
 ### Patch Changes
