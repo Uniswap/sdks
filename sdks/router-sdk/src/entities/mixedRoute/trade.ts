@@ -465,7 +465,7 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
       // pool irrelevant
       if (!pool.token0.equals(amountInAdjusted.currency) && !pool.token1.equals(amountInAdjusted.currency)) continue
       if (pool instanceof Pair) {
-        if ((pool as Pair).reserve0.equalTo(ZERO) || (pool as Pair).reserve1.equalTo(ZERO)) continue
+        if ((pool as Pair).reserve0.equalTo(0) || (pool as Pair).reserve1.equalTo(0)) continue
       }
 
       let amountOut: CurrencyAmount<Currency>
