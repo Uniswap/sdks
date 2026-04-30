@@ -1,5 +1,5 @@
 import invariant from 'tiny-invariant'
-import { keccak256 } from '@ethersproject/solidity'
+import { solidityPackedKeccak256, AbiCoder, isAddress } from 'ethers'
 import { BigintIsh, Currency, CurrencyAmount, Price } from '@uniswap/sdk-core'
 import {
   v3Swap,
@@ -10,7 +10,7 @@ import {
   TickListDataProvider,
   TickMath,
 } from '@uniswap/v3-sdk'
-import { defaultAbiCoder, isAddress } from 'ethers/lib/utils'
+
 import { sortsBefore } from '../utils/sortsBefore'
 import { Hook } from '../utils/hook'
 import { ADDRESS_ZERO, NEGATIVE_ONE, Q192 } from '../internalConstants'
@@ -78,10 +78,10 @@ export class Pool {
     const [currency0, currency1] = sortsBefore(currencyA, currencyB) ? [currencyA, currencyB] : [currencyB, currencyA]
     const currency0Addr = currency0.isNative ? ADDRESS_ZERO : currency0.wrapped.address
     const currency1Addr = currency1.isNative ? ADDRESS_ZERO : currency1.wrapped.address
-    return keccak256(
+    return solidityPackedKeccak256(
       ['bytes'],
       [
-        defaultAbiCoder.encode(
+        AbiCoder.defaultAbiCoder().encode(
           ['address', 'address', 'uint24', 'int24', 'address'],
           [currency0Addr, currency1Addr, fee, tickSpacing, hooks]
         ),

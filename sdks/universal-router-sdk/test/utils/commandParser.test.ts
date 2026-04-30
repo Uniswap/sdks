@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { Token, WETH9 } from '@uniswap/sdk-core'
 import { encodeSqrtRatioX96, nearestUsableTick, TickMath } from '@uniswap/v3-sdk'
-import { ethers, BigNumber } from 'ethers'
+import { parseEther, ZeroAddress } from 'ethers'
 import { CommandParser, UniversalRouterCall } from '../../src/utils/commandParser'
 import { RoutePlanner, CommandType } from '../../src/utils/routerCommands'
 import { SwapRouter } from '../../src/swapRouter'
@@ -9,17 +9,18 @@ import { V4Planner, Actions, Pool } from '@uniswap/v4-sdk'
 
 const addressOne = '0x0000000000000000000000000000000000000001'
 const addressTwo = '0x0000000000000000000000000000000000000002'
-const amount = ethers.utils.parseEther('1')
+const amount = parseEther('1')
+const amountStr = amount.toString()
 const TICKLIST = [
   {
     index: nearestUsableTick(TickMath.MIN_TICK, 10),
-    liquidityNet: amount,
-    liquidityGross: amount,
+    liquidityNet: amountStr,
+    liquidityGross: amountStr,
   },
   {
     index: nearestUsableTick(TickMath.MAX_TICK, 10),
-    liquidityNet: amount.mul(-1),
-    liquidityGross: amount,
+    liquidityNet: `-${amountStr}`,
+    liquidityGross: amountStr,
   },
 ]
 const USDC = new Token(1, '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', 6, 'USDC', 'USD Coin')
@@ -28,7 +29,7 @@ const USDC_WETH = new Pool(
   WETH9[1],
   3000,
   10,
-  ethers.constants.AddressZero,
+  ZeroAddress,
   encodeSqrtRatioX96(1, 1),
   0,
   0,
@@ -362,15 +363,15 @@ describe('Command Parser', () => {
                   },
                   {
                     name: 'tickLower',
-                    value: -60,
+                    value: BigInt(-60),
                   },
                   {
                     name: 'tickUpper',
-                    value: 60,
+                    value: BigInt(60),
                   },
                   {
                     name: 'liquidity',
-                    value: BigNumber.from(5000000),
+                    value: BigInt(5000000),
                   },
                   {
                     name: 'amount0Max',
@@ -397,10 +398,10 @@ describe('Command Parser', () => {
     },
   ]
 
-  // Helper to convert BigNumbers to strings for comparison
+  // Helper to convert bigints to strings for comparison
   function normalizeBigNumbers(obj: any): any {
     if (obj == null) return obj
-    if (BigNumber.isBigNumber(obj)) return obj.toString()
+    if (typeof obj === 'bigint') return obj.toString()
     if (Array.isArray(obj)) return obj.map(normalizeBigNumbers)
     if (typeof obj === 'object') {
       const normalized: any = {}

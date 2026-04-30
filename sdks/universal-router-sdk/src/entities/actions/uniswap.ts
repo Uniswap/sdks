@@ -38,7 +38,7 @@ import {
 } from '../../utils/constants'
 import { getCurrencyAddress } from '../../utils/getCurrencyAddress'
 import { encodeFeeBips, encodeFee1e18 } from '../../utils/numbers'
-import { BigNumber, BigNumberish } from 'ethers'
+import { BigNumberish } from 'ethers'
 import { TPool } from '@uniswap/router-sdk'
 
 export type FlatFeeOptions = {
@@ -273,7 +273,7 @@ export class UniswapTrade implements Command {
       }
     }
 
-    let minimumAmountOut: BigNumber = BigNumber.from(
+    let minimumAmountOut: bigint = BigInt(
       this.trade.minimumAmountOut(this.options.slippageTolerance).quotient.toString()
     )
     // The router custodies for 3 reasons: to unwrap, to take a fee, and/or to do a slippage check
@@ -283,7 +283,7 @@ export class UniswapTrade implements Command {
         getPathCurrency(this.trade.outputAmount.currency, pools[pools.length - 1])
       )
 
-      let feeDeduction = BigNumber.from(0)
+      let feeDeduction = 0n
 
       // If there is a fee, that percentage is sent to the fee recipient
       // In the case where ETH is the output currency, the fee is taken in WETH (for gas reasons)
@@ -305,11 +305,11 @@ export class UniswapTrade implements Command {
             false,
             this.options.urVersion
           )
-          feeDeduction = minimumAmountOut.mul(fee1e18).div(BigNumber.from(10).pow(18))
+          feeDeduction = minimumAmountOut * BigInt(fee1e18) / (10n ** 18n)
         } else {
           const feeBips = encodeFeeBips(this.options.fee.fee)
           planner.addCommand(CommandType.PAY_PORTION, [pathOutputCurrencyAddress, this.options.fee.recipient, feeBips])
-          feeDeduction = minimumAmountOut.mul(feeBips).div(10000)
+          feeDeduction = minimumAmountOut * BigInt(feeBips) / 10000n
         }
       }
 
@@ -317,16 +317,16 @@ export class UniswapTrade implements Command {
       // In the case where ETH is the output currency, the fee is taken in WETH (for gas reasons)
       if (!!this.options.flatFee) {
         const feeAmount = this.options.flatFee.amount
-        if (minimumAmountOut.lt(feeAmount)) throw new Error('Flat fee amount greater than minimumAmountOut')
+        if (minimumAmountOut < BigInt(feeAmount)) throw new Error('Flat fee amount greater than minimumAmountOut')
 
         planner.addCommand(CommandType.TRANSFER, [pathOutputCurrencyAddress, this.options.flatFee.recipient, feeAmount])
-        feeDeduction = BigNumber.from(feeAmount)
+        feeDeduction = BigInt(feeAmount)
       }
 
       // If the trade is exact output, and a fee was taken, we must adjust the amount out to be the amount after the fee
       // Otherwise we continue as expected with the trade's normal expected output
       if (this.trade.tradeType === TradeType.EXACT_OUTPUT) {
-        minimumAmountOut = minimumAmountOut.sub(feeDeduction)
+        minimumAmountOut = minimumAmountOut - feeDeduction
       }
 
       // The remaining tokens that need to be sent to the user after the fee is taken will be caught
@@ -491,7 +491,7 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
   const slippageToleranceOnSwap =
     routerMustCustody && tradeType == TradeType.EXACT_INPUT ? undefined : options.slippageTolerance
 
-  const perHopSlippage = maxHopSlippage?.map((s) => BigNumber.from(s)) ?? []
+    const perHopSlippage = maxHopSlippage ?? []
 
   const v4Planner = new V4Planner()
   v4Planner.addTrade(trade, slippageToleranceOnSwap, perHopSlippage, toURVersion(options.urVersion))
@@ -605,9 +605,9 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
     if (routePool instanceof V4Pool) {
       const v4Planner = new V4Planner()
       const v4SubRoute = new V4Route(section as V4Pool[], subRoute.input, subRoute.output)
-      const v4SectionSlippage: BigNumber[] = sectionHopSlippage?.map((s) => BigNumber.from(s)) ?? []
+      const v4SectionSlippage: bigint[] = sectionHopSlippage ?? []
 
-      v4Planner.addSettle(inputToken, payerIsUser && i === 0, (i == 0 ? amountIn : CONTRACT_BALANCE) as BigNumber)
+      v4Planner.addSettle(inputToken, payerIsUser && i === 0, (i == 0 ? amountIn : CONTRACT_BALANCE) as bigint)
       v4Planner.addAction(
         Actions.SWAP_EXACT_IN,
         [

@@ -1,5 +1,5 @@
-import { BigNumber, BigNumberish } from 'ethers'
+import { BigNumberish } from 'ethers'
 
 export function hexToDecimalString(hex: BigNumberish) {
-  return BigNumber.from(hex).toString()
+  return BigInt(hex).toString()
 }

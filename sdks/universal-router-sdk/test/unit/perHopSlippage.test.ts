@@ -1,6 +1,5 @@
 import { expect } from 'chai'
-import { BigNumber, utils } from 'ethers'
-import { defaultAbiCoder } from 'ethers/lib/utils'
+import { parseEther, AbiCoder } from 'ethers'
 import { RoutePlanner, CommandType, createCommand } from '../../src/utils/routerCommands'
 import { URVersion, Route as V4Route, Trade as V4Trade, V4BaseActionsParser } from '@uniswap/v4-sdk'
 import { UniversalRouterVersion } from '../../src/utils/constants'
@@ -61,11 +60,11 @@ describe('Per-Hop Slippage', () => {
       const v2Idx = commandTypes.indexOf(CommandType.V2_SWAP_EXACT_IN)
       expect(v2Idx).to.not.equal(-1)
 
-      const decoded = defaultAbiCoder.decode(
+      const decoded = AbiCoder.defaultAbiCoder().decode(
         ['address', 'uint256', 'uint256', 'address[]', 'bool', 'uint256[]'],
         inputs[v2Idx]
       )
-      expect(decoded[5].map((v: BigNumber) => v.toString())).to.deep.equal(['500', '600'])
+      expect(decoded[5].map((v: any) => v.toString())).to.deep.equal(['500', '600'])
     })
 
     it('exact output: encodes maxHopSlippage array', () => {
@@ -89,11 +88,11 @@ describe('Per-Hop Slippage', () => {
       const v2Idx = commandTypes.indexOf(CommandType.V2_SWAP_EXACT_OUT)
       expect(v2Idx).to.not.equal(-1)
 
-      const decoded = defaultAbiCoder.decode(
+      const decoded = AbiCoder.defaultAbiCoder().decode(
         ['address', 'uint256', 'uint256', 'address[]', 'bool', 'uint256[]'],
         inputs[v2Idx]
       )
-      expect(decoded[5].map((v: BigNumber) => v.toString())).to.deep.equal(['250'])
+      expect(decoded[5].map((v: any) => v.toString())).to.deep.equal(['250'])
     })
   })
 
@@ -123,11 +122,11 @@ describe('Per-Hop Slippage', () => {
       const v3Idx = commandTypes.indexOf(CommandType.V3_SWAP_EXACT_IN)
       expect(v3Idx).to.not.equal(-1)
 
-      const decoded = defaultAbiCoder.decode(
+      const decoded = AbiCoder.defaultAbiCoder().decode(
         ['address', 'uint256', 'uint256', 'bytes', 'bool', 'uint256[]'],
         inputs[v3Idx]
       )
-      expect(decoded[5].map((v: BigNumber) => v.toString())).to.deep.equal(['300', '400'])
+      expect(decoded[5].map((v: any) => v.toString())).to.deep.equal(['300', '400'])
     })
 
     it('exact output: encodes maxHopSlippage array', () => {
@@ -151,11 +150,11 @@ describe('Per-Hop Slippage', () => {
       const v3Idx = commandTypes.indexOf(CommandType.V3_SWAP_EXACT_OUT)
       expect(v3Idx).to.not.equal(-1)
 
-      const decoded = defaultAbiCoder.decode(
+      const decoded = AbiCoder.defaultAbiCoder().decode(
         ['address', 'uint256', 'uint256', 'bytes', 'bool', 'uint256[]'],
         inputs[v3Idx]
       )
-      expect(decoded[5].map((v: BigNumber) => v.toString())).to.deep.equal(['750'])
+      expect(decoded[5].map((v: any) => v.toString())).to.deep.equal(['750'])
     })
   })
 
@@ -263,17 +262,17 @@ describe('Per-Hop Slippage', () => {
       expect(v3Idx).to.not.equal(-1, 'expected a V3_SWAP_EXACT_IN command')
       expect(v2Idx).to.not.equal(-1, 'expected a V2_SWAP_EXACT_IN command')
 
-      const v3Decoded = defaultAbiCoder.decode(
+      const v3Decoded = AbiCoder.defaultAbiCoder().decode(
         ['address', 'uint256', 'uint256', 'bytes', 'bool', 'uint256[]'],
         inputs[v3Idx]
       )
-      expect(v3Decoded[5].map((v: BigNumber) => v.toString())).to.deep.equal(['100'])
+      expect(v3Decoded[5].map((v: any) => v.toString())).to.deep.equal(['100'])
 
-      const v2Decoded = defaultAbiCoder.decode(
+      const v2Decoded = AbiCoder.defaultAbiCoder().decode(
         ['address', 'uint256', 'uint256', 'address[]', 'bool', 'uint256[]'],
         inputs[v2Idx]
       )
-      expect(v2Decoded[5].map((v: BigNumber) => v.toString())).to.deep.equal(['200'])
+      expect(v2Decoded[5].map((v: any) => v.toString())).to.deep.equal(['200'])
     })
 
     it('undefined maxHopSlippage encodes empty arrays per section', () => {
@@ -297,13 +296,13 @@ describe('Per-Hop Slippage', () => {
       const v3Idx = commandTypes.indexOf(CommandType.V3_SWAP_EXACT_IN)
       const v2Idx = commandTypes.indexOf(CommandType.V2_SWAP_EXACT_IN)
 
-      const v3Decoded = defaultAbiCoder.decode(
+      const v3Decoded = AbiCoder.defaultAbiCoder().decode(
         ['address', 'uint256', 'uint256', 'bytes', 'bool', 'uint256[]'],
         inputs[v3Idx]
       )
       expect(v3Decoded[5]).to.deep.equal([])
 
-      const v2Decoded = defaultAbiCoder.decode(
+      const v2Decoded = AbiCoder.defaultAbiCoder().decode(
         ['address', 'uint256', 'uint256', 'address[]', 'bool', 'uint256[]'],
         inputs[v2Idx]
       )
@@ -337,7 +336,7 @@ describe('Per-Hop Slippage', () => {
       const v2Idx = commandTypes.indexOf(CommandType.V2_SWAP_EXACT_IN)
       expect(v2Idx).to.not.equal(-1)
 
-      const decoded = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'address[]', 'bool'], inputs[v2Idx])
+      const decoded = AbiCoder.defaultAbiCoder().decode(['address', 'uint256', 'uint256', 'address[]', 'bool'], inputs[v2Idx])
       expect(decoded.length).to.equal(5)
     })
 
@@ -362,7 +361,7 @@ describe('Per-Hop Slippage', () => {
       const v3Idx = commandTypes.indexOf(CommandType.V3_SWAP_EXACT_IN)
       expect(v3Idx).to.not.equal(-1)
 
-      const decoded = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], inputs[v3Idx])
+      const decoded = AbiCoder.defaultAbiCoder().decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], inputs[v3Idx])
       expect(decoded.length).to.equal(5)
     })
 
@@ -387,7 +386,7 @@ describe('Per-Hop Slippage', () => {
       const v3Idx = commandTypes.indexOf(CommandType.V3_SWAP_EXACT_OUT)
       expect(v3Idx).to.not.equal(-1)
 
-      const decoded = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], inputs[v3Idx])
+      const decoded = AbiCoder.defaultAbiCoder().decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], inputs[v3Idx])
       expect(decoded.length).to.equal(5)
     })
 
@@ -414,10 +413,10 @@ describe('Per-Hop Slippage', () => {
       expect(v3Idx).to.not.equal(-1)
       expect(v2Idx).to.not.equal(-1)
 
-      const v3Decoded = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], inputs[v3Idx])
+      const v3Decoded = AbiCoder.defaultAbiCoder().decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], inputs[v3Idx])
       expect(v3Decoded.length).to.equal(5)
 
-      const v2Decoded = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'address[]', 'bool'], inputs[v2Idx])
+      const v2Decoded = AbiCoder.defaultAbiCoder().decode(['address', 'uint256', 'uint256', 'address[]', 'bool'], inputs[v2Idx])
       expect(v2Decoded.length).to.equal(5)
     })
 
@@ -440,7 +439,7 @@ describe('Per-Hop Slippage', () => {
       const v2Idx = commandTypes.indexOf(CommandType.V2_SWAP_EXACT_IN)
       expect(v2Idx).to.not.equal(-1)
 
-      const decoded = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'address[]', 'bool'], inputs[v2Idx])
+      const decoded = AbiCoder.defaultAbiCoder().decode(['address', 'uint256', 'uint256', 'address[]', 'bool'], inputs[v2Idx])
       expect(decoded.length).to.equal(5)
     })
 
@@ -448,8 +447,8 @@ describe('Per-Hop Slippage', () => {
       const planner1 = new RoutePlanner()
       planner1.addCommand(CommandType.V2_SWAP_EXACT_IN, [
         RECIPIENT,
-        utils.parseEther('1'),
-        utils.parseEther('1'),
+        parseEther('1'),
+        parseEther('1'),
         [WETH.address, USDC.address],
         true,
       ])
@@ -457,7 +456,7 @@ describe('Per-Hop Slippage', () => {
       const planner2 = new RoutePlanner()
       planner2.addCommand(
         CommandType.V2_SWAP_EXACT_IN,
-        [RECIPIENT, utils.parseEther('1'), utils.parseEther('1'), [WETH.address, USDC.address], true],
+        [RECIPIENT, parseEther('1'), parseEther('1'), [WETH.address, USDC.address], true],
         false,
         UniversalRouterVersion.V2_0
       )
@@ -492,7 +491,7 @@ describe('Per-Hop Slippage', () => {
       const v2Idx = commandTypes.indexOf(CommandType.V2_SWAP_EXACT_IN)
       expect(v2Idx).to.not.equal(-1)
 
-      const decoded = defaultAbiCoder.decode(
+      const decoded = AbiCoder.defaultAbiCoder().decode(
         ['address', 'uint256', 'uint256', 'address[]', 'bool', 'uint256[]'],
         inputs[v2Idx]
       )
@@ -519,7 +518,7 @@ describe('Per-Hop Slippage', () => {
       const v3Idx = commandTypes.indexOf(CommandType.V3_SWAP_EXACT_IN)
       expect(v3Idx).to.not.equal(-1)
 
-      const decoded = defaultAbiCoder.decode(
+      const decoded = AbiCoder.defaultAbiCoder().decode(
         ['address', 'uint256', 'uint256', 'bytes', 'bool', 'uint256[]'],
         inputs[v3Idx]
       )
@@ -574,13 +573,13 @@ describe('Per-Hop Slippage', () => {
       const v3Idx = commandTypes.indexOf(CommandType.V3_SWAP_EXACT_IN)
       const v2Idx = commandTypes.indexOf(CommandType.V2_SWAP_EXACT_IN)
 
-      const v3Decoded = defaultAbiCoder.decode(
+      const v3Decoded = AbiCoder.defaultAbiCoder().decode(
         ['address', 'uint256', 'uint256', 'bytes', 'bool', 'uint256[]'],
         inputs[v3Idx]
       )
       expect(v3Decoded[5]).to.deep.equal([])
 
-      const v2Decoded = defaultAbiCoder.decode(
+      const v2Decoded = AbiCoder.defaultAbiCoder().decode(
         ['address', 'uint256', 'uint256', 'address[]', 'bool', 'uint256[]'],
         inputs[v2Idx]
       )
@@ -593,7 +592,7 @@ describe('Per-Hop Slippage', () => {
   // ─────────────────────────────────────────────────────────────────────────
 
   describe('Low-level encoding: RoutePlanner & createCommand', () => {
-    const amount = utils.parseEther('1')
+    const amount = parseEther('1')
     const v3Path = '0x' + WETH.address.slice(2) + '000bb8' + USDC.address.slice(2)
 
     it('V2_1_1 RoutePlanner encodes V2_SWAP_EXACT_IN with 6 params', () => {
@@ -608,11 +607,11 @@ describe('Per-Hop Slippage', () => {
 
       expect(planner.inputs.length).to.equal(1)
 
-      const decoded = defaultAbiCoder.decode(
+      const decoded = AbiCoder.defaultAbiCoder().decode(
         ['address', 'uint256', 'uint256', 'address[]', 'bool', 'uint256[]'],
         planner.inputs[0]
       )
-      expect(decoded[5].map((v: BigNumber) => v.toString())).to.deep.equal(hopSlippage)
+      expect(decoded[5].map((v: any) => v.toString())).to.deep.equal(hopSlippage)
     })
 
     it('V2_1_1 RoutePlanner encodes V3_SWAP_EXACT_IN with 6 params', () => {
@@ -625,18 +624,18 @@ describe('Per-Hop Slippage', () => {
         UniversalRouterVersion.V2_1_1
       )
 
-      const decoded = defaultAbiCoder.decode(
+      const decoded = AbiCoder.defaultAbiCoder().decode(
         ['address', 'uint256', 'uint256', 'bytes', 'bool', 'uint256[]'],
         planner.inputs[0]
       )
-      expect(decoded[5].map((v: BigNumber) => v.toString())).to.deep.equal(hopSlippage)
+      expect(decoded[5].map((v: any) => v.toString())).to.deep.equal(hopSlippage)
     })
 
     it('V2_0 RoutePlanner encodes only 5 params (no maxHopSlippage)', () => {
       const planner = new RoutePlanner()
       planner.addCommand(CommandType.V2_SWAP_EXACT_IN, [RECIPIENT, amount, amount, [WETH.address, USDC.address], true])
 
-      const decoded = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'address[]', 'bool'], planner.inputs[0])
+      const decoded = AbiCoder.defaultAbiCoder().decode(['address', 'uint256', 'uint256', 'address[]', 'bool'], planner.inputs[0])
       expect(decoded.length).to.equal(5)
     })
 
@@ -649,11 +648,11 @@ describe('Per-Hop Slippage', () => {
       )
 
       expect(command.type).to.equal(CommandType.V2_SWAP_EXACT_IN)
-      const decoded = defaultAbiCoder.decode(
+      const decoded = AbiCoder.defaultAbiCoder().decode(
         ['address', 'uint256', 'uint256', 'address[]', 'bool', 'uint256[]'],
         command.encodedInput
       )
-      expect(decoded[5].map((v: BigNumber) => v.toString())).to.deep.equal(hopSlippage)
+      expect(decoded[5].map((v: any) => v.toString())).to.deep.equal(hopSlippage)
     })
 
     it('createCommand without urVersion uses base ABI (5 params)', () => {
@@ -665,7 +664,7 @@ describe('Per-Hop Slippage', () => {
         true,
       ])
 
-      const decoded = defaultAbiCoder.decode(
+      const decoded = AbiCoder.defaultAbiCoder().decode(
         ['address', 'uint256', 'uint256', 'address[]', 'bool'],
         command.encodedInput
       )
@@ -675,7 +674,7 @@ describe('Per-Hop Slippage', () => {
     it('non-swap commands are unaffected by V2_1_1', () => {
       const command = createCommand(CommandType.WRAP_ETH, [RECIPIENT, amount], UniversalRouterVersion.V2_1_1)
 
-      const decoded = defaultAbiCoder.decode(['address', 'uint256'], command.encodedInput)
+      const decoded = AbiCoder.defaultAbiCoder().decode(['address', 'uint256'], command.encodedInput)
       expect(decoded.length).to.equal(2)
     })
   })

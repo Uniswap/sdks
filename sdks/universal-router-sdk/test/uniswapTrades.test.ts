@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import JSBI from 'jsbi'
-import { BigNumber, ethers, utils, Wallet, Signature } from 'ethers'
+import { Wallet, Signature, parseEther, parseUnits, zeroPadValue } from 'ethers'
 import { expandTo18Decimals } from '../src/utils/numbers'
 import { SwapRouter, UniswapTrade, FlatFeeOptions } from '../src'
 import { MixedRouteTrade, MixedRouteSDK } from '@uniswap/router-sdk'
@@ -55,14 +55,14 @@ import {
   UniversalRouterVersion,
   ZERO_ADDRESS,
 } from '../src/utils/constants'
-import { parseUnits, parseUnits, splitSignature } from 'ethers/lib/utils'
+
 
 const FORK_BLOCK = 16075500
 
 // note: these tests aren't testing much but registering calldata to interop file
 // for use in forge fork tests
 describe('Uniswap', () => {
-  const wallet = new Wallet(utils.zeroPad('0x1234', 32))
+  const wallet = new Wallet(zeroPadValue('0x1234', 32))
   let WETH_USDC_V2: Pair
   let USDC_DAI_V2: Pair
   let WETH_USDC_V3: V3Pool
@@ -82,7 +82,7 @@ describe('Uniswap', () => {
       FORK_BLOCK
     ))
 
-    let liquidity = JSBI.BigInt(utils.parseEther('1000000').toString())
+    let liquidity = JSBI.BigInt(parseEther('1000000').toString())
     let tickSpacing = 60
     let tickProviderMock = [
       {
@@ -184,7 +184,7 @@ describe('Uniswap', () => {
 
   describe('v2', () => {
     it('encodes a single exactInput ETH->USDC swap', async () => {
-      const inputEther = utils.parseEther('1').toString()
+      const inputEther = parseEther('1').toString()
       const trade = new V2Trade(
         new RouteV2([WETH_USDC_V2], ETHER, USDC),
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
@@ -197,7 +197,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactInput ETH->USDC swap, with a fee', async () => {
-      const inputEther = utils.parseEther('1').toString()
+      const inputEther = parseEther('1').toString()
       const trade = new V2Trade(
         new RouteV2([WETH_USDC_V2], ETHER, USDC),
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
@@ -211,7 +211,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes an exactInput ETH->USDC->DAI swap', async () => {
-      const inputEther = utils.parseEther('1').toString()
+      const inputEther = parseEther('1').toString()
       const trade = new V2Trade(
         new RouteV2([WETH_USDC_V2, USDC_DAI_V2], ETHER, DAI),
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
@@ -224,7 +224,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes an exactInput ETH->USDC->DAI swap, with a fee', async () => {
-      const inputEther = utils.parseEther('1').toString()
+      const inputEther = parseEther('1').toString()
       const trade = new V2Trade(
         new RouteV2([WETH_USDC_V2, USDC_DAI_V2], ETHER, DAI),
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
@@ -238,7 +238,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactInput USDC->ETH swap', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const inputUSDC = parseUnits('1000', 6).toString()
       const trade = new V2Trade(
         new RouteV2([WETH_USDC_V2], USDC, ETHER),
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
@@ -251,7 +251,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactInput USDC->ETH swap, with WETH fee', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const inputUSDC = parseUnits('1000', 6).toString()
       const trade = new V2Trade(
         new RouteV2([WETH_USDC_V2], USDC, ETHER),
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
@@ -265,7 +265,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactInput USDC->ETH swap with permit', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const inputUSDC = parseUnits('1000', 6).toString()
       const trade = new V2Trade(
         new RouteV2([WETH_USDC_V2], USDC, ETHER),
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
@@ -285,7 +285,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactInput USDC->ETH swap with EIP-2098 permit', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const inputUSDC = parseUnits('1000', 6).toString()
       const trade = new V2Trade(
         new RouteV2([WETH_USDC_V2], USDC, ETHER),
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
@@ -305,7 +305,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactInput USDC->ETH swap with permit with v recovery id', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const inputUSDC = parseUnits('1000', 6).toString()
       const trade = new V2Trade(
         new RouteV2([WETH_USDC_V2], USDC, ETHER),
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
@@ -318,13 +318,13 @@ describe('Uniswap', () => {
         UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_0, 1)
       )
       const originalSignature = await generatePermitSignature(permit, wallet, trade.route.chainId, PERMIT2_ADDRESS)
-      const { recoveryParam } = utils.splitSignature(originalSignature)
+      const { yParity } = Signature.from(originalSignature)
       // slice off current v
       let signature = originalSignature.substring(0, originalSignature.length - 2)
       // append recoveryParam as v
-      signature += BigNumber.from(recoveryParam).toHexString().slice(2)
+      signature += yParity.toString(16).padStart(2, '0')
       // assert ethers sanitization technique works
-      expect(utils.joinSignature(utils.splitSignature(signature))).to.eq(originalSignature)
+      expect(Signature.from(signature).serialized).to.eq(originalSignature)
       const opts = swapOptions({ inputTokenPermit: toInputPermit(signature, permit) })
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V2_1000_USDC_FOR_ETH_PERMIT_V_RECOVERY_PARAM', methodParameters)
@@ -332,7 +332,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes an exactInput DAI->USDC->ETH swap', async () => {
-      const inputDAI = utils.parseEther('10').toString()
+      const inputDAI = parseEther('10').toString()
       const trade = new V2Trade(
         new RouteV2([USDC_DAI_V2, WETH_USDC_V2], DAI, ETHER),
         CurrencyAmount.fromRawAmount(DAI, inputDAI),
@@ -345,7 +345,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactOutput ETH->USDC swap', async () => {
-      const outputUSDC = utils.parseUnits('1000', 6).toString()
+      const outputUSDC = parseUnits('1000', 6).toString()
       const trade = new V2Trade(
         new RouteV2([WETH_USDC_V2], ETHER, USDC),
         CurrencyAmount.fromRawAmount(USDC, outputUSDC),
@@ -360,11 +360,8 @@ describe('Uniswap', () => {
 
     it('encodes a single exactOutput ETH->USDC swap, with a fee', async () => {
       // We must adjust the output amount for the 5% output fee
-      const outputUSDC = utils.parseUnits('1000', 6)
-      const adjustedOutputUSDC = outputUSDC
-        .mul(10000)
-        .div(10000 - 500)
-        .toString()
+      const outputUSDC = parseUnits('1000', 6)
+      const adjustedOutputUSDC = (outputUSDC * 10000n / (10000n - 500n)).toString()
       const trade = new V2Trade(
         new RouteV2([WETH_USDC_V2], ETHER, USDC),
         CurrencyAmount.fromRawAmount(USDC, adjustedOutputUSDC),
@@ -378,13 +375,13 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactOutput ETH->USDC swap, with a flat fee', async () => {
-      const outputUSDC = utils.parseUnits('1050', 6).toString()
+      const outputUSDC = parseUnits('1050', 6).toString()
       const trade = new V2Trade(
         new RouteV2([WETH_USDC_V2], ETHER, USDC),
         CurrencyAmount.fromRawAmount(USDC, outputUSDC),
         TradeType.EXACT_OUTPUT
       )
-      const feeOptions: FlatFeeOptions = { amount: utils.parseUnits('50', 6), recipient: TEST_FEE_RECIPIENT_ADDRESS }
+      const feeOptions: FlatFeeOptions = { amount: parseUnits('50', 6), recipient: TEST_FEE_RECIPIENT_ADDRESS }
       const opts = swapOptions({ flatFee: feeOptions })
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V2_ETH_FOR_1000_USDC_WITH_FLAT_FEE', methodParameters)
@@ -392,13 +389,13 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactOutput USDC->ETH swap, with a flat fee', async () => {
-      const outputUSDC = utils.parseUnits('15', 18).toString()
+      const outputUSDC = parseUnits('15', 18).toString()
       const trade = new V2Trade(
         new RouteV2([WETH_USDC_V2], USDC, ETHER),
         CurrencyAmount.fromRawAmount(ETHER, outputUSDC),
         TradeType.EXACT_OUTPUT
       )
-      const feeOptions: FlatFeeOptions = { amount: utils.parseUnits('5', 18), recipient: TEST_FEE_RECIPIENT_ADDRESS }
+      const feeOptions: FlatFeeOptions = { amount: parseUnits('5', 18), recipient: TEST_FEE_RECIPIENT_ADDRESS }
       const opts = swapOptions({ flatFee: feeOptions })
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V2_USCD_FOR_10_ETH_WITH_FLAT_FEE', methodParameters)
@@ -406,7 +403,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactOutput USDC->ETH swap', async () => {
-      const outputETH = utils.parseEther('1').toString()
+      const outputETH = parseEther('1').toString()
       const trade = new V2Trade(
         new RouteV2([WETH_USDC_V2], USDC, ETHER),
         CurrencyAmount.fromRawAmount(ETHER, outputETH),
@@ -421,7 +418,7 @@ describe('Uniswap', () => {
 
   describe('v3', () => {
     it('encodes a single exactInput ETH->USDC swap', async () => {
-      const inputEther = utils.parseEther('1').toString()
+      const inputEther = parseEther('1').toString()
       const trade = await V3Trade.fromRoute(
         new V3Route([WETH_USDC_V3], ETHER, USDC),
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
@@ -434,7 +431,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactInput ETH->USDC swap, with a fee', async () => {
-      const inputEther = utils.parseEther('1').toString()
+      const inputEther = parseEther('1').toString()
       const trade = await V3Trade.fromRoute(
         new V3Route([WETH_USDC_V3], ETHER, USDC),
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
@@ -448,13 +445,13 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactInput ETH->USDC swap, with a flat fee', async () => {
-      const inputEther = utils.parseEther('1').toString()
+      const inputEther = parseEther('1').toString()
       const trade = await V3Trade.fromRoute(
         new V3Route([WETH_USDC_V3], ETHER, USDC),
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
         TradeType.EXACT_INPUT
       )
-      const feeOptions: FlatFeeOptions = { amount: utils.parseUnits('50', 6), recipient: TEST_FEE_RECIPIENT_ADDRESS }
+      const feeOptions: FlatFeeOptions = { amount: parseUnits('50', 6), recipient: TEST_FEE_RECIPIENT_ADDRESS }
       const opts = swapOptions({ flatFee: feeOptions })
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V3_1_ETH_FOR_USDC_WITH_FLAT_FEE', methodParameters)
@@ -462,7 +459,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactInput USDC->ETH swap', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const inputUSDC = parseUnits('1000', 6).toString()
       const trade = await V3Trade.fromRoute(
         new V3Route([WETH_USDC_V3], USDC, ETHER),
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
@@ -475,7 +472,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactInput USDC->ETH swap, with WETH fee', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const inputUSDC = parseUnits('1000', 6).toString()
       const trade = await V3Trade.fromRoute(
         new V3Route([WETH_USDC_V3], USDC, ETHER),
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
@@ -489,7 +486,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactInput USDC->ETH swap with permit', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const inputUSDC = parseUnits('1000', 6).toString()
       const trade = await V3Trade.fromRoute(
         new V3Route([WETH_USDC_V3], USDC, ETHER),
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
@@ -509,7 +506,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactInput ETH->USDC->DAI swap', async () => {
-      const inputEther = utils.parseEther('1').toString()
+      const inputEther = parseEther('1').toString()
       const trade = await V3Trade.fromRoute(
         new V3Route([WETH_USDC_V3, USDC_DAI_V3], ETHER, DAI),
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
@@ -522,7 +519,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactInput ETH->USDC->DAI swap in safemode, sends too much ETH', async () => {
-      const inputEther = utils.parseEther('1').toString()
+      const inputEther = parseEther('1').toString()
       const trade = await V3Trade.fromRoute(
         new V3Route([WETH_USDC_V3, USDC_DAI_V3], ETHER, DAI),
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
@@ -535,7 +532,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactOutput ETH->USDC swap', async () => {
-      const outputUSDC = utils.parseUnits('1000', 6).toString()
+      const outputUSDC = parseUnits('1000', 6).toString()
       const trade = await V3Trade.fromRoute(
         new V3Route([WETH_USDC_V3], ETHER, USDC),
         CurrencyAmount.fromRawAmount(USDC, outputUSDC),
@@ -548,7 +545,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactOutput USDC->ETH swap', async () => {
-      const outputEther = utils.parseEther('1').toString()
+      const outputEther = parseEther('1').toString()
       const trade = await V3Trade.fromRoute(
         new V3Route([WETH_USDC_V3], USDC, ETHER),
         CurrencyAmount.fromRawAmount(ETHER, outputEther),
@@ -561,7 +558,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes an exactOutput ETH->USDC->DAI swap', async () => {
-      const outputDai = utils.parseEther('1000').toString()
+      const outputDai = parseEther('1000').toString()
       const trade = await V3Trade.fromRoute(
         new V3Route([WETH_USDC_V3, USDC_DAI_V3], ETHER, DAI),
         CurrencyAmount.fromRawAmount(DAI, outputDai),
@@ -574,7 +571,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes an exactOutput DAI->USDC->ETH swap', async () => {
-      const outputEther = utils.parseEther('1').toString()
+      const outputEther = parseEther('1').toString()
       const trade = await V3Trade.fromRoute(
         new V3Route([USDC_DAI_V3, WETH_USDC_V3], DAI, ETHER),
         CurrencyAmount.fromRawAmount(ETHER, outputEther),
@@ -588,11 +585,8 @@ describe('Uniswap', () => {
 
     it('encodes an exactOutput DAI->USDC->ETH swap, with WETH fee', async () => {
       // "exact output" of 1ETH. We must adjust for a 5% fee
-      const outputEther = utils.parseEther('1')
-      const adjustedOutputEther = outputEther
-        .mul(10000)
-        .div(10000 - 500)
-        .toString()
+      const outputEther = parseEther('1')
+      const adjustedOutputEther = (outputEther * 10000n / (10000n - 500n)).toString()
       const trade = await V3Trade.fromRoute(
         new V3Route([USDC_DAI_V3, WETH_USDC_V3], DAI, ETHER),
         CurrencyAmount.fromRawAmount(ETHER, adjustedOutputEther),
@@ -610,7 +604,7 @@ describe('Uniswap', () => {
   describe('v4', () => {
     // swapping 1 ETH for 1 USDC
     it('encodes a single exactInput ETH->USDC swap', async () => {
-      const inputEther = utils.parseEther('1').toString()
+      const inputEther = parseEther('1').toString()
       const trade = await V4Trade.fromRoute(
         new V4Route([ETH_USDC_V4], ETHER, USDC),
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
@@ -623,7 +617,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactInput ETH->USDC swap, via WETH', async () => {
-      const inputEther = utils.parseEther('1').toString()
+      const inputEther = parseEther('1').toString()
       const trade = await V4Trade.fromRoute(
         new V4Route([WETH_USDC_V4], ETHER, USDC),
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
@@ -636,7 +630,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactInput ETH->USDC swap, with a fee', async () => {
-      const inputEther = utils.parseEther('1').toString()
+      const inputEther = parseEther('1').toString()
       const trade = await V4Trade.fromRoute(
         new V4Route([ETH_USDC_V4], ETHER, USDC),
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
@@ -650,13 +644,13 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactInput ETH->USDC swap, with a flat fee', async () => {
-      const inputEther = utils.parseEther('1').toString()
+      const inputEther = parseEther('1').toString()
       const trade = await V4Trade.fromRoute(
         new V4Route([ETH_USDC_V4], ETHER, USDC),
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
         TradeType.EXACT_INPUT
       )
-      const feeOptions: FlatFeeOptions = { amount: utils.parseUnits('50', 6), recipient: TEST_FEE_RECIPIENT_ADDRESS }
+      const feeOptions: FlatFeeOptions = { amount: parseUnits('50', 6), recipient: TEST_FEE_RECIPIENT_ADDRESS }
       const opts = swapOptions({ flatFee: feeOptions })
       const methodParameters = SwapRouter.swapCallParameters(buildTrade([trade]), opts)
       registerFixture('_UNISWAP_V4_1_ETH_FOR_USDC_WITH_FLAT_FEE', methodParameters)
@@ -664,7 +658,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactInput USDC->ETH swap', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const inputUSDC = parseUnits('1000', 6).toString()
       const trade = await V4Trade.fromRoute(
         new V4Route([ETH_USDC_V4], USDC, ETHER),
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
@@ -677,7 +671,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactInput USDC->ETH swap with wrap', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const inputUSDC = parseUnits('1000', 6).toString()
       const trade = await V4Trade.fromRoute(
         new V4Route([ETH_USDC_V4], USDC, WETH),
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
@@ -690,7 +684,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactInput USDC->DAI->ETH swap with wrap', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const inputUSDC = parseUnits('1000', 6).toString()
       const trade = await V4Trade.fromRoute(
         new V4Route([USDC_DAI_V4, ETH_DAI_V4], USDC, WETH),
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
@@ -703,7 +697,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a single exactInput ETH->USDC->DAI swap', async () => {
-      const inputEther = utils.parseEther('1').toString()
+      const inputEther = parseEther('1').toString()
       const trade = await V4Trade.fromRoute(
         new V4Route([ETH_USDC_V4, USDC_DAI_V4], ETHER, DAI),
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
@@ -716,7 +710,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes an exactOutput DAI->USDC->ETH swap', async () => {
-      const outputEther = utils.parseEther('1').toString()
+      const outputEther = parseEther('1').toString()
       const trade = await V4Trade.fromRoute(
         new V4Route([USDC_DAI_V4, ETH_USDC_V4], DAI, ETHER),
         CurrencyAmount.fromRawAmount(ETHER, outputEther),
@@ -729,11 +723,8 @@ describe('Uniswap', () => {
     })
 
     it('encodes an exactOutput DAI->USDC->ETH swap, with ETH fee', async () => {
-      const outputEther = utils.parseEther('1')
-      const adjustedOutputEther = outputEther
-        .mul(10000)
-        .div(10000 - 500)
-        .toString()
+      const outputEther = parseEther('1')
+      const adjustedOutputEther = (outputEther * 10000n / (10000n - 500n)).toString()
       const trade = await V4Trade.fromRoute(
         new V4Route([USDC_DAI_V4, ETH_DAI_V4], USDC, ETHER),
         CurrencyAmount.fromRawAmount(ETHER, adjustedOutputEther),
@@ -747,10 +738,10 @@ describe('Uniswap', () => {
     })
 
     it('encodes an exactOuput USDC->DAI->ETH swap with a wrap to recieve WETH, no eth-weth', async () => {
-      const outputEther = utils.parseEther('1')
+      const outputEther = parseEther('1')
       const trade = await V4Trade.fromRoute(
         new V4Route([USDC_DAI_V4, ETH_DAI_V4], USDC, WETH),
-        CurrencyAmount.fromRawAmount(WETH, outputEther),
+        CurrencyAmount.fromRawAmount(WETH, outputEther.toString()),
         TradeType.EXACT_OUTPUT
       )
 
@@ -761,11 +752,11 @@ describe('Uniswap', () => {
     })
 
     it('encodes an exactOutput USDC->DAI->ETH swap with a fee that must then wrap to recieve WETH', async () => {
-      const outputEther = utils.parseEther('1')
-      const flatFee = outputEther.mul('5').div('100')
+      const outputEther = parseEther('1')
+      const flatFee = outputEther * 5n / 100n
       const trade = await V4Trade.fromRoute(
         new V4Route([USDC_DAI_V4, ETH_DAI_V4], USDC, WETH),
-        CurrencyAmount.fromRawAmount(WETH, outputEther.add(flatFee).toString()),
+        CurrencyAmount.fromRawAmount(WETH, (outputEther + flatFee).toString()),
         TradeType.EXACT_OUTPUT
       )
 
@@ -777,7 +768,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes an exactOutput ETH->DAI->USDC swap', async () => {
-      const outputUSDC = utils.parseUnits('1000', 6).toString()
+      const outputUSDC = parseUnits('1000', 6).toString()
       const trade = await V4Trade.fromRoute(
         new V4Route([ETH_DAI_V4, USDC_DAI_V4], ETHER, USDC),
         CurrencyAmount.fromRawAmount(USDC, outputUSDC),
@@ -792,7 +783,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes an exactOutput ETH->DAI->USDC swap that must first unwrap WETH', async () => {
-      const outputUSDC = utils.parseUnits('1000', 6).toString()
+      const outputUSDC = parseUnits('1000', 6).toString()
       const trade = await V4Trade.fromRoute(
         new V4Route([ETH_DAI_V4, USDC_DAI_V4], WETH, USDC),
         CurrencyAmount.fromRawAmount(USDC, outputUSDC),
@@ -807,10 +798,10 @@ describe('Uniswap', () => {
     })
 
     it('encodes an exactOutput WETH->DAI->USDC swap that must first wrap ETH', async () => {
-      const outputDAI = BigNumber.from(utils.parseEther('1'))
+      const outputDAI = parseEther('1')
       const trade = await V4Trade.fromRoute(
         new V4Route([WETH_USDC_V4, USDC_DAI_V4], ETHER, DAI),
-        CurrencyAmount.fromRawAmount(DAI, outputDAI),
+        CurrencyAmount.fromRawAmount(DAI, outputDAI.toString()),
         TradeType.EXACT_OUTPUT
       )
 
@@ -824,7 +815,7 @@ describe('Uniswap', () => {
 
   describe('mixed (interleaved)', async () => {
     it('encodes a mixed exactInput v3ETH->v2USDC->DAI swap', async () => {
-      const inputEther = utils.parseEther('1').toString()
+      const inputEther = parseEther('1').toString()
       const trade = await MixedRouteTrade.fromRoute(
         new MixedRouteSDK([WETH_USDC_V3, USDC_DAI_V2], ETHER, DAI),
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
@@ -837,7 +828,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a mixed exactInput v2ETH->v3USDC->DAI swap', async () => {
-      const inputEther = utils.parseEther('1').toString()
+      const inputEther = parseEther('1').toString()
       const trade = await MixedRouteTrade.fromRoute(
         new MixedRouteSDK([WETH_USDC_V2, USDC_DAI_V3], ETHER, DAI),
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
@@ -850,7 +841,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a mixed exactInput v2ETH->v2USDC->DAI swap', async () => {
-      const inputEther = utils.parseEther('1').toString()
+      const inputEther = parseEther('1').toString()
       const trade = await MixedRouteTrade.fromRoute(
         new MixedRouteSDK([WETH_USDC_V2, USDC_DAI_V2], ETHER, DAI),
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
@@ -863,7 +854,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a mixed exactInput v3ETH->v3USDC->DAI swap', async () => {
-      const inputEther = utils.parseEther('1').toString()
+      const inputEther = parseEther('1').toString()
       const trade = await MixedRouteTrade.fromRoute(
         new MixedRouteSDK([WETH_USDC_V3, USDC_DAI_V3], ETHER, DAI),
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
@@ -876,7 +867,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a mixed exactInput v2DAI->v3USDC->ETH swap', async () => {
-      const inputDai = utils.parseEther('1000').toString()
+      const inputDai = parseEther('1000').toString()
       const trade = await MixedRouteTrade.fromRoute(
         new MixedRouteSDK([USDC_DAI_V2, WETH_USDC_V3], DAI, ETHER), // tests mixed route unwrap weth to eth
         CurrencyAmount.fromRawAmount(DAI, inputDai),
@@ -889,7 +880,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a mixed exactInput v3USDC-WETH->v4ETH->DAI', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const inputUSDC = parseUnits('1000', 6).toString()
       const trade = await MixedRouteTrade.fromRoute(
         new MixedRouteSDK([WETH_USDC_V3, ETH_DAI_V4], USDC, DAI),
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
@@ -902,7 +893,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a mixed exactInput v2USDC-WETH->v4ETH->DAI', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const inputUSDC = parseUnits('1000', 6).toString()
       const trade = await MixedRouteTrade.fromRoute(
         new MixedRouteSDK([WETH_USDC_V2, ETH_DAI_V4], USDC, DAI),
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
@@ -916,7 +907,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a mixed exactInput v4DAI->ETH->V3WETH->USDC', async () => {
-      const inputDAI = utils.parseEther('1000').toString()
+      const inputDAI = parseEther('1000').toString()
       const trade = await MixedRouteTrade.fromRoute(
         new MixedRouteSDK([ETH_DAI_V4, WETH_USDC_V3], DAI, USDC),
         CurrencyAmount.fromRawAmount(DAI, inputDAI),
@@ -929,7 +920,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a mixed exactInput v4DAI->ETH->V2WETH->USDC', async () => {
-      const inputDAI = utils.parseEther('1000').toString()
+      const inputDAI = parseEther('1000').toString()
       const trade = await MixedRouteTrade.fromRoute(
         new MixedRouteSDK([ETH_DAI_V4, WETH_USDC_V2], DAI, USDC),
         CurrencyAmount.fromRawAmount(DAI, inputDAI),
@@ -942,7 +933,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a mixed exactInput v4ETH->DAI->V3DAI->USDC', async () => {
-      const inputEther = utils.parseEther('1').toString()
+      const inputEther = parseEther('1').toString()
       const trade = await MixedRouteTrade.fromRoute(
         new MixedRouteSDK([ETH_DAI_V4, USDC_DAI_V3], ETHER, USDC),
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
@@ -955,7 +946,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a mixed exactInput v4ETH->WETH->V3USDC->USDC', async () => {
-      const inputEther = utils.parseEther('1').toString()
+      const inputEther = parseEther('1').toString()
       const trade = await MixedRouteTrade.fromRoute(
         new MixedRouteSDK([ETH_WETH_V4, WETH_USDC_V3], ETHER, USDC),
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
@@ -968,7 +959,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a mixed exactInput v4wrapWETH->USDC->V3USDC->DAI', async () => {
-      const inputEther = utils.parseUnits('3000', 6).toString() // 1000 with 6 decimals (match decimals since mock v4 weth-usdc pool is 1-1)
+      const inputEther = parseUnits('3000', 6).toString() // 1000 with 6 decimals (match decimals since mock v4 weth-usdc pool is 1-1)
       const trade = await MixedRouteTrade.fromRoute(
         new MixedRouteSDK([WETH_USDC_V4, USDC_DAI_V3], ETHER, DAI),
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
@@ -981,7 +972,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a mixed exactInput v4unwrapETH->USDC->V3USDC->DAI', async () => {
-      const inputWeth = utils.parseUnits('3000', 6).toString() // 1000 with 6 decimals (match decimals since mock v4 weth-usdc pool is 1-1)
+      const inputWeth = parseUnits('3000', 6).toString() // 1000 with 6 decimals (match decimals since mock v4 weth-usdc pool is 1-1)
       const trade = await MixedRouteTrade.fromRoute(
         new MixedRouteSDK([ETH_USDC_V4, USDC_DAI_V3], WETH, DAI),
         CurrencyAmount.fromRawAmount(WETH, inputWeth),
@@ -994,7 +985,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a mixed exactInput v4WETH->USDC->V3USDC->DAI', async () => {
-      const inputWeth = utils.parseUnits('3000', 6).toString() // 1000 with 6 decimals (match decimals since mock v4 weth-usdc pool is 1-1)
+      const inputWeth = parseUnits('3000', 6).toString() // 1000 with 6 decimals (match decimals since mock v4 weth-usdc pool is 1-1)
       const trade = await MixedRouteTrade.fromRoute(
         new MixedRouteSDK([WETH_USDC_V4, USDC_DAI_V3], WETH, DAI),
         CurrencyAmount.fromRawAmount(WETH, inputWeth),
@@ -1007,7 +998,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a mixed exactInput v2DAI->v4USDC->ETH swap unwrap', async () => {
-      const inputDai = utils.parseEther('1000').toString()
+      const inputDai = parseEther('1000').toString()
       const trade = await MixedRouteTrade.fromRoute(
         new MixedRouteSDK([USDC_DAI_V2, WETH_USDC_V4], DAI, ETHER), // tests mixed route unwrap weth to eth
         CurrencyAmount.fromRawAmount(DAI, inputDai),
@@ -1020,7 +1011,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a mixed exactInput v2DAI->v4USDC->WETH swap wrap', async () => {
-      const inputDai = utils.parseEther('1000').toString()
+      const inputDai = parseEther('1000').toString()
       const trade = await MixedRouteTrade.fromRoute(
         new MixedRouteSDK([USDC_DAI_V2, ETH_USDC_V4], DAI, WETH), // tests mixed route wrap eth to weth
         CurrencyAmount.fromRawAmount(DAI, inputDai),
@@ -1096,7 +1087,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a split exactOutput with 3 routes v3ETH->v3USDC & v2ETH->v2USDC swap', async () => {
-      const outputUSDC = utils.parseUnits('1000', 6).toString()
+      const outputUSDC = parseUnits('1000', 6).toString()
       const v2Trade = new V2Trade(
         new RouteV2([WETH_USDC_V2], ETHER, USDC),
         CurrencyAmount.fromRawAmount(USDC, outputUSDC),
@@ -1119,7 +1110,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a split exactOutput with 3 routes v2ETH->v2USDC & v3ETH->v3USDC & v4ETH->v4USDC swap', async () => {
-      const outputUSDC = utils.parseUnits('1000', 6).toString()
+      const outputUSDC = parseUnits('1000', 6).toString()
       const v2Trade = new V2Trade(
         new RouteV2([WETH_USDC_V2], ETHER, USDC),
         CurrencyAmount.fromRawAmount(USDC, outputUSDC),
@@ -1161,7 +1152,7 @@ describe('Uniswap', () => {
      * Verifies: V4 correctly uses WETH in ETH-WETH pool, then unwraps all WETH to ETH
      */
     it('encodes a split exactInput with 2 routes v3USDC->v3ETH & v4USDC->v4ETH swap', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const inputUSDC = parseUnits('1000', 6).toString()
       const v4Trade = await V4Trade.fromRoute(
         new V4Route([ETH_USDC_V4, ETH_WETH_V4], USDC, ETHER),
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
@@ -1185,7 +1176,7 @@ describe('Uniswap', () => {
      * Verifies: V4 correctly uses WETH in ETH-WETH pool, then unwraps all WETH to ETH
      */
     it('encodes a split exactInput with 2 routes mixed v2DAI->v3ETH & v4 v4DAI->v4USDC->v4ETH swap', async () => {
-      const inputDAI = utils.parseUnits('1000', 18).toString()
+      const inputDAI = parseUnits('1000', 18).toString()
       const mixedTrade = await MixedRouteTrade.fromRoute(
         new MixedRouteSDK([USDC_DAI_V2, WETH_USDC_V3], DAI, ETHER),
         CurrencyAmount.fromRawAmount(DAI, inputDAI),
@@ -1209,7 +1200,7 @@ describe('Uniswap', () => {
      * Verifies: Both routes end in ETH pools, output is unwrapped ETH
      */
     it('encodes a split exactInput with 2 routes mixed v2DAI->v4ETH & v4 v4DAI->v4USDC->v4ETH swap', async () => {
-      const inputDAI = utils.parseUnits('1000', 18).toString()
+      const inputDAI = parseUnits('1000', 18).toString()
       const mixedTrade = await MixedRouteTrade.fromRoute(
         new MixedRouteSDK([USDC_DAI_V2, ETH_USDC_V4_LOW_FEE], DAI, ETHER),
         CurrencyAmount.fromRawAmount(DAI, inputDAI),
@@ -1233,7 +1224,7 @@ describe('Uniswap', () => {
      * Verifies: Both routes end in WETH pools, then unwrap to ETH output
      */
     it('encodes a split exactInput with 2 routes mixed v2DAI->v4WETH & v4 v4DAI->v4USDC->v4WETH swap', async () => {
-      const inputDAI = utils.parseUnits('1000', 18).toString()
+      const inputDAI = parseUnits('1000', 18).toString()
       const mixedTrade = await MixedRouteTrade.fromRoute(
         new MixedRouteSDK([USDC_DAI_V2, WETH_USDC_V4_LOW_FEE], DAI, ETHER),
         CurrencyAmount.fromRawAmount(DAI, inputDAI),
@@ -1257,7 +1248,7 @@ describe('Uniswap', () => {
      * Verifies: Route 1 uses WETH in ETH-WETH pool, all WETH unwrapped to ETH
      */
     it('encodes a split exactInput with 2 routes v4 eth-weth & v4 weth swap', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const inputUSDC = parseUnits('1000', 6).toString()
       const v4Trade1 = await V4Trade.fromRoute(
         new V4Route([ETH_USDC_V4, ETH_WETH_V4], USDC, ETHER),
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
@@ -1281,7 +1272,7 @@ describe('Uniswap', () => {
      * Verifies: V4 uses WETH in ETH-WETH pool, all WETH unwrapped to ETH
      */
     it('encodes a split exactInput with 2 routes v4 eth-weth & mixed weth swap', async () => {
-      const inputDAI = utils.parseUnits('1000', 18).toString()
+      const inputDAI = parseUnits('1000', 18).toString()
       const v4Trade = await V4Trade.fromRoute(
         new V4Route([USDC_DAI_V4, ETH_USDC_V4, ETH_WETH_V4], DAI, ETHER),
         CurrencyAmount.fromRawAmount(DAI, inputDAI),
@@ -1305,7 +1296,7 @@ describe('Uniswap', () => {
      * Verifies: Mixed route uses WETH in ETH-WETH pool, all WETH unwrapped to ETH
      */
     it('encodes a split exactInput with 2 routes v4 weth & mixed eth-weth swap', async () => {
-      const inputDAI = utils.parseUnits('1000', 18).toString()
+      const inputDAI = parseUnits('1000', 18).toString()
       const v4Trade = await V4Trade.fromRoute(
         new V4Route([USDC_DAI_V4, WETH_USDC_V4], DAI, ETHER),
         CurrencyAmount.fromRawAmount(DAI, inputDAI),
@@ -1331,7 +1322,7 @@ describe('Uniswap', () => {
      * Verifies: Both routes output WETH (no unwrapping)
      */
     it('encodes a split exactInput with 2 routes v3USDC->v3ETH & v4USDC->v4ETH swap ending in weth', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const inputUSDC = parseUnits('1000', 6).toString()
       const v3Trade = await V3Trade.fromRoute(
         new V3Route([WETH_USDC_V3], USDC, WETH),
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
@@ -1355,7 +1346,7 @@ describe('Uniswap', () => {
      * Verifies: Both routes output WETH (no unwrapping)
      */
     it('encodes a split exactInput with 2 routes v4 ending in weth & v4 ending in eth-weth swap', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const inputUSDC = parseUnits('1000', 6).toString()
       const v4Trade1 = await V4Trade.fromRoute(
         new V4Route([WETH_USDC_V4], USDC, WETH),
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
@@ -1373,7 +1364,7 @@ describe('Uniswap', () => {
     })
 
     it('encodes a split exactInput with 2 routes v4 ending in eth & v4 ending in eth-weth swap with weth output', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const inputUSDC = parseUnits('1000', 6).toString()
       const v4Trade1 = await V4Trade.fromRoute(
         new V4Route([ETH_USDC_V4], USDC, WETH),
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
@@ -1397,7 +1388,7 @@ describe('Uniswap', () => {
      * Verifies: Both routes use ETH pools but wrap to WETH for output
      */
     it('encodes a split exactInput with 2 routes v4 ending in eth & v4 ending in eth swap', async () => {
-      const inputUSDC = utils.parseUnits('1000', 6).toString()
+      const inputUSDC = parseUnits('1000', 6).toString()
       const v4Trade1 = await V4Trade.fromRoute(
         new V4Route([ETH_USDC_V4], USDC, WETH),
         CurrencyAmount.fromRawAmount(USDC, inputUSDC),
@@ -1417,14 +1408,14 @@ describe('Uniswap', () => {
 
   describe('fees', () => {
     it('throws if instantiated with a proportional fee and a flat fee', async () => {
-      const outputUSDC = utils.parseUnits('1050', 6).toString()
+      const outputUSDC = parseUnits('1050', 6).toString()
       const trade = new V2Trade(
         new RouteV2([WETH_USDC_V2], ETHER, USDC),
         CurrencyAmount.fromRawAmount(USDC, outputUSDC),
         TradeType.EXACT_OUTPUT
       )
       const proportionalFee: FeeOptions = { fee: new Percent(5, 100), recipient: TEST_FEE_RECIPIENT_ADDRESS }
-      const feeOptions: FlatFeeOptions = { amount: utils.parseUnits('50', 6), recipient: TEST_FEE_RECIPIENT_ADDRESS }
+      const feeOptions: FlatFeeOptions = { amount: parseUnits('50', 6), recipient: TEST_FEE_RECIPIENT_ADDRESS }
       const opts = swapOptions({ fee: proportionalFee, flatFee: feeOptions })
       expect(function () {
         SwapRouter.swapCallParameters(buildTrade([trade]), opts)
@@ -1432,13 +1423,13 @@ describe('Uniswap', () => {
     })
 
     it('throws if flat fee amount is larger than minimumAmountOut', async () => {
-      const inputEther = utils.parseEther('1').toString()
+      const inputEther = parseEther('1').toString()
       const trade = await V3Trade.fromRoute(
         new V3Route([WETH_USDC_V3], ETHER, USDC),
         CurrencyAmount.fromRawAmount(ETHER, inputEther),
         TradeType.EXACT_INPUT
       )
-      const feeOptions: FlatFeeOptions = { amount: utils.parseUnits('5000', 6), recipient: TEST_FEE_RECIPIENT_ADDRESS }
+      const feeOptions: FlatFeeOptions = { amount: parseUnits('5000', 6), recipient: TEST_FEE_RECIPIENT_ADDRESS }
       const opts = swapOptions({ flatFee: feeOptions })
       expect(function () {
         SwapRouter.swapCallParameters(buildTrade([trade]), opts)
@@ -1576,8 +1567,7 @@ describe('Uniswap', () => {
 
       it('v2 - erc20 <> erc20', async () => {
         const [tokenIn, tokenOut] = [DAI, USDC]
-        const inputAmount = ethers.utils
-          .parseUnits('1000', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
+        const inputAmount = parseUnits('1000', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
           .toString()
         const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
 
@@ -1608,8 +1598,7 @@ describe('Uniswap', () => {
 
       it('v3 - erc20 <> erc20', async () => {
         const [tokenIn, tokenOut] = [DAI, USDC]
-        const inputAmount = ethers.utils
-          .parseUnits('1000', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
+        const inputAmount = parseUnits('1000', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
           .toString()
         const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
 
@@ -1639,8 +1628,7 @@ describe('Uniswap', () => {
 
       it('v4 - erc20 <> erc20', async () => {
         const [tokenIn, tokenOut] = [DAI, USDC]
-        const inputAmount = ethers.utils
-          .parseUnits('1000', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
+        const inputAmount = parseUnits('1000', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
           .toString()
         const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
 
@@ -1670,8 +1658,7 @@ describe('Uniswap', () => {
 
       it('v2 - handles weth input properly', async () => {
         const [tokenIn, tokenOut] = [WETH, USDC]
-        const inputAmount = ethers.utils
-          .parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
+        const inputAmount = parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
           .toString()
         const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
 
@@ -1701,8 +1688,7 @@ describe('Uniswap', () => {
 
       it('v3 - handles weth input properly', async () => {
         const [tokenIn, tokenOut] = [WETH, USDC]
-        const inputAmount = ethers.utils
-          .parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
+        const inputAmount = parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
           .toString()
         const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
 
@@ -1732,8 +1718,7 @@ describe('Uniswap', () => {
 
       it('v4 - handles weth input properly', async () => {
         const [tokenIn, tokenOut] = [WETH, USDC]
-        const inputAmount = ethers.utils
-          .parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
+        const inputAmount = parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
           .toString()
         const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
 
@@ -1763,8 +1748,7 @@ describe('Uniswap', () => {
 
       it('v2 - handles eth input properly', async () => {
         const [tokenIn, tokenOut] = [Ether.onChain(1), USDC]
-        const inputAmount = ethers.utils
-          .parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
+        const inputAmount = parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
           .toString()
         const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
 
@@ -1795,8 +1779,7 @@ describe('Uniswap', () => {
 
       it('v2 - handles eth input properly - 0xeeee...eeee address', async () => {
         const [tokenIn, tokenOut] = [Ether.onChain(1), USDC]
-        const inputAmount = ethers.utils
-          .parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
+        const inputAmount = parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
           .toString()
         const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
 
@@ -1827,8 +1810,7 @@ describe('Uniswap', () => {
 
       it('v3 - handles eth input properly', async () => {
         const [tokenIn, tokenOut] = [Ether.onChain(1), USDC]
-        const inputAmount = ethers.utils
-          .parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
+        const inputAmount = parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
           .toString()
         const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
 
@@ -1863,8 +1845,7 @@ describe('Uniswap', () => {
 
       it('v4 - handles eth input properly', async () => {
         const [tokenIn, tokenOut] = [Ether.onChain(1), USDC]
-        const inputAmount = ethers.utils
-          .parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
+        const inputAmount = parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
           .toString()
         const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
         const opts = swapOptions({})
@@ -1896,8 +1877,7 @@ describe('Uniswap', () => {
 
       it('v2 - handles eth output properly', async () => {
         const [tokenIn, tokenOut] = [USDC, Ether.onChain(1)]
-        const inputAmount = ethers.utils
-          .parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
+        const inputAmount = parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
           .toString()
         const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
 
@@ -1928,8 +1908,7 @@ describe('Uniswap', () => {
 
       it('v3 - handles eth output properly', async () => {
         const [tokenIn, tokenOut] = [USDC, Ether.onChain(1)]
-        const inputAmount = ethers.utils
-          .parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
+        const inputAmount = parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
           .toString()
         const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
 
@@ -1960,8 +1939,7 @@ describe('Uniswap', () => {
 
       it('v3 - multi pool erc20 <> erc20', async () => {
         const [tokenIn, tokenOut] = [DAI, WETH]
-        const inputAmount = ethers.utils
-          .parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
+        const inputAmount = parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
           .toString()
         const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
 
@@ -2002,8 +1980,7 @@ describe('Uniswap', () => {
 
       it('v4 - multi pool erc20 <> erc20', async () => {
         const [tokenIn, tokenOut] = [DAI, WETH]
-        const inputAmount = ethers.utils
-          .parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
+        const inputAmount = parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
           .toString()
         const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
 
@@ -2046,9 +2023,7 @@ describe('Uniswap', () => {
       if (tradeType === TradeType.EXACT_INPUT) {
         it('v2/v3 - mixed route erc20 <> erc20', async () => {
           const [tokenIn, tokenOut] = [DAI, WETH]
-          const inputAmount = ethers.utils
-            .parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
-            .toString()
+          const inputAmount = parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals).toString()
           const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
 
           const opts = swapOptions({})
@@ -2088,9 +2063,7 @@ describe('Uniswap', () => {
 
         it('v2/v3/v4 - mixed route erc20 <> erc20', async () => {
           const [tokenIn, tokenOut] = [DAI, WETH]
-          const inputAmount = ethers.utils
-            .parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
-            .toString()
+          const inputAmount = parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals).toString()
           const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
 
           const opts = swapOptions({})
@@ -2138,8 +2111,7 @@ describe('Uniswap', () => {
 
       it('v3 - handles split routes properly', async () => {
         const [tokenIn, tokenOut] = [WETH, USDC]
-        const inputAmount = ethers.utils
-          .parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
+        const inputAmount = parseUnits('1', getAmountToken(tokenIn, tokenOut, tradeType).decimals)
           .toString()
         const rawInputAmount = getAmount(tokenIn, tokenOut, inputAmount, tradeType)
 
@@ -2294,7 +2266,7 @@ describe('Uniswap', () => {
         ChainId.MAINNET
       )
 
-      const signature: Signature = splitSignature(await wallet._signTypedData(domain, types, values))
+      const signature = Signature.from(await wallet.signTypedData(domain, types, values))
 
       // create migrate options
       const opts = Object.assign({
@@ -2358,7 +2330,7 @@ describe('Uniswap', () => {
         ChainId.MAINNET
       )
 
-      const signature: Signature = splitSignature(await wallet._signTypedData(domain, types, values))
+      const signature = Signature.from(await wallet.signTypedData(domain, types, values))
 
       // create migrate options
       const opts = Object.assign({
@@ -2500,7 +2472,7 @@ describe('Uniswap', () => {
         ChainId.MAINNET
       )
 
-      const signature: Signature = splitSignature(await wallet._signTypedData(domain, types, values))
+      const signature = Signature.from(await wallet.signTypedData(domain, types, values))
 
       let superLowFeePool = new V4Pool(ETHER, USDC, 100, 10, ZERO_ADDRESS, encodeSqrtRatioX96(1, 1), 100000, 0)
 
@@ -2567,7 +2539,7 @@ describe('Uniswap', () => {
         ChainId.MAINNET
       )
 
-      const signature: Signature = splitSignature(await wallet._signTypedData(domain, types, values))
+      const signature = Signature.from(await wallet.signTypedData(domain, types, values))
 
       let superLowFeePool = new V4Pool(USDC, WETH, 100, 10, ZERO_ADDRESS, encodeSqrtRatioX96(1, 1), 100000, 0)
 

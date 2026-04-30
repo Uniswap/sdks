@@ -1,5 +1,5 @@
 import JSBI from 'jsbi'
-import { ethers } from 'ethers'
+import { JsonRpcProvider, Contract, parseEther } from 'ethers'
 import { MixedRouteTrade, MixedRouteSDK, Trade as RouterTrade } from '@uniswap/router-sdk'
 import { Trade as V2Trade, Pair, Route as RouteV2, computePairAddress } from '@uniswap/v2-sdk'
 import {
@@ -83,28 +83,31 @@ export async function getUniswapPools(forkBlock?: number): Promise<UniswapPools>
   }
 }
 
-function getProvider(): ethers.providers.BaseProvider {
-  return new ethers.providers.JsonRpcProvider(process.env['FORK_URL'])
+function getProvider(): JsonRpcProvider {
+  return new JsonRpcProvider(process.env['FORK_URL'])
 }
 
 export async function getPair(tokenA: Token, tokenB: Token, blockNumber: number): Promise<Pair> {
   const pairAddress = computePairAddress({ factoryAddress: V2_FACTORY, tokenA, tokenB })
-  const contract = new ethers.Contract(pairAddress, V2_ABI, getProvider())
+  const contract = new Contract(pairAddress, V2_ABI, getProvider())
   const { reserve0, reserve1 } = await contract.getReserves({ blockTag: blockNumber })
   const [token0, token1] = tokenA.sortsBefore(tokenB) ? [tokenA, tokenB] : [tokenB, tokenA] // does safety checks
-  return new Pair(CurrencyAmount.fromRawAmount(token0, reserve0), CurrencyAmount.fromRawAmount(token1, reserve1))
+  return new Pair(
+    CurrencyAmount.fromRawAmount(token0, reserve0.toString()),
+    CurrencyAmount.fromRawAmount(token1, reserve1.toString())
+  )
 }
 
 export async function getPool(tokenA: Token, tokenB: Token, feeAmount: FeeAmount, blockNumber: number): Promise<Pool> {
   const [token0, token1] = tokenA.sortsBefore(tokenB) ? [tokenA, tokenB] : [tokenB, tokenA] // does safety checks
   const poolAddress = Pool.getAddress(token0, token1, feeAmount)
-  const contract = new ethers.Contract(poolAddress, IUniswapV3Pool.abi, getProvider())
+  const contract = new Contract(poolAddress, IUniswapV3Pool.abi, getProvider())
   let liquidity = await contract.liquidity({ blockTag: blockNumber })
   let { sqrtPriceX96, tick } = await contract.slot0({ blockTag: blockNumber })
   liquidity = JSBI.BigInt(liquidity.toString())
   sqrtPriceX96 = JSBI.BigInt(sqrtPriceX96.toString())
 
-  return new Pool(token0, token1, feeAmount, sqrtPriceX96, liquidity, tick, [
+  return new Pool(token0, token1, feeAmount, sqrtPriceX96, liquidity, Number(tick), [
     {
       index: nearestUsableTick(TickMath.MIN_TICK, TICK_SPACINGS[feeAmount]),
       liquidityNet: liquidity,
@@ -177,7 +180,7 @@ export function buildTrade(
 // ─── Shared unit-test pool factories (no RPC needed) ─────────────────────────
 
 export function makeV3Pool(tokenA: Token, tokenB: Token, fee: FeeAmount = FeeAmount.MEDIUM): Pool {
-  const liquidity = JSBI.BigInt(ethers.utils.parseEther('1000000').toString())
+  const liquidity = JSBI.BigInt(parseEther('1000000').toString())
   const tickSpacing = TICK_SPACINGS[fee]
   const ticks = [
     { index: nearestUsableTick(TickMath.MIN_TICK, tickSpacing), liquidityNet: liquidity, liquidityGross: liquidity },
@@ -191,7 +194,7 @@ export function makeV3Pool(tokenA: Token, tokenB: Token, fee: FeeAmount = FeeAmo
 }
 
 export function makeV4Pool(tokenA: Currency, tokenB: Currency, fee: FeeAmount = FeeAmount.MEDIUM): V4Pool {
-  const liquidity = JSBI.BigInt(ethers.utils.parseEther('1000000').toString())
+  const liquidity = JSBI.BigInt(parseEther('1000000').toString())
   const tickSpacing = 60
   const ticks = [
     { index: nearestUsableTick(TickMath.MIN_TICK, tickSpacing), liquidityNet: liquidity, liquidityGross: liquidity },

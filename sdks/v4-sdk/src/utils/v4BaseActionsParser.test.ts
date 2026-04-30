@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import { CurrencyAmount, WETH9 } from '@uniswap/sdk-core'
-import { ethers, BigNumber } from 'ethers'
+import { parseEther } from 'ethers'
 import { Route } from '../entities/route'
 import { Trade } from '../entities/trade'
 import { encodeRouteToPath } from './encodeRouteToPath'
@@ -12,7 +12,7 @@ import JSBI from 'jsbi'
 
 const addressOne = '0x0000000000000000000000000000000000000001'
 const addressTwo = '0x0000000000000000000000000000000000000002'
-const amount = ethers.utils.parseEther('1')
+const amount = parseEther('1')
 
 describe('Command Parser', () => {
   type ParserTest = {
@@ -368,7 +368,7 @@ describe('Version-aware Parser', () => {
         TradeType.EXACT_INPUT
       )
 
-      const maxHopSlippage = [BigNumber.from('10000'), BigNumber.from('20000')]
+      const maxHopSlippage = [BigInt('10000'), BigInt('20000')]
 
       const planner = new V4Planner()
       planner.addTrade(trade, undefined, maxHopSlippage, URVersion.V2_1_1)
@@ -397,7 +397,7 @@ describe('Version-aware Parser', () => {
         TradeType.EXACT_OUTPUT
       )
 
-      const maxHopSlippage = [BigNumber.from('15000'), BigNumber.from('25000')]
+      const maxHopSlippage = [BigInt('15000'), BigInt('25000')]
 
       const planner = new V4Planner()
       planner.addTrade(trade, new (await import('@uniswap/sdk-core')).Percent('5'), maxHopSlippage, URVersion.V2_1_1)
@@ -470,7 +470,7 @@ describe('Version-aware Parser', () => {
         TradeType.EXACT_INPUT
       )
 
-      const maxHopSlippage = [BigNumber.from('12345'), BigNumber.from('67890')]
+      const maxHopSlippage = [BigInt('12345'), BigInt('67890')]
 
       const planner = new V4Planner()
       planner.addTrade(trade, undefined, maxHopSlippage, URVersion.V2_1_1)
