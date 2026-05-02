@@ -76,6 +76,21 @@ export class V3DutchOrderBuilder extends OrderBuilder {
   ) {
     super();
 
+    // Guard against accidentally constructing a builder against a placeholder
+    // (zero-address) reactor from the chain mapping — this would silently
+    // produce orders signed against 0x0 and is never the intended state. The
+    // mapping intentionally registers the zero address only for chains where
+    // the reactor has not yet been deployed (see TRA2-12 for Tempo). The
+    // check is scoped to the mapping lookup so callers that explicitly pass
+    // a reactor override (e.g. tests) are not affected.
+    if (
+      reactorAddress === undefined &&
+      getReactor(chainId, OrderType.Dutch_V3) === ethers.constants.AddressZero
+    ) {
+      throw new Error(
+        `Cannot construct V3DutchOrderBuilder for chain ${chainId} — V3DutchOrderReactor not yet deployed (placeholder address). See TRA2-12.`
+      );
+    }
     this.reactor(getReactor(chainId, OrderType.Dutch_V3, reactorAddress));
     this.permit2Address = getPermit2(chainId, _permit2Address);
     this.info = {

@@ -1,8 +1,10 @@
 import {
+  EXCLUSIVE_FILLER_VALIDATION_MAPPING,
   OrderType,
   PERMIT2_MAPPING,
   REACTOR_ADDRESS_MAPPING,
   UNISWAPX_ORDER_QUOTER_MAPPING,
+  UNISWAPX_V4_ORDER_QUOTER_MAPPING,
 } from "./constants";
 import { getPermit2, getReactor } from "./utils";
 
@@ -91,5 +93,19 @@ describe("Tempo (chainId 4217) registration", () => {
 
   it("registers the placeholder UniswapX order quoter for Tempo (TODO TRA2-12)", () => {
     expect(UNISWAPX_ORDER_QUOTER_MAPPING[TEMPO]).toEqual(PLACEHOLDER);
+  });
+
+  it("registers the zero-address exclusive filler validator for Tempo (matches Arbitrum/Sepolia precedent)", () => {
+    expect(EXCLUSIVE_FILLER_VALIDATION_MAPPING[TEMPO]).toEqual(PLACEHOLDER);
+  });
+
+  it("does NOT register Tempo for Priority / Dutch_V2 / V4 (intentional — V3-only chain)", () => {
+    // Locking in the intentional absences so a future regression cannot
+    // silently extend Tempo to unsupported order types. The downstream
+    // OffChainUniswapXOrderValidator in x-service relies on these gaps.
+    expect(REACTOR_ADDRESS_MAPPING[TEMPO][OrderType.Priority]).toBeUndefined();
+    expect(REACTOR_ADDRESS_MAPPING[TEMPO][OrderType.Dutch_V2]).toBeUndefined();
+    expect(REACTOR_ADDRESS_MAPPING[TEMPO][OrderType.V4]).toBeUndefined();
+    expect(UNISWAPX_V4_ORDER_QUOTER_MAPPING[TEMPO]).toBeUndefined();
   });
 });

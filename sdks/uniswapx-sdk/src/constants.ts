@@ -49,6 +49,11 @@ export const UNISWAPX_ORDER_QUOTER_MAPPING: AddressMap = {
   4217: "0x0000000000000000000000000000000000000000",
 };
 
+// Tempo (4217) is intentionally NOT registered here: only Dutch_V3 is
+// supported on Tempo, so a V4 quoter entry is meaningless. Leaving Tempo
+// absent from this map matches the upstream guard in x-service's
+// OffChainUniswapXOrderValidator, which infers "V4 not supported" from the
+// missing entry.
 export const UNISWAPX_V4_ORDER_QUOTER_MAPPING: AddressMap = {
   ...constructSameAddressMap("0x0000000000000000000000000000000000000000"),
   1301: "0x8166d8286Ec24E1D17A054088B2a71470527BFf8",
@@ -59,12 +64,18 @@ export const UNISWAPX_V4_TOKEN_TRANSFER_HOOK_MAPPING: AddressMap = {
   1301: "0xBc879Fa59f5F99eb7C3FA0F87c41457773C4adB3",
 };
 
+// Tempo (4217) follows the Arbitrum/Sepolia precedent of registering the
+// zero address: there is no exclusive-filler validation contract deployed on
+// Tempo, and an explicit zero entry signals "intentionally unset" rather than
+// "missing config".
 export const EXCLUSIVE_FILLER_VALIDATION_MAPPING: AddressMap = {
   ...constructSameAddressMap("0x8A66A74e15544db9688B68B06E116f5d19e5dF90"),
   5: "0x0000000000000000000000000000000000000000",
   11155111: "0x0000000000000000000000000000000000000000",
   42161: "0x0000000000000000000000000000000000000000",
   12341234: "0x8A66A74e15544db9688B68B06E116f5d19e5dF90",
+  // TODO: ChainId.TEMPO once sdk-core dist is bumped
+  4217: "0x0000000000000000000000000000000000000000",
 };
 
 export enum KNOWN_EVENT_SIGNATURES {
@@ -140,6 +151,8 @@ export const REACTOR_ADDRESS_MAPPING: ReactorMapping = {
     [OrderType.Priority]: "0x0000000000000000000000000000000000000000",
   },
   // TODO: ChainId.TEMPO once sdk-core is bumped
+  // Only Dutch_V3 is supported on Tempo; absence of Priority/V2/V4 is the
+  // upstream guard for x-service's OffChainUniswapXOrderValidator.
   4217: {
     // TODO(TRA2-12): replace with deployed V3DutchOrderReactor address from contracts repo
     [OrderType.Dutch_V3]: "0x0000000000000000000000000000000000000000",
