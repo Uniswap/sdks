@@ -982,4 +982,16 @@ describe("V3DutchOrderBuilder", () => {
             expect(created_order.info.cosignerData.decayStartBlock).toEqual(212121);
         });
     });
+
+    describe("Tempo (4217) chain support", () => {
+        // TODO(TRA2-12): Tempo's V3DutchOrderReactor is currently registered as the
+        // zero address placeholder. Once the reactor is deployed and the SDK is
+        // updated, the placeholder assertions below should switch to the real
+        // deployed address.
+        it("resolves the Tempo Dutch_V3 reactor placeholder when constructing the builder", () => {
+            const tempoBuilder = new V3DutchOrderBuilder(4217);
+            // Resolution succeeds without throwing MissingConfiguration.
+            expect(tempoBuilder).toBeInstanceOf(V3DutchOrderBuilder);
+        });
+    });
 });

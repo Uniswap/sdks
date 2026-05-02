@@ -30,6 +30,8 @@ export const PERMIT2_MAPPING: AddressMap = {
   ),
   12341234: "0x000000000022d473030f116ddee9f6b43ac78ba3",
   1301: "0x000000000022d473030f116ddee9f6b43ac78ba3",
+  // TODO: ChainId.TEMPO once sdk-core is bumped
+  4217: "0x000000000022d473030f116ddee9f6b43ac78ba3",
 };
 
 export const UNISWAPX_ORDER_QUOTER_MAPPING: AddressMap = {
@@ -42,6 +44,9 @@ export const UNISWAPX_ORDER_QUOTER_MAPPING: AddressMap = {
   130: "0xc6ef4C96Ee89e48Eff1C35545DBEED4Ad8dAC9D4",
   42161: "0xc6ef4C96Ee89e48Eff1C35545DBEED4Ad8dAC9D4",
   1301: "0xBFE64A14130054E1C3aB09287bc69E7148471636",
+  // TODO(TRA2-12): replace with deployed UniswapXOrderQuoter address from contracts repo
+  // TODO: ChainId.TEMPO once sdk-core is bumped
+  4217: "0x0000000000000000000000000000000000000000",
 };
 
 export const UNISWAPX_V4_ORDER_QUOTER_MAPPING: AddressMap = {
@@ -133,6 +138,11 @@ export const REACTOR_ADDRESS_MAPPING: ReactorMapping = {
     [OrderType.Dutch_V2]: "0x0000000000000000000000000000000000000000",
     [OrderType.Relay]: "0x0000000000000000000000000000000000000000",
     [OrderType.Priority]: "0x0000000000000000000000000000000000000000",
+  },
+  // TODO: ChainId.TEMPO once sdk-core is bumped
+  4217: {
+    // TODO(TRA2-12): replace with deployed V3DutchOrderReactor address from contracts repo
+    [OrderType.Dutch_V3]: "0x0000000000000000000000000000000000000000",
   },
 };
 
