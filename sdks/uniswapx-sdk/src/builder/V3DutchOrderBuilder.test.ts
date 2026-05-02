@@ -982,4 +982,23 @@ describe("V3DutchOrderBuilder", () => {
             expect(created_order.info.cosignerData.decayStartBlock).toEqual(212121);
         });
     });
+
+    describe("Tempo (4217) chain support", () => {
+        // TODO(TRA2-12): Tempo's V3DutchOrderReactor is currently registered as the
+        // zero address placeholder. Once the reactor is deployed and the SDK is
+        // updated, the builder-time guard below should stop firing and this
+        // test should switch to asserting successful construction.
+        it("throws when constructing against the Tempo placeholder reactor", () => {
+            expect(() => new V3DutchOrderBuilder(4217)).toThrow(
+                "Cannot construct V3DutchOrderBuilder for chain 4217 — V3DutchOrderReactor not yet deployed (placeholder address). See TRA2-12."
+            );
+        });
+
+        it("does not throw on chains with a real deployed reactor (Arbitrum One)", () => {
+            // Arbitrum One has a real Dutch_V3 reactor in REACTOR_ADDRESS_MAPPING,
+            // so the placeholder guard must not fire there.
+            const arbBuilder = new V3DutchOrderBuilder(42161);
+            expect(arbBuilder).toBeInstanceOf(V3DutchOrderBuilder);
+        });
+    });
 });
