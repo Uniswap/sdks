@@ -27,7 +27,6 @@ import { encodePermit, encodeV3PositionPermit } from './utils/inputTokens'
 import {
   ETH_ADDRESS,
   ROUTER_AS_RECIPIENT,
-  SENDER_AS_RECIPIENT,
   UNIVERSAL_ROUTER_ADDRESS,
   UniversalRouterVersion,
   isAtLeastV2_1_1,
@@ -36,6 +35,7 @@ import { getCurrencyAddress } from './utils/getCurrencyAddress'
 import { encodeFee1e18, encodeFeeBips } from './utils/numbers'
 import { encodeSwapStep } from './utils/encodeSwapStep'
 import { computeEncodeSwapsAmounts } from './utils/computeEncodeSwapsAmounts'
+import { normalizeEncodeSwapsSpec } from './utils/normalizeEncodeSwapsSpec'
 import { validateEncodeSwaps } from './utils/validateEncodeSwaps'
 import { getUniversalRouterDomain, EXECUTE_SIGNED_TYPES, generateNonce } from './utils/eip712'
 import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
@@ -71,16 +71,6 @@ export interface MigrateV3ToV4Options {
   outputPosition: V4Position
   v3RemoveLiquidityOptions: V3RemoveLiquidityOptions
   v4AddLiquidityOptions: V4AddLiquidityOptions
-}
-
-type NormalizedSwapSpecification = Omit<
-  SwapSpecification,
-  'recipient' | 'tokenTransferMode' | 'urVersion' | 'safeMode'
-> & {
-  recipient: string
-  tokenTransferMode: TokenTransferMode
-  urVersion: UniversalRouterVersion
-  safeMode: boolean
 }
 
 const DEFAULT_PROXY_DEADLINE_BUFFER_SECONDS = 30 * 60
@@ -159,16 +149,18 @@ export abstract class SwapRouter {
    * command or transfer. The SDK does not infer route topology or add transition commands on behalf of routers.
    */
   public static encodeSwaps(spec: SwapSpecification, swapSteps: SwapStep[]): MethodParameters {
-    const normalizedSpec = SwapRouter.normalizeEncodeSwapsSpec(spec)
+    const normalizedSpec = normalizeEncodeSwapsSpec(spec)
     const planner = new RoutePlanner()
 
     validateEncodeSwaps(normalizedSpec, swapSteps)
 
-    const { maxAmountIn, netMinOrExactOut } = computeEncodeSwapsAmounts(normalizedSpec)
+    const { exactOrMaxAmountIn, netMinOrExactAmountOut } = computeEncodeSwapsAmounts(normalizedSpec)
     const {
       routing: { inputToken, outputToken },
     } = normalizedSpec
 
+    // Ingress: pull funds into the router. Native input is paid as msg.value at the bottom
+    // instead of via Permit2; ApproveProxy ingress is handled by the outer wrapper at the end.
     if (normalizedSpec.tokenTransferMode === TokenTransferMode.Permit2) {
       if (normalizedSpec.permit) {
         encodePermit(planner, normalizedSpec.permit)
@@ -177,7 +169,7 @@ export abstract class SwapRouter {
       if (!inputToken.isNative) {
         planner.addCommand(
           CommandType.PERMIT2_TRANSFER_FROM,
-          [getCurrencyAddress(inputToken), ROUTER_AS_RECIPIENT, maxAmountIn],
+          [getCurrencyAddress(inputToken), ROUTER_AS_RECIPIENT, exactOrMaxAmountIn],
           false,
           normalizedSpec.urVersion
         )
@@ -188,6 +180,8 @@ export abstract class SwapRouter {
       encodeSwapStep(planner, step, normalizedSpec.urVersion)
     }
 
+    // Fee deducted from gross output before final settlement.
+    // Portion uses 1e18 precision on >=v2.1.1 and bps on v2.0; flat is a plain TRANSFER.
     if (normalizedSpec.fee?.kind === 'portion') {
       const feeCommandType = isAtLeastV2_1_1(normalizedSpec.urVersion)
         ? CommandType.PAY_PORTION_FULL_PRECISION
@@ -214,7 +208,7 @@ export abstract class SwapRouter {
     // Assumes routers already normalized final gross output into `routing.outputToken`.
     planner.addCommand(
       CommandType.SWEEP,
-      [getCurrencyAddress(outputToken), normalizedSpec.recipient, netMinOrExactOut],
+      [getCurrencyAddress(outputToken), normalizedSpec.recipient, netMinOrExactAmountOut],
       false,
       normalizedSpec.urVersion
     )
@@ -229,22 +223,25 @@ export abstract class SwapRouter {
       )
     }
 
+    // safeMode: zero-min ETH sweep collects any native dust left on the router.
     if (normalizedSpec.safeMode) {
       planner.addCommand(CommandType.SWEEP, [ETH_ADDRESS, normalizedSpec.recipient, 0], false, normalizedSpec.urVersion)
     }
 
+    // ApproveProxy wraps the inner UR plan in an outer proxy.execute() that handles ingress upstream.
     if (normalizedSpec.tokenTransferMode === TokenTransferMode.ApproveProxy) {
       return SwapRouter.encodeProxyCall(
         planner,
         getCurrencyAddress(inputToken),
-        maxAmountIn,
+        exactOrMaxAmountIn,
         normalizedSpec.chainId!,
         normalizedSpec.urVersion,
         normalizedSpec.deadline
       )
     }
 
-    return SwapRouter.encodePlan(planner, inputToken.isNative ? maxAmountIn : BigNumber.from(0), {
+    // Native input pays via msg.value; ERC20 input is already in the router via Permit2.
+    return SwapRouter.encodePlan(planner, inputToken.isNative ? exactOrMaxAmountIn : BigNumber.from(0), {
       deadline: normalizedSpec.deadline ? BigNumber.from(normalizedSpec.deadline) : undefined,
     })
   }
@@ -537,15 +534,5 @@ export abstract class SwapRouter {
     ])
 
     return { calldata, value: BigNumber.from(0).toHexString() }
-  }
-
-  private static normalizeEncodeSwapsSpec(spec: SwapSpecification): NormalizedSwapSpecification {
-    return {
-      ...spec,
-      recipient: spec.recipient ?? SENDER_AS_RECIPIENT,
-      tokenTransferMode: spec.tokenTransferMode ?? TokenTransferMode.Permit2,
-      urVersion: spec.urVersion ?? UniversalRouterVersion.V2_0,
-      safeMode: spec.safeMode ?? false,
-    }
   }
 }

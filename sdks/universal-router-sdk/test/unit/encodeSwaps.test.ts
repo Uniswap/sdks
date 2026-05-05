@@ -9,6 +9,7 @@ import { SwapRouter } from '../../src/swapRouter'
 import { TokenTransferMode } from '../../src/entities/actions/uniswap'
 import {
   Fee,
+  NormalizedSwapSpecification,
   SwapSpecification,
   SwapStep,
   V2SwapExactIn,
@@ -111,8 +112,8 @@ function portionAmount(amount: BigNumber, fee: Percent): BigNumber {
 function buildSpec(
   overrides: Partial<SwapSpecification> = {},
   routingOverrides: Partial<SwapSpecification['routing']> = {}
-): SwapSpecification {
-  const base: SwapSpecification = {
+): NormalizedSwapSpecification {
+  const base: NormalizedSwapSpecification = {
     tradeType: TradeType.EXACT_INPUT,
     routing: {
       inputToken: USDC,
@@ -122,11 +123,18 @@ function buildSpec(
     },
     recipient: TEST_RECIPIENT,
     slippageTolerance: new Percent(5, 100),
+    tokenTransferMode: TokenTransferMode.Permit2,
+    urVersion: UniversalRouterVersion.V2_0,
+    safeMode: false,
   }
 
   return {
     ...base,
     ...overrides,
+    recipient: overrides.recipient ?? base.recipient,
+    tokenTransferMode: overrides.tokenTransferMode ?? base.tokenTransferMode,
+    urVersion: overrides.urVersion ?? base.urVersion,
+    safeMode: overrides.safeMode ?? base.safeMode,
     routing: {
       ...base.routing,
       ...routingOverrides,
@@ -440,15 +448,15 @@ describe('encodeSwaps', () => {
       ).to.throw('FLAT_FEE_GT_AMOUNT')
     })
 
-    it('rejects maxHopSlippage on UR 2.0 steps', () => {
+    it('rejects minHopPriceX36 on UR 2.0 steps', () => {
       expect(() =>
         validateEncodeSwaps(buildSpec({ urVersion: UniversalRouterVersion.V2_0 }), [
-          buildV3ExactInStep({ maxHopSlippage: ['100'] }),
+          buildV3ExactInStep({ minHopPriceX36: ['100'] }),
         ])
-      ).to.throw('MAX_HOP_SLIPPAGE_UNSUPPORTED_ON_V2_0')
+      ).to.throw('MIN_HOP_PRICE_X36_UNSUPPORTED_ON_V2_0')
     })
 
-    it('rejects maxHopSlippage on UR 2.0 v4 actions', () => {
+    it('rejects minHopPriceX36 on UR 2.0 v4 actions', () => {
       const v4Step: V4Swap = {
         type: 'V4_SWAP',
         v4Actions: [
@@ -464,14 +472,14 @@ describe('encodeSwaps', () => {
             zeroForOne: true,
             amountOut: '1000',
             amountInMaximum: '2000',
-            maxHopSlippage: '123',
+            minHopPriceX36: '123',
             hookData: '0x',
           },
         ],
       }
 
       expect(() => validateEncodeSwaps(buildSpec({ urVersion: UniversalRouterVersion.V2_0 }), [v4Step])).to.throw(
-        'MAX_HOP_SLIPPAGE_UNSUPPORTED_ON_V2_0'
+        'MIN_HOP_PRICE_X36_UNSUPPORTED_ON_V2_0'
       )
     })
 
@@ -489,11 +497,11 @@ describe('encodeSwaps', () => {
         amountIn: '1000',
         amountOutMin: '0',
         path: [USDC.address, WETH.address],
-        maxHopSlippage: ['10', '20'],
+        minHopPriceX36: ['10', '20'],
       }
 
       expect(() => validateEncodeSwaps(buildSpec({ urVersion: UniversalRouterVersion.V2_1_1 }), [step])).to.throw(
-        'V2_MAX_HOP_SLIPPAGE_LENGTH_MISMATCH'
+        'V2_MIN_HOP_PRICE_X36_LENGTH_MISMATCH'
       )
     })
 
@@ -515,23 +523,23 @@ describe('encodeSwaps', () => {
             ],
             amountIn: '1000',
             amountOutMinimum: '0',
-            maxHopSlippage: ['10', '20'],
+            minHopPriceX36: ['10', '20'],
           },
         ],
       }
 
       expect(() => validateEncodeSwaps(buildSpec({ urVersion: UniversalRouterVersion.V2_1_1 }), [step])).to.throw(
-        'V4_MAX_HOP_SLIPPAGE_LENGTH_MISMATCH'
+        'V4_MIN_HOP_PRICE_X36_LENGTH_MISMATCH'
       )
     })
 
     it('rejects V3 path-count mismatches when the path can be counted', () => {
       const step = buildV3ExactInStep({
-        maxHopSlippage: ['10', '20'],
+        minHopPriceX36: ['10', '20'],
       })
 
       expect(() => validateEncodeSwaps(buildSpec({ urVersion: UniversalRouterVersion.V2_1_1 }), [step])).to.throw(
-        'V3_MAX_HOP_SLIPPAGE_LENGTH_MISMATCH'
+        'V3_MIN_HOP_PRICE_X36_LENGTH_MISMATCH'
       )
     })
   })
@@ -543,14 +551,14 @@ describe('encodeSwaps', () => {
       planner = new RoutePlanner()
     })
 
-    it('encodes V2 swap maxHopSlippage on UR 2.1.1', () => {
+    it('encodes V2 swap minHopPriceX36 on UR 2.1.1', () => {
       const step: V2SwapExactIn = {
         type: 'V2_SWAP_EXACT_IN',
         recipient: ROUTER_AS_RECIPIENT,
         amountIn: '1000',
         amountOutMin: '0',
         path: [USDC.address, WETH.address, DAI.address],
-        maxHopSlippage: ['10', '20'],
+        minHopPriceX36: ['10', '20'],
       }
 
       encodeSwapStep(planner, step, UniversalRouterVersion.V2_1_1)
@@ -563,17 +571,17 @@ describe('encodeSwaps', () => {
       expect(decoded[5].map((value: BigNumber) => value.toString())).to.deep.equal(['10', '20'])
     })
 
-    it('omits V3 maxHopSlippage on UR 2.0', () => {
+    it('omits V3 minHopPriceX36 on UR 2.0', () => {
       encodeSwapStep(planner, buildV3ExactInStep(), UniversalRouterVersion.V2_0)
 
       const decoded = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], planner.inputs[0])
       expect(decoded[4]).to.equal(false)
     })
 
-    it('encodes V3 maxHopSlippage on UR 2.1.1', () => {
+    it('encodes V3 minHopPriceX36 on UR 2.1.1', () => {
       encodeSwapStep(
         planner,
-        buildV3ExactInStep({ maxHopSlippage: ['500', '600'] }, [USDC, WETH, DAI], [500, 3000]),
+        buildV3ExactInStep({ minHopPriceX36: ['500', '600'] }, [USDC, WETH, DAI], [500, 3000]),
         UniversalRouterVersion.V2_1_1
       )
 
@@ -592,8 +600,8 @@ describe('encodeSwaps', () => {
       expect(decoded[3]).to.equal(packV3ExactOutPath([USDC.address, WETH.address, DAI.address], [500, 3000]))
     })
 
-    it('encodes V3 exact-output maxHopSlippage on UR 2.1.1', () => {
-      const step = buildV3ExactOutStep({ maxHopSlippage: ['750'] }, [WETH, USDC], [500])
+    it('encodes V3 exact-output minHopPriceX36 on UR 2.1.1', () => {
+      const step = buildV3ExactOutStep({ minHopPriceX36: ['750'] }, [WETH, USDC], [500])
 
       encodeSwapStep(planner, step, UniversalRouterVersion.V2_1_1)
 
@@ -607,7 +615,7 @@ describe('encodeSwaps', () => {
       expect(decoded[5].map((value: BigNumber) => value.toString())).to.deep.equal(['750'])
     })
 
-    it('encodes V4 path maxHopSlippage on UR 2.1.1', () => {
+    it('encodes V4 path minHopPriceX36 on UR 2.1.1', () => {
       const step: V4Swap = {
         type: 'V4_SWAP',
         v4Actions: [
@@ -632,7 +640,7 @@ describe('encodeSwaps', () => {
             ],
             amountIn: '1000',
             amountOutMinimum: '0',
-            maxHopSlippage: ['100', '200'],
+            minHopPriceX36: ['100', '200'],
           },
         ],
       }
@@ -641,10 +649,11 @@ describe('encodeSwaps', () => {
 
       const parsed = V4BaseActionsParser.parseCalldata(planner.inputs[0], URVersion.V2_1_1)
       const action = parsed.actions[0].params[0].value as any
+      // v4-sdk's parser emits the field as `maxHopSlippage`; the value is the contract's `minHopPriceX36`.
       expect(action.maxHopSlippage.map((value: BigNumber) => value.toString())).to.deep.equal(['100', '200'])
     })
 
-    it('encodes V4 single maxHopSlippage on UR 2.1.1', () => {
+    it('encodes V4 single minHopPriceX36 on UR 2.1.1', () => {
       const step: V4Swap = {
         type: 'V4_SWAP',
         v4Actions: [
@@ -660,7 +669,7 @@ describe('encodeSwaps', () => {
             zeroForOne: true,
             amountOut: '1000',
             amountInMaximum: '2000',
-            maxHopSlippage: '123456',
+            minHopPriceX36: '123456',
             hookData: '0x',
           },
         ],
@@ -1193,7 +1202,7 @@ describe('encodeSwaps', () => {
         urVersion: UniversalRouterVersion.V2_1_1,
       })
 
-      const result = SwapRouter.encodeSwaps(spec, [buildV3ExactInStep({ maxHopSlippage: ['10'] })])
+      const result = SwapRouter.encodeSwaps(spec, [buildV3ExactInStep({ minHopPriceX36: ['10'] })])
       const { commands, inputs } = decodeExecute(result.calldata)
 
       expect(commands).to.equal('0x02000704')

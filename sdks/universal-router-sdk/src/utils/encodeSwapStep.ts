@@ -10,25 +10,25 @@ export function encodeSwapStep(planner: RoutePlanner, step: SwapStep, urVersion?
   switch (step.type) {
     case 'V2_SWAP_EXACT_IN': {
       const params: any[] = [step.recipient, step.amountIn, step.amountOutMin, step.path, false]
-      if (useV2_1_1) params.push(step.maxHopSlippage ?? [])
+      if (useV2_1_1) params.push(step.minHopPriceX36 ?? [])
       planner.addCommand(CommandType.V2_SWAP_EXACT_IN, params, false, urVersion)
       return
     }
     case 'V2_SWAP_EXACT_OUT': {
       const params: any[] = [step.recipient, step.amountOut, step.amountInMax, step.path, false]
-      if (useV2_1_1) params.push(step.maxHopSlippage ?? [])
+      if (useV2_1_1) params.push(step.minHopPriceX36 ?? [])
       planner.addCommand(CommandType.V2_SWAP_EXACT_OUT, params, false, urVersion)
       return
     }
     case 'V3_SWAP_EXACT_IN': {
       const params: any[] = [step.recipient, step.amountIn, step.amountOutMin, step.path, false]
-      if (useV2_1_1) params.push(step.maxHopSlippage ?? [])
+      if (useV2_1_1) params.push(step.minHopPriceX36 ?? [])
       planner.addCommand(CommandType.V3_SWAP_EXACT_IN, params, false, urVersion)
       return
     }
     case 'V3_SWAP_EXACT_OUT': {
       const params: any[] = [step.recipient, step.amountOut, step.amountInMax, step.path, false]
-      if (useV2_1_1) params.push(step.maxHopSlippage ?? [])
+      if (useV2_1_1) params.push(step.minHopPriceX36 ?? [])
       planner.addCommand(CommandType.V3_SWAP_EXACT_OUT, params, false, urVersion)
       return
     }

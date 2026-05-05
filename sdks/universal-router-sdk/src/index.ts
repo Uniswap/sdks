@@ -17,5 +17,6 @@ export {
 export { CommandParser, GenericCommandParser } from './utils/commandParser'
 export type { UniversalRouterCommand, UniversalRouterCall, Param, CommandsDefinition } from './utils/commandParser'
 export type { Permit2Permit } from './utils/inputTokens'
+export { normalizeEncodeSwapsSpec } from './utils/normalizeEncodeSwapsSpec'
 export { validateEncodeSwaps } from './utils/validateEncodeSwaps'
 export { NONCE_SKIP_CHECK, generateNonce, EXECUTE_SIGNED_TYPES, getUniversalRouterDomain } from './utils/eip712'

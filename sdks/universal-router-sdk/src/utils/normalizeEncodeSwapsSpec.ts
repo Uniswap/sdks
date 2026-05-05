@@ -1,0 +1,13 @@
+import { TokenTransferMode } from '../entities/actions/uniswap'
+import { NormalizedSwapSpecification, SwapSpecification } from '../types/encodeSwaps'
+import { SENDER_AS_RECIPIENT, UniversalRouterVersion } from './constants'
+
+export function normalizeEncodeSwapsSpec(spec: SwapSpecification): NormalizedSwapSpecification {
+  return {
+    ...spec,
+    recipient: spec.recipient ?? SENDER_AS_RECIPIENT,
+    tokenTransferMode: spec.tokenTransferMode ?? TokenTransferMode.Permit2,
+    urVersion: spec.urVersion ?? UniversalRouterVersion.V2_0,
+    safeMode: spec.safeMode ?? false,
+  }
+}

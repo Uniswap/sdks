@@ -30,13 +30,26 @@ export type SwapSpecification = {
   safeMode?: boolean
 }
 
+// Output of `normalizeEncodeSwapsSpec`: the four fields below are guaranteed
+// non-undefined, encoding the precondition for `validateEncodeSwaps` and
+// `computeEncodeSwapsAmounts` at the type level.
+export type NormalizedSwapSpecification = Omit<
+  SwapSpecification,
+  'recipient' | 'tokenTransferMode' | 'urVersion' | 'safeMode'
+> & {
+  recipient: string
+  tokenTransferMode: TokenTransferMode
+  urVersion: UniversalRouterVersion
+  safeMode: boolean
+}
+
 export type V2SwapExactIn = {
   type: 'V2_SWAP_EXACT_IN'
   recipient: string
   amountIn: BigNumberish
   amountOutMin: BigNumberish
   path: string[]
-  maxHopSlippage?: BigNumberish[]
+  minHopPriceX36?: BigNumberish[]
 }
 
 export type V2SwapExactOut = {
@@ -45,7 +58,7 @@ export type V2SwapExactOut = {
   amountOut: BigNumberish
   amountInMax: BigNumberish
   path: string[]
-  maxHopSlippage?: BigNumberish[]
+  minHopPriceX36?: BigNumberish[]
 }
 
 export type V3SwapExactIn = {
@@ -54,7 +67,7 @@ export type V3SwapExactIn = {
   amountIn: BigNumberish
   amountOutMin: BigNumberish
   path: string
-  maxHopSlippage?: BigNumberish[]
+  minHopPriceX36?: BigNumberish[]
 }
 
 export type V3SwapExactOut = {
@@ -63,7 +76,7 @@ export type V3SwapExactOut = {
   amountOut: BigNumberish
   amountInMax: BigNumberish
   path: string
-  maxHopSlippage?: BigNumberish[]
+  minHopPriceX36?: BigNumberish[]
 }
 
 export type V4Swap = {
@@ -91,7 +104,7 @@ export type V4SwapExactIn = {
   path: PathKey[]
   amountIn: BigNumberish
   amountOutMinimum: BigNumberish
-  maxHopSlippage?: BigNumberish[]
+  minHopPriceX36?: BigNumberish[]
 }
 
 export type V4SwapExactInSingle = {
@@ -100,7 +113,7 @@ export type V4SwapExactInSingle = {
   zeroForOne: boolean
   amountIn: BigNumberish
   amountOutMinimum: BigNumberish
-  maxHopSlippage?: BigNumberish
+  minHopPriceX36?: BigNumberish
   hookData: string
 }
 
@@ -110,7 +123,7 @@ export type V4SwapExactOut = {
   path: PathKey[]
   amountOut: BigNumberish
   amountInMaximum: BigNumberish
-  maxHopSlippage?: BigNumberish[]
+  minHopPriceX36?: BigNumberish[]
 }
 
 export type V4SwapExactOutSingle = {
@@ -119,7 +132,7 @@ export type V4SwapExactOutSingle = {
   zeroForOne: boolean
   amountOut: BigNumberish
   amountInMaximum: BigNumberish
-  maxHopSlippage?: BigNumberish
+  minHopPriceX36?: BigNumberish
   hookData: string
 }
 

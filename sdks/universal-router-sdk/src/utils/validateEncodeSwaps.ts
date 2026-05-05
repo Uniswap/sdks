@@ -3,7 +3,7 @@ import invariant from 'tiny-invariant'
 import { TradeType } from '@uniswap/sdk-core'
 import { TokenTransferMode } from '../entities/actions/uniswap'
 import { ROUTER_AS_RECIPIENT, SENDER_AS_RECIPIENT, UniversalRouterVersion, ZERO_ADDRESS } from './constants'
-import { SwapSpecification, SwapStep, V4Action } from '../types/encodeSwaps'
+import { NormalizedSwapSpecification, SwapStep, V4Action } from '../types/encodeSwaps'
 
 function getV3HopCount(path: string): number | undefined {
   if (!path.startsWith('0x')) return undefined
@@ -17,14 +17,13 @@ function getV3HopCount(path: string): number | undefined {
   return variableSegmentLength / 23
 }
 
-function hasV4MaxHopSlippage(action: V4Action): boolean {
+function hasV4MinHopPriceX36(action: V4Action): boolean {
   switch (action.action) {
     case 'SWAP_EXACT_IN':
     case 'SWAP_EXACT_OUT':
-      return action.maxHopSlippage !== undefined
     case 'SWAP_EXACT_IN_SINGLE':
     case 'SWAP_EXACT_OUT_SINGLE':
-      return action.maxHopSlippage !== undefined
+      return action.minHopPriceX36 !== undefined
     default:
       return false
   }
@@ -36,8 +35,8 @@ function validateV4HopCounts(actions: V4Action[]): void {
       case 'SWAP_EXACT_IN':
       case 'SWAP_EXACT_OUT':
         invariant(
-          !action.maxHopSlippage || action.maxHopSlippage.length === action.path.length,
-          'V4_MAX_HOP_SLIPPAGE_LENGTH_MISMATCH'
+          !action.minHopPriceX36 || action.minHopPriceX36.length === action.path.length,
+          'V4_MIN_HOP_PRICE_X36_LENGTH_MISMATCH'
         )
         break
       default:
@@ -69,20 +68,17 @@ function validateV4Recipients(actions: V4Action[]): void {
   }
 }
 
-export function validateEncodeSwaps(spec: SwapSpecification, swapSteps: SwapStep[]): void {
+export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps: SwapStep[]): void {
   invariant(swapSteps.length > 0, 'EMPTY_SWAP_STEPS')
 
-  const recipient = spec.recipient ?? SENDER_AS_RECIPIENT
-  const tokenTransferMode = spec.tokenTransferMode ?? TokenTransferMode.Permit2
-  const urVersion = spec.urVersion ?? UniversalRouterVersion.V2_0
   const amountCurrency = spec.routing.amount.currency.wrapped
   const quoteCurrency = spec.routing.quote.currency.wrapped
   const inputCurrency = spec.routing.inputToken.wrapped
   const outputCurrency = spec.routing.outputToken.wrapped
 
   invariant(!spec.slippageTolerance.lessThan(0), 'SLIPPAGE_TOLERANCE')
-  invariant(recipient !== ZERO_ADDRESS, 'RECIPIENT_CANNOT_BE_ZERO')
-  invariant(recipient !== ROUTER_AS_RECIPIENT, 'RECIPIENT_CANNOT_BE_ROUTER')
+  invariant(spec.recipient !== ZERO_ADDRESS, 'RECIPIENT_CANNOT_BE_ZERO')
+  invariant(spec.recipient !== ROUTER_AS_RECIPIENT, 'RECIPIENT_CANNOT_BE_ROUTER')
 
   if (spec.tradeType === TradeType.EXACT_INPUT) {
     invariant(amountCurrency.equals(inputCurrency), 'INVALID_ROUTING_AMOUNT_CURRENCY')
@@ -92,11 +88,11 @@ export function validateEncodeSwaps(spec: SwapSpecification, swapSteps: SwapStep
     invariant(quoteCurrency.equals(inputCurrency), 'INVALID_ROUTING_QUOTE_CURRENCY')
   }
 
-  if (tokenTransferMode === TokenTransferMode.ApproveProxy) {
+  if (spec.tokenTransferMode === TokenTransferMode.ApproveProxy) {
     invariant(!!spec.chainId, 'PROXY_MISSING_CHAIN_ID')
     invariant(!spec.routing.inputToken.isNative, 'PROXY_NATIVE_INPUT')
     invariant(!spec.permit, 'PROXY_PERMIT_CONFLICT')
-    invariant(!!spec.recipient && recipient !== SENDER_AS_RECIPIENT, 'PROXY_EXPLICIT_RECIPIENT_REQUIRED')
+    invariant(spec.recipient !== SENDER_AS_RECIPIENT, 'PROXY_EXPLICIT_RECIPIENT_REQUIRED')
   }
   invariant(!(spec.routing.inputToken.isNative && spec.permit), 'NATIVE_INPUT_PERMIT')
   invariant(
@@ -115,21 +111,21 @@ export function validateEncodeSwaps(spec: SwapSpecification, swapSteps: SwapStep
   invariant(
     !(
       spec.fee?.kind === 'portion' &&
-      urVersion === UniversalRouterVersion.V2_0 &&
+      spec.urVersion === UniversalRouterVersion.V2_0 &&
       !spec.fee.fee.multiply(10_000).remainder.equalTo(0)
     ),
     'FRACTIONAL_BPS_PORTION_FEE_UNSUPPORTED_ON_V2_0'
   )
 
   for (const step of swapSteps) {
-    if (urVersion === UniversalRouterVersion.V2_0) {
+    if (spec.urVersion === UniversalRouterVersion.V2_0) {
       invariant(
-        !('maxHopSlippage' in step) || step.maxHopSlippage === undefined,
-        'MAX_HOP_SLIPPAGE_UNSUPPORTED_ON_V2_0'
+        !('minHopPriceX36' in step) || step.minHopPriceX36 === undefined,
+        'MIN_HOP_PRICE_X36_UNSUPPORTED_ON_V2_0'
       )
       invariant(
-        !(step.type === 'V4_SWAP' && step.v4Actions.some(hasV4MaxHopSlippage)),
-        'MAX_HOP_SLIPPAGE_UNSUPPORTED_ON_V2_0'
+        !(step.type === 'V4_SWAP' && step.v4Actions.some(hasV4MinHopPriceX36)),
+        'MIN_HOP_PRICE_X36_UNSUPPORTED_ON_V2_0'
       )
     }
 
@@ -138,8 +134,8 @@ export function validateEncodeSwaps(spec: SwapSpecification, swapSteps: SwapStep
       case 'V2_SWAP_EXACT_OUT':
         assertRouterRecipient(step.recipient)
         invariant(
-          !step.maxHopSlippage || step.maxHopSlippage.length === step.path.length - 1,
-          'V2_MAX_HOP_SLIPPAGE_LENGTH_MISMATCH'
+          !step.minHopPriceX36 || step.minHopPriceX36.length === step.path.length - 1,
+          'V2_MIN_HOP_PRICE_X36_LENGTH_MISMATCH'
         )
         break
       case 'V3_SWAP_EXACT_IN':
@@ -147,8 +143,8 @@ export function validateEncodeSwaps(spec: SwapSpecification, swapSteps: SwapStep
         assertRouterRecipient(step.recipient)
         const hopCount = getV3HopCount(step.path)
         invariant(
-          hopCount === undefined || !step.maxHopSlippage || step.maxHopSlippage.length === hopCount,
-          'V3_MAX_HOP_SLIPPAGE_LENGTH_MISMATCH'
+          hopCount === undefined || !step.minHopPriceX36 || step.minHopPriceX36.length === hopCount,
+          'V3_MIN_HOP_PRICE_X36_LENGTH_MISMATCH'
         )
         break
       }

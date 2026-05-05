@@ -35,7 +35,8 @@ export function encodeV4Action(
           {
             currencyIn: v4Action.currencyIn,
             path: v4Action.path,
-            ...(useV2_1_1 && { maxHopSlippage: v4Action.maxHopSlippage ?? [] }),
+            // v4-sdk's ABI fragment names this field `maxHopSlippage`; the value is the contract's `minHopPriceX36`.
+            ...(useV2_1_1 && { maxHopSlippage: v4Action.minHopPriceX36 ?? [] }),
             amountIn: v4Action.amountIn,
             amountOutMinimum: v4Action.amountOutMinimum,
           },
@@ -50,7 +51,7 @@ export function encodeV4Action(
             zeroForOne: v4Action.zeroForOne,
             amountIn: v4Action.amountIn,
             amountOutMinimum: v4Action.amountOutMinimum,
-            ...(useV2_1_1 && { maxHopSlippage: v4Action.maxHopSlippage ?? 0 }),
+            ...(useV2_1_1 && { maxHopSlippage: v4Action.minHopPriceX36 ?? 0 }),
             hookData: v4Action.hookData,
           },
         ],
@@ -62,7 +63,7 @@ export function encodeV4Action(
           {
             currencyOut: v4Action.currencyOut,
             path: v4Action.path,
-            ...(useV2_1_1 && { maxHopSlippage: v4Action.maxHopSlippage ?? [] }),
+            ...(useV2_1_1 && { maxHopSlippage: v4Action.minHopPriceX36 ?? [] }),
             amountOut: v4Action.amountOut,
             amountInMaximum: v4Action.amountInMaximum,
           },
@@ -77,7 +78,7 @@ export function encodeV4Action(
             zeroForOne: v4Action.zeroForOne,
             amountOut: v4Action.amountOut,
             amountInMaximum: v4Action.amountInMaximum,
-            ...(useV2_1_1 && { maxHopSlippage: v4Action.maxHopSlippage ?? 0 }),
+            ...(useV2_1_1 && { maxHopSlippage: v4Action.minHopPriceX36 ?? 0 }),
             hookData: v4Action.hookData,
           },
         ],
