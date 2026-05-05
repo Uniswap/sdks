@@ -44,9 +44,9 @@ export const UNISWAPX_ORDER_QUOTER_MAPPING: AddressMap = {
   130: "0xc6ef4C96Ee89e48Eff1C35545DBEED4Ad8dAC9D4",
   42161: "0xc6ef4C96Ee89e48Eff1C35545DBEED4Ad8dAC9D4",
   1301: "0xBFE64A14130054E1C3aB09287bc69E7148471636",
-  // TODO(TRA2-12): replace with deployed UniswapXOrderQuoter address from contracts repo
   // TODO: ChainId.TEMPO once sdk-core is bumped
-  4217: "0x0000000000000000000000000000000000000000",
+  // Mined via create2crunch (ECO-365); 4 leading zero bytes.
+  4217: "0x00000000a3db63Df9078cBF3dF88B4CAdD5a7F58",
 };
 
 // Tempo (4217) is intentionally NOT registered here: only Dutch_V3 is
@@ -153,9 +153,9 @@ export const REACTOR_ADDRESS_MAPPING: ReactorMapping = {
   // TODO: ChainId.TEMPO once sdk-core is bumped
   // Only Dutch_V3 is supported on Tempo; absence of Priority/V2/V4 is the
   // upstream guard for x-service's OffChainUniswapXOrderValidator.
+  // Address mined via create2crunch (ECO-365); 4 leading + 5 total zero bytes.
   4217: {
-    // TODO(TRA2-12): replace with deployed V3DutchOrderReactor address from contracts repo
-    [OrderType.Dutch_V3]: "0x0000000000000000000000000000000000000000",
+    [OrderType.Dutch_V3]: "0x000000005aF66799D1a6317714D66800f9CA1406",
   },
 };
 
