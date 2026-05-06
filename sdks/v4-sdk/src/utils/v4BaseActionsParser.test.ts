@@ -205,7 +205,7 @@ describe('Command Parser', () => {
         ],
       },
     },
-    // V2.0: SWAP_EXACT_IN without maxHopSlippage
+    // V2.0: SWAP_EXACT_IN without minHopPriceX36
     {
       input: new V4Planner().addAction(Actions.SWAP_EXACT_IN, [
         {
@@ -250,7 +250,7 @@ describe('Command Parser', () => {
         ],
       },
     },
-    // V2.0: SWAP_EXACT_OUT without maxHopSlippage
+    // V2.0: SWAP_EXACT_OUT without minHopPriceX36
     {
       input: new V4Planner().addAction(Actions.SWAP_EXACT_OUT, [
         {
@@ -310,7 +310,7 @@ describe('Version-aware Parser', () => {
   const ONE_ETHER = JSBI.exponentiate(JSBI.BigInt(10), JSBI.BigInt(18))
 
   describe('V2.0 parsing (default)', () => {
-    it('should parse SWAP_EXACT_IN without maxHopSlippage', async () => {
+    it('should parse SWAP_EXACT_IN without minHopPriceX36', async () => {
       const route = new Route([DAI_USDC, USDC_WETH], DAI, WETH9[1])
       const trade = await Trade.fromRoute(
         route,
@@ -331,10 +331,10 @@ describe('Version-aware Parser', () => {
       expect(swapValue.currencyIn).to.equal(DAI.address)
       expect(swapValue.path).to.have.length(2)
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      expect(swapValue.maxHopSlippage).to.be.undefined // V2.0 does not have maxHopSlippage
+      expect(swapValue.minHopPriceX36).to.be.undefined // V2.0 does not have minHopPriceX36
     })
 
-    it('should parse SWAP_EXACT_OUT without maxHopSlippage', async () => {
+    it('should parse SWAP_EXACT_OUT without minHopPriceX36', async () => {
       const route = new Route([DAI_USDC, USDC_WETH], DAI, WETH9[1])
       const trade = await Trade.fromRoute(
         route,
@@ -355,12 +355,12 @@ describe('Version-aware Parser', () => {
       expect(swapValue.currencyOut).to.equal(WETH9[1].address)
       expect(swapValue.path).to.have.length(2)
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      expect(swapValue.maxHopSlippage).to.be.undefined // V2.0 does not have maxHopSlippage
+      expect(swapValue.minHopPriceX36).to.be.undefined // V2.0 does not have minHopPriceX36
     })
   })
 
   describe('V2.1 parsing', () => {
-    it('should parse SWAP_EXACT_IN with maxHopSlippage', async () => {
+    it('should parse SWAP_EXACT_IN with minHopPriceX36', async () => {
       const route = new Route([DAI_USDC, USDC_WETH], DAI, WETH9[1])
       const trade = await Trade.fromRoute(
         route,
@@ -368,10 +368,10 @@ describe('Version-aware Parser', () => {
         TradeType.EXACT_INPUT
       )
 
-      const maxHopSlippage = [BigNumber.from('10000'), BigNumber.from('20000')]
+      const minHopPriceX36 = [BigNumber.from('10000'), BigNumber.from('20000')]
 
       const planner = new V4Planner()
-      planner.addTrade(trade, undefined, maxHopSlippage, URVersion.V2_1_1)
+      planner.addTrade(trade, undefined, minHopPriceX36, URVersion.V2_1_1)
 
       const calldata = planner.finalize()
       const result = V4BaseActionsParser.parseCalldata(calldata, URVersion.V2_1_1)
@@ -383,13 +383,13 @@ describe('Version-aware Parser', () => {
       expect(swapValue.currencyIn).to.equal(DAI.address)
       expect(swapValue.path).to.have.length(2)
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      expect(swapValue.maxHopSlippage).to.not.be.undefined
-      expect(swapValue.maxHopSlippage).to.have.length(2)
-      expect(swapValue.maxHopSlippage![0].toString()).to.equal('10000')
-      expect(swapValue.maxHopSlippage![1].toString()).to.equal('20000')
+      expect(swapValue.minHopPriceX36).to.not.be.undefined
+      expect(swapValue.minHopPriceX36).to.have.length(2)
+      expect(swapValue.minHopPriceX36![0].toString()).to.equal('10000')
+      expect(swapValue.minHopPriceX36![1].toString()).to.equal('20000')
     })
 
-    it('should parse SWAP_EXACT_OUT with maxHopSlippage', async () => {
+    it('should parse SWAP_EXACT_OUT with minHopPriceX36', async () => {
       const route = new Route([DAI_USDC, USDC_WETH], DAI, WETH9[1])
       const trade = await Trade.fromRoute(
         route,
@@ -397,10 +397,10 @@ describe('Version-aware Parser', () => {
         TradeType.EXACT_OUTPUT
       )
 
-      const maxHopSlippage = [BigNumber.from('15000'), BigNumber.from('25000')]
+      const minHopPriceX36 = [BigNumber.from('15000'), BigNumber.from('25000')]
 
       const planner = new V4Planner()
-      planner.addTrade(trade, new (await import('@uniswap/sdk-core')).Percent('5'), maxHopSlippage, URVersion.V2_1_1)
+      planner.addTrade(trade, new (await import('@uniswap/sdk-core')).Percent('5'), minHopPriceX36, URVersion.V2_1_1)
 
       const calldata = planner.finalize()
       const result = V4BaseActionsParser.parseCalldata(calldata, URVersion.V2_1_1)
@@ -412,13 +412,13 @@ describe('Version-aware Parser', () => {
       expect(swapValue.currencyOut).to.equal(WETH9[1].address)
       expect(swapValue.path).to.have.length(2)
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      expect(swapValue.maxHopSlippage).to.not.be.undefined
-      expect(swapValue.maxHopSlippage).to.have.length(2)
-      expect(swapValue.maxHopSlippage![0].toString()).to.equal('15000')
-      expect(swapValue.maxHopSlippage![1].toString()).to.equal('25000')
+      expect(swapValue.minHopPriceX36).to.not.be.undefined
+      expect(swapValue.minHopPriceX36).to.have.length(2)
+      expect(swapValue.minHopPriceX36![0].toString()).to.equal('15000')
+      expect(swapValue.minHopPriceX36![1].toString()).to.equal('25000')
     })
 
-    it('should parse SWAP_EXACT_IN with empty maxHopSlippage array', async () => {
+    it('should parse SWAP_EXACT_IN with empty minHopPriceX36 array', async () => {
       const route = new Route([DAI_USDC, USDC_WETH], DAI, WETH9[1])
       const trade = await Trade.fromRoute(
         route,
@@ -427,7 +427,7 @@ describe('Version-aware Parser', () => {
       )
 
       const planner = new V4Planner()
-      planner.addTrade(trade, undefined, undefined, URVersion.V2_1_1) // No maxHopSlippage provided, defaults to []
+      planner.addTrade(trade, undefined, undefined, URVersion.V2_1_1) // No minHopPriceX36 provided, defaults to []
 
       const calldata = planner.finalize()
       const result = V4BaseActionsParser.parseCalldata(calldata, URVersion.V2_1_1)
@@ -437,8 +437,8 @@ describe('Version-aware Parser', () => {
 
       const swapValue = result.actions[0].params[0].value as SwapExactIn
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      expect(swapValue.maxHopSlippage).to.not.be.undefined
-      expect(swapValue.maxHopSlippage).to.have.length(0) // Empty array
+      expect(swapValue.minHopPriceX36).to.not.be.undefined
+      expect(swapValue.minHopPriceX36).to.have.length(0) // Empty array
     })
   })
 
@@ -462,7 +462,7 @@ describe('Version-aware Parser', () => {
       expect(swapValue.amountIn.toString()).to.equal(ONE_ETHER.toString())
     })
 
-    it('should round-trip V2.1 SWAP_EXACT_IN with maxHopSlippage correctly', async () => {
+    it('should round-trip V2.1 SWAP_EXACT_IN with minHopPriceX36 correctly', async () => {
       const route = new Route([DAI_USDC, USDC_WETH], DAI, WETH9[1])
       const trade = await Trade.fromRoute(
         route,
@@ -470,10 +470,10 @@ describe('Version-aware Parser', () => {
         TradeType.EXACT_INPUT
       )
 
-      const maxHopSlippage = [BigNumber.from('12345'), BigNumber.from('67890')]
+      const minHopPriceX36 = [BigNumber.from('12345'), BigNumber.from('67890')]
 
       const planner = new V4Planner()
-      planner.addTrade(trade, undefined, maxHopSlippage, URVersion.V2_1_1)
+      planner.addTrade(trade, undefined, minHopPriceX36, URVersion.V2_1_1)
 
       const calldata = planner.finalize()
       const result = V4BaseActionsParser.parseCalldata(calldata, URVersion.V2_1_1)
@@ -481,8 +481,8 @@ describe('Version-aware Parser', () => {
       const swapValue = result.actions[0].params[0].value as SwapExactIn
       expect(swapValue.currencyIn).to.equal(DAI.address)
       expect(swapValue.amountIn.toString()).to.equal(ONE_ETHER.toString())
-      expect(swapValue.maxHopSlippage![0].toString()).to.equal('12345')
-      expect(swapValue.maxHopSlippage![1].toString()).to.equal('67890')
+      expect(swapValue.minHopPriceX36![0].toString()).to.equal('12345')
+      expect(swapValue.minHopPriceX36![1].toString()).to.equal('67890')
     })
   })
 })

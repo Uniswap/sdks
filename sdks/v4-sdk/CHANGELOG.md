@@ -1,5 +1,11 @@
 # @uniswap/v4-sdk
 
+## 2.1.0
+
+### Minor Changes
+
+- 5398a2c: Rename maxHopSlippage to minHopPriceX36
+
 ## 2.0.0
 
 ### Major Changes
