@@ -18,6 +18,8 @@ export function toV4URVersion(version?: UniversalRouterVersion): URVersion {
   return mapped
 }
 
+// Object keys here must match v4-sdk's V4Planner ABI fragment names. The `maxHopSlippage` keys
+// in the swap branches carry the contract's `minHopPriceX36` value — v4-sdk hasn't been renamed yet.
 export function encodeV4Action(
   v4Action: V4Action,
   urVersion?: UniversalRouterVersion
@@ -35,7 +37,6 @@ export function encodeV4Action(
           {
             currencyIn: v4Action.currencyIn,
             path: v4Action.path,
-            // v4-sdk's ABI fragment names this field `maxHopSlippage`; the value is the contract's `minHopPriceX36`.
             ...(useV2_1_1 && { maxHopSlippage: v4Action.minHopPriceX36 ?? [] }),
             amountIn: v4Action.amountIn,
             amountOutMinimum: v4Action.amountOutMinimum,
@@ -84,6 +85,7 @@ export function encodeV4Action(
         ],
       }
     case 'SETTLE':
+      // payerIsUser=false: same router-custody model as encodeSwapStep — funds are already in the router
       return { action, params: [v4Action.currency, v4Action.amount, false] }
     case 'SETTLE_ALL':
       return { action, params: [v4Action.currency, v4Action.maxAmount] }

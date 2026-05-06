@@ -223,7 +223,7 @@ export abstract class SwapRouter {
       )
     }
 
-    // safeMode: zero-min ETH sweep collects any native dust left on the router.
+    // safeMode: zero-min ETH sweep recovers any native funds left on the router (dust or unintended msg.value)
     if (normalizedSpec.safeMode) {
       planner.addCommand(CommandType.SWEEP, [ETH_ADDRESS, normalizedSpec.recipient, 0], false, normalizedSpec.urVersion)
     }
@@ -496,7 +496,7 @@ export abstract class SwapRouter {
   }
 
   /**
-   * Encodes a planned route into calldata targeting the SwapProxy contract.
+   * Wraps an inner UR plan in calldata targeting the SwapProxy contract.
    * The proxy pulls ERC20 tokens from the user into the UR, then executes commands.
    */
   private static encodeProxyPlan(planner: RoutePlanner, trade: UniswapTrade, options: SwapOptions): MethodParameters {
@@ -522,7 +522,7 @@ export abstract class SwapRouter {
     const routerAddress = UNIVERSAL_ROUTER_ADDRESS(urVersion, chainId)
     const resolvedDeadline = deadline
       ? BigNumber.from(deadline)
-      : BigNumber.from(Math.floor(Date.now() / 1000) + DEFAULT_PROXY_DEADLINE_BUFFER_SECONDS)
+      : BigNumber.from(Math.floor(Date.now() / 1000) + DEFAULT_PROXY_DEADLINE_BUFFER_SECONDS) // 30 min default
 
     const calldata = SwapRouter.PROXY_INTERFACE.encodeFunctionData('execute', [
       routerAddress,

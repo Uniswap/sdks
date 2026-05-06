@@ -7,6 +7,8 @@ import { UniversalRouterVersion } from '../utils/constants'
 
 export type { PathKey, PoolKey }
 
+// portion: % of variable output, used with exact-input
+// flat: fixed amount, deducted from exact-output target
 export type Fee =
   | { kind: 'portion'; recipient: string; fee: Percent }
   | { kind: 'flat'; recipient: string; amount: BigNumberish }
@@ -16,18 +18,18 @@ export type SwapSpecification = {
   routing: {
     inputToken: Currency
     outputToken: Currency
-    amount: CurrencyAmount<Currency>
-    quote: CurrencyAmount<Currency>
+    amount: CurrencyAmount<Currency> // the exact side: input for exact-input, output for exact-output
+    quote: CurrencyAmount<Currency> // the slippage side: output for exact-input, input for exact-output
   }
-  recipient?: string
+  slippageTolerance: Percent
+  recipient?: string // defaults to SENDER_AS_RECIPIENT (0x01); ApproveProxy requires an explicit address
   fee?: Fee
   tokenTransferMode?: TokenTransferMode
   permit?: Permit2Permit
-  chainId?: number
-  slippageTolerance: Percent
+  chainId?: number // required only for ApproveProxy
   deadline?: BigNumberish
   urVersion?: UniversalRouterVersion
-  safeMode?: boolean
+  safeMode?: boolean // appends a trailing SWEEP(ETH, recipient, 0) to recover native dust or unintended msg.value
 }
 
 // Output of `normalizeEncodeSwapsSpec`: the four fields below are guaranteed

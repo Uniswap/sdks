@@ -4,6 +4,7 @@ import { CommandType, RoutePlanner } from './routerCommands'
 import { SwapStep } from '../types/encodeSwaps'
 import { encodeV4Action, toV4URVersion } from './encodeV4Action'
 
+// V2/V3 swap params hardcode payerIsUser=false; encodeSwaps pulls funds into the router first via PERMIT2_TRANSFER_FROM
 export function encodeSwapStep(planner: RoutePlanner, step: SwapStep, urVersion?: UniversalRouterVersion): void {
   const useV2_1_1 = isAtLeastV2_1_1(urVersion)
 

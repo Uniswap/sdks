@@ -5,6 +5,7 @@ import { TokenTransferMode } from '../entities/actions/uniswap'
 import { ROUTER_AS_RECIPIENT, SENDER_AS_RECIPIENT, UniversalRouterVersion, ZERO_ADDRESS } from './constants'
 import { NormalizedSwapSpecification, SwapStep, V4Action } from '../types/encodeSwaps'
 
+// V3 path: 20-byte address + N × (3-byte fee + 20-byte address); returns N or undefined if malformed
 function getV3HopCount(path: string): number | undefined {
   if (!path.startsWith('0x')) return undefined
 
@@ -53,6 +54,7 @@ function assertRouterActionRecipient(recipient: string): void {
   invariant(recipient === ROUTER_AS_RECIPIENT, 'V4_ACTION_RECIPIENT_MUST_BE_ROUTER')
 }
 
+// V4 actions that take a recipient must use router custody so the SDK's settlement sweeps see the funds
 function validateV4Recipients(actions: V4Action[]): void {
   for (const action of actions) {
     switch (action.action) {
@@ -80,6 +82,7 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
   invariant(spec.recipient !== ZERO_ADDRESS, 'RECIPIENT_CANNOT_BE_ZERO')
   invariant(spec.recipient !== ROUTER_AS_RECIPIENT, 'RECIPIENT_CANNOT_BE_ROUTER')
 
+  // routing.amount is on the exact side of the trade; routing.quote is on the slippage side
   if (spec.tradeType === TradeType.EXACT_INPUT) {
     invariant(amountCurrency.equals(inputCurrency), 'INVALID_ROUTING_AMOUNT_CURRENCY')
     invariant(quoteCurrency.equals(outputCurrency), 'INVALID_ROUTING_QUOTE_CURRENCY')
@@ -88,13 +91,17 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
     invariant(quoteCurrency.equals(inputCurrency), 'INVALID_ROUTING_QUOTE_CURRENCY')
   }
 
+  // ApproveProxy ingress lives upstream in the proxy contract: needs chain id, ERC20 input, no permit2, explicit recipient
   if (spec.tokenTransferMode === TokenTransferMode.ApproveProxy) {
     invariant(!!spec.chainId, 'PROXY_MISSING_CHAIN_ID')
     invariant(!spec.routing.inputToken.isNative, 'PROXY_NATIVE_INPUT')
     invariant(!spec.permit, 'PROXY_PERMIT_CONFLICT')
     invariant(spec.recipient !== SENDER_AS_RECIPIENT, 'PROXY_EXPLICIT_RECIPIENT_REQUIRED')
   }
+  // permit2 is ERC20-only; native input pays via msg.value
   invariant(!(spec.routing.inputToken.isNative && spec.permit), 'NATIVE_INPUT_PERMIT')
+
+  // portion fees pair with exact-input (% of variable output); flat fees pair with exact-output (fixed deduction from the target)
   invariant(
     !(spec.fee?.kind === 'portion' && spec.tradeType !== TradeType.EXACT_INPUT),
     'INVALID_PORTION_FEE_TRADE_TYPE'
@@ -108,6 +115,7 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
     'FLAT_FEE_GT_AMOUNT'
   )
 
+  // v2.0 PAY_PORTION takes whole bps; fractional bps need >=v2.1.1's PAY_PORTION_FULL_PRECISION
   invariant(
     !(
       spec.fee?.kind === 'portion' &&
@@ -117,6 +125,7 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
     'FRACTIONAL_BPS_PORTION_FEE_UNSUPPORTED_ON_V2_0'
   )
 
+  // per-step: capability-gate by UR version, recipients must be router custody, per-hop arrays must match hop counts
   for (const step of swapSteps) {
     if (spec.urVersion === UniversalRouterVersion.V2_0) {
       invariant(
