@@ -135,18 +135,15 @@ export abstract class SwapRouter {
   /**
    * Encodes router-provided swap steps inside the SDK safety envelope.
    *
-   * Routers own `swapSteps`, including any route-dependent `WRAP_ETH` / `UNWRAP_WETH`
-   * commands needed to execute the route and normalize balances for settlement/refund.
+   * Routers own `swapSteps` (V2/V3/V4 swaps, plus any `WRAP_ETH` / `UNWRAP_WETH` required by the route).
    * The SDK owns ingress, fees, final settlement, exact-output refund, and optional `safeMode`.
    *
-   * Routers must end with final output in `spec.routing.outputToken`.
-   * For `EXACT_OUTPUT`, unused input must end in `spec.routing.inputToken`.
-   * Exact-input plans are expected to fully consume or normalize away non-boundary leftovers before control returns.
-   * Top-level `SWEEP` is intentionally not part of `SwapStep[]`; the SDK appends final settlement,
-   * exact-output input refund when applicable, and `safeMode`'s trailing `SWEEP(ETH, recipient, 0)`.
+   * Router contract: end with final output in `spec.routing.outputToken`; for `EXACT_OUTPUT`, unused input
+   * must end in `spec.routing.inputToken`. Don't include a top-level `SWEEP` — the SDK appends settlement,
+   * refund, and safeMode sweeps itself.
    *
-   * Router custody with `payerIsUser = false` is deliberate for safety, even if it can cost an extra
-   * command or transfer. The SDK does not infer route topology or add transition commands on behalf of routers.
+   * Router custody with `payerIsUser = false` is deliberate for safety, even if it costs an extra command
+   * or transfer; the SDK does not infer route topology on behalf of routers.
    */
   public static encodeSwaps(spec: SwapSpecification, swapSteps: SwapStep[]): MethodParameters {
     const normalizedSpec = normalizeEncodeSwapsSpec(spec)
