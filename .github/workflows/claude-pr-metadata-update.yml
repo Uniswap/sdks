@@ -38,7 +38,7 @@ jobs:
       !startsWith(github.head_ref, 'changeset-release/') &&
       !startsWith(github.event.pull_request.title, 'chore(release):')
 
-    uses: Uniswap/ai-toolkit/.github/workflows/_generate-pr-metadata.yml@b229e128e6a60bc6a495e80bda9f13d6bafdfc5e
+    uses: Uniswap/ai-toolkit/.github/workflows/_generate-pr-metadata.yml@96ef665ba04221de07e94fcc3ea69fe32c7cf306
     with:
       generation_mode: "description,deferred-title"
       pr_number: ${{ github.event.pull_request.number }}
