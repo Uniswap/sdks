@@ -22,6 +22,28 @@ const routerTrade = new RouterTrade({ v2Routes, v3Routes, mixedRoutes, tradeType
 const { calldata, value } = SwapRouter.swapCallParameters(routerTrade, options)
 ```
 
+This SDK has two entry points for encoding swap calldata:
+
+- **`SwapRouter.swapCallParameters(trade, options)`** — builds calldata from a high-level `RouterTrade` (shown above). Best when your swap fits as one or more independent linear routes through pools.
+- **`SwapRouter.encodeSwaps(spec, swapSteps)`** — takes Universal Router commands directly, with the SDK adding ingress, fee, and settlement calldata around them. Best for topologies that don't fit a Trade, routing-service integrations, or advanced V4 compositions. See [Encoding Router-Provided Swap Steps](#encoding-router-provided-swap-steps-encodeswaps).
+
+## Running this package
+
+Make sure you are running `node v18`
+Install dependencies and run typescript unit tests
+
+```bash
+yarn install
+yarn test:hardhat
+```
+
+Run forge integration tests
+
+```bash
+forge install
+yarn test:forge
+```
+
 ## Encoding Router-Provided Swap Steps (`encodeSwaps`)
 
 `SwapRouter.encodeSwaps(spec, swapSteps)` is an alternative entry point for callers that already produce explicit `SwapStep[]` plans (e.g. routing services) and want the SDK to wrap them in a safety envelope. It decouples route topology from SDK trade construction.
@@ -86,6 +108,8 @@ const { calldata, value } = SwapRouter.encodeSwaps(
 
 ### Per-Hop Slippage
 
+Per-hop bounds require Universal Router v2.1.1+ — set `urVersion: UniversalRouterVersion.V2_1_1` on `spec` to enable.
+
 `encodeSwaps` accepts per-hop bounds as `minHopPriceX36` on each swap step, matching the contract parameter name. The value is a 1e36-scaled price floor.
 
 ```typescript
@@ -94,23 +118,6 @@ const { calldata, value } = SwapRouter.encodeSwaps(
   // ...
   minHopPriceX36: ['995000000000000000000000000000000000', ...], // one per hop
 }
-```
-
-## Running this package
-
-Make sure you are running `node v18`
-Install dependencies and run typescript unit tests
-
-```bash
-yarn install
-yarn test:hardhat
-```
-
-Run forge integration tests
-
-```bash
-forge install
-yarn test:forge
 ```
 
 ## Per-Hop Slippage Protection
