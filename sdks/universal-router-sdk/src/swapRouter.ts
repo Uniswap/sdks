@@ -214,6 +214,7 @@ export abstract class SwapRouter {
     )
 
     // Assumes routers already normalized unused input into `routing.inputToken`.
+    // Exact-output uses max input, so any unused slippage padding is refunded to the recipient.
     if (normalizedSpec.tradeType === TradeType.EXACT_OUTPUT) {
       planner.addCommand(
         CommandType.SWEEP,

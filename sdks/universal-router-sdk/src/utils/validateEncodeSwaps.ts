@@ -5,7 +5,8 @@ import { TokenTransferMode } from '../entities/actions/uniswap'
 import { ROUTER_AS_RECIPIENT, SENDER_AS_RECIPIENT, UniversalRouterVersion, ZERO_ADDRESS } from './constants'
 import { NormalizedSwapSpecification, SwapStep, V4Action } from '../types/encodeSwaps'
 
-// V3 path: 20-byte address + N × (3-byte fee + 20-byte address); returns N or undefined if malformed
+// V3 path: 20-byte address + N × (3-byte fee + 20-byte address); minimum is 43 bytes (single hop, N=1)
+// Returns N or undefined if malformed
 function getV3HopCount(path: string): number | undefined {
   if (!path.startsWith('0x')) return undefined
 

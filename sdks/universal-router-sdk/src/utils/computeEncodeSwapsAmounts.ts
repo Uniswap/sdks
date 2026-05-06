@@ -22,7 +22,6 @@ export function computeEncodeSwapsAmounts(spec: NormalizedSwapSpecification): En
   const slippageDenominator = BigNumber.from(spec.slippageTolerance.denominator.toString())
 
   if (spec.tradeType === TradeType.EXACT_INPUT) {
-    // quote * denom / (denom + numerator)
     const grossMinOrExactAmountOut = routingQuote
       .mul(slippageDenominator)
       .div(slippageDenominator.add(slippageNumerator))
@@ -46,7 +45,6 @@ export function computeEncodeSwapsAmounts(spec: NormalizedSwapSpecification): En
     }
   }
 
-  // quote * (denom + numerator) / denom
   const exactOrMaxAmountIn = routingQuote.mul(slippageDenominator.add(slippageNumerator)).div(slippageDenominator)
   const grossMinOrExactAmountOut = routingAmount
   const netMinOrExactAmountOut =
