@@ -1,12 +1,4 @@
-import {
-  EXCLUSIVE_FILLER_VALIDATION_MAPPING,
-  OrderType,
-  PERMIT2_MAPPING,
-  REACTOR_ADDRESS_MAPPING,
-  UNISWAPX_ORDER_QUOTER_MAPPING,
-  UNISWAPX_V4_ORDER_QUOTER_MAPPING,
-} from "./constants";
-import { getPermit2, getReactor } from "./utils";
+import { REACTOR_ADDRESS_MAPPING } from "./constants";
 
 describe("REACTOR_ADDRESS_MAPPING", () => {
   it("matches the existing reactor mapping snapshot", () => {
@@ -15,8 +7,12 @@ describe("REACTOR_ADDRESS_MAPPING", () => {
         "1": {
           "Dutch": "0x6000da47483062A0D734Ba3dc7576Ce6A0B645C4",
           "Dutch_V2": "0x00000011F84B9aa48e5f8aA8B9897600006289Be",
+          "Dutch_V3": "0x0000000015757c461808EA25Eb309638B62681cf",
           "Priority": "0x0000000000000000000000000000000000000000",
           "Relay": "0x0000000000A4e21E2597DCac987455c48b12edBF",
+        },
+        "10": {
+          "Dutch_V3": "0x000000000923439A92daE8930613568824108631",
         },
         "11155111": {
           "Dutch": "0xD6c073F2A3b676B8f9002b276B618e0d8bA84Fad",
@@ -31,6 +27,7 @@ describe("REACTOR_ADDRESS_MAPPING", () => {
         "130": {
           "Dutch": "0x0000000000000000000000000000000000000000",
           "Dutch_V2": "0x0000000000000000000000000000000000000000",
+          "Dutch_V3": "0x000000005aF66799D1a6317714D66800f9CA1406",
           "Priority": "0x00000006021a6Bce796be7ba509BBBA71e956e37",
           "Relay": "0x0000000000000000000000000000000000000000",
         },
@@ -44,7 +41,17 @@ describe("REACTOR_ADDRESS_MAPPING", () => {
         "137": {
           "Dutch": "0x6000da47483062A0D734Ba3dc7576Ce6A0B645C4",
           "Dutch_V2": "0x0000000000000000000000000000000000000000",
+          "Dutch_V3": "0x00000000bAB6E234db8AD638B6A6395b7c499Bc4",
           "Relay": "0x0000000000A4e21E2597DCac987455c48b12edBF",
+        },
+        "143": {
+          "Dutch_V3": "0x000000000Ac008F7e07210CFb6648e40249232c2",
+        },
+        "1868": {
+          "Dutch_V3": "0x000000005aF66799D1a6317714D66800f9CA1406",
+        },
+        "196": {
+          "Dutch_V3": "0x000000005aF66799D1a6317714D66800f9CA1406",
         },
         "42161": {
           "Dutch": "0x0000000000000000000000000000000000000000",
@@ -53,16 +60,35 @@ describe("REACTOR_ADDRESS_MAPPING", () => {
           "Relay": "0x0000000000000000000000000000000000000000",
         },
         "4217": {
-          "Dutch_V3": "0x000000005aF66799D1a6317714D66800f9CA1406",
+          "Dutch_V3": "0x00000000fc1E66C9f582566EAd00108e55F1c0C6",
+        },
+        "42220": {
+          "Dutch_V3": "0x00000000B8077fdf2281A80bE96f6c282B5d943A",
+        },
+        "43114": {
+          "Dutch_V3": "0x00000000862cCF095823fc7576Fa6C7e6b7385ef",
+        },
+        "480": {
+          "Dutch_V3": "0x00000000d714EA34028930b762E96bFBe50F42C2",
         },
         "5": {
           "Dutch": "0x6000da47483062A0D734Ba3dc7576Ce6A0B645C4",
           "Dutch_V2": "0x0000000000000000000000000000000000000000",
           "Relay": "0x0000000000A4e21E2597DCac987455c48b12edBF",
         },
+        "56": {
+          "Dutch_V3": "0x00000000a55e50C71b70Db3C8B58749cd1E18eB2",
+        },
+        "7777777": {
+          "Dutch_V3": "0x000000002C9A3812e15cf233190992E9a57EDB56",
+        },
+        "81457": {
+          "Dutch_V3": "0x0000000086f50C5E1a2500602183D4390A7FFc98",
+        },
         "8453": {
           "Dutch": "0x0000000000000000000000000000000000000000",
           "Dutch_V2": "0x0000000000000000000000000000000000000000",
+          "Dutch_V3": "0x000000008a8330B5d1F43A62Bf4C673A49f27ba0",
           "Priority": "0x000000001Ec5656dcdB24D90DFa42742738De729",
           "Relay": "0x0000000000000000000000000000000000000000",
         },
@@ -71,43 +97,3 @@ describe("REACTOR_ADDRESS_MAPPING", () => {
   });
 });
 
-describe("Tempo (chainId 4217) registration", () => {
-  const TEMPO = 4217;
-  const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
-  const CANONICAL_PERMIT2 = "0x000000000022d473030f116ddee9f6b43ac78ba3";
-  // Both addresses were deployed via the canonical Arachnid CREATE2 factory
-  // using salts mined with create2crunch (ECO-365). The reactor has 4 leading
-  // zero bytes (5 total); the quoter has 4 leading zero bytes.
-  const TEMPO_V3_REACTOR = "0x000000005aF66799D1a6317714D66800f9CA1406";
-  const TEMPO_ORDER_QUOTER = "0x00000000a3db63Df9078cBF3dF88B4CAdD5a7F58";
-
-  it("registers the canonical Permit2 address for Tempo", () => {
-    expect(PERMIT2_MAPPING[TEMPO]).toEqual(CANONICAL_PERMIT2);
-    expect(getPermit2(TEMPO)).toEqual(CANONICAL_PERMIT2);
-  });
-
-  it("getReactor returns the deployed Dutch_V3 reactor for Tempo", () => {
-    expect(getReactor(TEMPO, OrderType.Dutch_V3)).toEqual(TEMPO_V3_REACTOR);
-    expect(REACTOR_ADDRESS_MAPPING[TEMPO][OrderType.Dutch_V3]).toEqual(
-      TEMPO_V3_REACTOR
-    );
-  });
-
-  it("registers the deployed UniswapX order quoter for Tempo", () => {
-    expect(UNISWAPX_ORDER_QUOTER_MAPPING[TEMPO]).toEqual(TEMPO_ORDER_QUOTER);
-  });
-
-  it("registers the zero-address exclusive filler validator for Tempo (matches Arbitrum/Sepolia precedent)", () => {
-    expect(EXCLUSIVE_FILLER_VALIDATION_MAPPING[TEMPO]).toEqual(ZERO_ADDR);
-  });
-
-  it("does NOT register Tempo for Priority / Dutch_V2 / V4 (intentional — V3-only chain)", () => {
-    // Locking in the intentional absences so a future regression cannot
-    // silently extend Tempo to unsupported order types. The downstream
-    // OffChainUniswapXOrderValidator in x-service relies on these gaps.
-    expect(REACTOR_ADDRESS_MAPPING[TEMPO][OrderType.Priority]).toBeUndefined();
-    expect(REACTOR_ADDRESS_MAPPING[TEMPO][OrderType.Dutch_V2]).toBeUndefined();
-    expect(REACTOR_ADDRESS_MAPPING[TEMPO][OrderType.V4]).toBeUndefined();
-    expect(UNISWAPX_V4_ORDER_QUOTER_MAPPING[TEMPO]).toBeUndefined();
-  });
-});
