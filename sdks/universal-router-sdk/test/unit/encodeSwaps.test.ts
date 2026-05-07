@@ -390,21 +390,6 @@ describe('encodeSwaps', () => {
       expect(() => validateEncodeSwaps(buildSpec(), [step])).to.throw('V4_ACTION_RECIPIENT_MUST_BE_ROUTER')
     })
 
-    it('rejects V4 SWEEP recipients that are not router custody', () => {
-      const step: V4Swap = {
-        type: 'V4_SWAP',
-        v4Actions: [
-          {
-            action: 'SWEEP',
-            currency: USDC.address,
-            recipient: TEST_RECIPIENT,
-          },
-        ],
-      }
-
-      expect(() => validateEncodeSwaps(buildSpec(), [step])).to.throw('V4_ACTION_RECIPIENT_MUST_BE_ROUTER')
-    })
-
     it('allows router-custody recipients in swap steps', () => {
       expect(() => validateEncodeSwaps(buildSpec(), [buildV3ExactInStep()])).not.to.throw()
     })

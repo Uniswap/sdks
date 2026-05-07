@@ -60,9 +60,7 @@ function validateV4Recipients(actions: V4Action[]): void {
   for (const action of actions) {
     switch (action.action) {
       case 'TAKE':
-      case 'TAKE_PAIR':
       case 'TAKE_PORTION':
-      case 'SWEEP':
         assertRouterActionRecipient(action.recipient)
         break
       default:

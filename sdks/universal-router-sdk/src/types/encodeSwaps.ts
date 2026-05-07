@@ -150,12 +150,6 @@ export type V4SettleAll = {
   maxAmount: BigNumberish
 }
 
-export type V4SettlePair = {
-  action: 'SETTLE_PAIR'
-  currency0: string
-  currency1: string
-}
-
 export type V4Take = {
   action: 'TAKE'
   currency: string
@@ -176,29 +170,7 @@ export type V4TakePortion = {
   bips: BigNumberish
 }
 
-export type V4TakePair = {
-  action: 'TAKE_PAIR'
-  currency0: string
-  currency1: string
-  recipient: string
-}
-
-export type V4CloseCurrency = {
-  action: 'CLOSE_CURRENCY'
-  currency: string
-}
-
-export type V4Sweep = {
-  action: 'SWEEP'
-  currency: string
-  recipient: string
-}
-
-export type V4Unwrap = {
-  action: 'UNWRAP'
-  amount: BigNumberish
-}
-
+// the v4-periphery actions UR's `V4Router._handleAction` dispatches
 export type V4Action =
   | V4SwapExactIn
   | V4SwapExactInSingle
@@ -206,11 +178,6 @@ export type V4Action =
   | V4SwapExactOutSingle
   | V4Settle
   | V4SettleAll
-  | V4SettlePair
   | V4Take
   | V4TakeAll
   | V4TakePortion
-  | V4TakePair
-  | V4CloseCurrency
-  | V4Sweep
-  | V4Unwrap

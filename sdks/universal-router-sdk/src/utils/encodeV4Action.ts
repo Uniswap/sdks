@@ -89,22 +89,12 @@ export function encodeV4Action(
       return { action, params: [v4Action.currency, v4Action.amount, false] }
     case 'SETTLE_ALL':
       return { action, params: [v4Action.currency, v4Action.maxAmount] }
-    case 'SETTLE_PAIR':
-      return { action, params: [v4Action.currency0, v4Action.currency1] }
     case 'TAKE':
       return { action, params: [v4Action.currency, v4Action.recipient, v4Action.amount] }
     case 'TAKE_ALL':
       return { action, params: [v4Action.currency, v4Action.minAmount] }
     case 'TAKE_PORTION':
       return { action, params: [v4Action.currency, v4Action.recipient, v4Action.bips] }
-    case 'TAKE_PAIR':
-      return { action, params: [v4Action.currency0, v4Action.currency1, v4Action.recipient] }
-    case 'CLOSE_CURRENCY':
-      return { action, params: [v4Action.currency] }
-    case 'SWEEP':
-      return { action, params: [v4Action.currency, v4Action.recipient] }
-    case 'UNWRAP':
-      return { action, params: [v4Action.amount] }
     default:
       throw new Error(`Unhandled V4 action: ${(v4Action as { action: string }).action}`)
   }
