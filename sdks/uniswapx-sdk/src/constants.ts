@@ -155,10 +155,6 @@ export const REACTOR_ADDRESS_MAPPING: ReactorMapping = {
     [OrderType.Dutch_V2]: "0x1bd1aAdc9E230626C44a139d7E70d842749351eb",
     [OrderType.Dutch]: "0x0000000000000000000000000000000000000000",
     [OrderType.Relay]: "0x0000000000000000000000000000000000000000",
-    // Production reactor; routes live traffic. A second V3 reactor at
-    // 0x000000005aF66799D1a6317714D66800f9CA1406 also exists on Arbitrum
-    // but is intentionally NOT registered here — flipping requires a
-    // deliberate SDK migration, not a silent edit.
     [OrderType.Dutch_V3]: "0xB274d5F4b833b61B340b654d600A864fB604a87c",
   },
   8453: {
