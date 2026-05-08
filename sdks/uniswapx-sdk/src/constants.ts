@@ -38,6 +38,7 @@ export const PERMIT2_MAPPING: AddressMap = {
       196,      // xlayer
       480,      // worldchain
       1868,     // soneium
+      4217,     // tempo
       42161,    // arbitrum
       42220,    // celo
       43114,    // avalanche
@@ -47,7 +48,6 @@ export const PERMIT2_MAPPING: AddressMap = {
   ),
   12341234: "0x000000000022d473030f116ddee9f6b43ac78ba3",
   1301: "0x000000000022d473030f116ddee9f6b43ac78ba3",
-  4217: "0x000000000022d473030f116ddee9f6b43ac78ba3",
 };
 
 export const UNISWAPX_ORDER_QUOTER_MAPPING: AddressMap = {
