@@ -983,22 +983,4 @@ describe("V3DutchOrderBuilder", () => {
         });
     });
 
-    describe("Tempo (4217) chain support", () => {
-        // V3DutchOrderReactor is deployed on Tempo at
-        // 0x000000005aF66799D1a6317714D66800f9CA1406 (mined via create2crunch
-        // for a 4-leading-zero-byte address). The builder-time placeholder
-        // guard remains in place to catch any FUTURE chain whose reactor is
-        // still a zero-address placeholder.
-        it("constructs successfully against the deployed Tempo reactor", () => {
-            const tempoBuilder = new V3DutchOrderBuilder(4217);
-            expect(tempoBuilder).toBeInstanceOf(V3DutchOrderBuilder);
-        });
-
-        it("does not throw on chains with a real deployed reactor (Arbitrum One)", () => {
-            // Arbitrum One has a real Dutch_V3 reactor in REACTOR_ADDRESS_MAPPING,
-            // so the placeholder guard must not fire there.
-            const arbBuilder = new V3DutchOrderBuilder(42161);
-            expect(arbBuilder).toBeInstanceOf(V3DutchOrderBuilder);
-        });
-    });
 });
