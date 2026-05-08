@@ -982,5 +982,4 @@ describe("V3DutchOrderBuilder", () => {
             expect(created_order.info.cosignerData.decayStartBlock).toEqual(212121);
         });
     });
-
 });
