@@ -30,14 +30,14 @@ export type SwapExactInSingle = {
   readonly zeroForOne: boolean
   readonly amountIn: string
   readonly amountOutMinimum: string
-  readonly maxHopSlippage?: string // Only present in V2.1.1
+  readonly minHopPriceX36?: string // Only present in V2.1.1
   readonly hookData: string
 }
 
 export type SwapExactIn = {
   readonly currencyIn: string
   readonly path: readonly PathKey[]
-  readonly maxHopSlippage?: readonly string[] // Only present in V2.1.1
+  readonly minHopPriceX36?: readonly string[] // Only present in V2.1.1
   readonly amountIn: string
   readonly amountOutMinimum: string
 }
@@ -47,14 +47,14 @@ export type SwapExactOutSingle = {
   readonly zeroForOne: boolean
   readonly amountOut: string
   readonly amountInMaximum: string
-  readonly maxHopSlippage?: string // Only present in V2.1.1
+  readonly minHopPriceX36?: string // Only present in V2.1.1
   readonly hookData: string
 }
 
 export type SwapExactOut = {
   readonly currencyOut: string
   readonly path: readonly PathKey[]
-  readonly maxHopSlippage?: readonly string[] // Only present in V2.1.1
+  readonly minHopPriceX36?: readonly string[] // Only present in V2.1.1
   readonly amountOut: string
   readonly amountInMaximum: string
 }
@@ -173,14 +173,14 @@ function parseV4ExactInSingle(data: any[], urVersion: URVersion): SwapExactInSin
       hookData,
     }
   } else {
-    // V2.1.1: [poolKey, zeroForOne, amountIn, amountOutMinimum, maxHopSlippage, hookData]
-    const [, zeroForOne, amountIn, amountOutMinimum, maxHopSlippage, hookData] = data
+    // V2.1.1: [poolKey, zeroForOne, amountIn, amountOutMinimum, minHopPriceX36, hookData]
+    const [, zeroForOne, amountIn, amountOutMinimum, minHopPriceX36, hookData] = data
     return {
       poolKey,
       zeroForOne,
       amountIn,
       amountOutMinimum,
-      maxHopSlippage,
+      minHopPriceX36,
       hookData,
     }
   }
@@ -199,12 +199,12 @@ function parseV4ExactIn(data: any[], urVersion: URVersion): SwapExactIn {
       amountOutMinimum,
     }
   } else {
-    // V2.1.1: [currencyIn, path, maxHopSlippage, amountIn, amountOutMinimum]
-    const [currencyIn, , maxHopSlippage, amountIn, amountOutMinimum] = data
+    // V2.1.1: [currencyIn, path, minHopPriceX36, amountIn, amountOutMinimum]
+    const [currencyIn, , minHopPriceX36, amountIn, amountOutMinimum] = data
     return {
       currencyIn,
       path: paths,
-      maxHopSlippage,
+      minHopPriceX36,
       amountIn,
       amountOutMinimum,
     }
@@ -226,14 +226,14 @@ function parseV4ExactOutSingle(data: any[], urVersion: URVersion): SwapExactOutS
       hookData,
     }
   } else {
-    // V2.1.1: [poolKey, zeroForOne, amountOut, amountInMaximum, maxHopSlippage, hookData]
-    const [, zeroForOne, amountOut, amountInMaximum, maxHopSlippage, hookData] = data
+    // V2.1.1: [poolKey, zeroForOne, amountOut, amountInMaximum, minHopPriceX36, hookData]
+    const [, zeroForOne, amountOut, amountInMaximum, minHopPriceX36, hookData] = data
     return {
       poolKey,
       zeroForOne,
       amountOut,
       amountInMaximum,
-      maxHopSlippage,
+      minHopPriceX36,
       hookData,
     }
   }
@@ -252,12 +252,12 @@ function parseV4ExactOut(data: any[], urVersion: URVersion): SwapExactOut {
       amountInMaximum,
     }
   } else {
-    // V2.1.1: [currencyOut, path, maxHopSlippage, amountOut, amountInMaximum]
-    const [currencyOut, , maxHopSlippage, amountOut, amountInMaximum] = data
+    // V2.1.1: [currencyOut, path, minHopPriceX36, amountOut, amountInMaximum]
+    const [currencyOut, , minHopPriceX36, amountOut, amountInMaximum] = data
     return {
       currencyOut,
       path: paths,
-      maxHopSlippage,
+      minHopPriceX36,
       amountOut,
       amountInMaximum,
     }
