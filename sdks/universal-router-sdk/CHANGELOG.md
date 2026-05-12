@@ -1,5 +1,11 @@
 # @uniswap/universal-router-sdk
 
+## 5.3.0
+
+### Minor Changes
+
+- e8e7bd5: Add SwapRouter.encodeSwaps(spec, swapSteps), an alternative entry point for callers that can provide explicit SwapStep[] plans
+
 ## 5.2.0
 
 ### Minor Changes
