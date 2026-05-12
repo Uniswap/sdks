@@ -18,8 +18,6 @@ export function toV4URVersion(version?: UniversalRouterVersion): URVersion {
   return mapped
 }
 
-// Object keys here must match v4-sdk's V4Planner ABI fragment names. The `maxHopSlippage` keys
-// in the swap branches carry the contract's `minHopPriceX36` value — v4-sdk hasn't been renamed yet.
 export function encodeV4Action(
   v4Action: V4Action,
   urVersion?: UniversalRouterVersion
@@ -37,7 +35,7 @@ export function encodeV4Action(
           {
             currencyIn: v4Action.currencyIn,
             path: v4Action.path,
-            ...(useV2_1_1 && { maxHopSlippage: v4Action.minHopPriceX36 ?? [] }),
+            ...(useV2_1_1 && { minHopPriceX36: v4Action.minHopPriceX36 ?? [] }),
             amountIn: v4Action.amountIn,
             amountOutMinimum: v4Action.amountOutMinimum,
           },
@@ -52,7 +50,7 @@ export function encodeV4Action(
             zeroForOne: v4Action.zeroForOne,
             amountIn: v4Action.amountIn,
             amountOutMinimum: v4Action.amountOutMinimum,
-            ...(useV2_1_1 && { maxHopSlippage: v4Action.minHopPriceX36 ?? 0 }),
+            ...(useV2_1_1 && { minHopPriceX36: v4Action.minHopPriceX36 ?? 0 }),
             hookData: v4Action.hookData,
           },
         ],
@@ -64,7 +62,7 @@ export function encodeV4Action(
           {
             currencyOut: v4Action.currencyOut,
             path: v4Action.path,
-            ...(useV2_1_1 && { maxHopSlippage: v4Action.minHopPriceX36 ?? [] }),
+            ...(useV2_1_1 && { minHopPriceX36: v4Action.minHopPriceX36 ?? [] }),
             amountOut: v4Action.amountOut,
             amountInMaximum: v4Action.amountInMaximum,
           },
@@ -79,7 +77,7 @@ export function encodeV4Action(
             zeroForOne: v4Action.zeroForOne,
             amountOut: v4Action.amountOut,
             amountInMaximum: v4Action.amountInMaximum,
-            ...(useV2_1_1 && { maxHopSlippage: v4Action.minHopPriceX36 ?? 0 }),
+            ...(useV2_1_1 && { minHopPriceX36: v4Action.minHopPriceX36 ?? 0 }),
             hookData: v4Action.hookData,
           },
         ],

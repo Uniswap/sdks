@@ -1,5 +1,16 @@
 # @uniswap/router-sdk
 
+## 2.10.0
+
+### Minor Changes
+
+- 5398a2c: Rename maxHopSlippage to minHopPriceX36
+
+### Patch Changes
+
+- Updated dependencies [5398a2c]
+  - @uniswap/v4-sdk@2.1.0
+
 ## 2.9.0
 
 ### Minor Changes

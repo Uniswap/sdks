@@ -634,8 +634,7 @@ describe('encodeSwaps', () => {
 
       const parsed = V4BaseActionsParser.parseCalldata(planner.inputs[0], URVersion.V2_1_1)
       const action = parsed.actions[0].params[0].value as any
-      // v4-sdk's parser emits the field as `maxHopSlippage`; the value is the contract's `minHopPriceX36`.
-      expect(action.maxHopSlippage.map((value: BigNumber) => value.toString())).to.deep.equal(['100', '200'])
+      expect(action.minHopPriceX36.map((value: BigNumber) => value.toString())).to.deep.equal(['100', '200'])
     })
 
     it('encodes V4 single minHopPriceX36 on UR 2.1.1', () => {
@@ -664,7 +663,7 @@ describe('encodeSwaps', () => {
 
       const parsed = V4BaseActionsParser.parseCalldata(planner.inputs[0], URVersion.V2_1_1)
       const action = parsed.actions[0].params[0].value as any
-      expect(action.maxHopSlippage.toString()).to.equal('123456')
+      expect(action.minHopPriceX36.toString()).to.equal('123456')
     })
 
     it('hardcodes V4 SETTLE payerIsUser to false', () => {
