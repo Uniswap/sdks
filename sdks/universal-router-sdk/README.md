@@ -22,6 +22,11 @@ const routerTrade = new RouterTrade({ v2Routes, v3Routes, mixedRoutes, tradeType
 const { calldata, value } = SwapRouter.swapCallParameters(routerTrade, options)
 ```
 
+This SDK has two entry points for encoding swap calldata:
+
+- **`SwapRouter.swapCallParameters(trade, options)`** — builds calldata from a high-level `RouterTrade` (shown above). Best when your swap fits as one or more independent linear routes through pools.
+- **`SwapRouter.encodeSwaps(spec, swapSteps)`** — takes Universal Router commands directly, with the SDK adding ingress, fee, and settlement calldata around them. Best for topologies that don't fit a Trade, routing-service integrations, or advanced V4 compositions. See [Encoding Router-Provided Swap Steps](#encoding-router-provided-swap-steps-encodeswaps).
+
 ## Running this package
 
 Make sure you are running `node v18`
@@ -37,6 +42,82 @@ Run forge integration tests
 ```bash
 forge install
 yarn test:forge
+```
+
+## Encoding Router-Provided Swap Steps (`encodeSwaps`)
+
+`SwapRouter.encodeSwaps(spec, swapSteps)` is an alternative entry point for callers that already produce explicit `SwapStep[]` plans (e.g. routing services) and want the SDK to wrap them in a safety envelope. It decouples route topology from SDK trade construction.
+
+The router owns `swapSteps` (V2/V3/V4 swaps + any `WRAP_ETH` / `UNWRAP_WETH`). The SDK owns ingress, fees, final settlement, exact-output refund, and optional `safeMode`.
+
+### Swap Step Types
+
+Each `SwapStep` is a 1:1 representation of a Universal Router command:
+
+- `V2_SWAP_EXACT_IN` / `V2_SWAP_EXACT_OUT` — V2 swap (multi-hop via `path: address[]`)
+- `V3_SWAP_EXACT_IN` / `V3_SWAP_EXACT_OUT` — V3 swap (multi-hop via packed `path: bytes`)
+- `V4_SWAP` — wraps a sequence of V4 actions (`SWAP_EXACT_IN`, `SETTLE`, `TAKE`, etc.) for the V4 router module
+- `WRAP_ETH` / `UNWRAP_WETH` — required when the route bridges native ETH and WETH
+
+Routers compose these to express any supported route topology. The SDK does not infer wrap/unwrap commands — routers must include them when their route depends on it.
+
+### Basic Usage
+
+```typescript
+import { SwapRouter, ROUTER_AS_RECIPIENT } from '@uniswap/universal-router-sdk'
+import { CurrencyAmount, Percent, TradeType } from '@uniswap/sdk-core'
+
+const { calldata, value } = SwapRouter.encodeSwaps(
+  {
+    tradeType: TradeType.EXACT_INPUT,
+    routing: {
+      inputToken: USDC,
+      outputToken: WETH,
+      amount: CurrencyAmount.fromRawAmount(USDC, '1000000000'),
+      quote: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+    },
+    slippageTolerance: new Percent(50, 10000), // 0.5%
+    recipient: '0x...',
+  },
+  [
+    {
+      type: 'V3_SWAP_EXACT_IN',
+      recipient: ROUTER_AS_RECIPIENT,
+      amountIn: '1000000000',
+      amountOutMin: '0', // SDK enforces final slippage via the trailing SWEEP
+      path: '0x...', // packed V3 path
+    },
+  ]
+)
+```
+
+### What the SDK adds around `swapSteps`
+
+1. **Ingress**: `PERMIT2_TRANSFER_FROM` for ERC20 input, or `proxy.execute()` wrapping for `ApproveProxy`. Native input flows through `msg.value`.
+2. **Fee deduction** before settlement: portion (`PAY_PORTION` / `PAY_PORTION_FULL_PRECISION`) on exact-input, flat (`TRANSFER`) on exact-output.
+3. **Final SWEEP** of `outputToken` to recipient with the slippage-bounded floor.
+4. **Exact-output refund**: SWEEPs unused input back to recipient.
+5. **safeMode** (optional): trailing zero-min ETH SWEEP to recover dust or unintended `msg.value`.
+
+### Constraints
+
+- All swap step recipients must be `ROUTER_AS_RECIPIENT` — the SDK's settlement sweeps need router custody to see the funds.
+- `payerIsUser` is hardcoded to `false`; ingress runs once up-front via `PERMIT2_TRANSFER_FROM`.
+- Routers must end with output in `routing.outputToken`. For exact-output, unused input must end in `routing.inputToken`.
+- The final top-level `SWEEP` is appended by the SDK — don't include it in `swapSteps`.
+
+### Per-Hop Slippage
+
+Per-hop bounds require Universal Router v2.1.1+ — set `urVersion: UniversalRouterVersion.V2_1_1` on `spec` to enable.
+
+`encodeSwaps` accepts per-hop bounds as `minHopPriceX36` on each swap step, matching the contract parameter name. The value is a 1e36-scaled price floor.
+
+```typescript
+{
+  type: 'V3_SWAP_EXACT_IN',
+  // ...
+  minHopPriceX36: ['995000000000000000000000000000000000', ...], // one per hop
+}
 ```
 
 ## Signed Routes (Universal Router v2.1)
