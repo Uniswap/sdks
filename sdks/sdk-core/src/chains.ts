@@ -62,7 +62,7 @@ export const AVERAGE_BLOCK_TIMES_SECONDS: { [chainId: number]: number } = {
   [ChainId.MONAD]: 0.4,
   [ChainId.XLAYER]: 1,
   [ChainId.TEMPO]: 0.5,
-  [ChainId.ROBINHOOD]: 0.25,
+  [ChainId.ROBINHOOD]: 0.1,
 }
 
 /**
