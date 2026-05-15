@@ -79,6 +79,15 @@ export function getAverageBlockTimeSecs(chainId: number): number {
   return value
 }
 
+/**
+ * Converts a wallclock duration in seconds to a block count for the given
+ * chain, rounding up so the resulting window fully covers the requested time.
+ * Throws if the chain is not registered in AVERAGE_BLOCK_TIMES_SECONDS.
+ */
+export function secondsToBlocks(seconds: number, chainId: number): number {
+  return Math.ceil(seconds / getAverageBlockTimeSecs(chainId))
+}
+
 export const SUPPORTED_CHAINS = [
   ChainId.MAINNET,
   ChainId.OPTIMISM,

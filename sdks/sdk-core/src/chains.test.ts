@@ -1,4 +1,4 @@
-import { ChainId, getAverageBlockTimeSecs } from './chains'
+import { ChainId, getAverageBlockTimeSecs, secondsToBlocks } from './chains'
 
 describe('getAverageBlockTimeSecs', () => {
   it('returns the registered block time for a known chain', () => {
@@ -9,5 +9,18 @@ describe('getAverageBlockTimeSecs', () => {
 
   it('throws on unregistered chainId', () => {
     expect(() => getAverageBlockTimeSecs(99999)).toThrow(/unsupported chainId 99999/)
+  })
+})
+
+describe('secondsToBlocks', () => {
+  it('converts wallclock seconds to a block count using ceil', () => {
+    expect(secondsToBlocks(8, ChainId.MAINNET)).toEqual(1) // ceil(8/12)
+    expect(secondsToBlocks(8, ChainId.ARBITRUM_ONE)).toEqual(32) // ceil(8/0.25)
+    expect(secondsToBlocks(8, ChainId.TEMPO)).toEqual(16) // ceil(8/0.5)
+    expect(secondsToBlocks(1, ChainId.MAINNET)).toEqual(1) // ceil(1/12) — rounds up to a full block
+  })
+
+  it('propagates throw on unregistered chainId', () => {
+    expect(() => secondsToBlocks(10, 99999)).toThrow(/unsupported chainId 99999/)
   })
 })
