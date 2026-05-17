@@ -1,4 +1,5 @@
 import { Currency, Fraction, Percent, Price, sortedInsert, CurrencyAmount, TradeType, Token } from '@uniswap/sdk-core'
+import JSBI from 'jsbi'
 import invariant from 'tiny-invariant'
 import { ONE, ZERO } from '../internalConstants'
 import { Pool } from './pool'
@@ -431,10 +432,12 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       return amountOut
     } else {
       const slippageAdjustedAmountOut = new Fraction(ONE)
-        .add(slippageTolerance)
-        .invert()
+        .subtract(slippageTolerance)
         .multiply(amountOut.quotient).quotient
-      return CurrencyAmount.fromRawAmount(amountOut.currency, slippageAdjustedAmountOut)
+      const clampedAmount = JSBI.greaterThan(slippageAdjustedAmountOut, JSBI.BigInt(0))
+        ? slippageAdjustedAmountOut
+        : JSBI.BigInt(0)
+      return CurrencyAmount.fromRawAmount(amountOut.currency, clampedAmount)
     }
   }
 
