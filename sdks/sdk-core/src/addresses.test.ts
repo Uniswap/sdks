@@ -57,5 +57,10 @@ describe('addresses', () => {
       const address = SWAP_ROUTER_02_ADDRESSES(ChainId.TEMPO)
       expect(address).toEqual('0x7e9d53081e961201837336bcd81f52ae92691a8f')
     })
+
+    it('should return the correct address for megaeth', () => {
+      const address = SWAP_ROUTER_02_ADDRESSES(ChainId.MEGAETH)
+      expect(address).toEqual('0x48020de9208bafc183f5cad5118ffbe8f0f913f5')
+    })
   })
 })

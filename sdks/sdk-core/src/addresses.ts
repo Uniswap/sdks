@@ -65,6 +65,7 @@ export const V2_FACTORY_ADDRESSES: AddressMap = {
   [ChainId.XLAYER]: '0xdf38f24fe153761634be942f9d859f3dba857e95',
   [ChainId.LINEA]: '0x114A43DF6C5f54EBB8A9d70Cd1951D3dD68004c7',
   [ChainId.TEMPO]: '0xf9ec577a4e45b5278bb7cf60fcbc20c3acaef68f',
+  [ChainId.MEGAETH]: '0xbf56488c857a881ae7e3bed27cf99c10a7ab7e50',
 }
 /**
  * @deprecated use V2_ROUTER_ADDRESSES instead
@@ -91,6 +92,7 @@ export const V2_ROUTER_ADDRESSES: AddressMap = {
   [ChainId.XLAYER]: '0x182a927119d56008d921126764bf884221b10f59',
   [ChainId.LINEA]: '0x8702463e73f74d0b6765abceb314ef07acb92650',
   [ChainId.TEMPO]: '0x0fbac3c46f6f83b44c7fb4ea986d7309c701d73e',
+  [ChainId.MEGAETH]: '0xb73055db2b3a3eae87a331dd88e4a80b43602690',
 }
 
 // Networks that share most of the same addresses i.e. Mainnet, Goerli, Optimism, Arbitrum, Polygon
@@ -493,6 +495,22 @@ const TEMPO_ADDRESSES: ChainAddresses = {
   v4QuoterAddress: '0x20e6487c371a2086f841ef453f85378223df4f4e',
 }
 
+const MEGAETH_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: '0x3a5f0cd7d62452b7f899b2a5758bfa57be0de478',
+  multicallAddress: '0x61f3272a3619d9f20788c6822fed2e5471bfc477',
+  quoterAddress: '0x5affda77bc34d945f9632bd080ebfcf24133b90e',
+  v3MigratorAddress: '0xed30f6c25fe915dc710f168fa3ab66199ee84454',
+  nonfungiblePositionManagerAddress: '0xcdc86e98184e96436f733a8bf31bd4f0214e6d7d',
+  tickLensAddress: '0xe7a2d824722addcb21e7a203ae7b372bf3a29ec5',
+  swapRouter02Address: '0x48020de9208bafc183f5cad5118ffbe8f0f913f5',
+  mixedRouteQuoterV2Address: '0x1768d0b0f8ee6638986aab8f775ceb87c45f8730',
+
+  v4PoolManagerAddress: '0xacb7e78fa05d562e0a5d3089ec896d57d057d38e',
+  v4PositionManagerAddress: '0x9ae0921e981aaa7308f176f8d4f9129b9247c89d',
+  v4StateView: '0x726f84e1dfb8d375a365e0808282f40d52d3e4e8',
+  v4QuoterAddress: '0x94bdc671f0c35f44a1daa53143fd1f868d1623b9',
+}
+
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
   [ChainId.MAINNET]: MAINNET_ADDRESSES,
   [ChainId.OPTIMISM]: OPTIMISM_ADDRESSES,
@@ -526,6 +544,7 @@ export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses>
   [ChainId.XLAYER]: XLAYER_ADDRESSES,
   [ChainId.LINEA]: LINEA_ADDRESSES,
   [ChainId.TEMPO]: TEMPO_ADDRESSES,
+  [ChainId.MEGAETH]: MEGAETH_ADDRESSES,
 }
 
 /* V3 Contract Addresses */

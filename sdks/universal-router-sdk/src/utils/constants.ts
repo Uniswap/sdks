@@ -498,6 +498,21 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
+  // megaeth
+  [4326]: {
+    weth: '0x4200000000000000000000000000000000000006',
+    routerConfigs: {
+      [UniversalRouterVersion.V2_0]: {
+        address: '0x48fd03529d2a91be835f07f6b72f53b4aad6093d',
+        creationBlock: 7009661,
+      },
+      [UniversalRouterVersion.V2_1_1]: {
+        address: '0x47837eb80db5908eabba9105626d9b348bea7b02',
+        creationBlock: 7009661,
+      },
+    },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
+  },
   // xlayer
   [196]: {
     weth: '0xe538905cf8410324e03A5A23C1c177a474D59b2b',
