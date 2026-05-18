@@ -19,7 +19,6 @@ jobs:
   claude-review-auto:
     if: |
       github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.action != 'review_requested' &&
       !contains(github.head_ref, 'gh-readonly-queue/') &&
       !startsWith(github.head_ref, 'release/') &&
@@ -29,7 +28,7 @@ jobs:
         github.event.action == 'ready_for_review'
       )
 
-    uses: Uniswap/ai-toolkit/.github/workflows/_claude-code-review.yml@96ef665ba04221de07e94fcc3ea69fe32c7cf306
+    uses: Uniswap/ai-toolkit/.github/workflows/_claude-code-review.yml@b39cd9aff6e657d58862fff5b0bec04eb2dea4af
     with:
       pr_number: ${{ github.event.pull_request.number }}
       base_ref: ${{ github.base_ref }}
