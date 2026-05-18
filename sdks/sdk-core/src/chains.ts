@@ -34,6 +34,7 @@ export enum ChainId {
   XLAYER = 196,
   LINEA = 59144,
   TEMPO = 4217,
+  MEGAETH = 4326,
   ROBINHOOD = 46630,
 }
 
@@ -62,6 +63,7 @@ export const AVERAGE_BLOCK_TIMES_SECONDS: { [chainId: number]: number } = {
   [ChainId.MONAD]: 0.4,
   [ChainId.XLAYER]: 1,
   [ChainId.TEMPO]: 0.5,
+  [ChainId.MEGAETH]: 1,
   [ChainId.ROBINHOOD]: 0.1,
 }
 
@@ -121,6 +123,7 @@ export const SUPPORTED_CHAINS = [
   ChainId.XLAYER,
   ChainId.LINEA,
   ChainId.TEMPO,
+  ChainId.MEGAETH,
 ] as const
 export type SupportedChainsType = (typeof SUPPORTED_CHAINS)[number]
 

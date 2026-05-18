@@ -35,6 +35,11 @@ describe('Universal Router Constants', () => {
       expect(() => UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V1_2, 59144)).to.throw(
         'Universal Router version 1.2 not deployed on chain 59144'
       )
+
+      // MegaETH (4326) has no V1_2
+      expect(() => UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V1_2, 4326)).to.throw(
+        'Universal Router version 1.2 not deployed on chain 4326'
+      )
     })
   })
 
@@ -61,6 +66,11 @@ describe('Universal Router Constants', () => {
       // Linea (59144) has no V1_2
       expect(() => UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V1_2, 59144)).to.throw(
         'Universal Router version 1.2 not deployed on chain 59144'
+      )
+
+      // MegaETH (4326) has no V1_2
+      expect(() => UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V1_2, 4326)).to.throw(
+        'Universal Router version 1.2 not deployed on chain 4326'
       )
     })
   })
