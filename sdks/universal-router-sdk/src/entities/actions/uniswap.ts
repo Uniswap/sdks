@@ -69,6 +69,7 @@ export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit'> & {
 const UR_VERSION_MAP: Record<string, URVersion> = {
   [UniversalRouterVersion.V2_0]: URVersion.V2_0,
   [UniversalRouterVersion.V2_1_1]: URVersion.V2_1_1,
+  [UniversalRouterVersion.V2_2_0]: URVersion.V2_2_0,
 }
 
 function toURVersion(version?: UniversalRouterVersion): URVersion {
