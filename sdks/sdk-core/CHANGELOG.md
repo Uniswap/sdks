@@ -1,5 +1,11 @@
 # @uniswap/sdk-core
 
+## 7.15.0
+
+### Minor Changes
+
+- 0e30be1: Add MegaETH chain and Universal Router deployment config
+
 ## 7.13.0
 
 ### Minor Changes

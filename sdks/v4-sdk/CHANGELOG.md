@@ -1,5 +1,13 @@
 # @uniswap/v4-sdk
 
+## 2.1.1
+
+### Patch Changes
+
+- Updated dependencies [0e30be1]
+  - @uniswap/sdk-core@7.15.0
+  - @uniswap/v3-sdk@3.30.1
+
 ## 2.1.0
 
 ### Minor Changes
