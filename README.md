@@ -11,27 +11,27 @@ git clone --recurse-submodules https://github.com/Uniswap/sdks.git
 
 # Install
 
-yarn
+bun install
 
 # Build
 
-yarn g:build
+bun run g:build
 
 # Typecheck
 
-yarn g:typecheck
+bun run g:typecheck
 
 # Lint
 
-yarn g:lint
+bun run g:lint
 
 # Test
 
-yarn g:test
+bun run g:test
 
 # Run a specific package.json command for an individual SDK
 
-yarn sdk @uniswap/{sdk-name} {command}
+bun run sdk @uniswap/{sdk-name} {command}
 ```
 
 ## Making Changes & Publishing
@@ -85,7 +85,7 @@ Previously this required 4 sequential PRs with publish-wait-bump cycles. Now it'
 
 ```
 1. Edit sdk-core (add chain) + universal-router-sdk (use chain)
-2. Run `yarn changeset` and select both packages
+2. Run `bun run changeset` and select both packages
 3. Open PR, merge
 4. Merge the auto-generated "Version Packages" PR
 5. All affected packages publish to npm
