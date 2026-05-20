@@ -6,18 +6,31 @@ A repository for many Uniswap SDK's. All SDK's can be found in `sdk/` and have m
 
 ```markdown
 # Clone
+
 git clone --recurse-submodules https://github.com/Uniswap/sdks.git
+
 # Install
+
 yarn
+
 # Build
+
 yarn g:build
+
 # Typecheck
+
 yarn g:typecheck
+
 # Lint
+
 yarn g:lint
+
 # Test
+
 yarn g:test
+
 # Run a specific package.json command for an individual SDK
+
 yarn sdk @uniswap/{sdk-name} {command}
 ```
 
@@ -34,10 +47,11 @@ Internal dependencies (e.g., `v4-sdk` depending on `sdk-core`) use the `workspac
 After making your changes, run:
 
 ```
-yarn changeset
+bun run changeset
 ```
 
 This interactive CLI will ask you:
+
 - **Which packages should be bumped?** Select the packages you directly changed (e.g., `@uniswap/sdk-core`).
 - **What type of bump?** `patch`, `minor`, or `major`.
 - **Summary** A short description of the change (this becomes the changelog entry).
@@ -79,8 +93,8 @@ Previously this required 4 sequential PRs with publish-wait-bump cycles. Now it'
 
 ### Quick reference
 
-| Command | What it does |
-|---|---|
-| `yarn changeset` | Create a changeset file (run before opening your PR) |
-| `yarn version-packages` | Apply pending changesets to bump versions (CI does this) |
-| `yarn g:release` | Publish all bumped packages to npm (CI does this) |
+| Command                    | What it does                                             |
+| -------------------------- | -------------------------------------------------------- |
+| `bun run changeset`        | Create a changeset file (run before opening your PR)     |
+| `bun run version-packages` | Apply pending changesets to bump versions (CI does this) |
+| `bun run g:release`        | Publish all bumped packages to npm (CI does this)        |
