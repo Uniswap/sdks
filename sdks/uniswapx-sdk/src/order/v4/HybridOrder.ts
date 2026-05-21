@@ -71,6 +71,16 @@ export class HybridOrderCosignatureError extends Error {
   }
 }
 
+export class ResolverMismatchError extends Error {
+  constructor(outerResolver: string, auctionResolver: string) {
+    super(
+      `Outer resolver ${outerResolver} does not match signed auctionResolver ${auctionResolver}. ` +
+        "The outer wrapper resolver must equal info.auctionResolver to prevent resolver rewrapping."
+    );
+    this.name = "ResolverMismatchError";
+  }
+}
+
 /**
  * Parse a serialized HybridOrder
  */
@@ -115,6 +125,11 @@ function parseSerializedHybridOrder(encoded: string): {
       cosignature,
     ],
   ] = decoded;
+
+  // Validate outer resolver matches signed auctionResolver
+  if (resolver.toLowerCase() !== auctionResolver.toLowerCase()) {
+    throw new ResolverMismatchError(resolver, auctionResolver);
+  }
 
   return {
     resolver,
@@ -165,6 +180,9 @@ export class UnsignedHybridOrder {
     public readonly resolver: string,
     _permit2Address?: string
   ) {
+    if (resolver.toLowerCase() !== info.auctionResolver.toLowerCase()) {
+      throw new ResolverMismatchError(resolver, info.auctionResolver);
+    }
     this.permit2Address = getPermit2(chainId, _permit2Address);
   }
 
@@ -312,7 +330,9 @@ export class UnsignedHybridOrder {
         "0x", // Empty cosignature
       ],
     ]);
-    return abiCoder.encode(["address", "bytes"], [this.resolver, orderData]);
+    // Always use the signed auctionResolver as the outer wrapper to prevent
+    // resolver rewrapping attacks where the unsigned outer resolver is replaced
+    return abiCoder.encode(["address", "bytes"], [this.info.auctionResolver, orderData]);
   }
 
   permitData(): PermitTransferFromData {
@@ -570,7 +590,9 @@ export class CosignedHybridOrder extends UnsignedHybridOrder {
         this.info.cosignature,
       ],
     ]);
-    return abiCoder.encode(["address", "bytes"], [this.resolver, orderData]);
+    // Always use the signed auctionResolver as the outer wrapper to prevent
+    // resolver rewrapping attacks where the unsigned outer resolver is replaced
+    return abiCoder.encode(["address", "bytes"], [this.info.auctionResolver, orderData]);
   }
 
   get blockOverrides(): BlockOverridesV4 {

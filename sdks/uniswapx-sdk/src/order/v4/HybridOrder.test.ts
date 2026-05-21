@@ -1,6 +1,6 @@
 import { BigNumber, ethers, Wallet } from "ethers";
 
-import { CosignedHybridOrder, OrderResolutionError } from "./HybridOrder";
+import { CosignedHybridOrder, OrderResolutionError, ResolverMismatchError } from "./HybridOrder";
 import { hashHybridCosignerData, hashHybridOrder } from "./hashing";
 import { CosignedHybridOrderInfo, CosignedHybridOrderInfoJSON } from "./types";
 
@@ -434,6 +434,49 @@ describe("CosignedHybridOrder", () => {
         priorityFeeWei: order.baselinePriorityFee,
       }),
     ).toThrow(OrderResolutionError);
+  });
+  describe("resolver mismatch protection", () => {
+    it("rejects construction with mismatched resolver and auctionResolver", () => {
+      const order = buildOrder();
+      const ATTACKER_RESOLVER = "0x0000000000000000000000000000000000000bad";
+      expect(
+        () => new CosignedHybridOrder(order, chainId, ATTACKER_RESOLVER),
+      ).toThrow(ResolverMismatchError);
+    });
+
+    it("rejects parsing serialized order with tampered outer resolver", () => {
+      const order = buildOrder();
+      const hybrid = new CosignedHybridOrder(order, chainId, RESOLVER);
+      const serialized = hybrid.serialize();
+
+      // Tamper with the outer resolver in the serialized bytes
+      const abiCoder = new ethers.utils.AbiCoder();
+      const [, orderData] = abiCoder.decode(["address", "bytes"], serialized);
+      const ATTACKER_RESOLVER = "0x0000000000000000000000000000000000000bad";
+      const tampered = abiCoder.encode(
+        ["address", "bytes"],
+        [ATTACKER_RESOLVER, orderData],
+      );
+
+      expect(() => CosignedHybridOrder.parse(tampered, chainId)).toThrow(
+        ResolverMismatchError,
+      );
+    });
+
+    it("serialize always uses signed auctionResolver in outer wrapper", () => {
+      const order = buildOrder();
+      const hybrid = new CosignedHybridOrder(order, chainId, RESOLVER);
+      const serialized = hybrid.serialize();
+
+      const abiCoder = new ethers.utils.AbiCoder();
+      const [outerResolver] = abiCoder.decode(
+        ["address", "bytes"],
+        serialized,
+      );
+      expect(outerResolver.toLowerCase()).toEqual(
+        order.auctionResolver.toLowerCase(),
+      );
+    });
   });
 });
 
