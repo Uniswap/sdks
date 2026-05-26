@@ -4,6 +4,7 @@ export enum UniversalRouterVersion {
   V1_2 = '1.2',
   V2_0 = '2.0',
   V2_1_1 = '2.1.1',
+  V2_2_0 = '2.2.0',
 }
 
 /**
@@ -79,6 +80,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b',
         creationBlock: 10470160,
+      },
+      [UniversalRouterVersion.V2_2_0]: {
+        address: '0x36aDBb78ebA5C9e04A8Dd700464329D442464553',
+        creationBlock: 10927672,
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,

@@ -18,6 +18,7 @@ type ChainAddresses = {
   v4PositionManagerAddress?: string
   v4StateView?: string
   v4QuoterAddress?: string
+  permissionedV4PositionManagerAddress?: string
 }
 
 const DEFAULT_NETWORKS = [ChainId.MAINNET, ChainId.GOERLI, ChainId.SEPOLIA]
@@ -241,6 +242,7 @@ const SEPOLIA_ADDRESSES: ChainAddresses = {
   v4PositionManagerAddress: '0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4',
   v4StateView: '0xe1dd9c3fa50edb962e442f60dfbc432e24537e4c',
   v4QuoterAddress: '0x61b3f2011a92d183c7dbadbda940a7555ccf9227',
+  permissionedV4PositionManagerAddress: '0x96a866F17eC1e53f184C3F997D0dc026035aFe16',
 }
 
 // Avalanche v3 addresses

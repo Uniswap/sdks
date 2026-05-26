@@ -1,5 +1,15 @@
 # @uniswap/router-sdk
 
+## 2.10.2
+
+### Patch Changes
+
+- Updated dependencies
+  - @uniswap/sdk-core@7.16.0
+  - @uniswap/v4-sdk@2.2.0
+  - @uniswap/v2-sdk@4.20.2
+  - @uniswap/v3-sdk@3.30.2
+
 ## 2.10.1
 
 ### Patch Changes

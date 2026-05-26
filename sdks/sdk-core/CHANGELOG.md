@@ -1,5 +1,11 @@
 # @uniswap/sdk-core
 
+## 7.16.0
+
+### Minor Changes
+
+- Add UniversalRouterVersion V2_2_0 (Sepolia) with permissioned-pool support
+
 ## 7.15.0
 
 ### Minor Changes
