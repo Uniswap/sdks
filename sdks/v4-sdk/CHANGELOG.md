@@ -1,5 +1,17 @@
 # @uniswap/v4-sdk
 
+## 2.2.0
+
+### Minor Changes
+
+- Add UniversalRouterVersion V2_2_0 (Sepolia) with permissioned-pool support
+
+### Patch Changes
+
+- Updated dependencies
+  - @uniswap/sdk-core@7.16.0
+  - @uniswap/v3-sdk@3.30.2
+
 ## 2.1.1
 
 ### Patch Changes
