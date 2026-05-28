@@ -1,5 +1,11 @@
 # @uniswap/sdk-core
 
+## 7.16.1
+
+### Patch Changes
+
+- Add mainnet permissioned V4 position manager address and update sepolia permissioned V4 position manager address (perm-pool redeploy)
+
 ## 7.16.0
 
 ### Minor Changes

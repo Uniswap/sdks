@@ -112,6 +112,7 @@ const MAINNET_ADDRESSES: ChainAddresses = {
   v4PositionManagerAddress: '0xbd216513d74c8cf14cf4747e6aaa6420ff64ee9e',
   v4StateView: '0x7ffe42c4a5deea5b0fec41c94c136cf115597227',
   v4QuoterAddress: '0x52f0e24d1c21c8a0cb1e5a5dd6198556bd9e1203',
+  permissionedV4PositionManagerAddress: '0x89628C9B4CE81951a9BC1F36F0688Fad6A6ee248',
 }
 const GOERLI_ADDRESSES: ChainAddresses = {
   ...DEFAULT_ADDRESSES,
@@ -242,7 +243,7 @@ const SEPOLIA_ADDRESSES: ChainAddresses = {
   v4PositionManagerAddress: '0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4',
   v4StateView: '0xe1dd9c3fa50edb962e442f60dfbc432e24537e4c',
   v4QuoterAddress: '0x61b3f2011a92d183c7dbadbda940a7555ccf9227',
-  permissionedV4PositionManagerAddress: '0x96a866F17eC1e53f184C3F997D0dc026035aFe16',
+  permissionedV4PositionManagerAddress: '0x68fC145BB20b388965bED184Df5ef912215bb3C7',
 }
 
 // Avalanche v3 addresses

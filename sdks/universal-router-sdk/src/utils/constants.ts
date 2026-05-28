@@ -48,6 +48,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x4C82D1fBFe28C977cBB58D8C7FF8FCF9F70a2cCA',
         creationBlock: 24680568,
       },
+      [UniversalRouterVersion.V2_2_0]: {
+        address: '0xCb640A86855f1A828c27241bA364348de28abe66',
+        creationBlock: 25195294,
+      },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
@@ -82,8 +86,8 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 10470160,
       },
       [UniversalRouterVersion.V2_2_0]: {
-        address: '0x36aDBb78ebA5C9e04A8Dd700464329D442464553',
-        creationBlock: 10927672,
+        address: '0xB0C89059d7190EDb17eFF19829cc009cEe923916',
+        creationBlock: 10941522,
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
