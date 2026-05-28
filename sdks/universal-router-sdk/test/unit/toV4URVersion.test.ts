@@ -7,7 +7,6 @@ describe('toV4URVersion', () => {
   it('maps each UR version to the matching v4-sdk URVersion', () => {
     expect(toV4URVersion(UniversalRouterVersion.V2_0)).to.equal(URVersion.V2_0)
     expect(toV4URVersion(UniversalRouterVersion.V2_1_1)).to.equal(URVersion.V2_1_1)
-    // regression: a newly-added UR version must resolve without touching this map
     expect(toV4URVersion(UniversalRouterVersion.V2_2_0)).to.equal(URVersion.V2_2_0)
   })
 
@@ -17,11 +16,11 @@ describe('toV4URVersion', () => {
 
   it('throws for UR versions with no v4-sdk equivalent', () => {
     // v4 actions do not exist pre-V2, so V1_2 has no URVersion
-    expect(() => toV4URVersion(UniversalRouterVersion.V1_2)).to.throw(/No v4-sdk URVersion mapping/)
+    expect(() => toV4URVersion(UniversalRouterVersion.V1_2)).to.throw('No v4-sdk URVersion mapping')
   })
 
   it('throws for an unknown version value', () => {
-    expect(() => toV4URVersion('9.9.9' as UniversalRouterVersion)).to.throw(/No v4-sdk URVersion mapping/)
+    expect(() => toV4URVersion('9.9.9' as UniversalRouterVersion)).to.throw('No v4-sdk URVersion mapping')
   })
 
   // contract: every UR version whose string also exists in URVersion must resolve to it.
@@ -32,7 +31,7 @@ describe('toV4URVersion', () => {
       if (urVersionValues.has(version)) {
         expect(toV4URVersion(version)).to.equal(version)
       } else {
-        expect(() => toV4URVersion(version)).to.throw(/No v4-sdk URVersion mapping/)
+        expect(() => toV4URVersion(version)).to.throw('No v4-sdk URVersion mapping')
       }
     }
   })
