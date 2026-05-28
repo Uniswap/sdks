@@ -1,8 +1,7 @@
 import { URVersion } from '@uniswap/v4-sdk'
 import { UniversalRouterVersion } from './constants'
 
-// the one sanctioned bridge to v4-sdk's URVersion — kept out of constants.ts on purpose (see isAtLeastV2_1_1 note there)
-// so the widely-imported constants leaf stays free of v4-sdk. UniversalRouterVersion and URVersion share string values,
+// the one sanctioned bridge to v4-sdk's URVersion — UniversalRouterVersion and URVersion share string values,
 // so resolve by value: new versions map without code changes, as long as both enums stay in sync.
 const URVERSION_VALUES = new Set<string>(Object.values(URVersion))
 
