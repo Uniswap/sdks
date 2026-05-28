@@ -1,5 +1,11 @@
 # @uniswap/universal-router-sdk
 
+## 5.5.2
+
+### Patch Changes
+
+- 5d35ab3: Fix UR version mapping with v4-sdk
+
 ## 5.5.1
 
 ### Patch Changes
