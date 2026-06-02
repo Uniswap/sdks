@@ -2,6 +2,7 @@ import { Currency, Fraction, Percent, Price, sortedInsert, CurrencyAmount, Trade
 import { Pair } from '@uniswap/v2-sdk'
 import { BestTradeOptions, Pool as V3Pool } from '@uniswap/v3-sdk'
 import { Pool as V4Pool } from '@uniswap/v4-sdk'
+import JSBI from 'jsbi'
 import invariant from 'tiny-invariant'
 import { ONE, ZERO } from '../../constants'
 import { MixedRouteSDK } from './route'
@@ -398,10 +399,12 @@ export class MixedRouteTrade<TInput extends Currency, TOutput extends Currency, 
     invariant(!slippageTolerance.lessThan(ZERO), 'SLIPPAGE_TOLERANCE')
     /// does not support exactOutput, as enforced in the constructor
     const slippageAdjustedAmountOut = new Fraction(ONE)
-      .add(slippageTolerance)
-      .invert()
+      .subtract(slippageTolerance)
       .multiply(amountOut.quotient).quotient
-    return CurrencyAmount.fromRawAmount(amountOut.currency, slippageAdjustedAmountOut)
+    const clampedAmount = JSBI.greaterThan(slippageAdjustedAmountOut, JSBI.BigInt(0))
+      ? slippageAdjustedAmountOut
+      : JSBI.BigInt(0)
+    return CurrencyAmount.fromRawAmount(amountOut.currency, clampedAmount)
   }
 
   /**
