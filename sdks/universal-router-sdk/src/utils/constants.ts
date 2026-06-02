@@ -5,6 +5,7 @@ export enum UniversalRouterVersion {
   V2_0 = '2.0',
 <<<<<<< Updated upstream
   V2_1_1 = '2.1.1',
+  V2_2_0 = '2.2.0',
 }
 
 /**
@@ -57,6 +58,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 23836348,
 >>>>>>> Stashed changes
       },
+      [UniversalRouterVersion.V2_2_0]: {
+        address: '0xCb640A86855f1A828c27241bA364348de28abe66',
+        creationBlock: 25195294,
+      },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
@@ -99,6 +104,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x470FFC67b1feEEC31D16C46AC7545C98716a194c',
         creationBlock: 9664766,
 >>>>>>> Stashed changes
+      },
+      [UniversalRouterVersion.V2_2_0]: {
+        address: '0xB0C89059d7190EDb17eFF19829cc009cEe923916',
+        creationBlock: 10941522,
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
@@ -627,6 +636,21 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       [UniversalRouterVersion.V2_1_1]: {
         address: '0xFdf682F51FE81Aa4898F0AE2163d8A55c127fbC7',
         creationBlock: 10065560,
+      },
+    },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
+  },
+  // megaeth
+  [4326]: {
+    weth: '0x4200000000000000000000000000000000000006',
+    routerConfigs: {
+      [UniversalRouterVersion.V2_0]: {
+        address: '0x48fd03529d2a91be835f07f6b72f53b4aad6093d',
+        creationBlock: 7009661,
+      },
+      [UniversalRouterVersion.V2_1_1]: {
+        address: '0x47837eb80db5908eabba9105626d9b348bea7b02',
+        creationBlock: 7009661,
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,

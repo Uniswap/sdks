@@ -1,7 +1,6 @@
 import { ethers } from 'ethers'
 import { PoolKey } from '../entities/pool'
 import { PathKey } from './encodeRouteToPath'
-<<<<<<< Updated upstream
 import {
   Actions,
   Subparser,
@@ -10,9 +9,6 @@ import {
   V4_BASE_ACTIONS_ABI_DEFINITION,
   V4_SWAP_ACTIONS_V2_1_1,
 } from './v4Planner'
-=======
-import { Actions, Subparser, V4_BASE_ACTIONS_ABI_DEFINITION } from './v4Planner'
->>>>>>> Stashed changes
 
 export type Param = {
   readonly name: string
@@ -34,18 +30,14 @@ export type SwapExactInSingle = {
   readonly zeroForOne: boolean
   readonly amountIn: string
   readonly amountOutMinimum: string
-  readonly maxHopSlippage?: string // Only present in V2.1.1
+  readonly minHopPriceX36?: string // Only present in V2.1.1
   readonly hookData: string
 }
 
 export type SwapExactIn = {
   readonly currencyIn: string
   readonly path: readonly PathKey[]
-<<<<<<< Updated upstream
-  readonly maxHopSlippage?: readonly string[] // Only present in V2.1.1
-=======
-  readonly maxHopSlippage: readonly string[]
->>>>>>> Stashed changes
+  readonly minHopPriceX36?: readonly string[] // Only present in V2.1.1
   readonly amountIn: string
   readonly amountOutMinimum: string
 }
@@ -55,40 +47,32 @@ export type SwapExactOutSingle = {
   readonly zeroForOne: boolean
   readonly amountOut: string
   readonly amountInMaximum: string
-  readonly maxHopSlippage?: string // Only present in V2.1.1
+  readonly minHopPriceX36?: string // Only present in V2.1.1
   readonly hookData: string
 }
 
 export type SwapExactOut = {
   readonly currencyOut: string
   readonly path: readonly PathKey[]
-<<<<<<< Updated upstream
-  readonly maxHopSlippage?: readonly string[] // Only present in V2.1.1
-=======
-  readonly maxHopSlippage: readonly string[]
->>>>>>> Stashed changes
+  readonly minHopPriceX36?: readonly string[] // Only present in V2.1.1
   readonly amountOut: string
   readonly amountInMaximum: string
 }
 
 // Parses V4Router actions
 export abstract class V4BaseActionsParser {
-  public static parseCalldata(calldata: string): V4RouterCall {
+  public static parseCalldata(calldata: string, urVersion: URVersion = URVersion.V2_0): V4RouterCall {
     const [actions, inputs] = ethers.utils.defaultAbiCoder.decode(['bytes', 'bytes[]'], calldata)
 
     const actionTypes = V4BaseActionsParser.getActions(actions)
 
     return {
       actions: actionTypes.map((actionType: Actions, i: number) => {
-<<<<<<< Updated upstream
         // Use V2.1.1 ABI for swap actions if V2.1.1, otherwise use base ABI (V2.0)
         const abiDef =
           isAtLeastV2_1_1(urVersion) && actionType in V4_SWAP_ACTIONS_V2_1_1
             ? V4_SWAP_ACTIONS_V2_1_1[actionType]
             : V4_BASE_ACTIONS_ABI_DEFINITION[actionType]
-=======
-        const abiDef = V4_BASE_ACTIONS_ABI_DEFINITION[actionType]
->>>>>>> Stashed changes
         const rawParams = ethers.utils.defaultAbiCoder.decode(
           abiDef.map((command) => command.type),
           inputs[i]
@@ -103,7 +87,7 @@ export abstract class V4BaseActionsParser {
             case Subparser.V4SwapExactIn:
               return {
                 name: abiDef[j].name,
-                value: parseV4ExactIn(param),
+                value: parseV4ExactIn(param, urVersion),
               }
             case Subparser.V4SwapExactOutSingle:
               return {
@@ -113,7 +97,7 @@ export abstract class V4BaseActionsParser {
             case Subparser.V4SwapExactOut:
               return {
                 name: abiDef[j].name,
-                value: parseV4ExactOut(param),
+                value: parseV4ExactOut(param, urVersion),
               }
             case Subparser.PoolKey:
               return {
@@ -189,24 +173,22 @@ function parseV4ExactInSingle(data: any[], urVersion: URVersion): SwapExactInSin
       hookData,
     }
   } else {
-    // V2.1.1: [poolKey, zeroForOne, amountIn, amountOutMinimum, maxHopSlippage, hookData]
-    const [, zeroForOne, amountIn, amountOutMinimum, maxHopSlippage, hookData] = data
+    // V2.1.1: [poolKey, zeroForOne, amountIn, amountOutMinimum, minHopPriceX36, hookData]
+    const [, zeroForOne, amountIn, amountOutMinimum, minHopPriceX36, hookData] = data
     return {
       poolKey,
       zeroForOne,
       amountIn,
       amountOutMinimum,
-      maxHopSlippage,
+      minHopPriceX36,
       hookData,
     }
   }
 }
 
-function parseV4ExactIn(data: any[]): SwapExactIn {
-  const [currencyIn, path, maxHopSlippage, amountIn, amountOutMinimum] = data
-  const paths: readonly PathKey[] = path.map((pathKey: string) => parsePathKey(pathKey))
+function parseV4ExactIn(data: any[], urVersion: URVersion): SwapExactIn {
+  const paths: readonly PathKey[] = data[1].map((pathKey: string) => parsePathKey(pathKey))
 
-<<<<<<< Updated upstream
   if (urVersion === URVersion.V2_0) {
     // V2.0: [currencyIn, path, amountIn, amountOutMinimum]
     const [currencyIn, , amountIn, amountOutMinimum] = data
@@ -217,23 +199,15 @@ function parseV4ExactIn(data: any[]): SwapExactIn {
       amountOutMinimum,
     }
   } else {
-    // V2.1.1: [currencyIn, path, maxHopSlippage, amountIn, amountOutMinimum]
-    const [currencyIn, , maxHopSlippage, amountIn, amountOutMinimum] = data
+    // V2.1.1: [currencyIn, path, minHopPriceX36, amountIn, amountOutMinimum]
+    const [currencyIn, , minHopPriceX36, amountIn, amountOutMinimum] = data
     return {
       currencyIn,
       path: paths,
-      maxHopSlippage,
+      minHopPriceX36,
       amountIn,
       amountOutMinimum,
     }
-=======
-  return {
-    path: paths,
-    currencyIn,
-    maxHopSlippage,
-    amountIn,
-    amountOutMinimum,
->>>>>>> Stashed changes
   }
 }
 
@@ -252,24 +226,22 @@ function parseV4ExactOutSingle(data: any[], urVersion: URVersion): SwapExactOutS
       hookData,
     }
   } else {
-    // V2.1.1: [poolKey, zeroForOne, amountOut, amountInMaximum, maxHopSlippage, hookData]
-    const [, zeroForOne, amountOut, amountInMaximum, maxHopSlippage, hookData] = data
+    // V2.1.1: [poolKey, zeroForOne, amountOut, amountInMaximum, minHopPriceX36, hookData]
+    const [, zeroForOne, amountOut, amountInMaximum, minHopPriceX36, hookData] = data
     return {
       poolKey,
       zeroForOne,
       amountOut,
       amountInMaximum,
-      maxHopSlippage,
+      minHopPriceX36,
       hookData,
     }
   }
 }
 
-function parseV4ExactOut(data: any[]): SwapExactOut {
-  const [currencyOut, path, maxHopSlippage, amountOut, amountInMaximum] = data
-  const paths: readonly PathKey[] = path.map((pathKey: string) => parsePathKey(pathKey))
+function parseV4ExactOut(data: any[], urVersion: URVersion): SwapExactOut {
+  const paths: readonly PathKey[] = data[1].map((pathKey: string) => parsePathKey(pathKey))
 
-<<<<<<< Updated upstream
   if (urVersion === URVersion.V2_0) {
     // V2.0: [currencyOut, path, amountOut, amountInMaximum]
     const [currencyOut, , amountOut, amountInMaximum] = data
@@ -280,22 +252,14 @@ function parseV4ExactOut(data: any[]): SwapExactOut {
       amountInMaximum,
     }
   } else {
-    // V2.1.1: [currencyOut, path, maxHopSlippage, amountOut, amountInMaximum]
-    const [currencyOut, , maxHopSlippage, amountOut, amountInMaximum] = data
+    // V2.1.1: [currencyOut, path, minHopPriceX36, amountOut, amountInMaximum]
+    const [currencyOut, , minHopPriceX36, amountOut, amountInMaximum] = data
     return {
       currencyOut,
       path: paths,
-      maxHopSlippage,
+      minHopPriceX36,
       amountOut,
       amountInMaximum,
     }
-=======
-  return {
-    path: paths,
-    currencyOut,
-    maxHopSlippage,
-    amountOut,
-    amountInMaximum,
->>>>>>> Stashed changes
   }
 }

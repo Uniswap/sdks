@@ -1,5 +1,26 @@
 # @uniswap/v3-sdk
 
+## 3.30.3
+
+### Patch Changes
+
+- Updated dependencies
+  - @uniswap/sdk-core@7.16.1
+
+## 3.30.2
+
+### Patch Changes
+
+- Updated dependencies
+  - @uniswap/sdk-core@7.16.0
+
+## 3.30.1
+
+### Patch Changes
+
+- Updated dependencies [0e30be1]
+  - @uniswap/sdk-core@7.15.0
+
 ## 3.30.0
 
 ### Minor Changes

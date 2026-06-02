@@ -34,6 +34,60 @@ export enum ChainId {
   XLAYER = 196,
   LINEA = 59144,
   TEMPO = 4217,
+  MEGAETH = 4326,
+  ROBINHOOD = 46630,
+}
+
+/**
+ * Average block time in seconds, per chain. Fractional values are intentional
+ * for sub-second chains so block-from-timestamp math stays accurate. Used as a
+ * single source of truth across UniswapX services and GPA to avoid drift.
+ *
+ * Values reflect each chain's most recent published target as of the last
+ * update; update here when chains alter their block cadence.
+ */
+export const AVERAGE_BLOCK_TIMES_SECONDS: { [chainId: number]: number } = {
+  [ChainId.MAINNET]: 12,
+  [ChainId.OPTIMISM]: 2,
+  [ChainId.ARBITRUM_ONE]: 0.25,
+  [ChainId.POLYGON]: 1.75,
+  [ChainId.CELO]: 1,
+  [ChainId.BNB]: 0.45, // post-Maxwell hardfork
+  [ChainId.AVALANCHE]: 1,
+  [ChainId.BASE]: 2,
+  [ChainId.ZORA]: 2,
+  [ChainId.BLAST]: 2,
+  [ChainId.WORLDCHAIN]: 2,
+  [ChainId.UNICHAIN]: 1,
+  [ChainId.SONEIUM]: 2,
+  [ChainId.MONAD]: 0.4,
+  [ChainId.XLAYER]: 1,
+  [ChainId.TEMPO]: 0.5,
+  [ChainId.MEGAETH]: 1,
+  [ChainId.ROBINHOOD]: 0.1,
+}
+
+/**
+ * Returns the average block time in seconds for a chain. Throws if the chain
+ * is not registered — callers must extend AVERAGE_BLOCK_TIMES_SECONDS rather
+ * than silently fall back to a mainnet-shaped default that would undercount
+ * blocks on faster chains.
+ */
+export function getAverageBlockTimeSecs(chainId: number): number {
+  const value = AVERAGE_BLOCK_TIMES_SECONDS[chainId]
+  if (value === undefined) {
+    throw new Error(`getAverageBlockTimeSecs: unsupported chainId ${chainId}; register it in chains.ts before use`)
+  }
+  return value
+}
+
+/**
+ * Converts a wallclock duration in seconds to a block count for the given
+ * chain, rounding up so the resulting window fully covers the requested time.
+ * Throws if the chain is not registered in AVERAGE_BLOCK_TIMES_SECONDS.
+ */
+export function secondsToBlocks(seconds: number, chainId: number): number {
+  return Math.ceil(seconds / getAverageBlockTimeSecs(chainId))
 }
 
 export const SUPPORTED_CHAINS = [
@@ -69,6 +123,7 @@ export const SUPPORTED_CHAINS = [
   ChainId.XLAYER,
   ChainId.LINEA,
   ChainId.TEMPO,
+  ChainId.MEGAETH,
 ] as const
 export type SupportedChainsType = (typeof SUPPORTED_CHAINS)[number]
 

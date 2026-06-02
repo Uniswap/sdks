@@ -259,7 +259,7 @@ export const COMMAND_DEFINITION: { [key in CommandType]: CommandDefinition } = {
 <<<<<<< Updated upstream
 }
 
-// V2.1.1 ABI definitions for V2/V3 swap commands (extended with maxHopSlippage)
+// V2.1.1 ABI definitions for V2/V3 swap commands (extended with minHopPriceX36)
 export const V2V3_SWAP_COMMANDS_V2_1_1: { [key: number]: CommandDefinition } = {
   [CommandType.V3_SWAP_EXACT_IN]: {
     parser: Parser.Abi,
@@ -269,7 +269,7 @@ export const V2V3_SWAP_COMMANDS_V2_1_1: { [key: number]: CommandDefinition } = {
       { name: 'amountOutMin', type: 'uint256' },
       { name: 'path', subparser: Subparser.V3PathExactIn, type: 'bytes' },
       { name: 'payerIsUser', type: 'bool' },
-      { name: 'maxHopSlippage', type: 'uint256[]' },
+      { name: 'minHopPriceX36', type: 'uint256[]' },
     ],
   },
   [CommandType.V3_SWAP_EXACT_OUT]: {
@@ -280,7 +280,7 @@ export const V2V3_SWAP_COMMANDS_V2_1_1: { [key: number]: CommandDefinition } = {
       { name: 'amountInMax', type: 'uint256' },
       { name: 'path', subparser: Subparser.V3PathExactOut, type: 'bytes' },
       { name: 'payerIsUser', type: 'bool' },
-      { name: 'maxHopSlippage', type: 'uint256[]' },
+      { name: 'minHopPriceX36', type: 'uint256[]' },
     ],
   },
   [CommandType.V2_SWAP_EXACT_IN]: {
@@ -291,7 +291,7 @@ export const V2V3_SWAP_COMMANDS_V2_1_1: { [key: number]: CommandDefinition } = {
       { name: 'amountOutMin', type: 'uint256' },
       { name: 'path', type: 'address[]' },
       { name: 'payerIsUser', type: 'bool' },
-      { name: 'maxHopSlippage', type: 'uint256[]' },
+      { name: 'minHopPriceX36', type: 'uint256[]' },
     ],
   },
   [CommandType.V2_SWAP_EXACT_OUT]: {
@@ -302,7 +302,7 @@ export const V2V3_SWAP_COMMANDS_V2_1_1: { [key: number]: CommandDefinition } = {
       { name: 'amountInMax', type: 'uint256' },
       { name: 'path', type: 'address[]' },
       { name: 'payerIsUser', type: 'bool' },
-      { name: 'maxHopSlippage', type: 'uint256[]' },
+      { name: 'minHopPriceX36', type: 'uint256[]' },
     ],
   },
 =======
