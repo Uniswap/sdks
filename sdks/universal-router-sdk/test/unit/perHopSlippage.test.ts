@@ -40,7 +40,7 @@ describe('Per-Hop Slippage', () => {
   // ─────────────────────────────────────────────────────────────────────────
 
   describe('V2 routes with V2_1_1', () => {
-    it('exact input: encodes maxHopSlippage array', () => {
+    it('exact input: encodes minHopPriceX36 array', () => {
       const v2Route = new V2RouteSDK([WETH_USDC_V2, USDC_DAI_V2], WETH, DAI)
       const trade = new RouterTrade({
         v2Routes: [
@@ -48,7 +48,7 @@ describe('Per-Hop Slippage', () => {
             routev2: v2Route,
             inputAmount: CurrencyAmount.fromRawAmount(WETH, ONE_ETH),
             outputAmount: CurrencyAmount.fromRawAmount(DAI, ONE_ETH),
-            maxHopSlippage: [BigInt(500), BigInt(600)],
+            minHopPriceX36: [BigInt(500), BigInt(600)],
           },
         ],
         tradeType: TradeType.EXACT_INPUT,
@@ -68,7 +68,7 @@ describe('Per-Hop Slippage', () => {
       expect(decoded[5].map((v: BigNumber) => v.toString())).to.deep.equal(['500', '600'])
     })
 
-    it('exact output: encodes maxHopSlippage array', () => {
+    it('exact output: encodes minHopPriceX36 array', () => {
       const v2Route = new V2RouteSDK([WETH_USDC_V2], WETH, USDC)
       const trade = new RouterTrade({
         v2Routes: [
@@ -76,7 +76,7 @@ describe('Per-Hop Slippage', () => {
             routev2: v2Route,
             inputAmount: CurrencyAmount.fromRawAmount(WETH, ONE_ETH),
             outputAmount: CurrencyAmount.fromRawAmount(USDC, ONE_USDC),
-            maxHopSlippage: [BigInt(250)],
+            minHopPriceX36: [BigInt(250)],
           },
         ],
         tradeType: TradeType.EXACT_OUTPUT,
@@ -102,7 +102,7 @@ describe('Per-Hop Slippage', () => {
   // ─────────────────────────────────────────────────────────────────────────
 
   describe('V3 routes with V2_1_1', () => {
-    it('exact input: encodes maxHopSlippage array', () => {
+    it('exact input: encodes minHopPriceX36 array', () => {
       const v3Route = new V3RouteSDK([WETH_USDC_V3, USDC_DAI_V3], WETH, DAI)
       const trade = new RouterTrade({
         v3Routes: [
@@ -110,7 +110,7 @@ describe('Per-Hop Slippage', () => {
             routev3: v3Route,
             inputAmount: CurrencyAmount.fromRawAmount(WETH, ONE_ETH),
             outputAmount: CurrencyAmount.fromRawAmount(DAI, ONE_ETH),
-            maxHopSlippage: [BigInt(300), BigInt(400)],
+            minHopPriceX36: [BigInt(300), BigInt(400)],
           },
         ],
         tradeType: TradeType.EXACT_INPUT,
@@ -130,7 +130,7 @@ describe('Per-Hop Slippage', () => {
       expect(decoded[5].map((v: BigNumber) => v.toString())).to.deep.equal(['300', '400'])
     })
 
-    it('exact output: encodes maxHopSlippage array', () => {
+    it('exact output: encodes minHopPriceX36 array', () => {
       const v3Route = new V3RouteSDK([WETH_USDC_V3], WETH, USDC)
       const trade = new RouterTrade({
         v3Routes: [
@@ -138,7 +138,7 @@ describe('Per-Hop Slippage', () => {
             routev3: v3Route,
             inputAmount: CurrencyAmount.fromRawAmount(WETH, ONE_ETH),
             outputAmount: CurrencyAmount.fromRawAmount(USDC, ONE_USDC),
-            maxHopSlippage: [BigInt(750)],
+            minHopPriceX36: [BigInt(750)],
           },
         ],
         tradeType: TradeType.EXACT_OUTPUT,
@@ -164,7 +164,7 @@ describe('Per-Hop Slippage', () => {
   // ─────────────────────────────────────────────────────────────────────────
 
   describe('V4 routes with V2_1_1', () => {
-    it('exact input: encodes maxHopSlippage in V4 swap action', () => {
+    it('exact input: encodes minHopPriceX36 in V4 swap action', () => {
       const v4Route = new V4Route([WETH_USDC_V4, USDC_DAI_V4], WETH, DAI)
       const v4Trade = V4Trade.createUncheckedTrade({
         route: v4Route,
@@ -179,7 +179,7 @@ describe('Per-Hop Slippage', () => {
             routev4: v4Trade.route,
             inputAmount: v4Trade.inputAmount,
             outputAmount: v4Trade.outputAmount,
-            maxHopSlippage: [BigInt(1000), BigInt(2000)],
+            minHopPriceX36: [BigInt(1000), BigInt(2000)],
           },
         ],
         tradeType: TradeType.EXACT_INPUT,
@@ -196,10 +196,10 @@ describe('Per-Hop Slippage', () => {
       const swapAction = parsed.actions.find((a) => a.actionName === 'SWAP_EXACT_IN')
       expect(swapAction).to.not.be.undefined
       const swapParams = swapAction!.params[0].value as any
-      expect(swapParams.maxHopSlippage.map((v: any) => v.toString())).to.deep.equal(['1000', '2000'])
+      expect(swapParams.minHopPriceX36.map((v: any) => v.toString())).to.deep.equal(['1000', '2000'])
     })
 
-    it('exact output: encodes maxHopSlippage in V4 swap action', () => {
+    it('exact output: encodes minHopPriceX36 in V4 swap action', () => {
       const v4Route = new V4Route([WETH_USDC_V4], WETH, USDC)
       const v4Trade = V4Trade.createUncheckedTrade({
         route: v4Route,
@@ -214,7 +214,7 @@ describe('Per-Hop Slippage', () => {
             routev4: v4Trade.route,
             inputAmount: v4Trade.inputAmount,
             outputAmount: v4Trade.outputAmount,
-            maxHopSlippage: [BigInt(3000)],
+            minHopPriceX36: [BigInt(3000)],
           },
         ],
         tradeType: TradeType.EXACT_OUTPUT,
@@ -231,7 +231,7 @@ describe('Per-Hop Slippage', () => {
       const swapAction = parsed.actions.find((a) => a.actionName === 'SWAP_EXACT_OUT')
       expect(swapAction).to.not.be.undefined
       const swapParams = swapAction!.params[0].value as any
-      expect(swapParams.maxHopSlippage.toString()).to.equal('3000')
+      expect(swapParams.minHopPriceX36.toString()).to.equal('3000')
     })
   })
 
@@ -240,7 +240,7 @@ describe('Per-Hop Slippage', () => {
   // ─────────────────────────────────────────────────────────────────────────
 
   describe('Mixed routes with V2_1_1', () => {
-    it('slices maxHopSlippage across V3 and V2 sections', () => {
+    it('slices minHopPriceX36 across V3 and V2 sections', () => {
       const mixedRoute = new MixedRouteSDK([WETH_USDC_V3, USDC_DAI_V2], WETH, DAI)
       const trade = new RouterTrade({
         mixedRoutes: [
@@ -248,7 +248,7 @@ describe('Per-Hop Slippage', () => {
             mixedRoute,
             inputAmount: CurrencyAmount.fromRawAmount(WETH, ONE_ETH),
             outputAmount: CurrencyAmount.fromRawAmount(DAI, ONE_ETH),
-            maxHopSlippage: [BigInt(100), BigInt(200)],
+            minHopPriceX36: [BigInt(100), BigInt(200)],
           },
         ],
         tradeType: TradeType.EXACT_INPUT,
@@ -276,7 +276,7 @@ describe('Per-Hop Slippage', () => {
       expect(v2Decoded[5].map((v: BigNumber) => v.toString())).to.deep.equal(['200'])
     })
 
-    it('undefined maxHopSlippage encodes empty arrays per section', () => {
+    it('undefined minHopPriceX36 encodes empty arrays per section', () => {
       const mixedRoute = new MixedRouteSDK([WETH_USDC_V3, USDC_DAI_V2], WETH, DAI)
       const trade = new RouterTrade({
         mixedRoutes: [
@@ -284,7 +284,7 @@ describe('Per-Hop Slippage', () => {
             mixedRoute,
             inputAmount: CurrencyAmount.fromRawAmount(WETH, ONE_ETH),
             outputAmount: CurrencyAmount.fromRawAmount(DAI, ONE_ETH),
-            maxHopSlippage: undefined,
+            minHopPriceX36: undefined,
           },
         ],
         tradeType: TradeType.EXACT_INPUT,
@@ -312,11 +312,11 @@ describe('Per-Hop Slippage', () => {
   })
 
   // ─────────────────────────────────────────────────────────────────────────
-  // 5. Backwards compatibility — V2_0 never encodes maxHopSlippage
+  // 5. Backwards compatibility — V2_0 never encodes minHopPriceX36
   // ─────────────────────────────────────────────────────────────────────────
 
   describe('Backwards compatibility: V2_0', () => {
-    it('V2 route with V2_0: maxHopSlippage is dropped', () => {
+    it('V2 route with V2_0: minHopPriceX36 is dropped', () => {
       const v2Route = new V2RouteSDK([WETH_USDC_V2, USDC_DAI_V2], WETH, DAI)
       const trade = new RouterTrade({
         v2Routes: [
@@ -324,7 +324,7 @@ describe('Per-Hop Slippage', () => {
             routev2: v2Route,
             inputAmount: CurrencyAmount.fromRawAmount(WETH, ONE_ETH),
             outputAmount: CurrencyAmount.fromRawAmount(DAI, ONE_ETH),
-            maxHopSlippage: [BigInt(500), BigInt(600)],
+            minHopPriceX36: [BigInt(500), BigInt(600)],
           },
         ],
         tradeType: TradeType.EXACT_INPUT,
@@ -341,7 +341,7 @@ describe('Per-Hop Slippage', () => {
       expect(decoded.length).to.equal(5)
     })
 
-    it('V3 route with V2_0: maxHopSlippage is dropped', () => {
+    it('V3 route with V2_0: minHopPriceX36 is dropped', () => {
       const v3Route = new V3RouteSDK([WETH_USDC_V3, USDC_DAI_V3], WETH, DAI)
       const trade = new RouterTrade({
         v3Routes: [
@@ -349,7 +349,7 @@ describe('Per-Hop Slippage', () => {
             routev3: v3Route,
             inputAmount: CurrencyAmount.fromRawAmount(WETH, ONE_ETH),
             outputAmount: CurrencyAmount.fromRawAmount(DAI, ONE_ETH),
-            maxHopSlippage: [BigInt(300), BigInt(400)],
+            minHopPriceX36: [BigInt(300), BigInt(400)],
           },
         ],
         tradeType: TradeType.EXACT_INPUT,
@@ -366,7 +366,7 @@ describe('Per-Hop Slippage', () => {
       expect(decoded.length).to.equal(5)
     })
 
-    it('V3 exact output with V2_0: maxHopSlippage is dropped', () => {
+    it('V3 exact output with V2_0: minHopPriceX36 is dropped', () => {
       const v3Route = new V3RouteSDK([WETH_USDC_V3], WETH, USDC)
       const trade = new RouterTrade({
         v3Routes: [
@@ -374,7 +374,7 @@ describe('Per-Hop Slippage', () => {
             routev3: v3Route,
             inputAmount: CurrencyAmount.fromRawAmount(WETH, ONE_ETH),
             outputAmount: CurrencyAmount.fromRawAmount(USDC, ONE_USDC),
-            maxHopSlippage: [BigInt(750)],
+            minHopPriceX36: [BigInt(750)],
           },
         ],
         tradeType: TradeType.EXACT_OUTPUT,
@@ -391,7 +391,7 @@ describe('Per-Hop Slippage', () => {
       expect(decoded.length).to.equal(5)
     })
 
-    it('mixed route with V2_0: maxHopSlippage is dropped from all sections', () => {
+    it('mixed route with V2_0: minHopPriceX36 is dropped from all sections', () => {
       const mixedRoute = new MixedRouteSDK([WETH_USDC_V3, USDC_DAI_V2], WETH, DAI)
       const trade = new RouterTrade({
         mixedRoutes: [
@@ -399,7 +399,7 @@ describe('Per-Hop Slippage', () => {
             mixedRoute,
             inputAmount: CurrencyAmount.fromRawAmount(WETH, ONE_ETH),
             outputAmount: CurrencyAmount.fromRawAmount(DAI, ONE_ETH),
-            maxHopSlippage: [BigInt(100), BigInt(200)],
+            minHopPriceX36: [BigInt(100), BigInt(200)],
           },
         ],
         tradeType: TradeType.EXACT_INPUT,
@@ -421,7 +421,7 @@ describe('Per-Hop Slippage', () => {
       expect(v2Decoded.length).to.equal(5)
     })
 
-    it('default (no urVersion) drops maxHopSlippage — same as V2_0', () => {
+    it('default (no urVersion) drops minHopPriceX36 — same as V2_0', () => {
       const v2Route = new V2RouteSDK([WETH_USDC_V2, USDC_DAI_V2], WETH, DAI)
       const trade = new RouterTrade({
         v2Routes: [
@@ -429,7 +429,7 @@ describe('Per-Hop Slippage', () => {
             routev2: v2Route,
             inputAmount: CurrencyAmount.fromRawAmount(WETH, ONE_ETH),
             outputAmount: CurrencyAmount.fromRawAmount(DAI, ONE_ETH),
-            maxHopSlippage: [BigInt(500), BigInt(600)],
+            minHopPriceX36: [BigInt(500), BigInt(600)],
           },
         ],
         tradeType: TradeType.EXACT_INPUT,
@@ -468,11 +468,11 @@ describe('Per-Hop Slippage', () => {
   })
 
   // ─────────────────────────────────────────────────────────────────────────
-  // 6. V2_1_1 without maxHopSlippage — should not break
+  // 6. V2_1_1 without minHopPriceX36 — should not break
   // ─────────────────────────────────────────────────────────────────────────
 
-  describe('V2_1_1 without maxHopSlippage', () => {
-    it('V2 route: encodes empty maxHopSlippage array', () => {
+  describe('V2_1_1 without minHopPriceX36', () => {
+    it('V2 route: encodes empty minHopPriceX36 array', () => {
       const v2Route = new V2RouteSDK([WETH_USDC_V2, USDC_DAI_V2], WETH, DAI)
       const trade = new RouterTrade({
         v2Routes: [
@@ -499,7 +499,7 @@ describe('Per-Hop Slippage', () => {
       expect(decoded[5]).to.deep.equal([])
     })
 
-    it('V3 route: encodes empty maxHopSlippage array', () => {
+    it('V3 route: encodes empty minHopPriceX36 array', () => {
       const v3Route = new V3RouteSDK([WETH_USDC_V3, USDC_DAI_V3], WETH, DAI)
       const trade = new RouterTrade({
         v3Routes: [
@@ -526,7 +526,7 @@ describe('Per-Hop Slippage', () => {
       expect(decoded[5]).to.deep.equal([])
     })
 
-    it('V4 route: encodes empty maxHopSlippage in V4 swap action', () => {
+    it('V4 route: encodes empty minHopPriceX36 in V4 swap action', () => {
       const v4Route = new V4Route([WETH_USDC_V4], WETH, USDC)
       const v4Trade = V4Trade.createUncheckedTrade({
         route: v4Route,
@@ -551,7 +551,7 @@ describe('Per-Hop Slippage', () => {
       const swapAction = parsed.actions.find((a) => a.actionName === 'SWAP_EXACT_IN')
       expect(swapAction).to.not.be.undefined
       const swapValue = swapAction!.params[0].value as any
-      expect(swapValue.maxHopSlippage).to.deep.equal([])
+      expect(swapValue.minHopPriceX36).to.deep.equal([])
     })
 
     it('mixed route: encodes empty arrays per section', () => {
@@ -632,7 +632,7 @@ describe('Per-Hop Slippage', () => {
       expect(decoded[5].map((v: BigNumber) => v.toString())).to.deep.equal(hopSlippage)
     })
 
-    it('V2_0 RoutePlanner encodes only 5 params (no maxHopSlippage)', () => {
+    it('V2_0 RoutePlanner encodes only 5 params (no minHopPriceX36)', () => {
       const planner = new RoutePlanner()
       planner.addCommand(CommandType.V2_SWAP_EXACT_IN, [RECIPIENT, amount, amount, [WETH.address, USDC.address], true])
 

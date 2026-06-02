@@ -21,9 +21,22 @@ import { Trade as RouterTrade } from '@uniswap/router-sdk'
 import { Currency, TradeType, Percent, CHAIN_TO_ADDRESSES_MAP, SupportedChainsType } from '@uniswap/sdk-core'
 import { UniswapTrade, SwapOptions, TokenTransferMode } from './entities/actions/uniswap'
 import { AcrossV4DepositV3Params } from './entities/actions/across'
+import { SwapSpecification, SwapStep } from './types/encodeSwaps'
 import { RoutePlanner, CommandType } from './utils/routerCommands'
 import { encodePermit, encodeV3PositionPermit } from './utils/inputTokens'
-import { UNIVERSAL_ROUTER_ADDRESS, UniversalRouterVersion } from './utils/constants'
+import {
+  ETH_ADDRESS,
+  ROUTER_AS_RECIPIENT,
+  UNIVERSAL_ROUTER_ADDRESS,
+  UniversalRouterVersion,
+  isAtLeastV2_1_1,
+} from './utils/constants'
+import { getCurrencyAddress } from './utils/getCurrencyAddress'
+import { encodeFee1e18, encodeFeeBips } from './utils/numbers'
+import { encodeSwapStep } from './utils/encodeSwapStep'
+import { computeEncodeSwapsAmounts } from './utils/computeEncodeSwapsAmounts'
+import { normalizeEncodeSwapsSpec } from './utils/normalizeEncodeSwapsSpec'
+import { validateEncodeSwaps } from './utils/validateEncodeSwaps'
 import { getUniversalRouterDomain, EXECUTE_SIGNED_TYPES, generateNonce } from './utils/eip712'
 import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer'
 
@@ -59,6 +72,8 @@ export interface MigrateV3ToV4Options {
   v3RemoveLiquidityOptions: V3RemoveLiquidityOptions
   v4AddLiquidityOptions: V4AddLiquidityOptions
 }
+
+const DEFAULT_PROXY_DEADLINE_BUFFER_SECONDS = 30 * 60
 
 function isMint(options: V4AddLiquidityOptions): options is MintOptions {
   return Object.keys(options).some((k) => k === 'recipient')
@@ -114,6 +129,118 @@ export abstract class SwapRouter {
 
     return SwapRouter.encodePlan(planner, nativeCurrencyValue, {
       deadline: options.deadlineOrPreviousBlockhash ? BigNumber.from(options.deadlineOrPreviousBlockhash) : undefined,
+    })
+  }
+
+  /**
+   * Encodes router-provided swap steps inside the SDK safety envelope.
+   *
+   * Routers own `swapSteps` (V2/V3/V4 swaps, plus any `WRAP_ETH` / `UNWRAP_WETH` required by the route).
+   * The SDK owns ingress, fees, final settlement, exact-output refund, and optional `safeMode`.
+   *
+   * Router contract: end with final output in `spec.routing.outputToken`; for `EXACT_OUTPUT`, unused input
+   * must end in `spec.routing.inputToken`. Don't include a top-level `SWEEP` — the SDK appends settlement,
+   * refund, and safeMode sweeps itself.
+   *
+   * Router custody with `payerIsUser = false` is deliberate for safety, even if it costs an extra command
+   * or transfer; the SDK does not infer route topology on behalf of routers.
+   */
+  public static encodeSwaps(spec: SwapSpecification, swapSteps: SwapStep[]): MethodParameters {
+    const normalizedSpec = normalizeEncodeSwapsSpec(spec)
+    const planner = new RoutePlanner()
+
+    validateEncodeSwaps(normalizedSpec, swapSteps)
+
+    const { exactOrMaxAmountIn, netMinOrExactAmountOut } = computeEncodeSwapsAmounts(normalizedSpec)
+    const {
+      routing: { inputToken, outputToken },
+    } = normalizedSpec
+
+    // Ingress: pull funds into the router. Native input is paid as msg.value at the bottom
+    // instead of via Permit2; ApproveProxy ingress is handled by the outer wrapper at the end.
+    if (normalizedSpec.tokenTransferMode === TokenTransferMode.Permit2) {
+      if (normalizedSpec.permit) {
+        encodePermit(planner, normalizedSpec.permit)
+      }
+
+      if (!inputToken.isNative) {
+        planner.addCommand(
+          CommandType.PERMIT2_TRANSFER_FROM,
+          [getCurrencyAddress(inputToken), ROUTER_AS_RECIPIENT, exactOrMaxAmountIn],
+          false,
+          normalizedSpec.urVersion
+        )
+      }
+    }
+
+    for (const step of swapSteps) {
+      encodeSwapStep(planner, step, normalizedSpec.urVersion)
+    }
+
+    // Fee deducted from gross output before final settlement.
+    // Portion uses 1e18 precision on >=v2.1.1 and bps on v2.0; flat is a plain TRANSFER.
+    if (normalizedSpec.fee?.kind === 'portion') {
+      const feeCommandType = isAtLeastV2_1_1(normalizedSpec.urVersion)
+        ? CommandType.PAY_PORTION_FULL_PRECISION
+        : CommandType.PAY_PORTION
+      const encodedFee = isAtLeastV2_1_1(normalizedSpec.urVersion)
+        ? encodeFee1e18(normalizedSpec.fee.fee)
+        : encodeFeeBips(normalizedSpec.fee.fee)
+
+      planner.addCommand(
+        feeCommandType,
+        [getCurrencyAddress(outputToken), normalizedSpec.fee.recipient, encodedFee],
+        false,
+        normalizedSpec.urVersion
+      )
+    } else if (normalizedSpec.fee?.kind === 'flat') {
+      planner.addCommand(
+        CommandType.TRANSFER,
+        [getCurrencyAddress(outputToken), normalizedSpec.fee.recipient, normalizedSpec.fee.amount],
+        false,
+        normalizedSpec.urVersion
+      )
+    }
+
+    // Assumes routers already normalized final gross output into `routing.outputToken`.
+    planner.addCommand(
+      CommandType.SWEEP,
+      [getCurrencyAddress(outputToken), normalizedSpec.recipient, netMinOrExactAmountOut],
+      false,
+      normalizedSpec.urVersion
+    )
+
+    // Assumes routers already normalized unused input into `routing.inputToken`.
+    // Exact-output uses max input, so any unused slippage padding is refunded to the recipient.
+    if (normalizedSpec.tradeType === TradeType.EXACT_OUTPUT) {
+      planner.addCommand(
+        CommandType.SWEEP,
+        [getCurrencyAddress(inputToken), normalizedSpec.recipient, 0],
+        false,
+        normalizedSpec.urVersion
+      )
+    }
+
+    // safeMode: zero-min ETH sweep recovers any native funds left on the router (dust or unintended msg.value)
+    if (normalizedSpec.safeMode) {
+      planner.addCommand(CommandType.SWEEP, [ETH_ADDRESS, normalizedSpec.recipient, 0], false, normalizedSpec.urVersion)
+    }
+
+    // ApproveProxy wraps the inner UR plan in an outer proxy.execute() that handles ingress upstream.
+    if (normalizedSpec.tokenTransferMode === TokenTransferMode.ApproveProxy) {
+      return SwapRouter.encodeProxyCall(
+        planner,
+        getCurrencyAddress(inputToken),
+        exactOrMaxAmountIn,
+        normalizedSpec.chainId!,
+        normalizedSpec.urVersion,
+        normalizedSpec.deadline
+      )
+    }
+
+    // Native input pays via msg.value; ERC20 input is already in the router via Permit2.
+    return SwapRouter.encodePlan(planner, inputToken.isNative ? exactOrMaxAmountIn : BigNumber.from(0), {
+      deadline: normalizedSpec.deadline ? BigNumber.from(normalizedSpec.deadline) : undefined,
     })
   }
 
@@ -367,18 +494,33 @@ export abstract class SwapRouter {
   }
 
   /**
-   * Encodes a planned route into calldata targeting the SwapProxy contract.
+   * Wraps an inner UR plan in calldata targeting the SwapProxy contract.
    * The proxy pulls ERC20 tokens from the user into the UR, then executes commands.
    */
   private static encodeProxyPlan(planner: RoutePlanner, trade: UniswapTrade, options: SwapOptions): MethodParameters {
-    const { commands, inputs } = planner
+    return SwapRouter.encodeProxyCall(
+      planner,
+      (trade.trade.inputAmount.currency as { address: string }).address,
+      BigNumber.from(trade.trade.maximumAmountIn(options.slippageTolerance).quotient.toString()),
+      options.chainId!,
+      options.urVersion ?? UniversalRouterVersion.V2_0,
+      options.deadlineOrPreviousBlockhash ? BigNumber.from(options.deadlineOrPreviousBlockhash) : undefined
+    )
+  }
 
-    const routerAddress = UNIVERSAL_ROUTER_ADDRESS(options.urVersion ?? UniversalRouterVersion.V2_0, options.chainId!)
-    const inputToken = (trade.trade.inputAmount.currency as { address: string }).address
-    const inputAmount = BigNumber.from(trade.trade.maximumAmountIn(options.slippageTolerance).quotient.toString())
-    const deadline = options.deadlineOrPreviousBlockhash
-      ? BigNumber.from(options.deadlineOrPreviousBlockhash)
-      : BigNumber.from(Math.floor(Date.now() / 1000) + 1800) // 30 min default
+  private static encodeProxyCall(
+    planner: RoutePlanner,
+    inputToken: string,
+    inputAmount: BigNumber,
+    chainId: number,
+    urVersion: UniversalRouterVersion,
+    deadline?: BigNumberish
+  ): MethodParameters {
+    const { commands, inputs } = planner
+    const routerAddress = UNIVERSAL_ROUTER_ADDRESS(urVersion, chainId)
+    const resolvedDeadline = deadline
+      ? BigNumber.from(deadline)
+      : BigNumber.from(Math.floor(Date.now() / 1000) + DEFAULT_PROXY_DEADLINE_BUFFER_SECONDS) // 30 min default
 
     const calldata = SwapRouter.PROXY_INTERFACE.encodeFunctionData('execute', [
       routerAddress,
@@ -386,7 +528,7 @@ export abstract class SwapRouter {
       inputAmount,
       commands,
       inputs,
-      deadline,
+      resolvedDeadline,
     ])
 
     return { calldata, value: BigNumber.from(0).toHexString() }

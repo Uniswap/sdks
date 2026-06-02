@@ -11,9 +11,15 @@ import { BATCHED_CALL_ABI_PARAMS } from './utils/batchedCallPlanner'
 const EXECUTE_SELECTOR = '0xe9ae5c53' as `0x${string}`
 const EXECUTE_USER_OP_SELECTOR = '0x8dd7712f' as `0x${string}`
 
+function decodeUserOpCalldata(calldata: `0x${string}`): BatchedCall {
+  const argsData = `0x${calldata.slice(10)}` as `0x${string}` // slice out executeUserOp selector to get encoded data
+  const decoded = decodeAbiParameters(BATCHED_CALL_ABI_PARAMS, argsData)
+  return decoded[0] as BatchedCall
+}
+
 describe('SmartWallet', () => {
   describe('encodeUserOp', () => {
-    it('encodes a single call correctly', () => {
+    it('encodes a single call with correct selector and call fields', () => {
       const calls: Call[] = [
         {
           to: '0x1111111111111111111111111111111111111111',
@@ -24,35 +30,18 @@ describe('SmartWallet', () => {
 
       const result = SmartWallet.encodeUserOp(calls)
 
-      expect(result).toBeDefined()
-      expect(result.calldata).toBeDefined()
       expect(result.calldata.startsWith(EXECUTE_USER_OP_SELECTOR)).toBe(true)
       expect(result.value).toBe(0n)
+
+      const decoded = decodeUserOpCalldata(result.calldata)
+      expect(decoded.calls.length).toBe(1)
+      expect(decoded.calls[0].to.toLowerCase()).toBe(calls[0].to.toLowerCase())
+      expect(decoded.calls[0].data).toBe(calls[0].data)
+      expect(decoded.calls[0].value).toBe(0n)
+      expect(decoded.revertOnFailure).toBe(true)
     })
 
-    it('encodes multiple calls correctly', () => {
-      const calls: Call[] = [
-        {
-          to: '0x1111111111111111111111111111111111111111',
-          data: '0x1234',
-          value: 0n,
-        },
-        {
-          to: '0x2222222222222222222222222222222222222222',
-          data: '0x5678',
-          value: 0n,
-        },
-      ]
-
-      const result = SmartWallet.encodeUserOp(calls)
-
-      expect(result).toBeDefined()
-      expect(result.calldata).toBeDefined()
-      expect(result.calldata.startsWith(EXECUTE_USER_OP_SELECTOR)).toBe(true)
-      expect(result.value).toBe(0n)
-    })
-
-    it('sums the value of all calls', () => {
+    it('encodes multiple calls and sums values', () => {
       const calls: Call[] = [
         {
           to: '0x1111111111111111111111111111111111111111',
@@ -69,30 +58,17 @@ describe('SmartWallet', () => {
       const result = SmartWallet.encodeUserOp(calls)
 
       expect(result.value).toBe(300n)
+
+      const decoded = decodeUserOpCalldata(result.calldata)
+      expect(decoded.calls.length).toBe(2)
+      for (let i = 0; i < calls.length; i++) {
+        expect(decoded.calls[i].to.toLowerCase()).toBe(calls[i].to.toLowerCase())
+        expect(decoded.calls[i].data).toBe(calls[i].data)
+        expect(decoded.calls[i].value).toBe(calls[i].value)
+      }
     })
 
-    it('encodes with revertOnFailure: true', () => {
-      const calls: Call[] = [
-        {
-          to: '0x1111111111111111111111111111111111111111',
-          data: '0x1234',
-          value: 0n,
-        },
-      ]
-
-      const result = SmartWallet.encodeUserOp(calls, { revertOnFailure: true })
-
-      expect(result).toBeDefined()
-      expect(result.calldata).toBeDefined()
-      expect(result.calldata.startsWith(EXECUTE_USER_OP_SELECTOR)).toBe(true)
-      
-      // Decode using BATCHED_CALL_ABI_PARAMS which matches the encoding format
-      const argsData = `0x${result.calldata.slice(10)}` as `0x${string}`
-      const decoded = decodeAbiParameters(BATCHED_CALL_ABI_PARAMS, argsData)
-      expect((decoded[0] as BatchedCall).revertOnFailure).toBe(true)
-    })
-
-    it('encodes with revertOnFailure: false', () => {
+    it('encodes revertOnFailure: false', () => {
       const calls: Call[] = [
         {
           to: '0x1111111111111111111111111111111111111111',
@@ -103,34 +79,11 @@ describe('SmartWallet', () => {
 
       const result = SmartWallet.encodeUserOp(calls, { revertOnFailure: false })
 
-      expect(result).toBeDefined()
-      expect(result.calldata).toBeDefined()
-
-      // Decode using BATCHED_CALL_ABI_PARAMS which matches the encoding format
-      const argsData = `0x${result.calldata.slice(10)}` as `0x${string}`
-      const decoded = decodeAbiParameters(BATCHED_CALL_ABI_PARAMS, argsData)
-      expect((decoded[0] as BatchedCall).revertOnFailure).toBe(false)
+      const decoded = decodeUserOpCalldata(result.calldata)
+      expect(decoded.revertOnFailure).toBe(false)
     })
 
-    it('defaults revertOnFailure to true when no options provided', () => {
-      const calls: Call[] = [
-        {
-          to: '0x1111111111111111111111111111111111111111',
-          data: '0x1234',
-          value: 0n,
-        },
-      ]
-
-      const result = SmartWallet.encodeUserOp(calls)
-
-      // Decode using BATCHED_CALL_ABI_PARAMS which matches the encoding format
-      const argsData = `0x${result.calldata.slice(10)}` as `0x${string}`
-      const decoded = decodeAbiParameters(BATCHED_CALL_ABI_PARAMS, argsData)
-      // When no option is provided, BatchedCallPlanner defaults revertOnFailure to true
-      expect((decoded[0] as BatchedCall).revertOnFailure).toBe(true)
-    })
-
-    it('handles calls with chainId property', () => {
+    it('excludes chainId from the encoded calldata', () => {
       const calls: Call[] = [
         {
           to: '0x1111111111111111111111111111111111111111',
@@ -139,12 +92,19 @@ describe('SmartWallet', () => {
           chainId: ChainId.SEPOLIA,
         },
       ]
+      const callsWithoutChainId: Call[] = [
+        {
+          to: '0x1111111111111111111111111111111111111111',
+          data: '0x1234',
+          value: 50n,
+        },
+      ]
 
-      const result = SmartWallet.encodeUserOp(calls)
+      const withChainId = SmartWallet.encodeUserOp(calls)
+      const withoutChainId = SmartWallet.encodeUserOp(callsWithoutChainId)
 
-      expect(result).toBeDefined()
-      expect(result.calldata.startsWith(EXECUTE_USER_OP_SELECTOR)).toBe(true)
-      expect(result.value).toBe(50n)
+      expect(withChainId.calldata).toBe(withoutChainId.calldata)
+      expect(withChainId.value).toBe(50n)
     })
   })
 
