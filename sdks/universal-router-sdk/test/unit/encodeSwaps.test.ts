@@ -96,7 +96,7 @@ function decodeExecute(calldata: string): { commands: string; inputs: string[]; 
 function exactInputGrossMin(quote: BigNumber, slippageTolerance: Percent): BigNumber {
   const numerator = BigNumber.from(slippageTolerance.numerator.toString())
   const denominator = BigNumber.from(slippageTolerance.denominator.toString())
-  return quote.mul(denominator).div(denominator.add(numerator))
+  return quote.mul(denominator.sub(numerator)).div(denominator)
 }
 
 function exactOutputMaxIn(quote: BigNumber, slippageTolerance: Percent): BigNumber {
@@ -1643,10 +1643,10 @@ describe('encodeSwaps', () => {
         portionAmount(exactInputGrossMin(grossQuote, slippageTolerance), feePercent)
       )
       const legacyNetQuote = expectedSettlement
-        .mul(slippageDenominator.add(slippageNumerator))
-        .add(slippageDenominator)
+        .mul(slippageDenominator)
+        .add(slippageDenominator.sub(slippageNumerator))
         .sub(1)
-        .div(slippageDenominator)
+        .div(slippageDenominator.sub(slippageNumerator))
       const route = new V3RouteSDK([pool], USDC, WETH)
       const trade = new RouterTrade({
         v2Routes: [],
