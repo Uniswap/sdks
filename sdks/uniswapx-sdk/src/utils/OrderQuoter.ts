@@ -6,20 +6,30 @@ import {
   PERMIT2_MAPPING,
   REACTOR_ADDRESS_MAPPING,
   UNISWAPX_ORDER_QUOTER_MAPPING,
+  UNISWAPX_V4_ORDER_QUOTER_MAPPING,
 } from "../constants";
 import {
   OrderQuoter__factory,
   OrderQuoter as OrderQuoterContract,
+  OrderQuoterV4__factory,
+  OrderQuoterV4 as OrderQuoterV4Contract,
   RelayOrderReactor,
   RelayOrderReactor__factory,
 } from "../contracts";
 import { MissingConfiguration } from "../errors";
 import {
+  CosignedPriorityOrderInfo,
+  CosignedV2DutchOrderInfo,
+  CosignedV3DutchOrderInfo,
+  DutchOrderInfo,
   Order,
   RelayOrder,
   ResolvedRelayFee,
   TokenAmount,
   UniswapXOrder,
+  UnsignedPriorityOrderInfo,
+  UnsignedV2DutchOrderInfo,
+  UnsignedV3DutchOrderInfo,
 } from "../order";
 import { parseExclusiveFillerData, ValidationType } from "../order/validation";
 
@@ -65,6 +75,15 @@ export interface RelayOrderQuote {
   quote: ResolvedRelayOrder | undefined;
 }
 
+export type LegacyOrderInfoTypes =
+  | DutchOrderInfo
+  | UnsignedV2DutchOrderInfo
+  | CosignedV2DutchOrderInfo
+  | UnsignedV3DutchOrderInfo
+  | CosignedV3DutchOrderInfo
+  | UnsignedPriorityOrderInfo
+  | CosignedPriorityOrderInfo;
+
 const BASIC_ERROR = "0x08c379a0";
 
 const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
@@ -103,7 +122,7 @@ const KNOWN_ERRORS: { [key: string]: OrderValidation } = {
   d856fc5a: OrderValidation.InvalidOrderFields,
   // Signature expired
   cd21db4f: OrderValidation.Expired,
-  // PriorityOrderReactor:InvalidDeadline() 
+  // PriorityOrderReactor:InvalidDeadline()
   "769d11e4": OrderValidation.Expired,
   // PriorityOrderReactor:OrderNotFillable()
   c6035520: OrderValidation.OrderNotFillableYet,
@@ -158,7 +177,11 @@ async function checkTerminalStates(
         return cancelled ? OrderValidation.NonceUsed : OrderValidation.Expired;
       }
       // if the order has block overrides AND order validation is OK, it is invalid if current block number is < block override
-      else if (order.order.blockOverrides && order.order.blockOverrides.number && validation === OrderValidation.OK) {
+      else if (
+        order.order.blockOverrides &&
+        order.order.blockOverrides.number &&
+        validation === OrderValidation.OK
+      ) {
         const blockNumber = await provider.getBlockNumber();
         if (blockNumber < parseInt(order.order.blockOverrides.number, 16)) {
           return OrderValidation.OrderNotFillableYet;
@@ -201,10 +224,7 @@ export class UniswapXOrderQuoter
   async quoteBatch(
     orders: SignedUniswapXOrder[]
   ): Promise<UniswapXOrderQuote[]> {
-    const results = await this.getMulticallResults(
-      "quote",
-      orders
-    );
+    const results = await this.getMulticallResults("quote", orders);
     const validations = await this.getValidations(orders, results);
 
     const quotes: (ResolvedUniswapXOrder | undefined)[] = results.map(
@@ -246,15 +266,20 @@ export class UniswapXOrderQuoter
 
         for (const key of Object.keys(KNOWN_ERRORS)) {
           if (returnData.includes(key)) {
+            // OrderValidation.ValidationFailed
             if (key === "0a0b0d79") {
-              const fillerValidation = parseExclusiveFillerData(
-                orders[idx].order.info.additionalValidationData
-              );
-              if (
-                fillerValidation.type === ValidationType.ExclusiveFiller &&
-                fillerValidation.data.filler !== ethers.constants.AddressZero
-              ) {
-                return OrderValidation.ExclusivityPeriod;
+              // V4 orders use hooks instead of additionalValidationData
+              if ("additionalValidationData" in orders[idx].order.info) {
+                const fillerValidation = parseExclusiveFillerData(
+                  (orders[idx].order.info as LegacyOrderInfoTypes)
+                    .additionalValidationData
+                );
+                if (
+                  fillerValidation.type === ValidationType.ExclusiveFiller &&
+                  fillerValidation.data.filler !== ethers.constants.AddressZero
+                ) {
+                  return OrderValidation.ExclusivityPeriod;
+                }
               }
               return OrderValidation.ValidationFailed;
             }
@@ -283,31 +308,42 @@ export class UniswapXOrderQuoter
     functionName: string,
     orders: SignedOrder[]
   ): Promise<MulticallResult[]> {
-    const ordersWithBlockOverrides = orders.filter((order) => order.order.blockOverrides);
+    const ordersWithBlockOverrides = orders.filter(
+      (order) => order.order.blockOverrides
+    );
     const promises = [];
     ordersWithBlockOverrides.map((order) => {
       promises.push(
-        multicallSameContractManyFunctions(this.provider, {
-          address: this.quoter.address,
-          contractInterface: this.quoter.interface,
-          functionName: functionName,
-          functionParams: [[order.order.serialize(), order.signature]],
-        }, undefined, order.order.blockOverrides)
-      )
+        multicallSameContractManyFunctions(
+          this.provider,
+          {
+            address: this.quoter.address,
+            contractInterface: this.quoter.interface,
+            functionName: functionName,
+            functionParams: [[order.order.serialize(), order.signature]],
+          },
+          undefined,
+          order.order.blockOverrides
+        )
+      );
     });
 
-    const ordersWithoutBlockOverrides = orders.filter((order) => !order.order.blockOverrides);
+    const ordersWithoutBlockOverrides = orders.filter(
+      (order) => !order.order.blockOverrides
+    );
 
     const calls = ordersWithoutBlockOverrides.map((order) => {
       return [order.order.serialize(), order.signature];
     });
-  
-    promises.push(multicallSameContractManyFunctions(this.provider, {
-      address: this.quoter.address,
-      contractInterface: this.quoter.interface,
-      functionName: functionName,
-      functionParams: calls,
-    }));
+
+    promises.push(
+      multicallSameContractManyFunctions(this.provider, {
+        address: this.quoter.address,
+        contractInterface: this.quoter.interface,
+        functionName: functionName,
+        functionParams: calls,
+      })
+    );
 
     const results = await Promise.all(promises);
     return results.flat();
@@ -387,43 +423,54 @@ export class RelayOrderQuoter
     functionName: string,
     orders: SignedRelayOrder[]
   ): Promise<MulticallResult[]> {
-    const ordersWithBlockOverrides = orders.filter((order) => order.order.blockOverrides);
+    const ordersWithBlockOverrides = orders.filter(
+      (order) => order.order.blockOverrides
+    );
     const promises = [];
     ordersWithBlockOverrides.map((order) => {
       promises.push(
-        multicallSameContractManyFunctions(this.provider, {
-          address: this.quoter.address,
-          contractInterface: this.quoter.interface,
-          functionName: functionName,
-          functionParams: [
-            [
-              {
-                order: order.order.serialize(), 
-                sig: order.signature,
-              },
+        multicallSameContractManyFunctions(
+          this.provider,
+          {
+            address: this.quoter.address,
+            contractInterface: this.quoter.interface,
+            functionName: functionName,
+            functionParams: [
+              [
+                {
+                  order: order.order.serialize(),
+                  sig: order.signature,
+                },
+              ],
             ],
-          ],
-        }, undefined, order.order.blockOverrides)
-      )
+          },
+          undefined,
+          order.order.blockOverrides
+        )
+      );
     });
 
-    const ordersWithoutBlockOverrides = orders.filter((order) => !order.order.blockOverrides);
+    const ordersWithoutBlockOverrides = orders.filter(
+      (order) => !order.order.blockOverrides
+    );
 
     const calls = ordersWithoutBlockOverrides.map((order) => {
       return [
         {
-          order: order.order.serialize(), 
+          order: order.order.serialize(),
           sig: order.signature,
         },
       ];
     });
-  
-    promises.push(multicallSameContractManyFunctions(this.provider, {
-      address: this.quoter.address,
-      contractInterface: this.quoter.interface,
-      functionName: functionName,
-      functionParams: calls,
-    }));
+
+    promises.push(
+      multicallSameContractManyFunctions(this.provider, {
+        address: this.quoter.address,
+        contractInterface: this.quoter.interface,
+        functionName: functionName,
+        functionParams: calls,
+      })
+    );
 
     const results = await Promise.all(promises);
     return results.flat();
@@ -466,6 +513,342 @@ export class RelayOrderQuoter
       orders,
       validations
     );
+  }
+
+  get orderQuoterAddress(): string {
+    return this.quoter.address;
+  }
+}
+
+/**
+ * V4 resolved order from quoter
+ */
+export interface ResolvedV4Order {
+  input: TokenAmount;
+  outputs: TokenAmount[];
+  auctionResolver: string;
+  witnessTypeString: string;
+}
+
+/**
+ * V4 order quote result
+ */
+export interface V4OrderQuote {
+  validation: OrderValidation;
+  quote: ResolvedV4Order | undefined;
+  /**
+   * Debug info when `validation !== OK`.
+   * This is the raw revert data returned by multicall (hex string, usually starting with `0x`).
+   */
+  validationErrorData?: string;
+  /**
+   * Best-effort decoded error text (e.g. `Error(string)` / `Panic(uint256)` / custom error selector).
+   */
+  validationErrorText?: string;
+  /**
+   * Optional debug trace of the underlying `eth_call` performed by the quoter.
+   * Captures the JSON-RPC method + params (payload), and the raw RPC result/error (when available).
+   * Present only when `validation !== OK`.
+   */
+  rpcCalls?: V4RpcCallTrace[];
+}
+
+/**
+ * Signed V4 order (Hybrid orders)
+ */
+export interface SignedV4Order {
+  order: UniswapXOrder;
+  signature: string;
+}
+
+export type V4RpcCallTrace = {
+  method: string;
+  params: unknown[];
+  result?: unknown;
+  error?: {
+    message?: string;
+    code?: unknown;
+    data?: unknown;
+    body?: unknown;
+    error?: unknown;
+  };
+};
+
+// Solidity `Panic(uint256)` selector. If revert data starts with this, we decode it as a panic
+// (e.g. overflow/out-of-bounds/assert) instead of treating it as an unknown error.
+const V4_PANIC_ERROR = "0x4e487b71";
+
+function decodeV4RevertData(returnData: string): { raw: string; text?: string } {
+  const raw = returnData;
+  if (!raw || raw === "0x" || raw === "0x0") {
+    return { raw, text: "Empty revert data" };
+  }
+
+  try {
+    // Error(string)
+    if (raw.startsWith(BASIC_ERROR)) {
+      const decoded = new ethers.utils.AbiCoder().decode(
+        ["string"],
+        "0x" + raw.slice(10)
+      )[0] as string;
+      return { raw, text: decoded };
+    }
+
+    // Panic(uint256)
+    if (raw.startsWith(V4_PANIC_ERROR)) {
+      const code = new ethers.utils.AbiCoder().decode(
+        ["uint256"],
+        "0x" + raw.slice(10)
+      )[0] as ethers.BigNumber;
+      return { raw, text: `Panic(${code.toHexString()})` };
+    }
+
+    // Custom errors: first 4 bytes are selector
+    if (raw.startsWith("0x") && raw.length >= 10) {
+      return { raw, text: `CustomError(${raw.slice(0, 10)})` };
+    }
+  } catch {
+    // best-effort decoding only
+  }
+
+  return { raw };
+}
+
+function createV4SendCapturingProvider(
+  provider: StaticJsonRpcProvider,
+  traces: V4RpcCallTrace[]
+): StaticJsonRpcProvider {
+  const originalSend = (provider.send as unknown as (
+    method: string,
+    params: unknown[]
+  ) => Promise<unknown>).bind(provider);
+
+  const proxy = new Proxy(provider as unknown as object, {
+    get(target, prop, receiver) {
+      if (prop === "send") {
+        return async (method: string, params: unknown[]) => {
+          const trace: V4RpcCallTrace | undefined =
+            method === "eth_call" ? { method, params } : undefined;
+          if (trace) traces.push(trace);
+
+          try {
+            const result = await originalSend(method, params);
+            if (trace) trace.result = result;
+            return result;
+          } catch (e: unknown) {
+            if (trace) {
+              const err = e as {
+                message?: string;
+                code?: unknown;
+                data?: unknown;
+                body?: unknown;
+                error?: { body?: unknown } | unknown;
+              };
+              trace.error = {
+                message: err?.message,
+                code: err?.code,
+                data: err?.data,
+                body:
+                  err?.body ??
+                  ((err?.error as { body?: unknown } | undefined)?.body ??
+                    undefined),
+                error: err?.error,
+              };
+            }
+            throw e;
+          }
+        };
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  });
+
+  return proxy as unknown as StaticJsonRpcProvider;
+}
+
+/**
+ * V4 order quoter for Hybrid orders
+ */
+export class V4OrderQuoter implements OrderQuoter<SignedV4Order, V4OrderQuote> {
+  protected quoter: OrderQuoterV4Contract;
+
+  constructor(
+    protected provider: StaticJsonRpcProvider,
+    protected chainId: number,
+    orderQuoterAddress?: string
+  ) {
+    if (orderQuoterAddress) {
+      this.quoter = OrderQuoterV4__factory.connect(
+        orderQuoterAddress,
+        this.provider
+      );
+    } else if (UNISWAPX_V4_ORDER_QUOTER_MAPPING[chainId]) {
+      this.quoter = OrderQuoterV4__factory.connect(
+        UNISWAPX_V4_ORDER_QUOTER_MAPPING[chainId],
+        this.provider
+      );
+    } else {
+      throw new MissingConfiguration("v4Quoter", chainId.toString());
+    }
+  }
+
+  async quote(order: SignedV4Order): Promise<V4OrderQuote> {
+    return (await this.quoteBatch([order]))[0];
+  }
+
+  async quoteBatch(orders: SignedV4Order[]): Promise<V4OrderQuote[]> {
+    const rpcCalls: V4RpcCallTrace[] = [];
+    const providerForQuote = createV4SendCapturingProvider(
+      this.provider,
+      rpcCalls
+    );
+    const results = await this.getMulticallResults(providerForQuote, "quote", orders);
+    const validations = await this.getValidations(orders, results);
+    const validationErrors = results.map((r) =>
+      r.success ? undefined : decodeV4RevertData(r.returnData)
+    );
+
+    const quotes: (ResolvedV4Order | undefined)[] = results.map(
+      ({ success, returnData }) => {
+        if (!success) {
+          return undefined;
+        }
+
+        const result = this.quoter.interface.decodeFunctionResult(
+          "quote",
+          returnData
+        ).result;
+
+        return {
+          input: {
+            token: result.input.token,
+            amount: result.input.amount,
+          },
+          outputs: result.outputs.map(
+            (output: { token: string; amount: ethers.BigNumber }) => ({
+              token: output.token,
+              amount: output.amount,
+            })
+          ),
+          auctionResolver: result.auctionResolver,
+          witnessTypeString: result.witnessTypeString,
+        };
+      }
+    );
+
+    return validations.map((validation, i) => {
+      return {
+        validation,
+        quote: quotes[i],
+        validationErrorData: validationErrors[i]?.raw,
+        validationErrorText: validationErrors[i]?.text,
+        rpcCalls: validation === OrderValidation.OK ? undefined : rpcCalls,
+      };
+    });
+  }
+
+  private async getValidations(
+    orders: SignedV4Order[],
+    results: MulticallResult[]
+  ): Promise<OrderValidation[]> {
+    const validations = results.map((result) => {
+      if (result.success) {
+        return OrderValidation.OK;
+      } else {
+        let returnData = result.returnData;
+
+        // Parse traditional string error messages
+        if (returnData.startsWith(BASIC_ERROR)) {
+          returnData = new ethers.utils.AbiCoder().decode(
+            ["string"],
+            "0x" + returnData.slice(10)
+          )[0];
+        }
+
+        for (const key of Object.keys(KNOWN_ERRORS)) {
+          if (returnData.includes(key)) {
+            return KNOWN_ERRORS[key];
+          }
+        }
+        return OrderValidation.UnknownError;
+      }
+    });
+
+    return await checkTerminalStates(
+      this.provider,
+      new NonceManager(
+        this.provider,
+        this.chainId,
+        PERMIT2_MAPPING[this.chainId]
+      ),
+      orders,
+      validations
+    );
+  }
+
+  /// Get the results of a multicall for a given function
+  /// V4 quote requires (reactor, order, sig) instead of (order, sig)
+  private async getMulticallResults(
+    provider: StaticJsonRpcProvider,
+    functionName: string,
+    orders: SignedV4Order[]
+  ): Promise<MulticallResult[]> {
+    const ordersWithBlockOverrides = orders.filter(
+      (order) => order.order.blockOverrides
+    );
+    const promises: Promise<MulticallResult[]>[] = [];
+
+    ordersWithBlockOverrides.map((order) => {
+      promises.push(
+        multicallSameContractManyFunctions(
+          provider,
+          {
+            address: this.quoter.address,
+            contractInterface: this.quoter.interface,
+            functionName: functionName,
+            functionParams: [
+              [
+                order.order.info.reactor,
+                order.order.serialize(),
+                order.signature,
+              ],
+            ],
+          },
+          undefined,
+          order.order.blockOverrides
+        )
+      );
+    });
+
+    const ordersWithoutBlockOverrides = orders.filter(
+      (order) => !order.order.blockOverrides
+    );
+
+    const calls = ordersWithoutBlockOverrides.map((order) => {
+      return [
+        order.order.info.reactor,
+        order.order.serialize(),
+        order.signature,
+      ];
+    });
+
+    if (calls.length > 0) {
+      promises.push(
+        multicallSameContractManyFunctions(
+          provider,
+          {
+            address: this.quoter.address,
+            contractInterface: this.quoter.interface,
+            functionName: functionName,
+            functionParams: calls,
+          },
+          undefined
+        )
+      );
+    }
+
+    const results = await Promise.all(promises);
+    return results.flat();
   }
 
   get orderQuoterAddress(): string {
