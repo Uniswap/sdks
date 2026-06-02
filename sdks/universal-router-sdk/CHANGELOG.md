@@ -1,5 +1,65 @@
 # @uniswap/universal-router-sdk
 
+## 5.5.1
+
+### Patch Changes
+
+- Add mainnet UniversalRouterVersion V2_2_0 router config and update sepolia V2_2_0 address (perm-pool redeploy)
+- Updated dependencies
+  - @uniswap/sdk-core@7.16.1
+  - @uniswap/v4-sdk@2.2.1
+  - @uniswap/router-sdk@2.10.3
+  - @uniswap/v2-sdk@4.20.3
+  - @uniswap/v3-sdk@3.30.3
+
+## 5.5.0
+
+### Minor Changes
+
+- Add UniversalRouterVersion V2_2_0 (Sepolia) with permissioned-pool support
+
+### Patch Changes
+
+- Updated dependencies
+  - @uniswap/sdk-core@7.16.0
+  - @uniswap/v4-sdk@2.2.0
+  - @uniswap/router-sdk@2.10.2
+  - @uniswap/v2-sdk@4.20.2
+  - @uniswap/v3-sdk@3.30.2
+
+## 5.4.0
+
+### Minor Changes
+
+- 0e30be1: Add MegaETH chain and Universal Router deployment config
+
+### Patch Changes
+
+- Updated dependencies [0e30be1]
+  - @uniswap/sdk-core@7.15.0
+  - @uniswap/router-sdk@2.10.1
+  - @uniswap/v2-sdk@4.20.1
+  - @uniswap/v3-sdk@3.30.1
+  - @uniswap/v4-sdk@2.1.1
+
+## 5.3.0
+
+### Minor Changes
+
+- e8e7bd5: Add SwapRouter.encodeSwaps(spec, swapSteps), an alternative entry point for callers that can provide explicit SwapStep[] plans
+
+## 5.2.0
+
+### Minor Changes
+
+- 5398a2c: Rename maxHopSlippage to minHopPriceX36
+
+### Patch Changes
+
+- Updated dependencies [5398a2c]
+  - @uniswap/router-sdk@2.10.0
+  - @uniswap/v4-sdk@2.1.0
+
 ## 5.1.0
 
 ### Minor Changes

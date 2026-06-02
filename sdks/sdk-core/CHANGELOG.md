@@ -1,5 +1,23 @@
 # @uniswap/sdk-core
 
+## 7.16.1
+
+### Patch Changes
+
+- Add mainnet permissioned V4 position manager address and update sepolia permissioned V4 position manager address (perm-pool redeploy)
+
+## 7.16.0
+
+### Minor Changes
+
+- Add UniversalRouterVersion V2_2_0 (Sepolia) with permissioned-pool support
+
+## 7.15.0
+
+### Minor Changes
+
+- 0e30be1: Add MegaETH chain and Universal Router deployment config
+
 ## 7.13.0
 
 ### Minor Changes
