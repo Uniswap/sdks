@@ -99,5 +99,83 @@ describe("NonLinearDutchDecayLib", () => {
             expect(result.toString()).toEqual('130');
         });
 
+        // Tempo (chainId 4217) has ~0.5s blocks, so a realistic Dutch_V3 decay
+        // window of ~30s wallclock corresponds to 60 blocks. The block-delta
+        // math in NonLinearDutchDecayLib is chain-agnostic: it operates purely
+        // on block deltas, so no source change is required for Tempo support.
+        // These tests exercise that math at Tempo-realistic block lengths to
+        // guard against regressions.
+        describe("Tempo-realistic decay (60 blocks @ 0.5s ~= 30s wallclock)", () => {
+            const TEMPO_DECAY_BLOCKS = 60;
+            const decayStartBlock = 1_000_000;
+            const startAmount = BigNumber.from("1000000000000000000"); // 1e18
+
+            it("returns startAmount at decayStartBlock", () => {
+                const curve = {
+                    relativeBlocks: [TEMPO_DECAY_BLOCKS],
+                    relativeAmounts: [BigInt("100000000000000000")], // 0.1e18 decay
+                };
+                const result = NonLinearDutchDecayLib.decay(
+                    curve,
+                    startAmount,
+                    decayStartBlock,
+                    decayStartBlock
+                );
+                expect(result.toString()).toEqual(startAmount.toString());
+            });
+
+            it("returns endAmount after the full Tempo decay window", () => {
+                const decayDelta = BigInt("100000000000000000");
+                const curve = {
+                    relativeBlocks: [TEMPO_DECAY_BLOCKS],
+                    relativeAmounts: [decayDelta],
+                };
+                const result = NonLinearDutchDecayLib.decay(
+                    curve,
+                    startAmount,
+                    decayStartBlock,
+                    decayStartBlock + TEMPO_DECAY_BLOCKS
+                );
+                expect(result.toString()).toEqual(
+                    startAmount.sub(decayDelta.toString()).toString()
+                );
+            });
+
+            it("linearly interpolates at the midpoint of the Tempo decay window", () => {
+                const decayDelta = BigInt("100000000000000000"); // 0.1e18
+                const curve = {
+                    relativeBlocks: [TEMPO_DECAY_BLOCKS],
+                    relativeAmounts: [decayDelta],
+                };
+                const result = NonLinearDutchDecayLib.decay(
+                    curve,
+                    startAmount,
+                    decayStartBlock,
+                    decayStartBlock + TEMPO_DECAY_BLOCKS / 2
+                );
+                // Halfway through: startAmount - decayDelta/2
+                expect(result.toString()).toEqual(
+                    startAmount.sub((decayDelta / BigInt(2)).toString()).toString()
+                );
+            });
+
+            it("clamps to endAmount past the Tempo decay window", () => {
+                const decayDelta = BigInt("100000000000000000");
+                const curve = {
+                    relativeBlocks: [TEMPO_DECAY_BLOCKS],
+                    relativeAmounts: [decayDelta],
+                };
+                const result = NonLinearDutchDecayLib.decay(
+                    curve,
+                    startAmount,
+                    decayStartBlock,
+                    decayStartBlock + TEMPO_DECAY_BLOCKS * 10
+                );
+                expect(result.toString()).toEqual(
+                    startAmount.sub(decayDelta.toString()).toString()
+                );
+            });
+        });
+
     });
 });

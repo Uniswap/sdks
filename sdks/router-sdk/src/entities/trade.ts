@@ -24,7 +24,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     route: IRoute<TInput, TOutput, Pair | V3Pool | V4Pool>
     inputAmount: CurrencyAmount<TInput>
     outputAmount: CurrencyAmount<TOutput>
-    maxHopSlippage?: bigint[]
+    minHopPriceX36?: bigint[]
   }[]
 
   //  construct a trade across v2 and v3 routes from pre-computed amounts
@@ -39,71 +39,71 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
       routev2: V2RouteSDK<TInput, TOutput>
       inputAmount: CurrencyAmount<TInput>
       outputAmount: CurrencyAmount<TOutput>
-      maxHopSlippage?: bigint[]
+      minHopPriceX36?: bigint[]
     }[]
     v3Routes?: {
       routev3: V3RouteSDK<TInput, TOutput>
       inputAmount: CurrencyAmount<TInput>
       outputAmount: CurrencyAmount<TOutput>
-      maxHopSlippage?: bigint[]
+      minHopPriceX36?: bigint[]
     }[]
     v4Routes?: {
       routev4: V4RouteSDK<TInput, TOutput>
       inputAmount: CurrencyAmount<TInput>
       outputAmount: CurrencyAmount<TOutput>
-      maxHopSlippage?: bigint[]
+      minHopPriceX36?: bigint[]
     }[]
     mixedRoutes?: {
       mixedRoute: MixedRouteSDK<TInput, TOutput>
       inputAmount: CurrencyAmount<TInput>
       outputAmount: CurrencyAmount<TOutput>
-      maxHopSlippage?: bigint[]
+      minHopPriceX36?: bigint[]
     }[]
     tradeType: TTradeType
   }) {
     this.swaps = []
     this.routes = []
     // wrap v2 routes
-    for (const { routev2, inputAmount, outputAmount, maxHopSlippage } of v2Routes) {
+    for (const { routev2, inputAmount, outputAmount, minHopPriceX36 } of v2Routes) {
       const route = new RouteV2(routev2)
       this.routes.push(route)
       this.swaps.push({
         route,
         inputAmount,
         outputAmount,
-        maxHopSlippage,
+        minHopPriceX36,
       })
     }
     // wrap v3 routes
-    for (const { routev3, inputAmount, outputAmount, maxHopSlippage } of v3Routes) {
+    for (const { routev3, inputAmount, outputAmount, minHopPriceX36 } of v3Routes) {
       const route = new RouteV3(routev3)
       this.routes.push(route)
       this.swaps.push({
         route,
         inputAmount,
         outputAmount,
-        maxHopSlippage,
+        minHopPriceX36,
       })
     }
     // wrap v4 routes
-    for (const { routev4, inputAmount, outputAmount, maxHopSlippage } of v4Routes) {
+    for (const { routev4, inputAmount, outputAmount, minHopPriceX36 } of v4Routes) {
       const route = new RouteV4(routev4)
       this.routes.push(route)
       this.swaps.push({
         route,
         inputAmount,
         outputAmount,
-        maxHopSlippage,
+        minHopPriceX36,
       })
     }
-    for (const { mixedRoute, inputAmount, outputAmount, maxHopSlippage } of mixedRoutes) {
+    for (const { mixedRoute, inputAmount, outputAmount, minHopPriceX36 } of mixedRoutes) {
       const route = new MixedRoute(mixedRoute)
       this.routes.push(route)
       this.swaps.push({
         route,
         inputAmount,
         outputAmount,
-        maxHopSlippage,
+        minHopPriceX36,
       })
     }
 
@@ -375,54 +375,54 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
     v2Routes: {
       routev2: V2RouteSDK<TInput, TOutput>
       amount: TTradeType extends TradeType.EXACT_INPUT ? CurrencyAmount<TInput> : CurrencyAmount<TOutput>
-      maxHopSlippage?: bigint[]
+      minHopPriceX36?: bigint[]
     }[],
     v3Routes: {
       routev3: V3RouteSDK<TInput, TOutput>
       amount: TTradeType extends TradeType.EXACT_INPUT ? CurrencyAmount<TInput> : CurrencyAmount<TOutput>
-      maxHopSlippage?: bigint[]
+      minHopPriceX36?: bigint[]
     }[],
     tradeType: TTradeType,
     mixedRoutes?: {
       mixedRoute: MixedRouteSDK<TInput, TOutput>
       amount: TTradeType extends TradeType.EXACT_INPUT ? CurrencyAmount<TInput> : CurrencyAmount<TOutput>
-      maxHopSlippage?: bigint[]
+      minHopPriceX36?: bigint[]
     }[],
     v4Routes?: {
       routev4: V4RouteSDK<TInput, TOutput>
       amount: TTradeType extends TradeType.EXACT_INPUT ? CurrencyAmount<TInput> : CurrencyAmount<TOutput>
-      maxHopSlippage?: bigint[]
+      minHopPriceX36?: bigint[]
     }[]
   ): Promise<Trade<TInput, TOutput, TTradeType>> {
     const populatedV2Routes: {
       routev2: V2RouteSDK<TInput, TOutput>
       inputAmount: CurrencyAmount<TInput>
       outputAmount: CurrencyAmount<TOutput>
-      maxHopSlippage?: bigint[]
+      minHopPriceX36?: bigint[]
     }[] = []
 
     const populatedV3Routes: {
       routev3: V3RouteSDK<TInput, TOutput>
       inputAmount: CurrencyAmount<TInput>
       outputAmount: CurrencyAmount<TOutput>
-      maxHopSlippage?: bigint[]
+      minHopPriceX36?: bigint[]
     }[] = []
 
     const populatedV4Routes: {
       routev4: V4RouteSDK<TInput, TOutput>
       inputAmount: CurrencyAmount<TInput>
       outputAmount: CurrencyAmount<TOutput>
-      maxHopSlippage?: bigint[]
+      minHopPriceX36?: bigint[]
     }[] = []
 
     const populatedMixedRoutes: {
       mixedRoute: MixedRouteSDK<TInput, TOutput>
       inputAmount: CurrencyAmount<TInput>
       outputAmount: CurrencyAmount<TOutput>
-      maxHopSlippage?: bigint[]
+      minHopPriceX36?: bigint[]
     }[] = []
 
-    for (const { routev2, amount, maxHopSlippage } of v2Routes) {
+    for (const { routev2, amount, minHopPriceX36 } of v2Routes) {
       const v2Trade = new V2TradeSDK(routev2, amount, tradeType)
       const { inputAmount, outputAmount } = v2Trade
 
@@ -430,11 +430,11 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
         routev2,
         inputAmount,
         outputAmount,
-        maxHopSlippage,
+        minHopPriceX36,
       })
     }
 
-    for (const { routev3, amount, maxHopSlippage } of v3Routes) {
+    for (const { routev3, amount, minHopPriceX36 } of v3Routes) {
       const v3Trade = await V3TradeSDK.fromRoute(routev3, amount, tradeType)
       const { inputAmount, outputAmount } = v3Trade
 
@@ -442,12 +442,12 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
         routev3,
         inputAmount,
         outputAmount,
-        maxHopSlippage,
+        minHopPriceX36,
       })
     }
 
     if (v4Routes) {
-      for (const { routev4, amount, maxHopSlippage } of v4Routes) {
+      for (const { routev4, amount, minHopPriceX36 } of v4Routes) {
         const v4Trade = await V4TradeSDK.fromRoute(routev4, amount, tradeType)
         const { inputAmount, outputAmount } = v4Trade
 
@@ -455,13 +455,13 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
           routev4,
           inputAmount,
           outputAmount,
-          maxHopSlippage,
+          minHopPriceX36,
         })
       }
     }
 
     if (mixedRoutes) {
-      for (const { mixedRoute, amount, maxHopSlippage } of mixedRoutes) {
+      for (const { mixedRoute, amount, minHopPriceX36 } of mixedRoutes) {
         const mixedRouteTrade = await MixedRouteTradeSDK.fromRoute(mixedRoute, amount, tradeType)
         const { inputAmount, outputAmount } = mixedRouteTrade
 
@@ -469,7 +469,7 @@ export class Trade<TInput extends Currency, TOutput extends Currency, TTradeType
           mixedRoute,
           inputAmount,
           outputAmount,
-          maxHopSlippage,
+          minHopPriceX36,
         })
       }
     }
