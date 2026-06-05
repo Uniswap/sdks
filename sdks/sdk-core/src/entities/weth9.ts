@@ -36,7 +36,5 @@ export const WETH9: { [chainId: number]: Token } = {
   143: new Token(143, '0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A', 18, 'WMON', 'Wrapped Monad'),
   59144: new Token(59144, '0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f', 18, 'WETH', 'Wrapped Ether'),
   4326: new Token(4326, '0x4200000000000000000000000000000000000006', 18, 'WETH', 'Wrapped Ether'),
-  // Arc's native currency is USDC; this is the wrapped-native token used in Arc's contract deployments.
-  5042: new Token(5042, '0x8bceaa40b9acdfaedf85adf4ff01f5ad6517937f', 18, 'WETH', 'Wrapped Ether'),
-  4663: new Token(4663, '0x0bd7d308f8e1639fab988df18a8011f41eacad73', 18, 'WETH', 'Wrapped Ether'),
+  4663: new Token(4663, '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73', 18, 'WETH', 'Wrapped Ether'),
 }
