@@ -65,7 +65,7 @@ export const AVERAGE_BLOCK_TIMES_SECONDS: { [chainId: number]: number } = {
   [ChainId.XLAYER]: 1,
   [ChainId.TEMPO]: 0.5,
   [ChainId.MEGAETH]: 1,
-  [ChainId.ARC]: 1, // TODO(arc): confirm average block time from explorer.arc.io
+  [ChainId.ARC]: 0.48,
   [ChainId.ROBINHOOD]: 0.1,
 }
 

@@ -522,30 +522,24 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
-  // arc (native currency is USDC; weth is the wrapped-native used in Arc's contract deployments)
+  // arc
   [5042]: {
-    weth: '0x8bceaa40b9acdfaedf85adf4ff01f5ad6517937f',
+    weth: WETH_NOT_SUPPORTED_ON_CHAIN,
     routerConfigs: {
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x4fca4a51ab4f23a7447b3284fbd7d73289a89fb1',
-        // TODO(arc): backfill exact UR creation block from explorer.arc.io (deploy tx
-        // 0xf07bb4c6eaccb5b7e128625b0c4fc6bc79f727f9b647a6e81a886bde905345b8). Placeholder 1 is a
-        // conservative scan lower-bound (never misses events, just less efficient).
-        creationBlock: 1,
+        creationBlock: 1950059,
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
   // robinhood
   [4663]: {
-    weth: '0x0bd7d308f8e1639fab988df18a8011f41eacad73',
+    weth: '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73',
     routerConfigs: {
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x8876789976decbfcbbbe364623c63652db8c0904',
-        // TODO(robinhood): backfill exact UR creation block from the Robinhood explorer (deploy tx
-        // 0x422569c99e80a452d45680fbf16cf04cd4ae79cd2b0d7a6a89cf6603009ed1fa). Placeholder 1 is a
-        // conservative scan lower-bound (never misses events, just less efficient).
-        creationBlock: 1,
+        creationBlock: 18127,
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
