@@ -1,5 +1,15 @@
 # @uniswap/router-sdk
 
+## 2.10.4
+
+### Patch Changes
+
+- Updated dependencies [ca82bac]
+  - @uniswap/sdk-core@7.17.0
+  - @uniswap/v2-sdk@4.20.4
+  - @uniswap/v3-sdk@3.30.4
+  - @uniswap/v4-sdk@2.2.2
+
 ## 2.10.3
 
 ### Patch Changes
