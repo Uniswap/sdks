@@ -6,6 +6,7 @@ describe('getAverageBlockTimeSecs', () => {
     expect(getAverageBlockTimeSecs(ChainId.ARBITRUM_ONE)).toEqual(0.25)
     expect(getAverageBlockTimeSecs(ChainId.ROBINHOOD)).toEqual(0.1)
     expect(getAverageBlockTimeSecs(ChainId.MEGAETH)).toEqual(1)
+    expect(getAverageBlockTimeSecs(ChainId.ARC)).toEqual(1) // TODO(arc): confirm average block time
   })
 
   it('throws on unregistered chainId', () => {

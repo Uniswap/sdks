@@ -40,6 +40,16 @@ describe('Universal Router Constants', () => {
       expect(() => UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V1_2, 4326)).to.throw(
         'Universal Router version 1.2 not deployed on chain 4326'
       )
+
+      // Arc (5042) only has V2_1_1
+      expect(() => UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V1_2, 5042)).to.throw(
+        'Universal Router version 1.2 not deployed on chain 5042'
+      )
+
+      // Robinhood (4663) only has V2_1_1
+      expect(() => UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V1_2, 4663)).to.throw(
+        'Universal Router version 1.2 not deployed on chain 4663'
+      )
     })
   })
 
@@ -71,6 +81,16 @@ describe('Universal Router Constants', () => {
       // MegaETH (4326) has no V1_2
       expect(() => UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V1_2, 4326)).to.throw(
         'Universal Router version 1.2 not deployed on chain 4326'
+      )
+
+      // Arc (5042) only has V2_1_1
+      expect(() => UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V1_2, 5042)).to.throw(
+        'Universal Router version 1.2 not deployed on chain 5042'
+      )
+
+      // Robinhood (4663) only has V2_1_1
+      expect(() => UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V1_2, 4663)).to.throw(
+        'Universal Router version 1.2 not deployed on chain 4663'
       )
     })
   })
