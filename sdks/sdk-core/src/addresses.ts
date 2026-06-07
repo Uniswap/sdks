@@ -67,6 +67,8 @@ export const V2_FACTORY_ADDRESSES: AddressMap = {
   [ChainId.LINEA]: '0x114A43DF6C5f54EBB8A9d70Cd1951D3dD68004c7',
   [ChainId.TEMPO]: '0xf9ec577a4e45b5278bb7cf60fcbc20c3acaef68f',
   [ChainId.MEGAETH]: '0xbf56488c857a881ae7e3bed27cf99c10a7ab7e50',
+  [ChainId.ARC]: '0x89e5db8b5aa49aa85ac63f691524311aeb649eba',
+  [ChainId.ROBINHOOD]: '0x8bceaa40b9acdfaedf85adf4ff01f5ad6517937f',
 }
 /**
  * @deprecated use V2_ROUTER_ADDRESSES instead
@@ -94,6 +96,8 @@ export const V2_ROUTER_ADDRESSES: AddressMap = {
   [ChainId.LINEA]: '0x8702463e73f74d0b6765abceb314ef07acb92650',
   [ChainId.TEMPO]: '0x0fbac3c46f6f83b44c7fb4ea986d7309c701d73e',
   [ChainId.MEGAETH]: '0xb73055db2b3a3eae87a331dd88e4a80b43602690',
+  [ChainId.ARC]: '0x1f7d7550b1b028f7571e69a784071f0205fd2efa',
+  [ChainId.ROBINHOOD]: '0x89e5db8b5aa49aa85ac63f691524311aeb649eba',
 }
 
 // Networks that share most of the same addresses i.e. Mainnet, Goerli, Optimism, Arbitrum, Polygon
@@ -514,6 +518,34 @@ const MEGAETH_ADDRESSES: ChainAddresses = {
   v4QuoterAddress: '0x94bdc671f0c35f44a1daa53143fd1f868d1623b9',
 }
 
+const ARC_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: '0xf0db7b58379503491d857db50ac9ece64c653918',
+  multicallAddress: '0x33e885ed0ec9bf04ecfb19341582aadcb4c8a9e7',
+  quoterAddress: '0x7dfd4f31be6814d2906bde155c3e1b146eac1468',
+  nonfungiblePositionManagerAddress: '0x39654a85a4c05127f5fd6ed22caec077a0fb1377',
+  tickLensAddress: '0x9eb8600665b55d10c1eb2316ca5127a9ca6e2e76',
+  swapRouter02Address: '0x53bf6b0684ec7ef91e1387da3d1a1769bc5a6f77',
+
+  v4PoolManagerAddress: '0x8366a39cc670b4001a1121b8f6a443a643e40951',
+  v4PositionManagerAddress: '0x6049c9a0e26405c0985f9e3685c87d0ae917f82b',
+  v4StateView: '0xf3334192d15450cdd385c8b70e03f9a6bd9e673b',
+  v4QuoterAddress: '0x8dc178efb8111bb0973dd9d722ebeff267c98f94',
+}
+
+const ROBINHOOD_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: '0x1f7d7550b1b028f7571e69a784071f0205fd2efa',
+  multicallAddress: '0x282a3c4d320cc7f0d5eaf56b8029e4b88338f0a3',
+  quoterAddress: '0x33e885ed0ec9bf04ecfb19341582aadcb4c8a9e7',
+  nonfungiblePositionManagerAddress: '0x73991a25c818bf1f1128deaab1492d45638de0d3',
+  tickLensAddress: '0x7dfd4f31be6814d2906bde155c3e1b146eac1468',
+  swapRouter02Address: '0xcaf681a66d020601342297493863e78c959e5cb2',
+
+  v4PoolManagerAddress: '0x8366a39cc670b4001a1121b8f6a443a643e40951',
+  v4PositionManagerAddress: '0x58daec3116aae6d93017baaea7749052e8a04fa7',
+  v4StateView: '0xf3334192d15450cdd385c8b70e03f9a6bd9e673b',
+  v4QuoterAddress: '0x8dc178efb8111bb0973dd9d722ebeff267c98f94',
+}
+
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {
   [ChainId.MAINNET]: MAINNET_ADDRESSES,
   [ChainId.OPTIMISM]: OPTIMISM_ADDRESSES,
@@ -548,6 +580,8 @@ export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses>
   [ChainId.LINEA]: LINEA_ADDRESSES,
   [ChainId.TEMPO]: TEMPO_ADDRESSES,
   [ChainId.MEGAETH]: MEGAETH_ADDRESSES,
+  [ChainId.ARC]: ARC_ADDRESSES,
+  [ChainId.ROBINHOOD]: ROBINHOOD_ADDRESSES,
 }
 
 /* V3 Contract Addresses */

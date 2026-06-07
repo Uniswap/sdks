@@ -1,5 +1,30 @@
 # @uniswap/universal-router-sdk
 
+## 5.6.0
+
+### Minor Changes
+
+- ca82bac: Add Robinhood (4663) and Arc (5042) chain and Universal Router deployment config.
+
+  Also corrects `ChainId.ROBINHOOD` from `46630` to `4663` to match the canonical Robinhood
+  mainnet chain ID used across Uniswap's backend and the contracts deployments repo. Robinhood
+  had no addresses wired up previously, so this is shipped as a minor bump.
+
+### Patch Changes
+
+- Updated dependencies [ca82bac]
+  - @uniswap/sdk-core@7.17.0
+  - @uniswap/router-sdk@2.10.4
+  - @uniswap/v2-sdk@4.20.4
+  - @uniswap/v3-sdk@3.30.4
+  - @uniswap/v4-sdk@2.2.2
+
+## 5.5.2
+
+### Patch Changes
+
+- Fix UR version mapping with v4-sdk
+
 ## 5.5.1
 
 ### Patch Changes
