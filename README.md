@@ -1,4 +1,4 @@
-# Uniswap SDK's
+# Uniswap SDK's.
 
 A repository for many Uniswap SDK's. All SDK's can be found in `sdk/` and have more information in their individual README's.
 

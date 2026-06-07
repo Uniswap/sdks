@@ -14,4 +14,10 @@ describe('Ether', () => {
   it('#equals returns true for same chains', () => {
     expect(Ether.onChain(1).equals(Ether.onChain(1))).toEqual(true)
   })
+  it('#wrapped returns Robinhood WETH', () => {
+    expect(Ether.onChain(4663).wrapped.address).toEqual('0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73')
+  })
+  it('#wrapped throws for Arc because WETH is unsupported', () => {
+    expect(() => Ether.onChain(5042).wrapped).toThrow('WRAPPED')
+  })
 })

@@ -1,5 +1,12 @@
 # @uniswap/uniswapx-sdk
 
+## 3.0.7
+
+### Patch Changes
+
+- Updated dependencies [ca82bac]
+  - @uniswap/sdk-core@7.17.0
+
 ## 3.0.6
 
 ### Patch Changes

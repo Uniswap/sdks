@@ -1,22 +1,10 @@
-import { Actions, URVersion } from '@uniswap/v4-sdk'
+import { Actions } from '@uniswap/v4-sdk'
 import { UniversalRouterVersion, isAtLeastV2_1_1 } from './constants'
 import { V4Action } from '../types/encodeSwaps'
 
 const ACTION_NAME_TO_ENUM: { [key: string]: Actions } = Object.fromEntries(
   Object.entries(Actions).filter(([key]) => isNaN(Number(key)))
 ) as { [key: string]: Actions }
-
-const V4_UR_VERSION_MAP: Record<string, URVersion> = {
-  [UniversalRouterVersion.V2_0]: URVersion.V2_0,
-  [UniversalRouterVersion.V2_1_1]: URVersion.V2_1_1,
-}
-
-export function toV4URVersion(version?: UniversalRouterVersion): URVersion {
-  if (version === undefined) return URVersion.V2_0
-  const mapped = V4_UR_VERSION_MAP[version]
-  if (!mapped) throw new Error(`No v4-sdk URVersion mapping for UniversalRouterVersion: ${version}`)
-  return mapped
-}
 
 export function encodeV4Action(
   v4Action: V4Action,
