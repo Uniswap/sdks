@@ -160,11 +160,11 @@ export class UniswapTrade implements Command {
           let poolBefore = lastRoute.pools[lastRoute.pools.length - 2]
           // this means last pool is eth-weth and pool before contains weth
           if (
-            poolBefore instanceof V4Pool &&
+            'currency0' in poolBefore &&
             (poolBefore.currency0.equals(lastPool.currency1) || poolBefore.currency1.equals(lastPool.currency1))
           ) {
             return true
-          } else if (poolBefore.token0.equals(lastPool.currency1) || poolBefore.token1.equals(lastPool.currency1)) {
+          } else if ('token0' in poolBefore && (poolBefore.token0.equals(lastPool.currency1) || poolBefore.token1.equals(lastPool.currency1))) {
             // same for v2 and v3 pools
             return true
           }
