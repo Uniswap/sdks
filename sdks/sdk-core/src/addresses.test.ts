@@ -62,5 +62,15 @@ describe('addresses', () => {
       const address = SWAP_ROUTER_02_ADDRESSES(ChainId.MEGAETH)
       expect(address).toEqual('0x48020de9208bafc183f5cad5118ffbe8f0f913f5')
     })
+
+    it('should return the correct address for arc', () => {
+      const address = SWAP_ROUTER_02_ADDRESSES(ChainId.ARC)
+      expect(address).toEqual('0x53bf6b0684ec7ef91e1387da3d1a1769bc5a6f77')
+    })
+
+    it('should return the correct address for robinhood', () => {
+      const address = SWAP_ROUTER_02_ADDRESSES(ChainId.ROBINHOOD)
+      expect(address).toEqual('0xcaf681a66d020601342297493863e78c959e5cb2')
+    })
   })
 })
