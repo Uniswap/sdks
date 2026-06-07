@@ -6,12 +6,12 @@ import {Test} from "forge-std/Test.sol";
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
 import {IUniversalRouter} from "universal-router/interfaces/IUniversalRouter.sol";
 import {UniversalRouter} from "universal-router/UniversalRouter.sol";
-import {PoolManager, ModifyLiquidityParams} from "@uniswap/v4-core/src/PoolManager.sol";
+import {PoolManager} from "@uniswap/v4-core/src/PoolManager.sol";
 import {IERC20Minimal} from "@uniswap/v4-core/src/interfaces/external/IERC20Minimal.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
-import {IPoolManager, ModifyLiquidityParams} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {PositionManager} from "@uniswap/v4-periphery/src/PositionManager.sol";
@@ -32,7 +32,6 @@ contract DeployRouter is Test {
     bytes32 public constant POOL_INIT_CODE_HASH = 0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54;
     address public constant WETH9 = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address public constant V3_POSITION_MANAGER = 0xC36442b4a4522E871399CD717aBDD847Ab11FE88;
-    address public constant ACROSS_SPOKE_POOL = 0x5c7BCd6E7De5423a257D81B442095A1a6ced35C5;
 
     address internal constant RECIPIENT = 0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa;
     address internal constant FEE_RECIPIENT = 0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB;
@@ -73,8 +72,7 @@ contract DeployRouter is Test {
                 poolInitCodeHash: POOL_INIT_CODE_HASH,
                 v4PoolManager: address(poolManager),
                 v3NFTPositionManager: V3_POSITION_MANAGER,
-                v4PositionManager: address(v4PositionManager),
-                spokePool: ACROSS_SPOKE_POOL
+                v4PositionManager: address(v4PositionManager)
             })
         );
 
@@ -100,7 +98,7 @@ contract DeployRouter is Test {
         Currency usdc = Currency.wrap(address(USDC));
         Currency dai = Currency.wrap(address(DAI));
 
-        uint256 amount = 10000 ether;
+        uint256 amount = 20000 ether;
 
         deal(address(USDC), address(this), amount);
         USDC.approve(address(poolManager), amount);
@@ -120,6 +118,8 @@ contract DeployRouter is Test {
                     PoolKey(eth, dai, 3000, 60, IHooks(address(0))),
                     PoolKey(dai, usdc, 3000, 60, IHooks(address(0))),
                     PoolKey(usdc, weth, 3000, 60, IHooks(address(0))),
+                    PoolKey(usdc, weth, 500, 60, IHooks(address(0))), // low fee USDC-WETH pool
+                    PoolKey(eth, usdc, 500, 60, IHooks(address(0))), // low fee USDC-ETH pool
                     PoolKey(eth, weth, 3000, 60, IHooks(address(0)))
                 ]
             )
@@ -127,7 +127,7 @@ contract DeployRouter is Test {
     }
 
     function unlockCallback(bytes calldata data) external returns (bytes memory) {
-        PoolKey[5] memory poolKeys = abi.decode(data, (PoolKey[5]));
+        PoolKey[7] memory poolKeys = abi.decode(data, (PoolKey[7]));
 
         for (uint256 i = 0; i < poolKeys.length; i++) {
             PoolKey memory poolKey = poolKeys[i];
@@ -135,7 +135,12 @@ contract DeployRouter is Test {
 
             (BalanceDelta delta,) = poolManager.modifyLiquidity(
                 poolKey,
-                ModifyLiquidityParams({tickLower: -60, tickUpper: 60, liquidityDelta: 1000000 ether, salt: 0}),
+                IPoolManager.ModifyLiquidityParams({
+                    tickLower: -60,
+                    tickUpper: 60,
+                    liquidityDelta: 1000000 ether,
+                    salt: 0
+                }),
                 bytes("")
             );
 
@@ -156,21 +161,22 @@ contract DeployRouter is Test {
         ERC20(token0).approve(V3_POSITION_MANAGER, type(uint256).max);
         ERC20(token1).approve(V3_POSITION_MANAGER, type(uint256).max);
 
-        INonfungiblePositionManager(V3_POSITION_MANAGER).mint(
-            INonfungiblePositionManager.MintParams({
-                token0: token0,
-                token1: token1,
-                fee: fee,
-                tickLower: 200040,
-                tickUpper: 300000,
-                amount0Desired: amount0Desired,
-                amount1Desired: amount1Desired,
-                amount0Min: 0,
-                amount1Min: 0,
-                recipient: from,
-                deadline: type(uint256).max
-            })
-        );
+        INonfungiblePositionManager(V3_POSITION_MANAGER)
+            .mint(
+                INonfungiblePositionManager.MintParams({
+                    token0: token0,
+                    token1: token1,
+                    fee: fee,
+                    tickLower: 200040,
+                    tickUpper: 300000,
+                    amount0Desired: amount0Desired,
+                    amount1Desired: amount1Desired,
+                    amount0Min: 0,
+                    amount1Min: 0,
+                    recipient: from,
+                    deadline: type(uint256).max
+                })
+            );
 
         vm.stopPrank();
     }
