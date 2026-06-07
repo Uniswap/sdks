@@ -12,11 +12,8 @@
     "./sdks/uniswapx-sdk",
     "./sdks/universal-router-sdk",
     "./sdks/v2-sdk",
-    "./sdks/v3-sdk"
+    "./sdks/v3-sdk",
   ],
   "testing.openTesting": "neverOpen",
-  "testing.automaticallyOpenTestResults": "neverOpen",
-  "githubPullRequests.ignoredPullRequestBranches": [
-    "main"
-  ]
+  "testing.automaticallyOpenTestResults": "neverOpen"
 }

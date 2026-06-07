@@ -33,7 +33,7 @@
     "@typechain/hardhat": "^6.1.2",
     "@uniswap/sdk-core": "workspace:*",
     "dotenv": "^16.0.3",
-    "ethers": "^6.0.0",
+    "ethers": "^5.7.0",
     "typechain": "^8.1.0"
   }
 }
