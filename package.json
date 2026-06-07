@@ -37,5 +37,8 @@
   ],
   "overrides": {
     "eslint-config-prettier": "^9.1.0"
+  },
+  "resolutions": {
+    "elliptic": "6.6.1"
   }
 }
