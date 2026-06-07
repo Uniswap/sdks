@@ -27,11 +27,9 @@ export { ExclusiveFillerValidation__factory } from "./factories/ExclusiveFillerV
 export { ISuperstateTokenV4__factory } from "./factories/ISuperstateTokenV4__factory";
 export { MockDSTokenInterface__factory } from "./factories/MockDSTokenInterface__factory";
 export { MockERC20__factory } from "./factories/MockERC20__factory";
-<<<<<<< Updated upstream
+
 export { MockSuperstateTokenV4__factory } from "./factories/MockSuperstateTokenV4__factory";
 export { Multicall2__factory } from "./factories/Multicall2__factory";
-=======
->>>>>>> Stashed changes
 export { OrderQuoter__factory } from "./factories/OrderQuoter__factory";
 export { Permit2__factory } from "./factories/Permit2__factory";
 export { PriorityOrderReactor__factory } from "./factories/PriorityOrderReactor__factory";
