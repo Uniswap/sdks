@@ -744,6 +744,13 @@ function applySupplementalPriceCurve(
     return priceCurve.map((value) => BigNumber.from(value));
   }
 
+  if (supplemental.length > priceCurve.length) {
+    throw new HybridOrderPriceCurveError(
+      "Supplemental curve cannot be longer than base price curve"
+    );
+  }
+  }
+
   if (priceCurve.length === 0) {
     throw new HybridOrderPriceCurveError(
       "Supplemental curve provided without base curve"
