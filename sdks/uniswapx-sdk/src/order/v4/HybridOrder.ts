@@ -29,7 +29,7 @@ import {
 
 const ZERO_ADDRESS = ethers.constants.AddressZero;
 const WAD = ethers.constants.WeiPerEther;
-const MAX_UINT_240 = BigNumber.from(1).shl(240).sub(1);
+const MAX_UINT_240 = BigNumber.from((BigInt(1) << BigInt(240)) - BigInt(1));
 const MAX_UINT_16 = 65535; // 2^16 - 1, max duration that fits in 16 bits
 const PRICE_CURVE_DURATION_SHIFT = 240;
 
