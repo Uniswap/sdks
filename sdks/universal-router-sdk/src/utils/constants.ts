@@ -530,6 +530,28 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
+  // arc
+  [5042]: {
+    weth: WETH_NOT_SUPPORTED_ON_CHAIN,
+    routerConfigs: {
+      [UniversalRouterVersion.V2_1_1]: {
+        address: '0x4fca4a51ab4f23a7447b3284fbd7d73289a89fb1',
+        creationBlock: 1950059,
+      },
+    },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
+  },
+  // robinhood
+  [4663]: {
+    weth: '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73',
+    routerConfigs: {
+      [UniversalRouterVersion.V2_1_1]: {
+        address: '0x8876789976decbfcbbbe364623c63652db8c0904',
+        creationBlock: 18127,
+      },
+    },
+    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
+  },
   // xlayer
   [196]: {
     weth: '0xe538905cf8410324e03A5A23C1c177a474D59b2b',
