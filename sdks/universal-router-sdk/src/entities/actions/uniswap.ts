@@ -60,7 +60,6 @@ export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit'> & {
   inputTokenPermit?: Permit2Permit
   flatFee?: FlatFeeOptions
   safeMode?: boolean
-<<<<<<< Updated upstream
   urVersion?: UniversalRouterVersion // Universal Router version for encoding (defaults to V2_0 for backward compatibility)
   tokenTransferMode?: TokenTransferMode // How input tokens are transferred to the UR (defaults to Permit2). ApproveProxy uses the SwapProxy contract.
   chainId?: number // Required when tokenTransferMode is ApproveProxy, used to resolve UR address for the proxy
@@ -78,9 +77,7 @@ function toURVersion(version?: UniversalRouterVersion): URVersion {
   const mapped = UR_VERSION_MAP[version]
   if (!mapped) throw new Error(`No v4-sdk URVersion mapping for UniversalRouterVersion: ${version}`)
   return mapped
-=======
   maxHopSlippage?: BigNumber[] // Optional per-hop slippage protection for V4 routes
->>>>>>> Stashed changes
 }
 
 const REFUND_ETH_PRICE_IMPACT_THRESHOLD = new Percent(50, 100)
@@ -473,12 +470,7 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
   const perHopSlippage = minHopPriceX36?.map((s) => BigNumber.from(s)) ?? []
 
   const v4Planner = new V4Planner()
-<<<<<<< Updated upstream
   v4Planner.addTrade(trade, slippageToleranceOnSwap, perHopSlippage, toURVersion(options.urVersion))
-=======
-  v4Planner.addTrade(trade, slippageToleranceOnSwap, options.maxHopSlippage)
-
->>>>>>> Stashed changes
   v4Planner.addSettle(trade.route.pathInput, payerIsUser)
   v4Planner.addTake(
     trade.route.pathOutput,
@@ -572,7 +564,6 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
       const v4SectionSlippage: BigNumber[] = sectionHopSlippage?.map((s) => BigNumber.from(s)) ?? []
 
       v4Planner.addSettle(inputToken, payerIsUser && i === 0, (i == 0 ? amountIn : CONTRACT_BALANCE) as BigNumber)
-<<<<<<< Updated upstream
       v4Planner.addAction(
         Actions.SWAP_EXACT_IN,
         [
@@ -608,19 +599,6 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
       }
 
       v4Planner.addTake(outputTokenForTake, swapRecipient)
-=======
-      v4Planner.addAction(Actions.SWAP_EXACT_IN, [
-        {
-          currencyIn: inputToken.isNative ? ETH_ADDRESS : inputToken.address,
-          path: encodeV4RouteToPath(v4SubRoute),
-          maxHopSlippage: options.maxHopSlippage || [],
-          amountIn: 0, // denotes open delta, amount set in v4Planner.addSettle()
-          amountOutMinimum: !isLastSectionInRoute(i) ? 0 : amountOut,
-        },
-      ])
-      v4Planner.addTake(outputToken, swapRecipient)
->>>>>>> Stashed changes
-
       planner.addCommand(CommandType.V4_SWAP, [v4Planner.finalize()])
     } else if (routePool instanceof V3Pool) {
       const v3Params: any[] = [
