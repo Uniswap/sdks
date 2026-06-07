@@ -3,23 +3,13 @@
   "version": "0.0.0",
   "dependencies": {
     "@babel/runtime": "7.18.9",
-<<<<<<< Updated upstream
     "@changesets/cli": "2.30.0",
-=======
-    "@manypkg/cli": "^0.19.2",
-    "@semantic-release/exec": "6.0.3",
->>>>>>> Stashed changes
     "@typescript-eslint/eslint-plugin": "^8.38.0",
     "danger": "11.2.6",
     "eslint": "^8.57.0",
     "eslint-plugin-prettier": "^3.4.1",
     "husky": "^8.0.3",
-<<<<<<< Updated upstream
     "check-dependency-version-consistency": "^4.1.0",
-=======
-    "semantic-release": "^25.0.1",
-    "semantic-release-monorepo": "8.0.2",
->>>>>>> Stashed changes
     "syncpack": "^8.5.14",
     "turbo": "1.10.16"
   },
@@ -45,12 +35,7 @@
     "sdks/*",
     "sdks/uniswapx-sdk/integration"
   ],
-<<<<<<< Updated upstream
   "overrides": {
-=======
-  "resolutions": {
-    "@manypkg/cli@^0.19.2": "patch:@manypkg/cli@npm%3A0.19.2#./.yarn/patches/@manypkg-cli-npm-0.19.2-ea52ff91d4.patch",
->>>>>>> Stashed changes
     "eslint-config-prettier": "^9.1.0"
   }
 }
