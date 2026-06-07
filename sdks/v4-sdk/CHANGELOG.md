@@ -1,5 +1,13 @@
 # @uniswap/v4-sdk
 
+## 2.2.2
+
+### Patch Changes
+
+- Updated dependencies [ca82bac]
+  - @uniswap/sdk-core@7.17.0
+  - @uniswap/v3-sdk@3.30.4
+
 ## 2.2.1
 
 ### Patch Changes
