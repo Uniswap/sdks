@@ -43,7 +43,7 @@ If you add a Next.js application with the Pages Router:
 1. Add the Analytics component to your `_app.tsx` or `_app.js` file:
 
 ```typescript
-import { Analytics } from '@vercel/analytics/react';
+import { Analytics } from '@vercel/analytics/next';
 import type { AppProps } from 'next/app';
 
 export default function App({ Component, pageProps }: AppProps) {
