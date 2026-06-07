@@ -1,12 +1,5 @@
 # @uniswap/v3-sdk
 
-## 3.30.4
-
-### Patch Changes
-
-- Updated dependencies [ca82bac]
-  - @uniswap/sdk-core@7.17.0
-
 ## 3.30.3
 
 ### Patch Changes

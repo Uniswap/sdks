@@ -62,6 +62,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0xCb640A86855f1A828c27241bA364348de28abe66',
         creationBlock: 25195294,
       },
+      [UniversalRouterVersion.V2_2_0]: {
+        address: '0xCb640A86855f1A828c27241bA364348de28abe66',
+        creationBlock: 25195294,
+      },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
@@ -104,6 +108,10 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x470FFC67b1feEEC31D16C46AC7545C98716a194c',
         creationBlock: 9664766,
 >>>>>>> Stashed changes
+      },
+      [UniversalRouterVersion.V2_2_0]: {
+        address: '0xB0C89059d7190EDb17eFF19829cc009cEe923916',
+        creationBlock: 10941522,
       },
       [UniversalRouterVersion.V2_2_0]: {
         address: '0xB0C89059d7190EDb17eFF19829cc009cEe923916',
@@ -651,28 +659,6 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
       [UniversalRouterVersion.V2_1_1]: {
         address: '0x47837eb80db5908eabba9105626d9b348bea7b02',
         creationBlock: 7009661,
-      },
-    },
-    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
-  },
-  // arc
-  [5042]: {
-    weth: WETH_NOT_SUPPORTED_ON_CHAIN,
-    routerConfigs: {
-      [UniversalRouterVersion.V2_1_1]: {
-        address: '0x4fca4a51ab4f23a7447b3284fbd7d73289a89fb1',
-        creationBlock: 1950059,
-      },
-    },
-    swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
-  },
-  // robinhood
-  [4663]: {
-    weth: '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73',
-    routerConfigs: {
-      [UniversalRouterVersion.V2_1_1]: {
-        address: '0x8876789976decbfcbbbe364623c63652db8c0904',
-        creationBlock: 18127,
       },
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
