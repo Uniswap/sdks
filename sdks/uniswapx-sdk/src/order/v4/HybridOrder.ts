@@ -965,9 +965,9 @@ function encodePriceCurveElement(
   duration: number,
   scalingFactor: BigNumber
 ): BigNumber {
-  return BigNumber.from(duration)
-    .shl(PRICE_CURVE_DURATION_SHIFT)
-    .or(scalingFactor);
+  const durationBI = BigInt(duration) << BigInt(PRICE_CURVE_DURATION_SHIFT);
+  const scalingBI = BigInt(scalingFactor.toString());
+  return BigNumber.from(durationBI | scalingBI);
 }
 
 function sharesScalingDirection(a: BigNumber, b: BigNumber): boolean {
