@@ -100,6 +100,14 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
   // permit2 is ERC20-only; native input pays via msg.value
   invariant(!(spec.routing.inputToken.isNative && spec.permit), 'NATIVE_INPUT_PERMIT')
 
+  // native-ERC20 gas-token input (e.g. Arc USDC): funded via msg.value, never via Permit2
+  if (spec.nativeErc20Input) {
+    invariant(!spec.routing.inputToken.isNative, 'NATIVE_ERC20_INPUT_NATIVE_TOKEN')
+    invariant(!spec.permit, 'NATIVE_ERC20_INPUT_PERMIT_CONFLICT')
+    invariant(spec.tokenTransferMode !== TokenTransferMode.ApproveProxy, 'NATIVE_ERC20_INPUT_PROXY_CONFLICT')
+    invariant(spec.routing.inputToken.decimals <= 18, 'NATIVE_ERC20_INPUT_DECIMALS')
+  }
+
   // portion fees pair with exact-input (% of variable output); flat fees pair with exact-output (fixed deduction from the target)
   invariant(
     !(spec.fee?.kind === 'portion' && spec.tradeType !== TradeType.EXACT_INPUT),

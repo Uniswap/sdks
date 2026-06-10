@@ -167,13 +167,14 @@ export abstract class SwapRouter {
     } = normalizedSpec
 
     // Ingress: pull funds into the router. Native input is paid as msg.value at the bottom
-    // instead of via Permit2; ApproveProxy ingress is handled by the outer wrapper at the end.
+    // instead of via Permit2 — as is a native-ERC20 gas-token input (nativeErc20Input);
+    // ApproveProxy ingress is handled by the outer wrapper at the end.
     if (normalizedSpec.tokenTransferMode === TokenTransferMode.Permit2) {
       if (normalizedSpec.permit) {
         encodePermit(planner, normalizedSpec.permit)
       }
 
-      if (!inputToken.isNative) {
+      if (!inputToken.isNative && !normalizedSpec.nativeErc20Input) {
         planner.addCommand(
           CommandType.PERMIT2_TRANSFER_FROM,
           [getCurrencyAddress(inputToken), ROUTER_AS_RECIPIENT, exactOrMaxAmountIn],
@@ -249,7 +250,18 @@ export abstract class SwapRouter {
     }
 
     // Native input pays via msg.value; ERC20 input is already in the router via Permit2.
-    return SwapRouter.encodePlan(planner, inputToken.isNative ? exactOrMaxAmountIn : BigNumber.from(0), {
+    // A native-ERC20 gas-token input (e.g. Arc USDC predeploy) also pays via msg.value,
+    // scaled from token decimals to 18-decimal native units.
+    let nativeCurrencyValue: BigNumber
+    if (inputToken.isNative) {
+      nativeCurrencyValue = exactOrMaxAmountIn
+    } else if (normalizedSpec.nativeErc20Input) {
+      nativeCurrencyValue = exactOrMaxAmountIn.mul(BigNumber.from(10).pow(18 - inputToken.decimals))
+    } else {
+      nativeCurrencyValue = BigNumber.from(0)
+    }
+
+    return SwapRouter.encodePlan(planner, nativeCurrencyValue, {
       deadline: normalizedSpec.deadline ? BigNumber.from(normalizedSpec.deadline) : undefined,
     })
   }
