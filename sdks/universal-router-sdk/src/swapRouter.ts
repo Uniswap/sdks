@@ -223,10 +223,12 @@ export abstract class SwapRouter {
 
     // Assumes routers already normalized unused input into `routing.inputToken`.
     // Exact-output uses max input, so any unused slippage padding is refunded to the recipient.
+    // For nativeErc20Input the leftover lives in the router's native balance (18 decimals), so
+    // sweep it as native: an ERC20 sweep would floor to the token's decimals and strand dust.
     if (normalizedSpec.tradeType === TradeType.EXACT_OUTPUT) {
       planner.addCommand(
         CommandType.SWEEP,
-        [getCurrencyAddress(inputToken), normalizedSpec.recipient, 0],
+        [normalizedSpec.nativeErc20Input ? ETH_ADDRESS : getCurrencyAddress(inputToken), normalizedSpec.recipient, 0],
         false,
         normalizedSpec.urVersion
       )
