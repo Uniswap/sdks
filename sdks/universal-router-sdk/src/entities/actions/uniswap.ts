@@ -374,16 +374,10 @@ export class UniswapTrade implements Command {
           this.options.recipient,
           0,
         ])
-      } else if (this.options.nativeErc20Input) {
-        // msg.value funded the router with maximumAmountIn (native balance == ERC20 balance via predeploy);
-        // sweep any unused input ERC20 back to the user
-        planner.addCommand(CommandType.SWEEP, [
-          getCurrencyAddress(this.trade.inputAmount.currency),
-          this.options.recipient,
-          0,
-        ])
-      } else if (this.trade.inputAmount.currency.isNative) {
-        // must refund extra native currency sent along for native v4 trades (no input transition)
+      } else if (this.options.nativeErc20Input || this.trade.inputAmount.currency.isNative) {
+        // must refund extra native currency sent along (nativeErc20Input or native v4 trades).
+        // For nativeErc20Input the leftover lives in the router's native balance (18 decimals), so
+        // sweep it as native: an ERC20 sweep would floor to the token's decimals and strand dust.
         planner.addCommand(CommandType.SWEEP, [ETH_ADDRESS, this.options.recipient, 0])
       }
     }

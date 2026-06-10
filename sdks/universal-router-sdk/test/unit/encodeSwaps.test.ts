@@ -1619,9 +1619,10 @@ describe('encodeSwaps', () => {
         const { commandTypes, inputs } = parseCommands(calldata)
         expect(commandTypes).to.deep.equal([CommandType.V3_SWAP_EXACT_OUT, CommandType.SWEEP, CommandType.SWEEP])
 
-        // the unconditional exact-output refund returns the surplus as the input ERC20
+        // the exact-output refund returns the surplus as native (18 decimals): an ERC20 sweep
+        // would floor to the token's decimals and strand dust in the router
         const refund = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[2])
-        expect((refund[0] as string).toLowerCase()).to.equal(USDC.address.toLowerCase())
+        expect((refund[0] as string).toLowerCase()).to.equal(ETH_ADDRESS.toLowerCase())
         expect((refund[1] as string).toLowerCase()).to.equal(TEST_RECIPIENT.toLowerCase())
 
         // value covers the slippage-padded maximum input, scaled to native units

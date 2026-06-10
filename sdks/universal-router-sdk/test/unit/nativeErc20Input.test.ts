@@ -8,6 +8,7 @@ import { Trade as RouterTrade } from '@uniswap/router-sdk'
 import { SwapRouter } from '../../src/swapRouter'
 import { UniswapTrade, SwapOptions, TokenTransferMode } from '../../src/entities/actions/uniswap'
 import { CommandType } from '../../src/utils/routerCommands'
+import { ETH_ADDRESS } from '../../src/utils/constants'
 import { ETHER, WETH, USDC, makeV3Pool, makeV4Pool, parseCommands } from '../utils/uniswapData'
 
 const TEST_RECIPIENT = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
@@ -210,9 +211,10 @@ describe('nativeErc20Input', () => {
       expect(BigNumber.from(value).toString()).to.equal(amountInMax.mul(SCALE_6_TO_18).toString())
       expect(swap[4]).to.equal(false) // payerIsUser
 
-      // the surplus is returned as the input ERC20
+      // the surplus is returned as native (18 decimals): an ERC20 sweep would floor
+      // to the token's decimals and strand dust in the router
       const sweep = decodeSweepCommand(inputs[1])
-      expect((sweep[0] as string).toLowerCase()).to.equal(USDC.address.toLowerCase())
+      expect((sweep[0] as string).toLowerCase()).to.equal(ETH_ADDRESS.toLowerCase())
       expect((sweep[1] as string).toLowerCase()).to.equal(TEST_RECIPIENT)
     })
 
