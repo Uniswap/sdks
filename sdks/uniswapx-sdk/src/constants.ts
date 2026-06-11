@@ -28,22 +28,37 @@ export const PERMIT2_MAPPING: AddressMap = {
     "0x000000000022d473030f116ddee9f6b43ac78ba3",
     [
       11155111, // sepolia
-      10,       // optimism
-      56,       // bnb
-      143,      // monad
-      196,      // xlayer
-      480,      // worldchain
-      1868,     // soneium
-      4217,     // tempo
-      42161,    // arbitrum
-      42220,    // celo
-      43114,    // avalanche
-      81457,    // blast
-      7777777,  // zora
+      10,        // optimism
+      30,        // rootstock
+      56,        // bnb
+      100,       // gnosis
+      143,       // monad
+      196,       // xlayer
+      480,       // worldchain
+      1284,      // moonbeam
+      1868,      // soneium
+      4217,      // tempo
+      4326,      // megaeth
+      4663,      // robinhood
+      5042,      // arc
+      10143,     // monad testnet
+      42161,     // arbitrum
+      42220,     // celo
+      43114,     // avalanche
+      59144,     // linea
+      81457,     // blast
+      84532,     // base sepolia
+      421614,    // arbitrum sepolia
+      7777777,   // zora
+      11155420,  // optimism sepolia
+      999999999, // zora sepolia
     ]
   ),
   12341234: "0x000000000022d473030f116ddee9f6b43ac78ba3",
   1301: "0x000000000022d473030f116ddee9f6b43ac78ba3",
+  // zksync has a different create2 address derivation, so Permit2 lives at a
+  // non-canonical address there (matches permit2-sdk's permit2Address(324))
+  324: "0x0000000000225e31D15943971F47aD3022F714Fa",
 };
 
 export const UNISWAPX_ORDER_QUOTER_MAPPING: AddressMap = {
