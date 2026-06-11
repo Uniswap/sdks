@@ -43,6 +43,11 @@ describe('Universal Router Constants', () => {
         'Universal Router version 1.2 not deployed on chain 4326'
       )
 
+      // Ink (57073) has no V1_2
+      expect(() => UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V1_2, 57073)).to.throw(
+        'Universal Router version 1.2 not deployed on chain 57073'
+      )
+
       // Arc (5042) and Robinhood (4663) only have V2_1_1
       v211OnlyChainIds.forEach((chainId) => {
         expect(() => UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V1_2, chainId)).to.throw(
@@ -92,6 +97,11 @@ describe('Universal Router Constants', () => {
       // MegaETH (4326) has no V1_2
       expect(() => UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V1_2, 4326)).to.throw(
         'Universal Router version 1.2 not deployed on chain 4326'
+      )
+
+      // Ink (57073) has no V1_2
+      expect(() => UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V1_2, 57073)).to.throw(
+        'Universal Router version 1.2 not deployed on chain 57073'
       )
 
       // Arc (5042) and Robinhood (4663) only have V2_1_1

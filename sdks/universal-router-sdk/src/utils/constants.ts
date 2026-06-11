@@ -544,6 +544,16 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
     },
     swapProxy: SWAP_PROXY_DEPLOY_ADDRESS,
   },
+  // ink
+  [57073]: {
+    weth: '0x4200000000000000000000000000000000000006',
+    routerConfigs: {
+      [UniversalRouterVersion.V2_0]: {
+        address: '0x112908dac86e20e7241b0927479ea3bf935d1fa0',
+        creationBlock: 4580586,
+      },
+    },
+  },
   // xlayer
   [196]: {
     weth: '0xe538905cf8410324e03A5A23C1c177a474D59b2b',
