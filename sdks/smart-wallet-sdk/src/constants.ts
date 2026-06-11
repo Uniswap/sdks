@@ -30,6 +30,8 @@ export enum SupportedChainIds {
   BNB = ChainId.BNB,
   ARBITRUM_ONE = ChainId.ARBITRUM_ONE,
   XLAYER = ChainId.XLAYER,
+  ARC = ChainId.ARC,
+  ROBINHOOD = ChainId.ROBINHOOD,
 }
 
 /**
@@ -91,6 +93,14 @@ export const SMART_WALLET_VERSIONS: { [_chainId in SupportedChainIds]: SmartWall
     [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
   },
   [SupportedChainIds.XLAYER]: {
+    [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
+    [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
+  },
+  [SupportedChainIds.ARC]: {
+    [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
+    [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
+  },
+  [SupportedChainIds.ROBINHOOD]: {
     [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
     [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
   },
