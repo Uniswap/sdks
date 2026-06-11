@@ -553,6 +553,8 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         creationBlock: 4580586,
       },
     },
+    // SwapProxy on Ink is not at the deterministic SWAP_PROXY_DEPLOY_ADDRESS
+    swapProxy: '0x0000000085E102724e78eCd2F45DC9cA239Affad',
   },
   // xlayer
   [196]: {

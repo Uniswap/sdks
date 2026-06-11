@@ -4,6 +4,7 @@ import {
   UNIVERSAL_ROUTER_ADDRESS,
   UNIVERSAL_ROUTER_CREATION_BLOCK,
   WETH_ADDRESS,
+  SWAP_PROXY_ADDRESS,
   CHAIN_CONFIGS,
 } from '../../src/utils/constants'
 
@@ -118,6 +119,16 @@ describe('Universal Router Constants', () => {
     it('should return the correct V2_1_1 creation block for arc and robinhood', () => {
       expect(UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_1_1, 5042)).to.equal(1950059)
       expect(UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_1_1, 4663)).to.equal(18127)
+    })
+  })
+
+  describe('SWAP_PROXY_ADDRESS', () => {
+    it('should return the Ink SwapProxy address', () => {
+      expect(SWAP_PROXY_ADDRESS(57073)).to.equal('0x0000000085E102724e78eCd2F45DC9cA239Affad')
+    })
+
+    it('should throw for an unsupported chain', () => {
+      expect(() => SWAP_PROXY_ADDRESS(999999)).to.throw('SwapProxy not deployed on chain 999999')
     })
   })
 
