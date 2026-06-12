@@ -554,6 +554,7 @@ const INK_ADDRESSES: ChainAddresses = {
   nonfungiblePositionManagerAddress: '0xc0836e5b058bbe22ae2266e1ac488a1a0fd8dce8',
   tickLensAddress: '0x3e6dba802d62aba2361dd632fbc9f547aa6789ae',
   swapRouter02Address: '0x177778f19e89dd1012bdbe603f144088a95c4b53',
+  mixedRouteQuoterV2Address: '0x1f7d7550b1b028f7571e69a784071f0205fd2efa',
 
   v4PoolManagerAddress: '0x360e68faccca8ca495c1b759fd9eee466db9fb32',
   v4PositionManagerAddress: '0x1b35d13a2e2528f192637f14b05f0dc0e7deb566',
