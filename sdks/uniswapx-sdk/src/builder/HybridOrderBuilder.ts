@@ -338,8 +338,8 @@ export class HybridOrderBuilder {
   private extractScalingFactor(curveElement: BigNumber): BigNumber {
     // Price curve element format: (duration << 240) | scalingFactor
     // Extract lower 240 bits for scaling factor
-    const mask = BigNumber.from(2).pow(240).sub(1);
-    return curveElement.and(mask);
+    const mask = (BigInt(1) << BigInt(240)) - BigInt(1);
+    return BigNumber.from(BigInt(curveElement.toString()) & mask);
   }
 
   private checkCosignedInvariants(): void {

@@ -127,9 +127,10 @@ describe("HybridOrderBuilder", () => {
       const deadline = Math.floor(Date.now() / 1000) + 1000;
       // Price curve: duration=10 blocks, scaling factor=1.1e18
       const PRICE_CURVE_DURATION_SHIFT = 240;
-      const priceCurveElement = BigNumber.from(10)
-        .shl(PRICE_CURVE_DURATION_SHIFT)
-        .or(BASE_SCALING_FACTOR.mul(11).div(10));
+      const priceCurveElement = BigNumber.from(
+        (BigInt(10) << BigInt(PRICE_CURVE_DURATION_SHIFT)) |
+          BigInt(BASE_SCALING_FACTOR.mul(11).div(10).toString())
+      );
 
       const order = builder
         .cosigner(constants.AddressZero)

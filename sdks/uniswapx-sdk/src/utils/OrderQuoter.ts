@@ -269,7 +269,7 @@ export class UniswapXOrderQuoter
             // OrderValidation.ValidationFailed
             if (key === "0a0b0d79") {
               // V4 orders use hooks instead of additionalValidationData
-              if ("additionalValidationData" in orders[idx].order.info) {
+              if (orders[idx].order.info && "additionalValidationData" in orders[idx].order.info) {
                 const fillerValidation = parseExclusiveFillerData(
                   (orders[idx].order.info as LegacyOrderInfoTypes)
                     .additionalValidationData

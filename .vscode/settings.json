@@ -15,5 +15,8 @@
     "./sdks/v3-sdk",
   ],
   "testing.openTesting": "neverOpen",
-  "testing.automaticallyOpenTestResults": "neverOpen"
+  "testing.automaticallyOpenTestResults": "neverOpen",
+  "githubPullRequests.ignoredPullRequestBranches": [
+    "main"
+  ]
 }
