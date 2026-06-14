@@ -1,5 +1,11 @@
 # @uniswap/smart-wallet-sdk
 
+## 2.6.5
+
+### Patch Changes
+
+- d200b3b: Add Arc and Robinhood smart wallet deployment addresses.
+
 ## 2.6.4
 
 ### Patch Changes
