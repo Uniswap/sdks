@@ -3,7 +3,7 @@ import { BigNumber, utils } from 'ethers'
 import { defaultAbiCoder } from 'ethers/lib/utils'
 import { Route as V3RouteSDK } from '@uniswap/v3-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
-import { Currency, CurrencyAmount, Percent, TradeType } from '@uniswap/sdk-core'
+import { Currency, CurrencyAmount, Percent, Token, TradeType } from '@uniswap/sdk-core'
 import { URVersion, V4BaseActionsParser } from '@uniswap/v4-sdk'
 import { SwapRouter } from '../../src/swapRouter'
 import { TokenTransferMode } from '../../src/entities/actions/uniswap'
@@ -1541,6 +1541,120 @@ describe('encodeSwaps', () => {
           }),
         ])
       ).to.throw('STEP_RECIPIENT_MUST_BE_ROUTER')
+    })
+  })
+
+  describe('nativeErc20Input', () => {
+    // scale from a 6-decimal native-ERC20 (e.g. Arc USDC) to 18-decimal native units
+    const SCALE_6_TO_18 = BigNumber.from(10).pow(12)
+    const TOKEN_20_DECIMALS = new Token(1, '0x1111111111111111111111111111111111111111', 20, 'T20', 'Twenty')
+
+    describe('validateEncodeSwaps', () => {
+      it('rejects native input', () => {
+        const spec = buildSpec(
+          { nativeErc20Input: true },
+          {
+            inputToken: ETH,
+            outputToken: DAI,
+            amount: CurrencyAmount.fromRawAmount(ETH, '1000000000000000000'),
+            quote: CurrencyAmount.fromRawAmount(DAI, '1000000000000000000'),
+          }
+        )
+        expect(() => validateEncodeSwaps(spec, [buildV3ExactInStep({}, [WETH, DAI])])).to.throw(
+          'NATIVE_ERC20_INPUT_NATIVE_TOKEN'
+        )
+      })
+
+      it('rejects a permit', () => {
+        const spec = buildSpec({ nativeErc20Input: true, permit: TEST_PERMIT })
+        expect(() => validateEncodeSwaps(spec, [buildV3ExactInStep()])).to.throw('NATIVE_ERC20_INPUT_PERMIT_CONFLICT')
+      })
+
+      it('rejects ApproveProxy token transfer mode', () => {
+        const spec = buildSpec({
+          nativeErc20Input: true,
+          tokenTransferMode: TokenTransferMode.ApproveProxy,
+          chainId: 1,
+        })
+        expect(() => validateEncodeSwaps(spec, [buildV3ExactInStep()])).to.throw('NATIVE_ERC20_INPUT_PROXY_CONFLICT')
+      })
+
+      it('rejects input tokens with more than 18 decimals', () => {
+        const spec = buildSpec(
+          { nativeErc20Input: true },
+          {
+            inputToken: TOKEN_20_DECIMALS,
+            amount: CurrencyAmount.fromRawAmount(TOKEN_20_DECIMALS, '100000000000000000000'),
+          }
+        )
+        expect(() => validateEncodeSwaps(spec, [buildV3ExactInStep({}, [TOKEN_20_DECIMALS, WETH])])).to.throw(
+          'NATIVE_ERC20_INPUT_DECIMALS'
+        )
+      })
+    })
+
+    describe('SwapRouter.encodeSwaps', () => {
+      it('skips the PERMIT2_TRANSFER_FROM ingress and attaches msg.value scaled from 6 to 18 decimals', () => {
+        const spec = buildSpec({ nativeErc20Input: true })
+        const { calldata, value } = SwapRouter.encodeSwaps(spec, [buildV3ExactInStep()])
+
+        // no ingress pull: the router is funded by msg.value
+        const { commandTypes } = parseCommands(calldata)
+        expect(commandTypes).to.deep.equal([CommandType.V3_SWAP_EXACT_IN, CommandType.SWEEP])
+
+        // exact-input: value is the exact input amount, scaled to native units
+        expect(BigNumber.from(value).toString()).to.equal(BigNumber.from('1000000').mul(SCALE_6_TO_18).toString())
+      })
+
+      it('still refunds unused input and scales the slippage-padded max for exact-output', () => {
+        const spec = buildSpec(
+          { tradeType: TradeType.EXACT_OUTPUT, nativeErc20Input: true },
+          {
+            amount: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+            quote: CurrencyAmount.fromRawAmount(USDC, '1000000'),
+          }
+        )
+        const { calldata, value } = SwapRouter.encodeSwaps(spec, [buildV3ExactOutStep()])
+
+        const { commandTypes, inputs } = parseCommands(calldata)
+        expect(commandTypes).to.deep.equal([CommandType.V3_SWAP_EXACT_OUT, CommandType.SWEEP, CommandType.SWEEP])
+
+        // the exact-output refund returns the surplus as native (18 decimals): an ERC20 sweep
+        // would floor to the token's decimals and strand dust in the router
+        const refund = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[2])
+        expect((refund[0] as string).toLowerCase()).to.equal(ETH_ADDRESS.toLowerCase())
+        expect((refund[1] as string).toLowerCase()).to.equal(TEST_RECIPIENT.toLowerCase())
+
+        // value covers the slippage-padded maximum input, scaled to native units
+        const maxIn = exactOutputMaxIn(BigNumber.from('1000000'), spec.slippageTolerance)
+        expect(BigNumber.from(value).toString()).to.equal(maxIn.mul(SCALE_6_TO_18).toString())
+      })
+
+      it('uses a scale factor of 1 for an 18-decimal native-ERC20 (Celo-style)', () => {
+        const inputAmount = '1000000000000000000'
+        const spec = buildSpec(
+          { nativeErc20Input: true },
+          {
+            inputToken: DAI,
+            amount: CurrencyAmount.fromRawAmount(DAI, inputAmount),
+          }
+        )
+        const { value } = SwapRouter.encodeSwaps(spec, [buildV3ExactInStep({ amountIn: inputAmount }, [DAI, WETH])])
+
+        expect(BigNumber.from(value).toString()).to.equal(inputAmount)
+      })
+
+      it('leaves behavior unchanged when the flag is not set', () => {
+        const { calldata, value } = SwapRouter.encodeSwaps(buildSpec(), [buildV3ExactInStep()])
+
+        expect(value).to.equal('0x00')
+        const { commandTypes } = parseCommands(calldata)
+        expect(commandTypes).to.deep.equal([
+          CommandType.PERMIT2_TRANSFER_FROM,
+          CommandType.V3_SWAP_EXACT_IN,
+          CommandType.SWEEP,
+        ])
+      })
     })
   })
 

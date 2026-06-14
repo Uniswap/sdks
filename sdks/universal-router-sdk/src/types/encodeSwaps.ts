@@ -30,6 +30,14 @@ export type SwapSpecification = {
   deadline?: BigNumberish
   urVersion?: UniversalRouterVersion
   safeMode?: boolean // appends a trailing SWEEP(ETH, recipient, 0) to recover native dust or unintended msg.value
+  /**
+   * The input Token is the chain's native gas token exposed via an ERC20 predeploy whose balance
+   * mirrors the native balance (e.g. USDC on Arc). The swap is funded by attaching
+   * msg.value = exactOrMaxAmountIn * 10^(18 - token.decimals) instead of pulling via Permit2:
+   * the PERMIT2_TRANSFER_FROM ingress is skipped and no ERC20 approval or permit is ever needed.
+   * Incompatible with native input, permit, and TokenTransferMode.ApproveProxy.
+   */
+  nativeErc20Input?: boolean
 }
 
 // Output of `normalizeEncodeSwapsSpec`: the four fields below are guaranteed

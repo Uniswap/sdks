@@ -57,6 +57,15 @@ export enum TokenTransferMode {
 
 export type SwapOptions = Omit<RouterSwapOptions, 'inputTokenPermit'> & {
   useRouterBalance?: boolean
+  /**
+   * The input Token is the chain's native gas token exposed via an ERC20 predeploy whose balance
+   * mirrors the native balance (e.g. USDC on Arc). The swap is funded by attaching
+   * msg.value = maximumAmountIn * 10^(18 - token.decimals) instead of pulling via Permit2:
+   * the router self-funds (payerIsUser = false) and unused input is swept back to the recipient
+   * on exact-output / partial-fill-risk trades. No ERC20 approval or permit is ever needed.
+   * Incompatible with native input, inputTokenPermit, and TokenTransferMode.ApproveProxy.
+   */
+  nativeErc20Input?: boolean
   inputTokenPermit?: Permit2Permit
   flatFee?: FlatFeeOptions
   safeMode?: boolean
@@ -83,6 +92,21 @@ export class UniswapTrade implements Command {
   constructor(public trade: RouterTrade<Currency, Currency, TradeType>, public options: SwapOptions) {
     if (!!options.fee && !!options.flatFee) throw new Error('Only one fee option permitted')
 
+    if (options.nativeErc20Input) {
+      // input token is the chain's native gas token exposed via an ERC20 predeploy (e.g. Arc USDC);
+      // the router is funded by msg.value instead of Permit2, so it pays pools from its own balance
+      if (this.trade.inputAmount.currency.isNative) throw new Error('nativeErc20Input requires an ERC20 input token')
+      if (options.tokenTransferMode === TokenTransferMode.ApproveProxy) {
+        throw new Error('nativeErc20Input is not supported with ApproveProxy')
+      }
+      if (options.inputTokenPermit) throw new Error('nativeErc20Input does not use Permit2; remove inputTokenPermit')
+      if (this.inputRequiresUnwrap) {
+        throw new Error(
+          'nativeErc20Input requires routes quoted against the ERC20 input (native pathInput unsupported)'
+        )
+      }
+    }
+
     if (options.tokenTransferMode === TokenTransferMode.ApproveProxy) {
       if (!options.recipient || options.recipient === SENDER_AS_RECIPIENT) {
         throw new Error(
@@ -90,7 +114,12 @@ export class UniswapTrade implements Command {
         )
       }
       this.payerIsUser = false
-    } else if (this.inputRequiresWrap || this.inputRequiresUnwrap || this.options.useRouterBalance) {
+    } else if (
+      this.inputRequiresWrap ||
+      this.inputRequiresUnwrap ||
+      this.options.useRouterBalance ||
+      this.options.nativeErc20Input
+    ) {
       this.payerIsUser = false
     } else {
       this.payerIsUser = true
@@ -345,8 +374,10 @@ export class UniswapTrade implements Command {
           this.options.recipient,
           0,
         ])
-      } else if (this.trade.inputAmount.currency.isNative) {
-        // must refund extra native currency sent along for native v4 trades (no input transition)
+      } else if (this.options.nativeErc20Input || this.trade.inputAmount.currency.isNative) {
+        // must refund extra native currency sent along (nativeErc20Input or native v4 trades).
+        // For nativeErc20Input the leftover lives in the router's native balance (18 decimals), so
+        // sweep it as native: an ERC20 sweep would floor to the token's decimals and strand dust.
         planner.addCommand(CommandType.SWEEP, [ETH_ADDRESS, this.options.recipient, 0])
       }
     }

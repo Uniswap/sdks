@@ -30,6 +30,8 @@ Below is a table of the most recent contract deployment addresses across various
 | Arbitrum One | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
 | Unichain Sepolia | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
 | Sepolia | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
+| Arc | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
+| Robinhood | 0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00 | 35d80918e120d177a49d3d90bcd4dd011caedd32 | v1.0.0 |
 
 ## Documentation
 
