@@ -38,7 +38,7 @@ describe("REACTOR_ADDRESS_MAPPING", () => {
           "Priority": "0x0000000000000000000000000000000000000000",
           "Relay": "0x0000000000000000000000000000000000000000",
         },
-        "137": {
+        "137": Object {
           "Dutch": "0x6000da47483062A0D734Ba3dc7576Ce6A0B645C4",
           "Dutch_V2": "0x0000000000000000000000000000000000000000",
           "Dutch_V3": "0x00000000bAB6E234db8AD638B6A6395b7c499Bc4",
@@ -96,4 +96,3 @@ describe("REACTOR_ADDRESS_MAPPING", () => {
     `);
   });
 });
-

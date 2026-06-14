@@ -29,7 +29,7 @@ import {
 
 const ZERO_ADDRESS = ethers.constants.AddressZero;
 const WAD = ethers.constants.WeiPerEther;
-const MAX_UINT_240 = BigNumber.from(1).shl(240).sub(1);
+const MAX_UINT_240 = BigNumber.from((BigInt(1) << BigInt(240)) - BigInt(1));
 const MAX_UINT_16 = 65535; // 2^16 - 1, max duration that fits in 16 bits
 const PRICE_CURVE_DURATION_SHIFT = 240;
 
@@ -744,6 +744,13 @@ function applySupplementalPriceCurve(
     return priceCurve.map((value) => BigNumber.from(value));
   }
 
+  if (supplemental.length > priceCurve.length) {
+    throw new HybridOrderPriceCurveError(
+      "Supplemental curve cannot be longer than base price curve"
+    );
+  }
+  }
+
   if (priceCurve.length === 0) {
     throw new HybridOrderPriceCurveError(
       "Supplemental curve provided without base curve"
@@ -965,9 +972,9 @@ function encodePriceCurveElement(
   duration: number,
   scalingFactor: BigNumber
 ): BigNumber {
-  return BigNumber.from(duration)
-    .shl(PRICE_CURVE_DURATION_SHIFT)
-    .or(scalingFactor);
+  const durationBI = BigInt(duration) << BigInt(PRICE_CURVE_DURATION_SHIFT);
+  const scalingBI = BigInt(scalingFactor.toString());
+  return BigNumber.from(durationBI | scalingBI);
 }
 
 function sharesScalingDirection(a: BigNumber, b: BigNumber): boolean {
