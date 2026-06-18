@@ -7,6 +7,7 @@ describe('getAverageBlockTimeSecs', () => {
     expect(getAverageBlockTimeSecs(ChainId.ROBINHOOD)).toEqual(0.1)
     expect(getAverageBlockTimeSecs(ChainId.MEGAETH)).toEqual(1)
     expect(getAverageBlockTimeSecs(ChainId.ARC)).toEqual(0.48)
+    expect(getAverageBlockTimeSecs(ChainId.INK)).toEqual(1)
   })
 
   it('throws on unregistered chainId', () => {
@@ -22,6 +23,7 @@ describe('secondsToBlocks', () => {
     expect(secondsToBlocks(8, ChainId.MEGAETH)).toEqual(8) // ceil(8/1)
     expect(secondsToBlocks(8, ChainId.ARC)).toEqual(17) // ceil(8/0.48)
     expect(secondsToBlocks(8, ChainId.ROBINHOOD)).toEqual(80) // ceil(8/0.1)
+    expect(secondsToBlocks(8, ChainId.INK)).toEqual(8) // ceil(8/1)
     expect(secondsToBlocks(1, ChainId.MAINNET)).toEqual(1) // ceil(1/12) — rounds up to a full block
   })
 
