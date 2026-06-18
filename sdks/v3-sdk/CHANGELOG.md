@@ -1,5 +1,12 @@
 # @uniswap/v3-sdk
 
+## 3.30.5
+
+### Patch Changes
+
+- Updated dependencies [4263dcf]
+  - @uniswap/sdk-core@7.18.0
+
 ## 3.30.4
 
 ### Patch Changes
