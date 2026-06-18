@@ -552,6 +552,14 @@ export const CHAIN_CONFIGS: { [key: number]: ChainConfig } = {
         address: '0x112908dac86e20e7241b0927479ea3bf935d1fa0',
         creationBlock: 4580586,
       },
+      // No standalone v2.1.1 router is deployed on Ink. v2.2.0 is a strict
+      // superset of v2.1.1 (adds permissioned-pool support, no change to any
+      // existing command/struct/behavior), so the v2.2.0 deployment serves
+      // v2.1.1 callers byte-for-byte. Aliased to the v2.2.0 address/block.
+      [UniversalRouterVersion.V2_1_1]: {
+        address: '0x28bd21bb4ea4fda370d8d7544992038375d8d456',
+        creationBlock: 47542762,
+      },
       [UniversalRouterVersion.V2_2_0]: {
         address: '0x28bd21bb4ea4fda370d8d7544992038375d8d456',
         creationBlock: 47542762,
