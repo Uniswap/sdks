@@ -357,7 +357,7 @@ export class Pair {
     if (!feeOn) {
       totalSupplyAdjusted = totalSupply
     } else {
-      invariant(!!kLast, 'K_LAST')
+      invariant(typeof kLast !== 'undefined', 'K_LAST')
       const kLastParsed = JSBI.BigInt(kLast)
       if (!JSBI.equal(kLastParsed, ZERO)) {
         const rootK = sqrt(JSBI.multiply(this.reserve0.quotient, this.reserve1.quotient))
