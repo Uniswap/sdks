@@ -664,6 +664,53 @@ describe("V3DutchOrderBuilder", () => {
             `Missing configuration for reactor: ${chainId}`
         );
     });
+
+    // DutchV3 rollout: Robinhood (4663) and Arc (5042). decayBlocks is the
+    // chain-realistic V3 decay window (~30s wallclock): 60 blocks at Arc's
+    // 500ms, 120 blocks at Robinhood's ~250ms under load. Confirms the reactor
+    // resolves from REACTOR_ADDRESS_MAPPING and an order decaying over that
+    // window builds.
+    describe.each([
+        { name: "Robinhood", chainId: 4663, reactor: "0x000000007A1C8e570011EeDF86A2A35593013cBA", decayBlocks: 120 },
+        { name: "Arc", chainId: 5042, reactor: "0x0000000015134054eA82AE0bb9fda66b36402C36", decayBlocks: 60 },
+    ])("DutchV3 rollout: $name ($chainId)", ({ chainId, reactor, decayBlocks }) => {
+        it("resolves the reactor without an explicit address", () => {
+            const b = new V3DutchOrderBuilder(chainId);
+            const order = b
+                .cosigner(constants.AddressZero)
+                .cosignature("0x")
+                .decayStartBlock(212121)
+                .startingBaseFee(BigNumber.from(0))
+                .input({
+                    token: INPUT_TOKEN,
+                    startAmount: INPUT_START_AMOUNT,
+                    curve: { relativeBlocks: [], relativeAmounts: [] },
+                    maxAmount: INPUT_START_AMOUNT.add(1),
+                    adjustmentPerGweiBaseFee: BigNumber.from(0),
+                })
+                .output({
+                    token: OUTPUT_TOKEN,
+                    startAmount: OUTPUT_START_AMOUNT,
+                    curve: {
+                        relativeBlocks: [decayBlocks],
+                        relativeAmounts: [BigInt(4)],
+                    },
+                    recipient: constants.AddressZero,
+                    minAmount: OUTPUT_START_AMOUNT.sub(4),
+                    adjustmentPerGweiBaseFee: BigNumber.from(0),
+                })
+                .inputOverride(INPUT_START_AMOUNT.mul(99).div(100))
+                .outputOverrides([OUTPUT_START_AMOUNT])
+                .deadline(Math.floor(Date.now() / 1000) + 1000)
+                .swapper(constants.AddressZero)
+                .nonce(BigNumber.from(100))
+                .build();
+
+            expect(order.info.reactor.toLowerCase()).toEqual(reactor.toLowerCase());
+            expect(order.chainId).toEqual(chainId);
+            expect(order.info.outputs[0].curve.relativeBlocks).toEqual([decayBlocks]);
+        });
+    });
     
 	it("Regenerate builder from order JSON", () => {
 		const deadline = Math.floor(Date.now() / 1000) + 1000;
