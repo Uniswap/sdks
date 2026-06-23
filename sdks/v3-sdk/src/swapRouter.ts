@@ -7,8 +7,17 @@ import { PermitOptions, SelfPermit } from './selfPermit'
 import { encodeRouteToPath } from './utils'
 import { MethodParameters, toHex } from './utils/calldata'
 import ISwapRouter from '@uniswap/v3-periphery/artifacts/contracts/SwapRouter.sol/SwapRouter.json'
+import ISwapRouter02 from '@uniswap/swap-router-contracts/artifacts/contracts/SwapRouter02.sol/SwapRouter02.json'
 import { Multicall } from './multicall'
 import { FeeOptions, Payments } from './payments'
+
+/**
+ * The SwapRouterType enum is used to specify the type of SwapRouter to use.
+ */
+export enum SwapRouterType {
+  SwapRouter = 0,
+  SwapRouter02 = 1,
+}
 
 /**
  * Options for producing the arguments to send calls to the router.
@@ -27,7 +36,7 @@ export interface SwapOptions {
   /**
    * When the transaction expires, in epoch seconds.
    */
-  deadline: BigintIsh
+  deadline?: BigintIsh
 
   /**
    * The optional permit parameters for spending the input.
@@ -43,6 +52,11 @@ export interface SwapOptions {
    * Optional information for taking a fee on output.
    */
   fee?: FeeOptions
+
+  /**
+   *
+   */
+  swapRouterType?: SwapRouterType
 }
 
 /**
@@ -50,6 +64,7 @@ export interface SwapOptions {
  */
 export abstract class SwapRouter {
   public static INTERFACE: Interface = new Interface(ISwapRouter.abi)
+  public static INTERFACE_02: Interface = new Interface(ISwapRouter02.abi)
 
   /**
    * Cannot be constructed.
@@ -110,8 +125,22 @@ export abstract class SwapRouter {
       calldatas.push(SelfPermit.encodePermit(sampleTrade.inputAmount.currency, options.inputTokenPermit))
     }
 
+    // make deadline required if swaprouterType is not SWAPROUTER02
+    if (options.swapRouterType != SwapRouterType.SwapRouter02 && !options.deadline) {
+      invariant(options.deadline, 'DEADLINE_REQUIRED')
+    }
+
     const recipient: string = validateAndParseAddress(options.recipient)
-    const deadline = toHex(options.deadline)
+    const deadlineParams: {
+      deadline?: string
+    } = {}
+
+    if (options.deadline && options.swapRouterType != SwapRouterType.SwapRouter02) {
+      deadlineParams['deadline'] = toHex(options.deadline)
+    }
+
+    const swapRouterInterface =
+      options.swapRouterType === SwapRouterType.SwapRouter02 ? SwapRouter.INTERFACE_02 : SwapRouter.INTERFACE
 
     for (const trade of trades) {
       for (const { route, inputAmount, outputAmount } of trade.swaps) {
@@ -128,26 +157,26 @@ export abstract class SwapRouter {
               tokenOut: route.tokenPath[1].address,
               fee: route.pools[0].fee,
               recipient: routerMustCustody ? ADDRESS_ZERO : recipient,
-              deadline,
+              ...deadlineParams,
               amountIn,
               amountOutMinimum: amountOut,
               sqrtPriceLimitX96: toHex(options.sqrtPriceLimitX96 ?? 0),
             }
 
-            calldatas.push(SwapRouter.INTERFACE.encodeFunctionData('exactInputSingle', [exactInputSingleParams]))
+            calldatas.push(swapRouterInterface.encodeFunctionData('exactInputSingle', [exactInputSingleParams]))
           } else {
             const exactOutputSingleParams = {
               tokenIn: route.tokenPath[0].address,
               tokenOut: route.tokenPath[1].address,
               fee: route.pools[0].fee,
               recipient: routerMustCustody ? ADDRESS_ZERO : recipient,
-              deadline,
+              ...deadlineParams,
               amountOut,
               amountInMaximum: amountIn,
               sqrtPriceLimitX96: toHex(options.sqrtPriceLimitX96 ?? 0),
             }
 
-            calldatas.push(SwapRouter.INTERFACE.encodeFunctionData('exactOutputSingle', [exactOutputSingleParams]))
+            calldatas.push(swapRouterInterface.encodeFunctionData('exactOutputSingle', [exactOutputSingleParams]))
           }
         } else {
           invariant(options.sqrtPriceLimitX96 === undefined, 'MULTIHOP_PRICE_LIMIT')
@@ -158,22 +187,22 @@ export abstract class SwapRouter {
             const exactInputParams = {
               path,
               recipient: routerMustCustody ? ADDRESS_ZERO : recipient,
-              deadline,
+              ...deadlineParams,
               amountIn,
               amountOutMinimum: amountOut,
             }
 
-            calldatas.push(SwapRouter.INTERFACE.encodeFunctionData('exactInput', [exactInputParams]))
+            calldatas.push(swapRouterInterface.encodeFunctionData('exactInput', [exactInputParams]))
           } else {
             const exactOutputParams = {
               path,
               recipient: routerMustCustody ? ADDRESS_ZERO : recipient,
-              deadline,
+              ...deadlineParams,
               amountOut,
               amountInMaximum: amountIn,
             }
 
-            calldatas.push(SwapRouter.INTERFACE.encodeFunctionData('exactOutput', [exactOutputParams]))
+            calldatas.push(swapRouterInterface.encodeFunctionData('exactOutput', [exactOutputParams]))
           }
         }
       }
