@@ -1,4 +1,41 @@
-import { REACTOR_ADDRESS_MAPPING } from "./constants";
+import {
+  EXCLUSIVE_FILLER_VALIDATION_MAPPING,
+  OrderType,
+  PERMIT2_MAPPING,
+  REACTOR_ADDRESS_MAPPING,
+  UNISWAPX_ORDER_QUOTER_MAPPING,
+} from "./constants";
+import { getReactor } from "./utils";
+
+const CANONICAL_PERMIT2 = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
+const CANONICAL_QUOTER = "0x00000000a3db63Df9078cBF3dF88B4CAdD5a7F58";
+const ZERO = "0x0000000000000000000000000000000000000000";
+
+// DutchV3 rollout to Robinhood (4663) and Arc (5042). These guard against the
+// two ways the mappings would otherwise silently misresolve: the quoter
+// falling through to the legacy default (0x5453…) and the exclusive-filler
+// validator falling through to 0x8A66… (a contract that doesn't exist on
+// either chain).
+describe.each([
+  { name: "Robinhood", chainId: 4663, reactor: "0x000000007A1C8e570011EeDF86A2A35593013cBA" },
+  { name: "Arc", chainId: 5042, reactor: "0x0000000015134054eA82AE0bb9fda66b36402C36" },
+])("DutchV3 rollout: $name ($chainId)", ({ chainId, reactor }) => {
+  it("getReactor resolves the deployed Dutch_V3 reactor", () => {
+    expect(getReactor(chainId, OrderType.Dutch_V3).toLowerCase()).toEqual(reactor.toLowerCase());
+  });
+
+  it("maps to the canonical OrderQuoter, not the legacy default", () => {
+    expect(UNISWAPX_ORDER_QUOTER_MAPPING[chainId].toLowerCase()).toEqual(CANONICAL_QUOTER.toLowerCase());
+  });
+
+  it("maps to canonical Permit2", () => {
+    expect(PERMIT2_MAPPING[chainId].toLowerCase()).toEqual(CANONICAL_PERMIT2.toLowerCase());
+  });
+
+  it("uses the zero address for exclusive-filler validation (reactor-enforced)", () => {
+    expect(EXCLUSIVE_FILLER_VALIDATION_MAPPING[chainId]).toEqual(ZERO);
+  });
+});
 
 describe("REACTOR_ADDRESS_MAPPING", () => {
   it("matches the existing reactor mapping snapshot", () => {
@@ -68,6 +105,9 @@ describe("REACTOR_ADDRESS_MAPPING", () => {
         "43114": {
           "Dutch_V3": "0x00000000862cCF095823fc7576Fa6C7e6b7385ef",
         },
+        "4663": {
+          "Dutch_V3": "0x000000007A1C8e570011EeDF86A2A35593013cBA",
+        },
         "480": {
           "Dutch_V3": "0x00000000d714EA34028930b762E96bFBe50F42C2",
         },
@@ -75,6 +115,9 @@ describe("REACTOR_ADDRESS_MAPPING", () => {
           "Dutch": "0x6000da47483062A0D734Ba3dc7576Ce6A0B645C4",
           "Dutch_V2": "0x0000000000000000000000000000000000000000",
           "Relay": "0x0000000000A4e21E2597DCac987455c48b12edBF",
+        },
+        "5042": {
+          "Dutch_V3": "0x0000000015134054eA82AE0bb9fda66b36402C36",
         },
         "56": {
           "Dutch_V3": "0x00000000a55e50C71b70Db3C8B58749cd1E18eB2",

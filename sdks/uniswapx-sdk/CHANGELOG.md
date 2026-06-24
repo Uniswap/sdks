@@ -1,5 +1,11 @@
 # @uniswap/uniswapx-sdk
 
+## 3.0.10
+
+### Patch Changes
+
+- 8ccefd4: Add Robinhood (4663) and Arc (5042) Dutch_V3 reactors to REACTOR_ADDRESS_MAPPING, their canonical OrderQuoter entries in UNISWAPX_ORDER_QUOTER_MAPPING, and zero-address EXCLUSIVE_FILLER_VALIDATION_MAPPING entries (exclusivity is reactor-enforced).
+
 ## 3.0.9
 
 ### Patch Changes
