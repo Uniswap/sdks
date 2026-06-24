@@ -4,6 +4,7 @@ import {
   UNIVERSAL_ROUTER_ADDRESS,
   UNIVERSAL_ROUTER_CREATION_BLOCK,
   WETH_ADDRESS,
+  SWAP_PROXY_ADDRESS,
   CHAIN_CONFIGS,
 } from '../../src/utils/constants'
 
@@ -43,6 +44,11 @@ describe('Universal Router Constants', () => {
         'Universal Router version 1.2 not deployed on chain 4326'
       )
 
+      // Ink (57073) has no V1_2
+      expect(() => UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V1_2, 57073)).to.throw(
+        'Universal Router version 1.2 not deployed on chain 57073'
+      )
+
       // Arc (5042) and Robinhood (4663) only have V2_1_1
       v211OnlyChainIds.forEach((chainId) => {
         expect(() => UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V1_2, chainId)).to.throw(
@@ -60,6 +66,15 @@ describe('Universal Router Constants', () => {
       )
       expect(UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_1_1, 4663)).to.equal(
         '0x8876789976decbfcbbbe364623c63652db8c0904'
+      )
+    })
+
+    it('should alias Ink (57073) V2_1_1 to the deployed V2_2_0 router', () => {
+      expect(UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_1_1, 57073)).to.equal(
+        '0x28bd21bb4ea4fda370d8d7544992038375d8d456'
+      )
+      expect(UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_1_1, 57073)).to.equal(
+        UNIVERSAL_ROUTER_ADDRESS(UniversalRouterVersion.V2_2_0, 57073)
       )
     })
   })
@@ -94,6 +109,11 @@ describe('Universal Router Constants', () => {
         'Universal Router version 1.2 not deployed on chain 4326'
       )
 
+      // Ink (57073) has no V1_2
+      expect(() => UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V1_2, 57073)).to.throw(
+        'Universal Router version 1.2 not deployed on chain 57073'
+      )
+
       // Arc (5042) and Robinhood (4663) only have V2_1_1
       v211OnlyChainIds.forEach((chainId) => {
         expect(() => UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V1_2, chainId)).to.throw(
@@ -108,6 +128,23 @@ describe('Universal Router Constants', () => {
     it('should return the correct V2_1_1 creation block for arc and robinhood', () => {
       expect(UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_1_1, 5042)).to.equal(1950059)
       expect(UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_1_1, 4663)).to.equal(18127)
+    })
+
+    it('should alias Ink (57073) V2_1_1 creation block to the deployed V2_2_0 router', () => {
+      expect(UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_1_1, 57073)).to.equal(47542762)
+      expect(UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_1_1, 57073)).to.equal(
+        UNIVERSAL_ROUTER_CREATION_BLOCK(UniversalRouterVersion.V2_2_0, 57073)
+      )
+    })
+  })
+
+  describe('SWAP_PROXY_ADDRESS', () => {
+    it('should return the Ink SwapProxy address', () => {
+      expect(SWAP_PROXY_ADDRESS(57073)).to.equal('0x0000000085E102724e78eCd2F45DC9cA239Affad')
+    })
+
+    it('should throw for an unsupported chain', () => {
+      expect(() => SWAP_PROXY_ADDRESS(999999)).to.throw('SwapProxy not deployed on chain 999999')
     })
   })
 

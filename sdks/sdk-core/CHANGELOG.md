@@ -1,5 +1,11 @@
 # @uniswap/sdk-core
 
+## 7.18.0
+
+### Minor Changes
+
+- 4263dcf: Add Ink chain and Universal Router deployment config (v2.2.0 router also exposed as v2.1.1)
+
 ## 7.17.0
 
 ### Minor Changes

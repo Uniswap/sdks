@@ -37,6 +37,7 @@ export enum ChainId {
   MEGAETH = 4326,
   ARC = 5042,
   ROBINHOOD = 4663,
+  INK = 57073,
 }
 
 /**
@@ -67,6 +68,7 @@ export const AVERAGE_BLOCK_TIMES_SECONDS: { [chainId: number]: number } = {
   [ChainId.MEGAETH]: 1,
   [ChainId.ARC]: 0.48,
   [ChainId.ROBINHOOD]: 0.1,
+  [ChainId.INK]: 1,
 }
 
 /**
@@ -128,6 +130,7 @@ export const SUPPORTED_CHAINS = [
   ChainId.MEGAETH,
   ChainId.ARC,
   ChainId.ROBINHOOD,
+  ChainId.INK,
 ] as const
 export type SupportedChainsType = (typeof SUPPORTED_CHAINS)[number]
 
