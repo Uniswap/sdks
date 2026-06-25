@@ -1,8 +1,16 @@
 import { ethers } from 'ethers'
 import UniversalRouter from '@uniswap/universal-router/artifacts/contracts/UniversalRouter.sol/UniversalRouter.json'
 import { Interface } from '@ethersproject/abi'
-import { V4BaseActionsParser, V4RouterAction } from '@uniswap/v4-sdk'
-import { CommandType, CommandDefinition, COMMAND_DEFINITION, Subparser, Parser } from '../utils/routerCommands'
+import { URVersion, V4BaseActionsParser, V4RouterAction } from '@uniswap/v4-sdk'
+import {
+  CommandType,
+  CommandDefinition,
+  COMMAND_DEFINITION,
+  V2V3_SWAP_COMMANDS_V2_1_1,
+  Subparser,
+  Parser,
+} from '../utils/routerCommands'
+import { UniversalRouterVersion, isAtLeastV2_1_1 } from '../utils/constants'
 
 export type Param = {
   readonly name: string
@@ -33,8 +41,16 @@ export interface CommandsDefinition {
 export abstract class CommandParser {
   public static INTERFACE: Interface = new Interface(UniversalRouter.abi)
 
-  public static parseCalldata(calldata: string): UniversalRouterCall {
-    const genericParser = new GenericCommandParser(COMMAND_DEFINITION)
+  public static parseCalldata(
+    calldata: string,
+    urVersion: UniversalRouterVersion = UniversalRouterVersion.V2_0
+  ): UniversalRouterCall {
+    // From V2.1.1 onwards the V2/V3 swap commands carry an extra minHopPriceX36 array,
+    // so the matching command definitions must be used to decode them correctly.
+    const commandDefinition = isAtLeastV2_1_1(urVersion)
+      ? { ...COMMAND_DEFINITION, ...V2V3_SWAP_COMMANDS_V2_1_1 }
+      : COMMAND_DEFINITION
+    const genericParser = new GenericCommandParser(commandDefinition, urVersion)
     const txDescription = CommandParser.INTERFACE.parseTransaction({ data: calldata })
     const { commands, inputs } = txDescription.args
     return genericParser.parse(commands, inputs)
@@ -43,7 +59,10 @@ export abstract class CommandParser {
 
 // Parses commands based on given command definition
 export class GenericCommandParser {
-  constructor(private readonly commandDefinition: CommandsDefinition) {}
+  constructor(
+    private readonly commandDefinition: CommandsDefinition,
+    private readonly urVersion: UniversalRouterVersion = UniversalRouterVersion.V2_0
+  ) {}
 
   public parse(commands: string, inputs: string[]): UniversalRouterCall {
     const commandTypes = GenericCommandParser.getCommands(commands)
@@ -53,7 +72,8 @@ export class GenericCommandParser {
         const commandDef = this.commandDefinition[commandType]
 
         if (commandDef.parser === Parser.V4Actions) {
-          const { actions } = V4BaseActionsParser.parseCalldata(inputs[i])
+          // UniversalRouterVersion and URVersion share identical string values; cast across the SDK boundary
+          const { actions } = V4BaseActionsParser.parseCalldata(inputs[i], this.urVersion as unknown as URVersion)
           return {
             commandName: CommandType[commandType],
             commandType,
