@@ -1,11 +1,14 @@
 import { expect } from 'chai'
-import { Token, WETH9 } from '@uniswap/sdk-core'
+import { Token, WETH9, CurrencyAmount, TradeType } from '@uniswap/sdk-core'
 import { encodeSqrtRatioX96, nearestUsableTick, TickMath } from '@uniswap/v3-sdk'
 import { ethers, BigNumber } from 'ethers'
-import { CommandParser, UniversalRouterCall } from '../../src/utils/commandParser'
+import { CommandParser, Param, UniversalRouterCall } from '../../src/utils/commandParser'
 import { RoutePlanner, CommandType } from '../../src/utils/routerCommands'
+import { UniversalRouterVersion } from '../../src/utils/constants'
 import { SwapRouter } from '../../src/swapRouter'
-import { V4Planner, Actions, Pool } from '@uniswap/v4-sdk'
+import { V4Planner, Actions, Pool, Route as V4Route, Trade as V4Trade } from '@uniswap/v4-sdk'
+import { Trade as RouterTrade } from '@uniswap/router-sdk'
+import { WETH, USDC as USDC_DATA, DAI, makeV4Pool, swapOptions } from './uniswapData'
 
 const addressOne = '0x0000000000000000000000000000000000000001'
 const addressTwo = '0x0000000000000000000000000000000000000002'
@@ -39,6 +42,7 @@ describe('Command Parser', () => {
   type ParserTest = {
     input: RoutePlanner
     result: UniversalRouterCall
+    version?: UniversalRouterVersion
   }
 
   const tests: ParserTest[] = [
@@ -273,6 +277,110 @@ describe('Command Parser', () => {
         ],
       },
     },
+    // V2.1.1 V3 exact-in carries the trailing minHopPriceX36 array and must round-trip through the decoder
+    {
+      version: UniversalRouterVersion.V2_1_1,
+      input: new RoutePlanner().addCommand(
+        CommandType.V3_SWAP_EXACT_IN,
+        [addressOne, amount, amount, encodePathExactInput([addressOne, addressTwo], 123), true, ['500', '600']],
+        false,
+        UniversalRouterVersion.V2_1_1
+      ),
+      result: {
+        commands: [
+          {
+            commandName: 'V3_SWAP_EXACT_IN',
+            commandType: CommandType.V3_SWAP_EXACT_IN,
+            params: [
+              { name: 'recipient', value: addressOne },
+              { name: 'amountIn', value: amount },
+              { name: 'amountOutMin', value: amount },
+              { name: 'path', value: [{ tokenIn: addressOne, tokenOut: addressTwo, fee: 123 }] },
+              { name: 'payerIsUser', value: true },
+              { name: 'minHopPriceX36', value: [BigNumber.from(500), BigNumber.from(600)] },
+            ],
+          },
+        ],
+      },
+    },
+    // V2.1.1 V3 exact-out
+    {
+      version: UniversalRouterVersion.V2_1_1,
+      input: new RoutePlanner().addCommand(
+        CommandType.V3_SWAP_EXACT_OUT,
+        [addressOne, amount, amount, encodePathExactOutput([addressOne, addressTwo], 123), true, ['750']],
+        false,
+        UniversalRouterVersion.V2_1_1
+      ),
+      result: {
+        commands: [
+          {
+            commandName: 'V3_SWAP_EXACT_OUT',
+            commandType: CommandType.V3_SWAP_EXACT_OUT,
+            params: [
+              { name: 'recipient', value: addressOne },
+              { name: 'amountOut', value: amount },
+              { name: 'amountInMax', value: amount },
+              { name: 'path', value: [{ tokenIn: addressOne, tokenOut: addressTwo, fee: 123 }] },
+              { name: 'payerIsUser', value: true },
+              { name: 'minHopPriceX36', value: [BigNumber.from(750)] },
+            ],
+          },
+        ],
+      },
+    },
+    // V2.1.1 V2 exact-in
+    {
+      version: UniversalRouterVersion.V2_1_1,
+      input: new RoutePlanner().addCommand(
+        CommandType.V2_SWAP_EXACT_IN,
+        [addressOne, amount, amount, [addressOne, addressTwo], true, ['500', '600']],
+        false,
+        UniversalRouterVersion.V2_1_1
+      ),
+      result: {
+        commands: [
+          {
+            commandName: 'V2_SWAP_EXACT_IN',
+            commandType: CommandType.V2_SWAP_EXACT_IN,
+            params: [
+              { name: 'recipient', value: addressOne },
+              { name: 'amountIn', value: amount },
+              { name: 'amountOutMin', value: amount },
+              { name: 'path', value: [addressOne, addressTwo] },
+              { name: 'payerIsUser', value: true },
+              { name: 'minHopPriceX36', value: [BigNumber.from(500), BigNumber.from(600)] },
+            ],
+          },
+        ],
+      },
+    },
+    // V2.1.1 V2 exact-out
+    {
+      version: UniversalRouterVersion.V2_1_1,
+      input: new RoutePlanner().addCommand(
+        CommandType.V2_SWAP_EXACT_OUT,
+        [addressOne, amount, amount, [addressOne, addressTwo], true, ['250']],
+        false,
+        UniversalRouterVersion.V2_1_1
+      ),
+      result: {
+        commands: [
+          {
+            commandName: 'V2_SWAP_EXACT_OUT',
+            commandType: CommandType.V2_SWAP_EXACT_OUT,
+            params: [
+              { name: 'recipient', value: addressOne },
+              { name: 'amountOut', value: amount },
+              { name: 'amountInMax', value: amount },
+              { name: 'path', value: [addressOne, addressTwo] },
+              { name: 'payerIsUser', value: true },
+              { name: 'minHopPriceX36', value: [BigNumber.from(250)] },
+            ],
+          },
+        ],
+      },
+    },
     {
       input: new RoutePlanner().addCommand(CommandType.V4_SWAP, [
         new V4Planner()
@@ -418,11 +526,76 @@ describe('Command Parser', () => {
       const functionSignature = 'execute(bytes,bytes[])'
       const calldata = SwapRouter.INTERFACE.encodeFunctionData(functionSignature, [commands, inputs])
 
-      const result = CommandParser.parseCalldata(calldata)
+      const result = CommandParser.parseCalldata(calldata, test.version)
       // Normalize BigNumbers in both objects for comparison
       expect(normalizeBigNumbers(result)).to.deep.equal(normalizeBigNumbers(test.result))
     })
   }
+
+  // V4 swaps are delegated to V4BaseActionsParser; the V2.1.1 minHopPriceX36 lives inside the
+  // swap action struct, so verify it survives a full round-trip through CommandParser.
+  describe('V4 per-hop slippage (V2.1.1)', () => {
+    const WETH_USDC_V4 = makeV4Pool(WETH, USDC_DATA)
+    const USDC_DAI_V4 = makeV4Pool(USDC_DATA, DAI)
+
+    it('surfaces minHopPriceX36 in the decoded V4_SWAP action', () => {
+      const v4Route = new V4Route([WETH_USDC_V4, USDC_DAI_V4], WETH, DAI)
+      const v4Trade = V4Trade.createUncheckedTrade({
+        route: v4Route,
+        inputAmount: CurrencyAmount.fromRawAmount(WETH, '1000000000000000000'),
+        outputAmount: CurrencyAmount.fromRawAmount(DAI, '1000000000000000000'),
+        tradeType: TradeType.EXACT_INPUT,
+      })
+      const trade = new RouterTrade({
+        v4Routes: [
+          {
+            routev4: v4Trade.route,
+            inputAmount: v4Trade.inputAmount,
+            outputAmount: v4Trade.outputAmount,
+            minHopPriceX36: [BigInt(1000), BigInt(2000)],
+          },
+        ],
+        tradeType: TradeType.EXACT_INPUT,
+      })
+
+      const { calldata } = SwapRouter.swapCallParameters(
+        trade,
+        swapOptions({ urVersion: UniversalRouterVersion.V2_1_1 })
+      )
+
+      const result = CommandParser.parseCalldata(calldata, UniversalRouterVersion.V2_1_1)
+      const v4Command = result.commands.find((c) => c.commandType === CommandType.V4_SWAP)
+      expect(v4Command, 'expected a V4_SWAP command').to.not.be.undefined
+
+      const swapAction = v4Command!.params.find((p) => p.name === 'SWAP_EXACT_IN')
+      expect(swapAction, 'expected a SWAP_EXACT_IN action').to.not.be.undefined
+
+      const swapStruct = (swapAction!.value as Param[]).find((p) => p.name === 'swap')!.value as any
+      expect(swapStruct.minHopPriceX36.map((v: BigNumber) => v.toString())).to.deep.equal(['1000', '2000'])
+    })
+
+    it('omits minHopPriceX36 when decoding the same V4 swap as V2_0', () => {
+      const v4Route = new V4Route([WETH_USDC_V4, USDC_DAI_V4], WETH, DAI)
+      const v4Trade = V4Trade.createUncheckedTrade({
+        route: v4Route,
+        inputAmount: CurrencyAmount.fromRawAmount(WETH, '1000000000000000000'),
+        outputAmount: CurrencyAmount.fromRawAmount(DAI, '1000000000000000000'),
+        tradeType: TradeType.EXACT_INPUT,
+      })
+      const trade = new RouterTrade({
+        v4Routes: [{ routev4: v4Trade.route, inputAmount: v4Trade.inputAmount, outputAmount: v4Trade.outputAmount }],
+        tradeType: TradeType.EXACT_INPUT,
+      })
+
+      const { calldata } = SwapRouter.swapCallParameters(trade, swapOptions({ urVersion: UniversalRouterVersion.V2_0 }))
+
+      const result = CommandParser.parseCalldata(calldata, UniversalRouterVersion.V2_0)
+      const v4Command = result.commands.find((c) => c.commandType === CommandType.V4_SWAP)!
+      const swapAction = v4Command.params.find((p) => p.name === 'SWAP_EXACT_IN')!
+      const swapStruct = (swapAction.value as Param[]).find((p) => p.name === 'swap')!.value as any
+      expect(swapStruct.minHopPriceX36).to.be.undefined
+    })
+  })
 })
 
 function encodePath(path: string[], fee: number): string {
