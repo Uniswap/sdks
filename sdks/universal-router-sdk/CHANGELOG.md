@@ -1,5 +1,20 @@
 # @uniswap/universal-router-sdk
 
+## 5.9.0
+
+### Minor Changes
+
+- d0718a9: Aligning our slippage tolerance equation around the same definition: slippage represents loss in output, not price worsening.
+
+### Patch Changes
+
+- f4f3a9e: Fix `CommandParser.parseCalldata` to decode the `minHopPriceX36` per-hop slippage parameter added in UniversalRouter V2.1.1. The decoder now accepts an optional `UniversalRouterVersion` (defaulting to `V2_0` for backwards compatibility) and uses the V2.1.1 V2/V3 swap command definitions plus the versioned V4 action parser so the trailing `minHopPriceX36` array is no longer silently dropped.
+- Updated dependencies [d0718a9]
+  - @uniswap/router-sdk@2.11.0
+  - @uniswap/v2-sdk@4.21.0
+  - @uniswap/v3-sdk@3.31.0
+  - @uniswap/v4-sdk@2.3.0
+
 ## 5.8.0
 
 ### Minor Changes
