@@ -23,8 +23,8 @@ export function computeEncodeSwapsAmounts(spec: NormalizedSwapSpecification): En
 
   if (spec.tradeType === TradeType.EXACT_INPUT) {
     const grossMinOrExactAmountOut = routingQuote
-      .mul(slippageDenominator)
-      .div(slippageDenominator.add(slippageNumerator))
+      .mul(slippageDenominator.sub(slippageNumerator))
+      .div(slippageDenominator)
 
     if (spec.fee?.kind === 'portion') {
       const feeAmount = isAtLeastV2_1_1(spec.urVersion)
