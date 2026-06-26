@@ -36,5 +36,8 @@ export * from './reads'
 export * from './availability'
 export * from './build'
 
+// Liquidity-lock recipients (timelock / fees-forwarder / buyback-burn)
+export * from './lock'
+
 // Formatting
 export * from './format'

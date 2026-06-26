@@ -19,6 +19,12 @@ export const NATIVE_CURRENCY_DECIMALS = 18
  */
 export const FUNDS_RECIPIENT_SENTINEL = '0x0000000000000000000000000000000000000001' as Address
 
+/**
+ * The canonical CREATE2 deployer (same address on every chain) used to deterministically deploy a
+ * per-launch liquidity-lock recipient. Calldata convention: `salt(32 bytes) ++ initCode`.
+ */
+export const CANONICAL_CREATE2_DEPLOYER = '0x4e59b44847b379578588920cA78FbF26c0B4956C' as Address
+
 /** 1e7 = 100%, the milli-percent (mps) denominator used across the launcher contracts. */
 export const MPS_TOTAL = 10_000_000
 

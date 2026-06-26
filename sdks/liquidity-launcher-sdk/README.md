@@ -140,6 +140,27 @@ const txs = buildLaunchTransactions({
 // → [{ to, data, value }] — add `from` / `chainId` / gas and submit.
 ```
 
+### Lock the migrated liquidity (timelock)
+
+After an auction migrates, its LP position can be sent to a per-launch **lock recipient** that holds
+the liquidity until a timelock expires. `buildLockRecipient` computes the recipient's deterministic
+CREATE2 address (bake it into `MigratorParameters.positionRecipient`) and the calldata to deploy it:
+
+```ts
+import { buildLockRecipient, getLauncherAddresses, computeLauncherSalt } from '@uniswap/liquidity-launcher-sdk'
+
+const { positionManager } = getLauncherAddresses(130)!
+const { predictedAddress, deployData } = buildLockRecipient({
+  mode: 'timelock', // or 'feesForwarder' | 'buybackBurn'
+  positionManager: positionManager!,
+  operator: poolOwner,
+  timelockBlockNumber: unlockBlock,
+  lockSalt: computeLauncherSalt(wallet, userSalt),
+})
+// predictedAddress → MigratorParameters.positionRecipient
+// deployData → send to the canonical CREATE2 deployer before migration
+```
+
 ## Supported chains
 
 `getLauncherAddresses(chainId)` returns the deployed stack, or `undefined` if the launcher isn't on
@@ -165,4 +186,5 @@ Config-derivation helpers throw [`LauncherSdkError`](./src/errors.ts) with a sta
 | `reads` | descriptor builders + viem helpers (`registeredPoolIdCall`, `slot0Call`, `predictTokenAddress`, `predictAuctionAddress`, allowance reads) |
 | `availability` | `getFeeTierAvailability` |
 | `build` | `buildLaunchTransactions`, `buildLaunchMulticall` |
+| `lock` | `buildLockRecipient` (timelock / fees-forwarder / buyback-burn liquidity locks) |
 | `format` | `formatFeePercent`, `formatTokenAmount` |

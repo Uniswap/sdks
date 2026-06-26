@@ -23,6 +23,11 @@ export interface LauncherAddresses {
    */
   uerc20Factory?: Address
   usuperc20Factory?: Address
+  /**
+   * Canonical Uniswap v4 PositionManager (source: sdk-core `v4PositionManagerAddress`). Liquidity-lock
+   * recipients hold migrated LP positions via this. Optional: lock is only offered where it's set.
+   */
+  positionManager?: Address
 }
 
 const PERMIT2 = getAddress('0x000000000022D473030F116dDEE9F6B43aC78BA3')
@@ -37,6 +42,14 @@ const TOKEN_SPLITTER = getAddress('0x8B7DCeb5639DB986FCf86606C74e6300C40FE3cd')
 const UERC20_FACTORY = getAddress('0x000000e200088D55C39a11F609E5F667729ad49b')
 const USUPERC20_FACTORY = getAddress('0xeEeeEEE204Afb6BABb1287ffed52cCD6BA0b0fb2')
 
+// Canonical Uniswap v4 PositionManager per chain (sdk-core CHAIN_TO_ADDRESSES_MAP[id].v4PositionManagerAddress).
+const POSITION_MANAGER_MAINNET = getAddress('0xbD216513d74C8cf14cf4747E6AaA6420FF64ee9e')
+const POSITION_MANAGER_UNICHAIN = getAddress('0x4529A01c7A0410167c5740C487A8DE60232617bf')
+const POSITION_MANAGER_BASE = getAddress('0x7C5f5A4bBd8fD63184577525326123B519429bDc')
+const POSITION_MANAGER_ARBITRUM = getAddress('0xd88F38F930b7952f2DB2432Cb002E7abbF3dD869')
+const POSITION_MANAGER_SEPOLIA = getAddress('0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4')
+const POSITION_MANAGER_BASE_SEPOLIA = getAddress('0x4B2C77d209D3405F41a037Ec6c77F7F5b8e2ca80')
+
 /** All deployed launcher stacks, keyed by numeric chain id. */
 export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   [SupportedChainId.MAINNET]: {
@@ -47,6 +60,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
     permit2: PERMIT2,
     uerc20Factory: UERC20_FACTORY,
     usuperc20Factory: USUPERC20_FACTORY,
+    positionManager: POSITION_MANAGER_MAINNET,
   },
   [SupportedChainId.UNICHAIN]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
@@ -55,6 +69,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
     usuperc20Factory: USUPERC20_FACTORY,
+    positionManager: POSITION_MANAGER_UNICHAIN,
   },
   [SupportedChainId.BASE]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
@@ -63,6 +78,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
     usuperc20Factory: USUPERC20_FACTORY,
+    positionManager: POSITION_MANAGER_BASE,
   },
   [SupportedChainId.ARBITRUM_ONE]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
@@ -71,6 +87,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
     uerc20Factory: UERC20_FACTORY,
+    positionManager: POSITION_MANAGER_ARBITRUM,
   },
   [SupportedChainId.SEPOLIA]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
@@ -79,6 +96,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
     uerc20Factory: UERC20_FACTORY,
+    positionManager: POSITION_MANAGER_SEPOLIA,
   },
   [SupportedChainId.BASE_SEPOLIA]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
@@ -87,6 +105,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
     usuperc20Factory: USUPERC20_FACTORY,
+    positionManager: POSITION_MANAGER_BASE_SEPOLIA,
   },
 }
 
