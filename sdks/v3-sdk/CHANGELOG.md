@@ -1,5 +1,11 @@
 # @uniswap/v3-sdk
 
+## 3.31.0
+
+### Minor Changes
+
+- d0718a9: Aligning our slippage tolerance equation around the same definition: slippage represents loss in output, not price worsening.
+
 ## 3.30.5
 
 ### Patch Changes
