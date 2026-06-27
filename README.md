@@ -2,6 +2,10 @@
 
 A repository for many Uniswap SDK's. All SDK's can be found in `sdk/` and have more information in their individual README's.
 
+## Web Analytics
+
+This repository has Vercel Web Analytics configured and ready for integration. See [`docs/VERCEL_ANALYTICS.md`](docs/VERCEL_ANALYTICS.md) for integration instructions when adding web applications to this monorepo.
+
 ## Development Commands
 
 ```markdown
