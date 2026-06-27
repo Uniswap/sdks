@@ -293,12 +293,14 @@ const FEED_INFO_TYPE =
 const FEED_INFO_TYPE_HASH = ethers.utils.keccak256(
   ethers.utils.toUtf8Bytes(FEED_INFO_TYPE)
 );
-
-/**
- * EIP-712 type string for PrivateIntent
- */
-const PRIVATE_INTENT_TYPE =
-  "PrivateIntent(uint256 totalAmount,uint256 exactFrequency," +
+function hashFeedInfoArray(feeds: FeedInfo[]): string {
+  const hashes = feeds.map(hashFeedInfo);
+  if (hashes.length === 0) {
+    return ethers.utils.keccak256("0x");
+  }
+  const types = new Array(hashes.length).fill("bytes32");
+  return ethers.utils.keccak256(ethers.utils.solidityPack(types, hashes));
+}
   "uint256 numChunks,bytes32 salt,FeedInfo[] oracleFeeds)" +
   FEED_INFO_TYPE;
 
