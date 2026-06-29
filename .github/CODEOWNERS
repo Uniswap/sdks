@@ -15,3 +15,8 @@ sdks/v4-sdk/ @Uniswap/swap-be
 # Last match wins — allows swap-be to approve version-only changes
 **/package.json @Uniswap/swap-be
 **/CHANGELOG.md @Uniswap/swap-be
+
+# Teams that own their own version bumps (last match wins, so these override the
+# repo-wide version-file rules above for their package only).
+sdks/liquidity-launcher-sdk/package.json @Uniswap/apps-lp
+sdks/liquidity-launcher-sdk/CHANGELOG.md @Uniswap/apps-lp
