@@ -40,6 +40,28 @@
         "typescript": "npm:typescript@^5.6.2",
       },
     },
+    "sdks/liquidity-launcher-sdk": {
+      "name": "@uniswap/liquidity-launcher-sdk",
+      "version": "0.0.0",
+      "dependencies": {
+        "@uniswap/sdk-core": "workspace:*",
+        "@uniswap/v3-sdk": "workspace:*",
+        "@uniswap/v4-sdk": "workspace:*",
+        "jsbi": "^3.1.4",
+        "viem": "^2.23.5",
+      },
+      "devDependencies": {
+        "@types/node": "^18.7.16",
+        "@typescript-eslint/eslint-plugin": "^8.38.0",
+        "@typescript-eslint/parser": "^8.38.0",
+        "eslint": "^8.57.0",
+        "eslint-config-prettier": "^9.1.0",
+        "eslint-plugin-import": "^2.22.0",
+        "prettier": "^2.4.1",
+        "tslib": "^2.3.0",
+        "typescript": "npm:typescript@^5.6.2",
+      },
+    },
     "sdks/permit2-sdk": {
       "name": "@uniswap/permit2-sdk",
       "version": "1.4.0",
@@ -60,7 +82,7 @@
     },
     "sdks/router-sdk": {
       "name": "@uniswap/router-sdk",
-      "version": "2.7.2",
+      "version": "2.10.5",
       "dependencies": {
         "@ethersproject/abi": "^5.5.0",
         "@ethersproject/solidity": "^5.0.9",
@@ -86,7 +108,7 @@
     },
     "sdks/sdk-core": {
       "name": "@uniswap/sdk-core",
-      "version": "7.12.2",
+      "version": "7.18.0",
       "dependencies": {
         "@ethersproject/address": "^5.0.2",
         "@ethersproject/bignumber": "^5.5.0",
@@ -116,7 +138,7 @@
     },
     "sdks/smart-wallet-sdk": {
       "name": "@uniswap/smart-wallet-sdk",
-      "version": "2.5.1",
+      "version": "2.6.6",
       "dependencies": {
         "@uniswap/sdk-core": "workspace:~",
         "viem": "^2.23.5",
@@ -155,7 +177,7 @@
     },
     "sdks/uniswapx-sdk": {
       "name": "@uniswap/uniswapx-sdk",
-      "version": "3.0.1",
+      "version": "3.0.10",
       "dependencies": {
         "@ethersproject/abi": "^5.5.0",
         "@ethersproject/bytes": "^5.7.0",
@@ -213,7 +235,7 @@
     },
     "sdks/universal-router-sdk": {
       "name": "@uniswap/universal-router-sdk",
-      "version": "4.34.1",
+      "version": "5.8.0",
       "dependencies": {
         "@ethersproject/abi": "^5.5.0",
         "@ethersproject/abstract-signer": "^5.7.0",
@@ -250,7 +272,7 @@
     },
     "sdks/v2-sdk": {
       "name": "@uniswap/v2-sdk",
-      "version": "4.19.2",
+      "version": "4.20.5",
       "dependencies": {
         "@ethersproject/address": "^5.0.2",
         "@ethersproject/bignumber": "^5.5.0",
@@ -278,7 +300,7 @@
     },
     "sdks/v3-sdk": {
       "name": "@uniswap/v3-sdk",
-      "version": "3.29.2",
+      "version": "3.30.5",
       "dependencies": {
         "@ethersproject/abi": "^5.5.0",
         "@ethersproject/abstract-signer": "^5.7.0",
@@ -310,7 +332,7 @@
     },
     "sdks/v4-sdk": {
       "name": "@uniswap/v4-sdk",
-      "version": "1.29.2",
+      "version": "2.2.3",
       "dependencies": {
         "@ethersproject/abi": "^5.5.0",
         "@ethersproject/abstract-signer": "^5.7.0",
@@ -907,6 +929,8 @@
     "@uniswap/flashtestations-sdk": ["@uniswap/flashtestations-sdk@workspace:sdks/flashtestations-sdk"],
 
     "@uniswap/lib": ["@uniswap/lib@4.0.1-alpha", "", {}, "sha512-f6UIliwBbRsgVLxIaBANF6w09tYqc6Y/qXdsrbEmXHyFA7ILiKrIwRFXe1yOg8M3cksgVsO9N7yuL2DdCGQKBA=="],
+
+    "@uniswap/liquidity-launcher-sdk": ["@uniswap/liquidity-launcher-sdk@workspace:sdks/liquidity-launcher-sdk"],
 
     "@uniswap/permit2-sdk": ["@uniswap/permit2-sdk@workspace:sdks/permit2-sdk"],
 

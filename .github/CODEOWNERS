@@ -1,4 +1,5 @@
 sdks/flashtestations-sdk/ @Uniswap/Unichain
+sdks/liquidity-launcher-sdk/ @Uniswap/apps-lp
 sdks/permit2-sdk/ @Uniswap/swap-be
 sdks/router-sdk/ @Uniswap/swap-be
 sdks/sdk-core/ @Uniswap/swap-be
