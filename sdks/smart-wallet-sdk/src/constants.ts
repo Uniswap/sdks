@@ -40,6 +40,7 @@ export enum SupportedChainIds {
  */
 export enum SmartWalletVersion {
   LATEST = 'latest',
+  v1_1_0 = 'v1.1.0',
   v1_0_0 = 'v1.0.0',
   v1_0_0_staging = 'v1.0.0-staging',
 }
@@ -49,60 +50,76 @@ type SmartWalletVersionMap = Partial<{ [_version in SmartWalletVersion]: `0x${st
   [SmartWalletVersion.LATEST]: `0x${string}`
 }
 
+// Canonical addresses are the same across all chains (deterministic deployment)
+const CANONICAL_V1_1_0_ADDRESS: `0x${string}` = '0x000000005c84F8Fd50b21CAC312528A64437030e'
+const CANONICAL_V1_0_0_ADDRESS: `0x${string}` = '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00'
+const CANONICAL_V1_0_0_STAGING_ADDRESS: `0x${string}` = '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5'
+
 /**
  * Smart wallet versions for supported chains
  */
 export const SMART_WALLET_VERSIONS: { [_chainId in SupportedChainIds]: SmartWalletVersionMap } = {
   [SupportedChainIds.MAINNET]: {
-    [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
-    [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
-    [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+    [SmartWalletVersion.LATEST]: CANONICAL_V1_1_0_ADDRESS,
+    [SmartWalletVersion.v1_1_0]: CANONICAL_V1_1_0_ADDRESS,
+    [SmartWalletVersion.v1_0_0]: CANONICAL_V1_0_0_ADDRESS,
+    [SmartWalletVersion.v1_0_0_staging]: CANONICAL_V1_0_0_STAGING_ADDRESS,
   },
   [SupportedChainIds.UNICHAIN]: {
-    [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
-    [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
-    [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+    [SmartWalletVersion.LATEST]: CANONICAL_V1_1_0_ADDRESS,
+    [SmartWalletVersion.v1_1_0]: CANONICAL_V1_1_0_ADDRESS,
+    [SmartWalletVersion.v1_0_0]: CANONICAL_V1_0_0_ADDRESS,
+    [SmartWalletVersion.v1_0_0_staging]: CANONICAL_V1_0_0_STAGING_ADDRESS,
   },
   [SupportedChainIds.BASE]: {
-    [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
-    [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
-    [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+    [SmartWalletVersion.LATEST]: CANONICAL_V1_1_0_ADDRESS,
+    [SmartWalletVersion.v1_1_0]: CANONICAL_V1_1_0_ADDRESS,
+    [SmartWalletVersion.v1_0_0]: CANONICAL_V1_0_0_ADDRESS,
+    [SmartWalletVersion.v1_0_0_staging]: CANONICAL_V1_0_0_STAGING_ADDRESS,
   },
   [SupportedChainIds.OPTIMISM]: {
-    [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
-    [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
-    [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+    [SmartWalletVersion.LATEST]: CANONICAL_V1_1_0_ADDRESS,
+    [SmartWalletVersion.v1_1_0]: CANONICAL_V1_1_0_ADDRESS,
+    [SmartWalletVersion.v1_0_0]: CANONICAL_V1_0_0_ADDRESS,
+    [SmartWalletVersion.v1_0_0_staging]: CANONICAL_V1_0_0_STAGING_ADDRESS,
   },
   [SupportedChainIds.BNB]: {
-    [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
-    [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
-    [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+    [SmartWalletVersion.LATEST]: CANONICAL_V1_1_0_ADDRESS,
+    [SmartWalletVersion.v1_1_0]: CANONICAL_V1_1_0_ADDRESS,
+    [SmartWalletVersion.v1_0_0]: CANONICAL_V1_0_0_ADDRESS,
+    [SmartWalletVersion.v1_0_0_staging]: CANONICAL_V1_0_0_STAGING_ADDRESS,
   },
   [SupportedChainIds.ARBITRUM_ONE]: {
-    [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
-    [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
+    [SmartWalletVersion.LATEST]: CANONICAL_V1_1_0_ADDRESS,
+    [SmartWalletVersion.v1_1_0]: CANONICAL_V1_1_0_ADDRESS,
+    [SmartWalletVersion.v1_0_0]: CANONICAL_V1_0_0_ADDRESS,
   },
   [SupportedChainIds.UNICHAIN_SEPOLIA]: {
-    [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
-    [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
-    [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+    [SmartWalletVersion.LATEST]: CANONICAL_V1_1_0_ADDRESS,
+    [SmartWalletVersion.v1_1_0]: CANONICAL_V1_1_0_ADDRESS,
+    [SmartWalletVersion.v1_0_0]: CANONICAL_V1_0_0_ADDRESS,
+    [SmartWalletVersion.v1_0_0_staging]: CANONICAL_V1_0_0_STAGING_ADDRESS,
   },
   [SupportedChainIds.SEPOLIA]: {
-    [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
-    [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
-    [SmartWalletVersion.v1_0_0_staging]: '0x3cbad1e3b9049ecdb9588fb48dd61d80faf41bd5',
+    [SmartWalletVersion.LATEST]: CANONICAL_V1_1_0_ADDRESS,
+    [SmartWalletVersion.v1_1_0]: CANONICAL_V1_1_0_ADDRESS,
+    [SmartWalletVersion.v1_0_0]: CANONICAL_V1_0_0_ADDRESS,
+    [SmartWalletVersion.v1_0_0_staging]: CANONICAL_V1_0_0_STAGING_ADDRESS,
   },
   [SupportedChainIds.XLAYER]: {
-    [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
-    [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
+    [SmartWalletVersion.LATEST]: CANONICAL_V1_1_0_ADDRESS,
+    [SmartWalletVersion.v1_1_0]: CANONICAL_V1_1_0_ADDRESS,
+    [SmartWalletVersion.v1_0_0]: CANONICAL_V1_0_0_ADDRESS,
   },
   [SupportedChainIds.ARC]: {
-    [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
-    [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
+    [SmartWalletVersion.LATEST]: CANONICAL_V1_1_0_ADDRESS,
+    [SmartWalletVersion.v1_1_0]: CANONICAL_V1_1_0_ADDRESS,
+    [SmartWalletVersion.v1_0_0]: CANONICAL_V1_0_0_ADDRESS,
   },
   [SupportedChainIds.ROBINHOOD]: {
-    [SmartWalletVersion.LATEST]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
-    [SmartWalletVersion.v1_0_0]: '0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00',
+    [SmartWalletVersion.LATEST]: CANONICAL_V1_1_0_ADDRESS,
+    [SmartWalletVersion.v1_1_0]: CANONICAL_V1_1_0_ADDRESS,
+    [SmartWalletVersion.v1_0_0]: CANONICAL_V1_0_0_ADDRESS,
   },
 }
 
