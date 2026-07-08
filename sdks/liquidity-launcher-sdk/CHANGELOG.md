@@ -1,5 +1,11 @@
 # @uniswap/liquidity-launcher-sdk
 
+## 0.2.0
+
+### Minor Changes
+
+- 437605c: Add Avalanche (43114), XLayer (196), and Robinhood Chain (4663) to the supported launch chains, all carrying the canonical uERC20 factory. Robinhood is intentionally omitted from `BLOCK_TIME_SECONDS_BY_CHAIN` — like Arbitrum, its contract-visible `block.number` tracks Ethereum L1 (~12s).
+
 ## 0.1.0
 
 ### Minor Changes
