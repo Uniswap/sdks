@@ -44,8 +44,14 @@ describe('selectTokenFactory', () => {
     expect(selectTokenFactory(addresses)).toEqual({ factory: addresses.usuperc20Factory!, kind: 'usuperc20' })
   })
 
-  it('returns undefined when the chain deploys neither factory (Avalanche)', () => {
+  it('selects the uERC20 factory on the 2026-07 launch chains', () => {
     const addresses = getLauncherAddresses(SupportedChainId.AVALANCHE)!
-    expect(selectTokenFactory(addresses)).toBeUndefined()
+    expect(selectTokenFactory(addresses)).toEqual({ factory: addresses.uerc20Factory!, kind: 'uerc20' })
+  })
+
+  it('returns undefined when a chain deploys neither factory', () => {
+    const { uerc20Factory: _u, usuperc20Factory: _s, ...withoutFactories } =
+      getLauncherAddresses(SupportedChainId.ROBINHOOD)!
+    expect(selectTokenFactory(withoutFactories)).toBeUndefined()
   })
 })

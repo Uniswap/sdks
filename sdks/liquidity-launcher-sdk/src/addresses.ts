@@ -99,6 +99,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
+    uerc20Factory: UERC20_FACTORY,
     positionManager: POSITION_MANAGER_AVALANCHE,
   },
   [SupportedChainId.XLAYER]: {
@@ -107,6 +108,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
+    uerc20Factory: UERC20_FACTORY,
     positionManager: POSITION_MANAGER_XLAYER,
   },
   [SupportedChainId.ROBINHOOD]: {
