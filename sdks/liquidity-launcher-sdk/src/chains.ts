@@ -8,6 +8,9 @@ export enum SupportedChainId {
   UNICHAIN = 130,
   BASE = 8453,
   ARBITRUM_ONE = 42161,
+  AVALANCHE = 43114,
+  XLAYER = 196,
+  ROBINHOOD = 4663,
   SEPOLIA = 11155111,
   BASE_SEPOLIA = 84532,
 }
