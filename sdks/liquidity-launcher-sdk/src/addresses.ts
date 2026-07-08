@@ -18,8 +18,9 @@ export interface LauncherAddresses {
   permit2: Address
   /**
    * Registered token factories the new-token path may target. Ethereum-style chains carry a uERC20
-   * factory; superchains carry a super-uERC20 factory. A chain has at least one (mainnet has both);
-   * both are optional so superchain-only and Ethereum-only chains can each omit the one they lack.
+   * factory; superchains carry a super-uERC20 factory (mainnet has both). Both are optional: chains
+   * that deploy neither support launches with pre-existing tokens only ({@link selectTokenFactory}
+   * returns `undefined` there).
    */
   uerc20Factory?: Address
   usuperc20Factory?: Address
@@ -47,6 +48,9 @@ const POSITION_MANAGER_MAINNET = getAddress('0xbD216513d74C8cf14cf4747E6AaA6420F
 const POSITION_MANAGER_UNICHAIN = getAddress('0x4529A01c7A0410167c5740C487A8DE60232617bf')
 const POSITION_MANAGER_BASE = getAddress('0x7C5f5A4bBd8fD63184577525326123B519429bDc')
 const POSITION_MANAGER_ARBITRUM = getAddress('0xd88F38F930b7952f2DB2432Cb002E7abbF3dD869')
+const POSITION_MANAGER_AVALANCHE = getAddress('0xB74b1F14d2754AcfcbBe1a221023a5cf50Ab8ACD')
+const POSITION_MANAGER_XLAYER = getAddress('0xcF1EAFC6928dC385A342E7C6491d371d2871458b')
+const POSITION_MANAGER_ROBINHOOD = getAddress('0x58daec3116aae6D93017bAAea7749052E8a04fA7')
 const POSITION_MANAGER_SEPOLIA = getAddress('0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4')
 const POSITION_MANAGER_BASE_SEPOLIA = getAddress('0x4B2C77d209D3405F41a037Ec6c77F7F5b8e2ca80')
 
@@ -88,6 +92,33 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
     permit2: PERMIT2,
     uerc20Factory: UERC20_FACTORY,
     positionManager: POSITION_MANAGER_ARBITRUM,
+  },
+  [SupportedChainId.AVALANCHE]: {
+    liquidityLauncher: LIQUIDITY_LAUNCHER,
+    lbpStrategy: getAddress('0xcAcd77134b072b4AD5621f585b0b422C6Da4E000'),
+    tokenSplitter: TOKEN_SPLITTER,
+    ccaFactory: CCA_FACTORY,
+    permit2: PERMIT2,
+    uerc20Factory: UERC20_FACTORY,
+    positionManager: POSITION_MANAGER_AVALANCHE,
+  },
+  [SupportedChainId.XLAYER]: {
+    liquidityLauncher: LIQUIDITY_LAUNCHER,
+    lbpStrategy: getAddress('0x95bcb80e3804a085d23778F2956c305d6488e000'),
+    tokenSplitter: TOKEN_SPLITTER,
+    ccaFactory: CCA_FACTORY,
+    permit2: PERMIT2,
+    uerc20Factory: UERC20_FACTORY,
+    positionManager: POSITION_MANAGER_XLAYER,
+  },
+  [SupportedChainId.ROBINHOOD]: {
+    liquidityLauncher: LIQUIDITY_LAUNCHER,
+    lbpStrategy: getAddress('0x095e38a2135aeBcfFa98A5B6911591937f912000'),
+    tokenSplitter: TOKEN_SPLITTER,
+    ccaFactory: CCA_FACTORY,
+    permit2: PERMIT2,
+    uerc20Factory: UERC20_FACTORY,
+    positionManager: POSITION_MANAGER_ROBINHOOD,
   },
   [SupportedChainId.SEPOLIA]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,

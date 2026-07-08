@@ -66,14 +66,17 @@ export const DEFAULT_BLOCK_TIME_SECONDS = 12
 
 /**
  * Approximate block time (seconds) per chain, used to convert auction start/end times to blocks.
- * Chains without an entry fall back to {@link DEFAULT_BLOCK_TIME_SECONDS}. Arbitrum is intentionally
- * omitted: its `block.number` tracks the L1 block cadence (~12s), which the default already matches.
+ * Chains without an entry fall back to {@link DEFAULT_BLOCK_TIME_SECONDS}. Arbitrum and Robinhood
+ * (an Arbitrum Orbit chain) are intentionally omitted: their contract-visible `block.number` tracks
+ * the Ethereum L1 block cadence (~12s), which the default already matches.
  */
 export const BLOCK_TIME_SECONDS_BY_CHAIN: Record<number, number> = {
   1: 12, // mainnet
   130: 1, // unichain
+  196: 1, // xlayer
   1301: 1, // unichain sepolia
   8453: 2, // base
+  43114: 1, // avalanche
   84532: 2, // base sepolia
   11155111: 12, // sepolia
 }
