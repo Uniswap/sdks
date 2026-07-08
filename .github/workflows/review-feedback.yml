@@ -63,7 +63,7 @@ jobs:
           # Same fallback shape as claude-code-review.yml — the repo
           # variable is the authoritative pin; this only matters if
           # it's unset.
-          version: ${{ vars.REVIEW_CLI_VERSION || '1.3.1' }}
+          version: ${{ vars.REVIEW_CLI_VERSION || '1.6.0' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       # SINCE_DAYS goes through `env:` rather than being interpolated
