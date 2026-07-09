@@ -36,6 +36,9 @@ const PERMIT2 = getAddress('0x000000000022D473030F116dDEE9F6B43aC78BA3')
 // Deployed at the same CREATE2 address on every supported chain.
 const LIQUIDITY_LAUNCHER = getAddress('0x00004c4ccc709Ef590F7C81102C0689F0263D4e9')
 const CCA_FACTORY = getAddress('0x00cCa200BF124dBfA848937c553864f4B4CE0632')
+// Robinhood-only redeploy (2026-07-09): CCA factory rebuilt against a blocknumberish that also
+// recognizes chain 4663 (the original deployment only substituted arbBlockNumber on Arbitrum One).
+const CCA_FACTORY_ROBINHOOD = getAddress('0x000000001F26a0044BaA66024e7b6599c61963F8')
 const TOKEN_SPLITTER = getAddress('0x8B7DCeb5639DB986FCf86606C74e6300C40FE3cd')
 
 // Token factories, split by token standard. The uERC20 factory shares a CREATE2 address across the
@@ -113,9 +116,10 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   },
   [SupportedChainId.ROBINHOOD]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0x095e38a2135aeBcfFa98A5B6911591937f912000'),
+    // Redeployed 2026-07-09 alongside CCA_FACTORY_ROBINHOOD (blocknumberish-aware).
+    lbpStrategy: getAddress('0x843747f4c08E3393E55508F577296bA48E8Ca000'),
     tokenSplitter: TOKEN_SPLITTER,
-    ccaFactory: CCA_FACTORY,
+    ccaFactory: CCA_FACTORY_ROBINHOOD,
     permit2: PERMIT2,
     uerc20Factory: UERC20_FACTORY,
     positionManager: POSITION_MANAGER_ROBINHOOD,

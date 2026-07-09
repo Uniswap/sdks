@@ -75,10 +75,13 @@ export const DEFAULT_BLOCK_TIME_SECONDS = 12
  *
  * Arbitrum One and Robinhood are Arbitrum L2s whose block clock ticks sub-second, so they need
  * explicit entries. NOTE: Robinhood is an Orbit chain where `block.number` diverges from its L2
- * height; the on-chain `blocknumberish` library only substitutes `arbBlockNumber` for Arbitrum
- * One's chain id today, so Robinhood's CCA/LBPStrategy must be redeployed against a blocknumberish
- * that also recognizes Robinhood before this value takes effect — keep Robinhood launches gated
- * until then. Chains without an entry fall back to {@link DEFAULT_BLOCK_TIME_SECONDS}.
+ * height; the original on-chain `blocknumberish` library only substituted `arbBlockNumber` for
+ * Arbitrum One's chain id, so Robinhood's CCA/LBPStrategy were redeployed on 2026-07-09 against a
+ * blocknumberish that also recognizes Robinhood (CCA factory
+ * 0x000000001F26a0044BaA66024e7b6599c61963F8, LBPStrategy
+ * 0x843747f4c08E3393E55508F577296bA48E8Ca000 — the chain-4663 entries in addresses.ts). This value
+ * takes effect on those redeployed contracts. Chains without an entry fall back to
+ * {@link DEFAULT_BLOCK_TIME_SECONDS}.
  *
  * Values are approximate by nature (a chain's real cadence drifts), and non-integer entries like
  * `0.1` aren't exactly representable in IEEE-754 — both are absorbed by `deriveBlocks`, which
@@ -89,7 +92,7 @@ export const BLOCK_TIME_SECONDS_BY_CHAIN: Record<number, number> = {
   130: 1, // unichain
   196: 1, // xlayer
   1301: 1, // unichain sepolia
-  4663: 0.1, // robinhood (arbitrum orbit) — L2 arbBlockNumber cadence; needs blocknumberish support on-chain
+  4663: 0.1, // robinhood (arbitrum orbit) — L2 arbBlockNumber cadence (blocknumberish-aware contracts redeployed 2026-07-09)
   8453: 2, // base
   42161: 0.25, // arbitrum one — L2 arbBlockNumber cadence (NOT the L1 block.number ~12s)
   43114: 1, // avalanche
