@@ -5,31 +5,31 @@ import { SwapStep } from '../types/encodeSwaps'
 import { encodeV4Action } from './encodeV4Action'
 import { toV4URVersion } from './toV4URVersion'
 
-// V2/V3 swap params hardcode payerIsUser=false; encodeSwaps pulls funds into the router first via PERMIT2_TRANSFER_FROM
+// payerIsUser defaults to false (router custody); validateEncodeSwaps gates when true is allowed
 export function encodeSwapStep(planner: RoutePlanner, step: SwapStep, urVersion?: UniversalRouterVersion): void {
   const useV2_1_1 = isAtLeastV2_1_1(urVersion)
 
   switch (step.type) {
     case 'V2_SWAP_EXACT_IN': {
-      const params: any[] = [step.recipient, step.amountIn, step.amountOutMin, step.path, false]
+      const params: any[] = [step.recipient, step.amountIn, step.amountOutMin, step.path, step.payerIsUser ?? false]
       if (useV2_1_1) params.push(step.minHopPriceX36 ?? [])
       planner.addCommand(CommandType.V2_SWAP_EXACT_IN, params, false, urVersion)
       return
     }
     case 'V2_SWAP_EXACT_OUT': {
-      const params: any[] = [step.recipient, step.amountOut, step.amountInMax, step.path, false]
+      const params: any[] = [step.recipient, step.amountOut, step.amountInMax, step.path, step.payerIsUser ?? false]
       if (useV2_1_1) params.push(step.minHopPriceX36 ?? [])
       planner.addCommand(CommandType.V2_SWAP_EXACT_OUT, params, false, urVersion)
       return
     }
     case 'V3_SWAP_EXACT_IN': {
-      const params: any[] = [step.recipient, step.amountIn, step.amountOutMin, step.path, false]
+      const params: any[] = [step.recipient, step.amountIn, step.amountOutMin, step.path, step.payerIsUser ?? false]
       if (useV2_1_1) params.push(step.minHopPriceX36 ?? [])
       planner.addCommand(CommandType.V3_SWAP_EXACT_IN, params, false, urVersion)
       return
     }
     case 'V3_SWAP_EXACT_OUT': {
-      const params: any[] = [step.recipient, step.amountOut, step.amountInMax, step.path, false]
+      const params: any[] = [step.recipient, step.amountOut, step.amountInMax, step.path, step.payerIsUser ?? false]
       if (useV2_1_1) params.push(step.minHopPriceX36 ?? [])
       planner.addCommand(CommandType.V3_SWAP_EXACT_OUT, params, false, urVersion)
       return

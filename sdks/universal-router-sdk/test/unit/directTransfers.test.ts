@@ -195,4 +195,56 @@ describe('allowDirectTransfers', () => {
       expect(normalizeEncodeSwapsSpec(spec).allowDirectTransfers).to.equal(true)
     })
   })
+
+  describe('encodeSwapStep payerIsUser threading', () => {
+    let planner: RoutePlanner
+
+    beforeEach(() => {
+      planner = new RoutePlanner()
+    })
+
+    it('encodes V3 exact-in payerIsUser=true', () => {
+      encodeSwapStep(planner, buildV3ExactInStep({ payerIsUser: true }), UniversalRouterVersion.V2_0)
+      const decoded = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], planner.inputs[0])
+      expect(decoded[4]).to.equal(true)
+    })
+
+    it('defaults V3 exact-in payerIsUser to false', () => {
+      encodeSwapStep(planner, buildV3ExactInStep(), UniversalRouterVersion.V2_0)
+      const decoded = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], planner.inputs[0])
+      expect(decoded[4]).to.equal(false)
+    })
+
+    it('encodes V3 exact-out payerIsUser=true', () => {
+      encodeSwapStep(planner, buildV3ExactOutStep({ payerIsUser: true }), UniversalRouterVersion.V2_0)
+      const decoded = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], planner.inputs[0])
+      expect(decoded[4]).to.equal(true)
+    })
+
+    it('encodes V2 exact-in payerIsUser=true', () => {
+      encodeSwapStep(planner, buildV2ExactInStep({ payerIsUser: true }), UniversalRouterVersion.V2_0)
+      const decoded = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'address[]', 'bool'], planner.inputs[0])
+      expect(decoded[4]).to.equal(true)
+    })
+
+    it('encodes V2 exact-out payerIsUser=true', () => {
+      encodeSwapStep(planner, buildV2ExactOutStep({ payerIsUser: true }), UniversalRouterVersion.V2_0)
+      const decoded = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'address[]', 'bool'], planner.inputs[0])
+      expect(decoded[4]).to.equal(true)
+    })
+
+    it('encodes payerIsUser=true alongside minHopPriceX36 on UR 2.1.1', () => {
+      encodeSwapStep(
+        planner,
+        buildV3ExactInStep({ payerIsUser: true, minHopPriceX36: ['123'] }),
+        UniversalRouterVersion.V2_1_1
+      )
+      const decoded = defaultAbiCoder.decode(
+        ['address', 'uint256', 'uint256', 'bytes', 'bool', 'uint256[]'],
+        planner.inputs[0]
+      )
+      expect(decoded[4]).to.equal(true)
+      expect(decoded[5][0].toString()).to.equal('123')
+    })
+  })
 })
