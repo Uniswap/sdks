@@ -13,6 +13,7 @@ import {
   V2SwapExactOut,
   V3SwapExactIn,
   V3SwapExactOut,
+  V4Settle,
   V4Swap,
 } from '../../src/types/encodeSwaps'
 import { encodeSwapStep } from '../../src/utils/encodeSwapStep'
@@ -140,7 +141,7 @@ function buildV2ExactOutStep(overrides: Partial<V2SwapExactOut> = {}): V2SwapExa
   }
 }
 
-function buildV4SettleSwap(settleOverrides: Record<string, unknown> = {}): V4Swap {
+function buildV4SettleSwap(settleOverrides: Partial<V4Settle> = {}): V4Swap {
   return {
     type: 'V4_SWAP',
     v4Actions: [
@@ -158,7 +159,7 @@ function buildV4SettleSwap(settleOverrides: Record<string, unknown> = {}): V4Swa
         amountOutMinimum: '0',
         hookData: '0x',
       },
-      { action: 'SETTLE', currency: USDC.address, amount: '1000000', ...settleOverrides } as any,
+      { action: 'SETTLE', currency: USDC.address, amount: '1000000', ...settleOverrides },
       { action: 'TAKE', currency: WETH.address, recipient: ROUTER_AS_RECIPIENT, amount: '0' },
     ],
   }
@@ -233,6 +234,12 @@ describe('allowDirectTransfers', () => {
       expect(decoded[4]).to.equal(true)
     })
 
+    it('defaults V2 exact-out payerIsUser to false', () => {
+      encodeSwapStep(planner, buildV2ExactOutStep(), UniversalRouterVersion.V2_0)
+      const decoded = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'address[]', 'bool'], planner.inputs[0])
+      expect(decoded[4]).to.equal(false)
+    })
+
     it('encodes payerIsUser=true alongside minHopPriceX36 on UR 2.1.1', () => {
       encodeSwapStep(
         planner,
@@ -245,6 +252,32 @@ describe('allowDirectTransfers', () => {
       )
       expect(decoded[4]).to.equal(true)
       expect(decoded[5][0].toString()).to.equal('123')
+    })
+  })
+
+  describe('encodeV4Action SETTLE payerIsUser threading', () => {
+    it('encodes SETTLE payerIsUser=true', () => {
+      const { params } = encodeV4Action(
+        { action: 'SETTLE', currency: USDC.address, amount: '1000000', payerIsUser: true },
+        UniversalRouterVersion.V2_1_1
+      )
+      expect(params[2]).to.equal(true)
+    })
+
+    it('defaults SETTLE payerIsUser to false', () => {
+      const { params } = encodeV4Action(
+        { action: 'SETTLE', currency: USDC.address, amount: '1000000' },
+        UniversalRouterVersion.V2_1_1
+      )
+      expect(params[2]).to.equal(false)
+    })
+
+    it('round-trips SETTLE payerIsUser=true through V4_SWAP calldata', () => {
+      const planner = new RoutePlanner()
+      encodeSwapStep(planner, buildV4SettleSwap({ payerIsUser: true }), UniversalRouterVersion.V2_1_1)
+      const parsed = V4BaseActionsParser.parseCalldata(planner.inputs[0], URVersion.V2_1_1)
+      // action order: SWAP_EXACT_IN_SINGLE, SETTLE, TAKE
+      expect(parsed.actions[1].params[2].value).to.equal(true)
     })
   })
 })

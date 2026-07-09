@@ -668,7 +668,7 @@ describe('encodeSwaps', () => {
       expect(action.minHopPriceX36.toString()).to.equal('123456')
     })
 
-    it('hardcodes V4 SETTLE payerIsUser to false', () => {
+    it('defaults V4 SETTLE payerIsUser to false', () => {
       const step: V4Swap = {
         type: 'V4_SWAP',
         v4Actions: [

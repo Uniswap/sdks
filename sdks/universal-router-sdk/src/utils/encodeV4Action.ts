@@ -71,8 +71,8 @@ export function encodeV4Action(
         ],
       }
     case 'SETTLE':
-      // payerIsUser=false: same router-custody model as encodeSwapStep — funds are already in the router
-      return { action, params: [v4Action.currency, v4Action.amount, false] }
+      // payerIsUser defaults to false (router custody); validateEncodeSwaps gates when true is allowed
+      return { action, params: [v4Action.currency, v4Action.amount, v4Action.payerIsUser ?? false] }
     case 'SETTLE_ALL':
       return { action, params: [v4Action.currency, v4Action.maxAmount] }
     case 'TAKE':
