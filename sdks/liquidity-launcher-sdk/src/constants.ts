@@ -65,17 +65,29 @@ export const DEFAULT_CONVEXITY_ALPHA = 1.2
 export const DEFAULT_BLOCK_TIME_SECONDS = 12
 
 /**
- * Approximate block time (seconds) per chain, used to convert auction start/end times to blocks.
- * Chains without an entry fall back to {@link DEFAULT_BLOCK_TIME_SECONDS}. Arbitrum and Robinhood
- * (an Arbitrum Orbit chain) are intentionally omitted: their contract-visible `block.number` tracks
- * the Ethereum L1 block cadence (~12s), which the default already matches.
+ * Approximate block time (seconds) per chain, used to convert an auction's start/end times into a
+ * block range. This MUST match the cadence of the clock the CCA advances on —
+ * `blocknumberish._getBlockNumberish()`, which returns the L2 `arbBlockNumber` on Arbitrum-family
+ * chains and `block.number` everywhere else — because the range is derived from the same
+ * `eth_blockNumber` (L2 sequencer) height the backend reads. A wrong value scales the auction's
+ * real-time window by (real cadence / assumed cadence): the old 12s default silently compressed a
+ * 14h auction to ~17min on Arbitrum and ~7min on Robinhood.
+ *
+ * Arbitrum One and Robinhood are Arbitrum L2s whose block clock ticks sub-second, so they need
+ * explicit entries. NOTE: Robinhood is an Orbit chain where `block.number` diverges from its L2
+ * height; the on-chain `blocknumberish` library only substitutes `arbBlockNumber` for Arbitrum
+ * One's chain id today, so Robinhood's CCA/LBPStrategy must be redeployed against a blocknumberish
+ * that also recognizes Robinhood before this value takes effect — keep Robinhood launches gated
+ * until then. Chains without an entry fall back to {@link DEFAULT_BLOCK_TIME_SECONDS}.
  */
 export const BLOCK_TIME_SECONDS_BY_CHAIN: Record<number, number> = {
   1: 12, // mainnet
   130: 1, // unichain
   196: 1, // xlayer
   1301: 1, // unichain sepolia
+  4663: 0.1, // robinhood (arbitrum orbit) — L2 arbBlockNumber cadence; needs blocknumberish support on-chain
   8453: 2, // base
+  42161: 0.25, // arbitrum one — L2 arbBlockNumber cadence (NOT the L1 block.number ~12s)
   43114: 1, // avalanche
   84532: 2, // base sepolia
   11155111: 12, // sepolia
