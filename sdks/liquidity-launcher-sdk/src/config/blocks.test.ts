@@ -38,7 +38,7 @@ describe('deriveBlocks — real-time auction window is honored', () => {
       nowUnix: NOW,
       blockTimeSeconds: getBlockTimeSeconds(SupportedChainId.ROBINHOOD),
     })
-    // 50400s / 0.1s = 504000 blocks. At the wrong 12s default this was 4200 blocks (~7min real time).
+    // 50400s / 0.1s = 504000 blocks; the 12s default would yield only 4200 (~7min of real time).
     expect(endBlock - startBlock).toBe(504_000n)
   })
 
@@ -50,7 +50,7 @@ describe('deriveBlocks — real-time auction window is honored', () => {
       nowUnix: NOW,
       blockTimeSeconds: getBlockTimeSeconds(SupportedChainId.ARBITRUM_ONE),
     })
-    // 50400s / 0.25s = 201600 blocks (was 4200 → ~17min real time at the 12s default).
+    // 50400s / 0.25s = 201600 blocks; the 12s default would yield only 4200 (~17min of real time).
     expect(endBlock - startBlock).toBe(201_600n)
   })
 })

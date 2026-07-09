@@ -70,8 +70,8 @@ export const DEFAULT_BLOCK_TIME_SECONDS = 12
  * `blocknumberish._getBlockNumberish()`, which returns the L2 `arbBlockNumber` on Arbitrum-family
  * chains and `block.number` everywhere else — because the range is derived from the same
  * `eth_blockNumber` (L2 sequencer) height the backend reads. A wrong value scales the auction's
- * real-time window by (real cadence / assumed cadence): the old 12s default silently compressed a
- * 14h auction to ~17min on Arbitrum and ~7min on Robinhood.
+ * real-time window by (real cadence / assumed cadence) — e.g. the 12s default would silently
+ * compress a 14h auction to ~17min on Arbitrum and ~7min on Robinhood.
  *
  * Arbitrum One and Robinhood are Arbitrum L2s whose block clock ticks sub-second, so they need
  * explicit entries. NOTE: Robinhood is an Orbit chain where `block.number` diverges from its L2
