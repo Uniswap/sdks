@@ -72,7 +72,7 @@ export function encodeV4Action(
       }
     case 'SETTLE':
       // payerIsUser defaults to false (router custody); validateEncodeSwaps gates when true is allowed
-      return { action, params: [v4Action.currency, v4Action.amount, v4Action.payerIsUser ?? false] }
+      return { action, params: [v4Action.currency, v4Action.amount, v4Action.payerIsUser === true] }
     case 'SETTLE_ALL':
       return { action, params: [v4Action.currency, v4Action.maxAmount] }
     case 'TAKE':

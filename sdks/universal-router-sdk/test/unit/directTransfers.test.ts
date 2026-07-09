@@ -253,6 +253,12 @@ describe('allowDirectTransfers', () => {
       expect(decoded[4]).to.equal(true)
       expect(decoded[5][0].toString()).to.equal('123')
     })
+
+    it('encodes non-boolean payerIsUser values as false (fail closed on wire garbage)', () => {
+      encodeSwapStep(planner, buildV3ExactInStep({ payerIsUser: 'false' as any }), UniversalRouterVersion.V2_0)
+      const decoded = defaultAbiCoder.decode(['address', 'uint256', 'uint256', 'bytes', 'bool'], planner.inputs[0])
+      expect(decoded[4]).to.equal(false)
+    })
   })
 
   describe('encodeV4Action SETTLE payerIsUser threading', () => {
@@ -330,6 +336,26 @@ describe('allowDirectTransfers', () => {
 
     it('still accepts a plain custody plan', () => {
       expect(() => validateEncodeSwaps(buildSpec(), [buildV3ExactInStep()])).to.not.throw()
+    })
+
+    it('accepts the same shapes when allowDirectTransfers is set', () => {
+      const flagOn = { allowDirectTransfers: true }
+      expect(() => validateEncodeSwaps(buildSpec(flagOn), [buildV3ExactInStep({ payerIsUser: true })])).to.not.throw()
+      expect(() =>
+        validateEncodeSwaps(buildSpec(flagOn), [
+          { type: 'V4_SWAP', v4Actions: [{ action: 'SETTLE_ALL', currency: USDC.address, maxAmount: '1000000' }] },
+        ])
+      ).to.not.throw()
+      expect(() =>
+        validateEncodeSwaps(buildSpec({ ...flagOn, recipient: SENDER_AS_RECIPIENT }), [
+          { type: 'V4_SWAP', v4Actions: [{ action: 'TAKE_ALL', currency: WETH.address, minAmount: '1' }] },
+        ])
+      ).to.not.throw()
+    })
+
+    it('accepts plain v4 SETTLE plans in safe mode (no over-rejection near the boundary)', () => {
+      expect(() => validateEncodeSwaps(buildSpec(), [buildV4SettleSwap()])).to.not.throw()
+      expect(() => validateEncodeSwaps(buildSpec(), [buildV3ExactInStep({ payerIsUser: false })])).to.not.throw()
     })
   })
 })
