@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 
 import { SupportedChainId } from '../chains'
 import { DEFAULT_BLOCK_TIME_SECONDS } from '../constants'
+
 import { deriveBlocks, getBlockTimeSeconds } from './blocks'
 
 describe('getBlockTimeSeconds', () => {

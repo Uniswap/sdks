@@ -79,6 +79,10 @@ export const DEFAULT_BLOCK_TIME_SECONDS = 12
  * One's chain id today, so Robinhood's CCA/LBPStrategy must be redeployed against a blocknumberish
  * that also recognizes Robinhood before this value takes effect — keep Robinhood launches gated
  * until then. Chains without an entry fall back to {@link DEFAULT_BLOCK_TIME_SECONDS}.
+ *
+ * Values are approximate by nature (a chain's real cadence drifts), and non-integer entries like
+ * `0.1` aren't exactly representable in IEEE-754 — both are absorbed by `deriveBlocks`, which
+ * `Math.round`s the block delta (at most ±1 block, far below the cadence-estimate error itself).
  */
 export const BLOCK_TIME_SECONDS_BY_CHAIN: Record<number, number> = {
   1: 12, // mainnet
