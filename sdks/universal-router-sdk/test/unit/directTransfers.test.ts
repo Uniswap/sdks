@@ -16,6 +16,7 @@ import {
   V4Settle,
   V4Swap,
 } from '../../src/types/encodeSwaps'
+import { stepUserPaidPulls, sumUserPaidMax, v3PathFirstToken, v3PathLastToken } from '../../src/utils/directTransfers'
 import { encodeSwapStep } from '../../src/utils/encodeSwapStep'
 import { encodeV4Action } from '../../src/utils/encodeV4Action'
 import { validateEncodeSwaps } from '../../src/utils/validateEncodeSwaps'
@@ -356,6 +357,71 @@ describe('allowDirectTransfers', () => {
     it('accepts plain v4 SETTLE plans in safe mode (no over-rejection near the boundary)', () => {
       expect(() => validateEncodeSwaps(buildSpec(), [buildV4SettleSwap()])).to.not.throw()
       expect(() => validateEncodeSwaps(buildSpec(), [buildV3ExactInStep({ payerIsUser: false })])).to.not.throw()
+    })
+  })
+
+  describe('directTransfers inbound helpers', () => {
+    describe('v3 path token extraction', () => {
+      it('extracts first and last tokens from an exact-in path', () => {
+        const path = packV3Path([USDC.address, WETH.address, DAI.address], [500, 3000])
+        expect(v3PathFirstToken(path)!.toLowerCase()).to.equal(USDC.address.toLowerCase())
+        expect(v3PathLastToken(path)!.toLowerCase()).to.equal(DAI.address.toLowerCase())
+      })
+
+      it('returns undefined for malformed paths', () => {
+        expect(v3PathFirstToken('0x1234')).to.equal(undefined)
+        expect(v3PathLastToken('nope')).to.equal(undefined)
+      })
+    })
+
+    describe('stepUserPaidPulls / sumUserPaidMax', () => {
+      it('router-funded steps produce no pulls', () => {
+        expect(stepUserPaidPulls(buildV3ExactInStep())).to.deep.equal([])
+        expect(sumUserPaidMax([buildV3ExactInStep(), buildV2ExactInStep()]).toString()).to.equal('0')
+      })
+
+      it('counts V3 exact-in at amountIn with the first path token', () => {
+        const pulls = stepUserPaidPulls(buildV3ExactInStep({ payerIsUser: true, amountIn: '600000' }))
+        expect(pulls.length).to.equal(1)
+        expect(pulls[0].maxAmount.toString()).to.equal('600000')
+        expect(pulls[0].token!.toLowerCase()).to.equal(USDC.address.toLowerCase())
+      })
+
+      it('counts V3 exact-out at amountInMax with the LAST path token (reversed encoding)', () => {
+        const pulls = stepUserPaidPulls(buildV3ExactOutStep({ payerIsUser: true }))
+        expect(pulls[0].maxAmount.toString()).to.equal('1050000')
+        expect(pulls[0].token!.toLowerCase()).to.equal(USDC.address.toLowerCase())
+      })
+
+      it('counts V2 pulls with path[0]', () => {
+        const inPulls = stepUserPaidPulls(buildV2ExactInStep({ payerIsUser: true }))
+        expect(inPulls[0].token!.toLowerCase()).to.equal(USDC.address.toLowerCase())
+        expect(inPulls[0].maxAmount.toString()).to.equal('1000000')
+        const outPulls = stepUserPaidPulls(buildV2ExactOutStep({ payerIsUser: true }))
+        expect(outPulls[0].maxAmount.toString()).to.equal('1050000')
+      })
+
+      it('counts v4 SETTLE only when flagged, SETTLE_ALL always', () => {
+        expect(stepUserPaidPulls(buildV4SettleSwap())).to.deep.equal([])
+        const settle = stepUserPaidPulls(buildV4SettleSwap({ payerIsUser: true }))
+        expect(settle.length).to.equal(1)
+        expect(settle[0].maxAmount.toString()).to.equal('1000000')
+        expect(settle[0].token!.toLowerCase()).to.equal(USDC.address.toLowerCase())
+        const settleAll: V4Swap = {
+          type: 'V4_SWAP',
+          v4Actions: [{ action: 'SETTLE_ALL', currency: USDC.address, maxAmount: '400000' }],
+        }
+        expect(stepUserPaidPulls(settleAll)[0].maxAmount.toString()).to.equal('400000')
+      })
+
+      it('sums pull maxima across steps', () => {
+        const steps: SwapStep[] = [
+          buildV3ExactInStep({ payerIsUser: true, amountIn: '600000' }),
+          buildV2ExactInStep({ payerIsUser: true, amountIn: '150000' }),
+          buildV3ExactInStep(),
+        ]
+        expect(sumUserPaidMax(steps).toString()).to.equal('750000')
+      })
     })
   })
 })
