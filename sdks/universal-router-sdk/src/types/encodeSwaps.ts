@@ -38,19 +38,30 @@ export type SwapSpecification = {
    * Incompatible with native input, permit, and TokenTransferMode.ApproveProxy.
    */
   nativeErc20Input?: boolean
+  /**
+   * Opts the plan into "budgeted" validation: steps may move funds directly between the
+   * user and pools (per-step `payerIsUser`, step recipients equal to `recipient`, v4
+   * SETTLE_ALL / TAKE_ALL). The SDK enforces that total direct user pulls never exceed
+   * exactOrMaxAmountIn (ingress pulls only the remainder) and that directly-delivered,
+   * contract-enforced output minimums reduce the final sweep floor. Default false =
+   * router-custody-only validation (all step recipients must be the router; no user-paid
+   * steps). Portion fees additionally require full output custody even when enabled.
+   */
+  allowDirectTransfers?: boolean
 }
 
-// Output of `normalizeEncodeSwapsSpec`: the four fields below are guaranteed
+// Output of `normalizeEncodeSwapsSpec`: the five fields below are guaranteed
 // non-undefined, encoding the precondition for `validateEncodeSwaps` and
 // `computeEncodeSwapsAmounts` at the type level.
 export type NormalizedSwapSpecification = Omit<
   SwapSpecification,
-  'recipient' | 'tokenTransferMode' | 'urVersion' | 'safeMode'
+  'recipient' | 'tokenTransferMode' | 'urVersion' | 'safeMode' | 'allowDirectTransfers'
 > & {
   recipient: string
   tokenTransferMode: TokenTransferMode
   urVersion: UniversalRouterVersion
   safeMode: boolean
+  allowDirectTransfers: boolean
 }
 
 export type V2SwapExactIn = {
@@ -60,6 +71,7 @@ export type V2SwapExactIn = {
   amountOutMin: BigNumberish
   path: string[]
   minHopPriceX36?: BigNumberish[]
+  payerIsUser?: boolean // pull input directly from the user via permit2; requires spec.allowDirectTransfers
 }
 
 export type V2SwapExactOut = {
@@ -69,6 +81,7 @@ export type V2SwapExactOut = {
   amountInMax: BigNumberish
   path: string[]
   minHopPriceX36?: BigNumberish[]
+  payerIsUser?: boolean // pull input directly from the user via permit2; requires spec.allowDirectTransfers
 }
 
 export type V3SwapExactIn = {
@@ -78,6 +91,7 @@ export type V3SwapExactIn = {
   amountOutMin: BigNumberish
   path: string
   minHopPriceX36?: BigNumberish[]
+  payerIsUser?: boolean // pull input directly from the user via permit2; requires spec.allowDirectTransfers
 }
 
 export type V3SwapExactOut = {
@@ -87,6 +101,7 @@ export type V3SwapExactOut = {
   amountInMax: BigNumberish
   path: string
   minHopPriceX36?: BigNumberish[]
+  payerIsUser?: boolean // pull input directly from the user via permit2; requires spec.allowDirectTransfers
 }
 
 export type V4Swap = {
@@ -150,6 +165,7 @@ export type V4Settle = {
   action: 'SETTLE'
   currency: string
   amount: BigNumberish
+  payerIsUser?: boolean // settle from the user via permit2; requires spec.allowDirectTransfers
 }
 
 export type V4SettleAll = {

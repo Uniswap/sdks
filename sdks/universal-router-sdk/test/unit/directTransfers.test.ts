@@ -1,0 +1,198 @@
+import { expect } from 'chai'
+import { BigNumber, utils } from 'ethers'
+import { defaultAbiCoder } from 'ethers/lib/utils'
+import { CurrencyAmount, Percent, TradeType } from '@uniswap/sdk-core'
+import { URVersion, V4BaseActionsParser } from '@uniswap/v4-sdk'
+import { SwapRouter } from '../../src/swapRouter'
+import { TokenTransferMode } from '../../src/entities/actions/uniswap'
+import {
+  NormalizedSwapSpecification,
+  SwapSpecification,
+  SwapStep,
+  V2SwapExactIn,
+  V2SwapExactOut,
+  V3SwapExactIn,
+  V3SwapExactOut,
+  V4Swap,
+} from '../../src/types/encodeSwaps'
+import { encodeSwapStep } from '../../src/utils/encodeSwapStep'
+import { encodeV4Action } from '../../src/utils/encodeV4Action'
+import { validateEncodeSwaps } from '../../src/utils/validateEncodeSwaps'
+import { normalizeEncodeSwapsSpec } from '../../src/utils/normalizeEncodeSwapsSpec'
+import { CommandType, RoutePlanner } from '../../src/utils/routerCommands'
+import {
+  CONTRACT_BALANCE,
+  ETH_ADDRESS,
+  ROUTER_AS_RECIPIENT,
+  SENDER_AS_RECIPIENT,
+  UniversalRouterVersion,
+} from '../../src/utils/constants'
+import { TEST_FEE_RECIPIENT_ADDRESS, TEST_RECIPIENT_ADDRESS } from '../utils/addresses'
+import { DAI, ETHER as ETH, USDC, WETH, parseCommands } from '../utils/uniswapData'
+
+const TEST_RECIPIENT = TEST_RECIPIENT_ADDRESS
+const FEE_RECIPIENT = TEST_FEE_RECIPIENT_ADDRESS
+
+function packV3Path(tokens: string[], fees: number[]): string {
+  const types: string[] = ['address']
+  const values: Array<string | number> = [tokens[0]]
+  for (let i = 0; i < fees.length; i++) {
+    types.push('uint24', 'address')
+    values.push(fees[i], tokens[i + 1])
+  }
+  return utils.solidityPack(types, values)
+}
+
+// exact-out paths are encoded output-first
+function packV3ExactOutPath(tokens: string[], fees: number[]): string {
+  const types: string[] = ['address']
+  const values: Array<string | number> = [tokens[tokens.length - 1]]
+  for (let i = fees.length - 1; i >= 0; i--) {
+    types.push('uint24', 'address')
+    values.push(fees[i], tokens[i])
+  }
+  return utils.solidityPack(types, values)
+}
+
+function buildSpec(
+  overrides: Partial<SwapSpecification> = {},
+  routingOverrides: Partial<SwapSpecification['routing']> = {}
+): NormalizedSwapSpecification {
+  const base: NormalizedSwapSpecification = {
+    tradeType: TradeType.EXACT_INPUT,
+    routing: {
+      inputToken: USDC,
+      outputToken: WETH,
+      amount: CurrencyAmount.fromRawAmount(USDC, '1000000'),
+      quote: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+    },
+    recipient: TEST_RECIPIENT,
+    slippageTolerance: new Percent(5, 100),
+    tokenTransferMode: TokenTransferMode.Permit2,
+    urVersion: UniversalRouterVersion.V2_0,
+    safeMode: false,
+    allowDirectTransfers: false,
+  }
+  return {
+    ...base,
+    ...overrides,
+    recipient: overrides.recipient ?? base.recipient,
+    tokenTransferMode: overrides.tokenTransferMode ?? base.tokenTransferMode,
+    urVersion: overrides.urVersion ?? base.urVersion,
+    safeMode: overrides.safeMode ?? base.safeMode,
+    allowDirectTransfers: overrides.allowDirectTransfers ?? base.allowDirectTransfers,
+    routing: { ...base.routing, ...routingOverrides },
+  }
+}
+
+// exact-output mirror of buildSpec: 0.5 WETH out exact, 1 USDC quote, 5% slippage -> maxIn 1_050_000
+function buildExactOutSpec(overrides: Partial<SwapSpecification> = {}): NormalizedSwapSpecification {
+  return buildSpec(
+    { tradeType: TradeType.EXACT_OUTPUT, ...overrides },
+    {
+      amount: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+      quote: CurrencyAmount.fromRawAmount(USDC, '1000000'),
+    }
+  )
+}
+
+function buildV3ExactInStep(overrides: Partial<V3SwapExactIn> = {}): V3SwapExactIn {
+  return {
+    type: 'V3_SWAP_EXACT_IN',
+    recipient: ROUTER_AS_RECIPIENT,
+    amountIn: '1000000',
+    amountOutMin: '0',
+    path: packV3Path([USDC.address, WETH.address], [500]),
+    ...overrides,
+  }
+}
+
+function buildV3ExactOutStep(overrides: Partial<V3SwapExactOut> = {}): V3SwapExactOut {
+  return {
+    type: 'V3_SWAP_EXACT_OUT',
+    recipient: ROUTER_AS_RECIPIENT,
+    amountOut: '500000000000000000',
+    amountInMax: '1050000',
+    path: packV3ExactOutPath([USDC.address, WETH.address], [500]),
+    ...overrides,
+  }
+}
+
+function buildV2ExactInStep(overrides: Partial<V2SwapExactIn> = {}): V2SwapExactIn {
+  return {
+    type: 'V2_SWAP_EXACT_IN',
+    recipient: ROUTER_AS_RECIPIENT,
+    amountIn: '1000000',
+    amountOutMin: '0',
+    path: [USDC.address, WETH.address],
+    ...overrides,
+  }
+}
+
+function buildV2ExactOutStep(overrides: Partial<V2SwapExactOut> = {}): V2SwapExactOut {
+  return {
+    type: 'V2_SWAP_EXACT_OUT',
+    recipient: ROUTER_AS_RECIPIENT,
+    amountOut: '500000000000000000',
+    amountInMax: '1050000',
+    path: [USDC.address, WETH.address],
+    ...overrides,
+  }
+}
+
+function buildV4SettleSwap(settleOverrides: Record<string, unknown> = {}): V4Swap {
+  return {
+    type: 'V4_SWAP',
+    v4Actions: [
+      {
+        action: 'SWAP_EXACT_IN_SINGLE',
+        poolKey: {
+          currency0: USDC.address,
+          currency1: WETH.address,
+          fee: 500,
+          tickSpacing: 10,
+          hooks: ETH_ADDRESS,
+        },
+        zeroForOne: true,
+        amountIn: '1000000',
+        amountOutMinimum: '0',
+        hookData: '0x',
+      },
+      { action: 'SETTLE', currency: USDC.address, amount: '1000000', ...settleOverrides } as any,
+      { action: 'TAKE', currency: WETH.address, recipient: ROUTER_AS_RECIPIENT, amount: '0' },
+    ],
+  }
+}
+
+describe('allowDirectTransfers', () => {
+  describe('normalizeEncodeSwapsSpec', () => {
+    it('defaults allowDirectTransfers to false', () => {
+      const spec: SwapSpecification = {
+        tradeType: TradeType.EXACT_INPUT,
+        routing: {
+          inputToken: USDC,
+          outputToken: WETH,
+          amount: CurrencyAmount.fromRawAmount(USDC, '1000000'),
+          quote: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+        },
+        slippageTolerance: new Percent(5, 100),
+      }
+      expect(normalizeEncodeSwapsSpec(spec).allowDirectTransfers).to.equal(false)
+    })
+
+    it('preserves allowDirectTransfers when set', () => {
+      const spec: SwapSpecification = {
+        tradeType: TradeType.EXACT_INPUT,
+        routing: {
+          inputToken: USDC,
+          outputToken: WETH,
+          amount: CurrencyAmount.fromRawAmount(USDC, '1000000'),
+          quote: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+        },
+        slippageTolerance: new Percent(5, 100),
+        allowDirectTransfers: true,
+      }
+      expect(normalizeEncodeSwapsSpec(spec).allowDirectTransfers).to.equal(true)
+    })
+  })
+})

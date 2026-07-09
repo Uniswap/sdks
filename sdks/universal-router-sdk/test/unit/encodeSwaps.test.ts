@@ -126,6 +126,7 @@ function buildSpec(
     tokenTransferMode: TokenTransferMode.Permit2,
     urVersion: UniversalRouterVersion.V2_0,
     safeMode: false,
+    allowDirectTransfers: false,
   }
 
   return {
@@ -135,6 +136,7 @@ function buildSpec(
     tokenTransferMode: overrides.tokenTransferMode ?? base.tokenTransferMode,
     urVersion: overrides.urVersion ?? base.urVersion,
     safeMode: overrides.safeMode ?? base.safeMode,
+    allowDirectTransfers: overrides.allowDirectTransfers ?? base.allowDirectTransfers,
     routing: {
       ...base.routing,
       ...routingOverrides,
