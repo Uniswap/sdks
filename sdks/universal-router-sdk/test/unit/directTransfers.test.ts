@@ -280,4 +280,56 @@ describe('allowDirectTransfers', () => {
       expect(parsed.actions[1].params[2].value).to.equal(true)
     })
   })
+
+  describe('safe mode (allowDirectTransfers=false)', () => {
+    it('rejects V3 exact-in payerIsUser', () => {
+      expect(() => validateEncodeSwaps(buildSpec(), [buildV3ExactInStep({ payerIsUser: true })])).to.throw(
+        'PAYER_IS_USER_REQUIRES_DIRECT_TRANSFERS'
+      )
+    })
+
+    it('rejects V3 exact-out payerIsUser', () => {
+      expect(() => validateEncodeSwaps(buildExactOutSpec(), [buildV3ExactOutStep({ payerIsUser: true })])).to.throw(
+        'PAYER_IS_USER_REQUIRES_DIRECT_TRANSFERS'
+      )
+    })
+
+    it('rejects V2 exact-in payerIsUser', () => {
+      expect(() => validateEncodeSwaps(buildSpec(), [buildV2ExactInStep({ payerIsUser: true })])).to.throw(
+        'PAYER_IS_USER_REQUIRES_DIRECT_TRANSFERS'
+      )
+    })
+
+    it('rejects V2 exact-out payerIsUser', () => {
+      expect(() => validateEncodeSwaps(buildExactOutSpec(), [buildV2ExactOutStep({ payerIsUser: true })])).to.throw(
+        'PAYER_IS_USER_REQUIRES_DIRECT_TRANSFERS'
+      )
+    })
+
+    it('rejects v4 SETTLE payerIsUser', () => {
+      expect(() => validateEncodeSwaps(buildSpec(), [buildV4SettleSwap({ payerIsUser: true })])).to.throw(
+        'PAYER_IS_USER_REQUIRES_DIRECT_TRANSFERS'
+      )
+    })
+
+    it('rejects v4 SETTLE_ALL', () => {
+      const step: V4Swap = {
+        type: 'V4_SWAP',
+        v4Actions: [{ action: 'SETTLE_ALL', currency: USDC.address, maxAmount: '1000000' }],
+      }
+      expect(() => validateEncodeSwaps(buildSpec(), [step])).to.throw('SETTLE_ALL_REQUIRES_DIRECT_TRANSFERS')
+    })
+
+    it('rejects v4 TAKE_ALL', () => {
+      const step: V4Swap = {
+        type: 'V4_SWAP',
+        v4Actions: [{ action: 'TAKE_ALL', currency: WETH.address, minAmount: '1' }],
+      }
+      expect(() => validateEncodeSwaps(buildSpec(), [step])).to.throw('TAKE_ALL_REQUIRES_DIRECT_TRANSFERS')
+    })
+
+    it('still accepts a plain custody plan', () => {
+      expect(() => validateEncodeSwaps(buildSpec(), [buildV3ExactInStep()])).to.not.throw()
+    })
+  })
 })

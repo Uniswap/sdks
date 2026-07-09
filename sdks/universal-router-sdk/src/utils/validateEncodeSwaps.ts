@@ -4,6 +4,7 @@ import { TradeType } from '@uniswap/sdk-core'
 import { TokenTransferMode } from '../entities/actions/uniswap'
 import { ROUTER_AS_RECIPIENT, SENDER_AS_RECIPIENT, UniversalRouterVersion, ZERO_ADDRESS } from './constants'
 import { NormalizedSwapSpecification, SwapStep, V4Action } from '../types/encodeSwaps'
+import { hasUserPaidFlag } from './directTransfers'
 
 // V3 path: 20-byte address + N × (3-byte fee + 20-byte address); minimum is 43 bytes (single hop, N=1)
 // Returns N or undefined if malformed
@@ -134,6 +135,16 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
 
   // per-step: capability-gate by UR version, recipients must be router custody, per-hop arrays must match hop counts
   for (const step of swapSteps) {
+    if (!spec.allowDirectTransfers) {
+      invariant(!hasUserPaidFlag(step), 'PAYER_IS_USER_REQUIRES_DIRECT_TRANSFERS')
+      if (step.type === 'V4_SWAP') {
+        for (const action of step.v4Actions) {
+          invariant(action.action !== 'SETTLE_ALL', 'SETTLE_ALL_REQUIRES_DIRECT_TRANSFERS')
+          invariant(action.action !== 'TAKE_ALL', 'TAKE_ALL_REQUIRES_DIRECT_TRANSFERS')
+        }
+      }
+    }
+
     if (spec.urVersion === UniversalRouterVersion.V2_0) {
       invariant(
         !('minHopPriceX36' in step) || step.minHopPriceX36 === undefined,
