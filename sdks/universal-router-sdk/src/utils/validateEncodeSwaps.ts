@@ -12,7 +12,7 @@ import {
 import { NormalizedSwapSpecification, SwapStep, V4Action } from '../types/encodeSwaps'
 import { getCurrencyAddress } from './getCurrencyAddress'
 import { getV3HopCount, hasUserPaidFlag, stepUserPaidPulls } from './directTransfers'
-import { computeEncodeSwapsAmounts, EncodeSwapsAmounts } from './computeEncodeSwapsAmounts'
+import { computeEncodeSwapsAmounts } from './computeEncodeSwapsAmounts'
 
 function hasV4MinHopPriceX36(action: V4Action): boolean {
   switch (action.action) {
@@ -102,16 +102,7 @@ function validateV4HookData(actions: V4Action[]): void {
   }
 }
 
-/**
- * @param amounts optional precomputed `computeEncodeSwapsAmounts(spec)` result, so callers that
- * already computed it avoid recomputing. MUST equal that value — passing different numbers
- * weakens the budget check to the caller's figures. Omit to compute internally.
- */
-export function validateEncodeSwaps(
-  spec: NormalizedSwapSpecification,
-  swapSteps: SwapStep[],
-  amounts?: EncodeSwapsAmounts
-): void {
+export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps: SwapStep[]): void {
   invariant(swapSteps.length > 0, 'EMPTY_SWAP_STEPS')
 
   const amountCurrency = spec.routing.amount.currency.wrapped
@@ -246,7 +237,7 @@ export function validateEncodeSwaps(
       invariant(!spec.nativeErc20Input, 'DIRECT_TRANSFERS_NATIVE_ERC20_INPUT')
       invariant(spec.tokenTransferMode === TokenTransferMode.Permit2, 'DIRECT_TRANSFERS_REQUIRES_PERMIT2')
 
-      const { exactOrMaxAmountIn } = amounts ?? computeEncodeSwapsAmounts(spec)
+      const { exactOrMaxAmountIn } = computeEncodeSwapsAmounts(spec)
       const inputTokenAddress = getCurrencyAddress(spec.routing.inputToken).toLowerCase()
 
       let userPaidTotal = BigNumber.from(0)

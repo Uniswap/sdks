@@ -169,10 +169,9 @@ export abstract class SwapRouter {
     const normalizedSpec = normalizeEncodeSwapsSpec(spec)
     const planner = new RoutePlanner()
 
-    const amounts = computeEncodeSwapsAmounts(normalizedSpec)
-    validateEncodeSwaps(normalizedSpec, swapSteps, amounts)
+    validateEncodeSwaps(normalizedSpec, swapSteps)
 
-    const { exactOrMaxAmountIn, netMinOrExactAmountOut } = amounts
+    const { exactOrMaxAmountIn, netMinOrExactAmountOut } = computeEncodeSwapsAmounts(normalizedSpec)
     const {
       routing: { inputToken, outputToken },
     } = normalizedSpec
