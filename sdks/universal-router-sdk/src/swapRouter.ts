@@ -24,6 +24,7 @@ import { AcrossV4DepositV3Params } from './entities/actions/across'
 import { SwapSpecification, SwapStep } from './types/encodeSwaps'
 import { RoutePlanner, CommandType } from './utils/routerCommands'
 import { encodePermit, encodeV3PositionPermit } from './utils/inputTokens'
+import { sumUserPaidMax } from './utils/directTransfers'
 import {
   ETH_ADDRESS,
   ROUTER_AS_RECIPIENT,
@@ -159,9 +160,10 @@ export abstract class SwapRouter {
     const normalizedSpec = normalizeEncodeSwapsSpec(spec)
     const planner = new RoutePlanner()
 
-    validateEncodeSwaps(normalizedSpec, swapSteps)
+    const amounts = computeEncodeSwapsAmounts(normalizedSpec)
+    validateEncodeSwaps(normalizedSpec, swapSteps, amounts)
 
-    const { exactOrMaxAmountIn, netMinOrExactAmountOut } = computeEncodeSwapsAmounts(normalizedSpec)
+    const { exactOrMaxAmountIn, netMinOrExactAmountOut } = amounts
     const {
       routing: { inputToken, outputToken },
     } = normalizedSpec
@@ -175,12 +177,16 @@ export abstract class SwapRouter {
       }
 
       if (!inputToken.isNative && !normalizedSpec.nativeErc20Input) {
-        planner.addCommand(
-          CommandType.PERMIT2_TRANSFER_FROM,
-          [getCurrencyAddress(inputToken), ROUTER_AS_RECIPIENT, exactOrMaxAmountIn],
-          false,
-          normalizedSpec.urVersion
-        )
+        // user-paid steps draw part of the budget straight from the wallet; ingress pulls only the rest
+        const ingressAmount = exactOrMaxAmountIn.sub(sumUserPaidMax(swapSteps))
+        if (ingressAmount.gt(0)) {
+          planner.addCommand(
+            CommandType.PERMIT2_TRANSFER_FROM,
+            [getCurrencyAddress(inputToken), ROUTER_AS_RECIPIENT, ingressAmount],
+            false,
+            normalizedSpec.urVersion
+          )
+        }
       }
     }
 

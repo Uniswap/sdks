@@ -673,4 +673,39 @@ describe('allowDirectTransfers', () => {
       ).to.throw('USER_PAID_MALFORMED_PATH (step 0)')
     })
   })
+
+  describe('budgeted mode — ingress remainder', () => {
+    const flagOn = { allowDirectTransfers: true }
+
+    it('omits PERMIT2_TRANSFER_FROM when user-paid pulls consume the whole budget', () => {
+      const result = SwapRouter.encodeSwaps(buildSpec(flagOn), [buildV3ExactInStep({ payerIsUser: true })])
+      const { commandTypes } = parseCommands(result.calldata)
+      expect(commandTypes).to.deep.equal([CommandType.V3_SWAP_EXACT_IN, CommandType.SWEEP])
+    })
+
+    it('pulls only the remainder when pulls cover part of the budget', () => {
+      const steps: SwapStep[] = [
+        buildV3ExactInStep({ payerIsUser: true, amountIn: '600000' }),
+        buildV3ExactInStep({ amountIn: '400000' }),
+      ]
+      const result = SwapRouter.encodeSwaps(buildSpec(flagOn), steps)
+      const { commandTypes, inputs } = parseCommands(result.calldata)
+      expect(commandTypes).to.deep.equal([
+        CommandType.PERMIT2_TRANSFER_FROM,
+        CommandType.V3_SWAP_EXACT_IN,
+        CommandType.V3_SWAP_EXACT_IN,
+        CommandType.SWEEP,
+      ])
+      const transfer = defaultAbiCoder.decode(['address', 'address', 'uint160'], inputs[0])
+      expect(transfer[2].toString()).to.equal('400000')
+    })
+
+    it('encodes byte-identically to safe mode when no direct-transfer steps are used', () => {
+      const steps = [buildV3ExactInStep()]
+      const on = SwapRouter.encodeSwaps(buildSpec(flagOn), steps)
+      const off = SwapRouter.encodeSwaps(buildSpec(), steps)
+      expect(on.calldata).to.equal(off.calldata)
+      expect(on.value).to.equal(off.value)
+    })
+  })
 })
