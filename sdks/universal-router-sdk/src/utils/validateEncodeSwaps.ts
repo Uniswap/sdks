@@ -72,9 +72,19 @@ function validateV4HookData(actions: V4Action[]): void {
     if (action.action === 'SWAP_EXACT_IN_SINGLE' || action.action === 'SWAP_EXACT_OUT_SINGLE') {
       invariant(HEX_BYTES.test(action.hookData), 'V4_HOOK_DATA_INVALID')
     }
+    if (action.action === 'SWAP_EXACT_IN' || action.action === 'SWAP_EXACT_OUT') {
+      for (const hop of action.path) {
+        invariant(HEX_BYTES.test(hop.hookData), 'V4_HOOK_DATA_INVALID')
+      }
+    }
   }
 }
 
+/**
+ * @param amounts optional precomputed `computeEncodeSwapsAmounts(spec)` result, so callers that
+ * already computed it avoid recomputing. MUST equal that value — passing different numbers
+ * weakens the budget check to the caller's figures. Omit to compute internally.
+ */
 export function validateEncodeSwaps(
   spec: NormalizedSwapSpecification,
   swapSteps: SwapStep[],
@@ -220,7 +230,7 @@ export function validateEncodeSwaps(
             pull.maxAmount.gt(0) && pull.maxAmount.lte(MAX_UINT160),
             () => `USER_PAID_AMOUNT_OUT_OF_RANGE (step ${stepIndex})`
           )
-          invariant(pull.token !== undefined, () => `USER_PAID_MALFORMED_PATH (step ${stepIndex})`)
+          invariant(typeof pull.token === 'string', () => `USER_PAID_MALFORMED_PATH (step ${stepIndex})`)
           invariant(
             pull.token.toLowerCase() === inputTokenAddress,
             () => `USER_PAID_INPUT_TOKEN_MISMATCH (step ${stepIndex})`
@@ -232,6 +242,7 @@ export function validateEncodeSwaps(
 
       // keeps the permit2 allowance an on-chain outer ceiling equal to the budget
       if (spec.permit) {
+        invariant(spec.permit.details.token.toLowerCase() === inputTokenAddress, 'PERMIT_TOKEN_MISMATCH')
         invariant(BigNumber.from(spec.permit.details.amount).gte(exactOrMaxAmountIn), 'PERMIT_AMOUNT_INSUFFICIENT')
       }
     }

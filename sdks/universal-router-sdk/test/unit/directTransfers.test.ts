@@ -626,5 +626,51 @@ describe('allowDirectTransfers', () => {
         'V4_HOOK_DATA_INVALID'
       )
     })
+
+    it('rejects permits for a token other than the input token', () => {
+      const permit = { ...TEST_PERMIT, details: { ...TEST_PERMIT.details, token: WETH.address, amount: '99999999999' } }
+      expect(() =>
+        validateEncodeSwaps(buildSpec({ allowDirectTransfers: true, permit }), [
+          buildV3ExactInStep({ payerIsUser: true }),
+        ])
+      ).to.throw('PERMIT_TOKEN_MISMATCH')
+    })
+
+    it('rejects invalid per-hop hookData in v4 path-form swaps', () => {
+      const step: V4Swap = {
+        type: 'V4_SWAP',
+        v4Actions: [
+          {
+            action: 'SWAP_EXACT_IN',
+            currencyIn: USDC.address,
+            path: [{ intermediateCurrency: WETH.address, fee: 500, tickSpacing: 10, hooks: ETH_ADDRESS, hookData: '' }],
+            amountIn: '1000000',
+            amountOutMinimum: '0',
+          },
+        ],
+      }
+      expect(() => validateEncodeSwaps(buildSpec(), [step])).to.throw('V4_HOOK_DATA_INVALID')
+    })
+
+    it('counts flagged SETTLE and SETTLE_ALL together against the budget', () => {
+      const step: V4Swap = {
+        type: 'V4_SWAP',
+        v4Actions: [
+          { action: 'SETTLE', currency: USDC.address, amount: '600000', payerIsUser: true },
+          { action: 'SETTLE_ALL', currency: USDC.address, maxAmount: '400001' },
+        ],
+      }
+      expect(() => validateEncodeSwaps(buildSpec({ allowDirectTransfers: true }), [step])).to.throw(
+        'USER_PAID_EXCEEDS_MAX_INPUT'
+      )
+    })
+
+    it('rejects non-string path tokens on user-paid steps as malformed', () => {
+      expect(() =>
+        validateEncodeSwaps(buildSpec({ allowDirectTransfers: true }), [
+          buildV2ExactInStep({ payerIsUser: true, path: [123 as any, WETH.address] }),
+        ])
+      ).to.throw('USER_PAID_MALFORMED_PATH (step 0)')
+    })
   })
 })
