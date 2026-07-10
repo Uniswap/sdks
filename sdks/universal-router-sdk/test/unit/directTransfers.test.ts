@@ -16,7 +16,13 @@ import {
   V4Settle,
   V4Swap,
 } from '../../src/types/encodeSwaps'
-import { stepUserPaidPulls, sumUserPaidMax, v3PathFirstToken, v3PathLastToken } from '../../src/utils/directTransfers'
+import {
+  stepUserPaidPulls,
+  sumDirectOutputMin,
+  sumUserPaidMax,
+  v3PathFirstToken,
+  v3PathLastToken,
+} from '../../src/utils/directTransfers'
 import { encodeSwapStep } from '../../src/utils/encodeSwapStep'
 import { encodeV4Action } from '../../src/utils/encodeV4Action'
 import { validateEncodeSwaps } from '../../src/utils/validateEncodeSwaps'
@@ -815,6 +821,187 @@ describe('allowDirectTransfers', () => {
     it('matches step recipients case-insensitively', () => {
       const upper = ('0x' + TEST_RECIPIENT.slice(2).toUpperCase()) as string
       expect(() => validateEncodeSwaps(buildSpec(flagOn), [buildV3ExactInStep({ recipient: upper })])).to.not.throw()
+    })
+
+    it('rejects the sender sentinel as a step recipient when the spec recipient is explicit', () => {
+      expect(() =>
+        validateEncodeSwaps(buildSpec({ allowDirectTransfers: true }), [
+          buildV3ExactInStep({ recipient: SENDER_AS_RECIPIENT }),
+        ])
+      ).to.throw('STEP_RECIPIENT_NOT_ALLOWED')
+    })
+
+    it('accepts the sender sentinel as a step recipient when the spec recipient is the sender', () => {
+      expect(() =>
+        validateEncodeSwaps(buildSpec({ allowDirectTransfers: true, recipient: SENDER_AS_RECIPIENT }), [
+          buildV3ExactInStep({ recipient: SENDER_AS_RECIPIENT }),
+        ])
+      ).to.not.throw()
+    })
+
+    it('rejects sender-sentinel step recipients under ApproveProxy (would pay the proxy)', () => {
+      const spec = buildSpec({
+        allowDirectTransfers: true,
+        tokenTransferMode: TokenTransferMode.ApproveProxy,
+        chainId: 1,
+      })
+      expect(() => validateEncodeSwaps(spec, [buildV3ExactInStep({ recipient: SENDER_AS_RECIPIENT })])).to.throw(
+        'STEP_RECIPIENT_NOT_ALLOWED'
+      )
+      expect(() => validateEncodeSwaps(spec, [buildV3ExactInStep({ recipient: TEST_RECIPIENT })])).to.not.throw()
+    })
+
+    it('rejects non-string recipients with a clean invariant error', () => {
+      expect(() =>
+        validateEncodeSwaps(buildSpec({ allowDirectTransfers: true }), [buildV3ExactInStep({ recipient: 123 as any })])
+      ).to.throw('STEP_RECIPIENT_MUST_BE_ROUTER')
+    })
+  })
+
+  describe('directTransfers output coverage helpers', () => {
+    it('counts V3 exact-in minimums delivered to the recipient in the output token', () => {
+      const steps: SwapStep[] = [
+        buildV3ExactInStep({ recipient: TEST_RECIPIENT, amountOutMin: '100' }),
+        buildV3ExactInStep({ amountOutMin: '50' }), // router custody: not counted
+      ]
+      expect(sumDirectOutputMin(steps, TEST_RECIPIENT, WETH.address).toString()).to.equal('100')
+    })
+
+    it('counts V3 exact-out amounts via the path head (reversed encoding)', () => {
+      const steps: SwapStep[] = [buildV3ExactOutStep({ recipient: TEST_RECIPIENT })]
+      expect(sumDirectOutputMin(steps, TEST_RECIPIENT, WETH.address).toString()).to.equal('500000000000000000')
+    })
+
+    it('counts V2 credits via the last path token', () => {
+      const steps: SwapStep[] = [buildV2ExactInStep({ recipient: TEST_RECIPIENT, amountOutMin: '9' })]
+      expect(sumDirectOutputMin(steps, TEST_RECIPIENT, WETH.address).toString()).to.equal('9')
+    })
+
+    it('counts V2 exact-out amounts as credits', () => {
+      const steps: SwapStep[] = [buildV2ExactOutStep({ recipient: TEST_RECIPIENT })]
+      expect(sumDirectOutputMin(steps, TEST_RECIPIENT, WETH.address).toString()).to.equal('500000000000000000')
+    })
+
+    it('counts TAKE_PORTION to the recipient as zero (runtime-sized)', () => {
+      const steps: SwapStep[] = [
+        {
+          type: 'V4_SWAP',
+          v4Actions: [{ action: 'TAKE_PORTION', currency: WETH.address, recipient: TEST_RECIPIENT, bips: '100' }],
+        },
+      ]
+      expect(sumDirectOutputMin(steps, TEST_RECIPIENT, WETH.address).toString()).to.equal('0')
+    })
+
+    it('ignores credits in tokens other than the output token', () => {
+      const steps: SwapStep[] = [
+        buildV3ExactInStep({
+          recipient: TEST_RECIPIENT,
+          amountOutMin: '100',
+          path: packV3Path([USDC.address, DAI.address], [500]),
+        }),
+      ]
+      expect(sumDirectOutputMin(steps, TEST_RECIPIENT, WETH.address).toString()).to.equal('0')
+    })
+
+    it('counts UNWRAP_WETH to the recipient as native', () => {
+      const steps: SwapStep[] = [{ type: 'UNWRAP_WETH', recipient: TEST_RECIPIENT, amountMin: '77' }]
+      expect(sumDirectOutputMin(steps, TEST_RECIPIENT, ETH_ADDRESS).toString()).to.equal('77')
+      expect(sumDirectOutputMin(steps, TEST_RECIPIENT, WETH.address).toString()).to.equal('0')
+    })
+
+    it('counts concrete v4 TAKEs; OPEN_DELTA and CONTRACT_BALANCE takes count zero', () => {
+      const steps: SwapStep[] = [
+        {
+          type: 'V4_SWAP',
+          v4Actions: [
+            { action: 'TAKE', currency: WETH.address, recipient: TEST_RECIPIENT, amount: '40' },
+            { action: 'TAKE', currency: WETH.address, recipient: TEST_RECIPIENT, amount: '0' },
+            { action: 'TAKE', currency: WETH.address, recipient: TEST_RECIPIENT, amount: CONTRACT_BALANCE.toString() },
+          ],
+        },
+      ]
+      expect(sumDirectOutputMin(steps, TEST_RECIPIENT, WETH.address).toString()).to.equal('40')
+    })
+
+    it('counts TAKE_ALL minAmount only for the sender-sentinel recipient', () => {
+      const steps: SwapStep[] = [
+        { type: 'V4_SWAP', v4Actions: [{ action: 'TAKE_ALL', currency: WETH.address, minAmount: '2' }] },
+      ]
+      expect(sumDirectOutputMin(steps, SENDER_AS_RECIPIENT, WETH.address).toString()).to.equal('2')
+      expect(sumDirectOutputMin(steps, TEST_RECIPIENT, WETH.address).toString()).to.equal('0')
+    })
+  })
+
+  describe('budgeted mode — sweep floor', () => {
+    const flagOn = { allowDirectTransfers: true }
+    const NET_MIN = '475000000000000000' // 0.5 WETH quote less 5% slippage
+
+    function sweepAmount(calldata: string): string {
+      const { commandTypes, inputs } = parseCommands(calldata)
+      const sweepIndex = commandTypes.indexOf(CommandType.SWEEP)
+      expect(sweepIndex).to.be.greaterThan(-1)
+      const sweep = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[sweepIndex])
+      return sweep[2].toString()
+    }
+
+    it('keeps the full floor when nothing is delivered directly', () => {
+      const result = SwapRouter.encodeSwaps(buildSpec(flagOn), [buildV3ExactInStep()])
+      expect(sweepAmount(result.calldata)).to.equal(NET_MIN)
+    })
+
+    it('reduces the floor by direct-output minimums', () => {
+      const direct = BigNumber.from(NET_MIN).sub(1000)
+      const steps: SwapStep[] = [buildV3ExactInStep({ recipient: TEST_RECIPIENT, amountOutMin: direct.toString() })]
+      const result = SwapRouter.encodeSwaps(buildSpec(flagOn), steps)
+      expect(sweepAmount(result.calldata)).to.equal('1000')
+    })
+
+    it('clamps the floor at zero when direct minimums exceed netMin', () => {
+      const steps: SwapStep[] = [
+        buildV3ExactInStep({ recipient: TEST_RECIPIENT, amountOutMin: BigNumber.from(NET_MIN).add(5).toString() }),
+      ]
+      const result = SwapRouter.encodeSwaps(buildSpec(flagOn), steps)
+      expect(sweepAmount(result.calldata)).to.equal('0')
+    })
+
+    it('does not reduce the floor for direct deliveries in other tokens', () => {
+      const steps: SwapStep[] = [
+        buildV3ExactInStep(),
+        buildV3ExactInStep({
+          recipient: TEST_RECIPIENT,
+          amountOutMin: '999',
+          path: packV3Path([USDC.address, DAI.address], [500]),
+        }),
+      ]
+      const result = SwapRouter.encodeSwaps(buildSpec(flagOn), steps)
+      expect(sweepAmount(result.calldata)).to.equal(NET_MIN)
+    })
+
+    it('safe-mode floor is unchanged', () => {
+      const result = SwapRouter.encodeSwaps(buildSpec(), [buildV3ExactInStep()])
+      expect(sweepAmount(result.calldata)).to.equal(NET_MIN)
+    })
+
+    it('flat fee with a direct exact-out leg: TRANSFER, residual SWEEP, refund sweep', () => {
+      // exact-out 0.5 WETH with flat fee 0.01 WETH -> netMin 0.49; a direct leg delivers 0.2
+      const fee = { kind: 'flat' as const, recipient: FEE_RECIPIENT, amount: '10000000000000000' }
+      const steps: SwapStep[] = [
+        buildV3ExactOutStep({ recipient: TEST_RECIPIENT, amountOut: '200000000000000000', amountInMax: '400000' }),
+        buildV3ExactOutStep({ amountOut: '300000000000000000', amountInMax: '650000' }),
+      ]
+      const result = SwapRouter.encodeSwaps(buildExactOutSpec({ ...flagOn, fee }), steps)
+      const { commandTypes, inputs } = parseCommands(result.calldata)
+      expect(commandTypes).to.deep.equal([
+        CommandType.PERMIT2_TRANSFER_FROM,
+        CommandType.V3_SWAP_EXACT_OUT,
+        CommandType.V3_SWAP_EXACT_OUT,
+        CommandType.TRANSFER,
+        CommandType.SWEEP,
+        CommandType.SWEEP,
+      ])
+      const residual = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[4])
+      // netMin (0.5 - 0.01 fee) minus 0.2 direct = 0.29 WETH
+      expect(residual[2].toString()).to.equal('290000000000000000')
     })
   })
 })

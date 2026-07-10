@@ -43,6 +43,7 @@ function validateV4HopCounts(actions: V4Action[]): void {
 }
 
 function assertRouterRecipient(recipient: string): void {
+  invariant(typeof recipient === 'string', 'STEP_RECIPIENT_MUST_BE_ROUTER')
   invariant(recipient.toLowerCase() === ROUTER_AS_RECIPIENT, 'STEP_RECIPIENT_MUST_BE_ROUTER')
 }
 
@@ -52,6 +53,7 @@ function makeRecipientCheck(spec: NormalizedSwapSpecification, routerOnlyError: 
   const directOutputAllowed = spec.allowDirectTransfers && spec.fee?.kind !== 'portion'
   const specRecipient = spec.recipient.toLowerCase()
   return (recipient: string): void => {
+    invariant(typeof recipient === 'string', routerOnlyError)
     if (recipient.toLowerCase() === ROUTER_AS_RECIPIENT) return
     invariant(spec.allowDirectTransfers, routerOnlyError)
     invariant(directOutputAllowed, 'PORTION_FEE_REQUIRES_ROUTER_CUSTODY')
@@ -76,6 +78,7 @@ function validateV4Recipients(
         // sender sentinel as the spec recipient, or it would pay the wrong party
         // while reducing the recipient's sweep floor
         invariant(directOutputAllowed, 'PORTION_FEE_REQUIRES_ROUTER_CUSTODY')
+        // strict equality: the sentinel is all-numeric hex, so no checksum variant exists; anything else fails closed
         invariant(spec.recipient === SENDER_AS_RECIPIENT, 'TAKE_ALL_REQUIRES_SENDER_RECIPIENT')
         break
       default:

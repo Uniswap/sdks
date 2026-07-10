@@ -1,5 +1,6 @@
 import { BigNumber } from 'ethers'
 import { SwapStep, V4Action } from '../types/encodeSwaps'
+import { CONTRACT_BALANCE, ETH_ADDRESS, SENDER_AS_RECIPIENT } from './constants'
 
 export type UserPaidPull = {
   // token the step pulls from the user; undefined when not extractable (malformed path)
@@ -86,4 +87,58 @@ export function stepUserPaidPulls(step: SwapStep): UserPaidPull[] {
 
 export function sumUserPaidMax(steps: SwapStep[]): BigNumber {
   return steps.flatMap(stepUserPaidPulls).reduce((total, pull) => total.add(pull.maxAmount), BigNumber.from(0))
+}
+
+export type DirectOutputCredit = {
+  token: string | undefined
+  minAmount: BigNumber
+}
+
+function v4DirectOutputCredits(action: V4Action, recipient: string): DirectOutputCredit[] {
+  switch (action.action) {
+    case 'TAKE': {
+      if (action.recipient.toLowerCase() !== recipient.toLowerCase()) return []
+      const amount = BigNumber.from(action.amount)
+      // OPEN_DELTA (0) / CONTRACT_BALANCE takes are runtime-sized: deliverable, but guarantee nothing
+      if (amount.lte(0) || amount.gte(CONTRACT_BALANCE)) return []
+      return [{ token: action.currency, minAmount: amount }]
+    }
+    case 'TAKE_ALL':
+      // pays msgSender on-chain: counts only when the spec recipient IS the sender sentinel
+      return recipient.toLowerCase() === SENDER_AS_RECIPIENT
+        ? [{ token: action.currency, minAmount: BigNumber.from(action.minAmount) }]
+        : []
+    default:
+      return []
+  }
+}
+
+// contract-guaranteed amounts a step delivers directly to `recipient`
+export function stepDirectOutputCredits(step: SwapStep, recipient: string): DirectOutputCredit[] {
+  const isDirect = 'recipient' in step && step.recipient.toLowerCase() === recipient.toLowerCase()
+  switch (step.type) {
+    case 'V2_SWAP_EXACT_IN':
+      return isDirect ? [{ token: step.path[step.path.length - 1], minAmount: BigNumber.from(step.amountOutMin) }] : []
+    case 'V2_SWAP_EXACT_OUT':
+      return isDirect ? [{ token: step.path[step.path.length - 1], minAmount: BigNumber.from(step.amountOut) }] : []
+    case 'V3_SWAP_EXACT_IN':
+      return isDirect ? [{ token: v3PathLastToken(step.path), minAmount: BigNumber.from(step.amountOutMin) }] : []
+    case 'V3_SWAP_EXACT_OUT':
+      // exact-out paths are encoded output-first, so the output token is the path head
+      return isDirect ? [{ token: v3PathFirstToken(step.path), minAmount: BigNumber.from(step.amountOut) }] : []
+    case 'UNWRAP_WETH':
+      return isDirect ? [{ token: ETH_ADDRESS, minAmount: BigNumber.from(step.amountMin) }] : []
+    case 'V4_SWAP':
+      return step.v4Actions.flatMap((action) => v4DirectOutputCredits(action, recipient))
+    default:
+      return []
+  }
+}
+
+export function sumDirectOutputMin(steps: SwapStep[], recipient: string, outputTokenAddress: string): BigNumber {
+  const target = outputTokenAddress.toLowerCase()
+  return steps
+    .flatMap((step) => stepDirectOutputCredits(step, recipient))
+    .filter((credit) => credit.token !== undefined && credit.token.toLowerCase() === target)
+    .reduce((total, credit) => total.add(credit.minAmount), BigNumber.from(0))
 }
