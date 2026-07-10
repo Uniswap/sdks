@@ -1,5 +1,11 @@
 # @uniswap/liquidity-launcher-sdk
 
+## 0.3.1
+
+### Patch Changes
+
+- 9f407e4: Update LBPStrategy addresses to the v3.1.0 deployments on all chains
+
 ## 0.3.0
 
 ### Minor Changes
