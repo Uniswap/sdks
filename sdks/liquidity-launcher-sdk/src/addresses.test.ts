@@ -15,7 +15,7 @@ import { SupportedChainId } from './chains'
 describe('getLauncherAddresses', () => {
   it('returns the Unichain LBPStrategy singleton', () => {
     const addresses = getLauncherAddresses(SupportedChainId.UNICHAIN)
-    expect(addresses?.lbpStrategy).toBe(getAddress('0x824a3ecde463dd45cc156b64cefa132596c9a000'))
+    expect(addresses?.lbpStrategy).toBe(getAddress('0x298eA05D0356B2Ae5cCAa3169E471783ee9EA000'))
   })
 
   it('uses the same LiquidityLauncher CREATE2 address on every chain', () => {
@@ -30,13 +30,13 @@ describe('getLauncherAddresses', () => {
 
   it('returns the per-chain LBPStrategy singletons for the 2026-07 launch chains', () => {
     expect(getLauncherAddresses(SupportedChainId.AVALANCHE)?.lbpStrategy).toBe(
-      getAddress('0xcacd77134b072b4ad5621f585b0b422c6da4e000')
+      getAddress('0x57BD0A9Cd933c89Ba55e086D53031367b6406000')
     )
     expect(getLauncherAddresses(SupportedChainId.XLAYER)?.lbpStrategy).toBe(
-      getAddress('0x95bcb80e3804a085d23778f2956c305d6488e000')
+      getAddress('0x58DF162fF41e5cB42B8515f75F90C1841938A000')
     )
     expect(getLauncherAddresses(SupportedChainId.ROBINHOOD)?.lbpStrategy).toBe(
-      getAddress('0x843747f4c08e3393e55508f577296ba48e8ca000')
+      getAddress('0x05d552391067389EE44fec3924157ed33F976000')
     )
   })
 })

@@ -61,7 +61,7 @@ const POSITION_MANAGER_BASE_SEPOLIA = getAddress('0x4B2C77d209D3405F41a037Ec6c77
 export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   [SupportedChainId.MAINNET]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0xb98766A35cdc28415be0767D4EA41e39fBA3e000'),
+    lbpStrategy: getAddress('0x49380c4EfaB1b491006aF7FabAB8B3459F0E6000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
@@ -71,7 +71,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   },
   [SupportedChainId.UNICHAIN]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0x824A3eCDe463DD45cC156b64CEfA132596C9A000'),
+    lbpStrategy: getAddress('0x298eA05D0356B2Ae5cCAa3169E471783ee9EA000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
@@ -80,7 +80,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   },
   [SupportedChainId.BASE]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0x5bB4bAfafEc57BEd50D864AAA9D1ef992611e000'),
+    lbpStrategy: getAddress('0x34385dD739FE5464892BF0bA4CC42492804dA000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
@@ -89,7 +89,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   },
   [SupportedChainId.ARBITRUM_ONE]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0x18608AD558dcD233F7854242bbAef73988Bee000'),
+    lbpStrategy: getAddress('0x8Af0775a70Cc94D71DFc0fE809435e833F2Fe000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
@@ -98,7 +98,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   },
   [SupportedChainId.AVALANCHE]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0xcAcd77134b072b4AD5621f585b0b422C6Da4E000'),
+    lbpStrategy: getAddress('0x57BD0A9Cd933c89Ba55e086D53031367b6406000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
@@ -107,7 +107,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   },
   [SupportedChainId.XLAYER]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0x95bcb80e3804a085d23778F2956c305d6488e000'),
+    lbpStrategy: getAddress('0x58DF162fF41e5cB42B8515f75F90C1841938A000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
@@ -116,8 +116,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   },
   [SupportedChainId.ROBINHOOD]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    // Redeployed 2026-07-09 alongside CCA_FACTORY_ROBINHOOD (blocknumberish-aware).
-    lbpStrategy: getAddress('0x843747f4c08E3393E55508F577296bA48E8Ca000'),
+    lbpStrategy: getAddress('0x05d552391067389EE44fec3924157ed33F976000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY_ROBINHOOD,
     permit2: PERMIT2,
@@ -126,7 +125,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   },
   [SupportedChainId.SEPOLIA]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0x3f37838651B5AD71D4e01Ec9745862A5D9DF2000'),
+    lbpStrategy: getAddress('0x96641d91e223c766F45b19d09494F5925C3cE000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
@@ -135,7 +134,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   },
   [SupportedChainId.BASE_SEPOLIA]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0x0e1793a989c682117fcBfB3a9aA8e451D37D2000'),
+    lbpStrategy: getAddress('0xB06428b62c259eE982cE3D9BED47391dC9A5E000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
