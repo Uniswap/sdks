@@ -149,6 +149,83 @@ export function getLauncherAddresses(chainId: number): LauncherAddresses | undef
   return LAUNCHER_ADDRESSES[chainId]
 }
 
+// ---------------------------------------------------------------------------
+// Auction factory deployment registry (chain-independent)
+// ---------------------------------------------------------------------------
+
+// Historical auction factories. Every factory is a CREATE2 deploy, so each address is the same on
+// every chain it exists on — the registry below is therefore chain-independent.
+const TWA_FACTORY_V1 = getAddress('0xcccccccae7503cac057829bf2811de42e16e0bd5')
+const CCA_FACTORY_EARLY_TEST = getAddress('0x088ca22b591f2f4bf0ad2780d2a44fa692e948d0')
+
+/** TickDataLens for v1 (TWA) auctions. CREATE2 — same address on every supported chain. */
+export const TICK_DATA_LENS_V1: Address = getAddress('0x5fAE46790F3F48A35e3792f89A9eC54FC52b207a')
+/** TickDataLens for v2 (CCA) auctions. CREATE2 — same address on every supported chain. */
+export const TICK_DATA_LENS_V2: Address = getAddress('0xc3C65F5453A3674aDb693cbdA3C842545cD30f53')
+
+/** One historical auction-factory deployment, paired with the lens that reads its auctions. */
+export interface AuctionFactoryDeployment {
+  /** The auction factory (CREATE2 — same address on every chain it is deployed to). */
+  factory: Address
+  /**
+   * The TickDataLens that can read auctions created by this factory. The lens is 1:1 with the
+   * auction implementation version: v1 (TWA) auctions can only be read by the v1 lens, v2 (CCA)
+   * auctions by the v2 lens. Both lenses return the same tuple shape, so one ABI decodes either.
+   */
+  tickDataLens: Address
+  /** Human-readable deployment tag (not an on-chain value). */
+  description: string
+}
+
+/**
+ * Every auction factory ever deployed — current and historical — each paired with its TickDataLens.
+ * Append-only: indexed auctions permanently reference the factory that created them, so when a
+ * factory is redeployed the new entry is added and the old ones are kept. Downstream indexers
+ * resolve a stored factory address through this registry instead of hardcoding their own map, so a
+ * redeploy only requires bumping this package.
+ */
+export const AUCTION_FACTORY_DEPLOYMENTS: readonly AuctionFactoryDeployment[] = [
+  {
+    factory: TWA_FACTORY_V1,
+    tickDataLens: TICK_DATA_LENS_V1,
+    description: 'v1 TWA auction factory',
+  },
+  {
+    factory: CCA_FACTORY_EARLY_TEST,
+    tickDataLens: TICK_DATA_LENS_V2,
+    description: 'v2 CCA factory (early test deploy)',
+  },
+  {
+    factory: CCA_FACTORY,
+    tickDataLens: TICK_DATA_LENS_V2,
+    description: 'v2 CCA factory (contracts v2.0.0, deployed on all supported chains)',
+  },
+  {
+    factory: CCA_FACTORY_ROBINHOOD,
+    tickDataLens: TICK_DATA_LENS_V2,
+    description: 'v2 CCA factory (2026-07-09 blocknumberish-aware redeploy, contracts v1.1.x)',
+  },
+]
+
+/**
+ * Factory address (lowercased) → TickDataLens, derived from {@link AUCTION_FACTORY_DEPLOYMENTS}.
+ * Keys are lowercased so lookups are case-insensitive regardless of how the caller stored the
+ * factory address; prefer {@link getTickDataLensForFactory}, which normalizes for you.
+ */
+export const TICK_DATA_LENS_BY_FACTORY: ReadonlyMap<string, Address> = new Map(
+  AUCTION_FACTORY_DEPLOYMENTS.map((deployment) => [deployment.factory.toLowerCase(), deployment.tickDataLens])
+)
+
+/**
+ * Resolves the TickDataLens that reads auctions created by `factoryAddress` (case-insensitive).
+ * Returns `undefined` for a factory not in {@link AUCTION_FACTORY_DEPLOYMENTS} — callers with
+ * pre-registry rows (or a null stored factory) typically fall back to {@link TICK_DATA_LENS_V1},
+ * since every auction indexed before factories were recorded is a v1 auction.
+ */
+export function getTickDataLensForFactory(factoryAddress: string): Address | undefined {
+  return TICK_DATA_LENS_BY_FACTORY.get(factoryAddress.toLowerCase())
+}
+
 /** Which token standard a new-token launch targets (selects its address-derivation scheme). */
 export type TokenFactoryKind = 'uerc20' | 'usuperc20'
 
