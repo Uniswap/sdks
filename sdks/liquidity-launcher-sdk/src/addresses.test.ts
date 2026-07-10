@@ -28,7 +28,7 @@ describe('getLauncherAddresses', () => {
       getAddress('0x95bcb80e3804a085d23778f2956c305d6488e000')
     )
     expect(getLauncherAddresses(SupportedChainId.ROBINHOOD)?.lbpStrategy).toBe(
-      getAddress('0x095e38a2135aebcffa98a5b6911591937f912000')
+      getAddress('0x843747f4c08e3393e55508f577296ba48e8ca000')
     )
   })
 })
