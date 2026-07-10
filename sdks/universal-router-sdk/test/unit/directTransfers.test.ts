@@ -1039,6 +1039,7 @@ describe('allowDirectTransfers', () => {
       const off = SwapRouter.encodeSwaps(spec, steps)
       const on = SwapRouter.encodeSwaps(usdtEthSpec('100000', '60175820634906', true), steps)
       expect(on.calldata).to.equal(off.calldata)
+      expect(on.value).to.equal(off.value)
     })
 
     it('rejects the multi-protocol sample raw (hookData "") and encodes it normalized, byte-identical across regimes', () => {
@@ -1049,8 +1050,9 @@ describe('allowDirectTransfers', () => {
       const steps = normalizeHookData(raw)
       const off = SwapRouter.encodeSwaps(spec, steps)
       const on = SwapRouter.encodeSwaps(usdtEthSpec('10000000000', '5551980093360789420', true), steps)
-      expect(off.calldata.length).to.be.greaterThan(2000) // 9-step plan, ~5kB calldata
+      expect(off.calldata.length).to.be.greaterThan(2000) // 8-step plan, ~5kB calldata
       expect(on.calldata).to.equal(off.calldata)
+      expect(on.value).to.equal(off.value)
     })
   })
 })
