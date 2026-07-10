@@ -149,12 +149,21 @@ export abstract class SwapRouter {
    * Routers own `swapSteps` (V2/V3/V4 swaps, plus any `WRAP_ETH` / `UNWRAP_WETH` required by the route).
    * The SDK owns ingress, fees, final settlement, exact-output refund, and optional `safeMode`.
    *
+   * Two validation regimes:
+   * - Default (router custody): the single SDK ingress pull is the only user withdrawal and every step
+   *   recipient must be the router; the final SWEEP floor enforces the minimum output.
+   * - `allowDirectTransfers`: steps may pull input directly from the user (`payerIsUser`, v4 SETTLE_ALL)
+   *   and deliver output directly to `recipient` (step recipients, v4 TAKE/TAKE_ALL, UNWRAP_WETH). The
+   *   SDK enforces an inbound budget (total contract-enforced pulls <= exactOrMaxAmountIn, ingress pulls
+   *   only the remainder) and outbound coverage (contract-enforced direct minimums reduce the SWEEP
+   *   floor). Portion fees require full output custody. Protective amounts always derive from the spec;
+   *   step amounts are only counted or capped. For fee-on-transfer output tokens the guarantee holds at
+   *   the enforcement point (router balance or pool payout), i.e. modulo at most one transfer fee — same
+   *   as the custody model.
+   *
    * Router contract: end with final output in `spec.routing.outputToken`; for `EXACT_OUTPUT`, unused input
    * must end in `spec.routing.inputToken`. Don't include a top-level `SWEEP` — the SDK appends settlement,
    * refund, and safeMode sweeps itself.
-   *
-   * Router custody with `payerIsUser = false` is deliberate for safety, even if it costs an extra command
-   * or transfer; the SDK does not infer route topology on behalf of routers.
    */
   public static encodeSwaps(spec: SwapSpecification, swapSteps: SwapStep[]): MethodParameters {
     const normalizedSpec = normalizeEncodeSwapsSpec(spec)

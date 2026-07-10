@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { BigNumber, utils } from 'ethers'
 import { defaultAbiCoder } from 'ethers/lib/utils'
-import { CurrencyAmount, Percent, TradeType } from '@uniswap/sdk-core'
+import { CurrencyAmount, Percent, Token, TradeType } from '@uniswap/sdk-core'
 import { URVersion, V4BaseActionsParser } from '@uniswap/v4-sdk'
 import { SwapRouter } from '../../src/swapRouter'
 import { TokenTransferMode } from '../../src/entities/actions/uniswap'
@@ -37,6 +37,7 @@ import {
 } from '../../src/utils/constants'
 import { TEST_FEE_RECIPIENT_ADDRESS, TEST_RECIPIENT_ADDRESS } from '../utils/addresses'
 import { DAI, ETHER as ETH, USDC, WETH, parseCommands } from '../utils/uniswapData'
+import routingSamples from './fixtures/routingSwapSteps.json'
 
 const TEST_RECIPIENT = TEST_RECIPIENT_ADDRESS
 const FEE_RECIPIENT = TEST_FEE_RECIPIENT_ADDRESS
@@ -930,6 +931,11 @@ describe('allowDirectTransfers', () => {
       expect(sumDirectOutputMin(steps, SENDER_AS_RECIPIENT, WETH.address).toString()).to.equal('2')
       expect(sumDirectOutputMin(steps, TEST_RECIPIENT, WETH.address).toString()).to.equal('0')
     })
+
+    it('accumulates duplicate direct legs (each is independently contract-enforced)', () => {
+      const leg = buildV3ExactInStep({ recipient: TEST_RECIPIENT, amountOutMin: '200000000000000000' })
+      expect(sumDirectOutputMin([leg, leg], TEST_RECIPIENT, WETH.address).toString()).to.equal('400000000000000000')
+    })
   })
 
   describe('budgeted mode — sweep floor', () => {
@@ -1002,6 +1008,49 @@ describe('allowDirectTransfers', () => {
       const residual = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[4])
       // netMin (0.5 - 0.01 fee) minus 0.2 direct = 0.29 WETH
       expect(residual[2].toString()).to.equal('290000000000000000')
+    })
+  })
+
+  describe('real routing corpus', () => {
+    const USDT = new Token(1, '0xdAC17F958D2ee523a2206206994597C13D831ec7', 6, 'USDT')
+    const normalizeHookData = (steps: SwapStep[]): SwapStep[] =>
+      steps.map((s) =>
+        s.type === 'V4_SWAP'
+          ? {
+              ...s,
+              v4Actions: s.v4Actions.map((a) => ('hookData' in a && a.hookData === '' ? { ...a, hookData: '0x' } : a)),
+            }
+          : s
+      )
+    const usdtEthSpec = (amount: string, quote: string, allowDirectTransfers: boolean): NormalizedSwapSpecification =>
+      buildSpec(
+        { allowDirectTransfers, urVersion: UniversalRouterVersion.V2_1_1 },
+        {
+          inputToken: USDT,
+          outputToken: ETH,
+          amount: CurrencyAmount.fromRawAmount(USDT, amount),
+          quote: CurrencyAmount.fromRawAmount(ETH, quote),
+        }
+      )
+
+    it('encodes the custody+unwrap sample identically in both regimes', () => {
+      const steps = routingSamples.custodyUnwrap as SwapStep[]
+      const spec = usdtEthSpec('100000', '60175820634906', false)
+      const off = SwapRouter.encodeSwaps(spec, steps)
+      const on = SwapRouter.encodeSwaps(usdtEthSpec('100000', '60175820634906', true), steps)
+      expect(on.calldata).to.equal(off.calldata)
+    })
+
+    it('rejects the multi-protocol sample raw (hookData "") and encodes it normalized, byte-identical across regimes', () => {
+      const raw = routingSamples.multiProtocolSplit as SwapStep[]
+      const spec = usdtEthSpec('10000000000', '5551980093360789420', false)
+      expect(() => validateEncodeSwaps(spec, raw)).to.throw('V4_HOOK_DATA_INVALID')
+
+      const steps = normalizeHookData(raw)
+      const off = SwapRouter.encodeSwaps(spec, steps)
+      const on = SwapRouter.encodeSwaps(usdtEthSpec('10000000000', '5551980093360789420', true), steps)
+      expect(off.calldata.length).to.be.greaterThan(2000) // 9-step plan, ~5kB calldata
+      expect(on.calldata).to.equal(off.calldata)
     })
   })
 })

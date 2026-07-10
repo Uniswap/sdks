@@ -105,7 +105,7 @@ function v4DirectOutputCredits(action: V4Action, recipient: string): DirectOutpu
     }
     case 'TAKE_ALL':
       // pays msgSender on-chain: counts only when the spec recipient IS the sender sentinel
-      return recipient.toLowerCase() === SENDER_AS_RECIPIENT
+      return recipient === SENDER_AS_RECIPIENT
         ? [{ token: action.currency, minAmount: BigNumber.from(action.minAmount) }]
         : []
     default:

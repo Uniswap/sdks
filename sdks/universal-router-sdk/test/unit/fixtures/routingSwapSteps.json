@@ -1,0 +1,120 @@
+{
+  "custodyUnwrap": [
+    {
+      "type": "V2_SWAP_EXACT_IN",
+      "recipient": "0x0000000000000000000000000000000000000002",
+      "amountIn": "100000",
+      "amountOutMin": "0",
+      "path": ["0xdAC17F958D2ee523a2206206994597C13D831ec7", "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"]
+    },
+    { "type": "UNWRAP_WETH", "recipient": "0x0000000000000000000000000000000000000002", "amountMin": "57167029603161" }
+  ],
+  "multiProtocolSplit": [
+    {
+      "type": "V3_SWAP_EXACT_IN",
+      "recipient": "0x0000000000000000000000000000000000000002",
+      "amountIn": "1030000000",
+      "amountOutMin": "0",
+      "path": "0xdac17f958d2ee523a2206206994597c13d831ec7000064c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+    },
+    {
+      "type": "V3_SWAP_EXACT_IN",
+      "recipient": "0x0000000000000000000000000000000000000002",
+      "amountIn": "2890000000",
+      "amountOutMin": "0",
+      "path": "0xdac17f958d2ee523a2206206994597c13d831ec70001f4c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+    },
+    {
+      "type": "V4_SWAP",
+      "v4Actions": [
+        { "action": "SETTLE", "currency": "0xdAC17F958D2ee523a2206206994597C13D831ec7", "amount": "6080000000" },
+        {
+          "action": "SWAP_EXACT_IN_SINGLE",
+          "poolKey": {
+            "currency0": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            "currency1": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+            "fee": 10,
+            "tickSpacing": 1,
+            "hooks": "0x0000000000000000000000000000000000000000"
+          },
+          "zeroForOne": false,
+          "amountIn": "5460000000",
+          "amountOutMinimum": "5429279208",
+          "hookData": "",
+          "minHopPriceX36": "0"
+        },
+        {
+          "action": "SWAP_EXACT_IN_SINGLE",
+          "poolKey": {
+            "currency0": "0x0000000000000000000000000000000000000000",
+            "currency1": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+            "fee": 100,
+            "tickSpacing": 1,
+            "hooks": "0x0000000000000000000000000000000000000000"
+          },
+          "zeroForOne": false,
+          "amountIn": "620000000",
+          "amountOutMinimum": "355141336725403322",
+          "hookData": "",
+          "minHopPriceX36": "0"
+        },
+        {
+          "action": "SWAP_EXACT_IN_SINGLE",
+          "poolKey": {
+            "currency0": "0x0000000000000000000000000000000000000000",
+            "currency1": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            "fee": 100,
+            "tickSpacing": 1,
+            "hooks": "0x0000000000000000000000000000000000000000"
+          },
+          "zeroForOne": false,
+          "amountIn": "169893226",
+          "amountOutMinimum": "97369597604936590",
+          "hookData": "",
+          "minHopPriceX36": "0"
+        },
+        {
+          "action": "TAKE",
+          "currency": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+          "recipient": "0x0000000000000000000000000000000000000002",
+          "amount": "0"
+        },
+        {
+          "action": "TAKE",
+          "currency": "0x0000000000000000000000000000000000000000",
+          "recipient": "0x0000000000000000000000000000000000000002",
+          "amount": "0"
+        }
+      ]
+    },
+    {
+      "type": "V3_SWAP_EXACT_IN",
+      "recipient": "0x0000000000000000000000000000000000000002",
+      "amountIn": "99937230",
+      "amountOutMin": "0",
+      "path": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb480001f42260fac5e5542a773aa44fbcfedf7c193bc2c599"
+    },
+    {
+      "type": "V3_SWAP_EXACT_IN",
+      "recipient": "0x0000000000000000000000000000000000000002",
+      "amountIn": "2028724299",
+      "amountOutMin": "0",
+      "path": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48000064c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+    },
+    {
+      "type": "V3_SWAP_EXACT_IN",
+      "recipient": "0x0000000000000000000000000000000000000002",
+      "amountIn": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "amountOutMin": "0",
+      "path": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb480001f4c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+    },
+    {
+      "type": "V3_SWAP_EXACT_IN",
+      "recipient": "0x0000000000000000000000000000000000000002",
+      "amountIn": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+      "amountOutMin": "0",
+      "path": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599000064c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+    },
+    { "type": "UNWRAP_WETH", "recipient": "0x0000000000000000000000000000000000000002", "amountMin": "5274381088692749949" }
+  ]
+}
