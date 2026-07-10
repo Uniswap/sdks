@@ -8,14 +8,27 @@ export type UserPaidPull = {
   maxAmount: BigNumber
 }
 
-// a v3 path is token (20 bytes) + N * (fee (3 bytes) + token (20 bytes)), hex-encoded
+// V3 path: 20-byte address + N × (3-byte fee + 20-byte address); minimum is 43 bytes (single hop, N=1)
+// Returns N or undefined if malformed
+export function getV3HopCount(path: string): number | undefined {
+  if (!path.startsWith('0x')) return undefined
+
+  const byteLength = (path.length - 2) / 2
+  if (byteLength < 43) return undefined
+
+  const variableSegmentLength = byteLength - 20
+  if (variableSegmentLength < 23 || variableSegmentLength % 23 !== 0) return undefined
+
+  return variableSegmentLength / 23
+}
+
 export function v3PathFirstToken(path: string): string | undefined {
-  if (!path.startsWith('0x') || path.length < 42) return undefined
+  if (getV3HopCount(path) === undefined) return undefined
   return '0x' + path.slice(2, 42)
 }
 
 export function v3PathLastToken(path: string): string | undefined {
-  if (!path.startsWith('0x') || path.length < 42) return undefined
+  if (getV3HopCount(path) === undefined) return undefined
   return '0x' + path.slice(-40)
 }
 

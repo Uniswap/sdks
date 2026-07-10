@@ -372,6 +372,21 @@ describe('allowDirectTransfers', () => {
         expect(v3PathFirstToken('0x1234')).to.equal(undefined)
         expect(v3PathLastToken('nope')).to.equal(undefined)
       })
+
+      it('returns undefined for hop-misaligned and single-address paths', () => {
+        const valid = packV3Path([USDC.address, WETH.address, DAI.address], [500, 3000])
+        const truncated = valid.slice(0, valid.length - 2) // drop one byte: no longer 20 + N*23 aligned
+        expect(v3PathFirstToken(truncated)).to.equal(undefined)
+        expect(v3PathLastToken(truncated)).to.equal(undefined)
+        expect(v3PathFirstToken('0x' + USDC.address.slice(2))).to.equal(undefined)
+        expect(v3PathLastToken('0x' + USDC.address.slice(2))).to.equal(undefined)
+      })
+
+      it('preserves address casing from checksummed paths', () => {
+        const path = '0x' + DAI.address.slice(2) + '0001f4' + WETH.address.slice(2)
+        expect(v3PathFirstToken(path)).to.equal('0x' + DAI.address.slice(2))
+        expect(v3PathLastToken(path)).to.equal('0x' + WETH.address.slice(2))
+      })
     })
 
     describe('stepUserPaidPulls / sumUserPaidMax', () => {
@@ -421,6 +436,19 @@ describe('allowDirectTransfers', () => {
           buildV3ExactInStep(),
         ]
         expect(sumUserPaidMax(steps).toString()).to.equal('750000')
+      })
+
+      it('wrap/unwrap and settle-free v4 steps produce no pulls', () => {
+        expect(stepUserPaidPulls({ type: 'WRAP_ETH', recipient: ROUTER_AS_RECIPIENT, amount: '1' })).to.deep.equal([])
+        expect(
+          stepUserPaidPulls({ type: 'UNWRAP_WETH', recipient: ROUTER_AS_RECIPIENT, amountMin: '1' })
+        ).to.deep.equal([])
+        expect(
+          stepUserPaidPulls({
+            type: 'V4_SWAP',
+            v4Actions: [{ action: 'TAKE', currency: WETH.address, recipient: ROUTER_AS_RECIPIENT, amount: '0' }],
+          })
+        ).to.deep.equal([])
       })
     })
   })

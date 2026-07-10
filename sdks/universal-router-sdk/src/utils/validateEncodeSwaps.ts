@@ -4,21 +4,7 @@ import { TradeType } from '@uniswap/sdk-core'
 import { TokenTransferMode } from '../entities/actions/uniswap'
 import { ROUTER_AS_RECIPIENT, SENDER_AS_RECIPIENT, UniversalRouterVersion, ZERO_ADDRESS } from './constants'
 import { NormalizedSwapSpecification, SwapStep, V4Action } from '../types/encodeSwaps'
-import { hasUserPaidFlag } from './directTransfers'
-
-// V3 path: 20-byte address + N × (3-byte fee + 20-byte address); minimum is 43 bytes (single hop, N=1)
-// Returns N or undefined if malformed
-function getV3HopCount(path: string): number | undefined {
-  if (!path.startsWith('0x')) return undefined
-
-  const byteLength = (path.length - 2) / 2
-  if (byteLength < 43) return undefined
-
-  const variableSegmentLength = byteLength - 20
-  if (variableSegmentLength < 23 || variableSegmentLength % 23 !== 0) return undefined
-
-  return variableSegmentLength / 23
-}
+import { getV3HopCount, hasUserPaidFlag } from './directTransfers'
 
 function hasV4MinHopPriceX36(action: V4Action): boolean {
   switch (action.action) {
