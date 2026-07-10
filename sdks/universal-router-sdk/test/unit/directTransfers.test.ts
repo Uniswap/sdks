@@ -707,5 +707,114 @@ describe('allowDirectTransfers', () => {
       expect(on.calldata).to.equal(off.calldata)
       expect(on.value).to.equal(off.value)
     })
+
+    it('fails closed when the ingress remainder exceeds uint160 (ethers abi bounds)', () => {
+      const huge = BigNumber.from(2).pow(170).toString()
+      const spec = buildSpec(
+        { allowDirectTransfers: true },
+        {
+          amount: CurrencyAmount.fromRawAmount(USDC, huge),
+          quote: CurrencyAmount.fromRawAmount(WETH, '500000000000000000'),
+        }
+      )
+      expect(() =>
+        SwapRouter.encodeSwaps(spec, [buildV3ExactInStep({ payerIsUser: true, amountIn: '1000' })])
+      ).to.throw(/out-of-bounds/)
+    })
+  })
+
+  describe('budgeted mode — outbound recipients', () => {
+    const flagOn = { allowDirectTransfers: true }
+    const portionFee = { kind: 'portion' as const, recipient: FEE_RECIPIENT, fee: new Percent(5, 1000) }
+
+    it('accepts steps paying the spec recipient directly', () => {
+      expect(() =>
+        validateEncodeSwaps(buildSpec(flagOn), [buildV3ExactInStep({ recipient: TEST_RECIPIENT })])
+      ).to.not.throw()
+    })
+
+    it('rejects recipients that are neither router nor the spec recipient', () => {
+      expect(() => validateEncodeSwaps(buildSpec(flagOn), [buildV3ExactInStep({ recipient: FEE_RECIPIENT })])).to.throw(
+        'STEP_RECIPIENT_NOT_ALLOWED'
+      )
+    })
+
+    it('still rejects non-router recipients in safe mode with the legacy error', () => {
+      expect(() => validateEncodeSwaps(buildSpec(), [buildV3ExactInStep({ recipient: TEST_RECIPIENT })])).to.throw(
+        'STEP_RECIPIENT_MUST_BE_ROUTER'
+      )
+    })
+
+    it('rejects direct-output steps when a portion fee is set', () => {
+      expect(() =>
+        validateEncodeSwaps(buildSpec({ ...flagOn, fee: portionFee }), [
+          buildV3ExactInStep({ recipient: TEST_RECIPIENT }),
+        ])
+      ).to.throw('PORTION_FEE_REQUIRES_ROUTER_CUSTODY')
+    })
+
+    it('allows user-paid input alongside a portion fee with custody output', () => {
+      expect(() =>
+        validateEncodeSwaps(buildSpec({ ...flagOn, fee: portionFee }), [buildV3ExactInStep({ payerIsUser: true })])
+      ).to.not.throw()
+    })
+
+    it('accepts v4 TAKE / TAKE_PORTION to the spec recipient', () => {
+      const step: V4Swap = {
+        type: 'V4_SWAP',
+        v4Actions: [
+          { action: 'TAKE', currency: WETH.address, recipient: TEST_RECIPIENT, amount: '1' },
+          { action: 'TAKE_PORTION', currency: WETH.address, recipient: TEST_RECIPIENT, bips: '100' },
+        ],
+      }
+      expect(() => validateEncodeSwaps(buildSpec(flagOn), [step])).to.not.throw()
+    })
+
+    it('rejects v4 TAKE to an address that is neither router nor the spec recipient', () => {
+      const step: V4Swap = {
+        type: 'V4_SWAP',
+        v4Actions: [{ action: 'TAKE', currency: WETH.address, recipient: FEE_RECIPIENT, amount: '1' }],
+      }
+      expect(() => validateEncodeSwaps(buildSpec(flagOn), [step])).to.throw('STEP_RECIPIENT_NOT_ALLOWED')
+    })
+
+    it('accepts UNWRAP_WETH to the spec recipient but keeps WRAP_ETH router-only', () => {
+      expect(() =>
+        validateEncodeSwaps(buildSpec(flagOn), [
+          buildV3ExactInStep(),
+          { type: 'UNWRAP_WETH', recipient: TEST_RECIPIENT, amountMin: '1' },
+        ])
+      ).to.not.throw()
+      expect(() =>
+        validateEncodeSwaps(buildSpec(flagOn), [
+          { type: 'WRAP_ETH', recipient: TEST_RECIPIENT, amount: '1' },
+          buildV3ExactInStep(),
+        ])
+      ).to.throw('STEP_RECIPIENT_MUST_BE_ROUTER')
+    })
+
+    it('requires the sender-sentinel recipient for TAKE_ALL', () => {
+      const step: V4Swap = {
+        type: 'V4_SWAP',
+        v4Actions: [{ action: 'TAKE_ALL', currency: WETH.address, minAmount: '1' }],
+      }
+      expect(() => validateEncodeSwaps(buildSpec(flagOn), [step])).to.throw('TAKE_ALL_REQUIRES_SENDER_RECIPIENT')
+      expect(() => validateEncodeSwaps(buildSpec({ ...flagOn, recipient: SENDER_AS_RECIPIENT }), [step])).to.not.throw()
+    })
+
+    it('bans TAKE_ALL under a portion fee', () => {
+      const step: V4Swap = {
+        type: 'V4_SWAP',
+        v4Actions: [{ action: 'TAKE_ALL', currency: WETH.address, minAmount: '1' }],
+      }
+      expect(() =>
+        validateEncodeSwaps(buildSpec({ ...flagOn, recipient: SENDER_AS_RECIPIENT, fee: portionFee }), [step])
+      ).to.throw('PORTION_FEE_REQUIRES_ROUTER_CUSTODY')
+    })
+
+    it('matches step recipients case-insensitively', () => {
+      const upper = ('0x' + TEST_RECIPIENT.slice(2).toUpperCase()) as string
+      expect(() => validateEncodeSwaps(buildSpec(flagOn), [buildV3ExactInStep({ recipient: upper })])).to.not.throw()
+    })
   })
 })

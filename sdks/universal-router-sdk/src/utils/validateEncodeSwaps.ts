@@ -43,20 +43,40 @@ function validateV4HopCounts(actions: V4Action[]): void {
 }
 
 function assertRouterRecipient(recipient: string): void {
-  invariant(recipient === ROUTER_AS_RECIPIENT, 'STEP_RECIPIENT_MUST_BE_ROUTER')
+  invariant(recipient.toLowerCase() === ROUTER_AS_RECIPIENT, 'STEP_RECIPIENT_MUST_BE_ROUTER')
 }
 
-function assertRouterActionRecipient(recipient: string): void {
-  invariant(recipient === ROUTER_AS_RECIPIENT, 'V4_ACTION_RECIPIENT_MUST_BE_ROUTER')
+// router custody is always allowed; the spec recipient is additionally allowed under
+// allowDirectTransfers unless a portion fee requires full output custody
+function makeRecipientCheck(spec: NormalizedSwapSpecification, routerOnlyError: string) {
+  const directOutputAllowed = spec.allowDirectTransfers && spec.fee?.kind !== 'portion'
+  const specRecipient = spec.recipient.toLowerCase()
+  return (recipient: string): void => {
+    if (recipient.toLowerCase() === ROUTER_AS_RECIPIENT) return
+    invariant(spec.allowDirectTransfers, routerOnlyError)
+    invariant(directOutputAllowed, 'PORTION_FEE_REQUIRES_ROUTER_CUSTODY')
+    invariant(recipient.toLowerCase() === specRecipient, 'STEP_RECIPIENT_NOT_ALLOWED')
+  }
 }
 
-// V4 actions that take a recipient must use router custody so the SDK's settlement sweeps see the funds
-function validateV4Recipients(actions: V4Action[]): void {
+function validateV4Recipients(
+  actions: V4Action[],
+  spec: NormalizedSwapSpecification,
+  checkV4Recipient: (recipient: string) => void
+): void {
+  const directOutputAllowed = spec.allowDirectTransfers && spec.fee?.kind !== 'portion'
   for (const action of actions) {
     switch (action.action) {
       case 'TAKE':
       case 'TAKE_PORTION':
-        assertRouterActionRecipient(action.recipient)
+        checkV4Recipient(action.recipient)
+        break
+      case 'TAKE_ALL':
+        // TAKE_ALL pays msgSender on-chain: needs direct output allowed and the
+        // sender sentinel as the spec recipient, or it would pay the wrong party
+        // while reducing the recipient's sweep floor
+        invariant(directOutputAllowed, 'PORTION_FEE_REQUIRES_ROUTER_CUSTODY')
+        invariant(spec.recipient === SENDER_AS_RECIPIENT, 'TAKE_ALL_REQUIRES_SENDER_RECIPIENT')
         break
       default:
         break
@@ -152,7 +172,11 @@ export function validateEncodeSwaps(
     'FRACTIONAL_BPS_PORTION_FEE_UNSUPPORTED_ON_V2_0'
   )
 
-  // per-step: capability-gate by UR version, recipients must be router custody, per-hop arrays must match hop counts
+  const checkStepRecipient = makeRecipientCheck(spec, 'STEP_RECIPIENT_MUST_BE_ROUTER')
+  const checkV4Recipient = makeRecipientCheck(spec, 'V4_ACTION_RECIPIENT_MUST_BE_ROUTER')
+
+  // per-step: capability-gate by UR version, recipients must be router custody (or the spec
+  // recipient under allowDirectTransfers), per-hop arrays must match hop counts
   for (const step of swapSteps) {
     if (!spec.allowDirectTransfers) {
       invariant(!hasUserPaidFlag(step), 'PAYER_IS_USER_REQUIRES_DIRECT_TRANSFERS')
@@ -178,7 +202,7 @@ export function validateEncodeSwaps(
     switch (step.type) {
       case 'V2_SWAP_EXACT_IN':
       case 'V2_SWAP_EXACT_OUT':
-        assertRouterRecipient(step.recipient)
+        checkStepRecipient(step.recipient)
         invariant(
           !step.minHopPriceX36 || step.minHopPriceX36.length === step.path.length - 1,
           'V2_MIN_HOP_PRICE_X36_LENGTH_MISMATCH'
@@ -186,7 +210,7 @@ export function validateEncodeSwaps(
         break
       case 'V3_SWAP_EXACT_IN':
       case 'V3_SWAP_EXACT_OUT': {
-        assertRouterRecipient(step.recipient)
+        checkStepRecipient(step.recipient)
         const hopCount = getV3HopCount(step.path)
         invariant(
           hopCount === undefined || !step.minHopPriceX36 || step.minHopPriceX36.length === hopCount,
@@ -195,13 +219,16 @@ export function validateEncodeSwaps(
         break
       }
       case 'WRAP_ETH':
-      case 'UNWRAP_WETH':
+        // router-only in both regimes: this is the input-side transition, not an outbound payout
         assertRouterRecipient(step.recipient)
+        break
+      case 'UNWRAP_WETH':
+        checkStepRecipient(step.recipient)
         break
       case 'V4_SWAP':
         validateV4HopCounts(step.v4Actions)
         validateV4HookData(step.v4Actions)
-        validateV4Recipients(step.v4Actions)
+        validateV4Recipients(step.v4Actions, spec, checkV4Recipient)
         break
       default:
         break
