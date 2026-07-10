@@ -35,10 +35,17 @@ const PERMIT2 = getAddress('0x000000000022D473030F116dDEE9F6B43aC78BA3')
 
 // Deployed at the same CREATE2 address on every supported chain.
 const LIQUIDITY_LAUNCHER = getAddress('0x00004c4ccc709Ef590F7C81102C0689F0263D4e9')
-const CCA_FACTORY = getAddress('0x00cCa200BF124dBfA848937c553864f4B4CE0632')
-// Robinhood-only redeploy (2026-07-09): CCA factory rebuilt against a blocknumberish that also
-// recognizes chain 4663 (the original deployment only substituted arbBlockNumber on Arbitrum One).
-const CCA_FACTORY_ROBINHOOD = getAddress('0x000000001F26a0044BaA66024e7b6599c61963F8')
+// Current CCA factory: the 2026-07-09 redeploy built against blocknumberish v1.1.0, which translates
+// block.number on every chain that needs it (e.g. Arbitrum One and Robinhood/4663 — the earlier
+// factory only handled Arbitrum, so on other translated chains it derived auction block ranges
+// against the wrong clock). Every v3.1.0 LBPStrategy in LAUNCHER_ADDRESSES creates its auction
+// through this factory (verified on-chain via LBPStrategy.initializerFactory()), so it is the
+// ccaFactory for all chains.
+const CCA_FACTORY = getAddress('0x000000001F26a0044BaA66024e7b6599c61963F8')
+// Legacy CCA factory (built against blocknumberish v1.0.x), used by the pre-v3.1.0 strategies.
+// Superseded as the per-chain ccaFactory by CCA_FACTORY above; retained only so the auction-factory
+// registry can still resolve auctions created before the redeploy.
+const CCA_FACTORY_LEGACY = getAddress('0x00cCa200BF124dBfA848937c553864f4B4CE0632')
 const TOKEN_SPLITTER = getAddress('0x8B7DCeb5639DB986FCf86606C74e6300C40FE3cd')
 
 // Token factories, split by token standard. The uERC20 factory shares a CREATE2 address across the
@@ -118,7 +125,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
     lbpStrategy: getAddress('0x05d552391067389EE44fec3924157ed33F976000'),
     tokenSplitter: TOKEN_SPLITTER,
-    ccaFactory: CCA_FACTORY_ROBINHOOD,
+    ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
     uerc20Factory: UERC20_FACTORY,
     positionManager: POSITION_MANAGER_ROBINHOOD,
@@ -195,14 +202,14 @@ export const AUCTION_FACTORY_DEPLOYMENTS: readonly AuctionFactoryDeployment[] = 
     description: 'v2 CCA factory (early test deploy)',
   },
   {
-    factory: CCA_FACTORY,
+    factory: CCA_FACTORY_LEGACY,
     tickDataLens: TICK_DATA_LENS_V2,
-    description: 'v2 CCA factory (contracts v2.0.0, deployed on all supported chains)',
+    description: 'v2 CCA factory (blocknumberish v1.0.x; superseded by the 2026-07-09 redeploy)',
   },
   {
-    factory: CCA_FACTORY_ROBINHOOD,
+    factory: CCA_FACTORY,
     tickDataLens: TICK_DATA_LENS_V2,
-    description: 'v2 CCA factory (2026-07-09 blocknumberish-aware redeploy, contracts v1.1.x)',
+    description: 'v2 CCA factory (2026-07-09 blocknumberish v1.1.0 redeploy; current on all chains)',
   },
 ]
 
