@@ -35,6 +35,13 @@ import { DAI, ETHER as ETH, USDC, WETH, parseCommands } from '../utils/uniswapDa
 const TEST_RECIPIENT = TEST_RECIPIENT_ADDRESS
 const FEE_RECIPIENT = TEST_FEE_RECIPIENT_ADDRESS
 
+const TEST_PERMIT = {
+  details: { token: USDC.address, amount: '999999', expiration: '2000000000', nonce: 0 },
+  spender: '0x0000000000000000000000000000000000000001',
+  sigDeadline: '2000000000',
+  signature: '0x' + '00'.repeat(65),
+}
+
 function packV3Path(tokens: string[], fees: number[]): string {
   const types: string[] = ['address']
   const values: Array<string | number> = [tokens[0]]
@@ -450,6 +457,174 @@ describe('allowDirectTransfers', () => {
           })
         ).to.deep.equal([])
       })
+    })
+  })
+
+  describe('budgeted mode — inbound', () => {
+    const flagOn = { allowDirectTransfers: true }
+
+    it('accepts a user-paid exact-in step consuming the whole budget', () => {
+      expect(() => validateEncodeSwaps(buildSpec(flagOn), [buildV3ExactInStep({ payerIsUser: true })])).to.not.throw()
+    })
+
+    it('rejects user-paid pulls above the budget', () => {
+      expect(() =>
+        validateEncodeSwaps(buildSpec(flagOn), [buildV3ExactInStep({ payerIsUser: true, amountIn: '1000001' })])
+      ).to.throw('USER_PAID_EXCEEDS_MAX_INPUT')
+    })
+
+    it('sums pulls across steps against the budget', () => {
+      const steps: SwapStep[] = [
+        buildV3ExactInStep({ payerIsUser: true, amountIn: '600000' }),
+        buildV2ExactInStep({ payerIsUser: true, amountIn: '400001' }),
+      ]
+      expect(() => validateEncodeSwaps(buildSpec(flagOn), steps)).to.throw('USER_PAID_EXCEEDS_MAX_INPUT')
+    })
+
+    it('counts SETTLE_ALL maxAmount toward the budget', () => {
+      const steps: SwapStep[] = [
+        buildV3ExactInStep({ payerIsUser: true, amountIn: '700000' }),
+        { type: 'V4_SWAP', v4Actions: [{ action: 'SETTLE_ALL', currency: USDC.address, maxAmount: '300001' }] },
+      ]
+      expect(() => validateEncodeSwaps(buildSpec(flagOn), steps)).to.throw('USER_PAID_EXCEEDS_MAX_INPUT')
+    })
+
+    it('exact-output budget uses the slippage-padded max input', () => {
+      // maxIn = 1_050_000: amountInMax at the cap passes, one above fails
+      expect(() =>
+        validateEncodeSwaps(buildExactOutSpec(flagOn), [buildV3ExactOutStep({ payerIsUser: true })])
+      ).to.not.throw()
+      expect(() =>
+        validateEncodeSwaps(buildExactOutSpec(flagOn), [
+          buildV3ExactOutStep({ payerIsUser: true, amountInMax: '1050001' }),
+        ])
+      ).to.throw('USER_PAID_EXCEEDS_MAX_INPUT')
+    })
+
+    it('rejects zero and sentinel amounts on user-paid steps', () => {
+      expect(() =>
+        validateEncodeSwaps(buildSpec(flagOn), [buildV3ExactInStep({ payerIsUser: true, amountIn: '0' })])
+      ).to.throw('USER_PAID_AMOUNT_OUT_OF_RANGE')
+      expect(() =>
+        validateEncodeSwaps(buildSpec(flagOn), [
+          buildV3ExactInStep({ payerIsUser: true, amountIn: CONTRACT_BALANCE.toString() }),
+        ])
+      ).to.throw('USER_PAID_AMOUNT_OUT_OF_RANGE')
+    })
+
+    it('rejects user-paid steps whose input token is not the spec input token', () => {
+      expect(() =>
+        validateEncodeSwaps(buildSpec(flagOn), [
+          buildV3ExactInStep({ payerIsUser: true, path: packV3Path([DAI.address, WETH.address], [500]) }),
+        ])
+      ).to.throw('USER_PAID_INPUT_TOKEN_MISMATCH')
+    })
+
+    it('binds V3 exact-out user-paid steps to the path tail (reversed encoding)', () => {
+      expect(() =>
+        validateEncodeSwaps(buildExactOutSpec(flagOn), [
+          buildV3ExactOutStep({ payerIsUser: true, path: packV3ExactOutPath([DAI.address, WETH.address], [500]) }),
+        ])
+      ).to.throw('USER_PAID_INPUT_TOKEN_MISMATCH')
+    })
+
+    it('rejects malformed paths on user-paid steps', () => {
+      expect(() =>
+        validateEncodeSwaps(buildSpec(flagOn), [buildV3ExactInStep({ payerIsUser: true, path: '0x1234' })])
+      ).to.throw('USER_PAID_MALFORMED_PATH')
+    })
+
+    it('names the offending step in the error', () => {
+      const steps: SwapStep[] = [
+        buildV3ExactInStep({ payerIsUser: true, amountIn: '400000' }),
+        buildV3ExactInStep({ payerIsUser: true, path: '0x1234' }),
+      ]
+      expect(() => validateEncodeSwaps(buildSpec(flagOn), steps)).to.throw('USER_PAID_MALFORMED_PATH (step 1)')
+    })
+
+    it('rejects user-paid steps with native input', () => {
+      const spec = buildSpec(flagOn, {
+        inputToken: ETH,
+        outputToken: USDC,
+        amount: CurrencyAmount.fromRawAmount(ETH, '1000000000000000000'),
+        quote: CurrencyAmount.fromRawAmount(USDC, '1000000'),
+      })
+      const step = buildV3ExactInStep({
+        payerIsUser: true,
+        amountIn: '1000000000000000000',
+        path: packV3Path([WETH.address, USDC.address], [500]),
+      })
+      expect(() => validateEncodeSwaps(spec, [step])).to.throw('DIRECT_TRANSFERS_NATIVE_INPUT')
+    })
+
+    it('rejects user-paid steps with nativeErc20Input', () => {
+      expect(() =>
+        validateEncodeSwaps(buildSpec({ ...flagOn, nativeErc20Input: true }), [
+          buildV3ExactInStep({ payerIsUser: true }),
+        ])
+      ).to.throw('DIRECT_TRANSFERS_NATIVE_ERC20_INPUT')
+    })
+
+    it('rejects user-paid steps under ApproveProxy', () => {
+      const spec = buildSpec({ ...flagOn, tokenTransferMode: TokenTransferMode.ApproveProxy, chainId: 1 })
+      expect(() => validateEncodeSwaps(spec, [buildV3ExactInStep({ payerIsUser: true })])).to.throw(
+        'DIRECT_TRANSFERS_REQUIRES_PERMIT2'
+      )
+    })
+
+    it('rejects undersized permits when user-paid pulls exist', () => {
+      expect(() =>
+        validateEncodeSwaps(buildSpec({ ...flagOn, permit: { ...TEST_PERMIT } }), [
+          buildV3ExactInStep({ payerIsUser: true }),
+        ])
+      ).to.throw('PERMIT_AMOUNT_INSUFFICIENT')
+    })
+
+    it('accepts permits covering the budget', () => {
+      const permit = { ...TEST_PERMIT, details: { ...TEST_PERMIT.details, amount: '1000000' } }
+      expect(() =>
+        validateEncodeSwaps(buildSpec({ ...flagOn, permit }), [buildV3ExactInStep({ payerIsUser: true })])
+      ).to.not.throw()
+    })
+
+    it('skips inbound gating when no user-paid pulls exist (flag on, custody steps, native input)', () => {
+      const spec = buildSpec(flagOn, {
+        inputToken: ETH,
+        outputToken: USDC,
+        amount: CurrencyAmount.fromRawAmount(ETH, '1000000000000000000'),
+        quote: CurrencyAmount.fromRawAmount(USDC, '1000000'),
+      })
+      const step = buildV3ExactInStep({
+        amountIn: '1000000000000000000',
+        path: packV3Path([WETH.address, USDC.address], [500]),
+      })
+      expect(() => validateEncodeSwaps(spec, [step])).to.not.throw()
+    })
+
+    it('rejects invalid v4 hookData with a clear code (routing emits "")', () => {
+      const step: V4Swap = {
+        type: 'V4_SWAP',
+        v4Actions: [
+          {
+            action: 'SWAP_EXACT_IN_SINGLE',
+            poolKey: {
+              currency0: USDC.address,
+              currency1: WETH.address,
+              fee: 500,
+              tickSpacing: 10,
+              hooks: ETH_ADDRESS,
+            },
+            zeroForOne: true,
+            amountIn: '1000000',
+            amountOutMinimum: '0',
+            hookData: '',
+          },
+        ],
+      }
+      expect(() => validateEncodeSwaps(buildSpec(), [step])).to.throw('V4_HOOK_DATA_INVALID')
+      expect(() => validateEncodeSwaps(buildSpec({ allowDirectTransfers: true }), [step])).to.throw(
+        'V4_HOOK_DATA_INVALID'
+      )
     })
   })
 })

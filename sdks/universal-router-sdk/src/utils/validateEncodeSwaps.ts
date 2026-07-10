@@ -2,9 +2,17 @@ import { BigNumber } from 'ethers'
 import invariant from 'tiny-invariant'
 import { TradeType } from '@uniswap/sdk-core'
 import { TokenTransferMode } from '../entities/actions/uniswap'
-import { ROUTER_AS_RECIPIENT, SENDER_AS_RECIPIENT, UniversalRouterVersion, ZERO_ADDRESS } from './constants'
+import {
+  MAX_UINT160,
+  ROUTER_AS_RECIPIENT,
+  SENDER_AS_RECIPIENT,
+  UniversalRouterVersion,
+  ZERO_ADDRESS,
+} from './constants'
 import { NormalizedSwapSpecification, SwapStep, V4Action } from '../types/encodeSwaps'
-import { getV3HopCount, hasUserPaidFlag } from './directTransfers'
+import { getCurrencyAddress } from './getCurrencyAddress'
+import { getV3HopCount, hasUserPaidFlag, stepUserPaidPulls } from './directTransfers'
+import { computeEncodeSwapsAmounts, EncodeSwapsAmounts } from './computeEncodeSwapsAmounts'
 
 function hasV4MinHopPriceX36(action: V4Action): boolean {
   switch (action.action) {
@@ -56,7 +64,22 @@ function validateV4Recipients(actions: V4Action[]): void {
   }
 }
 
-export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps: SwapStep[]): void {
+const HEX_BYTES = /^0x([0-9a-fA-F]{2})*$/
+
+// real routing emits hookData: "" — ethers rejects it deep in abi encoding; fail loudly here instead
+function validateV4HookData(actions: V4Action[]): void {
+  for (const action of actions) {
+    if (action.action === 'SWAP_EXACT_IN_SINGLE' || action.action === 'SWAP_EXACT_OUT_SINGLE') {
+      invariant(HEX_BYTES.test(action.hookData), 'V4_HOOK_DATA_INVALID')
+    }
+  }
+}
+
+export function validateEncodeSwaps(
+  spec: NormalizedSwapSpecification,
+  swapSteps: SwapStep[],
+  amounts?: EncodeSwapsAmounts
+): void {
   invariant(swapSteps.length > 0, 'EMPTY_SWAP_STEPS')
 
   const amountCurrency = spec.routing.amount.currency.wrapped
@@ -167,10 +190,50 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
         break
       case 'V4_SWAP':
         validateV4HopCounts(step.v4Actions)
+        validateV4HookData(step.v4Actions)
         validateV4Recipients(step.v4Actions)
         break
       default:
         break
+    }
+  }
+
+  // --- budgeted mode, inbound: applies only when at least one user-paid pull exists ---
+  if (spec.allowDirectTransfers) {
+    const pulls = swapSteps.flatMap(stepUserPaidPulls)
+    if (pulls.length > 0) {
+      // permit2-based direct pulls need a plain ERC20 input owned by the tx sender
+      invariant(!spec.routing.inputToken.isNative, 'DIRECT_TRANSFERS_NATIVE_INPUT')
+      invariant(!spec.nativeErc20Input, 'DIRECT_TRANSFERS_NATIVE_ERC20_INPUT')
+      invariant(spec.tokenTransferMode === TokenTransferMode.Permit2, 'DIRECT_TRANSFERS_REQUIRES_PERMIT2')
+
+      const { exactOrMaxAmountIn } = amounts ?? computeEncodeSwapsAmounts(spec)
+      const inputTokenAddress = getCurrencyAddress(spec.routing.inputToken).toLowerCase()
+
+      let userPaidTotal = BigNumber.from(0)
+      swapSteps.forEach((step, stepIndex) => {
+        for (const pull of stepUserPaidPulls(step)) {
+          // concrete amounts only: bans ALREADY_PAID/OPEN_DELTA (0), CONTRACT_BALANCE (2^255),
+          // and anything permit2's uint160 cannot move. lazy messages: step-indexed for
+          // debuggability without happy-path string building
+          invariant(
+            pull.maxAmount.gt(0) && pull.maxAmount.lte(MAX_UINT160),
+            () => `USER_PAID_AMOUNT_OUT_OF_RANGE (step ${stepIndex})`
+          )
+          invariant(pull.token !== undefined, () => `USER_PAID_MALFORMED_PATH (step ${stepIndex})`)
+          invariant(
+            pull.token.toLowerCase() === inputTokenAddress,
+            () => `USER_PAID_INPUT_TOKEN_MISMATCH (step ${stepIndex})`
+          )
+          userPaidTotal = userPaidTotal.add(pull.maxAmount)
+        }
+      })
+      invariant(userPaidTotal.lte(exactOrMaxAmountIn), 'USER_PAID_EXCEEDS_MAX_INPUT')
+
+      // keeps the permit2 allowance an on-chain outer ceiling equal to the budget
+      if (spec.permit) {
+        invariant(BigNumber.from(spec.permit.details.amount).gte(exactOrMaxAmountIn), 'PERMIT_AMOUNT_INSUFFICIENT')
+      }
     }
   }
 }
