@@ -78,9 +78,9 @@ export const DEFAULT_BLOCK_TIME_SECONDS = 12
  * height; the original on-chain `blocknumberish` library only substituted `arbBlockNumber` for
  * Arbitrum One's chain id, so Robinhood's CCA/LBPStrategy were redeployed on 2026-07-09 against a
  * blocknumberish that also recognizes Robinhood (CCA factory
- * 0x000000001F26a0044BaA66024e7b6599c61963F8, LBPStrategy
- * 0x843747f4c08E3393E55508F577296bA48E8Ca000 — the chain-4663 entries in addresses.ts). This value
- * takes effect on those redeployed contracts. Chains without an entry fall back to
+ * 0x000000001F26a0044BaA66024e7b6599c61963F8 — the chain-4663 ccaFactory in addresses.ts; the
+ * matching LBPStrategy has since been superseded by the v3.1.0 deploy, also blocknumberish-aware).
+ * This value takes effect on those redeployed contracts. Chains without an entry fall back to
  * {@link DEFAULT_BLOCK_TIME_SECONDS}.
  *
  * Values are approximate by nature (a chain's real cadence drifts), and non-integer entries like
