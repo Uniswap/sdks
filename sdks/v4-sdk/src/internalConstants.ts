@@ -38,6 +38,8 @@ export const NATIVE_NOT_SET = 'NATIVE_NOT_SET'
 export const ZERO_LIQUIDITY = 'ZERO_LIQUIDITY'
 export const NO_SQRT_PRICE = 'NO_SQRT_PRICE'
 export const CANNOT_BURN = 'CANNOT_BURN'
+export const CANNOT_COMBINE_NATIVE_OPTIONS = 'CANNOT_COMBINE_NATIVE_OPTIONS'
+export const SETTLE_CURRENCY_NOT_IN_POOL = 'SETTLE_CURRENCY_NOT_IN_POOL'
 
 /**
  * Function fragments that exist on the PositionManager contract.
