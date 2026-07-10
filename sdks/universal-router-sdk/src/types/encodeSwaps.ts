@@ -41,11 +41,10 @@ export type SwapSpecification = {
   /**
    * Opts the plan into "budgeted" validation: steps may move funds directly between the
    * user and pools (per-step `payerIsUser`, step recipients equal to `recipient`, v4
-   * SETTLE_ALL / TAKE_ALL). The SDK enforces that total direct user pulls never exceed
-   * exactOrMaxAmountIn (ingress pulls only the remainder) and that directly-delivered,
-   * contract-enforced output minimums reduce the final sweep floor. Default false =
-   * router-custody-only validation (all step recipients must be the router; no user-paid
-   * steps). Portion fees additionally require full output custody even when enabled.
+   * SETTLE_ALL / TAKE_ALL). Total direct pulls may never exceed exactOrMaxAmountIn
+   * (ingress pulls only the remainder) and contract-enforced direct output minimums
+   * reduce the final sweep floor. Portion fees still require full output custody.
+   * Default false: router-custody-only validation.
    */
   allowDirectTransfers?: boolean
 }
@@ -71,7 +70,7 @@ export type V2SwapExactIn = {
   amountOutMin: BigNumberish
   path: string[]
   minHopPriceX36?: BigNumberish[]
-  payerIsUser?: boolean // pull input directly from the user via permit2; requires spec.allowDirectTransfers
+  payerIsUser?: boolean
 }
 
 export type V2SwapExactOut = {
@@ -81,7 +80,7 @@ export type V2SwapExactOut = {
   amountInMax: BigNumberish
   path: string[]
   minHopPriceX36?: BigNumberish[]
-  payerIsUser?: boolean // pull input directly from the user via permit2; requires spec.allowDirectTransfers
+  payerIsUser?: boolean
 }
 
 export type V3SwapExactIn = {
@@ -91,7 +90,7 @@ export type V3SwapExactIn = {
   amountOutMin: BigNumberish
   path: string
   minHopPriceX36?: BigNumberish[]
-  payerIsUser?: boolean // pull input directly from the user via permit2; requires spec.allowDirectTransfers
+  payerIsUser?: boolean
 }
 
 export type V3SwapExactOut = {
@@ -101,7 +100,7 @@ export type V3SwapExactOut = {
   amountInMax: BigNumberish
   path: string
   minHopPriceX36?: BigNumberish[]
-  payerIsUser?: boolean // pull input directly from the user via permit2; requires spec.allowDirectTransfers
+  payerIsUser?: boolean
 }
 
 export type V4Swap = {
@@ -165,7 +164,7 @@ export type V4Settle = {
   action: 'SETTLE'
   currency: string
   amount: BigNumberish
-  payerIsUser?: boolean // settle from the user via permit2; requires spec.allowDirectTransfers
+  payerIsUser?: boolean
 }
 
 export type V4SettleAll = {

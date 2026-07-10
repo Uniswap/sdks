@@ -74,11 +74,10 @@ function validateV4Recipients(
         checkV4Recipient(action.recipient)
         break
       case 'TAKE_ALL':
-        // TAKE_ALL pays msgSender on-chain: needs direct output allowed and the
-        // sender sentinel as the spec recipient, or it would pay the wrong party
-        // while reducing the recipient's sweep floor
+        // TAKE_ALL pays msgSender on-chain; any other spec recipient would be the
+        // wrong payee while still reducing their sweep floor
         invariant(directOutputAllowed, 'PORTION_FEE_REQUIRES_ROUTER_CUSTODY')
-        // strict equality: the sentinel is all-numeric hex, so no checksum variant exists; anything else fails closed
+        // strict equality: the all-numeric sentinel has no checksum variant; anything else fails closed
         invariant(spec.recipient === SENDER_AS_RECIPIENT, 'TAKE_ALL_REQUIRES_SENDER_RECIPIENT')
         break
       default:
@@ -238,7 +237,7 @@ export function validateEncodeSwaps(
     }
   }
 
-  // --- budgeted mode, inbound: applies only when at least one user-paid pull exists ---
+  // budgeted mode, inbound: applies only when at least one user-paid pull exists
   if (spec.allowDirectTransfers) {
     const pulls = swapSteps.flatMap(stepUserPaidPulls)
     if (pulls.length > 0) {
@@ -254,8 +253,7 @@ export function validateEncodeSwaps(
       swapSteps.forEach((step, stepIndex) => {
         for (const pull of stepUserPaidPulls(step)) {
           // concrete amounts only: bans ALREADY_PAID/OPEN_DELTA (0), CONTRACT_BALANCE (2^255),
-          // and anything permit2's uint160 cannot move. lazy messages: step-indexed for
-          // debuggability without happy-path string building
+          // and anything permit2's uint160 cannot move
           invariant(
             pull.maxAmount.gt(0) && pull.maxAmount.lte(MAX_UINT160),
             () => `USER_PAID_AMOUNT_OUT_OF_RANGE (step ${stepIndex})`

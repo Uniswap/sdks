@@ -33,8 +33,7 @@ export function v3PathLastToken(path: string): string | undefined {
   return '0x' + path.slice(-40)
 }
 
-// true when the step carries an explicit payerIsUser=true (V2/V3 swaps or a v4 SETTLE).
-// SETTLE_ALL / TAKE_ALL are intrinsically direct (no flag on-chain) and are gated separately.
+// SETTLE_ALL / TAKE_ALL are intrinsically direct (no flag on-chain) and are gated separately
 export function hasUserPaidFlag(step: SwapStep): boolean {
   switch (step.type) {
     case 'V2_SWAP_EXACT_IN':
@@ -61,8 +60,7 @@ function v4UserPaidPulls(action: V4Action): UserPaidPull[] {
   }
 }
 
-// permit2 pulls a step can make from the user, with their contract-enforced maxima:
-// exact-in pulls exactly amountIn; exact-out reverts above amountInMax
+// contract-enforced maxima: exact-in pulls exactly amountIn; exact-out reverts above amountInMax
 export function stepUserPaidPulls(step: SwapStep): UserPaidPull[] {
   switch (step.type) {
     case 'V2_SWAP_EXACT_IN':
