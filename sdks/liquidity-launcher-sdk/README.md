@@ -178,7 +178,7 @@ Config-derivation helpers throw [`LauncherSdkError`](./src/errors.ts) with a sta
 
 | Module | Exports |
 | --- | --- |
-| `addresses`, `chains` | `getLauncherAddresses`, `LAUNCHER_ADDRESSES`, `selectTokenFactory`, `SupportedChainId`, `isLaunchSupportedChain` |
+| `addresses`, `chains` | `getLauncherAddresses`, `LAUNCHER_ADDRESSES`, `selectTokenFactory`, `SupportedChainId`, `isLaunchSupportedChain`, `AUCTION_FACTORY_DEPLOYMENTS`, `getTickDataLensForFactory`, `TICK_DATA_LENS_BY_FACTORY`, `TICK_DATA_LENS_V1`, `TICK_DATA_LENS_V2` |
 | `poolId`, `salts` | `computeLbpPoolId`, `computeGraffiti`, `computeLauncherSalt`, `computeInitializerSalt` |
 | `abis`, `types` | contract ABIs and on-chain struct types |
 | `encode` | `encodeCreateToken`, `encodeDepositToken`, `encodeDistributeToken`, `encodeMulticall`, `encodeConfigData`, `encodeAuctionParams`, `encodeAuctionSteps`, `encodeTokenData`, … |
