@@ -10,7 +10,7 @@ import {
   toHex,
 } from 'viem'
 
-import { ERC20_APPROVE_ABI, LIQUIDITY_LAUNCHER_ABI, PERMIT2_ABI } from './abis'
+import { CCA_ABI, ERC20_APPROVE_ABI, LBP_STRATEGY_ABI, LIQUIDITY_LAUNCHER_ABI, PERMIT2_ABI } from './abis'
 import { LauncherSdkError } from './errors'
 import type {
   AuctionParameters,
@@ -243,6 +243,25 @@ export function encodeMulticall(calls: Hex[]): Hex {
  */
 export function encodeErc20Approve(spender: Address, amount: bigint = maxUint256): Hex {
   return encodeFunctionData({ abi: ERC20_APPROVE_ABI, functionName: 'approve', args: [spender, amount] })
+}
+
+/**
+ * `ContinuousClearingAuction.sweepUnsoldTokens()` — the creator's token recovery. Callable only by
+ * the auction's `tokensRecipient()`, only after `endBlock`, and only once. On a failed
+ * (non-graduated) auction it returns the full deposited supply; on a graduated one, the unsold
+ * remainder.
+ */
+export function encodeSweepUnsoldTokens(): Hex {
+  return encodeFunctionData({ abi: CCA_ABI, functionName: 'sweepUnsoldTokens', args: [] })
+}
+
+/**
+ * `LBPStrategy.migrate(initializer)` — the permissionless success-path migration for the strategy's
+ * auction at `auctionAddress`. Sweeps the raised currency and seeds the v4 pool; reverts until the
+ * auction is finalized & graduated and `migrationBlock` has passed.
+ */
+export function encodeMigrate(auctionAddress: Address): Hex {
+  return encodeFunctionData({ abi: LBP_STRATEGY_ABI, functionName: 'migrate', args: [auctionAddress] })
 }
 
 // uint48 max; viem maps uint48 to `number`, which is safe (< 2^53).
