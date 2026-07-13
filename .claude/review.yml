@@ -1,0 +1,48 @@
+# review-cli config for Uniswap/sdks.
+# Schema reference: packages/review-cli/src/config.ts in Uniswap/internal-tools.
+#
+# Mirrors the shared knobs used by Uniswap/universe and Uniswap/backend.
+# This repo has no .claude/agents/ of its own — the cli's bundled
+# agents (security / correctness / triage / synthesis) run by default;
+# repo-specific reviewer prompts can be added later under
+# .claude/agents/ and will be unioned in automatically.
+
+# Default model for all claude-runtime review agents. The bundled
+# agents declare `model: sonnet` in frontmatter, which resolve-model
+# treats as "unpinned", so this config default is what actually
+# selects the model (see resolve-model.ts priority order: CLI
+# override > frontmatter pin > config default > sonnet fallback).
+model:
+  default: claude-opus-4-8
+
+# Per-agent budget — soft cap. Same value as universe/backend so
+# investigations on cross-package SDK changes aren't budget-starved.
+agent_budget_usd: 10.0
+
+# Per-agent turn ceiling — set well above any reasonable investigation
+# depth so the budget is always the cap, never turns.
+agent_max_turns: 500
+
+# Disable the trivial-threshold skip — every PR gets reviewed,
+# regardless of size. Tiny diffs are still meaningful here (a one-line
+# math or units change in an SDK propagates to every consumer), and
+# the skip path interacts badly with the running-sticky placeholder.
+# Setting the threshold to 0 means the size guard always passes.
+trivial_threshold: 0
+
+# Staffing guidance for the triage agent.
+triage:
+  guidance: |
+    Public TypeScript SDK monorepo (sdks/*): sdk-core, v2/v3/v4 sdks,
+    router-sdk, universal-router-sdk, permit2-sdk, uniswapx-sdk, and
+    friends. Published to npm and consumed by Uniswap Labs apps and
+    external integrators.
+
+    correctness-reviewer and security-reviewer are the baseline. The
+    highest-stakes surfaces are financial math (prices, ticks, fees,
+    slippage, currency amounts), calldata/ABI encoding, and permit/
+    signature handling — treat changes there as high-risk even when
+    the diff is small. Breaking public API changes matter: exported
+    types and function signatures are semver-locked (conventional
+    commits drive releases), so flag breaking changes that aren't
+    marked as such.

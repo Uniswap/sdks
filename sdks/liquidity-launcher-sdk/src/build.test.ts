@@ -10,7 +10,7 @@ const TOKEN = getAddress('0x15d0e0c55a3e7ee67152ad7e89acf164253ff68d')
 const SALT = `0x${'00'.repeat(32)}` as const
 
 const distribution: Distribution = {
-  strategy: getAddress('0x824a3ecde463dd45cc156b64cefa132596c9a000'),
+  strategy: getAddress('0x298eA05D0356B2Ae5cCAa3169E471783ee9EA000'),
   amount: 100000000000000n,
   configData: '0x',
 }

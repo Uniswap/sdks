@@ -35,7 +35,17 @@ const PERMIT2 = getAddress('0x000000000022D473030F116dDEE9F6B43aC78BA3')
 
 // Deployed at the same CREATE2 address on every supported chain.
 const LIQUIDITY_LAUNCHER = getAddress('0x00004c4ccc709Ef590F7C81102C0689F0263D4e9')
-const CCA_FACTORY = getAddress('0x00cCa200BF124dBfA848937c553864f4B4CE0632')
+// Current CCA factory: the 2026-07-09 redeploy built against blocknumberish v1.1.0, which translates
+// block.number on every chain that needs it (e.g. Arbitrum One and Robinhood/4663 — the earlier
+// factory only handled Arbitrum, so on other translated chains it derived auction block ranges
+// against the wrong clock). Every v3.1.0 LBPStrategy in LAUNCHER_ADDRESSES creates its auction
+// through this factory (verified on-chain via LBPStrategy.initializerFactory()), so it is the
+// ccaFactory for all chains.
+const CCA_FACTORY = getAddress('0x000000001F26a0044BaA66024e7b6599c61963F8')
+// Legacy CCA factory (built against blocknumberish v1.0.x), used by the pre-v3.1.0 strategies.
+// Superseded as the per-chain ccaFactory by CCA_FACTORY above; retained only so the auction-factory
+// registry can still resolve auctions created before the redeploy.
+const CCA_FACTORY_LEGACY = getAddress('0x00cCa200BF124dBfA848937c553864f4B4CE0632')
 const TOKEN_SPLITTER = getAddress('0x8B7DCeb5639DB986FCf86606C74e6300C40FE3cd')
 
 // Token factories, split by token standard. The uERC20 factory shares a CREATE2 address across the
@@ -58,7 +68,7 @@ const POSITION_MANAGER_BASE_SEPOLIA = getAddress('0x4B2C77d209D3405F41a037Ec6c77
 export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   [SupportedChainId.MAINNET]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0xb98766A35cdc28415be0767D4EA41e39fBA3e000'),
+    lbpStrategy: getAddress('0x49380c4EfaB1b491006aF7FabAB8B3459F0E6000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
@@ -68,7 +78,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   },
   [SupportedChainId.UNICHAIN]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0x824A3eCDe463DD45cC156b64CEfA132596C9A000'),
+    lbpStrategy: getAddress('0x298eA05D0356B2Ae5cCAa3169E471783ee9EA000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
@@ -77,7 +87,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   },
   [SupportedChainId.BASE]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0x5bB4bAfafEc57BEd50D864AAA9D1ef992611e000'),
+    lbpStrategy: getAddress('0x34385dD739FE5464892BF0bA4CC42492804dA000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
@@ -86,7 +96,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   },
   [SupportedChainId.ARBITRUM_ONE]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0x18608AD558dcD233F7854242bbAef73988Bee000'),
+    lbpStrategy: getAddress('0x8Af0775a70Cc94D71DFc0fE809435e833F2Fe000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
@@ -95,7 +105,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   },
   [SupportedChainId.AVALANCHE]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0xcAcd77134b072b4AD5621f585b0b422C6Da4E000'),
+    lbpStrategy: getAddress('0x57BD0A9Cd933c89Ba55e086D53031367b6406000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
@@ -104,7 +114,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   },
   [SupportedChainId.XLAYER]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0x95bcb80e3804a085d23778F2956c305d6488e000'),
+    lbpStrategy: getAddress('0x58DF162fF41e5cB42B8515f75F90C1841938A000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
@@ -113,7 +123,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   },
   [SupportedChainId.ROBINHOOD]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0x095e38a2135aeBcfFa98A5B6911591937f912000'),
+    lbpStrategy: getAddress('0x05d552391067389EE44fec3924157ed33F976000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
@@ -122,7 +132,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   },
   [SupportedChainId.SEPOLIA]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0x3f37838651B5AD71D4e01Ec9745862A5D9DF2000'),
+    lbpStrategy: getAddress('0x96641d91e223c766F45b19d09494F5925C3cE000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
@@ -131,7 +141,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
   },
   [SupportedChainId.BASE_SEPOLIA]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,
-    lbpStrategy: getAddress('0x0e1793a989c682117fcBfB3a9aA8e451D37D2000'),
+    lbpStrategy: getAddress('0xB06428b62c259eE982cE3D9BED47391dC9A5E000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
     permit2: PERMIT2,
@@ -143,6 +153,83 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
 /** Returns the launch addresses for a chain, or `undefined` if the stack is not deployed there. */
 export function getLauncherAddresses(chainId: number): LauncherAddresses | undefined {
   return LAUNCHER_ADDRESSES[chainId]
+}
+
+// ---------------------------------------------------------------------------
+// Auction factory deployment registry (chain-independent)
+// ---------------------------------------------------------------------------
+
+// Historical auction factories. Every factory is a CREATE2 deploy, so each address is the same on
+// every chain it exists on — the registry below is therefore chain-independent.
+const TWA_FACTORY_V1 = getAddress('0xcccccccae7503cac057829bf2811de42e16e0bd5')
+const CCA_FACTORY_EARLY_TEST = getAddress('0x088ca22b591f2f4bf0ad2780d2a44fa692e948d0')
+
+/** TickDataLens for v1 (TWA) auctions. CREATE2 — same address on every supported chain. */
+export const TICK_DATA_LENS_V1: Address = getAddress('0x5fAE46790F3F48A35e3792f89A9eC54FC52b207a')
+/** TickDataLens for v2 (CCA) auctions. CREATE2 — same address on every supported chain. */
+export const TICK_DATA_LENS_V2: Address = getAddress('0xc3C65F5453A3674aDb693cbdA3C842545cD30f53')
+
+/** One historical auction-factory deployment, paired with the lens that reads its auctions. */
+export interface AuctionFactoryDeployment {
+  /** The auction factory (CREATE2 — same address on every chain it is deployed to). */
+  factory: Address
+  /**
+   * The TickDataLens that can read auctions created by this factory. The lens is 1:1 with the
+   * auction implementation version: v1 (TWA) auctions can only be read by the v1 lens, v2 (CCA)
+   * auctions by the v2 lens. Both lenses return the same tuple shape, so one ABI decodes either.
+   */
+  tickDataLens: Address
+  /** Human-readable deployment tag (not an on-chain value). */
+  description: string
+}
+
+/**
+ * Every auction factory ever deployed — current and historical — each paired with its TickDataLens.
+ * Append-only: indexed auctions permanently reference the factory that created them, so when a
+ * factory is redeployed the new entry is added and the old ones are kept. Downstream indexers
+ * resolve a stored factory address through this registry instead of hardcoding their own map, so a
+ * redeploy only requires bumping this package.
+ */
+export const AUCTION_FACTORY_DEPLOYMENTS: readonly AuctionFactoryDeployment[] = [
+  {
+    factory: TWA_FACTORY_V1,
+    tickDataLens: TICK_DATA_LENS_V1,
+    description: 'v1 TWA auction factory',
+  },
+  {
+    factory: CCA_FACTORY_EARLY_TEST,
+    tickDataLens: TICK_DATA_LENS_V2,
+    description: 'v2 CCA factory (early test deploy)',
+  },
+  {
+    factory: CCA_FACTORY_LEGACY,
+    tickDataLens: TICK_DATA_LENS_V2,
+    description: 'v2 CCA factory (blocknumberish v1.0.x; superseded by the 2026-07-09 redeploy)',
+  },
+  {
+    factory: CCA_FACTORY,
+    tickDataLens: TICK_DATA_LENS_V2,
+    description: 'v2 CCA factory (2026-07-09 blocknumberish v1.1.0 redeploy; current on all chains)',
+  },
+]
+
+/**
+ * Factory address (lowercased) → TickDataLens, derived from {@link AUCTION_FACTORY_DEPLOYMENTS}.
+ * Keys are lowercased so lookups are case-insensitive regardless of how the caller stored the
+ * factory address; prefer {@link getTickDataLensForFactory}, which normalizes for you.
+ */
+export const TICK_DATA_LENS_BY_FACTORY: ReadonlyMap<string, Address> = new Map(
+  AUCTION_FACTORY_DEPLOYMENTS.map((deployment) => [deployment.factory.toLowerCase(), deployment.tickDataLens])
+)
+
+/**
+ * Resolves the TickDataLens that reads auctions created by `factoryAddress` (case-insensitive).
+ * Returns `undefined` for a factory not in {@link AUCTION_FACTORY_DEPLOYMENTS} — callers with
+ * pre-registry rows (or a null stored factory) typically fall back to {@link TICK_DATA_LENS_V1},
+ * since every auction indexed before factories were recorded is a v1 auction.
+ */
+export function getTickDataLensForFactory(factoryAddress: string): Address | undefined {
+  return TICK_DATA_LENS_BY_FACTORY.get(factoryAddress.toLowerCase())
 }
 
 /** Which token standard a new-token launch targets (selects its address-derivation scheme). */

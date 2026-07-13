@@ -65,17 +65,36 @@ export const DEFAULT_CONVEXITY_ALPHA = 1.2
 export const DEFAULT_BLOCK_TIME_SECONDS = 12
 
 /**
- * Approximate block time (seconds) per chain, used to convert auction start/end times to blocks.
- * Chains without an entry fall back to {@link DEFAULT_BLOCK_TIME_SECONDS}. Arbitrum and Robinhood
- * (an Arbitrum Orbit chain) are intentionally omitted: their contract-visible `block.number` tracks
- * the Ethereum L1 block cadence (~12s), which the default already matches.
+ * Approximate block time (seconds) per chain, used to convert an auction's start/end times into a
+ * block range. This MUST match the cadence of the clock the CCA advances on —
+ * `blocknumberish._getBlockNumberish()`, which returns the L2 `arbBlockNumber` on Arbitrum-family
+ * chains and `block.number` everywhere else — because the range is derived from the same
+ * `eth_blockNumber` (L2 sequencer) height the backend reads. A wrong value scales the auction's
+ * real-time window by (real cadence / assumed cadence) — e.g. the 12s default would silently
+ * compress a 14h auction to ~17min on Arbitrum and ~7min on Robinhood.
+ *
+ * Arbitrum One and Robinhood are Arbitrum L2s whose block clock ticks sub-second, so they need
+ * explicit entries. NOTE: Robinhood is an Orbit chain where `block.number` diverges from its L2
+ * height; the original on-chain `blocknumberish` library only substituted `arbBlockNumber` for
+ * Arbitrum One's chain id, so Robinhood's CCA/LBPStrategy were redeployed on 2026-07-09 against a
+ * blocknumberish that also recognizes Robinhood (CCA factory
+ * 0x000000001F26a0044BaA66024e7b6599c61963F8 — the chain-4663 ccaFactory in addresses.ts; the
+ * matching LBPStrategy has since been superseded by the v3.1.0 deploy, also blocknumberish-aware).
+ * This value takes effect on those redeployed contracts. Chains without an entry fall back to
+ * {@link DEFAULT_BLOCK_TIME_SECONDS}.
+ *
+ * Values are approximate by nature (a chain's real cadence drifts), and non-integer entries like
+ * `0.1` aren't exactly representable in IEEE-754 — both are absorbed by `deriveBlocks`, which
+ * `Math.round`s the block delta (at most ±1 block, far below the cadence-estimate error itself).
  */
 export const BLOCK_TIME_SECONDS_BY_CHAIN: Record<number, number> = {
   1: 12, // mainnet
   130: 1, // unichain
   196: 1, // xlayer
   1301: 1, // unichain sepolia
+  4663: 0.1, // robinhood (arbitrum orbit) — L2 arbBlockNumber cadence (blocknumberish-aware contracts redeployed 2026-07-09)
   8453: 2, // base
+  42161: 0.25, // arbitrum one — L2 arbBlockNumber cadence (NOT the L1 block.number ~12s)
   43114: 1, // avalanche
   84532: 2, // base sepolia
   11155111: 12, // sepolia

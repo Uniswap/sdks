@@ -1,0 +1,94 @@
+name: Review feedback emission
+
+# Weekly emitter for human signal on review-cli comments.
+#
+# Architecture:
+#   - This workflow runs `review-cli feedback` on a cron, scans the
+#     last 14 days of review-cli comments + human reactions/replies,
+#     and uploads the result as a `review-feedback` GitHub Actions
+#     artifact.
+#   - A central aggregator in Uniswap/internal-tools downloads the
+#     artifact via `gh run download`, scores findings across all
+#     consumer repos, and opens a digest PR.
+#
+# Auth: only reads this repo's PRs + review threads. Bundled
+# GITHUB_TOKEN is enough — no PAT, no secrets. The aggregator-side
+# PAT lives in Uniswap/internal-tools and is independent of this repo.
+
+on:
+  schedule:
+    # Mondays 12:00 UTC — deliberately *before* the aggregator's
+    # 13:00 UTC run in Uniswap/internal-tools so a fresh artifact is
+    # always available when it tries to download.
+    - cron: '0 12 * * 1'
+  workflow_dispatch:
+    inputs:
+      sinceDays:
+        description: 'How many days back to scan (default 14)'
+        required: false
+        default: '14'
+
+concurrency:
+  group: review-feedback-emit
+  cancel-in-progress: false
+
+permissions:
+  # Read-only: the workflow reads PRs + review threads, never writes.
+  # Uploading the artifact does not require explicit `actions: write`.
+  contents: read
+  pull-requests: read
+  packages: read # pull @uniswap/review-cli from GH Packages (install_review_cli)
+
+jobs:
+  emit:
+    name: Emit feedback artifact
+    runs-on: ubuntu-latest
+    # Hard cap: feedback scans 14 days of PRs + per-comment reactions
+    # via GraphQL.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      # NOTE: deliberately not using a monorepo-wide bun install.
+      # See .github/actions/install_review_cli/action.yml for the
+      # reasoning — review-cli is installed into an isolated $RUNNER_TEMP
+      # dir to keep the consumer repo's bunfig.toml untouched.
+      - name: Install review-cli
+        id: install-review-cli
+        uses: ./.github/actions/install_review_cli
+        with:
+          # Same fallback shape as claude-code-review.yml — the repo
+          # variable is the authoritative pin; this only matters if
+          # it's unset.
+          version: ${{ vars.REVIEW_CLI_VERSION || '1.6.0' }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # SINCE_DAYS goes through `env:` rather than being interpolated
+      # into `run:` directly. Even though workflow_dispatch inputs are
+      # typically trusted, the lint rule blocks `${{ inputs.* }}`
+      # inside `run:` to avoid shell-injection footguns
+      # (run-shell-injection).
+      - name: Run review-cli feedback
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SINCE_DAYS: ${{ inputs.sinceDays || '14' }}
+          OUTPUT_PATH: ${{ runner.temp }}/review-feedback.json
+          REVIEW_CLI_BIN: ${{ steps.install-review-cli.outputs.bin-path }}
+        run: |
+          "$REVIEW_CLI_BIN/review-cli" feedback \
+            --since-days "$SINCE_DAYS" \
+            --output "$OUTPUT_PATH"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          # The aggregator filters by this exact name — keep it stable.
+          name: review-feedback
+          path: ${{ runner.temp }}/review-feedback.json
+          # Aggregator runs weekly; keep ~6 weeks of history so it can
+          # recover even if it skipped a few runs.
+          retention-days: 45
+          if-no-files-found: error
