@@ -5,6 +5,9 @@ export enum UniversalRouterVersion {
   V2_0 = '2.0',
   V2_1_1 = '2.1.1',
   V2_2_0 = '2.2.0',
+  // Router release containing the 3-parameter UNWRAP_WETH (recipient, amount, minAmount).
+  // Not deployed yet: no CHAIN_CONFIGS entries until per-chain addresses are known.
+  V2_3_0 = '2.3.0',
 }
 
 /**
@@ -14,6 +17,15 @@ export enum UniversalRouterVersion {
  */
 export function isAtLeastV2_1_1(version?: UniversalRouterVersion): boolean {
   return !!version && version.localeCompare(UniversalRouterVersion.V2_1_1, undefined, { numeric: true }) >= 0
+}
+
+/**
+ * Check if a UniversalRouterVersion is at least V2_3_0.
+ * From V2_3_0 onwards UNWRAP_WETH takes (recipient, amount, minAmount): `amount` is the exact
+ * amount of WETH to unwrap, with CONTRACT_BALANCE as the only unwrap-the-full-balance sentinel.
+ */
+export function isAtLeastV2_3_0(version?: UniversalRouterVersion): boolean {
+  return !!version && version.localeCompare(UniversalRouterVersion.V2_3_0, undefined, { numeric: true }) >= 0
 }
 
 export type RouterConfig = {

@@ -2,7 +2,13 @@ import { BigNumber } from 'ethers'
 import invariant from 'tiny-invariant'
 import { TradeType } from '@uniswap/sdk-core'
 import { TokenTransferMode } from '../entities/actions/uniswap'
-import { ROUTER_AS_RECIPIENT, SENDER_AS_RECIPIENT, UniversalRouterVersion, ZERO_ADDRESS } from './constants'
+import {
+  ROUTER_AS_RECIPIENT,
+  SENDER_AS_RECIPIENT,
+  UniversalRouterVersion,
+  ZERO_ADDRESS,
+  isAtLeastV2_3_0,
+} from './constants'
 import { NormalizedSwapSpecification, SwapStep, V4Action } from '../types/encodeSwaps'
 
 // V3 path: 20-byte address + N × (3-byte fee + 20-byte address); minimum is 43 bytes (single hop, N=1)
@@ -165,8 +171,16 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
         break
       }
       case 'WRAP_ETH':
+        assertRouterRecipient(step.recipient)
+        break
       case 'UNWRAP_WETH':
         assertRouterRecipient(step.recipient)
+        // exact `amount` only exists in the >= 2.3.0 UNWRAP_WETH ABI; reject it on older routers
+        // instead of silently dropping the field
+        invariant(
+          step.amount === undefined || isAtLeastV2_3_0(spec.urVersion),
+          'UNWRAP_WETH_AMOUNT_UNSUPPORTED_BEFORE_V2_3_0'
+        )
         break
       case 'V4_SWAP':
         validateV4HopCounts(step.v4Actions)

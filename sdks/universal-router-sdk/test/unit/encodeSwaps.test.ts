@@ -527,6 +527,48 @@ describe('encodeSwaps', () => {
         'V3_MIN_HOP_PRICE_X36_LENGTH_MISMATCH'
       )
     })
+
+    it('rejects an exact UNWRAP_WETH amount before UR 2.3.0', () => {
+      const step: SwapStep = {
+        type: 'UNWRAP_WETH',
+        recipient: ROUTER_AS_RECIPIENT,
+        amountMin: '0',
+        amount: '1000',
+      }
+
+      for (const urVersion of [UniversalRouterVersion.V2_0, UniversalRouterVersion.V2_1_1]) {
+        expect(() => validateEncodeSwaps(buildSpec({ urVersion }), [step])).to.throw(
+          'UNWRAP_WETH_AMOUNT_UNSUPPORTED_BEFORE_V2_3_0'
+        )
+      }
+    })
+
+    it('accepts an exact UNWRAP_WETH amount on UR 2.3.0', () => {
+      const step: SwapStep = {
+        type: 'UNWRAP_WETH',
+        recipient: ROUTER_AS_RECIPIENT,
+        amountMin: '0',
+        amount: '1000',
+      }
+
+      expect(() => validateEncodeSwaps(buildSpec({ urVersion: UniversalRouterVersion.V2_3_0 }), [step])).to.not.throw()
+    })
+
+    it('accepts UNWRAP_WETH without an exact amount on any UR version', () => {
+      const step: SwapStep = {
+        type: 'UNWRAP_WETH',
+        recipient: ROUTER_AS_RECIPIENT,
+        amountMin: '0',
+      }
+
+      for (const urVersion of [
+        UniversalRouterVersion.V2_0,
+        UniversalRouterVersion.V2_1_1,
+        UniversalRouterVersion.V2_3_0,
+      ]) {
+        expect(() => validateEncodeSwaps(buildSpec({ urVersion }), [step])).to.not.throw()
+      }
+    })
   })
 
   describe('encodeSwapStep', () => {
@@ -682,6 +724,43 @@ describe('encodeSwaps', () => {
 
       const parsed = V4BaseActionsParser.parseCalldata(planner.inputs[0], URVersion.V2_1_1)
       expect(parsed.actions[0].params[2].value).to.equal(false)
+    })
+
+    it('encodes the legacy 2-param UNWRAP_WETH before UR 2.3.0', () => {
+      const step: SwapStep = { type: 'UNWRAP_WETH', recipient: ROUTER_AS_RECIPIENT, amountMin: '123' }
+
+      encodeSwapStep(planner, step, UniversalRouterVersion.V2_1_1)
+
+      const decoded = defaultAbiCoder.decode(['address', 'uint256'], planner.inputs[0])
+      expect(decoded[0]).to.equal(ROUTER_AS_RECIPIENT)
+      expect(decoded[1].toString()).to.equal('123')
+    })
+
+    it('encodes 3-param UNWRAP_WETH with the CONTRACT_BALANCE default on UR 2.3.0', () => {
+      const step: SwapStep = { type: 'UNWRAP_WETH', recipient: ROUTER_AS_RECIPIENT, amountMin: '123' }
+
+      encodeSwapStep(planner, step, UniversalRouterVersion.V2_3_0)
+
+      const decoded = defaultAbiCoder.decode(['address', 'uint256', 'uint256'], planner.inputs[0])
+      expect(decoded[0]).to.equal(ROUTER_AS_RECIPIENT)
+      expect(decoded[1].toString()).to.equal(CONTRACT_BALANCE.toString())
+      expect(decoded[2].toString()).to.equal('123')
+    })
+
+    it('passes an exact UNWRAP_WETH amount through on UR 2.3.0', () => {
+      const step: SwapStep = {
+        type: 'UNWRAP_WETH',
+        recipient: ROUTER_AS_RECIPIENT,
+        amountMin: '123',
+        amount: '456',
+      }
+
+      encodeSwapStep(planner, step, UniversalRouterVersion.V2_3_0)
+
+      const decoded = defaultAbiCoder.decode(['address', 'uint256', 'uint256'], planner.inputs[0])
+      expect(decoded[0]).to.equal(ROUTER_AS_RECIPIENT)
+      expect(decoded[1].toString()).to.equal('456')
+      expect(decoded[2].toString()).to.equal('123')
     })
   })
 
@@ -895,6 +974,91 @@ describe('encodeSwaps', () => {
       const sweep = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[3])
       expect(sweep[0].toLowerCase()).to.equal(ETH_ADDRESS.toLowerCase())
       expect(sweep[1].toLowerCase()).to.equal(TEST_RECIPIENT.toLowerCase())
+    })
+
+    it('encodes 3-param UNWRAP_WETH with the CONTRACT_BALANCE default on UR 2.3.0', () => {
+      const spec = buildSpec(
+        {
+          urVersion: UniversalRouterVersion.V2_3_0,
+          slippageTolerance: new Percent(25, 1000),
+        },
+        {
+          outputToken: ETH,
+          quote: CurrencyAmount.fromRawAmount(ETH, '500000000000000000'),
+        }
+      )
+
+      const swapSteps: SwapStep[] = [
+        buildV3ExactInStep(),
+        {
+          type: 'UNWRAP_WETH',
+          recipient: ROUTER_AS_RECIPIENT,
+          amountMin: '0',
+        },
+      ]
+
+      const result = SwapRouter.encodeSwaps(spec, swapSteps)
+      const { commands, inputs } = decodeExecute(result.calldata)
+
+      expect(commands).to.equal('0x02000c04')
+
+      const unwrap = defaultAbiCoder.decode(['address', 'uint256', 'uint256'], inputs[2])
+      expect(unwrap[0]).to.equal(ROUTER_AS_RECIPIENT)
+      expect(unwrap[1].toString()).to.equal(CONTRACT_BALANCE.toString())
+      expect(unwrap[2].toString()).to.equal('0')
+    })
+
+    it('encodes an exact UNWRAP_WETH amount on UR 2.3.0', () => {
+      const spec = buildSpec(
+        {
+          urVersion: UniversalRouterVersion.V2_3_0,
+          slippageTolerance: new Percent(25, 1000),
+        },
+        {
+          outputToken: ETH,
+          quote: CurrencyAmount.fromRawAmount(ETH, '500000000000000000'),
+        }
+      )
+
+      const swapSteps: SwapStep[] = [
+        buildV3ExactInStep(),
+        {
+          type: 'UNWRAP_WETH',
+          recipient: ROUTER_AS_RECIPIENT,
+          amountMin: '0',
+          amount: '250000000000000000',
+        },
+      ]
+
+      const result = SwapRouter.encodeSwaps(spec, swapSteps)
+      const { inputs } = decodeExecute(result.calldata)
+
+      const unwrap = defaultAbiCoder.decode(['address', 'uint256', 'uint256'], inputs[2])
+      expect(unwrap[0]).to.equal(ROUTER_AS_RECIPIENT)
+      expect(unwrap[1].toString()).to.equal('250000000000000000')
+      expect(unwrap[2].toString()).to.equal('0')
+    })
+
+    it('rejects an exact UNWRAP_WETH amount when encoding for a pre-2.3.0 router', () => {
+      const spec = buildSpec(
+        { urVersion: UniversalRouterVersion.V2_0 },
+        {
+          outputToken: ETH,
+          quote: CurrencyAmount.fromRawAmount(ETH, '500000000000000000'),
+        }
+      )
+
+      expect(() =>
+        SwapRouter.encodeSwaps(spec, [
+          buildV3ExactInStep(),
+          {
+            type: 'UNWRAP_WETH',
+            recipient: ROUTER_AS_RECIPIENT,
+            amountMin: '0',
+            amount: '250000000000000000',
+          },
+        ])
+      ).to.throw('UNWRAP_WETH_AMOUNT_UNSUPPORTED_BEFORE_V2_3_0')
     })
 
     it('encodes exact-output ERC20 to ERC20 with refund sweep', () => {

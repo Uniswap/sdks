@@ -35,6 +35,7 @@ import {
   ETH_ADDRESS,
   UniversalRouterVersion,
   isAtLeastV2_1_1,
+  isAtLeastV2_3_0,
 } from '../../utils/constants'
 import { getCurrencyAddress } from '../../utils/getCurrencyAddress'
 import { encodeFeeBips, encodeFee1e18 } from '../../utils/numbers'
@@ -256,7 +257,12 @@ export class UniswapTrade implements Command {
         ])
       }
       // In proxy mode, the proxy already transferred tokens to the UR; just unwrap
-      planner.addCommand(CommandType.UNWRAP_WETH, [ROUTER_AS_RECIPIENT, 0])
+      planner.addCommand(
+        CommandType.UNWRAP_WETH,
+        unwrapWethParams(ROUTER_AS_RECIPIENT, 0, this.options.urVersion),
+        false,
+        this.options.urVersion
+      )
     }
     // The overall recipient at the end of the trade, SENDER_AS_RECIPIENT uses the msg.sender
     this.options.recipient = this.options.recipient ?? SENDER_AS_RECIPIENT
@@ -348,7 +354,12 @@ export class UniswapTrade implements Command {
       // The remaining tokens that need to be sent to the user after the fee is taken will be caught
       // by this if-else clause.
       if (this.outputRequiresUnwrap) {
-        planner.addCommand(CommandType.UNWRAP_WETH, [this.options.recipient, minimumAmountOut])
+        planner.addCommand(
+          CommandType.UNWRAP_WETH,
+          unwrapWethParams(this.options.recipient, minimumAmountOut, this.options.urVersion),
+          false,
+          this.options.urVersion
+        )
       } else if (this.outputRequiresWrap) {
         planner.addCommand(CommandType.WRAP_ETH, [this.options.recipient, CONTRACT_BALANCE])
       } else {
@@ -364,7 +375,12 @@ export class UniswapTrade implements Command {
     // we need to send back the change to the user
     if (this.trade.tradeType === TradeType.EXACT_OUTPUT || riskOfPartialFill(this.trade)) {
       if (this.inputRequiresWrap) {
-        planner.addCommand(CommandType.UNWRAP_WETH, [this.options.recipient, 0])
+        planner.addCommand(
+          CommandType.UNWRAP_WETH,
+          unwrapWethParams(this.options.recipient, 0, this.options.urVersion),
+          false,
+          this.options.urVersion
+        )
       } else if (this.inputRequiresUnwrap) {
         planner.addCommand(CommandType.WRAP_ETH, [this.options.recipient, CONTRACT_BALANCE])
       } else if (this.options.tokenTransferMode === TokenTransferMode.ApproveProxy) {
@@ -692,13 +708,25 @@ function addMixedSwap<TInput extends Currency, TOutput extends Currency>(
       if (outputToken.isNative && !nextInputToken.isNative) {
         planner.addCommand(CommandType.WRAP_ETH, [ROUTER_AS_RECIPIENT, CONTRACT_BALANCE])
       } else if (!outputToken.isNative && nextInputToken.isNative) {
-        planner.addCommand(CommandType.UNWRAP_WETH, [ROUTER_AS_RECIPIENT, 0])
+        planner.addCommand(
+          CommandType.UNWRAP_WETH,
+          unwrapWethParams(ROUTER_AS_RECIPIENT, 0, options.urVersion),
+          false,
+          options.urVersion
+        )
       }
     }
 
     hopOffset += section.length
     inputToken = nextInputToken
   }
+}
+
+// UNWRAP_WETH params for a "unwrap the router's full WETH balance, expecting at least amountMin" call.
+// From UR v2.3.0 the command takes (recipient, amount, minAmount) where `amount` is exact and
+// CONTRACT_BALANCE is the only full-balance sentinel; older routers take (recipient, amountMin).
+function unwrapWethParams(recipient: string, amountMin: BigNumberish, urVersion?: UniversalRouterVersion): any[] {
+  return isAtLeastV2_3_0(urVersion) ? [recipient, CONTRACT_BALANCE, amountMin] : [recipient, amountMin]
 }
 
 // if price impact is very high, there's a chance of hitting max/min prices resulting in a partial fill of the swap

@@ -1,5 +1,5 @@
 import { defaultAbiCoder } from 'ethers/lib/utils'
-import { UniversalRouterVersion, isAtLeastV2_1_1 } from './constants'
+import { UniversalRouterVersion, isAtLeastV2_1_1, isAtLeastV2_3_0 } from './constants'
 import { AcrossV4DepositV3Params } from '../entities/actions/across'
 
 /**
@@ -303,6 +303,27 @@ export const V2V3_SWAP_COMMANDS_V2_1_1: { [key: number]: CommandDefinition } = {
   },
 }
 
+// V2.3.0 ABI definitions for payments commands: UNWRAP_WETH gains an explicit `amount`
+// (exact amount of WETH to unwrap; CONTRACT_BALANCE is the unwrap-the-full-balance sentinel)
+export const PAYMENTS_COMMANDS_V2_3_0: { [key: number]: CommandDefinition } = {
+  [CommandType.UNWRAP_WETH]: {
+    parser: Parser.Abi,
+    params: [
+      { name: 'recipient', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'minAmount', type: 'uint256' },
+    ],
+  },
+}
+
+// Resolves a command's ABI definition for a router version, layering version overrides
+// (newest tier first) over the base COMMAND_DEFINITION.
+export function getCommandDefinition(type: CommandType, urVersion?: UniversalRouterVersion): CommandDefinition {
+  if (isAtLeastV2_3_0(urVersion) && type in PAYMENTS_COMMANDS_V2_3_0) return PAYMENTS_COMMANDS_V2_3_0[type]
+  if (isAtLeastV2_1_1(urVersion) && type in V2V3_SWAP_COMMANDS_V2_1_1) return V2V3_SWAP_COMMANDS_V2_1_1[type]
+  return COMMAND_DEFINITION[type]
+}
+
 export class RoutePlanner {
   commands: string
   inputs: string[]
@@ -367,10 +388,7 @@ export type RouterCommand = {
 }
 
 export function createCommand(type: CommandType, parameters: any[], urVersion?: UniversalRouterVersion): RouterCommand {
-  const commandDef =
-    isAtLeastV2_1_1(urVersion) && type in V2V3_SWAP_COMMANDS_V2_1_1
-      ? V2V3_SWAP_COMMANDS_V2_1_1[type]
-      : COMMAND_DEFINITION[type]
+  const commandDef = getCommandDefinition(type, urVersion)
   switch (commandDef.parser) {
     case Parser.Abi:
       const encodedInput = defaultAbiCoder.encode(

@@ -104,6 +104,12 @@ export type UnwrapWeth = {
   type: 'UNWRAP_WETH'
   recipient: string
   amountMin: BigNumberish
+  /**
+   * Exact amount of WETH to unwrap. Requires urVersion >= 2.3.0, where UNWRAP_WETH encodes
+   * (recipient, amount, minAmount). Omit to unwrap the router's full WETH balance
+   * (encoded as the CONTRACT_BALANCE sentinel), matching pre-2.3.0 behavior.
+   */
+  amount?: BigNumberish
 }
 
 export type SwapStep = V2SwapExactIn | V2SwapExactOut | V3SwapExactIn | V3SwapExactOut | V4Swap | WrapEth | UnwrapWeth
