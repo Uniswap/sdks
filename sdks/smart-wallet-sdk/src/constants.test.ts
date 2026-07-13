@@ -18,4 +18,13 @@ describe('constants', () => {
       expect(getAllSmartWalletVersions(chainId as SupportedChainIds)).toEqual(Object.values(SMART_WALLET_VERSIONS[chainId as SupportedChainIds]))
     }
   })
+
+  it('Monad should have v1.0.0 and v1.1.0 deployments with v1.1.0 as latest', () => {
+    const versions = SMART_WALLET_VERSIONS[SupportedChainIds.MONAD]
+    expect(Object.keys(versions).sort()).toEqual(
+      [SmartWalletVersion.LATEST, SmartWalletVersion.v1_1_0, SmartWalletVersion.v1_0_0].sort()
+    )
+    expect(versions[SmartWalletVersion.LATEST]).toEqual(versions[SmartWalletVersion.v1_1_0])
+    expect(SMART_WALLET_ADDRESSES[SupportedChainIds.MONAD]).toEqual('0x000000005c84F8Fd50b21CAC312528A64437030e')
+  })
 })
