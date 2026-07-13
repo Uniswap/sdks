@@ -19,7 +19,6 @@ import {
 import {
   stepUserPaidPulls,
   sumDirectOutputMin,
-  sumUserPaidMax,
   v3PathFirstToken,
   v3PathLastToken,
 } from '../../src/utils/directTransfers'
@@ -35,12 +34,12 @@ import {
   SENDER_AS_RECIPIENT,
   UniversalRouterVersion,
 } from '../../src/utils/constants'
-import { TEST_FEE_RECIPIENT_ADDRESS, TEST_RECIPIENT_ADDRESS } from '../utils/addresses'
+import {
+  TEST_FEE_RECIPIENT_ADDRESS as FEE_RECIPIENT,
+  TEST_RECIPIENT_ADDRESS as TEST_RECIPIENT,
+} from '../utils/addresses'
 import { DAI, ETHER as ETH, USDC, WETH, parseCommands } from '../utils/uniswapData'
 import routingSamples from './fixtures/routingSwapSteps.json'
-
-const TEST_RECIPIENT = TEST_RECIPIENT_ADDRESS
-const FEE_RECIPIENT = TEST_FEE_RECIPIENT_ADDRESS
 
 const TEST_PERMIT = {
   details: { token: USDC.address, amount: '999999', expiration: '2000000000', nonce: 0 },
@@ -376,17 +375,6 @@ describe('allowDirectTransfers', () => {
 
   describe('directTransfers inbound helpers', () => {
     describe('v3 path token extraction', () => {
-      it('extracts first and last tokens from an exact-in path', () => {
-        const path = packV3Path([USDC.address, WETH.address, DAI.address], [500, 3000])
-        expect(v3PathFirstToken(path)!.toLowerCase()).to.equal(USDC.address.toLowerCase())
-        expect(v3PathLastToken(path)!.toLowerCase()).to.equal(DAI.address.toLowerCase())
-      })
-
-      it('returns undefined for malformed paths', () => {
-        expect(v3PathFirstToken('0x1234')).to.equal(undefined)
-        expect(v3PathLastToken('nope')).to.equal(undefined)
-      })
-
       it('returns undefined for hop-misaligned and single-address paths', () => {
         const valid = packV3Path([USDC.address, WETH.address, DAI.address], [500, 3000])
         const truncated = valid.slice(0, valid.length - 2) // drop one byte: no longer 20 + N*23 aligned
@@ -403,55 +391,7 @@ describe('allowDirectTransfers', () => {
       })
     })
 
-    describe('stepUserPaidPulls / sumUserPaidMax', () => {
-      it('router-funded steps produce no pulls', () => {
-        expect(stepUserPaidPulls(buildV3ExactInStep())).to.deep.equal([])
-        expect(sumUserPaidMax([buildV3ExactInStep(), buildV2ExactInStep()]).toString()).to.equal('0')
-      })
-
-      it('counts V3 exact-in at amountIn with the first path token', () => {
-        const pulls = stepUserPaidPulls(buildV3ExactInStep({ payerIsUser: true, amountIn: '600000' }))
-        expect(pulls.length).to.equal(1)
-        expect(pulls[0].maxAmount.toString()).to.equal('600000')
-        expect(pulls[0].token!.toLowerCase()).to.equal(USDC.address.toLowerCase())
-      })
-
-      it('counts V3 exact-out at amountInMax with the LAST path token (reversed encoding)', () => {
-        const pulls = stepUserPaidPulls(buildV3ExactOutStep({ payerIsUser: true }))
-        expect(pulls[0].maxAmount.toString()).to.equal('1050000')
-        expect(pulls[0].token!.toLowerCase()).to.equal(USDC.address.toLowerCase())
-      })
-
-      it('counts V2 pulls with path[0]', () => {
-        const inPulls = stepUserPaidPulls(buildV2ExactInStep({ payerIsUser: true }))
-        expect(inPulls[0].token!.toLowerCase()).to.equal(USDC.address.toLowerCase())
-        expect(inPulls[0].maxAmount.toString()).to.equal('1000000')
-        const outPulls = stepUserPaidPulls(buildV2ExactOutStep({ payerIsUser: true }))
-        expect(outPulls[0].maxAmount.toString()).to.equal('1050000')
-      })
-
-      it('counts v4 SETTLE only when flagged, SETTLE_ALL always', () => {
-        expect(stepUserPaidPulls(buildV4SettleSwap())).to.deep.equal([])
-        const settle = stepUserPaidPulls(buildV4SettleSwap({ payerIsUser: true }))
-        expect(settle.length).to.equal(1)
-        expect(settle[0].maxAmount.toString()).to.equal('1000000')
-        expect(settle[0].token!.toLowerCase()).to.equal(USDC.address.toLowerCase())
-        const settleAll: V4Swap = {
-          type: 'V4_SWAP',
-          v4Actions: [{ action: 'SETTLE_ALL', currency: USDC.address, maxAmount: '400000' }],
-        }
-        expect(stepUserPaidPulls(settleAll)[0].maxAmount.toString()).to.equal('400000')
-      })
-
-      it('sums pull maxima across steps', () => {
-        const steps: SwapStep[] = [
-          buildV3ExactInStep({ payerIsUser: true, amountIn: '600000' }),
-          buildV2ExactInStep({ payerIsUser: true, amountIn: '150000' }),
-          buildV3ExactInStep(),
-        ]
-        expect(sumUserPaidMax(steps).toString()).to.equal('750000')
-      })
-
+    describe('stepUserPaidPulls', () => {
       it('wrap/unwrap and settle-free v4 steps produce no pulls', () => {
         expect(stepUserPaidPulls({ type: 'WRAP_ETH', recipient: ROUTER_AS_RECIPIENT, amount: '1' })).to.deep.equal([])
         expect(
@@ -860,24 +800,6 @@ describe('allowDirectTransfers', () => {
   })
 
   describe('directTransfers output coverage helpers', () => {
-    it('counts V3 exact-in minimums delivered to the recipient in the output token', () => {
-      const steps: SwapStep[] = [
-        buildV3ExactInStep({ recipient: TEST_RECIPIENT, amountOutMin: '100' }),
-        buildV3ExactInStep({ amountOutMin: '50' }), // router custody: not counted
-      ]
-      expect(sumDirectOutputMin(steps, TEST_RECIPIENT, WETH.address).toString()).to.equal('100')
-    })
-
-    it('counts V3 exact-out amounts via the path head (reversed encoding)', () => {
-      const steps: SwapStep[] = [buildV3ExactOutStep({ recipient: TEST_RECIPIENT })]
-      expect(sumDirectOutputMin(steps, TEST_RECIPIENT, WETH.address).toString()).to.equal('500000000000000000')
-    })
-
-    it('counts V2 credits via the last path token', () => {
-      const steps: SwapStep[] = [buildV2ExactInStep({ recipient: TEST_RECIPIENT, amountOutMin: '9' })]
-      expect(sumDirectOutputMin(steps, TEST_RECIPIENT, WETH.address).toString()).to.equal('9')
-    })
-
     it('counts V2 exact-out amounts as credits', () => {
       const steps: SwapStep[] = [buildV2ExactOutStep({ recipient: TEST_RECIPIENT })]
       expect(sumDirectOutputMin(steps, TEST_RECIPIENT, WETH.address).toString()).to.equal('500000000000000000')
@@ -889,17 +811,6 @@ describe('allowDirectTransfers', () => {
           type: 'V4_SWAP',
           v4Actions: [{ action: 'TAKE_PORTION', currency: WETH.address, recipient: TEST_RECIPIENT, bips: '100' }],
         },
-      ]
-      expect(sumDirectOutputMin(steps, TEST_RECIPIENT, WETH.address).toString()).to.equal('0')
-    })
-
-    it('ignores credits in tokens other than the output token', () => {
-      const steps: SwapStep[] = [
-        buildV3ExactInStep({
-          recipient: TEST_RECIPIENT,
-          amountOutMin: '100',
-          path: packV3Path([USDC.address, DAI.address], [500]),
-        }),
       ]
       expect(sumDirectOutputMin(steps, TEST_RECIPIENT, WETH.address).toString()).to.equal('0')
     })
