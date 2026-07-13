@@ -39,12 +39,10 @@ export type SwapSpecification = {
    */
   nativeErc20Input?: boolean
   /**
-   * Opts the plan into "budgeted" validation: steps may move funds directly between the
-   * user and pools (per-step `payerIsUser`, step recipients equal to `recipient`, v4
-   * SETTLE_ALL / TAKE_ALL). Total direct pulls may never exceed exactOrMaxAmountIn
-   * (ingress pulls only the remainder) and contract-enforced direct output minimums
-   * reduce the final sweep floor. Portion fees still require full output custody.
-   * Default false: router-custody-only validation.
+   * Lets steps pull input straight from the user and pay output straight to `recipient`
+   * (instead of router custody), still validated so the user never pays more than
+   * `exactOrMaxAmountIn` or receives less than the minimum output. Default false.
+   * See `SwapRouter.encodeSwaps`.
    */
   allowDirectTransfers?: boolean
 }

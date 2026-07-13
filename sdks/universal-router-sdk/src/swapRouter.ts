@@ -152,14 +152,11 @@ export abstract class SwapRouter {
    * Two validation regimes:
    * - Default (router custody): the single SDK ingress pull is the only user withdrawal and every step
    *   recipient must be the router; the final SWEEP floor enforces the minimum output.
-   * - `allowDirectTransfers`: steps may pull input directly from the user (`payerIsUser`, v4 SETTLE_ALL)
-   *   and deliver output directly to `recipient` (step recipients, v4 TAKE/TAKE_ALL, UNWRAP_WETH). The
-   *   SDK enforces an inbound budget (total contract-enforced pulls <= exactOrMaxAmountIn, ingress pulls
-   *   only the remainder) and outbound coverage (contract-enforced direct minimums reduce the SWEEP
-   *   floor). Portion fees require full output custody. Protective amounts always derive from the spec;
-   *   step amounts are only counted or capped. For fee-on-transfer output tokens the guarantee holds at
-   *   the enforcement point (router balance or pool payout), i.e. modulo at most one transfer fee — same
-   *   as the custody model.
+   * - `allowDirectTransfers`: steps may pull input straight from the user (`payerIsUser`,
+   *   v4 SETTLE_ALL) and pay output straight to `recipient` (step recipients, v4 TAKE/TAKE_ALL,
+   *   UNWRAP_WETH). Direct pulls may total at most exactOrMaxAmountIn — ingress pulls the
+   *   remainder — and direct output minimums count toward the SWEEP floor. Portion fees still
+   *   require output custody. Step amounts are never trusted, only counted or capped.
    *
    * Router contract: end with final output in `spec.routing.outputToken`; for `EXACT_OUTPUT`, unused input
    * must end in `spec.routing.inputToken`. Don't include a top-level `SWEEP` — the SDK appends settlement,
