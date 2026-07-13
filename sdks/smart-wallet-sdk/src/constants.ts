@@ -32,6 +32,7 @@ export enum SupportedChainIds {
   XLAYER = ChainId.XLAYER,
   ARC = ChainId.ARC,
   ROBINHOOD = ChainId.ROBINHOOD,
+  MONAD = ChainId.MONAD,
 }
 
 /**
@@ -117,6 +118,11 @@ export const SMART_WALLET_VERSIONS: { [_chainId in SupportedChainIds]: SmartWall
     [SmartWalletVersion.v1_0_0]: CANONICAL_V1_0_0_ADDRESS,
   },
   [SupportedChainIds.ROBINHOOD]: {
+    [SmartWalletVersion.LATEST]: CANONICAL_V1_1_0_ADDRESS,
+    [SmartWalletVersion.v1_1_0]: CANONICAL_V1_1_0_ADDRESS,
+    [SmartWalletVersion.v1_0_0]: CANONICAL_V1_0_0_ADDRESS,
+  },
+  [SupportedChainIds.MONAD]: {
     [SmartWalletVersion.LATEST]: CANONICAL_V1_1_0_ADDRESS,
     [SmartWalletVersion.v1_1_0]: CANONICAL_V1_1_0_ADDRESS,
     [SmartWalletVersion.v1_0_0]: CANONICAL_V1_0_0_ADDRESS,
