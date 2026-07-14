@@ -215,7 +215,9 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
     }
   }
 
-  // budgeted mode, inbound
+  // inbound budget: user-paid pulls must be concrete input-token amounts whose combined
+  // maxima fit within exactOrMaxAmountIn; the encoder then ingresses only the remainder,
+  // so total user outflow can never exceed the spec's input
   if (spec.allowDirectTransfers && swapSteps.some((step) => stepUserPaidPulls(step).length > 0)) {
     // permit2-based direct pulls need a plain ERC20 input owned by the tx sender
     invariant(!spec.routing.inputToken.isNative, 'DIRECT_TRANSFERS_NATIVE_INPUT')
