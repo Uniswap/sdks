@@ -43,8 +43,7 @@ function validateV4HopCounts(actions: V4Action[]): void {
 }
 
 function assertRouterRecipient(recipient: string): void {
-  invariant(typeof recipient === 'string', 'STEP_RECIPIENT_MUST_BE_ROUTER')
-  invariant(recipient.toLowerCase() === ROUTER_AS_RECIPIENT, 'STEP_RECIPIENT_MUST_BE_ROUTER')
+  invariant(recipient === ROUTER_AS_RECIPIENT, 'STEP_RECIPIENT_MUST_BE_ROUTER')
 }
 
 // router custody is always allowed; the spec recipient is additionally allowed under
@@ -52,7 +51,7 @@ function assertRouterRecipient(recipient: string): void {
 // `routerOnlyError` is the surface's legacy flag-off code (steps vs v4 actions).
 function checkRecipient(spec: NormalizedSwapSpecification, recipient: string, routerOnlyError: string): void {
   invariant(typeof recipient === 'string', routerOnlyError)
-  if (recipient.toLowerCase() === ROUTER_AS_RECIPIENT) return
+  if (recipient === ROUTER_AS_RECIPIENT) return
   invariant(spec.allowDirectTransfers, routerOnlyError)
   invariant(spec.fee?.kind !== 'portion', 'PORTION_FEE_REQUIRES_ROUTER_CUSTODY')
   invariant(recipient.toLowerCase() === spec.recipient.toLowerCase(), 'STEP_RECIPIENT_NOT_ALLOWED')
