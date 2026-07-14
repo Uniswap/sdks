@@ -115,6 +115,10 @@
       "amountOutMin": "0",
       "path": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599000064c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
     },
-    { "type": "UNWRAP_WETH", "recipient": "0x0000000000000000000000000000000000000002", "amountMin": "5274381088692749949" }
+    {
+      "type": "UNWRAP_WETH",
+      "recipient": "0x0000000000000000000000000000000000000002",
+      "amountMin": "5274381088692749949"
+    }
   ]
 }
