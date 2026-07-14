@@ -68,6 +68,20 @@ describe('getV3AddLiquidityGasEstimateTransactions', () => {
     expect(transactions[0].to).toEqual(positionManager)
   })
 
+  it('treats the desired mint amounts as the approval threshold', () => {
+    // v3 pulls at most amount0Desired/amount1Desired (mintAmounts), so an allowance
+    // exactly equal to them needs no approval
+    const desired = expectedPosition.mintAmounts
+    const transactions = getV3AddLiquidityGasEstimateTransactions({
+      ...baseParams,
+      token0: { allowance: desired.amount0.toString() },
+      token1: { allowance: desired.amount1.toString() },
+    })
+
+    expect(transactions).toHaveLength(1)
+    expect(transactions[0].to).toEqual(positionManager)
+  })
+
   it('prepends an approve(0) reset for tokens that require it', () => {
     const transactions = getV3AddLiquidityGasEstimateTransactions({
       ...baseParams,

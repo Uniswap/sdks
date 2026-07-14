@@ -108,6 +108,8 @@ export function getV3AddLiquidityGasEstimateTransactions(
   }
   const { calldata, value } = NonfungiblePositionManager.addCallParameters(position, options)
 
+  // v3 pulls at most the desired amounts (mintAmounts); its mintAmountsWithSlippage
+  // are lower-bound minimums, so mintAmounts is the correct approval threshold
   const { amount0, amount1 } = position.mintAmounts
   const transactions: LpGasEstimateTransaction[] = []
   if (!useNative?.wrapped.equals(pool.token0)) {

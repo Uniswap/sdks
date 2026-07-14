@@ -78,6 +78,42 @@ describe('getV4AddLiquidityGasEstimateTransactions', () => {
     expect(transactions[0].to).toEqual(positionManager)
   })
 
+  it('requires allowances to cover the slippage-inflated maximums, not just the desired amounts', () => {
+    const slippageTolerance = new Percent(250, 10_000)
+    const desired = expectedPosition.mintAmounts
+    const maximums = expectedPosition.mintAmountsWithSlippage(slippageTolerance)
+
+    // borderline: covers mintAmounts but not the amount0Max/amount1Max the manager settles
+    const borderline = getV4AddLiquidityGasEstimateTransactions({
+      ...baseParams,
+      currency0: {
+        allowance: desired.amount0.toString(),
+        permit2Allowance: { amount: desired.amount0.toString(), expiration: deadline },
+      },
+      currency1: {
+        allowance: maximums.amount1.toString(),
+        permit2Allowance: { amount: maximums.amount1.toString(), expiration: deadline },
+      },
+    })
+    // ERC-20 + Permit2 approvals for currency0 still included
+    expect(borderline).toHaveLength(3)
+    expect(borderline[0].to).toEqual(currency0.address)
+    expect(borderline[1].to).toEqual(PERMIT2_ADDRESS)
+
+    const covered = getV4AddLiquidityGasEstimateTransactions({
+      ...baseParams,
+      currency0: {
+        allowance: maximums.amount0.toString(),
+        permit2Allowance: { amount: maximums.amount0.toString(), expiration: deadline },
+      },
+      currency1: {
+        allowance: maximums.amount1.toString(),
+        permit2Allowance: { amount: maximums.amount1.toString(), expiration: deadline },
+      },
+    })
+    expect(covered).toHaveLength(1)
+  })
+
   it('includes a Permit2 approval when the existing permit expires before the deadline', () => {
     const transactions = getV4AddLiquidityGasEstimateTransactions({
       ...baseParams,
