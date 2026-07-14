@@ -89,7 +89,7 @@ export function sumUserPaidMax(steps: SwapStep[]): BigNumber {
   return steps.flatMap(stepUserPaidPulls).reduce((total, pull) => total.add(pull.maxAmount), BigNumber.from(0))
 }
 
-export type DirectOutputCredit = {
+type DirectOutputCredit = {
   token: string | undefined
   minAmount: BigNumber
 }
@@ -114,7 +114,7 @@ function v4DirectOutputCredits(action: V4Action, recipient: string): DirectOutpu
 }
 
 // contract-guaranteed amounts a step delivers directly to `recipient`
-export function stepDirectOutputCredits(step: SwapStep, recipient: string): DirectOutputCredit[] {
+function stepDirectOutputCredits(step: SwapStep, recipient: string): DirectOutputCredit[] {
   const isDirect = 'recipient' in step && step.recipient.toLowerCase() === recipient.toLowerCase()
   switch (step.type) {
     case 'V2_SWAP_EXACT_IN':

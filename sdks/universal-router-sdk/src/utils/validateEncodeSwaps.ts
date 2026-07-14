@@ -46,9 +46,7 @@ function assertRouterRecipient(recipient: string): void {
   invariant(recipient === ROUTER_AS_RECIPIENT, 'STEP_RECIPIENT_MUST_BE_ROUTER')
 }
 
-// router custody is always allowed; the spec recipient is additionally allowed under
-// allowDirectTransfers unless a portion fee requires full output custody.
-// `routerOnlyError` is the surface's legacy flag-off code (steps vs v4 actions).
+// `routerOnlyError` is the surface's legacy flag-off code (steps vs v4 actions)
 function checkRecipient(spec: NormalizedSwapSpecification, recipient: string, routerOnlyError: string): void {
   invariant(typeof recipient === 'string', routerOnlyError)
   if (recipient === ROUTER_AS_RECIPIENT) return
@@ -217,7 +215,7 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
     }
   }
 
-  // budgeted mode, inbound: applies only when at least one user-paid pull exists
+  // budgeted mode, inbound
   if (spec.allowDirectTransfers && swapSteps.some((step) => stepUserPaidPulls(step).length > 0)) {
     // permit2-based direct pulls need a plain ERC20 input owned by the tx sender
     invariant(!spec.routing.inputToken.isNative, 'DIRECT_TRANSFERS_NATIVE_INPUT')
