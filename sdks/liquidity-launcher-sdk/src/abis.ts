@@ -76,6 +76,91 @@ export const LBP_STRATEGY_ABI = [
     inputs: [],
     outputs: [{ name: '', type: 'address' }],
   },
+  {
+    // Permissionless, one-shot success-path migration. Sweeps the raised currency out of the
+    // auction (initializer) and seeds the v4 pool. Reverts until the auction is finalized &
+    // graduated and its `migrationBlock` has passed.
+    type: 'function',
+    name: 'migrate',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'initializer', type: 'address' }],
+    outputs: [],
+  },
+] as const satisfies Abi
+
+/**
+ * ContinuousClearingAuction instance — post-auction outcome views and the creator token-recovery
+ * entrypoint. `sweepUnsoldTokens()` is callable only by `tokensRecipient()` after `endBlock`, once
+ * (`sweepUnsoldTokensBlock() != 0` afterwards): on a failed (non-graduated) auction it returns the
+ * full deposited supply; on a graduated one, `remainingSupply()`. There is no failure enum on-chain —
+ * a failed auction is `currentBlock >= endBlock && !isGraduated()`.
+ */
+export const CCA_ABI = [
+  {
+    type: 'function',
+    name: 'sweepUnsoldTokens',
+    stateMutability: 'nonpayable',
+    inputs: [],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'isGraduated',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+  {
+    // 0 until swept; set to the sweep block afterwards (one-shot latch).
+    type: 'function',
+    name: 'sweepUnsoldTokensBlock',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    // 0 until the raised currency is swept (the strategy's `migrate()` does this on success).
+    type: 'function',
+    name: 'sweepCurrencyBlock',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'currencyRaised',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'remainingSupply',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'tokensRecipient',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+  },
+  {
+    type: 'function',
+    name: 'endBlock',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint64' }],
+  },
+  {
+    type: 'function',
+    name: 'claimBlock',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint64' }],
+  },
 ] as const satisfies Abi
 
 /** ContinuousClearingAuction factory — deterministic auction (initializer) address view. */

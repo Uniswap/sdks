@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'bun:test'
-import { decodeFunctionData, getAddress, slice, zeroAddress } from 'viem'
+import { decodeFunctionData, encodeFunctionData, getAddress, slice, zeroAddress } from 'viem'
 
-import { LIQUIDITY_LAUNCHER_ABI } from './abis'
-import { buildLaunchTransactions } from './build'
+import { CCA_ABI, LBP_STRATEGY_ABI, LIQUIDITY_LAUNCHER_ABI } from './abis'
+import { buildLaunchTransactions, buildMigrateTx, buildSweepUnsoldTokensTx } from './build'
+import { deriveAuctionOutcome, isGraduatedCall, sweepUnsoldTokensBlockCall, tokensRecipientCall } from './reads'
 import type { Distribution } from './types'
 
 const LAUNCHER = getAddress('0x00004c4ccc709Ef590F7C81102C0689F0263D4e9')
@@ -69,5 +70,51 @@ describe('buildLaunchTransactions', () => {
     const { functionName, args } = decodeFunctionData({ abi: LIQUIDITY_LAUNCHER_ABI, data: txs[0]!.data })
     expect(functionName).toBe('multicall')
     expect((args[0] as readonly unknown[]).length).toBe(2)
+  })
+})
+
+const AUCTION = getAddress('0x298eA05D0356B2Ae5cCAa3169E471783ee9EA000')
+const STRATEGY = getAddress('0x00004c4ccc709Ef590F7C81102C0689F0263D4e9')
+
+describe('buildSweepUnsoldTokensTx', () => {
+  it('targets the auction with sweepUnsoldTokens() calldata and no value', () => {
+    const tx = buildSweepUnsoldTokensTx({ auctionAddress: AUCTION })
+    expect(tx).toEqual({
+      to: AUCTION,
+      data: encodeFunctionData({ abi: CCA_ABI, functionName: 'sweepUnsoldTokens', args: [] }),
+      value: 0n,
+    })
+  })
+})
+
+describe('buildMigrateTx', () => {
+  it('targets the strategy with migrate(auction) calldata and no value', () => {
+    const tx = buildMigrateTx({ lbpStrategyAddress: STRATEGY, auctionAddress: AUCTION })
+    expect(tx).toEqual({
+      to: STRATEGY,
+      data: encodeFunctionData({ abi: LBP_STRATEGY_ABI, functionName: 'migrate', args: [AUCTION] }),
+      value: 0n,
+    })
+  })
+})
+
+describe('auction outcome reads', () => {
+  it('builds descriptors against the auction instance', () => {
+    expect(isGraduatedCall(AUCTION)).toEqual({
+      address: AUCTION,
+      abi: CCA_ABI,
+      functionName: 'isGraduated',
+      args: [],
+    })
+    expect(sweepUnsoldTokensBlockCall(AUCTION).functionName).toBe('sweepUnsoldTokensBlock')
+    expect(tokensRecipientCall(AUCTION).functionName).toBe('tokensRecipient')
+  })
+
+  it('derives active / graduated / failed from endBlock + isGraduated', () => {
+    expect(deriveAuctionOutcome({ isGraduated: false, endBlock: 100n, currentBlock: 99n })).toBe('active')
+    // Graduation can latch before endBlock; the outcome is still `active` until the auction ends.
+    expect(deriveAuctionOutcome({ isGraduated: true, endBlock: 100n, currentBlock: 99n })).toBe('active')
+    expect(deriveAuctionOutcome({ isGraduated: true, endBlock: 100n, currentBlock: 100n })).toBe('graduated')
+    expect(deriveAuctionOutcome({ isGraduated: false, endBlock: 100n, currentBlock: 100n })).toBe('failed')
   })
 })

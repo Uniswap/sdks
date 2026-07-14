@@ -1,6 +1,7 @@
 import { type Abi, type Address, type Hex, type PublicClient, erc20Abi, zeroAddress } from 'viem'
 
 import {
+  CCA_ABI,
   CCA_FACTORY_ABI,
   LBP_STRATEGY_ABI,
   PERMIT2_ABI,
@@ -67,6 +68,65 @@ export async function isV4PoolInitialized(
 ): Promise<boolean> {
   const [sqrtPriceX96] = await readContract<readonly [bigint, number, number, number]>(client, slot0Call(p))
   return sqrtPriceX96 !== 0n
+}
+
+// ---------------------------------------------------------------------------
+// ContinuousClearingAuction instance state (post-auction outcome & recovery gates)
+// ---------------------------------------------------------------------------
+
+/** `auction.isGraduated()` — whether the auction met its graduation criteria. */
+export function isGraduatedCall(auction: Address): ContractCall<typeof CCA_ABI> {
+  return { address: auction, abi: CCA_ABI, functionName: 'isGraduated', args: [] }
+}
+/** `auction.sweepUnsoldTokensBlock()` — 0 until the creator sweeps; non-zero once swept (one-shot). */
+export function sweepUnsoldTokensBlockCall(auction: Address): ContractCall<typeof CCA_ABI> {
+  return { address: auction, abi: CCA_ABI, functionName: 'sweepUnsoldTokensBlock', args: [] }
+}
+/** `auction.sweepCurrencyBlock()` — 0 until the raised currency is swept (`migrate()` does this). */
+export function sweepCurrencyBlockCall(auction: Address): ContractCall<typeof CCA_ABI> {
+  return { address: auction, abi: CCA_ABI, functionName: 'sweepCurrencyBlock', args: [] }
+}
+/** `auction.currencyRaised()` — total currency raised so far. */
+export function currencyRaisedCall(auction: Address): ContractCall<typeof CCA_ABI> {
+  return { address: auction, abi: CCA_ABI, functionName: 'currencyRaised', args: [] }
+}
+/** `auction.remainingSupply()` — tokens not (yet) sold; the graduated-path sweep amount. */
+export function remainingSupplyCall(auction: Address): ContractCall<typeof CCA_ABI> {
+  return { address: auction, abi: CCA_ABI, functionName: 'remainingSupply', args: [] }
+}
+/** `auction.tokensRecipient()` — the only address allowed to call `sweepUnsoldTokens()`. */
+export function tokensRecipientCall(auction: Address): ContractCall<typeof CCA_ABI> {
+  return { address: auction, abi: CCA_ABI, functionName: 'tokensRecipient', args: [] }
+}
+/** `auction.endBlock()` — when the auction finishes (in the auction's block domain, see below). */
+export function auctionEndBlockCall(auction: Address): ContractCall<typeof CCA_ABI> {
+  return { address: auction, abi: CCA_ABI, functionName: 'endBlock', args: [] }
+}
+/** `auction.claimBlock()` — when winning bids become claimable. */
+export function auctionClaimBlockCall(auction: Address): ContractCall<typeof CCA_ABI> {
+  return { address: auction, abi: CCA_ABI, functionName: 'claimBlock', args: [] }
+}
+
+export type AuctionOutcome = 'active' | 'graduated' | 'failed'
+
+/**
+ * Derives the auction outcome from already-read state (there is no failure enum on-chain):
+ * `active` until `endBlock`, then `graduated` or `failed` by `isGraduated()`. A `failed` auction's
+ * creator recovers the full deposited supply via {@link buildSweepUnsoldTokensTx}; a `graduated`
+ * one migrates via {@link buildMigrateTx} (and can sweep only the unsold remainder).
+ *
+ * `currentBlock` must be in the auction's own block domain: the CCA is BlockNumberish-aware, so on
+ * chains like Arbitrum it counts L1 (ArbSys) blocks, not the L2 blocks `eth_blockNumber` returns.
+ */
+export function deriveAuctionOutcome(p: {
+  isGraduated: boolean
+  endBlock: bigint
+  currentBlock: bigint
+}): AuctionOutcome {
+  if (p.currentBlock < p.endBlock) {
+    return 'active'
+  }
+  return p.isGraduated ? 'graduated' : 'failed'
 }
 
 // ---------------------------------------------------------------------------

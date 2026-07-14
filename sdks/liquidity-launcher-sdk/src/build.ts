@@ -6,8 +6,10 @@ import {
   encodeDepositToken,
   encodeDistributeToken,
   encodeErc20Approve,
+  encodeMigrate,
   encodeMulticall,
   encodePermit2Approve,
+  encodeSweepUnsoldTokens,
 } from './encode'
 import type { Distribution } from './types'
 
@@ -83,4 +85,21 @@ export function buildErc20ApprovePermit2Tx(token: Address, permit2: Address): Tr
 /** Convenience: the Permit2 `approve(token, launcher, max)` transaction for an existing-token launch. */
 export function buildPermit2ApproveLauncherTx(permit2: Address, token: Address, launcher: Address): TransactionRequest {
   return { to: permit2, data: encodePermit2Approve(token, launcher), value: 0n }
+}
+
+/**
+ * The creator's post-auction token recovery: `ContinuousClearingAuction.sweepUnsoldTokens()` on the
+ * auction instance. Must be sent by the auction's `tokensRecipient()`, after `endBlock`, and only if
+ * `sweepUnsoldTokensBlock() == 0` (one-shot) — see the `reads` descriptors for these gates.
+ */
+export function buildSweepUnsoldTokensTx(p: { auctionAddress: Address }): TransactionRequest {
+  return { to: p.auctionAddress, data: encodeSweepUnsoldTokens(), value: 0n }
+}
+
+/**
+ * The permissionless success-path migration: `LBPStrategy.migrate(auctionAddress)` on the strategy.
+ * Reverts until the auction is finalized & graduated and its `migrationBlock` has passed.
+ */
+export function buildMigrateTx(p: { lbpStrategyAddress: Address; auctionAddress: Address }): TransactionRequest {
+  return { to: p.lbpStrategyAddress, data: encodeMigrate(p.auctionAddress), value: 0n }
 }
