@@ -83,6 +83,8 @@ export function stepUserPaidPulls(step: SwapStep): UserPaidPull[] {
   }
 }
 
+// token-agnostic by design: validation binds every pull to the input token before this sum is
+// used, so off-token pulls are rejected rather than filtered (unlike output credits below)
 export function sumUserPaidMax(steps: SwapStep[]): BigNumber {
   return steps.flatMap(stepUserPaidPulls).reduce((total, pull) => total.add(pull.maxAmount), BigNumber.from(0))
 }

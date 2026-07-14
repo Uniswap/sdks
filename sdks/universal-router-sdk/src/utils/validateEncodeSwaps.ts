@@ -71,6 +71,7 @@ function validateV4Recipients(
     switch (action.action) {
       case 'TAKE':
       case 'TAKE_PORTION':
+        // fees are sdk-authored (the envelope's PAY_PORTION); a step-level TAKE_PORTION never pays the fee recipient
         checkV4Recipient(action.recipient)
         break
       case 'TAKE_ALL':
