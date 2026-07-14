@@ -39,5 +39,8 @@ export * from './build'
 // Liquidity-lock recipients (timelock / fees-forwarder / buyback-burn)
 export * from './lock'
 
+// Canonical quick-launch preset + pure classifier
+export * from './quickLaunch'
+
 // Formatting
 export * from './format'
