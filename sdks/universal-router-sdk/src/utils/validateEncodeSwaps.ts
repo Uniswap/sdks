@@ -219,41 +219,35 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
   }
 
   // budgeted mode, inbound: applies only when at least one user-paid pull exists
-  if (spec.allowDirectTransfers) {
-    const pulls = swapSteps.flatMap(stepUserPaidPulls)
-    if (pulls.length > 0) {
-      // permit2-based direct pulls need a plain ERC20 input owned by the tx sender
-      invariant(!spec.routing.inputToken.isNative, 'DIRECT_TRANSFERS_NATIVE_INPUT')
-      invariant(!spec.nativeErc20Input, 'DIRECT_TRANSFERS_NATIVE_ERC20_INPUT')
-      invariant(spec.tokenTransferMode === TokenTransferMode.Permit2, 'DIRECT_TRANSFERS_REQUIRES_PERMIT2')
+  if (spec.allowDirectTransfers && swapSteps.some((step) => stepUserPaidPulls(step).length > 0)) {
+    // permit2-based direct pulls need a plain ERC20 input owned by the tx sender
+    invariant(!spec.routing.inputToken.isNative, 'DIRECT_TRANSFERS_NATIVE_INPUT')
+    invariant(!spec.nativeErc20Input, 'DIRECT_TRANSFERS_NATIVE_ERC20_INPUT')
+    invariant(spec.tokenTransferMode === TokenTransferMode.Permit2, 'DIRECT_TRANSFERS_REQUIRES_PERMIT2')
 
-      const { exactOrMaxAmountIn } = computeEncodeSwapsAmounts(spec)
-      const inputTokenAddress = getCurrencyAddress(spec.routing.inputToken).toLowerCase()
+    const { exactOrMaxAmountIn } = computeEncodeSwapsAmounts(spec)
+    const inputTokenAddress = getCurrencyAddress(spec.routing.inputToken).toLowerCase()
 
-      let userPaidTotal = BigNumber.from(0)
-      swapSteps.forEach((step, stepIndex) => {
-        for (const pull of stepUserPaidPulls(step)) {
-          // concrete amounts only: bans ALREADY_PAID/OPEN_DELTA (0), CONTRACT_BALANCE (2^255),
-          // and anything permit2's uint160 cannot move
-          invariant(
-            pull.maxAmount.gt(0) && pull.maxAmount.lte(MAX_UINT160),
-            () => `USER_PAID_AMOUNT_OUT_OF_RANGE (step ${stepIndex})`
-          )
-          invariant(typeof pull.token === 'string', () => `USER_PAID_MALFORMED_PATH (step ${stepIndex})`)
-          invariant(
-            pull.token.toLowerCase() === inputTokenAddress,
-            () => `USER_PAID_INPUT_TOKEN_MISMATCH (step ${stepIndex})`
-          )
-          userPaidTotal = userPaidTotal.add(pull.maxAmount)
-        }
-      })
-      invariant(userPaidTotal.lte(exactOrMaxAmountIn), 'USER_PAID_EXCEEDS_MAX_INPUT')
-
-      // keeps the permit2 allowance an on-chain outer ceiling equal to the budget
-      if (spec.permit) {
-        invariant(spec.permit.details.token.toLowerCase() === inputTokenAddress, 'PERMIT_TOKEN_MISMATCH')
-        invariant(BigNumber.from(spec.permit.details.amount).gte(exactOrMaxAmountIn), 'PERMIT_AMOUNT_INSUFFICIENT')
+    let userPaidTotal = BigNumber.from(0)
+    swapSteps.forEach((step, stepIndex) => {
+      for (const pull of stepUserPaidPulls(step)) {
+        // concrete amounts only: bans ALREADY_PAID/OPEN_DELTA (0), CONTRACT_BALANCE (2^255),
+        // and anything permit2's uint160 cannot move
+        invariant(
+          pull.maxAmount.gt(0) && pull.maxAmount.lte(MAX_UINT160),
+          `USER_PAID_AMOUNT_OUT_OF_RANGE (step ${stepIndex})`
+        )
+        invariant(typeof pull.token === 'string', `USER_PAID_MALFORMED_PATH (step ${stepIndex})`)
+        invariant(pull.token.toLowerCase() === inputTokenAddress, `USER_PAID_INPUT_TOKEN_MISMATCH (step ${stepIndex})`)
+        userPaidTotal = userPaidTotal.add(pull.maxAmount)
       }
+    })
+    invariant(userPaidTotal.lte(exactOrMaxAmountIn), 'USER_PAID_EXCEEDS_MAX_INPUT')
+
+    // keeps the permit2 allowance an on-chain outer ceiling equal to the budget
+    if (spec.permit) {
+      invariant(spec.permit.details.token.toLowerCase() === inputTokenAddress, 'PERMIT_TOKEN_MISMATCH')
+      invariant(BigNumber.from(spec.permit.details.amount).gte(exactOrMaxAmountIn), 'PERMIT_AMOUNT_INSUFFICIENT')
     }
   }
 }
