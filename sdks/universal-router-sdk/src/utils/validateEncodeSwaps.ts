@@ -66,7 +66,8 @@ function validateV4Recipients(actions: V4Action[], spec: NormalizedSwapSpecifica
       case 'TAKE_ALL':
         // TAKE_ALL pays msgSender on-chain; any other spec recipient would be the
         // wrong payee while still reducing their sweep floor
-        invariant(spec.allowDirectTransfers && spec.fee?.kind !== 'portion', 'PORTION_FEE_REQUIRES_ROUTER_CUSTODY')
+        // flag-off TAKE_ALL is already rejected by the safe-mode gate above, so only a portion fee can block it here
+        invariant(spec.fee?.kind !== 'portion', 'PORTION_FEE_REQUIRES_ROUTER_CUSTODY')
         // strict equality: the all-numeric sentinel has no checksum variant; anything else fails closed
         invariant(spec.recipient === SENDER_AS_RECIPIENT, 'TAKE_ALL_REQUIRES_SENDER_RECIPIENT')
         break
