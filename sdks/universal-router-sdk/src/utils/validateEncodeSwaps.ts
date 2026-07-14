@@ -48,36 +48,28 @@ function assertRouterRecipient(recipient: string): void {
 }
 
 // router custody is always allowed; the spec recipient is additionally allowed under
-// allowDirectTransfers unless a portion fee requires full output custody
-function makeRecipientCheck(spec: NormalizedSwapSpecification, routerOnlyError: string) {
-  const directOutputAllowed = spec.allowDirectTransfers && spec.fee?.kind !== 'portion'
-  const specRecipient = spec.recipient.toLowerCase()
-  return (recipient: string): void => {
-    invariant(typeof recipient === 'string', routerOnlyError)
-    if (recipient.toLowerCase() === ROUTER_AS_RECIPIENT) return
-    invariant(spec.allowDirectTransfers, routerOnlyError)
-    invariant(directOutputAllowed, 'PORTION_FEE_REQUIRES_ROUTER_CUSTODY')
-    invariant(recipient.toLowerCase() === specRecipient, 'STEP_RECIPIENT_NOT_ALLOWED')
-  }
+// allowDirectTransfers unless a portion fee requires full output custody.
+// `routerOnlyError` is the surface's legacy flag-off code (steps vs v4 actions).
+function checkRecipient(spec: NormalizedSwapSpecification, recipient: string, routerOnlyError: string): void {
+  invariant(typeof recipient === 'string', routerOnlyError)
+  if (recipient.toLowerCase() === ROUTER_AS_RECIPIENT) return
+  invariant(spec.allowDirectTransfers, routerOnlyError)
+  invariant(spec.fee?.kind !== 'portion', 'PORTION_FEE_REQUIRES_ROUTER_CUSTODY')
+  invariant(recipient.toLowerCase() === spec.recipient.toLowerCase(), 'STEP_RECIPIENT_NOT_ALLOWED')
 }
 
-function validateV4Recipients(
-  actions: V4Action[],
-  spec: NormalizedSwapSpecification,
-  checkV4Recipient: (recipient: string) => void
-): void {
-  const directOutputAllowed = spec.allowDirectTransfers && spec.fee?.kind !== 'portion'
+function validateV4Recipients(actions: V4Action[], spec: NormalizedSwapSpecification): void {
   for (const action of actions) {
     switch (action.action) {
       case 'TAKE':
       case 'TAKE_PORTION':
         // fees are sdk-authored (the envelope's PAY_PORTION); a step-level TAKE_PORTION never pays the fee recipient
-        checkV4Recipient(action.recipient)
+        checkRecipient(spec, action.recipient, 'V4_ACTION_RECIPIENT_MUST_BE_ROUTER')
         break
       case 'TAKE_ALL':
         // TAKE_ALL pays msgSender on-chain; any other spec recipient would be the
         // wrong payee while still reducing their sweep floor
-        invariant(directOutputAllowed, 'PORTION_FEE_REQUIRES_ROUTER_CUSTODY')
+        invariant(spec.allowDirectTransfers && spec.fee?.kind !== 'portion', 'PORTION_FEE_REQUIRES_ROUTER_CUSTODY')
         // strict equality: the all-numeric sentinel has no checksum variant; anything else fails closed
         invariant(spec.recipient === SENDER_AS_RECIPIENT, 'TAKE_ALL_REQUIRES_SENDER_RECIPIENT')
         break
@@ -166,9 +158,6 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
     'FRACTIONAL_BPS_PORTION_FEE_UNSUPPORTED_ON_V2_0'
   )
 
-  const checkStepRecipient = makeRecipientCheck(spec, 'STEP_RECIPIENT_MUST_BE_ROUTER')
-  const checkV4Recipient = makeRecipientCheck(spec, 'V4_ACTION_RECIPIENT_MUST_BE_ROUTER')
-
   // per-step: capability-gate by UR version, recipients must be router custody (or the spec
   // recipient under allowDirectTransfers), per-hop arrays must match hop counts
   for (const step of swapSteps) {
@@ -196,7 +185,7 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
     switch (step.type) {
       case 'V2_SWAP_EXACT_IN':
       case 'V2_SWAP_EXACT_OUT':
-        checkStepRecipient(step.recipient)
+        checkRecipient(spec, step.recipient, 'STEP_RECIPIENT_MUST_BE_ROUTER')
         invariant(
           !step.minHopPriceX36 || step.minHopPriceX36.length === step.path.length - 1,
           'V2_MIN_HOP_PRICE_X36_LENGTH_MISMATCH'
@@ -204,7 +193,7 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
         break
       case 'V3_SWAP_EXACT_IN':
       case 'V3_SWAP_EXACT_OUT': {
-        checkStepRecipient(step.recipient)
+        checkRecipient(spec, step.recipient, 'STEP_RECIPIENT_MUST_BE_ROUTER')
         const hopCount = getV3HopCount(step.path)
         invariant(
           hopCount === undefined || !step.minHopPriceX36 || step.minHopPriceX36.length === hopCount,
@@ -217,12 +206,12 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
         assertRouterRecipient(step.recipient)
         break
       case 'UNWRAP_WETH':
-        checkStepRecipient(step.recipient)
+        checkRecipient(spec, step.recipient, 'STEP_RECIPIENT_MUST_BE_ROUTER')
         break
       case 'V4_SWAP':
         validateV4HopCounts(step.v4Actions)
         validateV4HookData(step.v4Actions)
-        validateV4Recipients(step.v4Actions, spec, checkV4Recipient)
+        validateV4Recipients(step.v4Actions, spec)
         break
       default:
         break
