@@ -118,7 +118,9 @@ export function getV4AddLiquidityGasEstimateTransactions(
   }
   const { calldata, value } = V4PositionManager.addCallParameters(position, options)
 
-  const { amount0, amount1 } = position.mintAmounts
+  // v4 settles up to the slippage-inflated maximums (amount0Max/amount1Max in the
+  // encoded call), so allowances must cover those — not just the desired amounts
+  const { amount0, amount1 } = position.mintAmountsWithSlippage(slippageTolerance)
   const transactions: LpGasEstimateTransaction[] = []
   const sides = [
     { currency: pool.currency0, amount: amount0, input: params.currency0 },
