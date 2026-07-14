@@ -168,7 +168,8 @@ export function getQuickLaunchDurationBlocks(chainId: number): bigint {
 /**
  * Decoded liquidity-lock descriptor for the matcher: the lock mode plus whether the timelock is
  * permanent. Derived from an auction's `MigratorParameters.positionRecipient` lock recipient (the
- * caller decodes it; the matcher never compares raw addresses — see {@link isQuickLaunch}).
+ * caller decodes it; the matcher never compares against specific contract/migrator addresses — see
+ * {@link isQuickLaunch}).
  */
 export interface QuickLaunchLockDescriptor {
   mode: QuickLaunchLockMode
@@ -221,7 +222,9 @@ export interface QuickLaunchMatchOptions {
 
 /**
  * Pure, deterministic matcher: returns whether a CCA auction's on-chain parameters match the canonical
- * {@link QUICK_LAUNCH_PRESET}. No I/O, no network, no address comparisons.
+ * {@link QUICK_LAUNCH_PRESET}. No I/O, no network, and no comparisons against specific contract/migrator
+ * addresses (classification stays address-independent). Checking the raise `currency` against the native
+ * zero-address sentinel is a denomination check, not an address-identity comparison.
  *
  * Presumes a CCA (v2) auction — the caller should gate on the auction version first (e.g. via the
  * factory→lens registry in `addresses`), since `AuctionParameters` is inherently CCA. The floor /
