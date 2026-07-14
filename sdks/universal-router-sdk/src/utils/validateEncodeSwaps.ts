@@ -78,7 +78,7 @@ function validateV4Recipients(actions: V4Action[], spec: NormalizedSwapSpecifica
 
 const HEX_BYTES = /^0x([0-9a-fA-F]{2})*$/
 
-// real routing emits hookData: "" — ethers rejects it deep in abi encoding; fail loudly here instead
+// ethers rejects non-hex hookData (e.g. '') deep inside abi encoding; fail loudly here instead
 function validateV4HookData(actions: V4Action[]): void {
   for (const action of actions) {
     if (action.action === 'SWAP_EXACT_IN_SINGLE' || action.action === 'SWAP_EXACT_OUT_SINGLE') {
