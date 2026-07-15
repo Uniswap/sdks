@@ -843,6 +843,119 @@ describe('allowDirectTransfers', () => {
       expect(sumDirectOutputMin(steps, TEST_RECIPIENT, WETH.address).toString()).to.equal('0')
     })
 
+    describe('v4 single OPEN_DELTA take credits swap minimums', () => {
+      const swapMinToRecipient = (extra: V4Action[] = [], takeOverrides: Record<string, unknown> = {}): SwapStep => ({
+        type: 'V4_SWAP',
+        v4Actions: [
+          {
+            action: 'SWAP_EXACT_IN_SINGLE',
+            poolKey: {
+              currency0: USDC.address,
+              currency1: WETH.address,
+              fee: 500,
+              tickSpacing: 10,
+              hooks: ETH_ADDRESS,
+            },
+            zeroForOne: true,
+            amountIn: '1000000',
+            amountOutMinimum: '400000000000000000',
+            hookData: '0x',
+          },
+          { action: 'SETTLE', currency: USDC.address, amount: '1000000' },
+          ...extra,
+          {
+            action: 'TAKE',
+            currency: WETH.address,
+            recipient: TEST_RECIPIENT,
+            amount: '0',
+            ...takeOverrides,
+          } as V4Action,
+        ],
+      })
+
+      it('credits the swap minimum through a sole OPEN_DELTA take to the recipient', () => {
+        expect(sumDirectOutputMin([swapMinToRecipient()], TEST_RECIPIENT, WETH.address).toString()).to.equal(
+          '400000000000000000'
+        )
+      })
+
+      it('credits exact-out swap amounts and sums multiple swaps of the same currency', () => {
+        const step: SwapStep = {
+          type: 'V4_SWAP',
+          v4Actions: [
+            {
+              action: 'SWAP_EXACT_IN_SINGLE',
+              poolKey: {
+                currency0: USDC.address,
+                currency1: WETH.address,
+                fee: 500,
+                tickSpacing: 10,
+                hooks: ETH_ADDRESS,
+              },
+              zeroForOne: true,
+              amountIn: '1000000',
+              amountOutMinimum: '100',
+              hookData: '0x',
+            },
+            {
+              action: 'SWAP_EXACT_OUT',
+              currencyOut: WETH.address,
+              path: [
+                { intermediateCurrency: DAI.address, fee: 500, tickSpacing: 10, hooks: ETH_ADDRESS, hookData: '0x' },
+              ],
+              amountOut: '40',
+              amountInMaximum: '1000000',
+            },
+            { action: 'TAKE', currency: WETH.address, recipient: TEST_RECIPIENT, amount: '0' },
+          ],
+        }
+        expect(sumDirectOutputMin([step], TEST_RECIPIENT, WETH.address).toString()).to.equal('140')
+      })
+
+      it('credits nothing when a second take of the currency exists', () => {
+        const step = swapMinToRecipient([
+          { action: 'TAKE_PORTION', currency: WETH.address, recipient: ROUTER_AS_RECIPIENT, bips: '100' },
+        ])
+        expect(sumDirectOutputMin([step], TEST_RECIPIENT, WETH.address).toString()).to.equal('0')
+      })
+
+      it('credits nothing when the block settles the output currency', () => {
+        const step = swapMinToRecipient([{ action: 'SETTLE', currency: WETH.address, amount: '1' }])
+        expect(sumDirectOutputMin([step], TEST_RECIPIENT, WETH.address).toString()).to.equal('0')
+      })
+
+      it('credits nothing when another swap consumes the output currency as input', () => {
+        const step = swapMinToRecipient([
+          {
+            action: 'SWAP_EXACT_IN_SINGLE',
+            poolKey: { currency0: DAI.address, currency1: WETH.address, fee: 500, tickSpacing: 10, hooks: ETH_ADDRESS },
+            zeroForOne: false,
+            amountIn: '1',
+            amountOutMinimum: '0',
+            hookData: '0x',
+          },
+        ])
+        expect(sumDirectOutputMin([step], TEST_RECIPIENT, WETH.address).toString()).to.equal('0')
+      })
+
+      it('credits nothing when the take goes to the router or carries a concrete amount', () => {
+        expect(
+          sumDirectOutputMin(
+            [swapMinToRecipient([], { recipient: ROUTER_AS_RECIPIENT })],
+            TEST_RECIPIENT,
+            WETH.address
+          ).toString()
+        ).to.equal('0')
+        expect(
+          sumDirectOutputMin(
+            [swapMinToRecipient([], { amount: '400000000000000000' })],
+            TEST_RECIPIENT,
+            WETH.address
+          ).toString()
+        ).to.equal('400000000000000000') // concrete take counted per-action, not by the block rule
+      })
+    })
+
     it('accumulates duplicate direct legs (each is independently contract-enforced)', () => {
       const leg = buildV3ExactInStep({ recipient: TEST_RECIPIENT, amountOutMin: '200000000000000000' })
       expect(sumDirectOutputMin([leg, leg], TEST_RECIPIENT, WETH.address).toString()).to.equal('400000000000000000')
@@ -919,6 +1032,52 @@ describe('allowDirectTransfers', () => {
       const residual = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[4])
       // netMin (0.5 - 0.01 fee) minus 0.2 direct = 0.29 WETH
       expect(residual[2].toString()).to.equal('290000000000000000')
+    })
+  })
+
+  describe('budgeted mode — v4 OPEN_DELTA direct output', () => {
+    it('drops the sweep floor for a native-input exact-in leg whose sole OPEN_DELTA take pays the recipient', () => {
+      // production shape: SETTLE(native) + SWAP_EXACT_IN_SINGLE(min) + TAKE(recipient, OPEN_DELTA)
+      const USDT = new Token(1, '0xdAC17F958D2ee523a2206206994597C13D831ec7', 6, 'USDT')
+      const steps: SwapStep[] = [
+        {
+          type: 'V4_SWAP',
+          v4Actions: [
+            { action: 'SETTLE', currency: ETH_ADDRESS, amount: '100000000000000000', payerIsUser: false },
+            {
+              action: 'SWAP_EXACT_IN_SINGLE',
+              poolKey: {
+                currency0: ETH_ADDRESS,
+                currency1: USDT.address,
+                fee: 100,
+                tickSpacing: 1,
+                hooks: ETH_ADDRESS,
+              },
+              zeroForOne: true,
+              amountIn: '100000000000000000',
+              amountOutMinimum: '187642691',
+              minHopPriceX36: '1924540420000000000000000000',
+              hookData: '0x',
+            },
+            { action: 'TAKE', currency: USDT.address, recipient: TEST_RECIPIENT, amount: '0' },
+          ],
+        },
+      ]
+      const spec = buildSpec(
+        { allowDirectTransfers: true, urVersion: UniversalRouterVersion.V2_1_1 },
+        {
+          inputToken: ETH,
+          outputToken: USDT,
+          amount: CurrencyAmount.fromRawAmount(ETH, '100000000000000000'),
+          quote: CurrencyAmount.fromRawAmount(USDT, '188113224'),
+        }
+      )
+      const result = SwapRouter.encodeSwaps(spec, steps)
+      const { commandTypes, inputs } = parseCommands(result.calldata)
+      expect(commandTypes).to.deep.equal([CommandType.V4_SWAP, CommandType.SWEEP])
+      const sweep = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[1])
+      // netMin = 188113224 * 0.95 = 178707562 (5% builder slippage), fully covered by the credited 187642691
+      expect(sweep[2].toString()).to.equal('0')
     })
   })
 

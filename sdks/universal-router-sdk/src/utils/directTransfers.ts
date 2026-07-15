@@ -94,6 +94,92 @@ type DirectOutputCredit = {
   minAmount: BigNumber
 }
 
+// input/output currencies of a v4 swap action's delta within its command's lock
+function v4SwapCurrencies(action: V4Action): { input: string; output: string } | undefined {
+  switch (action.action) {
+    case 'SWAP_EXACT_IN':
+      return action.path.length > 0
+        ? { input: action.currencyIn, output: action.path[action.path.length - 1].intermediateCurrency }
+        : undefined
+    case 'SWAP_EXACT_OUT':
+      // exact-out paths walk from the input side, so the first hop names the input currency
+      return action.path.length > 0
+        ? { input: action.path[0].intermediateCurrency, output: action.currencyOut }
+        : undefined
+    case 'SWAP_EXACT_IN_SINGLE':
+    case 'SWAP_EXACT_OUT_SINGLE':
+      return action.zeroForOne
+        ? { input: action.poolKey.currency0, output: action.poolKey.currency1 }
+        : { input: action.poolKey.currency1, output: action.poolKey.currency0 }
+    default:
+      return undefined
+  }
+}
+
+// credits swap-enforced output minimums that a single OPEN_DELTA take forwards to the recipient.
+// sound because the v4 ledger must zero for the command to succeed: when a currency's only
+// take is one OPEN_DELTA take to the recipient and nothing else in the block can consume that
+// currency, any successful transaction paid the recipient everything the block's swaps produced
+// of it — contract-enforced to be at least the swaps' summed minimums (order-independent: an
+// early take strands later credit and reverts the lock)
+function v4OpenDeltaTakeCredits(actions: V4Action[], recipient: string): DirectOutputCredit[] {
+  const swapMins = new Map<string, BigNumber>()
+  const takeCounts = new Map<string, number>()
+  const soleOpenDeltaToRecipient = new Map<string, boolean>()
+  const disqualified = new Set<string>()
+
+  for (const action of actions) {
+    switch (action.action) {
+      case 'SWAP_EXACT_IN':
+      case 'SWAP_EXACT_OUT':
+      case 'SWAP_EXACT_IN_SINGLE':
+      case 'SWAP_EXACT_OUT_SINGLE': {
+        const currencies = v4SwapCurrencies(action)
+        if (currencies === undefined) return [] // unparseable swap: cannot attribute deltas, credit nothing
+        disqualified.add(currencies.input.toLowerCase()) // the swap consumes this currency's delta
+        const min = BigNumber.from(
+          action.action === 'SWAP_EXACT_IN' || action.action === 'SWAP_EXACT_IN_SINGLE'
+            ? action.amountOutMinimum
+            : action.amountOut
+        )
+        const output = currencies.output.toLowerCase()
+        swapMins.set(output, (swapMins.get(output) ?? BigNumber.from(0)).add(min))
+        break
+      }
+      case 'SETTLE':
+      case 'SETTLE_ALL':
+        disqualified.add(action.currency.toLowerCase())
+        break
+      case 'TAKE': {
+        const currency = action.currency.toLowerCase()
+        takeCounts.set(currency, (takeCounts.get(currency) ?? 0) + 1)
+        soleOpenDeltaToRecipient.set(
+          currency,
+          BigNumber.from(action.amount).isZero() && action.recipient.toLowerCase() === recipient.toLowerCase()
+        )
+        break
+      }
+      case 'TAKE_ALL':
+      case 'TAKE_PORTION': {
+        const currency = action.currency.toLowerCase()
+        takeCounts.set(currency, (takeCounts.get(currency) ?? 0) + 1)
+        soleOpenDeltaToRecipient.set(currency, false)
+        break
+      }
+      default:
+        break
+    }
+  }
+
+  const credits: DirectOutputCredit[] = []
+  for (const [currency, min] of swapMins) {
+    if (takeCounts.get(currency) === 1 && soleOpenDeltaToRecipient.get(currency) && !disqualified.has(currency)) {
+      credits.push({ token: currency, minAmount: min })
+    }
+  }
+  return credits
+}
+
 function v4DirectOutputCredits(action: V4Action, recipient: string): DirectOutputCredit[] {
   switch (action.action) {
     case 'TAKE': {
@@ -129,7 +215,12 @@ function stepDirectOutputCredits(step: SwapStep, recipient: string): DirectOutpu
     case 'UNWRAP_WETH':
       return isDirect ? [{ token: ETH_ADDRESS, minAmount: BigNumber.from(step.amountMin) }] : []
     case 'V4_SWAP':
-      return step.v4Actions.flatMap((action) => v4DirectOutputCredits(action, recipient))
+      // per-action concrete credits and the block-level OPEN_DELTA rule are disjoint:
+      // an OPEN_DELTA take never produces a per-action credit
+      return [
+        ...step.v4Actions.flatMap((action) => v4DirectOutputCredits(action, recipient)),
+        ...v4OpenDeltaTakeCredits(step.v4Actions, recipient),
+      ]
     default:
       return []
   }
