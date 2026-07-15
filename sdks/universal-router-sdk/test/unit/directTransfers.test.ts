@@ -879,7 +879,7 @@ describe('allowDirectTransfers', () => {
         )
       })
 
-      it('credits exact-out swap amounts and sums multiple swaps of the same currency', () => {
+      it('does not credit exact-out amounts (the v4 router does not assert full exact-out delivery)', () => {
         const step: SwapStep = {
           type: 'V4_SWAP',
           v4Actions: [
@@ -909,7 +909,8 @@ describe('allowDirectTransfers', () => {
             { action: 'TAKE', currency: WETH.address, recipient: TEST_RECIPIENT, amount: '0' },
           ],
         }
-        expect(sumDirectOutputMin([step], TEST_RECIPIENT, WETH.address).toString()).to.equal('140')
+        // only the exact-in leg's minimum counts; the exact-out leg's 40 is not contract-guaranteed
+        expect(sumDirectOutputMin([step], TEST_RECIPIENT, WETH.address).toString()).to.equal('100')
       })
 
       it('credits nothing when a second take of the currency exists', () => {

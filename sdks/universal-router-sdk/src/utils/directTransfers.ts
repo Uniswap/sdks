@@ -116,12 +116,12 @@ function v4SwapCurrencies(action: V4Action): { input: string; output: string } |
   }
 }
 
-// credits swap-enforced output minimums that a single OPEN_DELTA take forwards to the recipient.
+// credits exact-in swap minimums that a single OPEN_DELTA take forwards to the recipient.
 // sound because the v4 ledger must zero for the command to succeed: when a currency's only
 // take is one OPEN_DELTA take to the recipient and nothing else in the block can consume that
 // currency, any successful transaction paid the recipient everything the block's swaps produced
-// of it — contract-enforced to be at least the swaps' summed minimums (order-independent: an
-// early take strands later credit and reverts the lock)
+// of it — contract-enforced to be at least the exact-in swaps' summed amountOutMinimums
+// (order-independent: an early take strands later credit and reverts the lock)
 function v4OpenDeltaTakeCredits(actions: V4Action[], recipient: string): DirectOutputCredit[] {
   const swapMins = new Map<string, BigNumber>()
   const takeCounts = new Map<string, number>()
@@ -137,13 +137,14 @@ function v4OpenDeltaTakeCredits(actions: V4Action[], recipient: string): DirectO
         const currencies = v4SwapCurrencies(action)
         if (currencies === undefined) return [] // unparseable swap: cannot attribute deltas, credit nothing
         disqualified.add(currencies.input.toLowerCase()) // the swap consumes this currency's delta
-        const min = BigNumber.from(
-          action.action === 'SWAP_EXACT_IN' || action.action === 'SWAP_EXACT_IN_SINGLE'
-            ? action.amountOutMinimum
-            : action.amountOut
-        )
-        const output = currencies.output.toLowerCase()
-        swapMins.set(output, (swapMins.get(output) ?? BigNumber.from(0)).add(min))
+        // only exact-in minimums are creditable: the action enforces them (V4TooLittleReceived).
+        // exact-out amounts are NOT asserted by the deployed v4 router — a price-limit partial
+        // fill succeeds with less — so exact-out swaps contribute zero (their actual output only
+        // adds on top of the credited exact-in minimums, keeping the credit a valid lower bound)
+        if (action.action === 'SWAP_EXACT_IN' || action.action === 'SWAP_EXACT_IN_SINGLE') {
+          const output = currencies.output.toLowerCase()
+          swapMins.set(output, (swapMins.get(output) ?? BigNumber.from(0)).add(BigNumber.from(action.amountOutMinimum)))
+        }
         break
       }
       case 'SETTLE':
