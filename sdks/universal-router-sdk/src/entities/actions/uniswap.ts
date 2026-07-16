@@ -1,3 +1,4 @@
+import invariant from 'tiny-invariant'
 import { RoutePlanner, CommandType } from '../../utils/routerCommands'
 import { Trade as V2Trade, Pair } from '@uniswap/v2-sdk'
 import { Trade as V3Trade, Pool as V3Pool, encodeRouteToPath } from '@uniswap/v3-sdk'
@@ -534,9 +535,20 @@ function addV4Swap<TInput extends Currency, TOutput extends Currency>(
     }
   }
 
+  // Floor exact-out delivery: TAKE the exact leg amountOut instead of OPEN_DELTA, so an
+  // under-delivering pool (e.g. liquidity exhausted at the price limit) leaves an unsettled
+  // delta and reverts at unlock instead of silently forwarding a partial fill.
+  let takeAmount: BigNumber | undefined
+  if (tradeType === TradeType.EXACT_OUTPUT) {
+    takeAmount = BigNumber.from(outputAmount.quotient.toString())
+    // amount 0 encodes as the OPEN_DELTA sentinel, which would silently drop the floor
+    invariant(!takeAmount.isZero(), 'ZERO_EXACT_OUTPUT_AMOUNT')
+  }
+
   v4Planner.addTake(
     pathOutputForTake,
-    routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient ?? SENDER_AS_RECIPIENT
+    routerMustCustody ? ROUTER_AS_RECIPIENT : options.recipient ?? SENDER_AS_RECIPIENT,
+    takeAmount
   )
   planner.addCommand(CommandType.V4_SWAP, [v4Planner.finalize()])
 }
