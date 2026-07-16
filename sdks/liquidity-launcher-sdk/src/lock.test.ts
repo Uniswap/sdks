@@ -74,12 +74,17 @@ describe('buildLockRecipient', () => {
 describe('creation bytecode pins', () => {
   it('TIMELOCK bytecode hash is unchanged', () => {
     expect(keccak256(LOCK_RECIPIENT_CREATION_BYTECODE.TIMELOCK)).toBe(
-      '0x2191c5153dfbfe1eff2d9e1140ea84188b935273eb299c3afbc4f9a82ce8203c'
+      '0x86ae215e4056c6fda23e5572f4b20f3f22ca2f6922133c95ad0ce0e8bced7555'
     )
   })
   it('FEES_FORWARDER bytecode hash is unchanged', () => {
     expect(keccak256(LOCK_RECIPIENT_CREATION_BYTECODE.FEES_FORWARDER)).toBe(
-      '0x507a9a1b056e76a6d3fa727c9cd50aeae62665594832e50dc977e1864de9e539'
+      '0xeae154385d89ee8293b868cadce468df4b64c33995c1340284d1b7dd82267013'
+    )
+  })
+  it('BUYBACK_BURN bytecode hash is unchanged', () => {
+    expect(keccak256(LOCK_RECIPIENT_CREATION_BYTECODE.BUYBACK_BURN)).toBe(
+      '0x591c41e1cb988ea96f8bd7ea36b649dd12536119e9c8a706b5d062ddd8c0fc1f'
     )
   })
 })
