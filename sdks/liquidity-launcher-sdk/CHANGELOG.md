@@ -1,5 +1,11 @@
 # @uniswap/liquidity-launcher-sdk
 
+## 0.5.1
+
+### Patch Changes
+
+- 1c06f58: Update lock recipient creation bytecodes to the latest liquidity-launcher artifacts (commit e4660af). Picks up the new BlockNumberish that detects the ArbSys precompile at construction time instead of hardcoding the Arbitrum One chain id.
+
 ## 0.5.0
 
 ### Minor Changes
