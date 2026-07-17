@@ -404,14 +404,20 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
     prevIdentity = undefined // Force the first tick to derive (don't skip against stale identity).
     prevTickFailed = false
     if (isWs) {
+      // The block-notification registration must be synchronous so no pushed block is missed.
       wsUnwatch = (client.watchBlockNumber as unknown as (args: { onBlockNumber: () => void }) => () => void)({
         onBlockNumber: () => {
           void runTick()
         },
       })
     }
-    // Both transports run an immediate first tick; HTTP then chains via scheduleNextSuccess.
-    void runTick()
+    // Defer the first tick to a microtask so every source subscribed in the same synchronous frame
+    // (the page-mount pattern) is registered before `doTick` snapshots the active set — they all
+    // share tick 1. No-op if the heartbeat was stopped/paused in the interim (e.g. a synchronous
+    // unsubscribe). Not the Scheduler: this is microtask ordering, not a timing policy.
+    queueMicrotask(() => {
+      if (running && !paused && !stopped) void runTick()
+    })
   }
 
   function stopHeartbeat(): void {

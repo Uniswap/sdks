@@ -189,12 +189,8 @@ describe('createBlockFeed', () => {
   })
 
   it('(b) two sources sharing one identical call → one batch slot, both derive', async () => {
-    const { client, state } = createFakeClient({
-      // Block advances each tick so the tick after both subscribe still derives (identity changed).
-      block: () => ({ number: BigInt(100 + state.multicallCount), hash: `0x${'ab'.repeat(32)}`, ts: 1700n }),
-      resolveCall: (c) => (c.functionName === 'foo' ? ok(42n) : ok(0n)),
-    })
-    const { scheduler, advance } = createFakeScheduler()
+    const { client, state } = createFakeClient({ resolveCall: (c) => (c.functionName === 'foo' ? ok(42n) : ok(0n)) })
+    const { scheduler } = createFakeScheduler()
     const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, scheduler })
 
     const shared = () => ({ x: call('foo') })
@@ -202,13 +198,13 @@ describe('createBlockFeed', () => {
     const b = source<bigint>({ key: 'b', calls: shared, derive: (t) => ({ value: (t.results['x'] as { result: bigint }).result, identity: t.identity }) })
     const sa = feed.watch(a)
     const sb = feed.watch(b)
+    // Both subscribe in the same synchronous frame; the deferred first tick sees both.
     sa.subscribe(() => {})
     sb.subscribe(() => {})
-    await flush() // tick 1: only `a` is active (b subscribed mid-tick, joins next tick)
-    await advance(1000) // tick 2: both `a` and `b` participate
+    await flush()
 
     // Only ONE 'foo' contract in the batch despite two sources requesting it.
-    const fooSlots = state.contractsSeen.at(-1)!.filter((c) => c.functionName === 'foo')
+    const fooSlots = state.contractsSeen[0]!.filter((c) => c.functionName === 'foo')
     expect(fooSlots.length).toBe(1)
     expect(sa.getSnapshot().current?.value).toBe(42n)
     expect(sb.getSnapshot().current?.value).toBe(42n)
@@ -382,12 +378,8 @@ describe('createBlockFeed', () => {
   })
 
   it('(j) a throwing derive isolates that source; others still emit', async () => {
-    const scheduled = captureMicrotasks()
-    const { client, state } = createFakeClient({
-      block: () => ({ number: BigInt(100 + state.multicallCount), hash: `0x${'ab'.repeat(32)}`, ts: 1700n }),
-      resolveCall: () => ok(1n),
-    })
-    const { scheduler, advance } = createFakeScheduler()
+    const { client } = createFakeClient({ resolveCall: () => ok(1n) })
+    const { scheduler } = createFakeScheduler()
     const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, scheduler })
 
     const bad = feed.watch(
@@ -399,11 +391,13 @@ describe('createBlockFeed', () => {
       })
     )
     const good = feed.watch(source({ key: 'good', derive: (t) => ({ value: 7, identity: t.identity }) }))
-    // Subscribe `good` first so tick 1 covers it; `bad` joins on tick 2 and throws exactly once.
-    good.subscribe(() => {})
+    // Both subscribe in the same frame → they share tick 1 (the deferred first tick).
     bad.subscribe(() => {})
-    await flush() // tick 1: only `good` active
-    await advance(1000) // tick 2: both active → bad throws once
+    good.subscribe(() => {})
+    // Capture AFTER subscribing: the deferred first-tick microtask was already queued via the real
+    // queueMicrotask, so it still runs on flush; only the derive-throw rethrow is captured here.
+    const scheduled = captureMicrotasks()
+    await flush()
 
     expect(good.getSnapshot().current?.value).toBe(7)
     expect(bad.getSnapshot().current).toBeUndefined()
@@ -441,7 +435,6 @@ describe('createBlockFeed', () => {
   })
 
   it('(l) log events are delivered even when derive throws; not re-delivered next tick', async () => {
-    const scheduled = captureMicrotasks()
     let blockNo = 100n
     const { client } = createFakeClient({
       block: () => ({ number: blockNo, hash: `0x${'ab'.repeat(32)}`, ts: 1700n }),
@@ -460,6 +453,8 @@ describe('createBlockFeed', () => {
     )
     const seen: FeedEvent<number>[] = []
     store.subscribe((e) => seen.push(e))
+    // Capture after subscribing so the deferred first tick still runs; only the rethrow is captured.
+    const scheduled = captureMicrotasks()
     await flush() // tick 1: throw isolated, but log still ships
 
     expect(seen.map((e) => e.type)).toEqual(['log'])
@@ -489,14 +484,13 @@ describe('createBlockFeed', () => {
     )
     sa.subscribe(() => {})
     const unsubB = sb.subscribe(() => {})
-    await flush() // tick 1: only `a` active (b subscribed mid-tick)
-    await advance(1000) // tick 2: both participate
+    await flush() // tick 1: both participate (same-frame subscribe)
 
     expect(state.contractsSeen.at(-1)!.some((c) => c.functionName === 'bfoo')).toBe(true)
     const bFrozen = sb.getSnapshot().current?.value
 
     unsubB() // b now has zero subscribers; a keeps the feed running
-    await advance(1000) // tick 3
+    await advance(1000) // tick 2
 
     const lastBatch = state.contractsSeen.at(-1)!
     expect(lastBatch.some((c) => c.functionName === 'bfoo')).toBe(false) // b contributes no calls
@@ -519,17 +513,39 @@ describe('createBlockFeed', () => {
     )
     sa.subscribe(() => {})
     const unsubB = sb.subscribe(() => {})
-    await flush() // tick 1: only `a` active (b subscribed mid-tick)
-    await advance(1000) // tick 2: both participate
-    expect(state.contractsSeen.at(-1)!.some((c) => c.functionName === 'bfoo')).toBe(true)
+    await flush() // tick 1: both participate (same-frame subscribe)
 
     unsubB()
-    await advance(1000) // tick 3: b skipped
+    await advance(1000) // tick 2: b skipped
     expect(state.contractsSeen.at(-1)!.some((c) => c.functionName === 'bfoo')).toBe(false)
 
     sb.subscribe(() => {}) // resubscribe (feed already running via a)
-    await advance(1000) // tick 4: b resumes
+    await advance(1000) // tick 3: b resumes
     expect(state.contractsSeen.at(-1)!.some((c) => c.functionName === 'bfoo')).toBe(true)
     expect(sb.getSnapshot().current?.value).toBeDefined()
+  })
+
+  it('(o) two stores subscribed in the same frame both join tick 1 (single multicall)', async () => {
+    const { client, state } = createFakeClient({ resolveCall: () => ok(1n) })
+    const { scheduler } = createFakeScheduler()
+    const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, scheduler })
+    const sa = feed.watch(
+      source<bigint>({ key: 'a', calls: () => ({ x: call('afoo') }), derive: (t) => ({ value: t.identity.blockNumber, identity: t.identity }) })
+    )
+    const sb = feed.watch(
+      source<bigint>({ key: 'b', calls: () => ({ y: call('bfoo') }), derive: (t) => ({ value: t.identity.blockNumber, identity: t.identity }) })
+    )
+    // Page-mount pattern: both stores subscribe synchronously before any tick runs.
+    sa.subscribe(() => {})
+    sb.subscribe(() => {})
+    await flush()
+
+    // Exactly one tick ran, and its single multicall batch carries BOTH sources' calls.
+    expect(state.multicallCount).toBe(1)
+    const batch = state.contractsSeen[0]!
+    expect(batch.some((c) => c.functionName === 'afoo')).toBe(true)
+    expect(batch.some((c) => c.functionName === 'bfoo')).toBe(true)
+    expect(sa.getSnapshot().current).toBeDefined()
+    expect(sb.getSnapshot().current).toBeDefined()
   })
 })
