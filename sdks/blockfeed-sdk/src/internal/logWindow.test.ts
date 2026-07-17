@@ -211,6 +211,31 @@ describe('reconcileLogs', () => {
     expect(book.entries.has('0xout:0')).toBe(false)
   })
 
+  it('(A3) carries forward a prior entry ABOVE toBlock unchanged (head regression), no retraction', () => {
+    const a = log('0xa', 100n)
+    const first = reconcileLogs({ book: emptyLogBook, observed: [a], fromBlock: 98n, toBlock: 100n })
+    // Head regresses to 99: block 100 is above the window and was not re-scanned this tick.
+    const second = reconcileLogs({ book: first.book, observed: [], fromBlock: 97n, toBlock: 99n })
+    expect(second.retractions).toHaveLength(0) // NOT falsely retracted
+    expect(second.book.entries.has('0xa:0')).toBe(true) // carried forward
+    // Head re-advances to 100 and re-observes the same log: deduped, not re-emitted.
+    const third = reconcileLogs({ book: second.book, observed: [a], fromBlock: 98n, toBlock: 100n })
+    expect(third.newLogs).toHaveLength(0)
+    expect(third.retractions).toHaveLength(0)
+  })
+
+  it('(A3) never emits an observed log outside [fromBlock, toBlock] as new (defense in depth)', () => {
+    const inWin = log('0xin', 100n)
+    const outWin = log('0xout', 200n)
+    const { newLogs } = reconcileLogs({
+      book: emptyLogBook,
+      observed: [inWin, outWin],
+      fromBlock: 98n,
+      toBlock: 100n,
+    })
+    expect(newLogs.map((l) => l.txHash)).toEqual(['0xin'])
+  })
+
   it('is immutable: does not mutate the input book map and returns a new book', () => {
     const a = log('0xa', 100n)
     const input = bookOf(a)

@@ -116,11 +116,15 @@ export function decodeFeedLogs(filters: LogFilter[], rawLogs: Log[]): DecodedFee
  * Reconcile a re-scanned trailing window against the prior book. Returns a NEW book (never mutates the
  * input) plus the new logs and retractions this tick.
  *
- * - `newLogs`: observed logs whose key is not already in the book.
+ * - `newLogs`: observed logs within `[fromBlock, toBlock]` whose key is not already in the book.
  * - `retractions`: prior book entries within `[fromBlock, toBlock]` that are absent from `observed` — the
  *   window re-scanned their block and they are gone (a reorg dropped them).
  * - Prior entries older than `fromBlock` are evicted silently (outside the window, no longer verifiable).
- * - The returned book contains only entries within `[fromBlock, toBlock]`.
+ * - Prior entries ABOVE `toBlock` (blockNumber > toBlock) are carried forward unchanged: this tick's
+ *   re-scan did not cover their block, so they are neither re-confirmed nor retractable. Dropping them
+ *   would re-emit them as "new" once the head re-advances (head regression / reorg).
+ * - The returned book contains observed entries within `[fromBlock, toBlock]` plus carried-forward
+ *   above-window entries.
  */
 export function reconcileLogs(args: {
   book: LogBook
@@ -134,7 +138,9 @@ export function reconcileLogs(args: {
   const observedKeys = new Set(observed.map((log) => logKey(log)))
   const withinWindow = (blockNumber: bigint): boolean => blockNumber >= fromBlock && blockNumber <= toBlock
 
-  const newLogs = observed.filter((log) => !book.entries.has(logKey(log)))
+  // Defense in depth: a racing getLogs can return logs outside the requested window; an observed log
+  // beyond [fromBlock, toBlock] must never be emitted (the engine also pre-windows `observed`).
+  const newLogs = observed.filter((log) => withinWindow(log.blockNumber) && !book.entries.has(logKey(log)))
 
   const retractions: FeedLogRef[] = []
   for (const entry of book.entries.values()) {
@@ -143,9 +149,14 @@ export function reconcileLogs(args: {
     }
   }
 
-  // New book: every observed log within the window. This re-confirms surviving entries, admits new ones,
+  // New book: carry forward prior entries ABOVE the window unchanged (their block was not re-scanned this
+  // tick, so they are neither re-confirmed nor retractable — dropping them would re-emit on re-advance),
+  // then add every observed log within the window. This re-confirms surviving entries, admits new ones,
   // drops retracted ones (absent from observed), and evicts pre-window entries (never re-added).
   const nextEntries = new Map<string, LogBookEntry>()
+  for (const entry of book.entries.values()) {
+    if (entry.ref.blockNumber > toBlock) nextEntries.set(logKey(entry.ref), entry)
+  }
   for (const log of observed) {
     if (!withinWindow(log.blockNumber)) continue
     nextEntries.set(logKey(log), { ref: refOf(log), log })

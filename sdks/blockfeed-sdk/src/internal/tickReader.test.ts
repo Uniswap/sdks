@@ -134,4 +134,37 @@ describe('readTick', () => {
     const { client } = fakeClient(() => [ok(100n), fail('no hash'), ok(1700000000n)])
     await expect(readTick(client, { keyed: {} })).rejects.toBeInstanceOf(TickFailedError)
   })
+
+  it('(g) passes batchSize:0 to every multicall so viem cannot internally re-split a chunk', async () => {
+    // Capture the FULL args object, not just `contracts`, to assert the batchSize guard.
+    const seen: Array<Record<string, unknown>> = []
+    const client = {
+      multicall: async (args: { contracts: RawContract[] }): Promise<RawResult[]> => {
+        seen.push(args as unknown as Record<string, unknown>)
+        return (args.contracts as RawContract[]).map((c) =>
+          ['getBlockNumber', 'getLastBlockHash', 'getCurrentBlockTimestamp'].includes(c.functionName)
+            ? c.functionName === 'getBlockNumber'
+              ? ok(100n)
+              : c.functionName === 'getLastBlockHash'
+                ? ok('0xabc123')
+                : ok(1700000000n)
+            : ok(c.functionName)
+        )
+      },
+    } as never
+
+    const keyed: Record<string, SpeculativeCall> = {}
+    for (let i = 0; i < 7; i++) keyed[`k${i}`] = speculativeCall(`fn${i}`, true)
+    await readTick(client, { keyed }, { maxCallsPerChunk: 5 })
+
+    expect(seen.length).toBe(2)
+    expect(seen.every((a) => a['batchSize'] === 0)).toBe(true)
+    expect(seen.every((a) => a['allowFailure'] === true)).toBe(true)
+  })
+
+  it('(h) throws TickFailedError when a chunk returns fewer results than calls', async () => {
+    // Return one short — a broken/mis-batched aggregate3 must fail the tick, not mis-align results.
+    const { client } = fakeClient(() => [ok(100n), ok('0xabc123')])
+    await expect(readTick(client, { keyed: {} })).rejects.toBeInstanceOf(TickFailedError)
+  })
 })

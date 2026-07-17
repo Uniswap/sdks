@@ -13,6 +13,7 @@ import type { FeedEvent, Source, SpeculativeCall } from './types'
 
 type RawResult = { status: 'success'; result: unknown } | { status: 'failure'; error: Error }
 const ok = (result: unknown): RawResult => ({ status: 'success', result })
+const fail = (message: string): RawResult => ({ status: 'failure', error: new Error(message) })
 
 /** Real-macrotask flush so all pending microtasks/promises settle (engine's injected scheduler is fake). */
 const flush = (): Promise<void> => new Promise((r) => globalThis.setTimeout(r, 0))
@@ -547,5 +548,527 @@ describe('createBlockFeed', () => {
     expect(batch.some((c) => c.functionName === 'bfoo')).toBe(true)
     expect(sa.getSnapshot().current).toBeDefined()
     expect(sb.getSnapshot().current).toBeDefined()
+  })
+
+  // -------------------------------------------------------------------------
+  // A1 — window continuity + unified gap rule
+  // -------------------------------------------------------------------------
+
+  it('(A1-i) short pause + large override → no duplicate log, no gap (book floor clamps fromBlock)', async () => {
+    let blockNo = 100n
+    const { client, state } = createFakeClient({
+      block: () => ({ number: blockNo, hash: `0x${'ab'.repeat(32)}`, ts: 1700n }),
+      logs: () => [bidLog(100n, 0)], // the block-100 log is present in every scan
+    })
+    const { scheduler } = createFakeScheduler()
+    const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, scheduler })
+    const store = feed.watch(
+      source<bigint>({
+        key: 's',
+        logFilters: () => [{ address: ADDR, event: BID_EVENT }],
+        derive: (t) => ({ value: t.identity.blockNumber, identity: t.identity }),
+      })
+    )
+    const events: FeedEvent<bigint>[] = []
+    store.subscribe((e) => events.push(e))
+    await flush() // tick 1 @ block 100 → log delivered, lastProcessed = 100
+
+    expect(events.filter((e) => e.type === 'log').length).toBe(1)
+    feed.pause()
+    blockNo = 101n // SHORT pause: head advanced only 1 block
+    events.length = 0
+    feed.resume({ logWindowOverride: 20 })
+    await flush()
+
+    // fromBlock = max(101-19, 100-2, 0) = 98 → block-100 log already in book, not re-delivered; 98 <= 101 → no gap.
+    expect(events.filter((e) => e.type === 'log').length).toBe(0)
+    expect(events.find((e) => e.type === 'gap')).toBeUndefined()
+    const last = state.getLogsParams.at(-1)!
+    expect(last.fromBlock).toBe(98n)
+    expect(last.toBlock).toBe(101n)
+  })
+
+  it('(A1-ii) long pause + override → gap with exact bounds and no duplicate of the pre-pause log', async () => {
+    let blockNo = 100n
+    const { client } = createFakeClient({
+      block: () => ({ number: blockNo, hash: `0x${'ab'.repeat(32)}`, ts: 1700n }),
+      logs: () => (blockNo === 100n ? [bidLog(100n, 0)] : []),
+    })
+    const { scheduler } = createFakeScheduler()
+    const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, scheduler })
+    const store = feed.watch(
+      source<bigint>({
+        key: 's',
+        logFilters: () => [{ address: ADDR, event: BID_EVENT }],
+        derive: (t) => ({ value: t.identity.blockNumber, identity: t.identity }),
+      })
+    )
+    const events: FeedEvent<bigint>[] = []
+    store.subscribe((e) => events.push(e))
+    await flush() // tick 1 @ 100 → log(100) delivered, lastProcessed = 100
+
+    feed.pause()
+    blockNo = 110n
+    events.length = 0
+    feed.resume({ logWindowOverride: 3 })
+    await flush()
+
+    const gap = events.find((e) => e.type === 'gap')
+    expect(gap).toBeDefined()
+    if (gap && gap.type === 'gap') {
+      expect(gap.fromBlock).toBe(101n)
+      expect(gap.toBlock).toBe(107n) // fromBlock(108) - 1
+    }
+    // block-100 log fell below the [108,110] window: evicted, never re-delivered, never retracted.
+    expect(events.filter((e) => e.type === 'log').length).toBe(0)
+    expect(events.filter((e) => e.type === 'retraction').length).toBe(0)
+  })
+
+  it('(A1-iii) resume WITHOUT override after a long pause still publishes a gap', async () => {
+    let blockNo = 100n
+    const { client } = createFakeClient({
+      block: () => ({ number: blockNo, hash: `0x${'ab'.repeat(32)}`, ts: 1700n }),
+    })
+    const { scheduler } = createFakeScheduler()
+    const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, scheduler })
+    const store = feed.watch(
+      source<bigint>({
+        key: 's',
+        logFilters: () => [{ address: ADDR, event: BID_EVENT }],
+        derive: (t) => ({ value: t.identity.blockNumber, identity: t.identity }),
+      })
+    )
+    const events: FeedEvent<bigint>[] = []
+    store.subscribe((e) => events.push(e))
+    await flush() // lastProcessed = 100
+
+    feed.pause()
+    blockNo = 110n
+    events.length = 0
+    feed.resume() // no override → tickK = trailingLogWindow = 3
+    await flush()
+
+    const gap = events.find((e) => e.type === 'gap')
+    expect(gap).toBeDefined()
+    if (gap && gap.type === 'gap') {
+      expect(gap.fromBlock).toBe(101n) // lastProcessed + 1
+      expect(gap.toBlock).toBe(107n) // fromBlock(108) - 1
+    }
+  })
+
+  it('(A1-iv) override 0 and override 1 are consistent: window [head,head], gap ends at head-1', async () => {
+    const run = async (override: number): Promise<{ fromBlock: bigint; toBlock: bigint }> => {
+      let blockNo = 100n
+      const { client } = createFakeClient({
+        block: () => ({ number: blockNo, hash: `0x${'ab'.repeat(32)}`, ts: 1700n }),
+      })
+      const { scheduler } = createFakeScheduler()
+      const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, scheduler })
+      const store = feed.watch(
+        source<bigint>({
+          key: 's',
+          logFilters: () => [{ address: ADDR, event: BID_EVENT }],
+          derive: (t) => ({ value: t.identity.blockNumber, identity: t.identity }),
+        })
+      )
+      const events: FeedEvent<bigint>[] = []
+      store.subscribe((e) => events.push(e))
+      await flush() // lastProcessed = 100
+      feed.pause()
+      blockNo = 110n
+      events.length = 0
+      feed.resume({ logWindowOverride: override })
+      await flush()
+      const gap = events.find((e) => e.type === 'gap')
+      if (!gap || gap.type !== 'gap') throw new Error('expected gap')
+      return { fromBlock: gap.fromBlock, toBlock: gap.toBlock }
+    }
+    const g0 = await run(0)
+    const g1 = await run(1)
+    // Both collapse the scan window to [110,110]; gap covers [101,109].
+    expect(g0).toEqual({ fromBlock: 101n, toBlock: 109n })
+    expect(g1).toEqual({ fromBlock: 101n, toBlock: 109n })
+  })
+
+  // -------------------------------------------------------------------------
+  // A2 — stale/backoff state machine runs AFTER the logs stage
+  // -------------------------------------------------------------------------
+
+  it('(A2) persistent getLogs failure (multicall healthy) still climbs to stale at 3 and recovers', async () => {
+    let logsFail = 4
+    const { client } = createFakeClient({
+      // Block advances each tick so identity changes and the logs stage is always reached.
+      block: (): FakeBlock => ({ number: 100n + BigInt(logsFail), hash: `0x${'ab'.repeat(32)}`, ts: 1700n }),
+      logs: () => {
+        if (logsFail-- > 1) throw new Error('getLogs down')
+        return []
+      },
+    })
+    const { scheduler, advance, pendingDelays } = createFakeScheduler()
+    const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, scheduler })
+    const store = feed.watch(
+      source({ key: 's', logFilters: () => [{ address: ADDR, event: BID_EVENT }], derive: (t) => ({ value: 1, identity: t.identity }) })
+    )
+    store.subscribe(() => {})
+
+    await flush() // failure 1 (getLogs threw) → backoff 2^1, NOT reset by the healthy multicall
+    expect(pendingDelays()).toEqual([BACKOFF_BASE_MS * 2])
+    expect(store.getSnapshot().stale).toBe(false)
+
+    await advance(BACKOFF_BASE_MS * 2) // failure 2
+    expect(pendingDelays()).toEqual([BACKOFF_BASE_MS * 4])
+    expect(store.getSnapshot().stale).toBe(false)
+
+    await advance(BACKOFF_BASE_MS * 4) // failure 3 → stale
+    expect(store.getSnapshot().stale).toBe(true)
+
+    await advance(BACKOFF_BASE_MS * 8) // success → recover
+    expect(store.getSnapshot().stale).toBe(false)
+    expect(pendingDelays()).toEqual([1000])
+  })
+
+  // -------------------------------------------------------------------------
+  // A4 — pause preservation across mount
+  // -------------------------------------------------------------------------
+
+  it('(A4) pause before the first subscribe → no tick runs when a subscriber arrives', async () => {
+    const { client, state } = createFakeClient({ resolveCall: () => ok(1n) })
+    const { scheduler } = createFakeScheduler()
+    const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, scheduler })
+    const store = feed.watch(source({ key: 's', derive: (t) => ({ value: 1, identity: t.identity }) }))
+
+    feed.pause() // paused while not yet running
+    store.subscribe(() => {})
+    await flush()
+
+    expect(feed.running).toBe(true) // heartbeat started (refcount) …
+    expect(state.multicallCount).toBe(0) // … but stayed paused: no tick
+  })
+
+  it('(A4) resume before subscribe clears pause so the first subscribe starts live', async () => {
+    const { client, state } = createFakeClient({ resolveCall: () => ok(1n) })
+    const { scheduler } = createFakeScheduler()
+    const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, scheduler })
+    const store = feed.watch(source({ key: 's', derive: (t) => ({ value: 1, identity: t.identity }) }))
+
+    feed.pause()
+    feed.resume() // not running yet → just clears paused
+    store.subscribe(() => {})
+    await flush()
+
+    expect(state.multicallCount).toBe(1) // tick ran
+  })
+
+  // -------------------------------------------------------------------------
+  // A6 — resume options survive an in-flight tick
+  // -------------------------------------------------------------------------
+
+  it('(A6) resume during an in-flight tick still produces the gap', async () => {
+    const gates: Array<() => void> = []
+    let blockNo = 100n
+    const st = { multicallCount: 0, getLogsParams: [] as Array<{ fromBlock: bigint; toBlock: bigint }> }
+    const client = {
+      transport: { type: 'http' },
+      multicall: async ({ contracts }: { contracts: Array<{ functionName: string }> }) => {
+        const idx = st.multicallCount++
+        const b = blockNo // capture at call time, before the gate
+        await new Promise<void>((r) => {
+          gates[idx] = r
+        })
+        return contracts.map((c) => {
+          if (c.functionName === 'getBlockNumber') return ok(b)
+          if (c.functionName === 'getLastBlockHash') return ok(`0x${'ab'.repeat(32)}`)
+          if (c.functionName === 'getCurrentBlockTimestamp') return ok(1700n)
+          return ok(0n)
+        })
+      },
+      getLogs: async (p: { fromBlock: bigint; toBlock: bigint }) => {
+        st.getLogsParams.push(p)
+        return []
+      },
+      watchBlockNumber: () => () => {},
+    } as unknown as PublicClient
+    const { scheduler } = createFakeScheduler()
+    const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, scheduler })
+    const store = feed.watch(
+      source<bigint>({
+        key: 's',
+        logFilters: () => [{ address: ADDR, event: BID_EVENT }],
+        derive: (t) => ({ value: t.identity.blockNumber, identity: t.identity }),
+      })
+    )
+    const events: FeedEvent<bigint>[] = []
+    store.subscribe((e) => events.push(e))
+    await flush() // tick 1 is now suspended at its multicall gate (block captured = 100)
+
+    feed.resume({ logWindowOverride: 3 }) // lands mid-tick → coalesced with resume options preserved
+    blockNo = 110n // tick 2 will capture this
+    gates[0]!() // release tick 1 → lastProcessed = 100, follow-up (resume) tick spawned
+    await flush() // tick 2 now suspended at its own gate
+    gates[1]!() // release tick 2 @ block 110, resume override 3
+    await flush()
+
+    const gap = events.find((e) => e.type === 'gap')
+    expect(gap).toBeDefined()
+    if (gap && gap.type === 'gap') {
+      expect(gap.fromBlock).toBe(101n)
+      expect(gap.toBlock).toBe(107n)
+    }
+  })
+
+  // -------------------------------------------------------------------------
+  // A8 — a store created while stale reports stale immediately
+  // -------------------------------------------------------------------------
+
+  it('(A8) a source watched while the feed is already stale reports stale:true immediately', async () => {
+    const { client } = createFakeClient({ failMulticall: () => true })
+    const { scheduler, advance } = createFakeScheduler()
+    const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, scheduler })
+    const first = feed.watch(source({ key: 'a', derive: (t) => ({ value: 1, identity: t.identity }) }))
+    first.subscribe(() => {})
+
+    await flush() // failure 1
+    await advance(BACKOFF_BASE_MS * 2) // failure 2
+    await advance(BACKOFF_BASE_MS * 4) // failure 3 → staleActive
+    expect(first.getSnapshot().stale).toBe(true)
+
+    const late = feed.watch(source({ key: 'b', derive: (t) => ({ value: 2, identity: t.identity }) }))
+    expect(late.getSnapshot().stale).toBe(true) // A8: not stale:false
+  })
+
+  // -------------------------------------------------------------------------
+  // B1 — same-height reorg re-emits
+  // -------------------------------------------------------------------------
+
+  it('(B1) same blockNumber but different parentBlockHash → derive re-runs and a tick emits', async () => {
+    let hash = 'aa'
+    const { client } = createFakeClient({
+      block: () => ({ number: 100n, hash: `0x${hash.repeat(32)}`, ts: 1700n }),
+    })
+    const { scheduler, advance } = createFakeScheduler()
+    const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, scheduler })
+    let deriveCalls = 0
+    const store = feed.watch(
+      source<number>({
+        key: 's',
+        derive: (t) => {
+          deriveCalls += 1
+          return { value: deriveCalls, identity: t.identity }
+        },
+      })
+    )
+    const ticks: FeedEvent<number>[] = []
+    store.subscribe((e) => {
+      if (e.type === 'tick') ticks.push(e)
+    })
+    await flush() // tick 1
+    expect(deriveCalls).toBe(1)
+
+    hash = 'bb' // same height, forked parent hash
+    ticks.length = 0
+    await advance(1000) // tick 2: identity changed via hash → NOT skipped
+    expect(deriveCalls).toBe(2)
+    expect(ticks.length).toBe(1)
+  })
+
+  // -------------------------------------------------------------------------
+  // B2 — retraction flows through the engine
+  // -------------------------------------------------------------------------
+
+  it('(B2) event order within a tick is phase → log → retraction → tick', async () => {
+    let hash = 'aa'
+    const { client } = createFakeClient({
+      block: () => ({ number: 100n, hash: `0x${hash.repeat(32)}`, ts: 1700n }),
+      // tick 1: log at index 0. tick 2 (reorg): index 0 gone, index 1 appears.
+      logs: () => (hash === 'aa' ? [bidLog(100n, 0)] : [bidLog(100n, 1)]),
+    })
+    const { scheduler, advance } = createFakeScheduler()
+    const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, scheduler })
+    const store = feed.watch(
+      source<number>({
+        key: 's',
+        logFilters: () => [{ address: ADDR, event: BID_EVENT }],
+        derive: (t, ctx) => {
+          const value = (ctx.prev?.value ?? 0) + 1
+          return { value, phase: value === 1 ? 'a' : 'b', identity: t.identity }
+        },
+      })
+    )
+    const seen: string[] = []
+    store.subscribe((e) => seen.push(e.type))
+    await flush() // tick 1
+
+    hash = 'bb'
+    seen.length = 0
+    await advance(1000) // tick 2: phase a→b, new log(index1), retraction of log(index0), tick
+    expect(seen).toEqual(['phase', 'log', 'retraction', 'tick'])
+  })
+
+  it('(B2) a retraction is emitted even when derive returns undefined', async () => {
+    let hash = 'aa'
+    const { client } = createFakeClient({
+      block: () => ({ number: 100n, hash: `0x${hash.repeat(32)}`, ts: 1700n }),
+      logs: () => (hash === 'aa' ? [bidLog(100n, 0)] : []),
+    })
+    const { scheduler, advance } = createFakeScheduler()
+    const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, scheduler })
+    const store = feed.watch(
+      source<number>({
+        key: 's',
+        logFilters: () => [{ address: ADDR, event: BID_EVENT }],
+        derive: () => undefined, // never emits a value
+      })
+    )
+    const seen: FeedEvent<number>[] = []
+    store.subscribe((e) => seen.push(e))
+    await flush() // tick 1: log delivered
+
+    hash = 'bb'
+    seen.length = 0
+    await advance(1000) // tick 2: log(100) gone → retraction survives the undefined derive
+    expect(seen.map((e) => e.type)).toEqual(['retraction'])
+  })
+
+  // -------------------------------------------------------------------------
+  // B3 — trailing-window K mapping onto getLogs params
+  // -------------------------------------------------------------------------
+
+  it('(B3) getLogs window params follow K across two ticks', async () => {
+    const { client, state } = createFakeClient({
+      block: () => ({ number: BigInt(100 + state.multicallCount), hash: `0x${'ab'.repeat(32)}`, ts: 1700n }),
+    })
+    const { scheduler, advance } = createFakeScheduler()
+    const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, trailingLogWindow: 3, scheduler })
+    const store = feed.watch(
+      source({ key: 's', logFilters: () => [{ address: ADDR, event: BID_EVENT }], derive: (t) => ({ value: 1, identity: t.identity }) })
+    )
+    store.subscribe(() => {})
+    await flush() // tick 1 @ head 101: fromBlock = max(101-2,0) = 99
+    await advance(1000) // tick 2 @ head 102: fromBlock = max(102-2, 101-2, 0) = 100
+
+    expect(state.getLogsParams.map((p) => ({ fromBlock: p.fromBlock, toBlock: p.toBlock }))).toEqual([
+      { fromBlock: 99n, toBlock: 101n },
+      { fromBlock: 100n, toBlock: 102n },
+    ])
+  })
+
+  // -------------------------------------------------------------------------
+  // B4 — WS failure/backoff + overlap coalescing
+  // -------------------------------------------------------------------------
+
+  it('(B4) WS mode: failing multicall backs off and marks stale at 3, then recovers', async () => {
+    let failures = 3
+    const { client, state } = createFakeClient({
+      ws: true,
+      failMulticall: () => failures-- > 0,
+      resolveCall: () => ok(1n),
+    })
+    const { scheduler, advance, pendingDelays } = createFakeScheduler()
+    const feed = createBlockFeed({ client, chainId: 1, scheduler })
+    const store = feed.watch(source({ key: 's', derive: (t) => ({ value: 1, identity: t.identity }) }))
+    store.subscribe(() => {})
+
+    await flush() // failure 1 → backoff timer even in WS mode
+    expect(pendingDelays()).toEqual([BACKOFF_BASE_MS * 2])
+    await advance(BACKOFF_BASE_MS * 2) // failure 2
+    await advance(BACKOFF_BASE_MS * 4) // failure 3 → stale
+    expect(store.getSnapshot().stale).toBe(true)
+    await advance(BACKOFF_BASE_MS * 8) // success → recovery
+    expect(store.getSnapshot().stale).toBe(false)
+
+    // Once recovered, a pushed block still drives a tick.
+    const before = state.multicallCount
+    state.push!(200n)
+    await flush()
+    expect(state.multicallCount).toBe(before + 1)
+  })
+
+  it('(B4) overlap guard: multiple pushes during an in-flight tick coalesce to exactly one follow-up', async () => {
+    const gates: Array<() => void> = []
+    const st = { multicallCount: 0, push: undefined as undefined | ((b: bigint) => void) }
+    const client = {
+      transport: { type: 'webSocket' },
+      multicall: async ({ contracts }: { contracts: Array<{ functionName: string }> }) => {
+        const idx = st.multicallCount++
+        // Only gate the FIRST tick; later ticks resolve immediately.
+        if (idx === 0) await new Promise<void>((r) => (gates[idx] = r))
+        return contracts.map((c) => {
+          if (c.functionName === 'getBlockNumber') return ok(BigInt(100 + idx))
+          if (c.functionName === 'getLastBlockHash') return ok(`0x${'ab'.repeat(32)}`)
+          if (c.functionName === 'getCurrentBlockTimestamp') return ok(1700n)
+          return ok(1n)
+        })
+      },
+      getLogs: async () => [],
+      watchBlockNumber: ({ onBlockNumber }: { onBlockNumber: (b: bigint) => void }) => {
+        st.push = onBlockNumber
+        return () => {}
+      },
+    } as unknown as PublicClient
+    const { scheduler } = createFakeScheduler()
+    const feed = createBlockFeed({ client, chainId: 1, scheduler })
+    const store = feed.watch(source({ key: 's', derive: (t) => ({ value: 1, identity: t.identity }) }))
+    store.subscribe(() => {})
+    await flush() // tick 1 suspended at its gate
+
+    st.push!(101n) // arrives mid-tick → pendingTrigger
+    st.push!(102n) // arrives mid-tick → coalesced (no second follow-up)
+    gates[0]!() // release tick 1 → exactly one coalesced follow-up runs
+    await flush()
+
+    expect(st.multicallCount).toBe(2) // tick 1 + one coalesced follow-up, not 3
+  })
+
+  // -------------------------------------------------------------------------
+  // B5 — chunk pass-through + shared-slot allowFailure AND-merge
+  // -------------------------------------------------------------------------
+
+  it('(B5) maxCallsPerChunk splits one tick across multiple multicall invocations', async () => {
+    const { client, state } = createFakeClient({ resolveCall: () => ok(1n) })
+    const { scheduler } = createFakeScheduler()
+    // 3 identity + 5 keyed = 8 calls; chunk size 4 → 2 invocations in a single tick.
+    const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, maxCallsPerChunk: 4, scheduler })
+    const store = feed.watch(
+      source({
+        key: 's',
+        calls: () => ({ a: call('fa'), b: call('fb'), c: call('fc'), d: call('fd'), e: call('fe') }),
+        derive: (t) => ({ value: 1, identity: t.identity }),
+      })
+    )
+    store.subscribe(() => {})
+    await flush()
+
+    expect(state.multicallCount).toBe(2) // one tick, two chunked multicall invocations
+    expect(state.contractsSeen.length).toBe(2)
+  })
+
+  it('(B5) a shared slot is strict if ANY requester is strict (allowFailure AND-merge)', async () => {
+    const { client } = createFakeClient({
+      resolveCall: (c) => (c.functionName === 'foo' ? fail('reverted') : ok(1n)),
+    })
+    const { scheduler, pendingDelays } = createFakeScheduler()
+    // pollInterval 5000 so a success (5000) is distinguishable from a backoff (1000).
+    const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 5000, scheduler })
+    // Both sources request an identical `foo` read (same fingerprint) → one shared slot.
+    const tolerant = source<bigint>({
+      key: 'tolerant',
+      calls: () => ({ x: call('foo', true) }),
+      derive: (t) => ({ value: (t.results['x'] as { result?: bigint }).result ?? 0n, identity: t.identity }),
+    })
+    const strict = source<bigint>({
+      key: 'strict',
+      calls: () => ({ x: call('foo', false) }),
+      derive: (t) => ({ value: (t.results['x'] as { result?: bigint }).result ?? 0n, identity: t.identity }),
+    })
+    const st = feed.watch(strict)
+    const to = feed.watch(tolerant)
+    st.subscribe(() => {})
+    to.subscribe(() => {})
+    await flush()
+
+    // Merged slot is strict → the reverting 'foo' fails the whole tick (backoff, not the 5000 cadence).
+    expect(pendingDelays()).toEqual([BACKOFF_BASE_MS * 2])
+    expect(st.getSnapshot().current).toBeUndefined()
+    expect(to.getSnapshot().current).toBeUndefined()
   })
 })

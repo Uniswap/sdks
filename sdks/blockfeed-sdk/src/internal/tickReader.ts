@@ -73,10 +73,26 @@ export async function readTick(
 
   // Chunk sequentially. Because the identity calls head the array, simple in-order chunking keeps
   // them in the first chunk only. Chunks run one at a time to bound provider pressure.
+  //
+  // `batchSize: 0` disables viem's internal calldata-size re-batching (default splits at ~1KB). That
+  // internal split would issue multiple eth_calls for one chunk, breaking the identity/state atomicity
+  // that is THE core invariant here — every result in a chunk MUST come from one aggregate3 call.
   const results: RawResult[] = []
   for (let i = 0; i < contracts.length; i += maxCallsPerChunk) {
     const chunk = contracts.slice(i, i + maxCallsPerChunk)
-    const chunkResults = (await client.multicall({ contracts: chunk, allowFailure: true } as never)) as RawResult[]
+    const chunkResults = (await client.multicall({
+      contracts: chunk,
+      allowFailure: true,
+      batchSize: 0,
+    } as never)) as RawResult[]
+    // Defensive: a well-behaved aggregate3 returns exactly one result per call. A short return means the
+    // atomic mapping is broken — fail the tick rather than mis-align keyed results.
+    if (chunkResults.length < chunk.length) {
+      throw new TickFailedError(
+        `Tick read returned ${chunkResults.length} results for ${chunk.length} calls`,
+        []
+      )
+    }
     results.push(...chunkResults)
   }
 

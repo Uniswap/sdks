@@ -113,6 +113,9 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
   // so exactly one more tick runs immediately after the current one settles.
   let ticking = false
   let pendingTrigger = false
+  // A6: the options of the coalesced follow-up tick. A resume trigger must not be lost behind a plain
+  // poll/WS trigger, so resume options win over (and are never overwritten by) a plain trigger.
+  let pendingOptions: TickOptions | undefined
 
   let timerHandle: unknown
   let wsUnwatch: (() => void) | undefined
@@ -176,13 +179,27 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
     }
   }
 
-  /** Fetch the union `getLogs` for the window, then split/reconcile into each source's own book. */
+  /**
+   * Fetch the union `getLogs` for the window, then split/reconcile into each source's own book.
+   *
+   * Window math (design doc §4.3, unified gap semantics):
+   * - `bookK = trailingLogWindow` is the coverage each source's book was last built with; scanning below
+   *   `lastProcessedBlock − (bookK − 1)` would re-observe logs the book never recorded and re-deliver them
+   *   as new (the resume-duplication bug). The book's lower edge is therefore a hard floor on `fromBlock`.
+   * - `tickK = logWindowOverride ?? trailingLogWindow` is this tick's requested look-back.
+   * - `fromBlock = max(head − (tickK − 1), lastProcessedBlock − (bookK − 1), 0)`.
+   * - Gap: whenever `lastProcessedBlock !== undefined && fromBlock > lastProcessedBlock + 1`, the span
+   *   `[lastProcessedBlock + 1, fromBlock − 1]` was NOT re-scanned — publish a `gap` to every source with
+   *   filters. This holds independent of whether an override was passed (an honest resume-without-override
+   *   after a long pause, or a plain tick that skipped blocks, both surface the gap).
+   */
   async function fetchAndReconcileLogs(
     active: EngineEntry[],
     identity: Omit<TickIdentity, 'chainId'>,
     overrideK: number | undefined
   ): Promise<void> {
-    const k = BigInt(Math.max(0, (overrideK ?? trailingLogWindow) - 1))
+    const bookLookback = BigInt(Math.max(0, trailingLogWindow - 1))
+    const tickLookback = BigInt(Math.max(0, (overrideK ?? trailingLogWindow) - 1))
     const addresses = new Map<string, Address>()
     const events = new Map<string, AbiEvent>()
     for (const entry of active) {
@@ -197,14 +214,21 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
     }
     if (addresses.size === 0) return
 
-    let fromBlock = identity.blockNumber - k
-    if (fromBlock < 0n) fromBlock = 0n
+    let fromBlock = identity.blockNumber - tickLookback
     if (lastProcessedBlock !== undefined) {
-      let lower = lastProcessedBlock - k
-      if (lower < 0n) lower = 0n
-      if (fromBlock < lower) fromBlock = lower
+      const bookFloor = lastProcessedBlock - bookLookback
+      if (bookFloor > fromBlock) fromBlock = bookFloor
     }
+    if (fromBlock < 0n) fromBlock = 0n
     const toBlock = identity.blockNumber
+
+    // Unified gap rule: any block strictly between lastProcessedBlock and fromBlock went un-scanned.
+    if (lastProcessedBlock !== undefined && fromBlock > lastProcessedBlock + 1n) {
+      const gap: FeedEvent<unknown> = { type: 'gap', fromBlock: lastProcessedBlock + 1n, toBlock: fromBlock - 1n }
+      for (const entry of active) {
+        if (entry.filters.length > 0) entry.store.publish([gap])
+      }
+    }
 
     const rawLogs = (await (client.getLogs as unknown as (args: unknown) => Promise<Log[]>)({
       address: [...addresses.values()],
@@ -334,9 +358,9 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
       prevIdentity.parentBlockHash === identity.parentBlockHash
     const skip = identityUnchanged && !isResume && !prevTickFailed
 
-    onTickSuccess()
-
     if (skip) {
+      // A successful read with an unchanged identity still clears failure/backoff/stale state.
+      onTickSuccess()
       prevIdentity = identity
       scheduleNextSuccess()
       return
@@ -349,7 +373,7 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
       for (const { entry, callKey } of requesters) entry.tickResults[callKey] = res
     }
 
-    // (d) One union getLogs → per-source reconciliation.
+    // (d) One union getLogs → per-source reconciliation (also publishes any `gap` for the un-scanned span).
     try {
       await fetchAndReconcileLogs(active, identity, isResume ? options?.logWindowOverride : undefined)
     } catch {
@@ -357,16 +381,9 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
       return
     }
 
-    // Resume gap: pause outran the (bounded) override window — announce the uncovered span.
-    if (isResume && options?.logWindowOverride !== undefined && lastProcessedBlock !== undefined) {
-      const fromBlock = lastProcessedBlock + 1n
-      const toBlock = identity.blockNumber - BigInt(options.logWindowOverride)
-      if (fromBlock <= toBlock) {
-        for (const entry of active) {
-          if (entry.filters.length > 0) entry.store.publish([{ type: 'gap', fromBlock, toBlock }])
-        }
-      }
-    }
+    // A2: only now — after BOTH the atomic read AND the logs stage succeeded — is the tick a success.
+    // Clearing failure/backoff/stale before the logs fetch would mask a persistent getLogs outage.
+    onTickSuccess()
 
     // (e) Derive + publish, one source at a time (source-level errors isolated).
     const fullIdentity: TickIdentity = { chainId, ...identity }
@@ -382,6 +399,9 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
     if (stopped || !running || paused) return
     if (ticking) {
       pendingTrigger = true
+      // Resume options win; once a resume is pending a plain trigger must not clobber it.
+      if (options?.isResume) pendingOptions = options
+      else if (pendingOptions?.isResume !== true) pendingOptions = options
       return
     }
     ticking = true
@@ -391,7 +411,9 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
       ticking = false
       if (pendingTrigger && running && !paused && !stopped) {
         pendingTrigger = false
-        void runTick()
+        const next = pendingOptions
+        pendingOptions = undefined
+        void runTick(next)
       }
     }
   }
@@ -399,7 +421,8 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
   function startHeartbeat(): void {
     if (running || stopped) return
     running = true
-    paused = false
+    // A4: do NOT reset `paused`. A feed paused before its first subscriber (mount-while-hidden) must
+    // stay paused when the heartbeat starts; the deferred first tick below is guarded on `!paused`.
     consecutiveFailures = 0
     prevIdentity = undefined // Force the first tick to derive (don't skip against stale identity).
     prevTickFailed = false
@@ -454,6 +477,9 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
         filters: [],
       }
       entries.set(source.key, entry)
+      // A8: a store created while the feed is already stale must reflect that immediately, not report
+      // stale:false until the next failure. (No-op fan-out — the snapshot flips to stale regardless.)
+      if (staleActive) store.publish([{ type: 'stale', stale: true }])
       store.onSubscriberChange((count) => handleSubscriberChange(source.key, count))
       return store
     },
@@ -463,8 +489,10 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
       clearTimer()
     },
     resume(resumeOpts?: { logWindowOverride?: number }): void {
-      if (stopped || !running) return
+      if (stopped) return
+      // A4: clear `paused` even when not running so a later subscribe starts live (never stuck paused).
       paused = false
+      if (!running) return
       void runTick({ isResume: true, logWindowOverride: resumeOpts?.logWindowOverride })
     },
     stop(): void {
