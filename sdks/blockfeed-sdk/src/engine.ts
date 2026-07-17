@@ -34,6 +34,13 @@ import type {
 } from './types'
 
 export interface BlockFeedOptions {
+  /**
+   * The viem `PublicClient` (or a structural subset). NOTE: each tick attempt issues its reads through
+   * this client, so any retry policy configured on its transport (viem's `http`/`fallback` defaults
+   * retry failing requests) stacks INSIDE a single tick attempt — before the engine's own
+   * backoff/stale machine ever sees a failure. Tune the transport's `retryCount` if you want the
+   * engine's backoff to react promptly rather than after the transport exhausts its own retries.
+   */
   client: BlockfeedClient
   /**
    * Chain id. Optional: defaults to `client.chain?.id` (a real viem client always carries it).

@@ -3,6 +3,7 @@ import { discoverPricePath } from '@uniswap/blockfeed-sdk/discovery'
 import type { PoolRef, PricePath } from '@uniswap/blockfeed-sdk'
 // enumerateCandidates is module-internal (not part of the public discovery surface); import from source.
 import { enumerateCandidates } from '../src/discovery/enumerate'
+import { ERC20_ABI, NPM_ABI, POOL_MANAGER_ABI, SWAP_ROUTER_ABI, V3_FACTORY_ABI, V3_POOL_ABI } from './abis'
 import { describe, expect, it } from 'bun:test'
 import {
   type Account,
@@ -12,7 +13,6 @@ import {
   encodeAbiParameters,
   getAddress,
   http,
-  parseAbi,
   type PublicClient,
   type Transport,
   type WalletClient,
@@ -65,28 +65,6 @@ const BRETT = new Token(CHAIN_ID, BRETT_ADDR, 18, 'BRETT', 'Brett')
 // into a ~23M-block upstream getLogs. Every discovery call caps the scan to fork-local blocks.
 const LOCAL_V4_SCAN = { fromBlockOverride: FORK_BLOCK + 1n }
 
-const ERC20_ABI = parseAbi([
-  'function approve(address spender, uint256 amount) returns (bool)',
-  'function balanceOf(address account) view returns (uint256)',
-  'function deposit() payable',
-])
-const V3_FACTORY_ABI = parseAbi(['function getPool(address,address,uint24) view returns (address)'])
-const V3_POOL_ABI = parseAbi([
-  'function slot0() view returns (uint160 sqrtPriceX96, int24 tick, uint16 a, uint16 b, uint16 c, uint8 d, bool e)',
-  'function liquidity() view returns (uint128)',
-])
-const POOL_MANAGER_ABI = parseAbi([
-  'function initialize((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint160 sqrtPriceX96) returns (int24 tick)',
-])
-const SWAP_ROUTER_ABI = parseAbi([
-  'struct ExactInputSingleParams { address tokenIn; address tokenOut; uint24 fee; address recipient; uint256 amountIn; uint256 amountOutMinimum; uint160 sqrtPriceLimitX96; }',
-  'function exactInputSingle(ExactInputSingleParams params) payable returns (uint256 amountOut)',
-])
-const NPM_ABI = parseAbi([
-  'function createAndInitializePoolIfNecessary(address token0, address token1, uint24 fee, uint160 sqrtPriceX96) payable returns (address pool)',
-  'struct MintParams { address token0; address token1; uint24 fee; int24 tickLower; int24 tickUpper; uint256 amount0Desired; uint256 amount1Desired; uint256 amount0Min; uint256 amount1Min; address recipient; uint256 deadline; }',
-  'function mint(MintParams params) payable returns (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1)',
-])
 
 const liveForks = new Set<AnvilFork>()
 

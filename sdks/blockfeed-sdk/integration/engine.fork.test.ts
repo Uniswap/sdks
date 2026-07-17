@@ -15,7 +15,6 @@ import {
   createPublicClient,
   createWalletClient,
   http,
-  parseAbi,
   type PublicClient,
   type Transport,
   type WalletClient,
@@ -23,6 +22,7 @@ import {
 } from 'viem'
 import { base } from 'viem/chains'
 
+import { ERC20_ABI, SWAP_ROUTER_ABI, TRANSFER_EVENT, V3_POOL_ABI } from './abis'
 import { type AnvilFork, forkTestsEnabled, FORK_RPC_BASE, startAnvilFork } from './anvil'
 
 /**
@@ -58,20 +58,6 @@ const WETH_ADDR = '0x4200000000000000000000000000000000000006' as Address
  */
 const USDC_WHALE = '0x20FE51A9229EEf2cF8Ad9E89d91CAb9312cF3b7A' as Address
 
-const V3_SLOT0_ABI = parseAbi([
-  'function slot0() view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, uint8 feeProtocol, bool unlocked)',
-])
-const ERC20_ABI = parseAbi([
-  'function approve(address spender, uint256 amount) returns (bool)',
-  'function transfer(address to, uint256 amount) returns (bool)',
-  'function balanceOf(address account) view returns (uint256)',
-  'event Transfer(address indexed from, address indexed to, uint256 value)',
-])
-const TRANSFER_EVENT = ERC20_ABI[3]
-const SWAP_ROUTER_ABI = parseAbi([
-  'struct ExactInputSingleParams { address tokenIn; address tokenOut; uint24 fee; address recipient; uint256 amountIn; uint256 amountOutMinimum; uint160 sqrtPriceLimitX96; }',
-  'function exactInputSingle(ExactInputSingleParams params) payable returns (uint256 amountOut)',
-])
 
 // sdk-core currencies for the watched path (WETH priced in USDC over the single v3 leg).
 const WETH = new Token(CHAIN_ID, WETH_ADDR, 18, 'WETH', 'Wrapped Ether')
@@ -111,7 +97,7 @@ const mine = (fork: AnvilFork, n = 1): Promise<unknown> => fork.rpc('anvil_mine'
 
 /** Read the pool's slot0 at a specific block and price WETH in USDC exactly as the source does. */
 async function poolPriceAt(pub: ForkPublicClient, blockNumber: bigint) {
-  const slot0 = await pub.readContract({ address: POOL, abi: V3_SLOT0_ABI, functionName: 'slot0', blockNumber })
+  const slot0 = await pub.readContract({ address: POOL, abi: V3_POOL_ABI, functionName: 'slot0', blockNumber })
   return priceFromSqrtPriceX96({ sqrtPriceX96: slot0[0], token0: WETH, token1: USDC, base: WETH, quote: USDC })
 }
 
@@ -339,12 +325,12 @@ describe.skipIf(!RUN)('engine fork scenarios (Base)', () => {
           expect(await blockNumberOf(fork)).toBe(headWithLog)
 
           const retraction = await rec.waitFor(
-            (e) => e.type === 'retraction' && e.ref.txHash.toLowerCase() === transferHash.toLowerCase()
+            (e) => e.type === 'retraction' && e.log.txHash.toLowerCase() === transferHash.toLowerCase()
           )
           if (retraction.type !== 'retraction') throw new Error('unreachable')
-          expect(retraction.ref.txHash.toLowerCase()).toBe(transferHash.toLowerCase())
-          expect(retraction.ref.logIndex).toBe(expectedLogIndex)
-          expect(retraction.ref.blockNumber).toBe(logReceipt.blockNumber)
+          expect(retraction.log.txHash.toLowerCase()).toBe(transferHash.toLowerCase())
+          expect(retraction.log.logIndex).toBe(expectedLogIndex)
+          expect(retraction.log.blockNumber).toBe(logReceipt.blockNumber)
         } finally {
           rec.stop()
           feed.stop()

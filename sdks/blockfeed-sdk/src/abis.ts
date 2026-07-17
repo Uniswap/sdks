@@ -5,6 +5,17 @@ import { type AbiEvent, parseAbi, parseAbiItem } from 'viem'
  * the entries actually invoked, so viem's type inference stays tight and bundles stay small.
  */
 
+/**
+ * The three Multicall3 self-calls that anchor every tick's identity (block number, parent hash,
+ * timestamp). See the tick reader's call site for why bundling them into the same `aggregate3` batch
+ * is what makes a tick atomic.
+ */
+export const MULTICALL3_HELPER_ABI = parseAbi([
+  'function getBlockNumber() view returns (uint256 blockNumber)',
+  'function getLastBlockHash() view returns (bytes32 blockHash)',
+  'function getCurrentBlockTimestamp() view returns (uint256 timestamp)',
+])
+
 /** Uniswap v2 pair: spot reserves plus the sorted token accessors (used by discovery). */
 export const V2_PAIR_ABI = parseAbi([
   'function getReserves() view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast)',

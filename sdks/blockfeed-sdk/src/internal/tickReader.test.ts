@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'bun:test'
 
+import { MULTICALL3_HELPER_ABI } from '../abis'
 import { MULTICALL3_ADDRESS } from '../constants'
 import { TickFailedError } from '../errors'
 import type { ContractCall } from '../types'
 
 import { ok, fail } from './testing'
-import { MULTICALL3_HELPER_ABI, readTick } from './tickReader'
+import { readTick } from './tickReader'
 
 type RawResult = { status: 'success'; result: unknown } | { status: 'failure'; error: Error }
 

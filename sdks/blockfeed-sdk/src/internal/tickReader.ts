@@ -1,22 +1,11 @@
 import type { Hex, PublicClient } from 'viem'
-import { parseAbi } from 'viem'
 
+import { MULTICALL3_HELPER_ABI } from '../abis'
 import { DEFAULT_MAX_CALLS_PER_CHUNK, MULTICALL3_ADDRESS } from '../constants'
 import { TickFailedError } from '../errors'
 import type { CallResult, ContractCall, TickIdentity } from '../types'
 
 import { type RawContract, multicallAllowFailure } from './multicall'
-
-/**
- * Minimal ABI for the three Multicall3 self-calls that anchor every tick's identity. Bundling them
- * as the first calls of the same `aggregate3` batch is what makes the read atomic: block number,
- * parent hash, and timestamp come from the exact same EVM call as the state below them.
- */
-export const MULTICALL3_HELPER_ABI = parseAbi([
-  'function getBlockNumber() view returns (uint256 blockNumber)',
-  'function getLastBlockHash() view returns (bytes32 blockHash)',
-  'function getCurrentBlockTimestamp() view returns (uint256 timestamp)',
-])
 
 /** One atomic tick: the identity anchored to it plus every keyed call's result. */
 export interface TickReadResult {
@@ -45,6 +34,9 @@ export async function readTick(
 ): Promise<TickReadResult> {
   const maxCallsPerChunk = opts?.maxCallsPerChunk ?? DEFAULT_MAX_CALLS_PER_CHUNK
 
+  // The three Multicall3 identity self-calls (MULTICALL3_HELPER_ABI) head the batch so block number,
+  // parent hash, and timestamp come from the exact same `aggregate3` EVM call as the state below them
+  // — this bundling is what makes a tick atomic.
   const identityContracts: RawContract[] = IDENTITY_FUNCTIONS.map((functionName) => ({
     address: MULTICALL3_ADDRESS,
     abi: MULTICALL3_HELPER_ABI,

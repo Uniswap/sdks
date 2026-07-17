@@ -38,12 +38,12 @@ import {
   encodeAbiParameters,
   getAddress,
   http,
-  parseAbi,
   type WalletClient,
   zeroAddress,
 } from 'viem'
 import { base } from 'viem/chains'
 
+import { CCA_BID_ABI, STATE_VIEW_GETSLOT0_ABI } from './abis'
 import { type AnvilFork, forkTestsEnabled, FORK_RPC_BASE, startAnvilFork } from './anvil'
 import { TEST_ERC20_CREATION_BYTECODE } from './testErc20.bytecode'
 
@@ -59,20 +59,6 @@ const STATE_VIEW = getAddress('0xa3c0c9b65bad0b08107aa264b0f3db444b867a71')
 const CREATOR = getAddress('0x1111111111111111111111111111111111111111')
 const BIDDER1 = getAddress('0x2222222222222222222222222222222222222222')
 const BIDDER2 = getAddress('0x3333333333333333333333333333333333333333')
-
-const ERC20_ABI = parseAbi([
-  'function approve(address spender, uint256 amount) returns (bool)',
-  'function balanceOf(address account) view returns (uint256)',
-])
-// submitBid ported from the backend AuctionAbi (data-api Auctions/AuctionAbi.ts) — the same source the
-// SDK ported `BidSubmitted` from. Kept in the test (not the SDK): the SDK intentionally exposes only
-// read/log descriptors for auctions, not the bid-submission calldata.
-const CCA_BID_ABI = parseAbi([
-  'function submitBid(uint256 maxPrice, uint128 amount, address owner, bytes hookData) payable returns (uint256)',
-  'function isGraduated() view returns (bool)',
-  'function currencyRaised() view returns (uint256)',
-  'function checkpoint() returns (uint256 clearingPrice, uint256 a, uint256 b, uint24 c, uint64 d, uint64 e)',
-])
 
 const liveForks = new Set<AnvilFork>()
 async function newFork(port: number): Promise<AnvilFork> {
@@ -288,7 +274,7 @@ describe.skipIf(!RUN)('CCA launch lifecycle end-to-end (Base fork)', () => {
 
           // No-gap: the poolSqrtPriceX96 in the graduation emission matches a direct StateView read at
           // that same block (the source read the freshly-initialized pool atomically in the tick batch).
-          const slot0 = (await pub.readContract({ address: STATE_VIEW, abi: parseAbi(['function getSlot0(bytes32) view returns (uint160 sqrtPriceX96, int24 tick, uint24 protocolFee, uint24 lpFee)']), functionName: 'getSlot0', args: [poolId], blockNumber: gradTick.emission.identity.blockNumber })) as readonly [bigint, ...unknown[]]
+          const slot0 = (await pub.readContract({ address: STATE_VIEW, abi: STATE_VIEW_GETSLOT0_ABI, functionName: 'getSlot0', args: [poolId], blockNumber: gradTick.emission.identity.blockNumber })) as readonly [bigint, ...unknown[]]
           expect(gradTick.emission.value.poolSqrtPriceX96).toBe(slot0[0])
 
           // (4) Post-graduation pool price is consistent with the auction's final clearing price (±10%).
