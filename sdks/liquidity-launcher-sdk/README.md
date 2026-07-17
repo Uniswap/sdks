@@ -108,7 +108,9 @@ const { startBlock, endBlock, claimBlock, migrationBlock } = deriveBlocks({
 })
 const { floorPriceX96, tickSpacing } = deriveAuctionPricing(floorPriceToX96('0.0001', 18, 18))
 const steps = deriveConvexAuctionSteps(startBlock, endBlock)
-const positions = buildPositionDefinitions('FULL_RANGE', [], feeToTickSpacing(10000))
+// Pass the raised currency and launched token so custom ranges land on the correct price band
+// (ordering follows the on-chain `currency < token`; native ETH is the zero address).
+const positions = buildPositionDefinitions('FULL_RANGE', [], feeToTickSpacing(10000), currency, tokenAddress)
 const lp = buildLpAllocationSchedule({ kind: 'single', percent: 50 })
 ```
 
@@ -188,3 +190,96 @@ Config-derivation helpers throw [`LauncherSdkError`](./src/errors.ts) with a sta
 | `build` | `buildLaunchTransactions`, `buildLaunchMulticall` |
 | `lock` | `buildLockRecipient` (timelock / fees-forwarder / buyback-burn liquidity locks) |
 | `format` | `formatFeePercent`, `formatTokenAmount` |
+
+## Maintaining the lock-recipient bytecode
+
+`buildLockRecipient` predicts CREATE2 addresses from three **creation bytecodes** committed in
+[`src/lockRecipientBytecode.ts`](./src/lockRecipientBytecode.ts) — `TIMELOCK`
+(`TimelockedPositionRecipient`), `FEES_FORWARDER` (`PositionFeesForwarder`), and `BUYBACK_BURN`
+(`BuybackAndBurnPositionRecipient`). These are compiled artifacts lifted from the
+[liquidity-launcher](https://github.com/Uniswap/liquidity-launcher) contracts and pinned to a
+specific commit; the launcher publishes no consumable npm/artifact bundle, so extraction is the only
+path today.
+
+### Why they can silently go stale
+
+The bytecode is pinned to an upstream **commit**, but nothing here re-derives it — so when the
+launcher contracts (or any base contract they inherit, e.g. `BlockNumberish`) change and the pin is
+not refreshed, the SDK keeps predicting addresses for the *old* code. That is exactly how the
+Robinhood-chain timelock became a no-op: the launcher advanced, `BlockNumberish` behaved differently,
+and the stale bytecode still predicted (and deployed) the previous recipient. The keccak assertions in
+[`src/lock.test.ts`](./src/lock.test.ts) do **not** catch this — they hash the bytes committed
+alongside them, so they only guard against an accidental local edit, not drift from upstream.
+
+### When to regenerate
+
+Whenever the liquidity-launcher periphery recipients **or their dependencies** (including inherited
+base contracts such as `BlockNumberish`) change, and you are bumping the pinned commit. Treat a bump
+as a deliberate, reviewed step.
+
+### How to regenerate
+
+Run the deterministic script against a local launcher checkout — it rewrites
+`src/lockRecipientBytecode.ts` (header + the three constants) and refreshes the keccak pins in
+`src/lock.test.ts`, so nothing is hand-copied:
+
+```bash
+LAUNCHER_REPO=/path/to/liquidity-launcher \
+LAUNCHER_COMMIT=<commit-sha> \
+bun run regenerate:lock-bytecode
+```
+
+It checks out the commit, initializes submodules, runs `forge build` for the three recipient sources,
+reads each `out/<Contract>.sol/<Contract>.json` `bytecode.object`, and recomputes the pins. It fails
+loudly (and writes nothing) if `forge` is missing, the build fails, or an artifact is absent.
+Regeneration requires [Foundry](https://getfoundry.sh) plus the launcher's submodules; the
+OpenZeppelin submodule uses an SSH remote, so a fresh clone needs SSH access (or an
+`insteadOf` https rewrite). Escape-hatch env vars cover non-standard toolchains:
+
+| Env var | Purpose |
+| --- | --- |
+| `FORGE_BIN` | Path to a `forge` binary (default: `forge` on `PATH`). |
+| `SOLC_PATH` | Path to a `solc` binary, passed to `forge build --use`. |
+| `SKIP_SUBMODULES` | Skip `git submodule update` when submodules are already fetched. |
+| `SKIP_CHECKOUT` | Skip `git checkout` when the repo is already at the target commit. |
+
+Running it against the already-pinned commit produces zero diff — a bump only changes the output when
+the upstream bytecode actually changed.
+
+### How it is enforced in CI
+
+The regeneration script is only half the story — nothing stops a contributor from editing the pin or
+the bytecode and forgetting to regenerate. Two GitHub Actions workflows close that gap by running the
+script in **`--check` mode** (`bun run check:lock-bytecode`), which rebuilds the three recipients and
+diffs the result against the committed `lockRecipientBytecode.ts` constants and the `lock.test.ts`
+keccak pins **without writing anything** — exiting nonzero on any difference.
+
+- **Consistency gate — `.github/workflows/liquidity-launcher-bytecode-check.yml`** (required PR check).
+  Runs on every PR that touches `sdks/liquidity-launcher-sdk/**`. It clones liquidity-launcher, builds
+  it at the commit recorded in the `lockRecipientBytecode.ts` header, and fails the PR if the committed
+  bytecode does not match that build. This is what catches "edited the pin / hand-edited the hex and
+  forgot to regenerate." Run the same check locally with:
+
+  ```bash
+  LAUNCHER_REPO=/path/to/liquidity-launcher bun run check:lock-bytecode
+  ```
+
+  (The pinned commit is read from the file header, so no `LAUNCHER_COMMIT` is needed for a consistency
+  check.)
+
+- **Staleness alarm — `.github/workflows/liquidity-launcher-bytecode-staleness.yml`** (weekly cron).
+  The consistency gate only re-verifies the bytes *at the pin*, so it stays green even when upstream has
+  moved on and the pin is stale — which is exactly what produced the Robinhood timelock no-op bug. This
+  scheduled job rebuilds the recipients from **upstream main HEAD** (not the pinned commit) and compares
+  to the committed bytecode. **A red "Lock Bytecode Staleness Alarm" run means upstream has advanced
+  past the pin: a maintainer must review the launcher changes and regenerate + re-pin.** It does not
+  auto-open a PR — the red run is the signal. It compares against main HEAD (rather than the latest
+  release tag) on purpose: the Robinhood drift landed on main *between* releases, so a tag-based check
+  would have missed it; the workflow header documents this choice and how to switch to a release tag.
+
+Both jobs pin solc to the version the committed bytecode was built with (`0.8.35`), so the check
+verifies genuine contract drift rather than tripping on an unrelated upstream solc release. They depend
+on the CI runner being able to fetch the launcher and its public submodules over https (the workflows
+rewrite the launcher's `git@github.com:` SSH submodule URLs to https before init). The fully
+dependency-free alternative — the launcher publishing versioned bytecode/ABI artifacts, letting this
+SDK adopt the `v2-sdk`/`v3-sdk` recompute-from-published-artifact pattern — is tracked as a follow-up.
