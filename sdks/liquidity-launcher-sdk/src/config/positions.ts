@@ -1,5 +1,6 @@
 import { TickMath, encodeSqrtRatioX96 } from '@uniswap/v3-sdk'
 import JSBI from 'jsbi'
+import type { Address } from 'viem'
 
 import { MPS_TOTAL, UNBOUNDED_PERCENT, ZERO_ADDRESS } from '../constants'
 import { LauncherSdkError } from '../errors'
@@ -9,6 +10,13 @@ import type { PositionDefinition } from '../types'
  * Price-range strategy → `PositionDefinition[]` (the LP positions the migrator opens). Offsets are
  * ticks relative to the final auction (clearing) tick. Validated end-to-end against testnet by
  * simulation; follows the CCA price model (currency-per-token in Q96).
+ *
+ * The raw offsets are computed in that currency-per-token frame. The v4 pool, however, expresses
+ * price as currency1-per-currency0. When the raised `currency` sorts as `currency0` (`currency <
+ * token`, always the case for native ETH), the pool price is the reciprocal of currency-per-token,
+ * so a custom range must be mirrored onto the reciprocal band: negate and swap the tick offsets.
+ * Full-range positions use the `(MIN_TICK, MAX_TICK)` sentinel and are mirror-invariant, so they are
+ * left untouched. Callers must pass the ordering pair (`currency`, `token`) for this reason.
  */
 
 export type PriceRangeKind = 'CONCENTRATED_FULL_RANGE' | 'FULL_RANGE' | 'CUSTOM_RANGE'
@@ -56,16 +64,27 @@ const FULL_RANGE_DEFINITION: PositionDefinition = {
   overridePositionRecipient: ZERO_ADDRESS,
 }
 
-/** Builds the LP `PositionDefinition[]` for a price-range strategy. */
+/**
+ * Builds the LP `PositionDefinition[]` for a price-range strategy.
+ *
+ * `currency`/`token` (the raised currency and the launched token) determine v4 currency ordering.
+ * When `currency` sorts as `currency0` the custom offsets are mirrored onto the reciprocal price
+ * band (see the module header). Native ETH is `ZERO_ADDRESS`, which always sorts as `currency0`.
+ */
 export function buildPositionDefinitions(
   strategy: PriceRangeKind,
   customRanges: CustomRangeInput[],
-  tickSpacing: number
+  tickSpacing: number,
+  currency: Address,
+  token: Address
 ): PositionDefinition[] {
   if (strategy !== 'CUSTOM_RANGE') {
     // Concentrated-full-range and full-range both resolve to a single full-range position for v1.
+    // The full-range sentinel is mirror-invariant, so ordering does not affect it.
     return [{ ...FULL_RANGE_DEFINITION }]
   }
+  // Matches the contract's `currency < token` (LBPStrategy) ordering; ZERO_ADDRESS (native) is always currency0.
+  const currencyIsCurrency0 = BigInt(currency) < BigInt(token)
   if (customRanges.length === 0) {
     throw new LauncherSdkError('INVALID_PRICE_RANGE', 'Custom price range strategy requires at least one range')
   }
@@ -90,8 +109,14 @@ export function buildPositionDefinitions(
     const rawUpper = percentToTickOffset(range.maxPercentFromClearing)
     // Clamp to the valid tick range: snapping an unbounded range (±MAX_TICK) outward can push the
     // offset past MAX_TICK / below MIN_TICK, which reverts on-chain as an invalid tick.
-    const offsetLower = Math.max(snapDown(rawLower, tickSpacing), TickMath.MIN_TICK)
-    const offsetUpper = Math.min(snapUp(rawUpper, tickSpacing), TickMath.MAX_TICK)
+    let offsetLower = Math.max(snapDown(rawLower, tickSpacing), TickMath.MIN_TICK)
+    let offsetUpper = Math.min(snapUp(rawUpper, tickSpacing), TickMath.MAX_TICK)
+    // When currency is currency0 the pool price is the reciprocal of currency-per-token, so mirror the
+    // range onto the reciprocal band. Negate-and-swap keeps the values tick-aligned and in range
+    // (MIN_TICK == -MAX_TICK), and preserves upper > lower.
+    if (currencyIsCurrency0) {
+      ;[offsetLower, offsetUpper] = [-offsetUpper, -offsetLower]
+    }
     if (offsetUpper <= offsetLower) {
       throw new LauncherSdkError('INVALID_PRICE_RANGE', 'Custom price range upper bound must exceed the lower bound')
     }

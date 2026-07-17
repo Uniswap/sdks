@@ -108,7 +108,9 @@ const { startBlock, endBlock, claimBlock, migrationBlock } = deriveBlocks({
 })
 const { floorPriceX96, tickSpacing } = deriveAuctionPricing(floorPriceToX96('0.0001', 18, 18))
 const steps = deriveConvexAuctionSteps(startBlock, endBlock)
-const positions = buildPositionDefinitions('FULL_RANGE', [], feeToTickSpacing(10000))
+// Pass the raised currency and launched token so custom ranges land on the correct price band
+// (ordering follows the on-chain `currency < token`; native ETH is the zero address).
+const positions = buildPositionDefinitions('FULL_RANGE', [], feeToTickSpacing(10000), currency, tokenAddress)
 const lp = buildLpAllocationSchedule({ kind: 'single', percent: 50 })
 ```
 
