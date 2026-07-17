@@ -17,6 +17,7 @@ import {
   V4Swap,
 } from '../../src/types/encodeSwaps'
 import {
+  directTransferSweepFloor,
   stepUserPaidPulls,
   sumDirectOutputMin,
   v3PathFirstToken,
@@ -960,6 +961,74 @@ describe('allowDirectTransfers', () => {
     it('accumulates duplicate direct legs (each is independently contract-enforced)', () => {
       const leg = buildV3ExactInStep({ recipient: TEST_RECIPIENT, amountOutMin: '200000000000000000' })
       expect(sumDirectOutputMin([leg, leg], TEST_RECIPIENT, WETH.address).toString()).to.equal('400000000000000000')
+    })
+  })
+
+  describe('directTransferSweepFloor', () => {
+    const OUT = WETH.address
+    const directLeg = (amountOutMin: string) => buildV3ExactInStep({ recipient: TEST_RECIPIENT, amountOutMin })
+
+    it('forgives a sub-buffer shortfall (within 0.5bps of netMin) to zero', () => {
+      const spec = buildSpec({ allowDirectTransfers: true }) // 5% slippage -> flexibility caps at 0.5bps
+      const netMin = BigNumber.from('500000000000000000') // 0.5bps = 2.5e13; a 1000-wei shortfall is far inside it
+      expect(directTransferSweepFloor(spec, netMin, [directLeg(netMin.sub(1000).toString())], OUT).toString()).to.equal(
+        '0'
+      )
+    })
+
+    it('enforces the full shortfall when it exceeds the buffer', () => {
+      const spec = buildSpec({ allowDirectTransfers: true })
+      const netMin = BigNumber.from('500000000000000000')
+      const shortfall = BigNumber.from('1000000000000000') // 1e15 >> 2.5e13
+      expect(
+        directTransferSweepFloor(spec, netMin, [directLeg(netMin.sub(shortfall).toString())], OUT).toString()
+      ).to.equal(shortfall.toString())
+    })
+
+    it('caps the flexibility buffer at 1% of slippage below 50bps', () => {
+      // 25bps: 1% of slippage (1.25e13) < 0.5bps of netMin (2.5e13), so the slippage cap binds
+      const spec = buildSpec({ allowDirectTransfers: true, slippageTolerance: new Percent(25, 10000) })
+      const netMin = BigNumber.from('500000000000000000')
+      const shortfall = BigNumber.from('20000000000000') // 2e13: within 0.5bps but above the 1%-of-slippage cap
+      expect(
+        directTransferSweepFloor(spec, netMin, [directLeg(netMin.sub(shortfall).toString())], OUT).toString()
+      ).to.equal(shortfall.toString())
+    })
+
+    it('drops the flexibility buffer to zero at zero slippage (only per-leg rounding remains)', () => {
+      const spec = buildSpec({ allowDirectTransfers: true, slippageTolerance: new Percent(0) })
+      const netMin = BigNumber.from('500000000000000000')
+      expect(directTransferSweepFloor(spec, netMin, [directLeg(netMin.sub(2).toString())], OUT).toString()).to.equal('0')
+      expect(directTransferSweepFloor(spec, netMin, [directLeg(netMin.sub(3).toString())], OUT).toString()).to.equal('3')
+    })
+
+    it('has no output-side slippage for exact-output (only per-leg rounding)', () => {
+      const spec = buildExactOutSpec({ allowDirectTransfers: true })
+      const netMin = BigNumber.from('500000000000000000')
+      expect(directTransferSweepFloor(spec, netMin, [directLeg(netMin.sub(2).toString())], OUT).toString()).to.equal('0')
+      expect(directTransferSweepFloor(spec, netMin, [directLeg(netMin.sub(3).toString())], OUT).toString()).to.equal('3')
+    })
+
+    it('falls back to the per-leg rounding term when 0.5bps rounds to zero (small netMin)', () => {
+      const spec = buildSpec({ allowDirectTransfers: true }, { quote: CurrencyAmount.fromRawAmount(WETH, '10000') })
+      const netMin = BigNumber.from('10000') // netMin/20000 floors to 0, so only the per-leg term applies
+      expect(directTransferSweepFloor(spec, netMin, [directLeg(netMin.sub(2).toString())], OUT).toString()).to.equal('0')
+      expect(directTransferSweepFloor(spec, netMin, [directLeg(netMin.sub(3).toString())], OUT).toString()).to.equal('3')
+    })
+
+    it('scales the rounding term by leg count (2 wei per direct leg)', () => {
+      const spec = buildSpec({ allowDirectTransfers: true, slippageTolerance: new Percent(0) })
+      const netMin = BigNumber.from('500000000000000000')
+      const twoLegs = (sum: BigNumber) => [directLeg(sum.sub(1).toString()), directLeg('1')] // credits sum to `sum`
+      // 2 legs -> buffer 4: a 4-wei shortfall is forgiven, 5-wei enforced
+      expect(directTransferSweepFloor(spec, netMin, twoLegs(netMin.sub(4)), OUT).toString()).to.equal('0')
+      expect(directTransferSweepFloor(spec, netMin, twoLegs(netMin.sub(5)), OUT).toString()).to.equal('5')
+    })
+
+    it('clamps to zero when direct coverage exceeds netMin (over-cover)', () => {
+      const spec = buildSpec({ allowDirectTransfers: true })
+      const netMin = BigNumber.from('500000000000000000')
+      expect(directTransferSweepFloor(spec, netMin, [directLeg(netMin.add(5).toString())], OUT).toString()).to.equal('0')
     })
   })
 
