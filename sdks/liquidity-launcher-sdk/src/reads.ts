@@ -62,6 +62,11 @@ export function slot0Call(p: { stateView: Address; poolId: Hex }): ContractCall<
   return { address: p.stateView, abi: STATE_VIEW_ABI, functionName: 'getSlot0', args: [p.poolId] }
 }
 
+/** Decode a successful `getSlot0` result to its `sqrtPriceX96` (first tuple element). */
+export function decodeSlot0SqrtPriceX96(result: unknown): bigint {
+  return (result as readonly unknown[])[0] as bigint
+}
+
 /** Whether the v4 pool for `poolId` is already initialized (`sqrtPriceX96 != 0`). */
 export async function isV4PoolInitialized(
   client: PublicClient,
@@ -162,6 +167,11 @@ export async function getClearingPrice(client: PublicClient, auction: Address): 
   return checkpoint.clearingPrice
 }
 
+/** Decode a successful `checkpoint()` result — viem decodes the single-tuple return as the object. */
+export function decodeCheckpoint(result: unknown): AuctionCheckpoint {
+  return result as AuctionCheckpoint
+}
+
 // ---------------------------------------------------------------------------
 // TickDataLens.getInitializedTickData (live bid-distribution data)
 // ---------------------------------------------------------------------------
@@ -182,6 +192,11 @@ export interface InitializedTick {
  */
 export function tickDataCall(lens: Address, auction: Address): ContractCall<typeof TICK_DATA_LENS_ABI> {
   return { address: lens, abi: TICK_DATA_LENS_ABI, functionName: 'getInitializedTickData', args: [auction] }
+}
+
+/** Decode a successful `getInitializedTickData` result (a `tuple[]`) into initialized ticks. */
+export function decodeInitializedTicks(result: unknown): readonly InitializedTick[] {
+  return result as readonly InitializedTick[]
 }
 
 /** Reads the auction's initialized tick data from the lens. */

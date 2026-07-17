@@ -2,37 +2,19 @@ import type { Hex } from 'viem'
 
 import { computeLbpPoolId } from '../poolId'
 import {
-  type AuctionCheckpoint,
-  type InitializedTick,
   type TickFillRatio,
-  clearingPriceCall,
-  currencyRaisedCall,
+  decodeSlot0SqrtPriceX96,
   deriveAuctionOutcome,
   deriveTickFillRatios,
   isGraduatedCall,
-  remainingSupplyCall,
   slot0Call,
-  tickDataCall,
 } from '../reads'
-import type { ContractCall } from '../reads'
 
+import { auctionCallSet, readAuctionResults, tolerant } from './auctionReads'
 import type { LaunchAssetSourceArgs, LaunchAssetState, Source, SpeculativeCall, TickData } from './types'
 
 /** 2^288 — numerator for the currency-per-token inversion below. */
 const Q288 = 1n << 288n
-
-/**
- * Tag a descriptor as failure-tolerant. EVERY call this source issues is `allowFailure: true` so that
- * a reverting read (a not-yet-started `checkpoint()`, a stale lens address, a pool that does not exist
- * yet) is isolated to THIS source and never escalates to the engine. In the shared heartbeat a
- * non-speculative failure throws `TickFailedError` and fails the whole tick for EVERY source on the
- * chain (backoff + stale) — a source must never have the power to poison unrelated token-page feeds.
- * `derive` already treats any non-success result as "return undefined / keep prev", so per-source
- * behavior is unchanged; failures simply stop propagating.
- */
-function tolerant(call: ContractCall): SpeculativeCall {
-  return { ...call, allowFailure: true }
-}
 
 /**
  * Convert a v4 `getSlot0` sqrtPriceX96 into a Q96 raw-currency-per-raw-token price, matching the
@@ -54,7 +36,7 @@ function poolPriceX96FromSqrt(sqrtPriceX96: bigint): bigint {
 function readPoolSqrtPrice(tick: TickData): bigint | undefined {
   const res = tick.results['slot0']
   if (!res || res.status !== 'success') return undefined
-  const sqrtPriceX96 = (res.result as readonly unknown[])[0] as bigint
+  const sqrtPriceX96 = decodeSlot0SqrtPriceX96(res.result)
   return sqrtPriceX96 === 0n ? undefined : sqrtPriceX96
 }
 
@@ -129,14 +111,7 @@ export function launchAssetSource(args: LaunchAssetSourceArgs): Source<LaunchAss
         return { isGraduated: tolerant(isGraduatedCall(auction)), slot0: speculativeSlot0 }
       }
       // Auction (or first tick): full read-set + always-on speculative pool read.
-      return {
-        checkpoint: tolerant(clearingPriceCall(auction)),
-        currencyRaised: tolerant(currencyRaisedCall(auction)),
-        remainingSupply: tolerant(remainingSupplyCall(auction)),
-        isGraduated: tolerant(isGraduatedCall(auction)),
-        tickData: tolerant(tickDataCall(tickDataLens, auction)),
-        slot0: speculativeSlot0,
-      }
+      return auctionCallSet(auction, tickDataLens, speculativeSlot0)
     },
     derive(tick: TickData, ctx) {
       const prev = ctx.prev
@@ -170,26 +145,13 @@ export function launchAssetSource(args: LaunchAssetSourceArgs): Source<LaunchAss
       }
 
       // --- Auction / first tick: full read-set required. ---
-      const checkpoint = tick.results['checkpoint']
-      const currencyRaised = tick.results['currencyRaised']
-      const remainingSupply = tick.results['remainingSupply']
-      const isGraduated = tick.results['isGraduated']
-      const tickData = tick.results['tickData']
-      if (
-        checkpoint?.status !== 'success' ||
-        currencyRaised?.status !== 'success' ||
-        remainingSupply?.status !== 'success' ||
-        isGraduated?.status !== 'success' ||
-        tickData?.status !== 'success'
-      ) {
-        return undefined
-      }
+      const results = readAuctionResults(tick)
+      if (results === undefined) return undefined
 
-      const raised = currencyRaised.result as bigint
-      const remaining = remainingSupply.result as bigint
-      const graduatedFlag = isGraduated.result as boolean
+      const raised = results.currencyRaised
+      const remaining = results.remainingSupply
       const outcome = deriveAuctionOutcome({
-        isGraduated: graduatedFlag,
+        isGraduated: results.isGraduated,
         endBlock,
         currentBlock: tick.identity.blockNumber,
       })
@@ -199,8 +161,8 @@ export function launchAssetSource(args: LaunchAssetSourceArgs): Source<LaunchAss
         return graduatedEmission(tick, poolSqrtPriceX96, { currencyRaised: raised, remainingSupply: remaining })
       }
 
-      const clearingPrice = (checkpoint.result as AuctionCheckpoint).clearingPrice
-      const fillRatios: TickFillRatio[] = deriveTickFillRatios(tickData.result as readonly InitializedTick[])
+      const clearingPrice = results.clearingPrice
+      const fillRatios: TickFillRatio[] = deriveTickFillRatios(results.ticks)
       // 'active' → auction; 'failed' → failed. A 'graduated' outcome without a pool read this tick
       // (defensive; the atomic-batch guarantee makes it a no-op) degrades to 'auction' so the phase
       // event and first pool price still land together on the tick slot0 succeeds.

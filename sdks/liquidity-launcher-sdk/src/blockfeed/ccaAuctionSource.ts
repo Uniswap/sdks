@@ -1,30 +1,10 @@
 import type { Address } from 'viem'
 
-import {
-  type AuctionCheckpoint,
-  type ContractCall,
-  type InitializedTick,
-  clearingPriceCall,
-  currencyRaisedCall,
-  deriveTickFillRatios,
-  isGraduatedCall,
-  remainingSupplyCall,
-  tickDataCall,
-} from '../reads'
+import { deriveTickFillRatios } from '../reads'
 import type { TickFillRatio } from '../reads'
 
+import { auctionCallSet, readAuctionResults } from './auctionReads'
 import type { CcaAuctionState, Source, SpeculativeCall, TickData } from './types'
-
-/**
- * Tag a descriptor as failure-tolerant. Every call this source issues is `allowFailure: true` so a
- * reverting read (a not-yet-started `checkpoint()`, a stale lens address) is isolated to THIS source
- * and never escalates to the engine — a non-speculative failure throws `TickFailedError` and fails
- * the whole shared tick for EVERY source on the chain. `derive` already returns `undefined` on any
- * non-success result, so per-source behavior is unchanged; failures just stop propagating.
- */
-function tolerant(call: ContractCall): SpeculativeCall {
-  return { ...call, allowFailure: true }
-}
 
 /** Element-wise equality of two fill-ratio arrays (price + ratio). */
 function fillRatiosEqual(a: readonly TickFillRatio[], b: readonly TickFillRatio[]): boolean {
@@ -33,17 +13,6 @@ function fillRatiosEqual(a: readonly TickFillRatio[], b: readonly TickFillRatio[
     if (a[i].priceQ96 !== b[i].priceQ96 || a[i].fillRatio !== b[i].fillRatio) return false
   }
   return true
-}
-
-/** Read the currently-clearing-price checkpoint tuple from a successful `checkpoint()` result. */
-function decodeCheckpoint(result: unknown): AuctionCheckpoint {
-  // viem decodes a single-tuple return as the object directly.
-  return result as AuctionCheckpoint
-}
-
-/** Read the lens `getInitializedTickData` result (a `tuple[]`) from a successful call. */
-function decodeTicks(result: unknown): readonly InitializedTick[] {
-  return result as readonly InitializedTick[]
 }
 
 /**
@@ -66,40 +35,21 @@ export function ccaAuctionSource(args: { auction: Address; tickDataLens: Address
 
   return {
     key,
-    // Every call is `allowFailure: true` — see `tolerant` for the isolation rationale.
+    // Every call is `allowFailure: true` — see `tolerant` (auctionReads) for the isolation rationale.
     calls(): Record<string, SpeculativeCall> {
-      return {
-        checkpoint: tolerant(clearingPriceCall(auction)),
-        currencyRaised: tolerant(currencyRaisedCall(auction)),
-        remainingSupply: tolerant(remainingSupplyCall(auction)),
-        isGraduated: tolerant(isGraduatedCall(auction)),
-        tickData: tolerant(tickDataCall(tickDataLens, auction)),
-      }
+      return auctionCallSet(auction, tickDataLens)
     },
     derive(tick: TickData) {
-      const checkpoint = tick.results['checkpoint']
-      const currencyRaised = tick.results['currencyRaised']
-      const remainingSupply = tick.results['remainingSupply']
-      const isGraduated = tick.results['isGraduated']
-      const tickData = tick.results['tickData']
-
-      if (
-        checkpoint?.status !== 'success' ||
-        currencyRaised?.status !== 'success' ||
-        remainingSupply?.status !== 'success' ||
-        isGraduated?.status !== 'success' ||
-        tickData?.status !== 'success'
-      ) {
-        return undefined
-      }
+      const results = readAuctionResults(tick)
+      if (results === undefined) return undefined
 
       return {
         value: {
-          priceX96: decodeCheckpoint(checkpoint.result).clearingPrice,
-          currencyRaised: currencyRaised.result as bigint,
-          remainingSupply: remainingSupply.result as bigint,
-          isGraduated: isGraduated.result as boolean,
-          tickFillRatios: deriveTickFillRatios(decodeTicks(tickData.result)),
+          priceX96: results.clearingPrice,
+          currencyRaised: results.currencyRaised,
+          remainingSupply: results.remainingSupply,
+          isGraduated: results.isGraduated,
+          tickFillRatios: deriveTickFillRatios(results.ticks),
         },
         identity: tick.identity,
       }
