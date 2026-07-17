@@ -161,45 +161,24 @@ const { predictedAddress, deployData } = buildLockRecipient({
 // deployData → send to the canonical CREATE2 deployer before migration
 ```
 
-## Live data (blockfeed) sources
+## Auction reads (live data)
 
-A quick-launch asset lives two lives — a live continuous-clearing auction, then a graduated Uniswap v4
-pool. This SDK exports **structural `Source` factories** that stream both over
-[`@uniswap/blockfeed-sdk`](../blockfeed-sdk)'s block-latency engine. They live here, next to the auction
-semantics they depend on (`deriveAuctionOutcome`, deterministic pool-id derivation, the `TickDataLens`
-registry), but there is **zero runtime coupling**: blockfeed is a `devDependency` only, a source is a
-plain object, and TypeScript's structural typing makes these factories assignable to the engine's
-`Source` with nothing imported at runtime (a types-only drift guard, run in CI via `g:typecheck`, keeps
-the shapes compatible).
+This SDK exports the **read descriptors, decoders, and ABIs** for continuous-clearing-auction state,
+plus the `TickDataLens` registry and the auction-outcome logic (`deriveAuctionOutcome`):
 
-- **`launchAssetSource`** — one continuous, phase-tagged lifecycle stream (`auction` →
-  `graduated`/`failed`) with **no gap tick at graduation**. From late auction onward it speculatively
-  reads the deterministic graduated v4 pool's `StateView.getSlot0` every tick; on the tick graduation
-  lands, the pool read succeeds in the *same* multicall, so the `phase` event and the first pool-price
-  tick carry the same block number — no discovery, no indexer wait, no one-block price hole.
-- **`ccaBidsSource`** — the append-only `BidSubmitted` log ticker (monotonic cumulative count; a bid
-  that un-happens in a reorg surfaces as a blockfeed `retraction` event).
-- **`ccaAuctionSource`** — auction-only state (clearing price, currency raised, remaining supply,
-  per-tick bid-distribution fill ratios) without the graduation lifecycle.
+- `clearingPriceCall`/`getClearingPrice` — the auction's `checkpoint()` clearing price (Q96
+  raw-currency-per-raw-token; the same live source the backend uses), with `decodeCheckpoint`.
+- `tickDataCall`/`getTickData` — the lens's initialized price ticks (the live bid-distribution data),
+  with `decodeInitializedTicks` and the pure `deriveTickFillRatios` helper.
+- `currencyRaisedCall`, `remainingSupplyCall`, `isGraduatedCall`, `slot0Call`/`decodeSlot0SqrtPriceX96`.
+- `decodeBidSubmitted` — typed decode of a `BidSubmitted` feed log (its event ABI,
+  `CCA_BID_SUBMITTED_EVENT`, is in `abis`), and `getTickDataLensForFactory` to resolve the lens for an
+  auction factory.
 
-The underlying reads are also usable standalone: `clearingPriceCall`/`getClearingPrice` (Q96
-raw-currency-per-raw-token, from the auction's `checkpoint()` — the same live source the backend uses),
-`tickDataCall`/`getTickData` (the lens's initialized price ticks — the live bid-distribution data), and
-the pure `deriveTickFillRatios` helper.
-
-```ts
-import { createBlockFeed } from '@uniswap/blockfeed-sdk'
-import { launchAssetSource, ccaBidsSource, getTickDataLensForFactory } from '@uniswap/liquidity-launcher-sdk'
-
-const feed = createBlockFeed({ client, chainId: 8453 })
-const launch = feed.watch(
-  launchAssetSource({ chainId: 8453, auction, tickDataLens, poolKey, stateView, endBlock })
-)
-launch.subscribe((e) => {
-  if (e.type === 'phase') console.log(e.from, '→', e.to) // auction → graduated
-  if (e.type === 'tick') console.log('priceX96', e.emission.value.priceX96)
-})
-```
+> **Live launch feeds moved.** The block-latency `Source` factories that stream this data
+> (`launchAssetSource`, `quickLaunchAssetSource`, `ccaBidsSource`) now live in
+> [`@uniswap/blockfeed-sdk`](../blockfeed-sdk) — see its README's "Launch sources" section. They read
+> the descriptors/decoders above from this package.
 
 ## Supported chains
 
@@ -223,8 +202,7 @@ Config-derivation helpers throw [`LauncherSdkError`](./src/errors.ts) with a sta
 | `abis`, `types` | contract ABIs and on-chain struct types |
 | `encode` | `encodeCreateToken`, `encodeDepositToken`, `encodeDistributeToken`, `encodeMulticall`, `encodeConfigData`, `encodeAuctionParams`, `encodeAuctionSteps`, `encodeTokenData`, … |
 | `config/*` | `deriveBlocks`, `floorPriceToX96`, `deriveAuctionPricing`, `feeToTickSpacing`, `buildPositionDefinitions`, `buildLpAllocationSchedule`, `deriveConvexAuctionSteps` |
-| `reads` | descriptor builders + viem helpers (`registeredPoolIdCall`, `slot0Call`, `predictTokenAddress`, `predictAuctionAddress`, allowance reads, `clearingPriceCall`/`getClearingPrice`, `tickDataCall`/`getTickData`, `deriveTickFillRatios`) |
-| `blockfeed` | `launchAssetSource`, `ccaAuctionSource`, `ccaBidsSource` (structural blockfeed `Source` factories) |
+| `reads` | descriptor builders + viem helpers (`registeredPoolIdCall`, `slot0Call`, `predictTokenAddress`, `predictAuctionAddress`, allowance reads, `clearingPriceCall`/`getClearingPrice`, `tickDataCall`/`getTickData`, `deriveTickFillRatios`, `decodeBidSubmitted`) |
 | `availability` | `getFeeTierAvailability` |
 | `build` | `buildLaunchTransactions`, `buildLaunchMulticall` |
 | `lock` | `buildLockRecipient` (timelock / fees-forwarder / buyback-burn liquidity locks) |

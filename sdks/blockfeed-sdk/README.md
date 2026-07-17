@@ -22,17 +22,21 @@ bun add @uniswap/blockfeed-sdk viem
 
 ## Quickstart
 
-Create one feed per `(chainId, client)`, `watch` a source, and `subscribe` to its store. The heartbeat
-starts on the first subscriber and stops on the last unsubscribe (refcounted).
+Create one feed per `(client, chainId)`, `watch` a source, and `subscribe` to its store. The heartbeat
+starts on the first subscriber and stops on the last unsubscribe (refcounted). `chainId` is optional —
+it defaults to `client.chain?.id`.
 
 ```ts
 import { createPublicClient, http } from 'viem'
 import { base } from 'viem/chains'
 import { Token } from '@uniswap/sdk-core'
-import { createBlockFeed, pricePathSource, type PricePath } from '@uniswap/blockfeed-sdk'
+import { createFeedRegistry, pricePathSource, type PricePath } from '@uniswap/blockfeed-sdk'
 
 const client = createPublicClient({ chain: base, transport: http() })
-const feed = createBlockFeed({ client, chainId: 8453 })
+
+// A registry hands back ONE shared feed per (client, chainId) — see "The double-feed footgun" below.
+const registry = createFeedRegistry()
+const feed = registry.getFeed(client) // chainId inferred from client.chain.id (8453)
 
 const usdc = new Token(8453, '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913', 6, 'USDC')
 const weth = new Token(8453, '0x4200000000000000000000000000000000000006', 18, 'WETH')
@@ -43,25 +47,40 @@ const path: PricePath = {
   quote: usdc,
   // A single v3 leg here for brevity; supply the pool address from your backend, or use Discovery
   // (below) to find it. Legs are also v2 (`{ protocol: 'v2', pair }`) or v4 (`{ protocol: 'v4', poolKey }`).
-  legs: [{ pool: { protocol: 'v3', pool: '0x…' }, base: weth, quote: usdc }],
+  legs: [{ pool: { protocol: 'v3', pool: '0x0000000000000000000000000000000000000000' }, base: weth, quote: usdc }],
 }
 
-const store = feed.watch(pricePathSource(path, { chainId: 8453 }))
+// chainId is taken from path.base.chainId — no options argument.
+const store = feed.watch(pricePathSource(path))
 
 const unsubscribe = store.subscribe((event) => {
   if (event.type === 'tick') {
-    // event.emission.value.price is an sdk-core Price<Currency, Currency>
-    console.log('WETH price:', event.emission.value.price.toSignificant(6), 'USDC', '@ block', event.emission.identity.blockNumber)
+    // value.price is an sdk-core Price; value.priceFloat is the same number for charts.
+    console.log('WETH price:', event.emission.value.price.toSignificant(6), 'USDC', '@', event.emission.identity.blockNumber)
   }
 })
 
-// getSnapshot() returns a referentially-stable object (useSyncExternalStore-compatible): current value,
-// rolling tick buffer, phase, and staleness.
-const { current, buffer, stale } = store.getSnapshot()
+// getSnapshot() returns a referentially-stable object (useSyncExternalStore-compatible):
+// current value, rolling tick buffer, delivered logs, staleness, last tick identity, last error.
+const { current, buffer, logs, stale, lastError } = store.getSnapshot()
 
 // later:
 unsubscribe()
 ```
+
+### Feed lifecycle: `{ watch, unwatch, stop }`
+
+- `watch(source)` — register a source and get its store (same `key` ⇒ same shared store).
+- `unwatch(key)` — remove an entry you own: its store stops updating and its calls drop out of the
+  next tick's batch. Intended for keys you created.
+- `stop()` — tear the whole feed down (a stopped feed rejects further `watch`).
+
+### The double-feed footgun
+
+Two `createBlockFeed` calls for the same `(client, chainId)` run two independent heartbeats — double
+the RPC, duplicate ticks. Prefer a single `createFeedRegistry()` per app and always `getFeed(...)`
+through it; it memoizes one feed per `(client reference, resolved chainId)`. Call `registry.stopAll()`
+on teardown.
 
 ### Transports
 
@@ -72,25 +91,29 @@ The engine adapts to the transport automatically:
 - **WebSocket** (`webSocket()`) — uses `newHeads` purely as a *trigger* for the same atomic read, for
   sub-second latency. No polling.
 
-```ts
-import { webSocket } from 'viem'
-const wsClient = createPublicClient({ chain: base, transport: webSocket('wss://…') })
-const wsFeed = createBlockFeed({ client: wsClient, chainId: 8453 })
-```
+> **Transport retries stack inside a tick.** Each tick attempt reads through your client, so a retry
+> policy on its transport (viem's `http`/`fallback` retry by default) runs *before* the engine's own
+> backoff/stale machine ever sees a failure. Tune the transport's `retryCount` if you want backoff to
+> react promptly.
 
 ### Tab visibility (browser)
 
-The core references no `document`/`window`. Tab-visibility handling ships as an optional plugin the app
-installs, with the DOM injected as a structural type (never read from a global):
+The core references no `document`/`window`. Gate subscriptions on visibility yourself — because the
+heartbeat is refcounted, dropping the last subscriber stops it:
 
 ```ts
-import { attachVisibilityPlugin } from '@uniswap/blockfeed-sdk'
-
-const detach = attachVisibilityPlugin(feed, { target: document })
-// Pauses the heartbeat while the tab is hidden; on regain, widens the next trailing log window to
-// cover the missed span (bounded by maxCatchupBlocks, default 20). Beyond the bound → a `gap` event.
-// detach() removes the listener.
+let unsub: (() => void) | undefined
+const sync = (): void => {
+  const visible = document.visibilityState === 'visible'
+  if (visible && !unsub) unsub = store.subscribe((e) => { /* handle event */ void e })
+  else if (!visible && unsub) { unsub(); unsub = undefined } // last unsubscribe stops the heartbeat
+}
+document.addEventListener('visibilitychange', sync)
+sync()
 ```
+
+On regain, the always-on catch-up window (bounded by `maxCatchupBlocks`, default 20) recovers recent
+logs; a stall longer than the bound surfaces a `gap` event instead of a silent hole.
 
 ## Discovery — router-lite
 
@@ -102,84 +125,104 @@ deployed QuoterV2 / V4Quoter, and **selects** by two-way executable quality — 
 in-range liquidity, both of which are cheap to fake.
 
 ```ts
-import { discoverPricePath } from '@uniswap/blockfeed-sdk/discovery'
+import { discoverPricePath, isNoPathFound } from '@uniswap/blockfeed-sdk/discovery'
 
-// Tuning knobs are passed nested under `options` (all optional).
+// chainId is derived from base.chainId (quote must agree). Tuning knobs are nested under `options`.
 const result = await discoverPricePath(client, {
-  chainId: 8453,
   base: weth,
   quote: usdc,
   options: { maxHops: 2, maxProbeCandidatesPerPair: 12 },
 })
 
-// `'kind' in result` alone narrows to NoPathFound on the true branch and to PricePath on the false
-// branch. Do NOT write `'kind' in result && result.kind === 'no-path'`: a false compound condition
-// does not narrow the `else` branch to PricePath, so `pricePathSource(result)` would not typecheck.
-if ('kind' in result) {
-  // NoPathFound — no pool produced a positive two-way executable score.
-  console.warn(result.reason)
+if (isNoPathFound(result)) {
+  console.warn(result.reason) // no pool produced a positive two-way executable score
 } else {
-  const store = feed.watch(pricePathSource(result, { chainId: 8453 }))
+  const store = feed.watch(pricePathSource(result))
   // …subscribe
 }
 ```
+
+`base`/`quote` also accept a plain `CurrencyInput` (`{ chainId, address, decimals, symbol? }`, where
+`address: 'native'` means the native currency) — see [`toCurrency`](#currency--price-helpers).
 
 Knobs under `options`: `intermediaries` (2-hop bridge assets, default the chain's WETH), `maxHops`
 (default 2), `probeNotional` (default `10^quote.decimals * 1000`), `hookAllowlist` (default `[]` —
 hookless only), `maxProbeCandidatesPerPair` (default 12), and `fromBlockOverride` (start block for the
 v4 `Initialize` scan — see the RPC caveat below).
 
-## CCA / quick-launch (live launch data)
+## Launch sources (CCA / quick-launch)
 
-Continuous Clearing Auction sources live in `@uniswap/liquidity-launcher-sdk` (next to the auction
-semantics they depend on), but they are plain structural `Source` objects — `feed.watch(...)` consumes
-them with **zero runtime coupling** (blockfeed is not even a runtime dependency of the launcher SDK).
+The Uniswap Liquidity Launcher auction sources ship **in this package** (`launchAssetSource`,
+`quickLaunchAssetSource`, `ccaBidsSource`, `decodeBidSubmitted`); they read their descriptors and
+decoders from `@uniswap/liquidity-launcher-sdk`.
+
+`quickLaunchAssetSource` is the one-call path for the canonical native-ETH quick-launch shape: it
+resolves the TickDataLens from the auction factory and builds the graduated `(native, token)` pool key
+for you. The result is **one continuous, phase-tagged stream across the auction → graduated-pool
+transition, with no gap tick at graduation** (the deterministic v4 pool is read speculatively every
+tick until it exists). The lifecycle `phase` (`'auction' | 'graduated' | 'failed'`) lives **inside the
+emission value**, not as a separate event.
 
 ```ts
-import { createBlockFeed } from '@uniswap/blockfeed-sdk'
-import { launchAssetSource, ccaBidsSource, getTickDataLensForFactory } from '@uniswap/liquidity-launcher-sdk'
+import { createFeedRegistry, quickLaunchAssetSource, ccaBidsSource, decodeBidSubmitted } from '@uniswap/blockfeed-sdk'
 
-const feed = createBlockFeed({ client, chainId: 8453 })
+const feed = createFeedRegistry().getFeed(client, { chainId: 8453 })
 
-// getTickDataLensForFactory returns `Address | undefined` (undefined = a factory it doesn't recognize);
-// guard it before use rather than passing the union into the source.
-const tickDataLens = getTickDataLensForFactory(factory)
-if (!tickDataLens) throw new Error('unknown CCA factory — no TickDataLens mapping')
-
-// One continuous, phase-tagged stream across the auction → graduated-pool transition, with NO gap
-// tick at graduation (the deterministic v4 pool is read speculatively every tick until it exists).
 const launch = feed.watch(
-  launchAssetSource({
+  quickLaunchAssetSource({
     chainId: 8453,
-    auction: auctionAddress,
-    tickDataLens,          // guarded Address (see above)
-    poolKey,               // deterministic graduated-pool key from launch params
-    stateView,             // v4 StateView address
-    endBlock,              // auction end, in the auction's own block domain
+    auction: '0x0000000000000000000000000000000000000000',       // auction (initializer) address
+    token: '0x0000000000000000000000000000000000000000',         // launched token
+    auctionFactory: '0x0000000000000000000000000000000000000000', // resolves the TickDataLens
+    endBlock: 0n,                                                  // auction end, in the auction's block domain
   })
 )
 launch.subscribe((e) => {
-  if (e.type === 'phase') console.log('lifecycle:', e.from, '→', e.to) // e.g. auction → graduated
-  if (e.type === 'tick') console.log('priceX96:', e.emission.value.priceX96)
+  if (e.type === 'tick') {
+    const v = e.emission.value
+    console.log('phase:', v.phase, 'priceX96:', v.priceX96) // phase is part of the value
+  }
 })
 
-// The append-only bid ticker (cumulative count; retracted bids surface as `retraction` events).
-const bids = feed.watch(ccaBidsSource({ auction: auctionAddress }))
+// The append-only bid ticker: each new bid is a `log` event (decode it); retracted bids are `retraction`.
+const bids = feed.watch(ccaBidsSource({ auction: '0x0000000000000000000000000000000000000000' }))
+bids.subscribe((e) => {
+  if (e.type === 'log') console.log(decodeBidSubmitted(e.log)) // { id, owner, price, amount }
+})
 ```
+
+For non-native raises or bespoke pool keys, the lower-level `launchAssetSource({ chainId, auction,
+tickDataLens, poolKey, endBlock })` stays available (it resolves the v4 StateView internally from
+`chainId`).
+
+## Currency & price helpers
+
+- `toCurrency({ chainId, address, decimals, symbol? })` builds an sdk-core `Currency` from a plain
+  shape (`address: 'native'` → the native currency, else an ERC-20 `Token`). `discoverPricePath`
+  accepts these directly.
+- `q96ToPrice(priceX96, base, quote)` converts a Q96 raw-currency-per-raw-token price (the launch
+  vocabulary) into an sdk-core `Price` (the `pricePath`/discovery vocabulary).
+- `PricePathValue.priceFloat` is the composed price as a plain number, computed once per emission.
+  Handy for charts — but note that **ticks are suppressed when the value is unchanged**, so points are
+  unevenly spaced in time; plot against `emission.identity.blockNumber`/`timestamp`, never assume a
+  fixed interval.
 
 ## Event model
 
 Every emission is tagged with `(blockNumber, parentBlockHash, timestamp)`. A store's `subscribe`
-listener receives `FeedEvent<T>`:
+listener receives `FeedEvent<T>` — six variants:
 
 | Event | Fields | Meaning |
 |---|---|---|
 | `tick` | `emission` | New derived value at block N. **Suppressed** when the derived value is unchanged (per-source `valueEquals`, default `Object.is`), so fast L2 blocks don't spam subscribers. |
-| `log` | `log` | New matched log (e.g. a bid), deduped by `(txHash, logIndex)`. Never suppressed. |
-| `retraction` | `ref` | A previously-emitted log vanished in a reorg. Carries the original `(txHash, logIndex, blockNumber)`. |
-| `phase` | `from`, `to`, `identity` | Source lifecycle transition (e.g. `auction → graduated`). Distinct from ticks so charts draw markers instead of connecting discontinuous lines. |
-| `gap` | `fromBlock`, `toBlock` | The feed knows it missed blocks it cannot cheaply recover (e.g. a long tab-throttle beyond the catch-up bound). Charts must not draw a false flat line across it. |
+| `log` | `log` | New matched log (e.g. a bid), deduped by `(txHash, logIndex)`. Never suppressed. Also buffered in `snapshot.logs`. |
+| `retraction` | `log` | A previously-emitted log vanished in a reorg. Carries the **full** `DecodedFeedLog`; removes the matching entry from `snapshot.logs`. |
+| `gap` | `fromBlock`, `toBlock` | The feed knows it missed blocks it cannot cheaply recover (e.g. a stall beyond the catch-up bound). Charts must not draw a false flat line across it. |
 | `stale` | `stale` | Heartbeat health flipped. Set after `STALE_AFTER_CONSECUTIVE_FAILURES` (3) consecutive RPC failures; cleared on the next success. Dim the UI rather than lie. |
+| `error` | `scope`, `error`, `identity?` | Diagnostic (fan-out only; never enters the tick buffer). `scope: 'tick'` is a shared read/`getLogs` failure sent to every store; `scope: 'source'` is a throwing `derive`, sent only to that store. Mirrored in `snapshot.lastError`, cleared on that store's next tick. |
+
+The lifecycle phase of the launch sources is **not** an event — it is a field on the emission value
+(`value.phase`), so a phase transition arrives as an ordinary `tick`.
 
 State never lags the head — there is no confirmation depth. A reorged-away value self-heals on the next
 tick (~one block of exposure); reorged logs within the trailing window (default K=3 blocks) surface as
@@ -187,19 +230,20 @@ tick (~one block of exposure); reorged logs within the trailing window (default 
 
 ## Configuration
 
-Pass overrides to `createBlockFeed({ client, chainId, … })`; defaults live in
-[`src/constants.ts`](./src/constants.ts).
+Pass overrides to `createBlockFeed({ client, chainId, … })` (or `registry.getFeed(client, { … })`);
+defaults live in [`src/constants.ts`](./src/constants.ts).
 
 | Option | Default | Notes |
 |---|---|---|
+| `chainId` | `client.chain?.id` | Required only when the client carries no `chain.id` (throws synchronously if neither). |
 | `pollIntervalMs` | `{ 1: 3000, 8453: 1000, 130: 500 }[chainId] ?? 1000` | HTTP poll cadence, keyed to block time. Moot on WebSocket. |
 | `trailingLogWindow` | `3` | Blocks (K) of already-delivered logs re-scanned each tick to reconcile reorgs. |
-| `bufferSize` | `120` | Per-store rolling emission buffer length (a chart mounting mid-session renders a live tail immediately). |
-| `maxCallsPerChunk` | `200` | Max calls per multicall chunk before splitting; chunks share tick 1's identity. |
+| `maxCatchupBlocks` | `20` | Upper bound on the always-on catch-up look-back after a stall. A longer stall recovers at most this many recent blocks; the rest surfaces as a `gap`. |
+| `bufferSize` | `120` | Per-store rolling tick/log buffer length (a chart mounting mid-session renders a live tail immediately). |
 | `scheduler` | `realScheduler` | Injectable time source for tests. |
 
 Backoff and staleness (heartbeat-wide, not per-call): `BACKOFF_BASE_MS` (500), `BACKOFF_MAX_MS`
-(30000), `STALE_AFTER_CONSECUTIVE_FAILURES` (3).
+(30000), `STALE_AFTER_CONSECUTIVE_FAILURES` (3). The multicall chunk size is an internal constant.
 
 ## Supported chains (v1)
 
@@ -213,6 +257,8 @@ in v1.
   token verification** — it prices exactly the pools it is handed. Correctness is the control plane's
   responsibility (a backend that knows the canonical pools, or discovery's executable ranking). A path
   built from an attacker-chosen pool will be priced faithfully and wrongly.
+- **A bad source never poisons the others.** Launch and `pricePath` reads are failure-tolerant, so a
+  reverting/unpriceable pool yields no emission for that source instead of failing the shared tick.
 - **Discovery's v4 `Initialize` scan needs a capable RPC provider.** The full-history log scan from the
   PoolManager deploy block is Alchemy-class work; weak public RPCs time out or cap the range. Prefer
   backend-supplied paths, or pass `fromBlockOverride` to bound the scan, where possible.
@@ -223,11 +269,11 @@ in v1.
 
 ## Integration tests
 
-A private Anvil-fork suite lives in [`integration/`](./integration) — 11 fork tests including a real
+A private Anvil-fork suite lives in [`integration/`](./integration) — fork tests including a real
 launch → bids → graduation end-to-end. These are **local developer tools, never run in CI**: they are
-**opt-in** and execute only when `BLOCKFEED_FORK=1` is set (CI installs foundry, so an opt-out gate
-would run them on every PR). They also require a locally installed [foundry](https://getfoundry.sh)
-(`anvil`) and skip cleanly when it is absent or when `BLOCKFEED_FORK` is unset.
+**opt-in** and execute only when `BLOCKFEED_FORK=1` is set. They also require a locally installed
+[foundry](https://getfoundry.sh) (`anvil`) and skip cleanly when it is absent or when `BLOCKFEED_FORK`
+is unset.
 
 ```bash
 cd integration
@@ -237,7 +283,3 @@ BLOCKFEED_FORK=1 bun test                        # run the fork suites against a
 BLOCKFEED_FORK=1 BLOCKFEED_FORK_RPC_BASE=https://… bun test   # override the upstream Base RPC (Alchemy-class recommended)
 BLOCKFEED_SKIP_FORK=1 bun test                   # force-skip even when opted in (back-compat kill switch)
 ```
-
-## Design
-
-Full design and architecture: [`docs/blockfeed-sdk-design.md`](../../docs/blockfeed-sdk-design.md).
