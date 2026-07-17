@@ -37,5 +37,8 @@ export function ccaBidsSource(args: { auction: Address }): Source<CcaBidsState> 
         identity: tick.identity,
       }
     },
+    // Suppress tick events when the running bid count is unchanged (default Object.is compares the
+    // fresh object references, which never match — so this must be explicit).
+    valueEquals: (a, b) => a.bidCount === b.bidCount,
   }
 }

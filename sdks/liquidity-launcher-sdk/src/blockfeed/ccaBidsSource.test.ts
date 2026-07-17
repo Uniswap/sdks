@@ -70,4 +70,17 @@ describe('ccaBidsSource', () => {
     const source = ccaBidsSource({ auction: AUCTION })
     expect(source.derive(tick([]), { prev: undefined })?.value.bidCount).toBe(0)
   })
+
+  it('valueEquals compares bidCount so equal counts from fresh objects suppress (A5)', () => {
+    const source = ccaBidsSource({ auction: AUCTION })
+    expect(source.valueEquals).toBeDefined()
+    // Two distinct derivations that yield the same running count must compare equal…
+    const a = source.derive(tick([]), { prev: prevEmission(3) })!
+    const b = source.derive(tick([]), { prev: prevEmission(3) })!
+    expect(a.value).not.toBe(b.value) // fresh object refs (Object.is would say false)
+    expect(source.valueEquals!(a.value, b.value)).toBe(true)
+    // …and differing counts must compare not-equal.
+    const c = source.derive(tick([bidLog(0)]), { prev: prevEmission(3) })!
+    expect(source.valueEquals!(a.value, c.value)).toBe(false)
+  })
 })
