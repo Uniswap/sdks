@@ -6,6 +6,7 @@ import {
   LBP_STRATEGY_ABI,
   PERMIT2_ABI,
   STATE_VIEW_ABI,
+  TICK_DATA_LENS_ABI,
   UERC20_FACTORY_ABI,
   USUPERC20_FACTORY_ABI,
 } from './abis'
@@ -127,6 +128,102 @@ export function deriveAuctionOutcome(p: {
     return 'active'
   }
   return p.isGraduated ? 'graduated' : 'failed'
+}
+
+// ---------------------------------------------------------------------------
+// CCA live clearing price (auction.checkpoint().clearingPrice)
+// ---------------------------------------------------------------------------
+
+/** The live clearing-state checkpoint returned by `auction.checkpoint()`. */
+export interface AuctionCheckpoint {
+  /** Current clearing price, Q96 raw-currency-per-raw-token. */
+  clearingPrice: bigint
+  currencyRaisedAtClearingPriceQ96_X7: bigint
+  cumulativeMpsPerPrice: bigint
+  cumulativeMps: number
+  prev: bigint
+  next: bigint
+}
+
+/**
+ * `auction.checkpoint()` — the live per-block clearing state. This is the source the backend reads
+ * for the current clearing price (data-api `getLatestCheckpoint`); the CCA price decays with
+ * emission every block, so `checkpoint()` recomputes the current-block value rather than returning a
+ * stale stored one. Declared `nonpayable` on-chain but read via `eth_call`/multicall; the price of
+ * interest is `.clearingPrice` (Q96 raw-currency-per-raw-token).
+ */
+export function clearingPriceCall(auction: Address): ContractCall<typeof CCA_ABI> {
+  return { address: auction, abi: CCA_ABI, functionName: 'checkpoint', args: [] }
+}
+
+/** Reads the auction's current clearing price (Q96 raw-currency-per-raw-token) from `checkpoint()`. */
+export async function getClearingPrice(client: PublicClient, auction: Address): Promise<bigint> {
+  const checkpoint = await readContract<AuctionCheckpoint>(client, clearingPriceCall(auction))
+  return checkpoint.clearingPrice
+}
+
+// ---------------------------------------------------------------------------
+// TickDataLens.getInitializedTickData (live bid-distribution data)
+// ---------------------------------------------------------------------------
+
+/** One initialized auction price tick and its demand data. All quantities are Q96. */
+export interface InitializedTick {
+  priceQ96: bigint
+  currencyDemandQ96: bigint
+  requiredCurrencyDemandQ96: bigint
+  currencyRequiredQ96: bigint
+}
+
+/**
+ * `TickDataLens.getInitializedTickData(auction)` — the auction's initialized price ticks with their
+ * demand data, in a single (non-paginated) call. The lens address is version-specific to the auction
+ * factory; resolve it via {@link getTickDataLensForFactory}. The returned order is not guaranteed
+ * sorted — sort by `priceQ96` before interpolating.
+ */
+export function tickDataCall(lens: Address, auction: Address): ContractCall<typeof TICK_DATA_LENS_ABI> {
+  return { address: lens, abi: TICK_DATA_LENS_ABI, functionName: 'getInitializedTickData', args: [auction] }
+}
+
+/** Reads the auction's initialized tick data from the lens. */
+export async function getTickData(
+  client: PublicClient,
+  lens: Address,
+  auction: Address
+): Promise<InitializedTick[]> {
+  const ticks = await readContract<readonly InitializedTick[]>(client, tickDataCall(lens, auction))
+  return ticks.map((t) => ({
+    priceQ96: t.priceQ96,
+    currencyDemandQ96: t.currencyDemandQ96,
+    requiredCurrencyDemandQ96: t.requiredCurrencyDemandQ96,
+    currencyRequiredQ96: t.currencyRequiredQ96,
+  }))
+}
+
+/** A tick's price paired with its fill ratio. */
+export interface TickFillRatio {
+  /** The tick price, Q96 raw-currency-per-raw-token. */
+  priceQ96: bigint
+  /**
+   * `currencyDemandQ96 / requiredCurrencyDemandQ96` at this tick: `1` is exactly filled, `>1`
+   * oversubscribed, `<1` partially filled. `undefined` when required demand is `0` (undefined ratio).
+   */
+  fillRatio: number | undefined
+}
+
+/**
+ * Pure: per-tick fill ratio from lens output. Mirrors the frontend's fill-ratio semantics
+ * (universe `interpolateFillRatio`): `currencyDemandQ96 / requiredCurrencyDemandQ96`, computed at
+ * 1e-4 resolution, `undefined` when required demand is `0`. Does not sort or interpolate — one ratio
+ * per input tick, in input order.
+ */
+export function deriveTickFillRatios(ticks: readonly InitializedTick[]): TickFillRatio[] {
+  return ticks.map((t) => ({
+    priceQ96: t.priceQ96,
+    fillRatio:
+      t.requiredCurrencyDemandQ96 === 0n
+        ? undefined
+        : Number((t.currencyDemandQ96 * 10000n) / t.requiredCurrencyDemandQ96) / 10000,
+  }))
 }
 
 // ---------------------------------------------------------------------------
