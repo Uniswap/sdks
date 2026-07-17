@@ -1,5 +1,6 @@
 import { BigNumber } from 'ethers'
-import { SwapStep, V4Action } from '../types/encodeSwaps'
+import { TradeType } from '@uniswap/sdk-core'
+import { NormalizedSwapSpecification, SwapStep, V4Action } from '../types/encodeSwaps'
 import { CONTRACT_BALANCE, ETH_ADDRESS, SENDER_AS_RECIPIENT } from './constants'
 
 export type UserPaidPull = {
@@ -207,7 +208,11 @@ function stepDirectOutputCredits(step: SwapStep, recipient: string): DirectOutpu
     case 'V2_SWAP_EXACT_IN':
       return isDirect ? [{ token: step.path[step.path.length - 1], minAmount: BigNumber.from(step.amountOutMin) }] : []
     case 'V2_SWAP_EXACT_OUT':
-      return isDirect ? [{ token: step.path[step.path.length - 1], minAmount: BigNumber.from(step.amountOut) }] : []
+      // not creditable: v2SwapExactOutput only checks amountIn <= amountInMaximum and never asserts the
+      // recipient received amountOut (unlike v2 exact-in's balance-delta check or V3 exact-out's
+      // V3InvalidAmountOut), so a fee-on-transfer input/intermediate can under-deliver and still succeed.
+      // like v4 exact-out, contribute zero and leave the unverifiable amount to the sweep floor.
+      return []
     case 'V3_SWAP_EXACT_IN':
       return isDirect ? [{ token: v3PathLastToken(step.path), minAmount: BigNumber.from(step.amountOutMin) }] : []
     case 'V3_SWAP_EXACT_OUT':
@@ -227,10 +232,58 @@ function stepDirectOutputCredits(step: SwapStep, recipient: string): DirectOutpu
   }
 }
 
-export function sumDirectOutputMin(steps: SwapStep[], recipient: string, outputTokenAddress: string): BigNumber {
+// Direct-output coverage in the output token: the summed contract-enforced minimum delivered straight to
+// the recipient, and the number of legs it came from. Summed per-leg floors can trail the trade-level
+// floor by up to one wei each, so the caller uses `legs` to size how much rounding to tolerate.
+function directOutputCoverage(
+  steps: SwapStep[],
+  recipient: string,
+  outputTokenAddress: string
+): { min: BigNumber; legs: number } {
   const target = outputTokenAddress.toLowerCase()
-  return steps
+  const credits = steps
     .flatMap((step) => stepDirectOutputCredits(step, recipient))
     .filter((credit) => credit.token !== undefined && credit.token.toLowerCase() === target)
-    .reduce((total, credit) => total.add(credit.minAmount), BigNumber.from(0))
+  return {
+    min: credits.reduce((total, credit) => total.add(credit.minAmount), BigNumber.from(0)),
+    legs: credits.length,
+  }
+}
+
+export function sumDirectOutputMin(steps: SwapStep[], recipient: string, outputTokenAddress: string): BigNumber {
+  return directOutputCoverage(steps, recipient, outputTokenAddress).min
+}
+
+// The final SWEEP floor for a direct-transfer plan: netMin minus what the direct legs already guarantee to
+// the recipient. Direct legs pay straight from the pools, so their credited minimums can sum a few wei
+// below netMin — from independent integer flooring, and from routers that floor slippage in f64 — with no
+// custody balance to cover the gap. A small tolerance forgives that sub-economic rounding so a fully
+// covered direct plan doesn't revert; a larger, real coverage gap still enforces the full floor.
+export function directTransferSweepFloor(
+  spec: NormalizedSwapSpecification,
+  netMin: BigNumber,
+  swapSteps: SwapStep[],
+  outputTokenAddress: string
+): BigNumber {
+  const { min: directOutputMin, legs } = directOutputCoverage(swapSteps, spec.recipient, outputTokenAddress)
+  const shortfall = netMin.sub(directOutputMin)
+
+  // flexibility tolerance: min(0.5bps of netMin, 1% of the slippage the user set). Headroom for a router's
+  // per-leg slippage math; scales to 0 as slippage -> 0 (and is 0 for exact-output, which has no
+  // output-side slippage), so an exact-price trade stays exact.
+  const slippageNumerator = BigNumber.from(spec.slippageTolerance.numerator.toString())
+  const slippageDenominator = BigNumber.from(spec.slippageTolerance.denominator.toString())
+  const outputSlippage =
+    spec.tradeType === TradeType.EXACT_INPUT
+      ? BigNumber.from(spec.routing.quote.quotient.toString()).mul(slippageNumerator).div(slippageDenominator)
+      : BigNumber.from(0)
+  const halfBps = netMin.div(20000)
+  const onePercentOfSlippage = outputSlippage.div(100)
+  const flexibilityTolerance = halfBps.lt(onePercentOfSlippage) ? halfBps : onePercentOfSlippage
+
+  // rounding tolerance: 2 wei per direct leg — inherent integer per-leg flooring, always allowed.
+  const roundingTolerance = BigNumber.from(legs * 2)
+
+  const toleratedShortfall = flexibilityTolerance.gt(roundingTolerance) ? flexibilityTolerance : roundingTolerance
+  return shortfall.gt(toleratedShortfall) ? shortfall : BigNumber.from(0)
 }

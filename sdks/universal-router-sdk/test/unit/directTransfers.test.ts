@@ -800,9 +800,9 @@ describe('allowDirectTransfers', () => {
   })
 
   describe('directTransfers output coverage helpers', () => {
-    it('counts V2 exact-out amounts as credits', () => {
+    it('does not credit V2 exact-out amounts (v2SwapExactOutput never asserts recipient delivery)', () => {
       const steps: SwapStep[] = [buildV2ExactOutStep({ recipient: TEST_RECIPIENT })]
-      expect(sumDirectOutputMin(steps, TEST_RECIPIENT, WETH.address).toString()).to.equal('500000000000000000')
+      expect(sumDirectOutputMin(steps, TEST_RECIPIENT, WETH.address).toString()).to.equal('0')
     })
 
     it('counts TAKE_PORTION to the recipient as zero (runtime-sized)', () => {
@@ -980,11 +980,29 @@ describe('allowDirectTransfers', () => {
       expect(sweepAmount(result.calldata)).to.equal(NET_MIN)
     })
 
-    it('reduces the floor by direct-output minimums', () => {
+    it('reduces the floor by direct-output minimums beyond the buffer', () => {
+      const shortfall = BigNumber.from('1000000000000000') // 0.001 WETH — well above the ~0.5bps buffer
+      const direct = BigNumber.from(NET_MIN).sub(shortfall)
+      const steps: SwapStep[] = [buildV3ExactInStep({ recipient: TEST_RECIPIENT, amountOutMin: direct.toString() })]
+      const result = SwapRouter.encodeSwaps(buildSpec(flagOn), steps)
+      expect(sweepAmount(result.calldata)).to.equal(shortfall.toString())
+    })
+
+    it('forgives a sub-buffer shortfall (router rounding) down to zero', () => {
+      // 1000 wei below netMin is far within the buffer (~0.5bps of netMin), so the floor drops to 0
       const direct = BigNumber.from(NET_MIN).sub(1000)
       const steps: SwapStep[] = [buildV3ExactInStep({ recipient: TEST_RECIPIENT, amountOutMin: direct.toString() })]
       const result = SwapRouter.encodeSwaps(buildSpec(flagOn), steps)
-      expect(sweepAmount(result.calldata)).to.equal('1000')
+      expect(sweepAmount(result.calldata)).to.equal('0')
+    })
+
+    it('at 0 slippage forgives only per-leg rounding (2 wei/leg), not the flexibility buffer', () => {
+      const spec = buildSpec({ ...flagOn, slippageTolerance: new Percent(0) })
+      const netMinZeroSlip = BigNumber.from('500000000000000000') // quote unchanged at 0 slippage
+      const forgiven = [buildV3ExactInStep({ recipient: TEST_RECIPIENT, amountOutMin: netMinZeroSlip.sub(2).toString() })]
+      expect(sweepAmount(SwapRouter.encodeSwaps(spec, forgiven).calldata)).to.equal('0')
+      const enforced = [buildV3ExactInStep({ recipient: TEST_RECIPIENT, amountOutMin: netMinZeroSlip.sub(3).toString() })]
+      expect(sweepAmount(SwapRouter.encodeSwaps(spec, enforced).calldata)).to.equal('3')
     })
 
     it('clamps the floor at zero when direct minimums exceed netMin', () => {

@@ -24,7 +24,7 @@ import { AcrossV4DepositV3Params } from './entities/actions/across'
 import { SwapSpecification, SwapStep } from './types/encodeSwaps'
 import { RoutePlanner, CommandType } from './utils/routerCommands'
 import { encodePermit, encodeV3PositionPermit } from './utils/inputTokens'
-import { sumDirectOutputMin, sumUserPaidMax } from './utils/directTransfers'
+import { directTransferSweepFloor, sumUserPaidMax } from './utils/directTransfers'
 import {
   ETH_ADDRESS,
   ROUTER_AS_RECIPIENT,
@@ -158,6 +158,12 @@ export abstract class SwapRouter {
    *   remainder — and direct output minimums count toward the SWEEP floor. Portion fees still
    *   require output custody. Step amounts are never trusted, only counted or capped.
    *
+   * Direct-transfer caveats:
+   * - Fee-on-transfer output tokens are out of scope under `allowDirectTransfers` — a direct output leg
+   *   can pay the recipient below netMin and still succeed; route FoT outputs to custody instead.
+   * - A flat fee is a plain TRANSFER, so routing must keep at least the fee amount in router custody
+   *   (not route 100% of output directly), or the fee TRANSFER reverts.
+   *
    * Router contract: end with final output in `spec.routing.outputToken`; for `EXACT_OUTPUT`, unused input
    * must end in `spec.routing.inputToken`. Don't include a top-level `SWEEP` — the SDK appends settlement,
    * refund, and safeMode sweeps itself.
@@ -227,12 +233,9 @@ export abstract class SwapRouter {
     // Assumes routers already normalized final gross output into `routing.outputToken`.
     // Direct-output minimums (contract-enforced, delivered straight to the recipient)
     // reduce the floor; the sweep always remains to forward any custody balance.
-    const directOutputMin = normalizedSpec.allowDirectTransfers
-      ? sumDirectOutputMin(swapSteps, normalizedSpec.recipient, getCurrencyAddress(outputToken))
-      : BigNumber.from(0)
-    const sweepFloor = netMinOrExactAmountOut.gt(directOutputMin)
-      ? netMinOrExactAmountOut.sub(directOutputMin)
-      : BigNumber.from(0)
+    const sweepFloor = normalizedSpec.allowDirectTransfers
+      ? directTransferSweepFloor(normalizedSpec, netMinOrExactAmountOut, swapSteps, getCurrencyAddress(outputToken))
+      : netMinOrExactAmountOut
 
     planner.addCommand(
       CommandType.SWEEP,

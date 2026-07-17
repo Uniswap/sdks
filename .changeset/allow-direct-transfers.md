@@ -6,4 +6,4 @@
 
 Tightened in the default regime: v4 `SETTLE_ALL` and `TAKE_ALL` are now rejected at encode time unless `allowDirectTransfers` is set — both act on `msgSender()` directly on-chain and could previously only revert, double-charge, or bypass the fee/sweep envelope under custody encoding.
 
-Also exports `computeEncodeSwapsAmounts` (and the `EncodeSwapsAmounts` type) so integrators can derive the trade-level amount bounds from a `SwapSpecification` without reimplementing the math.
+Also exports `computeEncodeSwapsAmounts` (and the `EncodeSwapsAmounts` type) so integrators can derive the trade-level amount bounds without reimplementing the math. It takes a `NormalizedSwapSpecification`, so run `normalizeEncodeSwapsSpec` on a `SwapSpecification` first.
