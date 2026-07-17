@@ -25,10 +25,17 @@ function stale(value: boolean): FeedEvent<number> {
   return { type: 'stale', stale: value }
 }
 
-function log(): FeedEvent<number> {
+function log(txHash = '0xabc', logIndex = 0): FeedEvent<number> {
   return {
     type: 'log',
-    log: { txHash: '0xabc', logIndex: 0, blockNumber: 1n, address: '0x0', eventName: 'X', args: {} },
+    log: { txHash: txHash as `0x${string}`, logIndex, blockNumber: 1n, address: '0x0', eventName: 'X', args: {} },
+  }
+}
+
+function retraction(txHash: string, logIndex = 0): FeedEvent<number> {
+  return {
+    type: 'retraction',
+    log: { txHash: txHash as `0x${string}`, logIndex, blockNumber: 1n, address: '0x0', eventName: 'X', args: {} },
   }
 }
 
@@ -65,13 +72,11 @@ describe('createInternalStore', () => {
       expect(after.lastTick?.blockNumber).toBe(1n)
     })
 
-    it('does not create a new snapshot when only non-state events are published', () => {
-      const restore = silenceMicrotasks()
+    it('does not create a new snapshot for a fan-out-only event (gap)', () => {
       const store = createInternalStore<number>({ bufferSize: 5 })
       const before = store.getSnapshot()
-      store.publish([log()])
+      store.publish([{ type: 'gap', fromBlock: 1n, toBlock: 2n }])
       expect(store.getSnapshot()).toBe(before)
-      restore()
     })
 
     it('uses a fresh buffer array for each changed snapshot', () => {
@@ -102,6 +107,55 @@ describe('createInternalStore', () => {
       })
       store.publish([tick(1, 1n), tick(2, 2n)])
       expect(seen).toEqual([2, 2])
+    })
+  })
+
+  describe('snapshot log buffer (M3)', () => {
+    it('appends delivered logs so a late subscriber sees prior logs via getSnapshot', () => {
+      const restore = silenceMicrotasks()
+      const store = createInternalStore<number>({ bufferSize: 5 })
+      store.publish([log('0xa', 0), log('0xb', 1)])
+      // A subscriber that joins after the logs shipped still sees them in the snapshot.
+      expect(store.getSnapshot().logs.map((l) => l.txHash)).toEqual(['0xa', '0xb'])
+      restore()
+    })
+
+    it('a retraction removes the matching buffered log (by txHash+logIndex)', () => {
+      const restore = silenceMicrotasks()
+      const store = createInternalStore<number>({ bufferSize: 5 })
+      store.publish([log('0xa', 0), log('0xb', 1)])
+      store.publish([retraction('0xa', 0)])
+      expect(store.getSnapshot().logs.map((l) => l.txHash)).toEqual(['0xb'])
+      restore()
+    })
+
+    it('caps the log buffer at bufferSize, dropping oldest', () => {
+      const restore = silenceMicrotasks()
+      const store = createInternalStore<number>({ bufferSize: 2 })
+      store.publish([log('0xa', 0), log('0xb', 1), log('0xc', 2)])
+      expect(store.getSnapshot().logs.map((l) => l.txHash)).toEqual(['0xb', '0xc'])
+      restore()
+    })
+  })
+
+  describe('lastError (M2)', () => {
+    it('records a tick-scope error and clears it on the next tick', () => {
+      const store = createInternalStore<number>({ bufferSize: 5 })
+      const boom = new Error('rpc down')
+      store.publish([{ type: 'error', scope: 'tick', error: boom, identity: identity(9n) }])
+      const snap = store.getSnapshot()
+      expect(snap.lastError?.scope).toBe('tick')
+      expect(snap.lastError?.error).toBe(boom)
+      expect(snap.lastError?.identity?.blockNumber).toBe(9n)
+      // A successful emission clears it.
+      store.publish([tick(1, 10n)])
+      expect(store.getSnapshot().lastError).toBeUndefined()
+    })
+
+    it('records a source-scope error', () => {
+      const store = createInternalStore<number>({ bufferSize: 5 })
+      store.publish([{ type: 'error', scope: 'source', error: new Error('derive boom') }])
+      expect(store.getSnapshot().lastError?.scope).toBe('source')
     })
   })
 

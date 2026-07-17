@@ -1,4 +1,4 @@
-import type { FeedEvent, FeedSnapshot, FeedStore, SourceEmission, TickIdentity } from '../types'
+import type { DecodedFeedLog, FeedEvent, FeedSnapshot, FeedStore, SourceEmission, TickIdentity } from '../types'
 
 /**
  * The consumer surface (`subscribe`/`getSnapshot`) plus the engine-side controls. Extends the public
@@ -17,9 +17,10 @@ export interface InternalStore<T> extends FeedStore<T> {
  * Create a feed store shaped for React's `useSyncExternalStore`.
  *
  * `getSnapshot()` returns a referentially-stable object: the same reference is returned until a
- * `publish` actually mutates state (`tick`/`stale`), at which point exactly one new snapshot is built.
- * A `publish([])` — or a publish carrying only fan-out-only events (`log`/`retraction`/`gap`) — never
- * mints a new snapshot. `tick` events append to a rolling buffer capped at `bufferSize`
+ * `publish` actually mutates state, at which point exactly one new snapshot is built. `tick`, `log`,
+ * `retraction` (when it removes a buffered log), `stale`, and `error` all mutate the snapshot; a `gap`
+ * or a `publish([])` never mints a new snapshot. `tick` events append to a rolling buffer capped at
+ * `bufferSize`
  * (oldest dropped first); each changed snapshot carries a fresh buffer array so consumers can treat it
  * as immutable.
  *
@@ -35,14 +36,18 @@ export function createInternalStore<T>(opts: { bufferSize: number }): InternalSt
   // Mutable working state; the snapshot is a frozen view rebuilt only when this changes.
   let current: SourceEmission<T> | undefined
   const buffer: SourceEmission<T>[] = []
+  const logs: DecodedFeedLog[] = []
   let stale = false
   let lastTick: TickIdentity | undefined
+  let lastError: FeedSnapshot<T>['lastError']
+
+  const logKey = (log: DecodedFeedLog): string => `${log.txHash}:${log.logIndex}`
 
   const listeners = new Set<(e: FeedEvent<T>) => void>()
   const subscriberChangeCbs = new Set<(count: number) => void>()
 
   function buildSnapshot(): FeedSnapshot<T> {
-    return { current, buffer: buffer.slice(), stale, lastTick }
+    return { current, buffer: buffer.slice(), logs: logs.slice(), stale, lastTick, lastError }
   }
 
   // Referentially-stable cache; only reassigned by a publish that changes state.
@@ -60,11 +65,28 @@ export function createInternalStore<T>(opts: { bufferSize: number }): InternalSt
         buffer.push(event.emission)
         if (buffer.length > bufferSize) buffer.splice(0, buffer.length - bufferSize)
         lastTick = event.emission.identity
+        // A successful emission clears any pending error for this store.
+        lastError = undefined
         return true
+      case 'log':
+        logs.push(event.log)
+        if (logs.length > bufferSize) logs.splice(0, logs.length - bufferSize)
+        return true
+      case 'retraction': {
+        // A reorg removed this log: drop the matching entry (by txHash+logIndex) from the buffer.
+        const key = logKey(event.log)
+        const idx = logs.findIndex((l) => logKey(l) === key)
+        if (idx === -1) return false
+        logs.splice(idx, 1)
+        return true
+      }
       case 'stale':
         stale = event.stale
         return true
-      // 'log' | 'retraction' | 'gap' are fan-out-only: they do not mutate the snapshot.
+      case 'error':
+        lastError = { scope: event.scope, error: event.error, identity: event.identity }
+        return true
+      // 'gap' is fan-out-only: it does not mutate the snapshot.
       default:
         return false
     }

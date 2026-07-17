@@ -1,6 +1,7 @@
 import { type Currency, Token } from '@uniswap/sdk-core'
 
 import { getChainAddresses } from '../addresses'
+import { type CurrencyInput, normalizeCurrency } from '../currency'
 import { BlockfeedError } from '../errors'
 import { sameCurrency } from '../internal/currency'
 import type { BlockfeedClient, PathLeg, PoolRef, PricePath } from '../types'
@@ -94,10 +95,12 @@ interface Contender {
  */
 export async function discoverPricePath(
   client: BlockfeedClient,
-  args: { base: Currency; quote: Currency; options?: DiscoveryOptions },
+  args: { base: Currency | CurrencyInput; quote: Currency | CurrencyInput; options?: DiscoveryOptions },
   _deps: DiscoverDeps = defaultDeps
 ): Promise<PricePath | NoPathFound> {
-  const { base, quote } = args
+  // Normalize plain CurrencyInput to sdk-core Currency at the entry point.
+  const base = normalizeCurrency(args.base)
+  const quote = normalizeCurrency(args.quote)
   // chainId is derived from `base`; `quote` must agree (single-chain paths only).
   const chainId = base.chainId
   if (quote.chainId !== chainId) {

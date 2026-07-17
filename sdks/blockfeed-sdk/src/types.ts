@@ -89,13 +89,23 @@ export type FeedEvent<T> =
   | { type: 'retraction'; log: DecodedFeedLog }
   | { type: 'gap'; fromBlock: bigint; toBlock: bigint }
   | { type: 'stale'; stale: boolean }
+  /**
+   * A diagnostic error (fan-out-only; never enters the tick buffer). `scope: 'tick'` is a shared
+   * failure (atomic read / getLogs) delivered to every active store; `scope: 'source'` is a throwing
+   * `derive`, delivered only to that source's store. `identity` is the tick's identity when known.
+   */
+  | { type: 'error'; scope: 'tick' | 'source'; error: unknown; identity?: TickIdentity }
 
 export interface FeedSnapshot<T> {
   current: SourceEmission<T> | undefined
   /** Oldest→newest rolling tick buffer, length ≤ bufferSize. */
   buffer: readonly SourceEmission<T>[]
+  /** Delivered logs (after book dedupe), oldest→newest, length ≤ bufferSize; retractions remove. */
+  logs: readonly DecodedFeedLog[]
   stale: boolean
   lastTick: TickIdentity | undefined
+  /** Most recent error since the last successful emission; cleared when this store next ticks. */
+  lastError: { scope: 'tick' | 'source'; error: unknown; identity?: TickIdentity } | undefined
 }
 
 export interface FeedStore<T> {

@@ -260,21 +260,25 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
 
     let emission: SourceEmission<unknown> | undefined
     let derived = false
+    let errorEvent: FeedEvent<unknown> | undefined
     try {
       emission = entry.source.derive(tick, entry.prev)
       derived = true
     } catch (err) {
-      // Source-level isolation: keep prev, don't publish a tick, rethrow async to the host.
-      // Still fall through so the tick's logs/retractions are published (never suppressed).
+      // Source-level isolation: keep prev, don't publish a tick. Surface the error to THIS store only
+      // (scope 'source') AND rethrow async to the host. Still fall through so the tick's
+      // logs/retractions are published (never suppressed).
+      errorEvent = { type: 'error', scope: 'source', error: err, identity }
       queueMicrotask(() => {
         throw err
       })
     }
 
     // Derive threw, or returned `undefined` (nothing to say): no tick event and prev does not advance,
-    // but the tick's logs/retractions still ship.
+    // but the tick's error/logs/retractions still ship.
     if (!derived || emission === undefined) {
-      if (logEvents.length > 0) entry.store.publish(logEvents)
+      const events = errorEvent ? [errorEvent, ...logEvents] : logEvents
+      if (events.length > 0) entry.store.publish(events)
       return
     }
 
@@ -290,6 +294,12 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
 
     entry.prev = emission
     if (events.length > 0) entry.store.publish(events)
+  }
+
+  /** Publish a tick-scope diagnostic error to every active store (shared read/getLogs failure). */
+  function publishTickError(active: EngineEntry[], error: unknown, identity: TickIdentity | undefined): void {
+    const event: FeedEvent<unknown> = { type: 'error', scope: 'tick', error, identity }
+    for (const entry of active) entry.store.publish([event])
   }
 
   async function doTick(): Promise<void> {
@@ -308,7 +318,9 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
     let result
     try {
       result = await readTick(client, batch.keyed)
-    } catch {
+    } catch (err) {
+      // Shared failure: no trustworthy identity yet. Fan the diagnostic out to every active store.
+      publishTickError(active, err, undefined)
       handleTickFailure()
       return
     }
@@ -337,7 +349,9 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
     let logsByEntry: Map<EngineEntry, EntryLogs>
     try {
       logsByEntry = await fetchAndReconcileLogs(active, identity)
-    } catch {
+    } catch (err) {
+      // getLogs failed after a good atomic read: the tick's identity IS known — carry it.
+      publishTickError(active, err, { chainId, ...identity })
       handleTickFailure()
       return
     }

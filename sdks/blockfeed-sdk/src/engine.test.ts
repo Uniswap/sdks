@@ -325,9 +325,9 @@ describe('createBlockFeed', () => {
     store.subscribe((e) => seen.push(e))
     // Capture after subscribing so the deferred first tick still runs; only the rethrow is captured.
     const scheduled = captureMicrotasks()
-    await flush() // tick 1: throw isolated, but log still ships
+    await flush() // tick 1: throw isolated (error event), but log still ships
 
-    expect(seen.map((e) => e.type)).toEqual(['log'])
+    expect(seen.map((e) => e.type)).toEqual(['error', 'log'])
     expect(store.getSnapshot().current).toBeUndefined()
     expect(scheduled.length).toBe(1) // throw rethrown async
     expect(() => scheduled[0]!()).toThrow('derive boom')
@@ -910,5 +910,57 @@ describe('createBlockFeed', () => {
     expect(pendingDelays()).toEqual([BACKOFF_BASE_MS * 2])
     expect(st.getSnapshot().current).toBeUndefined()
     expect(to.getSnapshot().current).toBeUndefined()
+  })
+
+  // -------------------------------------------------------------------------
+  // Error diagnostics (M2)
+  // -------------------------------------------------------------------------
+
+  it('(M2) a tick-level failure publishes a scope:tick error to EVERY active store, cleared on recovery', async () => {
+    let failures = 1
+    const { client } = createFakeClient({
+      block: () => ({ number: BigInt(100 + failures), hash: `0x${'ab'.repeat(32)}`, ts: 1700n }),
+      failMulticall: () => failures-- > 0,
+      resolveCall: () => ok(1n),
+    })
+    const { scheduler, advance } = createFakeScheduler()
+    const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, scheduler })
+    const a = feed.watch(source({ key: 'a', derive: (t) => ({ value: 1, identity: t.identity }) }))
+    const b = feed.watch(source({ key: 'b', derive: (t) => ({ value: 2, identity: t.identity }) }))
+    a.subscribe(() => {})
+    b.subscribe(() => {})
+    await flush() // tick 1: multicall throws → scope:tick error to both stores
+
+    expect(a.getSnapshot().lastError?.scope).toBe('tick')
+    expect(b.getSnapshot().lastError?.scope).toBe('tick')
+
+    await advance(BACKOFF_BASE_MS * 2) // backoff retry succeeds → tick emits → clears lastError
+    expect(a.getSnapshot().lastError).toBeUndefined()
+    expect(b.getSnapshot().lastError).toBeUndefined()
+    expect(a.getSnapshot().current?.value).toBe(1)
+  })
+
+  it('(M2) a throwing derive publishes a scope:source error to that store only', async () => {
+    const { client } = createFakeClient({ resolveCall: () => ok(1n) })
+    const { scheduler } = createFakeScheduler()
+    const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, scheduler })
+    const bad = feed.watch(
+      source({
+        key: 'bad',
+        derive: () => {
+          throw new Error('derive boom')
+        },
+      })
+    )
+    const good = feed.watch(source({ key: 'good', derive: (t) => ({ value: 7, identity: t.identity }) }))
+    bad.subscribe(() => {})
+    good.subscribe(() => {})
+    const scheduled = captureMicrotasks() // swallow the async rethrow
+    await flush()
+
+    expect(bad.getSnapshot().lastError?.scope).toBe('source')
+    expect(good.getSnapshot().lastError).toBeUndefined() // isolated to the throwing source
+    expect(scheduled.length).toBe(1) // rethrow preserved
+    expect(() => scheduled[0]!()).toThrow('derive boom')
   })
 })

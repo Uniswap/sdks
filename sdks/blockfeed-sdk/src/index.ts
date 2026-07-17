@@ -9,6 +9,14 @@
 export { createBlockFeed } from './engine'
 export type { BlockFeed, BlockFeedOptions } from './engine'
 
+// Feed registry (one heartbeat per client+chain; avoids the double-feed footgun)
+export { createFeedRegistry } from './registry'
+export type { FeedRegistry } from './registry'
+
+// Currency helpers
+export { toCurrency } from './currency'
+export type { CurrencyInput } from './currency'
+
 // Scheduler (injectable time source for the engine)
 export { realScheduler } from './internal/scheduler'
 export type { Scheduler } from './internal/scheduler'

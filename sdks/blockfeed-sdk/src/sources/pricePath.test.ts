@@ -106,12 +106,26 @@ describe('pricePathSource.calls', () => {
     expect(Object.keys(calls).sort()).toEqual(['leg0', 'leg1'])
     expect(calls.leg0.functionName).toBe('slot0')
     expect(calls.leg0.address).toBe(V3_POOL)
-    expect(calls.leg0.allowFailure ?? false).toBe(false)
     expect(calls.leg1.functionName).toBe('getSlot0')
     // v4 leg reads StateView with the derived poolId.
     const poolId = poolIdFromPoolKey({ currency0: '0x0000000000000000000000000000000000000000' as Address, currency1: DAI.address, fee: 500, tickSpacing: 10, hooks: '0x0000000000000000000000000000000000000000' as Address })
     expect(calls.leg1.args[0]).toBe(poolId)
-    expect(calls.leg1.allowFailure ?? false).toBe(false)
+  })
+
+  it('ISOLATION INVARIANT: every leg read is allowFailure:true (a bad path never fails other sources’ tick)', () => {
+    const source = pricePathSource({
+      base: WETH,
+      quote: USDC,
+      legs: [
+        { pool: { protocol: 'v2', pair: V2_PAIR }, base: WETH, quote: DAI },
+        { pool: { protocol: 'v3', pool: V3_POOL }, base: DAI, quote: USDC },
+      ],
+    })
+    const calls = source.calls(undefined)
+    expect(Object.keys(calls).length).toBeGreaterThan(0)
+    for (const key of Object.keys(calls)) {
+      expect({ key, allowFailure: calls[key].allowFailure }).toEqual({ key, allowFailure: true })
+    }
   })
 
   it('uses getReserves for a v2 leg', () => {
@@ -138,6 +152,8 @@ describe('pricePathSource.derive', () => {
     expect(emission!.value.price.baseCurrency.equals(WETH)).toBe(true)
     expect(emission!.value.price.quoteCurrency.equals(USDC)).toBe(true)
     expect(emission!.value.price.toSignificant(5).startsWith('2000')).toBe(true)
+    // priceFloat mirrors the composed price as a plain number.
+    expect(Math.round(emission!.value.priceFloat)).toBe(2000)
     expect(emission!.value.legPrices).toHaveLength(1)
     expect(emission!.identity).toBe(IDENTITY)
   })

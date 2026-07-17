@@ -13,6 +13,11 @@ import type { ContractCall, PathLeg, PricePath, Source, TickData } from '../type
 export interface PricePathValue {
   price: Price<Currency, Currency>
   legPrices: Price<Currency, Currency>[]
+  /**
+   * The composed price as a plain JS number (quote per base), computed once per emission from
+   * `price.toSignificant(15)`. Convenience for charting; loses precision beyond ~15 significant digits.
+   */
+  priceFloat: number
 }
 
 /** Stable, chain-carrying id for a currency (native and wrapped are distinguished; chainId included). */
@@ -85,6 +90,7 @@ function buildLegPlan(leg: PathLeg, index: number, v4?: V4Addresses): LegPlan {
         abi: V2_PAIR_ABI,
         functionName: 'getReserves',
         args: [],
+        allowFailure: true,
       }
       return {
         key,
@@ -98,7 +104,7 @@ function buildLegPlan(leg: PathLeg, index: number, v4?: V4Addresses): LegPlan {
       }
     }
     case 'v3': {
-      const call: ContractCall = { address: leg.pool.pool, abi: V3_POOL_ABI, functionName: 'slot0', args: [] }
+      const call: ContractCall = { address: leg.pool.pool, abi: V3_POOL_ABI, functionName: 'slot0', args: [], allowFailure: true }
       return {
         key,
         call,
@@ -112,7 +118,7 @@ function buildLegPlan(leg: PathLeg, index: number, v4?: V4Addresses): LegPlan {
     case 'v4': {
       const poolId: Hex = poolIdFromPoolKey(leg.pool.poolKey)
       const stateView = (v4 as V4Addresses).stateView
-      const call: ContractCall = { address: stateView, abi: STATE_VIEW_ABI, functionName: 'getSlot0', args: [poolId] }
+      const call: ContractCall = { address: stateView, abi: STATE_VIEW_ABI, functionName: 'getSlot0', args: [poolId], allowFailure: true }
       return {
         key,
         call,
@@ -217,8 +223,9 @@ export function pricePathSource(path: PricePath): Source<PricePathValue> {
         composed = composed.multiply(new Fraction(legPrices[i].numerator, legPrices[i].denominator))
       }
       const price = new Price(path.base, path.quote, composed.denominator, composed.numerator)
+      const priceFloat = parseFloat(price.toSignificant(15))
 
-      return { value: { price, legPrices }, identity: tick.identity }
+      return { value: { price, legPrices, priceFloat }, identity: tick.identity }
     },
     valueEquals(a, b) {
       return a.price.equalTo(b.price)
