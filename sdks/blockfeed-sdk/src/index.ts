@@ -40,9 +40,14 @@ export type {
 export { pricePathSource, pricePathKey } from './sources/pricePath'
 export type { PricePathValue } from './sources/pricePath'
 
+// Launch-lifecycle sources (Uniswap Liquidity Launcher auctions; moved in-package from the launcher SDK)
+export { launchAssetSource, quickLaunchAssetSource, ccaBidsSource, decodeBidSubmitted } from './sources/launch'
+export type { LaunchAssetState, CcaBidsState, LaunchPhase, LaunchAssetSourceArgs, BidSubmitted } from './sources/launch'
+
 // Price math
 export { priceFromSqrtPriceX96, priceFromV2Reserves } from './math/sqrtPrice'
 export { poolIdFromPoolKey, poolRefIdentifier } from './math/poolId'
+export { q96ToPrice } from './math/price'
 
 // Visibility plugin
 export { attachVisibilityPlugin, DEFAULT_MAX_CATCHUP_BLOCKS } from './plugins/visibility'

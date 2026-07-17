@@ -1,5 +1,3 @@
-import type { Address } from 'viem'
-
 import {
   type ContractCall,
   type InitializedTick,
@@ -10,12 +8,13 @@ import {
   isGraduatedCall,
   remainingSupplyCall,
   tickDataCall,
-} from '../reads'
+} from '@uniswap/liquidity-launcher-sdk'
+import type { Address } from 'viem'
 
-import type { SpeculativeCall, TickData } from './types'
+import type { SpeculativeCall, TickData } from '../../types'
 
 /**
- * Tag a descriptor as failure-tolerant — the single home for the CCA sources' isolation rationale.
+ * Tag a descriptor as failure-tolerant — the single home for the launch sources' isolation rationale.
  *
  * EVERY call these sources issue is `allowFailure: true` so a reverting read (a not-yet-started
  * `checkpoint()`, a stale lens address, a pool that does not exist yet) is isolated to THIS source and
@@ -33,7 +32,7 @@ export function tolerant(call: ContractCall): SpeculativeCall {
  * The shared auction read-set (all failure-tolerant): live `checkpoint()`, `currencyRaised()`,
  * `remainingSupply()`, `isGraduated()`, and the lens `getInitializedTickData(auction)`. When a
  * `speculativeSlot0` descriptor is supplied it is added under the `slot0` key (the composite
- * `launchAssetSource` needs the always-on pool read; `ccaAuctionSource` does not).
+ * `launchAssetSource` needs the always-on pool read).
  */
 export function auctionCallSet(
   auction: Address,

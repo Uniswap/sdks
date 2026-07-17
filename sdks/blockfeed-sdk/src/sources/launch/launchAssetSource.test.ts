@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'bun:test'
 import { getAddress, zeroAddress } from 'viem'
 
-import { computeLbpPoolId } from '../poolId'
-import { slot0Call } from '../reads'
+import { STATE_VIEW_ABI } from '../../abis'
+import { getChainAddresses } from '../../addresses'
+import { poolIdFromPoolKey } from '../../math/poolId'
+import type { CallResult, LaunchAssetSourceArgs, LaunchAssetState, SourceEmission, TickData, TickIdentity } from '../../types'
 
 import { AUCTION, CHECKPOINT, LENS, Q96, fail, ok } from './__fixtures__'
 import { launchAssetSource } from './launchAssetSource'
-import type { CallResult, LaunchAssetSourceArgs, LaunchAssetState, SourceEmission, TickData, TickIdentity } from './types'
 
-const STATE_VIEW = getAddress('0xabababababababababababababababababababab')
+// chainId 130 (Unichain) — the source resolves the v4 StateView internally from this id.
+const STATE_VIEW = getChainAddresses(130).v4StateView
 const TOKEN = getAddress('0xcccccccccccccccccccccccccccccccccccccccc')
 
 const END_BLOCK = 1000n
@@ -19,11 +21,10 @@ const ARGS: LaunchAssetSourceArgs = {
   tickDataLens: LENS,
   // Native ETH (address(0)) sorts first → currency0 == native, currency1 == token (quick-launch shape).
   poolKey: { currency0: zeroAddress, currency1: TOKEN, fee: 2500, tickSpacing: 50, hooks: zeroAddress },
-  stateView: STATE_VIEW,
   endBlock: END_BLOCK,
 }
 
-const POOL_ID = computeLbpPoolId(zeroAddress, TOKEN, 2500, 50, zeroAddress)
+const POOL_ID = poolIdFromPoolKey({ currency0: zeroAddress, currency1: TOKEN, fee: 2500, tickSpacing: 50, hooks: zeroAddress })
 
 // Local single-tick set (fill ratio 2.5) — launchAsset's assertions expect exactly one tick.
 const TICKS = [{ priceQ96: 1000n, currencyDemandQ96: 500n, requiredCurrencyDemandQ96: 200n, currencyRequiredQ96: 300n }]
@@ -81,7 +82,13 @@ describe('launchAssetSource — call sets', () => {
   const source = launchAssetSource(ARGS)
 
   it('always includes the speculative StateView getSlot0 pre-graduation (allowFailure)', () => {
-    const expectedSlot0 = { ...slot0Call({ stateView: STATE_VIEW, poolId: POOL_ID }), allowFailure: true }
+    const expectedSlot0 = {
+      address: STATE_VIEW,
+      abi: STATE_VIEW_ABI,
+      functionName: 'getSlot0',
+      args: [POOL_ID],
+      allowFailure: true,
+    }
     // First tick (prev undefined) → full auction read-set + speculative slot0.
     const first = source.calls({ prev: undefined })
     expect(first.slot0).toEqual(expectedSlot0)

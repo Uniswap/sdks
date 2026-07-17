@@ -1,20 +1,29 @@
-import type { Hex } from 'viem'
+import { type TickFillRatio, deriveAuctionOutcome, deriveTickFillRatios, isGraduatedCall } from '@uniswap/liquidity-launcher-sdk'
+import type { Address, Hex } from 'viem'
 
-import { computeLbpPoolId } from '../poolId'
-import {
-  type TickFillRatio,
-  decodeSlot0SqrtPriceX96,
-  deriveAuctionOutcome,
-  deriveTickFillRatios,
-  isGraduatedCall,
-  slot0Call,
-} from '../reads'
+import { STATE_VIEW_ABI } from '../../abis'
+import { getChainAddresses } from '../../addresses'
+import { poolIdFromPoolKey } from '../../math/poolId'
+import type { Source, SpeculativeCall, TickData } from '../../types'
 
 import { auctionCallSet, readAuctionResults, tolerant } from './auctionReads'
-import type { LaunchAssetSourceArgs, LaunchAssetState, Source, SpeculativeCall, TickData } from './types'
+import type { LaunchAssetSourceArgs, LaunchAssetState } from './types'
 
 /** 2^288 — numerator for the currency-per-token inversion below. */
 const Q288 = 1n << 288n
+
+/**
+ * Blockfeed's own v4 StateView `getSlot0(poolId)` descriptor (it owns the v4 reads), always
+ * failure-tolerant — see `tolerant` in auctionReads for the isolation rationale.
+ */
+function slot0Descriptor(stateView: Address, poolId: Hex): SpeculativeCall {
+  return { address: stateView, abi: STATE_VIEW_ABI, functionName: 'getSlot0', args: [poolId], allowFailure: true }
+}
+
+/** Decode a successful `getSlot0` result to its `sqrtPriceX96` (first tuple element). */
+function decodeSlot0SqrtPriceX96(result: unknown): bigint {
+  return (result as readonly unknown[])[0] as bigint
+}
 
 /**
  * Convert a v4 `getSlot0` sqrtPriceX96 into a Q96 raw-currency-per-raw-token price, matching the
@@ -81,20 +90,17 @@ function graduatedEmission(
  * Phase is derived from `deriveAuctionOutcome(isGraduated, endBlock, currentBlock)`; `currentBlock` is
  * the tick's block number. On L1-block-domain chains (Arbitrum) `endBlock` and the L2 head differ —
  * that block-domain reconciliation is out of scope for v1 (OP-stack / Base targets, where they align).
+ *
+ * The v4 StateView address is resolved internally from `chainId` via `getChainAddresses`.
  */
 export function launchAssetSource(args: LaunchAssetSourceArgs): Source<LaunchAssetState> {
-  const { chainId, auction, tickDataLens, poolKey, stateView, endBlock } = args
+  const { chainId, auction, tickDataLens, poolKey, endBlock } = args
+  const stateView = getChainAddresses(chainId).v4StateView
 
-  // Deterministic graduated-pool id. The poolKey currencies are already address-sorted, so passing
-  // them as (currency0, currency1) to computeLbpPoolId (which re-sorts) yields the canonical id.
-  const poolId: Hex = computeLbpPoolId(
-    poolKey.currency0,
-    poolKey.currency1,
-    poolKey.fee,
-    poolKey.tickSpacing,
-    poolKey.hooks
-  )
-  const speculativeSlot0: SpeculativeCall = tolerant(slot0Call({ stateView, poolId }))
+  // Deterministic graduated-pool id. The poolKey currencies are already address-sorted, so this
+  // matches the canonical on-chain PoolKey.toId().
+  const poolId: Hex = poolIdFromPoolKey(poolKey)
+  const speculativeSlot0: SpeculativeCall = slot0Descriptor(stateView, poolId)
   const key = `launchAsset:${chainId}:${auction.toLowerCase()}`
 
   return {

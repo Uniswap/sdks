@@ -242,6 +242,33 @@ export function deriveTickFillRatios(ticks: readonly InitializedTick[]): TickFil
 }
 
 // ---------------------------------------------------------------------------
+// CCA BidSubmitted log decode
+// ---------------------------------------------------------------------------
+
+/** The typed fields of a `ContinuousClearingAuction.BidSubmitted` event (see {@link CCA_BID_SUBMITTED_EVENT}). */
+export interface BidSubmitted {
+  /** The bid id (auto-incrementing on-chain). */
+  id: bigint
+  /** The bid owner. */
+  owner: Address
+  /** The bid's max price, Q96 raw-currency-per-raw-token. */
+  price: bigint
+  /** The bid amount, in raw currency units. */
+  amount: bigint
+}
+
+/**
+ * Decode a `BidSubmitted` feed log into its typed fields. The `args` are the object viem produces when
+ * decoding a raw log against {@link CCA_BID_SUBMITTED_EVENT} (`@uniswap/blockfeed-sdk` delivers these
+ * on its `log` events). Typed structurally (`{ args }`) so this decoder carries no dependency on the
+ * blockfeed SDK; blockfeed re-exports it beside its launch sources.
+ */
+export function decodeBidSubmitted(log: { args: Record<string, unknown> }): BidSubmitted {
+  const { id, owner, price, amount } = log.args
+  return { id: id as bigint, owner: owner as Address, price: price as bigint, amount: amount as bigint }
+}
+
+// ---------------------------------------------------------------------------
 // ERC20 + Permit2 allowance reads
 // ---------------------------------------------------------------------------
 

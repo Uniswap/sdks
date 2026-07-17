@@ -1,10 +1,10 @@
+import { CCA_BID_SUBMITTED_EVENT } from '@uniswap/liquidity-launcher-sdk'
 import { describe, expect, it } from 'bun:test'
 import { getAddress } from 'viem'
 
-import { CCA_BID_SUBMITTED_EVENT } from '../abis'
+import type { DecodedFeedLog, FeedLogRef, SourceEmission, TickData, TickIdentity } from '../../types'
 
 import { ccaBidsSource } from './ccaBidsSource'
-import type { DecodedFeedLog, FeedLogRef, SourceEmission, TickData, TickIdentity } from './types'
 
 const AUCTION = getAddress('0x1234567890abcdef1234567890abcdef12345678')
 

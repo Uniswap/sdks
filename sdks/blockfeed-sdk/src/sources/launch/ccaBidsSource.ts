@@ -1,8 +1,9 @@
+import { CCA_BID_SUBMITTED_EVENT } from '@uniswap/liquidity-launcher-sdk'
 import type { Address } from 'viem'
 
-import { CCA_BID_SUBMITTED_EVENT } from '../abis'
+import type { LogFilter, Source, TickData } from '../../types'
 
-import type { CcaBidsState, LogFilter, Source, TickData } from './types'
+import type { CcaBidsState } from './types'
 
 /**
  * A {@link Source} watching the live bid stream of a Continuous Clearing Auction. It issues no state

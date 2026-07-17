@@ -1,4 +1,11 @@
-import { createBlockFeed, type FeedEvent, type FeedStore } from '@uniswap/blockfeed-sdk'
+import {
+  ccaBidsSource,
+  createBlockFeed,
+  type FeedEvent,
+  type FeedStore,
+  launchAssetSource,
+  type LaunchAssetState,
+} from '@uniswap/blockfeed-sdk'
 import {
   buildErc20ApprovePermit2Tx,
   buildLaunchTransactions,
@@ -6,7 +13,6 @@ import {
   buildPermit2ApproveLauncherTx,
   buildLpAllocationSchedule,
   buildPositionDefinitions,
-  ccaBidsSource,
   computeInitializerSalt,
   computeLbpPoolId,
   deriveAuctionPricing,
@@ -19,11 +25,9 @@ import {
   feeToTickSpacing,
   floorPriceToX96,
   getLauncherAddresses,
-  launchAssetSource,
   predictAuctionAddress,
   requiredCurrencyRaised,
   type AuctionParameters,
-  type LaunchAssetState,
   type MigratorParameters,
 } from '@uniswap/liquidity-launcher-sdk'
 import { afterAll, describe, expect, it } from 'bun:test'
@@ -204,7 +208,7 @@ describe.skipIf(!RUN)('CCA launch lifecycle end-to-end (Base fork)', () => {
         //     heartbeat, so a bid's log and the clearing-price it moves land on the same block. ---
         const feed = createBlockFeed({ client: pub, chainId: CHAIN_ID, pollIntervalMs: 150 })
         const assetStore = feed.watch(
-          launchAssetSource({ chainId: CHAIN_ID, auction: auctionAddr, tickDataLens: getAddress('0xc3C65F5453A3674aDb693cbdA3C842545cD30f53'), poolKey, stateView: STATE_VIEW, endBlock }) as never
+          launchAssetSource({ chainId: CHAIN_ID, auction: auctionAddr, tickDataLens: getAddress('0xc3C65F5453A3674aDb693cbdA3C842545cD30f53'), poolKey, endBlock }) as never
         ) as FeedStore<LaunchAssetState>
         const bidStore = feed.watch(ccaBidsSource({ auction: auctionAddr }) as never) as FeedStore<{ bidCount: number }>
         const asset = record(assetStore)

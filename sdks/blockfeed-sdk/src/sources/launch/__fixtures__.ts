@@ -1,11 +1,11 @@
 import { type Address, getAddress } from 'viem'
 
-import type { CallResult } from './types'
+import type { CallResult } from '../../types'
 
 /**
- * Shared constants for the CCA blockfeed source tests. Constants only — per-file tick builders stay
- * local to each test. NOT part of the build: excluded from the emitted output (see the build
- * tsconfigs' `exclude`, alongside `*.test.ts`), so `dist` never ships it.
+ * Shared constants for the launch source tests. Constants only — per-file tick builders stay local to
+ * each test. NOT part of the build: excluded from the emitted output (see the build tsconfigs'
+ * `exclude` glob `src/**\/__fixtures__.ts`), so `dist` never ships it.
  */
 
 export const AUCTION: Address = getAddress('0x1234567890abcdef1234567890abcdef12345678')

@@ -45,6 +45,7 @@
   },
   "sideEffects": false,
   "dependencies": {
+    "@uniswap/liquidity-launcher-sdk": "workspace:*",
     "@uniswap/sdk-core": "workspace:*",
     "jsbi": "^3.1.4",
     "viem": "^2.23.5"
