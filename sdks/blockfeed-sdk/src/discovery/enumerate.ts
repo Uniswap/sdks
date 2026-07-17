@@ -1,48 +1,22 @@
 import type { Currency } from '@uniswap/sdk-core'
 import type { Address, Log } from 'viem'
-import { getAddress } from 'viem'
+import { getAddress, zeroAddress } from 'viem'
 
 import { STATE_VIEW_ABI, V2_FACTORY_ABI, V3_FACTORY_ABI, V3_POOL_ABI, V4_POOL_MANAGER_INITIALIZE_EVENT } from '../abis'
 import { getChainAddresses } from '../addresses'
 import { BlockfeedError } from '../errors'
-import { poolIdFromPoolKey } from '../math/poolId'
-import type { BlockfeedClient, PoolKeyStruct, PoolRef } from '../types'
+import { eqAddress, v4Representations } from '../internal/currency'
+import { type RawContract, multicallAllowFailure } from '../internal/multicall'
+import { poolIdFromPoolKey, poolRefIdentifier } from '../math/poolId'
+import type { BlockfeedClient, PoolKeyStruct } from '../types'
 
 import type { CandidatePool, DiscoveryOptions } from './types'
-
-const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as Address
 
 /** v3 canonical fee tiers, queried on the factory for every pair. */
 const V3_FEE_TIERS = [100, 500, 3000, 10000] as const
 
 /** Max recursive halvings of a v4 log range before giving up on a provider that keeps erroring. */
 const MAX_BISECT_DEPTH = 8
-
-/** viem `multicall({ allowFailure: true })` per-call outcome. */
-type RawMulticallResult = { status: 'success'; result: unknown } | { status: 'failure'; error: Error }
-
-/** A single contract read shaped for viem `multicall`. */
-interface RawContract {
-  address: Address
-  abi: unknown
-  functionName: string
-  args: readonly unknown[]
-}
-
-function eqAddr(a: string, b: string): boolean {
-  return a.toLowerCase() === b.toLowerCase()
-}
-
-/**
- * The v4 PoolKey currency addresses a currency can legitimately appear under. Native and WETH are
- * interchangeable in v4 (a native-denominated pool uses `address(0)`, a WETH pool uses the WETH
- * token), so a WETH or native side expands to BOTH representations; any other token is just itself.
- */
-function v4Representations(c: Currency, weth: Address): Address[] {
-  if (c.isNative) return [ZERO_ADDRESS, getAddress(weth)]
-  if (eqAddr(c.wrapped.address, weth)) return [getAddress(weth), ZERO_ADDRESS]
-  return [getAddress(c.wrapped.address)]
-}
 
 /**
  * Cartesian product of both sides' representations, each sorted into `(currency0, currency1)` with
@@ -54,7 +28,7 @@ function v4QueryPairs(repsA: Address[], repsB: Address[]): Array<{ currency0: Ad
   const pairs: Array<{ currency0: Address; currency1: Address }> = []
   for (const a of repsA) {
     for (const b of repsB) {
-      if (eqAddr(a, b)) continue // a pool cannot pair a currency with itself
+      if (eqAddress(a, b)) continue // a pool cannot pair a currency with itself
       const [currency0, currency1] = BigInt(a) < BigInt(b) ? [a, b] : [b, a]
       const key = `${currency0.toLowerCase()}-${currency1.toLowerCase()}`
       if (seen.has(key)) continue
@@ -97,18 +71,6 @@ async function getInitializeLogsBisected(
     const left = await getInitializeLogsBisected(client, poolManager, args, from, mid, depth + 1)
     const right = await getInitializeLogsBisected(client, poolManager, args, mid + 1n, to, depth + 1)
     return [...left, ...right]
-  }
-}
-
-/** The pool's on-chain identifier used for deterministic sorting: pair/pool address, or v4 poolId. */
-function candidateIdentifier(ref: PoolRef): string {
-  switch (ref.protocol) {
-    case 'v2':
-      return ref.pair.toLowerCase()
-    case 'v3':
-      return ref.pool.toLowerCase()
-    case 'v4':
-      return poolIdFromPoolKey(ref.poolKey).toLowerCase()
   }
 }
 
@@ -163,14 +125,12 @@ export async function enumerateCandidates(
     factoryMeta.push({ kind: 'v3', fee })
   }
 
-  const factoryResults = factoryCalls.length
-    ? ((await client.multicall({ contracts: factoryCalls, allowFailure: true } as never)) as RawMulticallResult[])
-    : []
+  const factoryResults = await multicallAllowFailure(client, factoryCalls)
 
   factoryResults.forEach((res, i) => {
     if (res.status !== 'success') return
     const addr = res.result as string
-    if (!addr || eqAddr(addr, ZERO_ADDRESS)) return
+    if (!addr || eqAddress(addr, zeroAddress)) return
     const poolAddr = getAddress(addr)
     const meta = factoryMeta[i]
     if (meta?.kind === 'v2') {
@@ -208,7 +168,7 @@ export async function enumerateCandidates(
           hooks: getAddress(a.hooks as string),
         }
         // Hookless by default; a hooked pool survives only if its hook is explicitly allowlisted.
-        if (!eqAddr(poolKey.hooks, ZERO_ADDRESS) && !hookAllowlist.includes(poolKey.hooks.toLowerCase())) continue
+        if (!eqAddress(poolKey.hooks, zeroAddress) && !hookAllowlist.includes(poolKey.hooks.toLowerCase())) continue
         const poolId = poolIdFromPoolKey(poolKey)
         const poolIdKey = poolId.toLowerCase()
         if (seenPoolIds.has(poolIdKey)) continue
@@ -227,10 +187,7 @@ export async function enumerateCandidates(
 
   // --- Round 2: backfill in-range liquidity for all v3 + v4 candidates in one multicall. ---
   if (liquidityCalls.length) {
-    const liqResults = (await client.multicall({
-      contracts: liquidityCalls,
-      allowFailure: true,
-    } as never)) as RawMulticallResult[]
+    const liqResults = await multicallAllowFailure(client, liquidityCalls)
     liqResults.forEach((res, i) => {
       const target = liquidityTargets[i]
       if (target && res.status === 'success') target.inRangeLiquidity = res.result as bigint
@@ -239,8 +196,8 @@ export async function enumerateCandidates(
 
   candidates.sort((x, y) => {
     if (x.ref.protocol !== y.ref.protocol) return x.ref.protocol < y.ref.protocol ? -1 : 1
-    const ix = candidateIdentifier(x.ref)
-    const iy = candidateIdentifier(y.ref)
+    const ix = poolRefIdentifier(x.ref)
+    const iy = poolRefIdentifier(y.ref)
     return ix < iy ? -1 : ix > iy ? 1 : 0
   })
 

@@ -4,11 +4,12 @@ import { getAddress } from 'viem'
 
 import { QUOTER_V2_ABI, V2_PAIR_ABI, V4_QUOTER_ABI } from '../abis'
 import { getChainAddresses } from '../addresses'
-import type { BlockfeedClient, PoolKeyStruct } from '../types'
+import { matchesV4Currency } from '../internal/currency'
+import { type RawContract, multicallSparse } from '../internal/multicall'
+import type { BlockfeedClient, CallResult, PoolKeyStruct } from '../types'
 
 import type { CandidatePool } from './types'
 
-const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as Address
 /** v4 quoter's `exactAmount` is `uint128`; a probe that would overflow it is treated as unquotable. */
 const MAX_UINT128 = (1n << 128n) - 1n
 
@@ -25,35 +26,6 @@ export interface ProbeResult {
   candidate: CandidatePool
   buyOut: bigint
   roundTripOut: bigint
-}
-
-/** viem `multicall({ allowFailure: true })` per-call outcome. */
-type RawMulticallResult = { status: 'success'; result: unknown } | { status: 'failure'; error: Error }
-
-/** A single contract read shaped for viem `multicall`. */
-interface RawContract {
-  address: Address
-  abi: unknown
-  functionName: string
-  args: readonly unknown[]
-}
-
-function eqAddr(a: string, b: string): boolean {
-  return a.toLowerCase() === b.toLowerCase()
-}
-
-/** Address a currency presents in a v4 PoolKey: `address(0)` for native, else its wrapped token. */
-function v4Address(c: Currency): Address {
-  return (c.isNative ? ZERO_ADDRESS : getAddress(c.wrapped.address)) as Address
-}
-
-/** Whether a leg currency corresponds to a v4 PoolKey currency address, honoring native/WETH duality. */
-function matchesV4Currency(c: Currency, addr: Address, weth: Address): boolean {
-  if (eqAddr(v4Address(c), addr)) return true
-  // native/WETH interop: a native-denominated pool (addr 0x0) accepts WETH, and a WETH pool accepts native.
-  if (eqAddr(addr, ZERO_ADDRESS) && !c.isNative && eqAddr(c.wrapped.address, weth)) return true
-  if (eqAddr(addr, weth) && c.isNative) return true
-  return false
 }
 
 /** Uniswap v2 constant-product output with the 0.3% fee (integer floor), matching the on-chain router. */
@@ -105,11 +77,11 @@ interface ProbePlan {
   /** Round-1 call, or `undefined` when this candidate cannot be probed at all (buyOut → 0n). */
   buyCall?: RawContract
   /** Turn the round-1 result (or `undefined` when no call was issued) into `buyOut`. */
-  computeBuyOut(r: RawMulticallResult | undefined): bigint
+  computeBuyOut(r: CallResult | undefined): bigint
   /** Round-2 call for the given `buyOut`, or `undefined` to compute the round trip purely in TS. */
   buildSellCall(buyOut: bigint): RawContract | undefined
   /** Turn `buyOut` + the round-2 result (or `undefined`) into `roundTripOut`. */
-  computeRoundTrip(buyOut: bigint, r: RawMulticallResult | undefined): bigint
+  computeRoundTrip(buyOut: bigint, r: CallResult | undefined): bigint
 }
 
 function buildPlan(
@@ -226,40 +198,17 @@ export async function probeCandidates(
   const plans = candidates.map((c) => buildPlan(c, base, quote, notional, { quoterV2, v4Quoter, weth }))
 
   // --- Round 1: buy probes (quote→base) + v2 getReserves, in one multicall. ---
-  const buyCalls: RawContract[] = []
-  const buyCallPlanIdx: number[] = []
-  plans.forEach((p, i) => {
-    if (p.buyCall) {
-      buyCalls.push(p.buyCall)
-      buyCallPlanIdx.push(i)
-    }
-  })
-  const buyRaw = buyCalls.length
-    ? ((await client.multicall({ contracts: buyCalls, allowFailure: true } as never)) as RawMulticallResult[])
-    : []
-  const buyResultByPlan: Array<RawMulticallResult | undefined> = new Array(plans.length).fill(undefined)
-  buyCallPlanIdx.forEach((planIdx, k) => {
-    buyResultByPlan[planIdx] = buyRaw[k]
-  })
+  const buyResultByPlan = await multicallSparse(
+    client,
+    plans.map((p) => p.buyCall)
+  )
   const buyOuts = plans.map((p, i) => p.computeBuyOut(buyResultByPlan[i]))
 
   // --- Round 2: round-trip probes (base→quote at each buyOut), in one multicall. ---
-  const sellCalls: RawContract[] = []
-  const sellCallPlanIdx: number[] = []
-  plans.forEach((p, i) => {
-    const call = p.buildSellCall(buyOuts[i]!)
-    if (call) {
-      sellCalls.push(call)
-      sellCallPlanIdx.push(i)
-    }
-  })
-  const sellRaw = sellCalls.length
-    ? ((await client.multicall({ contracts: sellCalls, allowFailure: true } as never)) as RawMulticallResult[])
-    : []
-  const sellResultByPlan: Array<RawMulticallResult | undefined> = new Array(plans.length).fill(undefined)
-  sellCallPlanIdx.forEach((planIdx, k) => {
-    sellResultByPlan[planIdx] = sellRaw[k]
-  })
+  const sellResultByPlan = await multicallSparse(
+    client,
+    plans.map((p, i) => p.buildSellCall(buyOuts[i]!))
+  )
 
   return plans.map((p, i) => ({
     candidate: p.candidate,

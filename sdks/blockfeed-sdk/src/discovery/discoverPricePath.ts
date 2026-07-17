@@ -1,6 +1,7 @@
 import { type Currency, Token } from '@uniswap/sdk-core'
 
 import { getChainAddresses } from '../addresses'
+import { sameCurrency } from '../internal/currency'
 import type { BlockfeedClient, PathLeg, PoolRef, PricePath } from '../types'
 
 import { enumerateCandidates } from './enumerate'
@@ -16,11 +17,6 @@ export interface DiscoverDeps {
 }
 
 const defaultDeps: DiscoverDeps = { enumerateCandidates, probeCandidates, pickBest }
-
-/** True when two currencies are the same logical asset, treating native ETH and its WETH as one. */
-function sameCurrency(a: Currency, b: Currency): boolean {
-  return a.wrapped.equals(b.wrapped)
-}
 
 /** Human label for a currency in diagnostics: its symbol, else its wrapped address. */
 function label(c: Currency): string {

@@ -3,6 +3,8 @@ import { decodeEventLog, toEventSelector } from 'viem'
 
 import type { DecodedFeedLog, FeedLogRef, LogFilter } from '../types'
 
+import { eqAddress } from './currency'
+
 export interface LogBookEntry {
   ref: FeedLogRef
   log: DecodedFeedLog
@@ -42,13 +44,9 @@ function argEquals(filterVal: unknown, logVal: unknown): boolean {
   return filterVal === logVal
 }
 
-function addressEquals(a: string, b: string): boolean {
-  return a.toLowerCase() === b.toLowerCase()
-}
-
 /** True iff the decoded log satisfies the filter: same address, same event, and all specified args match. */
 function filterMatches(filter: LogFilter, log: DecodedFeedLog): boolean {
-  if (!addressEquals(filter.address, log.address)) return false
+  if (!eqAddress(filter.address, log.address)) return false
   if (filter.event.name !== log.eventName) return false
   if (filter.args) {
     for (const [key, val] of Object.entries(filter.args)) {

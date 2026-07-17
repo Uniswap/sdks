@@ -1,6 +1,6 @@
 import { type Hex, encodeAbiParameters, keccak256 } from 'viem'
 
-import type { PoolKeyStruct } from '../types'
+import type { PoolKeyStruct, PoolRef } from '../types'
 
 /**
  * Compute the Uniswap v4 PoolId from a {@link PoolKeyStruct}, matching the on-chain `PoolKey.toId()`:
@@ -17,4 +17,16 @@ export function poolIdFromPoolKey(poolKey: PoolKeyStruct): Hex {
       [poolKey.currency0, poolKey.currency1, poolKey.fee, poolKey.tickSpacing, poolKey.hooks]
     )
   )
+}
+
+/** A pool's on-chain identifier for deterministic keying/sorting: pair/pool address, or v4 poolId. */
+export function poolRefIdentifier(ref: PoolRef): string {
+  switch (ref.protocol) {
+    case 'v2':
+      return ref.pair.toLowerCase()
+    case 'v3':
+      return ref.pool.toLowerCase()
+    case 'v4':
+      return poolIdFromPoolKey(ref.poolKey).toLowerCase()
+  }
 }

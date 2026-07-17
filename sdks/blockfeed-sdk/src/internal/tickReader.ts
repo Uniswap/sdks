@@ -5,6 +5,8 @@ import { DEFAULT_MAX_CALLS_PER_CHUNK, MULTICALL3_ADDRESS } from '../constants'
 import { TickFailedError } from '../errors'
 import type { CallResult, SpeculativeCall, TickIdentity } from '../types'
 
+import { type RawContract, multicallAllowFailure } from './multicall'
+
 /**
  * Minimal ABI for the three Multicall3 self-calls that anchor every tick's identity. Bundling them
  * as the first calls of the same `aggregate3` batch is what makes the read atomic: block number,
@@ -30,16 +32,6 @@ export interface TickReadResult {
 /** The three identity self-calls, in the order they occupy at the head of the batch. */
 const IDENTITY_FUNCTIONS = ['getBlockNumber', 'getLastBlockHash', 'getCurrentBlockTimestamp'] as const
 
-/** viem-shaped per-call outcome from a multicall with `allowFailure: true`. */
-type RawResult = { status: 'success'; result: unknown } | { status: 'failure'; error: Error }
-
-interface BatchContract {
-  address: string
-  abi: unknown
-  functionName: string
-  args: readonly unknown[]
-}
-
 /**
  * Execute one atomic tick read: a single Multicall3 `aggregate3` batch whose first three calls are
  * Multicall3's own identity helpers, followed by the request's keyed calls in deterministic
@@ -55,7 +47,7 @@ export async function readTick(
 ): Promise<TickReadResult> {
   const maxCallsPerChunk = opts?.maxCallsPerChunk ?? DEFAULT_MAX_CALLS_PER_CHUNK
 
-  const identityContracts: BatchContract[] = IDENTITY_FUNCTIONS.map((functionName) => ({
+  const identityContracts: RawContract[] = IDENTITY_FUNCTIONS.map((functionName) => ({
     address: MULTICALL3_ADDRESS,
     abi: MULTICALL3_HELPER_ABI,
     functionName,
@@ -64,7 +56,7 @@ export async function readTick(
 
   // Deterministic ordering: identity calls first, then keyed calls sorted by key.
   const sortedKeys = Object.keys(request.keyed).sort()
-  const keyedContracts: BatchContract[] = sortedKeys.map((key) => {
+  const keyedContracts: RawContract[] = sortedKeys.map((key) => {
     const call = request.keyed[key] as SpeculativeCall
     return { address: call.address, abi: call.abi, functionName: call.functionName, args: call.args }
   })
@@ -77,14 +69,10 @@ export async function readTick(
   // `batchSize: 0` disables viem's internal calldata-size re-batching (default splits at ~1KB). That
   // internal split would issue multiple eth_calls for one chunk, breaking the identity/state atomicity
   // that is THE core invariant here — every result in a chunk MUST come from one aggregate3 call.
-  const results: RawResult[] = []
+  const results: CallResult[] = []
   for (let i = 0; i < contracts.length; i += maxCallsPerChunk) {
     const chunk = contracts.slice(i, i + maxCallsPerChunk)
-    const chunkResults = (await client.multicall({
-      contracts: chunk,
-      allowFailure: true,
-      batchSize: 0,
-    } as never)) as RawResult[]
+    const chunkResults = await multicallAllowFailure(client, chunk, { batchSize: 0 })
     // Defensive: a well-behaved aggregate3 returns exactly one result per call. A short return means the
     // atomic mapping is broken — fail the tick rather than mis-align keyed results.
     if (chunkResults.length < chunk.length) {
@@ -123,7 +111,7 @@ export async function readTick(
   let firstFailure: Error | undefined
 
   sortedKeys.forEach((key, idx) => {
-    const raw = keyedResults[idx] as RawResult
+    const raw = keyedResults[idx] as CallResult
     if (raw.status === 'success') {
       resultsByKey[key] = { status: 'success', result: raw.result }
       return

@@ -1,11 +1,7 @@
 import { type Currency, Price } from '@uniswap/sdk-core'
 
 import { BlockfeedError } from '../errors'
-
-/** True when two currencies are the same logical asset, treating native ETH and its WETH as one. */
-function sameCurrency(a: Currency, b: Currency): boolean {
-  return a.wrapped.equals(b.wrapped)
-}
+import { sameCurrency } from '../internal/currency'
 
 /**
  * Orient a `base`/`quote` request against a pool's sorted `token0`/`token1` and produce the price of

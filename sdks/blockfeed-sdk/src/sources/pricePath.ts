@@ -1,14 +1,13 @@
 import { type Currency, Fraction, Price } from '@uniswap/sdk-core'
-import type { Address, Hex } from 'viem'
+import type { Hex } from 'viem'
 
 import { STATE_VIEW_ABI, V2_PAIR_ABI, V3_POOL_ABI } from '../abis'
 import { getChainAddresses } from '../addresses'
 import { BlockfeedError } from '../errors'
-import { poolIdFromPoolKey } from '../math/poolId'
+import { matchesV4Currency, sameCurrency } from '../internal/currency'
+import { poolIdFromPoolKey, poolRefIdentifier } from '../math/poolId'
 import { priceFromSqrtPriceX96, priceFromV2Reserves } from '../math/sqrtPrice'
 import type { PathLeg, PricePath, Source, SpeculativeCall, TickData } from '../types'
-
-const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 
 /** The composed price of the path plus each leg's individual spot price, oldest→newest by leg order. */
 export interface PricePathValue {
@@ -16,26 +15,9 @@ export interface PricePathValue {
   legPrices: Price<Currency, Currency>[]
 }
 
-/** True when two currencies are the same logical asset, treating native ETH and its WETH as one. */
-function sameCurrency(a: Currency, b: Currency): boolean {
-  return a.wrapped.equals(b.wrapped)
-}
-
 /** Stable, chain-carrying id for a currency (native and wrapped are distinguished; chainId included). */
 function currencyId(c: Currency): string {
   return c.isNative ? `${c.chainId}-native` : `${c.chainId}-${c.wrapped.address.toLowerCase()}`
-}
-
-/** The pool's on-chain identifier for keying: pair/pool address, or the derived v4 poolId. */
-function poolIdentifier(leg: PathLeg): string {
-  switch (leg.pool.protocol) {
-    case 'v2':
-      return leg.pool.pair.toLowerCase()
-    case 'v3':
-      return leg.pool.pool.toLowerCase()
-    case 'v4':
-      return poolIdFromPoolKey(leg.pool.poolKey).toLowerCase()
-  }
 }
 
 /**
@@ -46,24 +28,9 @@ function poolIdentifier(leg: PathLeg): string {
  */
 export function pricePathKey(path: PricePath): string {
   const legs = path.legs
-    .map((leg) => `${leg.pool.protocol}:${poolIdentifier(leg)}:${currencyId(leg.base)}>${currencyId(leg.quote)}`)
+    .map((leg) => `${leg.pool.protocol}:${poolRefIdentifier(leg.pool)}:${currencyId(leg.base)}>${currencyId(leg.quote)}`)
     .join('|')
   return `${currencyId(path.base)}=>${currencyId(path.quote)}#${legs}`
-}
-
-/** Address a currency presents in a v4 PoolKey: `address(0)` for native, else its wrapped token. */
-function v4Address(c: Currency): Address {
-  return (c.isNative ? ZERO_ADDRESS : c.wrapped.address) as Address
-}
-
-/** Whether a leg currency corresponds to a v4 PoolKey currency address, honoring native/WETH duality. */
-function matchesV4Currency(c: Currency, addr: Address, weth: Address): boolean {
-  const eq = (x: string, y: string) => x.toLowerCase() === y.toLowerCase()
-  if (eq(v4Address(c), addr)) return true
-  // native/WETH interop: a native-denominated pool (addr 0x0) accepts WETH, and a WETH pool accepts native.
-  if (eq(addr, ZERO_ADDRESS) && !c.isNative && eq(c.wrapped.address, weth)) return true
-  if (eq(addr, weth) && c.isNative) return true
-  return false
 }
 
 /** Order a leg's `base`/`quote` into the pool's `token0`/`token1`. */
