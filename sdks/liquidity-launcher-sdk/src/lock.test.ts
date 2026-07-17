@@ -70,7 +70,9 @@ describe('buildLockRecipient', () => {
   })
 })
 
-// Pins the audited creation bytecode so an accidental recompile/version bump fails loudly.
+// Edit-guard only: these pins catch an accidental local edit of the committed bytecode.
+// They do NOT detect drift from the upstream contracts — regenerating via
+// `bun run regenerate:lock-bytecode` is the only thing that picks up upstream changes.
 describe('creation bytecode pins', () => {
   it('TIMELOCK bytecode hash is unchanged', () => {
     expect(keccak256(LOCK_RECIPIENT_CREATION_BYTECODE.TIMELOCK)).toBe(

@@ -188,3 +188,58 @@ Config-derivation helpers throw [`LauncherSdkError`](./src/errors.ts) with a sta
 | `build` | `buildLaunchTransactions`, `buildLaunchMulticall` |
 | `lock` | `buildLockRecipient` (timelock / fees-forwarder / buyback-burn liquidity locks) |
 | `format` | `formatFeePercent`, `formatTokenAmount` |
+
+## Maintaining the lock-recipient bytecode
+
+`buildLockRecipient` predicts CREATE2 addresses from three **creation bytecodes** committed in
+[`src/lockRecipientBytecode.ts`](./src/lockRecipientBytecode.ts) — `TIMELOCK`
+(`TimelockedPositionRecipient`), `FEES_FORWARDER` (`PositionFeesForwarder`), and `BUYBACK_BURN`
+(`BuybackAndBurnPositionRecipient`). These are compiled artifacts lifted from the
+[liquidity-launcher](https://github.com/Uniswap/liquidity-launcher) contracts and pinned to a
+specific commit; the launcher publishes no consumable npm/artifact bundle, so extraction is the only
+path today.
+
+### Why they can silently go stale
+
+The bytecode is pinned to an upstream **commit**, but nothing here re-derives it — so when the
+launcher contracts (or any base contract they inherit, e.g. `BlockNumberish`) change and the pin is
+not refreshed, the SDK keeps predicting addresses for the *old* code. That is exactly how the
+Robinhood-chain timelock became a no-op: the launcher advanced, `BlockNumberish` behaved differently,
+and the stale bytecode still predicted (and deployed) the previous recipient. The keccak assertions in
+[`src/lock.test.ts`](./src/lock.test.ts) do **not** catch this — they hash the bytes committed
+alongside them, so they only guard against an accidental local edit, not drift from upstream.
+
+### When to regenerate
+
+Whenever the liquidity-launcher periphery recipients **or their dependencies** (including inherited
+base contracts such as `BlockNumberish`) change, and you are bumping the pinned commit. Treat a bump
+as a deliberate, reviewed step.
+
+### How to regenerate
+
+Run the deterministic script against a local launcher checkout — it rewrites
+`src/lockRecipientBytecode.ts` (header + the three constants) and refreshes the keccak pins in
+`src/lock.test.ts`, so nothing is hand-copied:
+
+```bash
+LAUNCHER_REPO=/path/to/liquidity-launcher \
+LAUNCHER_COMMIT=<commit-sha> \
+bun run regenerate:lock-bytecode
+```
+
+It checks out the commit, initializes submodules, runs `forge build` for the three recipient sources,
+reads each `out/<Contract>.sol/<Contract>.json` `bytecode.object`, and recomputes the pins. It fails
+loudly (and writes nothing) if `forge` is missing, the build fails, or an artifact is absent.
+Regeneration requires [Foundry](https://getfoundry.sh) plus the launcher's submodules; the
+OpenZeppelin submodule uses an SSH remote, so a fresh clone needs SSH access (or an
+`insteadOf` https rewrite). Escape-hatch env vars cover non-standard toolchains:
+
+| Env var | Purpose |
+| --- | --- |
+| `FORGE_BIN` | Path to a `forge` binary (default: `forge` on `PATH`). |
+| `SOLC_PATH` | Path to a `solc` binary, passed to `forge build --use`. |
+| `SKIP_SUBMODULES` | Skip `git submodule update` when submodules are already fetched. |
+| `SKIP_CHECKOUT` | Skip `git checkout` when the repo is already at the target commit. |
+
+Running it against the already-pinned commit produces zero diff — a bump only changes the output when
+the upstream bytecode actually changed.
