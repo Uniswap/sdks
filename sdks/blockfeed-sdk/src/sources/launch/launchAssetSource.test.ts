@@ -4,10 +4,11 @@ import { getAddress, zeroAddress } from 'viem'
 
 import { getChainAddresses } from '../../addresses'
 import { poolIdFromPoolKey } from '../../math/poolId'
-import type { CallResult, LaunchAssetSourceArgs, LaunchAssetState, SourceEmission, TickData, TickIdentity } from '../../types'
+import type { CallResult, SourceEmission, TickData, TickIdentity } from '../../types'
 
 import { AUCTION, CHECKPOINT, LENS, Q96, fail, ok } from './__fixtures__'
 import { launchAssetSource } from './launchAssetSource'
+import type { LaunchAssetSourceArgs, LaunchAssetState } from './types'
 
 // chainId 130 (Unichain) — the source resolves the v4 StateView internally from this id.
 const STATE_VIEW = getChainAddresses(130).v4StateView
@@ -56,7 +57,6 @@ function auctionTick(
 
 const auctionEmission = (blockNumber: bigint): SourceEmission<LaunchAssetState> => ({
   value: { phase: 'auction', priceX96: 2n * Q96, currencyRaised: 5_000n, remainingSupply: 9_000n, tickFillRatios: [] },
-  phase: 'auction',
   identity: identity(blockNumber),
 })
 
@@ -68,13 +68,11 @@ const graduatedEmission = (blockNumber: bigint): SourceEmission<LaunchAssetState
     currencyRaised: 5_000n,
     remainingSupply: 9_000n,
   },
-  phase: 'graduated',
   identity: identity(blockNumber),
 })
 
 const failedEmission = (blockNumber: bigint): SourceEmission<LaunchAssetState> => ({
   value: { phase: 'failed', priceX96: 2n * Q96, currencyRaised: 5_000n, remainingSupply: 0n, tickFillRatios: [] },
-  phase: 'failed',
   identity: identity(blockNumber),
 })
 
@@ -153,7 +151,6 @@ describe('launchAssetSource — derive', () => {
     const tick = auctionTick(1001n, { isGraduated: true, slot0: v4Slot0(Q96) })
     const emission = source.derive(tick, auctionEmission(1000n))
     expect(emission?.value.phase).toBe('graduated')
-    expect(emission?.value.phase).toBe('graduated')
     expect(emission?.value.poolSqrtPriceX96).toBe(Q96)
     expect(emission?.value.priceX96).toBe(Q96) // 2^288 / (2^96)^2 == 2^96 (currency-per-token, currency0-native)
     expect(emission?.identity.blockNumber).toBe(1001n) // same block as the phase transition
@@ -164,7 +161,6 @@ describe('launchAssetSource — derive', () => {
 
   it('failed outcome: endBlock passed, not graduated → phase=failed with the final clearing price', () => {
     const emission = source.derive(auctionTick(1001n, { isGraduated: false }), undefined)
-    expect(emission?.value.phase).toBe('failed')
     expect(emission?.value.phase).toBe('failed')
     expect(emission?.value.priceX96).toBe(2n * Q96)
     expect(emission?.value.poolSqrtPriceX96).toBeUndefined()

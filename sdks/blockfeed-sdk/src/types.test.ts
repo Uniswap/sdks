@@ -82,16 +82,37 @@ describe('core types', () => {
       { type: 'retraction', log: { txHash: '0x1', logIndex: 0, blockNumber: 1n, address: '0x0', eventName: 'E', args: {} } },
       { type: 'gap', fromBlock: 1n, toBlock: 2n },
       { type: 'stale', stale: true },
+      { type: 'error', scope: 'tick', error: new Error('boom'), identity: IDENTITY },
     ]
-    expect(events.map((e) => e.type)).toContain('gap')
+    // Compile-time exhaustiveness: the switch must handle every FeedEvent variant. Adding a variant to
+    // the union without a case here makes the `never` default fail to type-check — so this test's
+    // "every variant" claim can never silently go stale.
+    const kindOf = (e: FeedEvent<number>): FeedEvent<number>['type'] => {
+      switch (e.type) {
+        case 'tick':
+        case 'log':
+        case 'retraction':
+        case 'gap':
+        case 'stale':
+        case 'error':
+          return e.type
+        default: {
+          const _exhaustive: never = e
+          return _exhaustive
+        }
+      }
+    }
+    expect(events.map(kindOf)).toEqual(['tick', 'log', 'retraction', 'gap', 'stale', 'error'])
   })
 
   it('FeedSnapshot and PoolRef/PricePath compose with sdk-core Currency', () => {
     const snapshot: FeedSnapshot<number> = {
       current: { value: 1, identity: IDENTITY },
       buffer: [{ value: 1, identity: IDENTITY }],
+      logs: [],
       stale: false,
       lastTick: IDENTITY,
+      lastError: undefined,
     }
     expect(snapshot.buffer.length).toBe(1)
 

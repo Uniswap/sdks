@@ -46,18 +46,18 @@ export const V3_FACTORY_ABI = parseAbi([
 /**
  * Uniswap v4 PoolManager `Initialize` event — `currency0`/`currency1` are indexed, so an
  * `eth_getLogs` scan per token surfaces every v4 pool containing it, each log carrying the full
- * PoolKey (discovery, §5).
+ * PoolKey — how discovery enumerates candidate v4 pools for a token.
  */
 export const V4_POOL_MANAGER_INITIALIZE_EVENT: AbiEvent = parseAbiItem(
   'event Initialize(bytes32 indexed id, address indexed currency0, address indexed currency1, uint24 fee, int24 tickSpacing, address hooks, uint160 sqrtPriceX96, int24 tick)'
 )
 
-/** Uniswap v3 QuoterV2: two-way executable probe quotes (discovery evaluation, §5). */
+/** Uniswap v3 QuoterV2: two-way executable probe quotes used to rank candidate pools by real executable quality (discovery evaluation). */
 export const QUOTER_V2_ABI = parseAbi([
   'function quoteExactInputSingle((address tokenIn, address tokenOut, uint256 amountIn, uint24 fee, uint160 sqrtPriceLimitX96) params) returns (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)',
 ])
 
-/** Uniswap v4 Quoter: probe quotes across arbitrary PoolKeys (discovery evaluation, §5). */
+/** Uniswap v4 Quoter: probe quotes across arbitrary PoolKeys used to rank candidate pools by real executable quality (discovery evaluation). */
 export const V4_QUOTER_ABI = parseAbi([
   'struct PoolKey { address currency0; address currency1; uint24 fee; int24 tickSpacing; address hooks; }',
   'function quoteExactInputSingle((PoolKey poolKey, bool zeroForOne, uint128 exactAmount, bytes hookData) params) returns (uint256 amountOut, uint256 gasEstimate)',

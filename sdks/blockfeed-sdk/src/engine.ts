@@ -99,7 +99,8 @@ interface EntryLogs {
  * Create the block heartbeat engine for one `(chainId, client)` pair. The returned {@link BlockFeed}
  * owns a single atomic read loop shared by every watched source; the loop runs only while at least one
  * store has a subscriber (refcounted), one tick at a time (no overlap), with exponential backoff on
- * failure. See the package design doc §4.1–§4.4, §7–§8 for the intent behind each rule.
+ * failure. A tick counts as a success only after BOTH the atomic multicall AND the trailing-window
+ * getLogs stage succeed; any failure feeds the shared backoff/stale machine and never advances `prev`.
  */
 export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
   const { client } = opts

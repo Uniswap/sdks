@@ -3,12 +3,12 @@ import { describe, expect, it } from 'bun:test'
 import type { Address, PublicClient } from 'viem'
 import { getAddress } from 'viem'
 
-import type { NoPathFound, PricePath } from '../types'
+import type { PricePath } from '../types'
 
 import { discoverPricePath, type DiscoverDeps } from './discoverPricePath'
 import type { ProbeResult } from './probe'
 import { pickBest } from './rank'
-import type { CandidatePool } from './types'
+import type { CandidatePool, NoPathFound } from './types'
 
 const WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2' // mainnet WETH = default intermediary
 const USDC = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
@@ -43,7 +43,7 @@ interface Scenario {
 function makeDeps(s: Scenario) {
   const enumCalls: Array<{ pair: string; opts: unknown }> = []
   const deps: DiscoverDeps = {
-    enumerateCandidates: (async (_c, _id, a: Token, b: Token, opts: unknown) => {
+    enumerateCandidates: (async (_c: PublicClient, _id: number, a: Token, b: Token, opts: unknown) => {
       enumCalls.push({ pair: `${a.symbol}/${b.symbol}`, opts })
       return s.enumerate(a.symbol!, b.symbol!)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -57,7 +57,7 @@ function makeDeps(s: Scenario) {
 
 const client = {} as PublicClient
 const run = (deps: DiscoverDeps, options = {}) =>
-  discoverPricePath(client, { chainId: 1, base: tkn, quote: usdc, options: { probeNotional: 1000n, ...options } }, deps)
+  discoverPricePath(client, { base: tkn, quote: usdc, options: { probeNotional: 1000n, ...options } }, deps)
 
 describe('discoverPricePath', () => {
   it('picks the direct pool when it out-scores every 2-hop', async () => {

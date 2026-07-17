@@ -27,7 +27,7 @@
     "build:cjs": "tsc -p tsconfig.cjs.json",
     "build:esm": "tsc -p tsconfig.esm.json",
     "build:types": "tsc -p tsconfig.types.json",
-    "typecheck": "tsc -p tsconfig.base.json --noEmit",
+    "typecheck": "tsc -p tsconfig.typecheck.json",
     "release": "changeset publish",
     "lint": "eslint src --ext .ts",
     "test": "bun test",

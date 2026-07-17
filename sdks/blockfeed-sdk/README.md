@@ -218,7 +218,7 @@ listener receives `FeedEvent<T>` — six variants:
 | `log` | `log` | New matched log (e.g. a bid), deduped by `(txHash, logIndex)`. Never suppressed. Also buffered in `snapshot.logs`. |
 | `retraction` | `log` | A previously-emitted log vanished in a reorg. Carries the **full** `DecodedFeedLog`; removes the matching entry from `snapshot.logs`. |
 | `gap` | `fromBlock`, `toBlock` | The feed knows it missed blocks it cannot cheaply recover (e.g. a stall beyond the catch-up bound). Charts must not draw a false flat line across it. |
-| `stale` | `stale` | Heartbeat health flipped. Set after `STALE_AFTER_CONSECUTIVE_FAILURES` (3) consecutive RPC failures; cleared on the next success. Dim the UI rather than lie. |
+| `stale` | `stale` | Heartbeat health flipped. Set after 3 consecutive RPC failures; cleared on the next success. Dim the UI rather than lie. |
 | `error` | `scope`, `error`, `identity?` | Diagnostic (fan-out only; never enters the tick buffer). `scope: 'tick'` is a shared read/`getLogs` failure sent to every store; `scope: 'source'` is a throwing `derive`, sent only to that store. Mirrored in `snapshot.lastError`, cleared on that store's next tick. |
 
 The lifecycle phase of the launch sources is **not** an event — it is a field on the emission value
@@ -242,8 +242,9 @@ defaults live in [`src/constants.ts`](./src/constants.ts).
 | `bufferSize` | `120` | Per-store rolling tick/log buffer length (a chart mounting mid-session renders a live tail immediately). |
 | `scheduler` | `realScheduler` | Injectable time source for tests. |
 
-Backoff and staleness (heartbeat-wide, not per-call): `BACKOFF_BASE_MS` (500), `BACKOFF_MAX_MS`
-(30000), `STALE_AFTER_CONSECUTIVE_FAILURES` (3). The multicall chunk size is an internal constant.
+Backoff and staleness (heartbeat-wide, not per-call): backoff starts at 1s and doubles to a 30s
+ceiling; feeds mark stale after 3 consecutive failures. The multicall chunk size is an internal
+constant.
 
 ## Supported chains (v1)
 

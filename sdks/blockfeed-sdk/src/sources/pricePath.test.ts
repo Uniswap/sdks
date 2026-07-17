@@ -45,7 +45,7 @@ describe('pricePathSource construction', () => {
       quote: USDC,
       legs: [
         {
-          pool: { protocol: 'v4', poolKey: { currency0: USDC.address, currency1: WETH.address, fee: 500, tickSpacing: 10, hooks: '0x0000000000000000000000000000000000000000' } },
+          pool: { protocol: 'v4', poolKey: { currency0: USDC.address as Address, currency1: WETH.address as Address, fee: 500, tickSpacing: 10, hooks: '0x0000000000000000000000000000000000000000' } },
           base: WETH,
           quote: USDC,
         },
@@ -96,7 +96,7 @@ describe('pricePathSource.calls', () => {
     const legs: PathLeg[] = [
       { pool: { protocol: 'v3', pool: V3_POOL }, base: WETH, quote: DAI },
       {
-        pool: { protocol: 'v4', poolKey: { currency0: '0x0000000000000000000000000000000000000000', currency1: DAI.address, fee: 500, tickSpacing: 10, hooks: '0x0000000000000000000000000000000000000000' } },
+        pool: { protocol: 'v4', poolKey: { currency0: '0x0000000000000000000000000000000000000000', currency1: DAI.address as Address, fee: 500, tickSpacing: 10, hooks: '0x0000000000000000000000000000000000000000' } },
         base: DAI,
         quote: ETH,
       },
@@ -108,7 +108,7 @@ describe('pricePathSource.calls', () => {
     expect(calls.leg0.address).toBe(V3_POOL)
     expect(calls.leg1.functionName).toBe('getSlot0')
     // v4 leg reads StateView with the derived poolId.
-    const poolId = poolIdFromPoolKey({ currency0: '0x0000000000000000000000000000000000000000' as Address, currency1: DAI.address, fee: 500, tickSpacing: 10, hooks: '0x0000000000000000000000000000000000000000' as Address })
+    const poolId = poolIdFromPoolKey({ currency0: '0x0000000000000000000000000000000000000000' as Address, currency1: DAI.address as Address, fee: 500, tickSpacing: 10, hooks: '0x0000000000000000000000000000000000000000' as Address })
     expect(calls.leg1.args[0]).toBe(poolId)
   })
 
@@ -188,7 +188,7 @@ describe('pricePathSource.derive', () => {
     // sqrtP=2^96 with DAI(18)/WETH(18) ⇒ DAI in WETH = 1. Then ETH(≡WETH) in USDC ≈ 2000 ⇒ product ≈ 2000.
     const Q96 = 2n ** 96n
     // v4 pool currency0=USDC, currency1=WETH (address-sorted, non-native); leg prices from native ETH.
-    const v4Key = { currency0: USDC.address, currency1: WETH.address, fee: 500, tickSpacing: 10, hooks: '0x0000000000000000000000000000000000000000' as Address }
+    const v4Key = { currency0: USDC.address as Address, currency1: WETH.address as Address, fee: 500, tickSpacing: 10, hooks: '0x0000000000000000000000000000000000000000' as Address }
     const source = pricePathSource({
       base: DAI,
       quote: USDC,
@@ -205,7 +205,7 @@ describe('pricePathSource.derive', () => {
   })
 
   it('returns undefined for an uninitialized v4 pool (sqrtPriceX96 === 0)', () => {
-    const v4Key = { currency0: USDC.address, currency1: WETH.address, fee: 500, tickSpacing: 10, hooks: '0x0000000000000000000000000000000000000000' as Address }
+    const v4Key = { currency0: USDC.address as Address, currency1: WETH.address as Address, fee: 500, tickSpacing: 10, hooks: '0x0000000000000000000000000000000000000000' as Address }
     const source = pricePathSource({
       base: WETH,
       quote: USDC,
@@ -268,7 +268,7 @@ describe('pricePathKey', () => {
   })
 
   it('encodes the v4 poolId so two paths with the same poolKey collapse', () => {
-    const v4Key = { currency0: USDC.address, currency1: WETH.address, fee: 500, tickSpacing: 10, hooks: '0x0000000000000000000000000000000000000000' as Address }
+    const v4Key = { currency0: USDC.address as Address, currency1: WETH.address as Address, fee: 500, tickSpacing: 10, hooks: '0x0000000000000000000000000000000000000000' as Address }
     const p: PricePath = {
       base: WETH,
       quote: USDC,

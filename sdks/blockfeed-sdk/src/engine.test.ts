@@ -132,7 +132,7 @@ describe('createBlockFeed', () => {
     expect(store.getSnapshot().buffer.length).toBe(1)
   })
 
-  it('(d) a changed value emits exactly one tick event (no separate phase event)', async () => {
+  it('(d) a changed value emits exactly one tick event carrying the whole emission', async () => {
     const { client, state } = createFakeClient({
       block: () => ({ number: BigInt(100 + state.multicallCount), hash: `0x${'ab'.repeat(32)}`, ts: 1700n }),
     })
@@ -148,7 +148,7 @@ describe('createBlockFeed', () => {
     store.subscribe((e) => seen.push(e.type))
     await flush() // tick 1: value 1
     seen = []
-    await advance(1000) // tick 2: value 2 (changed) → exactly one tick event, no phase event
+    await advance(1000) // tick 2: value 2 (changed) → exactly one tick event, nothing else
 
     expect(seen).toEqual(['tick'])
   })
@@ -514,7 +514,8 @@ describe('createBlockFeed', () => {
   })
 
   // -------------------------------------------------------------------------
-  // Always-on catch-up window + unified gap rule (guarantees formerly asserted via pause/resume)
+  // Always-on catch-up window + unified gap rule: the trailing log window self-adjusts after a stall,
+  // recovering recent blocks up to maxCatchupBlocks and publishing a bounded gap beyond it.
   // -------------------------------------------------------------------------
 
   it('(catch-up-i) a quick restart re-delivers no duplicate log and publishes no gap (book floor)', async () => {

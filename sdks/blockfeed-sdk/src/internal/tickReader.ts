@@ -74,7 +74,8 @@ export async function readTick(
     results.push(...chunkResults)
   }
 
-  // Rule 3: an identity-call failure invalidates the whole tick.
+  // The identity reads (block number/hash/timestamp) are mandatory: if any fails there is no trustworthy
+  // tick identity, so the whole tick fails (no partial identity is ever surfaced).
   const [blockNumberR, blockHashR, timestampR] = results
   const identityFailures = IDENTITY_FUNCTIONS.filter((_, idx) => results[idx]?.status === 'failure')
   if (identityFailures.length > 0) {
@@ -94,7 +95,8 @@ export async function readTick(
     timestamp: (timestampR as { status: 'success'; result: unknown }).result as bigint,
   }
 
-  // Rules 4 & 5: map keyed outcomes back by key; a non-speculative failure fails the tick.
+  // Map each keyed source-call outcome back to its key. A call marked allowFailure keeps a `failure`
+  // CallResult (isolated to that source); a non-tolerant call that fails throws and fails the whole tick.
   const keyedResults = results.slice(IDENTITY_FUNCTIONS.length)
   const resultsByKey: Record<string, CallResult> = {}
   const failedKeys: string[] = []

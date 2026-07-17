@@ -15,7 +15,9 @@ export interface LogBook {
 export const emptyLogBook: LogBook = { entries: new Map() }
 
 /**
- * Pure window/gap math for one tick's union `getLogs` (design doc §4.3, unified gap semantics). Given
+ * Pure window/gap math for one tick's union `getLogs`. Any block span that goes un-scanned this tick —
+ * whether from a stall beyond the catch-up ceiling or a plain tick that skipped blocks — is reported as
+ * a single `gap` so no source silently misses logs (unified gap semantics). Given
  * the head block, the last fully-processed block, the book window, and the catch-up ceiling, compute
  * the `[fromBlock, toBlock]` to scan and any gap span that went un-scanned.
  *
