@@ -131,7 +131,10 @@ function main() {
       skippedRepos.push(`${key} (set ${spec.envVar} to refresh its ${artifacts.length} artifact(s))`)
       continue
     }
-    const commit = process.env[`${key.toUpperCase()}_COMMIT`]
+    // Derive the commit var from the same `spec.envVar` as the repo path (strip the `_REPO`
+    // suffix, append `_COMMIT`) so the <REPO>/<REPO>_COMMIT pair can never drift for a future
+    // entry whose manifest key differs from its envVar prefix.
+    const commit = process.env[`${spec.envVar.replace(/_REPO$/, '')}_COMMIT`]
     plan.push({ key, spec, repoPath: resolve(repoPath), commit, artifacts })
   }
 
