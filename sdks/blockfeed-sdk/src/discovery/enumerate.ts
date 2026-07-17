@@ -153,14 +153,14 @@ export async function enumerateCandidates(
 
   // --- Round 1: factory lookups (v2 getPair + v3 getPool per fee tier) in one multicall. ---
   const factoryCalls: RawContract[] = []
-  const factoryMeta: Array<{ kind: 'v2' } | { kind: 'v3' }> = []
+  const factoryMeta: Array<{ kind: 'v2' } | { kind: 'v3'; fee: number }> = []
   if (v2Factory) {
     factoryCalls.push({ address: v2Factory, abi: V2_FACTORY_ABI, functionName: 'getPair', args: [addrA, addrB] })
     factoryMeta.push({ kind: 'v2' })
   }
   for (const fee of V3_FEE_TIERS) {
     factoryCalls.push({ address: v3Factory, abi: V3_FACTORY_ABI, functionName: 'getPool', args: [addrA, addrB, fee] })
-    factoryMeta.push({ kind: 'v3' })
+    factoryMeta.push({ kind: 'v3', fee })
   }
 
   const factoryResults = factoryCalls.length
@@ -172,11 +172,17 @@ export async function enumerateCandidates(
     const addr = res.result as string
     if (!addr || eqAddr(addr, ZERO_ADDRESS)) return
     const poolAddr = getAddress(addr)
-    if (factoryMeta[i]?.kind === 'v2') {
+    const meta = factoryMeta[i]
+    if (meta?.kind === 'v2') {
       candidates.push({ ref: { protocol: 'v2', pair: poolAddr }, currencyA: tokenA, currencyB: tokenB })
       return
     }
-    const candidate: CandidatePool = { ref: { protocol: 'v3', pool: poolAddr }, currencyA: tokenA, currencyB: tokenB }
+    const candidate: CandidatePool = {
+      ref: { protocol: 'v3', pool: poolAddr },
+      currencyA: tokenA,
+      currencyB: tokenB,
+      v3Fee: meta?.kind === 'v3' ? meta.fee : undefined,
+    }
     candidates.push(candidate)
     liquidityCalls.push({ address: poolAddr, abi: V3_POOL_ABI, functionName: 'liquidity', args: [] })
     liquidityTargets.push(candidate)

@@ -15,6 +15,12 @@ export interface CandidatePool {
   currencyA: Currency
   currencyB: Currency
   inRangeLiquidity?: bigint
+  /**
+   * The fee tier this v3 pool was enumerated at (v3 factory lookups are keyed by fee, but a
+   * {@link PoolRef} for v3 carries only the pool address). Present only for `protocol: 'v3'`
+   * candidates; the executable probe needs it to call QuoterV2. Absent for v2/v4.
+   */
+  v3Fee?: number
 }
 
 /** Returned by discovery when no viable price path exists for the requested pair. */

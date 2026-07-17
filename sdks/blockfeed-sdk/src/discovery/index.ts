@@ -1,2 +1,7 @@
+export { discoverPricePath } from './discoverPricePath'
+export type { DiscoverDeps } from './discoverPricePath'
 export { enumerateCandidates } from './enumerate'
+export { probeCandidates } from './probe'
+export type { ProbeResult } from './probe'
+export { pickBest, scoreProbe } from './rank'
 export type { CandidatePool, DiscoveryOptions, NoPathFound } from './types'
