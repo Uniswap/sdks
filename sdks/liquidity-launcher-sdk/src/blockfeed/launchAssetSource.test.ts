@@ -114,6 +114,27 @@ describe('launchAssetSource — call sets', () => {
     expect(Object.keys(calls).sort()).toEqual(['isGraduated', 'slot0'].sort())
     expect(calls.slot0.allowFailure).toBe(true)
   })
+
+  it('ISOLATION INVARIANT: every call in every phase is allowFailure:true (never poisons the shared tick)', () => {
+    const phases: Array<[string, SourceEmission<LaunchAssetState> | undefined]> = [
+      ['first-tick', undefined],
+      ['auction', auctionEmission(500n)],
+      ['failed', failedEmission(1001n)],
+      ['graduated', graduatedEmission(1001n)],
+    ]
+    for (const [label, prev] of phases) {
+      const calls = source.calls({ prev })
+      const keys = Object.keys(calls)
+      expect(keys.length).toBeGreaterThan(0)
+      for (const k of keys) {
+        expect({ phase: label, key: k, allowFailure: calls[k].allowFailure }).toEqual({
+          phase: label,
+          key: k,
+          allowFailure: true,
+        })
+      }
+    }
+  })
 })
 
 describe('launchAssetSource — derive', () => {
@@ -204,6 +225,14 @@ describe('launchAssetSource — derive', () => {
     const tick = auctionTick(500n)
     tick.results.checkpoint = fail()
     expect(source.derive(tick, { prev: undefined })).toBeUndefined()
+  })
+
+  it('a failed tickData read yields no emission (and the call was allowFailure, so the tick never threw)', () => {
+    const tick = auctionTick(500n, { slot0: fail() })
+    tick.results.tickData = fail()
+    expect(source.derive(tick, { prev: undefined })).toBeUndefined()
+    // The engine would never have thrown, because tickData is issued allowFailure:true.
+    expect(source.calls({ prev: undefined }).tickData.allowFailure).toBe(true)
   })
 
   it('suppresses unchanged emissions but not phase/price/pool changes (valueEquals)', () => {

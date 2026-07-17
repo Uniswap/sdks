@@ -2,6 +2,7 @@ import type { Address } from 'viem'
 
 import {
   type AuctionCheckpoint,
+  type ContractCall,
   type InitializedTick,
   clearingPriceCall,
   currencyRaisedCall,
@@ -13,6 +14,17 @@ import {
 import type { TickFillRatio } from '../reads'
 
 import type { CcaAuctionState, Source, SpeculativeCall, TickData } from './types'
+
+/**
+ * Tag a descriptor as failure-tolerant. Every call this source issues is `allowFailure: true` so a
+ * reverting read (a not-yet-started `checkpoint()`, a stale lens address) is isolated to THIS source
+ * and never escalates to the engine — a non-speculative failure throws `TickFailedError` and fails
+ * the whole shared tick for EVERY source on the chain. `derive` already returns `undefined` on any
+ * non-success result, so per-source behavior is unchanged; failures just stop propagating.
+ */
+function tolerant(call: ContractCall): SpeculativeCall {
+  return { ...call, allowFailure: true }
+}
 
 /** Element-wise equality of two fill-ratio arrays (price + ratio). */
 function fillRatiosEqual(a: readonly TickFillRatio[], b: readonly TickFillRatio[]): boolean {
@@ -54,13 +66,14 @@ export function ccaAuctionSource(args: { auction: Address; tickDataLens: Address
 
   return {
     key,
+    // Every call is `allowFailure: true` — see `tolerant` for the isolation rationale.
     calls(): Record<string, SpeculativeCall> {
       return {
-        checkpoint: clearingPriceCall(auction),
-        currencyRaised: currencyRaisedCall(auction),
-        remainingSupply: remainingSupplyCall(auction),
-        isGraduated: isGraduatedCall(auction),
-        tickData: tickDataCall(tickDataLens, auction),
+        checkpoint: tolerant(clearingPriceCall(auction)),
+        currencyRaised: tolerant(currencyRaisedCall(auction)),
+        remainingSupply: tolerant(remainingSupplyCall(auction)),
+        isGraduated: tolerant(isGraduatedCall(auction)),
+        tickData: tolerant(tickDataCall(tickDataLens, auction)),
       }
     },
     derive(tick: TickData) {

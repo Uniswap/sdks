@@ -54,11 +54,12 @@ describe('ccaAuctionSource', () => {
   it('requests the five auction-state reads keyed by name', () => {
     const source = ccaAuctionSource({ auction: AUCTION, tickDataLens: LENS })
     const calls = source.calls({ prev: undefined })
-    expect(calls.checkpoint).toEqual(clearingPriceCall(AUCTION))
-    expect(calls.currencyRaised).toEqual(currencyRaisedCall(AUCTION))
-    expect(calls.remainingSupply).toEqual(remainingSupplyCall(AUCTION))
-    expect(calls.isGraduated).toEqual(isGraduatedCall(AUCTION))
-    expect(calls.tickData).toEqual(tickDataCall(LENS, AUCTION))
+    // Descriptors match reads.ts, wrapped failure-tolerant (isolation — see ccaAuctionSource).
+    expect(calls.checkpoint).toEqual({ ...clearingPriceCall(AUCTION), allowFailure: true })
+    expect(calls.currencyRaised).toEqual({ ...currencyRaisedCall(AUCTION), allowFailure: true })
+    expect(calls.remainingSupply).toEqual({ ...remainingSupplyCall(AUCTION), allowFailure: true })
+    expect(calls.isGraduated).toEqual({ ...isGraduatedCall(AUCTION), allowFailure: true })
+    expect(calls.tickData).toEqual({ ...tickDataCall(LENS, AUCTION), allowFailure: true })
     expect(Object.keys(calls).sort()).toEqual(
       ['checkpoint', 'currencyRaised', 'isGraduated', 'remainingSupply', 'tickData'].sort()
     )
@@ -66,6 +67,13 @@ describe('ccaAuctionSource', () => {
 
   it('has a stable, auction-keyed identity', () => {
     expect(ccaAuctionSource({ auction: AUCTION, tickDataLens: LENS }).key).toBe(`ccaAuction:${AUCTION.toLowerCase()}`)
+  })
+
+  it('ISOLATION INVARIANT: every call is allowFailure:true (a reverting read must not poison the shared tick)', () => {
+    const calls = ccaAuctionSource({ auction: AUCTION, tickDataLens: LENS }).calls({ prev: undefined })
+    for (const k of Object.keys(calls)) {
+      expect({ key: k, allowFailure: calls[k].allowFailure }).toEqual({ key: k, allowFailure: true })
+    }
   })
 
   it('derives the live auction state from the fixture checkpoint + tick data', () => {

@@ -14,11 +14,25 @@ import {
   slot0Call,
   tickDataCall,
 } from '../reads'
+import type { ContractCall } from '../reads'
 
 import type { LaunchAssetSourceArgs, LaunchAssetState, Source, SpeculativeCall, TickData } from './types'
 
 /** 2^288 — numerator for the currency-per-token inversion below. */
 const Q288 = 1n << 288n
+
+/**
+ * Tag a descriptor as failure-tolerant. EVERY call this source issues is `allowFailure: true` so that
+ * a reverting read (a not-yet-started `checkpoint()`, a stale lens address, a pool that does not exist
+ * yet) is isolated to THIS source and never escalates to the engine. In the shared heartbeat a
+ * non-speculative failure throws `TickFailedError` and fails the whole tick for EVERY source on the
+ * chain (backoff + stale) — a source must never have the power to poison unrelated token-page feeds.
+ * `derive` already treats any non-success result as "return undefined / keep prev", so per-source
+ * behavior is unchanged; failures simply stop propagating.
+ */
+function tolerant(call: ContractCall): SpeculativeCall {
+  return { ...call, allowFailure: true }
+}
 
 /**
  * Convert a v4 `getSlot0` sqrtPriceX96 into a Q96 raw-currency-per-raw-token price, matching the
@@ -98,11 +112,12 @@ export function launchAssetSource(args: LaunchAssetSourceArgs): Source<LaunchAss
     poolKey.tickSpacing,
     poolKey.hooks
   )
-  const speculativeSlot0: SpeculativeCall = { ...slot0Call({ stateView, poolId }), allowFailure: true }
+  const speculativeSlot0: SpeculativeCall = tolerant(slot0Call({ stateView, poolId }))
   const key = `launchAsset:${chainId}:${auction.toLowerCase()}`
 
   return {
     key,
+    // Every call is `allowFailure: true` in every phase — see `tolerant` for the isolation rationale.
     calls(ctx): Record<string, SpeculativeCall> {
       const prevPhase = ctx.prev?.value.phase
       if (prevPhase === 'graduated') {
@@ -111,15 +126,15 @@ export function launchAssetSource(args: LaunchAssetSourceArgs): Source<LaunchAss
       }
       if (prevPhase === 'failed') {
         // Keep watching for a late graduation; the full auction read-set is no longer meaningful.
-        return { isGraduated: isGraduatedCall(auction), slot0: speculativeSlot0 }
+        return { isGraduated: tolerant(isGraduatedCall(auction)), slot0: speculativeSlot0 }
       }
       // Auction (or first tick): full read-set + always-on speculative pool read.
       return {
-        checkpoint: clearingPriceCall(auction),
-        currencyRaised: currencyRaisedCall(auction),
-        remainingSupply: remainingSupplyCall(auction),
-        isGraduated: isGraduatedCall(auction),
-        tickData: tickDataCall(tickDataLens, auction),
+        checkpoint: tolerant(clearingPriceCall(auction)),
+        currencyRaised: tolerant(currencyRaisedCall(auction)),
+        remainingSupply: tolerant(remainingSupplyCall(auction)),
+        isGraduated: tolerant(isGraduatedCall(auction)),
+        tickData: tolerant(tickDataCall(tickDataLens, auction)),
         slot0: speculativeSlot0,
       }
     },
@@ -203,6 +218,10 @@ export function launchAssetSource(args: LaunchAssetSourceArgs): Source<LaunchAss
       }
     },
     valueEquals(a, b) {
+      // Intentionally ignores `tickFillRatios`: during the auction the clearing price (`priceX96`)
+      // decays every block, so an emission is virtually never suppressed mid-auction anyway; once the
+      // auction ends the ratios are frozen. Comparing the (potentially large) ratio array every tick
+      // would be pure cost for no practical suppression benefit.
       return (
         a.phase === b.phase &&
         a.priceX96 === b.priceX96 &&
