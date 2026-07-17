@@ -8,8 +8,8 @@
     "strict": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "types": ["bun", "node"],
+    "types": ["node"],
     "noEmit": true
   },
-  "include": ["*.ts"]
+  "include": ["*.ts", "typings/**/*"]
 }
