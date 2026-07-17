@@ -169,7 +169,8 @@ pool. This SDK exports **structural `Source` factories** that stream both over
 semantics they depend on (`deriveAuctionOutcome`, deterministic pool-id derivation, the `TickDataLens`
 registry), but there is **zero runtime coupling**: blockfeed is a `devDependency` only, a source is a
 plain object, and TypeScript's structural typing makes these factories assignable to the engine's
-`Source` with nothing imported at runtime (a types-only drift guard keeps the shapes compatible in CI).
+`Source` with nothing imported at runtime (a types-only drift guard, run in CI via `g:typecheck`, keeps
+the shapes compatible).
 
 - **`launchAssetSource`** — one continuous, phase-tagged lifecycle stream (`auction` →
   `graduated`/`failed`) with **no gap tick at graduation**. From late auction onward it speculatively
@@ -222,7 +223,8 @@ Config-derivation helpers throw [`LauncherSdkError`](./src/errors.ts) with a sta
 | `abis`, `types` | contract ABIs and on-chain struct types |
 | `encode` | `encodeCreateToken`, `encodeDepositToken`, `encodeDistributeToken`, `encodeMulticall`, `encodeConfigData`, `encodeAuctionParams`, `encodeAuctionSteps`, `encodeTokenData`, … |
 | `config/*` | `deriveBlocks`, `floorPriceToX96`, `deriveAuctionPricing`, `feeToTickSpacing`, `buildPositionDefinitions`, `buildLpAllocationSchedule`, `deriveConvexAuctionSteps` |
-| `reads` | descriptor builders + viem helpers (`registeredPoolIdCall`, `slot0Call`, `predictTokenAddress`, `predictAuctionAddress`, allowance reads) |
+| `reads` | descriptor builders + viem helpers (`registeredPoolIdCall`, `slot0Call`, `predictTokenAddress`, `predictAuctionAddress`, allowance reads, `clearingPriceCall`/`getClearingPrice`, `tickDataCall`/`getTickData`, `deriveTickFillRatios`) |
+| `blockfeed` | `launchAssetSource`, `ccaAuctionSource`, `ccaBidsSource` (structural blockfeed `Source` factories) |
 | `availability` | `getFeeTierAvailability` |
 | `build` | `buildLaunchTransactions`, `buildLaunchMulticall` |
 | `lock` | `buildLockRecipient` (timelock / fees-forwarder / buyback-burn liquidity locks) |

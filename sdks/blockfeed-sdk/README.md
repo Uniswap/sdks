@@ -102,11 +102,20 @@ deployed QuoterV2 / V4Quoter, and **selects** by two-way executable quality — 
 in-range liquidity, both of which are cheap to fake.
 
 ```ts
-import { discoverPricePath, type NoPathFound } from '@uniswap/blockfeed-sdk/discovery'
+import { discoverPricePath } from '@uniswap/blockfeed-sdk/discovery'
 
-const result = await discoverPricePath(client, { chainId: 8453, base: weth, quote: usdc })
+// Tuning knobs are passed nested under `options` (all optional).
+const result = await discoverPricePath(client, {
+  chainId: 8453,
+  base: weth,
+  quote: usdc,
+  options: { maxHops: 2, maxProbeCandidatesPerPair: 12 },
+})
 
-if ('kind' in result && result.kind === 'no-path') {
+// `'kind' in result` alone narrows to NoPathFound on the true branch and to PricePath on the false
+// branch. Do NOT write `'kind' in result && result.kind === 'no-path'`: a false compound condition
+// does not narrow the `else` branch to PricePath, so `pricePathSource(result)` would not typecheck.
+if ('kind' in result) {
   // NoPathFound — no pool produced a positive two-way executable score.
   console.warn(result.reason)
 } else {
@@ -115,10 +124,10 @@ if ('kind' in result && result.kind === 'no-path') {
 }
 ```
 
-Options: `intermediaries` (2-hop bridge assets, default the chain's WETH), `maxHops` (default 2),
-`probeNotional` (default `10^quote.decimals * 1000`), `hookAllowlist` (default `[]` — hookless only),
-`maxProbeCandidatesPerPair` (default 12), and `fromBlockOverride` (start block for the v4 `Initialize`
-scan — see the RPC caveat below).
+Knobs under `options`: `intermediaries` (2-hop bridge assets, default the chain's WETH), `maxHops`
+(default 2), `probeNotional` (default `10^quote.decimals * 1000`), `hookAllowlist` (default `[]` —
+hookless only), `maxProbeCandidatesPerPair` (default 12), and `fromBlockOverride` (start block for the
+v4 `Initialize` scan — see the RPC caveat below).
 
 ## CCA / quick-launch (live launch data)
 
@@ -132,13 +141,18 @@ import { launchAssetSource, ccaBidsSource, getTickDataLensForFactory } from '@un
 
 const feed = createBlockFeed({ client, chainId: 8453 })
 
+// getTickDataLensForFactory returns `Address | undefined` (undefined = a factory it doesn't recognize);
+// guard it before use rather than passing the union into the source.
+const tickDataLens = getTickDataLensForFactory(factory)
+if (!tickDataLens) throw new Error('unknown CCA factory — no TickDataLens mapping')
+
 // One continuous, phase-tagged stream across the auction → graduated-pool transition, with NO gap
 // tick at graduation (the deterministic v4 pool is read speculatively every tick until it exists).
 const launch = feed.watch(
   launchAssetSource({
     chainId: 8453,
     auction: auctionAddress,
-    tickDataLens,          // getTickDataLensForFactory(factory)
+    tickDataLens,          // guarded Address (see above)
     poolKey,               // deterministic graduated-pool key from launch params
     stateView,             // v4 StateView address
     endBlock,              // auction end, in the auction's own block domain
@@ -210,20 +224,20 @@ in v1.
 ## Integration tests
 
 A private Anvil-fork suite lives in [`integration/`](./integration) — 11 fork tests including a real
-launch → bids → graduation end-to-end. These are **local developer tools**, not part of CI. They
-require a locally installed [foundry](https://getfoundry.sh) (`anvil`) and skip cleanly when it is
-absent.
+launch → bids → graduation end-to-end. These are **local developer tools, never run in CI**: they are
+**opt-in** and execute only when `BLOCKFEED_FORK=1` is set (CI installs foundry, so an opt-out gate
+would run them on every PR). They also require a locally installed [foundry](https://getfoundry.sh)
+(`anvil`) and skip cleanly when it is absent or when `BLOCKFEED_FORK` is unset.
 
 ```bash
 cd integration
 bun install
-bun test                              # runs against a Base fork of https://mainnet.base.org
-BLOCKFEED_FORK_RPC_BASE=https://… bun test   # override the upstream Base RPC (Alchemy-class recommended)
-BLOCKFEED_SKIP_FORK=1 bun test        # force-skip the fork suites (they also skip if anvil is missing)
+bun test                                        # SKIPS every fork suite (opt-in gate not set)
+BLOCKFEED_FORK=1 bun test                        # run the fork suites against a Base fork of https://mainnet.base.org
+BLOCKFEED_FORK=1 BLOCKFEED_FORK_RPC_BASE=https://… bun test   # override the upstream Base RPC (Alchemy-class recommended)
+BLOCKFEED_SKIP_FORK=1 bun test                   # force-skip even when opted in (back-compat kill switch)
 ```
 
 ## Design
 
 Full design and architecture: [`docs/blockfeed-sdk-design.md`](../../docs/blockfeed-sdk-design.md).
-</content>
-</invoke>

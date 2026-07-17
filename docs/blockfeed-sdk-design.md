@@ -85,8 +85,12 @@ interface Source<T> {
   calls(ctx: TickContext<T>): Record<string, SpeculativeCall>
   /** Optional log filters for this tick. */
   logFilters?(ctx: TickContext<T>): LogFilter[]
-  /** PURE reducer: (previous emission, this tick's keyed results + logs) → next emission. */
-  derive(prev: SourceEmission<T> | undefined, tick: TickData, ctx: TickContext<T>): SourceEmission<T>
+  /** PURE reducer: (this tick's keyed results + logs, with the previous emission on `ctx.prev`) →
+   *  next emission, or `undefined` to emit nothing this tick. `prev` is threaded via `ctx`, not a
+   *  positional argument. */
+  derive(tick: TickData, ctx: TickContext<T>): SourceEmission<T> | undefined
+  /** Emission-suppression comparator; default is strict equality of `value` (`Object.is`). */
+  valueEquals?(a: T, b: T): boolean
 }
 
 type SpeculativeCall = ContractCall & { allowFailure?: boolean }
@@ -122,7 +126,7 @@ interface FeedStore<T> {
 
 ### 4.4 Event model
 
-Every emission is tagged with `(blockNumber, blockHash)` (consumers reconcile against indexer data by block). Five first-class event types:
+Every emission is tagged with `(blockNumber, parentBlockHash, timestamp)` (consumers reconcile against indexer data by block; the parent hash is the reorg discriminator). Six first-class event types:
 
 | Event | Meaning |
 |---|---|
@@ -131,6 +135,7 @@ Every emission is tagged with `(blockNumber, blockHash)` (consumers reconcile ag
 | `retraction` | A previously emitted log vanished in a reorg (§7). Carries the original log identity. |
 | `phase` | Source lifecycle transition (`auction → graduated`, `auction → failed`). Distinct from ticks so charts render markers instead of silently connecting discontinuous lines. |
 | `gap` | The feed knows it missed blocks it cannot cheaply recover (e.g., long tab-throttle, §8) — charts must not draw a false flat line across it. |
+| `stale` | Heartbeat health flipped. Set after `STALE_AFTER_CONSECUTIVE_FAILURES` (3) consecutive RPC failures; cleared on the next success. UIs dim rather than lie. |
 
 ### 4.5 `PricePath` — the pricing contract
 
@@ -138,13 +143,19 @@ Every emission is tagged with `(blockNumber, blockHash)` (consumers reconcile ag
 interface PricePath {
   base: Currency          // the asset being priced
   quote: Currency         // ANY currency — USDC, EURC, WETH, …
-  legs: PoolLeg[]         // ordered; ≤ 2 in practice; each leg oriented base→quote
+  legs: PathLeg[]         // ordered; ≤ 2 in practice; each leg oriented base→quote
 }
 
-type PoolLeg =
+interface PathLeg {
+  pool: PoolRef           // the pool this leg reads
+  base: Currency          // leg input
+  quote: Currency         // leg output (leg[i].quote must equal leg[i+1].base, wrapped-equivalent)
+}
+
+type PoolRef =
   | { protocol: 'v2'; pair: Address }
   | { protocol: 'v3'; pool: Address }
-  | { protocol: 'v4'; poolKey: PoolKey }   // poolId derived
+  | { protocol: 'v4'; poolKey: PoolKeyStruct }   // poolId derived
 ```
 
 The data plane only ever consumes explicit paths. Where they come from:
@@ -161,11 +172,16 @@ There is **no anchor registry**. "Price in USDC" is just discovery/backend produ
 
 ```ts
 discoverPricePath(client, {
+  chainId,
   base, quote,
-  intermediaries?,   // default: [WETH/native] (from sdk-core registries)
-  maxHops?,          // default 2
-  probeNotional?,    // default ≈ 1_000 quote units, sized in quote terms
-  hookPolicy?,       // default: hookless only + explicit whitelist
+  options?: {
+    intermediaries?,             // default: [WETH/native] (from sdk-core registries)
+    maxHops?,                    // default 2
+    probeNotional?,              // default ≈ 1_000 quote units, sized in quote terms
+    hookAllowlist?,              // default [] — hookless only
+    maxProbeCandidatesPerPair?,  // default 12 — caps how many candidates per pair are probe-quoted
+    fromBlockOverride?,          // start block for the v4 Initialize scan (RPC-cost bound)
+  },
 }): Promise<PricePath | NoPathFound>
 ```
 
@@ -181,14 +197,14 @@ discoverPricePath(client, {
 
 **Why not the deployed onchain-router lens** (`routeExactInput` as a single view `eth_call`): its v4 enumeration probes only the default configs `(100, 500, 3000, 10000)` + a permissionless win-scored leaderboard. **The quick-launch graduated pool has fee 2500** — invisible to default enumeration, dependent on leaderboard registration that is untested in anger and score-maintained only by swaps through that router. Adding 2500 to the config list treats the symptom (whack-a-mole per exotic config, redeploy per chain, extra gas on every route call for everyone). The router's bundling of enumeration+evaluation+selection into one contract is correct for *its* problem — atomic on-chain execution — and structurally handicapped for ours. The `Discoverer` interface stays pluggable; the lens (and a future full TS mini-router) can be added as alternative discoverers if a use case demands simulation-grade route selection.
 
-**Policy knobs (defaults to be finalized in review):** probe notional (~1k quote units), round-trip-spread penalty weight, dust-filter liquidity floor, hook whitelist (default empty). These are the places where "automatic pool choice" embeds judgment — they are explicit config, not buried constants.
+**Policy knobs (as shipped, under `options`):** `probeNotional` (~1k quote units), `maxProbeCandidatesPerPair` (default 12 — the shipped probe-count bound; there is no separate spread-penalty-weight or liquidity-floor knob), `hookAllowlist` (default empty — hookless only), `intermediaries`, `maxHops`, and `fromBlockOverride`. These are the places where "automatic pool choice" embeds judgment — they are explicit config, not buried constants.
 
 ## 6. CCA / quick-launch sources (in `liquidity-launcher-sdk`)
 
 A quick-launch asset lives two lives; `launchAssetSource(launch)` makes them one stream.
 
 **During the auction (`phase: 'auction'`):**
-- Clearing price via the auction contract's own **`clearingPrice()`** view (Q96 raw-currency-per-raw-token). *Implementation correction:* this doc originally assumed the clearing price came from `TickDataLens`; on-chain, the lens exposes only the per-tick demand distribution (`getInitializedTickData`), and both data-api and the frontend read the price from the auction directly. The lens tick data is still read per block — it drives the **live bid-distribution chart** (fill ratio per tick), mirrored from data-api's derivation.
+- Clearing price via the auction contract's own **`checkpoint()`** call (Q96 raw-currency-per-raw-token; `clearingPriceCall`/`getClearingPrice`). *Implementation correction:* this doc originally assumed the clearing price came from `TickDataLens`; on-chain, the lens exposes only the per-tick demand distribution (`getTickData`), and both data-api and the frontend read the price from the auction's `checkpoint()` directly. The lens tick data is still read per block — it drives the **live bid-distribution chart** (fill ratio per tick via `deriveTickFillRatios`), mirrored from data-api's derivation.
 - `currencyRaised`, `remainingSupply`, graduation-relevant block getters from `CCA_ABI` — all in the shared per-tick multicall.
 - **Live bids** via log filters on the auction address — single contract, few topics, append-only ticker: the easy case of log watching. Reorged bids surface as `retraction` events (§7) — during a live auction, a bid that "un-happens" moves the clearing price people just watched; the retraction event is the explanation.
 
@@ -235,7 +251,7 @@ Layered so that everything above the network boundary is hermetic, and everythin
 
 ### 9.4 CCA lifecycle end-to-end (Anvil fork — the flagship scenario)
 Fork a chain where `LiquidityLauncher` is deployed. Using the launcher SDK's own helpers (`buildLaunchTransactions`), execute a real launch with a test-sized block duration; then, from impersonated accounts, place bids across several mined blocks; mine through `endBlock`; trigger graduation/migration. Against a single `launchAssetSource` subscription, assert one continuous stream:
-1. auction-phase ticks with a clearing price that moves as bids land (validates `TickDataLens` reads),
+1. auction-phase ticks with a clearing price that moves as bids land,
 2. `log` events for each bid in the same tick as the price they moved,
 3. the `phase: graduated` event **and the first pool-price tick on the same block** (regression test for the speculative-descriptor design, §6),
 4. post-graduation spot ticks from the deterministic v4 pool consistent with the auction's final clearing price.
@@ -247,7 +263,7 @@ Watch WETH/USDC on real Base for ~10 blocks over both HTTP and WS; assert monoto
 
 ## 10. Open items
 
-1. **`TickDataLens` ABI + read helpers** in `liquidity-launcher-sdk` — RESOLVED during implementation: clearing price comes from the auction's `clearingPrice()` view (the lens has no price), lens `getInitializedTickData` feeds the live bid-distribution chart.
+1. **`TickDataLens` ABI + read helpers** in `liquidity-launcher-sdk` — RESOLVED during implementation: clearing price comes from the auction's `checkpoint()` call (the lens has no price), lens `getTickData` feeds the live bid-distribution chart.
 2. **Quick-launch v1 chain list** — no longer architecturally load-bearing (onchain-router dependency dropped) but determines the tested/tuned chain set, quoter address table, and PoolManager deploy-block registry entries.
 3. **Policy defaults** — probe notional, spread penalty, liquidity floor, poll cadences, buffer length N, trailing window K, multicall chunk size. Proposed defaults above; finalize in implementation review.
 4. **Quick-launch fee sign-off** — 0.25% vs 0.3% is still marked PENDING SIGN-OFF in `quickLaunch.ts`; discovery is immune either way (holistic enumeration), but test fixtures should track the decision.
@@ -267,16 +283,19 @@ where a delta was already folded in (noted below); this section is the single pl
 
 1. **Clearing price source (already corrected in §6, §10.1).** The design originally assumed the
    clearing price came from `TickDataLens`. On-chain, the lens exposes only the per-tick demand
-   distribution (`getInitializedTickData`); the live clearing price is read directly from the auction's
+   distribution (`getTickData`); the live clearing price is read directly from the auction's
    `checkpoint()` (`clearingPriceCall`/`getClearingPrice`), matching data-api and the frontend. The lens
    tick data is still read per block — it drives the live bid-distribution (fill-ratio) chart via the
    pure `deriveTickFillRatios` helper. See §6 for the corrected description.
 2. **§9.5 live-RPC smoke suite deferred.** Not implemented in v1; it remains future work (nightly/manual
    env-gated tooling, never CI-blocking), as flagged in the plan self-review. Forks structurally cannot
    catch provider-behavior drift (rate limits, `getLogs` caps, WS quirks), so this stays on the roadmap.
-3. **Fork tests are local-only developer tools (already stated in §9).** The `integration/` suites
-   (§9.2–§9.4) require a locally installed foundry and an RPC URL env var and skip cleanly when either
-   is absent (`BLOCKFEED_SKIP_FORK=1` or no `anvil` on PATH). CI runs only the hermetic unit suite.
+3. **Fork tests are local-only developer tools, opt-IN via `BLOCKFEED_FORK=1`.** The `integration/`
+   suites (§9.2–§9.4) run ONLY when `BLOCKFEED_FORK=1` is set (and foundry is installed); they skip
+   otherwise — when the flag is unset, when `anvil` is absent, or when force-skipped via
+   `BLOCKFEED_SKIP_FORK=1`. Opt-in (not opt-out) is deliberate: CI installs foundry, so an opt-out gate
+   would run the 11 public-RPC fork tests on every PR. CI runs only the hermetic unit suite
+   (`bun test src`).
 4. **Reorg scenario uses snapshot/revert, not `anvil_reorg`.** The reorg-honesty fork test (§9.2) was
    written against `evm_snapshot`/`evm_revert` + re-mine (the fallback §9.2 itself allows), because
    `anvil_reorg` was not reliably available in the pinned foundry; the observable assertion (a
@@ -285,3 +304,15 @@ where a delta was already folded in (noted below); this section is the single pl
    from the PoolManager deploy block is Alchemy-class work; weak public RPCs time out or cap the range.
    `DiscoveryOptions.fromBlockOverride` bounds the scan start, and backend-supplied paths avoid it
    entirely. Documented as a caveat in the package README.
+6. **L1-block-domain reconciliation is not implemented in v1.** `launchAssetSource` compares the tick's
+   block number against the auction's `endBlock` directly. On OP-stack chains (the v1 targets: Base,
+   Unichain) the auction's block domain and the head the engine reads are the same, so this is correct.
+   On chains where the auction denominates blocks in the L1 domain while the engine reads the L2 head
+   (e.g. Arbitrum), the two would need reconciling before the phase derivation is trustworthy — deferred
+   as future work, not a v1 target.
+7. **Known follow-ups deferred out of v1 (adjudicated).** Left unimplemented by design, tracked for a
+   later pass: orphaned log-book entry GC (entries above the window are carried forward but never
+   actively garbage-collected once permanently un-reachable); a WebSocket silence watchdog (detecting a
+   quietly-dead socket that stops delivering `newHeads` without erroring); cross-chunk block-mismatch
+   detection beyond the `batchSize: 0` atomicity guard; listener-set dedupe; and ABI-identity in the
+   cross-source call fingerprint. None affects v1 correctness on the supported chains.
