@@ -42,6 +42,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@uniswap/blockfeed-sdk": "workspace:*",
+        "@uniswap/liquidity-launcher-sdk": "workspace:*",
         "@uniswap/sdk-core": "workspace:*",
         "viem": "^2.23.5",
       },
