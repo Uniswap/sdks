@@ -4,7 +4,7 @@ import type { Address, Hex } from 'viem'
 import { STATE_VIEW_ABI } from '../../abis'
 import { getChainAddresses } from '../../addresses'
 import { poolIdFromPoolKey } from '../../math/poolId'
-import type { Source, SpeculativeCall, TickData } from '../../types'
+import type { ContractCall, Source, TickData } from '../../types'
 
 import { auctionCallSet, readAuctionResults, tolerant } from './auctionReads'
 import type { LaunchAssetSourceArgs, LaunchAssetState } from './types'
@@ -16,7 +16,7 @@ const Q288 = 1n << 288n
  * Blockfeed's own v4 StateView `getSlot0(poolId)` descriptor (it owns the v4 reads), always
  * failure-tolerant — see `tolerant` in auctionReads for the isolation rationale.
  */
-function slot0Descriptor(stateView: Address, poolId: Hex): SpeculativeCall {
+function slot0Descriptor(stateView: Address, poolId: Hex): ContractCall {
   return { address: stateView, abi: STATE_VIEW_ABI, functionName: 'getSlot0', args: [poolId], allowFailure: true }
 }
 
@@ -63,7 +63,6 @@ function graduatedEmission(
       currencyRaised: carried.currencyRaised,
       remainingSupply: carried.remainingSupply,
     },
-    phase: 'graduated',
     identity: tick.identity,
   }
 }
@@ -71,7 +70,7 @@ function graduatedEmission(
 /**
  * The composite launch-lifecycle {@link Source}: one continuous, phase-tagged stream across a
  * quick-launch asset's two lives — the live auction and the graduated v4 pool — with no gap tick at
- * graduation. A pure reducer; all phase/cross-tick memory flows through `ctx.prev`.
+ * graduation. A pure reducer; all phase/cross-tick memory flows through `prev`.
  *
  * **Call set varies by phase** (looked up keyed, never positionally):
  * - *auction* (or `prev` undefined): `checkpoint`, `currencyRaised`, `remainingSupply`, `isGraduated`,
@@ -100,14 +99,14 @@ export function launchAssetSource(args: LaunchAssetSourceArgs): Source<LaunchAss
   // Deterministic graduated-pool id. The poolKey currencies are already address-sorted, so this
   // matches the canonical on-chain PoolKey.toId().
   const poolId: Hex = poolIdFromPoolKey(poolKey)
-  const speculativeSlot0: SpeculativeCall = slot0Descriptor(stateView, poolId)
+  const speculativeSlot0: ContractCall = slot0Descriptor(stateView, poolId)
   const key = `launchAsset:${chainId}:${auction.toLowerCase()}`
 
   return {
     key,
     // Every call is `allowFailure: true` in every phase — see `tolerant` for the isolation rationale.
-    calls(ctx): Record<string, SpeculativeCall> {
-      const prevPhase = ctx.prev?.value.phase
+    calls(prev): Record<string, ContractCall> {
+      const prevPhase = prev?.value.phase
       if (prevPhase === 'graduated') {
         // Steady-state graduated: only the pool price matters now.
         return { slot0: speculativeSlot0 }
@@ -119,8 +118,7 @@ export function launchAssetSource(args: LaunchAssetSourceArgs): Source<LaunchAss
       // Auction (or first tick): full read-set + always-on speculative pool read.
       return auctionCallSet(auction, tickDataLens, speculativeSlot0)
     },
-    derive(tick: TickData, ctx) {
-      const prev = ctx.prev
+    derive(tick: TickData, prev) {
       const poolSqrtPriceX96 = readPoolSqrtPrice(tick)
 
       // --- Steady-state graduated: pool price only, auction totals carried forward. ---
@@ -145,7 +143,6 @@ export function launchAssetSource(args: LaunchAssetSourceArgs): Source<LaunchAss
             remainingSupply: prev.value.remainingSupply,
             tickFillRatios: prev.value.tickFillRatios,
           },
-          phase: 'failed',
           identity: tick.identity,
         }
       }
@@ -181,7 +178,6 @@ export function launchAssetSource(args: LaunchAssetSourceArgs): Source<LaunchAss
           remainingSupply: remaining,
           tickFillRatios: fillRatios,
         },
-        phase,
         identity: tick.identity,
       }
     },

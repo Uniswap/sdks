@@ -17,9 +17,9 @@ export interface InternalStore<T> extends FeedStore<T> {
  * Create a feed store shaped for React's `useSyncExternalStore`.
  *
  * `getSnapshot()` returns a referentially-stable object: the same reference is returned until a
- * `publish` actually mutates state (`tick`/`phase`/`stale`), at which point exactly one new snapshot
- * is built. A `publish([])` — or a publish carrying only fan-out-only events (`log`/`retraction`/`gap`)
- * — never mints a new snapshot. `tick` events append to a rolling buffer capped at `bufferSize`
+ * `publish` actually mutates state (`tick`/`stale`), at which point exactly one new snapshot is built.
+ * A `publish([])` — or a publish carrying only fan-out-only events (`log`/`retraction`/`gap`) — never
+ * mints a new snapshot. `tick` events append to a rolling buffer capped at `bufferSize`
  * (oldest dropped first); each changed snapshot carries a fresh buffer array so consumers can treat it
  * as immutable.
  *
@@ -35,7 +35,6 @@ export function createInternalStore<T>(opts: { bufferSize: number }): InternalSt
   // Mutable working state; the snapshot is a frozen view rebuilt only when this changes.
   let current: SourceEmission<T> | undefined
   const buffer: SourceEmission<T>[] = []
-  let phase: string | undefined
   let stale = false
   let lastTick: TickIdentity | undefined
 
@@ -43,7 +42,7 @@ export function createInternalStore<T>(opts: { bufferSize: number }): InternalSt
   const subscriberChangeCbs = new Set<(count: number) => void>()
 
   function buildSnapshot(): FeedSnapshot<T> {
-    return { current, buffer: buffer.slice(), phase, stale, lastTick }
+    return { current, buffer: buffer.slice(), stale, lastTick }
   }
 
   // Referentially-stable cache; only reassigned by a publish that changes state.
@@ -61,9 +60,6 @@ export function createInternalStore<T>(opts: { bufferSize: number }): InternalSt
         buffer.push(event.emission)
         if (buffer.length > bufferSize) buffer.splice(0, buffer.length - bufferSize)
         lastTick = event.emission.identity
-        return true
-      case 'phase':
-        phase = event.to
         return true
       case 'stale':
         stale = event.stale

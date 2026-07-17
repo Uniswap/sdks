@@ -90,22 +90,22 @@ describe('launchAssetSource — call sets', () => {
       allowFailure: true,
     }
     // First tick (prev undefined) → full auction read-set + speculative slot0.
-    const first = source.calls({ prev: undefined })
+    const first = source.calls(undefined)
     expect(first.slot0).toEqual(expectedSlot0)
     expect(Object.keys(first).sort()).toEqual(
       ['checkpoint', 'currencyRaised', 'isGraduated', 'remainingSupply', 'slot0', 'tickData'].sort()
     )
     // Mid-auction → still the full set + speculative slot0.
-    expect(source.calls({ prev: auctionEmission(500n) }).slot0).toEqual(expectedSlot0)
+    expect(source.calls(auctionEmission(500n)).slot0).toEqual(expectedSlot0)
   })
 
   it('shrinks to StateView getSlot0 only after graduation', () => {
-    const calls = source.calls({ prev: graduatedEmission(1001n) })
+    const calls = source.calls(graduatedEmission(1001n))
     expect(Object.keys(calls)).toEqual(['slot0'])
   })
 
   it('failed regime keeps watching isGraduated + speculative slot0 for a late migrate()', () => {
-    const calls = source.calls({ prev: failedEmission(1001n) })
+    const calls = source.calls(failedEmission(1001n))
     expect(Object.keys(calls).sort()).toEqual(['isGraduated', 'slot0'].sort())
     expect(calls.slot0.allowFailure).toBe(true)
   })
@@ -118,7 +118,7 @@ describe('launchAssetSource — call sets', () => {
       ['graduated', graduatedEmission(1001n)],
     ]
     for (const [label, prev] of phases) {
-      const calls = source.calls({ prev })
+      const calls = source.calls(prev)
       const keys = Object.keys(calls)
       expect(keys.length).toBeGreaterThan(0)
       for (const k of keys) {
@@ -136,8 +136,8 @@ describe('launchAssetSource — derive', () => {
   const source = launchAssetSource(ARGS)
 
   it('auction phase: emits clearing price + fill ratios, no pool price (slot0 fails harmlessly)', () => {
-    const emission = source.derive(auctionTick(500n), { prev: undefined })
-    expect(emission?.phase).toBe('auction')
+    const emission = source.derive(auctionTick(500n), undefined)
+    expect(emission?.value.phase).toBe('auction')
     expect(emission?.value).toEqual({
       phase: 'auction',
       priceX96: 2n * Q96,
@@ -151,8 +151,8 @@ describe('launchAssetSource — derive', () => {
   it('NO-GAP: the graduation tick carries phase=graduated AND poolSqrtPriceX96 in the SAME emission', () => {
     // endBlock passed, isGraduated flips true, and the speculative slot0 now succeeds in the same batch.
     const tick = auctionTick(1001n, { isGraduated: true, slot0: v4Slot0(Q96) })
-    const emission = source.derive(tick, { prev: auctionEmission(1000n) })
-    expect(emission?.phase).toBe('graduated')
+    const emission = source.derive(tick, auctionEmission(1000n))
+    expect(emission?.value.phase).toBe('graduated')
     expect(emission?.value.phase).toBe('graduated')
     expect(emission?.value.poolSqrtPriceX96).toBe(Q96)
     expect(emission?.value.priceX96).toBe(Q96) // 2^288 / (2^96)^2 == 2^96 (currency-per-token, currency0-native)
@@ -163,8 +163,8 @@ describe('launchAssetSource — derive', () => {
   })
 
   it('failed outcome: endBlock passed, not graduated → phase=failed with the final clearing price', () => {
-    const emission = source.derive(auctionTick(1001n, { isGraduated: false }), { prev: undefined })
-    expect(emission?.phase).toBe('failed')
+    const emission = source.derive(auctionTick(1001n, { isGraduated: false }), undefined)
+    expect(emission?.value.phase).toBe('failed')
     expect(emission?.value.phase).toBe('failed')
     expect(emission?.value.priceX96).toBe(2n * Q96)
     expect(emission?.value.poolSqrtPriceX96).toBeUndefined()
@@ -177,8 +177,8 @@ describe('launchAssetSource — derive', () => {
       logs: [],
       retractions: [],
     }
-    const emission = source.derive(tick, { prev: graduatedEmission(1001n) })
-    expect(emission?.phase).toBe('graduated')
+    const emission = source.derive(tick, graduatedEmission(1001n))
+    expect(emission?.value.phase).toBe('graduated')
     expect(emission?.value.poolSqrtPriceX96).toBe(2n * Q96)
     // 2^288 / (2*2^96)^2 = 2^288 / (4*2^192) = 2^96/4
     expect(emission?.value.priceX96).toBe(Q96 / 4n)
@@ -188,7 +188,7 @@ describe('launchAssetSource — derive', () => {
 
   it('post-graduation: a transient slot0 read miss emits nothing (keeps prev)', () => {
     const tick: TickData = { identity: identity(1051n), results: { slot0: fail() }, logs: [], retractions: [] }
-    expect(source.derive(tick, { prev: graduatedEmission(1001n) })).toBeUndefined()
+    expect(source.derive(tick, graduatedEmission(1001n))).toBeUndefined()
   })
 
   it('late graduation: a migrate() landing after a failed phase transitions to graduated', () => {
@@ -198,8 +198,8 @@ describe('launchAssetSource — derive', () => {
       logs: [],
       retractions: [],
     }
-    const emission = source.derive(tick, { prev: failedEmission(1050n) })
-    expect(emission?.phase).toBe('graduated')
+    const emission = source.derive(tick, failedEmission(1050n))
+    expect(emission?.value.phase).toBe('graduated')
     expect(emission?.value.poolSqrtPriceX96).toBe(Q96)
     expect(emission?.value.currencyRaised).toBe(5_000n)
   })
@@ -211,23 +211,23 @@ describe('launchAssetSource — derive', () => {
       logs: [],
       retractions: [],
     }
-    const emission = source.derive(tick, { prev: failedEmission(1050n) })
-    expect(emission?.phase).toBe('failed')
+    const emission = source.derive(tick, failedEmission(1050n))
+    expect(emission?.value.phase).toBe('failed')
     expect(emission?.value.priceX96).toBe(2n * Q96)
   })
 
   it('emits no tick during auction when a required read failed', () => {
     const tick = auctionTick(500n)
     tick.results.checkpoint = fail()
-    expect(source.derive(tick, { prev: undefined })).toBeUndefined()
+    expect(source.derive(tick, undefined)).toBeUndefined()
   })
 
   it('a failed tickData read yields no emission (and the call was allowFailure, so the tick never threw)', () => {
     const tick = auctionTick(500n, { slot0: fail() })
     tick.results.tickData = fail()
-    expect(source.derive(tick, { prev: undefined })).toBeUndefined()
+    expect(source.derive(tick, undefined)).toBeUndefined()
     // The engine would never have thrown, because tickData is issued allowFailure:true.
-    expect(source.calls({ prev: undefined }).tickData.allowFailure).toBe(true)
+    expect(source.calls(undefined).tickData.allowFailure).toBe(true)
   })
 
   it('suppresses unchanged emissions but not phase/price/pool changes (valueEquals)', () => {

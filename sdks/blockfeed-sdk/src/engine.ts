@@ -5,7 +5,7 @@ import {
   BACKOFF_BASE_MS,
   BACKOFF_MAX_MS,
   DEFAULT_BUFFER_SIZE,
-  DEFAULT_MAX_CALLS_PER_CHUNK,
+  DEFAULT_MAX_CATCHUP_BLOCKS,
   DEFAULT_POLL_INTERVAL_MS,
   DEFAULT_TRAILING_LOG_WINDOW,
   FALLBACK_POLL_INTERVAL_MS,
@@ -25,7 +25,6 @@ import type {
   CallResult,
   DecodedFeedLog,
   FeedEvent,
-  FeedLogRef,
   FeedStore,
   LogFilter,
   Source,
@@ -36,33 +35,44 @@ import type {
 
 export interface BlockFeedOptions {
   client: BlockfeedClient
-  /** Explicit; the engine never fetches it, so construction stays synchronous. */
-  chainId: number
+  /**
+   * Chain id. Optional: defaults to `client.chain?.id` (a real viem client always carries it).
+   * Throws synchronously at construction if neither is present. The engine never fetches it, so
+   * construction stays synchronous.
+   */
+  chainId?: number
   /** HTTP poll cadence. Default `DEFAULT_POLL_INTERVAL_MS[chainId] ?? FALLBACK_POLL_INTERVAL_MS`. */
   pollIntervalMs?: number
   /** Trailing log window K (blocks re-scanned each tick). Default `DEFAULT_TRAILING_LOG_WINDOW`. */
   trailingLogWindow?: number
+  /**
+   * Upper bound on the trailing window's always-on catch-up growth after a stall. Default
+   * `DEFAULT_MAX_CATCHUP_BLOCKS`. A long stall recovers at most this many recent blocks of logs; the
+   * un-scanned remainder surfaces as a `gap`.
+   */
+  maxCatchupBlocks?: number
   /** Per-store rolling buffer length. Default `DEFAULT_BUFFER_SIZE`. */
   bufferSize?: number
-  /** Max calls per multicall chunk. Default `DEFAULT_MAX_CALLS_PER_CHUNK`. */
-  maxCallsPerChunk?: number
   /** Injectable time source (tests). Default `realScheduler`. */
   scheduler?: Scheduler
 }
 
 export interface BlockFeed {
   watch<T>(source: Source<T>): FeedStore<T>
-  pause(): void
-  resume(opts?: { logWindowOverride?: number }): void
+  /**
+   * Remove a watched entry by key: its store stops updating and no further events are published to
+   * its subscribers. Intended for keys you own (unwatching a key another consumer subscribed to
+   * silently stops their store too). A no-op for an unknown key.
+   */
+  unwatch(key: string): void
   stop(): void
-  readonly running: boolean
 }
 
 /** Per-source engine state. `T` is erased to `unknown` inside the engine; sources are opaque here. */
 interface EngineEntry {
   source: Source<unknown>
   store: InternalStore<unknown>
-  /** Threaded `ctx.prev`, updated after each non-suppressed derive. */
+  /** Threaded `prev`, updated after each non-suppressed derive. */
   prev: SourceEmission<unknown> | undefined
   logBook: LogBook
 }
@@ -70,12 +80,7 @@ interface EngineEntry {
 /** Per-source log reconciliation output for one tick (what `fetchAndReconcileLogs` hands to derive). */
 interface EntryLogs {
   newLogs: DecodedFeedLog[]
-  retractions: FeedLogRef[]
-}
-
-interface TickOptions {
-  isResume?: boolean
-  logWindowOverride?: number
+  retractions: DecodedFeedLog[]
 }
 
 /**
@@ -85,11 +90,17 @@ interface TickOptions {
  * failure. See the package design doc §4.1–§4.4, §7–§8 for the intent behind each rule.
  */
 export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
-  const { client, chainId } = opts
+  const { client } = opts
+  const resolvedChainId = opts.chainId ?? client.chain?.id
+  if (resolvedChainId === undefined) {
+    throw new BlockfeedError('BlockFeedOptions.chainId is required when the client carries no chain.id')
+  }
+  // Declared `number` (not the narrowed union) so nested closures see the resolved id.
+  const chainId: number = resolvedChainId
   const pollIntervalMs = opts.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS[chainId] ?? FALLBACK_POLL_INTERVAL_MS
   const trailingLogWindow = opts.trailingLogWindow ?? DEFAULT_TRAILING_LOG_WINDOW
+  const maxCatchupBlocks = opts.maxCatchupBlocks ?? DEFAULT_MAX_CATCHUP_BLOCKS
   const bufferSize = opts.bufferSize ?? DEFAULT_BUFFER_SIZE
-  const maxCallsPerChunk = opts.maxCallsPerChunk ?? DEFAULT_MAX_CALLS_PER_CHUNK
   const scheduler = opts.scheduler ?? realScheduler
   // v1 rule: only a direct WebSocket transport uses the push trigger. `transport` is declared on
   // BlockfeedClient, so no cast is needed; a non-viem structural client omits it (HTTP semantics).
@@ -101,15 +112,11 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
 
   let running = false
   let stopped = false
-  let paused = false
 
   // Overlap guard: at most one tick in flight. A trigger that arrives mid-tick sets `pendingTrigger`
   // so exactly one more tick runs immediately after the current one settles.
   let ticking = false
   let pendingTrigger = false
-  // A6: the options of the coalesced follow-up tick. A resume trigger must not be lost behind a plain
-  // poll/WS trigger, so resume options win over (and are never overwritten by) a plain trigger.
-  let pendingOptions: TickOptions | undefined
 
   let timerHandle: unknown
   let wsUnwatch: (() => void) | undefined
@@ -121,7 +128,7 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
   let staleActive = false
 
   function canSchedule(): boolean {
-    return running && !paused && !stopped
+    return running && !stopped
   }
 
   function clearTimer(): void {
@@ -176,20 +183,19 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
    * (the engine threads them into `deriveAndPublish`); the source books are the only state mutated here.
    *
    * The unified gap rule publishes a `gap` to every source with filters whenever a span went un-scanned
-   * — independent of whether an override was passed (a resume-without-override after a long pause, or a
-   * plain tick that skipped blocks, both surface it). See {@link planLogWindow} for the window math.
+   * (a stall longer than the catch-up ceiling, or a plain tick that skipped blocks). See
+   * {@link planLogWindow} for the always-on window math.
    */
   async function fetchAndReconcileLogs(
     active: EngineEntry[],
-    identity: Omit<TickIdentity, 'chainId'>,
-    overrideK: number | undefined
+    identity: Omit<TickIdentity, 'chainId'>
   ): Promise<Map<EngineEntry, EntryLogs>> {
     const logsByEntry = new Map<EngineEntry, EntryLogs>()
     const filtersByEntry = new Map<EngineEntry, LogFilter[]>()
     const addresses = new Map<string, Address>()
     const events = new Map<string, AbiEvent>()
     for (const entry of active) {
-      const filters = entry.source.logFilters ? entry.source.logFilters({ prev: entry.prev }) : []
+      const filters = entry.source.logFilters ? entry.source.logFilters(entry.prev) : []
       filtersByEntry.set(entry, filters)
       for (const filter of filters) {
         addresses.set(filter.address.toLowerCase(), filter.address)
@@ -202,7 +208,7 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
       head: identity.blockNumber,
       lastProcessedBlock,
       bookWindow: trailingLogWindow,
-      tickWindow: overrideK ?? trailingLogWindow,
+      maxCatchupBlocks,
     })
 
     // Gap fan-out: publish the un-scanned span to every source that has filters.
@@ -242,55 +248,51 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
     entryLogs: EntryLogs
   ): void {
     const { newLogs, retractions } = entryLogs
-    const tick: TickData = { identity, results, logs: newLogs, retractions }
 
     // Log/retraction events are NEVER suppressed: `reconcileLogs` already recorded these logs in the
     // source's book, so if we don't emit them now they are lost forever. Build them up front, before
     // derive runs, so they survive an `undefined` emission or a throw. Order: logs → retractions.
     const logEvents: FeedEvent<unknown>[] = []
     for (const log of newLogs) logEvents.push({ type: 'log', log })
-    for (const ref of retractions) logEvents.push({ type: 'retraction', ref })
+    for (const log of retractions) logEvents.push({ type: 'retraction', log })
+
+    const tick: TickData = { identity, results, logs: newLogs, retractions }
 
     let emission: SourceEmission<unknown> | undefined
     let derived = false
     try {
-      emission = entry.source.derive(tick, { prev: entry.prev })
+      emission = entry.source.derive(tick, entry.prev)
       derived = true
     } catch (err) {
-      // Source-level isolation: keep prev, don't publish phase/tick, rethrow async to the host.
+      // Source-level isolation: keep prev, don't publish a tick, rethrow async to the host.
       // Still fall through so the tick's logs/retractions are published (never suppressed).
       queueMicrotask(() => {
         throw err
       })
     }
 
-    // Derive threw, or returned `undefined` (nothing to say): no phase/tick event and prev does not
-    // advance, but the tick's logs/retractions still ship.
+    // Derive threw, or returned `undefined` (nothing to say): no tick event and prev does not advance,
+    // but the tick's logs/retractions still ship.
     if (!derived || emission === undefined) {
       if (logEvents.length > 0) entry.store.publish(logEvents)
       return
     }
 
     const prev = entry.prev
-    const events: FeedEvent<unknown>[] = []
-
-    // Order within a source's batch: phase → logs → retractions → tick.
-    if (emission.phase !== undefined && emission.phase !== prev?.phase) {
-      events.push({ type: 'phase', from: prev?.phase, to: emission.phase, identity })
-    }
-    events.push(...logEvents)
+    const events: FeedEvent<unknown>[] = [...logEvents]
 
     const valueEquals = entry.source.valueEquals ?? Object.is
     const valueChanged = prev === undefined || !valueEquals(prev.value, emission.value)
-    // Suppression: unchanged value + unchanged phase → no tick event (and none enters the buffer),
-    // but prev still advances and log/retraction events are never suppressed.
+    // Suppression: unchanged value → no tick event (and none enters the buffer), but prev still
+    // advances and log/retraction events are never suppressed. Order within a source's batch:
+    // logs → retractions → tick.
     if (valueChanged) events.push({ type: 'tick', emission })
 
     entry.prev = emission
     if (events.length > 0) entry.store.publish(events)
   }
 
-  async function doTick(options: TickOptions | undefined): Promise<void> {
+  async function doTick(): Promise<void> {
     clearTimer()
     // Only sources with a live subscriber participate this tick. A zero-subscriber (orphan) entry
     // registered via `watch()` would otherwise inflate every multicall forever. Skipped entries keep
@@ -299,27 +301,26 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
 
     // (a) Gather each source's calls; dedupe identical cross-source calls into shared slots.
     const batch = planCallBatch(
-      active.map((entry) => ({ requester: entry, sourceKey: entry.source.key, calls: entry.source.calls({ prev: entry.prev }) }))
+      active.map((entry) => ({ requester: entry, sourceKey: entry.source.key, calls: entry.source.calls(entry.prev) }))
     )
 
     // (b) Atomic read.
     let result
     try {
-      result = await readTick(client, batch.keyed, { maxCallsPerChunk })
+      result = await readTick(client, batch.keyed)
     } catch {
       handleTickFailure()
       return
     }
 
     const identity = result.identity
-    const isResume = options?.isResume === true
-    // (c) Same identity ⇒ nothing moved: skip logs + derive. Never skip on resume or after a failure
+    // (c) Same identity ⇒ nothing moved: skip logs + derive. Never skip after a failure
     // (`consecutiveFailures > 0` iff the previous tick failed — cleared only by a full success).
     const identityUnchanged =
       prevIdentity !== undefined &&
       prevIdentity.blockNumber === identity.blockNumber &&
       prevIdentity.parentBlockHash === identity.parentBlockHash
-    const skip = identityUnchanged && !isResume && consecutiveFailures === 0
+    const skip = identityUnchanged && consecutiveFailures === 0
 
     if (skip) {
       // A successful read with an unchanged identity still clears failure/backoff/stale state.
@@ -335,7 +336,7 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
     // (d) One union getLogs → per-source reconciliation (also publishes any `gap` for the un-scanned span).
     let logsByEntry: Map<EngineEntry, EntryLogs>
     try {
-      logsByEntry = await fetchAndReconcileLogs(active, identity, isResume ? options?.logWindowOverride : undefined)
+      logsByEntry = await fetchAndReconcileLogs(active, identity)
     } catch {
       handleTickFailure()
       return
@@ -357,25 +358,20 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
     scheduleNextSuccess()
   }
 
-  async function runTick(options?: TickOptions): Promise<void> {
-    if (stopped || !running || paused) return
+  async function runTick(): Promise<void> {
+    if (stopped || !running) return
     if (ticking) {
       pendingTrigger = true
-      // Resume options win; once a resume is pending a plain trigger must not clobber it.
-      if (options?.isResume) pendingOptions = options
-      else if (pendingOptions?.isResume !== true) pendingOptions = options
       return
     }
     ticking = true
     try {
-      await doTick(options)
+      await doTick()
     } finally {
       ticking = false
-      if (pendingTrigger && running && !paused && !stopped) {
+      if (pendingTrigger && running && !stopped) {
         pendingTrigger = false
-        const next = pendingOptions
-        pendingOptions = undefined
-        void runTick(next)
+        void runTick()
       }
     }
   }
@@ -383,8 +379,6 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
   function startHeartbeat(): void {
     if (running || stopped) return
     running = true
-    // A4: do NOT reset `paused`. A feed paused before its first subscriber (mount-while-hidden) must
-    // stay paused when the heartbeat starts; the deferred first tick below is guarded on `!paused`.
     consecutiveFailures = 0
     prevIdentity = undefined // Force the first tick to derive (don't skip against stale identity).
     if (isWs) {
@@ -397,10 +391,10 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
     }
     // Defer the first tick to a microtask so every source subscribed in the same synchronous frame
     // (the page-mount pattern) is registered before `doTick` snapshots the active set — they all
-    // share tick 1. No-op if the heartbeat was stopped/paused in the interim (e.g. a synchronous
+    // share tick 1. No-op if the heartbeat was stopped in the interim (e.g. a synchronous
     // unsubscribe). Not the Scheduler: this is microtask ordering, not a timing policy.
     queueMicrotask(() => {
-      if (running && !paused && !stopped) void runTick()
+      if (running && !stopped) void runTick()
     })
   }
 
@@ -411,6 +405,8 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
   }
 
   function handleSubscriberChange(key: string, count: number): void {
+    // Ignore callbacks from a store whose entry was unwatched (its count no longer refcounts).
+    if (!entries.has(key)) return
     const prev = subscriberCounts.get(key) ?? 0
     totalSubscribers += count - prev
     subscriberCounts.set(key, count)
@@ -440,27 +436,21 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
       store.onSubscriberChange((count) => handleSubscriberChange(source.key, count))
       return store
     },
-    pause(): void {
-      if (stopped) return
-      paused = true
-      clearTimer()
-    },
-    resume(resumeOpts?: { logWindowOverride?: number }): void {
-      if (stopped) return
-      // A4: clear `paused` even when not running so a later subscribe starts live (never stuck paused).
-      paused = false
-      if (!running) return
-      void runTick({ isResume: true, logWindowOverride: resumeOpts?.logWindowOverride })
+    unwatch(key: string): void {
+      const entry = entries.get(key)
+      if (!entry) return
+      entries.delete(key)
+      // Drop its subscriber count from the heartbeat refcount; stop the loop if it was the last.
+      const count = subscriberCounts.get(key) ?? 0
+      subscriberCounts.delete(key)
+      totalSubscribers -= count
+      if (!stopped && totalSubscribers <= 0 && running) stopHeartbeat()
     },
     stop(): void {
       stopped = true
       running = false
-      paused = false
       clearTimer()
       clearWs()
-    },
-    get running(): boolean {
-      return running
     },
   }
 }

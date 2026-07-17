@@ -1,5 +1,3 @@
 export { discoverPricePath } from './discoverPricePath'
-export { enumerateCandidates } from './enumerate'
-export { probeCandidates } from './probe'
-export type { ProbeResult } from './probe'
-export type { CandidatePool, DiscoveryOptions, NoPathFound } from './types'
+export { isNoPathFound } from './types'
+export type { DiscoveryOptions, NoPathFound } from './types'

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 
 import { MULTICALL3_ADDRESS } from '../constants'
 import { TickFailedError } from '../errors'
-import type { SpeculativeCall } from '../types'
+import type { ContractCall } from '../types'
 
 import { ok, fail } from './testing'
 import { MULTICALL3_HELPER_ABI, readTick } from './tickReader'
@@ -31,7 +31,7 @@ function fakeClient(handler: (contracts: RawContract[]) => RawResult[]) {
 // Canned identity triple returned in call order: getBlockNumber, getLastBlockHash, getCurrentBlockTimestamp.
 const IDENTITY_OK: RawResult[] = [ok(100n), ok('0xabc123'), ok(1700000000n)]
 
-const speculativeCall = (fn: string, allowFailure?: boolean): SpeculativeCall => ({
+const speculativeCall = (fn: string, allowFailure?: boolean): ContractCall => ({
   address: '0x000000000004444c5dc75cB358380D2e3dE08A90',
   abi: [],
   functionName: fn,
@@ -105,7 +105,7 @@ describe('readTick', () => {
 
   it('(e) chunks at maxCallsPerChunk=5 with 7 keyed calls into two invocations, identity only in the first', async () => {
     const { client, calls } = fakeClient((contracts) => contracts.map((c) => ok(c.functionName)))
-    const keyed: Record<string, SpeculativeCall> = {}
+    const keyed: Record<string, ContractCall> = {}
     for (let i = 0; i < 7; i++) keyed[`k${i}`] = speculativeCall(`fn${i}`, true)
 
     await readTick(client, keyed, { maxCallsPerChunk: 5 })
@@ -147,7 +147,7 @@ describe('readTick', () => {
       },
     } as never
 
-    const keyed: Record<string, SpeculativeCall> = {}
+    const keyed: Record<string, ContractCall> = {}
     for (let i = 0; i < 7; i++) keyed[`k${i}`] = speculativeCall(`fn${i}`, true)
     await readTick(client, keyed, { maxCallsPerChunk: 5 })
 

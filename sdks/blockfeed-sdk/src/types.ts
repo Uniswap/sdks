@@ -13,18 +13,20 @@ import type { Abi, AbiEvent, Address, Hex, PublicClient } from 'viem'
  */
 export type BlockfeedClient = Pick<PublicClient, 'multicall' | 'getLogs' | 'watchBlockNumber' | 'getBlockNumber'> & {
   transport?: { type?: string }
+  /** viem clients carry `chain.id`; used as the default `chainId` when constructing a feed. */
+  chain?: { id?: number }
 }
 
-/** A single read against a contract, shaped for viem `multicall` / `readContract`. */
+/**
+ * A single read against a contract, shaped for viem `multicall` / `readContract`. `allowFailure` maps
+ * to aggregate3 per-call tolerance: absent/false → a failing call fails the whole tick; `true` →
+ * the failure is isolated to this call's result (the source sees a `failure` `CallResult`).
+ */
 export interface ContractCall<TAbi extends Abi = Abi> {
   address: Address
   abi: TAbi
   functionName: string
   args: readonly unknown[]
-}
-
-/** allowFailure maps to aggregate3 per-call tolerance. Absent/false → a failure fails the whole tick. */
-export interface SpeculativeCall extends ContractCall {
   allowFailure?: boolean
 }
 
@@ -46,13 +48,10 @@ export interface TickIdentity {
 
 export type CallResult = { status: 'success'; result: unknown } | { status: 'failure'; error: Error }
 
-export interface FeedLogRef {
+export interface DecodedFeedLog {
   txHash: Hex
   logIndex: number
   blockNumber: bigint
-}
-
-export interface DecodedFeedLog extends FeedLogRef {
   address: Address
   eventName: string
   args: Record<string, unknown>
@@ -64,27 +63,22 @@ export interface TickData {
   results: Record<string, CallResult>
   /** New logs matching this source's filters this tick (deduped). */
   logs: DecodedFeedLog[]
-  /** Logs previously delivered to this source that a reorg removed. */
-  retractions: FeedLogRef[]
+  /** Logs previously delivered to this source that a reorg removed (the full log, not just a ref). */
+  retractions: DecodedFeedLog[]
 }
 
 export interface SourceEmission<T> {
   value: T
-  phase?: string
   identity: TickIdentity
-}
-
-export interface TickContext<T> {
-  prev: SourceEmission<T> | undefined
 }
 
 export interface Source<T> {
   /** Stable identity; equal keys share one evaluation and one store. */
   key: string
-  calls(ctx: TickContext<T>): Record<string, SpeculativeCall>
-  logFilters?(ctx: TickContext<T>): LogFilter[]
+  calls(prev: SourceEmission<T> | undefined): Record<string, ContractCall>
+  logFilters?(prev: SourceEmission<T> | undefined): LogFilter[]
   /** PURE. Return undefined when required data is missing (no emission this tick). */
-  derive(tick: TickData, ctx: TickContext<T>): SourceEmission<T> | undefined
+  derive(tick: TickData, prev: SourceEmission<T> | undefined): SourceEmission<T> | undefined
   /** Emission suppression comparator; default is strict equality of `value`. */
   valueEquals?(a: T, b: T): boolean
 }
@@ -92,8 +86,7 @@ export interface Source<T> {
 export type FeedEvent<T> =
   | { type: 'tick'; emission: SourceEmission<T> }
   | { type: 'log'; log: DecodedFeedLog }
-  | { type: 'retraction'; ref: FeedLogRef }
-  | { type: 'phase'; from: string | undefined; to: string; identity: TickIdentity }
+  | { type: 'retraction'; log: DecodedFeedLog }
   | { type: 'gap'; fromBlock: bigint; toBlock: bigint }
   | { type: 'stale'; stale: boolean }
 
@@ -101,7 +94,6 @@ export interface FeedSnapshot<T> {
   current: SourceEmission<T> | undefined
   /** Oldest→newest rolling tick buffer, length ≤ bufferSize. */
   buffer: readonly SourceEmission<T>[]
-  phase: string | undefined
   stale: boolean
   lastTick: TickIdentity | undefined
 }

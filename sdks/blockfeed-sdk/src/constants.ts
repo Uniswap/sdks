@@ -9,8 +9,14 @@ export const DEFAULT_TRAILING_LOG_WINDOW = 3
 /** Default rolling emission buffer length retained by a feed store. */
 export const DEFAULT_BUFFER_SIZE = 120
 
-/** Max calls packed into a single multicall chunk before splitting. */
+/** Max calls packed into a single multicall chunk before splitting (internal; not a public option). */
 export const DEFAULT_MAX_CALLS_PER_CHUNK = 200
+
+/**
+ * Default upper bound on the trailing log window's catch-up growth: after a stall, the union `getLogs`
+ * looks back at most this many blocks so a long gap recovers recent logs without an unbounded scan.
+ */
+export const DEFAULT_MAX_CATCHUP_BLOCKS = 20
 
 /** Default heartbeat poll interval per chain id, milliseconds. */
 export const DEFAULT_POLL_INTERVAL_MS: Record<number, number> = { 1: 3_000, 8453: 1_000, 130: 500 }

@@ -30,8 +30,8 @@ export function ccaBidsSource(args: { auction: Address }): Source<CcaBidsState> 
     logFilters(): LogFilter[] {
       return [{ address: auction, event: CCA_BID_SUBMITTED_EVENT }]
     },
-    derive(tick: TickData, ctx) {
-      const prevCount = ctx.prev?.value.bidCount ?? 0
+    derive(tick: TickData, prev) {
+      const prevCount = prev?.value.bidCount ?? 0
       // Monotonic: add this tick's new bids; retractions (tick.retractions) intentionally ignored.
       return {
         value: { bidCount: prevCount + tick.logs.length },

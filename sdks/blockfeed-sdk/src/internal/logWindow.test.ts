@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import type { AbiEvent, Hex, Log } from 'viem'
 import { encodeAbiParameters, encodeEventTopics, parseAbiItem } from 'viem'
 
-import type { DecodedFeedLog, FeedLogRef, LogFilter } from '../types'
+import type { DecodedFeedLog, LogFilter } from '../types'
 
 import { decodeFeedLogs, emptyLogBook, matchLogsToFilters, planLogWindow, reconcileLogs } from './logWindow'
 import type { LogBook } from './logWindow'
@@ -152,10 +152,9 @@ describe('reconcileLogs', () => {
     decoded({ txHash, logIndex, blockNumber, args: { value: blockNumber } })
 
   const bookOf = (...logs: DecodedFeedLog[]): LogBook => {
-    const entries = new Map(logs.map((l) => [`${l.txHash}:${l.logIndex}`, { ref: refOf(l), log: l }]))
+    const entries = new Map(logs.map((l) => [`${l.txHash}:${l.logIndex}`, l]))
     return { entries }
   }
-  const refOf = (l: DecodedFeedLog): FeedLogRef => ({ txHash: l.txHash, logIndex: l.logIndex, blockNumber: l.blockNumber })
 
   it('detects new logs not present in the book', () => {
     const a = log('0xa', 100n)
@@ -185,7 +184,8 @@ describe('reconcileLogs', () => {
     const first = reconcileLogs({ book: emptyLogBook, observed: [a], fromBlock: 98n, toBlock: 100n })
     // Same window re-scanned; the log is gone (reorg replaced block 100).
     const second = reconcileLogs({ book: first.book, observed: [], fromBlock: 98n, toBlock: 100n })
-    expect(second.retractions).toEqual([refOf(a)])
+    // Retractions carry the FULL log, not just a ref.
+    expect(second.retractions).toEqual([a])
     expect(second.book.entries.has('0xa:0')).toBe(false)
   })
 
@@ -254,62 +254,58 @@ describe('reconcileLogs', () => {
 })
 
 describe('planLogWindow', () => {
-  it('first tick (no lastProcessedBlock): window is [head-(K-1), head], no gap', () => {
-    expect(planLogWindow({ head: 101n, lastProcessedBlock: undefined, bookWindow: 3, tickWindow: 3 })).toEqual({
+  it('first tick (no lastProcessedBlock): window is [head-(bookWindow-1), head], no gap', () => {
+    // blocksSinceLastProcessed defaults to bookWindow when lastProcessedBlock is undefined → tickWindow = 3.
+    expect(planLogWindow({ head: 101n, lastProcessedBlock: undefined, bookWindow: 3, maxCatchupBlocks: 20 })).toEqual({
       fromBlock: 99n,
       toBlock: 101n,
     })
   })
 
-  it('steady tick: book floor lifts fromBlock, no gap', () => {
-    // head 102, last 101, K=3: fromBlock = max(102-2, 101-2) = 100.
-    expect(planLogWindow({ head: 102n, lastProcessedBlock: 101n, bookWindow: 3, tickWindow: 3 })).toEqual({
+  it('steady tick: bookWindow look-back, book floor lifts fromBlock, no gap', () => {
+    // head 102, last 101, bookWindow 3, blocksSince 1 → tickWindow 3: fromBlock = max(102-2, 101-2) = 100.
+    expect(planLogWindow({ head: 102n, lastProcessedBlock: 101n, bookWindow: 3, maxCatchupBlocks: 20 })).toEqual({
       fromBlock: 100n,
       toBlock: 102n,
     })
   })
 
-  it('short pause + large override: book floor clamps fromBlock, no gap', () => {
-    // head 101, last 100, book K=3, tick K=20: fromBlock = max(101-19, 100-2, 0) = 98; 98 <= 101 → no gap.
-    expect(planLogWindow({ head: 101n, lastProcessedBlock: 100n, bookWindow: 3, tickWindow: 20 })).toEqual({
-      fromBlock: 98n,
-      toBlock: 101n,
+  it('moderate stall within maxCatchupBlocks: the window grows to cover the whole gap, no gap event', () => {
+    // head 110, last 100, bookWindow 3, maxCatchup 20: blocksSince 10 → tickWindow 10 → fromBlock = 101 = last+1.
+    expect(planLogWindow({ head: 110n, lastProcessedBlock: 100n, bookWindow: 3, maxCatchupBlocks: 20 })).toEqual({
+      fromBlock: 101n,
+      toBlock: 110n,
     })
   })
 
-  it('long pause + override 3: gap with exact bounds', () => {
-    // head 110, last 100, K=3: fromBlock = 108; gap = [101, 107].
-    expect(planLogWindow({ head: 110n, lastProcessedBlock: 100n, bookWindow: 3, tickWindow: 3 })).toEqual({
+  it('stall beyond maxCatchupBlocks: the window is capped and a gap with exact bounds is surfaced', () => {
+    // head 110, last 100, bookWindow 3, maxCatchup 3: tickWindow = min(max(3,10),3) = 3 → fromBlock 108; gap [101,107].
+    expect(planLogWindow({ head: 110n, lastProcessedBlock: 100n, bookWindow: 3, maxCatchupBlocks: 3 })).toEqual({
       fromBlock: 108n,
       toBlock: 110n,
       gap: { fromBlock: 101n, toBlock: 107n },
     })
   })
 
-  it('resume WITHOUT override after a long pause still surfaces a gap (tickWindow = bookWindow)', () => {
-    expect(planLogWindow({ head: 110n, lastProcessedBlock: 100n, bookWindow: 3, tickWindow: 3 }).gap).toEqual({
-      fromBlock: 101n,
-      toBlock: 107n,
+  it('maxCatchupBlocks 1 collapses the window to [head, head] with gap [last+1, head-1]', () => {
+    // bookWindow 1 (floor = last), maxCatchup 1 → tickWindow 1 → fromBlock = head; gap covers the stall.
+    expect(planLogWindow({ head: 110n, lastProcessedBlock: 100n, bookWindow: 1, maxCatchupBlocks: 1 })).toEqual({
+      fromBlock: 110n,
+      toBlock: 110n,
+      gap: { fromBlock: 101n, toBlock: 109n },
     })
   })
 
-  it('override 0 and override 1 both collapse the window to [head, head] with gap [last+1, head-1]', () => {
-    const expected = { fromBlock: 110n, toBlock: 110n, gap: { fromBlock: 101n, toBlock: 109n } }
-    expect(planLogWindow({ head: 110n, lastProcessedBlock: 100n, bookWindow: 3, tickWindow: 0 })).toEqual(expected)
-    expect(planLogWindow({ head: 110n, lastProcessedBlock: 100n, bookWindow: 3, tickWindow: 1 })).toEqual(expected)
-  })
-
   it('zero-clamp arm: head below the look-back floors fromBlock at 0', () => {
-    expect(planLogWindow({ head: 1n, lastProcessedBlock: undefined, bookWindow: 10, tickWindow: 10 })).toEqual({
+    expect(planLogWindow({ head: 1n, lastProcessedBlock: undefined, bookWindow: 10, maxCatchupBlocks: 20 })).toEqual({
       fromBlock: 0n,
       toBlock: 1n,
     })
   })
 
   it('no gap when fromBlock is exactly lastProcessedBlock + 1 (contiguous)', () => {
-    // head 102, last 100, tick K=1: fromBlock = 102; but book floor = 100-2 = 98 → fromBlock = max(102,98)=102?
-    // Use K where fromBlock lands at last+1: head 101, last 100, book K=1, tick K=1 → fromBlock=101=last+1 → no gap.
-    expect(planLogWindow({ head: 101n, lastProcessedBlock: 100n, bookWindow: 1, tickWindow: 1 })).toEqual({
+    // head 101, last 100, bookWindow 1, blocksSince 1 → tickWindow 1 → fromBlock = 101 = last+1 → no gap.
+    expect(planLogWindow({ head: 101n, lastProcessedBlock: 100n, bookWindow: 1, maxCatchupBlocks: 20 })).toEqual({
       fromBlock: 101n,
       toBlock: 101n,
     })

@@ -1,7 +1,7 @@
 import type { Currency } from '@uniswap/sdk-core'
 import type { Address } from 'viem'
 
-import type { PoolRef } from '../types'
+import type { PoolRef, PricePath } from '../types'
 
 /**
  * A pool discovered by enumeration that MIGHT price the requested pair, before any executable
@@ -27,6 +27,11 @@ export interface CandidatePool {
 export interface NoPathFound {
   kind: 'no-path'
   reason: string
+}
+
+/** Narrowing guard: `true` when a {@link discoverPricePath} result is a {@link NoPathFound}, not a path. */
+export function isNoPathFound(x: PricePath | NoPathFound): x is NoPathFound {
+  return (x as NoPathFound).kind === 'no-path'
 }
 
 /** Tunable policy for discovery. Enumeration reads only `hookAllowlist` and `fromBlockOverride`. */

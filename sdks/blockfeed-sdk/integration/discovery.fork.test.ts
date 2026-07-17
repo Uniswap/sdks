@@ -1,6 +1,8 @@
 import { Token } from '@uniswap/sdk-core'
-import { discoverPricePath, enumerateCandidates } from '@uniswap/blockfeed-sdk/discovery'
+import { discoverPricePath } from '@uniswap/blockfeed-sdk/discovery'
 import type { PoolRef, PricePath } from '@uniswap/blockfeed-sdk'
+// enumerateCandidates is module-internal (not part of the public discovery surface); import from source.
+import { enumerateCandidates } from '../src/discovery/enumerate'
 import { describe, expect, it } from 'bun:test'
 import {
   type Account,
@@ -132,7 +134,7 @@ describe.skipIf(!RUN)('discovery fork scenarios (Base)', () => {
       const fork = await newFork(8651)
       try {
         const pub = httpClient(fork)
-        const result = await discoverPricePath(pub, { chainId: CHAIN_ID, base: WETH, quote: USDC, options: LOCAL_V4_SCAN })
+        const result = await discoverPricePath(pub, { base: WETH, quote: USDC, options: LOCAL_V4_SCAN })
         expect(isPricePath(result)).toBe(true)
         if (!isPricePath(result)) throw new Error('unreachable')
 
@@ -153,7 +155,7 @@ describe.skipIf(!RUN)('discovery fork scenarios (Base)', () => {
       const fork = await newFork(8652)
       try {
         const pub = httpClient(fork)
-        const result = await discoverPricePath(pub, { chainId: CHAIN_ID, base: BRETT, quote: USDC, options: LOCAL_V4_SCAN })
+        const result = await discoverPricePath(pub, { base: BRETT, quote: USDC, options: LOCAL_V4_SCAN })
         expect(isPricePath(result)).toBe(true)
         if (!isPricePath(result)) throw new Error('unreachable')
 
@@ -296,7 +298,7 @@ describe.skipIf(!RUN)('discovery fork scenarios (Base)', () => {
 
         // Despite the trap, discovery must still select the honest 2-hop; the trap's two-way probe
         // collapses (its thin single-tick band can't fill a 1000-USDC round trip).
-        const result = await discoverPricePath(pub, { chainId: CHAIN_ID, base: BRETT, quote: USDC, options: LOCAL_V4_SCAN })
+        const result = await discoverPricePath(pub, { base: BRETT, quote: USDC, options: LOCAL_V4_SCAN })
         expect(isPricePath(result)).toBe(true)
         if (!isPricePath(result)) throw new Error('unreachable')
 

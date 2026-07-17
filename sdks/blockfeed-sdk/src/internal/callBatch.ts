@@ -1,7 +1,7 @@
-import type { CallResult, SpeculativeCall } from '../types'
+import type { CallResult, ContractCall } from '../types'
 
 /** Stable string identity for a call, for cross-source batch dedupe. */
-function callFingerprint(callDescriptor: SpeculativeCall): string {
+function callFingerprint(callDescriptor: ContractCall): string {
   const args = JSON.stringify(callDescriptor.args, (_k, v) => (typeof v === 'bigint' ? `${v}n` : v))
   return `${callDescriptor.address.toLowerCase()}::${callDescriptor.functionName}::${args}`
 }
@@ -17,12 +17,12 @@ function callFingerprint(callDescriptor: SpeculativeCall): string {
  * Every requester passed in gets an entry in the returned map (empty when it requested no calls).
  */
 export function planCallBatch<R>(
-  requests: Array<{ requester: R; sourceKey: string; calls: Record<string, SpeculativeCall> }>
+  requests: Array<{ requester: R; sourceKey: string; calls: Record<string, ContractCall> }>
 ): {
-  keyed: Record<string, SpeculativeCall>
+  keyed: Record<string, ContractCall>
   distribute(results: Record<string, CallResult>): Map<R, Record<string, CallResult>>
 } {
-  const keyed: Record<string, SpeculativeCall> = {}
+  const keyed: Record<string, ContractCall> = {}
   const fingerprintToSlot = new Map<string, string>()
   const slotRequesters = new Map<string, Array<{ requester: R; callKey: string }>>()
 
@@ -43,7 +43,7 @@ export function planCallBatch<R>(
         slotRequesters.set(slotKey, [])
       } else {
         // Shared slot tolerates failure only if EVERY requester tolerates it (AND).
-        const slot = keyed[slotKey] as SpeculativeCall
+        const slot = keyed[slotKey] as ContractCall
         slot.allowFailure = slot.allowFailure === true && descriptor.allowFailure === true
       }
       slotRequesters.get(slotKey)!.push({ requester, callKey })

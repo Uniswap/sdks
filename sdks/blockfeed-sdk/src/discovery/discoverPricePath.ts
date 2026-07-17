@@ -1,6 +1,7 @@
 import { type Currency, Token } from '@uniswap/sdk-core'
 
 import { getChainAddresses } from '../addresses'
+import { BlockfeedError } from '../errors'
 import { sameCurrency } from '../internal/currency'
 import type { BlockfeedClient, PathLeg, PoolRef, PricePath } from '../types'
 
@@ -93,10 +94,17 @@ interface Contender {
  */
 export async function discoverPricePath(
   client: BlockfeedClient,
-  args: { chainId: number; base: Currency; quote: Currency; options?: DiscoveryOptions },
+  args: { base: Currency; quote: Currency; options?: DiscoveryOptions },
   _deps: DiscoverDeps = defaultDeps
 ): Promise<PricePath | NoPathFound> {
-  const { chainId, base, quote } = args
+  const { base, quote } = args
+  // chainId is derived from `base`; `quote` must agree (single-chain paths only).
+  const chainId = base.chainId
+  if (quote.chainId !== chainId) {
+    throw new BlockfeedError(
+      `discoverPricePath base/quote are on different chains (${chainId} vs ${quote.chainId}); paths are single-chain`
+    )
+  }
   const options = args.options ?? {}
   const maxHops = options.maxHops ?? 2
   const notional = options.probeNotional ?? 10n ** BigInt(quote.decimals) * 1000n

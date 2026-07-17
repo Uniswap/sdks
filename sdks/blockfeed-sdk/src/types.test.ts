@@ -4,6 +4,7 @@ import { parseAbiItem } from 'viem'
 
 import type {
   CallResult,
+  ContractCall,
   DecodedFeedLog,
   FeedEvent,
   FeedSnapshot,
@@ -12,7 +13,6 @@ import type {
   PricePath,
   Source,
   SourceEmission,
-  SpeculativeCall,
   TickData,
   TickIdentity,
 } from './types'
@@ -28,7 +28,7 @@ const IDENTITY: TickIdentity = {
 const counterSource: Source<number> = {
   key: 'counter',
   calls: () => {
-    const call: SpeculativeCall = {
+    const call: ContractCall = {
       address: '0x000000000004444c5dc75cB358380D2e3dE08A90',
       abi: [],
       functionName: 'foo',
@@ -66,9 +66,11 @@ describe('core types', () => {
       identity: IDENTITY,
       results: { foo: { status: 'success', result: 42 } },
       logs: [log],
-      retractions: [{ txHash: '0xbeef', logIndex: 1, blockNumber: 99n }],
+      retractions: [
+        { txHash: '0xbeef', logIndex: 1, blockNumber: 99n, address: '0x0', eventName: 'Transfer', args: {} },
+      ],
     }
-    const emission = counterSource.derive(tick, { prev: undefined })
+    const emission = counterSource.derive(tick, undefined)
     expect(emission?.value).toBe(42)
     expect(counterSource.valueEquals?.(1, 1)).toBe(true)
   })
@@ -77,8 +79,7 @@ describe('core types', () => {
     const events: FeedEvent<number>[] = [
       { type: 'tick', emission: { value: 1, identity: IDENTITY } },
       { type: 'log', log: { txHash: '0x1', logIndex: 0, blockNumber: 1n, address: '0x0', eventName: 'E', args: {} } },
-      { type: 'retraction', ref: { txHash: '0x1', logIndex: 0, blockNumber: 1n } },
-      { type: 'phase', from: undefined, to: 'live', identity: IDENTITY },
+      { type: 'retraction', log: { txHash: '0x1', logIndex: 0, blockNumber: 1n, address: '0x0', eventName: 'E', args: {} } },
       { type: 'gap', fromBlock: 1n, toBlock: 2n },
       { type: 'stale', stale: true },
     ]
@@ -89,7 +90,6 @@ describe('core types', () => {
     const snapshot: FeedSnapshot<number> = {
       current: { value: 1, identity: IDENTITY },
       buffer: [{ value: 1, identity: IDENTITY }],
-      phase: undefined,
       stale: false,
       lastTick: IDENTITY,
     }

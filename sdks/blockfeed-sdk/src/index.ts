@@ -17,15 +17,12 @@ export type { Scheduler } from './internal/scheduler'
 export type {
   BlockfeedClient,
   ContractCall,
-  SpeculativeCall,
   LogFilter,
   TickIdentity,
   CallResult,
-  FeedLogRef,
   DecodedFeedLog,
   TickData,
   SourceEmission,
-  TickContext,
   Source,
   FeedEvent,
   FeedSnapshot,
@@ -49,10 +46,6 @@ export { priceFromSqrtPriceX96, priceFromV2Reserves } from './math/sqrtPrice'
 export { poolIdFromPoolKey, poolRefIdentifier } from './math/poolId'
 export { q96ToPrice } from './math/price'
 
-// Visibility plugin
-export { attachVisibilityPlugin, DEFAULT_MAX_CATCHUP_BLOCKS } from './plugins/visibility'
-export type { VisibilityTarget } from './plugins/visibility'
-
 // Chain addresses
 export { getChainAddresses, CHAIN_ADDRESSES } from './addresses'
 export type { ChainAddresses } from './addresses'
@@ -63,7 +56,7 @@ export {
   MULTICALL3_ADDRESS,
   DEFAULT_TRAILING_LOG_WINDOW,
   DEFAULT_BUFFER_SIZE,
-  DEFAULT_MAX_CALLS_PER_CHUNK,
+  DEFAULT_MAX_CATCHUP_BLOCKS,
   DEFAULT_POLL_INTERVAL_MS,
   FALLBACK_POLL_INTERVAL_MS,
 } from './constants'

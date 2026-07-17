@@ -1,5 +1,4 @@
 import {
-  type ContractCall,
   type InitializedTick,
   clearingPriceCall,
   currencyRaisedCall,
@@ -11,7 +10,7 @@ import {
 } from '@uniswap/liquidity-launcher-sdk'
 import type { Address } from 'viem'
 
-import type { SpeculativeCall, TickData } from '../../types'
+import type { ContractCall, TickData } from '../../types'
 
 /**
  * Tag a descriptor as failure-tolerant — the single home for the launch sources' isolation rationale.
@@ -24,7 +23,7 @@ import type { SpeculativeCall, TickData } from '../../types'
  * non-success result as "return undefined / keep prev", so per-source behavior is unchanged; failures
  * simply stop propagating.
  */
-export function tolerant(call: ContractCall): SpeculativeCall {
+export function tolerant(call: ContractCall): ContractCall {
   return { ...call, allowFailure: true }
 }
 
@@ -37,9 +36,9 @@ export function tolerant(call: ContractCall): SpeculativeCall {
 export function auctionCallSet(
   auction: Address,
   lens: Address,
-  speculativeSlot0?: SpeculativeCall
-): Record<string, SpeculativeCall> {
-  const calls: Record<string, SpeculativeCall> = {
+  speculativeSlot0?: ContractCall
+): Record<string, ContractCall> {
+  const calls: Record<string, ContractCall> = {
     checkpoint: tolerant(clearingPriceCall(auction)),
     currencyRaised: tolerant(currencyRaisedCall(auction)),
     remainingSupply: tolerant(remainingSupplyCall(auction)),

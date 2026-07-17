@@ -39,7 +39,7 @@ const v4Slot0 = (sqrtPriceX96: bigint) => ok([sqrtPriceX96, 0, 0, 0])
 const reserves = (r0: bigint, r1: bigint) => ok([r0, r1, 0])
 
 describe('pricePathSource construction', () => {
-  it('throws when a leg is v4 but no chainId is provided', () => {
+  it('derives chainId from path.base and resolves a v4 leg without an options arg', () => {
     const path: PricePath = {
       base: WETH,
       quote: USDC,
@@ -51,8 +51,18 @@ describe('pricePathSource construction', () => {
         },
       ],
     }
+    // chainId comes from path.base.chainId (1) — no options needed for the v4 StateView resolution.
+    expect(() => pricePathSource(path)).not.toThrow()
+  })
+
+  it('throws when a leg currency is on a different chain than path.base', () => {
+    const USDC_OP = new Token(10, '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85', 6, 'USDC', 'USD Coin')
+    const path: PricePath = {
+      base: WETH, // chain 1
+      quote: USDC_OP, // chain 10 → mismatch
+      legs: [{ pool: { protocol: 'v3', pool: V3_POOL }, base: WETH, quote: USDC_OP }],
+    }
     expect(() => pricePathSource(path)).toThrow(BlockfeedError)
-    expect(() => pricePathSource(path, { chainId: 1 })).not.toThrow()
   })
 
   it('throws when adjacent legs do not chain (leg[i].quote != leg[i+1].base)', () => {
@@ -91,8 +101,8 @@ describe('pricePathSource.calls', () => {
         quote: ETH,
       },
     ]
-    const source = pricePathSource({ base: WETH, quote: ETH, legs }, { chainId: 1 })
-    const calls = source.calls({ prev: undefined })
+    const source = pricePathSource({ base: WETH, quote: ETH, legs })
+    const calls = source.calls(undefined)
     expect(Object.keys(calls).sort()).toEqual(['leg0', 'leg1'])
     expect(calls.leg0.functionName).toBe('slot0')
     expect(calls.leg0.address).toBe(V3_POOL)
@@ -110,7 +120,7 @@ describe('pricePathSource.calls', () => {
       quote: USDC,
       legs: [{ pool: { protocol: 'v2', pair: V2_PAIR }, base: WETH, quote: USDC }],
     })
-    const calls = source.calls({ prev: undefined })
+    const calls = source.calls(undefined)
     expect(calls.leg0.functionName).toBe('getReserves')
     expect(calls.leg0.address).toBe(V2_PAIR)
   })
@@ -123,7 +133,7 @@ describe('pricePathSource.derive', () => {
       quote: USDC,
       legs: [{ pool: { protocol: 'v3', pool: V3_POOL }, base: WETH, quote: USDC }],
     })
-    const emission = source.derive(tick({ leg0: slot0(SQRT_USDC_WETH) }), { prev: undefined })
+    const emission = source.derive(tick({ leg0: slot0(SQRT_USDC_WETH) }), undefined)
     expect(emission).toBeDefined()
     expect(emission!.value.price.baseCurrency.equals(WETH)).toBe(true)
     expect(emission!.value.price.quoteCurrency.equals(USDC)).toBe(true)
@@ -147,7 +157,7 @@ describe('pricePathSource.derive', () => {
         { pool: { protocol: 'v3', pool: V3_POOL }, base: WETH, quote: USDC },
       ],
     })
-    const emission = source.derive(tick({ leg0: reserves(r0, r1), leg1: slot0(SQRT_USDC_WETH) }), { prev: undefined })
+    const emission = source.derive(tick({ leg0: reserves(r0, r1), leg1: slot0(SQRT_USDC_WETH) }), undefined)
     expect(emission).toBeDefined()
     // DAI in USDC = (WETH per DAI) × (USDC per WETH) = 0.0005 × 2000 = 1.00.
     expect(emission!.value.price.baseCurrency.equals(DAI)).toBe(true)
@@ -170,8 +180,8 @@ describe('pricePathSource.derive', () => {
         { pool: { protocol: 'v3', pool: V3_POOL }, base: DAI, quote: WETH },
         { pool: { protocol: 'v4', poolKey: v4Key }, base: ETH, quote: USDC },
       ],
-    }, { chainId: 1 })
-    const emission = source.derive(tick({ leg0: slot0(Q96), leg1: v4Slot0(SQRT_USDC_WETH) }), { prev: undefined })
+    })
+    const emission = source.derive(tick({ leg0: slot0(Q96), leg1: v4Slot0(SQRT_USDC_WETH) }), undefined)
     expect(emission).toBeDefined()
     expect(emission!.value.price.baseCurrency.equals(DAI)).toBe(true)
     expect(emission!.value.price.quoteCurrency.equals(USDC)).toBe(true)
@@ -184,8 +194,8 @@ describe('pricePathSource.derive', () => {
       base: WETH,
       quote: USDC,
       legs: [{ pool: { protocol: 'v4', poolKey: v4Key }, base: WETH, quote: USDC }],
-    }, { chainId: 1 })
-    expect(source.derive(tick({ leg0: v4Slot0(0n) }), { prev: undefined })).toBeUndefined()
+    })
+    expect(source.derive(tick({ leg0: v4Slot0(0n) }), undefined)).toBeUndefined()
   })
 
   it('returns undefined when a leg read is missing or failed', () => {
@@ -194,9 +204,9 @@ describe('pricePathSource.derive', () => {
       quote: USDC,
       legs: [{ pool: { protocol: 'v3', pool: V3_POOL }, base: WETH, quote: USDC }],
     })
-    expect(source.derive(tick({}), { prev: undefined })).toBeUndefined()
+    expect(source.derive(tick({}), undefined)).toBeUndefined()
     const failed: CallResult = { status: 'failure', error: new Error('revert') }
-    expect(source.derive(tick({ leg0: failed }), { prev: undefined })).toBeUndefined()
+    expect(source.derive(tick({ leg0: failed }), undefined)).toBeUndefined()
   })
 })
 
@@ -207,12 +217,12 @@ describe('pricePathSource.valueEquals', () => {
       quote: USDC,
       legs: [{ pool: { protocol: 'v3', pool: V3_POOL }, base: WETH, quote: USDC }],
     })
-    const a = source.derive(tick({ leg0: slot0(SQRT_USDC_WETH) }), { prev: undefined })!
-    const b = source.derive(tick({ leg0: slot0(SQRT_USDC_WETH) }), { prev: undefined })!
+    const a = source.derive(tick({ leg0: slot0(SQRT_USDC_WETH) }), undefined)!
+    const b = source.derive(tick({ leg0: slot0(SQRT_USDC_WETH) }), undefined)!
     expect(a.value).not.toBe(b.value) // different object identities
     expect(source.valueEquals!(a.value, b.value)).toBe(true)
     // A moved price is not suppressed.
-    const c = source.derive(tick({ leg0: slot0(SQRT_USDC_WETH + 10n ** 30n) }), { prev: undefined })!
+    const c = source.derive(tick({ leg0: slot0(SQRT_USDC_WETH + 10n ** 30n) }), undefined)!
     expect(source.valueEquals!(a.value, c.value)).toBe(false)
   })
 })

@@ -13,16 +13,12 @@ function identity(blockNumber: bigint): TickIdentity {
   }
 }
 
-function emission(value: number, blockNumber: bigint, phase?: string): SourceEmission<number> {
-  return { value, phase, identity: identity(blockNumber) }
+function emission(value: number, blockNumber: bigint): SourceEmission<number> {
+  return { value, identity: identity(blockNumber) }
 }
 
-function tick(value: number, blockNumber: bigint, phase?: string): FeedEvent<number> {
-  return { type: 'tick', emission: emission(value, blockNumber, phase) }
-}
-
-function phase(to: string, from: string | undefined, blockNumber: bigint): FeedEvent<number> {
-  return { type: 'phase', from, to, identity: identity(blockNumber) }
+function tick(value: number, blockNumber: bigint): FeedEvent<number> {
+  return { type: 'tick', emission: emission(value, blockNumber) }
 }
 
 function stale(value: boolean): FeedEvent<number> {
@@ -91,12 +87,10 @@ describe('createInternalStore', () => {
   })
 
   describe('state application', () => {
-    it('applies phase and stale to the snapshot', () => {
+    it('applies stale to the snapshot', () => {
       const store = createInternalStore<number>({ bufferSize: 5 })
-      store.publish([phase('open', undefined, 1n), stale(true)])
-      const snap = store.getSnapshot()
-      expect(snap.phase).toBe('open')
-      expect(snap.stale).toBe(true)
+      store.publish([stale(true)])
+      expect(store.getSnapshot().stale).toBe(true)
     })
 
     it('applies ALL events before notifying any listener', () => {
@@ -122,7 +116,7 @@ describe('createInternalStore', () => {
     it('appends only on tick events', () => {
       const restore = silenceMicrotasks()
       const store = createInternalStore<number>({ bufferSize: 5 })
-      store.publish([tick(1, 1n), phase('a', undefined, 1n), stale(true), log()])
+      store.publish([tick(1, 1n), stale(true), log()])
       expect(store.getSnapshot().buffer.map((e) => e.value)).toEqual([1])
       restore()
     })
@@ -133,8 +127,8 @@ describe('createInternalStore', () => {
       const store = createInternalStore<number>({ bufferSize: 5 })
       const seen: string[] = []
       store.subscribe((e) => seen.push(e.type))
-      store.publish([tick(1, 1n), phase('open', undefined, 1n), stale(true)])
-      expect(seen).toEqual(['tick', 'phase', 'stale'])
+      store.publish([tick(1, 1n), stale(true)])
+      expect(seen).toEqual(['tick', 'stale'])
     })
 
     it('delivers to multiple listeners', () => {

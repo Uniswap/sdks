@@ -279,12 +279,12 @@ describe.skipIf(!RUN)('CCA launch lifecycle end-to-end (Base fork)', () => {
           expect(gradTick.emission.value.poolSqrtPriceX96).toBeDefined()
           expect(gradTick.emission.value.poolSqrtPriceX96! > 0n).toBe(true)
           expect(gradTick.emission.value.priceX96).toBeDefined()
-          expect(gradTick.emission.phase).toBe('graduated')
 
-          // A `phase` FeedEvent (auction → graduated) fired on the asset stream.
-          const phaseEvent = asset.events.find((e) => e.type === 'phase' && e.to === 'graduated')
-          expect(phaseEvent).toBeDefined()
-          if (phaseEvent && phaseEvent.type === 'phase') expect(phaseEvent.from).toBe('auction')
+          // The lifecycle transitioned auction → graduated within the value: an earlier auction-phase
+          // tick preceded the graduated tick on the same stream (phase lives in `value`, not as a
+          // separate FeedEvent).
+          const firstAuctionTick = asset.events.filter(isTick).find((e) => e.emission.value.phase === 'auction')
+          expect(firstAuctionTick).toBeDefined()
 
           // No-gap: the poolSqrtPriceX96 in the graduation emission matches a direct StateView read at
           // that same block (the source read the freshly-initialized pool atomically in the tick batch).

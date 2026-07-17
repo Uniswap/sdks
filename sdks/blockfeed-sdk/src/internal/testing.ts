@@ -61,6 +61,8 @@ export interface FakeBlock {
 
 export interface FakeClientOpts {
   ws?: boolean
+  /** `client.chain.id`. Default 1. Pass `null` to omit `chain` entirely (no chain-id fallback). */
+  chainId?: number | null
   block?: () => FakeBlock
   resolveCall?: (c: { address: string; functionName: string; args: readonly unknown[] }) => CallResult
   logs?: () => Log[]
@@ -103,6 +105,7 @@ export function createFakeClient(opts: FakeClientOpts = {}): { client: Blockfeed
   }
   const client = {
     transport: { type: opts.ws ? 'webSocket' : 'http' },
+    ...(opts.chainId === null ? {} : { chain: { id: opts.chainId ?? 1 } }),
     multicall: async ({ contracts }: { contracts: Array<{ address: string; functionName: string; args: readonly unknown[] }> }) => {
       const idx = state.multicallCount
       state.multicallCount += 1

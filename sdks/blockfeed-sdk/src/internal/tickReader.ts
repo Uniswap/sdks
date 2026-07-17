@@ -3,7 +3,7 @@ import { parseAbi } from 'viem'
 
 import { DEFAULT_MAX_CALLS_PER_CHUNK, MULTICALL3_ADDRESS } from '../constants'
 import { TickFailedError } from '../errors'
-import type { CallResult, SpeculativeCall, TickIdentity } from '../types'
+import type { CallResult, ContractCall, TickIdentity } from '../types'
 
 import { type RawContract, multicallAllowFailure } from './multicall'
 
@@ -40,7 +40,7 @@ const IDENTITY_FUNCTIONS = ['getBlockNumber', 'getLastBlockHash', 'getCurrentBlo
  */
 export async function readTick(
   client: Pick<PublicClient, 'multicall'>,
-  keyed: Record<string, SpeculativeCall>,
+  keyed: Record<string, ContractCall>,
   opts?: { maxCallsPerChunk?: number }
 ): Promise<TickReadResult> {
   const maxCallsPerChunk = opts?.maxCallsPerChunk ?? DEFAULT_MAX_CALLS_PER_CHUNK
@@ -55,7 +55,7 @@ export async function readTick(
   // Deterministic ordering: identity calls first, then keyed calls sorted by key.
   const sortedKeys = Object.keys(keyed).sort()
   const keyedContracts: RawContract[] = sortedKeys.map((key) => {
-    const call = keyed[key] as SpeculativeCall
+    const call = keyed[key] as ContractCall
     return { address: call.address, abi: call.abi, functionName: call.functionName, args: call.args }
   })
 

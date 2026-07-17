@@ -1,19 +1,14 @@
 import type { Hex, Log } from 'viem'
 import { decodeEventLog, toEventSelector } from 'viem'
 
-import type { DecodedFeedLog, FeedLogRef, LogFilter } from '../types'
+import type { DecodedFeedLog, LogFilter } from '../types'
 
 import { eqAddress } from './currency'
 
-export interface LogBookEntry {
-  ref: FeedLogRef
-  log: DecodedFeedLog
-}
-
 /** Immutable snapshot of delivered logs within the trailing window. */
 export interface LogBook {
-  /** key = `${txHash}:${logIndex}` */
-  entries: ReadonlyMap<string, LogBookEntry>
+  /** key = `${txHash}:${logIndex}` → the full decoded log. */
+  entries: ReadonlyMap<string, DecodedFeedLog>
 }
 
 /** A book with no delivered logs. */
@@ -21,28 +16,37 @@ export const emptyLogBook: LogBook = { entries: new Map() }
 
 /**
  * Pure window/gap math for one tick's union `getLogs` (design doc §4.3, unified gap semantics). Given
- * the head block, the last fully-processed block, and the two look-back windows, compute the
- * `[fromBlock, toBlock]` to scan and any gap span that went un-scanned.
+ * the head block, the last fully-processed block, the book window, and the catch-up ceiling, compute
+ * the `[fromBlock, toBlock]` to scan and any gap span that went un-scanned.
+ *
+ * The look-back is always-on and self-adjusting (no pause/resume override): a steady tick looks back
+ * `bookWindow` blocks; after a stall it grows toward `blocksSinceLastProcessed`, capped at
+ * `maxCatchupBlocks`, so a long gap recovers recent logs without an unbounded scan.
  *
  * - `bookWindow` (= trailingLogWindow) is the coverage each source's book was last built with; scanning
  *   below `lastProcessedBlock − (bookWindow − 1)` would re-observe logs the book never recorded and
  *   re-deliver them as new (the resume-duplication bug). The book's lower edge is a hard floor on
  *   `fromBlock`.
- * - `tickWindow` (= `logWindowOverride ?? trailingLogWindow`) is this tick's requested look-back.
+ * - effective look-back `tickWindow = min(max(bookWindow, blocksSinceLastProcessed), maxCatchupBlocks)`.
  * - `fromBlock = max(head − (tickWindow − 1), lastProcessedBlock − (bookWindow − 1), 0)`.
  * - Gap: whenever `lastProcessedBlock !== undefined && fromBlock > lastProcessedBlock + 1`, the span
- *   `[lastProcessedBlock + 1, fromBlock − 1]` was NOT re-scanned. This holds independent of whether an
- *   override was passed (an honest resume-without-override after a long pause, or a plain tick that
- *   skipped blocks, both surface the gap).
+ *   `[lastProcessedBlock + 1, fromBlock − 1]` was NOT re-scanned (a stall longer than the catch-up
+ *   ceiling, or a plain tick that skipped blocks, both surface it).
  */
 export function planLogWindow(args: {
   head: bigint
   lastProcessedBlock: bigint | undefined
   bookWindow: number
-  tickWindow: number
+  maxCatchupBlocks: number
 }): { fromBlock: bigint; toBlock: bigint; gap?: { fromBlock: bigint; toBlock: bigint } } {
-  const { head, lastProcessedBlock, bookWindow, tickWindow } = args
+  const { head, lastProcessedBlock, bookWindow, maxCatchupBlocks } = args
   const bookLookback = BigInt(Math.max(0, bookWindow - 1))
+
+  // Effective look-back: bookWindow in steady state, growing toward the stall length, capped at the
+  // catch-up ceiling. `blocksSinceLastProcessed` clamps at bookWindow when unknown/regressed.
+  const blocksSinceLastProcessed =
+    lastProcessedBlock !== undefined && head > lastProcessedBlock ? Number(head - lastProcessedBlock) : bookWindow
+  const tickWindow = Math.min(Math.max(bookWindow, blocksSinceLastProcessed), maxCatchupBlocks)
   const tickLookback = BigInt(Math.max(0, tickWindow - 1))
 
   let fromBlock = head - tickLookback
@@ -60,12 +64,8 @@ export function planLogWindow(args: {
 }
 
 /** Stable per-log identity used as the book key. */
-function logKey(ref: FeedLogRef): string {
-  return `${ref.txHash}:${ref.logIndex}`
-}
-
-function refOf(log: DecodedFeedLog): FeedLogRef {
-  return { txHash: log.txHash, logIndex: log.logIndex, blockNumber: log.blockNumber }
+function logKey(log: Pick<DecodedFeedLog, 'txHash' | 'logIndex'>): string {
+  return `${log.txHash}:${log.logIndex}`
 }
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/
@@ -170,7 +170,7 @@ export function reconcileLogs(args: {
   observed: DecodedFeedLog[]
   fromBlock: bigint
   toBlock: bigint
-}): { book: LogBook; newLogs: DecodedFeedLog[]; retractions: FeedLogRef[] } {
+}): { book: LogBook; newLogs: DecodedFeedLog[]; retractions: DecodedFeedLog[] } {
   const { book, observed, fromBlock, toBlock } = args
 
   const observedKeys = new Set(observed.map((log) => logKey(log)))
@@ -180,10 +180,11 @@ export function reconcileLogs(args: {
   // beyond [fromBlock, toBlock] must never be emitted (the engine also pre-windows `observed`).
   const newLogs = observed.filter((log) => withinWindow(log.blockNumber) && !book.entries.has(logKey(log)))
 
-  const retractions: FeedLogRef[] = []
+  // Retractions carry the FULL prior log (not just a ref) so consumers can reconcile without a lookup.
+  const retractions: DecodedFeedLog[] = []
   for (const entry of book.entries.values()) {
-    if (withinWindow(entry.ref.blockNumber) && !observedKeys.has(logKey(entry.ref))) {
-      retractions.push(entry.ref)
+    if (withinWindow(entry.blockNumber) && !observedKeys.has(logKey(entry))) {
+      retractions.push(entry)
     }
   }
 
@@ -191,13 +192,13 @@ export function reconcileLogs(args: {
   // tick, so they are neither re-confirmed nor retractable — dropping them would re-emit on re-advance),
   // then add every observed log within the window. This re-confirms surviving entries, admits new ones,
   // drops retracted ones (absent from observed), and evicts pre-window entries (never re-added).
-  const nextEntries = new Map<string, LogBookEntry>()
+  const nextEntries = new Map<string, DecodedFeedLog>()
   for (const entry of book.entries.values()) {
-    if (entry.ref.blockNumber > toBlock) nextEntries.set(logKey(entry.ref), entry)
+    if (entry.blockNumber > toBlock) nextEntries.set(logKey(entry), entry)
   }
   for (const log of observed) {
     if (!withinWindow(log.blockNumber)) continue
-    nextEntries.set(logKey(log), { ref: refOf(log), log })
+    nextEntries.set(logKey(log), log)
   }
 
   return { book: { entries: nextEntries }, newLogs, retractions }
