@@ -189,8 +189,12 @@ describe('createBlockFeed', () => {
   })
 
   it('(b) two sources sharing one identical call → one batch slot, both derive', async () => {
-    const { client, state } = createFakeClient({ resolveCall: (c) => (c.functionName === 'foo' ? ok(42n) : ok(0n)) })
-    const { scheduler } = createFakeScheduler()
+    const { client, state } = createFakeClient({
+      // Block advances each tick so the tick after both subscribe still derives (identity changed).
+      block: () => ({ number: BigInt(100 + state.multicallCount), hash: `0x${'ab'.repeat(32)}`, ts: 1700n }),
+      resolveCall: (c) => (c.functionName === 'foo' ? ok(42n) : ok(0n)),
+    })
+    const { scheduler, advance } = createFakeScheduler()
     const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, scheduler })
 
     const shared = () => ({ x: call('foo') })
@@ -200,10 +204,11 @@ describe('createBlockFeed', () => {
     const sb = feed.watch(b)
     sa.subscribe(() => {})
     sb.subscribe(() => {})
-    await flush()
+    await flush() // tick 1: only `a` is active (b subscribed mid-tick, joins next tick)
+    await advance(1000) // tick 2: both `a` and `b` participate
 
     // Only ONE 'foo' contract in the batch despite two sources requesting it.
-    const fooSlots = state.contractsSeen[0]!.filter((c) => c.functionName === 'foo')
+    const fooSlots = state.contractsSeen.at(-1)!.filter((c) => c.functionName === 'foo')
     expect(fooSlots.length).toBe(1)
     expect(sa.getSnapshot().current?.value).toBe(42n)
     expect(sb.getSnapshot().current?.value).toBe(42n)
@@ -378,8 +383,11 @@ describe('createBlockFeed', () => {
 
   it('(j) a throwing derive isolates that source; others still emit', async () => {
     const scheduled = captureMicrotasks()
-    const { client } = createFakeClient({ resolveCall: () => ok(1n) })
-    const { scheduler } = createFakeScheduler()
+    const { client, state } = createFakeClient({
+      block: () => ({ number: BigInt(100 + state.multicallCount), hash: `0x${'ab'.repeat(32)}`, ts: 1700n }),
+      resolveCall: () => ok(1n),
+    })
+    const { scheduler, advance } = createFakeScheduler()
     const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, scheduler })
 
     const bad = feed.watch(
@@ -391,13 +399,137 @@ describe('createBlockFeed', () => {
       })
     )
     const good = feed.watch(source({ key: 'good', derive: (t) => ({ value: 7, identity: t.identity }) }))
-    bad.subscribe(() => {})
+    // Subscribe `good` first so tick 1 covers it; `bad` joins on tick 2 and throws exactly once.
     good.subscribe(() => {})
-    await flush()
+    bad.subscribe(() => {})
+    await flush() // tick 1: only `good` active
+    await advance(1000) // tick 2: both active → bad throws once
 
     expect(good.getSnapshot().current?.value).toBe(7)
     expect(bad.getSnapshot().current).toBeUndefined()
     expect(scheduled.length).toBe(1)
     expect(() => scheduled[0]!()).toThrow('derive boom')
+  })
+
+  it('(k) log events are delivered even when derive returns undefined; not re-delivered next tick', async () => {
+    let blockNo = 100n
+    const { client } = createFakeClient({
+      block: () => ({ number: blockNo, hash: `0x${'ab'.repeat(32)}`, ts: 1700n }),
+      logs: () => [bidLog(100n, 0)],
+    })
+    const { scheduler, advance } = createFakeScheduler()
+    const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, scheduler })
+    const store = feed.watch(
+      source<number>({
+        key: 's',
+        logFilters: () => [{ address: ADDR, event: BID_EVENT }],
+        derive: () => undefined, // never emits — but the log must still flow
+      })
+    )
+    const seen: FeedEvent<number>[] = []
+    store.subscribe((e) => seen.push(e))
+    await flush() // tick 1 at block 100: one new log, undefined emission
+
+    expect(seen.map((e) => e.type)).toEqual(['log']) // log delivered, no tick event
+    expect(store.getSnapshot().current).toBeUndefined()
+
+    seen.length = 0
+    blockNo = 101n // identity advances → tick 2 runs and re-scans the window
+    await advance(1000)
+    // The block-100 log is already recorded in the source's book → not re-delivered.
+    expect(seen.filter((e) => e.type === 'log').length).toBe(0)
+  })
+
+  it('(l) log events are delivered even when derive throws; not re-delivered next tick', async () => {
+    const scheduled = captureMicrotasks()
+    let blockNo = 100n
+    const { client } = createFakeClient({
+      block: () => ({ number: blockNo, hash: `0x${'ab'.repeat(32)}`, ts: 1700n }),
+      logs: () => [bidLog(100n, 0)],
+    })
+    const { scheduler, advance } = createFakeScheduler()
+    const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, scheduler })
+    const store = feed.watch(
+      source<number>({
+        key: 's',
+        logFilters: () => [{ address: ADDR, event: BID_EVENT }],
+        derive: () => {
+          throw new Error('derive boom')
+        },
+      })
+    )
+    const seen: FeedEvent<number>[] = []
+    store.subscribe((e) => seen.push(e))
+    await flush() // tick 1: throw isolated, but log still ships
+
+    expect(seen.map((e) => e.type)).toEqual(['log'])
+    expect(store.getSnapshot().current).toBeUndefined()
+    expect(scheduled.length).toBe(1) // throw rethrown async
+    expect(() => scheduled[0]!()).toThrow('derive boom')
+
+    seen.length = 0
+    blockNo = 101n
+    await advance(1000)
+    // Book dedupe intact: the log recorded on tick 1 does not re-emit.
+    expect(seen.filter((e) => e.type === 'log').length).toBe(0)
+  })
+
+  it('(m) a zero-subscriber source stops participating in ticks', async () => {
+    const { client, state } = createFakeClient({
+      block: () => ({ number: BigInt(100 + state.multicallCount), hash: `0x${'ab'.repeat(32)}`, ts: 1700n }),
+      resolveCall: () => ok(1n),
+    })
+    const { scheduler, advance } = createFakeScheduler()
+    const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, scheduler })
+    const sa = feed.watch(
+      source<bigint>({ key: 'a', calls: () => ({ x: call('afoo') }), derive: (t) => ({ value: t.identity.blockNumber, identity: t.identity }) })
+    )
+    const sb = feed.watch(
+      source<bigint>({ key: 'b', calls: () => ({ y: call('bfoo') }), derive: (t) => ({ value: t.identity.blockNumber, identity: t.identity }) })
+    )
+    sa.subscribe(() => {})
+    const unsubB = sb.subscribe(() => {})
+    await flush() // tick 1: only `a` active (b subscribed mid-tick)
+    await advance(1000) // tick 2: both participate
+
+    expect(state.contractsSeen.at(-1)!.some((c) => c.functionName === 'bfoo')).toBe(true)
+    const bFrozen = sb.getSnapshot().current?.value
+
+    unsubB() // b now has zero subscribers; a keeps the feed running
+    await advance(1000) // tick 3
+
+    const lastBatch = state.contractsSeen.at(-1)!
+    expect(lastBatch.some((c) => c.functionName === 'bfoo')).toBe(false) // b contributes no calls
+    expect(lastBatch.some((c) => c.functionName === 'afoo')).toBe(true) // a still participates
+    expect(sb.getSnapshot().current?.value).toBe(bFrozen) // b's snapshot stops advancing
+  })
+
+  it('(n) resubscribing resumes participation on the following tick', async () => {
+    const { client, state } = createFakeClient({
+      block: () => ({ number: BigInt(100 + state.multicallCount), hash: `0x${'ab'.repeat(32)}`, ts: 1700n }),
+      resolveCall: () => ok(1n),
+    })
+    const { scheduler, advance } = createFakeScheduler()
+    const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, scheduler })
+    const sa = feed.watch(
+      source<bigint>({ key: 'a', calls: () => ({ x: call('afoo') }), derive: (t) => ({ value: t.identity.blockNumber, identity: t.identity }) })
+    )
+    const sb = feed.watch(
+      source<bigint>({ key: 'b', calls: () => ({ y: call('bfoo') }), derive: (t) => ({ value: t.identity.blockNumber, identity: t.identity }) })
+    )
+    sa.subscribe(() => {})
+    const unsubB = sb.subscribe(() => {})
+    await flush() // tick 1: only `a` active (b subscribed mid-tick)
+    await advance(1000) // tick 2: both participate
+    expect(state.contractsSeen.at(-1)!.some((c) => c.functionName === 'bfoo')).toBe(true)
+
+    unsubB()
+    await advance(1000) // tick 3: b skipped
+    expect(state.contractsSeen.at(-1)!.some((c) => c.functionName === 'bfoo')).toBe(false)
+
+    sb.subscribe(() => {}) // resubscribe (feed already running via a)
+    await advance(1000) // tick 4: b resumes
+    expect(state.contractsSeen.at(-1)!.some((c) => c.functionName === 'bfoo')).toBe(true)
+    expect(sb.getSnapshot().current?.value).toBeDefined()
   })
 })

@@ -232,17 +232,33 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
       logs: entry.newLogs,
       retractions: entry.retractions,
     }
+
+    // Log/retraction events are NEVER suppressed: `reconcileLogs` already recorded these logs in the
+    // source's book, so if we don't emit them now they are lost forever. Build them up front, before
+    // derive runs, so they survive an `undefined` emission or a throw. Order: logs → retractions.
+    const logEvents: FeedEvent<unknown>[] = []
+    for (const log of entry.newLogs) logEvents.push({ type: 'log', log })
+    for (const ref of entry.retractions) logEvents.push({ type: 'retraction', ref })
+
     let emission: SourceEmission<unknown> | undefined
+    let derived = false
     try {
       emission = entry.source.derive(tick, { prev: entry.prev })
+      derived = true
     } catch (err) {
-      // Source-level isolation: keep prev, don't publish, rethrow async so it surfaces to the host.
+      // Source-level isolation: keep prev, don't publish phase/tick, rethrow async to the host.
+      // Still fall through so the tick's logs/retractions are published (never suppressed).
       queueMicrotask(() => {
         throw err
       })
+    }
+
+    // Derive threw, or returned `undefined` (nothing to say): no phase/tick event and prev does not
+    // advance, but the tick's logs/retractions still ship.
+    if (!derived || emission === undefined) {
+      if (logEvents.length > 0) entry.store.publish(logEvents)
       return
     }
-    if (emission === undefined) return // Nothing to say this tick.
 
     const prev = entry.prev
     const events: FeedEvent<unknown>[] = []
@@ -251,8 +267,7 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
     if (emission.phase !== undefined && emission.phase !== prev?.phase) {
       events.push({ type: 'phase', from: prev?.phase, to: emission.phase, identity })
     }
-    for (const log of entry.newLogs) events.push({ type: 'log', log })
-    for (const ref of entry.retractions) events.push({ type: 'retraction', ref })
+    events.push(...logEvents)
 
     const valueEquals = entry.source.valueEquals ?? Object.is
     const valueChanged = prev === undefined || !valueEquals(prev.value, emission.value)
@@ -266,7 +281,10 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
 
   async function doTick(options: TickOptions | undefined): Promise<void> {
     clearTimer()
-    const active = [...entries.values()]
+    // Only sources with a live subscriber participate this tick. A zero-subscriber (orphan) entry
+    // registered via `watch()` would otherwise inflate every multicall forever. Skipped entries keep
+    // their `prev`, `logBook`, and store state frozen and resume participating when resubscribed.
+    const active = [...entries.values()].filter((entry) => entry.store.subscriberCount > 0)
 
     // (a) Gather each source's calls, namespace keys, and dedupe identical calls into shared slots.
     const keyed: Record<string, SpeculativeCall> = {}
