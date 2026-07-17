@@ -48,4 +48,12 @@ export interface DiscoveryOptions {
   maxProbeCandidatesPerPair?: number
   /** Override the v4 `Initialize` scan start block (tests / forks). Default: PoolManager deploy block. */
   fromBlockOverride?: bigint
+  /**
+   * When true, a v4 `Initialize` scan that keeps failing (e.g. a provider with a hard `eth_getLogs`
+   * block-range cap that bisection cannot get under) SKIPS v4 enumeration instead of failing the whole
+   * discovery — the path is then selected from v2/v3 candidates only, which can silently miss a better
+   * v4 pool. Default false: correctness first; opt in for range-capped RPCs, or pass
+   * `fromBlockOverride` to bound the scan instead.
+   */
+  bestEffortV4?: boolean
 }

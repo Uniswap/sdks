@@ -112,7 +112,11 @@ export async function discoverPricePath(
   const maxHops = options.maxHops ?? 2
   const notional = options.probeNotional ?? 10n ** BigInt(quote.decimals) * 1000n
   const cap = options.maxProbeCandidatesPerPair ?? 12
-  const enumOpts = { hookAllowlist: options.hookAllowlist, fromBlockOverride: options.fromBlockOverride }
+  const enumOpts = {
+    hookAllowlist: options.hookAllowlist,
+    fromBlockOverride: options.fromBlockOverride,
+    bestEffortV4: options.bestEffortV4,
+  }
 
   const { weth } = getChainAddresses(chainId)
   const intermediaries = options.intermediaries ?? [new Token(chainId, weth, 18, 'WETH')]

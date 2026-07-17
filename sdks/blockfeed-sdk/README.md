@@ -262,7 +262,10 @@ in v1.
   reverting/unpriceable pool yields no emission for that source instead of failing the shared tick.
 - **Discovery's v4 `Initialize` scan needs a capable RPC provider.** The full-history log scan from the
   PoolManager deploy block is Alchemy-class work; weak public RPCs time out or cap the range. Prefer
-  backend-supplied paths, or pass `fromBlockOverride` to bound the scan, where possible.
+  backend-supplied paths, or pass `fromBlockOverride` to bound the scan, where possible. On providers
+  with hard `eth_getLogs` range caps, `options.bestEffortV4: true` skips v4 enumeration (selecting from
+  v2/v3 candidates only — it can miss a better v4 pool) instead of failing the whole discovery; the SDK
+  also fast-fails unreachable capped scans rather than burning the full bisection budget.
 - **Prices are asset-denominated, never "USD".** A USDC-quoted price is a price *in USDC*; fiat display
   mapping is the UI's concern. USDC is not special-cased — EURC, WETH, or any currency is the same code
   path.

@@ -12,7 +12,7 @@
  * Default token: UNI. Ctrl-C to stop.
  */
 import { erc20Abi, createPublicClient, http, isAddress, type Address } from 'viem'
-import { mainnet } from 'viem/chains'
+import { base as baseChain, mainnet, unichain } from 'viem/chains'
 
 import {
   createBlockFeed,
@@ -25,34 +25,59 @@ import { discoverPricePath, isNoPathFound } from '../src/discovery/index'
 
 const RPC_URL = process.env.ETH_RPC_URL
 if (!RPC_URL) {
-  console.error('ETH_RPC_URL not set — run via: chainz exec mainnet -- bun run examples/live-price.ts')
+  console.error('ETH_RPC_URL not set — run via: chainz exec <chainId> -- bun run examples/live-price.ts')
   process.exit(1)
 }
 
-const UNI: Address = '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984'
-const USDC: Address = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
+/** Per-chain wiring: viem chain, the local USDC, and a default demo token with real volume. */
+const CHAINS: Record<number, { chain: typeof mainnet; usdc: Address; defaultToken?: Address }> = {
+  1: {
+    chain: mainnet,
+    usdc: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+    defaultToken: '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984', // UNI
+  },
+  8453: {
+    chain: baseChain,
+    usdc: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+    defaultToken: '0x532f27101965dd16442E59d40670FaF5eBB142E4', // BRETT (WETH-routed — shows 2-hop)
+  },
+  130: {
+    chain: unichain,
+    usdc: '0x078D782b760474a361dDA0AF3839290b0EF57AD6',
+  },
+}
 
-const tokenAddress = (process.argv[2] as Address | undefined) ?? UNI
-if (!isAddress(tokenAddress)) {
-  console.error(`not an address: ${tokenAddress}`)
+const chainId = Number(process.env.CHAIN_ID ?? 1)
+const cfg = CHAINS[chainId]
+if (!cfg) {
+  console.error(`unsupported CHAIN_ID ${chainId} — supported: ${Object.keys(CHAINS).join(', ')}`)
   process.exit(1)
 }
 
-const client = createPublicClient({ chain: mainnet, transport: http(RPC_URL) })
+const tokenAddress = (process.argv[2] as Address | undefined) ?? cfg.defaultToken
+if (!tokenAddress || !isAddress(tokenAddress)) {
+  console.error(tokenAddress ? `not an address: ${tokenAddress}` : `pass a token address (no default for chain ${chainId})`)
+  process.exit(1)
+}
+
+const client = createPublicClient({ chain: cfg.chain, transport: http(RPC_URL) })
+console.log(`chain: ${cfg.chain.name} (${chainId})`)
 
 // --- 1. Token metadata straight from the chain (any ERC20 works). -------------------------------
 const [decimals, symbol] = await Promise.all([
   client.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'decimals' }),
   client.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'symbol' }),
 ])
-const base = toCurrency({ chainId: mainnet.id, address: tokenAddress, decimals, symbol })
-const quote = toCurrency({ chainId: mainnet.id, address: USDC, decimals: 6, symbol: 'USDC' })
+const base = toCurrency({ chainId, address: tokenAddress, decimals, symbol })
+const quote = toCurrency({ chainId, address: cfg.usdc, decimals: 6, symbol: 'USDC' })
 console.log(`token: ${symbol} (${tokenAddress}, ${decimals} decimals)`)
 
 // --- 2. Discovery: enumerate v2/v3/v4 candidates, probe-quote both ways, pick the best path. ----
 console.log('discovering price path → USDC (v2/v3 factories + v4 Initialize scan + probe quotes)…')
 const t0 = Date.now()
-const result = await discoverPricePath(client, { base, quote })
+// bestEffortV4: range-capped RPCs (QuikNode: 10k-block getLogs cap) can't serve the full v4
+// Initialize scan — fall back to v2/v3 candidates rather than failing discovery outright.
+const result = await discoverPricePath(client, { base, quote, options: { bestEffortV4: true } })
 if (isNoPathFound(result)) {
   console.error(`no path: ${result.reason}`)
   process.exit(1)
@@ -88,7 +113,7 @@ const unsub = store.subscribe((e: FeedEvent<PricePathValue>) => {
   }
 })
 
-console.log('live — new price on every mainnet block that moves it (Ctrl-C to stop)\n')
+console.log('live — new price on every block that moves it (Ctrl-C to stop)\n')
 const shutdown = (): void => {
   unsub()
   feed.stop()

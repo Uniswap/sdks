@@ -38,13 +38,7 @@ interface FakeOpts {
 }
 
 /** Build a v4 `Initialize` log (viem returns args already decoded when an `event` is passed). */
-function initLog(a: {
-  currency0: string
-  currency1: string
-  fee: number
-  tickSpacing: number
-  hooks: string
-}): Log {
+function initLog(a: { currency0: string; currency1: string; fee: number; tickSpacing: number; hooks: string }): Log {
   return { args: { id: `0x${'0'.repeat(64)}`, sqrtPriceX96: 0n, tick: 0, ...a } } as unknown as Log
 }
 
@@ -145,7 +139,9 @@ describe('enumerateCandidates', () => {
 
     // Two queries: (WETH, USDC) and the native-substituted (0x0, USDC), each sorted currency0<currency1.
     expect(getLogsCalls.length).toBe(2)
-    const queried = getLogsCalls.map((q) => `${(q.args.currency0 as string).toLowerCase()}/${(q.args.currency1 as string).toLowerCase()}`)
+    const queried = getLogsCalls.map(
+      (q) => `${(q.args.currency0 as string).toLowerCase()}/${(q.args.currency1 as string).toLowerCase()}`
+    )
     expect(queried).toContain(`${USDC.toLowerCase()}/${WETH.toLowerCase()}`) // USDC < WETH
     expect(queried).toContain(`${ZERO.toLowerCase()}/${USDC.toLowerCase()}`) // 0x0 sorts first
     // Same pool returned by both queries → deduped to one candidate.
@@ -157,7 +153,9 @@ describe('enumerateCandidates', () => {
     const { client, getLogsCalls } = makeClient({ tip: 100n })
     await enumerateCandidates(client, 1, ether, usdc, { fromBlockOverride: 0n })
     expect(getLogsCalls.length).toBe(2)
-    const queried = getLogsCalls.map((q) => `${(q.args.currency0 as string).toLowerCase()}/${(q.args.currency1 as string).toLowerCase()}`)
+    const queried = getLogsCalls.map(
+      (q) => `${(q.args.currency0 as string).toLowerCase()}/${(q.args.currency1 as string).toLowerCase()}`
+    )
     expect(queried).toContain(`${ZERO.toLowerCase()}/${USDC.toLowerCase()}`)
     expect(queried).toContain(`${USDC.toLowerCase()}/${WETH.toLowerCase()}`)
   })
@@ -195,5 +193,62 @@ describe('enumerateCandidates', () => {
     await expect(enumerateCandidates(client, 1, usdc, dai, { fromBlockOverride: 0n })).rejects.toBeInstanceOf(
       BlockfeedError
     )
+  })
+})
+
+describe('enumerateCandidates bestEffortV4', () => {
+  const alwaysFailingLogs = {
+    logs: () => {
+      throw new Error('eth_getLogs is limited to a 10,000 range')
+    },
+    factory: (c: { functionName: string; args: readonly unknown[] }) =>
+      c.functionName === 'getPool' && c.args[2] === 3000 ? ok(POOL_A) : ok(ZERO),
+    tip: 100n,
+  }
+
+  it('skips v4 enumeration and keeps v2/v3 candidates when bestEffortV4 is set', async () => {
+    const { client } = makeClient(alwaysFailingLogs)
+    const out = await enumerateCandidates(client, 1, usdc, dai, { fromBlockOverride: 0n, bestEffortV4: true })
+    expect(out.length).toBe(1)
+    expect(out[0]!.ref.protocol).toBe('v3')
+  })
+
+  it('still fails the whole enumeration without bestEffortV4', async () => {
+    const { client } = makeClient(alwaysFailingLogs)
+    await expect(enumerateCandidates(client, 1, usdc, dai, { fromBlockOverride: 0n })).rejects.toBeInstanceOf(
+      BlockfeedError
+    )
+  })
+})
+
+describe('range-cap fast-fail', () => {
+  it('gives up immediately when the declared cap is unreachable within the bisection budget', async () => {
+    let logsCalls = 0
+    const { client } = makeClient({
+      logs: () => {
+        logsCalls++
+        throw new Error('eth_getLogs is limited to a 10,000 range')
+      },
+      tip: 100_000_000n, // ~100M-block span: 2^8 bisections can never reach 10k
+    })
+    await expect(enumerateCandidates(client, 1, usdc, dai, { fromBlockOverride: 0n })).rejects.toBeInstanceOf(
+      BlockfeedError
+    )
+    expect(logsCalls).toBe(1) // fast-fail: no bisection cascade
+  })
+
+  it('still bisects normally when the capped span is reachable', async () => {
+    let logsCalls = 0
+    const { client } = makeClient({
+      logs: ({ fromBlock, toBlock }) => {
+        logsCalls++
+        if (toBlock - fromBlock >= 10_000n) throw new Error('eth_getLogs is limited to a 10,000 range')
+        return []
+      },
+      tip: 30_000n, // 30k span: two halvings land under the cap
+    })
+    const out = await enumerateCandidates(client, 1, usdc, dai, { fromBlockOverride: 0n })
+    expect(out).toEqual([])
+    expect(logsCalls).toBeGreaterThan(2)
   })
 })

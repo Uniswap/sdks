@@ -69,11 +69,45 @@ async function getInitializeLogsBisected(
         err
       )
     }
+    // Fast-fail on hard range caps the provider names (e.g. "eth_getLogs is limited to a 10,000
+    // range"): if even the remaining bisection budget cannot shrink this span under the cap, every
+    // descendant request is doomed — throw now instead of burning 2^(budget) failing calls (each of
+    // which viem's transport also retries).
+    const cap = parseRangeCap(err)
+    if (cap !== undefined && (to - from + 1n) >> BigInt(MAX_BISECT_DEPTH - depth) > cap) {
+      throw new BlockfeedError(
+        `v4 Initialize getLogs range [${from}, ${to}] cannot fit the provider's ${cap}-block getLogs cap ` +
+          `within the bisection budget; use a provider without hard caps, or pass fromBlockOverride/bestEffortV4`,
+        err
+      )
+    }
     const mid = from + (to - from) / 2n
     const left = await getInitializeLogsBisected(client, poolManager, args, from, mid, depth + 1)
     const right = await getInitializeLogsBisected(client, poolManager, args, mid + 1n, to, depth + 1)
     return [...left, ...right]
   }
+}
+
+/**
+ * Extract a provider-declared getLogs block-range cap from an error's message chain (e.g. QuikNode's
+ * "eth_getLogs is limited to a 10,000 range"), searching the error, its `details`, and its causes.
+ * Returns undefined when no cap is recognizable.
+ */
+function parseRangeCap(err: unknown): bigint | undefined {
+  const seen = new Set<unknown>()
+  let node: unknown = err
+  while (node && typeof node === 'object' && !seen.has(node)) {
+    seen.add(node)
+    const { message, details, cause } = node as { message?: unknown; details?: unknown; cause?: unknown }
+    for (const text of [message, details]) {
+      if (typeof text !== 'string') continue
+      const match =
+        /limited to a ([\d,]+)(?:[- ]block)? range/i.exec(text) ?? /range .{0,20}?exceed.{0,20}?([\d,]+)/i.exec(text)
+      if (match?.[1]) return BigInt(match[1].replace(/,/g, ''))
+    }
+    node = cause
+  }
+  return undefined
 }
 
 /**
@@ -100,7 +134,7 @@ export async function enumerateCandidates(
   chainId: number,
   tokenA: Currency,
   tokenB: Currency,
-  opts: Pick<DiscoveryOptions, 'hookAllowlist' | 'fromBlockOverride'>
+  opts: Pick<DiscoveryOptions, 'hookAllowlist' | 'fromBlockOverride' | 'bestEffortV4'>
 ): Promise<CandidatePool[]> {
   const { v2Factory, v3Factory, v4PoolManager, v4StateView, v4PoolManagerDeployBlock, weth } =
     getChainAddresses(chainId)
@@ -156,35 +190,47 @@ export async function enumerateCandidates(
   const tip = await client.getBlockNumber()
   const seenPoolIds = new Set<string>()
 
-  if (tip >= fromBlock) {
-    for (const args of queryPairs) {
-      const logs = await getInitializeLogsBisected(client, v4PoolManager, args, fromBlock, tip, 0)
-      for (const log of logs) {
-        const a = (log as unknown as { args?: Record<string, unknown> }).args
-        if (!a) continue
-        const poolKey: PoolKeyStruct = {
-          currency0: getAddress(a.currency0 as string),
-          currency1: getAddress(a.currency1 as string),
-          fee: Number(a.fee),
-          tickSpacing: Number(a.tickSpacing),
-          hooks: getAddress(a.hooks as string),
+  // With `bestEffortV4`, a scan the provider cannot serve (hard getLogs range caps that bisection
+  // cannot get under) skips v4 enumeration instead of failing the whole discovery; candidates from
+  // any query pair that succeeded before the failure are kept. Without it, the failure propagates.
+  try {
+    if (tip >= fromBlock) {
+      for (const args of queryPairs) {
+        const logs = await getInitializeLogsBisected(client, v4PoolManager, args, fromBlock, tip, 0)
+        for (const log of logs) {
+          const a = (log as unknown as { args?: Record<string, unknown> }).args
+          if (!a) continue
+          const poolKey: PoolKeyStruct = {
+            currency0: getAddress(a.currency0 as string),
+            currency1: getAddress(a.currency1 as string),
+            fee: Number(a.fee),
+            tickSpacing: Number(a.tickSpacing),
+            hooks: getAddress(a.hooks as string),
+          }
+          // Hookless by default; a hooked pool survives only if its hook is explicitly allowlisted.
+          if (!eqAddress(poolKey.hooks, zeroAddress) && !hookAllowlist.includes(poolKey.hooks.toLowerCase())) continue
+          const poolId = poolIdFromPoolKey(poolKey)
+          const poolIdKey = poolId.toLowerCase()
+          if (seenPoolIds.has(poolIdKey)) continue
+          seenPoolIds.add(poolIdKey)
+          const candidate: CandidatePool = {
+            ref: { protocol: 'v4', poolKey },
+            currencyA: tokenA,
+            currencyB: tokenB,
+          }
+          candidates.push(candidate)
+          liquidityCalls.push({
+            address: v4StateView,
+            abi: STATE_VIEW_ABI,
+            functionName: 'getLiquidity',
+            args: [poolId],
+          })
+          liquidityTargets.push(candidate)
         }
-        // Hookless by default; a hooked pool survives only if its hook is explicitly allowlisted.
-        if (!eqAddress(poolKey.hooks, zeroAddress) && !hookAllowlist.includes(poolKey.hooks.toLowerCase())) continue
-        const poolId = poolIdFromPoolKey(poolKey)
-        const poolIdKey = poolId.toLowerCase()
-        if (seenPoolIds.has(poolIdKey)) continue
-        seenPoolIds.add(poolIdKey)
-        const candidate: CandidatePool = {
-          ref: { protocol: 'v4', poolKey },
-          currencyA: tokenA,
-          currencyB: tokenB,
-        }
-        candidates.push(candidate)
-        liquidityCalls.push({ address: v4StateView, abi: STATE_VIEW_ABI, functionName: 'getLiquidity', args: [poolId] })
-        liquidityTargets.push(candidate)
       }
     }
+  } catch (err) {
+    if (!opts.bestEffortV4) throw err
   }
 
   // --- Round 2: backfill in-range liquidity for all v3 + v4 candidates in one multicall. ---
