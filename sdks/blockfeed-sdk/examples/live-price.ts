@@ -20,6 +20,7 @@ import {
   toCurrency,
   type FeedEvent,
   type PricePathValue,
+  type Source,
 } from '../src/index'
 import { discoverPricePath, isNoPathFound } from '../src/discovery/index'
 
@@ -56,7 +57,9 @@ if (!cfg) {
 
 const tokenAddress = (process.argv[2] as Address | undefined) ?? cfg.defaultToken
 if (!tokenAddress || !isAddress(tokenAddress)) {
-  console.error(tokenAddress ? `not an address: ${tokenAddress}` : `pass a token address (no default for chain ${chainId})`)
+  console.error(
+    tokenAddress ? `not an address: ${tokenAddress}` : `pass a token address (no default for chain ${chainId})`
+  )
   process.exit(1)
 }
 
@@ -84,24 +87,43 @@ if (isNoPathFound(result)) {
 }
 const legLabel = (leg: (typeof result.legs)[number]): string => {
   const pool =
-    leg.pool.protocol === 'v2' ? leg.pool.pair : leg.pool.protocol === 'v3' ? leg.pool.pool : `fee=${leg.pool.poolKey.fee}`
+    leg.pool.protocol === 'v2'
+      ? leg.pool.pair
+      : leg.pool.protocol === 'v3'
+      ? leg.pool.pool
+      : `fee=${leg.pool.poolKey.fee}`
   return `${leg.base.symbol}→${leg.quote.symbol} [${leg.pool.protocol} ${pool}]`
 }
 console.log(`path (${((Date.now() - t0) / 1000).toFixed(1)}s): ${result.legs.map(legLabel).join('  ·  ')}`)
 
 // --- 3. Live feed: one atomic multicall per block over the discovered path. ---------------------
-const feed = createBlockFeed({ client }) // chainId derived from client.chain; mainnet polls every 3s
+const feed = createBlockFeed({ client }) // chainId derived from client.chain
 const store = feed.watch(pricePathSource(result))
 
+// A block-number source shares the same per-block multicall and can never be value-suppressed —
+// it prints a dim dot for blocks the engine processed but where the price didn't move.
+const blockTicker: Source<bigint> = {
+  key: 'demo:blocks',
+  calls: () => ({}),
+  derive: (tick) => ({ value: tick.identity.blockNumber, identity: tick.identity }),
+}
+const heartbeat = feed.watch(blockTicker)
+
 let lastPrice: number | undefined
+let lastPrintedBlock = -1n
+const unsubHeartbeat = heartbeat.subscribe((e) => {
+  if (e.type === 'tick' && e.emission.identity.blockNumber > lastPrintedBlock) {
+    process.stdout.write('\x1b[2m·\x1b[0m') // processed, price unchanged
+  }
+})
 const unsub = store.subscribe((e: FeedEvent<PricePathValue>) => {
   if (e.type === 'tick') {
     const { price, priceFloat } = e.emission.value
     const at = new Date(Number(e.emission.identity.timestamp) * 1000).toISOString().slice(11, 19)
-    const delta =
-      lastPrice === undefined ? '' : priceFloat > lastPrice ? '  ▲' : priceFloat < lastPrice ? '  ▼' : '  ='
+    const delta = lastPrice === undefined ? '' : priceFloat > lastPrice ? '  ▲' : priceFloat < lastPrice ? '  ▼' : '  ='
+    lastPrintedBlock = e.emission.identity.blockNumber
     console.log(
-      `block ${e.emission.identity.blockNumber} ${at}  1 ${symbol} = ${price.toSignificant(6)} USDC${delta}`
+      `\nblock ${e.emission.identity.blockNumber} ${at}  1 ${symbol} = ${price.toSignificant(6)} USDC${delta}`
     )
     lastPrice = priceFloat
   } else if (e.type === 'stale') {
@@ -116,6 +138,7 @@ const unsub = store.subscribe((e: FeedEvent<PricePathValue>) => {
 console.log('live — new price on every block that moves it (Ctrl-C to stop)\n')
 const shutdown = (): void => {
   unsub()
+  unsubHeartbeat()
   feed.stop()
   process.exit(0)
 }
