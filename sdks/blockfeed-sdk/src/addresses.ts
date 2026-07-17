@@ -24,7 +24,7 @@ export interface ChainAddresses {
   weth: Address
 }
 
-export const CHAIN_ADDRESSES: Record<number, ChainAddresses> = {
+const CHAIN_ADDRESSES_MUTABLE: Record<number, ChainAddresses> = {
   // Ethereum Mainnet
   1: {
     v2Factory: getAddress('0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f'),
@@ -66,6 +66,17 @@ export const CHAIN_ADDRESSES: Record<number, ChainAddresses> = {
     weth: getAddress('0x4200000000000000000000000000000000000006'),
   },
 }
+
+/**
+ * Frozen registry of per-chain protocol addresses, keyed by numeric chain id. Deep-frozen (the record
+ * and each chain's address object) so consumers treat it as read-only canonical data — mutating it
+ * would silently corrupt every source on that chain.
+ */
+export const CHAIN_ADDRESSES: Readonly<Record<number, Readonly<ChainAddresses>>> = Object.freeze(
+  Object.fromEntries(
+    Object.entries(CHAIN_ADDRESSES_MUTABLE).map(([id, addrs]) => [id, Object.freeze(addrs)])
+  )
+)
 
 /**
  * Returns the protocol addresses for a chain, throwing {@link BlockfeedError} (with the chain id in

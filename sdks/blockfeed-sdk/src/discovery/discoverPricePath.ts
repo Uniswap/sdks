@@ -84,9 +84,7 @@ interface Contender {
  * through each intermediary (default: the chain's WETH). The 2-hop assembly, per intermediary I:
  *  1. probe `I/quote` at `notional` → best leg L2 and the implied I amount it buys (`L2.buyOut`);
  *  2. probe `base/I` using that I amount as the notional → best leg L1;
- *  3. compose a two-hop score from `L1.buyOut` (base bought via quote→I→base) scaled by BOTH legs'
- *     round-trip retention — leg 1 (`L1.roundTripOut / L2.buyOut`) and leg 2 (`L2.roundTripOut /
- *     notional`) — so a thin/manipulated leg-1 pool whose round trip collapses is penalized.
+ *  3. compose the two-hop score via {@link compositeScore} (see there for the leg-1 retention rationale).
  * The highest-scoring contender wins. Legs are oriented base→quote (2-hop: `base/I` then `I/quote`).
  * When nothing scores above zero, a {@link NoPathFound} naming the pair and probe count is returned.
  *
@@ -111,6 +109,40 @@ export async function discoverPricePath(
   let totalProbed = 0
   const contenders: Contender[] = []
 
+  /**
+   * Assemble the best 2-hop contender through one intermediary `inter`, or `undefined` if no viable
+   * route exists (unusable intermediary, no priceable leg, or a non-positive composite score).
+   */
+  async function twoHopContender(inter: Currency): Promise<Contender | undefined> {
+    if (sameCurrency(inter, base) || sameCurrency(inter, quote)) return undefined
+
+    // Step 1: I/quote — how much I does `notional` of quote buy, and the best leg to do it.
+    const iqCands = capCandidates(await _deps.enumerateCandidates(client, chainId, inter, quote, enumOpts), cap)
+    totalProbed += iqCands.length
+    const iqProbes = await _deps.probeCandidates(client, chainId, iqCands, inter, quote, notional)
+    const l2 = _deps.pickBest(iqProbes, notional)
+    if (!l2 || l2.buyOut <= 0n) return undefined
+    const buyOutI = l2.buyOut
+
+    // Step 2: base/I — using that I amount as the notional, buy base.
+    const biCands = capCandidates(await _deps.enumerateCandidates(client, chainId, base, inter, enumOpts), cap)
+    totalProbed += biCands.length
+    const biProbes = await _deps.probeCandidates(client, chainId, biCands, base, inter, buyOutI)
+    const l1 = _deps.pickBest(biProbes, buyOutI)
+    if (!l1 || l1.buyOut <= 0n) return undefined
+
+    // Two-hop score; see compositeScore for why BOTH legs' round-trip retention is load-bearing.
+    const score = compositeScore(l1.buyOut, l1.roundTripOut, buyOutI, l2.roundTripOut, notional)
+    if (score <= 0) return undefined
+    return {
+      score,
+      legs: [
+        { pool: l1.candidate.ref, base, quote: inter },
+        { pool: l2.candidate.ref, base: inter, quote },
+      ],
+    }
+  }
+
   // --- Direct base/quote. ---
   const directCands = capCandidates(await _deps.enumerateCandidates(client, chainId, base, quote, enumOpts), cap)
   totalProbed += directCands.length
@@ -123,37 +155,8 @@ export async function discoverPricePath(
   // --- 2-hop through each intermediary. ---
   if (maxHops >= 2) {
     for (const inter of intermediaries) {
-      if (sameCurrency(inter, base) || sameCurrency(inter, quote)) continue
-
-      // Step 1: I/quote — how much I does `notional` of quote buy, and the best leg to do it.
-      const iqCands = capCandidates(await _deps.enumerateCandidates(client, chainId, inter, quote, enumOpts), cap)
-      totalProbed += iqCands.length
-      const iqProbes = await _deps.probeCandidates(client, chainId, iqCands, inter, quote, notional)
-      const l2 = _deps.pickBest(iqProbes, notional)
-      if (!l2 || l2.buyOut <= 0n) continue
-      const buyOutI = l2.buyOut
-
-      // Step 3: base/I — using that I amount as the notional, buy base.
-      const biCands = capCandidates(await _deps.enumerateCandidates(client, chainId, base, inter, enumOpts), cap)
-      totalProbed += biCands.length
-      const biProbes = await _deps.probeCandidates(client, chainId, biCands, base, inter, buyOutI)
-      const l1 = _deps.pickBest(biProbes, buyOutI)
-      if (!l1 || l1.buyOut <= 0n) continue
-
-      // Two-hop composite retention: base bought via quote→I→base (`l1.buyOut`), scaled by BOTH legs'
-      // round-trip retention — leg 1 (base→I: `l1.roundTripOut`/`buyOutI`) AND leg 2 (I→quote:
-      // `l2.roundTripOut`/`notional`). Including leg 1's factor is adversarially load-bearing: a
-      // manipulated thin base/I pool whose round trip collapses is penalized here rather than hidden.
-      const score = compositeScore(l1.buyOut, l1.roundTripOut, buyOutI, l2.roundTripOut, notional)
-      if (score > 0) {
-        contenders.push({
-          score,
-          legs: [
-            { pool: l1.candidate.ref, base, quote: inter },
-            { pool: l2.candidate.ref, base: inter, quote },
-          ],
-        })
-      }
+      const contender = await twoHopContender(inter)
+      if (contender) contenders.push(contender)
     }
   }
 

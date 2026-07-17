@@ -34,9 +34,6 @@ import type {
   TickIdentity,
 } from './types'
 
-export { realScheduler } from './internal/scheduler'
-export type { Scheduler } from './internal/scheduler'
-
 export interface BlockFeedOptions {
   client: BlockfeedClient
   /** Explicit; the engine never fetches it, so construction stays synchronous. */
