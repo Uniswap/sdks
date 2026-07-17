@@ -44,3 +44,6 @@ export * from './quickLaunch'
 
 // Formatting
 export * from './format'
+
+// CCA blockfeed sources (pure-reducer `Source` factories for @uniswap/blockfeed-sdk)
+export * from './blockfeed'

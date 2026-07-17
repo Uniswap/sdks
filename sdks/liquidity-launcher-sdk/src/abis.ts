@@ -1,4 +1,4 @@
-import { type Abi } from 'viem'
+import { type Abi, type AbiEvent } from 'viem'
 
 /**
  * Minimal, exact ABIs for the launch stack. Each is `as const satisfies Abi` so viem/wagmi infer
@@ -188,6 +188,27 @@ export const CCA_ABI = [
     ],
   },
 ] as const satisfies Abi
+
+/**
+ * `ContinuousClearingAuction.BidSubmitted(uint256 indexed id, address indexed owner, uint256 price,
+ * uint128 amount)` — emitted once per bid landing on the auction. This is the append-only ticker the
+ * live-bids feed watches (single contract, few topics). Ported verbatim from data-api's auction ABI
+ * (`packages/services/data-api/src/abis/Auctions/AuctionAbi.ts`).
+ *
+ * Bid *retractions* are a separate `BidExited` event; the live-bids source deliberately counts only
+ * `BidSubmitted` (monotonic) — see `ccaBidsSource`.
+ */
+export const CCA_BID_SUBMITTED_EVENT = {
+  type: 'event',
+  name: 'BidSubmitted',
+  inputs: [
+    { name: 'id', type: 'uint256', indexed: true },
+    { name: 'owner', type: 'address', indexed: true },
+    { name: 'price', type: 'uint256', indexed: false },
+    { name: 'amount', type: 'uint128', indexed: false },
+  ],
+  anonymous: false,
+} as const satisfies AbiEvent
 
 /**
  * TickDataLens — a stateless view contract that returns the auction's initialized price ticks and

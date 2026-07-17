@@ -74,6 +74,7 @@
         "@types/node": "^18.7.16",
         "@typescript-eslint/eslint-plugin": "^8.38.0",
         "@typescript-eslint/parser": "^8.38.0",
+        "@uniswap/blockfeed-sdk": "workspace:*",
         "eslint": "^8.57.0",
         "eslint-config-prettier": "^9.1.0",
         "eslint-plugin-import": "^2.22.0",

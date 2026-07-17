@@ -49,6 +49,7 @@
   },
   "devDependencies": {
     "@types/node": "^18.7.16",
+    "@uniswap/blockfeed-sdk": "workspace:*",
     "@typescript-eslint/eslint-plugin": "^8.38.0",
     "@typescript-eslint/parser": "^8.38.0",
     "eslint": "^8.57.0",
