@@ -81,6 +81,12 @@ interface EngineEntry {
   /** Threaded `prev`, updated after each non-suppressed derive. */
   prev: SourceEmission<unknown> | undefined
   logBook: LogBook
+  /**
+   * This entry's last-seen subscriber count, already folded into `totalSubscribers`. The refcount slot
+   * lives on the entry (not a key-keyed map) so an orphaned store from a prior `watch` of the same key
+   * can never mutate a newer entry's slot after an unwatch→rewatch.
+   */
+  subscribers: number
 }
 
 /** Per-source log reconciliation output for one tick (what `fetchAndReconcileLogs` hands to derive). */
@@ -113,7 +119,6 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
   const isWs = client.transport?.type === 'webSocket'
 
   const entries = new Map<string, EngineEntry>()
-  const subscriberCounts = new Map<string, number>()
   let totalSubscribers = 0
 
   let running = false
@@ -424,12 +429,17 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
     clearWs()
   }
 
-  function handleSubscriberChange(key: string, count: number): void {
-    // Ignore callbacks from a store whose entry was unwatched (its count no longer refcounts).
-    if (!entries.has(key)) return
-    const prev = subscriberCounts.get(key) ?? 0
+  function handleSubscriberChange(entry: EngineEntry, count: number): void {
+    // Refcount transitions are bound to the ENTRY that owns the store, not to its string key. Ignore a
+    // callback from a store whose entry is no longer the one registered for its key — i.e. an orphaned
+    // store left live after `unwatch(key)` was never rewatched (no entry for the key) OR after
+    // `unwatch(key)` then `watch(sameKeySource)` (a NEW entry now owns the key). Without this guard the
+    // orphan's own unsubscribe would mutate the new entry's refcount slot and could wrongly drive
+    // totalSubscribers to 0 and stop the heartbeat while the new store has live subscribers.
+    if (entries.get(entry.source.key) !== entry) return
+    const prev = entry.subscribers
     totalSubscribers += count - prev
-    subscriberCounts.set(key, count)
+    entry.subscribers = count
     if (stopped) return
     if (totalSubscribers > 0 && !running) startHeartbeat()
     else if (totalSubscribers <= 0 && running) stopHeartbeat()
@@ -448,22 +458,24 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
         store: store as unknown as InternalStore<unknown>,
         prev: undefined,
         logBook: emptyLogBook,
+        subscribers: 0,
       }
       entries.set(source.key, entry)
       // A8: a store created while the feed is already stale must reflect that immediately, not report
       // stale:false until the next failure. (No-op fan-out — the snapshot flips to stale regardless.)
       if (staleActive) store.publish([{ type: 'stale', stale: true }])
-      store.onSubscriberChange((count) => handleSubscriberChange(source.key, count))
+      store.onSubscriberChange((count) => handleSubscriberChange(entry, count))
       return store
     },
     unwatch(key: string): void {
       const entry = entries.get(key)
       if (!entry) return
       entries.delete(key)
-      // Drop its subscriber count from the heartbeat refcount; stop the loop if it was the last.
-      const count = subscriberCounts.get(key) ?? 0
-      subscriberCounts.delete(key)
-      totalSubscribers -= count
+      // Drop THIS entry's current subscriber count from the heartbeat refcount; stop the loop if it
+      // was the last. The store may still have live subscribers (unwatching a key another consumer
+      // subscribed to): their later transitions are ignored because the entry is no longer registered,
+      // so they can neither corrupt totals nor toggle the heartbeat.
+      totalSubscribers -= entry.subscribers
       if (!stopped && totalSubscribers <= 0 && running) stopHeartbeat()
     },
     stop(): void {

@@ -465,6 +465,54 @@ describe('createBlockFeed', () => {
     expect(state.multicallCount).toBe(before)
   })
 
+  it('(unwatch) removes the entry\'s count from totals immediately, even with a live subscriber', async () => {
+    const { client, state } = createFakeClient({ resolveCall: () => ok(1n) })
+    const { scheduler, advance, timerCount } = createFakeScheduler()
+    const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, scheduler })
+    const store = feed.watch(source({ key: 's', derive: (t) => ({ value: 1, identity: t.identity }) }))
+    // A live subscriber remains through the unwatch (we never unsubscribe it).
+    store.subscribe(() => {})
+    await flush()
+    expect(timerCount()).toBe(1)
+
+    // Unwatch drops this entry's whole count from the refcount right now → heartbeat stops despite the
+    // still-live subscriber (unwatch semantics: the key's feed is torn down).
+    feed.unwatch('s')
+    expect(timerCount()).toBe(0)
+    const before = state.multicallCount
+    await advance(5000)
+    expect(state.multicallCount).toBe(before)
+  })
+
+  it('(unwatch→rewatch) an orphaned old store\'s unsubscribe does not stop the new entry\'s heartbeat', async () => {
+    const { client, state } = createFakeClient({ resolveCall: () => ok(1n) })
+    const { scheduler, advance, timerCount } = createFakeScheduler()
+    const feed = createBlockFeed({ client, chainId: 1, pollIntervalMs: 1000, scheduler })
+
+    // Watch key 'k', give it a live subscriber, then unwatch WITHOUT unsubscribing (store is orphaned).
+    const store1 = feed.watch(source({ key: 'k', derive: (t) => ({ value: 1, identity: t.identity }) }))
+    const unsub1 = store1.subscribe(() => {})
+    await flush()
+    expect(timerCount()).toBe(1)
+    feed.unwatch('k')
+    expect(timerCount()).toBe(0) // heartbeat stopped by the unwatch
+
+    // Re-watch the SAME key: a brand-new entry/store owns 'k' now. Subscribe → heartbeat restarts.
+    const store2 = feed.watch(source({ key: 'k', derive: (t) => ({ value: 2, identity: t.identity }) }))
+    expect(store2).not.toBe(store1) // a genuinely new store, not the orphan
+    store2.subscribe(() => {})
+    await flush()
+    expect(timerCount()).toBe(1) // new entry's heartbeat is running
+
+    // The ORPHANED store1's subscriber now unsubscribes. Its refcount transition targets a stale entry
+    // and must be ignored: the new entry keeps its live subscriber, so the heartbeat must NOT stop.
+    unsub1()
+    expect(timerCount()).toBe(1) // still running — no cross-talk into store2's refcount slot
+    const before = state.multicallCount
+    await advance(1000)
+    expect(state.multicallCount).toBe(before + 1) // ticks keep coming for the new entry
+  })
+
   // -------------------------------------------------------------------------
   // Always-on catch-up window + unified gap rule (guarantees formerly asserted via pause/resume)
   // -------------------------------------------------------------------------
