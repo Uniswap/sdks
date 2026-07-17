@@ -1,0 +1,21 @@
+{
+  "name": "blockfeed-integration",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Anvil-fork integration suite for @uniswap/blockfeed-sdk (local dev tool; skips without foundry)",
+  "scripts": {
+    "test": "bun test"
+  },
+  "author": "Uniswap",
+  "dependencies": {
+    "@uniswap/blockfeed-sdk": "workspace:*",
+    "@uniswap/sdk-core": "workspace:*",
+    "viem": "^2.23.5"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.0",
+    "@types/node": "^18.7.16",
+    "typescript": "npm:typescript@^5.6.2"
+  }
+}
