@@ -998,22 +998,34 @@ describe('allowDirectTransfers', () => {
     it('drops the flexibility buffer to zero at zero slippage (only per-leg rounding remains)', () => {
       const spec = buildSpec({ allowDirectTransfers: true, slippageTolerance: new Percent(0) })
       const netMin = BigNumber.from('500000000000000000')
-      expect(directTransferSweepFloor(spec, netMin, [directLeg(netMin.sub(2).toString())], OUT).toString()).to.equal('0')
-      expect(directTransferSweepFloor(spec, netMin, [directLeg(netMin.sub(3).toString())], OUT).toString()).to.equal('3')
+      expect(directTransferSweepFloor(spec, netMin, [directLeg(netMin.sub(2).toString())], OUT).toString()).to.equal(
+        '0'
+      )
+      expect(directTransferSweepFloor(spec, netMin, [directLeg(netMin.sub(3).toString())], OUT).toString()).to.equal(
+        '3'
+      )
     })
 
     it('has no output-side slippage for exact-output (only per-leg rounding)', () => {
       const spec = buildExactOutSpec({ allowDirectTransfers: true })
       const netMin = BigNumber.from('500000000000000000')
-      expect(directTransferSweepFloor(spec, netMin, [directLeg(netMin.sub(2).toString())], OUT).toString()).to.equal('0')
-      expect(directTransferSweepFloor(spec, netMin, [directLeg(netMin.sub(3).toString())], OUT).toString()).to.equal('3')
+      expect(directTransferSweepFloor(spec, netMin, [directLeg(netMin.sub(2).toString())], OUT).toString()).to.equal(
+        '0'
+      )
+      expect(directTransferSweepFloor(spec, netMin, [directLeg(netMin.sub(3).toString())], OUT).toString()).to.equal(
+        '3'
+      )
     })
 
     it('falls back to the per-leg rounding term when 0.5bps rounds to zero (small netMin)', () => {
       const spec = buildSpec({ allowDirectTransfers: true }, { quote: CurrencyAmount.fromRawAmount(WETH, '10000') })
       const netMin = BigNumber.from('10000') // netMin/20000 floors to 0, so only the per-leg term applies
-      expect(directTransferSweepFloor(spec, netMin, [directLeg(netMin.sub(2).toString())], OUT).toString()).to.equal('0')
-      expect(directTransferSweepFloor(spec, netMin, [directLeg(netMin.sub(3).toString())], OUT).toString()).to.equal('3')
+      expect(directTransferSweepFloor(spec, netMin, [directLeg(netMin.sub(2).toString())], OUT).toString()).to.equal(
+        '0'
+      )
+      expect(directTransferSweepFloor(spec, netMin, [directLeg(netMin.sub(3).toString())], OUT).toString()).to.equal(
+        '3'
+      )
     })
 
     it('scales the rounding term by leg count (2 wei per direct leg)', () => {
@@ -1028,7 +1040,9 @@ describe('allowDirectTransfers', () => {
     it('clamps to zero when direct coverage exceeds netMin (over-cover)', () => {
       const spec = buildSpec({ allowDirectTransfers: true })
       const netMin = BigNumber.from('500000000000000000')
-      expect(directTransferSweepFloor(spec, netMin, [directLeg(netMin.add(5).toString())], OUT).toString()).to.equal('0')
+      expect(directTransferSweepFloor(spec, netMin, [directLeg(netMin.add(5).toString())], OUT).toString()).to.equal(
+        '0'
+      )
     })
   })
 
@@ -1068,9 +1082,13 @@ describe('allowDirectTransfers', () => {
     it('at 0 slippage forgives only per-leg rounding (2 wei/leg), not the flexibility buffer', () => {
       const spec = buildSpec({ ...flagOn, slippageTolerance: new Percent(0) })
       const netMinZeroSlip = BigNumber.from('500000000000000000') // quote unchanged at 0 slippage
-      const forgiven = [buildV3ExactInStep({ recipient: TEST_RECIPIENT, amountOutMin: netMinZeroSlip.sub(2).toString() })]
+      const forgiven = [
+        buildV3ExactInStep({ recipient: TEST_RECIPIENT, amountOutMin: netMinZeroSlip.sub(2).toString() }),
+      ]
       expect(sweepAmount(SwapRouter.encodeSwaps(spec, forgiven).calldata)).to.equal('0')
-      const enforced = [buildV3ExactInStep({ recipient: TEST_RECIPIENT, amountOutMin: netMinZeroSlip.sub(3).toString() })]
+      const enforced = [
+        buildV3ExactInStep({ recipient: TEST_RECIPIENT, amountOutMin: netMinZeroSlip.sub(3).toString() }),
+      ]
       expect(sweepAmount(SwapRouter.encodeSwaps(spec, enforced).calldata)).to.equal('3')
     })
 
