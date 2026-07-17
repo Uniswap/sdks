@@ -31,7 +31,8 @@
     "release": "changeset publish",
     "lint": "eslint src --ext .ts",
     "test": "bun test",
-    "regenerate:lock-bytecode": "bun run scripts/regenerate-lock-bytecode.ts"
+    "regenerate:lock-bytecode": "bun run scripts/regenerate-lock-bytecode.ts",
+    "check:lock-bytecode": "bun run scripts/regenerate-lock-bytecode.ts --check"
   },
   "exports": {
     ".": {

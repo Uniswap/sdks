@@ -243,3 +243,41 @@ OpenZeppelin submodule uses an SSH remote, so a fresh clone needs SSH access (or
 
 Running it against the already-pinned commit produces zero diff — a bump only changes the output when
 the upstream bytecode actually changed.
+
+### How it is enforced in CI
+
+The regeneration script is only half the story — nothing stops a contributor from editing the pin or
+the bytecode and forgetting to regenerate. Two GitHub Actions workflows close that gap by running the
+script in **`--check` mode** (`bun run check:lock-bytecode`), which rebuilds the three recipients and
+diffs the result against the committed `lockRecipientBytecode.ts` constants and the `lock.test.ts`
+keccak pins **without writing anything** — exiting nonzero on any difference.
+
+- **Consistency gate — `.github/workflows/liquidity-launcher-bytecode-check.yml`** (required PR check).
+  Runs on every PR that touches `sdks/liquidity-launcher-sdk/**`. It clones liquidity-launcher, builds
+  it at the commit recorded in the `lockRecipientBytecode.ts` header, and fails the PR if the committed
+  bytecode does not match that build. This is what catches "edited the pin / hand-edited the hex and
+  forgot to regenerate." Run the same check locally with:
+
+  ```bash
+  LAUNCHER_REPO=/path/to/liquidity-launcher bun run check:lock-bytecode
+  ```
+
+  (The pinned commit is read from the file header, so no `LAUNCHER_COMMIT` is needed for a consistency
+  check.)
+
+- **Staleness alarm — `.github/workflows/liquidity-launcher-bytecode-staleness.yml`** (weekly cron).
+  The consistency gate only re-verifies the bytes *at the pin*, so it stays green even when upstream has
+  moved on and the pin is stale — which is exactly what produced the Robinhood timelock no-op bug. This
+  scheduled job rebuilds the recipients from **upstream main HEAD** (not the pinned commit) and compares
+  to the committed bytecode. **A red "Lock Bytecode Staleness Alarm" run means upstream has advanced
+  past the pin: a maintainer must review the launcher changes and regenerate + re-pin.** It does not
+  auto-open a PR — the red run is the signal. It compares against main HEAD (rather than the latest
+  release tag) on purpose: the Robinhood drift landed on main *between* releases, so a tag-based check
+  would have missed it; the workflow header documents this choice and how to switch to a release tag.
+
+Both jobs pin solc to the version the committed bytecode was built with (`0.8.35`), so the check
+verifies genuine contract drift rather than tripping on an unrelated upstream solc release. They depend
+on the CI runner being able to fetch the launcher and its public submodules over https (the workflows
+rewrite the launcher's `git@github.com:` SSH submodule URLs to https before init). The fully
+dependency-free alternative — the launcher publishing versioned bytecode/ABI artifacts, letting this
+SDK adopt the `v2-sdk`/`v3-sdk` recompute-from-published-artifact pattern — is tracked as a follow-up.
