@@ -1,6 +1,6 @@
 # `@uniswap/blockfeed-sdk` — Live On-Chain Data Design
 
-**Status:** Draft v2 (post self-review) for team review
+**Status:** Implemented (v1) — see §12 for implementation deltas
 **Date:** 2026-07-16
 **Scope:** New package in the SDKs monorepo, plus CCA source additions to `@uniswap/liquidity-launcher-sdk`
 
@@ -259,3 +259,29 @@ Watch WETH/USDC on real Base for ~10 blocks over both HTTP and WS; assert monoto
 2. **Discovery module:** enumeration, probes, ranking (§9.3 suite).
 3. **CCA sources** in `liquidity-launcher-sdk` (blocked on `TickDataLens` helpers): auction source, bids source, composite lifecycle source with speculative graduation reads (§9.4 suite).
 4. **Hardening:** reorg/retraction paths, backgrounding, backoff, per-chain tuning, live-RPC smoke (§9.5) — against the quick-launch launch-day traffic profile.
+
+## 12. Implementation deltas
+
+Honest divergences between this design and the shipped v1. The body above is left as written except
+where a delta was already folded in (noted below); this section is the single place to reconcile.
+
+1. **Clearing price source (already corrected in §6, §10.1).** The design originally assumed the
+   clearing price came from `TickDataLens`. On-chain, the lens exposes only the per-tick demand
+   distribution (`getInitializedTickData`); the live clearing price is read directly from the auction's
+   `checkpoint()` (`clearingPriceCall`/`getClearingPrice`), matching data-api and the frontend. The lens
+   tick data is still read per block — it drives the live bid-distribution (fill-ratio) chart via the
+   pure `deriveTickFillRatios` helper. See §6 for the corrected description.
+2. **§9.5 live-RPC smoke suite deferred.** Not implemented in v1; it remains future work (nightly/manual
+   env-gated tooling, never CI-blocking), as flagged in the plan self-review. Forks structurally cannot
+   catch provider-behavior drift (rate limits, `getLogs` caps, WS quirks), so this stays on the roadmap.
+3. **Fork tests are local-only developer tools (already stated in §9).** The `integration/` suites
+   (§9.2–§9.4) require a locally installed foundry and an RPC URL env var and skip cleanly when either
+   is absent (`BLOCKFEED_SKIP_FORK=1` or no `anvil` on PATH). CI runs only the hermetic unit suite.
+4. **Reorg scenario uses snapshot/revert, not `anvil_reorg`.** The reorg-honesty fork test (§9.2) was
+   written against `evm_snapshot`/`evm_revert` + re-mine (the fallback §9.2 itself allows), because
+   `anvil_reorg` was not reliably available in the pinned foundry; the observable assertion (a
+   `retraction` carrying the original `(txHash, logIndex)` plus self-healing state ticks) is unchanged.
+5. **Discovery v4 scans should be range-bounded on weak RPCs.** The v4 `Initialize` full-history scan
+   from the PoolManager deploy block is Alchemy-class work; weak public RPCs time out or cap the range.
+   `DiscoveryOptions.fromBlockOverride` bounds the scan start, and backend-supplied paths avoid it
+   entirely. Documented as a caveat in the package README.

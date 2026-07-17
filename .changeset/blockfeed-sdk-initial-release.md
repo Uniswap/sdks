@@ -1,0 +1,6 @@
+---
+"@uniswap/blockfeed-sdk": minor
+---
+
+Initial release: block-latency on-chain data feeds over any viem `PublicClient`. `createBlockFeed` runs one refcounted atomic heartbeat per `(chainId, client)` — a single Multicall3 batch (block number/hash/timestamp + every active source's state reads, deduped and chunked) plus one trailing-window `eth_getLogs` per tick — over both HTTP (polled) and WebSocket (push-triggered) transports. Sources are pure reducers (`(prev, tick) → emission`), fully unit-testable without a network; v1 ships `pricePathSource` (v2/v3/v4 spot composed via sdk-core `Price`) and an on-chain discovery module (`@uniswap/blockfeed-sdk/discovery`) that enumerates candidate pools — including holistic v4 `Initialize`-scan coverage — and selects by two-way executable quality rather than easily-faked spot or liquidity. Subscriptions are `useSyncExternalStore`-compatible stores with a rolling tick buffer; the event model covers `tick`/`log`/`retraction`/`phase`/`gap`/`stale`, with block-latency reorg self-healing and trailing-window log retraction. The core references no browser APIs (tab-visibility is an injectable plugin), and it composes with the CCA/quick-launch sources exported from `@uniswap/liquidity-launcher-sdk` at zero runtime coupling. Supported chains: Ethereum mainnet, Base, and Unichain.
+</content>

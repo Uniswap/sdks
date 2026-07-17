@@ -161,6 +161,45 @@ const { predictedAddress, deployData } = buildLockRecipient({
 // deployData → send to the canonical CREATE2 deployer before migration
 ```
 
+## Live data (blockfeed) sources
+
+A quick-launch asset lives two lives — a live continuous-clearing auction, then a graduated Uniswap v4
+pool. This SDK exports **structural `Source` factories** that stream both over
+[`@uniswap/blockfeed-sdk`](../blockfeed-sdk)'s block-latency engine. They live here, next to the auction
+semantics they depend on (`deriveAuctionOutcome`, deterministic pool-id derivation, the `TickDataLens`
+registry), but there is **zero runtime coupling**: blockfeed is a `devDependency` only, a source is a
+plain object, and TypeScript's structural typing makes these factories assignable to the engine's
+`Source` with nothing imported at runtime (a types-only drift guard keeps the shapes compatible in CI).
+
+- **`launchAssetSource`** — one continuous, phase-tagged lifecycle stream (`auction` →
+  `graduated`/`failed`) with **no gap tick at graduation**. From late auction onward it speculatively
+  reads the deterministic graduated v4 pool's `StateView.getSlot0` every tick; on the tick graduation
+  lands, the pool read succeeds in the *same* multicall, so the `phase` event and the first pool-price
+  tick carry the same block number — no discovery, no indexer wait, no one-block price hole.
+- **`ccaBidsSource`** — the append-only `BidSubmitted` log ticker (monotonic cumulative count; a bid
+  that un-happens in a reorg surfaces as a blockfeed `retraction` event).
+- **`ccaAuctionSource`** — auction-only state (clearing price, currency raised, remaining supply,
+  per-tick bid-distribution fill ratios) without the graduation lifecycle.
+
+The underlying reads are also usable standalone: `clearingPriceCall`/`getClearingPrice` (Q96
+raw-currency-per-raw-token, from the auction's `checkpoint()` — the same live source the backend uses),
+`tickDataCall`/`getTickData` (the lens's initialized price ticks — the live bid-distribution data), and
+the pure `deriveTickFillRatios` helper.
+
+```ts
+import { createBlockFeed } from '@uniswap/blockfeed-sdk'
+import { launchAssetSource, ccaBidsSource, getTickDataLensForFactory } from '@uniswap/liquidity-launcher-sdk'
+
+const feed = createBlockFeed({ client, chainId: 8453 })
+const launch = feed.watch(
+  launchAssetSource({ chainId: 8453, auction, tickDataLens, poolKey, stateView, endBlock })
+)
+launch.subscribe((e) => {
+  if (e.type === 'phase') console.log(e.from, '→', e.to) // auction → graduated
+  if (e.type === 'tick') console.log('priceX96', e.emission.value.priceX96)
+})
+```
+
 ## Supported chains
 
 `getLauncherAddresses(chainId)` returns the deployed stack, or `undefined` if the launcher isn't on
