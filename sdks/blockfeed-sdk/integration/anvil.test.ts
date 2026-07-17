@@ -1,8 +1,8 @@
 import { afterAll, describe, expect, it } from 'bun:test'
 
-import { anvilAvailable, FORK_RPC_BASE, startAnvilFork } from './anvil'
+import { anvilAvailable, forkTestsEnabled, FORK_RPC_BASE, startAnvilFork } from './anvil'
 
-const RUN = anvilAvailable() && process.env.BLOCKFEED_SKIP_FORK !== '1'
+const RUN = forkTestsEnabled()
 
 // Pinned Base block; see engine.fork.test.ts for provenance. Reused here so the harness test shares
 // anvil's on-disk fork cache with the scenario suite (cheap rerun).

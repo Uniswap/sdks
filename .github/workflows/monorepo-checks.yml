@@ -54,6 +54,9 @@ jobs:
       - name: 🔬 Lint
         run: bun run g:lint
 
+      - name: 🧷 Typecheck
+        run: bun run g:typecheck
+
       - name: 🏗  Build
         run: bun run g:build
 

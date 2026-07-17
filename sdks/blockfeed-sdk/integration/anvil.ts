@@ -39,6 +39,20 @@ export function anvilAvailable(): boolean {
   return resolveAnvilBin() !== undefined
 }
 
+/**
+ * Whether the fork suites should run. Opt-IN by design: these suites hit a public Base RPC and take
+ * minutes, so they must NEVER run implicitly (CI installs foundry, which would otherwise satisfy an
+ * opt-out gate). They run only when the caller explicitly sets `BLOCKFEED_FORK=1` locally.
+ *
+ * - `BLOCKFEED_SKIP_FORK=1` force-skips even when opted in (back-compat kill switch).
+ * - foundry/anvil absent → skip regardless.
+ */
+export function forkTestsEnabled(): boolean {
+  if (process.env.BLOCKFEED_SKIP_FORK === '1') return false
+  if (process.env.BLOCKFEED_FORK !== '1') return false
+  return anvilAvailable()
+}
+
 async function jsonRpc<T>(rpcUrl: string, method: string, params: unknown[]): Promise<T> {
   const res = await fetch(rpcUrl, {
     method: 'POST',

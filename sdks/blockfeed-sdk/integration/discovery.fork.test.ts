@@ -17,13 +17,13 @@ import {
 } from 'viem'
 import { base } from 'viem/chains'
 
+import { type AnvilFork, forkTestsEnabled, FORK_RPC_BASE, startAnvilFork } from './anvil'
+import { TEST_ERC20_CREATION_BYTECODE } from './testErc20.bytecode'
+
 /** Concrete Base-chain client type — lets an OP-stack client flow into the SDK without an `as` cast. */
 type ForkPublicClient = PublicClient<Transport, typeof base>
 
-import { type AnvilFork, anvilAvailable, FORK_RPC_BASE, startAnvilFork } from './anvil'
-import { TEST_ERC20_CREATION_BYTECODE } from './testErc20.bytecode'
-
-const RUN = anvilAvailable() && process.env.BLOCKFEED_SKIP_FORK !== '1'
+const RUN = forkTestsEnabled()
 
 /** Pinned Base block — same fixture as the engine fork suite (see engine.fork.test.ts for provenance). */
 const FORK_BLOCK = 48_730_000n

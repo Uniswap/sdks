@@ -23,7 +23,7 @@ import {
 } from 'viem'
 import { base } from 'viem/chains'
 
-import { type AnvilFork, anvilAvailable, FORK_RPC_BASE, startAnvilFork } from './anvil'
+import { type AnvilFork, forkTestsEnabled, FORK_RPC_BASE, startAnvilFork } from './anvil'
 
 /**
  * The concrete Base-chain client type. Declaring it explicitly (rather than the bare `PublicClient`)
@@ -32,7 +32,7 @@ import { type AnvilFork, anvilAvailable, FORK_RPC_BASE, startAnvilFork } from '.
  */
 type ForkPublicClient = PublicClient<Transport, typeof base>
 
-const RUN = anvilAvailable() && process.env.BLOCKFEED_SKIP_FORK !== '1'
+const RUN = forkTestsEnabled()
 
 /**
  * Pinned Base block. Chosen at implementation time as a recent, well-behind-head block

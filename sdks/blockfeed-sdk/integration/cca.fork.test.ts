@@ -40,10 +40,10 @@ import {
 } from 'viem'
 import { base } from 'viem/chains'
 
-import { type AnvilFork, anvilAvailable, FORK_RPC_BASE, startAnvilFork } from './anvil'
+import { type AnvilFork, forkTestsEnabled, FORK_RPC_BASE, startAnvilFork } from './anvil'
 import { TEST_ERC20_CREATION_BYTECODE } from './testErc20.bytecode'
 
-const RUN = anvilAvailable() && process.env.BLOCKFEED_SKIP_FORK !== '1'
+const RUN = forkTestsEnabled()
 
 /** Pinned Base block — same fixture as the other fork suites; every launcher contract has code here. */
 const FORK_BLOCK = 48_730_000n
