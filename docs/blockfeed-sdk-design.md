@@ -188,7 +188,7 @@ discoverPricePath(client, {
 A quick-launch asset lives two lives; `launchAssetSource(launch)` makes them one stream.
 
 **During the auction (`phase: 'auction'`):**
-- Clearing price via **`TickDataLens`** (`getTickDataLensForFactory` registry already exists in `addresses.ts`; the ABI + read helpers are new work, see §10).
+- Clearing price via the auction contract's own **`clearingPrice()`** view (Q96 raw-currency-per-raw-token). *Implementation correction:* this doc originally assumed the clearing price came from `TickDataLens`; on-chain, the lens exposes only the per-tick demand distribution (`getInitializedTickData`), and both data-api and the frontend read the price from the auction directly. The lens tick data is still read per block — it drives the **live bid-distribution chart** (fill ratio per tick), mirrored from data-api's derivation.
 - `currencyRaised`, `remainingSupply`, graduation-relevant block getters from `CCA_ABI` — all in the shared per-tick multicall.
 - **Live bids** via log filters on the auction address — single contract, few topics, append-only ticker: the easy case of log watching. Reorged bids surface as `retraction` events (§7) — during a live auction, a bid that "un-happens" moves the clearing price people just watched; the retraction event is the explanation.
 
@@ -247,7 +247,7 @@ Watch WETH/USDC on real Base for ~10 blocks over both HTTP and WS; assert monoto
 
 ## 10. Open items
 
-1. **`TickDataLens` ABI + read helpers** in `liquidity-launcher-sdk` — prerequisite for auction clearing price; registry exists, ABI/helpers don't.
+1. **`TickDataLens` ABI + read helpers** in `liquidity-launcher-sdk` — RESOLVED during implementation: clearing price comes from the auction's `clearingPrice()` view (the lens has no price), lens `getInitializedTickData` feeds the live bid-distribution chart.
 2. **Quick-launch v1 chain list** — no longer architecturally load-bearing (onchain-router dependency dropped) but determines the tested/tuned chain set, quoter address table, and PoolManager deploy-block registry entries.
 3. **Policy defaults** — probe notional, spread penalty, liquidity floor, poll cadences, buffer length N, trailing window K, multicall chunk size. Proposed defaults above; finalize in implementation review.
 4. **Quick-launch fee sign-off** — 0.25% vs 0.3% is still marked PENDING SIGN-OFF in `quickLaunch.ts`; discovery is immune either way (holistic enumeration), but test fixtures should track the decision.
