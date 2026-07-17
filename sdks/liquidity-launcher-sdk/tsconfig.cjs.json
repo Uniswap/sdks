@@ -5,6 +5,13 @@
     "outDir": "dist/cjs",
     "target": "es2020"
   },
-  "include": ["src/**/*"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts", "src/**/*.test-d.ts"]
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts",
+    "src/**/*.test-d.ts",
+    "src/blockfeed/__fixtures__.ts"
+  ]
 }

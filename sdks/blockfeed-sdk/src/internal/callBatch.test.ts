@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'bun:test'
 
-import type { CallResult, SpeculativeCall } from '../types'
+import type { SpeculativeCall } from '../types'
 
 import { planCallBatch } from './callBatch'
+import { ok } from './testing'
 
 const ADDR = '0x000000000004444c5dc75cB358380D2e3dE08A90'
 const call = (functionName: string, args: readonly unknown[] = [], allowFailure?: boolean): SpeculativeCall => ({
@@ -12,7 +13,6 @@ const call = (functionName: string, args: readonly unknown[] = [], allowFailure?
   args,
   allowFailure,
 })
-const ok = (result: unknown): CallResult => ({ status: 'success', result })
 
 describe('planCallBatch', () => {
   it('dedupes identical cross-source calls into ONE slot and fans the result back to every requester', () => {

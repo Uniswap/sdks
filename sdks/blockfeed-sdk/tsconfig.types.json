@@ -5,5 +5,13 @@
     "emitDeclarationOnly": true,
     "outDir": "dist/types"
   },
-  "include": ["src"]
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts",
+    "src/**/*.test-d.ts",
+    "src/internal/testing.ts"
+  ]
 }

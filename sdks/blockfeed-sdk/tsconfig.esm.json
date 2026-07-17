@@ -5,5 +5,13 @@
     "outDir": "dist/esm",
     "target": "es2020"
   },
-  "include": ["src/**/*"]
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts",
+    "src/**/*.test-d.ts",
+    "src/internal/testing.ts"
+  ]
 }

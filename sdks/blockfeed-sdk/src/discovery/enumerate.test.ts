@@ -4,6 +4,7 @@ import type { Log, PublicClient } from 'viem'
 import { getAddress } from 'viem'
 
 import { BlockfeedError } from '../errors'
+import { fail, ok } from '../internal/testing'
 
 import { enumerateCandidates } from './enumerate'
 
@@ -27,8 +28,6 @@ interface RawContract {
   functionName: string
   args: readonly unknown[]
 }
-const ok = (result: unknown): RawResult => ({ status: 'success', result })
-const fail = (message: string): RawResult => ({ status: 'failure', error: new Error(message) })
 const eqAddr = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
 
 interface FakeOpts {

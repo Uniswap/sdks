@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test'
 import type { Address, PublicClient } from 'viem'
 import { getAddress } from 'viem'
 
+import { fail, ok } from '../internal/testing'
 import type { PoolKeyStruct } from '../types'
 
 import { probeCandidates } from './probe'
@@ -22,8 +23,6 @@ interface RawContract {
   functionName: string
   args: readonly unknown[]
 }
-const ok = (result: unknown): RawResult => ({ status: 'success', result })
-const fail = (message: string): RawResult => ({ status: 'failure', error: new Error(message) })
 
 /** Fake client returning one canned `RawResult[]` per multicall round, capturing the contracts sent. */
 function makeClient(rounds: RawResult[][]) {

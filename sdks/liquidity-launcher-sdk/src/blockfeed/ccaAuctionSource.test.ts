@@ -1,15 +1,10 @@
 import { describe, expect, it } from 'bun:test'
-import { getAddress } from 'viem'
 
 import { clearingPriceCall, currencyRaisedCall, isGraduatedCall, remainingSupplyCall, tickDataCall } from '../reads'
 
+import { AUCTION, CHECKPOINT, LENS, Q96, TICKS, fail, ok } from './__fixtures__'
 import { ccaAuctionSource } from './ccaAuctionSource'
 import type { CallResult, CcaAuctionState, SourceEmission, TickData, TickIdentity } from './types'
-
-const AUCTION = getAddress('0x1234567890abcdef1234567890abcdef12345678')
-const LENS = getAddress('0x00cca200bf124dbfa848937c553864f4b4ce0632')
-
-const Q96 = 79228162514264337593543950336n // 1 * 2^96
 
 const IDENTITY: TickIdentity = {
   chainId: 130,
@@ -17,22 +12,6 @@ const IDENTITY: TickIdentity = {
   parentBlockHash: '0xabc',
   timestamp: 1_700_000_000n,
 }
-
-const ok = (result: unknown): CallResult => ({ status: 'success', result })
-const fail = (): CallResult => ({ status: 'failure', error: new Error('reverted') })
-
-const CHECKPOINT = {
-  clearingPrice: 2n * Q96,
-  currencyRaisedAtClearingPriceQ96_X7: 0n,
-  cumulativeMpsPerPrice: 0n,
-  cumulativeMps: 0,
-  prev: 0n,
-  next: 0n,
-}
-const TICKS = [
-  { priceQ96: 1000n, currencyDemandQ96: 500n, requiredCurrencyDemandQ96: 200n, currencyRequiredQ96: 300n },
-  { priceQ96: 2000n, currencyDemandQ96: 800n, requiredCurrencyDemandQ96: 400n, currencyRequiredQ96: 600n },
-]
 
 function fullTick(overrides: Partial<Record<string, CallResult>> = {}): TickData {
   return {

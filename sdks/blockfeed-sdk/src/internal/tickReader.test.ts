@@ -4,6 +4,7 @@ import { MULTICALL3_ADDRESS } from '../constants'
 import { TickFailedError } from '../errors'
 import type { SpeculativeCall } from '../types'
 
+import { ok, fail } from './testing'
 import { MULTICALL3_HELPER_ABI, readTick } from './tickReader'
 
 type RawResult = { status: 'success'; result: unknown } | { status: 'failure'; error: Error }
@@ -26,9 +27,6 @@ function fakeClient(handler: (contracts: RawContract[]) => RawResult[]) {
   } as never
   return { client, calls }
 }
-
-const ok = (result: unknown): RawResult => ({ status: 'success', result })
-const fail = (message: string): RawResult => ({ status: 'failure', error: new Error(message) })
 
 // Canned identity triple returned in call order: getBlockNumber, getLastBlockHash, getCurrentBlockTimestamp.
 const IDENTITY_OK: RawResult[] = [ok(100n), ok('0xabc123'), ok(1700000000n)]

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test'
 import type { Address } from 'viem'
 
 import { BlockfeedError } from '../errors'
+import { ok } from '../internal/testing'
 import { poolIdFromPoolKey } from '../math/poolId'
 import type { CallResult, PathLeg, PricePath, TickData, TickIdentity } from '../types'
 
@@ -29,7 +30,6 @@ function tick(results: Record<string, CallResult>): TickData {
   return { identity: IDENTITY, results, logs: [], retractions: [] }
 }
 
-const ok = (result: unknown): CallResult => ({ status: 'success', result })
 
 // v3 slot0 returns a 7-tuple; only index 0 (sqrtPriceX96) matters.
 const slot0 = (sqrtPriceX96: bigint) => ok([sqrtPriceX96, 0, 0, 0, 0, 0, true])
