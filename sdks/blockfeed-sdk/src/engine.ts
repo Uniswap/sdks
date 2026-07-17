@@ -12,8 +12,9 @@ import {
   STALE_AFTER_CONSECUTIVE_FAILURES,
 } from './constants'
 import { BlockfeedError } from './errors'
+import { planCallBatch } from './internal/callBatch'
 import type { LogBook } from './internal/logWindow'
-import { decodeFeedLogs, emptyLogBook, reconcileLogs } from './internal/logWindow'
+import { decodeFeedLogs, emptyLogBook, planLogWindow, reconcileLogs } from './internal/logWindow'
 import type { Scheduler } from './internal/scheduler'
 import { realScheduler } from './internal/scheduler'
 import type { InternalStore } from './internal/store'
@@ -29,7 +30,6 @@ import type {
   LogFilter,
   Source,
   SourceEmission,
-  SpeculativeCall,
   TickData,
   TickIdentity,
 } from './types'
@@ -68,22 +68,17 @@ interface EngineEntry {
   /** Threaded `ctx.prev`, updated after each non-suppressed derive. */
   prev: SourceEmission<unknown> | undefined
   logBook: LogBook
-  // Per-tick scratch (reset each tick before use):
-  tickResults: Record<string, CallResult>
+}
+
+/** Per-source log reconciliation output for one tick (what `fetchAndReconcileLogs` hands to derive). */
+interface EntryLogs {
   newLogs: DecodedFeedLog[]
   retractions: FeedLogRef[]
-  filters: LogFilter[]
 }
 
 interface TickOptions {
   isResume?: boolean
   logWindowOverride?: number
-}
-
-/** Stable string identity for a call, for cross-source batch dedupe. */
-function callFingerprint(callDescriptor: SpeculativeCall): string {
-  const args = JSON.stringify(callDescriptor.args, (_k, v) => (typeof v === 'bigint' ? `${v}n` : v))
-  return `${callDescriptor.address.toLowerCase()}::${callDescriptor.functionName}::${args}`
 }
 
 /**
@@ -99,8 +94,9 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
   const bufferSize = opts.bufferSize ?? DEFAULT_BUFFER_SIZE
   const maxCallsPerChunk = opts.maxCallsPerChunk ?? DEFAULT_MAX_CALLS_PER_CHUNK
   const scheduler = opts.scheduler ?? realScheduler
-  // v1 rule: only a direct WebSocket transport uses the push trigger.
-  const isWs = (client as { transport?: { type?: string } }).transport?.type === 'webSocket'
+  // v1 rule: only a direct WebSocket transport uses the push trigger. `transport` is declared on
+  // BlockfeedClient, so no cast is needed; a non-viem structural client omits it (HTTP semantics).
+  const isWs = client.transport?.type === 'webSocket'
 
   const entries = new Map<string, EngineEntry>()
   const subscriberCounts = new Map<string, number>()
@@ -122,7 +118,6 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
   let wsUnwatch: (() => void) | undefined
 
   let prevIdentity: Omit<TickIdentity, 'chainId'> | undefined
-  let prevTickFailed = false
   let lastProcessedBlock: bigint | undefined
 
   let consecutiveFailures = 0
@@ -157,7 +152,6 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
 
   function handleTickFailure(): void {
     consecutiveFailures += 1
-    prevTickFailed = true
     if (consecutiveFailures >= STALE_AFTER_CONSECUTIVE_FAILURES && !staleActive) {
       staleActive = true
       for (const entry of entries.values()) entry.store.publish([{ type: 'stale', stale: true }])
@@ -173,7 +167,6 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
 
   function onTickSuccess(): void {
     consecutiveFailures = 0
-    prevTickFailed = false
     if (staleActive) {
       staleActive = false
       for (const entry of entries.values()) entry.store.publish([{ type: 'stale', stale: false }])
@@ -181,56 +174,50 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
   }
 
   /**
-   * Fetch the union `getLogs` for the window, then split/reconcile into each source's own book.
+   * Fetch the union `getLogs` for the window ({@link planLogWindow} computes the bounds + any gap), then
+   * split/reconcile into each source's own book. Returns per-source new-logs/retractions keyed by entry
+   * (the engine threads them into `deriveAndPublish`); the source books are the only state mutated here.
    *
-   * Window math (design doc §4.3, unified gap semantics):
-   * - `bookK = trailingLogWindow` is the coverage each source's book was last built with; scanning below
-   *   `lastProcessedBlock − (bookK − 1)` would re-observe logs the book never recorded and re-deliver them
-   *   as new (the resume-duplication bug). The book's lower edge is therefore a hard floor on `fromBlock`.
-   * - `tickK = logWindowOverride ?? trailingLogWindow` is this tick's requested look-back.
-   * - `fromBlock = max(head − (tickK − 1), lastProcessedBlock − (bookK − 1), 0)`.
-   * - Gap: whenever `lastProcessedBlock !== undefined && fromBlock > lastProcessedBlock + 1`, the span
-   *   `[lastProcessedBlock + 1, fromBlock − 1]` was NOT re-scanned — publish a `gap` to every source with
-   *   filters. This holds independent of whether an override was passed (an honest resume-without-override
-   *   after a long pause, or a plain tick that skipped blocks, both surface the gap).
+   * The unified gap rule publishes a `gap` to every source with filters whenever a span went un-scanned
+   * — independent of whether an override was passed (a resume-without-override after a long pause, or a
+   * plain tick that skipped blocks, both surface it). See {@link planLogWindow} for the window math.
    */
   async function fetchAndReconcileLogs(
     active: EngineEntry[],
     identity: Omit<TickIdentity, 'chainId'>,
     overrideK: number | undefined
-  ): Promise<void> {
-    const bookLookback = BigInt(Math.max(0, trailingLogWindow - 1))
-    const tickLookback = BigInt(Math.max(0, (overrideK ?? trailingLogWindow) - 1))
+  ): Promise<Map<EngineEntry, EntryLogs>> {
+    const logsByEntry = new Map<EngineEntry, EntryLogs>()
+    const filtersByEntry = new Map<EngineEntry, LogFilter[]>()
     const addresses = new Map<string, Address>()
     const events = new Map<string, AbiEvent>()
     for (const entry of active) {
       const filters = entry.source.logFilters ? entry.source.logFilters({ prev: entry.prev }) : []
-      entry.filters = filters
-      entry.newLogs = []
-      entry.retractions = []
+      filtersByEntry.set(entry, filters)
       for (const filter of filters) {
         addresses.set(filter.address.toLowerCase(), filter.address)
         events.set(toEventSelector(filter.event), filter.event)
       }
     }
-    if (addresses.size === 0) return
+    if (addresses.size === 0) return logsByEntry
 
-    let fromBlock = identity.blockNumber - tickLookback
-    if (lastProcessedBlock !== undefined) {
-      const bookFloor = lastProcessedBlock - bookLookback
-      if (bookFloor > fromBlock) fromBlock = bookFloor
-    }
-    if (fromBlock < 0n) fromBlock = 0n
-    const toBlock = identity.blockNumber
+    const { fromBlock, toBlock, gap } = planLogWindow({
+      head: identity.blockNumber,
+      lastProcessedBlock,
+      bookWindow: trailingLogWindow,
+      tickWindow: overrideK ?? trailingLogWindow,
+    })
 
-    // Unified gap rule: any block strictly between lastProcessedBlock and fromBlock went un-scanned.
-    if (lastProcessedBlock !== undefined && fromBlock > lastProcessedBlock + 1n) {
-      const gap: FeedEvent<unknown> = { type: 'gap', fromBlock: lastProcessedBlock + 1n, toBlock: fromBlock - 1n }
+    // Gap fan-out: publish the un-scanned span to every source that has filters.
+    if (gap !== undefined) {
+      const gapEvent: FeedEvent<unknown> = { type: 'gap', fromBlock: gap.fromBlock, toBlock: gap.toBlock }
       for (const entry of active) {
-        if (entry.filters.length > 0) entry.store.publish([gap])
+        if ((filtersByEntry.get(entry) ?? []).length > 0) entry.store.publish([gapEvent])
       }
     }
 
+    // `getLogs` is cast through `unknown`: BlockfeedClient is a structural subset of viem's PublicClient
+    // whose overloaded getLogs signature does not accept our erased filter shape without this bridge.
     const rawLogs = (await (client.getLogs as unknown as (args: unknown) => Promise<Log[]>)({
       address: [...addresses.values()],
       events: [...events.values()],
@@ -239,31 +226,33 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
     })) as Log[]
 
     for (const entry of active) {
-      if (entry.filters.length === 0) continue
-      const decoded = decodeFeedLogs(entry.filters, rawLogs)
+      const filters = filtersByEntry.get(entry) ?? []
+      if (filters.length === 0) continue
+      const decoded = decodeFeedLogs(filters, rawLogs)
       // A racing getLogs can return logs past the tick's block; exclude anything outside [from, to].
       const windowed = decoded.filter((log) => log.blockNumber >= fromBlock && log.blockNumber <= toBlock)
       const reconciled = reconcileLogs({ book: entry.logBook, observed: windowed, fromBlock, toBlock })
       entry.logBook = reconciled.book
-      entry.newLogs = reconciled.newLogs
-      entry.retractions = reconciled.retractions
+      logsByEntry.set(entry, { newLogs: reconciled.newLogs, retractions: reconciled.retractions })
     }
+    return logsByEntry
   }
 
-  function deriveAndPublish(entry: EngineEntry, identity: TickIdentity): void {
-    const tick: TickData = {
-      identity,
-      results: entry.tickResults,
-      logs: entry.newLogs,
-      retractions: entry.retractions,
-    }
+  function deriveAndPublish(
+    entry: EngineEntry,
+    identity: TickIdentity,
+    results: Record<string, CallResult>,
+    entryLogs: EntryLogs
+  ): void {
+    const { newLogs, retractions } = entryLogs
+    const tick: TickData = { identity, results, logs: newLogs, retractions }
 
     // Log/retraction events are NEVER suppressed: `reconcileLogs` already recorded these logs in the
     // source's book, so if we don't emit them now they are lost forever. Build them up front, before
     // derive runs, so they survive an `undefined` emission or a throw. Order: logs → retractions.
     const logEvents: FeedEvent<unknown>[] = []
-    for (const log of entry.newLogs) logEvents.push({ type: 'log', log })
-    for (const ref of entry.retractions) logEvents.push({ type: 'retraction', ref })
+    for (const log of newLogs) logEvents.push({ type: 'log', log })
+    for (const ref of retractions) logEvents.push({ type: 'retraction', ref })
 
     let emission: SourceEmission<unknown> | undefined
     let derived = false
@@ -311,40 +300,15 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
     // their `prev`, `logBook`, and store state frozen and resume participating when resubscribed.
     const active = [...entries.values()].filter((entry) => entry.store.subscriberCount > 0)
 
-    // (a) Gather each source's calls, namespace keys, and dedupe identical calls into shared slots.
-    const keyed: Record<string, SpeculativeCall> = {}
-    const fingerprintToSlot = new Map<string, string>()
-    const slotRequesters = new Map<string, Array<{ entry: EngineEntry; callKey: string }>>()
-    for (const entry of active) {
-      entry.tickResults = {}
-      const calls = entry.source.calls({ prev: entry.prev })
-      for (const [callKey, descriptor] of Object.entries(calls)) {
-        const fingerprint = callFingerprint(descriptor)
-        let slotKey = fingerprintToSlot.get(fingerprint)
-        if (slotKey === undefined) {
-          slotKey = `${entry.source.key}:${callKey}`
-          fingerprintToSlot.set(fingerprint, slotKey)
-          keyed[slotKey] = {
-            address: descriptor.address,
-            abi: descriptor.abi,
-            functionName: descriptor.functionName,
-            args: descriptor.args,
-            allowFailure: descriptor.allowFailure === true,
-          }
-          slotRequesters.set(slotKey, [])
-        } else {
-          // Shared slot tolerates failure only if EVERY requester tolerates it (AND).
-          const slot = keyed[slotKey] as SpeculativeCall
-          slot.allowFailure = slot.allowFailure === true && descriptor.allowFailure === true
-        }
-        slotRequesters.get(slotKey)!.push({ entry, callKey })
-      }
-    }
+    // (a) Gather each source's calls; dedupe identical cross-source calls into shared slots.
+    const batch = planCallBatch(
+      active.map((entry) => ({ requester: entry, sourceKey: entry.source.key, calls: entry.source.calls({ prev: entry.prev }) }))
+    )
 
     // (b) Atomic read.
     let result
     try {
-      result = await readTick(client, { keyed }, { maxCallsPerChunk })
+      result = await readTick(client, batch.keyed, { maxCallsPerChunk })
     } catch {
       handleTickFailure()
       return
@@ -352,12 +316,13 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
 
     const identity = result.identity
     const isResume = options?.isResume === true
-    // (c) Same identity ⇒ nothing moved: skip logs + derive. Never skip on resume or after a failure.
+    // (c) Same identity ⇒ nothing moved: skip logs + derive. Never skip on resume or after a failure
+    // (`consecutiveFailures > 0` iff the previous tick failed — cleared only by a full success).
     const identityUnchanged =
       prevIdentity !== undefined &&
       prevIdentity.blockNumber === identity.blockNumber &&
       prevIdentity.parentBlockHash === identity.parentBlockHash
-    const skip = identityUnchanged && !isResume && !prevTickFailed
+    const skip = identityUnchanged && !isResume && consecutiveFailures === 0
 
     if (skip) {
       // A successful read with an unchanged identity still clears failure/backoff/stale state.
@@ -367,16 +332,13 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
       return
     }
 
-    // Map deduped slot results back to every requester's own un-namespaced call key.
-    for (const [slotKey, requesters] of slotRequesters) {
-      const res = result.results[slotKey]
-      if (res === undefined) continue
-      for (const { entry, callKey } of requesters) entry.tickResults[callKey] = res
-    }
+    // Map deduped slot results back to every requester's own un-namespaced call keys.
+    const resultsByEntry = batch.distribute(result.results)
 
     // (d) One union getLogs → per-source reconciliation (also publishes any `gap` for the un-scanned span).
+    let logsByEntry: Map<EngineEntry, EntryLogs>
     try {
-      await fetchAndReconcileLogs(active, identity, isResume ? options?.logWindowOverride : undefined)
+      logsByEntry = await fetchAndReconcileLogs(active, identity, isResume ? options?.logWindowOverride : undefined)
     } catch {
       handleTickFailure()
       return
@@ -388,10 +350,12 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
 
     // (e) Derive + publish, one source at a time (source-level errors isolated).
     const fullIdentity: TickIdentity = { chainId, ...identity }
-    for (const entry of active) deriveAndPublish(entry, fullIdentity)
+    const noLogs: EntryLogs = { newLogs: [], retractions: [] }
+    for (const entry of active) {
+      deriveAndPublish(entry, fullIdentity, resultsByEntry.get(entry) ?? {}, logsByEntry.get(entry) ?? noLogs)
+    }
 
     prevIdentity = identity
-    prevTickFailed = false
     lastProcessedBlock = identity.blockNumber
     scheduleNextSuccess()
   }
@@ -426,7 +390,6 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
     // stay paused when the heartbeat starts; the deferred first tick below is guarded on `!paused`.
     consecutiveFailures = 0
     prevIdentity = undefined // Force the first tick to derive (don't skip against stale identity).
-    prevTickFailed = false
     if (isWs) {
       // The block-notification registration must be synchronous so no pushed block is missed.
       wsUnwatch = (client.watchBlockNumber as unknown as (args: { onBlockNumber: () => void }) => () => void)({
@@ -472,10 +435,6 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
         store: store as unknown as InternalStore<unknown>,
         prev: undefined,
         logBook: emptyLogBook,
-        tickResults: {},
-        newLogs: [],
-        retractions: [],
-        filters: [],
       }
       entries.set(source.key, entry)
       // A8: a store created while the feed is already stale must reflect that immediately, not report

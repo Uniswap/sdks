@@ -18,11 +18,6 @@ export const MULTICALL3_HELPER_ABI = parseAbi([
   'function getCurrentBlockTimestamp() view returns (uint256 timestamp)',
 ])
 
-/** The keyed reads to execute this tick. Keys are already namespaced by the engine (`${sourceKey}:${callKey}`). */
-export interface TickReadRequest {
-  keyed: Record<string, SpeculativeCall>
-}
-
 /** One atomic tick: the identity anchored to it plus every keyed call's result. */
 export interface TickReadResult {
   identity: Omit<TickIdentity, 'chainId'>
@@ -38,11 +33,14 @@ const IDENTITY_FUNCTIONS = ['getBlockNumber', 'getLastBlockHash', 'getCurrentBlo
  * (sorted-key) order. Large batches are split into sequential chunks bounded by `maxCallsPerChunk`;
  * the identity calls live only in the first chunk and all chunks share that identity.
  *
+ * `keyed` is the reads to execute this tick; its keys are already namespaced by the engine
+ * (`${sourceKey}:${callKey}`).
+ *
  * @throws {TickFailedError} if any identity call fails, or any non-speculative keyed call fails.
  */
 export async function readTick(
   client: Pick<PublicClient, 'multicall'>,
-  request: TickReadRequest,
+  keyed: Record<string, SpeculativeCall>,
   opts?: { maxCallsPerChunk?: number }
 ): Promise<TickReadResult> {
   const maxCallsPerChunk = opts?.maxCallsPerChunk ?? DEFAULT_MAX_CALLS_PER_CHUNK
@@ -55,9 +53,9 @@ export async function readTick(
   }))
 
   // Deterministic ordering: identity calls first, then keyed calls sorted by key.
-  const sortedKeys = Object.keys(request.keyed).sort()
+  const sortedKeys = Object.keys(keyed).sort()
   const keyedContracts: RawContract[] = sortedKeys.map((key) => {
-    const call = request.keyed[key] as SpeculativeCall
+    const call = keyed[key] as SpeculativeCall
     return { address: call.address, abi: call.abi, functionName: call.functionName, args: call.args }
   })
 
@@ -116,7 +114,7 @@ export async function readTick(
       resultsByKey[key] = { status: 'success', result: raw.result }
       return
     }
-    if (request.keyed[key]?.allowFailure === true) {
+    if (keyed[key]?.allowFailure === true) {
       resultsByKey[key] = { status: 'failure', error: raw.error }
     } else {
       failedKeys.push(key)

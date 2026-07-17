@@ -53,6 +53,8 @@ async function getInitializeLogsBisected(
   depth: number
 ): Promise<Log[]> {
   try {
+    // `getLogs` is cast through `unknown`: BlockfeedClient is a structural subset of viem's PublicClient
+    // whose overloaded getLogs signature does not accept this bare filter shape without the bridge.
     return (await (client.getLogs as unknown as (a: unknown) => Promise<Log[]>)({
       address: poolManager,
       event: V4_POOL_MANAGER_INITIALIZE_EVENT,

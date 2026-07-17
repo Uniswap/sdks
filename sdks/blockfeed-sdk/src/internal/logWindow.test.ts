@@ -4,7 +4,7 @@ import { encodeAbiParameters, encodeEventTopics, parseAbiItem } from 'viem'
 
 import type { DecodedFeedLog, FeedLogRef, LogFilter } from '../types'
 
-import { decodeFeedLogs, emptyLogBook, matchLogsToFilters, reconcileLogs } from './logWindow'
+import { decodeFeedLogs, emptyLogBook, matchLogsToFilters, planLogWindow, reconcileLogs } from './logWindow'
 import type { LogBook } from './logWindow'
 
 const TRANSFER = parseAbiItem(
@@ -250,5 +250,68 @@ describe('reconcileLogs', () => {
 
   it('emptyLogBook has no entries', () => {
     expect(emptyLogBook.entries.size).toBe(0)
+  })
+})
+
+describe('planLogWindow', () => {
+  it('first tick (no lastProcessedBlock): window is [head-(K-1), head], no gap', () => {
+    expect(planLogWindow({ head: 101n, lastProcessedBlock: undefined, bookWindow: 3, tickWindow: 3 })).toEqual({
+      fromBlock: 99n,
+      toBlock: 101n,
+    })
+  })
+
+  it('steady tick: book floor lifts fromBlock, no gap', () => {
+    // head 102, last 101, K=3: fromBlock = max(102-2, 101-2) = 100.
+    expect(planLogWindow({ head: 102n, lastProcessedBlock: 101n, bookWindow: 3, tickWindow: 3 })).toEqual({
+      fromBlock: 100n,
+      toBlock: 102n,
+    })
+  })
+
+  it('short pause + large override: book floor clamps fromBlock, no gap', () => {
+    // head 101, last 100, book K=3, tick K=20: fromBlock = max(101-19, 100-2, 0) = 98; 98 <= 101 → no gap.
+    expect(planLogWindow({ head: 101n, lastProcessedBlock: 100n, bookWindow: 3, tickWindow: 20 })).toEqual({
+      fromBlock: 98n,
+      toBlock: 101n,
+    })
+  })
+
+  it('long pause + override 3: gap with exact bounds', () => {
+    // head 110, last 100, K=3: fromBlock = 108; gap = [101, 107].
+    expect(planLogWindow({ head: 110n, lastProcessedBlock: 100n, bookWindow: 3, tickWindow: 3 })).toEqual({
+      fromBlock: 108n,
+      toBlock: 110n,
+      gap: { fromBlock: 101n, toBlock: 107n },
+    })
+  })
+
+  it('resume WITHOUT override after a long pause still surfaces a gap (tickWindow = bookWindow)', () => {
+    expect(planLogWindow({ head: 110n, lastProcessedBlock: 100n, bookWindow: 3, tickWindow: 3 }).gap).toEqual({
+      fromBlock: 101n,
+      toBlock: 107n,
+    })
+  })
+
+  it('override 0 and override 1 both collapse the window to [head, head] with gap [last+1, head-1]', () => {
+    const expected = { fromBlock: 110n, toBlock: 110n, gap: { fromBlock: 101n, toBlock: 109n } }
+    expect(planLogWindow({ head: 110n, lastProcessedBlock: 100n, bookWindow: 3, tickWindow: 0 })).toEqual(expected)
+    expect(planLogWindow({ head: 110n, lastProcessedBlock: 100n, bookWindow: 3, tickWindow: 1 })).toEqual(expected)
+  })
+
+  it('zero-clamp arm: head below the look-back floors fromBlock at 0', () => {
+    expect(planLogWindow({ head: 1n, lastProcessedBlock: undefined, bookWindow: 10, tickWindow: 10 })).toEqual({
+      fromBlock: 0n,
+      toBlock: 1n,
+    })
+  })
+
+  it('no gap when fromBlock is exactly lastProcessedBlock + 1 (contiguous)', () => {
+    // head 102, last 100, tick K=1: fromBlock = 102; but book floor = 100-2 = 98 → fromBlock = max(102,98)=102?
+    // Use K where fromBlock lands at last+1: head 101, last 100, book K=1, tick K=1 → fromBlock=101=last+1 → no gap.
+    expect(planLogWindow({ head: 101n, lastProcessedBlock: 100n, bookWindow: 1, tickWindow: 1 })).toEqual({
+      fromBlock: 101n,
+      toBlock: 101n,
+    })
   })
 })

@@ -1,5 +1,5 @@
 import { type Currency, Fraction, Price } from '@uniswap/sdk-core'
-import type { Hex } from 'viem'
+import type { Address, Hex } from 'viem'
 
 import { STATE_VIEW_ABI, V2_PAIR_ABI, V3_POOL_ABI } from '../abis'
 import { getChainAddresses } from '../addresses'
@@ -33,11 +33,17 @@ export function pricePathKey(path: PricePath): string {
   return `${currencyId(path.base)}=>${currencyId(path.quote)}#${legs}`
 }
 
+/** Chain addresses a v4 leg needs, resolved once at construction (only when the path has a v4 leg). */
+interface V4Addresses {
+  weth: Address
+  stateView: Address
+}
+
 /** Order a leg's `base`/`quote` into the pool's `token0`/`token1`. */
-function orderCurrencies(leg: PathLeg, chainId?: number): { token0: Currency; token1: Currency } {
+function orderCurrencies(leg: PathLeg, v4?: V4Addresses): { token0: Currency; token1: Currency } {
   if (leg.pool.protocol === 'v4') {
     const { currency0, currency1 } = leg.pool.poolKey
-    const weth = getChainAddresses(chainId as number).weth
+    const weth = (v4 as V4Addresses).weth
     if (matchesV4Currency(leg.base, currency0, weth) && matchesV4Currency(leg.quote, currency1, weth)) {
       return { token0: leg.base, token1: leg.quote }
     }
@@ -67,9 +73,9 @@ function tupleBigInt(result: unknown, index: number): bigint {
   return (result as readonly unknown[])[index] as bigint
 }
 
-function buildLegPlan(leg: PathLeg, index: number, chainId?: number): LegPlan {
+function buildLegPlan(leg: PathLeg, index: number, v4?: V4Addresses): LegPlan {
   const key = `leg${index}`
-  const { token0, token1 } = orderCurrencies(leg, chainId)
+  const { token0, token1 } = orderCurrencies(leg, v4)
   const { base, quote } = leg
 
   switch (leg.pool.protocol) {
@@ -105,7 +111,7 @@ function buildLegPlan(leg: PathLeg, index: number, chainId?: number): LegPlan {
     }
     case 'v4': {
       const poolId: Hex = poolIdFromPoolKey(leg.pool.poolKey)
-      const stateView = getChainAddresses(chainId as number).v4StateView
+      const stateView = (v4 as V4Addresses).stateView
       const call: SpeculativeCall = { address: stateView, abi: STATE_VIEW_ABI, functionName: 'getSlot0', args: [poolId] }
       return {
         key,
@@ -172,7 +178,14 @@ export function pricePathSource(path: PricePath, opts?: { chainId?: number }): S
 
   validatePath(path)
 
-  const plans = path.legs.map((leg, i) => buildLegPlan(leg, i, chainId))
+  // Resolve chain addresses ONCE when any leg is v4 (the only case they're needed); thread them into
+  // each leg plan. The `chainId !== undefined` guard narrows the type (it is guaranteed when `hasV4`).
+  let v4Addresses: V4Addresses | undefined
+  if (hasV4 && chainId !== undefined) {
+    const addrs = getChainAddresses(chainId)
+    v4Addresses = { weth: addrs.weth, stateView: addrs.v4StateView }
+  }
+  const plans = path.legs.map((leg, i) => buildLegPlan(leg, i, v4Addresses))
   const key = `pricePath:${pricePathKey(path)}`
 
   return {

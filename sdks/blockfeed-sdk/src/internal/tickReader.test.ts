@@ -44,7 +44,7 @@ const speculativeCall = (fn: string, allowFailure?: boolean): SpeculativeCall =>
 describe('readTick', () => {
   it('(a) issues the three identity calls first and lands their values in identity', async () => {
     const { client, calls } = fakeClient(() => IDENTITY_OK)
-    const result = await readTick(client, { keyed: {} })
+    const result = await readTick(client, {})
 
     // Identity calls are first, at Multicall3, in the fixed order.
     const first3 = calls[0]!.slice(0, 3)
@@ -72,10 +72,8 @@ describe('readTick', () => {
       ...contracts.slice(3).map((c) => ok(`ran:${c.functionName}`)),
     ])
     const result = await readTick(client, {
-      keyed: {
-        zebra: speculativeCall('zFn'),
-        apple: speculativeCall('aFn'),
-      },
+      zebra: speculativeCall('zFn'),
+      apple: speculativeCall('aFn'),
     })
 
     // Keyed calls are appended sorted by key.
@@ -86,7 +84,7 @@ describe('readTick', () => {
 
   it('(c) records a tolerated (allowFailure) keyed failure as a failure CallResult', async () => {
     const { client } = fakeClient(() => [...IDENTITY_OK, fail('reverted')])
-    const result = await readTick(client, { keyed: { soft: speculativeCall('sFn', true) } })
+    const result = await readTick(client, { soft: speculativeCall('sFn', true) })
 
     const r = result.results['soft']!
     expect(r.status).toBe('failure')
@@ -96,10 +94,8 @@ describe('readTick', () => {
   it('(d) throws TickFailedError naming the keys for a non-tolerated keyed failure', async () => {
     const { client } = fakeClient(() => [...IDENTITY_OK, ok('fine'), fail('boom')])
     const promise = readTick(client, {
-      keyed: {
-        good: speculativeCall('gFn', true),
-        hard: speculativeCall('hFn', false),
-      },
+      good: speculativeCall('gFn', true),
+      hard: speculativeCall('hFn', false),
     })
     await expect(promise).rejects.toBeInstanceOf(TickFailedError)
     try {
@@ -114,7 +110,7 @@ describe('readTick', () => {
     const keyed: Record<string, SpeculativeCall> = {}
     for (let i = 0; i < 7; i++) keyed[`k${i}`] = speculativeCall(`fn${i}`, true)
 
-    await readTick(client, { keyed }, { maxCallsPerChunk: 5 })
+    await readTick(client, keyed, { maxCallsPerChunk: 5 })
 
     expect(calls.length).toBe(2)
     // Chunk 1: 3 identity + 2 keyed = 5 calls.
@@ -132,7 +128,7 @@ describe('readTick', () => {
 
   it('(f) throws TickFailedError when an identity call fails', async () => {
     const { client } = fakeClient(() => [ok(100n), fail('no hash'), ok(1700000000n)])
-    await expect(readTick(client, { keyed: {} })).rejects.toBeInstanceOf(TickFailedError)
+    await expect(readTick(client, {})).rejects.toBeInstanceOf(TickFailedError)
   })
 
   it('(g) passes batchSize:0 to every multicall so viem cannot internally re-split a chunk', async () => {
@@ -155,7 +151,7 @@ describe('readTick', () => {
 
     const keyed: Record<string, SpeculativeCall> = {}
     for (let i = 0; i < 7; i++) keyed[`k${i}`] = speculativeCall(`fn${i}`, true)
-    await readTick(client, { keyed }, { maxCallsPerChunk: 5 })
+    await readTick(client, keyed, { maxCallsPerChunk: 5 })
 
     expect(seen.length).toBe(2)
     expect(seen.every((a) => a['batchSize'] === 0)).toBe(true)
@@ -165,6 +161,6 @@ describe('readTick', () => {
   it('(h) throws TickFailedError when a chunk returns fewer results than calls', async () => {
     // Return one short — a broken/mis-batched aggregate3 must fail the tick, not mis-align results.
     const { client } = fakeClient(() => [ok(100n), ok('0xabc123')])
-    await expect(readTick(client, { keyed: {} })).rejects.toBeInstanceOf(TickFailedError)
+    await expect(readTick(client, {})).rejects.toBeInstanceOf(TickFailedError)
   })
 })

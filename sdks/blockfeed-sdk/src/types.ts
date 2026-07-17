@@ -7,8 +7,13 @@ import type { Abi, AbiEvent, Address, Hex, PublicClient } from 'viem'
  * `createPublicClient({ chain: base })`, whose chain formatters make the full `PublicClient` generic
  * incompatible under strict TS — be passed without a cast. The engine needs `multicall`/`getLogs`/
  * `watchBlockNumber`; discovery additionally reads `getBlockNumber`. One shared type covers both.
+ *
+ * `transport.type` is part of the declared contract so the engine's WebSocket sniff needs no cast; a
+ * real viem client always carries it, and non-viem structural clients simply omit it (HTTP semantics).
  */
-export type BlockfeedClient = Pick<PublicClient, 'multicall' | 'getLogs' | 'watchBlockNumber' | 'getBlockNumber'>
+export type BlockfeedClient = Pick<PublicClient, 'multicall' | 'getLogs' | 'watchBlockNumber' | 'getBlockNumber'> & {
+  transport?: { type?: string }
+}
 
 /** A single read against a contract, shaped for viem `multicall` / `readContract`. */
 export interface ContractCall<TAbi extends Abi = Abi> {
