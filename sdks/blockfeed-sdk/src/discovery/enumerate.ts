@@ -1,12 +1,12 @@
 import type { Currency } from '@uniswap/sdk-core'
-import type { Address, Log, PublicClient } from 'viem'
+import type { Address, Log } from 'viem'
 import { getAddress } from 'viem'
 
 import { STATE_VIEW_ABI, V2_FACTORY_ABI, V3_FACTORY_ABI, V3_POOL_ABI, V4_POOL_MANAGER_INITIALIZE_EVENT } from '../abis'
 import { getChainAddresses } from '../addresses'
 import { BlockfeedError } from '../errors'
 import { poolIdFromPoolKey } from '../math/poolId'
-import type { PoolKeyStruct, PoolRef } from '../types'
+import type { BlockfeedClient, PoolKeyStruct, PoolRef } from '../types'
 
 import type { CandidatePool, DiscoveryOptions } from './types'
 
@@ -71,7 +71,7 @@ function v4QueryPairs(repsA: Address[], repsB: Address[]): Array<{ currency0: Ad
  * single-block range that still errors — the failure is rethrown as {@link BlockfeedError}.
  */
 async function getInitializeLogsBisected(
-  client: PublicClient,
+  client: BlockfeedClient,
   poolManager: Address,
   args: { currency0: Address; currency1: Address },
   from: bigint,
@@ -132,7 +132,7 @@ function candidateIdentifier(ref: PoolRef): string {
  * `(protocol, identifier)`.
  */
 export async function enumerateCandidates(
-  client: PublicClient,
+  client: BlockfeedClient,
   chainId: number,
   tokenA: Currency,
   tokenB: Currency,

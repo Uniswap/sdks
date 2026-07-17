@@ -35,7 +35,6 @@ import {
   getAddress,
   http,
   parseAbi,
-  type PublicClient,
   type WalletClient,
   zeroAddress,
 } from 'viem'
@@ -117,7 +116,7 @@ describe.skipIf(!RUN)('CCA launch lifecycle end-to-end (Base fork)', () => {
     async () => {
       const fork = await newFork(8671)
       try {
-        const pub = createPublicClient({ chain: base, transport: http(fork.rpcUrl) }) as PublicClient
+        const pub = createPublicClient({ chain: base, transport: http(fork.rpcUrl) })
         const mine = (n = 1): Promise<unknown> => fork.rpc('anvil_mine', [`0x${n.toString(16)}`])
         const bn = async (): Promise<bigint> => BigInt(await fork.rpc<string>('eth_blockNumber', []))
         const wallet = (a: Address): WalletClient => createWalletClient({ account: a, chain: base, transport: http(fork.rpcUrl) })

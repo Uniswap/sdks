@@ -17,12 +17,20 @@ import {
   http,
   parseAbi,
   type PublicClient,
+  type Transport,
   type WalletClient,
   webSocket,
 } from 'viem'
 import { base } from 'viem/chains'
 
 import { type AnvilFork, anvilAvailable, FORK_RPC_BASE, startAnvilFork } from './anvil'
+
+/**
+ * The concrete Base-chain client type. Declaring it explicitly (rather than the bare `PublicClient`)
+ * is what lets an OP-stack `createPublicClient({ chain: base })` flow through without an `as`
+ * cast — its chain formatters are incompatible with the default `PublicClient` generic.
+ */
+type ForkPublicClient = PublicClient<Transport, typeof base>
 
 const RUN = anvilAvailable() && process.env.BLOCKFEED_SKIP_FORK !== '1'
 
@@ -102,7 +110,7 @@ const blockNumberOf = async (fork: AnvilFork): Promise<bigint> => BigInt(await f
 const mine = (fork: AnvilFork, n = 1): Promise<unknown> => fork.rpc('anvil_mine', [`0x${n.toString(16)}`])
 
 /** Read the pool's slot0 at a specific block and price WETH in USDC exactly as the source does. */
-async function poolPriceAt(pub: PublicClient, blockNumber: bigint) {
+async function poolPriceAt(pub: ForkPublicClient, blockNumber: bigint) {
   const slot0 = await pub.readContract({ address: POOL, abi: V3_SLOT0_ABI, functionName: 'slot0', blockNumber })
   return priceFromSqrtPriceX96({ sqrtPriceX96: slot0[0], token0: WETH, token1: USDC, base: WETH, quote: USDC })
 }
@@ -195,7 +203,7 @@ async function sendSwap(wallet: WalletClient, amountInUsdc: bigint): Promise<`0x
  * the pre-swap tick matches a direct slot0 read, then that a single 50k-USDC swap produces a NEW tick
  * whose price (a) differs, (b) equals a fresh slot0 read at the new block, and (c) is tagged with it.
  */
-async function runPriceTickScenario(fork: AnvilFork, pub: PublicClient, wallet: WalletClient): Promise<void> {
+async function runPriceTickScenario(fork: AnvilFork, pub: ForkPublicClient, wallet: WalletClient): Promise<void> {
   const feed = createBlockFeed({ client: pub, chainId: CHAIN_ID, pollIntervalMs: 200 })
   const store = feed.watch(pricePathSource(WETH_USDC_PATH))
   const rec = record(store)
@@ -236,7 +244,7 @@ describe.skipIf(!RUN)('engine fork scenarios (Base)', () => {
       const fork = await newFork(8601)
       try {
         await prepareWhale(fork)
-        const pub = createPublicClient({ chain: base, transport: http(fork.rpcUrl) }) as PublicClient
+        const pub = createPublicClient({ chain: base, transport: http(fork.rpcUrl) })
         const wallet = createWalletClient({ account: USDC_WHALE, chain: base, transport: http(fork.rpcUrl) })
         await runPriceTickScenario(fork, pub, wallet)
       } finally {
@@ -258,7 +266,7 @@ describe.skipIf(!RUN)('engine fork scenarios (Base)', () => {
         const pub = createPublicClient({
           chain: base,
           transport: webSocket(fork.wsUrl, { reconnect: false }),
-        }) as PublicClient
+        })
         const wallet = createWalletClient({ account: USDC_WHALE, chain: base, transport: http(fork.rpcUrl) })
         expect((pub as unknown as { transport: { type: string } }).transport.type).toBe('webSocket')
         await runPriceTickScenario(fork, pub, wallet)
@@ -275,7 +283,7 @@ describe.skipIf(!RUN)('engine fork scenarios (Base)', () => {
       const fork = await newFork(8603)
       try {
         await prepareWhale(fork)
-        const pub = createPublicClient({ chain: base, transport: http(fork.rpcUrl) }) as PublicClient
+        const pub = createPublicClient({ chain: base, transport: http(fork.rpcUrl) })
         const wallet = createWalletClient({ account: USDC_WHALE, chain: base, transport: http(fork.rpcUrl) })
 
         // Mine past the pinned block onto locally-mined (empty) blocks BEFORE watching, so every log
@@ -354,7 +362,7 @@ describe.skipIf(!RUN)('engine fork scenarios (Base)', () => {
       const fork = await newFork(8604)
       try {
         await prepareWhale(fork)
-        const pub = createPublicClient({ chain: base, transport: http(fork.rpcUrl) }) as PublicClient
+        const pub = createPublicClient({ chain: base, transport: http(fork.rpcUrl) })
         const wallet = createWalletClient({ account: USDC_WHALE, chain: base, transport: http(fork.rpcUrl) })
 
         const feed = createBlockFeed({ client: pub, chainId: CHAIN_ID, pollIntervalMs: 120 })

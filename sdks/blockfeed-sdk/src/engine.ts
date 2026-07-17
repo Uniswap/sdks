@@ -1,4 +1,4 @@
-import type { AbiEvent, Address, Log, PublicClient } from 'viem'
+import type { AbiEvent, Address, Log } from 'viem'
 import { toEventSelector } from 'viem'
 
 import {
@@ -20,6 +20,7 @@ import type { InternalStore } from './internal/store'
 import { createInternalStore } from './internal/store'
 import { readTick } from './internal/tickReader'
 import type {
+  BlockfeedClient,
   CallResult,
   DecodedFeedLog,
   FeedEvent,
@@ -37,7 +38,7 @@ export { realScheduler } from './internal/scheduler'
 export type { Scheduler } from './internal/scheduler'
 
 export interface BlockFeedOptions {
-  client: PublicClient
+  client: BlockfeedClient
   /** Explicit; the engine never fetches it, so construction stays synchronous. */
   chainId: number
   /** HTTP poll cadence. Default `DEFAULT_POLL_INTERVAL_MS[chainId] ?? FALLBACK_POLL_INTERVAL_MS`. */

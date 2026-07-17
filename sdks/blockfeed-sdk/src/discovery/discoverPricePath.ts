@@ -1,8 +1,7 @@
 import { type Currency, Token } from '@uniswap/sdk-core'
-import type { PublicClient } from 'viem'
 
 import { getChainAddresses } from '../addresses'
-import type { PathLeg, PoolRef, PricePath } from '../types'
+import type { BlockfeedClient, PathLeg, PoolRef, PricePath } from '../types'
 
 import { enumerateCandidates } from './enumerate'
 import { probeCandidates } from './probe'
@@ -99,7 +98,7 @@ interface Contender {
  * implementations.
  */
 export async function discoverPricePath(
-  client: PublicClient,
+  client: BlockfeedClient,
   args: { chainId: number; base: Currency; quote: Currency; options?: DiscoveryOptions },
   _deps: DiscoverDeps = defaultDeps
 ): Promise<PricePath | NoPathFound> {

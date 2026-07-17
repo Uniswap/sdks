@@ -1,5 +1,14 @@
 import type { Currency } from '@uniswap/sdk-core'
-import type { Abi, AbiEvent, Address, Hex } from 'viem'
+import type { Abi, AbiEvent, Address, Hex, PublicClient } from 'viem'
+
+/**
+ * The subset of a viem `PublicClient` the blockfeed engine and discovery actually use. Declaring the
+ * dependency structurally (rather than as a bare `PublicClient`) lets OP-stack clients — e.g.
+ * `createPublicClient({ chain: base })`, whose chain formatters make the full `PublicClient` generic
+ * incompatible under strict TS — be passed without a cast. The engine needs `multicall`/`getLogs`/
+ * `watchBlockNumber`; discovery additionally reads `getBlockNumber`. One shared type covers both.
+ */
+export type BlockfeedClient = Pick<PublicClient, 'multicall' | 'getLogs' | 'watchBlockNumber' | 'getBlockNumber'>
 
 /** A single read against a contract, shaped for viem `multicall` / `readContract`. */
 export interface ContractCall<TAbi extends Abi = Abi> {

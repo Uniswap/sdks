@@ -2,9 +2,6 @@ import { type Currency, Price } from '@uniswap/sdk-core'
 
 import { BlockfeedError } from '../errors'
 
-/** 2¹⁹² as a decimal string — the denominator of the raw sqrtPriceX96 → price conversion. */
-export const Q192 = (2n ** 192n).toString()
-
 /** True when two currencies are the same logical asset, treating native ETH and its WETH as one. */
 function sameCurrency(a: Currency, b: Currency): boolean {
   return a.wrapped.equals(b.wrapped)

@@ -1,10 +1,10 @@
 import type { Currency } from '@uniswap/sdk-core'
-import type { Address, PublicClient } from 'viem'
+import type { Address } from 'viem'
 import { getAddress } from 'viem'
 
 import { QUOTER_V2_ABI, V2_PAIR_ABI, V4_QUOTER_ABI } from '../abis'
 import { getChainAddresses } from '../addresses'
-import type { PoolKeyStruct } from '../types'
+import type { BlockfeedClient, PoolKeyStruct } from '../types'
 
 import type { CandidatePool } from './types'
 
@@ -172,7 +172,19 @@ function buildPlan(
 
   // v4: direction is set by which PoolKey currency the input token matches (native/WETH aware).
   const poolKey = ref.poolKey
-  const buyZeroForOne = matchesV4Currency(quote, poolKey.currency0, addrs.weth) // buy spends quote (tokenIn)
+  const quoteIsCurrency0 = matchesV4Currency(quote, poolKey.currency0, addrs.weth)
+  const quoteIsCurrency1 = matchesV4Currency(quote, poolKey.currency1, addrs.weth)
+  if (!quoteIsCurrency0 && !quoteIsCurrency1) {
+    // A10 (defensive): `quote` is neither pool currency — quoting either direction would price the wrong
+    // pair. Score it out (no buy call) rather than guess a direction.
+    return {
+      candidate,
+      computeBuyOut: () => 0n,
+      buildSellCall: () => undefined,
+      computeRoundTrip: () => 0n,
+    }
+  }
+  const buyZeroForOne = quoteIsCurrency0 // buy spends quote (tokenIn); zeroForOne iff quote is currency0
   return {
     candidate,
     buyCall: notional <= MAX_UINT128 ? v4QuoterCall(addrs.v4Quoter, poolKey, buyZeroForOne, notional) : undefined,
@@ -202,7 +214,7 @@ function buildPlan(
  * issues no reads and returns all-zero results when `candidates` is empty.
  */
 export async function probeCandidates(
-  client: PublicClient,
+  client: BlockfeedClient,
   chainId: number,
   candidates: CandidatePool[],
   base: Currency,

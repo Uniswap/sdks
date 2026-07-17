@@ -143,6 +143,25 @@ describe('probeCandidates — v4 (V4Quoter)', () => {
     expect(arg0(calls[0]![0]!).zeroForOne).toBe(false)
     expect(arg0(calls[1]![0]!).zeroForOne).toBe(true)
   })
+
+  it('(A10) scores out a candidate whose poolKey matches NEITHER quote currency (no buy call)', async () => {
+    // Pathological pool over two unrelated tokens; quote=USDC is neither currency → cannot orient direction.
+    const DAI = '0x6B175474E89094C44Da98b954EedeAC495271d0F'
+    const other = '0x1111111111111111111111111111111111111111'
+    const poolKey: PoolKeyStruct = {
+      currency0: getAddress(DAI) as Address,
+      currency1: getAddress(other) as Address,
+      fee: 500,
+      tickSpacing: 10,
+      hooks: '0x0000000000000000000000000000000000000000' as Address,
+    }
+    const { client, calls } = makeClient([]) // no canned rounds: none should be requested
+    const res = await probeCandidates(client, 1, [v4Cand(poolKey)], weth, usdc, 1000n)
+
+    expect(res[0]!.buyOut).toBe(0n)
+    expect(res[0]!.roundTripOut).toBe(0n)
+    expect(calls.length).toBe(0) // scored out with no on-chain read at all
+  })
 })
 
 describe('probeCandidates — v2 (TS reserve math)', () => {

@@ -7,12 +7,10 @@
 export interface Scheduler {
   setTimeout(cb: () => void, ms: number): unknown
   clearTimeout(handle: unknown): void
-  now(): number
 }
 
-/** The production scheduler, backed by the host's real timers and clock. */
+/** The production scheduler, backed by the host's real timers. */
 export const realScheduler: Scheduler = {
   setTimeout: (cb, ms) => setTimeout(cb, ms),
   clearTimeout: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
-  now: () => Date.now(),
 }

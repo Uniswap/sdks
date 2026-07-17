@@ -12,9 +12,13 @@ import {
   http,
   parseAbi,
   type PublicClient,
+  type Transport,
   type WalletClient,
 } from 'viem'
 import { base } from 'viem/chains'
+
+/** Concrete Base-chain client type — lets an OP-stack client flow into the SDK without an `as` cast. */
+type ForkPublicClient = PublicClient<Transport, typeof base>
 
 import { type AnvilFork, anvilAvailable, FORK_RPC_BASE, startAnvilFork } from './anvil'
 import { TEST_ERC20_CREATION_BYTECODE } from './testErc20.bytecode'
@@ -102,8 +106,8 @@ async function prepareWhale(fork: AnvilFork): Promise<void> {
   await fork.rpc('evm_setAutomine', [false])
 }
 
-const httpClient = (fork: AnvilFork): PublicClient =>
-  createPublicClient({ chain: base, transport: http(fork.rpcUrl) }) as PublicClient
+const httpClient = (fork: AnvilFork): ForkPublicClient =>
+  createPublicClient({ chain: base, transport: http(fork.rpcUrl) })
 const whaleWallet = (fork: AnvilFork): WalletClient =>
   createWalletClient({ account: USDC_WHALE, chain: base, transport: http(fork.rpcUrl) })
 

@@ -5,8 +5,6 @@
  * PublicClient.
  */
 
-export const BLOCKFEED_SDK_VERSION = '0.0.0'
-
 export * from './abis'
 export * from './addresses'
 export * from './constants'

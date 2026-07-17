@@ -32,7 +32,6 @@ function createFakeScheduler() {
     clearTimeout(handle) {
       if (typeof handle === 'number') timers.delete(handle)
     },
-    now: () => now,
   }
   async function advance(ms: number): Promise<void> {
     now += ms
