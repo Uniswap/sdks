@@ -101,10 +101,20 @@ const { calldata, value } = SwapRouter.encodeSwaps(
 
 ### Constraints
 
-- All swap step recipients must be `ROUTER_AS_RECIPIENT` — the SDK's settlement sweeps need router custody to see the funds.
-- `payerIsUser` is hardcoded to `false`; ingress runs once up-front via `PERMIT2_TRANSFER_FROM`.
+- By default, all swap step recipients must be `ROUTER_AS_RECIPIENT` and `payerIsUser` is `false` (ingress runs once up-front via `PERMIT2_TRANSFER_FROM`) — the SDK's settlement sweeps need router custody to see the funds. The optional `allowDirectTransfers` regime relaxes both (see [Direct Transfers](#direct-transfers-allowdirecttransfers)).
 - Routers must end with output in `routing.outputToken`. For exact-output, unused input must end in `routing.inputToken`.
 - The final top-level `SWEEP` is appended by the SDK — don't include it in `swapSteps`.
+
+### Direct Transfers (`allowDirectTransfers`)
+
+By default every transfer routes through router custody. Setting `allowDirectTransfers: true` on the spec lets routing-supplied steps move funds directly between the user and the pools — pulling input straight from the user (`payerIsUser` on V2/V3 swaps and v4 `SETTLE`) and paying output straight to `recipient` — which removes the Permit2 ingress and the final sweep transfer for a simple swap.
+
+The safety contract is unchanged (the user pays at most `exactOrMaxAmountIn`; the recipient receives at least the slippage-bounded minimum), but it's enforced by counting instead of custody:
+
+- **Inbound budget** — contract-enforced direct pulls must sum within `exactOrMaxAmountIn`; the SDK ingress pulls only the remainder.
+- **Outbound coverage** — contract-enforced direct-output minimums reduce the final `SWEEP` floor. Since independently-floored per-leg minimums can sum a few wei below the trade minimum, the floor forgives a bounded, sub-economic rounding shortfall (`max(min(0.5bps of the minimum, 1% of slippage), a small per-leg allowance)`, zero at zero slippage); a larger, real gap still reverts.
+
+Step amounts are never trusted — only counted or capped.
 
 ### Per-Hop Slippage
 
