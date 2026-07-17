@@ -5,7 +5,7 @@ import { getChainAddresses } from '../addresses'
 import type { PathLeg, PoolRef, PricePath } from '../types'
 
 import { enumerateCandidates } from './enumerate'
-import { type ProbeResult, probeCandidates } from './probe'
+import { probeCandidates } from './probe'
 import { pickBest, scoreProbe } from './rank'
 import type { CandidatePool, DiscoveryOptions, NoPathFound } from './types'
 
@@ -54,6 +54,26 @@ function directLeg(pool: PoolRef, base: Currency, quote: Currency): PathLeg[] {
   return [{ pool, base, quote }]
 }
 
+/**
+ * Two-hop executable score, using data already probed (no extra RPC): raw base bought via
+ * quote→I→base (`buyOut2hop`), scaled by BOTH legs' round-trip retention — leg 1's base→I recovery
+ * (`l1RoundTrip / buyOutI`) and leg 2's I→quote recovery (`l2RoundTrip / notional`). Any factor with
+ * a non-positive numerator or denominator collapses the score to `0`, matching {@link scoreProbe}'s
+ * broken-probe semantics. Leg 1's factor is what penalizes a manipulated thin base/I pool whose round
+ * trip collapses — dropping it would let such a pool win on leg 2's retention alone. Float precision
+ * is fine: this only orders contenders.
+ */
+function compositeScore(
+  buyOut2hop: bigint,
+  l1RoundTrip: bigint,
+  buyOutI: bigint,
+  l2RoundTrip: bigint,
+  notional: bigint
+): number {
+  if (buyOut2hop <= 0n || l1RoundTrip <= 0n || buyOutI <= 0n || l2RoundTrip <= 0n || notional <= 0n) return 0
+  return Number(buyOut2hop) * (Number(l1RoundTrip) / Number(buyOutI)) * (Number(l2RoundTrip) / Number(notional))
+}
+
 /** A scored candidate route (direct or 2-hop), reduced to the legs it would emit. */
 interface Contender {
   score: number
@@ -69,8 +89,9 @@ interface Contender {
  * through each intermediary (default: the chain's WETH). The 2-hop assembly, per intermediary I:
  *  1. probe `I/quote` at `notional` → best leg L2 and the implied I amount it buys (`L2.buyOut`);
  *  2. probe `base/I` using that I amount as the notional → best leg L1;
- *  3. compose a two-hop score from `L1.buyOut` (base bought via quote→I→base) and `L2.roundTripOut`
- *     (quote recovered on the way back), scored with the direct formula against the original notional.
+ *  3. compose a two-hop score from `L1.buyOut` (base bought via quote→I→base) scaled by BOTH legs'
+ *     round-trip retention — leg 1 (`L1.roundTripOut / L2.buyOut`) and leg 2 (`L2.roundTripOut /
+ *     notional`) — so a thin/manipulated leg-1 pool whose round trip collapses is penalized.
  * The highest-scoring contender wins. Legs are oriented base→quote (2-hop: `base/I` then `I/quote`).
  * When nothing scores above zero, a {@link NoPathFound} naming the pair and probe count is returned.
  *
@@ -124,9 +145,11 @@ export async function discoverPricePath(
       const l1 = _deps.pickBest(biProbes, buyOutI)
       if (!l1 || l1.buyOut <= 0n) continue
 
-      // Two-hop composite: base bought via quote→I→base, quote recovered on the round trip back.
-      const composite: ProbeResult = { candidate: l1.candidate, buyOut: l1.buyOut, roundTripOut: l2.roundTripOut }
-      const score = scoreProbe(composite, notional)
+      // Two-hop composite retention: base bought via quote→I→base (`l1.buyOut`), scaled by BOTH legs'
+      // round-trip retention — leg 1 (base→I: `l1.roundTripOut`/`buyOutI`) AND leg 2 (I→quote:
+      // `l2.roundTripOut`/`notional`). Including leg 1's factor is adversarially load-bearing: a
+      // manipulated thin base/I pool whose round trip collapses is penalized here rather than hidden.
+      const score = compositeScore(l1.buyOut, l1.roundTripOut, buyOutI, l2.roundTripOut, notional)
       if (score > 0) {
         contenders.push({
           score,

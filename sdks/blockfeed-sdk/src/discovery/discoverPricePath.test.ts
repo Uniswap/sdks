@@ -107,6 +107,30 @@ describe('discoverPricePath', () => {
     expect(path.legs[1]!.quote).toBe(usdc)
   })
 
+  it('lets a collapsed leg-1 round-trip sink a 2-hop that would win without the leg-1 factor', async () => {
+    // Direct scores 100. 2-hop: L2 buyOutI=50/R2=1000 (leg-2 retention 1.0), L1 buyOut=200 but only
+    // recovers 10 I on the way back (leg-1 retention 10/50=0.2). Under a leg-2-only formula the 2-hop
+    // would score 200 and BEAT the direct; the leg-1 retention factor pulls it to 200*0.2*1.0=40 < 100,
+    // so the direct pool wins. This test is load-bearing on that factor.
+    const { deps } = makeDeps({
+      enumerate: (a, b) => {
+        if (a === 'TKN' && b === 'USDC') return [cand(D_POOL)]
+        if (a === 'WETH' && b === 'USDC') return [cand(L2_POOL)]
+        if (a === 'TKN' && b === 'WETH') return [cand(L1_POOL)]
+        return []
+      },
+      probe: (a, b, cands) => {
+        if (a === 'TKN' && b === 'USDC') return [probe(cands[0]!, 100n, 1000n)] // score 100
+        if (a === 'WETH' && b === 'USDC') return [probe(cands[0]!, 50n, 1000n)] // buyOutI=50, R2=1000
+        if (a === 'TKN' && b === 'WETH') return [probe(cands[0]!, 200n, 10n)] // collapsed round-trip
+        return []
+      },
+    })
+    const path = (await run(deps)) as PricePath
+    expect(path.legs.length).toBe(1)
+    expect(path.legs[0]!.pool).toEqual({ protocol: 'v3', pool: D_POOL })
+  })
+
   it('returns NoPathFound (naming the pair + probe count) when nothing scores', async () => {
     const { deps } = makeDeps({
       enumerate: (a, b) => {
