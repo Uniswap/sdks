@@ -6,9 +6,8 @@ import {
   BACKOFF_MAX_MS,
   DEFAULT_BUFFER_SIZE,
   DEFAULT_MAX_CATCHUP_BLOCKS,
-  DEFAULT_POLL_INTERVAL_MS,
   DEFAULT_TRAILING_LOG_WINDOW,
-  FALLBACK_POLL_INTERVAL_MS,
+  resolvePollIntervalMs,
   STALE_AFTER_CONSECUTIVE_FAILURES,
 } from './constants'
 import { BlockfeedError } from './errors'
@@ -48,7 +47,7 @@ export interface BlockFeedOptions {
    * construction stays synchronous.
    */
   chainId?: number
-  /** HTTP poll cadence. Default `DEFAULT_POLL_INTERVAL_MS[chainId] ?? FALLBACK_POLL_INTERVAL_MS`. */
+  /** HTTP poll cadence. Default `resolvePollIntervalMs(chainId)` (tuned → block-time-derived → flat fallback). */
   pollIntervalMs?: number
   /** Trailing log window K (blocks re-scanned each tick). Default `DEFAULT_TRAILING_LOG_WINDOW`. */
   trailingLogWindow?: number
@@ -104,7 +103,7 @@ export function createBlockFeed(opts: BlockFeedOptions): BlockFeed {
   }
   // Declared `number` (not the narrowed union) so nested closures see the resolved id.
   const chainId: number = resolvedChainId
-  const pollIntervalMs = opts.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS[chainId] ?? FALLBACK_POLL_INTERVAL_MS
+  const pollIntervalMs = opts.pollIntervalMs ?? resolvePollIntervalMs(chainId)
   const trailingLogWindow = opts.trailingLogWindow ?? DEFAULT_TRAILING_LOG_WINDOW
   const maxCatchupBlocks = opts.maxCatchupBlocks ?? DEFAULT_MAX_CATCHUP_BLOCKS
   const bufferSize = opts.bufferSize ?? DEFAULT_BUFFER_SIZE

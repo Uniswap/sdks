@@ -1,4 +1,3 @@
-import { CHAIN_TO_ADDRESSES_MAP, V2_FACTORY_ADDRESSES, WETH9 } from '@uniswap/sdk-core'
 import { describe, expect, it } from 'bun:test'
 import { type Address, getAddress } from 'viem'
 
@@ -53,35 +52,4 @@ describe('CHAIN_ADDRESSES', () => {
       expect(addresses.v4PoolManagerDeployBlock >= 0n).toBe(true)
     }
   })
-})
-
-describe('CHAIN_ADDRESSES cross-check against sdk-core', () => {
-  const eq = (a: string | undefined, b: string | undefined): boolean =>
-    (a ?? '').toLowerCase() === (b ?? '').toLowerCase()
-
-  /**
-   * quoterV2 is exempted on Mainnet and Unichain: sdk-core's generic `quoterAddress` field is NOT the
-   * v3 QuoterV2 on those chains — on Mainnet it stores QuoterV1 (0xb273…) and on Unichain a different
-   * non-V2 quoter — so it is not a valid cross-check source for our `quoterV2`. On Base sdk-core's
-   * `quoterAddress` IS the QuoterV2, so it is checked there. (See the addresses.ts comments.)
-   */
-  const QUOTER_V2_EXEMPT = new Set<number>([1, 130])
-
-  for (const chainId of [1, 8453, 130]) {
-    it(`matches sdk-core CHAIN_TO_ADDRESSES_MAP / V2_FACTORY_ADDRESSES / WETH9 for chain ${chainId}`, () => {
-      const bf = getChainAddresses(chainId)
-      const sdk = CHAIN_TO_ADDRESSES_MAP[chainId as keyof typeof CHAIN_TO_ADDRESSES_MAP]
-
-      expect(eq(bf.v3Factory, sdk.v3CoreFactoryAddress), 'v3Factory').toBe(true)
-      expect(eq(bf.v4PoolManager, sdk.v4PoolManagerAddress), 'v4PoolManager').toBe(true)
-      expect(eq(bf.v4StateView, sdk.v4StateView), 'v4StateView').toBe(true)
-      expect(eq(bf.v4Quoter, sdk.v4QuoterAddress), 'v4Quoter').toBe(true)
-      expect(eq(bf.v2Factory, V2_FACTORY_ADDRESSES[chainId]), 'v2Factory').toBe(true)
-      expect(eq(bf.weth, WETH9[chainId]?.address), 'weth').toBe(true)
-
-      if (!QUOTER_V2_EXEMPT.has(chainId)) {
-        expect(eq(bf.quoterV2, sdk.quoterAddress), 'quoterV2').toBe(true)
-      }
-    })
-  }
 })

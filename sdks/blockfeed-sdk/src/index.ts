@@ -67,6 +67,7 @@ export {
   DEFAULT_MAX_CATCHUP_BLOCKS,
   DEFAULT_POLL_INTERVAL_MS,
   FALLBACK_POLL_INTERVAL_MS,
+  resolvePollIntervalMs,
 } from './constants'
 
 // ABIs consumers need to build custom sources (factory/quoter ABIs stay discovery-internal).
