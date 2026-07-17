@@ -1,3 +1,4 @@
+import type { ContractCall as LauncherContractCall } from '@uniswap/liquidity-launcher-sdk'
 import type { Currency } from '@uniswap/sdk-core'
 import type { Abi, AbiEvent, Address, Hex, PublicClient } from 'viem'
 
@@ -18,15 +19,15 @@ export type BlockfeedClient = Pick<PublicClient, 'multicall' | 'getLogs' | 'watc
 }
 
 /**
- * A single read against a contract, shaped for viem `multicall` / `readContract`. `allowFailure` maps
- * to aggregate3 per-call tolerance: absent/false → a failing call fails the whole tick; `true` →
- * the failure is isolated to this call's result (the source sees a `failure` `CallResult`).
+ * A single read against a contract, shaped for viem `multicall` / `readContract`. Extends the
+ * launcher's framework-agnostic `ContractCall` descriptor (`{ address, abi, functionName, args }`) so
+ * cross-package descriptor assignability — every `*Call` this package feeds into a batch comes from
+ * `@uniswap/liquidity-launcher-sdk` — is a compile-time contract rather than a structural coincidence.
+ * `allowFailure` maps to aggregate3 per-call tolerance: absent/false → a failing call fails the whole
+ * tick; `true` → the failure is isolated to this call's result (the source sees a `failure`
+ * `CallResult`).
  */
-export interface ContractCall<TAbi extends Abi = Abi> {
-  address: Address
-  abi: TAbi
-  functionName: string
-  args: readonly unknown[]
+export interface ContractCall<TAbi extends Abi = Abi> extends LauncherContractCall<TAbi> {
   allowFailure?: boolean
 }
 

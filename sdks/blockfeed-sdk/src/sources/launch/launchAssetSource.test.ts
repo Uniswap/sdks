@@ -1,7 +1,7 @@
+import { STATE_VIEW_ABI } from '@uniswap/liquidity-launcher-sdk'
 import { describe, expect, it } from 'bun:test'
 import { getAddress, zeroAddress } from 'viem'
 
-import { STATE_VIEW_ABI } from '../../abis'
 import { getChainAddresses } from '../../addresses'
 import { poolIdFromPoolKey } from '../../math/poolId'
 import type { CallResult, LaunchAssetSourceArgs, LaunchAssetState, SourceEmission, TickData, TickIdentity } from '../../types'

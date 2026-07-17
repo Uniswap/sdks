@@ -1,7 +1,13 @@
-import { type TickFillRatio, deriveAuctionOutcome, deriveTickFillRatios, isGraduatedCall } from '@uniswap/liquidity-launcher-sdk'
-import type { Address, Hex } from 'viem'
+import {
+  type TickFillRatio,
+  decodeSlot0SqrtPriceX96,
+  deriveAuctionOutcome,
+  deriveTickFillRatios,
+  isGraduatedCall,
+  slot0Call,
+} from '@uniswap/liquidity-launcher-sdk'
+import type { Hex } from 'viem'
 
-import { STATE_VIEW_ABI } from '../../abis'
 import { getChainAddresses } from '../../addresses'
 import { poolIdFromPoolKey } from '../../math/poolId'
 import type { ContractCall, Source, TickData } from '../../types'
@@ -11,19 +17,6 @@ import type { LaunchAssetSourceArgs, LaunchAssetState } from './types'
 
 /** 2^288 — numerator for the currency-per-token inversion below. */
 const Q288 = 1n << 288n
-
-/**
- * Blockfeed's own v4 StateView `getSlot0(poolId)` descriptor (it owns the v4 reads), always
- * failure-tolerant — see `tolerant` in auctionReads for the isolation rationale.
- */
-function slot0Descriptor(stateView: Address, poolId: Hex): ContractCall {
-  return { address: stateView, abi: STATE_VIEW_ABI, functionName: 'getSlot0', args: [poolId], allowFailure: true }
-}
-
-/** Decode a successful `getSlot0` result to its `sqrtPriceX96` (first tuple element). */
-function decodeSlot0SqrtPriceX96(result: unknown): bigint {
-  return (result as readonly unknown[])[0] as bigint
-}
 
 /**
  * Convert a v4 `getSlot0` sqrtPriceX96 into a Q96 raw-currency-per-raw-token price, matching the
@@ -99,7 +92,9 @@ export function launchAssetSource(args: LaunchAssetSourceArgs): Source<LaunchAss
   // Deterministic graduated-pool id. The poolKey currencies are already address-sorted, so this
   // matches the canonical on-chain PoolKey.toId().
   const poolId: Hex = poolIdFromPoolKey(poolKey)
-  const speculativeSlot0: ContractCall = slot0Descriptor(stateView, poolId)
+  // Blockfeed owns the v4 reads; the StateView `getSlot0(poolId)` descriptor is always failure-tolerant
+  // (see `tolerant` in auctionReads for the isolation rationale), like every other descriptor here.
+  const speculativeSlot0: ContractCall = tolerant(slot0Call({ stateView, poolId }))
   const key = `launchAsset:${chainId}:${auction.toLowerCase()}`
 
   return {

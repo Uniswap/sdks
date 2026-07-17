@@ -1,7 +1,8 @@
+import { Q96 } from '@uniswap/liquidity-launcher-sdk'
 import { type Currency, Price } from '@uniswap/sdk-core'
 
-/** 2^96 as a decimal string — the Q96 denominator. */
-const Q96_STRING = (1n << 96n).toString()
+/** 2^96 as a decimal string — the Q96 denominator (from the launcher's CCA price scale). */
+const Q96_STRING = Q96.toString()
 
 /**
  * Convert a Q96 raw-currency-per-raw-token price (the launch/auction price vocabulary) into an

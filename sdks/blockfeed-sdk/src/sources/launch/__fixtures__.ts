@@ -1,3 +1,4 @@
+import { type AuctionCheckpoint, type InitializedTick, Q96 } from '@uniswap/liquidity-launcher-sdk'
 import { type Address, getAddress } from 'viem'
 
 import type { CallResult } from '../../types'
@@ -11,8 +12,7 @@ import type { CallResult } from '../../types'
 export const AUCTION: Address = getAddress('0x1234567890abcdef1234567890abcdef12345678')
 export const LENS: Address = getAddress('0x00cca200bf124dbfa848937c553864f4b4ce0632')
 
-/** 1 * 2^96. */
-export const Q96 = 79228162514264337593543950336n
+export { Q96 }
 
 export const ok = (result: unknown): CallResult => ({ status: 'success', result })
 export const fail = (): CallResult => ({ status: 'failure', error: new Error('reverted') })
@@ -25,10 +25,10 @@ export const CHECKPOINT = {
   cumulativeMps: 0,
   prev: 0n,
   next: 0n,
-}
+} satisfies AuctionCheckpoint
 
 /** Two initialized ticks (fill ratios 2.5 and 2.0). */
 export const TICKS = [
   { priceQ96: 1000n, currencyDemandQ96: 500n, requiredCurrencyDemandQ96: 200n, currencyRequiredQ96: 300n },
   { priceQ96: 2000n, currencyDemandQ96: 800n, requiredCurrencyDemandQ96: 400n, currencyRequiredQ96: 600n },
-]
+] satisfies InitializedTick[]
