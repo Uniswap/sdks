@@ -159,8 +159,9 @@ export abstract class SwapRouter {
    *   require output custody. Step amounts are never trusted, only counted or capped.
    *
    * Direct-transfer caveats:
-   * - Fee-on-transfer output tokens are out of scope under `allowDirectTransfers` — a direct output leg
-   *   can pay the recipient below netMin and still succeed; route FoT outputs to custody instead.
+   * - Fee-on-transfer output: output minimums bind the amount each swap *produces* (pre-transfer), not the
+   *   recipient's post-tax balance. A FoT token's own transfer tax reduces the final balance below the
+   *   minimum — inherent to such tokens and expected when swapping into one, not a shortfall to guard.
    * - A flat fee is a plain TRANSFER, so routing must keep at least the fee amount in router custody
    *   (not route 100% of output directly), or the fee TRANSFER reverts.
    *

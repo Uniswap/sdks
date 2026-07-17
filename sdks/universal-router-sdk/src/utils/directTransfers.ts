@@ -208,10 +208,10 @@ function stepDirectOutputCredits(step: SwapStep, recipient: string): DirectOutpu
     case 'V2_SWAP_EXACT_IN':
       return isDirect ? [{ token: step.path[step.path.length - 1], minAmount: BigNumber.from(step.amountOutMin) }] : []
     case 'V2_SWAP_EXACT_OUT':
-      // not creditable: v2SwapExactOutput only checks amountIn <= amountInMaximum and never asserts the
-      // recipient received amountOut (unlike v2 exact-in's balance-delta check or V3 exact-out's
-      // V3InvalidAmountOut), so a fee-on-transfer input/intermediate can under-deliver and still succeed.
-      // like v4 exact-out, contribute zero and leave the unverifiable amount to the sweep floor.
+      // not creditable: v2SwapExactOutput only bounds amountIn (<= amountInMaximum) and never asserts
+      // amountOut was produced — unlike V3 exact-out (V3InvalidAmountOut) or v4 exact-out (concrete TAKE /
+      // CurrencyNotSettled). So a fee-on-transfer input/intermediate makes the leg produce less than
+      // amountOut and still succeed; like v4 OPEN_DELTA exact-out, contribute zero.
       return []
     case 'V3_SWAP_EXACT_IN':
       return isDirect ? [{ token: v3PathLastToken(step.path), minAmount: BigNumber.from(step.amountOutMin) }] : []
