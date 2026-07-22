@@ -233,8 +233,10 @@ function stepDirectOutputCredits(step: SwapStep, recipient: string): DirectOutpu
 }
 
 // Direct-output coverage in the output token: the summed contract-enforced minimum delivered straight to
-// the recipient, and the number of legs it came from. Summed per-leg floors can trail the trade-level
-// floor by up to one wei each, so the caller uses `legs` to size how much rounding to tolerate.
+// the recipient, and the number of coverage-bearing legs it came from. Summed per-leg floors can trail the
+// trade-level floor by up to one wei each, so the caller uses `legs` to size how much rounding to tolerate;
+// only legs carrying a nonzero minimum count — a zero-min leg has no flooring error to forgive, so it must
+// not pad the tolerance.
 function directOutputCoverage(
   steps: SwapStep[],
   recipient: string,
@@ -246,7 +248,7 @@ function directOutputCoverage(
     .filter((credit) => credit.token !== undefined && credit.token.toLowerCase() === target)
   return {
     min: credits.reduce((total, credit) => total.add(credit.minAmount), BigNumber.from(0)),
-    legs: credits.length,
+    legs: credits.filter((credit) => credit.minAmount.gt(0)).length,
   }
 }
 

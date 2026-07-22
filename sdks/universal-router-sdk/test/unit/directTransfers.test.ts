@@ -31,6 +31,7 @@ import { CommandType, RoutePlanner } from '../../src/utils/routerCommands'
 import {
   CONTRACT_BALANCE,
   ETH_ADDRESS,
+  MAX_UINT160,
   ROUTER_AS_RECIPIENT,
   SENDER_AS_RECIPIENT,
   UniversalRouterVersion,
@@ -468,6 +469,27 @@ describe('allowDirectTransfers', () => {
       ).to.throw('USER_PAID_INPUT_TOKEN_MISMATCH')
     })
 
+    it('rejects an off-token SETTLE_ALL rather than counting it into the input budget', () => {
+      // SETTLE_ALL always settles from the user; on a currency other than the spec input token it must be
+      // rejected outright, never silently summed into the input-token budget.
+      const steps: SwapStep[] = [
+        { type: 'V4_SWAP', v4Actions: [{ action: 'SETTLE_ALL', currency: DAI.address, maxAmount: '300000' }] },
+      ]
+      expect(() => validateEncodeSwaps(buildSpec(flagOn), steps)).to.throw('USER_PAID_INPUT_TOKEN_MISMATCH')
+    })
+
+    it('accepts a user-paid pull of exactly MAX_UINT160 and rejects MAX_UINT160 + 1', () => {
+      // uint160 is permit2's transfer width and the pull ceiling is inclusive. Budget is set to MAX_UINT160
+      // so the boundary is exercised by the range check, not the budget check.
+      const spec = buildSpec(flagOn, { amount: CurrencyAmount.fromRawAmount(USDC, MAX_UINT160.toString()) })
+      expect(() =>
+        validateEncodeSwaps(spec, [buildV3ExactInStep({ payerIsUser: true, amountIn: MAX_UINT160.toString() })])
+      ).to.not.throw()
+      expect(() =>
+        validateEncodeSwaps(spec, [buildV3ExactInStep({ payerIsUser: true, amountIn: MAX_UINT160.add(1).toString() })])
+      ).to.throw('USER_PAID_AMOUNT_OUT_OF_RANGE')
+    })
+
     it('binds V3 exact-out user-paid steps to the path tail (reversed encoding)', () => {
       expect(() =>
         validateEncodeSwaps(buildExactOutSpec(flagOn), [
@@ -668,6 +690,48 @@ describe('allowDirectTransfers', () => {
       expect(() =>
         SwapRouter.encodeSwaps(spec, [buildV3ExactInStep({ payerIsUser: true, amountIn: '1000' })])
       ).to.throw(/out-of-bounds/)
+    })
+
+    it('exact-output user-paid leg omits ingress but keeps the input-token refund SWEEP to the recipient', () => {
+      // A user-paid exact-out leg draws its input straight from the wallet (up to amountInMax = the whole
+      // slippage-padded budget), so ingress is omitted. The exact-output refund SWEEP of the INPUT token to
+      // the recipient stays: any padding the router holds is returned, and the padding the user never spent
+      // simply stays in their wallet — the direct-leg padding stays with the payer.
+      const result = SwapRouter.encodeSwaps(buildExactOutSpec(flagOn), [buildV3ExactOutStep({ payerIsUser: true })])
+      const { commandTypes, inputs } = parseCommands(result.calldata)
+      expect(commandTypes).to.deep.equal([
+        CommandType.V3_SWAP_EXACT_OUT,
+        CommandType.SWEEP, // output settlement
+        CommandType.SWEEP, // input-token refund
+      ])
+      const refund = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[2])
+      expect(refund[0].toLowerCase()).to.equal(USDC.address.toLowerCase()) // input token
+      expect(refund[1].toLowerCase()).to.equal(TEST_RECIPIENT.toLowerCase()) // spec recipient
+    })
+
+    it('omits PERMIT2_TRANSFER_FROM entirely for a zero-amount exact-input', () => {
+      // exactOrMaxAmountIn 0 -> the ingress pull is guarded by `ingressAmount.gt(0)` and dropped outright.
+      const spec = buildSpec(flagOn, {
+        amount: CurrencyAmount.fromRawAmount(USDC, '0'),
+        quote: CurrencyAmount.fromRawAmount(WETH, '0'),
+      })
+      const result = SwapRouter.encodeSwaps(spec, [buildV3ExactInStep({ amountIn: '0' })])
+      const { commandTypes } = parseCommands(result.calldata)
+      expect(commandTypes).to.deep.equal([CommandType.V3_SWAP_EXACT_IN, CommandType.SWEEP])
+    })
+
+    it('default regime never reduces ingress: a user-paid step is rejected before any ingress math', () => {
+      // The ingress subtraction (exactOrMaxAmountIn - sumUserPaidMax) is not itself flag-gated; the guarantee
+      // that default-regime ingress pulls the whole budget comes from the validator refusing any user-paid
+      // step. Pin that coupling at the encoder boundary.
+      expect(() => SwapRouter.encodeSwaps(buildSpec(), [buildV3ExactInStep({ payerIsUser: true })])).to.throw(
+        'PAYER_IS_USER_REQUIRES_DIRECT_TRANSFERS'
+      )
+      const result = SwapRouter.encodeSwaps(buildSpec(), [buildV3ExactInStep()])
+      const { commandTypes, inputs } = parseCommands(result.calldata)
+      expect(commandTypes[0]).to.equal(CommandType.PERMIT2_TRANSFER_FROM)
+      const ingress = defaultAbiCoder.decode(['address', 'address', 'uint160'], inputs[0])
+      expect(ingress[2].toString()).to.equal('1000000') // the full exactOrMaxAmountIn
     })
   })
 
@@ -880,6 +944,33 @@ describe('allowDirectTransfers', () => {
         )
       })
 
+      it('credits across address casing: checksummed swap currency, lowercase OPEN_DELTA take', () => {
+        // WETH is checksummed in the pool key but lowercase in the take; the delta bookkeeping is
+        // case-insensitive, so it is still recognized as the sole OPEN_DELTA take of the output currency.
+        const step: SwapStep = {
+          type: 'V4_SWAP',
+          v4Actions: [
+            {
+              action: 'SWAP_EXACT_IN_SINGLE',
+              poolKey: {
+                currency0: USDC.address,
+                currency1: WETH.address,
+                fee: 500,
+                tickSpacing: 10,
+                hooks: ETH_ADDRESS,
+              },
+              zeroForOne: true,
+              amountIn: '1000000',
+              amountOutMinimum: '400000000000000000',
+              hookData: '0x',
+            },
+            { action: 'SETTLE', currency: USDC.address, amount: '1000000' },
+            { action: 'TAKE', currency: WETH.address.toLowerCase(), recipient: TEST_RECIPIENT, amount: '0' },
+          ],
+        }
+        expect(sumDirectOutputMin([step], TEST_RECIPIENT, WETH.address).toString()).to.equal('400000000000000000')
+      })
+
       it('does not credit exact-out amounts (the v4 router does not assert full exact-out delivery)', () => {
         const step: SwapStep = {
           type: 'V4_SWAP',
@@ -1037,6 +1128,16 @@ describe('allowDirectTransfers', () => {
       expect(directTransferSweepFloor(spec, netMin, twoLegs(netMin.sub(5)), OUT).toString()).to.equal('5')
     })
 
+    it('does not let zero-min padding legs widen the rounding tolerance', () => {
+      // Small netMin so the 0.5bps flexibility buffer floors to 0 and only the per-leg rounding term applies.
+      // One real leg is 4 wei short; two amountOutMin:0 legs deliver nothing. Only coverage-bearing legs size
+      // the tolerance, so the padding cannot inflate it past 2 wei and the 4-wei shortfall stays enforced.
+      const spec = buildSpec({ allowDirectTransfers: true }, { quote: CurrencyAmount.fromRawAmount(WETH, '10000') })
+      const netMin = BigNumber.from('10000')
+      const steps = [directLeg(netMin.sub(4).toString()), directLeg('0'), directLeg('0')]
+      expect(directTransferSweepFloor(spec, netMin, steps, OUT).toString()).to.equal('4')
+    })
+
     it('clamps to zero when direct coverage exceeds netMin (over-cover)', () => {
       const spec = buildSpec({ allowDirectTransfers: true })
       const netMin = BigNumber.from('500000000000000000')
@@ -1138,6 +1239,54 @@ describe('allowDirectTransfers', () => {
       const residual = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[4])
       // netMin (0.5 - 0.01 fee) minus 0.2 direct = 0.29 WETH
       expect(residual[2].toString()).to.equal('290000000000000000')
+    })
+
+    it('flat fee with a lone 100%-direct exact-out leg still emits the fee TRANSFER (self-enforcing on-chain)', () => {
+      // The flat fee is a plain TRANSFER of fee.amount out of router custody. A single direct exact-out leg
+      // pays the full output straight to the recipient, leaving the router with zero output token — so this
+      // TRANSFER always reverts on-chain. By design the SDK encodes it rather than statically rejecting
+      // (fails safe: the on-chain TRANSFER is the guard) and never silently drops the fee. netMin (0.49) is
+      // over-covered by the 0.5 direct leg, so the output SWEEP floor clamps to 0.
+      const fee = { kind: 'flat' as const, recipient: FEE_RECIPIENT, amount: '10000000000000000' } // 0.01 WETH
+      const steps: SwapStep[] = [
+        buildV3ExactOutStep({ recipient: TEST_RECIPIENT, amountOut: '500000000000000000', amountInMax: '1050000' }),
+      ]
+      const result = SwapRouter.encodeSwaps(buildExactOutSpec({ ...flagOn, fee }), steps)
+      const { commandTypes, inputs } = parseCommands(result.calldata)
+      expect(commandTypes).to.deep.equal([
+        CommandType.PERMIT2_TRANSFER_FROM,
+        CommandType.V3_SWAP_EXACT_OUT,
+        CommandType.TRANSFER,
+        CommandType.SWEEP,
+        CommandType.SWEEP,
+      ])
+      const transfer = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[2])
+      expect(transfer[2].toString()).to.equal(fee.amount) // fee is preserved, not dropped
+      const outputSweep = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[3])
+      expect(outputSweep[2].toString()).to.equal('0')
+    })
+
+    it('flat fee funds cleanly from a custody leg while direct legs cover netMin', () => {
+      // The complement to the lone-direct case: a direct leg delivers netMin (0.49) to the recipient and a
+      // custody leg produces the fee amount (0.01) into router custody, so the fee TRANSFER is funded and
+      // would not revert on-chain. Encodes with the custody leg present and a zero output floor.
+      const fee = { kind: 'flat' as const, recipient: FEE_RECIPIENT, amount: '10000000000000000' } // 0.01 WETH
+      const steps: SwapStep[] = [
+        buildV3ExactOutStep({ recipient: TEST_RECIPIENT, amountOut: '490000000000000000', amountInMax: '1030000' }),
+        buildV3ExactOutStep({ recipient: ROUTER_AS_RECIPIENT, amountOut: '10000000000000000', amountInMax: '20000' }),
+      ]
+      const result = SwapRouter.encodeSwaps(buildExactOutSpec({ ...flagOn, fee }), steps)
+      const { commandTypes, inputs } = parseCommands(result.calldata)
+      expect(commandTypes).to.deep.equal([
+        CommandType.PERMIT2_TRANSFER_FROM,
+        CommandType.V3_SWAP_EXACT_OUT,
+        CommandType.V3_SWAP_EXACT_OUT,
+        CommandType.TRANSFER,
+        CommandType.SWEEP,
+        CommandType.SWEEP,
+      ])
+      const outputSweep = defaultAbiCoder.decode(['address', 'address', 'uint256'], inputs[4])
+      expect(outputSweep[2].toString()).to.equal('0') // netMin 0.49 fully covered by the 0.49 direct leg
     })
   })
 
