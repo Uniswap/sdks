@@ -126,6 +126,7 @@ function buildSpec(
     tokenTransferMode: TokenTransferMode.Permit2,
     urVersion: UniversalRouterVersion.V2_0,
     safeMode: false,
+    allowDirectTransfers: false,
   }
 
   return {
@@ -135,6 +136,7 @@ function buildSpec(
     tokenTransferMode: overrides.tokenTransferMode ?? base.tokenTransferMode,
     urVersion: overrides.urVersion ?? base.urVersion,
     safeMode: overrides.safeMode ?? base.safeMode,
+    allowDirectTransfers: overrides.allowDirectTransfers ?? base.allowDirectTransfers,
     routing: {
       ...base.routing,
       ...routingOverrides,
@@ -666,7 +668,7 @@ describe('encodeSwaps', () => {
       expect(action.minHopPriceX36.toString()).to.equal('123456')
     })
 
-    it('hardcodes V4 SETTLE payerIsUser to false', () => {
+    it('defaults V4 SETTLE payerIsUser to false', () => {
       const step: V4Swap = {
         type: 'V4_SWAP',
         v4Actions: [
