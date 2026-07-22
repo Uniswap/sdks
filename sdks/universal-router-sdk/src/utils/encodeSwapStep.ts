@@ -1,5 +1,5 @@
 import { V4Planner } from '@uniswap/v4-sdk'
-import { UniversalRouterVersion, isAtLeastV2_1_1 } from './constants'
+import { CONTRACT_BALANCE, UniversalRouterVersion, isAtLeastV2_1_1, isAtLeastV2_3_0 } from './constants'
 import { CommandType, RoutePlanner } from './routerCommands'
 import { SwapStep } from '../types/encodeSwaps'
 import { encodeV4Action } from './encodeV4Action'
@@ -48,9 +48,16 @@ export function encodeSwapStep(planner: RoutePlanner, step: SwapStep, urVersion?
     case 'WRAP_ETH':
       planner.addCommand(CommandType.WRAP_ETH, [step.recipient, step.amount], false, urVersion)
       return
-    case 'UNWRAP_WETH':
-      planner.addCommand(CommandType.UNWRAP_WETH, [step.recipient, step.amountMin], false, urVersion)
+    case 'UNWRAP_WETH': {
+      // From UR v2.3.0 the command takes (recipient, amount, minAmount) where `amount` is the exact
+      // amount of WETH to unwrap; CONTRACT_BALANCE (the default) unwraps the full router balance,
+      // matching the only behavior available on older routers.
+      const params = isAtLeastV2_3_0(urVersion)
+        ? [step.recipient, step.amount ?? CONTRACT_BALANCE, step.amountMin]
+        : [step.recipient, step.amountMin]
+      planner.addCommand(CommandType.UNWRAP_WETH, params, false, urVersion)
       return
+    }
     default:
       throw new Error(`Unknown swap step type: ${(step as { type: string }).type}`)
   }

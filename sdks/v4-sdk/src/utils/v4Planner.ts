@@ -20,6 +20,7 @@ export enum URVersion {
   V2_0 = '2.0',
   V2_1_1 = '2.1.1',
   V2_2_0 = '2.2.0',
+  V2_3_0 = '2.3.0',
 }
 
 export function isAtLeastV2_1_1(version?: string): boolean {
