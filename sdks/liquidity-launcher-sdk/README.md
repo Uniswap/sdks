@@ -163,6 +163,25 @@ const { predictedAddress, deployData } = buildLockRecipient({
 // deployData → send to the canonical CREATE2 deployer before migration
 ```
 
+## Auction reads (live data)
+
+This SDK exports the **read descriptors, decoders, and ABIs** for continuous-clearing-auction state,
+plus the `TickDataLens` registry and the auction-outcome logic (`deriveAuctionOutcome`):
+
+- `clearingPriceCall`/`getClearingPrice` — the auction's `checkpoint()` clearing price (Q96
+  raw-currency-per-raw-token; the same live source the backend uses), with `decodeCheckpoint`.
+- `tickDataCall`/`getTickData` — the lens's initialized price ticks (the live bid-distribution data),
+  with `decodeInitializedTicks` and the pure `deriveTickFillRatios` helper.
+- `currencyRaisedCall`, `remainingSupplyCall`, `isGraduatedCall`, `slot0Call`/`decodeSlot0SqrtPriceX96`.
+- `decodeBidSubmitted` — typed decode of a `BidSubmitted` feed log (its event ABI,
+  `CCA_BID_SUBMITTED_EVENT`, is in `abis`), and `getTickDataLensForFactory` to resolve the lens for an
+  auction factory.
+
+> **Live launch feeds moved.** The block-latency `Source` factories that stream this data
+> (`launchAssetSource`, `quickLaunchAssetSource`, `ccaBidsSource`) now live in
+> [`@uniswap/blockfeed-sdk`](../blockfeed-sdk) — see its README's "Launch sources" section. They read
+> the descriptors/decoders above from this package.
+
 ## Supported chains
 
 `getLauncherAddresses(chainId)` returns the deployed stack, or `undefined` if the launcher isn't on
@@ -185,7 +204,7 @@ Config-derivation helpers throw [`LauncherSdkError`](./src/errors.ts) with a sta
 | `abis`, `types` | contract ABIs and on-chain struct types |
 | `encode` | `encodeCreateToken`, `encodeDepositToken`, `encodeDistributeToken`, `encodeMulticall`, `encodeConfigData`, `encodeAuctionParams`, `encodeAuctionSteps`, `encodeTokenData`, … |
 | `config/*` | `deriveBlocks`, `floorPriceToX96`, `deriveAuctionPricing`, `feeToTickSpacing`, `buildPositionDefinitions`, `buildLpAllocationSchedule`, `deriveConvexAuctionSteps` |
-| `reads` | descriptor builders + viem helpers (`registeredPoolIdCall`, `slot0Call`, `predictTokenAddress`, `predictAuctionAddress`, allowance reads) |
+| `reads` | descriptor builders + viem helpers (`registeredPoolIdCall`, `slot0Call`, `predictTokenAddress`, `predictAuctionAddress`, allowance reads, `clearingPriceCall`/`getClearingPrice`, `tickDataCall`/`getTickData`, `deriveTickFillRatios`, `decodeBidSubmitted`) |
 | `availability` | `getFeeTierAvailability` |
 | `build` | `buildLaunchTransactions`, `buildLaunchMulticall` |
 | `lock` | `buildLockRecipient` (timelock / fees-forwarder / buyback-burn liquidity locks) |

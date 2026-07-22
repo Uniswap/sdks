@@ -1,4 +1,4 @@
-import { type Abi } from 'viem'
+import { type Abi, type AbiEvent } from 'viem'
 
 /**
  * Minimal, exact ABIs for the launch stack. Each is `as const satisfies Abi` so viem/wagmi infer
@@ -160,6 +160,80 @@ export const CCA_ABI = [
     stateMutability: 'view',
     inputs: [],
     outputs: [{ name: '', type: 'uint64' }],
+  },
+  {
+    // The live per-block clearing state. `checkpoint()` recomputes the current-block clearing price
+    // (the CCA price decays continuously with emission, so it moves every block even without new
+    // bids) and is the source the backend reads for the "updated every block" clearing price — see
+    // data-api `OnChainAuctionsClient.getLatestCheckpoint`. It is declared `nonpayable` on-chain but
+    // returns via `eth_call`/multicall without persisting; `clearingPrice` is Q96
+    // raw-currency-per-raw-token.
+    type: 'function',
+    name: 'checkpoint',
+    stateMutability: 'nonpayable',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'tuple',
+        components: [
+          { name: 'clearingPrice', type: 'uint256' },
+          { name: 'currencyRaisedAtClearingPriceQ96_X7', type: 'uint256' },
+          { name: 'cumulativeMpsPerPrice', type: 'uint256' },
+          { name: 'cumulativeMps', type: 'uint24' },
+          { name: 'prev', type: 'uint64' },
+          { name: 'next', type: 'uint64' },
+        ],
+      },
+    ],
+  },
+] as const satisfies Abi
+
+/**
+ * `ContinuousClearingAuction.BidSubmitted(uint256 indexed id, address indexed owner, uint256 price,
+ * uint128 amount)` — emitted once per bid landing on the auction. This is the append-only ticker the
+ * live-bids feed watches (single contract, few topics). Ported verbatim from data-api's auction ABI
+ * (`packages/services/data-api/src/abis/Auctions/AuctionAbi.ts`).
+ *
+ * Bid *retractions* are a separate `BidExited` event; the live-bids source deliberately counts only
+ * `BidSubmitted` (monotonic) — see `ccaBidsSource`.
+ */
+export const CCA_BID_SUBMITTED_EVENT = {
+  type: 'event',
+  name: 'BidSubmitted',
+  inputs: [
+    { name: 'id', type: 'uint256', indexed: true },
+    { name: 'owner', type: 'address', indexed: true },
+    { name: 'price', type: 'uint256', indexed: false },
+    { name: 'amount', type: 'uint128', indexed: false },
+  ],
+  anonymous: false,
+} as const satisfies AbiEvent
+
+/**
+ * TickDataLens — a stateless view contract that returns the auction's initialized price ticks and
+ * their demand data (used to render the live bid-distribution chart). The v1 (TWA) and v2 (CCA)
+ * lenses share this identical tuple shape; only the deployed address differs by auction-factory
+ * version (see `getTickDataLensForFactory` / `TICK_DATA_LENS_V1|V2`). All quantities are Q96.
+ */
+export const TICK_DATA_LENS_ABI = [
+  {
+    type: 'function',
+    name: 'getInitializedTickData',
+    stateMutability: 'view',
+    inputs: [{ name: 'auction', type: 'address' }],
+    outputs: [
+      {
+        name: '',
+        type: 'tuple[]',
+        components: [
+          { name: 'priceQ96', type: 'uint256' },
+          { name: 'currencyDemandQ96', type: 'uint256' },
+          { name: 'requiredCurrencyDemandQ96', type: 'uint256' },
+          { name: 'currencyRequiredQ96', type: 'uint256' },
+        ],
+      },
+    ],
   },
 ] as const satisfies Abi
 

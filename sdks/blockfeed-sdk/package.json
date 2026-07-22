@@ -1,0 +1,73 @@
+{
+  "name": "@uniswap/blockfeed-sdk",
+  "version": "0.0.0",
+  "description": "⚡ Block-latency on-chain data feeds — live prices, auction state, and logs over any viem PublicClient",
+  "repository": "https://github.com/Uniswap/sdks.git",
+  "keywords": [
+    "uniswap",
+    "ethereum",
+    "blockfeed",
+    "price-feed",
+    "live-data"
+  ],
+  "license": "MIT",
+  "main": "./dist/cjs/src/index.js",
+  "module": "./dist/esm/src/index.js",
+  "types": "./dist/types/src/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "bun run clean && bun run build:cjs && bun run build:esm && bun run build:types",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "build:types": "tsc -p tsconfig.types.json",
+    "typecheck": "tsc -p tsconfig.typecheck.json",
+    "release": "changeset publish",
+    "lint": "eslint src --ext .ts",
+    "test": "bun test src"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/types/src/index.d.ts",
+      "import": "./dist/esm/src/index.js",
+      "require": "./dist/cjs/src/index.js"
+    },
+    "./discovery": {
+      "types": "./dist/types/src/discovery/index.d.ts",
+      "import": "./dist/esm/src/discovery/index.js",
+      "require": "./dist/cjs/src/discovery/index.js"
+    }
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "@uniswap/liquidity-launcher-sdk": "workspace:*",
+    "@uniswap/sdk-core": "workspace:*",
+    "jsbi": "^3.1.4",
+    "viem": "^2.23.5"
+  },
+  "devDependencies": {
+    "@types/node": "^18.7.16",
+    "@typescript-eslint/eslint-plugin": "^8.38.0",
+    "@typescript-eslint/parser": "^8.38.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.22.0",
+    "prettier": "^2.4.1",
+    "tslib": "^2.3.0",
+    "typescript": "npm:typescript@^5.6.2"
+  },
+  "prettier": {
+    "printWidth": 120,
+    "semi": false,
+    "singleQuote": true
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}
