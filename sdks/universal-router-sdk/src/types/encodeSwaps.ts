@@ -38,19 +38,27 @@ export type SwapSpecification = {
    * Incompatible with native input, permit, and TokenTransferMode.ApproveProxy.
    */
   nativeErc20Input?: boolean
+  /**
+   * Lets steps pull input straight from the user and pay output straight to `recipient`
+   * (instead of router custody), still validated so the user never pays more than
+   * `exactOrMaxAmountIn` or receives less than the minimum output. Default false.
+   * See `SwapRouter.encodeSwaps`.
+   */
+  allowDirectTransfers?: boolean
 }
 
-// Output of `normalizeEncodeSwapsSpec`: the four fields below are guaranteed
+// Output of `normalizeEncodeSwapsSpec`: the five fields below are guaranteed
 // non-undefined, encoding the precondition for `validateEncodeSwaps` and
 // `computeEncodeSwapsAmounts` at the type level.
 export type NormalizedSwapSpecification = Omit<
   SwapSpecification,
-  'recipient' | 'tokenTransferMode' | 'urVersion' | 'safeMode'
+  'recipient' | 'tokenTransferMode' | 'urVersion' | 'safeMode' | 'allowDirectTransfers'
 > & {
   recipient: string
   tokenTransferMode: TokenTransferMode
   urVersion: UniversalRouterVersion
   safeMode: boolean
+  allowDirectTransfers: boolean
 }
 
 export type V2SwapExactIn = {
@@ -60,6 +68,7 @@ export type V2SwapExactIn = {
   amountOutMin: BigNumberish
   path: string[]
   minHopPriceX36?: BigNumberish[]
+  payerIsUser?: boolean
 }
 
 export type V2SwapExactOut = {
@@ -69,6 +78,7 @@ export type V2SwapExactOut = {
   amountInMax: BigNumberish
   path: string[]
   minHopPriceX36?: BigNumberish[]
+  payerIsUser?: boolean
 }
 
 export type V3SwapExactIn = {
@@ -78,6 +88,7 @@ export type V3SwapExactIn = {
   amountOutMin: BigNumberish
   path: string
   minHopPriceX36?: BigNumberish[]
+  payerIsUser?: boolean
 }
 
 export type V3SwapExactOut = {
@@ -87,6 +98,7 @@ export type V3SwapExactOut = {
   amountInMax: BigNumberish
   path: string
   minHopPriceX36?: BigNumberish[]
+  payerIsUser?: boolean
 }
 
 export type V4Swap = {
@@ -156,6 +168,7 @@ export type V4Settle = {
   action: 'SETTLE'
   currency: string
   amount: BigNumberish
+  payerIsUser?: boolean
 }
 
 export type V4SettleAll = {

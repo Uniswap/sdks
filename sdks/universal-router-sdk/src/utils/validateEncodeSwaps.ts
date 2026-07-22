@@ -3,6 +3,7 @@ import invariant from 'tiny-invariant'
 import { TradeType } from '@uniswap/sdk-core'
 import { TokenTransferMode } from '../entities/actions/uniswap'
 import {
+  MAX_UINT160,
   ROUTER_AS_RECIPIENT,
   SENDER_AS_RECIPIENT,
   UniversalRouterVersion,
@@ -10,20 +11,9 @@ import {
   isAtLeastV2_3_0,
 } from './constants'
 import { NormalizedSwapSpecification, SwapStep, V4Action } from '../types/encodeSwaps'
-
-// V3 path: 20-byte address + N × (3-byte fee + 20-byte address); minimum is 43 bytes (single hop, N=1)
-// Returns N or undefined if malformed
-function getV3HopCount(path: string): number | undefined {
-  if (!path.startsWith('0x')) return undefined
-
-  const byteLength = (path.length - 2) / 2
-  if (byteLength < 43) return undefined
-
-  const variableSegmentLength = byteLength - 20
-  if (variableSegmentLength < 23 || variableSegmentLength % 23 !== 0) return undefined
-
-  return variableSegmentLength / 23
-}
+import { getCurrencyAddress } from './getCurrencyAddress'
+import { getV3HopCount, hasUserPaidFlag, stepUserPaidPulls } from './directTransfers'
+import { computeEncodeSwapsAmounts } from './computeEncodeSwapsAmounts'
 
 function hasV4MinHopPriceX36(action: V4Action): boolean {
   switch (action.action) {
@@ -57,20 +47,49 @@ function assertRouterRecipient(recipient: string): void {
   invariant(recipient === ROUTER_AS_RECIPIENT, 'STEP_RECIPIENT_MUST_BE_ROUTER')
 }
 
-function assertRouterActionRecipient(recipient: string): void {
-  invariant(recipient === ROUTER_AS_RECIPIENT, 'V4_ACTION_RECIPIENT_MUST_BE_ROUTER')
+// `routerOnlyError` is the surface's legacy flag-off code (steps vs v4 actions)
+function checkRecipient(spec: NormalizedSwapSpecification, recipient: string, routerOnlyError: string): void {
+  invariant(typeof recipient === 'string', routerOnlyError)
+  if (recipient === ROUTER_AS_RECIPIENT) return
+  invariant(spec.allowDirectTransfers, routerOnlyError)
+  invariant(spec.fee?.kind !== 'portion', 'PORTION_FEE_REQUIRES_ROUTER_CUSTODY')
+  invariant(recipient.toLowerCase() === spec.recipient.toLowerCase(), 'STEP_RECIPIENT_NOT_ALLOWED')
 }
 
-// V4 actions that take a recipient must use router custody so the SDK's settlement sweeps see the funds
-function validateV4Recipients(actions: V4Action[]): void {
+function validateV4Recipients(actions: V4Action[], spec: NormalizedSwapSpecification): void {
   for (const action of actions) {
     switch (action.action) {
       case 'TAKE':
       case 'TAKE_PORTION':
-        assertRouterActionRecipient(action.recipient)
+        // fees are sdk-authored (the envelope's PAY_PORTION); a step-level TAKE_PORTION never pays the fee recipient
+        checkRecipient(spec, action.recipient, 'V4_ACTION_RECIPIENT_MUST_BE_ROUTER')
+        break
+      case 'TAKE_ALL':
+        // TAKE_ALL pays msgSender on-chain; any other spec recipient would be the
+        // wrong payee while still reducing their sweep floor.
+        invariant(spec.allowDirectTransfers, 'TAKE_ALL_REQUIRES_DIRECT_TRANSFERS')
+        invariant(spec.fee?.kind !== 'portion', 'PORTION_FEE_REQUIRES_ROUTER_CUSTODY')
+        // strict equality: the all-numeric sentinel has no checksum variant; anything else fails closed
+        invariant(spec.recipient === SENDER_AS_RECIPIENT, 'TAKE_ALL_REQUIRES_SENDER_RECIPIENT')
         break
       default:
         break
+    }
+  }
+}
+
+const HEX_BYTES = /^0x([0-9a-fA-F]{2})*$/
+
+// ethers rejects non-hex hookData (e.g. '') deep inside abi encoding; fail loudly here instead
+function validateV4HookData(actions: V4Action[]): void {
+  for (const action of actions) {
+    if (action.action === 'SWAP_EXACT_IN_SINGLE' || action.action === 'SWAP_EXACT_OUT_SINGLE') {
+      invariant(HEX_BYTES.test(action.hookData), 'V4_HOOK_DATA_INVALID')
+    }
+    if (action.action === 'SWAP_EXACT_IN' || action.action === 'SWAP_EXACT_OUT') {
+      for (const hop of action.path) {
+        invariant(HEX_BYTES.test(hop.hookData), 'V4_HOOK_DATA_INVALID')
+      }
     }
   }
 }
@@ -138,8 +157,19 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
     'FRACTIONAL_BPS_PORTION_FEE_UNSUPPORTED_ON_V2_0'
   )
 
-  // per-step: capability-gate by UR version, recipients must be router custody, per-hop arrays must match hop counts
+  // per-step: capability-gate by UR version, recipients must be router custody (or the spec
+  // recipient under allowDirectTransfers), per-hop arrays must match hop counts
   for (const step of swapSteps) {
+    if (!spec.allowDirectTransfers) {
+      invariant(!hasUserPaidFlag(step), 'PAYER_IS_USER_REQUIRES_DIRECT_TRANSFERS')
+      if (step.type === 'V4_SWAP') {
+        for (const action of step.v4Actions) {
+          invariant(action.action !== 'SETTLE_ALL', 'SETTLE_ALL_REQUIRES_DIRECT_TRANSFERS')
+          invariant(action.action !== 'TAKE_ALL', 'TAKE_ALL_REQUIRES_DIRECT_TRANSFERS')
+        }
+      }
+    }
+
     if (spec.urVersion === UniversalRouterVersion.V2_0) {
       invariant(
         !('minHopPriceX36' in step) || step.minHopPriceX36 === undefined,
@@ -154,7 +184,7 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
     switch (step.type) {
       case 'V2_SWAP_EXACT_IN':
       case 'V2_SWAP_EXACT_OUT':
-        assertRouterRecipient(step.recipient)
+        checkRecipient(spec, step.recipient, 'STEP_RECIPIENT_MUST_BE_ROUTER')
         invariant(
           !step.minHopPriceX36 || step.minHopPriceX36.length === step.path.length - 1,
           'V2_MIN_HOP_PRICE_X36_LENGTH_MISMATCH'
@@ -162,7 +192,7 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
         break
       case 'V3_SWAP_EXACT_IN':
       case 'V3_SWAP_EXACT_OUT': {
-        assertRouterRecipient(step.recipient)
+        checkRecipient(spec, step.recipient, 'STEP_RECIPIENT_MUST_BE_ROUTER')
         const hopCount = getV3HopCount(step.path)
         invariant(
           hopCount === undefined || !step.minHopPriceX36 || step.minHopPriceX36.length === hopCount,
@@ -171,10 +201,11 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
         break
       }
       case 'WRAP_ETH':
+        // router-only in both regimes: this is the input-side transition, not an outbound payout
         assertRouterRecipient(step.recipient)
         break
       case 'UNWRAP_WETH':
-        assertRouterRecipient(step.recipient)
+        checkRecipient(spec, step.recipient, 'STEP_RECIPIENT_MUST_BE_ROUTER')
         // exact `amount` only exists in the >= 2.3.0 UNWRAP_WETH ABI; reject it on older routers
         // instead of silently dropping the field
         invariant(
@@ -184,10 +215,46 @@ export function validateEncodeSwaps(spec: NormalizedSwapSpecification, swapSteps
         break
       case 'V4_SWAP':
         validateV4HopCounts(step.v4Actions)
-        validateV4Recipients(step.v4Actions)
+        validateV4HookData(step.v4Actions)
+        validateV4Recipients(step.v4Actions, spec)
         break
       default:
         break
+    }
+  }
+
+  // inbound budget: user-paid pulls must be concrete input-token amounts whose combined
+  // maxima fit within exactOrMaxAmountIn; the encoder then ingresses only the remainder,
+  // so total user outflow can never exceed the spec's input
+  if (spec.allowDirectTransfers && swapSteps.some((step) => stepUserPaidPulls(step).length > 0)) {
+    // permit2-based direct pulls need a plain ERC20 input owned by the tx sender
+    invariant(!spec.routing.inputToken.isNative, 'DIRECT_TRANSFERS_NATIVE_INPUT')
+    invariant(!spec.nativeErc20Input, 'DIRECT_TRANSFERS_NATIVE_ERC20_INPUT')
+    invariant(spec.tokenTransferMode === TokenTransferMode.Permit2, 'DIRECT_TRANSFERS_REQUIRES_PERMIT2')
+
+    const { exactOrMaxAmountIn } = computeEncodeSwapsAmounts(spec)
+    const inputTokenAddress = getCurrencyAddress(spec.routing.inputToken).toLowerCase()
+
+    let userPaidTotal = BigNumber.from(0)
+    swapSteps.forEach((step, stepIndex) => {
+      for (const pull of stepUserPaidPulls(step)) {
+        // concrete amounts only: bans ALREADY_PAID/OPEN_DELTA (0), CONTRACT_BALANCE (2^255),
+        // and anything permit2's uint160 cannot move
+        invariant(
+          pull.maxAmount.gt(0) && pull.maxAmount.lte(MAX_UINT160),
+          `USER_PAID_AMOUNT_OUT_OF_RANGE (step ${stepIndex})`
+        )
+        invariant(typeof pull.token === 'string', `USER_PAID_MALFORMED_PATH (step ${stepIndex})`)
+        invariant(pull.token.toLowerCase() === inputTokenAddress, `USER_PAID_INPUT_TOKEN_MISMATCH (step ${stepIndex})`)
+        userPaidTotal = userPaidTotal.add(pull.maxAmount)
+      }
+    })
+    invariant(userPaidTotal.lte(exactOrMaxAmountIn), 'USER_PAID_EXCEEDS_MAX_INPUT')
+
+    // keeps the permit2 allowance an on-chain outer ceiling equal to the budget
+    if (spec.permit) {
+      invariant(spec.permit.details.token.toLowerCase() === inputTokenAddress, 'PERMIT_TOKEN_MISMATCH')
+      invariant(BigNumber.from(spec.permit.details.amount).gte(exactOrMaxAmountIn), 'PERMIT_AMOUNT_INSUFFICIENT')
     }
   }
 }

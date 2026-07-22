@@ -1,6 +1,6 @@
 {
   "name": "@uniswap/liquidity-launcher-sdk",
-  "version": "0.3.2",
+  "version": "1.0.0",
   "description": "⚒️ An SDK for launching tokens and auctions with the Uniswap Liquidity Launcher (CCA + LBP) stack",
   "repository": "https://github.com/Uniswap/sdks.git",
   "keywords": [
@@ -30,7 +30,9 @@
     "typecheck": "tsc -p tsconfig.base.json --noEmit",
     "release": "changeset publish",
     "lint": "eslint src --ext .ts",
-    "test": "bun test"
+    "test": "bun test",
+    "regenerate:lock-bytecode": "bun run scripts/regenerate-lock-bytecode.ts",
+    "check:lock-bytecode": "bun run scripts/regenerate-lock-bytecode.ts --check"
   },
   "exports": {
     ".": {

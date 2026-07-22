@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'bun:test'
+import { encodeFunctionData, getAddress } from 'viem'
 
-import { encodeAuctionSteps, encodeDepositToken } from './encode'
+import { CCA_ABI, LBP_STRATEGY_ABI } from './abis'
+import { encodeAuctionSteps, encodeDepositToken, encodeMigrate, encodeSweepUnsoldTokens } from './encode'
 
 describe('encodeDepositToken', () => {
   // Golden vector: call[0] of a real Unichain launch multicall (depositToken(token, 0.0001e18)).
@@ -8,6 +10,27 @@ describe('encodeDepositToken', () => {
     const data = encodeDepositToken('0x15d0e0c55a3e7ee67152ad7e89acf164253ff68d', 100000000000000n)
     expect(data).toBe(
       '0x44599bc500000000000000000000000015d0e0c55a3e7ee67152ad7e89acf164253ff68d00000000000000000000000000000000000000000000000000005af3107a4000'
+    )
+  })
+})
+
+describe('encodeSweepUnsoldTokens', () => {
+  it('encodes the 4-byte sweepUnsoldTokens() call', () => {
+    expect(encodeSweepUnsoldTokens()).toBe('0x5dd13ca7')
+    expect(encodeSweepUnsoldTokens()).toBe(
+      encodeFunctionData({ abi: CCA_ABI, functionName: 'sweepUnsoldTokens', args: [] })
+    )
+  })
+})
+
+describe('encodeMigrate', () => {
+  it('encodes migrate(auction) calldata', () => {
+    const auction = getAddress('0x15d0e0c55a3e7ee67152ad7e89acf164253ff68d')
+    expect(encodeMigrate(auction)).toBe(
+      '0xce5494bb00000000000000000000000015d0e0c55a3e7ee67152ad7e89acf164253ff68d'
+    )
+    expect(encodeMigrate(auction)).toBe(
+      encodeFunctionData({ abi: LBP_STRATEGY_ABI, functionName: 'migrate', args: [auction] })
     )
   })
 })

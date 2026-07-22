@@ -1,0 +1,100 @@
+name: "Lock Bytecode Staleness Alarm"
+
+# STALENESS ALARM (Gap 2) — proves the pinned liquidity-launcher commit is still current
+# upstream. The consistency gate only re-verifies the committed bytes AT the pin, so it
+# stays green even when upstream has advanced and the pin is stale. That stale-pin state
+# is exactly what caused the Robinhood timelock no-op bug: the contracts moved, the pin
+# did not, and a consistency check at the (stale) pin still passed.
+#
+# This scheduled job rebuilds the three periphery recipients from an UPSTREAM ref (NOT the
+# pinned commit) and diffs against the committed bytecode. On any difference it fails the
+# run (visible red). A red "Lock Bytecode Staleness Alarm" means: upstream advanced —
+# a maintainer must review the launcher changes and regenerate + re-pin. It does NOT
+# auto-open a PR; the red run is the signal (see the SDK README).
+#
+# ── Which upstream ref? main HEAD, not the latest release tag. ────────────────────────
+# liquidity-launcher DOES publish semver release tags (v2.0.0, v3.0.0, ...), and comparing
+# against the latest tag would be less noisy. We deliberately compare against main HEAD
+# instead, because:
+#   1. The failure mode this alarm exists to catch (Robinhood) was upstream advancing ON
+#      MAIN BETWEEN releases — the recipient bytecode changed without a tag being cut. A
+#      tag-based check would not have fired until the next release, too late.
+#   2. The current SDK pin (e4660af) is itself an untagged post-v3.0.0 main commit, so
+#      "latest tag" (v3.0.0) is actually BEHIND the pin — comparing against it would be
+#      backwards and misleading.
+#   3. The check compiles only the three periphery recipients, so main-HEAD noise is low:
+#      it fires only when those contracts (or a base contract they inherit, e.g.
+#      BlockNumberish) change — precisely the signal we want.
+# If maintainers decide to pin only to reviewed release tags, switch the `ref` below (or
+# the workflow_dispatch input) to the tag, e.g. `v3.0.0`, for a lower-frequency signal.
+
+on:
+  schedule:
+    # Weekly, Monday 08:00 UTC. Recipient contracts change rarely; weekly is enough to
+    # surface drift long before the next SDK release without adding daily noise.
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "liquidity-launcher ref to check against (default: main HEAD)"
+        required: false
+        default: "main"
+
+permissions:
+  contents: read
+
+jobs:
+  staleness:
+    name: Alarm if upstream launcher has advanced past the pin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db # v0.8.3
+        with:
+          egress-policy: audit
+
+      - name: ✅ Checkout sdks
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
+        with:
+          persist-credentials: false
+
+      - name: 💽 Setup Node
+        uses: actions/setup-node@1a4442cacd436585916779262731d5b162bc6ec7
+        with:
+          node-version: 24
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@ecf28ddc73e819eb6fa29df6b34ef8921c743461 # v2
+        with:
+          bun-version: 1.3.10
+
+      - name: 📥 Install dependencies
+        run: bun install --frozen-lockfile
+        env:
+          HUSKY: "0"
+
+      - name: 🪨 Install Foundry
+        uses: foundry-rs/foundry-toolchain@82dee4ba654bd2146511f85f0d013af94670c4de # v1
+        with:
+          version: nightly
+
+      - name: ⬇️ Clone liquidity-launcher (with public submodules over https)
+        run: |
+          # Rewrite the launcher's git@github.com: SSH submodule URLs to https BEFORE any
+          # submodule init so the keyless runner can fetch these public repos. The
+          # regenerate script runs the recursive submodule update itself.
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git clone https://github.com/Uniswap/liquidity-launcher.git "$RUNNER_TEMP/liquidity-launcher"
+
+      - name: 🚨 Compare committed bytecode against upstream launcher
+        working-directory: sdks/liquidity-launcher-sdk
+        env:
+          LAUNCHER_REPO: ${{ runner.temp }}/liquidity-launcher
+          # Upstream ref to build. Defaults to main HEAD; the script checks it out, resolves
+          # its sha, and reports drift when it differs from the committed pin.
+          LAUNCHER_COMMIT: ${{ github.event.inputs.ref || 'main' }}
+          # Pin solc to the version the committed bytecode was produced with, so this alarm
+          # tracks UPSTREAM CONTRACT changes rather than firing on unrelated solc releases.
+          # If upstream ever requires a solc newer than this, the build fails here and a
+          # maintainer investigates — also the correct outcome.
+          SOLC_PATH: "0.8.35"
+        run: bun run check:lock-bytecode

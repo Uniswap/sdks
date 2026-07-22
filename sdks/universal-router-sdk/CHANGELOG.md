@@ -1,5 +1,17 @@
 # @uniswap/universal-router-sdk
 
+## 5.11.0
+
+### Minor Changes
+
+- `SwapRouter.encodeSwaps`: add `allowDirectTransfers`, an opt-in regime letting routing-supplied steps move funds directly between the user and pools (per-step `payerIsUser` on V2/V3 swaps and v4 SETTLE, step recipients equal to the spec recipient, v4 SETTLE_ALL/TAKE_ALL). The SDK enforces an inbound budget (direct pulls never exceed `exactOrMaxAmountIn`; ingress pulls only the remainder) and outbound coverage (direct output minimums reduce the final sweep floor, with a small tolerance for per-leg rounding). Portion fees still require full output custody. Without the flag, v4 `SETTLE_ALL`/`TAKE_ALL` are now rejected at encode time. Also exports `computeEncodeSwapsAmounts` (and `EncodeSwapsAmounts`); it takes a `NormalizedSwapSpecification`, so run `normalizeEncodeSwapsSpec` first.
+
+## 5.10.0
+
+### Minor Changes
+
+- 124bfcd: V4 exact-output legs encoded via `swapCallParameters` now `TAKE` the exact leg output amount instead of `OPEN_DELTA`, so under-delivery (e.g. pool liquidity exhausted at the price limit) reverts at unlock settlement instead of silently partial-filling. Hook pools that overcredit output beyond the exact amount will also revert. Zero exact-output amounts now throw at encode time (`ZERO_EXACT_OUTPUT_AMOUNT`). Scope: SDK-generated trade encoding through `addV4Swap` only — caller-authored `encodeSwaps` V4 action plans are unaffected.
+
 ## 5.9.0
 
 ### Minor Changes
