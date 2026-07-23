@@ -250,6 +250,18 @@ Resolved via `getMarginAddresses(chainId)`; Ethereum mainnet today:
 The SDK's ABIs, selectors, and account derivation are test-anchored against this live deployment
 (see `src/*.test.ts`).
 
+## End-to-end demos
+
+[`demo/`](./demo) contains runnable flows that validate the SDK against the live deployment on an
+anvil mainnet fork — each mirrors a v4-periphery contract test: the full long lifecycle,
+native-ETH equity, Aave v3/v4 shorts, a cross-venue delta-neutral hedge on sub-accounts, and raw
+`execute` plans (including a `MarginPlanner` reconstruction of the curated open and the owner
+escape hatch). With [foundry](https://getfoundry.sh) installed:
+
+```bash
+bun run demo
+```
+
 ## Error handling
 
 All SDK validation throws `MarginSdkError` with a stable `code`

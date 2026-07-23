@@ -31,7 +31,8 @@
     "typecheck": "tsc -p tsconfig.base.json --noEmit",
     "release": "changeset publish",
     "lint": "eslint src --ext .ts",
-    "test": "bun test"
+    "test": "bun test",
+    "demo": "bun demo/run-all.ts"
   },
   "exports": {
     ".": {
