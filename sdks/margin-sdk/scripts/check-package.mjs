@@ -69,7 +69,63 @@ try {
   for (const consumer of ['check.cjs', 'check.mjs']) {
     execFileSync('node', [consumer], { cwd: tmp, stdio: 'inherit' })
   }
-  console.log(`package check passed: ${pkg.name} loads under native Node (CJS + ESM) with declared deps only`)
+
+  // 4a. Browser target, static: the shipped ESM module graph must reference no Node builtins.
+  //     This is the actual browser failure mode for an isomorphic library — a stray
+  //     `node:crypto`/`fs` import that Node smoke tests would never catch.
+  const { builtinModules } = await import('node:module')
+  const builtins = new Set(builtinModules)
+  const esmDir = path.join(installDir, 'dist', 'esm')
+  const offenders = []
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) walk(full)
+      else if (entry.name.endsWith('.js')) {
+        const source = fs.readFileSync(full, 'utf8')
+        for (const match of source.matchAll(/(?:from\s*|import\s*\(\s*|require\s*\(\s*)['"]([^'"]+)['"]/g)) {
+          const spec = match[1]
+          if (spec.startsWith('node:') || builtins.has(spec)) {
+            offenders.push(`${path.relative(installDir, full)} imports ${spec}`)
+          }
+        }
+      }
+    }
+  }
+  walk(esmDir)
+  if (offenders.length > 0) {
+    throw new Error(`shipped ESM references Node builtins (breaks the browser target):\n  ${offenders.join('\n  ')}`)
+  }
+
+  // 4b. Browser target, dynamic: load the installed ESM entry with jsdom's window/document as the
+  //     global environment and run the functional vector. jsdom is a devDependency resolved from
+  //     the package root; the SDK still resolves its own deps from the isolated install.
+  const esmEntry = path.join(installDir, 'dist', 'esm', 'src', 'index.js')
+  fs.writeFileSync(
+    path.join(tmp, 'check-browser.mjs'),
+    `import { createRequire } from 'node:module'
+import { pathToFileURL } from 'node:url'
+const require = createRequire(${JSON.stringify(path.join(pkgRoot, 'package.json'))})
+const { JSDOM } = require('jsdom')
+const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'https://margin-sdk.test' })
+for (const [key, value] of Object.entries({ window: dom.window, document: dom.window.document, self: dom.window })) {
+  try {
+    Object.defineProperty(globalThis, key, { value, configurable: true })
+  } catch {
+    /* some globals are non-configurable on newer Node; the import below is the real check */
+  }
+}
+const sdk = await import(pathToFileURL(${JSON.stringify(esmEntry)}).href)
+${functionalCheck}
+console.log('BROWSER (jsdom) OK')
+`
+  )
+  execFileSync('node', ['check-browser.mjs'], { cwd: tmp, stdio: 'inherit' })
+
+  console.log(
+    `package check passed: ${pkg.name} loads under native Node (CJS + ESM) with declared deps only, ` +
+      'ships no Node builtins, and loads under jsdom'
+  )
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true })
 }
