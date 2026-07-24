@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'bun:test'
 import { type Address, decodeAbiParameters } from 'viem'
 
-import { MarginAction, V4RouterAction } from './actions'
-import { CONTRACT_BALANCE, MSG_SENDER, OPEN_DELTA } from './constants'
-import { MarginSdkError } from './errors'
-import { MarginPlanner } from './planner'
-import { type PoolKey } from './types'
+import { MarginAction, V4RouterAction } from './actions.js'
+import { CONTRACT_BALANCE, MSG_SENDER, OPEN_DELTA } from './constants.js'
+import { MarginSdkError } from './errors.js'
+import { MarginPlanner } from './planner.js'
+import { type PoolKey } from './types.js'
 
 const WETH: Address = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
 const USDC: Address = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
@@ -156,5 +156,26 @@ describe('MarginPlanner.finalize', () => {
       amountOutMinimum: 1n,
     })
     expect(p.actions).toEqual([V4RouterAction.SWAP_EXACT_IN])
+  })
+})
+
+describe('zero-recipient guards on fund-out actions', () => {
+  const planner = () => new MarginPlanner().setAccount(0n)
+
+  test('account fund-out actions reject the zero address', () => {
+    expect(() => planner().withdrawCollateral(ADAPTER, MARKET, 1n, ZERO)).toThrow(MarginSdkError)
+    expect(() => planner().borrow(ADAPTER, MARKET, 1n, ZERO)).toThrow(MarginSdkError)
+    expect(() => planner().accountSweep(WETH, 1n, ZERO)).toThrow(MarginSdkError)
+  })
+
+  test('router fund-out actions reject the zero address', () => {
+    expect(() => planner().take(WETH, ZERO, 1n)).toThrow(MarginSdkError)
+    expect(() => planner().takePortion(WETH, ZERO, 100n)).toThrow(MarginSdkError)
+    expect(() => planner().sweep(WETH, ZERO)).toThrow(MarginSdkError)
+  })
+
+  test('the MSG_SENDER / ADDRESS_THIS sentinels remain valid recipients', () => {
+    expect(() => planner().take(WETH, MSG_SENDER, 1n).sweep(WETH, MSG_SENDER)).not.toThrow()
+    expect(() => planner().borrow(ADAPTER, MARKET, 1n, ADDR2)).not.toThrow()
   })
 })

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { type Address } from 'viem'
 
-import { MarginSdkError } from './errors'
+import { MarginSdkError } from './errors.js'
 import {
   marketHasCurrencies,
   poolKeyMatchesMarket,
@@ -9,8 +9,8 @@ import {
   swapZeroForOne,
   toPoolKey,
   validateMarket,
-} from './market'
-import { type PoolKey } from './types'
+} from './market.js'
+import { type PoolKey } from './types.js'
 
 const WETH: Address = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
 const USDC: Address = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
@@ -66,5 +66,30 @@ describe('swapZeroForOne (Market.toSwapParams direction mirror)', () => {
     const wrongPool: PoolKey = { ...POOL, currency0: OTHER }
     expect(() => swapZeroForOne(LONG, USDC, wrongPool)).toThrow(MarginSdkError)
     expect(() => swapZeroForOne(LONG, OTHER, POOL)).toThrow(MarginSdkError)
+  })
+})
+
+describe('toPoolKey bounds', () => {
+  test('rejects out-of-range fees but accepts the dynamic-fee flag', () => {
+    expect(() => toPoolKey({ currencyA: WETH, currencyB: USDC, fee: 1_000_001, tickSpacing: 60 })).toThrow(
+      MarginSdkError
+    )
+    expect(() => toPoolKey({ currencyA: WETH, currencyB: USDC, fee: -1, tickSpacing: 60 })).toThrow(MarginSdkError)
+    expect(() => toPoolKey({ currencyA: WETH, currencyB: USDC, fee: 0x800000, tickSpacing: 60 })).not.toThrow()
+  })
+
+  test('rejects out-of-range tick spacings', () => {
+    expect(() => toPoolKey({ currencyA: WETH, currencyB: USDC, fee: 3000, tickSpacing: 0 })).toThrow(MarginSdkError)
+    expect(() => toPoolKey({ currencyA: WETH, currencyB: USDC, fee: 3000, tickSpacing: 32_768 })).toThrow(
+      MarginSdkError
+    )
+    expect(() => toPoolKey({ currencyA: WETH, currencyB: USDC, fee: 3000, tickSpacing: 2.5 })).toThrow(MarginSdkError)
+  })
+
+  test('rejects malformed addresses', () => {
+    expect(() => toPoolKey({ currencyA: '0xnope' as never, currencyB: USDC, fee: 3000, tickSpacing: 60 })).toThrow(
+      MarginSdkError
+    )
+    expect(() => validateMarket({ collateral: '0x12' as never, debt: USDC })).toThrow(MarginSdkError)
   })
 })

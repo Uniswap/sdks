@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { type Address, decodeFunctionData, toFunctionSelector } from 'viem'
 
-import { MARGIN_ROUTER_ABI } from './abis'
-import { FULL_CLOSE } from './constants'
+import { MARGIN_ROUTER_ABI } from './abis.js'
+import { FULL_CLOSE } from './constants.js'
 import {
   addCollateralCall,
   closePositionCall,
@@ -13,9 +13,9 @@ import {
   encodeIncreasePosition,
   encodeRouterMulticall,
   increasePositionCall,
-} from './encode'
-import { MarginSdkError } from './errors'
-import { type IncreaseParams, type PoolKey } from './types'
+} from './encode.js'
+import { MarginSdkError } from './errors.js'
+import { type IncreaseParams, type PoolKey } from './types.js'
 
 const WETH: Address = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
 const USDC: Address = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
@@ -210,5 +210,36 @@ describe('encodeExecute / multicall', () => {
 
   test('multicall rejects an empty batch', () => {
     expect(() => encodeRouterMulticall([])).toThrow(MarginSdkError)
+  })
+})
+
+describe('deadline validation', () => {
+  test('rejects zero and negative deadlines', () => {
+    expect(() => encodeIncreasePosition({ ...BASE_INCREASE, deadline: 0n })).toThrow(MarginSdkError)
+    expect(() => encodeExecute('0x1234', -1n)).toThrow(MarginSdkError)
+  })
+
+  test('rejects millisecond timestamps (Date.now() footgun)', () => {
+    const ms = BigInt(1_784_900_000_000) // a Date.now()-scale value
+    expect(() => encodeIncreasePosition({ ...BASE_INCREASE, deadline: ms })).toThrow(/milliseconds/)
+    expect(() => encodeAddCollateral({ adapter: ADAPTER, market: LONG_MARKET, amount: 1n, deadline: ms })).toThrow(
+      MarginSdkError
+    )
+  })
+
+  test('accepts plausible second timestamps', () => {
+    expect(() => encodeIncreasePosition({ ...BASE_INCREASE, deadline: 1_784_900_000n })).not.toThrow()
+  })
+})
+
+describe('address validation', () => {
+  test('rejects a malformed adapter address', () => {
+    expect(() => encodeIncreasePosition({ ...BASE_INCREASE, adapter: '0x1234' as never })).toThrow(MarginSdkError)
+  })
+
+  test('rejects a malformed market token address', () => {
+    expect(() =>
+      encodeIncreasePosition({ ...BASE_INCREASE, market: { collateral: 'not-an-address' as never, debt: USDC } })
+    ).toThrow(MarginSdkError)
   })
 })

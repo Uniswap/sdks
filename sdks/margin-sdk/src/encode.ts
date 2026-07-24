@@ -1,11 +1,31 @@
 import { type Address, type Hex, encodeFunctionData } from 'viem'
 
-import { MARGIN_ROUTER_ABI, PERMIT2_ABI } from './abis'
-import { FULL_CLOSE, MAX_UINT48 } from './constants'
-import { MarginSdkError } from './errors'
-import { poolKeyMatchesMarket, validateMarket } from './market'
-import { toUint128 } from './math'
-import { type AddCollateralParams, type DecreaseParams, type IncreaseParams } from './types'
+import { MARGIN_ROUTER_ABI, PERMIT2_ABI } from './abis.js'
+import { FULL_CLOSE, MAX_UINT48 } from './constants.js'
+import { MarginSdkError } from './errors.js'
+import { poolKeyMatchesMarket, validateAddress, validateMarket } from './market.js'
+import { toUint128 } from './math.js'
+import { type AddCollateralParams, type DecreaseParams, type IncreaseParams } from './types.js'
+
+// A Unix-seconds deadline beyond this is almost certainly a milliseconds value (Date.now()),
+// which would silently disable the deadline for the next ~3,000 years.
+const MAX_REASONABLE_DEADLINE = 100_000_000_000n // year ~5138
+
+/** Asserts a deadline is a plausible Unix-seconds timestamp (positive, not milliseconds). */
+export function validateDeadline(deadline: bigint): void {
+  if (deadline <= 0n) {
+    throw new MarginSdkError(
+      'INVALID_DEADLINE',
+      `deadline must be a positive Unix timestamp in seconds, got ${deadline}`
+    )
+  }
+  if (deadline > MAX_REASONABLE_DEADLINE) {
+    throw new MarginSdkError(
+      'INVALID_DEADLINE',
+      `deadline ${deadline} looks like milliseconds — pass Unix SECONDS (e.g. BigInt(Math.floor(Date.now() / 1000)) + buffer)`
+    )
+  }
+}
 
 /**
  * Calldata encoders and write descriptors for the MarginRouter entry points. Each entry point is
@@ -43,7 +63,9 @@ type IncreaseArgs = {
 }
 
 function normalizeIncrease(params: IncreaseParams, isNative: boolean): IncreaseArgs {
+  validateAddress(params.adapter, 'adapter')
   validateMarket(params.market)
+  validateDeadline(params.deadline)
   if (!poolKeyMatchesMarket(params.poolKey, params.market)) {
     throw new MarginSdkError('MARKET_MISMATCH', 'pool currencies do not match the market (collateral, debt) pair')
   }
@@ -125,7 +147,9 @@ type DecreaseArgs = {
 }
 
 function normalizeDecrease(params: DecreaseParams): DecreaseArgs {
+  validateAddress(params.adapter, 'adapter')
   validateMarket(params.market)
+  validateDeadline(params.deadline)
   if (!poolKeyMatchesMarket(params.poolKey, params.market)) {
     throw new MarginSdkError('MARKET_MISMATCH', 'pool currencies do not match the market (collateral, debt) pair')
   }
@@ -215,7 +239,9 @@ type AddCollateralArgs = {
 }
 
 function normalizeAddCollateral(params: AddCollateralParams, isNative: boolean): AddCollateralArgs {
+  validateAddress(params.adapter, 'adapter')
   validateMarket(params.market)
+  validateDeadline(params.deadline)
   if (isNative && params.amount !== 0n) {
     throw new MarginSdkError(
       'INVALID_INPUT',
@@ -265,6 +291,7 @@ export function addCollateralCall(p: {
  * your own code built — a plan has full authority over the caller's sub-accounts.
  */
 export function encodeExecute(unlockData: Hex, deadline: bigint): Hex {
+  validateDeadline(deadline)
   return encodeFunctionData({ abi: MARGIN_ROUTER_ABI, functionName: 'execute', args: [unlockData, deadline] })
 }
 
@@ -275,6 +302,7 @@ export function executeCall(p: {
   deadline: bigint
   value?: bigint
 }): ContractWrite {
+  validateDeadline(p.deadline)
   return {
     address: p.marginRouter,
     abi: MARGIN_ROUTER_ABI,

@@ -1,9 +1,16 @@
-import { type Address, type Hex, concatHex, encodeAbiParameters, numberToHex } from 'viem'
+import { type Address, type Hex, concatHex, encodeAbiParameters, isAddressEqual, numberToHex, zeroAddress } from 'viem'
 
-import { ACCOUNT_SCOPED_ACTIONS, ACTION_ABI, MarginAction, type PlanAction, V4RouterAction } from './actions'
-import { CONTRACT_BALANCE } from './constants'
-import { MarginSdkError } from './errors'
-import { type Market, type PathKey, type PoolKey } from './types'
+import { ACCOUNT_SCOPED_ACTIONS, ACTION_ABI, MarginAction, type PlanAction, V4RouterAction } from './actions.js'
+import { CONTRACT_BALANCE } from './constants.js'
+import { MarginSdkError } from './errors.js'
+import { type Market, type PathKey, type PoolKey } from './types.js'
+
+/** Fund-out destinations must never be the zero address (tokens would burn or the call reverts). */
+function validateRecipient(to: Address, action: string): void {
+  if (isAddressEqual(to, zeroAddress)) {
+    throw new MarginSdkError('INVALID_RECIPIENT', `${action} recipient must not be the zero address`)
+  }
+}
 
 /**
  * Builds the `unlockData` for `MarginRouter.execute`: an ordered plan of v4 routing and margin
@@ -75,13 +82,18 @@ export class MarginPlanner {
     return this.add(MarginAction.ACCOUNT_SUPPLY_COLLATERAL, [adapter, market, amount])
   }
 
-  /** Withdraws `amount` of the market's collateral from the active account's position to `to`. */
+  /**
+   * Withdraws `amount` of the market's collateral from the active account's position to `to`
+   * (the account constrains `to` to its manager — the router — or its owner).
+   */
   withdrawCollateral(adapter: Address, market: Market, amount: bigint, to: Address): this {
+    validateRecipient(to, 'ACCOUNT_WITHDRAW_COLLATERAL')
     return this.add(MarginAction.ACCOUNT_WITHDRAW_COLLATERAL, [adapter, market, amount, to])
   }
 
   /** Borrows `amount` of the market's debt against the active account, delivered to `to`. */
   borrow(adapter: Address, market: Market, amount: bigint, to: Address): this {
+    validateRecipient(to, 'ACCOUNT_BORROW')
     return this.add(MarginAction.ACCOUNT_BORROW, [adapter, market, amount, to])
   }
 
@@ -92,6 +104,7 @@ export class MarginPlanner {
 
   /** Sweeps `amount` of `currency` out of the active account to `to` (manager or owner only). */
   accountSweep(currency: Address, amount: bigint, to: Address): this {
+    validateRecipient(to, 'ACCOUNT_SWEEP')
     return this.add(MarginAction.ACCOUNT_SWEEP, [currency, amount, to])
   }
 
@@ -201,6 +214,7 @@ export class MarginPlanner {
 
   /** Takes `amount` of `currency` from the PoolManager to `recipient` (0 == full credit). */
   take(currency: Address, recipient: Address, amount: bigint): this {
+    validateRecipient(recipient, 'TAKE')
     return this.add(V4RouterAction.TAKE, [currency, recipient, amount])
   }
 
@@ -211,11 +225,13 @@ export class MarginPlanner {
 
   /** Takes `bips` (out of 10_000) of the full credit in `currency` to `recipient`. */
   takePortion(currency: Address, recipient: Address, bips: bigint): this {
+    validateRecipient(recipient, 'TAKE_PORTION')
     return this.add(V4RouterAction.TAKE_PORTION, [currency, recipient, bips])
   }
 
   /** Sweeps the router's entire balance of `currency` to `to` (use to net the router to zero). */
   sweep(currency: Address, to: Address): this {
+    validateRecipient(to, 'SWEEP')
     return this.add(V4RouterAction.SWEEP, [currency, to])
   }
 
