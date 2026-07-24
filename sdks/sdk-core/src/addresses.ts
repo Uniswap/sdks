@@ -237,7 +237,7 @@ const SEPOLIA_ADDRESSES: ChainAddresses = {
   quoterAddress: '0xEd1f6473345F45b75F8179591dd5bA1888cf2FB3',
   v3MigratorAddress: '0x729004182cF005CEC8Bd85df140094b6aCbe8b15',
   nonfungiblePositionManagerAddress: '0x1238536071E1c677A632429e3655c799b22cDA52',
-  tickLensAddress: '0xd7f33bcdb21b359c8ee6f0251d30e94832baad07',
+  tickLensAddress: '0x0b343475d44EC2b4b8243EBF81dc888BF0A14b36',
   swapRouter02Address: '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E',
 
   // TODO: update mixedRouteQuoterV2Address once v4 on sepolia redeployed
