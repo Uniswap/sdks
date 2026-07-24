@@ -260,14 +260,18 @@ Beyond the unit suite (`bun test`), three gates validate what unit tests structu
 
 - **`bun run check:package`** — packs the publish artifact, installs it into an isolated consumer
   with only its declared dependencies resolvable, and loads it under **native Node in both module
-  systems** (CJS `require` + ESM `import`), running a real account-derivation vector. Catches
-  undeclared runtime deps, extensionless ESM emit, and missing module-type markers. Runs as part
-  of `test`.
-- **`bun run check:abi-drift`** — compiles the contracts from a local v4-periphery checkout
-  (`V4_PERIPHERY_PATH`, default `~/dev/v4-periphery`) and asserts every hand-written SDK ABI entry
-  matches the Solidity: canonical signatures, outputs, state mutability, and event index layouts,
-  for the router, the account, and all three adapters. viem encodes tuples positionally, so this
-  is the gate that catches a silent field reorder in the draft contracts.
+  systems** (CJS `require` + ESM `import`) plus the **browser target** (a static scan proving the
+  shipped ESM references no Node builtins, and a jsdom-globals load), running a real
+  account-derivation vector in each. Catches undeclared runtime deps, extensionless ESM emit,
+  missing module-type markers, and accidental Node-only imports. Runs as part of `test`.
+- **`bun run check:abis`** — the margin-contract ABIs are **forge-generated, never hand-written**:
+  `src/generated/abis.ts` is produced by `bun run regenerate:abis` from a v4-periphery checkout
+  **pinned to a specific commit** (recorded in the file header). The check mode recompiles the
+  pinned commit and diffs the regenerated bindings against the committed file; the
+  `margin-sdk-abi-check` CI workflow runs it on every PR touching the package, cloning
+  v4-periphery at the pin. viem encodes tuples positionally, so this closes the
+  silent-wrong-calldata risk of a contract field reorder. When the contracts move, re-pin with
+  `bun scripts/generate-abis.ts --update-pin` against the new checkout.
 - **`bun run test:fork`** — the end-to-end demo suite against an anvil mainnet fork (see below);
   runs inside `test` when `FORK_URL` (or `MARGIN_DEMO_RPC`) is set and skips cleanly otherwise,
   so CI with the `FORK_URL` secret exercises the SDK against the live deployment on every run.
