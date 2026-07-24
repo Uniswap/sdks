@@ -250,6 +250,28 @@ Resolved via `getMarginAddresses(chainId)`; Ethereum mainnet today:
 The SDK's ABIs, selectors, and account derivation are test-anchored against this live deployment
 (see `src/*.test.ts`).
 
+> The margin contracts ([v4-periphery#563](https://github.com/Uniswap/v4-periphery/pull/563)) are
+> still in review and router governance has not yet moved to a timelock/multisig, so the package
+> is published as a `0.0.x` pre-release until the deployment is final.
+
+## Validation gates
+
+Beyond the unit suite (`bun test`), three gates validate what unit tests structurally cannot:
+
+- **`bun run check:package`** — packs the publish artifact, installs it into an isolated consumer
+  with only its declared dependencies resolvable, and loads it under **native Node in both module
+  systems** (CJS `require` + ESM `import`), running a real account-derivation vector. Catches
+  undeclared runtime deps, extensionless ESM emit, and missing module-type markers. Runs as part
+  of `test`.
+- **`bun run check:abi-drift`** — compiles the contracts from a local v4-periphery checkout
+  (`V4_PERIPHERY_PATH`, default `~/dev/v4-periphery`) and asserts every hand-written SDK ABI entry
+  matches the Solidity: canonical signatures, outputs, state mutability, and event index layouts,
+  for the router, the account, and all three adapters. viem encodes tuples positionally, so this
+  is the gate that catches a silent field reorder in the draft contracts.
+- **`bun run test:fork`** — the end-to-end demo suite against an anvil mainnet fork (see below);
+  runs inside `test` when `FORK_URL` (or `MARGIN_DEMO_RPC`) is set and skips cleanly otherwise,
+  so CI with the `FORK_URL` secret exercises the SDK against the live deployment on every run.
+
 ## End-to-end demos
 
 [`demo/`](./demo) contains runnable flows that validate the SDK against the live deployment on an

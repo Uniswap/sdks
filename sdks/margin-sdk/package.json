@@ -33,6 +33,7 @@
     "lint": "eslint src --ext .ts",
     "test": "bun test && bun run check:package && bun run test:fork",
     "check:package": "bun run build && node scripts/check-package.mjs",
+    "check:abi-drift": "bun scripts/check-abi-drift.ts",
     "test:fork": "bun scripts/fork-tests.ts",
     "demo": "bun demo/run-all.ts"
   },
