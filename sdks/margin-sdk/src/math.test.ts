@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { parseUnits } from 'viem'
 
-import { MAX_UINT128, MAX_UINT256, WAD } from './constants'
-import { MarginSdkError } from './errors'
+import { MAX_UINT128, MAX_UINT256, WAD } from './constants.js'
+import { MarginSdkError } from './errors.js'
 import {
   collateralToBuyForLeverage,
   estimateLtv,
@@ -18,7 +18,7 @@ import {
   totalExposure,
   withSlippageDown,
   withSlippageUp,
-} from './math'
+} from './math.js'
 
 describe('parseLeverageX18', () => {
   test('parses numbers and strings', () => {

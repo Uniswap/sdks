@@ -1,7 +1,7 @@
 import { parseUnits } from 'viem'
 
-import { BPS_DENOMINATOR, MAX_UINT128, MAX_UINT256, ONE_X18, WAD } from './constants'
-import { MarginSdkError } from './errors'
+import { BPS_DENOMINATOR, MAX_UINT128, MAX_UINT256, ONE_X18, WAD } from './constants.js'
+import { MarginSdkError } from './errors.js'
 
 /**
  * Leverage, sizing, and health math for margin positions. All ratios are WAD-scaled bigints

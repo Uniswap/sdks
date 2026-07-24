@@ -7,26 +7,26 @@
  */
 
 // Chains & addresses
-export * from './chains'
-export * from './addresses'
+export * from './chains.js'
+export * from './addresses.js'
 
 // Constants & errors
-export * from './constants'
-export * from './errors'
+export * from './constants.js'
+export * from './errors.js'
 
 // Onchain struct mirrors & ABIs
-export * from './types'
-export * from './abis'
+export * from './types.js'
+export * from './abis.js'
 
 // Markets, account derivation, leverage & health math
-export * from './market'
-export * from './account'
-export * from './math'
+export * from './market.js'
+export * from './account.js'
+export * from './math.js'
 
 // Entry-point encoders & the execute-plan builder
-export * from './encode'
-export * from './actions'
-export * from './planner'
+export * from './encode.js'
+export * from './actions.js'
+export * from './planner.js'
 
 // Reads (descriptors + viem helpers)
-export * from './reads'
+export * from './reads.js'

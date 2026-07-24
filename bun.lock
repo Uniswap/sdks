@@ -66,7 +66,7 @@
       "name": "@uniswap/margin-sdk",
       "version": "0.0.0",
       "dependencies": {
-        "viem": "^2.23.5",
+        "tslib": "^2.3.0",
       },
       "devDependencies": {
         "@types/node": "^18.7.16",
@@ -76,8 +76,11 @@
         "eslint-config-prettier": "^9.1.0",
         "eslint-plugin-import": "^2.22.0",
         "prettier": "^2.4.1",
-        "tslib": "^2.3.0",
         "typescript": "npm:typescript@^5.6.2",
+        "viem": "^2.23.5",
+      },
+      "peerDependencies": {
+        "viem": "^2.23.5",
       },
     },
     "sdks/permit2-sdk": {

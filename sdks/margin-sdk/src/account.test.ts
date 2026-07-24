@@ -7,10 +7,10 @@ import {
   marginAccountArgs,
   marginAccountSalt,
   predictMarginAccountAddress,
-} from './account'
-import { MARGIN_ADDRESSES } from './addresses'
-import { SupportedChainId } from './chains'
-import { MarginSdkError } from './errors'
+} from './account.js'
+import { MARGIN_ADDRESSES } from './addresses.js'
+import { SupportedChainId } from './chains.js'
+import { MarginSdkError } from './errors.js'
 
 const MAINNET = MARGIN_ADDRESSES[SupportedChainId.MAINNET]!
 const ROUTER = MAINNET.marginRouter

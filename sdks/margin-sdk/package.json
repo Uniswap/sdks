@@ -24,14 +24,15 @@
   },
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "bun run clean && bun run build:cjs && bun run build:esm && bun run build:types",
+    "build": "bun run clean && bun run build:cjs && bun run build:esm && bun run build:types && node scripts/write-module-markers.mjs",
     "build:cjs": "tsc -p tsconfig.cjs.json",
     "build:esm": "tsc -p tsconfig.esm.json",
     "build:types": "tsc -p tsconfig.types.json",
     "typecheck": "tsc -p tsconfig.base.json --noEmit",
     "release": "changeset publish",
     "lint": "eslint src --ext .ts",
-    "test": "bun test",
+    "test": "bun test && bun run check:package",
+    "check:package": "bun run build && node scripts/check-package.mjs",
     "demo": "bun demo/run-all.ts"
   },
   "exports": {
@@ -43,6 +44,9 @@
   },
   "sideEffects": false,
   "dependencies": {
+    "tslib": "^2.3.0"
+  },
+  "peerDependencies": {
     "viem": "^2.23.5"
   },
   "devDependencies": {
@@ -53,8 +57,8 @@
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import": "^2.22.0",
     "prettier": "^2.4.1",
-    "tslib": "^2.3.0",
-    "typescript": "npm:typescript@^5.6.2"
+    "typescript": "npm:typescript@^5.6.2",
+    "viem": "^2.23.5"
   },
   "prettier": {
     "printWidth": 120,

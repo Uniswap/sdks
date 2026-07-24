@@ -1,7 +1,7 @@
 import { type Address, type Hex, concatHex, encodeAbiParameters, getAddress, keccak256, numberToHex } from 'viem'
 
-import { getMarginAddresses } from './addresses'
-import { MarginSdkError } from './errors'
+import { getMarginAddresses } from './addresses.js'
+import { MarginSdkError } from './errors.js'
 
 /**
  * Offchain mirror of `MarginRouter.accountOf`: the deterministic MarginAccount address for an

@@ -1,6 +1,6 @@
 import { type Address, getAddress } from 'viem'
 
-import { SupportedChainId } from './chains'
+import { SupportedChainId } from './chains.js'
 
 /** The lending venues integrated behind `ILendingAdapter` today. */
 export type LendingVenue = 'morphoBlue' | 'aaveV3' | 'aaveV4'

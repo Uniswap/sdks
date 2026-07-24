@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 import { getAddress } from 'viem'
 
-import { MARGIN_ADDRESSES, getMarginAddresses } from './addresses'
-import { SupportedChainId, isMarginSupportedChain } from './chains'
-import { MarginSdkError, isMarginSdkError } from './errors'
+import { MARGIN_ADDRESSES, getMarginAddresses } from './addresses.js'
+import { SupportedChainId, isMarginSupportedChain } from './chains.js'
+import { MarginSdkError, isMarginSdkError } from './errors.js'
 
 describe('addresses', () => {
   test('every address is checksummed', () => {

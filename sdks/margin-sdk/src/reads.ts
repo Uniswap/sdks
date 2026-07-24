@@ -1,7 +1,7 @@
 import { type Abi, type Address, type PublicClient } from 'viem'
 
-import { LENDING_ADAPTER_ABI, MARGIN_ACCOUNT_ABI, MARGIN_ROUTER_ABI } from './abis'
-import { type Market, type PositionData } from './types'
+import { LENDING_ADAPTER_ABI, MARGIN_ACCOUNT_ABI, MARGIN_ROUTER_ABI } from './abis.js'
+import { type Market, type PositionData } from './types.js'
 
 /**
  * Read layer. Every read is exposed two ways:
