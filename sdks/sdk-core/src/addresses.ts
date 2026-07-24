@@ -19,6 +19,7 @@ type ChainAddresses = {
   v4StateView?: string
   v4QuoterAddress?: string
   permissionedV4PositionManagerAddress?: string
+  permissionedV4HooksAddress?: string
 }
 
 const DEFAULT_NETWORKS = [ChainId.MAINNET, ChainId.GOERLI, ChainId.SEPOLIA]
@@ -118,6 +119,7 @@ const MAINNET_ADDRESSES: ChainAddresses = {
   v4StateView: '0x7ffe42c4a5deea5b0fec41c94c136cf115597227',
   v4QuoterAddress: '0x52f0e24d1c21c8a0cb1e5a5dd6198556bd9e1203',
   permissionedV4PositionManagerAddress: '0x89628C9B4CE81951a9BC1F36F0688Fad6A6ee248',
+  permissionedV4HooksAddress: '0x69603ab16110Eb0bB5f5E9C8019749eE41A128C0',
 }
 const GOERLI_ADDRESSES: ChainAddresses = {
   ...DEFAULT_ADDRESSES,
@@ -249,6 +251,7 @@ const SEPOLIA_ADDRESSES: ChainAddresses = {
   v4StateView: '0xe1dd9c3fa50edb962e442f60dfbc432e24537e4c',
   v4QuoterAddress: '0x61b3f2011a92d183c7dbadbda940a7555ccf9227',
   permissionedV4PositionManagerAddress: '0x68fC145BB20b388965bED184Df5ef912215bb3C7',
+  permissionedV4HooksAddress: '0x8B0E8d467af81D9F5B49165e104a2fe1b98328C0',
 }
 
 // Avalanche v3 addresses
