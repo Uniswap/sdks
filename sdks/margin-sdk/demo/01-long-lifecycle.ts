@@ -148,7 +148,9 @@ export async function run(ctx: Ctx): Promise<void> {
     })
   )
   const added = routerEvent<{ amount: bigint; debtTotal: bigint; currentLtv: bigint }>(addReceipt, 'CollateralAdded')
-  assert(added?.amount === topUp && added.debtTotal === position.debtAmount, 'CollateralAdded: debt unchanged')
+  assert(added?.amount === topUp, 'CollateralAdded: exact top-up amount')
+  // debt is untouched by the add but accrues a few wei of interest across the blocks in between
+  assertApprox(added!.debtTotal, position.debtAmount, 1, 'CollateralAdded: debt unchanged (± accrued interest)')
   assert(added!.currentLtv < position.currentLtv, 'LTV improved after the top-up')
 
   // -- 7. Pure leverage increase: equity = 0, same account ---------------------------------------
