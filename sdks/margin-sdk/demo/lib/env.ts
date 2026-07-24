@@ -35,7 +35,8 @@ export const USDC: Address = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
 /** Canonical mainnet v4 Quoter (sdk-core `v4QuoterAddress`); used to derive real swap quotes. */
 export const V4_QUOTER: Address = '0x52F0E24D1c21C8A0cB1e5a5dD6198556BD9E1203'
 
-const DEFAULT_FORK_RPC = process.env.MARGIN_DEMO_RPC ?? process.env.RPC_URL ?? 'https://ethereum-rpc.publicnode.com'
+const DEFAULT_FORK_RPC =
+  process.env.MARGIN_DEMO_RPC ?? process.env.FORK_URL ?? process.env.RPC_URL ?? 'https://ethereum-rpc.publicnode.com'
 
 export interface Ctx {
   rpcUrl: string
