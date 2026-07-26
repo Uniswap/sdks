@@ -1,11 +1,13 @@
-import { type Address, type Hex, isAddressEqual } from 'viem'
+import { type Address, type Hex, type PublicClient, getAddress, isAddressEqual } from 'viem'
 
+import { V4_QUOTER_ABI } from './abis'
 import { getLauncherAddresses } from './addresses'
 import { buildLaunchTransactions, type TransactionRequest } from './build'
 import { NEW_TOKEN_DECIMALS, ZERO_ADDRESS } from './constants'
 import { encodeDirectLaunchConfig, encodeTokenData } from './encode'
 import { LauncherSdkError } from './errors'
-import { type ContractCall, predictTokenAddressCall } from './reads'
+import { computeLbpPoolId } from './poolId'
+import { type ContractCall, predictTokenAddressCall, readContract } from './reads'
 import type { Uerc20Metadata } from './types'
 
 /**
@@ -178,6 +180,112 @@ export function buildDirectLaunchTransaction(params: BuildDirectLaunchParams): D
     throw new LauncherSdkError('INVALID_INPUT', 'buildLaunchTransactions returned no transaction')
   }
   return { to: transaction.to, data: transaction.data, value: transaction.value, chainId: params.chainId }
+}
+
+// ---------------------------------------------------------------------------
+// The launch pool: deterministic PoolKey/PoolId derivation + on-chain quoting
+// ---------------------------------------------------------------------------
+
+/** DirectLaunchStrategy's immutable pool LP fee (pips). On-chain-verified on 4663 (`LP_FEE`). */
+export const DIRECT_LAUNCH_POOL_LP_FEE = 2500
+
+/** DirectLaunchStrategy's immutable pool tick spacing. On-chain-verified on 4663 (`TICK_SPACING`). */
+export const DIRECT_LAUNCH_POOL_TICK_SPACING = 60
+
+/** The launch pool is hookless. */
+export const DIRECT_LAUNCH_POOL_HOOKS: Address = ZERO_ADDRESS
+
+/** The launch pool's raise currency: native ETH (address(0)), which always sorts as `currency0`. */
+export const DIRECT_LAUNCH_POOL_CURRENCY0: Address = ZERO_ADDRESS
+
+/** A Uniswap v4 `PoolKey` struct mirror (currencies sorted ascending, as the PoolManager requires). */
+export interface V4PoolKey {
+  currency0: Address
+  currency1: Address
+  fee: number
+  tickSpacing: number
+  hooks: Address
+}
+
+/**
+ * The one v4 pool a Direct Launch token trades in: hookless native-ETH pool at the strategy's
+ * immutable fee/spacing. Native ETH (address(0)) sorts below every token, so `currency0` is always
+ * ETH and an ETH→token swap is always `zeroForOne`. The token address is EIP-55 normalized.
+ */
+export function getDirectLaunchPoolKey(token: Address): V4PoolKey {
+  return {
+    currency0: DIRECT_LAUNCH_POOL_CURRENCY0,
+    currency1: normalizeDirectLaunchToken(token),
+    fee: DIRECT_LAUNCH_POOL_LP_FEE,
+    tickSpacing: DIRECT_LAUNCH_POOL_TICK_SPACING,
+    hooks: DIRECT_LAUNCH_POOL_HOOKS,
+  }
+}
+
+/**
+ * The launch pool's v4 PoolId — `keccak256(abi.encode(poolKey))`, matching the on-chain
+ * `PoolKey.toId()`. Use it with `slot0Call` / `isV4PoolInitialized` or any StateView read.
+ */
+export function getDirectLaunchPoolId(token: Address): Hex {
+  const key = getDirectLaunchPoolKey(token)
+  return computeLbpPoolId(key.currency0, key.currency1, key.fee, key.tickSpacing, key.hooks)
+}
+
+export interface QuoteDirectLaunchBuyParams {
+  /** The chain's v4 View Quoter (caller-supplied, like every read in `reads.ts`). */
+  v4Quoter: Address
+  /** The Direct Launch token being bought. */
+  token: Address
+  /** Exact ETH input, in wei. */
+  exactAmountInWei: bigint
+}
+
+/**
+ * `V4Quoter.quoteExactInputSingle` descriptor for an exact-in ETH→token buy on the launch pool
+ * (`zeroForOne` since ETH is always `currency0`; no hook data). The quoter quotes by
+ * revert-and-catch, so execute this as an `eth_call` simulation (viem `readContract` /
+ * {@link quoteDirectLaunchBuy}), never as a transaction. Returns `(amountOut, gasEstimate)`.
+ */
+export function quoteDirectLaunchBuyCall(params: QuoteDirectLaunchBuyParams): ContractCall<typeof V4_QUOTER_ABI> {
+  return {
+    address: params.v4Quoter,
+    abi: V4_QUOTER_ABI,
+    functionName: 'quoteExactInputSingle',
+    args: [
+      {
+        poolKey: getDirectLaunchPoolKey(params.token),
+        zeroForOne: true,
+        exactAmount: params.exactAmountInWei,
+        hookData: '0x',
+      },
+    ],
+  }
+}
+
+/** Executes {@link quoteDirectLaunchBuyCall} against a viem `PublicClient`. */
+export async function quoteDirectLaunchBuy(
+  client: PublicClient,
+  params: QuoteDirectLaunchBuyParams
+): Promise<{ amountOut: bigint; gasEstimate: bigint }> {
+  const [amountOut, gasEstimate] = await readContract<readonly [bigint, bigint]>(
+    client,
+    quoteDirectLaunchBuyCall(params)
+  )
+  return { amountOut, gasEstimate }
+}
+
+/** EIP-55 normalizes the token address; rejects malformed input and the native-currency sentinel. */
+function normalizeDirectLaunchToken(token: Address): Address {
+  let normalized: Address
+  try {
+    normalized = getAddress(token)
+  } catch {
+    throw new LauncherSdkError('INVALID_INPUT', `Invalid Direct Launch token address: ${token}`)
+  }
+  if (isAddressEqual(normalized, ZERO_ADDRESS)) {
+    throw new LauncherSdkError('INVALID_INPUT', 'Direct Launch token address must not be the zero address')
+  }
+  return normalized
 }
 
 function requireDirectLaunchAddresses(chainId: number): DirectLaunchAddresses {

@@ -1,20 +1,26 @@
 import { describe, expect, it } from 'bun:test'
-import { decodeAbiParameters, decodeFunctionData, getAddress } from 'viem'
+import { decodeAbiParameters, decodeFunctionData, encodeFunctionData, getAddress, toFunctionSelector } from 'viem'
 
-import { LIQUIDITY_LAUNCHER_ABI, UERC20_FACTORY_ABI } from './abis'
+import { LIQUIDITY_LAUNCHER_ABI, UERC20_FACTORY_ABI, V4_QUOTER_ABI } from './abis'
 import { getLauncherAddresses } from './addresses'
 import { SupportedChainId } from './chains'
+import { ZERO_ADDRESS } from './constants'
 import {
   buildDirectLaunchTransaction,
+  DIRECT_LAUNCH_POOL_LP_FEE,
+  DIRECT_LAUNCH_POOL_TICK_SPACING,
   DIRECT_LAUNCH_TOKEN_DECIMALS,
   DIRECT_LAUNCH_TOTAL_SUPPLY_RAW,
   DISABLED_CREATOR_FEE_BENEFICIARY,
   getDirectLaunchAddresses,
+  getDirectLaunchPoolId,
+  getDirectLaunchPoolKey,
   isDirectLaunchSupportedChain,
   predictDirectLaunchTokenAddressCall,
+  quoteDirectLaunchBuyCall,
 } from './directLaunch'
 import { isLauncherSdkError } from './errors'
-import { computeGraffiti } from './poolId'
+import { computeGraffiti, computeLbpPoolId } from './poolId'
 
 const CHAIN_ID = SupportedChainId.ROBINHOOD
 const WALLET = getAddress('0x51b0bad1e2977ad4a256d4863f569923d3a10b1d')
@@ -156,6 +162,103 @@ describe('buildDirectLaunchTransaction', () => {
   it('throws UNSUPPORTED_CHAIN where Direct Launch is not deployed', () => {
     expect(() => buildDirectLaunchTransaction({ ...BUILD_PARAMS, chainId: SupportedChainId.MAINNET })).toThrow(
       'not deployed'
+    )
+  })
+})
+
+// A real 4663 Direct Launch token ("TTT"); its pool id and slot0 were read back on-chain 2026-07-26
+// (StateView.getSlot0 → lpFee 2500, tick 121980 — the strategy's immutable initialTick).
+const LAUNCHED_TOKEN = getAddress('0xFb12A16F5842bA4886130cAA6664aB5db2D2F2fb')
+const LAUNCHED_TOKEN_POOL_ID = '0xacab50a30661df2dd6bff53c7ba773a20a0efe0eea8b4216efd08caf557c73a3'
+
+describe('getDirectLaunchPoolKey', () => {
+  it('derives the hookless native-ETH pool at the strategy immutables, ETH always currency0', () => {
+    expect(getDirectLaunchPoolKey(LAUNCHED_TOKEN)).toEqual({
+      currency0: ZERO_ADDRESS,
+      currency1: LAUNCHED_TOKEN,
+      fee: DIRECT_LAUNCH_POOL_LP_FEE,
+      tickSpacing: DIRECT_LAUNCH_POOL_TICK_SPACING,
+      hooks: ZERO_ADDRESS,
+    })
+    expect(DIRECT_LAUNCH_POOL_LP_FEE).toBe(2500)
+    expect(DIRECT_LAUNCH_POOL_TICK_SPACING).toBe(60)
+  })
+
+  it('EIP-55 normalizes a lowercase token address', () => {
+    const key = getDirectLaunchPoolKey(LAUNCHED_TOKEN.toLowerCase() as `0x${string}`)
+    expect(key.currency1).toBe(LAUNCHED_TOKEN)
+  })
+
+  it('rejects a malformed or zero token address with INVALID_INPUT', () => {
+    for (const bad of ['0x1234', ZERO_ADDRESS] as const) {
+      try {
+        getDirectLaunchPoolKey(bad)
+        throw new Error('expected to throw')
+      } catch (error) {
+        expect(isLauncherSdkError(error)).toBe(true)
+        expect((error as { code: string }).code).toBe('INVALID_INPUT')
+      }
+    }
+  })
+})
+
+describe('getDirectLaunchPoolId', () => {
+  it('matches the on-chain pool id for the real launched token (golden vector)', () => {
+    expect(getDirectLaunchPoolId(LAUNCHED_TOKEN)).toBe(LAUNCHED_TOKEN_POOL_ID)
+  })
+
+  it('is casing-independent (lowercase input → same pool id)', () => {
+    expect(getDirectLaunchPoolId(LAUNCHED_TOKEN.toLowerCase() as `0x${string}`)).toBe(LAUNCHED_TOKEN_POOL_ID)
+  })
+
+  it('agrees with the generic computeLbpPoolId derivation', () => {
+    expect(getDirectLaunchPoolId(LAUNCHED_TOKEN)).toBe(
+      computeLbpPoolId(
+        ZERO_ADDRESS,
+        LAUNCHED_TOKEN,
+        DIRECT_LAUNCH_POOL_LP_FEE,
+        DIRECT_LAUNCH_POOL_TICK_SPACING,
+        ZERO_ADDRESS
+      )
+    )
+  })
+})
+
+describe('quoteDirectLaunchBuyCall', () => {
+  const V4_QUOTER = getAddress('0x8Dc178eFB8111BB0973Dd9d722ebeFF267c98F94') // 4663
+
+  it('describes an exact-in ETH→token quoteExactInputSingle on the launch pool', () => {
+    const call = quoteDirectLaunchBuyCall({ v4Quoter: V4_QUOTER, token: LAUNCHED_TOKEN, exactAmountInWei: 10n ** 15n })
+    expect(call.address).toBe(V4_QUOTER)
+    expect(call.abi).toBe(V4_QUOTER_ABI)
+    expect(call.functionName).toBe('quoteExactInputSingle')
+    expect(call.args).toEqual([
+      {
+        poolKey: getDirectLaunchPoolKey(LAUNCHED_TOKEN),
+        zeroForOne: true,
+        exactAmount: 10n ** 15n,
+        hookData: '0x',
+      },
+    ])
+  })
+
+  it('encodes to the live-verified calldata (selector + argument layout golden vector)', () => {
+    // This exact eth_call quoted 0.001 ETH → 197.775299 TTT on 4663 (2026-07-26).
+    expect(toFunctionSelector(V4_QUOTER_ABI[0])).toBe('0xaa9d21cb')
+    const call = quoteDirectLaunchBuyCall({ v4Quoter: V4_QUOTER, token: LAUNCHED_TOKEN, exactAmountInWei: 10n ** 15n })
+    const data = encodeFunctionData({ abi: call.abi, functionName: 'quoteExactInputSingle', args: call.args as never })
+    expect(data).toBe(
+      '0xaa9d21cb' +
+        '0000000000000000000000000000000000000000000000000000000000000020' + // params tuple offset
+        '0000000000000000000000000000000000000000000000000000000000000000' + // currency0 = native ETH
+        '000000000000000000000000fb12a16f5842ba4886130caa6664ab5db2d2f2fb' + // currency1 = token
+        '00000000000000000000000000000000000000000000000000000000000009c4' + // fee = 2500
+        '000000000000000000000000000000000000000000000000000000000000003c' + // tickSpacing = 60
+        '0000000000000000000000000000000000000000000000000000000000000000' + // hooks = address(0)
+        '0000000000000000000000000000000000000000000000000000000000000001' + // zeroForOne = true
+        '00000000000000000000000000000000000000000000000000038d7ea4c68000' + // exactAmount = 1e15
+        '0000000000000000000000000000000000000000000000000000000000000100' + // hookData offset
+        '0000000000000000000000000000000000000000000000000000000000000000' // hookData = empty
     )
   })
 })

@@ -259,6 +259,45 @@ export const PERMIT2_ABI = [
   },
 ] as const satisfies Abi
 
+/**
+ * v4 View Quoter — off-chain swap quoting by revert-and-catch. `quoteExactInputSingle` is declared
+ * `nonpayable` on-chain (it state-mutates then reverts internally), so it must be executed as an
+ * `eth_call` simulation, never submitted as a transaction.
+ */
+export const V4_QUOTER_ABI = [
+  {
+    type: 'function',
+    name: 'quoteExactInputSingle',
+    stateMutability: 'nonpayable',
+    inputs: [
+      {
+        name: 'params',
+        type: 'tuple',
+        components: [
+          {
+            name: 'poolKey',
+            type: 'tuple',
+            components: [
+              { name: 'currency0', type: 'address' },
+              { name: 'currency1', type: 'address' },
+              { name: 'fee', type: 'uint24' },
+              { name: 'tickSpacing', type: 'int24' },
+              { name: 'hooks', type: 'address' },
+            ],
+          },
+          { name: 'zeroForOne', type: 'bool' },
+          { name: 'exactAmount', type: 'uint128' },
+          { name: 'hookData', type: 'bytes' },
+        ],
+      },
+    ],
+    outputs: [
+      { name: 'amountOut', type: 'uint256' },
+      { name: 'gasEstimate', type: 'uint256' },
+    ],
+  },
+] as const satisfies Abi
+
 /** v4 StateView — reads pool state by pool id. `sqrtPriceX96 == 0` means the pool is uninitialized. */
 export const STATE_VIEW_ABI = [
   {
