@@ -12,9 +12,9 @@ import {
 import type { LockRecipientInput } from './lock'
 
 /**
- * The canonical "quick launch" definition — the single source of truth both universe (create flow +
- * discovery badge) and data-api (server-side classification) consume, replacing the two drifting
- * client copies that existed before.
+ * The canonical "quick launch" definition — the single source of truth that client-side (create
+ * flow + discovery badge) and server-side (classification) consumers share, replacing the two
+ * drifting client copies that existed before.
  *
  * A quick launch is not a separate contract: it is a {@link AuctionParameters CCA auction} created
  * with this fixed, non-negotiable parameter set. Classification is therefore purely by parameters —
@@ -179,8 +179,8 @@ export interface QuickLaunchLockDescriptor {
 
 /**
  * The structural, address-free fields {@link isQuickLaunch} compares against the preset. Each field
- * maps to already-indexed on-chain data, so the matcher is usable both client-side (universe) and
- * server-side (data-api classifying from on-chain params).
+ * maps to already-indexed on-chain data, so the matcher is usable both client-side and
+ * server-side (classifying from on-chain params).
  */
 export interface QuickLaunchMatchParams {
   /** Launch chain id — needed to convert the block window into real seconds. */
