@@ -29,6 +29,14 @@ export interface LauncherAddresses {
    * recipients hold migrated LP positions via this. Optional: lock is only offered where it's set.
    */
   positionManager?: Address
+  /**
+   * Hookless DirectLaunchStrategy (`Distribution.strategy` for a Direct Launch). Optional: Direct
+   * Launch is only offered on chains where it (and {@link feeSplitter}) is deployed — see
+   * `getDirectLaunchAddresses`.
+   */
+  directLaunchStrategy?: Address
+  /** FeeSplitter singleton — permanent custodian of the Direct Launch LP NFT + fee distributor. */
+  feeSplitter?: Address
 }
 
 const PERMIT2 = getAddress('0x000000000022D473030F116dDEE9F6B43aC78BA3')
@@ -63,6 +71,15 @@ const POSITION_MANAGER_XLAYER = getAddress('0xcF1EAFC6928dC385A342E7C6491d371d28
 const POSITION_MANAGER_ROBINHOOD = getAddress('0x58daec3116aae6D93017bAAea7749052E8a04fA7')
 const POSITION_MANAGER_SEPOLIA = getAddress('0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4')
 const POSITION_MANAGER_BASE_SEPOLIA = getAddress('0x4B2C77d209D3405F41a037Ec6c77F7F5b8e2ca80')
+
+// Direct Launch stack (Robinhood-only today). Values verified on-chain 2026-07-24: the strategy's
+// `launcher()`/`feeSplitter()` immutables match the launcher/splitter entries, `LP_FEE=2500`,
+// `TICK_SPACING=60`, `TOTAL_SUPPLY=1e27`, `initialTick=121980`. A REDEPLOY IS EXPECTED from the
+// liquidity-launcher#196 strategy/splitter interface rework — this registry is the single swap
+// point: update these entries (plus any `DirectLaunchConfig` encoding change) in one SDK release
+// and every consumer picks it up.
+const DIRECT_LAUNCH_STRATEGY_ROBINHOOD = getAddress('0x6E572A882eD13e310204698e474D7A1c8Cc59215')
+const FEE_SPLITTER_ROBINHOOD = getAddress('0xc98D02d3700818B3Af1Ec22dAA75F9FDe9C7d59B')
 
 /** All deployed launcher stacks, keyed by numeric chain id. */
 export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
@@ -129,6 +146,8 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
     permit2: PERMIT2,
     uerc20Factory: UERC20_FACTORY,
     positionManager: POSITION_MANAGER_ROBINHOOD,
+    directLaunchStrategy: DIRECT_LAUNCH_STRATEGY_ROBINHOOD,
+    feeSplitter: FEE_SPLITTER_ROBINHOOD,
   },
   [SupportedChainId.SEPOLIA]: {
     liquidityLauncher: LIQUIDITY_LAUNCHER,

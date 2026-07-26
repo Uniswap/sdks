@@ -42,5 +42,8 @@ export * from './lock'
 // Canonical quick-launch preset + pure classifier
 export * from './quickLaunch'
 
+// Canonical Direct Launch ("Instant Launch") preset + transaction assembler
+export * from './directLaunch'
+
 // Formatting
 export * from './format'

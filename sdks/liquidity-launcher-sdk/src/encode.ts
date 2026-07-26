@@ -106,6 +106,12 @@ const UERC20_METADATA_PARAM = {
   ],
 } as const satisfies AbiParameter
 
+const DIRECT_LAUNCH_CONFIG_PARAM = {
+  name: 'config',
+  type: 'tuple',
+  components: [{ name: 'feeBeneficiary', type: 'address' }],
+} as const satisfies AbiParameter
+
 const TOKEN_SPLITTER_SPLITS_PARAM = {
   name: 'splits',
   type: 'tuple[]',
@@ -149,6 +155,14 @@ export function encodeConfigData(migrator: MigratorParameters, auctionParams: He
 /** `abi.encode(Split[])` — the TokenSplitter strategy's `configData`. */
 export function encodeTokenSplitterConfig(splits: Split[]): Hex {
   return encodeAbiParameters([TOKEN_SPLITTER_SPLITS_PARAM], [splits])
+}
+
+/**
+ * `abi.encode(DirectLaunchConfig)` — the DirectLaunchStrategy's `configData` (see `directLaunch`).
+ * A single-member struct today: the LP-fee beneficiary.
+ */
+export function encodeDirectLaunchConfig(config: { feeBeneficiary: Address }): Hex {
+  return encodeAbiParameters([DIRECT_LAUNCH_CONFIG_PARAM], [config])
 }
 
 /**

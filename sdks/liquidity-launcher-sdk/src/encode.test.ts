@@ -2,7 +2,13 @@ import { describe, expect, it } from 'bun:test'
 import { encodeFunctionData, getAddress } from 'viem'
 
 import { CCA_ABI, LBP_STRATEGY_ABI } from './abis'
-import { encodeAuctionSteps, encodeDepositToken, encodeMigrate, encodeSweepUnsoldTokens } from './encode'
+import {
+  encodeAuctionSteps,
+  encodeDepositToken,
+  encodeDirectLaunchConfig,
+  encodeMigrate,
+  encodeSweepUnsoldTokens,
+} from './encode'
 
 describe('encodeDepositToken', () => {
   // Golden vector: call[0] of a real Unichain launch multicall (depositToken(token, 0.0001e18)).
@@ -26,9 +32,7 @@ describe('encodeSweepUnsoldTokens', () => {
 describe('encodeMigrate', () => {
   it('encodes migrate(auction) calldata', () => {
     const auction = getAddress('0x15d0e0c55a3e7ee67152ad7e89acf164253ff68d')
-    expect(encodeMigrate(auction)).toBe(
-      '0xce5494bb00000000000000000000000015d0e0c55a3e7ee67152ad7e89acf164253ff68d'
-    )
+    expect(encodeMigrate(auction)).toBe('0xce5494bb00000000000000000000000015d0e0c55a3e7ee67152ad7e89acf164253ff68d')
     expect(encodeMigrate(auction)).toBe(
       encodeFunctionData({ abi: LBP_STRATEGY_ABI, functionName: 'migrate', args: [auction] })
     )
@@ -48,5 +52,13 @@ describe('encodeAuctionSteps', () => {
 
   it('rejects a non-increasing step', () => {
     expect(() => encodeAuctionSteps([{ mps: 1, startBlock: 5n, endBlock: 5n }])).toThrow()
+  })
+})
+
+describe('encodeDirectLaunchConfig', () => {
+  it('abi-encodes the single-member struct (one left-padded address word)', () => {
+    const feeBeneficiary = getAddress('0x00000000000000000000000000000000000000cc')
+    const encoded = encodeDirectLaunchConfig({ feeBeneficiary })
+    expect(encoded).toBe(`0x${feeBeneficiary.slice(2).toLowerCase().padStart(64, '0')}`)
   })
 })
