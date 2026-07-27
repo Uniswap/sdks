@@ -39,10 +39,11 @@ const BUILD_PARAMS = {
 }
 
 describe('getDirectLaunchAddresses', () => {
-  it('carries the Robinhood (4663) stack, on-chain-verified 2026-07-24', () => {
+  it('carries the Robinhood (4663) stack from the 2026-07-27 redeploy', () => {
     const addresses = getDirectLaunchAddresses(CHAIN_ID)
-    expect(addresses?.directLaunchStrategy).toBe(getAddress('0x6E572A882eD13e310204698e474D7A1c8Cc59215'))
-    expect(addresses?.feeSplitter).toBe(getAddress('0xc98D02d3700818B3Af1Ec22dAA75F9FDe9C7d59B'))
+    expect(addresses?.directLaunchStrategy).toBe(getAddress('0x2CB3650C70A88E5563b6A2Db0B609F886ec7DE4e'))
+    expect(addresses?.feeSplitter).toBe(getAddress('0x7278d55E2fB14dB975d3DE07b3E6cd3081c03BA5'))
+    expect(addresses?.beneficiaryVault).toBe(getAddress('0xB8997753B221Bd3e8D7143Ca2994cF4c18e619Bc'))
   })
 
   it('resolves the launcher-side contracts from the single launcher registry', () => {
@@ -142,18 +143,25 @@ describe('buildDirectLaunchTransaction', () => {
     expect(config.feeBeneficiary).toBe(FEE_RECIPIENT)
   })
 
-  it('rejects a zero or launcher fee beneficiary (mirrors the strategy revert)', () => {
+  it('rejects a zero, launcher, or vault fee beneficiary (mirrors the on-chain reverts)', () => {
     expect(() =>
       buildDirectLaunchTransaction({
         ...BUILD_PARAMS,
         feeBeneficiary: '0x0000000000000000000000000000000000000000',
       })
     ).toThrow('fee beneficiary')
-    const launcher = getDirectLaunchAddresses(CHAIN_ID)!.liquidityLauncher
-    expect(() => buildDirectLaunchTransaction({ ...BUILD_PARAMS, feeBeneficiary: launcher })).toThrow('fee beneficiary')
+    const addresses = getDirectLaunchAddresses(CHAIN_ID)!
+    expect(() =>
+      buildDirectLaunchTransaction({ ...BUILD_PARAMS, feeBeneficiary: addresses.liquidityLauncher })
+    ).toThrow('fee beneficiary')
+    // The BeneficiaryVault rejects itself at registration (InvalidBeneficiary).
+    expect(() =>
+      buildDirectLaunchTransaction({ ...BUILD_PARAMS, feeBeneficiary: addresses.beneficiaryVault })
+    ).toThrow('fee beneficiary')
   })
 
-  it('accepts the disabled-creator-fee placeholder', () => {
+  it('accepts the disabled-creator-fee placeholder (the 4663 CompoundingClaimRecipient)', () => {
+    expect(DISABLED_CREATOR_FEE_BENEFICIARY).toBe(getAddress('0x3fC7BA967295C10AFD2Ad4f098Dce3a71e6b8c73'))
     expect(() =>
       buildDirectLaunchTransaction({ ...BUILD_PARAMS, feeBeneficiary: DISABLED_CREATOR_FEE_BENEFICIARY })
     ).not.toThrow()
@@ -167,7 +175,9 @@ describe('buildDirectLaunchTransaction', () => {
 })
 
 // A real 4663 Direct Launch token ("TTT"); its pool id and slot0 were read back on-chain 2026-07-26
-// (StateView.getSlot0 → lpFee 2500, tick 121980 — the strategy's immutable initialTick).
+// (StateView.getSlot0 → lpFee 2500, tick 121980). Launched via an earlier strategy deploy, but the
+// pool-key derivation (hookless native-ETH pool at LP_FEE/TICK_SPACING) is identical across deploys,
+// so it stays a valid golden vector for the PoolKey/PoolId math.
 const LAUNCHED_TOKEN = getAddress('0xFb12A16F5842bA4886130cAA6664aB5db2D2F2fb')
 const LAUNCHED_TOKEN_POOL_ID = '0xacab50a30661df2dd6bff53c7ba773a20a0efe0eea8b4216efd08caf557c73a3'
 

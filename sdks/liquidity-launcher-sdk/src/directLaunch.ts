@@ -14,22 +14,23 @@ import type { Uerc20Metadata } from './types'
  * Direct Launch ("Instant Launch") — the canonical preset + transaction assembler, mirroring
  * `quickLaunch`'s role for the CCA path. Launch params in → one signable transaction out.
  *
- * On-chain flow (hookless DirectLaunchStrategy, liquidity-launcher#195): one
- * `LiquidityLauncher.multicall` wrapping
+ * On-chain flow (hookless DirectLaunchStrategy, liquidity-launcher#195 + the #196 fee-routing
+ * rework): one `LiquidityLauncher.multicall` wrapping
  *   1. `createToken(uerc20Factory, name, symbol, 18, 1e27, launcher, tokenData)`
  *      — mints the fixed 1B supply straight to the launcher, and
  *   2. `distributeToken(token, { strategy: directLaunchStrategy, amount: 1e27,
  *      configData: abi.encode(DirectLaunchConfig{feeBeneficiary}) }, salt)`
  *      — the strategy pulls the full supply, initializes the hookless native-ETH v4 pool
- *      (LP_FEE=2500, TICK_SPACING=60, price fixed by the strategy's immutable initialTick) and
- *      parks the single-sided LP NFT in the FeeSplitter forever. `msg.value` is always 0.
+ *      (LP_FEE=2500, TICK_SPACING=60, price fixed by the strategy's immutable initialTick),
+ *      registers `feeBeneficiary` with the BeneficiaryVault (minting the transferable beneficiary
+ *      ERC721, keyed by the LP position's tokenId) and parks the single-sided LP NFT in the
+ *      FeeSplitter forever. `msg.value` is always 0.
  *
  * The token address is deterministic (CREATE2 keyed on name/symbol/decimals/creator/graffiti),
  * read from the factory's `getUERC20Address` view — see {@link predictDirectLaunchTokenAddressCall}.
  *
- * Addresses come from the single `addresses.ts` registry (`directLaunchStrategy` / `feeSplitter`
- * on {@link getLauncherAddresses}) — the one swap point for the expected liquidity-launcher#196
- * strategy/splitter redeploy.
+ * Addresses come from the single `addresses.ts` registry (`directLaunchStrategy` / `feeSplitter` /
+ * `beneficiaryVault` on {@link getLauncherAddresses}) — the one swap point for contract redeploys.
  */
 
 /**
@@ -46,6 +47,8 @@ export interface DirectLaunchAddresses {
   directLaunchStrategy: Address
   /** FeeSplitter singleton — permanent LP-NFT custodian + fee distributor. */
   feeSplitter: Address
+  /** BeneficiaryVault singleton — the fee-beneficiary ERC721 registry + the beneficiary share's vault. */
+  beneficiaryVault: Address
 }
 
 /**
@@ -54,7 +57,12 @@ export interface DirectLaunchAddresses {
  */
 export function getDirectLaunchAddresses(chainId: number): DirectLaunchAddresses | undefined {
   const addresses = getLauncherAddresses(chainId)
-  if (!addresses?.uerc20Factory || !addresses.directLaunchStrategy || !addresses.feeSplitter) {
+  if (
+    !addresses?.uerc20Factory ||
+    !addresses.directLaunchStrategy ||
+    !addresses.feeSplitter ||
+    !addresses.beneficiaryVault
+  ) {
     return undefined
   }
   return {
@@ -62,6 +70,7 @@ export function getDirectLaunchAddresses(chainId: number): DirectLaunchAddresses
     uerc20Factory: addresses.uerc20Factory,
     directLaunchStrategy: addresses.directLaunchStrategy,
     feeSplitter: addresses.feeSplitter,
+    beneficiaryVault: addresses.beneficiaryVault,
   }
 }
 
@@ -83,11 +92,12 @@ export const DIRECT_LAUNCH_TOTAL_SUPPLY_RAW = DIRECT_LAUNCH_TOTAL_SUPPLY * 10n *
 
 /**
  * feeBeneficiary when the creator-fee toggle is OFF (the config field is mandatory — the strategy
- * reverts on zero or the launcher). Decision: Bruno 2026-07-24 — when the creator opts out, ALL
- * fees go to autocompound; this is the deployed 4663 FeeSplitter's autocompound/protocol recipient
- * (also its nativeFallback), so any beneficiary share stays protocol-owned.
+ * reverts on zero or the launcher, and the vault additionally rejects itself). When the creator
+ * opts out, the beneficiary share must stay protocol-owned: this is the deployed 4663
+ * CompoundingClaimRecipient — the FeeSplitter's protocol/autocompound split recipient — so the
+ * beneficiary claim NFT is minted to a protocol contract and the share never accrues to a user.
  */
-export const DISABLED_CREATOR_FEE_BENEFICIARY: Address = '0x2aC03e14Cfe755426DaAEe0a4994184Ce81482F8'
+export const DISABLED_CREATOR_FEE_BENEFICIARY: Address = '0x3fC7BA967295C10AFD2Ad4f098Dce3a71e6b8c73'
 
 export interface PredictDirectLaunchTokenParams {
   chainId: number
@@ -138,14 +148,16 @@ export interface DirectLaunchTransaction extends TransactionRequest {
 
 /**
  * Pure assembler: builds the one-transaction Direct Launch multicall (createToken then
- * distributeToken; `value` is always 0). Mirrors the strategy's own guards where they are cheap to
- * check client-side (zero/launcher feeBeneficiary would revert on-chain).
+ * distributeToken; `value` is always 0). Mirrors the on-chain guards where they are cheap to check
+ * client-side (a zero/launcher feeBeneficiary reverts in the strategy; the vault rejects itself at
+ * registration).
  */
 export function buildDirectLaunchTransaction(params: BuildDirectLaunchParams): DirectLaunchTransaction {
   const addresses = requireDirectLaunchAddresses(params.chainId)
   if (
     isAddressEqual(params.feeBeneficiary, ZERO_ADDRESS) ||
-    isAddressEqual(params.feeBeneficiary, addresses.liquidityLauncher)
+    isAddressEqual(params.feeBeneficiary, addresses.liquidityLauncher) ||
+    isAddressEqual(params.feeBeneficiary, addresses.beneficiaryVault)
   ) {
     throw new LauncherSdkError('INVALID_INPUT', `Invalid Direct Launch fee beneficiary: ${params.feeBeneficiary}`)
   }
@@ -186,10 +198,10 @@ export function buildDirectLaunchTransaction(params: BuildDirectLaunchParams): D
 // The launch pool: deterministic PoolKey/PoolId derivation + on-chain quoting
 // ---------------------------------------------------------------------------
 
-/** DirectLaunchStrategy's immutable pool LP fee (pips). On-chain-verified on 4663 (`LP_FEE`). */
+/** DirectLaunchStrategy's compile-time pool LP fee (pips) — `LP_FEE`, unchanged across deploys. */
 export const DIRECT_LAUNCH_POOL_LP_FEE = 2500
 
-/** DirectLaunchStrategy's immutable pool tick spacing. On-chain-verified on 4663 (`TICK_SPACING`). */
+/** DirectLaunchStrategy's compile-time pool tick spacing — `TICK_SPACING`, unchanged across deploys. */
 export const DIRECT_LAUNCH_POOL_TICK_SPACING = 60
 
 /** The launch pool is hookless. */
