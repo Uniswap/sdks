@@ -3,7 +3,7 @@
  *
  * A framework-agnostic toolkit for the Uniswap v4 margin trading periphery: leveraged spot
  * positions built from a v4 swap plus a borrow/supply against an external lending venue (Morpho
- * Blue, Aave v3, Aave v4), all behind one MarginRouter.
+ * Blue, Aave v3, Aave v4, Compound v3), all behind one MarginRouter.
  */
 
 // Chains & addresses

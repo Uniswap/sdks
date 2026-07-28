@@ -11,9 +11,9 @@ import { type Market, type PositionData } from './types.js'
  *  - an async helper that executes the descriptor against a viem `PublicClient`, for scripts and
  *    quick server-side use.
  *
- * The `ILendingAdapter` read surface is identical across the Morpho Blue, Aave v3, and Aave v4
- * adapters, so the same read code works for any venue — only the adapter address changes. All
- * position amounts are interest-accrued.
+ * The `ILendingAdapter` read surface is identical across the Morpho Blue, Aave v3, Aave v4, and
+ * Compound v3 adapters, so the same read code works for any venue — only the adapter address
+ * changes. All position amounts are interest-accrued.
  */
 
 /** A framework-agnostic contract read descriptor. */
@@ -148,9 +148,9 @@ export function describePositionCall(p: {
 }
 
 /**
- * Reads the consolidated position snapshot. Note for cross-collateral venues (Aave v3/v4): LTV
- * and health factor are account-level, so keep one position per `(owner, subId)` — never co-locate
- * two Aave markets under one sub-account.
+ * Reads the consolidated position snapshot. Note for account-level venues (Aave v3/v4, Compound
+ * v3): LTV and health factor are account-level, so keep one position per `(owner, subId)` — never
+ * co-locate two markets of the same venue under one sub-account.
  */
 export async function getPosition(
   client: PublicClient,

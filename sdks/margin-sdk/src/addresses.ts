@@ -3,7 +3,7 @@ import { type Address, getAddress } from 'viem'
 import { SupportedChainId } from './chains.js'
 
 /** The lending venues integrated behind `ILendingAdapter` today. */
-export type LendingVenue = 'morphoBlue' | 'aaveV3' | 'aaveV4'
+export type LendingVenue = 'morphoBlue' | 'aaveV3' | 'aaveV4' | 'compoundV3'
 
 /**
  * Per-chain addresses of the margin trading stack. Keyed by numeric chain id.
@@ -16,7 +16,10 @@ export interface MarginAddresses {
   /**
    * Deployed lending adapters by venue. Each is a singleton encoder over a governed market
    * routing table; the caller selects the venue per call by passing the matching adapter. The
-   * Aave v4 adapter is bound to a single Spoke — a second Spoke is a second adapter instance.
+   * Aave v4 adapter is bound to a single Spoke and the Compound v3 adapter to a single Comet
+   * (whose base token is the only borrowable debt) — a second Spoke/Comet is a second adapter
+   * instance. A venue absent from the record is not in that chain's live deployment yet
+   * (`compoundV3` on mainnet today).
    */
   lendingAdapters: Partial<Record<LendingVenue, Address>>
   /** Permit2 (canonical address on every chain). Equity/collateral is pulled through it. */

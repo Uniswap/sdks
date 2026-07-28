@@ -39,7 +39,7 @@ export interface PoolKey {
 
 /** Parameters for `increasePosition` (open a position or add leverage to one). */
 export interface IncreaseParams {
-  /** The allowlisted lending adapter that selects the venue (Morpho Blue, Aave v3, Aave v4). */
+  /** The allowlisted lending adapter that selects the venue (Morpho Blue, Aave v3, Aave v4, Compound v3). */
   adapter: Address
   /** The (collateral, debt) pair. This sets direction: long the collateral, short the debt. */
   market: Market

@@ -23,12 +23,15 @@ describe('addresses', () => {
     }
   })
 
-  test('mainnet stack resolves with all three venues', () => {
+  test('mainnet stack resolves with the three deployed venues', () => {
     const mainnet = getMarginAddresses(SupportedChainId.MAINNET)
     expect(mainnet).toBeDefined()
     expect(mainnet!.lendingAdapters.morphoBlue).toBeDefined()
     expect(mainnet!.lendingAdapters.aaveV3).toBeDefined()
     expect(mainnet!.lendingAdapters.aaveV4).toBeDefined()
+    // CompoundV3LendingAdapter exists upstream but is not in the live mainnet deployment yet;
+    // this assertion is the tripwire to flip when the adapter address lands.
+    expect(mainnet!.lendingAdapters.compoundV3).toBeUndefined()
     expect(isMarginSupportedChain(1)).toBe(true)
   })
 

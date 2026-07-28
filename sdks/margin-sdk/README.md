@@ -2,7 +2,8 @@
 
 A framework-agnostic TypeScript SDK for the **Uniswap v4 margin trading periphery**: open, manage,
 and close leveraged spot positions built from a v4 swap composed with a borrow/supply against an
-external lending venue — **Morpho Blue, Aave v3, or Aave v4** — all behind one `MarginRouter`.
+external lending venue — **Morpho Blue, Aave v3, Aave v4, or Compound v3** — all behind one
+`MarginRouter`.
 
 The SDK covers:
 
@@ -16,7 +17,7 @@ The SDK covers:
 - **A plan builder** (`MarginPlanner`) for the advanced `execute` entry point: compose v4 routing
   actions and margin account actions into one atomic flash-accounted plan.
 - **Read descriptors** that drop into wagmi `useReadContract(s)` / viem `readContract`, identical
-  across all three lending venues.
+  across all lending venues.
 
 Built on [viem](https://viem.sh); no other runtime dependencies.
 
@@ -311,6 +312,10 @@ Resolved via `getMarginAddresses(chainId)`; Ethereum mainnet today:
 | AaveLendingAdapter (v3)      | `0x8EeacdB24c7650478496845A61f03fF6BC263222` |
 | AaveV4LendingAdapter         | `0x3a9Cc5eEbAC911E5a316de1F2bCD166016d7469E` |
 
+`CompoundV3LendingAdapter` (the fourth venue upstream, bound to the cUSDCv3 Comet) is not in the
+live mainnet deployment yet, so `lendingAdapters.compoundV3` is absent until it is deployed and
+allowlisted; its ABI ships as `COMPOUND_V3_LENDING_ADAPTER_ABI`.
+
 The SDK's ABIs, selectors, and account derivation are test-anchored against this live deployment
 (see `src/*.test.ts`).
 
@@ -357,13 +362,15 @@ bun run demo
 All SDK validation throws `MarginSdkError` with a stable `code`
 (`INVALID_LEVERAGE`, `INVALID_AMOUNT`, `AMOUNT_OVERFLOW`, `SLIPPAGE_BOUND_REQUIRED`,
 `MARKET_MISMATCH`, `INVALID_PLAN`, …) — catch with `isMarginSdkError` and forward. Onchain reverts
-(`SlippageBoundRequired`, `PositionUnhealthy`, `AdapterNotAllowed`, `DeadlinePassed`,
-`NativeCollateralMismatch`, `IncompleteFill`, …) are declared in `MARGIN_ROUTER_ABI`, so viem's
-`simulateContract` decodes them into readable messages — always simulate before writing.
+(`SlippageBoundRequired`, `ZeroAmount`, `PositionUnhealthy`, `AdapterNotAllowed`,
+`DeadlinePassed`, `NativeCollateralMismatch`, `IncompleteFill`, …) are declared in
+`MARGIN_ROUTER_ABI`, so viem's `simulateContract` decodes them into readable messages — always
+simulate before writing. (`ZeroAmount` is new in current v4-periphery source; the live mainnet
+router predates it and still reverts zero-amount inputs with `SlippageBoundRequired`.)
 
 ## Reference
 
 Full protocol and integration documentation lives in v4-periphery
 [`docs/margin-trading.md`](https://github.com/Uniswap/v4-periphery/blob/margin-trading/docs/margin-trading.md),
 including the security model, the `execute` opcode reference, and venue-specific notes
-(Aave v4 hub-and-spoke, reserve ids, premium-inclusive debt).
+(Aave v4 hub-and-spoke, reserve ids, premium-inclusive debt, Compound v3 single-base Comets).

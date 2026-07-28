@@ -110,7 +110,7 @@ export class MarginPlanner {
     return this.add(MarginAction.ACCOUNT_BORROW, [adapter, market, amount, to])
   }
 
-  /** Repays `amount` of the active account's debt (`type(uint256).max` == full repay by shares). */
+  /** Repays `amount` of the active account's debt (`type(uint256).max` == dust-free full repay). */
   repay(adapter: Address, market: Market, amount: bigint): this {
     return this.add(MarginAction.ACCOUNT_REPAY, [adapter, market, amount])
   }

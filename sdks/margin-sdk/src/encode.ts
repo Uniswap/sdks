@@ -37,8 +37,11 @@ export function validateDeadline(deadline: bigint): void {
  *    straight into viem `simulateContract`/`writeContract` or wagmi `useWriteContract`.
  *
  * Always `simulateContract` before `writeContract` so reverts (`SlippageBoundRequired`,
- * `PositionUnhealthy`, `AdapterNotAllowed`, `DeadlinePassed`, `NativeCollateralMismatch`,
- * `IncompleteFill`) surface with a decoded message.
+ * `ZeroAmount`, `PositionUnhealthy`, `AdapterNotAllowed`, `DeadlinePassed`,
+ * `NativeCollateralMismatch`, `IncompleteFill`) surface with a decoded message. (`ZeroAmount` is
+ * the dedicated zero-amount error in current v4-periphery source; the live mainnet router predates
+ * it and reverts those paths with `SlippageBoundRequired`. The SDK validates the inputs offchain
+ * either way.)
  */
 
 /** A framework-agnostic contract write descriptor. */
