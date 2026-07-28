@@ -2,8 +2,8 @@
  * GENERATED FILE — DO NOT EDIT.
  *
  * Forge-generated ABI bindings for the margin trading periphery.
- * Pinned to v4-periphery commit fe8105a9e31ac6e30c9b18bd1078047cab3e1cea
- * (https://github.com/Uniswap/v4-periphery/commit/fe8105a9e31ac6e30c9b18bd1078047cab3e1cea)
+ * Pinned to v4-periphery commit e4a50623cc38e997a582c1eecd4e521e218ebfd3
+ * (https://github.com/Uniswap/v4-periphery/commit/e4a50623cc38e997a582c1eecd4e521e218ebfd3)
  *
  * Regenerate with `bun run regenerate:abis`; CI verifies the bindings against a fresh build of
  * the pinned commit via `bun run check:abis`. LENDING_ADAPTER_ABI is the venue-agnostic surface:
@@ -16,7 +16,7 @@ import { type Abi } from 'viem'
 /** The v4-periphery source this file was generated from. */
 export const V4_PERIPHERY_PIN = {
   repository: 'Uniswap/v4-periphery',
-  commit: 'fe8105a9e31ac6e30c9b18bd1078047cab3e1cea',
+  commit: 'e4a50623cc38e997a582c1eecd4e521e218ebfd3',
 } as const
 
 /** src/MarginRouter.sol:MarginRouter */
@@ -1124,6 +1124,11 @@ export const MARGIN_ROUTER_ABI = [
   },
   {
     type: 'error',
+    name: 'ZeroAmount',
+    inputs: [],
+  },
+  {
+    type: 'error',
     name: 'ZeroOwner',
     inputs: [],
   },
@@ -1131,6 +1136,10 @@ export const MARGIN_ROUTER_ABI = [
 
 /** src/MarginAccount.sol:MarginAccount */
 export const MARGIN_ACCOUNT_ABI = [
+  {
+    type: 'receive',
+    stateMutability: 'payable',
+  },
   {
     type: 'function',
     name: 'borrow',
@@ -1214,13 +1223,6 @@ export const MARGIN_ACCOUNT_ABI = [
         name: 'ownerAddr',
       },
     ],
-  },
-  {
-    type: 'function',
-    name: 'receive',
-    stateMutability: 'payable',
-    inputs: [],
-    outputs: [],
   },
   {
     type: 'function',
@@ -2116,6 +2118,11 @@ export const MORPHO_LENDING_ADAPTER_ABI = [
         name: 'caller',
       },
     ],
+  },
+  {
+    type: 'error',
+    name: 'ZeroAddress',
+    inputs: [],
   },
   {
     type: 'error',
@@ -3244,6 +3251,595 @@ export const AAVE_V4_LENDING_ADAPTER_ABI = [
       {
         type: 'address',
         name: 'expectedUnderlying',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'ZeroAddress',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'ZeroOwner',
+    inputs: [],
+  },
+] as const satisfies Abi
+
+/** src/CompoundV3LendingAdapter.sol:CompoundV3LendingAdapter */
+export const COMPOUND_V3_LENDING_ADAPTER_ABI = [
+  {
+    type: 'constructor',
+    stateMutability: 'nonpayable',
+    inputs: [
+      {
+        type: 'address',
+        name: 'comet_',
+      },
+      {
+        type: 'address',
+        name: 'owner_',
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'acceptOwnership',
+    stateMutability: 'nonpayable',
+    inputs: [],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'baseScale',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [
+      {
+        type: 'uint256',
+        name: '',
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'baseToken',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [
+      {
+        type: 'address',
+        name: '',
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'baseTokenPriceFeed',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [
+      {
+        type: 'address',
+        name: '',
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'comet',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [
+      {
+        type: 'address',
+        name: '',
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'currentLtvWad',
+    stateMutability: 'view',
+    inputs: [
+      {
+        type: 'address',
+        name: 'account',
+      },
+      {
+        type: 'tuple',
+        name: 'market',
+        components: [
+          {
+            type: 'address',
+            name: 'collateral',
+          },
+          {
+            type: 'address',
+            name: 'debt',
+          },
+        ],
+      },
+    ],
+    outputs: [
+      {
+        type: 'uint256',
+        name: '',
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'describePosition',
+    stateMutability: 'view',
+    inputs: [
+      {
+        type: 'address',
+        name: 'account',
+      },
+      {
+        type: 'tuple',
+        name: 'market',
+        components: [
+          {
+            type: 'address',
+            name: 'collateral',
+          },
+          {
+            type: 'address',
+            name: 'debt',
+          },
+        ],
+      },
+    ],
+    outputs: [
+      {
+        type: 'tuple',
+        name: 'data',
+        components: [
+          {
+            type: 'uint256',
+            name: 'collateralAmount',
+          },
+          {
+            type: 'uint256',
+            name: 'debtAmount',
+          },
+          {
+            type: 'uint256',
+            name: 'maxLtv',
+          },
+          {
+            type: 'uint256',
+            name: 'currentLtv',
+          },
+          {
+            type: 'uint256',
+            name: 'healthFactorWad',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'encodeBorrow',
+    stateMutability: 'view',
+    inputs: [
+      {
+        type: 'address',
+        name: 'account',
+      },
+      {
+        type: 'tuple',
+        name: 'market',
+        components: [
+          {
+            type: 'address',
+            name: 'collateral',
+          },
+          {
+            type: 'address',
+            name: 'debt',
+          },
+        ],
+      },
+      {
+        type: 'uint256',
+        name: 'amount',
+      },
+    ],
+    outputs: [
+      {
+        type: 'address',
+        name: '',
+      },
+      {
+        type: 'uint256',
+        name: '',
+      },
+      {
+        type: 'bytes',
+        name: '',
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'encodeRepay',
+    stateMutability: 'view',
+    inputs: [
+      {
+        type: 'address',
+        name: 'account',
+      },
+      {
+        type: 'tuple',
+        name: 'market',
+        components: [
+          {
+            type: 'address',
+            name: 'collateral',
+          },
+          {
+            type: 'address',
+            name: 'debt',
+          },
+        ],
+      },
+      {
+        type: 'uint256',
+        name: 'amount',
+      },
+    ],
+    outputs: [
+      {
+        type: 'address',
+        name: '',
+      },
+      {
+        type: 'uint256',
+        name: '',
+      },
+      {
+        type: 'bytes',
+        name: '',
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'encodeSupplyCollateral',
+    stateMutability: 'view',
+    inputs: [
+      {
+        type: 'address',
+        name: 'account',
+      },
+      {
+        type: 'tuple',
+        name: 'market',
+        components: [
+          {
+            type: 'address',
+            name: 'collateral',
+          },
+          {
+            type: 'address',
+            name: 'debt',
+          },
+        ],
+      },
+      {
+        type: 'uint256',
+        name: 'amount',
+      },
+    ],
+    outputs: [
+      {
+        type: 'address',
+        name: '',
+      },
+      {
+        type: 'uint256',
+        name: '',
+      },
+      {
+        type: 'bytes',
+        name: '',
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'encodeWithdrawCollateral',
+    stateMutability: 'view',
+    inputs: [
+      {
+        type: 'address',
+        name: 'account',
+      },
+      {
+        type: 'tuple',
+        name: 'market',
+        components: [
+          {
+            type: 'address',
+            name: 'collateral',
+          },
+          {
+            type: 'address',
+            name: 'debt',
+          },
+        ],
+      },
+      {
+        type: 'uint256',
+        name: 'amount',
+      },
+      {
+        type: 'address',
+        name: 'receiver',
+      },
+    ],
+    outputs: [
+      {
+        type: 'address',
+        name: '',
+      },
+      {
+        type: 'uint256',
+        name: '',
+      },
+      {
+        type: 'bytes',
+        name: '',
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'isSupportedMarket',
+    stateMutability: 'view',
+    inputs: [
+      {
+        type: 'tuple',
+        name: 'market',
+        components: [
+          {
+            type: 'address',
+            name: 'collateral',
+          },
+          {
+            type: 'address',
+            name: 'debt',
+          },
+        ],
+      },
+    ],
+    outputs: [
+      {
+        type: 'bool',
+        name: '',
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'lendingProtocol',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [
+      {
+        type: 'address',
+        name: '',
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'maxLtvWad',
+    stateMutability: 'view',
+    inputs: [
+      {
+        type: 'tuple',
+        name: 'market',
+        components: [
+          {
+            type: 'address',
+            name: 'collateral',
+          },
+          {
+            type: 'address',
+            name: 'debt',
+          },
+        ],
+      },
+    ],
+    outputs: [
+      {
+        type: 'uint256',
+        name: '',
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'owner',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [
+      {
+        type: 'address',
+        name: '',
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'pendingOwner',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [
+      {
+        type: 'address',
+        name: '',
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'positionOf',
+    stateMutability: 'view',
+    inputs: [
+      {
+        type: 'address',
+        name: 'account',
+      },
+      {
+        type: 'tuple',
+        name: 'market',
+        components: [
+          {
+            type: 'address',
+            name: 'collateral',
+          },
+          {
+            type: 'address',
+            name: 'debt',
+          },
+        ],
+      },
+    ],
+    outputs: [
+      {
+        type: 'uint256',
+        name: 'collateralAmount',
+      },
+      {
+        type: 'uint256',
+        name: 'debtAmount',
+      },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'setMarket',
+    stateMutability: 'nonpayable',
+    inputs: [
+      {
+        type: 'address',
+        name: 'collateral',
+      },
+      {
+        type: 'address',
+        name: 'debt',
+      },
+      {
+        type: 'bool',
+        name: 'allowed',
+      },
+    ],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'transferOwnership',
+    stateMutability: 'nonpayable',
+    inputs: [
+      {
+        type: 'address',
+        name: 'newOwner',
+      },
+    ],
+    outputs: [],
+  },
+  {
+    type: 'event',
+    name: 'MarketSet',
+    anonymous: false,
+    inputs: [
+      {
+        type: 'address',
+        name: 'collateral',
+        indexed: true,
+      },
+      {
+        type: 'address',
+        name: 'debt',
+        indexed: true,
+      },
+      {
+        type: 'bool',
+        name: 'allowed',
+        indexed: false,
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'AccountMismatch',
+    inputs: [
+      {
+        type: 'address',
+        name: 'account',
+      },
+      {
+        type: 'address',
+        name: 'caller',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'DebtNotBaseToken',
+    inputs: [
+      {
+        type: 'address',
+        name: 'debt',
+      },
+      {
+        type: 'address',
+        name: 'baseToken',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'MarketNotSupported',
+    inputs: [
+      {
+        type: 'address',
+        name: 'collateral',
+      },
+      {
+        type: 'address',
+        name: 'debt',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'MathOverflowedMulDiv',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NotOwner',
+    inputs: [
+      {
+        type: 'address',
+        name: 'caller',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'NotPendingOwner',
+    inputs: [
+      {
+        type: 'address',
+        name: 'caller',
       },
     ],
   },

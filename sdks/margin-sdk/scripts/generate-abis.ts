@@ -30,6 +30,10 @@ const CONTRACTS: Array<{ exportName: string; contract: string }> = [
   { exportName: 'MORPHO_LENDING_ADAPTER_ABI', contract: 'src/MorphoLendingAdapter.sol:MorphoLendingAdapter' },
   { exportName: 'AAVE_LENDING_ADAPTER_ABI', contract: 'src/AaveLendingAdapter.sol:AaveLendingAdapter' },
   { exportName: 'AAVE_V4_LENDING_ADAPTER_ABI', contract: 'src/AaveV4LendingAdapter.sol:AaveV4LendingAdapter' },
+  {
+    exportName: 'COMPOUND_V3_LENDING_ADAPTER_ABI',
+    contract: 'src/CompoundV3LendingAdapter.sol:CompoundV3LendingAdapter',
+  },
   { exportName: 'ILENDING_ADAPTER_ABI', contract: 'src/interfaces/ILendingAdapter.sol:ILendingAdapter' },
 ]
 
