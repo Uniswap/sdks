@@ -5,7 +5,7 @@ import { CCA_ABI, LBP_STRATEGY_ABI } from './abis'
 import {
   encodeAuctionSteps,
   encodeDepositToken,
-  encodeDirectLaunchConfig,
+  encodeInstantLaunchConfig,
   encodeMigrate,
   encodeSweepUnsoldTokens,
 } from './encode'
@@ -55,10 +55,10 @@ describe('encodeAuctionSteps', () => {
   })
 })
 
-describe('encodeDirectLaunchConfig', () => {
+describe('encodeInstantLaunchConfig', () => {
   it('abi-encodes the single-member struct (one left-padded address word)', () => {
     const feeBeneficiary = getAddress('0x00000000000000000000000000000000000000cc')
-    const encoded = encodeDirectLaunchConfig({ feeBeneficiary })
+    const encoded = encodeInstantLaunchConfig({ feeBeneficiary })
     expect(encoded).toBe(`0x${feeBeneficiary.slice(2).toLowerCase().padStart(64, '0')}`)
   })
 })

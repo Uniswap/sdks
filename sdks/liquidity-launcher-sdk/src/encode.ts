@@ -106,7 +106,7 @@ const UERC20_METADATA_PARAM = {
   ],
 } as const satisfies AbiParameter
 
-const DIRECT_LAUNCH_CONFIG_PARAM = {
+const INSTANT_LAUNCH_CONFIG_PARAM = {
   name: 'config',
   type: 'tuple',
   components: [{ name: 'feeBeneficiary', type: 'address' }],
@@ -158,11 +158,12 @@ export function encodeTokenSplitterConfig(splits: Split[]): Hex {
 }
 
 /**
- * `abi.encode(DirectLaunchConfig)` — the DirectLaunchStrategy's `configData` (see `directLaunch`).
- * A single-member struct today: the LP-fee beneficiary.
+ * `abi.encode(InstantLaunchConfig)` — the InstantLaunchStrategy's `configData` (see `instantLaunch`).
+ * A single-member struct today: the LP-fee beneficiary. Mandatory on every strategy instance,
+ * including the fees-off one (where the beneficiary goes unused).
  */
-export function encodeDirectLaunchConfig(config: { feeBeneficiary: Address }): Hex {
-  return encodeAbiParameters([DIRECT_LAUNCH_CONFIG_PARAM], [config])
+export function encodeInstantLaunchConfig(config: { feeBeneficiary: Address }): Hex {
+  return encodeAbiParameters([INSTANT_LAUNCH_CONFIG_PARAM], [config])
 }
 
 /**

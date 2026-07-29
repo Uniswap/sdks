@@ -3,8 +3,14 @@ import { getAddress } from 'viem'
 
 import {
   AUCTION_FACTORY_DEPLOYMENTS,
+  getInstantLaunchContracts,
+  getInstantLaunchDeployment,
+  getInstantLaunchDeployments,
+  getInstantLaunchStrategy,
   getLauncherAddresses,
   getTickDataLensForFactory,
+  INSTANT_LAUNCH_DEPLOYMENT_BY_STRATEGY,
+  INSTANT_LAUNCH_DEPLOYMENTS,
   selectTokenFactory,
   TICK_DATA_LENS_BY_FACTORY,
   TICK_DATA_LENS_V1,
@@ -96,5 +102,56 @@ describe('selectTokenFactory', () => {
     const { uerc20Factory: _u, usuperc20Factory: _s, ...withoutFactories } =
       getLauncherAddresses(SupportedChainId.ROBINHOOD)!
     expect(selectTokenFactory(withoutFactories)).toBeUndefined()
+  })
+})
+
+describe('Instant Launch deployment registry', () => {
+  it('carries both canonical Robinhood variants from the liquidity-launcher dev README', () => {
+    const deployments = getInstantLaunchDeployments(SupportedChainId.ROBINHOOD)
+    expect(deployments).toHaveLength(2)
+    const [on, off] = deployments
+    expect(on!.strategy).toBe(getAddress('0x5B37F9a24e9CAb142Ca758A69a28Bf57B4c714D9'))
+    expect(on!.feeSplitter).toBe(getAddress('0xf139e6835B1494c9AC57133B1Dc052B097328199'))
+    expect(on!.creatorFeesEnabled).toBe(true)
+    expect(on!.creatorFeeNativeBps).toBe(4000)
+    expect(on!.creatorFeeTokenBps).toBe(0)
+    expect(off!.strategy).toBe(getAddress('0x42cdE2f72B2292BE3973c59811b8901627930b2d'))
+    expect(off!.feeSplitter).toBe(getAddress('0xF165D5B169106e13bFB568C52af5d11977365630'))
+    expect(off!.creatorFeesEnabled).toBe(false)
+    expect(off!.creatorFeeNativeBps).toBe(0)
+    expect(off!.creatorFeeTokenBps).toBe(0)
+    // Both current instances open at the same immutable initial tick.
+    expect(on!.initialTick).toBe(198060)
+    expect(off!.initialTick).toBe(198060)
+  })
+
+  it('is empty for chains without an Instant Launch deployment', () => {
+    expect(getInstantLaunchDeployments(SupportedChainId.MAINNET)).toHaveLength(0)
+    expect(getInstantLaunchStrategy(SupportedChainId.MAINNET, { creatorFeesEnabled: true })).toBeUndefined()
+    expect(getInstantLaunchContracts(SupportedChainId.MAINNET)).toBeUndefined()
+  })
+
+  it('getInstantLaunchStrategy selects the current deployment per variant', () => {
+    expect(getInstantLaunchStrategy(SupportedChainId.ROBINHOOD, { creatorFeesEnabled: true })?.strategy).toBe(
+      getAddress('0x5B37F9a24e9CAb142Ca758A69a28Bf57B4c714D9')
+    )
+    expect(getInstantLaunchStrategy(SupportedChainId.ROBINHOOD, { creatorFeesEnabled: false })?.strategy).toBe(
+      getAddress('0x42cdE2f72B2292BE3973c59811b8901627930b2d')
+    )
+  })
+
+  it('getInstantLaunchDeployment reverse-resolves case-insensitively and derives from the registry', () => {
+    expect(INSTANT_LAUNCH_DEPLOYMENT_BY_STRATEGY.size).toBe(INSTANT_LAUNCH_DEPLOYMENTS.length)
+    for (const deployment of INSTANT_LAUNCH_DEPLOYMENTS) {
+      expect(getInstantLaunchDeployment(deployment.strategy.toUpperCase().replace('0X', '0x'))).toBe(deployment)
+    }
+    expect(getInstantLaunchDeployment('0x0000000000000000000000000000000000000001')).toBeUndefined()
+  })
+
+  it('carries the Robinhood singletons (vault, compounding recipient, launcher)', () => {
+    const contracts = getInstantLaunchContracts(SupportedChainId.ROBINHOOD)
+    expect(contracts?.beneficiaryVault).toBe(getAddress('0xF3b8653B53d75ec9925d88b051CcFDabbd4894f5'))
+    expect(contracts?.compoundingClaimRecipient).toBe(getAddress('0x3fC7BA967295C10AFD2Ad4f098Dce3a71e6b8c73'))
+    expect(contracts?.liquidityLauncher).toBe(getLauncherAddresses(SupportedChainId.ROBINHOOD)!.liquidityLauncher)
   })
 })
