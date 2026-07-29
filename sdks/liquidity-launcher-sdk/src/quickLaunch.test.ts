@@ -4,11 +4,13 @@ import { getAddress, zeroAddress } from 'viem'
 import { SupportedChainId } from './chains'
 import { getBlockTimeSeconds } from './config/blocks'
 import {
+  PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS,
   QUICK_LAUNCH_DURATION_SECONDS,
   QUICK_LAUNCH_PRESET,
   QUICK_LAUNCH_RESERVED_FOR_LP_RAW,
   QUICK_LAUNCH_TOTAL_SUPPLY_RAW,
   getQuickLaunchDurationBlocks,
+  isPermanentTimelock,
   isQuickLaunch,
   type QuickLaunchMatchParams,
 } from './quickLaunch'
@@ -110,6 +112,104 @@ describe('isQuickLaunch — duration policy', () => {
         allowedDurationsSeconds: [1800, 3600, 14400],
       })
     ).toBe(true)
+  })
+})
+
+describe('isQuickLaunch — reserve refinement null/undefined semantics', () => {
+  it('leaves the 50/50 split unasserted when the reserve is null (unknown)', () => {
+    expect(isQuickLaunch(presetAuction({ reservedTokenAmountForLP: null }))).toBe(true)
+  })
+
+  it('does not treat a zeroed strategy-getter read (0n) as a passing reserve', () => {
+    expect(isQuickLaunch(presetAuction({ reservedTokenAmountForLP: 0n }))).toBe(false)
+  })
+
+  it('rejects a reserve that is half the preset split', () => {
+    expect(isQuickLaunch(presetAuction({ reservedTokenAmountForLP: QUICK_LAUNCH_RESERVED_FOR_LP_RAW / 2n }))).toBe(
+      false
+    )
+  })
+})
+
+describe('isQuickLaunch — lock refinement null/undefined semantics', () => {
+  it('fails when the auction is known to have no lock (null)', () => {
+    expect(isQuickLaunch(presetAuction({ lock: null }))).toBe(false)
+  })
+
+  it('leaves the lock unasserted when it has not been resolved yet (undefined)', () => {
+    expect(isQuickLaunch(presetAuction({ lock: undefined }))).toBe(true)
+  })
+
+  it('rejects a permanent feesForwarder lock — the preset is buyback-&-burn', () => {
+    expect(isQuickLaunch(presetAuction({ lock: { mode: 'feesForwarder', permanentTimelock: true } }))).toBe(false)
+  })
+
+  it('still fails the base fingerprint even when both refinements pass', () => {
+    expect(
+      isQuickLaunch(presetAuction({ currency: getAddress('0x15d0e0c55a3e7Ee67152ad7E89AcF164253Ff68D') }))
+    ).toBe(false)
+  })
+})
+
+describe('isPermanentTimelock', () => {
+  const endBlock = END
+  // The block delta that makes a timelock permanent on this chain. Derived from the block-time
+  // table and the threshold, not hardcoded, so a change to either keeps these tests honest.
+  const permanentUnlockBlock =
+    endBlock + BigInt(Math.ceil(PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS / getBlockTimeSeconds(CHAIN)))
+  const nearlyPermanentUnlockBlock =
+    endBlock + BigInt(Math.floor(PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS / getBlockTimeSeconds(CHAIN)) - 1)
+
+  it('encodes a 1000-year horizon', () => {
+    expect(PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS).toBe(1000 * 365 * 86_400)
+  })
+
+  it('accepts an unlock block at or past the permanence horizon', () => {
+    expect(isPermanentTimelock({ chainId: CHAIN, endBlock, unlockBlock: permanentUnlockBlock }))
+      .toBe(true)
+  })
+
+  it('rejects an unlock block one block short of the horizon', () => {
+    expect(isPermanentTimelock({ chainId: CHAIN, endBlock, unlockBlock: nearlyPermanentUnlockBlock }))
+      .toBe(false)
+  })
+
+  it('rejects a lock that unlocks right after the auction ends', () => {
+    expect(isPermanentTimelock({ chainId: CHAIN, endBlock, unlockBlock: endBlock + 1n })).toBe(false)
+  })
+
+  it('judges the horizon from the auction end, matching how the create flow derives it', () => {
+    // The same unlock block fails when the auction ends later.
+    expect(
+      isPermanentTimelock({ chainId: CHAIN, endBlock: permanentUnlockBlock - 1n, unlockBlock: permanentUnlockBlock })
+    ).toBe(false)
+  })
+
+  it('composes with the matcher: permanence derived from an unlock block feeds the lock descriptor', () => {
+    expect(
+      isQuickLaunch(
+        presetAuction({
+          lock: {
+            mode: 'buybackBurn',
+            permanentTimelock: isPermanentTimelock({ chainId: CHAIN, endBlock, unlockBlock: permanentUnlockBlock }),
+          },
+        })
+      )
+    ).toBe(true)
+    expect(
+      isQuickLaunch(
+        presetAuction({
+          lock: {
+            mode: 'buybackBurn',
+            permanentTimelock: isPermanentTimelock({
+              chainId: CHAIN,
+              endBlock,
+              unlockBlock: nearlyPermanentUnlockBlock,
+            }),
+          },
+        })
+      )
+    ).toBe(false)
   })
 })
 

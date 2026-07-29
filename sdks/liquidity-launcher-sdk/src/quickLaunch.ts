@@ -77,6 +77,21 @@ export const QUICK_LAUNCH_LP_RANGE: PriceRangeKind = 'CONCENTRATED_FULL_RANGE'
 export const QUICK_LAUNCH_LOCK_MODE: QuickLaunchLockMode = 'buybackBurn'
 
 /**
+ * Minimum lock horizon past the auction end, in real seconds, for a timelock to count as
+ * *permanent* (1000 years). The preset declares `permanentTimelock: true`; this is the operational
+ * threshold shared by every consumer (create flow, liquidity service, server-side classifier) so
+ * they cannot drift on what "permanent" means.
+ *
+ * The create flow requests `unlockTimeUnix = auctionEnd + 365 * 100_000 days` (~100k years), which
+ * the liquidity service converts to a block number the lock recipient stores as an immutable. Only
+ * that block number is observable on-chain, so permanence is re-derived from it — see
+ * {@link isPermanentTimelock}. 1000 years sits in a very wide empty band — ~100x under what the
+ * flow requests, ~100x over the longest plausible real lock — so block-time drift cannot move an
+ * auction across it.
+ */
+export const PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS = 1000 * 365 * 86_400
+
+/**
  * Buyback-&-burn searcher threshold: a searcher burns ~0.05% of supply to claim the accrued ETH
  * (the token portion is burned in the same call). tokenJar-style; auto-compounding was rejected.
  */
@@ -161,6 +176,18 @@ export function getQuickLaunchDurationBlocks(chainId: number): bigint {
   return BigInt(Math.round(QUICK_LAUNCH_DURATION_SECONDS / getBlockTimeSeconds(chainId)))
 }
 
+/**
+ * Whether a lock recipient's unlock block constitutes a *permanent* timelock: the horizon from the
+ * auction's end block to the unlock block, converted to real seconds via the chain block time, must
+ * be at least {@link PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS}. Judged past the auction end because
+ * that is how the create flow derives `unlockTimeUnix` before it is converted to the block number
+ * the recipient stores.
+ */
+export function isPermanentTimelock(params: { chainId: number; endBlock: bigint; unlockBlock: bigint }): boolean {
+  const horizonSeconds = Number(params.unlockBlock - params.endBlock) * getBlockTimeSeconds(params.chainId)
+  return horizonSeconds >= PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS
+}
+
 // ---------------------------------------------------------------------------
 // Matcher
 // ---------------------------------------------------------------------------
@@ -194,16 +221,22 @@ export interface QuickLaunchMatchParams {
   /** The token's total supply in raw base units (18dp). */
   totalSupplyRaw: bigint
   /**
-   * `MigratorParameters.reservedTokenAmountForLP`, if decoded. When present it must equal the preset's
-   * 50% LP reserve; when omitted the 50/50 split is not asserted (the core fingerprint still classifies).
+   * `MigratorParameters.reservedTokenAmountForLP` (readable from the LBP strategy's
+   * `initializers(initializer)` getter, or the flat `reserves(initializer)` on later revisions), if
+   * decoded. When present it must equal the preset's 50% LP reserve; `undefined` and `null` both
+   * mean *unknown* and leave the 50/50 split unasserted (the core fingerprint still classifies).
+   * NOTE: the strategy getter returns a zeroed struct for an unset/consumed entry — callers must map
+   * such a read to `null`/`undefined`, never pass the raw `0n`, which is a real (failing) value.
    */
-  reservedTokenAmountForLP?: bigint
+  reservedTokenAmountForLP?: bigint | null
   /**
-   * The decoded liquidity lock, if available. When present it must be a permanent buyback-&-burn lock;
-   * when omitted the lock is not asserted. data-api should pass it once the migrator params are decoded
-   * for a stronger match.
+   * The liquidity lock decoded from `MigratorParameters.positionRecipient`, when resolved.
+   * `undefined` means *not resolved yet* and leaves the lock unasserted; `null` means *resolved: this
+   * auction has no lock*, which fails the match — an unlocked LP position is not the preset. When
+   * present it must be a permanent buyback-&-burn lock (see {@link isPermanentTimelock} for deriving
+   * permanence from the recipient's immutable unlock block).
    */
-  lock?: QuickLaunchLockDescriptor
+  lock?: QuickLaunchLockDescriptor | null
 }
 
 export interface QuickLaunchMatchOptions {
@@ -233,7 +266,10 @@ export interface QuickLaunchMatchOptions {
  *
  * Required fingerprint (always available from indexed data): native raise currency, 1B total supply,
  * and the 4h duration. The 50/50 LP reserve and the permanent buyback-&-burn lock are matched only
- * when supplied.
+ * when supplied — with one asymmetry: a `null` lock is a *resolved* answer (known to have no lock)
+ * and fails, while a `null` reserve is merely unknown and stays unasserted. Since a refinement can
+ * only turn a match into a non-match, classifying without them is a safe over-approximation that a
+ * later pass can tighten.
  */
 export function isQuickLaunch(params: QuickLaunchMatchParams, options: QuickLaunchMatchOptions = {}): boolean {
   const {
@@ -264,15 +300,22 @@ export function isQuickLaunch(params: QuickLaunchMatchParams, options: QuickLaun
     return false
   }
 
-  // 50/50 supply split — asserted only when the LP reserve is supplied.
+  // 50/50 supply split (MigratorParameters.reservedTokenAmountForLP) — asserted only when the LP
+  // reserve is known; undefined/null both mean unknown and leave it unasserted.
   if (
     params.reservedTokenAmountForLP !== undefined &&
+    params.reservedTokenAmountForLP !== null &&
     params.reservedTokenAmountForLP !== QUICK_LAUNCH_RESERVED_FOR_LP_RAW
   ) {
     return false
   }
 
-  // Permanent buyback-&-burn LP lock — asserted only when a lock descriptor is supplied.
+  // Permanent buyback-&-burn LP lock (decoded from MigratorParameters.positionRecipient).
+  // `null` is a resolved answer — the auction is known to have no lock, which the preset forbids.
+  if (params.lock === null) {
+    return false
+  }
+  // Asserted only when a lock descriptor is supplied; undefined = not resolved yet, unasserted.
   if (params.lock !== undefined && (params.lock.mode !== QUICK_LAUNCH_LOCK_MODE || !params.lock.permanentTimelock)) {
     return false
   }
