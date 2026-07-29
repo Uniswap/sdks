@@ -5,6 +5,8 @@ import { SupportedChainId } from './chains'
 import { getBlockTimeSeconds } from './config/blocks'
 import {
   PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS,
+  PERMANENT_TIMELOCK_REQUEST_SECONDS,
+  PERMANENT_UNLOCK_BLOCK_THRESHOLD,
   QUICK_LAUNCH_DURATION_SECONDS,
   QUICK_LAUNCH_PRESET,
   QUICK_LAUNCH_RESERVED_FOR_LP_RAW,
@@ -185,6 +187,11 @@ describe('isPermanentTimelock', () => {
     ).toBe(false)
   })
 
+  it('accepts a legacy max-uint256 sentinel unlock block (block form)', () => {
+    const maxUint256 = 2n ** 256n - 1n
+    expect(isPermanentTimelock({ chainId: CHAIN, endBlock, unlockBlock: maxUint256 })).toBe(true)
+  })
+
   it('composes with the matcher: permanence derived from an unlock block feeds the lock descriptor', () => {
     expect(
       isQuickLaunch(
@@ -210,6 +217,94 @@ describe('isPermanentTimelock', () => {
         })
       )
     ).toBe(false)
+  })
+})
+
+describe('isPermanentTimelock — timestamp form (create flow)', () => {
+  const endTimeSeconds = 1_753_000_000n // an ordinary auction end time
+
+  it('accepts the horizon the create flow requests (PERMANENT_TIMELOCK_REQUEST_SECONDS)', () => {
+    expect(
+      isPermanentTimelock({ endTimeSeconds, unlockTimeSeconds: endTimeSeconds + PERMANENT_TIMELOCK_REQUEST_SECONDS })
+    ).toBe(true)
+  })
+
+  it('encodes the ~100k-year request as exactly 100x the classification threshold', () => {
+    expect(PERMANENT_TIMELOCK_REQUEST_SECONDS).toBe(365n * 100_000n * 86_400n)
+    expect(Number(PERMANENT_TIMELOCK_REQUEST_SECONDS)).toBe(100 * PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS)
+  })
+
+  it('accepts a horizon exactly at the threshold', () => {
+    expect(
+      isPermanentTimelock({
+        endTimeSeconds,
+        unlockTimeSeconds: endTimeSeconds + BigInt(PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS),
+      })
+    ).toBe(true)
+  })
+
+  it('rejects a horizon one second short of the threshold', () => {
+    expect(
+      isPermanentTimelock({
+        endTimeSeconds,
+        unlockTimeSeconds: endTimeSeconds + BigInt(PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS) - 1n,
+      })
+    ).toBe(false)
+  })
+
+  it('accepts plain number timestamps', () => {
+    expect(
+      isPermanentTimelock({ endTimeSeconds: 1_753_000_000, unlockTimeSeconds: 1_753_000_000 + 1001 * 365 * 86_400 })
+    ).toBe(true)
+  })
+})
+
+describe('isPermanentTimelock — raw-block sentinel form (chain-agnostic serving)', () => {
+  it('accepts an unlock block at the sentinel threshold', () => {
+    expect(isPermanentTimelock({ unlockBlock: PERMANENT_UNLOCK_BLOCK_THRESHOLD })).toBe(true)
+  })
+
+  it('rejects an unlock block one below the sentinel threshold', () => {
+    expect(isPermanentTimelock({ unlockBlock: PERMANENT_UNLOCK_BLOCK_THRESHOLD - 1n })).toBe(false)
+  })
+
+  it('accepts a legacy max-uint256 sentinel unlock block', () => {
+    expect(isPermanentTimelock({ unlockBlock: 2n ** 256n - 1n })).toBe(true)
+  })
+
+  it('rejects an ordinary near-term unlock block', () => {
+    expect(isPermanentTimelock({ unlockBlock: 25_000_000n })).toBe(false)
+  })
+})
+
+describe('isPermanentTimelock — burn is structurally permanent', () => {
+  it('accepts a burn lock at unlock block 0 (block form), as burn rows carry', () => {
+    expect(isPermanentTimelock({ lockMode: 'burn', chainId: CHAIN, endBlock: END, unlockBlock: 0n })).toBe(true)
+  })
+
+  it('accepts a burn lock at unlock block 0 (sentinel form)', () => {
+    expect(isPermanentTimelock({ lockMode: 'burn', unlockBlock: 0n })).toBe(true)
+  })
+
+  it('accepts a burn lock regardless of the timestamp horizon', () => {
+    expect(isPermanentTimelock({ lockMode: 'burn', endTimeSeconds: 1_753_000_000n, unlockTimeSeconds: 0n })).toBe(true)
+  })
+
+  it('does not treat other modes as structurally permanent', () => {
+    expect(isPermanentTimelock({ lockMode: 'buybackBurn', chainId: CHAIN, endBlock: END, unlockBlock: 0n })).toBe(
+      false
+    )
+    expect(isPermanentTimelock({ lockMode: 'timelock', unlockBlock: 0n })).toBe(false)
+  })
+})
+
+describe('isQuickLaunch — burn lock qualifies', () => {
+  it('matches a burn lock — strictly stronger than the preset buyback-&-burn', () => {
+    expect(isQuickLaunch(presetAuction({ lock: { mode: 'burn', permanentTimelock: true } }))).toBe(true)
+  })
+
+  it('matches a burn lock even when the caller derived permanentTimelock=false from unlock_block 0', () => {
+    expect(isQuickLaunch(presetAuction({ lock: { mode: 'burn', permanentTimelock: false } }))).toBe(true)
   })
 })
 
