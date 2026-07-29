@@ -240,14 +240,17 @@ export function getTickDataLensForFactory(factoryAddress: string): Address | und
 // (the single source of truth for these addresses). Creator-fee on/off is a **constructor immutable
 // per strategy instance** (a zero `beneficiaryVault` immutable = fees off), so each variant is its
 // own strategy + FeeSplitter pair; the FeeSplitter's split table is likewise immutable at
-// construction. Strategies from commit dd232ed (includes the OZ H01 fix flooring launch positions
-// at tick -208,980); periphery from commit 0b06e9f.
-const INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD = getAddress('0x5B37F9a24e9CAb142Ca758A69a28Bf57B4c714D9')
-const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD = getAddress('0x42cdE2f72B2292BE3973c59811b8901627930b2d')
-const INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ROBINHOOD = getAddress('0xf139e6835B1494c9AC57133B1Dc052B097328199')
-const INSTANT_LAUNCH_FEE_SPLITTER_FEES_OFF_ROBINHOOD = getAddress('0xF165D5B169106e13bFB568C52af5d11977365630')
-const UERC20_BENEFICIARY_VAULT_ROBINHOOD = getAddress('0xF3b8653B53d75ec9925d88b051CcFDabbd4894f5')
-const COMPOUNDING_CLAIM_RECIPIENT_ROBINHOOD = getAddress('0x3fC7BA967295C10AFD2Ad4f098Dce3a71e6b8c73')
+// construction. Whole stack from commit c3f9506 (v3.1.0 — OZ notes/L-04 round + the 1e20
+// compounding floor; still carries the OZ H01 fix flooring launch positions at tick -208,980).
+// The prior dd232ed set is replaced outright rather than kept as a historical entry: eth_getLogs
+// over its full block range returned zero TokenLaunched events, so no indexed launch can reference
+// it (the append-only rule below binds once an entry has launches).
+const INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD = getAddress('0x60D73b21cDf2EA846ab3d58699BBbb8F29d72491')
+const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD = getAddress('0xFCe92C70f1fc017b72f6DD7a00D9E38725C7fBd1')
+const INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ROBINHOOD = getAddress('0x7198C32a497c09497e04C86cf8F77A244A9E4b8F')
+const INSTANT_LAUNCH_FEE_SPLITTER_FEES_OFF_ROBINHOOD = getAddress('0xDF50f4ea2207F9D2A753a3DaE729B36FDEF13b23')
+const UERC20_BENEFICIARY_VAULT_ROBINHOOD = getAddress('0x587D2fDDDF14F6f84022b51e8c3a473eB88C4544')
+const COMPOUNDING_CLAIM_RECIPIENT_ROBINHOOD = getAddress('0x666DA63451A502A323677C2Ef5F763181358be9b')
 
 /** FeeSplitter splits are expressed in basis points summing to this denominator per currency side. */
 export const FEE_SPLIT_BPS_DENOMINATOR = 10_000
@@ -327,7 +330,7 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
     creatorFeeTokenBps: 0,
     initialTick: 198060,
     description:
-      'Instant Launch with creator fees (2026-07-29, liquidity-launcher dd232ed): splitter forwards 40% of native fees to the UERC20BeneficiaryVault, 60% native + 100% token to the CompoundingClaimRecipient',
+      'Instant Launch with creator fees (2026-07-29, liquidity-launcher c3f9506): splitter forwards 40% of native fees to the UERC20BeneficiaryVault, 60% native + 100% token to the CompoundingClaimRecipient',
   },
   {
     chainId: SupportedChainId.ROBINHOOD,
@@ -338,7 +341,7 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
     creatorFeeTokenBps: 0,
     initialTick: 198060,
     description:
-      'Instant Launch without creator fees (2026-07-29, liquidity-launcher dd232ed): zero beneficiary vault; splitter forwards 100% of both fee sides to the CompoundingClaimRecipient',
+      'Instant Launch without creator fees (2026-07-29, liquidity-launcher c3f9506): zero beneficiary vault; splitter forwards 100% of both fee sides to the CompoundingClaimRecipient',
   },
 ]
 

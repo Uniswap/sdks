@@ -127,7 +127,7 @@ export const INSTANT_LAUNCH_TOTAL_SUPPLY_RAW =
  * protocol-owned contract (the deployed 4663 CompoundingClaimRecipient) rather than a user address,
  * since it must never be mistaken for a creator claim.
  */
-export const DISABLED_CREATOR_FEE_BENEFICIARY: Address = '0x3fC7BA967295C10AFD2Ad4f098Dce3a71e6b8c73'
+export const DISABLED_CREATOR_FEE_BENEFICIARY: Address = '0x666DA63451A502A323677C2Ef5F763181358be9b'
 
 export interface PredictInstantLaunchTokenParams {
   chainId: number
