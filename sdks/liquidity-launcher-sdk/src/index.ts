@@ -42,5 +42,9 @@ export * from './lock'
 // Canonical quick-launch preset + pure classifier
 export * from './quickLaunch'
 
+// Canonical Instant Launch preset + transaction assembler, and fee math over its indexed events
+export * from './instantLaunch'
+export * from './instantLaunchFees'
+
 // Formatting
 export * from './format'

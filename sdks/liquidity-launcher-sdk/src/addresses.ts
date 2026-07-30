@@ -232,6 +232,172 @@ export function getTickDataLensForFactory(factoryAddress: string): Address | und
   return TICK_DATA_LENS_BY_FACTORY.get(factoryAddress.toLowerCase())
 }
 
+// ---------------------------------------------------------------------------
+// Instant Launch deployment registry (variant-keyed, append-only)
+// ---------------------------------------------------------------------------
+
+// Canonical chain-4663 (Robinhood) Instant Launch deployment, per the liquidity-launcher dev README
+// (the single source of truth for these addresses). Creator-fee on/off is a **constructor immutable
+// per strategy instance** (a zero `beneficiaryVault` immutable = fees off), so each variant is its
+// own strategy + FeeSplitter pair; the FeeSplitter's split table is likewise immutable at
+// construction. Whole stack from commit c3f9506 (v3.1.0 — OZ notes/L-04 round + the 1e20
+// compounding floor; still carries the OZ H01 fix flooring launch positions at tick -208,980).
+// The prior dd232ed set is replaced outright rather than kept as a historical entry: eth_getLogs
+// over its full block range returned zero TokenLaunched events, so no indexed launch can reference
+// it (the append-only rule below binds once an entry has launches).
+const INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD = getAddress('0x60D73b21cDf2EA846ab3d58699BBbb8F29d72491')
+const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD = getAddress('0xFCe92C70f1fc017b72f6DD7a00D9E38725C7fBd1')
+const INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ROBINHOOD = getAddress('0x7198C32a497c09497e04C86cf8F77A244A9E4b8F')
+const INSTANT_LAUNCH_FEE_SPLITTER_FEES_OFF_ROBINHOOD = getAddress('0xDF50f4ea2207F9D2A753a3DaE729B36FDEF13b23')
+const UERC20_BENEFICIARY_VAULT_ROBINHOOD = getAddress('0x587D2fDDDF14F6f84022b51e8c3a473eB88C4544')
+const COMPOUNDING_CLAIM_RECIPIENT_ROBINHOOD = getAddress('0x666DA63451A502A323677C2Ef5F763181358be9b')
+
+/** FeeSplitter splits are expressed in basis points summing to this denominator per currency side. */
+export const FEE_SPLIT_BPS_DENOMINATOR = 10_000
+
+/**
+ * One Instant Launch strategy deployment: an InstantLaunchStrategy instance plus the immutable
+ * contracts wired into it at construction. The creator-fee variant is a deployment property, not a
+ * launch parameter — enabling/disabling creator fees means launching through a different strategy.
+ */
+export interface InstantLaunchDeployment {
+  /** Chain the instance is deployed to. */
+  chainId: number
+  /** The InstantLaunchStrategy instance (`Distribution.strategy` of a launch). */
+  strategy: Address
+  /**
+   * The strategy's immutable FeeSplitter — the permanent custodian of every launch LP NFT this
+   * strategy mints (`TokenLaunched.finalPositionRecipient`) and the fee distributor for it.
+   */
+  feeSplitter: Address
+  /**
+   * Whether this instance carries a creator-fee share: `true` when the strategy's immutable
+   * `beneficiaryVault` is set (each launch registers its `feeBeneficiary`, minting the transferable
+   * beneficiary ERC721), `false` when it is zero (registration skipped; the config beneficiary is
+   * ignored and 100% of fees autocompound).
+   */
+  creatorFeesEnabled: boolean
+  /**
+   * Share of each `FeesCollected` **native (ETH)** amount the splitter forwards to the beneficiary
+   * vault, in bps of {@link FEE_SPLIT_BPS_DENOMINATOR}. The creator's accrual rate: 4000 on the
+   * fees-on splitter, 0 on the fees-off one. The remainder autocompounds.
+   */
+  creatorFeeNativeBps: number
+  /** Share of each `FeesCollected` **token** amount forwarded to the vault, in bps (0 on every current deploy). */
+  creatorFeeTokenBps: number
+  /** The strategy's immutable `initialTick` — the aligned tick the launch pool opens at. */
+  initialTick: number
+  /** Human-readable deployment tag (not an on-chain value). */
+  description: string
+  /** Block the strategy was deployed at, when recorded (indexer start height). */
+  deployedAtBlock?: number
+}
+
+/**
+ * The per-chain Instant Launch singletons shared by every strategy variant on that chain.
+ */
+export interface InstantLaunchChainContracts {
+  /** LiquidityLauncher — the `multicall(createToken, distributeToken)` entrypoint (same registry value as {@link LauncherAddresses.liquidityLauncher}). */
+  liquidityLauncher: Address
+  /**
+   * UERC20BeneficiaryVault — registers each fees-on launch's beneficiary as a transferable ERC721
+   * and vaults the creator's share of split fees. Also lets the creator of a launcher-created
+   * uERC20 claim unregistered positions via the token's graffiti.
+   */
+  beneficiaryVault: Address
+  /**
+   * CompoundingClaimRecipient — the protocol/autocompound split recipient of every FeeSplitter on
+   * the chain. Its `Claimed` events prove same-transaction liquidity compounding.
+   */
+  compoundingClaimRecipient: Address
+}
+
+/**
+ * Every Instant Launch strategy deployment — current and historical. **Append-only**: indexed
+ * launches permanently reference the strategy that created them, so a redeploy appends new entries
+ * and keeps the old ones; downstream indexers resolve a stored strategy address through
+ * {@link getInstantLaunchDeployment} instead of hardcoding their own map, and transaction builders
+ * select the current variant via {@link getInstantLaunchStrategy}. A contract redeploy is then just
+ * an SDK release. The current deployment for a (chain, variant) pair is the **last** matching entry.
+ */
+export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
+  {
+    chainId: SupportedChainId.ROBINHOOD,
+    strategy: INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD,
+    feeSplitter: INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ROBINHOOD,
+    creatorFeesEnabled: true,
+    creatorFeeNativeBps: 4000,
+    creatorFeeTokenBps: 0,
+    initialTick: 198060,
+    description:
+      'Instant Launch with creator fees (2026-07-29, liquidity-launcher c3f9506): splitter forwards 40% of native fees to the UERC20BeneficiaryVault, 60% native + 100% token to the CompoundingClaimRecipient',
+  },
+  {
+    chainId: SupportedChainId.ROBINHOOD,
+    strategy: INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD,
+    feeSplitter: INSTANT_LAUNCH_FEE_SPLITTER_FEES_OFF_ROBINHOOD,
+    creatorFeesEnabled: false,
+    creatorFeeNativeBps: 0,
+    creatorFeeTokenBps: 0,
+    initialTick: 198060,
+    description:
+      'Instant Launch without creator fees (2026-07-29, liquidity-launcher c3f9506): zero beneficiary vault; splitter forwards 100% of both fee sides to the CompoundingClaimRecipient',
+  },
+]
+
+/** The per-chain Instant Launch singleton contracts, keyed by numeric chain id. */
+export const INSTANT_LAUNCH_CONTRACTS: Partial<Record<number, InstantLaunchChainContracts>> = {
+  [SupportedChainId.ROBINHOOD]: {
+    liquidityLauncher: LIQUIDITY_LAUNCHER,
+    beneficiaryVault: UERC20_BENEFICIARY_VAULT_ROBINHOOD,
+    compoundingClaimRecipient: COMPOUNDING_CLAIM_RECIPIENT_ROBINHOOD,
+  },
+}
+
+/**
+ * Strategy address (lowercased) → deployment, derived from {@link INSTANT_LAUNCH_DEPLOYMENTS}.
+ * Keys are lowercased so lookups are case-insensitive regardless of how the caller stored the
+ * strategy address; prefer {@link getInstantLaunchDeployment}, which normalizes for you.
+ */
+export const INSTANT_LAUNCH_DEPLOYMENT_BY_STRATEGY: ReadonlyMap<string, InstantLaunchDeployment> = new Map(
+  INSTANT_LAUNCH_DEPLOYMENTS.map((deployment) => [deployment.strategy.toLowerCase(), deployment])
+)
+
+/** Every Instant Launch strategy deployment on `chainId` (empty where none is deployed). */
+export function getInstantLaunchDeployments(chainId: number): readonly InstantLaunchDeployment[] {
+  return INSTANT_LAUNCH_DEPLOYMENTS.filter((deployment) => deployment.chainId === chainId)
+}
+
+/**
+ * Selects the **current** strategy deployment for a chain and creator-fee variant — what a
+ * transaction builder launches through. Returns the last matching registry entry (the registry is
+ * append-only, so the newest deployment of a variant wins), or `undefined` where the variant is not
+ * deployed.
+ */
+export function getInstantLaunchStrategy(
+  chainId: number,
+  options: { creatorFeesEnabled: boolean }
+): InstantLaunchDeployment | undefined {
+  const matching = INSTANT_LAUNCH_DEPLOYMENTS.filter(
+    (deployment) => deployment.chainId === chainId && deployment.creatorFeesEnabled === options.creatorFeesEnabled
+  )
+  return matching[matching.length - 1]
+}
+
+/**
+ * Reverse lookup for indexers/attribution: resolves a stored strategy address (case-insensitive) to
+ * its deployment — chain, FeeSplitter, creator-fee variant and split bps. Returns `undefined` for a
+ * strategy not in {@link INSTANT_LAUNCH_DEPLOYMENTS}.
+ */
+export function getInstantLaunchDeployment(strategyAddress: string): InstantLaunchDeployment | undefined {
+  return INSTANT_LAUNCH_DEPLOYMENT_BY_STRATEGY.get(strategyAddress.toLowerCase())
+}
+
+/** The per-chain Instant Launch singletons, or `undefined` where Instant Launch is not deployed. */
+export function getInstantLaunchContracts(chainId: number): InstantLaunchChainContracts | undefined {
+  return INSTANT_LAUNCH_CONTRACTS[chainId]
+}
+
 /** Which token standard a new-token launch targets (selects its address-derivation scheme). */
 export type TokenFactoryKind = 'uerc20' | 'usuperc20'
 
