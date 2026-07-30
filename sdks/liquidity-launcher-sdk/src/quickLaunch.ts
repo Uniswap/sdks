@@ -77,12 +77,12 @@ export const QUICK_LAUNCH_LP_RANGE: PriceRangeKind = 'CONCENTRATED_FULL_RANGE'
 export const QUICK_LAUNCH_LOCK_MODE: QuickLaunchLockMode = 'buybackBurn'
 
 // ---------------------------------------------------------------------------
-// Permanence (LP-1362): the ONE definition of a "permanent" lock
+// Permanence: the ONE definition of a "permanent" lock
 // ---------------------------------------------------------------------------
 // "Permanent" used to be defined independently in three places — the create
-// flow's requested horizon (rh-cca's local `PERMANENT_TIMELOCK_SECONDS`), the
-// data-api classifier's threshold (`PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS`,
-// backend#11194), and this SDK's bare `permanentTimelock: true` declaration —
+// flow's requested horizon, the data-api classifier's threshold
+// (`PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS`), and this SDK's bare
+// `permanentTimelock: true` declaration —
 // plus a fourth, chain-agnostic raw-block sentinel serving `lockedForever`
 // (data-api's `PERMANENT_UNLOCK_BLOCK_THRESHOLD`). They now all live here,
 // next to {@link QUICK_LAUNCH_LOCK_MODE}, and every consumer imports them:
@@ -105,8 +105,8 @@ export const PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS = 1000 * 365 * 86_400
 
 /**
  * The lock horizon the create flow *requests* for a permanent lock: `unlockTimeUnix = auctionEnd +
- * 365 * 100_000 days` (~100k years — apps/web's `TimeLockPreset.Permanent`; previously duplicated
- * as rh-cca's local `PERMANENT_TIMELOCK_SECONDS`). Deliberately ~100x over the classification
+ * 365 * 100_000 days` (~100k years — the create flow's "Permanent" preset; previously duplicated
+ * as a local constant in the create flow). Deliberately ~100x over the classification
  * threshold ({@link PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS}) so a requested-permanent lock can
  * never be classified finite, on any plausible block-time table.
  */
@@ -147,7 +147,7 @@ export const QUICK_LAUNCH_DURATION_TOLERANCE_RATIO = 0.1
  * rows carry `unlock_block = 0` (there is no timelock to expire), so permanence for `'burn'` must
  * never be derived from an unlock horizon — {@link isPermanentTimelock} short-circuits on it.
  *
- * PRODUCT DECISION (LP-1345/LP-1362, Bruno on backend#11194): a burn lock QUALIFIES as a quick
+ * PRODUCT DECISION (Bruno): a burn lock QUALIFIES as a quick
  * launch — strictly stronger than the preset's buyback-&-burn lock — so {@link isQuickLaunch}
  * accepts it and consumers no longer need a local `'burn'` → `'buybackBurn'` fold.
  */
@@ -252,7 +252,7 @@ export type PermanentTimelockParams = {
 )
 
 /**
- * The canonical predicate for whether a liquidity lock is *permanent* (LP-1362) — judged past the
+ * The canonical predicate for whether a liquidity lock is *permanent* — judged past the
  * auction end because that is how the create flow derives `unlockTimeUnix` before it is converted
  * to the block number the recipient stores as an immutable. See {@link PermanentTimelockParams}
  * for the three accepted input forms and the `'burn'` structural short-circuit.
