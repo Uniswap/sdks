@@ -3,6 +3,8 @@ import { getAddress } from 'viem'
 
 import {
   AUCTION_FACTORY_DEPLOYMENTS,
+  CREATOR_FEES_POSITION_RECIPIENTS,
+  getCreatorFeesPositionRecipient,
   getInstantLaunchContracts,
   getInstantLaunchDeployment,
   getInstantLaunchDeployments,
@@ -11,6 +13,7 @@ import {
   getTickDataLensForFactory,
   INSTANT_LAUNCH_DEPLOYMENT_BY_STRATEGY,
   INSTANT_LAUNCH_DEPLOYMENTS,
+  isCreatorFeesPositionRecipient,
   selectTokenFactory,
   TICK_DATA_LENS_BY_FACTORY,
   TICK_DATA_LENS_V1,
@@ -153,5 +156,46 @@ describe('Instant Launch deployment registry', () => {
     expect(contracts?.beneficiaryVault).toBe(getAddress('0x587D2fDDDF14F6f84022b51e8c3a473eB88C4544'))
     expect(contracts?.compoundingClaimRecipient).toBe(getAddress('0x666DA63451A502A323677C2Ef5F763181358be9b'))
     expect(contracts?.liquidityLauncher).toBe(getLauncherAddresses(SupportedChainId.ROBINHOOD)!.liquidityLauncher)
+  })
+})
+
+describe('creator-fees position recipient', () => {
+  // Independent literal (not read back from the registry) so a registry edit cannot silently move
+  // the recipient: the current fees-enabled Robinhood FeeSplitter.
+  const FEES_ON_SPLITTER = getAddress('0x7198C32a497c09497e04C86cf8F77A244A9E4b8F')
+  const FEES_OFF_SPLITTER = getAddress('0xDF50f4ea2207F9D2A753a3DaE729B36FDEF13b23')
+
+  it('resolves to the fees-enabled Robinhood FeeSplitter (registry-literal pin)', () => {
+    expect(getCreatorFeesPositionRecipient(SupportedChainId.ROBINHOOD)).toBe(FEES_ON_SPLITTER)
+    expect(CREATOR_FEES_POSITION_RECIPIENTS[SupportedChainId.ROBINHOOD]).toBe(FEES_ON_SPLITTER)
+  })
+
+  it('never resolves to the fees-off splitter', () => {
+    expect(getCreatorFeesPositionRecipient(SupportedChainId.ROBINHOOD)).not.toBe(FEES_OFF_SPLITTER)
+  })
+
+  it('returns undefined where the chain has no creator-fees deployment', () => {
+    expect(getCreatorFeesPositionRecipient(SupportedChainId.MAINNET)).toBeUndefined()
+    expect(CREATOR_FEES_POSITION_RECIPIENTS[SupportedChainId.MAINNET]).toBeUndefined()
+  })
+
+  it('agrees with the current fees-enabled registry entry', () => {
+    const deployment = getInstantLaunchStrategy(SupportedChainId.ROBINHOOD, { creatorFeesEnabled: true })
+    expect(getCreatorFeesPositionRecipient(SupportedChainId.ROBINHOOD)).toBe(deployment!.feeSplitter)
+  })
+
+  it('isCreatorFeesPositionRecipient recognizes the fees-enabled splitter, case-insensitively', () => {
+    expect(isCreatorFeesPositionRecipient(SupportedChainId.ROBINHOOD, FEES_ON_SPLITTER)).toBe(true)
+    expect(isCreatorFeesPositionRecipient(SupportedChainId.ROBINHOOD, FEES_ON_SPLITTER.toLowerCase())).toBe(true)
+    expect(isCreatorFeesPositionRecipient(SupportedChainId.ROBINHOOD, FEES_ON_SPLITTER.toUpperCase().replace('0X', '0x'))).toBe(true)
+  })
+
+  it('rejects the fees-off splitter — permanent custody but no creator claim path', () => {
+    expect(isCreatorFeesPositionRecipient(SupportedChainId.ROBINHOOD, FEES_OFF_SPLITTER)).toBe(false)
+  })
+
+  it('rejects an unknown recipient and a wrong chain', () => {
+    expect(isCreatorFeesPositionRecipient(SupportedChainId.ROBINHOOD, '0x0000000000000000000000000000000000000001')).toBe(false)
+    expect(isCreatorFeesPositionRecipient(SupportedChainId.MAINNET, FEES_ON_SPLITTER)).toBe(false)
   })
 })

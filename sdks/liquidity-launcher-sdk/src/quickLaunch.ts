@@ -148,18 +148,45 @@ export const QUICK_LAUNCH_DURATION_TOLERANCE_RATIO = 0.1
 // ---------------------------------------------------------------------------
 
 /**
- * Lock-recipient modes ({@link LockRecipientInput}) plus `'burn'`: the LP position minted straight
- * to the burn address, with no recipient contract at all. `'burn'` is not a buildable
- * {@link LockRecipientInput} mode — there is nothing to deploy — but it is a first-class lock mode
- * for classification: a burned position is irrecoverable, i.e. *structurally* permanent, and such
- * rows carry `unlock_block = 0` (there is no timelock to expire), so permanence for `'burn'` must
- * never be derived from an unlock horizon — {@link isPermanentTimelock} short-circuits on it.
+ * Lock-recipient modes ({@link LockRecipientInput}) plus two modes with no per-launch recipient
+ * contract at all:
+ *
+ *  - `'burn'` — the LP position minted straight to the burn address. Not a buildable
+ *    {@link LockRecipientInput} mode (there is nothing to deploy), but a first-class lock mode for
+ *    classification: a burned position is irrecoverable, i.e. *structurally* permanent, and such
+ *    rows carry `unlock_block = 0` (there is no timelock to expire), so permanence for `'burn'` must
+ *    never be derived from an unlock horizon — {@link isPermanentTimelock} short-circuits on it.
+ *  - `'creatorFees'` — the LP position sent to the chain's fees-enabled FeeSplitter (the registry's
+ *    `creatorFeesEnabled: true` entry), which routes the creator's share of native fees to the
+ *    BeneficiaryVault and auto-compounds the rest. Also not buildable here — the splitter is a
+ *    pre-deployed singleton, resolved via `getCreatorFeesPositionRecipient` — and likewise
+ *    *structurally* permanent: the splitter has no code path that transfers positions out, and such
+ *    rows carry `unlock_block = 0`, so {@link isPermanentTimelock} short-circuits on it too.
+ *    Callers derive this mode by matching the decoded `MigratorParameters.positionRecipient` with
+ *    `isCreatorFeesPositionRecipient` (fees-OFF splitters do not qualify — see its docs); the
+ *    matcher here stays address-free.
  *
  * PRODUCT DECISION (Bruno): a burn lock QUALIFIES as a quick
  * launch — strictly stronger than the preset's buyback-&-burn lock — so {@link isQuickLaunch}
- * accepts it and consumers no longer need a local `'burn'` → `'buybackBurn'` fold.
+ * accepts it and consumers no longer need a local `'burn'` → `'buybackBurn'` fold. A
+ * `'creatorFees'` position likewise qualifies: custody is permanent by construction, so it is the
+ * preset's permanence with a different fee routing.
  */
-export type QuickLaunchLockMode = LockRecipientInput['mode'] | 'burn'
+export type QuickLaunchLockMode = LockRecipientInput['mode'] | 'burn' | 'creatorFees'
+
+/**
+ * The lock modes whose permanence is *structural* — the position can never leave its custodian, so
+ * there is no unlock horizon to check (their rows carry `unlock_block = 0`): `'burn'` (irrecoverably
+ * at the burn address) and `'creatorFees'` (parked at the fee splitter, which has no code path that
+ * transfers positions out). {@link isPermanentTimelock} short-circuits on these, and
+ * {@link isQuickLaunch} accepts them regardless of the caller-derived `permanentTimelock` flag.
+ */
+export const STRUCTURALLY_PERMANENT_LOCK_MODES: readonly QuickLaunchLockMode[] = ['burn', 'creatorFees']
+
+/** Whether `mode`'s permanence is structural (see {@link STRUCTURALLY_PERMANENT_LOCK_MODES}). */
+export function isStructurallyPermanentLockMode(mode: QuickLaunchLockMode): boolean {
+  return STRUCTURALLY_PERMANENT_LOCK_MODES.includes(mode)
+}
 
 /**
  * The canonical quick-launch parameter set. Every field here is chain-independent (factory tokens are
@@ -272,12 +299,12 @@ export function getQuickLaunchGraduationPricePerToken(ethUsdPrice: number): stri
  *    {@link PERMANENT_UNLOCK_BLOCK_THRESHOLD} approximation, for serving-side call sites that have
  *    only the stored unlock block. Prefer the chain-aware forms when possible.
  *
- * `lockMode` may accompany any form: `'burn'` is *structurally* permanent (the position is
- * irrecoverable and such rows carry `unlock_block = 0`), so it short-circuits to `true` before any
- * horizon math.
+ * `lockMode` may accompany any form: `'burn'` and `'creatorFees'` are *structurally* permanent
+ * (see {@link STRUCTURALLY_PERMANENT_LOCK_MODES}; such rows carry `unlock_block = 0`), so they
+ * short-circuit to `true` before any horizon math.
  */
 export type PermanentTimelockParams = {
-  /** When supplied, `'burn'` is permanent by construction regardless of the block/time inputs. */
+  /** When supplied, a structurally permanent mode passes by construction regardless of the block/time inputs. */
   lockMode?: QuickLaunchLockMode
 } & (
   | { chainId: number; endBlock: bigint; unlockBlock: bigint }
@@ -289,12 +316,13 @@ export type PermanentTimelockParams = {
  * The canonical predicate for whether a liquidity lock is *permanent* — judged past the
  * auction end because that is how the create flow derives `unlockTimeUnix` before it is converted
  * to the block number the recipient stores as an immutable. See {@link PermanentTimelockParams}
- * for the three accepted input forms and the `'burn'` structural short-circuit.
+ * for the three accepted input forms and the structural (`'burn'` / `'creatorFees'`) short-circuit.
  */
 export function isPermanentTimelock(params: PermanentTimelockParams): boolean {
-  // A burned position has no timelock to expire — permanence is structural, not derived. Burn rows
-  // carry unlock_block = 0, so falling through to the horizon math would wrongly report finite.
-  if (params.lockMode === 'burn') {
+  // A burned or splitter-parked position has no timelock to expire — permanence is structural, not
+  // derived. Such rows carry unlock_block = 0, so falling through to the horizon math would wrongly
+  // report finite.
+  if (params.lockMode !== undefined && isStructurallyPermanentLockMode(params.lockMode)) {
     return true
   }
   // Timestamp form: the create flow's real-seconds horizon past the auction end.
@@ -356,8 +384,9 @@ export interface QuickLaunchMatchParams {
    * `undefined` means *not resolved yet* and leaves the lock unasserted; `null` means *resolved: this
    * auction has no lock*, which fails the match — an unlocked LP position is not the preset. When
    * present it must be a permanent buyback-&-burn lock (see {@link isPermanentTimelock} for deriving
-   * permanence from the recipient's immutable unlock block) — or a `'burn'` lock, which is strictly
-   * stronger and structurally permanent (see {@link QuickLaunchLockMode}).
+   * permanence from the recipient's immutable unlock block) — or a structurally permanent mode:
+   * `'burn'` (strictly stronger) or `'creatorFees'` (position parked at the fee splitter forever;
+   * derive it via `isCreatorFeesPositionRecipient` — see {@link QuickLaunchLockMode}).
    */
   lock?: QuickLaunchLockDescriptor | null
 }
@@ -388,7 +417,8 @@ export interface QuickLaunchMatchOptions {
  * stable structural field.
  *
  * Required fingerprint (always available from indexed data): native raise currency, 1B total supply,
- * and the 4h duration. The 50/50 LP reserve and the permanent buyback-&-burn lock are matched only
+ * and the 4h duration. The 50/50 LP reserve and the permanent lock (buyback-&-burn, or a
+ * structurally permanent `'burn'` / `'creatorFees'` mode) are matched only
  * when supplied — with one asymmetry: a `null` lock is a *resolved* answer (known to have no lock)
  * and fails, while a `null` reserve is merely unknown and stays unasserted. Since a refinement can
  * only turn a match into a non-match, classifying without them is a safe over-approximation that a
@@ -439,10 +469,11 @@ export function isQuickLaunch(params: QuickLaunchMatchParams, options: QuickLaun
     return false
   }
   // Asserted only when a lock descriptor is supplied; undefined = not resolved yet, unasserted.
-  // A 'burn' lock qualifies (strictly stronger than the preset — see QuickLaunchLockMode) and is
-  // structurally permanent, so it passes regardless of the caller-derived permanentTimelock flag
-  // (burn rows carry unlock_block = 0, from which a horizon derivation would report finite).
-  if (params.lock !== undefined && params.lock.mode !== 'burn') {
+  // The structurally permanent modes qualify — 'burn' (strictly stronger than the preset) and
+  // 'creatorFees' (parked at the fee splitter forever) — and pass regardless of the caller-derived
+  // permanentTimelock flag (their rows carry unlock_block = 0, from which a horizon derivation
+  // would report finite). See QuickLaunchLockMode.
+  if (params.lock !== undefined && !isStructurallyPermanentLockMode(params.lock.mode)) {
     if (params.lock.mode !== QUICK_LAUNCH_LOCK_MODE || !params.lock.permanentTimelock) {
       return false
     }
