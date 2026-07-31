@@ -326,8 +326,9 @@ describe('isQuickLaunch — purity', () => {
 })
 
 describe('graduation threshold constants', () => {
-  it('graduation FDV is $10k (signed off 2026-07-31), decoupled from the floor', () => {
+  it('graduation FDV is $10k (signed off 2026-07-31), decoupled from the $1k floor', () => {
     expect(QUICK_LAUNCH_GRADUATION_FDV_USD).toBe(10_000)
+    expect(QUICK_LAUNCH_FLOOR_FDV_USD).toBe(1_000)
   })
 
   it('required raise = graduation FDV x sold share ($5k at the 50%-sold preset), never FDV 1:1', () => {
@@ -339,8 +340,8 @@ describe('graduation threshold constants', () => {
 
 describe('FDV -> price-per-token request derivation', () => {
   it('derives the floor price per token: floorFDV / 1B tokens / ethUsd', () => {
-    // $5k FDV over 1B tokens at $2,000/ETH = 5e-6 / 2000 = 2.5e-9 ETH per token.
-    expect(getQuickLaunchFloorPricePerToken(2_000)).toBe('0.0000000025')
+    // $1k FDV over 1B tokens at $2,000/ETH = 1e-6 / 2000 = 5e-10 ETH per token.
+    expect(getQuickLaunchFloorPricePerToken(2_000)).toBe('0.0000000005')
   })
 
   it('derives the graduation price per token with the same derivation as the floor', () => {
