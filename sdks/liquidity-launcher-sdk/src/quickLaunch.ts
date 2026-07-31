@@ -2,6 +2,7 @@ import { type Address } from 'viem'
 
 import { getBlockTimeSeconds } from './config/blocks'
 import type { PriceRangeKind } from './config/positions'
+import { fdvUsdToPricePerToken } from './config/price'
 import {
   DEFAULT_AUCTION_STEPS,
   DEFAULT_CONVEXITY_ALPHA,
@@ -53,15 +54,22 @@ export const QUICK_LAUNCH_RESERVED_FOR_LP_RAW = QUICK_LAUNCH_TOTAL_SUPPLY_RAW / 
 /** Raise denomination: ETH / the network's native token only (`address(0)` sentinel). */
 export const QUICK_LAUNCH_RAISE_CURRENCY: Address = ZERO_ADDRESS
 
-/** Starting clearing price floor, expressed as a target FDV in USD (~$5k, cheap enough to deter spam). */
-export const QUICK_LAUNCH_FLOOR_FDV_USD = 5_000
+/** Starting clearing price floor, expressed as a target FDV in USD (~$1k, cheap enough to deter spam). */
+export const QUICK_LAUNCH_FLOOR_FDV_USD = 1_000
+
+/** Fraction of the total supply actually sold in the auction (the other half seeds the LP). */
+export const QUICK_LAUNCH_SOLD_SUPPLY_SHARE = QUICK_LAUNCH_SUPPLY_AUCTIONED_PERCENT / 100
 
 /**
- * Graduation threshold as a target FDV in USD ($50k FDV clearing price → ~$25k raised, since 50% of
- * supply is auctioned).
- * PENDING SIGN-OFF: the $50k figure is not final (open product debate on failed-graduation risk).
+ * Graduation threshold as a target FDV in USD ($10k FDV, i.e. ~$5k raised at the 50%-sold preset —
+ * the USD raise is always FDV x {@link QUICK_LAUNCH_SOLD_SUPPLY_SHARE}, never the FDV itself).
+ * Decoupled from {@link QUICK_LAUNCH_FLOOR_FDV_USD}: sent to the liquidity service as its own
+ * `graduation_price_raise_per_token` — see {@link getQuickLaunchGraduationPricePerToken}.
  */
-export const QUICK_LAUNCH_GRADUATION_FDV_USD = 50_000
+export const QUICK_LAUNCH_GRADUATION_FDV_USD = 10_000
+
+/** Approximate USD of (time-weighted) committed bids needed to graduate: graduation FDV x sold share. */
+export const QUICK_LAUNCH_GRADUATION_RAISE_USD = QUICK_LAUNCH_GRADUATION_FDV_USD * QUICK_LAUNCH_SOLD_SUPPLY_SHARE
 
 /**
  * V4 LP fee tier in hundredths of a bip (2500 = 0.25%).
@@ -220,6 +228,32 @@ export const QUICK_LAUNCH_PRESET: QuickLaunchPreset = {
 /** The 4h window as a block count on `chainId` (uses the chain's block time). */
 export function getQuickLaunchDurationBlocks(chainId: number): bigint {
   return BigInt(Math.round(QUICK_LAUNCH_DURATION_SECONDS / getBlockTimeSeconds(chainId)))
+}
+
+// ---------------------------------------------------------------------------
+// CreateAuction request derivation (FDV -> price-per-token)
+// ---------------------------------------------------------------------------
+
+/**
+ * The preset floor as the CreateAuction `floor_price_raise_per_token` decimal:
+ * {@link QUICK_LAUNCH_FLOOR_FDV_USD} / 1B tokens, converted to the raise currency (native ETH)
+ * at `ethUsdPrice`. Throws {@link LauncherSdkError} on a missing/invalid price — callers decide
+ * their own fallback.
+ */
+export function getQuickLaunchFloorPricePerToken(ethUsdPrice: number): string {
+  return fdvUsdToPricePerToken(QUICK_LAUNCH_FLOOR_FDV_USD, QUICK_LAUNCH_TOTAL_SUPPLY, ethUsdPrice)
+}
+
+/**
+ * The preset graduation threshold as the CreateAuction `graduation_price_raise_per_token`
+ * decimal: {@link QUICK_LAUNCH_GRADUATION_FDV_USD} / 1B tokens, converted to the raise currency
+ * (native ETH) at `ethUsdPrice` — the same derivation as the floor, over the FULL supply. The
+ * service turns it into `requiredCurrencyRaised = graduationPrice x soldSupply`, so the USD
+ * raise this demands is graduation FDV x {@link QUICK_LAUNCH_SOLD_SUPPLY_SHARE}
+ * (= {@link QUICK_LAUNCH_GRADUATION_RAISE_USD}), never the FDV 1:1.
+ */
+export function getQuickLaunchGraduationPricePerToken(ethUsdPrice: number): string {
+  return fdvUsdToPricePerToken(QUICK_LAUNCH_GRADUATION_FDV_USD, QUICK_LAUNCH_TOTAL_SUPPLY, ethUsdPrice)
 }
 
 /**
