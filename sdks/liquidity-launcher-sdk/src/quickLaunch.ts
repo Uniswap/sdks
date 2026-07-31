@@ -54,27 +54,17 @@ export const QUICK_LAUNCH_RESERVED_FOR_LP_RAW = QUICK_LAUNCH_TOTAL_SUPPLY_RAW / 
 /** Raise denomination: ETH / the network's native token only (`address(0)` sentinel). */
 export const QUICK_LAUNCH_RAISE_CURRENCY: Address = ZERO_ADDRESS
 
-/**
- * Starting clearing price floor, expressed as a target FDV in USD (~$1k, cheap enough to deter
- * spam; signed off 2026-07-31, down from $5k).
- *
- * ADOPTION ORDER: consumers must not ship this lowered floor to production before the decoupled
- * graduation threshold ({@link QUICK_LAUNCH_GRADUATION_FDV_USD} via
- * {@link getQuickLaunchGraduationPricePerToken} -> `graduation_price_raise_per_token`) is live
- * end-to-end — with a floor-derived graduation gate, a $1k floor alone silently drops the
- * graduation target to ~$500 raised.
- */
+/** Starting clearing price floor, expressed as a target FDV in USD (~$1k, cheap enough to deter spam). */
 export const QUICK_LAUNCH_FLOOR_FDV_USD = 1_000
 
 /** Fraction of the total supply actually sold in the auction (the other half seeds the LP). */
 export const QUICK_LAUNCH_SOLD_SUPPLY_SHARE = QUICK_LAUNCH_SUPPLY_AUCTIONED_PERCENT / 100
 
 /**
- * Graduation threshold as a target FDV in USD. Signed off 2026-07-31: $10k FDV, i.e. ~$5k raised
- * at the 50%-sold preset — the USD raise is always FDV x {@link QUICK_LAUNCH_SOLD_SUPPLY_SHARE},
- * never the FDV itself. Decoupled from {@link QUICK_LAUNCH_FLOOR_FDV_USD}: sent to the liquidity
- * service as its own `graduation_price_raise_per_token` — see
- * {@link getQuickLaunchGraduationPricePerToken}.
+ * Graduation threshold as a target FDV in USD ($10k FDV, i.e. ~$5k raised at the 50%-sold preset —
+ * the USD raise is always FDV x {@link QUICK_LAUNCH_SOLD_SUPPLY_SHARE}, never the FDV itself).
+ * Decoupled from {@link QUICK_LAUNCH_FLOOR_FDV_USD}: sent to the liquidity service as its own
+ * `graduation_price_raise_per_token` — see {@link getQuickLaunchGraduationPricePerToken}.
  */
 export const QUICK_LAUNCH_GRADUATION_FDV_USD = 10_000
 

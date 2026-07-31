@@ -326,7 +326,7 @@ describe('isQuickLaunch — purity', () => {
 })
 
 describe('graduation threshold constants', () => {
-  it('graduation FDV is $10k (signed off 2026-07-31), decoupled from the $1k floor', () => {
+  it('graduation FDV is $10k, decoupled from the $1k floor', () => {
     expect(QUICK_LAUNCH_GRADUATION_FDV_USD).toBe(10_000)
     expect(QUICK_LAUNCH_FLOOR_FDV_USD).toBe(1_000)
   })
