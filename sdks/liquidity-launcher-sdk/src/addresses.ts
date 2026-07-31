@@ -398,6 +398,74 @@ export function getInstantLaunchContracts(chainId: number): InstantLaunchChainCo
   return INSTANT_LAUNCH_CONTRACTS[chainId]
 }
 
+// ---------------------------------------------------------------------------
+// Creator-fees position recipient (auction / crowd launches)
+// ---------------------------------------------------------------------------
+
+/**
+ * The current creator-fees position recipient per chain: the fees-enabled FeeSplitter from
+ * {@link INSTANT_LAUNCH_DEPLOYMENTS} (the `creatorFeesEnabled: true` entry; last one wins where the
+ * append-only registry carries several). Derived from the registry, so a splitter redeploy only
+ * requires appending a registry entry. Prefer {@link getCreatorFeesPositionRecipient}.
+ */
+export const CREATOR_FEES_POSITION_RECIPIENTS: Partial<Record<number, Address>> = Object.fromEntries(
+  INSTANT_LAUNCH_DEPLOYMENTS.filter((deployment) => deployment.creatorFeesEnabled).map((deployment) => [
+    deployment.chainId,
+    deployment.feeSplitter,
+  ])
+)
+
+/**
+ * The position recipient that opts an auction / crowd launch into creator fees on `chainId` — set it
+ * as the launch's `MigratorParameters.positionRecipient` (in place of a per-launch lock-recipient
+ * contract). It is the **fees-enabled** FeeSplitter of the chain's current creator-fees deployment
+ * ({@link getInstantLaunchStrategy} with `creatorFeesEnabled: true` — the same splitter Instant
+ * Launch mints its positions to).
+ *
+ * What sending the migrated LP position there means:
+ *  - the splitter forwards the creator's share of each collected **native (ETH)** fee amount
+ *    ({@link InstantLaunchDeployment.creatorFeeNativeBps} — 40% on the current deploy) to the
+ *    chain's BeneficiaryVault, where the token's creator — the `createToken` caller, proven by the
+ *    token's graffiti — claims it post-migration;
+ *  - the remainder (60% native + 100% of the token side) auto-compounds into the position via the
+ *    chain's compounding claim recipient;
+ *  - custody is **permanent**: the splitter has no code path that transfers positions out, so the
+ *    liquidity is locked forever by construction (no timelock involved).
+ *
+ * Only the `creatorFeesEnabled: true` splitter qualifies — the fees-off splitter never routes
+ * anything to the vault, so it is not a creator-fees recipient (see
+ * {@link isCreatorFeesPositionRecipient}). Returns `undefined` where the chain has no creator-fees
+ * deployment.
+ */
+export function getCreatorFeesPositionRecipient(chainId: number): Address | undefined {
+  return getInstantLaunchStrategy(chainId, { creatorFeesEnabled: true })?.feeSplitter
+}
+
+/**
+ * Whether `recipient` is a creator-fees position recipient on `chainId`: the fees-enabled
+ * FeeSplitter of any registry deployment for the chain — current or historical, since the registry
+ * is append-only and indexed launches permanently reference the splitter they migrated to.
+ * Case-insensitive. This is the classifier-side counterpart of
+ * {@link getCreatorFeesPositionRecipient}: a launch whose `MigratorParameters.positionRecipient`
+ * matches is parked at the splitter forever (structurally permanent custody) with creator fees
+ * routed to the BeneficiaryVault.
+ *
+ * DECISION: the fees-off splitter does NOT qualify, even though its custody is equally permanent.
+ * `creatorFees` semantics promise a creator claim path through the vault; the fees-off splitter
+ * forwards 100% of fees to the compounding recipient and registers no beneficiary, and it is not a
+ * supported recipient for auction / crowd launches — recognizing it here would misclassify such a
+ * launch as carrying creator fees.
+ */
+export function isCreatorFeesPositionRecipient(chainId: number, recipient: string): boolean {
+  const normalized = recipient.toLowerCase()
+  return INSTANT_LAUNCH_DEPLOYMENTS.some(
+    (deployment) =>
+      deployment.chainId === chainId &&
+      deployment.creatorFeesEnabled &&
+      deployment.feeSplitter.toLowerCase() === normalized
+  )
+}
+
 /** Which token standard a new-token launch targets (selects its address-derivation scheme). */
 export type TokenFactoryKind = 'uerc20' | 'usuperc20'
 

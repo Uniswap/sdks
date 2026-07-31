@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { getAddress, zeroAddress } from 'viem'
 
+import { isCreatorFeesPositionRecipient } from './addresses'
 import { SupportedChainId } from './chains'
 import { getBlockTimeSeconds } from './config/blocks'
 import {
@@ -20,6 +21,8 @@ import {
   getQuickLaunchGraduationPricePerToken,
   isPermanentTimelock,
   isQuickLaunch,
+  isStructurallyPermanentLockMode,
+  STRUCTURALLY_PERMANENT_LOCK_MODES,
   type QuickLaunchMatchParams,
 } from './quickLaunch'
 
@@ -304,6 +307,25 @@ describe('isPermanentTimelock — burn is structurally permanent', () => {
   })
 })
 
+describe('isPermanentTimelock — creatorFees is structurally permanent', () => {
+  it('accepts a creatorFees position at unlock block 0 (block form), as splitter rows carry', () => {
+    expect(isPermanentTimelock({ lockMode: 'creatorFees', chainId: CHAIN, endBlock: END, unlockBlock: 0n })).toBe(true)
+  })
+
+  it('accepts a creatorFees position at unlock block 0 (sentinel form)', () => {
+    expect(isPermanentTimelock({ lockMode: 'creatorFees', unlockBlock: 0n })).toBe(true)
+  })
+
+  it('exposes the structural set: burn and creatorFees only', () => {
+    expect([...STRUCTURALLY_PERMANENT_LOCK_MODES].sort()).toEqual(['burn', 'creatorFees'])
+    expect(isStructurallyPermanentLockMode('creatorFees')).toBe(true)
+    expect(isStructurallyPermanentLockMode('burn')).toBe(true)
+    expect(isStructurallyPermanentLockMode('buybackBurn')).toBe(false)
+    expect(isStructurallyPermanentLockMode('timelock')).toBe(false)
+    expect(isStructurallyPermanentLockMode('feesForwarder')).toBe(false)
+  })
+})
+
 describe('isQuickLaunch — burn lock qualifies', () => {
   it('matches a burn lock — strictly stronger than the preset buyback-&-burn', () => {
     expect(isQuickLaunch(presetAuction({ lock: { mode: 'burn', permanentTimelock: true } }))).toBe(true)
@@ -311,6 +333,59 @@ describe('isQuickLaunch — burn lock qualifies', () => {
 
   it('matches a burn lock even when the caller derived permanentTimelock=false from unlock_block 0', () => {
     expect(isQuickLaunch(presetAuction({ lock: { mode: 'burn', permanentTimelock: false } }))).toBe(true)
+  })
+})
+
+describe('isQuickLaunch — creatorFees custody qualifies', () => {
+  // Callers derive this descriptor by matching MigratorParameters.positionRecipient against the
+  // registry's fees-enabled splitter via isCreatorFeesPositionRecipient (addresses.ts); the fees-off
+  // splitter does not qualify there, so it never reaches the matcher as 'creatorFees' — it stays an
+  // unrecognized recipient, i.e. lock: null, which fails below.
+  it('matches a position parked at the fee splitter — structurally permanent custody', () => {
+    expect(isQuickLaunch(presetAuction({ lock: { mode: 'creatorFees', permanentTimelock: true } }))).toBe(true)
+  })
+
+  it('matches even when the caller derived permanentTimelock=false from unlock_block 0', () => {
+    expect(isQuickLaunch(presetAuction({ lock: { mode: 'creatorFees', permanentTimelock: false } }))).toBe(true)
+  })
+
+  it('still rejects an unrecognized recipient (resolved as no lock)', () => {
+    expect(isQuickLaunch(presetAuction({ lock: null }))).toBe(false)
+  })
+})
+
+describe('isQuickLaunch — composition with the registry recipient matcher', () => {
+  // How a classifier derives the 'creatorFees' descriptor from an indexed positionRecipient. The
+  // matcher itself stays address-free; the registry lookup happens here, at the call site.
+  const LAUNCH_CHAIN = SupportedChainId.ROBINHOOD
+  const LAUNCH_START = 1_000_000n
+  const LAUNCH_END = LAUNCH_START + getQuickLaunchDurationBlocks(LAUNCH_CHAIN)
+
+  function lockFromPositionRecipient(recipient: string): QuickLaunchMatchParams['lock'] {
+    return isCreatorFeesPositionRecipient(LAUNCH_CHAIN, recipient)
+      ? { mode: 'creatorFees', permanentTimelock: true }
+      : null
+  }
+
+  function launchWithRecipient(recipient: string): QuickLaunchMatchParams {
+    return presetAuction({
+      chainId: LAUNCH_CHAIN,
+      startBlock: LAUNCH_START,
+      endBlock: LAUNCH_END,
+      lock: lockFromPositionRecipient(recipient),
+    })
+  }
+
+  it('accepts a launch whose position recipient is the fees-enabled splitter', () => {
+    expect(isQuickLaunch(launchWithRecipient('0x7198C32a497c09497e04C86cf8F77A244A9E4b8F'))).toBe(true)
+  })
+
+  it('rejects a launch whose position recipient is the fees-off splitter (no creator claim path)', () => {
+    expect(isQuickLaunch(launchWithRecipient('0xDF50f4ea2207F9D2A753a3DaE729B36FDEF13b23'))).toBe(false)
+  })
+
+  it('rejects a launch with an unknown position recipient', () => {
+    expect(isQuickLaunch(launchWithRecipient('0x0000000000000000000000000000000000000001'))).toBe(false)
   })
 })
 
