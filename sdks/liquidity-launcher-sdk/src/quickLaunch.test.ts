@@ -8,10 +8,16 @@ import {
   PERMANENT_TIMELOCK_REQUEST_SECONDS,
   PERMANENT_UNLOCK_BLOCK_THRESHOLD,
   QUICK_LAUNCH_DURATION_SECONDS,
+  QUICK_LAUNCH_FLOOR_FDV_USD,
+  QUICK_LAUNCH_GRADUATION_FDV_USD,
+  QUICK_LAUNCH_GRADUATION_RAISE_USD,
   QUICK_LAUNCH_PRESET,
   QUICK_LAUNCH_RESERVED_FOR_LP_RAW,
+  QUICK_LAUNCH_SOLD_SUPPLY_SHARE,
   QUICK_LAUNCH_TOTAL_SUPPLY_RAW,
   getQuickLaunchDurationBlocks,
+  getQuickLaunchFloorPricePerToken,
+  getQuickLaunchGraduationPricePerToken,
   isPermanentTimelock,
   isQuickLaunch,
   type QuickLaunchMatchParams,
@@ -316,5 +322,41 @@ describe('isQuickLaunch — purity', () => {
     const second = isQuickLaunch(params)
     expect(first).toBe(second)
     expect(JSON.stringify(params, (_k, v) => (typeof v === 'bigint' ? v.toString() : v))).toBe(snapshot)
+  })
+})
+
+describe('graduation threshold constants', () => {
+  it('graduation FDV is $10k (signed off 2026-07-31), decoupled from the floor', () => {
+    expect(QUICK_LAUNCH_GRADUATION_FDV_USD).toBe(10_000)
+  })
+
+  it('required raise = graduation FDV x sold share ($5k at the 50%-sold preset), never FDV 1:1', () => {
+    expect(QUICK_LAUNCH_SOLD_SUPPLY_SHARE).toBe(0.5)
+    expect(QUICK_LAUNCH_GRADUATION_RAISE_USD).toBe(5_000)
+    expect(QUICK_LAUNCH_GRADUATION_RAISE_USD).not.toBe(QUICK_LAUNCH_GRADUATION_FDV_USD)
+  })
+})
+
+describe('FDV -> price-per-token request derivation', () => {
+  it('derives the floor price per token: floorFDV / 1B tokens / ethUsd', () => {
+    // $5k FDV over 1B tokens at $2,000/ETH = 5e-6 / 2000 = 2.5e-9 ETH per token.
+    expect(getQuickLaunchFloorPricePerToken(2_000)).toBe('0.0000000025')
+  })
+
+  it('derives the graduation price per token with the same derivation as the floor', () => {
+    // $10k FDV over 1B tokens at $2,500/ETH = 1e-5 / 2500 = 4e-9 ETH per token.
+    expect(getQuickLaunchGraduationPricePerToken(2_500)).toBe('0.000000004')
+  })
+
+  it('keeps graduation/floor at the FDV ratio', () => {
+    const ethUsd = 3_123.45
+    const floor = Number(getQuickLaunchFloorPricePerToken(ethUsd))
+    const graduation = Number(getQuickLaunchGraduationPricePerToken(ethUsd))
+    expect(graduation / floor).toBeCloseTo(QUICK_LAUNCH_GRADUATION_FDV_USD / QUICK_LAUNCH_FLOOR_FDV_USD, 6)
+  })
+
+  it('throws on a missing/invalid ETH price so callers choose their own fallback', () => {
+    expect(() => getQuickLaunchFloorPricePerToken(0)).toThrow()
+    expect(() => getQuickLaunchGraduationPricePerToken(Number.NaN)).toThrow()
   })
 })

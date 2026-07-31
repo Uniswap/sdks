@@ -43,6 +43,41 @@ export function requiredCurrencyRaised(floorPriceX96: bigint, auctionSupply: big
   return (floorPriceX96 * auctionSupply) / Q96
 }
 
+/**
+ * Converts a target FDV in USD into the canonical raise-currency-per-1-token decimal string the
+ * CreateAuction API expects (`floor_price_raise_per_token` / `graduation_price_raise_per_token`):
+ * `pricePerToken = (fdvUsd / totalSupplyWholeTokens) / raiseCurrencyUsdPrice`.
+ *
+ * The result is a plain decimal (the liquidity service rejects scientific notation). Unit
+ * discipline: this converts an FDV (a price over the FULL supply) — the USD actually raised at
+ * that price is `fdvUsd x soldSupplyShare`, never `fdvUsd` itself.
+ */
+export function fdvUsdToPricePerToken(
+  fdvUsd: number,
+  totalSupplyWholeTokens: bigint | number,
+  raiseCurrencyUsdPrice: number
+): string {
+  const supply = Number(totalSupplyWholeTokens)
+  if (!Number.isFinite(fdvUsd) || fdvUsd <= 0) {
+    throw new LauncherSdkError('INVALID_INPUT', 'FDV must be a positive, finite USD amount')
+  }
+  if (!Number.isFinite(supply) || supply <= 0) {
+    throw new LauncherSdkError('INVALID_INPUT', 'Total supply must be a positive, finite token amount')
+  }
+  if (!Number.isFinite(raiseCurrencyUsdPrice) || raiseCurrencyUsdPrice <= 0) {
+    throw new LauncherSdkError('INVALID_INPUT', 'Raise-currency USD price must be a positive, finite amount')
+  }
+  const pricePerToken = fdvUsd / supply / raiseCurrencyUsdPrice
+  const fixed = pricePerToken
+    .toFixed(18)
+    .replace(/0+$/, '')
+    .replace(/\.$/, '')
+  if (fixed === '' || fixed === '0') {
+    throw new LauncherSdkError('INVALID_INPUT', 'Price per token is below 1e-18 and rounds to zero')
+  }
+  return fixed
+}
+
 /** Derives the CCA price-tick granularity from the floor price (minimum 1). */
 export function deriveAuctionTickSpacing(floorPriceX96: bigint): bigint {
   const tickSpacing = floorPriceX96 / AUCTION_TICK_DIVISOR
