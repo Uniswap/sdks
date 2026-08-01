@@ -1,4 +1,13 @@
-import { SWAP_ROUTER_02_ADDRESSES } from './addresses'
+import {
+  CHAIN_TO_ADDRESSES_MAP,
+  SWAP_ROUTER_02_ADDRESSES,
+  V3_MIGRATOR_ADDRESSES,
+  V3_CORE_FACTORY_ADDRESSES,
+  MULTICALL_ADDRESSES,
+  QUOTER_ADDRESSES,
+  TICK_LENS_ADDRESSES,
+  NONFUNGIBLE_POSITION_MANAGER_ADDRESSES,
+} from './addresses'
 import { ChainId } from './chains'
 
 describe('addresses', () => {
@@ -76,6 +85,61 @@ describe('addresses', () => {
     it('should return the correct address for ink', () => {
       const address = SWAP_ROUTER_02_ADDRESSES(ChainId.INK)
       expect(address).toEqual('0x177778f19e89dd1012bdbe603f144088a95c4b53')
+    })
+
+    it('should return the correct address for celo alfajores', () => {
+      const address = SWAP_ROUTER_02_ADDRESSES(ChainId.CELO_ALFAJORES)
+      expect(address).toEqual('0x8C456F41A3883bA0ba99f810F7A2Da54D9Ea3EF0')
+    })
+  })
+
+  describe('celo alfajores addresses', () => {
+    it('should use distinct addresses from celo mainnet', () => {
+      const celoAddresses = CHAIN_TO_ADDRESSES_MAP[ChainId.CELO]
+      const alfajoresAddresses = CHAIN_TO_ADDRESSES_MAP[ChainId.CELO_ALFAJORES]
+      expect(alfajoresAddresses).not.toBe(celoAddresses)
+    })
+
+    it('should have different factory address from celo mainnet', () => {
+      expect(CHAIN_TO_ADDRESSES_MAP[ChainId.CELO_ALFAJORES].v3CoreFactoryAddress).not.toEqual(
+        CHAIN_TO_ADDRESSES_MAP[ChainId.CELO].v3CoreFactoryAddress
+      )
+    })
+
+    it('should have the correct factory address', () => {
+      expect(V3_CORE_FACTORY_ADDRESSES[ChainId.CELO_ALFAJORES]).toEqual('0x229Fd76DA9062C1a10eb4193768E192bdEA99572')
+    })
+
+    it('should have the correct multicall address', () => {
+      expect(MULTICALL_ADDRESSES[ChainId.CELO_ALFAJORES]).toEqual('0x692A12C7C167c44e54c3d381CA3EE91F058Dc404')
+    })
+
+    it('should have the correct quoter address', () => {
+      expect(QUOTER_ADDRESSES[ChainId.CELO_ALFAJORES]).toEqual('0x3c1FCF8D6f3A579E98F4AE75EB0adA6de70f5673')
+    })
+
+    it('should have the correct tick lens address', () => {
+      expect(TICK_LENS_ADDRESSES[ChainId.CELO_ALFAJORES]).toEqual('0xFdACaEfB0f85C9BE9d319023453cC85C812d7e1E')
+    })
+
+    it('should have the correct nonfungible position manager address', () => {
+      expect(NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[ChainId.CELO_ALFAJORES]).toEqual(
+        '0x0eC9d3C06Bc0A472A80085244d897bb604548824'
+      )
+    })
+
+    it('should have the correct v3 migrator address', () => {
+      expect(V3_MIGRATOR_ADDRESSES[ChainId.CELO_ALFAJORES]).toEqual('0x245d3F47F55c532dbE9340368855Be631B162cfd')
+    })
+  })
+
+  describe('optimism v3 migrator', () => {
+    it('should not have a v3 migrator address', () => {
+      expect(CHAIN_TO_ADDRESSES_MAP[ChainId.OPTIMISM].v3MigratorAddress).toBeUndefined()
+    })
+
+    it('should not be present in V3_MIGRATOR_ADDRESSES', () => {
+      expect(V3_MIGRATOR_ADDRESSES[ChainId.OPTIMISM]).toBeUndefined()
     })
   })
 })

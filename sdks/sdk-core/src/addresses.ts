@@ -128,6 +128,7 @@ const GOERLI_ADDRESSES: ChainAddresses = {
 
 const OPTIMISM_ADDRESSES: ChainAddresses = {
   ...DEFAULT_ADDRESSES,
+  v3MigratorAddress: undefined,
 
   v4PoolManagerAddress: '0x9a13f98cb987694c9f086b1f5eb990eea8264ec3',
   v4PositionManagerAddress: '0x3c3ea4b57a46241e54610e5f022e5c45859a1017',
@@ -167,6 +168,17 @@ const CELO_ADDRESSES: ChainAddresses = {
   v4PositionManagerAddress: '0xf7965f3981e4d5bc383bfbcb61501763e9068ca9',
   v4StateView: '0xbc21f8720babf4b20d195ee5c6e99c52b76f2bfb',
   v4QuoterAddress: '0x28566da1093609182dff2cb2a91cfd72e61d66cd',
+}
+
+// celo alfajores testnet v3 addresses
+const CELO_ALFAJORES_ADDRESSES: ChainAddresses = {
+  v3CoreFactoryAddress: '0x229Fd76DA9062C1a10eb4193768E192bdEA99572',
+  multicallAddress: '0x692A12C7C167c44e54c3d381CA3EE91F058Dc404',
+  quoterAddress: '0x3c1FCF8D6f3A579E98F4AE75EB0adA6de70f5673',
+  v3MigratorAddress: '0x245d3F47F55c532dbE9340368855Be631B162cfd',
+  nonfungiblePositionManagerAddress: '0x0eC9d3C06Bc0A472A80085244d897bb604548824',
+  tickLensAddress: '0xFdACaEfB0f85C9BE9d319023453cC85C812d7e1E',
+  swapRouter02Address: '0x8C456F41A3883bA0ba99f810F7A2Da54D9Ea3EF0',
 }
 
 // BNB v3 addresses
@@ -573,7 +585,7 @@ export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses>
   [ChainId.POLYGON_MUMBAI]: POLYGON_ADDRESSES,
   [ChainId.GOERLI]: GOERLI_ADDRESSES,
   [ChainId.CELO]: CELO_ADDRESSES,
-  [ChainId.CELO_ALFAJORES]: CELO_ADDRESSES,
+  [ChainId.CELO_ALFAJORES]: CELO_ALFAJORES_ADDRESSES,
   [ChainId.BNB]: BNB_ADDRESSES,
   [ChainId.OPTIMISM_GOERLI]: OPTIMISM_GOERLI_ADDRESSES,
   [ChainId.OPTIMISM_SEPOLIA]: OPTIMISM_SEPOLIA_ADDRESSES,
