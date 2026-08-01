@@ -5,6 +5,7 @@ import {
   V3_CORE_FACTORY_ADDRESSES,
   MULTICALL_ADDRESSES,
   QUOTER_ADDRESSES,
+  QUOTER_V2_ADDRESSES,
   TICK_LENS_ADDRESSES,
   NONFUNGIBLE_POSITION_MANAGER_ADDRESSES,
 } from './addresses'
@@ -17,9 +18,9 @@ describe('addresses', () => {
       expect(address).toEqual('0x2626664c2603336E57B271c5C0b26F421741e481')
     })
 
-    it('should return the correct address for base goerli', () => {
+    it('should return undefined for base goerli', () => {
       const address = SWAP_ROUTER_02_ADDRESSES(ChainId.BASE_GOERLI)
-      expect(address).toEqual('0x8357227D4eDc78991Db6FDB9bD6ADE250536dE1d')
+      expect(address).toBeUndefined()
     })
 
     it('should return the correct address for avalanche', () => {
@@ -32,9 +33,9 @@ describe('addresses', () => {
       expect(address).toEqual('0xB971eF87ede563556b2ED4b1C0b0019111Dd85d2')
     })
 
-    it('should return the correct address for arbitrum goerli', () => {
+    it('should return undefined for arbitrum goerli', () => {
       const address = SWAP_ROUTER_02_ADDRESSES(ChainId.ARBITRUM_GOERLI)
-      expect(address).toEqual('0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45')
+      expect(address).toBeUndefined()
     })
 
     it('should return the correct address for optimism sepolia', () => {
@@ -47,14 +48,14 @@ describe('addresses', () => {
       expect(address).toEqual('0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E')
     })
 
-    it('should return the correct address for bast', () => {
+    it('should return undefined for blast', () => {
       const address = SWAP_ROUTER_02_ADDRESSES(ChainId.BLAST)
-      expect(address).toEqual('0x549FEB8c9bd4c12Ad2AB27022dA12492aC452B66')
+      expect(address).toBeUndefined()
     })
 
     it('should return the correct address for xlayer', () => {
       const address = SWAP_ROUTER_02_ADDRESSES(ChainId.XLAYER)
-      expect(address).toEqual('0x4f0c28f5926afda16bf2506d5d9e57ea190f9bca')
+      expect(address).toEqual('0x4f0C28f5926AFDA16bf2506D5D9e57Ea190f9bcA')
     })
 
     it('should return the correct address for linea', () => {
@@ -64,27 +65,27 @@ describe('addresses', () => {
 
     it('should return the correct address for tempo', () => {
       const address = SWAP_ROUTER_02_ADDRESSES(ChainId.TEMPO)
-      expect(address).toEqual('0x7e9d53081e961201837336bcd81f52ae92691a8f')
+      expect(address).toEqual('0x7e9D53081e961201837336BcD81f52aE92691a8f')
     })
 
     it('should return the correct address for megaeth', () => {
       const address = SWAP_ROUTER_02_ADDRESSES(ChainId.MEGAETH)
-      expect(address).toEqual('0x48020de9208bafc183f5cad5118ffbe8f0f913f5')
+      expect(address).toEqual('0x48020De9208baFC183F5CAd5118FFbe8f0F913F5')
     })
 
-    it('should return the correct address for arc', () => {
+    it('should return undefined for arc', () => {
       const address = SWAP_ROUTER_02_ADDRESSES(ChainId.ARC)
-      expect(address).toEqual('0x53bf6b0684ec7ef91e1387da3d1a1769bc5a6f77')
+      expect(address).toBeUndefined()
     })
 
     it('should return the correct address for robinhood', () => {
       const address = SWAP_ROUTER_02_ADDRESSES(ChainId.ROBINHOOD)
-      expect(address).toEqual('0xcaf681a66d020601342297493863e78c959e5cb2')
+      expect(address).toEqual('0xCaf681a66D020601342297493863E78C959E5cb2')
     })
 
     it('should return the correct address for ink', () => {
       const address = SWAP_ROUTER_02_ADDRESSES(ChainId.INK)
-      expect(address).toEqual('0x177778f19e89dd1012bdbe603f144088a95c4b53')
+      expect(address).toEqual('0x177778F19E89dD1012BdBe603F144088A95C4B53')
     })
 
     it('should return the correct address for celo alfajores', () => {
@@ -114,8 +115,12 @@ describe('addresses', () => {
       expect(MULTICALL_ADDRESSES[ChainId.CELO_ALFAJORES]).toEqual('0x692A12C7C167c44e54c3d381CA3EE91F058Dc404')
     })
 
-    it('should have the correct quoter address', () => {
-      expect(QUOTER_ADDRESSES[ChainId.CELO_ALFAJORES]).toEqual('0x3c1FCF8D6f3A579E98F4AE75EB0adA6de70f5673')
+    it('should have the correct quoter v2 address', () => {
+      expect(QUOTER_V2_ADDRESSES[ChainId.CELO_ALFAJORES]).toEqual('0x3c1FCF8D6f3A579E98F4AE75EB0adA6de70f5673')
+    })
+
+    it('should have an undefined quoter v1 address', () => {
+      expect(QUOTER_ADDRESSES[ChainId.CELO_ALFAJORES]).toBeUndefined()
     })
 
     it('should have the correct tick lens address', () => {
