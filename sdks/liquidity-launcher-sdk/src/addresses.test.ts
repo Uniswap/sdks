@@ -108,24 +108,38 @@ describe('selectTokenFactory', () => {
   })
 })
 
+// The three canonical Robinhood strategy generations from the liquidity-launcher dev README, in
+// registry (append) order. All share the per-variant FeeSplitters and open at initialTick 198,060.
+const ROBINHOOD_STRATEGY_GENERATIONS = [
+  // c3f9506 (2026-07-29)
+  { on: '0x60D73b21cDf2EA846ab3d58699BBbb8F29d72491', off: '0xFCe92C70f1fc017b72f6DD7a00D9E38725C7fBd1' },
+  // 8e40a35 (2026-07-30, initial-tick cap)
+  { on: '0xcE57498D3474DCC244dFb6710fFbE6D4441cD2b2', off: '0x583a7903152b95831e82ffF534448Dee081754ec' },
+  // 3e05da8 (2026-07-30, current)
+  { on: '0x9F67B864B565966dfCc2E0C6bA2483b2D5fF4b00', off: '0x16b63f1c8415FD68591c31FB3c6796a333DD640C' },
+] as const
+
 describe('Instant Launch deployment registry', () => {
-  it('carries both canonical Robinhood variants from the liquidity-launcher dev README', () => {
+  it('carries all three canonical Robinhood strategy generations from the liquidity-launcher dev README', () => {
     const deployments = getInstantLaunchDeployments(SupportedChainId.ROBINHOOD)
-    expect(deployments).toHaveLength(2)
-    const [on, off] = deployments
-    expect(on!.strategy).toBe(getAddress('0x60D73b21cDf2EA846ab3d58699BBbb8F29d72491'))
-    expect(on!.feeSplitter).toBe(getAddress('0x7198C32a497c09497e04C86cf8F77A244A9E4b8F'))
-    expect(on!.creatorFeesEnabled).toBe(true)
-    expect(on!.creatorFeeNativeBps).toBe(4000)
-    expect(on!.creatorFeeTokenBps).toBe(0)
-    expect(off!.strategy).toBe(getAddress('0xFCe92C70f1fc017b72f6DD7a00D9E38725C7fBd1'))
-    expect(off!.feeSplitter).toBe(getAddress('0xDF50f4ea2207F9D2A753a3DaE729B36FDEF13b23'))
-    expect(off!.creatorFeesEnabled).toBe(false)
-    expect(off!.creatorFeeNativeBps).toBe(0)
-    expect(off!.creatorFeeTokenBps).toBe(0)
-    // Both current instances open at the same immutable initial tick.
-    expect(on!.initialTick).toBe(198060)
-    expect(off!.initialTick).toBe(198060)
+    expect(deployments).toHaveLength(6)
+    ROBINHOOD_STRATEGY_GENERATIONS.forEach((generation, index) => {
+      const on = deployments[index * 2]
+      const off = deployments[index * 2 + 1]
+      expect(on!.strategy).toBe(getAddress(generation.on))
+      expect(on!.feeSplitter).toBe(getAddress('0x7198C32a497c09497e04C86cf8F77A244A9E4b8F'))
+      expect(on!.creatorFeesEnabled).toBe(true)
+      expect(on!.creatorFeeNativeBps).toBe(4000)
+      expect(on!.creatorFeeTokenBps).toBe(0)
+      expect(off!.strategy).toBe(getAddress(generation.off))
+      expect(off!.feeSplitter).toBe(getAddress('0xDF50f4ea2207F9D2A753a3DaE729B36FDEF13b23'))
+      expect(off!.creatorFeesEnabled).toBe(false)
+      expect(off!.creatorFeeNativeBps).toBe(0)
+      expect(off!.creatorFeeTokenBps).toBe(0)
+      // Every generation opens at the same immutable initial tick.
+      expect(on!.initialTick).toBe(198060)
+      expect(off!.initialTick).toBe(198060)
+    })
   })
 
   it('is empty for chains without an Instant Launch deployment', () => {
@@ -134,12 +148,33 @@ describe('Instant Launch deployment registry', () => {
     expect(getInstantLaunchContracts(SupportedChainId.MAINNET)).toBeUndefined()
   })
 
-  it('getInstantLaunchStrategy selects the current deployment per variant', () => {
+  it('getInstantLaunchStrategy selects the current (3e05da8) deployment per variant', () => {
     expect(getInstantLaunchStrategy(SupportedChainId.ROBINHOOD, { creatorFeesEnabled: true })?.strategy).toBe(
-      getAddress('0x60D73b21cDf2EA846ab3d58699BBbb8F29d72491')
+      getAddress('0x9F67B864B565966dfCc2E0C6bA2483b2D5fF4b00')
     )
     expect(getInstantLaunchStrategy(SupportedChainId.ROBINHOOD, { creatorFeesEnabled: false })?.strategy).toBe(
-      getAddress('0xFCe92C70f1fc017b72f6DD7a00D9E38725C7fBd1')
+      getAddress('0x16b63f1c8415FD68591c31FB3c6796a333DD640C')
+    )
+  })
+
+  it('keeps every historical generation resolvable while selecting only the newest (append-only)', () => {
+    for (const generation of ROBINHOOD_STRATEGY_GENERATIONS) {
+      const on = getInstantLaunchDeployment(generation.on)
+      const off = getInstantLaunchDeployment(generation.off)
+      expect(on?.chainId).toBe(SupportedChainId.ROBINHOOD)
+      expect(on?.creatorFeesEnabled).toBe(true)
+      expect(on?.feeSplitter).toBe(getAddress('0x7198C32a497c09497e04C86cf8F77A244A9E4b8F'))
+      expect(off?.chainId).toBe(SupportedChainId.ROBINHOOD)
+      expect(off?.creatorFeesEnabled).toBe(false)
+      expect(off?.feeSplitter).toBe(getAddress('0xDF50f4ea2207F9D2A753a3DaE729B36FDEF13b23'))
+    }
+    // The historical generations classify but are never selected for new launches.
+    const current = ROBINHOOD_STRATEGY_GENERATIONS[ROBINHOOD_STRATEGY_GENERATIONS.length - 1]!
+    expect(getInstantLaunchStrategy(SupportedChainId.ROBINHOOD, { creatorFeesEnabled: true })).toBe(
+      getInstantLaunchDeployment(current.on)!
+    )
+    expect(getInstantLaunchStrategy(SupportedChainId.ROBINHOOD, { creatorFeesEnabled: false })).toBe(
+      getInstantLaunchDeployment(current.off)!
     )
   })
 
