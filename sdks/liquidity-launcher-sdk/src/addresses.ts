@@ -236,17 +236,28 @@ export function getTickDataLensForFactory(factoryAddress: string): Address | und
 // Instant Launch deployment registry (variant-keyed, append-only)
 // ---------------------------------------------------------------------------
 
-// Canonical chain-4663 (Robinhood) Instant Launch deployment, per the liquidity-launcher dev README
-// (the single source of truth for these addresses). Creator-fee on/off is a **constructor immutable
-// per strategy instance** (a zero `beneficiaryVault` immutable = fees off), so each variant is its
-// own strategy + FeeSplitter pair; the FeeSplitter's split table is likewise immutable at
-// construction. Whole stack from commit c3f9506 (v3.1.0 — OZ notes/L-04 round + the 1e20
-// compounding floor; still carries the OZ H01 fix flooring launch positions at tick -208,980).
-// The prior dd232ed set is replaced outright rather than kept as a historical entry: eth_getLogs
-// over its full block range returned zero TokenLaunched events, so no indexed launch can reference
-// it (the append-only rule below binds once an entry has launches).
-const INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD = getAddress('0x60D73b21cDf2EA846ab3d58699BBbb8F29d72491')
-const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD = getAddress('0xFCe92C70f1fc017b72f6DD7a00D9E38725C7fBd1')
+// Canonical chain-4663 (Robinhood) Instant Launch deployments, per the liquidity-launcher dev
+// README (the single source of truth for these addresses). Creator-fee on/off is a **constructor
+// immutable per strategy instance** (a zero `beneficiaryVault` immutable = fees off), so each
+// variant is its own strategy + FeeSplitter pair; the FeeSplitter's split table is likewise
+// immutable at construction.
+//
+// Three strategy generations are registered (append-only — indexed launches permanently reference
+// the strategy that created them; see {@link INSTANT_LAUNCH_DEPLOYMENTS}), all v3.1.0 logic:
+//  - c3f9506 pair (2026-07-29): OZ notes/L-04 round + the 1e20 compounding floor; still carries
+//    the OZ H01 fix flooring launch positions at tick -208,980. Has indexed launches, so it stays.
+//  - 8e40a35 pair (2026-07-30): caps the instant-launch initial tick at 251,340 — a deploy-script/
+//    constructor-side change only, no ABI or event changes.
+//  - 3e05da8 pair (2026-07-30, current): comment/natspec cleanup on the same logic; the pair new
+//    launches build against.
+// The FeeSplitters and the shared singletons below are unchanged across all three generations
+// (still the c3f9506 deploys), and every generation opens pools at initialTick 198,060.
+const INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_C3F9506 = getAddress('0x60D73b21cDf2EA846ab3d58699BBbb8F29d72491')
+const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD_C3F9506 = getAddress('0xFCe92C70f1fc017b72f6DD7a00D9E38725C7fBd1')
+const INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_8E40A35 = getAddress('0xcE57498D3474DCC244dFb6710fFbE6D4441cD2b2')
+const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD_8E40A35 = getAddress('0x583a7903152b95831e82ffF534448Dee081754ec')
+const INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_3E05DA8 = getAddress('0x9F67B864B565966dfCc2E0C6bA2483b2D5fF4b00')
+const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD_3E05DA8 = getAddress('0x16b63f1c8415FD68591c31FB3c6796a333DD640C')
 const INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ROBINHOOD = getAddress('0x7198C32a497c09497e04C86cf8F77A244A9E4b8F')
 const INSTANT_LAUNCH_FEE_SPLITTER_FEES_OFF_ROBINHOOD = getAddress('0xDF50f4ea2207F9D2A753a3DaE729B36FDEF13b23')
 const UERC20_BENEFICIARY_VAULT_ROBINHOOD = getAddress('0x587D2fDDDF14F6f84022b51e8c3a473eB88C4544')
@@ -323,7 +334,7 @@ export interface InstantLaunchChainContracts {
 export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
   {
     chainId: SupportedChainId.ROBINHOOD,
-    strategy: INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD,
+    strategy: INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_C3F9506,
     feeSplitter: INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ROBINHOOD,
     creatorFeesEnabled: true,
     creatorFeeNativeBps: 4000,
@@ -334,7 +345,7 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
   },
   {
     chainId: SupportedChainId.ROBINHOOD,
-    strategy: INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD,
+    strategy: INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD_C3F9506,
     feeSplitter: INSTANT_LAUNCH_FEE_SPLITTER_FEES_OFF_ROBINHOOD,
     creatorFeesEnabled: false,
     creatorFeeNativeBps: 0,
@@ -342,6 +353,50 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
     initialTick: 198060,
     description:
       'Instant Launch without creator fees (2026-07-29, liquidity-launcher c3f9506): zero beneficiary vault; splitter forwards 100% of both fee sides to the CompoundingClaimRecipient',
+  },
+  {
+    chainId: SupportedChainId.ROBINHOOD,
+    strategy: INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_8E40A35,
+    feeSplitter: INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ROBINHOOD,
+    creatorFeesEnabled: true,
+    creatorFeeNativeBps: 4000,
+    creatorFeeTokenBps: 0,
+    initialTick: 198060,
+    description:
+      'Instant Launch with creator fees (2026-07-30, liquidity-launcher 8e40a35 — initial-tick cap): same c3f9506 FeeSplitter; splitter forwards 40% of native fees to the UERC20BeneficiaryVault, 60% native + 100% token to the CompoundingClaimRecipient',
+  },
+  {
+    chainId: SupportedChainId.ROBINHOOD,
+    strategy: INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD_8E40A35,
+    feeSplitter: INSTANT_LAUNCH_FEE_SPLITTER_FEES_OFF_ROBINHOOD,
+    creatorFeesEnabled: false,
+    creatorFeeNativeBps: 0,
+    creatorFeeTokenBps: 0,
+    initialTick: 198060,
+    description:
+      'Instant Launch without creator fees (2026-07-30, liquidity-launcher 8e40a35 — initial-tick cap): zero beneficiary vault; same c3f9506 FeeSplitter forwarding 100% of both fee sides to the CompoundingClaimRecipient',
+  },
+  {
+    chainId: SupportedChainId.ROBINHOOD,
+    strategy: INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_3E05DA8,
+    feeSplitter: INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ROBINHOOD,
+    creatorFeesEnabled: true,
+    creatorFeeNativeBps: 4000,
+    creatorFeeTokenBps: 0,
+    initialTick: 198060,
+    description:
+      'Instant Launch with creator fees (2026-07-30, liquidity-launcher 3e05da8, current): same c3f9506 FeeSplitter; splitter forwards 40% of native fees to the UERC20BeneficiaryVault, 60% native + 100% token to the CompoundingClaimRecipient',
+  },
+  {
+    chainId: SupportedChainId.ROBINHOOD,
+    strategy: INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD_3E05DA8,
+    feeSplitter: INSTANT_LAUNCH_FEE_SPLITTER_FEES_OFF_ROBINHOOD,
+    creatorFeesEnabled: false,
+    creatorFeeNativeBps: 0,
+    creatorFeeTokenBps: 0,
+    initialTick: 198060,
+    description:
+      'Instant Launch without creator fees (2026-07-30, liquidity-launcher 3e05da8, current): zero beneficiary vault; same c3f9506 FeeSplitter forwarding 100% of both fee sides to the CompoundingClaimRecipient',
   },
 ]
 

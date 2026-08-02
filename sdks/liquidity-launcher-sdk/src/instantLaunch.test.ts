@@ -42,7 +42,7 @@ const BUILD_PARAMS = {
 describe('getInstantLaunchAddresses', () => {
   it('resolves the fees-on Robinhood (4663) stack from the canonical dev-README deployment', () => {
     const addresses = getInstantLaunchAddresses(CHAIN_ID, { creatorFeesEnabled: true })
-    expect(addresses?.strategy).toBe(getAddress('0x60D73b21cDf2EA846ab3d58699BBbb8F29d72491'))
+    expect(addresses?.strategy).toBe(getAddress('0x9F67B864B565966dfCc2E0C6bA2483b2D5fF4b00'))
     expect(addresses?.feeSplitter).toBe(getAddress('0x7198C32a497c09497e04C86cf8F77A244A9E4b8F'))
     expect(addresses?.beneficiaryVault).toBe(getAddress('0x587D2fDDDF14F6f84022b51e8c3a473eB88C4544'))
     expect(addresses?.compoundingClaimRecipient).toBe(getAddress('0x666DA63451A502A323677C2Ef5F763181358be9b'))
@@ -52,7 +52,7 @@ describe('getInstantLaunchAddresses', () => {
   it('resolves the fees-off Robinhood stack to its own strategy + splitter, same singletons', () => {
     const on = getInstantLaunchAddresses(CHAIN_ID, { creatorFeesEnabled: true })
     const off = getInstantLaunchAddresses(CHAIN_ID, { creatorFeesEnabled: false })
-    expect(off?.strategy).toBe(getAddress('0xFCe92C70f1fc017b72f6DD7a00D9E38725C7fBd1'))
+    expect(off?.strategy).toBe(getAddress('0x16b63f1c8415FD68591c31FB3c6796a333DD640C'))
     expect(off?.feeSplitter).toBe(getAddress('0xDF50f4ea2207F9D2A753a3DaE729B36FDEF13b23'))
     expect(off?.strategy).not.toBe(on!.strategy)
     expect(off?.feeSplitter).not.toBe(on!.feeSplitter)
@@ -224,18 +224,23 @@ describe('deployment registry selectors', () => {
   it('getInstantLaunchStrategy keys the variant by creatorFeesEnabled', () => {
     const on = getInstantLaunchStrategy(CHAIN_ID, { creatorFeesEnabled: true })
     const off = getInstantLaunchStrategy(CHAIN_ID, { creatorFeesEnabled: false })
-    expect(on?.strategy).toBe(getAddress('0x60D73b21cDf2EA846ab3d58699BBbb8F29d72491'))
+    expect(on?.strategy).toBe(getAddress('0x9F67B864B565966dfCc2E0C6bA2483b2D5fF4b00'))
     expect(on?.creatorFeeNativeBps).toBe(4000)
     expect(on?.creatorFeeTokenBps).toBe(0)
-    expect(off?.strategy).toBe(getAddress('0xFCe92C70f1fc017b72f6DD7a00D9E38725C7fBd1'))
+    expect(off?.strategy).toBe(getAddress('0x16b63f1c8415FD68591c31FB3c6796a333DD640C'))
     expect(off?.creatorFeeNativeBps).toBe(0)
   })
 
   it('getInstantLaunchDeployment reverse-resolves a stored strategy address case-insensitively', () => {
+    // A historical (c3f9506) strategy with indexed launches: stays resolvable after later appends.
     const deployment = getInstantLaunchDeployment('0x60d73b21cdf2ea846ab3d58699bbbb8f29d72491')
     expect(deployment?.chainId).toBe(CHAIN_ID)
     expect(deployment?.creatorFeesEnabled).toBe(true)
     expect(deployment?.feeSplitter).toBe(getAddress('0x7198C32a497c09497e04C86cf8F77A244A9E4b8F'))
+    // The intermediate (8e40a35) generation resolves too, and is not the current selection.
+    const intermediate = getInstantLaunchDeployment('0xce57498d3474dcc244dfb6710ffbe6d4441cd2b2')
+    expect(intermediate?.creatorFeesEnabled).toBe(true)
+    expect(intermediate).not.toBe(getInstantLaunchStrategy(CHAIN_ID, { creatorFeesEnabled: true })!)
     expect(getInstantLaunchDeployment('0x00000000000000000000000000000000000000aa')).toBeUndefined()
   })
 })
