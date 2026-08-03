@@ -454,7 +454,7 @@ export function getInstantLaunchContracts(chainId: number): InstantLaunchChainCo
 }
 
 // ---------------------------------------------------------------------------
-// Creator-fees position recipient (auction / crowd launches)
+// Creator-fees / autocompound position recipients (auction / crowd launches)
 // ---------------------------------------------------------------------------
 
 /**
@@ -489,7 +489,8 @@ export const CREATOR_FEES_POSITION_RECIPIENTS: Partial<Record<number, Address>> 
  *
  * Only the `creatorFeesEnabled: true` splitter qualifies — the fees-off splitter never routes
  * anything to the vault, so it is not a creator-fees recipient (see
- * {@link isCreatorFeesPositionRecipient}). Returns `undefined` where the chain has no creator-fees
+ * {@link isCreatorFeesPositionRecipient}); its own accessor is
+ * {@link getAutocompoundPositionRecipient}. Returns `undefined` where the chain has no creator-fees
  * deployment.
  */
 export function getCreatorFeesPositionRecipient(chainId: number): Address | undefined {
@@ -507,9 +508,10 @@ export function getCreatorFeesPositionRecipient(chainId: number): Address | unde
  *
  * DECISION: the fees-off splitter does NOT qualify, even though its custody is equally permanent.
  * `creatorFees` semantics promise a creator claim path through the vault; the fees-off splitter
- * forwards 100% of fees to the compounding recipient and registers no beneficiary, and it is not a
- * supported recipient for auction / crowd launches — recognizing it here would misclassify such a
- * launch as carrying creator fees.
+ * forwards 100% of fees to the compounding recipient and registers no beneficiary. As of 2026-08-03
+ * auction / crowd launches with creator fees off route to it too (see
+ * {@link isAutocompoundPositionRecipient}), so the exclusion here exists purely so such a launch is
+ * not misclassified as carrying creator fees.
  */
 export function isCreatorFeesPositionRecipient(chainId: number, recipient: string): boolean {
   const normalized = recipient.toLowerCase()
@@ -517,6 +519,61 @@ export function isCreatorFeesPositionRecipient(chainId: number, recipient: strin
     (deployment) =>
       deployment.chainId === chainId &&
       deployment.creatorFeesEnabled &&
+      deployment.feeSplitter.toLowerCase() === normalized
+  )
+}
+
+/**
+ * The current autocompound position recipient per chain: the fees-off FeeSplitter from
+ * {@link INSTANT_LAUNCH_DEPLOYMENTS} (the `creatorFeesEnabled: false` entry; last one wins where the
+ * append-only registry carries several). Derived from the registry, so a splitter redeploy only
+ * requires appending a registry entry. Prefer {@link getAutocompoundPositionRecipient}.
+ */
+export const AUTOCOMPOUND_POSITION_RECIPIENTS: Partial<Record<number, Address>> = Object.fromEntries(
+  INSTANT_LAUNCH_DEPLOYMENTS.filter((deployment) => !deployment.creatorFeesEnabled).map((deployment) => [
+    deployment.chainId,
+    deployment.feeSplitter,
+  ])
+)
+
+/**
+ * The position recipient for an auction / crowd launch with creator fees OFF on `chainId` — set it
+ * as the launch's `MigratorParameters.positionRecipient` (in place of a per-launch lock-recipient
+ * contract). It is the **fees-off** FeeSplitter of the chain's current fees-off deployment
+ * ({@link getInstantLaunchStrategy} with `creatorFeesEnabled: false` — the same splitter fees-off
+ * Instant Launch mints its positions to; as of 2026-08-03 crowd launches with fees off route here
+ * too).
+ *
+ * What sending the migrated LP position there means:
+ *  - no beneficiary is registered and nothing routes to the vault: the splitter forwards 100% of
+ *    both fee sides to the chain's compounding claim recipient, auto-compounding them into the
+ *    position;
+ *  - custody is **permanent**: the splitter has no code path that transfers positions out, so the
+ *    liquidity is locked forever by construction (no timelock involved).
+ *
+ * The creator-fees counterpart is {@link getCreatorFeesPositionRecipient}. Returns `undefined`
+ * where the chain has no fees-off deployment.
+ */
+export function getAutocompoundPositionRecipient(chainId: number): Address | undefined {
+  return getInstantLaunchStrategy(chainId, { creatorFeesEnabled: false })?.feeSplitter
+}
+
+/**
+ * Whether `recipient` is an autocompound position recipient on `chainId`: the fees-off FeeSplitter
+ * of any registry deployment for the chain — current or historical, since the registry is
+ * append-only and indexed launches permanently reference the splitter they migrated to.
+ * Case-insensitive. This is the classifier-side counterpart of
+ * {@link getAutocompoundPositionRecipient}: a launch whose `MigratorParameters.positionRecipient`
+ * matches is parked at the splitter forever (structurally permanent custody) with 100% of fees
+ * auto-compounding — no creator fees (see the DECISION on {@link isCreatorFeesPositionRecipient},
+ * which deliberately rejects these splitters).
+ */
+export function isAutocompoundPositionRecipient(chainId: number, recipient: string): boolean {
+  const normalized = recipient.toLowerCase()
+  return INSTANT_LAUNCH_DEPLOYMENTS.some(
+    (deployment) =>
+      deployment.chainId === chainId &&
+      !deployment.creatorFeesEnabled &&
       deployment.feeSplitter.toLowerCase() === normalized
   )
 }

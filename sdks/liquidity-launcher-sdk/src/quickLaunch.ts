@@ -81,7 +81,13 @@ export const QUICK_LAUNCH_LP_FEE = 2_500
 /** V4 LP price-range strategy: full-range + concentrated. */
 export const QUICK_LAUNCH_LP_RANGE: PriceRangeKind = 'CONCENTRATED_FULL_RANGE'
 
-/** The migrated LP is locked forever (permanent timelock) via a buyback-&-burn lock recipient. */
+/**
+ * The migrated LP is locked forever (permanent timelock) via a buyback-&-burn lock recipient.
+ * Launches created before 2026-08-03 carry this lock, and {@link isQuickLaunch} matches on it;
+ * since then fees-off quick launches autocompound instead — the LP position goes to the fees-off
+ * FeeSplitter (`getAutocompoundPositionRecipient`), which is structurally permanent, not a
+ * buyback-&-burn lock. See {@link QUICK_LAUNCH_SEARCHER_BURN_THRESHOLD_PERCENT}.
+ */
 export const QUICK_LAUNCH_LOCK_MODE: QuickLaunchLockMode = 'buybackBurn'
 
 // ---------------------------------------------------------------------------
@@ -136,7 +142,10 @@ export const PERMANENT_UNLOCK_BLOCK_THRESHOLD = 200_000_000_000n
 
 /**
  * Buyback-&-burn searcher threshold: a searcher burns ~0.05% of supply to claim the accrued ETH
- * (the token portion is burned in the same call). tokenJar-style; auto-compounding was rejected.
+ * (the token portion is burned in the same call). tokenJar-style. Applies to the buyback-&-burn
+ * locks of launches created before 2026-08-03 — the earlier auto-compounding rejection was
+ * REVERSED then (Bruno, 2026-08-03): fees-off quick launches now autocompound via the fees-off
+ * FeeSplitter (`getAutocompoundPositionRecipient`) instead of deploying a buyback-&-burn lock.
  */
 export const QUICK_LAUNCH_SEARCHER_BURN_THRESHOLD_PERCENT = 0.05
 
