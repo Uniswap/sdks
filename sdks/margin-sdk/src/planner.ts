@@ -1,11 +1,18 @@
 import { type Address, type Hex, concatHex, encodeAbiParameters, isAddressEqual, numberToHex, zeroAddress } from 'viem'
 
+import { validateAccountRecipient } from './account.js'
 import { ACCOUNT_SCOPED_ACTIONS, ACTION_ABI, MarginAction, type PlanAction, V4RouterAction } from './actions.js'
 import { CONTRACT_BALANCE } from './constants.js'
 import { MarginSdkError } from './errors.js'
+import { validateMarket } from './market.js'
 import { type Market, type PathKey, type PoolKey } from './types.js'
 
-/** Fund-out destinations must never be the zero address (tokens would burn or the call reverts). */
+/**
+ * Router-level fund-out destinations must never be the zero address (tokens would burn or the call
+ * reverts). These opcodes DO resolve the `MSG_SENDER`/`ADDRESS_THIS` sentinels through
+ * `_mapRecipient`, so the sentinels are valid here — unlike the account-scoped fund-out actions,
+ * which use {@link validateAccountRecipient}.
+ */
 function validateRecipient(to: Address, action: string): void {
   if (isAddressEqual(to, zeroAddress)) {
     throw new MarginSdkError('INVALID_RECIPIENT', `${action} recipient must not be the zero address`)
@@ -85,15 +92,21 @@ export class MarginPlanner {
   /**
    * Withdraws `amount` of the market's collateral from the active account's position to `to`
    * (the account constrains `to` to its manager — the router — or its owner).
+   *
+   * ⚠️ `amount` is NOT an `OPEN_DELTA`-means-everything sentinel here. Onchain, `OPEN_DELTA` (0)
+   * resolves to the router's open delta owed to the PoolManager in the collateral currency — the
+   * right amount inside a swap-bearing delever, but **zero** in a swap-free withdraw plan, which
+   * would silently withdraw nothing. For a standalone withdraw read the live collateral with
+   * `getPosition` and pass an explicit amount, or use {@link withdrawCollateralPlan}.
    */
   withdrawCollateral(adapter: Address, market: Market, amount: bigint, to: Address): this {
-    validateRecipient(to, 'ACCOUNT_WITHDRAW_COLLATERAL')
+    validateAccountRecipient(to, 'ACCOUNT_WITHDRAW_COLLATERAL')
     return this.add(MarginAction.ACCOUNT_WITHDRAW_COLLATERAL, [adapter, market, amount, to])
   }
 
   /** Borrows `amount` of the market's debt against the active account, delivered to `to`. */
   borrow(adapter: Address, market: Market, amount: bigint, to: Address): this {
-    validateRecipient(to, 'ACCOUNT_BORROW')
+    validateAccountRecipient(to, 'ACCOUNT_BORROW')
     return this.add(MarginAction.ACCOUNT_BORROW, [adapter, market, amount, to])
   }
 
@@ -104,7 +117,7 @@ export class MarginPlanner {
 
   /** Sweeps `amount` of `currency` out of the active account to `to` (manager or owner only). */
   accountSweep(currency: Address, amount: bigint, to: Address): this {
-    validateRecipient(to, 'ACCOUNT_SWEEP')
+    validateAccountRecipient(to, 'ACCOUNT_SWEEP')
     return this.add(MarginAction.ACCOUNT_SWEEP, [currency, amount, to])
   }
 
@@ -271,4 +284,87 @@ export class MarginPlanner {
     const packedActions = concatHex(this.actions.map((a) => numberToHex(a, { size: 1 })))
     return encodeAbiParameters([{ type: 'bytes' }, { type: 'bytes[]' }], [packedActions, this.params])
   }
+}
+
+// ---------------------------------------------------------------------------
+// Curated plans
+// ---------------------------------------------------------------------------
+
+/** Parameters for {@link withdrawCollateralPlan}. */
+export interface WithdrawCollateralPlanParams {
+  /** The lending adapter. Withdrawals are not allowlist-gated — a position must always be exitable. */
+  adapter: Address
+  /** The (collateral, debt) pair to withdraw from. */
+  market: Market
+  /**
+   * The exact collateral to withdraw, in the collateral token's native decimals. Must be positive:
+   * there is no full-balance sentinel on this action (see {@link MarginPlanner.withdrawCollateral}).
+   * Derive it from a live `getPosition` read.
+   */
+  amount: bigint
+  /**
+   * The recipient. Must be the account's owner or the MarginRouter — the account reverts
+   * `ReceiverNotAllowed` otherwise, and the `MSG_SENDER`/`ADDRESS_THIS` sentinels are not resolved
+   * for account-scoped actions. Pass the router to stage the funds for a later action in the plan
+   * (e.g. `unwrap` + `sweep` to exit as native ETH).
+   */
+  to: Address
+  /**
+   * The maximum LTV the position may have afterwards (WAD; 1e18 == 100%). **Mandatory here.**
+   * Withdrawing collateral raises LTV, and the underlying `ASSERT_HEALTH` opcode treats zero as
+   * "skip", so a zero bound would let a single transaction walk the position to the liquidation
+   * edge without reverting. Size it from `maxLtv` on a `getPosition` read.
+   */
+  maxLtvAfter: bigint
+  /** Sub-account index identifying which MarginAccount to withdraw from. Default 0. */
+  subId?: bigint
+}
+
+/**
+ * Builds the `unlockData` for a swap-free collateral withdrawal — reducing a position's collateral
+ * without touching its debt.
+ *
+ * The router has no curated `withdrawCollateral` entry point (its only write entry points are
+ * `increasePosition`, `decreasePosition`, `addCollateral`, and `execute`), so this composes the
+ * `IMarginAccount.withdrawCollateral` primitive into a minimal `execute` plan and closes the three
+ * footguns of hand-rolling it: the non-sentinel recipient, the explicit amount, and the mandatory
+ * health bound. Pass the result to `executeCall`.
+ *
+ * To exit as native ETH from a WETH-collateral market, pass `to: marginRouter` and continue the
+ * returned plan with `unwrap` + `sweep` instead of using this helper.
+ *
+ * @example
+ * ```ts
+ * const position = await getPosition(client, { adapter, account, market })
+ * const unlockData = withdrawCollateralPlan({
+ *   adapter,
+ *   market,
+ *   amount: position.collateralAmount / 4n,
+ *   to: owner,
+ *   maxLtvAfter: (position.maxLtv * 80n) / 100n, // keep 20% headroom under liquidation
+ * })
+ * await walletClient.writeContract(executeCall({ marginRouter, unlockData, deadline }))
+ * ```
+ */
+export function withdrawCollateralPlan(params: WithdrawCollateralPlanParams): Hex {
+  validateMarket(params.market)
+  if (params.amount <= 0n) {
+    throw new MarginSdkError(
+      'INVALID_AMOUNT',
+      'amount must be positive: ACCOUNT_WITHDRAW_COLLATERAL has no full-balance sentinel, and a zero ' +
+        'amount resolves to the (empty) pool delta in a swap-free plan, withdrawing nothing'
+    )
+  }
+  if (params.maxLtvAfter <= 0n) {
+    throw new MarginSdkError(
+      'SLIPPAGE_BOUND_REQUIRED',
+      'maxLtvAfter is mandatory for a withdrawal: withdrawing collateral raises LTV, and ASSERT_HEALTH ' +
+        'skips a zero bound, so the withdrawal would be unbounded against liquidation'
+    )
+  }
+  return new MarginPlanner()
+    .setAccount(params.subId ?? 0n)
+    .withdrawCollateral(params.adapter, params.market, params.amount, params.to)
+    .assertHealth(params.adapter, params.market, params.maxLtvAfter)
+    .finalize()
 }

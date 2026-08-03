@@ -2,16 +2,17 @@ import { describe, expect, test } from 'bun:test'
 import { type Address, decodeAbiParameters } from 'viem'
 
 import { MarginAction, V4RouterAction } from './actions.js'
-import { CONTRACT_BALANCE, MSG_SENDER, OPEN_DELTA } from './constants.js'
+import { ADDRESS_THIS, CONTRACT_BALANCE, MSG_SENDER, OPEN_DELTA } from './constants.js'
 import { MarginSdkError } from './errors.js'
-import { MarginPlanner } from './planner.js'
+import { MarginPlanner, withdrawCollateralPlan } from './planner.js'
 import { type PoolKey } from './types.js'
 
 const WETH: Address = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
 const USDC: Address = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
 const ADAPTER: Address = '0x9A7f8F5A9496D3c9dc0BEEfb44cCaC17CAAF28fa'
 const ZERO: Address = '0x0000000000000000000000000000000000000000'
-const ADDR2: Address = '0x0000000000000000000000000000000000000002'
+const OWNER: Address = '0x1111111111111111111111111111111111111111'
+const ROUTER: Address = '0x0000000004BBC92D0657580CAe35aEBF054E5CDC'
 
 const MARKET = { collateral: WETH, debt: USDC }
 const POOL: PoolKey = { currency0: USDC, currency1: WETH, fee: 3000, tickSpacing: 60, hooks: ZERO }
@@ -23,12 +24,17 @@ const CAST = {
     '0x000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000000000de0b6b3a76400000000000000000000000000000000000000000000000000000000000000000001',
   supplyOpenDelta:
     '0x0000000000000000000000009a7f8f5a9496d3c9dc0beefb44ccac17caaf28fa000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb480000000000000000000000000000000000000000000000000000000000000000',
+  // `to` is the LITERAL router address, not the ADDRESS_THIS sentinel: the router forwards
+  // ACCOUNT_BORROW recipients to the account unmapped, and the account's _requireReceiver only
+  // accepts its baked-in {owner, manager}. The curated increase encodes `address(this)` here too.
   borrow3e9ToRouter:
-    '0x0000000000000000000000009a7f8f5a9496d3c9dc0beefb44ccac17caaf28fa000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb4800000000000000000000000000000000000000000000000000000000b2d05e000000000000000000000000000000000000000000000000000000000000000002',
+    '0x0000000000000000000000009a7f8f5a9496d3c9dc0beefb44ccac17caaf28fa000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb4800000000000000000000000000000000000000000000000000000000b2d05e000000000000000000000000000000000004bbc92d0657580cae35aebf054e5cdc',
   assertHealth07:
     '0x0000000000000000000000009a7f8f5a9496d3c9dc0beefb44ccac17caaf28fa000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb4800000000000000000000000000000000000000000000000009b6e64a8ec60000',
   assertFillWeth1e18:
     '0x000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000000000de0b6b3a7640000',
+  withdrawWeth1e18ToOwner:
+    '0x0000000000000000000000009a7f8f5a9496d3c9dc0beefb44ccac17caaf28fa000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb480000000000000000000000000000000000000000000000000de0b6b3a76400000000000000000000000000001111111111111111111111111111111111111111',
   swapExactOutSingle:
     '0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000003c000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000de0b6b3a764000000000000000000000000000000000000000000000000000000000000b3b53fc0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000000',
   settleUsdcOpenDeltaRouter:
@@ -56,8 +62,8 @@ describe('MarginPlanner action encodings (vs cast abi-encode ground truth)', () 
     expect(p.params[1]).toBe(CAST.supplyOpenDelta as `0x${string}`)
   })
 
-  test('borrow to ADDRESS_THIS', () => {
-    const p = new MarginPlanner().setAccount(0n).borrow(ADAPTER, MARKET, 3_000n * 10n ** 6n, ADDR2)
+  test('borrow to the literal router address', () => {
+    const p = new MarginPlanner().setAccount(0n).borrow(ADAPTER, MARKET, 3_000n * 10n ** 6n, ROUTER)
     expect(p.params[1]).toBe(CAST.borrow3e9ToRouter as `0x${string}`)
   })
 
@@ -107,7 +113,7 @@ describe('MarginPlanner.finalize', () => {
       .swapExactOutSingle({ poolKey: POOL, zeroForOne: true, amountOut: 1n, amountInMaximum: 1n })
       .assertFill(WETH, 1n)
       .supplyCollateral(ADAPTER, MARKET, OPEN_DELTA)
-      .borrow(ADAPTER, MARKET, 1n, ADDR2)
+      .borrow(ADAPTER, MARKET, 1n, ROUTER)
       .settle(USDC, OPEN_DELTA, false)
       .assertHealth(ADAPTER, MARKET, 7n * 10n ** 17n)
       .sweep(WETH, MSG_SENDER)
@@ -168,14 +174,70 @@ describe('zero-recipient guards on fund-out actions', () => {
     expect(() => planner().accountSweep(WETH, 1n, ZERO)).toThrow(MarginSdkError)
   })
 
+  test('account fund-out actions reject the unmapped v4 sentinels', () => {
+    // The router passes ACCOUNT_* recipients straight to the account without _mapRecipient, so a
+    // sentinel arrives as the literal 0x…01/0x…02 and reverts ReceiverNotAllowed.
+    for (const sentinel of [MSG_SENDER, ADDRESS_THIS]) {
+      expect(() => planner().withdrawCollateral(ADAPTER, MARKET, 1n, sentinel)).toThrow(/sentinel/)
+      expect(() => planner().borrow(ADAPTER, MARKET, 1n, sentinel)).toThrow(/sentinel/)
+      expect(() => planner().accountSweep(WETH, 1n, sentinel)).toThrow(/sentinel/)
+    }
+  })
+
   test('router fund-out actions reject the zero address', () => {
     expect(() => planner().take(WETH, ZERO, 1n)).toThrow(MarginSdkError)
     expect(() => planner().takePortion(WETH, ZERO, 100n)).toThrow(MarginSdkError)
     expect(() => planner().sweep(WETH, ZERO)).toThrow(MarginSdkError)
   })
 
-  test('the MSG_SENDER / ADDRESS_THIS sentinels remain valid recipients', () => {
+  test('the MSG_SENDER / ADDRESS_THIS sentinels remain valid ROUTER-level recipients', () => {
+    // Only the router-level opcodes resolve them (via _mapRecipient); the account-scoped ones do
+    // not, which is what the sentinel-rejection test above pins.
     expect(() => planner().take(WETH, MSG_SENDER, 1n).sweep(WETH, MSG_SENDER)).not.toThrow()
-    expect(() => planner().borrow(ADAPTER, MARKET, 1n, ADDR2)).not.toThrow()
+    expect(() => planner().take(WETH, ADDRESS_THIS, 1n).takePortion(WETH, ADDRESS_THIS, 100n)).not.toThrow()
+  })
+})
+
+describe('withdrawCollateralPlan', () => {
+  const base = { adapter: ADAPTER, market: MARKET, amount: 10n ** 18n, to: OWNER, maxLtvAfter: 8n * 10n ** 17n }
+
+  test('composes SET_ACCOUNT → ACCOUNT_WITHDRAW_COLLATERAL → ASSERT_HEALTH', () => {
+    const [actions] = decodeAbiParameters([{ type: 'bytes' }, { type: 'bytes[]' }], withdrawCollateralPlan(base))
+    expect(actions).toBe(
+      `0x${[MarginAction.SET_ACCOUNT, MarginAction.ACCOUNT_WITHDRAW_COLLATERAL, MarginAction.ASSERT_HEALTH]
+        .map((a) => a.toString(16).padStart(2, '0'))
+        .join('')}`
+    )
+  })
+
+  test('the withdraw params match cast-generated ground truth', () => {
+    const [, params] = decodeAbiParameters([{ type: 'bytes' }, { type: 'bytes[]' }], withdrawCollateralPlan(base))
+    expect(params[1]).toBe(CAST.withdrawWeth1e18ToOwner)
+  })
+
+  test('threads subId through SET_ACCOUNT', () => {
+    const [, params] = decodeAbiParameters(
+      [{ type: 'bytes' }, { type: 'bytes[]' }],
+      withdrawCollateralPlan({ ...base, subId: 7n })
+    )
+    expect(params[0]).toBe(CAST.setAccount7)
+  })
+
+  test('rejects a zero amount — there is no full-balance sentinel on this action', () => {
+    expect(() => withdrawCollateralPlan({ ...base, amount: OPEN_DELTA })).toThrow(/no full-balance sentinel/)
+    expect(() => withdrawCollateralPlan({ ...base, amount: -1n })).toThrow(MarginSdkError)
+  })
+
+  test('requires a non-zero maxLtvAfter (ASSERT_HEALTH skips a zero bound)', () => {
+    expect(() => withdrawCollateralPlan({ ...base, maxLtvAfter: 0n })).toThrow(/mandatory/)
+  })
+
+  test('rejects recipients the account would reject', () => {
+    expect(() => withdrawCollateralPlan({ ...base, to: ZERO })).toThrow(MarginSdkError)
+    expect(() => withdrawCollateralPlan({ ...base, to: MSG_SENDER })).toThrow(/sentinel/)
+  })
+
+  test('rejects a native-ETH market', () => {
+    expect(() => withdrawCollateralPlan({ ...base, market: { collateral: ZERO, debt: USDC } })).toThrow(MarginSdkError)
   })
 })

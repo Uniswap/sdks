@@ -177,6 +177,70 @@ const delever = decreasePositionCall({
 Closing and delevering **never** require the adapter to be allowlisted, so a position is always
 exitable — even if its adapter is later removed from governance's allowlist.
 
+## Withdraw collateral (without touching debt)
+
+`decreasePosition` withdraws collateral as part of repaying debt. To pull collateral out while
+leaving debt untouched — de-risking, or taking excess equity off the table — there is no curated
+entry point (the router's only write entry points are `increasePosition`, `decreasePosition`,
+`addCollateral`, and `execute`), so this composes the `IMarginAccount.withdrawCollateral` primitive
+into a minimal `execute` plan:
+
+```ts
+import { executeCall, getPosition, withdrawCollateralPlan } from '@uniswap/margin-sdk'
+
+const position = await getPosition(publicClient, { adapter, account, market })
+
+const unlockData = withdrawCollateralPlan({
+  adapter,
+  market,
+  amount: position.collateralAmount / 4n, // explicit — read live, never a sentinel
+  to: owner, // must be the account's owner or the router
+  maxLtvAfter: (position.maxLtv * 80n) / 100n, // mandatory: keep 20% headroom
+})
+
+const call = executeCall({ marginRouter: addresses.marginRouter, unlockData, deadline })
+```
+
+Three things the helper enforces that a hand-rolled plan does not:
+
+- **The recipient must be a literal address** — the account's owner or the MarginRouter. Unlike the
+  router-level `TAKE`/`SWEEP` opcodes, the `ACCOUNT_*` actions are **not** run through
+  `_mapRecipient`, so the `MSG_SENDER`/`ADDRESS_THIS` sentinels arrive at the account as the literal
+  addresses `0x…01`/`0x…02` and revert `ReceiverNotAllowed`.
+- **The amount must be explicit.** `OPEN_DELTA` is not a full-balance sentinel on this action: it
+  resolves to the router's open delta owed to the pool, which is the correct amount inside a
+  swap-bearing delever but **zero** in a swap-free withdrawal — silently withdrawing nothing.
+- **`maxLtvAfter` is mandatory.** Withdrawing raises LTV and `ASSERT_HEALTH` skips a zero bound, so
+  an unbounded withdrawal can walk a position to the liquidation edge in one transaction.
+
+To exit a WETH-collateral position as native ETH, withdraw `to: addresses.marginRouter` and continue
+the plan with `unwrap` + `sweep` rather than using the helper.
+
+Withdrawals are not allowlist-gated either — like closing, a position must always be exitable.
+
+**Owner escape hatch.** The account's primitives are callable by `{manager, owner}`, so the owner can
+withdraw directly without the router if it is ever deprecated, paused, or compromised:
+
+```ts
+import { accountWithdrawCollateralCall, getMarginAccountAddress } from '@uniswap/margin-sdk'
+
+const call = accountWithdrawCollateralCall({
+  account: getMarginAccountAddress(mainnet.id, owner, 0n),
+  params: { adapter, market, amount, to: owner },
+})
+```
+
+This path carries **no** health assertion — the lending venue's own borrow-limit check is the only
+backstop, so an unsafe withdrawal reverts inside the venue rather than with `PositionUnhealthy`.
+Prefer the router path for normal operation.
+
+The sibling primitives are encoded the same way, for recovering a position when the router is
+unavailable: `accountSupplyCollateralCall`, `accountRepayCall` (pass `FULL_CLOSE` for a share-based
+full repay that leaves no interest dust), `accountBorrowCall`, and `accountSweepCall` (pass the zero
+address as the currency to sweep native ETH). All of them supply from or deliver to the account
+itself, so they never pull from the owner's wallet, and `borrow` bypasses both the adapter allowlist
+and any health assertion — use `increasePositionCall` instead unless the router is unavailable.
+
 ## Going short & venue selection
 
 A short is the same call with the market pairing reversed and the venue chosen per call by

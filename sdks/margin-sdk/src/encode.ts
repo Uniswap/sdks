@@ -1,11 +1,12 @@
 import { type Address, type Hex, encodeFunctionData } from 'viem'
 
-import { MARGIN_ROUTER_ABI, PERMIT2_ABI } from './abis.js'
+import { MARGIN_ACCOUNT_ABI, MARGIN_ROUTER_ABI, PERMIT2_ABI } from './abis.js'
+import { validateAccountRecipient } from './account.js'
 import { FULL_CLOSE, MAX_UINT48 } from './constants.js'
 import { MarginSdkError } from './errors.js'
 import { poolKeyMatchesMarket, validateAddress, validateMarket } from './market.js'
 import { toUint128 } from './math.js'
-import { type AddCollateralParams, type DecreaseParams, type IncreaseParams } from './types.js'
+import { type AddCollateralParams, type DecreaseParams, type IncreaseParams, type Market } from './types.js'
 
 // A Unix-seconds deadline beyond this is almost certainly a milliseconds value (Date.now()),
 // which would silently disable the deadline for the next ~3,000 years.
@@ -47,6 +48,17 @@ export interface ContractWrite {
   functionName: string
   args: readonly unknown[]
   value?: bigint
+}
+
+/**
+ * A write descriptor targeting a MarginAccount directly rather than the router — the owner escape
+ * hatch. Same shape as {@link ContractWrite} with the account ABI.
+ */
+export interface AccountContractWrite {
+  address: Address
+  abi: typeof MARGIN_ACCOUNT_ABI
+  functionName: string
+  args: readonly unknown[]
 }
 
 type IncreaseArgs = {
@@ -283,6 +295,247 @@ export function addCollateralCall(p: {
     functionName: 'addCollateral',
     args: [normalizeAddCollateral(p.params, isNative)],
     value: isNative ? p.nativeAmount : undefined,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// MarginAccount primitives (the owner escape hatch)
+// ---------------------------------------------------------------------------
+
+/**
+ * Parameters for the account-direct `withdrawCollateral` primitive
+ * (`IMarginAccount.withdrawCollateral`).
+ */
+export interface AccountWithdrawCollateralParams {
+  /** The lending adapter that encodes the withdrawal call. Not allowlist-gated. */
+  adapter: Address
+  /** The (collateral, debt) pair identifying the lending market. */
+  market: Market
+  /** The exact collateral to withdraw, in the collateral token's native decimals. */
+  amount: bigint
+  /**
+   * The recipient; must be the account's owner or its manager (the MarginRouter), or the account
+   * reverts `ReceiverNotAllowed(to)`.
+   */
+  to: Address
+}
+
+type AccountWithdrawCollateralArgs = readonly [
+  adapter: Address,
+  market: { collateral: Address; debt: Address },
+  amount: bigint,
+  to: Address,
+]
+
+function normalizeAccountWithdrawCollateral(
+  params: AccountWithdrawCollateralParams
+): AccountWithdrawCollateralArgs {
+  validateAddress(params.adapter, 'adapter')
+  validateMarket(params.market)
+  validateAccountRecipient(params.to, 'withdrawCollateral')
+  if (params.amount <= 0n) {
+    throw new MarginSdkError('INVALID_AMOUNT', 'amount must be positive')
+  }
+  return [params.adapter, params.market, params.amount, params.to]
+}
+
+/**
+ * Encodes `IMarginAccount.withdrawCollateral` calldata — the owner escape hatch, called **on the
+ * account** rather than through the router.
+ *
+ * Prefer the router path for normal operation (`withdrawCollateralPlan` + `executeCall`), which can
+ * compose the withdrawal with a health assertion and other actions atomically. This direct path
+ * exists for when the router is deprecated, paused, or compromised: the account's primitives are
+ * callable by `{manager, owner}`, so the owner can always exit without the router. Note that it
+ * carries **no** health assertion — the lending protocol's own borrow-limit check is the only
+ * backstop, so a withdrawal that would leave the position unhealthy reverts inside the venue rather
+ * than with `PositionUnhealthy`.
+ */
+export function encodeAccountWithdrawCollateral(params: AccountWithdrawCollateralParams): Hex {
+  return encodeFunctionData({
+    abi: MARGIN_ACCOUNT_ABI,
+    functionName: 'withdrawCollateral',
+    args: normalizeAccountWithdrawCollateral(params),
+  })
+}
+
+/**
+ * Account-direct `withdrawCollateral` write descriptor. `account` is the MarginAccount address —
+ * derive it with `getMarginAccountAddress(chainId, owner, subId)`; the transaction must be sent by
+ * that account's owner.
+ */
+export function accountWithdrawCollateralCall(p: {
+  account: Address
+  params: AccountWithdrawCollateralParams
+}): AccountContractWrite {
+  validateAddress(p.account, 'account')
+  return {
+    address: p.account,
+    abi: MARGIN_ACCOUNT_ABI,
+    functionName: 'withdrawCollateral',
+    args: normalizeAccountWithdrawCollateral(p.params),
+  }
+}
+
+/** Parameters for the account-direct `supplyCollateral` / `repay` primitives (no recipient). */
+export interface AccountMarketAmountParams {
+  /** The lending adapter that encodes the call. */
+  adapter: Address
+  /** The (collateral, debt) pair identifying the lending market. */
+  market: Market
+  /** The amount, in the relevant token's native decimals. */
+  amount: bigint
+}
+
+function normalizeAccountMarketAmount(
+  params: AccountMarketAmountParams,
+  label: string,
+  allowFullSentinel = false
+): readonly [Address, { collateral: Address; debt: Address }, bigint] {
+  validateAddress(params.adapter, 'adapter')
+  validateMarket(params.market)
+  if (params.amount <= 0n) {
+    throw new MarginSdkError('INVALID_AMOUNT', `${label} amount must be positive`)
+  }
+  if (!allowFullSentinel && params.amount === FULL_CLOSE) {
+    throw new MarginSdkError('INVALID_AMOUNT', `${label} has no max-amount sentinel; pass an explicit amount`)
+  }
+  return [params.adapter, params.market, params.amount]
+}
+
+/**
+ * Encodes `IMarginAccount.supplyCollateral` calldata — the owner escape hatch. The collateral must
+ * already sit in the account (the account approves the venue and supplies its own balance); this
+ * does **not** pull from the owner's wallet. Use `addCollateralCall` on the router for the normal
+ * Permit2-funded path.
+ */
+export function encodeAccountSupplyCollateral(params: AccountMarketAmountParams): Hex {
+  return encodeFunctionData({
+    abi: MARGIN_ACCOUNT_ABI,
+    functionName: 'supplyCollateral',
+    args: normalizeAccountMarketAmount(params, 'supplyCollateral'),
+  })
+}
+
+/** Account-direct `supplyCollateral` write descriptor. */
+export function accountSupplyCollateralCall(p: {
+  account: Address
+  params: AccountMarketAmountParams
+}): AccountContractWrite {
+  validateAddress(p.account, 'account')
+  return {
+    address: p.account,
+    abi: MARGIN_ACCOUNT_ABI,
+    functionName: 'supplyCollateral',
+    args: normalizeAccountMarketAmount(p.params, 'supplyCollateral'),
+  }
+}
+
+/**
+ * Encodes `IMarginAccount.repay` calldata — the owner escape hatch. The debt token must already sit
+ * in the account. Pass {@link FULL_CLOSE} (`type(uint256).max`) for a full **share-based** repay,
+ * which leaves no interest dust behind — the amount-denominated path can leave rounding dust that
+ * then blocks a full collateral withdrawal's health check.
+ */
+export function encodeAccountRepay(params: AccountMarketAmountParams): Hex {
+  return encodeFunctionData({
+    abi: MARGIN_ACCOUNT_ABI,
+    functionName: 'repay',
+    args: normalizeAccountMarketAmount(params, 'repay', true),
+  })
+}
+
+/** Account-direct `repay` write descriptor. `FULL_CLOSE` repays everything by shares. */
+export function accountRepayCall(p: { account: Address; params: AccountMarketAmountParams }): AccountContractWrite {
+  validateAddress(p.account, 'account')
+  return {
+    address: p.account,
+    abi: MARGIN_ACCOUNT_ABI,
+    functionName: 'repay',
+    args: normalizeAccountMarketAmount(p.params, 'repay', true),
+  }
+}
+
+/** Parameters for the account-direct `borrow` primitive. */
+export interface AccountBorrowParams extends AccountMarketAmountParams {
+  /**
+   * The recipient; must be the account's owner or its manager (the MarginRouter), or the account
+   * reverts `ReceiverNotAllowed(to)`.
+   */
+  to: Address
+}
+
+/**
+ * Encodes `IMarginAccount.borrow` calldata — the owner escape hatch. ⚠️ Borrowing is
+ * exposure-increasing and this path bypasses both the adapter allowlist and any health assertion,
+ * so the venue's own borrow limit is the only backstop. Prefer `increasePositionCall`.
+ */
+export function encodeAccountBorrow(params: AccountBorrowParams): Hex {
+  validateAccountRecipient(params.to, 'borrow')
+  return encodeFunctionData({
+    abi: MARGIN_ACCOUNT_ABI,
+    functionName: 'borrow',
+    args: [...normalizeAccountMarketAmount(params, 'borrow'), params.to],
+  })
+}
+
+/** Account-direct `borrow` write descriptor. */
+export function accountBorrowCall(p: { account: Address; params: AccountBorrowParams }): AccountContractWrite {
+  validateAddress(p.account, 'account')
+  validateAccountRecipient(p.params.to, 'borrow')
+  return {
+    address: p.account,
+    abi: MARGIN_ACCOUNT_ABI,
+    functionName: 'borrow',
+    args: [...normalizeAccountMarketAmount(p.params, 'borrow'), p.params.to],
+  }
+}
+
+/** Parameters for the account-direct `sweep` primitive. */
+export interface AccountSweepParams {
+  /**
+   * The currency to sweep out of the account. The zero address means native ETH — unlike a market
+   * currency, this is valid here (the account has a `receive()` and can hold ETH).
+   */
+  currency: Address
+  /** The amount to sweep, in the currency's native decimals. */
+  amount: bigint
+  /**
+   * The recipient; must be the account's owner or its manager (the MarginRouter), or the account
+   * reverts `ReceiverNotAllowed(to)`.
+   */
+  to: Address
+}
+
+function normalizeAccountSweep(params: AccountSweepParams): readonly [Address, bigint, Address] {
+  validateAddress(params.currency, 'currency')
+  validateAccountRecipient(params.to, 'sweep')
+  if (params.amount <= 0n) {
+    throw new MarginSdkError('INVALID_AMOUNT', 'sweep amount must be positive')
+  }
+  return [params.currency, params.amount, params.to]
+}
+
+/**
+ * Encodes `IMarginAccount.sweep` calldata — the owner escape hatch for recovering a stray token (or
+ * native ETH, via the zero address) sitting on the account.
+ */
+export function encodeAccountSweep(params: AccountSweepParams): Hex {
+  return encodeFunctionData({
+    abi: MARGIN_ACCOUNT_ABI,
+    functionName: 'sweep',
+    args: normalizeAccountSweep(params),
+  })
+}
+
+/** Account-direct `sweep` write descriptor. */
+export function accountSweepCall(p: { account: Address; params: AccountSweepParams }): AccountContractWrite {
+  validateAddress(p.account, 'account')
+  return {
+    address: p.account,
+    abi: MARGIN_ACCOUNT_ABI,
+    functionName: 'sweep',
+    args: normalizeAccountSweep(p.params),
   }
 }
 

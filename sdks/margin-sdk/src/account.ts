@@ -1,6 +1,17 @@
-import { type Address, type Hex, concatHex, encodeAbiParameters, getAddress, keccak256, numberToHex } from 'viem'
+import {
+  type Address,
+  type Hex,
+  concatHex,
+  encodeAbiParameters,
+  getAddress,
+  isAddressEqual,
+  keccak256,
+  numberToHex,
+  zeroAddress,
+} from 'viem'
 
 import { getMarginAddresses } from './addresses.js'
+import { ADDRESS_THIS, MSG_SENDER } from './constants.js'
 import { MarginSdkError } from './errors.js'
 
 /**
@@ -10,6 +21,35 @@ import { MarginSdkError } from './errors.js'
  * `(owner, manager, subId)`, so the address is a pure function of those inputs. Verified against
  * the live mainnet router's `accountOf` (see account.test.ts).
  */
+
+/**
+ * Offchain mirror of `MarginAccount._requireReceiver`: every fund-out primitive on the account
+ * (`withdrawCollateral`, `borrow`, `sweep`) constrains its recipient to the clone's baked-in
+ * `{owner, manager}` and otherwise reverts `ReceiverNotAllowed(to)`.
+ *
+ * Critically, the router does **not** run these recipients through `_mapRecipient` — the
+ * `ACCOUNT_*` handlers pass `to` straight into the account (`MarginRouter._handleAction`), unlike
+ * the router-level `SWEEP`/`TAKE` opcodes which do resolve it. So the v4 sentinels that work
+ * everywhere else in a plan (`MSG_SENDER`, `ADDRESS_THIS`) arrive at the account as the literal
+ * addresses `0x…01` / `0x…02`, match neither owner nor manager, and revert. Rejecting them here
+ * turns a mid-plan onchain revert into a build-time error.
+ *
+ * Pass the resolved owner EOA (funds to the user) or the MarginRouter address (funds staged for a
+ * later action in the same plan).
+ */
+export function validateAccountRecipient(to: Address, label: string): void {
+  if (isAddressEqual(to, zeroAddress)) {
+    throw new MarginSdkError('INVALID_RECIPIENT', `${label} recipient must not be the zero address`)
+  }
+  if (isAddressEqual(to, MSG_SENDER) || isAddressEqual(to, ADDRESS_THIS)) {
+    throw new MarginSdkError(
+      'INVALID_RECIPIENT',
+      `${label} does not resolve the MSG_SENDER/ADDRESS_THIS sentinels — the account requires a literal ` +
+        `recipient and reverts ReceiverNotAllowed for anything but its owner or the MarginRouter. ` +
+        `Pass the owner address or the router address explicitly.`
+    )
+  }
+}
 
 /** The immutable args baked into an account clone: `abi.encode(owner, manager)`. */
 export function marginAccountArgs(owner: Address, manager: Address): Hex {

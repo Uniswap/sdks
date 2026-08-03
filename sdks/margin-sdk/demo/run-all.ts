@@ -11,6 +11,7 @@ import { run as nativeEth } from './02-native-eth'
 import { run as shortAave } from './03-short-aave'
 import { run as hedge } from './04-hedge-subaccounts'
 import { run as executePlans } from './05-execute-plans'
+import { run as withdrawCollateral } from './06-withdraw-collateral'
 import { withAnvil } from './lib/env'
 
 await withAnvil(async (ctx) => {
@@ -20,5 +21,6 @@ await withAnvil(async (ctx) => {
   await shortAave(ctx)
   await hedge(ctx)
   await executePlans(ctx)
+  await withdrawCollateral(ctx)
   console.log('\nall demo flows passed ✓')
 })
