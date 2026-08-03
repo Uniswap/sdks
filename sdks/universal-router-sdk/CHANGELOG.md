@@ -1,5 +1,23 @@
 # @uniswap/universal-router-sdk
 
+## 5.11.2
+
+### Patch Changes
+
+- 842f63f: Update the Ethereum Sepolia (11155111) Universal Router 2.1.1 address to the fresh deployment at `0x7DfD4F31be6814D2906BDE155c3e1B146EAc1468` (creation block 11343084), replacing the previous deployment at `0x8B844f885672f333Bc0042cB669255f93a4C1E6b`.
+
+## 5.11.1
+
+### Patch Changes
+
+- Updated dependencies [8dc2570]
+- Updated dependencies [0b2b31c]
+  - @uniswap/sdk-core@7.19.0
+  - @uniswap/router-sdk@2.11.1
+  - @uniswap/v2-sdk@4.21.1
+  - @uniswap/v3-sdk@3.31.1
+  - @uniswap/v4-sdk@2.3.1
+
 ## 5.11.0
 
 ### Minor Changes
