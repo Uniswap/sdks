@@ -24,6 +24,7 @@ import { AcrossV4DepositV3Params } from './entities/actions/across'
 import { SwapSpecification, SwapStep } from './types/encodeSwaps'
 import { RoutePlanner, CommandType } from './utils/routerCommands'
 import { encodePermit, encodeV3PositionPermit } from './utils/inputTokens'
+import { directTransferSweepFloor, sumUserPaidMax } from './utils/directTransfers'
 import {
   ETH_ADDRESS,
   ROUTER_AS_RECIPIENT,
@@ -148,12 +149,25 @@ export abstract class SwapRouter {
    * Routers own `swapSteps` (V2/V3/V4 swaps, plus any `WRAP_ETH` / `UNWRAP_WETH` required by the route).
    * The SDK owns ingress, fees, final settlement, exact-output refund, and optional `safeMode`.
    *
+   * Two validation regimes:
+   * - Default (router custody): the single SDK ingress pull is the only user withdrawal and every step
+   *   recipient must be the router; the final SWEEP floor enforces the minimum output.
+   * - `allowDirectTransfers`: steps may pull input straight from the user (`payerIsUser`,
+   *   v4 SETTLE_ALL) and pay output straight to `recipient` (step recipients, v4 TAKE/TAKE_ALL,
+   *   UNWRAP_WETH). Direct pulls may total at most exactOrMaxAmountIn — ingress pulls the
+   *   remainder — and direct output minimums count toward the SWEEP floor. Portion fees still
+   *   require output custody. Step amounts are never trusted, only counted or capped.
+   *
+   * Direct-transfer caveats:
+   * - Fee-on-transfer output: output minimums bind the amount each swap *produces* (pre-transfer), not the
+   *   recipient's post-tax balance. A FoT token's own transfer tax reduces the final balance below the
+   *   minimum — inherent to such tokens and expected when swapping into one, not a shortfall to guard.
+   * - A flat fee is a plain TRANSFER, so routing must keep at least the fee amount in router custody
+   *   (not route 100% of output directly), or the fee TRANSFER reverts.
+   *
    * Router contract: end with final output in `spec.routing.outputToken`; for `EXACT_OUTPUT`, unused input
    * must end in `spec.routing.inputToken`. Don't include a top-level `SWEEP` — the SDK appends settlement,
    * refund, and safeMode sweeps itself.
-   *
-   * Router custody with `payerIsUser = false` is deliberate for safety, even if it costs an extra command
-   * or transfer; the SDK does not infer route topology on behalf of routers.
    */
   public static encodeSwaps(spec: SwapSpecification, swapSteps: SwapStep[]): MethodParameters {
     const normalizedSpec = normalizeEncodeSwapsSpec(spec)
@@ -175,12 +189,16 @@ export abstract class SwapRouter {
       }
 
       if (!inputToken.isNative && !normalizedSpec.nativeErc20Input) {
-        planner.addCommand(
-          CommandType.PERMIT2_TRANSFER_FROM,
-          [getCurrencyAddress(inputToken), ROUTER_AS_RECIPIENT, exactOrMaxAmountIn],
-          false,
-          normalizedSpec.urVersion
-        )
+        // user-paid steps draw part of the budget straight from the wallet; ingress pulls only the rest
+        const ingressAmount = exactOrMaxAmountIn.sub(sumUserPaidMax(swapSteps))
+        if (ingressAmount.gt(0)) {
+          planner.addCommand(
+            CommandType.PERMIT2_TRANSFER_FROM,
+            [getCurrencyAddress(inputToken), ROUTER_AS_RECIPIENT, ingressAmount],
+            false,
+            normalizedSpec.urVersion
+          )
+        }
       }
     }
 
@@ -214,9 +232,15 @@ export abstract class SwapRouter {
     }
 
     // Assumes routers already normalized final gross output into `routing.outputToken`.
+    // Direct-output minimums (contract-enforced, delivered straight to the recipient)
+    // reduce the floor; the sweep always remains to forward any custody balance.
+    const sweepFloor = normalizedSpec.allowDirectTransfers
+      ? directTransferSweepFloor(normalizedSpec, netMinOrExactAmountOut, swapSteps, getCurrencyAddress(outputToken))
+      : netMinOrExactAmountOut
+
     planner.addCommand(
       CommandType.SWEEP,
-      [getCurrencyAddress(outputToken), normalizedSpec.recipient, netMinOrExactAmountOut],
+      [getCurrencyAddress(outputToken), normalizedSpec.recipient, sweepFloor],
       false,
       normalizedSpec.urVersion
     )

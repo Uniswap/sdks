@@ -19,6 +19,7 @@ type ChainAddresses = {
   v4StateView?: string
   v4QuoterAddress?: string
   permissionedV4PositionManagerAddress?: string
+  permissionedV4HooksAddress?: string
 }
 
 const DEFAULT_NETWORKS = [ChainId.MAINNET, ChainId.GOERLI, ChainId.SEPOLIA]
@@ -118,6 +119,7 @@ const MAINNET_ADDRESSES: ChainAddresses = {
   v4StateView: '0x7ffe42c4a5deea5b0fec41c94c136cf115597227',
   v4QuoterAddress: '0x52f0e24d1c21c8a0cb1e5a5dd6198556bd9e1203',
   permissionedV4PositionManagerAddress: '0x89628C9B4CE81951a9BC1F36F0688Fad6A6ee248',
+  permissionedV4HooksAddress: '0x69603ab16110Eb0bB5f5E9C8019749eE41A128C0',
 }
 const GOERLI_ADDRESSES: ChainAddresses = {
   ...DEFAULT_ADDRESSES,
@@ -237,7 +239,7 @@ const SEPOLIA_ADDRESSES: ChainAddresses = {
   quoterAddress: '0xEd1f6473345F45b75F8179591dd5bA1888cf2FB3',
   v3MigratorAddress: '0x729004182cF005CEC8Bd85df140094b6aCbe8b15',
   nonfungiblePositionManagerAddress: '0x1238536071E1c677A632429e3655c799b22cDA52',
-  tickLensAddress: '0xd7f33bcdb21b359c8ee6f0251d30e94832baad07',
+  tickLensAddress: '0x0b343475d44EC2b4b8243EBF81dc888BF0A14b36',
   swapRouter02Address: '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E',
 
   // TODO: update mixedRouteQuoterV2Address once v4 on sepolia redeployed
@@ -249,6 +251,7 @@ const SEPOLIA_ADDRESSES: ChainAddresses = {
   v4StateView: '0xe1dd9c3fa50edb962e442f60dfbc432e24537e4c',
   v4QuoterAddress: '0x61b3f2011a92d183c7dbadbda940a7555ccf9227',
   permissionedV4PositionManagerAddress: '0x68fC145BB20b388965bED184Df5ef912215bb3C7',
+  permissionedV4HooksAddress: '0x8B0E8d467af81D9F5B49165e104a2fe1b98328C0',
 }
 
 // Avalanche v3 addresses

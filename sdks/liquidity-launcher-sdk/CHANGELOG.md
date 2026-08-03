@@ -1,5 +1,43 @@
 # @uniswap/liquidity-launcher-sdk
 
+## 1.4.0
+
+### Minor Changes
+
+- 85f8b43: Append the two newer chain-4663 Instant Launch strategy generations (liquidity-launcher deploy commits 8e40a35 and 3e05da8) to the deployment registry, keeping the original c3f9506 pair as a historical entry per the registry's append-only rule. `getInstantLaunchStrategy` (and the transaction builder) now selects the 3e05da8 pair for new launches, while `getInstantLaunchDeployment` still resolves every generation for indexers. FeeSplitters, singletons, creator-fee splits, and `initialTick` are unchanged across generations.
+
+## 1.3.0
+
+### Minor Changes
+
+- 275572c: Add creator-fees position recipient helper and fee-splitter custody mode for auction launches: `getCreatorFeesPositionRecipient` / `CREATOR_FEES_POSITION_RECIPIENTS` resolve the fees-enabled FeeSplitter to use as a launch's position recipient, `isCreatorFeesPositionRecipient` recognizes it classifier-side, and the quick-launch model gains a structurally permanent `creatorFees` lock mode that `isQuickLaunch` and `isPermanentTimelock` accept.
+
+## 1.2.0
+
+### Minor Changes
+
+- c5ae2e8: Decouple the quick-launch graduation threshold from the floor price: `QUICK_LAUNCH_GRADUATION_FDV_USD` is now 10_000 (was 50_000) and `QUICK_LAUNCH_FLOOR_FDV_USD` is now 1_000 (was 5_000). Adds `QUICK_LAUNCH_SOLD_SUPPLY_SHARE` (0.5) and `QUICK_LAUNCH_GRADUATION_RAISE_USD` (graduation FDV x sold share = $5k — the USD raised at a given FDV is always FDV x sold share, never the FDV itself), plus derivation helpers for the liquidity service's CreateAuction request fields: `fdvUsdToPricePerToken(fdvUsd, totalSupplyWholeTokens, raiseCurrencyUsdPrice)` and the preset-bound `getQuickLaunchFloorPricePerToken(ethUsdPrice)` / `getQuickLaunchGraduationPricePerToken(ethUsdPrice)`, the latter feeding the CreateAuction `graduation_price_raise_per_token` param.
+
+  Adoption note: pick up the lowered floor only together with (or after) sending `graduation_price_raise_per_token`. Against a liquidity service that derives the graduation threshold from the floor, the lower floor alone also lowers the graduation target (~$500 raised at a $1k floor, instead of the intended ~$5k).
+
+## 1.1.0
+
+### Minor Changes
+
+- 24ac471: Make the SDK the single home for interacting with the Instant Launch contracts — ABI fragments, address registry, transaction building, and fee math — consumed by both backend and frontend. Adds the variant-keyed, append-only Instant Launch deployment registry (`INSTANT_LAUNCH_DEPLOYMENTS` / `INSTANT_LAUNCH_CONTRACTS`, with `getInstantLaunchStrategy(chainId, { creatorFeesEnabled })`, the `getInstantLaunchDeployment(strategyAddress)` reverse lookup for indexers, and `getInstantLaunchDeployments(chainId)`), carrying the canonical chain-4663 deployment: creator-fee on/off is a per-instance constructor immutable, so each variant is its own strategy + FeeSplitter pair sharing the UERC20BeneficiaryVault and CompoundingClaimRecipient singletons. `buildInstantLaunchTransaction` selects the strategy by `creatorFeesEnabled` and, on the fees-off path, internally encodes the mandatory-but-unused `DISABLED_CREATOR_FEE_BENEFICIARY` placeholder. Ships minimal event/function ABI fragments for InstantLaunchStrategy, FeeSplitter, the beneficiary vault, and the compounding claim recipient, plus dependency-light BigInt fee math over indexed events (`creatorFeesAccumulated`, `creatorFeesClaimable`, `feesCompounded`) driven by the per-splitter bps recorded in the registry. Also adds the launch-pool derivation and quoting helpers (`getInstantLaunchPoolKey` / `getInstantLaunchPoolId` / `quoteInstantLaunchBuy*`), `predictInstantLaunchTokenAddressCall`, and the preset constants (1e27 supply, LP fee 2500, tick spacing 60, initial tick 198060, min launch tick -208980). Everything is named InstantLaunch (contracts renamed in liquidity-launcher#214); the unreleased DirectLaunch API surface is superseded.
+
+  Also refines the quick-launch classifier so the SDK owns the full predicate: `isQuickLaunch` now accepts `null` for its two `MigratorParameters` refinements with resolved-vs-unknown semantics — a `null` lock means _resolved: no lock_ and fails the match, while `null`/`undefined` for `reservedTokenAmountForLP` mean _unknown_ and leave the 50/50 split unasserted. Consolidates every definition of a "permanent" lock into the SDK: `PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS` (1000 years — the canonical classification threshold), `PERMANENT_TIMELOCK_REQUEST_SECONDS` (~100k years — the horizon the create flow requests, formerly a local constant in the create flow), and `PERMANENT_UNLOCK_BLOCK_THRESHOLD` (2e11 — the chain-agnostic raw-block approximation formerly private to data-api's `lockedForever` serving path), with `isPermanentTimelock` as the one predicate accepting all three call-site forms: the chain-aware block form (`{chainId, endBlock, unlockBlock}`), the create-flow timestamp form (`{endTimeSeconds, unlockTimeSeconds}`), and the raw-block sentinel form (`{unlockBlock}`), legacy max-uint sentinel unlock blocks included. `QuickLaunchLockMode` gains `'burn'` as a first-class member — a burned LP position is _structurally_ permanent (such rows carry `unlock_block = 0`) and qualifies as a quick launch (strictly stronger than the preset), so `isPermanentTimelock({lockMode: 'burn', ...})` short-circuits to true, `isQuickLaunch` accepts a burn lock, and the backend can drop its local `'burn'` → `'buybackBurn'` fold and structural special-case.
+
+## 1.0.1
+
+### Patch Changes
+
+- Updated dependencies [8dc2570]
+- Updated dependencies [0b2b31c]
+  - @uniswap/sdk-core@7.19.0
+  - @uniswap/v3-sdk@3.31.1
+  - @uniswap/v4-sdk@2.3.1
+
 ## 1.0.0
 
 ### Major Changes
@@ -16,10 +54,10 @@
 
 ### Minor Changes
 
-- 305a40d: Add the canonical quick-launch definition as the single source of truth for CCA "quick launches", replacing the two drifting client copies (universe's `quickLaunchAuction.ts` heuristic and the create flow's `quickLaunchPreset.ts`).
+- 305a40d: Add the canonical quick-launch definition as the single source of truth for CCA "quick launches", replacing the two drifting client copies that existed before (a discovery-side heuristic and the create flow's preset).
 
   - `QUICK_LAUNCH_PRESET` — the frozen, defining CCA parameter set: CCA auction type, instant start, 4h duration (14400s, superseding the old 30m/1h/4h set), 1B fixed supply (1e27 @ 18dp), native (ETH) raise, ~$5k floor FDV, 50/50 supply split, V4 LP (0.25% fee tier, full-range + concentrated, permanent buyback-&-burn timelock), and the fixed convex emission curve.
-  - `isQuickLaunch(params, options?)` — a pure, deterministic, address-free matcher that classifies a CCA auction's on-chain parameters against the preset. Usable client-side (universe) and server-side (data-api). Matches on native raise, 1B supply, and the 4h window (with the 50/50 reserve and permanent buyback-&-burn lock as optional refinements); duration is 4h-only by default, with an opt-in override for historical 30m/1h windows.
+  - `isQuickLaunch(params, options?)` — a pure, deterministic, address-free matcher that classifies a CCA auction's on-chain parameters against the preset. Usable client-side and server-side. Matches on native raise, 1B supply, and the 4h window (with the 50/50 reserve and permanent buyback-&-burn lock as optional refinements); duration is 4h-only by default, with an opt-in override for historical 30m/1h windows.
   - Field constants (`QUICK_LAUNCH_DURATION_SECONDS`, `QUICK_LAUNCH_TOTAL_SUPPLY_RAW`, `QUICK_LAUNCH_RESERVED_FOR_LP_RAW`, etc.) and `getQuickLaunchDurationBlocks(chainId)`.
 
   The LP fee tier (0.25% vs 0.3%) and the $50k graduation FDV are marked pending final sign-off in code comments. This classifier is a cosmetic / discovery descriptor only and, being reproducible by construction, must not gate suppression of security warnings.

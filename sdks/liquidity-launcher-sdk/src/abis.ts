@@ -7,6 +7,20 @@ import { type Abi, type AbiEvent } from 'viem'
 
 export const LIQUIDITY_LAUNCHER_ABI = [
   {
+    type: 'event',
+    name: 'TokenCreated',
+    inputs: [{ name: 'tokenAddress', type: 'address', indexed: true }],
+  },
+  {
+    type: 'event',
+    name: 'TokenDistributed',
+    inputs: [
+      { name: 'tokenAddress', type: 'address', indexed: true },
+      { name: 'strategy', type: 'address', indexed: true },
+      { name: 'amount', type: 'uint256', indexed: false },
+    ],
+  },
+  {
     type: 'function',
     name: 'createToken',
     stateMutability: 'nonpayable',
@@ -330,6 +344,271 @@ export const PERMIT2_ABI = [
       { name: 'expiration', type: 'uint48' },
     ],
     outputs: [],
+  },
+] as const satisfies Abi
+
+/**
+ * v4 View Quoter — off-chain swap quoting by revert-and-catch. `quoteExactInputSingle` is declared
+ * `nonpayable` on-chain (it state-mutates then reverts internally), so it must be executed as an
+ * `eth_call` simulation, never submitted as a transaction.
+ */
+export const V4_QUOTER_ABI = [
+  {
+    type: 'function',
+    name: 'quoteExactInputSingle',
+    stateMutability: 'nonpayable',
+    inputs: [
+      {
+        name: 'params',
+        type: 'tuple',
+        components: [
+          {
+            name: 'poolKey',
+            type: 'tuple',
+            components: [
+              { name: 'currency0', type: 'address' },
+              { name: 'currency1', type: 'address' },
+              { name: 'fee', type: 'uint24' },
+              { name: 'tickSpacing', type: 'int24' },
+              { name: 'hooks', type: 'address' },
+            ],
+          },
+          { name: 'zeroForOne', type: 'bool' },
+          { name: 'exactAmount', type: 'uint128' },
+          { name: 'hookData', type: 'bytes' },
+        ],
+      },
+    ],
+    outputs: [
+      { name: 'amountOut', type: 'uint256' },
+      { name: 'gasEstimate', type: 'uint256' },
+    ],
+  },
+] as const satisfies Abi
+
+// The v4 PoolKey struct, as it appears in launch-stack event payloads.
+const POOL_KEY_COMPONENTS = [
+  { name: 'currency0', type: 'address' },
+  { name: 'currency1', type: 'address' },
+  { name: 'fee', type: 'uint24' },
+  { name: 'tickSpacing', type: 'int24' },
+  { name: 'hooks', type: 'address' },
+] as const
+
+/**
+ * InstantLaunchStrategy — launch event plus the immutable views that identify a deployment variant
+ * (`beneficiaryVault() == address(0)` ⇔ creator fees off). One ABI serves every instance; consult
+ * the `INSTANT_LAUNCH_DEPLOYMENTS` registry for the deployed addresses.
+ */
+export const INSTANT_LAUNCH_STRATEGY_ABI = [
+  {
+    // Emitted once per launch. `finalPositionRecipient` is the instance's FeeSplitter — the
+    // permanent custodian of the launch LP position.
+    type: 'event',
+    name: 'TokenLaunched',
+    inputs: [
+      { name: 'poolId', type: 'bytes32', indexed: true },
+      { name: 'token', type: 'address', indexed: true },
+      { name: 'finalPositionRecipient', type: 'address', indexed: true },
+      { name: 'key', type: 'tuple', components: POOL_KEY_COMPONENTS, indexed: false },
+    ],
+  },
+  {
+    // IStrategy event, emitted alongside TokenLaunched in the same launch transaction.
+    type: 'event',
+    name: 'DistributionInitialized',
+    inputs: [
+      { name: 'distributor', type: 'address', indexed: true },
+      { name: 'token', type: 'address', indexed: true },
+      { name: 'totalSupply', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'launcher',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+  },
+  {
+    type: 'function',
+    name: 'feeSplitter',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+  },
+  {
+    // address(0) on a fees-off instance (beneficiary registration skipped for its launches).
+    type: 'function',
+    name: 'beneficiaryVault',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+  },
+  {
+    // The aligned tick the launch pool opens at (a constructor immutable, may differ per deploy).
+    type: 'function',
+    name: 'initialTick',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'int24' }],
+  },
+] as const satisfies Abi
+
+/**
+ * FeeSplitter — immutable-configuration custodian of the launch LP positions; permissionlessly
+ * collects their fees and pushes the configured splits. One instance per strategy variant.
+ */
+export const FEE_SPLITTER_ABI = [
+  {
+    // The accrual event: full realized fees per position per collect. The vault leg of each event,
+    // floored per the immutable bps, is the creator's accumulation (see `creatorFeesAccumulated`).
+    type: 'event',
+    name: 'FeesCollected',
+    inputs: [
+      { name: 'tokenId', type: 'uint256', indexed: true },
+      { name: 'token', type: 'address', indexed: true },
+      { name: 'nativeAmount', type: 'uint256', indexed: false },
+      { name: 'tokenAmount', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    // One per nonzero split leg per currency; carries no tokenId (within a transaction, a
+    // FeesCollected's forwarded legs follow it in log order until the next FeesCollected).
+    type: 'event',
+    name: 'FeesForwarded',
+    inputs: [
+      { name: 'recipient', type: 'address', indexed: true },
+      { name: 'currency', type: 'address', indexed: true },
+      { name: 'amount', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    // Permissionless: collects each position's accrued fees and pushes the splits.
+    type: 'function',
+    name: 'collectFees',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'tokenIds', type: 'uint256[]' }],
+    outputs: [],
+  },
+  {
+    // The immutable split table: per recipient, independent bps of both currency sides (each side
+    // sums to 10,000) and whether the recipient is notified via callback.
+    type: 'function',
+    name: 'getSplits',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'tuple[]',
+        components: [
+          { name: 'recipient', type: 'address' },
+          { name: 'nativeBps', type: 'uint16' },
+          { name: 'tokenBps', type: 'uint16' },
+          { name: 'useCallback', type: 'bool' },
+        ],
+      },
+    ],
+  },
+] as const satisfies Abi
+
+/**
+ * UERC20BeneficiaryVault (and its BeneficiaryVault base) — a transferable ERC721 claim on each
+ * registered position's creator fee share. Registration mints the ERC721 `Transfer` (from zero);
+ * claims pay the current NFT holder and emit `Claimed`.
+ */
+export const BENEFICIARY_VAULT_ABI = [
+  {
+    // ERC721 Transfer: mint (from == 0) is the launch's beneficiary registration; later transfers
+    // move the fee claim. The token id equals the LP position's tokenId.
+    type: 'event',
+    name: 'Transfer',
+    inputs: [
+      { name: 'from', type: 'address', indexed: true },
+      { name: 'to', type: 'address', indexed: true },
+      { name: 'id', type: 'uint256', indexed: true },
+    ],
+  },
+  {
+    // Payout of a position's attributed amounts (carries no recipient — join the Transfer history).
+    type: 'event',
+    name: 'Claimed',
+    inputs: [
+      { name: 'tokenId', type: 'uint256', indexed: true },
+      { name: 'currency0Amount', type: 'uint256', indexed: false },
+      { name: 'currency1Amount', type: 'uint256', indexed: false },
+      { name: 'poolKey', type: 'tuple', components: POOL_KEY_COMPONENTS, indexed: false },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'claim',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'tokenId', type: 'uint256' },
+      { name: 'minCurrency0Amount', type: 'uint256' },
+      { name: 'minCurrency1Amount', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+  {
+    // The amounts attributed to a position and available to claim.
+    type: 'function',
+    name: 'amounts',
+    stateMutability: 'view',
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    outputs: [
+      { name: 'currency0Amount', type: 'uint128' },
+      { name: 'currency1Amount', type: 'uint128' },
+    ],
+  },
+  {
+    // The current beneficiary (fee-claim holder) of a registered position.
+    type: 'function',
+    name: 'ownerOf',
+    stateMutability: 'view',
+    inputs: [{ name: 'id', type: 'uint256' }],
+    outputs: [{ name: '', type: 'address' }],
+  },
+] as const satisfies Abi
+
+/**
+ * CompoundingClaimRecipient — the autocompound recipient of every FeeSplitter. `claim` pays the
+ * caller and reverts unless the caller increases the same position's liquidity within the same
+ * transaction, so each `Claimed` event proves a compounding.
+ */
+export const COMPOUNDING_CLAIM_RECIPIENT_ABI = [
+  {
+    type: 'event',
+    name: 'Claimed',
+    inputs: [
+      { name: 'tokenId', type: 'uint256', indexed: true },
+      { name: 'currency0Amount', type: 'uint256', indexed: false },
+      { name: 'currency1Amount', type: 'uint256', indexed: false },
+      { name: 'poolKey', type: 'tuple', components: POOL_KEY_COMPONENTS, indexed: false },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'claim',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'tokenId', type: 'uint256' },
+      { name: 'minCurrency0Amount', type: 'uint256' },
+      { name: 'minCurrency1Amount', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'amounts',
+    stateMutability: 'view',
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    outputs: [
+      { name: 'currency0Amount', type: 'uint128' },
+      { name: 'currency1Amount', type: 'uint128' },
+    ],
   },
 ] as const satisfies Abi
 

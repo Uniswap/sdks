@@ -79,6 +79,10 @@ jobs:
         with:
           version: bun run version-packages
           publish: bun run g:release
+          # Conventional-commit title/message so the PR passes the
+          # "Check PR Title" workflow without manual retitling.
+          title: "chore(sdks): Version Packages"
+          commit: "chore(sdks): Version Packages"
         env:
           GITHUB_TOKEN: ${{ github.token }}
           # No NPM_TOKEN needed — npm auth uses trusted publishing (OIDC via id-token)

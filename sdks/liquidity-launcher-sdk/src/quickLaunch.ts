@@ -2,6 +2,7 @@ import { type Address } from 'viem'
 
 import { getBlockTimeSeconds } from './config/blocks'
 import type { PriceRangeKind } from './config/positions'
+import { fdvUsdToPricePerToken } from './config/price'
 import {
   DEFAULT_AUCTION_STEPS,
   DEFAULT_CONVEXITY_ALPHA,
@@ -12,9 +13,9 @@ import {
 import type { LockRecipientInput } from './lock'
 
 /**
- * The canonical "quick launch" definition — the single source of truth both universe (create flow +
- * discovery badge) and data-api (server-side classification) consume, replacing the two drifting
- * client copies that existed before.
+ * The canonical "quick launch" definition — the single source of truth that client-side (create
+ * flow + discovery badge) and server-side (classification) consumers share, replacing the two
+ * drifting client copies that existed before.
  *
  * A quick launch is not a separate contract: it is a {@link AuctionParameters CCA auction} created
  * with this fixed, non-negotiable parameter set. Classification is therefore purely by parameters —
@@ -53,15 +54,22 @@ export const QUICK_LAUNCH_RESERVED_FOR_LP_RAW = QUICK_LAUNCH_TOTAL_SUPPLY_RAW / 
 /** Raise denomination: ETH / the network's native token only (`address(0)` sentinel). */
 export const QUICK_LAUNCH_RAISE_CURRENCY: Address = ZERO_ADDRESS
 
-/** Starting clearing price floor, expressed as a target FDV in USD (~$5k, cheap enough to deter spam). */
-export const QUICK_LAUNCH_FLOOR_FDV_USD = 5_000
+/** Starting clearing price floor, expressed as a target FDV in USD (~$1k, cheap enough to deter spam). */
+export const QUICK_LAUNCH_FLOOR_FDV_USD = 1_000
+
+/** Fraction of the total supply actually sold in the auction (the other half seeds the LP). */
+export const QUICK_LAUNCH_SOLD_SUPPLY_SHARE = QUICK_LAUNCH_SUPPLY_AUCTIONED_PERCENT / 100
 
 /**
- * Graduation threshold as a target FDV in USD ($50k FDV clearing price → ~$25k raised, since 50% of
- * supply is auctioned).
- * PENDING SIGN-OFF: the $50k figure is not final (open product debate on failed-graduation risk).
+ * Graduation threshold as a target FDV in USD ($10k FDV, i.e. ~$5k raised at the 50%-sold preset —
+ * the USD raise is always FDV x {@link QUICK_LAUNCH_SOLD_SUPPLY_SHARE}, never the FDV itself).
+ * Decoupled from {@link QUICK_LAUNCH_FLOOR_FDV_USD}: sent to the liquidity service as its own
+ * `graduation_price_raise_per_token` — see {@link getQuickLaunchGraduationPricePerToken}.
  */
-export const QUICK_LAUNCH_GRADUATION_FDV_USD = 50_000
+export const QUICK_LAUNCH_GRADUATION_FDV_USD = 10_000
+
+/** Approximate USD of (time-weighted) committed bids needed to graduate: graduation FDV x sold share. */
+export const QUICK_LAUNCH_GRADUATION_RAISE_USD = QUICK_LAUNCH_GRADUATION_FDV_USD * QUICK_LAUNCH_SOLD_SUPPLY_SHARE
 
 /**
  * V4 LP fee tier in hundredths of a bip (2500 = 0.25%).
@@ -76,6 +84,56 @@ export const QUICK_LAUNCH_LP_RANGE: PriceRangeKind = 'CONCENTRATED_FULL_RANGE'
 /** The migrated LP is locked forever (permanent timelock) via a buyback-&-burn lock recipient. */
 export const QUICK_LAUNCH_LOCK_MODE: QuickLaunchLockMode = 'buybackBurn'
 
+// ---------------------------------------------------------------------------
+// Permanence: the ONE definition of a "permanent" lock
+// ---------------------------------------------------------------------------
+// "Permanent" used to be defined independently in three places — the create
+// flow's requested horizon, the data-api classifier's threshold
+// (`PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS`), and this SDK's bare
+// `permanentTimelock: true` declaration —
+// plus a fourth, chain-agnostic raw-block sentinel serving `lockedForever`
+// (data-api's `PERMANENT_UNLOCK_BLOCK_THRESHOLD`). They now all live here,
+// next to {@link QUICK_LAUNCH_LOCK_MODE}, and every consumer imports them:
+// changing one in isolation is no longer possible.
+
+/**
+ * Minimum lock horizon past the auction end, in real seconds, for a timelock to count as
+ * *permanent* (1000 years). The preset declares `permanentTimelock: true`; this is the canonical
+ * operational threshold shared by every consumer (create flow, liquidity service, server-side
+ * classifier) so they cannot drift on what "permanent" means.
+ *
+ * The create flow requests {@link PERMANENT_TIMELOCK_REQUEST_SECONDS} (~100k years) past the
+ * auction end, which the liquidity service converts to a block number the lock recipient stores as
+ * an immutable. Only that block number is observable on-chain, so permanence is re-derived from it
+ * — see {@link isPermanentTimelock}. 1000 years sits in a very wide empty band — exactly 100x
+ * under what the flow requests, ~100x over the longest plausible real lock — so block-time drift
+ * cannot move an auction across it.
+ */
+export const PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS = 1000 * 365 * 86_400
+
+/**
+ * The lock horizon the create flow *requests* for a permanent lock: `unlockTimeUnix = auctionEnd +
+ * 365 * 100_000 days` (~100k years — the create flow's "Permanent" preset; previously duplicated
+ * as a local constant in the create flow). Deliberately ~100x over the classification
+ * threshold ({@link PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS}) so a requested-permanent lock can
+ * never be classified finite, on any plausible block-time table.
+ */
+export const PERMANENT_TIMELOCK_REQUEST_SECONDS = 365n * 100_000n * 86_400n
+
+/**
+ * Chain-AGNOSTIC approximation: a raw unlock block at or past this threshold counts as permanent
+ * without consulting the chain's block time (previously data-api's serving-side
+ * `PERMANENT_UNLOCK_BLOCK_THRESHOLD`, gating the `lockedForever` proto field).
+ *
+ * Use the chain-aware forms of {@link isPermanentTimelock} whenever the chain id and auction end
+ * are available — a single block count cannot express "1000 years" on every chain (on a 0.1s
+ * chain this threshold is only ~600 years). This form exists for call sites that only have the
+ * stored unlock block, and it still catches every real permanent lock: the create flow's ~100k-year
+ * request converts to far more than 2e11 blocks on any chain, and legacy max-uint sentinel unlock
+ * blocks trivially exceed it.
+ */
+export const PERMANENT_UNLOCK_BLOCK_THRESHOLD = 200_000_000_000n
+
 /**
  * Buyback-&-burn searcher threshold: a searcher burns ~0.05% of supply to claim the accrued ETH
  * (the token portion is burned in the same call). tokenJar-style; auto-compounding was rejected.
@@ -89,8 +147,46 @@ export const QUICK_LAUNCH_DURATION_TOLERANCE_RATIO = 0.1
 // Preset object
 // ---------------------------------------------------------------------------
 
-/** Lock-recipient modes, reused from {@link LockRecipientInput}. */
-export type QuickLaunchLockMode = LockRecipientInput['mode']
+/**
+ * Lock-recipient modes ({@link LockRecipientInput}) plus two modes with no per-launch recipient
+ * contract at all:
+ *
+ *  - `'burn'` — the LP position minted straight to the burn address. Not a buildable
+ *    {@link LockRecipientInput} mode (there is nothing to deploy), but a first-class lock mode for
+ *    classification: a burned position is irrecoverable, i.e. *structurally* permanent, and such
+ *    rows carry `unlock_block = 0` (there is no timelock to expire), so permanence for `'burn'` must
+ *    never be derived from an unlock horizon — {@link isPermanentTimelock} short-circuits on it.
+ *  - `'creatorFees'` — the LP position sent to the chain's fees-enabled FeeSplitter (the registry's
+ *    `creatorFeesEnabled: true` entry), which routes the creator's share of native fees to the
+ *    BeneficiaryVault and auto-compounds the rest. Also not buildable here — the splitter is a
+ *    pre-deployed singleton, resolved via `getCreatorFeesPositionRecipient` — and likewise
+ *    *structurally* permanent: the splitter has no code path that transfers positions out, and such
+ *    rows carry `unlock_block = 0`, so {@link isPermanentTimelock} short-circuits on it too.
+ *    Callers derive this mode by matching the decoded `MigratorParameters.positionRecipient` with
+ *    `isCreatorFeesPositionRecipient` (fees-OFF splitters do not qualify — see its docs); the
+ *    matcher here stays address-free.
+ *
+ * PRODUCT DECISION (Bruno): a burn lock QUALIFIES as a quick
+ * launch — strictly stronger than the preset's buyback-&-burn lock — so {@link isQuickLaunch}
+ * accepts it and consumers no longer need a local `'burn'` → `'buybackBurn'` fold. A
+ * `'creatorFees'` position likewise qualifies: custody is permanent by construction, so it is the
+ * preset's permanence with a different fee routing.
+ */
+export type QuickLaunchLockMode = LockRecipientInput['mode'] | 'burn' | 'creatorFees'
+
+/**
+ * The lock modes whose permanence is *structural* — the position can never leave its custodian, so
+ * there is no unlock horizon to check (their rows carry `unlock_block = 0`): `'burn'` (irrecoverably
+ * at the burn address) and `'creatorFees'` (parked at the fee splitter, which has no code path that
+ * transfers positions out). {@link isPermanentTimelock} short-circuits on these, and
+ * {@link isQuickLaunch} accepts them regardless of the caller-derived `permanentTimelock` flag.
+ */
+export const STRUCTURALLY_PERMANENT_LOCK_MODES: readonly QuickLaunchLockMode[] = ['burn', 'creatorFees']
+
+/** Whether `mode`'s permanence is structural (see {@link STRUCTURALLY_PERMANENT_LOCK_MODES}). */
+export function isStructurallyPermanentLockMode(mode: QuickLaunchLockMode): boolean {
+  return STRUCTURALLY_PERMANENT_LOCK_MODES.includes(mode)
+}
 
 /**
  * The canonical quick-launch parameter set. Every field here is chain-independent (factory tokens are
@@ -162,6 +258,87 @@ export function getQuickLaunchDurationBlocks(chainId: number): bigint {
 }
 
 // ---------------------------------------------------------------------------
+// CreateAuction request derivation (FDV -> price-per-token)
+// ---------------------------------------------------------------------------
+
+/**
+ * The preset floor as the CreateAuction `floor_price_raise_per_token` decimal:
+ * {@link QUICK_LAUNCH_FLOOR_FDV_USD} / 1B tokens, converted to the raise currency (native ETH)
+ * at `ethUsdPrice`. Throws {@link LauncherSdkError} on a missing/invalid price — callers decide
+ * their own fallback.
+ */
+export function getQuickLaunchFloorPricePerToken(ethUsdPrice: number): string {
+  return fdvUsdToPricePerToken(QUICK_LAUNCH_FLOOR_FDV_USD, QUICK_LAUNCH_TOTAL_SUPPLY, ethUsdPrice)
+}
+
+/**
+ * The preset graduation threshold as the CreateAuction `graduation_price_raise_per_token`
+ * decimal: {@link QUICK_LAUNCH_GRADUATION_FDV_USD} / 1B tokens, converted to the raise currency
+ * (native ETH) at `ethUsdPrice` — the same derivation as the floor, over the FULL supply. The
+ * service turns it into `requiredCurrencyRaised = graduationPrice x soldSupply`, so the USD
+ * raise this demands is graduation FDV x {@link QUICK_LAUNCH_SOLD_SUPPLY_SHARE}
+ * (= {@link QUICK_LAUNCH_GRADUATION_RAISE_USD}), never the FDV 1:1.
+ */
+export function getQuickLaunchGraduationPricePerToken(ethUsdPrice: number): string {
+  return fdvUsdToPricePerToken(QUICK_LAUNCH_GRADUATION_FDV_USD, QUICK_LAUNCH_TOTAL_SUPPLY, ethUsdPrice)
+}
+
+/**
+ * Inputs to {@link isPermanentTimelock} — the one permanence predicate, accepting each of the forms
+ * its call sites actually hold, so no consumer needs a local reformulation of the rule:
+ *
+ * 1. **Block form** (`{chainId, endBlock, unlockBlock}`) — the canonical, chain-aware check used by
+ *    classifiers over indexed data: the block horizon past the auction end, converted to real
+ *    seconds via the chain block time, must reach
+ *    {@link PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS}. Legacy max-uint sentinel unlock blocks pass
+ *    naturally (their horizon is astronomically large).
+ * 2. **Timestamp form** (`{endTimeSeconds, unlockTimeSeconds}`) — the same horizon rule over real
+ *    seconds, for the create flow, which reasons in unix time *before* the liquidity service
+ *    converts its request to a block number.
+ * 3. **Raw-block sentinel form** (`{unlockBlock}` alone) — the chain-agnostic
+ *    {@link PERMANENT_UNLOCK_BLOCK_THRESHOLD} approximation, for serving-side call sites that have
+ *    only the stored unlock block. Prefer the chain-aware forms when possible.
+ *
+ * `lockMode` may accompany any form: `'burn'` and `'creatorFees'` are *structurally* permanent
+ * (see {@link STRUCTURALLY_PERMANENT_LOCK_MODES}; such rows carry `unlock_block = 0`), so they
+ * short-circuit to `true` before any horizon math.
+ */
+export type PermanentTimelockParams = {
+  /** When supplied, a structurally permanent mode passes by construction regardless of the block/time inputs. */
+  lockMode?: QuickLaunchLockMode
+} & (
+  | { chainId: number; endBlock: bigint; unlockBlock: bigint }
+  | { endTimeSeconds: bigint | number; unlockTimeSeconds: bigint | number }
+  | { chainId?: undefined; endBlock?: undefined; unlockBlock: bigint }
+)
+
+/**
+ * The canonical predicate for whether a liquidity lock is *permanent* — judged past the
+ * auction end because that is how the create flow derives `unlockTimeUnix` before it is converted
+ * to the block number the recipient stores as an immutable. See {@link PermanentTimelockParams}
+ * for the three accepted input forms and the structural (`'burn'` / `'creatorFees'`) short-circuit.
+ */
+export function isPermanentTimelock(params: PermanentTimelockParams): boolean {
+  // A burned or splitter-parked position has no timelock to expire — permanence is structural, not
+  // derived. Such rows carry unlock_block = 0, so falling through to the horizon math would wrongly
+  // report finite.
+  if (params.lockMode !== undefined && isStructurallyPermanentLockMode(params.lockMode)) {
+    return true
+  }
+  // Timestamp form: the create flow's real-seconds horizon past the auction end.
+  if ('endTimeSeconds' in params) {
+    return Number(params.unlockTimeSeconds) - Number(params.endTimeSeconds) >= PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS
+  }
+  // Block form: chain-aware horizon via the chain block time.
+  if (params.chainId !== undefined && params.endBlock !== undefined) {
+    const horizonSeconds = Number(params.unlockBlock - params.endBlock) * getBlockTimeSeconds(params.chainId)
+    return horizonSeconds >= PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS
+  }
+  // Sentinel form: chain-agnostic raw-block approximation.
+  return params.unlockBlock >= PERMANENT_UNLOCK_BLOCK_THRESHOLD
+}
+
+// ---------------------------------------------------------------------------
 // Matcher
 // ---------------------------------------------------------------------------
 
@@ -179,8 +356,8 @@ export interface QuickLaunchLockDescriptor {
 
 /**
  * The structural, address-free fields {@link isQuickLaunch} compares against the preset. Each field
- * maps to already-indexed on-chain data, so the matcher is usable both client-side (universe) and
- * server-side (data-api classifying from on-chain params).
+ * maps to already-indexed on-chain data, so the matcher is usable both client-side and
+ * server-side (classifying from on-chain params).
  */
 export interface QuickLaunchMatchParams {
   /** Launch chain id — needed to convert the block window into real seconds. */
@@ -194,16 +371,24 @@ export interface QuickLaunchMatchParams {
   /** The token's total supply in raw base units (18dp). */
   totalSupplyRaw: bigint
   /**
-   * `MigratorParameters.reservedTokenAmountForLP`, if decoded. When present it must equal the preset's
-   * 50% LP reserve; when omitted the 50/50 split is not asserted (the core fingerprint still classifies).
+   * `MigratorParameters.reservedTokenAmountForLP` (readable from the LBP strategy's
+   * `initializers(initializer)` getter, or the flat `reserves(initializer)` on later revisions), if
+   * decoded. When present it must equal the preset's 50% LP reserve; `undefined` and `null` both
+   * mean *unknown* and leave the 50/50 split unasserted (the core fingerprint still classifies).
+   * NOTE: the strategy getter returns a zeroed struct for an unset/consumed entry — callers must map
+   * such a read to `null`/`undefined`, never pass the raw `0n`, which is a real (failing) value.
    */
-  reservedTokenAmountForLP?: bigint
+  reservedTokenAmountForLP?: bigint | null
   /**
-   * The decoded liquidity lock, if available. When present it must be a permanent buyback-&-burn lock;
-   * when omitted the lock is not asserted. data-api should pass it once the migrator params are decoded
-   * for a stronger match.
+   * The liquidity lock decoded from `MigratorParameters.positionRecipient`, when resolved.
+   * `undefined` means *not resolved yet* and leaves the lock unasserted; `null` means *resolved: this
+   * auction has no lock*, which fails the match — an unlocked LP position is not the preset. When
+   * present it must be a permanent buyback-&-burn lock (see {@link isPermanentTimelock} for deriving
+   * permanence from the recipient's immutable unlock block) — or a structurally permanent mode:
+   * `'burn'` (strictly stronger) or `'creatorFees'` (position parked at the fee splitter forever;
+   * derive it via `isCreatorFeesPositionRecipient` — see {@link QuickLaunchLockMode}).
    */
-  lock?: QuickLaunchLockDescriptor
+  lock?: QuickLaunchLockDescriptor | null
 }
 
 export interface QuickLaunchMatchOptions {
@@ -232,8 +417,12 @@ export interface QuickLaunchMatchOptions {
  * stable structural field.
  *
  * Required fingerprint (always available from indexed data): native raise currency, 1B total supply,
- * and the 4h duration. The 50/50 LP reserve and the permanent buyback-&-burn lock are matched only
- * when supplied.
+ * and the 4h duration. The 50/50 LP reserve and the permanent lock (buyback-&-burn, or a
+ * structurally permanent `'burn'` / `'creatorFees'` mode) are matched only
+ * when supplied — with one asymmetry: a `null` lock is a *resolved* answer (known to have no lock)
+ * and fails, while a `null` reserve is merely unknown and stays unasserted. Since a refinement can
+ * only turn a match into a non-match, classifying without them is a safe over-approximation that a
+ * later pass can tighten.
  */
 export function isQuickLaunch(params: QuickLaunchMatchParams, options: QuickLaunchMatchOptions = {}): boolean {
   const {
@@ -264,17 +453,30 @@ export function isQuickLaunch(params: QuickLaunchMatchParams, options: QuickLaun
     return false
   }
 
-  // 50/50 supply split — asserted only when the LP reserve is supplied.
+  // 50/50 supply split (MigratorParameters.reservedTokenAmountForLP) — asserted only when the LP
+  // reserve is known; undefined/null both mean unknown and leave it unasserted.
   if (
     params.reservedTokenAmountForLP !== undefined &&
+    params.reservedTokenAmountForLP !== null &&
     params.reservedTokenAmountForLP !== QUICK_LAUNCH_RESERVED_FOR_LP_RAW
   ) {
     return false
   }
 
-  // Permanent buyback-&-burn LP lock — asserted only when a lock descriptor is supplied.
-  if (params.lock !== undefined && (params.lock.mode !== QUICK_LAUNCH_LOCK_MODE || !params.lock.permanentTimelock)) {
+  // Permanent buyback-&-burn LP lock (decoded from MigratorParameters.positionRecipient).
+  // `null` is a resolved answer — the auction is known to have no lock, which the preset forbids.
+  if (params.lock === null) {
     return false
+  }
+  // Asserted only when a lock descriptor is supplied; undefined = not resolved yet, unasserted.
+  // The structurally permanent modes qualify — 'burn' (strictly stronger than the preset) and
+  // 'creatorFees' (parked at the fee splitter forever) — and pass regardless of the caller-derived
+  // permanentTimelock flag (their rows carry unlock_block = 0, from which a horizon derivation
+  // would report finite). See QuickLaunchLockMode.
+  if (params.lock !== undefined && !isStructurallyPermanentLockMode(params.lock.mode)) {
+    if (params.lock.mode !== QUICK_LAUNCH_LOCK_MODE || !params.lock.permanentTimelock) {
+      return false
+    }
   }
 
   return true
