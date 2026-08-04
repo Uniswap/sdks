@@ -446,8 +446,8 @@ describe('graduation-FDV gate constants', () => {
     expect(QUICK_LAUNCH_ALLOWED_GRADUATION_FDV_USD).toContain(QUICK_LAUNCH_GRADUATION_FDV_USD)
   })
 
-  it('uses a ±25% comfort tolerance frozen at ingest', () => {
-    expect(QUICK_LAUNCH_GRADUATION_FDV_TOLERANCE_RATIO).toBe(0.25)
+  it('uses a ±10% tolerance, mirroring the duration ratio', () => {
+    expect(QUICK_LAUNCH_GRADUATION_FDV_TOLERANCE_RATIO).toBe(0.1)
   })
 })
 
@@ -461,6 +461,18 @@ describe('isQuickLaunch — graduation-FDV gate', () => {
     expect(isQuickLaunch(presetAuction({ graduationFdvUsd: null }))).toBe(true)
   })
 
+  it('treats a non-finite FDV (NaN) as unresolved — a price-resolution miss must not demote', () => {
+    // NaN is the natural output of a failed Number() on the native amount at ingest. Folding it into
+    // the unresolved branch avoids the worse error (a false negative on an otherwise-legit launch).
+    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: Number.NaN }))).toBe(true)
+    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: Number.POSITIVE_INFINITY }))).toBe(true)
+  })
+
+  it('still asserts on 0 — 0 is finite and a real mismatch, NOT unresolved', () => {
+    // Distinct from NaN: 0 is a resolved value that simply does not match any allowed preset.
+    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 0 }))).toBe(false)
+  })
+
   it('matches an exact in-set $5k graduation FDV', () => {
     expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 5_000 }))).toBe(true)
   })
@@ -469,17 +481,26 @@ describe('isQuickLaunch — graduation-FDV gate', () => {
     expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 10_000 }))).toBe(true)
   })
 
-  it('matches a value within tolerance of an allowed preset (±25%)', () => {
-    // 12_400 is within 25% of 10_000 (11_500 low bound would fail; 12_500 is the edge).
-    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 12_400 }))).toBe(true)
-    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 12_500 }))).toBe(true) // exactly at the edge
-    // 6_000 is within 25% of 5_000.
-    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 6_000 }))).toBe(true)
+  it('matches a value within tolerance of an allowed preset (±10%)', () => {
+    // Accepted bands at ratio 0.1: [4500, 5500] and [9000, 11000].
+    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 11_000 }))).toBe(true) // exactly at the $10k edge
+    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 10_900 }))).toBe(true)
+    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 9_000 }))).toBe(true) // low edge of the $10k band
+    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 5_500 }))).toBe(true) // high edge of the $5k band
+    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 4_500 }))).toBe(true) // low edge of the $5k band
+  })
+
+  it('rejects $12,500 — inside the old ±25% band but outside the tightened ±10%', () => {
+    // At 0.25 this used to badge (10_000 edge was 12_500); at 0.1 the $10k band tops out at 11_000,
+    // so $12,500 is rejected — the impersonation room the tightening removes.
+    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 12_500 }))).toBe(false)
   })
 
   it('rejects a value that falls between the allowed presets, outside both tolerances', () => {
-    // 7_000 is >25% above 5_000 (edge 6_250) and >25% below 10_000 (edge 7_500).
+    // 7_000 is above the $5k band (5500) and below the $10k band (9000).
     expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 7_000 }))).toBe(false)
+    // 6_000 was within the old ±25% of 5_000; at ±10% (band tops at 5500) it now rejects.
+    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 6_000 }))).toBe(false)
   })
 
   it("rejects RTH's ~$3.7B graduation FDV — the impersonation this gate closes", () => {
