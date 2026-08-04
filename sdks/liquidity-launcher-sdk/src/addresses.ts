@@ -44,8 +44,8 @@ const PERMIT2 = getAddress('0x000000000022D473030F116dDEE9F6B43aC78BA3')
 const LIQUIDITY_LAUNCHER = getAddress('0x00004c4ccc709Ef590F7C81102C0689F0263D4e9')
 // liquidity-launcher #223/#227 dev deploy, chain 4663 only. The redeploy changes the launcher's
 // bytecode so the mined vanity salt no longer resolves to LIQUIDITY_LAUNCHER. Scoped to Robinhood
-// because that is the only chain it exists on; when the final re-mined launcher is deployed on
-// every chain this collapses back into LIQUIDITY_LAUNCHER.
+// because 4663 is the only chain it exists on; once the final re-mined launcher is deployed on
+// every chain, this constant collapses back into LIQUIDITY_LAUNCHER.
 const LIQUIDITY_LAUNCHER_ROBINHOOD = getAddress('0xe050309b2F42cD5f788aB6eE1a07467770C03BF7')
 // UniversalRouterStrategy, pinned to LIQUIDITY_LAUNCHER_ROBINHOOD as a constructor immutable (verified
 // on-chain: `launcher()` returns it). Deployed via CREATE2 at salt 0 through the canonical deployer
