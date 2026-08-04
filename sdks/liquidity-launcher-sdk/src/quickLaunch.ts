@@ -72,6 +72,24 @@ export const QUICK_LAUNCH_GRADUATION_FDV_USD = 10_000
 export const QUICK_LAUNCH_GRADUATION_RAISE_USD = QUICK_LAUNCH_GRADUATION_FDV_USD * QUICK_LAUNCH_SOLD_SUPPLY_SHARE
 
 /**
+ * The graduation-FDV values (USD) a quick launch may carry. Grandfathers the historical $5k cohort
+ * alongside the current $10k preset ({@link QUICK_LAUNCH_GRADUATION_FDV_USD}), the same escape-hatch
+ * shape as the {@link QuickLaunchMatchOptions.allowedDurationsSeconds} override that grandfathers the
+ * POC 30m/1h windows. USD-denominated on purpose: the gate is chain-agnostic, so a legit $5k launch
+ * on any chain (e.g. ~378 AVAX) passes, while a raw-native threshold would wrongly demote every
+ * non-ETH chain. See {@link isQuickLaunch}.
+ */
+export const QUICK_LAUNCH_ALLOWED_GRADUATION_FDV_USD = [5_000, 10_000] as const
+
+/**
+ * Default fractional tolerance when comparing a resolved graduation FDV (USD) to an allowed preset
+ * value (±25%). Comfortable because the USD value is frozen at ingest: the tolerance only has to
+ * absorb the minutes between the FE's live ETH quote and the backend price snapshot, not long-term
+ * price drift, so it never needs to widen over the life of an auction.
+ */
+export const QUICK_LAUNCH_GRADUATION_FDV_TOLERANCE_RATIO = 0.25
+
+/**
  * V4 LP fee tier in hundredths of a bip (2500 = 0.25%).
  * PENDING SIGN-OFF: 0.25% vs 0.3% is unresolved (v4 additive fees / possible higher protocol fee is a
  * governance decision). Encoding the spec's current stated value; revisit before GA.
@@ -398,6 +416,19 @@ export interface QuickLaunchMatchParams {
    * derive it via `isCreatorFeesPositionRecipient` — see {@link QuickLaunchLockMode}).
    */
   lock?: QuickLaunchLockDescriptor | null
+  /**
+   * The auction's graduation threshold expressed as a target FDV in USD, frozen at ingest by the
+   * caller. USD-denominated so the gate is chain-agnostic — the matcher never sees or compares the
+   * native `required_currency_raised` amount, which would wrongly demote every non-ETH chain (a
+   * legit $5k launch is ~378 AVAX, not an ETH figure). When present it must match one of the allowed
+   * preset values ({@link QUICK_LAUNCH_ALLOWED_GRADUATION_FDV_USD}) within
+   * {@link QUICK_LAUNCH_GRADUATION_FDV_TOLERANCE_RATIO}, or the auction is not a quick launch.
+   *
+   * `undefined` and `null` both mean *unresolved* — the backend has not populated the USD FDV yet —
+   * and leave the graduation assertion OFF, so nothing regresses before the field is supplied. The
+   * caller must convert the native threshold to USD; the matcher stays pure (no price conversion).
+   */
+  graduationFdvUsd?: number | null
 }
 
 export interface QuickLaunchMatchOptions {
@@ -412,6 +443,18 @@ export interface QuickLaunchMatchOptions {
    * (`[1800, 3600, 14400]`) so callers make the choice explicitly — the default stays strict on 4h.
    */
   allowedDurationsSeconds?: readonly number[]
+  /**
+   * Graduation-FDV values (USD) accepted as quick-launch, asserted only when
+   * {@link QuickLaunchMatchParams.graduationFdvUsd} is a resolved number. Defaults to
+   * {@link QUICK_LAUNCH_ALLOWED_GRADUATION_FDV_USD} ($5k / $10k). Overridable via the same mechanism
+   * as {@link allowedDurationsSeconds}, so callers can widen or narrow the set explicitly.
+   */
+  allowedGraduationFdvUsd?: readonly number[]
+  /**
+   * Fractional tolerance on the graduation-FDV comparison. Default
+   * {@link QUICK_LAUNCH_GRADUATION_FDV_TOLERANCE_RATIO} (±25%).
+   */
+  graduationFdvToleranceRatio?: number
 }
 
 /**
@@ -432,11 +475,25 @@ export interface QuickLaunchMatchOptions {
  * and fails, while a `null` reserve is merely unknown and stays unasserted. Since a refinement can
  * only turn a match into a non-match, classifying without them is a safe over-approximation that a
  * later pass can tighten.
+ *
+ * The graduation FDV ({@link QuickLaunchMatchParams.graduationFdvUsd}) is a further such refinement,
+ * layered on top of — never replacing — the structural checks: when the caller supplies a resolved
+ * USD number it must match an allowed preset ({@link QUICK_LAUNCH_ALLOWED_GRADUATION_FDV_USD}) within
+ * {@link QUICK_LAUNCH_GRADUATION_FDV_TOLERANCE_RATIO}, and `undefined`/`null` leave it unasserted.
+ * It is USD-denominated so the matcher stays chain-agnostic and address-free — the caller converts
+ * the native threshold to USD; the matcher never does price conversion.
+ *
+ * SECURITY NOTE (unchanged): the preset is reproducible by construction, so a positive match — even
+ * with the graduation gate — is still a cosmetic / discovery descriptor and MUST NOT gate Blockaid /
+ * token-protection warnings. This gate narrows impersonation (a $3.7B-FDV auction no longer matches
+ * the $10k preset) but the badge remains no trust signal.
  */
 export function isQuickLaunch(params: QuickLaunchMatchParams, options: QuickLaunchMatchOptions = {}): boolean {
   const {
     durationToleranceRatio = QUICK_LAUNCH_DURATION_TOLERANCE_RATIO,
     allowedDurationsSeconds = [QUICK_LAUNCH_DURATION_SECONDS],
+    allowedGraduationFdvUsd = QUICK_LAUNCH_ALLOWED_GRADUATION_FDV_USD,
+    graduationFdvToleranceRatio = QUICK_LAUNCH_GRADUATION_FDV_TOLERANCE_RATIO,
   } = options
 
   // Raise denomination: native only.
@@ -484,6 +541,23 @@ export function isQuickLaunch(params: QuickLaunchMatchParams, options: QuickLaun
   // would report finite). See QuickLaunchLockMode.
   if (params.lock !== undefined && !isStructurallyPermanentLockMode(params.lock.mode)) {
     if (params.lock.mode !== QUICK_LAUNCH_LOCK_MODE || !params.lock.permanentTimelock) {
+      return false
+    }
+  }
+
+  // Graduation FDV (USD) — an ADDITIONAL gate on top of the structural checks above, never a
+  // replacement for them. Asserted only when the caller supplies a resolved USD number; undefined
+  // and null both mean the backend has not populated it yet and leave the graduation unasserted, so
+  // the gate is a no-op until the value is supplied. When resolved, the auction is a quick launch
+  // only if the FDV is within tolerance of SOME allowed preset value. USD-denominated on purpose:
+  // the matcher never sees a native amount, so the gate is chain-agnostic (a legit $5k launch passes
+  // on any chain; a raw-native threshold would wrongly demote every non-ETH chain).
+  if (params.graduationFdvUsd !== undefined && params.graduationFdvUsd !== null) {
+    const fdv = params.graduationFdvUsd
+    const graduationMatches = allowedGraduationFdvUsd.some(
+      (allowed) => Math.abs(fdv - allowed) <= allowed * graduationFdvToleranceRatio
+    )
+    if (!graduationMatches) {
       return false
     }
   }

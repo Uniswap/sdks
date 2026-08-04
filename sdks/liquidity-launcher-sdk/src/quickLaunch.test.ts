@@ -8,8 +8,10 @@ import {
   PERMANENT_TIMELOCK_MIN_HORIZON_SECONDS,
   PERMANENT_TIMELOCK_REQUEST_SECONDS,
   PERMANENT_UNLOCK_BLOCK_THRESHOLD,
+  QUICK_LAUNCH_ALLOWED_GRADUATION_FDV_USD,
   QUICK_LAUNCH_DURATION_SECONDS,
   QUICK_LAUNCH_FLOOR_FDV_USD,
+  QUICK_LAUNCH_GRADUATION_FDV_TOLERANCE_RATIO,
   QUICK_LAUNCH_GRADUATION_FDV_USD,
   QUICK_LAUNCH_GRADUATION_RAISE_USD,
   QUICK_LAUNCH_PRESET,
@@ -434,5 +436,161 @@ describe('FDV -> price-per-token request derivation', () => {
   it('throws on a missing/invalid ETH price so callers choose their own fallback', () => {
     expect(() => getQuickLaunchFloorPricePerToken(0)).toThrow()
     expect(() => getQuickLaunchGraduationPricePerToken(Number.NaN)).toThrow()
+  })
+})
+
+describe('graduation-FDV gate constants', () => {
+  it('grandfathers both the $5k historical cohort and the $10k current preset', () => {
+    expect([...QUICK_LAUNCH_ALLOWED_GRADUATION_FDV_USD]).toEqual([5_000, 10_000])
+    // The current preset value is in the allowed set.
+    expect(QUICK_LAUNCH_ALLOWED_GRADUATION_FDV_USD).toContain(QUICK_LAUNCH_GRADUATION_FDV_USD)
+  })
+
+  it('uses a ±25% comfort tolerance frozen at ingest', () => {
+    expect(QUICK_LAUNCH_GRADUATION_FDV_TOLERANCE_RATIO).toBe(0.25)
+  })
+})
+
+describe('isQuickLaunch — graduation-FDV gate', () => {
+  it('leaves the assertion off when graduationFdvUsd is undefined (unresolved)', () => {
+    // Structural match still classifies — nothing regresses before the backend populates the field.
+    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: undefined }))).toBe(true)
+  })
+
+  it('leaves the assertion off when graduationFdvUsd is null (unresolved)', () => {
+    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: null }))).toBe(true)
+  })
+
+  it('matches an exact in-set $5k graduation FDV', () => {
+    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 5_000 }))).toBe(true)
+  })
+
+  it('matches an exact in-set $10k graduation FDV', () => {
+    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 10_000 }))).toBe(true)
+  })
+
+  it('matches a value within tolerance of an allowed preset (±25%)', () => {
+    // 12_400 is within 25% of 10_000 (11_500 low bound would fail; 12_500 is the edge).
+    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 12_400 }))).toBe(true)
+    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 12_500 }))).toBe(true) // exactly at the edge
+    // 6_000 is within 25% of 5_000.
+    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 6_000 }))).toBe(true)
+  })
+
+  it('rejects a value that falls between the allowed presets, outside both tolerances', () => {
+    // 7_000 is >25% above 5_000 (edge 6_250) and >25% below 10_000 (edge 7_500).
+    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 7_000 }))).toBe(false)
+  })
+
+  it("rejects RTH's ~$3.7B graduation FDV — the impersonation this gate closes", () => {
+    // required_currency_raised = 1,000,000 ETH at the 50%-sold preset => ~$3.7B FDV, ~375,000x over
+    // the $10k preset. Structurally it looks like a quick launch; the graduation gate demotes it.
+    const rth = presetAuction({ graduationFdvUsd: 3_700_000_000 })
+    expect(isQuickLaunch(rth)).toBe(false)
+    // Proof the gate is the ONLY reason it fails: drop the FDV and it matches structurally.
+    expect(isQuickLaunch(presetAuction({ ...rth, graduationFdvUsd: undefined }))).toBe(true)
+  })
+
+  it('is USD-denominated, so a legit $5k launch on a non-ETH chain passes (chain-agnostic)', () => {
+    // PHILAVAX raises ~378 AVAX = ~$5k. The matcher never sees the native amount — only the USD FDV —
+    // so it classifies identically regardless of chain / native token.
+    const avaxLaunch = presetAuction({ chainId: SupportedChainId.MAINNET, startBlock: 20_000n })
+    const withWindow = {
+      ...avaxLaunch,
+      endBlock: 20_000n + getQuickLaunchDurationBlocks(SupportedChainId.MAINNET),
+      graduationFdvUsd: 5_000,
+    }
+    expect(isQuickLaunch(withWindow)).toBe(true)
+  })
+
+  it('is an ADDITIONAL gate: a good FDV cannot rescue a broken structural fingerprint', () => {
+    expect(
+      isQuickLaunch(presetAuction({ totalSupplyRaw: 500_000_000n * 10n ** 18n, graduationFdvUsd: 10_000 }))
+    ).toBe(false)
+  })
+
+  it('honors an overridden allowed set (same mechanism as allowedDurationsSeconds)', () => {
+    // $50k is not in the default set, so it fails by default...
+    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 50_000 }))).toBe(false)
+    // ...but passes when the caller widens the allowed set explicitly.
+    expect(
+      isQuickLaunch(presetAuction({ graduationFdvUsd: 50_000 }), { allowedGraduationFdvUsd: [50_000] })
+    ).toBe(true)
+  })
+
+  it('honors an overridden tolerance ratio', () => {
+    // 20_000 is 100% over 10_000 — far outside the default ±25%...
+    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: 20_000 }))).toBe(false)
+    // ...but within a widened ±100% tolerance.
+    expect(
+      isQuickLaunch(presetAuction({ graduationFdvUsd: 20_000 }), { graduationFdvToleranceRatio: 1.0 })
+    ).toBe(true)
+  })
+})
+
+describe('isQuickLaunch — real prod cohort (graduation FDVs as of 2026-08-04, verified by Bruno)', () => {
+  // The live auctions that motivated this gate. Each ACCEPT lands within tolerance of an allowed
+  // preset ({5_000, 10_000} at ratio 0.25); the single REJECT is the $3.7B impersonation the gate
+  // exists to demote. Named so the fixtures cite the real auctions.
+
+  // ACCEPT — clustered within 0.1% of the $10k preset.
+  const AROUND_10K: ReadonlyArray<readonly [name: string, fdvUsd: number]> = [
+    ['COCO', 9_993],
+    ['BING', 10_002],
+    ['LILY', 10_077],
+    ['JAM', 10_000],
+    ['SKRMP', 10_000],
+    ['HBD', 10_000],
+    ['PCHOWD', 10_000],
+    ['TEST', 10_000],
+  ]
+
+  // ACCEPT — grandfathered $5k historical cohort.
+  const AROUND_5K: ReadonlyArray<readonly [name: string, fdvUsd: number]> = [
+    ['CHWDR', 4_878],
+    ['TOYODA', 4_870],
+    ['PHIL', 4_889],
+  ]
+
+  it.each(AROUND_10K)('accepts %s ($%d) — within 0.1%% of the $10k preset', (_name, fdvUsd) => {
+    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: fdvUsd }))).toBe(true)
+  })
+
+  it.each(AROUND_5K)('accepts %s ($%d) — grandfathered $5k cohort', (_name, fdvUsd) => {
+    expect(isQuickLaunch(presetAuction({ graduationFdvUsd: fdvUsd }))).toBe(true)
+  })
+
+  it('accepts PHILAVAX ($5,073 = 378.09 AVAX x $6.71) — proves the gate must be USD, not native', () => {
+    // 378 native units would look like an outlier against an ETH-shaped threshold, but the USD FDV
+    // is a legit $5k. The matcher only ever sees the USD number, so it classifies chain-agnostically.
+    const philAvax = presetAuction({
+      chainId: SupportedChainId.MAINNET,
+      startBlock: 20_000n,
+      endBlock: 20_000n + getQuickLaunchDurationBlocks(SupportedChainId.MAINNET),
+      graduationFdvUsd: 5_073,
+    })
+    expect(isQuickLaunch(philAvax)).toBe(true)
+  })
+
+  it('rejects RTH ($3,747,000,000) — the ~375,000x impersonation this gate closes', () => {
+    const rth = presetAuction({ graduationFdvUsd: 3_747_000_000 })
+    expect(isQuickLaunch(rth)).toBe(false)
+    // The graduation gate is the ONLY reason RTH fails — it matches the preset structurally.
+    expect(isQuickLaunch(presetAuction({ ...rth, graduationFdvUsd: undefined }))).toBe(true)
+  })
+
+  it('confirms the tolerance math: the whole legit cohort [$4,870 … $10,077] passes', () => {
+    const cohort = [...AROUND_10K, ...AROUND_5K, ['PHILAVAX', 5_073] as const]
+    for (const [name, fdvUsd] of cohort) {
+      const withinTolerance = QUICK_LAUNCH_ALLOWED_GRADUATION_FDV_USD.some(
+        (allowed) => Math.abs(fdvUsd - allowed) / allowed <= QUICK_LAUNCH_GRADUATION_FDV_TOLERANCE_RATIO
+      )
+      expect({ name, withinTolerance }).toEqual({ name, withinTolerance: true })
+    }
+    // ...and RTH's $3.7B is nowhere near either allowed value.
+    const rthWithin = QUICK_LAUNCH_ALLOWED_GRADUATION_FDV_USD.some(
+      (allowed) => Math.abs(3_747_000_000 - allowed) / allowed <= QUICK_LAUNCH_GRADUATION_FDV_TOLERANCE_RATIO
+    )
+    expect(rthWithin).toBe(false)
   })
 })
