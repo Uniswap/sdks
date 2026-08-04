@@ -41,20 +41,13 @@ export interface LauncherAddresses {
 const PERMIT2 = getAddress('0x000000000022D473030F116dDEE9F6B43aC78BA3')
 
 // Deployed at the same CREATE2 address on every supported chain.
-//
-// The liquidity-launcher#223 / #227 work (UniversalRouterStrategy plus the native path) changes the
-// launcher's bytecode, so the mined vanity salt no longer resolves to the previous
-// 0x00004c4ccc709Ef590F7C81102C0689F0263D4e9 and the launcher is being redeployed. The constructor
-// is untouched, so the init code stays chain-independent and one address on every chain still holds
-// — a fresh salt is mined once and the launcher is redeployed everywhere.
-//
-// PLACEHOLDER, NOT THE FINAL ADDRESS. This is the chain-4663 dev deploy built from the tip of
-// liquidity-launcher#227, and 4663 is the only chain it exists on today (verified by eth_getCode
-// against every chain in this registry, 2026-08-04). The production address will be a different,
-// re-mined one that has not been deployed anywhere yet. Replace this value before releasing: as
-// written, the eight non-4663 chains resolve to an address with no code on them.
-const LIQUIDITY_LAUNCHER = getAddress('0xe050309b2F42cD5f788aB6eE1a07467770C03BF7')
-// UniversalRouterStrategy, pinned to LIQUIDITY_LAUNCHER as a constructor immutable (verified
+const LIQUIDITY_LAUNCHER = getAddress('0x00004c4ccc709Ef590F7C81102C0689F0263D4e9')
+// liquidity-launcher #223/#227 dev deploy, chain 4663 only. The redeploy changes the launcher's
+// bytecode so the mined vanity salt no longer resolves to LIQUIDITY_LAUNCHER. Scoped to Robinhood
+// because that is the only chain it exists on; when the final re-mined launcher is deployed on
+// every chain this collapses back into LIQUIDITY_LAUNCHER.
+const LIQUIDITY_LAUNCHER_ROBINHOOD = getAddress('0xe050309b2F42cD5f788aB6eE1a07467770C03BF7')
+// UniversalRouterStrategy, pinned to LIQUIDITY_LAUNCHER_ROBINHOOD as a constructor immutable (verified
 // on-chain: `launcher()` returns it). Deployed via CREATE2 at salt 0 through the canonical deployer
 // (liquidity-launcher#227 `DeployUniversalRouterStrategy.s.sol`), so it is chain-independent too —
 // but it is only deployed on 4663 so far, hence the per-chain optional field. Same dev-deploy
@@ -147,7 +140,7 @@ export const LAUNCHER_ADDRESSES: Partial<Record<number, LauncherAddresses>> = {
     positionManager: POSITION_MANAGER_XLAYER,
   },
   [SupportedChainId.ROBINHOOD]: {
-    liquidityLauncher: LIQUIDITY_LAUNCHER,
+    liquidityLauncher: LIQUIDITY_LAUNCHER_ROBINHOOD,
     lbpStrategy: getAddress('0x05d552391067389EE44fec3924157ed33F976000'),
     tokenSplitter: TOKEN_SPLITTER,
     ccaFactory: CCA_FACTORY,
@@ -278,7 +271,7 @@ export function getTickDataLensForFactory(factoryAddress: string): Address | und
 //  - PR227 pair (2026-08-04, current): forced by the launcher redeploy in liquidity-launcher
 //    #223/#227. The strategy logic is untouched (neither PR modifies InstantLaunchStrategy.sol) —
 //    each new runtime is byte-identical to its 3e05da8 counterpart except at the three sites
-//    embedding the `launcher` immutable, which now holds LIQUIDITY_LAUNCHER. A pure re-pin.
+//    embedding the `launcher` immutable, which now holds LIQUIDITY_LAUNCHER_ROBINHOOD. A pure re-pin.
 // The FeeSplitters and the shared singletons below are unchanged across all four generations
 // (still the c3f9506 deploys), and every generation opens pools at initialTick 198,060.
 const INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_C3F9506 = getAddress('0x60D73b21cDf2EA846ab3d58699BBbb8F29d72491')
@@ -287,7 +280,7 @@ const INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_8E40A35 = getAddress('0xcE57498D
 const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD_8E40A35 = getAddress('0x583a7903152b95831e82ffF534448Dee081754ec')
 const INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_3E05DA8 = getAddress('0x9F67B864B565966dfCc2E0C6bA2483b2D5fF4b00')
 const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD_3E05DA8 = getAddress('0x16b63f1c8415FD68591c31FB3c6796a333DD640C')
-// Same dev-deploy caveat as LIQUIDITY_LAUNCHER: these are re-pinned to the 4663 dev launcher and
+// Same dev-deploy caveat as LIQUIDITY_LAUNCHER_ROBINHOOD: these are re-pinned to the 4663 dev launcher and
 // will be redeployed again against the final re-mined launcher address.
 const INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_PR227 = getAddress('0xF0C0a0f3a0c09023c8E4747DEED996FE8648e85e')
 const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD_PR227 = getAddress('0x3fe607E7236DDa841bC805dDe8821339f012dcE3')
@@ -458,7 +451,7 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
 /** The per-chain Instant Launch singleton contracts, keyed by numeric chain id. */
 export const INSTANT_LAUNCH_CONTRACTS: Partial<Record<number, InstantLaunchChainContracts>> = {
   [SupportedChainId.ROBINHOOD]: {
-    liquidityLauncher: LIQUIDITY_LAUNCHER,
+    liquidityLauncher: LIQUIDITY_LAUNCHER_ROBINHOOD,
     beneficiaryVault: UERC20_BENEFICIARY_VAULT_ROBINHOOD,
     compoundingClaimRecipient: COMPOUNDING_CLAIM_RECIPIENT_ROBINHOOD,
   },

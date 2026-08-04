@@ -13,8 +13,10 @@ import {
   getInstantLaunchStrategy,
   getLauncherAddresses,
   getTickDataLensForFactory,
+  INSTANT_LAUNCH_CONTRACTS,
   INSTANT_LAUNCH_DEPLOYMENT_BY_STRATEGY,
   INSTANT_LAUNCH_DEPLOYMENTS,
+  LAUNCHER_ADDRESSES,
   isAutocompoundPositionRecipient,
   isCreatorFeesPositionRecipient,
   selectTokenFactory,
@@ -30,10 +32,18 @@ describe('getLauncherAddresses', () => {
     expect(addresses?.lbpStrategy).toBe(getAddress('0x298eA05D0356B2Ae5cCAa3169E471783ee9EA000'))
   })
 
-  it('uses the same LiquidityLauncher CREATE2 address on every chain', () => {
-    const mainnet = getLauncherAddresses(SupportedChainId.MAINNET)
-    const unichain = getLauncherAddresses(SupportedChainId.UNICHAIN)
-    expect(mainnet?.liquidityLauncher).toBe(unichain!.liquidityLauncher)
+  it('keeps the live shared LiquidityLauncher CREATE2 address on every chain except Robinhood', () => {
+    const sharedLauncher = getAddress('0x00004c4ccc709Ef590F7C81102C0689F0263D4e9')
+    for (const chainId of Object.values(SupportedChainId).filter((v): v is number => typeof v === 'number')) {
+      if (chainId === SupportedChainId.ROBINHOOD) continue
+      expect(getLauncherAddresses(chainId)?.liquidityLauncher).toBe(sharedLauncher)
+    }
+  })
+
+  it('scopes the #223/#227 dev launcher to Robinhood (4663) in both registries', () => {
+    const devLauncher = getAddress('0xe050309b2F42cD5f788aB6eE1a07467770C03BF7')
+    expect(getLauncherAddresses(SupportedChainId.ROBINHOOD)?.liquidityLauncher).toBe(devLauncher)
+    expect(getInstantLaunchContracts(SupportedChainId.ROBINHOOD)?.liquidityLauncher).toBe(devLauncher)
   })
 
   it('returns undefined for an unsupported chain', () => {
@@ -203,6 +213,19 @@ describe('Instant Launch deployment registry', () => {
     expect(contracts?.beneficiaryVault).toBe(getAddress('0x587D2fDDDF14F6f84022b51e8c3a473eB88C4544'))
     expect(contracts?.compoundingClaimRecipient).toBe(getAddress('0x666DA63451A502A323677C2Ef5F763181358be9b'))
     expect(contracts?.liquidityLauncher).toBe(getLauncherAddresses(SupportedChainId.ROBINHOOD)!.liquidityLauncher)
+  })
+
+  it('agrees with LAUNCHER_ADDRESSES on liquidityLauncher for every chain both registries cover', () => {
+    // The InstantLaunchChainContracts docstring asserts "same registry value as
+    // {@link LauncherAddresses.liquidityLauncher}" — with a chain-scoped launcher constant this
+    // invariant now has a way to be violated, so pin it here for every co-covered chain.
+    const coveredChains = Object.keys(INSTANT_LAUNCH_CONTRACTS).map(Number)
+    expect(coveredChains.length).toBeGreaterThan(0)
+    for (const chainId of coveredChains) {
+      const launcherEntry = LAUNCHER_ADDRESSES[chainId]
+      expect(launcherEntry).toBeDefined()
+      expect(INSTANT_LAUNCH_CONTRACTS[chainId]!.liquidityLauncher).toBe(launcherEntry!.liquidityLauncher)
+    }
   })
 })
 
