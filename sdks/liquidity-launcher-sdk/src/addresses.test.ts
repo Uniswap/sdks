@@ -13,8 +13,10 @@ import {
   getInstantLaunchStrategy,
   getLauncherAddresses,
   getTickDataLensForFactory,
+  INSTANT_LAUNCH_CONTRACTS,
   INSTANT_LAUNCH_DEPLOYMENT_BY_STRATEGY,
   INSTANT_LAUNCH_DEPLOYMENTS,
+  LAUNCHER_ADDRESSES,
   isAutocompoundPositionRecipient,
   isCreatorFeesPositionRecipient,
   selectTokenFactory,
@@ -30,14 +32,29 @@ describe('getLauncherAddresses', () => {
     expect(addresses?.lbpStrategy).toBe(getAddress('0x298eA05D0356B2Ae5cCAa3169E471783ee9EA000'))
   })
 
-  it('uses the same LiquidityLauncher CREATE2 address on every chain', () => {
-    const mainnet = getLauncherAddresses(SupportedChainId.MAINNET)
-    const unichain = getLauncherAddresses(SupportedChainId.UNICHAIN)
-    expect(mainnet?.liquidityLauncher).toBe(unichain!.liquidityLauncher)
+  it('keeps the live shared LiquidityLauncher CREATE2 address on every chain except Robinhood', () => {
+    const sharedLauncher = getAddress('0x00004c4ccc709Ef590F7C81102C0689F0263D4e9')
+    for (const chainId of Object.values(SupportedChainId).filter((v): v is number => typeof v === 'number')) {
+      if (chainId === SupportedChainId.ROBINHOOD) continue
+      expect(getLauncherAddresses(chainId)?.liquidityLauncher).toBe(sharedLauncher)
+    }
+  })
+
+  it('scopes the #223/#227 dev launcher to Robinhood (4663) in both registries', () => {
+    const devLauncher = getAddress('0xe050309b2F42cD5f788aB6eE1a07467770C03BF7')
+    expect(getLauncherAddresses(SupportedChainId.ROBINHOOD)?.liquidityLauncher).toBe(devLauncher)
+    expect(getInstantLaunchContracts(SupportedChainId.ROBINHOOD)?.liquidityLauncher).toBe(devLauncher)
   })
 
   it('returns undefined for an unsupported chain', () => {
     expect(getLauncherAddresses(999999)).toBeUndefined()
+  })
+
+  it('carries the UniversalRouterStrategy only where it is deployed (4663 so far)', () => {
+    expect(getLauncherAddresses(SupportedChainId.ROBINHOOD)?.universalRouterStrategy).toBe(
+      getAddress('0xB7fF4d94C3fB06ec4D715cFa4DDdf3f18d16e945')
+    )
+    expect(getLauncherAddresses(SupportedChainId.MAINNET)?.universalRouterStrategy).toBeUndefined()
   })
 
   it('returns the per-chain LBPStrategy singletons for the 2026-07 launch chains', () => {
@@ -111,21 +128,23 @@ describe('selectTokenFactory', () => {
   })
 })
 
-// The three canonical Robinhood strategy generations from the liquidity-launcher dev README, in
+// The four canonical Robinhood strategy generations from the liquidity-launcher dev README, in
 // registry (append) order. All share the per-variant FeeSplitters and open at initialTick 198,060.
 const ROBINHOOD_STRATEGY_GENERATIONS = [
   // c3f9506 (2026-07-29)
   { on: '0x60D73b21cDf2EA846ab3d58699BBbb8F29d72491', off: '0xFCe92C70f1fc017b72f6DD7a00D9E38725C7fBd1' },
   // 8e40a35 (2026-07-30, initial-tick cap)
   { on: '0xcE57498D3474DCC244dFb6710fFbE6D4441cD2b2', off: '0x583a7903152b95831e82ffF534448Dee081754ec' },
-  // 3e05da8 (2026-07-30, current)
+  // 3e05da8 (2026-07-30)
   { on: '0x9F67B864B565966dfCc2E0C6bA2483b2D5fF4b00', off: '0x16b63f1c8415FD68591c31FB3c6796a333DD640C' },
+  // #223/#227 launcher redeploy (2026-08-04, current)
+  { on: '0xF0C0a0f3a0c09023c8E4747DEED996FE8648e85e', off: '0x3fe607E7236DDa841bC805dDe8821339f012dcE3' },
 ] as const
 
 describe('Instant Launch deployment registry', () => {
-  it('carries all three canonical Robinhood strategy generations from the liquidity-launcher dev README', () => {
+  it('carries all four canonical Robinhood strategy generations from the liquidity-launcher dev README', () => {
     const deployments = getInstantLaunchDeployments(SupportedChainId.ROBINHOOD)
-    expect(deployments).toHaveLength(6)
+    expect(deployments).toHaveLength(8)
     ROBINHOOD_STRATEGY_GENERATIONS.forEach((generation, index) => {
       const on = deployments[index * 2]
       const off = deployments[index * 2 + 1]
@@ -151,12 +170,12 @@ describe('Instant Launch deployment registry', () => {
     expect(getInstantLaunchContracts(SupportedChainId.MAINNET)).toBeUndefined()
   })
 
-  it('getInstantLaunchStrategy selects the current (3e05da8) deployment per variant', () => {
+  it('getInstantLaunchStrategy selects the current (#223/#227 redeploy) deployment per variant', () => {
     expect(getInstantLaunchStrategy(SupportedChainId.ROBINHOOD, { creatorFeesEnabled: true })?.strategy).toBe(
-      getAddress('0x9F67B864B565966dfCc2E0C6bA2483b2D5fF4b00')
+      getAddress('0xF0C0a0f3a0c09023c8E4747DEED996FE8648e85e')
     )
     expect(getInstantLaunchStrategy(SupportedChainId.ROBINHOOD, { creatorFeesEnabled: false })?.strategy).toBe(
-      getAddress('0x16b63f1c8415FD68591c31FB3c6796a333DD640C')
+      getAddress('0x3fe607E7236DDa841bC805dDe8821339f012dcE3')
     )
   })
 
@@ -194,6 +213,19 @@ describe('Instant Launch deployment registry', () => {
     expect(contracts?.beneficiaryVault).toBe(getAddress('0x587D2fDDDF14F6f84022b51e8c3a473eB88C4544'))
     expect(contracts?.compoundingClaimRecipient).toBe(getAddress('0x666DA63451A502A323677C2Ef5F763181358be9b'))
     expect(contracts?.liquidityLauncher).toBe(getLauncherAddresses(SupportedChainId.ROBINHOOD)!.liquidityLauncher)
+  })
+
+  it('agrees with LAUNCHER_ADDRESSES on liquidityLauncher for every chain both registries cover', () => {
+    // The InstantLaunchChainContracts docstring asserts "same registry value as
+    // {@link LauncherAddresses.liquidityLauncher}" — with a chain-scoped launcher constant this
+    // invariant now has a way to be violated, so pin it here for every co-covered chain.
+    const coveredChains = Object.keys(INSTANT_LAUNCH_CONTRACTS).map(Number)
+    expect(coveredChains.length).toBeGreaterThan(0)
+    for (const chainId of coveredChains) {
+      const launcherEntry = LAUNCHER_ADDRESSES[chainId]
+      expect(launcherEntry).toBeDefined()
+      expect(INSTANT_LAUNCH_CONTRACTS[chainId]!.liquidityLauncher).toBe(launcherEntry!.liquidityLauncher)
+    }
   })
 })
 

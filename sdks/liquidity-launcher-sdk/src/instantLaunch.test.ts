@@ -42,7 +42,7 @@ const BUILD_PARAMS = {
 describe('getInstantLaunchAddresses', () => {
   it('resolves the fees-on Robinhood (4663) stack from the canonical dev-README deployment', () => {
     const addresses = getInstantLaunchAddresses(CHAIN_ID, { creatorFeesEnabled: true })
-    expect(addresses?.strategy).toBe(getAddress('0x9F67B864B565966dfCc2E0C6bA2483b2D5fF4b00'))
+    expect(addresses?.strategy).toBe(getAddress('0xF0C0a0f3a0c09023c8E4747DEED996FE8648e85e'))
     expect(addresses?.feeSplitter).toBe(getAddress('0x7198C32a497c09497e04C86cf8F77A244A9E4b8F'))
     expect(addresses?.beneficiaryVault).toBe(getAddress('0x587D2fDDDF14F6f84022b51e8c3a473eB88C4544'))
     expect(addresses?.compoundingClaimRecipient).toBe(getAddress('0x666DA63451A502A323677C2Ef5F763181358be9b'))
@@ -52,7 +52,7 @@ describe('getInstantLaunchAddresses', () => {
   it('resolves the fees-off Robinhood stack to its own strategy + splitter, same singletons', () => {
     const on = getInstantLaunchAddresses(CHAIN_ID, { creatorFeesEnabled: true })
     const off = getInstantLaunchAddresses(CHAIN_ID, { creatorFeesEnabled: false })
-    expect(off?.strategy).toBe(getAddress('0x16b63f1c8415FD68591c31FB3c6796a333DD640C'))
+    expect(off?.strategy).toBe(getAddress('0x3fe607E7236DDa841bC805dDe8821339f012dcE3'))
     expect(off?.feeSplitter).toBe(getAddress('0xDF50f4ea2207F9D2A753a3DaE729B36FDEF13b23'))
     expect(off?.strategy).not.toBe(on!.strategy)
     expect(off?.feeSplitter).not.toBe(on!.feeSplitter)
@@ -224,10 +224,10 @@ describe('deployment registry selectors', () => {
   it('getInstantLaunchStrategy keys the variant by creatorFeesEnabled', () => {
     const on = getInstantLaunchStrategy(CHAIN_ID, { creatorFeesEnabled: true })
     const off = getInstantLaunchStrategy(CHAIN_ID, { creatorFeesEnabled: false })
-    expect(on?.strategy).toBe(getAddress('0x9F67B864B565966dfCc2E0C6bA2483b2D5fF4b00'))
+    expect(on?.strategy).toBe(getAddress('0xF0C0a0f3a0c09023c8E4747DEED996FE8648e85e'))
     expect(on?.creatorFeeNativeBps).toBe(4000)
     expect(on?.creatorFeeTokenBps).toBe(0)
-    expect(off?.strategy).toBe(getAddress('0x16b63f1c8415FD68591c31FB3c6796a333DD640C'))
+    expect(off?.strategy).toBe(getAddress('0x3fe607E7236DDa841bC805dDe8821339f012dcE3'))
     expect(off?.creatorFeeNativeBps).toBe(0)
   })
 
