@@ -665,14 +665,15 @@ describe("V3DutchOrderBuilder", () => {
         );
     });
 
-    // DutchV3 rollout: Robinhood (4663) and Arc (5042). decayBlocks is the
-    // chain-realistic V3 decay window (~30s wallclock): 60 blocks at Arc's
-    // 500ms, 120 blocks at Robinhood's ~250ms under load. Confirms the reactor
-    // resolves from REACTOR_ADDRESS_MAPPING and an order decaying over that
-    // window builds.
+    // DutchV3 rollout: Robinhood (4663), Arc (5042), Ink (57073). decayBlocks is
+    // the chain-realistic V3 decay window (~30s wallclock): 60 blocks at Arc's
+    // 500ms, 120 blocks at Robinhood's ~250ms under load, 30 blocks at Ink's 1s.
+    // Confirms the reactor resolves from REACTOR_ADDRESS_MAPPING and an order
+    // decaying over that window builds.
     describe.each([
         { name: "Robinhood", chainId: 4663, reactor: "0x000000007A1C8e570011EeDF86A2A35593013cBA", decayBlocks: 120 },
         { name: "Arc", chainId: 5042, reactor: "0x0000000015134054eA82AE0bb9fda66b36402C36", decayBlocks: 60 },
+        { name: "Ink", chainId: 57073, reactor: "0x000000007A1C8e570011EeDF86A2A35593013cBA", decayBlocks: 30 },
     ])("DutchV3 rollout: $name ($chainId)", ({ chainId, reactor, decayBlocks }) => {
         it("resolves the reactor without an explicit address", () => {
             const b = new V3DutchOrderBuilder(chainId);
