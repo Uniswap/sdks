@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from 'bun:test'
 import type { Address } from 'viem'
 
-import type { PoolRef, QuoteResult, SearchReport } from '../src/index'
+import type { PoolRef, QuoteResult, SearchReport, SwapResult } from '../src/index'
 import { REASON_CODES } from '../src/index'
 
 import { setColorEnabled } from './ansi'
@@ -15,6 +15,7 @@ import {
   renderQuoteResult,
   renderRoute,
   renderSearchReport,
+  renderSwapResult,
   renderWaveLine,
   type RenderCtx,
 } from './report'
@@ -178,6 +179,45 @@ describe('result rendering', () => {
     expect(renderWaveLine(2, 181, result, trade, CTX, 3_900_000_000n)).toBe(
       'wave 2  +181ms  ▲ 3,912.401234 USDC  ETH ─(v3 0.05% 0xE055…939F)→ USDC [12/18 quoted]',
     )
+  })
+})
+
+describe('renderSwapResult', () => {
+  const UR: Address = '0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af'
+  const PERMIT2: Address = '0x000000000022D473030F116dDEE9F6B43aC78BA3'
+
+  it('renders the needs-action checklist, tx, and limits panel — snapshot', () => {
+    const result: SwapResult = {
+      status: 'needs-action',
+      best: {
+        route: { legs: [{ pool: V3_POOL, currencyIn: USDC, currencyOut: 'native' }] },
+        quote: { amountIn: 250_000_000n, amountOut: 100_000_000_000_000_000n, intermediateAmounts: [] },
+        execution: 'needs-action',
+      },
+      tx: { to: UR, data: '0xdeadbeef', value: 0n },
+      requirements: [
+        { kind: 'erc20-approval', token: USDC, spender: PERMIT2, minimumAmount: 250_000_000n },
+        { kind: 'permit2-allowance', token: USDC, spender: UR, minimumAmount: 250_000_000n },
+      ],
+      limits: { minAmountOut: 99_000_000_000_000_000n, deadline: 2_000_000_000n },
+      search: REPORT,
+      alternatives: [],
+    }
+    const trade = { tokenIn: USDC, tokenOut: 'native' as const, amountIn: 250_000_000n }
+    expect(renderSwapResult(result, trade, CTX, 412)).toEqual([
+      '● needs-action  250 USDC → ETH: 0.1 ETH  (412ms)',
+      '  USDC ─(v3 0.05% 0xE055…939F)→ ETH  needs-action',
+      'before sending:',
+      '  • approve USDC to Permit2 0x0000…8BA3 for ≥ 250 USDC',
+      '  • set Permit2 allowance USDC → 0x66a9…A8Af for ≥ 250 USDC',
+      'tx',
+      `  to    ${UR}`,
+      '  value 0 ETH',
+      '  data  0xdeadbeef',
+      'limits minAmountOut 0.099 ETH · deadline 2033-05-18T03:33:20Z',
+      '',
+      ...renderSearchReport(REPORT),
+    ])
   })
 })
 

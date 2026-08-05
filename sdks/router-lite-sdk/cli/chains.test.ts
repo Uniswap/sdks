@@ -1,7 +1,11 @@
-import { describe, expect, it } from 'bun:test'
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 
 import { UsageError } from './args'
-import { matchChain, parseChainzList, type ChainzEntry } from './chains'
+import { chainzRpcUrl, matchChain, parseChainzList, resolveChain, type ChainzEntry } from './chains'
 
 // A canned `chainz list --json` capture (URLs already redacted by chainz itself; this CLI only
 // reads name/aliases/chain_id). Pins the parse to the real shape so a chainz upgrade that changes
@@ -48,5 +52,46 @@ describe('matchChain', () => {
 
   it('rejects a name neither source knows', () => {
     expect(() => matchChain('gibberish', chainz)).toThrow(UsageError)
+  })
+})
+
+// A shim standing in for chainz: knows no chains at all (`list` is empty, `exec` exits 1 the way
+// the real chainz does for an unconfigured chain). Wired in via the RL_CHAINZ_BIN override —
+// `chains.ts`'s explicit test seam — rather than a PATH prepend, which does not reliably redirect
+// executable resolution under every runtime's spawn.
+describe('chainz process integration (stubbed via RL_CHAINZ_BIN shim)', () => {
+  let shimDir: string
+
+  beforeAll(() => {
+    shimDir = mkdtempSync(join(tmpdir(), 'rl-chainz-shim-'))
+    const shim = join(shimDir, 'chainz')
+    writeFileSync(
+      shim,
+      '#!/bin/sh\ncase "$1" in\n  --version) echo "chainz 0.0.0-shim"; exit 0;;\n  list) echo "[]"; exit 0;;\n  exec) echo "Chain not found" >&2; exit 1;;\nesac\nexit 1\n',
+    )
+    chmodSync(shim, 0o755)
+    process.env.RL_CHAINZ_BIN = shim
+  })
+
+  afterAll(() => {
+    delete process.env.RL_CHAINZ_BIN
+    rmSync(shimDir, { recursive: true, force: true })
+  })
+
+  it('treats a nonzero chainz exit (chain not configured) as undefined, not an error', () => {
+    // execFileSync reports the child's exit code via `status`; a missing chain must come back as
+    // "no URL" so `resolveChain` can render its friendly guidance instead of an internal stack.
+    expect(chainzRpcUrl(4663)).toBeUndefined()
+  })
+
+  it('resolveChain renders the friendly no-endpoint guidance (a UsageError, exit 3)', () => {
+    expect(() => resolveChain('mainnet', undefined)).toThrow(UsageError)
+    expect(() => resolveChain('mainnet', undefined)).toThrow(/chainz add.*--rpc/)
+  })
+
+  it('never spawns chainz when --rpc is supplied', () => {
+    const resolved = resolveChain('mainnet', 'https://rpc.example.test/KEYKEYKEYKEYKEYKEYKEY')
+    expect(resolved.rpcUrl).toBe('https://rpc.example.test/KEYKEYKEYKEYKEYKEYKEY')
+    expect(resolved.rpcSource).toBe('--rpc')
   })
 })

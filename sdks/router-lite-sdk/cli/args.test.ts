@@ -31,6 +31,10 @@ describe('parseArgs', () => {
     expect(() => parseArgs(['--budjet', '10s'], SPEC)).toThrow(UsageError)
   })
 
+  it("strips Node's misleading positional-argument advice from unknown-flag errors", () => {
+    expect(() => parseArgs(['--budjet', '10s'], SPEC)).toThrow(/^Unknown option '--budjet'\.?$/)
+  })
+
   it('rejects a value-flag with no value', () => {
     expect(() => parseArgs(['--chain'], SPEC)).toThrow(UsageError)
   })

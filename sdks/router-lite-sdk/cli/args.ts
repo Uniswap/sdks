@@ -51,9 +51,11 @@ export function parseArgs(argv: string[], spec: FlagSpec): ParsedArgs {
   try {
     ;({ values, positionals } = nodeParseArgs({ args: argv, options, allowPositionals: true, strict: true }))
   } catch (err) {
-    // Node's own message ("Unknown option '--budjet'", "Option '--budget' requires argument") is
-    // already the right prose — just strip the trailing usage hint it sometimes appends.
-    const message = err instanceof Error ? err.message.split('\n')[0]! : String(err)
+    // Node's own diagnosis ("Unknown option '--budjet'", "Option '--budget' requires argument") is
+    // the right prose, but it appends same-line advice about quoting positionals after `--` that
+    // is misleading for this CLI (no such convention here) — strip everything from that advice on.
+    const raw = err instanceof Error ? err.message : String(err)
+    const message = raw.split('\n')[0]!.replace(/\s*To specify a positional argument.*$/, '')
     throw new UsageError(message)
   }
 

@@ -41,6 +41,8 @@ import {
 
 import type { CurrencyRef, EncodedTx, ExecutionRequirement, NeedsActionSwap, ReadySwap, Router } from '../src/index'
 
+import { UsageError } from './args'
+
 /** Native balance the trader is given INSIDE the simulation only. */
 export const SIM_NATIVE_BALANCE = parseEther('100')
 
@@ -198,10 +200,12 @@ export async function simulateSwap(
     const acquire = await router.getSwap({ tokenIn: 'native', tokenOut: tokenIn, amountIn: ACQUIRE_NATIVE_BUDGET, trader })
     if (acquire.status !== 'ready' && acquire.status !== 'needs-action') {
       const reason = 'reason' in acquire ? ` (${acquire.reason.code})` : ''
-      throw new Error(`--simulate: no acquisition route native → tokenIn for the trader${reason} — cannot fund the simulated swap`)
+      throw new UsageError(
+        `--simulate: no acquisition route native → tokenIn for the trader${reason} — cannot fund the simulated swap`,
+      )
     }
     if (acquire.best.quote.amountOut < result.best.quote.amountIn) {
-      throw new Error('--simulate: the acquisition leg cannot buy enough tokenIn to fund the swap — try a smaller amount')
+      throw new UsageError('--simulate: the acquisition leg cannot buy enough tokenIn to fund the swap — try a smaller amount')
     }
     acquisitionTx = acquire.tx
   }
@@ -209,6 +213,6 @@ export async function simulateSwap(
   const payload = buildSimulatePayload(result, trader, acquisitionTx ? { acquisitionTx } : undefined)
   const blocks = (await client.request({ method: 'eth_simulateV1', params: [payload, 'latest'] } as never)) as SimulateBlockResult[]
   const block = blocks[0]
-  if (!block) throw new Error('--simulate: eth_simulateV1 returned no block results')
+  if (!block) throw new UsageError('--simulate: eth_simulateV1 returned no block results — the endpoint may not really support it')
   return evaluateSimulateResult(block, recipient, result.limits.minAmountOut)
 }

@@ -64,6 +64,12 @@ import { assertResultCoherent } from '../src/internal/testing'
 // and exported specifically so the payload shape and the log-decoding logic
 // can be unit-tested with canned inputs/responses, independent of whether a
 // live RPC (or even a working local eth_simulateV1) is available.
+//
+// ADAPTED (deliberately, not imported) BY `cli/simulate.ts` for the local-
+// testing CLI's `--simulate`: this module resolves the SDK by package name
+// (the built dist), while that tool must always run the working tree's
+// source. A change to the chained acquire→approve→swap design here should be
+// mirrored there (both carry unit tests over the pure halves).
 // ---------------------------------------------------------------------------
 
 /** The synthetic trader every canary run uses: fixed, and never signed for — this suite holds no

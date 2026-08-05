@@ -52,12 +52,15 @@ describe('formatAmount', () => {
 })
 
 describe('parseBudget', () => {
-  it('parses ms/s/m and bare milliseconds', () => {
+  it('parses ms/s/m durations', () => {
     expect(parseBudget('900ms')).toBe(900)
     expect(parseBudget('10s')).toBe(10_000)
     expect(parseBudget('2m')).toBe(120_000)
-    expect(parseBudget('750')).toBe(750)
     expect(parseBudget('1.5s')).toBe(1_500)
+  })
+
+  it('rejects a unitless number — ms-vs-s ambiguity must not be guessed at', () => {
+    expect(() => parseBudget('900')).toThrow(AmountError)
   })
 
   it('rejects zero and garbage', () => {

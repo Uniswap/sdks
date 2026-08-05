@@ -28,11 +28,11 @@ jobs:
   # Ungated: needs no secret, so it runs for every trigger of this workflow — including PRs from
   # forks/Dependabot, which never receive secrets, and before ROUTER_LITE_FORK_RPC is configured at
   # all. monorepo-checks.yml's `g:build`/`g:test` never typecheck *.test.ts files or the
-  # integration/canary suites' own tsconfigs, so this is its own job rather than a step folded into
+  # integration/canary/cli workspaces' own tsconfigs, so this is its own job rather than a step folded into
   # the (secret-gated) fork suite below, which would otherwise never run for exactly the PRs that
   # most need a static check they can't get real RPC coverage for.
   typecheck:
-    name: Typecheck (sdks/router-lite-sdk, base + tests + integration + canary)
+    name: Typecheck (sdks/router-lite-sdk, base + tests + integration + canary + cli)
     runs-on: ubuntu-latest
     env:
       TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
@@ -67,7 +67,7 @@ jobs:
         # points (package.json main/module -> dist/), not source, so a real build is required first.
         run: bun run g:build
 
-      - name: 🔎 Typecheck (base + tests + integration + canary tsconfigs)
+      - name: 🔎 Typecheck (base + tests + integration + canary + cli tsconfigs)
         working-directory: sdks/router-lite-sdk
         run: bun run typecheck:all
 

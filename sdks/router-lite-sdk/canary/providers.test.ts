@@ -88,6 +88,10 @@ const SECRET_SEGMENT_MIN_LENGTH = 16
  * redacting it unconditionally would trade a real diagnostic for no security at all. A URL is
  * treated as keyed when it has a path segment of at least {@link SECRET_SEGMENT_MIN_LENGTH}
  * characters, or any query string (some vendors pass the key as `?apikey=`).
+ *
+ * DUPLICATED (deliberately) IN `cli/redact.ts`, which must track the working tree's source rather
+ * than this workspace's built-dist resolution — its unit tests mirror this suite's cases, so a
+ * rule change here must be made there too (and vice versa).
  */
 export function redactKeyedUrl(message: string): string {
   return message.replace(/https?:\/\/[^\s"'<>\\]+/g, (url) => {

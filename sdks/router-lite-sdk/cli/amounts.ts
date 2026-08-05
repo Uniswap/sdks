@@ -59,14 +59,16 @@ export function formatAmount(amount: bigint, decimals: number, maxFractionDigits
 }
 
 /**
- * Parses a `--budget` duration (`'10s'`, `'500ms'`, `'2m'`, or bare milliseconds `'900'`) into
- * milliseconds for `AbortSignal.timeout` — the SDK's only wall-clock bound.
+ * Parses a `--budget` duration (`'900ms'`, `'10s'`, `'2m'`) into milliseconds for
+ * `AbortSignal.timeout`. A unit is REQUIRED: a bare `'900'` reads as 900ms to someone fresh from
+ * the SDK docs and as 900s to someone thinking in seconds, and a silently misread budget is worse
+ * than a one-line rejection.
  */
 export function parseBudget(text: string): number {
-  const match = text.trim().toLowerCase().match(/^(\d+(?:\.\d+)?)(ms|s|m)?$/)
-  if (!match) throw new AmountError(`unparseable budget '${text}' — expected e.g. 900ms, 10s, 2m`)
+  const match = text.trim().toLowerCase().match(/^(\d+(?:\.\d+)?)(ms|s|m)$/)
+  if (!match) throw new AmountError(`unparseable budget '${text}' — give a unit: 900ms, 10s, 2m`)
   const value = Number(match[1])
-  const unit = match[2] ?? 'ms'
+  const unit = match[2]
   const ms = unit === 'm' ? value * 60_000 : unit === 's' ? value * 1_000 : value
   if (!Number.isFinite(ms) || ms <= 0) throw new AmountError(`budget '${text}' must be positive`)
   return Math.round(ms)

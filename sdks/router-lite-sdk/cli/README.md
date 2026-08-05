@@ -40,20 +40,28 @@ puts `rl` on your PATH.
 ## Exit codes
 
 Scripting contract: `0` actionable (quote / ready / needs-action) · `1` no-route ·
-`2` inconclusive · `3` usage or configuration error · `4` unexpected internal error.
+`2` inconclusive · `3` usage or configuration error · `4` unexpected internal error ·
+`5` `--simulate` disproved the tx (a call in the proof chain reverted, or delivery landed below
+the tx's own `minAmountOut`) — distinct from `2` because the chain gave a verdict.
 
 ## Notes
 
 - **Chains**: the five built-in manifests (`rl chains` lists them; Robinhood Chain is quote-only,
   exactly as the SDK ships it). Chains without a built-in manifest need SDK-level `manifestFor`
-  overrides and are out of scope here.
+  overrides and are out of scope here. `RL_CHAINZ_BIN` pins a non-standard chainz binary location.
 - **Tokens**: symbols resolve against the manifest's own `coreIntermediates` by on-chain `symbol()`
   — no hardcoded token list, so `usdc` means USDC on mainnet and errors (naming what would work) on
   a chain that has none. Anything else takes an address.
 - **Amounts** are human units scaled by the token's on-chain decimals (`1.5`), or raw with a
-  suffix (`2500000wei`).
-- **`--budget`** maps to `AbortSignal.timeout` — the SDK's only wall-clock bound. Without it a
-  throttled endpoint can take a long time; the search is bounded in *work*, not in seconds.
+  suffix (`2500000wei`). An amount with more fractional digits than the token has decimals is an
+  error, not a silent truncation — `0.0000001` of a 6-decimals token is rejected rather than
+  quoted as zero (or as a different number than you typed).
+- **`--budget`** (unit required: `900ms`, `10s`, `2m`) is a **best-effort** budget, not a hard
+  wall-clock cap: it becomes an `AbortSignal` the SDK honors *between* search waves, and the
+  transport's own per-request timeout and retries are derived from it (requests capped at the
+  budget, no retries) so a stalled endpoint can't pin a wave far past it. A single in-flight
+  request can still overrun a very tight budget by up to that capped timeout. Without a budget the
+  search is bounded in *work*, not in seconds — a throttled endpoint can take a long time.
 - **`--verbose` vs `--watch`**: both stream a line per search wave; `--verbose` stops at the first
   actionable result (what `getQuote`/`getSwap` would return), `--watch` drains the whole bounded
   search (what the `quotes()`/`swaps()` iterators expose).

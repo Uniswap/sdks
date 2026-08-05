@@ -95,7 +95,12 @@ export function matchChain(
 // ---------------------------------------------------------------------------
 
 function chainzBinary(): string | undefined {
-  for (const candidate of ['chainz', join(homedir(), '.nix-profile/bin/chainz')]) {
+  // `RL_CHAINZ_BIN` pins the binary outright — for a non-standard install location, and for the
+  // unit tests, which point it at a shim (mutating PATH does not reliably redirect executable
+  // resolution under every runtime's spawn, so the seam is explicit instead).
+  const override = process.env.RL_CHAINZ_BIN
+  const candidates = override ? [override] : ['chainz', join(homedir(), '.nix-profile/bin/chainz')]
+  for (const candidate of candidates) {
     try {
       execFileSync(candidate, ['--version'], { stdio: ['ignore', 'ignore', 'ignore'] })
       return candidate
@@ -106,11 +111,14 @@ function chainzBinary(): string | undefined {
   return undefined
 }
 
-let cachedBinary: string | undefined | null = null
+let cachedBinary: { key: string | undefined; value: string | undefined } | undefined
 
 function binary(): string | undefined {
-  if (cachedBinary === null) cachedBinary = chainzBinary()
-  return cachedBinary
+  // Cache keyed by the override so a test (or shell) that changes RL_CHAINZ_BIN mid-process is
+  // never served the previous binary.
+  const key = process.env.RL_CHAINZ_BIN
+  if (!cachedBinary || cachedBinary.key !== key) cachedBinary = { key, value: chainzBinary() }
+  return cachedBinary.value
 }
 
 /** Every chain chainz knows about, or `[]` when chainz is not installed/configured. */
@@ -140,9 +148,13 @@ export function chainzRpcUrl(chainId: number): string | undefined {
     }).trim()
     return url.length > 0 ? url : undefined
   } catch (err) {
-    // A chain chainz doesn't have exits nonzero — that is "not configured", not an error.
+    // A chain chainz doesn't have makes it exit nonzero, which execFileSync reports via the
+    // error's `status` property (the child's exit code) — that is "not configured", not an error.
+    // The message itself is just "Command failed: …", so string-matching it can never distinguish
+    // the two; only a missing `status` (ENOENT, signal kill) is a real failure worth surfacing.
+    const status = (err as { status?: number | null }).status
+    if (typeof status === 'number') return undefined
     const message = err instanceof Error ? err.message : String(err)
-    if (/exited|status/i.test(message)) return undefined
     throw new Error(`chainz exec failed: ${redactKeyedUrl(message)}`)
   }
 }
@@ -162,7 +174,9 @@ export type ResolvedChain = {
  * the endpoint comes from `--rpc` when given, else from chainz.
  */
 export function resolveChain(chainSpec: string | undefined, rpcOverride: string | undefined): ResolvedChain {
-  const match = matchChain(chainSpec ?? 'mainnet', chainzChains())
+  // With --rpc there is nothing to ask chainz for — don't spawn it at all (built-in names/ids
+  // resolve without it, and the machine may not even have chainz installed).
+  const match = matchChain(chainSpec ?? 'mainnet', rpcOverride ? [] : chainzChains())
   if (!match.builtin) {
     const known = BUILTIN_CHAINS.map((c) => `${c.aliases[0]} (${c.chainId})`).join(', ')
     throw new UsageError(

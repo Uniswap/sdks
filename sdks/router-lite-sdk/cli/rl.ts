@@ -26,6 +26,8 @@
 //        2  inconclusive
 //        3  usage or configuration error
 //        4  unexpected internal error
+//        5  --simulate DISPROVED the tx (a call in the proof chain reverted,
+//           or delivery landed below the tx's own minAmountOut)
 // ---------------------------------------------------------------------------
 
 import { RouterConfigError, UnsupportedRouteError } from '../src/index'
@@ -54,7 +56,8 @@ ${bold('amounts')}   human units ('1.5', decimals-aware) or raw ('2500000wei')
 ${bold('common options')}
   --chain, -c <id|name>   chain (default: mainnet); rl chains lists them
   --rpc <url>             endpoint override (default: resolved from chainz — never printed)
-  --budget, -b <dur>      wall-clock cap, e.g. 900ms, 10s, 2m (maps to AbortSignal.timeout)
+  --budget, -b <dur>      best-effort budget (unit required: 900ms, 10s, 2m) — an AbortSignal the
+                          search honors between waves; transport timeouts/retries derive from it
   --hint <spec>           assert a pool for the pair: v2 | v3@500 | v4@3000/60[/0xHooks][:0xHookData]
   --watch, -w             stream every search wave to the end of the bounded search
   --verbose, -v           stream waves, stop at the first actionable result
@@ -74,7 +77,7 @@ ${bold('examples')}
   rl swap eth usdc 0.5 --trader 0x1111111111111111111111111111111111111111 --simulate
   rl discover 0xTOKEN --chain unichain
 
-${bold('exit codes')}   0 actionable · 1 no-route · 2 inconclusive · 3 usage/config · 4 internal`
+${bold('exit codes')}   0 actionable · 1 no-route · 2 inconclusive · 3 usage/config · 4 internal · 5 simulation disproved`
 
 async function dispatch(command: string | undefined, rest: string[]): Promise<number> {
   switch (command) {

@@ -51,16 +51,26 @@ export type ChainContext = {
  */
 export function buildChainContext(parsed: ParsedArgs): ChainContext {
   const chain = resolveChain(parsed.strings.get('chain'), parsed.strings.get('rpc'))
+  const budgetArg = parsed.strings.get('budget')
+  const budgetMs = budgetArg !== undefined ? parseBudget(budgetArg) : undefined
+  // `--budget` is a COOPERATIVE bound: the SDK consults its AbortSignal between waves, but a
+  // single stalled transport call would otherwise sit through viem's full per-request timeout
+  // times its default retries before the signal is ever looked at — measured at ~2 minutes of
+  // real time under `--budget 3s` against a stalled endpoint. So a budgeted run also derives the
+  // transport's behaviour from the budget: each request is capped at the budget itself (floored
+  // at 1s so a tight budget still lets one round trip through) and never retried. An unbudgeted
+  // run keeps viem's defaults plus the chain-shaped timeout.
+  const timeout =
+    budgetMs !== undefined ? Math.max(1_000, Math.min(budgetMs, clientTimeoutMs(chain.chainId))) : clientTimeoutMs(chain.chainId)
   const client = createPublicClient({
-    transport: http(chain.rpcUrl, { batch: true, timeout: clientTimeoutMs(chain.chainId) }),
+    transport: http(chain.rpcUrl, { batch: true, timeout, ...(budgetMs !== undefined ? { retryCount: 0 } : {}) }),
   }) as PublicClient
   const index = new PoolIndex(chain.manifest.wrappedNative, {
     reorgOverlapBlocks: chain.manifest.chain?.reorgOverlapBlocks,
   })
   const router = createRouter({ client, manifest: chain.manifest, index })
-  const budget = parsed.strings.get('budget')
   const base = { chain, client, router, index }
-  return budget !== undefined ? { ...base, signal: AbortSignal.timeout(parseBudget(budget)) } : base
+  return budgetMs !== undefined ? { ...base, signal: AbortSignal.timeout(budgetMs) } : base
 }
 
 export type TradeContextResolved = {

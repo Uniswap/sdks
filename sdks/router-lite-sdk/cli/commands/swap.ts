@@ -114,13 +114,19 @@ export async function cmdSwap(argv: string[]): Promise<number> {
   }
 
   if (parsed.booleans.has('simulate')) {
-    await runSimulation(ctx, final, trader, recipient ?? trader, tradeCtx, trade.renderCtx, json)
+    const verdict = await runSimulation(ctx, final, trader, recipient ?? trader, tradeCtx, trade.renderCtx, json)
+    // A simulation that DISPROVED the tx must not exit 0 — a script gating on "swap --simulate"
+    // would otherwise treat a proven-broken transaction as a success. Dedicated code 5 (documented
+    // in rl.ts/README) keeps it distinguishable from `inconclusive` (2): the chain gave a verdict.
+    if (verdict === 'disproved') return 5
   }
 
   return exitCodeFor(final.status)
 }
 
-/** The `--simulate` leg: probe for eth_simulateV1, then prove the final tx end to end. */
+/** The `--simulate` leg: probe for eth_simulateV1, then prove the final tx end to end. Returns
+ * `proved`/`disproved` when a simulation actually ran, `skipped` otherwise (nothing executable,
+ * or the endpoint lacks the method) — `skipped` never changes the exit code. */
 async function runSimulation(
   ctx: ChainContext,
   final: SwapResult,
@@ -129,21 +135,21 @@ async function runSimulation(
   tradeCtx: TradeContext,
   renderCtx: Parameters<typeof renderSwapResult>[2],
   json: boolean,
-): Promise<void> {
+): Promise<'proved' | 'disproved' | 'skipped'> {
   if (final.status !== 'ready' && final.status !== 'needs-action') {
     if (!json) console.log(dim(`--simulate skipped: nothing executable on a '${final.status}' result`))
-    return
+    return 'skipped'
   }
   const supported = await probeSimulateV1Support(ctx.client)
   if (!supported) {
     if (!json) console.log(yellow('--simulate skipped: this endpoint does not serve eth_simulateV1'))
     else console.log(jsonify({ simulate: { skipped: 'eth_simulateV1 unsupported' } }, false))
-    return
+    return 'skipped'
   }
   const outcome = await simulateSwap(ctx.client, ctx.router, final, trader, recipient)
   if (json) {
     console.log(jsonify({ simulate: outcome }, false))
-    return
+    return outcome.ok ? 'proved' : 'disproved'
   }
   console.log('')
   if (outcome.ok) {
@@ -152,7 +158,9 @@ async function runSimulation(
         amountFor(renderCtx, tradeCtx.tokenOut, outcome.outputReceived),
       )} ${dim(`(floor: ${amountFor(renderCtx, tradeCtx.tokenOut, final.limits.minAmountOut)})`)}`,
     )
-  } else if (outcome.failedCallIndex !== undefined) {
+    return 'proved'
+  }
+  if (outcome.failedCallIndex !== undefined) {
     console.log(red(`✖ simulation: call ${outcome.failedCallIndex + 1}/${outcome.callCount} of the chain reverted`))
   } else {
     console.log(
@@ -161,4 +169,5 @@ async function runSimulation(
       ),
     )
   }
+  return 'disproved'
 }
