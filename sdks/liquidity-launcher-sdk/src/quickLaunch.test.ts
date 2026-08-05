@@ -9,11 +9,13 @@ import {
   PERMANENT_TIMELOCK_REQUEST_SECONDS,
   PERMANENT_UNLOCK_BLOCK_THRESHOLD,
   QUICK_LAUNCH_ALLOWED_GRADUATION_FDV_USD,
+  QUICK_LAUNCH_ALLOWED_POOL_TICK_SPACINGS,
   QUICK_LAUNCH_DURATION_SECONDS,
   QUICK_LAUNCH_FLOOR_FDV_USD,
   QUICK_LAUNCH_GRADUATION_FDV_TOLERANCE_RATIO,
   QUICK_LAUNCH_GRADUATION_FDV_USD,
   QUICK_LAUNCH_GRADUATION_RAISE_USD,
+  QUICK_LAUNCH_POOL_TICK_SPACING,
   QUICK_LAUNCH_PRESET,
   QUICK_LAUNCH_RESERVED_FOR_LP_RAW,
   QUICK_LAUNCH_SOLD_SUPPLY_SHARE,
@@ -56,6 +58,8 @@ describe('QUICK_LAUNCH_PRESET', () => {
     expect(QUICK_LAUNCH_PRESET.auctionSupplyRaw).toBe(5n * 10n ** 26n)
     expect(QUICK_LAUNCH_PRESET.reservedForLpRaw).toBe(5n * 10n ** 26n)
     expect(QUICK_LAUNCH_PRESET.raiseCurrency).toBe(zeroAddress)
+    expect(QUICK_LAUNCH_PRESET.lp.fee).toBe(2_500)
+    expect(QUICK_LAUNCH_PRESET.lp.tickSpacing).toBe(25)
     expect(QUICK_LAUNCH_PRESET.lp.range).toBe('CONCENTRATED_FULL_RANGE')
     expect(QUICK_LAUNCH_PRESET.lp.lockMode).toBe('buybackBurn')
     expect(QUICK_LAUNCH_PRESET.lp.permanentTimelock).toBe(true)
@@ -436,6 +440,21 @@ describe('FDV -> price-per-token request derivation', () => {
   it('throws on a missing/invalid ETH price so callers choose their own fallback', () => {
     expect(() => getQuickLaunchFloorPricePerToken(0)).toThrow()
     expect(() => getQuickLaunchGraduationPricePerToken(Number.NaN)).toThrow()
+  })
+})
+
+describe('graduation-pool tick spacing constants', () => {
+  it('states the observed post-redeploy spacing, not the feeToTickSpacing derivation', () => {
+    // The 2026-08-05 chain-4663 redeploy mints graduation pools at spacing 25; the generic
+    // fee->spacing formula would say 50 for the 2500 tier. The preset states on-chain reality.
+    expect(QUICK_LAUNCH_POOL_TICK_SPACING).toBe(25)
+    expect(QUICK_LAUNCH_PRESET.lp.tickSpacing).toBe(QUICK_LAUNCH_POOL_TICK_SPACING)
+  })
+
+  it('grandfathers every spacing pools were ever minted at — pools are permanent', () => {
+    expect([...QUICK_LAUNCH_ALLOWED_POOL_TICK_SPACINGS]).toEqual([25, 50])
+    // The current preset value is in the allowed set.
+    expect(QUICK_LAUNCH_ALLOWED_POOL_TICK_SPACINGS).toContain(QUICK_LAUNCH_POOL_TICK_SPACING)
   })
 })
 
