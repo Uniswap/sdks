@@ -35,11 +35,32 @@ jobs:
   canary:
     name: Live-RPC canary (sdks/router-lite-sdk)
     runs-on: ubuntu-latest
-    # Room for two full attempts of the step below. A typical keyed run measured 5-8 minutes; the
-    # worst case is bounded (not open-ended) by the per-row budgets in canary/canary.test.ts —
-    # LONG_TAIL_MAX_CANDIDATES x LONG_TAIL_CANDIDATE_BUDGET_MS for discovery, LATENCY_BUDGET_MS per
-    # latency row — and lands near 15 minutes.
-    timeout-minutes: 60
+    # RETRY ARITHMETIC (C4-T5). 2 attempts x timeout_minutes: 35 = 70, plus ~5 for
+    # checkout/install/build and the artifact upload, so the job cap is 80 and every attempt can
+    # actually run to its own limit.
+    #
+    # THE OLD NUMBERS DID NOT ADD UP: 3 attempts x 25 minutes is 75, above the previous 60-minute job
+    # cap, so a third attempt could never run to completion — it was always cut off partway by the job
+    # timeout. That is the worst outcome available: the runner time is spent AND the result is a
+    # job-cancelled failure indistinguishable from the canary genuinely firing, which the
+    # pinned-failure-issue step below would then open an issue about.
+    #
+    # TWO CHANGES, EACH DELIBERATE. Attempts dropped 3 -> 2 and the per-attempt cap raised 25 -> 35,
+    # because the suite got materially longer this task: canary/robinhood.test.ts adds a fourth
+    # chain whose rows each spend a full QUOTE_BUDGET_MS by construction (a 0.1s chain's wave
+    # iterator does not finish early — see that file's note), so one attempt now needs more than 25
+    # minutes for a legitimate worst case. Given a fixed job budget, one attempt that can finish
+    # beats two that cannot; a third retry is the cheapest thing to give up, since the failures this
+    # retry exists for are transient provider-side ones (a 429, a lagging replica, a dropped
+    # connection) and two attempts already clear almost all of them.
+    #
+    # None of this binds on the normal path: a typical keyed run measured 5-8 minutes and exits, so
+    # the job ends in minutes. The worst case is bounded (not open-ended) by the per-row budgets in
+    # the suite — LONG_TAIL_MAX_CANDIDATES x LONG_TAIL_CANDIDATE_BUDGET_MS for mainnet discovery and
+    # LATENCY_BUDGET_MS per latency row (~15 min), plus, for Robinhood, two SCAN_BUDGET_MS scans
+    # (6 min) + MAX_MEMECOIN_CANDIDATES x PER_CANDIDATE_BUDGET_MS for the tradeable-pool hunt (6 min)
+    # + QUOTE_BUDGET_MS x 2 rows (4 min) = 16 min. ~31 minutes all told, inside one attempt's 35.
+    timeout-minutes: 80
     continue-on-error: false
     permissions:
       contents: read # checkout
@@ -90,10 +111,17 @@ jobs:
           CANARY_RPC_URL_1: ${{ secrets.CANARY_RPC_URL_1 }}
           CANARY_RPC_URL_2: ${{ secrets.CANARY_RPC_URL_2 }}
           CANARY_RPC_URL_3: ${{ secrets.CANARY_RPC_URL_3 }}
+          # Robinhood Chain (4663) rows only — canary/robinhood.test.ts skips cleanly without it,
+          # so this secret is as optional as _2/_3 (see that file's gating note). It is a SEPARATE
+          # variable rather than a fourth CANARY_RPC_URL_* because those form a same-chain provider
+          # matrix for cross-provider agreement; a different chain's endpoint is not a peer in that
+          # matrix and would be compared against mainnet quotes if it were added to it.
+          CANARY_RPC_URL_ROBINHOOD: ${{ secrets.CANARY_RPC_URL_ROBINHOOD }}
         with:
-          timeout_minutes: 25
+          # See the job's `timeout-minutes` comment above for why this is 2 x 35 and not 3 x 25.
+          timeout_minutes: 35
           retry_wait_seconds: 2
-          max_attempts: 3
+          max_attempts: 2
           command: bun test sdks/router-lite-sdk/canary
 
       - name: 📤 Upload latency benchmarks

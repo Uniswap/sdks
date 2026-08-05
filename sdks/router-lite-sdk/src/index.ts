@@ -2,7 +2,8 @@
 // @uniswap/router-lite-sdk — public entry point.
 //
 // The whole public surface: `createRouter` (the facade), `manifestFor` / the built-in manifests
-// (`MAINNET_MANIFEST`, `BASE_MANIFEST`, `UNICHAIN_MANIFEST`, `ARBITRUM_MANIFEST` — chain
+// (`MAINNET_MANIFEST`, `BASE_MANIFEST`, `UNICHAIN_MANIFEST`, `ARBITRUM_MANIFEST`,
+// `ROBINHOOD_MANIFEST` — chain
 // configuration), the domain types requests and results are built from, and the two errors the
 // package ever throws.
 // Everything else (discovery, quoting, planning, encoding, verifying, the
@@ -16,7 +17,14 @@ import type { QuoteResult, SwapResult } from './types'
 export { createRouter } from './router'
 export type { CreateRouterOptions, Router, RouterStats } from './router'
 
-export { manifestFor, MAINNET_MANIFEST, BASE_MANIFEST, UNICHAIN_MANIFEST, ARBITRUM_MANIFEST } from './manifest'
+export {
+  manifestFor,
+  MAINNET_MANIFEST,
+  BASE_MANIFEST,
+  UNICHAIN_MANIFEST,
+  ARBITRUM_MANIFEST,
+  ROBINHOOD_MANIFEST,
+} from './manifest'
 
 export { RouterConfigError, UnsupportedRouteError } from './errors'
 

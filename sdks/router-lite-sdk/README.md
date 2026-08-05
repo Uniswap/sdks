@@ -106,6 +106,11 @@ const { best } = await router.getQuote({ tokenIn: 'native', tokenOut: usdc, amou
 Calling `getSwap`/`swaps` on a manifest with no `execution` bundle throws `RouterConfigError`
 synchronously, before any RPC — see [Error handling](#error-handling).
 
+Quote-only is not only a caller's choice: it is also the honest shape for a chain whose Universal
+Router this package cannot encode for. `ROBINHOOD_MANIFEST` (`chainId: 4663`) ships that way for
+exactly that reason — see [Supported chains](#supported-chains) — so `manifestFor(4663)` needs no
+`{ execution: undefined }` override to reach the behaviour above.
+
 ## Status semantics
 
 Both `getQuote`/`quotes` and `getSwap`/`swaps` resolve to a tagged result union — quotes never carry
@@ -419,7 +424,7 @@ bytecode at `execution.address` hashes to it. Either check failing rejects that 
 | `router.ingestLogs(logs)` / `router.ingestReceipt(receipt)` | Feed known pool-creation logs (or a whole receipt) into the index ahead of a search. |
 | `router.stats()` | A sizes-only snapshot of what the router's index currently holds — see [PoolIndex lifecycle](#poolindex-lifecycle). |
 | `router.clearIndex()` | Drops every learned pool/coverage/discredit and starts the index over empty — see [PoolIndex lifecycle](#poolindex-lifecycle). |
-| `manifestFor(chainId, overrides?)`, `MAINNET_MANIFEST`, `BASE_MANIFEST`, `UNICHAIN_MANIFEST`, `ARBITRUM_MANIFEST` | Chain configuration: the required top-level `wrappedNative`, per-protocol deployment bundles, an optional Universal Router deployment (`execution` — omitted for [quote-only](#quote-only-mode) manifests), and the `chain` bundle of chain facts (block time, reorg depth) — see [Supported chains](#supported-chains). |
+| `manifestFor(chainId, overrides?)`, `MAINNET_MANIFEST`, `BASE_MANIFEST`, `UNICHAIN_MANIFEST`, `ARBITRUM_MANIFEST`, `ROBINHOOD_MANIFEST` | Chain configuration: the required top-level `wrappedNative`, per-protocol deployment bundles, an optional Universal Router deployment (`execution` — omitted for [quote-only](#quote-only-mode) manifests), and the `chain` bundle of chain facts (block time, reorg depth) — see [Supported chains](#supported-chains). |
 | `RouterConfigError`, `UnsupportedRouteError` | The two typed throws — see [Error handling](#error-handling). |
 
 Pure, no-stability-guarantee building blocks — `generateRoutes`, `compileExecutionPlan`,
@@ -433,24 +438,39 @@ subpath alone (plus the public types from the package root): `generateRoutes` on
 
 ## Supported chains
 
-Four chains ship as built-in manifests — `manifestFor(chainId)` works out of the box for each, no
+Five chains ship as built-in manifests — `manifestFor(chainId)` works out of the box for each, no
 overrides required:
 
-| Chain | `chainId` | Manifest constant | `blockTimeSeconds` | `reorgOverlapBlocks` | wave-0 window (blocks) |
-| --- | --- | --- | --- | --- | --- |
-| Mainnet | `1` | `MAINNET_MANIFEST` | `12` | `32n` | `50,400` |
-| Base | `8453` | `BASE_MANIFEST` | `2` | `150n` | `302,400` |
-| Unichain | `130` | `UNICHAIN_MANIFEST` | `1` | `300n` | `604,800` |
-| Arbitrum One | `42161` | `ARBITRUM_MANIFEST` | `0.25` | `1200n` | `2,419,200` |
+| Chain | `chainId` | Manifest constant | `blockTimeSeconds` | `reorgOverlapBlocks` | wave-0 window (blocks) | swaps? |
+| --- | --- | --- | --- | --- | --- | --- |
+| Mainnet | `1` | `MAINNET_MANIFEST` | `12` | `32n` | `50,400` | yes |
+| Base | `8453` | `BASE_MANIFEST` | `2` | `150n` | `302,400` | yes |
+| Unichain | `130` | `UNICHAIN_MANIFEST` | `1` | `300n` | `604,800` | yes |
+| Arbitrum One | `42161` | `ARBITRUM_MANIFEST` | `0.25` | `1200n` | `2,419,200` | yes |
+| Robinhood Chain | `4663` | `ROBINHOOD_MANIFEST` | `0.1` | `3000n` | `6,048,000` | **no — [quote-only](#quote-only-mode)** |
 
-Each ships v2/v3/v4 protocol bundles (factory/poolManager addresses and deployment blocks), the
-Universal Router 2.0 deployment, and `coreIntermediates` (wrapped native + native USDC). Every
-address and deployment block was independently verified against that chain's public RPC — see the
-`VERIFIED` comment block directly above each manifest constant in `src/manifest.ts` for the exact
-`eth_getCode`/`eth_call` evidence, method, and date. One entry is a documented exception: Arbitrum's
-v2 factory `deploymentBlock` is UNVERIFIED/conservative (the public Arbitrum RPC does not serve
-archive state far enough back to binary-search it; see that manifest's comment for the full
-reasoning) — safe because an early bound only costs extra scan work, never a missed pool.
+Each ships v2/v3/v4 protocol bundles (factory/poolManager addresses and deployment blocks) and
+`coreIntermediates`, and the first four ship the Universal Router 2.0 deployment too. Every address
+and deployment block was independently verified against that chain's RPC — see the `VERIFIED` comment
+block directly above each manifest constant in `src/manifest.ts` for the exact
+`eth_getCode`/`eth_call`/`eth_getLogs` evidence, method, and date. All five have also now been
+verified to actually route a live trade, not merely to hold correct-looking addresses; the
+first-live-quote results are recorded alongside the manifests in that same file.
+
+Two entries are documented exceptions, both stated as such in `src/manifest.ts`:
+
+- **Arbitrum's v2 factory `deploymentBlock` is UNVERIFIED/conservative** — the public Arbitrum RPC
+  does not serve archive state far enough back to binary-search it, so it is pinned to the v3
+  factory's own verified block. Safe because an early bound only costs extra scan work, never a
+  missed pool.
+- **Robinhood Chain ships NO `execution` bundle, so it quotes but cannot swap.** The chain has all
+  three protocols deployed, but its only Universal Router is a 2.1.1 deployment and this package's
+  `COMMAND_SETS` is `['ur-2.0']` — there is no encoder for it. Rather than mislabel a 2.1.1 router
+  as 2.0, the manifest omits `execution`, so `getQuote`/`quotes` work normally and
+  `getSwap`/`swaps` throw `RouterConfigError` immediately. A caller who has verified 2.0-compatible
+  calldata for that chain can attach their own bundle via
+  `manifestFor(4663, { execution: … })`. `coreIntermediates` there is wrapped native + **USDG**
+  ("Global Dollar"), not USDC — no USDC deployment exists on that chain.
 
 For any other chain, build a manifest via
 `manifestFor(chainId, { wrappedNative, execution?, chain?, v2?, v3?, v4?, coreIntermediates? })` —

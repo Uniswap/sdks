@@ -5,6 +5,7 @@ import {
   BASE_MANIFEST,
   MAINNET_MANIFEST,
   REASON_CODES,
+  ROBINHOOD_MANIFEST,
   RouterConfigError,
   UNICHAIN_MANIFEST,
   UnsupportedRouteError,
@@ -50,6 +51,7 @@ test('createRouter, manifestFor, and the built-in manifests are reachable and ca
   expect(BASE_MANIFEST.chainId).toBe(8453)
   expect(UNICHAIN_MANIFEST.chainId).toBe(130)
   expect(ARBITRUM_MANIFEST.chainId).toBe(42161)
+  expect(ROBINHOOD_MANIFEST.chainId).toBe(4663)
   expect(manifestFor(1)).toEqual(MAINNET_MANIFEST)
 })
 

@@ -12,6 +12,7 @@ import {
   manifestFor,
   reorgOverlapBlocksOf,
   requireExecution,
+  ROBINHOOD_MANIFEST,
   UNICHAIN_MANIFEST,
   validateManifest,
   wave0PairScanBlocks,
@@ -30,7 +31,7 @@ describe('chain manifest', () => {
     expect(() => manifestFor(999999)).toThrow(RouterConfigError)
   })
   test('the unknown-chain error message lists every built-in chain id', () => {
-    expect(() => manifestFor(999999)).toThrow(/Built-in manifests exist for: 1, 130, 8453, 42161/)
+    expect(() => manifestFor(999999)).toThrow(/Built-in manifests exist for: 1, 130, 4663, 8453, 42161/)
   })
 
   // -------------------------------------------------------------------------
@@ -140,6 +141,83 @@ describe('chain manifest', () => {
         (m) => m.execution!.address,
       )
       expect(new Set(addrs).size).toBe(addrs.length)
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // C4-T5: Robinhood Chain (4663) — the first BUILT-IN quote-only manifest.
+  //
+  // Deliberately NOT folded into the `cases` table above: every assertion in
+  // that loop demands an `execution` bundle with `commandSet: 'ur-2.0'`, and the
+  // whole point of this manifest is that this chain has no Universal Router this
+  // package can encode for (only UR 2.1.1 — see `manifest.ts`'s docstring). So
+  // these tests pin the OPPOSITE shape, and the absence of `execution` is the
+  // assertion rather than an omission nobody checked.
+  // -------------------------------------------------------------------------
+  describe('Robinhood Chain manifest (C4-T5)', () => {
+    test('manifestFor(4663) returns the built-in manifest', () => {
+      const m = manifestFor(4663)
+      expect(m).toEqual(ROBINHOOD_MANIFEST)
+      expect(m.chainId).toBe(4663)
+    })
+
+    test('all three protocol bundles are present, each with a verified factory and deployment block', () => {
+      const m = manifestFor(4663)
+      // v2 IS deployed on this chain (1,689 live `PairCreated` logs) — the quote-only-ness of this
+      // manifest is about execution, not about a missing protocol.
+      expect(m.v2?.factory).toMatch(/^0x[0-9a-fA-F]{40}$/)
+      expect(m.v2?.deploymentBlock).toBe(8_928n)
+      expect(m.v3?.factory).toMatch(/^0x[0-9a-fA-F]{40}$/)
+      expect(m.v3?.deploymentBlock).toBe(8_930n)
+      expect(m.v3?.v3QuoterV2).toMatch(/^0x[0-9a-fA-F]{40}$/)
+      expect(m.v4?.poolManager).toMatch(/^0x[0-9a-fA-F]{40}$/)
+      expect(m.v4?.deploymentBlock).toBe(9_070n)
+      expect(m.v4?.quoter).toMatch(/^0x[0-9a-fA-F]{40}$/)
+    })
+
+    test('carries NO execution bundle, so requireExecution throws rather than returning a wrong router', () => {
+      const m = manifestFor(4663)
+      expect(m.execution).toBeUndefined()
+      expect(() => requireExecution(m)).toThrow(RouterConfigError)
+      expect(() => requireExecution(m)).toThrow(/no execution bundle/)
+    })
+
+    test('assertWrappedNativeConsistency passes with only the hoisted wrappedNative to check', () => {
+      // Nothing for it to disagree with (C4-P3): the top-level field is the sole statement here.
+      expect(() => assertWrappedNativeConsistency(ROBINHOOD_MANIFEST)).not.toThrow()
+      expect(ROBINHOOD_MANIFEST.wrappedNative).toMatch(/^0x[0-9a-fA-F]{40}$/)
+    })
+
+    test('coreIntermediates are WETH + USDG, the two currencies the live pool census ranks highest', () => {
+      const m = manifestFor(4663)
+      expect(m.coreIntermediates).toHaveLength(2)
+      expect(m.coreIntermediates).toContain(m.wrappedNative)
+      // USDG, not USDC — no USDC deployment exists on this chain (see manifest.ts).
+      expect(m.coreIntermediates).toContain('0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168')
+    })
+
+    test("wave0PairScanBlocks derives 6,048,000 from this chain's own 0.1s block time", () => {
+      // ceil(604800 / 0.1) — by far the largest wave-0 window of any built-in manifest, and the
+      // honest cost of a 0.1s chain. `assertChainData` accepts 0.1 as a finite positive number well
+      // under the milliseconds tripwire.
+      expect(blockTimeSecondsOf(manifestFor(4663))).toBe(0.1)
+      expect(wave0PairScanBlocks(manifestFor(4663))).toBe(6_048_000n)
+      expect(reorgOverlapBlocksOf(manifestFor(4663))).toBe(3000n)
+      expect(() => assertChainData(manifestFor(4663))).not.toThrow()
+    })
+
+    test('an execution bundle can still be supplied by a caller who has one, via overrides', () => {
+      // The manifest omits `execution` because THIS package has no 2.1.1 encoder — not because the
+      // chain forbids one. A caller who brings their own stays able to swap.
+      const m = manifestFor(4663, {
+        execution: {
+          address: '0x8876789976dEcBfCbBbe364623C63652db8C0904',
+          commandSet: 'ur-2.0',
+          permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
+          wrappedNative: ROBINHOOD_MANIFEST.wrappedNative,
+        },
+      })
+      expect(requireExecution(m).address).toBe('0x8876789976dEcBfCbBbe364623C63652db8C0904')
     })
   })
   test('validateManifest rejects chainId mismatch', async () => {

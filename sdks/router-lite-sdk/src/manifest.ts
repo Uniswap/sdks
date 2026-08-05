@@ -258,11 +258,181 @@ export const ARBITRUM_MANIFEST: ChainManifest = {
   ],
 }
 
+// ---------------------------------------------------------------------------
+// C4-T5: Robinhood Chain built-in manifest — the first chain this package was
+// pointed at FROM SCRATCH, with no prior manifest to copy and no assumption
+// that any address would look like another chain's.
+//
+// THE QUOTE-ONLY MANIFEST IS THE HEADLINE, AND IT IS DELIBERATE. Robinhood
+// Chain has all three protocols deployed (v2, v3 AND v4 — see below) but NO
+// Universal Router this package can encode for, so `execution` is omitted and
+// this is the first built-in manifest to exercise C4-P3's quote-only path.
+// The reasoning is in ROBINHOOD_MANIFEST's own docstring; the short version is
+// that `eth_getCode` alone would have shipped a manifest pointed at a
+// MAINNET-configured Universal Router, and only fingerprinting the router's
+// baked-in immutables caught it.
+// ---------------------------------------------------------------------------
+
+/**
+ * Robinhood Chain (`chainId: 4663`) — an Arbitrum Orbit chain, ~0.1s blocks.
+ *
+ * VERIFIED live on 2026-08-05 against a keyed archive endpoint (alchemy, robinhood-mainnet; head at
+ * verification: block 28,169,616, chain age 96.4 days — block 1 timestamped 2026-04-30). Endpoint
+ * identity stays at provider granularity here, per `canary/providers.test.ts`'s redaction rule.
+ *
+ *  - `eth_getCode` at `latest`: v2 factory, v3 factory, v3QuoterV2, v4 poolManager, v4 quoter,
+ *    Permit2 and WETH all non-empty.
+ *  - `deploymentBlock`s BINARY-SEARCHED over `eth_getCode` (present vs absent, 27 calls each — this
+ *    endpoint serves full archive state, unlike Arbitrum's public RPC): v2 factory 8,928; v3 factory
+ *    8,930; v3 quoter 9,063; v4 poolManager 9,070; v4 quoter 9,074 — all five inside 146 blocks of
+ *    each other, which is what a single-deployer bring-up of a brand-new chain looks like. (No
+ *    wall-clock figure is quoted for that span on purpose: the 0.1s block time below is the CURRENT
+ *    rate, and these blocks are from the chain's first hour, when it ran several times slower.)
+ *  - REAL EVENTS, not just code — the check that actually establishes each address IS the deployment
+ *    rather than merely being occupied (see the Universal Router note below for why that distinction
+ *    is not academic here). Over the last 2,000,000 blocks, `scanLogs` recovered, complete in one
+ *    pass: 18,347 v4 `Initialize` logs at the poolManager, 12,407 v3 `PoolCreated` at the v3 factory,
+ *    and 1,689 v2 `PairCreated` at the v2 factory — every sample decoding to sane currency pairs.
+ *  - `v3QuoterV2` bytecode length 8,273 bytes (16,546 hex chars), matching canonical QuoterV2 exactly
+ *    (the same length asserted for the other four manifests). On this chain `sdk-core`'s
+ *    `quoterAddress` already IS QuoterV2 — unlike Unichain/Arbitrum, where it is a QuoterV1-shaped
+ *    deployment (see UNICHAIN_MANIFEST's note); it is still verified by bytecode length here rather
+ *    than trusted.
+ *  - `wrappedNative` `0x0Bd7…D73`: `symbol()`/`name()` -> "WETH", `decimals()` -> 18, deployed at
+ *    block 2. The OP-style predeploy `0x4200…0006` was probed and has NO code on this chain, so this
+ *    is not an OP-stack-shaped deployment; the Unichain-style `0x1F984000…0004` v4 predeploy is
+ *    likewise absent.
+ *  - `chain.blockTimeSeconds: 0.1` — MEASURED, twice: 0.10028s/block over the last 1,000,000 blocks
+ *    and 0.09s over the last 100 (too short a span to be anything but a cross-check). Also equals
+ *    `sdk-core`'s registered `AVERAGE_BLOCK_TIMES_SECONDS[ChainId.ROBINHOOD]`. Note that the
+ *    LIFETIME average is 0.296s/block: the chain ran much slower in its first weeks, so the lifetime
+ *    figure is the wrong one to derive a recent-window from.
+ *
+ *  UNVERIFIED / CONVENTIONAL — `chain.reorgOverlapBlocks: 3000n`. Unlike every other value here this
+ *  one was NOT measured: it is 300 seconds expressed in this chain's blocks, matching what every
+ *  other built-in manifest already spends (Base 150 @ 2s, Unichain 300 @ 1s, Arbitrum 1200 @ 0.25s —
+ *  all exactly 300s). No observed reorg depth on this chain informed it, and none informed the other
+ *  four either; the number is a re-scan budget for shallow-reorg tolerance, so being generous costs
+ *  bounded duplicate work at the tip while being too small would silently drop pools that a rewind
+ *  moved. Flagged rather than presented as a fact because a chain-specific finality claim is exactly
+ *  the kind of thing a reader would otherwise assume was checked.
+ *  - `coreIntermediates`: WETH plus USDG (`0x5fc5…168`, `name()` "Global Dollar", `symbol()` "USDG",
+ *    `decimals()` 6). NO USDC DEPLOYMENT WAS FOUND on this chain, and USDG is not a guess at a
+ *    substitute: a census of every currency appearing in the 18,347 v4 `Initialize` + 12,407 v3
+ *    `PoolCreated` logs above ranks WETH first (15,096 pools), the v4 native sentinel second (11,552),
+ *    and USDG a distant but unambiguous third (1,999) — an order of magnitude ahead of the fourth
+ *    (APPLE, 481). Nothing named USDC appears anywhere in the top of that census. So USDG is THE
+ *    stable intermediate on this chain, established from pool population rather than assumed from
+ *    other chains' address lists.
+ *
+ * NO `execution` BUNDLE — UNVERIFIABLE COMMAND SET, NOT MISSING DATA. This chain has exactly one
+ * Universal Router, `0x8876789976dEcBfCbBbe364623C63652db8C0904`, deployed at block 18,127; that
+ * block number independently corroborates `universal-router-sdk`'s own `creationBlock` for 4663
+ * (18127) to the block. But `universal-router-sdk` registers it under `UniversalRouterVersion.V2_1_1`
+ * and lists NO `V2_0` deployment for this chain at all, and `types.ts#COMMAND_SETS` is `['ur-2.0']` —
+ * this package has no encoder for a 2.1.1 command set. Claiming `commandSet: 'ur-2.0'` for a 2.1.1
+ * router would produce plausible-looking calldata with no guarantee the commands mean what the
+ * encoder thinks; omitting `execution` instead makes the manifest quote-only, which is honest,
+ * type-checked (C4-P3), and fails loudly (`requireExecution` throws `RouterConfigError`
+ * synchronously) the moment someone calls `getSwap` on it.
+ *
+ * AND `eth_getCode` WOULD HAVE GOTTEN THIS WRONG. Both mainnet's UR 2.0 address
+ * (`0x66a9…8Af`) and Base's (`0x6fF5…b43`) DO have code on Robinhood Chain — 19,499 bytes each,
+ * byte-identical (same keccak) to those chains' own deployments. Presence alone would have read as
+ * "UR 2.0 is deployed here at the familiar address". It is not: a Universal Router bakes
+ * permit2/WETH9/v2Factory/v3Factory/poolManager in as RUNTIME IMMUTABLES, and searching that code
+ * for known addresses shows `0x66a9…8Af` embeds MAINNET's WETH, v2 factory, v3 factory and
+ * poolManager, while `0x6fF5…b43` embeds BASE's — i.e. they are foreign-configured routers sitting at
+ * cross-chain-identical addresses, and a swap encoded against either would be sent to factories that
+ * do not exist on this chain. The genuine `0x8876…904` fingerprints, by the same method, against
+ * Robinhood Chain's OWN weth/v2Factory/v3Factory/poolManager/permit2. IMMUTABLE FINGERPRINTING, NOT
+ * `eth_getCode`, IS THE ORACLE FOR "is this deployment configured for THIS chain" — the one
+ * methodology note from this bring-up worth carrying to the next chain.
+ */
+export const ROBINHOOD_MANIFEST: ChainManifest = {
+  chainId: 4663,
+  // Hoisted (C4-P3) — see MAINNET_MANIFEST's comment. Unlike every other built-in manifest there is
+  // no `execution.wrappedNative` for this to be cross-checked against (no execution bundle), so this
+  // top-level field is the sole statement of the chain's wrapped native — which is exactly the case
+  // C4-P3 hoisted it for.
+  wrappedNative: '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73',
+  chain: { blockTimeSeconds: 0.1, reorgOverlapBlocks: 3000n },
+  v2: {
+    factory: '0x8bcEaA40B9AcdfAedF85AdF4FF01F5Ad6517937f',
+    deploymentBlock: 8_928n,
+  },
+  v3: {
+    factory: '0x1f7d7550B1b028f7571E69A784071F0205FD2EfA',
+    deploymentBlock: 8_930n,
+    v3QuoterV2: '0x33e885eD0Ec9bF04EcfB19341582aADCb4c8A9E7',
+  },
+  v4: {
+    poolManager: '0x8366a39CC670B4001A1121B8F6A443A643e40951',
+    deploymentBlock: 9_070n,
+    quoter: '0x8Dc178eFB8111BB0973Dd9d722ebeFF267c98F94', // inlined from sdk-core (C4-P4) — see MAINNET_MANIFEST's comment
+  },
+  // execution: deliberately absent — see the docstring above.
+  coreIntermediates: [
+    '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73', // WETH
+    '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168', // USDG ("Global Dollar", 6dp) — this chain's stable
+  ],
+}
+
+// ---------------------------------------------------------------------------
+// FIRST LIVE QUOTE PER CHAIN (C4-T5). Until this run the L2 manifests above
+// were verified as DEPLOYMENT DATA (addresses, code, deployment blocks) but had
+// never actually routed a trade; these rows are the first end-to-end proof that
+// each one quotes. Provider granularity only, never a keyed URL.
+//
+//   chain              first live quote, native -> stable            date
+//   Base (8453)        `quote` — 1 ETH -> 1,863.512057 USDC          2026-08-05
+//                      single-leg v3 (fee 500); first quote 16.3s
+//                      provider: quiknode (base-mainnet)
+//   Unichain (130)     `quote` — 1 ETH -> 1,862.167431 USDC          2026-08-05
+//                      single-leg v4 (fee 500, hookless); 3.1s
+//                      provider: mainnet.unichain.org (keyless)
+//   Arbitrum (42161)   `quote` — 1 ETH -> 1,863.271052 USDC          2026-08-05
+//                      single-leg v3 (fee 500); first quote 4.6s
+//                      provider: quiknode (arbitrum-mainnet)
+//   Robinhood (4663)   `quote` — 0.01 ETH -> 18.665521 USDG,           2026-08-05
+//                      i.e. ETH at 1,866.55 — v3 (fee 100), and
+//                      quote-only (no execution bundle at all).
+//                      Memecoin pools priced HINT-FREE in ~17-18s,
+//                      including hook-gated ones, and the round trip
+//                      back to native agreed to within the fee tier.
+//                      provider: alchemy (robinhood-mainnet). Full
+//                      per-pool rows and the quote-only rationale:
+//                      canary/robinhood.test.ts
+//
+// ALL FIVE PRICES AGREE TO WITHIN 0.18% (the three L2 USDC rows to within
+// 0.07%), which is the cross-check that matters most: five independently-
+// assembled manifests, five different endpoints, two different stablecoins, and
+// both v3 and v4 carrying the winning route on different chains — one arbitraged
+// ETH price. A wrong factory or a wrong quoter does not produce a number 18 basis
+// points from the other four; it produces no route at all, or a nonsense one.
+//
+// EVERY ROW WAS `aborted: true` WITH `discovery: partial` ON ALL THREE
+// PROTOCOLS AT A 60s BUDGET, AND THAT IS THE EXPECTED SHAPE, NOT A DEFECT. The
+// leading route was priced in wave 0 in every case (10, 9 and 10 candidates
+// attempted; ALL succeeded; zero quote failures, zero transport failures), while
+// full log-scan discovery over these chains' wave-0 windows — 302,400 blocks on
+// Base, 604,800 on Unichain, 2,419,200 on Arbitrum, per `wave0PairScanBlocks` —
+// does not finish in 60 seconds. This is the same "first actionable latency is
+// stable, completion is not" finding the mainnet canary recorded, reproduced on
+// three L2s: quote quality came from wave 0, and the caller's `AbortSignal` is
+// what bounds the rest.
+//
+// NO MANIFEST DATA BUGS WERE FOUND BY THIS RUN. Each chain's USDC was confirmed
+// live by `symbol()`/`decimals()` ("USDC"/6) at the address `coreIntermediates`
+// already carried, and each chain's `chainId` matched its endpoint's.
+// ---------------------------------------------------------------------------
+
 const KNOWN_MANIFESTS: Record<number, ChainManifest> = {
   1: MAINNET_MANIFEST,
   8453: BASE_MANIFEST,
   130: UNICHAIN_MANIFEST,
   42161: ARBITRUM_MANIFEST,
+  4663: ROBINHOOD_MANIFEST,
 }
 
 const BUNDLE_KEYS = ['chain', 'v2', 'v3', 'v4', 'execution', 'coreIntermediates'] as const
