@@ -422,6 +422,59 @@ describe('createRouter — validation (before any RPC)', () => {
     )
   })
 
+  test("a malformed permit.spender or permit.details.token throws RouterConfigError pre-RPC", async () => {
+    // `permit.spender` is the field this wave initially MISSED: nothing validated it, yet
+    // `verify/readiness.ts#isPermitValid` and `encode/ur20.ts` both began comparing it with
+    // `isAddressEqual`, which throws. Downstream neither can report a `RouterConfigError` about a
+    // request field — and `checkReadiness` is documented never to throw at all — so the request
+    // path is where a malformed permit has to be caught.
+    const router = createRouter({ client: poisonedClient(), manifest: baseManifest() })
+    const permitBase: Permit2PermitSingle = {
+      details: { token: TOKEN_A, amount: AMOUNT_IN, expiration: 2_000_000_000, nonce: 0 },
+      spender: UNIVERSAL_ROUTER,
+      sigDeadline: 2_000_000_000n,
+      signature: '0xabcd' as Hex,
+    }
+    const swap = (permit: Permit2PermitSingle): Promise<SwapResult> =>
+      router.getSwap({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, trader: TRADER, permit })
+
+    for (const bad of MALFORMED) {
+      await expect(swap({ ...permitBase, spender: bad })).rejects.toThrow(/permit\.spender is not a valid address/)
+      await expect(swap({ ...permitBase, details: { ...permitBase.details, token: bad } })).rejects.toThrow(
+        /permit\.details\.token is not a valid address/,
+      )
+    }
+    for (const p of [swap({ ...permitBase, spender: '' as Address }), swap({ ...permitBase, details: { ...permitBase.details, token: '' as Address } })]) {
+      await expect(p).rejects.toThrow(RouterConfigError)
+    }
+  })
+
+  test('a manifest address field that is not an address throws RouterConfigError at createRouter, not a viem error', async () => {
+    // `ChainManifest` types these as `Address`, but a caller assembles one by hand — from a config
+    // file, a paste, an env var. Nothing checked them, and once `assertWrappedNativeConsistency`
+    // started comparing with `isAddressEqual` a malformed one raised a raw viem
+    // `InvalidAddressError` out of a config check whose whole job is `RouterConfigError`.
+    const cases: [string, () => ChainManifest][] = [
+      ['wrappedNative', () => ({ ...baseManifest(), wrappedNative: '0xnope' as Address })],
+      [
+        'execution.wrappedNative',
+        () => ({ ...baseManifest(), execution: { ...baseManifest().execution!, wrappedNative: '0xnope' as Address } }),
+      ],
+      ['execution.permit2', () => ({ ...baseManifest(), execution: { ...baseManifest().execution!, permit2: '0xnope' as Address } })],
+      ['execution.address', () => ({ ...baseManifest(), execution: { ...baseManifest().execution!, address: '0xnope' as Address } })],
+      ['v2.factory', () => ({ ...baseManifest(), v2: { ...baseManifest().v2!, factory: '0xnope' as Address } })],
+      ['v4.poolManager', () => ({ ...baseManifest(), v4: { ...baseManifest().v4!, poolManager: '0xnope' as Address } })],
+      ['v4.quoter', () => ({ ...baseManifest(), v4: { ...baseManifest().v4!, quoter: '0xnope' as Address } })],
+      ['coreIntermediates[0]', () => ({ ...baseManifest(), coreIntermediates: ['0xnope' as Address] })],
+    ]
+    for (const [label, build] of cases) {
+      expect(() => createRouter({ client: poisonedClient(), manifest: build() }), label).toThrow(RouterConfigError)
+      expect(() => createRouter({ client: poisonedClient(), manifest: build() }), label).toThrow(
+        new RegExp(`manifest ${label.replace(/[.[\]]/g, '\\$&')} is not a valid address`),
+      )
+    }
+  })
+
   test('amountIn at or above 2^128 (the v4 quoter uint128 ceiling) throws RouterConfigError, for quotes and swaps alike (C4-H4)', async () => {
     const manifest = baseManifest()
     const router = createRouter({ client: poisonedClient(), manifest })

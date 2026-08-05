@@ -1,7 +1,14 @@
 import { CHAIN_TO_ADDRESSES_MAP, ChainId, V2_FACTORY_ADDRESSES, V3_CORE_FACTORY_ADDRESSES, WETH9 } from '@uniswap/sdk-core'
 import { describe, expect, test } from 'bun:test'
 
-import { ARBITRUM_MANIFEST, BASE_MANIFEST, MAINNET_MANIFEST, ROBINHOOD_MANIFEST, UNICHAIN_MANIFEST } from './manifest'
+import {
+  ARBITRUM_MANIFEST,
+  BASE_MANIFEST,
+  KNOWN_MANIFESTS,
+  MAINNET_MANIFEST,
+  ROBINHOOD_MANIFEST,
+  UNICHAIN_MANIFEST,
+} from './manifest'
 
 // ---------------------------------------------------------------------------
 // C4-P4: `@uniswap/sdk-core` is a devDependency ONLY — this file is the one
@@ -143,4 +150,37 @@ describe('v2/v3/v4 core address parity with sdk-core (R6)', () => {
     expect(UNICHAIN_MANIFEST.wrappedNative.toLowerCase()).toBe(WETH9[ChainId.UNICHAIN]!.address.toLowerCase())
     expect(ARBITRUM_MANIFEST.wrappedNative.toLowerCase()).toBe(WETH9[ChainId.ARBITRUM_ONE]!.address.toLowerCase())
   })
+})
+
+// ---------------------------------------------------------------------------
+// The drift guard for the guards.
+//
+// Every block above enumerates its chains BY HAND, and it has to: `sdk-core`'s
+// `CHAIN_TO_ADDRESSES_MAP` is typed per-chain, so only a literal `ChainId`
+// member indexes it (see the note at the top of this file). The cost of a hand
+// enumeration is that it silently stops covering a chain the moment a sixth
+// built-in manifest is added — the new chain's addresses would be pinned
+// against nothing, which is precisely the state R6 existed to end.
+//
+// So the enumeration is asserted against `KNOWN_MANIFESTS` itself: adding a
+// manifest without extending these tests fails here, on the commit that adds
+// it, with a message naming the chain that lost coverage.
+// ---------------------------------------------------------------------------
+
+test('every built-in manifest is covered by a parity assertion above', () => {
+  const asserted = new Set([
+    ChainId.MAINNET,
+    ChainId.BASE,
+    ChainId.UNICHAIN,
+    ChainId.ARBITRUM_ONE,
+    ChainId.ROBINHOOD,
+  ] as number[])
+  const built_in = new Set(Object.keys(KNOWN_MANIFESTS).map(Number))
+
+  const uncovered = [...built_in].filter((id) => !asserted.has(id))
+  expect(uncovered, `built-in manifests with no sdk-core parity assertion: ${uncovered.join(', ')}`).toEqual([])
+  // ...and the converse, so a chain removed from the manifests does not leave a test asserting
+  // against a manifest that no longer exists (which would fail confusingly, at the import).
+  const stale = [...asserted].filter((id) => !built_in.has(id))
+  expect(stale, `parity assertions for chains that are no longer built in: ${stale.join(', ')}`).toEqual([])
 })

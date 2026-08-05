@@ -219,8 +219,19 @@ type ErrorFacts = {
   numericCodes: number[]
   stringCodes: string[]
   statuses: number[]
-  /** A revert-data FIELD was present anywhere in the chain — including a zero-length `0x`, which is
-   * geth's way of saying "reverted, no reason". Evidence the node executed; see `classifyRpcError`. */
+  /**
+   * A revert-data FIELD was present anywhere in the chain. Evidence the node executed; see
+   * `classifyRpcError`, whose first rule this is.
+   *
+   * A ZERO-LENGTH `'0x'` COUNTS ONLY AT THE NESTED `data.data` POSITION, NOT AT THE TOP LEVEL — an
+   * asymmetry inherited verbatim from the pre-R1 code and deliberately preserved, since changing it
+   * would silently reclassify errors this package has never seen a real example of. The nested
+   * position is geth's error object, where a bare `'0x'` genuinely means "reverted, no reason";
+   * a top-level `data: '0x'` has no such established provenance. `revertData` below applies the
+   * `.length > 2` rule uniformly at BOTH positions, so the two fields disagree for exactly one
+   * shape: `{ cause: { data: { data: '0x' } } }` is `hasRevertData` with no `revertData`.
+   * `rpc.test.ts` pins the asymmetry in both directions.
+   */
   hasRevertData: boolean
   /** The first NON-EMPTY revert payload found while walking. `undefined` means the revert carried no
    * bytes at all; a bare `0x` never lands here. See {@link revertDataOf}, the only reader. */

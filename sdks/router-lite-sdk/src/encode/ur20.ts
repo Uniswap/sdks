@@ -1,5 +1,5 @@
 import type { Address, Hex } from 'viem'
-import { encodeAbiParameters, encodeFunctionData, isAddressEqual, parseAbiParameters, zeroAddress } from 'viem'
+import { encodeAbiParameters, encodeFunctionData, isAddress, isAddressEqual, parseAbiParameters, zeroAddress } from 'viem'
 
 import { UR_ADDRESS_THIS } from '../constants'
 import { UnsupportedRouteError } from '../errors'
@@ -287,9 +287,15 @@ export function encodeExecutionPlan(
     // permit naming anyone but this router would be broadcast on the trader's behalf and leave that
     // party spending their tokens afterwards — and the swap itself would still succeed whenever the
     // trader already had a standing allowance, so nothing downstream would notice.
-    // `isAddressEqual` (R3): both are validated addresses by now — the permit's spender by
-    // `router.ts#validateSwapRequest`, the deployment's by the manifest — and a permit written with
-    // checksummed casing must not read as "grants an allowance to someone else".
+    // `isAddressEqual` (R3) so a permit written with checksummed casing does not read as "grants an
+    // allowance to someone else" — but it THROWS on a malformed operand, and this encoder's contract
+    // is that every failure is an `UnsupportedRouteError`, not a leaked viem class. `spender` is
+    // caller-supplied (`router.ts#validateSwapRequest` shape-checks it on the request path;
+    // `encodeExecutionPlan` is also reachable through `../experimental`, which has no request path),
+    // so it is shape-checked here before the comparison. `deployment.address` is manifest data,
+    // shape-checked by `manifest.ts#assertManifestAddresses`.
+    if (!isAddress(spender, { strict: false }))
+      throw new UnsupportedRouteError(`permit spender is not a valid address, got ${String(spender)}`)
     if (!isAddressEqual(spender, deployment.address))
       throw new UnsupportedRouteError(
         `permit grants an allowance to ${spender}, not to the Universal Router at ${deployment.address}`,

@@ -320,24 +320,22 @@ test('goldens.json is a non-empty set of distinct encodings', () => {
 })
 
 /**
- * Calldata is compared CASE-INSENSITIVELY, exactly as the differential suite compares against
- * `universal-router-sdk` (`assertMatches` lowercases both sides).
+ * Calldata is compared EXACTLY — no case folding, no normalization of any kind. A golden's whole
+ * job is "the stored string is what the encoder emits today", and any comparison looser than `toBe`
+ * lets the file drift into a representation no code produces, which is a trap for the next reader
+ * rather than a safeguard.
  *
- * Hex letter-case carries no information: `0x6B` and `0x6b` are the same byte, and a node reading
- * `tx.data` cannot tell them apart. The stored goldens happen to carry EIP-55 casing inside the
- * v3 `bytes path` field because the encoder that produced them concatenated checksummed address
- * strings by hand; `protocols/v3.ts#encodeV3Path` — the single surviving implementation (R4) —
- * builds the same bytes with `encodePacked`, which normalizes to lowercase. Every one of the 73
- * goldens is byte-identical across that change; 35 differ in casing alone.
- *
- * So the file is deliberately NOT regenerated: an over-specified assertion is the thing that was
- * wrong, not the frozen bytes. What a golden is for — "any change to the encoder at all shows up
- * here" — is unaffected, because a real encoding change moves the bytes, not their spelling.
+ * The file was regenerated once during R4, when `encode/ur20.ts`'s hand-rolled v3 path builder was
+ * deleted in favour of `protocols/v3.ts#encodeV3Path`. That change was BYTE-NEUTRAL — 73 goldens,
+ * 38 byte-and-spelling identical, 35 differing only in hex letter-case, 0 real byte differences —
+ * because viem's `encodePacked` lowercases addresses while the deleted encoder concatenated
+ * checksummed strings, and `0x6B` and `0x6b` are the same byte. Regenerating canonicalized the
+ * stored spelling to what the surviving encoder actually produces.
  */
 for (const [name, golden] of Object.entries(goldens)) {
   test(`golden: ${name}`, () => {
     const tx = encodeExecutionPlan(golden.plan as ExecutionPlan, deployment, DEADLINE)
-    expect(tx.data.toLowerCase()).toBe(golden.calldata.toLowerCase())
+    expect(tx.data).toBe(golden.calldata as `0x${string}`)
     expect(tx.value).toBe(BigInt(golden.value))
   })
 }

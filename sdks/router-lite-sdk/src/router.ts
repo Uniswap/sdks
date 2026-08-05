@@ -336,10 +336,17 @@ function validateSwapRequest(req: SwapRequest, manifest: ChainManifest): void {
     if (req.tokenIn === 'native') {
       throw new RouterConfigError('a Permit2 permit cannot be attached to a native-value input')
     }
-    // `tokenIn` is shape-validated above and known non-'native' in this branch; the permit's own
-    // token is caller-supplied and unvalidated, so it is shape-checked before the comparison.
+    // `tokenIn` is shape-validated above and known non-'native' in this branch. BOTH of the permit's
+    // own address fields are caller-supplied and shape-checked here, before any comparison reads
+    // them. `spender` is not compared in this function at all — it is compared in
+    // `verify/readiness.ts#isPermitValid` and `encode/ur20.ts` — and that is precisely why it needs
+    // checking HERE: those two are downstream of the request, one of them (`checkReadiness`) is
+    // documented never to throw, and neither can report a `RouterConfigError` about a request field.
     if (typeof req.permit.details.token !== 'string' || !isAddress(req.permit.details.token, { strict: false })) {
       throw new RouterConfigError(`permit.details.token is not a valid address, got ${String(req.permit.details.token)}`)
+    }
+    if (typeof req.permit.spender !== 'string' || !isAddress(req.permit.spender, { strict: false })) {
+      throw new RouterConfigError(`permit.spender is not a valid address, got ${String(req.permit.spender)}`)
     }
     if (!isAddressEqual(req.permit.details.token, req.tokenIn)) {
       throw new RouterConfigError(`permit token ${req.permit.details.token} does not match tokenIn ${req.tokenIn}`)

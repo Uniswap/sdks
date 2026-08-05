@@ -1,5 +1,5 @@
 import type { Address, Hex, PublicClient } from 'viem'
-import { isAddressEqual, keccak256 } from 'viem'
+import { isAddress, isAddressEqual, keccak256 } from 'viem'
 
 import {
   DEFAULT_BLOCK_TIME_SECONDS,
@@ -430,7 +430,17 @@ export const ROBINHOOD_MANIFEST: ChainManifest = {
 // already carried, and each chain's `chainId` matched its endpoint's.
 // ---------------------------------------------------------------------------
 
-const KNOWN_MANIFESTS: Record<number, ChainManifest> = {
+/**
+ * Every built-in manifest, by chainId.
+ *
+ * EXPORTED FOR THE PARITY TEST'S DRIFT GUARD (R6 follow-up) as well as for `manifestFor` below.
+ * `manifest.parity.test.ts` enumerates chains by hand — it has to, since `sdk-core`'s address map
+ * is typed per-chain and only literal `ChainId` members index it — and a hand-written enumeration
+ * silently stops covering a chain the moment a sixth manifest is added here. Asserting the
+ * enumerated set equals this one turns that from an invisible coverage hole into a failing test on
+ * the commit that opens it.
+ */
+export const KNOWN_MANIFESTS: Record<number, ChainManifest> = {
   1: MAINNET_MANIFEST,
   8453: BASE_MANIFEST,
   130: UNICHAIN_MANIFEST,
@@ -570,7 +580,52 @@ const MAX_BLOCK_TIME_SECONDS = 3_600
  * `reorgOverlapBlocks` re-opens coverage *ahead* of the tip, which reads as "nothing to scan" rather
  * than as a configuration mistake.
  */
+/**
+ * Rejects a manifest whose address fields are not syntactically valid addresses, naming the field,
+ * synchronously and before any RPC.
+ *
+ * WHY THIS EXISTS SEPARATELY FROM THE TYPE. `ChainManifest` types these as `Address`, which is a
+ * compile-time assertion about data a caller assembled by hand — from a config file, a paste, an
+ * environment variable. Nothing checked it, and until `isAddressEqual` arrived (R3) nothing needed
+ * to: every comparison lowercased strings and a malformed value merely failed to match, surfacing
+ * eventually as "no routes found". Now `assertWrappedNativeConsistency` and the request/plan paths
+ * compare with viem, which THROWS `InvalidAddressError` on a malformed operand — so without this,
+ * `createRouter({ manifest: { execution: { wrappedNative: '0xnope', … } } })` raises a raw viem
+ * class from inside a config check whose entire job is to raise `RouterConfigError`.
+ *
+ * EVERY bundle is covered, not just the ones a comparison currently reads. The set of fields some
+ * future comparison touches is not knowable here, and a manifest with a malformed `v3.v3QuoterV2`
+ * is misconfigured whether or not anything has gotten around to comparing it yet.
+ *
+ * `strict: false` — shape, not EIP-55 casing — for the same reason as everywhere else: manifests
+ * are routinely written in lowercase, and every comparison in this package is case-insensitive.
+ */
+export function assertManifestAddresses(m: ChainManifest): void {
+  const fields: Array<[label: string, value: Address | undefined]> = [['wrappedNative', m.wrappedNative]]
+  if (m.execution) {
+    fields.push(
+      ['execution.address', m.execution.address],
+      ['execution.permit2', m.execution.permit2],
+      ['execution.wrappedNative', m.execution.wrappedNative],
+    )
+  }
+  if (m.v2) fields.push(['v2.factory', m.v2.factory])
+  if (m.v3) fields.push(['v3.factory', m.v3.factory], ['v3.v3QuoterV2', m.v3.v3QuoterV2])
+  if (m.v4) fields.push(['v4.poolManager', m.v4.poolManager], ['v4.quoter', m.v4.quoter])
+  m.coreIntermediates?.forEach((token, i) => fields.push([`coreIntermediates[${i}]`, token]))
+
+  for (const [label, value] of fields) {
+    if (typeof value !== 'string' || !isAddress(value, { strict: false })) {
+      throw new RouterConfigError(`manifest ${label} is not a valid address, got ${String(value)}`)
+    }
+  }
+}
+
 export function assertChainData(m: ChainManifest): void {
+  // Addresses first: everything downstream of a manifest — the consistency cross-check below, the
+  // request path, the plan compiler — now compares them with viem rather than with lowercased
+  // strings, and viem throws rather than returning false on a malformed one.
+  assertManifestAddresses(m)
   const blockTime = m.chain?.blockTimeSeconds
   if (blockTime !== undefined && (!Number.isFinite(blockTime) || blockTime <= 0)) {
     throw new RouterConfigError(`manifest chain.blockTimeSeconds must be a finite positive number; got ${blockTime}`)

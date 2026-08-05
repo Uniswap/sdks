@@ -3,11 +3,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { getAddress, maxUint160, parseEther, type Address, type Hex } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 
+import { PERMIT2_TYPES, permit2Domain } from '../src/internal/testing'
+
 import { PERMIT2_ABI } from './abis'
 import { forkTestsEnabled, startAnvilFork, type AnvilClient } from './anvil'
 import { executeSwap, forkManifest, minAmountOut, needsAction, readySwap, sendAsTrader } from './e2e'
-import { PERMIT2_TYPES, permit2Domain } from '../src/internal/testing'
-
 import { ADDRESSES, createWorld, type World } from './worldBuilder'
 
 // ---------------------------------------------------------------------------

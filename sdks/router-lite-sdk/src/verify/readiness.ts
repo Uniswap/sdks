@@ -1,5 +1,5 @@
 import type { Address, Hex, PublicClient } from 'viem'
-import { decodeFunctionResult, encodeFunctionData, isAddressEqual } from 'viem'
+import { decodeFunctionResult, encodeFunctionData, isAddress, isAddressEqual } from 'viem'
 
 import { DEFAULT_CONCURRENCY } from '../constants'
 import { TransportError } from '../errors'
@@ -77,9 +77,22 @@ async function getNativeBalance(
  */
 function isPermitValid(permit: Permit2PermitSingle, token: Address, router: Address, amountIn: bigint, blockTimestamp: bigint): boolean {
   // viem's `isAddressEqual` replaces a local `addressesEqual` helper that did the same lowercased
-  // comparison (R3). Every address reaching here is already shape-validated — the permit's token and
-  // the router by `router.ts#validateSwapRequest`, `token` by the same request path — which is what
-  // makes `isAddressEqual` (which throws on malformed input) the right call rather than a hazard.
+  // comparison (R3) — but `isAddressEqual` THROWS on a malformed operand where the old helper simply
+  // compared unequal, and this function is reached from `checkReadiness`, whose contract is that it
+  // NEVER THROWS FOR A BUSINESS OUTCOME. The two permit-supplied fields are therefore shape-checked
+  // here rather than assumed valid.
+  //
+  // ASSUMED-VALID IS NOT GOOD ENOUGH EVEN THOUGH `router.ts#validateSwapRequest` NOW CHECKS BOTH.
+  // `checkReadiness` is called directly by tests and reachable by anyone assembling their own search
+  // wiring, so the request-path check is a first line, not a guarantee — and a comment claiming
+  // otherwise is exactly what let this ship: `permit.spender` was never validated anywhere at all
+  // while a comment here asserted it was.
+  //
+  // A malformed field means "this permit does not authorize this trade", which is the SAFE answer:
+  // the caller gets a `permit2-allowance` requirement rather than a swap built on a permit nothing
+  // could verify. `router` and `token` come from the manifest/request and are validated upstream, so
+  // only the permit's own two fields need the guard.
+  if (!isAddress(permit.details.token, { strict: false }) || !isAddress(permit.spender, { strict: false })) return false
   if (!isAddressEqual(permit.details.token, token)) return false
   if (!isAddressEqual(permit.spender, router)) return false
   if (permit.details.amount < amountIn) return false

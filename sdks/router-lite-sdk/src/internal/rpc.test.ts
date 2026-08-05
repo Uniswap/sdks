@@ -576,3 +576,40 @@ describe('parseDeclaredCap — providers that state the window they would serve'
     expect(parseDeclaredCap(new Error('retry with the range 2000-1000'))).toEqual({})
   })
 })
+
+// ---------------------------------------------------------------------------
+// R1 follow-up: the one shape where `hasRevertData` and `revertData` disagree.
+//
+// `collectFacts` treats a zero-length `'0x'` as revert EVIDENCE at the nested
+// `data.data` position (geth's error object, where it genuinely means "reverted,
+// no reason") but not at the top level. `revertData` applies the `.length > 2`
+// rule uniformly at both. The asymmetry is inherited from the pre-R1 code and
+// deliberately preserved rather than tidied — but "deliberately preserved" is
+// only true if something notices when it changes, hence these.
+// ---------------------------------------------------------------------------
+
+describe("the zero-length '0x' asymmetry between classification and extraction", () => {
+  test("nested `cause.data.data === '0x'` IS revert evidence, and yields no payload", () => {
+    // A transport-worded message is the discriminator: without `hasRevertData` this would fall to
+    // the message tier and classify `transport`. It classifies `execution`, so the bare '0x' at the
+    // nested position is doing the work — and `revertDataOf` still reports nothing to decode.
+    const err = { cause: { data: { data: '0x' }, message: 'connection reset' } }
+    expect(classifyRpcError(err)).toBe('execution')
+    expect(revertDataOf(err)).toBeUndefined()
+  })
+
+  test("top-level `data === '0x'` is NOT revert evidence — the message tier decides", () => {
+    // The other side of the asymmetry. Same bare '0x', top-level position, same transport wording:
+    // classification falls through to the message tier and reads `transport`.
+    const err = { data: '0x', message: 'connection reset' }
+    expect(classifyRpcError(err)).toBe('transport')
+    expect(revertDataOf(err)).toBeUndefined()
+  })
+
+  test('non-empty payload is revert evidence at EITHER position — no asymmetry there', () => {
+    for (const err of [{ data: '0x1234', message: 'connection reset' }, { cause: { data: { data: '0x1234' }, message: 'connection reset' } }]) {
+      expect(classifyRpcError(err)).toBe('execution')
+      expect(revertDataOf(err)).toBe('0x1234')
+    }
+  })
+})
