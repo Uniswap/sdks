@@ -3,8 +3,13 @@ name: "Router-lite Canary"
 # Nightly live-RPC canary for @uniswap/router-lite-sdk (Task 21's suite,
 # sdks/router-lite-sdk/canary) — testing-architecture layer 6: provider caps/batching/latency,
 # cross-provider quote agreement, and `eth_simulateV1` chained-call execution proof against the
-# real, moving mainnet head. No keys, no funds: everything runs as the fixed, permanently-unfunded
-# CANARY_TRADER.
+# real, moving mainnet head. No private keys and no broadcasts: everything runs as the fixed,
+# synthetic CANARY_TRADER, whose spending power exists only inside an eth_simulateV1 state override.
+#
+# CANARY_RPC_URL_1 SHOULD BE A KEYED ARCHIVE ENDPOINT. The live C4-T4 run established that no free
+# keyless endpoint serves both `eth_simulateV1` and unrestricted historical `eth_getLogs`, and the
+# pair-matrix, long-tail-discovery and latency rows need both. Anything captured from a keyed
+# endpoint is redacted before it is written down — see `redactKeyedUrl` in canary/providers.test.ts.
 #
 # NEVER PR-blocking — its own workflow with no `pull_request` trigger, so it can't be added to
 # required status checks by mistake. Runs nightly (cron) plus on-demand (workflow_dispatch).
@@ -30,7 +35,11 @@ jobs:
   canary:
     name: Live-RPC canary (sdks/router-lite-sdk)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Room for two full attempts of the step below. A typical keyed run measured 5-8 minutes; the
+    # worst case is bounded (not open-ended) by the per-row budgets in canary/canary.test.ts —
+    # LONG_TAIL_MAX_CANDIDATES x LONG_TAIL_CANDIDATE_BUDGET_MS for discovery, LATENCY_BUDGET_MS per
+    # latency row — and lands near 15 minutes.
+    timeout-minutes: 60
     continue-on-error: false
     permissions:
       contents: read # checkout
@@ -82,7 +91,7 @@ jobs:
           CANARY_RPC_URL_2: ${{ secrets.CANARY_RPC_URL_2 }}
           CANARY_RPC_URL_3: ${{ secrets.CANARY_RPC_URL_3 }}
         with:
-          timeout_minutes: 20
+          timeout_minutes: 25
           retry_wait_seconds: 2
           max_attempts: 3
           command: bun test sdks/router-lite-sdk/canary

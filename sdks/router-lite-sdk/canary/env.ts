@@ -20,6 +20,23 @@ const RPC_ENV_VARS = ['CANARY_RPC_URL_1', 'CANARY_RPC_URL_2', 'CANARY_RPC_URL_3'
 
 export type CanaryProvider = { label: string; url: string; client: PublicClient }
 
+function clientFor(url: string): PublicClient {
+  return createPublicClient({ chain: mainnet, transport: http(url, { timeout: 30_000 }) }) as PublicClient
+}
+
+/**
+ * A brand-new client for `provider`, sharing no state with `provider.client` or any other caller's.
+ *
+ * This exists for the latency benchmarks, where "cold" has to actually mean cold. A `Router` keeps a
+ * pool index across calls and a viem client caches the block number, so a second measurement taken
+ * through either one is measuring a warm cache, not discovery. The C4-T4b run caught exactly that:
+ * the cold-long-tail row reported 113ms because the same router had already discovered that pool
+ * while hunting for a tradeable candidate moments earlier — a real number for the wrong question.
+ */
+export function freshClient(provider: CanaryProvider): PublicClient {
+  return clientFor(provider.url)
+}
+
 /** Whether ANY canary test should run at all. */
 export function canaryEnabled(): boolean {
   if (process.env.ROUTER_LITE_CANARY !== '1') return false
@@ -32,11 +49,7 @@ export function canaryProviders(): CanaryProvider[] {
   for (const key of RPC_ENV_VARS) {
     const url = process.env[key]
     if (!url) continue
-    providers.push({
-      label: key,
-      url,
-      client: createPublicClient({ chain: mainnet, transport: http(url, { timeout: 30_000 }) }) as PublicClient,
-    })
+    providers.push({ label: key, url, client: clientFor(url) })
   }
   return providers
 }

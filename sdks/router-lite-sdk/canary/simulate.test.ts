@@ -8,6 +8,7 @@ import {
   buildSimulateSwapPayload,
   evaluateSimulateResult,
   probeSimulateV1Support,
+  traderInputCurrency,
   TRADER_NATIVE_BALANCE,
   type SimulateV1BlockResult,
 } from './simulate'
@@ -70,6 +71,51 @@ function needsActionResult(
     search: emptyReport(),
   }
 }
+
+const WETH: Address = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
+
+/** A `needsActionResult` with an explicit `tx.value` — the discriminator `traderInputCurrency` reads.
+ * Kept separate from {@link needsActionResult} so the existing cases keep asserting today's shape. */
+function needsActionResultWithValue(
+  currencyIn: Address | 'native',
+  currencyOut: Address | 'native',
+  requirements: ExecutionRequirement[],
+  value: bigint,
+): NeedsActionSwap {
+  const base = needsActionResult(currencyIn, currencyOut, requirements)
+  return { ...base, tx: { ...base.tx, value } }
+}
+
+describe('traderInputCurrency', () => {
+  // The C4-T4b live regression, in one test: a `tokenIn: 'native'` request routed through a
+  // WETH-paired v4 pool, so the leg reports WETH while the trader is paying native. Reading the leg
+  // sent the acquisition step off to buy WETH with native, which the SDK rejects outright.
+  test('a native-paying swap through a WETH-paired pool is native, not the leg currency', () => {
+    const result = needsActionResultWithValue(WETH, TOKEN_OUT, [], parseEther('0.01'))
+    expect(result.best.route.legs[0]!.currencyIn).toBe(WETH) // what the route says
+    expect(traderInputCurrency(result)).toBe('native') // what the trader actually pays
+  })
+
+  // The mirror case, which fails silently rather than loudly: an ERC-20 input routed through a v4
+  // NATIVE pool reports `legs[0].currencyIn === 'native'`, and believing it would skip the approval
+  // chain entirely and simulate a swap the real trader could never send.
+  test('an ERC-20 input routed through a native pool is the ERC-20, not native', () => {
+    const result = needsActionResultWithValue(
+      'native',
+      TOKEN_OUT,
+      [{ kind: 'erc20-approval', token: TOKEN_IN, spender: PERMIT2, minimumAmount: AMOUNT_IN }],
+      0n,
+    )
+    expect(result.best.route.legs[0]!.currencyIn).toBe('native')
+    expect(traderInputCurrency(result)).toBe(TOKEN_IN)
+  })
+
+  test('falls back to the first leg when nothing else can name the input', () => {
+    // A fully-approved ERC-20 trader: zero value, no requirements to read a token off.
+    const result = needsActionResultWithValue(TOKEN_IN, TOKEN_OUT, [], 0n)
+    expect(traderInputCurrency(result)).toBe(TOKEN_IN)
+  })
+})
 
 describe('buildSimulateSwapPayload', () => {
   test('native tokenIn: no acquisition/approval calls, just the final tx', () => {

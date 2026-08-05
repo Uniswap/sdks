@@ -10,7 +10,7 @@ import { V4_POOL_MANAGER_ABI } from '../src/internal/abis'
 import { scanLogs } from '../src/internal/logScan'
 import { assertResultCoherent } from '../src/internal/testing'
 
-import { canaryEnabled, canaryLog, canaryProviders, primaryProvider, type CanaryProvider } from './env'
+import { canaryEnabled, canaryLog, canaryProviders, freshClient, primaryProvider, type CanaryProvider } from './env'
 import { CANARY_TRADER, simulateSwapE2E } from './simulate'
 
 const CANARY_DIR = dirname(fileURLToPath(import.meta.url))
@@ -20,18 +20,19 @@ const CANARY_DIR = dirname(fileURLToPath(import.meta.url))
 //
 // Gated on ROUTER_LITE_CANARY=1 + at least CANARY_RPC_URL_1 — see `env.ts`.
 // NEVER PR-blocking: this file only ever runs from a nightly job wired up
-// separately (Task 22), never from the PR pipeline. No keys, no funds: every
-// `getSwap` below is for the fixed, permanently-unfunded `CANARY_TRADER`
-// (0x1111...1111) — the search result is the coherence proof, and
-// `simulateSwapE2E` (see `simulate.ts`) is the execution proof.
+// separately (Task 22), never from the PR pipeline. NO KEYS ARE HELD AND
+// NOTHING IS EVER FUNDED BY THIS SUITE: every `getSwap` below is for the
+// fixed, synthetic `CANARY_TRADER` (0x1111...1111), which this suite has no
+// private key for and never sends a transaction as — the search result is the
+// coherence proof, and `simulateSwapE2E` (see `simulate.ts`) is the execution
+// proof, run entirely inside one `eth_simulateV1` state override.
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// C4-T4 — first-ever live run against real public endpoints (2026-08-04/05).
-// `providerErrors.json` had never held anything but "source": "seed" before
-// this; every entry there is now a real "live-capture". Numbers below are
-// real, not projected — rows that did not complete are marked as such rather
-// than filled in with a guess.
+// LIVE-RUN LOG. Every number below was measured, never projected; a row that
+// did not complete is marked as such rather than filled in with a guess.
+//
+// --- C4-T4, first-ever live run, keyless public endpoints (2026-08-04/05) ---
 //
 // Live provider capability matrix (probed directly, no keys, mainnet head):
 //
@@ -45,48 +46,115 @@ const CANARY_DIR = dirname(fileURLToPath(import.meta.url))
 //
 // No free, keyless endpoint tested supports BOTH eth_simulateV1 and an
 // unrestricted eth_getLogs — the two things the pair-matrix/latency rows
-// below need together via `primaryProvider()`. That is the headline finding
-// of this run, not a bug: it means every row that depends on both (this
-// file's four `describe` blocks) could not be exercised end-to-end against
-// any single public candidate within a live run's time budget.
+// below need together via `primaryProvider()`. That was the headline finding
+// of that run: every row depending on both was left unmeasured, because no
+// single public candidate could serve them.
 //
 // provider-behavior evidence (`providers.test.ts`), huge-getLogs probe
 // (2,000-block unfiltered window against the live v4 PoolManager):
-//   CANARY_RPC_URL_1 (publicnode): 0/2,000 blocks covered — every request
-//     lands on the archive wall above; `MIN_CHUNK` (128 blocks) never gets
-//     small enough to matter, because the block range was never the problem.
-//   CANARY_RPC_URL_2 (blastapi): 0/2,000 blocks covered — the provider's
-//     real cap (10 blocks) is narrower than `scanLogs`'s `MIN_CHUNK` floor
-//     (128 blocks), so no window the bisector will ever try can succeed.
-//   CANARY_RPC_URL_3 (drpc): complete convergence, 40,994 logs recovered in
-//     one pass — the bisector's intended case, working as designed live.
+//   publicnode: 0/2,000 blocks covered — every request lands on the archive
+//     wall above; `MIN_CHUNK` (128 blocks) never gets small enough to matter,
+//     because the block range was never the problem.
+//   blastapi: 0/2,000 blocks covered — the provider's real cap (10 blocks) is
+//     narrower than `scanLogs`'s `MIN_CHUNK` floor (128 blocks), so no window
+//     the bisector will ever try can succeed.
+//   drpc: complete convergence, 40,994 logs recovered in one pass — the
+//     bisector's intended case, working as designed live.
 //
-// Pair matrix / cross-provider agreement / latency benchmarks (this file):
-// NOT completed this run. `primaryProvider()` (publicnode, the only
-// simulateV1-capable candidate tested) went into ~60s-per-call soft stalls
-// immediately after the huge-getLogs probe's request burst against it in
-// the same process — the very next test to reuse it (the batched-transport
-// check, then this file's native->USDC row) each timed out at 60s. Real,
-// reportable behavior (a public free-tier endpoint degrading under
-// sustained single-IP load), but not the wave-timing data this comment was
-// meant to hold — no hinted-swap/direct-pair/cold-long-tail numbers were
-// obtained, and none are fabricated here. A retry should give the pair
-// matrix a provider that has not just been hit by `providers.test.ts` in
-// the same run (e.g. separate CI steps/providers per test file).
+// --- C4-T4b, keyed run (2026-08-04) ------------------------------------------
 //
-// Canary-code fixes made in response to this run (src/ untouched):
-//   - `providers.test.ts`: the huge-getLogs probe asserted convergence
-//     BEFORE recording the captured error, so any non-convergent provider
-//     (the common, most-informative case) had its real error discarded
-//     instead of persisted. Reordered, and added a graceful skip when
-//     `coveredRanges === 0` (categorical incompatibility — an archive wall
-//     or a per-call cap under `MIN_CHUNK` — rather than a bisector defect).
-//   - `providers.test.ts`: `HUGE_WINDOW_BLOCKS` 200_000n -> 2_000n. Against
-//     the actually-live, high-volume v4 PoolManager the original window
-//     forced `scanLogs` into its near-worst case (every request landing at
-//     `MIN_CHUNK`), timing out the test even without any archive gating
-//     (confirmed directly: 200_000n against publicnode ran the full 180s
-//     without finishing).
+// Re-run with a KEYED archive endpoint as `CANARY_RPC_URL_1` (alchemy-mainnet:
+// eth_simulateV1 supported AND unrestricted archive eth_getLogs — the exact
+// combination no keyless endpoint had) and `drpc` as `CANARY_RPC_URL_2`. Every
+// row in this file completed. Endpoint identity stays at hostname granularity
+// in this file and in `providerErrors.json`; see `redactKeyedUrl` in
+// `providers.test.ts` for why the fixture can never carry a keyed URL.
+//
+// provider-behavior evidence, re-run against the same pair:
+//
+//   probe                          alchemy-mainnet            drpc
+//   huge unfiltered getLogs        complete in ONE call,      complete, bisected around a
+//   (2,000 blocks, v4 PoolManager) 39,929 logs, no error      20,000-result cap, 39,929 logs
+//   eth_simulateV1                 supported                  not supported
+//
+// Both recovered the SAME 39,929 logs by different routes, which is the
+// bisector's actual contract: a provider's cap changes how many requests the
+// scan costs, never what it returns.
+//
+// So `providerErrors.json` has NO entry for the keyed endpoint, and that is the
+// honest outcome rather than a gap: it never errored, and there was nothing to
+// capture. The bisector's convergence was proved on both — trivially on one,
+// through the cap-halving path on the other.
+//
+// A batched transport coalesced a wave's concurrent reads into a single 10-call
+// JSON-RPC batch (`batchSizes: [1,1,10,1,1,1,1,1,1]`) — the batching claim,
+// verified on the wire rather than from viem's documentation.
+//
+// pair matrix (mainnet head ~25,686,000, alchemy-mainnet) — every row's `tx`
+// re-executed through the full acquire/approve chain in one eth_simulateV1:
+//
+//   row                 status         simulated   quoted out       received
+//   native -> USDC      ready          ok          1,870,316,771    1,870,318,237
+//   USDC -> native      needs-action   ok          2.672269e18 wei  2.672269e18 wei
+//   USDC -> WBTC        needs-action   ok          7,755,077 sat    7,755,077 sat
+//   recent v4 pool      ready          ok          2.554551e17      2.554551e17
+//
+// (Amounts move with the head between runs — 1 ETH priced 1,873.06 and then
+// 1,870.32 USDC an hour apart. `received` occasionally exceeds `quoted` for the
+// same reason, the block advancing between the quote and the simulation;
+// `evaluateSimulateResult` checks the plan's own slippage floor, not equality.)
+//
+// `ready` FOR A NATIVE INPUT IS CORRECT, and the first run's assertion of
+// `needs-action` for every row was the canary's bug, not the SDK's: the
+// "permanently unfunded" premise behind `CANARY_TRADER` (0x1111...1111) is
+// simply false on mainnet — that address is a well-known dust/burn sink and
+// held ~5.72 ETH at the time of this run, so a 1 ETH native-input swap has no
+// outstanding requirement and `classifySwap` rightly reports `ready`. It holds
+// no USDC, so the ERC-20 rows still exercise the `needs-action` shape. See
+// `checkPairIsCanary`, which now accepts either executable status.
+//
+// long-tail discovery (the memecoin proof) — 3,208 v4 `Initialize` logs over
+// the last ~7 days (50,400 blocks) recovered by `scanLogs` in ONE pass, 7.3s,
+// 105 of them with a native/WETH leg. Of the 12 most recent, 9 quoted a real
+// route in 4.4-6.2s (hinted, single leg) and 3 spent the whole 20s
+// per-candidate budget without pricing. Tokens routed included
+// launchpad-hooked pools (hooks 0xA6f7…9440 / 0x4A80…C8c0 / 0x6C24…e8Cc /
+// 0x2762…0080) and hookless ones — i.e. the fresh, hook-gated memecoin case,
+// live. The row's own pool (0x8F29…2DA9, hook 0xA6f7…9440, `Initialize`d at
+// block 25,678,511, ~1 day old) both quoted and simulated clean.
+//
+// A FRESHLY-INITIALIZED POOL IS OFTEN NOT TRADEABLE (liquidity never added, or
+// a hook that gates swaps), and that is what broke the first keyed attempt:
+// the single most-recent pool was un-quotable, its hint died in wave 0, and
+// the search fell through into the scan-bound waves — >10 minutes without
+// returning, against a full-archive endpoint. Hence `pickTradeableRecentV4Pool`
+// below walks candidates under a per-candidate `AbortSignal` instead of betting
+// the row on the single newest pool.
+//
+// latency (fresh client + fresh router per row, 60s budget per row). Two runs
+// an hour apart, because the difference between them is the finding:
+//
+//   scenario               first actionable    wave 1, run A   wave 1, run B
+//   hinted-native-usdc     6,881 / 8,627ms     49,505ms        60,381ms (cut)
+//   direct-pair-usdc-wbtc  5,517 / 5,197ms     43,125ms        60,347ms (cut)
+//   cold-long-tail         5,693 / 5,183ms     46,361ms        60,493ms (cut)
+//
+// FIRST-ACTIONABLE LATENCY IS STABLE AT ~5-9s; COMPLETION IS NOT. In run A all
+// three iterators ended naturally at 43-50s; in run B all three were still
+// producing waves when the budget cut them off, and a separate cold-long-tail
+// probe under a 240s budget was cut off at 240,040ms. So wave 0 is the number to
+// build an SLA on, and full discovery is bounded only by the caller's own
+// `AbortSignal` — which is precisely what `LATENCY_BUDGET_MS` supplies here and
+// what `types.ts#QuoteRequest.signal` exists for in the SDK proper.
+//
+// THE COLD LONG-TAIL FLOOR IS AS GOOD AS THE HINTED ONE (5.2s vs 8.6s — the
+// hinted row is the SLOWER of the two), which is the wave-0 recent-window design
+// paying off rather than a measurement error: a pool `Initialize`d a day ago
+// falls inside wave 0's ~7-day exact-pair window and is found in the first wave
+// with no hint at all, while the hinted row still pays for the rest of wave 0
+// around its hint. A hint's value is therefore not latency on a FRESH pool — it
+// is what rescues an OLD, thinly indexed one, whose discovery would otherwise
+// wait for the scan-bound waves.
 // ---------------------------------------------------------------------------
 
 const RUN = canaryEnabled()
@@ -100,17 +168,37 @@ const USDC_IN = 5_000n * 10n ** 6n
 /** ~7 days of mainnet blocks at ~12s/block — the recent-pool discovery window the brief calls for. */
 const SEVEN_DAYS_BLOCKS = 50_400n
 
-type DiscoveredV4Pool = { poolKey: PoolKey; other: Address }
+/**
+ * Native input for the long-tail row, deliberately ~100x smaller than {@link ETH_IN}.
+ *
+ * A pool that was `Initialize`d hours ago holds whatever liquidity its launch seeded and no more;
+ * pricing 1 ETH through it is a request to eat the entire curve, which is a statement about the
+ * pool's depth rather than about the SDK. 0.01 ETH is the size a real first buy of a fresh launch
+ * actually is, and it is what the numbers in this file's header were measured at.
+ */
+const LONG_TAIL_ETH_IN = parseEther('0.01')
+
+/** Per-candidate wall-clock budget while hunting for a tradeable fresh pool — see
+ * {@link pickTradeableRecentV4Pool} for why this bound is what keeps the row finite. */
+const LONG_TAIL_CANDIDATE_BUDGET_MS = 20_000
+
+/** How many of the most recent native-leg pools to try before giving the row up. Live, 9 of the
+ * first 12 quoted, so a run that exhausts this has found something categorically unusual (or a very
+ * quiet week) — worth a logged skip, not a failure. */
+const LONG_TAIL_MAX_CANDIDATES = 12
+
+type DiscoveredV4Pool = { poolKey: PoolKey; other: Address; createdAtBlock: bigint | null }
 
 /**
- * Finds the most-recently-created v4 pool (last ~7 days of `Initialize` logs) that has a direct
- * native/WETH leg — kept deliberately simple: a pool between two arbitrary long-tail tokens would
- * need its OWN acquisition strategy, which is out of scope here, so this only looks for pools this
- * suite can trivially trade into from native. Returns `undefined` (never throws) when none is found,
- * so callers can skip that row with a note rather than fail the whole suite over "the chain happened
- * to be quiet this week" — a real, expected outcome, not a defect.
+ * Every v4 pool created in the last ~7 days of `Initialize` logs that has a direct native/WETH leg,
+ * MOST RECENT FIRST.
+ *
+ * Deliberately restricted to native-leg pools: a pool between two arbitrary long-tail tokens would
+ * need its OWN acquisition strategy, which is out of scope here. Returns `[]` (never throws) when
+ * none is found, so callers can skip that row with a note rather than fail the whole suite over "the
+ * chain happened to be quiet this week" — a real, expected outcome, not a defect.
  */
-async function discoverRecentV4Pool(client: PublicClient): Promise<DiscoveredV4Pool | undefined> {
+async function discoverRecentV4Pools(client: PublicClient): Promise<DiscoveredV4Pool[]> {
   const head = await client.getBlockNumber()
   const poolManager = MAINNET_MANIFEST.v4!.poolManager
   const wrappedNative = MAINNET_MANIFEST.wrappedNative.toLowerCase()
@@ -125,7 +213,8 @@ async function discoverRecentV4Pool(client: PublicClient): Promise<DiscoveredV4P
     {},
   )
 
-  // Recent-first: the first qualifying log IS the most recently created pool.
+  const pools: DiscoveredV4Pool[] = []
+  // `scanLogs` walks recent-first, so this list is already newest-first.
   for (const log of logs) {
     const decoded = decodeEventLog({
       abi: V4_POOL_MANAGER_ABI,
@@ -138,13 +227,64 @@ async function discoverRecentV4Pool(client: PublicClient): Promise<DiscoveredV4P
     const c1 = currency1.toLowerCase()
     if (c0 !== wrappedNative && c1 !== wrappedNative) continue
     const other = (c0 === wrappedNative ? currency1 : currency0) as Address
-    return { poolKey: { currency0, currency1, fee, tickSpacing, hooks }, other }
+    pools.push({ poolKey: { currency0, currency1, fee, tickSpacing, hooks }, other, createdAtBlock: log.blockNumber })
+  }
+  return pools
+}
+
+/**
+ * Walks {@link discoverRecentV4Pools} newest-first and returns the first pool that will actually
+ * PRICE a trade, or `undefined` when none of the first {@link LONG_TAIL_MAX_CANDIDATES} will.
+ *
+ * "Most recently created" is not the same as "tradeable", and conflating the two is what made the
+ * first keyed run of this row hang: a freshly-`Initialize`d pool very often has no liquidity yet, or
+ * a hook that gates swaps. When the hint cannot be priced, wave 0 has nothing to yield and the search
+ * proceeds into the scan-bound waves — full-history `eth_getLogs` walks that, against an endpoint
+ * with real archive access, run for TENS OF MINUTES rather than failing fast. So each candidate is
+ * quoted under its own `AbortSignal`: the budget is what converts "this pool is dead" from a hang
+ * into a 20s no, and the row moves on to the next candidate instead of the whole suite stalling.
+ *
+ * Quoting (not swapping) is the probe deliberately — it is the cheaper half and needs no trader, and
+ * the caller re-runs the winner through the full `getSwap` + `eth_simulateV1` path anyway.
+ */
+async function pickTradeableRecentV4Pool(router: Router, client: PublicClient): Promise<DiscoveredV4Pool | undefined> {
+  const pools = await discoverRecentV4Pools(client)
+  canaryLog('recent v4 pools with a native leg (last ~7d)', { found: pools.length, tried: Math.min(pools.length, LONG_TAIL_MAX_CANDIDATES) })
+
+  for (const pool of pools.slice(0, LONG_TAIL_MAX_CANDIDATES)) {
+    const quote = await router.getQuote({
+      tokenIn: 'native',
+      tokenOut: pool.other,
+      amountIn: LONG_TAIL_ETH_IN,
+      hints: [{ protocol: 'v4', poolKey: pool.poolKey }],
+      signal: AbortSignal.timeout(LONG_TAIL_CANDIDATE_BUDGET_MS),
+    })
+    if (quote.status === 'quote') {
+      canaryLog('long-tail candidate priced', {
+        token: pool.other,
+        hooks: pool.poolKey.hooks,
+        createdAtBlock: pool.createdAtBlock?.toString() ?? null,
+        amountOut: quote.best.quote.amountOut.toString(),
+      })
+      return pool
+    }
+    canaryLog('long-tail candidate not tradeable — trying the next one', { token: pool.other, status: quote.status })
   }
   return undefined
 }
 
-/** Runs `getSwap` for the synthetic trader, asserts `needs-action` (the honest shape for a
- * permanently-unfunded trader), then proves the returned `tx` is actually executable. */
+/**
+ * Runs `getSwap` for the synthetic trader, asserts it produced an EXECUTABLE result, then proves the
+ * returned `tx` really executes via `eth_simulateV1`.
+ *
+ * Both `ready` and `needs-action` are accepted, and which one comes back is a fact about the trader's
+ * real on-chain state rather than about the SDK. This used to demand `needs-action` on the premise
+ * that {@link CANARY_TRADER} is permanently unfunded — false on mainnet, where 0x1111...1111 is a
+ * well-known dust/burn sink holding several ETH, so native-input rows legitimately come back `ready`
+ * (no approval or balance requirement is outstanding). It holds no ERC-20s, so those rows still
+ * exercise the `needs-action` shape. Anything else (`no-route`, `inconclusive`) still fails the row —
+ * that IS the canary firing.
+ */
 async function checkPairIsCanary(
   label: string,
   router: Router,
@@ -153,11 +293,18 @@ async function checkPairIsCanary(
 ): Promise<void> {
   const result = await router.getSwap({ ...req, trader: CANARY_TRADER })
   assertResultCoherent(result)
-  if (result.status !== 'needs-action') {
-    throw new Error(`${label}: expected needs-action for the unfunded synthetic trader, got ${result.status}`)
+  if (result.status !== 'needs-action' && result.status !== 'ready') {
+    const reason = 'reason' in result ? `: ${result.reason.code}` : ''
+    throw new Error(`${label}: expected an executable result (ready | needs-action), got ${result.status}${reason}`)
   }
   const outcome = await simulateSwapE2E(provider.client, result, CANARY_TRADER)
-  canaryLog(`${label}: simulated`, { provider: provider.label, ok: outcome.ok, outputReceived: outcome.outputReceived.toString() })
+  canaryLog(`${label}: simulated`, {
+    provider: provider.label,
+    status: result.status,
+    ok: outcome.ok,
+    amountOut: result.best.quote.amountOut.toString(),
+    outputReceived: outcome.outputReceived.toString(),
+  })
   expect(outcome.ok).toBe(true)
 }
 
@@ -172,29 +319,33 @@ describe.skipIf(!RUN)('pair matrix (canary, live head)', () => {
 
   it('native -> USDC', async () => {
     await checkPairIsCanary('native->USDC', router, provider, { tokenIn: 'native', tokenOut: USDC, amountIn: ETH_IN })
-  }, 60_000)
+  }, 120_000)
 
   it('USDC -> native', async () => {
     await checkPairIsCanary('USDC->native', router, provider, { tokenIn: USDC, tokenOut: 'native', amountIn: USDC_IN })
-  }, 60_000)
+  }, 120_000)
 
   it('USDC -> WBTC (likely 2-hop)', async () => {
     await checkPairIsCanary('USDC->WBTC', router, provider, { tokenIn: USDC, tokenOut: WBTC, amountIn: USDC_IN })
-  }, 60_000)
+  }, 120_000)
 
+  // Generous timeout: this row does a ~7-day log scan and then prices up to
+  // `LONG_TAIL_MAX_CANDIDATES` fresh pools, each of which may spend its whole
+  // `LONG_TAIL_CANDIDATE_BUDGET_MS` before being ruled out. The worst case is bounded by those two
+  // constants, not by luck, which is the point — see `pickTradeableRecentV4Pool`.
   it('a recently-created v4 pool (last ~7d of Initialize logs, with a native leg)', async () => {
-    const pool = await discoverRecentV4Pool(provider.client)
+    const pool = await pickTradeableRecentV4Pool(router, provider.client)
     if (!pool) {
-      canaryLog('no recent v4 pool with a native/WETH leg found in the last ~7 days — skipping this row')
+      canaryLog('no tradeable recent v4 pool with a native/WETH leg found in the last ~7 days — skipping this row')
       return
     }
     await checkPairIsCanary(`native -> ${pool.other} (v4, discovered)`, router, provider, {
       tokenIn: 'native',
       tokenOut: pool.other,
-      amountIn: ETH_IN,
+      amountIn: LONG_TAIL_ETH_IN,
       hints: [{ protocol: 'v4', poolKey: pool.poolKey }],
     })
-  }, 60_000)
+  }, 600_000)
 })
 
 describe.skipIf(!RUN || canaryProviders().length < 2)('cross-provider quote agreement (canary, live head)', () => {
@@ -244,32 +395,68 @@ describe.skipIf(!RUN || canaryProviders().length < 2)('cross-provider quote agre
 // (gitignored — these are point-in-time measurements, not fixtures). This is
 // what revisits the internal wave-budget constants (see `constants.ts`), not
 // something a test should pass/fail on.
+//
+// EVERY ROW IS RUN UNDER AN `AbortSignal.timeout`, and that is a measurement
+// decision rather than a convenience. `router.swaps()` keeps yielding refined
+// results until discovery is COMPLETE, and completeness on mainnet means
+// walking each protocol's factory logs back to its deploy block — thousands of
+// sequential `eth_getLogs` even against an endpoint that serves every one of
+// them. Measured live: a cold long-tail token yielded its first executable
+// result at 5.8s and was still going when a 240s budget cut it off. So the
+// number worth recording is TIME TO THE FIRST ACTIONABLE RESULT (what a caller
+// waiting on `getSwap` actually experiences — `getSwap` returns on exactly that
+// yield), plus however many later refinements land inside the budget. A row
+// that reaches the budget is reported with `finishedWithinBudget: false`, never
+// silently truncated.
 // ---------------------------------------------------------------------------
 
-type WaveTiming = { index: number; elapsedMs: number; status: string }
-type LatencyRow = { label: string; waves: WaveTiming[] }
+/** Wall-clock budget per latency row — generous enough to capture wave 0 and its first refinements,
+ * far short of what a complete mainnet discovery costs. */
+const LATENCY_BUDGET_MS = 60_000
 
-async function timeWaves(label: string, router: Router, req: Omit<SwapRequest, 'trader'>): Promise<LatencyRow> {
+type WaveTiming = { index: number; elapsedMs: number; status: string }
+type LatencyRow = {
+  label: string
+  budgetMs: number
+  waves: WaveTiming[]
+  /** Elapsed at the first `ready`/`needs-action` yield — the latency a `getSwap` caller sees. */
+  firstActionableMs: number | null
+  /** False when the iterator was still producing waves when the budget expired. */
+  finishedWithinBudget: boolean
+}
+
+/**
+ * Times one scenario end to end on a router and client that have NEVER SEEN A REQUEST BEFORE.
+ *
+ * Reusing a router across rows quietly turns every row after the first into a warm-cache
+ * measurement — see `freshClient` in `env.ts` for the run where that produced a 113ms "cold"
+ * long-tail number. Each row paying its own discovery cost is the whole point of the comparison
+ * between these three scenarios.
+ */
+async function timeWaves(label: string, provider: CanaryProvider, req: Omit<SwapRequest, 'trader'>): Promise<LatencyRow> {
+  const router = createRouter({ client: freshClient(provider), manifest: MAINNET_MANIFEST })
   const start = performance.now()
   const waves: WaveTiming[] = []
+  let firstActionableMs: number | null = null
   let index = 0
-  for await (const r of router.swaps({ ...req, trader: CANARY_TRADER })) {
-    waves.push({ index: index++, elapsedMs: performance.now() - start, status: r.status })
+  for await (const r of router.swaps({ ...req, trader: CANARY_TRADER, signal: AbortSignal.timeout(LATENCY_BUDGET_MS) })) {
+    const elapsedMs = performance.now() - start
+    waves.push({ index: index++, elapsedMs, status: r.status })
+    if (firstActionableMs === null && (r.status === 'ready' || r.status === 'needs-action')) firstActionableMs = elapsedMs
   }
-  return { label, waves }
+  const totalMs = performance.now() - start
+  return { label, budgetMs: LATENCY_BUDGET_MS, waves, firstActionableMs, finishedWithinBudget: totalMs < LATENCY_BUDGET_MS }
 }
 
 describe.skipIf(!RUN)('latency benchmarks (canary, record only)', () => {
   it('wall-clock per wave: hinted swap, direct pair, cold long-tail token', async () => {
     const provider = primaryProvider()
-    const router = createRouter({ client: provider.client, manifest: MAINNET_MANIFEST })
-
     const results: LatencyRow[] = []
 
     // Hinted: a well-known WETH/USDC v2 pair, supplied as a hint so wave 0 resolves it immediately
     // without any discovery round trip — the latency floor.
     results.push(
-      await timeWaves('hinted-native-usdc', router, {
+      await timeWaves('hinted-native-usdc', provider, {
         tokenIn: 'native',
         tokenOut: USDC,
         amountIn: ETH_IN,
@@ -278,13 +465,18 @@ describe.skipIf(!RUN)('latency benchmarks (canary, record only)', () => {
     )
 
     // Direct pair, no hints: ordinary discovery against two well-known majors.
-    results.push(await timeWaves('direct-pair-usdc-wbtc', router, { tokenIn: USDC, tokenOut: WBTC, amountIn: USDC_IN }))
+    results.push(await timeWaves('direct-pair-usdc-wbtc', provider, { tokenIn: USDC, tokenOut: WBTC, amountIn: USDC_IN }))
 
-    // Cold long-tail: whatever `discoverRecentV4Pool` found, traded WITHOUT hints — full discovery,
-    // the latency ceiling. Skipped with a note (not a failure) when nothing recent was found.
-    const cold = await discoverRecentV4Pool(provider.client)
+    // Cold long-tail: a freshly-launched token traded WITHOUT hints — the pool has to be DISCOVERED,
+    // which is the latency ceiling a memecoin buyer actually pays. The candidate hunt runs on its own
+    // throwaway router so the one `timeWaves` builds starts genuinely cold; a router shared with the
+    // hunt would already hold the pool and report discovery it never did. Skipped with a note (not a
+    // failure) when nothing tradeable was found.
+    const scoutClient = freshClient(provider)
+    const scoutRouter = createRouter({ client: scoutClient, manifest: MAINNET_MANIFEST })
+    const cold = await pickTradeableRecentV4Pool(scoutRouter, scoutClient)
     if (cold) {
-      results.push(await timeWaves('cold-long-tail', router, { tokenIn: 'native', tokenOut: cold.other, amountIn: ETH_IN }))
+      results.push(await timeWaves('cold-long-tail', provider, { tokenIn: 'native', tokenOut: cold.other, amountIn: LONG_TAIL_ETH_IN }))
     } else {
       canaryLog('no cold long-tail token discovered — skipping that latency row')
     }
@@ -294,5 +486,5 @@ describe.skipIf(!RUN)('latency benchmarks (canary, record only)', () => {
     writeFileSync(join(CANARY_DIR, `latency-${payload.timestamp}.json`), JSON.stringify(payload, null, 2))
     // Record only — no assertions. These numbers are what a human revisits the wave-budget constants
     // (constants.ts) against, not something CI should ever gate on.
-  }, 120_000)
+  }, 900_000)
 })

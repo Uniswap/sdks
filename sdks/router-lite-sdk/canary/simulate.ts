@@ -1,6 +1,7 @@
 import {
   createRouter,
   manifestFor,
+  type CurrencyRef,
   type EncodedTx,
   type ExecutionRequirement,
   type NeedsActionSwap,
@@ -33,14 +34,20 @@ import { assertResultCoherent } from '../src/internal/testing'
 // eth_simulateV1 — the execution proof for the live-RPC canary suite.
 //
 // The design decision this module exists to satisfy: canary runs carry NO
-// keys and fund NO real trader. `getSwap` is called against a synthetic,
-// permanently-unfunded address, which always comes back `needs-action` (the
-// trader has no balance and no approvals). `simulateSwapE2E` is the other
-// half — it proves the `tx` that came back is actually EXECUTABLE, by running
-// the whole authorization chain a real trader would need, inside one
-// `eth_simulateV1` request, with only a native-balance override (first-class
-// in the RPC method; no storage-slot guessing) giving the synthetic trader
-// spending power that exists nowhere on chain.
+// private key and send NO transaction. `getSwap` is called against a synthetic
+// address nobody in this suite can sign for, so its result — `needs-action`
+// where approvals are outstanding, `ready` where none are — is a claim that has
+// never been tested against the chain. `simulateSwapE2E` is the other half: it
+// proves the `tx` that came back is actually EXECUTABLE, by running the whole
+// authorization chain a real trader would need, inside one `eth_simulateV1`
+// request, with a native-balance override (first-class in the RPC method; no
+// storage-slot guessing) supplying spending power for the run.
+//
+// The trader's REAL on-chain state is not part of the design and must not be
+// assumed: 0x1111...1111 is a public dust/burn sink, and a keyed live run
+// (C4-T4b) found several ETH sitting in it. Nothing here depends on the
+// balance being any particular number — the override replaces it outright, and
+// `canary.test.ts` accepts either executable status for exactly this reason.
 //
 // The call chain, in order, all against the SAME block:
 //   1. acquire  (skipped when tokenIn is native): a real Universal Router
@@ -59,7 +66,9 @@ import { assertResultCoherent } from '../src/internal/testing'
 // live RPC (or even a working local eth_simulateV1) is available.
 // ---------------------------------------------------------------------------
 
-/** The synthetic trader every canary run uses: fixed, and never funded for real. */
+/** The synthetic trader every canary run uses: fixed, and never signed for — this suite holds no
+ * private key for it and never broadcasts a transaction. Whatever balance the address happens to
+ * hold on a given chain is incidental (see the module header); the simulation overrides it. */
 export const CANARY_TRADER: Address = '0x1111111111111111111111111111111111111111'
 
 /** Native balance the trader is given INSIDE the simulation only. */
@@ -153,9 +162,9 @@ export async function probeSimulateV1Support(client: Pick<PublicClient, 'request
 // ---------------------------------------------------------------------------
 // Acquisition leg — the only piece that touches live RPC beyond the one
 // eth_simulateV1 call. Built by asking the SDK for a plain native -> tokenIn
-// swap for the same trader; the fact that the trader is unfunded in reality
-// is irrelevant here, since only the ENCODED TX is taken from the result —
-// the balance override inside the simulation is what makes it actually run.
+// swap for the same trader; whatever the trader can or cannot afford in
+// reality is irrelevant here, since only the ENCODED TX is taken from the
+// result — the balance override inside the simulation is what makes it run.
 // ---------------------------------------------------------------------------
 
 /**
@@ -206,6 +215,36 @@ function findRequirement<K extends ExecutionRequirement['kind']>(
 }
 
 /**
+ * The currency THE TRADER must supply for `result` — which is emphatically not
+ * `result.best.route.legs[0].currencyIn`.
+ *
+ * A route's legs describe POOL currencies; the request's input currency is a separate fact, and the
+ * Universal Router bridges the two with an implicit wrap/unwrap. Reading the trader's obligation off
+ * the first leg is therefore wrong in both directions, and the C4-T4b live run hit one of them: a
+ * native-input swap that routed through a WETH-paired v4 pool reports `legs[0].currencyIn === WETH`,
+ * so the acquisition leg below tried to buy WETH with native and the SDK (rightly) rejected
+ * `native -> WETH` as "the same currency family; there is nothing to route". The mirror case — a
+ * WETH input routed through a v4 NATIVE pool, reporting `legs[0].currencyIn === 'native'` — would
+ * have silently skipped an approval the trader actually needs.
+ *
+ * `tx.value` is the reliable signal, and not by coincidence: the compiler sets `acquireInput` to
+ * `native-value` exactly when the REQUEST's `tokenIn` is native (`plan/compile.ts`), and the encoder
+ * puts that amount, and only that amount, in `tx.value` (`encode/ur20.ts`). So a nonzero value is the
+ * request's own answer read back off the encoded transaction. For an ERC-20 input the readiness
+ * requirements name the same token (`verify/readiness.ts` only ever reports on `currencyIn`), with
+ * the first leg as a last resort for the case where a trader is already fully approved and there is
+ * consequently nothing to report.
+ */
+export function traderInputCurrency(result: ReadySwap | NeedsActionSwap): CurrencyRef {
+  if (result.tx.value > 0n) return 'native'
+  const requirement = result.status === 'needs-action' ? result.requirements[0] : undefined
+  if (requirement) return requirement.token
+  const legs = result.best.route.legs
+  if (legs.length === 0) throw new Error('traderInputCurrency: result.best.route has no legs')
+  return legs[0]!.currencyIn
+}
+
+/**
  * Builds the exact `eth_simulateV1` payload for the chained acquire+approve+swap proof. Pure: takes
  * an already-resolved `acquisitionTx` (from {@link resolveAcquisitionTx}) rather than fetching one
  * itself, so the exact request shape can be asserted against canned inputs with no client at all.
@@ -218,9 +257,8 @@ export function buildSimulateSwapPayload(
   trader: Address,
   opts?: { acquisitionTx?: EncodedTx; nativeBalance?: bigint },
 ): SimulateV1Payload {
-  const legs = result.best.route.legs
-  if (legs.length === 0) throw new Error('buildSimulateSwapPayload: result.best.route has no legs')
-  const tokenIn = legs[0]!.currencyIn
+  if (result.best.route.legs.length === 0) throw new Error('buildSimulateSwapPayload: result.best.route has no legs')
+  const tokenIn = traderInputCurrency(result)
 
   const calls: SimulateV1Call[] = []
 
@@ -317,13 +355,12 @@ export function evaluateSimulateResult(blockResult: SimulateV1BlockResult, recip
 
 /**
  * Simulates the full acquire+approve+swap chain for `result` (a `getSwap` response for
- * {@link CANARY_TRADER} or any other permanently-unfunded synthetic trader) via one
- * `eth_simulateV1` request, and reports whether it would actually execute successfully with output
- * meeting the SDK's own slippage floor.
+ * {@link CANARY_TRADER} or any other synthetic trader) via one `eth_simulateV1` request, and reports
+ * whether it would actually execute successfully with output meeting the SDK's own slippage floor.
  *
- * No keys, no funds, ever: `trader`'s only spending power is the native-balance override this
- * function sets up inside the simulated block, which exists nowhere on chain before or after the
- * call. `slippageBps` defaults to the SDK's own default (100) since `SwapResult` does not carry the
+ * No keys, no broadcast, ever: `trader`'s spending power inside the simulated block comes from the
+ * native-balance override this function sets up, and no state it writes survives the call.
+ * `slippageBps` defaults to the SDK's own default (100) since `SwapResult` does not carry the
  * request's slippage back — pass the value your `getSwap` call actually used if it was overridden.
  */
 export async function simulateSwapE2E(
@@ -334,9 +371,8 @@ export async function simulateSwapE2E(
 ): Promise<SimulateSwapOutcome> {
   assertResultCoherent(result)
 
-  const legs = result.best.route.legs
-  if (legs.length === 0) throw new Error('simulateSwapE2E: result.best.route has no legs')
-  const tokenIn = legs[0]!.currencyIn
+  if (result.best.route.legs.length === 0) throw new Error('simulateSwapE2E: result.best.route has no legs')
+  const tokenIn = traderInputCurrency(result)
   const recipient = opts?.recipient ?? trader
   const slippageBps = opts?.slippageBps ?? DEFAULT_SLIPPAGE_BPS
   const minAmountOut = computeMinAmountOut(result.best.quote.amountOut, slippageBps)
