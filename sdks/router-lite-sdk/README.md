@@ -377,7 +377,10 @@ itself):
   even though nothing asked for that. One semaphore, built once per router instance, is what makes
   `concurrency` a genuine ceiling rather than a per-batch one. Raise it for a provider with deep
   connection headroom that would rather trade concurrency for latency; lower it fronting a
-  stricter/shared-quota endpoint.
+  stricter/shared-quota endpoint. A single log scan contributes up to 4 of those permits on its own:
+  once it has learned a block-window width the endpoint will actually serve, it dispatches that many
+  same-width chunks at a time instead of walking them one by one. The bisection that *finds* the
+  width is still strictly sequential, and so is everything after a chunk fails.
 - **`logChunkBlocks`** (default `16_000_000n`) — a CEILING on the block span of an `eth_getLogs`
   window: the widest this router will ever ask a log scan for, as both the starting width and the
   regrowth ceiling. Scans **start wide and bisect down** — the first request spans

@@ -448,6 +448,38 @@ export const MAX_CONSECUTIVE_MIN_FAILURES = 3
 export const CHUNK_REGROWTH_SUCCESSES = 4
 
 /**
+ * How many `eth_getLogs` chunk requests ONE {@link scanLogs} call may have in flight at once, once
+ * the working window width has been ESTABLISHED (P1).
+ *
+ * WHY A SCAN NEEDED ITS OWN BOUND AT ALL. The router-wide semaphore
+ * ({@link DEFAULT_CONCURRENCY} = 20) has always been the ceiling on in-flight requests, but nothing
+ * under it ever generated the demand: `search/discovery.ts` fans out across protocols and topic
+ * positions, and every one of those chains then walked its own block range strictly one chunk at a
+ * time. Measured during a full cold mainnet drain: 7 of the 20 permits in use at the peak — the
+ * per-query loop, not the semaphore, was the bound. With adaptive windows (S1) most queries now
+ * finish in one or two chunks and this changes nothing for them; it is the narrow-cap queries that
+ * still serialize (v4 adjacency caps between 200k and 1M blocks on a keyed mainnet endpoint, so a
+ * 4M-block delta is 4-20 sequential round trips) plus every post-descent walk.
+ *
+ * 4, NOT 20, AND DELIBERATELY MODEST. This multiplies with the fan-out ABOVE it rather than
+ * replacing it: a realistic adjacency wave runs ~8 scans concurrently, so 8 x 4 = 32 chunk requests
+ * competing for 20 permits — already saturation, with a queue. At 20 it would be 160 contending for
+ * 20, which does not scan any faster (the semaphore admits 20 either way) and does starve the
+ * `eth_call` quoting that shares the same permits, since `createSemaphore` is FIFO and a scan that
+ * queues 160 acquires puts every subsequent quote behind them. 4 fills the measured 13-permit gap
+ * without letting log scanning crowd the wave engine out of its own concurrency budget. A caller who
+ * wants a different total still has one knob — `createRouter({ concurrency })` — and it still binds.
+ *
+ * WHAT IT NEVER DOES. The first chunk of any width goes out ALONE: a batch is only planned after a
+ * chunk at the current width has actually been served, so the bisection descent (which is a
+ * sequential search, and where a wide concurrent volley would be N simultaneous refusals instead of
+ * one) is untouched. A batch also never crosses a {@link CHUNK_REGROWTH_SUCCESSES} boundary while the
+ * window is below the scan's ceiling, so the regrowth ratchet's cadence is bit-for-bit what it was
+ * sequentially — at the ceiling, doubling is a no-op and there is no boundary to respect.
+ */
+export const SCAN_CHUNK_CONCURRENCY = 4
+
+/**
  * Hard ceiling on `eth_getLogs` attempts (successes *and* failures) in one {@link scanLogs} call.
  *
  * THE BUDGET IS NOW MOSTLY HEADROOM, AND DELIBERATELY SO. A cold full-history scan against a

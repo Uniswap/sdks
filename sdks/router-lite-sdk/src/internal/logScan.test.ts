@@ -8,6 +8,8 @@ import {
   MAX_BACKOFF_TOTAL_MS,
   MAX_REQUESTS_PER_SCAN,
   MAX_SCAN_WINDOW,
+  MIN_CHUNK,
+  SCAN_CHUNK_CONCURRENCY,
 } from '../constants'
 
 import providerErrors from './__fixtures__/providerErrors.json'
@@ -34,6 +36,61 @@ const QUERY = { address: '0x1', topics: [] } as any
 /** Blocks a recorded filter asked for (inclusive on both ends). */
 function span(filter: any): bigint {
   return BigInt(filter.toBlock) - BigInt(filter.fromBlock) + 1n
+}
+
+/**
+ * A stub whose `request` is genuinely asynchronous, so OVERLAP is observable: it records the number
+ * of requests in flight at the instant each one is dispatched, plus the peak ever reached.
+ *
+ * `settle` controls when a request finishes and defaults to a macrotask (`setTimeout(0)`) — long
+ * enough that every sibling in a concurrent batch is dispatched before any of them completes, so
+ * `inFlightAt` reads as a clean `1,2,…,N` run per batch (which is what {@link batchSizes} decodes).
+ * Tests that care about COMPLETION order override it.
+ */
+function concurrentStub(
+  handler: (filter: any) => unknown[],
+  settle: (ctx: { filter: any; inFlight: number }) => Promise<void> = () => new Promise((r) => setTimeout(r, 0)),
+): { client: any; filters: any[]; inFlightAt: number[]; state: { peak: number } } {
+  const filters: any[] = []
+  const inFlightAt: number[] = []
+  const state = { peak: 0 }
+  let inFlight = 0
+  return {
+    filters,
+    inFlightAt,
+    state,
+    client: {
+      request: async (args: any) => {
+        if (args.method !== 'eth_getLogs') throw new Error(`unexpected method ${args.method}`)
+        const filter = args.params[0]
+        filters.push(filter)
+        inFlight++
+        inFlightAt.push(inFlight)
+        if (inFlight > state.peak) state.peak = inFlight
+        try {
+          await settle({ filter, inFlight })
+          return handler(filter)
+        } finally {
+          inFlight--
+        }
+      },
+    },
+  }
+}
+
+/**
+ * The scan's DISPATCH PATTERN, recovered from {@link concurrentStub}'s per-request in-flight counts:
+ * a batch of N dispatches as the run `1,2,…,N` (nothing settles in between), so a new `1` starts a
+ * new batch and every higher value extends the current one. `[1, 4, 4, 1]` reads as "one alone, two
+ * batches of four, one alone".
+ */
+function batchSizes(inFlightAt: number[]): number[] {
+  const out: number[] = []
+  for (const n of inFlightAt) {
+    if (n === 1) out.push(1)
+    else out[out.length - 1] = n
+  }
+  return out
 }
 
 /** A `sleep` that records what it was asked to wait, so backoff is asserted without wall-clock. */
@@ -590,4 +647,162 @@ test('R2: a declared cap WIDER than the window in flight is ignored — that fai
   expect(span(filters[0]!)).toBe(30_001n)
   expect(span(filters[1]!)).toBe(15_000n) // halved as usual — the declared cap changed nothing
   expect(res.complete).toBe(true)
+})
+
+// ---------------------------------------------------------------------------
+// P1: concurrent chunk dispatch WITHIN one scan.
+//
+// The scanner used to walk a range strictly one chunk at a time, which — after
+// S1 made most queries a request or two — left the narrow-cap queries (v4
+// adjacency caps between 200k and 1M blocks on a keyed mainnet endpoint) and
+// every post-descent walk serializing against a router semaphore that was
+// measured 7/20 utilized during a full cold drain.
+//
+// The split these tests pin is between the SEARCH and the WALK. Finding the
+// width an endpoint will serve is inherently sequential (each answer picks the
+// next question), so the descent is untouched and a failure re-enters it. Once
+// a width has actually been SERVED, the remaining same-width sub-ranges are
+// disjoint and independent, and they go out together.
+// ---------------------------------------------------------------------------
+
+test('P1: once a width is established, same-width chunks are dispatched CONCURRENTLY', async () => {
+  const CEILING = 1_000n
+  const { client, filters, inFlightAt, state } = concurrentStub(() => [])
+
+  const res = await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 20_000n }, { initialChunk: CEILING })
+
+  expect(state.peak).toBe(SCAN_CHUNK_CONCURRENCY) // the whole point: >1 request in flight from ONE scan
+  expect(state.peak).toBeGreaterThanOrEqual(2)
+  expect(inFlightAt[0]).toBe(1) // ...but never on the first chunk, which is what establishes the width
+  // The width is at the ceiling here, so doubling is a no-op and no batch has to stop short of a
+  // regrowth boundary: one establishing chunk, then full batches, then the 3-chunk remainder.
+  expect(batchSizes(inFlightAt)).toEqual([1, 4, 4, 4, 4, 3])
+  expect(filters).toHaveLength(20) // 20,000 blocks / 1,000 — the same count the sequential walk cost
+  expect(res.complete).toBe(true)
+  expect(res.covered).toEqual([{ fromBlock: 1n, toBlock: 20_000n }])
+})
+
+test('P1: the descent is sequential, and only a width the endpoint has SERVED is dispatched in parallel', async () => {
+  const cap = 1_000n
+  const { client, inFlightAt } = concurrentStub((filter) => {
+    if (span(filter) > cap) throw new Error('exceeds max block range')
+    return []
+  })
+
+  await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 40_000n }, {})
+
+  // 40,001 -> 20,000 -> 10,000 -> 5,000 -> 2,500 -> 1,250 are all refused, ONE AT A TIME: a bisection
+  // is a search, and six simultaneous refusals would buy nothing the first one did not already say.
+  // 625 is the first width served, and it too goes out alone — nothing had proven it yet. Only then
+  // does the walk batch, and the batch is CHUNK_REGROWTH_SUCCESSES - 1 rather than a full
+  // SCAN_CHUNK_CONCURRENCY: below the ceiling a batch stops at the regrowth boundary so the ratchet
+  // still doubles after exactly CHUNK_REGROWTH_SUCCESSES clean chunks, counting the establishing one.
+  // The `1` after it is that doubled 1,250 probe — refused again, and alone, because a width nothing
+  // has served is exactly the state the scan opened in.
+  expect(batchSizes(inFlightAt).slice(0, 9)).toEqual([1, 1, 1, 1, 1, 1, 1, CHUNK_REGROWTH_SUCCESSES - 1, 1])
+})
+
+test('P1: a failure inside a batch falls back to the sequential path, and the failed chunk covers NOTHING', async () => {
+  // One poisoned block the endpoint refuses to serve at ANY width — so the failure lands mid-batch,
+  // and no amount of halving gets past it. This is the case where "concurrent" could quietly become
+  // "optimistic": a batch that claimed its whole planned span, or that kept a success sitting BEHIND
+  // an unserved chunk, would report coverage for blocks nobody ever read.
+  const POISON = 5_000n
+  const CEILING = 1_000n
+  const { client, inFlightAt } = concurrentStub((filter) => {
+    if (BigInt(filter.fromBlock) <= POISON && POISON <= BigInt(filter.toBlock)) throw new Error('server error')
+    return []
+  })
+
+  const res = await scanLogs(
+    client,
+    QUERY,
+    { fromBlock: 1n, toBlock: 20_000n },
+    { initialChunk: CEILING, sleep: recorder().sleep },
+  )
+
+  // Exactly one gap, exactly the width of the sub-range the endpoint gave up on (MIN_CHUNK, after
+  // 1,000 -> 500 -> 250 -> 128 and MAX_CONSECUTIVE_MIN_FAILURES retries there). Everything else is
+  // covered — including the tail of the failed batch, which was discarded on the spot and re-walked.
+  expect(res.covered).toEqual([
+    { fromBlock: 1n, toBlock: 5_000n - MIN_CHUNK },
+    { fromBlock: 5_001n, toBlock: 20_000n },
+  ])
+  expect(res.covered.some((r) => r.fromBlock <= POISON && POISON <= r.toBlock)).toBe(false)
+  expect(res.complete).toBe(false)
+
+  // The dispatch pattern: establish, four clean batches (the fourth is the one that contained the
+  // poisoned chunk — it still went out four-wide), then strictly one at a time while the descent
+  // re-derives a width for that sub-range.
+  const sizes = batchSizes(inFlightAt)
+  expect(sizes.slice(0, 5)).toEqual([1, 4, 4, 4, 4])
+  expect(sizes.slice(5, 9)).toEqual([1, 1, 1, 1])
+})
+
+test('P1: the request budget stays EXACT under concurrency — a batch never overshoots it', async () => {
+  // `MAX_REQUESTS_PER_SCAN` counts dispatched requests, and a batch pays for all of its chunks before
+  // any of them answers. Without clamping the batch to what is left, the last one would step over the
+  // line (1 establishing + 4n lands on 3,997, and a full batch from there is 4,001).
+  const { client, filters } = concurrentStub(
+    () => [],
+    () => Promise.resolve(), // no timer: 4,000 requests, and overlap is still real (nothing settles mid-batch)
+  )
+
+  const res = await scanLogs(client, QUERY, { fromBlock: 0n, toBlock: 2_000_000n }, { initialChunk: MIN_CHUNK })
+
+  expect(filters).toHaveLength(MAX_REQUESTS_PER_SCAN) // not one request more
+  expect(res.complete).toBe(false) // the range is far wider than the budget can walk at MIN_CHUNK
+})
+
+test('P1: results are ordered by BLOCK, not by arrival — a batch that answers backwards is still recent-first', async () => {
+  // The one thing a caller can actually observe about dispatch order. Here the batch completes in the
+  // exact REVERSE of the order it was planned (the newest chunk, dispatched first, answers last), so
+  // anything that appended logs or coverage as they landed would come back inverted.
+  const { client } = concurrentStub(
+    (filter) => [
+      {
+        address: '0x1',
+        topics: [],
+        data: '0x',
+        blockNumber: filter.toBlock,
+        logIndex: '0x0',
+        transactionIndex: '0x0',
+      },
+    ],
+    ({ inFlight }) => new Promise((r) => setTimeout(r, 10 - inFlight)),
+  )
+
+  const res = await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 8_000n }, { initialChunk: 1_000n })
+
+  const blocks = res.logs.map((l) => l.blockNumber!)
+  expect(blocks).toHaveLength(8)
+  expect(blocks).toEqual([...blocks].sort((a, b) => (a > b ? -1 : 1))) // strictly descending: recent-first
+  expect(res.covered).toEqual([{ fromBlock: 1n, toBlock: 8_000n }])
+  expect(res.complete).toBe(true)
+})
+
+test('P1: an abort stops the scan BETWEEN batches — the batch in flight is kept, nothing new is dispatched', async () => {
+  const ac = new AbortController()
+  let answered = 0
+  const { client, filters, inFlightAt } = concurrentStub(() => {
+    if (++answered === 6) ac.abort() // partway through the third batch
+    return []
+  })
+
+  const res = await scanLogs(
+    client,
+    QUERY,
+    { fromBlock: 1n, toBlock: 100_000n },
+    { initialChunk: 1_000n, signal: ac.signal },
+  )
+
+  // One establishing chunk, then two full batches — the second of which was already in flight when
+  // the signal tripped. It is allowed to finish and its chunks are kept: they were paid for and
+  // honestly served, and dropping them would be its own kind of dishonesty. Nothing is dispatched
+  // after it, which is the guarantee the between-chunks check gave before P1 and still gives now.
+  expect(batchSizes(inFlightAt)).toEqual([1, 4, 4])
+  expect(filters).toHaveLength(9)
+  expect(res.complete).toBe(false)
+  const claimed = res.covered.reduce((s, r) => s + (r.toBlock - r.fromBlock + 1n), 0n)
+  expect(claimed).toBe(9_000n) // exactly the nine chunks served, not one block more
 })

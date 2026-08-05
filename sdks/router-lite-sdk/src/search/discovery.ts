@@ -141,9 +141,13 @@ export async function completeExactPairScan(run: Run): Promise<void> {
  * index has not already covered, and folds both the pools and the coverage back in.
  *
  * Protocols and topic-position queries are independent scans against independent contracts, so they
- * all run concurrently — an adjacency wave costs one scan chain's latency, not six. Only the ranges
- * *within* one query stay sequential, because `scanLogs` walks them recent-first and adapts its
- * window to the provider's cap as it goes.
+ * all run concurrently — an adjacency wave costs one scan chain's latency, not six. The uncovered
+ * RANGES within one query stay sequential here, because each is handed to `scanLogs` in turn and
+ * that call adapts its window to the provider's cap as it goes; the CHUNKS inside one such call are
+ * not (P1 — `scanLogs` dispatches up to `SCAN_CHUNK_CONCURRENCY` of them at once once it has learned
+ * a width the endpoint will serve), so this fan-out multiplies with that one under the router's
+ * shared semaphore. See `constants.ts#SCAN_CHUNK_CONCURRENCY` for why that product is deliberately
+ * kept near the semaphore's own size rather than far above it.
  */
 export async function scanAdjacency(run: Run, endpoint: CurrencyRef): Promise<void> {
   const { ctx, req, state } = run
