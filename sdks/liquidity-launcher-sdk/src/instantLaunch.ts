@@ -124,10 +124,10 @@ export const INSTANT_LAUNCH_TOTAL_SUPPLY_RAW =
  * one, where the value goes unused (its `beneficiaryVault` immutable is zero, so registration is
  * skipped entirely) — and the strategy reverts on a zero or launcher beneficiary either way. So the
  * placeholder must be a non-zero address that is not the LiquidityLauncher; it is deliberately a
- * protocol-owned contract (the deployed 4663 CompoundingClaimRecipient) rather than a user address,
- * since it must never be mistaken for a creator claim.
+ * protocol-owned contract (the current 4663 CompoundingClaimRecipient — the 2026-08-05 full
+ * redeploy) rather than a user address, since it must never be mistaken for a creator claim.
  */
-export const DISABLED_CREATOR_FEE_BENEFICIARY: Address = '0x666DA63451A502A323677C2Ef5F763181358be9b'
+export const DISABLED_CREATOR_FEE_BENEFICIARY: Address = '0xf9526Dd3361fe0ba6b7a99533ed471D3E808E99a'
 
 export interface PredictInstantLaunchTokenParams {
   chainId: number
