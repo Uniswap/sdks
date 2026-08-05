@@ -26,7 +26,13 @@ export async function v3Swap(
   zeroForOne: boolean,
   amountSpecified: JSBI,
   sqrtPriceLimitX96?: JSBI
-): Promise<{ amountCalculated: JSBI; sqrtRatioX96: JSBI; liquidity: JSBI; tickCurrent: number }> {
+): Promise<{
+  amountSpecifiedRemaining: JSBI
+  tickCurrent: number
+  liquidity: JSBI
+  sqrtRatioX96: JSBI
+  amountCalculated: JSBI
+}> {
   if (!sqrtPriceLimitX96)
     sqrtPriceLimitX96 = zeroForOne
       ? JSBI.add(TickMath.MIN_SQRT_RATIO, ONE)
@@ -119,6 +125,7 @@ export async function v3Swap(
   }
 
   return {
+    amountSpecifiedRemaining: state.amountSpecifiedRemaining,
     amountCalculated: state.amountCalculated,
     sqrtRatioX96: state.sqrtPriceX96,
     liquidity: state.liquidity,
