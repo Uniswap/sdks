@@ -265,11 +265,23 @@ export function maxPlausibleHeadRegression(reorgOverlapBlocks: bigint): bigint {
 // ---------------------------------------------------------------------------
 // Log scanning (`internal/logScan.ts`).
 //
-// `eth_getLogs` caps are never advertised, differ per endpoint, and differ per
-// *query* on the same endpoint (a result cap binds on a busy contract at a span
-// a quiet one sails through). So the scanner discovers the usable window
-// empirically, and every constant below is a bound on how much that discovery
-// is allowed to cost — in requests, in wasted probes, and in wall-clock.
+// `eth_getLogs` caps differ per endpoint, and differ per *query* on the same
+// endpoint (a result cap binds on a busy contract at a span a quiet one sails
+// through). So the scanner discovers the usable window empirically, and every
+// constant below is a bound on how much that discovery is allowed to cost — in
+// requests, in wasted probes, and in wall-clock.
+//
+// THE DECLARED-CAP FAST PATH SHORT-CIRCUITS THAT DISCOVERY WHEN IT CAN (R2).
+// Caps are not *never* advertised — several providers state the window that
+// would have worked in the error itself, and
+// `internal/rpc.ts#parseDeclaredCap` reads it out. Where it fires, the window
+// jumps straight to the stated cap instead of halving toward it, and a cap
+// below {@link MIN_CHUNK} gives the sub-range up on the FIRST error rather than
+// spending {@link MAX_CONSECUTIVE_MIN_FAILURES} retries and a backoff
+// escalation on a window the endpoint has already said it will not serve. Every
+// number below is therefore a bound on the SILENT case — the endpoints that
+// only ever answer with an error — and an upper bound, not an expected cost,
+// for the ones that talk.
 // ---------------------------------------------------------------------------
 
 /**
@@ -291,6 +303,13 @@ export const INITIAL_CHUNK = 10_000n
  * {@link DEFAULT_REORG_OVERLAP_BLOCKS}, i.e. the smallest window still larger than the overlap a warm
  * re-scan re-reads anyway — so an endpoint that cannot answer this is failing, not capping, and the
  * failure path (retry, then give the sub-range up) takes over instead of bisecting toward 1.
+ *
+ * AN ENDPOINT THAT DECLARES A CAP BELOW THIS IS THE ONE CASE WHERE "FAILING, NOT CAPPING" IS WRONG
+ * (R2), and it is a real one: `eth-mainnet.public.blastapi.io` caps public `eth_getLogs` at TEN
+ * blocks, nine halvings under this floor. It is genuinely capping, it says so in the error, and no
+ * retry can reach a window it will serve — so the scanner gives that sub-range up on the first
+ * error instead of treating it as a transient failure. See `internal/logScan.ts`'s declared-cap
+ * branch; raising this floor widens the set of endpoints that fall into that case.
  */
 export const MIN_CHUNK = 128n
 

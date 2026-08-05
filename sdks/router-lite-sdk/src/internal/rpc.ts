@@ -1,7 +1,7 @@
 import type { Address, Hex, PublicClient } from 'viem'
 
 import { NodeStateError, TransportError } from '../errors'
-import type { EthCall } from '../types'
+import type { BlockRange, EthCall } from '../types'
 
 // ---------------------------------------------------------------------------
 // RPC primitives — raw `eth_call` over `client.request` (not viem's `call()`
@@ -67,6 +67,110 @@ const TRANSPORT_MESSAGE =
  */
 const NODE_STATE_MESSAGE =
   /header not found|block not found|unknown block\b|missing trie node|state .{0,40}(not available|unavailable)|nonexistent block|requested block|exceeded maximum block range|query returned more than|response size/i
+
+// ---------------------------------------------------------------------------
+// Declared `eth_getLogs` caps (R2).
+//
+// Concept borrowed, with thanks, from `blockfeed`'s `enumerate.ts`: several
+// providers do not merely refuse an over-wide `eth_getLogs` — they TELL YOU the
+// window that would have worked, in the error message. `internal/logScan.ts`'s
+// bisection was written for the providers that say nothing (halve, retry,
+// halve again), and it applied that same blind ratchet to the ones that
+// answered the question outright.
+//
+// Two things that costs, both visible in the live captures in
+// `__fixtures__/providerErrors.json`:
+//
+//   * A provider capping at 10 blocks (`eth-mainnet.public.blastapi.io`) is
+//     nine halvings below MIN_CHUNK. The scanner cannot bisect its way to a
+//     window that endpoint will serve — MIN_CHUNK is the floor — so it spends
+//     MAX_CONSECUTIVE_MIN_FAILURES requests plus a full backoff escalation per
+//     sub-range discovering, over and over, a fact the FIRST error stated in
+//     plain English. Reading the cap turns that into one request and an honest
+//     "not covered".
+//   * A provider that declares a usable span (`eth.drpc.org`'s
+//     `retry with the range 25683953-25685027`) has just handed over the answer
+//     the halving loop is searching for. Jumping straight to it skips every
+//     intermediate probe.
+//
+// This is a MESSAGE parser, and deliberately a conservative one: an unmatched
+// message returns `{}` and the caller's existing halve/retry/give-up logic runs
+// exactly as before. Nothing here is required to fire for the scanner to work.
+// ---------------------------------------------------------------------------
+
+/**
+ * What a provider's own error message says about the window it would accept.
+ *
+ * `capBlocks` — the widest span it claims to serve, in blocks. Taken from an explicit "N block
+ * range" phrase when there is one; otherwise derived from `retryRange`'s width, since a range the
+ * provider volunteers is a span it is asserting will work.
+ *
+ * `retryRange` — the literal range it suggested. Parsed and exposed because it is real information
+ * a diagnostic may want, but see `logScan.ts` for why the scanner uses only its WIDTH: the live
+ * captures show providers suggesting ranges that sit partly (blastapi: the oldest 10 blocks of a
+ * 2,000-block request) or entirely (drpc: 25,683,953-25,685,027 against a request for
+ * 25,684,977-25,686,977) outside the window that was actually asked for. Jumping the cursor to one
+ * would leave a hole the scanner would then report as covered — a coverage lie, which is the one
+ * failure mode this whole module is built to avoid.
+ */
+export type DeclaredCap = { capBlocks?: bigint; retryRange?: BlockRange }
+
+/**
+ * "…with up to a 10 block range…" (blastapi, alchemy). The generic `N block range` tail also
+ * catches phrasings that drop the "up to a", which is the shape alchemy's response-size variant
+ * uses. Digit separators are tolerated because providers write both `10000` and `10,000`.
+ */
+const DECLARED_CAP_BLOCKS = /\b([\d][\d,_]*) block range\b/i
+
+/** drpc: "query exceeds max results 20000, retry with the range 25683953-25685027". */
+const DECLARED_RETRY_RANGE_DEC = /\brange\s+(\d[\d,_]*)\s*-\s*(\d[\d,_]*)/i
+
+/**
+ * blastapi: "…this block range should work: [0x187e655, 0x187e65e]".
+ *
+ * The `0x` is required on BOTH sides with no intervening quote, which is what keeps this off the
+ * JSON `topics` array viem echoes into the same message (`["0x…","0x…"]` — quoted, so it cannot
+ * match) and off the `params` array (`[{…}]`).
+ */
+const DECLARED_RETRY_RANGE_HEX = /\[\s*(0x[0-9a-f]+)\s*,\s*(0x[0-9a-f]+)\s*\]/i
+
+/** Strips the digit separators providers sprinkle into large numbers. */
+function toBig(digits: string): bigint {
+  return BigInt(digits.replace(/[,_]/g, ''))
+}
+
+/**
+ * Reads a provider's declared `eth_getLogs` window out of a failure, walking the same `cause` chain
+ * as {@link classifyRpcError} (one walker — see {@link collectFacts}) because the useful text is
+ * routinely on a nested `details`/`cause.message` rather than the error handed to the caller.
+ *
+ * Returns `{}` for anything it does not recognize, which is most errors: the caller must treat a
+ * declared cap as an optimization it may or may not get, never as a precondition.
+ */
+export function parseDeclaredCap(err: unknown): DeclaredCap {
+  const declared: DeclaredCap = {}
+  for (const message of collectFacts(err).messages) {
+    if (declared.retryRange === undefined) {
+      const hex = DECLARED_RETRY_RANGE_HEX.exec(message)
+      const dec = hex ? null : DECLARED_RETRY_RANGE_DEC.exec(message)
+      const bounds = hex ? [BigInt(hex[1]!), BigInt(hex[2]!)] : dec ? [toBig(dec[1]!), toBig(dec[2]!)] : undefined
+      // A suggestion whose ends are inverted is not a range, it is noise from a regex that found two
+      // numbers next to each other; drop it rather than derive a negative width from it.
+      if (bounds && bounds[1]! >= bounds[0]!) declared.retryRange = { fromBlock: bounds[0]!, toBlock: bounds[1]! }
+    }
+    if (declared.capBlocks === undefined) {
+      const cap = DECLARED_CAP_BLOCKS.exec(message)
+      if (cap) {
+        const blocks = toBig(cap[1]!)
+        if (blocks > 0n) declared.capBlocks = blocks
+      }
+    }
+  }
+  if (declared.capBlocks === undefined && declared.retryRange !== undefined) {
+    declared.capBlocks = declared.retryRange.toBlock - declared.retryRange.fromBlock + 1n
+  }
+  return declared
+}
 
 /**
  * viem error classes that only ever describe the transport itself.

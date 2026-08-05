@@ -5,7 +5,8 @@ import type { Hex, PublicClient } from 'viem'
 import { NodeStateError, TransportError } from '../errors'
 import type { EthCall } from '../types'
 
-import { classifyRpcError, createSemaphore, ethCall, mapConcurrent, revertDataOf } from './rpc'
+import providerErrors from './__fixtures__/providerErrors.json'
+import { classifyRpcError, createSemaphore, ethCall, mapConcurrent, parseDeclaredCap, revertDataOf } from './rpc'
 import {
   chainDisconnectedError,
   connectionRefusedError,
@@ -499,5 +500,79 @@ describe('revertDataOf — the shared walker', () => {
     expect(revertDataOf('execution reverted')).toBeUndefined()
     expect(revertDataOf(null)).toBeUndefined()
     expect(revertDataOf(undefined)).toBeUndefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// R2: reading a provider's DECLARED `eth_getLogs` cap.
+//
+// Every message below is a verbatim live capture from
+// `__fixtures__/providerErrors.json` — not a hand-written approximation — so
+// these tests fail if a provider's real phrasing drifts away from what the
+// parser understands, which is the only drift that matters. The fixture is
+// loaded as JSON rather than restated here for exactly that reason: the
+// canary re-captures it against live endpoints (`canary/providers.test.ts`),
+// and a re-capture that changes the wording must show up as a failure here.
+// ---------------------------------------------------------------------------
+
+describe('parseDeclaredCap — providers that state the window they would serve', () => {
+  /** A viem-shaped error carrying a captured provider message, as `scanLogs` would catch it. */
+  function capturedError(endpoint: keyof typeof providerErrors): Error {
+    const err = new Error(providerErrors[endpoint].message)
+    err.name = 'HttpRequestError'
+    return err
+  }
+
+  test('blastapi: "up to a 10 block range" yields cap 10 and the suggested hex range', () => {
+    const declared = parseDeclaredCap(capturedError('eth-mainnet.public.blastapi.io'))
+    expect(declared.capBlocks).toBe(10n)
+    expect(declared.retryRange).toEqual({ fromBlock: 0x187e655n, toBlock: 0x187e65en })
+  })
+
+  test('drpc: a result cap with a suggested range yields that range and its width as the cap', () => {
+    // No "N block range" phrase at all here — the cap is DERIVED from the span the provider
+    // volunteered, which is the only thing in the message that describes a window.
+    const declared = parseDeclaredCap(capturedError('eth.drpc.org'))
+    expect(declared.retryRange).toEqual({ fromBlock: 25_683_953n, toBlock: 25_685_027n })
+    expect(declared.capBlocks).toBe(25_685_027n - 25_683_953n + 1n)
+  })
+
+  test('publicnode: an auth complaint declares nothing — the caller keeps its blind bisection', () => {
+    // The third capture is a 403 about archive access. It is the control: a message with no window
+    // in it must not produce one, or the scanner would jump to a fabricated cap.
+    expect(parseDeclaredCap(capturedError('ethereum.publicnode.com'))).toEqual({})
+  })
+
+  test('alchemy-style phrasing without the "up to a" prefix still parses', () => {
+    expect(parseDeclaredCap(new Error('Log response size exceeded. You can make eth_getLogs requests with a 10 block range.')).capBlocks).toBe(10n)
+  })
+
+  test('digit separators are tolerated in both shapes', () => {
+    expect(parseDeclaredCap(new Error('up to a 10,000 block range')).capBlocks).toBe(10_000n)
+    expect(parseDeclaredCap(new Error('retry with the range 1,000-2,000')).retryRange).toEqual({ fromBlock: 1_000n, toBlock: 2_000n })
+  })
+
+  test('the cap is read off a NESTED cause, not just the error handed over', () => {
+    // viem wraps the provider's text one or two levels down as often as not; the parser rides the
+    // same `cause` walker classification does, so depth costs it nothing.
+    const inner = { message: 'You can make eth_getLogs requests with up to a 10 block range.' }
+    expect(parseDeclaredCap(Object.assign(new Error('HTTP request failed.'), { cause: inner })).capBlocks).toBe(10n)
+  })
+
+  test('an ordinary failure declares nothing', () => {
+    for (const err of [new Error('query returned more than 10000 results'), rateLimitHttpError(), timeoutError(), undefined, null, 'boom']) {
+      expect(parseDeclaredCap(err)).toEqual({})
+    }
+  })
+
+  test('the JSON viem echoes into its messages is not mistaken for a suggested range', () => {
+    // Every capture embeds `Request body: {"method":"eth_getLogs","params":[{...}]}`, and a topics
+    // filter embeds `["0x…","0x…"]`. Both are bracketed hex-adjacent text; neither is a suggestion.
+    const err = new Error('HTTP request failed.\n\nRequest body: {"method":"eth_getLogs","params":[{"topics":["0xabc","0xdef"],"fromBlock":"0x1"}]}')
+    expect(parseDeclaredCap(err)).toEqual({})
+  })
+
+  test('an inverted range is discarded rather than turned into a negative width', () => {
+    expect(parseDeclaredCap(new Error('retry with the range 2000-1000'))).toEqual({})
   })
 })
