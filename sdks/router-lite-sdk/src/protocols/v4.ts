@@ -1,5 +1,5 @@
 import type { Address, Hex, Log } from 'viem'
-import { decodeEventLog, decodeFunctionResult, encodeEventTopics, encodeFunctionData, zeroAddress } from 'viem'
+import { decodeEventLog, decodeFunctionResult, encodeEventTopics, encodeFunctionData, isAddressEqual, zeroAddress } from 'viem'
 
 import { RouterConfigError, UnsupportedRouteError } from '../errors'
 import { V4_POOL_MANAGER_ABI, V4_QUOTER_ABI } from '../internal/abis'
@@ -148,7 +148,7 @@ export const v4Module = {
     // the raw on-chain currency — address(0) for native, never the wrapped address — so the
     // wrapped-native endpoint is mapped back to address(0) before building the query.
     const wrappedNative = m.wrappedNative
-    const v4Endpoint = endpoint.toLowerCase() === wrappedNative.toLowerCase() ? zeroAddress : endpoint
+    const v4Endpoint = isAddressEqual(endpoint, wrappedNative) ? zeroAddress : endpoint
     return v4AdjacencyQueries(m.v4.poolManager, v4Endpoint)
   },
 
@@ -162,6 +162,9 @@ export const v4Module = {
     // caller-supplied via `router.ingestLogs`/`ingestReceipt`, so its declared shape is an
     // assertion, not a guarantee — a `null` entry or an object with no `address` must be skipped
     // like any other non-matching log, never crash the batch (C4-H4).
+    // `.toLowerCase()` HERE ON PURPOSE, NOT `isAddressEqual` (R3, C4-H4): `log.address` is
+    // caller-supplied through `ingestLogs`/`ingestReceipt`. `isAddressEqual` throws on a malformed
+    // operand, which would let one junk entry abort the whole batch instead of being skipped.
     if (!m.v4 || typeof log?.address !== 'string' || log.address.toLowerCase() !== m.v4.poolManager.toLowerCase()) {
       return null
     }
@@ -172,6 +175,7 @@ export const v4Module = {
       // Integrity check: the indexed `id` is redundant with the decoded key fields, and the ref's
       // own `poolId` is recomputed from them. A mismatch means the log doesn't actually describe the
       // pool it claims to (or was tampered with) — reject it rather than trusting either value blindly.
+      // `.toLowerCase()`, not `isAddressEqual` (R3): a v4 poolId is a 32-byte hash, not an address.
       if (pool.poolId.toLowerCase() !== id.toLowerCase()) return null
       return { pool, createdAtBlock: log.blockNumber ?? undefined, source: 'event' }
     } catch {

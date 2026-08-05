@@ -1,5 +1,5 @@
 import type { Address, Hex, PublicClient } from 'viem'
-import { decodeFunctionResult, encodeFunctionData } from 'viem'
+import { decodeFunctionResult, encodeFunctionData, isAddressEqual } from 'viem'
 
 import { DEFAULT_CONCURRENCY } from '../constants'
 import { TransportError } from '../errors'
@@ -54,10 +54,6 @@ export type CheckReadinessArgs = {
   semaphore?: Semaphore | undefined
 }
 
-function addressesEqual(a: Address, b: Address): boolean {
-  return a.toLowerCase() === b.toLowerCase()
-}
-
 async function getNativeBalance(
   client: Pick<PublicClient, 'request'>,
   trader: Address,
@@ -80,8 +76,12 @@ async function getNativeBalance(
  * of `blockTimestamp` (the pinned block used everywhere else in this check, not wall-clock time).
  */
 function isPermitValid(permit: Permit2PermitSingle, token: Address, router: Address, amountIn: bigint, blockTimestamp: bigint): boolean {
-  if (!addressesEqual(permit.details.token, token)) return false
-  if (!addressesEqual(permit.spender, router)) return false
+  // viem's `isAddressEqual` replaces a local `addressesEqual` helper that did the same lowercased
+  // comparison (R3). Every address reaching here is already shape-validated — the permit's token and
+  // the router by `router.ts#validateSwapRequest`, `token` by the same request path — which is what
+  // makes `isAddressEqual` (which throws on malformed input) the right call rather than a hazard.
+  if (!isAddressEqual(permit.details.token, token)) return false
+  if (!isAddressEqual(permit.spender, router)) return false
   if (permit.details.amount < amountIn) return false
   if (permit.sigDeadline <= blockTimestamp) return false
   if (BigInt(permit.details.expiration) <= blockTimestamp) return false

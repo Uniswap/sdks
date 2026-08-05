@@ -1,16 +1,7 @@
 import type { Address, Hex, Log, PublicClient, TransactionReceipt } from 'viem'
-import { zeroAddress, zeroHash } from 'viem'
+import { isAddress, isAddressEqual, zeroHash } from 'viem'
 
-import {
-  DEFAULT_CONCURRENCY,
-  MAX_AMOUNT_IN,
-  MAX_CONCURRENCY,
-  MAX_DEADLINE_SECONDS,
-  MAX_HINTS_PER_REQUEST,
-  MIN_CHUNK,
-  UR_ADDRESS_THIS,
-  UR_MSG_SENDER,
-} from './constants'
+import { DEFAULT_CONCURRENCY, isUnusableCustodyAddress, MAX_AMOUNT_IN, MAX_CONCURRENCY, MAX_DEADLINE_SECONDS, MAX_HINTS_PER_REQUEST, MIN_CHUNK } from './constants'
 import { RouterConfigError, RpcUnavailableError } from './errors'
 import { sameFamily } from './internal/currency'
 import { createSemaphore } from './internal/rpc'
@@ -18,7 +9,7 @@ import { assertChainData, assertWrappedNativeConsistency, requireExecution, reor
 import { PoolIndex } from './pools/poolIndex'
 import type { PoolIndexStats } from './pools/poolIndex'
 import { PROTOCOL_MODULES } from './protocols'
-import { buildHookData } from './search/hookData'
+import { assertHintAddresses, buildHookData } from './search/hookData'
 import type { HeadWatermark, InternalResult, SearchContext } from './search/waves'
 import { searchWaves } from './search/waves'
 import type {
@@ -197,19 +188,52 @@ export interface Router {
 // Request validation — synchronous, before any RPC.
 // ---------------------------------------------------------------------------
 
-/** Addresses that can never be a usable trader/recipient: the zero address, and the Universal
- * Router's own recipient sentinels (`msg.sender` / `address(this)`) — a plan that carried one of
- * these as a literal recipient would silently misdirect funds, so it is rejected up front rather
- * than left for the compiler to (also) reject deep inside a search. */
-const FORBIDDEN_ADDRESSES: readonly Address[] = [zeroAddress, UR_MSG_SENDER, UR_ADDRESS_THIS]
-
+/**
+ * Rejects an address that cannot serve as a trader/recipient.
+ *
+ * SHAPE FIRST (R3). `Address` is a compile-time claim about a value a stranger may have composed:
+ * `'0xnope'` type-checks and, before this check existed, sailed through every lowercased string
+ * comparison here to fail much later as a raw viem `InvalidAddressError` thrown from inside an
+ * encoder or from `eth_call` param formatting — a mid-search stack trace instead of a named,
+ * pre-RPC complaint about the field the caller got wrong. `strict: false` checks the 20-byte hex
+ * shape without demanding EIP-55 checksum casing, which callers legitimately do not have (every
+ * JSON-RPC response is lowercase, and every comparison in this package is case-insensitive).
+ *
+ * Then IDENTITY, via the shared predicate in `constants.ts` — the zero address and the Universal
+ * Router's own recipient sentinels (`msg.sender` / `address(this)`), any of which as a literal
+ * recipient would silently misdirect funds. `plan/compile.ts` rejects the same set with its own
+ * error class; only the predicate is shared. The shape check above is what makes the identity check
+ * safe to write with `isAddressEqual`, which throws on malformed input.
+ */
 function assertUsableAddress(addr: Address, label: string): void {
-  if (FORBIDDEN_ADDRESSES.some((a) => a.toLowerCase() === addr.toLowerCase())) {
+  if (typeof addr !== 'string' || !isAddress(addr, { strict: false })) {
+    throw new RouterConfigError(`${label} is not a valid address, got ${String(addr)}`)
+  }
+  if (isUnusableCustodyAddress(addr)) {
     throw new RouterConfigError(`${label} must not be the zero address or a Universal Router recipient sentinel, got ${addr}`)
   }
 }
 
+/**
+ * Rejects a `tokenIn`/`tokenOut` that is neither the `'native'` literal nor a syntactically valid
+ * address (R3). Same reasoning as {@link assertUsableAddress}'s shape check, but these two fields do
+ * NOT get its identity check: the zero address is a legitimate token reference in some manifests'
+ * vocabulary, and a token that happens to equal a UR sentinel is a routing dead end rather than a
+ * fund-loss hazard — the search will simply find nothing.
+ */
+function assertCurrencyRef(currency: QuoteRequest['tokenIn'], label: string): void {
+  if (currency === 'native') return
+  if (typeof currency !== 'string' || !isAddress(currency, { strict: false })) {
+    throw new RouterConfigError(`${label} must be 'native' or a valid address, got ${String(currency)}`)
+  }
+}
+
 function validateQuoteRequest(req: QuoteRequest, manifest: ChainManifest): void {
+  // Shape before semantics: `sameFamily` below lowercases and compares, which quietly "succeeds" on
+  // garbage, and every downstream consumer (CREATE2 derivation, `eth_call` params, the encoder)
+  // assumes these are real addresses.
+  assertCurrencyRef(req.tokenIn, 'tokenIn')
+  assertCurrencyRef(req.tokenOut, 'tokenOut')
   if (sameFamily(req.tokenIn, req.tokenOut, manifest.wrappedNative)) {
     throw new RouterConfigError(
       `tokenIn and tokenOut are the same currency family (${String(req.tokenIn)} / ${String(req.tokenOut)}); there is nothing to route`,
@@ -228,9 +252,11 @@ function validateQuoteRequest(req: QuoteRequest, manifest: ChainManifest): void 
   if (req.hints !== undefined && req.hints.length > MAX_HINTS_PER_REQUEST) {
     throw new RouterConfigError(`a request may carry at most ${MAX_HINTS_PER_REQUEST} hints, got ${req.hints.length}`)
   }
-  // Building the hookData map is where a hint's opaque bytes are checked (size + hex shape), so it
-  // runs here — synchronously, pre-RPC — rather than only inside `buildContext`, where a malformed
-  // hint would surface after the manifest round trip instead of before it.
+  // Hint field validation is where a hint's caller-supplied values are checked — the addresses
+  // (R3) and then the opaque `hookData` bytes (size + hex shape) — and it runs here,
+  // synchronously, pre-RPC, rather than only inside `buildContext`, where a malformed hint would
+  // surface after the manifest round trip instead of before it.
+  assertHintAddresses(req.hints)
   buildHookData(req.hints)
 }
 
@@ -260,9 +286,16 @@ function assertRecipientNotAContract(recipient: Address, req: SwapRequest, execu
   if (req.tokenIn !== 'native') named.push([req.tokenIn, 'tokenIn'])
   if (req.tokenOut !== 'native') named.push([req.tokenOut, 'tokenOut'])
 
-  const lower = recipient.toLowerCase()
+  // `isAddressEqual`, not lowercased strings: it cannot be defeated by a checksum-vs-lowercase
+  // spelling difference. It DOES throw on a malformed address, so each side is shape-checked first
+  // — the recipient by `assertUsableAddress` above, and the entries below here, because nothing
+  // else validates a caller-assembled manifest's address fields and a raw viem `InvalidAddressError`
+  // out of a swap request is a worse answer than naming the field.
   for (const [addr, label] of named) {
-    if (addr.toLowerCase() === lower) {
+    if (typeof addr !== 'string' || !isAddress(addr, { strict: false })) {
+      throw new RouterConfigError(`${label} (${String(addr)}) is not a valid address`)
+    }
+    if (isAddressEqual(addr, recipient)) {
       throw new RouterConfigError(`recipient must not be ${label} (${addr}); the swap output would be unrecoverable`)
     }
   }
@@ -303,7 +336,12 @@ function validateSwapRequest(req: SwapRequest, manifest: ChainManifest): void {
     if (req.tokenIn === 'native') {
       throw new RouterConfigError('a Permit2 permit cannot be attached to a native-value input')
     }
-    if (req.permit.details.token.toLowerCase() !== req.tokenIn.toLowerCase()) {
+    // `tokenIn` is shape-validated above and known non-'native' in this branch; the permit's own
+    // token is caller-supplied and unvalidated, so it is shape-checked before the comparison.
+    if (typeof req.permit.details.token !== 'string' || !isAddress(req.permit.details.token, { strict: false })) {
+      throw new RouterConfigError(`permit.details.token is not a valid address, got ${String(req.permit.details.token)}`)
+    }
+    if (!isAddressEqual(req.permit.details.token, req.tokenIn)) {
       throw new RouterConfigError(`permit token ${req.permit.details.token} does not match tokenIn ${req.tokenIn}`)
     }
   }
@@ -658,7 +696,10 @@ export function createRouter(opts: CreateRouterOptions): Router {
 
   const reorgOverlapBlocks = reorgOverlapBlocksOf(manifest)
 
-  if (opts.index && opts.index.wrappedNative.toLowerCase() !== manifest.wrappedNative.toLowerCase()) {
+  // Both sides are addresses this package itself constructed the index from, so `isAddressEqual` is
+  // safe without a shape pre-check here — and it is the right comparison: an index built from a
+  // checksummed spelling of the same token must not read as "a different chain".
+  if (opts.index && !isAddressEqual(opts.index.wrappedNative, manifest.wrappedNative)) {
     throw new RouterConfigError(
       `injected index's wrappedNative (${opts.index.wrappedNative}) does not match manifest.wrappedNative (${manifest.wrappedNative}) — an index built for a different chain/manifest cannot be safely reused`,
     )
@@ -844,6 +885,10 @@ export function createRouter(opts: CreateRouterOptions): Router {
   async function ingestPool(hint: PoolHint): Promise<void> {
     const module_ = modules[hint.protocol]
     if (!module_) throw new RouterConfigError(`ingestPool received a hint with unknown protocol ${String(hint.protocol)}`)
+    // Same validation the request path applies to `req.hints` (R3): this is the OTHER door a
+    // caller-composed hint comes through, and it writes straight into the long-lived index, so a
+    // malformed address here would be a permanent resident rather than a one-request mistake.
+    assertHintAddresses([hint])
     if (!module_.enabled(manifest)) return
     const record = await module_.validateHint(hint, ethCallLatest, manifest)
     if (record) index.upsert(record)

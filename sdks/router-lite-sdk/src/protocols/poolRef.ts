@@ -1,5 +1,5 @@
 import type { Address, Hex } from 'viem'
-import { zeroAddress } from 'viem'
+import { isAddressEqual, zeroAddress } from 'viem'
 
 import { sortAddresses } from '../internal/currency'
 import { computeV4PoolId } from '../internal/poolId'
@@ -25,14 +25,20 @@ export type V2PoolRef = Extract<PoolRef, { protocol: 'v2' }>
 export type V3PoolRef = Extract<PoolRef, { protocol: 'v3' }>
 export type V4PoolRef = Extract<PoolRef, { protocol: 'v4' }>
 
-/** `${protocol}:${lowercased address-or-poolId}` — the pool index key and `routeId`'s unit. */
+/** `${protocol}:${lowercased address-or-poolId}` — the pool index key and `routeId`'s unit.
+ *
+ * DELIBERATELY `.toLowerCase()`, NOT `isAddressEqual` (R3): this builds a MAP KEY, not a comparison.
+ * A canonical lowercased string is exactly what makes two spellings of the same pool collide in the
+ * index's `Map`, and `id` is a v4 poolId (a 32-byte hash) as often as an address, which
+ * `isAddressEqual` cannot take at all. Every keyed lookup in this package is lowercased for the same
+ * reason — see `pools/poolIndex.ts` and `search/waves.ts`. */
 function identity(protocol: Protocol, id: Address | Hex): string {
   return `${protocol}:${id.toLowerCase()}`
 }
 
 /** v4 spells native as address(0) on-chain (never the wrapped address); the domain spells it 'native'. */
 function domainCurrency(c: Address): CurrencyRef {
-  return c.toLowerCase() === zeroAddress.toLowerCase() ? 'native' : c
+  return isAddressEqual(c, zeroAddress) ? 'native' : c
 }
 
 /**
@@ -76,5 +82,5 @@ export function v4PoolRef(poolKey: PoolKey): V4PoolRef {
 
 /** True only for a v4 pool with a non-zero `hooks` address — v2 and v3 pools have no hooks at all. */
 export function isHooked(ref: PoolRef): boolean {
-  return ref.protocol === 'v4' && ref.poolKey.hooks.toLowerCase() !== zeroAddress.toLowerCase()
+  return ref.protocol === 'v4' && !isAddressEqual(ref.poolKey.hooks, zeroAddress)
 }

@@ -1,5 +1,5 @@
 import type { Address, Hex } from 'viem'
-import { concatHex, encodeAbiParameters, encodeFunctionData, parseAbiParameters, zeroAddress } from 'viem'
+import { concatHex, encodeAbiParameters, encodeFunctionData, isAddressEqual, parseAbiParameters, zeroAddress } from 'viem'
 
 import { UR_ADDRESS_THIS } from '../constants'
 import { UnsupportedRouteError } from '../errors'
@@ -258,7 +258,10 @@ export function encodeExecutionPlan(
     // permit naming anyone but this router would be broadcast on the trader's behalf and leave that
     // party spending their tokens afterwards — and the swap itself would still succeed whenever the
     // trader already had a standing allowance, so nothing downstream would notice.
-    if (spender.toLowerCase() !== deployment.address.toLowerCase())
+    // `isAddressEqual` (R3): both are validated addresses by now — the permit's spender by
+    // `router.ts#validateSwapRequest`, the deployment's by the manifest — and a permit written with
+    // checksummed casing must not read as "grants an allowance to someone else".
+    if (!isAddressEqual(spender, deployment.address))
       throw new UnsupportedRouteError(
         `permit grants an allowance to ${spender}, not to the Universal Router at ${deployment.address}`,
       )
@@ -293,7 +296,7 @@ export function encodeExecutionPlan(
     // UNWRAP_WETH calls `withdraw` on the router's own immutable WETH, whatever the plan pulled. A
     // plan that pulls some other token and then unwraps would move that token into the router and
     // strand it there, while the swap runs on the router's incidental native balance.
-    if (acquireInput.token.toLowerCase() !== deployment.wrappedNative.toLowerCase())
+    if (!isAddressEqual(acquireInput.token, deployment.wrappedNative))
       throw new UnsupportedRouteError(
         `a leading unwrap must pull the router's wrapped native (${deployment.wrappedNative}), not ${acquireInput.token}`,
       )

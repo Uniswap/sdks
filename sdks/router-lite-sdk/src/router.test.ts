@@ -299,6 +299,129 @@ describe('createRouter — validation (before any RPC)', () => {
     await expect(router.getSwap({ ...base, recipient: UR_ADDRESS_THIS })).rejects.toThrow(RouterConfigError)
   })
 
+  // -------------------------------------------------------------------------------------------
+  // R3: a malformed address is a REQUEST error, named and thrown pre-RPC.
+  //
+  // `Address` is a compile-time claim about a value a stranger may have composed. Before these
+  // checks, `'0xnope'` sailed through every lowercased string comparison in the request path and
+  // surfaced much later as a raw viem `InvalidAddressError` thrown from inside an encoder or from
+  // `eth_call` param formatting — a mid-search stack trace, from a package whose whole validation
+  // posture is "reject the request synchronously, before any RPC". `poisonedClient` is what proves
+  // the "pre-RPC" half: any RPC at all fails these with a different error.
+  // -------------------------------------------------------------------------------------------
+
+  const MALFORMED: Address[] = [
+    '0xnope' as Address, // not hex, too short
+    `0x${'aa'.repeat(19)}` as Address, // 19 bytes — one short, the classic truncation
+    `0x${'aa'.repeat(21)}` as Address, // 21 bytes — one long
+    'not-an-address-at-all' as Address, // no 0x prefix
+  ]
+
+  test("a malformed trader throws RouterConfigError before any RPC, not a viem InvalidAddressError (R3)", async () => {
+    const router = createRouter({ client: poisonedClient(), manifest: baseManifest() })
+    for (const trader of MALFORMED) {
+      const p = router.getSwap({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, trader })
+      await expect(p).rejects.toThrow(RouterConfigError)
+      await expect(p).rejects.toThrow(/trader is not a valid address/)
+    }
+    // An EMPTY trader keeps its own, older message: `!req.trader` is checked first, and "you did
+    // not supply one" is a more useful answer than "the one you supplied is malformed".
+    await expect(
+      router.getSwap({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, trader: '' as Address }),
+    ).rejects.toThrow(/swap requests require a trader address/)
+  })
+
+  test('a malformed recipient throws RouterConfigError before any RPC (R3)', async () => {
+    const router = createRouter({ client: poisonedClient(), manifest: baseManifest() })
+    const base: SwapRequest = { tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, trader: TRADER }
+    for (const recipient of MALFORMED) {
+      await expect(router.getSwap({ ...base, recipient })).rejects.toThrow(/recipient is not a valid address/)
+    }
+  })
+
+  test('a malformed tokenIn/tokenOut throws RouterConfigError, for quotes as well as swaps (R3)', async () => {
+    const router = createRouter({ client: poisonedClient(), manifest: baseManifest() })
+    for (const bad of MALFORMED) {
+      await expect(router.getQuote({ tokenIn: bad, tokenOut: TOKEN_B, amountIn: AMOUNT_IN })).rejects.toThrow(
+        /tokenIn must be 'native' or a valid address/,
+      )
+      await expect(router.getQuote({ tokenIn: TOKEN_A, tokenOut: bad, amountIn: AMOUNT_IN })).rejects.toThrow(
+        /tokenOut must be 'native' or a valid address/,
+      )
+      await expect(
+        router.getSwap({ tokenIn: bad, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, trader: TRADER }),
+      ).rejects.toThrow(RouterConfigError)
+    }
+    // 'native' is not an address and must still be accepted — the check is a union, not a narrowing.
+    await expectPassesValidation(router.getQuote({ tokenIn: 'native', tokenOut: TOKEN_B, amountIn: AMOUNT_IN }))
+  })
+
+  test('a malformed hint address throws RouterConfigError naming the field, pre-RPC (R3)', async () => {
+    const router = createRouter({ client: poisonedClient(), manifest: baseManifest() })
+    const quote = (hints: PoolHint[]): Promise<QuoteResult> =>
+      router.getQuote({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, hints })
+
+    await expect(quote([{ protocol: 'v2', token0: '0xnope' as Address, token1: TOKEN_B }])).rejects.toThrow(
+      /hint\[0\]\.token0 is not a valid address/,
+    )
+    await expect(quote([{ protocol: 'v2', token0: TOKEN_A, token1: '0xnope' as Address }])).rejects.toThrow(
+      /hint\[0\]\.token1 is not a valid address/,
+    )
+    await expect(
+      quote([{ protocol: 'v3', token0: TOKEN_A, token1: TOKEN_B, fee: 3000, pool: '0xnope' as Address }]),
+    ).rejects.toThrow(/hint\[0\]\.pool is not a valid address/)
+    // The index is 1-based on the offending entry, not on the array: a request may carry up to
+    // MAX_HINTS_PER_REQUEST of them and the caller has to be able to find the bad one.
+    await expect(
+      quote([
+        { protocol: 'v2', token0: TOKEN_A, token1: TOKEN_B },
+        { protocol: 'v2', token0: TOKEN_A, token1: '0xnope' as Address },
+      ]),
+    ).rejects.toThrow(/hint\[1\]\.token1 is not a valid address/)
+    // v4 spells its addresses inside `poolKey`; the field path in the error says so.
+    await expect(
+      quote([
+        {
+          protocol: 'v4',
+          poolKey: { currency0: '0xnope' as Address, currency1: TOKEN_B, fee: 3000, tickSpacing: 60, hooks: zeroAddress },
+        },
+      ]),
+    ).rejects.toThrow(/hint\[0\]\.poolKey\.currency0 is not a valid address/)
+    // address(0) hooks is the no-hooks case and must remain perfectly valid.
+    await expectPassesValidation(
+      quote([
+        {
+          protocol: 'v4',
+          poolKey: { currency0: TOKEN_A, currency1: TOKEN_B, fee: 3000, tickSpacing: 60, hooks: zeroAddress },
+        },
+      ]),
+    )
+  })
+
+  test('ingestPool validates hint addresses too — the other door into the long-lived index (R3)', async () => {
+    // A malformed address reaching the index through `ingestPool` would be a PERMANENT resident
+    // (the index outlives the request), not a one-request mistake, so this door is checked as
+    // strictly as the request path.
+    const router = createRouter({ client: poisonedClient(), manifest: baseManifest() })
+    await expect(router.ingestPool({ protocol: 'v2', token0: '0xnope' as Address, token1: TOKEN_B })).rejects.toThrow(
+      /hint\[0\]\.token0 is not a valid address/,
+    )
+  })
+
+  test('a lowercase (non-checksummed) address is accepted — strict: false is deliberate (R3)', async () => {
+    // Every JSON-RPC response and most config files carry lowercase addresses, and every comparison
+    // in this package is case-insensitive. Demanding EIP-55 casing would reject correct input.
+    const router = createRouter({ client: poisonedClient(), manifest: baseManifest() })
+    await expectPassesValidation(
+      router.getSwap({
+        tokenIn: TOKEN_A.toLowerCase() as Address,
+        tokenOut: TOKEN_B.toLowerCase() as Address,
+        amountIn: AMOUNT_IN,
+        trader: TRADER.toLowerCase() as Address,
+      }),
+    )
+  })
+
   test('amountIn at or above 2^128 (the v4 quoter uint128 ceiling) throws RouterConfigError, for quotes and swaps alike (C4-H4)', async () => {
     const manifest = baseManifest()
     const router = createRouter({ client: poisonedClient(), manifest })

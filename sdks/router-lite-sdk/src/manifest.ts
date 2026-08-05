@@ -1,5 +1,5 @@
 import type { Address, Hex, PublicClient } from 'viem'
-import { keccak256 } from 'viem'
+import { isAddressEqual, keccak256 } from 'viem'
 
 import {
   DEFAULT_BLOCK_TIME_SECONDS,
@@ -452,7 +452,11 @@ const BUNDLE_KEYS = ['chain', 'v2', 'v3', 'v4', 'execution', 'coreIntermediates'
  * same posture as `assertChainData`.
  */
 export function assertWrappedNativeConsistency(m: ChainManifest): void {
-  if (m.execution && m.execution.wrappedNative.toLowerCase() !== m.wrappedNative.toLowerCase()) {
+  // `isAddressEqual` (R3): two manifest fields describing the same token must not disagree merely
+  // because one was pasted checksummed and the other lowercase — which is precisely the shape of
+  // hand-assembly mistake this cross-check exists to catch, so a case-sensitive comparison here
+  // would report a false mismatch on a correct manifest.
+  if (m.execution && !isAddressEqual(m.execution.wrappedNative, m.wrappedNative)) {
     throw new RouterConfigError(
       `manifest.wrappedNative (${m.wrappedNative}) does not match manifest.execution.wrappedNative (${m.execution.wrappedNative}) — both describe the same on-chain wrapped-native token and must agree; supply the same address for both, or omit one`,
     )
@@ -689,6 +693,10 @@ export async function validateManifest(
 
   if (codeHash) {
     const actualHash = keccak256(code)
+    // DELIBERATELY `.toLowerCase()`, NOT `isAddressEqual` (R3): a codeHash is a 32-byte keccak
+    // digest, not an address. `isAddressEqual` would reject both operands as malformed addresses —
+    // they are the wrong length — so the case-insensitive string compare is the correct tool here,
+    // and the only remaining one of its kind in this file.
     if (actualHash.toLowerCase() !== codeHash.toLowerCase()) {
       throw new RouterConfigError(
         `execution address ${address} codeHash mismatch: expected ${codeHash}, got ${actualHash}`,

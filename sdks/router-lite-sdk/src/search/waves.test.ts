@@ -87,10 +87,18 @@ function feeTag(fee: number): string {
   return (fee % 256).toString(16).padStart(2, '0')
 }
 
-/** Deterministic synthetic pool address: tag byte + 9 bytes of each sorted token. */
+/**
+ * Deterministic synthetic pool address: tag byte + 19 nibbles of each sorted token.
+ *
+ * The widths are 19+19 rather than 18+18 so the result is a REAL 20-byte address (2 + 19 + 19 = 40
+ * nibbles). It used to be 38 nibbles — a value no chain could ever produce, which the package's
+ * lowercased string comparisons happily accepted. Now that plan invariants compare with viem's
+ * `isAddressEqual` (R3), a malformed fixture throws `InvalidAddressError` instead of silently not
+ * matching, which is the point: the test data has to be as well-formed as the data it stands in for.
+ */
 function poolAddress(tag: string, a: CurrencyRef, b: CurrencyRef): Address {
   const [t0, t1] = sortAddresses(resolveAddress(a), resolveAddress(b))
-  return `0x${tag}${t0.slice(2, 20)}${t1.slice(2, 20)}` as Address
+  return `0x${tag}${t0.slice(2, 21)}${t1.slice(2, 21)}` as Address
 }
 
 function stubPoolRef(id: 'v2' | 'v3', a: CurrencyRef, b: CurrencyRef, opts: { tag?: string; fee?: number } = {}): PoolRef {

@@ -7,7 +7,9 @@ import {
   encodeFunctionData,
   encodePacked,
   getCreate2Address,
+  isAddressEqual,
   keccak256,
+  zeroAddress,
 } from 'viem'
 
 import { RouterConfigError, UnsupportedRouteError } from '../errors'
@@ -108,7 +110,7 @@ export function encodeV3Path(legs: RouteLeg[], wrappedNative: Address): Hex {
     if (leg.pool.protocol !== 'v3') throw new UnsupportedRouteError(`encodeV3Path received a ${leg.pool.protocol} leg`)
     const { pool } = leg
     const inToken = currentToken ?? resolveLegToken(leg.currencyIn, wrappedNative)
-    const outToken = inToken.toLowerCase() === pool.token0.toLowerCase() ? pool.token1 : pool.token0
+    const outToken = isAddressEqual(inToken, pool.token0) ? pool.token1 : pool.token0
     types.push('address', 'uint24')
     values.push(inToken, pool.fee)
     currentToken = outToken
@@ -179,6 +181,9 @@ export const v3Module = {
 
     feesFromLogs(logs: Log[], m) {
       if (!m.v3) return []
+      // `.toLowerCase()` on purpose, for the same reason as `parsePoolLog`'s guard below: these logs
+      // come off the wire (or out of a caller's batch) and a malformed `address` must be filtered
+      // out, not thrown over.
       const fromFactory = logs.filter((log) => log.address.toLowerCase() === m.v3!.factory.toLowerCase())
       return mergeEnabledFees(fromFactory)
     },
@@ -194,6 +199,9 @@ export const v3Module = {
     // caller-supplied via `router.ingestLogs`/`ingestReceipt`, so its declared shape is an
     // assertion, not a guarantee — a `null` entry or an object with no `address` must be skipped
     // like any other non-matching log, never crash the batch (C4-H4).
+    // `.toLowerCase()` HERE ON PURPOSE, NOT `isAddressEqual` (R3, C4-H4): `log.address` is
+    // caller-supplied through `ingestLogs`/`ingestReceipt`. `isAddressEqual` throws on a malformed
+    // operand, which would let one junk entry abort the whole batch instead of being skipped.
     if (!m.v3 || typeof log?.address !== 'string' || log.address.toLowerCase() !== m.v3.factory.toLowerCase()) {
       return null
     }
@@ -229,7 +237,12 @@ export const v3Module = {
     } catch {
       return null
     }
-    if (address === '0x0000000000000000000000000000000000000000') return null
+    // The factory's `getPool` returns address(0) for "no such pool". `zeroAddress` rather than the
+    // literal (R5): the literal was the only spelling of it left in this package, and a literal is
+    // the one form of this check that can be typo'd into never matching.
+    if (isAddressEqual(address, zeroAddress)) return null
+    // `.toLowerCase()` on purpose (R3): `hint.pool` is the caller's unvalidated assertion and a bad
+    // hint must be IGNORED (`null`), never thrown over — see `v2Module.validateHint`.
     if (hint.pool && hint.pool.toLowerCase() !== address.toLowerCase()) return null
     const [token0, token1] = sortAddresses(hint.token0, hint.token1)
     const pool = v3PoolRef(address, token0, token1, hint.fee)

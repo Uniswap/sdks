@@ -4,6 +4,7 @@
  */
 
 import type { Address } from 'viem'
+import { isAddressEqual, zeroAddress } from 'viem'
 
 /**
  * Universal Router recipient sentinel meaning "the caller" (`msg.sender`). The encoder substitutes
@@ -14,6 +15,38 @@ export const UR_MSG_SENDER = '0x0000000000000000000000000000000000000001' as Add
 
 /** Universal Router recipient sentinel meaning "the router itself" (`address(this)`). */
 export const UR_ADDRESS_THIS = '0x0000000000000000000000000000000000000002' as Address
+
+/**
+ * True for either Universal Router recipient sentinel.
+ *
+ * THE PREDICATE LIVES HERE, THE ERROR LIVES AT THE CALL SITE (R5). `router.ts` and `plan/compile.ts`
+ * each had their own copy of this membership test, next to their own copy of a zero-address check —
+ * two implementations of one fact ("which addresses can never be a real custody endpoint"), which is
+ * exactly the kind of duplicate that goes stale the day a third sentinel is added. The predicate is
+ * shared; the throw is not, because the two callers are answering different questions and must keep
+ * their own error classes: `router.ts` is rejecting a caller's REQUEST (`RouterConfigError`, before
+ * any RPC) while `plan/compile.ts` is rejecting a PLAN the search itself built (`UnsupportedRouteError`).
+ *
+ * `isAddressEqual` rather than lowercased string comparison, so a checksummed and an all-lowercase
+ * spelling of the same sentinel can never disagree. It throws on a malformed address, which is why
+ * every caller validates shape (`isAddress`) first — see {@link isUnusableCustodyAddress}.
+ */
+export function isUrSentinel(address: Address): boolean {
+  return isAddressEqual(address, UR_MSG_SENDER) || isAddressEqual(address, UR_ADDRESS_THIS)
+}
+
+/**
+ * True for any address that can never be a real trader/recipient/custody endpoint: the zero address
+ * or either Universal Router sentinel (see {@link isUrSentinel}).
+ *
+ * REQUIRES A SYNTACTICALLY VALID ADDRESS — `isAddressEqual` throws viem's `InvalidAddressError` on
+ * anything else, which would be a raw viem throw where the caller wanted its own named error. Every
+ * call site checks `isAddress(addr, { strict: false })` first and reports that failure in its own
+ * vocabulary.
+ */
+export function isUnusableCustodyAddress(address: Address): boolean {
+  return isAddressEqual(address, zeroAddress) || isUrSentinel(address)
+}
 
 /**
  * Max direct (tokenIn <-> tokenOut) pools considered per pair, across all protocols (C4-P7).
