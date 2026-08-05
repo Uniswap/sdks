@@ -1,5 +1,5 @@
 import type { Address, Hex } from 'viem'
-import { concatHex, encodeAbiParameters, encodeFunctionData, parseAbiParameters, zeroAddress } from 'viem'
+import { encodeAbiParameters, encodeFunctionData, isAddress, isAddressEqual, parseAbiParameters, zeroAddress } from 'viem'
 
 import { UR_ADDRESS_THIS } from '../constants'
 import { UnsupportedRouteError } from '../errors'
@@ -7,6 +7,7 @@ import { UR_ABI } from '../internal/abis'
 import { isNative } from '../internal/currency'
 import { assertPlanInvariants } from '../plan/compile'
 import { assertNever, isSwapOperation, payerOf, recipientOf } from '../plan/operations'
+import { encodeV3Path } from '../protocols/v3'
 import type {
   ConversionOperation,
   CurrencyRef,
@@ -67,8 +68,18 @@ import type {
 //     the wave-engine/preflight tasks, plus a product decision.
 // ---------------------------------------------------------------------------
 
-/** Universal Router `ur-2.0` command bytes. Values verified against `universal-router-sdk`'s `CommandType`. */
-const COMMAND = {
+/**
+ * Universal Router `ur-2.0` command bytes.
+ *
+ * EXPORTED FOR TEST-TIME PARITY ONLY (R6) — not re-exported from `index.ts` or `experimental.ts`,
+ * so this is not public API. The values were "verified against `universal-router-sdk`'s
+ * `CommandType`" by a human reading two files; `ur20.test.ts` now asserts every entry against that
+ * enum mechanically, on every run, without `universal-router-sdk` becoming a runtime dependency
+ * (it stays a devDependency — the same C4-P4 posture as `manifest.parity.test.ts`). A command byte
+ * that moved between router versions is a fund-loss bug, which is more than a comment should be
+ * asked to hold.
+ */
+export const COMMAND = {
   V3_SWAP_EXACT_IN: 0x00,
   PERMIT2_TRANSFER_FROM: 0x02,
   V2_SWAP_EXACT_IN: 0x08,
@@ -78,8 +89,9 @@ const COMMAND = {
   V4_SWAP: 0x10,
 } as const
 
-/** v4 router action bytes. Values verified against `v4-sdk`'s `Actions`. */
-const V4_ACTION = {
+/** v4 router action bytes. Asserted against `v4-sdk`'s `Actions` in `ur20.test.ts` — exported for
+ * that test only, on the same terms as {@link COMMAND} above (R6). */
+export const V4_ACTION = {
   SWAP_EXACT_IN: 0x07,
   SETTLE: 0x0b,
   TAKE: 0x0e,
@@ -170,14 +182,31 @@ function mergeContiguousV2(operations: ExecutionOperation[]): ExecutionOperation
   return merged
 }
 
-/** `tokenIn, fee, tokenOut, fee, …` — the v3 exact-input path encoding. */
-function encodeV3Path(legs: RouteLeg[]): Hex {
-  const parts: Hex[] = [currencyAddress(legs[0]!.currencyIn)]
+/**
+ * Guards the assumption `protocols/v3.ts#encodeV3Path` is called under here (R4).
+ *
+ * THE ENCODER USED TO HAVE ITS OWN v3 PATH BUILDER — a `concatHex` of manually `padStart`-ed fee
+ * bytes, second implementation of a format `protocols/v3.ts` already encodes with `encodePacked`
+ * against ABI types. Two hand-rolled encodings of one wire format is one too many: the fee width
+ * (3 bytes, `uint24`) was a literal `6` in a `padStart` here and a type in the ABI there, and only
+ * one of them was covered by the differential suite against `universal-router-sdk`.
+ *
+ * The surviving implementation resolves a `'native'` leg input to `wrappedNative`, while this one
+ * resolved it to `address(0)`. The difference is unobservable, and this assertion is what says so
+ * out loud rather than leaving it to be rediscovered: `assertPlanInvariants` rejects any v2/v3
+ * operation holding native (`"${op.kind} operations hold wrapped native only, never native"`), so
+ * no v3 leg reaching this encoder can carry it, and every plan arrives here already wrapped by
+ * `plan/compile.ts#wrappedLeg`. If that invariant is ever relaxed, this throws instead of silently
+ * encoding a path against a different token than either implementation intended.
+ */
+function assertNoNativeInV3Path(legs: RouteLeg[]): void {
   for (const leg of legs) {
-    if (leg.pool.protocol !== 'v3') throw new UnsupportedRouteError(`v3 path contains a ${leg.pool.protocol} leg`)
-    parts.push(`0x${leg.pool.fee.toString(16).padStart(6, '0')}` as Hex, currencyAddress(leg.currencyOut))
+    if (isNative(leg.currencyIn) || isNative(leg.currencyOut)) {
+      throw new UnsupportedRouteError(
+        `a v3 operation reached the encoder holding native currency; v2/v3 legs are always wrapped (plan invariant)`,
+      )
+    }
   }
-  return concatHex(parts)
 }
 
 /** `[tokenIn, …tokenOut per hop]` — the v2 address path. */
@@ -258,7 +287,16 @@ export function encodeExecutionPlan(
     // permit naming anyone but this router would be broadcast on the trader's behalf and leave that
     // party spending their tokens afterwards — and the swap itself would still succeed whenever the
     // trader already had a standing allowance, so nothing downstream would notice.
-    if (spender.toLowerCase() !== deployment.address.toLowerCase())
+    // `isAddressEqual` (R3) so a permit written with checksummed casing does not read as "grants an
+    // allowance to someone else" — but it THROWS on a malformed operand, and this encoder's contract
+    // is that every failure is an `UnsupportedRouteError`, not a leaked viem class. `spender` is
+    // caller-supplied (`router.ts#validateSwapRequest` shape-checks it on the request path;
+    // `encodeExecutionPlan` is also reachable through `../experimental`, which has no request path),
+    // so it is shape-checked here before the comparison. `deployment.address` is manifest data,
+    // shape-checked by `manifest.ts#assertManifestAddresses`.
+    if (!isAddress(spender, { strict: false }))
+      throw new UnsupportedRouteError(`permit spender is not a valid address, got ${String(spender)}`)
+    if (!isAddressEqual(spender, deployment.address))
       throw new UnsupportedRouteError(
         `permit grants an allowance to ${spender}, not to the Universal Router at ${deployment.address}`,
       )
@@ -293,7 +331,7 @@ export function encodeExecutionPlan(
     // UNWRAP_WETH calls `withdraw` on the router's own immutable WETH, whatever the plan pulled. A
     // plan that pulls some other token and then unwraps would move that token into the router and
     // strand it there, while the swap runs on the router's incidental native balance.
-    if (acquireInput.token.toLowerCase() !== deployment.wrappedNative.toLowerCase())
+    if (!isAddressEqual(acquireInput.token, deployment.wrappedNative))
       throw new UnsupportedRouteError(
         `a leading unwrap must pull the router's wrapped native (${deployment.wrappedNative}), not ${acquireInput.token}`,
       )
@@ -351,9 +389,21 @@ export function encodeExecutionPlan(
         input: encodeAbiParameters(V2_SWAP_PARAMS, [recipient, amountIn, amountOutMin, encodeV2Path(op.legs), payer]),
       })
     } else if (op.kind === 'v3-swap') {
+      // ONE v3 path encoder for the whole package (R4): `protocols/v3.ts`'s, which builds the
+      // `token(20) | fee(3) | token(20) …` layout with `encodePacked` against ABI types rather than
+      // hand-padded hex, and is the one the differential suite already pins byte-for-byte against
+      // `universal-router-sdk`. See `assertNoNativeInV3Path` for why the `wrappedNative` argument
+      // can never actually be consulted from here.
+      assertNoNativeInV3Path(op.legs)
       commands.push({
         type: COMMAND.V3_SWAP_EXACT_IN,
-        input: encodeAbiParameters(V3_SWAP_PARAMS, [recipient, amountIn, amountOutMin, encodeV3Path(op.legs), payer]),
+        input: encodeAbiParameters(V3_SWAP_PARAMS, [
+          recipient,
+          amountIn,
+          amountOutMin,
+          encodeV3Path(op.legs, deployment.wrappedNative),
+          payer,
+        ]),
       })
     } else if (op.kind === 'v4-swap') {
       commands.push({

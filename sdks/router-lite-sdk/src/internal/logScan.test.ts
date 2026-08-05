@@ -9,6 +9,7 @@ import {
   MAX_REQUESTS_PER_SCAN,
 } from '../constants'
 
+import providerErrors from './__fixtures__/providerErrors.json'
 import { delay, scanLogs } from './logScan'
 
 /** A stub whose `request` records every `eth_getLogs` filter it is handed. */
@@ -309,4 +310,110 @@ test('the real backoff timer resolves on time and is cleared by an abort', async
   expect(Date.now() - abortStarted).toBeLessThan(1_000)
 
   await delay(10, AbortSignal.abort()) // already-aborted signal: resolves immediately, no timer
+})
+
+// ---------------------------------------------------------------------------
+// R2: the declared-cap fast path.
+//
+// Every failure message below is a verbatim live capture from
+// `../internal/__fixtures__/providerErrors.json`, fed through the stub — so
+// these test the scanner against what providers ACTUALLY say, not against a
+// paraphrase that happens to match the parser. If a re-capture changes the
+// wording, these fail alongside the parser's own tests in `rpc.test.ts`.
+// ---------------------------------------------------------------------------
+
+/** The captured message for one endpoint, thrown the way viem surfaces it. */
+function providerFailure(endpoint: keyof typeof providerErrors): Error {
+  const err = new Error(providerErrors[endpoint].message)
+  err.name = 'HttpRequestError'
+  return err
+}
+
+test('R2: a declared cap BELOW MIN_CHUNK gives the sub-range up at once — no retries, no backoff', async () => {
+  // blastapi caps public `eth_getLogs` at ten blocks: nine halvings under MIN_CHUNK, so the
+  // bisection can never reach a window this endpoint will serve. Before the fast path, each
+  // sub-range cost a full halving ladder (10_000 -> 128) plus MAX_CONSECUTIVE_MIN_FAILURES retries
+  // plus an exponential backoff escalation, all to rediscover a fact the FIRST error stated.
+  const { client, filters } = stub(() => {
+    throw providerFailure('eth-mainnet.public.blastapi.io')
+  })
+  const { sleep, delays } = recorder()
+
+  const res = await scanLogs(client, QUERY, { fromBlock: 0n, toBlock: 5_000n }, { sleep })
+
+  expect(filters).toHaveLength(1) // ONE request for the whole range, then the honest give-up
+  expect(delays).toEqual([]) // the endpoint is capping, not throttling: nothing to back off from
+  expect(res.logs).toEqual([])
+  // Coverage is reported honestly rather than optimistically: nothing was served, nothing is claimed.
+  expect(res.covered).toEqual([])
+  expect(res.complete).toBe(false)
+})
+
+test('R2: the give-up is per sub-range and still walks the whole span, one request per window', async () => {
+  // The budget is what this protects. A 40,000-block range is four INITIAL_CHUNK windows, so a
+  // capped endpoint costs four requests total — versus (4 windows x ~7 halvings x 3 retries) and a
+  // full MAX_BACKOFF_TOTAL_MS of sleeping under the old path.
+  const { client, filters } = stub(() => {
+    throw providerFailure('eth-mainnet.public.blastapi.io')
+  })
+  const { sleep, delays } = recorder()
+
+  const res = await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 40_000n }, { sleep })
+
+  expect(filters).toHaveLength(4)
+  expect(delays).toEqual([])
+  expect(res.complete).toBe(false)
+  expect(filters.every((f) => span(f) === INITIAL_CHUNK)).toBe(true)
+  expect(filters.length).toBeLessThan(MAX_REQUESTS_PER_SCAN)
+})
+
+test('R2: a declared SERVEABLE cap is jumped to directly — no blind halving toward it', async () => {
+  // drpc states a workable span (25683953-25685027 = 1,075 blocks) rather than a block cap. The
+  // scanner takes its WIDTH as the next window: reaching 1,075 by halving from 10,000 would take
+  // four probes (5000, 2500, 1250, 625 — overshooting to less than the cap allows), and the endpoint
+  // already said what it would accept.
+  const declaredWidth = 25_685_027n - 25_683_953n + 1n
+  const { client, filters } = stub((filter) => {
+    if (span(filter) > declaredWidth) throw providerFailure('eth.drpc.org')
+    return []
+  })
+  const { sleep, delays } = recorder()
+
+  const res = await scanLogs(client, QUERY, { fromBlock: 0n, toBlock: 20_000n }, { sleep })
+
+  expect(span(filters[0]!)).toBe(INITIAL_CHUNK) // the first attempt is still the optimistic one
+  expect(span(filters[1]!)).toBe(declaredWidth) // ...and the SECOND is exactly what drpc declared
+  expect(filters[1]!.toBlock).toBe(filters[0]!.toBlock) // same cursor, narrower window — nothing skipped
+  expect(delays).toEqual([]) // a cap, not an outage
+  expect(res.complete).toBe(true) // and the whole range is still covered, at the declared width
+})
+
+test('R2: an undeclared cap still bisects exactly as before', async () => {
+  // The control. The publicnode capture declares no window at all, so the pre-existing halving
+  // ladder must be untouched: window halves, no give-up, coverage completes.
+  const { client, filters } = stub((filter) => {
+    if (span(filter) > 2_500n) throw providerFailure('ethereum.publicnode.com')
+    return []
+  })
+
+  const res = await scanLogs(client, QUERY, { fromBlock: 0n, toBlock: 30_000n }, { sleep: recorder().sleep })
+
+  expect(span(filters[0]!)).toBe(INITIAL_CHUNK)
+  expect(span(filters[1]!)).toBe(INITIAL_CHUNK / 2n) // halved, not jumped
+  expect(res.complete).toBe(true)
+})
+
+test('R2: a declared cap WIDER than the window in flight is ignored — that failure is something else', async () => {
+  // A cap only explains this failure if it is narrower than what was asked for. A provider quoting
+  // its (generous) ceiling while failing for an unrelated reason must not widen the window or
+  // suppress the halving that will actually get past it.
+  const { client, filters } = stub((filter) => {
+    if (span(filter) > 1_000n) throw new Error('You can make eth_getLogs requests with up to a 50000 block range, but something else went wrong')
+    return []
+  })
+
+  const res = await scanLogs(client, QUERY, { fromBlock: 0n, toBlock: 30_000n }, { sleep: recorder().sleep })
+
+  expect(span(filters[1]!)).toBe(INITIAL_CHUNK / 2n) // halved as usual — the declared cap changed nothing
+  expect(res.complete).toBe(true)
 })

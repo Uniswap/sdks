@@ -1,5 +1,5 @@
 import type { Address, Hex } from 'viem'
-import { decodeEventLog, decodeFunctionResult, encodeEventTopics, encodeFunctionData, encodePacked, getCreate2Address, keccak256 } from 'viem'
+import { decodeEventLog, decodeFunctionResult, encodeEventTopics, encodeFunctionData, encodePacked, getCreate2Address, isAddressEqual, keccak256 } from 'viem'
 
 import { RouterConfigError, UnsupportedRouteError } from '../errors'
 import { V2_FACTORY_ABI, V2_PAIR_ABI } from '../internal/abis'
@@ -23,9 +23,17 @@ import type { ProtocolModule, QuoteProbe } from './types'
 /**
  * keccak256 of the UniswapV2Pair creation code — the CREATE2 init code hash for the canonical v2
  * factory deployment and every ordinary EVM fork of it. The DEFAULT, not a law of nature: a chain
- * whose CREATE2 derivation or pair bytecode differs (zkSync-class chains hash a different preimage
- * entirely) overrides it via `ChainManifest.v2.initCodeHash`, without which every address computed
- * here points at empty space and the search reports a confident `no-route`.
+ * that deployed DIFFERENT PAIR BYTECODE overrides it via `ChainManifest.v2.initCodeHash`, without
+ * which every address computed here points at empty space and the search reports a confident
+ * `no-route`.
+ *
+ * THE OVERRIDE IS FOR A DIFFERENT BYTECODE, NOT A DIFFERENT DERIVATION (R7). It substitutes one
+ * input to the standard EVM formula `keccak256(0xff ++ factory ++ salt ++ initCodeHash)[12:]`; it
+ * cannot express a chain that computes the address by a different rule. zkSync-class chains do
+ * exactly that — a different prefix, a different preimage, and a bytecode HASH rather than the
+ * creation code — so no value of this field makes speculative v2 addressing work there. Such chains
+ * are OUT OF SCOPE for this package's speculative path today, and there is no manifest field that
+ * changes that; supporting one means teaching `computeV2PairAddress` a second algorithm.
  */
 export const V2_INIT_CODE_HASH: Hex = '0x96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f'
 
@@ -103,7 +111,7 @@ export const v2Module = {
     const aAddr = resolveAddress(a, wrappedNative)
     const bAddr = resolveAddress(b, wrappedNative)
     const [token0, token1] = sortAddresses(aAddr, bAddr)
-    const zeroForOne = aAddr.toLowerCase() === token0.toLowerCase()
+    const zeroForOne = isAddressEqual(aAddr, token0)
     const address = computeV2PairAddress(m.v2.factory, aAddr, bAddr, m.v2.initCodeHash)
     const pool = v2PoolRef(address, token0, token1)
     const leg: RouteLeg = { pool, currencyIn: a, currencyOut: b }
@@ -121,6 +129,11 @@ export const v2Module = {
     // caller-supplied via `router.ingestLogs`/`ingestReceipt`, so its declared shape is an
     // assertion, not a guarantee — a `null` entry or an object with no `address` must be skipped
     // like any other non-matching log, never crash the batch (C4-H4).
+    // `.toLowerCase()` HERE ON PURPOSE, NOT `isAddressEqual` (R3, C4-H4): `log.address` is
+    // caller-supplied through `ingestLogs`/`ingestReceipt` and may be any string at all. viem's
+    // `isAddressEqual` THROWS `InvalidAddressError` on a malformed operand, which would turn one
+    // junk entry in a batch into an exception that takes the whole batch down — the precise failure
+    // the `typeof` guard beside it exists to prevent. A non-matching log must be skipped, silently.
     if (!m.v2 || typeof log?.address !== 'string' || log.address.toLowerCase() !== m.v2.factory.toLowerCase()) {
       return null
     }
@@ -143,6 +156,9 @@ export const v2Module = {
     const address = computeV2PairAddress(factory, hint.token0, hint.token1, initCodeHash)
     // The CREATE2 address is fully determined by (factory, token0, token1) — no RPC call is
     // needed to validate a v2 hint, unlike v3 where the fee tier isn't recoverable locally.
+    // `.toLowerCase()` on purpose (R3): `hint.pool` is the caller's ASSERTION about where the pair
+    // lives, and a hint that fails validation must return `null` (ignored) rather than throw. A
+    // shape-invalid value would make `isAddressEqual` throw out of hint resolution instead.
     if (hint.pool && hint.pool.toLowerCase() !== address.toLowerCase()) return null
     const [token0, token1] = sortAddresses(hint.token0, hint.token1)
     const pool = v2PoolRef(address, token0, token1)
@@ -155,7 +171,7 @@ export const v2Module = {
     if (leg.pool.protocol !== 'v2') throw new UnsupportedRouteError(`v2 encodeQuote received a ${leg.pool.protocol} leg`)
     const wrappedNative = m.wrappedNative
     const inAddr = resolveAddress(leg.currencyIn, wrappedNative)
-    const zeroForOne = inAddr.toLowerCase() === leg.pool.token0.toLowerCase()
+    const zeroForOne = isAddressEqual(inAddr, leg.pool.token0)
     return reservesQuote(leg.pool.address, zeroForOne, amountIn)
   },
 

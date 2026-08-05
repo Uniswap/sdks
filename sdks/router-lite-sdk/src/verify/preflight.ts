@@ -1,6 +1,6 @@
 import type { Address, Hex, PublicClient } from 'viem'
 
-import { classifyRpcError } from '../internal/rpc'
+import { classifyRpcError, revertDataOf } from '../internal/rpc'
 import type { Semaphore } from '../internal/rpc'
 import type { EncodedTx } from '../types'
 
@@ -85,34 +85,15 @@ export async function preflightTx(
     // pinned block: `!== 'execution'` rather than `=== 'transport'` so the node-state channel can
     // never be laundered into the `reverted` branch below and read as revert-data-free rejection.
     if (classifyRpcError(err) !== 'execution') return { ok: false, kind: 'transport' }
-    // Extract revert data from the error if present
-    const revertData = extractRevertData(err)
+    // Revert data comes out of `internal/rpc.ts`'s ONE cause-chain walker — the same one
+    // `classifyRpcError` just used, and the same one `quote/quote.ts` reads for its
+    // amount-independence rule. This file used to keep a third, weaker copy: it looked only one
+    // level down the `cause` chain, never stepped into geth's nested `data.data`, and accepted a
+    // zero-length `'0x'` as if it were payload. Against a real geth node — whose revert arrives as
+    // `{ cause: { data: { data: '0x…' } } }` — that copy found nothing, so `RankedRoute.revertData`
+    // was empty for the leader in exactly the case a caller wants the reason bytes, and `'0x'` was
+    // reported as data whenever the node reverted without any.
+    const revertData = revertDataOf(err)
     return { ok: false, kind: 'reverted', ...(revertData !== undefined && { revertData }) }
   }
-}
-
-/**
- * Extracts revert data from various error types that viem might throw.
- * Walks the error chain (err.data, err.cause?.data) to find hex revert data.
- * Returns undefined if no revert data is found.
- */
-function extractRevertData(err: unknown): Hex | undefined {
-  if (err === null || err === undefined) return undefined
-
-  const errorObj = err as any
-
-  // Direct revert data on the error
-  if (typeof errorObj.data === 'string' && errorObj.data.startsWith('0x')) {
-    return errorObj.data as Hex
-  }
-
-  // Check nested cause chain (viem's error structure)
-  if (errorObj.cause !== null && errorObj.cause !== undefined) {
-    const causeData = errorObj.cause.data
-    if (typeof causeData === 'string' && causeData.startsWith('0x')) {
-      return causeData as Hex
-    }
-  }
-
-  return undefined
 }

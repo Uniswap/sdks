@@ -1,5 +1,5 @@
 import type { Address, Hex, PublicClient } from 'viem'
-import { keccak256 } from 'viem'
+import { isAddress, isAddressEqual, keccak256 } from 'viem'
 
 import {
   DEFAULT_BLOCK_TIME_SECONDS,
@@ -430,7 +430,17 @@ export const ROBINHOOD_MANIFEST: ChainManifest = {
 // already carried, and each chain's `chainId` matched its endpoint's.
 // ---------------------------------------------------------------------------
 
-const KNOWN_MANIFESTS: Record<number, ChainManifest> = {
+/**
+ * Every built-in manifest, by chainId.
+ *
+ * EXPORTED FOR THE PARITY TEST'S DRIFT GUARD (R6 follow-up) as well as for `manifestFor` below.
+ * `manifest.parity.test.ts` enumerates chains by hand — it has to, since `sdk-core`'s address map
+ * is typed per-chain and only literal `ChainId` members index it — and a hand-written enumeration
+ * silently stops covering a chain the moment a sixth manifest is added here. Asserting the
+ * enumerated set equals this one turns that from an invisible coverage hole into a failing test on
+ * the commit that opens it.
+ */
+export const KNOWN_MANIFESTS: Record<number, ChainManifest> = {
   1: MAINNET_MANIFEST,
   8453: BASE_MANIFEST,
   130: UNICHAIN_MANIFEST,
@@ -452,7 +462,11 @@ const BUNDLE_KEYS = ['chain', 'v2', 'v3', 'v4', 'execution', 'coreIntermediates'
  * same posture as `assertChainData`.
  */
 export function assertWrappedNativeConsistency(m: ChainManifest): void {
-  if (m.execution && m.execution.wrappedNative.toLowerCase() !== m.wrappedNative.toLowerCase()) {
+  // `isAddressEqual` (R3): two manifest fields describing the same token must not disagree merely
+  // because one was pasted checksummed and the other lowercase — which is precisely the shape of
+  // hand-assembly mistake this cross-check exists to catch, so a case-sensitive comparison here
+  // would report a false mismatch on a correct manifest.
+  if (m.execution && !isAddressEqual(m.execution.wrappedNative, m.wrappedNative)) {
     throw new RouterConfigError(
       `manifest.wrappedNative (${m.wrappedNative}) does not match manifest.execution.wrappedNative (${m.execution.wrappedNative}) — both describe the same on-chain wrapped-native token and must agree; supply the same address for both, or omit one`,
     )
@@ -566,7 +580,52 @@ const MAX_BLOCK_TIME_SECONDS = 3_600
  * `reorgOverlapBlocks` re-opens coverage *ahead* of the tip, which reads as "nothing to scan" rather
  * than as a configuration mistake.
  */
+/**
+ * Rejects a manifest whose address fields are not syntactically valid addresses, naming the field,
+ * synchronously and before any RPC.
+ *
+ * WHY THIS EXISTS SEPARATELY FROM THE TYPE. `ChainManifest` types these as `Address`, which is a
+ * compile-time assertion about data a caller assembled by hand — from a config file, a paste, an
+ * environment variable. Nothing checked it, and until `isAddressEqual` arrived (R3) nothing needed
+ * to: every comparison lowercased strings and a malformed value merely failed to match, surfacing
+ * eventually as "no routes found". Now `assertWrappedNativeConsistency` and the request/plan paths
+ * compare with viem, which THROWS `InvalidAddressError` on a malformed operand — so without this,
+ * `createRouter({ manifest: { execution: { wrappedNative: '0xnope', … } } })` raises a raw viem
+ * class from inside a config check whose entire job is to raise `RouterConfigError`.
+ *
+ * EVERY bundle is covered, not just the ones a comparison currently reads. The set of fields some
+ * future comparison touches is not knowable here, and a manifest with a malformed `v3.v3QuoterV2`
+ * is misconfigured whether or not anything has gotten around to comparing it yet.
+ *
+ * `strict: false` — shape, not EIP-55 casing — for the same reason as everywhere else: manifests
+ * are routinely written in lowercase, and every comparison in this package is case-insensitive.
+ */
+export function assertManifestAddresses(m: ChainManifest): void {
+  const fields: Array<[label: string, value: Address | undefined]> = [['wrappedNative', m.wrappedNative]]
+  if (m.execution) {
+    fields.push(
+      ['execution.address', m.execution.address],
+      ['execution.permit2', m.execution.permit2],
+      ['execution.wrappedNative', m.execution.wrappedNative],
+    )
+  }
+  if (m.v2) fields.push(['v2.factory', m.v2.factory])
+  if (m.v3) fields.push(['v3.factory', m.v3.factory], ['v3.v3QuoterV2', m.v3.v3QuoterV2])
+  if (m.v4) fields.push(['v4.poolManager', m.v4.poolManager], ['v4.quoter', m.v4.quoter])
+  m.coreIntermediates?.forEach((token, i) => fields.push([`coreIntermediates[${i}]`, token]))
+
+  for (const [label, value] of fields) {
+    if (typeof value !== 'string' || !isAddress(value, { strict: false })) {
+      throw new RouterConfigError(`manifest ${label} is not a valid address, got ${String(value)}`)
+    }
+  }
+}
+
 export function assertChainData(m: ChainManifest): void {
+  // Addresses first: everything downstream of a manifest — the consistency cross-check below, the
+  // request path, the plan compiler — now compares them with viem rather than with lowercased
+  // strings, and viem throws rather than returning false on a malformed one.
+  assertManifestAddresses(m)
   const blockTime = m.chain?.blockTimeSeconds
   if (blockTime !== undefined && (!Number.isFinite(blockTime) || blockTime <= 0)) {
     throw new RouterConfigError(`manifest chain.blockTimeSeconds must be a finite positive number; got ${blockTime}`)
@@ -621,6 +680,11 @@ export function wave0PairScanBlocks(m: ChainManifest): bigint {
  * the immutables back out of the code told them apart. Called unconditionally from
  * {@link validateManifest} whenever `execution` is present, independent of whether `codeHash` was
  * also supplied.
+ *
+ * ASSUMES `execution.address` IS THE IMMUTABLE-BEARING CONTRACT ITSELF, NEVER A PROXY (R7) — the
+ * Uniswap convention for every Universal Router deployment there is. A proxied UR would carry only
+ * forwarding bytecode at this address, embedding none of these immutables, and would therefore be
+ * FALSE-REJECTED as "configured for a different chain".
  */
 function assertImmutablesEmbedded(m: ChainManifest, code: Hex): void {
   const execution = m.execution!
@@ -689,6 +753,10 @@ export async function validateManifest(
 
   if (codeHash) {
     const actualHash = keccak256(code)
+    // DELIBERATELY `.toLowerCase()`, NOT `isAddressEqual` (R3): a codeHash is a 32-byte keccak
+    // digest, not an address. `isAddressEqual` would reject both operands as malformed addresses —
+    // they are the wrong length — so the case-insensitive string compare is the correct tool here,
+    // and the only remaining one of its kind in this file.
     if (actualHash.toLowerCase() !== codeHash.toLowerCase()) {
       throw new RouterConfigError(
         `execution address ${address} codeHash mismatch: expected ${codeHash}, got ${actualHash}`,

@@ -3,6 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { getAddress, maxUint160, parseEther, type Address, type Hex } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 
+import { PERMIT2_TYPES, permit2Domain } from '../src/internal/testing'
+
 import { PERMIT2_ABI } from './abis'
 import { forkTestsEnabled, startAnvilFork, type AnvilClient } from './anvil'
 import { executeSwap, forkManifest, minAmountOut, needsAction, readySwap, sendAsTrader } from './e2e'
@@ -60,25 +62,14 @@ const PERMIT_TRADER_KEY: Hex = '0x504d17ec4f5b0b6a2c34c3e4bbe6f8a3f2f6a1c9d8e7b6
 /** An unrelated address, used only to prove the permit granted nothing to anyone but the router. */
 const BYSTANDER_SPENDER: Address = '0x000000000000000000000000000000000b7574a9'
 
-/**
- * Permit2's EIP-712 domain and `PermitSingle` types, restated here rather than imported from
- * `@uniswap/permit2-sdk` for the same reason `worldBuilder` restates the pool math: the signature
- * this test produces must be independent of any Uniswap library, or a wrong typed-data shape would
- * be validated against an equally wrong one. Note the domain has NO `version` field.
- */
-const PERMIT2_TYPES = {
-  PermitDetails: [
-    { name: 'token', type: 'address' },
-    { name: 'amount', type: 'uint160' },
-    { name: 'expiration', type: 'uint48' },
-    { name: 'nonce', type: 'uint48' },
-  ],
-  PermitSingle: [
-    { name: 'details', type: 'PermitDetails' },
-    { name: 'spender', type: 'address' },
-    { name: 'sigDeadline', type: 'uint256' },
-  ],
-} as const
+// Permit2's EIP-712 domain and `PermitSingle` types now live in `src/internal/testing.ts` (R6).
+// They are still RESTATED rather than imported from `@uniswap/permit2-sdk` — the signature this
+// test produces must be independent of any Uniswap library, or a wrong typed-data shape would be
+// validated against an equally wrong one — but they are no longer UNCHECKED: this literal used to
+// sit here, where a wrong field order or a `uint256` in place of Permit2's `uint160`/`uint48` was
+// discoverable only by a fork run someone remembered to do. `src/permit2Types.parity.test.ts`
+// compares the shared shape against `AllowanceTransfer.getPermitData(...)` on every unit run.
+// Note the domain has NO `version` field, which that test also pins.
 
 const kindsOf = (requirements: ExecutionRequirement[]): string[] => requirements.map((r) => r.kind).sort()
 
@@ -234,7 +225,7 @@ describe.skipIf(!RUN)('readiness against the real Permit2 (fork)', () => {
       sigDeadline: now + 3_600n,
     }
     const signature = await privateKeyToAccount(PERMIT_TRADER_KEY).signTypedData({
-      domain: { name: 'Permit2', chainId: 1, verifyingContract: ADDRESSES.permit2 },
+      domain: permit2Domain(ADDRESSES.permit2, 1),
       types: PERMIT2_TYPES,
       primaryType: 'PermitSingle',
       message: values,

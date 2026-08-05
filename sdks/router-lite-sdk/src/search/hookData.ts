@@ -1,4 +1,5 @@
-import type { Hex } from 'viem'
+import type { Address, Hex } from 'viem'
+import { isAddress } from 'viem'
 
 import { MAX_HOOK_DATA_BYTES } from '../constants'
 import { RouterConfigError } from '../errors'
@@ -13,13 +14,23 @@ import type { PoolHint, PoolKey } from '../types'
 // `../experimental` callers building their own `SearchContext`-equivalent
 // wiring around `generateRoutes`.
 //
-// This is also the ONLY place a hint's opaque bytes are inspected, so it is
-// where they are bounds- and shape-checked (C4-H4). `hookData` is copied
-// verbatim into every quote call for the pool and into the final calldata,
-// and nothing downstream can tell a 2 MB blob or a truncated nibble from
-// legitimate hook input: viem's ABI encoder accepts an odd-length `0x` string
-// by silently padding it, so a malformed hint would otherwise reach the chain
-// as different bytes than the caller wrote.
+// This is also the hint FIELD-VALIDATION seam (C4-H4) — the one place a hint's
+// caller-supplied values are checked before anything derives an address, a
+// poolId or a calldata blob from them. Two kinds of value are checked:
+//
+//  - `hookData`, the opaque bytes. Copied verbatim into every quote call for
+//    the pool and into the final calldata, and nothing downstream can tell a
+//    2 MB blob or a truncated nibble from legitimate hook input: viem's ABI
+//    encoder accepts an odd-length `0x` string by silently padding it, so a
+//    malformed hint would otherwise reach the chain as different bytes than
+//    the caller wrote.
+//  - The ADDRESS fields (R3). `PoolHint` types them as `Address`, but that is
+//    a compile-time assertion about a value a stranger may have composed —
+//    `'0xnope'` satisfies no runtime check the type performs. Left unchecked it
+//    travels into `computeV2PairAddress`/`computeV4PoolId`/`getPool`, where
+//    viem throws its own `InvalidAddressError` from the middle of a search: a
+//    stack pointing at an encoder rather than a named, pre-RPC complaint about
+//    the field the caller got wrong.
 // ---------------------------------------------------------------------------
 
 /** `0x` followed by an even number of hex digits — the only shape a `bytes` argument can be. */
@@ -39,6 +50,47 @@ function assertHookData(hookData: Hex, poolKey: PoolKey): void {
   if (bytes > MAX_HOOK_DATA_BYTES) {
     throw new RouterConfigError(`${hintLabel(poolKey)} carries ${bytes} bytes of hookData, over the ${MAX_HOOK_DATA_BYTES}-byte limit`)
   }
+}
+
+/**
+ * Rejects a hint address that is not a syntactically valid 20-byte address, naming the exact field
+ * so the caller can find it in a request that may carry up to `MAX_HINTS_PER_REQUEST` of them.
+ *
+ * `strict: false` is deliberate: it checks the SHAPE (`0x` + 40 hex digits) without demanding EIP-55
+ * checksum casing. Callers legitimately pass all-lowercase addresses — that is what every JSON-RPC
+ * response and most config files contain — and every comparison this package makes is
+ * case-insensitive anyway, so strict mode would reject correct input.
+ */
+function assertHintAddress(value: Address, field: string, hintIndex: number): void {
+  if (typeof value !== 'string' || !isAddress(value, { strict: false })) {
+    throw new RouterConfigError(`hint[${hintIndex}].${field} is not a valid address, got ${String(value)}`)
+  }
+}
+
+/**
+ * Validates every address a {@link PoolHint} carries — synchronously, before any RPC and before any
+ * CREATE2/poolId derivation reads them. See this module's header for why the `Address` type alone is
+ * not the check.
+ *
+ * `pool` is optional on v2/v3 hints and validated only when supplied. v4's `hooks` is validated like
+ * any other field: `address(0)` (the no-hooks case) is a perfectly valid address and passes.
+ */
+export function assertHintAddresses(hints: PoolHint[] | undefined): void {
+  if (!hints) return
+  hints.forEach((hint, i) => {
+    if (hint === null || typeof hint !== 'object') throw new RouterConfigError(`hint[${i}] is not an object, got ${String(hint)}`)
+    if (hint.protocol === 'v4') {
+      const key = hint.poolKey as PoolKey | undefined
+      if (key === null || typeof key !== 'object') throw new RouterConfigError(`hint[${i}].poolKey is not an object, got ${String(key)}`)
+      assertHintAddress(key.currency0, 'poolKey.currency0', i)
+      assertHintAddress(key.currency1, 'poolKey.currency1', i)
+      assertHintAddress(key.hooks, 'poolKey.hooks', i)
+      return
+    }
+    assertHintAddress(hint.token0, 'token0', i)
+    assertHintAddress(hint.token1, 'token1', i)
+    if (hint.pool !== undefined) assertHintAddress(hint.pool, 'pool', i)
+  })
 }
 
 /**

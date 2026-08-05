@@ -1,7 +1,7 @@
 import type { Address } from 'viem'
-import { zeroAddress } from 'viem'
+import { isAddress, isAddressEqual, zeroAddress } from 'viem'
 
-import { UR_ADDRESS_THIS, UR_MSG_SENDER } from '../constants'
+import { isUrSentinel } from '../constants'
 import { UnsupportedRouteError } from '../errors'
 import { isNative, sameFamily, sameToken } from '../internal/currency'
 import type { Segment } from '../internal/segment'
@@ -85,16 +85,25 @@ function protocolOf(op: SwapOperation): Protocol {
   return assertNever(op, 'swap operation kind')
 }
 
-function isSentinel(address: Address): boolean {
-  const lower = address.toLowerCase()
-  return lower === UR_MSG_SENDER.toLowerCase() || lower === UR_ADDRESS_THIS.toLowerCase()
-}
-
-/** Rejects addresses that cannot be a real custody endpoint: UR sentinels and the zero address. */
+/**
+ * Rejects addresses that cannot be a real custody endpoint: UR sentinels and the zero address.
+ *
+ * The membership tests are `constants.ts`'s shared predicates (R5) — `router.ts` asks the same
+ * question of a caller's request and used to carry its own copy of both. Only the predicate is
+ * shared: this throws `UnsupportedRouteError` because it is judging a PLAN the search built, not a
+ * request the caller sent, and the two stay distinguishable to callers.
+ *
+ * The shape check leads (R3) for the same reason it does in `router.ts`: `isAddressEqual`/
+ * `isUrSentinel` throw viem's own `InvalidAddressError` on malformed input, and a compiler that
+ * emitted that instead of its own error type would leak a viem class through this package's
+ * documented error surface.
+ */
 function assertUsableAddress(address: Address, role: string): void {
-  if (!address || address.toLowerCase() === zeroAddress.toLowerCase())
+  if (typeof address !== 'string' || !isAddress(address, { strict: false }))
+    throw new UnsupportedRouteError(`${role} must be a valid address, got ${String(address)}`)
+  if (isAddressEqual(address, zeroAddress))
     throw new UnsupportedRouteError(`${role} must be a real address, got the zero address`)
-  if (isSentinel(address))
+  if (isUrSentinel(address))
     throw new UnsupportedRouteError(`${role} must not be a Universal Router sentinel address (${address})`)
 }
 
@@ -298,11 +307,14 @@ export function assertPlanInvariants(plan: ExecutionPlan, wrappedNative: Address
   // through is a donation to that pool's LPs with no way back. The legs are in hand here, so the
   // check costs a walk over at most two of them. v4 pools have no address at all (their identity is
   // a poolId inside the PoolManager singleton), so only v2/v3 legs can collide.
-  const recipientLower = deliverOutput.recipient.toLowerCase()
+  // Both sides are validated by this point: the recipient by `assertUsableAddress` above, and a
+  // pool address by whichever `PoolRef` constructor built it from an ABI-decoded log or a CREATE2
+  // derivation — so `isAddressEqual` is safe, and it is what makes a checksummed pool address
+  // compare equal to a lowercased recipient naming the same contract.
   for (const op of swaps) {
     for (const leg of op.legs) {
       if (leg.pool.protocol === 'v4') continue
-      if (leg.pool.address.toLowerCase() === recipientLower)
+      if (isAddressEqual(leg.pool.address, deliverOutput.recipient))
         throw new UnsupportedRouteError(`recipient ${deliverOutput.recipient} is the ${leg.pool.protocol} pool this plan trades through`)
     }
   }

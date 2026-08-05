@@ -1,16 +1,20 @@
 import { describe, expect, test } from 'bun:test'
+import * as viem from 'viem'
 import type { Hex, PublicClient } from 'viem'
 
 import { NodeStateError, TransportError } from '../errors'
 import type { EthCall } from '../types'
 
-import { classifyRpcError, createSemaphore, ethCall, mapConcurrent } from './rpc'
+import providerErrors from './__fixtures__/providerErrors.json'
+import { classifyRpcError, createSemaphore, ethCall, mapConcurrent, parseDeclaredCap, revertDataOf } from './rpc'
 import {
+  chainDisconnectedError,
   connectionRefusedError,
   deeplyNestedSocketError,
   headerNotFoundError,
   nestedRevertDataError,
   nonexistentBlockError,
+  providerDisconnectedError,
   rateLimitHttpError,
   rateLimitRpcError,
   selfReferentialError,
@@ -138,13 +142,47 @@ describe('classifyRpcError — transport failures (no answer about the chain at 
   })
 
   test('every viem transport error CLASS is transport by name alone, with no other signal present', () => {
-    // The four below had no coverage at all: a name silently dropped from `TRANSPORT_ERROR_NAMES`
-    // would have gone unnoticed, and none of these messages carries a transport word to fall back on.
-    for (const name of ['SocketClosedError', 'WebSocketRequestError', 'ResourceUnavailableRpcError', 'RequestTimeoutError']) {
+    // These had no coverage at all: a name silently dropped from `TRANSPORT_ERROR_NAMES` would have
+    // gone unnoticed, and none of these messages carries a transport word to fall back on.
+    //
+    // `'RequestTimeoutError'` USED TO BE IN THIS LIST AND IS GONE (R5). viem has never exported a
+    // class by that name — its timeout class is plain `TimeoutError` — so the assertion passed for
+    // the wrong reason: it proved a *string* was in the set, not that any error viem throws is
+    // classified. A test may only pin names the dependency actually ships, which is what the
+    // sibling test below now enforces against viem's real exports.
+    for (const name of ['SocketClosedError', 'WebSocketRequestError', 'ResourceUnavailableRpcError']) {
       const err = new Error('the provider stopped talking')
       err.name = name
       expect(classifyRpcError(err)).toBe('transport')
     }
+  })
+
+  test('every name in TRANSPORT_ERROR_NAMES is a class viem really exports', () => {
+    // The guard that would have caught `RequestTimeoutError` the day it was written. Each name is
+    // resolved against viem's own export map, so a typo (or a class renamed in a viem upgrade)
+    // fails here rather than degrading silently into a name that matches nothing forever.
+    for (const name of ['HttpRequestError', 'TimeoutError', 'SocketClosedError', 'WebSocketRequestError',
+      'LimitExceededRpcError', 'ResourceUnavailableRpcError', 'ProviderDisconnectedError', 'ChainDisconnectedError']) {
+      expect(typeof (viem as Record<string, unknown>)[name]).toBe('function')
+    }
+    expect((viem as Record<string, unknown>).RequestTimeoutError).toBeUndefined()
+  })
+
+  test('an EIP-1193 provider/chain disconnect is transport — the name is the only signal (R5)', () => {
+    // 4900/4901 are not in `TRANSPORT_RPC_CODES` and neither message carries a transport word, so
+    // these classify on `TRANSPORT_ERROR_NAMES` alone. A disconnected injected provider must not
+    // read as "the chain refused this call".
+    for (const makeError of [providerDisconnectedError, chainDisconnectedError]) {
+      expect(classifyRpcError(makeError())).toBe('transport')
+    }
+  })
+
+  test('RpcRequestError is deliberately NOT transport — it wraps reverts too', () => {
+    // viem puts `RpcRequestError` around every JSON-RPC error response, `execution reverted`
+    // included. Adding it to the set would launder every revert into "the node never answered".
+    const err = new Error('RPC Request failed.\n\nDetails: execution reverted')
+    err.name = 'RpcRequestError'
+    expect(classifyRpcError(err)).toBe('execution')
   })
 })
 
@@ -413,5 +451,165 @@ describe('createSemaphore / mapConcurrent (C4-P6)', () => {
     expect(results[0]).toBe(1)
     expect(results[1]).toBeInstanceOf(Error)
     expect(results[2]).toBe(3)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// R1: `revertDataOf` and `classifyRpcError` share ONE cause-chain walker.
+//
+// These two used to be separate walks with subtly different shape rules, and a
+// third (weaker) walk lived in `verify/preflight.ts`. The tests below pin the
+// two properties that made the divergence a live bug rather than a tidiness
+// complaint: the nested geth shape must yield its bytes, and a zero-length
+// '0x' must never be mistaken for payload (it is what `quote/quote.ts`'s
+// amount-independence rule keys off, so a false positive there suppresses a
+// cacheable "pool absent" fact).
+// ---------------------------------------------------------------------------
+
+describe('revertDataOf — the shared walker', () => {
+  test('reads the geth-shaped payload at cause.data.data', () => {
+    expect(revertDataOf(nestedRevertDataError())).toBe('0x08c379a0deadbeef')
+  })
+
+  test('reads a top-level payload, and prefers it over a nested one on the same node', () => {
+    expect(revertDataOf({ data: '0x1111', cause: { data: { data: '0x2222' } } })).toBe('0x1111')
+  })
+
+  test('walks past bland frames to a payload deeper in the chain', () => {
+    const inner = { data: { data: '0xfeed' } }
+    expect(revertDataOf(Object.assign(new Error('a'), { cause: Object.assign(new Error('b'), { cause: inner }) }))).toBe('0xfeed')
+  })
+
+  test("a zero-length '0x' is NOT data, at either depth", () => {
+    expect(revertDataOf({ data: '0x' })).toBeUndefined()
+    expect(revertDataOf({ cause: { data: { data: '0x' } } })).toBeUndefined()
+  })
+
+  test('agrees with classifyRpcError: whenever there are bytes, the call executed', () => {
+    for (const err of [nestedRevertDataError(), { data: '0x1234' }, { cause: { data: { data: '0xabcd' } } }]) {
+      expect(revertDataOf(err)).toBeDefined()
+      expect(classifyRpcError(err)).toBe('execution')
+    }
+  })
+
+  test('is depth-bounded exactly as classification is — a self-referential cause terminates', () => {
+    expect(revertDataOf(selfReferentialError())).toBeUndefined()
+  })
+
+  test('a bare string error, null and undefined carry no data', () => {
+    expect(revertDataOf('execution reverted')).toBeUndefined()
+    expect(revertDataOf(null)).toBeUndefined()
+    expect(revertDataOf(undefined)).toBeUndefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// R2: reading a provider's DECLARED `eth_getLogs` cap.
+//
+// Every message below is a verbatim live capture from
+// `__fixtures__/providerErrors.json` — not a hand-written approximation — so
+// these tests fail if a provider's real phrasing drifts away from what the
+// parser understands, which is the only drift that matters. The fixture is
+// loaded as JSON rather than restated here for exactly that reason: the
+// canary re-captures it against live endpoints (`canary/providers.test.ts`),
+// and a re-capture that changes the wording must show up as a failure here.
+// ---------------------------------------------------------------------------
+
+describe('parseDeclaredCap — providers that state the window they would serve', () => {
+  /** A viem-shaped error carrying a captured provider message, as `scanLogs` would catch it. */
+  function capturedError(endpoint: keyof typeof providerErrors): Error {
+    const err = new Error(providerErrors[endpoint].message)
+    err.name = 'HttpRequestError'
+    return err
+  }
+
+  test('blastapi: "up to a 10 block range" yields cap 10 and the suggested hex range', () => {
+    const declared = parseDeclaredCap(capturedError('eth-mainnet.public.blastapi.io'))
+    expect(declared.capBlocks).toBe(10n)
+    expect(declared.retryRange).toEqual({ fromBlock: 0x187e655n, toBlock: 0x187e65en })
+  })
+
+  test('drpc: a result cap with a suggested range yields that range and its width as the cap', () => {
+    // No "N block range" phrase at all here — the cap is DERIVED from the span the provider
+    // volunteered, which is the only thing in the message that describes a window.
+    const declared = parseDeclaredCap(capturedError('eth.drpc.org'))
+    expect(declared.retryRange).toEqual({ fromBlock: 25_683_953n, toBlock: 25_685_027n })
+    expect(declared.capBlocks).toBe(25_685_027n - 25_683_953n + 1n)
+  })
+
+  test('publicnode: an auth complaint declares nothing — the caller keeps its blind bisection', () => {
+    // The third capture is a 403 about archive access. It is the control: a message with no window
+    // in it must not produce one, or the scanner would jump to a fabricated cap.
+    expect(parseDeclaredCap(capturedError('ethereum.publicnode.com'))).toEqual({})
+  })
+
+  test('alchemy-style phrasing without the "up to a" prefix still parses', () => {
+    expect(parseDeclaredCap(new Error('Log response size exceeded. You can make eth_getLogs requests with a 10 block range.')).capBlocks).toBe(10n)
+  })
+
+  test('digit separators are tolerated in both shapes', () => {
+    expect(parseDeclaredCap(new Error('up to a 10,000 block range')).capBlocks).toBe(10_000n)
+    expect(parseDeclaredCap(new Error('retry with the range 1,000-2,000')).retryRange).toEqual({ fromBlock: 1_000n, toBlock: 2_000n })
+  })
+
+  test('the cap is read off a NESTED cause, not just the error handed over', () => {
+    // viem wraps the provider's text one or two levels down as often as not; the parser rides the
+    // same `cause` walker classification does, so depth costs it nothing.
+    const inner = { message: 'You can make eth_getLogs requests with up to a 10 block range.' }
+    expect(parseDeclaredCap(Object.assign(new Error('HTTP request failed.'), { cause: inner })).capBlocks).toBe(10n)
+  })
+
+  test('an ordinary failure declares nothing', () => {
+    for (const err of [new Error('query returned more than 10000 results'), rateLimitHttpError(), timeoutError(), undefined, null, 'boom']) {
+      expect(parseDeclaredCap(err)).toEqual({})
+    }
+  })
+
+  test('the JSON viem echoes into its messages is not mistaken for a suggested range', () => {
+    // Every capture embeds `Request body: {"method":"eth_getLogs","params":[{...}]}`, and a topics
+    // filter embeds `["0x…","0x…"]`. Both are bracketed hex-adjacent text; neither is a suggestion.
+    const err = new Error('HTTP request failed.\n\nRequest body: {"method":"eth_getLogs","params":[{"topics":["0xabc","0xdef"],"fromBlock":"0x1"}]}')
+    expect(parseDeclaredCap(err)).toEqual({})
+  })
+
+  test('an inverted range is discarded rather than turned into a negative width', () => {
+    expect(parseDeclaredCap(new Error('retry with the range 2000-1000'))).toEqual({})
+  })
+})
+
+// ---------------------------------------------------------------------------
+// R1 follow-up: the one shape where `hasRevertData` and `revertData` disagree.
+//
+// `collectFacts` treats a zero-length `'0x'` as revert EVIDENCE at the nested
+// `data.data` position (geth's error object, where it genuinely means "reverted,
+// no reason") but not at the top level. `revertData` applies the `.length > 2`
+// rule uniformly at both. The asymmetry is inherited from the pre-R1 code and
+// deliberately preserved rather than tidied — but "deliberately preserved" is
+// only true if something notices when it changes, hence these.
+// ---------------------------------------------------------------------------
+
+describe("the zero-length '0x' asymmetry between classification and extraction", () => {
+  test("nested `cause.data.data === '0x'` IS revert evidence, and yields no payload", () => {
+    // A transport-worded message is the discriminator: without `hasRevertData` this would fall to
+    // the message tier and classify `transport`. It classifies `execution`, so the bare '0x' at the
+    // nested position is doing the work — and `revertDataOf` still reports nothing to decode.
+    const err = { cause: { data: { data: '0x' }, message: 'connection reset' } }
+    expect(classifyRpcError(err)).toBe('execution')
+    expect(revertDataOf(err)).toBeUndefined()
+  })
+
+  test("top-level `data === '0x'` is NOT revert evidence — the message tier decides", () => {
+    // The other side of the asymmetry. Same bare '0x', top-level position, same transport wording:
+    // classification falls through to the message tier and reads `transport`.
+    const err = { data: '0x', message: 'connection reset' }
+    expect(classifyRpcError(err)).toBe('transport')
+    expect(revertDataOf(err)).toBeUndefined()
+  })
+
+  test('non-empty payload is revert evidence at EITHER position — no asymmetry there', () => {
+    for (const err of [{ data: '0x1234', message: 'connection reset' }, { cause: { data: { data: '0x1234' }, message: 'connection reset' } }]) {
+      expect(classifyRpcError(err)).toBe('execution')
+      expect(revertDataOf(err)).toBe('0x1234')
+    }
   })
 })

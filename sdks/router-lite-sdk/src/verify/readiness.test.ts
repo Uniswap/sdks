@@ -370,3 +370,56 @@ test('an on-chain read failure (a non-ERC20 token reverting) still fails safe to
   expect(result.degraded).toBe(false)
   expect(result.requirements).toEqual([{ kind: 'insufficient-balance', token: TOKEN, required: AMOUNT_IN, available: 0n }])
 })
+
+// ---------------------------------------------------------------------------
+// The never-throws contract, against a MALFORMED permit.
+//
+// `checkReadiness` promises never to throw for a business outcome — every
+// failure widens the requirement set instead. Adopting viem's `isAddressEqual`
+// (R3) put that promise at risk in a way a lowercased string compare never
+// could: `isAddressEqual` THROWS `InvalidAddressError` on a malformed operand
+// where the old helper simply returned false. `permit.details.token` and
+// `permit.spender` are the only two operands here that a caller supplies, and
+// `permit.spender` in particular was validated NOWHERE at the time — while a
+// comment in this module asserted that it was.
+//
+// `router.ts#validateSwapRequest` now rejects both pre-RPC, but that is a first
+// line rather than a guarantee: `checkReadiness` is called directly by tests
+// and reachable by anyone assembling their own search wiring. So the contract
+// is tested where the contract lives.
+// ---------------------------------------------------------------------------
+
+test('(k) a malformed permit address does not throw — the permit simply does not cover the trade', async () => {
+  const client = stubClient({
+    ...entryFor(balanceCall(), balanceReturn(AMOUNT_IN * 2n)),
+    ...entryFor(erc20AllowanceCall(), erc20AllowanceReturn(AMOUNT_IN * 2n)),
+    // Deliberately the shape of case (c): the on-chain Permit2 allowance is EXPIRED, so the only
+    // thing that could make this trade ready is the supplied permit. If the malformed field were
+    // ignored rather than rejected, this would come back with no requirements at all.
+    ...entryFor(permit2AllowanceCall(), permit2AllowanceReturn(AMOUNT_IN * 2n, Number(BLOCK_TIMESTAMP) - 10)),
+  })
+
+  const malformed = [
+    validPermit({ spender: '0xnope' as never }),
+    validPermit({ details: { ...validPermit().details, token: '0xnope' as never } }),
+    validPermit({ spender: `0x${'aa'.repeat(19)}` as never }), // 19 bytes — the classic truncation
+  ]
+
+  for (const permit of malformed) {
+    const result = await checkReadiness({
+      client,
+      trader: TRADER,
+      currencyIn: TOKEN,
+      amountIn: AMOUNT_IN,
+      permit2: PERMIT2,
+      router: ROUTER,
+      permit,
+      blockNumber: BLOCK_NUMBER,
+      blockTimestamp: BLOCK_TIMESTAMP,
+    })
+    // Fails SAFE: an unverifiable permit yields the requirement, never a silently-accepted one.
+    expect(result.requirements).toEqual([{ kind: 'permit2-allowance', token: TOKEN, spender: ROUTER, minimumAmount: AMOUNT_IN }])
+    // ...and not by way of `degraded`, which would wrongly claim a read never landed.
+    expect(result.degraded).toBe(false)
+  }
+})

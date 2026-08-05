@@ -4,6 +4,7 @@
  */
 
 import type { Address } from 'viem'
+import { isAddressEqual, zeroAddress } from 'viem'
 
 /**
  * Universal Router recipient sentinel meaning "the caller" (`msg.sender`). The encoder substitutes
@@ -14,6 +15,38 @@ export const UR_MSG_SENDER = '0x0000000000000000000000000000000000000001' as Add
 
 /** Universal Router recipient sentinel meaning "the router itself" (`address(this)`). */
 export const UR_ADDRESS_THIS = '0x0000000000000000000000000000000000000002' as Address
+
+/**
+ * True for either Universal Router recipient sentinel.
+ *
+ * THE PREDICATE LIVES HERE, THE ERROR LIVES AT THE CALL SITE (R5). `router.ts` and `plan/compile.ts`
+ * each had their own copy of this membership test, next to their own copy of a zero-address check —
+ * two implementations of one fact ("which addresses can never be a real custody endpoint"), which is
+ * exactly the kind of duplicate that goes stale the day a third sentinel is added. The predicate is
+ * shared; the throw is not, because the two callers are answering different questions and must keep
+ * their own error classes: `router.ts` is rejecting a caller's REQUEST (`RouterConfigError`, before
+ * any RPC) while `plan/compile.ts` is rejecting a PLAN the search itself built (`UnsupportedRouteError`).
+ *
+ * `isAddressEqual` rather than lowercased string comparison, so a checksummed and an all-lowercase
+ * spelling of the same sentinel can never disagree. It throws on a malformed address, which is why
+ * every caller validates shape (`isAddress`) first — see {@link isUnusableCustodyAddress}.
+ */
+export function isUrSentinel(address: Address): boolean {
+  return isAddressEqual(address, UR_MSG_SENDER) || isAddressEqual(address, UR_ADDRESS_THIS)
+}
+
+/**
+ * True for any address that can never be a real trader/recipient/custody endpoint: the zero address
+ * or either Universal Router sentinel (see {@link isUrSentinel}).
+ *
+ * REQUIRES A SYNTACTICALLY VALID ADDRESS — `isAddressEqual` throws viem's `InvalidAddressError` on
+ * anything else, which would be a raw viem throw where the caller wanted its own named error. Every
+ * call site checks `isAddress(addr, { strict: false })` first and reports that failure in its own
+ * vocabulary.
+ */
+export function isUnusableCustodyAddress(address: Address): boolean {
+  return isAddressEqual(address, zeroAddress) || isUrSentinel(address)
+}
 
 /**
  * Max direct (tokenIn <-> tokenOut) pools considered per pair, across all protocols (C4-P7).
@@ -265,11 +298,23 @@ export function maxPlausibleHeadRegression(reorgOverlapBlocks: bigint): bigint {
 // ---------------------------------------------------------------------------
 // Log scanning (`internal/logScan.ts`).
 //
-// `eth_getLogs` caps are never advertised, differ per endpoint, and differ per
-// *query* on the same endpoint (a result cap binds on a busy contract at a span
-// a quiet one sails through). So the scanner discovers the usable window
-// empirically, and every constant below is a bound on how much that discovery
-// is allowed to cost — in requests, in wasted probes, and in wall-clock.
+// `eth_getLogs` caps differ per endpoint, and differ per *query* on the same
+// endpoint (a result cap binds on a busy contract at a span a quiet one sails
+// through). So the scanner discovers the usable window empirically, and every
+// constant below is a bound on how much that discovery is allowed to cost — in
+// requests, in wasted probes, and in wall-clock.
+//
+// THE DECLARED-CAP FAST PATH SHORT-CIRCUITS THAT DISCOVERY WHEN IT CAN (R2).
+// Caps are not *never* advertised — several providers state the window that
+// would have worked in the error itself, and
+// `internal/rpc.ts#parseDeclaredCap` reads it out. Where it fires, the window
+// jumps straight to the stated cap instead of halving toward it, and a cap
+// below {@link MIN_CHUNK} gives the sub-range up on the FIRST error rather than
+// spending {@link MAX_CONSECUTIVE_MIN_FAILURES} retries and a backoff
+// escalation on a window the endpoint has already said it will not serve. Every
+// number below is therefore a bound on the SILENT case — the endpoints that
+// only ever answer with an error — and an upper bound, not an expected cost,
+// for the ones that talk.
 // ---------------------------------------------------------------------------
 
 /**
@@ -291,6 +336,13 @@ export const INITIAL_CHUNK = 10_000n
  * {@link DEFAULT_REORG_OVERLAP_BLOCKS}, i.e. the smallest window still larger than the overlap a warm
  * re-scan re-reads anyway — so an endpoint that cannot answer this is failing, not capping, and the
  * failure path (retry, then give the sub-range up) takes over instead of bisecting toward 1.
+ *
+ * AN ENDPOINT THAT DECLARES A CAP BELOW THIS IS THE ONE CASE WHERE "FAILING, NOT CAPPING" IS WRONG
+ * (R2), and it is a real one: `eth-mainnet.public.blastapi.io` caps public `eth_getLogs` at TEN
+ * blocks, nine halvings under this floor. It is genuinely capping, it says so in the error, and no
+ * retry can reach a window it will serve — so the scanner gives that sub-range up on the first
+ * error instead of treating it as a transient failure. See `internal/logScan.ts`'s declared-cap
+ * branch; raising this floor widens the set of endpoints that fall into that case.
  */
 export const MIN_CHUNK = 128n
 

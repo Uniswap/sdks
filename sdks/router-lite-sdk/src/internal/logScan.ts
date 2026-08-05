@@ -14,6 +14,7 @@ import {
 import type { BlockRange, LogQuery } from '../types'
 
 import { maxBig, mergeRanges } from './ranges'
+import { parseDeclaredCap } from './rpc'
 import type { Semaphore } from './rpc'
 
 // viem types each topic slot as `Hex | Hex[] | null` to allow OR-matching on
@@ -30,11 +31,21 @@ export function narrowTopics(topics: (Hex | Hex[] | null)[]): (Hex | null)[] {
 // Recent-first log scanner with adaptive range bisection.
 //
 // Providers cap `eth_getLogs` by result count or block span, and the cap is
-// discovered empirically (never advertised up front). This walks backward
-// from `toBlock` in windows, halving the window on any error and giving up a
-// sub-range only after repeated failures at the smallest allowed window —
-// recording exactly what was (and wasn't) covered so callers can decide
-// whether a partial scan is good enough.
+// usually discovered empirically (rarely advertised up front). This walks
+// backward from `toBlock` in windows, halving the window on any error and
+// giving up a sub-range only after repeated failures at the smallest allowed
+// window — recording exactly what was (and wasn't) covered so callers can
+// decide whether a partial scan is good enough.
+//
+// SOME PROVIDERS DO SAY (R2). blastapi, drpc and alchemy all state the window
+// that would have worked, in the error text, and
+// `internal/rpc.ts#parseDeclaredCap` reads it. When a cap is declared the loop
+// below skips the search entirely: it jumps the window straight to the stated
+// cap, or — when that cap is below MIN_CHUNK, i.e. below anything this scanner
+// will ever ask for — gives the sub-range up on the first error instead of
+// spending a retry budget and a backoff escalation rediscovering the same
+// sentence. A message it does not recognize changes nothing; every bound below
+// still applies.
 //
 // Three things keep that adaptation from becoming its own failure mode, since
 // nothing above this bounds a scan's cost and the zero-config path passes no
@@ -197,8 +208,36 @@ export async function scanLogs(
         chunkSize = grown > initialChunk ? initialChunk : grown
         consecutiveSuccesses = 0
       }
-    } catch {
+    } catch (err) {
       consecutiveSuccesses = 0
+
+      // --- the declared-cap fast path (R2) -------------------------------------------------
+      // Some providers state the window they WOULD have served, right there in the error (see
+      // `internal/rpc.ts#parseDeclaredCap` and the live captures it is built from). When they do,
+      // the bisection below is searching for an answer already in hand.
+      const { capBlocks } = parseDeclaredCap(err)
+      if (capBlocks !== undefined && capBlocks < chunkSize) {
+        if (capBlocks < MIN_CHUNK) {
+          // The endpoint's own ceiling is BELOW the smallest window this scanner will ask for, so no
+          // amount of halving, retrying or backing off can reach it — MIN_CHUNK is the floor, and the
+          // provider has just said the floor is too high. Give the sub-range up on the spot: leave it
+          // out of `covered` (partial discovery, reported honestly, exactly as an exhausted retry
+          // budget would) and move on to older blocks. Without this, a 10-block-cap endpoint costs
+          // MAX_CONSECUTIVE_MIN_FAILURES requests AND a full backoff escalation per sub-range to
+          // rediscover the same sentence, burning the request budget and up to MAX_BACKOFF_TOTAL_MS
+          // of deliberate sleeping on a scan that was never going to cover anything.
+          cursor = chunkStart - 1n
+          consecutiveMinFailures = 0
+          continue
+        }
+        // A real, serveable cap: jump straight to it instead of halving toward it. No backoff — this
+        // is an endpoint capping, not an endpoint failing, which is the same reason the blind-halving
+        // branch below does not sleep either.
+        chunkSize = capBlocks
+        consecutiveMinFailures = 0
+        continue
+      }
+
       if (chunkSize <= MIN_CHUNK) {
         consecutiveMinFailures++
         minFailuresSinceSuccess++

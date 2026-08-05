@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
+import { CommandType } from '@uniswap/universal-router-sdk'
+import { Actions } from '@uniswap/v4-sdk'
 import { expect, test } from 'bun:test'
 import type { Address } from 'viem'
 import { decodeAbiParameters, decodeFunctionData, parseAbiParameters, zeroAddress } from 'viem'
@@ -27,7 +29,7 @@ import type {
   UniversalRouterDeployment,
 } from '../types'
 
-import { encodeExecutionPlan } from './ur20'
+import { COMMAND, encodeExecutionPlan, V4_ACTION } from './ur20'
 
 const modules: Record<Protocol, ProtocolModule> = { v2: v2Module, v3: v3Module, v4: v4Module }
 
@@ -317,6 +319,19 @@ test('goldens.json is a non-empty set of distinct encodings', () => {
   expect(new Set(entries.map(([, golden]) => golden.calldata)).size).toBe(entries.length)
 })
 
+/**
+ * Calldata is compared EXACTLY — no case folding, no normalization of any kind. A golden's whole
+ * job is "the stored string is what the encoder emits today", and any comparison looser than `toBe`
+ * lets the file drift into a representation no code produces, which is a trap for the next reader
+ * rather than a safeguard.
+ *
+ * The file was regenerated once during R4, when `encode/ur20.ts`'s hand-rolled v3 path builder was
+ * deleted in favour of `protocols/v3.ts#encodeV3Path`. That change was BYTE-NEUTRAL — 73 goldens,
+ * 38 byte-and-spelling identical, 35 differing only in hex letter-case, 0 real byte differences —
+ * because viem's `encodePacked` lowercases addresses while the deleted encoder concatenated
+ * checksummed strings, and `0x6B` and `0x6b` are the same byte. Regenerating canonicalized the
+ * stored spelling to what the surviving encoder actually produces.
+ */
 for (const [name, golden] of Object.entries(goldens)) {
   test(`golden: ${name}`, () => {
     const tx = encodeExecutionPlan(golden.plan as ExecutionPlan, deployment, DEADLINE)
@@ -339,4 +354,76 @@ test('a v4 group settles and takes around the swap, native currencies as address
   const [actions] = decodeAbiParameters(parseAbiParameters('bytes actions, bytes[] params'), inputsOf(tx.data)[0]!)
   // SWAP_EXACT_IN(0x07), SETTLE(0x0b), TAKE(0x0e) — the whole-route ordering
   expect(actions).toBe('0x070b0e')
+})
+
+// ---------------------------------------------------------------------------
+// R4: ONE v3 path encoder for the package.
+//
+// The encoder used to carry its own `concatHex` + `padStart(6)` path builder
+// alongside `protocols/v3.ts`'s `encodePacked` one — two hand-rolled encodings
+// of one wire format, of which only the protocol module's had the fee width as
+// an ABI type rather than a magic `6`. The 73 goldens above are the real proof
+// the consolidation is byte-neutral; these two pin the properties that make it
+// SAFE rather than merely currently-true.
+// ---------------------------------------------------------------------------
+
+test('R4: the v3 path is the protocol module\'s encoding, fee width and all', () => {
+  const plan = compileExecutionPlan(base())
+  const tx = encodeExecutionPlan(plan, deployment, DEADLINE)
+  // token(20) | fee(3) | token(20), lowercased — exactly what `protocols/v3.ts#encodeV3Path` emits
+  // for this leg. Spelled out rather than compared to a call so a change in EITHER implementation
+  // (had there still been two) shows up as a literal diff.
+  const expected = `${USDC.slice(2)}000bb8${WETH.slice(2)}`.toLowerCase()
+  expect(tx.data.toLowerCase()).toContain(expected)
+})
+
+test('R4: a v3 operation carrying native is rejected at the boundary, never encoded', () => {
+  // The invariant that makes the surviving implementation's `wrappedNative` argument unreachable
+  // from this encoder: no v3 leg here can hold native, so it can never matter that the two
+  // implementations resolved `'native'` differently (wrappedNative vs address(0)). Plan invariants
+  // are the first line; `assertNoNativeInV3Path` in the encoder is the second.
+  const nativeLegPlan: ExecutionPlan = compileExecutionPlan(base())
+  const swap = nativeLegPlan.operations.find((op) => op.kind === 'v3-swap')!
+  const mutated: ExecutionPlan = {
+    ...nativeLegPlan,
+    operations: nativeLegPlan.operations.map((op) =>
+      op === swap ? { ...swap, legs: swap.legs.map((leg) => ({ ...leg, currencyOut: 'native' as const })) } : op,
+    ),
+  }
+  expect(() => encodeExecutionPlan(mutated, deployment, DEADLINE)).toThrow(UnsupportedRouteError)
+})
+
+// ---------------------------------------------------------------------------
+// R6(a): the command/action bytes are ASSERTED against the SDKs, not just
+// annotated as having been checked once.
+//
+// `COMMAND` and `V4_ACTION` carried "// Values verified against
+// universal-router-sdk's CommandType" — a claim about a past reading of another
+// repository, which nothing re-checks when that repository changes. A command
+// byte that moved between router versions is a fund-loss bug, so the check runs
+// every time. Both SDKs are devDependencies and stay that way (C4-P4): this
+// file is the only importer, exactly as `manifest.parity.test.ts` is for
+// `sdk-core`.
+// ---------------------------------------------------------------------------
+
+test('R6: every ur-2.0 COMMAND byte equals universal-router-sdk CommandType', () => {
+  for (const [name, byte] of Object.entries(COMMAND)) {
+    expect(CommandType[name as keyof typeof CommandType], `COMMAND.${name}`).toBe(byte)
+  }
+})
+
+test('R6: every V4_ACTION byte equals v4-sdk Actions', () => {
+  for (const [name, byte] of Object.entries(V4_ACTION)) {
+    expect(Actions[name as keyof typeof Actions], `V4_ACTION.${name}`).toBe(byte)
+  }
+})
+
+test('R6: the parity loops are not vacuous — both tables are non-empty and every name resolves', () => {
+  // A loop over an empty object passes silently, and so does one whose keys are all absent from the
+  // enum (`undefined === undefined` would never be reached, but a typo'd lookup returning
+  // `undefined` on BOTH sides is the failure mode a `toBe` between two lookups would hide).
+  expect(Object.keys(COMMAND).length).toBeGreaterThan(0)
+  expect(Object.keys(V4_ACTION).length).toBeGreaterThan(0)
+  for (const name of Object.keys(COMMAND)) expect(CommandType[name as keyof typeof CommandType]).toBeDefined()
+  for (const name of Object.keys(V4_ACTION)) expect(Actions[name as keyof typeof Actions]).toBeDefined()
 })
