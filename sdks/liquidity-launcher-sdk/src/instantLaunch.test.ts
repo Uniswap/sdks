@@ -42,18 +42,18 @@ const BUILD_PARAMS = {
 describe('getInstantLaunchAddresses', () => {
   it('resolves the fees-on Robinhood (4663) stack from the canonical dev-README deployment', () => {
     const addresses = getInstantLaunchAddresses(CHAIN_ID, { creatorFeesEnabled: true })
-    expect(addresses?.strategy).toBe(getAddress('0x3f556B542105D5EFBBefe7C766a4919C76B960Fb'))
-    expect(addresses?.feeSplitter).toBe(getAddress('0x6CC1b74Fc1BE1ff373Fa07f3381856f38103e653'))
-    expect(addresses?.beneficiaryVault).toBe(getAddress('0xa5889CaFCB1757218eA71730bee381Cc2a3F2CCC'))
-    expect(addresses?.compoundingClaimRecipient).toBe(getAddress('0x666DA63451A502A323677C2Ef5F763181358be9b'))
+    expect(addresses?.strategy).toBe(getAddress('0x23f8209572b4a1C2AD88A42749E830791Fb027f1'))
+    expect(addresses?.feeSplitter).toBe(getAddress('0xeFF166AAf189323c58dc27eD1206EB2C37FaACDf'))
+    expect(addresses?.beneficiaryVault).toBe(getAddress('0xd35E9CA72F64C7F93BE30fad67524323396B36D7'))
+    expect(addresses?.compoundingClaimRecipient).toBe(getAddress('0xf9526Dd3361fe0ba6b7a99533ed471D3E808E99a'))
     expect(addresses?.creatorFeesEnabled).toBe(true)
   })
 
   it('resolves the fees-off Robinhood stack to its own strategy + splitter, same singletons', () => {
     const on = getInstantLaunchAddresses(CHAIN_ID, { creatorFeesEnabled: true })
     const off = getInstantLaunchAddresses(CHAIN_ID, { creatorFeesEnabled: false })
-    expect(off?.strategy).toBe(getAddress('0x36bdB859518C89F764337cd5C24762d2Aa650f3C'))
-    expect(off?.feeSplitter).toBe(getAddress('0xDF50f4ea2207F9D2A753a3DaE729B36FDEF13b23'))
+    expect(off?.strategy).toBe(getAddress('0xAD44D55E7f8337C3cE113fBb591486E85be104b2'))
+    expect(off?.feeSplitter).toBe(getAddress('0x222D6d4f1ce59b0d48D5505114eC8Addc90A4359'))
     expect(off?.strategy).not.toBe(on!.strategy)
     expect(off?.feeSplitter).not.toBe(on!.feeSplitter)
     expect(off?.beneficiaryVault).toBe(on!.beneficiaryVault)
@@ -179,8 +179,10 @@ describe('buildInstantLaunchTransaction', () => {
       distribution.configData
     )
     // The config field is mandatory on-chain even though the fees-off instance ignores it; the
-    // placeholder must be non-zero and not the launcher.
+    // placeholder must be non-zero and not the launcher. Independent literal pin: the current 4663
+    // CompoundingClaimRecipient (2026-08-05 full redeploy).
     expect(config.feeBeneficiary).toBe(DISABLED_CREATOR_FEE_BENEFICIARY)
+    expect(DISABLED_CREATOR_FEE_BENEFICIARY).toBe(getAddress('0xf9526Dd3361fe0ba6b7a99533ed471D3E808E99a'))
     expect(DISABLED_CREATOR_FEE_BENEFICIARY).not.toBe(ZERO_ADDRESS)
     expect(DISABLED_CREATOR_FEE_BENEFICIARY).not.toBe(offStack!.liquidityLauncher)
   })
@@ -224,10 +226,10 @@ describe('deployment registry selectors', () => {
   it('getInstantLaunchStrategy keys the variant by creatorFeesEnabled', () => {
     const on = getInstantLaunchStrategy(CHAIN_ID, { creatorFeesEnabled: true })
     const off = getInstantLaunchStrategy(CHAIN_ID, { creatorFeesEnabled: false })
-    expect(on?.strategy).toBe(getAddress('0x3f556B542105D5EFBBefe7C766a4919C76B960Fb'))
+    expect(on?.strategy).toBe(getAddress('0x23f8209572b4a1C2AD88A42749E830791Fb027f1'))
     expect(on?.creatorFeeNativeBps).toBe(4000)
     expect(on?.creatorFeeTokenBps).toBe(0)
-    expect(off?.strategy).toBe(getAddress('0x36bdB859518C89F764337cd5C24762d2Aa650f3C'))
+    expect(off?.strategy).toBe(getAddress('0xAD44D55E7f8337C3cE113fBb591486E85be104b2'))
     expect(off?.creatorFeeNativeBps).toBe(0)
   })
 
