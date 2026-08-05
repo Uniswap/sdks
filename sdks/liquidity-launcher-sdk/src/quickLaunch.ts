@@ -99,6 +99,28 @@ export const QUICK_LAUNCH_GRADUATION_FDV_TOLERANCE_RATIO = 0.1
  */
 export const QUICK_LAUNCH_LP_FEE = 2_500
 
+/**
+ * V4 graduation-pool tick spacing, as passed in `MigratorParameters.poolParameters` since the
+ * 2026-08-05 chain-4663 full redeploy. Deliberately NOT the generic {@link feeToTickSpacing}
+ * derivation, which yields 50 for the {@link QUICK_LAUNCH_LP_FEE} tier: the post-redeploy
+ * Initialize census shows every quick-launch graduation pool minted at spacing 25 (295 pools in
+ * the redeploy's first day, zero new pools at 50), so the preset states the observed value rather
+ * than a formula the launch flow no longer follows.
+ */
+export const QUICK_LAUNCH_POOL_TICK_SPACING = 25
+
+/**
+ * Every tick spacing a quick-launch graduation pool has ever been minted at, newest first — the
+ * append-only grandfather set (same shape as {@link QUICK_LAUNCH_ALLOWED_GRADUATION_FDV_USD}).
+ * Pools are permanent, so a superseded spacing never leaves this list; routing/discovery consumers
+ * deriving a token's candidate launch pools must race a `(QUICK_LAUNCH_LP_FEE, spacing)` key for
+ * EVERY entry, because the token address alone cannot say which generation minted the pool.
+ * - 25: since the 2026-08-05 chain-4663 full redeploy ({@link QUICK_LAUNCH_POOL_TICK_SPACING}).
+ * - 50: every earlier generation — the {@link feeToTickSpacing} derivation of the fee, kept as a
+ *   literal so a future change to that formula cannot rewrite the historical record.
+ */
+export const QUICK_LAUNCH_ALLOWED_POOL_TICK_SPACINGS = [QUICK_LAUNCH_POOL_TICK_SPACING, 50] as const
+
 /** V4 LP price-range strategy: full-range + concentrated. */
 export const QUICK_LAUNCH_LP_RANGE: PriceRangeKind = 'CONCENTRATED_FULL_RANGE'
 
@@ -242,6 +264,8 @@ export interface QuickLaunchPreset {
   readonly graduationFdvUsd: number
   readonly lp: {
     readonly fee: number
+    /** Graduation-pool tick spacing — see {@link QUICK_LAUNCH_POOL_TICK_SPACING}. */
+    readonly tickSpacing: number
     readonly range: PriceRangeKind
     readonly lockMode: QuickLaunchLockMode
     /** Locked forever. */
@@ -270,6 +294,7 @@ export const QUICK_LAUNCH_PRESET: QuickLaunchPreset = {
   graduationFdvUsd: QUICK_LAUNCH_GRADUATION_FDV_USD,
   lp: {
     fee: QUICK_LAUNCH_LP_FEE,
+    tickSpacing: QUICK_LAUNCH_POOL_TICK_SPACING,
     range: QUICK_LAUNCH_LP_RANGE,
     lockMode: QUICK_LAUNCH_LOCK_MODE,
     permanentTimelock: true,
