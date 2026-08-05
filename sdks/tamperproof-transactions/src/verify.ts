@@ -19,6 +19,7 @@ import {
 } from "./constants/errors.js";
 import { fromHex } from "./utils/hex.js";
 import { processTxtRecordData } from "./utils/txtRecord.js";
+import { EnforcementMode } from "./generate.js";
 import dohjs from "dohjs";
 
 const { DohResolver } = dohjs;
@@ -28,6 +29,15 @@ const TIMEOUT = 1000;
 const MAX_MANIFEST_BYTES = 64 * 1024; // 64KB
 const MAX_TWIST_PATH = 1024;
 const PUBLIC_KEY_FORMAT = "spki";
+
+export type ManifestData = {
+  publicKeys: Array<{
+    id: string;
+    alg: string;
+    publicKey: string;
+  }>;
+  enforcement?: EnforcementMode;
+};
 
 export async function verifyAsyncDns(
   calldata: string,
@@ -122,13 +132,7 @@ export async function verifyAsyncJson(
     throw new Error(ERROR_MANIFEST_TOO_LARGE);
   }
 
-  const data = (await response.json()) as {
-    publicKeys: Array<{
-      id: string;
-      alg: string;
-      publicKey: string;
-    }>;
-  };
+  const data = (await response.json()) as ManifestData;
   const matchingKeys = data.publicKeys.filter((pk) => pk.id === id.toString());
 
   if (matchingKeys.length === 0) {
