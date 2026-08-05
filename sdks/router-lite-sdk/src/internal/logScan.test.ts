@@ -4,6 +4,7 @@ import {
   BACKOFF_BASE_MS,
   BACKOFF_MAX_MS,
   CHUNK_REGROWTH_SUCCESSES,
+  DESCENT_TIMEOUT_FALLBACK,
   MAX_BACKOFF_TOTAL_MS,
   MAX_REQUESTS_PER_SCAN,
   MAX_SCAN_WINDOW,
@@ -115,6 +116,56 @@ test('S1: bisection from a wide start converges on a hard cap in ~log2 failed pr
   expect(spans[0]).toBe(MAX_SCAN_WINDOW)
   expect(spans[spans.length - 1]).toBe(1_953n) // and it lands just under the cap, not at MIN_CHUNK
   expect(spans.every((s, i) => i === 0 || s === spans[i - 1]! / 2n)).toBe(true) // every step is a halving
+})
+
+test('S1: a TIMEOUT-shaped refusal collapses the window in ONE step instead of thirteen halvings', async () => {
+  // The halving ladder prices every refusal as free. A provider that hangs until viem gives up does
+  // not refuse for free: viem has already retried three times at ~10s before this scanner sees the
+  // error, so 13 halvings from MAX_SCAN_WINDOW is ~9 minutes of zero progress. One expensive failure
+  // must buy the whole descent.
+  const { client, filters } = stub((filter) => {
+    if (span(filter) > DESCENT_TIMEOUT_FALLBACK) {
+      const err = new Error('The request took too long to respond.')
+      err.name = 'TimeoutError' // viem's real timeout class — `classifyRpcError` reads the name
+      throw err
+    }
+    return []
+  })
+
+  const res = await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 20_000_000n }, { sleep: recorder().sleep })
+
+  const spans = filters.map(span)
+  // The DESCENT is what this measures — every request before the first the endpoint accepted.
+  // (Steady-state regrowth probes afterwards are the pre-existing 1-per-CHUNK_REGROWTH_SUCCESSES
+  // trade, unchanged by S1 and bounded by the test below it.)
+  const descent = spans.slice(0, spans.findIndex((s) => s <= DESCENT_TIMEOUT_FALLBACK))
+  expect(descent).toHaveLength(1) // ONE timeout paid, not thirteen
+  expect(spans[0]).toBe(MAX_SCAN_WINDOW) // it still starts wide...
+  expect(spans[1]).toBe(DESCENT_TIMEOUT_FALLBACK) // ...and lands on the fallback in a single step
+  expect(res.complete).toBe(true)
+})
+
+test('S1: a timeout BELOW the fallback width halves as usual — the collapse fires at most once', async () => {
+  // The guard is `chunkSize > DESCENT_TIMEOUT_FALLBACK`, so a stricter endpoint that also times out at
+  // 100,000 cannot get stuck re-collapsing to a width it already refused: ordinary halving resumes and
+  // every termination guarantee below is untouched.
+  const { client, filters } = stub((filter) => {
+    if (span(filter) > 20_000n) {
+      const err = new Error('The request took too long to respond.')
+      err.name = 'TimeoutError'
+      throw err
+    }
+    return []
+  })
+
+  const res = await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 20_000_000n }, { sleep: recorder().sleep })
+
+  const spans = filters.map(span)
+  expect(spans.slice(0, 2)).toEqual([MAX_SCAN_WINDOW, DESCENT_TIMEOUT_FALLBACK]) // collapse, once
+  expect(spans[2]).toBe(DESCENT_TIMEOUT_FALLBACK / 2n) // then halving, not another collapse
+  expect(spans[3]).toBe(DESCENT_TIMEOUT_FALLBACK / 4n)
+  expect(spans[4]).toBe(12_500n) // the first width this endpoint serves
+  expect(res.complete).toBe(true)
 })
 
 test('S1: regrowth ratchets PAST the old 10k ceiling, back up to the width the endpoint really serves', async () => {
@@ -492,7 +543,7 @@ test('R2 x S1: a cap declared partway DOWN the descent is jumped to, cutting the
   const ac = new AbortController()
   const { client, filters } = stub((filter) => {
     const width = span(filter)
-    if (width > 1_000_000n) throw new Error('server error') // no cap stated: keep halving
+    if (width > 1_000_000n) throw new Error('invalid params') // no cap stated, not transport: keep halving
     if (width > declaredWidth) throw providerFailure('eth.drpc.org') // now it states one
     ac.abort() // the descent is the subject; stop once it lands
     return []

@@ -5,6 +5,7 @@ import {
   BACKOFF_BASE_MS,
   BACKOFF_MAX_MS,
   CHUNK_REGROWTH_SUCCESSES,
+  DESCENT_TIMEOUT_FALLBACK,
   MAX_BACKOFF_TOTAL_MS,
   MAX_CONSECUTIVE_MIN_FAILURES,
   MAX_REQUESTS_PER_SCAN,
@@ -14,7 +15,7 @@ import {
 import type { BlockRange, LogQuery } from '../types'
 
 import { maxBig, mergeRanges, minBig } from './ranges'
-import { parseDeclaredCap } from './rpc'
+import { classifyRpcError, parseDeclaredCap } from './rpc'
 import type { Semaphore } from './rpc'
 
 // viem types each topic slot as `Hex | Hex[] | null` to allow OR-matching on
@@ -46,8 +47,21 @@ export function narrowTopics(topics: (Hex | Hex[] | null)[]): (Hex | null)[] {
 // nothing, while a per-request latency that is overhead-dominated rather than
 // width-dominated (456ms for 10k blocks, 89ms for 1M, measured live) makes
 // every one of those extra round trips pure loss. Being refused is how the
-// endpoint's real cap gets learned, and a refusal is cheap: `eth_getLogs`
-// rejects an over-wide span with a validation error, not with work.
+// endpoint's real cap gets learned.
+//
+// NOT EVERY REFUSAL IS CHEAP, WHICH IS WHY THE DESCENT IS NOT PURELY log2. A
+// provider that VALIDATES the span rejects an over-wide window without doing
+// any work, and for those a 13-step halving ladder costs 13 round trips of
+// nothing. A provider that instead EXECUTES the query and then refuses (a
+// result-size cap) — or one that simply hangs until it times out, which this
+// repo has captured drpc doing on archive reads — bills real time for every
+// step, and viem retries a timeout three times at ~10s before the error even
+// reaches this loop: a naive ladder there is minutes of zero progress. So the
+// catch below classifies (`internal/rpc.ts#classifyRpcError`) and, on a
+// transport/unavailable failure at a wide window, drops straight to
+// `DESCENT_TIMEOUT_FALLBACK` rather than halving — one expensive failure buys
+// the whole descent. A caller who already knows the cap skips all of it with
+// `logChunkBlocks`.
 //
 // SOME PROVIDERS DO SAY (R2). blastapi, drpc and alchemy all state the window
 // that would have worked, in the error text, and
@@ -221,7 +235,14 @@ export async function scanLogs(
       } finally {
         opts.semaphore?.release()
       }
-      logs.push(...result.map((log) => formatLog(log as never) as Log))
+      // A for-of push, NOT `logs.push(...result.map(...))`. Spreading an array into an argument list
+      // materializes one call argument per element, and V8 throws `RangeError: Maximum call stack
+      // size exceeded` somewhere north of ~125k arguments — so on Node (this package declares
+      // `engines.node >= 18`) a single wide window over a busy contract could blow up the scan on
+      // SUCCESS, after the request was paid for. Bun's JSC tolerates far larger spreads, which is
+      // exactly why the unit suite could never catch it. Wide windows make the log counts that reach
+      // that limit routine rather than theoretical.
+      for (const log of result) logs.push(formatLog(log as never) as Log)
       coveredRaw.push({ fromBlock: chunkStart, toBlock: cursor })
       cursor = chunkStart - 1n
       consecutiveMinFailures = 0
@@ -262,6 +283,24 @@ export async function scanLogs(
         chunkSize = capBlocks
         consecutiveMinFailures = 0
         continue
+      }
+
+      // --- the expensive-refusal fast path (S1) ---------------------------------------------
+      // Halving assumes a refusal is free. It is, for a provider that VALIDATES the span — and it is
+      // not, for one that executed the query before refusing (a result-size cap) or simply hung until
+      // viem gave up (a timeout, which viem has already retried 3 times at ~10s before this catch even
+      // runs). On those, thirteen halvings from MAX_SCAN_WINDOW is minutes of no progress. So when the
+      // failure classifies as transport/unavailable — precisely those two shapes — collapse the window
+      // to DESCENT_TIMEOUT_FALLBACK in one step. Guarded by `>` so it can fire at most once per
+      // descent and can only ever NARROW: below that width, ordinary halving takes over and every
+      // termination guarantee is exactly as it was.
+      if (chunkSize > DESCENT_TIMEOUT_FALLBACK) {
+        const kind = classifyRpcError(err)
+        if (kind === 'transport' || kind === 'unavailable') {
+          chunkSize = DESCENT_TIMEOUT_FALLBACK
+          consecutiveMinFailures = 0
+          continue
+        }
       }
 
       if (chunkSize <= MIN_CHUNK) {

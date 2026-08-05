@@ -167,6 +167,11 @@ export function parseDeclaredCap(err: unknown): DeclaredCap {
     }
   }
   if (declared.capBlocks === undefined && declared.retryRange !== undefined) {
+    // A suggested RANGE is a width, not a policy: it is what the provider computed would fit under a
+    // RESULT cap at this query's density right here, so it is only as durable as that density. It can
+    // therefore come back absurdly narrow — a range under `MIN_CHUNK` is only plausible at densities
+    // above ~20k logs per 128 blocks — and the scanner treats such a width exactly as it treats a
+    // declared block cap that low: give the sub-range up rather than chase it (`logScan.ts`).
     declared.capBlocks = declared.retryRange.toBlock - declared.retryRange.fromBlock + 1n
   }
   return declared

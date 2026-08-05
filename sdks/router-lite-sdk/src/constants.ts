@@ -356,13 +356,23 @@ export function maxPlausibleHeadRegression(reorgOverlapBlocks: bigint): bigint {
  * full history of every chain this package ships a manifest for except mainnet, so most scans start
  * at `remaining range` and finish in one request.
  *
- * AN OVERSIZED START COSTS A HANDFUL OF CHEAP FAILED PROBES, NOT A SLOW SCAN. Failures bisect down in
- * ~log2 steps ({@link MIN_CHUNK} is the floor), so the worst case — a hard 2k-block-cap provider — is
- * ~13 halvings of failed probes before landing on a width that clears. Those 13 are fast (a rejected
- * `eth_getLogs` is a validation error, not a query), they happen ONCE (the within-scan ratchet and the
- * index's coverage cache both remember), and providers that DECLARE their cap skip the ladder
- * entirely — `internal/rpc.ts#parseDeclaredCap` jumps the window straight to the stated width on the
- * way down. Against that, the old 10k start paid ~100 needless round trips on every generous endpoint,
+ * AN OVERSIZED START COSTS A HANDFUL OF FAILED PROBES, NOT A SLOW SCAN — BUT ONLY BECAUSE THE DESCENT
+ * IS NOT PURELY log2. Failures bisect down in ~log2 steps ({@link MIN_CHUNK} is the floor), so a hard
+ * 2k-block-cap provider is ~13 halvings before landing on a width that clears, and they happen ONCE
+ * (the within-scan ratchet and the index's coverage cache both remember). Whether those 13 are cheap
+ * depends entirely on HOW the provider refuses:
+ *
+ *   * A SPAN VALIDATOR rejects an over-wide window without touching the chain. 13 of those is 13 fast
+ *     round trips — genuinely cheap, and the case this ceiling was sized for.
+ *   * A RESULT-SIZE CAP executes the query first and refuses on the way out, and a TIMEOUT-SHAPED
+ *     endpoint (drpc's archive reads, captured in this repo) bills the full wait — which viem then
+ *     multiplies by its own retries (3 × ~10s) before the error even reaches the scanner. A naive
+ *     ladder there is minutes of zero progress, not a handful of probes.
+ *
+ * {@link DESCENT_TIMEOUT_FALLBACK} is what makes the second class affordable, and
+ * `internal/rpc.ts#parseDeclaredCap` lets providers that DECLARE their cap skip the ladder entirely
+ * (the window jumps straight to the stated width on the way down). Against all of that, the old 10k
+ * start paid ~2,600 needless round trips per cold mainnet history scan, on every generous endpoint,
  * every scan, forever.
  *
  * `logChunkBlocks` IS A CEILING OVERRIDE, NOT A MANDATORY START (C4-P6). A caller who KNOWS their
@@ -372,6 +382,30 @@ export function maxPlausibleHeadRegression(reorgOverlapBlocks: bigint): bigint {
  * find the truth.
  */
 export const MAX_SCAN_WINDOW = 16_000_000n
+
+/**
+ * The width the descent drops STRAIGHT to when a wide window fails in a way that cost the provider
+ * real time, rather than being cheaply refused — instead of halving toward it one expensive step at
+ * a time.
+ *
+ * HALVING PRICES A REFUSAL AS FREE, AND FOR SOME PROVIDERS IT IS NOT. `internal/logScan.ts`'s catch
+ * classifies the failure (`internal/rpc.ts#classifyRpcError`); a `transport` or `unavailable` verdict
+ * covers exactly the expensive shapes — a timeout (the endpoint hung until viem gave up, having
+ * already retried 3 times at ~10s apiece: ~40s for ONE probe, so a 13-step ladder from
+ * {@link MAX_SCAN_WINDOW} is ~9 minutes of no progress) and a result-size cap (the endpoint executed
+ * the query and refused on the way out). This package documents drpc doing the former on archive
+ * reads. One such failure now costs ONE narrowing instead of thirteen.
+ *
+ * 100,000 IS A WIDTH ALMOST NOTHING REFUSES, WITHOUT BEING TIMID. It is 10x the old fixed 10k start
+ * and comfortably above every documented provider ceiling this package knows of (Alchemy/Infura/
+ * QuickNode's 10k filtered-query limit, Ankr's ~3k, blastapi's public 10) — so it lands in one step
+ * where the ladder would have taken ~7 — while still being narrow enough that a busy contract's
+ * result cap has a real chance of clearing it. If it does not clear, ordinary halving takes over from
+ * there (this jump can fire at most once per descent, since it only applies while the window is
+ * strictly wider than this), so nothing about termination or the request budget depends on the guess
+ * being right.
+ */
+export const DESCENT_TIMEOUT_FALLBACK = 100_000n
 
 /**
  * Floor on the window. Below this a scan is no longer usefully making progress — 128 blocks is 4x

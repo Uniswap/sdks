@@ -135,14 +135,15 @@ export type CreateRouterOptions = {
    * scan for, as both the starting window and the regrowth ceiling (see
    * `internal/logScan.ts#scanLogs`) (C4-P6). Default: {@link MAX_SCAN_WINDOW} (16,000,000n), the
    * widest single request measured served; a scan then starts at `min(remaining range, ceiling)` and
-   * BISECTS DOWN on refusal, so a generous endpoint serves a cold history scan in a couple of
-   * requests instead of the ~100 a fixed 10k window used to cost.
+   * BISECTS DOWN on refusal, so a generous endpoint serves a cold mainnet history scan in ~2 requests
+   * instead of the ~2,600 a fixed 10,000-block window used to cost.
    *
    * Pass it when you KNOW your provider's cap and would rather not pay the descent: Ankr's public
    * endpoint caps `eth_getLogs` around 3,000 blocks, so `logChunkBlocks: 3_000n` pins the ceiling
    * there and every scan starts at a width that clears. Leave it unset and the scanner discovers the
-   * cap itself, at a cost of a few fast rejections per scan (bounded by ~log2 of the range, and
-   * skipped entirely for providers that state their cap in the error — see `internal/rpc.ts`).
+   * cap itself, at a cost of a few rejections per scan — bounded by ~log2 of the range, skipped
+   * entirely for providers that state their cap in the error, and collapsed to a single narrowing for
+   * providers whose refusals are expensive rather than instant (`constants.ts#DESCENT_TIMEOUT_FALLBACK`).
    */
   logChunkBlocks?: bigint
 }

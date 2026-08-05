@@ -386,10 +386,15 @@ itself):
   sails through a span a busy one cannot), and because per-request latency is dominated by the round
   trip rather than the width: measured live on a keyed mainnet endpoint, a 10,000-block window cost
   456ms per request and a 1,000,000-block window cost 89ms. Discovering the real width therefore pays
-  for itself immediately; the descent costs a handful of fast rejections (bounded by ~log2 of the
-  range, and skipped entirely for the providers that state their cap in the error text). Pass this
-  when you already KNOW your provider's cap and would rather not pay the descent — Ankr's public
-  endpoint caps `eth_getLogs` around 3,000 blocks:
+  for itself immediately, and the descent is bounded by ~log2 of the range. How much that descent
+  actually costs depends on how the provider refuses: one that **validates the span** rejects an
+  over-wide window instantly, and those probes are free in all but round trips; one that **executes
+  the query first** (a result-size cap) or **hangs until it times out** (drpc's archive reads do this,
+  and viem retries a timeout three times before the scanner ever sees it) bills real time per step, so
+  the scanner classifies the failure and collapses straight to a conservative 100,000-block window
+  instead of halving thirteen times. Providers that state their cap in the error text skip the descent
+  entirely. Pass this option when you already KNOW your provider's cap and would rather not pay any of
+  it — Ankr's public endpoint caps `eth_getLogs` around 3,000 blocks:
 
 ```ts
 // Fronting a stricter/shared-quota endpoint with a known eth_getLogs cap: lower both.
