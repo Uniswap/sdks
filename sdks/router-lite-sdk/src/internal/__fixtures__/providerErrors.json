@@ -1,17 +1,36 @@
 {
-  "ethereum.publicnode.com": {
-    "source": "live-capture",
-    "capturedAt": "2026-08-05T01:48:44.712Z",
-    "message": "HTTP request failed.\n\nStatus: 403\nURL: https://ethereum.publicnode.com/\nRequest body: {\"method\":\"eth_getLogs\",\"params\":[{\"address\":\"0x000000000004444c5dc75cB358380D2e3dE08A90\",\"fromBlock\":\"0x187e64b\",\"toBlock\":\"0x187ee1b\"}]}\n\nDetails: {\"code\":-32602,\"message\":\"Archive requests require a personal token. Get one at: https://www.allnodes.com/publicnode\"}\nVersion: viem@2.47.2"
-  },
-  "eth-mainnet.public.blastapi.io": {
-    "source": "live-capture",
-    "capturedAt": "2026-08-05T01:49:46.735Z",
-    "message": "HTTP request failed.\n\nStatus: 400\nURL: https://eth-mainnet.public.blastapi.io/\nRequest body: {\"method\":\"eth_getLogs\",\"params\":[{\"address\":\"0x000000000004444c5dc75cB358380D2e3dE08A90\",\"fromBlock\":\"0x187e655\",\"toBlock\":\"0x187ee25\"}]}\n\nDetails: {\"code\":-32600,\"message\":\"You can make eth_getLogs requests with up to a 10 block range. Based on your parameters, this block range should work: [0x187e655, 0x187e65e]\"}\nVersion: viem@2.47.2"
-  },
-  "eth.drpc.org": {
-    "source": "live-capture",
-    "capturedAt": "2026-08-05T03:11:25.461Z",
-    "message": "Invalid parameters were provided to the RPC method.\nDouble check you have provided the correct parameters.\n\nURL: https://eth.drpc.org\nRequest body: {\"method\":\"eth_getLogs\",\"params\":[{\"address\":\"0x000000000004444c5dc75cB358380D2e3dE08A90\",\"fromBlock\":\"0x187e7f1\",\"toBlock\":\"0x187efc1\"}]}\n\nDetails: query exceeds max results 20000, retry with the range 25683953-25685027\nVersion: viem@2.47.2"
-  }
+ "ethereum.publicnode.com": {
+  "source": "live-capture",
+  "capturedAt": "2026-08-05T01:48:44.712Z",
+  "message": "HTTP request failed.\n\nStatus: 403\nURL: https://ethereum.publicnode.com/\nRequest body: {\"method\":\"eth_getLogs\",\"params\":[{\"address\":\"0x000000000004444c5dc75cB358380D2e3dE08A90\",\"fromBlock\":\"0x187e64b\",\"toBlock\":\"0x187ee1b\"}]}\n\nDetails: {\"code\":-32602,\"message\":\"Archive requests require a personal token. Get one at: https://www.allnodes.com/publicnode\"}\nVersion: viem@2.47.2"
+ },
+ "eth-mainnet.public.blastapi.io": {
+  "source": "live-capture",
+  "capturedAt": "2026-08-05T01:49:46.735Z",
+  "message": "HTTP request failed.\n\nStatus: 400\nURL: https://eth-mainnet.public.blastapi.io/\nRequest body: {\"method\":\"eth_getLogs\",\"params\":[{\"address\":\"0x000000000004444c5dc75cB358380D2e3dE08A90\",\"fromBlock\":\"0x187e655\",\"toBlock\":\"0x187ee25\"}]}\n\nDetails: {\"code\":-32600,\"message\":\"You can make eth_getLogs requests with up to a 10 block range. Based on your parameters, this block range should work: [0x187e655, 0x187e65e]\"}\nVersion: viem@2.47.2"
+ },
+ "eth.drpc.org": {
+  "source": "live-capture",
+  "capturedAt": "2026-08-05T03:11:25.461Z",
+  "message": "Invalid parameters were provided to the RPC method.\nDouble check you have provided the correct parameters.\n\nURL: https://eth.drpc.org\nRequest body: {\"method\":\"eth_getLogs\",\"params\":[{\"address\":\"0x000000000004444c5dc75cB358380D2e3dE08A90\",\"fromBlock\":\"0x187e7f1\",\"toBlock\":\"0x187efc1\"}]}\n\nDetails: query exceeds max results 20000, retry with the range 25683953-25685027\nVersion: viem@2.47.2"
+ },
+ "base-mainnet.quiknode.pro (unbatched)": {
+  "source": "live-capture",
+  "capturedAt": "2026-08-05T19:22:08.000Z",
+  "note": "Base (8453) v3 factory PoolCreated adjacency query, 1M-block window. Keyed URL REDACTED. Unbatched http transport: the cap arrives as an HTTP 413 whose body carries the JSON-RPC error.",
+  "message": "HTTP request failed.\n\nStatus: 413\nURL: https://base-mainnet.quiknode.pro/<redacted>\nRequest body: {\"method\":\"eth_getLogs\",\"params\":[{\"address\":\"0x33128a8fC17869897dcE68Ed026d694621f6FDfD\",\"topics\":[\"0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118\",\"0x0000000000000000000000004200000000000000000000000000000000000006\",null,null],\"fromBlock\":\"0x2e555db\",\"toBlock\":\"0x2f4981b\"}]}\n\nDetails: {\"code\":-32614,\"message\":\"eth_getLogs is limited to a 10,000 range\"}\nVersion: viem@2.47.2"
+ },
+ "base-mainnet.quiknode.pro (batched)": {
+  "source": "live-capture",
+  "capturedAt": "2026-08-05T19:22:09.000Z",
+  "note": "The SAME cap through a `batch: true` transport: HTTP 200, no status anywhere, `code: -32614` on the cause. This is the shape `cli/` hit, and the one that used to classify as `execution`.",
+  "message": "RPC Request failed.\n\nURL: https://base-mainnet.quiknode.pro/<redacted>\nRequest body: {\"method\":\"eth_getLogs\",\"params\":[{\"address\":\"0x33128a8fC17869897dcE68Ed026d694621f6FDfD\",\"topics\":[\"0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118\",\"0x0000000000000000000000004200000000000000000000000000000000000006\",null,null],\"fromBlock\":\"0x2e555db\",\"toBlock\":\"0x2f4981b\"}]}\n\nDetails: eth_getLogs is limited to a 10,000 range\nVersion: viem@2.47.2",
+  "causeCode": -32614
+ },
+ "eth-mainnet.g.alchemy.com": {
+  "source": "live-capture",
+  "capturedAt": "2026-08-05T21:02:00.000Z",
+  "note": "Mainnet v2 factory PairCreated token0=WETH over a 16M-block window. Keyed URL REDACTED. THE IMPORTANT CAPTURE FOR capKind: it states a 10,000 BLOCK RANGE and, in the same breath, suggests an ~8,000,000-block retry range for the same query \u2014 so the 10,000 is one of two offered modes, NOT a span policy. Clamping a scan ceiling to it pins every mainnet scan 800x too narrow.",
+  "message": "HTTP request failed.\n\nStatus: 400\nURL: https://eth-mainnet.g.alchemy.com/<redacted>\nRequest body: {\"method\":\"eth_getLogs\",\"params\":[{\"address\":\"0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f\",\"topics\":[\"0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9\",\"0x000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2\",null],\"fromBlock\":\"0x93e08c\",\"toBlock\":\"0x188048b\"}]}\n\nDetails: {\"code\":-32602,\"message\":\"Log response size exceeded. You can make eth_getLogs requests with up to a 10,000 block range and no limit on the response size, or you can request any block range with a cap of 10K logs in the response. Based on your parameters and the response size limit, this block range should work: [0x93e08c, 0x10df28a]\"}\nVersion: viem@2.47.2"
+ }
 }

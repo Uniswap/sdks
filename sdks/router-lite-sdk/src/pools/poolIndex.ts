@@ -3,6 +3,7 @@ import type { Address } from 'viem'
 import { DEFAULT_REORG_OVERLAP_BLOCKS, HINT_DISCREDIT_FAILURE_BLOCKS, NEGATIVE_CACHE_BLOCKS } from '../constants'
 import { RouterConfigError } from '../errors'
 import { toGraphNode } from '../internal/currency'
+import type { ScanWidthMemory } from '../internal/logScan'
 import { maxBig, mergeRanges } from '../internal/ranges'
 import type { BlockRange, CurrencyRef, PoolRecord, PoolRef, Protocol } from '../types'
 
@@ -137,7 +138,7 @@ function latest(a: bigint | undefined, b: bigint | undefined): bigint | undefine
  * cheapest possible failure mode and infinitely cheaper than silently restoring coverage claims
  * whose meaning has drifted.
  */
-export const POOL_INDEX_SCHEMA_VERSION = 1
+export const POOL_INDEX_SCHEMA_VERSION = 2
 
 /**
  * A serializable, process-independent picture of everything a {@link PoolIndex} learned that is worth
@@ -155,6 +156,13 @@ export const POOL_INDEX_SCHEMA_VERSION = 1
  *    scan, and unlike the pools it cannot be re-derived from anything cheaper than the scan itself.
  *  - `enabledFees`: fee tiers discovered from a factory's own enablement events, per
  *    `${protocol}:${factory}` key. Same argument as coverage at a smaller scale.
+ *  - `learnedScanWidth`: the widest `eth_getLogs` window the endpoint has been seen to serve
+ *    ({@link ScanWidthMemory}). The scanner finds it by refusal — halving down from
+ *    `MAX_SCAN_WINDOW` until something is served — so on a hard-capped endpoint it is worth a run of
+ *    wasted probes per cold process, and it is one small integer. Note what is stored is the HINT
+ *    and not the sibling `declaredScanCap`: a snapshot is keyed by chain, so two providers on one
+ *    chain share this file, and a hint that is wrong for the other provider costs a few regrowth
+ *    doublings while a CEILING that is wrong for it would cap every scan it ever runs.
  *  - `wrappedNative` / `reorgOverlapBlocks`: the two chain facts the index was BUILT with and which
  *    everything above is expressed in terms of. They travel with the data because they are what make
  *    it interpretable: a restored coverage cache maintained under a different reorg depth, or an
@@ -195,6 +203,8 @@ export type PoolIndexSnapshot = {
   coverage: [string, BlockRange[]][]
   /** `[`${protocol}:${factory}`, feeTiers]` — the per-factory enabled-fee cache, as entries. */
   enabledFees: [string, number[]][]
+  /** The widest served `eth_getLogs` window; absent when this index has never run a scan. */
+  learnedScanWidth?: bigint
 }
 
 /**
@@ -318,6 +328,15 @@ function assertSnapshotShape(snap: PoolIndexSnapshot): void {
     if (!Array.isArray(tiers)) bad('an enabledFees entry has no tier array')
     for (const t of tiers) if (typeof t !== 'number') bad('an enabledFees tier is not a number')
   }
+
+  // Compared against, and `minBig`/`maxBig`d with, block counts on the first request of every scan
+  // — the same class of field as `reorgOverlapBlocks` above, and the same failure if it is a string.
+  // Optional: an index that never scanned anything has none, and neither did any snapshot written
+  // before it existed.
+  if (snap.learnedScanWidth !== undefined && typeof snap.learnedScanWidth !== 'bigint') {
+    bad('learnedScanWidth is not a bigint')
+  }
+  if (snap.learnedScanWidth !== undefined && snap.learnedScanWidth < 1n) bad('learnedScanWidth is not positive')
 }
 
 export type PoolIndexOptions = {
@@ -435,10 +454,42 @@ export class PoolIndex {
    */
   private readonly lastTouched = new Map<string, bigint>()
 
+  /**
+   * What the endpoint behind this index has taught the scanner about `eth_getLogs` window widths —
+   * see {@link ScanWidthMemory}, which owns the semantics.
+   *
+   * IT LIVES HERE BECAUSE THIS IS WHERE THE OTHER SCAN BOOKKEEPING LIVES. It is not pool data, and
+   * on a first read it does not belong on a pool index at all — but {@link coverage} is not pool
+   * data either, and the two answer the same question from opposite ends: coverage is WHICH blocks a
+   * scan can skip, this is HOW WIDE a request for the rest of them may be. Both are learned by
+   * scanning, both are worthless to re-derive, and both need to reach the next process by the same
+   * route, so putting them anywhere else would mean a second snapshot with a second lifetime.
+   *
+   * Handed out by reference (see {@link scanWidth}) rather than copied: the scanner updates it in
+   * place as it learns, which is the whole mechanism.
+   */
+  private readonly scanWidthMemory: ScanWidthMemory = {}
+
   constructor(wrappedNative: Address, options?: PoolIndexOptions) {
     this.wrappedNative = wrappedNative
     this.maxPools = options?.maxPools
     this.reorgOverlapBlocks = options?.reorgOverlapBlocks ?? DEFAULT_REORG_OVERLAP_BLOCKS
+  }
+
+  /**
+   * The live {@link ScanWidthMemory} every scan on this index shares — handed out BY REFERENCE, on
+   * purpose: `internal/logScan.ts#scanLogs` reads its starting width from it and writes back what it
+   * learned, so a copy would make each scan's discovery invisible to the next and defeat the point.
+   *
+   * There is exactly one per index, i.e. one per router, i.e. (in practice) one per endpoint, which
+   * is the scope the fact is true at. A caller sharing one index across two DIFFERENT endpoints —
+   * nothing prevents it, and `cli/cache.ts` shares a snapshot between providers on the same chain by
+   * design — gets the narrower endpoint's hint as the wider one's starting guess, which costs the
+   * regrowth ratchet a few doublings and nothing else. That tolerance is exactly why only the hint
+   * and not the declared cap survives {@link toSnapshot}.
+   */
+  scanWidth(): ScanWidthMemory {
+    return this.scanWidthMemory
   }
 
   private link(nodeA: string, nodeB: string, key: string): void {
@@ -842,6 +893,13 @@ export class PoolIndex {
       pools: [...this.pools.values()],
       coverage: [...this.coverage].map(([key, ranges]) => [key, [...ranges]]),
       enabledFees: [...this.fees].map(([key, tiers]) => [key, [...tiers].sort((a, b) => a - b)]),
+      // The HINT only — never `declaredScanCap`. See {@link PoolIndexSnapshot} and
+      // {@link ScanWidthMemory} for why one of the two fields may cross a process boundary and the
+      // other may not. Absent when nothing has been scanned yet, so an index that never ran a scan
+      // still round-trips to the same snapshot it always did.
+      ...(this.scanWidthMemory.learnedScanWidth !== undefined && {
+        learnedScanWidth: this.scanWidthMemory.learnedScanWidth,
+      }),
     }
   }
 
@@ -887,6 +945,7 @@ export class PoolIndex {
     for (const rec of snap.pools) index.upsert(rec)
     for (const [key, ranges] of snap.coverage) index.coverage.set(key, mergeRanges([...ranges]))
     for (const [key, tiers] of snap.enabledFees) index.fees.set(key, new Set(tiers))
+    if (snap.learnedScanWidth !== undefined) index.scanWidthMemory.learnedScanWidth = snap.learnedScanWidth
     return index
   }
 }

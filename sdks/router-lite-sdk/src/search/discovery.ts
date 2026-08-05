@@ -1,7 +1,9 @@
 import type { Address, Log } from 'viem'
 
+import { FEE_DISCOVERY_MAX_REQUESTS } from '../constants'
 import { toGraphNode } from '../internal/currency'
 import { scanLogs } from '../internal/logScan'
+import type { ScanWidthMemory } from '../internal/logScan'
 import { intersectAll, intersectRanges, maxBig, mergeRanges, subtractRanges } from '../internal/ranges'
 import type { Semaphore } from '../internal/rpc'
 import { wave0PairScanBlocks } from '../manifest'
@@ -88,11 +90,24 @@ export function exactPairPlan(run: Run): ExactPairPlan | undefined {
  * directly (rather than the `signal`-style conditional spread) is not an `exactOptionalPropertyTypes`
  * violation — both sides agree an explicit `undefined` is a legal, meaningful "no override".
  */
-function scanOpts(run: Run): { signal?: AbortSignal; semaphore?: Semaphore | undefined; initialChunk?: bigint | undefined } {
+function scanOpts(run: Run): {
+  signal?: AbortSignal
+  semaphore?: Semaphore | undefined
+  initialChunk?: bigint | undefined
+  widthMemory?: ScanWidthMemory | undefined
+} {
   return {
     ...(run.req.signal !== undefined && { signal: run.req.signal }),
     semaphore: run.ctx.semaphore,
     initialChunk: run.ctx.logChunkBlocks,
+    // The index's own scan-width memory, by reference (`PoolIndex.scanWidth`). This is the seam that
+    // makes the width descent a per-endpoint cost instead of a per-scan one: a cold search here runs
+    // SEVEN scans — three protocols x two topic-slot adjacency queries, plus the v4 exact-pair scan —
+    // and each of them used to halve its way down from `MAX_SCAN_WINDOW` to rediscover the same
+    // provider cap the previous one had just found. Threaded from the INDEX rather than from a field
+    // on `SearchContext` because the index is what already outlives the search (and what `cli/`
+    // snapshots to disk), so the memory reaches the next search and the next process for free.
+    widthMemory: run.ctx.index.scanWidth(),
   }
 }
 
@@ -215,10 +230,33 @@ export async function discoverFeeTiers(run: Run, module_: ProtocolModule): Promi
   const factory = query.address
   const ranges = ctx.index.uncovered(module_.id, factory, deployBlock, state.block.number)
 
+  // BUDGETED, unlike every other scan in this file, because of where it runs rather than what it
+  // costs. It is a FULL-HISTORY scan sitting in wave 1 — ahead of the adjacency scans in waves 2 and
+  // 3, which are the ones the search reports coverage for and the ones a two-hop route depends on —
+  // and a wave awaits everything in it. On a provider that serves wide windows the whole history is
+  // a few requests and the budget never binds; on one that caps `eth_getLogs` at 10,000 blocks it is
+  // thousands, and un-budgeted it consumed every remaining millisecond of a `--budget 60s` search,
+  // so neither adjacency wave ever started and all three protocols reported "nothing covered yet".
+  // See `constants.ts#FEE_DISCOVERY_MAX_REQUESTS` for the measurements and for why the bound is on
+  // requests rather than on a recent block window (fee enablements are OLD — Base's newest is 29.8M
+  // blocks back — so there is no window that is both small and where the answers are).
+  //
+  // The shortfall is carried, not lost: coverage is keyed by factory, so the next search resumes
+  // from where this one stopped instead of re-walking, and `speculativeDirect` probes the standard
+  // tiers on every search regardless of what this has reached.
+  //
+  // The budget spans THIS CALL, not each range, which is the difference between a bound and a
+  // multiplier: a warm index's `uncovered` is two ranges (the unscanned gap, plus the re-opened
+  // reorg tail), so a per-range budget quietly bought twice what it said — and on the warm Base run
+  // that was the whole 60s again, with the adjacency waves starved exactly as before.
   const opts = scanOpts(run)
+  let spent = 0
   for (const range of ranges) {
     if (req.signal?.aborted) return
-    const scan = await scanLogs(ctx.client, query, range, opts)
+    const remaining = FEE_DISCOVERY_MAX_REQUESTS - spent
+    if (remaining <= 0) return
+    const scan = await scanLogs(ctx.client, query, range, { ...opts, maxRequests: remaining })
+    spent += scan.requests
     ctx.index.addEnabledFees(module_.id, factory, feeDiscovery.feesFromLogs(scan.logs, ctx.manifest))
     for (const covered of scan.covered) ctx.index.addCoverage(module_.id, factory, covered)
   }

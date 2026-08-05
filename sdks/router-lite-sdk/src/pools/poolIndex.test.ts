@@ -671,6 +671,15 @@ describe('PoolIndexSnapshot', () => {
       ['a createdAtBlock that is a string', () => { const s = valid(); return { ...s, pools: [{ ...s.pools[0]!, createdAtBlock: '7' }] } }],
       ['pools that is not an array', () => ({ ...valid(), pools: {} })],
       ['an enabledFees tier that is not a number', () => ({ ...valid(), enabledFees: [['v3:x', ['500']]] })],
+      // Same class as `reorgOverlapBlocks`: `minBig`/`maxBig`d with block counts on the first
+      // request of every scan, so a string here poisons the scanner rather than the coverage cache.
+      ['a learnedScanWidth that is a string', () => ({ ...valid(), learnedScanWidth: '10000' })],
+      ['a learnedScanWidth that is a number', () => ({ ...valid(), learnedScanWidth: 10000 })],
+      // Zero or negative would make `chunkSize` non-positive, which inverts the chunk arithmetic and
+      // burns the whole per-scan request budget on a range that can never be asked for (the same
+      // failure `createRouter` rejects `logChunkBlocks < MIN_CHUNK` for).
+      ['a learnedScanWidth of zero', () => ({ ...valid(), learnedScanWidth: 0n })],
+      ['a negative learnedScanWidth', () => ({ ...valid(), learnedScanWidth: -1n })],
     ]
 
     for (const [what, build] of cases) {
@@ -699,6 +708,44 @@ describe('PoolIndexSnapshot', () => {
     })
   })
 
+  // -------------------------------------------------------------------------
+  // The scan-width memory (see `internal/logScan.ts#ScanWidthMemory`).
+  //
+  // It rides in the index because it answers the same question the coverage
+  // cache does from the other end — coverage is WHICH blocks a scan can skip,
+  // this is HOW WIDE a request for the rest may be — and because the index is
+  // already what crosses the process boundary.
+  // -------------------------------------------------------------------------
+  test('the width memory is handed out BY REFERENCE, so what a scan learns is what the next scan sees', () => {
+    const idx = new PoolIndex(WETH)
+    expect(idx.scanWidth()).toEqual({})
+    idx.scanWidth().learnedScanWidth = 10_000n
+    // Not a copy: a copy would make every scan's discovery invisible to the next, which is the
+    // entire mechanism.
+    expect(idx.scanWidth().learnedScanWidth).toBe(10_000n)
+  })
+
+  test('the learned width survives a snapshot round trip; the declared cap deliberately does NOT', () => {
+    const idx = new PoolIndex(WETH)
+    idx.scanWidth().learnedScanWidth = 10_000n
+    idx.scanWidth().declaredScanCap = 10_000n
+
+    const restored = PoolIndex.fromSnapshot(parseSnapshot(serializeSnapshot(idx.toSnapshot())))
+
+    expect(restored.scanWidth().learnedScanWidth).toBe(10_000n)
+    // THE ASYMMETRY IS THE POINT. A snapshot is keyed by CHAIN, so two providers on one chain share
+    // it (`cli/cache.ts`). A stale HINT costs the regrowth ratchet a few doublings; a stale CEILING
+    // would cap every scan the other provider ever runs, at up to 1,300x the requests, with nothing
+    // anywhere saying why.
+    expect(restored.scanWidth().declaredScanCap).toBeUndefined()
+  })
+
+  test('an index that never scanned anything writes no width field at all', () => {
+    const snap = new PoolIndex(WETH).toSnapshot()
+    expect('learnedScanWidth' in snap).toBe(false)
+    expect(PoolIndex.fromSnapshot(snap).scanWidth()).toEqual({})
+  })
+
   test('a schemaVersion mismatch is refused outright — no migration, no partial restore', () => {
     const snap = new PoolIndex(WETH).toSnapshot()
     expect(snap.schemaVersion).toBe(POOL_INDEX_SCHEMA_VERSION)
@@ -706,7 +753,9 @@ describe('PoolIndexSnapshot', () => {
     expect(() => PoolIndex.fromSnapshot({ ...snap, schemaVersion: POOL_INDEX_SCHEMA_VERSION + 1 })).toThrow(
       RouterConfigError,
     )
-    expect(() => PoolIndex.fromSnapshot({ ...snap, schemaVersion: 0 })).toThrow(/schemaVersion 0.*reads 1/)
+    expect(() => PoolIndex.fromSnapshot({ ...snap, schemaVersion: 0 })).toThrow(
+      new RegExp(`schemaVersion 0.*reads ${POOL_INDEX_SCHEMA_VERSION}`),
+    )
   })
 
   test('a snapshot is a detached copy — the index it came from can keep changing', () => {

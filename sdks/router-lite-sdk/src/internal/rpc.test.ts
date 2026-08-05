@@ -254,6 +254,45 @@ describe('classifyRpcError — node-state availability (the node could not serve
     expect(classifyRpcError(new Error('unknown blockNumber field in request'))).toBe('execution')
     expect(classifyRpcError(new Error('unknown block 0x1234'))).toBe('unavailable')
   })
+
+  // -------------------------------------------------------------------------
+  // quicknode's span cap, both transports (live captures).
+  //
+  // The BATCHED shape is the one this fixes and the one that mattered: HTTP
+  // 200, no status, no viem transport class, `-32614` on the cause, and a
+  // sentence that matched none of the three message dialects — so it defaulted
+  // to `execution`, i.e. "the EVM rejected this", about a request no EVM ever
+  // saw. Two independent rules now catch it (the code and the phrasing), which
+  // is deliberate: either alone would be enough, and a provider that drops one
+  // of the two must not silently fall back to the default.
+  // -------------------------------------------------------------------------
+  test('quicknode -32614 with no HTTP status classifies unavailable, not execution', () => {
+    const batched = Object.assign(new Error('RPC Request failed.'), {
+      name: 'RpcRequestError',
+      cause: { code: -32614, message: 'eth_getLogs is limited to a 10,000 range' },
+    })
+    expect(classifyRpcError(batched)).toBe('unavailable')
+  })
+
+  test('the code alone is enough, and the phrasing alone is enough', () => {
+    expect(classifyRpcError({ code: -32614, message: 'nope' })).toBe('unavailable')
+    expect(classifyRpcError(new Error('eth_getLogs is limited to a 10,000 range'))).toBe('unavailable')
+  })
+
+  test('the unbatched capture stays transport (HTTP 413) — both are "no evidence about the chain"', () => {
+    // Not `unavailable`, and that is correct rather than a gap: the structured HTTP-status tier runs
+    // first and 413 IS a transport-level refusal. `logScan`'s expensive-refusal fast path and every
+    // report axis treat the two identically; only a diagnostic can tell them apart.
+    const unbatched = Object.assign(new Error(providerErrors['base-mainnet.quiknode.pro (unbatched)'].message), {
+      name: 'HttpRequestError',
+      status: 413,
+    })
+    expect(classifyRpcError(unbatched)).toBe('transport')
+  })
+
+  test('"limited to" prose without a numbered range is NOT node-state', () => {
+    expect(classifyRpcError(new Error('this key is limited to the free tier'))).toBe('execution')
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -574,6 +613,97 @@ describe('parseDeclaredCap — providers that state the window they would serve'
 
   test('an inverted range is discarded rather than turned into a negative width', () => {
     expect(parseDeclaredCap(new Error('retry with the range 2000-1000'))).toEqual({})
+  })
+
+  // -------------------------------------------------------------------------
+  // quicknode says it WITHOUT the word "block" — the miss that cost Base.
+  //
+  // "eth_getLogs is limited to a 10,000 range" states the cap as plainly as
+  // blastapi's "up to a 10 block range" does, and the original pattern (which
+  // required the literal `block range`) matched neither shape it arrives in.
+  // Both are captured live, from the same request, through the two transports
+  // that deliver it differently.
+  // -------------------------------------------------------------------------
+  const QUICKNODE_CAPTURES = [
+    'base-mainnet.quiknode.pro (unbatched)', // an HTTP 413 whose body carries the JSON-RPC error
+    'base-mainnet.quiknode.pro (batched)', //   an HTTP 200 with the text on the RpcRequestError
+  ] as const
+  for (const endpoint of QUICKNODE_CAPTURES) {
+    test(`quicknode Base, ${endpoint}: the stated 10,000 is read as the cap`, () => {
+      const declared = parseDeclaredCap(capturedError(endpoint))
+      expect(declared.capBlocks).toBe(10_000n)
+      // No range is suggested in either shape, and none may be invented: `logScan` uses only a
+      // declared WIDTH, but a fabricated `retryRange` would still be a lie in a diagnostic.
+      expect(declared.retryRange).toBeUndefined()
+    })
+  }
+
+  const LIMITED_TO_PHRASINGS: [string, bigint][] = [
+    ['eth_getLogs is limited to a 10,000 range', 10_000n],
+    ['eth_getLogs is limited to a 10000 range', 10_000n],
+    ['is limited to an 800 range', 800n],
+    ['limited to a 2,000 block range', 2_000n],
+  ]
+  for (const [message, expected] of LIMITED_TO_PHRASINGS) {
+    test(`"${message}" parses as ${expected}`, () => {
+      expect(parseDeclaredCap(new Error(message)).capBlocks).toBe(expected)
+    })
+  }
+
+  // -------------------------------------------------------------------------
+  // capKind: a stated block count is not always a POLICY.
+  //
+  // This is the distinction that keeps `logScan`'s ceiling clamp from being a
+  // catastrophe on the provider it was NOT developed against. Both endpoints
+  // below say "10,000"; only one of them means it.
+  // -------------------------------------------------------------------------
+  test('quicknode states a bare span policy: capKind is "span"', () => {
+    for (const endpoint of QUICKNODE_CAPTURES) {
+      const declared = parseDeclaredCap(capturedError(endpoint))
+      expect(declared.capBlocks).toBe(10_000n)
+      expect(declared.capKind).toBe('span')
+    }
+  })
+
+  test('alchemy states 10,000 AND offers an 8M-block retry range: capKind is "density"', () => {
+    // The regression this exists for, in one assertion. Alchemy's response-size refusal names a
+    // 10,000-block range as one of two modes and then suggests ~8,000,000 blocks for the SAME query.
+    // Treating that 10,000 as a ceiling pins every mainnet scan 800x too narrow, permanently, on an
+    // endpoint that serves 13M-block windows.
+    const declared = parseDeclaredCap(capturedError('eth-mainnet.g.alchemy.com'))
+    expect(declared.capBlocks).toBe(10_000n)
+    expect(declared.capKind).toBe('density')
+    expect(declared.retryRange).toEqual({ fromBlock: 0x93e08cn, toBlock: 0x10df28an })
+    // ...and the range it suggested really is enormously wider than the number it quoted.
+    const suggested = declared.retryRange!.toBlock - declared.retryRange!.fromBlock + 1n
+    expect(suggested).toBeGreaterThan(declared.capBlocks! * 100n)
+  })
+
+  test('drpc and blastapi — anything volunteering a retry range — are "density" too', () => {
+    // Conservative by construction: a suggested range describes THIS query's data, so the doubt goes
+    // to `density`. Misfiling a policy as density costs one probe per regrowth cycle; misfiling
+    // density as policy costs the whole scan, permanently.
+    expect(parseDeclaredCap(capturedError('eth.drpc.org')).capKind).toBe('density')
+    expect(parseDeclaredCap(capturedError('eth-mainnet.public.blastapi.io')).capKind).toBe('density')
+  })
+
+  test('response-size language alone makes a cap "density", with no retry range in sight', () => {
+    expect(parseDeclaredCap(new Error('Log response size exceeded. Use up to a 10,000 block range.')).capKind).toBe('density')
+    expect(parseDeclaredCap(new Error('query returned more than 10000 results; use a 500 block range')).capKind).toBe('density')
+    expect(parseDeclaredCap(new Error('eth_getLogs is limited to a 10,000 range')).capKind).toBe('span')
+  })
+
+  test('capKind is absent when no cap was declared at all', () => {
+    expect(parseDeclaredCap(new Error('boom')).capKind).toBeUndefined()
+    expect(parseDeclaredCap(capturedError('ethereum.publicnode.com')).capKind).toBeUndefined()
+  })
+
+  test('"limited to" without a number and a range is not a declared cap', () => {
+    // The pattern is anchored on BOTH a digit run and the word `range`, so ordinary prose that
+    // merely says something is limited cannot fabricate a window for the scanner to jump to.
+    for (const m of ['this account is limited to the free tier', 'limited to 5 requests per second', 'range limited']) {
+      expect(parseDeclaredCap(new Error(m)).capBlocks).toBeUndefined()
+    }
   })
 })
 

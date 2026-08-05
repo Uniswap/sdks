@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import type { Address } from 'viem'
 
-import { PoolIndex, serializeSnapshot, v2PoolRef } from '../src/experimental/index'
+import { PoolIndex, POOL_INDEX_SCHEMA_VERSION, serializeSnapshot, v2PoolRef } from '../src/experimental/index'
 
 import { CACHE_MAX_POOLS, cacheDir, cacheEnabled, cachePath, flushCacheSave, loadCache, saveCache, scheduleCacheSave } from './cache'
 
@@ -106,7 +106,7 @@ describe('starting fresh', () => {
 
   it('discards a corrupt file rather than failing the command', async () => {
     await mkdir(join(dir, 'router-lite'), { recursive: true })
-    await writeFile(join(dir, 'router-lite', '1.json'), '{"schemaVersion":1,"pools":[', 'utf8')
+    await writeFile(join(dir, 'router-lite', '1.json'), '{"schemaVersion":' + POOL_INDEX_SCHEMA_VERSION + ',"pools":[', 'utf8')
 
     const loaded = await loadCache(1, warmIndex())
     expect(loaded.index).toBeUndefined()
@@ -202,14 +202,18 @@ describe('a corrupt cache file is never a crash (F1)', () => {
   // the try. The result was a raw TypeError travelling up through `buildChainContext` into `rl.ts`'s
   // catch-all: an exit-4 stack trace for a file the user never asked about, in flat contradiction of
   // the header's "every failure resolves to start fresh" invariant.
+  // `V` rather than a literal `1`: these payloads exercise the SHAPE checks, so they must keep
+  // reaching them as the schema version moves. Hard-coded, they start failing the version check
+  // first and silently stop testing anything they were written for.
+  const V = POOL_INDEX_SCHEMA_VERSION
   const payloads: [string, string][] = [
-    ['wrappedNative is a number', '{"schemaVersion":1,"wrappedNative":1,"reorgOverlapBlocks":"$bigint:32","pools":[],"coverage":[],"enabledFees":[]}'],
-    ['wrappedNative is missing', '{"schemaVersion":1,"reorgOverlapBlocks":"$bigint:32","pools":[],"coverage":[],"enabledFees":[]}'],
-    ['wrappedNative is null', '{"schemaVersion":1,"wrappedNative":null,"reorgOverlapBlocks":"$bigint:32","pools":[],"coverage":[],"enabledFees":[]}'],
+    ['wrappedNative is a number', '{"schemaVersion":' + V + ',"wrappedNative":1,"reorgOverlapBlocks":"$bigint:32","pools":[],"coverage":[],"enabledFees":[]}'],
+    ['wrappedNative is missing', '{"schemaVersion":' + V + ',"reorgOverlapBlocks":"$bigint:32","pools":[],"coverage":[],"enabledFees":[]}'],
+    ['wrappedNative is null', '{"schemaVersion":' + V + ',"wrappedNative":null,"reorgOverlapBlocks":"$bigint:32","pools":[],"coverage":[],"enabledFees":[]}'],
     ['the whole file is a JSON scalar', '42'],
     ['the whole file is JSON null', 'null'],
     ['the file is empty', ''],
-    ['a coverage bound is poisoned', '{"schemaVersion":1,"wrappedNative":"0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2","reorgOverlapBlocks":"$bigint:32","pools":[],"coverage":[["v3:x",[{"fromBlock":"abc","toBlock":"$bigint:9"}]]],"enabledFees":[]}'],
+    ['a coverage bound is poisoned', '{"schemaVersion":' + V + ',"wrappedNative":"0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2","reorgOverlapBlocks":"$bigint:32","pools":[],"coverage":[["v3:x",[{"fromBlock":"abc","toBlock":"$bigint:9"}]]],"enabledFees":[]}'],
   ]
 
   for (const [what, body] of payloads) {

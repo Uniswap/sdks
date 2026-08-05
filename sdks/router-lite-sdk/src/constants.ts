@@ -505,6 +505,44 @@ export const SCAN_CHUNK_CONCURRENCY = 4
 export const MAX_REQUESTS_PER_SCAN = 4_000
 
 /**
+ * Requests one fee-tier discovery scan (`search/discovery.ts#discoverFeeTiers`) may spend per search
+ * — {@link MAX_REQUESTS_PER_SCAN}'s ceiling narrowed for the one scan that had no business having a
+ * ceiling that generous.
+ *
+ * WHAT THIS FIXES, MEASURED. `discoverFeeTiers` walks a factory's ENTIRE `FeeAmountEnabled` history,
+ * and it sits in wave 1 — ahead of the adjacency scans in waves 2 and 3, which are what the search
+ * actually reports coverage for. On a provider that serves wide windows the whole history is a
+ * handful of requests and nobody notices. On Base through quicknode, which caps `eth_getLogs` at
+ * 10,000 blocks over 48.2M blocks of v3 history, it is 4,822 requests and 62 seconds — so a
+ * `--budget 60s` quote spent its ENTIRE remaining budget in wave 1 on this one scan, reached neither
+ * adjacency wave, and reported `partial — nothing covered yet` for all three protocols. Which was
+ * true: no adjacency scan had been started. Bounding it here is what lets waves 2-3 run at all.
+ *
+ * WHY A REQUEST BUDGET RATHER THAN A BLOCK WINDOW. Wave 0's exact-pair scan solves the same problem
+ * with a recent window (`WAVE0_RECENT_WINDOW_SECONDS`) because the pools it hunts are new by
+ * definition. Fee enablements are not: Base's three governance-added tiers (400/300/200) were
+ * enabled 689 days and 29.8M blocks before this was written, and its four genesis tiers at the
+ * deployment block itself. There is no window that is both small and where the answers live, so the
+ * bound has to be on COST, and the scan converges across searches instead — the coverage cache is
+ * keyed by factory, so each search resumes where the last one stopped rather than re-walking.
+ *
+ * 128 IS PROPORTION, NOT PRECISION, and it is priced off a measured rate rather than a guess. ONE
+ * scan is ~15 requests/second against the 10k-capped endpoint — a scan dispatches
+ * {@link SCAN_CHUNK_CONCURRENCY} chunks per round trip and a round trip there is ~250ms — so this is
+ * ~8s, or roughly an eighth of a 60s budget. The first cut at 512 was measured too: ~34s, more than
+ * half the budget, which starved the adjacency waves nearly as thoroughly as no bound at all.
+ *
+ * It is unreachable on a wide-window provider (mainnet's whole v3 fee history is ~4 requests), so
+ * nothing changes there at all. On the capped case it is ~1.3M blocks per search and it CONVERGES
+ * rather than completing: coverage is keyed by factory, so each search resumes where the last
+ * stopped. The tiers not yet reached cost nothing a caller can see — `speculativeDirect` probes v3's
+ * four standard tiers on every search regardless, and this scan only ever ADDS to that set — whereas
+ * every second spent here is a second the adjacency waves, which are what a two-hop route and the
+ * whole `discovery` report depend on, do not get.
+ */
+export const FEE_DISCOVERY_MAX_REQUESTS = 128
+
+/**
  * First backoff delay before retrying a failed chunk at {@link MIN_CHUNK}, doubled per consecutive
  * failure and capped at {@link BACKOFF_MAX_MS}. Retrying a throttling endpoint immediately is how a
  * rate limit becomes a tight loop; 250ms is short enough that a one-off blip barely registers, and

@@ -64,8 +64,8 @@ export function narrowTopics(topics: (Hex | Hex[] | null)[]): (Hex | null)[] {
 // the whole descent. A caller who already knows the cap skips all of it with
 // `logChunkBlocks`.
 //
-// SOME PROVIDERS DO SAY (R2). blastapi, drpc and alchemy all state the window
-// that would have worked, in the error text, and
+// SOME PROVIDERS DO SAY (R2). blastapi, drpc, alchemy and quicknode all state
+// the window that would have worked, in the error text, and
 // `internal/rpc.ts#parseDeclaredCap` reads it. When a cap is declared the loop
 // below skips the search entirely: it jumps the window straight to the stated
 // cap, or — when that cap is below MIN_CHUNK, i.e. below anything this scanner
@@ -73,6 +73,25 @@ export function narrowTopics(topics: (Hex | Hex[] | null)[]): (Hex | null)[] {
 // spending a retry budget and a backoff escalation rediscovering the same
 // sentence. A message it does not recognize changes nothing; every bound below
 // still applies.
+//
+// A DECLARED CAP LOWERS THE CEILING, NOT JUST THE WIDTH, and on a hard-capped
+// endpoint that is worth more than the probes it skips. A cap is a policy: it
+// will still be true in four chunks' time, so the regrowth ratchet must not
+// double past it. Left un-clamped it does — probe, fail, halve, re-establish,
+// forever — and because a width that CHANGED is a width nothing has served yet,
+// each cycle also forces the next chunk out ALONE, collapsing the batching
+// below to three sequential round trips per four chunks of real work.
+// Quicknode's Base endpoint (10,000-block cap, 48M blocks of v3 history) is the
+// endpoint that made this visible: clamping the ceiling is 1.39x on a six-scan
+// adjacency fan-out, measured live, on top of the 1.28x from settling at the
+// stated 10,000 rather than at the 7,812 blind halving lands on.
+//
+// AND IT IS REMEMBERED (see {@link ScanWidthMemory}). The descent is a search
+// for a fact about the ENDPOINT, and one cold Base search runs seven scans that
+// each used to re-derive it from scratch. `opts.widthMemory` carries the answer
+// between calls — a start hint, plus the declared ceiling — so the search is
+// paid for once per endpoint rather than once per scan, and (via
+// `PoolIndex.toSnapshot`) once per machine rather than once per process.
 //
 // Three things keep that adaptation from becoming its own failure mode, since
 // nothing above this bounds a scan's cost and the zero-config path passes no
@@ -153,6 +172,41 @@ export function narrowTopics(topics: (Hex | Hex[] | null)[]): (Hex | null)[] {
  * never exercises. Resolves rather than rejects on abort — the scan loop re-checks the signal itself,
  * and a rejection here would be indistinguishable from a provider failure.
  */
+/**
+ * What one endpoint has taught this process about how wide an `eth_getLogs` window it will serve —
+ * the memory that turns the descent below from a per-CALL cost into a per-ENDPOINT one.
+ *
+ * WHY IT EXISTS. The descent is a SEARCH, and every `scanLogs` call used to run its own from
+ * scratch: a single cold Base search issues seven of them (three protocols x two topic-slot queries,
+ * plus the v4 exact-pair scan), so an endpoint capping at 10k blocks was rediscovered seven times per
+ * search and again on every later search and every later CLI invocation. The answer does not change
+ * between calls, so it should not be paid for between calls.
+ *
+ * TWO FIELDS, BECAUSE THEY ARE NOT THE SAME CLAIM, and conflating them would be a correctness bug:
+ *
+ *  - `learnedScanWidth` is descriptive — the widest window this endpoint has actually SERVED. It is
+ *    a starting HINT and nothing more: a scan that begins there still halves down if it is now too
+ *    wide, and still regrows toward its ceiling if it is now too narrow. Being wrong costs a probe.
+ *  - `declaredScanCap` is prescriptive — a ceiling the endpoint STATED in an error
+ *    (`internal/rpc.ts#parseDeclaredCap`). A scan may not exceed it, which is the whole point: see
+ *    the ceiling discussion in this file's header for why a known ceiling is worth far more than the
+ *    probes it saves.
+ *
+ * ONLY `learnedScanWidth` IS SAFE TO PERSIST ACROSS PROCESSES, and `pools/poolIndex.ts` persists
+ * exactly that one. A snapshot is keyed by CHAIN, not by endpoint (two providers serving the same
+ * chain share a cache file, deliberately — see `cli/cache.ts`), so a stored `declaredScanCap` of
+ * 10,000 learned from quicknode would silently cap an alchemy run that serves 13M-block windows, at
+ * 1,300x the requests, with nothing anywhere saying why. A stored `learnedScanWidth` of 10,000 in
+ * that same situation costs the regrowth ratchet a handful of doublings to climb back out of, which
+ * is a hint being wrong — the failure mode it is allowed to have.
+ */
+export type ScanWidthMemory = {
+  /** Widest window this endpoint has been observed to serve. A start hint; never a bound. */
+  learnedScanWidth?: bigint
+  /** A ceiling the endpoint declared in an error. A bound; never persisted (see above). */
+  declaredScanCap?: bigint
+}
+
 export function delay(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
     if (signal?.aborted) {
@@ -209,27 +263,67 @@ export function delay(ms: number, signal?: AbortSignal): Promise<void> {
  * known-capped provider (Ankr's public endpoint caps `eth_getLogs` around 3k blocks) pins it there
  * and skips the bisection down; a caller who does not know starts at the empirical ceiling and lets
  * the endpoint's refusals find the real width (see this file's header).
+ *
+ * `opts.widthMemory` ({@link ScanWidthMemory}), when supplied, is READ for this scan's starting
+ * width and ceiling and WRITTEN with whatever this scan learns — the seam that makes the descent a
+ * per-endpoint cost rather than a per-call one. It is a plain mutable object shared by every scan on
+ * one router (`search/discovery.ts` threads `PoolIndex`'s), and mutating it is safe under the
+ * concurrent scans a single wave issues: both fields are monotone — the hint only rises, the cap
+ * only falls — so interleaved writes converge on the same value whatever order they land in, and a
+ * lost update costs one probe. Omitted, every line below behaves exactly as it did before this
+ * option existed.
+ *
+ * `opts.maxRequests` narrows {@link MAX_REQUESTS_PER_SCAN} for THIS scan (never widens it), for a
+ * caller whose scan is one of several competing for a latency budget and is not the one the caller
+ * is waiting on. Running out of it is not an error and needs no new report surface: the scan stops
+ * where it is and the blocks it never reached are simply absent from `covered`, which is already how
+ * partial discovery is expressed everywhere else. See `constants.ts#FEE_DISCOVERY_MAX_REQUESTS` for
+ * the case that motivated it — a full-history scan in an early wave starving every later one.
  */
 export async function scanLogs(
   client: Pick<PublicClient, 'request'>,
   query: LogQuery,
   range: BlockRange,
-  opts: { signal?: AbortSignal; sleep?: (ms: number) => Promise<void>; semaphore?: Semaphore | undefined; initialChunk?: bigint | undefined },
-): Promise<{ logs: Log[]; covered: BlockRange[]; complete: boolean }> {
+  opts: {
+    signal?: AbortSignal
+    sleep?: (ms: number) => Promise<void>
+    semaphore?: Semaphore | undefined
+    initialChunk?: bigint | undefined
+    widthMemory?: ScanWidthMemory | undefined
+    maxRequests?: number | undefined
+  },
+): Promise<{ logs: Log[]; covered: BlockRange[]; complete: boolean; requests: number }> {
   const { fromBlock, toBlock } = range
   const logs: Log[] = []
   const coveredRaw: BlockRange[] = []
   const sleep = opts.sleep ?? ((ms: number): Promise<void> => delay(ms, opts.signal))
+  const memory = opts.widthMemory
   // The widest window this scan may ever ask for: the caller's override when they know their
-  // provider's cap, otherwise the empirical ceiling. Never exceeded, by the first request or by any
-  // regrowth doubling after it.
-  const ceiling = opts.initialChunk ?? MAX_SCAN_WINDOW
+  // provider's cap, otherwise the empirical ceiling — narrowed further by any cap the endpoint has
+  // DECLARED (this scan, or an earlier one through `opts.widthMemory`). Never exceeded, by the first
+  // request or by any regrowth doubling after it.
+  //
+  // MUTABLE, WHICH IS THE POINT (see the declared-cap branch below). Clamping the ceiling — rather
+  // than only the current width — is what stops the regrowth ratchet from doubling past a ceiling
+  // the endpoint has already named, failing, and re-establishing, forever: at `chunkSize >= ceiling`
+  // the doubling is a no-op, so `widthEstablished` survives it and the batching below stays whole.
+  let ceiling = minBig(opts.initialChunk ?? MAX_SCAN_WINDOW, memory?.declaredScanCap ?? MAX_SCAN_WINDOW)
+
+  // The request budget for THIS scan: {@link MAX_REQUESTS_PER_SCAN}, or a caller's tighter one. Only
+  // ever narrows — a caller may buy less of the endpoint's time than the global ceiling allows, never
+  // more, so the ceiling stays the one thing every scan in the package is bounded by.
+  const requestBudget = Math.max(1, Math.min(opts.maxRequests ?? MAX_REQUESTS_PER_SCAN, MAX_REQUESTS_PER_SCAN))
 
   let cursor = toBlock
   // Start at the whole range when it fits under the ceiling — asking for 16M blocks of a 5,000-block
   // re-scan would be a guaranteed-wasted probe on any endpoint that validates the span it was handed.
+  // A `learnedScanWidth` from an earlier scan narrows the start the same way, and for the same
+  // reason: it is the widest window this endpoint is known to serve, so anything above it is a probe
+  // whose answer is already in hand. It is only a hint — the halving below still corrects it
+  // downward and the regrowth ratchet still climbs back to `ceiling` — so a stale one costs a probe,
+  // never coverage.
   // `maxBig(..., 1n)` only guards an inverted range, whose loop below never runs anyway.
-  let chunkSize = minBig(maxBig(toBlock - fromBlock + 1n, 1n), ceiling)
+  let chunkSize = minBig(minBig(maxBig(toBlock - fromBlock + 1n, 1n), ceiling), memory?.learnedScanWidth ?? ceiling)
   let requests = 0
   // Failures at MIN_CHUNK on the *current* sub-range: drives when to give that sub-range up.
   let consecutiveMinFailures = 0
@@ -292,7 +386,7 @@ export async function scanLogs(
 
   while (cursor >= fromBlock) {
     if (opts.signal?.aborted) break
-    if (requests >= MAX_REQUESTS_PER_SCAN) break
+    if (requests >= requestBudget) break
 
     // --- how many chunks go out together (P1) --------------------------------------------------
     // One, until a chunk at this exact width has been served. After that, up to
@@ -303,7 +397,7 @@ export async function scanLogs(
     // double after exactly CHUNK_REGROWTH_SUCCESSES clean chunks, so a batch stops short of that
     // count rather than sailing past it. AT the ceiling, doubling is a no-op — there is no boundary
     // to respect and no reason to break the batch up.
-    const budgetLeft = MAX_REQUESTS_PER_SCAN - requests
+    const budgetLeft = requestBudget - requests
     const regrowthRoom =
       chunkSize >= ceiling ? SCAN_CHUNK_CONCURRENCY : CHUNK_REGROWTH_SUCCESSES - consecutiveSuccesses
     const batchLimit = widthEstablished
@@ -356,6 +450,11 @@ export async function scanLogs(
       minFailuresSinceSuccess = 0
       consecutiveSuccesses += okCount
       widthEstablished = true
+      // A window this endpoint DEMONSTRABLY serves, remembered for the next scan's starting guess.
+      // A running MAXIMUM, not the last value: `chunkSize` is also narrowed by a short range (a
+      // 5,000-block delta re-scan asks for 5,000 blocks and is served), and recording that as what
+      // the endpoint "can do" would ratchet the hint down towards nothing over a warm router's life.
+      if (memory && chunkSize > (memory.learnedScanWidth ?? 0n)) memory.learnedScanWidth = chunkSize
     }
 
     if (stopAt === -1) {
@@ -392,8 +491,34 @@ export async function scanLogs(
     // Some providers state the window they WOULD have served, right there in the error (see
     // `internal/rpc.ts#parseDeclaredCap` and the live captures it is built from). When they do,
     // the bisection below is searching for an answer already in hand.
-    const { capBlocks } = parseDeclaredCap(err)
+    const { capBlocks, capKind } = parseDeclaredCap(err)
     if (capBlocks !== undefined && capBlocks < chunkSize) {
+      // A SPAN cap is a POLICY, not a data point, so it lowers the CEILING and not merely the current
+      // width — and that distinction is worth more than every probe the fast path skips. Left as only
+      // a width, the ratchet doubles straight back past the stated cap after CHUNK_REGROWTH_SUCCESSES
+      // clean chunks, fails, un-establishes the width, and sends the next chunk out alone: measured
+      // against quicknode's Base endpoint, that cycle spends three sequential round trips per four
+      // chunks of real work and never stops. Clamped, `grown === chunkSize` at the ceiling,
+      // `widthEstablished` survives, and the walk runs at a full SCAN_CHUNK_CONCURRENCY-wide batch per
+      // round trip — 1.39x on a six-scan adjacency fan-out, live.
+      //
+      // A `'density'` CAP MUST NOT CLAMP, and getting this wrong would be far more expensive than
+      // never having read the message at all. Alchemy answers a too-wide WETH adjacency query with
+      // "you can make eth_getLogs requests with up to a 10,000 block range … or you can request any
+      // block range with a cap of 10K logs … this block range should work: [8,000,000 blocks]" — a
+      // stated 10,000 alongside a demonstration that it will serve 8M for this very query. Clamping
+      // there pins every mainnet scan 800x too narrow for the rest of its life. The WIDTH jump below
+      // still applies to both kinds (it is only this attempt's guess, and the regrowth ratchet climbs
+      // back out of it, which is exactly the recovery a density observation needs); only the durable
+      // ceiling is withheld. See `internal/rpc.ts#DeclaredCap.capKind`.
+      //
+      // Only ever NARROWS (`minBig`), so a provider that declares different span caps for different
+      // queries leaves this scan at the tightest one it was actually told about, and an
+      // `initialChunk` override is never widened by anything a provider says.
+      if (capKind === 'span') {
+        ceiling = minBig(ceiling, capBlocks)
+        if (memory) memory.declaredScanCap = minBig(memory.declaredScanCap ?? capBlocks, capBlocks)
+      }
       if (capBlocks < MIN_CHUNK) {
         // The endpoint's own ceiling is BELOW the smallest window this scanner will ask for, so no
         // amount of halving, retrying or backing off can reach it — MIN_CHUNK is the floor, and the
@@ -468,5 +593,8 @@ export async function scanLogs(
   const covered = mergeRanges(coveredRaw)
   const complete = covered.length === 1 && covered[0]!.fromBlock === fromBlock && covered[0]!.toBlock === toBlock
 
-  return { logs, covered, complete }
+  // `requests` is what actually reached the wire (skipped-on-abort chunks are handed back above), so
+  // a caller spreading one budget across several scans can subtract it and get an exact remainder
+  // rather than an estimate — see `search/discovery.ts#discoverFeeTiers`.
+  return { logs, covered, complete, requests }
 }

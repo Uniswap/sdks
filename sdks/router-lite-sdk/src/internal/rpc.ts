@@ -58,15 +58,22 @@ const TRANSPORT_MESSAGE =
  *    `requested block is not available`
  *  - result caps that abort the request rather than answer it: `exceeded maximum block range`,
  *    `query returned more than 10000 results`, `response size exceeded`
+ *  - quicknode's span cap, captured live off `base-mainnet.quiknode.pro`:
+ *    `eth_getLogs is limited to a 10,000 range` (JSON-RPC `-32614`)
  *
  * `state .{0,40}(not available|unavailable)` is bounded rather than `.*` so it cannot leap across a
  * whole verbose viem message to marry an unrelated "state" to an unrelated "unavailable".
  *
  * `unknown block\b` is anchored on the right so prose like "unknown blockNumber field" (a schema
  * complaint, not a node-state one) does not match — the phrase is short enough to collide otherwise.
+ *
+ * `limited to a N range` is anchored on BOTH a digit run and the word `range`, so it cannot match a
+ * revert whose message merely says something is "limited" — the shape it exists for always states a
+ * number and always calls it a range (see {@link DECLARED_CAP_LIMITED_TO}, which reads the same
+ * sentence for the width itself).
  */
 const NODE_STATE_MESSAGE =
-  /header not found|block not found|unknown block\b|missing trie node|state .{0,40}(not available|unavailable)|nonexistent block|requested block|exceeded maximum block range|query returned more than|response size/i
+  /header not found|block not found|unknown block\b|missing trie node|state .{0,40}(not available|unavailable)|nonexistent block|requested block|exceeded maximum block range|query returned more than|response size|limited to (?:an?\s+)?[\d][\d,_]*\s+(?:block\s+)?range/i
 
 // ---------------------------------------------------------------------------
 // Declared `eth_getLogs` caps (R2).
@@ -113,7 +120,46 @@ const NODE_STATE_MESSAGE =
  * would leave a hole the scanner would then report as covered — a coverage lie, which is the one
  * failure mode this whole module is built to avoid.
  */
-export type DeclaredCap = { capBlocks?: bigint; retryRange?: BlockRange }
+export type DeclaredCap = {
+  capBlocks?: bigint
+  retryRange?: BlockRange
+  /**
+   * Whether `capBlocks` is a DURABLE SPAN POLICY or a one-off DENSITY observation — the distinction
+   * that decides whether a caller may treat it as a ceiling or only as this attempt's width.
+   *
+   * `'span'`  — the endpoint refuses spans wider than N, full stop, and will still refuse them in
+   *             four chunks' time. quicknode: `eth_getLogs is limited to a 10,000 range`.
+   * `'density'` — N is what the endpoint computed would fit under a RESULT/RESPONSE-SIZE limit at
+   *             this query's density right here, and it says nothing about any other query. drpc
+   *             (`query exceeds max results 20000, retry with the range …`) and alchemy both do this.
+   *
+   * ALCHEMY IS WHY THIS FIELD EXISTS, and it is worth spelling out because the message reads like a
+   * policy and is not one. Its response-size refusal says: `Log response size exceeded. You can make
+   * eth_getLogs requests with up to a 10,000 block range and no limit on the response size, OR you
+   * can request any block range with a cap of 10K logs in the response. Based on your parameters …
+   * this block range should work: [<8,000,000 blocks>]`. That is TWO offers, and the "10,000 block
+   * range" is only the first one's terms — the endpoint demonstrably serves 8M-block windows for the
+   * very same query, and 13M-block ones for a sparser one. A caller that read the 10,000 as a
+   * ceiling would pin every mainnet scan 800x too narrow, forever, off a sentence the provider meant
+   * as an option.
+   *
+   * THE DISCRIMINATOR IS DELIBERATELY CONSERVATIVE: a cap is `'span'` only when the failure mentions
+   * no response-size/result-count limit AND volunteers no retry range. Anything that suggests a
+   * range is describing THIS query's data (see {@link DeclaredCap.retryRange}'s note), and anything
+   * that mentions a size limit is describing a second limit that the block cap alone does not
+   * characterize. Misfiling a real span policy as `'density'` costs one probe per regrowth cycle;
+   * misfiling a density observation as `'span'` costs the entire scan, permanently — so the doubt
+   * goes to `'density'`.
+   */
+  capKind?: 'span' | 'density'
+}
+
+/**
+ * Response-size / result-count language: the marker that a stated block count is a DENSITY
+ * observation about this query rather than a span policy. Matched against the same messages
+ * {@link parseDeclaredCap} reads, and captured verbatim from alchemy and drpc.
+ */
+const DENSITY_CAP_MESSAGE = /response size|result size|max results|too many (results|logs)|log(s)? (response|limit)|cap of [\d][\d,_]* logs|returned more than/i
 
 /**
  * "…with up to a 10 block range…" (blastapi, alchemy). The generic `N block range` tail also
@@ -121,6 +167,27 @@ export type DeclaredCap = { capBlocks?: bigint; retryRange?: BlockRange }
  * uses. Digit separators are tolerated because providers write both `10000` and `10,000`.
  */
 const DECLARED_CAP_BLOCKS = /\b([\d][\d,_]*) block range\b/i
+
+/**
+ * quicknode: "eth_getLogs is limited to a 10,000 range" — the same fact as {@link
+ * DECLARED_CAP_BLOCKS}, said without the word "block", which is why the pattern above missed it
+ * entirely. Captured live off `base-mainnet.quiknode.pro` (see `__fixtures__/providerErrors.json`)
+ * in BOTH shapes viem can deliver it in: an `HttpRequestError` (status 413, the cap in `details`)
+ * when the transport is unbatched, and an `RpcRequestError` (HTTP 200, `code: -32614`) when it is
+ * batched — the batched one being what `cli/` actually hits.
+ *
+ * MISSING THIS ONE SENTENCE COST THE WHOLE FAST PATH. Base's v3 history is ~48M blocks and this
+ * endpoint serves 10k of them at a time, so a scan that cannot read the cap blind-halves from
+ * `MAX_SCAN_WINDOW` eleven times, settles on 7,812 (the first power-of-two step under the cap
+ * rather than the cap), and then re-probes 15,624 after every four clean chunks forever. Measured
+ * against this endpoint, reading the sentence is worth 1.39x on a six-scan adjacency fan-out — and
+ * most of that is not the eleven probes, it is that a cap the scanner KNOWS is a ceiling stops the
+ * regrowth ratchet from breaking up its own request batches (see `logScan.ts`).
+ *
+ * `block` stays optional so a provider that words it the other way is read by this pattern too;
+ * the two are tried in order and the first to match wins.
+ */
+const DECLARED_CAP_LIMITED_TO = /\blimited to (?:an?\s+)?([\d][\d,_]*)\s+(?:block\s+)?range\b/i
 
 /** drpc: "query exceeds max results 20000, retry with the range 25683953-25685027". */
 const DECLARED_RETRY_RANGE_DEC = /\brange\s+(\d[\d,_]*)\s*-\s*(\d[\d,_]*)/i
@@ -159,12 +226,19 @@ export function parseDeclaredCap(err: unknown): DeclaredCap {
       if (bounds && bounds[1]! >= bounds[0]!) declared.retryRange = { fromBlock: bounds[0]!, toBlock: bounds[1]! }
     }
     if (declared.capBlocks === undefined) {
-      const cap = DECLARED_CAP_BLOCKS.exec(message)
+      const cap = DECLARED_CAP_BLOCKS.exec(message) ?? DECLARED_CAP_LIMITED_TO.exec(message)
       if (cap) {
         const blocks = toBig(cap[1]!)
         if (blocks > 0n) declared.capBlocks = blocks
       }
     }
+  }
+  if (declared.capBlocks !== undefined) {
+    // A stated block count is only a policy when nothing else in the failure says it is really about
+    // how much DATA this particular query would have returned.
+    const density =
+      declared.retryRange !== undefined || collectFacts(err).messages.some((m) => DENSITY_CAP_MESSAGE.test(m))
+    declared.capKind = density ? 'density' : 'span'
   }
   if (declared.capBlocks === undefined && declared.retryRange !== undefined) {
     // A suggested RANGE is a width, not a policy: it is what the provider computed would fit under a
@@ -173,6 +247,7 @@ export function parseDeclaredCap(err: unknown): DeclaredCap {
     // above ~20k logs per 128 blocks — and the scanner treats such a width exactly as it treats a
     // declared block cap that low: give the sub-range up rather than chase it (`logScan.ts`).
     declared.capBlocks = declared.retryRange.toBlock - declared.retryRange.fromBlock + 1n
+    declared.capKind = 'density'
   }
   return declared
 }
@@ -214,6 +289,22 @@ const TRANSPORT_ERROR_NAMES = new Set([
 /** JSON-RPC codes that report a provider limit, not an EVM outcome. `-32000` is deliberately absent:
  * it is geth's catch-all and carries "execution reverted" far more often than anything else. */
 const TRANSPORT_RPC_CODES = new Set([-32005, -32002])
+
+/**
+ * JSON-RPC codes that mean "I will not serve a request over THIS BLOCK SPAN" — a range cap, which is
+ * `unavailable` (see {@link RpcFailureKind}) rather than transport or execution.
+ *
+ * `-32614` is quicknode's, captured live off `base-mainnet.quiknode.pro`. It needs a STRUCTURED rule
+ * and not just the message tier because of how the two transports differ: unbatched, the cap arrives
+ * as an HTTP 413 and the status rule above already catches it; BATCHED, it arrives inside a 200 with
+ * no status anywhere, no viem transport class, and a message (`eth_getLogs is limited to a 10,000
+ * range`) that matched none of the three dialects — so it fell all the way through to the default and
+ * was classified `execution`, i.e. "the EVM rejected this", about a request the EVM never saw. That
+ * is the same mis-tiering C4-H1 fixed for `header not found`, and it has the same two costs: a
+ * `no-route` could be built out of it, and `logScan.ts`'s expensive-refusal fast path (which fires on
+ * `transport`/`unavailable`) never engaged.
+ */
+const NODE_STATE_RPC_CODES = new Set([-32614])
 
 /** geth's dedicated revert code (EIP-1474-era `3`), which always accompanies real revert data. */
 const REVERT_RPC_CODE = 3
@@ -292,7 +383,8 @@ function collectFacts(err: unknown): ErrorFacts {
  *
  * Order matters and is deliberate: structured revert evidence (revert data, geth's code `3`) beats
  * everything, then structured transport evidence (HTTP status, viem transport class, rate-limit RPC
- * code, a Node `E*` errno), then message dialects.
+ * code, a Node `E*` errno) and the structured node-state codes beside it
+ * ({@link NODE_STATE_RPC_CODES}), then message dialects.
  *
  * Within the message tier, NODE-STATE TEXT IS CHECKED FIRST — ahead of both revert and transport
  * text. A node-state error names a block, not an outcome ("header not found"), and nothing else in
@@ -320,6 +412,7 @@ export function classifyRpcError(err: unknown): RpcFailureKind {
   if (facts.statuses.some((s) => s >= 400)) return 'transport'
   if (facts.names.some((n) => TRANSPORT_ERROR_NAMES.has(n))) return 'transport'
   if (facts.numericCodes.some((c) => TRANSPORT_RPC_CODES.has(c))) return 'transport'
+  if (facts.numericCodes.some((c) => NODE_STATE_RPC_CODES.has(c))) return 'unavailable'
   // Node system errors (`ECONNREFUSED`, `ETIMEDOUT`, `UND_ERR_CONNECT_TIMEOUT`, ...) are string codes.
   if (facts.stringCodes.some((c) => /^(e[a-z_]+|und_err_|err_)/i.test(c))) return 'transport'
 

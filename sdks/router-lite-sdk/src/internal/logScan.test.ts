@@ -901,3 +901,319 @@ test('P1 (F9): several concurrent scans never exceed the shared semaphore, howev
   expect(peak).toBeGreaterThan(1) // ...and the gate is not accidentally serializing everything either
   for (const res of results) expect(res.complete).toBe(true)
 })
+
+// ---------------------------------------------------------------------------
+// A DECLARED CAP IS A CEILING, AND THE CEILING IS REMEMBERED.
+//
+// Base on quicknode is the endpoint that made both of these matter: a hard
+// 10,000-block `eth_getLogs` cap over 48M blocks of v3 history, stated in every
+// refusal, and seven scans per cold search.
+//
+// Reading the cap as only a WIDTH left two things broken that nothing in the
+// suite could see, because both are about what happens on the FIFTH clean chunk
+// and beyond:
+//
+//   * the regrowth ratchet doubles straight back past the stated cap, fails,
+//     and — since a changed width is a width nothing has served — sends the
+//     next chunk out ALONE. Three sequential round trips per four chunks of
+//     real work, forever, on an endpoint that had already said what it would
+//     serve.
+//   * the next scan starts over at MAX_SCAN_WINDOW and halves its way back
+//     down to rediscover the same sentence.
+// ---------------------------------------------------------------------------
+
+test('a declared cap lowers the CEILING, so regrowth cannot double past it', async () => {
+  const CAP = 10_000n
+  const { client, filters, inFlightAt } = concurrentStub((filter) => {
+    if (span(filter) > CAP) throw new Error('eth_getLogs is limited to a 10,000 range')
+    return []
+  })
+
+  const res = await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 200_000n }, {})
+
+  // One refusal (the whole 200,000-block range), then straight to the declared width — and never a
+  // request above it again, which is the property the ceiling adds over jumping the width alone.
+  expect(span(filters[0]!)).toBe(200_000n)
+  expect(filters.slice(1).every((f) => span(f) === CAP)).toBe(true)
+  expect(filters.filter((f) => span(f) > CAP)).toHaveLength(1)
+  // ...and because the width now SITS AT the ceiling, doubling is a no-op, `widthEstablished`
+  // survives it, and the walk runs at full batches instead of collapsing to 1-3-1-3.
+  // 20 chunks of 10,000: one establishing, then four full batches, then the 3-chunk remainder.
+  expect(batchSizes(inFlightAt).slice(1)).toEqual([1, 4, 4, 4, 4, 3])
+  expect(res.complete).toBe(true)
+  expect(res.covered).toEqual([{ fromBlock: 1n, toBlock: 200_000n }])
+})
+
+test('without the clamp the same walk would re-probe: the un-clamped ratchet is what this replaces', async () => {
+  // The control. An endpoint that caps at 10,000 but says NOTHING about it gets the old behaviour —
+  // blind halving to 6,250 and a wasted probe at 12,500 after every regrowth boundary — which is
+  // exactly the cost the declared-cap clamp above avoids, and is unchanged for providers that
+  // decline to say anything.
+  const CAP = 10_000n
+  const { client, filters } = stub((filter) => {
+    if (span(filter) > CAP) throw new Error('boom') // no window stated anywhere
+    return []
+  })
+
+  await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 200_000n }, { sleep: recorder().sleep })
+
+  const overCap = filters.filter((f) => span(f) > CAP)
+  expect(overCap.length).toBeGreaterThan(1) // the descent, PLUS a regrowth probe per 4 clean chunks
+  expect(filters.some((f) => span(f) === 6_250n)).toBe(true) // …and it settles below the real cap
+})
+
+test('widthMemory: the second scan starts at the width the first one learned', async () => {
+  const CAP = 10_000n
+  const memory: { learnedScanWidth?: bigint; declaredScanCap?: bigint } = {}
+  const handler = (filter: any): unknown[] => {
+    if (span(filter) > CAP) throw new Error('eth_getLogs is limited to a 10,000 range')
+    return []
+  }
+
+  const first = stub(handler)
+  await scanLogs(first.client, QUERY, { fromBlock: 1n, toBlock: 100_000n }, { widthMemory: memory })
+  expect(memory.learnedScanWidth).toBe(CAP)
+  expect(memory.declaredScanCap).toBe(CAP)
+  expect(first.filters.filter((f) => span(f) > CAP)).toHaveLength(1) // the one probe that taught it
+
+  const second = stub(handler)
+  const res = await scanLogs(second.client, QUERY, { fromBlock: 1n, toBlock: 100_000n }, { widthMemory: memory })
+
+  // Not one wasted request this time: the descent was a search for a fact already in hand.
+  expect(second.filters.filter((f) => span(f) > CAP)).toHaveLength(0)
+  expect(span(second.filters[0]!)).toBe(CAP)
+  expect(res.complete).toBe(true)
+})
+
+test('widthMemory: a stale hint is a HINT — the scan still corrects downward and still covers', async () => {
+  // The hint's whole safety argument. A remembered width that the endpoint no longer serves (a
+  // tightened plan, or a snapshot shared between two providers on one chain — `cli/cache.ts` does
+  // exactly that) costs probes, never coverage.
+  const memory = { learnedScanWidth: 1_000_000n }
+  const { client, filters } = stub((filter) => {
+    if (span(filter) > 1_000n) throw new Error('boom')
+    return []
+  })
+
+  const res = await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 8_000n }, { sleep: recorder().sleep, widthMemory: memory })
+
+  expect(span(filters[0]!)).toBe(8_000n) // bounded by the RANGE, which is narrower than the hint
+  expect(res.complete).toBe(true)
+  expect(res.covered).toEqual([{ fromBlock: 1n, toBlock: 8_000n }])
+})
+
+test('widthMemory: the hint never widens a scan past its own ceiling', async () => {
+  // `initialChunk` is the caller's own bound on their provider. A remembered width from somewhere
+  // else must not be allowed to overrule it, or `logChunkBlocks` would stop meaning anything.
+  const memory = { learnedScanWidth: MAX_SCAN_WINDOW }
+  const { client, filters } = stub(() => [])
+
+  await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 100_000n }, { initialChunk: 1_000n, widthMemory: memory })
+
+  expect(filters.every((f) => span(f) <= 1_000n)).toBe(true)
+})
+
+test('widthMemory: the learned width is a running MAXIMUM, not the last window asked for', async () => {
+  // A short delta re-scan asks for a short window and is served. Recording that as what the endpoint
+  // "can do" would ratchet the hint towards nothing over a warm router's life — every incremental
+  // re-scan is short.
+  const memory: { learnedScanWidth?: bigint } = {}
+  const { client } = stub(() => [])
+
+  await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 500_000n }, { widthMemory: memory })
+  expect(memory.learnedScanWidth).toBe(500_000n)
+
+  await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 300n }, { widthMemory: memory })
+  expect(memory.learnedScanWidth).toBe(500_000n) // unchanged by the narrow re-scan
+})
+
+test('widthMemory: absent, every behaviour is exactly what it was', async () => {
+  const CAP = 1_000n
+  const withMemory = stub((f) => (span(f) > CAP ? (() => { throw new Error('boom') })() : []))
+  const without = stub((f) => (span(f) > CAP ? (() => { throw new Error('boom') })() : []))
+
+  const a = await scanLogs(withMemory.client, QUERY, { fromBlock: 1n, toBlock: 20_000n }, { sleep: recorder().sleep, widthMemory: {} })
+  const b = await scanLogs(without.client, QUERY, { fromBlock: 1n, toBlock: 20_000n }, { sleep: recorder().sleep })
+
+  expect(withMemory.filters.map(span)).toEqual(without.filters.map(span))
+  expect(a).toEqual(b)
+})
+
+test('quicknode Base, live capture: the batched shape reaches the fast path through its cause', async () => {
+  // End to end against the real captured error, in the shape the CLI's transport delivered it:
+  // HTTP 200, `-32614` on the cause, the cap only in the prose. If either the classifier tier or the
+  // parser pattern regresses, this scan goes back to eleven blind halvings and settles at 7,812.
+  const CAP = 10_000n
+  const { client, filters } = stub((filter) => {
+    if (span(filter) <= CAP) return []
+    throw Object.assign(new Error(providerErrors['base-mainnet.quiknode.pro (batched)'].message), {
+      name: 'RpcRequestError',
+      cause: { code: -32614, message: 'eth_getLogs is limited to a 10,000 range' },
+    })
+  })
+
+  const res = await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 1_000_000n }, { sleep: recorder().sleep })
+
+  expect(span(filters[0]!)).toBe(1_000_000n)
+  expect(span(filters[1]!)).toBe(CAP) // straight to the stated cap, not 500,000
+  expect(filters.filter((f) => span(f) > CAP)).toHaveLength(1)
+  expect(res.complete).toBe(true)
+})
+
+// ---------------------------------------------------------------------------
+// `opts.maxRequests` — a caller narrowing its own slice of the budget.
+//
+// The case it exists for is not an expensive scan; it is a scan in the WRONG
+// PLACE. `discoverFeeTiers` walks a factory's whole fee history from wave 1,
+// ahead of the adjacency waves that are what a search reports coverage for, and
+// on a 10,000-block-capped endpoint over 48M blocks that is 4,822 requests —
+// the entire `--budget 60s`, spent before wave 2 could start.
+// ---------------------------------------------------------------------------
+
+test('maxRequests stops the scan at the caller’s bound and reports the rest as uncovered', async () => {
+  const { client, filters } = stub(() => [])
+
+  const res = await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 1_000_000n }, { initialChunk: 1_000n, maxRequests: 10 })
+
+  expect(filters).toHaveLength(10) // 1,000 windows would be needed; ten were bought
+  expect(res.complete).toBe(false)
+  // Recent-first, so what IS covered is the tail — and it is claimed honestly, not rounded up.
+  expect(res.covered).toEqual([{ fromBlock: 990_001n, toBlock: 1_000_000n }])
+})
+
+test('maxRequests counts FAILURES too — a refusing endpoint cannot spend more than the bound', async () => {
+  const { client, filters } = stub(() => {
+    throw new Error('boom')
+  })
+
+  const res = await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 1_000_000n }, { sleep: recorder().sleep, maxRequests: 5 })
+
+  expect(filters).toHaveLength(5)
+  expect(res.covered).toEqual([])
+})
+
+test('maxRequests only ever NARROWS: it cannot buy more than MAX_REQUESTS_PER_SCAN', async () => {
+  // The global ceiling is what bounds every scan in the package; a caller may take less of the
+  // endpoint's time than it allows, never more.
+  const { client, filters } = stub(() => {
+    throw new Error('boom')
+  })
+
+  await scanLogs(client, QUERY, { fromBlock: 0n, toBlock: MAX_SCAN_WINDOW * 100n }, {
+    sleep: recorder().sleep,
+    initialChunk: MIN_CHUNK,
+    maxRequests: MAX_REQUESTS_PER_SCAN * 10,
+  })
+
+  expect(filters.length).toBeLessThanOrEqual(MAX_REQUESTS_PER_SCAN)
+})
+
+test('maxRequests never lets a concurrent batch overshoot the bound', async () => {
+  // The batch is planned before it is dispatched, so an off-by-one here would let a scan spend
+  // SCAN_CHUNK_CONCURRENCY - 1 requests it was not sold — the same exactness `MAX_REQUESTS_PER_SCAN`
+  // already relies on.
+  for (const bound of [1, 2, 3, 5, 7, 11]) {
+    const { client, filters } = concurrentStub(() => [])
+    await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 1_000_000n }, { initialChunk: 1_000n, maxRequests: bound })
+    expect(filters).toHaveLength(bound)
+  }
+})
+
+test('maxRequests absent leaves the global ceiling in charge, unchanged', async () => {
+  const { client, filters } = stub(() => [])
+  const res = await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 20_000n }, { initialChunk: 1_000n })
+  expect(filters).toHaveLength(20)
+  expect(res.complete).toBe(true)
+})
+
+test('the returned `requests` is what reached the wire, so a shared budget can be split exactly', async () => {
+  // `discoverFeeTiers` spends ONE budget across however many ranges `uncovered` hands it (a warm
+  // index gives two: the unscanned gap plus the re-opened reorg tail). Subtracting an ESTIMATE there
+  // is how a bound quietly becomes a multiplier — which it did, and the warm Base run spent the whole
+  // 60s in wave 1 again for exactly that reason.
+  const { client, filters } = stub(() => [])
+  const res = await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 100_000n }, { initialChunk: 1_000n, maxRequests: 30 })
+  expect(res.requests).toBe(30)
+  expect(res.requests).toBe(filters.length)
+
+  const complete = await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 5_000n }, { initialChunk: 1_000n })
+  expect(complete.requests).toBe(5)
+  expect(complete.complete).toBe(true)
+})
+
+test('an aborted chunk is not billed: `requests` counts the wire, not the plan', async () => {
+  const ac = new AbortController()
+  let served = 0
+  const { client } = concurrentStub(() => {
+    if (++served === 2) ac.abort()
+    return []
+  })
+
+  const res = await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 1_000_000n }, { initialChunk: 1_000n, signal: ac.signal })
+
+  // Whatever the batch planned, only chunks that actually went out are charged — the same accounting
+  // `MAX_REQUESTS_PER_SCAN` has always used, now visible to callers splitting a budget.
+  expect(res.requests).toBeGreaterThan(0)
+  expect(res.requests).toBeLessThanOrEqual(served + SCAN_CHUNK_CONCURRENCY)
+})
+
+// ---------------------------------------------------------------------------
+// THE CLAMP IS FOR SPAN POLICIES ONLY.
+//
+// Alchemy's response-size refusal names a "10,000 block range" and, in the same
+// sentence, suggests an ~8,000,000-block retry range for the same query. It is
+// offering two modes, not stating a ceiling. Clamping a scan's ceiling to the
+// 10,000 would pin every mainnet scan 800x too narrow for the rest of its life
+// — on the endpoint this package's own baseline numbers come from.
+// ---------------------------------------------------------------------------
+
+test('a DENSITY cap moves the width but never the ceiling: the ratchet must still climb out', async () => {
+  // The endpoint refuses the widest windows on DENSITY (a dense recent region) but happily serves
+  // 4,000,000-block windows once the walk is past it — the shape of a real mainnet adjacency scan.
+  const DENSE_BELOW = 30_000_000n // blocks below this are sparse and serve at any width
+  const { client, filters } = stub((filter) => {
+    const to = BigInt(filter.toBlock)
+    if (to > DENSE_BELOW && span(filter) > 1_000_000n) throw new Error(providerErrors['eth-mainnet.g.alchemy.com'].message)
+    return []
+  })
+
+  const res = await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 40_000_000n }, { sleep: recorder().sleep })
+
+  // It obeyed the stated 10,000 for the attempt that failed...
+  expect(filters.some((f) => span(f) === 10_000n)).toBe(true)
+  // ...but the ceiling was NOT lowered, so regrowth climbed back to windows orders of magnitude
+  // wider once the dense region was behind it. Un-gated, every window here would be <= 10,000 and
+  // this 40M-block range would need ~4,000 requests instead of a few dozen.
+  expect(filters.some((f) => span(f) > 1_000_000n)).toBe(true)
+  expect(filters.length).toBeLessThan(500)
+  expect(res.complete).toBe(true)
+})
+
+test('a density cap does not poison the width memory for later scans', async () => {
+  const memory: { learnedScanWidth?: bigint; declaredScanCap?: bigint } = {}
+  const { client } = stub((filter) => {
+    if (span(filter) > 4_000_000n) throw new Error(providerErrors['eth-mainnet.g.alchemy.com'].message)
+    return []
+  })
+
+  await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 20_000_000n }, { sleep: recorder().sleep, widthMemory: memory })
+
+  // No CEILING is remembered from a density observation — the next scan must be free to ask wide
+  // again, because the next scan is a different query over a different region.
+  expect(memory.declaredScanCap).toBeUndefined()
+  expect(memory.learnedScanWidth).toBeGreaterThan(10_000n)
+})
+
+test('a SPAN cap still clamps — the Base fix is not weakened by the density gate', async () => {
+  const CAP = 10_000n
+  const memory: { learnedScanWidth?: bigint; declaredScanCap?: bigint } = {}
+  const { client, filters } = stub((filter) => {
+    if (span(filter) > CAP) throw new Error('eth_getLogs is limited to a 10,000 range')
+    return []
+  })
+
+  await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 200_000n }, { widthMemory: memory })
+
+  expect(memory.declaredScanCap).toBe(CAP)
+  expect(filters.filter((f) => span(f) > CAP)).toHaveLength(1) // one probe, then never again
+})
