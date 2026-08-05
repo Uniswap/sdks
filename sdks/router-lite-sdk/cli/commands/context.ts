@@ -95,8 +95,26 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
   // run keeps viem's defaults plus the chain-shaped timeout.
   const timeout =
     budgetMs !== undefined ? Math.max(1_000, Math.min(budgetMs, clientTimeoutMs(chain.chainId))) : clientTimeoutMs(chain.chainId)
+  // `batch: false` IS THE MEASUREMENT, NOT THE DEFAULT-BY-OMISSION. This used to be `batch: true`, on
+  // the reasonable-sounding theory that coalescing concurrent JSON-RPC calls into one POST is
+  // strictly cheaper than making them separately. Against a real endpoint it is the opposite, and by
+  // a lot, because of what this tool's heaviest phase looks like: an adjacency wave runs six scans at
+  // once, each dispatching up to `SCAN_CHUNK_CONCURRENCY` chunks, so ~20 `eth_getLogs` are in flight
+  // together — and viem's batcher turns those into ONE request that the provider serves more or less
+  // serially and that cannot return until its slowest member does. Twenty independent requests over a
+  // keep-alive pool genuinely overlap; one batch of twenty does not.
+  //
+  // Measured, 20s of six concurrent adjacency scans, blocks covered per second:
+  //
+  //     endpoint                   batch: true    batch: false
+  //     quicknode  Base (8453)          71,161         437,435     6.1x
+  //     alchemy    Mainnet (1)       2,472,779       3,316,227     1.34x
+  //
+  // It is not merely slower, either: an un-abortable multi-second batch POST is also why `--budget`
+  // overshot — a 20s window returned at 29s, because the signal cannot interrupt a request whose
+  // twenty members the transport has already fused into one.
   const client = createPublicClient({
-    transport: http(rpcUrl, { batch: true, timeout, ...(budgetMs !== undefined ? { retryCount: 0 } : {}) }),
+    transport: http(rpcUrl, { batch: false, timeout, ...(budgetMs !== undefined ? { retryCount: 0 } : {}) }),
   }) as PublicClient
   const fresh = new PoolIndex(chain.manifest.wrappedNative, {
     reorgOverlapBlocks: chain.manifest.chain?.reorgOverlapBlocks,
@@ -144,7 +162,52 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
 
   const router = createRouter({ client, manifest: chain.manifest, index })
   const base = { chain, client, router, index }
-  return budgetMs !== undefined ? { ...base, signal: AbortSignal.timeout(budgetMs) } : base
+  return budgetMs !== undefined ? { ...base, signal: budgetSignal(budgetMs) } : base
+}
+
+// ---------------------------------------------------------------------------
+// `--budget`'s clock.
+//
+// This is deliberately NOT `AbortSignal.timeout(ms)`, which is what it used to
+// be and which reads as the obvious answer. That signal's timer is UNREF'D, and
+// an unref'd timer is not reliably serviced by this runtime's loop while the
+// loop is saturated with network I/O — which is precisely the state a budgeted
+// search spends its whole life in.
+//
+// OBSERVED, NOT INFERRED. `rl quote eth usdc 1 --watch --budget 60s` against
+// Base's quicknode endpoint: four consecutive runs never saw `aborted` flip at
+// all — the search was still issuing `eth_getLogs` at t=180s, ~7,700 requests
+// deep and climbing, with the signal reporting `aborted === false` the entire
+// time and RSS past 13 GB on the longest one. The identical run with an
+// explicit `AbortController` behind an ordinary ref'd `setTimeout` aborted at
+// t=60.4s and exited. Shorter budgets (20s, 45s) fired reliably either way,
+// which is why this went unnoticed: the failure needs a loop that has been
+// busy for long enough, and until the fee-discovery scan stopped eating whole
+// budgets (`constants.ts#FEE_DISCOVERY_MAX_REQUESTS`) nothing here ever ran the
+// adjacency waves that keep it that busy.
+//
+// A ref'd timer would hold the process open for the remainder of the budget
+// after a fast command finishes, so {@link cancelBudget} clears it — from
+// `rl.ts`'s `finally` and from its signal handlers, next to the cache flush
+// that already runs there for the same "one invocation, one context" reason.
+//
+// THE SDK IS NOT AFFECTED and needs no change: it consumes whatever
+// `AbortSignal` it is handed and never manufactures one. This is a fact about
+// how a HOST should build the signal, so it belongs in the host.
+// ---------------------------------------------------------------------------
+
+let pendingBudgetTimer: ReturnType<typeof setTimeout> | undefined
+
+function budgetSignal(budgetMs: number): AbortSignal {
+  const controller = new AbortController()
+  pendingBudgetTimer = setTimeout(() => controller.abort(), budgetMs)
+  return controller.signal
+}
+
+/** Clears the budget timer so a finished command exits immediately. Idempotent; never throws. */
+export function cancelBudget(): void {
+  if (pendingBudgetTimer !== undefined) clearTimeout(pendingBudgetTimer)
+  pendingBudgetTimer = undefined
 }
 
 export type TradeContextResolved = {

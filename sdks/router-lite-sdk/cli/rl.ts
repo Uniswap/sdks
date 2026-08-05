@@ -42,6 +42,7 @@ import { bold, dim, red, setColorEnabled } from './ansi'
 import { UsageError } from './args'
 import { flushCacheSave } from './cache'
 import { cmdChains } from './commands/chains'
+import { cancelBudget } from './commands/context'
 import { cmdDiscover } from './commands/discover'
 import { cmdQuote } from './commands/quote'
 import { cmdSwap } from './commands/swap'
@@ -139,6 +140,9 @@ async function main(): Promise<number> {
     // the runs that are already going badly permanently slow. `flushCacheSave` never throws, so this
     // cannot change the exit code a branch above already decided on.
     await flushCacheSave()
+    // The `--budget` clock is a REF'D timer (see `commands/context.ts#budgetSignal`), so a command
+    // that finished early would otherwise hold the process open for the rest of its budget.
+    cancelBudget()
   }
 }
 
@@ -165,6 +169,7 @@ for (const [signal, signo] of [
       // `flushCacheSave` clears its own registration, so the `finally` in `main` — if it ever gets to
       // run — is a no-op rather than a second write, and the save itself never throws.
       await flushCacheSave()
+      cancelBudget()
       process.exit(128 + signo)
     })()
   })
