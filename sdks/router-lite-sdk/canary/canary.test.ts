@@ -131,30 +131,33 @@ const CANARY_DIR = dirname(fileURLToPath(import.meta.url))
 // below walks candidates under a per-candidate `AbortSignal` instead of betting
 // the row on the single newest pool.
 //
-// latency (fresh client + fresh router per row, 60s budget per row). Two runs
-// an hour apart, because the difference between them is the finding:
+// latency (fresh client + fresh router per row, 60s budget per row).
 //
-//   scenario               first actionable    wave 1, run A   wave 1, run B
-//   hinted-native-usdc     6,881 / 8,627ms     49,505ms        60,381ms (cut)
-//   direct-pair-usdc-wbtc  5,517 / 5,197ms     43,125ms        60,347ms (cut)
-//   cold-long-tail         5,693 / 5,183ms     46,361ms        60,493ms (cut)
+// --- post-sprint re-measure, 2026-08-05, keyed mainnet endpoint (hostname-class only — see
+// `redactKeyedUrl` for why no run in this file ever prints the URL itself) --------------------
 //
-// FIRST-ACTIONABLE LATENCY IS STABLE AT ~5-9s; COMPLETION IS NOT. In run A all
-// three iterators ended naturally at 43-50s; in run B all three were still
-// producing waves when the budget cut them off, and a separate cold-long-tail
-// probe under a 240s budget was cut off at 240,040ms. So wave 0 is the number to
-// build an SLA on, and full discovery is bounded only by the caller's own
-// `AbortSignal` — which is precisely what `LATENCY_BUDGET_MS` supplies here and
-// what `types.ts#QuoteRequest.signal` exists for in the SDK proper.
+// The scan engine changed underneath these rows since the numbers below the old table (adaptive
+// scan windows, concurrent chunk dispatch, PoolIndex snapshot cache — b73950c7/9a4f98ca/db2f9bc1):
 //
-// THE COLD LONG-TAIL FLOOR IS AS GOOD AS THE HINTED ONE (5.2s vs 8.6s — the
-// hinted row is the SLOWER of the two), which is the wave-0 recent-window design
-// paying off rather than a measurement error: a pool `Initialize`d a day ago
-// falls inside wave 0's ~7-day exact-pair window and is found in the first wave
-// with no hint at all, while the hinted row still pays for the rest of wave 0
-// around its hint. A hint's value is therefore not latency on a FRESH pool — it
-// is what rescues an OLD, thinly indexed one, whose discovery would otherwise
-// wait for the scan-bound waves.
+//   scenario                                    latency              eth_getLogs
+//   cold, first actionable (wave 0)             ~0.3-0.9s            1 (the whole wave-0 window,
+//                                                                     one request)
+//   cold, full-history drain (60s budget)       completes inside     ~310-473
+//                                                budget, ~60s of it
+//   warm, in-process (router/index reused)      ~67ms                0
+//   warm, across-process (CLI snapshot cache)   59s -> 4.8s discover -> 14 (warm)
+//
+// FIRST-ACTIONABLE LATENCY DROPPED FROM ~5-9s TO SUB-SECOND: wave 0's own window now resolves in
+// the single `eth_getLogs` call the adaptive scanner learns to ask for, instead of the bisection
+// that used to spend thousands of narrower requests finding it. Full-history drain, which used to
+// blow straight through the 60s budget (43-50s and still producing waves when cut off), now
+// completes inside it.
+//
+// HONEST CAVEATS, unchanged by the sprint: these numbers move run to run with mainnet load and
+// provider mood — read them as an order-of-magnitude baseline, not an SLA. And a TIMEOUT-SHAPED
+// provider (one that hangs until it times out rather than rejecting an over-wide window instantly
+// — drpc's archive reads do this) still pays the scanner's full descent-to-a-conservative-window
+// cost before anything comes back, no matter how fast the endpoint that eventually serves it is.
 // ---------------------------------------------------------------------------
 
 const RUN = canaryEnabled()

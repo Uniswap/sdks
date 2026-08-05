@@ -241,8 +241,13 @@ answer is a bug in the record, not a chain that rewound, and it must not brick t
   order of an hour before the partial answer comes back (deliberate backoff adds at most a further
   60s) — so any caller with a latency budget should pass an `AbortSignal`, which is the only
   wall-clock bound there is. On a well-behaved endpoint the budget is now almost entirely headroom:
-  a cold mainnet-history scan is a couple of requests wide, not the ~2,600 a fixed 10,000-block
-  window used to cost.
+  measured 2026-08-05, keyed mainnet endpoint, a cold first-actionable result costs ONE
+  `eth_getLogs` call (~0.3-0.9s — the whole wave-0 window resolved in a single request), and a full
+  cold drain to complete discovery lands inside a 60s budget at ~310-473 `eth_getLogs` calls total —
+  not the ~2,600 a fixed 10,000-block window used to cost. These move run to run with mainnet load
+  and provider mood, and a timeout-shaped provider (one that hangs rather than rejecting an
+  over-wide window instantly) still pays the full cost of the scan descent before any of this
+  headroom shows up.
 
 ## Launcher recipe: routing a brand-new pool immediately
 
@@ -402,12 +407,13 @@ starting fresh costs one delta scan.
 The CLI (`cli/rl.ts`) is the reference consumer: it keeps one snapshot per chain under
 `~/.cache/router-lite/<chainId>.json` (respecting `$XDG_CACHE_HOME`), loads it at start, and writes
 it back atomically on exit. It is on by default for every command; `--no-cache` opts out, and
-`--verbose` reports what was loaded and saved. Measured on mainnet, `rl discover usdc` goes from 67s
-cold (budget-aborted, v2 discovery still partial) to 5.1s fully warm, with `eth_getLogs` dropping
-from 356 to 14 — the 14 being the standing reorg-overlap re-scans. The cost is on the other side: a
-maximal 275 MB snapshot adds ~1.5s to load, so a major-pair `rl quote` that would have resolved in
-wave 0 without the index gets slower (and more thorough) rather than faster. See `cli/cache.ts` for
-the size bound and the numbers behind it.
+`--verbose` reports what was loaded and saved. Measured 2026-08-05, keyed mainnet endpoint, `rl
+discover usdc` goes from 59s cold (budget-aborted, v2 discovery still partial) to 4.8s fully warm,
+with `eth_getLogs` dropping to 14 on the warm run — the 14 being the standing reorg-overlap
+re-scans. (Run to run variance is real here too — treat 59s/4.8s as representative, not exact.) The
+cost is on the other side: a maximal 275 MB snapshot adds ~1.5s to load, so a major-pair `rl quote`
+that would have resolved in wave 0 without the index gets slower (and more thorough) rather than
+faster. See `cli/cache.ts` for the size bound and the numbers behind it.
 
 ## Transport options
 

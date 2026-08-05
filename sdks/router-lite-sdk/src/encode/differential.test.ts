@@ -534,7 +534,9 @@ for (const shape of SHAPES) {
       calldata: ours.data,
       value: ours.value.toString(),
     }
-  })
+  // 30s (vs. bun's 5s default): under CPU contention, universal-router-sdk's Trade construction is
+  // slow enough to flake here — reproduced taking ~17s under load at 6bf70b99, no regression on our side.
+  }, 30_000)
 }
 
 test('goldens.json covers every shape and matches the current encoding', () => {
