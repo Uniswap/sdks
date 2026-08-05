@@ -42,17 +42,23 @@ const PERMIT2 = getAddress('0x000000000022D473030F116dDEE9F6B43aC78BA3')
 
 // Deployed at the same CREATE2 address on every supported chain.
 const LIQUIDITY_LAUNCHER = getAddress('0x00004c4ccc709Ef590F7C81102C0689F0263D4e9')
-// liquidity-launcher #223/#227 dev deploy, chain 4663 only. The redeploy changes the launcher's
+// liquidity-launcher v3.1.1 deploy, chain 4663 only. The #223/#227 redeploy changes the launcher's
 // bytecode so the mined vanity salt no longer resolves to LIQUIDITY_LAUNCHER. Scoped to Robinhood
 // because 4663 is the only chain it exists on; once the final re-mined launcher is deployed on
 // every chain, this constant collapses back into LIQUIDITY_LAUNCHER.
-const LIQUIDITY_LAUNCHER_ROBINHOOD = getAddress('0xe050309b2F42cD5f788aB6eE1a07467770C03BF7')
+//
+// This supersedes the v3.1.0 dev launcher `0xe050309b…` that shipped in 1.6.0. That deploy was
+// never launched against, and the strategies deployed alongside it were mis-pinned (they held the
+// previous launcher as their `launcher` immutable, so calls from `0x7A6C474b…` reverted
+// `OnlyLauncher()`); liquidity-launcher `5ef0262b` redeployed the strategies against this launcher.
+// Verified on-chain on 4663: every strategy below returns this address from `launcher()`.
+const LIQUIDITY_LAUNCHER_ROBINHOOD = getAddress('0x7A6C474b4DcD35b72203D2B569EAfE4C9b5C768e')
 // UniversalRouterStrategy, pinned to LIQUIDITY_LAUNCHER_ROBINHOOD as a constructor immutable (verified
 // on-chain: `launcher()` returns it). Deployed via CREATE2 at salt 0 through the canonical deployer
 // (liquidity-launcher#227 `DeployUniversalRouterStrategy.s.sol`), so it is chain-independent too —
 // but it is only deployed on 4663 so far, hence the per-chain optional field. Same dev-deploy
-// caveat as the launcher above.
-const UNIVERSAL_ROUTER_STRATEGY_ROBINHOOD = getAddress('0xB7fF4d94C3fB06ec4D715cFa4DDdf3f18d16e945')
+// caveat as the launcher above; supersedes the v3.1.0 `0xB7fF4d94…`.
+const UNIVERSAL_ROUTER_STRATEGY_ROBINHOOD = getAddress('0x4962907c62eBC529E84de899d081A53Ca9Ed05dD')
 // Current CCA factory: the 2026-07-09 redeploy built against blocknumberish v1.1.0, which translates
 // block.number on every chain that needs it (e.g. Arbitrum One and Robinhood/4663 — the earlier
 // factory only handled Arbitrum, so on other translated chains it derived auction block ranges
@@ -262,31 +268,47 @@ export function getTickDataLensForFactory(factoryAddress: string): Address | und
 // immutable at construction.
 //
 // Four strategy generations are registered (append-only — indexed launches permanently reference
-// the strategy that created them; see {@link INSTANT_LAUNCH_DEPLOYMENTS}), all v3.1.0 logic:
+// the strategy that created them; see {@link INSTANT_LAUNCH_DEPLOYMENTS}), all identical strategy
+// logic — the generations differ only in constructor immutables:
 //  - c3f9506 pair (2026-07-29): OZ notes/L-04 round + the 1e20 compounding floor; still carries
 //    the OZ H01 fix flooring launch positions at tick -208,980. Has indexed launches, so it stays.
 //  - 8e40a35 pair (2026-07-30): caps the instant-launch initial tick at 251,340 — a deploy-script/
 //    constructor-side change only, no ABI or event changes.
 //  - 3e05da8 pair (2026-07-30): comment/natspec cleanup on the same logic.
-//  - PR227 pair (2026-08-04, current): forced by the launcher redeploy in liquidity-launcher
+//  - v3.1.1 pair (2026-08-05, current): forced by the launcher redeploy in liquidity-launcher
 //    #223/#227. The strategy logic is untouched (neither PR modifies InstantLaunchStrategy.sol) —
 //    each new runtime is byte-identical to its 3e05da8 counterpart except at the three sites
 //    embedding the `launcher` immutable, which now holds LIQUIDITY_LAUNCHER_ROBINHOOD. A pure re-pin.
-// The FeeSplitters and the shared singletons below are unchanged across all four generations
-// (still the c3f9506 deploys), and every generation opens pools at initialTick 198,060.
+//    This pair also carries a **new fees-on FeeSplitter and a new UERC20BeneficiaryVault**, unlike
+//    the earlier three generations which all reuse the c3f9506 splitters and vault.
+//
+// The v3.1.0 dev pair (`0xF0C0a0f3…` / `0x3fe607E7…`) that shipped in 1.6.0 is **removed rather than
+// retained**: it was mis-pinned to the previous launcher, was never launched against, and therefore
+// has no indexed launches for the append-only rule to protect. Every generation that does have
+// indexed launches is still registered below.
+//
+// Every generation opens pools at initialTick 198,060.
 const INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_C3F9506 = getAddress('0x60D73b21cDf2EA846ab3d58699BBbb8F29d72491')
 const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD_C3F9506 = getAddress('0xFCe92C70f1fc017b72f6DD7a00D9E38725C7fBd1')
 const INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_8E40A35 = getAddress('0xcE57498D3474DCC244dFb6710fFbE6D4441cD2b2')
 const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD_8E40A35 = getAddress('0x583a7903152b95831e82ffF534448Dee081754ec')
 const INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_3E05DA8 = getAddress('0x9F67B864B565966dfCc2E0C6bA2483b2D5fF4b00')
 const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD_3E05DA8 = getAddress('0x16b63f1c8415FD68591c31FB3c6796a333DD640C')
-// Same dev-deploy caveat as LIQUIDITY_LAUNCHER_ROBINHOOD: these are re-pinned to the 4663 dev launcher and
-// will be redeployed again against the final re-mined launcher address.
-const INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_PR227 = getAddress('0xF0C0a0f3a0c09023c8E4747DEED996FE8648e85e')
-const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD_PR227 = getAddress('0x3fe607E7236DDa841bC805dDe8821339f012dcE3')
-const INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ROBINHOOD = getAddress('0x7198C32a497c09497e04C86cf8F77A244A9E4b8F')
+// v3.1.1, re-pinned to LIQUIDITY_LAUNCHER_ROBINHOOD (verified on-chain: `launcher()` returns it).
+const INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_V311 = getAddress('0x3f556B542105D5EFBBefe7C766a4919C76B960Fb')
+const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD_V311 = getAddress('0x36bdB859518C89F764337cd5C24762d2Aa650f3C')
+// FeeSplitters. The fees-on side gets a fresh splitter in v3.1.1 (it points at the new beneficiary
+// vault, which is likewise a new deploy); the fees-off splitter is unchanged across every generation.
+// The c3f9506 fees-on splitter stays as the splitter of the three older generations — indexed
+// launches migrated LP positions to it permanently, so it must keep classifying.
+const INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ROBINHOOD_C3F9506 = getAddress('0x7198C32a497c09497e04C86cf8F77A244A9E4b8F')
+const INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ROBINHOOD_V311 = getAddress('0x6CC1b74Fc1BE1ff373Fa07f3381856f38103e653')
 const INSTANT_LAUNCH_FEE_SPLITTER_FEES_OFF_ROBINHOOD = getAddress('0xDF50f4ea2207F9D2A753a3DaE729B36FDEF13b23')
-const UERC20_BENEFICIARY_VAULT_ROBINHOOD = getAddress('0x587D2fDDDF14F6f84022b51e8c3a473eB88C4544')
+// UERC20BeneficiaryVault. v3.1.1 deploys a new one (liquidity-launcher `feat/beneficiary-vault-register`);
+// it is the vault the current fees-on splitter forwards the creator share to, and the one a new
+// launch registers its beneficiary with. Supersedes the c3f9506 vault `0x587D2fDD…`, which remains
+// the claim surface for beneficiaries registered by the three older generations.
+const UERC20_BENEFICIARY_VAULT_ROBINHOOD = getAddress('0xa5889CaFCB1757218eA71730bee381Cc2a3F2CCC')
 const COMPOUNDING_CLAIM_RECIPIENT_ROBINHOOD = getAddress('0x666DA63451A502A323677C2Ef5F763181358be9b')
 
 /** FeeSplitter splits are expressed in basis points summing to this denominator per currency side. */
@@ -361,7 +383,7 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
   {
     chainId: SupportedChainId.ROBINHOOD,
     strategy: INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_C3F9506,
-    feeSplitter: INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ROBINHOOD,
+    feeSplitter: INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ROBINHOOD_C3F9506,
     creatorFeesEnabled: true,
     creatorFeeNativeBps: 4000,
     creatorFeeTokenBps: 0,
@@ -383,7 +405,7 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
   {
     chainId: SupportedChainId.ROBINHOOD,
     strategy: INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_8E40A35,
-    feeSplitter: INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ROBINHOOD,
+    feeSplitter: INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ROBINHOOD_C3F9506,
     creatorFeesEnabled: true,
     creatorFeeNativeBps: 4000,
     creatorFeeTokenBps: 0,
@@ -405,7 +427,7 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
   {
     chainId: SupportedChainId.ROBINHOOD,
     strategy: INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_3E05DA8,
-    feeSplitter: INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ROBINHOOD,
+    feeSplitter: INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ROBINHOOD_C3F9506,
     creatorFeesEnabled: true,
     creatorFeeNativeBps: 4000,
     creatorFeeTokenBps: 0,
@@ -426,25 +448,25 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
   },
   {
     chainId: SupportedChainId.ROBINHOOD,
-    strategy: INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_PR227,
-    feeSplitter: INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ROBINHOOD,
+    strategy: INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_V311,
+    feeSplitter: INSTANT_LAUNCH_FEE_SPLITTER_FEES_ON_ROBINHOOD_V311,
     creatorFeesEnabled: true,
     creatorFeeNativeBps: 4000,
     creatorFeeTokenBps: 0,
     initialTick: 198060,
     description:
-      'Instant Launch with creator fees (2026-08-04, liquidity-launcher #223/#227 launcher redeploy, current): unchanged 3e05da8 logic re-pinned to the new LiquidityLauncher; same c3f9506 FeeSplitter forwarding 40% of native fees to the UERC20BeneficiaryVault, 60% native + 100% token to the CompoundingClaimRecipient',
+      'Instant Launch with creator fees (2026-08-05, liquidity-launcher v3.1.1, current): unchanged 3e05da8 logic re-pinned to the v3.1.1 LiquidityLauncher; new FeeSplitter forwarding 40% of native fees to the new UERC20BeneficiaryVault, 60% native + 100% token to the CompoundingClaimRecipient',
   },
   {
     chainId: SupportedChainId.ROBINHOOD,
-    strategy: INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD_PR227,
+    strategy: INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD_V311,
     feeSplitter: INSTANT_LAUNCH_FEE_SPLITTER_FEES_OFF_ROBINHOOD,
     creatorFeesEnabled: false,
     creatorFeeNativeBps: 0,
     creatorFeeTokenBps: 0,
     initialTick: 198060,
     description:
-      'Instant Launch without creator fees (2026-08-04, liquidity-launcher #223/#227 launcher redeploy, current): unchanged 3e05da8 logic re-pinned to the new LiquidityLauncher; zero beneficiary vault; same c3f9506 FeeSplitter forwarding 100% of both fee sides to the CompoundingClaimRecipient',
+      'Instant Launch without creator fees (2026-08-05, liquidity-launcher v3.1.1, current): unchanged 3e05da8 logic re-pinned to the v3.1.1 LiquidityLauncher; zero beneficiary vault; same c3f9506 FeeSplitter forwarding 100% of both fee sides to the CompoundingClaimRecipient',
   },
 ]
 

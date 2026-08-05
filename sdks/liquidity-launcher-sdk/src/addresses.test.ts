@@ -40,10 +40,10 @@ describe('getLauncherAddresses', () => {
     }
   })
 
-  it('scopes the #223/#227 dev launcher to Robinhood (4663) in both registries', () => {
-    const devLauncher = getAddress('0xe050309b2F42cD5f788aB6eE1a07467770C03BF7')
-    expect(getLauncherAddresses(SupportedChainId.ROBINHOOD)?.liquidityLauncher).toBe(devLauncher)
-    expect(getInstantLaunchContracts(SupportedChainId.ROBINHOOD)?.liquidityLauncher).toBe(devLauncher)
+  it('scopes the v3.1.1 launcher to Robinhood (4663) in both registries', () => {
+    const v311Launcher = getAddress('0x7A6C474b4DcD35b72203D2B569EAfE4C9b5C768e')
+    expect(getLauncherAddresses(SupportedChainId.ROBINHOOD)?.liquidityLauncher).toBe(v311Launcher)
+    expect(getInstantLaunchContracts(SupportedChainId.ROBINHOOD)?.liquidityLauncher).toBe(v311Launcher)
   })
 
   it('returns undefined for an unsupported chain', () => {
@@ -52,7 +52,7 @@ describe('getLauncherAddresses', () => {
 
   it('carries the UniversalRouterStrategy only where it is deployed (4663 so far)', () => {
     expect(getLauncherAddresses(SupportedChainId.ROBINHOOD)?.universalRouterStrategy).toBe(
-      getAddress('0xB7fF4d94C3fB06ec4D715cFa4DDdf3f18d16e945')
+      getAddress('0x4962907c62eBC529E84de899d081A53Ca9Ed05dD')
     )
     expect(getLauncherAddresses(SupportedChainId.MAINNET)?.universalRouterStrategy).toBeUndefined()
   })
@@ -128,17 +128,39 @@ describe('selectTokenFactory', () => {
   })
 })
 
+// The fees-on FeeSplitter changes in v3.1.1 (it forwards to the new beneficiary vault); the fees-off
+// splitter is the same contract on every generation.
+const FEES_ON_SPLITTER_C3F9506 = '0x7198C32a497c09497e04C86cf8F77A244A9E4b8F'
+const FEES_ON_SPLITTER_V311 = '0x6CC1b74Fc1BE1ff373Fa07f3381856f38103e653'
+const FEES_OFF_SPLITTER_ALL = '0xDF50f4ea2207F9D2A753a3DaE729B36FDEF13b23'
+
 // The four canonical Robinhood strategy generations from the liquidity-launcher dev README, in
-// registry (append) order. All share the per-variant FeeSplitters and open at initialTick 198,060.
+// registry (append) order. Every generation opens at initialTick 198,060.
 const ROBINHOOD_STRATEGY_GENERATIONS = [
   // c3f9506 (2026-07-29)
-  { on: '0x60D73b21cDf2EA846ab3d58699BBbb8F29d72491', off: '0xFCe92C70f1fc017b72f6DD7a00D9E38725C7fBd1' },
+  {
+    on: '0x60D73b21cDf2EA846ab3d58699BBbb8F29d72491',
+    off: '0xFCe92C70f1fc017b72f6DD7a00D9E38725C7fBd1',
+    onSplitter: FEES_ON_SPLITTER_C3F9506,
+  },
   // 8e40a35 (2026-07-30, initial-tick cap)
-  { on: '0xcE57498D3474DCC244dFb6710fFbE6D4441cD2b2', off: '0x583a7903152b95831e82ffF534448Dee081754ec' },
+  {
+    on: '0xcE57498D3474DCC244dFb6710fFbE6D4441cD2b2',
+    off: '0x583a7903152b95831e82ffF534448Dee081754ec',
+    onSplitter: FEES_ON_SPLITTER_C3F9506,
+  },
   // 3e05da8 (2026-07-30)
-  { on: '0x9F67B864B565966dfCc2E0C6bA2483b2D5fF4b00', off: '0x16b63f1c8415FD68591c31FB3c6796a333DD640C' },
-  // #223/#227 launcher redeploy (2026-08-04, current)
-  { on: '0xF0C0a0f3a0c09023c8E4747DEED996FE8648e85e', off: '0x3fe607E7236DDa841bC805dDe8821339f012dcE3' },
+  {
+    on: '0x9F67B864B565966dfCc2E0C6bA2483b2D5fF4b00',
+    off: '0x16b63f1c8415FD68591c31FB3c6796a333DD640C',
+    onSplitter: FEES_ON_SPLITTER_C3F9506,
+  },
+  // v3.1.1 launcher redeploy (2026-08-05, current) — new strategy pair AND a new fees-on splitter
+  {
+    on: '0x3f556B542105D5EFBBefe7C766a4919C76B960Fb',
+    off: '0x36bdB859518C89F764337cd5C24762d2Aa650f3C',
+    onSplitter: FEES_ON_SPLITTER_V311,
+  },
 ] as const
 
 describe('Instant Launch deployment registry', () => {
@@ -149,12 +171,12 @@ describe('Instant Launch deployment registry', () => {
       const on = deployments[index * 2]
       const off = deployments[index * 2 + 1]
       expect(on!.strategy).toBe(getAddress(generation.on))
-      expect(on!.feeSplitter).toBe(getAddress('0x7198C32a497c09497e04C86cf8F77A244A9E4b8F'))
+      expect(on!.feeSplitter).toBe(getAddress(generation.onSplitter))
       expect(on!.creatorFeesEnabled).toBe(true)
       expect(on!.creatorFeeNativeBps).toBe(4000)
       expect(on!.creatorFeeTokenBps).toBe(0)
       expect(off!.strategy).toBe(getAddress(generation.off))
-      expect(off!.feeSplitter).toBe(getAddress('0xDF50f4ea2207F9D2A753a3DaE729B36FDEF13b23'))
+      expect(off!.feeSplitter).toBe(getAddress(FEES_OFF_SPLITTER_ALL))
       expect(off!.creatorFeesEnabled).toBe(false)
       expect(off!.creatorFeeNativeBps).toBe(0)
       expect(off!.creatorFeeTokenBps).toBe(0)
@@ -170,12 +192,12 @@ describe('Instant Launch deployment registry', () => {
     expect(getInstantLaunchContracts(SupportedChainId.MAINNET)).toBeUndefined()
   })
 
-  it('getInstantLaunchStrategy selects the current (#223/#227 redeploy) deployment per variant', () => {
+  it('getInstantLaunchStrategy selects the current (v3.1.1) deployment per variant', () => {
     expect(getInstantLaunchStrategy(SupportedChainId.ROBINHOOD, { creatorFeesEnabled: true })?.strategy).toBe(
-      getAddress('0xF0C0a0f3a0c09023c8E4747DEED996FE8648e85e')
+      getAddress('0x3f556B542105D5EFBBefe7C766a4919C76B960Fb')
     )
     expect(getInstantLaunchStrategy(SupportedChainId.ROBINHOOD, { creatorFeesEnabled: false })?.strategy).toBe(
-      getAddress('0x3fe607E7236DDa841bC805dDe8821339f012dcE3')
+      getAddress('0x36bdB859518C89F764337cd5C24762d2Aa650f3C')
     )
   })
 
@@ -185,10 +207,10 @@ describe('Instant Launch deployment registry', () => {
       const off = getInstantLaunchDeployment(generation.off)
       expect(on?.chainId).toBe(SupportedChainId.ROBINHOOD)
       expect(on?.creatorFeesEnabled).toBe(true)
-      expect(on?.feeSplitter).toBe(getAddress('0x7198C32a497c09497e04C86cf8F77A244A9E4b8F'))
+      expect(on?.feeSplitter).toBe(getAddress(generation.onSplitter))
       expect(off?.chainId).toBe(SupportedChainId.ROBINHOOD)
       expect(off?.creatorFeesEnabled).toBe(false)
-      expect(off?.feeSplitter).toBe(getAddress('0xDF50f4ea2207F9D2A753a3DaE729B36FDEF13b23'))
+      expect(off?.feeSplitter).toBe(getAddress(FEES_OFF_SPLITTER_ALL))
     }
     // The historical generations classify but are never selected for new launches.
     const current = ROBINHOOD_STRATEGY_GENERATIONS[ROBINHOOD_STRATEGY_GENERATIONS.length - 1]!
@@ -210,7 +232,7 @@ describe('Instant Launch deployment registry', () => {
 
   it('carries the Robinhood singletons (vault, compounding recipient, launcher)', () => {
     const contracts = getInstantLaunchContracts(SupportedChainId.ROBINHOOD)
-    expect(contracts?.beneficiaryVault).toBe(getAddress('0x587D2fDDDF14F6f84022b51e8c3a473eB88C4544'))
+    expect(contracts?.beneficiaryVault).toBe(getAddress('0xa5889CaFCB1757218eA71730bee381Cc2a3F2CCC'))
     expect(contracts?.compoundingClaimRecipient).toBe(getAddress('0x666DA63451A502A323677C2Ef5F763181358be9b'))
     expect(contracts?.liquidityLauncher).toBe(getLauncherAddresses(SupportedChainId.ROBINHOOD)!.liquidityLauncher)
   })
@@ -232,7 +254,7 @@ describe('Instant Launch deployment registry', () => {
 describe('creator-fees position recipient', () => {
   // Independent literal (not read back from the registry) so a registry edit cannot silently move
   // the recipient: the current fees-enabled Robinhood FeeSplitter.
-  const FEES_ON_SPLITTER = getAddress('0x7198C32a497c09497e04C86cf8F77A244A9E4b8F')
+  const FEES_ON_SPLITTER = getAddress('0x6CC1b74Fc1BE1ff373Fa07f3381856f38103e653')
   const FEES_OFF_SPLITTER = getAddress('0xDF50f4ea2207F9D2A753a3DaE729B36FDEF13b23')
 
   it('resolves to the fees-enabled Robinhood FeeSplitter (registry-literal pin)', () => {
@@ -264,6 +286,14 @@ describe('creator-fees position recipient', () => {
     expect(isCreatorFeesPositionRecipient(SupportedChainId.ROBINHOOD, FEES_OFF_SPLITTER)).toBe(false)
   })
 
+  it('still classifies the superseded c3f9506 fees-on splitter (append-only classifier)', () => {
+    // v3.1.1 introduces a new fees-on splitter, so the current recipient moves — but launches that
+    // migrated their LP position to the c3f9506 splitter did so permanently, and must keep
+    // classifying as creator-fees launches. Selection moves; classification does not.
+    expect(isCreatorFeesPositionRecipient(SupportedChainId.ROBINHOOD, FEES_ON_SPLITTER_C3F9506)).toBe(true)
+    expect(getCreatorFeesPositionRecipient(SupportedChainId.ROBINHOOD)).not.toBe(getAddress(FEES_ON_SPLITTER_C3F9506))
+  })
+
   it('rejects an unknown recipient and a wrong chain', () => {
     expect(isCreatorFeesPositionRecipient(SupportedChainId.ROBINHOOD, '0x0000000000000000000000000000000000000001')).toBe(false)
     expect(isCreatorFeesPositionRecipient(SupportedChainId.MAINNET, FEES_ON_SPLITTER)).toBe(false)
@@ -273,7 +303,7 @@ describe('creator-fees position recipient', () => {
 describe('autocompound position recipient', () => {
   // Independent literal (not read back from the registry) so a registry edit cannot silently move
   // the recipient: the current fees-off Robinhood FeeSplitter.
-  const FEES_ON_SPLITTER = getAddress('0x7198C32a497c09497e04C86cf8F77A244A9E4b8F')
+  const FEES_ON_SPLITTER = getAddress('0x6CC1b74Fc1BE1ff373Fa07f3381856f38103e653')
   const FEES_OFF_SPLITTER = getAddress('0xDF50f4ea2207F9D2A753a3DaE729B36FDEF13b23')
 
   it('resolves to the fees-off Robinhood FeeSplitter (registry-literal pin)', () => {
