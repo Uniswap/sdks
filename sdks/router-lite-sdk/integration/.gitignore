@@ -1,0 +1,4 @@
+# forge build output — `artifacts/contracts.json` is the committed, test-consumed product.
+out/
+cache/
+broadcast/

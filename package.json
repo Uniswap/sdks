@@ -33,7 +33,9 @@
   },
   "workspaces": [
     "sdks/*",
-    "sdks/uniswapx-sdk/integration"
+    "sdks/uniswapx-sdk/integration",
+    "sdks/router-lite-sdk/integration",
+    "sdks/router-lite-sdk/canary"
   ],
   "overrides": {
     "eslint-config-prettier": "^9.1.0"

@@ -1,0 +1,82 @@
+{
+  "name": "@uniswap/router-lite-sdk",
+  "version": "0.0.0",
+  "description": "Lightweight RPC-only router: find and encode working Uniswap v2/v3/v4 routes over any viem PublicClient",
+  "repository": "https://github.com/Uniswap/sdks.git",
+  "keywords": [
+    "uniswap",
+    "router",
+    "v2",
+    "v3",
+    "v4",
+    "rpc"
+  ],
+  "license": "MIT",
+  "main": "./dist/cjs/src/index.js",
+  "module": "./dist/esm/src/index.js",
+  "types": "./dist/types/src/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "bun run clean && bun run build:cjs && bun run build:esm && bun run build:types",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "build:types": "tsc -p tsconfig.types.json",
+    "typecheck": "tsc -p tsconfig.base.json --noEmit",
+    "typecheck:tests": "tsc -p tsconfig.test.json --noEmit",
+    "typecheck:integration": "tsc -p integration/tsconfig.json",
+    "typecheck:canary": "tsc -p canary/tsconfig.json",
+    "typecheck:all": "bun run typecheck && bun run typecheck:tests && bun run typecheck:integration && bun run typecheck:canary",
+    "release": "changeset publish",
+    "lint": "eslint src --ext .ts",
+    "test": "bun test"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/types/src/index.d.ts",
+      "import": "./dist/esm/src/index.js",
+      "require": "./dist/cjs/src/index.js"
+    },
+    "./experimental": {
+      "types": "./dist/types/src/experimental/index.d.ts",
+      "import": "./dist/esm/src/experimental/index.js",
+      "require": "./dist/cjs/src/experimental/index.js"
+    }
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "viem": "^2.23.5"
+  },
+  "devDependencies": {
+    "@types/node": "^18.7.16",
+    "@typescript-eslint/eslint-plugin": "^8.38.0",
+    "@typescript-eslint/parser": "^8.38.0",
+    "@uniswap/router-sdk": "workspace:*",
+    "@uniswap/sdk-core": "workspace:*",
+    "@uniswap/universal-router-sdk": "workspace:*",
+    "@uniswap/v2-sdk": "workspace:*",
+    "@uniswap/v3-sdk": "workspace:*",
+    "@uniswap/v4-sdk": "workspace:*",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.22.0",
+    "fast-check": "3.23.2",
+    "prettier": "^2.4.1",
+    "tslib": "^2.3.0",
+    "typescript": "npm:typescript@^5.6.2"
+  },
+  "prettier": {
+    "printWidth": 120,
+    "semi": false,
+    "singleQuote": true
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@uniswap/router-lite-sdk-canary",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Live-RPC canary suite for @uniswap/router-lite-sdk via eth_simulateV1 (nightly; no keys, no funds; skips unless ROUTER_LITE_CANARY=1 + CANARY_RPC_URL_1). Never PR-blocking.",
+  "scripts": {
+    "test": "bun test"
+  },
+  "author": "Uniswap",
+  "dependencies": {
+    "@uniswap/router-lite-sdk": "workspace:*",
+    "viem": "^2.23.5"
+  },
+  "devDependencies": {
+    "@types/node": "^18.7.16",
+    "typescript": "npm:typescript@^5.6.2"
+  }
+}

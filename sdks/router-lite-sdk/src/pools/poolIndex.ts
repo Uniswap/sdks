@@ -1,0 +1,620 @@
+import type { Address } from 'viem'
+
+import { DEFAULT_REORG_OVERLAP_BLOCKS, HINT_DISCREDIT_FAILURE_BLOCKS, NEGATIVE_CACHE_BLOCKS } from '../constants'
+import { toGraphNode } from '../internal/currency'
+import { maxBig, mergeRanges } from '../internal/ranges'
+import type { BlockRange, CurrencyRef, PoolRecord, PoolRef, Protocol } from '../types'
+
+// ---------------------------------------------------------------------------
+// In-memory pool index with a scan-coverage cache.
+//
+// Three independent concerns share one class because they share a lifetime
+// (per-chain, per-process) and a key space (protocol + graph node):
+//   - pool identity + metadata (dedup, merge, adjacency for pair/neighbor search)
+//   - scan coverage per (protocol, endpoint) — which block ranges have been
+//     scanned for pool-creation events, with a standing reorg-overlap re-scan
+//     window at the tip
+//   - a negative cache bounded to the last NEGATIVE_CACHE_BLOCKS blocks (a pool
+//     that failed to quote at block N says nothing about block N+1, and the
+//     cache forgets N once the head has moved a couple of blocks past it —
+//     see `markNegative`)
+//
+// C4-H5: THE ONE THING NONE OF THAT BOUNDS IS THE POOL COUNT ITSELF. Every
+// distinct pool ever seen — hinted, discovered, or merely probed and found to
+// respond — earns a permanent `pools` entry plus two permanent `adjacency`
+// entries (measured ~3.1 KB/pool), and `coverage` gains a permanent entry per
+// distinct scope a caller has ever asked about (a single long-tail trade's
+// WETH-adjacency scan alone has been measured at ~150-250 MB). None of that
+// was reachable from outside the class before this: no size accessor, no way
+// to reset, no way to hand a pre-warmed index to a fresh router instance. This
+// file now adds all three: `stats()` (a sizes-only snapshot, safe to log on an
+// interval — see {@link PoolIndexStats}), `maxPools` (an optional bound
+// enforced by evicting the least-recently-touched pool — see
+// {@link PoolIndexOptions} and `evictIfNeeded`), and injectability (the
+// constructor already took nothing this class doesn't also expose, so
+// `createRouter({ index })` in `router.ts` can hand a whole `PoolIndex` instance
+// to a router that did not build it — the "warm handoff between routers" case).
+// Clearing an index is deliberately NOT a method here: `router.ts#clearIndex`
+// does it by constructing a fresh `PoolIndex` and swapping the router's
+// reference to it, which is also what makes an in-flight search on the old
+// index safe (its `SearchContext` already copied the old reference at
+// `buildContext` time, before the swap).
+// ---------------------------------------------------------------------------
+
+/**
+ * Provenance axis, most-specific (most-authoritative) first: a caller's `hint` is never downgraded
+ * by anything discovered later — 'event' (an on-chain creation log) is stronger provenance than
+ * 'factory' (a quote probe that merely proved a pool responds) and so outranks it, but neither ever
+ * displaces a `hint`. Merge keeps whichever source has the LOWER index here.
+ *
+ * This is the *stored* provenance, and it is deliberately monotone: what a record says about where
+ * it came from never changes. Whether that provenance is still CREDIBLE is a separate, evidence-
+ * driven question answered by {@link isDiscredited} at ranking time — see its docstring.
+ */
+const SOURCE_PRIORITY = ['hint', 'event', 'factory'] as const
+
+function rank(source: PoolRecord['source']): number {
+  return SOURCE_PRIORITY.indexOf(source)
+}
+
+/**
+ * Whether a hinted pool's top-rank provenance has been contradicted by the chain often enough to
+ * stop honoring it (C4-H4).
+ *
+ * WHY THIS EXISTS. `validateHint` for v2 and v4 does no on-chain lookup at all — a v2 pair address
+ * is a pure CREATE2 derivation from (factory, token0, token1), and a v4 poolId is the hash of the
+ * caller's own PoolKey — so *any* well-formed hint "validates" and enters the index at the top of
+ * {@link SOURCE_PRIORITY}, ahead of every pool an actual creation log proved exists. That is
+ * correct for the case hints exist for (a pool created seconds ago, invisible to any log scan) and
+ * exploitable otherwise: 64 fabricated PoolKeys would permanently occupy the per-pair selection cap
+ * ahead of the real pools, on nothing but the caller's assertion, for the whole life of the router
+ * instance.
+ *
+ * WHAT IT IS NOT. It is not deletion, and it is not permanent. A hint may legitimately name a pool
+ * that does not quote *yet* (pre-launch, unfunded, a hook that opens later), so the record stays in
+ * the index with its `source: 'hint'` intact and merely loses its ranking privilege. The evidence
+ * required is failures at {@link HINT_DISCREDIT_FAILURE_BLOCKS} DISTINCT blocks — and only failures
+ * of the pool-absent shape, since that is the only shape `markNegative` is ever called for (see its
+ * docstring and `search/waves.ts#recordFailures`), so a pool that reverts on liquidity or on a
+ * hook's own rules is never discredited by this.
+ *
+ * TWO ROUTES BACK, AND THE LIMITS OF EACH:
+ *
+ *  1. A successful quote. `lastQuoteSuccessBlock === undefined` is part of the test, so the first
+ *     one clears the demotion outright. This is the ordinary path — a demoted pool is still
+ *     enumerated, just behind the proved ones, so on a pair with spare capacity under its pool cap
+ *     (`MAX_POOLS_DIRECT` direct, `MAX_POOLS_PER_LEG` per two-hop leg) it keeps getting quoted and
+ *     keeps its chance to recover.
+ *  2. A creation log. `upsert` clears the failure counters when an `event`-sourced record arrives
+ *     (see there), because a creation log answers the existence question directly.
+ *
+ * Route 1 is NOT guaranteed: on a pair that is already at its pool cap with proved pools, a
+ * tier-2 record can be pruned out of selection entirely and is then never quoted again, so it can
+ * never earn its own way back. That is the intended trade — a contradicted assertion should not
+ * displace proved pools in order to re-prove itself every block — and it is why route 2 exists:
+ * recovery requires spare pair capacity or a creation log, not merely patience.
+ */
+export function isDiscredited(rec: PoolRecord): boolean {
+  return (
+    rec.source === 'hint' &&
+    rec.lastQuoteSuccessBlock === undefined &&
+    (rec.quoteFailureBlocks ?? 0) >= HINT_DISCREDIT_FAILURE_BLOCKS
+  )
+}
+
+function earliest(a: bigint | undefined, b: bigint | undefined): bigint | undefined {
+  if (a === undefined) return b
+  if (b === undefined) return a
+  return a < b ? a : b
+}
+
+function latest(a: bigint | undefined, b: bigint | undefined): bigint | undefined {
+  if (a === undefined) return b
+  if (b === undefined) return a
+  return a > b ? a : b
+}
+
+export type PoolIndexOptions = {
+  /**
+   * Bound the index to at most this many distinct pools. `undefined` (the default) is unbounded —
+   * see the C4-H5 header comment above for what that costs on a long-running instance. When set,
+   * inserting a pool beyond the cap evicts the least-recently-TOUCHED pool(s) first (touch =
+   * {@link PoolIndex.upsert}/{@link PoolIndex.markSuccess}/{@link PoolIndex.markNegative}/
+   * {@link PoolIndex.touchAll} — the last of which touches every pool a search's candidate
+   * enumeration selects as a route leg, whether or not it goes on to quote successfully), except a
+   * pool touched at the block the triggering call itself named, which is never evicted regardless of
+   * how far over cap that leaves the index — see {@link PoolIndex.evictIfNeeded}.
+   *
+   * A pool with `isDiscredited(record)` true (an unverified hint the chain has already contradicted —
+   * see `isDiscredited`'s docstring) is the LAST eviction candidate, not an ordinary one: its record is
+   * tiny, and its accumulated failure count is the one thing worth paying to keep, since evicting it
+   * hands a caller who resubmits the same junk hint its full, un-discredited rank right back. It is
+   * only evicted when no other (unprotected) pool is eligible at all.
+   */
+  maxPools?: number | undefined
+  /**
+   * How many blocks of already-covered tip {@link PoolIndex.uncovered} re-opens on every call, for
+   * shallow-reorg tolerance. Defaults to {@link DEFAULT_REORG_OVERLAP_BLOCKS} (mainnet's 32).
+   *
+   * A CHAIN FACT, injected rather than read from a constant (C4-P1). This class is deliberately
+   * manifest-unaware — it knows pools and block ranges, not deployments — so the chain's answer
+   * arrives here the same way `wrappedNative` does: through the constructor, from whoever built the
+   * index against a manifest. `router.ts` passes `reorgOverlapBlocksOf(manifest)` and rejects an
+   * INJECTED index whose value disagrees, exactly as it does for `wrappedNative`.
+   */
+  reorgOverlapBlocks?: bigint | undefined
+}
+
+/**
+ * A snapshot of what a {@link PoolIndex} currently holds — every field is a size, not a value, so
+ * this is safe to log/emit on an interval without leaking anything the index was told in confidence
+ * (a hint's pool identity, a discovered pair). Exists so a long-running host can watch an unbounded
+ * index's footprint grow (or confirm a `maxPools`-bounded one is holding steady) without reaching
+ * into private state — see `createRouter`'s `stats()`, which returns this same shape under the
+ * public name `RouterStats`.
+ */
+export type PoolIndexStats = {
+  /** Distinct pools currently held (`pools.size`). */
+  pools: number
+  /** Directed adjacency relationships (`link` writes two per pool — A->B and B->A — so this is
+   * `2 * <undirected pool-edges>` at steady state, not a pool count). The single largest driver of
+   * the ~3.1 KB/pool growth this type exists to make visible. */
+  adjacencyEdges: number
+  /** Distinct `${protocol}:${scope}` scan-coverage cache keys — one per distinct endpoint or
+   * {@link PoolIndex.pairScope} a caller has ever asked this index to cover. */
+  coverageScopes: number
+  /** Distinct blocks currently retained in the negative cache — bounded by {@link NEGATIVE_CACHE_BLOCKS}
+   * regardless of how many pools have ever failed a quote (see {@link PoolIndex.markNegative}).
+   * Formerly the test-only `negativeCacheBlockCount()` accessor, folded in here (C4-H5). */
+  negativeCacheBlocks: number
+  /** Distinct `${protocol}:${factory}` keys with recorded enabled fee tiers. */
+  enabledFeeFactories: number
+}
+
+export class PoolIndex {
+  /**
+   * Exposed (not private) so a caller injecting a pre-built index into `createRouter({ index })` can
+   * be validated against the target manifest before it is used for anything — a mismatched
+   * wrappedNative would silently collapse native-family adjacency onto the wrong graph node. See
+   * `router.ts#createRouter`'s injection check.
+   */
+  readonly wrappedNative: Address
+
+  /**
+   * The tip overlap {@link uncovered} re-opens — see {@link PoolIndexOptions.reorgOverlapBlocks}.
+   * Exposed for the same reason `wrappedNative` is: `createRouter({ index })` validates an injected
+   * index against the target manifest before using it, and an index built with a different overlap
+   * has a coverage cache whose tip was maintained under a different reorg assumption.
+   */
+  readonly reorgOverlapBlocks: bigint
+
+  /** `PoolRef.id` -> merged record. */
+  private readonly pools = new Map<string, PoolRecord>()
+
+  /** graph node -> (graph node -> pool keys). Symmetric adjacency for pair()/neighbors(). */
+  private readonly adjacency = new Map<string, Map<string, Set<string>>>()
+
+  /** `${protocol}:${scope}` -> merged, sorted, disjoint covered ranges. */
+  private readonly coverage = new Map<string, BlockRange[]>()
+
+  /**
+   * `block` -> set of pool ids marked negative AT that block. Keyed by block first (not by pool),
+   * so eviction in {@link markNegative} is a bounded scan over the (small) set of distinct blocks
+   * ever marked, never over the number of pools that have ever failed a quote.
+   *
+   * Previously `Map<PoolRef.id, Set<bigint>>`: a pool's entry, once created, was never removed, so
+   * the per-block sets only ever grew for the lifetime of the process — "block-scoped" was a key
+   * on each entry, not a lifetime for the map. On a busy server quoting many distinct pools across
+   * many blocks that is unbounded memory growth (measured ~136 B/entry — on the order of 590 MB/
+   * month). {@link markNegative} now evicts every block older than {@link NEGATIVE_CACHE_BLOCKS}
+   * behind the one it is about to write, on every call, so this map never holds more than a
+   * handful of blocks' worth of pool ids regardless of how long the process runs.
+   */
+  private readonly negative = new Map<bigint, Set<string>>()
+
+  /** `${protocol}:${factory}` -> fee tiers the factory has enabled (v3's governance-extensible set). */
+  private readonly fees = new Map<string, Set<number>>()
+
+  /** Bound on `pools.size` from {@link PoolIndexOptions.maxPools}; `undefined` is unbounded. */
+  private readonly maxPools?: number | undefined
+
+  /**
+   * `PoolRef.id` -> the block it was last TOUCHED at (see {@link touch}) — upsert, a successful
+   * quote, or a failed one. Read only by {@link evictIfNeeded}, and only when {@link maxPools} is
+   * set: an unbounded index never evicts, so it never needs to know which pool is oldest. A pool
+   * absent from this map (a hint or factory-probe record upserted with no block information at all,
+   * and never yet quoted) has never been touched — the sentinel `-1n` used in {@link evictIfNeeded}
+   * sorts it before every real block number, so it is the first thing evicted under pressure, which
+   * is the right default: nothing has demonstrated it is worth keeping yet.
+   */
+  private readonly lastTouched = new Map<string, bigint>()
+
+  constructor(wrappedNative: Address, options?: PoolIndexOptions) {
+    this.wrappedNative = wrappedNative
+    this.maxPools = options?.maxPools
+    this.reorgOverlapBlocks = options?.reorgOverlapBlocks ?? DEFAULT_REORG_OVERLAP_BLOCKS
+  }
+
+  private link(nodeA: string, nodeB: string, key: string): void {
+    for (const [from, to] of [
+      [nodeA, nodeB],
+      [nodeB, nodeA],
+    ] as const) {
+      let edges = this.adjacency.get(from)
+      if (!edges) {
+        edges = new Map()
+        this.adjacency.set(from, edges)
+      }
+      let keys = edges.get(to)
+      if (!keys) {
+        keys = new Set()
+        edges.set(to, keys)
+      }
+      keys.add(key)
+    }
+  }
+
+  /** The inverse of {@link link} for exactly one direction — used only by {@link evictPool}, which
+   * calls it twice (A->B and B->A) the same way `link` writes both directions on insert. Prunes the
+   * now-empty inner/outer map entries too, so an evicted pool leaves no empty scaffolding behind for
+   * `neighbors()` to iterate over forever. */
+  private unlink(from: string, to: string, key: string): void {
+    const edges = this.adjacency.get(from)
+    const keys = edges?.get(to)
+    if (!keys) return
+    keys.delete(key)
+    if (keys.size === 0) edges!.delete(to)
+    if (edges!.size === 0) this.adjacency.delete(from)
+  }
+
+  /** Records `id` as touched at `block`, keeping the LATEST block seen (a search pins blocks
+   * monotonically in steady state, but nothing here depends on that — a lower/duplicate block is
+   * simply not an improvement). A `block` of `undefined` (no block information available at the call
+   * site) leaves any existing touch alone rather than erasing it. */
+  private touch(id: string, block: bigint | undefined): void {
+    if (block === undefined) return
+    const existing = this.lastTouched.get(id)
+    if (existing === undefined || block > existing) this.lastTouched.set(id, block)
+  }
+
+  /** Removes `id` entirely: the pool record, its touch history, and both directions of its adjacency
+   * link. Nothing else references a pool by id (the negative cache is keyed by block first and
+   * already self-evicts — see {@link markNegative} — and the fee-tier cache is keyed by factory, never
+   * by pool), so this is the whole cleanup an eviction needs to leave no dangling reference behind. */
+  private evictPool(id: string): void {
+    const rec = this.pools.get(id)
+    if (!rec) return
+    this.pools.delete(id)
+    this.lastTouched.delete(id)
+    const [c0, c1] = rec.pool.currencies
+    const nodeA = toGraphNode(c0, this.wrappedNative)
+    const nodeB = toGraphNode(c1, this.wrappedNative)
+    this.unlink(nodeA, nodeB, id)
+    this.unlink(nodeB, nodeA, id)
+  }
+
+  /**
+   * Enforces {@link maxPools} after a NEW pool has just been inserted (the only way `pools.size`
+   * grows — {@link markSuccess}/{@link markNegative} only ever touch an existing record). A no-op
+   * when `maxPools` is `undefined` (the default, unbounded).
+   *
+   * Eviction is a plain O(n) scan over every pool for its `lastTouched` entry, picking the lowest
+   * (untouched pools sort first via the `-1n` sentinel — see {@link lastTouched}'s docstring) and
+   * repeating until back at or under the cap. That is deliberately not indexed by recency: eviction
+   * only runs when the cap is actually exceeded, which — per {@link PoolIndexOptions.maxPools}'s
+   * docstring — is meant to be rare relative to the steady stream of upserts/touches a busy router
+   * generates, so paying O(n) on the rare event is cheaper than maintaining a sorted structure on
+   * every touch just to make the rare event O(log n).
+   *
+   * `currentBlock` is the block the triggering upsert itself named (its `createdAtBlock` /
+   * `lastQuoteSuccessBlock` / `lastQuoteFailureBlock` — whichever {@link touch} used) — NEVER evicted,
+   * however far over cap that leaves the index, because a pool touched at the same block as the one
+   * that just pushed the index over the line is, by construction, part of what the CURRENT search
+   * just proved useful. If every remaining pool is protected this way the loop simply stops (`victim`
+   * stays `undefined`) rather than violate that rule to satisfy the cap.
+   *
+   * DISCREDITED HINTS ARE THE LAST RESORT, NOT AN ORDINARY CANDIDATE (reviewer follow-up to C4-H5).
+   * A {@link isDiscredited} record is exactly the accumulated evidence that
+   * {@link HINT_DISCREDIT_FAILURE_BLOCKS} failed blocks were needed to establish — evicting it throws
+   * that history away, and a caller that resubmits the same junk hint afterward gets it back in at
+   * FULL, un-discredited rank (`upsert` has no record of the past to merge against anymore). The
+   * record itself is tiny (a handful of scalar fields, no adjacency of its own worth preserving
+   * beyond the one entry), so among eligible (unprotected) pools this method always prefers to evict
+   * a non-discredited one first, and only reaches for a discredited one when no other candidate is
+   * eligible at all.
+   */
+  private evictIfNeeded(currentBlock: bigint | undefined): void {
+    if (this.maxPools === undefined) return
+    while (this.pools.size > this.maxPools) {
+      let victim: string | undefined
+      let victimTouch = 0n
+      let discreditedVictim: string | undefined
+      let discreditedVictimTouch = 0n
+      for (const [id, rec] of this.pools) {
+        const touched = this.lastTouched.get(id) ?? -1n
+        if (currentBlock !== undefined && touched === currentBlock) continue // protected: touched THIS block
+        if (isDiscredited(rec)) {
+          if (discreditedVictim === undefined || touched < discreditedVictimTouch) {
+            discreditedVictim = id
+            discreditedVictimTouch = touched
+          }
+          continue
+        }
+        if (victim === undefined || touched < victimTouch) {
+          victim = id
+          victimTouch = touched
+        }
+      }
+      // Prefer the ordinary eviction candidate; a discredited hint is only reached for when nothing
+      // else is eligible (every remaining non-discredited pool is protected, or there are none left).
+      const chosen = victim ?? discreditedVictim
+      if (chosen === undefined) break // every remaining pool is protected — stop rather than evict one
+      this.evictPool(chosen)
+    }
+  }
+
+  upsert(rec: PoolRecord): void {
+    const key = rec.pool.id
+    const existing = this.pools.get(key)
+    const touchBlock = rec.createdAtBlock ?? rec.lastQuoteSuccessBlock ?? rec.lastQuoteFailureBlock
+    if (!existing) {
+      this.pools.set(key, rec)
+      this.touch(key, touchBlock)
+      // The ref's currencies are already in domain form, so a v4 native side arrives as 'native' and
+      // collapses onto the wrapped-native graph node rather than linking under address(0).
+      const [t0, t1] = rec.pool.currencies
+      this.link(toGraphNode(t0, this.wrappedNative), toGraphNode(t1, this.wrappedNative), key)
+      // Only a NEW pool can push `pools.size` past `maxPools` — a re-upsert of an already-known pool
+      // never changes the count, so eviction is checked here and nowhere else.
+      this.evictIfNeeded(touchBlock)
+      return
+    }
+    // The failure history is a property of the POOL, not of the record that happened to be merged
+    // in, so it survives every re-upsert. Otherwise a discredited hint would be laundered clean by
+    // any later `upsert` naming the same pool — including the caller simply re-sending its hint,
+    // which is the one thing a hostile caller can do for free.
+    //
+    // WITH ONE EXCEPTION: an incoming `event` record. That is a pool-creation log — direct evidence
+    // that the pool the hint asserted genuinely exists — and it answers the exact question the
+    // failure counter was standing in for. Without this, a hinted pool that failed twice before it
+    // was funded could never be restored except by quoting successfully, which per
+    // {@link isDiscredited} it may not get the chance to do on a pair already at its selection cap.
+    // (Scope of trust: `event` records reach the index from the log scanner, and from a caller's own
+    // `ingestLogs`/`ingestReceipt` — which this package documents as trusting the caller's log
+    // provenance. A caller able to forge a creation log can already inject arbitrary pools at
+    // `event` rank directly, so this exception grants it nothing it did not already have.)
+    const proved = rec.source === 'event'
+    this.pools.set(key, {
+      pool: existing.pool,
+      createdAtBlock: earliest(existing.createdAtBlock, rec.createdAtBlock),
+      source: rank(rec.source) < rank(existing.source) ? rec.source : existing.source,
+      lastQuoteSuccessBlock: latest(existing.lastQuoteSuccessBlock, rec.lastQuoteSuccessBlock),
+      quoteFailureBlocks: proved ? 0 : Math.max(existing.quoteFailureBlocks ?? 0, rec.quoteFailureBlocks ?? 0),
+      lastQuoteFailureBlock: proved ? undefined : latest(existing.lastQuoteFailureBlock, rec.lastQuoteFailureBlock),
+    })
+    this.touch(key, touchBlock)
+  }
+
+  pair(a: CurrencyRef, b: CurrencyRef): PoolRecord[] {
+    const nodeA = toGraphNode(a, this.wrappedNative)
+    const nodeB = toGraphNode(b, this.wrappedNative)
+    const keys = this.adjacency.get(nodeA)?.get(nodeB)
+    if (!keys) return []
+    return [...keys].map((k) => this.pools.get(k)!)
+  }
+
+  neighbors(endpoint: CurrencyRef): Map<string, PoolRecord[]> {
+    const node = toGraphNode(endpoint, this.wrappedNative)
+    const edges = this.adjacency.get(node)
+    const result = new Map<string, PoolRecord[]>()
+    if (!edges) return result
+    for (const [otherNode, keys] of edges) {
+      result.set(
+        otherNode,
+        [...keys].map((k) => this.pools.get(k)!),
+      )
+    }
+    return result
+  }
+
+  /**
+   * The coverage scope for an *exact-pair* query — a scan that answers "every pool holding exactly
+   * these two currencies", which is strictly narrower than either endpoint's adjacency and must
+   * therefore never be confused with it. Family-normalized and sorted (so direction and
+   * native/wrapped spelling do not fork the cache) and namespaced so it can never collide with an
+   * endpoint address key.
+   */
+  pairScope(a: CurrencyRef, b: CurrencyRef): string {
+    const [n0, n1] = [toGraphNode(a, this.wrappedNative), toGraphNode(b, this.wrappedNative)].sort()
+    return `pair:${n0}-${n1}`
+  }
+
+  /** `scope` is either a token endpoint's address (adjacency) or a {@link pairScope} string. */
+  addCoverage(p: Protocol, scope: string, r: BlockRange): void {
+    const key = `${p}:${scope.toLowerCase()}`
+    const existing = this.coverage.get(key) ?? []
+    this.coverage.set(key, mergeRanges([...existing, r]))
+  }
+
+  uncovered(p: Protocol, scope: string, deployBlock: bigint, head: bigint): BlockRange[] {
+    const key = `${p}:${scope.toLowerCase()}`
+    const covered = this.coverage.get(key) ?? []
+
+    // Clip covered ranges to the requested domain [deployBlock, head]; they arrive sorted/disjoint.
+    const clipped: BlockRange[] = []
+    for (const c of covered) {
+      const from = maxBig(c.fromBlock, deployBlock)
+      const to = c.toBlock < head ? c.toBlock : head
+      if (from <= to) clipped.push({ fromBlock: from, toBlock: to })
+    }
+
+    // Raw complement of the clipped covered ranges within the domain.
+    const raw: BlockRange[] = []
+    let cursor = deployBlock
+    let maxCoveredEnd: bigint | undefined
+    for (const c of clipped) {
+      if (c.fromBlock > cursor) raw.push({ fromBlock: cursor, toBlock: c.fromBlock - 1n })
+      cursor = maxBig(cursor, c.toBlock + 1n)
+      maxCoveredEnd = maxCoveredEnd === undefined ? c.toBlock : maxBig(maxCoveredEnd, c.toBlock)
+    }
+    if (cursor <= head) raw.push({ fromBlock: cursor, toBlock: head })
+
+    // Re-open the final `reorgOverlapBlocks` of whatever coverage reaches furthest, regardless
+    // of whether it was otherwise covered — shallow reorgs can invalidate the tip at any time.
+    if (maxCoveredEnd !== undefined) {
+      const reopenFrom = maxBig(maxCoveredEnd - this.reorgOverlapBlocks + 1n, deployBlock)
+      if (reopenFrom <= head) raw.push({ fromBlock: reopenFrom, toBlock: head })
+    }
+
+    return mergeRanges(raw)
+  }
+
+  /**
+   * Records fee tiers discovered from a factory's own enablement events. Shares the coverage cache's
+   * key space (`protocol:address`) but keyed by *factory*, not by a token endpoint — the two can
+   * never collide because a factory is never one of a pool's currencies.
+   */
+  addEnabledFees(p: Protocol, factory: string, fees: number[]): void {
+    const key = `${p}:${factory.toLowerCase()}`
+    let set = this.fees.get(key)
+    if (!set) {
+      set = new Set()
+      this.fees.set(key, set)
+    }
+    for (const fee of fees) set.add(fee)
+  }
+
+  /** Fee tiers discovered for `factory` so far, ascending (empty until a fee scan has run). */
+  enabledFees(p: Protocol, factory: string): number[] {
+    return [...(this.fees.get(`${p}:${factory.toLowerCase()}`) ?? [])].sort((a, b) => a - b)
+  }
+
+  markSuccess(ref: PoolRef, block: bigint): void {
+    const key = ref.id
+    const existing = this.pools.get(key)
+    if (!existing) return
+    this.pools.set(key, { ...existing, lastQuoteSuccessBlock: latest(existing.lastQuoteSuccessBlock, block) })
+    this.touch(key, block)
+  }
+
+  /**
+   * Marks `ref` unquoteable at `block`. Evicts stale history first (see {@link evictNegativeBefore})
+   * so the cache's size is bounded on every write, not just eventually swept — a caller that never
+   * calls `markNegative` again after a burst pays nothing extra, but also never gets to rely on a
+   * background sweep it never triggered.
+   *
+   * Deliberately amount-independent AT THIS LAYER: it is the caller's job (see
+   * `search/waves.ts#recordFailures`) to only mark a pool negative for a failure shape that is
+   * itself amount-independent (an empty-data revert — the pool-absent shape). This method has no
+   * way to know why the caller decided to mark, so it does not gate on amount at all; it only bounds
+   * *how long* a mark can possibly outlive its evidence.
+   *
+   * `ref` is not required to already be in the index — a speculative quote candidate the wave engine
+   * probed can fail before anything ever `upsert`s it — so the touch it records for eviction purposes
+   * is gated on the pool actually being indexed: touching (or worse, creating a `lastTouched` entry
+   * for) an id `pools` has never heard of would itself be exactly the kind of key that never gets
+   * cleaned up, since {@link evictPool} only ever runs for ids `pools` contains.
+   */
+  markNegative(ref: PoolRef, block: bigint): void {
+    this.recordQuoteFailure(ref, block)
+    this.evictNegativeBefore(block)
+    let ids = this.negative.get(block)
+    if (!ids) {
+      ids = new Set()
+      this.negative.set(block, ids)
+    }
+    ids.add(ref.id)
+    if (this.pools.has(ref.id)) this.touch(ref.id, block)
+  }
+
+  /**
+   * Touches every pool in `refs` at `block` in one call — for the wave engine's candidate-enumeration
+   * step (`search/waves.ts#quoteEnumerated`), which hands back every pool `generateRoutes` selected as
+   * a route leg *before* anything is quoted, let alone quoted successfully.
+   *
+   * WHY THIS EXISTS (reviewer follow-up to C4-H5). `upsert`/`markSuccess`/`markNegative` all key a
+   * touch to a route's OUTCOME — inserted, quoted successfully, quoted and failed. A pool alive only
+   * as a two-hop intermediate leg can be enumerated by every single search that runs against its pair
+   * and never once hit any of those three: `markSuccess` only fires on the LEG that was actually
+   * quoted and returned, and a leg can be pruned before quoting (`MAX_POOLS_DIRECT`/`MAX_POOLS_PER_LEG`,
+   * `MAX_QUOTE_CANDIDATES`) without ever reaching a call that would touch it. Under `maxPools` that
+   * pool was evictable despite being exactly the kind of pool the cap exists to keep — one this
+   * router's own searches keep finding useful. Being selected as a candidate leg IS evidence the pool
+   * is worth keeping, independent of whether that particular quote later succeeds or fails.
+   *
+   * Refs not currently indexed are silently skipped (mirrors `markNegative`'s same guard) — nothing
+   * here upserts a pool that is not already known.
+   */
+  touchAll(refs: PoolRef[], block: bigint): void {
+    for (const ref of refs) {
+      if (this.pools.has(ref.id)) this.touch(ref.id, block)
+    }
+  }
+
+  isNegative(ref: PoolRef, block: bigint): boolean {
+    return this.negative.get(block)?.has(ref.id) ?? false
+  }
+
+  /**
+   * The durable half of {@link markNegative}: the negative cache itself is deliberately forgotten
+   * within a couple of blocks (a pool that could not quote at block N says nothing about N+1), but
+   * "this pool has never once quoted, across N separate blocks" is a fact that only accumulates by
+   * outliving individual blocks. Kept as a COUNT plus the last block seen, so repeated failures at
+   * one block (concurrent requests at the same head, a wave re-quoting) count once and the memory
+   * cost is two fields, not a growing set.
+   *
+   * PRECISELY: this counts blocks at which the failing block CHANGED, which is not the same as the
+   * number of distinct blocks — N, N+1, N counts three. That approximation is sound only because
+   * the single threshold reading it is {@link HINT_DISCREDIT_FAILURE_BLOCKS} = 2, where the two
+   * measures cannot disagree about whether the bar is met; see that constant for why raising it
+   * requires a real distinct-block set instead.
+   *
+   * Only ever consumed for hinted pools ({@link isDiscredited}); recorded for all of them because
+   * the counter is two fields either way and a pool's `source` can be upgraded to `hint` by a later
+   * upsert, which must not resurrect an already-contradicted key.
+   */
+  private recordQuoteFailure(ref: PoolRef, block: bigint): void {
+    const existing = this.pools.get(ref.id)
+    if (!existing) return
+    if (existing.lastQuoteFailureBlock === block) return
+    this.pools.set(ref.id, {
+      ...existing,
+      quoteFailureBlocks: (existing.quoteFailureBlocks ?? 0) + 1,
+      lastQuoteFailureBlock: block,
+    })
+  }
+
+  /**
+   * Drops every negative-cache entry older than {@link NEGATIVE_CACHE_BLOCKS} behind `newBlock`.
+   * Run on every {@link markNegative} call rather than on a timer or a separate sweep method: a
+   * search pins blocks close to monotonically (the head watermark in `search/waves.ts` only ever
+   * regresses across a lagging-replica hiccup, and self-heals even then), so in steady state this is
+   * a handful of `Map` key deletions per call — never a scan whose cost grows with how many pools
+   * have ever failed, which is what made the un-evicted map unbounded in the first place.
+   */
+  private evictNegativeBefore(newBlock: bigint): void {
+    const threshold = newBlock - NEGATIVE_CACHE_BLOCKS
+    for (const block of this.negative.keys()) {
+      if (block < threshold) this.negative.delete(block)
+    }
+  }
+
+  /**
+   * A sizes-only snapshot of everything this index currently holds — see {@link PoolIndexStats} for
+   * what each field means and why it is safe to log on an interval. Not part of routing (no search
+   * reads it) — it exists for hosts running a long-lived instance to observe the growth C4-H5 exists
+   * to bound, and it subsumes what used to be the test-only `negativeCacheBlockCount()` accessor
+   * (`stats().negativeCacheBlocks`).
+   */
+  stats(): PoolIndexStats {
+    let adjacencyEdges = 0
+    for (const edges of this.adjacency.values()) adjacencyEdges += edges.size
+    return {
+      pools: this.pools.size,
+      adjacencyEdges,
+      coverageScopes: this.coverage.size,
+      negativeCacheBlocks: this.negative.size,
+      enabledFeeFactories: this.fees.size,
+    }
+  }
+}

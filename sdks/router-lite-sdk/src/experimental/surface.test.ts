@@ -1,0 +1,123 @@
+import { expect, test } from 'bun:test'
+import type { Address } from 'viem'
+
+import type { PoolRecord, PoolRef, QuotedRoute, RouteLeg, UniversalRouterDeployment } from '../index'
+
+import type { Custody, FeeDiscovery, ProtocolModule, QuoteProbe } from './index'
+import {
+  PROTOCOL_MODULES,
+  PoolIndex,
+  buildHookData,
+  compileExecutionPlan,
+  encoderFor,
+  generateRoutes,
+  isHooked,
+  v2PoolRef,
+  v4PoolRef,
+} from './index'
+
+// ---------------------------------------------------------------------------
+// Compile-time + minimal-execution guard that `@uniswap/router-lite-sdk/experimental`
+// stays externally callable.
+//
+// Every value and type below is built ONLY from this subpath's own exports
+// (`./index`, i.e. what a real consumer imports as `.../experimental`) plus
+// the public types re-exported from the package root (`../index`) — never
+// from an internal path like `../search/candidates` or `../protocols/types`.
+// If a future edit to `experimental/index.ts` drops an export, or adds a
+// required argument type that isn't reachable from here, this file stops
+// compiling — that's the point: it is the regression test for the shipped
+// defect this file fixes (generateRoutes/compileExecutionPlan's argument
+// types were unconstructible from outside the package).
+// ---------------------------------------------------------------------------
+
+const USDC = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as Address
+const WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2' as Address
+const TRADER = '0x2222222222222222222222222222222222222222' as Address
+const V2_POOL = '0x00000000000000000000000000000000000b0001' as Address
+const HOOK = '0x0000000000000000000000000000000000000088' as Address
+/** v4 spells native as address(0) on-chain; `zeroAddress` lives in viem, not in this package's surface. */
+const NATIVE_ONCHAIN = '0x0000000000000000000000000000000000000000' as Address
+
+// A `PoolRef` carries derived fields no caller can be expected to fill in by hand, so the
+// constructors have to be reachable from here too — an external caller with `PoolIndex.upsert` and
+// no way to build its argument would have the same defect this file was written to catch.
+const v2WethUsdc: PoolRef = v2PoolRef(V2_POOL, USDC, WETH)
+
+test('PoolIndex is constructible and upsert-able from only public/`.../experimental` types', () => {
+  const index = new PoolIndex(WETH)
+  const record: PoolRecord = { pool: v2WethUsdc, source: 'hint' }
+  index.upsert(record)
+  expect(index.pair(USDC, WETH)).toHaveLength(1)
+})
+
+test('generateRoutes is callable without hookData — it defaults to an empty map', () => {
+  const index = new PoolIndex(WETH)
+  index.upsert({ pool: v2WethUsdc, source: 'hint' })
+  const { candidates } = generateRoutes({ tokenIn: USDC, tokenOut: WETH, index, wrappedNative: WETH })
+  expect(candidates).toHaveLength(1)
+  expect(candidates[0]!.legs[0]!.pool).toEqual(v2WethUsdc)
+})
+
+test('the PoolRef constructors are reachable, and derive the ref\'s id/currencies', () => {
+  expect(v2WethUsdc.id).toBe(`v2:${V2_POOL.toLowerCase()}`)
+  expect(v2WethUsdc.currencies).toEqual([USDC, WETH])
+
+  const hooked = v4PoolRef({ currency0: NATIVE_ONCHAIN, currency1: USDC, fee: 3000, tickSpacing: 60, hooks: HOOK })
+  // v4's on-chain address(0) surfaces as the domain's 'native', and hooks are readable protocol-agnostically.
+  expect(hooked.currencies).toEqual(['native', USDC])
+  expect(isHooked(hooked)).toBe(true)
+  expect(isHooked(v2WethUsdc)).toBe(false)
+})
+
+test('buildHookData is directly callable and usable to build a v4 hookData map', () => {
+  expect(buildHookData([]).size).toBe(0)
+  expect(buildHookData(undefined).size).toBe(0)
+})
+
+test('PROTOCOL_MODULES and the individual protocol modules satisfy ProtocolModule', () => {
+  const modules: Record<string, ProtocolModule> = PROTOCOL_MODULES
+  expect(modules.v2!.id).toBe('v2')
+  expect(modules.v3!.id).toBe('v3')
+  expect(modules.v4!.id).toBe('v4')
+})
+
+test('FeeDiscovery and QuoteProbe are reachable, importable types', () => {
+  const feeDiscovery: FeeDiscovery | undefined = PROTOCOL_MODULES.v3.feeDiscovery
+  expect(feeDiscovery === undefined || typeof feeDiscovery.query === 'function').toBe(true)
+  const probes: QuoteProbe[] = []
+  expect(probes).toHaveLength(0)
+})
+
+test('Custody is constructible and usable directly against ProtocolModule.compileOperation', () => {
+  const custody: Custody = { payer: 'trader-via-permit2', recipient: 'final' }
+  const leg: RouteLeg = { pool: v2WethUsdc, currencyIn: USDC, currencyOut: WETH }
+  const op = PROTOCOL_MODULES.v2.compileOperation([leg], custody)
+  expect(op.kind).toBe('v2-swap')
+})
+
+test('compileExecutionPlan is callable without modules — it defaults to PROTOCOL_MODULES — and its plan encodes', () => {
+  const leg: RouteLeg = { pool: v2WethUsdc, currencyIn: USDC, currencyOut: WETH }
+  const quotedRoute: QuotedRoute = { route: { legs: [leg] }, quote: { amountIn: 1000n, amountOut: 900n, intermediateAmounts: [] } }
+
+  const plan = compileExecutionPlan({
+    quoted: quotedRoute,
+    tokenIn: USDC,
+    tokenOut: WETH,
+    trader: TRADER,
+    recipient: TRADER,
+    slippageBps: 100,
+    wrappedNative: WETH,
+  })
+  expect(plan.operations).toHaveLength(1)
+  expect(plan.deliverOutput.minAmountOut).toBe(891n) // 900 at 100bps slippage
+
+  const deployment: UniversalRouterDeployment = {
+    address: '0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af' as Address,
+    commandSet: 'ur-2.0',
+    permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3' as Address,
+    wrappedNative: WETH,
+  }
+  const tx = encoderFor(deployment.commandSet)(plan, deployment, 9_999_999_999n)
+  expect(tx.to).toBe(deployment.address)
+})

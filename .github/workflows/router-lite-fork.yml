@@ -1,0 +1,168 @@
+name: "Router-lite Fork Suite"
+
+# PR-BLOCKING fork-suite gate for @uniswap/router-lite-sdk (Task 22 of the router-lite-sdk plan).
+#
+# Runs the anvil-fork integration suite (sdks/router-lite-sdk/integration) against a pinned
+# mainnet block (FORK_BLOCK, sdks/router-lite-sdk/integration/anvil.ts) — full pipeline against
+# real bytecode with actual execution (testing-architecture layers 4/5: known pools + synthetic
+# worldBuilder worlds). Its own workflow, path-filtered exactly like
+# liquidity-launcher-bytecode-check.yml, since a job-level `paths:` filter doesn't exist for
+# `pull_request` — only whole-workflow `on.pull_request.paths` does.
+#
+# Requires the ROUTER_LITE_FORK_RPC repo secret (an archival-node mainnet RPC URL — most public
+# RPCs are pruned and won't serve state at a pinned historical block; see anvil.ts's
+# FORK_RPC_CANDIDATES doc comment). Until that secret is added in repo settings — and on any PR
+# from a fork or Dependabot, which never receive secrets regardless — this job self-skips with a
+# `::notice::` rather than failing. Add the secret to turn the real suite on.
+
+on:
+  pull_request:
+    paths:
+      - "sdks/router-lite-sdk/**"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  # Ungated: needs no secret, so it runs for every trigger of this workflow — including PRs from
+  # forks/Dependabot, which never receive secrets, and before ROUTER_LITE_FORK_RPC is configured at
+  # all. monorepo-checks.yml's `g:build`/`g:test` never typecheck *.test.ts files or the
+  # integration/canary suites' own tsconfigs, so this is its own job rather than a step folded into
+  # the (secret-gated) fork suite below, which would otherwise never run for exactly the PRs that
+  # most need a static check they can't get real RPC coverage for.
+  typecheck:
+    name: Typecheck (sdks/router-lite-sdk, base + tests + integration + canary)
+    runs-on: ubuntu-latest
+    env:
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+    steps:
+      - uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db # v0.8.3
+        with:
+          egress-policy: audit
+
+      - name: ✅ Checkout
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
+        with:
+          persist-credentials: false
+
+      - name: 💽 Setup Node
+        uses: actions/setup-node@1a4442cacd436585916779262731d5b162bc6ec7
+        with:
+          node-version: 24
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@ecf28ddc73e819eb6fa29df6b34ef8921c743461 # v2
+        with:
+          bun-version: 1.3.10
+
+      - name: 📥 Install dependencies
+        run: bun install --frozen-lockfile
+        env:
+          HUSKY: "0" # By default do not run HUSKY install
+
+      - name: 🏗  Build workspace SDKs
+        # integration/canary's tsconfigs resolve @uniswap/router-lite-sdk via its published entry
+        # points (package.json main/module -> dist/), not source, so a real build is required first.
+        run: bun run g:build
+
+      - name: 🔎 Typecheck (base + tests + integration + canary tsconfigs)
+        working-directory: sdks/router-lite-sdk
+        run: bun run typecheck:all
+
+  router-lite-fork:
+    name: Anvil fork suite (sdks/router-lite-sdk)
+    needs: typecheck
+    runs-on: ubuntu-latest
+    env:
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+    steps:
+      - uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db # v0.8.3
+        with:
+          egress-policy: audit
+
+      - name: ✅ Checkout
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
+        with:
+          persist-credentials: false
+
+      - name: 🔐 Check for the ROUTER_LITE_FORK_RPC secret
+        id: secret-check
+        run: |
+          if [ -z "$MAINNET_RPC_URL" ]; then
+            echo "::notice::ROUTER_LITE_FORK_RPC is not available (either not yet configured in repo settings, or this is a fork/Dependabot PR that never receives secrets) — skipping the router-lite fork suite."
+            echo "has_rpc=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_rpc=true" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          MAINNET_RPC_URL: ${{ secrets.ROUTER_LITE_FORK_RPC }}
+
+      - name: 💽 Setup Node
+        if: steps.secret-check.outputs.has_rpc == 'true'
+        uses: actions/setup-node@1a4442cacd436585916779262731d5b162bc6ec7
+        with:
+          node-version: 24
+
+      - name: Setup Bun
+        if: steps.secret-check.outputs.has_rpc == 'true'
+        uses: oven-sh/setup-bun@ecf28ddc73e819eb6fa29df6b34ef8921c743461 # v2
+        with:
+          bun-version: 1.3.10
+
+      - name: 📥 Install dependencies
+        if: steps.secret-check.outputs.has_rpc == 'true'
+        run: bun install --frozen-lockfile
+        env:
+          HUSKY: "0" # By default do not run HUSKY install
+
+      - name: 🏗  Build workspace SDKs
+        if: steps.secret-check.outputs.has_rpc == 'true'
+        # The fork suite imports @uniswap/router-lite-sdk via its published entry points
+        # (package.json main/module -> dist/), not source — it needs a real build first, same as
+        # the differential suite in the main job needs universal-router-sdk's dist (deferred
+        # finding from Task 14). This is a fresh runner with no shared build state from the main
+        # job, so this step is required here even though monorepo-checks.yml already builds.
+        run: bun run g:build
+
+      - name: 🪨 Install Foundry
+        if: steps.secret-check.outputs.has_rpc == 'true'
+        uses: foundry-rs/foundry-toolchain@82dee4ba654bd2146511f85f0d013af94670c4de # v1
+        with:
+          version: nightly
+
+      - name: 📌 Read the pinned FORK_BLOCK
+        if: steps.secret-check.outputs.has_rpc == 'true'
+        id: fork-block
+        run: |
+          # Single source of truth: FORK_BLOCK in anvil.ts. Reading it (rather than hardcoding the
+          # value here) keeps the cache key correct automatically if the pin ever moves.
+          block=$(sed -n 's/.*FORK_BLOCK = \([0-9_]*\)n.*/\1/p' sdks/router-lite-sdk/integration/anvil.ts | tr -d '_')
+          if [ -z "$block" ]; then echo "could not read FORK_BLOCK from anvil.ts"; exit 1; fi
+          echo "block=$block" >> "$GITHUB_OUTPUT"
+          echo "Pinned fork block: $block"
+
+      - name: 💾 Restore Foundry fork cache
+        if: steps.secret-check.outputs.has_rpc == 'true'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.foundry/cache
+          # Keyed on the pinned FORK_BLOCK: cold on a pin change, warm (largely offline archive
+          # reads) on every rerun against the same pin — see anvil.ts's cache doc comment.
+          key: router-lite-foundry-cache-${{ steps.fork-block.outputs.block }}
+          restore-keys: |
+            router-lite-foundry-cache-
+
+      - name: 🧪 Fork suite (anvil, pinned block)
+        if: steps.secret-check.outputs.has_rpc == 'true'
+        uses: nick-fields/retry@7d4a37704547a311dbb66ebdf5b23ec19374a767
+        env:
+          ROUTER_LITE_FORK: "1"
+          MAINNET_RPC_URL: ${{ secrets.ROUTER_LITE_FORK_RPC }}
+        with:
+          timeout_minutes: 15
+          retry_wait_seconds: 5
+          max_attempts: 2
+          command: bun test sdks/router-lite-sdk/integration
