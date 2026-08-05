@@ -1,6 +1,7 @@
 import type { Address } from 'viem'
 
 import { DEFAULT_REORG_OVERLAP_BLOCKS, HINT_DISCREDIT_FAILURE_BLOCKS, NEGATIVE_CACHE_BLOCKS } from '../constants'
+import { RouterConfigError } from '../errors'
 import { toGraphNode } from '../internal/currency'
 import { maxBig, mergeRanges } from '../internal/ranges'
 import type { BlockRange, CurrencyRef, PoolRecord, PoolRef, Protocol } from '../types'
@@ -39,6 +40,19 @@ import type { BlockRange, CurrencyRef, PoolRecord, PoolRef, Protocol } from '../
 // reference to it, which is also what makes an in-flight search on the old
 // index safe (its `SearchContext` already copied the old reference at
 // `buildContext` time, before the swap).
+//
+// P2: AND THE INDEX NOW OUTLIVES THE PROCESS. Injectability made a warm index
+// portable between routers; `toSnapshot`/`fromSnapshot` — plus the
+// `serializeSnapshot`/`parseSnapshot` JSON pair, which exist because
+// `JSON.stringify` throws outright on the bigints this class is full of — make
+// it portable between PROCESSES. That closes the gap the measurements kept
+// pointing at: a warm in-process `getQuote` is 67ms, and every CLI invocation,
+// which is how this package is actually exercised by hand, was cold. What
+// travels is what cannot be cheaply re-derived (the coverage cache above all —
+// the difference between a full-history scan and a delta scan) and what is
+// durable (pool identity, provenance, the discredit counters); what does not
+// travel is what is block-scoped by design. See {@link PoolIndexSnapshot} for
+// the inventory and the reasoning field by field.
 // ---------------------------------------------------------------------------
 
 /**
@@ -112,6 +126,119 @@ function latest(a: bigint | undefined, b: bigint | undefined): bigint | undefine
   if (a === undefined) return b
   if (b === undefined) return a
   return a > b ? a : b
+}
+
+/**
+ * Bumped whenever the SHAPE of a {@link PoolIndexSnapshot} changes in a way that would make an older
+ * payload misread rather than merely incomplete — a renamed field, a changed key format, a semantic
+ * change to what a stored value means. {@link PoolIndex.fromSnapshot} refuses anything that does not
+ * match exactly; there is deliberately no migration path, because the entire content of a snapshot is
+ * a CACHE of things the chain can be re-read for. Starting fresh costs a delta scan, which is the
+ * cheapest possible failure mode and infinitely cheaper than silently restoring coverage claims
+ * whose meaning has drifted.
+ */
+export const POOL_INDEX_SCHEMA_VERSION = 1
+
+/**
+ * A serializable, process-independent picture of everything a {@link PoolIndex} learned that is worth
+ * carrying to another process — the extension story the class was designed for
+ * (`toSnapshot`/`fromSnapshot`), and what makes a CLI invocation's second run warm.
+ *
+ * WHAT IS IN IT, AND WHY EACH THING SURVIVES A PROCESS BOUNDARY:
+ *
+ *  - `pools`: the merged {@link PoolRecord}s, in insertion order. Adjacency is NOT stored — it is
+ *    derived from each record's own `pool.currencies` on the way back in (`link`, exactly as `upsert`
+ *    does), so it cannot drift from the pools it indexes and costs nothing to re-derive. Storing it
+ *    would roughly double the payload to encode information already present.
+ *  - `coverage`: the block ranges already scanned per `${protocol}:${scope}` key. This is the single
+ *    most valuable thing here — it is the difference between a cold full-history scan and a delta
+ *    scan, and unlike the pools it cannot be re-derived from anything cheaper than the scan itself.
+ *  - `enabledFees`: fee tiers discovered from a factory's own enablement events, per
+ *    `${protocol}:${factory}` key. Same argument as coverage at a smaller scale.
+ *  - `wrappedNative` / `reorgOverlapBlocks`: the two chain facts the index was BUILT with and which
+ *    everything above is expressed in terms of. They travel with the data because they are what make
+ *    it interpretable: a restored coverage cache maintained under a different reorg depth, or an
+ *    adjacency graph collapsed onto a different native family, is not stale — it is wrong.
+ *    `createRouter({ index })` already rejects a mismatch against its manifest (see
+ *    `router.ts#createRouter`), which is where a restored index gets checked against the chain it is
+ *    about to be used for.
+ *
+ * WHAT IS DELIBERATELY ABSENT:
+ *
+ *  - The NEGATIVE CACHE. It is block-scoped by construction — "this pool could not quote at block N"
+ *    says nothing about N+1, and {@link PoolIndex.markNegative} evicts anything more than
+ *    {@link NEGATIVE_CACHE_BLOCKS} behind the head on every write. By the time a snapshot is read
+ *    back the head has moved and every entry in it would be evicted on first use anyway. Persisting
+ *    it would be persisting noise. (The DURABLE half of that machinery — `quoteFailureBlocks` /
+ *    `lastQuoteFailureBlock`, which is what {@link isDiscredited} reads — lives on the records and
+ *    therefore DOES survive, which is the half that should: a hint the chain contradicted twice
+ *    yesterday has not earned its rank back by the process restarting.)
+ *  - `lastTouched`, the LRU clock behind `maxPools`. It is re-derived on restore from each record's
+ *    own blocks (`upsert`'s `createdAtBlock ?? lastQuoteSuccessBlock ?? lastQuoteFailureBlock`) — an
+ *    approximation, and knowingly so: a pool kept alive purely by `touchAll` as a two-hop leg comes
+ *    back looking older than it is and is evicted sooner under pressure. The alternative is a
+ *    per-pool field on every record to preserve an ordering that only matters to a bounded index,
+ *    which re-earns itself within one search.
+ *  - `maxPools` itself. It is the RESTORING host's policy about its own memory, not a property of the
+ *    data — see {@link PoolIndex.fromSnapshot}'s options argument.
+ *
+ * `bigint` FIELDS ARE REAL BIGINTS HERE, not strings: this is the in-memory shape. `JSON.stringify`
+ * throws on a bigint, so the JSON round trip is handled by the {@link serializeSnapshot} /
+ * {@link parseSnapshot} pair rather than left as a trap for every caller to rediscover.
+ */
+export type PoolIndexSnapshot = {
+  schemaVersion: number
+  wrappedNative: Address
+  reorgOverlapBlocks: bigint
+  pools: PoolRecord[]
+  /** `[`${protocol}:${scope}`, mergedRanges]` — the coverage cache, as entries. */
+  coverage: [string, BlockRange[]][]
+  /** `[`${protocol}:${factory}`, feeTiers]` — the per-factory enabled-fee cache, as entries. */
+  enabledFees: [string, number[]][]
+}
+
+/**
+ * The tag {@link serializeSnapshot} wraps a `bigint` in, and {@link parseSnapshot} unwraps.
+ *
+ * A JSON reviver only sees strings, so round-tripping bigints needs a marker no legitimate string
+ * value in a snapshot could collide with. Every string a snapshot actually contains is one of: a
+ * `PoolRef.id` (`v2:`/`v3:`/`v4:` prefixed), a `0x`-prefixed address or poolId, a `'native'` currency
+ * ref, a `source` enum member, or a coverage/fee key (an address, or `pair:`-prefixed). None can
+ * begin with `$bigint:`, and none is caller-controlled free text — the index never stores a symbol,
+ * a URL, or anything else a user typed.
+ */
+const BIGINT_TAG = '$bigint:'
+
+/**
+ * A snapshot as JSON, with every `bigint` encoded as a tagged string (see {@link BIGINT_TAG}).
+ *
+ * Exists as a PAIR with {@link parseSnapshot} so that the bigint round trip is one library decision
+ * rather than a puzzle re-solved (differently, and wrongly) by every caller: `JSON.stringify` throws
+ * outright on a `bigint`, so a caller who reaches for it directly discovers the problem immediately
+ * — and the obvious fix, `String(v)`, loses the type on the way back in and yields an index whose
+ * `createdAtBlock` is `"18000000"` and whose every block comparison is then silently wrong.
+ */
+export function serializeSnapshot(snap: PoolIndexSnapshot): string {
+  return JSON.stringify(snap, (_key, value: unknown) =>
+    typeof value === 'bigint' ? `${BIGINT_TAG}${value.toString()}` : value,
+  )
+}
+
+/**
+ * The inverse of {@link serializeSnapshot}. Throws whatever `JSON.parse` throws on malformed input —
+ * a caller reading a cache file is expected to treat that the same way it treats a schema mismatch
+ * (discard, start fresh), since both mean "this file cannot be trusted" and neither is recoverable.
+ *
+ * The returned value is TRUSTED to be shape-correct beyond the bigint decoding: this is a
+ * deserializer, not a validator. {@link PoolIndex.fromSnapshot} checks the one thing that determines
+ * whether the shape can be trusted at all (`schemaVersion`), and `createRouter({ index })` checks the
+ * two chain facts. Feeding it a hand-edited file is the same class of act as calling `upsert` with a
+ * fabricated record, which this package has never defended against and documents as such.
+ */
+export function parseSnapshot(json: string): PoolIndexSnapshot {
+  return JSON.parse(json, (_key, value: unknown) =>
+    typeof value === 'string' && value.startsWith(BIGINT_TAG) ? BigInt(value.slice(BIGINT_TAG.length)) : value,
+  ) as PoolIndexSnapshot
 }
 
 export type PoolIndexOptions = {
@@ -616,5 +743,65 @@ export class PoolIndex {
       negativeCacheBlocks: this.negative.size,
       enabledFeeFactories: this.fees.size,
     }
+  }
+
+  /**
+   * Everything this index knows that outlives the process, in a shape {@link serializeSnapshot} can
+   * write to disk — see {@link PoolIndexSnapshot} for what is included, what is not, and why.
+   *
+   * A SHALLOW copy of the records, deliberately. `PoolRecord` is treated as immutable everywhere in
+   * this class (`upsert`/`markSuccess`/`recordQuoteFailure` all replace the map entry with a fresh
+   * object rather than mutating the stored one), so sharing the record objects with a snapshot costs
+   * nothing and cannot be observed. The container arrays ARE fresh, so a caller holding a snapshot
+   * does not hold a live view of an index that keeps changing under it.
+   */
+  toSnapshot(): PoolIndexSnapshot {
+    return {
+      schemaVersion: POOL_INDEX_SCHEMA_VERSION,
+      wrappedNative: this.wrappedNative,
+      reorgOverlapBlocks: this.reorgOverlapBlocks,
+      pools: [...this.pools.values()],
+      coverage: [...this.coverage].map(([key, ranges]) => [key, [...ranges]]),
+      enabledFees: [...this.fees].map(([key, tiers]) => [key, [...tiers].sort((a, b) => a - b)]),
+    }
+  }
+
+  /**
+   * Rebuilds an index from a {@link PoolIndexSnapshot}. The inverse of {@link toSnapshot} for every
+   * question the index can be asked (`pair`, `neighbors`, `uncovered`, `enabledFees`) — see
+   * `poolIndex.test.ts`'s round-trip property.
+   *
+   * VALIDATES `schemaVersion`, AND NOTHING ELSE. That check is the one the caller cannot make for
+   * itself (it is a fact about this file, not about their chain) and the one whose failure is
+   * silently corrupting rather than loudly wrong. The two chain facts that also matter —
+   * `wrappedNative` and `reorgOverlapBlocks` — are validated where they can actually be compared
+   * against something: `createRouter({ index })` already rejects an index that disagrees with its
+   * manifest, and it does so for indexes built by hand exactly as for indexes restored from here, so
+   * duplicating the check would add a second, weaker copy of a rule that already has a home.
+   *
+   * `options.maxPools` is the RESTORING host's bound on its own memory — not a property of the
+   * snapshot, which is why it is not stored in one. Supplying it here means the eviction pass runs as
+   * the pools go back in, so restoring an oversized snapshot into a bounded index trims rather than
+   * blows past the cap. (Note the LRU clock is reconstructed from record blocks — see
+   * {@link PoolIndexSnapshot} — so which pools a restore-time eviction picks is approximate.)
+   */
+  static fromSnapshot(snap: PoolIndexSnapshot, options?: Pick<PoolIndexOptions, 'maxPools'>): PoolIndex {
+    if (snap.schemaVersion !== POOL_INDEX_SCHEMA_VERSION) {
+      throw new RouterConfigError(
+        `pool index snapshot has schemaVersion ${snap.schemaVersion}, this build reads ${POOL_INDEX_SCHEMA_VERSION} — ` +
+          'discard it and start fresh (a snapshot is a cache of re-readable chain state, never a source of truth)',
+      )
+    }
+    const index = new PoolIndex(snap.wrappedNative, {
+      reorgOverlapBlocks: snap.reorgOverlapBlocks,
+      ...(options?.maxPools !== undefined && { maxPools: options.maxPools }),
+    })
+    // `upsert` rather than a direct map write, so adjacency, the LRU clock and any `maxPools`
+    // eviction are all built by the same code path a live insert uses — a restored index is not a
+    // second, parallel construction of the class's invariants that could drift from the first.
+    for (const rec of snap.pools) index.upsert(rec)
+    for (const [key, ranges] of snap.coverage) index.coverage.set(key, mergeRanges([...ranges]))
+    for (const [key, tiers] of snap.enabledFees) index.fees.set(key, new Set(tiers))
+    return index
   }
 }

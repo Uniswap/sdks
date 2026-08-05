@@ -13,7 +13,9 @@ import { createPublicClient, http, type Address, type PublicClient } from 'viem'
 import { PoolIndex } from '../../src/experimental/index'
 import { createRouter, type PoolHint, type QuotedRoute, type Router } from '../../src/index'
 import { parseAmount, parseBudget } from '../amounts'
+import { dim } from '../ansi'
 import { UsageError, type FlagSpec, type ParsedArgs } from '../args'
+import { CACHE_FLAGS, cacheEnabled, loadCache, saveCache, scheduleCacheSave } from '../cache'
 import {
   assertChainMatches,
   clientTimeoutMs,
@@ -34,6 +36,7 @@ export const COMMON_FLAGS: FlagSpec = {
   json: { kind: 'boolean' },
   budget: { kind: 'string', alias: 'b' },
   verbose: { kind: 'boolean', alias: 'v' },
+  ...CACHE_FLAGS,
 }
 
 /** Additional flags shared by the trade-shaped commands (quote/swap). */
@@ -95,9 +98,36 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
   const client = createPublicClient({
     transport: http(rpcUrl, { batch: true, timeout, ...(budgetMs !== undefined ? { retryCount: 0 } : {}) }),
   }) as PublicClient
-  const index = new PoolIndex(chain.manifest.wrappedNative, {
+  const fresh = new PoolIndex(chain.manifest.wrappedNative, {
     reorgOverlapBlocks: chain.manifest.chain?.reorgOverlapBlocks,
   })
+
+  // The on-disk cache (P2): a process is exactly the lifetime of a `PoolIndex`, so without this every
+  // invocation re-scans the same block history to re-learn the same pools. Restoring one is safe
+  // BECAUSE coverage is block-ranged — a snapshot from last week claims to have scanned up to block
+  // N, so the next search asks the chain for N+1..head plus the standing reorg overlap, which is the
+  // same incremental path a long-lived in-process router already takes. Every failure resolves to
+  // "start fresh with a note"; see `cache.ts`.
+  // Cache notes go to STDERR, and only under `--verbose`: `--json` output must stay machine-clean on
+  // stdout no matter what the cache did, and "why did this run scan from scratch?" must never be a
+  // mystery when someone asks. A silent cache is one a user cannot tell from a broken one.
+  const verbose = parsed.booleans.has('verbose')
+  const note = (line: string): void => {
+    if (verbose) console.error(dim(line))
+  }
+
+  let index = fresh
+  if (cacheEnabled(parsed.booleans)) {
+    const loaded = await loadCache(chain.chainId, fresh)
+    note(loaded.note)
+    if (loaded.index) index = loaded.index
+    // Registered here rather than at each command's end so no command can forget it, and flushed by
+    // `rl.ts` in a `finally` so a partial or failed search still banks the coverage it really learned.
+    scheduleCacheSave(async () => note(await saveCache(chain.chainId, index)))
+  } else {
+    note('cache: disabled (--no-cache)')
+  }
+
   const router = createRouter({ client, manifest: chain.manifest, index })
   const base = { chain, client, router, index }
   return budgetMs !== undefined ? { ...base, signal: AbortSignal.timeout(budgetMs) } : base

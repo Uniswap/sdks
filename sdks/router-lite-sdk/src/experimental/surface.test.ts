@@ -3,7 +3,7 @@ import type { Address } from 'viem'
 
 import type { PoolRecord, PoolRef, QuotedRoute, RouteLeg, UniversalRouterDeployment } from '../index'
 
-import type { Custody, FeeDiscovery, ProtocolModule, QuoteProbe } from './index'
+import type { Custody, FeeDiscovery, PoolIndexSnapshot, ProtocolModule, QuoteProbe } from './index'
 import {
   PROTOCOL_MODULES,
   PoolIndex,
@@ -12,6 +12,8 @@ import {
   encoderFor,
   generateRoutes,
   isHooked,
+  parseSnapshot,
+  serializeSnapshot,
   v2PoolRef,
   v4PoolRef,
 } from './index'
@@ -120,4 +122,23 @@ test('compileExecutionPlan is callable without modules — it defaults to PROTOC
   }
   const tx = encoderFor(deployment.commandSet)(plan, deployment, 9_999_999_999n)
   expect(tx.to).toBe(deployment.address)
+})
+
+test('a PoolIndex snapshot round-trips using only `.../experimental` exports (P2)', () => {
+  // The whole point of shipping `serializeSnapshot`/`parseSnapshot` alongside the type: a caller who
+  // has `toSnapshot()` and reaches for `JSON.stringify` gets a `TypeError` on the first bigint, and
+  // the obvious workaround silently turns block numbers into strings. An external consumer must be
+  // able to do the round trip with nothing but this subpath.
+  const index = new PoolIndex(WETH)
+  index.upsert({ pool: v2WethUsdc, source: 'event', createdAtBlock: 21_000_000n })
+  index.addCoverage('v2', WETH, { fromBlock: 0n, toBlock: 21_000_000n })
+
+  const snapshot: PoolIndexSnapshot = index.toSnapshot()
+  const restored = PoolIndex.fromSnapshot(parseSnapshot(serializeSnapshot(snapshot)))
+
+  expect(restored.pair(USDC, WETH)).toHaveLength(1)
+  expect(restored.pair(USDC, WETH)[0]!.createdAtBlock).toBe(21_000_000n)
+  expect(restored.uncovered('v2', WETH, 0n, 21_000_000n)).toEqual([
+    { fromBlock: 20_999_969n, toBlock: 21_000_000n }, // only the standing reorg overlap
+  ])
 })

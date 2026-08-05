@@ -40,6 +40,7 @@ import { RouterConfigError, UnsupportedRouteError } from '../src/index'
 import { AmountError } from './amounts'
 import { bold, dim, red, setColorEnabled } from './ansi'
 import { UsageError } from './args'
+import { flushCacheSave } from './cache'
 import { cmdChains } from './commands/chains'
 import { cmdDiscover } from './commands/discover'
 import { cmdQuote } from './commands/quote'
@@ -70,6 +71,9 @@ ${bold('common options')}
   --watch, -w             stream every search wave to the end of the bounded search
   --verbose, -v           stream waves, stop at the first actionable result
   --json                  machine output (NDJSON per wave with --watch)
+  --no-cache              skip the on-disk pool index (~/.cache/router-lite/<chainId>.json).
+                          It is ON by default: a warm second run re-scans only the block delta,
+                          never the history. --verbose reports what it loaded and saved.
 
 ${bold('swap options')}
   --trader, -t 0x…        required — the account the tx is encoded for
@@ -129,6 +133,12 @@ async function main(): Promise<number> {
     console.error(red('unexpected error:'))
     console.error(redactKeyedUrl(message))
     return 4
+  } finally {
+    // The on-disk pool index (P2), written on EVERY exit path including the error ones: a search that
+    // died partway still learned real, block-ranged coverage, and discarding it would make exactly
+    // the runs that are already going badly permanently slow. `flushCacheSave` never throws, so this
+    // cannot change the exit code a branch above already decided on.
+    await flushCacheSave()
   }
 }
 

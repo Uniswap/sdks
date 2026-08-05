@@ -15,6 +15,12 @@
 // to stop searching or *how* to classify what was found; these are the raw
 // stage functions it is built from.
 //
+// `PoolIndex`'s snapshot pair ships here too (P2): `toSnapshot`/`fromSnapshot`
+// are the class's own extension story, and `serializeSnapshot`/`parseSnapshot`
+// travel with them because `JSON.stringify` throws on the bigints a snapshot
+// carries — shipping the type without a working JSON round trip would ship a
+// puzzle. `cli/cache.ts` is the reference consumer.
+//
 // Every argument type below is constructible from exports reachable through
 // this file (plus the public types from the package root): `generateRoutes`
 // needs a `PoolIndex` (exported here) and, unless the caller has v4 hookData
@@ -35,8 +41,8 @@ export type { CompileExecutionPlanArgs } from '../plan/compile'
 export { encoderFor } from '../encode'
 export type { CommandSet } from '../types'
 
-export { PoolIndex } from '../pools/poolIndex'
-export type { PoolIndexOptions, PoolIndexStats } from '../pools/poolIndex'
+export { PoolIndex, POOL_INDEX_SCHEMA_VERSION, parseSnapshot, serializeSnapshot } from '../pools/poolIndex'
+export type { PoolIndexOptions, PoolIndexSnapshot, PoolIndexStats } from '../pools/poolIndex'
 
 export { PROTOCOL_MODULES, v2Module, v3Module, v4Module } from '../protocols'
 export type { FeeDiscovery, ProtocolModule, QuoteProbe } from '../protocols'

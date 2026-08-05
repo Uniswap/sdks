@@ -306,7 +306,7 @@ paying a few MB to never re-scan them is a bargain. A process that fields a long
 pairs (an aggregator relaying arbitrary user-chosen tokens) can instead accumulate this forever: one
 long-tail trade's WETH-adjacency scan alone has been measured at 150–250 MB, permanently.
 
-Four knobs manage that lifecycle:
+Five knobs manage that lifecycle:
 
 - **`router.stats(): RouterStats`** — a sizes-only snapshot (`pools`, `adjacencyEdges`,
   `coverageScopes`, `negativeCacheBlocks`, `enabledFeeFactories`), safe to log on an interval. It
@@ -361,6 +361,53 @@ const routerB = createRouter({ client: newClient, manifest, index: warm }) // ze
 console.log(routerB.stats()) // { pools, adjacencyEdges, coverageScopes, negativeCacheBlocks, enabledFeeFactories }
 routerB.clearIndex() // start over empty, whenever the host decides to
 ```
+
+### Snapshots: warm starts across processes
+
+Injection moves a warm index between routers. `PoolIndex.toSnapshot()` / `PoolIndex.fromSnapshot()`
+move one between **processes** — the case a long-lived server never has and a CLI, a serverless
+handler, or a restarted worker always does.
+
+```ts
+import { PoolIndex, parseSnapshot, serializeSnapshot } from '@uniswap/router-lite-sdk/experimental'
+
+// On the way out:
+await writeFile(path, serializeSnapshot(index.toSnapshot()))
+
+// On the way back in — `createRouter` re-checks it against the manifest, exactly as for any
+// injected index:
+const restored = PoolIndex.fromSnapshot(parseSnapshot(await readFile(path, 'utf8')))
+const router = createRouter({ client, manifest, index: restored })
+```
+
+Use `serializeSnapshot`/`parseSnapshot` rather than `JSON.stringify`/`JSON.parse`: a snapshot is full
+of `bigint`s (block numbers, coverage bounds), `JSON.stringify` throws outright on the first one, and
+the obvious workaround silently turns `createdAtBlock` into a string that every downstream block
+comparison then gets wrong. The pair encodes them as tagged strings and decodes them back.
+
+What travels: the pool records (with their provenance and hint-discredit history), the scan-coverage
+ranges, the per-factory `enabledFees`, and the two chain facts the rest is expressed in terms of
+(`wrappedNative`, `reorgOverlapBlocks`). Adjacency is rebuilt from the records rather than stored.
+What does not: the negative-quote cache, which is block-scoped by construction and would be evicted
+on first use anyway.
+
+**A snapshot cannot go stale, only behind.** Coverage is block-ranged, so a week-old snapshot claims
+to have scanned up to block N and nothing more — the next search asks the chain for N+1..head, which
+is the same incremental path a long-lived in-process router already takes. The tip is re-scanned
+either way, because `uncovered()` re-opens the last `reorgOverlapBlocks` of coverage on every call
+regardless of where the data came from. A `schemaVersion` mismatch throws `RouterConfigError`; there
+is deliberately no migration path, because everything in a snapshot is re-readable from the chain and
+starting fresh costs one delta scan.
+
+The CLI (`cli/rl.ts`) is the reference consumer: it keeps one snapshot per chain under
+`~/.cache/router-lite/<chainId>.json` (respecting `$XDG_CACHE_HOME`), loads it at start, and writes
+it back atomically on exit. It is on by default for every command; `--no-cache` opts out, and
+`--verbose` reports what was loaded and saved. Measured on mainnet, `rl discover usdc` goes from 67s
+cold (budget-aborted, v2 discovery still partial) to 5.1s fully warm, with `eth_getLogs` dropping
+from 356 to 14 — the 14 being the standing reorg-overlap re-scans. The cost is on the other side: a
+maximal 275 MB snapshot adds ~1.5s to load, so a major-pair `rl quote` that would have resolved in
+wave 0 without the index gets slower (and more thorough) rather than faster. See `cli/cache.ts` for
+the size bound and the numbers behind it.
 
 ## Transport options
 
@@ -441,6 +488,8 @@ bytecode at `execution.address` hashes to it. Either check failing rejects that 
 | `router.ingestLogs(logs)` / `router.ingestReceipt(receipt)` | Feed known pool-creation logs (or a whole receipt) into the index ahead of a search. |
 | `router.stats()` | A sizes-only snapshot of what the router's index currently holds — see [PoolIndex lifecycle](#poolindex-lifecycle). |
 | `router.clearIndex()` | Drops every learned pool/coverage/discredit and starts the index over empty — see [PoolIndex lifecycle](#poolindex-lifecycle). |
+| `PoolIndex#toSnapshot()` / `PoolIndex.fromSnapshot(snap, { maxPools? })` | Serializable form of a warm index, and its inverse — warm starts across processes. `/experimental`; see [Snapshots](#snapshots-warm-starts-across-processes). |
+| `serializeSnapshot(snap)` / `parseSnapshot(json)` | The bigint-safe JSON pair for a `PoolIndexSnapshot`. `/experimental`. |
 | `manifestFor(chainId, overrides?)`, `MAINNET_MANIFEST`, `BASE_MANIFEST`, `UNICHAIN_MANIFEST`, `ARBITRUM_MANIFEST`, `ROBINHOOD_MANIFEST` | Chain configuration: the required top-level `wrappedNative`, per-protocol deployment bundles, an optional Universal Router deployment (`execution` — omitted for [quote-only](#quote-only-mode) manifests), and the `chain` bundle of chain facts (block time, reorg depth) — see [Supported chains](#supported-chains). |
 | `RouterConfigError`, `UnsupportedRouteError` | The two typed throws — see [Error handling](#error-handling). |
 

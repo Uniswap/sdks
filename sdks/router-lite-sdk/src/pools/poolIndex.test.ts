@@ -4,10 +4,11 @@ import type { Address } from 'viem'
 import { zeroAddress } from 'viem'
 
 import { DEFAULT_REORG_OVERLAP_BLOCKS, HINT_DISCREDIT_FAILURE_BLOCKS, NEGATIVE_CACHE_BLOCKS } from '../constants'
+import { RouterConfigError } from '../errors'
 import { v2Ref, v4Ref } from '../internal/testing'
 import type { PoolRecord, PoolRef } from '../types'
 
-import { isDiscredited, PoolIndex } from './poolIndex'
+import { isDiscredited, parseSnapshot, PoolIndex, POOL_INDEX_SCHEMA_VERSION, serializeSnapshot } from './poolIndex'
 
 const WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2' as Address
 const A = '0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' as Address
@@ -454,5 +455,211 @@ describe('PoolIndex', () => {
       expect(idx.pair(A, B)).toEqual([])
       expect(idx.pair(A, USDC)).toHaveLength(1)
     })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// P2: snapshots — the index outliving its process.
+//
+// The contract these pin is BEHAVIORAL, not structural: a restored index must
+// answer every question the original one would have, which is what actually
+// makes a second CLI invocation warm. Comparing internal maps would pass while
+// (say) adjacency was rebuilt against the wrong graph node, and would fail on
+// harmless representation changes; comparing ANSWERS cannot do either.
+//
+// The negative cache is the one thing deliberately absent, and its two halves
+// have to part company here: the block-scoped mark evaporates (it would be
+// evicted on first use anyway), while the durable failure counters that
+// `isDiscredited` reads have to survive, or a process restart would launder
+// every hint the chain has already contradicted.
+// ---------------------------------------------------------------------------
+
+describe('PoolIndexSnapshot', () => {
+  /** The universe the property below draws from: small enough that collisions and merges happen. */
+  const NODES: Address[] = [A, B, USDC, WETH]
+
+  /** Applies `ops` to a fresh index — the arbitrary state generator's interpreter. */
+  function build(ops: SnapshotOp[]): PoolIndex {
+    const idx = new PoolIndex(WETH, { reorgOverlapBlocks: 16n })
+    for (const op of ops) {
+      if (op.kind === 'pool') {
+        idx.upsert({
+          pool: v2Ref(`0x${op.n.toString(16).padStart(40, '0')}` as Address, NODES[op.a]!, NODES[op.b]!),
+          source: op.source,
+          createdAtBlock: BigInt(op.block),
+        })
+      } else if (op.kind === 'v4') {
+        idx.upsert({
+          // Lowercased: a PoolKey is ABI-encoded to derive the poolId, and viem rejects a
+          // non-checksummed mixed-case address there. (The graph nodes are lowercase anyway.)
+          pool: v4Ref({
+            currency0: zeroAddress,
+            currency1: NODES[op.a]!.toLowerCase() as Address,
+            fee: op.n,
+            tickSpacing: 60,
+            hooks: zeroAddress,
+          }),
+          source: 'event',
+          createdAtBlock: BigInt(op.block),
+        })
+      } else if (op.kind === 'coverage') {
+        idx.addCoverage(op.protocol, NODES[op.a]!, { fromBlock: BigInt(op.block), toBlock: BigInt(op.block + op.n) })
+      } else {
+        idx.addEnabledFees('v3', NODES[op.a]!, [op.n])
+      }
+    }
+    return idx
+  }
+
+  type SnapshotOp =
+    | { kind: 'pool'; a: number; b: number; n: number; block: number; source: PoolRecord['source'] }
+    | { kind: 'v4'; a: number; n: number; block: number }
+    | { kind: 'coverage'; protocol: 'v2' | 'v3' | 'v4'; a: number; n: number; block: number }
+    | { kind: 'fees'; a: number; n: number }
+
+  const nodeIndex = fc.integer({ min: 0, max: NODES.length - 1 })
+  const opArb: fc.Arbitrary<SnapshotOp> = fc.oneof(
+    fc.record({
+      kind: fc.constant('pool' as const),
+      a: nodeIndex,
+      b: nodeIndex,
+      n: fc.integer({ min: 1, max: 40 }),
+      block: fc.integer({ min: 0, max: 5_000 }),
+      source: fc.constantFrom<PoolRecord['source']>('event', 'factory', 'hint'),
+    }),
+    fc.record({ kind: fc.constant('v4' as const), a: nodeIndex, n: fc.integer({ min: 100, max: 10_000 }), block: fc.integer({ min: 0, max: 5_000 }) }),
+    fc.record({
+      kind: fc.constant('coverage' as const),
+      protocol: fc.constantFrom('v2' as const, 'v3' as const, 'v4' as const),
+      a: nodeIndex,
+      n: fc.integer({ min: 0, max: 800 }),
+      block: fc.integer({ min: 0, max: 5_000 }),
+    }),
+    fc.record({ kind: fc.constant('fees' as const), a: nodeIndex, n: fc.integer({ min: 100, max: 10_000 }) }),
+  )
+
+  /** Every answer the index can give, as a comparable value — the actual definition of "identical". */
+  function answers(idx: PoolIndex): unknown {
+    const pairs: unknown[] = []
+    for (const a of [...NODES, 'native' as const]) {
+      for (const b of [...NODES, 'native' as const]) pairs.push([a, b, idx.pair(a, b).map((r) => r.pool.id).sort()])
+    }
+    const neighborhoods: unknown[] = []
+    for (const a of [...NODES, 'native' as const]) {
+      neighborhoods.push([a, [...idx.neighbors(a)].map(([n, recs]) => [n, recs.map((r) => r.pool.id).sort()]).sort()])
+    }
+    const uncovered: unknown[] = []
+    for (const p of ['v2', 'v3', 'v4'] as const) {
+      for (const a of NODES) uncovered.push([p, a, idx.uncovered(p, a, 0n, 6_000n)])
+      for (const a of NODES) uncovered.push([`${p}:pair`, a, idx.uncovered(p, idx.pairScope(a, WETH), 0n, 6_000n)])
+    }
+    const fees = NODES.map((a) => [a, idx.enabledFees('v3', a)])
+    // Records themselves, so provenance/merge/discredit state is compared too, not just topology.
+    const records = [...idx.neighbors(A).values(), ...idx.neighbors(B).values(), ...idx.neighbors(USDC).values()]
+      .flat()
+      .map((r) => JSON.stringify(r, (_k, v) => (typeof v === 'bigint' ? v.toString() : v)))
+      .sort()
+    return { pairs, neighborhoods, uncovered, fees, records, stats: idx.stats() }
+  }
+
+  test('round-trips through JSON: a restored index answers identically to the one it came from', () => {
+    fc.assert(
+      fc.property(fc.array(opArb, { maxLength: 40 }), (ops) => {
+        const original = build(ops)
+        const restored = PoolIndex.fromSnapshot(parseSnapshot(serializeSnapshot(original.toSnapshot())))
+
+        expect(restored.wrappedNative).toBe(original.wrappedNative)
+        expect(restored.reorgOverlapBlocks).toBe(original.reorgOverlapBlocks)
+        expect(answers(restored)).toEqual(answers(original))
+      }),
+      { numRuns: 60 },
+    )
+  })
+
+  test('the bigint round trip survives JSON, which cannot represent one at all', () => {
+    const idx = new PoolIndex(WETH)
+    idx.upsert({ pool: v2Ref('0xP9' as Address, A, B), source: 'event', createdAtBlock: 21_000_000n })
+    idx.addCoverage('v3', A, { fromBlock: 12_369_621n, toBlock: 21_000_000n })
+
+    // The naive alternative fails loudly, which is exactly why the pair exists — a caller who reaches
+    // for JSON.stringify directly cannot silently ship a broken cache, they get this.
+    expect(() => JSON.stringify(idx.toSnapshot())).toThrow(TypeError)
+
+    const restored = PoolIndex.fromSnapshot(parseSnapshot(serializeSnapshot(idx.toSnapshot())))
+    const rec = restored.pair(A, B)[0]!
+    expect(rec.createdAtBlock).toBe(21_000_000n) // a bigint, not the string "21000000"
+    expect(typeof rec.createdAtBlock).toBe('bigint')
+    expect(restored.uncovered('v3', A, 12_369_621n, 21_000_000n)).toEqual([
+      { fromBlock: 20_999_969n, toBlock: 21_000_000n }, // only the reorg overlap, i.e. the cache WORKS
+    ])
+  })
+
+  test('the coverage cache is the payload: a restored index re-scans the delta, not the history', () => {
+    const idx = new PoolIndex(WETH, { reorgOverlapBlocks: 32n })
+    idx.addCoverage('v3', A, { fromBlock: 0n, toBlock: 1_000n })
+    const restored = PoolIndex.fromSnapshot(parseSnapshot(serializeSnapshot(idx.toSnapshot())))
+
+    // Same head: nothing but the standing reorg overlap. This is the whole reason a snapshot exists.
+    expect(restored.uncovered('v3', A, 0n, 1_000n)).toEqual([{ fromBlock: 969n, toBlock: 1_000n }])
+    // Moved head: the delta plus the overlap, and NOT the 969 blocks already scanned.
+    expect(restored.uncovered('v3', A, 0n, 1_500n)).toEqual([{ fromBlock: 969n, toBlock: 1_500n }])
+  })
+
+  test('the block-scoped negative mark does NOT survive, but the durable discredit evidence does', () => {
+    const idx = new PoolIndex(WETH)
+    const hint = v2Ref('0xH1' as Address, A, B)
+    idx.upsert({ pool: hint, source: 'hint' })
+    idx.markNegative(hint, 100n)
+    idx.markNegative(hint, 101n)
+    expect(idx.isNegative(hint, 101n)).toBe(true)
+    expect(isDiscredited(idx.pair(A, B)[0]!)).toBe(true)
+
+    const restored = PoolIndex.fromSnapshot(parseSnapshot(serializeSnapshot(idx.toSnapshot())))
+
+    // Gone, and rightly: "could not quote at block 101" says nothing about any block a later process
+    // will ask about, and `markNegative` would have evicted it within NEGATIVE_CACHE_BLOCKS anyway.
+    expect(restored.isNegative(hint, 101n)).toBe(false)
+    expect(restored.stats().negativeCacheBlocks).toBe(0)
+    // Kept, and rightly: this is accumulated evidence about the pool, not about a block. Losing it
+    // would hand a caller who resubmits the same junk hint its full, un-discredited rank right back.
+    expect(isDiscredited(restored.pair(A, B)[0]!)).toBe(true)
+    expect(restored.pair(A, B)[0]!.quoteFailureBlocks).toBe(2)
+  })
+
+  test('a schemaVersion mismatch is refused outright — no migration, no partial restore', () => {
+    const snap = new PoolIndex(WETH).toSnapshot()
+    expect(snap.schemaVersion).toBe(POOL_INDEX_SCHEMA_VERSION)
+
+    expect(() => PoolIndex.fromSnapshot({ ...snap, schemaVersion: POOL_INDEX_SCHEMA_VERSION + 1 })).toThrow(
+      RouterConfigError,
+    )
+    expect(() => PoolIndex.fromSnapshot({ ...snap, schemaVersion: 0 })).toThrow(/schemaVersion 0.*reads 1/)
+  })
+
+  test('a snapshot is a detached copy — the index it came from can keep changing', () => {
+    const idx = new PoolIndex(WETH)
+    idx.upsert({ pool: v2Ref('0xS1' as Address, A, B), source: 'event' })
+    idx.addCoverage('v2', A, { fromBlock: 0n, toBlock: 10n })
+    const snap = idx.toSnapshot()
+
+    idx.upsert({ pool: v2Ref('0xS2' as Address, A, USDC), source: 'event' })
+    idx.addCoverage('v2', A, { fromBlock: 11n, toBlock: 20n })
+
+    expect(snap.pools).toHaveLength(1)
+    expect(snap.coverage.find(([k]) => k === `v2:${A.toLowerCase()}`)![1]).toEqual([{ fromBlock: 0n, toBlock: 10n }])
+  })
+
+  test('fromSnapshot takes the RESTORING host maxPools — it is memory policy, not snapshot data', () => {
+    const idx = new PoolIndex(WETH) // unbounded while it was built
+    for (let i = 1; i <= 5; i++) {
+      idx.upsert({ pool: v2Ref(`0x${i}` as Address, A, B), source: 'event', createdAtBlock: BigInt(i) })
+    }
+    const snap = idx.toSnapshot()
+    expect(snap.pools).toHaveLength(5)
+    expect('maxPools' in snap).toBe(false)
+
+    const bounded = PoolIndex.fromSnapshot(snap, { maxPools: 2 })
+    expect(bounded.stats().pools).toBe(2) // trimmed on the way in, rather than blowing past the cap
+    expect(PoolIndex.fromSnapshot(snap).stats().pools).toBe(5) // and unbounded by default
   })
 })
