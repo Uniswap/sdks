@@ -9,6 +9,7 @@ import { v2Ref, v4Ref } from '../internal/testing'
 import type { PoolRecord, PoolRef } from '../types'
 
 import { isDiscredited, parseSnapshot, PoolIndex, POOL_INDEX_SCHEMA_VERSION, serializeSnapshot } from './poolIndex'
+import type { PoolIndexSnapshot } from './poolIndex'
 
 const WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2' as Address
 const A = '0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' as Address
@@ -624,6 +625,78 @@ describe('PoolIndexSnapshot', () => {
     // would hand a caller who resubmits the same junk hint its full, un-discredited rank right back.
     expect(isDiscredited(restored.pair(A, B)[0]!)).toBe(true)
     expect(restored.pair(A, B)[0]!.quoteFailureBlocks).toBe(2)
+  })
+
+  // -------------------------------------------------------------------------
+  // F2: a snapshot that PARSES but is structurally wrong.
+  //
+  // The dangerous band is not truncated JSON (JSON.parse catches that) or a
+  // bumped schemaVersion (checked below) — it is a payload that loads perfectly
+  // happily and then detonates deep inside the engine, mid-search, in a stack
+  // that names nothing about caches. A coverage bound that came back as the
+  // string 'abc' is the canonical one: `fromSnapshot` used to accept it, and
+  // `uncovered`'s bigint comparisons threw on the next search.
+  //
+  // Every case below is one that ESCAPED the old checks — schemaVersion alone.
+  // Each must fail at the door, as a RouterConfigError the caller can turn into
+  // "discard and start fresh", never as a TypeError from three layers down.
+  // -------------------------------------------------------------------------
+
+  describe('malformed payloads are refused at the door, not mid-search', () => {
+    const valid = (): PoolIndexSnapshot => {
+      const idx = new PoolIndex(WETH)
+      idx.upsert({ pool: v2Ref('0xM1' as Address, A, B), source: 'event', createdAtBlock: 7n })
+      idx.addCoverage('v3', A, { fromBlock: 1n, toBlock: 100n })
+      idx.addEnabledFees('v3', A, [500])
+      return idx.toSnapshot()
+    }
+
+    const cases: [string, () => unknown][] = [
+      // The one that motivated all of this: loads clean, throws inside `uncovered`.
+      ['a coverage bound that is a string', () => ({ ...valid(), coverage: [['v3:x', [{ fromBlock: 'abc', toBlock: 9n }]]] })],
+      ['a coverage bound that is a number', () => ({ ...valid(), coverage: [['v3:x', [{ fromBlock: 0n, toBlock: 9 }]]] })],
+      ['a coverage range that is not an object', () => ({ ...valid(), coverage: [['v3:x', ['nope']]] })],
+      ['a coverage key that is not a string', () => ({ ...valid(), coverage: [[7, []]] })],
+      ['coverage that is not an array', () => ({ ...valid(), coverage: { 'v3:x': [] } })],
+      // `wrappedNative` is `.toLowerCase()`d by `cli/cache.ts`'s manifest cross-check — this is the
+      // exact payload that used to escape as an uncaught TypeError and an exit-4 stack trace.
+      ['wrappedNative that is not a string', () => ({ ...valid(), wrappedNative: 12345 })],
+      ['wrappedNative that is missing', () => { const s = valid() as Record<string, unknown>; delete s.wrappedNative; return s }],
+      // Subtracted from a block number on every `uncovered` call.
+      ['reorgOverlapBlocks that is a string', () => ({ ...valid(), reorgOverlapBlocks: '32' })],
+      // `id` is the primary map key; `currencies` is destructured into both adjacency links.
+      ['a pool ref with a non-string id', () => { const s = valid(); return { ...s, pools: [{ ...s.pools[0]!, pool: { ...s.pools[0]!.pool, id: 42 } }] } }],
+      ['a pool ref with one currency', () => { const s = valid(); return { ...s, pools: [{ ...s.pools[0]!, pool: { ...s.pools[0]!.pool, currencies: [A] } }] } }],
+      ['a pool record that is not an object', () => ({ ...valid(), pools: ['nope'] })],
+      ['a createdAtBlock that is a string', () => { const s = valid(); return { ...s, pools: [{ ...s.pools[0]!, createdAtBlock: '7' }] } }],
+      ['pools that is not an array', () => ({ ...valid(), pools: {} })],
+      ['an enabledFees tier that is not a number', () => ({ ...valid(), enabledFees: [['v3:x', ['500']]] })],
+    ]
+
+    for (const [what, build] of cases) {
+      test(`refuses ${what}`, () => {
+        expect(() => PoolIndex.fromSnapshot(build() as PoolIndexSnapshot)).toThrow(RouterConfigError)
+        expect(() => PoolIndex.fromSnapshot(build() as PoolIndexSnapshot)).toThrow(/malformed/)
+      })
+    }
+
+    test('the poisoned-coverage payload used to load clean and throw LATER — now it cannot load at all', () => {
+      // The regression in full: this is the shape that made it all the way into a live index.
+      const poisoned = { ...valid(), coverage: [['v3:x', [{ fromBlock: 'abc', toBlock: 9n }]]] } as unknown as PoolIndexSnapshot
+      expect(() => PoolIndex.fromSnapshot(poisoned)).toThrow(RouterConfigError)
+
+      // ...and a legitimate snapshot with the same fields still round-trips, so the check is a filter
+      // and not a wall.
+      const good = PoolIndex.fromSnapshot(parseSnapshot(serializeSnapshot(valid())))
+      expect(good.uncovered('v3', A, 1n, 100n)).toEqual([{ fromBlock: 69n, toBlock: 100n }])
+    })
+
+    test('the shape check survives the JSON round trip it exists to guard', () => {
+      // A hand-edited cache file is the real threat model, so the payload must be rejected after
+      // going through `parseSnapshot` exactly as a file would — not only as an in-memory literal.
+      const onDisk = serializeSnapshot(valid()).replace('"$bigint:1"', '"abc"')
+      expect(() => PoolIndex.fromSnapshot(parseSnapshot(onDisk))).toThrow(RouterConfigError)
+    })
   })
 
   test('a schemaVersion mismatch is refused outright — no migration, no partial restore', () => {

@@ -15,7 +15,7 @@ import { createRouter, type PoolHint, type QuotedRoute, type Router } from '../.
 import { parseAmount, parseBudget } from '../amounts'
 import { dim } from '../ansi'
 import { UsageError, type FlagSpec, type ParsedArgs } from '../args'
-import { CACHE_FLAGS, cacheEnabled, loadCache, saveCache, scheduleCacheSave } from '../cache'
+import { CACHE_FLAGS, cacheEnabled, cachePath, loadCache, saveCache, scheduleCacheSave } from '../cache'
 import {
   assertChainMatches,
   clientTimeoutMs,
@@ -108,9 +108,8 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
   // N, so the next search asks the chain for N+1..head plus the standing reorg overlap, which is the
   // same incremental path a long-lived in-process router already takes. Every failure resolves to
   // "start fresh with a note"; see `cache.ts`.
-  // Cache notes go to STDERR, and only under `--verbose`: `--json` output must stay machine-clean on
-  // stdout no matter what the cache did, and "why did this run scan from scratch?" must never be a
-  // mystery when someone asks. A silent cache is one a user cannot tell from a broken one.
+  // Everything the cache says goes to STDERR, never stdout: `--json` output must stay machine-clean
+  // no matter what the cache did.
   const verbose = parsed.booleans.has('verbose')
   const note = (line: string): void => {
     if (verbose) console.error(dim(line))
@@ -118,11 +117,26 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
 
   let index = fresh
   if (cacheEnabled(parsed.booleans)) {
+    const started = Date.now()
     const loaded = await loadCache(chain.chainId, fresh)
-    note(loaded.note)
+    const loadMs = Date.now() - started
     if (loaded.index) index = loaded.index
+
+    // ONE UNCONDITIONAL LINE, not gated on --verbose. A cache that reads and writes a file the user
+    // never named, silently, is one they cannot reason about: the only way to notice it had resolved
+    // a DIFFERENT chain than intended (and was therefore neither reading nor writing the file they
+    // expected) was to go looking. Naming the resolved chain id and the exact path on every cached
+    // run makes that self-evident, and costs one dim line on stderr. The load time is appended only
+    // when it is large enough to be felt — a multi-hundred-megabyte snapshot adds real seconds before
+    // the search starts, and an unexplained pause is the other thing a user cannot reason about.
+    const slow = loadMs > 500 ? ` · ${(loadMs / 1000).toFixed(1)}s load` : ''
+    console.error(dim(`cache: chain ${chain.chainId} · ${cachePath(chain.chainId)}${slow}`))
+    // The detail (hit/miss, why it was discarded, what was saved) stays under --verbose.
+    note(loaded.note)
+
     // Registered here rather than at each command's end so no command can forget it, and flushed by
-    // `rl.ts` in a `finally` so a partial or failed search still banks the coverage it really learned.
+    // `rl.ts` in a `finally` (and by its signal handler) so a partial, failed, or Ctrl-C'd search
+    // still banks the coverage it really learned.
     scheduleCacheSave(async () => note(await saveCache(chain.chainId, index)))
   } else {
     note('cache: disabled (--no-cache)')

@@ -24,11 +24,55 @@
 // the same thing that happens to a pool discovered thirty seconds ago.
 //
 // WHAT MAKES IT SAFE TO JUST DELETE. Every failure mode below — unreadable
-// file, malformed JSON, schemaVersion bump, a manifest that no longer matches —
-// resolves to "start fresh, note it under --verbose". A cache whose entire
-// content is re-derivable from the chain has no failure worth reporting as an
-// error, and a testing CLI that refused to run because of its own cache file
-// would be a worse tool than one with no cache at all.
+// file, malformed JSON, schemaVersion bump, a failed shape check, a manifest
+// that no longer matches — resolves to "start fresh, note it". A cache whose
+// entire content is re-derivable from the chain has no failure worth reporting
+// as an error, and a testing CLI that refused to run because of its own cache
+// file would be a worse tool than one with no cache at all. That invariant is
+// load-bearing enough to be a rule rather than a habit: NOTHING in the load
+// path may throw, which is why every line that touches the file's contents —
+// including the manifest cross-checks, which call methods on values that came
+// out of the file — lives inside `loadCache`'s single `try`.
+//
+// THE TRUST BOUNDARY, AND WHERE IT ACTUALLY IS (F3). The easy story is "it is a
+// local file the user owns, so reading it is as trusted as running the tool".
+// That story has real holes: a CI job that restores `~/.cache` from a shared
+// artifact, a devcontainer or build image with a baked-in cache, and a
+// multi-user box with `XDG_CACHE_HOME` pointed somewhere shared are all cases
+// where the bytes did not come from the person running the command. So the file
+// is treated as UNTRUSTED INPUT, and three things bound what a hostile one can
+// do:
+//
+//   * SHAPE. `PoolIndex.fromSnapshot` shape-checks before loading anything, so a
+//     payload cannot smuggle a `'abc'` where a bigint goes and detonate later,
+//     mid-search, in code that has no idea a cache exists.
+//   * A QUOTE IS A PROBE, NOT A BELIEF. Every pool a snapshot asserts is priced
+//     by a real `eth_call` at a pinned block before it can appear in a result.
+//     Injecting a fabricated pool buys an attacker some wasted `eth_call`s, not
+//     a wrong price — the same position a caller-supplied `--hint` is in, which
+//     this package already documents as trusted-but-verified.
+//   * DISCREDIT. A pool that keeps failing to quote loses its rank
+//     (`isDiscredited`), so injected junk decays rather than accumulating.
+//
+// THE RESIDUAL RISK, ACCEPTED AND NAMED: COVERAGE SUPPRESSION. A snapshot can
+// claim to have scanned block ranges nobody scanned, and the next search will
+// believe it and skip them — so a hostile cache can hide a pool rather than
+// invent one, and the symptom is a worse route (or a `no-route`) with nothing
+// anywhere saying why. Nothing here detects that, because detecting it means
+// doing the scan the cache exists to avoid. It is accepted for a local testing
+// CLI, where the blast radius is one developer's own quote being suboptimal;
+// `--no-cache` is the one-flag answer for anyone whose cache directory is
+// genuinely shared, and it is why this mechanism lives in `cli/` rather than
+// being switched on by default inside the SDK.
+//
+// THE REAL CEILING IS NODE'S STRING LIMIT, NOT `CACHE_MAX_POOLS` (F7). Both
+// halves of the round trip go through a single JavaScript string
+// (`JSON.stringify` out, `readFile(…, 'utf8')` in), so a snapshot can never
+// exceed the runtime's maximum string length — ~512 MB on V8, ~2 GB on JSC.
+// `CACHE_MAX_POOLS` (~420 MB at the bound) sits deliberately under the tighter
+// of those, so the guard trips before the runtime does and the failure is a
+// note rather than an allocation error. Anything that raises the bound has to
+// move to a streaming format first.
 //
 // KEYED URLS NEVER PRINT HERE EITHER (see `rl.ts`): nothing in this file ever
 // touches the endpoint, and the cache is keyed by CHAIN ID, not by endpoint —
@@ -36,7 +80,7 @@
 // so sharing one file between them is correct and halves the cold starts.
 // ---------------------------------------------------------------------------
 
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -155,6 +199,12 @@ export async function loadCache(
   expected: { wrappedNative: Address; reorgOverlapBlocks: bigint },
 ): Promise<CacheLoad> {
   const path = cachePath(chainId)
+  // Before anything else: clear out any full-size `.tmp` a previous run died holding. Awaited rather
+  // than fired-and-forgotten because this is a one-shot CLI — a detached promise races the process
+  // exit and would leave the orphan behind exactly as often as not — and because it is one `readdir`
+  // over a directory that holds a handful of entries.
+  await sweepStaleTmp()
+
   let raw: string
   try {
     raw = await readFile(path, 'utf8')
@@ -162,27 +212,64 @@ export async function loadCache(
     return { index: undefined, note: `cache: none at ${path} — cold start` }
   }
 
-  let snap: PoolIndexSnapshot
+  // EVERYTHING that touches the file's contents lives inside this `try`, including the two
+  // cross-checks below. That is not tidiness: `expected.wrappedNative.toLowerCase()` is a method call
+  // on a value that CAME FROM THE FILE, so a snapshot whose `wrappedNative` is a number, or absent,
+  // used to throw a raw `TypeError` out of this function — past every "start fresh" path, out through
+  // `buildChainContext`, and into `rl.ts`'s catch-all as an exit-4 stack trace. A corrupt cache file
+  // is never allowed to be a crash; `PoolIndex.fromSnapshot`'s shape check now makes that specific
+  // one impossible, and this `try` is the guarantee that the NEXT one is not a crash either.
   let index: PoolIndex
   try {
-    snap = parseSnapshot(raw)
+    const snap: PoolIndexSnapshot = parseSnapshot(raw)
     index = PoolIndex.fromSnapshot(snap)
+
+    if (index.wrappedNative.toLowerCase() !== expected.wrappedNative.toLowerCase()) {
+      return { index: undefined, note: `cache: ${path} was built for a different wrappedNative — starting fresh` }
+    }
+    if (index.reorgOverlapBlocks !== expected.reorgOverlapBlocks) {
+      return { index: undefined, note: `cache: ${path} was maintained under a different reorg overlap — starting fresh` }
+    }
   } catch (err) {
-    // Malformed JSON, a bumped schemaVersion, anything at all: the content is re-derivable from the
-    // chain, so there is no failure here worth more than a line under --verbose.
+    // Malformed JSON, a bumped schemaVersion, a failed shape check, anything at all: the content is
+    // re-derivable from the chain, so there is no failure here worth more than a note.
     const why = err instanceof Error ? err.message.split('\n')[0]! : String(err)
     return { index: undefined, note: `cache: discarded ${path} (${why}) — starting fresh` }
   }
 
-  if (index.wrappedNative.toLowerCase() !== expected.wrappedNative.toLowerCase()) {
-    return { index: undefined, note: `cache: ${path} was built for a different wrappedNative — starting fresh` }
-  }
-  if (index.reorgOverlapBlocks !== expected.reorgOverlapBlocks) {
-    return { index: undefined, note: `cache: ${path} was maintained under a different reorg overlap — starting fresh` }
-  }
-
   const stats = index.stats()
   return { index, note: `cache: loaded ${stats.pools} pools · ${stats.coverageScopes} coverage scopes from ${path}` }
+}
+
+/** A `.tmp` older than this cannot belong to a live write, so it is an orphan from a killed run. */
+const STALE_TMP_MS = 60 * 60 * 1000
+
+/**
+ * Deletes orphaned `*.tmp` files left behind by a write that never reached its `rename`.
+ *
+ * These are FULL-SIZE snapshots — up to a few hundred megabytes each — so a handful of Ctrl-C'd runs
+ * could quietly fill a cache directory with dead weight that nothing ever reads or replaces (the
+ * live path only ever writes to a fresh pid-suffixed name and renames it away). `saveCache` cleans up
+ * its own failures; this catches the case it cannot, where the process died between the write and the
+ * rename.
+ *
+ * Never throws and never reports: an mtime younger than {@link STALE_TMP_MS} is skipped so a
+ * concurrent writer's in-progress file is left strictly alone, and every error is swallowed —
+ * failing to tidy up is not a reason to fail a command, or even to mention it.
+ */
+async function sweepStaleTmp(): Promise<void> {
+  try {
+    const dir = cacheDir()
+    const now = Date.now()
+    for (const name of await readdir(dir)) {
+      if (!name.endsWith('.tmp')) continue
+      const full = join(dir, name)
+      const info = await stat(full)
+      if (now - info.mtimeMs > STALE_TMP_MS) await rm(full, { force: true })
+    }
+  } catch {
+    // No directory, no permission, a racing sweep from a second process: all fine, all ignorable.
+  }
 }
 
 /**
@@ -196,8 +283,18 @@ export async function loadCache(
  * or the whole new one, never a splice. The tmp name carries the pid so two concurrent writers
  * cannot clobber each other's partial file before either renames.
  *
- * NEVER THROWS. A cache write failing (read-only home, full disk, a sandbox with no HOME) must not
- * change what the command returned — the answer was already computed and printed.
+ * ATOMIC IS NOT COORDINATED, THOUGH. Two `rl` runs finishing at once is LAST-WRITER-WINS: both write
+ * a complete, self-consistent snapshot and the later `rename` is the one that survives, so the
+ * earlier run's newly-learned coverage is simply lost rather than corrupted. That is the intended
+ * behaviour and not worth a lock file — losing one run's delta costs the next run one delta re-scan,
+ * which is the same thing a cold start costs, and a lock introduces a failure mode (a stale lock from
+ * a killed run) strictly worse than the one it prevents.
+ *
+ * NEVER THROWS, AND NEVER LEAVES ITS TMP BEHIND. A cache write failing (read-only home, full disk, a
+ * sandbox with no HOME) must not change what the command returned — the answer was already computed
+ * and printed — and a failed write must not strand a several-hundred-megabyte partial file. The one
+ * case this cannot clean up is the process being killed mid-write, which is what `sweepStaleTmp`
+ * exists for.
  */
 export async function saveCache(chainId: number, index: PoolIndex): Promise<string> {
   const path = cachePath(chainId)
@@ -205,14 +302,15 @@ export async function saveCache(chainId: number, index: PoolIndex): Promise<stri
   if (stats.pools > CACHE_MAX_POOLS) {
     return `cache: not saved — ${stats.pools} pools exceeds the ${CACHE_MAX_POOLS} bound (see cli/cache.ts)`
   }
+  const tmp = `${path}.${process.pid}.tmp`
   try {
     await mkdir(cacheDir(), { recursive: true })
-    const tmp = `${path}.${process.pid}.tmp`
     await writeFile(tmp, serializeSnapshot(index.toSnapshot()), 'utf8')
     await rename(tmp, path)
     return `cache: saved ${stats.pools} pools · ${stats.coverageScopes} coverage scopes to ${path}`
   } catch (err) {
     const why = err instanceof Error ? err.message.split('\n')[0]! : String(err)
+    await rm(tmp, { force: true }).catch(() => {}) // never strand a partial snapshot
     return `cache: not saved (${why})`
   }
 }

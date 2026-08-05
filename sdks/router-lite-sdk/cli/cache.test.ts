@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readdir, readFile, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -187,5 +187,73 @@ describe('the exit-time flush', () => {
       throw new Error('disk on fire')
     })
     await flushCacheSave() // must not reject
+  })
+})
+
+describe('a corrupt cache file is never a crash (F1)', () => {
+  /** Writes `body` verbatim as chain 1's cache file. */
+  async function poison(body: string): Promise<void> {
+    await mkdir(join(dir, 'router-lite'), { recursive: true })
+    await writeFile(join(dir, 'router-lite', '1.json'), body, 'utf8')
+  }
+
+  // Each of these used to escape `loadCache` as an uncaught throw — `expected.wrappedNative` is
+  // compared with `.toLowerCase()` against a value that CAME FROM THE FILE, and that call sat outside
+  // the try. The result was a raw TypeError travelling up through `buildChainContext` into `rl.ts`'s
+  // catch-all: an exit-4 stack trace for a file the user never asked about, in flat contradiction of
+  // the header's "every failure resolves to start fresh" invariant.
+  const payloads: [string, string][] = [
+    ['wrappedNative is a number', '{"schemaVersion":1,"wrappedNative":1,"reorgOverlapBlocks":"$bigint:32","pools":[],"coverage":[],"enabledFees":[]}'],
+    ['wrappedNative is missing', '{"schemaVersion":1,"reorgOverlapBlocks":"$bigint:32","pools":[],"coverage":[],"enabledFees":[]}'],
+    ['wrappedNative is null', '{"schemaVersion":1,"wrappedNative":null,"reorgOverlapBlocks":"$bigint:32","pools":[],"coverage":[],"enabledFees":[]}'],
+    ['the whole file is a JSON scalar', '42'],
+    ['the whole file is JSON null', 'null'],
+    ['the file is empty', ''],
+    ['a coverage bound is poisoned', '{"schemaVersion":1,"wrappedNative":"0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2","reorgOverlapBlocks":"$bigint:32","pools":[],"coverage":[["v3:x",[{"fromBlock":"abc","toBlock":"$bigint:9"}]]],"enabledFees":[]}'],
+  ]
+
+  for (const [what, body] of payloads) {
+    it(`starts fresh when ${what}`, async () => {
+      await poison(body)
+      const loaded = await loadCache(1, warmIndex()) // must RESOLVE, never reject
+      expect(loaded.index).toBeUndefined()
+      expect(loaded.note).toMatch(/discarded|cold start/)
+    })
+  }
+
+  it('a poisoned coverage bound is caught at load, not on the next search', async () => {
+    // The one that motivated the shape check: this parses, and without it `fromSnapshot` returned a
+    // perfectly ordinary-looking index that threw inside `uncovered` mid-search.
+    await poison(payloads.find(([w]) => w === 'a coverage bound is poisoned')![1])
+    const loaded = await loadCache(1, warmIndex())
+    expect(loaded.index).toBeUndefined()
+    expect(loaded.note).toMatch(/malformed/)
+  })
+})
+
+describe('orphaned tmp files (F5)', () => {
+  it('removes its own tmp when the write fails', async () => {
+    // A directory where the final file should be: `writeFile` succeeds, `rename` cannot clobber it.
+    await mkdir(join(dir, 'router-lite', '1.json'), { recursive: true })
+    const note = await saveCache(1, warmIndex())
+    expect(note).toMatch(/not saved \(/)
+    expect((await readdir(join(dir, 'router-lite'))).filter((f) => f.endsWith('.tmp'))).toEqual([])
+  })
+
+  it('sweeps a stale tmp left by a killed run, and leaves a fresh one alone', async () => {
+    // These are FULL-SIZE snapshots — hundreds of megabytes each — so a few Ctrl-C'd runs could
+    // quietly fill the cache directory with files nothing ever reads or replaces.
+    await mkdir(join(dir, 'router-lite'), { recursive: true })
+    const stale = join(dir, 'router-lite', '1.json.99999.tmp')
+    const fresh = join(dir, 'router-lite', '1.json.88888.tmp')
+    await writeFile(stale, 'orphan', 'utf8')
+    await writeFile(fresh, 'in progress', 'utf8')
+    const old = new Date(Date.now() - 2 * 60 * 60 * 1000)
+    await utimes(stale, old, old)
+
+    await loadCache(1, warmIndex()) // the sweep rides along with the load
+
+    const left = (await readdir(join(dir, 'router-lite'))).filter((f) => f.endsWith('.tmp'))
+    expect(left).toEqual(['1.json.88888.tmp']) // a concurrent writer's in-progress file is never touched
   })
 })

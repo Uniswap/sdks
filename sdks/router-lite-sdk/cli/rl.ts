@@ -142,4 +142,32 @@ async function main(): Promise<number> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Ctrl-C banks the cache too.
+//
+// A default-terminating SIGINT never unwinds the stack, so `main`'s `finally`
+// never runs and everything the interrupted run learned is discarded. That is
+// not an edge case here: interrupting is the single most common way a long
+// `discover` ends (the output has scrolled, the answer is visible, the search
+// is still draining), and it was precisely the run with the most coverage to
+// bank. The handler makes the exit deliberate instead: flush, then exit with
+// 128+signo, which is what a shell expects from a signalled process.
+//
+// SIGTERM gets the same treatment for the same reason — a `timeout 30s rl …`
+// or a killed CI step should not be uniquely punished by losing its progress.
+// ---------------------------------------------------------------------------
+for (const [signal, signo] of [
+  ['SIGINT', 2],
+  ['SIGTERM', 15],
+] as const) {
+  process.on(signal, () => {
+    void (async (): Promise<void> => {
+      // `flushCacheSave` clears its own registration, so the `finally` in `main` — if it ever gets to
+      // run — is a no-op rather than a second write, and the save itself never throws.
+      await flushCacheSave()
+      process.exit(128 + signo)
+    })()
+  })
+}
+
 process.exitCode = await main()

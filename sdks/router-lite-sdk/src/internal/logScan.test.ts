@@ -14,6 +14,7 @@ import {
 
 import providerErrors from './__fixtures__/providerErrors.json'
 import { delay, scanLogs } from './logScan'
+import { createSemaphore } from './rpc'
 
 /** A stub whose `request` records every `eth_getLogs` filter it is handed. */
 function stub(handler: (filter: any) => unknown[]): { client: any; filters: any[] } {
@@ -805,4 +806,98 @@ test('P1: an abort stops the scan BETWEEN batches — the batch in flight is kep
   expect(res.complete).toBe(false)
   const claimed = res.covered.reduce((s, r) => s + (r.toBlock - r.fromBlock + 1n), 0n)
   expect(claimed).toBe(9_000n) // exactly the nine chunks served, not one block more
+})
+
+test('P1: an abort drains the queued batch instead of firing it — no request goes out after the signal', async () => {
+  // THE FAILURE THIS PINS. `createSemaphore` is a plain FIFO with no abort awareness: a queued
+  // acquire resolves whenever a permit frees, knowing nothing about a signal that fired while it
+  // waited. With a batch of four behind a busy router that meant four full `eth_getLogs` going out
+  // AFTER the caller walked away — and the more concurrency P1 added, the more of them there were.
+  const ac = new AbortController()
+  const gate = createSemaphore(1) // forces the batch to drain one at a time, so the abort lands mid-batch
+  let served = 0
+  const { client, filters } = concurrentStub(() => {
+    // Not the establishing chunk (that would abort before any batch is ever planned) — the FIRST
+    // chunk of the first four-wide batch, leaving three siblings queued on the semaphore behind it.
+    if (++served === 2) ac.abort()
+    return []
+  })
+
+  const res = await scanLogs(
+    client,
+    QUERY,
+    { fromBlock: 1n, toBlock: 100_000n },
+    { initialChunk: 1_000n, signal: ac.signal, semaphore: gate },
+  )
+
+  // One establishing chunk, then the first chunk of the four-wide batch — and then nothing. The three
+  // siblings holding queued acquires each check the signal the instant they get their permit and
+  // return without touching the transport.
+  expect(filters).toHaveLength(2)
+  expect(res.complete).toBe(false)
+  // A skipped chunk is not a failure: it covers nothing, and it is not evidence about the endpoint
+  // either, so the working width is neither halved nor backed off. Coverage is exactly what was served.
+  expect(res.covered).toEqual([{ fromBlock: 98_001n, toBlock: 100_000n }])
+})
+
+test('P1 (F9): a discarded batch tail still counts against the budget — it really did go to the wire', async () => {
+  // The tail of a failed batch is dropped for correctness (see the contiguous-prefix rule), and that
+  // must not be mistaken for the requests being free. They were dispatched, the endpoint served them,
+  // and the budget has to say so — otherwise a scan that keeps hitting mid-batch failures gets
+  // unlimited free retries against `MAX_REQUESTS_PER_SCAN`.
+  let served = 0
+  const { client, filters, inFlightAt } = concurrentStub(() => {
+    // The SECOND chunk of the first full batch fails; the two siblings behind it succeed and are then
+    // thrown away by the contiguous-prefix rule.
+    if (++served === 3) throw new Error('server error')
+    return []
+  })
+
+  const res = await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 20_000n }, { initialChunk: 1_000n })
+
+  expect(batchSizes(inFlightAt).slice(0, 2)).toEqual([1, 4]) // establish, then a full batch of four
+  expect(res.complete).toBe(true) // nothing is LOST — the dropped sub-ranges are simply re-walked
+  expect(res.covered).toEqual([{ fromBlock: 1n, toBlock: 20_000n }])
+
+  // The accounting this exists for. The whole 20,000-block range is 20 chunks at the established
+  // width, and the scan spent strictly more requests than that: the failure itself, the two siblings
+  // behind it that were served and discarded, and the narrower re-walk the descent then paid for.
+  // Crediting any of those back would hand a scan that keeps failing mid-batch unlimited free retries
+  // against MAX_REQUESTS_PER_SCAN.
+  expect(filters.length).toBeGreaterThanOrEqual(20 + 3)
+  // Every recorded filter is a request that really reached the transport — `requests` is a count of
+  // the wire, not of the plan, which is what makes the budget exact (see the budget test above).
+  expect(filters.every((f) => span(f) <= 1_000n)).toBe(true)
+})
+
+test('P1 (F9): several concurrent scans never exceed the shared semaphore, however wide their batches', async () => {
+  // P1's per-scan concurrency MULTIPLIES with the fan-out above it (`search/discovery.ts` runs a scan
+  // per protocol per topic position). The router-wide semaphore is what is supposed to make that
+  // product safe, and this is the test that it actually does — a bound that only holds for one scan
+  // at a time is not a bound.
+  const LIMIT = 5
+  const gate = createSemaphore(LIMIT)
+  let inFlight = 0
+  let peak = 0
+  const client = {
+    request: async () => {
+      inFlight++
+      if (inFlight > peak) peak = inFlight
+      try {
+        await new Promise((r) => setTimeout(r, 0))
+        return []
+      } finally {
+        inFlight--
+      }
+    },
+  }
+
+  const scans = Array.from({ length: 6 }, () =>
+    scanLogs(client as any, QUERY, { fromBlock: 1n, toBlock: 40_000n }, { initialChunk: 1_000n, semaphore: gate }),
+  )
+  const results = await Promise.all(scans)
+
+  expect(peak).toBeLessThanOrEqual(LIMIT) // 6 scans x 4 chunks = 24 would be in flight without the gate
+  expect(peak).toBeGreaterThan(1) // ...and the gate is not accidentally serializing everything either
+  for (const res of results) expect(res.complete).toBe(true)
 })

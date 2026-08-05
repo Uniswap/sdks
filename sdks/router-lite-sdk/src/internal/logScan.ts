@@ -245,11 +245,31 @@ export async function scanLogs(
   // which asking for several of them at once is not a gamble.
   let widthEstablished = false
 
-  /** One `eth_getLogs` for `chunk`, under the router's semaphore; failures are returned, never thrown. */
-  const fetchChunk = async (chunk: BlockRange): Promise<{ ok: true; result: Log[] } | { ok: false; err: unknown }> => {
+  /**
+   * One `eth_getLogs` for `chunk`, under the router's semaphore. Failures are RETURNED, never thrown,
+   * so `Promise.all` over a batch always settles and one bad chunk cannot discard its siblings'
+   * results.
+   *
+   * THE ABORT CHECK AFTER `acquire()` IS THE POINT, NOT DEFENSIVE PADDING. `createSemaphore` is a
+   * plain FIFO queue with no abort awareness: when a batch queues behind a busy router, each waiter
+   * resolves whenever a permit frees, with no idea that the signal fired while it sat there. Without
+   * this check, aborting a search with (say) three scans x four chunks queued means twelve full
+   * `eth_getLogs` go out AFTER the caller walked away — the exact opposite of what an `AbortSignal`
+   * is for, and worse the more concurrency P1 added. Checking once the permit is in hand costs
+   * nothing and makes the abort bite at the last possible moment before the wire.
+   *
+   * A skipped chunk is its OWN outcome, not a failure: it neither covers anything nor is evidence
+   * about the endpoint, so it must not reach the descent's halving/backoff logic (see the batch
+   * handling below).
+   */
+  const fetchChunk = async (
+    chunk: BlockRange,
+  ): Promise<{ ok: true; result: Log[] } | { ok: false; err: unknown } | { skipped: true }> => {
+    if (opts.signal?.aborted) return { skipped: true }
     try {
       await opts.semaphore?.acquire()
       try {
+        if (opts.signal?.aborted) return { skipped: true }
         const result = (await client.request({
           method: 'eth_getLogs',
           params: [
@@ -304,15 +324,19 @@ export async function scanLogs(
 
     const settled = await Promise.all(batch.map(fetchChunk))
 
-    // The batch is honored as a CONTIGUOUS PREFIX. Chunks up to the first failure are exactly what a
-    // sequential walk would have collected and are kept; the failure and everything behind it are
+    // The batch is honored as a CONTIGUOUS PREFIX. Chunks up to the first non-success are exactly what
+    // a sequential walk would have collected and are kept; that chunk and everything behind it are
     // dropped, because the sequential path is about to re-derive the width for that sub-range and
     // whatever it settles on decides how the rest of the range is asked for. Keeping the tail's
     // successes instead would mean claiming coverage out of order and returning duplicate logs once
     // the resumed walk re-covered it, to save at most SCAN_CHUNK_CONCURRENCY - 1 requests in a case
     // that only arises when a KNOWN-GOOD width has just stopped working.
-    const failedAt = settled.findIndex((s) => !s.ok)
-    const okCount = failedAt === -1 ? settled.length : failedAt
+    const stopAt = settled.findIndex((s) => !('ok' in s && s.ok))
+    const okCount = stopAt === -1 ? settled.length : stopAt
+    // An aborted chunk was never sent, so it never cost a request. Handing the budget back keeps
+    // `requests` an exact count of what actually went to the wire rather than of what was planned.
+    const skipped = settled.filter((s) => 'skipped' in s).length
+    requests -= skipped
 
     for (let i = 0; i < okCount; i++) {
       // A for-of push, NOT `logs.push(...result.map(...))`. Spreading an array into an argument list
@@ -334,7 +358,7 @@ export async function scanLogs(
       widthEstablished = true
     }
 
-    if (failedAt === -1) {
+    if (stopAt === -1) {
       if (consecutiveSuccesses >= CHUNK_REGROWTH_SUCCESSES) {
         // Probe for a wider window. If the earlier failure was transient this restores full speed;
         // if the cap is real the next request fails and halves straight back, costing one request.
@@ -348,13 +372,19 @@ export async function scanLogs(
       continue
     }
 
+    // An ABORT stopped the batch, not the endpoint. The prefix above is kept (those chunks really were
+    // served), and everything else is simply not evidence: no halving, no backoff, no give-up — the
+    // width that was working is still the width that was working, and the endpoint did nothing wrong.
+    // The loop's own top-of-iteration check ends the scan on the next pass.
+    if ('skipped' in settled[stopAt]!) continue
+
     // --- a chunk failed: the sequential descent takes over from here ----------------------------
     // `cursor`/`chunkStart` name the sub-range the FIRST failure was for, which is precisely the one
     // a sequential walk would have been sitting on when it saw this error — everything below is the
     // pre-P1 error path, unchanged, operating on exactly the state it always did.
-    const err = (settled[failedAt] as { ok: false; err: unknown }).err
-    const chunkStart = batch[failedAt]!.fromBlock
-    cursor = batch[failedAt]!.toBlock
+    const err = (settled[stopAt] as { ok: false; err: unknown }).err
+    const chunkStart = batch[stopAt]!.fromBlock
+    cursor = batch[stopAt]!.toBlock
     consecutiveSuccesses = 0
     widthEstablished = false
 

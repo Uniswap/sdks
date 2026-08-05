@@ -241,6 +241,85 @@ export function parseSnapshot(json: string): PoolIndexSnapshot {
   ) as PoolIndexSnapshot
 }
 
+function bad(what: string): never {
+  throw new RouterConfigError(
+    `pool index snapshot is malformed (${what}) — discard it and start fresh ` +
+      '(a snapshot is a cache of re-readable chain state, never a source of truth)',
+  )
+}
+
+/**
+ * Fails a snapshot whose SHAPE the index cannot operate on, before any of it is loaded.
+ *
+ * WHY A SHALLOW CHECK IS THE RIGHT AMOUNT. `parseSnapshot` is a deserializer: it turns tagged strings
+ * back into bigints and otherwise hands `JSON.parse`'s output straight through, so every field is
+ * whatever the file said. Most corruptions are self-announcing — truncated JSON throws in `JSON.parse`,
+ * a bumped `schemaVersion` is caught below. The dangerous middle band is a file that parses fine and
+ * is wrong in a way nothing notices until it is deep in the engine: a coverage bound that came back as
+ * the string `'abc'` restores without complaint and then throws inside `uncovered`'s bigint
+ * comparisons on the next search, or silently mis-sorts in `mergeRanges`. Every check below covers one
+ * of those — the fields the class does arithmetic or map-keying on — and stops there. Validating
+ * deeper (that a `poolId` really hashes its `PoolKey`, say) would be re-deriving the chain, which is
+ * what the snapshot exists to avoid, and would still not make the content trustworthy; see
+ * {@link PoolIndex.fromSnapshot}'s note on where the trust boundary actually is.
+ */
+function assertSnapshotShape(snap: PoolIndexSnapshot): void {
+  if (typeof snap !== 'object' || snap === null) bad('not an object')
+  if (snap.schemaVersion !== POOL_INDEX_SCHEMA_VERSION) {
+    throw new RouterConfigError(
+      `pool index snapshot has schemaVersion ${String(snap.schemaVersion)}, this build reads ${POOL_INDEX_SCHEMA_VERSION} — ` +
+        'discard it and start fresh (a snapshot is a cache of re-readable chain state, never a source of truth)',
+    )
+  }
+  // `wrappedNative` becomes every adjacency lookup's native-family fold, and is `.toLowerCase()`d by
+  // callers comparing it against a manifest — a non-string here is the `cli/cache.ts` TypeError.
+  if (typeof snap.wrappedNative !== 'string') bad('wrappedNative is not a string')
+  // Subtracted from block numbers on every `uncovered` call.
+  if (typeof snap.reorgOverlapBlocks !== 'bigint') bad('reorgOverlapBlocks is not a bigint')
+
+  if (!Array.isArray(snap.pools)) bad('pools is not an array')
+  for (const rec of snap.pools) {
+    if (typeof rec !== 'object' || rec === null) bad('a pool record is not an object')
+    const pool = rec.pool as unknown
+    if (typeof pool !== 'object' || pool === null) bad('a pool record has no pool')
+    // `id` is the index's primary map key; `currencies` is destructured into both adjacency links.
+    if (typeof (pool as PoolRef).id !== 'string') bad('a pool ref has a non-string id')
+    const currencies = (pool as PoolRef).currencies as unknown
+    if (!Array.isArray(currencies) || currencies.length !== 2) bad('a pool ref does not carry exactly two currencies')
+    for (const c of currencies) if (typeof c !== 'string') bad('a pool ref currency is not a string')
+    // Read by `rank()` (an `indexOf` that quietly returns -1) and by `isDiscredited`.
+    if (typeof rec.source !== 'string') bad('a pool record has a non-string source')
+    for (const field of ['createdAtBlock', 'lastQuoteSuccessBlock', 'lastQuoteFailureBlock'] as const) {
+      const v = rec[field]
+      if (v !== undefined && typeof v !== 'bigint') bad(`a pool record's ${field} is not a bigint`)
+    }
+    if (rec.quoteFailureBlocks !== undefined && typeof rec.quoteFailureBlocks !== 'number') {
+      bad("a pool record's quoteFailureBlocks is not a number")
+    }
+  }
+
+  if (!Array.isArray(snap.coverage)) bad('coverage is not an array')
+  for (const entry of snap.coverage) {
+    if (!Array.isArray(entry) || entry.length !== 2) bad('a coverage entry is not a [key, ranges] pair')
+    const [key, ranges] = entry
+    if (typeof key !== 'string') bad('a coverage key is not a string')
+    if (!Array.isArray(ranges)) bad('a coverage entry has no range array')
+    for (const r of ranges) {
+      if (typeof r !== 'object' || r === null) bad('a coverage range is not an object')
+      if (typeof r.fromBlock !== 'bigint' || typeof r.toBlock !== 'bigint') bad('a coverage range bound is not a bigint')
+    }
+  }
+
+  if (!Array.isArray(snap.enabledFees)) bad('enabledFees is not an array')
+  for (const entry of snap.enabledFees) {
+    if (!Array.isArray(entry) || entry.length !== 2) bad('an enabledFees entry is not a [key, tiers] pair')
+    const [key, tiers] = entry
+    if (typeof key !== 'string') bad('an enabledFees key is not a string')
+    if (!Array.isArray(tiers)) bad('an enabledFees entry has no tier array')
+    for (const t of tiers) if (typeof t !== 'number') bad('an enabledFees tier is not a number')
+  }
+}
+
 export type PoolIndexOptions = {
   /**
    * Bound the index to at most this many distinct pools. `undefined` (the default) is unbounded —
@@ -771,13 +850,24 @@ export class PoolIndex {
    * question the index can be asked (`pair`, `neighbors`, `uncovered`, `enabledFees`) — see
    * `poolIndex.test.ts`'s round-trip property.
    *
-   * VALIDATES `schemaVersion`, AND NOTHING ELSE. That check is the one the caller cannot make for
-   * itself (it is a fact about this file, not about their chain) and the one whose failure is
-   * silently corrupting rather than loudly wrong. The two chain facts that also matter —
-   * `wrappedNative` and `reorgOverlapBlocks` — are validated where they can actually be compared
-   * against something: `createRouter({ index })` already rejects an index that disagrees with its
-   * manifest, and it does so for indexes built by hand exactly as for indexes restored from here, so
-   * duplicating the check would add a second, weaker copy of a rule that already has a home.
+   * VALIDATES `schemaVersion` AND THE SHAPE, then stops. The version check is the one a caller cannot
+   * make for itself (it is a fact about this file, not about their chain). The shape check
+   * ({@link assertSnapshotShape}) exists because the alternative is not "a slightly wrong index" but a
+   * BOOBY-TRAPPED one: a snapshot whose coverage bound deserialized as the string `'abc'` instead of a
+   * bigint restores perfectly happily and then throws deep inside `uncovered`'s comparisons, mid-search,
+   * with a stack that names none of this. Anything that arrives structurally wrong must fail HERE,
+   * where the caller's answer is "discard it and start fresh", not three layers down where it is a
+   * crash.
+   *
+   * IT IS A SHAPE CHECK, NOT A TRUST BOUNDARY. It asserts that what came back is the kind of thing the
+   * class can operate on — bigints where bigints go, strings where keys go, arrays where arrays go —
+   * and nothing about whether the CONTENT is true. A snapshot can still assert a pool that does not
+   * exist or coverage of blocks nobody scanned; see `cli/cache.ts`'s trust-boundary note for why that
+   * residual is accepted and what bounds it.
+   *
+   * The two CHAIN facts are still validated where they can be compared against something:
+   * `createRouter({ index })` rejects an index that disagrees with its manifest, and it does so for
+   * indexes built by hand exactly as for indexes restored from here.
    *
    * `options.maxPools` is the RESTORING host's bound on its own memory — not a property of the
    * snapshot, which is why it is not stored in one. Supplying it here means the eviction pass runs as
@@ -786,12 +876,7 @@ export class PoolIndex {
    * {@link PoolIndexSnapshot} — so which pools a restore-time eviction picks is approximate.)
    */
   static fromSnapshot(snap: PoolIndexSnapshot, options?: Pick<PoolIndexOptions, 'maxPools'>): PoolIndex {
-    if (snap.schemaVersion !== POOL_INDEX_SCHEMA_VERSION) {
-      throw new RouterConfigError(
-        `pool index snapshot has schemaVersion ${snap.schemaVersion}, this build reads ${POOL_INDEX_SCHEMA_VERSION} — ` +
-          'discard it and start fresh (a snapshot is a cache of re-readable chain state, never a source of truth)',
-      )
-    }
+    assertSnapshotShape(snap)
     const index = new PoolIndex(snap.wrappedNative, {
       reorgOverlapBlocks: snap.reorgOverlapBlocks,
       ...(options?.maxPools !== undefined && { maxPools: options.maxPools }),
