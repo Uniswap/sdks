@@ -5,15 +5,15 @@ import {
   BACKOFF_BASE_MS,
   BACKOFF_MAX_MS,
   CHUNK_REGROWTH_SUCCESSES,
-  INITIAL_CHUNK,
   MAX_BACKOFF_TOTAL_MS,
   MAX_CONSECUTIVE_MIN_FAILURES,
   MAX_REQUESTS_PER_SCAN,
+  MAX_SCAN_WINDOW,
   MIN_CHUNK,
 } from '../constants'
 import type { BlockRange, LogQuery } from '../types'
 
-import { maxBig, mergeRanges } from './ranges'
+import { maxBig, mergeRanges, minBig } from './ranges'
 import { parseDeclaredCap } from './rpc'
 import type { Semaphore } from './rpc'
 
@@ -37,6 +37,18 @@ export function narrowTopics(topics: (Hex | Hex[] | null)[]): (Hex | null)[] {
 // window — recording exactly what was (and wasn't) covered so callers can
 // decide whether a partial scan is good enough.
 //
+// IT STARTS WIDE, ON PURPOSE (S1). The first window of every scan is
+// `min(remaining range, ceiling)`, where the ceiling is `MAX_SCAN_WINDOW`
+// (16M blocks — the widest single request measured served) unless the caller
+// pinned a lower one via `opts.initialChunk`. The alternative — a conservative
+// fixed start that is ALSO the regrowth ceiling, which is what this used to be
+// — cannot discover anything: it asks for 10k, is served 10k, and concludes
+// nothing, while a per-request latency that is overhead-dominated rather than
+// width-dominated (456ms for 10k blocks, 89ms for 1M, measured live) makes
+// every one of those extra round trips pure loss. Being refused is how the
+// endpoint's real cap gets learned, and a refusal is cheap: `eth_getLogs`
+// rejects an over-wide span with a validation error, not with work.
+//
 // SOME PROVIDERS DO SAY (R2). blastapi, drpc and alchemy all state the window
 // that would have worked, in the error text, and
 // `internal/rpc.ts#parseDeclaredCap` reads it. When a cap is declared the loop
@@ -54,10 +66,13 @@ export function narrowTopics(topics: (Hex | Hex[] | null)[]): (Hex | null)[] {
 //   * The window GROWS BACK. Halving alone is a one-way ratchet: a single
 //     transient error three requests into a multi-million-block range would
 //     otherwise pin the whole remaining walk at a tiny window (tens of
-//     thousands of sequential requests for a scan that should cost ~2.6k).
+//     thousands of sequential requests for a scan that should cost a handful).
 //     After `CHUNK_REGROWTH_SUCCESSES` clean chunks the window doubles, capped
-//     at `INITIAL_CHUNK`. Where the cap is real rather than transient the probe
-//     fails and re-halves at once, so the steady-state cost is one wasted
+//     at the scan's ceiling (`opts.initialChunk ?? MAX_SCAN_WINDOW`) — which is
+//     also what makes the wide start recoverable rather than one-way: the
+//     ratchet climbs back toward the widest width this endpoint has actually
+//     served for this query. Where the cap is real rather than transient the
+//     probe fails and re-halves at once, so the steady-state cost is one wasted
 //     request per `CHUNK_REGROWTH_SUCCESSES + 1` — bounded, and the price of
 //     never being permanently crippled by one bad response.
 //   * Every attempt is BUDGETED. `MAX_REQUESTS_PER_SCAN` counts successes and
@@ -143,9 +158,14 @@ export function delay(ms: number, signal?: AbortSignal): Promise<void> {
  * `opts.semaphore` (C4-P6), when supplied, is acquired around each `eth_getLogs` `client.request`
  * below and released as soon as it settles — the other of the exactly two places (with `ethCall`)
  * a real request goes out, so the router's `concurrency` bound covers log scanning too, not just
- * quoting/verification. `opts.initialChunk` overrides {@link INITIAL_CHUNK} as both the starting
- * window AND the regrowth ceiling (`createRouter`'s `logChunkBlocks`, provider-shaped — Alchemy's
- * 10k default is generous for some endpoints and too wide for others, e.g. Ankr's ~3k).
+ * quoting/verification.
+ *
+ * `opts.initialChunk` (`createRouter`'s `logChunkBlocks`) is a CEILING OVERRIDE, not a mandatory
+ * start: it replaces {@link MAX_SCAN_WINDOW} as the widest window this scan may ever ask for, and the
+ * first request spans `min(remaining range, override ?? MAX_SCAN_WINDOW)`. A caller fronting a
+ * known-capped provider (Ankr's public endpoint caps `eth_getLogs` around 3k blocks) pins it there
+ * and skips the bisection down; a caller who does not know starts at the empirical ceiling and lets
+ * the endpoint's refusals find the real width (see this file's header).
  */
 export async function scanLogs(
   client: Pick<PublicClient, 'request'>,
@@ -157,10 +177,16 @@ export async function scanLogs(
   const logs: Log[] = []
   const coveredRaw: BlockRange[] = []
   const sleep = opts.sleep ?? ((ms: number): Promise<void> => delay(ms, opts.signal))
-  const initialChunk = opts.initialChunk ?? INITIAL_CHUNK
+  // The widest window this scan may ever ask for: the caller's override when they know their
+  // provider's cap, otherwise the empirical ceiling. Never exceeded, by the first request or by any
+  // regrowth doubling after it.
+  const ceiling = opts.initialChunk ?? MAX_SCAN_WINDOW
 
   let cursor = toBlock
-  let chunkSize = initialChunk
+  // Start at the whole range when it fits under the ceiling — asking for 16M blocks of a 5,000-block
+  // re-scan would be a guaranteed-wasted probe on any endpoint that validates the span it was handed.
+  // `maxBig(..., 1n)` only guards an inverted range, whose loop below never runs anyway.
+  let chunkSize = minBig(maxBig(toBlock - fromBlock + 1n, 1n), ceiling)
   let requests = 0
   // Failures at MIN_CHUNK on the *current* sub-range: drives when to give that sub-range up.
   let consecutiveMinFailures = 0
@@ -205,7 +231,7 @@ export async function scanLogs(
         // Probe for a wider window. If the earlier failure was transient this restores full speed;
         // if the cap is real the next request fails and halves straight back, costing one request.
         const grown = chunkSize * 2n
-        chunkSize = grown > initialChunk ? initialChunk : grown
+        chunkSize = minBig(grown, ceiling)
         consecutiveSuccesses = 0
       }
     } catch (err) {

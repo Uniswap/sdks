@@ -21,6 +21,10 @@ export function maxBig(a: bigint, b: bigint): bigint {
   return a > b ? a : b
 }
 
+export function minBig(a: bigint, b: bigint): bigint {
+  return a < b ? a : b
+}
+
 /** Merges a set of ranges (in any order) into the minimal sorted set of disjoint ranges. */
 export function mergeRanges(ranges: BlockRange[]): BlockRange[] {
   if (ranges.length === 0) return []

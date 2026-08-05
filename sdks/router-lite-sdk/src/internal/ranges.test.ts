@@ -3,7 +3,7 @@ import fc from 'fast-check'
 
 import type { BlockRange } from '../types'
 
-import { intersectAll, intersectRanges, maxBig, mergeRanges, subtractRanges } from './ranges'
+import { intersectAll, intersectRanges, maxBig, mergeRanges, minBig, subtractRanges } from './ranges'
 
 const r = (fromBlock: bigint, toBlock: bigint): BlockRange => ({ fromBlock, toBlock })
 
@@ -11,6 +11,12 @@ test('maxBig picks the larger bigint', () => {
   expect(maxBig(1n, 2n)).toBe(2n)
   expect(maxBig(2n, 1n)).toBe(2n)
   expect(maxBig(2n, 2n)).toBe(2n)
+})
+
+test('minBig picks the smaller bigint', () => {
+  expect(minBig(1n, 2n)).toBe(1n)
+  expect(minBig(2n, 1n)).toBe(1n)
+  expect(minBig(2n, 2n)).toBe(2n)
 })
 
 test('mergeRanges sorts, merges overlaps, and closes adjacent (n, n+1) gaps', () => {

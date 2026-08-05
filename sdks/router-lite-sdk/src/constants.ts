@@ -304,6 +304,14 @@ export function maxPlausibleHeadRegression(reorgOverlapBlocks: bigint): bigint {
 // constant below is a bound on how much that discovery is allowed to cost — in
 // requests, in wasted probes, and in wall-clock.
 //
+// DISCOVERY MEANS STARTING WIDE (S1). The scanner opens every scan at
+// `min(remaining range, MAX_SCAN_WINDOW)` and bisects DOWN from there, rather
+// than opening at a conservative width it can never grow past. A start that is
+// too wide costs a few fast rejections once; a start that is too narrow costs a
+// round trip per window for the life of the scan, and — before this — could
+// never be corrected, because the starting width doubled as the regrowth
+// ceiling. See {@link MAX_SCAN_WINDOW} for the measurements.
+//
 // THE DECLARED-CAP FAST PATH SHORT-CIRCUITS THAT DISCOVERY WHEN IT CAN (R2).
 // Caps are not *never* advertised — several providers state the window that
 // would have worked in the error itself, and
@@ -318,18 +326,52 @@ export function maxPlausibleHeadRegression(reorgOverlapBlocks: bigint): bigint {
 // ---------------------------------------------------------------------------
 
 /**
- * Block span of the first `eth_getLogs` window, and the regrowth ceiling (nothing ever asks for a
- * wider one) — the DEFAULT for `createRouter`'s `logChunkBlocks` option (C4-P6). 10k is the largest
- * span Alchemy/Infura/QuickNode all document as a filtered-query ceiling, so starting here costs at
- * most a couple of halving probes on a stricter endpoint while saving ~5x the requests on a generous
- * one — but it is Alchemy-shaped, not universal: Ankr's public endpoint, for one, caps `eth_getLogs`
- * around 3k blocks, well below this default, so every cold scan against it pays a wasted halving
- * probe before settling at a window that actually clears. A caller who knows their provider's real
- * cap passes it directly (`createRouter({ ..., logChunkBlocks: 3_000n })`) and skips that probe
- * entirely; one who does not gets this mainnet-endpoint-shaped default, exactly as before this
- * option existed.
+ * Widest `eth_getLogs` window the scanner will EVER ask for: the default ceiling on both the first
+ * request of a scan (`min(remaining range, MAX_SCAN_WINDOW)`) and on regrowth, and the default for
+ * `createRouter`'s `logChunkBlocks` option (C4-P6, which lowers it — see below).
+ *
+ * START WIDE AND LET THE ENDPOINT SAY NO. This used to be a 10,000-block `INITIAL_CHUNK` that was
+ * simultaneously the starting window and the regrowth ceiling, which meant the scanner could never
+ * learn what an endpoint actually serves — it asked for 10k, got 10k, and asked for 10k again,
+ * forever. The S1 profile (measured live against a keyed Alchemy mainnet endpoint) is what killed
+ * that:
+ *
+ *   * PER-REQUEST LATENCY IS OVERHEAD-DOMINATED, NOT WIDTH-DOMINATED. A 10k-block window cost 456ms
+ *     per request; a 1,000,000-block window cost 89ms. Wider was not merely cheaper per block, it was
+ *     cheaper per REQUEST — the round trip, not the range, is the cost — so the 10k window was paying
+ *     full freight 100 times over for what one request could serve. Measured per-request medians:
+ *
+ *         window     10k    100k     1M      4M     16M
+ *         per req  456ms   ~200ms   89ms   ~300ms  ~900ms      (near-flat; ~500x throughput spread)
+ *
+ *   * THE REAL CAP IS PER-QUERY, NOT PER-ENDPOINT, so no single constant can be "the endpoint's cap"
+ *     and the scanner has to discover it per scan. On that one endpoint: v4 adjacency capped somewhere
+ *     between 200k and 1M blocks, v2 between 1M and 5M, v3 adjacency between 5M and 16M — while the v3
+ *     `FeeAmountEnabled` scan and the v4 exact-pair scan each served their ENTIRE history in ONE
+ *     request (16M blocks in 80ms; 4M in 887ms). Selectivity, not policy, is what binds: a filter that
+ *     matches a handful of logs sails through a span that a busy one cannot.
+ *
+ * 16,000,000 IS THE LARGEST SINGLE-REQUEST WIDTH OBSERVED SERVED (the v3 fee scan's whole history),
+ * so it is an empirical ceiling rather than an aspirational one — and, conveniently, wider than the
+ * full history of every chain this package ships a manifest for except mainnet, so most scans start
+ * at `remaining range` and finish in one request.
+ *
+ * AN OVERSIZED START COSTS A HANDFUL OF CHEAP FAILED PROBES, NOT A SLOW SCAN. Failures bisect down in
+ * ~log2 steps ({@link MIN_CHUNK} is the floor), so the worst case — a hard 2k-block-cap provider — is
+ * ~13 halvings of failed probes before landing on a width that clears. Those 13 are fast (a rejected
+ * `eth_getLogs` is a validation error, not a query), they happen ONCE (the within-scan ratchet and the
+ * index's coverage cache both remember), and providers that DECLARE their cap skip the ladder
+ * entirely — `internal/rpc.ts#parseDeclaredCap` jumps the window straight to the stated width on the
+ * way down. Against that, the old 10k start paid ~100 needless round trips on every generous endpoint,
+ * every scan, forever.
+ *
+ * `logChunkBlocks` IS A CEILING OVERRIDE, NOT A MANDATORY START (C4-P6). A caller who KNOWS their
+ * provider's cap passes it (`createRouter({ ..., logChunkBlocks: 3_000n })` for Ankr's ~3k public
+ * endpoint) and pins the ceiling there, skipping the descent; the start is then
+ * `min(remaining range, override)`. A caller who does not gets this constant and lets the bisection
+ * find the truth.
  */
-export const INITIAL_CHUNK = 10_000n
+export const MAX_SCAN_WINDOW = 16_000_000n
 
 /**
  * Floor on the window. Below this a scan is no longer usefully making progress — 128 blocks is 4x
@@ -355,34 +397,44 @@ export const MIN_CHUNK = 128n
 export const MAX_CONSECUTIVE_MIN_FAILURES = 3
 
 /**
- * Consecutive successful chunks before the window is doubled back toward {@link INITIAL_CHUNK}.
+ * Consecutive successful chunks before the window is doubled back toward the scan's ceiling
+ * ({@link MAX_SCAN_WINDOW}, or `logChunkBlocks` when the caller pinned it lower).
  *
  * Without regrowth the window only ever shrinks, so a single transient failure early in a scan pins
  * the entire remaining walk at a tiny window: one blip three requests into a multi-million-block
- * range turns a ~2.6k-request history scan into tens of thousands of sequential requests. Regrowth
- * makes that self-healing. The cost is one failed probe per regrowth attempt at an endpoint whose
- * cap is real and permanent, which is exactly what this number prices: at 4, a hard-capped provider
- * pays 1 wasted request per 5 (20% overhead, bounded and steady, since the probe re-halves
- * immediately), while a transient collapse recovers within a few hundred blocks.
+ * range turns a handful of requests into tens of thousands of sequential ones. Regrowth makes that
+ * self-healing — and, since the start is now wide (see {@link MAX_SCAN_WINDOW}), it is also how the
+ * scanner RE-CLIMBS after a transient cap: the ratchet is what remembers the widest width this
+ * endpoint has actually served for this query, rather than treating the first refusal as permanent.
+ * The cost is one failed probe per regrowth attempt at an endpoint whose cap is real, which is
+ * exactly what this number prices: at 4, a hard-capped provider pays 1 wasted request per 5 (20%
+ * overhead, bounded and steady, since the probe re-halves immediately), while a transient collapse
+ * recovers within a few chunks.
  */
 export const CHUNK_REGROWTH_SUCCESSES = 4
 
 /**
  * Hard ceiling on `eth_getLogs` attempts (successes *and* failures) in one {@link scanLogs} call.
  *
- * The honest worst case is a cold full-history scan: ~26M mainnet blocks at {@link INITIAL_CHUNK} is
- * ~2.6k requests, and every other chain is shorter. 4,000 leaves ~50% slack over that while still
- * bounding the pathological case — an endpoint that rate-limits everything down to {@link MIN_CHUNK}
- * would otherwise walk the same history in 60k+ sequential requests with no exit but the caller's
- * `AbortSignal`, which the zero-config path does not pass. When the budget is spent the scan stops
- * and returns what it covered; the coverage machinery already reports the shortfall as partial
- * discovery, so nothing is silently lost — it just stops paying for it.
+ * THE BUDGET IS NOW MOSTLY HEADROOM, AND DELIBERATELY SO. A cold full-history scan against a
+ * well-behaved endpoint costs a couple of requests, not thousands: ~26M mainnet blocks at
+ * {@link MAX_SCAN_WINDOW} is 2 requests where the old 10k window cost ~2.6k, so 4,000 is ~50x slack
+ * over the well-behaved case rather than the ~50% it used to be. It is kept at 4,000 because it never
+ * bounded the well-behaved case — it bounds the pathological one, and that case is unchanged: an
+ * endpoint that rate-limits everything down to {@link MIN_CHUNK} would otherwise walk the same
+ * history in 200k+ sequential requests with no exit but the caller's `AbortSignal`, which the
+ * zero-config path does not pass. When the budget is spent the scan stops and returns what it
+ * covered; the coverage machinery already reports the shortfall as partial discovery, so nothing is
+ * silently lost — it just stops paying for it.
  *
  * This bounds *work*, not latency, and the difference is worth stating plainly: 4,000 sequential
  * requests against an endpoint that takes ~1s to fail each one is on the order of an hour (plus at
  * most {@link MAX_BACKOFF_TOTAL_MS} of deliberate waiting) before a fully-throttling provider yields
  * its partial answer. That is a guarantee of termination, not of promptness — any caller with a
- * latency budget should pass an `AbortSignal`, which remains the only way to bound wall-clock.
+ * latency budget should pass an `AbortSignal`, which remains the only way to bound wall-clock. The
+ * wide start does not change that worst case (the same 4,000 attempts, the same ~1s each); it adds at
+ * most ~13 halving probes per scan on the way down to the floor, a rounding error against the budget
+ * and a one-time cost per scan.
  */
 export const MAX_REQUESTS_PER_SCAN = 4_000
 

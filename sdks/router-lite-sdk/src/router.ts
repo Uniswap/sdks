@@ -131,14 +131,18 @@ export type CreateRouterOptions = {
    */
   concurrency?: number
   /**
-   * Overrides the block span of a fresh `eth_getLogs` window (both the STARTING window and the
-   * regrowth ceiling — see `internal/logScan.ts#scanLogs`) for every log scan this router issues
-   * (C4-P6). Default: {@link INITIAL_CHUNK} (10,000n), which is Alchemy/Infura/QuickNode-shaped —
-   * the largest span those endpoints document as their filtered-query ceiling. It is NOT universal:
-   * Ankr's public endpoint, for one, caps `eth_getLogs` around 3,000 blocks, well under this
-   * default, so every cold scan against it pays a wasted halving probe before settling at a window
-   * that actually clears (see the README's provider-tuning note). A caller who knows their
-   * provider's real cap passes it directly (`logChunkBlocks: 3_000n`) and skips that probe.
+   * CAPS the block span of an `eth_getLogs` window — the widest this router will ever ask any log
+   * scan for, as both the starting window and the regrowth ceiling (see
+   * `internal/logScan.ts#scanLogs`) (C4-P6). Default: {@link MAX_SCAN_WINDOW} (16,000,000n), the
+   * widest single request measured served; a scan then starts at `min(remaining range, ceiling)` and
+   * BISECTS DOWN on refusal, so a generous endpoint serves a cold history scan in a couple of
+   * requests instead of the ~100 a fixed 10k window used to cost.
+   *
+   * Pass it when you KNOW your provider's cap and would rather not pay the descent: Ankr's public
+   * endpoint caps `eth_getLogs` around 3,000 blocks, so `logChunkBlocks: 3_000n` pins the ceiling
+   * there and every scan starts at a width that clears. Leave it unset and the scanner discovers the
+   * cap itself, at a cost of a few fast rejections per scan (bounded by ~log2 of the range, and
+   * skipped entirely for providers that state their cap in the error — see `internal/rpc.ts`).
    */
   logChunkBlocks?: bigint
 }

@@ -241,20 +241,35 @@ recent-first from the pinned block toward the protocol's `deploymentBlock`,
 bisecting ranges on provider caps. v4 poolIds are recomputed from decoded
 keys and checked against the indexed id.
 
+Scans **start wide**: the first request spans `min(remaining range, ceiling)`,
+where the ceiling is 16M blocks (`MAX_SCAN_WINDOW` — the widest single request
+measured served) unless the caller pins a lower one via `logChunkBlocks`. Caps
+are per-*query* rather than per-endpoint (measured on one keyed mainnet
+endpoint: v4 adjacency capped between 200k and 1M blocks, v2 between 1M and 5M,
+v3 adjacency between 5M and 16M, while the v3 fee scan and the v4 exact-pair
+scan each served their entire history in one request), and per-request latency
+is round-trip- rather than width-dominated (456ms for a 10k window, 89ms for a
+1M one), so a conservative fixed start is both unlearnable and expensive — it
+was ~100 needless round trips per cold history scan. Refusals bisect down in
+~log2 steps, and a provider that states its cap in the error is jumped straight
+to that width.
+
 Bisection is bounded in three directions, because the cap it discovers may be
 transient rather than real: the window **grows back** (doubling after N clean
-chunks, capped at the initial 10k) so one bad response cannot pin the rest of a
-multi-million-block walk at a tiny window; every attempt counts against a
-**per-scan request budget**, on exhaustion of which the scan stops and reports
-the blocks it never reached as uncovered (`partial` discovery — no new report
-surface); and retries at the minimum window **back off** exponentially (250ms
-doubling to a 2s cap, and no more than 60s of sleeping per scan in total) rather
-than tight-looping against an endpoint that is already throttling. All three
-bound the *work* a scan may do, not its latency: 4,000 sequential requests
-against an endpoint that takes ~1s to fail each one is on the order of an hour
-before the partial result is returned, so a caller with a latency budget must
-pass an `AbortSignal` — the only wall-clock bound in the package. Constants and
-their derivations live in `constants.ts`.
+chunks, capped at the scan's ceiling) so one bad response cannot pin the rest of
+a multi-million-block walk at a tiny window, and so a transient cap is re-climbed
+rather than treated as permanent; every attempt counts against a **per-scan
+request budget**, on exhaustion of which the scan stops and reports the blocks it
+never reached as uncovered (`partial` discovery — no new report surface); and
+retries at the minimum window **back off** exponentially (250ms doubling to a 2s
+cap, and no more than 60s of sleeping per scan in total) rather than tight-looping
+against an endpoint that is already throttling. All three bound the *work* a scan
+may do, not its latency: 4,000 sequential requests against an endpoint that takes
+~1s to fail each one is on the order of an hour before the partial result is
+returned, so a caller with a latency budget must pass an `AbortSignal` — the only
+wall-clock bound in the package. On a well-behaved endpoint that budget is now
+~50x headroom (a cold mainnet history is 2 requests at the ceiling, versus ~2,600
+at the old 10k window). Constants and their derivations live in `constants.ts`.
 
 ### Direct-pair probes
 
@@ -875,7 +890,7 @@ sets `verificationDegraded`, and the result is `inconclusive`, never `ready`. Na
 
 | RPC failure | Response |
 | --- | --- |
-| `eth_getLogs` range/result cap | Bisect ranges; regrow the window after a run of clean chunks (the cap may have been transient); record partial coverage |
+| `eth_getLogs` range/result cap | Start at `min(remaining range, 16M)`; bisect down on refusal (jumping straight to a declared cap when the provider states one); regrow the window after a run of clean chunks (the cap may have been transient); record partial coverage |
 | `eth_getLogs` rate-limited / failing at the minimum window | Exponential backoff (250ms → 2s cap, ≤60s of sleeping per scan) before retry; give the sub-range up after 3 attempts; stop the whole scan at the per-scan request budget and report the rest as uncovered — never an unbounded retry loop. Bounds work, not latency (a fully-throttling endpoint can still take ~an hour to return its partial answer): `AbortSignal` is the only wall-clock bound |
 | Single quote revert | Candidate dies; others unaffected |
 | Transport failure during quoting/preflight (429/5xx, timeout, dropped socket) | Counted apart (`quoting.transportFailed` / `verificationDegraded`), never as a revert; a preflighted route stays `unverified`, not `failed`; result is `inconclusive` (`rpc-degraded`) — never `no-route` — and still carries the route it priced and encoded |

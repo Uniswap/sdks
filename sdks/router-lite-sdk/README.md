@@ -230,15 +230,19 @@ answer is a bug in the record, not a chain that rewound, and it must not brick t
   RPC" above, just for the probe-surface axis rather than the log-history one.
 - **Log scanning is budgeted, so a throttling endpoint yields partial discovery rather than an
   unbounded scan.** Each `eth_getLogs` walk adapts its block window to whatever the provider will
-  actually serve — halving on failure, growing back after a run of clean chunks, and backing off
-  (exponentially, capped at 2s) before retrying at the smallest window. It gives up after a fixed
-  number of requests, and the blocks it never reached are simply reported as uncovered: discovery
-  comes back `partial` (`search.discovery[protocol]`) instead of the scan grinding on for tens of
-  thousands of sequential requests. A severely rate-limited endpoint therefore produces honest
-  partial results, not a hang. **That bounds the work, not the wall clock** — 4,000 sequential
-  requests against an endpoint that takes ~1s to fail each one is on the order of an hour before the
-  partial answer comes back (deliberate backoff adds at most a further 60s) — so any caller with a
-  latency budget should pass an `AbortSignal`, which is the only wall-clock bound there is.
+  actually serve — starting at the whole remaining range (up to a 16M-block ceiling, or
+  [`logChunkBlocks`](#transport-options) when you pin one), halving on failure, growing back after a
+  run of clean chunks, and backing off (exponentially, capped at 2s) before retrying at the smallest
+  window. It gives up after a fixed number of requests, and the blocks it never reached are simply
+  reported as uncovered: discovery comes back `partial` (`search.discovery[protocol]`) instead of the
+  scan grinding on for tens of thousands of sequential requests. A severely rate-limited endpoint
+  therefore produces honest partial results, not a hang. **That bounds the work, not the wall
+  clock** — 4,000 sequential requests against an endpoint that takes ~1s to fail each one is on the
+  order of an hour before the partial answer comes back (deliberate backoff adds at most a further
+  60s) — so any caller with a latency budget should pass an `AbortSignal`, which is the only
+  wall-clock bound there is. On a well-behaved endpoint the budget is now almost entirely headroom:
+  a cold mainnet-history scan is a couple of requests wide, not the ~2,600 a fixed 10,000-block
+  window used to cost.
 
 ## Launcher recipe: routing a brand-new pool immediately
 
@@ -374,21 +378,26 @@ itself):
   `concurrency` a genuine ceiling rather than a per-batch one. Raise it for a provider with deep
   connection headroom that would rather trade concurrency for latency; lower it fronting a
   stricter/shared-quota endpoint.
-- **`logChunkBlocks`** (default `10_000n`) — the starting (and regrowth-ceiling) block span of a
-  fresh `eth_getLogs` window for every log scan this router issues. The default is
-  Alchemy/Infura/QuickNode-shaped — the largest span those endpoints document as a filtered-query
-  ceiling — but it is not universal: Ankr's public endpoint, for one, caps `eth_getLogs` around 3,000
-  blocks, well under this default, so every cold scan against it pays a wasted halving probe before
-  settling at a window that actually clears. A caller who knows their provider's real cap passes it
-  directly and skips that probe entirely:
+- **`logChunkBlocks`** (default `16_000_000n`) — a CEILING on the block span of an `eth_getLogs`
+  window: the widest this router will ever ask a log scan for, as both the starting width and the
+  regrowth ceiling. Scans **start wide and bisect down** — the first request spans
+  `min(remaining range, ceiling)`, a refusal halves it, and the window climbs back after a run of
+  clean chunks — because `eth_getLogs` caps are per-*query*, not per-endpoint (a selective filter
+  sails through a span a busy one cannot), and because per-request latency is dominated by the round
+  trip rather than the width: measured live on a keyed mainnet endpoint, a 10,000-block window cost
+  456ms per request and a 1,000,000-block window cost 89ms. Discovering the real width therefore pays
+  for itself immediately; the descent costs a handful of fast rejections (bounded by ~log2 of the
+  range, and skipped entirely for the providers that state their cap in the error text). Pass this
+  when you already KNOW your provider's cap and would rather not pay the descent — Ankr's public
+  endpoint caps `eth_getLogs` around 3,000 blocks:
 
 ```ts
-// Fronting a stricter/shared-quota endpoint (or one with a known eth_getLogs cap): lower both.
+// Fronting a stricter/shared-quota endpoint with a known eth_getLogs cap: lower both.
 const router = createRouter({ client, manifest, concurrency: 8, logChunkBlocks: 3_000n }) // Ankr-shaped
 ```
 
-Both default to exactly the behavior this package had before either option existed — a zero-config
-caller sees no change.
+Both are optional; a zero-config caller gets the shared concurrency bound and the adaptive scan
+window without asking for either.
 
 ## Error handling
 

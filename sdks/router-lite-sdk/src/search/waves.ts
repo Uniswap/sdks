@@ -193,9 +193,9 @@ export type SearchContext = {
   semaphore?: Semaphore | undefined
   /**
    * The router's `logChunkBlocks` option (C4-P6), threaded into every `scanLogs` call as its
-   * `initialChunk` — the starting AND regrowth-ceiling `eth_getLogs` window, provider-shaped rather
-   * than universal (see `constants.ts#INITIAL_CHUNK`). Absent for a one-off engine run, `scanLogs`
-   * falls back to `INITIAL_CHUNK` itself.
+   * `initialChunk` — the CEILING on the `eth_getLogs` window (starting width and regrowth alike),
+   * provider-shaped rather than universal (see `constants.ts#MAX_SCAN_WINDOW`). Absent for a one-off
+   * engine run, `scanLogs` falls back to `MAX_SCAN_WINDOW` itself.
    */
   logChunkBlocks?: bigint | undefined
 }
