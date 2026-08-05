@@ -1,3 +1,4 @@
+import type { Address, TypedDataDomain } from 'viem'
 import { zeroHash } from 'viem'
 
 import { PREFLIGHT_TOP_K } from '../constants'
@@ -42,6 +43,52 @@ export function emptyReport(): SearchReport {
     headRegressed: false,
     verification: { preflightAttempted: 0, preflightBudgetExhausted: false },
   }
+}
+
+// ---------------------------------------------------------------------------
+// Permit2 EIP-712 (R6).
+//
+// Restated here rather than imported from `@uniswap/permit2-sdk` for the same
+// reason `integration/worldBuilder.ts` restates the pool math: a signature a
+// test produces must be independent of any Uniswap library, or a wrong
+// typed-data shape would be validated against an equally wrong one.
+//
+// INDEPENDENT, BUT NO LONGER UNCHECKED. It used to live as a literal inside
+// `integration/readiness.fork.test.ts`, where nothing compared it to anything —
+// a hand-transcription of a struct hash that, if wrong, produces a signature
+// the real Permit2 rejects only on a fork run someone remembers to do.
+// `permit2Types.parity.test.ts` asserts both of these against
+// `AllowanceTransfer.getPermitData(...)` on every unit run, so the restatement
+// is verified rather than merely intentional; the fork test imports these,
+// signs with them, and the chain checks the result.
+// ---------------------------------------------------------------------------
+
+/**
+ * Permit2's `PermitSingle` EIP-712 type set. Field order is load-bearing — it is hashed into the
+ * struct type string — as are the `uint160`/`uint48` widths, which are Permit2's own packing, not
+ * the `uint256`s an ERC-20 permit uses.
+ */
+export const PERMIT2_TYPES = {
+  PermitDetails: [
+    { name: 'token', type: 'address' },
+    { name: 'amount', type: 'uint160' },
+    { name: 'expiration', type: 'uint48' },
+    { name: 'nonce', type: 'uint48' },
+  ],
+  PermitSingle: [
+    { name: 'details', type: 'PermitDetails' },
+    { name: 'spender', type: 'address' },
+    { name: 'sigDeadline', type: 'uint256' },
+  ],
+} as const
+
+/**
+ * Permit2's EIP-712 domain. NOTE THE ABSENCE OF `version` — Permit2's `DOMAIN_SEPARATOR` is built
+ * from `(name, chainId, verifyingContract)` only, and adding the `version: '1'` that most EIP-712
+ * domains carry changes the separator and produces a signature the contract rejects.
+ */
+export function permit2Domain(permit2: Address, chainId: number): TypedDataDomain {
+  return { name: 'Permit2', chainId, verifyingContract: permit2 }
 }
 
 // ---------------------------------------------------------------------------

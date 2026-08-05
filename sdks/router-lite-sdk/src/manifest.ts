@@ -625,6 +625,11 @@ export function wave0PairScanBlocks(m: ChainManifest): bigint {
  * the immutables back out of the code told them apart. Called unconditionally from
  * {@link validateManifest} whenever `execution` is present, independent of whether `codeHash` was
  * also supplied.
+ *
+ * ASSUMES `execution.address` IS THE IMMUTABLE-BEARING CONTRACT ITSELF, NEVER A PROXY (R7) — the
+ * Uniswap convention for every Universal Router deployment there is. A proxied UR would carry only
+ * forwarding bytecode at this address, embedding none of these immutables, and would therefore be
+ * FALSE-REJECTED as "configured for a different chain".
  */
 function assertImmutablesEmbedded(m: ChainManifest, code: Hex): void {
   const execution = m.execution!

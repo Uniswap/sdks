@@ -537,11 +537,19 @@ for (const shape of SHAPES) {
   })
 }
 
+/** Lowercases each golden's `calldata` so the comparison below is over BYTES, not their spelling —
+ * the same normalization {@link assertMatches} applies to the universal-router-sdk side. See the
+ * long note on the golden replay in `ur20.test.ts` for why the stored file carries mixed casing in
+ * its v3 path bytes and is deliberately not regenerated over it. */
+function normalizeCalldata(goldens: Record<string, Golden>): Record<string, Golden> {
+  return Object.fromEntries(Object.entries(goldens).map(([k, g]) => [k, { ...g, calldata: g.calldata.toLowerCase() }]))
+}
+
 test('goldens.json covers every shape and matches the current encoding', () => {
   if (UPDATE_GOLDENS) {
     writeFileSync(GOLDENS_PATH, `${JSON.stringify(producedGoldens, null, 2)}\n`)
     return
   }
   expect(Object.keys(producedGoldens).sort()).toEqual(Object.keys(storedGoldens).sort())
-  expect(producedGoldens).toEqual(storedGoldens)
+  expect(normalizeCalldata(producedGoldens)).toEqual(normalizeCalldata(storedGoldens))
 })

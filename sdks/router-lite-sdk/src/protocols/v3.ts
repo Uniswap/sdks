@@ -40,10 +40,19 @@ export const STANDARD_V3_FEES: readonly number[] = [100, 500, 3000, 10000]
 /**
  * keccak256 of the UniswapV3Pool creation code — the CREATE2 init code hash shared by the mainnet v3
  * factory deployment and every canonical EVM fork of it. The DEFAULT, not a law of nature: a chain
- * whose CREATE2 derivation or pool bytecode differs (zkSync-class chains hash a different preimage
- * entirely) overrides it via `ChainManifest.v3.poolInitCodeHash`, without which every speculative
- * probe here targets an address no pool lives at — a quoter revert per fee tier, indistinguishable
- * from "this pair has no v3 pool", so the search reports a confident `no-route`.
+ * that deployed DIFFERENT POOL BYTECODE overrides it via `ChainManifest.v3.poolInitCodeHash`,
+ * without which every speculative probe here targets an address no pool lives at — a quoter revert
+ * per fee tier, indistinguishable from "this pair has no v3 pool", so the search reports a confident
+ * `no-route`.
+ *
+ * THE OVERRIDE IS FOR A DIFFERENT BYTECODE, NOT A DIFFERENT DERIVATION (R7). It substitutes one
+ * input to the standard EVM formula `keccak256(0xff ++ factory ++ salt ++ initCodeHash)[12:]`; it
+ * cannot express a chain that computes the address by a different rule. zkSync-class chains do
+ * exactly that — a different prefix, a different preimage, and a bytecode HASH rather than the
+ * creation code — so no value of this field makes speculative v3 addressing work there. Such chains
+ * are OUT OF SCOPE for this package's speculative path today; supporting one means teaching
+ * `computeV3PoolAddress` a second algorithm, not setting a different hash. (v3 hints are unaffected
+ * either way: `validateHint` asks the factory's own `getPool` mapping rather than deriving.)
  */
 export const V3_POOL_INIT_CODE_HASH: Hex = '0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54'
 

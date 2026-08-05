@@ -23,9 +23,17 @@ import type { ProtocolModule, QuoteProbe } from './types'
 /**
  * keccak256 of the UniswapV2Pair creation code — the CREATE2 init code hash for the canonical v2
  * factory deployment and every ordinary EVM fork of it. The DEFAULT, not a law of nature: a chain
- * whose CREATE2 derivation or pair bytecode differs (zkSync-class chains hash a different preimage
- * entirely) overrides it via `ChainManifest.v2.initCodeHash`, without which every address computed
- * here points at empty space and the search reports a confident `no-route`.
+ * that deployed DIFFERENT PAIR BYTECODE overrides it via `ChainManifest.v2.initCodeHash`, without
+ * which every address computed here points at empty space and the search reports a confident
+ * `no-route`.
+ *
+ * THE OVERRIDE IS FOR A DIFFERENT BYTECODE, NOT A DIFFERENT DERIVATION (R7). It substitutes one
+ * input to the standard EVM formula `keccak256(0xff ++ factory ++ salt ++ initCodeHash)[12:]`; it
+ * cannot express a chain that computes the address by a different rule. zkSync-class chains do
+ * exactly that — a different prefix, a different preimage, and a bytecode HASH rather than the
+ * creation code — so no value of this field makes speculative v2 addressing work there. Such chains
+ * are OUT OF SCOPE for this package's speculative path today, and there is no manifest field that
+ * changes that; supporting one means teaching `computeV2PairAddress` a second algorithm.
  */
 export const V2_INIT_CODE_HASH: Hex = '0x96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f'
 
