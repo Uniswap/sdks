@@ -11,7 +11,7 @@ import type { ReasonCode } from '../src/index'
 
 const EXPLANATIONS = {
   'rpc-unavailable':
-    'Total RPC outage — not even the pinned block could be fetched, so nothing was searched. Check the endpoint (chainz doctor) or pass --rpc.',
+    'Total RPC outage — not even the pinned block could be fetched, so nothing was searched. Check what --rpc/$ETH_RPC_URL points at.',
   'rpc-degraded':
     'Some RPC calls were rate-limited, timed out, or lost, so the search ran but cannot be promised complete. Retry, or point at a healthier endpoint.',
   aborted: 'The --budget expired before the bounded search finished. Raise it (or drop it) and rerun.',

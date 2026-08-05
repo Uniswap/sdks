@@ -34,7 +34,7 @@ export async function cmdDiscover(argv: string[]): Promise<number> {
   const [tokenArg] = parsed.positionals
   if (!tokenArg) throw new UsageError('expected: <token> — e.g. `rl discover 0xTOKEN --chain base`')
 
-  const ctx = buildChainContext(parsed)
+  const ctx = await buildChainContext(parsed)
   const token = await resolveToken(ctx.client, ctx.chain.manifest, tokenArg)
   const via = await resolveCounterparty(ctx, token, parsed.strings.get('via'))
   const json = parsed.booleans.has('json')

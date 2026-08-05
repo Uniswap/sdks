@@ -27,7 +27,7 @@ import { buildChainContext, hydrateLegSymbols, resolveTrade, TRADE_FLAGS, type C
 
 export async function cmdQuote(argv: string[]): Promise<number> {
   const parsed = parseArgs(argv, TRADE_FLAGS)
-  const ctx = buildChainContext(parsed)
+  const ctx = await buildChainContext(parsed)
   const trade = await resolveTrade(ctx, parsed)
 
   const request: QuoteRequest = {

@@ -10,11 +10,16 @@
 //    and it is why this CLI lives as a private nested workspace beside
 //    `integration/` and `canary/` rather than shipping in the package.
 //
-//  - KEYED URLS NEVER PRINT. RPC endpoints come from the user's `chainz`
-//    config (or `--rpc`) and routinely carry vendor keys; they are resolved
-//    process-to-process (`chains.ts`) and every error path below is scrubbed
-//    with `redactKeyedUrl` before it reaches a terminal — viem embeds the
-//    full URL in its error text, so redaction has to sit at this choke point.
+//  - PARAMETERS IN, NOTHING ELSE. This tool spawns no child processes and
+//    reads no machine config: the endpoint arrives as `--rpc <url>` or
+//    `$ETH_RPC_URL` (exactly what `chainz exec <chain> --` exports — compose
+//    with chainz, don't integrate it), and the chain identifies itself via
+//    `eth_chainId` against that endpoint. `--chain <id>` is an assertion
+//    cross-checked against that answer, never a selector.
+//
+//  - KEYED URLS NEVER PRINT. The endpoint routinely carries a vendor key,
+//    and viem embeds the full URL in its error text — so every error path
+//    below is scrubbed with `redactKeyedUrl` before it reaches a terminal.
 //
 //  - EXPECTED FAILURES ARE ONE-LINERS. `RouterConfigError` /
 //    `UnsupportedRouteError` / usage mistakes render as a single friendly
@@ -48,14 +53,17 @@ ${bold('usage')}
   rl quote <tokenIn> <tokenOut> <amount> [options]     price a trade
   rl swap  <tokenIn> <tokenOut> <amount> --trader 0x…  build executable calldata
   rl discover <token> [--via <token>]                  what pools the SDK sees for a token
-  rl chains                                            built-in manifests × chainz endpoints
+  rl chains                                            built-in manifest table (offline)
 
 ${bold('tokens')}    eth | native | 0xADDRESS | a core-intermediate symbol (usdc, weth, …)
 ${bold('amounts')}   human units ('1.5', decimals-aware) or raw ('2500000wei')
 
+${bold('endpoint')}  --rpc <url>, else $ETH_RPC_URL — exactly what \`chainz exec <chain> --\` exports.
+${bold('chain')}     detected from the endpoint via eth_chainId; \`rl chains\` lists the built-in manifests.
+
 ${bold('common options')}
-  --chain, -c <id|name>   chain (default: mainnet); rl chains lists them
-  --rpc <url>             endpoint override (default: resolved from chainz — never printed)
+  --chain, -c <id>        ASSERT the chain id — errors if the endpoint serves a different chain
+  --rpc <url>             endpoint (overrides $ETH_RPC_URL; never printed)
   --budget, -b <dur>      best-effort budget (unit required: 900ms, 10s, 2m) — an AbortSignal the
                           search honors between waves; transport timeouts/retries derive from it
   --hint <spec>           assert a pool for the pair: v2 | v3@500 | v4@3000/60[/0xHooks][:0xHookData]
@@ -70,12 +78,12 @@ ${bold('swap options')}
   --deadline-secs <n>     deadline from the pinned block timestamp (SDK default: 300)
   --simulate, -s          prove the tx via eth_simulateV1 — no keys, no funds
 
-${bold('examples')}
-  rl quote eth usdc 1
-  rl quote eth usdc 1 --chain base --watch
-  rl quote 0x6B17…71d0F usdc 250 --budget 5s --hint v3@500
-  rl swap eth usdc 0.5 --trader 0x1111111111111111111111111111111111111111 --simulate
-  rl discover 0xTOKEN --chain unichain
+${bold('examples')} (rl = \`bun cli/rl.ts\` from the package dir)
+  chainz exec 1 -- rl quote eth usdc 1
+  chainz exec base -- rl quote eth usdc 1 --watch
+  ETH_RPC_URL=… rl quote 0x6B17…71d0F usdc 250 --budget 5s --hint v3@500
+  chainz exec 1 -- rl swap eth usdc 0.5 --trader 0x1111111111111111111111111111111111111111 --simulate
+  chainz exec 130 -- rl discover 0xTOKEN --chain 130
 
 ${bold('exit codes')}   0 actionable · 1 no-route · 2 inconclusive · 3 usage/config · 4 internal · 5 simulation disproved`
 

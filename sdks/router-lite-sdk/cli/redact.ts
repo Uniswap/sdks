@@ -2,8 +2,8 @@
 // Keyed-URL redaction — mirrored from `canary/providers.test.ts#redactKeyedUrl`
 // (same rule, same rationale), because this CLI has the same leak path: viem
 // embeds the full request URL in every error it constructs, and the RPC URLs
-// this tool resolves (from chainz, or `--rpc`) routinely carry vendor keys in
-// the path or query string. Every error line this CLI prints goes through
+// this tool is handed (via `--rpc`/`$ETH_RPC_URL`) routinely carry vendor keys
+// in the path or query string. Every error line this CLI prints goes through
 // here first; the URL itself is never printed on any success path at all.
 //
 // Deliberately duplicated rather than imported: `canary/` resolves the SDK by

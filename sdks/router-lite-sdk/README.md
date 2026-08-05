@@ -523,9 +523,10 @@ Three private workspaces sit beside `src/`, none of them published:
 
 - **`integration/`** — anvil-fork integration suite (opt-in via `ROUTER_LITE_FORK=1`).
 - **`canary/`** — live-RPC nightly canary over `eth_simulateV1` (opt-in via `ROUTER_LITE_CANARY=1`).
-- **`cli/`** — a local-testing CLI (`bun cli/rl.ts quote eth usdc 1`, or `bun run cli -- …`) that
-  runs the SDK straight from `src/` with no build step: quotes, swaps (with an `eth_simulateV1`
-  execution proof), per-token pool discovery dumps, and a readable rendering of every result's
-  `SearchReport`. See `cli/README.md` for the tour.
+- **`cli/`** — a local-testing CLI (`ETH_RPC_URL=… bun cli/rl.ts quote eth usdc 1`, or e.g.
+  `chainz exec 1 -- bun cli/rl.ts quote eth usdc 1`) that runs the SDK straight from `src/` with
+  no build step: quotes, swaps (with an `eth_simulateV1` execution proof), per-token pool
+  discovery dumps, and a readable rendering of every result's `SearchReport`. The endpoint is a
+  parameter (`--rpc`/`$ETH_RPC_URL`); the chain is detected from it. See `cli/README.md`.
 
 `bun run typecheck:all` typechecks the package and all three; `bun run lint` covers `src` and `cli`.

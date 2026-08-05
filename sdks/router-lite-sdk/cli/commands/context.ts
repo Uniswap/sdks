@@ -14,8 +14,16 @@ import { PoolIndex } from '../../src/experimental/index'
 import { createRouter, type PoolHint, type QuotedRoute, type Router } from '../../src/index'
 import { parseAmount, parseBudget } from '../amounts'
 import { UsageError, type FlagSpec, type ParsedArgs } from '../args'
-import { clientTimeoutMs, resolveChain, type ResolvedChain } from '../chains'
+import {
+  assertChainMatches,
+  clientTimeoutMs,
+  parseChainAssertion,
+  resolveManifest,
+  resolveRpcUrl,
+  type ResolvedChain,
+} from '../chains'
 import { parseHint } from '../hints'
+import { redactKeyedUrl } from '../redact'
 import { viewKey, type RenderCtx, type TokenView } from '../report'
 import { fetchTokenMeta, resolveToken, type ResolvedToken } from '../tokens'
 
@@ -45,14 +53,36 @@ export type ChainContext = {
 }
 
 /**
- * Chain + client + router for `parsed`'s common flags. The router always gets a CLI-owned
- * `PoolIndex` injected (constructed to match the manifest, as `createRouter` requires) so commands
- * that want to inspect what a search learned — `discover` — can read it back afterwards.
+ * Chain + client + router for `parsed`'s common flags.
+ *
+ * The endpoint comes from `--rpc`/`$ETH_RPC_URL` and the chain identifies itself: one
+ * `eth_chainId` probe (fail-fast, no retries) detects what the endpoint serves, `--chain <id>` —
+ * when given — is asserted against that answer, and the detected id picks the built-in manifest.
+ * The router always gets a CLI-owned `PoolIndex` injected (constructed to match the manifest, as
+ * `createRouter` requires) so commands that want to inspect what a search learned — `discover` —
+ * can read it back afterwards.
  */
-export function buildChainContext(parsed: ParsedArgs): ChainContext {
-  const chain = resolveChain(parsed.strings.get('chain'), parsed.strings.get('rpc'))
+export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContext> {
+  const rpcUrl = resolveRpcUrl(parsed.strings.get('rpc'))
+  const asserted = parseChainAssertion(parsed.strings.get('chain'))
   const budgetArg = parsed.strings.get('budget')
   const budgetMs = budgetArg !== undefined ? parseBudget(budgetArg) : undefined
+
+  // Detect the chain with a short, unretried probe — an unreachable/misconfigured endpoint should
+  // be a friendly one-liner in seconds, not viem's full retry ladder ending in a stack.
+  const probe = createPublicClient({ transport: http(rpcUrl, { timeout: 10_000, retryCount: 0 }) }) as PublicClient
+  let chainId: number
+  try {
+    chainId = await probe.getChainId()
+  } catch (err) {
+    const message = err instanceof Error ? err.message.split('\n')[0]! : String(err)
+    throw new UsageError(
+      `the RPC endpoint did not answer eth_chainId — check --rpc/$ETH_RPC_URL (${redactKeyedUrl(message)})`,
+    )
+  }
+  assertChainMatches(asserted, chainId)
+  const chain = resolveManifest(chainId)
+
   // `--budget` is a COOPERATIVE bound: the SDK consults its AbortSignal between waves, but a
   // single stalled transport call would otherwise sit through viem's full per-request timeout
   // times its default retries before the signal is ever looked at — measured at ~2 minutes of
@@ -63,7 +93,7 @@ export function buildChainContext(parsed: ParsedArgs): ChainContext {
   const timeout =
     budgetMs !== undefined ? Math.max(1_000, Math.min(budgetMs, clientTimeoutMs(chain.chainId))) : clientTimeoutMs(chain.chainId)
   const client = createPublicClient({
-    transport: http(chain.rpcUrl, { batch: true, timeout, ...(budgetMs !== undefined ? { retryCount: 0 } : {}) }),
+    transport: http(rpcUrl, { batch: true, timeout, ...(budgetMs !== undefined ? { retryCount: 0 } : {}) }),
   }) as PublicClient
   const index = new PoolIndex(chain.manifest.wrappedNative, {
     reorgOverlapBlocks: chain.manifest.chain?.reorgOverlapBlocks,

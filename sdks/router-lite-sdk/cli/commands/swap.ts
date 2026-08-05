@@ -51,7 +51,7 @@ export async function cmdSwap(argv: string[]): Promise<number> {
     throw new UsageError('swap needs --trader 0x… — the tx is simulated from (and encoded for) that account')
   }
 
-  const ctx = buildChainContext(parsed)
+  const ctx = await buildChainContext(parsed)
   if (!ctx.chain.swaps) {
     throw new UsageError(
       `${ctx.chain.label} is quote-only (its manifest ships no Universal Router execution bundle) — use \`rl quote\``,
