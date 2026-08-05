@@ -310,12 +310,15 @@ export const ARBITRUM_MANIFEST: ChainManifest = {
  *
  *  UNVERIFIED / CONVENTIONAL — `chain.reorgOverlapBlocks: 3000n`. Unlike every other value here this
  *  one was NOT measured: it is 300 seconds expressed in this chain's blocks, matching what every
- *  other built-in manifest already spends (Base 150 @ 2s, Unichain 300 @ 1s, Arbitrum 1200 @ 0.25s —
- *  all exactly 300s). No observed reorg depth on this chain informed it, and none informed the other
- *  four either; the number is a re-scan budget for shallow-reorg tolerance, so being generous costs
- *  bounded duplicate work at the tip while being too small would silently drop pools that a rewind
- *  moved. Flagged rather than presented as a fact because a chain-specific finality claim is exactly
- *  the kind of thing a reader would otherwise assume was checked.
+ *  other L2 built-in manifest already spends (Base 150 @ 2s, Unichain 300 @ 1s, Arbitrum 1200 @
+ *  0.25s — all exactly 300s). Mainnet is deliberately NOT part of that pattern: its 32 @ 12s = 384s
+ *  is not a round wall-clock budget at all — it is ONE BEACON EPOCH, i.e. finality-informed rather
+ *  than time-informed, because mainnet is the one chain here with an epoch-shaped finality boundary
+ *  to derive it from. No observed reorg depth on THIS chain informed its 3000n, and none informed
+ *  the three L2 conventions either; the number is a re-scan budget for shallow-reorg tolerance, so
+ *  being generous costs bounded duplicate work at the tip while being too small would silently drop
+ *  pools that a rewind moved. Flagged rather than presented as a fact because a chain-specific
+ *  finality claim is exactly the kind of thing a reader would otherwise assume was checked.
  *  - `coreIntermediates`: WETH plus USDG (`0x5fc5…168`, `name()` "Global Dollar", `symbol()` "USDG",
  *    `decimals()` 6). NO USDC DEPLOYMENT WAS FOUND on this chain, and USDG is not a guess at a
  *    substitute: a census of every currency appearing in the 18,347 v4 `Initialize` + 12,407 v3
@@ -604,18 +607,63 @@ export function wave0PairScanBlocks(m: ChainManifest): bigint {
 }
 
 /**
+ * Fingerprints `m.execution`'s deployed bytecode against this manifest's OWN immutables —
+ * `permit2`/`wrappedNative` always, plus `v2.factory`/`v3.factory`/`v4.poolManager` for whichever of
+ * those bundles the manifest carries. A Universal Router bakes these in as constructor immutables,
+ * verbatim, so the lowercased address (without its `0x` prefix) must appear as a substring somewhere
+ * in the deployed code's hex whenever the router is genuinely configured for this manifest's chain.
+ *
+ * THIS IS WHAT `codeHash` CANNOT SEE (see {@link UniversalRouterDeployment.codeHash}'s doc). The
+ * Robinhood Chain bring-up found mainnet's and Base's real Universal Router bytecode deployed,
+ * byte-for-byte, at Robinhood Chain's usual UR address — `eth_getCode` and even an exact `codeHash`
+ * match would have called that "the genuine deployment", when in fact it was wired to mainnet's (or
+ * Base's) own factories, addresses that do not exist as pools on Robinhood Chain at all. Only reading
+ * the immutables back out of the code told them apart. Called unconditionally from
+ * {@link validateManifest} whenever `execution` is present, independent of whether `codeHash` was
+ * also supplied.
+ */
+function assertImmutablesEmbedded(m: ChainManifest, code: Hex): void {
+  const execution = m.execution!
+  const codeHex = code.toLowerCase()
+  const checks: Array<[label: string, address: Address]> = [
+    ['execution.wrappedNative', execution.wrappedNative],
+    ['execution.permit2', execution.permit2],
+  ]
+  if (m.v2) checks.push(['v2.factory', m.v2.factory])
+  if (m.v3) checks.push(['v3.factory', m.v3.factory])
+  if (m.v4) checks.push(['v4.poolManager', m.v4.poolManager])
+
+  for (const [label, address] of checks) {
+    const needle = address.toLowerCase().slice(2) // immutables are embedded verbatim, without '0x'
+    if (!codeHex.includes(needle)) {
+      throw new RouterConfigError(
+        `execution address ${execution.address} does not embed ${label} (${address}) anywhere in its deployed ` +
+          `bytecode — this Universal Router appears to be configured for a different chain`,
+      )
+    }
+  }
+}
+
+/**
  * Cross-checks `m.chainId` against the connected client's actual chain before any RPC traffic
  * depends on the manifest — a mismatch means every downstream address in the manifest is for the
  * wrong network. Runs identically whether or not `execution` is present (C4-P3): a quote-only
  * manifest still gets this check, since a wrong chainId misdirects quoting's own addresses (the v2
- * factory, the v3/v4 quoters) just as much as it would the Universal Router. When `m.execution` IS
- * present and its `codeHash` is provided, also fetches the deployed code at `m.execution.address`
- * and verifies its keccak256 matches — catching a manifest pointed at the wrong (or an
- * un-deployed) address that the chainId check alone can't see. No `execution` bundle, or an
- * `execution` with no `codeHash`, both skip this second check entirely: no `eth_getCode` call is
- * made.
+ * factory, the v3/v4 quoters) just as much as it would the Universal Router.
  *
- * NEITHER CALL IS GATED BY THE ROUTER'S CONCURRENCY SEMAPHORE (C4-P6, F2) — the one deliberate
+ * When `m.execution` IS present, ALSO fetches the deployed code at `m.execution.address` — exactly
+ * once, regardless of whether `codeHash` is supplied — and runs two independent checks against it:
+ *
+ *  1. If `codeHash` is provided, its keccak256 must match — catching a manifest pointed at the wrong
+ *     (or an un-deployed) address that the chainId check alone can't see.
+ *  2. UNCONDITIONALLY, {@link assertImmutablesEmbedded} fingerprints the code for this manifest's own
+ *     `permit2`/`wrappedNative`/factory immutables — catching a router whose CODE is fine (an exact
+ *     `codeHash` match, even) but whose baked-in factories belong to a different chain. See that
+ *     function's doc for the real-world case (Robinhood Chain) this exists to catch.
+ *
+ * No `execution` bundle at all skips both checks entirely: no `eth_getCode` call is made.
+ *
+ * NEITHER RPC CALL IS GATED BY THE ROUTER'S CONCURRENCY SEMAPHORE (C4-P6, F2) — the one deliberate
  * carve-out from `internal/rpc.ts`'s "every `client.request` is gated" rule. `getChainId`(this
  * function) is deterministic per `(client, manifest)` and runs at most ONCE per router's lifetime:
  * `router.ts#ensureManifestValidated` caches the outcome (success, or a `RouterConfigError`) forever
@@ -631,17 +679,22 @@ export async function validateManifest(
     throw new RouterConfigError(`manifest chainId ${m.chainId} does not match client chainId ${clientChainId}`)
   }
 
-  if (!m.execution?.codeHash) return
+  if (!m.execution) return
   const { codeHash, address } = m.execution
 
   const code = (await client.request({ method: 'eth_getCode', params: [address, 'latest'] } as any)) as Hex
   if (!code || code === '0x') {
-    throw new RouterConfigError(`no code found at execution address ${address}; expected codeHash ${codeHash}`)
+    throw new RouterConfigError(`no code found at execution address ${address}; expected a deployed Universal Router`)
   }
-  const actualHash = keccak256(code)
-  if (actualHash.toLowerCase() !== codeHash.toLowerCase()) {
-    throw new RouterConfigError(
-      `execution address ${address} codeHash mismatch: expected ${codeHash}, got ${actualHash}`,
-    )
+
+  if (codeHash) {
+    const actualHash = keccak256(code)
+    if (actualHash.toLowerCase() !== codeHash.toLowerCase()) {
+      throw new RouterConfigError(
+        `execution address ${address} codeHash mismatch: expected ${codeHash}, got ${actualHash}`,
+      )
+    }
   }
+
+  assertImmutablesEmbedded(m, code)
 }

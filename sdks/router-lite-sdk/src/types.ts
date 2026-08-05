@@ -395,6 +395,28 @@ export type SearchReport = {
    *
    * Invariant: `attempted === succeeded + failed + transportFailed`. `unattempted` counts candidates
    * that were never dispatched at all (an abort landed first) and is not part of that sum.
+   *
+   * READ THIS AS PROBE-INCLUSIVE, NOT ROUTE-FRAMED, OR `succeeded` WILL MISLEAD. Three separate
+   * channels feed these five counters (`search/waves.ts`):
+   *
+   *  1. Route quotes (`runRouteProbes`) — wave 0's direct-pair probes, where the quote call *is* the
+   *     existence check and a success *is* a route. Counted here AND in `enumeration.candidatesGenerated`.
+   *  2. Enumerated quotes (`quoteNew`) — candidates `generateRoutes` built from discovered pools.
+   *     Counted here AND in `enumeration.candidatesGenerated`.
+   *  3. Discovery probes (`runDiscoveryProbes`) — single-leg, half-pair existence checks
+   *     (`tokenIn -> core`, `neighbor -> tokenOut`) run purely to learn whether a hinted or
+   *     newly-scanned pool exists, so a fabricated hint accumulates the failure history
+   *     `isDiscredited` reads. Counted HERE ONLY: `candidatesGenerated` never sees them, because a
+   *     half-pair leg is not a route and can NEVER become one — its priced amount is for one leg at
+   *     the full input, not a quote for anything the caller asked about, and is discarded on success.
+   *
+   * The consequence: `quoting.succeeded > 0 && alternatives.length === 0` (or `best` absent
+   * entirely) is a NORMAL shape, not a bug — every one of `succeeded` may be a discovery probe that
+   * confirmed a pool exists and nothing more. `candidatesGenerated` excludes channel 3 by
+   * construction, so comparing it against `quoting.succeeded`/`attempted` directly (as if they
+   * counted the same thing with a different label) will never reconcile; treat the two as answering
+   * different questions — "how many candidates were built" vs. "how many on-chain calls resolved,
+   * across all three channels" — rather than as the same count reported twice.
    */
   quoting: { attempted: number; succeeded: number; failed: number; transportFailed: number; unattempted: number }
   aborted: boolean
@@ -493,7 +515,22 @@ export type CommandSet = (typeof COMMAND_SETS)[number]
 export type UniversalRouterDeployment = {
   address: Address
   commandSet: CommandSet
-  codeHash?: Hex // verified at init when provided
+  /**
+   * Optional exact-bytecode check, verified at init when provided: `validateManifest` (`manifest.ts`)
+   * fetches the code at `address` and rejects a `keccak256` mismatch.
+   *
+   * THE IMMUTABLE CROSS-CHECK BELOW IS STRONGER, AND ALWAYS ON — WITH OR WITHOUT THIS FIELD. A
+   * Universal Router's `permit2`/`wrappedNative` immutables (plus, when present, `v2.factory` /
+   * `v3.factory` / `v4.poolManager`) are baked verbatim into its deployed bytecode at construction
+   * time. `codeHash` alone is BLIND to a router whose code is byte-identical to a known-good
+   * deployment but wired to the wrong chain's factories — exactly what the Robinhood Chain bring-up
+   * found: mainnet's and Base's real Universal Router bytecode sits, unmodified, at Robinhood
+   * Chain's usual UR address, configured for mainnet/Base's own factories instead of Robinhood's.
+   * Same code, same hash, wrong chain. `validateManifest` therefore fingerprints the fetched code for
+   * this manifest's own immutables every time `execution` is present — regardless of whether
+   * `codeHash` is set — and throws `RouterConfigError` naming whichever immutable it could not find.
+   */
+  codeHash?: Hex
   permit2: Address
   wrappedNative: Address // UR's own immutable; also drives native-family normalization
 }

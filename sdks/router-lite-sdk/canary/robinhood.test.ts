@@ -44,7 +44,13 @@ import { canaryLog, robinhoodChainId, robinhoodClient, robinhoodEnabled } from '
 //
 // ---------------------------------------------------------------------------
 // LIVE-RUN LOG (C4-T5, first-ever run against this chain, 2026-08-05, keyed archive endpoint —
-// alchemy, robinhood-mainnet; provider granularity only, never a keyed URL). Every number measured.
+// alchemy, robinhood-mainnet). Every number measured. Endpoint identity is kept at provider
+// granularity in what is WRITTEN HERE manually — same posture as `canary.test.ts`. THAT IS NARROWER
+// THAN "never a keyed URL", THOUGH, AND WORTH BEING PRECISE ABOUT: `redactKeyedUrl`
+// (`canary/providers.test.ts`) only scrubs the captured-error fixture path (`providerErrors.json`);
+// it is not wired into this file at all. An uncaught error surfacing from a viem call anywhere in
+// this suite would print its full, unredacted URL straight into the nightly job's raw logs — the
+// same caveat `canary.test.ts` carries for its own uncaught errors.
 //
 // chain facts confirmed at run time: head ~28,170,000; chain age 96.4 days (block 1 timestamped
 // 2026-04-30); 0.10028 s/block over the last 1,000,000 blocks. Archive state available — the

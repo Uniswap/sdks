@@ -338,7 +338,16 @@ describe('chain manifest', () => {
   })
 
   describe('execution codeHash verification', () => {
-    const deployedCode = '0x600160010160005260206000f3' as const
+    // Real "bytecode" is not needed to exercise the hash check — but the immutable cross-check
+    // (below) now runs unconditionally too, so this fixture embeds mainnet's own immutables
+    // (wrappedNative, permit2, v2 factory, v3 factory, v4 poolManager) padded with filler, exactly
+    // like a real Universal Router's deployed code would. Without that, every test in this block
+    // would fail the immutable check before ever reaching the codeHash comparison it means to test.
+    const hex = (addr: string) => addr.toLowerCase().slice(2)
+    const mainnet = manifestFor(1)
+    const deployedCode = `0xfe${hex(mainnet.execution!.wrappedNative)}${hex(mainnet.execution!.permit2)}${hex(
+      mainnet.v2!.factory,
+    )}${hex(mainnet.v3!.factory)}${hex(mainnet.v4!.poolManager)}fe` as const
     const correctHash = keccak256(deployedCode)
 
     test('matching codeHash passes', async () => {
@@ -360,7 +369,7 @@ describe('chain manifest', () => {
       await expect(validateManifest(client as any, manifest)).rejects.toThrow(RouterConfigError)
     })
 
-    test('absent codeHash skips the eth_getCode fetch entirely', async () => {
+    test('absent codeHash still fetches the code once — the immutable cross-check runs regardless', async () => {
       const manifest = manifestFor(1) // no codeHash set
       let requestCalls = 0
       const client = {
@@ -370,6 +379,84 @@ describe('chain manifest', () => {
           return deployedCode
         },
       }
+      await expect(validateManifest(client as any, manifest)).resolves.toBeUndefined()
+      expect(requestCalls).toBe(1) // one eth_getCode call, spent on the immutable check
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // C4-T5f: the immutable cross-check — what catches a foreign-configured router that `codeHash`
+  // provably cannot (see UniversalRouterDeployment.codeHash's doc and manifest.ts's
+  // `assertImmutablesEmbedded`). Mirrors the real Robinhood Chain bug: mainnet's and Base's actual
+  // Universal Router bytecode is deployed, byte-identical, at Robinhood Chain's usual UR address,
+  // but wired to the wrong chain's factories — so `codeHash` alone is blind to it (the code IS the
+  // genuine Universal Router code). These stubs hand-build code hex containing (or omitting) the
+  // manifest's own immutables, rather than real UR bytecode, since that is exactly the surface this
+  // check reads and it keeps the fixture legible.
+  // -------------------------------------------------------------------------
+  describe('immutable cross-check (foreign-configured router detection)', () => {
+    const hex = (addr: string) => addr.toLowerCase().slice(2)
+
+    /** Builds fake "deployed code" embedding every immutable of `m.execution`/`m.v2`/`m.v3`/`m.v4`
+     * except `omit`, which is left out — simulating a router genuinely deployed, but configured for
+     * a different chain's version of exactly that one contract. */
+    function buildCode(m: ChainManifest, omit?: 'wrappedNative' | 'permit2' | 'v2' | 'v3' | 'v4'): `0x${string}` {
+      const execution = m.execution!
+      const parts: string[] = ['fe'.repeat(4)] // filler, so a real router's surrounding code is plausible
+      if (omit !== 'wrappedNative') parts.push(hex(execution.wrappedNative))
+      if (omit !== 'permit2') parts.push(hex(execution.permit2))
+      if (m.v2 && omit !== 'v2') parts.push(hex(m.v2.factory))
+      if (m.v3 && omit !== 'v3') parts.push(hex(m.v3.factory))
+      if (m.v4 && omit !== 'v4') parts.push(hex(m.v4.poolManager))
+      parts.push('fe'.repeat(4))
+      return `0x${parts.join('')}` as `0x${string}`
+    }
+
+    test('code missing the manifest\'s v3 factory throws, naming the offending immutable', async () => {
+      const manifest = manifestFor(1)
+      const code = buildCode(manifest, 'v3')
+      const client = { getChainId: async () => 1, request: async () => code }
+      await expect(validateManifest(client as any, manifest)).rejects.toThrow(RouterConfigError)
+      await expect(validateManifest(client as any, manifest)).rejects.toThrow(/v3\.factory/)
+      await expect(validateManifest(client as any, manifest)).rejects.toThrow(/different chain/)
+    })
+
+    test('code embedding every immutable passes, with no codeHash supplied at all', async () => {
+      const manifest = manifestFor(1)
+      const code = buildCode(manifest)
+      const client = { getChainId: async () => 1, request: async () => code }
+      await expect(validateManifest(client as any, manifest)).resolves.toBeUndefined()
+    })
+
+    test('the Robinhood scenario reproduced: a foreign chain\'s genuine router code at the right address, wrong factories', async () => {
+      // Robinhood Chain's manifest, with a caller-supplied execution bundle pointing at MAINNET's
+      // real Universal Router address — but the code the client returns is mainnet's OWN deployed
+      // code (i.e. it embeds mainnet's factories, not Robinhood's). Exactly the shape that made
+      // `eth_getCode`/`codeHash` alone insufficient during the real bring-up.
+      const manifest = manifestFor(4663, {
+        execution: {
+          address: '0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af', // mainnet's UR address
+          commandSet: 'ur-2.0',
+          permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
+          wrappedNative: ROBINHOOD_MANIFEST.wrappedNative, // must agree with the top-level field
+        },
+      })
+      const mainnetLikeCode = buildCode(manifestFor(1)) // embeds MAINNET's immutables, not Robinhood's
+      const client = { getChainId: async () => 4663, request: async () => mainnetLikeCode }
+      await expect(validateManifest(client as any, manifest)).rejects.toThrow(RouterConfigError)
+      await expect(validateManifest(client as any, manifest)).rejects.toThrow(/different chain/)
+    })
+
+    test('quote-only manifests (no execution) are unaffected — no eth_getCode call at all', async () => {
+      let requestCalls = 0
+      const client = {
+        getChainId: async () => 4663,
+        request: async () => {
+          requestCalls++
+          return '0x'
+        },
+      }
+      const manifest = manifestFor(4663) // ROBINHOOD_MANIFEST — quote-only, no execution bundle
       await expect(validateManifest(client as any, manifest)).resolves.toBeUndefined()
       expect(requestCalls).toBe(0)
     })

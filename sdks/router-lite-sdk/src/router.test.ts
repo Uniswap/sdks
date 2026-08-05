@@ -132,6 +132,16 @@ function stubClient(script: ClientScript): { client: PublicClient; counters: Cou
         return { number: toHex(headOf()), hash: BLOCK_HASH, timestamp: toHex(BLOCK_TIMESTAMP) }
       }
       if (args.method === 'eth_getBalance') return toHex(balance)
+      if (args.method === 'eth_getCode') {
+        // `validateManifest`'s immutable cross-check (manifest.ts) fetches the execution address's
+        // code unconditionally whenever `execution` is present, codeHash or not. This stub's fake
+        // "bytecode" is just this manifest's own immutables concatenated — enough to satisfy that
+        // substring check without asserting anything about real Universal Router bytecode.
+        const [addr] = args.params as [string]
+        if (addr.toLowerCase() !== UNIVERSAL_ROUTER.toLowerCase()) return '0x'
+        const embed = [WRAPPED, PERMIT2, V2_FACTORY, V4_POOL_MANAGER].map((a) => a.slice(2).toLowerCase()).join('')
+        return `0x${embed}` as Hex
+      }
       if (args.method === 'eth_getLogs') {
         const filter = args.params[0]
         counters.scans++
@@ -1770,6 +1780,13 @@ describe('transport options (C4-P6)', () => {
         if (args.method === 'eth_getBlockByNumber') {
           return { number: toHex(BLOCK_NUMBER), hash: BLOCK_HASH, timestamp: toHex(BLOCK_TIMESTAMP) }
         }
+        if (args.method === 'eth_getCode') {
+          // `validateManifest`'s immutable cross-check fetches the execution address's code
+          // unconditionally — fabricate code embedding this manifest's own immutables so validation
+          // passes and the test proceeds to the actual wave-0 concurrency it means to measure.
+          const embed = [WRAPPED, PERMIT2, V2_FACTORY, V3_FACTORY].map((a) => a.slice(2).toLowerCase()).join('')
+          return `0x${embed}` as Hex
+        }
         if (args.method === 'eth_call') {
           active++
           peak = Math.max(peak, active)
@@ -1814,6 +1831,12 @@ describe('transport options (C4-P6)', () => {
       async request(args: any) {
         if (args.method === 'eth_getBlockByNumber') {
           return { number: toHex(BLOCK_NUMBER), hash: BLOCK_HASH, timestamp: toHex(BLOCK_TIMESTAMP) }
+        }
+        if (args.method === 'eth_getCode') {
+          // Same reason as the concurrency test above: satisfy the unconditional immutable
+          // cross-check so this test reaches the log-scan behavior it actually exercises.
+          const embed = [WRAPPED, PERMIT2, V2_FACTORY, V4_POOL_MANAGER].map((a) => a.slice(2).toLowerCase()).join('')
+          return `0x${embed}` as Hex
         }
         if (args.method === 'eth_getLogs') {
           const filter = args.params[0]

@@ -6,19 +6,31 @@ name: "Router-lite Canary"
 # real, moving mainnet head. No private keys and no broadcasts: everything runs as the fixed,
 # synthetic CANARY_TRADER, whose spending power exists only inside an eth_simulateV1 state override.
 #
+# AS OF C4-T5 THE SUITE COVERS TWO CHAINS: mainnet (canary.test.ts, the matrix above) AND Robinhood
+# Chain (canary/robinhood.test.ts) — the first quote-only, hint-free-discovery manifest this package
+# shipped. Robinhood's rows are gated on their own secret (see CANARY_RPC_URL_ROBINHOOD below) and
+# skip cleanly without it, same posture as _2/_3.
+#
 # CANARY_RPC_URL_1 SHOULD BE A KEYED ARCHIVE ENDPOINT. The live C4-T4 run established that no free
 # keyless endpoint serves both `eth_simulateV1` and unrestricted historical `eth_getLogs`, and the
 # pair-matrix, long-tail-discovery and latency rows need both. Anything captured from a keyed
 # endpoint is redacted before it is written down — see `redactKeyedUrl` in canary/providers.test.ts.
+# That redaction covers what gets WRITTEN TO THE FIXTURE, not every code path: see
+# `canary/robinhood.test.ts`'s header for the narrower, more accurate claim about what this does and
+# does not catch (an uncaught error's stack can still print a keyed URL straight to these nightly logs).
 #
 # NEVER PR-blocking — its own workflow with no `pull_request` trigger, so it can't be added to
 # required status checks by mistake. Runs nightly (cron) plus on-demand (workflow_dispatch).
 #
 # Gated on the CANARY_RPC_URL_1/_2/_3 repo secrets (sdks/router-lite-sdk/canary/env.ts;
-# CANARY_RPC_URL_1 is required, _2/_3 are optional and only light up the cross-provider checks).
-# Until those secrets are added in repo settings, `canaryEnabled()` returns false and the suite
-# self-skips cleanly — this job stays green either way, it never fails PRs, and the failure-issue
-# step below only fires once real secrets are wired up and something actually breaks.
+# CANARY_RPC_URL_1 is required, _2/_3 are optional and only light up the cross-provider checks), plus
+# CANARY_RPC_URL_ROBINHOOD (canary/env.ts) for the Robinhood Chain rows — its own secret, not a
+# fourth CANARY_RPC_URL_*, because those form a same-chain provider matrix and Robinhood is a
+# different chain entirely (see the env var's own comment below). Until CANARY_RPC_URL_1 is added in
+# repo settings, `canaryEnabled()` returns false and the mainnet suite self-skips cleanly; absent
+# CANARY_RPC_URL_ROBINHOOD, `robinhoodEnabled()` does the same for the Robinhood rows independently.
+# This job stays green either way, it never fails PRs, and the failure-issue step below only fires
+# once real secrets are wired up and something actually breaks.
 
 on:
   schedule:
