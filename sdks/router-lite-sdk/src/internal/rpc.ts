@@ -68,15 +68,38 @@ const TRANSPORT_MESSAGE =
 const NODE_STATE_MESSAGE =
   /header not found|block not found|unknown block\b|missing trie node|state .{0,40}(not available|unavailable)|nonexistent block|requested block|exceeded maximum block range|query returned more than|response size/i
 
-/** viem error classes that only ever describe the transport itself. */
+/**
+ * viem error classes that only ever describe the transport itself.
+ *
+ * EVERY NAME HERE IS A REAL viem 2.47 CLASS — checked against the package, not remembered. The set
+ * used to also carry `'RequestTimeoutError'`, which viem has never exported under that name (its
+ * timeout class is plain `TimeoutError`, `errors/request.ts`); a name that matches nothing is dead
+ * weight that reads as coverage, so it is gone. The real transport-shaped classes viem 2.47 ships,
+ * for anyone extending this list later:
+ *
+ *  - `errors/request.ts`: `HttpRequestError`, `WebSocketRequestError`, `RpcRequestError`,
+ *    `SocketClosedError`, `TimeoutError`
+ *  - `errors/rpc.ts`: `LimitExceededRpcError` (-32005), `ResourceUnavailableRpcError` (-32002),
+ *    `ProviderDisconnectedError` (4900), `ChainDisconnectedError` (4901)
+ *
+ * `RpcRequestError` is deliberately ABSENT: it is the generic wrapper viem puts around *every*
+ * JSON-RPC error response, including `execution reverted` — classifying it as transport would
+ * launder every revert into "the node never answered".
+ *
+ * The two `ProviderRpcError` subclasses ARE included: EIP-1193 4900/4901 both mean the provider is
+ * not connected to a chain right now, which is the definition of a failure that says nothing about
+ * the chain. They arrive from injected/EIP-1193 transports rather than HTTP, which is the only
+ * reason they were not here before.
+ */
 const TRANSPORT_ERROR_NAMES = new Set([
   'HttpRequestError',
   'TimeoutError',
-  'RequestTimeoutError',
   'SocketClosedError',
   'WebSocketRequestError',
   'LimitExceededRpcError',
   'ResourceUnavailableRpcError',
+  'ProviderDisconnectedError',
+  'ChainDisconnectedError',
 ])
 
 /** JSON-RPC codes that report a provider limit, not an EVM outcome. `-32000` is deliberately absent:
@@ -86,10 +109,32 @@ const TRANSPORT_RPC_CODES = new Set([-32005, -32002])
 /** geth's dedicated revert code (EIP-1474-era `3`), which always accompanies real revert data. */
 const REVERT_RPC_CODE = 3
 
-type ErrorFacts = { messages: string[]; names: string[]; numericCodes: number[]; stringCodes: string[]; statuses: number[]; hasRevertData: boolean }
+type ErrorFacts = {
+  messages: string[]
+  names: string[]
+  numericCodes: number[]
+  stringCodes: string[]
+  statuses: number[]
+  /** A revert-data FIELD was present anywhere in the chain — including a zero-length `0x`, which is
+   * geth's way of saying "reverted, no reason". Evidence the node executed; see `classifyRpcError`. */
+  hasRevertData: boolean
+  /** The first NON-EMPTY revert payload found while walking. `undefined` means the revert carried no
+   * bytes at all; a bare `0x` never lands here. See {@link revertDataOf}, the only reader. */
+  revertData?: Hex
+}
 
-/** Flattens an error and its `cause` chain (viem nests 2-3 deep) into the few facts classification
- * needs. Bounded depth so a self-referential `cause` can never spin. */
+/**
+ * Flattens an error and its `cause` chain (viem nests 2-3 deep) into the few facts classification
+ * and revert-data extraction need. Bounded depth so a self-referential `cause` can never spin.
+ *
+ * THIS IS THE ONLY CAUSE-CHAIN WALKER IN THE PACKAGE, and that is the point rather than an
+ * incidental tidiness. There used to be three: this one, {@link revertDataOf}'s own copy, and a
+ * third in `verify/preflight.ts` that walked only ONE level, never stepped into geth's `data.data`,
+ * and accepted a zero-length `'0x'` as data. That third copy is why a preflight against a real geth
+ * node lost `revertData` for exactly the nested shape geth actually emits — `RankedRoute.revertData`
+ * came back empty precisely when a caller most wanted the reason bytes. One walker, one set of
+ * shape rules, and the regression test in `preflight.test.ts` pins the geth shape end to end.
+ */
 function collectFacts(err: unknown): ErrorFacts {
   const facts: ErrorFacts = { messages: [], names: [], numericCodes: [], stringCodes: [], statuses: [], hasRevertData: false }
   let node: any = err
@@ -106,9 +151,16 @@ function collectFacts(err: unknown): ErrorFacts {
     if (typeof node.code === 'string') facts.stringCodes.push(node.code)
     if (typeof node.status === 'number') facts.statuses.push(node.status)
     // Revert data can sit on the error itself or one level in as `data.data` (geth's error object).
-    if (typeof node.data === 'string' && node.data.startsWith('0x') && node.data.length > 2) facts.hasRevertData = true
-    if (node.data !== null && typeof node.data === 'object' && typeof node.data.data === 'string' && node.data.data.startsWith('0x'))
+    // Top-level is preferred when both are present, and the FIRST non-empty payload down the chain
+    // wins — the outermost wrapper is the one closest to what the node actually said.
+    if (typeof node.data === 'string' && node.data.startsWith('0x') && node.data.length > 2) {
       facts.hasRevertData = true
+      facts.revertData ??= node.data as Hex
+    }
+    if (node.data !== null && typeof node.data === 'object' && typeof node.data.data === 'string' && node.data.data.startsWith('0x')) {
+      facts.hasRevertData = true
+      if (node.data.data.length > 2) facts.revertData ??= node.data.data as Hex
+    }
     node = node.cause
   }
   return facts
@@ -159,11 +211,11 @@ export function classifyRpcError(err: unknown): RpcFailureKind {
 }
 
 /**
- * Extracts the raw revert data from a failed `eth_call`'s error shape, if any is present — walking
- * the same `cause` chain (and the same "top-level `data`, or one level in at `data.data`" shapes) as
- * {@link collectFacts}'s `hasRevertData` fact, but returning the bytes instead of a boolean.
- * `undefined` means the revert carried NO data at all (a zero-length `0x` counts as none, same as
- * `collectFacts`).
+ * Extracts the raw revert data from a failed `eth_call`'s error shape, if any is present — a thin
+ * read of {@link collectFacts}, so it walks the same `cause` chain and honours the same "top-level
+ * `data`, or one level in at `data.data`" shapes as classification does, by construction rather
+ * than by two implementations agreeing. `undefined` means the revert carried NO data at all (a
+ * zero-length `0x` counts as none).
  *
  * This is the amount-independence seam: an execution-channel revert with NO data is the pool-absent
  * shape (v2's `getReserves()` on an address with no contract there decodes nothing because there is
@@ -175,15 +227,7 @@ export function classifyRpcError(err: unknown): RpcFailureKind {
  * is allowed into the (cross-request-shared) negative cache.
  */
 export function revertDataOf(err: unknown): Hex | undefined {
-  let node: any = err
-  for (let depth = 0; node !== null && node !== undefined && depth < 8; depth++) {
-    if (typeof node === 'string') return undefined
-    if (typeof node.data === 'string' && node.data.startsWith('0x') && node.data.length > 2) return node.data as Hex
-    if (node.data !== null && typeof node.data === 'object' && typeof node.data.data === 'string' && node.data.data.startsWith('0x') && node.data.data.length > 2)
-      return node.data.data as Hex
-    node = node.cause
-  }
-  return undefined
+  return collectFacts(err).revertData
 }
 
 // ---------------------------------------------------------------------------

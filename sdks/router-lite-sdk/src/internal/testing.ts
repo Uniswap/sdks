@@ -147,6 +147,28 @@ export function connectionRefusedError(): Error {
 }
 
 /**
+ * viem's `ProviderDisconnectedError` — EIP-1193 code 4900, "disconnected from all chains".
+ *
+ * The two fixtures below only arise behind an injected/EIP-1193 transport (a wallet provider rather
+ * than an HTTP URL), which is why they were absent from `TRANSPORT_ERROR_NAMES` until now. Neither
+ * message carries a transport word and neither code is in `TRANSPORT_RPC_CODES`, so the CLASS NAME
+ * is the entire signal: without the name in the set, both classify `execution` and a disconnected
+ * wallet provider reports every candidate as an on-chain refusal.
+ */
+export function providerDisconnectedError(): Error {
+  const err = new Error('The Provider is disconnected from all chains.\n\nVersion: viem@2.47.2')
+  err.name = 'ProviderDisconnectedError'
+  return Object.assign(err, { code: 4900, shortMessage: 'The Provider is disconnected from all chains.' })
+}
+
+/** viem's `ChainDisconnectedError` — EIP-1193 code 4901. See {@link providerDisconnectedError}. */
+export function chainDisconnectedError(): Error {
+  const err = new Error('The Provider is not connected to the requested chain.\n\nVersion: viem@2.47.2')
+  err.name = 'ChainDisconnectedError'
+  return Object.assign(err, { code: 4901, shortMessage: 'The Provider is not connected to the requested chain.' })
+}
+
+/**
  * The `ReasonCode`s legal on an `inconclusive` result (C4-P5, F5) — the mirror image of `no-route`'s
  * whitelist (`no-viable-route`/`no-route-verified`) below: those two claim the search COMPLETED,
  * which directly contradicts every incompleteness axis `inconclusive` requires, so they may never
