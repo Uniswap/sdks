@@ -1,0 +1,160 @@
+// ---------------------------------------------------------------------------
+// `rl discover <token>` — what pools does the SDK actually see for a token?
+//
+// Mechanism: the CLI always injects its own `PoolIndex` into the router
+// (`context.ts`), so this command runs one full bounded search (token → a
+// counterparty, `focusToken` pinned to the token so the adjacency wave scans
+// ITS neighborhood) and then reads the index back: every pool discovery
+// proved, probed, or was hinted into existence, per protocol, with each
+// pool's provenance (`event`/`factory`/`hint`) and quote history — including
+// hints the chain has discredited. This answers the question a `no-route`
+// alone can't: "is my pool invisible, or visible and failing?"
+// ---------------------------------------------------------------------------
+
+import type { CurrencyRef, PoolRecord, Protocol, QuoteResult } from '../../src/index'
+// `isDiscredited` and the `PROTOCOLS` value are internal (not on the public/experimental surface);
+// imported by relative path — the same escape hatch `canary/simulate.ts` documents — rather than
+// re-deriving the discredit rule here and drifting.
+import { isDiscredited } from '../../src/pools/poolIndex'
+import { PROTOCOLS } from '../../src/types'
+import { bold, cyan, dim, green, red, shortHex, yellow } from '../ansi'
+import { parseArgs, UsageError } from '../args'
+import { describePool, jsonify, renderSearchReport, viewKey, type RenderCtx, type TokenView } from '../report'
+import { fetchTokenMeta, resolveToken, type ResolvedToken } from '../tokens'
+
+import { buildChainContext, COMMON_FLAGS, type ChainContext } from './context'
+
+const DISCOVER_FLAGS = {
+  ...COMMON_FLAGS,
+  via: { kind: 'string' as const },
+}
+
+export async function cmdDiscover(argv: string[]): Promise<number> {
+  const parsed = parseArgs(argv, DISCOVER_FLAGS)
+  const [tokenArg] = parsed.positionals
+  if (!tokenArg) throw new UsageError('expected: <token> — e.g. `rl discover 0xTOKEN --chain base`')
+
+  const ctx = buildChainContext(parsed)
+  const token = await resolveToken(ctx.client, ctx.chain.manifest, tokenArg)
+  const via = await resolveCounterparty(ctx, token, parsed.strings.get('via'))
+  const json = parsed.booleans.has('json')
+
+  // One unit of the token is enough to drive discovery; the amount only shapes quotes, not coverage.
+  const request = {
+    tokenIn: token.ref,
+    tokenOut: via.ref,
+    amountIn: 10n ** BigInt(token.decimals),
+    focusToken: token.ref,
+    ...(ctx.signal ? { signal: ctx.signal } : {}),
+  }
+
+  let final: QuoteResult | undefined
+  for await (const result of ctx.router.quotes(request)) {
+    final = result
+    if (!json && parsed.booleans.has('verbose')) {
+      const q = result.search.quoting
+      console.log(dim(`wave: ${q.succeeded}/${q.attempted} quotes ok, ${ctx.index.stats().pools} pools indexed`))
+    }
+  }
+
+  const neighbors = ctx.index.neighbors(token.ref)
+  const records = [...neighbors.values()].flat()
+  const byProtocol = new Map<Protocol, PoolRecord[]>()
+  for (const p of PROTOCOLS) byProtocol.set(p, [])
+  for (const rec of records) byProtocol.get(rec.pool.protocol)!.push(rec)
+
+  if (json) {
+    console.log(
+      jsonify({
+        token: { ref: token.ref, symbol: token.symbol },
+        counterparty: { ref: via.ref, symbol: via.symbol },
+        pools: records.map((rec) => ({ ...rec, discredited: isDiscredited(rec) })),
+        stats: ctx.router.stats(),
+        search: final?.search,
+      }),
+    )
+    return 0
+  }
+
+  const renderCtx = await counterpartyViews(ctx, token, records)
+  console.log(bold(`pools seen for ${token.symbol} on ${ctx.chain.label} (${records.length} total)`))
+  for (const p of PROTOCOLS) {
+    const recs = byProtocol.get(p)!
+    console.log(`  ${bold(p)} ${dim(`(${recs.length})`)}`)
+    const shown = recs.slice(0, 50)
+    for (const rec of shown) console.log(`    ${renderRecord(rec, token, renderCtx)}`)
+    if (recs.length > shown.length) console.log(dim(`    … and ${recs.length - shown.length} more`))
+  }
+
+  const stats = ctx.router.stats()
+  console.log('')
+  console.log(dim(`index: ${stats.pools} pools · ${stats.adjacencyEdges} adjacency edges · ${stats.coverageScopes} coverage scopes`))
+  if (final) {
+    console.log('')
+    console.log(renderSearchReport(final.search).join('\n'))
+  }
+  return 0
+}
+
+/** `--via`, or the first core intermediate outside the token's own family. */
+async function resolveCounterparty(ctx: ChainContext, token: ResolvedToken, viaArg: string | undefined): Promise<ResolvedToken> {
+  if (viaArg) {
+    const via = await resolveToken(ctx.client, ctx.chain.manifest, viaArg)
+    if (sameFamily(ctx, via.ref, token.ref)) throw new UsageError(`--via ${viaArg} is the same currency family as the token`)
+    return via
+  }
+  if (!sameFamily(ctx, token.ref, 'native')) return { ref: 'native', symbol: 'ETH', decimals: 18 }
+  for (const addr of ctx.chain.manifest.coreIntermediates ?? []) {
+    if (!sameFamily(ctx, addr, 'native')) return fetchTokenMeta(ctx.client, ctx.chain.chainId, addr)
+  }
+  throw new UsageError('no default counterparty for the native family on this chain — pass --via <token>')
+}
+
+/** Native/wrapped-native are one graph family — mirror that here so discover never routes a token
+ * "against itself" and never mislabels a WETH pool as a counterparty of ETH. */
+function sameFamily(ctx: ChainContext, a: CurrencyRef, b: CurrencyRef): boolean {
+  const wrapped = ctx.chain.manifest.wrappedNative.toLowerCase()
+  const norm = (ref: CurrencyRef): string => (ref === 'native' || ref.toLowerCase() === wrapped ? 'native' : ref.toLowerCase())
+  return norm(a) === norm(b)
+}
+
+/** Best-effort symbols for the counterparty side of every pool (bounded fetch, addresses beyond it). */
+async function counterpartyViews(ctx: ChainContext, token: ResolvedToken, records: PoolRecord[]): Promise<RenderCtx> {
+  const views = new Map<string, TokenView>()
+  views.set('native', { symbol: 'ETH', decimals: 18 })
+  views.set(viewKey(token.ref), { symbol: token.symbol, decimals: token.decimals })
+  const unknown = new Set<string>()
+  for (const rec of records) {
+    const other = counterpartOf(ctx, rec, token)
+    if (other !== 'native' && !views.has(other.toLowerCase())) unknown.add(other)
+  }
+  const targets = [...unknown].slice(0, 40) as `0x${string}`[]
+  const metas = await Promise.allSettled(targets.map((addr) => fetchTokenMeta(ctx.client, ctx.chain.chainId, addr)))
+  for (const meta of metas) {
+    if (meta.status !== 'fulfilled' || meta.value.ref === 'native') continue
+    views.set(viewKey(meta.value.ref), { symbol: meta.value.symbol, decimals: meta.value.decimals })
+  }
+  return { views }
+}
+
+function counterpartOf(ctx: ChainContext, rec: PoolRecord, token: ResolvedToken): CurrencyRef {
+  const [a, b] = rec.pool.currencies
+  return sameFamily(ctx, a, token.ref) ? b : a
+}
+
+function renderRecord(rec: PoolRecord, token: ResolvedToken, renderCtx: RenderCtx): string {
+  const other = rec.pool.currencies.find((c) => viewKey(c) !== viewKey(token.ref)) ?? rec.pool.currencies[0]
+  const otherView = renderCtx.views.get(viewKey(other))
+  const counterpart = otherView?.symbol ?? (other === 'native' ? 'native' : shortHex(other))
+  const provenance = rec.source === 'hint' ? cyan('hint') : dim(rec.source)
+  const created = rec.createdAtBlock !== undefined ? dim(`created #${rec.createdAtBlock}`) : ''
+  const quoteMark =
+    rec.lastQuoteSuccessBlock !== undefined
+      ? green(`✔ quoted #${rec.lastQuoteSuccessBlock}`)
+      : isDiscredited(rec)
+        ? red(`✖ discredited (${rec.quoteFailureBlocks} failed blocks)`)
+        : (rec.quoteFailureBlocks ?? 0) > 0
+          ? yellow(`${rec.quoteFailureBlocks} failed block(s)`)
+          : dim('never quoted')
+  return [describePool(rec.pool), `↔ ${counterpart}`, provenance, created, quoteMark].filter(Boolean).join('  ')
+}

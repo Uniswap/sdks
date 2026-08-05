@@ -117,6 +117,21 @@
         "typescript": "npm:typescript@^5.6.2",
       },
     },
+    "sdks/router-lite-sdk/cli": {
+      "name": "@uniswap/router-lite-sdk-cli",
+      "version": "0.0.0",
+      "bin": {
+        "rl": "./rl.ts",
+      },
+      "dependencies": {
+        "@uniswap/router-lite-sdk": "workspace:*",
+        "viem": "^2.23.5",
+      },
+      "devDependencies": {
+        "@types/node": "^18.7.16",
+        "typescript": "npm:typescript@^5.6.2",
+      },
+    },
     "sdks/router-lite-sdk/integration": {
       "name": "@uniswap/router-lite-sdk-integration",
       "version": "0.0.0",
@@ -987,6 +1002,8 @@
     "@uniswap/router-lite-sdk": ["@uniswap/router-lite-sdk@workspace:sdks/router-lite-sdk"],
 
     "@uniswap/router-lite-sdk-canary": ["@uniswap/router-lite-sdk-canary@workspace:sdks/router-lite-sdk/canary"],
+
+    "@uniswap/router-lite-sdk-cli": ["@uniswap/router-lite-sdk-cli@workspace:sdks/router-lite-sdk/cli"],
 
     "@uniswap/router-lite-sdk-integration": ["@uniswap/router-lite-sdk-integration@workspace:sdks/router-lite-sdk/integration"],
 

@@ -31,9 +31,11 @@
     "typecheck:tests": "tsc -p tsconfig.test.json --noEmit",
     "typecheck:integration": "tsc -p integration/tsconfig.json",
     "typecheck:canary": "tsc -p canary/tsconfig.json",
-    "typecheck:all": "bun run typecheck && bun run typecheck:tests && bun run typecheck:integration && bun run typecheck:canary",
+    "typecheck:cli": "tsc -p cli/tsconfig.json",
+    "typecheck:all": "bun run typecheck && bun run typecheck:tests && bun run typecheck:integration && bun run typecheck:canary && bun run typecheck:cli",
     "release": "changeset publish",
-    "lint": "eslint src --ext .ts",
+    "cli": "bun cli/rl.ts",
+    "lint": "eslint src cli --ext .ts",
     "test": "bun test"
   },
   "exports": {

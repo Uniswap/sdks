@@ -1,0 +1,22 @@
+{
+  "name": "@uniswap/router-lite-sdk-cli",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Local-testing CLI for @uniswap/router-lite-sdk (dev tool; runs the SDK straight from src/ via bun, no build step)",
+  "bin": {
+    "rl": "./rl.ts"
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "author": "Uniswap",
+  "dependencies": {
+    "@uniswap/router-lite-sdk": "workspace:*",
+    "viem": "^2.23.5"
+  },
+  "devDependencies": {
+    "@types/node": "^18.7.16",
+    "typescript": "npm:typescript@^5.6.2"
+  }
+}

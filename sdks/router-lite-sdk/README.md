@@ -516,3 +516,16 @@ ordinary EVM fork shares. Chains whose CREATE2 derivation differs (zkSync-class 
 different preimage) must state their own: without it, every locally-derived pool address points at
 empty space, every speculative probe reverts, and the search reports a confident `no-route` that
 looks exactly like a pair with no liquidity.
+
+## Development
+
+Three private workspaces sit beside `src/`, none of them published:
+
+- **`integration/`** — anvil-fork integration suite (opt-in via `ROUTER_LITE_FORK=1`).
+- **`canary/`** — live-RPC nightly canary over `eth_simulateV1` (opt-in via `ROUTER_LITE_CANARY=1`).
+- **`cli/`** — a local-testing CLI (`bun cli/rl.ts quote eth usdc 1`, or `bun run cli -- …`) that
+  runs the SDK straight from `src/` with no build step: quotes, swaps (with an `eth_simulateV1`
+  execution proof), per-token pool discovery dumps, and a readable rendering of every result's
+  `SearchReport`. See `cli/README.md` for the tour.
+
+`bun run typecheck:all` typechecks the package and all three; `bun run lint` covers `src` and `cli`.
