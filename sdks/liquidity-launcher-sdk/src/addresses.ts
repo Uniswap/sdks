@@ -270,8 +270,7 @@ export function getTickDataLensForFactory(factoryAddress: string): Address | und
 // immutable at construction.
 //
 // Five strategy generations are registered (append-only — indexed launches permanently reference
-// the strategy that created them; see {@link INSTANT_LAUNCH_DEPLOYMENTS}), all identical strategy
-// logic — the generations differ only in constructor immutables:
+// the strategy that created them; see {@link INSTANT_LAUNCH_DEPLOYMENTS}):
 //  - c3f9506 pair (2026-07-29): OZ notes/L-04 round + the 1e20 compounding floor; still carries
 //    the OZ H01 fix flooring launch positions at tick -208,980. Has indexed launches, so it stays.
 //  - 8e40a35 pair (2026-07-30): caps the instant-launch initial tick at 251,340 — a deploy-script/
@@ -286,15 +285,19 @@ export function getTickDataLensForFactory(factoryAddress: string): Address | und
 //    the c3f9506 splitters and vault.
 //  - 2026-08-05 full-redeploy pair (current): the whole 4663 stack was redeployed the same day —
 //    launcher (re-mined `0x0000FffF…`), strategies, both FeeSplitters, UERC20BeneficiaryVault,
-//    CompoundingClaimRecipient, TokenSplitter and UniversalRouterStrategy. Same strategy logic,
-//    re-pinned to the final LIQUIDITY_LAUNCHER_ROBINHOOD.
+//    CompoundingClaimRecipient, TokenSplitter and UniversalRouterStrategy. NOT a pure re-pin,
+//    unlike v3.1.1: the strategy was recompiled with a new pool shape — TICK_SPACING 60 → 25,
+//    initialTick 198,060 → 198,050, MIN_LAUNCH_TICK -208,980 → -160,100 (all read back from the
+//    deployed contracts' getters, 2026-08-05).
 //
 // The v3.1.0 dev pair (`0xF0C0a0f3…` / `0x3fe607E7…`) that shipped in 1.6.0 is **removed rather than
 // retained**: it was mis-pinned to the previous launcher, was never launched against, and therefore
 // has no indexed launches for the append-only rule to protect. Every generation that does have
 // indexed launches is still registered below.
 //
-// Every generation opens pools at initialTick 198,060.
+// Every generation up to and including v3.1.1 opens pools at initialTick 198,060 (spacing 60); the
+// 2026-08-05 full-redeploy pair opens at 198,050 (spacing 25). Pools are permanent, so BOTH pool
+// shapes trade forever — see the per-entry `tickSpacing` / `initialTick` / `minLaunchTick` fields.
 const INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_C3F9506 = getAddress('0x60D73b21cDf2EA846ab3d58699BBbb8F29d72491')
 const INSTANT_LAUNCH_STRATEGY_FEES_OFF_ROBINHOOD_C3F9506 = getAddress('0xFCe92C70f1fc017b72f6DD7a00D9E38725C7fBd1')
 const INSTANT_LAUNCH_STRATEGY_FEES_ON_ROBINHOOD_8E40A35 = getAddress('0xcE57498D3474DCC244dFb6710fFbE6D4441cD2b2')
@@ -360,8 +363,20 @@ export interface InstantLaunchDeployment {
   creatorFeeNativeBps: number
   /** Share of each `FeesCollected` **token** amount forwarded to the vault, in bps (0 on every current deploy). */
   creatorFeeTokenBps: number
+  /**
+   * The strategy's compile-time pool tick spacing (`TICK_SPACING`) — the spacing every pool this
+   * generation minted has forever. 25 on the 2026-08-05 full-redeploy pair, 60 on every earlier
+   * generation.
+   */
+  tickSpacing: number
   /** The strategy's immutable `initialTick` — the aligned tick the launch pool opens at. */
   initialTick: number
+  /**
+   * The strategy's compile-time lower tick of every launch position (`MIN_LAUNCH_TICK`).
+   * -160,100 on the 2026-08-05 full-redeploy pair, -208,980 (the OZ H01 floor) on every earlier
+   * generation.
+   */
+  minLaunchTick: number
   /** Human-readable deployment tag (not an on-chain value). */
   description: string
   /** Block the strategy was deployed at, when recorded (indexer start height). */
@@ -403,7 +418,9 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
     creatorFeesEnabled: true,
     creatorFeeNativeBps: 4000,
     creatorFeeTokenBps: 0,
+    tickSpacing: 60,
     initialTick: 198060,
+    minLaunchTick: -208980,
     description:
       'Instant Launch with creator fees (2026-07-29, liquidity-launcher c3f9506): splitter forwards 40% of native fees to the UERC20BeneficiaryVault, 60% native + 100% token to the CompoundingClaimRecipient',
   },
@@ -414,7 +431,9 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
     creatorFeesEnabled: false,
     creatorFeeNativeBps: 0,
     creatorFeeTokenBps: 0,
+    tickSpacing: 60,
     initialTick: 198060,
+    minLaunchTick: -208980,
     description:
       'Instant Launch without creator fees (2026-07-29, liquidity-launcher c3f9506): zero beneficiary vault; splitter forwards 100% of both fee sides to the CompoundingClaimRecipient',
   },
@@ -425,7 +444,9 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
     creatorFeesEnabled: true,
     creatorFeeNativeBps: 4000,
     creatorFeeTokenBps: 0,
+    tickSpacing: 60,
     initialTick: 198060,
+    minLaunchTick: -208980,
     description:
       'Instant Launch with creator fees (2026-07-30, liquidity-launcher 8e40a35 — initial-tick cap): same c3f9506 FeeSplitter; splitter forwards 40% of native fees to the UERC20BeneficiaryVault, 60% native + 100% token to the CompoundingClaimRecipient',
   },
@@ -436,7 +457,9 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
     creatorFeesEnabled: false,
     creatorFeeNativeBps: 0,
     creatorFeeTokenBps: 0,
+    tickSpacing: 60,
     initialTick: 198060,
+    minLaunchTick: -208980,
     description:
       'Instant Launch without creator fees (2026-07-30, liquidity-launcher 8e40a35 — initial-tick cap): zero beneficiary vault; same c3f9506 FeeSplitter forwarding 100% of both fee sides to the CompoundingClaimRecipient',
   },
@@ -447,7 +470,9 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
     creatorFeesEnabled: true,
     creatorFeeNativeBps: 4000,
     creatorFeeTokenBps: 0,
+    tickSpacing: 60,
     initialTick: 198060,
+    minLaunchTick: -208980,
     description:
       'Instant Launch with creator fees (2026-07-30, liquidity-launcher 3e05da8): same c3f9506 FeeSplitter; splitter forwards 40% of native fees to the UERC20BeneficiaryVault, 60% native + 100% token to the CompoundingClaimRecipient',
   },
@@ -458,7 +483,9 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
     creatorFeesEnabled: false,
     creatorFeeNativeBps: 0,
     creatorFeeTokenBps: 0,
+    tickSpacing: 60,
     initialTick: 198060,
+    minLaunchTick: -208980,
     description:
       'Instant Launch without creator fees (2026-07-30, liquidity-launcher 3e05da8): zero beneficiary vault; same c3f9506 FeeSplitter forwarding 100% of both fee sides to the CompoundingClaimRecipient',
   },
@@ -469,7 +496,9 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
     creatorFeesEnabled: true,
     creatorFeeNativeBps: 4000,
     creatorFeeTokenBps: 0,
+    tickSpacing: 60,
     initialTick: 198060,
+    minLaunchTick: -208980,
     description:
       'Instant Launch with creator fees (2026-08-05, liquidity-launcher v3.1.1): unchanged 3e05da8 logic re-pinned to the interim v3.1.1 LiquidityLauncher; own FeeSplitter forwarding 40% of native fees to the v3.1.1 UERC20BeneficiaryVault, 60% native + 100% token to the CompoundingClaimRecipient',
   },
@@ -480,7 +509,9 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
     creatorFeesEnabled: false,
     creatorFeeNativeBps: 0,
     creatorFeeTokenBps: 0,
+    tickSpacing: 60,
     initialTick: 198060,
+    minLaunchTick: -208980,
     description:
       'Instant Launch without creator fees (2026-08-05, liquidity-launcher v3.1.1): unchanged 3e05da8 logic re-pinned to the interim v3.1.1 LiquidityLauncher; zero beneficiary vault; same c3f9506 FeeSplitter forwarding 100% of both fee sides to the CompoundingClaimRecipient',
   },
@@ -491,9 +522,11 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
     creatorFeesEnabled: true,
     creatorFeeNativeBps: 4000,
     creatorFeeTokenBps: 0,
-    initialTick: 198060,
+    tickSpacing: 25,
+    initialTick: 198050,
+    minLaunchTick: -160100,
     description:
-      'Instant Launch with creator fees (2026-08-05, full 4663 stack redeploy, current): unchanged strategy logic re-pinned to the final re-mined LiquidityLauncher; new FeeSplitter forwarding 40% of native fees to the new UERC20BeneficiaryVault, 60% native + 100% token to the new CompoundingClaimRecipient',
+      'Instant Launch with creator fees (2026-08-05, full 4663 stack redeploy, current): recompiled with the new pool shape (TICK_SPACING 25, initialTick 198,050, MIN_LAUNCH_TICK -160,100) and pinned to the final re-mined LiquidityLauncher; new FeeSplitter forwarding 40% of native fees to the new UERC20BeneficiaryVault, 60% native + 100% token to the new CompoundingClaimRecipient',
   },
   {
     chainId: SupportedChainId.ROBINHOOD,
@@ -502,9 +535,11 @@ export const INSTANT_LAUNCH_DEPLOYMENTS: readonly InstantLaunchDeployment[] = [
     creatorFeesEnabled: false,
     creatorFeeNativeBps: 0,
     creatorFeeTokenBps: 0,
-    initialTick: 198060,
+    tickSpacing: 25,
+    initialTick: 198050,
+    minLaunchTick: -160100,
     description:
-      'Instant Launch without creator fees (2026-08-05, full 4663 stack redeploy, current): unchanged strategy logic re-pinned to the final re-mined LiquidityLauncher; zero beneficiary vault; new FeeSplitter forwarding 100% of both fee sides to the new CompoundingClaimRecipient',
+      'Instant Launch without creator fees (2026-08-05, full 4663 stack redeploy, current): recompiled with the new pool shape (TICK_SPACING 25, initialTick 198,050, MIN_LAUNCH_TICK -160,100) and pinned to the final re-mined LiquidityLauncher; zero beneficiary vault; new FeeSplitter forwarding 100% of both fee sides to the new CompoundingClaimRecipient',
   },
 ]
 

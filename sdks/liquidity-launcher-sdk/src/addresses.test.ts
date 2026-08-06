@@ -149,7 +149,12 @@ const FEES_OFF_SPLITTER_C3F9506 = '0xDF50f4ea2207F9D2A753a3DaE729B36FDEF13b23'
 const FEES_OFF_SPLITTER_20260805 = '0x222D6d4f1ce59b0d48D5505114eC8Addc90A4359'
 
 // The five canonical Robinhood strategy generations from the liquidity-launcher dev README, in
-// registry (append) order. Every generation opens at initialTick 198,060.
+// registry (append) order. Pool shape is per-generation: every generation up to and including
+// v3.1.1 is (spacing 60, initialTick 198,060, minLaunchTick -208,980); the 2026-08-05 full-redeploy
+// pair was recompiled to (25, 198,050, -160,100) — all values read back on-chain from the deployed
+// strategies' getters (2026-08-05).
+const LEGACY_POOL_SHAPE = { tickSpacing: 60, initialTick: 198060, minLaunchTick: -208980 } as const
+const REDEPLOY_POOL_SHAPE = { tickSpacing: 25, initialTick: 198050, minLaunchTick: -160100 } as const
 const ROBINHOOD_STRATEGY_GENERATIONS = [
   // c3f9506 (2026-07-29)
   {
@@ -157,6 +162,7 @@ const ROBINHOOD_STRATEGY_GENERATIONS = [
     off: '0xFCe92C70f1fc017b72f6DD7a00D9E38725C7fBd1',
     onSplitter: FEES_ON_SPLITTER_C3F9506,
     offSplitter: FEES_OFF_SPLITTER_C3F9506,
+    poolShape: LEGACY_POOL_SHAPE,
   },
   // 8e40a35 (2026-07-30, initial-tick cap)
   {
@@ -164,6 +170,7 @@ const ROBINHOOD_STRATEGY_GENERATIONS = [
     off: '0x583a7903152b95831e82ffF534448Dee081754ec',
     onSplitter: FEES_ON_SPLITTER_C3F9506,
     offSplitter: FEES_OFF_SPLITTER_C3F9506,
+    poolShape: LEGACY_POOL_SHAPE,
   },
   // 3e05da8 (2026-07-30)
   {
@@ -171,6 +178,7 @@ const ROBINHOOD_STRATEGY_GENERATIONS = [
     off: '0x16b63f1c8415FD68591c31FB3c6796a333DD640C',
     onSplitter: FEES_ON_SPLITTER_C3F9506,
     offSplitter: FEES_OFF_SPLITTER_C3F9506,
+    poolShape: LEGACY_POOL_SHAPE,
   },
   // v3.1.1 launcher redeploy (2026-08-05) — new strategy pair AND a new fees-on splitter
   {
@@ -178,13 +186,16 @@ const ROBINHOOD_STRATEGY_GENERATIONS = [
     off: '0x36bdB859518C89F764337cd5C24762d2Aa650f3C',
     onSplitter: FEES_ON_SPLITTER_V311,
     offSplitter: FEES_OFF_SPLITTER_C3F9506,
+    poolShape: LEGACY_POOL_SHAPE,
   },
-  // 2026-08-05 full 4663 stack redeploy (current) — new strategies and new splitters on both sides
+  // 2026-08-05 full 4663 stack redeploy (current) — new strategies, new splitters on both sides,
+  // and a recompiled pool shape (TICK_SPACING 25, initialTick 198,050, MIN_LAUNCH_TICK -160,100)
   {
     on: '0x23f8209572b4a1C2AD88A42749E830791Fb027f1',
     off: '0xAD44D55E7f8337C3cE113fBb591486E85be104b2',
     onSplitter: FEES_ON_SPLITTER_20260805,
     offSplitter: FEES_OFF_SPLITTER_20260805,
+    poolShape: REDEPLOY_POOL_SHAPE,
   },
 ] as const
 
@@ -205,9 +216,12 @@ describe('Instant Launch deployment registry', () => {
       expect(off!.creatorFeesEnabled).toBe(false)
       expect(off!.creatorFeeNativeBps).toBe(0)
       expect(off!.creatorFeeTokenBps).toBe(0)
-      // Every generation opens at the same immutable initial tick.
-      expect(on!.initialTick).toBe(198060)
-      expect(off!.initialTick).toBe(198060)
+      // Pool shape is per-generation (the 2026-08-05 redeploy recompiled all three values).
+      for (const variant of [on!, off!]) {
+        expect(variant.tickSpacing).toBe(generation.poolShape.tickSpacing)
+        expect(variant.initialTick).toBe(generation.poolShape.initialTick)
+        expect(variant.minLaunchTick).toBe(generation.poolShape.minLaunchTick)
+      }
     })
   })
 
