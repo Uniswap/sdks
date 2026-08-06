@@ -12,17 +12,12 @@
 //    every wave, including the ones that only improve the answer.
 // ---------------------------------------------------------------------------
 
-import type { QuoteRequest, QuoteResult } from '../../src/index'
+import type { QuoteRequest } from '../../src/index'
 import { parseArgs } from '../args'
-import {
-  exitCodeFor,
-  jsonify,
-  renderQuoteResult,
-  renderWaveLine,
-  type TradeContext,
-} from '../report'
+import { exitCodeFor, jsonify, renderQuoteResult, type TradeContext } from '../report'
+import { iterateWaves } from '../waves'
 
-import { buildChainContext, hydrateLegSymbols, resolveTrade, TRADE_FLAGS, type ChainContext } from './context'
+import { buildChainContext, hydrateLegSymbols, resolveTrade, TRADE_FLAGS } from './context'
 
 
 export async function cmdQuote(argv: string[]): Promise<number> {
@@ -56,7 +51,14 @@ export async function cmdQuote(argv: string[]): Promise<number> {
     return exitCodeFor(result.status)
   }
 
-  const final = await iterateWaves(ctx, request, tradeCtx, trade.renderCtx, { json, stopAtActionable: !watch, started })
+  const final = await iterateWaves(ctx.router.quotes(request), tradeCtx, trade.renderCtx, {
+    json,
+    started,
+    // `--watch` drains the whole bounded search; `--verbose` alone stops at the first actionable
+    // wave, which for a quote is any result carrying a leader.
+    stopAt: (result) => !watch && result.status === 'quote',
+    hydrate: (routes) => hydrateLegSymbols(ctx, trade.renderCtx, routes),
+  })
   if (!final) return 2
   if (!json) {
     await hydrateLegSymbols(ctx, trade.renderCtx, [...('best' in final && final.best ? [final.best] : []), ...final.alternatives])
@@ -64,32 +66,4 @@ export async function cmdQuote(argv: string[]): Promise<number> {
     console.log(renderQuoteResult(final, tradeCtx, trade.renderCtx, Date.now() - started).join('\n'))
   }
   return exitCodeFor(final.status)
-}
-
-/** Streams one line (or NDJSON object) per wave; returns the last result the iterator yielded. */
-async function iterateWaves(
-  ctx: ChainContext,
-  request: QuoteRequest,
-  tradeCtx: TradeContext,
-  renderCtx: Parameters<typeof renderWaveLine>[4],
-  opts: { json: boolean; stopAtActionable: boolean; started: number },
-): Promise<QuoteResult | undefined> {
-  let wave = 0
-  let previousBest: bigint | undefined
-  let final: QuoteResult | undefined
-  for await (const result of ctx.router.quotes(request)) {
-    wave++
-    final = result
-    const elapsed = Date.now() - opts.started
-    if (opts.json) {
-      console.log(jsonify({ wave, elapsedMs: elapsed, result }, false))
-    } else {
-      const best = 'best' in result && result.best ? [result.best] : []
-      await hydrateLegSymbols(ctx, renderCtx, best)
-      console.log(renderWaveLine(wave, elapsed, result, tradeCtx, renderCtx, previousBest))
-    }
-    if ('best' in result && result.best) previousBest = result.best.quote.amountOut
-    if (opts.stopAtActionable && result.status === 'quote') break
-  }
-  return final
 }

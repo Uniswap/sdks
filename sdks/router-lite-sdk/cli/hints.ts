@@ -15,16 +15,13 @@
 // v2/v3 pool can only hold the wrapped form), address(0) for v4.
 // ---------------------------------------------------------------------------
 
-import { zeroAddress, type Address, type Hex } from 'viem'
+import { isAddress, zeroAddress, type Address, type Hex } from 'viem'
 
 import type { CurrencyRef, PoolHint } from '../src/index'
+import { sortAddresses } from '../src/internal/currency'
 
 import { UsageError } from './args'
 
-
-function isAddress(s: string): s is Address {
-  return /^0x[0-9a-fA-F]{40}$/.test(s)
-}
 
 function isHex(s: string): s is Hex {
   return /^0x([0-9a-fA-F]{2})*$/.test(s)
@@ -34,10 +31,6 @@ function isHex(s: string): s is Hex {
 function concrete(ref: CurrencyRef, protocol: 'v2' | 'v3' | 'v4', wrappedNative: Address): Address {
   if (ref !== 'native') return ref
   return protocol === 'v4' ? zeroAddress : wrappedNative
-}
-
-function sortPair(a: Address, b: Address): [Address, Address] {
-  return a.toLowerCase() < b.toLowerCase() ? [a, b] : [b, a]
 }
 
 function parsePositiveInt(text: string, what: string, spec: string): number {
@@ -60,7 +53,7 @@ export function parseHint(spec: string, tokenIn: CurrencyRef, tokenOut: Currency
   if (protocol === 'v2') {
     if (params !== undefined) throw new UsageError(`bad --hint '${spec}': v2 takes no fee (a pair has exactly one pool)`)
     if (hookData !== undefined) throw new UsageError(`bad --hint '${spec}': hookData is v4-only`)
-    const [token0, token1] = sortPair(concrete(tokenIn, 'v2', wrappedNative), concrete(tokenOut, 'v2', wrappedNative))
+    const [token0, token1] = sortAddresses(concrete(tokenIn, 'v2', wrappedNative), concrete(tokenOut, 'v2', wrappedNative))
     return { protocol: 'v2', token0, token1 }
   }
 
@@ -68,7 +61,7 @@ export function parseHint(spec: string, tokenIn: CurrencyRef, tokenOut: Currency
     if (params === undefined) throw new UsageError(`bad --hint '${spec}': v3 needs a fee, e.g. v3@500`)
     if (hookData !== undefined) throw new UsageError(`bad --hint '${spec}': hookData is v4-only`)
     const fee = parsePositiveInt(params, 'fee', spec)
-    const [token0, token1] = sortPair(concrete(tokenIn, 'v3', wrappedNative), concrete(tokenOut, 'v3', wrappedNative))
+    const [token0, token1] = sortAddresses(concrete(tokenIn, 'v3', wrappedNative), concrete(tokenOut, 'v3', wrappedNative))
     return { protocol: 'v3', token0, token1, fee }
   }
 
@@ -81,8 +74,8 @@ export function parseHint(spec: string, tokenIn: CurrencyRef, tokenOut: Currency
     const fee = parsePositiveInt(parts[0]!, 'fee', spec)
     const tickSpacing = parsePositiveInt(parts[1]!, 'tickSpacing', spec)
     const hooks = parts[2] ?? zeroAddress
-    if (!isAddress(hooks)) throw new UsageError(`bad --hint '${spec}': hooks '${hooks}' is not an address`)
-    const [currency0, currency1] = sortPair(concrete(tokenIn, 'v4', wrappedNative), concrete(tokenOut, 'v4', wrappedNative))
+    if (!isAddress(hooks, { strict: false })) throw new UsageError(`bad --hint '${spec}': hooks '${hooks}' is not an address`)
+    const [currency0, currency1] = sortAddresses(concrete(tokenIn, 'v4', wrappedNative), concrete(tokenOut, 'v4', wrappedNative))
     const hint: PoolHint = { protocol: 'v4', poolKey: { currency0, currency1, fee, tickSpacing, hooks } }
     return hookData !== undefined ? { ...hint, hookData } : hint
   }

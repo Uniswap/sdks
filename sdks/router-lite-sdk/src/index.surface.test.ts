@@ -4,6 +4,7 @@ import {
   ARBITRUM_MANIFEST,
   BASE_MANIFEST,
   MAINNET_MANIFEST,
+  PROTOCOLS,
   REASON_CODES,
   ROBINHOOD_MANIFEST,
   RouterConfigError,
@@ -12,7 +13,7 @@ import {
   createRouter,
   manifestFor,
 } from './index'
-import type { ReasonCode } from './index'
+import type { Protocol, ReasonCode } from './index'
 
 // ---------------------------------------------------------------------------
 // Compile-time + minimal-execution guard that every VALUE export of the package root
@@ -42,6 +43,18 @@ test('REASON_CODES is a real, importable, iterable value — not just the Reason
   // the value and the type it's drawn from stay in sync from the caller's point of view.
   const code: ReasonCode = REASON_CODES[0]!
   expect(typeof code).toBe('string')
+})
+
+test('PROTOCOLS is a real, importable, iterable value — not just the Protocol type', () => {
+  // Same guard as `REASON_CODES` above, for the same reason: a caller iterating the closed set (a
+  // per-protocol table, a `Record<Protocol, …>` builder) has no other way to reach it, and the
+  // demotion to `export type` that would break them is invisible to `tsc` everywhere else.
+  expect(Array.isArray(PROTOCOLS)).toBe(true)
+  expect([...PROTOCOLS]).toEqual(['v2', 'v3', 'v4'])
+  // Every key of `SearchReport.discovery` is drawn from exactly this set — the property the CLI's
+  // coverage panel relies on when it walks `PROTOCOLS` to index into the report.
+  const p: Protocol = PROTOCOLS[0]!
+  expect(typeof p).toBe('string')
 })
 
 test('createRouter, manifestFor, and the built-in manifests are reachable and callable from the package root', () => {

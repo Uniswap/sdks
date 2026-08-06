@@ -6,9 +6,7 @@
 // `ETH_RPC_URL=…`) and the chain is detected from the endpoint at run time.
 // ---------------------------------------------------------------------------
 
-import { manifestFor } from '../../src/index'
-// `PROTOCOLS` (the value) is not on the public surface — only the `Protocol` type is.
-import { PROTOCOLS } from '../../src/types'
+import { manifestFor, PROTOCOLS } from '../../src/index'
 import { bold, dim, green, yellow } from '../ansi'
 import { parseArgs } from '../args'
 import { BUILTIN_CHAINS } from '../chains'

@@ -22,6 +22,7 @@
 // snapshot-tested against a canned report with color forced off.
 // ---------------------------------------------------------------------------
 
+import { PROTOCOLS } from '../src/index'
 import type {
   CurrencyRef,
   ExecutionRequirement,
@@ -200,7 +201,7 @@ export function renderSearchReport(report: SearchReport): string[] {
     `  block         #${report.block.number} ${dim(shortHex(report.block.hash))} ${dim(isoUtc(report.block.timestamp))}`,
   )
 
-  for (const protocol of ['v2', 'v3', 'v4'] as const) {
+  for (const protocol of PROTOCOLS) {
     const label = protocol === 'v2' ? 'discovery  v2' : `           ${protocol}`
     lines.push(`  ${label} ${coverageLine(report.discovery[protocol], report.block.number)}`)
   }

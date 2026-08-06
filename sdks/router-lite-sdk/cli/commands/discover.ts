@@ -11,18 +11,21 @@
 // alone can't: "is my pool invisible, or visible and failing?"
 // ---------------------------------------------------------------------------
 
+import type { Address } from 'viem'
+
+import { PROTOCOLS } from '../../src/index'
 import type { CurrencyRef, PoolRecord, Protocol, QuoteResult } from '../../src/index'
-// `isDiscredited` and the `PROTOCOLS` value are internal (not on the public/experimental surface);
-// imported by relative path — the same escape hatch `canary/simulate.ts` documents — rather than
-// re-deriving the discredit rule here and drifting.
+// `isDiscredited` and `sameFamily` are internal (not on the public/experimental surface); imported
+// by relative path — the same escape hatch `canary/simulate.ts` documents — rather than re-deriving
+// the discredit rule or the native/wrapped-native family rule here and drifting.
+import { sameFamily } from '../../src/internal/currency'
 import { isDiscredited } from '../../src/pools/poolIndex'
-import { PROTOCOLS } from '../../src/types'
 import { bold, cyan, dim, green, red, shortHex, yellow } from '../ansi'
 import { parseArgs, UsageError } from '../args'
 import { describePool, jsonify, renderSearchReport, viewKey, type RenderCtx, type TokenView } from '../report'
 import { fetchTokenMeta, resolveToken, type ResolvedToken } from '../tokens'
 
-import { buildChainContext, COMMON_FLAGS, type ChainContext } from './context'
+import { buildChainContext, COMMON_FLAGS, hydrateViews, type ChainContext } from './context'
 
 const DISCOVER_FLAGS = {
   ...COMMON_FLAGS,
@@ -96,50 +99,53 @@ export async function cmdDiscover(argv: string[]): Promise<number> {
   return 0
 }
 
-/** `--via`, or the first core intermediate outside the token's own family. */
+/**
+ * `--via`, or the first core intermediate outside the token's own family.
+ *
+ * Native and wrapped-native are ONE graph family (the SDK's `sameFamily`, shared rather than
+ * mirrored here), so discover never routes a token "against itself" and never mislabels a WETH pool
+ * as a counterparty of ETH.
+ */
 async function resolveCounterparty(ctx: ChainContext, token: ResolvedToken, viaArg: string | undefined): Promise<ResolvedToken> {
+  const wrappedNative = ctx.chain.manifest.wrappedNative
   if (viaArg) {
     const via = await resolveToken(ctx.client, ctx.chain.manifest, viaArg)
-    if (sameFamily(ctx, via.ref, token.ref)) throw new UsageError(`--via ${viaArg} is the same currency family as the token`)
+    if (sameFamily(via.ref, token.ref, wrappedNative)) {
+      throw new UsageError(`--via ${viaArg} is the same currency family as the token`)
+    }
     return via
   }
-  if (!sameFamily(ctx, token.ref, 'native')) return { ref: 'native', symbol: 'ETH', decimals: 18 }
+  if (!sameFamily(token.ref, 'native', wrappedNative)) return { ref: 'native', symbol: 'ETH', decimals: 18 }
   for (const addr of ctx.chain.manifest.coreIntermediates ?? []) {
-    if (!sameFamily(ctx, addr, 'native')) return fetchTokenMeta(ctx.client, ctx.chain.chainId, addr)
+    if (!sameFamily(addr, 'native', wrappedNative)) return fetchTokenMeta(ctx.client, ctx.chain.chainId, addr)
   }
   throw new UsageError('no default counterparty for the native family on this chain — pass --via <token>')
 }
 
-/** Native/wrapped-native are one graph family — mirror that here so discover never routes a token
- * "against itself" and never mislabels a WETH pool as a counterparty of ETH. */
-function sameFamily(ctx: ChainContext, a: CurrencyRef, b: CurrencyRef): boolean {
-  const wrapped = ctx.chain.manifest.wrappedNative.toLowerCase()
-  const norm = (ref: CurrencyRef): string => (ref === 'native' || ref.toLowerCase() === wrapped ? 'native' : ref.toLowerCase())
-  return norm(a) === norm(b)
-}
+/** Cap for {@link counterpartyViews}: this command's whole output is a counterparty column, up to 50
+ * rows PER PROTOCOL — an order of magnitude more distinct tokens on screen at once than a quote/swap
+ * panel's route legs, which is why it fetches an order of magnitude more of them than
+ * `hydrateLegSymbols` does. Addresses past the cap render as shortened hex. */
+const MAX_COUNTERPARTY_METADATA_FETCHES = 40
 
 /** Best-effort symbols for the counterparty side of every pool (bounded fetch, addresses beyond it). */
 async function counterpartyViews(ctx: ChainContext, token: ResolvedToken, records: PoolRecord[]): Promise<RenderCtx> {
   const views = new Map<string, TokenView>()
   views.set('native', { symbol: 'ETH', decimals: 18 })
   views.set(viewKey(token.ref), { symbol: token.symbol, decimals: token.decimals })
-  const unknown = new Set<string>()
+  const renderCtx: RenderCtx = { views }
+  const unknown = new Set<Address>()
   for (const rec of records) {
     const other = counterpartOf(ctx, rec, token)
-    if (other !== 'native' && !views.has(other.toLowerCase())) unknown.add(other)
+    if (other !== 'native' && !views.has(viewKey(other))) unknown.add(other)
   }
-  const targets = [...unknown].slice(0, 40) as `0x${string}`[]
-  const metas = await Promise.allSettled(targets.map((addr) => fetchTokenMeta(ctx.client, ctx.chain.chainId, addr)))
-  for (const meta of metas) {
-    if (meta.status !== 'fulfilled' || meta.value.ref === 'native') continue
-    views.set(viewKey(meta.value.ref), { symbol: meta.value.symbol, decimals: meta.value.decimals })
-  }
-  return { views }
+  await hydrateViews(ctx, renderCtx, unknown, MAX_COUNTERPARTY_METADATA_FETCHES)
+  return renderCtx
 }
 
 function counterpartOf(ctx: ChainContext, rec: PoolRecord, token: ResolvedToken): CurrencyRef {
   const [a, b] = rec.pool.currencies
-  return sameFamily(ctx, a, token.ref) ? b : a
+  return sameFamily(a, token.ref, ctx.chain.manifest.wrappedNative) ? b : a
 }
 
 function renderRecord(rec: PoolRecord, token: ResolvedToken, renderCtx: RenderCtx): string {

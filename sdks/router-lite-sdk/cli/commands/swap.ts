@@ -12,13 +12,14 @@
 //    supports the method.
 // ---------------------------------------------------------------------------
 
-import { type Address } from 'viem'
+import { isAddress, type Address } from 'viem'
 
 import type { SwapRequest, SwapResult } from '../../src/index'
 import { bold, dim, green, red, yellow } from '../ansi'
 import { parseArgs, UsageError } from '../args'
-import { amountFor, exitCodeFor, jsonify, renderSwapResult, renderWaveLine, type TradeContext } from '../report'
+import { amountFor, exitCodeFor, jsonify, renderSwapResult, type TradeContext } from '../report'
 import { probeSimulateV1Support, simulateSwap } from '../simulate'
+import { iterateWaves } from '../waves'
 
 import { buildChainContext, hydrateLegSymbols, resolveTrade, TRADE_FLAGS, type ChainContext } from './context'
 
@@ -32,10 +33,12 @@ const SWAP_FLAGS = {
   simulate: { kind: 'boolean' as const, alias: 's' },
 }
 
+/** `strict: false` — the 20-byte hex shape, without demanding EIP-55 casing the user does not have;
+ * the same call and the same reasoning as the SDK's own trader/recipient check (`src/router.ts`). */
 function parseAddress(value: string | undefined, flag: string): Address | undefined {
   if (value === undefined) return undefined
-  if (!/^0x[0-9a-fA-F]{40}$/.test(value)) throw new UsageError(`--${flag} '${value}' is not a valid address`)
-  return value as Address
+  if (!isAddress(value, { strict: false })) throw new UsageError(`--${flag} '${value}' is not a valid address`)
+  return value
 }
 
 function parseIntFlag(value: string | undefined, flag: string): number | undefined {
@@ -85,22 +88,14 @@ export async function cmdSwap(argv: string[]): Promise<number> {
   if (!watch && !verbose) {
     final = await ctx.router.getSwap(request)
   } else {
-    let wave = 0
-    let previousBest: bigint | undefined
-    for await (const result of ctx.router.swaps(request)) {
-      wave++
-      final = result
-      const elapsed = Date.now() - started
-      if (json) {
-        console.log(jsonify({ wave, elapsedMs: elapsed, result }, false))
-      } else {
-        const best = 'best' in result && result.best ? [result.best] : []
-        await hydrateLegSymbols(ctx, trade.renderCtx, best)
-        console.log(renderWaveLine(wave, elapsed, result, tradeCtx, trade.renderCtx, previousBest))
-      }
-      if ('best' in result && result.best) previousBest = result.best.quote.amountOut
-      if (!watch && (result.status === 'ready' || result.status === 'needs-action')) break
-    }
+    final = await iterateWaves(ctx.router.swaps(request), tradeCtx, trade.renderCtx, {
+      json,
+      started,
+      // `--watch` drains the whole bounded search; `--verbose` alone stops at the first actionable
+      // wave, which for a swap is a result that carries a transaction.
+      stopAt: (result) => !watch && (result.status === 'ready' || result.status === 'needs-action'),
+      hydrate: (routes) => hydrateLegSymbols(ctx, trade.renderCtx, routes),
+    })
     if (!json && final) console.log('')
   }
   if (!final) return 2

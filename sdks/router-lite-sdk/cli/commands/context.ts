@@ -241,7 +241,31 @@ export async function resolveTrade(ctx: ChainContext, parsed: ParsedArgs): Promi
   return { tokenIn, tokenOut, amountIn, hints, renderCtx: { views } }
 }
 
-/** Cap on how many unknown route-leg tokens {@link hydrateLegSymbols} will fetch metadata for. */
+/**
+ * Resolves up to `cap` of `unknown`'s addresses and records what came back in `renderCtx.views`.
+ *
+ * Bounded and best-effort by construction: `Promise.allSettled`, so one dead token contract never
+ * takes the render down, and an address that stays unresolved simply renders as a shortened hex
+ * string. `cap` is the caller's, because the two callers are rendering different amounts of surface
+ * (see each call site) — the fetch shape is what's shared, not the budget.
+ */
+export async function hydrateViews(
+  ctx: ChainContext,
+  renderCtx: RenderCtx,
+  unknown: Iterable<Address>,
+  cap: number,
+): Promise<void> {
+  const targets = [...unknown].slice(0, cap)
+  const metas = await Promise.allSettled(targets.map((addr) => fetchTokenMeta(ctx.client, ctx.chain.chainId, addr)))
+  for (const meta of metas) {
+    if (meta.status !== 'fulfilled' || meta.value.ref === 'native') continue
+    renderCtx.views.set(viewKey(meta.value.ref), { symbol: meta.value.symbol, decimals: meta.value.decimals })
+  }
+}
+
+/** Cap for {@link hydrateLegSymbols}: a wave line and a result panel render ONE route plus a handful
+ * of alternatives, each at most two hops — a dozen distinct leg tokens already covers every token
+ * that can appear on screen, and every fetch beyond that is latency the user waits on for nothing. */
 const MAX_LEG_METADATA_FETCHES = 12
 
 /**
@@ -258,10 +282,5 @@ export async function hydrateLegSymbols(ctx: ChainContext, renderCtx: RenderCtx,
       }
     }
   }
-  const targets = [...unknown].slice(0, MAX_LEG_METADATA_FETCHES)
-  const metas = await Promise.allSettled(targets.map((addr) => fetchTokenMeta(ctx.client, ctx.chain.chainId, addr)))
-  for (const meta of metas) {
-    if (meta.status !== 'fulfilled' || meta.value.ref === 'native') continue
-    renderCtx.views.set(viewKey(meta.value.ref), { symbol: meta.value.symbol, decimals: meta.value.decimals })
-  }
+  await hydrateViews(ctx, renderCtx, unknown, MAX_LEG_METADATA_FETCHES)
 }

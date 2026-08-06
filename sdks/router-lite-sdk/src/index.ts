@@ -33,6 +33,13 @@ export { RouterConfigError, UnsupportedRouteError } from './errors'
 // hand-copying the closed set this package defines it from.
 export { REASON_CODES } from './types'
 
+// `PROTOCOLS` is exported as a value for the same reason as `REASON_CODES` above: the `Protocol`
+// type names the closed set but cannot be walked at run time, so anything that needs one row/entry
+// per protocol (a coverage table, a `Record<Protocol, …>` builder, a manifest filter) was
+// hand-copying `['v2', 'v3', 'v4'] as const` — a literal that silently stops matching the day a
+// protocol is added. `SearchReport.discovery` is already keyed by exactly this set.
+export { PROTOCOLS } from './types'
+
 // `EthCall`, `QuoteCall`, and `LogQuery` are internal RPC/plugin-surface primitives (only ever
 // appearing in `ProtocolModule`, which itself is internal) — no public type reaches them, so they
 // are deliberately not re-exported here. `Custody` is the same kind of primitive, but it (like
