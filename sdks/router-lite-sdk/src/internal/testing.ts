@@ -371,6 +371,46 @@ export function assertResultCoherent(r: QuoteResult | SwapResult): void {
   const q = r.search.quoting
   if (q.attempted !== q.succeeded + q.failed + q.transportFailed) throw new Error('quoting stats do not add up')
 
+  // THE CONSERVATION INVARIANT — every candidate the enumeration built is accounted for by exactly
+  // one quoting outcome, and nothing is accounted for that was never built.
+  //
+  // WHY IT IS TWO BOUNDS AND NOT ONE EQUALITY, WHICH IS THE WHOLE SUBTLETY. The tempting statement is
+  // `candidatesGenerated === attempted + unattempted`, and it is FALSE by design: three channels feed
+  // `quoting` and only two of them feed `candidatesGenerated` (see `types.ts#SearchReport.quoting`).
+  // `search/waves.ts#runDiscoveryProbes` quotes single-leg, HALF-PAIR existence checks — `tokenIn ->
+  // core`, `neighbor -> tokenOut` — which are not routes, can never become routes, and are counted in
+  // `attempted`/`succeeded`/`failed`/`transportFailed` ONLY. So the exact identity is
+  //
+  //     candidatesGenerated === attempted + unattempted - (discovery-probe calls)
+  //
+  // and the report deliberately carries no discovery-probe term (it is not a candidate count, and
+  // adding one to the public surface to make an assertion tidy would be the tail wagging the dog).
+  // What survives the elimination of that unknown non-negative term is the pair of bounds below, and
+  // between them they pin every accounting site that exists:
+  //
+  //   * `unattempted <= candidatesGenerated` — an unattempted quote IS a generated candidate that
+  //     never got dispatched, so the two route-bearing channels can only ever move `unattempted` up
+  //     in lockstep with `candidatesGenerated`. This is also what keeps `runDiscoveryProbes` honest
+  //     about staying OUT of `unattempted`: the moment a half-pair probe skipped by an abort were
+  //     counted there, `unattempted` could exceed a `candidatesGenerated` that never saw it, and the
+  //     `'quotes-unattempted'` reason code would start claiming candidates that do not exist.
+  //   * `candidatesGenerated <= attempted + unattempted` — the leak-catcher, and the one the
+  //     `runRouteProbes` bug tripped: that function counted `candidatesGenerated += fresh.length` and
+  //     then only `attempted`, so an abort that skipped queued probes (`quote/quote.ts` returns
+  //     `attempted < probes.length` on `AbortedCallError`) silently dropped the difference — a report
+  //     claiming N candidates and accounting for fewer than N outcomes, with no field saying where
+  //     the rest went. Equality holds exactly when no discovery probe was dispatched.
+  const cg = r.search.enumeration.candidatesGenerated
+  if (q.unattempted > cg) {
+    throw new Error(`unattempted quotes (${q.unattempted}) exceed candidatesGenerated (${cg}) — unattempted counts candidates`)
+  }
+  if (cg > q.attempted + q.unattempted) {
+    throw new Error(
+      `candidatesGenerated (${cg}) exceeds attempted + unattempted (${q.attempted} + ${q.unattempted}) — ` +
+        `${cg - q.attempted - q.unattempted} generated candidate(s) are unaccounted for`,
+    )
+  }
+
   // C4-P7: `verifyLeader` spends at most `PREFLIGHT_TOP_K` real simulations per wave, and the engine
   // runs at most `WAVE_COUNT` waves — so a per-search cumulative total above that product is not a
   // report of legitimate work, it is a bug in how `preflightAttempted` is accumulated (e.g. double

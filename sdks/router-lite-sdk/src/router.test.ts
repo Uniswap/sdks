@@ -933,7 +933,14 @@ test('classifySwap: unattempted quote candidates (no best) classify inconclusive
   // Discovery is complete (every protocol `disabled` in `emptyReport`), nothing aborted, nothing
   // degraded — the search was simply cut off with candidates still unquoted, which is its own
   // incompleteness axis and must not be folded into a generic "did not complete" message.
-  const report: SearchReport = { ...emptyReport(), quoting: { ...emptyReport().quoting, unattempted: 3 } }
+  // `candidatesGenerated` moves with `unattempted`: an unattempted quote IS a generated candidate
+  // nobody dispatched, so a fixture setting one without the other describes a report the engine
+  // cannot produce — which is what `assertResultCoherent`'s conservation invariant now says out loud.
+  const report: SearchReport = {
+    ...emptyReport(),
+    enumeration: { ...emptyReport().enumeration, candidatesGenerated: 3 },
+    quoting: { ...emptyReport().quoting, unattempted: 3 },
+  }
 
   const r = classifySwap({ alternatives: [], report, done: true })
 

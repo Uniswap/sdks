@@ -594,6 +594,16 @@ async function runRouteProbes(run: Run, probes: QuoteProbe[]): Promise<void> {
   state.quoting.succeeded += stats.succeeded
   state.quoting.failed += stats.failed
   state.quoting.transportFailed += stats.transportFailed
+  // Mirrors `quoteNew`, and for the identical reason: `probeQuotes` genuinely returns
+  // `attempted < probes.length` — an abort that lands while a probe is queued for a semaphore permit
+  // raises `AbortedCallError`, which is deliberately counted in NO stats bucket (`quote/quote.ts`)
+  // so the `attempted === succeeded + failed + transportFailed` invariant survives; turning that
+  // shortfall into `unattempted` is the CALLER's job. This channel feeds `candidatesGenerated` above
+  // on exactly the same terms `quoteNew` does (`types.ts#SearchReport.quoting`, channel 1), and
+  // omitting this line meant a report that claimed N candidates and accounted for fewer than N
+  // outcomes, with nothing anywhere saying where the rest went — the conservation invariant
+  // `internal/testing.ts#assertResultCoherent` now enforces.
+  state.quoting.unattempted += fresh.length - stats.attempted
   recordSuccess(run, quoted)
   recordFailures(run, amountIndependentFailures)
   for (const q of quoted) state.quoted.set(routeId(q.route), q)
@@ -640,6 +650,15 @@ async function runDiscoveryProbes(run: Run, probes: QuoteProbe[]): Promise<void>
   state.quoting.succeeded += stats.succeeded
   state.quoting.failed += stats.failed
   state.quoting.transportFailed += stats.transportFailed
+  // AND DELIBERATELY NO `unattempted` LINE HERE — this is NOT the `runRouteProbes` hole repeated.
+  // That one was a leak: it claimed `candidatesGenerated` it then failed to account for. This
+  // function claims none (see the docstring above), so there is nothing to conserve, and
+  // `unattempted` is defined as a CANDIDATE count — "quote candidates that were never dispatched"
+  // (`types.ts#SearchReport.quoting`), which is also exactly what the `'quotes-unattempted'` reason
+  // code promises a caller. A half-pair leg is not a candidate and can never become one, so counting
+  // a skipped one here would make `unattempted` exceed `candidatesGenerated` and have the reason code
+  // name candidates that do not exist. Nothing is lost by the omission: a probe is only ever skipped
+  // by an abort, and `state.aborted` already reports that axis.
   recordFailures(run, amountIndependentFailures)
   for (const q of quoted) {
     for (const leg of q.route.legs) rememberPool(run, { pool: leg.pool, source: 'factory' })

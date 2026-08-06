@@ -5,6 +5,7 @@ import { encodeAbiParameters, toHex, zeroAddress } from 'viem'
 import { DEFAULT_REORG_OVERLAP_BLOCKS, MAX_INTERMEDIATES, PREFLIGHT_TOP_K } from '../constants'
 import { UnsupportedRouteError } from '../errors'
 import { sortAddresses } from '../internal/currency'
+import { createSemaphore } from '../internal/rpc'
 import { assertResultCoherent, rateLimitHttpError, v2Ref, v3Ref, v4Ref } from '../internal/testing'
 import { wave0PairScanBlocks } from '../manifest'
 import { isDiscredited, PoolIndex } from '../pools/poolIndex'
@@ -1456,4 +1457,41 @@ test('a scan-bound wave quotes what it discovers WHILE it discovers it, so an ab
 
   const result = classify('quote', final)
   assertResultCoherent(result)
+})
+
+test('an abort mid-WAVE-0 leaves no generated candidate unaccounted for: skipped route probes are `unattempted`', async () => {
+  // THE ACCOUNTING HOLE, in the one channel that had it. `runRouteProbes` counted
+  // `candidatesGenerated += fresh.length` and then only `stats.attempted` — never the shortfall — so
+  // an abort that skipped queued probes produced a report claiming N candidates and accounting for
+  // fewer than N quoting outcomes, with no field anywhere saying where the rest went. `quoteNew` had
+  // always differenced `fresh.length - stats.attempted` into `unattempted`; wave 0's probes, which
+  // feed `candidatesGenerated` on exactly the same terms (`types.ts#SearchReport.quoting`, channel
+  // 1), did not.
+  //
+  // The shortfall is REAL, not theoretical: `probeQuotes` returns `attempted < probes.length`
+  // whenever `ethCall` raises `AbortedCallError` for a call that queued behind the semaphore and was
+  // never sent (`quote/quote.ts`). A one-permit semaphore is what makes that deterministic here —
+  // the first probe is served, the stub aborts on it, and the second finds the signal already set.
+  const controller = new AbortController()
+  const v2Direct = stubPoolRef('v2', TOKEN_A, TOKEN_B)
+  const { client } = stubClient({
+    calls: { ...quoteEntry([v2Direct], AMOUNT_IN, 100n) },
+    abortAfterCalls: 1,
+    controller,
+  })
+  const ctx = makeContext(client, manifestWith({ v3: true }), { semaphore: createSemaphore(1) })
+
+  const events = await drain(searchWaves(ctx, { ...quoteReq, signal: controller.signal }, 'quote'))
+  const final = events.at(-1)!
+  const { quoting, enumeration } = final.report
+
+  expect(final.report.aborted).toBe(true)
+  // Two speculative direct probes (the v2 and v3 stub modules); exactly one was ever dispatched.
+  expect(enumeration.candidatesGenerated).toBe(2)
+  expect(quoting.attempted).toBe(1)
+  // The point of the fix: the probe that was never sent is REPORTED as never sent.
+  expect(quoting.unattempted).toBe(1)
+  expect(enumeration.candidatesGenerated).toBe(quoting.attempted + quoting.unattempted)
+
+  assertCoherent('quote', events)
 })
