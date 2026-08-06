@@ -201,6 +201,12 @@ describe('classifyRpcError — node-state availability (the node could not serve
     'exceeded maximum block range: 10000',
     'query returned more than 10000 results',
     'response size exceeded the configured limit',
+    // drpc's wording for the same result cap as the two above, verbatim from the live capture. It
+    // matched no dialect until `providerConformance.test.ts` rebuilt that capture faithfully (no
+    // hand-pinned `HttpRequestError`, no status) and caught it defaulting to `execution` — an EVM
+    // verdict invented for an `eth_getLogs` the EVM never saw. `-32602` cannot be the discriminator:
+    // publicnode's archive-paywall capture carries the same code for an unrelated failure.
+    'query exceeds max results 20000, retry with the range 25683953-25685027',
   ]
 
   for (const message of NODE_STATE_MESSAGES) {

@@ -69,7 +69,8 @@ const TRANSPORT_MESSAGE =
  *  - alchemy/infura load balancers: `Nonexistent block: requested 21000002, latest 21000000`,
  *    `requested block is not available`
  *  - result caps that abort the request rather than answer it: `exceeded maximum block range`,
- *    `query returned more than 10000 results`, `response size exceeded`
+ *    `query returned more than 10000 results`, `response size exceeded`, and drpc's phrasing of the
+ *    same fact, `query exceeds max results 20000` (see below)
  *  - quicknode's span cap, captured live off `base-mainnet.quiknode.pro`:
  *    `eth_getLogs is limited to a 10,000 range` (JSON-RPC `-32614`)
  *
@@ -83,9 +84,25 @@ const TRANSPORT_MESSAGE =
  * revert whose message merely says something is "limited" — the shape it exists for always states a
  * number and always calls it a range (see {@link DECLARED_CAP_LIMITED_TO}, which reads the same
  * sentence for the width itself).
+ *
+ * `max results` is drpc's wording for the result cap the two alternatives beside it already cover
+ * (`query returned more than`, `response size`), and it was missing — found by
+ * `providerConformance.test.ts`, which rebuilds each live capture from its OWN recorded fields
+ * instead of pinning a transport class on by hand. Rebuilt faithfully, the drpc capture (`query
+ * exceeds max results 20000, retry with the range …`) has no HTTP status, no transport-class name,
+ * and a JSON-RPC code (`-32602`) that is in no code set — publicnode's archive-paywall capture
+ * carries the same `-32602` for a completely unrelated failure, so the CODE can never be the
+ * discriminator here and the message tier is all there is. It matched none of the three dialects and
+ * fell through to the `execution` default: "the EVM rejected this", about an `eth_getLogs` no EVM
+ * ever saw. That is the identical mis-tiering C4-H1 fixed for `header not found` and the -32614 fix
+ * fixed for quicknode, with the identical two costs (a `no-route` could be built out of it, and
+ * `logScanPolicy`'s expensive-refusal collapse never engages on a refusal that cost the node a full
+ * query). The vocabulary was already in this file — {@link DENSITY_CAP_MESSAGE} reads `max results`
+ * as a result-cap marker — so the defect was two regexes in one module disagreeing about the same
+ * sentence.
  */
 const NODE_STATE_MESSAGE =
-  /header not found|block not found|unknown block\b|missing trie node|state .{0,40}(not available|unavailable)|nonexistent block|requested block|exceeded maximum block range|query returned more than|response size|limited to (?:an?\s+)?[\d][\d,_]*\s+(?:block\s+)?range/i
+  /header not found|block not found|unknown block\b|missing trie node|state .{0,40}(not available|unavailable)|nonexistent block|requested block|exceeded maximum block range|query returned more than|\bmax(?:imum)? results?\b|response size|limited to (?:an?\s+)?[\d][\d,_]*\s+(?:block\s+)?range/i
 
 // ---------------------------------------------------------------------------
 // Declared `eth_getLogs` caps (R2).
