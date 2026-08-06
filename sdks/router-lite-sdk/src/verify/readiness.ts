@@ -2,7 +2,7 @@ import type { Address, Hex, PublicClient } from 'viem'
 import { decodeFunctionResult, encodeFunctionData, isAddress, isAddressEqual } from 'viem'
 
 import { DEFAULT_CONCURRENCY } from '../constants'
-import { TransportError } from '../errors'
+import { AbortedCallError, TransportError } from '../errors'
 import { ERC20_ABI, PERMIT2_ABI } from '../internal/abis'
 import { classifyRpcError, ethCall, mapConcurrent } from '../internal/rpc'
 import type { Semaphore } from '../internal/rpc'
@@ -29,15 +29,23 @@ import type { CurrencyRef, ExecutionRequirement, Permit2PermitSingle } from '../
 // that check failing — never as licence to throw — so it fails safe (more
 // requirements reported, never fewer).
 //
-// A read that fails in the TRANSPORT (`TransportError`: 429, timeout, dropped
-// socket) is different in kind, and "fails safe" is the wrong instinct there.
-// Coercing an unread balance to `0n` states `insufficient-balance available:
-// 0n` AS FACT and fabricates approval requirements the trader may already
-// satisfy — a *confident wrong* `needs-action` that also short-circuits
-// preflight, so nothing downstream ever notices. Such a read contributes NO
-// requirement; instead the whole result is flagged `degraded`, and the caller
-// (`search/waves.ts`) refuses to promise `needs-action` from a requirement set
-// it knows is incomplete.
+// A read that fails ANY OTHER WAY — in the transport (429, timeout, dropped
+// socket), in the node's own state (a replica that cannot serve the pinned
+// block), or because the call was never sent at all — is different in kind, and
+// "fails safe" is the wrong instinct there. Coercing an unread balance to `0n`
+// states `insufficient-balance available: 0n` AS FACT and fabricates approval
+// requirements the trader may already satisfy — a *confident wrong*
+// `needs-action` that also short-circuits preflight, so nothing downstream ever
+// notices. Such a read contributes NO requirement; instead the whole result is
+// flagged `degraded`, and the caller (`search/waves.ts`) refuses to promise
+// `needs-action` from a requirement set it knows is incomplete.
+//
+// ONE PREDICATE DECIDES THAT, FOR BOTH BRANCHES ({@link isUnread}). The two used
+// to disagree: the ERC-20 branch asked `result instanceof TransportError` while
+// the native branch asked `classifyRpcError(err) !== 'execution'`, so the same
+// failure could fabricate a `0n` balance on one path and report `degraded` on
+// the other. The rule is stated once, in the terms the header uses — did this
+// read get an ON-CHAIN ANSWER — rather than twice in two vocabularies.
 // ---------------------------------------------------------------------------
 
 export type CheckReadinessArgs = {
@@ -141,25 +149,45 @@ async function readErc20State(
 /**
  * What the readiness reads established.
  *
- * `degraded` means at least one read never got an answer (transport failure), so `requirements` is
+ * `degraded` means at least one read never got an ON-CHAIN ANSWER ({@link isUnread}), so `requirements` is
  * known-INCOMPLETE and known-uninterpretable as "do exactly these things and the swap will work".
  * The missing check contributes no requirement — a fabricated one, stated with a hard number
  * (`available: 0n`), is worse than a reported gap in knowledge.
  */
 export type ReadinessResult = { requirements: ExecutionRequirement[]; degraded: boolean }
 
-/** True when this slot failed in the transport channel rather than on-chain — `NodeStateError`
- * (a node that could not serve the pinned block) included, since it extends `TransportError`.
- * Callers must neither trust the value nor invent one for it. */
-function isTransportFailure(result: unknown): boolean {
-  return result instanceof TransportError
+/**
+ * True when this read never produced an ON-CHAIN ANSWER, so its value must be neither trusted nor
+ * invented — the single predicate behind every `degraded` decision in this module (see the header).
+ *
+ * Three channels, one verdict:
+ *
+ *  - `TransportError` (and its `NodeStateError` subclass): what `ethCall` raises once it has already
+ *    classified the provider's failure. Checked by identity because that is the fact it carries;
+ *    re-classifying its *message* would be asking a second time and risking a different answer.
+ *  - `AbortedCallError`: our own skip — the call never went to the wire, on our own instruction.
+ *    {@link classifyRpcError} CANNOT SEE THIS. It reads provider vocabulary and defaults to
+ *    `'execution'` for anything it does not recognize, which is the correct conservative default for
+ *    a real error off a real wire and exactly the wrong one for a request that never made it there:
+ *    an unsent call would otherwise fabricate `available: 0n` out of nothing at all.
+ *  - anything else the classifier can place outside the execution channel (a raw transport/node-state
+ *    error that reached this slot without passing through `ethCall`'s wrapping — a decode stage, a
+ *    caller wiring its own client).
+ *
+ * Everything the classifier leaves in the `execution` channel — a real revert, a decode failure, an
+ * unrecognized error off a live call — keeps the conservative treatment the header describes: that
+ * check fails, widening the requirement set rather than hiding it behind `degraded`.
+ */
+function isUnread(err: unknown): boolean {
+  if (err instanceof TransportError || err instanceof AbortedCallError) return true
+  return classifyRpcError(err) !== 'execution'
 }
 
 /**
  * Computes the {@link ExecutionRequirement}s the trader still needs to satisfy before `amountIn` of
  * `currencyIn` can move, as of `blockNumber`/`blockTimestamp`. Never throws for a business outcome —
  * a read that fails *on chain* just widens the returned set rather than propagating, while a read
- * that fails in the *transport* sets `degraded` and adds nothing (see the module header).
+ * that never got an on-chain answer at all sets `degraded` and adds nothing (see the module header).
  */
 export async function checkReadiness(args: CheckReadinessArgs): Promise<ReadinessResult> {
   const { client, trader, currencyIn, amountIn, permit2, router, permit, blockNumber, blockTimestamp, semaphore } = args
@@ -169,11 +197,11 @@ export async function checkReadiness(args: CheckReadinessArgs): Promise<Readines
     try {
       available = await getNativeBalance(client, trader, blockNumber, semaphore)
     } catch (err) {
-      // `eth_getBalance` goes out raw (not through `ethCall`), so classify it here rather than
-      // looking for a `TransportError` that was never constructed. `!== 'execution'` covers the
-      // node-state channel too (a replica that cannot serve the pinned block): an unread balance is
-      // an unread balance whichever way the node failed to read it.
-      if (classifyRpcError(err) !== 'execution') return { requirements: [], degraded: true }
+      // `eth_getBalance` goes out raw (not through `ethCall`), so nothing here ever constructed a
+      // `TransportError` — the classifier arm of {@link isUnread} is what carries this branch, and the
+      // identity arms cost nothing. An unread balance is an unread balance whichever way the node
+      // failed to read it.
+      if (isUnread(err)) return { requirements: [], degraded: true }
       available = 0n
     }
     if (available < amountIn)
@@ -194,7 +222,7 @@ export async function checkReadiness(args: CheckReadinessArgs): Promise<Readines
   const requirements: ExecutionRequirement[] = []
   let degraded = false
 
-  if (isTransportFailure(balanceResult)) {
+  if (balanceResult instanceof Error && isUnread(balanceResult)) {
     degraded = true
   } else {
     const available = balanceResult instanceof Error ? 0n : balanceResult
@@ -203,7 +231,7 @@ export async function checkReadiness(args: CheckReadinessArgs): Promise<Readines
     }
   }
 
-  if (isTransportFailure(erc20AllowanceResult)) {
+  if (erc20AllowanceResult instanceof Error && isUnread(erc20AllowanceResult)) {
     degraded = true
   } else {
     const erc20Allowance = erc20AllowanceResult instanceof Error ? 0n : erc20AllowanceResult
@@ -214,7 +242,7 @@ export async function checkReadiness(args: CheckReadinessArgs): Promise<Readines
 
   const permitCovers = permit !== undefined && isPermitValid(permit, token, router, amountIn, blockTimestamp)
   if (!permitCovers) {
-    if (isTransportFailure(permit2AllowanceResult)) {
+    if (permit2AllowanceResult instanceof Error && isUnread(permit2AllowanceResult)) {
       degraded = true
     } else {
       const permit2Insufficient =

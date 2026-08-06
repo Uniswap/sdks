@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test'
 import type { Hex, PublicClient } from 'viem'
 import { encodeFunctionData, encodeFunctionResult, getAddress } from 'viem'
 
+import { AbortedCallError, NodeStateError } from '../errors'
 import { ERC20_ABI, PERMIT2_ABI } from '../internal/abis'
 import { rateLimitHttpError } from '../internal/testing'
 import type { EthCall, Permit2PermitSingle } from '../types'
@@ -14,19 +15,24 @@ import { checkReadiness } from './readiness'
 // check issues. Mirrors the stub in `quote/quote.test.ts`.
 // ---------------------------------------------------------------------------
 
-type StubEntry = Hex | 'revert' | 'rate-limit'
+type StubEntry = Hex | 'revert' | 'rate-limit' | 'aborted'
 
 function callKey(to: string, data: string): string {
   return `${to.toLowerCase()}:${data}`
 }
 
-function stubClient(returns: Record<string, StubEntry>, balance?: bigint | 'revert' | 'rate-limit'): Pick<PublicClient, 'request'> {
+function stubClient(
+  returns: Record<string, StubEntry>,
+  balance?: bigint | 'revert' | 'rate-limit' | 'aborted' | 'node-state',
+): Pick<PublicClient, 'request'> {
   return {
     async request(args: any) {
       if (args.method === 'eth_getBalance') {
         if (balance === undefined) throw new Error('stubClient: no balance stub registered')
         if (balance === 'revert') throw new Error('rpc failure')
         if (balance === 'rate-limit') throw rateLimitHttpError()
+        if (balance === 'aborted') throw new AbortedCallError('eth_getBalance was never sent — the search was aborted first')
+        if (balance === 'node-state') throw new NodeStateError('header not found')
         return `0x${balance.toString(16)}` as Hex
       }
       const [{ to, data }] = args.params
@@ -36,6 +42,10 @@ function stubClient(returns: Record<string, StubEntry>, balance?: bigint | 'reve
       if (entry === 'revert') throw new Error('execution reverted')
       // A throttled read: the node never answered, so its value is unknown — not zero.
       if (entry === 'rate-limit') throw rateLimitHttpError()
+      // A call that never went out at all. `ethCall` re-raises this one AS ITSELF (it is our own
+      // skip, not a provider failure), so what reaches `checkReadiness` is neither a `TransportError`
+      // nor anything `classifyRpcError` recognizes.
+      if (entry === 'aborted') throw new AbortedCallError('eth_call was never sent — the search was aborted first')
       return entry
     },
   } as unknown as Pick<PublicClient, 'request'>
@@ -369,6 +379,86 @@ test('an on-chain read failure (a non-ERC20 token reverting) still fails safe to
 
   expect(result.degraded).toBe(false)
   expect(result.requirements).toEqual([{ kind: 'insufficient-balance', token: TOKEN, required: AMOUNT_IN, available: 0n }])
+})
+
+// ---------------------------------------------------------------------------
+// The two branches answer "did this read land" the SAME way.
+//
+// The ERC-20 branch used to ask `result instanceof TransportError` while the
+// native branch asked `classifyRpcError(err) !== 'execution'` — two predicates
+// for one rule, inside one function. Anything that is neither a
+// `TransportError` nor a recognizable provider failure (an `AbortedCallError`
+// is exactly that: our own skip, re-raised as itself by `ethCall`, and
+// `classifyRpcError` defaults it to `execution`) fell into the fabricate-`0n`
+// branch the module header forbids: `available: 0n` stated as fact about a
+// call that never went to the wire.
+// ---------------------------------------------------------------------------
+
+test('a balance read that was never sent (AbortedCallError) reports degraded — it does NOT fabricate available: 0n', async () => {
+  const client = stubClient({
+    ...entryFor(balanceCall(), 'aborted'),
+    ...entryFor(erc20AllowanceCall(), erc20AllowanceReturn(AMOUNT_IN * 2n)),
+    ...entryFor(permit2AllowanceCall(), permit2AllowanceReturn(AMOUNT_IN * 2n, Number(BLOCK_TIMESTAMP) + 3600)),
+  })
+
+  const result = await checkReadiness({
+    client,
+    trader: TRADER,
+    currencyIn: TOKEN,
+    amountIn: AMOUNT_IN,
+    permit2: PERMIT2,
+    router: ROUTER,
+    blockNumber: BLOCK_NUMBER,
+    blockTimestamp: BLOCK_TIMESTAMP,
+  })
+
+  // No `insufficient-balance` anywhere: the trader may well be funded, and nothing here found out.
+  expect(result).toEqual({ requirements: [], degraded: true })
+})
+
+test('the native branch reports the identical verdict for the identical unsent read', async () => {
+  const result = await checkReadiness({
+    client: stubClient({}, 'aborted'),
+    trader: TRADER,
+    currencyIn: 'native',
+    amountIn: AMOUNT_IN,
+    permit2: PERMIT2,
+    router: ROUTER,
+    blockNumber: BLOCK_NUMBER,
+    blockTimestamp: BLOCK_TIMESTAMP,
+  })
+
+  expect(result).toEqual({ requirements: [], degraded: true })
+})
+
+test('a node-state failure (a replica that cannot serve the pinned block) is degraded on both branches', async () => {
+  const erc20 = await checkReadiness({
+    client: stubClient({
+      ...entryFor(balanceCall(), 'rate-limit'),
+      ...entryFor(erc20AllowanceCall(), erc20AllowanceReturn(AMOUNT_IN * 2n)),
+      ...entryFor(permit2AllowanceCall(), permit2AllowanceReturn(AMOUNT_IN * 2n, Number(BLOCK_TIMESTAMP) + 3600)),
+    }),
+    trader: TRADER,
+    currencyIn: TOKEN,
+    amountIn: AMOUNT_IN,
+    permit2: PERMIT2,
+    router: ROUTER,
+    blockNumber: BLOCK_NUMBER,
+    blockTimestamp: BLOCK_TIMESTAMP,
+  })
+  expect(erc20).toEqual({ requirements: [], degraded: true })
+
+  const native = await checkReadiness({
+    client: stubClient({}, 'node-state'),
+    trader: TRADER,
+    currencyIn: 'native',
+    amountIn: AMOUNT_IN,
+    permit2: PERMIT2,
+    router: ROUTER,
+    blockNumber: BLOCK_NUMBER,
+    blockTimestamp: BLOCK_TIMESTAMP,
+  })
+  expect(native).toEqual({ requirements: [], degraded: true })
 })
 
 // ---------------------------------------------------------------------------

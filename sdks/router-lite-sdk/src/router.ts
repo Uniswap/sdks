@@ -561,38 +561,60 @@ export function classifyQuote(e: InternalResult): QuoteResult {
 /** Exported for direct unit testing of the classification mapping in isolation — not part of the
  * `Router` surface (mirrors `search/waves.ts` exporting `selectFocus` for the same reason). */
 export function classifySwap(e: InternalResult): SwapResult {
-  // `needs-action` promises that this list is exactly what stands between the trader and the swap.
-  // When a readiness read never landed (`verificationDegraded`), the list is known-incomplete and
-  // the promise cannot be made — the caller would be sent to approve things while the real blocker
-  // stayed invisible. Such a result falls through to `inconclusive`/`rpc-degraded` below.
-  // Both `ready` and `needs-action` require `tx`, and `limits` is set in the same `compileAndEncode`
-  // call that produces `tx` (`search/leader.ts`) — so whenever `e.tx` is defined here, `e.limits` is
-  // too; the non-null assertion states that invariant rather than re-deriving it.
-  if (e.best && (e.requirements?.length ?? 0) > 0 && e.tx !== undefined && !e.report.verificationDegraded) {
+  // BOTH LEADING STATUSES GATE ON THE ROUTE'S OWN `execution` DISCRIMINANT, which is the fact each
+  // one is a claim about: `verified` means the chain simulated this candidate at this block,
+  // `needs-action` means `verifyLeader` short-circuited the simulation because the trader is not
+  // ready. `needs-action` used to be inferred from `requirements.length > 0` instead — a PROXY that
+  // agrees with the discriminant only because of the order of `verifyLeader`'s body (`search/
+  // leader.ts`, whose header has to say DO NOT REORDER for exactly this reason). Reading the
+  // discriminant asks the question directly, and `assertResultCoherent`'s
+  // "`needs-action` whose best route is X" check stops being a rule this function could break.
+  //
+  // `verificationDegraded` still guards `needs-action` independently. `needs-action` promises that
+  // this list is exactly what stands between the trader and the swap; when a readiness read never
+  // landed the list is known-incomplete and the promise cannot be made — the caller would be sent to
+  // approve things while the real blocker stayed invisible. (`leader.ts` already declines to mark
+  // the route `needs-action` in that case, so this is belt-and-braces, not the only line of defence.)
+  //
+  // EVERY FIELD IS CHECKED RATHER THAN ASSERTED. `limits` is set in the same `compileAndEncode` call
+  // that produces `tx` and `requirements` is non-empty whenever the route says `needs-action`, so the
+  // three `!` assertions this function used to carry were true — but they were *restating* invariants
+  // owned by another module, and a `!` is silent when one of them moves. A missing field now falls
+  // through to the terminal classification below, which is the same conservative direction the C1
+  // regression (`e.tx!` on a result with no tx) had to be fixed in.
+  const { best, tx, limits, requirements } = e
+  if (
+    best?.execution === 'needs-action' &&
+    tx !== undefined &&
+    limits !== undefined &&
+    requirements !== undefined &&
+    requirements.length > 0 &&
+    !e.report.verificationDegraded
+  ) {
     return {
       status: 'needs-action',
-      best: e.best,
-      tx: e.tx,
-      requirements: e.requirements!,
-      limits: e.limits!,
+      best,
+      tx,
+      requirements,
+      limits,
       alternatives: e.alternatives,
       search: e.report,
     }
   }
-  if (e.best?.execution === 'verified' && e.tx !== undefined) {
+  if (best?.execution === 'verified' && tx !== undefined && limits !== undefined) {
     return {
       status: 'ready',
-      best: e.best,
-      tx: e.tx,
+      best,
+      tx,
       execution: { verifiedAtBlock: e.report.block },
-      limits: e.limits!,
+      limits,
       alternatives: e.alternatives,
       search: e.report,
     }
   }
 
   const complete = isSearchComplete(e.report)
-  if (!e.best) {
+  if (!best) {
     return complete
       ? { status: 'no-route', reason: NO_VIABLE_ROUTE_REASON, alternatives: e.alternatives, search: e.report }
       : { status: 'inconclusive', reason: inconclusiveReason(e.report), alternatives: e.alternatives, search: e.report }
@@ -616,7 +638,7 @@ export function classifySwap(e: InternalResult): SwapResult {
         code: 'no-route-verified',
         detail: `no candidate route verified successfully${e.compileError !== undefined ? ` (${e.compileError})` : ''}`,
       },
-      alternatives: [e.best, ...e.alternatives],
+      alternatives: [best, ...e.alternatives],
       search: e.report,
     }
   }
@@ -628,11 +650,11 @@ export function classifySwap(e: InternalResult): SwapResult {
   // verify this", so the leader is demoted into `alternatives` (where its `revertData` explains
   // itself) and no `tx` is offered. The nominal ranking is unchanged: it is still the head of the
   // list, just not a lead.
-  if (e.best.execution === 'failed') {
+  if (best.execution === 'failed') {
     return {
       status: 'inconclusive',
       reason: inconclusiveReason(e.report),
-      alternatives: [e.best, ...e.alternatives],
+      alternatives: [best, ...e.alternatives],
       search: e.report,
     }
   }
@@ -647,8 +669,8 @@ export function classifySwap(e: InternalResult): SwapResult {
   return {
     status: 'inconclusive',
     reason: inconclusiveReason(e.report),
-    best: e.best,
-    ...(e.tx !== undefined && { tx: e.tx }),
+    best,
+    ...(tx !== undefined && { tx }),
     alternatives: e.alternatives,
     search: e.report,
   }

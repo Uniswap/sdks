@@ -865,6 +865,45 @@ test('classifySwap: promotedOverComplex survives onto the public SwapResult.best
   assertResultCoherent(needsAction)
 })
 
+test('classifySwap: `needs-action` is gated on the ROUTE\'s discriminant, not on the requirement count', () => {
+  // The two used to be read as interchangeable, and they are only interchangeable because of the
+  // order of `verifyLeader`'s body (`search/leader.ts`, "DO NOT REORDER"). This is the shape that
+  // tells them apart: a full requirement list, a compiled tx, a clean report — and a leader the
+  // engine did NOT gate on those requirements. `needs-action` would be a promise about a route
+  // nothing gated, and `assertResultCoherent` rejects exactly that result ("needs-action whose best
+  // route is unverified"), so the classifier must not produce it in the first place.
+  const requirement: ExecutionRequirement = { kind: 'erc20-approval', token: TOKEN_A, spender: PERMIT2, minimumAmount: 1n }
+  const tx: EncodedTx = { to: UNIVERSAL_ROUTER, data: '0xfeedface', value: 0n }
+  const limits = { minAmountOut: 99n, deadline: 9_999_999_999n }
+  const abortedReport: SearchReport = { ...emptyReport(), aborted: true }
+
+  const r = classifySwap({
+    best: rankedRoute(100n, 'unverified'),
+    alternatives: [],
+    tx,
+    limits,
+    requirements: [requirement],
+    report: abortedReport,
+    done: true,
+  })
+
+  expect(r.status).toBe('inconclusive')
+  assertResultCoherent(r)
+
+  // And the positive control: same everything, leader marked `needs-action` by the engine.
+  const gated = classifySwap({
+    best: rankedRoute(100n, 'needs-action'),
+    alternatives: [],
+    tx,
+    limits,
+    requirements: [requirement],
+    report: emptyReport(),
+    done: true,
+  })
+  expect(gated.status).toBe('needs-action')
+  assertResultCoherent(gated)
+})
+
 test('classifySwap: an aborted search hands back everything it computed — best, tx, and alternatives (FW5/P1 regression)', () => {
   // The `AbortSignal.timeout(900)` shape the README recommends: the search priced routes and even
   // compiled the leader's calldata, then the deadline fired. Nobody simulated the leader, so it
