@@ -601,4 +601,40 @@ Three private workspaces sit beside `src/`, none of them published:
   discovery dumps, and a readable rendering of every result's `SearchReport`. The endpoint is a
   parameter (`--rpc`/`$ETH_RPC_URL`); the chain is detected from it. See `cli/README.md`.
 
-`bun run typecheck:all` typechecks the package and all three; `bun run lint` covers `src` and `cli`.
+`bun run typecheck:all` typechecks the package and all three (plus `scripts/`); `bun run lint` covers `src` and `cli`.
+
+### Recorded-replay golden sessions
+
+`src/replay.golden.test.ts` is the hermetic "does the router find the RIGHT answer" layer: each
+fixture under `src/internal/__fixtures__/sessions/` is one real `getQuote` run's complete,
+block-pinned RPC conversation, and the test replays it against the real `createRouter` + built-in
+manifest and asserts the exact best route, exact `amountOut`, every alternative, and the
+canonicalized `SearchReport` against the committed golden. It runs as part of the ordinary unit
+suite (`bun test src`) — no env gate, no network. Requests are matched by canonical
+(method, canonicalized-params) key, so request *order* never matters; a request the recording never
+saw fails loudly by name, because a change to what the search *asks* is a deliberate golden
+regeneration, not noise.
+
+Regenerate a session (or record a new one) through `chainz exec`, so the keyed RPC URL never
+touches the fixture or the output:
+
+```bash
+# re-record one session (request + notes are reused from the existing fixture)
+chainz exec 8453 -- bun scripts/recordSession.ts --label base-eth-usdc --rpc @rpc
+
+# re-record every session
+bun scripts/recordSession.ts --all
+
+# record a brand-new session
+chainz exec 1 -- bun scripts/recordSession.ts --label mainnet-eth-usdc --rpc @rpc \
+  --chain 1 --token-in native --token-out 0xA0b8...eB48 --amount-in 1000000000000000000 --notes "..."
+```
+
+Goldens legitimately change when: (a) ranking/pruning/classification policy changes on purpose —
+regenerate and review the diff as the behavioral change it is; (b) the search starts asking
+different questions (new probe, different scan windows) — the replay transport names the unrecorded
+request and regeneration re-records the conversation; (c) a session is deliberately re-pinned to a
+newer block. They never legitimately change on their own: the recorder derives every golden from a
+strict replay and proves two replays agree before writing, so a golden diff with no code change is a
+determinism bug. Fixtures are redacted by construction (no RPC URLs — provider error messages pass
+through the keyed-URL redaction rule) and total ~1.3 MB across 7 sessions.
