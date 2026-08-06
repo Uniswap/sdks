@@ -5,7 +5,8 @@ import { RouterConfigError } from '../errors'
 import { toGraphNode } from '../internal/currency'
 import type { ScanWidthMemory } from '../internal/logScan'
 import { maxBig, mergeRanges } from '../internal/ranges'
-import type { BlockRange, CurrencyRef, PoolRecord, PoolRef, Protocol } from '../types'
+import type { BlockRange, CurrencyRef, PoolKey, PoolRecord, PoolRef, Protocol } from '../types'
+import { PROTOCOLS } from '../types'
 
 // ---------------------------------------------------------------------------
 // In-memory pool index with a scan-coverage cache.
@@ -259,6 +260,60 @@ function bad(what: string): never {
 }
 
 /**
+ * Checks the one field every consumer of a {@link PoolRef} reads FIRST — the `protocol` discriminant
+ * — and then the arm-specific identity fields that discriminant promises.
+ *
+ * WHY THE DISCRIMINANT IS NOT LIKE THE OTHER FIELDS. `id` and `currencies` are checked above because
+ * the index itself keys and links on them. `protocol` is checked here because everything DOWNSTREAM
+ * of the index switches on it and then reaches straight for an arm-specific field without looking:
+ * `search/candidates.ts#comparePoolPriority` calls `isHooked`, which reads `ref.poolKey.hooks` the
+ * moment `protocol === 'v4'`; `plan/compile.ts`'s recipient-vs-pool check reads `leg.pool.address`
+ * for anything that is not `'v4'` and hands it to viem's `isAddressEqual`; `protocols/v4.ts` and
+ * `encode/ur20.ts` ABI-encode `poolKey.fee`/`tickSpacing`/`hooks` into quote calls and calldata. So a
+ * crafted record claiming `protocol: 'v4'` with no `poolKey` restores into a perfectly ordinary
+ * index and detonates as a bare `TypeError` (or a viem `InvalidAddressError`) from the middle of a
+ * search — outside `cli/cache.ts`'s try, in a stack that names nothing about caches, which is exactly
+ * the failure mode the snapshot trust story (`cli/cache.ts` header, "SHAPE") says cannot happen.
+ *
+ * Still shallow, and for the same reason as everything above it: this checks that the union arm the
+ * record CLAIMS is populated with the right primitive types, not that the values are true. That a
+ * `poolId` really hashes its `PoolKey`, or that an address really holds a pool, is chain state — and
+ * re-deriving chain state is what the snapshot exists to avoid. A quote is still a probe, not a
+ * belief (`cli/cache.ts`).
+ */
+function assertPoolRefIdentity(pool: PoolRef): void {
+  const protocol = pool.protocol as unknown
+  if (typeof protocol !== 'string') bad('a pool ref has a non-string protocol')
+  if (!(PROTOCOLS as readonly string[]).includes(protocol)) bad(`a pool ref names an unknown protocol '${protocol}'`)
+  if (pool.protocol === 'v4') {
+    const key = pool.poolKey as unknown
+    if (typeof key !== 'object' || key === null) bad('a v4 pool ref has no poolKey object')
+    const { currency0, currency1, fee, tickSpacing, hooks } = key as PoolKey
+    // `hooks` reaches `isAddressEqual` in `isHooked` (which THROWS on a non-address) and is ABI-encoded
+    // as an address; `currency0`/`currency1` are the key's own identity and are ABI-encoded alongside it.
+    for (const [field, value] of [
+      ['currency0', currency0],
+      ['currency1', currency1],
+      ['hooks', hooks],
+    ] as const) {
+      if (typeof value !== 'string') bad(`a v4 pool ref's poolKey.${field} is not a string`)
+    }
+    // `fee` is `BigInt()`d in `encode/ur20.ts` and `tickSpacing` is encoded as an int24; a string or
+    // null in either is a throw from inside the encoder rather than a rejected snapshot.
+    for (const [field, value] of [
+      ['fee', fee],
+      ['tickSpacing', tickSpacing],
+    ] as const) {
+      if (typeof value !== 'number') bad(`a v4 pool ref's poolKey.${field} is not a number`)
+    }
+    return
+  }
+  // v2/v3: `address` is the `to` of every reserves/quote `eth_call` and the operand of
+  // `plan/compile.ts`'s `isAddressEqual` recipient check.
+  if (typeof pool.address !== 'string') bad(`a ${pool.protocol} pool ref's address is not a string`)
+}
+
+/**
  * Fails a snapshot whose SHAPE the index cannot operate on, before any of it is loaded.
  *
  * WHY A SHALLOW CHECK IS THE RIGHT AMOUNT. `parseSnapshot` is a deserializer: it turns tagged strings
@@ -297,6 +352,7 @@ function assertSnapshotShape(snap: PoolIndexSnapshot): void {
     const currencies = (pool as PoolRef).currencies as unknown
     if (!Array.isArray(currencies) || currencies.length !== 2) bad('a pool ref does not carry exactly two currencies')
     for (const c of currencies) if (typeof c !== 'string') bad('a pool ref currency is not a string')
+    assertPoolRefIdentity(pool as PoolRef)
     // Read by `rank()` (an `indexOf` that quietly returns -1) and by `isDiscredited`.
     if (typeof rec.source !== 'string') bad('a pool record has a non-string source')
     for (const field of ['createdAtBlock', 'lastQuoteSuccessBlock', 'lastQuoteFailureBlock'] as const) {

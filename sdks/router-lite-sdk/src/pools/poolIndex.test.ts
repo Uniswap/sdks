@@ -651,6 +651,16 @@ describe('PoolIndexSnapshot', () => {
       return idx.toSnapshot()
     }
 
+    /** A well-formed v4 key, so the v4 cases below differ from a legitimate ref in exactly one field.
+     * Lowercased: `computeV4PoolId` hashes real addresses, and `A`/`B` are not checksum-valid. */
+    const V4_KEY = { currency0: A.toLowerCase() as Address, currency1: B.toLowerCase() as Address, fee: 3000, tickSpacing: 60, hooks: zeroAddress }
+
+    /** `valid()` with its single pool replaced by a v4 ref patched by `patch` (`replace` drops the base ref's fields). */
+    const withV4Pool = (s: PoolIndexSnapshot, patch: Record<string, unknown>, replace = false): unknown => ({
+      ...s,
+      pools: [{ ...s.pools[0]!, pool: replace ? patch : { ...v4Ref(V4_KEY), ...patch } }],
+    })
+
     const cases: [string, () => unknown][] = [
       // The one that motivated all of this: loads clean, throws inside `uncovered`.
       ['a coverage bound that is a string', () => ({ ...valid(), coverage: [['v3:x', [{ fromBlock: 'abc', toBlock: 9n }]]] })],
@@ -680,6 +690,30 @@ describe('PoolIndexSnapshot', () => {
       // failure `createRouter` rejects `logChunkBlocks < MIN_CHUNK` for).
       ['a learnedScanWidth of zero', () => ({ ...valid(), learnedScanWidth: 0n })],
       ['a negative learnedScanWidth', () => ({ ...valid(), learnedScanWidth: -1n })],
+      // --- the DISCRIMINANT, and the per-arm identity fields it promises -------------------
+      // `protocol` is what every consumer switches on before touching an arm-specific field, and
+      // nothing checked it: `{ protocol: 'v4' }` with no `poolKey` loads clean and then detonates
+      // as a TypeError in `search/candidates.ts#comparePoolPriority` (via `isHooked`, which reads
+      // `ref.poolKey.hooks`) or as a viem `InvalidAddressError` in `plan/compile.ts`'s
+      // recipient-vs-pool check — both mid-search, both outside `cli/cache.ts`'s try.
+      ['a pool ref with no protocol', () => { const s = valid(); const { protocol: _p, ...rest } = s.pools[0]!.pool; return { ...s, pools: [{ ...s.pools[0]!, pool: rest }] } }],
+      ['a pool ref with a non-string protocol', () => { const s = valid(); return { ...s, pools: [{ ...s.pools[0]!, pool: { ...s.pools[0]!.pool, protocol: 4 } }] } }],
+      ['a pool ref with a protocol nothing implements', () => { const s = valid(); return { ...s, pools: [{ ...s.pools[0]!, pool: { ...s.pools[0]!.pool, protocol: 'v5' } }] } }],
+      // v4: `poolKey` is read by `isHooked` (ranking), `protocols/v4.ts#toPathKeys` (quoting) and
+      // `encode/ur20.ts#encodeV4PathKeys` (calldata) — `hooks` through `isAddressEqual`, which
+      // THROWS on a non-address, and `fee`/`tickSpacing` straight into ABI encoding.
+      ['a v4 ref with no poolKey', () => { const { poolKey: _k, ...rest } = v4Ref(V4_KEY); return withV4Pool(valid(), rest, true) }],
+      ['a v4 ref whose poolKey is not an object', () => withV4Pool(valid(), { poolKey: 'nope' })],
+      ['a v4 ref whose poolKey.hooks is not a string', () => withV4Pool(valid(), { poolKey: { ...V4_KEY, hooks: 0 } })],
+      ['a v4 ref whose poolKey.currency0 is not a string', () => withV4Pool(valid(), { poolKey: { ...V4_KEY, currency0: null } })],
+      ['a v4 ref whose poolKey.currency1 is not a string', () => withV4Pool(valid(), { poolKey: { ...V4_KEY, currency1: 7 } })],
+      ['a v4 ref whose poolKey.fee is not a number', () => withV4Pool(valid(), { poolKey: { ...V4_KEY, fee: '3000' } })],
+      ['a v4 ref whose poolKey.tickSpacing is not a number', () => withV4Pool(valid(), { poolKey: { ...V4_KEY, tickSpacing: null } })],
+      // v2/v3: `address` reaches `isAddressEqual` in `plan/compile.ts`'s recipient check and becomes
+      // the `to` of every reserves/quote `eth_call`.
+      ['a v2 ref with no address', () => { const s = valid(); const { address: _a, ...rest } = s.pools[0]!.pool as Record<string, unknown>; return { ...s, pools: [{ ...s.pools[0]!, pool: rest }] } }],
+      ['a v2 ref whose address is not a string', () => { const s = valid(); return { ...s, pools: [{ ...s.pools[0]!, pool: { ...s.pools[0]!.pool, address: 42 } }] } }],
+      ['a v3 ref whose address is not a string', () => { const s = valid(); return { ...s, pools: [{ ...s.pools[0]!, pool: { ...s.pools[0]!.pool, protocol: 'v3', address: null } }] } }],
     ]
 
     for (const [what, build] of cases) {
@@ -698,6 +732,26 @@ describe('PoolIndexSnapshot', () => {
       // and not a wall.
       const good = PoolIndex.fromSnapshot(parseSnapshot(serializeSnapshot(valid())))
       expect(good.uncovered('v3', A, 1n, 100n)).toEqual([{ fromBlock: 69n, toBlock: 100n }])
+    })
+
+    test('a v4-claiming ref with no poolKey used to load clean and detonate in RANKING — now it cannot load at all', () => {
+      // The discriminant's own version of the poisoned-coverage regression, and the reason
+      // `protocol` has to be checked alongside the arm it selects. `comparePoolPriority`
+      // (`search/candidates.ts`) calls `isHooked`, which reads `ref.poolKey.hooks` the instant
+      // `protocol === 'v4'` — so this payload restores into a perfectly ordinary-looking index and
+      // then throws a bare TypeError from the middle of candidate enumeration, in a stack that
+      // names nothing about caches and outside `cli/cache.ts`'s try.
+      const { poolKey: _k, ...noKey } = v4Ref(V4_KEY)
+      const poisoned = withV4Pool(valid(), noKey, true) as PoolIndexSnapshot
+      expect(() => PoolIndex.fromSnapshot(poisoned)).toThrow(RouterConfigError)
+      expect(() => PoolIndex.fromSnapshot(poisoned)).toThrow(/malformed/)
+
+      // ...and a genuine v4 snapshot still round-trips, so this is a filter and not a wall.
+      const idx = new PoolIndex(WETH)
+      idx.upsert({ pool: v4Ref(V4_KEY), source: 'event' })
+      const restored = PoolIndex.fromSnapshot(parseSnapshot(serializeSnapshot(idx.toSnapshot())))
+      expect(restored.pair(A, B)).toHaveLength(1)
+      expect(restored.pair(A, B)[0]!.pool).toEqual(v4Ref(V4_KEY))
     })
 
     test('the shape check survives the JSON round trip it exists to guard', () => {

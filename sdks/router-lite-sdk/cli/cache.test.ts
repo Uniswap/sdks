@@ -191,6 +191,27 @@ describe('the exit-time flush', () => {
 })
 
 describe('a corrupt cache file is never a crash (F1)', () => {
+  const PA = '0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+  const PB = '0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB'
+
+  /** A schema-`v` snapshot whose only content is one pool record wrapping the literal `poolJson`. */
+  function poolBody(v: number, poolJson: string): string {
+    return (
+      '{"schemaVersion":' + v + ',"wrappedNative":"0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",' +
+      '"reorgOverlapBlocks":"$bigint:32","pools":[{"pool":' + poolJson + ',"source":"event"}],' +
+      '"coverage":[],"enabledFees":[]}'
+    )
+  }
+
+  /** A ref that claims `protocol: 'v4'` — id, currencies and poolId all present — and omits `poolKey`. */
+  function v4NoPoolKeyBody(v: number): string {
+    return poolBody(
+      v,
+      '{"id":"v4:0x' + 'cd'.repeat(32) + '","currencies":["' + PA + '","' + PB + '"],' +
+        '"protocol":"v4","poolId":"0x' + 'cd'.repeat(32) + '"}',
+    )
+  }
+
   /** Writes `body` verbatim as chain 1's cache file. */
   async function poison(body: string): Promise<void> {
     await mkdir(join(dir, 'router-lite'), { recursive: true })
@@ -214,6 +235,13 @@ describe('a corrupt cache file is never a crash (F1)', () => {
     ['the whole file is JSON null', 'null'],
     ['the file is empty', ''],
     ['a coverage bound is poisoned', '{"schemaVersion":' + V + ',"wrappedNative":"0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2","reorgOverlapBlocks":"$bigint:32","pools":[],"coverage":[["v3:x",[{"fromBlock":"abc","toBlock":"$bigint:9"}]]],"enabledFees":[]}'],
+    // A pool that CLAIMS v4 and carries no `poolKey`: the discriminant's version of the poisoned
+    // coverage bound above. It parses, it restores, and it then throws a bare TypeError out of
+    // `isHooked` the first time candidate ranking touches it — mid-search, long past this function's
+    // try, which is the whole reason the shape check is the SDK's job and not the CLI's.
+    ['a pool claims v4 but carries no poolKey', v4NoPoolKeyBody(V)],
+    ['a pool carries a protocol nothing implements', poolBody(V, '{"id":"v9:0x1","currencies":["' + PA + '","' + PB + '"],"protocol":"v9","address":"' + PA + '"}')],
+    ['a v2 pool has no address', poolBody(V, '{"id":"v2:0x1","currencies":["' + PA + '","' + PB + '"],"protocol":"v2","token0":"' + PA + '","token1":"' + PB + '"}')],
   ]
 
   for (const [what, body] of payloads) {
@@ -232,6 +260,18 @@ describe('a corrupt cache file is never a crash (F1)', () => {
     const loaded = await loadCache(1, warmIndex())
     expect(loaded.index).toBeUndefined()
     expect(loaded.note).toMatch(/malformed/)
+  })
+
+  it('a pool ref lying about its protocol is caught at load, not on the next search', async () => {
+    // The sibling of the above for the PoolRef discriminant. Without the shape gate this file
+    // restores into a working index and the crash lands in `comparePoolPriority`/`compile.ts`, where
+    // nothing knows a cache exists — so the note here has to say `malformed` (the gate fired), not
+    // merely `cold start`.
+    await poison(v4NoPoolKeyBody(POOL_INDEX_SCHEMA_VERSION))
+    const loaded = await loadCache(1, warmIndex())
+    expect(loaded.index).toBeUndefined()
+    expect(loaded.note).toMatch(/malformed/)
+    expect(loaded.note).toMatch(/discard it and start fresh/)
   })
 })
 
