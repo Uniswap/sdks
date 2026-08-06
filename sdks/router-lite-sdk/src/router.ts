@@ -576,12 +576,11 @@ export function classifySwap(e: InternalResult): SwapResult {
   // approve things while the real blocker stayed invisible. (`leader.ts` already declines to mark
   // the route `needs-action` in that case, so this is belt-and-braces, not the only line of defence.)
   //
-  // EVERY FIELD IS CHECKED RATHER THAN ASSERTED. `limits` is set in the same `compileAndEncode` call
-  // that produces `tx` and `requirements` is non-empty whenever the route says `needs-action`, so the
-  // three `!` assertions this function used to carry were true — but they were *restating* invariants
-  // owned by another module, and a `!` is silent when one of them moves. A missing field now falls
-  // through to the terminal classification below, which is the same conservative direction the C1
-  // regression (`e.tx!` on a result with no tx) had to be fixed in.
+  // EVERY FIELD IS CHECKED RATHER THAN ASSERTED. The three `!` assertions this function used to
+  // carry were true, but each of them was this module betting on an invariant another module owns,
+  // and a `!` is silent when one of those moves. A missing field now falls through to the terminal
+  // classification below, which is the same conservative direction the C1 regression (`e.tx!` on a
+  // result with no tx) had to be fixed in.
   const { best, tx, limits, requirements } = e
   if (
     best?.execution === 'needs-action' &&

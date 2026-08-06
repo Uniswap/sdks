@@ -233,10 +233,9 @@ export type InternalResult = {
   best?: RankedRoute
   alternatives: RankedRoute[]
   requirements?: ExecutionRequirement[]
+  /** The leading route's {@link CompiledRoute}, spread into the two fields the public result shape
+   * declares. Present or absent together, by construction: they are read out of one record. */
   tx?: EncodedTx
-  /** The leading route's compiled `deliverOutput.minAmountOut`/deadline (C4-P7), alongside `tx`
-   * whenever `tx` is — set by `search/leader.ts#compileAndEncode` at the same time as `tx`, never
-   * independently, so the two can never disagree about which plan they describe. */
   limits?: CompiledLimits
   /** Why no candidate could be compiled into an executable plan, when that is what went wrong — see
    * {@link EngineState.firstCompileError}. The facade appends it to a `no-route` reason so the
@@ -261,6 +260,20 @@ export type ProtocolDiscovery = {
 
 export type ExecutionState = { status: RankedRoute['execution']; revertData?: Hex }
 
+/**
+ * What one compile+encode produced for a route: the calldata, and the two numbers that calldata
+ * asserts (`deliverOutput.minAmountOut`, and the deadline handed to the encoder).
+ *
+ * ONE RECORD RATHER THAN TWO PARALLEL MAPS, and that is the whole point of the type. These used to
+ * be `txById` and `limitsById`, written on adjacent lines of `compileAndEncode` and read on adjacent
+ * lines of `evaluate`, with three separate comments (here, in `leader.ts`, and in `router.ts`'s
+ * `classifySwap`) each promising the reader that the two could never describe different plans for
+ * the same routeId. A promise restated in three modules is a promise nothing enforces; a single
+ * record makes it unstateable instead — there is no write that sets one without the other, and no
+ * read that can find one without the other.
+ */
+export type CompiledRoute = { tx: EncodedTx; limits: CompiledLimits }
+
 export type EngineState = {
   block: BlockRef
   /** routeId -> successfully quoted route, accumulated across waves. */
@@ -270,12 +283,8 @@ export type EngineState = {
   /** Discovery-probe ids already fired (probe results are pool evidence, not routes). */
   probed: Set<string>
   execution: Map<string, ExecutionState>
-  txById: Map<string, EncodedTx>
-  /** The plan's own `deliverOutput.minAmountOut` and the deadline handed to the encoder, keyed
-   * alongside `txById` — set at the same time as the matching `txById` entry
-   * (`search/leader.ts#compileAndEncode`), never independently, so the two can never describe
-   * different plans for the same routeId. */
-  limitsById: Map<string, CompiledLimits>
+  /** routeId -> everything `search/leader.ts#compileAndEncode` produced for it. */
+  compiledById: Map<string, CompiledRoute>
   /**
    * The first reason a candidate could not be turned into an executable plan, verbatim.
    *
@@ -361,8 +370,7 @@ export function initialState(block: BlockRef, headRegressed: boolean): EngineSta
     seen: new Set(),
     probed: new Set(),
     execution: new Map(),
-    txById: new Map(),
-    limitsById: new Map(),
+    compiledById: new Map(),
     quoting: zeroQuoting(),
     verificationDegraded: false,
     readinessDegraded: false,

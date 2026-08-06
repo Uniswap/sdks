@@ -90,8 +90,8 @@ function isIntegerOutOfRange(err: unknown): boolean {
 export function compileAndEncode(run: Extract<Run, { kind: 'swap' }>, quoted: QuotedRoute): EncodedTx | undefined {
   const { ctx, req, state } = run
   const id = routeId(quoted.route)
-  const cached = state.txById.get(id)
-  if (cached) return cached
+  const cached = state.compiledById.get(id)
+  if (cached) return cached.tx
 
   try {
     // Safe to require here: `compileAndEncode` only ever runs on a swap `Run`, and
@@ -111,11 +111,10 @@ export function compileAndEncode(run: Extract<Run, { kind: 'swap' }>, quoted: Qu
     })
     const deadline = state.block.timestamp + BigInt(req.deadlineSeconds ?? DEFAULT_DEADLINE_SECONDS)
     const tx = encoderFor(execution.commandSet)(plan, execution, deadline)
-    state.txById.set(id, tx)
-    // Echoed onto the public result's `limits` (C4-P7): the same `minAmountOut`/`deadline` the plan
-    // and the encoded `tx` actually assert, captured at the moment they're computed so there is no
-    // second derivation of either number to drift from the calldata.
-    state.limitsById.set(id, { minAmountOut: plan.deliverOutput.minAmountOut, deadline })
+    // The limits are echoed onto the public result (C4-P7) straight from the plan and the deadline
+    // this call just used, so there is no second derivation of either number to drift from the
+    // calldata they were encoded into.
+    state.compiledById.set(id, { tx, limits: { minAmountOut: plan.deliverOutput.minAmountOut, deadline } })
     return tx
   } catch (err) {
     // Both arms are "this candidate cannot be executed", and both keep their reason: a search whose
@@ -298,10 +297,7 @@ export async function evaluate(run: Run, done: boolean): Promise<InternalResult>
   const evaluated = ranked.map((q) => withExecution(run, q))
   const best = pickLeader(evaluated, leaderId)
   const alternatives = evaluated.filter((e) => e !== best)
-  const tx = state.txById.get(routeId(best.route))
-  // Keyed identically to `tx` — set in the same `compileAndEncode` call, so one present without the
-  // other never happens.
-  const limits = state.limitsById.get(routeId(best.route))
+  const compiled = state.compiledById.get(routeId(best.route))
 
-  return { best, alternatives, ...base, ...(tx !== undefined && { tx }), ...(limits !== undefined && { limits }) }
+  return { best, alternatives, ...base, ...(compiled !== undefined && { tx: compiled.tx, limits: compiled.limits }) }
 }
