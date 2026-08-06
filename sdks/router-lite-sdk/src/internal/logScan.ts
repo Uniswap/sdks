@@ -1,23 +1,12 @@
 import type { Hex, Log, PublicClient } from 'viem'
 import { formatLog } from 'viem'
 
-import {
-  BACKOFF_BASE_MS,
-  BACKOFF_MAX_MS,
-  CHUNK_REGROWTH_SUCCESSES,
-  DESCENT_TIMEOUT_FALLBACK,
-  MAX_BACKOFF_TOTAL_MS,
-  MAX_CONSECUTIVE_MIN_FAILURES,
-  MAX_REQUESTS_PER_SCAN,
-  MAX_SCAN_WINDOW,
-  MIN_CHUNK,
-  SCAN_CHUNK_CONCURRENCY,
-} from '../constants'
+import { MAX_REQUESTS_PER_SCAN } from '../constants'
 import type { BlockRange, LogQuery } from '../types'
 
+import { batchLimit, initialPolicy, nextStep, refusalFactsOf } from './logScanPolicy'
 import { maxBig, mergeRanges, minBig } from './ranges'
 import type { Semaphore } from './rpc'
-import { classifyRpcError, parseDeclaredCap } from './rpcErrors'
 
 // viem types each topic slot as `Hex | Hex[] | null` to allow OR-matching on
 // array-typed indexed params. None of the creation-event topics this package
@@ -39,6 +28,18 @@ export function narrowTopics(topics: (Hex | Hex[] | null)[]): (Hex | null)[] {
 // window — recording exactly what was (and wasn't) covered so callers can
 // decide whether a partial scan is good enough.
 //
+// THE WIDTH POLICY IS A PURE REDUCER, NOT PART OF THIS LOOP. Every decision
+// about how wide the next request should be — the wide-start descent, the
+// declared-cap and expensive-refusal fast paths, halving, regrowth, the
+// minimum-window retry/backoff/give-up ladder — lives in
+// `./logScanPolicy.ts#nextStep` as a `(state, outcome) -> (state', action)`
+// transition function with its own table-driven tests. `scanLogs` below owns
+// only the I/O around it: dispatching batches, the semaphore and abort, the
+// request-budget accounting, coverage bookkeeping, `onLogs`, and reading /
+// writing `opts.widthMemory` at the edges. The paragraphs that follow describe
+// the machine's WHY at the scan level; the per-transition rationale sits on
+// the reducer's branches.
+//
 // IT STARTS WIDE, ON PURPOSE (S1). The first window of every scan is
 // `min(remaining range, ceiling)`, where the ceiling is `MAX_SCAN_WINDOW`
 // (16M blocks — the widest single request measured served) unless the caller
@@ -58,7 +59,7 @@ export function narrowTopics(topics: (Hex | Hex[] | null)[]): (Hex | null)[] {
 // repo has captured drpc doing on archive reads — bills real time for every
 // step, and viem retries a timeout three times at ~10s before the error even
 // reaches this loop: a naive ladder there is minutes of zero progress. So the
-// catch below classifies (`internal/rpcErrors.ts#classifyRpcError`) and, on a
+// policy classifies (`internal/rpcErrors.ts#classifyRpcError`) and, on a
 // transport/unavailable failure at a wide window, drops straight to
 // `DESCENT_TIMEOUT_FALLBACK` rather than halving — one expensive failure buys
 // the whole descent. A caller who already knows the cap skips all of it with
@@ -66,8 +67,8 @@ export function narrowTopics(topics: (Hex | Hex[] | null)[]): (Hex | null)[] {
 //
 // SOME PROVIDERS DO SAY (R2). blastapi, drpc, alchemy and quicknode all state
 // the window that would have worked, in the error text, and
-// `internal/rpcErrors.ts#parseDeclaredCap` reads it. When a cap is declared the loop
-// below skips the search entirely: it jumps the window straight to the stated
+// `internal/rpcErrors.ts#parseDeclaredCap` reads it. When a cap is declared the policy
+// skips the search entirely: it jumps the window straight to the stated
 // cap, or — when that cap is below MIN_CHUNK, i.e. below anything this scanner
 // will ever ask for — gives the sub-range up on the first error instead of
 // spending a retry budget and a backoff escalation rediscovering the same
@@ -306,16 +307,6 @@ export async function scanLogs(
   const coveredRaw: BlockRange[] = []
   const sleep = opts.sleep ?? ((ms: number): Promise<void> => delay(ms, opts.signal))
   const memory = opts.widthMemory
-  // The widest window this scan may ever ask for: the caller's override when they know their
-  // provider's cap, otherwise the empirical ceiling — narrowed further by any cap the endpoint has
-  // DECLARED (this scan, or an earlier one through `opts.widthMemory`). Never exceeded, by the first
-  // request or by any regrowth doubling after it.
-  //
-  // MUTABLE, WHICH IS THE POINT (see the declared-cap branch below). Clamping the ceiling — rather
-  // than only the current width — is what stops the regrowth ratchet from doubling past a ceiling
-  // the endpoint has already named, failing, and re-establishing, forever: at `chunkSize >= ceiling`
-  // the doubling is a no-op, so `widthEstablished` survives it and the batching below stays whole.
-  let ceiling = minBig(opts.initialChunk ?? MAX_SCAN_WINDOW, memory?.declaredScanCap ?? MAX_SCAN_WINDOW)
 
   // The request budget for THIS scan: {@link MAX_REQUESTS_PER_SCAN}, or a caller's tighter one. Only
   // ever narrows — a caller may buy less of the endpoint's time than the global ceiling allows, never
@@ -323,29 +314,16 @@ export async function scanLogs(
   const requestBudget = Math.max(1, Math.min(opts.maxRequests ?? MAX_REQUESTS_PER_SCAN, MAX_REQUESTS_PER_SCAN))
 
   let cursor = toBlock
-  // Start at the whole range when it fits under the ceiling — asking for 16M blocks of a 5,000-block
-  // re-scan would be a guaranteed-wasted probe on any endpoint that validates the span it was handed.
-  // A `learnedScanWidth` from an earlier scan narrows the start the same way, and for the same
-  // reason: it is the widest window this endpoint is known to serve, so anything above it is a probe
-  // whose answer is already in hand. It is only a hint — the halving below still corrects it
-  // downward and the regrowth ratchet still climbs back to `ceiling` — so a stale one costs a probe,
-  // never coverage.
-  // `maxBig(..., 1n)` only guards an inverted range, whose loop below never runs anyway.
-  let chunkSize = minBig(minBig(maxBig(toBlock - fromBlock + 1n, 1n), ceiling), memory?.learnedScanWidth ?? ceiling)
   let requests = 0
-  // Failures at MIN_CHUNK on the *current* sub-range: drives when to give that sub-range up.
-  let consecutiveMinFailures = 0
-  // Failures at MIN_CHUNK since the last success *anywhere*: drives the backoff exponent. Kept
-  // apart from the counter above because giving a sub-range up is not progress — the endpoint is
-  // still the same endpoint, and moving on to older blocks must not reset the escalation.
-  let minFailuresSinceSuccess = 0
-  let consecutiveSuccesses = 0
-  let backoffSpentMs = 0
-  // P1: whether the LAST chunk asked for at the current `chunkSize` was served. False at the start
-  // (nothing is known yet) and reset by every failure and by every regrowth that actually changes the
-  // width — so it is exactly "this width is known-good right now", which is the only state under
-  // which asking for several of them at once is not a gamble.
-  let widthEstablished = false
+  // The width-policy machine's whole belief state (see `./logScanPolicy.ts`). `opts.widthMemory` is
+  // READ exactly here — the start hint and any declared ceiling seed the initial state — and WRITTEN
+  // back at the two loop edges below, so the reducer itself never sees the shared object.
+  let policy = initialPolicy({
+    rangeSpan: toBlock - fromBlock + 1n,
+    ceilingOverride: opts.initialChunk,
+    declaredScanCap: memory?.declaredScanCap,
+    learnedScanWidth: memory?.learnedScanWidth,
+  })
 
   /**
    * One `eth_getLogs` for `chunk`, under the router's semaphore. Failures are RETURNED, never thrown,
@@ -396,27 +374,19 @@ export async function scanLogs(
     if (opts.signal?.aborted) break
     if (requests >= requestBudget) break
 
-    // --- how many chunks go out together (P1) --------------------------------------------------
-    // One, until a chunk at this exact width has been served. After that, up to
-    // SCAN_CHUNK_CONCURRENCY — bounded further by two things that are not about concurrency at all:
-    // the request budget (a batch may not overshoot it, so `MAX_REQUESTS_PER_SCAN` stays an exact
-    // count rather than an approximate one), and the regrowth boundary. The latter is what keeps the
-    // ratchet's cadence identical to the sequential one: below the ceiling the window must still
-    // double after exactly CHUNK_REGROWTH_SUCCESSES clean chunks, so a batch stops short of that
-    // count rather than sailing past it. AT the ceiling, doubling is a no-op — there is no boundary
-    // to respect and no reason to break the batch up.
-    const budgetLeft = requestBudget - requests
-    const regrowthRoom =
-      chunkSize >= ceiling ? SCAN_CHUNK_CONCURRENCY : CHUNK_REGROWTH_SUCCESSES - consecutiveSuccesses
-    const batchLimit = widthEstablished
-      ? Math.max(1, Math.min(SCAN_CHUNK_CONCURRENCY, regrowthRoom, budgetLeft))
-      : 1
+    // How many chunks go out together (P1) is the policy's call (`logScanPolicy.ts#batchLimit` —
+    // never past a regrowth boundary, width-established-then-parallel); the loop only supplies the
+    // budget headroom, so a batch can never overshoot `MAX_REQUESTS_PER_SCAN` and the count stays
+    // exact rather than approximate. `width` is pinned here because the batch is dispatched at THIS
+    // width — the policy may have moved on by the time the memory hint is recorded below.
+    const limit = batchLimit(policy, requestBudget - requests)
+    const width = policy.chunkSize
 
     // Consecutive same-width sub-ranges walking backward from `cursor`, recent-first — the exact
     // sequence the sequential loop would have visited, planned up front instead of one at a time.
     const batch: BlockRange[] = []
-    for (let planCursor = cursor; batch.length < batchLimit && planCursor >= fromBlock; ) {
-      const start = maxBig(fromBlock, planCursor - chunkSize + 1n)
+    for (let planCursor = cursor; batch.length < limit && planCursor >= fromBlock; ) {
+      const start = maxBig(fromBlock, planCursor - width + 1n)
       batch.push({ fromBlock: start, toBlock: planCursor })
       planCursor = start - 1n
     }
@@ -464,148 +434,59 @@ export async function scanLogs(
 
     if (okCount > 0) {
       cursor = batch[okCount - 1]!.fromBlock - 1n
-      consecutiveMinFailures = 0
-      minFailuresSinceSuccess = 0
-      consecutiveSuccesses += okCount
-      widthEstablished = true
       // A window this endpoint DEMONSTRABLY serves, remembered for the next scan's starting guess.
-      // A running MAXIMUM, not the last value: `chunkSize` is also narrowed by a short range (a
+      // A running MAXIMUM, not the last value: the width is also narrowed by a short range (a
       // 5,000-block delta re-scan asks for 5,000 blocks and is served), and recording that as what
       // the endpoint "can do" would ratchet the hint down towards nothing over a warm router's life.
-      if (memory && chunkSize > (memory.learnedScanWidth ?? 0n)) memory.learnedScanWidth = chunkSize
+      // `width` rather than `policy.chunkSize`, deliberately: the reduction below may regrow the
+      // width, and a grown width is a PROBE nothing has served yet.
+      if (memory && width > (memory.learnedScanWidth ?? 0n)) memory.learnedScanWidth = width
+      // The served prefix reaches the machine BEFORE the failure that cut the batch short (if any):
+      // a success resets the backoff escalation, and the descent must see that reset.
+      policy = nextStep(policy, { kind: 'served', chunks: okCount }).policy
     }
 
-    if (stopAt === -1) {
-      if (consecutiveSuccesses >= CHUNK_REGROWTH_SUCCESSES) {
-        // Probe for a wider window. If the earlier failure was transient this restores full speed;
-        // if the cap is real the next request fails and halves straight back, costing one request.
-        // A width that actually changed is a width nothing has served yet, so the probe goes out
-        // alone (P1) exactly as the very first chunk of the scan did.
-        const grown = minBig(chunkSize * 2n, ceiling)
-        if (grown !== chunkSize) widthEstablished = false
-        chunkSize = grown
-        consecutiveSuccesses = 0
-      }
-      continue
-    }
+    if (stopAt === -1) continue
 
     // An ABORT stopped the batch, not the endpoint. The prefix above is kept (those chunks really were
     // served), and everything else is simply not evidence: no halving, no backoff, no give-up — the
-    // width that was working is still the width that was working, and the endpoint did nothing wrong.
-    // The loop's own top-of-iteration check ends the scan on the next pass.
-    if ('skipped' in settled[stopAt]!) continue
-
-    // --- a chunk failed: the sequential descent takes over from here ----------------------------
-    // `cursor`/`chunkStart` name the sub-range the FIRST failure was for, which is precisely the one
-    // a sequential walk would have been sitting on when it saw this error — everything below is the
-    // pre-P1 error path, unchanged, operating on exactly the state it always did.
-    const err = (settled[stopAt] as { ok: false; err: unknown }).err
-    const chunkStart = batch[stopAt]!.fromBlock
-    cursor = batch[stopAt]!.toBlock
-    consecutiveSuccesses = 0
-    widthEstablished = false
-
-    // --- the declared-cap fast path (R2) -------------------------------------------------
-    // Some providers state the window they WOULD have served, right there in the error (see
-    // `internal/rpcErrors.ts#parseDeclaredCap` and the live captures it is built from). When they do,
-    // the bisection below is searching for an answer already in hand.
-    const { capBlocks, capKind } = parseDeclaredCap(err)
-    if (capBlocks !== undefined && capBlocks < chunkSize) {
-      // A SPAN cap is a POLICY, not a data point, so it lowers the CEILING and not merely the current
-      // width — and that distinction is worth more than every probe the fast path skips. Left as only
-      // a width, the ratchet doubles straight back past the stated cap after CHUNK_REGROWTH_SUCCESSES
-      // clean chunks, fails, un-establishes the width, and sends the next chunk out alone: measured
-      // against quicknode's Base endpoint, that cycle spends three sequential round trips per four
-      // chunks of real work and never stops. Clamped, `grown === chunkSize` at the ceiling,
-      // `widthEstablished` survives, and the walk runs at a full SCAN_CHUNK_CONCURRENCY-wide batch per
-      // round trip — 1.39x on a six-scan adjacency fan-out, live.
-      //
-      // A `'density'` CAP MUST NOT CLAMP, and getting this wrong would be far more expensive than
-      // never having read the message at all. Alchemy answers a too-wide WETH adjacency query with
-      // "you can make eth_getLogs requests with up to a 10,000 block range … or you can request any
-      // block range with a cap of 10K logs … this block range should work: [8,000,000 blocks]" — a
-      // stated 10,000 alongside a demonstration that it will serve 8M for this very query. Clamping
-      // there pins every mainnet scan 800x too narrow for the rest of its life. The WIDTH jump below
-      // still applies to both kinds (it is only this attempt's guess, and the regrowth ratchet climbs
-      // back out of it, which is exactly the recovery a density observation needs); only the durable
-      // ceiling is withheld. See `internal/rpcErrors.ts#DeclaredCap.capKind`.
-      //
-      // Only ever NARROWS (`minBig`), so a provider that declares different span caps for different
-      // queries leaves this scan at the tightest one it was actually told about, and an
-      // `initialChunk` override is never widened by anything a provider says.
-      if (capKind === 'span') {
-        ceiling = minBig(ceiling, capBlocks)
-        if (memory) memory.declaredScanCap = minBig(memory.declaredScanCap ?? capBlocks, capBlocks)
-      }
-      if (capBlocks < MIN_CHUNK) {
-        // The endpoint's own ceiling is BELOW the smallest window this scanner will ask for, so no
-        // amount of halving, retrying or backing off can reach it — MIN_CHUNK is the floor, and the
-        // provider has just said the floor is too high. Give the sub-range up on the spot: leave it
-        // out of `covered` (partial discovery, reported honestly, exactly as an exhausted retry
-        // budget would) and move on to older blocks. Without this, a 10-block-cap endpoint costs
-        // MAX_CONSECUTIVE_MIN_FAILURES requests AND a full backoff escalation per sub-range to
-        // rediscover the same sentence, burning the request budget and up to MAX_BACKOFF_TOTAL_MS
-        // of deliberate sleeping on a scan that was never going to cover anything.
-        cursor = chunkStart - 1n
-        consecutiveMinFailures = 0
-        continue
-      }
-      // A real, serveable cap: jump straight to it instead of halving toward it. No backoff — this
-      // is an endpoint capping, not an endpoint failing, which is the same reason the blind-halving
-      // branch below does not sleep either.
-      chunkSize = capBlocks
-      consecutiveMinFailures = 0
+    // width that was working is still the width that was working, and the endpoint did nothing wrong
+    // (the `skipped` transition is the identity). The loop's own top-of-iteration check ends the scan
+    // on the next pass.
+    if ('skipped' in settled[stopAt]!) {
+      policy = nextStep(policy, { kind: 'skipped' }).policy
       continue
     }
 
-    // --- the expensive-refusal fast path (S1) ---------------------------------------------
-    // Halving assumes a refusal is free. It is, for a provider that VALIDATES the span — and it is
-    // not, for one that executed the query before refusing (a result-size cap) or simply hung until
-    // viem gave up (a timeout, which viem has already retried 3 times at ~10s before this catch even
-    // runs). On those, thirteen halvings from MAX_SCAN_WINDOW is minutes of no progress. So when the
-    // failure classifies as transport/unavailable — precisely those two shapes — collapse the window
-    // to DESCENT_TIMEOUT_FALLBACK in one step. Guarded by `>` so it can fire at most once per
-    // descent and can only ever NARROW: below that width, ordinary halving takes over and every
-    // termination guarantee is exactly as it was.
-    if (chunkSize > DESCENT_TIMEOUT_FALLBACK) {
-      const kind = classifyRpcError(err)
-      if (kind === 'transport' || kind === 'unavailable') {
-        chunkSize = DESCENT_TIMEOUT_FALLBACK
-        consecutiveMinFailures = 0
-        continue
-      }
+    // --- a chunk failed: the pure descent decides what happens next -----------------------------
+    // `cursor`/`chunkStart` name the sub-range the FIRST failure was for, which is precisely the one
+    // a sequential walk would have been sitting on when it saw this error — the reducer receives
+    // exactly the state that walk would have had.
+    const err = (settled[stopAt] as { ok: false; err: unknown }).err
+    const chunkStart = batch[stopAt]!.fromBlock
+    cursor = batch[stopAt]!.toBlock
+
+    const ceilingBefore = policy.ceiling
+    const step = nextStep(policy, { kind: 'refused', facts: refusalFactsOf(err) })
+    policy = step.policy
+
+    // A ceiling the reducer just lowered is a span cap the endpoint DECLARED — the span-clamp is the
+    // only transition that lowers it — so it is mirrored into the shared memory here, at the loop
+    // edge, keeping the reducer pure. Monotone (`minBig`) for the same reason the clamp itself is:
+    // interleaved scans converge on the tightest cap whatever order their writes land in.
+    if (memory && policy.ceiling < ceilingBefore) {
+      memory.declaredScanCap = minBig(memory.declaredScanCap ?? policy.ceiling, policy.ceiling)
     }
 
-    if (chunkSize <= MIN_CHUNK) {
-      consecutiveMinFailures++
-      minFailuresSinceSuccess++
-      if (consecutiveMinFailures >= MAX_CONSECUTIVE_MIN_FAILURES) {
-        // Give up this sub-range: leave it out of `covered` and move on to older blocks.
-        cursor = chunkStart - 1n
-        consecutiveMinFailures = 0
-      }
-      // else: retry the same window (transient failure) — cursor/chunkSize unchanged.
-      //
-      // Either way the next request goes to an endpoint that just failed at the smallest window
-      // this scanner will ask for, so it waits first — moving on to an older sub-range is not a
-      // reason to stop backing off, the endpoint is the thing that is unwell, not the range.
-      // Waiting stops once MAX_BACKOFF_TOTAL_MS is spent: an endpoint still failing after a solid
-      // minute of deliberate quiet is not going to be nursed back by more of it, and the request
-      // budget — not the sleeping — is what stops the scan.
-      const wait = Math.min(
-        BACKOFF_BASE_MS * 2 ** (minFailuresSinceSuccess - 1),
-        BACKOFF_MAX_MS,
-        MAX_BACKOFF_TOTAL_MS - backoffSpentMs,
-      )
-      if (wait > 0) {
-        backoffSpentMs += wait
-        await sleep(wait)
-      }
-    } else {
-      chunkSize = maxBig(chunkSize / 2n, MIN_CHUNK)
-      consecutiveMinFailures = 0
-      // retry the same cursor with the smaller window — a cap, not an outage: no backoff.
-    }
+    // Give up this sub-range: leave it out of `covered` and move on to older blocks. Every other
+    // action retries the same sub-range — the loop re-plans from the unchanged cursor at whatever
+    // width the reducer settled on.
+    if (step.action.kind === 'giveUpSubrange') cursor = chunkStart - 1n
+    // The backoff (minimum-window failures only) is decided by the reducer and slept here — the
+    // clock is I/O. A 0 means the per-scan sleep budget is spent; the request budget, not the
+    // sleeping, is what ends the scan.
+    const backoffMs = 'backoffMs' in step.action ? step.action.backoffMs : 0
+    if (backoffMs > 0) await sleep(backoffMs)
   }
 
   const covered = mergeRanges(coveredRaw)

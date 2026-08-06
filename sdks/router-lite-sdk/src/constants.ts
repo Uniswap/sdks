@@ -321,7 +321,8 @@ export function maxPlausibleHeadRegression(reorgOverlapBlocks: bigint): bigint {
 }
 
 // ---------------------------------------------------------------------------
-// Log scanning (`internal/logScan.ts`).
+// Log scanning (`internal/logScan.ts`; the width-policy decisions these
+// constants parameterize live in `internal/logScanPolicy.ts`).
 //
 // `eth_getLogs` caps differ per endpoint, and differ per *query* on the same
 // endpoint (a result cap binds on a busy contract at a span a quiet one sails
@@ -413,8 +414,8 @@ export const MAX_SCAN_WINDOW = 16_000_000n
  * real time, rather than being cheaply refused — instead of halving toward it one expensive step at
  * a time.
  *
- * HALVING PRICES A REFUSAL AS FREE, AND FOR SOME PROVIDERS IT IS NOT. `internal/logScan.ts`'s catch
- * classifies the failure (`internal/rpcErrors.ts#classifyRpcError`); a `transport` or `unavailable` verdict
+ * HALVING PRICES A REFUSAL AS FREE, AND FOR SOME PROVIDERS IT IS NOT. `internal/logScanPolicy.ts`'s
+ * refusal transition classifies the failure (`internal/rpcErrors.ts#classifyRpcError`); a `transport` or `unavailable` verdict
  * covers exactly the expensive shapes — a timeout (the endpoint hung until viem gave up, having
  * already retried 3 times at ~10s apiece: ~40s for ONE probe, so a 13-step ladder from
  * {@link MAX_SCAN_WINDOW} is ~9 minutes of no progress) and a result-size cap (the endpoint executed
@@ -454,7 +455,7 @@ export const DESCENT_TIMEOUT_FALLBACK = 100_000n
  * (R2), and it is a real one: `eth-mainnet.public.blastapi.io` caps public `eth_getLogs` at TEN
  * blocks, nine halvings under this floor. It is genuinely capping, it says so in the error, and no
  * retry can reach a window it will serve — so the scanner gives that sub-range up on the first
- * error instead of treating it as a transient failure. See `internal/logScan.ts`'s declared-cap
+ * error instead of treating it as a transient failure. See `internal/logScanPolicy.ts`'s declared-cap
  * branch; raising this floor widens the set of endpoints that fall into that case.
  */
 export const MIN_CHUNK = 128n
