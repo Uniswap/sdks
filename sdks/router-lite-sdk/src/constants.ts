@@ -433,10 +433,22 @@ export const MAX_SCAN_WINDOW = 16_000_000n
 export const DESCENT_TIMEOUT_FALLBACK = 100_000n
 
 /**
- * Floor on the window. Below this a scan is no longer usefully making progress — 128 blocks is 4x
- * {@link DEFAULT_REORG_OVERLAP_BLOCKS}, i.e. the smallest window still larger than the overlap a warm
- * re-scan re-reads anyway — so an endpoint that cannot answer this is failing, not capping, and the
- * failure path (retry, then give the sub-range up) takes over instead of bisecting toward 1.
+ * Floor on the window. Below this a scan is no longer usefully making progress, so an endpoint that
+ * cannot answer this is failing, not capping, and the failure path (retry, then give the sub-range
+ * up) takes over instead of bisecting toward 1.
+ *
+ * 128 IS A FIXED TRANSPORT FLOOR, NOT A CHAIN-DERIVED ONE, and it is deliberately the one width in
+ * this file no manifest can move. What it prices is a PROVIDER's behaviour — the width below which
+ * "it refused" stops being evidence about the request and becomes evidence about the endpoint — and
+ * that has nothing to do with which chain is on the other end of it.
+ *
+ * (It used to be documented as "4x {@link DEFAULT_REORG_OVERLAP_BLOCKS} — the smallest window still
+ * larger than the overlap a warm re-scan re-reads anyway". That derivation holds on the mainnet
+ * DEFAULT and nowhere else: every other manifest this package ships overrides `reorgOverlapBlocks`
+ * upward (Base 150, Unichain 300, Arbitrum 1200, Robinhood 3000), so on four of five chains the
+ * floor sits BELOW the overlap rather than 4x above it. The number never changed with them, because
+ * it was never really about them. Reorg overlap is a per-chain question and is answered per
+ * manifest, in `manifest.ts#reorgOverlapBlocksOf`.)
  *
  * AN ENDPOINT THAT DECLARES A CAP BELOW THIS IS THE ONE CASE WHERE "FAILING, NOT CAPPING" IS WRONG
  * (R2), and it is a real one: `eth-mainnet.public.blastapi.io` caps public `eth_getLogs` at TEN

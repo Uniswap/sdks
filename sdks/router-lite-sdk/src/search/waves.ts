@@ -16,6 +16,7 @@ import type { PoolIndex } from '../pools/poolIndex'
 import { routeId } from '../protocols'
 import type { ProtocolModule, QuoteProbe } from '../protocols/types'
 import { probeQuotes, quoteCandidates } from '../quote/quote'
+import type { QuoteStats } from '../quote/quote'
 import type {
   BlockRange,
   BlockRef,
@@ -565,6 +566,23 @@ function recordFailures(run: Run, amountIndependentFailures: RouteCandidate[]): 
 // Quoting steps
 // ---------------------------------------------------------------------------
 
+/**
+ * Folds one `quoteCandidates`/`probeQuotes` call's outcome counters into the running report.
+ *
+ * THE FOUR COUNTERS HERE ARE THE ONES THAT MEAN THE SAME THING IN EVERY CHANNEL — each is a call
+ * that went out and came back a particular way, which is true whether the caller was quoting a
+ * route or probing for a pool. `unattempted` is deliberately NOT one of them: it is a shortfall the
+ * CALLER computes (`fresh.length - stats.attempted`) against a denominator only the caller knows,
+ * and one of the three call sites correctly reports none at all. See the two `unattempted` lines
+ * below, and the comment where the third would have been.
+ */
+function tallyQuoting(state: EngineState, stats: QuoteStats): void {
+  state.quoting.attempted += stats.attempted
+  state.quoting.succeeded += stats.succeeded
+  state.quoting.failed += stats.failed
+  state.quoting.transportFailed += stats.transportFailed
+}
+
 /** Quotes candidates never quoted before in this search, merging survivors into the running set. */
 async function quoteNew(run: Run, candidates: RouteCandidate[]): Promise<void> {
   const { state } = run
@@ -589,10 +607,7 @@ async function quoteNew(run: Run, candidates: RouteCandidate[]): Promise<void> {
     ...(run.req.signal !== undefined && { signal: run.req.signal }),
   })
 
-  state.quoting.attempted += stats.attempted
-  state.quoting.succeeded += stats.succeeded
-  state.quoting.failed += stats.failed
-  state.quoting.transportFailed += stats.transportFailed
+  tallyQuoting(state, stats)
   state.quoting.unattempted += fresh.length - stats.attempted
   recordSuccess(run, quoted)
   recordFailures(run, amountIndependentFailures)
@@ -621,10 +636,7 @@ async function runRouteProbes(run: Run, probes: QuoteProbe[]): Promise<void> {
     ...(run.req.signal !== undefined && { signal: run.req.signal }),
   })
 
-  state.quoting.attempted += stats.attempted
-  state.quoting.succeeded += stats.succeeded
-  state.quoting.failed += stats.failed
-  state.quoting.transportFailed += stats.transportFailed
+  tallyQuoting(state, stats)
   // Mirrors `quoteNew`, and for the identical reason: `probeQuotes` genuinely returns
   // `attempted < probes.length` — an abort that lands while a probe is queued for a semaphore permit
   // raises `AbortedCallError`, which is deliberately counted in NO stats bucket (`quote/quote.ts`)
@@ -677,10 +689,7 @@ async function runDiscoveryProbes(run: Run, probes: QuoteProbe[]): Promise<void>
     ...(run.req.signal !== undefined && { signal: run.req.signal }),
   })
 
-  state.quoting.attempted += stats.attempted
-  state.quoting.succeeded += stats.succeeded
-  state.quoting.failed += stats.failed
-  state.quoting.transportFailed += stats.transportFailed
+  tallyQuoting(state, stats)
   // AND DELIBERATELY NO `unattempted` LINE HERE — this is NOT the `runRouteProbes` hole repeated.
   // That one was a leak: it claimed `candidatesGenerated` it then failed to account for. This
   // function claims none (see the docstring above), so there is nothing to conserve, and
