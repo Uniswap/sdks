@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test'
 import type { Address, Hex, Log } from 'viem'
 import { encodeAbiParameters, toHex, zeroAddress } from 'viem'
 
-import { DEFAULT_REORG_OVERLAP_BLOCKS, MAX_INTERMEDIATES, PREFLIGHT_TOP_K } from '../constants'
+import { DEFAULT_REORG_OVERLAP_BLOCKS, FEE_DISCOVERY_MAX_REQUESTS, MAX_INTERMEDIATES, PREFLIGHT_TOP_K } from '../constants'
 import { UnsupportedRouteError } from '../errors'
 import { sortAddresses } from '../internal/currency'
 import { createSemaphore } from '../internal/rpc'
@@ -286,6 +286,10 @@ type ClientScript = {
   logs?: LogScript
   /** `FeeAmountEnabled` history for the v3 factory. */
   feeLogs?: (Log & { fee: number })[]
+  /** Widest `eth_getLogs` window this stub will serve for the FEE query; anything wider is refused.
+   * A fee scan is the only FULL-HISTORY scan the engine runs, so this is what turns it into the
+   * hundreds-of-chunks walk that `FEE_DISCOVERY_MAX_REQUESTS` exists to bound. */
+  feeScanMaxSpan?: bigint
   /** v4 `Initialize` history matched by the exact-pair query. */
   pairLogs?: (Log & { record: PoolRecord })[]
   /** Endpoints (lowercased) whose adjacency scans always fail, simulating a broken log source. */
@@ -417,6 +421,9 @@ function stubClient(script: ClientScript): { client: SearchContext['client']; co
 
     if (filter.topics[0] === FEE_TOPIC) {
       counters.feeScans++
+      if (script.feeScanMaxSpan !== undefined && toBlock - fromBlock + 1n > script.feeScanMaxSpan) {
+        throw new Error('query returned more than 10000 results')
+      }
       return (script.feeLogs ?? []).filter(inRange)
     }
 
@@ -894,6 +901,33 @@ test('v3 fee-tier discovery reaches a pool on a governance-enabled tier', async 
   expect(events.at(-1)!.best?.quote.amountOut).toBe(700n)
   expect(events.at(-1)!.best?.route.legs[0]!.pool).toMatchObject({ protocol: 'v3', fee: NONSTANDARD_FEE })
   assertCoherent('quote', events)
+})
+
+test('wave 1 fee discovery cannot starve the adjacency waves: its getLogs count respects FEE_DISCOVERY_MAX_REQUESTS', async () => {
+  // THE STARVATION REGRESSION, stated as a request count so no clock is involved.
+  //
+  // `discoverFeeTiers` is a FULL-HISTORY scan and it runs in wave 1, ahead of the adjacency waves
+  // that actually find the pair's pools. Against a provider that caps `eth_getLogs` narrowly, an
+  // unbounded one walks hundreds of chunks and — on the warm Base run this bound came from — spent
+  // the caller's entire 60-second budget before wave 2 issued a single request, so every protocol
+  // reported "nothing covered yet". The bound has to be visible HERE and not only in
+  // `discovery.test.ts`, because it is the wave engine that decides there is one at all.
+  const DEEP_HISTORY = BLOCK_NUMBER - 200_000n
+  const { client, counters } = stubClient({ feeScanMaxSpan: 1_000n, logs: () => [] })
+  const ctx = makeContext(client, manifestWith({ v3: true, deploymentBlock: DEEP_HISTORY }))
+
+  await drain(searchWaves(ctx, quoteReq, 'quote'))
+
+  // The scan really did have to chunk (otherwise the bound is untested), and it stopped at the bound.
+  expect(counters.feeScans).toBeGreaterThan(10)
+  expect(counters.feeScans).toBeLessThanOrEqual(FEE_DISCOVERY_MAX_REQUESTS)
+  // ...and it was the BUDGET that stopped it, not the history running out — the factory's own
+  // coverage is still short, which is exactly how a bounded scan is meant to report itself (the
+  // shortfall is carried to the next search, never lost).
+  expect(ctx.index.uncovered('v3', V3_FACTORY, DEEP_HISTORY, BLOCK_NUMBER).length).toBeGreaterThan(0)
+  // ...and the waves after it still ran. This is the half the request count alone does not show: the
+  // budget exists so the ADJACENCY scans get to happen, not merely so fee discovery stops.
+  expect([...counters.scannedEndpoints].sort()).toEqual([TOKEN_A.toLowerCase(), TOKEN_B.toLowerCase()].sort())
 })
 
 // ---------------------------------------------------------------------------
