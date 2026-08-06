@@ -226,6 +226,48 @@ describe('chain manifest', () => {
     await expect(validateManifest(client as any, manifestFor(1))).rejects.toThrow(RouterConfigError)
   })
 
+  test('validateManifest dispatches eth_getCode alongside getChainId, in ONE round trip', async () => {
+    // The two reads are independent and this runs on the critical path of the first search, so they
+    // must be in flight together — not `eth_getCode` awaiting the chainId's round trip. Both stubs
+    // hang until `open()`, so "getCode was already dispatched while getChainId was still pending" is
+    // observable rather than inferred from a timing.
+    let open!: () => void
+    const gate = new Promise<void>((resolve) => {
+      open = resolve
+    })
+    let getCodeDispatched = false
+    const client = {
+      getChainId: async () => {
+        await gate
+        return 1
+      },
+      request: async () => {
+        getCodeDispatched = true
+        await gate
+        return '0x00'
+      },
+    }
+    const done = validateManifest(client as any, manifestFor(1))
+    await Promise.resolve() // let the deferred dispatch run
+    expect(getCodeDispatched).toBe(true)
+    open()
+    // '0x00' embeds none of the manifest's immutables, so this still fails the cross-check — what is
+    // being pinned here is WHEN the call went out, not what it returned.
+    await expect(done).rejects.toThrow(RouterConfigError)
+  })
+
+  test('a chainId mismatch still reports the chainId, never the concurrently-dispatched read', async () => {
+    // The wasted `eth_getCode` this parallelism spends on a misconfigured caller must not become the
+    // error they see: its rejection is handled, and the chainId check is what throws.
+    const client = {
+      getChainId: async () => 8453,
+      request: async () => {
+        throw new Error('eth_getCode blew up')
+      },
+    }
+    await expect(validateManifest(client as any, manifestFor(1))).rejects.toThrow(/does not match client chainId/)
+  })
+
   // -------------------------------------------------------------------------
   // C4-P1: the `chain` bundle — chain FACTS, not code constants.
   // -------------------------------------------------------------------------

@@ -42,26 +42,60 @@ function isAddress(s: string): s is Address {
 const metaCache = new Map<string, ResolvedToken>()
 
 /**
+ * The same key's fetch while it is still in flight. The result cache above only fills once a fetch
+ * has RETURNED, so without this the concurrent shape this module is actually used in —
+ * `resolveTrade` resolves `tokenIn` and `tokenOut` at the same time, and a symbol argument makes
+ * each of them read every one of the manifest's core intermediates — issued the whole metadata set
+ * TWICE (measured on mainnet: 20 `eth_call`s for 5 tokens) because neither resolution had finished
+ * when the other started. Sharing the promise makes the second caller await the first's calls.
+ */
+const inFlightMeta = new Map<string, Promise<ResolvedToken>>()
+
+/**
  * Fetches `symbol()`/`decimals()` for `address`, with the classic bytes32-symbol fallback (MKR-era
  * tokens). A token with no readable `decimals()` is rejected — amount parsing without decimals
  * would silently mis-scale, which is worse than refusing.
+ *
+ * ONE ROUND TRIP, NOT TWO. The two reads are independent, so they go out together: this runs before
+ * the search on every `quote`/`swap`, on an endpoint whose round trip is the unit of latency the
+ * whole CLI is priced in (measured on a mainnet endpoint at ~0.9s/RTT: awaiting `decimals()` before
+ * even dispatching `symbol()` put a second full round trip in front of every search). The
+ * `Promise.allSettled` — rather than `Promise.all` — is what keeps the outcome identical to the
+ * sequential version it replaces: `decimals()` is still the read whose failure rejects the token,
+ * checked first, and a failed `symbol()` still falls back rather than throwing.
  */
 export async function fetchTokenMeta(client: PublicClient, chainId: number, address: Address): Promise<ResolvedToken> {
   const key = `${chainId}:${address.toLowerCase()}`
   const cached = metaCache.get(key)
   if (cached) return cached
+  const pending = inFlightMeta.get(key)
+  if (pending) return pending
 
-  let decimals: number
-  try {
-    decimals = await client.readContract({ address, abi: ERC20_META_ABI, functionName: 'decimals' })
-  } catch {
+  const fetching = loadTokenMeta(client, address)
+    .then((resolved) => {
+      metaCache.set(key, resolved)
+      return resolved
+    })
+    // Cleared either way: a failed read is not cached, so the next caller gets to try again.
+    .finally(() => inFlightMeta.delete(key))
+  inFlightMeta.set(key, fetching)
+  return fetching
+}
+
+async function loadTokenMeta(client: PublicClient, address: Address): Promise<ResolvedToken> {
+  const [decimalsRead, symbolRead] = await Promise.allSettled([
+    client.readContract({ address, abi: ERC20_META_ABI, functionName: 'decimals' }),
+    client.readContract({ address, abi: ERC20_META_ABI, functionName: 'symbol' }),
+  ])
+
+  if (decimalsRead.status !== 'fulfilled') {
     throw new UsageError(`${address} does not answer decimals() — is it an ERC-20 on this chain?`)
   }
 
   let symbol: string
-  try {
-    symbol = await client.readContract({ address, abi: ERC20_META_ABI, functionName: 'symbol' })
-  } catch {
+  if (symbolRead.status === 'fulfilled') {
+    symbol = symbolRead.value
+  } else {
     try {
       const raw = await client.readContract({ address, abi: ERC20_SYMBOL_BYTES32_ABI, functionName: 'symbol' })
       symbol = hexToString(trim(raw, { dir: 'right' }))
@@ -70,9 +104,7 @@ export async function fetchTokenMeta(client: PublicClient, chainId: number, addr
     }
   }
 
-  const resolved: ResolvedToken = { ref: address, symbol, decimals }
-  metaCache.set(key, resolved)
-  return resolved
+  return { ref: address, symbol, decimals: decimalsRead.value }
 }
 
 /** The manifest's symbol-resolvable addresses: wrapped native first, then the core intermediates. */

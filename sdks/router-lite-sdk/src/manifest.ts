@@ -787,6 +787,19 @@ function assertImmutablesEmbedded(m: ChainManifest, code: Hex): void {
  *
  * No `execution` bundle at all skips both checks entirely: no `eth_getCode` call is made.
  *
+ * THE TWO CALLS GO OUT TOGETHER, AND THE CHECKS STILL RUN IN ORDER. They are independent reads, and
+ * this function sits on the critical path of the FIRST search a router ever runs — one per process
+ * for a CLI — so awaiting the chainId before dispatching the `eth_getCode` put a whole extra round
+ * trip in front of every cold search (measured against a mainnet endpoint at ~0.9s per round trip;
+ * the pre-search setup was 6 sequential round trips, of which this was one). Dispatching both and
+ * awaiting them in sequence keeps every observable outcome identical: the chainId mismatch is still
+ * the first error raised, `eth_getCode`'s own transport failure still surfaces (it is re-awaited
+ * below), and a manifest without `execution` still makes no `eth_getCode` call at all. What changes
+ * is that a run which is going to fail the chainId check has already spent one wasted read — which
+ * costs a misconfigured caller one `eth_getCode` and buys every correctly-configured one a round
+ * trip. The dispatch is deferred through `Promise.resolve()` so a client that cannot serve the call
+ * rejects the promise rather than throwing past the chainId check that should have reported first.
+ *
  * NEITHER RPC CALL IS GATED BY THE ROUTER'S CONCURRENCY SEMAPHORE (C4-P6, F2) — the one deliberate
  * carve-out from `internal/rpc.ts`'s "every `client.request` is gated" rule. `getChainId`(this
  * function) is deterministic per `(client, manifest)` and runs at most ONCE per router's lifetime:
@@ -798,6 +811,14 @@ export async function validateManifest(
   client: Pick<PublicClient, 'getChainId' | 'request'>,
   m: ChainManifest,
 ): Promise<void> {
+  const codeRead = m.execution
+    ? // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      Promise.resolve().then(() => client.request({ method: 'eth_getCode', params: [m.execution!.address, 'latest'] } as any))
+    : undefined
+  // Attached immediately so a rejection this function never gets to (the chainId check below throws
+  // first) is a handled one — an unhandled rejection warning out of a config error would be noise.
+  codeRead?.catch(() => {})
+
   const clientChainId = await client.getChainId()
   if (clientChainId !== m.chainId) {
     throw new RouterConfigError(`manifest chainId ${m.chainId} does not match client chainId ${clientChainId}`)
@@ -806,7 +827,7 @@ export async function validateManifest(
   if (!m.execution) return
   const { codeHash, address } = m.execution
 
-  const code = (await client.request({ method: 'eth_getCode', params: [address, 'latest'] } as any)) as Hex
+  const code = (await codeRead!) as Hex
   if (!code || code === '0x') {
     throw new RouterConfigError(`no code found at execution address ${address}; expected a deployed Universal Router`)
   }
