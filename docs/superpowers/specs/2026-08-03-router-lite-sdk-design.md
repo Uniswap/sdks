@@ -1,8 +1,37 @@
 # router-lite-sdk — Design
 
-**Date:** 2026-08-03 (rev 4: config collapse, promise+iterator API, speculative quoting)
-**Status:** Approved direction
+**Date:** 2026-08-03 (rev 5: amended for the implemented package — pure protocol
+modules, structured reasons, transport knobs, quote-while-discovering)
+**Status:** Approved direction; rev 5 describes what `sdks/router-lite-sdk` does
 **Package:** `sdks/router-lite-sdk` → `@uniswap/router-lite-sdk`
+
+### Revision 5 — what changed, and why
+
+Rev 4 was written ahead of the implementation. Every normative section below is
+now amended in place to match `src/`; these are the differences worth naming:
+
+- **`ProtocolModule` became pure.** Its discovery methods return *descriptions*
+  (`LogQuery[]`, `QuoteProbe[]`), never promises. The engine owns every RPC, so
+  a module cannot invent a scan the wave policy did not authorize, and every
+  module is testable without a transport.
+- **Two transport-shaped construction knobs** (`concurrency`, `logChunkBlocks`)
+  joined `index`/`maxPools`. Neither is a *policy* knob — they bound in-flight
+  requests and `eth_getLogs` width, both provider-shaped facts the package
+  cannot learn for free.
+- **Per-pair caps split by cost class** (`MAX_POOLS_DIRECT = 6` linear,
+  `MAX_POOLS_PER_LEG = 3` quadratic) and `MAX_QUOTE_CANDIDATES` is now *derived*
+  from them, so the total can never drift below what enumeration produces.
+- **`reason` is structured** (`{ code, detail }` over the exported closed
+  `REASON_CODES`): the prose was already being branched on, and prose drifts.
+- **`SearchReport` grew two honesty axes** — `verification`
+  (preflight budget) and `enumeration.intermediatesPruned`; `ready`/
+  `needs-action` echo the plan's own `limits`.
+- **Waves 1–3 quote while they discover** (`QUOTE_INTERLEAVE_MS`) instead of
+  scan-then-quote, and preflight is deliberately *not* pipelined — laziness is
+  what makes the hint fast path free.
+- **The index can leave the process** (`toSnapshot`/`fromSnapshot`), which is
+  what makes a second CLI invocation warm; the SDK still performs no I/O of its
+  own.
 
 ## Purpose
 
@@ -59,7 +88,7 @@ sees RPC.
 | Route shapes | Direct + one intermediate (max 2 hops); protocols freely mixed |
 | Trade sides | Exact-input only |
 | Search | Wave-based anytime search; promises (`getQuote`/`getSwap`) resolve at the first actionable result; async iterators (`quotes()`/`swaps()`) yield the improving best per wave; cancellation via standard `AbortSignal`. No mode or budget knobs |
-| Configuration | `createRouter({ client, manifest, index?, maxPools? })` — the entire surface. All tuning values are internal constants, observable through `SearchReport`; `index`/`maxPools` are optional PoolIndex-lifecycle knobs (C4-H5), not a policy object |
+| Configuration | `createRouter({ client, manifest, index?, maxPools?, concurrency?, logChunkBlocks? })` — the entire surface. All *policy* values remain internal constants, observable through `SearchReport`; `index`/`maxPools` are PoolIndex-lifecycle knobs (C4-H5) and `concurrency`/`logChunkBlocks` are transport knobs (C4-P6). Still not a policy object |
 | Quoting | **Speculative**: the quote call is the existence probe (v2 computed-pair `getReserves`, v3 QuoterV2 path calls, v4 standard configs) — no separate discovery for direct pairs. Canonical on-chain quoters for v3/v4 (whole-path), local reserve math for v2 (standard ERC-20 only); real-trader UR preflight is the only execution verification |
 | Quote transport | Direct `eth_call`s via bounded-concurrency `client.request`; `http(url, { batch: true })` gives single-request batching; never Multicall3 for sender-sensitive quotes |
 | Preflight | Readiness by reads + simulation as the real trader; **no generic ERC-20 state overrides** (false-positive preflights are worse than "unverified") |
@@ -67,7 +96,7 @@ sees RPC.
 | Types | All public types defined in-package, viem-native; no type imports from ethers-based SDKs |
 | Client input | viem `PublicClient` + `ChainManifest` of atomic deployment bundles |
 | Encoding | RouteCandidate → version-neutral `ExecutionPlan` → version-bound encoder; `universal-router-sdk` pinned as devDependency oracle + golden vectors |
-| V1 caching | In-memory `PoolIndex` + `ScanCoverage`; no persistence or live ingestion; small overlap re-scan for shallow reorgs. Unbounded by default; optionally bounded (`maxPools`, LRU-touched eviction) or injected/handed off between routers (`index`), with `stats()`/`clearIndex()` for observability and reset (C4-H5) |
+| V1 caching | In-memory `PoolIndex` + `ScanCoverage`; no live ingestion; small overlap re-scan for shallow reorgs. Unbounded by default; optionally bounded (`maxPools`, LRU-touched eviction) or injected/handed off between routers (`index`), with `stats()`/`clearIndex()` for observability and reset (C4-H5). The index is *serializable* (`toSnapshot`/`fromSnapshot` + `serializeSnapshot`/`parseSnapshot`, `/experimental`) so a host can carry it across processes; the SDK itself still performs no file I/O — `cli/cache.ts` is the reference consumer |
 
 ## Domain model
 
@@ -111,6 +140,10 @@ type PoolRecord = {           // identity + index metadata (selection input)
   createdAtBlock?: bigint
   source: 'event' | 'factory' | 'hint'
   lastQuoteSuccessBlock?: bigint
+  // An O(1) distinct-block failure counter — the only evidence a hint's
+  // provenance can be discredited on (see "Hint provenance is provisional").
+  quoteFailureBlocks?: number
+  lastQuoteFailureBlock?: bigint
 }
 
 type RouteLeg = {             // one hop with concrete currencies
@@ -128,7 +161,17 @@ type RouteQuote = {
   intermediateAmounts: bigint[]   // realized per-leg outputs (chained quoting)
 }
 
-type QuotedRoute = { route: RouteCandidate; quote: RouteQuote }
+type QuotedRoute = {
+  route: RouteCandidate
+  quote: RouteQuote
+  // Set when the simplicity margin promoted this route ahead of a
+  // higher-`amountOut` hooked/mixed leader — the one ranking decision that
+  // overrides amountOut-descending order, so it must be observable. It lives
+  // here, not on `RankedRoute`: ranking is a fact about a QUOTE, and the quote
+  // surface (plain `QuotedRoute`s) would otherwise destroy the only thing
+  // explaining a `best` that prices below `alternatives[0]`.
+  promotedOverComplex?: true
+}
 
 type EncodedTx = { to: Address; data: Hex; value: bigint }
 
@@ -156,8 +199,8 @@ Snapshot ─────────── full pinned block { number, hash, tim
      ▼
 Wave engine ──────── owns stopping policy and caps; drives the primitives;
      │               readiness reads (route-independent) join wave 0's
-     │               batch; preflight of the current leader pipelines
-     │               against the next wave's scans
+     │               batch. Preflight of the leader is NOT pipelined against
+     │               the next wave (see "Preflight is not pipelined" below)
      │
      │   Wave 0 (1 RTT + 1 preflight RTT): hints (v4 hints validate
      │           locally via poolId recompute) + cached pools +
@@ -174,15 +217,20 @@ Wave engine ──────── owns stopping policy and caps; drives the p
      │   Wave 3 (scan-bound): adjacency of the other endpoint; complete
      │           bounded shared-neighbor cross product
      │
-     │   each wave: materialize candidates → quote → rank; getSwap
-     │   additionally compiles, encodes, and preflights the leader.
-     │   Promises resolve at the first actionable result; iterators
-     │   yield after every wave that improves the best; AbortSignal is
-     │   honored between batches.
+     │   waves 1-3 QUOTE WHILE THEY DISCOVER: the wave's scans run
+     │   concurrently with a re-enumerate-and-quote pass every
+     │   QUOTE_INTERLEAVE_MS (5s), fed by chunk-by-chunk `onLogs`
+     │   ingestion, and close with one final pass — so a wave whose
+     │   scans outlive the caller's budget still buys prices, not only
+     │   pools. getSwap additionally compiles, encodes, and preflights
+     │   the leader. Promises resolve at the first actionable result;
+     │   iterators yield after every wave that improves the best;
+     │   AbortSignal is honored between batches.
      ▼
 Stage primitives
-     discover/probe ── ProtocolModules: event adjacency, direct-pair
-     │                 lookups, hint validation → PoolRecords
+     discover/probe ── the engine issues every RPC; ProtocolModules only
+     │                 describe them (adjacency/exact-pair LogQuery,
+     │                 speculative QuoteProbes, log parsing) → PoolRecords
      ▼
      quote ─────────── whole-path canonical quotes (v3 QuoterV2 path,
      │                 V4Quoter PathKey[]), v2 local reserve math;
@@ -210,23 +258,58 @@ adjacency sets.
 ### ProtocolModule (internal contract)
 
 The honest per-protocol seam spans discovery through execution semantics —
-not discovery alone:
+not discovery alone. **It is pure: the engine owns every RPC.** A module
+*describes* the calls its protocol needs (a topic filter, a probe, a quote
+call) and *interprets* what comes back; it never awaits a transport:
 
 ```ts
+type QuoteProbe = { candidate: RouteCandidate; quote: QuoteCall }
+
 interface ProtocolModule {
-  id: 'v2' | 'v3' | 'v4'
-  adjacency(endpoint: Address, range: BlockRange): Promise<PoolRecord[]>
-  directPair(a: CurrencyRef, b: CurrencyRef): Promise<PoolRecord[]>
-  validateHint(hint: PoolHint): Promise<PoolRecord | null>
-  encodeQuote(legs: RouteLeg[], amountIn: bigint): EthCall   // same-protocol segment
-  decodeQuote(returnData: Hex): bigint
-  compileOperation(legs: RouteLeg[], ctx: CustodyContext): ExecutionOperation
+  readonly id: Protocol                                   // 'v2' | 'v3' | 'v4'
+  enabled(m: ChainManifest): boolean
+  speculativeDirect(a: CurrencyRef, b: CurrencyRef, amountIn: bigint, m: ChainManifest): QuoteProbe[]
+  adjacency(endpoint: Address, m: ChainManifest): LogQuery[]
+  exactPair?(a: CurrencyRef, b: CurrencyRef, m: ChainManifest): LogQuery
+  feeDiscovery?: FeeDiscovery                             // v3 only: { query, feesFromLogs, probes }
+  parsePoolLog(log: Log, m: ChainManifest): PoolRecord | null
+  validateHint(hint: PoolHint, call: (c: EthCall) => Promise<Hex>, m: ChainManifest): Promise<PoolRecord | null>
+  encodeQuote(legs: RouteLeg[], amountIn: bigint, m: ChainManifest): QuoteCall
+  compileOperation(legs: RouteLeg[], custody: Custody): ExecutionOperation
 }
 ```
+
+Rev 4 had `adjacency(): Promise<PoolRecord[]>`, `directPair()`, and an
+I/O-doing `validateHint` — a module that could reach the network. Purity is
+strictly better here, for reasons that all turned out to be load-bearing:
+
+- **Policy cannot leak downward.** Block ranges, per-scan request budgets, the
+  interleave, coverage bookkeeping and the abort are decided in `waves.ts` and
+  applied in `discovery.ts`. A module that awaited its own scan could quietly
+  spend a budget it was never told about — which is exactly how fee discovery
+  starved the adjacency waves before its budget was hoisted out (see below).
+- **One scanner, one set of hard-won behaviors.** Bisection, declared-cap
+  handling, regrowth, backoff, chunk batching and the cross-scan width memory
+  are written once and every protocol gets them, instead of three copies
+  drifting apart.
+- **Modules are testable with no transport at all.** `adjacency` returns a
+  value to assert on. Only `validateHint` is async, and it takes the caller's
+  `call` function rather than a client — the engine still owns the semaphore.
 
 Internal only; adding an AMM means implementing this interface plus (if its
 custody semantics are new) extending the encoder — a deliberate, reviewed
 change, not a plugin drop-in.
+
+### Preflight is not pipelined (deliberate)
+
+Rev 4 had the leader's preflight overlapping the next wave's scans. The engine
+does not do this, and the trade was made knowingly: the wave generator is
+**lazy**, so a wave only runs when the consumer pulls. Starting wave N+1's
+scans while verifying wave N's leader means doing work the consumer may never
+ask for — and never asking for it is precisely what lets `getSwap` resolve a
+hinted route with zero log scans. The cost is one preflight round trip of
+serial latency per improving wave. See the KNOWN DEVIATION note in
+`search/waves.ts`.
 
 ## Discovery
 
@@ -251,8 +334,35 @@ scan each served their entire history in one request), and per-request latency
 is round-trip- rather than width-dominated (456ms for a 10k window, 89ms for a
 1M one), so a conservative fixed start is both unlearnable and expensive — it
 was ~100 needless round trips per cold history scan. Refusals bisect down in
-~log2 steps, and a provider that states its cap in the error is jumped straight
-to that width.
+~log2 steps; a provider that states its cap in the error is jumped straight to
+that width, and one whose refusal was *expensive* rather than cheap (a timeout
+or a result-size cap — classified `transport`/`unavailable`) collapses to
+`DESCENT_TIMEOUT_FALLBACK` (100k) in one step instead of thirteen.
+
+**A declared cap has two flavors, and only one is durable.** A `span` cap is
+policy ("this endpoint serves ≤ N blocks per query") and clamps the scan's
+*ceiling*, so regrowth cannot double past a width already refused. A `density`
+cap is one observation about one busy filter ("that range returned too many
+logs") and only narrows the current window — clamping the ceiling on it would
+pin every later, more selective query to the width of the worst one.
+
+**Width discovery is remembered, not re-paid per scan.** A cold search runs
+seven scans (three protocols × two topic slots, plus the v4 exact-pair scan),
+each of which used to re-derive the same provider cap. `ScanWidthMemory` —
+held by the `PoolIndex`, so it outlives the search — carries
+`learnedScanWidth` (the widest window actually *served*: a hint, narrowing the
+start) and `declaredScanCap` (a ceiling the endpoint *stated*: a bound). Only
+the hint crosses a process boundary in a snapshot: a snapshot is keyed by
+chain, and two providers share one, so a wrong hint costs a few regrowth
+doublings while a wrong ceiling would cap every scan forever.
+
+Once a width has actually been served, chunks at that width go out
+`SCAN_CHUNK_CONCURRENCY` (4) at a time; the first chunk of any width always
+goes out alone, so the bisection descent is never N simultaneous refusals, and
+a batch never straddles a regrowth boundary. All of these decisions are a pure
+reducer (`internal/logScanPolicy.ts`) over `(state, outcome) → (state,
+action)`, table-tested row by row, so the loop that owns the wire never reasons
+about widths.
 
 Bisection is bounded in three directions, because the cap it discovers may be
 transient rather than real: the window **grows back** (doubling after N clean
@@ -273,9 +383,23 @@ at the old 10k window). Constants and their derivations live in `constants.ts`.
 
 ### Direct-pair probes
 
-v2 `getPair`; v3 `getPool` across **all enabled fees** (standard tiers probed
-immediately; the small `FeeAmountEnabled` history scanned once per factory
-and cached covers nonstandard tiers); v4 exact-pair topic filter.
+No factory lookup: the quote call *is* the probe, at a locally derived address.
+v2 computes the CREATE2 pair and calls `getReserves`; v3 calls QuoterV2 at the
+CREATE2 pool address across **all enabled fees** (standard tiers probed
+immediately; the `FeeAmountEnabled` history scanned per factory and cached
+covers nonstandard tiers); v4 uses an exact-pair topic filter. (`getPool` is
+still called, but only by v3's `validateHint`, where the fee tier makes a
+hinted pool's address non-derivable from the pair alone.)
+
+**Fee discovery carries a request budget, threaded from the wave engine.**
+`FEE_DISCOVERY_MAX_REQUESTS` (128) bounds one factory's `FeeAmountEnabled` walk
+per search. It sits in wave 1, ahead of the adjacency scans that discovery
+coverage is actually reported for, and on a 10k-capped endpoint Base's 48.2M
+blocks of v3 history is 4,822 requests / 62s — an entire `--budget 60s` spent
+before wave 2 started, reporting `partial — nothing covered yet` for all three
+protocols. The bound is on *cost* rather than on a block window (fee
+enablements are old, not recent), and the scan **converges across searches**:
+coverage is keyed by factory, so each search resumes where the last stopped.
 
 ### Scan-coverage cache
 
@@ -286,9 +410,32 @@ This makes the cache useful without becoming an indexer.
 
 ### Candidate selection (deterministic)
 
-Caps: `maxHops: 2`, `maxPoolsPerPair: 3` (across all protocols),
-`maxIntermediates: 8`, `maxQuoteCandidates: 48`, `preflightTopK: 3` — all
-observable in the `SearchReport`, including what they pruned.
+Caps: `maxHops: 2`, `MAX_POOLS_DIRECT = 6` and `MAX_POOLS_PER_LEG = 3` (both
+across all protocols), `MAX_INTERMEDIATES = 8`, `MAX_QUOTE_CANDIDATES` (78,
+derived), `PREFLIGHT_TOP_K = 3` — all observable in the `SearchReport`,
+including what they pruned.
+
+**The per-pair cap is split by cost class.** A direct-pair selection is linear
+(one candidate per kept pool), so 6 covers the pool set an ordinary major pair
+actually has: one v2 + the four standard v3 tiers + one v4, exactly. A two-hop
+*leg* selection is quadratic (every kept in-leg pool crossed with every kept
+out-leg pool, per intermediate), so it keeps the historical 3 — raising it to 6
+would take a single intermediate from 9 candidates to 36. One shared constant
+had to be either too small for the linear case or too expensive for the
+quadratic one.
+
+**And the total is derived from them, never chosen:**
+
+```ts
+MAX_QUOTE_CANDIDATES = MAX_POOLS_DIRECT + MAX_INTERMEDIATES * MAX_POOLS_PER_LEG ** 2   // 6 + 8*9 = 78
+```
+
+which is a true upper bound on what `generateRoutes` can produce. The bare
+`48` this replaced sat under a real worst case of 75: intermediates 6–8 could
+enumerate full cross products and have every candidate silently trimmed while
+`intermediatesSelected` still reported all 8 — a report overstating what was
+quoted. Deriving it makes that drift a compile-time impossibility, and makes
+`candidatesPruned` structurally zero today (it is kept as a drift backstop).
 
 Intermediate priority: hints → previously successful (this instance) →
 configured core intermediates → intermediates from newest endpoint pools →
@@ -313,11 +460,18 @@ block.
   downgraded at preflight, never returned `ready` on a mispriced quote.
 - **Cross-protocol paths**: two batch rounds (all first segments; then second
   segments fed with realized outputs).
-- **Transport**: bounded-concurrency `client.request`; callers opt into
-  single-HTTP-request batching via `http(url, { batch: true })`.
+- **Transport**: `client.request` under the router-wide semaphore
+  (`concurrency`, default 20 — shared with scans, readiness and preflight, not
+  per batch); callers opt into single-HTTP-request batching via
+  `http(url, { batch: true })`.
 - **Ranking**: `amountOut` desc → fewer protocol transitions → fewer hops →
-  deterministic route id. Simplicity margin (internal constant, 5 bps): a
-  hooked or mixed route must beat a simpler one by more than this to win.
+  deterministic route id. Simplicity margin (`SIMPLICITY_MARGIN_BPS`, 5): a
+  hooked or mixed route must beat a simpler one by more than this to win. A
+  promoted route carries `promotedOverComplex: true` — without it a `best`
+  pricing *below* `alternatives[0]` (observed live on Base: 1,906.256081 vs
+  1,906.567949 USDC from a hooked v4 pool, 1.6 bps inside the margin) reads as
+  a broken sort rather than as the documented margin. At most one route per
+  ranked list carries it, and it survives the quote surface's projection.
 - **Hooks**: v1 supports v4 pools quoteable via the canonical V4Quoter with
   empty or hint-supplied hookData; unknown hooks are always tried with `0x`,
   and such routes require a passing preflight to be `ready`. No policy knob.
@@ -363,7 +517,8 @@ Version binding:
 type UniversalRouterDeployment = {
   address: Address
   commandSet: 'ur-2.0'        // closed supported set; extended deliberately
-  codeHash?: Hex              // verified at init when provided
+  codeHash?: Hex              // keccak of the deployed code, verified at init when provided
+                              // (the immutable cross-check below is stronger, and always on)
   permit2: Address
   wrappedNative: Address      // UR's own immutable; also drives native-family normalization
 }
@@ -407,10 +562,22 @@ independently checked against each chain's public RPC — never taken from
 `sdk-core`'s `quoterAddress`, which is QuoterV1-shaped on several chains; see
 "Runtime dependency" below for why `sdk-core` is not a runtime import at all,
 C4-P4). At init: chainId cross-checked against the client; the `chain` bundle
-validated synchronously (positive block time, non-negative reorg depth);
-protocol bundles validated as reachable by the UR deployment; `wrappedNative`
-cross-checked against `execution.wrappedNative` whenever `execution` is
-present (`RouterConfigError` on mismatch — see below). A protocol
+validated synchronously (positive block time under a sanity ceiling,
+non-negative reorg depth); `wrappedNative` cross-checked against
+`execution.wrappedNative` whenever `execution` is present
+(`RouterConfigError` on mismatch — see below).
+
+**The UR's own bytecode is fingerprinted for this manifest's immutables,
+unconditionally.** Whenever `execution` is present, one `eth_getCode` fetches
+the deployed code and `assertImmutablesEmbedded` requires it to embed
+`execution.permit2`, `execution.wrappedNative`, and each configured
+`v2.factory` / `v3.factory` / `v4.poolManager` verbatim. `codeHash` alone is
+blind to a router whose code is byte-identical to a known-good deployment but
+wired to another chain's factories — which is exactly what the Robinhood Chain
+bring-up found: mainnet's and Base's real UR bytecode, unmodified, at the usual
+UR address, configured for their own factories. Same code, same hash, wrong
+chain. (This assumes `execution.address` is the immutable-bearing contract, not
+a proxy — the Uniswap convention for every UR deployment.) A protocol
 without a bundle is skipped and reported `disabled` in every result — "no v2
 route" is always distinguishable from "v2 not searched".
 
@@ -507,26 +674,38 @@ router.getSwap(req: SwapRequest): Promise<SwapResult>
 router.quotes(req: QuoteRequest): AsyncIterable<QuoteResult>
 router.swaps(req: SwapRequest): AsyncIterable<SwapResult>
 
-router.ingestPool(hint: PoolHint)
-router.ingestLogs(logs: Log[])
-router.ingestReceipt(receipt: TransactionReceipt)   // launcher fast path
+router.ingestPool(hint: PoolHint): Promise<void>
+router.ingestLogs(logs: Log[]): void
+router.ingestReceipt(receipt: Pick<TransactionReceipt, 'logs'>): void   // launcher fast path
 
 // PoolIndex lifecycle (C4-H5) — see the dedicated section below.
 router.stats(): RouterStats
 router.clearIndex(): void
 
-// Pure pieces, no stability guarantee:
-// import { generateRoutes, compileExecutionPlan, encodeExecutionPlan, PoolIndex }
-//   from '@uniswap/router-lite-sdk/experimental'
+// Pure pieces, no stability guarantee — everything the facade is built from,
+// each constructible from what this subpath itself exports:
+// import {
+//   generateRoutes, compileExecutionPlan, encoderFor, buildHookData,
+//   PoolIndex, POOL_INDEX_SCHEMA_VERSION, serializeSnapshot, parseSnapshot,
+//   PROTOCOL_MODULES, v2Module, v3Module, v4Module,
+//   v2PoolRef, v3PoolRef, v4PoolRef, isHooked,
+// } from '@uniswap/router-lite-sdk/experimental'
 ```
 
 **Internal constants** (not configuration; all effects observable in
-`SearchReport`): `MAX_POOLS_PER_PAIR = 3`, `MAX_INTERMEDIATES = 8`,
-`MAX_QUOTE_CANDIDATES = 48`, `PREFLIGHT_TOP_K = 3`,
-`SIMPLICITY_MARGIN_BPS = 5`. Values are revisited from the latency
-benchmarks, not exposed as knobs. Resume-from-previous-state is not an API:
-the instance's `PoolIndex` + `ScanCoverage` make every subsequent call start
-from what is already known and scan only the block delta.
+`SearchReport`): `MAX_POOLS_DIRECT = 6`, `MAX_POOLS_PER_LEG = 3`,
+`MAX_INTERMEDIATES = 8`, `MAX_QUOTE_CANDIDATES` (derived, 78),
+`PREFLIGHT_TOP_K = 3`, `SIMPLICITY_MARGIN_BPS = 5`,
+`FEE_DISCOVERY_MAX_REQUESTS = 128`, `QUOTE_INTERLEAVE_MS = 5_000`,
+`SCAN_CHUNK_CONCURRENCY = 4`, plus the log-scan bounds and the hostile-input
+ceilings (`MAX_HINTS_PER_REQUEST`, `MAX_AMOUNT_IN`, `MAX_DEADLINE_SECONDS`,
+`MAX_HOOK_DATA_BYTES`, `HINT_DISCREDIT_FAILURE_BLOCKS`). Values are revisited
+from the latency benchmarks, not exposed as knobs — the two `createRouter`
+options that *do* move a constant (`concurrency` over `DEFAULT_CONCURRENCY`,
+`logChunkBlocks` over `MAX_SCAN_WINDOW`) are transport facts about the
+caller's provider, not search policy. Resume-from-previous-state is not an
+API: the instance's `PoolIndex` + `ScanCoverage` make every subsequent call
+start from what is already known and scan only the block delta.
 
 ### PoolIndex lifecycle (C4-H5)
 
@@ -542,8 +721,10 @@ lifetime, none of which change the zero-config path:
 type CreateRouterOptions = {
   client: PublicClient
   manifest: ChainManifest
-  index?: PoolIndex     // inject a pre-built index (warm handoff between routers)
-  maxPools?: number      // bound this router's own index; default unbounded
+  index?: PoolIndex        // inject a pre-built index (warm handoff between routers)
+  maxPools?: number        // bound this router's own index; default unbounded
+  concurrency?: number     // C4-P6: router-WIDE in-flight `client.request` bound; default 20
+  logChunkBlocks?: bigint  // C4-P6: ceiling on the `eth_getLogs` window; default MAX_SCAN_WINDOW
 }
 
 type RouterStats = {
@@ -562,13 +743,18 @@ router.clearIndex(): void     // swaps in a fresh, empty PoolIndex
   `/experimental`) instead of letting `createRouter` allocate an empty one,
   for a host that owns the index's lifetime independently of any one router
   instance (warm one via `ingestLogs`/`ingestReceipt`/searches, hand it to a
-  freshly created router with zero re-scanning). Validated synchronously,
-  before any RPC: `index.wrappedNative` must equal `manifest.wrappedNative`
-  (the top-level field, C4-P3 — present on every manifest whether or not it
-  carries an `execution` bundle), or `RouterConfigError` throws
-  immediately — a mismatched index would silently misroute every
-  native-family pair. `maxPools` is ignored when `index` is supplied; the
-  injected index keeps whatever bound it was built with.
+  freshly created router with zero re-scanning; also how a restored
+  `fromSnapshot` index enters a router). Validated synchronously, before any
+  RPC, on the two chain facts the index was *built* with and cannot re-derive:
+  `index.wrappedNative` must equal `manifest.wrappedNative` (the top-level
+  field, C4-P3 — present on every manifest whether or not it carries an
+  `execution` bundle), and `index.reorgOverlapBlocks` must equal the
+  manifest's (C4-P1 — a coverage cache maintained under a shallower tip cannot
+  be trusted by a router that believes the chain rewinds deeper). Either
+  mismatch throws `RouterConfigError` immediately: a mismatched index would
+  silently misroute every native-family pair, or silently under-re-scan the
+  tip. `maxPools` is ignored when `index` is supplied; the injected index keeps
+  whatever bound it was built with.
 - **`maxPools`** — bounds the index `createRouter` allocates. Past the cap,
   inserting a pool evicts the least-recently-*touched* one (touch = an
   upsert, a successful quote, a failed quote, or being selected as a route
@@ -595,6 +781,48 @@ router.clearIndex(): void     // swaps in a fresh, empty PoolIndex
   search starts, so an in-flight `quotes`/`swaps` generator keeps draining
   its own already-pinned (old) index to completion — `clearIndex` only
   changes what the *next* call sees.
+- **`concurrency`** (C4-P6) — one semaphore per router instance, bounding
+  in-flight `client.request` calls **across** every operation sharing it
+  (`ethCall`, `scanLogs`, `preflightTx`, readiness's balance read,
+  `ingestPool`'s hint validation, the pinned-block fetch). It is a *global*
+  bound, not a per-batch one: wave 0 fires hint validation, probes and
+  readiness concurrently, so before this the real peak was the sum of each
+  batch's own limit — measured at ~44. Default 20; integer in
+  `[1, MAX_CONCURRENCY = 1024]`, validated synchronously because `<= 0` makes
+  every `acquire()` queue forever. The one deliberate carve-out is
+  `validateManifest`'s `getChainId`/`eth_getCode`, which run at most once per
+  router's lifetime.
+- **`logChunkBlocks`** (C4-P6) — the ceiling on the `eth_getLogs` window,
+  starting width and regrowth alike. Pass it when you *know* your provider's
+  cap (Ankr's public endpoint ~3,000) and would rather not pay the descent;
+  leave it unset and the scanner discovers the cap itself. Must be at least
+  `MIN_CHUNK`, validated synchronously — a smaller value inverts the chunk
+  arithmetic and burns the whole per-scan request budget on a range that can
+  never be served.
+
+### Index snapshots
+
+`PoolIndex.toSnapshot()`/`fromSnapshot()` (plus `serializeSnapshot`/
+`parseSnapshot`, since `JSON.stringify` throws on the bigints a snapshot
+carries) make everything the index learned portable across processes:
+`pools` (adjacency re-derived on the way in, never stored), `coverage` — the
+one thing that cannot be re-derived more cheaply than by re-scanning —
+`enabledFees`, `learnedScanWidth`, and the two chain facts (`wrappedNative`,
+`reorgOverlapBlocks`) that make the rest interpretable. `POOL_INDEX_SCHEMA_VERSION`
+is checked exactly, with no migration path: the whole payload is a cache of
+things the chain can be re-read for, so starting fresh costs a delta scan.
+Deliberately absent: the negative cache (block-scoped, evicted on first use
+anyway) and the LRU clock (re-approximated from each record's own blocks).
+
+The SDK still performs no I/O. `cli/cache.ts` is the reference consumer, and
+it states the trust boundary the SDK cannot: a cache file may come from a
+restored CI artifact or a shared `XDG_CACHE_HOME`, so it is treated as
+untrusted — shape-checked before loading, every asserted pool still priced by
+a real `eth_call` before it can appear in a result, and junk decaying via
+`isDiscredited`. The accepted, named residual is **coverage suppression**: a
+hostile snapshot can claim ranges nobody scanned and thereby *hide* a pool.
+Detecting that means doing the scan the cache exists to avoid, so `--no-cache`
+is the answer, and it is why this lives in `cli/` rather than in the SDK.
 
 ### Requests
 
@@ -636,6 +864,9 @@ never a silently-accepted value that surfaces as bad calldata:
 | `trader` / `recipient` | not zero, not a UR sentinel | A literal sentinel recipient silently misdirects funds |
 | `recipient` | not `tokenIn`/`tokenOut`, `execution.address`, `permit2`, or `wrappedNative` | All live contracts a caller reaches by copy-pasting the wrong config field; output delivered there is unrecoverable |
 | `recipient` | not any pool the chosen plan trades through (`assertPlanInvariants`) | Only checkable once a route exists, so it lives with the plan invariants rather than with request validation |
+| `permit.details.expiration` / `.nonce` | integer in `[0, 2^48)` (`MAX_PERMIT2_UINT48`) | Permit2's own `uint48`s, arriving as plain `number`s and reaching `BigInt(...)` in `isPermitValid` — a fractional one is a bare `RangeError` thrown from inside wave 0's `Promise.all`, out of a function documented never to throw for a business outcome |
+| `permit.details.amount` | bigint in `[0, 2^160)` (`MAX_PERMIT2_UINT160`) | Permit2's `uint160`. Held as a bigint, so the hazard is silent rather than loud: an over-wide amount compares fine against `amountIn` (the permit reads as covering the trade) and fails much later as an encoder error about calldata |
+| `permit.details.token` / `permit.spender` / `permit.sigDeadline` | valid addresses; token equals `tokenIn`; non-negative bigint | `spender` is compared only downstream (readiness, the encoder), neither of which can report a `RouterConfigError` about a request field — so it is shape-checked here |
 
 Two hostile-input defenses do not fit the table:
 
@@ -673,7 +904,7 @@ Two hostile-input defenses do not fit the table:
   (an `event`-sourced upsert clears the failure counters, since a creation log
   answers the existence question the counters stood in for). The second route
   exists because the first is not guaranteed: on a pair already at
-  `MAX_POOLS_PER_PAIR` with proved pools, a demoted record can be pruned out of
+  its pair's cap (`MAX_POOLS_DIRECT`/`MAX_POOLS_PER_LEG`) with proved pools, a demoted record can be pruned out of
   selection entirely and never quoted again — recovery needs spare pair
   capacity or a creation log, not merely patience.
 
@@ -698,17 +929,39 @@ overlap:
 // variant does not carry the field".
 type ResultBase = { search: SearchReport; alternatives: RankedRoute[] }
 
+// A terminal result's cause is STRUCTURED, not prose (C4-P5). `code` is the closed vocabulary a
+// caller may `switch` on — exported as a value (`REASON_CODES`) so the set can be walked, not
+// hand-copied; `detail` is human-readable text carrying no contract and free to be reworded.
+// Rev 4 had `reason: string`, and the README was already documenting two of those strings as if
+// they were an API, with nothing stopping the prose around them from drifting.
+const REASON_CODES = ['rpc-unavailable', 'rpc-degraded', 'aborted', 'discovery-incomplete',
+                      'quotes-unattempted', 'no-viable-route', 'no-route-verified'] as const
+type Reason = { code: (typeof REASON_CODES)[number]; detail: string }
+
+// The compiled plan's own on-chain limits, echoed onto the two leading arms (C4-P7) so a caller can
+// log or compare what the plan ASSERTS without re-deriving it from `slippageBps`/`deadlineSeconds`
+// and the pinned block — a re-derivation is a second chance to disagree with the encoded `tx`.
+type CompiledLimits = { minAmountOut: bigint; deadline: bigint }
+
 type SwapResult = ResultBase & (
-  | { status: 'ready';        best: RankedRoute; tx: EncodedTx; execution: { verifiedAtBlock: BlockRef } }
-  | { status: 'needs-action'; best: RankedRoute; tx: EncodedTx; requirements: ExecutionRequirement[] }
-  | { status: 'no-route';     reason: string }
-  | { status: 'inconclusive'; reason: string; best?: RankedRoute; tx?: EncodedTx }
+  | { status: 'ready';        best: RankedRoute; tx: EncodedTx; execution: { verifiedAtBlock: BlockRef }; limits: CompiledLimits }
+  | { status: 'needs-action'; best: RankedRoute; tx: EncodedTx; requirements: ExecutionRequirement[]; limits: CompiledLimits }
+  | { status: 'no-route';     reason: Reason }
+  // TWO ARMS, NOT ONE WITH TWO OPTIONAL FIELDS: a `tx` with no `best` is calldata with nothing
+  // naming the route it executes. The split makes that shape fail to COMPILE in any producer;
+  // both arms declare both fields, so a reader that narrowed to 'inconclusive' needs no further
+  // narrowing.
+  | { status: 'inconclusive'; reason: Reason; best?: undefined; tx?: undefined }
+  | { status: 'inconclusive'; reason: Reason; best: RankedRoute; tx?: EncodedTx }
 )
 
 type QuoteResult = { search: SearchReport; alternatives: QuotedRoute[] } & (
   | { status: 'quote';        best: QuotedRoute }
-  | { status: 'no-route';     reason: string }
-  | { status: 'inconclusive'; reason: string; best?: QuotedRoute }
+  | { status: 'no-route';     reason: Reason }
+  // NO `best`, and the asymmetry with SwapResult is deliberate: a price is a price, so a leader is
+  // reported `quote` however incomplete the search that found it. A quote is `inconclusive` only
+  // when NOTHING priced, and there is then no leader to carry.
+  | { status: 'inconclusive'; reason: Reason }
 )
 
 // Convenience aliases for the variants callers narrow to and then pass around:
@@ -775,25 +1028,30 @@ type SearchReport = {
     { status: 'complete' | 'partial' | 'disabled' | 'failed'; coveredRanges: BlockRange[] }>
   enumeration: { exhaustiveWithinMaxHops: boolean; intermediatesDiscovered: number;
                  intermediatesSelected: number; candidatesGenerated: number;
-                 poolsPruned: number; candidatesPruned: number }
+                 poolsPruned: number; candidatesPruned: number
+                 intermediatesPruned: number }
   quoting: { attempted: number; succeeded: number; failed: number
              transportFailed: number; unattempted: number }
   aborted: boolean
   verificationDegraded: boolean
   headRegressed: boolean
+  verification: { preflightAttempted: number; preflightBudgetExhausted: boolean }
 }
 ```
 
 Discovery coverage, enumeration pruning, quote completion, and execution
 verification are independent axes, reported independently.
 
-`poolsPruned` and `candidatesPruned` are deliberately separate counters, one
-per unit: `poolsPruned` is pools dropped by the per-pair cap
-(`MAX_POOLS_PER_PAIR`), summed across the direct pair and every two-hop leg
-selection; `candidatesPruned` is whole candidates dropped by the
-total-candidate cap (`MAX_QUOTE_CANDIDATES`) once direct and two-hop
-candidates are combined. Summing them would mix a pool-count with a
-candidate-count, so nothing does. `intermediatesSelected` is the actual
+The three pruning counters are deliberately separate, one per unit, and
+summing any two of them would mix units, so nothing does: `poolsPruned` is
+pools dropped by a per-pair cap (`MAX_POOLS_DIRECT` for the direct pair,
+`MAX_POOLS_PER_LEG` for a two-hop leg selection), summed across every
+selection; `intermediatesPruned` is eligible two-hop intermediate *nodes*
+dropped by `MAX_INTERMEDIATES` (it already drove `exhaustiveWithinMaxHops` —
+it is now also reported); `candidatesPruned` is whole candidates dropped by
+the total-candidate cap (`MAX_QUOTE_CANDIDATES`) once direct and two-hop
+candidates are combined — structurally zero at today's derived ceiling, kept
+as a drift backstop. `intermediatesSelected` is the actual
 number of intermediate nodes the enumeration used (≤ `MAX_INTERMEDIATES`) —
 threaded through from the enumeration itself, not re-derived from
 `intermediatesDiscovered` and the cap (a search that never enumerated reports
@@ -813,6 +1071,34 @@ not be *carried out* — forfeits the right to an authoritative `no-route`: such
 search is `inconclusive` with reason `rpc-degraded`, however complete its
 discovery looks. Invariant: `attempted === succeeded + failed +
 transportFailed`.
+
+**The quoting counters are probe-inclusive, not route-framed.** Three channels
+feed them — wave 0's route probes and the enumerated quotes (both of which also
+feed `candidatesGenerated`), and the half-pair *discovery* probes of waves 1–2,
+which feed only `quoting`, because a half-pair leg is not a route and can never
+become one. So `quoting.succeeded > 0` with an empty `alternatives` is a normal
+shape, and comparing `candidatesGenerated` against `attempted` as if they
+counted the same thing will never reconcile. What *is* asserted (in
+`assertResultCoherent`) is a two-sided conservation bound: `unattempted <=
+candidatesGenerated` (an unattempted quote *is* a generated candidate, which is
+also what keeps discovery probes out of `unattempted` and the
+`'quotes-unattempted'` code from naming candidates that do not exist) and
+`candidatesGenerated <= attempted + unattempted` (the leak-catcher: a channel
+that claims candidates it never accounts for is a report with generated
+candidates unaccounted for).
+
+**`verification` is the preflight budget, reported rather than absorbed**
+(C4-P7). `preflightAttempted` counts real simulations issued across the whole
+search (never a candidate skipped for free — an already-`verified`/`failed`
+route, or one that failed to compile). `preflightBudgetExhausted` is true when
+the most recent wave's `verifyLeader` stopped at `PREFLIGHT_TOP_K` with
+untried, not-already-resolved candidates still on the table; it is recomputed
+per wave, and an aborted search reports `false` by construction. It
+deliberately does **not** feed the `no-route`/`inconclusive` decision: a revert
+is real evidence about the chain, `alternatives` already makes the exhaustion
+inferable, and folding it in would make "no route" depend on `PREFLIGHT_TOP_K`
+— exactly the policy-into-verdict leak the report's independent axes exist to
+prevent.
 
 A NODE THAT CANNOT SERVE THE PINNED BLOCK IS NOT A REVERT EITHER. `header not
 found`, `missing trie node`, `unknown block`, erigon's `state at block N is not
@@ -869,8 +1155,9 @@ promised (the list is known-incomplete) and the result is `inconclusive`
 (`rpc-degraded`).
 
 When requirements are satisfied, the exact transaction is simulated as the
-real trader at the pinned block; top-`preflightTopK` candidates fall through
-on genuine reverts; unknown reverts stay unknown (raw data preserved) — no
+real trader at the pinned block; top-`PREFLIGHT_TOP_K` candidates fall through
+on genuine reverts (with the budget's use reported on `search.verification`);
+unknown reverts stay unknown (raw data preserved) — no
 revert-string guessing. A simulation that fails in the *transport* rather than
 reverting is not a verdict on the route: it stays `unverified` (never `failed`),
 sets `verificationDegraded`, and the result is `inconclusive`, never `ready`. Native-balance overrides may appear in *tests* only.
@@ -890,7 +1177,7 @@ sets `verificationDegraded`, and the result is `inconclusive`, never `ready`. Na
 
 | RPC failure | Response |
 | --- | --- |
-| `eth_getLogs` range/result cap | Start at `min(remaining range, 16M)`; bisect down on refusal (jumping straight to a declared cap when the provider states one); regrow the window after a run of clean chunks (the cap may have been transient); record partial coverage |
+| `eth_getLogs` range/result cap | Start at `min(remaining range, 16M)`; bisect down on refusal — jumping straight to a declared cap when the provider states one (a `span` cap also lowers the scan's ceiling; a `density` observation only narrows the current window), and collapsing to `DESCENT_TIMEOUT_FALLBACK` in one step when the refusal was expensive; regrow after a run of clean chunks (the cap may have been transient); remember the served width across scans (`ScanWidthMemory`); record partial coverage |
 | `eth_getLogs` rate-limited / failing at the minimum window | Exponential backoff (250ms → 2s cap, ≤60s of sleeping per scan) before retry; give the sub-range up after 3 attempts; stop the whole scan at the per-scan request budget and report the rest as uncovered — never an unbounded retry loop. Bounds work, not latency (a fully-throttling endpoint can still take ~an hour to return its partial answer): `AbortSignal` is the only wall-clock bound |
 | Single quote revert | Candidate dies; others unaffected |
 | Transport failure during quoting/preflight (429/5xx, timeout, dropped socket) | Counted apart (`quoting.transportFailed` / `verificationDegraded`), never as a revert; a preflighted route stays `unverified`, not `failed`; result is `inconclusive` (`rpc-degraded`) — never `no-route` — and still carries the route it priced and encoded |
@@ -907,7 +1194,9 @@ sets `verificationDegraded`, and the result is `inconclusive`, never `ready`. Na
    speculative-quote decode (revert ⇒ pool absent, not error),
    candidate-selection determinism, per-protocol topic filters, poolId
    integrity, coverage-cache merge/overlap, ranking + simplicity margin,
-   status classification, plan invariants.
+   status classification, plan invariants. The log-scan width policy is a pure
+   reducer, so its rules are a transition table (`(state, outcome) →
+   (state, action)`) rather than scenarios engineered through a fake transport.
 2. **Differential encoding**: every supported shape through the compiler and
    the pinned `universal-router-sdk` for the target `commandSet`;
    byte-identical; plus golden calldata vectors in-repo.
@@ -930,6 +1219,29 @@ sets `verificationDegraded`, and the result is `inconclusive`, never `ready`. Na
 9. **Latency benchmarks** (cold/warm): hint-only; direct pair; small-adjacency
    focus; WETH endpoint; full thorough search; non-batching transport;
    range-capped provider. Defaults are chosen from measurements.
+10. **Recorded-replay goldens** (`replay.golden.test.ts`) — the hermetic layer
+    that asks whether the router finds the *right* answer, not merely a
+    coherent one. A session is one real `getQuote` run's complete, block-pinned
+    RPC conversation, keyed by `(method, canonicalized params)` rather than by
+    sequence number, because the engine's concurrency makes request *order*
+    nondeterministic while the request *set* is not. Each session replays
+    against the real `createRouter` and asserts the full canonical result —
+    best routeId and `amountOut` exactly, every alternative, the canonicalized
+    `SearchReport`. An unrecorded key throws by name: a change to what the
+    search *asks* is a deliberate golden regeneration, never a defaulted
+    response. Determinism holds because `src/` contains no `Date.now`/
+    `Math.random` and the one wall-clock behavior (the 5s interleave) is
+    quiescent under microtask-resolved replay.
+11. **Provider conformance table** (`internal/providerConformance.test.ts`) —
+    one row per capture in the canary-written `providerErrors.json` fixture,
+    each error rebuilt from its own recorded fields rather than hand-asserted,
+    stating the classification, the declared cap (width *and* kind), the wire
+    shape, and what a real `scanLogs` run costs against an endpoint that fails
+    that way. The table is **closed against the fixture**: a new capture
+    recorded overnight fails this file until someone writes down what the stack
+    does with it. Alchemy and QuickNode both say "10,000"; the same scan costs
+    20 requests against one and 101 against the other, because only one means
+    it as a span policy — which is the kind of fact only this table holds.
 
 ## Package conventions
 
@@ -960,8 +1272,10 @@ Branch: `feat/router-lite-sdk-v2`.
 
 ## Out of scope for v1
 
-Exact-output; split routes; 3+ hops; persistence/live ingestion/reorg
-handling (beyond overlap re-scan); streaming results (waves make it a natural
+Exact-output; split routes; 3+ hops; live ingestion and reorg handling
+(beyond overlap re-scan); *host-managed* persistence — the index serializes
+itself (`toSnapshot`/`fromSnapshot`) but the SDK never touches a filesystem,
+a TTL, or a schema migration; streaming results (waves make it a natural
 later addition at wave boundaries); gas-aware ranking; `resolveHookData`
 callback; generic ERC-20 state overrides (rejected deliberately);
 fee-on-transfer support (safe rejection only); custom RPC batch executor
