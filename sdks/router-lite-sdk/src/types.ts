@@ -497,6 +497,47 @@ export type SearchReport = {
 }
 
 // ---------------------------------------------------------------------------
+// The all-zero counter blocks, spelled once.
+//
+// Three places need a `SearchReport`'s counters at their starting values — the
+// engine's `initialState` (`search/waves.ts`), the RPC-outage report
+// (`router.ts#buildOutageReport`), and the test-fixture report
+// (`internal/testing.ts#emptyReport`) — and each used to restate the object
+// literal in full. A counter added to one of these blocks is then a compile
+// error in exactly the places that hand-write it, which is fine, and a SILENT
+// omission in any place that spreads a partial, which is not: these factories
+// are the single spelling, typed as the report's own slices so the fields and
+// their types can never widen away from what `SearchReport` declares.
+// ---------------------------------------------------------------------------
+
+export function zeroQuoting(): SearchReport['quoting'] {
+  return { attempted: 0, succeeded: 0, failed: 0, transportFailed: 0, unattempted: 0 }
+}
+
+export function zeroVerification(): SearchReport['verification'] {
+  return { preflightAttempted: 0, preflightBudgetExhausted: false }
+}
+
+/**
+ * The report-shaped enumeration block. Deliberately NOT shared with the engine's
+ * `EngineState.enumeration`, which is a different type: it names its pruning counters
+ * `prunedPools`/`prunedCandidates`/`prunedIntermediates` (the report renames them
+ * `poolsPruned`/…) and carries no `exhaustiveWithinMaxHops`, because that field is a VERDICT
+ * `buildReport` derives from four other axes rather than a counter the engine accumulates.
+ */
+export function zeroReportEnumeration(): SearchReport['enumeration'] {
+  return {
+    exhaustiveWithinMaxHops: false,
+    intermediatesDiscovered: 0,
+    intermediatesSelected: 0,
+    candidatesGenerated: 0,
+    poolsPruned: 0,
+    candidatesPruned: 0,
+    intermediatesPruned: 0,
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Execution planning and encoding
 //
 // The encoder is a versioned execution compiler. The complexity is custody —

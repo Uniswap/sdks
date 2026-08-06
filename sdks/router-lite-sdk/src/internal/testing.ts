@@ -4,7 +4,7 @@ import { zeroHash } from 'viem'
 import { PREFLIGHT_TOP_K } from '../constants'
 import { WAVE_COUNT } from '../search/waves'
 import type { BlockRef, Protocol, QuoteResult, ReasonCode, SearchReport, SwapResult } from '../types'
-import { protocolRecord } from '../types'
+import { protocolRecord, zeroQuoting, zeroReportEnumeration, zeroVerification } from '../types'
 
 /**
  * The {@link PoolRef} constructors, re-exported under their test-facing names. A `PoolRef` carries
@@ -28,20 +28,12 @@ export function emptyReport(): SearchReport {
   return {
     block: ZERO_BLOCK,
     discovery: protocolRecord<SearchReport['discovery'][Protocol]>(() => ({ status: 'disabled', coveredRanges: [] })),
-    enumeration: {
-      exhaustiveWithinMaxHops: false,
-      intermediatesDiscovered: 0,
-      intermediatesSelected: 0,
-      candidatesGenerated: 0,
-      poolsPruned: 0,
-      candidatesPruned: 0,
-      intermediatesPruned: 0,
-    },
-    quoting: { attempted: 0, succeeded: 0, failed: 0, transportFailed: 0, unattempted: 0 },
+    enumeration: zeroReportEnumeration(),
+    quoting: zeroQuoting(),
     aborted: false,
     verificationDegraded: false,
     headRegressed: false,
-    verification: { preflightAttempted: 0, preflightBudgetExhausted: false },
+    verification: zeroVerification(),
   }
 }
 

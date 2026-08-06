@@ -820,6 +820,13 @@ test('intermediatesPruned (C4-P7): SearchReport.enumeration surfaces the same co
 
   expect(final.report.enumeration.intermediatesPruned).toBe(1)
   expect(final.report.enumeration.intermediatesSelected).toBe(MAX_INTERMEDIATES)
+  // …and the denominator of the ratio the panel prints as `selected/discovered`, threaded from the
+  // same `generateRoutes` call as the numerator rather than re-walked at report-assembly time. All
+  // three counters must reconcile: discovered = selected + pruned, from one sample of one index.
+  expect(final.report.enumeration.intermediatesDiscovered).toBe(MAX_INTERMEDIATES + 1)
+  expect(final.report.enumeration.intermediatesDiscovered).toBe(
+    final.report.enumeration.intermediatesSelected + final.report.enumeration.intermediatesPruned,
+  )
   // The pre-existing boolean this count already drove — kept in sync, not duplicated logic.
   expect(final.report.enumeration.exhaustiveWithinMaxHops).toBe(false)
   assertCoherent('quote', events)

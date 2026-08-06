@@ -38,7 +38,7 @@ import type {
   SwapResult,
   UniversalRouterDeployment,
 } from './types'
-import { protocolRecord, PROTOCOLS } from './types'
+import { protocolRecord, PROTOCOLS, zeroQuoting, zeroReportEnumeration, zeroVerification } from './types'
 
 // ---------------------------------------------------------------------------
 // The public router facade — the only layer callers touch. Its whole job is
@@ -696,16 +696,8 @@ function buildOutageReport(manifest: ChainManifest): SearchReport {
   return {
     block: ZERO_BLOCK,
     discovery,
-    enumeration: {
-      exhaustiveWithinMaxHops: false,
-      intermediatesDiscovered: 0,
-      intermediatesSelected: 0,
-      candidatesGenerated: 0,
-      poolsPruned: 0,
-      candidatesPruned: 0,
-      intermediatesPruned: 0,
-    },
-    quoting: { attempted: 0, succeeded: 0, failed: 0, transportFailed: 0, unattempted: 0 },
+    enumeration: zeroReportEnumeration(),
+    quoting: zeroQuoting(),
     aborted: false,
     // Nothing was ever quoted or verified, so neither degradation axis applies: the failed-discovery
     // axis above is what makes this report incomplete. No head was ever pinned either, so nothing
@@ -713,7 +705,7 @@ function buildOutageReport(manifest: ChainManifest): SearchReport {
     verificationDegraded: false,
     headRegressed: false,
     // Nothing was ever simulated either — the outage stopped the search before wave 0's first quote.
-    verification: { preflightAttempted: 0, preflightBudgetExhausted: false },
+    verification: zeroVerification(),
   }
 }
 

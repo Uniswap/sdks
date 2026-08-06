@@ -27,7 +27,7 @@ import type {
   SearchReport,
   SwapRequest,
 } from '../types'
-import { protocolRecord } from '../types'
+import { protocolRecord, zeroQuoting, zeroVerification } from '../types'
 import { checkReadiness } from '../verify/readiness'
 
 import { generateRoutes, routeId } from './candidates'
@@ -283,7 +283,11 @@ export type EngineState = {
    */
   firstCompileError?: string
   requirements?: ExecutionRequirement[]
-  quoting: { attempted: number; succeeded: number; failed: number; transportFailed: number; unattempted: number }
+  /** Structurally the report's own block, and typed as it so it can never drift: `buildReport`
+   * copies this straight into `SearchReport.quoting`, and the five counters' meanings (including the
+   * `attempted === succeeded + failed + transportFailed` invariant, and `unattempted` sitting outside
+   * that sum) are documented once, there. */
+  quoting: SearchReport['quoting']
   /** Set when verification could not be *carried out* — a preflight simulation, or one of the
    * read-only readiness checks, failed in the transport channel. The route stays `unverified`, and
    * the search can no longer be classified as an authoritative `no-route` (nor promised as
@@ -294,11 +298,21 @@ export type EngineState = {
    * (never promise `needs-action`; never blame a preflight revert on the route when the trader's
    * funding state is unknown), not just the report. */
   readinessDegraded: boolean
+  /**
+   * NOT `SearchReport['enumeration']`, on purpose: that type renames these pruning counters
+   * (`poolsPruned`/…) and adds `exhaustiveWithinMaxHops`, which is a verdict `buildReport` derives
+   * from four separate axes rather than anything the engine accumulates.
+   */
   enumeration: {
     candidatesGenerated: number
     prunedPools: number
     prunedCandidates: number
     prunedIntermediates: number
+    /** Eligible two-hop intermediates the last `generateRoutes` call SAW, before `MAX_INTERMEDIATES`.
+     * Threaded from the enumeration rather than re-walked at report time so it and
+     * `intermediatesSelected` — which the report prints as the single ratio `selected/discovered` —
+     * always describe the same index at the same instant. */
+    intermediatesDiscovered: number
     /** The real selected-intermediates count from the last `generateRoutes` call — never re-derived
      * downstream from a discovered-count + cap. */
     intermediatesSelected: number
@@ -320,7 +334,7 @@ export type EngineState = {
   /** Preflight-simulation budget, across the whole search (C4-P7) — see `SearchReport.verification`
    * for what each field means and why. Recomputed (not accumulated) every wave for
    * `preflightBudgetExhausted`; `preflightAttempted` accumulates. Set by `search/leader.ts#verifyLeader`. */
-  verification: { preflightAttempted: number; preflightBudgetExhausted: boolean }
+  verification: SearchReport['verification']
 }
 
 export type Run = { ctx: SearchContext; state: EngineState } & (
@@ -343,15 +357,22 @@ export function initialState(block: BlockRef, headRegressed: boolean): EngineSta
     execution: new Map(),
     txById: new Map(),
     limitsById: new Map(),
-    quoting: { attempted: 0, succeeded: 0, failed: 0, transportFailed: 0, unattempted: 0 },
+    quoting: zeroQuoting(),
     verificationDegraded: false,
     readinessDegraded: false,
-    enumeration: { candidatesGenerated: 0, prunedPools: 0, prunedCandidates: 0, prunedIntermediates: 0, intermediatesSelected: 0 },
+    enumeration: {
+      candidatesGenerated: 0,
+      prunedPools: 0,
+      prunedCandidates: 0,
+      prunedIntermediates: 0,
+      intermediatesDiscovered: 0,
+      intermediatesSelected: 0,
+    },
     discovery: protocolRecord<ProtocolDiscovery>(() => ({ complete: new Set(), failed: false, covered: [] })),
     pairScanned: [],
     intermediatePriority: [],
     aborted: false,
-    verification: { preflightAttempted: 0, preflightBudgetExhausted: false },
+    verification: zeroVerification(),
   }
 }
 
@@ -668,7 +689,7 @@ async function runDiscoveryProbes(run: Run, probes: QuoteProbe[]): Promise<void>
 /** Enumerates over everything the index currently knows and quotes whatever is new. */
 async function quoteEnumerated(run: Run): Promise<void> {
   const { ctx, req, state } = run
-  const { candidates, pruned, intermediatesSelected } = generateRoutes({
+  const { candidates, pruned, intermediatesDiscovered, intermediatesSelected } = generateRoutes({
     tokenIn: req.tokenIn,
     tokenOut: req.tokenOut,
     index: ctx.index,
@@ -681,6 +702,7 @@ async function quoteEnumerated(run: Run): Promise<void> {
   state.enumeration.prunedPools = pruned.pools
   state.enumeration.prunedCandidates = pruned.candidates
   state.enumeration.prunedIntermediates = pruned.intermediates
+  state.enumeration.intermediatesDiscovered = intermediatesDiscovered
   state.enumeration.intermediatesSelected = intermediatesSelected
   // C4-H5 follow-up: being selected as a candidate leg is evidence a pool is worth keeping under
   // `maxPools`, whether or not the quote that follows succeeds — see `PoolIndex.touchAll`'s docstring.

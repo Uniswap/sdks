@@ -4,7 +4,7 @@ import type { Address, Hex } from 'viem'
 import { keccak256, toHex, zeroAddress } from 'viem'
 
 import { MAX_INTERMEDIATES, MAX_POOLS_DIRECT, MAX_POOLS_PER_LEG, MAX_QUOTE_CANDIDATES } from '../constants'
-import { sameFamily } from '../internal/currency'
+import { sameFamily, toGraphNode } from '../internal/currency'
 import { v2Ref, v3Ref, v4Ref } from '../internal/testing'
 import { PoolIndex } from '../pools/poolIndex'
 import type { GenerateRoutesArgs } from '../search/candidates'
@@ -426,5 +426,84 @@ describe('generateRoutes — property tests', () => {
       ),
       { numRuns: 200 },
     )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The equality this file exists to pin so `search/report.ts` can stop
+// re-deriving it.
+//
+// `SearchReport.enumeration.intermediatesDiscovered` used to be computed a
+// SECOND time, inside `buildReport`, by re-walking the neighbor intersection
+// against whatever the index looked like at report-assembly time — the exact
+// drift class the `intermediatesSelected` doc comment warns about, one field
+// over: two numbers presented as a ratio (`selected/discovered`) but sampled
+// from different moments and by different code. This property pins that the
+// two walks really do compute the same thing on the same index, which is what
+// makes threading the enumeration's own count through `EngineState` a pure
+// refactor rather than a change of meaning.
+// ---------------------------------------------------------------------------
+
+/** `buildReport`'s former re-derivation, transcribed verbatim (it read `ctx.index`/`req` where this
+ * reads the same values by parameter) so the property compares implementations, not paraphrases. */
+function reportStyleIntermediatesDiscovered(index: PoolIndex, tokenIn: Address, tokenOut: Address, wrappedNative: Address): number {
+  const inNode = toGraphNode(tokenIn, wrappedNative)
+  const outNode = toGraphNode(tokenOut, wrappedNative)
+  const neighborsOut = index.neighbors(tokenOut)
+  let count = 0
+  for (const candidateNode of index.neighbors(tokenIn).keys()) {
+    if (candidateNode === inNode || candidateNode === outNode) continue
+    if (neighborsOut.has(candidateNode)) count++
+  }
+  return count
+}
+
+describe('intermediatesDiscovered', () => {
+  test("generateRoutes' count equals buildReport's former re-derivation, over arbitrary pool graphs", () => {
+    fc.assert(
+      fc.property(
+        fc.array(arbPool, { minLength: 0, maxLength: 30 }),
+        fc.integer({ min: 0, max: 7 }),
+        fc.integer({ min: 0, max: 7 }),
+        (pools, tokenInIdx, tokenOutIdx) => {
+          fc.pre(tokenInIdx !== tokenOutIdx)
+          const wrappedNative = TOKEN_POOL[0]!
+          const index = buildIndex(pools, wrappedNative)
+          const tokenIn = TOKEN_POOL[tokenInIdx]!
+          const tokenOut = TOKEN_POOL[tokenOutIdx]!
+
+          const fromEnumeration = generateRoutes({ tokenIn, tokenOut, index, hookData: new Map(), wrappedNative })
+          const fromReport = reportStyleIntermediatesDiscovered(index, tokenIn, tokenOut, wrappedNative)
+
+          // The equality itself…
+          if (fromEnumeration.intermediatesDiscovered !== fromReport) return false
+          // …and the two invariants the report renders it under: `selected/discovered` is a real
+          // ratio (selected never exceeds discovered, and never exceeds the cap), and the pruned
+          // count is exactly the difference.
+          if (fromEnumeration.intermediatesSelected > fromEnumeration.intermediatesDiscovered) return false
+          if (fromEnumeration.intermediatesSelected > MAX_INTERMEDIATES) return false
+          if (fromEnumeration.pruned.intermediates !== fromEnumeration.intermediatesDiscovered - fromEnumeration.intermediatesSelected) {
+            return false
+          }
+          return true
+        },
+      ),
+      { numRuns: 300 },
+    )
+  })
+
+  test('counts the intersection on a hand-built graph, endpoints excluded', () => {
+    // WETH(=wrappedNative) is an endpoint here, so a WETH node must NOT count as an intermediate
+    // even though it neighbors both sides; USDC and TOKEN_A must.
+    const index = new PoolIndex(WETH)
+    index.upsert(v2Rec(WETH, USDC))
+    index.upsert(v2Rec(USDC, NEW))
+    index.upsert(v3Rec(WETH, TOKEN_A, 500))
+    index.upsert(v3Rec(TOKEN_A, NEW, 500))
+    index.upsert(v2Rec(WETH, NEW)) // a direct pool: the endpoints' own node, never an intermediate
+
+    const result = generateRoutes({ tokenIn: WETH, tokenOut: NEW, index, hookData: new Map(), wrappedNative: WETH })
+    expect(result.intermediatesDiscovered).toBe(2)
+    expect(result.intermediatesDiscovered).toBe(reportStyleIntermediatesDiscovered(index, WETH, NEW, WETH))
   })
 })

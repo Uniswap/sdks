@@ -53,13 +53,6 @@ export function buildReport(run: Run): SearchReport {
     coveredRanges: mergeRanges(state.discovery[p].covered),
   }))
 
-  const neighborsOut = ctx.index.neighbors(req.tokenOut)
-  let intermediatesDiscovered = 0
-  for (const candidateNode of ctx.index.neighbors(req.tokenIn).keys()) {
-    if (candidateNode === inNode || candidateNode === outNode) continue
-    if (neighborsOut.has(candidateNode)) intermediatesDiscovered++
-  }
-
   const discoveryComplete = Object.values(discovery).every((d) => d.status === 'complete' || d.status === 'disabled')
 
   return {
@@ -78,10 +71,18 @@ export function buildReport(run: Run): SearchReport {
         state.quoting.unattempted === 0 &&
         // A candidate whose quote never got an answer was enumerated but not evaluated.
         state.quoting.transportFailed === 0,
-      intermediatesDiscovered,
-      // The real count `generateRoutes` selected, threaded through `state.enumeration` — not
-      // re-derived here as `min(discovered, MAX_INTERMEDIATES)`, which would silently drift from the
-      // real number the moment enumeration hasn't run yet (or ran against a smaller index).
+      // BOTH halves of the ratio come from the same `generateRoutes` call, threaded through
+      // `state.enumeration`. `intermediatesSelected` always did; `intermediatesDiscovered` used to be
+      // re-derived HERE, by re-walking the neighbor intersection against the index as it looked at
+      // report-assembly time — which is the same drift the `intermediatesSelected` note has always
+      // warned about, one field over. Two numbers rendered as one ratio (`selected/discovered`) must
+      // be sampled from one moment by one piece of code, or the ratio describes nothing that ever
+      // happened. `candidates.test.ts` pins that the two walks agreed, so this is the same number.
+      //
+      // The one place it now reads differently, and correctly so: a search aborted before its first
+      // enumeration reports `0/0` rather than "0 selected out of N the index happened to hold" — the
+      // enumeration never ran, so it discovered nothing.
+      intermediatesDiscovered: state.enumeration.intermediatesDiscovered,
       intermediatesSelected: state.enumeration.intermediatesSelected,
       candidatesGenerated: state.enumeration.candidatesGenerated,
       poolsPruned: state.enumeration.prunedPools,

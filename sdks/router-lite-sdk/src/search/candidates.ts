@@ -50,6 +50,15 @@ export type GenerateRoutesResult = {
    * see that constant's doc comment for why, at today's values, this counter can never actually fire:
    * the cap is derived to exactly bound what this function can produce. */
   pruned: { intermediates: number; pools: number; candidates: number }
+  /**
+   * Eligible two-hop intermediate nodes this enumeration SAW: the intersection of `tokenIn`'s and
+   * `tokenOut`'s graph neighbors, minus either endpoint. Reported alongside
+   * {@link GenerateRoutesResult.intermediatesSelected} (which is this, capped by `MAX_INTERMEDIATES`)
+   * so the pair always describes the same index at the same instant — `search/report.ts` used to
+   * re-walk the intersection itself at report-assembly time, which is the exact drift class the
+   * `intermediatesSelected` comment above warns about, just in the other field.
+   */
+  intermediatesDiscovered: number
   /** The actual number of intermediate nodes selected for two-hop enumeration (≤ `MAX_INTERMEDIATES`) —
    * the real count the engine used, not re-derived downstream from `intermediatesDiscovered`. */
   intermediatesSelected: number
@@ -284,6 +293,7 @@ export function generateRoutes(args: GenerateRoutesArgs): GenerateRoutesResult {
   return {
     candidates,
     pruned: { intermediates: prunedIntermediates, pools: prunedPools, candidates: prunedCandidates },
+    intermediatesDiscovered: eligibleIntermediates.length,
     intermediatesSelected: selectedIntermediates.length,
   }
 }
