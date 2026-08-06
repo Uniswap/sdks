@@ -4,8 +4,9 @@ import { decodeFunctionResult, encodeFunctionData, isAddress, isAddressEqual } f
 import { DEFAULT_CONCURRENCY } from '../constants'
 import { AbortedCallError, TransportError } from '../errors'
 import { ERC20_ABI, PERMIT2_ABI } from '../internal/abis'
-import { classifyRpcError, ethCall, mapConcurrent } from '../internal/rpc'
+import { ethCall, mapConcurrent } from '../internal/rpc'
 import type { Semaphore } from '../internal/rpc'
+import { classifyRpcError } from '../internal/rpcErrors'
 import type { CurrencyRef, ExecutionRequirement, Permit2PermitSingle } from '../types'
 
 // ---------------------------------------------------------------------------

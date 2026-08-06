@@ -4,7 +4,7 @@ import { mergeRanges } from '../internal/ranges'
 import type { Protocol, SearchReport } from '../types'
 import { protocolRecord } from '../types'
 
-import { node } from './discovery'
+import { node } from './context'
 import type { Run } from './waves'
 
 // ---------------------------------------------------------------------------

@@ -64,11 +64,6 @@ export type GenerateRoutesResult = {
   intermediatesSelected: number
 }
 
-/** Deterministic route identity: each leg's pool identity (protocol + lowercased address/poolId), joined by '>'. */
-export function routeId(c: RouteCandidate): string {
-  return c.legs.map((leg) => leg.pool.id).join('>')
-}
-
 /** Materializes a leg for `pool`, orienting currencyIn/currencyOut so currencyIn's graph node matches `fromNode`. */
 function materializeLeg(pool: PoolRef, fromNode: Address, wrappedNative: Address, hookData: Map<string, Hex>): RouteLeg {
   const [c0, c1] = pool.currencies

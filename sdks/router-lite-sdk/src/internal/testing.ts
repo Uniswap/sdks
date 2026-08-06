@@ -87,7 +87,7 @@ export function permit2Domain(permit2: Address, chainId: number): TypedDataDomai
 // Provider-failure shapes, as real transports actually throw them.
 //
 // These exist so the transport-vs-execution classifier
-// (`internal/rpc.ts#classifyRpcError`) is tested against the shapes it will
+// (`internal/rpcErrors.ts#classifyRpcError`) is tested against the shapes it will
 // really meet — a viem `HttpRequestError` carrying `status: 429`, a JSON-RPC
 // rate-limit object nested as a `cause`, an undici `fetch failed` wrapping an
 // `ECONNREFUSED` errno — rather than against a hand-rolled `Error('429')` that

@@ -520,7 +520,7 @@ test('the real backoff timer resolves on time and is cleared by an abort', async
 // `../internal/__fixtures__/providerErrors.json`, fed through the stub — so
 // these test the scanner against what providers ACTUALLY say, not against a
 // paraphrase that happens to match the parser. If a re-capture changes the
-// wording, these fail alongside the parser's own tests in `rpc.test.ts`.
+// wording, these fail alongside the parser's own tests in `rpcErrors.test.ts`.
 // ---------------------------------------------------------------------------
 
 /** The captured message for one endpoint, thrown the way viem surfaces it. */

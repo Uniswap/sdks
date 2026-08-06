@@ -340,7 +340,7 @@ export function maxPlausibleHeadRegression(reorgOverlapBlocks: bigint): bigint {
 // THE DECLARED-CAP FAST PATH SHORT-CIRCUITS THAT DISCOVERY WHEN IT CAN (R2).
 // Caps are not *never* advertised — several providers state the window that
 // would have worked in the error itself, and
-// `internal/rpc.ts#parseDeclaredCap` reads it out. Where it fires, the window
+// `internal/rpcErrors.ts#parseDeclaredCap` reads it out. Where it fires, the window
 // jumps straight to the stated cap instead of halving toward it, and a cap
 // below {@link MIN_CHUNK} gives the sub-range up on the FIRST error rather than
 // spending {@link MAX_CONSECUTIVE_MIN_FAILURES} retries and a backoff
@@ -395,7 +395,7 @@ export function maxPlausibleHeadRegression(reorgOverlapBlocks: bigint): bigint {
  *     ladder there is minutes of zero progress, not a handful of probes.
  *
  * {@link DESCENT_TIMEOUT_FALLBACK} is what makes the second class affordable, and
- * `internal/rpc.ts#parseDeclaredCap` lets providers that DECLARE their cap skip the ladder entirely
+ * `internal/rpcErrors.ts#parseDeclaredCap` lets providers that DECLARE their cap skip the ladder entirely
  * (the window jumps straight to the stated width on the way down). Against all of that, the old 10k
  * start paid ~2,600 needless round trips per cold mainnet history scan, on every generous endpoint,
  * every scan, forever.
@@ -414,7 +414,7 @@ export const MAX_SCAN_WINDOW = 16_000_000n
  * a time.
  *
  * HALVING PRICES A REFUSAL AS FREE, AND FOR SOME PROVIDERS IT IS NOT. `internal/logScan.ts`'s catch
- * classifies the failure (`internal/rpc.ts#classifyRpcError`); a `transport` or `unavailable` verdict
+ * classifies the failure (`internal/rpcErrors.ts#classifyRpcError`); a `transport` or `unavailable` verdict
  * covers exactly the expensive shapes — a timeout (the endpoint hung until viem gave up, having
  * already retried 3 times at ~10s apiece: ~40s for ONE probe, so a 13-step ladder from
  * {@link MAX_SCAN_WINDOW} is ~9 minutes of no progress) and a result-size cap (the endpoint executed

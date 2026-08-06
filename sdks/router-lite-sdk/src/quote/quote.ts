@@ -2,13 +2,13 @@ import type { PublicClient } from 'viem'
 
 import { DEFAULT_CONCURRENCY, SIMPLICITY_MARGIN_BPS } from '../constants'
 import { AbortedCallError, TransportError } from '../errors'
-import { ethCall, mapConcurrent, revertDataOf } from '../internal/rpc'
+import { ethCall, mapConcurrent } from '../internal/rpc'
 import type { Semaphore } from '../internal/rpc'
+import { revertDataOf } from '../internal/rpcErrors'
 import type { Segment } from '../internal/segment'
 import { segmentCandidate } from '../internal/segment'
-import { isHooked } from '../protocols'
+import { isHooked, routeId } from '../protocols'
 import type { ProtocolModule, QuoteProbe } from '../protocols/types'
-import { routeId } from '../search/candidates'
 import type { ChainManifest, Protocol, QuotedRoute, RouteCandidate, RouteLeg } from '../types'
 
 // ---------------------------------------------------------------------------

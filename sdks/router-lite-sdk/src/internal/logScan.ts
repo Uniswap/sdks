@@ -16,8 +16,8 @@ import {
 import type { BlockRange, LogQuery } from '../types'
 
 import { maxBig, mergeRanges, minBig } from './ranges'
-import { classifyRpcError, parseDeclaredCap } from './rpc'
 import type { Semaphore } from './rpc'
+import { classifyRpcError, parseDeclaredCap } from './rpcErrors'
 
 // viem types each topic slot as `Hex | Hex[] | null` to allow OR-matching on
 // array-typed indexed params. None of the creation-event topics this package
@@ -58,7 +58,7 @@ export function narrowTopics(topics: (Hex | Hex[] | null)[]): (Hex | null)[] {
 // repo has captured drpc doing on archive reads — bills real time for every
 // step, and viem retries a timeout three times at ~10s before the error even
 // reaches this loop: a naive ladder there is minutes of zero progress. So the
-// catch below classifies (`internal/rpc.ts#classifyRpcError`) and, on a
+// catch below classifies (`internal/rpcErrors.ts#classifyRpcError`) and, on a
 // transport/unavailable failure at a wide window, drops straight to
 // `DESCENT_TIMEOUT_FALLBACK` rather than halving — one expensive failure buys
 // the whole descent. A caller who already knows the cap skips all of it with
@@ -66,7 +66,7 @@ export function narrowTopics(topics: (Hex | Hex[] | null)[]): (Hex | null)[] {
 //
 // SOME PROVIDERS DO SAY (R2). blastapi, drpc, alchemy and quicknode all state
 // the window that would have worked, in the error text, and
-// `internal/rpc.ts#parseDeclaredCap` reads it. When a cap is declared the loop
+// `internal/rpcErrors.ts#parseDeclaredCap` reads it. When a cap is declared the loop
 // below skips the search entirely: it jumps the window straight to the stated
 // cap, or — when that cap is below MIN_CHUNK, i.e. below anything this scanner
 // will ever ask for — gives the sub-range up on the first error instead of
@@ -188,7 +188,7 @@ export function narrowTopics(topics: (Hex | Hex[] | null)[]): (Hex | null)[] {
  *    a starting HINT and nothing more: a scan that begins there still halves down if it is now too
  *    wide, and still regrows toward its ceiling if it is now too narrow. Being wrong costs a probe.
  *  - `declaredScanCap` is prescriptive — a ceiling the endpoint STATED in an error
- *    (`internal/rpc.ts#parseDeclaredCap`). A scan may not exceed it, which is the whole point: see
+ *    (`internal/rpcErrors.ts#parseDeclaredCap`). A scan may not exceed it, which is the whole point: see
  *    the ceiling discussion in this file's header for why a known ceiling is worth far more than the
  *    probes it saves.
  *
@@ -507,7 +507,7 @@ export async function scanLogs(
 
     // --- the declared-cap fast path (R2) -------------------------------------------------
     // Some providers state the window they WOULD have served, right there in the error (see
-    // `internal/rpc.ts#parseDeclaredCap` and the live captures it is built from). When they do,
+    // `internal/rpcErrors.ts#parseDeclaredCap` and the live captures it is built from). When they do,
     // the bisection below is searching for an answer already in hand.
     const { capBlocks, capKind } = parseDeclaredCap(err)
     if (capBlocks !== undefined && capBlocks < chunkSize) {
@@ -528,7 +528,7 @@ export async function scanLogs(
       // there pins every mainnet scan 800x too narrow for the rest of its life. The WIDTH jump below
       // still applies to both kinds (it is only this attempt's guess, and the regrowth ratchet climbs
       // back out of it, which is exactly the recovery a density observation needs); only the durable
-      // ceiling is withheld. See `internal/rpc.ts#DeclaredCap.capKind`.
+      // ceiling is withheld. See `internal/rpcErrors.ts#DeclaredCap.capKind`.
       //
       // Only ever NARROWS (`minBig`), so a provider that declares different span caps for different
       // queries leaves this scan at the tightest one it was actually told about, and an

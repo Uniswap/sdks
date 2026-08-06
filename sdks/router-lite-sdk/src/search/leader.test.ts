@@ -3,11 +3,10 @@ import type { Address } from 'viem'
 import { zeroHash } from 'viem'
 
 import { PoolIndex } from '../pools/poolIndex'
-import { PROTOCOL_MODULES } from '../protocols'
+import { PROTOCOL_MODULES, routeId } from '../protocols'
 import { v2PoolRef as v2Ref } from '../protocols/poolRef'
 import type { BlockRef, ChainManifest, ExecutionRequirement, QuotedRoute, RankedRoute, SwapRequest } from '../types'
 
-import { routeId } from './candidates'
 import { evaluate, pickLeader } from './leader'
 import { initialState } from './waves'
 import type { Run, SearchContext } from './waves'

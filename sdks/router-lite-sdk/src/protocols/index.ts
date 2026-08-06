@@ -22,9 +22,10 @@ export { v3Module } from './v3'
 export { v4Module } from './v4'
 export type { FeeDiscovery, ProtocolModule, QuoteProbe } from './types'
 
-// The PoolRef vocabulary itself: the three constructors (the only way a ref is ever built) and the
-// one predicate — `isHooked` — that anything outside a module needs to ask about a pool's shape.
-export { isHooked, v2PoolRef, v3PoolRef, v4PoolRef } from './poolRef'
+// The PoolRef vocabulary itself: the three constructors (the only way a ref is ever built), the one
+// predicate — `isHooked` — that anything outside a module needs to ask about a pool's shape, and
+// `routeId`, which is nothing but those refs' own `id`s in leg order.
+export { isHooked, routeId, v2PoolRef, v3PoolRef, v4PoolRef } from './poolRef'
 export type { V2PoolRef, V3PoolRef, V4PoolRef } from './poolRef'
 
 export const PROTOCOL_MODULES: Record<Protocol, ProtocolModule> = { v2: v2Module, v3: v3Module, v4: v4Module }

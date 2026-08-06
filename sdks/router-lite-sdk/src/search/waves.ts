@@ -13,6 +13,7 @@ import { ethCall, mapConcurrent } from '../internal/rpc'
 import type { Semaphore } from '../internal/rpc'
 import { reorgOverlapBlocksOf, requireExecution, wave0PairScanBlocks } from '../manifest'
 import type { PoolIndex } from '../pools/poolIndex'
+import { routeId } from '../protocols'
 import type { ProtocolModule, QuoteProbe } from '../protocols/types'
 import { probeQuotes, quoteCandidates } from '../quote/quote'
 import type {
@@ -36,15 +37,9 @@ import type {
 import { protocolRecord, zeroQuoting, zeroVerification } from '../types'
 import { checkReadiness } from '../verify/readiness'
 
-import { generateRoutes, routeId } from './candidates'
-import {
-  completeExactPairScan,
-  discoverFeeTiers,
-  enabledModules,
-  node,
-  scanAdjacency,
-  scanExactPairRecent,
-} from './discovery'
+import { generateRoutes } from './candidates'
+import { enabledModules, node } from './context'
+import { completeExactPairScan, discoverFeeTiers, scanAdjacency, scanExactPairRecent } from './discovery'
 import { evaluate } from './leader'
 
 // ---------------------------------------------------------------------------
@@ -67,10 +62,11 @@ import { evaluate } from './leader'
 //           product over everything the index now knows
 //
 // The engine's stages live in three sibling files, each with its own header:
-// `discovery.ts` (log-scan orchestration + the shared context accessors),
-// `leader.ts` (compile/encode/simulate, and the ordering invariant that makes
-// needs-action-vs-verified gating sound), `report.ts` (SearchReport assembly);
-// the set arithmetic every one of them shares is `internal/ranges.ts`.
+// `discovery.ts` (log-scan orchestration), `leader.ts` (compile/encode/
+// simulate, and the ordering invariant that makes needs-action-vs-verified
+// gating sound), `report.ts` (SearchReport assembly). What all three share is
+// `context.ts` (the three one-line accessors onto `SearchContext`) and
+// `internal/ranges.ts` (the set arithmetic).
 //
 // Four properties hold across every wave:
 //
@@ -533,7 +529,7 @@ function recordSuccess(run: Run, quoted: QuotedRoute[]): void {
  *  - single-leg: a failed two-leg candidate says nothing about which of its pools was at fault, so
  *    nothing is marked — a negative cache that poisons innocent pools would be worse than no cache.
  *  - amount-independent: `amountIndependentFailures` (from `quoteCandidates`/`probeQuotes`, via
- *    `internal/rpc.ts#revertDataOf`) is already filtered to failures whose revert carried NO data —
+ *    `internal/rpcErrors.ts#revertDataOf`) is already filtered to failures whose revert carried NO data —
  *    the pool-absent shape (v2 `getReserves()` at a nonexistent address; a v3/v4 quoter reverting
  *    with no payload because there is no pool at that key). A revert WITH data
  *    (`NotEnoughLiquidity`, a hook rejection, a zero-output rounding revert) can depend on `amountIn`

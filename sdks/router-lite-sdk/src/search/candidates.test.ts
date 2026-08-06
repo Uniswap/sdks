@@ -7,10 +7,11 @@ import { MAX_INTERMEDIATES, MAX_POOLS_DIRECT, MAX_POOLS_PER_LEG, MAX_QUOTE_CANDI
 import { sameFamily, toGraphNode } from '../internal/currency'
 import { v2Ref, v3Ref, v4Ref } from '../internal/testing'
 import { PoolIndex } from '../pools/poolIndex'
+import { routeId } from '../protocols'
 import type { GenerateRoutesArgs } from '../search/candidates'
 import type { PoolKey, PoolRecord, PoolRef } from '../types'
 
-import { generateRoutes, routeId } from './candidates'
+import { generateRoutes } from './candidates'
 
 const WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2' as Address
 const USDC = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as Address

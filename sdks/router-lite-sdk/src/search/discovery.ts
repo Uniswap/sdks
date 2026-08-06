@@ -1,15 +1,14 @@
-import type { Address, Log } from 'viem'
+import type { Log } from 'viem'
 
-import { toGraphNode } from '../internal/currency'
 import { scanLogs } from '../internal/logScan'
 import type { ScanWidthMemory } from '../internal/logScan'
 import { intersectAll, intersectRanges, maxBig, mergeRanges, subtractRanges } from '../internal/ranges'
 import type { Semaphore } from '../internal/rpc'
 import type { ProtocolModule } from '../protocols/types'
-import type { BlockRange, ChainManifest, CurrencyRef, LogQuery, Protocol } from '../types'
-import { PROTOCOLS } from '../types'
+import type { BlockRange, CurrencyRef, LogQuery } from '../types'
 
-import type { Run, SearchContext } from './waves'
+import { deploymentBlockOf, enabledModules, node } from './context'
+import type { Run } from './waves'
 
 // ---------------------------------------------------------------------------
 // Discovery: the engine's scan orchestration — what to ask the log stream for,
@@ -31,26 +30,10 @@ import type { Run, SearchContext } from './waves'
 // cover, and an endpoint that covered nothing is recorded as `failed` rather
 // than raised.
 //
-// The three one-line context accessors below (`deploymentBlockOf`,
-// `enabledModules`, `node`) live here because scanning is their heaviest user
-// and because a scan module may not import values from `waves.ts` without
-// making the engine's module graph cyclic — `waves.ts` and `report.ts` import
-// them from here, and the only thing this file takes from `waves.ts` is types.
+// Scanning, and only scanning. The three shared context accessors this file
+// used to host for lack of anywhere better (`deploymentBlockOf`,
+// `enabledModules`, `node`) are in `context.ts` now.
 // ---------------------------------------------------------------------------
-
-export function deploymentBlockOf(m: ChainManifest, p: Protocol): bigint | undefined {
-  if (p === 'v2') return m.v2?.deploymentBlock
-  if (p === 'v3') return m.v3?.deploymentBlock
-  return m.v4?.deploymentBlock
-}
-
-export function enabledModules(ctx: SearchContext): ProtocolModule[] {
-  return PROTOCOLS.map((p) => ctx.modules[p]).filter((m) => m.enabled(ctx.manifest))
-}
-
-export function node(c: CurrencyRef, m: ChainManifest): Address {
-  return toGraphNode(c, m.wrappedNative)
-}
 
 export function ingestLogs(run: Run, module_: ProtocolModule, logs: Log[]): void {
   for (const log of logs) {

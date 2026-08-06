@@ -1,7 +1,7 @@
 import type { Address, Hex, PublicClient } from 'viem'
 
-import { classifyRpcError, revertDataOf } from '../internal/rpc'
 import type { Semaphore } from '../internal/rpc'
+import { classifyRpcError, revertDataOf } from '../internal/rpcErrors'
 import type { EncodedTx } from '../types'
 
 // ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ export async function preflightTx(
     // pinned block: `!== 'execution'` rather than `=== 'transport'` so the node-state channel can
     // never be laundered into the `reverted` branch below and read as revert-data-free rejection.
     if (classifyRpcError(err) !== 'execution') return { ok: false, kind: 'transport' }
-    // Revert data comes out of `internal/rpc.ts`'s ONE cause-chain walker — the same one
+    // Revert data comes out of `internal/rpcErrors.ts`'s ONE cause-chain walker — the same one
     // `classifyRpcError` just used, and the same one `quote/quote.ts` reads for its
     // amount-independence rule. This file used to keep a third, weaker copy: it looked only one
     // level down the `cause` chain, never stepped into geth's nested `data.data`, and accepted a

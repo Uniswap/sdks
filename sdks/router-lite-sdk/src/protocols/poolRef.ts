@@ -3,10 +3,11 @@ import { isAddressEqual, zeroAddress } from 'viem'
 
 import { sortAddresses } from '../internal/currency'
 import { computeV4PoolId } from '../internal/poolId'
-import type { CurrencyRef, PoolKey, PoolRef, Protocol } from '../types'
+import type { CurrencyRef, PoolKey, PoolRef, Protocol, RouteCandidate } from '../types'
 
 // ---------------------------------------------------------------------------
-// PoolRef construction — the only place a `PoolRef` is ever built.
+// PoolRef construction — the only place a `PoolRef` is ever built, and the
+// identity vocabulary built out of it (`PoolRef.id`, and `routeId`).
 //
 // A `PoolRef` carries two derived fields on every arm (`id` and `currencies`,
 // see the type's own docs); they are derived here, once, so that every
@@ -34,6 +35,21 @@ export type V4PoolRef = Extract<PoolRef, { protocol: 'v4' }>
  * reason — see `pools/poolIndex.ts` and `search/waves.ts`. */
 function identity(protocol: Protocol, id: Address | Hex): string {
   return `${protocol}:${id.toLowerCase()}`
+}
+
+/**
+ * Deterministic route identity: each leg's pool identity (protocol + lowercased address/poolId),
+ * joined by '>'.
+ *
+ * IT LIVES BESIDE {@link identity} BECAUSE IT IS THAT FUNCTION'S ONLY COMPOSITION. `routeId` is
+ * nothing but `PoolRef.id` concatenated in leg order, so the two spellings of "what makes this the
+ * same thing as that" belong in one file — a change to how a pool is keyed is automatically a
+ * change to how a route is keyed, and this is where a reader looking for either finds both. It used
+ * to sit in `search/candidates.ts`, which meant `quote/quote.ts` (the ranking tie-break) imported
+ * UP the layer stack into the search engine to ask a question with no search in it at all.
+ */
+export function routeId(c: RouteCandidate): string {
+  return c.legs.map((leg) => leg.pool.id).join('>')
 }
 
 /** v4 spells native as address(0) on-chain (never the wrapped address); the domain spells it 'native'. */

@@ -3,11 +3,11 @@ import { encoderFor } from '../encode'
 import { UnsupportedRouteError } from '../errors'
 import { requireExecution } from '../manifest'
 import { compileExecutionPlan } from '../plan/compile'
+import { routeId } from '../protocols'
 import { rankRoutes } from '../quote/quote'
 import type { EncodedTx, QuotedRoute, RankedRoute } from '../types'
 import { preflightTx } from '../verify/preflight'
 
-import { routeId } from './candidates'
 import { buildReport } from './report'
 import type { InternalResult, Run } from './waves'
 

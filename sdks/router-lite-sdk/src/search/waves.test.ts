@@ -9,6 +9,7 @@ import { createSemaphore } from '../internal/rpc'
 import { assertResultCoherent, rateLimitHttpError, v2Ref, v3Ref, v4Ref } from '../internal/testing'
 import { wave0PairScanBlocks } from '../manifest'
 import { isDiscredited, PoolIndex } from '../pools/poolIndex'
+import { routeId } from '../protocols'
 import type { V4PoolRef } from '../protocols/poolRef'
 import type { ProtocolModule, QuoteProbe } from '../protocols/types'
 import { classifySwap } from '../router'
@@ -31,8 +32,8 @@ import type {
   SwapResult,
 } from '../types'
 
-import { generateRoutes, routeId } from './candidates'
-import { node } from './discovery'
+import { generateRoutes } from './candidates'
+import { node } from './context'
 import { evaluate } from './leader'
 import type { InternalResult, Run, SearchContext } from './waves'
 import { initialState, searchWaves, selectFocus } from './waves'

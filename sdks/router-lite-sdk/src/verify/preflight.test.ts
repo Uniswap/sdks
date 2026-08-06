@@ -138,7 +138,7 @@ test("(6) a node that cannot serve the pinned block is kind 'transport', never a
 // `err.cause.data` only, never stepping INTO `cause.data` to read its `.data`.
 // So against every geth/erigon endpoint `RankedRoute.revertData` came back
 // empty precisely when a caller wanted the reason bytes. `revertDataOf` (the
-// one walker in `internal/rpc.ts`) reads it, so preflight does now too.
+// one walker in `internal/rpcErrors.ts`) reads it, so preflight does now too.
 //
 // Note the error carries NO `code: 3` and no revert TEXT — classification here
 // rides on the revert data itself, which is what makes this the shape that
