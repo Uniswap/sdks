@@ -336,8 +336,9 @@ export function assertResultCoherent(r: QuoteResult | SwapResult): void {
     // A route the chain rejected is never offered as the lead, whatever else the search failed to
     // finish: `execution: 'failed'` is authoritative on its own, so such a candidate belongs in
     // `alternatives` (with its `revertData`) exactly as it would on the completed `no-route` path.
-    // Quote results have no execution status at all, hence the `in`.
-    if (r.best !== undefined && 'execution' in r.best && r.best.execution === 'failed')
+    // `'best' in r` is the QuoteResult/SwapResult seam (a quote's `inconclusive` has no leader to
+    // carry at all — see `types.ts`); the inner `in` is because a quote route has no `execution`.
+    if ('best' in r && r.best !== undefined && 'execution' in r.best && r.best.execution === 'failed')
       throw new Error('inconclusive led by a route that authoritatively failed preflight')
     // C4-P5: `reason.code` is not free-form — each incompleteness code names a specific axis, and the
     // axis it names must actually be set. A mismatch here is a classifier bug (the wrong code for the

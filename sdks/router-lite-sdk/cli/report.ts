@@ -287,15 +287,12 @@ export function renderQuoteResult(result: QuoteResult, trade: TradeContext, ctx:
     lines.push(`  ${renderRoute(result.best.route, ctx)}`)
     lines.push(...promotionNote(result.best, result.alternatives, trade.tokenOut, ctx))
   } else {
+    // No "best so far" panel on the quote side, unlike `renderSwapResult` below. A quote with a
+    // leader is reported `status: 'quote'` however incomplete the search that found it (`types.ts`
+    // spells out the asymmetry), so `inconclusive` here means nothing priced — there has never been
+    // a leader to render, and the branch that tried to render one was unreachable.
     lines.push(header(result.status, pair, elapsedMs))
     lines.push(...renderReason(result.reason))
-    if (result.status === 'inconclusive' && result.best) {
-      lines.push(
-        `${bold('best so far')} ${amountFor(ctx, trade.tokenOut, result.best.quote.amountOut)} ${dim('(unverified — search was cut short)')}`,
-      )
-      lines.push(`  ${renderRoute(result.best.route, ctx)}`)
-      lines.push(...promotionNote(result.best, result.alternatives, trade.tokenOut, ctx))
-    }
   }
 
   lines.push(...renderAlternatives(result.alternatives, trade.tokenOut, ctx))

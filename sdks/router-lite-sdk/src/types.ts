@@ -322,7 +322,16 @@ export type SwapResult = ResultBase &
         limits: CompiledLimits
       }
     | { status: 'no-route'; reason: Reason }
-    | { status: 'inconclusive'; reason: Reason; best?: RankedRoute; tx?: EncodedTx }
+    // TWO ARMS, NOT ONE WITH TWO OPTIONAL FIELDS. `tx` is calldata FOR `best`; a `tx` with no `best`
+    // is a dangling reference — the caller is handed bytes to send with nothing naming the route they
+    // execute. Splitting the arm makes that shape fail to COMPILE in any producer, rather than being
+    // caught only at runtime by `internal/testing.ts#assertResultCoherent` (whose check stays: it is
+    // the belt to this braces, and the only line of defence for a JS caller building results by hand).
+    //
+    // Both arms declare both fields, so a reader that has narrowed to `'inconclusive'` still reaches
+    // `result.best` / `result.tx` with no further narrowing — the split constrains PRODUCERS only.
+    | { status: 'inconclusive'; reason: Reason; best?: undefined; tx?: undefined }
+    | { status: 'inconclusive'; reason: Reason; best: RankedRoute; tx?: EncodedTx }
   )
 
 export type QuoteResult = { search: SearchReport; alternatives: QuotedRoute[] } &
@@ -332,10 +341,17 @@ export type QuoteResult = { search: SearchReport; alternatives: QuotedRoute[] } 
     // verification step to demote a leader over, so either something priced (and the leader is
     // reported `quote`, however incomplete the search that found it) or nothing did and there are no
     // runners-up to list. The field is present so callers need not narrow to read it, not because
-    // these two variants can populate it. The same goes for `best` below: it is declared so code
-    // written against both unions narrows identically, and is not produced today.
+    // these two variants can populate it.
     | { status: 'no-route'; reason: Reason }
-    | { status: 'inconclusive'; reason: Reason; best?: QuotedRoute }
+    // NO `best` HERE, AND THAT ASYMMETRY WITH `SwapResult` IS DELIBERATE. `classifyQuote` reports a
+    // leader as `status: 'quote'` however incomplete the search that found it — a price is a price,
+    // and quoting has no verification step that could make one provisional. So a quote is
+    // `inconclusive` only when NOTHING priced, and there is no leader to carry. (The truncation
+    // signal a caller needs is on `search`: `aborted`, the per-protocol `discovery` statuses, and
+    // `quoting.unattempted`, which is the same evidence the reason code is built from.) A swap's
+    // `inconclusive` genuinely can carry a leader, because verification is a step that can be cut
+    // short with the route already priced and compiled — hence the two arms over there.
+    | { status: 'inconclusive'; reason: Reason }
   )
 
 export type ExecutionRequirement =
