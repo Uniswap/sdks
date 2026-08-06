@@ -127,6 +127,31 @@ export const MAX_AMOUNT_IN = 2n ** 128n
 export const MAX_DEADLINE_SECONDS = 86_400
 
 /**
+ * Exclusive ceiling on a Permit2 permit's `expiration` and `nonce`: 2^48.
+ *
+ * Both are `uint48` in Permit2's `PermitDetails` struct, and both arrive as plain JS `number`s (see
+ * `types.ts#Permit2PermitSingle`) — so both carry the same hazard `MAX_DEADLINE_SECONDS` documents,
+ * one layer deeper: `verify/readiness.ts#isPermitValid` does `BigInt(details.expiration)`, and
+ * `BigInt(1.5)` is a `RangeError` thrown from a function whose contract is that it never throws for
+ * a business outcome, reached from inside wave 0's `Promise.all`. The integer check is therefore the
+ * point of this bound as much as the ceiling is: a value at or above 2^48 cannot be signed into a
+ * Permit2 permit at all, and a fractional one cannot be encoded at all.
+ */
+export const MAX_PERMIT2_UINT48 = 2 ** 48
+
+/**
+ * Exclusive ceiling on a Permit2 permit's `details.amount`: 2^160.
+ *
+ * `uint160` in Permit2's `PermitDetails` — the deliberate width that lets an allowance and an
+ * address share a storage slot. Held here as a `bigint`, so unlike the uint48s above the hazard is
+ * not `RangeError` but a silent one: an over-wide `amount` compares perfectly well against
+ * `amountIn` in `isPermitValid` (so the permit reads as covering the trade) and only fails much
+ * later, in the encoder, as a viem `IntegerOutOfRangeError` about calldata rather than a
+ * {@link RouterConfigError} about the request.
+ */
+export const MAX_PERMIT2_UINT160 = 2n ** 160n
+
+/**
  * Max bytes of `hookData` a v4 hint may carry.
  *
  * `hookData` is opaque caller bytes, copied verbatim into every quote call and into the final

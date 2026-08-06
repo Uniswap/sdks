@@ -449,6 +449,59 @@ describe('createRouter — validation (before any RPC)', () => {
     }
   })
 
+  test("a permit's NUMERIC fields are validated pre-RPC too — a fractional expiration is not a mid-search RangeError", async () => {
+    // The address half of a permit was checked; the numeric half was not. `expiration` and `nonce`
+    // are plain `number`s reaching `BigInt(permit.details.expiration)` in
+    // `verify/readiness.ts#isPermitValid` — the exact `slippageBps`/`deadlineSeconds` hazard, one
+    // layer deeper: a fractional value is a bare `RangeError` thrown from inside wave 0's
+    // `Promise.all`, which `getSwap`/`swaps` do not catch (they catch `RpcUnavailableError` only),
+    // out of a function whose header promises it NEVER THROWS FOR A BUSINESS OUTCOME.
+    const router = createRouter({ client: poisonedClient(), manifest: baseManifest() })
+    const permitBase: Permit2PermitSingle = {
+      details: { token: TOKEN_A, amount: AMOUNT_IN, expiration: 2_000_000_000, nonce: 0 },
+      spender: UNIVERSAL_ROUTER,
+      sigDeadline: 2_000_000_000n,
+      signature: '0xabcd' as Hex,
+    }
+    const swap = (permit: Permit2PermitSingle): Promise<SwapResult> =>
+      router.getSwap({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, trader: TRADER, permit })
+    const withDetails = (details: Partial<Permit2PermitSingle['details']>): Permit2PermitSingle => ({
+      ...permitBase,
+      details: { ...permitBase.details, ...details },
+    })
+
+    // uint48, so [0, 2^48) — and an integer, which is the half that turns into a `RangeError`.
+    const UINT48 = 2 ** 48
+    for (const expiration of [1.5, NaN, Infinity, -1, UINT48, 1e30]) {
+      const p = swap(withDetails({ expiration }))
+      await expect(p).rejects.toThrow(RouterConfigError)
+      await expect(p).rejects.toThrow(/permit\.details\.expiration must be an integer in \[0, 281474976710656\)/)
+    }
+    for (const nonce of [1.5, NaN, -1, UINT48]) {
+      const p = swap(withDetails({ nonce }))
+      await expect(p).rejects.toThrow(RouterConfigError)
+      await expect(p).rejects.toThrow(/permit\.details\.nonce must be an integer in \[0, 281474976710656\)/)
+    }
+    // `amount` is a uint160 on the wire and a `bigint` in the type — a number here is a caller who
+    // built the struct by hand, and it compares (`<`) against `amountIn` without complaint.
+    for (const amount of [-1n, 2n ** 160n, 1 as unknown as bigint]) {
+      const p = swap(withDetails({ amount }))
+      await expect(p).rejects.toThrow(RouterConfigError)
+      await expect(p).rejects.toThrow(/permit\.details\.amount must be a bigint in \[0, 2\^160\)/)
+    }
+    for (const sigDeadline of [-1n, 1 as unknown as bigint]) {
+      const p = swap({ ...permitBase, sigDeadline })
+      await expect(p).rejects.toThrow(RouterConfigError)
+      await expect(p).rejects.toThrow(/permit\.sigDeadline must be a non-negative bigint/)
+    }
+
+    // The boundaries themselves are legal: 0 and 2^48-1 for the uint48s, 0n and 2^160-1 for the
+    // amount — a bound that also rejected the value AT the bound would be a second bug.
+    await expectPassesValidation(swap(withDetails({ expiration: 0, nonce: 0, amount: 0n })))
+    await expectPassesValidation(swap(withDetails({ expiration: UINT48 - 1, nonce: UINT48 - 1, amount: 2n ** 160n - 1n })))
+    await expectPassesValidation(swap({ ...permitBase, sigDeadline: 0n }))
+  })
+
   test('a manifest address field that is not an address throws RouterConfigError at createRouter, not a viem error', async () => {
     // `ChainManifest` types these as `Address`, but a caller assembles one by hand — from a config
     // file, a paste, an env var. Nothing checked them, and once `assertWrappedNativeConsistency`

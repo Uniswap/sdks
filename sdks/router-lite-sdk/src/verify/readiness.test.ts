@@ -423,3 +423,34 @@ test('(k) a malformed permit address does not throw — the permit simply does n
     expect(result.degraded).toBe(false)
   }
 })
+
+test("(l) a non-integer permit expiration does not throw — `BigInt(1.5)` is a RangeError, not a business outcome", async () => {
+  // The sibling of (k), for the numeric half of the struct. `isPermitValid` does
+  // `BigInt(permit.details.expiration)` on a plain `number`; a fractional/NaN/Infinite one raises a
+  // raw `RangeError` straight out of `checkReadiness`, which is reached from wave 0's `Promise.all`
+  // and is documented never to throw for a business outcome. A malformed expiration means the same
+  // thing a malformed address does: THIS PERMIT DOES NOT AUTHORIZE THIS TRADE.
+  const client = stubClient({
+    ...entryFor(balanceCall(), balanceReturn(AMOUNT_IN * 2n)),
+    ...entryFor(erc20AllowanceCall(), erc20AllowanceReturn(AMOUNT_IN * 2n)),
+    // As in (k): the on-chain Permit2 allowance is EXPIRED, so only the supplied permit could make
+    // this ready — a silently-ignored malformed field would come back with no requirements at all.
+    ...entryFor(permit2AllowanceCall(), permit2AllowanceReturn(AMOUNT_IN * 2n, Number(BLOCK_TIMESTAMP) - 10)),
+  })
+
+  for (const expiration of [1.5, NaN, Infinity, -Infinity, '2000000000' as unknown as number]) {
+    const result = await checkReadiness({
+      client,
+      trader: TRADER,
+      currencyIn: TOKEN,
+      amountIn: AMOUNT_IN,
+      permit2: PERMIT2,
+      router: ROUTER,
+      permit: validPermit({ details: { ...validPermit().details, expiration } }),
+      blockNumber: BLOCK_NUMBER,
+      blockTimestamp: BLOCK_TIMESTAMP,
+    })
+    expect(result.requirements).toEqual([{ kind: 'permit2-allowance', token: TOKEN, spender: ROUTER, minimumAmount: AMOUNT_IN }])
+    expect(result.degraded).toBe(false)
+  }
+})

@@ -97,6 +97,15 @@ function isPermitValid(permit: Permit2PermitSingle, token: Address, router: Addr
   if (!isAddressEqual(permit.spender, router)) return false
   if (permit.details.amount < amountIn) return false
   if (permit.sigDeadline <= blockTimestamp) return false
+  // `expiration` is the numeric twin of the two address fields above, and it fails the SAME WAY:
+  // `BigInt(1.5)` / `BigInt(NaN)` / `BigInt('x')` is a `RangeError`/`SyntaxError` raised from this
+  // line, out of a function that must never throw for a business outcome. It is checked here for
+  // the same reason the addresses are — `router.ts#validateSwapRequest` now rejects it pre-RPC, but
+  // that is a first line, not a guarantee, since `checkReadiness` is reachable by anyone assembling
+  // their own search wiring — and it resolves the same way: a value that cannot be read as a
+  // uint48 timestamp means THIS PERMIT DOES NOT AUTHORIZE THIS TRADE, so the caller gets a
+  // `permit2-allowance` requirement rather than a swap built on a permit nothing could verify.
+  if (!Number.isInteger(permit.details.expiration)) return false
   if (BigInt(permit.details.expiration) <= blockTimestamp) return false
   return true
 }

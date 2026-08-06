@@ -1,7 +1,17 @@
 import type { Address, Hex, Log, PublicClient, TransactionReceipt } from 'viem'
 import { isAddress, isAddressEqual, zeroHash } from 'viem'
 
-import { DEFAULT_CONCURRENCY, isUnusableCustodyAddress, MAX_AMOUNT_IN, MAX_CONCURRENCY, MAX_DEADLINE_SECONDS, MAX_HINTS_PER_REQUEST, MIN_CHUNK } from './constants'
+import {
+  DEFAULT_CONCURRENCY,
+  isUnusableCustodyAddress,
+  MAX_AMOUNT_IN,
+  MAX_CONCURRENCY,
+  MAX_DEADLINE_SECONDS,
+  MAX_HINTS_PER_REQUEST,
+  MAX_PERMIT2_UINT48,
+  MAX_PERMIT2_UINT160,
+  MIN_CHUNK,
+} from './constants'
 import { RouterConfigError, RpcUnavailableError } from './errors'
 import { sameFamily } from './internal/currency'
 import { createSemaphore } from './internal/rpc'
@@ -355,6 +365,30 @@ function validateSwapRequest(req: SwapRequest, manifest: ChainManifest): void {
     }
     if (!isAddressEqual(req.permit.details.token, req.tokenIn)) {
       throw new RouterConfigError(`permit token ${req.permit.details.token} does not match tokenIn ${req.tokenIn}`)
+    }
+    // And the NUMERIC half, for exactly the reason `slippageBps`/`deadlineSeconds` above are checked:
+    // `expiration` and `nonce` are plain `number`s that reach `BigInt(...)` downstream
+    // (`verify/readiness.ts#isPermitValid`), where a fractional or non-finite value is a bare
+    // `RangeError` thrown from the middle of wave 0 — inside a `Promise.all` neither `getSwap` nor
+    // `swaps` catches, out of a function documented never to throw for a business outcome. The
+    // ranges are Permit2's own: `expiration`/`nonce` are `uint48`, `amount` is `uint160`, and
+    // `sigDeadline` is a `uint256` this package holds as a `bigint`. A value outside them cannot be
+    // signed or encoded at all, so rejecting it here makes it a request error — which is what it is
+    // — rather than an encoder throw much later.
+    const { amount, expiration, nonce } = req.permit.details
+    for (const [field, value] of [
+      ['expiration', expiration],
+      ['nonce', nonce],
+    ] as const) {
+      if (!Number.isInteger(value) || value < 0 || value >= MAX_PERMIT2_UINT48) {
+        throw new RouterConfigError(`permit.details.${field} must be an integer in [0, ${MAX_PERMIT2_UINT48}), got ${String(value)}`)
+      }
+    }
+    if (typeof amount !== 'bigint' || amount < 0n || amount >= MAX_PERMIT2_UINT160) {
+      throw new RouterConfigError(`permit.details.amount must be a bigint in [0, 2^160), got ${String(amount)}`)
+    }
+    if (typeof req.permit.sigDeadline !== 'bigint' || req.permit.sigDeadline < 0n) {
+      throw new RouterConfigError(`permit.sigDeadline must be a non-negative bigint, got ${String(req.permit.sigDeadline)}`)
     }
   }
 }
