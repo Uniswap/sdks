@@ -118,6 +118,35 @@ function executionBadge(route: RankedRoute): string {
   return marks.join(' ')
 }
 
+/**
+ * The line that explains a leader priced BELOW one of its own alternatives.
+ *
+ * `rankRoutes`' simplicity margin (`SIMPLICITY_MARGIN_BPS`, 5 bps) is the only thing in the SDK that
+ * can produce that ordering, and the route it promoted says so (`promotedOverComplex`). The panel
+ * used to print neither: `renderQuoteResult`'s best line carried no badge at all — unlike
+ * `renderSwapResult`'s, which has always had one — so a live Base quote showed 1,906.256081 USDC
+ * leading a listed 1,906.567949 from a hooked v4 pool with nothing to read it by. Empty for the
+ * ordinary case (no promotion, or a promoted route that also happens to be the highest-priced one),
+ * so a clean quote gains no noise.
+ */
+function promotionNote(best: QuotedRoute | RankedRoute, alternatives: (QuotedRoute | RankedRoute)[], out: CurrencyRef, ctx: RenderCtx): string[] {
+  if (!best.promotedOverComplex) return []
+  const outpriced = alternatives.reduce<QuotedRoute | RankedRoute | undefined>(
+    (top, alt) => (alt.quote.amountOut > best.quote.amountOut && (!top || alt.quote.amountOut > top.quote.amountOut) ? alt : top),
+    undefined,
+  )
+  const label = cyan('promoted-over-complex')
+  if (!outpriced) return [`  ${label} ${dim('— kept ahead of a hooked/mixed-protocol route inside the simplicity margin')}`]
+  const delta = outpriced.quote.amountOut - best.quote.amountOut
+  // The margin is reported as the bps ACTUALLY given up, not as the constant that allowed it: the
+  // constant is a bound the reader would still have to compare against, and this is the comparison.
+  const bps = Number((delta * 10_000_000n) / outpriced.quote.amountOut) / 1000
+  return [
+    `  ${label} ${dim(`— a hooked/mixed-protocol route quoted ${amountFor(ctx, out, outpriced.quote.amountOut)}`)}`,
+    dim(`  giving up ${amountFor(ctx, out, delta)} (${bps} bps) to stay on a simple route — see alternatives below`),
+  ]
+}
+
 function isRanked(route: QuotedRoute | RankedRoute): route is RankedRoute {
   return 'execution' in route
 }
@@ -256,6 +285,7 @@ export function renderQuoteResult(result: QuoteResult, trade: TradeContext, ctx:
   if (result.status === 'quote') {
     lines.push(header('quote', `${pair}: ${bold(amountFor(ctx, trade.tokenOut, result.best.quote.amountOut))}`, elapsedMs))
     lines.push(`  ${renderRoute(result.best.route, ctx)}`)
+    lines.push(...promotionNote(result.best, result.alternatives, trade.tokenOut, ctx))
   } else {
     lines.push(header(result.status, pair, elapsedMs))
     lines.push(...renderReason(result.reason))
@@ -264,6 +294,7 @@ export function renderQuoteResult(result: QuoteResult, trade: TradeContext, ctx:
         `${bold('best so far')} ${amountFor(ctx, trade.tokenOut, result.best.quote.amountOut)} ${dim('(unverified — search was cut short)')}`,
       )
       lines.push(`  ${renderRoute(result.best.route, ctx)}`)
+      lines.push(...promotionNote(result.best, result.alternatives, trade.tokenOut, ctx))
     }
   }
 
@@ -280,6 +311,7 @@ export function renderSwapResult(result: SwapResult, trade: TradeContext, ctx: R
   if (result.status === 'ready' || result.status === 'needs-action') {
     lines.push(header(result.status, `${pair}: ${bold(amountFor(ctx, trade.tokenOut, result.best.quote.amountOut))}`, elapsedMs))
     lines.push(`  ${renderRoute(result.best.route, ctx)}  ${executionBadge(result.best)}`)
+    lines.push(...promotionNote(result.best, result.alternatives, trade.tokenOut, ctx))
     if (result.status === 'needs-action') {
       lines.push(bold('before sending:'))
       for (const req of result.requirements) lines.push(`  • ${renderRequirement(req, ctx)}`)
@@ -299,6 +331,7 @@ export function renderSwapResult(result: SwapResult, trade: TradeContext, ctx: R
         `${bold('best so far')} ${amountFor(ctx, trade.tokenOut, result.best.quote.amountOut)} ${dim('(unverified — search was cut short)')}`,
       )
       lines.push(`  ${renderRoute(result.best.route, ctx)}  ${executionBadge(result.best)}`)
+      lines.push(...promotionNote(result.best, result.alternatives, trade.tokenOut, ctx))
       if (result.tx) lines.push(dim(`  unverified tx available — rerun with a bigger --budget to verify, or use --json to extract it`))
     }
   }
@@ -328,7 +361,11 @@ export function renderWaveLine(
   const improved = previousBest === undefined || best.quote.amountOut > previousBest
   const marker = improved ? green('▲') : dim('=')
   const amount = amountFor(ctx, trade.tokenOut, best.quote.amountOut)
-  return `${dim(`wave ${wave}`)}  ${dim(`+${elapsedMs}ms`)}  ${marker} ${improved ? bold(amount) : amount}  ${renderRoute(best.route, ctx)} ${stats}`
+  // A wave whose leader only leads because of the simplicity margin says so here too, compactly. The
+  // full explanation (what was given up, and to whom) belongs to the panel at the end; what this line
+  // owes a `--watch` reader is that the number in front of them is not simply the highest one found.
+  const promoted = best.promotedOverComplex ? ` ${cyan('promoted')}` : ''
+  return `${dim(`wave ${wave}`)}  ${dim(`+${elapsedMs}ms`)}  ${marker} ${improved ? bold(amount) : amount}  ${renderRoute(best.route, ctx)}${promoted} ${stats}`
 }
 
 // ---------------------------------------------------------------------------

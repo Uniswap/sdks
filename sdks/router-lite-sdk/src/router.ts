@@ -495,12 +495,22 @@ function inconclusiveReason(report: SearchReport): Reason {
  * anything, so a `QuoteResult` promises plain {@link QuotedRoute}s — and handing the engine's richer
  * object straight through would ship `execution: 'unverified'` on a field whose type says no such
  * key exists, which is exactly the sort of undeclared extra a caller ends up depending on.
+ *
+ * `promotedOverComplex` IS NOT ONE OF THOSE EXTRAS, and dropping it was a reporting bug with teeth.
+ * It is a fact about the RANKING, which quoting most certainly does perform — it is the only reason
+ * `best` may price below a route sitting in `alternatives`. Rebuilt from `{ route, quote }` alone,
+ * every quote consumer (the CLI panel included) saw a leader outpriced by its own runner-up with
+ * nothing anywhere naming the simplicity margin as the cause. It travels; only the two verification
+ * fields are stripped.
  */
-function toQuoted({ route, quote }: QuotedRoute): QuotedRoute {
-  return { route, quote }
+function toQuoted({ route, quote, promotedOverComplex }: QuotedRoute): QuotedRoute {
+  return { route, quote, ...(promotedOverComplex !== undefined && { promotedOverComplex }) }
 }
 
-function classifyQuote(e: InternalResult): QuoteResult {
+/** Exported for direct unit testing of the quote-side classification mapping — the twin of
+ * `classifySwap`'s export below, and the seam where `toQuoted` decides what a quote consumer is
+ * allowed to see. Not part of the `Router` surface. */
+export function classifyQuote(e: InternalResult): QuoteResult {
   // Below the `quote` branch, `e.alternatives` is always empty — the engine ranks a non-empty set or
   // hands back nothing at all, and quoting has no verification step that could demote a leader into
   // the runners-up. The mapping runs on every path anyway because it is the same two lines, and

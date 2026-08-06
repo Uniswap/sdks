@@ -117,7 +117,39 @@ export type RouteQuote = {
   intermediateAmounts: bigint[] // realized per-leg outputs (chained quoting)
 }
 
-export type QuotedRoute = { route: RouteCandidate; quote: RouteQuote }
+export type QuotedRoute = {
+  route: RouteCandidate
+  quote: RouteQuote
+  /**
+   * Set (to `true`; absent otherwise) when `rankRoutes` (`quote/quote.ts`) promoted this route ahead
+   * of a higher-`amountOut` but "complex" (mixed-protocol or hooked) leader under the simplicity
+   * margin (`SIMPLICITY_MARGIN_BPS`) — the one ranking decision that overrides the
+   * amountOut-descending order, made observable here rather than only inferable by a caller
+   * re-deriving `compareRoutes`' own ordering and noticing it disagrees with `amountOut` alone. Set
+   * on at most one route per ranked list (a promoted candidate is by construction non-complex, so
+   * `rankRoutes` promotes at most once).
+   *
+   * IT LIVES ON `QuotedRoute`, NOT ON `RankedRoute`, AND THAT IS THE WHOLE POINT. It used to sit on
+   * `RankedRoute`, which meant the QUOTE surface — where `best` and `alternatives` are plain
+   * `QuotedRoute`s and `router.ts#toQuoted` rebuilds each one from `{ route, quote }` — destroyed it
+   * on the way out. The observable result was a `QuoteResult` whose `best` priced BELOW
+   * `alternatives[0]` with nothing anywhere saying why (live on Base: 1,906.256081 USDC led
+   * 1,906.567949 USDC from a hooked v4 pool, 1.6 bps inside the margin), which reads as a broken
+   * sort rather than as the documented margin. Ranking is a fact about a QUOTE; only `execution` and
+   * `revertData` are facts about verification, so only those two belong one level down.
+   *
+   * A FACT ABOUT THE ROUTE, NOT ABOUT FINAL PLACEMENT — it USUALLY ends up leading (`best`), since
+   * promotion happens before verification and nothing downstream un-does it, but it is not
+   * guaranteed to: `rankRoutes` runs before `search/leader.ts#verifyLeader` ever simulates anything,
+   * so a promoted candidate that itself then fails preflight can still be demoted into `alternatives`
+   * (by a different, verified candidate becoming `best`) while carrying this marker right along with
+   * it — the marker travels with the route object, not with whichever slot it lands in. A caller that
+   * cares only about the leader's own promotion history reads it off `best`; one auditing the whole
+   * ranking (why did a lower-`amountOut` route ever outrank this one) may find it on an alternative
+   * too.
+   */
+  promotedOverComplex?: true
+}
 
 export type EncodedTx = { to: Address; data: Hex; value: bigint }
 
@@ -326,26 +358,6 @@ export type ExecutionRequirement =
 export type RankedRoute = QuotedRoute & {
   execution: 'verified' | 'needs-action' | 'unverified' | 'failed'
   revertData?: Hex
-  /**
-   * Set (to `true`; absent otherwise) when `rankRoutes` (`quote/quote.ts`) promoted this route ahead
-   * of a higher-`amountOut` but "complex" (mixed-protocol or hooked) leader under the simplicity
-   * margin (`SIMPLICITY_MARGIN_BPS`) — the one ranking decision that silently overrides the
-   * amountOut-descending order otherwise, made observable here rather than only inferable by a
-   * caller re-deriving `compareRoutes`' own ordering and noticing it disagrees with `amountOut`
-   * alone. Set on at most one route per ranked list (a promoted candidate is by construction
-   * non-complex, so `rankRoutes` promotes at most once).
-   *
-   * A FACT ABOUT THE ROUTE, NOT ABOUT FINAL PLACEMENT — it USUALLY ends up leading (`best`), since
-   * promotion happens before verification and nothing downstream un-does it, but it is not
-   * guaranteed to: `rankRoutes` runs before `search/leader.ts#verifyLeader` ever simulates anything,
-   * so a promoted candidate that itself then fails preflight can still be demoted into `alternatives`
-   * (by a different, verified candidate becoming `best`) while carrying this marker right along with
-   * it — the marker travels with the route object, not with whichever slot it lands in. A caller that
-   * cares only about the leader's own promotion history reads it off `best`; one auditing the whole
-   * ranking (why did a lower-`amountOut` route ever outrank this one) may find it on an alternative
-   * too.
-   */
-  promotedOverComplex?: true
 }
 
 // ---------------------------------------------------------------------------

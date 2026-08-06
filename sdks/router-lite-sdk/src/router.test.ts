@@ -18,7 +18,7 @@ import { manifestFor } from './manifest'
 import { PoolIndex } from './pools/poolIndex'
 import { computeV2PairAddress, v2Module } from './protocols/v2'
 import { v4Module } from './protocols/v4'
-import { classifySwap, createRouter } from './router'
+import { classifyQuote, classifySwap, createRouter } from './router'
 import type {
   ChainManifest,
   EncodedTx,
@@ -745,10 +745,46 @@ function rankedRoute(out: bigint, execution: RankedRoute['execution'], revertDat
   }
 }
 
+test('classifyQuote: a leader outpriced by its own alternative keeps the marker that explains it (live Base regression)', () => {
+  // The defect, exactly as it shipped. On Base, `rl quote eth usdc 1` ranked a hooked v4 pool top at
+  // 1,906.567949 USDC and `rankRoutes`' 5-bps simplicity margin (1.6 bps here) promoted a plain v3
+  // pool at 1,906.256081 ahead of it — correct, spec'd behaviour, and marked `promotedOverComplex`
+  // precisely so a caller can tell it apart from a broken sort. `toQuoted` then rebuilt every quote
+  // route from `{ route, quote }`, and the marker was the collateral: what reached `QuoteResult`
+  // (and the CLI panel, and any SDK consumer) was a `best` beaten by its own `alternatives[0]` with
+  // nothing anywhere to explain it. The marker is a fact about RANKING, which quoting performs; only
+  // `execution`/`revertData` are facts about verification, and only those two may be stripped.
+  const promoted: RankedRoute = { ...rankedRoute(1_906_256_081n, 'unverified'), promotedOverComplex: true }
+  const outpricing: RankedRoute = rankedRoute(1_906_567_949n, 'unverified')
+
+  const r = classifyQuote({ best: promoted, alternatives: [outpricing], report: emptyReport(), done: true })
+  expect(r.status).toBe('quote')
+  if (r.status !== 'quote') return
+  expect(r.best.promotedOverComplex).toBe(true)
+  // Still stripped: the verification fields say nothing a quote is entitled to claim.
+  expect(Object.keys(r.best).sort()).toEqual(['promotedOverComplex', 'quote', 'route'])
+  expect(Object.keys(r.alternatives[0]!).sort()).toEqual(['quote', 'route'])
+  assertResultCoherent(r)
+})
+
+test('assertResultCoherent: an UNMARKED quote inversion is the bug, and it is rejected', () => {
+  // The systemic half of the fix. An alternative pricing above `best` is legal — but only while the
+  // route says why. Drop the marker (which is precisely what `toQuoted` used to do) and the same
+  // result is indistinguishable from a sort bug, so it must not pass.
+  const best = rankedRoute(1_906_256_081n, 'unverified')
+  const outpricing = rankedRoute(1_906_567_949n, 'unverified')
+  const unmarked = classifyQuote({ best, alternatives: [outpricing], report: emptyReport(), done: true })
+  expect(() => assertResultCoherent(unmarked)).toThrow(/outpriced by an alternative/)
+
+  // And an ordinary, correctly-ordered quote is untouched by the check.
+  const ordered = classifyQuote({ best: outpricing, alternatives: [best], report: emptyReport(), done: true })
+  expect(() => assertResultCoherent(ordered)).not.toThrow()
+})
+
 test('classifySwap: promotedOverComplex survives onto the public SwapResult.best untouched (C4-P7)', () => {
   // `rankRoutes` (quote/quote.ts) is what actually sets this marker; this test pins the OTHER half of
-  // the contract — that `classifySwap` is a pure passthrough for it, unlike `classifyQuote`'s
-  // `toQuoted`, which strips every engine-only field down to `{ route, quote }`. A `RankedRoute`
+  // the contract — that `classifySwap` is a pure passthrough for it, just as `classifyQuote`'s
+  // `toQuoted` now is (it strips only the two verification fields). A `RankedRoute`
   // already carrying the marker (as if `rankRoutes` had promoted it) must reach `SwapResult.best`
   // exactly as-is for both statuses that lead with `best`.
   const promoted: RankedRoute = { ...rankedRoute(100n, 'verified'), promotedOverComplex: true }

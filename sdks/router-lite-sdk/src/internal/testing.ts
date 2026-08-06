@@ -238,7 +238,9 @@ const INCONCLUSIVE_REASON_CODES: ReadonlySet<ReasonCode> = new Set([
  * that ran against a head the router had already been past, both of which are evidence about the
  * provider and none about the chain; `inconclusive` always has a set
  * incompleteness axis, never carries calldata for a route it does not also name, and never leads
- * with a route the chain authoritatively rejected; a quote's routes carry nothing beyond the quote;
+ * with a route the chain authoritatively rejected; a quote's routes carry nothing beyond the quote
+ * and its ranking, and a quote whose `best` is outpriced by one of its own `alternatives` says on
+ * the route WHY (`promotedOverComplex`) rather than looking like a broken sort;
  * and quoting stats always add up. Every test in Tasks 12, 17, 18, and the fork/canary suites that
  * produces a result MUST pass it through this — a classification bug then fails tests that were
  * checking something else entirely.
@@ -250,9 +252,33 @@ export function assertResultCoherent(r: QuoteResult | SwapResult): void {
     // Quoting verifies nothing, so a quote's routes are plain `QuotedRoute`s. The engine's own
     // routes travel with `execution`/`revertData`; handing one straight through would ship keys the
     // declared type says do not exist (and that a caller would then start depending on).
+    // `promotedOverComplex` is declared ON `QuotedRoute` and so is not one of them — it is a fact
+    // about the ranking, which quoting does perform, and the check below is why it has to survive.
     for (const route of [r.best, ...r.alternatives]) {
-      const extra = Object.keys(route).filter((k) => k !== 'route' && k !== 'quote')
+      const extra = Object.keys(route).filter((k) => k !== 'route' && k !== 'quote' && k !== 'promotedOverComplex')
       if (extra.length > 0) throw new Error(`quote result carries non-quote route fields: ${extra.join(', ')}`)
+    }
+    // THE RANKING INVARIANT, AND THE ONE SANCTIONED EXCEPTION TO IT. A quote's `best` is the top of a
+    // list ordered by `amountOut` descending, so a listed alternative pricing ABOVE it is either a
+    // sort bug or `rankRoutes`' simplicity margin (`SIMPLICITY_MARGIN_BPS`) — and those two are
+    // indistinguishable to a caller unless the promotion says so on the route itself. Live on Base
+    // this shipped as the second: `best` at 1,906.256081 USDC above `alternatives[0]` at
+    // 1,906.567949 from a hooked v4 pool, correct ranking rendered as a broken one, because
+    // `toQuoted` had rebuilt `best` without its marker. An inversion is legal; an UNMARKED
+    // inversion is the bug, and it is checked here rather than in one test so that every result any
+    // suite produces has to be honest about it.
+    //
+    // Only the QUOTE union is checked. A swap's leader may legitimately price below an alternative
+    // with no promotion involved at all — `verifyLeader` walks the ranked list and stops at the
+    // first candidate that SIMULATES, so any higher-priced candidate it passed over is sitting in
+    // `alternatives` as `'failed'`/`'unverified'`, which is verification demoting a route rather
+    // than ranking mis-ordering one.
+    const outpriced = r.alternatives.find((alt) => alt.quote.amountOut > r.best.quote.amountOut)
+    if (outpriced !== undefined && r.best.promotedOverComplex !== true) {
+      throw new Error(
+        `quote best (${r.best.quote.amountOut}) is outpriced by an alternative (${outpriced.quote.amountOut}) ` +
+          'without promotedOverComplex to explain it',
+      )
     }
   }
   if (r.status === 'ready') {

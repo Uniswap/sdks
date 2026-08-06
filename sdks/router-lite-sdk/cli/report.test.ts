@@ -3,6 +3,7 @@ import type { Address } from 'viem'
 
 import type { PoolRef, QuoteResult, SearchReport, SwapResult } from '../src/index'
 import { REASON_CODES } from '../src/index'
+import { assertResultCoherent } from '../src/internal/testing'
 
 import { setColorEnabled } from './ansi'
 import { explainReason } from './reasons'
@@ -164,6 +165,64 @@ describe('result rendering', () => {
     const lines = renderQuoteResult(result, trade, CTX, 412)
     expect(lines[0]).toBe('✔ quote  1 ETH → USDC: 3,912.401234 USDC  (412ms)')
     expect(lines[1]).toBe('  ETH ─(v3 0.05% 0xE055…939F)→ USDC')
+  })
+
+  it('explains a best that its own alternatives outprice, instead of rendering a broken sort', () => {
+    // Live regression, Base, `rl quote eth usdc 1 --watch --budget 60s`: `best` came back at
+    // 1,906.256081 USDC with `alternatives[0]` — a hooked v4 pool — at 1,906.567949. The ranking was
+    // right (`rankRoutes`' 5-bps simplicity margin, 1.6 bps here) but the panel said nothing about
+    // it: `renderQuoteResult`'s best line carried no badge at all, and `router.ts#toQuoted` had
+    // already rebuilt `best` from `{ route, quote }`, destroying the `promotedOverComplex` marker
+    // that exists for exactly this. What reached the terminal was a leader beaten by its own
+    // runner-up with no explanation anywhere on the page.
+    const hooked: PoolRef = {
+      id: 'v4:0x964600000000000000000000000000000000000000000000000000000000c7ab',
+      currencies: ['native', USDC],
+      protocol: 'v4',
+      poolId: '0x964600000000000000000000000000000000000000000000000000000000c7ab',
+      poolKey: {
+        currency0: '0x0000000000000000000000000000000000000000',
+        currency1: USDC,
+        fee: 0,
+        tickSpacing: 1,
+        hooks: '0x1Df600000000000000000000000000000000658b',
+      },
+    }
+    const result: QuoteResult = {
+      status: 'quote',
+      best: {
+        route: { legs: [{ pool: V3_POOL, currencyIn: 'native', currencyOut: USDC }] },
+        quote: { amountIn: 10n ** 18n, amountOut: 1_906_256_081n, intermediateAmounts: [] },
+        promotedOverComplex: true,
+      },
+      alternatives: [
+        {
+          route: { legs: [{ pool: hooked, currencyIn: 'native', currencyOut: USDC }] },
+          quote: { amountIn: 10n ** 18n, amountOut: 1_906_567_949n, intermediateAmounts: [] },
+        },
+      ],
+      search: REPORT,
+    }
+    const lines = renderQuoteResult(result, trade, CTX)
+    expect(lines[0]).toBe('✔ quote  1 ETH → USDC: 1,906.256081 USDC')
+    expect(lines[1]).toBe('  ETH ─(v3 0.05% 0xE055…939F)→ USDC')
+    expect(lines[2]).toBe('  promoted-over-complex — a hooked/mixed-protocol route quoted 1,906.567949 USDC')
+    expect(lines[3]).toBe('  giving up 0.311868 USDC (1.635 bps) to stay on a simple route — see alternatives below')
+    // The engine's honesty invariant agrees: an inversion is legal only while the marker survives.
+    expect(() => assertResultCoherent(result)).not.toThrow()
+  })
+
+  it('says nothing about promotion when the leader is simply the best-priced route', () => {
+    const result: QuoteResult = {
+      status: 'quote',
+      best: {
+        route: { legs: [{ pool: V3_POOL, currencyIn: 'native', currencyOut: USDC }] },
+        quote: { amountIn: 10n ** 18n, amountOut: 3_912_401_234n, intermediateAmounts: [] },
+      },
+      search: REPORT,
+      alternatives: [],
+    }
+    expect(renderQuoteResult(result, trade, CTX).join('\n')).not.toContain('promoted')
   })
 
   it('marks an improving wave line', () => {
