@@ -1,11 +1,17 @@
 import type { Address, Hex, PublicClient } from 'viem'
 
-import { DEFAULT_CONCURRENCY, MAX_INTERMEDIATES, maxPlausibleHeadRegression, QUOTE_INTERLEAVE_MS } from '../constants'
+import {
+  DEFAULT_CONCURRENCY,
+  FEE_DISCOVERY_MAX_REQUESTS,
+  MAX_INTERMEDIATES,
+  maxPlausibleHeadRegression,
+  QUOTE_INTERLEAVE_MS,
+} from '../constants'
 import { RpcUnavailableError } from '../errors'
 import { toGraphNode } from '../internal/currency'
 import { ethCall, mapConcurrent } from '../internal/rpc'
 import type { Semaphore } from '../internal/rpc'
-import { reorgOverlapBlocksOf, requireExecution } from '../manifest'
+import { reorgOverlapBlocksOf, requireExecution, wave0PairScanBlocks } from '../manifest'
 import type { PoolIndex } from '../pools/poolIndex'
 import type { ProtocolModule, QuoteProbe } from '../protocols/types'
 import { probeQuotes, quoteCandidates } from '../quote/quote'
@@ -911,7 +917,15 @@ async function wave0(run: Run): Promise<void> {
 
   const [, , , readinessResult] = await Promise.all([
     resolveHints(run),
-    scanExactPairRecent(run),
+    // THE WINDOW IS THIS WAVE'S DECISION, and it is the one that makes wave 0 a latency budget
+    // rather than a completeness one (see this file's header). The pair scan reaches back roughly a
+    // week of this chain's own blocks and no further; wave 2 finishes the history.
+    //
+    // DERIVED FROM THE MANIFEST, not a constant (C4-P1): the policy is "roughly the last week", and
+    // only this chain's block time turns that into a block count. A fixed block count would mean a
+    // week on mainnet and a day on Base for the same code — see
+    // `constants.ts#WAVE0_RECENT_WINDOW_SECONDS`.
+    scanExactPairRecent(run, { window: wave0PairScanBlocks(ctx.manifest) }),
     runRouteProbes(run, probes),
     readiness,
   ])
@@ -973,10 +987,27 @@ async function wave1(run: Run): Promise<void> {
   }
 
   const feeModules = enabledModules(ctx).filter((m) => m.feeDiscovery !== undefined)
-  // Fee discovery is a bounded full-history scan (`FEE_DISCOVERY_MAX_REQUESTS`), which on a capped
-  // endpoint is still seconds — long enough for an abort to land inside it, so it gets the same
-  // quote-as-you-go treatment as the adjacency waves below.
-  await quoteWhileDiscovering(run, Promise.all([runDiscoveryProbes(run, probes), ...feeModules.map((m) => discoverFeeTiers(run, m))]))
+  // THE BUDGET IS THIS WAVE'S DECISION, because it is a fact about WHERE the scan sits, not about
+  // what the scan is. `discoverFeeTiers` is a FULL-HISTORY scan running here in wave 1 — ahead of
+  // the adjacency scans in waves 2 and 3, which are the ones the search reports coverage for and the
+  // ones a two-hop route depends on — and a wave awaits everything in it. On a provider that serves
+  // wide windows the whole history is a few requests and the budget never binds; on one that caps
+  // `eth_getLogs` at 10,000 blocks it is thousands, and un-budgeted it consumed every remaining
+  // millisecond of a `--budget 60s` search, so neither adjacency wave ever started and all three
+  // protocols reported "nothing covered yet". See `constants.ts#FEE_DISCOVERY_MAX_REQUESTS` for the
+  // measurements and for why the bound is on requests rather than on a recent block window (fee
+  // enablements are OLD — Base's newest is 29.8M blocks back — so there is no window that is both
+  // small and where the answers are).
+  //
+  // Bounded or not, on a capped endpoint it is still seconds — long enough for an abort to land
+  // inside it, so it gets the same quote-as-you-go treatment as the adjacency waves below.
+  await quoteWhileDiscovering(
+    run,
+    Promise.all([
+      runDiscoveryProbes(run, probes),
+      ...feeModules.map((m) => discoverFeeTiers(run, m, { maxRequests: FEE_DISCOVERY_MAX_REQUESTS })),
+    ]),
+  )
 
   // Nonstandard tiers can carry the whole trade, so these are route probes, not discovery probes.
   // Tiers already probed in wave 0 dedupe by routeId and cost nothing.

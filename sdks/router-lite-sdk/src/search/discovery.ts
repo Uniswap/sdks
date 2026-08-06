@@ -1,12 +1,10 @@
 import type { Address, Log } from 'viem'
 
-import { FEE_DISCOVERY_MAX_REQUESTS } from '../constants'
 import { toGraphNode } from '../internal/currency'
 import { scanLogs } from '../internal/logScan'
 import type { ScanWidthMemory } from '../internal/logScan'
 import { intersectAll, intersectRanges, maxBig, mergeRanges, subtractRanges } from '../internal/ranges'
 import type { Semaphore } from '../internal/rpc'
-import { wave0PairScanBlocks } from '../manifest'
 import type { ProtocolModule } from '../protocols/types'
 import type { BlockRange, ChainManifest, CurrencyRef, LogQuery, Protocol } from '../types'
 import { PROTOCOLS } from '../types'
@@ -18,11 +16,14 @@ import type { Run, SearchContext } from './waves'
 // over which block ranges, and what to fold back into the index and the run's
 // coverage bookkeeping.
 //
-// No policy lives here. Which scan runs in which wave (and therefore what the
-// caller waits for) is decided in `waves.ts`; these functions only know how to
-// carry a scan out incrementally and record honestly what it covered. They
-// take the whole `Run` because a scan writes to the shared index AND to the
-// run's per-protocol discovery state, which the report then reads.
+// No policy lives here, and that is now structural rather than aspirational.
+// Which scan runs in which wave, how far back wave 0's pair scan reaches, and
+// how many requests a fee-tier scan may spend are all DECIDED in `waves.ts`
+// and arrive here as parameters (`{ window }`, `{ maxRequests }`); these
+// functions only know how to carry a scan out incrementally, honour a bound
+// they were handed, and record honestly what they covered. They take the whole
+// `Run` because a scan writes to the shared index AND to the run's
+// per-protocol discovery state, which the report then reads.
 //
 // Every scan here is bounded by the index's coverage cache (`uncovered`), so a
 // warm router re-scans only the block delta plus the standing reorg overlap.
@@ -129,22 +130,18 @@ export async function runPairScan(run: Run, plan: ExactPairPlan, ranges: BlockRa
 }
 
 /**
- * Wave 0's slice of that scan: the most recent {@link wave0PairScanBlocks} only. Wave 0 is a latency
- * budget, and on a cold mainnet index the full v4 history is millions of blocks — hundreds of
- * sequential chunked `eth_getLogs` before anything could be yielded, which is not what "hints and
- * probes in one round trip" means. The recent window is precisely the case wave 0 exists for: a
- * pool created minutes ago, with the caller waiting. The rest is completed below.
+ * A leading slice of that scan: the most recent `window` blocks of the pair's history only,
+ * clamped to the v4 deployment block. Whatever is left is completed by {@link completeExactPairScan}.
  *
- * The window is DERIVED FROM THE MANIFEST, not a constant (C4-P1): the policy is "roughly the last
- * week", and only this chain's block time turns that into a block count. A fixed block count would
- * mean a week on mainnet and a day on Base for the same code — see
- * `constants.ts#WAVE0_RECENT_WINDOW_SECONDS`.
+ * `window` is a PARAMETER, not a constant read here: how far back a wave is willing to look is the
+ * wave engine's call, and only it knows which wave is running and what latency that wave owes the
+ * caller. See `waves.ts#wave0`'s call site for the window it passes and why.
  */
-export async function scanExactPairRecent(run: Run): Promise<void> {
+export async function scanExactPairRecent(run: Run, opts: { window: bigint }): Promise<void> {
   const plan = exactPairPlan(run)
   if (!plan) return
   const head = run.state.block.number
-  const windowStart = maxBig(plan.deployBlock, head - wave0PairScanBlocks(run.ctx.manifest) + 1n)
+  const windowStart = maxBig(plan.deployBlock, head - opts.window + 1n)
   const uncovered = run.ctx.index.uncovered('v4', plan.scope, plan.deployBlock, head)
   await runPairScan(run, plan, intersectRanges(uncovered, [{ fromBlock: windowStart, toBlock: head }]))
 }
@@ -227,8 +224,13 @@ export async function scanAdjacency(run: Run, endpoint: CurrencyRef): Promise<vo
  * kind of tier a long-tail pair is deployed on. The scan is topic-narrow, factory-wide, and keyed in
  * the coverage cache by the factory address, so a second search at a later block re-scans only the
  * block delta (plus the standing reorg overlap), never the full history.
+ *
+ * `maxRequests` is a PARAMETER, for the same reason {@link scanExactPairRecent}'s window is: this
+ * is a full-history scan, and whether a full history is affordable depends entirely on which wave is
+ * paying for it and what else that wave still owes the caller. See `waves.ts#wave1`'s call site for
+ * the budget it passes and why there is one at all.
  */
-export async function discoverFeeTiers(run: Run, module_: ProtocolModule): Promise<void> {
+export async function discoverFeeTiers(run: Run, module_: ProtocolModule, opts: { maxRequests: number }): Promise<void> {
   const { ctx, req, state } = run
   const feeDiscovery = module_.feeDiscovery
   const deployBlock = deploymentBlockOf(ctx.manifest, module_.id)
@@ -238,32 +240,22 @@ export async function discoverFeeTiers(run: Run, module_: ProtocolModule): Promi
   const factory = query.address
   const ranges = ctx.index.uncovered(module_.id, factory, deployBlock, state.block.number)
 
-  // BUDGETED, unlike every other scan in this file, because of where it runs rather than what it
-  // costs. It is a FULL-HISTORY scan sitting in wave 1 — ahead of the adjacency scans in waves 2 and
-  // 3, which are the ones the search reports coverage for and the ones a two-hop route depends on —
-  // and a wave awaits everything in it. On a provider that serves wide windows the whole history is
-  // a few requests and the budget never binds; on one that caps `eth_getLogs` at 10,000 blocks it is
-  // thousands, and un-budgeted it consumed every remaining millisecond of a `--budget 60s` search,
-  // so neither adjacency wave ever started and all three protocols reported "nothing covered yet".
-  // See `constants.ts#FEE_DISCOVERY_MAX_REQUESTS` for the measurements and for why the bound is on
-  // requests rather than on a recent block window (fee enablements are OLD — Base's newest is 29.8M
-  // blocks back — so there is no window that is both small and where the answers are).
+  // HOW THE HANDED-DOWN BUDGET IS HONOURED: it spans THIS CALL, not each range, which is the
+  // difference between a bound and a multiplier. A warm index's `uncovered` is two ranges (the
+  // unscanned gap, plus the re-opened reorg tail), so a per-range budget quietly bought twice what
+  // the caller asked for — and on the warm Base run that was the whole 60s, with the adjacency
+  // waves starved exactly as if there had been no bound at all.
   //
   // The shortfall is carried, not lost: coverage is keyed by factory, so the next search resumes
   // from where this one stopped instead of re-walking, and `speculativeDirect` probes the standard
   // tiers on every search regardless of what this has reached.
-  //
-  // The budget spans THIS CALL, not each range, which is the difference between a bound and a
-  // multiplier: a warm index's `uncovered` is two ranges (the unscanned gap, plus the re-opened
-  // reorg tail), so a per-range budget quietly bought twice what it said — and on the warm Base run
-  // that was the whole 60s again, with the adjacency waves starved exactly as before.
-  const opts = scanOpts(run)
+  const scanOptions = scanOpts(run)
   let spent = 0
   for (const range of ranges) {
     if (req.signal?.aborted) return
-    const remaining = FEE_DISCOVERY_MAX_REQUESTS - spent
+    const remaining = opts.maxRequests - spent
     if (remaining <= 0) return
-    const scan = await scanLogs(ctx.client, query, range, { ...opts, maxRequests: remaining })
+    const scan = await scanLogs(ctx.client, query, range, { ...scanOptions, maxRequests: remaining })
     spent += scan.requests
     ctx.index.addEnabledFees(module_.id, factory, feeDiscovery.feesFromLogs(scan.logs, ctx.manifest))
     for (const covered of scan.covered) ctx.index.addCoverage(module_.id, factory, covered)
