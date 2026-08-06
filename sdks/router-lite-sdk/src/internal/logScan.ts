@@ -273,6 +273,13 @@ export function delay(ms: number, signal?: AbortSignal): Promise<void> {
  * lost update costs one probe. Omitted, every line below behaves exactly as it did before this
  * option existed.
  *
+ * `opts.onLogs`, when supplied, is handed each chunk's logs AS THAT CHUNK IS SERVED — the seam that
+ * makes a long scan incremental for its caller instead of all-or-nothing. It is purely additive
+ * (`logs` still accumulates and is still returned whole) and it is best-effort: it must not throw,
+ * and nothing about the scan's coverage, budget or descent depends on it. Its reason for existing is
+ * `search/discovery.ts`, which used to ingest a scan's pools only once the entire multi-million-block
+ * range had come back — long after a budgeted caller could do anything with them.
+ *
  * `opts.maxRequests` narrows {@link MAX_REQUESTS_PER_SCAN} for THIS scan (never widens it), for a
  * caller whose scan is one of several competing for a latency budget and is not the one the caller
  * is waiting on. Running out of it is not an error and needs no new report surface: the scan stops
@@ -291,6 +298,7 @@ export async function scanLogs(
     initialChunk?: bigint | undefined
     widthMemory?: ScanWidthMemory | undefined
     maxRequests?: number | undefined
+    onLogs?: ((logs: Log[]) => void) | undefined
   },
 ): Promise<{ logs: Log[]; covered: BlockRange[]; complete: boolean; requests: number }> {
   const { fromBlock, toBlock } = range
@@ -433,15 +441,25 @@ export async function scanLogs(
     requests -= skipped
 
     for (let i = 0; i < okCount; i++) {
-      // A for-of push, NOT `logs.push(...result.map(...))`. Spreading an array into an argument list
+      // A for-of push, NOT `logs.push(...chunkLogs)`. Spreading an array into an argument list
       // materializes one call argument per element, and V8 throws `RangeError: Maximum call stack
       // size exceeded` somewhere north of ~125k arguments — so on Node (this package declares
       // `engines.node >= 18`) a single wide window over a busy contract could blow up the scan on
       // SUCCESS, after the request was paid for. Bun's JSC tolerates far larger spreads, which is
       // exactly why the unit suite could never catch it. Wide windows make the log counts that reach
-      // that limit routine rather than theoretical.
-      for (const log of (settled[i] as { ok: true; result: Log[] }).result) logs.push(formatLog(log as never) as Log)
+      // that limit routine rather than theoretical. (`.map` below is fine — it is not a spread.)
+      const chunkLogs = (settled[i] as { ok: true; result: Log[] }).result.map((log) => formatLog(log as never) as Log)
+      for (const log of chunkLogs) logs.push(log)
       coveredRaw.push(batch[i]!)
+      // `opts.onLogs` gets this chunk NOW, rather than the caller getting everything at the end.
+      // A multi-million-block scan is minutes long, and until this existed nothing downstream — not
+      // the pool index, not the candidate enumerator, not the quoter — learned a single pool until
+      // the LAST chunk landed. That made a scan an all-or-nothing purchase: aborted at 90%, it
+      // returned its logs but far too late for the wave to price any of them (see
+      // `search/waves.ts#quoteWhileDiscovering` for the live numbers). It is best-effort and purely
+      // additive: `logs` still accumulates and is still returned in full, so a caller that ignores
+      // this sees no difference whatsoever.
+      if (chunkLogs.length > 0) opts.onLogs?.(chunkLogs)
     }
 
     if (okCount > 0) {

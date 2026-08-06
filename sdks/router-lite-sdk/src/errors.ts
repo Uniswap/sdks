@@ -86,6 +86,36 @@ export class NodeStateError extends TransportError {
 }
 
 /**
+ * Thrown by {@link ethCall} for a call that was NEVER SENT because the caller's `AbortSignal` fired
+ * while it sat in the router's semaphore queue.
+ *
+ * IT IS DELIBERATELY NOT A {@link TransportError}, and the distinction is the same one that whole
+ * class exists to draw. A transport failure means the request went out and the provider let us down;
+ * this means the request never went out at all, on our own instruction. Counting it as a transport
+ * failure would set `verificationDegraded`/`rpc-degraded` and blame a provider for a deadline the
+ * caller set; counting it as a revert would be worse still (a fabricated on-chain fact, and a
+ * poisoned negative cache). It is counted as nothing — the candidate is simply never `attempted`,
+ * which is precisely what `SearchReport.quoting.unattempted` already means and how
+ * `quoteCandidates` already treats a candidate dropped between rounds.
+ *
+ * WHY THE SKIP EXISTS AT ALL. `createSemaphore` is a plain FIFO queue with no abort awareness: a
+ * quoting round that dispatched 47 calls against 20 permits has most of them waiting, and each one
+ * resolves whenever a permit frees with no idea the signal fired meanwhile. Without this check every
+ * one of them goes to the wire AFTER the caller walked away — measured as a 74s wall clock on a
+ * `--budget 60s` search once quoting began running alongside the scans
+ * (`search/waves.ts#quoteWhileDiscovering`). `internal/logScan.ts#fetchChunk` closes the identical
+ * gap for `eth_getLogs`; this is the `eth_call` half of it.
+ */
+export class AbortedCallError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'AbortedCallError'
+    // Restore prototype chain for instanceof across the ts→es target downlevel.
+    Object.setPrototypeOf(this, AbortedCallError.prototype)
+  }
+}
+
+/**
  * Thrown by the wave engine (`search/waves.ts`) when it cannot even fetch the pinned block to
  * search against — a provider outage, or a malformed/absent `eth_getBlockByNumber` response. This
  * is the engine's *only* throw: everything else it observes (a reverting quote, an uncompilable

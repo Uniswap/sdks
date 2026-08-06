@@ -1,6 +1,6 @@
 import type { Address, Hex, PublicClient } from 'viem'
 
-import { DEFAULT_CONCURRENCY, MAX_INTERMEDIATES, maxPlausibleHeadRegression } from '../constants'
+import { DEFAULT_CONCURRENCY, MAX_INTERMEDIATES, maxPlausibleHeadRegression, QUOTE_INTERLEAVE_MS } from '../constants'
 import { RpcUnavailableError } from '../errors'
 import { toGraphNode } from '../internal/currency'
 import { ethCall, mapConcurrent } from '../internal/rpc'
@@ -66,7 +66,7 @@ import { evaluate } from './leader'
 // needs-action-vs-verified gating sound), `report.ts` (SearchReport assembly);
 // the set arithmetic every one of them shares is `internal/ranges.ts`.
 //
-// Three properties hold across every wave:
+// Four properties hold across every wave:
 //
 //  1. A route is quoted at most once per search. Waves overlap heavily by
 //     design (each one re-enumerates over a bigger index), so dedup by
@@ -81,6 +81,13 @@ import { evaluate } from './leader'
 //     uncompilable route, a reverting simulation, a provider that caps
 //     `eth_getLogs` — all of them are recorded (in the index, in the route's
 //     `execution` status, in the `SearchReport`) and the search continues.
+//  4. A SCAN-BOUND WAVE QUOTES AS IT GOES, not only once its scans return
+//     (`quoteWhileDiscovering`). Waves 1-3 each pass their discovery phase
+//     through it, so the candidates a scan surfaces are priced every
+//     `QUOTE_INTERLEAVE_MS` rather than in one closing batch that an abort
+//     fired mid-scan will refuse outright. Without it a wave whose scans
+//     outlast the caller's budget converts its whole runtime into pools and
+//     none of it into prices — see that function's header for the live numbers.
 //
 // Speculative probes come in two flavors, and conflating them would be a
 // correctness bug: a *route probe* (wave 0) quotes tokenIn -> tokenOut and its
@@ -198,6 +205,16 @@ export type SearchContext = {
    * engine run, `scanLogs` falls back to `MAX_SCAN_WINDOW` itself.
    */
   logChunkBlocks?: bigint | undefined
+  /**
+   * How often a scan-bound wave pauses to quote what it has discovered so far
+   * ({@link quoteWhileDiscovering}); {@link QUOTE_INTERLEAVE_MS} when absent, which is every real
+   * router (`createRouter` does not expose it and nothing in `router.ts` sets it).
+   *
+   * It exists as a seam, and only as one: the behaviour it controls is defined by wall-clock time,
+   * so a unit test that could not shorten it would have to spend five real seconds per assertion to
+   * observe a single pass. Exactly the role `scanLogs`'s `opts.sleep` plays for the retry backoff.
+   */
+  quoteInterleaveMs?: number | undefined
 }
 
 // The engine's routes are plain {@link RankedRoute}s: `execution`, plus the raw `revertData` of a
@@ -656,6 +673,81 @@ async function quoteEnumerated(run: Run): Promise<void> {
   await quoteNew(run, candidates)
 }
 
+/**
+ * Resolves when `until` settles or `ms` elapses, whichever is first — and never leaves a timer
+ * holding a Node event loop open past that point, which is the only reason it is not a bare
+ * `Promise.race`: a race abandons the losing timer, and this package's own `--budget` overshoot bug
+ * (`cli/commands/context.ts`) is what a stray timer looks like from the outside.
+ *
+ * The rejection handler exists so polling a discovery promise that fails never registers as an
+ * unhandled rejection; the failure itself is re-awaited (and rethrown) by the caller below.
+ */
+function settleOrAfter(until: Promise<unknown>, ms: number): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, ms)
+    const finish = (): void => {
+      clearTimeout(timer)
+      resolve()
+    }
+    void until.then(finish, finish)
+  })
+}
+
+/**
+ * Runs a wave's discovery while quoting whatever the index learns ALONG THE WAY, instead of only
+ * once the last scan has landed.
+ *
+ * WHY THIS EXISTS (the sequel to `constants.ts#FEE_DISCOVERY_MAX_REQUESTS`). A wave used to be
+ * strictly "scan, then enumerate, then quote", and on an endpoint that caps `eth_getLogs` the scan
+ * half can outlast the caller's whole budget. When it does, the enumerate-and-quote half runs
+ * against an already-aborted signal: `quoteCandidates` refuses to issue calls (correctly — an abort
+ * is a stop request), so every candidate the wave's scans had just discovered is counted
+ * `unattempted` and the wave converts a minute of real time into exactly zero price information.
+ * Measured live on Base: `49 candidates · 10 attempted · 39 never attempted`, with the 39 being
+ * precisely what wave 2 had gone looking for. Quoting every {@link QUOTE_INTERLEAVE_MS} bounds what
+ * an abort can strand to one interval's worth of discovery instead of a whole wave's.
+ *
+ * IT CHANGES WHEN QUOTES HAPPEN, NOT WHAT IS TRUE ABOUT THEM. Every accounting rule the report rests
+ * on is preserved by construction rather than by care:
+ *
+ *  - A route is still quoted at most once per search: `quoteNew` adds each candidate's `routeId` to
+ *    `state.seen` synchronously, before it awaits anything, so a pass and the wave's own closing
+ *    `quoteEnumerated` cannot both submit the same candidate however they interleave.
+ *  - `enumeration` is still last-enumeration-wins: the wave's closing `quoteEnumerated` runs after
+ *    this returns, so the counters describe the largest index the wave ever saw, exactly as before.
+ *  - `quoting.unattempted` stays honest in both directions. Candidates a pass priced are `attempted`;
+ *    candidates discovered after the last pass and stranded by the abort are still generated, still
+ *    counted, and still reported as never attempted — the number gets smaller because the work got
+ *    done, not because the accounting looked away.
+ *  - Only one pass is ever in flight (each is awaited before the next timer starts), so the extra
+ *    `eth_call`s share the router's semaphore with the scans rather than doubling the peak.
+ *
+ * Reading the index while the scans write to it is safe for the reason it is not worth guarding:
+ * `generateRoutes` is synchronous and `ingestLogs`' upserts are synchronous, so neither can observe
+ * the other mid-update on a single-threaded runtime.
+ *
+ * `discovery`'s own rejection is not swallowed — it is rethrown by the final `await`, so a wave that
+ * genuinely fails still fails, and it fails after the pump has stopped rather than alongside it.
+ */
+async function quoteWhileDiscovering(run: Run, discovery: Promise<unknown>): Promise<void> {
+  const interval = run.ctx.quoteInterleaveMs ?? QUOTE_INTERLEAVE_MS
+  let discovering = true
+  const tracked = discovery.finally(() => {
+    discovering = false
+  })
+
+  while (discovering) {
+    await settleOrAfter(tracked, interval)
+    // An aborted search stops here rather than enumerating into a `quoteCandidates` that will refuse
+    // the calls: the closing `quoteEnumerated` below is what records those candidates as never
+    // attempted, and doing it twice would double-count nothing but would burn a `generateRoutes`.
+    if (!discovering || run.req.signal?.aborted) break
+    await quoteEnumerated(run)
+  }
+
+  await tracked
+}
+
 // ---------------------------------------------------------------------------
 // Focus selection
 // ---------------------------------------------------------------------------
@@ -840,7 +932,10 @@ async function wave1(run: Run): Promise<void> {
   }
 
   const feeModules = enabledModules(ctx).filter((m) => m.feeDiscovery !== undefined)
-  await Promise.all([runDiscoveryProbes(run, probes), ...feeModules.map((m) => discoverFeeTiers(run, m))])
+  // Fee discovery is a bounded full-history scan (`FEE_DISCOVERY_MAX_REQUESTS`), which on a capped
+  // endpoint is still seconds — long enough for an abort to land inside it, so it gets the same
+  // quote-as-you-go treatment as the adjacency waves below.
+  await quoteWhileDiscovering(run, Promise.all([runDiscoveryProbes(run, probes), ...feeModules.map((m) => discoverFeeTiers(run, m))]))
 
   // Nonstandard tiers can carry the whole trade, so these are route probes, not discovery probes.
   // Tiers already probed in wave 0 dedupe by routeId and cost nothing.
@@ -860,8 +955,9 @@ async function wave2(run: Run): Promise<void> {
   state.focus = focus
 
   // Wave 2 is already scan-bound, so the exact pair's remaining history rides along with the focus
-  // adjacency rather than adding a wave of its own.
-  await Promise.all([scanAdjacency(run, focus), completeExactPairScan(run)])
+  // adjacency rather than adding a wave of its own — and, being the wave most likely to outlive the
+  // caller's budget, it is the one `quoteWhileDiscovering` exists for.
+  await quoteWhileDiscovering(run, Promise.all([scanAdjacency(run, focus), completeExactPairScan(run)]))
 
   const other = otherEndpoint(run, focus)
   const endpoints = [node(req.tokenIn, ctx.manifest), node(req.tokenOut, ctx.manifest)]
@@ -877,7 +973,7 @@ async function wave2(run: Run): Promise<void> {
 /** The other endpoint's adjacency, then the complete bounded cross product over both neighborhoods. */
 async function wave3(run: Run): Promise<void> {
   const focus = run.state.focus ?? selectFocus(run.req, run.ctx.index, run.ctx.manifest.wrappedNative)
-  await scanAdjacency(run, otherEndpoint(run, focus))
+  await quoteWhileDiscovering(run, scanAdjacency(run, otherEndpoint(run, focus)))
   await quoteEnumerated(run)
 }
 

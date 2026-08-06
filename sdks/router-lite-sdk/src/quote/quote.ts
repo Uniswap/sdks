@@ -1,7 +1,7 @@
 import type { PublicClient } from 'viem'
 
 import { DEFAULT_CONCURRENCY, SIMPLICITY_MARGIN_BPS } from '../constants'
-import { TransportError } from '../errors'
+import { AbortedCallError, TransportError } from '../errors'
 import { ethCall, mapConcurrent, revertDataOf } from '../internal/rpc'
 import type { Semaphore } from '../internal/rpc'
 import type { Segment } from '../internal/segment'
@@ -41,9 +41,10 @@ async function runSegment(
   manifest: ChainManifest,
   blockNumber: bigint,
   semaphore?: Semaphore,
+  signal?: AbortSignal,
 ): Promise<bigint> {
   const quoteCall = module_.encodeQuote(legs, amountIn, manifest)
-  const returnData = await ethCall(client, quoteCall.call, blockNumber, semaphore)
+  const returnData = await ethCall(client, quoteCall.call, blockNumber, semaphore, signal)
   return quoteCall.decode(returnData)
 }
 
@@ -108,11 +109,18 @@ export type QuoteCandidatesResult = {
  * `failed`: nothing was learned about that route, so it must never contribute to an authoritative
  * "no route exists".
  *
- * `signal` is only checked between rounds (round 1 always runs to completion for every candidate):
- * if aborted before round 2, candidates still awaiting round 2 are dropped from `quoted` but are
- * *not* counted in `stats` at all — they are neither attempted, succeeded, nor failed, keeping
+ * `signal` is checked between rounds AND, per call, once a semaphore permit is in hand
+ * (`internal/rpc.ts#ethCall`). Either way the effect on `stats` is the same and is the point:
+ * candidates whose `eth_call` was never sent are dropped from `quoted` but are *not* counted in
+ * `stats` at all — neither attempted, succeeded, nor failed — keeping the
  * `attempted === succeeded + failed + transportFailed` invariant intact. It is the caller's job to
- * report them as unattempted (see `SearchReport.quoting.unattempted`).
+ * report them as unattempted (see `SearchReport.quoting.unattempted`), which `search/waves.ts`
+ * already does by differencing the candidates it submitted against `stats.attempted`.
+ *
+ * The per-call check is what stops an aborted search from finishing a whole quoting round anyway: a
+ * round dispatches every candidate at once and lets the router's semaphore meter them, so before it
+ * existed an abort landing mid-round still put every queued `eth_call` on the wire — 14 seconds past
+ * a 60s budget, measured (see {@link AbortedCallError}).
  */
 export async function quoteCandidates(args: QuoteCandidatesArgs): Promise<QuoteCandidatesResult> {
   const { client, modules, manifest, candidates, amountIn, blockNumber, signal, semaphore } = args
@@ -123,7 +131,7 @@ export async function quoteCandidates(args: QuoteCandidatesArgs): Promise<QuoteC
 
   const round1Results = await mapConcurrent(segmented, semaphore ?? DEFAULT_CONCURRENCY, ({ segments }) => {
     const first = segments[0]!
-    return runSegment(client, modules[first.protocol], first.legs, amountIn, manifest, blockNumber, semaphore)
+    return runSegment(client, modules[first.protocol], first.legs, amountIn, manifest, blockNumber, semaphore, signal)
   })
 
   const quoted: QuotedRoute[] = []
@@ -137,6 +145,10 @@ export async function quoteCandidates(args: QuoteCandidatesArgs): Promise<QuoteC
 
   segmented.forEach(({ candidate, segments }, i) => {
     const result = round1Results[i]!
+    // Never sent (the signal fired while it queued for a semaphore permit): not attempted, not
+    // failed, not transport-lost — exactly the treatment a candidate dropped between rounds already
+    // gets, and the caller turns the shortfall into `SearchReport.quoting.unattempted`.
+    if (result instanceof AbortedCallError) return
     if (result instanceof Error) {
       attempted++
       if (result instanceof TransportError) {
@@ -164,11 +176,12 @@ export async function quoteCandidates(args: QuoteCandidatesArgs): Promise<QuoteC
 
   const round2Results = await mapConcurrent(pendingRound2, semaphore ?? DEFAULT_CONCURRENCY, ({ segments, round1Output }) => {
     const second = segments[1]!
-    return runSegment(client, modules[second.protocol], second.legs, round1Output, manifest, blockNumber, semaphore)
+    return runSegment(client, modules[second.protocol], second.legs, round1Output, manifest, blockNumber, semaphore, signal)
   })
 
   pendingRound2.forEach(({ candidate, round1Output }, i) => {
     const result = round2Results[i]!
+    if (result instanceof AbortedCallError) return
     attempted++
     if (result instanceof Error) {
       if (result instanceof TransportError) {
@@ -272,7 +285,7 @@ export async function probeQuotes(args: ProbeQuotesArgs): Promise<QuoteCandidate
   if (signal?.aborted) return { quoted: [], stats: emptyStats(), transportFailures: [], amountIndependentFailures: [] }
 
   const results = await mapConcurrent(probes, semaphore ?? DEFAULT_CONCURRENCY, async (probe) => {
-    const returnData = await ethCall(client, probe.quote.call, blockNumber, semaphore)
+    const returnData = await ethCall(client, probe.quote.call, blockNumber, semaphore, signal)
     return probe.quote.decode(returnData)
   })
 
@@ -282,8 +295,14 @@ export async function probeQuotes(args: ProbeQuotesArgs): Promise<QuoteCandidate
   let succeeded = 0
   let failed = 0
   let transportFailed = 0
+  let attempted = 0
   probes.forEach((probe, i) => {
     const result = results[i]!
+    // Never sent — see `quoteCandidates`' round-1 tally. `attempted` is counted here rather than
+    // taken as `probes.length` precisely so a skipped probe leaves the
+    // `attempted === succeeded + failed + transportFailed` invariant intact.
+    if (result instanceof AbortedCallError) return
+    attempted++
     if (result instanceof Error) {
       if (result instanceof TransportError) {
         transportFailed++
@@ -298,5 +317,5 @@ export async function probeQuotes(args: ProbeQuotesArgs): Promise<QuoteCandidate
     quoted.push({ route: probe.candidate, quote: { amountIn, amountOut: result, intermediateAmounts: [] } })
   })
 
-  return { quoted, stats: { attempted: probes.length, succeeded, failed, transportFailed }, transportFailures, amountIndependentFailures }
+  return { quoted, stats: { attempted, succeeded, failed, transportFailed }, transportFailures, amountIndependentFailures }
 }

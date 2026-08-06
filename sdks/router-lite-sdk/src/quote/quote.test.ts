@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test'
 import type { Hex, PublicClient } from 'viem'
 import { encodeAbiParameters, zeroAddress } from 'viem'
 
+import { createSemaphore } from '../internal/rpc'
 import { rateLimitHttpError, rateLimitRpcError, v3Ref, v4Ref } from '../internal/testing'
 import { MAINNET_MANIFEST } from '../manifest'
 import type { ProtocolModule } from '../protocols/types'
@@ -426,4 +427,52 @@ test('rankRoutes orders by amountOut desc, then fewer protocol transitions, then
   const ranked = rankRoutes([lower, higher])
   expect(ranked[0]).toBe(higher)
   expect(ranked[1]).toBe(lower)
+})
+
+test('an abort mid-round skips the calls still queued for a permit — never sent, never counted, never blamed on the provider', async () => {
+  // Before `quoteWhileDiscovering`, a quoting round only ever started at a wave boundary, so an
+  // abort landing inside one was rare. Now that scan-bound waves quote as they go it is the common
+  // case, and it was expensive: `mapConcurrent` dispatches every candidate at once and lets the
+  // router's semaphore meter them, but `createSemaphore` is a plain FIFO queue with no abort
+  // awareness — so every queued `eth_call` still went to the wire once a permit freed, 14 seconds
+  // past a `--budget 60s` search, measured live on Base. `ethCall` now re-checks the signal with the
+  // permit in hand, exactly as `logScan.ts#fetchChunk` already did for `eth_getLogs`.
+  const amountIn = 10n ** 6n
+  const [first] = v2Module.speculativeDirect(USDC, WETH, amountIn, manifest)
+  const [second] = v2Module.speculativeDirect(WETH, DAI, amountIn, manifest)
+  const [third] = v2Module.speculativeDirect(USDC, DAI, amountIn, manifest)
+
+  const controller = new AbortController()
+  const reserves = v2Return(2_000_000n * 10n ** 6n, 1_000n * 10n ** 18n, true)
+  const served: string[] = []
+  const base = stubClient({
+    ...entryFor(first!.quote.call, reserves),
+    ...entryFor(second!.quote.call, reserves),
+    ...entryFor(third!.quote.call, reserves),
+  })
+  const client: Pick<PublicClient, 'request'> = {
+    async request(args: never) {
+      const [{ to }] = (args as unknown as { params: [{ to: string }] }).params
+      served.push(to.toLowerCase())
+      // The budget expiring the instant the first call is served: everything still queued behind the
+      // single permit is now work nobody asked for.
+      controller.abort()
+      return base.request(args)
+    },
+  } as Pick<PublicClient, 'request'>
+
+  const { quoted, stats } = await probeQuotes({
+    client,
+    probes: [first!, second!, third!],
+    amountIn,
+    blockNumber: 1n,
+    semaphore: createSemaphore(1),
+    signal: controller.signal,
+  })
+
+  expect(served).toHaveLength(1)
+  expect(quoted).toHaveLength(1)
+  // Not attempted, not failed, and emphatically not `transportFailed` — nothing was asked of the
+  // provider, so the search must not report itself rpc-degraded over its own deadline.
+  expect(stats).toEqual({ attempted: 1, succeeded: 1, failed: 0, transportFailed: 0 })
 })

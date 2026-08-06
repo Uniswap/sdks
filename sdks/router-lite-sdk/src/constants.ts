@@ -543,6 +543,33 @@ export const MAX_REQUESTS_PER_SCAN = 4_000
 export const FEE_DISCOVERY_MAX_REQUESTS = 128
 
 /**
+ * How often a scan-bound wave stops to quote what its scans have discovered so far
+ * (`search/waves.ts#quoteWhileDiscovering`).
+ *
+ * THE STAGE DOWNSTREAM OF THE ONE ABOVE, AND THE SAME BUG. Bounding fee discovery let waves 2-3
+ * *start*; it did not make them *pay*. A wave was strictly "scan everything, then enumerate, then
+ * quote", so on the capped Base endpoint wave 2 spent its whole remaining ~56s inside
+ * `scanAdjacency` and reached `quoteEnumerated` only after the caller's `--budget` had already
+ * fired — at which point `quoteCandidates` correctly refuses to issue calls for an aborted search.
+ * Measured live: 49 candidates enumerated, `10 attempted · 39 never attempted`. Every second of that
+ * wave bought pools, and not one of them bought a price. The anytime-search contract is "an
+ * improving best per wave", and a wave that cannot quote cannot improve anything.
+ *
+ * 5s, AND THE UNITS ARE THE POINT: this bounds the DISCOVERY THAT CAN BE STRANDED by an abort, which
+ * is wall-clock, not requests. Whatever the endpoint's shape, at most the last ~5s of a wave's scans
+ * go unquoted. It is also the floor on the overhead: each pass costs one `generateRoutes` over the
+ * whole index (tens of ms on a warm Base index) plus whatever genuinely-new candidates it found, so
+ * ~11 passes across a 60s wave is under 2% of the budget spent on re-enumeration — and passes that
+ * find nothing new stop at `quoteNew`'s dedup without issuing a single call. Shorter would spend
+ * real CPU re-deriving an unchanged candidate set; longer would strand more of exactly what this
+ * exists to rescue.
+ *
+ * It does not fire at all on a fast search: a warm index finishes wave 2 in well under one interval,
+ * so the pass count is zero and the code path is invisible.
+ */
+export const QUOTE_INTERLEAVE_MS = 5_000
+
+/**
  * First backoff delay before retrying a failed chunk at {@link MIN_CHUNK}, doubled per consecutive
  * failure and capped at {@link BACKOFF_MAX_MS}. Retrying a throttling endpoint immediately is how a
  * rate limit becomes a tight loop; 250ms is short enough that a one-off blip barely registers, and

@@ -1,6 +1,6 @@
 import type { Address, Hex, PublicClient } from 'viem'
 
-import { NodeStateError, TransportError } from '../errors'
+import { AbortedCallError, NodeStateError, TransportError } from '../errors'
 import type { BlockRange, EthCall } from '../types'
 
 // ---------------------------------------------------------------------------
@@ -542,21 +542,42 @@ export function createSemaphore(limit: number): Semaphore {
  * makes the router's `concurrency` option a genuine cross-batch bound rather than a per-call one.
  * Omitted (as every unit test below the router facade does) it is simply not gated, unchanged from
  * before this option existed.
+ *
+ * `signal`, when supplied, is checked ONCE THE PERMIT IS IN HAND, and that placement is the whole
+ * point rather than defensive padding — see {@link AbortedCallError} for the measurement. The
+ * semaphore is a plain FIFO queue with no abort awareness, so a batch queued behind a busy router
+ * resolves one waiter per freed permit long after the caller's deadline passed; checking here makes
+ * the abort bite at the last possible moment before the wire, exactly as `logScan.ts#fetchChunk`
+ * does for `eth_getLogs`. A skipped call raises {@link AbortedCallError}, which is deliberately not
+ * a {@link TransportError}: nothing was asked of the provider, so nothing may be blamed on it.
  */
-export async function ethCall(client: Pick<PublicClient, 'request'>, call: EthCall, blockNumber: bigint, semaphore?: Semaphore): Promise<Hex> {
+export async function ethCall(
+  client: Pick<PublicClient, 'request'>,
+  call: EthCall,
+  blockNumber: bigint,
+  semaphore?: Semaphore,
+  signal?: AbortSignal,
+): Promise<Hex> {
   const transaction: { to: Address; data: Hex; from?: Address; value?: Hex } = { to: call.to, data: call.data }
   if (call.from !== undefined) transaction.from = call.from
   if (call.value !== undefined) transaction.value = `0x${call.value.toString(16)}`
   const blockTag = `0x${blockNumber.toString(16)}` as Hex
 
+  if (signal?.aborted) throw new AbortedCallError(`eth_call to ${call.to} was never sent — the search was aborted first`)
   await semaphore?.acquire()
   try {
+    if (signal?.aborted) throw new AbortedCallError(`eth_call to ${call.to} was never sent — the search was aborted first`)
     // The typed `PublicRpcSchema` declares `eth_call`'s transaction/block params in viem's internal
     // (bigint-quantity) shape, not the hex-quantity wire shape this function builds — viem's own
     // `call()` action re-formats to hex before calling `request()` too (see
     // `actions/public/call.js`), so this cast just skips re-deriving that formatter here.
     return (await client.request({ method: 'eth_call', params: [transaction, blockTag] } as any)) as Hex
   } catch (err) {
+    // Our own skip, raised inside the `try` so the `finally` releases the permit. It must leave here
+    // as itself: `classifyRpcError` reads error TEXT, and "aborted" is exactly the vocabulary a real
+    // transport failure uses — misclassifying a call we chose not to make as a provider failure is
+    // the one outcome {@link AbortedCallError} exists to prevent.
+    if (err instanceof AbortedCallError) throw err
     const kind = classifyRpcError(err)
     if (kind === 'transport') {
       throw new TransportError(`eth_call to ${call.to} failed in the transport, not on-chain`, { cause: err })

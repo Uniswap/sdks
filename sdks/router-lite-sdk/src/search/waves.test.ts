@@ -293,6 +293,15 @@ type ClientScript = {
   readiness?: { balance?: bigint; erc20Allowance?: bigint; permit2Allowance?: bigint }
   /** Aborts the controller once this many `eth_call`s have been served. */
   abortAfterCalls?: number
+  /** Milliseconds each `eth_getLogs` takes to answer, so a test can give a scan a shape in TIME
+   * rather than only in results — which is the only way to observe anything that happens *during*
+   * one (`waves.ts#quoteWhileDiscovering`). */
+  logDelayMs?: number
+  /** Evaluated after every `eth_getLogs` this stub serves; aborts the controller the first time it
+   * is true. The budget-expiry trigger, expressed as a fact about what the search has LEARNED
+   * (`index.pair(...).length`) rather than as a request count, so it cannot drift when chunk
+   * batching changes underneath it. */
+  abortWhen?: () => boolean
   controller?: AbortController
   /** Call keys (`${to}:${data}`, lowercased) that must revert WITH real revert data attached —
    * simulating a `NotEnoughLiquidity`-shaped custom error — instead of the default data-less
@@ -341,7 +350,12 @@ function stubClient(script: ClientScript): { client: SearchContext['client']; co
         return { number: toHex(script.blockNumber?.() ?? BLOCK_NUMBER), hash: BLOCK_HASH, timestamp: toHex(BLOCK_TIMESTAMP) }
       }
       if (args.method === 'eth_getBalance') return toHex(balance)
-      if (args.method === 'eth_getLogs') return serveLogs(args.params[0])
+      if (args.method === 'eth_getLogs') {
+        if (script.logDelayMs !== undefined) await new Promise((r) => setTimeout(r, script.logDelayMs))
+        const served = serveLogs(args.params[0])
+        if (script.abortWhen?.()) script.controller?.abort()
+        return served
+      }
       if (args.method !== 'eth_call') throw new Error(`stubClient: unexpected method ${args.method}`)
 
       const [{ to, data }] = args.params
@@ -442,8 +456,12 @@ function scannedRecord(id: 'v2' | 'v3', a: CurrencyRef, b: CurrencyRef, createdA
   } as unknown as Log & { record: PoolRecord }
 }
 
-function makeContext(client: SearchContext['client'], manifest: ChainManifest): SearchContext {
-  return { client, manifest, modules, index: new PoolIndex(WETH), hookData: new Map() }
+function makeContext(
+  client: SearchContext['client'],
+  manifest: ChainManifest,
+  overrides: Partial<SearchContext> = {},
+): SearchContext {
+  return { client, manifest, modules, index: new PoolIndex(WETH), hookData: new Map(), ...overrides }
 }
 
 const quoteReq: QuoteRequest = { tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN }
@@ -1363,4 +1381,79 @@ test('quoteEnumerated touches every enumerated candidate leg (C4-H5 follow-up): 
   expect(index.pair(TOKEN_A, MID).some((r) => r.pool.id === aMidLeg.id)).toBe(true) // survived
   expect(index.pair(MID, TOKEN_B).some((r) => r.pool.id === midBLeg.id)).toBe(true) // survived
   expect(index.pair(TOKEN_A, WETH).some((r) => r.pool.id === freshPool.id)).toBe(true) // the new arrival
+})
+
+// ---------------------------------------------------------------------------
+// Wave-2 quote starvation (the sequel to the fee-discovery starvation bug)
+// ---------------------------------------------------------------------------
+
+test('a scan-bound wave quotes what it discovers WHILE it discovers it, so an abort cannot strand a whole wave of pools unpriced', async () => {
+  // THE LIVE DEFECT, REPRODUCED. `rl quote eth usdc 1 --watch --budget 60s` on Base, warm-ish index:
+  // `enumeration 49 candidates · quoting 10 attempted = 10 ok · 39 never attempted · flags aborted`.
+  // Wave 2 spent its entire remaining ~56s inside `scanAdjacency` against a 10k-capped `eth_getLogs`
+  // endpoint, and reached its closing `quoteEnumerated` only after the budget's signal had fired —
+  // at which point `quoteCandidates` correctly refuses to issue calls for an aborted search. So the
+  // wave enumerated all 39 newly-discovered candidates, priced none of them, and converted a minute
+  // of real time into pools and zero prices. The anytime-search contract is an improving best per
+  // wave; a wave that cannot quote cannot improve anything.
+  //
+  // The scenario below is that shape in miniature: nothing prices in waves 0-1 (every speculative
+  // probe reverts — "no pool there"), the focus-endpoint adjacency scan is the only source of
+  // quoteable pools, it is paced across ten chunks, and the budget expires partway through it. Every
+  // successful quote in the search is therefore one the interleaving bought.
+  const controller = new AbortController()
+  const deploymentBlock = BLOCK_NUMBER - 1_999n // a 2,000-block range...
+  const chunk = 200n //                            ...walked in ten chunks, recent-first
+
+  // Two direct A<->B pools on tiers `speculativeDirect` cannot guess, discoverable only by the scan:
+  // one in the FIRST chunk served, one in the LAST.
+  const early = scannedRecord('v3', TOKEN_A, TOKEN_B, BLOCK_NUMBER - 100n) //  chunk 1
+  const late = scannedRecord('v3', TOKEN_A, TOKEN_B, deploymentBlock + 99n) // chunk 10
+  // `scannedRecord` derives its pool from the pair alone, so the two would collide; re-tag the late
+  // one so the index holds two distinct direct pools and `pair()` can count them.
+  const latePool = stubPoolRef('v3', TOKEN_A, TOKEN_B, { tag: 'a7' })
+  late.record = { pool: latePool, createdAtBlock: deploymentBlock + 99n, source: 'event' }
+
+  const index = new PoolIndex(WETH)
+  const { client } = stubClient({
+    calls: {
+      ...quoteEntry([early.record.pool], AMOUNT_IN, 5_000n),
+      ...quoteEntry([latePool], AMOUNT_IN, 6_000n),
+    },
+    logs: (endpoint) => (endpoint === TOKEN_A.toLowerCase() ? [early, late] : []),
+    logDelayMs: 25,
+    // The budget expiring: the moment the scan has surfaced BOTH pools, the caller's clock is up.
+    abortWhen: () => index.pair(TOKEN_A, TOKEN_B).length >= 2,
+    controller,
+  })
+
+  const ctx = makeContext(client, manifestWith({ v3: true, deploymentBlock }), {
+    index,
+    logChunkBlocks: chunk,
+    // The pump's interval, shortened so the test observes passes without spending
+    // QUOTE_INTERLEAVE_MS of wall clock per one — the role `scanLogs`' `opts.sleep` plays for backoff.
+    quoteInterleaveMs: 10,
+  })
+  const events = await drain(searchWaves(ctx, { ...quoteReq, signal: controller.signal }, 'quote'))
+
+  const final = events.at(-1)!
+  const { quoting } = final.report
+  expect(final.report.aborted).toBe(true)
+
+  // THE REGRESSION. Before interleaving this was `0 ok`: every candidate the scan discovered was
+  // enumerated into `unattempted` by a `quoteEnumerated` that ran after the abort. The early pool is
+  // priced because a pass reached it while the remaining nine chunks were still in flight.
+  expect(quoting.succeeded).toBeGreaterThan(0)
+  expect(final.best?.quote.amountOut).toBe(5_000n)
+
+  // AND THE REPORT IS STILL HONEST ABOUT WHAT IT DID NOT DO. The late pool arrived WITH the abort, so
+  // it is still enumerated, still counted, and still reported as never attempted — the unattempted
+  // number shrinks because the work got done, not because the accounting looked away.
+  expect(quoting.succeeded).toBe(1)
+  expect(quoting.unattempted).toBeGreaterThan(0)
+  expect(quoting.attempted).toBe(quoting.succeeded + quoting.failed + quoting.transportFailed)
+  expect(final.report.enumeration.candidatesGenerated).toBeGreaterThanOrEqual(quoting.unattempted)
+
+  const result = classify('quote', final)
+  assertResultCoherent(result)
 })

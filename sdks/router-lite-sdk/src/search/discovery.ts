@@ -116,8 +116,14 @@ export async function runPairScan(run: Run, plan: ExactPairPlan, ranges: BlockRa
   for (const range of ranges) {
     if (req.signal?.aborted) return
     state.pairScanned.push(range)
-    const scan = await scanLogs(ctx.client, plan.query, range, scanOpts(run))
-    ingestLogs(run, plan.module_, scan.logs)
+    // Ingested chunk by chunk (`onLogs`) rather than in one pass over `scan.logs` at the end: the
+    // pools a long scan finds are worth having in the index the moment they are known, because
+    // `waves.ts#quoteWhileDiscovering` is running alongside and can only price what the index holds.
+    // `upsert` is idempotent, so nothing here depends on a chunk being delivered exactly once.
+    const scan = await scanLogs(ctx.client, plan.query, range, {
+      ...scanOpts(run),
+      onLogs: (logs) => ingestLogs(run, plan.module_, logs),
+    })
     for (const covered of scan.covered) ctx.index.addCoverage('v4', plan.scope, covered)
   }
 }
@@ -192,8 +198,10 @@ export async function scanAdjacency(run: Run, endpoint: CurrencyRef): Promise<vo
               complete = false
               break
             }
-            const scan = await scanLogs(ctx.client, query, range, opts)
-            ingestLogs(run, module_, scan.logs)
+            // Chunk-by-chunk ingestion (see `runPairScan`): an adjacency scan is the longest thing
+            // the engine does, and holding its pools back until the last chunk landed is what made a
+            // budget-expired wave 2 worth nothing at all.
+            const scan = await scanLogs(ctx.client, query, range, { ...opts, onLogs: (logs) => ingestLogs(run, module_, logs) })
             covered.push(...scan.covered)
             if (!scan.complete) complete = false
           }
