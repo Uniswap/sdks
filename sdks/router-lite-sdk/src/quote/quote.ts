@@ -244,7 +244,23 @@ function compareRoutes(a: QuotedRoute, b: QuotedRoute): number {
  * against the whole ranked list to notice the override happened at all.
  */
 export function rankRoutes(quoted: QuotedRoute[]): QuotedRoute[] {
-  const sorted = [...quoted].sort(compareRoutes)
+  // THE MARKER IS THIS CALL'S OUTPUT, NEVER ITS INPUT. `search/leader.ts` re-ranks the accumulated
+  // quote set on EVERY wave, so a route promoted in wave 1 comes back into wave 2 still carrying the
+  // marker. Once wave 2 has priced a route that outprices the complex leader outright, or the leader
+  // itself has been demoted, the promotion is no longer happening — but the marker would ride along
+  // unchanged, and it is not decorative: `assertResultCoherent` reads it as the licence for a `best`
+  // outpriced by its own `alternatives`, and the CLI prints it as the explanation. Stripping it up
+  // front makes this function idempotent: `rankRoutes(rankRoutes(x))` deep-equals `rankRoutes(x)`,
+  // and the marker on the way out always describes the promotion that just happened.
+  // Copying only the routes that actually carry a stale marker keeps every other route referentially
+  // identical to its input, which callers (and tests) rely on.
+  const sorted = [...quoted]
+    .map((candidate) => {
+      if (candidate.promotedOverComplex === undefined) return candidate
+      const { promotedOverComplex: _stale, ...rest } = candidate
+      return rest
+    })
+    .sort(compareRoutes)
   if (sorted.length <= 1) return sorted
 
   const leader = sorted[0]!

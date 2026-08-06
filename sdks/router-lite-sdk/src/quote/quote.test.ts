@@ -421,6 +421,24 @@ test('simplicity margin: hooked route must beat simple by >5bps', () => {
   expect((notPromoted[0] as RankedRoute).promotedOverComplex).toBeUndefined()
 })
 
+test('rankRoutes is idempotent: re-ranking its own output never carries a stale promotion marker', () => {
+  // `search/leader.ts` re-ranks the ACCUMULATED quote set on every wave, so a route promoted in one
+  // wave is an input to the next still wearing the marker. The marker is not decorative —
+  // `assertResultCoherent` reads it as the licence for a `best` outpriced by its own `alternatives`,
+  // and the CLI prints it as the explanation — so one that outlives the promotion it describes is a
+  // false explanation for whatever ordering happens to be current.
+  const once = rankRoutes([hookedRoute(10_005n), simpleRoute(10_000n)])
+  expect((once[0] as RankedRoute).promotedOverComplex).toBe(true)
+  expect(rankRoutes(once)).toEqual(once)
+
+  // And the case the marker must NOT survive: the promoted route is re-ranked against a field where
+  // it no longer wins anything (nothing complex is ahead of it, so no promotion happens at all).
+  const promoted = once[0]!
+  const reranked = rankRoutes([promoted, simpleRoute(9_000n)])
+  expect(reranked[0]!.quote.amountOut).toBe(10_000n)
+  expect((reranked[0] as RankedRoute).promotedOverComplex).toBeUndefined()
+})
+
 test('rankRoutes orders by amountOut desc, then fewer protocol transitions, then fewer hops, then routeId', () => {
   const higher = simpleRoute(500n)
   const lower = hookedRoute(100n) // amountOut lower, and complex — but amountOut alone should decide here

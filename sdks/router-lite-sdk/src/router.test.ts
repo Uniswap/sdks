@@ -834,6 +834,29 @@ test('assertResultCoherent: an UNMARKED quote inversion is the bug, and it is re
   expect(() => assertResultCoherent(ordered)).not.toThrow()
 })
 
+test('assertResultCoherent: a marker that OUTLIVED its promotion is the bug too, in the other direction', () => {
+  // The stale half. `search/leader.ts` re-ranks the accumulated quote set every wave, so a marker set
+  // in wave 1 is an input to wave 2 — and if it survives a re-rank that promoted nothing, it is a
+  // false explanation attached to a leader that simply won outright. (`rankRoutes` strips input
+  // markers precisely so this cannot happen; this is the assertion that would catch it if that ever
+  // regressed.)
+  const stale: RankedRoute = { ...rankedRoute(1_906_567_949n, 'unverified'), promotedOverComplex: true }
+  const lower = rankedRoute(1_000_000_000n, 'unverified')
+  const r = classifyQuote({ best: stale, alternatives: [lower], report: emptyReport(), done: true })
+  expect(() => assertResultCoherent(r)).toThrow(/marker outlived the promotion/)
+
+  // The bound is `>=`, not `>`: a promotion over a route pricing EXACTLY equal is legal (the margin
+  // is inclusive, and `compareRoutes`' tie-breaks decide who led), so an equal-priced alternative
+  // must satisfy the check.
+  const tied = classifyQuote({
+    best: { ...rankedRoute(1_906_567_949n, 'unverified'), promotedOverComplex: true },
+    alternatives: [rankedRoute(1_906_567_949n, 'unverified')],
+    report: emptyReport(),
+    done: true,
+  })
+  expect(() => assertResultCoherent(tied)).not.toThrow()
+})
+
 test('classifySwap: promotedOverComplex survives onto the public SwapResult.best untouched (C4-P7)', () => {
   // `rankRoutes` (quote/quote.ts) is what actually sets this marker; this test pins the OTHER half of
   // the contract — that `classifySwap` is a pure passthrough for it, just as `classifyQuote`'s

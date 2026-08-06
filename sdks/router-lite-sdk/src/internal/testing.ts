@@ -280,6 +280,25 @@ export function assertResultCoherent(r: QuoteResult | SwapResult): void {
           'without promotedOverComplex to explain it',
       )
     }
+    // AND THE SAME CHECK IN THE OTHER DIRECTION: a marker with no promotion left to explain. The
+    // marker is not decorative — it is the licence the check above grants, and the CLI prints it as
+    // the reason a caller is not looking at the highest number found — so one that outlived its
+    // promotion is a false explanation, and it is exactly what a re-rank produces if `rankRoutes` is
+    // ever allowed to carry an input marker through to its output (`quote/quote.ts` strips it for
+    // this reason).
+    //
+    // THE BOUND IS `>=`, NOT `>`, AND THAT IS NOT SLOPPINESS. A promotion needs the simpler candidate
+    // to be within `SIMPLICITY_MARGIN_BPS` of the complex leader — which includes pricing EXACTLY
+    // EQUAL to it, with `compareRoutes`' transition/hop/routeId tie-breaks deciding who led. So a
+    // legitimately-marked `best` is guaranteed an alternative pricing at or above it (the complex
+    // route it was promoted over), and nothing stronger: demanding a strict inversion would reject
+    // a correct result on every tie.
+    if (r.best.promotedOverComplex === true && !r.alternatives.some((alt) => alt.quote.amountOut >= r.best.quote.amountOut)) {
+      throw new Error(
+        `quote best (${r.best.quote.amountOut}) claims promotedOverComplex, but no alternative prices at or above ` +
+          'it — the marker outlived the promotion it describes',
+      )
+    }
   }
   if (r.status === 'ready') {
     if (!r.tx || r.execution.verifiedAtBlock.number !== r.search.block.number)

@@ -5,6 +5,7 @@ import { RouterConfigError } from './errors'
 import {
   ARBITRUM_MANIFEST,
   assertChainData,
+  assertManifestNumerics,
   assertWrappedNativeConsistency,
   BASE_MANIFEST,
   blockTimeSecondsOf,
@@ -333,6 +334,71 @@ describe('chain manifest', () => {
         expect(() =>
           assertChainData({ chainId: 1, wrappedNative: MAINNET_MANIFEST.wrappedNative, execution: manifestFor(1).execution }),
         ).not.toThrow()
+      })
+    })
+
+    // -----------------------------------------------------------------------
+    // Non-address manifest fields get the same shape check the addresses do.
+    //
+    // Every case below is a manifest assembled from JSON, a paste, or an env
+    // var — the only way any of them arises — and every one of them is silent
+    // otherwise: a `number` deploymentBlock throws "Cannot mix BigInt and
+    // other types" from inside a log scan, a bad init-code hash derives pool
+    // addresses nothing lives at and reports a confident `no-route`.
+    // -----------------------------------------------------------------------
+    describe('numeric and hash validation', () => {
+      const V2 = MAINNET_MANIFEST.v2!
+      const V3 = MAINNET_MANIFEST.v3!
+      const V4 = MAINNET_MANIFEST.v4!
+
+      test('a deploymentBlock that survived a JSON round trip as a number is rejected, per protocol', () => {
+        // `JSON.parse` has no bigint. This is what every config-file manifest actually hands over.
+        const asNumber = 10_000_835 as unknown as bigint
+        expect(() => manifestFor(1, { v2: { ...V2, deploymentBlock: asNumber } })).toThrow(RouterConfigError)
+        expect(() => manifestFor(1, { v2: { ...V2, deploymentBlock: asNumber } })).toThrow(/v2\.deploymentBlock must be a bigint/)
+        expect(() => manifestFor(1, { v3: { ...V3, deploymentBlock: asNumber } })).toThrow(/v3\.deploymentBlock must be a bigint/)
+        expect(() => manifestFor(1, { v4: { ...V4, deploymentBlock: asNumber } })).toThrow(/v4\.deploymentBlock must be a bigint/)
+      })
+
+      test('a deploymentBlock left as a decimal STRING is rejected too', () => {
+        const asString = '10000835' as unknown as bigint
+        expect(() => manifestFor(1, { v2: { ...V2, deploymentBlock: asString } })).toThrow(/v2\.deploymentBlock must be a bigint/)
+      })
+
+      test('a negative deploymentBlock is rejected — it re-opens the scan floor below genesis', () => {
+        expect(() => manifestFor(1, { v3: { ...V3, deploymentBlock: -1n } })).toThrow(RouterConfigError)
+        expect(() => manifestFor(1, { v3: { ...V3, deploymentBlock: -1n } })).toThrow(/v3\.deploymentBlock must be non-negative/)
+      })
+
+      test('deploymentBlock 0n is legal — it is a VERIFIED fact on chains deployed in the genesis block', () => {
+        // Unichain's whole v2/v3/v4 bundle states `0n` (see the manifest's own note), so a check that
+        // treated zero as a placeholder would reject a shipping manifest.
+        expect(() => manifestFor(1, { v2: { ...V2, deploymentBlock: 0n } })).not.toThrow()
+        expect(() => assertChainData(manifestFor(130))).not.toThrow()
+      })
+
+      test('a malformed init-code hash is rejected on every field that carries one', () => {
+        const short = '0xdeadbeef' as `0x${string}`
+        const unprefixed = 'a'.repeat(64) as unknown as `0x${string}`
+        expect(() => manifestFor(1, { v2: { ...V2, initCodeHash: short } })).toThrow(RouterConfigError)
+        expect(() => manifestFor(1, { v2: { ...V2, initCodeHash: short } })).toThrow(/v2\.initCodeHash is not a 32-byte hash/)
+        expect(() => manifestFor(1, { v3: { ...V3, poolInitCodeHash: unprefixed } })).toThrow(
+          /v3\.poolInitCodeHash is not a 32-byte hash/,
+        )
+        expect(() =>
+          manifestFor(1, { execution: { ...manifestFor(1).execution!, codeHash: `0x${'g'.repeat(64)}` as `0x${string}` } }),
+        ).toThrow(/execution\.codeHash is not a 32-byte hash/)
+      })
+
+      test('an ABSENT init-code hash is fine — it is what selects the canonical default', () => {
+        const { initCodeHash: _drop, ...v2WithoutHash } = V2
+        expect(() => manifestFor(1, { v2: v2WithoutHash })).not.toThrow()
+      })
+
+      test('every built-in manifest passes its own numeric check', () => {
+        for (const chainId of [1, 8453, 130, 42161, 4663]) {
+          expect(() => assertManifestNumerics(manifestFor(chainId))).not.toThrow()
+        }
       })
     })
   })

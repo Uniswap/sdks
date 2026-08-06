@@ -621,11 +621,71 @@ export function assertManifestAddresses(m: ChainManifest): void {
   }
 }
 
+/** A 32-byte hash, written the way every hash on a manifest is: `0x` + 64 hex digits. */
+const BYTES32_HEX = /^0x[0-9a-fA-F]{64}$/
+
+/**
+ * The non-address half of {@link assertManifestAddresses}: the manifest's own numeric and hash
+ * fields, rejected here rather than at the point of use, synchronously and before any RPC.
+ *
+ * WHY THESE FIELDS AND NOT THE TYPE. Same reason as the addresses: `ChainManifest` types
+ * `deploymentBlock` as `bigint` and the init-code hashes as `Hex`, which is a compile-time assertion
+ * about data a caller assembled by hand — from JSON (where a bigint cannot survive the round trip at
+ * all and arrives as a `number` or a `string`), from a paste, from an environment variable.
+ *
+ * EACH ONE FAILS SILENTLY AND FAR FROM ITS CAUSE, which is what makes them worth a check:
+ *
+ *  - `deploymentBlock` as a `number` (JSON's only numeric type) reaches the log scanner, where a
+ *    `bigint`/`number` mix throws `TypeError: Cannot mix BigInt and other types` from inside a scan
+ *    — an arithmetic error blamed on discovery, about a manifest field.
+ *  - a NEGATIVE `deploymentBlock` re-opens the scan floor below genesis, which reads as an
+ *    absurdly wide range and gets chunked/capped rather than reported as the mistake it is.
+ *  - a malformed `initCodeHash`/`poolInitCodeHash` yields CREATE2 addresses no pool lives at, and a
+ *    search there reports a confident `no-route` — the exact failure the comment on those fields
+ *    (`types.ts`) warns about for zkSync-class chains, arrived at by typo instead.
+ *  - a malformed `execution.codeHash` reaches `validateManifest`'s keccak comparison, which
+ *    `.toLowerCase()`s both sides and simply never matches, reporting the deployed router as wrong
+ *    when it is the manifest that is.
+ */
+export function assertManifestNumerics(m: ChainManifest): void {
+  const blocks: Array<[label: string, value: bigint]> = []
+  if (m.v2) blocks.push(['v2.deploymentBlock', m.v2.deploymentBlock])
+  if (m.v3) blocks.push(['v3.deploymentBlock', m.v3.deploymentBlock])
+  if (m.v4) blocks.push(['v4.deploymentBlock', m.v4.deploymentBlock])
+
+  for (const [label, value] of blocks) {
+    if (typeof value !== 'bigint') {
+      throw new RouterConfigError(
+        `manifest ${label} must be a bigint (JSON has no bigint — write \`123n\`, or \`BigInt(json.deploymentBlock)\`); got ${typeof value} ${String(value)}`,
+      )
+    }
+    if (value < 0n) throw new RouterConfigError(`manifest ${label} must be non-negative; got ${value}`)
+  }
+
+  const hashes: Array<[label: string, value: unknown]> = []
+  if (m.v2?.initCodeHash !== undefined) hashes.push(['v2.initCodeHash', m.v2.initCodeHash])
+  if (m.v3?.poolInitCodeHash !== undefined) hashes.push(['v3.poolInitCodeHash', m.v3.poolInitCodeHash])
+  if (m.execution?.codeHash !== undefined) hashes.push(['execution.codeHash', m.execution.codeHash])
+
+  for (const [label, value] of hashes) {
+    if (typeof value !== 'string' || !BYTES32_HEX.test(value)) {
+      throw new RouterConfigError(
+        `manifest ${label} is not a 32-byte hash (0x + 64 hex digits), got ${String(value)}`,
+      )
+    }
+  }
+}
+
 export function assertChainData(m: ChainManifest): void {
   // Addresses first: everything downstream of a manifest — the consistency cross-check below, the
   // request path, the plan compiler — now compares them with viem rather than with lowercased
   // strings, and viem throws rather than returning false on a malformed one.
   assertManifestAddresses(m)
+  // Then the same shape check for everything on a manifest that is NOT an address. Kept a separate
+  // function from the addresses rather than folded into one `assertManifestShape`: the address check
+  // is exported and called on its own (it is what `encode/ur20.ts` names as its precondition), and
+  // widening it silently would change what that name promises.
+  assertManifestNumerics(m)
   const blockTime = m.chain?.blockTimeSeconds
   if (blockTime !== undefined && (!Number.isFinite(blockTime) || blockTime <= 0)) {
     throw new RouterConfigError(`manifest chain.blockTimeSeconds must be a finite positive number; got ${blockTime}`)

@@ -17,10 +17,6 @@ export function setColorEnabled(on: boolean): void {
   colorEnabled = on
 }
 
-export function colorIsEnabled(): boolean {
-  return colorEnabled
-}
-
 function paint(open: string, close: string): (s: string) => string {
   return (s: string) => (colorEnabled ? `[${open}m${s}[${close}m` : s)
 }

@@ -57,7 +57,12 @@ export function intersectRanges(a: BlockRange[], b: BlockRange[]): BlockRange[] 
 
 /** `from` minus `remove` — used to keep one search from asking for the same blocks twice. */
 export function subtractRanges(from: BlockRange[], remove: BlockRange[]): BlockRange[] {
-  let result = from
+  // Seeded with a COPY, not the caller's own array. Every other path here rebuilds `result` into a
+  // fresh `next`, so the caller's array only ever escaped on the one path where `remove` is empty (or
+  // disjoint enough that nothing is cut) — and on that path this function used to return the input
+  // itself, so a caller that pushed onto the result silently grew its own input. That is precisely
+  // the aliasing bug this module's header says none of these functions has.
+  let result = [...from]
   for (const cut of mergeRanges(remove)) {
     const next: BlockRange[] = []
     for (const range of result) {

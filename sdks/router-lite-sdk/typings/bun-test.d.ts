@@ -61,6 +61,7 @@ declare module 'bun:test' {
     toHaveLength(expected: number): Matchers
     toMatch(expected: string | RegExp): Matchers
     toMatchObject(expected: object): Matchers
+    toHaveProperty(key: string, value?: unknown): Matchers
     toThrow(expected?: unknown): Matchers
     // Anything not named above (rarely used matchers) still resolves, but — correctly, per
     // `noUncheckedIndexedAccess` — as possibly `undefined`.

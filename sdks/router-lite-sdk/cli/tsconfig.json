@@ -9,7 +9,9 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "types": ["node"],
-    "noEmit": true
+    "noEmit": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true
   },
   "include": ["*.ts", "commands/**/*.ts", "typings/**/*"]
 }

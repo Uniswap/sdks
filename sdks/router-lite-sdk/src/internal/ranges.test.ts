@@ -58,6 +58,20 @@ test('subtractRanges removes covered blocks, splitting a range when the cut is i
   expect(subtractRanges([r(1n, 10n)], [r(20n, 30n)])).toEqual([r(1n, 10n)])
 })
 
+test('subtractRanges never hands back the caller\'s own array — the module\'s no-aliasing promise', () => {
+  // The one path that used to leak it: nothing to cut, so the loop body never ran and the seed
+  // (`from` itself) fell straight out. A caller pushing onto the result then grew its own input,
+  // which is exactly the mutation-through-a-returned-value bug this module's header says none of
+  // these functions has. `remove: []` and a fully-disjoint `remove` are the two ways to reach it.
+  const from = [r(1n, 10n)]
+  for (const remove of [[], [r(20n, 30n)]]) {
+    const result = subtractRanges(from, remove)
+    expect(result).not.toBe(from)
+    result.push(r(100n, 200n))
+    expect(from).toEqual([r(1n, 10n)])
+  }
+})
+
 test('intersectAll intersects every set; empty input is empty', () => {
   expect(intersectAll([])).toEqual([])
   expect(intersectAll([[r(1n, 10n)]])).toEqual([r(1n, 10n)])

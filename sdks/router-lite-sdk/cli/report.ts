@@ -239,7 +239,19 @@ export function renderSearchReport(report: SearchReport): string[] {
 // Full results
 // ---------------------------------------------------------------------------
 
-const STATUS_HEADER: Record<string, (s: string) => string> = {
+/**
+ * Every status either result union can carry — the CLI's own name for the closed set, derived from
+ * the SDK's types rather than restated as strings.
+ *
+ * The two tables below are `Record<Status, …>`, not `Record<string, …>`, and that is the whole
+ * point: a new status added to `QuoteResult`/`SwapResult` upstream becomes a COMPILE ERROR here
+ * (a missing key), instead of a silent `?? '·'` fallback rendering an uncolored bullet next to a
+ * verdict nobody taught this CLI to explain. With the tables total, the fallbacks are unreachable
+ * and are gone.
+ */
+type Status = QuoteResult['status'] | SwapResult['status']
+
+const STATUS_HEADER: Record<Status, (s: string) => string> = {
   quote: green,
   ready: green,
   'needs-action': yellow,
@@ -247,7 +259,7 @@ const STATUS_HEADER: Record<string, (s: string) => string> = {
   inconclusive: yellow,
 }
 
-const STATUS_GLYPH: Record<string, string> = {
+const STATUS_GLYPH: Record<Status, string> = {
   quote: '✔',
   ready: '✔',
   'needs-action': '●',
@@ -255,10 +267,9 @@ const STATUS_GLYPH: Record<string, string> = {
   inconclusive: '◐',
 }
 
-function header(status: string, summary: string, elapsedMs?: number): string {
-  const paintFn = STATUS_HEADER[status] ?? ((s: string) => s)
+function header(status: Status, summary: string, elapsedMs?: number): string {
   const elapsed = elapsedMs !== undefined ? dim(`  (${elapsedMs}ms)`) : ''
-  return `${paintFn(`${STATUS_GLYPH[status] ?? '·'} ${status}`)}  ${summary}${elapsed}`
+  return `${STATUS_HEADER[status](`${STATUS_GLYPH[status]} ${status}`)}  ${summary}${elapsed}`
 }
 
 function renderReason(reason: Reason): string[] {

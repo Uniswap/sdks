@@ -41,12 +41,18 @@ export { REASON_CODES } from './types'
 // `BlockRange` and `Protocol` stay here: both are reachable from `SearchReport`
 // (`discovery: Record<Protocol, { coveredRanges: BlockRange[]; ... }>`), which every
 // `QuoteResult`/`SwapResult` carries as `search`.
+//
+// `SwapOperation`/`ConversionOperation` are exported alongside `ExecutionOperation` for the same
+// reason: `ExecutionOperation` IS their union, so a caller narrowing an `ExecutionPlan.operations`
+// entry (a `switch` over `kind`, a per-arm renderer) already holds one of the two halves and had no
+// name for it — the union was exported while neither of its members was.
 export type {
   BlockRange,
   BlockRef,
   ChainData,
   ChainManifest,
   CompiledLimits,
+  ConversionOperation,
   CurrencyRef,
   EncodedTx,
   ExecutionOperation,
@@ -68,6 +74,7 @@ export type {
   RouteLeg,
   RouteQuote,
   SearchReport,
+  SwapOperation,
   SwapRequest,
   SwapResult,
   UniversalRouterDeployment,
