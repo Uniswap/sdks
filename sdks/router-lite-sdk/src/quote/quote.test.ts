@@ -671,3 +671,39 @@ test('multicall path: an abort before the round leaves every candidate unattempt
   expect(outer.count).toBe(0)
   expect(stats).toEqual({ attempted: 0, succeeded: 0, failed: 0, transportFailed: 0 })
 })
+
+test('an encode failure fails only its own candidate — identical accounting on both dispatch paths', async () => {
+  // encodeQuote runs eagerly now (the multicall path holds a whole round's calls at once), so the
+  // per-candidate isolation `mapConcurrent` used to provide for a throwing encoder has to be
+  // preserved deliberately (`encodeOr`). Unreachable through real segmentation — segments dispatch
+  // to their own protocol's module — so a throwing module stands in for the defect class.
+  const throwingModules: Record<Protocol, ProtocolModule> = {
+    ...modules,
+    v3: {
+      ...v3Module,
+      encodeQuote() {
+        throw new Error('encoder exploded')
+      },
+    },
+  }
+  const v3Candidate: RouteCandidate = { legs: [{ pool: v3Ref('0x0000000000000000000000000000000000c001', USDC, WETH, 500), currencyIn: USDC, currencyOut: WETH }] }
+  const good: RouteCandidate = { legs: [{ pool: v4UsdcWethPool, currencyIn: USDC, currencyOut: WETH }] }
+  const goodEntry = entryFor(v4Module.encodeQuote(good.legs, 1n, manifest).call, v4Return(42n))
+
+  for (const multicall3 of [undefined, MULTICALL3_ADDRESS]) {
+    const client = multicall3 === undefined ? stubClient(goodEntry) : multicallStubClient(goodEntry).client
+    const { quoted, stats, amountIndependentFailures } = await quoteCandidates({
+      client,
+      modules: throwingModules,
+      manifest,
+      candidates: [v3Candidate, good],
+      amountIn: 1n,
+      blockNumber: 1n,
+      ...(multicall3 !== undefined && { multicall3 }),
+    })
+    expect(quoted).toHaveLength(1)
+    expect(quoted[0]!.route).toBe(good)
+    expect(stats).toEqual({ attempted: 2, succeeded: 1, failed: 1, transportFailed: 0 })
+    expect(amountIndependentFailures).toEqual([v3Candidate])
+  }
+})

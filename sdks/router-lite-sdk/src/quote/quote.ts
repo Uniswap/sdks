@@ -36,11 +36,26 @@ import type { ChainManifest, Protocol, QuoteCall, QuotedRoute, RouteCandidate } 
 
 type RunRoundArgs = {
   client: Pick<PublicClient, 'request'>
-  calls: QuoteCall[]
+  /** One entry per candidate: the encoded quote, or the `Error` its encoding threw. Encoding happens
+   * at the caller (eagerly, per candidate, under {@link encodeOr}) rather than inside the dispatch
+   * workers, because the multicall path has to hold every call of a round at once — but "one bad
+   * candidate never takes down the batch" is a property of the ROUND, not of a dispatch strategy, so
+   * an encode failure travels as that candidate's slot exactly as it did when `mapConcurrent`
+   * captured the throw. */
+  calls: Array<QuoteCall | Error>
   blockNumber: bigint
   semaphore?: Semaphore | undefined
   signal?: AbortSignal | undefined
   multicall3?: Address | undefined
+}
+
+/** `encodeQuote`, with a throw demoted to the candidate's own slot — see {@link RunRoundArgs.calls}. */
+function encodeOr(encode: () => QuoteCall): QuoteCall | Error {
+  try {
+    return encode()
+  } catch (err) {
+    return err instanceof Error ? err : new Error(String(err))
+  }
 }
 
 /**
@@ -67,27 +82,39 @@ async function runQuoteRound(args: RunRoundArgs): Promise<Array<bigint | Error>>
 
   if (multicall3 === undefined) {
     return mapConcurrent(calls, semaphore ?? DEFAULT_CONCURRENCY, async (quoteCall) => {
+      // An encode failure travels as this candidate's slot — thrown here so `mapConcurrent` captures
+      // it exactly as it captured the throw when encoding ran inside this worker.
+      if (quoteCall instanceof Error) throw quoteCall
       const returnData = await ethCall(client, quoteCall.call, blockNumber, semaphore, signal)
       return quoteCall.decode(returnData)
     })
   }
 
+  const live = calls.flatMap((quoteCall, i) => (quoteCall instanceof Error ? [] : [{ quoteCall, i }]))
   const raw = await aggregateCalls({
     client,
     multicall3,
-    calls: calls.map((quoteCall) => quoteCall.call),
+    calls: live.map(({ quoteCall }) => quoteCall.call),
     blockNumber,
     semaphore,
     signal,
   })
-  return raw.map((slot, i) => {
-    if (slot instanceof Error) return slot
+  const results: Array<bigint | Error> = calls.map((quoteCall) =>
+    quoteCall instanceof Error ? quoteCall : new Error('unreachable: live slot never written'),
+  )
+  live.forEach(({ quoteCall, i }, j) => {
+    const slot = raw[j]!
+    if (slot instanceof Error) {
+      results[i] = slot
+      return
+    }
     try {
-      return calls[i]!.decode(slot)
+      results[i] = quoteCall.decode(slot)
     } catch (err) {
-      return err instanceof Error ? err : new Error(String(err))
+      results[i] = err instanceof Error ? err : new Error(String(err))
     }
   })
+  return results
 }
 
 /**
@@ -196,7 +223,7 @@ export async function quoteCandidates(args: QuoteCandidatesArgs): Promise<QuoteC
     client,
     calls: segmented.map(({ segments }) => {
       const first = segments[0]!
-      return modules[first.protocol].encodeQuote(first.legs, amountIn, manifest)
+      return encodeOr(() => modules[first.protocol].encodeQuote(first.legs, amountIn, manifest))
     }),
     blockNumber,
     semaphore,
@@ -248,7 +275,7 @@ export async function quoteCandidates(args: QuoteCandidatesArgs): Promise<QuoteC
     client,
     calls: pendingRound2.map(({ segments, round1Output }) => {
       const second = segments[1]!
-      return modules[second.protocol].encodeQuote(second.legs, round1Output, manifest)
+      return encodeOr(() => modules[second.protocol].encodeQuote(second.legs, round1Output, manifest))
     }),
     blockNumber,
     semaphore,
