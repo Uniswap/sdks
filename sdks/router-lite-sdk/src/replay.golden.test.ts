@@ -5,7 +5,7 @@ import { gunzipSync } from 'node:zlib'
 
 import { describe, expect, test } from 'bun:test'
 
-import { canonicalizeResult, replayClient, requestFromSession } from './internal/replay'
+import { canonicalizeResult, captureError, rebuildError, replayClient, requestFromSession } from './internal/replay'
 import type { RecordedSession } from './internal/replay'
 import { assertResultCoherent } from './internal/testing'
 import { manifestFor } from './manifest'
@@ -52,6 +52,43 @@ function loadSession(file: string): RecordedSession {
 const files = readdirSync(SESSIONS_DIR)
   .filter((f) => f.endsWith('.json') || f.endsWith('.json.gz'))
   .sort()
+
+describe('the error capture/rebuild round trip', () => {
+  test('a cause chain survives capture and rebuild, frame for frame', () => {
+    const inner = Object.assign(new Error('Details: eth_getLogs is limited to a 10,000 range'), {
+      name: 'RpcRequestError',
+      code: -32614,
+    })
+    const outer = Object.assign(new Error('HTTP request failed.\nURL: https://rpc.example/SECRET'), {
+      name: 'HttpRequestError',
+      status: 413,
+      cause: inner,
+    })
+
+    const rebuilt = rebuildError(captureError(outer, (s) => s.replace('SECRET', '<redacted>'))) as Error & {
+      status?: number
+      cause?: Error & { code?: number }
+    }
+
+    expect(rebuilt.name).toBe('HttpRequestError')
+    expect(rebuilt.message).toContain('<redacted>') // the recorder's redaction is what got written down
+    expect(rebuilt.message).not.toContain('SECRET')
+    expect(rebuilt.status).toBe(413)
+    expect(rebuilt.cause?.name).toBe('RpcRequestError')
+    expect(rebuilt.cause?.code).toBe(-32614)
+  })
+
+  test('an empty frame list rebuilds into a named Error, not undefined', () => {
+    // `captureError` cannot produce one (it writes a fallback frame), so this only happens to a
+    // hand-edited or truncated session — and the loop that walks the frames used to return
+    // `undefined` for it. `replayClient` throws whatever comes back, so the symptom was a
+    // `TypeError: undefined is not an object` thrown from the transport, with nothing anywhere
+    // naming the file that was actually wrong.
+    const rebuilt = rebuildError({ frames: [] })
+    expect(rebuilt).toBeInstanceOf(Error)
+    expect(rebuilt.message).toBe('recorded error with no frames')
+  })
+})
 
 describe('recorded-replay goldens', () => {
   test('the session corpus exists', () => {

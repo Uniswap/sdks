@@ -86,6 +86,12 @@ function detailsOf(message: string): string | undefined {
  * persists only `message`, so `eth.drpc.org`'s real `-32602` is absent here. It changes nothing —
  * `-32602` is in no code set (publicnode's archive-paywall capture carries the same code for a
  * completely different failure), so drpc classifies off its message either way.
+ *
+ * NOT `internal/replay.ts#rebuildError`, and the two must not be merged. That one replays a `cause`
+ * chain that was walked and written down frame by frame (`captureError`) and invents nothing; this
+ * one has only a message string and must INFER the wrapper from it. Same shape out, opposite amount
+ * of evidence in — and this one's inference is the thing under test, so borrowing the other's
+ * fidelity would defeat the point.
  */
 function rebuildCapturedError(capture: Capture): Error {
   const status = statusOf(capture.message)

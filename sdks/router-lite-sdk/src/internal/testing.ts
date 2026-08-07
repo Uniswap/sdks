@@ -312,6 +312,19 @@ export function assertResultCoherent(r: QuoteResult | SwapResult): void {
     if (r.search.verificationDegraded) throw new Error('needs-action off degraded verification')
     if (!r.limits) throw new Error('needs-action without compiled limits')
   }
+  // A QUOTE's `no-route`/`inconclusive` carries an EMPTY `alternatives` (`types.ts#QuoteResult`, in
+  // prose only — both unions share one field, so no type can say it). Quoting has no verification
+  // step that could demote a leader into the list: either something priced, and the result is
+  // `quote` however incomplete the search that found it, or nothing did and there are no runners-up.
+  // A populated one is therefore a result that lists routes under a status claiming none were found
+  // — visible to callers, and exactly the contradiction the `quote` arm's own checks would have
+  // caught had the leader still been there.
+  //
+  // The quote/swap seam is the ROUTE SHAPE, the same discriminator the `'quote'` arm above uses: a
+  // swap's `alternatives` are `RankedRoute`s and always carry `execution` (a quote's never do).
+  if ((r.status === 'no-route' || r.status === 'inconclusive') && r.alternatives.some((alt) => !('execution' in alt))) {
+    throw new Error(`${r.status} quote result with ${r.alternatives.length} alternative(s) — quoting demotes nothing`)
+  }
   if (r.status === 'no-route') {
     for (const [p, d] of Object.entries(r.search.discovery))
       if (d.status !== 'complete' && d.status !== 'disabled')

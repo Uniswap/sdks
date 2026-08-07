@@ -184,8 +184,23 @@ export function captureError(err: unknown, redact: (s: string) => string): Recor
   return { frames }
 }
 
-/** Rebuilds a thrown error (with its `cause` chain) from recorded frames — the replay half. */
+/**
+ * Rebuilds a thrown error (with its `cause` chain) from recorded frames — the replay half.
+ *
+ * NOT THE SAME JOB as `providerConformance.test.ts#rebuildCapturedError`, which reads ONE provider
+ * capture's message text and reconstructs the viem wrapper it must have arrived in (status out of
+ * the `Status:` line, code off `causeCode`). This one replays a chain that was already walked and
+ * written down frame by frame, and invents nothing. Two inputs, two round trips; neither can be
+ * expressed in terms of the other, which is why both exist.
+ *
+ * TOTAL BY CONSTRUCTION. `captureError` always writes at least one frame, so an empty `frames` can
+ * only come from a hand-edited or truncated session — and the loop below would then return
+ * `undefined`, which `replayClient` throws, leaving a `TypeError: undefined is not an object` far
+ * from the malformed file that caused it. An error is always returned; only its wording says the
+ * session is at fault.
+ */
 export function rebuildError(recorded: RecordedError): Error {
+  if (recorded.frames.length === 0) return new Error('recorded error with no frames')
   let cause: unknown
   for (let i = recorded.frames.length - 1; i >= 0; i--) {
     const frame = recorded.frames[i]!

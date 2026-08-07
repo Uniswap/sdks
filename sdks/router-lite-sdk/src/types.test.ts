@@ -2,8 +2,8 @@
 import { describe, expect, test } from 'bun:test'
 
 import { RouterConfigError, UnsupportedRouteError } from './errors'
-import { emptyReport, v2Ref } from './internal/testing'
-import type { PoolRef, QuoteResult, RouteLeg, SwapResult } from './types'
+import { assertResultCoherent, emptyReport, v2Ref } from './internal/testing'
+import type { PoolRef, QuotedRoute, QuoteResult, RouteLeg, SwapResult } from './types'
 
 describe('domain types', () => {
   test('errors are typed and named', () => {
@@ -47,6 +47,60 @@ describe('domain types', () => {
       search: emptyReport(),
     }
     expect(dangling.status).toBe('inconclusive')
+  })
+
+  // -------------------------------------------------------------------------
+  // ...and the half the TYPES cannot state: `QuoteResult`'s `no-route` and
+  // `inconclusive` arms carry an EMPTY `alternatives`. Both unions share one
+  // `alternatives` field, so the rule lives in prose on `types.ts` and, from
+  // here on, in `assertResultCoherent` — which every suite's results already go
+  // through.
+  // -------------------------------------------------------------------------
+
+  const LEG: RouteLeg = {
+    pool: v2Ref(
+      '0x0000000000000000000000000000000000000001',
+      '0x0000000000000000000000000000000000000002',
+      '0x0000000000000000000000000000000000000003',
+    ),
+    currencyIn: 'native',
+    currencyOut: '0x0000000000000000000000000000000000000002',
+  }
+  const QUOTED: QuotedRoute = {
+    route: { legs: [LEG] },
+    quote: { amountIn: 10n ** 18n, amountOut: 42n, intermediateAmounts: [] },
+  }
+
+  test('a quote that found nothing may not list runners-up', () => {
+    for (const arm of ['no-route', 'inconclusive'] as const) {
+      const listed: QuoteResult = {
+        status: arm,
+        reason: { code: arm === 'no-route' ? 'no-viable-route' : 'aborted', detail: 'test' },
+        alternatives: [QUOTED],
+        search: { ...emptyReport(), ...(arm === 'inconclusive' ? { aborted: true } : {}) },
+      }
+      // Quoting has no verification step that could demote a leader, so a listed alternative means
+      // something priced — and a result that says otherwise while listing routes is a contradiction
+      // its own caller can see.
+      expect(() => assertResultCoherent(listed)).toThrow(/quoting demotes nothing/)
+
+      const empty: QuoteResult = { ...listed, alternatives: [] }
+      expect(() => assertResultCoherent(empty)).not.toThrow()
+    }
+  })
+
+  test('a SWAP that found nothing still may list what verification demoted', () => {
+    // The other side of the same seam, and why the check reads the route shape rather than the
+    // status: `verifyLeader` walks the ranked list and demotes every candidate the chain rejected,
+    // so a swap's `no-route` legitimately carries them — with `execution` on each, which is exactly
+    // what tells the two unions apart at runtime.
+    const demoted: SwapResult = {
+      status: 'no-route',
+      reason: { code: 'no-route-verified', detail: 'test' },
+      alternatives: [{ ...QUOTED, execution: 'failed', revertData: '0xdeadbeef' }],
+      search: emptyReport(),
+    }
+    expect(() => assertResultCoherent(demoted)).not.toThrow()
   })
 
   test('an inconclusive quote carries no leader at all', () => {
