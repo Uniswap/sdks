@@ -5,7 +5,11 @@ import { ethers } from "ethers";
 import multicall2Abi from "../../abis/multicall2.json";
 import { BlockOverrides } from "../order";
 
-import { multicallOrdersPreservingOrder } from "./multicall";
+import {
+  multicallOrdersPreservingOrder,
+  multicallSameContractManyCalls,
+  multicallSameContractManyFunctions,
+} from "./multicall";
 
 const multicall2Interface = new Interface(multicall2Abi);
 // Stand-in for the real quoter: one string param per order so each call can be
@@ -90,6 +94,38 @@ async function quoteIds(
       ethers.utils.defaultAbiCoder.decode(["string"], result.returnData)[0]
   );
 }
+
+describe("multicallSameContractManyCalls", () => {
+  it("calls one function once per entry in functionParams", async () => {
+    const sent: SentCall[] = [];
+    const results = await multicallSameContractManyCalls(mockProvider(sent), {
+      address: QUOTER_ADDRESS,
+      contractInterface: quoterInterface,
+      functionName: "quote",
+      functionParams: [["a"], ["b"], ["c"]],
+    });
+
+    expect(sent).toEqual([{ ids: ["a", "b", "c"], blockOverrides: undefined }]);
+    expect(results).toHaveLength(3);
+  });
+
+  it("is still exported under its deprecated name", async () => {
+    expect(multicallSameContractManyFunctions).toBe(
+      multicallSameContractManyCalls
+    );
+
+    // the old name has to keep working for consumers that have not migrated
+    const sent: SentCall[] = [];
+    await multicallSameContractManyFunctions(mockProvider(sent), {
+      address: QUOTER_ADDRESS,
+      contractInterface: quoterInterface,
+      functionName: "quote",
+      functionParams: [["a"]],
+    });
+
+    expect(sent).toEqual([{ ids: ["a"], blockOverrides: undefined }]);
+  });
+});
 
 describe("multicallOrdersPreservingOrder", () => {
   describe("results line up with the input orders", () => {

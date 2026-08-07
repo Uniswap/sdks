@@ -40,10 +40,10 @@ type Call = {
   callData: string;
 };
 
-// Perform multiple on-chain calls in a single http request
-// return all results including errors
+// Call one function on one contract once per entry in `functionParams`, in a
+// single http request, returning all results including errors.
 // Uses deployless method to function properly even on chains with no multicall contract deployed
-export async function multicallSameContractManyFunctions<
+export async function multicallSameContractManyCalls<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   TFunctionParams extends any[] | undefined
 >(
@@ -73,6 +73,15 @@ export async function multicallSameContractManyFunctions<
 
   return multicall(provider, calls, stateOverrrides, blockOverrides);
 }
+
+/**
+ * @deprecated Renamed to {@link multicallSameContractManyCalls}. This helper calls a
+ * single function once per entry in `functionParams` -- it varies the arguments, not
+ * the function, which `functionName` being a lone string already implies. To call
+ * different functions in one request, build the calls yourself and use {@link multicall}.
+ */
+export const multicallSameContractManyFunctions =
+  multicallSameContractManyCalls;
 
 /// Structurally matches the SignedOrder / SignedV4Order shapes without importing
 /// them, which would create a cycle with OrderQuoter
@@ -106,7 +115,7 @@ export async function multicallOrdersPreservingOrder<
 
   const batches: Promise<{ indices: number[]; results: MulticallResult[] }>[] =
     overrideIndices.map((i) =>
-      multicallSameContractManyFunctions(
+      multicallSameContractManyCalls(
         provider,
         { ...params, functionParams: [buildParams(orders[i])] },
         undefined,
@@ -118,7 +127,7 @@ export async function multicallOrdersPreservingOrder<
   // otherwise it costs a round trip to quote nothing
   if (plainIndices.length > 0) {
     batches.push(
-      multicallSameContractManyFunctions(provider, {
+      multicallSameContractManyCalls(provider, {
         ...params,
         functionParams: plainIndices.map((i) => buildParams(orders[i])),
       }).then((results) => ({ indices: plainIndices, results }))
