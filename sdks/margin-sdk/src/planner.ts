@@ -1,0 +1,370 @@
+import { type Address, type Hex, concatHex, encodeAbiParameters, isAddressEqual, numberToHex, zeroAddress } from 'viem'
+
+import { validateAccountRecipient } from './account.js'
+import { ACCOUNT_SCOPED_ACTIONS, ACTION_ABI, MarginAction, type PlanAction, V4RouterAction } from './actions.js'
+import { CONTRACT_BALANCE } from './constants.js'
+import { MarginSdkError } from './errors.js'
+import { validateMarket } from './market.js'
+import { type Market, type PathKey, type PoolKey } from './types.js'
+
+/**
+ * Router-level fund-out destinations must never be the zero address (tokens would burn or the call
+ * reverts). These opcodes DO resolve the `MSG_SENDER`/`ADDRESS_THIS` sentinels through
+ * `_mapRecipient`, so the sentinels are valid here — unlike the account-scoped fund-out actions,
+ * which use {@link validateAccountRecipient}.
+ */
+function validateRecipient(to: Address, action: string): void {
+  if (isAddressEqual(to, zeroAddress)) {
+    throw new MarginSdkError('INVALID_RECIPIENT', `${action} recipient must not be the zero address`)
+  }
+}
+
+/**
+ * Builds the `unlockData` for `MarginRouter.execute`: an ordered plan of v4 routing and margin
+ * actions run atomically in one PoolManager unlock. `finalize()` produces
+ * `abi.encode(bytes actions, bytes[] params)` where `actions` is the packed opcode string and
+ * `params[i]` is the ABI-encoded parameters for `actions[i]`.
+ *
+ * `execute` does no entry validation — the plan carries exactly the guardrails it encodes:
+ * 1. Open each account-scoped section with {@link setAccount} (enforced by `finalize`).
+ * 2. Encode swap bounds (`amountInMaximum` / `amountOutMinimum`), {@link assertFill} after an
+ *    exact-output swap, and {@link assertHealth} per touched (account, market) — after each
+ *    account section, not once at the end.
+ * 3. Net the router to zero: terminate with {@link sweep} for every currency the plan may leave
+ *    on the router. Residual balances are claimable by the next caller.
+ * 4. Supply and borrow require an allowlisted adapter; withdraw, repay, and account-sweep do not.
+ *
+ * ⚠️ Signing an `execute` plan is equivalent to handing over the sub-account: a malicious plan
+ * can borrow to the market maximum and direct everything to an arbitrary address with no token
+ * approval required. Never execute a plan built by an untrusted party.
+ */
+export class MarginPlanner {
+  readonly actions: PlanAction[] = []
+  readonly params: Hex[] = []
+
+  /** Appends a raw action with pre-encoded params. Prefer the typed helpers below. */
+  addAction(action: PlanAction, params: Hex): this {
+    if (!(action in ACTION_ABI)) {
+      throw new MarginSdkError('INVALID_PLAN', `unsupported action opcode: 0x${action.toString(16)}`)
+    }
+    this.actions.push(action)
+    this.params.push(params)
+    return this
+  }
+
+  private add(action: PlanAction, values: readonly unknown[]): this {
+    return this.addAction(action, encodeAbiParameters([...ACTION_ABI[action]], values))
+  }
+
+  // -------------------------------------------------------------------------
+  // Margin actions
+  // -------------------------------------------------------------------------
+
+  /** Binds the active account for subsequent account-scoped actions (deploys it if needed). */
+  setAccount(subId: bigint): this {
+    return this.add(MarginAction.SET_ACCOUNT, [subId])
+  }
+
+  /**
+   * Moves `amount` of `currency` into the active account: pulled from the caller via Permit2
+   * (`payerIsUser` true) or from the router's own balance (false). A zero amount reverts onchain
+   * (no `OPEN_DELTA` sentinel here); `CONTRACT_BALANCE` is honored only on the router-balance
+   * path; native currency is unsupported — wrap to WETH first.
+   */
+  pullToAccount(currency: Address, amount: bigint, payerIsUser: boolean): this {
+    if (amount === 0n) {
+      throw new MarginSdkError('INVALID_AMOUNT', 'PULL_TO_ACCOUNT rejects a zero amount (no OPEN_DELTA sentinel)')
+    }
+    if (amount === CONTRACT_BALANCE && payerIsUser) {
+      throw new MarginSdkError('INVALID_AMOUNT', 'CONTRACT_BALANCE is only honored when pulling the router balance')
+    }
+    return this.add(MarginAction.PULL_TO_ACCOUNT, [currency, amount, payerIsUser])
+  }
+
+  /**
+   * Supplies `amount` of the market's collateral from the active account (0 == `OPEN_DELTA`, the
+   * account's full collateral-token balance). Requires an allowlisted adapter.
+   */
+  supplyCollateral(adapter: Address, market: Market, amount: bigint): this {
+    return this.add(MarginAction.ACCOUNT_SUPPLY_COLLATERAL, [adapter, market, amount])
+  }
+
+  /**
+   * Withdraws `amount` of the market's collateral from the active account's position to `to`
+   * (the account constrains `to` to its manager — the router — or its owner).
+   *
+   * ⚠️ `amount` is NOT an `OPEN_DELTA`-means-everything sentinel here. Onchain, `OPEN_DELTA` (0)
+   * resolves to the router's open delta owed to the PoolManager in the collateral currency — the
+   * right amount inside a swap-bearing delever, but **zero** in a swap-free withdraw plan, which
+   * would silently withdraw nothing. For a standalone withdraw read the live collateral with
+   * `getPosition` and pass an explicit amount, or use {@link withdrawCollateralPlan}.
+   */
+  withdrawCollateral(adapter: Address, market: Market, amount: bigint, to: Address): this {
+    validateAccountRecipient(to, 'ACCOUNT_WITHDRAW_COLLATERAL')
+    return this.add(MarginAction.ACCOUNT_WITHDRAW_COLLATERAL, [adapter, market, amount, to])
+  }
+
+  /** Borrows `amount` of the market's debt against the active account, delivered to `to`. */
+  borrow(adapter: Address, market: Market, amount: bigint, to: Address): this {
+    validateAccountRecipient(to, 'ACCOUNT_BORROW')
+    return this.add(MarginAction.ACCOUNT_BORROW, [adapter, market, amount, to])
+  }
+
+  /** Repays `amount` of the active account's debt (`type(uint256).max` == full repay by shares). */
+  repay(adapter: Address, market: Market, amount: bigint): this {
+    return this.add(MarginAction.ACCOUNT_REPAY, [adapter, market, amount])
+  }
+
+  /** Sweeps `amount` of `currency` out of the active account to `to` (manager or owner only). */
+  accountSweep(currency: Address, amount: bigint, to: Address): this {
+    validateAccountRecipient(to, 'ACCOUNT_SWEEP')
+    return this.add(MarginAction.ACCOUNT_SWEEP, [currency, amount, to])
+  }
+
+  /** Asserts the active account's LTV in `market` is at most `maxLtv` (WAD; 0 skips the check). */
+  assertHealth(adapter: Address, market: Market, maxLtv: bigint): this {
+    return this.add(MarginAction.ASSERT_HEALTH, [adapter, market, maxLtv])
+  }
+
+  /**
+   * Asserts the router holds at least `minAmount` credit of `currency` — i.e. the preceding
+   * exact-output swap delivered the full requested amount (all-or-nothing on a thin pool).
+   */
+  assertFill(currency: Address, minAmount: bigint): this {
+    return this.add(MarginAction.ASSERT_FILL, [currency, minAmount])
+  }
+
+  // -------------------------------------------------------------------------
+  // v4 routing actions
+  // -------------------------------------------------------------------------
+
+  swapExactInSingle(p: {
+    poolKey: PoolKey
+    zeroForOne: boolean
+    amountIn: bigint
+    amountOutMinimum: bigint
+    minHopPriceX36?: bigint
+    hookData?: Hex
+  }): this {
+    return this.add(V4RouterAction.SWAP_EXACT_IN_SINGLE, [
+      {
+        poolKey: p.poolKey,
+        zeroForOne: p.zeroForOne,
+        amountIn: p.amountIn,
+        amountOutMinimum: p.amountOutMinimum,
+        minHopPriceX36: p.minHopPriceX36 ?? 0n,
+        hookData: p.hookData ?? '0x',
+      },
+    ])
+  }
+
+  swapExactOutSingle(p: {
+    poolKey: PoolKey
+    zeroForOne: boolean
+    amountOut: bigint
+    amountInMaximum: bigint
+    minHopPriceX36?: bigint
+    hookData?: Hex
+  }): this {
+    return this.add(V4RouterAction.SWAP_EXACT_OUT_SINGLE, [
+      {
+        poolKey: p.poolKey,
+        zeroForOne: p.zeroForOne,
+        amountOut: p.amountOut,
+        amountInMaximum: p.amountInMaximum,
+        minHopPriceX36: p.minHopPriceX36 ?? 0n,
+        hookData: p.hookData ?? '0x',
+      },
+    ])
+  }
+
+  swapExactIn(p: {
+    currencyIn: Address
+    path: PathKey[]
+    amountIn: bigint
+    amountOutMinimum: bigint
+    /** Per-hop price bounds; defaults to a zero (disabled) entry per hop. */
+    minHopPriceX36?: bigint[]
+  }): this {
+    return this.add(V4RouterAction.SWAP_EXACT_IN, [
+      {
+        currencyIn: p.currencyIn,
+        path: p.path,
+        minHopPriceX36: p.minHopPriceX36 ?? p.path.map(() => 0n),
+        amountIn: p.amountIn,
+        amountOutMinimum: p.amountOutMinimum,
+      },
+    ])
+  }
+
+  swapExactOut(p: {
+    currencyOut: Address
+    path: PathKey[]
+    amountOut: bigint
+    amountInMaximum: bigint
+    minHopPriceX36?: bigint[]
+  }): this {
+    return this.add(V4RouterAction.SWAP_EXACT_OUT, [
+      {
+        currencyOut: p.currencyOut,
+        path: p.path,
+        minHopPriceX36: p.minHopPriceX36 ?? p.path.map(() => 0n),
+        amountOut: p.amountOut,
+        amountInMaximum: p.amountInMaximum,
+      },
+    ])
+  }
+
+  /** Pays `amount` of `currency` into the PoolManager (0 == `OPEN_DELTA` full debt). */
+  settle(currency: Address, amount: bigint, payerIsUser: boolean): this {
+    return this.add(V4RouterAction.SETTLE, [currency, amount, payerIsUser])
+  }
+
+  /** Settles the full open debt in `currency`, reverting if it exceeds `maxAmount`. */
+  settleAll(currency: Address, maxAmount: bigint): this {
+    return this.add(V4RouterAction.SETTLE_ALL, [currency, maxAmount])
+  }
+
+  /** Takes `amount` of `currency` from the PoolManager to `recipient` (0 == full credit). */
+  take(currency: Address, recipient: Address, amount: bigint): this {
+    validateRecipient(recipient, 'TAKE')
+    return this.add(V4RouterAction.TAKE, [currency, recipient, amount])
+  }
+
+  /** Takes the full open credit in `currency`, reverting if it is below `minAmount`. */
+  takeAll(currency: Address, minAmount: bigint): this {
+    return this.add(V4RouterAction.TAKE_ALL, [currency, minAmount])
+  }
+
+  /** Takes `bips` (out of 10_000) of the full credit in `currency` to `recipient`. */
+  takePortion(currency: Address, recipient: Address, bips: bigint): this {
+    validateRecipient(recipient, 'TAKE_PORTION')
+    return this.add(V4RouterAction.TAKE_PORTION, [currency, recipient, bips])
+  }
+
+  /** Sweeps the router's entire balance of `currency` to `to` (use to net the router to zero). */
+  sweep(currency: Address, to: Address): this {
+    validateRecipient(to, 'SWEEP')
+    return this.add(V4RouterAction.SWEEP, [currency, to])
+  }
+
+  /** Wraps `amount` of the router's native ETH to WETH (`CONTRACT_BALANCE` == entire balance). */
+  wrap(amount: bigint): this {
+    return this.add(V4RouterAction.WRAP, [amount])
+  }
+
+  /** Unwraps `amount` of the router's WETH to native ETH (`CONTRACT_BALANCE` == entire balance). */
+  unwrap(amount: bigint): this {
+    return this.add(V4RouterAction.UNWRAP, [amount])
+  }
+
+  // -------------------------------------------------------------------------
+  // Finalization
+  // -------------------------------------------------------------------------
+
+  /**
+   * Encodes the plan as `execute` `unlockData`: `abi.encode(bytes actions, bytes[] params)`.
+   * Rejects empty plans and plans that run an account-scoped action before any `SET_ACCOUNT`
+   * (which would revert `NoActiveAccount` onchain).
+   */
+  finalize(): Hex {
+    if (this.actions.length === 0) {
+      throw new MarginSdkError('INVALID_PLAN', 'cannot finalize an empty plan')
+    }
+    let accountSet = false
+    for (const action of this.actions) {
+      if (action === MarginAction.SET_ACCOUNT) accountSet = true
+      else if (!accountSet && ACCOUNT_SCOPED_ACTIONS.has(action)) {
+        throw new MarginSdkError(
+          'INVALID_PLAN',
+          `action 0x${action.toString(16)} is account-scoped: open the section with setAccount(subId)`
+        )
+      }
+    }
+    const packedActions = concatHex(this.actions.map((a) => numberToHex(a, { size: 1 })))
+    return encodeAbiParameters([{ type: 'bytes' }, { type: 'bytes[]' }], [packedActions, this.params])
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Curated plans
+// ---------------------------------------------------------------------------
+
+/** Parameters for {@link withdrawCollateralPlan}. */
+export interface WithdrawCollateralPlanParams {
+  /** The lending adapter. Withdrawals are not allowlist-gated — a position must always be exitable. */
+  adapter: Address
+  /** The (collateral, debt) pair to withdraw from. */
+  market: Market
+  /**
+   * The exact collateral to withdraw, in the collateral token's native decimals. Must be positive:
+   * there is no full-balance sentinel on this action (see {@link MarginPlanner.withdrawCollateral}).
+   * Derive it from a live `getPosition` read.
+   */
+  amount: bigint
+  /**
+   * The recipient. Must be the account's owner or the MarginRouter — the account reverts
+   * `ReceiverNotAllowed` otherwise, and the `MSG_SENDER`/`ADDRESS_THIS` sentinels are not resolved
+   * for account-scoped actions. Pass the router to stage the funds for a later action in the plan
+   * (e.g. `unwrap` + `sweep` to exit as native ETH).
+   */
+  to: Address
+  /**
+   * The maximum LTV the position may have afterwards (WAD; 1e18 == 100%). **Mandatory here.**
+   * Withdrawing collateral raises LTV, and the underlying `ASSERT_HEALTH` opcode treats zero as
+   * "skip", so a zero bound would let a single transaction walk the position to the liquidation
+   * edge without reverting. Size it from `maxLtv` on a `getPosition` read.
+   */
+  maxLtvAfter: bigint
+  /** Sub-account index identifying which MarginAccount to withdraw from. Default 0. */
+  subId?: bigint
+}
+
+/**
+ * Builds the `unlockData` for a swap-free collateral withdrawal — reducing a position's collateral
+ * without touching its debt.
+ *
+ * The router has no curated `withdrawCollateral` entry point (its only write entry points are
+ * `increasePosition`, `decreasePosition`, `addCollateral`, and `execute`), so this composes the
+ * `IMarginAccount.withdrawCollateral` primitive into a minimal `execute` plan and closes the three
+ * footguns of hand-rolling it: the non-sentinel recipient, the explicit amount, and the mandatory
+ * health bound. Pass the result to `executeCall`.
+ *
+ * To exit as native ETH from a WETH-collateral market, pass `to: marginRouter` and continue the
+ * returned plan with `unwrap` + `sweep` instead of using this helper.
+ *
+ * @example
+ * ```ts
+ * const position = await getPosition(client, { adapter, account, market })
+ * const unlockData = withdrawCollateralPlan({
+ *   adapter,
+ *   market,
+ *   amount: position.collateralAmount / 4n,
+ *   to: owner,
+ *   maxLtvAfter: (position.maxLtv * 80n) / 100n, // keep 20% headroom under liquidation
+ * })
+ * await walletClient.writeContract(executeCall({ marginRouter, unlockData, deadline }))
+ * ```
+ */
+export function withdrawCollateralPlan(params: WithdrawCollateralPlanParams): Hex {
+  validateMarket(params.market)
+  if (params.amount <= 0n) {
+    throw new MarginSdkError(
+      'INVALID_AMOUNT',
+      'amount must be positive: ACCOUNT_WITHDRAW_COLLATERAL has no full-balance sentinel, and a zero ' +
+        'amount resolves to the (empty) pool delta in a swap-free plan, withdrawing nothing'
+    )
+  }
+  if (params.maxLtvAfter <= 0n) {
+    throw new MarginSdkError(
+      'SLIPPAGE_BOUND_REQUIRED',
+      'maxLtvAfter is mandatory for a withdrawal: withdrawing collateral raises LTV, and ASSERT_HEALTH ' +
+        'skips a zero bound, so the withdrawal would be unbounded against liquidation'
+    )
+  }
+  return new MarginPlanner()
+    .setAccount(params.subId ?? 0n)
+    .withdrawCollateral(params.adapter, params.market, params.amount, params.to)
+    .assertHealth(params.adapter, params.market, params.maxLtvAfter)
+    .finalize()
+}
