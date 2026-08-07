@@ -33,6 +33,19 @@ export const V4_QUOTER_ABI = parseAbi([
   'function quoteExactInput((address exactCurrency, (address intermediateCurrency, uint24 fee, int24 tickSpacing, address hooks, bytes hookData)[] path, uint128 exactAmount) params) returns (uint256 amountOut, uint256 gasEstimate)',
 ])
 
+/**
+ * The one Multicall3 function this package uses. `aggregate3` (not `aggregate`/`tryAggregate`)
+ * because `allowFailure: true` per call is the whole point: a reverting quote must fail THAT slot —
+ * with its revert data preserved verbatim in `returnData` — while every other quote in the batch
+ * still answers, which is exactly the per-candidate isolation `mapConcurrent` gives the per-call
+ * path. See `internal/multicall.ts` for the dispatch seam built on this.
+ */
+export const MULTICALL3_ABI = parseAbi([
+  'struct Call3 { address target; bool allowFailure; bytes callData; }',
+  'struct Result { bool success; bytes returnData; }',
+  'function aggregate3(Call3[] calldata calls) payable returns (Result[] memory returnData)',
+])
+
 export const UR_ABI = parseAbi(['function execute(bytes commands, bytes[] inputs, uint256 deadline) payable'])
 
 export const PERMIT2_ABI = parseAbi([
