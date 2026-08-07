@@ -1,7 +1,8 @@
-import type { PublicClient } from 'viem'
+import type { Address, PublicClient } from 'viem'
 
 import { DEFAULT_CONCURRENCY, SIMPLICITY_MARGIN_BPS } from '../constants'
 import { AbortedCallError, TransportError } from '../errors'
+import { aggregateCalls, InnerCallFailure } from '../internal/multicall'
 import { ethCall, mapConcurrent } from '../internal/rpc'
 import type { Semaphore } from '../internal/rpc'
 import { revertDataOf } from '../internal/rpcErrors'
@@ -9,7 +10,7 @@ import type { Segment } from '../internal/segment'
 import { segmentCandidate } from '../internal/segment'
 import { isHooked, routeId } from '../protocols'
 import type { ProtocolModule, QuoteProbe } from '../protocols/types'
-import type { ChainManifest, Protocol, QuotedRoute, RouteCandidate, RouteLeg } from '../types'
+import type { ChainManifest, Protocol, QuoteCall, QuotedRoute, RouteCandidate } from '../types'
 
 // ---------------------------------------------------------------------------
 // Quoting engine — segments each candidate into contiguous same-protocol
@@ -33,19 +34,76 @@ import type { ChainManifest, Protocol, QuotedRoute, RouteCandidate, RouteLeg } f
 // two-segment candidate.
 // ---------------------------------------------------------------------------
 
-async function runSegment(
-  client: Pick<PublicClient, 'request'>,
-  module_: ProtocolModule,
-  legs: RouteLeg[],
-  amountIn: bigint,
-  manifest: ChainManifest,
-  blockNumber: bigint,
-  semaphore?: Semaphore,
-  signal?: AbortSignal,
-): Promise<bigint> {
-  const quoteCall = module_.encodeQuote(legs, amountIn, manifest)
-  const returnData = await ethCall(client, quoteCall.call, blockNumber, semaphore, signal)
-  return quoteCall.decode(returnData)
+type RunRoundArgs = {
+  client: Pick<PublicClient, 'request'>
+  calls: QuoteCall[]
+  blockNumber: bigint
+  semaphore?: Semaphore | undefined
+  signal?: AbortSignal | undefined
+  multicall3?: Address | undefined
+}
+
+/**
+ * Executes one quoting round — every `QuoteCall` in `calls`, block-pinned — and returns one slot per
+ * call, in order: the decoded amount, or the `Error` that stopped it. THE TWO DISPATCH PATHS PRODUCE
+ * THE SAME SLOT VOCABULARY, which is what lets the tally code below stay single:
+ *
+ *  - `multicall3` absent (no deployment on this chain, or a caller below the router facade that
+ *    never probed one): one `ethCall` per call under the shared semaphore — the original path,
+ *    byte-for-byte.
+ *  - `multicall3` present (the router's once-per-lifetime `eth_getCode` probe found code —
+ *    `router.ts#resolveMulticall3`): the round goes through `aggregate3`
+ *    (`internal/multicall.ts#aggregateCalls`, chunked, each chunk one permit). An inner failure
+ *    arrives as {@link InnerCallFailure} instead of a thrown provider error — see
+ *    {@link isAmountIndependentFailure} for the one place the difference is read.
+ *
+ * A decode failure is a plain `Error` slot on BOTH paths (aggregate3 returns success + `0x` for a
+ * call to codeless address, exactly as a direct `eth_call` does — study-verified), so v2's
+ * pool-absent shape (`getReserves()` where no pair exists → undecodable `0x`) keeps its existing
+ * accounting: an execution-channel failure with no revert data, negative-cacheable.
+ */
+async function runQuoteRound(args: RunRoundArgs): Promise<Array<bigint | Error>> {
+  const { client, calls, blockNumber, semaphore, signal, multicall3 } = args
+
+  if (multicall3 === undefined) {
+    return mapConcurrent(calls, semaphore ?? DEFAULT_CONCURRENCY, async (quoteCall) => {
+      const returnData = await ethCall(client, quoteCall.call, blockNumber, semaphore, signal)
+      return quoteCall.decode(returnData)
+    })
+  }
+
+  const raw = await aggregateCalls({
+    client,
+    multicall3,
+    calls: calls.map((quoteCall) => quoteCall.call),
+    blockNumber,
+    semaphore,
+    signal,
+  })
+  return raw.map((slot, i) => {
+    if (slot instanceof Error) return slot
+    try {
+      return calls[i]!.decode(slot)
+    } catch (err) {
+      return err instanceof Error ? err : new Error(String(err))
+    }
+  })
+}
+
+/**
+ * Whether an execution-channel quote failure is the amount-independent, pool-absent shape — the only
+ * kind the caller may negative-cache (C4-H3, see {@link QuoteCandidatesResult.amountIndependentFailures}).
+ * "Reverted with NO data" has two spellings, one per dispatch path: an {@link InnerCallFailure}
+ * carries the sub-call's revert bytes on `revertData` directly off aggregate3's decoded `Result`
+ * (never through `classifyRpcError`/`collectFacts` — it was constructed, not classified), while a
+ * per-call revert is a thrown provider error whose bytes `revertDataOf` digs out of the cause chain.
+ * Same question, same answer semantics ({@link revertDataOf}'s zero-length-`0x`-counts-as-none rule
+ * is applied at construction on the multicall side), asked here in one place so the two can never
+ * drift.
+ */
+function isAmountIndependentFailure(err: Error): boolean {
+  if (err instanceof InnerCallFailure) return err.revertData === undefined
+  return revertDataOf(err) === undefined
 }
 
 /**
@@ -77,6 +135,11 @@ export type QuoteCandidatesArgs = {
    * `ethCall` goes ungated, exactly as before this option existed; every real search always supplies
    * `ctx.semaphore` (see `search/waves.ts`). */
   semaphore?: Semaphore | undefined
+  /** The chain's PROBED Multicall3 deployment, when the router found one (`resolveMulticall3`) —
+   * routes each quoting round through `aggregate3` instead of one `ethCall` per candidate. Optional
+   * on the same terms as `semaphore`: omitted (unit tests, chains with no deployment), the per-call
+   * path runs unchanged. See {@link runQuoteRound}. */
+  multicall3?: Address | undefined
 }
 
 export type QuoteCandidatesResult = {
@@ -123,15 +186,22 @@ export type QuoteCandidatesResult = {
  * a 60s budget, measured (see {@link AbortedCallError}).
  */
 export async function quoteCandidates(args: QuoteCandidatesArgs): Promise<QuoteCandidatesResult> {
-  const { client, modules, manifest, candidates, amountIn, blockNumber, signal, semaphore } = args
+  const { client, modules, manifest, candidates, amountIn, blockNumber, signal, semaphore, multicall3 } = args
 
   if (signal?.aborted) return { quoted: [], stats: emptyStats(), transportFailures: [], amountIndependentFailures: [] }
 
   const segmented = candidates.map((candidate) => ({ candidate, segments: segmentCandidate(candidate) }))
 
-  const round1Results = await mapConcurrent(segmented, semaphore ?? DEFAULT_CONCURRENCY, ({ segments }) => {
-    const first = segments[0]!
-    return runSegment(client, modules[first.protocol], first.legs, amountIn, manifest, blockNumber, semaphore, signal)
+  const round1Results = await runQuoteRound({
+    client,
+    calls: segmented.map(({ segments }) => {
+      const first = segments[0]!
+      return modules[first.protocol].encodeQuote(first.legs, amountIn, manifest)
+    }),
+    blockNumber,
+    semaphore,
+    signal,
+    multicall3,
   })
 
   const quoted: QuotedRoute[] = []
@@ -156,7 +226,7 @@ export async function quoteCandidates(args: QuoteCandidatesArgs): Promise<QuoteC
         transportFailures.push(candidate)
       } else {
         failed++
-        if (revertDataOf(result) === undefined) amountIndependentFailures.push(candidate)
+        if (isAmountIndependentFailure(result)) amountIndependentFailures.push(candidate)
       }
       return
     }
@@ -174,9 +244,16 @@ export async function quoteCandidates(args: QuoteCandidatesArgs): Promise<QuoteC
   if (signal?.aborted)
     return { quoted, stats: { attempted, succeeded, failed, transportFailed }, transportFailures, amountIndependentFailures }
 
-  const round2Results = await mapConcurrent(pendingRound2, semaphore ?? DEFAULT_CONCURRENCY, ({ segments, round1Output }) => {
-    const second = segments[1]!
-    return runSegment(client, modules[second.protocol], second.legs, round1Output, manifest, blockNumber, semaphore, signal)
+  const round2Results = await runQuoteRound({
+    client,
+    calls: pendingRound2.map(({ segments, round1Output }) => {
+      const second = segments[1]!
+      return modules[second.protocol].encodeQuote(second.legs, round1Output, manifest)
+    }),
+    blockNumber,
+    semaphore,
+    signal,
+    multicall3,
   })
 
   pendingRound2.forEach(({ candidate, round1Output }, i) => {
@@ -189,7 +266,7 @@ export async function quoteCandidates(args: QuoteCandidatesArgs): Promise<QuoteC
         transportFailures.push(candidate)
       } else {
         failed++
-        if (revertDataOf(result) === undefined) amountIndependentFailures.push(candidate)
+        if (isAmountIndependentFailure(result)) amountIndependentFailures.push(candidate)
       }
       return
     }
@@ -286,6 +363,10 @@ export type ProbeQuotesArgs = {
   signal?: AbortSignal
   /** See {@link QuoteCandidatesArgs.semaphore}. */
   semaphore?: Semaphore | undefined
+  /** See {@link QuoteCandidatesArgs.multicall3}. v2 `getReserves` probes ride along with the quoter
+   * probes in the same chunks — they are the cheapest calls in the round, so excluding them would
+   * spend outer calls to save inner gas nothing is short of. */
+  multicall3?: Address | undefined
 }
 
 /**
@@ -296,13 +377,17 @@ export type ProbeQuotesArgs = {
  * channel, on the other hand, means "we never found out", and is counted as `transportFailed`.
  */
 export async function probeQuotes(args: ProbeQuotesArgs): Promise<QuoteCandidatesResult> {
-  const { client, probes, amountIn, blockNumber, signal, semaphore } = args
+  const { client, probes, amountIn, blockNumber, signal, semaphore, multicall3 } = args
 
   if (signal?.aborted) return { quoted: [], stats: emptyStats(), transportFailures: [], amountIndependentFailures: [] }
 
-  const results = await mapConcurrent(probes, semaphore ?? DEFAULT_CONCURRENCY, async (probe) => {
-    const returnData = await ethCall(client, probe.quote.call, blockNumber, semaphore, signal)
-    return probe.quote.decode(returnData)
+  const results = await runQuoteRound({
+    client,
+    calls: probes.map((probe) => probe.quote),
+    blockNumber,
+    semaphore,
+    signal,
+    multicall3,
   })
 
   const quoted: QuotedRoute[] = []
@@ -325,7 +410,7 @@ export async function probeQuotes(args: ProbeQuotesArgs): Promise<QuoteCandidate
         transportFailures.push(probe.candidate)
       } else {
         failed++
-        if (revertDataOf(result) === undefined) amountIndependentFailures.push(probe.candidate)
+        if (isAmountIndependentFailure(result)) amountIndependentFailures.push(probe.candidate)
       }
       return
     }

@@ -1,7 +1,9 @@
 import { expect, test } from 'bun:test'
 import type { Hex, PublicClient } from 'viem'
-import { encodeAbiParameters, zeroAddress } from 'viem'
+import { decodeFunctionData, encodeAbiParameters, encodeFunctionResult, zeroAddress } from 'viem'
 
+import { MULTICALL3_ABI } from '../internal/abis'
+import { MULTICALL3_ADDRESS } from '../internal/multicall'
 import { createSemaphore } from '../internal/rpc'
 import { rateLimitHttpError, rateLimitRpcError, v3Ref, v4Ref } from '../internal/testing'
 import { MAINNET_MANIFEST } from '../manifest'
@@ -493,4 +495,179 @@ test('an abort mid-round skips the calls still queued for a permit — never sen
   // Not attempted, not failed, and emphatically not `transportFailed` — nothing was asked of the
   // provider, so the search must not report itself rpc-degraded over its own deadline.
   expect(stats).toEqual({ attempted: 1, succeeded: 1, failed: 0, transportFailed: 0 })
+})
+
+// ---------------------------------------------------------------------------
+// The multicall dispatch path. Same functions, same accounting contract — the
+// only thing that changed is HOW a round reaches the chain (chunked aggregate3
+// instead of one eth_call per candidate), so these tests re-assert the tallies
+// and the C4-H3 amount-independence rule THROUGH an aggregate3-serving stub,
+// which (like a real node) decodes the Call3[] and answers each inner call
+// from the same registry the per-call stub uses. The stub also verifies the
+// outer target: a quote round aggregated to anything but the probed multicall
+// address is a wiring bug these tests must catch, not tolerate.
+// ---------------------------------------------------------------------------
+
+function multicallStubClient(
+  returns: Record<string, StubEntry>,
+  opts: { outerOutcomes?: ('serve' | Error)[] } = {},
+): { client: Pick<PublicClient, 'request'>; outer: { count: number } } {
+  const outer = { count: 0 }
+  let outerIndex = 0
+  const client = {
+    async request(args: any) {
+      const [{ to, data }] = args.params
+      if ((to as string).toLowerCase() !== MULTICALL3_ADDRESS.toLowerCase()) {
+        throw new Error(`multicallStubClient: eth_call to ${to} — the round should have aggregated through Multicall3`)
+      }
+      const { functionName, args: decodedArgs } = decodeFunctionData({ abi: MULTICALL3_ABI, data })
+      if (functionName !== 'aggregate3') throw new Error(`multicallStubClient: unexpected function ${functionName}`)
+      outer.count++
+      const outcome = opts.outerOutcomes?.[outerIndex++] ?? 'serve'
+      if (outcome instanceof Error) throw outcome
+      const calls = decodedArgs[0] as readonly { target: string; allowFailure: boolean; callData: Hex }[]
+      const results = calls.map((call) => {
+        const entry = returns[callKey(call.target, call.callData)]
+        if (entry === undefined || entry === 'revert') return { success: false, returnData: '0x' as Hex }
+        if (entry === 'revert-with-data') return { success: false, returnData: NOT_ENOUGH_LIQUIDITY_DATA }
+        if (entry === 'rate-limit') throw new Error('multicallStubClient: a 429 cannot happen inside aggregate3')
+        return { success: true, returnData: entry }
+      })
+      return encodeFunctionResult({ abi: MULTICALL3_ABI, functionName: 'aggregate3', result: results })
+    },
+  } as unknown as Pick<PublicClient, 'request'>
+  return { client, outer }
+}
+
+test('multicall path: mixed two-hop still chains realized output into round 2 — two aggregate3 calls, same quote, same stats', async () => {
+  const round1Call = v4Module.encodeQuote([v4Leg], 100n, manifest).call
+  const round2Call = v3Module.encodeQuote([v3Leg], 500n, manifest).call
+  const { client, outer } = multicallStubClient({
+    ...entryFor(round1Call, v4Return(500n)),
+    ...entryFor(round2Call, v3Return(900n)),
+  })
+
+  const { quoted, stats } = await quoteCandidates({
+    client,
+    modules,
+    manifest,
+    candidates: [mixedV4toV3],
+    amountIn: 100n,
+    blockNumber: 1n,
+    multicall3: MULTICALL3_ADDRESS,
+  })
+
+  expect(quoted).toHaveLength(1)
+  expect(quoted[0]!.quote.amountOut).toBe(900n)
+  expect(quoted[0]!.quote.intermediateAmounts).toEqual([500n])
+  expect(stats).toEqual({ attempted: 1, succeeded: 1, failed: 0, transportFailed: 0 })
+  // The two-round chained structure is the floor: round 2's input IS round 1's output, so the round
+  // trip count for a mixed candidate is 2 aggregate3 calls, never 1.
+  expect(outer.count).toBe(2)
+})
+
+test('multicall path (C4-H3): a bare inner failure is amount-independent, a data-carrying one is not', async () => {
+  const emptyRevertPool: PoolRef = v3Ref('0x0000000000000000000000000000000000b005', USDC, WETH, 500)
+  const emptyRevertLeg: RouteLeg = { pool: emptyRevertPool, currencyIn: USDC, currencyOut: WETH }
+  const emptyRevert: RouteCandidate = { legs: [emptyRevertLeg] }
+
+  const dataRevertPool: PoolRef = v3Ref('0x0000000000000000000000000000000000b006', USDC, WETH, 100)
+  const dataRevertLeg: RouteLeg = { pool: dataRevertPool, currencyIn: USDC, currencyOut: WETH }
+  const dataRevert: RouteCandidate = { legs: [dataRevertLeg] }
+
+  const good: RouteCandidate = { legs: [{ pool: v4UsdcWethPool, currencyIn: USDC, currencyOut: WETH }] }
+
+  const { client } = multicallStubClient({
+    ...entryFor(v3Module.encodeQuote([emptyRevertLeg], 1n, manifest).call, 'revert'),
+    ...entryFor(v3Module.encodeQuote([dataRevertLeg], 1n, manifest).call, 'revert-with-data'),
+    ...entryFor(v4Module.encodeQuote(good.legs, 1n, manifest).call, v4Return(42n)),
+  })
+
+  const { quoted, stats, amountIndependentFailures, transportFailures } = await quoteCandidates({
+    client,
+    modules,
+    manifest,
+    candidates: [emptyRevert, dataRevert, good],
+    amountIn: 1n,
+    blockNumber: 1n,
+    multicall3: MULTICALL3_ADDRESS,
+  })
+
+  expect(quoted).toHaveLength(1)
+  expect(quoted[0]!.route).toBe(good)
+  expect(stats).toEqual({ attempted: 3, succeeded: 1, failed: 2, transportFailed: 0 })
+  expect(stats.attempted).toBe(stats.succeeded + stats.failed + stats.transportFailed)
+  // Inner failures are execution-channel BY CONSTRUCTION: neither ever lands in the transport tally.
+  expect(transportFailures).toEqual([])
+  expect(amountIndependentFailures).toEqual([emptyRevert])
+})
+
+test('multicall path: an outer 429 marks the WHOLE round transportFailed — handed back, never negative-cacheable, invariant intact', async () => {
+  const a: RouteCandidate = { legs: [{ pool: v3Ref('0x0000000000000000000000000000000000b007', USDC, WETH, 500), currencyIn: USDC, currencyOut: WETH }] }
+  const b: RouteCandidate = { legs: [{ pool: v4UsdcWethPool, currencyIn: USDC, currencyOut: WETH }] }
+  const { client } = multicallStubClient({}, { outerOutcomes: [rateLimitHttpError()] })
+
+  const { quoted, stats, transportFailures, amountIndependentFailures } = await quoteCandidates({
+    client,
+    modules,
+    manifest,
+    candidates: [a, b],
+    amountIn: 1n,
+    blockNumber: 1n,
+    multicall3: MULTICALL3_ADDRESS,
+  })
+
+  expect(quoted).toHaveLength(0)
+  expect(stats).toEqual({ attempted: 2, succeeded: 0, failed: 0, transportFailed: 2 })
+  expect(stats.attempted).toBe(stats.succeeded + stats.failed + stats.transportFailed)
+  expect(transportFailures).toEqual([a, b])
+  expect(amountIndependentFailures).toEqual([])
+})
+
+test('multicall path: probeQuotes keeps its tally contract, and a success+0x inner result stays the pool-absent decode failure (v2 empty-code parity)', async () => {
+  const amountIn = 10n ** 6n
+  const [goodProbe] = v2Module.speculativeDirect(USDC, WETH, amountIn, manifest)
+  const [emptyCodeProbe] = v2Module.speculativeDirect(WETH, DAI, amountIn, manifest)
+
+  const { client } = multicallStubClient({
+    ...entryFor(goodProbe!.quote.call, v2Return(2_000_000n * 10n ** 6n, 1_000n * 10n ** 18n, true)),
+    // A v2 pair address with no contract: inside aggregate3 the inner call SUCCEEDS with `0x`
+    // (study-verified, identical to a direct eth_call), so the failure is the caller's decode —
+    // counted failed + amount-independent, exactly as on the per-call path.
+    ...entryFor(emptyCodeProbe!.quote.call, '0x' as Hex),
+  })
+
+  const { quoted, stats, amountIndependentFailures } = await probeQuotes({
+    client,
+    probes: [emptyCodeProbe!, goodProbe!],
+    amountIn,
+    blockNumber: 1n,
+    multicall3: MULTICALL3_ADDRESS,
+  })
+
+  expect(quoted).toHaveLength(1)
+  expect(quoted[0]!.route).toBe(goodProbe!.candidate)
+  expect(stats).toEqual({ attempted: 2, succeeded: 1, failed: 1, transportFailed: 0 })
+  expect(amountIndependentFailures).toEqual([emptyCodeProbe!.candidate])
+})
+
+test('multicall path: an abort before the round leaves every candidate unattempted — same zero-stats shape as per-call', async () => {
+  const controller = new AbortController()
+  controller.abort()
+  const { client, outer } = multicallStubClient({})
+
+  const { quoted, stats } = await quoteCandidates({
+    client,
+    modules,
+    manifest,
+    candidates: [mixedV4toV3],
+    amountIn: 100n,
+    blockNumber: 1n,
+    multicall3: MULTICALL3_ADDRESS,
+    signal: controller.signal,
+  })
+
+  expect(quoted).toHaveLength(0)
+  expect(outer.count).toBe(0)
+  expect(stats).toEqual({ attempted: 0, succeeded: 0, failed: 0, transportFailed: 0 })
 })

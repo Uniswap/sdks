@@ -680,4 +680,16 @@ export type ChainManifest = {
    */
   execution?: UniversalRouterDeployment | undefined
   coreIntermediates?: Address[] | undefined // default: wrappedNative + per-chain majors
+  /**
+   * The chain's Multicall3 deployment, used to aggregate a quoting round's `eth_call`s into a few
+   * `aggregate3` calls (`internal/multicall.ts`). OPTIONAL, and almost never stated: when absent the
+   * canonical CREATE2 deployment (`0xcA11bde05977b3631167028862bE2a173976CA11`, live on 250+ chains
+   * including all five built-in manifests' — see `internal/multicall.ts#MULTICALL3_ADDRESS`) is
+   * assumed. Either way the router PROBES the address (`eth_getCode`, once per router lifetime,
+   * cached like manifest validation — see `router.ts`) before ever aggregating through it, and a
+   * chain where no code lives there simply quotes call-by-call, exactly as before aggregation
+   * existed. So this field exists only for a chain that deployed Multicall3 somewhere non-canonical;
+   * a chain with no Multicall3 at all needs nothing — the probe discovers that on its own.
+   */
+  multicall3?: Address | undefined
 }

@@ -202,6 +202,19 @@ export type SearchContext = {
    */
   semaphore?: Semaphore | undefined
   /**
+   * The chain's Multicall3 deployment, PROBED (the router's once-per-lifetime `eth_getCode` check —
+   * `router.ts#resolveMulticall3` — found real code there; never the canonical address on faith).
+   * Threaded into every `quoteCandidates`/`probeQuotes` call this search makes, which then run each
+   * quoting round as a few chunked `aggregate3` calls instead of one `eth_call` per candidate — see
+   * `internal/multicall.ts` for the measured why. Absent (no deployment on this chain, a probe that
+   * has not answered, or a one-off engine run below the facade), quoting is per-call, exactly as
+   * before aggregation existed. Deliberately NOT used by hint validation (`resolveHints`: v3 hints
+   * are one cheap call each, capped at `MAX_HINTS_PER_REQUEST`), readiness, or preflight — preflight
+   * simulates a real transaction whose `from`/`value` are the whole point, the very shape
+   * `aggregateCalls` refuses to aggregate.
+   */
+  multicall3?: Address | undefined
+  /**
    * The router's `logChunkBlocks` option (C4-P6), threaded into every `scanLogs` call as its
    * `initialChunk` — the CEILING on the `eth_getLogs` window (starting width and regrowth alike),
    * provider-shaped rather than universal (see `constants.ts#MAX_SCAN_WINDOW`). Absent for a one-off
@@ -669,6 +682,7 @@ async function quoteNew(run: Run, candidates: RouteCandidate[]): Promise<void> {
     amountIn: run.req.amountIn,
     blockNumber: state.block.number,
     semaphore: run.ctx.semaphore,
+    multicall3: run.ctx.multicall3,
     ...(run.req.signal !== undefined && { signal: run.req.signal }),
   })
 
@@ -698,6 +712,7 @@ async function runRouteProbes(run: Run, probes: QuoteProbe[]): Promise<void> {
     amountIn: run.req.amountIn,
     blockNumber: state.block.number,
     semaphore: run.ctx.semaphore,
+    multicall3: run.ctx.multicall3,
     ...(run.req.signal !== undefined && { signal: run.req.signal }),
   })
 
@@ -754,6 +769,7 @@ async function runDiscoveryProbes(run: Run, probes: QuoteProbe[]): Promise<void>
     amountIn: run.req.amountIn,
     blockNumber: state.block.number,
     semaphore: run.ctx.semaphore,
+    multicall3: run.ctx.multicall3,
     ...(run.req.signal !== undefined && { signal: run.req.signal }),
   })
 

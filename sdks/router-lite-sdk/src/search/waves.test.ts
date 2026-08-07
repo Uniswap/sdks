@@ -1,10 +1,12 @@
 import { expect, test } from 'bun:test'
 import type { Address, Hex, Log } from 'viem'
-import { encodeAbiParameters, toHex, zeroAddress } from 'viem'
+import { decodeFunctionData, encodeAbiParameters, encodeFunctionResult, toHex, zeroAddress } from 'viem'
 
 import { DEFAULT_REORG_OVERLAP_BLOCKS, FEE_DISCOVERY_MAX_REQUESTS, MAX_INTERMEDIATES, PREFLIGHT_TOP_K } from '../constants'
 import { UnsupportedRouteError } from '../errors'
+import { MULTICALL3_ABI } from '../internal/abis'
 import { sortAddresses } from '../internal/currency'
+import { MULTICALL3_ADDRESS } from '../internal/multicall'
 import { createSemaphore } from '../internal/rpc'
 import { assertResultCoherent, rateLimitHttpError, v2Ref, v3Ref, v4Ref } from '../internal/testing'
 import { wave0PairScanBlocks } from '../manifest'
@@ -317,6 +319,19 @@ type ClientScript = {
    * `searchWaves` runs over the same `PoolIndex` — which is the only way to accumulate evidence at
    * *distinct* blocks, and therefore the only way to reach a hint demotion the honest way. */
   blockNumber?: () => bigint
+  /**
+   * Serve `aggregate3` at this address, decoding the Call3[] exactly as the deployed contract would
+   * and answering each inner call from the SAME `calls`/`dataReverts` registry the per-call path
+   * uses (a thrown "revert" becomes `{ success: false, returnData }`, its data preserved — the real
+   * contract's own behavior under `allowFailure: true`). Setting this also arms two VERIFIERS, which
+   * are the point as much as the serving is:
+   *  - a quote `eth_call` that arrives DIRECTLY while this is set throws loudly — every quoting
+   *    round is supposed to travel as aggregate3 once `ctx.multicall3` is threaded, so an escape is
+   *    a wiring bug, not something the stub should quietly serve;
+   *  - readiness/preflight calls arriving INSIDE an aggregate3 throw loudly — those are
+   *    sender/value-shaped and must never be aggregated.
+   */
+  multicall3?: Address
 }
 
 type Counters = {
@@ -329,8 +344,11 @@ type Counters = {
   pairScanRanges: { fromBlock: bigint; toBlock: bigint }[]
   /** Every `eth_call` this stub actually served (registered or reverted), keyed by `${to}:${data}` —
    * finer-grained than `calls` so a test can assert exactly one candidate's call count across
-   * multiple `searchWaves` invocations sharing the same `PoolIndex`. */
+   * multiple `searchWaves` invocations sharing the same `PoolIndex`. Inner aggregate3 calls count
+   * here identically (each is one quote the engine asked for, whatever envelope carried it). */
   callsByKey: Map<string, number>
+  /** OUTER aggregate3 envelopes served (`script.multicall3` mode only). */
+  aggregate3Calls: number
 }
 
 function stubClient(script: ClientScript): { client: SearchContext['client']; counters: Counters } {
@@ -343,6 +361,7 @@ function stubClient(script: ClientScript): { client: SearchContext['client']; co
     pairScans: 0,
     pairScanRanges: [],
     callsByKey: new Map(),
+    aggregate3Calls: 0,
   }
   const calls = script.calls ?? {}
   const balance = script.readiness?.balance ?? 10n ** 24n
@@ -367,6 +386,36 @@ function stubClient(script: ClientScript): { client: SearchContext['client']; co
       const [{ to, data }] = args.params
       const target = (to as string).toLowerCase()
 
+      if (script.multicall3 !== undefined && target === script.multicall3.toLowerCase()) {
+        counters.aggregate3Calls++
+        const decoded = decodeFunctionData({ abi: MULTICALL3_ABI, data })
+        if (decoded.functionName !== 'aggregate3') throw new Error(`stubClient: unexpected multicall function ${decoded.functionName}`)
+        const inner = decoded.args[0] as readonly { target: Address; allowFailure: boolean; callData: Hex }[]
+        const results = inner.map((c) => {
+          const innerTarget = c.target.toLowerCase()
+          // Sender/value-shaped calls (a preflight simulation, the readiness reads) must never be
+          // aggregated — their semantics depend on who is asking.
+          if ([UNIVERSAL_ROUTER, PERMIT2, TOKEN_A, TOKEN_B].some((a) => a.toLowerCase() === innerTarget)) {
+            throw new Error(`stubClient: non-quote call to ${innerTarget} arrived inside aggregate3`)
+          }
+          if (!c.allowFailure) throw new Error('stubClient: aggregate3 arrived without allowFailure')
+          // This file's quote answers are `toHex(amountOut)`, which is odd-nibbled for most values —
+          // fine verbatim over the wire, but an ABI `bytes` must be whole bytes, and viem would
+          // right-pad an odd value (turning 0x1f4 into 0x1f40: 500 into 8000). Left-padding instead
+          // preserves the stub protocol's `BigInt(returnData)` decode exactly.
+          const evenHex = (h: Hex): Hex => (h.length % 2 === 0 ? h : (`0x0${h.slice(2)}` as Hex))
+          try {
+            return { success: true as const, returnData: evenHex(serveQuoteCall(innerTarget, c.callData)) }
+          } catch (err) {
+            // The deployed contract's own allowFailure behavior: the revert's data (or none) becomes
+            // the failed Result's returnData.
+            const revertData = (err as { data?: unknown }).data
+            return { success: false as const, returnData: typeof revertData === 'string' ? evenHex(revertData as Hex) : '0x' }
+          }
+        })
+        return encodeFunctionResult({ abi: MULTICALL3_ABI, functionName: 'aggregate3', result: results })
+      }
+
       if (target === UNIVERSAL_ROUTER.toLowerCase()) {
         counters.preflights++
         const outcome = script.preflight?.[preflightIndex++] ?? 'ok'
@@ -382,22 +431,35 @@ function stubClient(script: ClientScript): { client: SearchContext['client']; co
         return encodeAbiParameters([{ type: 'uint256' }], [value])
       }
 
-      counters.calls++
-      if (script.abortAfterCalls !== undefined && counters.calls >= script.abortAfterCalls) script.controller?.abort()
-
-      const key = `${target}:${data}`
-      counters.callsByKey.set(key, (counters.callsByKey.get(key) ?? 0) + 1)
-
-      const entry = calls[key]
-      if (entry === undefined) {
-        const dataRevertData = script.dataReverts?.[key]
-        if (dataRevertData !== undefined) throw Object.assign(new Error('execution reverted'), { data: dataRevertData })
-        throw new Error('execution reverted') // no pool there
+      if (script.multicall3 !== undefined) {
+        throw new Error(
+          `stubClient: quote eth_call to ${target} escaped aggregation — ctx.multicall3 is set, so every quoting round must arrive as aggregate3`,
+        )
       }
-      return entry
+      return serveQuoteCall(target, data as Hex)
     },
 
   } as unknown as SearchContext['client']
+
+  /** One quote call — the shared serving path behind both envelopes. Throws exactly what a node
+   * would (a data-less revert for "no pool there", data attached when scripted), and counts the
+   * call in `calls`/`callsByKey` identically either way, so cross-search dedup assertions hold
+   * regardless of which dispatch path a test runs under. */
+  function serveQuoteCall(target: string, data: Hex): Hex {
+    counters.calls++
+    if (script.abortAfterCalls !== undefined && counters.calls >= script.abortAfterCalls) script.controller?.abort()
+
+    const key = `${target}:${data}`
+    counters.callsByKey.set(key, (counters.callsByKey.get(key) ?? 0) + 1)
+
+    const entry = calls[key]
+    if (entry === undefined) {
+      const dataRevertData = script.dataReverts?.[key]
+      if (dataRevertData !== undefined) throw Object.assign(new Error('execution reverted'), { data: dataRevertData })
+      throw new Error('execution reverted') // no pool there
+    }
+    return entry
+  }
 
   /**
    * Serves an `eth_getLogs` filter exactly as a node would — including refusing an unfiltered one.
@@ -470,7 +532,10 @@ function makeContext(
   manifest: ChainManifest,
   overrides: Partial<SearchContext> = {},
 ): SearchContext {
-  return { client, manifest, modules, index: new PoolIndex(WETH), hookData: new Map(), ...overrides }
+  // A FRESH modules record per context: two tests below (`ctx.modules.v2 = throwingModule`)
+  // deliberately swap a module out, and handing every test the same shared object let that mutation
+  // leak into whichever later swap-kind test happened to reach compileOperation next.
+  return { client, manifest, modules: { ...modules }, index: new PoolIndex(WETH), hookData: new Map(), ...overrides }
 }
 
 const quoteReq: QuoteRequest = { tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN }
@@ -1637,4 +1702,109 @@ test('an abort mid-WAVE-0 leaves no generated candidate unaccounted for: skipped
   expect(enumeration.candidatesGenerated).toBe(quoting.attempted + quoting.unattempted)
 
   assertCoherent('quote', events)
+})
+
+// ---------------------------------------------------------------------------
+// Multicall dispatch, through the whole engine. `ctx.multicall3` set means
+// every quoting round travels as aggregate3 — and the stub client is armed to
+// FAIL any test here where a quote escapes as a direct eth_call, where a round
+// aggregates to the wrong address (only `script.multicall3` is served), or
+// where a sender/value-shaped call (preflight, readiness) sneaks INSIDE an
+// envelope. So each passing test below is simultaneously an assertion about
+// the wiring, not only about the outcome.
+// ---------------------------------------------------------------------------
+
+test('multicall parity: the same world quotes to the same result, with the same inner calls, through aggregate3', async () => {
+  const directPool = stubPoolRef('v2', TOKEN_A, TOKEN_B)
+  const aMidPool = stubPoolRef('v2', TOKEN_A, MID, { tag: SCANNED_TAG })
+  const midBPool = stubPoolRef('v2', MID, TOKEN_B, { tag: SCANNED_TAG })
+  const world: ClientScript = {
+    calls: {
+      ...quoteEntry([directPool], AMOUNT_IN, 100n),
+      ...quoteEntry([aMidPool], AMOUNT_IN, 500n),
+      ...quoteEntry([midBPool], 500n, 700n),
+      ...quoteEntry([aMidPool, midBPool], AMOUNT_IN, 700n),
+    },
+    logs: (endpoint) =>
+      endpoint === TOKEN_A.toLowerCase() || endpoint === TOKEN_B.toLowerCase()
+        ? [scannedRecord('v2', TOKEN_A, MID, 500n), scannedRecord('v2', MID, TOKEN_B, 500n)]
+        : [],
+  }
+
+  const perCall = stubClient(world)
+  const perCallEvents = await drain(searchWaves(makeContext(perCall.client, manifestWith()), quoteReq, 'quote'))
+
+  const aggregated = stubClient({ ...world, multicall3: MULTICALL3_ADDRESS })
+  const aggregatedEvents = await drain(
+    searchWaves(makeContext(aggregated.client, manifestWith(), { multicall3: MULTICALL3_ADDRESS }), quoteReq, 'quote'),
+  )
+
+  const last = perCallEvents[perCallEvents.length - 1]!
+  const lastAgg = aggregatedEvents[aggregatedEvents.length - 1]!
+  expect(lastAgg.best).toBeDefined()
+  expect(routeId(lastAgg.best!.route)).toBe(routeId(last.best!.route))
+  expect(lastAgg.best!.quote.amountOut).toBe(last.best!.quote.amountOut)
+  expect(lastAgg.report.quoting).toEqual(last.report.quoting)
+  expect(lastAgg.report.quoting.attempted).toBe(
+    lastAgg.report.quoting.succeeded + lastAgg.report.quoting.failed + lastAgg.report.quoting.transportFailed,
+  )
+  // Same question set on the wire, different envelope: every (target, calldata) the per-call run
+  // issued was issued exactly as often inside the aggregate3 envelopes, and at least one envelope
+  // actually went out.
+  expect(aggregated.counters.aggregate3Calls).toBeGreaterThan(0)
+  expect([...aggregated.counters.callsByKey.entries()].sort()).toEqual([...perCall.counters.callsByKey.entries()].sort())
+  assertCoherent('quote', aggregatedEvents)
+})
+
+test('multicall C4-H3: a bare inner failure is negative-cached — the second search at the same block never re-asks', async () => {
+  const targetPool = stubPoolRef('v2', TOKEN_A, TOKEN_B)
+  const targetLegs: RouteLeg[] = [{ pool: targetPool, currencyIn: TOKEN_A, currencyOut: TOKEN_B }]
+  const targetKey = `${quoteTarget(targetPool).toLowerCase()}:${quoteData(targetLegs, AMOUNT_IN)}`
+  const { client, counters } = stubClient({ multicall3: MULTICALL3_ADDRESS }) // nothing registered: bare inner failures
+  const ctx = makeContext(client, manifestWith(), { multicall3: MULTICALL3_ADDRESS })
+
+  await drain(searchWaves(ctx, quoteReq, 'quote'))
+  expect(ctx.index.isNegative(targetPool, BLOCK_NUMBER)).toBe(true)
+  expect(counters.callsByKey.get(targetKey)).toBe(1)
+
+  await drain(searchWaves(ctx, quoteReq, 'quote'))
+  expect(counters.callsByKey.get(targetKey)).toBe(1) // skipped entirely — no second inner call
+})
+
+test('multicall C4-H3: a data-carrying inner failure is never negative-cached — the second search re-quotes it', async () => {
+  const targetPool = stubPoolRef('v2', TOKEN_A, TOKEN_B)
+  const targetLegs: RouteLeg[] = [{ pool: targetPool, currencyIn: TOKEN_A, currencyOut: TOKEN_B }]
+  const targetKey = `${quoteTarget(targetPool).toLowerCase()}:${quoteData(targetLegs, AMOUNT_IN)}`
+  const { client, counters } = stubClient({
+    multicall3: MULTICALL3_ADDRESS,
+    dataReverts: { [targetKey]: NOT_ENOUGH_LIQUIDITY_DATA },
+  })
+  const ctx = makeContext(client, manifestWith(), { multicall3: MULTICALL3_ADDRESS })
+
+  await drain(searchWaves(ctx, quoteReq, 'quote'))
+  expect(ctx.index.isNegative(targetPool, BLOCK_NUMBER)).toBe(false)
+  expect(counters.callsByKey.get(targetKey)).toBe(1)
+
+  await drain(searchWaves(ctx, quoteReq, 'quote'))
+  expect(counters.callsByKey.get(targetKey)).toBe(2)
+})
+
+test('multicall swap: quoting aggregates while readiness and preflight stay direct — verified end to end by the stub', async () => {
+  // The stub throws if a Permit2/ERC-20/Universal Router call arrives inside an aggregate3 envelope
+  // AND if a quote call arrives outside one, so this reaching `verified` proves the split.
+  const directPool = stubPoolRef('v2', TOKEN_A, TOKEN_B)
+  const { client, counters } = stubClient({
+    multicall3: MULTICALL3_ADDRESS,
+    calls: { ...quoteEntry([directPool], AMOUNT_IN, 100n) },
+  })
+  const ctx = makeContext(client, manifestWith(), { multicall3: MULTICALL3_ADDRESS })
+
+  const events = await drainUntilActionable(searchWaves(ctx, swapReq, 'swap'))
+
+  expect(events[0]!.best?.execution).toBe('verified')
+  expect(events[0]!.best?.quote.amountOut).toBe(100n)
+  expect(events[0]!.tx?.to).toBe(UNIVERSAL_ROUTER)
+  expect(counters.aggregate3Calls).toBeGreaterThan(0)
+  expect(counters.preflights).toBe(1)
+  assertCoherent('swap', events)
 })

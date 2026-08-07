@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { Address, Hex, Log, PublicClient } from 'viem'
-import { encodeAbiParameters, encodeEventTopics, toHex, zeroAddress } from 'viem'
+import { decodeFunctionData, encodeAbiParameters, encodeEventTopics, encodeFunctionResult, toHex, zeroAddress } from 'viem'
 
 import {
   MAX_DEADLINE_SECONDS,
@@ -11,8 +11,9 @@ import {
   UR_MSG_SENDER,
 } from './constants'
 import { RouterConfigError } from './errors'
-import { V2_FACTORY_ABI } from './internal/abis'
+import { MULTICALL3_ABI, V2_FACTORY_ABI } from './internal/abis'
 import { sortAddresses } from './internal/currency'
+import { MULTICALL3_ADDRESS } from './internal/multicall'
 import { assertResultCoherent, emptyReport, headerNotFoundError, rateLimitHttpError, rateLimitRpcError, v4Ref } from './internal/testing'
 import { manifestFor } from './manifest'
 import { PoolIndex } from './pools/poolIndex'
@@ -2287,5 +2288,180 @@ describe('transport options (C4-P6)', () => {
 
     expect(res.status).toBe('ready')
     assertResultCoherent(res)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Multicall3 adoption at the facade: the once-per-router probe and both of its
+// permanent verdicts. Every OTHER test in this file runs the per-call path
+// because `stubClient` answers `eth_getCode` with '0x' for anything that is
+// not the Universal Router — i.e. the fleet above doubles as coverage that a
+// chain with no Multicall3 deployment behaves exactly as before adoption.
+// The wrapper here decodes each aggregate3 envelope and REPLAYS its inner
+// calls through the same base stub, so the aggregated path is served by the
+// identical scripting the per-call path uses — plus counters over what
+// actually hit the wire, which is what these tests are about.
+// ---------------------------------------------------------------------------
+
+describe('Multicall3 probe and aggregation (facade)', () => {
+  type MulticallWrap = {
+    client: PublicClient
+    /** eth_getCode calls per (lowercased) address. */
+    codeProbes: Map<string, number>
+    aggregate3Calls: number
+    directQuoteCalls: number
+  }
+
+  /** Wraps a `stubClient` so the given multicall address (canonical by default) HAS code and serves
+   * aggregate3 by replaying each inner call through the base stub — throws and their `data` become
+   * `{ success: false, returnData }`, the deployed contract's own allowFailure behavior. */
+  function withMulticall(
+    base: PublicClient,
+    opts: { address?: Address; code?: Hex | 'absent'; failProbes?: number } = {},
+  ): MulticallWrap {
+    const address = (opts.address ?? MULTICALL3_ADDRESS).toLowerCase()
+    const wrap: MulticallWrap = { client: undefined as unknown as PublicClient, codeProbes: new Map(), aggregate3Calls: 0, directQuoteCalls: 0 }
+    let remainingProbeFailures = opts.failProbes ?? 0
+    wrap.client = {
+      ...base,
+      async request(args: any) {
+        if (args.method === 'eth_getCode') {
+          const probed = (args.params[0] as string).toLowerCase()
+          if (probed === address) {
+            wrap.codeProbes.set(probed, (wrap.codeProbes.get(probed) ?? 0) + 1)
+            if (remainingProbeFailures > 0) {
+              remainingProbeFailures--
+              throw rateLimitHttpError()
+            }
+            return opts.code === 'absent' ? '0x' : (opts.code ?? '0x600180') // any non-empty bytecode
+          }
+          return base.request(args)
+        }
+        if (args.method === 'eth_call') {
+          const [{ to, data }, blockTag] = args.params
+          if ((to as string).toLowerCase() === address) {
+            wrap.aggregate3Calls++
+            const decoded = decodeFunctionData({ abi: MULTICALL3_ABI, data })
+            const inner = decoded.args[0] as readonly { target: Address; allowFailure: boolean; callData: Hex }[]
+            const results = await Promise.all(
+              inner.map(async (c) => {
+                try {
+                  const returnData = (await base.request({
+                    method: 'eth_call',
+                    params: [{ to: c.target, data: c.callData }, blockTag],
+                  } as never)) as Hex
+                  return { success: true as const, returnData }
+                } catch (err) {
+                  const revertData = (err as { data?: unknown }).data
+                  return { success: false as const, returnData: (typeof revertData === 'string' ? revertData : '0x') as Hex }
+                }
+              }),
+            )
+            return encodeFunctionResult({ abi: MULTICALL3_ABI, functionName: 'aggregate3', result: results })
+          }
+          // Readiness/preflight targets are legitimate direct calls; anything else is a quote.
+          const special = [UNIVERSAL_ROUTER, PERMIT2, TOKEN_A, TOKEN_B].map((a) => a.toLowerCase())
+          if (!special.includes((to as string).toLowerCase())) wrap.directQuoteCalls++
+          return base.request(args)
+        }
+        return base.request(args)
+      },
+    } as unknown as PublicClient
+    return wrap
+  }
+
+  const manifest = (): ChainManifest => baseManifest()
+
+  function v2World(): { client: PublicClient } {
+    const m = manifest()
+    const [probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, m)
+    const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
+    const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
+    return stubClient({ calls: entryFor(probe!.quote.call, v2Return(10n ** 24n, 10n ** 24n, zeroForOne)) })
+  }
+
+  const req: QuoteRequest = { tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN }
+
+  test('code at the canonical address: every quoting round travels as aggregate3, and the probe runs once per router', async () => {
+    const wrap = withMulticall(v2World().client)
+    const router = createRouter({ client: wrap.client, manifest: manifest() })
+
+    const first = await router.getQuote(req)
+    expect(first.status).toBe('quote')
+    assertResultCoherent(first)
+    expect(wrap.aggregate3Calls).toBeGreaterThan(0)
+    expect(wrap.directQuoteCalls).toBe(0) // nothing escaped the envelope
+
+    const before = wrap.codeProbes.get(MULTICALL3_ADDRESS.toLowerCase())
+    expect(before).toBe(1)
+    const second = await router.getQuote(req)
+    expect(second.status).toBe('quote')
+    expect(wrap.codeProbes.get(MULTICALL3_ADDRESS.toLowerCase())).toBe(1) // cached: no re-probe, ever
+  })
+
+  test('no code at the address: per-call quoting forever, and the absent verdict is cached (no re-probe)', async () => {
+    const wrap = withMulticall(v2World().client, { code: 'absent' })
+    const router = createRouter({ client: wrap.client, manifest: manifest() })
+
+    const first = await router.getQuote(req)
+    expect(first.status).toBe('quote')
+    assertResultCoherent(first)
+    expect(wrap.aggregate3Calls).toBe(0)
+    expect(wrap.directQuoteCalls).toBeGreaterThan(0)
+
+    await router.getQuote(req)
+    expect(wrap.codeProbes.get(MULTICALL3_ADDRESS.toLowerCase())).toBe(1) // absence is permanent for this router
+    expect(wrap.aggregate3Calls).toBe(0)
+  })
+
+  test('a transient probe failure is NOT cached: this search quotes per-call, the next probes again and aggregates', async () => {
+    const wrap = withMulticall(v2World().client, { failProbes: 1 })
+    const router = createRouter({ client: wrap.client, manifest: manifest() })
+
+    const first = await router.getQuote(req)
+    expect(first.status).toBe('quote') // the conservative path needs no probe to be safe
+    expect(wrap.aggregate3Calls).toBe(0)
+    expect(wrap.directQuoteCalls).toBeGreaterThan(0)
+
+    const second = await router.getQuote(req)
+    expect(second.status).toBe('quote')
+    expect(wrap.codeProbes.get(MULTICALL3_ADDRESS.toLowerCase())).toBe(2) // retried, not bricked
+    expect(wrap.aggregate3Calls).toBeGreaterThan(0)
+  })
+
+  test('manifest.multicall3 overrides where BOTH the probe and the aggregation go', async () => {
+    const custom = `0x${'77'.repeat(20)}` as Address
+    const wrap = withMulticall(v2World().client, { address: custom })
+    const router = createRouter({ client: wrap.client, manifest: { ...manifest(), multicall3: custom } })
+
+    const result = await router.getQuote(req)
+    expect(result.status).toBe('quote')
+    expect(wrap.codeProbes.get(custom.toLowerCase())).toBe(1)
+    expect(wrap.codeProbes.get(MULTICALL3_ADDRESS.toLowerCase())).toBeUndefined() // canonical never touched
+    expect(wrap.aggregate3Calls).toBeGreaterThan(0)
+    expect(wrap.directQuoteCalls).toBe(0)
+  })
+
+  test('a malformed manifest.multicall3 is rejected synchronously, before any RPC', () => {
+    expect(() =>
+      createRouter({ client: poisonedClient(), manifest: { ...baseManifest(), multicall3: '0xnope' as Address } }),
+    ).toThrow(RouterConfigError)
+  })
+
+  test('a swap through aggregate3 still preflights directly and stays honest end to end', async () => {
+    const m = manifest()
+    const [probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, m)
+    const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
+    const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
+    const base = stubClient({ calls: entryFor(probe!.quote.call, v2Return(10n ** 24n, 10n ** 24n, zeroForOne)) })
+    const wrap = withMulticall(base.client)
+    const router = createRouter({ client: wrap.client, manifest: m })
+
+    const result = await router.getSwap({ ...req, trader: TRADER })
+    expect(result.status).toBe('ready')
+    assertResultCoherent(result)
+    expect(wrap.aggregate3Calls).toBeGreaterThan(0)
+    expect(wrap.directQuoteCalls).toBe(0)
+    expect(base.counters.preflights).toBe(1) // the simulation went out as itself, never aggregated
   })
 })

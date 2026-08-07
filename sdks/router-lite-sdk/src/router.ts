@@ -14,6 +14,7 @@ import {
 } from './constants'
 import { RouterConfigError, RpcUnavailableError } from './errors'
 import { sameFamily } from './internal/currency'
+import { MULTICALL3_ADDRESS } from './internal/multicall'
 import { createSemaphore } from './internal/rpc'
 import { assertChainData, assertWrappedNativeConsistency, requireExecution, reorgOverlapBlocksOf, validateManifest } from './manifest'
 import { PoolIndex } from './pools/poolIndex'
@@ -890,7 +891,59 @@ export function createRouter(opts: CreateRouterOptions): Router {
     return inFlight
   }
 
-  function buildContext(req: QuoteRequest, iterate?: IterateOptions): SearchContext {
+  // ---------------------------------------------------------------------------
+  // Multicall3 probe — the aggregation fallback's one decision, made once.
+  //
+  // Quoting rounds go through Multicall3 `aggregate3` (see `internal/multicall.ts` for the measured
+  // why) ONLY on a chain where the deployment is real, and "is it real" is answered by reading the
+  // code, never by trusting the canonical address: an `aggregate3` sent to an address with no code
+  // "succeeds" with `0x` and silently loses every quote in it. The answer is a deterministic,
+  // permanent property of `(client, manifest.multicall3 ?? canonical)` — a contract at that address
+  // cannot appear or vanish within a router's lifetime in any way this package should chase — so it
+  // is cached forever in BOTH directions, exactly like `ensureManifestValidated` caches a chainId
+  // mismatch: code present → every search aggregates; code absent → every search quotes per-call,
+  // permanently, with no re-probing. Only a probe that FAILED (transport blip — nothing was learned)
+  // is not cached: that search quotes per-call (the conservative path needs no probe to be safe) and
+  // the next search asks again.
+  //
+  // THE PROBE IS FIRED CONCURRENTLY WITH `ensureManifestValidated` (see the entry points below), so
+  // its round trip hides behind the validation round trip on the first search and behind nothing at
+  // all afterwards. It holds a semaphore permit around its one `eth_getCode` per `internal/rpc.ts`'s
+  // every-request-is-gated rule — a leaf request, like `requestHead`, so no lock-ordering risk —
+  // even though, like manifest validation, it can never contribute to a sustained peak.
+  type MulticallResolution = { address: Address | null }
+  let multicallResolved: MulticallResolution | undefined
+  let multicallInFlight: Promise<Address | null> | undefined
+
+  async function resolveMulticall3(): Promise<Address | null> {
+    if (multicallResolved) return multicallResolved.address
+    if (!multicallInFlight) {
+      multicallInFlight = (async () => {
+        const address = manifest.multicall3 ?? MULTICALL3_ADDRESS
+        try {
+          await semaphore.acquire()
+          let code: Hex
+          try {
+            code = (await client.request({ method: 'eth_getCode', params: [address, 'latest'] } as any)) as Hex
+          } finally {
+            semaphore.release()
+          }
+          const resolved = typeof code === 'string' && code !== '0x' && code.length > 2 ? address : null
+          multicallResolved = { address: resolved }
+          return resolved
+        } catch {
+          // Transport failure: nothing was learned about the address, so nothing is cached — this
+          // search runs per-call (correct on any chain) and the next one probes again.
+          return null
+        } finally {
+          multicallInFlight = undefined
+        }
+      })()
+    }
+    return multicallInFlight
+  }
+
+  function buildContext(req: QuoteRequest, multicall3: Address | null, iterate?: IterateOptions): SearchContext {
     return {
       client,
       manifest,
@@ -899,6 +952,7 @@ export function createRouter(opts: CreateRouterOptions): Router {
       hookData: buildHookData(req.hints),
       head,
       semaphore,
+      ...(multicall3 !== null && { multicall3 }),
       logChunkBlocks: opts.logChunkBlocks,
       onFirstRoute: iterate?.onFirstRoute,
     }
@@ -906,13 +960,16 @@ export function createRouter(opts: CreateRouterOptions): Router {
 
   async function getQuote(req: QuoteRequest): Promise<QuoteResult> {
     validateQuoteRequest(req, manifest)
+    // Dispatched BEFORE the validation await so the two round trips overlap (both are cached after
+    // the first search); `resolveMulticall3` never rejects, so nothing here needs a handler.
+    const multicallProbe = resolveMulticall3()
     try {
       await ensureManifestValidated()
     } catch (err) {
       if (err instanceof RouterConfigError) throw err
       return rpcUnavailable(manifest)
     }
-    const ctx = buildContext(req)
+    const ctx = buildContext(req, await multicallProbe)
     try {
       for await (const e of searchWaves(ctx, req, 'quote')) {
         const result = classifyQuote(e)
@@ -928,13 +985,14 @@ export function createRouter(opts: CreateRouterOptions): Router {
 
   async function getSwap(req: SwapRequest): Promise<SwapResult> {
     validateSwapRequest(req, manifest)
+    const multicallProbe = resolveMulticall3()
     try {
       await ensureManifestValidated()
     } catch (err) {
       if (err instanceof RouterConfigError) throw err
       return rpcUnavailable(manifest)
     }
-    const ctx = buildContext(req)
+    const ctx = buildContext(req, await multicallProbe)
     try {
       for await (const e of searchWaves(ctx, req, 'swap')) {
         const result = classifySwap(e)
@@ -951,6 +1009,7 @@ export function createRouter(opts: CreateRouterOptions): Router {
   function quotes(req: QuoteRequest, iterate?: IterateOptions): AsyncIterable<QuoteResult> {
     validateQuoteRequest(req, manifest)
     return (async function* () {
+      const multicallProbe = resolveMulticall3()
       try {
         await ensureManifestValidated()
       } catch (err) {
@@ -958,7 +1017,7 @@ export function createRouter(opts: CreateRouterOptions): Router {
         yield rpcUnavailable(manifest)
         return
       }
-      const ctx = buildContext(req, iterate)
+      const ctx = buildContext(req, await multicallProbe, iterate)
       try {
         for await (const e of searchWaves(ctx, req, 'quote')) yield classifyQuote(e)
       } catch (err) {
@@ -971,6 +1030,7 @@ export function createRouter(opts: CreateRouterOptions): Router {
   function swaps(req: SwapRequest, iterate?: IterateOptions): AsyncIterable<SwapResult> {
     validateSwapRequest(req, manifest)
     return (async function* () {
+      const multicallProbe = resolveMulticall3()
       try {
         await ensureManifestValidated()
       } catch (err) {
@@ -978,7 +1038,7 @@ export function createRouter(opts: CreateRouterOptions): Router {
         yield rpcUnavailable(manifest)
         return
       }
-      const ctx = buildContext(req, iterate)
+      const ctx = buildContext(req, await multicallProbe, iterate)
       try {
         for await (const e of searchWaves(ctx, req, 'swap')) yield classifySwap(e)
       } catch (err) {

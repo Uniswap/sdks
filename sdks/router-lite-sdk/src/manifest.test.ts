@@ -9,6 +9,7 @@ import {
   assertWrappedNativeConsistency,
   BASE_MANIFEST,
   blockTimeSecondsOf,
+  KNOWN_MANIFESTS,
   MAINNET_MANIFEST,
   manifestFor,
   reorgOverlapBlocksOf,
@@ -642,5 +643,27 @@ describe('chain manifest', () => {
       await expect(validateManifest(client as any, manifest)).resolves.toBeUndefined()
       expect(requestCalls).toBe(0)
     })
+  })
+})
+
+describe('multicall3 manifest field', () => {
+  test('no built-in manifest states multicall3 — the canonical deployment is the default, probed at runtime', () => {
+    for (const m of Object.values(KNOWN_MANIFESTS)) expect(m.multicall3).toBeUndefined()
+  })
+
+  test('manifestFor passes a multicall3 override through, on known and unknown chains alike', () => {
+    const custom = `0x${'77'.repeat(20)}` as const
+    expect(manifestFor(1, { multicall3: custom }).multicall3).toBe(custom)
+    expect(manifestFor(1).multicall3).toBeUndefined()
+    const unknown = manifestFor(999_999, { wrappedNative: `0x${'ee'.repeat(20)}`, multicall3: custom })
+    expect(unknown.multicall3).toBe(custom)
+  })
+
+  test('an explicit `multicall3: undefined` override restores the canonical default (field absent)', () => {
+    expect(manifestFor(1, { multicall3: undefined }).multicall3).toBeUndefined()
+  })
+
+  test('a malformed multicall3 is rejected by the manifest shape check, synchronously', () => {
+    expect(() => manifestFor(1, { multicall3: '0xnope' as never })).toThrow(RouterConfigError)
   })
 })

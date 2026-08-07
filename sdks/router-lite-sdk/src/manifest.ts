@@ -523,6 +523,10 @@ export function manifestFor(chainId: number, overrides?: Partial<ChainManifest>)
       )
     }
     const manifest: ChainManifest = { chainId, wrappedNative }
+    // `multicall3` is a scalar like `wrappedNative`, not a bundle — but unlike `wrappedNative` it is
+    // optional (absent means "the canonical deployment, probed"), so an explicit `undefined` in
+    // overrides simply restores that default rather than being rejected.
+    if ('multicall3' in overrides!) manifest.multicall3 = overrides!.multicall3
     for (const key of BUNDLE_KEYS) {
       if (key in overrides!) (manifest as any)[key] = (overrides as any)[key]
     }
@@ -534,6 +538,7 @@ export function manifestFor(chainId: number, overrides?: Partial<ChainManifest>)
   const manifest: ChainManifest = { ...base, chainId }
   if (overrides) {
     if ('wrappedNative' in overrides) manifest.wrappedNative = overrides.wrappedNative as Address
+    if ('multicall3' in overrides) manifest.multicall3 = overrides.multicall3 // see the unknown-chain branch above
     for (const key of BUNDLE_KEYS) {
       if (key in overrides) (manifest as any)[key] = overrides[key]
     }
@@ -602,6 +607,7 @@ const MAX_BLOCK_TIME_SECONDS = 3_600
  */
 export function assertManifestAddresses(m: ChainManifest): void {
   const fields: Array<[label: string, value: Address | undefined]> = [['wrappedNative', m.wrappedNative]]
+  if (m.multicall3 !== undefined) fields.push(['multicall3', m.multicall3])
   if (m.execution) {
     fields.push(
       ['execution.address', m.execution.address],
