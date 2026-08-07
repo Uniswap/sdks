@@ -35,8 +35,8 @@ import { parseExclusiveFillerData, ValidationType } from "../order/validation";
 
 import { NonceManager } from "./NonceManager";
 import {
+  multicallOrdersPreservingOrder,
   MulticallResult,
-  multicallSameContractManyFunctions,
 } from "./multicall";
 
 export enum OrderValidation {
@@ -303,50 +303,22 @@ export class UniswapXOrderQuoter
   }
 
   /// Get the results of a multicall for a given function
-  /// Each order with a blockOverride is multicalled separately
+  /// Each order with a blockOverride is multicalled separately, but results are
+  /// returned in the same order as `orders`
   private async getMulticallResults(
     functionName: string,
     orders: SignedOrder[]
   ): Promise<MulticallResult[]> {
-    const ordersWithBlockOverrides = orders.filter(
-      (order) => order.order.blockOverrides
-    );
-    const promises = [];
-    ordersWithBlockOverrides.map((order) => {
-      promises.push(
-        multicallSameContractManyFunctions(
-          this.provider,
-          {
-            address: this.quoter.address,
-            contractInterface: this.quoter.interface,
-            functionName: functionName,
-            functionParams: [[order.order.serialize(), order.signature]],
-          },
-          undefined,
-          order.order.blockOverrides
-        )
-      );
-    });
-
-    const ordersWithoutBlockOverrides = orders.filter(
-      (order) => !order.order.blockOverrides
-    );
-
-    const calls = ordersWithoutBlockOverrides.map((order) => {
-      return [order.order.serialize(), order.signature];
-    });
-
-    promises.push(
-      multicallSameContractManyFunctions(this.provider, {
+    return multicallOrdersPreservingOrder(
+      this.provider,
+      {
         address: this.quoter.address,
         contractInterface: this.quoter.interface,
         functionName: functionName,
-        functionParams: calls,
-      })
+      },
+      orders,
+      (order) => [order.order.serialize(), order.signature]
     );
-
-    const results = await Promise.all(promises);
-    return results.flat();
   }
 
   get orderQuoterAddress(): string {
@@ -418,62 +390,27 @@ export class RelayOrderQuoter
   }
 
   /// Get the results of a multicall for a given function
-  /// Each order with a blockOverride is multicalled separately
+  /// Each order with a blockOverride is multicalled separately, but results are
+  /// returned in the same order as `orders`
   private async getMulticallResults(
     functionName: string,
     orders: SignedRelayOrder[]
   ): Promise<MulticallResult[]> {
-    const ordersWithBlockOverrides = orders.filter(
-      (order) => order.order.blockOverrides
-    );
-    const promises = [];
-    ordersWithBlockOverrides.map((order) => {
-      promises.push(
-        multicallSameContractManyFunctions(
-          this.provider,
-          {
-            address: this.quoter.address,
-            contractInterface: this.quoter.interface,
-            functionName: functionName,
-            functionParams: [
-              [
-                {
-                  order: order.order.serialize(),
-                  sig: order.signature,
-                },
-              ],
-            ],
-          },
-          undefined,
-          order.order.blockOverrides
-        )
-      );
-    });
-
-    const ordersWithoutBlockOverrides = orders.filter(
-      (order) => !order.order.blockOverrides
-    );
-
-    const calls = ordersWithoutBlockOverrides.map((order) => {
-      return [
+    return multicallOrdersPreservingOrder(
+      this.provider,
+      {
+        address: this.quoter.address,
+        contractInterface: this.quoter.interface,
+        functionName: functionName,
+      },
+      orders,
+      (order) => [
         {
           order: order.order.serialize(),
           sig: order.signature,
         },
-      ];
-    });
-
-    promises.push(
-      multicallSameContractManyFunctions(this.provider, {
-        address: this.quoter.address,
-        contractInterface: this.quoter.interface,
-        functionName: functionName,
-        functionParams: calls,
-      })
+      ]
     );
-
-    const results = await Promise.all(promises);
-    return results.flat();
   }
 
   private async getValidations(
@@ -788,67 +725,27 @@ export class V4OrderQuoter implements OrderQuoter<SignedV4Order, V4OrderQuote> {
 
   /// Get the results of a multicall for a given function
   /// V4 quote requires (reactor, order, sig) instead of (order, sig)
+  /// Each order with a blockOverride is multicalled separately, but results are
+  /// returned in the same order as `orders`
   private async getMulticallResults(
     provider: StaticJsonRpcProvider,
     functionName: string,
     orders: SignedV4Order[]
   ): Promise<MulticallResult[]> {
-    const ordersWithBlockOverrides = orders.filter(
-      (order) => order.order.blockOverrides
-    );
-    const promises: Promise<MulticallResult[]>[] = [];
-
-    ordersWithBlockOverrides.map((order) => {
-      promises.push(
-        multicallSameContractManyFunctions(
-          provider,
-          {
-            address: this.quoter.address,
-            contractInterface: this.quoter.interface,
-            functionName: functionName,
-            functionParams: [
-              [
-                order.order.info.reactor,
-                order.order.serialize(),
-                order.signature,
-              ],
-            ],
-          },
-          undefined,
-          order.order.blockOverrides
-        )
-      );
-    });
-
-    const ordersWithoutBlockOverrides = orders.filter(
-      (order) => !order.order.blockOverrides
-    );
-
-    const calls = ordersWithoutBlockOverrides.map((order) => {
-      return [
+    return multicallOrdersPreservingOrder(
+      provider,
+      {
+        address: this.quoter.address,
+        contractInterface: this.quoter.interface,
+        functionName: functionName,
+      },
+      orders,
+      (order) => [
         order.order.info.reactor,
         order.order.serialize(),
         order.signature,
-      ];
-    });
-
-    if (calls.length > 0) {
-      promises.push(
-        multicallSameContractManyFunctions(
-          provider,
-          {
-            address: this.quoter.address,
-            contractInterface: this.quoter.interface,
-            functionName: functionName,
-            functionParams: calls,
-          },
-          undefined
-        )
-      );
-    }
-
-    const results = await Promise.all(promises);
-    return results.flat();
+      ]
+    );
   }
 
   get orderQuoterAddress(): string {
