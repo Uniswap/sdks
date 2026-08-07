@@ -638,6 +638,107 @@ test('iterator yields only on improvement, final yield has done=true', async () 
   assertCoherent('quote', events)
 })
 
+// ---------------------------------------------------------------------------
+// `onFirstRoute` — the early channel. See `SearchContext.onFirstRoute` for why
+// it is a callback rather than an extra yielded event (short version: the yield
+// SEQUENCE is a contract the facade, these tests, and the replay goldens all
+// rest on, and a notification can be added without touching it).
+// ---------------------------------------------------------------------------
+
+/** The `iterator yields only on improvement` scenario: a direct pool priced in wave 0, and a two-hop
+ * that only becomes reachable once BOTH endpoints' adjacency has been scanned in the final wave. */
+function improvingSearch(): ReturnType<typeof stubClient> {
+  const directPool = stubPoolRef('v2', TOKEN_A, TOKEN_B)
+  const aMidPool = stubPoolRef('v2', TOKEN_A, MID, { tag: SCANNED_TAG })
+  const midBPool = stubPoolRef('v2', MID, TOKEN_B, { tag: SCANNED_TAG })
+  return stubClient({
+    calls: {
+      ...quoteEntry([directPool], AMOUNT_IN, 100n),
+      ...quoteEntry([aMidPool], AMOUNT_IN, 500n),
+      ...quoteEntry([midBPool], 500n, 250n),
+    },
+    logs: (endpoint) => {
+      if (endpoint === TOKEN_A.toLowerCase()) return [scannedRecord('v2', TOKEN_A, MID, 400n)]
+      if (endpoint === TOKEN_B.toLowerCase()) return [scannedRecord('v2', MID, TOKEN_B, 450n)]
+      return []
+    },
+  })
+}
+
+test('onFirstRoute fires ONCE, with the leader, before the wave-0 yield', async () => {
+  const { client } = improvingSearch()
+  // Both channels write to one timeline, which is the only way to assert the ORDER rather than
+  // merely that both happened — "before wave 0 yields" is the entire value of the callback.
+  const timeline: string[] = []
+  const announced: QuotedRoute[] = []
+  const ctx = makeContext(client, manifestWith(), {
+    onFirstRoute: (route) => {
+      timeline.push('first')
+      announced.push(route)
+    },
+  })
+
+  const events: InternalResult[] = []
+  for await (const e of searchWaves(ctx, quoteReq, 'quote')) {
+    timeline.push(`yield:${e.best?.quote.amountOut}`)
+    events.push(e)
+  }
+
+  expect(timeline[0]).toBe('first')
+  expect(announced).toHaveLength(1)
+  expect(announced[0]!.quote.amountOut).toBe(100n) // wave 0's direct route, the leader at that moment
+  // ...and the later improvement does NOT re-announce: "first" means first, not "best so far".
+  expect(events.map((e) => e.best?.quote.amountOut)).toEqual([100n, 250n])
+  expect(timeline.filter((t) => t === 'first')).toHaveLength(1)
+})
+
+test('onFirstRoute is handed rankRoutes’ leader, not whichever quote happened to land first', async () => {
+  // Two direct pools price in the SAME wave-0 batch. The caller is being told what the search would
+  // lead with, so it must be the ranked winner — handing over `quoted[0]` would report a worse route
+  // that the very next line of the same search already disagrees with.
+  const v2Pool = stubPoolRef('v2', TOKEN_A, TOKEN_B)
+  const v3Pool = stubPoolRef('v3', TOKEN_A, TOKEN_B)
+  const { client } = stubClient({
+    calls: { ...quoteEntry([v2Pool], AMOUNT_IN, 100n), ...quoteEntry([v3Pool], AMOUNT_IN, 300n) },
+  })
+  const announced: QuotedRoute[] = []
+  const ctx = makeContext(client, manifestWith({ v3: true }), { onFirstRoute: (route) => announced.push(route) })
+
+  await drain(searchWaves(ctx, quoteReq, 'quote'))
+
+  expect(announced).toHaveLength(1)
+  expect(announced[0]!.quote.amountOut).toBe(300n)
+})
+
+test('a search that never prices anything never announces', async () => {
+  // The latch is on "the set became non-empty", not on "a quoting call returned".
+  const { client } = stubClient({ calls: {} })
+  let calls = 0
+  const ctx = makeContext(client, manifestWith(), { onFirstRoute: () => calls++ })
+
+  const events = await drain(searchWaves(ctx, quoteReq, 'quote'))
+
+  expect(events.at(-1)!.best).toBeUndefined()
+  expect(calls).toBe(0)
+})
+
+test('a throwing onFirstRoute cannot fail the search', async () => {
+  // A host's rendering bug is not a search outcome (this file's header rule 3). The notification is
+  // swallowed and every yielded result still arrives, unchanged.
+  const { client } = improvingSearch()
+  const ctx = makeContext(client, manifestWith(), {
+    onFirstRoute: () => {
+      throw new Error('the host blew up while rendering')
+    },
+  })
+
+  const events = await drain(searchWaves(ctx, quoteReq, 'quote'))
+
+  expect(events.map((e) => e.best?.quote.amountOut)).toEqual([100n, 250n])
+  expect(events.at(-1)!.done).toBe(true)
+  assertCoherent('quote', events)
+})
+
 test('abort between waves → aborted report, best-so-far kept', async () => {
   const controller = new AbortController()
   const directPool = stubPoolRef('v2', TOKEN_A, TOKEN_B)

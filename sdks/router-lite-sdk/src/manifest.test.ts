@@ -269,6 +269,80 @@ describe('chain manifest', () => {
   })
 
   // -------------------------------------------------------------------------
+  // `assumeChainId` — one fewer round trip for a caller that already asked.
+  // -------------------------------------------------------------------------
+  describe('assumeChainId', () => {
+    const hex = (addr: string): string => addr.toLowerCase().slice(2)
+    const mainnet = manifestFor(1)
+    /** A stand-in for the real Universal Router's code: embeds every immutable the cross-check reads. */
+    const deployedCode = `0xfe${hex(mainnet.execution!.wrappedNative)}${hex(mainnet.execution!.permit2)}${hex(
+      mainnet.v2!.factory,
+    )}${hex(mainnet.v3!.factory)}${hex(mainnet.v4!.poolManager)}fe`
+
+    /** A client that FAILS `getChainId`, so any test that passes is a test that never called it. */
+    function clientWithoutChainId(code: string = deployedCode): { getChainId: () => Promise<number>; request: () => Promise<string> } {
+      return {
+        getChainId: async () => {
+          throw new Error('eth_chainId must not be asked for when the caller already supplied it')
+        },
+        request: async () => code,
+      }
+    }
+
+    test('replaces the eth_chainId read entirely', async () => {
+      await expect(validateManifest(clientWithoutChainId() as any, mainnet, { assumeChainId: 1 })).resolves.toBeUndefined()
+    })
+
+    test('still CHECKS: a supplied id that disagrees with the manifest is the same RouterConfigError', async () => {
+      // The whole point of the option is that it skips the READ, not the comparison — a caller that
+      // probed a Base endpoint and reached for the mainnet manifest is caught before any search runs.
+      await expect(validateManifest(clientWithoutChainId() as any, mainnet, { assumeChainId: 8453 })).rejects.toThrow(
+        /manifest chainId 1 does not match client chainId 8453/,
+      )
+    })
+
+    test('still fetches the code and still runs the immutable fingerprint', async () => {
+      // Code that is deployed, non-empty, and belongs to a DIFFERENT chain's wiring: `assumeChainId`
+      // must not become a way to skip the check that catches it (the real Robinhood Chain bug).
+      const foreignCode = `0xfe${hex(mainnet.execution!.permit2)}fe`
+      await expect(validateManifest(clientWithoutChainId(foreignCode) as any, mainnet, { assumeChainId: 1 })).rejects.toThrow(
+        /different chain/,
+      )
+    })
+
+    test('a quote-only manifest with a supplied id makes NO rpc call at all', async () => {
+      // Both reads gone: nothing left for validation to ask. This is the CLI's cheapest shape.
+      const quoteOnly = manifestFor(1, { execution: undefined })
+      let requests = 0
+      const client = {
+        getChainId: async () => {
+          throw new Error('must not be called')
+        },
+        request: async () => {
+          requests++
+          return '0x'
+        },
+      }
+      await expect(validateManifest(client as any, quoteOnly, { assumeChainId: 1 })).resolves.toBeUndefined()
+      expect(requests).toBe(0)
+    })
+
+    test('omitting it (or passing no options at all) still reads the chain id from the client', async () => {
+      let chainIdReads = 0
+      const client = {
+        getChainId: async () => {
+          chainIdReads++
+          return 1
+        },
+        request: async () => deployedCode,
+      }
+      await expect(validateManifest(client as any, mainnet)).resolves.toBeUndefined()
+      await expect(validateManifest(client as any, mainnet, {})).resolves.toBeUndefined()
+      expect(chainIdReads).toBe(2)
+    })
+  })
+
+  // -------------------------------------------------------------------------
   // C4-P1: the `chain` bundle — chain FACTS, not code constants.
   // -------------------------------------------------------------------------
   describe('chain data', () => {

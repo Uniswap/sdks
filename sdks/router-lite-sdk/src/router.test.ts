@@ -26,6 +26,7 @@ import type {
   Permit2PermitSingle,
   PoolHint,
   PoolKey,
+  QuotedRoute,
   QuoteRequest,
   QuoteResult,
   RankedRoute,
@@ -2040,6 +2041,89 @@ describe('transport options (C4-P6)', () => {
   // so both are rejected up front instead, the same posture as every other caller-supplied number
   // this package bounds (`validateQuoteRequest`'s `amountIn`/`slippageBps`/etc.).
   // -------------------------------------------------------------------------
+
+  // -------------------------------------------------------------------------
+  // `assumeChainId`: the facade's half. `manifest.test.ts` owns what the option
+  // does to validation itself; these two pin that the router plumbs it and
+  // bounds it like every other caller-supplied number.
+  // -------------------------------------------------------------------------
+
+  for (const assumeChainId of [0, -1, 1.5, NaN]) {
+    test(`createRouter throws RouterConfigError for assumeChainId=${assumeChainId}`, () => {
+      const manifest = baseManifest()
+      expect(() => createRouter({ client: poisonedClient(), manifest, assumeChainId })).toThrow(RouterConfigError)
+      expect(() => createRouter({ client: poisonedClient(), manifest, assumeChainId })).toThrow(/assumeChainId/)
+    })
+  }
+
+  test('assumeChainId reaches validateManifest: a client that cannot answer eth_chainId still searches', async () => {
+    const manifest = baseManifest()
+    const [probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+    const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
+    const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
+    const { client } = stubClient({ calls: entryFor(probe!.quote.call, v2Return(10n ** 24n, 10n ** 24n, zeroForOne)) })
+    // The only way to prove the read was skipped rather than merely correct: make the read fail.
+    const noChainId = { ...client, getChainId: async () => Promise.reject(new Error('eth_chainId is not served')) } as typeof client
+
+    const router = createRouter({ client: noChainId, manifest, assumeChainId: CHAIN_ID })
+    const result = await router.getQuote({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN })
+
+    expect(result.status).toBe('quote')
+  })
+
+  // -------------------------------------------------------------------------
+  // `IterateOptions.onFirstRoute`: the facade threads it into the search context
+  // (`search/waves.test.ts` owns WHEN the engine fires it).
+  // -------------------------------------------------------------------------
+
+  test('quotes() forwards onFirstRoute, and getQuote() needs no such thing', async () => {
+    const manifest = baseManifest()
+    const [probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+    const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
+    const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
+    const { client } = stubClient({ calls: entryFor(probe!.quote.call, v2Return(10n ** 24n, 10n ** 24n, zeroForOne)) })
+    const router = createRouter({ client, manifest })
+
+    const announced: bigint[] = []
+    const results: string[] = []
+    for await (const r of router.quotes(
+      { tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN },
+      { onFirstRoute: (route) => announced.push(route.quote.amountOut) },
+    )) {
+      results.push(r.status)
+    }
+
+    expect(announced).toHaveLength(1)
+    expect(results[0]).toBe('quote')
+    // The same iterator without options is the pre-existing call shape, and it must still work.
+    const plain: string[] = []
+    for await (const r of router.quotes({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN })) plain.push(r.status)
+    expect(plain[0]).toBe('quote')
+  })
+
+  test('swaps() forwards onFirstRoute too — and what it hands over is a LEAD, not a verdict', async () => {
+    const manifest = baseManifest()
+    const [probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+    const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
+    const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
+    const { client } = stubClient({ calls: entryFor(probe!.quote.call, v2Return(10n ** 24n, 10n ** 24n, zeroForOne)) })
+    const router = createRouter({ client, manifest })
+
+    const announced: QuotedRoute[] = []
+    let firstStatus: string | undefined
+    for await (const r of router.swaps(
+      { tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, trader: TRADER },
+      { onFirstRoute: (route) => announced.push(route) },
+    )) {
+      firstStatus ??= r.status
+    }
+
+    expect(announced).toHaveLength(1)
+    // A plain `QuotedRoute`: no `execution`, no `tx`, nothing simulated. The verdict that follows is
+    // `ready`, and only the yielded result is entitled to say so.
+    expect('execution' in announced[0]!).toBe(false)
+    expect(firstStatus).toBe('ready')
+  })
 
   for (const concurrency of [0, -1, -20, NaN]) {
     test(`createRouter throws RouterConfigError for concurrency=${concurrency} rather than hanging forever`, () => {

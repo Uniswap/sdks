@@ -806,10 +806,16 @@ function assertImmutablesEmbedded(m: ChainManifest, code: Hex): void {
  * `router.ts#ensureManifestValidated` caches the outcome (success, or a `RouterConfigError`) forever
  * after the first call, so this never contributes to a sustained concurrency peak the way a
  * per-search read would — there is nothing here for `concurrency` to usefully bound.
+ *
+ * `opts.assumeChainId` lets a caller that has ALREADY observed this client's chain id supply it
+ * instead of paying for a second `eth_chainId`. It short-circuits the read only — the cross-check
+ * below, the `eth_getCode`, and the immutable fingerprint all run exactly as they do without it. See
+ * `router.ts#CreateRouterOptions.assumeChainId` for the trust it asks of the caller.
  */
 export async function validateManifest(
   client: Pick<PublicClient, 'getChainId' | 'request'>,
   m: ChainManifest,
+  opts?: { assumeChainId?: number },
 ): Promise<void> {
   const codeRead = m.execution
     ? // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
@@ -819,7 +825,13 @@ export async function validateManifest(
   // first) is a handled one — an unhandled rejection warning out of a config error would be noise.
   codeRead?.catch(() => {})
 
-  const clientChainId = await client.getChainId()
+  // `assumeChainId` is a chain id the CALLER already read off this same client (see
+  // `router.ts#CreateRouterOptions.assumeChainId` for who may supply one). It replaces the READ, not
+  // the CHECK: the comparison below is unchanged, runs first, and raises the same error — so a host
+  // that autodetected the chain to pick this manifest in the first place stops paying a second
+  // `eth_chainId` round trip for an answer it is already holding, and every caller that supplies
+  // nothing keeps asking the node itself.
+  const clientChainId = opts?.assumeChainId ?? (await client.getChainId())
   if (clientChainId !== m.chainId) {
     throw new RouterConfigError(`manifest chainId ${m.chainId} does not match client chainId ${clientChainId}`)
   }

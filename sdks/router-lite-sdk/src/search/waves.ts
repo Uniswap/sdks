@@ -15,7 +15,7 @@ import { reorgOverlapBlocksOf, requireExecution, wave0PairScanBlocks } from '../
 import type { PoolIndex } from '../pools/poolIndex'
 import { routeId } from '../protocols'
 import type { ProtocolModule, QuoteProbe } from '../protocols/types'
-import { probeQuotes, quoteCandidates } from '../quote/quote'
+import { probeQuotes, quoteCandidates, rankRoutes } from '../quote/quote'
 import type { QuoteStats } from '../quote/quote'
 import type {
   BlockRange,
@@ -209,6 +209,36 @@ export type SearchContext = {
    */
   logChunkBlocks?: bigint | undefined
   /**
+   * Fired ONCE per search, with the leading route, the moment this search first has a price at all
+   * — which is up to a whole wave earlier than the first yield.
+   *
+   * WHY THE ENGINE PUSHES THIS RATHER THAN YIELDING IT. Wave 0 runs its speculative route probes
+   * CONCURRENTLY with the exact-pair log scan (see {@link wave0}), and the probes are one round trip
+   * while the scan is many: on a warm mainnet index the probes answer at ~3.3s and the wave — and
+   * therefore the wave's yield — lands at ~7s. Everything between those two numbers is time a
+   * streaming consumer spends with a printable answer already sitting in `state.quoted` and no way
+   * to learn of it. Yielding an extra early event instead would have said the same thing at the cost
+   * of changing the generator's yield SEQUENCE, which is a contract three other things rest on: the
+   * facade's "stop at the first actionable event" loops (`router.ts`), the yield-count assertions in
+   * `waves.test.ts`, and the recorded-replay goldens. A callback adds a strictly new channel and
+   * moves none of them.
+   *
+   * IT IS A NOTIFICATION, NOT A RESULT. What it carries is the current leader of `rankRoutes` over
+   * everything priced so far — a real, quoted route, but one no later wave is bound by: a better
+   * route almost always follows, and for a SWAP nothing here has been compiled, simulated, or
+   * checked against the trader's readiness, so it is a lead rather than something to execute. The
+   * yielded results remain the only thing this engine promises anything about.
+   *
+   * A THROWN CALLBACK NEVER FAILS THE SEARCH — it is swallowed (see {@link recordQuoted}), the same
+   * posture as every other business outcome in this file. A host's rendering bug must not be able to
+   * take down a search that is otherwise going fine.
+   *
+   * No timing is passed: the only clock that means anything to a consumer is its OWN (a CLI measures
+   * from the moment it dispatched the search, which is not the moment `searchWaves` started), so the
+   * callback hands over the route and lets the caller time it.
+   */
+  onFirstRoute?: ((route: QuotedRoute) => void) | undefined
+  /**
    * How often a scan-bound wave pauses to quote what it has discovered so far
    * ({@link quoteWhileDiscovering}); {@link QUOTE_INTERLEAVE_MS} when absent, which is every real
    * router (`createRouter` does not expose it and nothing in `router.ts` sets it).
@@ -275,6 +305,10 @@ export type EngineState = {
   block: BlockRef
   /** routeId -> successfully quoted route, accumulated across waves. */
   quoted: Map<string, QuotedRoute>
+  /** Whether {@link SearchContext.onFirstRoute} has already fired. "Once per search" is a property
+   * of the SEARCH, not of the wave or the call that happened to price the first route, so the latch
+   * lives here with the rest of the search's memory. */
+  announcedFirstRoute: boolean
   /** routeIds ever submitted for quoting — a route is never quoted twice in one search. */
   seen: Set<string>
   /** Discovery-probe ids already fired (probe results are pool evidence, not routes). */
@@ -364,6 +398,7 @@ export function initialState(block: BlockRef, headRegressed: boolean): EngineSta
     block,
     headRegressed,
     quoted: new Map(),
+    announcedFirstRoute: false,
     seen: new Set(),
     probed: new Set(),
     execution: new Map(),
@@ -583,6 +618,36 @@ function tallyQuoting(state: EngineState, stats: QuoteStats): void {
   state.quoting.transportFailed += stats.transportFailed
 }
 
+/**
+ * Merges one quoting call's survivors into the search's running set — and, the first time that set
+ * becomes non-empty, hands the leader to {@link SearchContext.onFirstRoute}.
+ *
+ * THE NOTIFICATION LIVES HERE BECAUSE THE WRITE DOES. `state.quoted` is written by exactly two
+ * callers (`quoteNew` and `runRouteProbes` — a discovery probe's amount is not a price for anything
+ * the caller asked about, so `runDiscoveryProbes` deliberately writes nothing), and putting the
+ * latch anywhere else would mean two places agreeing about when "the first route" happened. Both
+ * lines now go through this function, so a third quoting channel added later gets the notification
+ * for free rather than silently missing it.
+ *
+ * The leader is `rankRoutes`' own top pick over everything priced so far, not `quoted[0]` — the
+ * caller is being handed the route it would lead with, and picking the first element of whatever
+ * batch happened to land would hand over a worse one with no way to tell.
+ */
+function recordQuoted(run: Run, quoted: QuotedRoute[]): void {
+  const { ctx, state } = run
+  for (const q of quoted) state.quoted.set(routeId(q.route), q)
+
+  if (state.announcedFirstRoute || ctx.onFirstRoute === undefined || state.quoted.size === 0) return
+  state.announcedFirstRoute = true
+  const leader = rankRoutes([...state.quoted.values()])[0]!
+  try {
+    ctx.onFirstRoute(leader)
+  } catch {
+    // A host's notification handler is not allowed to fail a search (see `onFirstRoute`'s doc): the
+    // search has a real price in hand and every consumer downstream still deserves to receive it.
+  }
+}
+
 /** Quotes candidates never quoted before in this search, merging survivors into the running set. */
 async function quoteNew(run: Run, candidates: RouteCandidate[]): Promise<void> {
   const { state } = run
@@ -611,7 +676,7 @@ async function quoteNew(run: Run, candidates: RouteCandidate[]): Promise<void> {
   state.quoting.unattempted += fresh.length - stats.attempted
   recordSuccess(run, quoted)
   recordFailures(run, amountIndependentFailures)
-  for (const q of quoted) state.quoted.set(routeId(q.route), q)
+  recordQuoted(run, quoted)
 }
 
 /** Wave 0's direct probes: the quote call *is* the existence check, and a hit is a real route. */
@@ -649,7 +714,10 @@ async function runRouteProbes(run: Run, probes: QuoteProbe[]): Promise<void> {
   state.quoting.unattempted += fresh.length - stats.attempted
   recordSuccess(run, quoted)
   recordFailures(run, amountIndependentFailures)
-  for (const q of quoted) state.quoted.set(routeId(q.route), q)
+  // THE EARLIEST POINT IN A SEARCH THAT A PRICE EXISTS, in the ordinary (unhinted, cached-index)
+  // case: wave 0's route probes are one round trip, and they run concurrently with a log scan that
+  // is many. `recordQuoted` is what turns that into something a streaming consumer can see.
+  recordQuoted(run, quoted)
 }
 
 /**

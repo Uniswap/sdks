@@ -141,6 +141,29 @@ export type CreateRouterOptions = {
    */
   concurrency?: number
   /**
+   * The chain id the caller has ALREADY observed from this very `client`, so `validateManifest` does
+   * not have to ask for it again.
+   *
+   * IT REPLACES THE READ, NOT THE CHECK. `manifest.chainId` is still cross-checked, still before any
+   * other RPC this router makes, and still raises the same `RouterConfigError` on a mismatch; the
+   * `eth_getCode` read and the immutable-fingerprint check behind it (`manifest.ts#
+   * assertImmutablesEmbedded`) are untouched, so a manifest pointed at the wrong deployment is caught
+   * exactly as before. What is skipped is one `eth_chainId` round trip whose answer the caller is
+   * already holding.
+   *
+   * WHO MAY PASS IT: a host that probed THIS client for THIS value — a CLI that autodetects the
+   * chain before choosing a manifest is the motivating case, and it costs a full round trip on the
+   * critical path of every invocation (~0.9s on a real mainnet endpoint). A caller that passes a
+   * chain id it got from anywhere else — a config file, an env var, `manifest.chainId` itself — has
+   * turned the cross-check into a tautology and is defeating the one thing it exists to catch. It is
+   * therefore opt-in and absent by default: no existing caller's validation weakens.
+   *
+   * Validated synchronously, before any RPC (F1), as a positive integer — the same posture as
+   * `concurrency` above, and for a related reason: a `NaN`/fractional value here would fail the
+   * `!==` comparison and report a "chainId mismatch" naming a number that was never a chain id.
+   */
+  assumeChainId?: number
+  /**
    * CAPS the block span of an `eth_getLogs` window — the widest this router will ever ask any log
    * scan for, as both the starting window and the regrowth ceiling (see
    * `internal/logScan.ts#scanLogs`) (C4-P6). Default: {@link MAX_SCAN_WINDOW} (16,000,000n), the
@@ -158,11 +181,38 @@ export type CreateRouterOptions = {
   logChunkBlocks?: bigint
 }
 
+/**
+ * Per-search options for the two ITERATOR shapes (`quotes`/`swaps`) — the callbacks a streaming
+ * consumer needs and a promise-shaped one cannot use.
+ *
+ * Deliberately not a field on `QuoteRequest`/`SwapRequest`: a request is a description of a trade
+ * (serializable, loggable, comparable), and a function on it would make it none of those.
+ * Deliberately not on `CreateRouterOptions` either: a router is long-lived and shared, while these
+ * are about ONE search's progress.
+ */
+export type IterateOptions = {
+  /**
+   * Fires once, with the leading route, as soon as the search has priced anything at all — up to a
+   * whole wave before the first yield carries it (see `search/waves.ts#SearchContext.onFirstRoute`
+   * for the measurements and for why this is a callback rather than an extra yielded event).
+   *
+   * FOR A QUOTE this route IS the leader of the `status: 'quote'` result that follows, arriving
+   * early. FOR A SWAP it is only a priced lead: nothing has been compiled, simulated, or checked
+   * against the trader's readiness yet, so it must never be treated as `ready`/`needs-action` — which
+   * is why this is named for the route and not for the verdict. Either way a later wave may improve
+   * on it; the yielded results stay the only authority.
+   *
+   * Only offered on the iterator shapes: `getQuote`/`getSwap` resolve with their answer at the same
+   * moment they would have called this, so there is nothing to learn earlier.
+   */
+  onFirstRoute?: (route: QuotedRoute) => void
+}
+
 export interface Router {
   getQuote(req: QuoteRequest): Promise<QuoteResult>
   getSwap(req: SwapRequest): Promise<SwapResult>
-  quotes(req: QuoteRequest): AsyncIterable<QuoteResult>
-  swaps(req: SwapRequest): AsyncIterable<SwapResult>
+  quotes(req: QuoteRequest, opts?: IterateOptions): AsyncIterable<QuoteResult>
+  swaps(req: SwapRequest, opts?: IterateOptions): AsyncIterable<SwapResult>
   /** Validates `hint` (recomputing/looking up its identity) and upserts it into the router's index. */
   ingestPool(hint: PoolHint): Promise<void>
   /** Routes every log through every enabled module's `parsePoolLog`; non-matching and malformed logs
@@ -753,6 +803,9 @@ export function createRouter(opts: CreateRouterOptions): Router {
     // otherwise report. See `constants.ts#MAX_CONCURRENCY` for the upper bound's reasoning.
     throw new RouterConfigError(`concurrency must be an integer in [1, ${MAX_CONCURRENCY}], got ${opts.concurrency}`)
   }
+  if (opts.assumeChainId !== undefined && (!Number.isInteger(opts.assumeChainId) || opts.assumeChainId < 1)) {
+    throw new RouterConfigError(`assumeChainId must be a positive integer chain id, got ${opts.assumeChainId}`)
+  }
   if (opts.logChunkBlocks !== undefined && opts.logChunkBlocks < MIN_CHUNK) {
     // `logChunkBlocks` below `MIN_CHUNK` (0n, negative, or merely too small) hands `scanLogs` a
     // window it can never usefully shrink further: `chunkStart = maxBig(fromBlock, cursor -
@@ -824,7 +877,7 @@ export function createRouter(opts: CreateRouterOptions): Router {
     if (!inFlight) {
       inFlight = (async () => {
         try {
-          await validateManifest(client, manifest)
+          await validateManifest(client, manifest, opts.assumeChainId !== undefined ? { assumeChainId: opts.assumeChainId } : undefined)
           validation = { kind: 'ok' }
         } catch (err) {
           if (err instanceof RouterConfigError) validation = { kind: 'config-error', error: err }
@@ -837,7 +890,7 @@ export function createRouter(opts: CreateRouterOptions): Router {
     return inFlight
   }
 
-  function buildContext(req: QuoteRequest): SearchContext {
+  function buildContext(req: QuoteRequest, iterate?: IterateOptions): SearchContext {
     return {
       client,
       manifest,
@@ -847,6 +900,7 @@ export function createRouter(opts: CreateRouterOptions): Router {
       head,
       semaphore,
       logChunkBlocks: opts.logChunkBlocks,
+      onFirstRoute: iterate?.onFirstRoute,
     }
   }
 
@@ -894,7 +948,7 @@ export function createRouter(opts: CreateRouterOptions): Router {
     }
   }
 
-  function quotes(req: QuoteRequest): AsyncIterable<QuoteResult> {
+  function quotes(req: QuoteRequest, iterate?: IterateOptions): AsyncIterable<QuoteResult> {
     validateQuoteRequest(req, manifest)
     return (async function* () {
       try {
@@ -904,7 +958,7 @@ export function createRouter(opts: CreateRouterOptions): Router {
         yield rpcUnavailable(manifest)
         return
       }
-      const ctx = buildContext(req)
+      const ctx = buildContext(req, iterate)
       try {
         for await (const e of searchWaves(ctx, req, 'quote')) yield classifyQuote(e)
       } catch (err) {
@@ -914,7 +968,7 @@ export function createRouter(opts: CreateRouterOptions): Router {
     })()
   }
 
-  function swaps(req: SwapRequest): AsyncIterable<SwapResult> {
+  function swaps(req: SwapRequest, iterate?: IterateOptions): AsyncIterable<SwapResult> {
     validateSwapRequest(req, manifest)
     return (async function* () {
       try {
@@ -924,7 +978,7 @@ export function createRouter(opts: CreateRouterOptions): Router {
         yield rpcUnavailable(manifest)
         return
       }
-      const ctx = buildContext(req)
+      const ctx = buildContext(req, iterate)
       try {
         for await (const e of searchWaves(ctx, req, 'swap')) yield classifySwap(e)
       } catch (err) {

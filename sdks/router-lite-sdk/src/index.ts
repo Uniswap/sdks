@@ -15,7 +15,7 @@
 import type { QuoteResult, SwapResult } from './types'
 
 export { createRouter } from './router'
-export type { CreateRouterOptions, Router, RouterStats } from './router'
+export type { CreateRouterOptions, IterateOptions, Router, RouterStats } from './router'
 
 export {
   manifestFor,
