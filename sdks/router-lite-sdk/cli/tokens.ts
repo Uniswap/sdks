@@ -170,12 +170,41 @@ export async function resolveToken(
     return fetchTokenMeta(client, manifest.chainId, input)
   }
 
+  // ONE UNREADABLE INTERMEDIATE MUST NOT DECIDE THE COMMAND. Resolving a symbol reads every core
+  // intermediate the manifest carries — five of them on mainnet — and under `Promise.all` a single
+  // rejection discarded all five answers, including the one the user asked for. The live shape is a
+  // budgeted run (`retryCount: 0`, so one 429 fails a read outright): `rl quote eth usdc 1` died
+  // reporting `rpc unavailable while resolving token 0x2260…C599` — wBTC, a token the user never
+  // typed, whose metadata the command did not need and would have thrown away.
+  //
+  // `allSettled`, so the match is looked for among the reads that DID answer. What the failures are
+  // allowed to decide is only what happens when there is no match, because then — and only then —
+  // they are load-bearing: an unread candidate is a candidate whose symbol might have been the one.
   const candidates = symbolCandidates(manifest)
-  const metas = await Promise.all(candidates.map((addr) => fetchTokenMeta(client, manifest.chainId, addr)))
-  const match = metas.find((m) => m.symbol.toLowerCase() === lower)
+  const settled = await Promise.allSettled(candidates.map((addr) => fetchTokenMeta(client, manifest.chainId, addr)))
+  const resolved = settled.flatMap((s) => (s.status === 'fulfilled' ? [s.value] : []))
+  const match = resolved.find((m) => m.symbol.toLowerCase() === lower)
   if (match) return match
 
-  const available = ['eth', ...metas.map((m) => m.symbol)].join(', ')
+  const available = ['eth', ...resolved.map((m) => m.symbol)].join(', ')
+  const failures = settled.flatMap((s) => (s.status === 'rejected' ? [s.reason] : []))
+
+  // "Unknown token" is a claim about the CHAIN, and it may only be made off a complete reading of
+  // it. With exactly one candidate unread, that candidate is the whole doubt: its own error is the
+  // most specific true thing available, and it already carries the right class — `RpcError` (exit 2,
+  // ask again) for a lost read, `UsageError` (exit 3) for an intermediate that genuinely is not an
+  // ERC-20 here.
+  if (failures.length === 1) throw failures[0]
+  // More than one, and no single error is the story. Still inconclusive rather than a usage mistake,
+  // which is the distinction `RpcError` exists for: a script told 3 ("fix your arguments") for
+  // something a retry would have fixed is exactly the bug that class was introduced to end.
+  if (failures.length > 1) {
+    throw new RpcError(
+      `could not resolve '${input}': ${failures.length} of this chain's ${candidates.length} core intermediates did not ` +
+        `answer (first: ${firstLine(failures[0])}) — of the rest, the resolvable symbols are: ${available}`,
+    )
+  }
+
   throw new UsageError(
     `unknown token '${input}' on this chain — resolvable symbols here are: ${available}; anything else needs its address`,
   )

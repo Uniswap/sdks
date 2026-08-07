@@ -258,10 +258,13 @@ export function minAmountOut(amountOut: bigint, slippageBps = 100): bigint {
 /**
  * A one-line summary of what a search saw — the difference between a useful failure and a puzzle.
  *
- * Every field this reads is either on the result union's base (`search`, `alternatives`) or reached
- * by narrowing on the status tag. There is no `'x' in r` shape-probing anywhere in here, which is
- * the whole point of hoisting the status-agnostic fields: telemetry code should not have to guess
- * which variant it was handed to find out how far the search got or what it priced.
+ * Every field this reads is either on the result union's base (`search`, `alternatives`), reached by
+ * narrowing on the status tag, or — for the leader alone — probed with `'best' in r`. That one
+ * exception is the QUOTE/SWAP seam rather than sloppiness: a swap's `inconclusive` can carry a
+ * leader (verification is a step that can be cut short with the route already priced), while a
+ * quote's cannot exist at all, since anything priced is reported as `status: 'quote'` however
+ * incomplete the search (`types.ts#QuoteResult`). Two unions, one function, and no tag distinguishes
+ * them — so the leader is the one field that has to be asked for rather than narrowed to.
  */
 export function describeResult(r: QuoteResult | SwapResult): string {
   const discovery = Object.entries(r.search.discovery)
@@ -273,9 +276,10 @@ export function describeResult(r: QuoteResult | SwapResult): string {
   // route whenever the search got far enough to find one. `reason.code` (C4-P5) is the stable part;
   // `detail` is the human-readable prose, appended only when it says more than the code alone.
   const reason = r.status === 'no-route' || r.status === 'inconclusive' ? ` reason="${r.reason.code}: ${r.reason.detail}"` : ''
+  const leader = 'best' in r ? r.best : undefined
   const best =
-    r.status !== 'no-route' && r.best !== undefined
-      ? ` best=[${r.best.route.legs.map((l) => l.pool.protocol).join('>')}] out=${r.best.quote.amountOut}`
+    leader !== undefined
+      ? ` best=[${leader.route.legs.map((l) => l.pool.protocol).join('>')}] out=${leader.quote.amountOut}`
       : ''
   // `attempted/succeeded/failed~transportFailed+unattempted` — the transport tally is called out
   // separately because "the provider dropped the call" and "the call reverted" are the difference

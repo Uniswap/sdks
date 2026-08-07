@@ -244,37 +244,55 @@ function parseConcurrency(raw: string | undefined): number | undefined {
 // adjacency waves that keep it that busy.
 //
 // A ref'd timer would hold the process open for the remainder of the budget
-// after a fast command finishes, so {@link cancelBudget} clears it — from
-// `rl.ts`'s `finally` and from its signal handlers, next to the cache flush
-// that already runs there for the same "one invocation, one context" reason.
+// after a fast command finishes, so the caller must clear it — which is why
+// {@link startBudget} hands back a `cancel` and every command runs it in a
+// `finally`, the error paths included.
+//
+// THE TIMER IS RETURNED, NOT PARKED IN A MODULE. It used to live in a
+// module-level `pendingBudgetTimer` that a module-level `cancelBudget()`
+// cleared from `rl.ts`, which made the timer's owner (the command that started
+// it) and its canceller (the process's exit path) two different things with a
+// mutable global between them: a second `startBudget` overwrote the first
+// handle and leaked it, the cancel applied to whichever call happened to be
+// last, and tests had to scrub the global in an `afterEach` to stay
+// independent. One invocation only ever starts one budget, so nothing was
+// observably broken — but the shape said otherwise, and a lifetime that a
+// `finally` can express does not need a global to hold it.
 //
 // THE SDK IS NOT AFFECTED and needs no change: it consumes whatever
 // `AbortSignal` it is handed and never manufactures one. This is a fact about
 // how a HOST should build the signal, so it belongs in the host.
 // ---------------------------------------------------------------------------
 
-let pendingBudgetTimer: ReturnType<typeof setTimeout> | undefined
+/**
+ * `--budget`'s live clock: the `AbortSignal` the search carries, and the handle that stops the timer
+ * holding the process open once the command is done with it.
+ */
+export type Budget = {
+  /** The search's signal, or `undefined` for an unbudgeted run (see {@link startBudget}). */
+  signal: AbortSignal | undefined
+  /** Clears the timer. Idempotent, never throws, and a no-op for an unbudgeted run. */
+  cancel: () => void
+}
 
 /**
- * Starts `--budget`'s clock and returns the `AbortSignal` the search should carry, or `undefined`
- * for an unbudgeted run — absence is how the SDK tells a bounded search from an unbounded one, so an
- * unbudgeted run must get no signal at all rather than one that never fires.
+ * Starts `--budget`'s clock. `signal` is `undefined` for an unbudgeted run — absence is how the SDK
+ * tells a bounded search from an unbounded one, so an unbudgeted run must get no signal at all
+ * rather than one that never fires.
  *
  * CALL IT IMMEDIATELY BEFORE THE SEARCH, on the same line as the command's own `started` stamp: the
  * budget is a bound on searching, and everything between this call and the first `eth_call` is what
  * it is spent on. See this section's header for what starting it any earlier cost.
+ *
+ * CANCEL IT IN A `finally`. The timer is ref'd on purpose (that is the whole fix above), so a
+ * command that finishes — or throws — before its budget expires would otherwise hold the runtime
+ * open for the remainder of it.
  */
-export function startBudget(budgetMs: number | undefined): AbortSignal | undefined {
-  if (budgetMs === undefined) return undefined
+export function startBudget(budgetMs: number | undefined): Budget {
+  if (budgetMs === undefined) return { signal: undefined, cancel: () => {} }
   const controller = new AbortController()
-  pendingBudgetTimer = setTimeout(() => controller.abort(), budgetMs)
-  return controller.signal
-}
-
-/** Clears the budget timer so a finished command exits immediately. Idempotent; never throws. */
-export function cancelBudget(): void {
-  if (pendingBudgetTimer !== undefined) clearTimeout(pendingBudgetTimer)
-  pendingBudgetTimer = undefined
+  const timer = setTimeout(() => controller.abort(), budgetMs)
+  return { signal: controller.signal, cancel: () => clearTimeout(timer) }
 }
 
 export type TradeContextResolved = {

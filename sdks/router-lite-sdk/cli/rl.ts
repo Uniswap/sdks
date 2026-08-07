@@ -44,7 +44,6 @@ import { bold, dim, red, setColorEnabled } from './ansi'
 import { UsageError } from './args'
 import { flushCacheSave } from './cache'
 import { cmdChains } from './commands/chains'
-import { cancelBudget } from './commands/context'
 import { cmdDiscover } from './commands/discover'
 import { cmdQuote } from './commands/quote'
 import { cmdSwap } from './commands/swap'
@@ -156,10 +155,12 @@ async function main(): Promise<number> {
     // died partway still learned real, block-ranged coverage, and discarding it would make exactly
     // the runs that are already going badly permanently slow. `flushCacheSave` never throws, so this
     // cannot change the exit code a branch above already decided on.
+    //
+    // The `--budget` clock is NOT cancelled here, and no longer can be: its ref'd timer (see
+    // `commands/context.ts#startBudget`) belongs to the command that started it, which clears it in
+    // its own `finally` — a lifetime a scope can express, rather than a module-level handle this
+    // file reaches across to clear.
     await flushCacheSave()
-    // The `--budget` clock is a REF'D timer (see `commands/context.ts#budgetSignal`), so a command
-    // that finished early would otherwise hold the process open for the rest of its budget.
-    cancelBudget()
   }
 }
 
@@ -184,9 +185,10 @@ for (const [signal, signo] of [
   process.on(signal, () => {
     void (async (): Promise<void> => {
       // `flushCacheSave` clears its own registration, so the `finally` in `main` — if it ever gets to
-      // run — is a no-op rather than a second write, and the save itself never throws.
+      // run — is a no-op rather than a second write, and the save itself never throws. A pending
+      // budget timer needs no attention on this path: `process.exit` does not wait for the loop to
+      // drain, so nothing it holds open can delay the exit.
       await flushCacheSave()
-      cancelBudget()
       process.exit(128 + signo)
     })()
   })

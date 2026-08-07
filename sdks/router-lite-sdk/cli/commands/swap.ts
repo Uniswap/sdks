@@ -71,60 +71,68 @@ export async function cmdSwap(argv: string[]): Promise<number> {
   const verbose = parsed.booleans.has('verbose')
   // Same placement as `quote`'s: `--budget` bounds the SEARCH, so its clock (and the elapsed-time
   // origin that shares it) starts here rather than back in `buildChainContext`.
-  const signal = startBudget(ctx.budgetMs)
-  const started = Date.now()
+  const budget = startBudget(ctx.budgetMs)
+  const signal = budget.signal
+  // The budget's timer is REF'D on purpose (see `context.ts`), so it is cleared here on every exit
+  // path — a command that finishes, or throws, before its budget expires must not hold the process
+  // open for the remainder of it.
+  try {
+    const started = Date.now()
 
-  const request: SwapRequest = {
-    tokenIn: trade.tokenIn.ref,
-    tokenOut: trade.tokenOut.ref,
-    amountIn: trade.amountIn,
-    trader,
-    ...(recipient ? { recipient } : {}),
-    ...(slippageBps !== undefined ? { slippageBps } : {}),
-    ...(deadlineSeconds !== undefined ? { deadlineSeconds } : {}),
-    ...(trade.hints.length > 0 ? { hints: trade.hints } : {}),
-    ...(signal ? { signal } : {}),
+    const request: SwapRequest = {
+      tokenIn: trade.tokenIn.ref,
+      tokenOut: trade.tokenOut.ref,
+      amountIn: trade.amountIn,
+      trader,
+      ...(recipient ? { recipient } : {}),
+      ...(slippageBps !== undefined ? { slippageBps } : {}),
+      ...(deadlineSeconds !== undefined ? { deadlineSeconds } : {}),
+      ...(trade.hints.length > 0 ? { hints: trade.hints } : {}),
+      ...(signal ? { signal } : {}),
+    }
+    const tradeCtx: TradeContext = { tokenIn: trade.tokenIn.ref, tokenOut: trade.tokenOut.ref, amountIn: trade.amountIn }
+
+    let final: SwapResult | undefined
+    if (!watch && !verbose) {
+      final = await ctx.router.getSwap(request)
+    } else {
+      // A swap's first priced route is a LEAD, not an executable answer (nothing is compiled or
+      // simulated yet) — `firstRouteReporter` labels it as such; see `src/router.ts#IterateOptions`.
+      const results = ctx.router.swaps(request, {
+        onFirstRoute: firstRouteReporter({ json, started, tradeCtx, renderCtx: trade.renderCtx }),
+      })
+      final = await iterateWaves(results, tradeCtx, trade.renderCtx, {
+        json,
+        started,
+        // `--watch` drains the whole bounded search; `--verbose` alone stops at the first actionable
+        // wave, which for a swap is a result that carries a transaction.
+        stopAt: (result) => !watch && (result.status === 'ready' || result.status === 'needs-action'),
+        hydrate: (routes) => hydrateLegSymbols(ctx, trade.renderCtx, routes),
+      })
+      if (!json && final) console.log('')
+    }
+    if (!final) return 2
+
+    const elapsed = Date.now() - started
+    if (json && !watch && !verbose) {
+      console.log(jsonify(final))
+    } else if (!json) {
+      await hydrateLegSymbols(ctx, trade.renderCtx, [...('best' in final && final.best ? [final.best] : []), ...final.alternatives])
+      console.log(renderSwapResult(final, tradeCtx, trade.renderCtx, elapsed).join('\n'))
+    }
+
+    if (parsed.booleans.has('simulate')) {
+      const verdict = await runSimulation(ctx, final, trader, recipient ?? trader, tradeCtx, trade.renderCtx, json)
+      // A simulation that DISPROVED the tx must not exit 0 — a script gating on "swap --simulate"
+      // would otherwise treat a proven-broken transaction as a success. Dedicated code 5 (documented
+      // in rl.ts/README) keeps it distinguishable from `inconclusive` (2): the chain gave a verdict.
+      if (verdict === 'disproved') return 5
+    }
+
+    return exitCodeFor(final.status)
+  } finally {
+    budget.cancel()
   }
-  const tradeCtx: TradeContext = { tokenIn: trade.tokenIn.ref, tokenOut: trade.tokenOut.ref, amountIn: trade.amountIn }
-
-  let final: SwapResult | undefined
-  if (!watch && !verbose) {
-    final = await ctx.router.getSwap(request)
-  } else {
-    // A swap's first priced route is a LEAD, not an executable answer (nothing is compiled or
-    // simulated yet) — `firstRouteReporter` labels it as such; see `src/router.ts#IterateOptions`.
-    const results = ctx.router.swaps(request, {
-      onFirstRoute: firstRouteReporter({ json, started, tradeCtx, renderCtx: trade.renderCtx }),
-    })
-    final = await iterateWaves(results, tradeCtx, trade.renderCtx, {
-      json,
-      started,
-      // `--watch` drains the whole bounded search; `--verbose` alone stops at the first actionable
-      // wave, which for a swap is a result that carries a transaction.
-      stopAt: (result) => !watch && (result.status === 'ready' || result.status === 'needs-action'),
-      hydrate: (routes) => hydrateLegSymbols(ctx, trade.renderCtx, routes),
-    })
-    if (!json && final) console.log('')
-  }
-  if (!final) return 2
-
-  const elapsed = Date.now() - started
-  if (json && !watch && !verbose) {
-    console.log(jsonify(final))
-  } else if (!json) {
-    await hydrateLegSymbols(ctx, trade.renderCtx, [...('best' in final && final.best ? [final.best] : []), ...final.alternatives])
-    console.log(renderSwapResult(final, tradeCtx, trade.renderCtx, elapsed).join('\n'))
-  }
-
-  if (parsed.booleans.has('simulate')) {
-    const verdict = await runSimulation(ctx, final, trader, recipient ?? trader, tradeCtx, trade.renderCtx, json)
-    // A simulation that DISPROVED the tx must not exit 0 — a script gating on "swap --simulate"
-    // would otherwise treat a proven-broken transaction as a success. Dedicated code 5 (documented
-    // in rl.ts/README) keeps it distinguishable from `inconclusive` (2): the chain gave a verdict.
-    if (verdict === 'disproved') return 5
-  }
-
-  return exitCodeFor(final.status)
 }
 
 /** The `--simulate` leg: probe for eth_simulateV1, then prove the final tx end to end. Returns

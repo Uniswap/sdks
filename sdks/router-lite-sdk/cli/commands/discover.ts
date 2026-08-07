@@ -43,63 +43,70 @@ export async function cmdDiscover(argv: string[]): Promise<number> {
   const json = parsed.booleans.has('json')
   // `--budget` bounds the search, so its clock starts here — after chain detection, the cache load
   // and both tokens' metadata reads, none of which this command's budget is meant to pay for.
-  const signal = startBudget(ctx.budgetMs)
-
-  // One unit of the token is enough to drive discovery; the amount only shapes quotes, not coverage.
-  const request = {
-    tokenIn: token.ref,
-    tokenOut: via.ref,
-    amountIn: 10n ** BigInt(token.decimals),
-    focusToken: token.ref,
-    ...(signal ? { signal } : {}),
-  }
-
-  let final: QuoteResult | undefined
-  for await (const result of ctx.router.quotes(request)) {
-    final = result
-    if (!json && parsed.booleans.has('verbose')) {
-      const q = result.search.quoting
-      console.log(dim(`wave: ${q.succeeded}/${q.attempted} quotes ok, ${ctx.index.stats().pools} pools indexed`))
+  const budget = startBudget(ctx.budgetMs)
+  const signal = budget.signal
+  // The budget's timer is REF'D on purpose (see `context.ts`), so it is cleared here on every exit
+  // path — a command that finishes, or throws, before its budget expires must not hold the process
+  // open for the remainder of it.
+  try {
+    // One unit of the token is enough to drive discovery; the amount only shapes quotes, not coverage.
+    const request = {
+      tokenIn: token.ref,
+      tokenOut: via.ref,
+      amountIn: 10n ** BigInt(token.decimals),
+      focusToken: token.ref,
+      ...(signal ? { signal } : {}),
     }
-  }
 
-  const neighbors = ctx.index.neighbors(token.ref)
-  const records = [...neighbors.values()].flat()
-  const byProtocol = new Map<Protocol, PoolRecord[]>()
-  for (const p of PROTOCOLS) byProtocol.set(p, [])
-  for (const rec of records) byProtocol.get(rec.pool.protocol)!.push(rec)
+    let final: QuoteResult | undefined
+    for await (const result of ctx.router.quotes(request)) {
+      final = result
+      if (!json && parsed.booleans.has('verbose')) {
+        const q = result.search.quoting
+        console.log(dim(`wave: ${q.succeeded}/${q.attempted} quotes ok, ${ctx.index.stats().pools} pools indexed`))
+      }
+    }
 
-  if (json) {
-    console.log(
-      jsonify({
-        token: { ref: token.ref, symbol: token.symbol },
-        counterparty: { ref: via.ref, symbol: via.symbol },
-        pools: records.map((rec) => ({ ...rec, discredited: isDiscredited(rec) })),
-        stats: ctx.router.stats(),
-        search: final?.search,
-      }),
-    )
-    return 0
-  }
+    const neighbors = ctx.index.neighbors(token.ref)
+    const records = [...neighbors.values()].flat()
+    const byProtocol = new Map<Protocol, PoolRecord[]>()
+    for (const p of PROTOCOLS) byProtocol.set(p, [])
+    for (const rec of records) byProtocol.get(rec.pool.protocol)!.push(rec)
 
-  const renderCtx = await counterpartyViews(ctx, token, records)
-  console.log(bold(`pools seen for ${token.symbol} on ${ctx.chain.label} (${records.length} total)`))
-  for (const p of PROTOCOLS) {
-    const recs = byProtocol.get(p)!
-    console.log(`  ${bold(p)} ${dim(`(${recs.length})`)}`)
-    const shown = recs.slice(0, 50)
-    for (const rec of shown) console.log(`    ${renderRecord(rec, token, renderCtx)}`)
-    if (recs.length > shown.length) console.log(dim(`    … and ${recs.length - shown.length} more`))
-  }
+    if (json) {
+      console.log(
+        jsonify({
+          token: { ref: token.ref, symbol: token.symbol },
+          counterparty: { ref: via.ref, symbol: via.symbol },
+          pools: records.map((rec) => ({ ...rec, discredited: isDiscredited(rec) })),
+          stats: ctx.router.stats(),
+          search: final?.search,
+        }),
+      )
+      return 0
+    }
 
-  const stats = ctx.router.stats()
-  console.log('')
-  console.log(dim(`index: ${stats.pools} pools · ${stats.adjacencyEdges} adjacency edges · ${stats.coverageScopes} coverage scopes`))
-  if (final) {
+    const renderCtx = await counterpartyViews(ctx, token, records)
+    console.log(bold(`pools seen for ${token.symbol} on ${ctx.chain.label} (${records.length} total)`))
+    for (const p of PROTOCOLS) {
+      const recs = byProtocol.get(p)!
+      console.log(`  ${bold(p)} ${dim(`(${recs.length})`)}`)
+      const shown = recs.slice(0, 50)
+      for (const rec of shown) console.log(`    ${renderRecord(rec, token, renderCtx)}`)
+      if (recs.length > shown.length) console.log(dim(`    … and ${recs.length - shown.length} more`))
+    }
+
+    const stats = ctx.router.stats()
     console.log('')
-    console.log(renderSearchReport(final.search).join('\n'))
+    console.log(dim(`index: ${stats.pools} pools · ${stats.adjacencyEdges} adjacency edges · ${stats.coverageScopes} coverage scopes`))
+    if (final) {
+      console.log('')
+      console.log(renderSearchReport(final.search).join('\n'))
+    }
+    return 0
+  } finally {
+    budget.cancel()
   }
-  return 0
 }
 
 /**

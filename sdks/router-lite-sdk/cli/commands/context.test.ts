@@ -6,7 +6,7 @@ import { afterEach, describe, expect, test } from 'bun:test'
 
 import type { ParsedArgs } from '../args'
 
-import { buildChainContext, cancelBudget, startBudget } from './context'
+import { buildChainContext, startBudget } from './context'
 
 // ---------------------------------------------------------------------------
 // `buildChainContext` — the three things it decides that nothing else can.
@@ -84,10 +84,22 @@ function args(opts: { budget?: string } = {}): ParsedArgs {
 
 afterEach(() => {
   globalThis.fetch = realFetch
-  // A budget timer is REF'D on purpose (that is the whole fix), so a test that left one pending
-  // would hold the runtime open for the rest of its budget. Cancelling here is the same discipline
-  // `rl.ts` applies in its `finally`.
-  cancelBudget()
+})
+
+/**
+ * Every budget a test starts, so none is left holding the runtime open for the rest of its window —
+ * the same discipline each command applies in its own `finally`. A LOCAL list rather than a module
+ * reset, because the timer is no longer module state: `startBudget` hands its `cancel` back to
+ * whoever started it, and this is that owner.
+ */
+const started: (() => void)[] = []
+function budgetFor(budgetMs: number | undefined): ReturnType<typeof startBudget> {
+  const budget = startBudget(budgetMs)
+  started.push(budget.cancel)
+  return budget
+}
+afterEach(() => {
+  for (const cancel of started.splice(0)) cancel()
 })
 
 // ---------------------------------------------------------------------------
@@ -101,7 +113,7 @@ describe('the budget signal', () => {
     stubFetch(chainIdThen(undefined, { hang: true }))
     const ctx = await buildChainContext(args({ budget: '40ms' }))
     const started = Date.now()
-    const signal = startBudget(ctx.budgetMs)!
+    const signal = budgetFor(ctx.budgetMs).signal!
 
     expect(signal).toBeDefined()
     expect(signal.aborted).toBe(false) // not pre-aborted: the budget is a deadline, not a veto
@@ -120,7 +132,7 @@ describe('the budget signal', () => {
     stubFetch(chainIdThen('0x1'))
     const ctx = await buildChainContext(args())
     expect(ctx.budgetMs).toBeUndefined()
-    expect(startBudget(ctx.budgetMs)).toBeUndefined()
+    expect(budgetFor(ctx.budgetMs).signal).toBeUndefined()
   })
 
   test('THE CLOCK DOES NOT START DURING SETUP — only when the command starts its search', async () => {
@@ -136,32 +148,58 @@ describe('the budget signal', () => {
     // longer than the whole budget. A clock started in `buildChainContext` has already fired by now.
     await new Promise((r) => setTimeout(r, 80))
 
-    const signal = startBudget(ctx.budgetMs)!
+    const signal = budgetFor(ctx.budgetMs).signal!
     expect(signal.aborted).toBe(false) // the search gets its full budget, not the remainder of one
     await new Promise<void>((resolve) => signal.addEventListener('abort', () => resolve(), { once: true }))
     expect(signal.aborted).toBe(true)
   })
 
-  test('cancelBudget clears the timer: a finished command does not keep waiting', async () => {
+  test('the returned cancel clears the timer: a finished command does not keep waiting', async () => {
     stubFetch(chainIdThen('0x1'))
     const ctx = await buildChainContext(args({ budget: '40ms' }))
-    const signal = startBudget(ctx.budgetMs)!
+    const budget = budgetFor(ctx.budgetMs)
 
-    cancelBudget()
+    budget.cancel()
     await new Promise((r) => setTimeout(r, 90)) // well past the budget
 
     // Still not aborted, which is the observable half of "the process would have exited by now".
-    expect(signal.aborted).toBe(false)
+    expect(budget.signal!.aborted).toBe(false)
   })
 
-  test('cancelBudget is idempotent, and safe with no budget in flight', () => {
-    // Called from `rl.ts`'s `finally` AND from its signal handlers, so a Ctrl-C during a normal exit
-    // reaches it twice. A second `clearTimeout` on a cleared handle must not throw.
+  test('cancel is idempotent, and present even on an unbudgeted run', async () => {
+    // Every command calls it from a `finally`, and an unbudgeted one takes the same path as a
+    // budgeted one — so the no-budget case has to hand back a callable no-op rather than nothing,
+    // and a second `clearTimeout` on a cleared handle must not throw.
+    stubFetch(chainIdThen('0x1'))
+    const unbudgeted = startBudget(undefined)
+    expect(unbudgeted.signal).toBeUndefined()
     expect(() => {
-      cancelBudget()
-      cancelBudget()
-      cancelBudget()
+      unbudgeted.cancel()
+      unbudgeted.cancel()
     }).not.toThrow()
+
+    const budget = budgetFor((await buildChainContext(args({ budget: '40ms' }))).budgetMs)
+    expect(() => {
+      budget.cancel()
+      budget.cancel()
+    }).not.toThrow()
+  })
+
+  test('two budgets in one process are independent — cancelling one does not disarm the other', () => {
+    // The shape the module-level handle could not express: it held ONE timer, so a second
+    // `startBudget` overwrote (and leaked) the first, and `cancelBudget` cleared whichever call
+    // happened to be last. One invocation only ever starts one budget, so nothing was observably
+    // broken — but nothing said so either, and the returned handle makes it true by construction.
+    const a = budgetFor(30)
+    const b = budgetFor(30)
+    a.cancel()
+    expect(b.signal!.aborted).toBe(false)
+    return new Promise<void>((resolve) => {
+      b.signal!.addEventListener('abort', () => {
+        expect(a.signal!.aborted).toBe(false) // the cancelled one never fires
+        resolve()
+      })
+    })
   })
 })
 
@@ -260,7 +298,7 @@ describe('the unref’d-timer escape stays closed', () => {
     // worse than no test at all.
     //
     // So the durable defense is the shape of the code: `--budget` builds its own `AbortController`
-    // behind an ordinary ref'd `setTimeout` (see `context.ts#budgetSignal`), and nothing in the host
+    // behind an ordinary ref'd `setTimeout` (see `context.ts#startBudget`), and nothing in the host
     // may go back to the one-liner. Reverting the fix is what fails here, immediately and cheaply.
     const offenders = cliSources().filter((f) => f.text.includes(FORBIDDEN))
     expect(offenders.map((f) => f.path)).toEqual([])
