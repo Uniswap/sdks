@@ -38,6 +38,13 @@ import type { ChainManifest, UniversalRouterDeployment } from './types'
  * change; `manifest.parity.test.ts` (a devDependency-only import) asserts the four literals still
  * equal `CHAIN_TO_ADDRESSES_MAP[chainId].v4QuoterAddress` so any future drift between the two is
  * caught in CI rather than silently shipped.
+ *
+ * MULTICALL3 — no `multicall3` field, deliberately: the canonical deployment
+ * (`0xcA11bde05977b3631167028862bE2a173976CA11`, `internal/multicall.ts`) VERIFIED live 2026-08-07
+ * at head 25,706,349 — 3,808 bytes of code, keccak `0xd5c15df6…8e770891`, byte-identical on all five
+ * built-in chains (each verified the same day; see the other four manifests' notes). The router
+ * still probes it at runtime before aggregating (`router.ts#resolveMulticall3`) — this note is why
+ * the DEFAULT is right for this chain, not a substitute for the probe.
  */
 export const MAINNET_MANIFEST: ChainManifest = {
   chainId: 1,
@@ -109,6 +116,9 @@ export const MAINNET_MANIFEST: ChainManifest = {
  *    Universal Router" in one launch sequence.
  *  - `v3QuoterV2` bytecode length 8,273 bytes (16,546 hex chars), matching canonical QuoterV2 exactly (and matching
  *    `sdk-core`'s Base `quoterAddress`, which — unlike Unichain/Arbitrum — already IS QuoterV2 here).
+ *  - Canonical Multicall3 VERIFIED live 2026-08-07 at head 49,677,841 (`https://mainnet.base.org`):
+ *    3,808 bytes, keccak `0xd5c15df6…8e770891` — byte-identical to mainnet's. No `multicall3` field
+ *    needed; see MAINNET_MANIFEST's note.
  */
 export const BASE_MANIFEST: ChainManifest = {
   chainId: 8453,
@@ -158,6 +168,9 @@ export const BASE_MANIFEST: ChainManifest = {
  *    (8,273 bytes / 16,546 hex chars) as the true QuoterV2. `sdk-core`'s Unichain `quoterAddress`
  *    (`0x565ac8c7863d9bb16d07e809ff49fe5cd467634c`) is a DIFFERENT, larger contract (10,541 bytes /
  *    21,082 hex chars) — almost certainly QuoterV1-shaped — and must never be used here.
+ *  - Canonical Multicall3 VERIFIED live 2026-08-07 at head 55,396,666: 3,808 bytes, keccak
+ *    `0xd5c15df6…8e770891` — byte-identical to mainnet's. No `multicall3` field needed; see
+ *    MAINNET_MANIFEST's note.
  */
 export const UNICHAIN_MANIFEST: ChainManifest = {
   chainId: 130,
@@ -226,6 +239,10 @@ export const UNICHAIN_MANIFEST: ChainManifest = {
  *  of the deployment transaction itself, whose constructor emitted this log in the same call. Cross-
  *  check: `universal-router-sdk`'s Arbitrum UR 2.0 `creationBlock` is 297,842,906, only 34 blocks
  *  later — consistent with "deploy poolManager, then Universal Router" moments apart.
+ *
+ *  Canonical Multicall3 VERIFIED live 2026-08-07 at head 492,205,733: 3,808 bytes, keccak
+ *  `0xd5c15df6…8e770891` — byte-identical to mainnet's. No `multicall3` field needed; see
+ *  MAINNET_MANIFEST's note.
  */
 export const ARBITRUM_MANIFEST: ChainManifest = {
   chainId: 42161,
@@ -351,6 +368,13 @@ export const ARBITRUM_MANIFEST: ChainManifest = {
  * Robinhood Chain's OWN weth/v2Factory/v3Factory/poolManager/permit2. IMMUTABLE FINGERPRINTING, NOT
  * `eth_getCode`, IS THE ORACLE FOR "is this deployment configured for THIS chain" — the one
  * methodology note from this bring-up worth carrying to the next chain.
+ *
+ * Canonical Multicall3 VERIFIED live 2026-08-07 at head 30,603,778: 3,808 bytes, keccak
+ * `0xd5c15df6…8e770891` — byte-identical to mainnet's, so even this from-scratch Orbit chain carries
+ * the canonical CREATE2 deployment. (Multicall3 bakes in no chain-specific immutables — it is pure
+ * code — so byte-identity IS the whole check here, unlike the Universal Router case above.) The
+ * study's 9/9 wave-0 probes agreed byte-for-byte between aggregate3 and individual calls on this
+ * chain. No `multicall3` field needed; see MAINNET_MANIFEST's note.
  */
 export const ROBINHOOD_MANIFEST: ChainManifest = {
   chainId: 4663,
