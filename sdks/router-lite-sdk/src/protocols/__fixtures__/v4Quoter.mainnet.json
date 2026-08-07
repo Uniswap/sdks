@@ -1,0 +1,22 @@
+{
+  "_comment": "Real V4Quoter.quoteExactInput returndata captured from mainnet (ETH/USDC 500/10, no hooks) — see `command` below to re-capture.",
+  "captured": true,
+  "chainId": 1,
+  "quoter": "0x52f0e24d1c21c8a0cb1e5a5dd6198556bd9e1203",
+  "blockNumber": 25677711,
+  "exactCurrency": "0x0000000000000000000000000000000000000000",
+  "path": [
+    {
+      "intermediateCurrency": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "fee": 500,
+      "tickSpacing": 10,
+      "hooks": "0x0000000000000000000000000000000000000000",
+      "hookData": "0x"
+    }
+  ],
+  "amountIn": "1000000000000000000",
+  "returnData": "0x000000000000000000000000000000000000000000000000000000006e932279000000000000000000000000000000000000000000000000000000000000fd1e",
+  "amountOut": "1855136377",
+  "gasEstimate": "64798",
+  "command": "cast call 0x52f0e24d1c21c8a0cb1e5a5dd6198556bd9e1203 \"quoteExactInput((address,(address,uint24,int24,address,bytes)[],uint128))(uint256,uint256)\" \"(0x0000000000000000000000000000000000000000,[(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,500,10,0x0000000000000000000000000000000000000000,0x)],1000000000000000000)\" --rpc-url $MAINNET_RPC_URL --block 25677711"
+}

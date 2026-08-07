@@ -1,0 +1,17 @@
+{
+  "CANARY_RPC_URL_1": {
+    "source": "live-capture",
+    "capturedAt": "2026-08-05T01:48:44.712Z",
+    "message": "HTTP request failed.\n\nStatus: 403\nURL: https://ethereum.publicnode.com/\nRequest body: {\"method\":\"eth_getLogs\",\"params\":[{\"address\":\"0x000000000004444c5dc75cB358380D2e3dE08A90\",\"fromBlock\":\"0x187e64b\",\"toBlock\":\"0x187ee1b\"}]}\n\nDetails: {\"code\":-32602,\"message\":\"Archive requests require a personal token. Get one at: https://www.allnodes.com/publicnode\"}\nVersion: viem@2.47.2"
+  },
+  "CANARY_RPC_URL_2": {
+    "source": "live-capture",
+    "capturedAt": "2026-08-05T01:49:46.735Z",
+    "message": "HTTP request failed.\n\nStatus: 400\nURL: https://eth-mainnet.public.blastapi.io/\nRequest body: {\"method\":\"eth_getLogs\",\"params\":[{\"address\":\"0x000000000004444c5dc75cB358380D2e3dE08A90\",\"fromBlock\":\"0x187e655\",\"toBlock\":\"0x187ee25\"}]}\n\nDetails: {\"code\":-32600,\"message\":\"You can make eth_getLogs requests with up to a 10 block range. Based on your parameters, this block range should work: [0x187e655, 0x187e65e]\"}\nVersion: viem@2.47.2"
+  },
+  "CANARY_RPC_URL_3": {
+    "source": "live-capture",
+    "capturedAt": "2026-08-05T01:43:14.242Z",
+    "message": "Invalid parameters were provided to the RPC method.\nDouble check you have provided the correct parameters.\n\nURL: https://eth.drpc.org\nRequest body: {\"method\":\"eth_getLogs\",\"params\":[{\"address\":\"0x000000000004444c5dc75cB358380D2e3dE08A90\",\"fromBlock\":\"0x187e639\",\"toBlock\":\"0x187ee09\"}]}\n\nDetails: query returns too many logs, narrow your filter: 20000\nVersion: viem@2.47.2"
+  }
+}

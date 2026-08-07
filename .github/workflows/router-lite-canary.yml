@@ -1,0 +1,144 @@
+name: "Router-lite Canary"
+
+# Nightly live-RPC canary for @uniswap/router-lite-sdk (Task 21's suite,
+# sdks/router-lite-sdk/canary) — testing-architecture layer 6: provider caps/batching/latency,
+# cross-provider quote agreement, and `eth_simulateV1` chained-call execution proof against the
+# real, moving mainnet head. No keys, no funds: everything runs as the fixed, permanently-unfunded
+# CANARY_TRADER.
+#
+# NEVER PR-blocking — its own workflow with no `pull_request` trigger, so it can't be added to
+# required status checks by mistake. Runs nightly (cron) plus on-demand (workflow_dispatch).
+#
+# Gated on the CANARY_RPC_URL_1/_2/_3 repo secrets (sdks/router-lite-sdk/canary/env.ts;
+# CANARY_RPC_URL_1 is required, _2/_3 are optional and only light up the cross-provider checks).
+# Until those secrets are added in repo settings, `canaryEnabled()` returns false and the suite
+# self-skips cleanly — this job stays green either way, it never fails PRs, and the failure-issue
+# step below only fires once real secrets are wired up and something actually breaks.
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: router-lite-canary
+  cancel-in-progress: false
+
+jobs:
+  canary:
+    name: Live-RPC canary (sdks/router-lite-sdk)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: false
+    permissions:
+      contents: read # checkout
+      issues: write # open/update the pinned "router-lite canary failing" issue on failure
+    env:
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+    steps:
+      - uses: bullfrogsec/bullfrog@dcde5841b19b7ef693224207a7fdec67fce604db # v0.8.3
+        with:
+          egress-policy: audit
+
+      - name: ✅ Checkout
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
+        with:
+          persist-credentials: false
+
+      - name: 💽 Setup Node
+        uses: actions/setup-node@1a4442cacd436585916779262731d5b162bc6ec7
+        with:
+          node-version: 24
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@ecf28ddc73e819eb6fa29df6b34ef8921c743461 # v2
+        with:
+          bun-version: 1.3.10
+
+      - name: 📥 Install dependencies
+        run: bun install --frozen-lockfile
+        env:
+          HUSKY: "0" # By default do not run HUSKY install
+
+      - name: 🏗  Build workspace SDKs
+        run: bun run g:build
+
+      - name: 🔎 Check for the canary RPC secret
+        run: |
+          if [ -z "$CANARY_RPC_URL_1" ]; then
+            echo "::notice::CANARY_RPC_URL_1 is not configured on this repo yet — canaryEnabled() returns false and the suite below will self-skip every test. Add CANARY_RPC_URL_1 (and optionally _2/_3) in repo settings to turn the canary on."
+          fi
+        env:
+          CANARY_RPC_URL_1: ${{ secrets.CANARY_RPC_URL_1 }}
+
+      - name: 🧪 Canary suite (live mainnet head)
+        uses: nick-fields/retry@7d4a37704547a311dbb66ebdf5b23ec19374a767
+        env:
+          ROUTER_LITE_CANARY: "1"
+          CANARY_RPC_URL_1: ${{ secrets.CANARY_RPC_URL_1 }}
+          CANARY_RPC_URL_2: ${{ secrets.CANARY_RPC_URL_2 }}
+          CANARY_RPC_URL_3: ${{ secrets.CANARY_RPC_URL_3 }}
+        with:
+          timeout_minutes: 20
+          retry_wait_seconds: 2
+          max_attempts: 3
+          command: bun test sdks/router-lite-sdk/canary
+
+      - name: 📤 Upload latency benchmarks
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: router-lite-canary-latency-${{ github.run_id }}
+          path: sdks/router-lite-sdk/canary/latency-*.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: 🚨 Open or update the pinned failure issue
+        if: failure()
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        with:
+          script: |
+            const title = 'router-lite canary failing'
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            const body = [
+              'The nightly `router-lite-canary` workflow failed.',
+              '',
+              `Run: ${runUrl}`,
+              `Commit: ${context.sha}`,
+            ].join('\n')
+
+            // Plain title search across ALL open issues (no label filter — a label filter could
+            // silently stop matching if a human removes/renames the label while triaging, which
+            // would create a duplicate every night instead of commenting on the existing one).
+            // Paginated: `listForRepo` only returns one page (30) by default, and this repo
+            // already has more open issues than that, so an unpaginated call could miss the
+            // pinned issue once other issues push it off page 1 — that would spam a new issue
+            // every night instead of finding and commenting on the existing one. `issues.list`
+            // also returns pull requests (the REST API models PRs as issues); filter those out
+            // since a PR could coincidentally share the title text.
+            const openIssues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            })
+            const existing = openIssues.find((issue) => !issue.pull_request && issue.title === title)
+
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+              })
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+              })
+            }
