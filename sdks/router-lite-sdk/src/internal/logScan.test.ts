@@ -203,28 +203,10 @@ test('S1: a TIMEOUT-shaped refusal collapses the window in ONE step instead of t
   expect(res.complete).toBe(true)
 })
 
-test('S1: a timeout BELOW the fallback width halves as usual — the collapse fires at most once', async () => {
-  // The guard is `chunkSize > DESCENT_TIMEOUT_FALLBACK`, so a stricter endpoint that also times out at
-  // 100,000 cannot get stuck re-collapsing to a width it already refused: ordinary halving resumes and
-  // every termination guarantee below is untouched.
-  const { client, filters } = stub((filter) => {
-    if (span(filter) > 20_000n) {
-      const err = new Error('The request took too long to respond.')
-      err.name = 'TimeoutError'
-      throw err
-    }
-    return []
-  })
-
-  const res = await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 20_000_000n }, { sleep: recorder().sleep })
-
-  const spans = filters.map(span)
-  expect(spans.slice(0, 2)).toEqual([MAX_SCAN_WINDOW, DESCENT_TIMEOUT_FALLBACK]) // collapse, once
-  expect(spans[2]).toBe(DESCENT_TIMEOUT_FALLBACK / 2n) // then halving, not another collapse
-  expect(spans[3]).toBe(DESCENT_TIMEOUT_FALLBACK / 4n)
-  expect(spans[4]).toBe(12_500n) // the first width this endpoint serves
-  expect(res.complete).toBe(true)
-})
+// (The collapse's ONE-SHOT guard — a timeout at or below DESCENT_TIMEOUT_FALLBACK halving as usual
+// rather than re-collapsing — is a single transition and lives in `logScanPolicy.test.ts` as
+// "AT the fallback width a transport failure halves as usual". What the scan level adds over it is
+// the collapse's effect on a real walk, which the test above pins.)
 
 test('S1: regrowth ratchets PAST the old 10k ceiling, back up to the width the endpoint really serves', async () => {
   // Cap-then-recovery: the endpoint refuses anything over 100k for the first stretch, then stops
@@ -571,6 +553,51 @@ test('R2: the give-up is per sub-range and still walks the whole span, one reque
   expect(filters.length).toBeLessThan(MAX_REQUESTS_PER_SCAN)
 })
 
+test('R2: a SPAN cap below MIN_CHUNK is remembered as NOTHING — the second scan costs exactly what the first did', async () => {
+  // The capture above (blastapi) states its ten-block cap as a DENSITY observation. This is the same
+  // unserveable width stated as a durable SPAN POLICY — quicknode's wording, whose whole point is
+  // that a span cap is a CEILING the scanner adopts for the rest of the endpoint's life. Below
+  // MIN_CHUNK it must adopt nothing, and this is the test that says so across the seam where it
+  // matters: `ScanWidthMemory`, and the scan after it.
+  //
+  // WHY TWO SCANS. A recorded ceiling of 10 is invisible in the FIRST scan, which keeps its wide
+  // width and abandons the range in two strides — and total from the second onwards, because
+  // `initialPolicy` has no MIN_CHUNK floor: it opens at chunkSize 10, the endpoint SERVES 10 blocks
+  // (its real cap is 10), nothing ever fails, nothing is ever given up, and the scan spends its
+  // entire MAX_REQUESTS_PER_SCAN budget covering 40,000 blocks of a 20,000,000-block range. Every
+  // later scan on that router does it again. The honest outcome is the one asserted here: this
+  // endpoint cannot serve a window this scanner is willing to pay for, so every scan says so in two
+  // requests and claims no coverage.
+  const memory: { learnedScanWidth?: bigint; declaredScanCap?: bigint } = {}
+  const handler = (filter: any): unknown[] => {
+    if (span(filter) > 10n) throw new Error('eth_getLogs is limited to a 10 range')
+    return []
+  }
+  const range = { fromBlock: 1n, toBlock: 20_000_000n }
+
+  const first = stub(handler)
+  const firstRes = await scanLogs(first.client, QUERY, range, { sleep: recorder().sleep, widthMemory: memory })
+
+  // Two requests: the 16M-block ceiling window, then the 4M-block remainder — each refused, each
+  // given up on the spot at the width it was asked at, which is what makes the abandonment cheap.
+  expect(first.filters.map(span)).toEqual([MAX_SCAN_WINDOW, 4_000_000n])
+  expect(firstRes.covered).toEqual([])
+  expect(firstRes.complete).toBe(false)
+
+  // NOTHING IS REMEMBERED. Not the cap (it is not a width this scanner can use, so recording it as a
+  // ceiling is recording a lie the next scan then acts on), and not a learned width (nothing served).
+  expect(memory.declaredScanCap).toBeUndefined()
+  expect(memory.learnedScanWidth).toBeUndefined()
+
+  const second = stub(handler)
+  const secondRes = await scanLogs(second.client, QUERY, range, { sleep: recorder().sleep, widthMemory: memory })
+
+  expect(second.filters.map(span)).toEqual(first.filters.map(span)) // not 4,000 requests of ten blocks
+  expect(secondRes.requests).toBe(firstRes.requests)
+  expect(secondRes.covered).toEqual([])
+  expect(secondRes.complete).toBe(false)
+})
+
 test('R2: a declared SERVEABLE cap is jumped to directly — no blind halving toward it', async () => {
   // drpc states a workable span (25683953-25685027 = 1,075 blocks) rather than a block cap. The
   // scanner takes its WIDTH as the next window: reaching 1,075 by halving from 10,000 would take
@@ -630,25 +657,10 @@ test('R2: an undeclared cap still bisects exactly as before', async () => {
   expect(res.complete).toBe(true)
 })
 
-test('R2: a declared cap WIDER than the window in flight is ignored — that failure is something else', async () => {
-  // A cap only explains this failure if it is narrower than what was asked for. A provider quoting
-  // its (generous) ceiling while failing for an unrelated reason must not widen the window or
-  // suppress the halving that will actually get past it.
-  const { client, filters } = stub((filter) => {
-    if (span(filter) > 1_000n) throw new Error('You can make eth_getLogs requests with up to a 50000 block range, but something else went wrong')
-    return []
-  })
-
-  // The range is deliberately narrower than the 50,000 the message quotes: with S1's wide start the
-  // window in flight is the whole 30,001-block range, so the declared cap is genuinely WIDER than
-  // what was asked for and must be ignored. (Had the start been 16M, a 50,000 cap would be narrower
-  // than the window — and honoring it would then be correct, which is a different test.)
-  const res = await scanLogs(client, QUERY, { fromBlock: 0n, toBlock: 30_000n }, { sleep: recorder().sleep })
-
-  expect(span(filters[0]!)).toBe(30_001n)
-  expect(span(filters[1]!)).toBe(15_000n) // halved as usual — the declared cap changed nothing
-  expect(res.complete).toBe(true)
-})
+// (A cap WIDER than the window in flight explaining nothing — no clamp, ordinary halving — is one
+// transition over synthetic facts, and lives in `logScanPolicy.test.ts` as "a declared cap WIDER
+// than the window in flight explains nothing"; the wording it has to survive is pinned by
+// `rpcErrors.test.ts`. Neither half needs a scan around it.)
 
 // ---------------------------------------------------------------------------
 // P1: concurrent chunk dispatch WITHIN one scan.
@@ -1002,16 +1014,9 @@ test('widthMemory: a stale hint is a HINT — the scan still corrects downward a
   expect(res.covered).toEqual([{ fromBlock: 1n, toBlock: 8_000n }])
 })
 
-test('widthMemory: the hint never widens a scan past its own ceiling', async () => {
-  // `initialChunk` is the caller's own bound on their provider. A remembered width from somewhere
-  // else must not be allowed to overrule it, or `logChunkBlocks` would stop meaning anything.
-  const memory = { learnedScanWidth: MAX_SCAN_WINDOW }
-  const { client, filters } = stub(() => [])
-
-  await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 100_000n }, { initialChunk: 1_000n, widthMemory: memory })
-
-  expect(filters.every((f) => span(f) <= 1_000n)).toBe(true)
-})
+// (`initialChunk` outranking a remembered hint is `min(hint, ceiling)` and nothing else — the same
+// assertion, under the same title, already sits in `logScanPolicy.test.ts` as
+// "initialPolicy: the hint never widens a scan past its own ceiling".)
 
 test('widthMemory: the learned width is a running MAXIMUM, not the last window asked for', async () => {
   // A short delta re-scan asks for a short window and is served. Recording that as what the endpoint

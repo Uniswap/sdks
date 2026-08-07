@@ -72,8 +72,10 @@ export function narrowTopics(topics: (Hex | Hex[] | null)[]): (Hex | null)[] {
 // cap, or — when that cap is below MIN_CHUNK, i.e. below anything this scanner
 // will ever ask for — gives the sub-range up on the first error instead of
 // spending a retry budget and a backoff escalation rediscovering the same
-// sentence. A message it does not recognize changes nothing; every bound below
-// still applies.
+// sentence, and remembers NOTHING from it (a cap under the floor is not a
+// ceiling; see the reducer's give-up branch for what remembering one cost).
+// A message it does not recognize changes nothing; every bound below still
+// applies.
 //
 // A DECLARED CAP LOWERS THE CEILING, NOT JUST THE WIDTH, and on a hard-capped
 // endpoint that is worth more than the probes it skips. A cap is a policy: it
@@ -473,7 +475,10 @@ export async function scanLogs(
     // A ceiling the reducer just lowered is a span cap the endpoint DECLARED — the span-clamp is the
     // only transition that lowers it — so it is mirrored into the shared memory here, at the loop
     // edge, keeping the reducer pure. Monotone (`minBig`) for the same reason the clamp itself is:
-    // interleaved scans converge on the tightest cap whatever order their writes land in.
+    // interleaved scans converge on the tightest cap whatever order their writes land in. What
+    // cannot arrive here is a ceiling below MIN_CHUNK: the reducer refuses to adopt one, precisely
+    // because THIS line would persist it and `initialPolicy` would then open every later scan at a
+    // width the endpoint serves and the caller cannot afford.
     if (memory && policy.ceiling < ceilingBefore) {
       memory.declaredScanCap = minBig(memory.declaredScanCap ?? policy.ceiling, policy.ceiling)
     }

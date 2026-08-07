@@ -123,17 +123,22 @@ const rows: Row[] = [
     expectAction: { kind: 'halve' },
   },
   {
-    name: 'a SPAN cap below MIN_CHUNK: give the sub-range up at once (no retries, no backoff) — and still clamp the ceiling',
+    // A cap the scanner cannot reach is not a ceiling it can adopt: MIN_CHUNK is the floor, so a
+    // ceiling below it describes no window this machine will ever ask for. Recorded as one it would
+    // break `chunkSize <= ceiling` on the spot (the width is untouched here — see below) and, once
+    // mirrored into `ScanWidthMemory`, would open the NEXT scan at a width the endpoint happily
+    // serves, grinding the whole request budget ten blocks at a time. Nothing moves but the counter.
+    name: 'a SPAN cap below MIN_CHUNK: give the sub-range up at once (no retries, no backoff) — and adopt NO ceiling, because a cap under the floor is not one',
     state: S({ chunkSize: 5_000n, consecutiveMinFailures: 2 }),
     outcome: refused({ capBlocks: 10n, capKind: 'span' }),
-    expectPolicy: { ceiling: 10n, consecutiveMinFailures: 0 },
+    expectPolicy: { ceiling: MAX_SCAN_WINDOW, chunkSize: 5_000n, consecutiveMinFailures: 0 },
     expectAction: { kind: 'giveUpSubrange', backoffMs: 0 },
   },
   {
-    name: 'a DENSITY cap below MIN_CHUNK: give up without touching the ceiling',
+    name: 'a DENSITY cap below MIN_CHUNK: give up, and the same two fields stay put',
     state: S({ chunkSize: 5_000n }),
     outcome: refused({ capBlocks: 10n, capKind: 'density' }),
-    expectPolicy: { ceiling: MAX_SCAN_WINDOW },
+    expectPolicy: { ceiling: MAX_SCAN_WINDOW, chunkSize: 5_000n },
     expectAction: { kind: 'giveUpSubrange', backoffMs: 0 },
   },
   {
@@ -238,7 +243,24 @@ const rows: Row[] = [
 for (const row of rows) {
   test(row.name, () => {
     const before = structuredClone(row.state)
+    // A row may not START from a state the machine could never have produced, or the transition it
+    // asserts is about nothing.
+    expect(row.state.chunkSize).toBeLessThanOrEqual(row.state.ceiling)
+
     const { policy, action } = nextStep(row.state, row.outcome)
+
+    // THE STANDING INVARIANT, ASSERTED ON EVERY ROW RATHER THAN WRITTEN DOWN IN ONE. `ceiling` is
+    // "the widest window this scan may ever ask for" and `chunkSize` is "the window the next request
+    // will span", so a state where the second exceeds the first is a state that describes a request
+    // the machine has already forbidden itself from making. Every transition maintains it — the
+    // regrowth doubling clamps, the declared-cap jump lands ON the ceiling, halving only narrows —
+    // and the one branch that once did not (a declared cap below MIN_CHUNK, which lowered the
+    // ceiling to the cap and left the width where it was) is exactly the branch that then poisoned
+    // `ScanWidthMemory` for every later scan. A per-row assertion is what makes that class of bug
+    // fail here instead of two scans later, in the loop. Checked BEFORE the row's own expectations,
+    // so a transition that breaks it is reported as what it is rather than as a surprising field.
+    expect(policy.chunkSize).toBeLessThanOrEqual(policy.ceiling)
+
     expect(policy).toEqual({ ...row.state, ...row.expectPolicy })
     expect(action).toEqual(row.expectAction)
     expect(row.state).toEqual(before) // pure: the input state is never mutated

@@ -69,6 +69,11 @@ export type PolicyState = {
    * from doubling past a ceiling the endpoint has already named, failing, and re-establishing,
    * forever: at `chunkSize >= ceiling` the doubling is a no-op, so `widthEstablished` survives it
    * and the batching stays whole.
+   *
+   * NEVER LOWERED BELOW {@link MIN_CHUNK} BY ANYTHING THE PROVIDER SAYS, because below the floor it
+   * would describe no window this machine can ask for; a sub-floor declared cap ends the sub-range
+   * instead of becoming a ceiling (see the give-up branch). `chunkSize <= ceiling` holds after every
+   * transition, and `logScanPolicy.test.ts` asserts it on every row.
    */
   ceiling: bigint
   /** The window the next request will span (clamped by the remaining range at dispatch time). */
@@ -269,6 +274,42 @@ export function nextStep(policy: PolicyState, outcome: Outcome): { policy: Polic
       // ceiling while failing for an unrelated reason must not suppress the halving that will
       // actually get past it.
       if (capBlocks !== undefined && capBlocks < base.chunkSize) {
+        if (capBlocks < MIN_CHUNK) {
+          // The endpoint's own ceiling is BELOW the smallest window this scanner will ask for, so
+          // no amount of halving, retrying or backing off can reach it — MIN_CHUNK is the floor,
+          // and the provider has just said the floor is too high. Give the sub-range up on the
+          // spot: leave it out of `covered` (partial discovery, reported honestly, exactly as an
+          // exhausted retry budget would) and move on to older blocks. Without this, a
+          // 10-block-cap endpoint costs MAX_CONSECUTIVE_MIN_FAILURES requests AND a full backoff
+          // escalation per sub-range to rediscover the same sentence, burning the request budget
+          // and up to MAX_BACKOFF_TOTAL_MS of deliberate sleeping on a scan that was never going
+          // to cover anything. No backoff either — capping, not failing.
+          //
+          // AND NOTHING IS ADOPTED FROM IT — NOT EVEN A SPAN CAP, WHICH IS THE WHOLE POINT OF THIS
+          // BRANCH SITTING ABOVE THE CLAMP. A ceiling is "the widest window this scan may ask for",
+          // and a value under MIN_CHUNK names no window this machine will ever ask for: adopting it
+          // breaks `chunkSize <= ceiling` on the spot (the width below is deliberately left where it
+          // is), and — because `logScan.ts` mirrors every ceiling the reducer lowers into
+          // `ScanWidthMemory.declaredScanCap` — it also PERSISTS the contradiction. That was the
+          // expensive half. `initialPolicy` has no MIN_CHUNK floor, so a remembered cap of 10 opened
+          // the next scan at a 10-block width, the endpoint SERVED it (10 is its real cap), nothing
+          // ever failed, nothing was ever given up, and the scan spent its entire
+          // MAX_REQUESTS_PER_SCAN budget walking 40,000 blocks of a multi-million-block range —
+          // every scan, for the life of the router, having been told once that this endpoint is
+          // unusable. The honest reading of a sub-floor cap is not "a very small ceiling" but "this
+          // endpoint cannot serve scans we are willing to pay for", and the honest way to act on it
+          // is to abandon each sub-range at the width already in hand: two requests to walk away
+          // from a 20M-block range, repeated identically (and cheaply) by every later scan, instead
+          // of one poisoned memory that no later scan can recover from.
+          //
+          // Leaving the WIDTH alone is what makes that abandonment cheap: the loop moves the cursor
+          // past the chunk it just planned, so a wide width abandons in wide strides. Narrowing it
+          // toward the useless cap would grind the same doomed range 128 blocks at a time.
+          return {
+            policy: { ...base, consecutiveMinFailures: 0 },
+            action: { kind: 'giveUpSubrange', backoffMs: 0 },
+          }
+        }
         // A SPAN cap is a POLICY, not a data point, so it lowers the CEILING and not merely the
         // current width — and that distinction is worth more than every probe the fast path skips.
         // Left as only a width, the ratchet doubles straight back past the stated cap after
@@ -294,21 +335,6 @@ export function nextStep(policy: PolicyState, outcome: Outcome): { policy: Polic
         // different queries leaves this scan at the tightest one it was actually told about, and an
         // `initialChunk` override is never widened by anything a provider says.
         const ceiling = capKind === 'span' ? minBig(base.ceiling, capBlocks) : base.ceiling
-        if (capBlocks < MIN_CHUNK) {
-          // The endpoint's own ceiling is BELOW the smallest window this scanner will ask for, so
-          // no amount of halving, retrying or backing off can reach it — MIN_CHUNK is the floor,
-          // and the provider has just said the floor is too high. Give the sub-range up on the
-          // spot: leave it out of `covered` (partial discovery, reported honestly, exactly as an
-          // exhausted retry budget would) and move on to older blocks. Without this, a
-          // 10-block-cap endpoint costs MAX_CONSECUTIVE_MIN_FAILURES requests AND a full backoff
-          // escalation per sub-range to rediscover the same sentence, burning the request budget
-          // and up to MAX_BACKOFF_TOTAL_MS of deliberate sleeping on a scan that was never going
-          // to cover anything. No backoff either — capping, not failing.
-          return {
-            policy: { ...base, ceiling, consecutiveMinFailures: 0 },
-            action: { kind: 'giveUpSubrange', backoffMs: 0 },
-          }
-        }
         // A real, serveable cap: jump straight to it instead of halving toward it. No backoff —
         // this is an endpoint capping, not an endpoint failing, which is the same reason the
         // blind-halving branch below does not sleep either.
