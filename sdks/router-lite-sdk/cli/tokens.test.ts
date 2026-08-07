@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import type { Address, PublicClient } from 'viem'
 
 import { UsageError } from './args'
-import { fetchTokenMeta } from './tokens'
+import { fetchTokenMeta, RpcError } from './tokens'
 
 const TOKEN = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as Address
 
@@ -100,9 +100,49 @@ describe('fetchTokenMeta', () => {
     await expect(fetchTokenMeta(client, freshChain(), TOKEN)).rejects.toThrow(UsageError)
   })
 
+  // -------------------------------------------------------------------------
+  // A LOST CALL IS NOT A VERDICT ABOUT THE TOKEN. Both branches below are a
+  // failed `decimals()` read; only one of them is evidence that there is no
+  // ERC-20 at the address. Reporting them identically told a user checking a
+  // rate-limited endpoint that USDC "does not answer decimals()" — and exited 3
+  // (fix your arguments) for something a retry would have fixed.
+  // -------------------------------------------------------------------------
+
+  it('blames the ENDPOINT, not the token, when decimals() is lost in the transport', async () => {
+    // The live shape: a budgeted run sets `retryCount: 0`, so one 429 fails the read outright.
+    const rateLimited = Object.assign(new Error('HTTP request failed.\nStatus: 429\nURL: https://rpc.example/key'), {
+      status: 429,
+    })
+    const { client } = fakeClient({ decimals: rateLimited, symbol: 'USDC' })
+
+    const failure = fetchTokenMeta(client, freshChain(), TOKEN)
+    await expect(failure).rejects.toThrow(RpcError)
+    await expect(failure).rejects.toThrow(/rpc unavailable while resolving token/)
+    // ...and it must NOT make the claim it has no evidence for.
+    await expect(failure).rejects.not.toThrow(/is it an ERC-20/)
+  })
+
+  it('keeps the not-an-ERC-20 message for a genuine execution result', async () => {
+    // The node answered and the EVM rejected the call: nothing there answers `decimals()`. That IS
+    // about the address, and the message that names it stays exactly as it was.
+    const { client } = fakeClient({ decimals: new Error('execution reverted'), symbol: 'USDC' })
+
+    const failure = fetchTokenMeta(client, freshChain(), TOKEN)
+    await expect(failure).rejects.toThrow(UsageError)
+    await expect(failure).rejects.toThrow(/is it an ERC-20 on this chain\?/)
+  })
+
+  it('treats a node that cannot serve the block as unavailable too, not as a missing token', async () => {
+    // `unavailable` (a replica behind the load balancer: `header not found`) carries the same weight
+    // as `transport` — none, about the chain — which is the SDK's own classification, read rather
+    // than re-derived here.
+    const { client } = fakeClient({ decimals: new Error('header not found'), symbol: 'USDC' })
+    await expect(fetchTokenMeta(client, freshChain(), TOKEN)).rejects.toThrow(RpcError)
+  })
+
   it('does not cache a failed fetch — the next caller gets to try again', async () => {
     const chainId = freshChain()
-    const failing = fakeClient({ decimals: new Error('rpc hiccup'), symbol: 'USDC' })
+    const failing = fakeClient({ decimals: new Error('execution reverted'), symbol: 'USDC' })
     await expect(fetchTokenMeta(failing.client, chainId, TOKEN)).rejects.toThrow(UsageError)
 
     const working = fakeClient({ decimals: 6, symbol: 'USDC' })

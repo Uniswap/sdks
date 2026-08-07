@@ -28,7 +28,9 @@
 //    drive the scripting-facing exit codes:
 //        0  actionable (quote / ready / needs-action)
 //        1  no-route
-//        2  inconclusive
+//        2  inconclusive — including an `RpcError`: the endpoint could not
+//           answer a read the command needed (429/timeout/dead socket), which
+//           is not a usage mistake and must not be reported as one
 //        3  usage or configuration error
 //        4  unexpected internal error
 //        5  --simulate DISPROVED the tx (a call in the proof chain reverted,
@@ -47,6 +49,7 @@ import { cmdDiscover } from './commands/discover'
 import { cmdQuote } from './commands/quote'
 import { cmdSwap } from './commands/swap'
 import { redactKeyedUrl } from './redact'
+import { RpcError } from './tokens'
 
 
 const USAGE = `${bold('rl')} — local-testing CLI for @uniswap/router-lite-sdk
@@ -125,6 +128,13 @@ async function main(): Promise<number> {
       console.error(`${red('error:')} ${redactKeyedUrl(err.message)}`)
       console.error(dim('run `rl help` for usage'))
       return 3
+    }
+    // Exit 2, not 3: the endpoint failed to answer, which says nothing about the arguments. A script
+    // that treats 3 as "fix your input" and 2 as "try again" must not be told to fix a correct
+    // address because the provider rate-limited a `decimals()` read.
+    if (err instanceof RpcError) {
+      console.error(`${red('rpc error:')} ${redactKeyedUrl(err.message)}`)
+      return 2
     }
     if (err instanceof RouterConfigError || err instanceof UnsupportedRouteError) {
       console.error(`${red('config error:')} ${redactKeyedUrl(err.message)}`)

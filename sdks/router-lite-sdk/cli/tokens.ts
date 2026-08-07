@@ -20,10 +20,31 @@
 import { hexToString, parseAbi, trim, type Address, type PublicClient } from 'viem'
 
 import type { ChainManifest, CurrencyRef } from '../src/index'
+// `classifyRpcError` is internal (not on the public/experimental surface); imported by relative path
+// — the same escape hatch `commands/discover.ts` documents — rather than re-deriving the SDK's
+// transport-vs-execution rules here, which is exactly the drift that produced the bug below.
+import { classifyRpcError } from '../src/internal/rpcErrors'
 
 import { shortHex } from './ansi'
 import { UsageError } from './args'
 
+
+/**
+ * The endpoint could not answer — as distinct from the endpoint answering something the CLI cannot
+ * use, which is {@link UsageError}.
+ *
+ * It exists because those two were being reported as one thing, and the wrong one: a `decimals()`
+ * read lost to a 429 (a budgeted run sets `retryCount: 0`, so a single rate-limited call fails
+ * outright) printed `0xA0b8… does not answer decimals() — is it an ERC-20 on this chain?` about
+ * USDC. That is a claim about the TOKEN, made on evidence about the PROVIDER, and it sent the reader
+ * to check the address rather than the endpoint. It also exited 3 (usage/config), telling a script
+ * its arguments were wrong when a retry would have worked.
+ *
+ * Lives here, next to the reads that raise it, for the same reason `AmountError` lives in
+ * `amounts.ts` and `UsageError` in `args.ts` — `rl.ts` maps each to its exit code (this one: 2,
+ * inconclusive; nothing was determined, and asking again may determine it).
+ */
+export class RpcError extends Error {}
 
 export type ResolvedToken = {
   ref: CurrencyRef
@@ -82,6 +103,12 @@ export async function fetchTokenMeta(client: PublicClient, chainId: number, addr
   return fetching
 }
 
+/** viem's errors are paragraphs (URL, request body, docs link); a CLI line wants the first line. The
+ * URL is scrubbed by `rl.ts`'s `redactKeyedUrl` on the way out, as every error path there is. */
+function firstLine(err: unknown): string {
+  return (err instanceof Error ? err.message : String(err)).split('\n')[0]!.trim()
+}
+
 async function loadTokenMeta(client: PublicClient, address: Address): Promise<ResolvedToken> {
   const [decimalsRead, symbolRead] = await Promise.allSettled([
     client.readContract({ address, abi: ERC20_META_ABI, functionName: 'decimals' }),
@@ -89,6 +116,14 @@ async function loadTokenMeta(client: PublicClient, address: Address): Promise<Re
   ])
 
   if (decimalsRead.status !== 'fulfilled') {
+    // WHICH CHANNEL DID IT FAIL IN? Only an `execution` failure — the node answered, and the EVM
+    // rejected the call — is evidence that there is no ERC-20 at this address. A `transport` or
+    // `unavailable` failure (429, timeout, dead socket, a replica that cannot serve the block) is
+    // evidence about the provider and NONE about the token, and the SDK draws that line in exactly
+    // one place, so this reads its verdict rather than pattern-matching the error a second time.
+    if (classifyRpcError(decimalsRead.reason) !== 'execution') {
+      throw new RpcError(`rpc unavailable while resolving token ${address}: ${firstLine(decimalsRead.reason)}`)
+    }
     throw new UsageError(`${address} does not answer decimals() — is it an ERC-20 on this chain?`)
   }
 
