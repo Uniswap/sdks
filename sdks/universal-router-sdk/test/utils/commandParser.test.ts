@@ -4,7 +4,7 @@ import { encodeSqrtRatioX96, nearestUsableTick, TickMath } from '@uniswap/v3-sdk
 import { ethers, BigNumber } from 'ethers'
 import { CommandParser, Param, UniversalRouterCall } from '../../src/utils/commandParser'
 import { RoutePlanner, CommandType } from '../../src/utils/routerCommands'
-import { UniversalRouterVersion } from '../../src/utils/constants'
+import { CONTRACT_BALANCE, UniversalRouterVersion } from '../../src/utils/constants'
 import { SwapRouter } from '../../src/swapRouter'
 import { V4Planner, Actions, Pool, Route as V4Route, Trade as V4Trade } from '@uniswap/v4-sdk'
 import { Trade as RouterTrade } from '@uniswap/router-sdk'
@@ -376,6 +376,100 @@ describe('Command Parser', () => {
               { name: 'path', value: [addressOne, addressTwo] },
               { name: 'payerIsUser', value: true },
               { name: 'minHopPriceX36', value: [BigNumber.from(250)] },
+            ],
+          },
+        ],
+      },
+    },
+    // V2.3.0 UNWRAP_WETH carries an explicit exact amount: (recipient, amount, minAmount)
+    {
+      version: UniversalRouterVersion.V2_3_0,
+      input: new RoutePlanner().addCommand(
+        CommandType.UNWRAP_WETH,
+        [addressOne, amount, amount],
+        false,
+        UniversalRouterVersion.V2_3_0
+      ),
+      result: {
+        commands: [
+          {
+            commandName: 'UNWRAP_WETH',
+            commandType: CommandType.UNWRAP_WETH,
+            params: [
+              { name: 'recipient', value: addressOne },
+              { name: 'amount', value: amount },
+              { name: 'minAmount', value: amount },
+            ],
+          },
+        ],
+      },
+    },
+    // V2.3.0 UNWRAP_WETH full-balance sentinel (CONTRACT_BALANCE) round-trips
+    {
+      version: UniversalRouterVersion.V2_3_0,
+      input: new RoutePlanner().addCommand(
+        CommandType.UNWRAP_WETH,
+        [addressOne, CONTRACT_BALANCE, amount],
+        false,
+        UniversalRouterVersion.V2_3_0
+      ),
+      result: {
+        commands: [
+          {
+            commandName: 'UNWRAP_WETH',
+            commandType: CommandType.UNWRAP_WETH,
+            params: [
+              { name: 'recipient', value: addressOne },
+              { name: 'amount', value: CONTRACT_BALANCE },
+              { name: 'minAmount', value: amount },
+            ],
+          },
+        ],
+      },
+    },
+    // V2.2.0 still decodes the legacy 2-param UNWRAP_WETH
+    {
+      version: UniversalRouterVersion.V2_2_0,
+      input: new RoutePlanner().addCommand(
+        CommandType.UNWRAP_WETH,
+        [addressOne, amount],
+        false,
+        UniversalRouterVersion.V2_2_0
+      ),
+      result: {
+        commands: [
+          {
+            commandName: 'UNWRAP_WETH',
+            commandType: CommandType.UNWRAP_WETH,
+            params: [
+              { name: 'recipient', value: addressOne },
+              { name: 'amountMin', value: amount },
+            ],
+          },
+        ],
+      },
+    },
+    // V2.3.0 keeps decoding the V2.1.1 swap-command overrides (version tiers layer)
+    {
+      version: UniversalRouterVersion.V2_3_0,
+      input: new RoutePlanner().addCommand(
+        CommandType.V3_SWAP_EXACT_IN,
+        [addressOne, amount, amount, encodePathExactInput([addressOne, addressTwo], 123), true, ['500', '600']],
+        false,
+        UniversalRouterVersion.V2_3_0
+      ),
+      result: {
+        commands: [
+          {
+            commandName: 'V3_SWAP_EXACT_IN',
+            commandType: CommandType.V3_SWAP_EXACT_IN,
+            params: [
+              { name: 'recipient', value: addressOne },
+              { name: 'amountIn', value: amount },
+              { name: 'amountOutMin', value: amount },
+              { name: 'path', value: [{ tokenIn: addressOne, tokenOut: addressTwo, fee: 123 }] },
+              { name: 'payerIsUser', value: true },
+              { name: 'minHopPriceX36', value: [BigNumber.from(500), BigNumber.from(600)] },
             ],
           },
         ],

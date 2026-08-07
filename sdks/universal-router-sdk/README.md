@@ -59,6 +59,8 @@ Each `SwapStep` is a 1:1 representation of a Universal Router command:
 - `V4_SWAP` — wraps a sequence of V4 actions (`SWAP_EXACT_IN`, `SETTLE`, `TAKE`, etc.) for the V4 router module
 - `WRAP_ETH` / `UNWRAP_WETH` — required when the route bridges native ETH and WETH
 
+On `urVersion >= 2.3.0` the `UNWRAP_WETH` step accepts an optional exact `amount` of WETH to unwrap (the on-chain command becomes `(recipient, amount, minAmount)`); omit it to unwrap the router's full WETH balance (encoded as the `CONTRACT_BALANCE` sentinel), which matches the only behavior available on older routers. Passing `amount` with an older `urVersion` is rejected at validation time.
+
 Routers compose these to express any supported route topology. The SDK does not infer wrap/unwrap commands — routers must include them when their route depends on it.
 
 ### Basic Usage
