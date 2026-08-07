@@ -19,9 +19,9 @@ import { bold, dim, green, red, yellow } from '../ansi'
 import { parseArgs, UsageError } from '../args'
 import { amountFor, exitCodeFor, jsonify, renderSwapResult, type TradeContext } from '../report'
 import { probeSimulateV1Support, simulateSwap } from '../simulate'
-import { iterateWaves } from '../waves'
+import { firstRouteReporter, iterateWaves } from '../waves'
 
-import { buildChainContext, hydrateLegSymbols, resolveTrade, TRADE_FLAGS, type ChainContext } from './context'
+import { buildChainContext, hydrateLegSymbols, resolveTrade, startBudget, TRADE_FLAGS, type ChainContext } from './context'
 
 
 const SWAP_FLAGS = {
@@ -66,6 +66,14 @@ export async function cmdSwap(argv: string[]): Promise<number> {
   const slippageBps = parseIntFlag(parsed.strings.get('slippage-bps'), 'slippage-bps')
   const deadlineSeconds = parseIntFlag(parsed.strings.get('deadline-secs'), 'deadline-secs')
 
+  const json = parsed.booleans.has('json')
+  const watch = parsed.booleans.has('watch')
+  const verbose = parsed.booleans.has('verbose')
+  // Same placement as `quote`'s: `--budget` bounds the SEARCH, so its clock (and the elapsed-time
+  // origin that shares it) starts here rather than back in `buildChainContext`.
+  const signal = startBudget(ctx.budgetMs)
+  const started = Date.now()
+
   const request: SwapRequest = {
     tokenIn: trade.tokenIn.ref,
     tokenOut: trade.tokenOut.ref,
@@ -75,20 +83,20 @@ export async function cmdSwap(argv: string[]): Promise<number> {
     ...(slippageBps !== undefined ? { slippageBps } : {}),
     ...(deadlineSeconds !== undefined ? { deadlineSeconds } : {}),
     ...(trade.hints.length > 0 ? { hints: trade.hints } : {}),
-    ...(ctx.signal ? { signal: ctx.signal } : {}),
+    ...(signal ? { signal } : {}),
   }
   const tradeCtx: TradeContext = { tokenIn: trade.tokenIn.ref, tokenOut: trade.tokenOut.ref, amountIn: trade.amountIn }
-
-  const json = parsed.booleans.has('json')
-  const watch = parsed.booleans.has('watch')
-  const verbose = parsed.booleans.has('verbose')
-  const started = Date.now()
 
   let final: SwapResult | undefined
   if (!watch && !verbose) {
     final = await ctx.router.getSwap(request)
   } else {
-    final = await iterateWaves(ctx.router.swaps(request), tradeCtx, trade.renderCtx, {
+    // A swap's first priced route is a LEAD, not an executable answer (nothing is compiled or
+    // simulated yet) — `firstRouteReporter` labels it as such; see `src/router.ts#IterateOptions`.
+    const results = ctx.router.swaps(request, {
+      onFirstRoute: firstRouteReporter({ json, started, tradeCtx, renderCtx: trade.renderCtx }),
+    })
+    final = await iterateWaves(results, tradeCtx, trade.renderCtx, {
       json,
       started,
       // `--watch` drains the whole bounded search; `--verbose` alone stops at the first actionable

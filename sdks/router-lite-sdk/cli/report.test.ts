@@ -13,6 +13,7 @@ import {
   exitCodeFor,
   formatFee,
   jsonify,
+  renderFirstRouteLine,
   renderQuoteResult,
   renderRoute,
   renderSearchReport,
@@ -237,6 +238,20 @@ describe('result rendering', () => {
     }
     expect(renderWaveLine(2, 181, result, trade, CTX, 3_900_000_000n)).toBe(
       'wave 2  +181ms  ▲ 3,912.401234 USDC  ETH ─(v3 0.05% 0xE055…939F)→ USDC [12/18 quoted]',
+    )
+  })
+
+  it('renders the early `first` line on the same grid as the wave lines', () => {
+    // It has to READ as part of the same timeline — same column widths, same `+Nms` origin — because
+    // it is one: it reports the very route wave 0's line will report seconds later. What it does not
+    // claim is any of what a wave line claims (quoting counters, an improvement marker, a verdict),
+    // hence `[unverified lead]` where the counters go.
+    const route = {
+      route: { legs: [{ pool: V3_POOL, currencyIn: 'native' as const, currencyOut: USDC }] },
+      quote: { amountIn: 10n ** 18n, amountOut: 3_912_401_234n, intermediateAmounts: [] },
+    }
+    expect(renderFirstRouteLine(3277, route, trade, CTX)).toBe(
+      'first   +3277ms  3,912.401234 USDC  ETH ─(v3 0.05% 0xE055…939F)→ USDC [unverified lead]',
     )
   })
 })

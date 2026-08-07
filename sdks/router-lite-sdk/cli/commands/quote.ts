@@ -15,9 +15,9 @@
 import type { QuoteRequest } from '../../src/index'
 import { parseArgs } from '../args'
 import { exitCodeFor, jsonify, renderQuoteResult, type TradeContext } from '../report'
-import { iterateWaves } from '../waves'
+import { firstRouteReporter, iterateWaves } from '../waves'
 
-import { buildChainContext, hydrateLegSymbols, resolveTrade, TRADE_FLAGS } from './context'
+import { buildChainContext, hydrateLegSymbols, resolveTrade, startBudget, TRADE_FLAGS } from './context'
 
 
 export async function cmdQuote(argv: string[]): Promise<number> {
@@ -25,19 +25,22 @@ export async function cmdQuote(argv: string[]): Promise<number> {
   const ctx = await buildChainContext(parsed)
   const trade = await resolveTrade(ctx, parsed)
 
+  const json = parsed.booleans.has('json')
+  const watch = parsed.booleans.has('watch')
+  const verbose = parsed.booleans.has('verbose')
+  // The budget clock and the elapsed-time origin start together, HERE — everything above this line
+  // is setup (chain detection, cache load, token metadata) and is not what `--budget` bounds.
+  const signal = startBudget(ctx.budgetMs)
+  const started = Date.now()
+
   const request: QuoteRequest = {
     tokenIn: trade.tokenIn.ref,
     tokenOut: trade.tokenOut.ref,
     amountIn: trade.amountIn,
     ...(trade.hints.length > 0 ? { hints: trade.hints } : {}),
-    ...(ctx.signal ? { signal: ctx.signal } : {}),
+    ...(signal ? { signal } : {}),
   }
   const tradeCtx: TradeContext = { tokenIn: trade.tokenIn.ref, tokenOut: trade.tokenOut.ref, amountIn: trade.amountIn }
-
-  const json = parsed.booleans.has('json')
-  const watch = parsed.booleans.has('watch')
-  const verbose = parsed.booleans.has('verbose')
-  const started = Date.now()
 
   if (!watch && !verbose) {
     const result = await ctx.router.getQuote(request)
@@ -51,7 +54,13 @@ export async function cmdQuote(argv: string[]): Promise<number> {
     return exitCodeFor(result.status)
   }
 
-  const final = await iterateWaves(ctx.router.quotes(request), tradeCtx, trade.renderCtx, {
+  // The SDK prices a direct route a whole wave before wave 0 yields (its probes are one round trip;
+  // the wave also waits on a log scan). `onFirstRoute` is how a streaming view gets to say so at the
+  // moment it becomes true instead of seconds later — see `src/router.ts#IterateOptions`.
+  const results = ctx.router.quotes(request, {
+    onFirstRoute: firstRouteReporter({ json, started, tradeCtx, renderCtx: trade.renderCtx }),
+  })
+  const final = await iterateWaves(results, tradeCtx, trade.renderCtx, {
     json,
     started,
     // `--watch` drains the whole bounded search; `--verbose` alone stops at the first actionable

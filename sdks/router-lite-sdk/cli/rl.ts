@@ -69,10 +69,17 @@ ${bold('chain')}     detected from the endpoint via eth_chainId; \`rl chains\` l
 ${bold('common options')}
   --chain, -c <id>        ASSERT the chain id — errors if the endpoint serves a different chain
   --rpc <url>             endpoint (overrides $ETH_RPC_URL; never printed)
-  --budget, -b <dur>      best-effort budget (unit required: 900ms, 10s, 2m) — an AbortSignal the
-                          search honors between waves; transport timeouts/retries derive from it
+  --budget, -b <dur>      best-effort budget for the SEARCH (unit required: 900ms, 10s, 2m) — an
+                          AbortSignal the search honors between waves; transport timeouts/retries
+                          derive from it. The clock starts when the search does: chain detection,
+                          the cache load and token metadata are NOT charged to it.
+  --concurrency <n>       max in-flight RPC requests, 1-1024 (SDK default: 20). Raise it for an
+                          endpoint with connection headroom — 40 measurably beat 20 on a keyed
+                          mainnet endpoint; lower it against a shared or rate-limited quota.
   --hint <spec>           assert a pool for the pair: v2 | v3@500 | v4@3000/60[/0xHooks][:0xHookData]
-  --watch, -w             stream every search wave to the end of the bounded search
+  --watch, -w             stream every search wave to the end of the bounded search. A leading
+                          \`first\` line reports the search's first priced route the moment it exists,
+                          which is a whole wave before wave 0's own line.
   --verbose, -v           stream waves, stop at the first actionable result
   --json                  machine output (NDJSON per wave with --watch)
   --no-cache              skip the on-disk pool index (~/.cache/router-lite/<chainId>.json).
@@ -93,7 +100,7 @@ ${bold('examples')} (rl = \`bun cli/rl.ts\` from the package dir)
   chainz exec 1 -- rl swap eth usdc 0.5 --trader 0x1111111111111111111111111111111111111111 --simulate
   chainz exec 130 -- rl discover 0xTOKEN --chain 130
 
-${bold('exit codes')}   0 actionable · 1 no-route · 2 inconclusive · 3 usage/config · 4 internal · 5 simulation disproved`
+${bold('exit codes')}   0 actionable · 1 no-route · 2 inconclusive (incl. rpc unavailable) · 3 usage/config · 4 internal · 5 simulation disproved`
 
 async function dispatch(command: string | undefined, rest: string[]): Promise<number> {
   switch (command) {

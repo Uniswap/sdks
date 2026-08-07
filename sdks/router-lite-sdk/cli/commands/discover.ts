@@ -25,7 +25,7 @@ import { parseArgs, UsageError } from '../args'
 import { describePool, jsonify, renderSearchReport, viewKey, type RenderCtx, type TokenView } from '../report'
 import { fetchTokenMeta, resolveToken, type ResolvedToken } from '../tokens'
 
-import { buildChainContext, COMMON_FLAGS, hydrateViews, type ChainContext } from './context'
+import { buildChainContext, COMMON_FLAGS, hydrateViews, startBudget, type ChainContext } from './context'
 
 const DISCOVER_FLAGS = {
   ...COMMON_FLAGS,
@@ -41,6 +41,9 @@ export async function cmdDiscover(argv: string[]): Promise<number> {
   const token = await resolveToken(ctx.client, ctx.chain.manifest, tokenArg)
   const via = await resolveCounterparty(ctx, token, parsed.strings.get('via'))
   const json = parsed.booleans.has('json')
+  // `--budget` bounds the search, so its clock starts here — after chain detection, the cache load
+  // and both tokens' metadata reads, none of which this command's budget is meant to pay for.
+  const signal = startBudget(ctx.budgetMs)
 
   // One unit of the token is enough to drive discovery; the amount only shapes quotes, not coverage.
   const request = {
@@ -48,7 +51,7 @@ export async function cmdDiscover(argv: string[]): Promise<number> {
     tokenOut: via.ref,
     amountIn: 10n ** BigInt(token.decimals),
     focusToken: token.ref,
-    ...(ctx.signal ? { signal: ctx.signal } : {}),
+    ...(signal ? { signal } : {}),
   }
 
   let final: QuoteResult | undefined

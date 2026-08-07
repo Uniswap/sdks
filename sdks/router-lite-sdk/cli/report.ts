@@ -352,6 +352,26 @@ export function renderSwapResult(result: SwapResult, trade: TradeContext, ctx: R
 }
 
 /**
+ * The `first` line: the moment the search HAS a price, which lands up to a whole wave before wave 0
+ * yields (`src/router.ts#IterateOptions.onFirstRoute`).
+ *
+ * Shaped like a wave line on purpose — same columns, same `+Nms` origin — so the stream reads as one
+ * timeline rather than two. It carries no `[n/m quoted]` counters and no improvement marker, because
+ * neither exists yet: this fires from inside the engine, before any `SearchReport` has been built,
+ * and there is nothing before it to have improved on.
+ *
+ * INTERMEDIATE SYMBOLS MAY RENDER AS SHORTENED ADDRESSES here and resolve properly on the wave line
+ * that follows. Filling them in means an `eth_call` per unknown token — a round trip, which is the
+ * entire quantity this line exists to save. A hex leg for a few hundred milliseconds is the right
+ * trade; blocking the fast line on metadata would defeat it.
+ */
+export function renderFirstRouteLine(elapsedMs: number, route: QuotedRoute, trade: TradeContext, ctx: RenderCtx): string {
+  const amount = amountFor(ctx, trade.tokenOut, route.quote.amountOut)
+  const promoted = route.promotedOverComplex ? ` ${cyan('promoted')}` : ''
+  return `${dim('first ')}  ${dim(`+${elapsedMs}ms`)}  ${bold(amount)}  ${renderRoute(route.route, ctx)}${promoted} ${dim('[unverified lead]')}`
+}
+
+/**
  * One line per search wave for `--watch`/`--verbose`: wave number, elapsed time, the improving
  * best, and the two counters that move between waves. `▲` marks a wave that improved the output.
  */

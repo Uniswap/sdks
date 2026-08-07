@@ -10,6 +10,10 @@
 
 import { createPublicClient, http, type Address, type PublicClient } from 'viem'
 
+// `DEFAULT_CONCURRENCY`/`MAX_CONCURRENCY` are the SDK's own bounds for the option `--concurrency`
+// maps to; imported by relative path (the same escape hatch `discover.ts` documents) so `--help` and
+// the flag's validation can never disagree with `createRouter`'s.
+import { DEFAULT_CONCURRENCY, MAX_CONCURRENCY } from '../../src/constants'
 import { PoolIndex } from '../../src/experimental/index'
 import { createRouter, type PoolHint, type QuotedRoute, type Router } from '../../src/index'
 import { parseAmount, parseBudget } from '../amounts'
@@ -35,6 +39,7 @@ export const COMMON_FLAGS: FlagSpec = {
   rpc: { kind: 'string' },
   json: { kind: 'boolean' },
   budget: { kind: 'string', alias: 'b' },
+  concurrency: { kind: 'string' },
   verbose: { kind: 'boolean', alias: 'v' },
   ...CACHE_FLAGS,
 }
@@ -52,7 +57,11 @@ export type ChainContext = {
   router: Router
   /** The injected index, exposed so `discover` can read back what a search learned. */
   index: PoolIndex
-  signal?: AbortSignal
+  /**
+   * `--budget`, parsed — NOT a live clock. The command starts it, with {@link startBudget}, at the
+   * moment its search does; see that function for why the difference is the whole point.
+   */
+  budgetMs?: number
 }
 
 /**
@@ -70,6 +79,7 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
   const asserted = parseChainAssertion(parsed.strings.get('chain'))
   const budgetArg = parsed.strings.get('budget')
   const budgetMs = budgetArg !== undefined ? parseBudget(budgetArg) : undefined
+  const concurrency = parseConcurrency(parsed.strings.get('concurrency'))
 
   // Detect the chain with a short, unretried probe — an unreachable/misconfigured endpoint should
   // be a friendly one-liner in seconds, not viem's full retry ladder ending in a stack.
@@ -160,15 +170,62 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
     note('cache: disabled (--no-cache)')
   }
 
-  const router = createRouter({ client, manifest: chain.manifest, index })
+  const router = createRouter({
+    client,
+    manifest: chain.manifest,
+    index,
+    // The chain id THIS client just answered, two dozen lines up. Without it `validateManifest` asks
+    // the same endpoint the same question again on the first search — one more sequential round trip
+    // (~0.9s on a real mainnet endpoint) in front of every single invocation, for an answer already
+    // in hand. The cross-check itself is unchanged, and so is the execution-address fingerprint.
+    assumeChainId: chainId,
+    ...(concurrency !== undefined ? { concurrency } : {}),
+  })
   const base = { chain, client, router, index }
-  return budgetMs !== undefined ? { ...base, signal: budgetSignal(budgetMs) } : base
+  return budgetMs !== undefined ? { ...base, budgetMs } : base
+}
+
+/**
+ * `--concurrency`, validated against the SDK's own bounds.
+ *
+ * Worth exposing because the right value is a property of the ENDPOINT, which only the person
+ * running the command knows: measured against a keyed mainnet endpoint, 40 in-flight requests beat
+ * the default 20 on wall time for the same search, while a stricter shared-quota endpoint wants
+ * less. The default stays {@link DEFAULT_CONCURRENCY} — it is the one that fits comfortably under
+ * every major public endpoint's connection-pool ceiling.
+ */
+function parseConcurrency(raw: string | undefined): number | undefined {
+  if (raw === undefined) return undefined
+  const value = Number(raw)
+  if (!/^\d+$/.test(raw.trim()) || !Number.isInteger(value) || value < 1 || value > MAX_CONCURRENCY) {
+    throw new UsageError(`--concurrency '${raw}' must be an integer in [1, ${MAX_CONCURRENCY}] (default: ${DEFAULT_CONCURRENCY})`)
+  }
+  return value
 }
 
 // ---------------------------------------------------------------------------
 // `--budget`'s clock.
 //
-// This is deliberately NOT `AbortSignal.timeout(ms)`, which is what it used to
+// IT STARTS WHEN THE SEARCH DOES, NOT WHEN THE PROCESS DOES, and that is a
+// deliberate correction. The clock used to start inside `buildChainContext`,
+// which meant the budget paid for everything BEFORE the search as well as the
+// search: the chain-detection probe, the on-disk cache load (a 115 MB mainnet
+// snapshot is real seconds), manifest validation, and both tokens' metadata
+// reads. Measured on a warm mainnet cache, `--budget 15s` reached the first
+// `searchWaves` call at t=16.7s — the search was born aborted and the run
+// returned `inconclusive/aborted` having never issued a quote. `--budget`
+// names a SEARCH budget in `--help` and in the README, and a bound that can be
+// consumed entirely by setup does not mean that.
+//
+// So the parse stays in `buildChainContext` (it also shapes the transport's
+// timeout, which must be decided when the client is built) and only the TIMER
+// moves: each command calls {@link startBudget} on the line before it starts
+// iterating, which is also the origin its `+Nms` wave lines are measured from.
+// Setup latency is still visible — the final panel's elapsed time and
+// `--verbose`'s cache line both report it — it is simply no longer charged to
+// a budget the user asked to spend on searching.
+//
+// The signal is deliberately NOT `AbortSignal.timeout(ms)`, which is what it used to
 // be and which reads as the obvious answer. That signal's timer is UNREF'D, and
 // an unref'd timer is not reliably serviced by this runtime's loop while the
 // loop is saturated with network I/O — which is precisely the state a budgeted
@@ -198,7 +255,17 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
 
 let pendingBudgetTimer: ReturnType<typeof setTimeout> | undefined
 
-function budgetSignal(budgetMs: number): AbortSignal {
+/**
+ * Starts `--budget`'s clock and returns the `AbortSignal` the search should carry, or `undefined`
+ * for an unbudgeted run — absence is how the SDK tells a bounded search from an unbounded one, so an
+ * unbudgeted run must get no signal at all rather than one that never fires.
+ *
+ * CALL IT IMMEDIATELY BEFORE THE SEARCH, on the same line as the command's own `started` stamp: the
+ * budget is a bound on searching, and everything between this call and the first `eth_call` is what
+ * it is spent on. See this section's header for what starting it any earlier cost.
+ */
+export function startBudget(budgetMs: number | undefined): AbortSignal | undefined {
+  if (budgetMs === undefined) return undefined
   const controller = new AbortController()
   pendingBudgetTimer = setTimeout(() => controller.abort(), budgetMs)
   return controller.signal

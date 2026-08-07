@@ -6,7 +6,7 @@ import { afterEach, describe, expect, test } from 'bun:test'
 
 import type { ParsedArgs } from '../args'
 
-import { buildChainContext, cancelBudget } from './context'
+import { buildChainContext, cancelBudget, startBudget } from './context'
 
 // ---------------------------------------------------------------------------
 // `buildChainContext` — the three things it decides that nothing else can.
@@ -15,9 +15,12 @@ import { buildChainContext, cancelBudget } from './context'
 // manifest, hand a `PoolIndex` to `createRouter`) and is covered where it
 // lives. These three are not:
 //
-//   1. HOW `--budget`'s clock is BUILT. The signal has to fire while a loop
-//      saturated with network I/O is the only thing running, which is the exact
-//      condition under which the runtime declines to service an unref'd timer.
+//   1. HOW `--budget`'s clock is BUILT, and WHEN IT STARTS. The signal has to
+//      fire while a loop saturated with network I/O is the only thing running,
+//      which is the exact condition under which the runtime declines to service
+//      an unref'd timer — and it must not start ticking until the command's
+//      search does, or setup (cache load, token metadata) spends the user's
+//      search budget for them.
 //   2. THAT THE UNREF'D ESCAPE STAYS CLOSED. See the source-guard test below
 //      for why that one is asserted against the SOURCE and not against
 //      behavior.
@@ -96,36 +99,59 @@ describe('the budget signal', () => {
     // The shape the bug lived in: the process is waiting on a request that will never come back, so
     // the ONLY thing that can end the run is the budget's own timer.
     stubFetch(chainIdThen(undefined, { hang: true }))
-    const started = Date.now()
     const ctx = await buildChainContext(args({ budget: '40ms' }))
+    const started = Date.now()
+    const signal = startBudget(ctx.budgetMs)!
 
-    expect(ctx.signal).toBeDefined()
-    expect(ctx.signal!.aborted).toBe(false) // not pre-aborted: the budget is a deadline, not a veto
+    expect(signal).toBeDefined()
+    expect(signal.aborted).toBe(false) // not pre-aborted: the budget is a deadline, not a veto
 
-    await new Promise<void>((resolve) => ctx.signal!.addEventListener('abort', () => resolve(), { once: true }))
+    await new Promise<void>((resolve) => signal.addEventListener('abort', () => resolve(), { once: true }))
 
-    expect(ctx.signal!.aborted).toBe(true)
+    expect(signal.aborted).toBe(true)
     expect(Date.now() - started).toBeGreaterThanOrEqual(35) // it waited for the budget...
     expect(Date.now() - started).toBeLessThan(5_000) // ...and did not wait for the request
   })
 
   test('an unbudgeted run gets no signal at all', async () => {
-    // Absence is meaningful here: `ChainContext.signal` being optional is how the SDK tells an
-    // unbounded run from a bounded one, and manufacturing an already-live signal for every run would
-    // hand every command a clock it never asked for.
+    // Absence is meaningful here: an optional signal is how the SDK tells an unbounded run from a
+    // bounded one, and manufacturing an already-live signal for every run would hand every command a
+    // clock it never asked for.
     stubFetch(chainIdThen('0x1'))
-    expect((await buildChainContext(args())).signal).toBeUndefined()
+    const ctx = await buildChainContext(args())
+    expect(ctx.budgetMs).toBeUndefined()
+    expect(startBudget(ctx.budgetMs)).toBeUndefined()
+  })
+
+  test('THE CLOCK DOES NOT START DURING SETUP — only when the command starts its search', async () => {
+    // The regression this pins, measured live: with the timer started inside `buildChainContext`, a
+    // `--budget 15s` run against a warm 115 MB mainnet cache reached the first `searchWaves` call at
+    // t=16.7s — the search was born aborted and returned `inconclusive/aborted` without issuing a
+    // single quote. `--budget` names a SEARCH budget, so `buildChainContext` may only PARSE it.
+    stubFetch(chainIdThen('0x1'))
+    const ctx = await buildChainContext(args({ budget: '30ms' }))
+    expect(ctx.budgetMs).toBe(30)
+
+    // Stand in for the setup a real command still has ahead of it (token metadata, hint parsing) —
+    // longer than the whole budget. A clock started in `buildChainContext` has already fired by now.
+    await new Promise((r) => setTimeout(r, 80))
+
+    const signal = startBudget(ctx.budgetMs)!
+    expect(signal.aborted).toBe(false) // the search gets its full budget, not the remainder of one
+    await new Promise<void>((resolve) => signal.addEventListener('abort', () => resolve(), { once: true }))
+    expect(signal.aborted).toBe(true)
   })
 
   test('cancelBudget clears the timer: a finished command does not keep waiting', async () => {
     stubFetch(chainIdThen('0x1'))
     const ctx = await buildChainContext(args({ budget: '40ms' }))
+    const signal = startBudget(ctx.budgetMs)!
 
     cancelBudget()
     await new Promise((r) => setTimeout(r, 90)) // well past the budget
 
     // Still not aborted, which is the observable half of "the process would have exited by now".
-    expect(ctx.signal!.aborted).toBe(false)
+    expect(signal.aborted).toBe(false)
   })
 
   test('cancelBudget is idempotent, and safe with no budget in flight', () => {
@@ -136,6 +162,48 @@ describe('the budget signal', () => {
       cancelBudget()
       cancelBudget()
     }).not.toThrow()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 1b. The chain id is probed ONCE, and `--concurrency` is bounded.
+// ---------------------------------------------------------------------------
+
+describe('the router the CLI builds', () => {
+  test('does not re-probe eth_chainId: the detected id is handed to createRouter', async () => {
+    // The CLI probes `eth_chainId` to pick a manifest at all, and `validateManifest` used to ask the
+    // same endpoint the same question again on the first search — a second sequential round trip
+    // (~0.9s live) in front of every invocation. `assumeChainId` replaces the READ; the cross-check
+    // and the execution-address fingerprint below it are untouched, which is why `eth_getCode` still
+    // goes out here.
+    const wire = stubFetch((body: any) => ((Array.isArray(body) ? body[0] : body)?.method === 'eth_chainId' ? { result: '0x1' } : { status: 500 }))
+    const ctx = await buildChainContext(args({ budget: '5s' }))
+
+    // Fails at the `eth_getCode` (the stub 500s it), which is exactly far enough: manifest validation
+    // ran, and whatever it asked for is now on the wire.
+    await ctx.router.getQuote({ tokenIn: 'native', tokenOut: `0x${'11'.repeat(20)}`, amountIn: 1n })
+
+    const methods = wire.map((w) => w.body.method)
+    expect(methods.filter((m) => m === 'eth_chainId')).toHaveLength(1)
+    expect(methods).toContain('eth_getCode')
+  })
+
+  test('--concurrency is validated against the SDK’s own bounds', async () => {
+    stubFetch(chainIdThen('0x1'))
+    const withConcurrency = (value: string): ParsedArgs => {
+      const parsed = args()
+      parsed.strings.set('concurrency', value)
+      return parsed
+    }
+
+    // Rejected BEFORE the endpoint is touched: a bad bound is the caller's mistake, and `createRouter`
+    // would report it as a `RouterConfigError` (exit 3 either way) only after a round trip.
+    for (const bad of ['0', '-1', '1.5', '1025', 'lots']) {
+      await expect(buildChainContext(withConcurrency(bad))).rejects.toThrow(/--concurrency/)
+    }
+    // ...and a legal value builds a router. 40 is the measured-better setting on a keyed mainnet
+    // endpoint; the DEFAULT is still the SDK's 20, which is what an absent flag leaves in place.
+    expect((await buildChainContext(withConcurrency('40'))).router).toBeDefined()
   })
 })
 
