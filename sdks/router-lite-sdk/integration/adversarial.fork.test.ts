@@ -4,6 +4,7 @@ import {
   type CurrencyRef,
   type PoolKey,
   type ReadySwap,
+  type RouteLeg,
   type Router,
 } from '@uniswap/router-lite-sdk'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
@@ -19,6 +20,13 @@ import {
 
 import { ERC20_ABI, V4_QUOTER_ABI } from './abis'
 import { FORK_BLOCK, forkTestsEnabled, startAnvilFork, type AnvilClient } from './anvil'
+// Internal seams, imported by relative path — the same escape hatch `e2e.ts` uses for
+// `assertResultCoherent`. Section 6 needs the raw dispatch primitives to compare the two envelopes
+// (direct eth_call vs aggregate3) on EXACTLY the call the SDK builds, below the search's dedup.
+import { aggregateCalls, InnerCallFailure, MULTICALL3_ADDRESS } from '../src/internal/multicall'
+import { ethCall } from '../src/internal/rpc'
+import { revertDataOf } from '../src/internal/rpcErrors'
+import { v4Module } from '../src/protocols/v4'
 import {
   balanceOf,
   executeSwap,
@@ -402,7 +410,87 @@ describe.skipIf(!RUN)('adversarial worlds (fork)', () => {
   }, 600_000)
 
   // -------------------------------------------------------------------------
-  // 5. The manifest itself
+  // 5. Sender visibility through the aggregator (Multicall3 adoption)
+  //
+  // The spec's rule is "never Multicall3 for sender-sensitive quotes", and the
+  // question this answers ON THE FORK, not from theory, is whether the SDK's
+  // quoter calls are sender-sensitive at all — i.e. whether wrapping one in
+  // aggregate3 (inner msg.sender: Multicall3 instead of the unset tx sender)
+  // changes anything a hook can see. It cannot: a v4 hook's `sender` parameter
+  // is the address that called the PoolManager, which is the V4Quoter in BOTH
+  // envelopes. The SenderGateHook is the recorder — `SenderNotAllowed(address
+  // sender)` puts the hook-observed sender into the revert data itself.
+  // -------------------------------------------------------------------------
+
+  it('aggregate3 does not change the hook-visible sender: same recorded sender, byte-identical revert data, equal quotes', async () => {
+    const manifest = forkManifest()
+
+    // (a) CLOSED gate — allowedSender is a stranger, so the hook reverts and thereby RECORDS whom it
+    // saw. Both dispatch paths must record the same address, and it must be the quoter.
+    const stranger: Address = '0x00000000000000000000000000000000000adf20'
+    const gate = await world.deployHook('revert-if-sender-not', { allowedSender: stranger })
+    const recIn = await world.deployToken('SenderRecIn')
+    const recOut = await world.deployToken('SenderRecOut')
+    const { ref } = await world.createV4Pool(recIn, recOut, { ...V4_SHAPE, hooks: gate })
+    if (ref.protocol !== 'v4') throw new Error('unreachable')
+
+    const leg: RouteLeg = { pool: ref, currencyIn: recIn, currencyOut: recOut }
+    const quote = v4Module.encodeQuote([leg], ONE, manifest)
+    // The premise, asserted rather than assumed: the SDK's quoter calls carry no `from` and no
+    // `value` today, so there is no tx-level sender for the aggregation envelope to displace —
+    // and `aggregateCalls` refuses to aggregate any future call that does carry one.
+    expect(quote.call.from).toBeUndefined()
+    expect(quote.call.value).toBeUndefined()
+
+    const head = await anvil.publicClient.getBlockNumber()
+
+    let directRevert: Hex | undefined
+    try {
+      await ethCall(anvil.publicClient, quote.call, head)
+      throw new Error('expected the gated quote to revert')
+    } catch (err) {
+      directRevert = revertDataOf(err)
+    }
+    expect(directRevert).toBeDefined()
+
+    const [slot] = await aggregateCalls({
+      client: anvil.publicClient,
+      multicall3: MULTICALL3_ADDRESS, // the real canonical deployment, live on the mainnet fork
+      calls: [quote.call],
+      blockNumber: head,
+    })
+    expect(slot).toBeInstanceOf(InnerCallFailure)
+    const aggRevert = (slot as InnerCallFailure).revertData
+    expect(aggRevert?.toLowerCase()).toBe(directRevert!.toLowerCase()) // byte-identical, recorded sender included
+
+    // Whose sender did the hook record? The V4Quoter's — the contract that actually calls the
+    // PoolManager — in BOTH envelopes; never Multicall3, whatever the inner msg.sender was.
+    const quoterNeedle = manifest.v4!.quoter.slice(2).toLowerCase()
+    expect(directRevert!.toLowerCase()).toContain(quoterNeedle)
+    expect(aggRevert!.toLowerCase()).toContain(quoterNeedle)
+    expect(aggRevert!.toLowerCase()).not.toContain(MULTICALL3_ADDRESS.slice(2).toLowerCase())
+
+    // (b) OPEN gate — reconfigure the same hook to allow the quoter: both dispatch paths now pass,
+    // and all three witnesses (direct eth_call, aggregate3 inner, ground-truth quoter simulation)
+    // agree on the amount to the wei.
+    await world.deployHook('revert-if-sender-not', { allowedSender: manifest.v4!.quoter })
+    const directOut = quote.decode(await ethCall(anvil.publicClient, quote.call, head))
+    const [openSlot] = await aggregateCalls({
+      client: anvil.publicClient,
+      multicall3: MULTICALL3_ADDRESS,
+      calls: [quote.call],
+      blockNumber: head,
+    })
+    expect(typeof openSlot).toBe('string')
+    const aggOut = quote.decode(openSlot as Hex)
+    expect(directOut).toBeGreaterThan(0n)
+    expect(aggOut).toBe(directOut)
+    const zeroForOne = getAddress(ref.poolKey.currency0) === getAddress(recIn)
+    expect(await quoteDirect(ref.poolKey, zeroForOne, ONE)).toBe(directOut)
+  }, 300_000)
+
+  // -------------------------------------------------------------------------
+  // 6. The manifest itself
   // -------------------------------------------------------------------------
 
   it('every address the mainnet manifest names has code at the pinned fork block', async () => {
