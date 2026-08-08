@@ -415,6 +415,48 @@ cost is on the other side: a maximal 275 MB snapshot adds ~1.5s to load, so a ma
 that would have resolved in wave 0 without the index gets slower (and more thorough) rather than
 faster. See `cli/cache.ts` for the size bound and the numbers behind it.
 
+### Pool lists: the same snapshot, published
+
+A snapshot crosses a **process** boundary. A **pool list** is the same snapshot crossing an
+**organization** boundary — a CI job publishes one, someone else's machine consumes it. The bytes are
+identical; what changes is who you are trusting, which is what the envelope around them is for.
+
+Full treatment in [`docs/pool-lists.md`](./docs/pool-lists.md). The three things worth knowing here:
+
+**The two halves of a snapshot are not equally safe to import.** *Pools* are self-verifying
+downstream — every one is priced by a real `eth_call` at a pinned block before it can appear in a
+result, and one that keeps failing loses its rank — so a fabricated pool costs an attacker's target
+some latency and nothing else. *Coverage* is a claim that **suppresses work**: "these blocks were
+already scanned" makes the next search skip them, so a list that lies here **hides** a pool rather
+than inventing one, and the only symptom is a worse route with nothing anywhere saying why. So a list
+is imported at one of two tiers: **Tier A** (signed / first-party — today, the operator passed
+`--trust-coverage`) takes pools *and* coverage; **Tier B**, the default for every list, takes **pools
+only**. Tier B is still most of the value — the pools are the expensive part to re-derive, and a Tier
+B consumer re-scans the ranges anyway, so it can only end up knowing more than the list did.
+
+**A list may claim coverage only for scopes whose pool set it kept in full.** This is the
+coverage-and-pools-are-inseparable invariant from `cli/cache.ts`, and violating it puts a silent,
+permanent hole in the consumer's index (coverage says the range is done, so the scan that would have
+found the dropped pools never runs again). It is enforced as an assertion that **fails the build**,
+not as a convention — and curation therefore picks *scopes* first and derives the pool set from them,
+never the reverse.
+
+**A list cannot go stale, only behind**, for the same reason a snapshot cannot: coverage is
+block-ranged, so an old list is a bigger delta scan, never a wrong answer.
+
+```sh
+# publish (see docs/pool-lists.md for curation flags and the live verify pass)
+chainz exec 1 -- bun scripts/buildPoolList.ts --warm usdc,weth
+
+# consume — Tier B by default, Tier A with --trust-coverage
+chainz exec 1 -- rl quote 0xTOKEN usdc 1 --pool-list ./pool-lists/1.poollist.json
+chainz exec 1 -- rl quote 0xTOKEN usdc 1 --pool-list ./pool-lists/1.poollist.json --trust-coverage
+```
+
+The list's integrity hash, chain id, `wrappedNative` and factory fingerprint are all checked against
+the manifest the run resolved; any mismatch exits 4 rather than running without it. Phase 2 adds a
+`'list'` provenance tier, a merge API inside the SDK, and signatures.
+
 ## Transport options
 
 Two knobs on `createRouter` tune how this package talks to `client.request`, both provider-shaped
