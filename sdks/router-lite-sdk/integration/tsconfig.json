@@ -11,5 +11,5 @@
     "types": ["node"],
     "noEmit": true
   },
-  "include": ["*.ts", "scripts/**/*.ts", "typings/**/*"]
+  "include": ["*.ts", "scripts/**/*.ts", "../typings/bun-test.d.ts"]
 }

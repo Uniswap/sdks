@@ -1,11 +1,12 @@
 /**
- * Minimal ambient declaration of the `bun:test` runtime module (same pattern as
- * `../integration/typings/bun-test.d.ts` and `../canary/typings/bun-test.d.ts`). It exists so
- * `tsconfig.test.json` (the *.test.ts-inclusive typecheck) can resolve `bun:test` WITHOUT depending
- * on `bun-types`/`@types/bun`: hoisting `bun-types` into the root `node_modules` breaks sibling
- * packages that still compile with TypeScript 4.x (their tsc auto-includes every hoisted `@types/*`
- * package and cannot parse modern `bun-types` syntax). The matcher surface is loose on purpose — the
- * suite runs under `bun test`, which needs no types.
+ * Minimal ambient declaration of the `bun:test` runtime module — the ONE copy, included by every
+ * typecheck config that sees test files (`tsconfig.test.json`, `cli/tsconfig.json`,
+ * `canary/tsconfig.json`, `integration/tsconfig.json`, each via its `include` list). It exists so
+ * those configs can resolve `bun:test` WITHOUT depending on `bun-types`/`@types/bun`: hoisting
+ * `bun-types` into the root `node_modules` breaks sibling packages that still compile with
+ * TypeScript 4.x (their tsc auto-includes every hoisted `@types/*` package and cannot parse modern
+ * `bun-types` syntax). The matcher surface is loose on purpose — the suite runs under `bun test`,
+ * which needs no types.
  */
 declare module 'bun:test' {
   type TestFn = () => void | Promise<void>
