@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
 
+import * as rootModule from './index'
 import {
   ARBITRUM_MANIFEST,
   BASE_MANIFEST,
@@ -13,7 +14,7 @@ import {
   createRouter,
   manifestFor,
 } from './index'
-import type { Protocol, ReasonCode } from './index'
+import type { CreateRouterOptions, IterateOptions, Protocol, ReasonCode } from './index'
 
 // ---------------------------------------------------------------------------
 // Compile-time + minimal-execution guard that every VALUE export of the package root
@@ -27,7 +28,75 @@ import type { Protocol, ReasonCode } from './index'
 // as a value except a caller who actually wants to iterate/validate against it, which is exactly
 // what this test does. The other root value exports ride along for the same cheap-drift-guard
 // reason `experimental/surface.test.ts` covers its own subpath.
+//
+// THE SPOT CHECKS BELOW ARE NOT A SURFACE PIN, WHICH IS WHY THE TWO EXHAUSTIVE ONES EXIST. A test
+// that names the exports it expects can only fail when one goes MISSING; an export that ARRIVES is
+// invisible to it, and the package shipped `PROTOCOLS` (a value) and `assumeChainId` /
+// `IterateOptions` (an option field and a type) with nothing failing and nothing documented. So
+// this file pins the full sorted export list, and — because `Object.keys` sees only value exports —
+// the option bag's keys are pinned at COMPILE time as well. Failing either is not a bug: it means
+// someone must consciously update the pin AND the README table it mirrors.
 // ---------------------------------------------------------------------------
+
+/**
+ * Every VALUE export of the package root, sorted. Adding one is a public-API decision; this is
+ * where it gets made deliberately instead of by import.
+ */
+const ROOT_VALUE_EXPORTS = [
+  'ARBITRUM_MANIFEST',
+  'BASE_MANIFEST',
+  'MAINNET_MANIFEST',
+  'PROTOCOLS',
+  'REASON_CODES',
+  'ROBINHOOD_MANIFEST',
+  'RouterConfigError',
+  'UNICHAIN_MANIFEST',
+  'UnsupportedRouteError',
+  'createRouter',
+  'manifestFor',
+] as const
+
+test('the package root exports EXACTLY these values — an addition fails here, not silently in a release', () => {
+  expect(Object.keys(rootModule).sort()).toEqual([...ROOT_VALUE_EXPORTS])
+})
+
+// The compile-time half. `Object.keys` cannot see a type export or an option FIELD, and both are
+// how the last two undocumented additions arrived. `Exclude<A, B> | Exclude<B, A>` resolves to
+// `never` iff the two key sets are identical, so a new option (or a removed one) fails to compile
+// here with the offending name printed in the error.
+type Exact<Actual extends string, Pinned extends string> = Exclude<Actual, Pinned> | Exclude<Pinned, Actual>
+type AssertNever<T extends never> = T
+
+type PinnedCreateRouterOptions =
+  | 'client'
+  | 'manifest'
+  | 'index'
+  | 'maxPools'
+  | 'concurrency'
+  | 'logChunkBlocks'
+  | 'assumeChainId'
+type PinnedIterateOptions = 'onFirstRoute'
+
+type _CreateRouterOptionsArePinned = AssertNever<Exact<keyof CreateRouterOptions & string, PinnedCreateRouterOptions>>
+type _IterateOptionsArePinned = AssertNever<Exact<keyof IterateOptions & string, PinnedIterateOptions>>
+
+test('the two option bags carry exactly the documented fields', () => {
+  // The assertion is the two type aliases above (they fail `bun run typecheck:tests`, not this
+  // runtime test). This case exists so the aliases are referenced — an unused type alias is exactly
+  // the thing a future cleanup deletes — and so the failure has a name in the test output too.
+  const createKeys: PinnedCreateRouterOptions[] = [
+    'client',
+    'manifest',
+    'index',
+    'maxPools',
+    'concurrency',
+    'logChunkBlocks',
+    'assumeChainId',
+  ]
+  const iterateKeys: PinnedIterateOptions[] = ['onFirstRoute']
+  expect(createKeys).toHaveLength(7)
+  expect(iterateKeys).toHaveLength(1)
+})
 
 test('REASON_CODES is a real, importable, iterable value — not just the ReasonCode type', () => {
   expect(Array.isArray(REASON_CODES)).toBe(true)

@@ -4,6 +4,7 @@ import type { Address } from 'viem'
 import type { PoolRecord, PoolRef, QuotedRoute, RouteLeg, UniversalRouterDeployment } from '../index'
 
 import type { Custody, FeeDiscovery, PoolIndexSnapshot, ProtocolModule, QuoteProbe } from './index'
+import * as experimentalModule from './index'
 import {
   PROTOCOL_MODULES,
   PoolIndex,
@@ -31,7 +32,40 @@ import {
 // compiling — that's the point: it is the regression test for the shipped
 // defect this file fixes (generateRoutes/compileExecutionPlan's argument
 // types were unconstructible from outside the package).
+//
+// WHAT THE CASES BELOW CANNOT DO IS NOTICE AN ARRIVAL. Each one names what it
+// uses, so it fails when an export goes missing and stays perfectly green when
+// one appears — which is how the root subpath shipped an undocumented value
+// export. The exhaustive pin directly below is the other direction: adding an
+// export to `experimental/index.ts` fails here until someone updates the pin
+// and the README table it mirrors. Deliberate, not automatic — "no stability
+// guarantee" is about the SEMANTICS of these primitives, not a license for the
+// name list to drift unread.
 // ---------------------------------------------------------------------------
+
+/** Every VALUE export of the `/experimental` subpath, sorted. */
+const EXPERIMENTAL_VALUE_EXPORTS = [
+  'POOL_INDEX_SCHEMA_VERSION',
+  'PROTOCOL_MODULES',
+  'PoolIndex',
+  'buildHookData',
+  'compileExecutionPlan',
+  'encoderFor',
+  'generateRoutes',
+  'isHooked',
+  'parseSnapshot',
+  'serializeSnapshot',
+  'v2Module',
+  'v2PoolRef',
+  'v3Module',
+  'v3PoolRef',
+  'v4Module',
+  'v4PoolRef',
+] as const
+
+test('/experimental exports EXACTLY these values — an addition fails here, not silently in a release', () => {
+  expect(Object.keys(experimentalModule).sort()).toEqual([...EXPERIMENTAL_VALUE_EXPORTS])
+})
 
 const USDC = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as Address
 const WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2' as Address
