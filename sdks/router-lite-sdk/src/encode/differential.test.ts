@@ -31,6 +31,8 @@ import type {
 } from '../types'
 
 import type { PlanEncoder } from './core'
+import type { GoldenPlan } from './testing'
+import { loadGoldenPlans, PLANS_FILE, withTaggedBigints } from './testing'
 import { encodeExecutionPlan } from './ur20'
 import { encodeExecutionPlanUr21 } from './ur21'
 
@@ -542,19 +544,39 @@ const SHAPES: Shape[] = [
 
 const UPDATE_GOLDENS = process.env['UPDATE_GOLDENS'] === '1'
 
-type Golden = { plan: unknown; calldata: string; value: string }
+/** What one run hands in: the calldata it produced, and the plan corpus it produced (which every
+ * run must agree on — see the shared-corpus test at the bottom of this section). */
+type RunOutput = { calldata: Record<string, string>; plans: Record<string, GoldenPlan> }
+const produced = new Map<CommandSet, RunOutput>()
 
-/** Tags bigints so an ExecutionPlan survives a JSON round trip unambiguously. */
-function withTaggedBigints(value: unknown): string {
-  return JSON.stringify(value, (_key, raw) => (typeof raw === 'bigint' ? { $bigint: raw.toString() } : raw), 2)
+function goldenPath(file: string): string {
+  return fileURLToPath(new URL(file, import.meta.url))
+}
+
+/**
+ * A REGENERATION MUST BE A WHOLE ONE, OR IT IS A TRUNCATION. The produced maps are filled by the
+ * per-shape tests, so they only ever hold the shapes that actually RAN AND PASSED in this process —
+ * and `bun test` makes partial runs one flag away (`-t`, a single file path, a shape whose
+ * universal-router-sdk construction timed out under load). Regenerating from that rewrites the file
+ * with the subset, and because the shapes that vanished are the ones nothing compared, the loss is
+ * invisible: the very next run passes, against a corpus that silently stopped covering half the
+ * encoder. This is the one thing standing between `UPDATE_GOLDENS=1 bun test -t v4` and a
+ * permanently narrower differential suite.
+ */
+function assertWholeRun(what: string, names: string[]): void {
+  expect(
+    names.length,
+    `refusing to regenerate ${what}: ${names.length}/${SHAPES.length} shapes ran — a filtered or ` +
+      'partly-failed run would silently truncate the golden corpus. Re-run without a -t filter.',
+  ).toBe(SHAPES.length)
 }
 
 for (const run of COMMAND_SET_RUNS) {
-  const goldensPath = fileURLToPath(new URL(run.goldensFile, import.meta.url))
-  const storedGoldens: Record<string, Golden> = existsSync(goldensPath)
-    ? JSON.parse(readFileSync(goldensPath, 'utf8'))
+  const output: RunOutput = { calldata: {}, plans: {} }
+  produced.set(run.commandSet, output)
+  const storedCalldata: Record<string, string> = existsSync(goldenPath(run.goldensFile))
+    ? (JSON.parse(readFileSync(goldenPath(run.goldensFile), 'utf8')) as Record<string, string>)
     : {}
-  const producedGoldens: Record<string, Golden> = {}
   const deployment = deploymentFor(run.commandSet)
 
   for (const shape of SHAPES) {
@@ -563,41 +585,66 @@ for (const run of COMMAND_SET_RUNS) {
       const built = buildCase(shape)
       const ours = encodeOurs(built, run.encoder, deployment)
       assertMatches(built, ours, encodeTheirs(built, run.urVersion))
-      producedGoldens[name] = {
-        plan: JSON.parse(withTaggedBigints(ours.plan)),
-        calldata: ours.data,
-        value: ours.value.toString(),
-      }
-    // 30s (vs. bun's 5s default): under CPU contention, universal-router-sdk's Trade construction is
-    // slow enough to flake here — reproduced taking ~17s under load at 6bf70b99, no regression on our side.
-    }, 30_000)
+      output.calldata[name] = ours.data
+      // The plan is tagged and re-parsed rather than kept live, so what this run hands in is exactly
+      // what a stored corpus round-trips to — the comparison below is against the FILE's semantics,
+      // not against an in-memory object that happens to be nearby.
+      output.plans[name] = { plan: JSON.parse(withTaggedBigints(ours.plan)), value: ours.value.toString() }
+    })
   }
 
-  test(`${run.goldensFile.replace('./', '')} covers every shape and matches the current encoding`, () => {
+  test(`${run.goldensFile.replace('./', '')} holds this command set's wire bytes for every shape`, () => {
     if (UPDATE_GOLDENS) {
-      // A REGENERATION MUST BE A WHOLE ONE, OR IT IS A TRUNCATION. `producedGoldens` is filled by
-      // the per-shape tests ABOVE, so it only ever holds the shapes that actually RAN AND PASSED in
-      // this process — and `bun test` makes partial runs one flag away (`-t`, a single file path, a
-      // shape whose universal-router-sdk construction timed out under load). Regenerating from that
-      // rewrites the file with the subset, and because the shapes that vanished are the ones nothing
-      // compared, the loss is invisible: the very next run passes, against a corpus that silently
-      // stopped covering half the encoder. This assertion is the one thing standing between
-      // `UPDATE_GOLDENS=1 bun test -t v4` and a permanently narrower differential suite.
-      //
-      // Per COMMAND SET, not globally: each run writes its own file from its own shapes, so the
-      // denominator is this run's `SHAPES` and a whole-suite count would pass a half-written pair.
-      expect(
-        Object.keys(producedGoldens).length,
-        `refusing to regenerate ${run.goldensFile}: ${Object.keys(producedGoldens).length}/${SHAPES.length} shapes ran ` +
-          '— a filtered or partly-failed run would silently truncate the golden corpus. Re-run without a -t filter.',
-      ).toBe(SHAPES.length)
-      writeFileSync(goldensPath, `${JSON.stringify(producedGoldens, null, 2)}\n`)
+      assertWholeRun(run.goldensFile, Object.keys(output.calldata))
+      writeFileSync(goldenPath(run.goldensFile), `${JSON.stringify(output.calldata, null, 2)}\n`)
       return
     }
-    expect(Object.keys(producedGoldens).sort()).toEqual(Object.keys(storedGoldens).sort())
-    expect(producedGoldens).toEqual(storedGoldens)
+    expect(Object.keys(output.calldata).sort()).toEqual(Object.keys(storedCalldata).sort())
+    expect(output.calldata).toEqual(storedCalldata)
   })
 }
+
+/**
+ * THE SHARED HALF, AND THE INVARIANT THAT LETS IT BE SHARED.
+ *
+ * A command set revises the ABI layout of three swap payloads (`ur21.ts`) and nothing about what a
+ * plan says to do or what ether it carries — so both runs must produce the SAME plan and the SAME
+ * value for every shape, and the corpus is stored once for both. Measured before the split: 73 of 73
+ * identical on both fields, 0 of 73 identical on calldata.
+ *
+ * Asserting it HERE is what makes the sharing safe. Stored per set, the fact had to be re-derived by
+ * diffing two large files and the copies were free to drift; stored once, a command set that
+ * genuinely needed a different plan fails on this line — loudly, by name — instead of hiding inside
+ * a regenerated 380 kB file.
+ *
+ * Registered after both runs' loops, so it observes what they produced (bun runs tests in
+ * registration order).
+ */
+test(`${PLANS_FILE.replace('./', '')} is ONE corpus both command sets agree on, shape for shape`, () => {
+  const outputs = COMMAND_SET_RUNS.map((run) => ({ run, out: produced.get(run.commandSet)! }))
+  const [first, ...rest] = outputs
+  for (const other of rest) {
+    expect(Object.keys(other.out.plans).sort(), `${other.run.commandSet} covers different shapes than ${first!.run.commandSet}`).toEqual(
+      Object.keys(first!.out.plans).sort(),
+    )
+    // Deep-equal on the whole corpus: a single shape whose plan or value differs between the sets
+    // is the assumption behind the shared file failing, and it should say so here.
+    expect(other.out.plans, `${other.run.commandSet}'s plans differ from ${first!.run.commandSet}'s`).toEqual(first!.out.plans)
+  }
+
+  const plans = first!.out.plans
+  if (UPDATE_GOLDENS) {
+    assertWholeRun(PLANS_FILE, Object.keys(plans))
+    writeFileSync(goldenPath(PLANS_FILE), `${JSON.stringify(plans, null, 2)}\n`)
+    return
+  }
+  // `loadGoldenPlans` revives the tags; re-tagging is the exact inverse, so comparing the tagged
+  // forms compares the FILES rather than two decodings of them — and asserts the
+  // `withTaggedBigints`/`reviveBigints` pair really is a round trip, which nothing else does now
+  // that the two hand-written copies of the reviver are gone.
+  const stored = loadGoldenPlans()
+  expect(JSON.parse(withTaggedBigints(stored))).toEqual(plans)
+})
 
 // The two sets share fixtures but not wire format: if any shape ever encodes byte-identically
 // across the sets, either the 2.1 codec stopped emitting its ABI extensions or a fixture collapsed.

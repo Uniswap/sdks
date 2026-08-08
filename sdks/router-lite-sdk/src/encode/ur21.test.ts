@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-
 import { expect, test } from 'bun:test'
 import type { Address } from 'viem'
 import { decodeAbiParameters, decodeFunctionData, parseAbiParameters, zeroAddress } from 'viem'
@@ -14,8 +11,9 @@ import type { ProtocolModule } from '../protocols/types'
 import { v2Module } from '../protocols/v2'
 import { v3Module } from '../protocols/v3'
 import { v4Module } from '../protocols/v4'
-import type { ExecutionPlan, PoolKey, PoolRef, Protocol, QuotedRoute, RouteLeg, UniversalRouterDeployment } from '../types'
+import type { PoolKey, PoolRef, Protocol, QuotedRoute, RouteLeg, UniversalRouterDeployment } from '../types'
 
+import { loadGoldenCalldata, loadGoldens } from './testing'
 import { encodeExecutionPlan } from './ur20'
 import { encodeExecutionPlanUr21 } from './ur21'
 
@@ -170,42 +168,39 @@ test('command bytes are identical to ur-2.0 for every shape the two sets share',
 })
 
 // ---------------------------------------------------------------------------
-// Goldens — `goldens-ur21.json`, written by the differential suite from the
-// run that proved every shape byte-identical with universal-router-sdk pinned
-// to V2_1_1. Replaying it here pins plan -> calldata directly, exactly as
-// `ur20.test.ts` does for `goldens.json` (see there for the reasoning, and
-// `differential.test.ts` for how to regenerate).
+// Goldens — `goldens-ur21.json` holds ur-2.1's wire bytes per shape, joined
+// against the plan corpus it shares with ur-2.0 (`encode/testing.ts` explains
+// the split). Written by the differential suite from the run that proved every
+// shape byte-identical with universal-router-sdk pinned to V2_1_1; see there
+// for how to regenerate, and `ur20.test.ts` for why one replay row rather than
+// seventy-three.
 // ---------------------------------------------------------------------------
 
-type Golden = { plan: unknown; calldata: string; value: string }
-
-/** Inverse of the differential suite's bigint tagging. */
-function reviveBigints(json: string): Record<string, Golden> {
-  return JSON.parse(json, (_key, value) =>
-    value !== null && typeof value === 'object' && typeof (value as { $bigint?: string }).$bigint === 'string'
-      ? BigInt((value as { $bigint: string }).$bigint)
-      : value,
-  )
-}
-
-const goldens = reviveBigints(readFileSync(fileURLToPath(new URL('./goldens-ur21.json', import.meta.url)), 'utf8'))
+const goldens = loadGoldens('./goldens-ur21.json')
 
 test('goldens-ur21.json is a non-empty set of distinct encodings, shape-for-shape with goldens.json', () => {
   const entries = Object.entries(goldens)
   expect(entries.length).toBeGreaterThan(50)
   expect(new Set(entries.map(([, golden]) => golden.calldata)).size).toBe(entries.length)
-  // The two sets cover the SAME closed shape matrix — a shape added to one file but not the other
-  // means the differential suite's per-set loops drifted apart.
-  const ur20Goldens = reviveBigints(readFileSync(fileURLToPath(new URL('./goldens.json', import.meta.url)), 'utf8'))
-  expect(Object.keys(goldens).sort()).toEqual(Object.keys(ur20Goldens).sort())
+  // The two sets cover the SAME closed shape matrix — a shape in one calldata file but not the
+  // other means the differential suite's per-set loops drifted apart. (Both now join against ONE
+  // plan corpus, and `loadGoldens` throws on a join miss, so this is the remaining axis: two
+  // calldata files that agree with the plans but not with each other.)
+  expect(Object.keys(goldens).sort()).toEqual(Object.keys(loadGoldenCalldata('./goldens.json')).sort())
 })
 
-// Calldata compared EXACTLY — no case folding, no normalization — for the same reason as
-// `ur20.test.ts`: a golden's whole job is "the stored string is what the encoder emits today".
-for (const [name, golden] of Object.entries(goldens)) {
-  test(`golden [ur-2.1]: ${name}`, () => {
-    const tx = encodeExecutionPlanUr21(golden.plan as ExecutionPlan, deployment, DEADLINE)
-    expect(tx.data).toBe(golden.calldata as `0x${string}`)
-    expect(tx.value).toBe(BigInt(golden.value))
-  })
-}
+/** One row, for the same reason and on the same terms as `ur20.test.ts`'s — see its docstring for
+ * why the other 72 replays were redundant with the differential suite rather than merely slow. The
+ * shape is the same one, so the two smoke tests differ in exactly the axis under test: the encoder. */
+const SMOKE_SHAPE = 'v4→v3 erc20-in erc20-out via-native +permit'
+
+test(`golden replay smoke [ur-2.1]: ${SMOKE_SHAPE}`, () => {
+  const golden = goldens[SMOKE_SHAPE]
+  expect(golden, `${SMOKE_SHAPE} is missing from the golden corpus`).toBeDefined()
+  const tx = encodeExecutionPlanUr21(golden!.plan, deployment, DEADLINE)
+  expect(tx.data).toBe(golden!.calldata as `0x${string}`)
+  expect(tx.value).toBe(BigInt(golden!.value))
+  // ...and really is a different encoding of the same plan, which is the whole point of the split
+  // corpus: same plan, same value, different bytes.
+  expect(tx.data).not.toBe(loadGoldenCalldata('./goldens.json')[SMOKE_SHAPE])
+})

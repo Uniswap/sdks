@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-
 import { CommandType } from '@uniswap/universal-router-sdk'
 import { Actions } from '@uniswap/v4-sdk'
 import { expect, test } from 'bun:test'
@@ -30,6 +27,7 @@ import type {
 } from '../types'
 
 import { COMMAND, V4_ACTION } from './core'
+import { loadGoldens } from './testing'
 import { encodeExecutionPlan } from './ur20'
 
 const modules: Record<Protocol, ProtocolModule> = { v2: v2Module, v3: v3Module, v4: v4Module }
@@ -292,27 +290,18 @@ test('a trailing unwrap carries the single slippage floor and pays the recipient
 // ---------------------------------------------------------------------------
 // Goldens
 //
-// `goldens.json` is written by the differential suite from the run that proved
-// every shape byte-identical with universal-router-sdk. Replaying it here pins
-// plan -> calldata directly: the differential suite can only catch a drift it
-// still knows how to build, while a golden catches any change to the encoder at
-// all, including one that moves our fixtures and the oracle together.
+// `goldens.json` holds ur-2.0's wire bytes per shape; the plans they encode
+// live once in `goldens-plans.json`, shared with ur-2.1 (see
+// `encode/testing.ts` for why the corpus is split that way). Both are written
+// by the differential suite from the run that proved every shape byte-identical
+// with universal-router-sdk — see there for how to regenerate.
 //
-// See differential.test.ts for how to regenerate.
+// The exhaustive plan->calldata check lives in that suite. What stays here is
+// one row, for the wiring the suite does not exercise: that the corpus loads
+// off disk, revives, and joins. See the smoke test's docstring.
 // ---------------------------------------------------------------------------
 
-type Golden = { plan: unknown; calldata: string; value: string }
-
-/** Inverse of the differential suite's bigint tagging. */
-function reviveBigints(json: string): Record<string, Golden> {
-  return JSON.parse(json, (_key, value) =>
-    value !== null && typeof value === 'object' && typeof (value as { $bigint?: string }).$bigint === 'string'
-      ? BigInt((value as { $bigint: string }).$bigint)
-      : value,
-  )
-}
-
-const goldens = reviveBigints(readFileSync(fileURLToPath(new URL('./goldens.json', import.meta.url)), 'utf8'))
+const goldens = loadGoldens('./goldens.json')
 
 test('goldens.json is a non-empty set of distinct encodings', () => {
   const entries = Object.entries(goldens)
@@ -321,25 +310,36 @@ test('goldens.json is a non-empty set of distinct encodings', () => {
 })
 
 /**
- * Calldata is compared EXACTLY — no case folding, no normalization of any kind. A golden's whole
- * job is "the stored string is what the encoder emits today", and any comparison looser than `toBe`
- * lets the file drift into a representation no code produces, which is a trap for the next reader
- * rather than a safeguard.
+ * ONE REPLAY, NOT SEVENTY-THREE — and the deleted seventy-two were redundant rather than merely
+ * expensive.
  *
- * The file was regenerated once during R4, when `encode/ur20.ts`'s hand-rolled v3 path builder was
- * deleted in favour of `protocols/v3.ts#encodeV3Path`. That change was BYTE-NEUTRAL — 73 goldens,
- * 38 byte-and-spelling identical, 35 differing only in hex letter-case, 0 real byte differences —
- * because viem's `encodePacked` lowercases addresses while the deleted encoder concatenated
- * checksummed strings, and `0x6B` and `0x6b` are the same byte. Regenerating canonicalized the
- * stored spelling to what the surviving encoder actually produces.
+ * `differential.test.ts` already asserts, for every shape: the plan it compiles equals the stored
+ * plan, and the calldata it encodes from that plan equals this file's stored calldata. Between them
+ * those pin `encoder(storedPlan) === storedCalldata` for all 73 — so a per-shape replay here proved
+ * nothing the differential suite had not already proved, at 146 `test()` cases across the two sets.
+ *
+ * What it did prove, and what this row keeps, is the WIRING: that the on-disk corpus loads, that the
+ * `$bigint` tags revive into an `ExecutionPlan` the encoder accepts, and that the plan corpus and
+ * this set's calldata file join on the same shape names. `loadGoldens` throws on a mismatched join,
+ * so a corpus that came apart fails before the assertion below is reached.
+ *
+ * The row is NAMED rather than sampled: a shape rename should fail here loudly instead of quietly
+ * moving which golden gets checked. This one carries a v4 group, a v3 group, an intermediate native
+ * conversion between them and a Permit2 permit — the richest single plan in the matrix.
+ *
+ * Calldata is compared EXACTLY — no case folding, no normalization of any kind. A golden's whole job
+ * is "the stored string is what the encoder emits today", and any comparison looser than `toBe` lets
+ * the file drift into a representation no code produces.
  */
-for (const [name, golden] of Object.entries(goldens)) {
-  test(`golden: ${name}`, () => {
-    const tx = encodeExecutionPlan(golden.plan as ExecutionPlan, deployment, DEADLINE)
-    expect(tx.data).toBe(golden.calldata as `0x${string}`)
-    expect(tx.value).toBe(BigInt(golden.value))
-  })
-}
+const SMOKE_SHAPE = 'v4→v3 erc20-in erc20-out via-native +permit'
+
+test(`golden replay smoke: ${SMOKE_SHAPE}`, () => {
+  const golden = goldens[SMOKE_SHAPE]
+  expect(golden, `${SMOKE_SHAPE} is missing from the golden corpus`).toBeDefined()
+  const tx = encodeExecutionPlan(golden!.plan, deployment, DEADLINE)
+  expect(tx.data).toBe(golden!.calldata as `0x${string}`)
+  expect(tx.value).toBe(BigInt(golden!.value))
+})
 
 test('a v4 group settles and takes around the swap, native currencies as address(0)', () => {
   const plan = compileExecutionPlan(
