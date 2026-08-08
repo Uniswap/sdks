@@ -22,3 +22,6 @@ npm-debug.log*
 
 # OS
 .DS_Store
+
+# Locally-built pool lists (published as CI artifacts, never committed — see docs/pool-lists.md)
+pool-lists/

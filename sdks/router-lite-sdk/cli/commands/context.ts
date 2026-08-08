@@ -29,11 +29,18 @@ import {
   type ResolvedChain,
 } from '../chains'
 import { parseHint } from '../hints'
+import { applyPoolList } from '../poolList'
 import { redactKeyedUrl } from '../redact'
 import { viewKey, type RenderCtx, type TokenView } from '../report'
 import { fetchTokenMeta, resolveToken, type ResolvedToken } from '../tokens'
 
-/** Flags shared by every command that talks to a chain. */
+/**
+ * Flags shared by every command that talks to a chain.
+ *
+ * `--pool-list` / `--trust-coverage` live HERE rather than on the trade commands only, because
+ * `discover` is the command a list most obviously helps: it exists to answer "what pools does the
+ * SDK see", and a list changes that answer.
+ */
 export const COMMON_FLAGS: FlagSpec = {
   chain: { kind: 'string', alias: 'c' },
   rpc: { kind: 'string' },
@@ -41,6 +48,8 @@ export const COMMON_FLAGS: FlagSpec = {
   budget: { kind: 'string', alias: 'b' },
   concurrency: { kind: 'string' },
   verbose: { kind: 'boolean', alias: 'v' },
+  'pool-list': { kind: 'string' },
+  'trust-coverage': { kind: 'boolean' },
   ...CACHE_FLAGS,
 }
 
@@ -168,6 +177,23 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
     scheduleCacheSave(async () => note(await saveCache(chain.chainId, index)))
   } else {
     note('cache: disabled (--no-cache)')
+  }
+
+  // `--pool-list` (phase 1): a published snapshot from somewhere else, merged INTO whatever the
+  // cache just restored. It runs after the cache load, and deliberately not instead of it — both are
+  // snapshot-shaped and `cli/poolList.ts#hydratePoolList` unions them through the index's own public
+  // merge rules, so neither source shadows the other. Coverage is DISCARDED unless
+  // `--trust-coverage` says otherwise; see `cli/poolList.ts` for why those two halves have different
+  // trust tiers. Any failure here is fatal (exit 4 via `rl.ts`) rather than a note: unlike the cache,
+  // a pool list is something the user explicitly asked for, so silently proceeding without it would
+  // answer a different question than the one asked.
+  const poolListSpec = parsed.strings.get('pool-list')
+  const trustCoverage = parsed.booleans.has('trust-coverage')
+  if (trustCoverage && poolListSpec === undefined) {
+    throw new UsageError('--trust-coverage only means something with --pool-list <path-or-https-url>')
+  }
+  if (poolListSpec !== undefined) {
+    console.error(dim(await applyPoolList(index, poolListSpec, { chainId, manifest: chain.manifest, trustCoverage })))
   }
 
   const router = createRouter({

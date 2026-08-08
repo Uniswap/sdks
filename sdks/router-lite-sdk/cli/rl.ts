@@ -35,6 +35,15 @@
 //        4  unexpected internal error
 //        5  --simulate DISPROVED the tx (a call in the proof chain reverted,
 //           or delivery landed below the tx's own minAmountOut)
+//
+//    `--pool-list` IS THE ONE DELIBERATE EXCEPTION TO "4 MEANS A BUG". A list
+//    that fails its integrity/chain/manifest checks exits 4 with a single clean
+//    line and no stack. It is not 3, because the flag was used correctly — the
+//    user named a list and meant it, and telling them to fix their arguments
+//    would be wrong advice; and it is emphatically not 0-with-a-warning,
+//    because a run that quietly proceeded without the list would print a
+//    perfectly ordinary-looking quote computed from a different index than the
+//    operator asked for. 4 is the code a script must never treat as "carry on".
 // ---------------------------------------------------------------------------
 
 import { RouterConfigError, UnsupportedRouteError } from '../src/index'
@@ -47,6 +56,7 @@ import { cmdChains } from './commands/chains'
 import { cmdDiscover } from './commands/discover'
 import { cmdQuote } from './commands/quote'
 import { cmdSwap } from './commands/swap'
+import { PoolListError } from './poolList'
 import { redactKeyedUrl } from './redact'
 import { RpcError } from './tokens'
 
@@ -84,6 +94,18 @@ ${bold('common options')}
   --no-cache              skip the on-disk pool index (~/.cache/router-lite/<chainId>.json).
                           It is ON by default: a warm second run re-scans only the block delta,
                           never the history. --verbose reports what it loaded and saved.
+  --pool-list <path|url>  load a published pool list (a path, or an https:// URL) and MERGE it into
+                          this run's index alongside the cache. Its integrity hash, chain id and
+                          factory fingerprint are checked against the resolved manifest; any
+                          mismatch exits 4 rather than running without it. POOLS ARE IMPORTED,
+                          COVERAGE IS NOT — see --trust-coverage.
+  --trust-coverage        also import the list's SCAN COVERAGE: its claim that particular block
+                          ranges have already been fully scanned for pool-creation events. This
+                          makes the search SKIP those ranges, so a list that claims a range it did
+                          not really scan permanently hides every pool created in it — with no
+                          symptom beyond a worse route. Pass this only for a list you would trust
+                          with your own cache directory. Without it a list is still a large win:
+                          the pools arrive, and the ranges are simply re-scanned.
 
 ${bold('swap options')}
   --trader, -t 0x…        required — the account the tx is encoded for
@@ -99,7 +121,7 @@ ${bold('examples')} (rl = \`bun cli/rl.ts\` from the package dir)
   chainz exec 1 -- rl swap eth usdc 0.5 --trader 0x1111111111111111111111111111111111111111 --simulate
   chainz exec 130 -- rl discover 0xTOKEN --chain 130
 
-${bold('exit codes')}   0 actionable · 1 no-route · 2 inconclusive (incl. rpc unavailable) · 3 usage/config · 4 internal · 5 simulation disproved`
+${bold('exit codes')}   0 actionable · 1 no-route · 2 inconclusive (incl. rpc unavailable) · 3 usage/config · 4 internal (or a rejected --pool-list) · 5 simulation disproved`
 
 async function dispatch(command: string | undefined, rest: string[]): Promise<number> {
   switch (command) {
@@ -141,6 +163,12 @@ async function main(): Promise<number> {
     if (err instanceof RpcError) {
       console.error(`${red('rpc error:')} ${redactKeyedUrl(err.message)}`)
       return 2
+    }
+    // A rejected `--pool-list`: exit 4 (see the exit-code block in this file's header for why), but
+    // as a one-liner — the failure is fully diagnosed in the message and a stack would only bury it.
+    if (err instanceof PoolListError) {
+      console.error(`${red('pool-list error:')} ${redactKeyedUrl(err.message)}`)
+      return 4
     }
     if (err instanceof RouterConfigError || err instanceof UnsupportedRouteError) {
       console.error(`${red('config error:')} ${redactKeyedUrl(err.message)}`)
