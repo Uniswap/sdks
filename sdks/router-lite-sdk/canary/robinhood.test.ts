@@ -6,15 +6,18 @@ import { V4_POOL_MANAGER_ABI } from '../src/internal/abis'
 import { scanLogs } from '../src/internal/logScan'
 
 import { canaryLog, robinhoodChainId, robinhoodClient, robinhoodEnabled } from './env'
+import { CANARY_TRADER, probeSimulateV1Support, simulateSwapE2E } from './simulate'
 
 // ---------------------------------------------------------------------------
 // ROBINHOOD CHAIN (4663) CANARY — the repurposability proof, as a repeatable test.
 //
 // Gated on ROUTER_LITE_CANARY=1 AND CANARY_RPC_URL_ROBINHOOD (see `env.ts` for why this chain gets
 // its own variable rather than a fourth CANARY_RPC_URL_*). NEVER PR-blocking: same nightly-only
-// posture as `canary.test.ts`. NO KEYS, NO FUNDS, NO BROADCASTS — and on this chain, not even a
-// simulated swap: the manifest is QUOTE-ONLY (see below), so `getSwap` is never called for real
-// here, and the one test that touches it asserts that it REFUSES.
+// posture as `canary.test.ts`. NO KEYS, NO FUNDS, NO BROADCASTS — swaps are proved by
+// `eth_simulateV1` (`simulate.ts`'s chained acquire→approve→swap), never sent. The manifest
+// shipped QUOTE-ONLY (no encoder existed for this chain's 2.1.1 Universal Router) until
+// `encode/ur21.ts`; it now carries `commandSet: 'ur-2.1'`, the swap row below is this chain's
+// execution proof, and the quote-only path is still pinned via an `execution: undefined` override.
 //
 // GRACEFUL SKIPS EVERYWHERE, BY DESIGN. Every row's subject is a pool that some stranger launched
 // on a public chain in the last three days. "No freshly-launched pool traded in the window" is a
@@ -30,10 +33,12 @@ import { canaryLog, robinhoodChainId, robinhoodClient, robinhoodEnabled } from '
 // manifest, no assumption that any address would resemble another chain's. Three things about it
 // exercise paths no other canary row reaches:
 //
-//  1. QUOTE-ONLY MANIFEST (C4-P3), live. The chain has all three protocols but no Universal Router
-//     this package can encode for — only UR 2.1.1, and `COMMAND_SETS` is `['ur-2.0']`. So
-//     `ROBINHOOD_MANIFEST` omits `execution` entirely, and this file is where that omission is
-//     proved to be a working configuration rather than a hole: quotes work, swaps refuse loudly.
+//  1. THE SECOND COMMAND SET, live. This chain's one Universal Router is a 2.1.1 deployment —
+//     `ROBINHOOD_MANIFEST` shipped quote-only (C4-P3) while `COMMAND_SETS` was `['ur-2.0']`, and
+//     now carries it under `commandSet: 'ur-2.1'` (`encode/ur21.ts`). The swap row below is the
+//     only place the ur-2.1 encoder's output meets a real chain (mainnet forks can only execute
+//     ur-2.0, and this chain has no forkable archive endpoint), so simulation IS the execution
+//     proof here. The quote-only configuration is still exercised via override.
 //  2. A 0.1s BLOCK TIME. `wave0PairScanBlocks` is 6,048,000 blocks here — 2.5x Arbitrum's, 20x
 //     Base's. Every budget in this file is sized for that, and the per-row `AbortSignal` is what
 //     keeps a row finite rather than open-ended.
@@ -487,11 +492,11 @@ describe.skipIf(!RUN)('Robinhood Chain manifest (canary, live)', () => {
     expect(manifest().coreIntermediates).toContain(USDG)
   })
 
-  // THE QUOTE-ONLY PATH (C4-P3), PROVED LIVE — the thing this chain uniquely tests. The manifest
-  // carries no Universal Router, so a swap must be refused SYNCHRONOUSLY, before any RPC, with a
-  // named error; a quote through the very same manifest must still work (the row below).
-  it('refuses getSwap with RouterConfigError — no execution bundle, and no silent fallback', async () => {
-    const m = manifest()
+  // THE QUOTE-ONLY PATH (C4-P3), still proved live — via override now that the built-in manifest
+  // carries an execution bundle (the shape it shipped in before `encode/ur21.ts` existed). A
+  // quote-only configuration must refuse a swap SYNCHRONOUSLY, before any RPC, with a named error.
+  it('a quote-only override still refuses getSwap with RouterConfigError — no silent fallback', async () => {
+    const m = manifestFor(robinhoodChainId(), { execution: undefined })
     expect(m.execution).toBeUndefined()
     const router = createRouter({ client: client!, manifest: m })
     // `getSwap` is `async`, so `validateSwapRequest`'s synchronous throw surfaces as a rejection —
@@ -512,6 +517,52 @@ describe.skipIf(!RUN)('Robinhood Chain manifest (canary, live)', () => {
     expect(caught).toBeInstanceOf(RouterConfigError)
     expect((caught as Error).message).toMatch(/no execution bundle/)
   })
+
+  // THE EXECUTION PROOF FOR THE ur-2.1 COMMAND SET — the row this chain gained when the manifest
+  // did. `getSwap` encodes against the 2.1.1 Universal Router, and the canary's chained
+  // acquire→approve→swap `eth_simulateV1` (see `simulate.ts`) runs that calldata against the REAL
+  // chain: every call must succeed and the recipient must receive at least the SDK's own slippage
+  // floor. Mainnet's fork suite cannot test this (it executes ur-2.0, and this chain cannot be
+  // forked without an archive endpoint), so per the project's "I trust simulations" ruling this
+  // simulation IS the execution proof. First live run 2026-08-07 (results block below the memecoin
+  // describe): both directions simulated ok — native -> USDG delivered +0.01 bps vs quote, the
+  // reverse +33 bps (the acquisition leg's own price impact, in the trader's favor), and a
+  // v4-routed swap (hook-gated fee-0 pool) delivered its quote EXACTLY, 0 bps.
+  it('simulates a real swap end-to-end: getSwap native -> USDG through the 2.1.1 router', async () => {
+    const supported = await probeSimulateV1Support(client!)
+    if (!supported) {
+      canaryLog('endpoint does not support eth_simulateV1 — swap row recorded as a skip, not a failure')
+      return
+    }
+    const router = createRouter({ client: client!, manifest: manifest() })
+    const result = await router.getSwap({
+      tokenIn: 'native',
+      tokenOut: USDG,
+      amountIn: parseEther('0.01'),
+      trader: CANARY_TRADER,
+      signal: AbortSignal.timeout(QUOTE_BUDGET_MS),
+    })
+    canaryLog('robinhood swap row: getSwap', { status: result.status })
+    // On a 0.1s chain the search can legitimately run out of budget mid-discovery (see the quote
+    // row above) — but a COMPLETED search against WETH/USDG that found nothing is a failure.
+    if (result.status !== 'ready' && result.status !== 'needs-action') {
+      expect(result.status).toBe('inconclusive')
+      canaryLog('swap search did not complete within budget — recorded, not failed', {
+        reasonCode: 'reason' in result ? result.reason.code : null,
+      })
+      return
+    }
+    expect(result.tx.to.toLowerCase()).toBe(manifest().execution!.address.toLowerCase())
+    const outcome = await simulateSwapE2E(client!, result, CANARY_TRADER)
+    canaryLog('robinhood swap row: simulated', {
+      ok: outcome.ok,
+      outputReceived: outcome.outputReceived.toString(),
+      quotedAmountOut: result.best.quote.amountOut.toString(),
+      route: result.best.route.legs.map(describeLeg).join(' -> '),
+    })
+    expect(outcome.ok).toBe(true)
+    expect(outcome.outputReceived).toBeGreaterThan(0n)
+  }, QUOTE_BUDGET_MS + 120_000)
 
   it('quotes native -> USDG through the same quote-only manifest', async () => {
     const row = await quoteRow('native->USDG', 'native', USDG, parseEther('0.01'))
@@ -606,13 +657,26 @@ describe.skipIf(!RUN)('Robinhood Chain manifest (canary, live)', () => {
 // manifests, five endpoints, two stablecoins and both v3 and v4 winning routes. Wrong addresses do
 // not agree to 18 basis points.
 //
-// NO EXECUTABLE (eth_simulateV1) PROOF EXISTS FOR THIS CHAIN, AND THE BLOCKER IS THIS PACKAGE, NOT
-// THE PROVIDER. `eth_simulateV1` was probed live on this endpoint and IS supported. But the chained
-// simulation `canary/simulate.ts` performs needs a `tx`, a `tx` needs `getSwap`, and `getSwap` cannot
-// run against a manifest with no `execution` bundle. So the strongest claim available on Robinhood
-// Chain is "quotes are real and self-consistent", not "a swap executes" — stated here rather than
-// left as an unexplained gap next to the mainnet suite's full E2E row. It becomes available the day
-// `COMMAND_SETS` gains a 2.1.1 encoder.
+// THE EXECUTABLE (eth_simulateV1) PROOF ARRIVED WITH THE ur-2.1 COMMAND SET (2026-08-07) — until
+// then the blocker was this package, not the provider (`getSwap` cannot run without an `execution`
+// bundle, and `COMMAND_SETS` had no encoder for this chain's 2.1.1 router). First live execution
+// proof, run the day the manifest gained its bundle (head ~30,672,000; keyed endpoint, alchemy
+// robinhood-mainnet; every simulation the canary's chained acquire→approve→swap via one
+// `eth_simulateV1`, no keys, no broadcasts):
+//
+//   direction                       route                        quote          simulated delta
+//   native -> USDG (0.01 ETH)       v3 fee 100                   19.145200 USDG +0.01 bps
+//   USDG -> native (10 USDG)        v3 fee 100 (+approve chain)  5.2223e15 wei  +33.34 bps *
+//   native -> memecoin (0.01 ETH)   v4 fee 0, HOOK-GATED         4,822.0025 tk  0 bps — EXACT
+//
+//   * the reverse row's +33 bps is the acquisition leg's own price impact (the simulation buys its
+//     USDG in the same block before selling it), in the trader's favor — not quote error.
+//
+// The v4 row is the one that only this chain could provide: the ur-2.1 `V4_SWAP` payload (the
+// struct whose `minHopPriceX36` sits mid-struct — the layout the deployed router was proved to
+// require, see `encode/ur21.ts`) executing through a hook-gated pool and delivering the quote to
+// the wei. The swap row in the manifest describe above re-proves the native -> USDG direction on
+// every canary run.
 // ---------------------------------------------------------------------------
 
 describe.skipIf(!RUN)('Robinhood Chain memecoin pools (canary, live, hint-free)', () => {
