@@ -1,7 +1,7 @@
 import type { Hex, Log, PublicClient } from 'viem'
 import { formatLog } from 'viem'
 
-import { MAX_REQUESTS_PER_SCAN } from '../constants'
+import { MAX_REQUESTS_PER_SCAN, MIN_CHUNK } from '../constants'
 import type { BlockRange, LogQuery } from '../types'
 
 import { batchLimit, initialPolicy, nextStep, refusalFactsOf } from './logScanPolicy'
@@ -442,7 +442,18 @@ export async function scanLogs(
       // the endpoint "can do" would ratchet the hint down towards nothing over a warm router's life.
       // `width` rather than `policy.chunkSize`, deliberately: the reduction below may regrow the
       // width, and a grown width is a PROBE nothing has served yet.
-      if (memory && width > (memory.learnedScanWidth ?? 0n)) memory.learnedScanWidth = width
+      //
+      // AND NOTHING BELOW `MIN_CHUNK` IS A CAPACITY OBSERVATION AT ALL. `initialPolicy` opens a
+      // scan at the whole range when the range is narrow, so a 32-block reorg re-scan asks for 32
+      // blocks and is served — which says nothing whatever about how wide a window this endpoint
+      // will serve, only that 32 was all anyone wanted. Recorded anyway it became a persisted
+      // `learnedScanWidth` of 32, and the next full-history scan opened there: served every time,
+      // never corrected, the entire request budget spent walking millions of blocks 32 at a time.
+      // `MIN_CHUNK` is the narrowest window this scanner ever asks for, so it is exactly the line
+      // below which a served width carries no information (see `logScanPolicy.ts#initialPolicy`,
+      // which floors the hint on the way back in, and `pools/poolIndex.ts`, which refuses to load a
+      // sub-floor one).
+      if (memory && width >= MIN_CHUNK && width > (memory.learnedScanWidth ?? 0n)) memory.learnedScanWidth = width
       // The served prefix reaches the machine BEFORE the failure that cut the batch short (if any):
       // a success resets the backoff escalation, and the descent must see that reset.
       policy = nextStep(policy, { kind: 'served', chunks: okCount }).policy

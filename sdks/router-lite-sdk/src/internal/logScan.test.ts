@@ -1032,6 +1032,25 @@ test('widthMemory: the learned width is a running MAXIMUM, not the last window a
   expect(memory.learnedScanWidth).toBe(500_000n) // unchanged by the narrow re-scan
 })
 
+// THE POISONED-HINT REGRESSION, WRITE SIDE. The running-maximum rule above only protects a memory
+// that already holds a wide value. A COLD one — a fresh index whose very first scan is a narrow
+// reorg re-scan — recorded the narrow width as this endpoint's learned capacity, and
+// `initialPolicy` then opened every later full-history scan there: served every time, never
+// corrected, the entire request budget spent walking millions of blocks a handful at a time. A width
+// below MIN_CHUNK is not a capacity observation at all — it is a report that nobody asked for more.
+test('widthMemory: a window narrower than MIN_CHUNK is never recorded as learned capacity', async () => {
+  const memory: { learnedScanWidth?: bigint } = {}
+  const { client } = stub(() => [])
+
+  // A 32-block reorg re-scan on a COLD memory: served, and deliberately learned from.
+  await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: 32n }, { widthMemory: memory })
+  expect(memory.learnedScanWidth).toBeUndefined()
+
+  // Exactly at the floor it IS a real observation — that is a window this scanner asks for.
+  await scanLogs(client, QUERY, { fromBlock: 1n, toBlock: MIN_CHUNK }, { widthMemory: memory })
+  expect(memory.learnedScanWidth).toBe(MIN_CHUNK)
+})
+
 test('widthMemory: absent, every behaviour is exactly what it was', async () => {
   const CAP = 1_000n
   const withMemory = stub((f) => (span(f) > CAP ? (() => { throw new Error('boom') })() : []))

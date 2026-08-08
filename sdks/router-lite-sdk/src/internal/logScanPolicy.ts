@@ -178,6 +178,19 @@ export type Action =
  * downward and the regrowth ratchet still climbs back to `ceiling` — so a stale one costs a probe,
  * never coverage. `maxBig(..., 1n)` only guards an inverted range, whose scan loop never runs
  * anyway.
+ *
+ * THE HINT IS FLOORED AT {@link MIN_CHUNK}, and the floor is the whole reason this is not a plain
+ * `minBig`. `MIN_CHUNK` is the narrowest window this scanner will ever ASK FOR — every other width
+ * in the machine is clamped to it (the halving, the give-up branch's refusal to adopt a sub-floor
+ * ceiling), and the give-up branch's own comment spells out what a sub-floor width costs: a scan
+ * that never fails, never gives anything up, and spends its whole `MAX_REQUESTS_PER_SCAN` budget
+ * walking a multi-million-block range a handful of blocks at a time. This was the one door left
+ * open to exactly that, from the other side: a persisted hint entered `chunkSize` UNFLOORED, so a
+ * remembered width of 32 (which a 32-block reorg re-scan used to record — see `logScan.ts`, where
+ * sub-floor widths are no longer recorded at all) opened the next full-history scan at 32 blocks,
+ * where the endpoint served it happily and nothing ever corrected it. `pools/poolIndex.ts` refuses
+ * to LOAD such a value, so this is belt and braces — but it is the belt that holds when the value
+ * arrives from anywhere other than a snapshot.
  */
 export function initialPolicy(args: {
   /** `toBlock - fromBlock + 1n` — the whole range, so a narrow re-scan never over-asks. */
@@ -190,9 +203,13 @@ export function initialPolicy(args: {
   learnedScanWidth?: bigint | undefined
 }): PolicyState {
   const ceiling = minBig(args.ceilingOverride ?? MAX_SCAN_WINDOW, args.declaredScanCap ?? MAX_SCAN_WINDOW)
+  // The floor applies to the HINT only, never to the range: a 32-block re-scan should still ask for
+  // 32 blocks (over-asking is the wasted probe the paragraph above exists to avoid). What must not
+  // happen is a remembered 32 deciding the width of a range that is millions of blocks wide.
+  const hint = args.learnedScanWidth === undefined ? ceiling : maxBig(args.learnedScanWidth, MIN_CHUNK)
   return {
     ceiling,
-    chunkSize: minBig(minBig(maxBig(args.rangeSpan, 1n), ceiling), args.learnedScanWidth ?? ceiling),
+    chunkSize: minBig(minBig(maxBig(args.rangeSpan, 1n), ceiling), hint),
     widthEstablished: false,
     consecutiveSuccesses: 0,
     consecutiveMinFailures: 0,

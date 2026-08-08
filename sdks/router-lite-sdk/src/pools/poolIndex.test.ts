@@ -3,7 +3,7 @@ import fc from 'fast-check'
 import type { Address } from 'viem'
 import { zeroAddress } from 'viem'
 
-import { DEFAULT_REORG_OVERLAP_BLOCKS, HINT_DISCREDIT_FAILURE_BLOCKS, NEGATIVE_CACHE_BLOCKS } from '../constants'
+import { DEFAULT_REORG_OVERLAP_BLOCKS, HINT_DISCREDIT_FAILURE_BLOCKS, MIN_CHUNK, NEGATIVE_CACHE_BLOCKS } from '../constants'
 import { RouterConfigError } from '../errors'
 import { v2Ref, v4Ref } from '../internal/testing'
 import type { PoolRecord, PoolRef } from '../types'
@@ -690,6 +690,14 @@ describe('PoolIndexSnapshot', () => {
       // failure `createRouter` rejects `logChunkBlocks < MIN_CHUNK` for).
       ['a learnedScanWidth of zero', () => ({ ...valid(), learnedScanWidth: 0n })],
       ['a negative learnedScanWidth', () => ({ ...valid(), learnedScanWidth: -1n })],
+      // AND MERELY POSITIVE IS NOT ENOUGH. `learnedScanWidth` becomes the next scan's FIRST WINDOW,
+      // and `MIN_CHUNK` is the narrowest window that scanner will ever ask for — so a positive value
+      // beneath it names no window the machine can use. It does not fail loudly either: the endpoint
+      // happily serves a 32-block request, so nothing ever refuses, nothing halves, nothing is given
+      // up, and the scan spends its whole `MAX_REQUESTS_PER_SCAN` budget walking a multi-million-
+      // block range 32 blocks at a time. Every scan, for the life of the router.
+      ['a learnedScanWidth just below MIN_CHUNK', () => ({ ...valid(), learnedScanWidth: MIN_CHUNK - 1n })],
+      ['a learnedScanWidth of 32 (the width a reorg re-scan used to record)', () => ({ ...valid(), learnedScanWidth: 32n })],
       // --- the DISCRIMINANT, and the per-arm identity fields it promises -------------------
       // `protocol` is what every consumer switches on before touching an arm-specific field, and
       // nothing checked it: `{ protocol: 'v4' }` with no `poolKey` loads clean and then detonates

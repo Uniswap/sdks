@@ -1,6 +1,6 @@
 import type { Address } from 'viem'
 
-import { DEFAULT_REORG_OVERLAP_BLOCKS, HINT_DISCREDIT_FAILURE_BLOCKS, NEGATIVE_CACHE_BLOCKS } from '../constants'
+import { DEFAULT_REORG_OVERLAP_BLOCKS, HINT_DISCREDIT_FAILURE_BLOCKS, MIN_CHUNK, NEGATIVE_CACHE_BLOCKS } from '../constants'
 import { RouterConfigError } from '../errors'
 import { toGraphNode } from '../internal/currency'
 import type { ScanWidthMemory } from '../internal/logScan'
@@ -392,7 +392,19 @@ function assertSnapshotShape(snap: PoolIndexSnapshot): void {
   if (snap.learnedScanWidth !== undefined && typeof snap.learnedScanWidth !== 'bigint') {
     bad('learnedScanWidth is not a bigint')
   }
-  if (snap.learnedScanWidth !== undefined && snap.learnedScanWidth < 1n) bad('learnedScanWidth is not positive')
+  // AND NOT MERELY POSITIVE — AT LEAST `MIN_CHUNK`. `learnedScanWidth` opens the next scan's first
+  // window (`internal/logScanPolicy.ts#initialPolicy`), and `MIN_CHUNK` is the narrowest window that
+  // scanner will ever ASK FOR: a smaller value describes no window the machine can use, and used as
+  // a starting width it produces a scan that never fails, never gives anything up, and spends its
+  // whole `MAX_REQUESTS_PER_SCAN` budget walking a multi-million-block range a handful of blocks at
+  // a time — a permanently crippled router with nothing anywhere saying why. `> 0` admitted exactly
+  // that. Belt and braces with `initialPolicy`'s own floor, and the two note each other: this gate
+  // stops a sub-floor value ENTERING a router's memory, the floor stops one that arrives by any
+  // other route from deciding a width. Nothing this package writes can trip it — `logScan.ts`
+  // records only widths at or above the floor — so a value below it means a foreign or corrupt file.
+  if (snap.learnedScanWidth !== undefined && snap.learnedScanWidth < MIN_CHUNK) {
+    bad(`learnedScanWidth ${snap.learnedScanWidth} is below MIN_CHUNK (${MIN_CHUNK}) — no window the scanner can ask for`)
+  }
 }
 
 export type PoolIndexOptions = {

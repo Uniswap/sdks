@@ -142,6 +142,28 @@ const rows: Row[] = [
     expectAction: { kind: 'giveUpSubrange', backoffMs: 0 },
   },
   {
+    // THE BOUNDARY THE GIVE-UP BRANCH IS DEFINED BY. `capBlocks < MIN_CHUNK` gives up; `capBlocks
+    // === MIN_CHUNK` is the narrowest window this scanner WILL ask for, so it is a real, serveable
+    // cap and takes the ordinary adopt-and-jump path. One block either side of this row is a
+    // different branch, and nothing else in the table pins which side the equality falls on.
+    name: 'a SPAN cap EXACTLY at MIN_CHUNK is serveable: adopted as the ceiling and jumped to, never given up',
+    state: S({ chunkSize: 5_000n, consecutiveMinFailures: 2 }),
+    outcome: refused({ capBlocks: MIN_CHUNK, capKind: 'span' }),
+    expectPolicy: { ceiling: MIN_CHUNK, chunkSize: MIN_CHUNK, widthEstablished: false, consecutiveSuccesses: 0, consecutiveMinFailures: 0 },
+    expectAction: { kind: 'jumpToDeclaredCap' },
+  },
+  {
+    // The other boundary of the same guard (`capBlocks < base.chunkSize`). A provider quoting the
+    // very width it just refused has explained nothing — it is stating its ceiling while failing for
+    // an unrelated reason — so the cap must NOT suppress the halving that will actually get past it,
+    // and must not be adopted as a ceiling the scan is already at.
+    name: 'a declared cap EQUAL to the width in flight explains nothing: ordinary halving, no clamp',
+    state: S({ chunkSize: 30_000n }),
+    outcome: refused({ capBlocks: 30_000n, capKind: 'span' }),
+    expectPolicy: { ceiling: MAX_SCAN_WINDOW, chunkSize: 15_000n, consecutiveMinFailures: 0 },
+    expectAction: { kind: 'halve' },
+  },
+  {
     name: 'a declared cap on a transport-shaped failure takes the CAP path, not the collapse — the answer in hand beats the heuristic',
     state: S({ chunkSize: 1_000_000n }),
     outcome: refused({ capBlocks: 10_000n, capKind: 'span', failureKind: 'transport' }),
@@ -296,6 +318,28 @@ test('initialPolicy: a remembered LEARNED width is a hint — it narrows the sta
   const p = initialPolicy({ rangeSpan: 1_000_000n, learnedScanWidth: 10_000n })
   expect(p.chunkSize).toBe(10_000n)
   expect(p.ceiling).toBe(MAX_SCAN_WINDOW)
+})
+
+// THE POISONED-HINT REGRESSION. A `learnedScanWidth` entered `chunkSize` unfloored, so a remembered
+// width below MIN_CHUNK — which a narrow re-scan used to record — opened the next full-history scan
+// at that width. The endpoint SERVES it (it is tiny), so nothing ever fails, nothing is ever given
+// up, and the scan spends its entire MAX_REQUESTS_PER_SCAN budget walking millions of blocks a
+// handful at a time. Every scan. For the life of the router.
+test('initialPolicy: a remembered width BELOW MIN_CHUNK is floored — a hint may narrow the start, never below what the scanner can ask for', () => {
+  const p = initialPolicy({ rangeSpan: 20_000_000n, learnedScanWidth: 32n })
+  expect(p.chunkSize).toBe(MIN_CHUNK)
+  expect(p.ceiling).toBe(MAX_SCAN_WINDOW)
+})
+
+test('initialPolicy: a remembered width EXACTLY at MIN_CHUNK is used as-is — the floor is inclusive', () => {
+  expect(initialPolicy({ rangeSpan: 20_000_000n, learnedScanWidth: MIN_CHUNK }).chunkSize).toBe(MIN_CHUNK)
+})
+
+// The floor is on the HINT, not on the range: a genuinely narrow scan should still ask for exactly
+// what it needs. Over-asking is the wasted probe `initialPolicy` exists to avoid.
+test('initialPolicy: the floor never widens a narrow RANGE — a 32-block re-scan still asks for 32', () => {
+  expect(initialPolicy({ rangeSpan: 32n }).chunkSize).toBe(32n)
+  expect(initialPolicy({ rangeSpan: 32n, learnedScanWidth: 10_000n }).chunkSize).toBe(32n)
 })
 
 test('initialPolicy: the hint never widens a scan past its own ceiling', () => {
