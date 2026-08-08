@@ -3,7 +3,7 @@ import type { Address } from 'viem'
 
 import type { PoolRef, QuoteResult, SearchReport, SwapResult } from '../src/index'
 import { REASON_CODES } from '../src/index'
-import { assertResultCoherent } from '../src/internal/testing'
+import { assertResultCoherent, emptyReport } from '../src/internal/testing'
 
 import { setColorEnabled } from './ansi'
 import { explainReason } from './reasons'
@@ -45,8 +45,16 @@ const CTX: RenderCtx = {
   ]),
 }
 
-/** A canned report exercising every axis: complete/disabled/partial discovery, pruning, reverts. */
+/**
+ * A canned report exercising every axis: complete/disabled/partial discovery, pruning, reverts.
+ *
+ * Every field the RENDERER reads is spelled out — that is the point of the snapshot below. The
+ * SDK's `emptyReport()` underneath supplies the ones that are not (the anomaly flags, all false
+ * here), so a new `SearchReport` field arrives with a default rather than as a type error in a
+ * fixture that was never about it.
+ */
 const REPORT: SearchReport = {
+  ...emptyReport(),
   block: {
     number: 23_456_789n,
     hash: '0x12ab00000000000000000000000000000000000000000000000000000000cd34',
@@ -73,9 +81,6 @@ const REPORT: SearchReport = {
     intermediatesPruned: 4,
   },
   quoting: { attempted: 18, succeeded: 12, failed: 6, transportFailed: 0, unattempted: 0 },
-  aborted: false,
-  verificationDegraded: false,
-  headRegressed: false,
   verification: { preflightAttempted: 2, preflightBudgetExhausted: false },
 }
 

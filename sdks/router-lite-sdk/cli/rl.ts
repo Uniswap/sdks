@@ -88,24 +88,27 @@ ${bold('common options')}
   --hint <spec>           assert a pool for the pair: v2 | v3@500 | v4@3000/60[/0xHooks][:0xHookData]
   --watch, -w             stream every search wave to the end of the bounded search. A leading
                           \`first\` line reports the search's first priced route the moment it exists,
-                          which is a whole wave before wave 0's own line.
+                          which is a whole wave before the \`wave 1\` line.
   --verbose, -v           stream waves, stop at the first actionable result
   --json                  machine output (NDJSON per wave with --watch)
   --no-cache              skip the on-disk pool index (~/.cache/router-lite/<chainId>.json).
                           It is ON by default: a warm second run re-scans only the block delta,
                           never the history. --verbose reports what it loaded and saved.
   --pool-list <path|url>  load a published pool list (a path, or an https:// URL) and MERGE it into
-                          this run's index alongside the cache. Its integrity hash, chain id and
-                          factory fingerprint are checked against the resolved manifest; any
-                          mismatch exits 4 rather than running without it. POOLS ARE IMPORTED,
-                          COVERAGE IS NOT — see --trust-coverage.
+                          this run's index alongside the cache. Its integrity hash, chain id,
+                          wrapped native and factory fingerprint are checked against the resolved
+                          manifest; any mismatch exits 4 rather than running without it. POOLS ARE
+                          IMPORTED, COVERAGE IS NOT — see --trust-coverage.
   --trust-coverage        also import the list's SCAN COVERAGE: its claim that particular block
                           ranges have already been fully scanned for pool-creation events. This
                           makes the search SKIP those ranges, so a list that claims a range it did
                           not really scan permanently hides every pool created in it — with no
-                          symptom beyond a worse route. Pass this only for a list you would trust
-                          with your own cache directory. Without it a list is still a large win:
-                          the pools arrive, and the ranges are simply re-scanned.
+                          symptom beyond a worse route. AND IT OUTLIVES THIS FLAG: adopted coverage
+                          is written into your local cache on exit, so every later run reuses it
+                          whether or not you pass --trust-coverage again (delete the file named by
+                          the cache line, or run --no-cache, to be rid of it). Pass this only for a
+                          list you would trust with your own cache directory. Without it a list is
+                          still a large win: the pools arrive, and the ranges are simply re-scanned.
 
 ${bold('swap options')}
   --trader, -t 0x…        required — the account the tx is encoded for

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { encodeAbiParameters, pad, toHex, type Address, type Hex } from 'viem'
 
 import type { NeedsActionSwap, ReadySwap, SearchReport } from '../src/index'
+import { emptyReport } from '../src/internal/testing'
 
 import {
   buildSimulatePayload,
@@ -18,29 +19,10 @@ const PERMIT2: Address = '0x000000000022D473030F116dDEE9F6B43aC78BA3'
 const USDC: Address = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
 const TRANSFER_TOPIC0: Hex = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
 
-// A structurally-complete canned report; its contents are irrelevant to payload construction.
-const SEARCH: SearchReport = {
-  block: { number: 1n, hash: pad('0x01', { size: 32 }), timestamp: 1n },
-  discovery: {
-    v2: { status: 'complete', coveredRanges: [] },
-    v3: { status: 'complete', coveredRanges: [] },
-    v4: { status: 'complete', coveredRanges: [] },
-  },
-  enumeration: {
-    exhaustiveWithinMaxHops: true,
-    intermediatesDiscovered: 0,
-    intermediatesSelected: 0,
-    candidatesGenerated: 1,
-    poolsPruned: 0,
-    candidatesPruned: 0,
-    intermediatesPruned: 0,
-  },
-  quoting: { attempted: 1, succeeded: 1, failed: 0, transportFailed: 0, unattempted: 0 },
-  aborted: false,
-  verificationDegraded: false,
-  headRegressed: false,
-  verification: { preflightAttempted: 1, preflightBudgetExhausted: false },
-}
+// A structurally-complete canned report; its contents are irrelevant to payload construction —
+// `simulate.ts` never reads one. The SDK's own all-zero report says exactly that, and says it
+// without a literal that would need editing every time `SearchReport` grows a field.
+const SEARCH: SearchReport = emptyReport()
 
 const BEST = {
   route: {

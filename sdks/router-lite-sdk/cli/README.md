@@ -41,6 +41,12 @@ chainz exec 130 -- bun cli/rl.ts discover 0xNEWTOKEN
 # Guard against pointing at the wrong endpoint: --chain <id> is an assertion, not a selector
 chainz exec base -- bun cli/rl.ts quote eth usdc 1 --chain 8453
 
+# Start from a published pool list instead of re-scanning history (pools only, by default)
+chainz exec 1 -- bun cli/rl.ts quote eth usdc 1 --pool-list ./1.poollist.json
+
+# Run against nothing but this endpoint — no cache read, no cache write
+chainz exec 1 -- bun cli/rl.ts quote eth usdc 1 --no-cache
+
 # Everything takes --json for scripting; --watch emits NDJSON per wave
 chainz exec 1 -- bun cli/rl.ts quote eth usdc 1 --json | jq .best.quote.amountOut
 ```
@@ -54,6 +60,14 @@ Scripting contract: `0` actionable (quote / ready / needs-action) · `1` no-rout
 `2` inconclusive · `3` usage or configuration error · `4` unexpected internal error ·
 `5` `--simulate` disproved the tx (a call in the proof chain reverted, or delivery landed below
 the tx's own `minAmountOut`) — distinct from `2` because the chain gave a verdict.
+
+**`4` has one deliberate non-bug meaning: a rejected `--pool-list`.** A list that fails its
+integrity hash, chain id, wrapped-native or factory-fingerprint check exits `4` as a single clean
+line with no stack. It is not `3`, because the flag was used correctly — the user named a list and
+meant it, and "fix your arguments" would be wrong advice; and it is emphatically not `0`-with-a-
+warning, because a run that quietly proceeded without the list would print a perfectly ordinary
+quote computed from a different index than the operator asked for. `4` is the code a script must
+never treat as "carry on".
 
 ## Notes
 
@@ -78,12 +92,80 @@ the tx's own `minAmountOut`) — distinct from `2` because the chain gave a verd
   search is bounded in *work*, not in seconds — a throttled endpoint can take a long time.
 - **`--verbose` vs `--watch`**: both stream a line per search wave; `--verbose` stops at the first
   actionable result (what `getQuote`/`getSwap` would return), `--watch` drains the whole bounded
-  search (what the `quotes()`/`swaps()` iterators expose).
+  search (what the `quotes()`/`swaps()` iterators expose). Wave lines are numbered from `wave 1`
+  (the engine counts its own waves from 0; the display counts the lines you have been shown).
+- **`--concurrency <n>`** caps in-flight RPC requests, `1`–`1024`, defaulting to the SDK's `20`.
+  The right value is a property of the *endpoint*, which only you know: `40` measurably beat `20`
+  on a keyed mainnet endpoint, while a shared or rate-limited quota wants less. It is validated
+  against the SDK's own bounds before the endpoint is touched.
+
+## The on-disk cache (on by default)
+
+**This is the biggest single factor in how a run behaves, and nothing turns it on — it is already
+on.** A process is exactly the lifetime of a `PoolIndex`, so without it every invocation re-scans
+the same block history to re-learn the same pools. After a search, the index is written to
+`$XDG_CACHE_HOME/router-lite/<chainId>.json` (`~/.cache/router-lite/…` when that is unset), keyed
+by **chain id only** — two providers serving the same chain see the same pools, so they share one
+file.
+
+- Every cached run prints one unconditional `cache: chain <id> · <path>` line to **stderr**, plus
+  the load time when it is large enough to feel. `--verbose` adds what was loaded, discarded, or
+  saved. Nothing the cache does ever touches stdout, so `--json` stays machine-clean.
+- Restoring is safe because coverage is **block-ranged**: a snapshot from last week claims to have
+  scanned up to block *N*, so the next search asks for *N+1..head* plus the standing reorg overlap.
+  A stale cache is a bigger delta scan, never a wrong answer — there is no TTL.
+- Every failure resolves to "start fresh with a note": a corrupt file, a bumped schema version, a
+  different `wrappedNative` or a different reorg overlap are all *discarded*, never fatal.
+- It is written on **every** exit path, including errors and Ctrl-C — a search that died partway
+  still learned real coverage, and throwing it away would make exactly the runs that are already
+  going badly permanently slow.
+- `--no-cache` skips both the read and the write. Reach for it when you want to measure a cold
+  search, or when you want a run that cannot inherit anything.
+
+## Pool lists
+
+`--pool-list <path|https-url>` loads a published snapshot — the same bytes the cache stores,
+wrapped in a trust envelope — and **merges** it into whatever the cache restored. Both are
+snapshot-shaped and the union goes through the index's own merge rules, so neither source shadows
+the other, and a cached pool the chain proved is never demoted by a list's copy of it. `http://` is
+refused outright (the integrity hash lives in the file it protects, so it defends against
+corruption, not against someone who can rewrite the response).
+
+**Pools are imported; coverage is not.** They are not equally safe to accept from a stranger: a
+pool is self-verifying downstream (every one is priced by a real `eth_call` before it can appear in
+a result, so a hostile list buys wasted calls, not a wrong price), whereas coverage is a claim that
+*suppresses work* — "these blocks are already scanned" makes the search skip them, so a list that
+lies there does not invent a pool, it **hides** one, with no symptom beyond a worse route.
+
+`--trust-coverage` opts into the second half, and it is stickier than it looks: **adopted coverage
+is saved into your local cache and outlives this flag.** Once adopted, a list's ranges are
+indistinguishable from ones your own machine scanned, and every later run reuses them whether or
+not you pass the flag again. Delete the file named by the `cache:` line (or use `--no-cache`) to be
+rid of it. Pass it only for a list you would trust with your cache directory. Without it a list is
+still a large win — the pools arrive, and the ranges are simply re-scanned.
+
+A list that fails any of its checks exits `4` and does not run; see the exit-code note above.
 
 ## Tests
 
-`bun test` in this directory covers the pure parts: flag/amount/hint/duration parsing, chainz list
-parsing and chain matching, URL redaction, `eth_simulateV1` payload construction/evaluation, and a
-snapshot of the search-report renderer against a canned `SearchReport`. Nothing here touches the
-network — the CLI itself is the live tool. `bun run typecheck:cli` (or `typecheck:all`) from the
-package root typechecks it; `bun run lint` lints `src` and `cli` together.
+`bun test` in this directory runs 12 files and touches no network — the CLI itself is the live
+tool:
+
+| file | what it owns |
+| --- | --- |
+| `args.test.ts` | flag/positional parsing |
+| `amounts.test.ts` | human and raw amount parsing, `--budget` durations |
+| `chains.test.ts` | chainz list parsing, `--chain` assertion matching |
+| `hints.test.ts` | `--hint` spec parsing |
+| `redact.test.ts` | keyed-URL scrubbing |
+| `report.test.ts` | every rendered line, snapshotted against a canned `SearchReport` |
+| `waves.test.ts` | the `--watch`/`--verbose` stream as a stream: ordering, NDJSON event types |
+| `simulate.test.ts` | `eth_simulateV1` payload construction and verdict evaluation |
+| `tokens.test.ts` | symbol/address resolution, and which failures are retryable |
+| `cache.test.ts` | save/load round trip, discard rules, atomic writes, tmp sweeping |
+| `poolList.test.ts` | curation, the envelope, trust tiers, verify-before-publish |
+| `commands/context.test.ts` | the setup seam: `--budget`'s clock, the transport, `--pool-list` |
+
+`cli/testing.ts` holds the fixtures more than one of them needs. `bun run typecheck:cli` (or
+`typecheck:all`) from the package root typechecks it; `bun run lint` lints `src` and `cli`
+together.

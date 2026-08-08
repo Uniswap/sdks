@@ -2,6 +2,7 @@ import { afterEach, beforeAll, describe, expect, it } from 'bun:test'
 import type { Address } from 'viem'
 
 import type { PoolRef, QuotedRoute, QuoteResult, SearchReport } from '../src/index'
+import { emptyReport } from '../src/internal/testing'
 
 import { setColorEnabled } from './ansi'
 import type { RenderCtx, TradeContext } from './report'
@@ -41,28 +42,12 @@ const CTX: RenderCtx = {
 
 const TRADE: TradeContext = { tokenIn: 'native', tokenOut: USDC, amountIn: 10n ** 18n }
 
-const EMPTY_REPORT: SearchReport = {
-  block: { number: 23_456_789n, hash: `0x${'ab'.repeat(32)}`, timestamp: 1_735_689_600n },
-  discovery: {
-    v2: { status: 'complete', coveredRanges: [] },
-    v3: { status: 'complete', coveredRanges: [] },
-    v4: { status: 'disabled', coveredRanges: [] },
-  },
-  enumeration: {
-    candidatesGenerated: 3,
-    poolsPruned: 0,
-    candidatesPruned: 0,
-    intermediatesPruned: 0,
-    intermediatesDiscovered: 0,
-    intermediatesSelected: 0,
-    exhaustiveWithinMaxHops: true,
-  },
-  quoting: { attempted: 3, succeeded: 3, failed: 0, transportFailed: 0, unattempted: 0 },
-  aborted: false,
-  verificationDegraded: false,
-  headRegressed: false,
-  verification: { preflightAttempted: 1, preflightBudgetExhausted: false },
-}
+/**
+ * A structurally-complete report. Nothing this file asserts reads it — the wave line quotes its
+ * `quoting` counters and nothing else — so it is the SDK's own all-zero one rather than a
+ * hand-rolled literal that would have to be edited every time `SearchReport` grows a field.
+ */
+const EMPTY_REPORT: SearchReport = { ...emptyReport(), quoting: { ...emptyReport().quoting, attempted: 3, succeeded: 3 } }
 
 function routeAt(amountOut: bigint): QuotedRoute {
   return {

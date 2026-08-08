@@ -59,9 +59,16 @@ export async function cmdQuote(argv: string[]): Promise<number> {
       return exitCodeFor(result.status)
     }
 
-    // The SDK prices a direct route a whole wave before wave 0 yields (its probes are one round trip;
-    // the wave also waits on a log scan). `onFirstRoute` is how a streaming view gets to say so at the
-    // moment it becomes true instead of seconds later — see `src/router.ts#IterateOptions`.
+    // The SDK prices a direct route a whole wave before the search's FIRST wave yields (its probes
+    // are one round trip; the wave also waits on a log scan). `onFirstRoute` is how a streaming view
+    // gets to say so at the moment it becomes true instead of seconds later — see
+    // `src/router.ts#IterateOptions`.
+    //
+    // THE ENGINE COUNTS WAVES FROM 0 AND THIS STREAM PRINTS THEM FROM 1, which is worth stating
+    // because this comment used to say "wave 0" about a line that reaches the terminal as `wave 1`.
+    // `iterateWaves` increments before it prints, so the wave described above is the one a reader
+    // sees as `wave 1`; the display numbering is not renumbered to match the engine, because the
+    // number in front of a user should count the lines they have actually been shown.
     const results = ctx.router.quotes(request, {
       onFirstRoute: firstRouteReporter({ json, started, tradeCtx, renderCtx: trade.renderCtx }),
     })
