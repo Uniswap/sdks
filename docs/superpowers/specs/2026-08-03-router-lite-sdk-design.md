@@ -88,7 +88,7 @@ sees RPC.
 | Route shapes | Direct + one intermediate (max 2 hops); protocols freely mixed |
 | Trade sides | Exact-input only |
 | Search | Wave-based anytime search; promises (`getQuote`/`getSwap`) resolve at the first actionable result; async iterators (`quotes()`/`swaps()`) yield the improving best per wave; cancellation via standard `AbortSignal`. No mode or budget knobs |
-| Configuration | `createRouter({ client, manifest, index?, maxPools?, concurrency?, logChunkBlocks? })` — the entire surface. All *policy* values remain internal constants, observable through `SearchReport`; `index`/`maxPools` are PoolIndex-lifecycle knobs (C4-H5) and `concurrency`/`logChunkBlocks` are transport knobs (C4-P6). Still not a policy object |
+| Configuration | `createRouter({ client, manifest, index?, maxPools?, concurrency?, logChunkBlocks?, assumeChainId? })` — the entire surface. All *policy* values remain internal constants, observable through `SearchReport`; `index`/`maxPools` are PoolIndex-lifecycle knobs (C4-H5), `concurrency`/`logChunkBlocks` are transport knobs (C4-P6), and `assumeChainId` (rev 6) is a validation *shortcut*, not a knob. Per-search callbacks live in a separate `IterateOptions` (rev 6), passed to the iterator shapes only. Still not a policy object |
 | Quoting | **Speculative**: the quote call is the existence probe (v2 computed-pair `getReserves`, v3 QuoterV2 path calls, v4 standard configs) — no separate discovery for direct pairs. Canonical on-chain quoters for v3/v4 (whole-path), local reserve math for v2 (standard ERC-20 only); real-trader UR preflight is the only execution verification |
 | Quote transport | Direct `eth_call`s via bounded-concurrency `client.request`; `http(url, { batch: true })` gives single-request batching; never Multicall3 for sender-sensitive quotes |
 | Preflight | Readiness by reads + simulation as the real trader; **no generic ERC-20 state overrides** (false-positive preflights are worse than "unverified") |
@@ -159,6 +159,24 @@ type RouteQuote = {
   amountIn: bigint
   amountOut: bigint
   intermediateAmounts: bigint[]   // realized per-leg outputs (chained quoting)
+  // The quoter's own gas word, when the chain reported one — REPORTED, NEVER RANKED, and never a
+  // transaction gas limit. QuoterV2/V4Quoter each return it alongside the amount, measured inside
+  // the quoter as `gasBefore - gasleft()`. Absent for v2 (local constant-product math simulates no
+  // swap, so there is nothing to report and inventing one would be a guess dressed as a reading),
+  // and absent for a multi-segment route unless EVERY segment reported one — a partial sum silently
+  // under-counts a leg. It covers the swap inside the quoter and nothing else: no intrinsic gas, no
+  // calldata cost, no Permit2 pull, no Universal Router dispatch or custody; the number to send a
+  // transaction with comes from preflight/`eth_estimateGas` against the encoded `tx`.
+  //
+  // ENVELOPE-DEPENDENT, and therefore display-only. `gasleft()` accounting includes EIP-2929
+  // cold/warm state-access costs, so the same route at the same block reads differently depending
+  // on what the carrying call already touched — and quoting rounds are aggregated (see
+  // "Quoting → Aggregation"). Measured live on mainnet at block 25,707,079: a v3 WETH→USDC 0.05%
+  // quote read 90,012 direct, 90,012 alone inside `aggregate3`, 90,012 behind unrelated calls, and
+  // 83,512 (−7.2%) behind another call to the same pool; the v4 twin read 43,222 / 43,222 / 40,722.
+  // `amountOut` was byte-identical in every envelope. Good for display and for relative comparison
+  // between routes priced in the same round; never an absolute cost. Ranking never reads it.
+  gasEstimate?: bigint
 }
 
 type QuotedRoute = {
@@ -608,6 +626,7 @@ type ChainManifest = {
   v4?: { poolManager: Address; deploymentBlock: bigint; quoter: Address }
   execution?: UniversalRouterDeployment   // optional (C4-P3) — see "Quote-only manifests" below
   coreIntermediates?: Address[]   // default: wrappedNative + per-chain majors
+  multicall3?: Address            // optional (rev 6) — see "The Multicall3 address" below
 }
 ```
 
@@ -634,6 +653,41 @@ chain. (This assumes `execution.address` is the immutable-bearing contract, not
 a proxy — the Uniswap convention for every UR deployment.) A protocol
 without a bundle is skipped and reported `disabled` in every result — "no v2
 route" is always distinguishable from "v2 not searched".
+
+### The Multicall3 address (rev 6)
+
+`multicall3` is the one field a manifest almost never states. Multicall3 is a
+CREATE2 deployment at the same address on 250+ chains
+(`0xcA11bde05977b3631167028862bE2a173976CA11`, verified live on all five
+built-in manifests' chains), so absence means "the canonical one" and every
+built-in manifest omits it deliberately.
+
+**It is a scalar, not a bundle, and unlike `wrappedNative` it is removable.**
+Bundle keys are replaced wholesale to prevent split-brain configs (discovery on
+factory A, execution against factory B); a single address has no halves to
+split, so `manifestFor` replaces just this field. Passing it explicitly as
+`undefined` restores the canonical default rather than being rejected, which is
+the difference from `wrappedNative` (required, and an override may only change
+it).
+
+**The address is never trusted on faith — it is probed.** Before it aggregates
+anything, the router spends one `eth_getCode` at
+`manifest.multicall3 ?? MULTICALL3_ADDRESS` (`router.ts#resolveMulticall3`).
+The probe fires *concurrently with* `ensureManifestValidated`, so its round trip
+hides behind the validation round trip on the first search and behind nothing at
+all afterwards, and it holds a semaphore permit like every other request. The
+outcome is cached for the router's lifetime in the direction that can be wrong
+only conservatively: code present → every search aggregates; code absent → every
+search quotes call-by-call, forever, exactly as before aggregation existed. A
+probe that *failed* (a transport blip — nothing was learned) is not cached at
+all: that search quotes per-call and the next one asks again.
+
+The probe is not ceremony. An `aggregate3` sent to an address with no code
+**succeeds** with `0x` return data, and every inner result would be silently
+lost to the outer decode — a chain-wide "no route" indistinguishable from a real
+one. So a chain with no Multicall3 at all needs no configuration: the probe
+discovers that on its own, and this field exists only for a chain that deployed
+Multicall3 somewhere non-canonical.
 
 ### Quote-only manifests (C4-P3)
 
@@ -779,6 +833,16 @@ type CreateRouterOptions = {
   maxPools?: number        // bound this router's own index; default unbounded
   concurrency?: number     // C4-P6: router-WIDE in-flight `client.request` bound; default 20
   logChunkBlocks?: bigint  // C4-P6: ceiling on the `eth_getLogs` window; default MAX_SCAN_WINDOW
+  assumeChainId?: number   // rev 6: this client's chain id, ALREADY OBSERVED by the caller
+}
+
+// rev 6. Per-SEARCH options, for the two iterator shapes only (`quotes`/`swaps`). Deliberately not
+// a field on QuoteRequest/SwapRequest — a request is a description of a trade (serializable,
+// loggable, comparable) and a function on it would make it none of those — and deliberately not on
+// CreateRouterOptions either, since a router is long-lived and shared while this is about ONE
+// search's progress.
+type IterateOptions = {
+  onFirstRoute?: (route: QuotedRoute) => void   // fires once, as soon as anything priced at all
 }
 
 type RouterStats = {
@@ -853,6 +917,29 @@ router.clearIndex(): void     // swaps in a fresh, empty PoolIndex
   `MIN_CHUNK`, validated synchronously — a smaller value inverts the chunk
   arithmetic and burns the whole per-scan request budget on a range that can
   never be served.
+- **`assumeChainId`** (rev 6) — the chain id the caller has ALREADY observed on
+  *this* client, supplied so manifest validation can skip its `eth_chainId`
+  round trip. It replaces the READ, never the CHECK: the value is still
+  compared against `manifest.chainId` and still throws `RouterConfigError` on a
+  mismatch, and the `eth_getCode` immutable-fingerprint read behind it is
+  untouched. The hazard is precise and worth naming — a caller that passes an id
+  it got from anywhere other than this client (a config file, an env var,
+  `manifest.chainId` itself) has turned the cross-check into a tautology and
+  defeated the one thing it exists to catch. It is therefore opt-in and absent
+  by default; the motivating caller is a CLI that autodetects the chain from the
+  endpoint before choosing a manifest and would otherwise pay ~0.9s on the
+  critical path of every invocation. Validated synchronously as a positive
+  integer, so a `NaN`/fractional value cannot become a "chainId mismatch"
+  naming a number that was never a chain id.
+- **`IterateOptions.onFirstRoute`** (rev 6) — a per-search callback, offered on
+  `quotes`/`swaps` only, firing once with the leading `QuotedRoute` as soon as
+  the search has priced *anything* — up to a whole wave before the first yield
+  carries it. `getQuote`/`getSwap` are not offered it because they resolve at
+  the same moment they would have called it. For a QUOTE the route is the leader
+  of the `status: 'quote'` result that follows; for a SWAP it is only a priced
+  lead — nothing compiled, simulated, or checked against readiness — which is
+  why it is named for the route and not for the verdict. The yielded results
+  stay the only authority; a later wave may improve on it.
 
 ### Index snapshots
 
@@ -877,6 +964,40 @@ a real `eth_call` before it can appear in a result, and junk decaying via
 hostile snapshot can claim ranges nobody scanned and thereby *hide* a pool.
 Detecting that means doing the scan the cache exists to avoid, so `--no-cache`
 is the answer, and it is why this lives in `cli/` rather than in the SDK.
+
+### Published pool lists (rev 6)
+
+Full treatment: [`sdks/router-lite-sdk/docs/pool-lists.md`](../../../sdks/router-lite-sdk/docs/pool-lists.md).
+It belongs beside the snapshot section because it *is* the snapshot: a **pool
+list** is a `PoolIndexSnapshot` crossing an ORGANIZATION boundary (a nightly CI
+job publishes one, someone else's machine consumes it) rather than a process
+boundary. The bytes are the same; the envelope around them exists because who
+you are trusting changed.
+
+**The line this spec has to hold: the SDK stays I/O-free.** Phase 1 touched no
+`src/` runtime semantics at all. The publisher is `scripts/buildPoolList.ts`,
+the consumer and the merge are `cli/poolList.ts`, and both are expressible
+entirely in public `PoolIndex` methods — which is exactly why they could live
+outside `src/`. A merge API inside the SDK is phase-2 work, and even then it
+would take a parsed snapshot, never a path or a URL.
+
+**The trust model is two-tier, because the two halves of a snapshot are not
+equally safe to import.** *Pools* are self-verifying downstream: every one is
+priced by a real `eth_call` at a pinned block before it can appear in a result,
+so a fabricated pool costs the target some latency and nothing else. *Coverage*
+is a claim that SUPPRESSES work — "these blocks were already scanned" makes the
+next search skip them — so a list that lies there **hides** a pool rather than
+inventing one, and the only symptom is a worse route with nothing saying why.
+Hence **Tier B** (the default for every list: pools only, coverage discarded)
+and **Tier A** (pools *and* coverage; today decided by the operator passing
+`--trust-coverage`, by a signature in phase 2). Tier B is still most of the
+value, and a Tier B consumer can only end up knowing more than the list did.
+
+**A list may claim coverage only for scopes whose pool set it kept in full** —
+the same coverage-and-pools-are-inseparable invariant `cli/cache.ts` states,
+enforced as an assertion that fails the build. Curation therefore picks *scopes*
+first and derives the pool set from them, never the reverse, and `--max-pools`
+is honored by dropping whole scopes largest-first rather than truncating one.
 
 ### Requests
 
@@ -1141,6 +1262,32 @@ also what keeps discovery probes out of `unattempted` and the
 that claims candidates it never accounts for is a report with generated
 candidates unaccounted for).
 
+**`candidatesGenerated` counts quote DISPATCHES, not distinct routes** (rev 6),
+which is what it has always literally counted — before retries existed the
+distinction could not arise. A candidate whose quote failed in the *transport*
+channel is released back for re-quoting (`search/waves.ts#retryTransportFailures`
+deletes its id from `seen`, or its probe id from `probed`), so a later wave or
+interleave pass re-enumerates it and it is counted again. **Exactly one retry
+per routeId**, tracked in `EngineState.transportRetried`: the retry is driven by
+re-enumeration, and re-enumeration is frequent (waves 1-3 each re-enumerate, and
+`quoteWhileDiscovering` re-enumerates every `QUOTE_INTERLEAVE_MS` for the whole
+of a scan-bound wave), so an unbounded rule would turn each interleave pass into
+a retry storm aimed at a provider that is already refusing. Capped at one, the
+worst case is that a search dispatches each candidate twice.
+
+The retry is safe for the conservation bounds by *construction* rather than by
+argument: every dispatching site moves `candidatesGenerated` and
+`attempted + unattempted` by the same `fresh.length`, per call, unconditionally,
+so a retry simply adds one more equal pair and both bounds above still hold. The
+alternative — an ever-generated set, keeping the count one-per-distinct-route —
+was rejected precisely because it breaks that per-call equality and turns
+`unattempted <= candidatesGenerated` into a proof a fourth quoting channel could
+silently invalidate. A transport failure is also why the release is not limited
+to freshly-enumerated candidates: one 429 can transport-fail a whole
+`MULTICALL_CHUNK` at once (see "Quoting → Aggregation"), and those candidates
+learned nothing about the chain, so nothing about them is negative-cached
+either.
+
 **`verification` is the preflight budget, reported rather than absorbed**
 (C4-P7). `preflightAttempted` counts real simulations issued across the whole
 search (never a candidate skipped for free — an already-`verified`/`failed`
@@ -1253,7 +1400,14 @@ sets `verificationDegraded`, and the result is `inconclusive`, never `ready`. Na
    (state, action)`) rather than scenarios engineered through a fake transport.
 2. **Differential encoding**: every supported shape through the compiler and
    the pinned `universal-router-sdk` for the target `commandSet`;
-   byte-identical; plus golden calldata vectors in-repo.
+   byte-identical; plus golden calldata vectors in-repo. The corpus is **split
+   by what actually varies** (rev 6): `goldens-plans.json` holds the shared
+   `{plan, value}` per shape — a command set revises the ABI layout of three
+   swap payloads and nothing about what the plan says to do or what ether it
+   carries — while `goldens.json`/`goldens-ur21.json` hold only their own wire
+   bytes. Stored twice, that invariant had to be re-derived by diffing two large
+   files and the copies were free to drift; stored once, it is structural, and
+   `differential.test.ts` is where a run whose plans diverge is caught.
 3. **Mixed-transition matrix**: all six transitions (v2↔v3, v2↔v4, v3↔v4 both
    directions), with ERC-20 and native/WETH intermediates, asserting custody
    on fork.
@@ -1296,6 +1450,62 @@ sets `verificationDegraded`, and the result is `inconclusive`, never `ready`. Na
     does with it. Alchemy and QuickNode both say "10,000"; the same scan costs
     20 requests against one and 101 against the other, because only one means
     it as a span policy — which is the kind of fact only this table holds.
+12. **Multicall aggregation** (`internal/multicall.test.ts`, 12 cases) — one
+    `aggregate3` stub shared by every file that needs one, so the four that had
+    drifted apart cannot again. It pins input-order results at the given
+    address, the chunk seam at `MULTICALL_CHUNK + 1` calls, inner failure →
+    `InnerCallFailure` with revert data verbatim and bare `0x` normalized to
+    `undefined`, an inner *success* with empty return data staying a plain `0x`
+    (the v2 empty-code shape), outer transport / node-state / execution-shaped /
+    undecodable failures all coarsening to that chunk **only**, abort with the
+    permit in hand, and — the rule the spec now leans on — that a call carrying
+    `from` or `value` is dispatched individually with its result interleaved in
+    order. The **fork sender proof** is the other half and lives in
+    `integration/adversarial.fork.test.ts` §5: see "Quoting → Aggregation",
+    which treats it as the normative evidence rather than as one more scenario.
+13. **Browser/edge certification** (`src/browser.certification.test.ts`) — the
+    "runs in a browser" claim is *certified on every commit* in the ordinary
+    suite, not asserted in a README. It parses every file the two published
+    entry points reach with TypeScript's own parser and rejects a Node builtin
+    import or a Node-only global (`process`, `Buffer`, `__dirname`, `require`);
+    it really bundles the package with `Bun.build` for `target: browser` and
+    again under the `worker`/`workerd`/`edge-light` export conditions an edge
+    bundler adds, requiring byte-identical, Node-free, `process.env`-shim-free
+    output across all four; and it measures the gzipped bundle against a
+    recorded baseline with a **1.5x** budget — loose enough to absorb a minifier
+    version bump, tight enough to catch a dependency that stops tree-shaking.
+    The baseline is toolchain-dependent (recorded under bun 1.3.14), which is
+    why CI pins the same bun version rather than tightening the budget.
+14. **Build-closure guard** (`src/build.surface.test.ts`) — what ships is
+    exactly what the entry points reach. `package.json#files` is `["dist"]` and
+    the build's file set is defined *subtractively* (`include: src/**/*` minus a
+    hand-written exclude list), which cannot notice a new file: the recorded-
+    replay harness shipped in every build for weeks because the excludes named
+    other things. So the shipped set is checked *positively*, against the import
+    closure of the two exported entry points, using TypeScript's own config
+    parser and preprocessor — shared with the browser certification via
+    `internal/moduleGraph.ts`, so the two can never walk subtly different
+    graphs. A file in the build that nothing exported reaches is dead or
+    test-only; both want the same answer.
+15. **Pool lists** (`cli/poolList.test.ts`) — curation is pure and unit-tested
+    ahead of the publisher that drives it: scopes chosen first and the pool set
+    derived from them, `--max-pools` dropping whole scopes largest-first rather
+    than truncating one, the envelope's `integrity`/chain-id/`wrappedNative`/
+    factory-fingerprint checks, the byte-exactness of the
+    `serializeSnapshot` ↔ `JSON.stringify(envelope.body)` round trip, and the
+    Tier A/Tier B split at import. The invariant that a list may claim coverage
+    only for scopes whose pools it kept in full is additionally an assertion
+    that **fails the build** in `scripts/buildPoolList.ts`, because a convention
+    would leave a silent permanent hole in the consumer's index.
+16. **Retry semantics** (`search/waves.test.ts`) — that a chunk lost to a 429 is
+    dispatched a second time and priced by the pass that got it back (while the
+    round that failed still reports `transportFailed`, so `rpc-degraded` stays
+    the honest verdict); that an endpoint 429ing *every* envelope is never asked
+    a third time; that the release covers wave-0 route probes too, not only
+    `quoteNew`'s candidates — reachable only from a warm index, which is why the
+    test warms one; and that `assertResultCoherent`'s conservation bounds still
+    close with a candidate counted twice. See "SearchReport" for why they hold
+    by construction rather than by argument.
 
 ## Package conventions
 
@@ -1330,12 +1540,18 @@ Exact-output; split routes; 3+ hops; live ingestion and reorg handling
 (beyond overlap re-scan); *host-managed* persistence — the index serializes
 itself (`toSnapshot`/`fromSnapshot`) but the SDK never touches a filesystem,
 a TTL, or a schema migration; streaming results (waves make it a natural
-later addition at wave boundaries); gas-aware ranking; `resolveHookData`
+later addition at wave boundaries); gas-aware ranking — **gas is reported,
+never ranked** (rev 6: `RouteQuote.gasEstimate` exists and `rankRoutes` does
+not read it; ranking on it would need a gas price and an output-token price,
+both of which are the caller's to know, and the figure itself is
+envelope-dependent to a few percent); `resolveHookData`
 callback; generic ERC-20 state overrides (rejected deliberately);
 fee-on-transfer support (safe rejection only); custom RPC batch executor
-(transport batching covers it); ZKsync-style CREATE2 variance. The minimal
-public surface is what gives these a chance to land compatibly; no blanket
-additivity claim is made.
+(rev 6: quoting rounds aggregate through Multicall3, which is a *dispatch*
+decision inside the package rather than an executor the caller supplies, and
+transport batching still covers the rest); ZKsync-style CREATE2 variance. The
+minimal public surface is what gives these a chance to land compatibly; no
+blanket additivity claim is made.
 
 ## Prior art consulted
 
