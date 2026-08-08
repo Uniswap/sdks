@@ -47,7 +47,7 @@ describe('resolveManifest', () => {
   it('maps a built-in chain id to its manifest and facts', () => {
     const resolved = resolveManifest(4663)
     expect(resolved.label).toBe('Robinhood Chain')
-    expect(resolved.swaps).toBe(false) // quote-only, exactly as the SDK ships it
+    expect(resolved.swaps).toBe(true) // swaps since the ur-2.1 command set — exactly as the SDK ships it
     expect(resolved.manifest.chainId).toBe(4663)
   })
 

@@ -139,7 +139,7 @@ describe('chain manifest', () => {
     }
 
     test('each chain has a distinct wrappedNative/execution address from the others', () => {
-      const addrs = [MAINNET_MANIFEST, BASE_MANIFEST, UNICHAIN_MANIFEST, ARBITRUM_MANIFEST].map(
+      const addrs = [MAINNET_MANIFEST, BASE_MANIFEST, UNICHAIN_MANIFEST, ARBITRUM_MANIFEST, ROBINHOOD_MANIFEST].map(
         (m) => m.execution!.address,
       )
       expect(new Set(addrs).size).toBe(addrs.length)
@@ -147,14 +147,14 @@ describe('chain manifest', () => {
   })
 
   // -------------------------------------------------------------------------
-  // C4-T5: Robinhood Chain (4663) — the first BUILT-IN quote-only manifest.
+  // C4-T5: Robinhood Chain (4663) — shipped as the first built-in QUOTE-ONLY
+  // manifest (no encoder existed for its 2.1.1 Universal Router), now the
+  // first `commandSet: 'ur-2.1'` execution bundle (`encode/ur21.ts`).
   //
-  // Deliberately NOT folded into the `cases` table above: every assertion in
-  // that loop demands an `execution` bundle with `commandSet: 'ur-2.0'`, and the
-  // whole point of this manifest is that this chain has no Universal Router this
-  // package can encode for (only UR 2.1.1 — see `manifest.ts`'s docstring). So
-  // these tests pin the OPPOSITE shape, and the absence of `execution` is the
-  // assertion rather than an omission nobody checked.
+  // Still deliberately NOT folded into the `cases` table above: that loop pins
+  // `commandSet: 'ur-2.0'` and a USDC intermediate, and this chain differs on
+  // both (ur-2.1, USDG). The command set is the assertion here — mislabeling
+  // this router `'ur-2.0'` is the fund-loss shape the encoder pin exists for.
   // -------------------------------------------------------------------------
   describe('Robinhood Chain manifest (C4-T5)', () => {
     test('manifestFor(4663) returns the built-in manifest', () => {
@@ -177,17 +177,21 @@ describe('chain manifest', () => {
       expect(m.v4?.quoter).toMatch(/^0x[0-9a-fA-F]{40}$/)
     })
 
-    test('carries NO execution bundle, so requireExecution throws rather than returning a wrong router', () => {
+    test("carries the chain's one Universal Router — the 2.1.1 deployment — under commandSet 'ur-2.1'", () => {
       const m = manifestFor(4663)
-      expect(m.execution).toBeUndefined()
-      expect(() => requireExecution(m)).toThrow(RouterConfigError)
-      expect(() => requireExecution(m)).toThrow(/no execution bundle/)
+      const execution = requireExecution(m)
+      // The address `universal-router-sdk` registers under V2_1_1 for 4663, re-verified live
+      // 2026-08-07 (codeHash + immutable fingerprint — see manifest.ts's docstring). 'ur-2.1', never
+      // 'ur-2.0': the deployed router misparses 2.0-shaped swap payloads (proved on-chain).
+      expect(execution.address).toBe('0x8876789976dEcBfCbBbe364623C63652db8C0904')
+      expect(execution.commandSet).toBe('ur-2.1')
+      expect(execution.permit2).toBe('0x000000000022D473030F116dDEE9F6B43aC78BA3')
     })
 
-    test('assertWrappedNativeConsistency passes with only the hoisted wrappedNative to check', () => {
-      // Nothing for it to disagree with (C4-P3): the top-level field is the sole statement here.
+    test('assertWrappedNativeConsistency holds between the hoisted field and the execution bundle', () => {
       expect(() => assertWrappedNativeConsistency(ROBINHOOD_MANIFEST)).not.toThrow()
       expect(ROBINHOOD_MANIFEST.wrappedNative).toMatch(/^0x[0-9a-fA-F]{40}$/)
+      expect(ROBINHOOD_MANIFEST.execution?.wrappedNative).toBe(ROBINHOOD_MANIFEST.wrappedNative)
     })
 
     test('coreIntermediates are WETH + USDG, the two currencies the live pool census ranks highest', () => {
@@ -208,18 +212,14 @@ describe('chain manifest', () => {
       expect(() => assertChainData(manifestFor(4663))).not.toThrow()
     })
 
-    test('an execution bundle can still be supplied by a caller who has one, via overrides', () => {
-      // The manifest omits `execution` because THIS package has no 2.1.1 encoder — not because the
-      // chain forbids one. A caller who brings their own stays able to swap.
-      const m = manifestFor(4663, {
-        execution: {
-          address: '0x8876789976dEcBfCbBbe364623C63652db8C0904',
-          commandSet: 'ur-2.0',
-          permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
-          wrappedNative: ROBINHOOD_MANIFEST.wrappedNative,
-        },
-      })
-      expect(requireExecution(m).address).toBe('0x8876789976dEcBfCbBbe364623C63652db8C0904')
+    test('a quote-only caller can still strip the execution bundle via overrides (C4-P3)', () => {
+      // The shape this manifest itself shipped in before `encode/ur21.ts` existed — still one
+      // override away for a price-feed caller with no interest in swap calldata.
+      const m = manifestFor(4663, { execution: undefined })
+      expect(m.execution).toBeUndefined()
+      expect(m.wrappedNative).toBe(ROBINHOOD_MANIFEST.wrappedNative)
+      expect(() => requireExecution(m)).toThrow(RouterConfigError)
+      expect(() => requireExecution(m)).toThrow(/no execution bundle/)
     })
   })
   test('validateManifest rejects chainId mismatch', async () => {
@@ -639,7 +639,9 @@ describe('chain manifest', () => {
           return '0x'
         },
       }
-      const manifest = manifestFor(4663) // ROBINHOOD_MANIFEST — quote-only, no execution bundle
+      // Quote-only via override (C4-P3) — the shape ROBINHOOD_MANIFEST itself shipped in before
+      // the ur-2.1 encoder existed; every built-in now carries an execution bundle.
+      const manifest = manifestFor(4663, { execution: undefined })
       await expect(validateManifest(client as any, manifest)).resolves.toBeUndefined()
       expect(requestCalls).toBe(0)
     })

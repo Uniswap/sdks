@@ -280,14 +280,19 @@ export const ARBITRUM_MANIFEST: ChainManifest = {
 // pointed at FROM SCRATCH, with no prior manifest to copy and no assumption
 // that any address would look like another chain's.
 //
-// THE QUOTE-ONLY MANIFEST IS THE HEADLINE, AND IT IS DELIBERATE. Robinhood
-// Chain has all three protocols deployed (v2, v3 AND v4 — see below) but NO
-// Universal Router this package can encode for, so `execution` is omitted and
-// this is the first built-in manifest to exercise C4-P3's quote-only path.
-// The reasoning is in ROBINHOOD_MANIFEST's own docstring; the short version is
-// that `eth_getCode` alone would have shipped a manifest pointed at a
-// MAINNET-configured Universal Router, and only fingerprinting the router's
-// baked-in immutables caught it.
+// IT SHIPPED QUOTE-ONLY FIRST, AND THAT WAS DELIBERATE: the chain's one
+// genuine Universal Router is a 2.1.1 deployment, and until `encode/ur21.ts`
+// existed this package had no encoder for it, so `execution` was omitted
+// (C4-P3's quote-only path, proved live) rather than mislabeled `'ur-2.0'`.
+// The `ur-2.1` command set closed that gap, and the bundle below now carries
+// the 2.1.1 router under `commandSet: 'ur-2.1'` — the second command-set
+// family, and the proof that the extension axis works as designed (register
+// an encoder, flip the manifest; the public API never changed).
+//
+// The bring-up's methodology finding stands either way: `eth_getCode` alone
+// would have shipped a manifest pointed at a MAINNET-configured Universal
+// Router, and only fingerprinting the router's baked-in immutables caught it
+// (see the docstring below).
 // ---------------------------------------------------------------------------
 
 /**
@@ -345,18 +350,38 @@ export const ARBITRUM_MANIFEST: ChainManifest = {
  *    stable intermediate on this chain, established from pool population rather than assumed from
  *    other chains' address lists.
  *
- * NO `execution` BUNDLE — UNVERIFIABLE COMMAND SET, NOT MISSING DATA. This chain has exactly one
- * Universal Router, `0x8876789976dEcBfCbBbe364623C63652db8C0904`, deployed at block 18,127; that
+ * `execution` — THE 2.1.1 UNIVERSAL ROUTER, UNDER `commandSet: 'ur-2.1'`. This chain has exactly
+ * one Universal Router, `0x8876789976dEcBfCbBbe364623C63652db8C0904`, deployed at block 18,127; that
  * block number independently corroborates `universal-router-sdk`'s own `creationBlock` for 4663
- * (18127) to the block. But `universal-router-sdk` registers it under `UniversalRouterVersion.V2_1_1`
- * and lists NO `V2_0` deployment for this chain at all, and `types.ts#COMMAND_SETS` is `['ur-2.0']` —
- * this package has no encoder for a 2.1.1 command set. Claiming `commandSet: 'ur-2.0'` for a 2.1.1
- * router would produce plausible-looking calldata with no guarantee the commands mean what the
- * encoder thinks; omitting `execution` instead makes the manifest quote-only, which is honest,
- * type-checked (C4-P3), and fails loudly (`requireExecution` throws `RouterConfigError`
- * synchronously) the moment someone calls `getSwap` on it.
+ * (18127) to the block, and that SDK registers it under `UniversalRouterVersion.V2_1_1` (it lists NO
+ * `V2_0` deployment for this chain at all). The manifest shipped QUOTE-ONLY until `encode/ur21.ts`
+ * existed, because claiming `commandSet: 'ur-2.0'` for a 2.1.1 router would produce
+ * plausible-looking calldata whose swap payloads the router misparses (proved on-chain — see the
+ * re-verification below); the honest states were "no execution" then, and "execution under the
+ * command set the encoder actually speaks" now.
  *
- * AND `eth_getCode` WOULD HAVE GOTTEN THIS WRONG. Both mainnet's UR 2.0 address
+ * RE-VERIFIED LIVE 2026-08-07 (chainz-keyed endpoint, alchemy robinhood-mainnet; head at
+ * re-verification: block 30,672,182), against the redeploy landmine this chain has already
+ * demonstrated elsewhere (a 2026-08-05 launcher-stack redeploy silently recompiled strategy
+ * constants — never trust old comments, read the chain):
+ *  - `eth_getCode` at `latest`: 24,546 bytes,
+ *    keccak `0x2ce6aaaf9f4151f5e1cbf774668772f17f532ae11b15e9284fd0a072a8b0fbde`.
+ *  - NO REDEPLOY DRIFT: the code at the deployment block 18,127 hashes to the SAME keccak, and
+ *    block 18,126 has no code — one deployment, byte-identical from its first block to head.
+ *  - IMMUTABLE FINGERPRINT (the oracle this bring-up established): the deployed code embeds THIS
+ *    manifest's `wrappedNative`, `permit2` (the canonical `0x0000…2Ba3`, which has code here),
+ *    `v2.factory`, `v3.factory` and `v4.poolManager` verbatim — and embeds NONE of mainnet's or
+ *    Base's WETH/factory/poolManager addresses. `validateManifest` re-runs this same check at every
+ *    router init now that `execution` is present.
+ *  - DISPATCH TABLE VERIFIED AGAINST THE DEPLOYED BYTECODE'S BEHAVIOR (not inferred from the SDK):
+ *    a 2.0-shaped `V3_SWAP_EXACT_IN`/`V2_SWAP_EXACT_IN` payload reverts `SliceOutOfBounds()`
+ *    (`0x3b99b53d`) while the 2.1 shape (trailing empty `minHopPriceX36`) runs into Permit2's
+ *    `AllowanceExpired(0)`; a 2.0-shaped v4 `SWAP_EXACT_IN` struct reverts
+ *    `SwapAmountCannotBeZero()` (`0xbe8b8507`) because the router reads `amountIn` from the 2.1
+ *    slot, and the positive control (2.1 shape, `amountIn: 0`) reverts identically. Full account:
+ *    `encode/ur21.ts`.
+ *
+ * `eth_getCode` ALONE WOULD HAVE GOTTEN THIS CHAIN WRONG. Both mainnet's UR 2.0 address
  * (`0x66a9…8Af`) and Base's (`0x6fF5…b43`) DO have code on Robinhood Chain — 19,499 bytes each,
  * byte-identical (same keccak) to those chains' own deployments. Presence alone would have read as
  * "UR 2.0 is deployed here at the familiar address". It is not: a Universal Router bakes
@@ -378,10 +403,8 @@ export const ARBITRUM_MANIFEST: ChainManifest = {
  */
 export const ROBINHOOD_MANIFEST: ChainManifest = {
   chainId: 4663,
-  // Hoisted (C4-P3) — see MAINNET_MANIFEST's comment. Unlike every other built-in manifest there is
-  // no `execution.wrappedNative` for this to be cross-checked against (no execution bundle), so this
-  // top-level field is the sole statement of the chain's wrapped native — which is exactly the case
-  // C4-P3 hoisted it for.
+  // Hoisted (C4-P3) — see MAINNET_MANIFEST's comment; same address as `execution.wrappedNative`
+  // below (and as the WETH immutable fingerprinted out of the router's own bytecode).
   wrappedNative: '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73',
   chain: { blockTimeSeconds: 0.1, reorgOverlapBlocks: 3000n },
   v2: {
@@ -398,7 +421,15 @@ export const ROBINHOOD_MANIFEST: ChainManifest = {
     deploymentBlock: 9_070n,
     quoter: '0x8Dc178eFB8111BB0973Dd9d722ebeFF267c98F94', // inlined from sdk-core (C4-P4) — see MAINNET_MANIFEST's comment
   },
-  // execution: deliberately absent — see the docstring above.
+  execution: {
+    // The chain's one Universal Router — a 2.1.1 deployment (block 18,127), re-verified live
+    // 2026-08-07: codeHash 0x2ce6aaaf…a8b0fbde, byte-identical since its deploy block, immutables
+    // fingerprinted against this manifest's own addresses. See the docstring above.
+    address: '0x8876789976dEcBfCbBbe364623C63652db8C0904',
+    commandSet: 'ur-2.1',
+    permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
+    wrappedNative: '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73',
+  },
   coreIntermediates: [
     '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73', // WETH
     '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168', // USDG ("Global Dollar", 6dp) — this chain's stable

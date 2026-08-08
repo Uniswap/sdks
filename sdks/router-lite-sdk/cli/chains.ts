@@ -33,7 +33,7 @@ export const BUILTIN_CHAINS: BuiltinChain[] = [
   { chainId: 130, name: 'Unichain', swaps: true },
   { chainId: 8453, name: 'Base', swaps: true },
   { chainId: 42161, name: 'Arbitrum One', swaps: true },
-  { chainId: 4663, name: 'Robinhood Chain', swaps: false }, // quote-only
+  { chainId: 4663, name: 'Robinhood Chain', swaps: true }, // UR 2.1.1, commandSet 'ur-2.1'
 ]
 
 function supportedList(): string {
