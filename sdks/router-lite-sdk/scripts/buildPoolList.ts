@@ -29,16 +29,11 @@
 //      See that file for why the reverse is the bug this whole design exists to
 //      prevent, and for the assertion that fails this build if curation ever
 //      drifts.
-//   3. VERIFY-BEFORE-PUBLISH (below). Curation is arithmetic over a file; it
-//      cannot tell whether the file is describing the real chain. So a sample
-//      of the curated pools is checked AGAINST THE CHAIN before anything is
-//      written, and a single definitive negative fails the build.
-//
-// WHY VERIFICATION IS AFFORDABLE AT ALL: `src/internal/multicall.ts`. Every
-// probe is one `aggregate3` inner call, 50 to a round trip and one rate-limit
-// charge per round trip, so checking 200 pools is ~4 requests rather than 200.
-// That is the only reason "probe every pool in every claimed pair scope" is a
-// default and not a flag nobody turns on.
+//   3. VERIFY-BEFORE-PUBLISH (`cli/poolList.ts#verifyLive`, driven below).
+//      Curation is arithmetic over a file; it cannot tell whether the file is
+//      describing the real chain. So a sample of the curated pools is checked
+//      AGAINST THE CHAIN before anything is written, and a single definitive
+//      negative — or a run that answered nothing at all — fails the build.
 // ---------------------------------------------------------------------------
 
 import { spawnSync } from 'node:child_process'
@@ -46,36 +41,22 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import {
-  createPublicClient,
-  decodeFunctionResult,
-  encodeFunctionData,
-  encodePacked,
-  http,
-  keccak256,
-  pad,
-  parseAbi,
-  toHex,
-  type Address,
-  type Hex,
-  type PublicClient,
-} from 'viem'
+import { createPublicClient, http, type Address, type PublicClient } from 'viem'
 
 import { cachePath } from '../cli/cache'
 import {
   buildEnvelope,
   curate,
-  PoolListError,
-  poolInScope,
+  probeMulticall3,
+  selectProbeTargets,
   serializeEnvelope,
-  splitCoverageKey,
-  type CoverageScope,
+  verifyLive,
+  PoolListError,
   type CurationStats,
 } from '../cli/poolList'
 import { redactKeyedUrl } from '../cli/redact'
 import { parseSnapshot, type PoolIndexSnapshot } from '../src/experimental/index'
-import { manifestFor, type ChainManifest, type PoolRecord } from '../src/index'
-import { MULTICALL3_ADDRESS, aggregateCalls } from '../src/internal/multicall'
+import { manifestFor } from '../src/index'
 
 const PKG_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const OUT_DIR = join(PKG_ROOT, 'pool-lists')
@@ -166,150 +147,22 @@ function warmCache(tokens: string[], budget: string): void {
 // ---------------------------------------------------------------------------
 // Verify-before-publish.
 //
-// EXISTENCE, NOT PRICE. The question is only "does this pool identity
-// correspond to something real on this chain right now", because that is the
-// one thing a curated list can get wrong in a way a consumer cannot notice: a
-// pool that does not exist wastes a consumer's `eth_call` and then vanishes
-// from their ranking (`isDiscredited`), but a list full of them is a list built
-// from a corrupted or wrong-chain source, and that is worth failing a build
-// over. Liquidity, price and quoteability are all deliberately out of scope —
-// they change every block and a list makes no claim about them.
+// THE DECISIONS LIVE IN `cli/poolList.ts` (which oracle per protocol, which
+// pools to probe, what counts as a definitive negative, and why a run that
+// verified NOTHING is a build failure rather than a quiet success) — this file
+// only supplies the client and the block. That split is not tidiness: `cli/` is
+// inside `bun test src cli`, and `scripts/` is not, so verification logic left
+// here is logic no gate ever runs.
 //
-// THREE DIFFERENT ORACLES, one per protocol, each the most authoritative cheap
-// one available:
-//   v2/v3 — ask the FACTORY. `getPair`/`getPool` is the factory's own registry;
-//           an address it returns is a pool it created, which is strictly
-//           stronger than "there is code at that address".
-//   v4    — ask the POOL MANAGER's storage. v4 pools are not contracts, so
-//           there is no address to have code at; `extsload` of the pool's slot0
-//           with a non-zero sqrtPriceX96 is the canonical "initialized" test
-//           (the same one v4-core's own StateLibrary performs).
-//
-// A REVERT IS NOT A NEGATIVE. Only a DEFINITIVE answer (the factory naming a
-// different address or the zero address; slot0 reading back zero) fails the
-// build. A reverting or transport-failed probe is reported as unverifiable and
-// tolerated: an endpoint that will not answer says nothing about the chain, and
-// failing a nightly publish because a provider rate-limited it would train
-// everyone to pass `--skip-verify`.
-// ---------------------------------------------------------------------------
-
-const V2_FACTORY_GETPAIR = parseAbi(['function getPair(address tokenA, address tokenB) view returns (address pair)'])
-const V3_FACTORY_GETPOOL = parseAbi(['function getPool(address tokenA, address tokenB, uint24 fee) view returns (address pool)'])
-/** v4-core's `Extsload`. `POOLS_SLOT` is 6 and slot0 is the state struct's first word — see StateLibrary. */
-const V4_EXTSLOAD = parseAbi(['function extsload(bytes32 slot) view returns (bytes32 value)'])
-const V4_POOLS_SLOT = 6n
-
-type Probe = { rec: PoolRecord; call: { to: Address; data: Hex }; check: (data: Hex) => 'ok' | 'missing' }
-
-function probesFor(rec: PoolRecord, manifest: ChainManifest): Probe | undefined {
-  if (rec.pool.protocol === 'v2') {
-    if (!manifest.v2) return undefined
-    const want = rec.pool.address.toLowerCase()
-    return {
-      rec,
-      call: {
-        to: manifest.v2.factory,
-        data: encodeFunctionData({ abi: V2_FACTORY_GETPAIR, functionName: 'getPair', args: [rec.pool.token0, rec.pool.token1] }),
-      },
-      check: (data) => (decodeAddress(V2_FACTORY_GETPAIR, 'getPair', data) === want ? 'ok' : 'missing'),
-    }
-  }
-  if (rec.pool.protocol === 'v3') {
-    if (!manifest.v3) return undefined
-    const want = rec.pool.address.toLowerCase()
-    const { token0, token1, fee } = rec.pool
-    return {
-      rec,
-      call: {
-        to: manifest.v3.factory,
-        data: encodeFunctionData({ abi: V3_FACTORY_GETPOOL, functionName: 'getPool', args: [token0, token1, fee] }),
-      },
-      check: (data) => (decodeAddress(V3_FACTORY_GETPOOL, 'getPool', data) === want ? 'ok' : 'missing'),
-    }
-  }
-  if (!manifest.v4) return undefined
-  const slot = keccak256(encodePacked(['bytes32', 'bytes32'], [rec.pool.poolId, pad(toHex(V4_POOLS_SLOT), { size: 32 })]))
-  return {
-    rec,
-    call: {
-      to: manifest.v4.poolManager,
-      data: encodeFunctionData({ abi: V4_EXTSLOAD, functionName: 'extsload', args: [slot] }),
-    },
-    // slot0 packs sqrtPriceX96 into the LOW 160 bits; zero there means the pool was never initialized.
-    check: (data) => ((BigInt(data) & ((1n << 160n) - 1n)) !== 0n ? 'ok' : 'missing'),
-  }
-}
-
-function decodeAddress(abi: typeof V2_FACTORY_GETPAIR | typeof V3_FACTORY_GETPOOL, fn: 'getPair' | 'getPool', data: Hex): string {
-  // A call to an address with no code succeeds with `0x`, which decodes to nothing — treated as a
-  // non-answer (never equal to the wanted address, hence 'missing'), which is the correct reading
-  // for a factory address the manifest is wrong about.
-  try {
-    return (decodeFunctionResult({ abi, functionName: fn, data } as never) as string).toLowerCase()
-  } catch {
-    return ''
-  }
-}
-
-/**
- * Picks which pools to probe: EVERY pool inside a claimed `pair:` scope (those are the scopes a
- * consumer will lean on hardest and they are small), plus a deterministic sample of the rest up to
- * `sample`. Deterministic — an evenly-spaced stride over insertion order rather than a random draw —
- * so two builds of the same source verify the same pools and a failure is reproducible.
- */
-function selectProbeTargets(body: PoolIndexSnapshot, claimed: string[], sample: number, wrappedNative: Address): PoolRecord[] {
-  const pairScopes = claimed
-    .map(splitCoverageKey)
-    .filter((s): s is CoverageScope => s !== undefined && s.scope.startsWith('pair:'))
-
-  const chosen = new Map<string, PoolRecord>()
-  for (const rec of body.pools) {
-    if (pairScopes.some((s) => poolInScope(rec, s, wrappedNative))) chosen.set(rec.pool.id, rec)
-  }
-  const rest = body.pools.filter((rec) => !chosen.has(rec.pool.id))
-  const take = Math.min(sample, rest.length)
-  if (take > 0) {
-    const stride = rest.length / take
-    for (let i = 0; i < take; i++) chosen.set(rest[Math.floor(i * stride)]!.pool.id, rest[Math.floor(i * stride)]!)
-  }
-  return [...chosen.values()]
-}
-
-async function verifyLive(
-  client: PublicClient,
-  manifest: ChainManifest,
-  targets: PoolRecord[],
-): Promise<{ checked: number; unverifiable: number }> {
-  if (targets.length === 0) return { checked: 0, unverifiable: 0 }
-  const blockNumber = await client.getBlockNumber()
-  const probes = targets.map((rec) => probesFor(rec, manifest)).filter((p): p is Probe => p !== undefined)
-  const results = await aggregateCalls({
-    client,
-    multicall3: manifest.multicall3 ?? MULTICALL3_ADDRESS,
-    calls: probes.map((p) => p.call),
-    blockNumber,
-  })
-
-  const missing: string[] = []
-  let unverifiable = 0
-  results.forEach((result, i) => {
-    const probe = probes[i]!
-    if (result instanceof Error) {
-      unverifiable++
-      return
-    }
-    if (probe.check(result) === 'missing') missing.push(probe.rec.pool.id)
-  })
-
-  if (missing.length > 0) {
-    throw new PoolListError(
-      `verify-before-publish FAILED at block ${blockNumber}: ${missing.length}/${probes.length} probed pools do not exist on chain ` +
-        `(e.g. ${missing.slice(0, 3).join(', ')}). The source snapshot describes a different chain, or is corrupt — not publishing.`,
-    )
-  }
-  return { checked: probes.length - unverifiable, unverifiable }
-}
-
+// WHY VERIFICATION IS AFFORDABLE AT ALL: `src/internal/multicall.ts`. Every
+// probe is one `aggregate3` inner call, 50 to a round trip and one rate-limit
+// charge per round trip, so checking 200 pools is ~4 requests rather than 200.
+// That is the only reason "probe every pool in every claimed pair scope" is a
+// default and not a flag nobody turns on — and it is why the Multicall3
+// deployment is PROBED (`eth_getCode`) rather than assumed: on a chain without
+// one, an unprobed `aggregate3` "succeeds" with `0x`, every probe comes back
+// unverifiable, and the build publishes an unverified list. `verifyLive` falls
+// back to per-call `eth_call`s there instead.
 // ---------------------------------------------------------------------------
 
 function report(stats: CurationStats, asOfBlock: string, bytes: number, out: string): void {
@@ -352,8 +205,16 @@ async function main(): Promise<void> {
   if (!args.skipVerify) {
     const client = createPublicClient({ transport: http(url, { batch: false, timeout: 60_000 }) }) as PublicClient
     const targets = selectProbeTargets(body, stats.claimedScopes, args.sample, manifest.wrappedNative)
-    const { checked, unverifiable } = await verifyLive(client, manifest, targets)
-    console.log(`[pool-list] verified ${checked} pools live${unverifiable > 0 ? ` (${unverifiable} unverifiable — endpoint did not answer)` : ''}`)
+    // The `eth_getCode` probe FIRST, and the block number only after it: on a chain with no
+    // Multicall3 the aggregated path is silently vacuous (see the section header), so which dispatch
+    // to use is decided before anything is asked about pools.
+    const multicall3: Address | null = await probeMulticall3(client, manifest)
+    const blockNumber = await client.getBlockNumber()
+    const { checked, unverifiable, aggregated } = await verifyLive({ client, manifest, targets, blockNumber, multicall3 })
+    console.log(
+      `[pool-list] verified ${checked} pools live at block ${blockNumber} via ${aggregated ? 'aggregate3' : 'per-call eth_call (no Multicall3 on this chain)'}` +
+        `${unverifiable > 0 ? ` — ${unverifiable} unverifiable (endpoint did not answer)` : ''}`,
+    )
   } else {
     console.warn('[pool-list] --skip-verify: publishing WITHOUT a live existence check')
   }

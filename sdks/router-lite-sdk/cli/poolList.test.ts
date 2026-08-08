@@ -3,10 +3,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
-import type { Address } from 'viem'
+import { decodeFunctionData, encodeFunctionResult, pad, type Address, type Hex, type PublicClient } from 'viem'
 
 import { PoolIndex, serializeSnapshot, v2PoolRef, v3PoolRef, type PoolIndexSnapshot } from '../src/experimental/index'
-import { manifestFor } from '../src/index'
+import { manifestFor, type ChainManifest, type PoolRecord } from '../src/index'
+import { MULTICALL3_ABI } from '../src/internal/abis'
+import { MULTICALL3_ADDRESS } from '../src/internal/multicall'
 
 import {
   applyPoolList,
@@ -19,9 +21,13 @@ import {
   parsePoolList,
   PoolListError,
   poolInScope,
+  probeFor,
+  probeMulticall3,
+  selectProbeTargets,
   serializeEnvelope,
   splitCoverageKey,
   stripEndpointSpecific,
+  verifyLive,
   verifyPoolList,
   type PoolListEnvelope,
 } from './poolList'
@@ -471,5 +477,184 @@ describe('applyPoolList (the CLI path)', () => {
     await expect(applyPoolList(new PoolIndex(WETH), path, { chainId: 1, manifest: MAINNET, trustCoverage: false })).rejects.toThrow(
       /schemaVersion/,
     )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Verify-before-publish.
+//
+// The stub below is a chain, not a mock of the code under test: it serves
+// `eth_getCode` at whatever address it was told holds Multicall3, decodes an
+// `aggregate3` envelope and answers each inner call from the SAME registry a
+// direct `eth_call` is answered from, and — crucially — replicates the one
+// behavior the bug lived inside: an `eth_call` to an address WITH NO CODE
+// SUCCEEDS AND RETURNS `0x`. That is what makes an unprobed aggregate3 vacuous
+// rather than loud, on a real chain and here alike.
+// ---------------------------------------------------------------------------
+
+type ChainScript = {
+  /** Which address (if any) actually has Multicall3 deployed. `undefined` → this chain has none. */
+  multicall3?: Address
+  /** `${target}:${calldata}` -> return data, for every call the chain can answer. */
+  answers: Record<string, Hex>
+  /** Every OUTER call (aggregate3 or direct) fails with this, in order; past the end, served. */
+  outerOutcomes?: (Error | 'serve')[]
+}
+
+function chainStub(script: ChainScript): { client: Pick<PublicClient, 'request'>; calls: { aggregate3: number; direct: number; getCode: number } } {
+  const calls = { aggregate3: 0, direct: 0, getCode: 0 }
+  let outerIndex = 0
+  const key = (to: string, data: string): string => `${to.toLowerCase()}:${data}`
+  const client = {
+    async request(args: any) {
+      if (args.method === 'eth_getCode') {
+        calls.getCode++
+        const probed = (args.params[0] as string).toLowerCase()
+        return script.multicall3 !== undefined && probed === script.multicall3.toLowerCase() ? '0x6080604052' : '0x'
+      }
+      if (args.method !== 'eth_call') throw new Error(`chainStub: unexpected method ${args.method}`)
+      const [{ to, data }] = args.params
+      const target = (to as string).toLowerCase()
+
+      let decoded: { functionName: string; args: readonly unknown[] } | undefined
+      try {
+        decoded = decodeFunctionData({ abi: MULTICALL3_ABI, data })
+      } catch {
+        // not an aggregate3 envelope — a direct probe
+      }
+      if (decoded?.functionName === 'aggregate3') {
+        // THE WHOLE POINT: a call to an address with no code succeeds with `0x`. The outer decode
+        // then fails, `aggregateCalls` conservatively coarsens that to a TransportError per slot,
+        // and every probe in the chunk is "unverifiable" while nothing anywhere errors.
+        if (script.multicall3 === undefined || target !== script.multicall3.toLowerCase()) return '0x'
+        calls.aggregate3++
+        const outcome = script.outerOutcomes?.[outerIndex++] ?? 'serve'
+        if (outcome instanceof Error) throw outcome
+        const inner = decoded.args[0] as readonly { target: Address; allowFailure: boolean; callData: Hex }[]
+        const results = inner.map((c) => {
+          if (!c.allowFailure) throw new Error('chainStub: aggregate3 arrived without allowFailure')
+          const answer = script.answers[key(c.target, c.callData)]
+          return answer === undefined
+            ? { success: false as const, returnData: '0x' as Hex }
+            : { success: true as const, returnData: answer }
+        })
+        return encodeFunctionResult({ abi: MULTICALL3_ABI, functionName: 'aggregate3', result: results })
+      }
+
+      calls.direct++
+      const outcome = script.outerOutcomes?.[outerIndex++] ?? 'serve'
+      if (outcome instanceof Error) throw outcome
+      const answer = script.answers[key(target, data as string)]
+      if (answer === undefined) throw new Error('execution reverted')
+      return answer
+    },
+  } as unknown as Pick<PublicClient, 'request'>
+  return { client, calls }
+}
+
+/** Truthful answers for every probe `verifyLive` will build from `targets` — the chain agreeing that
+ * each curated pool is exactly where the snapshot says it is. */
+function truthfulAnswers(targets: PoolRecord[], manifest: ChainManifest): Record<string, Hex> {
+  const answers: Record<string, Hex> = {}
+  for (const rec of targets) {
+    const probe = probeFor(rec, manifest)
+    if (probe === undefined) continue
+    answers[`${probe.call.to.toLowerCase()}:${probe.call.data}`] =
+      rec.pool.protocol === 'v4'
+        ? (pad('0x01', { size: 32 }) as Hex)
+        : (pad(rec.pool.address, { size: 32 }) as Hex)
+  }
+  return answers
+}
+
+describe('verify-before-publish', () => {
+  function targets(): PoolRecord[] {
+    const { body, claimed } = curated()
+    return selectProbeTargets(body, claimed, 200, MAINNET.wrappedNative)
+  }
+
+  it('probes eth_getCode and aggregates only where Multicall3 really is deployed', async () => {
+    const t = targets()
+    const { client, calls } = chainStub({ multicall3: MULTICALL3_ADDRESS, answers: truthfulAnswers(t, MAINNET) })
+    const multicall3 = await probeMulticall3(client, MAINNET)
+    expect(multicall3).toBe(MULTICALL3_ADDRESS)
+    const result = await verifyLive({ client, manifest: MAINNET, targets: t, blockNumber: 21_000_000n, multicall3 })
+    expect(result).toEqual({ checked: t.length, unverifiable: 0, aggregated: true })
+    expect(calls.getCode).toBe(1)
+    expect(calls.aggregate3).toBe(1)
+    expect(calls.direct).toBe(0)
+  })
+
+  // THE VACUOUS-VERIFICATION BUG. On a chain with no Multicall3, an unprobed `aggregate3` to the
+  // canonical address succeeds with `0x`, the outer decode fails, every slot becomes a
+  // `TransportError`, and the run reports "verified 0 pools" — then publishes. The probe is what
+  // routes this chain to per-call `eth_call`s, where the same pools are really checked.
+  it('falls back to per-call probes on a chain with no Multicall3 deployment', async () => {
+    const t = targets()
+    const { client, calls } = chainStub({ answers: truthfulAnswers(t, MAINNET) })
+    const multicall3 = await probeMulticall3(client, MAINNET)
+    expect(multicall3).toBeNull()
+    const result = await verifyLive({ client, manifest: MAINNET, targets: t, blockNumber: 21_000_000n, multicall3 })
+    expect(result).toEqual({ checked: t.length, unverifiable: 0, aggregated: false })
+    expect(calls.aggregate3).toBe(0)
+    expect(calls.direct).toBe(t.length)
+  })
+
+  // What the fallback protects against, stated as the outcome rather than the mechanism: hand
+  // `verifyLive` the canonical address on faith on a chain that does not have it, and it verifies
+  // NOTHING — which is now a build failure rather than a published list.
+  it('refuses to pass when every probe was unverifiable', async () => {
+    const t = targets()
+    const { client } = chainStub({ answers: truthfulAnswers(t, MAINNET) })
+    await expect(
+      verifyLive({ client, manifest: MAINNET, targets: t, blockNumber: 21_000_000n, multicall3: MULTICALL3_ADDRESS }),
+    ).rejects.toThrow(/VERIFIED NOTHING/)
+  })
+
+  it('refuses to pass when a real Multicall3 chunk is lost to the transport', async () => {
+    const t = targets()
+    const { client } = chainStub({
+      multicall3: MULTICALL3_ADDRESS,
+      answers: truthfulAnswers(t, MAINNET),
+      outerOutcomes: [Object.assign(new Error('HTTP request failed.\n\nStatus: 429'), { status: 429 })],
+    })
+    await expect(
+      verifyLive({ client, manifest: MAINNET, targets: t, blockNumber: 21_000_000n, multicall3: MULTICALL3_ADDRESS }),
+    ).rejects.toThrow(/VERIFIED NOTHING/)
+  })
+
+  // The tolerance the "verified nothing" guard must not have eaten: a partial outage still publishes.
+  it('tolerates SOME unverifiable probes as long as something was actually verified', async () => {
+    const t = targets()
+    const answers = truthfulAnswers(t, MAINNET)
+    const dropped = Object.keys(answers)[0]!
+    const partial = { ...answers }
+    delete partial[dropped]
+    // A v4 probe that cannot be answered reads back zero, which is a DEFINITIVE missing — so this
+    // case is built on the v2/v3 factory oracles, where an unanswerable probe is a revert.
+    const { client } = chainStub({ multicall3: MULTICALL3_ADDRESS, answers: partial })
+    const result = await verifyLive({ client, manifest: MAINNET, targets: t, blockNumber: 21_000_000n, multicall3: MULTICALL3_ADDRESS })
+    expect(result.unverifiable).toBe(1)
+    expect(result.checked).toBe(t.length - 1)
+  })
+
+  it('fails the build on a single definitive negative', async () => {
+    const t = targets()
+    const answers = truthfulAnswers(t, MAINNET)
+    const first = Object.keys(answers)[0]!
+    answers[first] = pad('0x00', { size: 32 }) as Hex // the factory names the zero address
+    const { client } = chainStub({ multicall3: MULTICALL3_ADDRESS, answers })
+    await expect(
+      verifyLive({ client, manifest: MAINNET, targets: t, blockNumber: 21_000_000n, multicall3: MULTICALL3_ADDRESS }),
+    ).rejects.toThrow(/do not exist on chain/)
+  })
+
+  it('claims nothing, and fails nothing, for an empty target set', async () => {
+    const { client } = chainStub({ multicall3: MULTICALL3_ADDRESS, answers: {} })
+    expect(await verifyLive({ client, manifest: MAINNET, targets: [], blockNumber: 1n, multicall3: MULTICALL3_ADDRESS })).toEqual({
+      checked: 0,
+      unverifiable: 0,
+      aggregated: true,
+    })
   })
 })
