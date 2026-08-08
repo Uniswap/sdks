@@ -138,7 +138,9 @@ function quoteData(legs: RouteLeg[], amountIn: bigint): Hex {
 function stubQuote(legs: RouteLeg[], amountIn: bigint): QuoteCall {
   return {
     call: { to: quoteTarget(legs[0]!.pool), data: quoteData(legs, amountIn) },
-    decode: (returnData: Hex) => BigInt(returnData),
+    // No `gasEstimate`: the stub protocol is v2-shaped (an amount and nothing else), so every route
+    // this file quotes lands with the field absent — which is exactly what these tests want to see.
+    decode: (returnData: Hex) => ({ amountOut: BigInt(returnData) }),
   }
 }
 

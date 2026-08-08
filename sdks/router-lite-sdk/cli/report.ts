@@ -105,6 +105,25 @@ export function renderRoute(route: QuotedRoute['route'], ctx: RenderCtx): string
   return parts.join(' ')
 }
 
+/**
+ * The quoter's gas figure, dimmed, as a route line's trailing note — `~90k gas`, or nothing at all
+ * when the route has none (every v2 route, and any two-segment route with a v2 leg; see
+ * `RouteQuote.gasEstimate`).
+ *
+ * ROUNDED ON PURPOSE, AND ROUNDED HARD. The underlying word is envelope-dependent to a few percent
+ * (measured: −7.2% for a v3 quote aggregated behind another call to the same pool), so printing
+ * `90,012 gas` would spend six digits of precision on a number that does not have six digits of
+ * meaning. Three significant figures is what the reader can actually use: which routes are cheap,
+ * which are two-hop expensive, and roughly by how much.
+ */
+function gasNote(route: QuotedRoute | RankedRoute): string {
+  const gas = route.quote.gasEstimate
+  if (gas === undefined) return ''
+  const n = Number(gas)
+  const label = n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${Math.round(n / 1_000)}k` : `${n}`
+  return ` ${dim(`~${label} gas`)}`
+}
+
 const EXECUTION_BADGE: Record<RankedRoute['execution'], (s: string) => string> = {
   verified: green,
   'needs-action': yellow,
@@ -158,7 +177,7 @@ function renderAlternatives(alternatives: (QuotedRoute | RankedRoute)[], out: Cu
   const shown = alternatives.slice(0, 5)
   for (const alt of shown) {
     const badge = isRanked(alt) ? `  ${executionBadge(alt)}` : ''
-    lines.push(`  ${amountFor(ctx, out, alt.quote.amountOut)}  ${renderRoute(alt.route, ctx)}${badge}`)
+    lines.push(`  ${amountFor(ctx, out, alt.quote.amountOut)}  ${renderRoute(alt.route, ctx)}${gasNote(alt)}${badge}`)
   }
   if (alternatives.length > shown.length) lines.push(dim(`  … and ${alternatives.length - shown.length} more`))
   return lines
@@ -296,7 +315,7 @@ export function renderQuoteResult(result: QuoteResult, trade: TradeContext, ctx:
 
   if (result.status === 'quote') {
     lines.push(header('quote', `${pair}: ${bold(amountFor(ctx, trade.tokenOut, result.best.quote.amountOut))}`, elapsedMs))
-    lines.push(`  ${renderRoute(result.best.route, ctx)}`)
+    lines.push(`  ${renderRoute(result.best.route, ctx)}${gasNote(result.best)}`)
     lines.push(...promotionNote(result.best, result.alternatives, trade.tokenOut, ctx))
   } else {
     // No "best so far" panel on the quote side, unlike `renderSwapResult` below. A quote with a
@@ -319,7 +338,7 @@ export function renderSwapResult(result: SwapResult, trade: TradeContext, ctx: R
 
   if (result.status === 'ready' || result.status === 'needs-action') {
     lines.push(header(result.status, `${pair}: ${bold(amountFor(ctx, trade.tokenOut, result.best.quote.amountOut))}`, elapsedMs))
-    lines.push(`  ${renderRoute(result.best.route, ctx)}  ${executionBadge(result.best)}`)
+    lines.push(`  ${renderRoute(result.best.route, ctx)}${gasNote(result.best)}  ${executionBadge(result.best)}`)
     lines.push(...promotionNote(result.best, result.alternatives, trade.tokenOut, ctx))
     if (result.status === 'needs-action') {
       lines.push(bold('before sending:'))
@@ -339,7 +358,7 @@ export function renderSwapResult(result: SwapResult, trade: TradeContext, ctx: R
       lines.push(
         `${bold('best so far')} ${amountFor(ctx, trade.tokenOut, result.best.quote.amountOut)} ${dim('(unverified — search was cut short)')}`,
       )
-      lines.push(`  ${renderRoute(result.best.route, ctx)}  ${executionBadge(result.best)}`)
+      lines.push(`  ${renderRoute(result.best.route, ctx)}${gasNote(result.best)}  ${executionBadge(result.best)}`)
       lines.push(...promotionNote(result.best, result.alternatives, trade.tokenOut, ctx))
       if (result.tx) lines.push(dim(`  unverified tx available — rerun with a bigger --budget to verify, or use --json to extract it`))
     }

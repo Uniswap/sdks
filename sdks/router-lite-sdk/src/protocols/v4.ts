@@ -5,7 +5,7 @@ import { RouterConfigError, UnsupportedRouteError } from '../errors'
 import { V4_POOL_MANAGER_ABI, V4_QUOTER_ABI } from '../internal/abis'
 import { sortAddresses } from '../internal/currency'
 import { narrowTopics } from '../internal/logScan'
-import type { ChainManifest, CurrencyRef, EthCall, ExecutionOperation, LogQuery, PoolKey, RouteLeg } from '../types'
+import type { ChainManifest, CurrencyRef, DecodedQuote, EthCall, ExecutionOperation, LogQuery, PoolKey, RouteLeg } from '../types'
 
 import { v4PoolRef } from './poolRef'
 import type { ProtocolModule, QuoteProbe } from './types'
@@ -117,9 +117,11 @@ function quoterQuote(quoter: Address, legs: RouteLeg[], amountIn: bigint): Quote
         args: [{ exactCurrency, path, exactAmount: amountIn }],
       }),
     },
-    decode(returnData: Hex): bigint {
+    decode(returnData: Hex): DecodedQuote {
       const result = decodeFunctionResult({ abi: V4_QUOTER_ABI, functionName: 'quoteExactInput', data: returnData })
-      return result[0]
+      // `result[1]` is V4Quoter's own `gasEstimate` word — reported verbatim, never used to rank.
+      // See `RouteQuote.gasEstimate` for what it measures and how far it moves between envelopes.
+      return { amountOut: result[0], gasEstimate: result[1] }
     },
   }
 }

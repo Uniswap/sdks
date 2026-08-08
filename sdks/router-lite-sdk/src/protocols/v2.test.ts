@@ -82,7 +82,11 @@ test('speculativeDirect probe decodes reserves into a quote', () => {
     [{ type: 'uint112' }, { type: 'uint112' }, { type: 'uint32' }],
     [2_000_000n * 10n ** 6n, 1_000n * 10n ** 18n, 0], // reserve0=USDC (token0), reserve1=WETH
   )
-  expect(probe!.quote.decode(reservesReturn)).toBeGreaterThan(0n)
+  const decoded = probe!.quote.decode(reservesReturn)
+  expect(decoded.amountOut).toBeGreaterThan(0n)
+  // NO gas figure on a v2 quote, ever: this is local constant-product math over `getReserves()`,
+  // not an on-chain swap simulation, so there is nothing that measured gas (`RouteQuote.gasEstimate`).
+  expect(decoded.gasEstimate).toBeUndefined()
 })
 
 test('speculativeDirect decode throws on an absent pool (empty returndata)', () => {

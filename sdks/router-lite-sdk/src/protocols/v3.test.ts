@@ -134,8 +134,10 @@ test('decode extracts amountOut from QuoterV2 return', () => {
     { type: 'uint32[]' },
     { type: 'uint256' },
   ] as const
-  const ret = encodeAbiParameters(quoterV2Returns, [123n, [], [], 0n])
-  expect(v3Module.encodeQuote(legs, 1n, MAINNET_MANIFEST).decode(ret)).toBe(123n)
+  const ret = encodeAbiParameters(quoterV2Returns, [123n, [], [], 45_678n])
+  // The fourth return word is QuoterV2's own `gasEstimate`; it rides along on the decode and is
+  // reported, never ranked on (`RouteQuote.gasEstimate`).
+  expect(v3Module.encodeQuote(legs, 1n, MAINNET_MANIFEST).decode(ret)).toEqual({ amountOut: 123n, gasEstimate: 45_678n })
 })
 
 test('mergeEnabledFees adds nonstandard fees once', () => {
@@ -217,5 +219,8 @@ test('decode matches a recorded mainnet QuoterV2 returndata fixture', () => {
     },
   ]
   const decoded = v3Module.encodeQuote(legs, BigInt(quoterFixture.amountIn), MAINNET_MANIFEST).decode(quoterFixture.returnData as `0x${string}`)
-  expect(decoded).toBe(BigInt(quoterFixture.amountOut))
+  expect(decoded.amountOut).toBe(BigInt(quoterFixture.amountOut))
+  // The real quoter's own gas word, out of the same recorded bytes — a live-plausible figure for a
+  // single-hop v3 swap, pinned here so a decode that read the wrong return slot cannot pass.
+  expect(decoded.gasEstimate).toBe(86_439n)
 })

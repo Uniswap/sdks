@@ -150,6 +150,37 @@ It usually rides along on `best` (the promoted route is the one that typically e
 it is a fact about the route, not about final placement — if the promoted route itself then fails
 preflight, it carries the marker into `alternatives` instead.
 
+### `quote.gasEstimate`: reported, never ranked
+
+Every `QuotedRoute`'s `quote` may carry `gasEstimate?: bigint` — the gas word QuoterV2 and V4Quoter
+already return alongside `amountOut`, decoded rather than discarded. It is there to display and to
+compare routes against each other, and it is deliberately not part of any decision this package
+makes.
+
+- **Absent for v2.** A v2 quote is local constant-product math over `getReserves()`; nothing
+  simulated a swap, so there is no measurement to report. Absence is the honest answer, not a gap.
+- **Summed across segments, all-or-nothing.** A route quoted in two rounds (a protocol boundary, or
+  two solo v2 legs) reports the sum of its segments' estimates, and only when *every* segment
+  reported one — one v2 leg anywhere makes the whole route's estimate absent, rather than a partial
+  sum that silently under-counts a leg.
+- **Not a gas limit.** It covers the swap inside the quoter and nothing else: no 21k intrinsic, no
+  calldata cost, no Permit2 pull, no Universal Router dispatch or custody. The number to send a
+  transaction with comes from preflight / `eth_estimateGas` against the encoded `tx`.
+- **Envelope-dependent to a few percent.** The quoter measures `gasBefore - gasleft()`, which
+  includes EIP-2929 cold/warm state-access costs — so the same route at the same block reads
+  differently depending on what the carrying call already touched, and this SDK aggregates quoting
+  rounds through Multicall3. Measured live on mainnet at block 25,707,079: a v3 WETH→USDC 0.05%
+  quote reported **90,012** as a direct `eth_call`, **90,012** alone inside `aggregate3`, **90,012**
+  aggregated behind unrelated calls, and **83,512** (−6,500, −7.2%) aggregated behind another call
+  to the same pool; the v4 ETH→USDC twin read 43,222 / 43,222 / 40,722 (−2,500, −5.8%). `amountOut`
+  was byte-identical in every envelope.
+- **Ranking never reads it.** `rankRoutes` orders on `amountOut` and its declared tie-breakers
+  alone; a route with no estimate is never disadvantaged and a cheap-gas route is never promoted.
+  Gas-aware ranking needs a gas price and an output-token price, both of which are the caller's.
+
+The CLI prints it dimmed on route lines (`~90k gas`), rounded to three significant figures because
+that is as much precision as the figure actually has.
+
 ### `reason` (C4-P5)
 
 `no-route` and `inconclusive` both carry `reason: { code: ReasonCode; detail: string }` instead of a
@@ -675,13 +706,24 @@ bun scripts/recordSession.ts --all
 # record a brand-new session
 chainz exec 1 -- bun scripts/recordSession.ts --label mainnet-eth-usdc --rpc @rpc \
   --chain 1 --token-in native --token-out 0xA0b8...eB48 --amount-in 1000000000000000000 --notes "..."
+
+# rebuild every golden from the conversations already on disk — NO network, no RPC URL, no chainz
+bun scripts/recordSession.ts --regold
 ```
+
+`--regold` is the update path when the change is to what a result *reports*, not to what the search
+*asks*: it replays each recorded session strictly (twice, and refuses to write if the two disagree —
+the same determinism proof a fresh recording makes) and rewrites only the golden. `gasEstimate` was
+added to the canonical route shape that way: the gas word was already sitting in the recorded
+quoter responses, so every golden gained the field with no session re-recorded. Re-recording for a
+reporting change would be strictly worse — it would move every amount in every golden (the chain has
+moved on) and bury the one field that actually changed.
 
 Goldens legitimately change when: (a) ranking/pruning/classification policy changes on purpose —
 regenerate and review the diff as the behavioral change it is; (b) the search starts asking
 different questions (new probe, different scan windows) — the replay transport names the unrecorded
 request and regeneration re-records the conversation; (c) a session is deliberately re-pinned to a
-newer block. They never legitimately change on their own: the recorder derives every golden from a
+newer block; (d) the canonical result shape gains a field — `--regold`, above, no network. They never legitimately change on their own: the recorder derives every golden from a
 strict replay and proves two replays agree before writing, so a golden diff with no code change is a
 determinism bug. Fixtures are redacted by construction (no RPC URLs — provider error messages pass
 through the keyed-URL redaction rule) and total ~1.3 MB across 7 sessions.

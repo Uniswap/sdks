@@ -5,7 +5,7 @@ import { RouterConfigError, UnsupportedRouteError } from '../errors'
 import { V2_FACTORY_ABI, V2_PAIR_ABI } from '../internal/abis'
 import { sortAddresses } from '../internal/currency'
 import { narrowTopics } from '../internal/logScan'
-import type { ChainManifest, CurrencyRef, ExecutionOperation, LogQuery, RouteLeg } from '../types'
+import type { ChainManifest, CurrencyRef, DecodedQuote, ExecutionOperation, LogQuery, RouteLeg } from '../types'
 
 import { v2PoolRef } from './poolRef'
 import type { ProtocolModule, QuoteProbe } from './types'
@@ -83,7 +83,7 @@ function resolveAddress(c: CurrencyRef, wrappedNative: Address): Address {
 function reservesQuote(pairAddress: Address, zeroForOne: boolean, amountIn: bigint): QuoteProbe['quote'] {
   return {
     call: { to: pairAddress, data: encodeFunctionData({ abi: V2_PAIR_ABI, functionName: 'getReserves' }) },
-    decode(returnData: Hex): bigint {
+    decode(returnData: Hex): DecodedQuote {
       // Throws on empty/short returndata (pool absent) — decodeFunctionResult rejects
       // undersized data rather than silently zero-filling it.
       const [reserve0, reserve1] = decodeFunctionResult({ abi: V2_PAIR_ABI, functionName: 'getReserves', data: returnData })
@@ -93,7 +93,12 @@ function reservesQuote(pairAddress: Address, zeroForOne: boolean, amountIn: bigi
       // "pool absent": throw so the probe is counted failed instead of surfacing a spurious
       // amountOut of 0 as a real quote.
       if (reserveIn === 0n || reserveOut === 0n) throw new Error('v2 pair has zero reserves')
-      return getAmountOut(amountIn, reserveIn, reserveOut)
+      // NO `gasEstimate`, DELIBERATELY. This is local constant-product arithmetic over a
+      // `getReserves()` read — no swap was simulated on-chain, so there is no gas measurement to
+      // report and any number here would be a fabrication. Absence is the honest answer, and it
+      // propagates: a two-segment route with a v2 segment reports no estimate at all
+      // (`quote/quote.ts`), rather than a sum that quietly omits this leg.
+      return { amountOut: getAmountOut(amountIn, reserveIn, reserveOut) }
     },
   }
 }

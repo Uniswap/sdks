@@ -233,13 +233,33 @@ const INCONCLUSIVE_REASON_CODES: ReadonlySet<ReasonCode> = new Set([
  * with a route the chain authoritatively rejected; a quote's routes carry nothing beyond the quote
  * and its ranking, and a quote whose `best` is outpriced by one of its own `alternatives` says on
  * the route WHY (`promotedOverComplex`) rather than looking like a broken sort;
- * and quoting stats always add up. Every test in Tasks 12, 17, 18, and the fork/canary suites that
+ * a route reports a quoter `gasEstimate` only if a quoter actually measured one (never a v2-only
+ * route); and quoting stats always add up. Every test in Tasks 12, 17, 18, and the fork/canary suites that
  * produces a result MUST pass it through this — a classification bug then fails tests that were
  * checking something else entirely.
  */
 export function assertResultCoherent(r: QuoteResult | SwapResult): void {
   // Status-agnostic fields, checked status-agnostically: no variant may omit them.
   if (!Array.isArray(r.alternatives)) throw new Error(`${r.status} without an alternatives array`)
+  // GAS IS REPORTED, NEVER RANKED, AND NEVER INVENTED. `RouteQuote.gasEstimate` is a reading taken by
+  // a quoter that actually simulated the swap, so a route made only of v2 legs — priced by local
+  // constant-product arithmetic over `getReserves()`, with no on-chain simulation anywhere — cannot
+  // have one. This is the shape of the field checked status-agnostically, on every route of every
+  // result any suite produces: an estimate appearing on a v2-only route would mean something
+  // downstream started synthesizing a number, which is precisely the failure the absence rule exists
+  // to prevent (a synthesized figure is indistinguishable from a measured one once it is on the
+  // object). Nothing here checks the VALUE against ranking, because ranking never reads it —
+  // `rankRoutes` orders on `amountOut` alone (`quote/quote.ts`, and its own test asserts the
+  // indifference directly).
+  const leader = 'best' in r ? r.best : undefined
+  for (const route of [...(leader ? [leader] : []), ...r.alternatives]) {
+    if (route.quote.gasEstimate === undefined) continue
+    if (route.route.legs.every((leg) => leg.pool.protocol === 'v2')) {
+      throw new Error(
+        `a v2-only route reports gasEstimate ${route.quote.gasEstimate} — v2 quotes are local reserve math and measure no gas`,
+      )
+    }
+  }
   if (r.status === 'quote') {
     // Quoting verifies nothing, so a quote's routes are plain `QuotedRoute`s. The engine's own
     // routes travel with `execution`/`revertData`; handing one straight through would ship keys the

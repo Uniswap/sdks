@@ -166,7 +166,9 @@ test('decode matches a recorded mainnet V4Quoter returndata fixture', () => {
   const decoded = v4Module
     .encodeQuote(legs, BigInt(quoterFixture.amountIn), MAINNET_MANIFEST)
     .decode(quoterFixture.returnData as `0x${string}`)
-  expect(decoded).toBe(BigInt(quoterFixture.amountOut))
+  expect(decoded.amountOut).toBe(BigInt(quoterFixture.amountOut))
+  // V4Quoter's second return word, from the same recorded bytes (see the v3 twin of this test).
+  expect(decoded.gasEstimate).toBe(64_798n)
 })
 
 test('parsePoolLog reconstructs a recorded mainnet Initialize log with a matching recomputed poolId', () => {

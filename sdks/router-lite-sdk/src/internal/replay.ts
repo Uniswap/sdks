@@ -281,6 +281,19 @@ export type CanonicalRoute = {
   amountIn: string
   amountOut: string
   intermediateAmounts: string[]
+  /**
+   * The quoter's own gas word for this route, when it reported one — decimal string, absent for a
+   * v2-only route (see `RouteQuote.gasEstimate`).
+   *
+   * IT IS GOLDEN-WORTHY AND IT COST NOTHING TO MAKE SO. The word has always been in the recorded
+   * responses (it is a return slot of the very quoter calls these sessions replay); the engine
+   * simply discarded it on decode. Canonicalizing it means a change that silently stopped reporting
+   * gas — a decode reading the wrong slot, a two-segment sum quietly dropped — fails the deep-equal
+   * here, exactly as an amount regression does. Adding it moved every golden's ROUTE entries with no
+   * session re-recording whatsoever (`scripts/recordSession.ts --regold`), because no new bytes were
+   * needed: the goldens were rebuilt from the same recorded conversations.
+   */
+  gasEstimate?: string
   promotedOverComplex?: true
 }
 
@@ -313,6 +326,7 @@ function canonicalRoute(q: QuotedRoute): CanonicalRoute {
     amountIn: q.quote.amountIn.toString(),
     amountOut: q.quote.amountOut.toString(),
     intermediateAmounts: q.quote.intermediateAmounts.map((a) => a.toString()),
+    ...(q.quote.gasEstimate !== undefined && { gasEstimate: q.quote.gasEstimate.toString() }),
     ...(q.promotedOverComplex !== undefined && { promotedOverComplex: q.promotedOverComplex }),
   }
 }

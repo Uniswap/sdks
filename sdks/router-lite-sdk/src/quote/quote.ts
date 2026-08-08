@@ -10,7 +10,7 @@ import type { Segment } from '../internal/segment'
 import { segmentCandidate } from '../internal/segment'
 import { isHooked, routeId } from '../protocols'
 import type { ProtocolModule, QuoteProbe } from '../protocols/types'
-import type { ChainManifest, Protocol, QuoteCall, QuotedRoute, RouteCandidate } from '../types'
+import type { ChainManifest, DecodedQuote, Protocol, QuoteCall, QuotedRoute, RouteCandidate, RouteQuote } from '../types'
 
 // ---------------------------------------------------------------------------
 // Quoting engine — segments each candidate into contiguous same-protocol
@@ -77,7 +77,7 @@ function encodeOr(encode: () => QuoteCall): QuoteCall | Error {
  * pool-absent shape (`getReserves()` where no pair exists → undecodable `0x`) keeps its existing
  * accounting: an execution-channel failure with no revert data, negative-cacheable.
  */
-async function runQuoteRound(args: RunRoundArgs): Promise<Array<bigint | Error>> {
+async function runQuoteRound(args: RunRoundArgs): Promise<Array<DecodedQuote | Error>> {
   const { client, calls, blockNumber, semaphore, signal, multicall3 } = args
 
   if (multicall3 === undefined) {
@@ -99,7 +99,7 @@ async function runQuoteRound(args: RunRoundArgs): Promise<Array<bigint | Error>>
     semaphore,
     signal,
   })
-  const results: Array<bigint | Error> = calls.map((quoteCall) =>
+  const results: Array<DecodedQuote | Error> = calls.map((quoteCall) =>
     quoteCall instanceof Error ? quoteCall : new Error('unreachable: live slot never written'),
   )
   live.forEach(({ quoteCall, i }, j) => {
@@ -131,6 +131,37 @@ async function runQuoteRound(args: RunRoundArgs): Promise<Array<bigint | Error>>
 function isAmountIndependentFailure(err: Error): boolean {
   if (err instanceof InnerCallFailure) return err.revertData === undefined
   return revertDataOf(err) === undefined
+}
+
+/**
+ * The gas figure for a whole route: the SUM of its segments' quoter estimates, or `undefined` if any
+ * segment did not report one (a v2 segment never does — `protocols/v2.ts`). Summing is the whole
+ * reason this is a fold rather than a read of the last segment: a two-round route really is two
+ * on-chain swaps, and reporting only the second's cost would under-count by an entire leg. See
+ * {@link RouteQuote.gasEstimate} for what the sum does and does not cover.
+ */
+function sumGasEstimates(segments: DecodedQuote[]): bigint | undefined {
+  let total = 0n
+  for (const segment of segments) {
+    if (segment.gasEstimate === undefined) return undefined
+    total += segment.gasEstimate
+  }
+  return total
+}
+
+/**
+ * The `RouteQuote` for a candidate priced by `segments` (in order) — the single place a quote object
+ * is built, so `amountOut` always comes from the LAST segment and `gasEstimate` always follows
+ * {@link sumGasEstimates}' all-or-nothing rule, on all three tally paths.
+ */
+function routeQuote(amountIn: bigint, intermediateAmounts: bigint[], segments: DecodedQuote[]): RouteQuote {
+  const gasEstimate = sumGasEstimates(segments)
+  return {
+    amountIn,
+    amountOut: segments[segments.length - 1]!.amountOut,
+    intermediateAmounts,
+    ...(gasEstimate !== undefined && { gasEstimate }),
+  }
 }
 
 /**
@@ -238,7 +269,7 @@ export async function quoteCandidates(args: QuoteCandidatesArgs): Promise<QuoteC
   let succeeded = 0
   let failed = 0
   let transportFailed = 0
-  const pendingRound2: { candidate: RouteCandidate; segments: Segment[]; round1Output: bigint }[] = []
+  const pendingRound2: { candidate: RouteCandidate; segments: Segment[]; round1: DecodedQuote }[] = []
 
   segmented.forEach(({ candidate, segments }, i) => {
     const result = round1Results[i]!
@@ -260,10 +291,10 @@ export async function quoteCandidates(args: QuoteCandidatesArgs): Promise<QuoteC
     if (segments.length === 1) {
       attempted++
       succeeded++
-      quoted.push({ route: candidate, quote: { amountIn, amountOut: result, intermediateAmounts: [] } })
+      quoted.push({ route: candidate, quote: routeQuote(amountIn, [], [result]) })
       return
     }
-    pendingRound2.push({ candidate, segments, round1Output: result })
+    pendingRound2.push({ candidate, segments, round1: result })
   })
 
   if (pendingRound2.length === 0)
@@ -273,9 +304,9 @@ export async function quoteCandidates(args: QuoteCandidatesArgs): Promise<QuoteC
 
   const round2Results = await runQuoteRound({
     client,
-    calls: pendingRound2.map(({ segments, round1Output }) => {
+    calls: pendingRound2.map(({ segments, round1 }) => {
       const second = segments[1]!
-      return encodeOr(() => modules[second.protocol].encodeQuote(second.legs, round1Output, manifest))
+      return encodeOr(() => modules[second.protocol].encodeQuote(second.legs, round1.amountOut, manifest))
     }),
     blockNumber,
     semaphore,
@@ -283,7 +314,7 @@ export async function quoteCandidates(args: QuoteCandidatesArgs): Promise<QuoteC
     multicall3,
   })
 
-  pendingRound2.forEach(({ candidate, round1Output }, i) => {
+  pendingRound2.forEach(({ candidate, round1 }, i) => {
     const result = round2Results[i]!
     if (result instanceof AbortedCallError) return
     attempted++
@@ -298,7 +329,9 @@ export async function quoteCandidates(args: QuoteCandidatesArgs): Promise<QuoteC
       return
     }
     succeeded++
-    quoted.push({ route: candidate, quote: { amountIn, amountOut: result, intermediateAmounts: [round1Output] } })
+    // Two segments, so two quoter estimates to add up (and one v2 segment anywhere is what makes the
+    // route's estimate absent) — see `routeQuote`/`sumGasEstimates`.
+    quoted.push({ route: candidate, quote: routeQuote(amountIn, [round1.amountOut], [round1, result]) })
   })
 
   return { quoted, stats: { attempted, succeeded, failed, transportFailed }, transportFailures, amountIndependentFailures }
@@ -442,7 +475,7 @@ export async function probeQuotes(args: ProbeQuotesArgs): Promise<QuoteCandidate
       return
     }
     succeeded++
-    quoted.push({ route: probe.candidate, quote: { amountIn, amountOut: result, intermediateAmounts: [] } })
+    quoted.push({ route: probe.candidate, quote: routeQuote(amountIn, [], [result]) })
   })
 
   return { quoted, stats: { attempted, succeeded, failed, transportFailed }, transportFailures, amountIndependentFailures }

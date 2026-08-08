@@ -213,6 +213,46 @@ describe('result rendering', () => {
     expect(() => assertResultCoherent(result)).not.toThrow()
   })
 
+  it('prints the quoter gas figure, dimmed and rounded, on the best line and on alternatives', () => {
+    const result: QuoteResult = {
+      status: 'quote',
+      best: {
+        route: { legs: [{ pool: V3_POOL, currencyIn: 'native', currencyOut: USDC }] },
+        quote: { amountIn: 10n ** 18n, amountOut: 3_912_401_234n, intermediateAmounts: [], gasEstimate: 186_412n },
+      },
+      search: REPORT,
+      alternatives: [
+        {
+          route: { legs: [{ pool: V3_POOL, currencyIn: 'native', currencyOut: USDC }] },
+          quote: { amountIn: 10n ** 18n, amountOut: 3_900_000_000n, intermediateAmounts: [], gasEstimate: 1_250_000n },
+        },
+        // No estimate at all (a v2 route): the line must simply not carry the note — never `~0 gas`,
+        // never `~undefined gas`.
+        {
+          route: { legs: [{ pool: V3_POOL, currencyIn: 'native', currencyOut: USDC }] },
+          quote: { amountIn: 10n ** 18n, amountOut: 3_800_000_000n, intermediateAmounts: [] },
+        },
+      ],
+    }
+    const lines = renderQuoteResult(result, trade, CTX)
+    expect(lines[1]).toBe('  ETH ─(v3 0.05% 0xE055…939F)→ USDC ~186k gas')
+    expect(lines[3]).toBe('  3,900 USDC  ETH ─(v3 0.05% 0xE055…939F)→ USDC ~1.3M gas')
+    expect(lines[4]).toBe('  3,800 USDC  ETH ─(v3 0.05% 0xE055…939F)→ USDC')
+  })
+
+  it('says nothing about gas when the route carries no estimate', () => {
+    const result: QuoteResult = {
+      status: 'quote',
+      best: {
+        route: { legs: [{ pool: V3_POOL, currencyIn: 'native', currencyOut: USDC }] },
+        quote: { amountIn: 10n ** 18n, amountOut: 3_912_401_234n, intermediateAmounts: [] },
+      },
+      search: REPORT,
+      alternatives: [],
+    }
+    expect(renderQuoteResult(result, trade, CTX).join('\n')).not.toContain('gas')
+  })
+
   it('says nothing about promotion when the leader is simply the best-priced route', () => {
     const result: QuoteResult = {
       status: 'quote',

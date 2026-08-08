@@ -23,7 +23,8 @@
       ],
       "amountIn": "1000000000",
       "amountOut": "153",
-      "intermediateAmounts": []
+      "intermediateAmounts": [],
+      "gasEstimate": "146398"
     },
     "alternatives": [],
     "report": {

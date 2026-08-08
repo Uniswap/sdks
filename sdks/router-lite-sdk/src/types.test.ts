@@ -89,6 +89,21 @@ describe('domain types', () => {
     }
   })
 
+  test('a v2-only route may not report a gasEstimate — nothing measured one', () => {
+    // The v2 path is local constant-product arithmetic over `getReserves()` (`protocols/v2.ts`); no
+    // swap is simulated, so an estimate on such a route can only have been synthesized somewhere —
+    // and once it is on the object nothing distinguishes it from a real quoter reading.
+    const fabricated: QuoteResult = {
+      status: 'quote',
+      best: { ...QUOTED, quote: { ...QUOTED.quote, gasEstimate: 120_000n } },
+      alternatives: [],
+      search: emptyReport(),
+    }
+    expect(() => assertResultCoherent(fabricated)).toThrow(/v2-only route reports gasEstimate/)
+    // The same route with no estimate is the honest shape, and passes.
+    expect(() => assertResultCoherent({ ...fabricated, best: QUOTED })).not.toThrow()
+  })
+
   test('a SWAP that found nothing still may list what verification demoted', () => {
     // The other side of the same seam, and why the check reads the route shape rather than the
     // status: `verifyLeader` walks the ranked list and demotes every candidate the chain rejected,

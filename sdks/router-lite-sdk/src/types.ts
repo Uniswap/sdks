@@ -115,6 +115,58 @@ export type RouteQuote = {
   amountIn: bigint
   amountOut: bigint
   intermediateAmounts: bigint[] // realized per-leg outputs (chained quoting)
+  /**
+   * The quoter's own gas figure for this route, when the chain reported one — REPORTED, NEVER
+   * RANKED, and NEVER a transaction gas limit.
+   *
+   * WHERE IT COMES FROM. QuoterV2 (`quoteExactInput` → `(amountOut, …, gasEstimate)`) and V4Quoter
+   * (`quoteExactInput` → `(amountOut, gasEstimate)`) each return a gas word alongside the amount,
+   * measured by the quoter as `gasBefore - gasleft()` around the swap it simulated. This package
+   * decoded and discarded it until now; here it is, unmodified.
+   *
+   * WHEN IT IS ABSENT — and absence is a fact, not a gap:
+   *  - v2 routes NEVER carry one. A v2 quote is local constant-product math over `getReserves()`
+   *    (`protocols/v2.ts#getAmountOut`); no swap is simulated anywhere, so there is no measurement
+   *    to report and inventing one would be a guess dressed as a reading.
+   *  - A route quoted in two rounds (a protocol boundary, or two solo v2 legs — see
+   *    `quote/quote.ts`'s segmentation header) carries the SUM of its segments' estimates, and only
+   *    when EVERY segment reported one. One v2 segment anywhere therefore makes the whole route's
+   *    estimate absent, rather than reporting a partial sum that silently under-counts a leg. The
+   *    sum is defensible because the segments really are separate on-chain swaps under the
+   *    Universal Router too — what it omits is the same thing a single-segment estimate omits (see
+   *    below), plus the router's own hop-to-hop custody, not a whole leg's swap cost.
+   *  - A route the quoter priced but whose response predates this field (an old recorded session,
+   *    a hand-built `QuotedRoute`) simply has no key.
+   *
+   * WHAT IT IS NOT. It is not a gas limit and must not be used as one: it covers the swap inside
+   * the quoter and nothing else — no 21k intrinsic, no calldata cost, no Permit2 pull, no Universal
+   * Router dispatch/custody/wrapping, no token-specific transfer quirks. The real number for a
+   * transaction comes from preflight/`eth_estimateGas` against the encoded `tx` at execution time
+   * (`verify/preflight.ts`), which is what `SwapResult`'s verification already does.
+   *
+   * IT IS ALSO ENVELOPE-DEPENDENT — the same route at the same block yields DIFFERENT values
+   * depending on what else the call that carried it had already touched, because `gasleft()`
+   * accounting includes EIP-2929 cold/warm state-access costs and this package aggregates quoting
+   * rounds through Multicall3 (`internal/multicall.ts`). Measured live on mainnet at block
+   * 25,707,079, one route quoted four ways:
+   *
+   *   v3 WETH→USDC 0.05%:  90,012 direct `eth_call`  ·  90,012 alone inside `aggregate3`
+   *                        90,012 aggregated behind unrelated calls
+   *                        83,512 aggregated behind ANOTHER call to the same pool  (−6,500, −7.2%)
+   *   v4 ETH→USDC 0.05%:   43,222 direct  ·  43,222 alone  ·  40,722 behind the same pool (−2,500, −5.8%)
+   *
+   * The deltas are exactly the EIP-2929 warm/cold deltas (2,600→100 per account, 2,100→100 per
+   * slot) for state an earlier inner call already warmed; `amountOut` was byte-identical in every
+   * envelope. So: treat it as an APPROXIMATE figure good for RELATIVE comparison between routes
+   * priced in the same round and for display (the CLI prints `~90k gas`), with a few percent of
+   * envelope noise — never as an absolute cost, and never as a number to send a transaction with.
+   *
+   * NOTHING IN THIS PACKAGE RANKS ON IT. `rankRoutes` (`quote/quote.ts`) orders by `amountOut` and
+   * its tie-breakers alone; a route with no estimate is never disadvantaged, and a cheaper-gas route
+   * is never promoted. Gas-aware ranking would need a gas PRICE and an output-token price to be
+   * meaningful, both of which are the caller's to know.
+   */
+  gasEstimate?: bigint
 }
 
 export type QuotedRoute = {
@@ -176,7 +228,16 @@ export type Permit2PermitSingle = {
 
 export type EthCall = { to: Address; data: Hex; value?: bigint; from?: Address }
 
-export type QuoteCall = { call: EthCall; decode(returnData: Hex): bigint }
+/**
+ * What one quote call's return data decodes to: the amount, plus the quoter's own gas figure when
+ * the protocol's quoter reports one (v3/v4 do; v2's local reserve math does not — see
+ * {@link RouteQuote.gasEstimate}). A `decode` that cannot produce an amount THROWS, exactly as
+ * before this shape carried two fields — a failed decode is the pool-absent/reverted signal
+ * `quote/quote.ts` accounts for, never a `{ amountOut: 0n }`.
+ */
+export type DecodedQuote = { amountOut: bigint; gasEstimate?: bigint }
+
+export type QuoteCall = { call: EthCall; decode(returnData: Hex): DecodedQuote }
 
 export type LogQuery = { address: Address; topics: (Hex | null)[] }
 

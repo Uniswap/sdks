@@ -41,6 +41,10 @@ import { assertResultCoherent } from '../src/internal/testing'
 //   # re-record EVERY session (drives `chainz exec <chainId>` per session):
 //   bun scripts/recordSession.ts --all
 //
+//   # rebuild every session's GOLDEN from the bytes already recorded — NO
+//   # network, no RPC URL, no chainz (see `regoldAll` below):
+//   bun scripts/recordSession.ts --regold
+//
 // HOW A SESSION BECOMES A FIXED POINT OF THE HERMETIC PATH. A live run and a
 // replay can quote slightly different candidate SETS (the 5s interleave timer
 // fires against real network latency and is quiescent against a map), so:
@@ -69,10 +73,11 @@ type Args = {
   amountIn?: string
   notes?: string
   all: boolean
+  regold: boolean
 }
 
 function parseArgs(argv: string[]): Args {
-  const args: Args = { all: false }
+  const args: Args = { all: false, regold: false }
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i]!
     const next = (): string => {
@@ -104,6 +109,9 @@ function parseArgs(argv: string[]): Args {
         break
       case '--all':
         args.all = true
+        break
+      case '--regold':
+        args.regold = true
         break
       default:
         throw new Error(`unknown flag ${flag}`)
@@ -266,6 +274,11 @@ async function recordOne(args: Args): Promise<void> {
     console.log(`[record:${label}]   info: ${unrequested.length} recorded-but-unrequested key(s) under strict replay (live-only interleave quotes; harmless)`)
   }
 
+  writeSession(label, session)
+}
+
+/** Writes a session to disk (gzipped past {@link GZIP_THRESHOLD_BYTES}), removing the other form. */
+function writeSession(label: string, session: RecordedSession): void {
   mkdirSync(SESSIONS_DIR, { recursive: true })
   const { json, gz } = sessionPath(label)
   const body = JSON.stringify(session, null, 2)
@@ -299,8 +312,49 @@ async function recordAll(): Promise<void> {
   }
 }
 
+/**
+ * Rebuilds every session's GOLDEN from the conversation already on disk — the update path for a
+ * change to what `canonicalizeResult` REPORTS, as opposed to a change to what the search asks the
+ * chain.
+ *
+ * NO NETWORK, BY CONSTRUCTION: it runs the same strict replay `replay.golden.test.ts` runs, twice,
+ * against the recorded entries, and refuses to write if the two disagree — the identical determinism
+ * proof `recordOne` makes before committing a fresh recording. Re-recording for a reporting change
+ * would be strictly worse: it would move every amount in every golden (the chain has moved on) and
+ * bury the one field that actually changed in a diff of thousands of unrelated lines, while
+ * spending real RPC to learn nothing new.
+ *
+ * A session whose golden does NOT change is left byte-identical on disk.
+ */
+async function regoldAll(): Promise<void> {
+  const files = readdirSync(SESSIONS_DIR).filter((f) => f.endsWith('.json') || f.endsWith('.json.gz'))
+  if (files.length === 0) throw new Error(`no sessions found in ${SESSIONS_DIR}`)
+  let changed = 0
+  for (const file of files) {
+    const label = file.replace(/\.json(\.gz)?$/, '')
+    const session = loadExistingSession(label)
+    if (!session) continue
+    const first = await strictReplay(session)
+    const second = await strictReplay(session)
+    const golden = canonicalizeResult(first.result)
+    if (JSON.stringify(golden) !== JSON.stringify(canonicalizeResult(second.result))) {
+      throw new Error(`[regold:${label}] two strict replays disagreed — not writing`)
+    }
+    if (JSON.stringify(golden) === JSON.stringify(session.golden)) {
+      console.log(`[regold:${label}] unchanged`)
+      continue
+    }
+    session.golden = golden
+    writeSession(label, session)
+    changed++
+  }
+  console.log(`\n[regold] ${changed} of ${files.length} session golden(s) updated (no RPC was used)`)
+}
+
 const args = parseArgs(process.argv.slice(2))
-if (args.all) {
+if (args.regold) {
+  await regoldAll()
+} else if (args.all) {
   await recordAll()
 } else {
   await recordOne(args)

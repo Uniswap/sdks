@@ -483,10 +483,26 @@ describe.skipIf(!RUN)('adversarial worlds (fork)', () => {
     })
     expect(typeof openSlot).toBe('string')
     const aggOut = quote.decode(openSlot as Hex)
-    expect(directOut).toBeGreaterThan(0n)
-    expect(aggOut).toBe(directOut)
+    expect(directOut.amountOut).toBeGreaterThan(0n)
+    expect(aggOut.amountOut).toBe(directOut.amountOut)
     const zeroForOne = getAddress(ref.poolKey.currency0) === getAddress(recIn)
-    expect(await quoteDirect(ref.poolKey, zeroForOne, ONE)).toBe(directOut)
+    expect(await quoteDirect(ref.poolKey, zeroForOne, ONE)).toBe(directOut.amountOut)
+
+    // THE AMOUNT IS EXACT ACROSS ENVELOPES; THE GAS WORD IS NOT, AND THIS IS WHERE THAT IS WRITTEN
+    // DOWN. `gasEstimate` is `gasBefore - gasleft()` measured INSIDE the quoter, so it inherits the
+    // call context's EIP-2929 cold/warm state-access accounting: the same route at the same block
+    // reads differently depending on what the carrying call already touched. Measured live on
+    // mainnet (block 25,707,079): identical direct vs. aggregated when nothing overlapped, and
+    // −6,500 gas (−7.2%, v3 WETH/USDC 0.05%) / −2,500 (−5.8%, v4 ETH/USDC) when an earlier inner
+    // call in the same aggregate3 had already warmed the pool. So this asserts a TOLERANCE, not
+    // equality — 25% is far above every divergence observed and still far below "a different
+    // route's cost", which is the only thing a regression here could plausibly mean. See
+    // `RouteQuote.gasEstimate`; the number is for display and relative comparison, never for a
+    // transaction's gas limit.
+    expect(directOut.gasEstimate).toBeGreaterThan(0n)
+    expect(aggOut.gasEstimate).toBeGreaterThan(0n)
+    const drift = Number(aggOut.gasEstimate! - directOut.gasEstimate!) / Number(directOut.gasEstimate!)
+    expect(Math.abs(drift)).toBeLessThan(0.25)
   }, 300_000)
 
   // -------------------------------------------------------------------------

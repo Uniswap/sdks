@@ -21,7 +21,8 @@
       ],
       "amountIn": "10000000000",
       "amountOut": "15374200",
-      "intermediateAmounts": []
+      "intermediateAmounts": [],
+      "gasEstimate": "64738"
     },
     "alternatives": [
       {
@@ -35,7 +36,8 @@
         ],
         "amountIn": "10000000000",
         "amountOut": "15369323",
-        "intermediateAmounts": []
+        "intermediateAmounts": [],
+        "gasEstimate": "98239"
       },
       {
         "routeId": "v4:0xb98437c7ba28c6590dd4e1cc46aa89eed181f97108e5b6221730d41347bc817f",
@@ -48,7 +50,8 @@
         ],
         "amountIn": "10000000000",
         "amountOut": "15366909",
-        "intermediateAmounts": []
+        "intermediateAmounts": [],
+        "gasEstimate": "40711"
       },
       {
         "routeId": "v3:0x9a772018fbd77fcd2d25657e5c547baff3fd7d16",
@@ -61,7 +64,8 @@
         ],
         "amountIn": "10000000000",
         "amountOut": "15293533",
-        "intermediateAmounts": []
+        "intermediateAmounts": [],
+        "gasEstimate": "175081"
       },
       {
         "routeId": "v2:0x004375dff511095cc5a197a54140a24efef3a416",
@@ -87,7 +91,8 @@
         ],
         "amountIn": "10000000000",
         "amountOut": "12261816",
-        "intermediateAmounts": []
+        "intermediateAmounts": [],
+        "gasEstimate": "223596"
       },
       {
         "routeId": "v3:0x026babd2ae9379525030fc2574e39bc156c10583",
@@ -100,7 +105,8 @@
         ],
         "amountIn": "10000000000",
         "amountOut": "15023",
-        "intermediateAmounts": []
+        "intermediateAmounts": [],
+        "gasEstimate": "4473396"
       }
     ],
     "report": {

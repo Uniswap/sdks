@@ -16,7 +16,7 @@ import { RouterConfigError, UnsupportedRouteError } from '../errors'
 import { QUOTER_V2_ABI, V3_FACTORY_ABI } from '../internal/abis'
 import { sortAddresses } from '../internal/currency'
 import { narrowTopics } from '../internal/logScan'
-import type { ChainManifest, CurrencyRef, EthCall, ExecutionOperation, LogQuery, RouteLeg } from '../types'
+import type { ChainManifest, CurrencyRef, DecodedQuote, EthCall, ExecutionOperation, LogQuery, RouteLeg } from '../types'
 
 import { v3PoolRef } from './poolRef'
 import type { ProtocolModule, QuoteProbe } from './types'
@@ -137,9 +137,12 @@ function resolveLegToken(currencyIn: CurrencyRef, wrappedNative: Address): Addre
 function quoterQuote(quoter: Address, path: Hex, amountIn: bigint): QuoteProbe['quote'] {
   return {
     call: { to: quoter, data: encodeFunctionData({ abi: QUOTER_V2_ABI, functionName: 'quoteExactInput', args: [path, amountIn] }) },
-    decode(returnData: Hex): bigint {
+    decode(returnData: Hex): DecodedQuote {
       const result = decodeFunctionResult({ abi: QUOTER_V2_ABI, functionName: 'quoteExactInput', data: returnData })
-      return result[0]
+      // `result[3]` is QuoterV2's own `gasEstimate` word — reported verbatim, never used to rank.
+      // See `RouteQuote.gasEstimate` for what it does and does not measure (and for why it moves
+      // between call envelopes).
+      return { amountOut: result[0], gasEstimate: result[3] }
     },
   }
 }

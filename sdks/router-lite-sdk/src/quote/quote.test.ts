@@ -63,12 +63,12 @@ function entryFor(call: EthCall, value: StubEntry): Record<string, StubEntry> {
 const V4_QUOTER_RETURN_TYPES = [{ type: 'uint256' }, { type: 'uint256' }] as const
 const QUOTER_V2_RETURN_TYPES = [{ type: 'uint256' }, { type: 'uint160[]' }, { type: 'uint32[]' }, { type: 'uint256' }] as const
 
-function v4Return(amountOut: bigint): Hex {
-  return encodeAbiParameters(V4_QUOTER_RETURN_TYPES, [amountOut, 0n])
+function v4Return(amountOut: bigint, gasEstimate = 0n): Hex {
+  return encodeAbiParameters(V4_QUOTER_RETURN_TYPES, [amountOut, gasEstimate])
 }
 
-function v3Return(amountOut: bigint): Hex {
-  return encodeAbiParameters(QUOTER_V2_RETURN_TYPES, [amountOut, [], [], 0n])
+function v3Return(amountOut: bigint, gasEstimate = 0n): Hex {
+  return encodeAbiParameters(QUOTER_V2_RETURN_TYPES, [amountOut, [], [], gasEstimate])
 }
 
 function v2Return(reserveIn: bigint, reserveOut: bigint, zeroForOne: boolean): Hex {
@@ -179,6 +179,92 @@ test('v2+v2 two-hop chains through two solo segments (v2 legs never batch)', asy
   expect(quoted).toHaveLength(1)
   expect(quoted[0]!.quote.intermediateAmounts).toHaveLength(1) // one segment boundary (leg1 -> leg2)
   expect(stats).toEqual({ attempted: 1, succeeded: 1, failed: 0, transportFailed: 0 })
+})
+
+// ---------------------------------------------------------------------------
+// gasEstimate — reported off the quoter's own return word, never ranked on.
+// See `RouteQuote.gasEstimate` for the semantics these four tests pin.
+// ---------------------------------------------------------------------------
+
+test('a v3 quote carries QuoterV2\'s own gasEstimate word', async () => {
+  const call = v3Module.encodeQuote([v3Leg], 100n, manifest).call
+  const client = stubClient(entryFor(call, v3Return(900n, 186_412n)))
+  const { quoted } = await quoteCandidates({
+    client,
+    modules,
+    manifest,
+    candidates: [{ legs: [v3Leg] }],
+    amountIn: 100n,
+    blockNumber: 1n,
+  })
+  expect(quoted[0]!.quote).toEqual({ amountIn: 100n, amountOut: 900n, intermediateAmounts: [], gasEstimate: 186_412n })
+})
+
+test('a v4 quote carries V4Quoter\'s own gasEstimate word', async () => {
+  const call = v4Module.encodeQuote([v4Leg], 100n, manifest).call
+  const client = stubClient(entryFor(call, v4Return(500n, 43_222n)))
+  const { quoted } = await quoteCandidates({
+    client,
+    modules,
+    manifest,
+    candidates: [{ legs: [v4Leg] }],
+    amountIn: 100n,
+    blockNumber: 1n,
+  })
+  expect(quoted[0]!.quote.gasEstimate).toBe(43_222n)
+})
+
+test('a v2 quote carries NO gasEstimate — local reserve math measured nothing', async () => {
+  const [probe] = v2Module.speculativeDirect(USDC, WETH, 10n ** 6n, manifest)
+  const client = stubClient(entryFor(probe!.quote.call, v2Return(2_000_000n * 10n ** 6n, 1_000n * 10n ** 18n, true)))
+  const { quoted } = await probeQuotes({ client, probes: [probe!], amountIn: 10n ** 6n, blockNumber: 1n })
+  expect(quoted[0]!.quote.amountOut).toBeGreaterThan(0n)
+  expect(quoted[0]!.quote.gasEstimate).toBeUndefined()
+  expect('gasEstimate' in quoted[0]!.quote).toBe(false) // absent, not an explicit `undefined`
+})
+
+test('a two-segment route SUMS its segments\' estimates when both quoters reported one', async () => {
+  const round1Call = v4Module.encodeQuote([v4Leg], 100n, manifest).call
+  const round2Call = v3Module.encodeQuote([v3Leg], 500n, manifest).call
+  const client = stubClient({
+    ...entryFor(round1Call, v4Return(500n, 43_000n)),
+    ...entryFor(round2Call, v3Return(900n, 90_000n)),
+  })
+  const { quoted } = await quoteCandidates({
+    client,
+    modules,
+    manifest,
+    candidates: [mixedV4toV3],
+    amountIn: 100n,
+    blockNumber: 1n,
+  })
+  // Both legs really do swap on-chain, so the route's cost is both — reporting only round 2's would
+  // under-count by a whole leg.
+  expect(quoted[0]!.quote.gasEstimate).toBe(133_000n)
+})
+
+test('a two-segment route with a v2 segment reports NO estimate at all, not a partial sum', async () => {
+  // v2 (USDC -> WETH) into v3 (WETH -> DAI): the v3 half measured 90k, the v2 half measured nothing.
+  // 90k would be a number that looks like the route's cost and is not.
+  const [probe] = v2Module.speculativeDirect(USDC, WETH, 1_000n, manifest)
+  const v2Leg = probe!.candidate.legs[0]!
+  const round1Call = v2Module.encodeQuote([v2Leg], 1_000n, manifest).call
+  const client = stubClient({
+    ...entryFor(round1Call, v2Return(2_000_000n, 1_000_000n, true)),
+    // The v2 leg's realized output feeds round 2; recompute it the way the engine will.
+    ...entryFor(v3Module.encodeQuote([v3Leg], 498n, manifest).call, v3Return(900n, 90_000n)),
+  })
+  const { quoted } = await quoteCandidates({
+    client,
+    modules,
+    manifest,
+    candidates: [{ legs: [v2Leg, v3Leg] }],
+    amountIn: 1_000n,
+    blockNumber: 1n,
+  })
+  expect(quoted).toHaveLength(1)
+  expect(quoted[0]!.quote.amountOut).toBe(900n)
+  expect(quoted[0]!.quote.gasEstimate).toBeUndefined()
 })
 
 test('abort between rounds drops pending round-2 candidates without counting them', async () => {
@@ -421,6 +507,23 @@ test('simplicity margin: hooked route must beat simple by >5bps', () => {
   const notPromoted = rankRoutes([hookedRoute(10_010n), simpleRoute(10_000n)])
   expect(notPromoted[0]!.quote.amountOut).toBe(10_010n)
   expect((notPromoted[0] as RankedRoute).promotedOverComplex).toBeUndefined()
+})
+
+test('rankRoutes ignores gasEstimate entirely — it reports gas, it never ranks on it', () => {
+  // Same amountOut, wildly different gas: the tie must break on `compareRoutes`' declared
+  // tie-breakers (transitions, hops, routeId) and be INDIFFERENT to which route is cheaper to run.
+  // A gas-aware ranking would need a gas price and an output-token price, neither of which this
+  // package has any business inventing.
+  const cheap = { ...simpleRoute(10_000n), quote: { ...simpleRoute(10_000n).quote, gasEstimate: 40_000n } }
+  const dear = { ...hookedRoute(10_000n), quote: { ...hookedRoute(10_000n).quote, gasEstimate: 900_000n } }
+  const withGas = rankRoutes([dear, cheap]).map((r) => r.quote.amountOut)
+  const withoutGas = rankRoutes([hookedRoute(10_000n), simpleRoute(10_000n)]).map((r) => r.quote.amountOut)
+  expect(withGas).toEqual(withoutGas)
+  // And the reverse input order lands the same way, so the assertion above is not just stability.
+  expect(rankRoutes([cheap, dear]).map((r) => r.quote.gasEstimate)).toEqual(rankRoutes([dear, cheap]).map((r) => r.quote.gasEstimate))
+  // A route with a HIGHER amountOut and worse gas still leads: amountOut is the only price axis.
+  const richButDear = { ...simpleRoute(10_100n), quote: { ...simpleRoute(10_100n).quote, gasEstimate: 2_000_000n } }
+  expect(rankRoutes([cheap, richButDear])[0]!.quote.amountOut).toBe(10_100n)
 })
 
 test('rankRoutes is idempotent: re-ranking its own output never carries a stale promotion marker', () => {

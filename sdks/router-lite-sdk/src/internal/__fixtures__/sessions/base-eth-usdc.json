@@ -21,7 +21,8 @@
       ],
       "amountIn": "1000000000000000000",
       "amountOut": "1913427845",
-      "intermediateAmounts": []
+      "intermediateAmounts": [],
+      "gasEstimate": "135288"
     },
     "alternatives": [
       {
@@ -35,7 +36,8 @@
         ],
         "amountIn": "1000000000000000000",
         "amountOut": "1913232342",
-        "intermediateAmounts": []
+        "intermediateAmounts": [],
+        "gasEstimate": "111597"
       },
       {
         "routeId": "v4:0x96d4b53a38337a5733179751781178a2613306063c511b78cd02684739288c0a",
@@ -48,7 +50,8 @@
         ],
         "amountIn": "1000000000000000000",
         "amountOut": "1910157766",
-        "intermediateAmounts": []
+        "intermediateAmounts": [],
+        "gasEstimate": "78479"
       },
       {
         "routeId": "v3:0x6c561b446416e1a00e8e93e221854d6ea4171372",
@@ -61,7 +64,8 @@
         ],
         "amountIn": "1000000000000000000",
         "amountOut": "1910067811",
-        "intermediateAmounts": []
+        "intermediateAmounts": [],
+        "gasEstimate": "72924"
       },
       {
         "routeId": "v4:0xe070797535b13431808f8fc81fdbe7b41362960ed0b55bc2b6117c49c51b7eb9",
@@ -74,7 +78,8 @@
         ],
         "amountIn": "1000000000000000000",
         "amountOut": "1908762107",
-        "intermediateAmounts": []
+        "intermediateAmounts": [],
+        "gasEstimate": "40662"
       },
       {
         "routeId": "v2:0x88a43bbdf9d098eec7bceda4e2494615dfd9bb9c",
@@ -100,7 +105,8 @@
         ],
         "amountIn": "1000000000000000000",
         "amountOut": "1901145355",
-        "intermediateAmounts": []
+        "intermediateAmounts": [],
+        "gasEstimate": "81495"
       },
       {
         "routeId": "v4:0xa7d23af8df40bfaa36d3635aa84475d53f635b1fdf42a99d3cd40bad59190100",
@@ -113,7 +119,8 @@
         ],
         "amountIn": "1000000000000000000",
         "amountOut": "1730594875",
-        "intermediateAmounts": []
+        "intermediateAmounts": [],
+        "gasEstimate": "78639"
       },
       {
         "routeId": "v4:0xe87077fd043c1a6afa5256104acb1d1eb5ca5bc031ee57f9d96c8172ead4bef8",
@@ -126,7 +133,8 @@
         ],
         "amountIn": "1000000000000000000",
         "amountOut": "99942837",
-        "intermediateAmounts": []
+        "intermediateAmounts": [],
+        "gasEstimate": "1700233"
       }
     ],
     "report": {
