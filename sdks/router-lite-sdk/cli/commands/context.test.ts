@@ -1,19 +1,25 @@
 import { readdirSync, readFileSync } from 'node:fs'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 
+import { manifestFor } from '../../src/index'
 import type { ParsedArgs } from '../args'
+import { flushCacheSave } from '../cache'
+import { buildEnvelope, parsePoolList, PoolListError, serializeEnvelope } from '../poolList'
+import { MAINNET, publishedListText, USDC, WETH } from '../testing'
 
 import { buildChainContext, startBudget } from './context'
 
 // ---------------------------------------------------------------------------
-// `buildChainContext` — the three things it decides that nothing else can.
+// `buildChainContext` — the things it decides that nothing else can.
 //
 // Everything else in this file's subject is plumbing (resolve a URL, pick a
 // manifest, hand a `PoolIndex` to `createRouter`) and is covered where it
-// lives. These three are not:
+// lives. These are not:
 //
 //   1. HOW `--budget`'s clock is BUILT, and WHEN IT STARTS. The signal has to
 //      fire while a loop saturated with network I/O is the only thing running,
@@ -27,6 +33,11 @@ import { buildChainContext, startBudget } from './context'
 //   3. THAT THE TRANSPORT DOES NOT BATCH. Measured at 6.1x on quicknode Base,
 //      and invisible to every other test in this repo because the SDK is handed
 //      a client rather than building one.
+//   4. WHERE `--pool-list` LANDS, and what a rejected one costs. `poolList.test.ts`
+//      owns what a list is; only here is it visible that the list reaches the
+//      index the ROUTER is built with, that a bad one travels as the class
+//      `rl.ts` turns into exit 4, and that the cache save this function
+//      registers sees the merged result.
 //
 // The whole file runs against a stubbed `globalThis.fetch`, so nothing here
 // touches a network, and the budgets are milliseconds rather than seconds.
@@ -270,6 +281,146 @@ describe('the router the CLI builds', () => {
     // ...and a legal value builds a router. 40 is the measured-better setting on a keyed mainnet
     // endpoint; the DEFAULT is still the SDK's 20, which is what an absent flag leaves in place.
     expect((await buildChainContext(withConcurrency('40'))).router).toBeDefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 1c. `--pool-list`, at the seam rather than at the unit.
+//
+// `poolList.test.ts` owns what a list IS — curation, the envelope, the trust
+// tiers, hydration into a bare index. What is only visible HERE is the wiring:
+// that `buildChainContext` puts the list into the index the ROUTER gets, that
+// the trust decision reaches a terminal, that a rejected list travels as the
+// class `rl.ts` maps to exit 4 (and not as one of the classes it maps to 3),
+// and that the cache save registered by this same function sees the merged
+// result rather than whatever the cache alone restored.
+// ---------------------------------------------------------------------------
+
+describe('--pool-list, wired into the run', () => {
+  let dir: string
+  const realError = console.error
+  const savedXdg = process.env.XDG_CACHE_HOME
+
+  /** Every `console.error` line the run produced — the CLI's whole non-machine channel. */
+  let stderr: string[]
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'rl-ctx-poollist-'))
+    stderr = []
+    console.error = (...parts: unknown[]): void => {
+      stderr.push(parts.map(String).join(' '))
+    }
+  })
+  afterEach(async () => {
+    console.error = realError
+    if (savedXdg === undefined) delete process.env.XDG_CACHE_HOME
+    else process.env.XDG_CACHE_HOME = savedXdg
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  async function listAt(name: string, text: string): Promise<string> {
+    const path = join(dir, name)
+    await writeFile(path, text, 'utf8')
+    return path
+  }
+
+  /** `args()` plus `--pool-list <path>`, and optionally `--trust-coverage` / the cache left ON. */
+  function withList(path: string, opts: { trust?: boolean; cache?: boolean } = {}): ParsedArgs {
+    const parsed = args()
+    parsed.strings.set('pool-list', path)
+    if (opts.trust === true) parsed.booleans.add('trust-coverage')
+    if (opts.cache === true) parsed.booleans.delete('no-cache')
+    return parsed
+  }
+
+  test('merges the list into the index the router is built with, and says so on stderr', async () => {
+    stubFetch(chainIdThen('0x1'))
+    const ctx = await buildChainContext(withList(await listAt('1.poollist.json', publishedListText())))
+
+    // The pools are IN THE RUN'S INDEX — not in some parsed object the router never sees.
+    expect(ctx.index.stats().pools).toBe(4)
+    expect(ctx.index.pair(USDC, WETH).map((r) => r.pool.id)).toHaveLength(1)
+    // ...and the load is announced unconditionally (no --verbose here), because a run whose index
+    // came from somewhere the user cannot see is a run they cannot reason about.
+    expect(stderr.filter((l) => l.includes('pool-list:'))).toHaveLength(1)
+    expect(stderr.join('\n')).toMatch(/pool-list: 4 pools \(4 new\).*as of block 20900000/)
+  })
+
+  test('DISCARDS the list’s coverage by default — the flag is the whole trust decision', async () => {
+    stubFetch(chainIdThen('0x1'))
+    const ctx = await buildChainContext(withList(await listAt('1.poollist.json', publishedListText())))
+
+    expect(ctx.index.stats().coverageScopes).toBe(0)
+    // The consumer therefore still scans the whole history: a Tier B list can only make it find MORE
+    // than the list knew, never less.
+    expect(ctx.index.uncovered('v2', WETH, 10_000_835n, 21_000_000n)).toEqual([
+      { fromBlock: 10_000_835n, toBlock: 21_000_000n },
+    ])
+    expect(stderr.join('\n')).toMatch(/coverage scopes discarded \(pass --trust-coverage to adopt\)/)
+  })
+
+  test('--trust-coverage adopts it, and the line names the tier it adopted', async () => {
+    stubFetch(chainIdThen('0x1'))
+    const ctx = await buildChainContext(withList(await listAt('1.poollist.json', publishedListText()), { trust: true }))
+
+    expect(ctx.index.stats().coverageScopes).toBeGreaterThan(0)
+    expect(ctx.index.enabledFees('v3', MAINNET.v3!.factory)).toEqual([100, 500, 3000, 10_000])
+    expect(stderr.join('\n')).toMatch(/coverage scopes ADOPTED \(--trust-coverage\)/)
+  })
+
+  // -------------------------------------------------------------------------
+  // THE EXIT-4 PATHS, asserted as the CLASS rather than as a message: `rl.ts`
+  // dispatches on `instanceof PoolListError` for exit 4, and on `UsageError`
+  // for exit 3. A rejected list that arrived as a `UsageError` would tell a
+  // script to fix its arguments — the arguments were right, the FILE was
+  // wrong — and one that arrived as anything else would print a stack.
+  // -------------------------------------------------------------------------
+
+  const rejections: [string, () => Promise<string>, RegExp][] = [
+    [
+      'a body that does not hash to the envelope’s claim',
+      async () => publishedListText().replace('"pools"', '"poolz"'),
+      /integrity check FAILED/,
+    ],
+    [
+      'a list built for a different chain',
+      async () => serializeEnvelope(buildEnvelope({ chainId: 8453, manifest: MAINNET, body: parsePoolList(publishedListText()).body })),
+      /built for chain 8453, but this run resolved chain 1/,
+    ],
+    [
+      'a factory fingerprint that is not this manifest’s',
+      async () => {
+        const env = buildEnvelope({ chainId: 1, manifest: manifestFor(8453), body: parsePoolList(publishedListText()).body })
+        return serializeEnvelope(env)
+      },
+      /manifestFingerprint/,
+    ],
+  ]
+
+  for (const [what, text, message] of rejections) {
+    test(`refuses ${what} — as a PoolListError (exit 4), never a UsageError (exit 3)`, async () => {
+      stubFetch(chainIdThen('0x1'))
+      const failing = buildChainContext(withList(await listAt('1.poollist.json', await text())))
+
+      await expect(failing).rejects.toBeInstanceOf(PoolListError)
+      await expect(failing).rejects.toThrow(message)
+    })
+  }
+
+  test('the cache save sees the MERGED index, not just what the cache restored', async () => {
+    // The property the registration order exists for. `scheduleCacheSave` closes over the index and
+    // is registered after the list is applied, so what `rl.ts` flushes on exit is everything this
+    // run assembled — a list loaded once is a list the next cold run already has.
+    process.env.XDG_CACHE_HOME = dir
+    stubFetch(chainIdThen('0x1'))
+
+    const ctx = await buildChainContext(withList(await listAt('1.poollist.json', publishedListText()), { cache: true }))
+    expect(ctx.index.stats().pools).toBe(4)
+
+    await flushCacheSave()
+
+    const saved = JSON.parse(await readFile(join(dir, 'router-lite', '1.json'), 'utf8')) as { pools: unknown[] }
+    expect(saved.pools).toHaveLength(4)
   })
 })
 

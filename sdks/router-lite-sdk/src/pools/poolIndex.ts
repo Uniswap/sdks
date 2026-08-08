@@ -327,8 +327,17 @@ function assertPoolRefIdentity(pool: PoolRef): void {
  * deeper (that a `poolId` really hashes its `PoolKey`, say) would be re-deriving the chain, which is
  * what the snapshot exists to avoid, and would still not make the content trustworthy; see
  * {@link PoolIndex.fromSnapshot}'s note on where the trust boundary actually is.
+ *
+ * EXPORTED, BUT NOT ON THE PACKAGE SURFACE — `src/experimental/index.ts` deliberately does not
+ * re-export it, so no published entry point reaches it. It is exported so a host that must GATE an
+ * untrusted snapshot without RESTORING one can run the same gate `fromSnapshot` runs, rather than
+ * writing a second copy of it that would drift. `cli/poolList.ts#parsePoolList` is that host: it
+ * checks a stranger's list at the boundary and then merges the records into an index it already
+ * holds, so building a whole throwaway index just to reach this function meant materializing every
+ * pool twice. This function is the ONLY part of `fromSnapshot` that gates anything — everything
+ * after it is construction — which is exactly why splitting it out changes no boundary.
  */
-function assertSnapshotShape(snap: PoolIndexSnapshot): void {
+export function assertSnapshotShape(snap: PoolIndexSnapshot): void {
   if (typeof snap !== 'object' || snap === null) bad('not an object')
   if (snap.schemaVersion !== POOL_INDEX_SCHEMA_VERSION) {
     throw new RouterConfigError(

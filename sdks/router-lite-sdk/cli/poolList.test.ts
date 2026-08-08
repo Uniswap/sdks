@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { decodeFunctionData, encodeFunctionResult, pad, type Address, type Hex, type PublicClient } from 'viem'
 
-import { PoolIndex, serializeSnapshot, v2PoolRef, v3PoolRef, type PoolIndexSnapshot } from '../src/experimental/index'
+import { PoolIndex, serializeSnapshot, v2PoolRef, type PoolIndexSnapshot } from '../src/experimental/index'
 import { manifestFor, type ChainManifest, type PoolRecord } from '../src/index'
 import { MULTICALL3_ABI } from '../src/internal/abis'
 import { MULTICALL3_ADDRESS } from '../src/internal/multicall'
@@ -31,55 +31,20 @@ import {
   verifyPoolList,
   type PoolListEnvelope,
 } from './poolList'
-
-const WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2' as Address
-const USDC = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as Address
-const DAI = '0x6B175474E89094C44Da98b954EedeAC495271d0F' as Address
-const LONGTAIL = '0x1111111111111111111111111111111111111111' as Address
-
-const POOL_WETH_USDC = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc' as Address
-const POOL_WETH_DAI = '0xA478c2975Ab1Ea89e8196811F51A7B7Ade33eB11' as Address
-const POOL_WETH_LONGTAIL = '0xcccccccccccccccccccccccccccccccccccccccc' as Address
-const POOL_USDC_DAI = '0xdddddddddddddddddddddddddddddddddddddddd' as Address
-
-const MAINNET = manifestFor(1)
-
-/**
- * The publisher's-eye view: an index holding four pools across three scopes, one of which (the
- * long-tail adjacency) is exactly the kind of one-off scan curation is supposed to drop.
- */
-function sourceIndex(): PoolIndex {
-  const index = new PoolIndex(WETH)
-  index.upsert({ pool: v2PoolRef(POOL_WETH_USDC, USDC, WETH), source: 'event', createdAtBlock: 10_008_355n })
-  index.upsert({ pool: v3PoolRef(POOL_WETH_DAI, DAI, WETH, 3000), source: 'event', createdAtBlock: 12_400_000n })
-  index.upsert({ pool: v2PoolRef(POOL_WETH_LONGTAIL, LONGTAIL, WETH), source: 'event', createdAtBlock: 15_000_000n })
-  index.upsert({ pool: v2PoolRef(POOL_USDC_DAI, USDC, DAI), source: 'event', createdAtBlock: 11_000_000n })
-  // Adjacency coverage for two core intermediates, plus a pair scope, plus a long-tail scope.
-  index.addCoverage('v2', WETH, { fromBlock: 10_000_835n, toBlock: 21_000_000n })
-  index.addCoverage('v3', WETH, { fromBlock: 12_369_621n, toBlock: 21_000_000n })
-  index.addCoverage('v2', USDC, { fromBlock: 10_000_835n, toBlock: 20_900_000n })
-  index.addCoverage('v2', index.pairScope(USDC, DAI), { fromBlock: 10_000_835n, toBlock: 21_000_000n })
-  index.addCoverage('v2', LONGTAIL, { fromBlock: 15_000_000n, toBlock: 21_000_000n })
-  // The fee-discovery scan's own scope: keyed by FACTORY, not by a token endpoint, and holding no
-  // pools at all (a factory is never one of a pool's currencies).
-  index.addCoverage('v3', MAINNET.v3!.factory, { fromBlock: 12_369_621n, toBlock: 21_000_000n })
-  index.addEnabledFees('v3', MAINNET.v3!.factory, [100, 500, 3000, 10_000])
-  return index
-}
-
-function curated(): { body: PoolIndexSnapshot; claimed: string[] } {
-  const { body, stats } = curate(sourceIndex().toSnapshot(), {
-    coreIntermediates: MAINNET.coreIntermediates ?? [],
-    factories: [MAINNET.v2!.factory, MAINNET.v3!.factory, MAINNET.v4!.poolManager],
-    wrappedNative: MAINNET.wrappedNative,
-    topPairs: 25,
-  })
-  return { body, claimed: stats.claimedScopes }
-}
-
-function publishedText(): string {
-  return serializeEnvelope(buildEnvelope({ chainId: 1, manifest: MAINNET, body: curated().body }))
-}
+import {
+  curatedList as curated,
+  DAI,
+  LONGTAIL,
+  MAINNET,
+  POOL_USDC_DAI,
+  POOL_WETH_LONGTAIL,
+  POOL_WETH_USDC,
+  publishedListText as publishedText,
+  sourceIndex,
+  USDC,
+  WARM_DELTA,
+  WETH,
+} from './testing'
 
 describe('coverage scope keys', () => {
   it('splits `${protocol}:${scope}` and rejects anything no protocol owns', () => {
@@ -301,12 +266,44 @@ describe('verification failures', () => {
     expect(() => parsePoolList(tamper((env) => (env.schemaVersion = 99)))).toThrow(/schemaVersion 99/)
   })
 
+  it('rejects a non-string asOfTimestamp', () => {
+    // It reaches a terminal through the envelope, so it is checked like every other rendered string.
+    expect(() => parsePoolList(tamper((env) => ((env as { asOfTimestamp: unknown }).asOfTimestamp = 5)))).toThrow(
+      /non-string asOfTimestamp/,
+    )
+  })
+
+  // -------------------------------------------------------------------------
+  // THE SHAPE GATE, which is the SDK's and not this file's.
+  //
+  // `parsePoolList` runs `assertSnapshotShape` — the whole of what
+  // `PoolIndex.fromSnapshot` validates — rather than building and discarding an
+  // index to reach it. Both cases below are things a malformed list can carry
+  // that JSON and the integrity hash are perfectly happy with, and each used to
+  // be caught by that discarded index; they must still be caught here, at the
+  // boundary, rather than mid-search where nothing knows a list exists.
+  // -------------------------------------------------------------------------
+
   it('rejects a malformed body even when the hash agrees', () => {
     // Re-hashed after poisoning, so integrity passes and the SDK's own shape gate is what has to fire.
     const body = curated().body
     const poisoned = { ...body, coverage: [['v2:0xabc', [{ fromBlock: 'abc', toBlock: 1n }]]] } as unknown as PoolIndexSnapshot
     const env = buildEnvelope({ chainId: 1, manifest: MAINNET, body: poisoned })
     expect(() => parsePoolList(serializeEnvelope(env))).toThrow(/body is malformed/)
+  })
+
+  it('rejects a POOL RECORD the index could not operate on, not just a poisoned coverage bound', () => {
+    // The per-record half of the gate (`assertPoolRefIdentity`): a ref claiming v4 with no `poolKey`
+    // parses, hashes, and restores fine — and then throws a bare TypeError out of `isHooked` the
+    // first time candidate ranking touches it.
+    const body = curated().body
+    const poisoned = {
+      ...body,
+      pools: [{ pool: { id: `v4:0x${'cd'.repeat(32)}`, currencies: [WETH, USDC], protocol: 'v4', poolId: `0x${'cd'.repeat(32)}` }, source: 'event' }],
+    } as unknown as PoolIndexSnapshot
+    const env = buildEnvelope({ chainId: 1, manifest: MAINNET, body: poisoned })
+    expect(() => parsePoolList(serializeEnvelope(env))).toThrow(/body is malformed/)
+    expect(() => parsePoolList(serializeEnvelope(env))).toThrow(/poolKey/)
   })
 
   it('rejects a list built for another chain', () => {
@@ -328,17 +325,24 @@ describe('verification failures', () => {
     expect(() => verifyPoolList(envelope, body, { chainId: 1, manifest: MAINNET })).toThrow(/v2 manifestFingerprint/)
   })
 
-  it('rejects an envelope edited to disagree with its own (hash-covered) body', () => {
-    const { envelope, body } = parsePoolList(publishedText())
-    envelope.wrappedNative = USDC.toLowerCase()
-    expect(() => verifyPoolList(envelope, body, { chainId: 1, manifest: MAINNET })).toThrow(/wrappedNative disagrees with its body/)
+  // EVERY DERIVED ENVELOPE FIELD, as a table, because the interesting property is that the set is
+  // COMPLETE — each of these is recomputable from the hash-covered body, so each must be recomputed.
+  // `asOfBlock` was the one that was not: it is the field a human reads out of `head -12` to decide
+  // whether a list is current enough to download, and an envelope claiming block 21,000,000 over a
+  // body that stops at 19,000,000 would load without a word.
+  const editedEnvelopes: [string, (env: PoolListEnvelope) => void, RegExp][] = [
+    ['wrappedNative', (env) => (env.wrappedNative = USDC.toLowerCase()), /wrappedNative disagrees with its body/],
+    ['reorgOverlapBlocks', (env) => (env.reorgOverlapBlocks = '999'), /reorgOverlapBlocks disagrees with its body/],
+    ['asOfBlock', (env) => (env.asOfBlock = '21000000'), /asOfBlock disagrees with its body/],
+  ]
 
-    const second = parsePoolList(publishedText())
-    second.envelope.reorgOverlapBlocks = '999'
-    expect(() => verifyPoolList(second.envelope, second.body, { chainId: 1, manifest: MAINNET })).toThrow(
-      /reorgOverlapBlocks disagrees with its body/,
-    )
-  })
+  for (const [field, edit, message] of editedEnvelopes) {
+    it(`rejects an envelope whose ${field} was edited to disagree with its own (hash-covered) body`, () => {
+      const { envelope, body } = parsePoolList(publishedText())
+      edit(envelope)
+      expect(() => verifyPoolList(envelope, body, { chainId: 1, manifest: MAINNET })).toThrow(message)
+    })
+  }
 
   it('accepts an honest list', () => {
     const { envelope, body } = parsePoolList(publishedText())
@@ -369,8 +373,9 @@ describe('hydration and trust tiers', () => {
 
     expect(summary.coverageAdopted).toBe(true)
     expect(summary.scopes).toBe(body.coverage.length)
-    // Now the same query collapses to the delta plus the standing reorg overlap.
-    expect(index.uncovered('v2', WETH, 10_000_835n, 21_000_100n)).toEqual([{ fromBlock: 20_999_969n, toBlock: 21_000_100n }])
+    // Now the same query collapses to exactly what a warm CACHE collapses it to (`cache.test.ts`
+    // asserts the identical range from the other direction) — the delta plus the reorg overlap.
+    expect(index.uncovered('v2', WETH, 10_000_835n, 21_000_100n)).toEqual(WARM_DELTA)
     expect(index.enabledFees('v3', MAINNET.v3!.factory)).toEqual([100, 500, 3000, 10_000])
   })
 

@@ -85,6 +85,10 @@ import { PROTOCOLS, type ChainManifest, type PoolRecord, type Protocol } from '.
 import { toGraphNode } from '../src/internal/currency'
 import { MULTICALL3_ADDRESS, aggregateCalls } from '../src/internal/multicall'
 import { ethCall, mapConcurrent } from '../src/internal/rpc'
+// The SDK's own snapshot shape gate — the one `PoolIndex.fromSnapshot` runs, reached directly (it is
+// not re-exported from `../src/experimental/index`) so an untrusted list can be GATED without being
+// RESTORED. See `parsePoolList` for what that saved.
+import { assertSnapshotShape } from '../src/pools/poolIndex'
 
 /**
  * Bumped when the ENVELOPE's shape changes. Independent of
@@ -153,7 +157,17 @@ export type ManifestFingerprint = {
 export type PoolListEnvelope = {
   schemaVersion: number
   chainId: number
-  /** The block up to which EVERY coverage scope this list claims is covered — see {@link asOfBlockOf}. */
+  /**
+   * How far this list's coverage REACHES — see {@link asOfBlockOf}, which computes it.
+   *
+   * A REACH, NOT A GUARANTEE ABOUT EVERYTHING BELOW IT. This used to read "the block up to which
+   * every coverage scope this list claims is covered", which is more than the number knows: a scope's
+   * ranges may have HOLES (a scan cut short by a budget leaves two ranges with a gap between them),
+   * and taking each scope's furthest-reaching range says nothing about them. The body's own per-scope
+   * ranges are the complete statement of what was scanned, and they are what a consumer's
+   * `uncovered()` reads; this field exists so a human can judge staleness from `head -12` without
+   * downloading the other 300 MB.
+   */
   asOfBlock: string
   /** ISO-8601, informational only: staleness is decided by `asOfBlock`, never by wall-clock time. */
   asOfTimestamp: string
@@ -194,6 +208,13 @@ export function fingerprintOf(manifest: ChainManifest): ManifestFingerprint {
  * current claim: reporting the head (or the furthest-reaching scope) would describe a list whose v2
  * coverage stopped a million blocks ago as fully current. A list claiming no coverage at all has no
  * scope to be behind on and reports `0n`.
+ *
+ * IT DOES NOT SEE HOLES, and is not meant to. Within one scope it takes the furthest `toBlock`,
+ * so a scope covering 1..100 and 1000..2000 reaches 2000 even though 101..999 was never scanned.
+ * Deciding what a gapped scope is "covered up to" would need a start block no snapshot records, and
+ * nothing consumes this number to skip work — `uncovered()` reads the ranges themselves, hole by
+ * hole. See {@link PoolListEnvelope.asOfBlock} for what the published field therefore does and does
+ * not promise.
  */
 export function asOfBlockOf(coverage: PoolIndexSnapshot['coverage']): bigint {
   let min: bigint | undefined
@@ -563,7 +584,10 @@ export function parsePoolList(text: string): { envelope: PoolListEnvelope; body:
   for (const field of ['chainId'] as const) {
     if (typeof env[field] !== 'number') throw new PoolListError(`pool list has a non-numeric ${field}`)
   }
-  for (const field of ['asOfBlock', 'integrity', 'wrappedNative', 'reorgOverlapBlocks'] as const) {
+  // `asOfTimestamp` is in the list because it is RENDERED (it reaches a terminal through the
+  // envelope), and every other rendered-or-compared string is checked here; leaving the one
+  // informational field out was an omission, not a decision.
+  for (const field of ['asOfBlock', 'asOfTimestamp', 'integrity', 'wrappedNative', 'reorgOverlapBlocks'] as const) {
     if (typeof env[field] !== 'string') throw new PoolListError(`pool list has a non-string ${field}`)
   }
   if (typeof env.body !== 'object' || env.body === null) throw new PoolListError('pool list has no body object')
@@ -580,11 +604,25 @@ export function parsePoolList(text: string): { envelope: PoolListEnvelope; body:
   let body: PoolIndexSnapshot
   try {
     body = parseSnapshot(canonical)
-    // `fromSnapshot` is the SDK's own shape gate (`assertSnapshotShape`) and the only complete one —
-    // running it here means a malformed body is rejected at the boundary rather than detonating
-    // mid-search, exactly as `cli/cache.ts` relies on it doing for a cache file. The index it builds
-    // is discarded; hydration goes through the CLI's own index (see `hydratePoolList`).
-    PoolIndex.fromSnapshot(body)
+    // THE SDK'S OWN SHAPE GATE, AND ONLY THE GATE. A malformed body has to be rejected at the
+    // boundary rather than detonating mid-search, exactly as `cli/cache.ts` relies on it doing for a
+    // cache file — but this used to be spelled `PoolIndex.fromSnapshot(body)`, which runs the gate
+    // and then builds an entire index that was immediately thrown away. Every pool was therefore
+    // materialized TWICE: once into that index and once, moments later, by `hydratePoolList`'s
+    // `upsert` loop into the index the run actually searches with. `assertSnapshotShape` is the whole
+    // of what `fromSnapshot` validates (everything after it is construction), so the trust boundary
+    // here is byte-for-byte the one it was — the second materialization simply no longer happens.
+    //
+    // MEASURED (synthetic v2 lists, parse + verify + hydrate, best of three):
+    //
+    //     pools     before    after     saved
+    //     100,000    269ms    242ms      27ms
+    //     400,000   1353ms   1218ms     135ms
+    //
+    // A tenth of the load, growing linearly with the pool count, plus the peak RSS of a whole
+    // second index — the rest is `sha256` and `JSON.parse` over the file, which no restructuring
+    // here can avoid.
+    assertSnapshotShape(body)
   } catch (err) {
     throw new PoolListError(`pool list body is malformed (${err instanceof Error ? err.message.split('\n')[0]! : String(err)})`)
   }
@@ -596,7 +634,7 @@ export function parsePoolList(text: string): { envelope: PoolListEnvelope; body:
  * Cross-checks a list against the chain and manifest THIS run resolved. Throws {@link PoolListError}
  * on any disagreement.
  *
- * All three checks answer the same question — "was this list built for the thing I am about to use
+ * Every check here answers the same question — "was this list built for the thing I am about to use
  * it for?" — and none of them is recoverable by loading the list anyway: a list for another chain
  * describes pools that do not exist here, and a list built against another factory has coverage
  * ranges that describe scans of a contract this run will never read.
@@ -619,6 +657,14 @@ export function verifyPoolList(
   }
   if (envelope.reorgOverlapBlocks !== body.reorgOverlapBlocks.toString()) {
     throw new PoolListError("pool list envelope's reorgOverlapBlocks disagrees with its body — the envelope was edited")
+  }
+  // THE THIRD DERIVED FIELD, which was being taken on faith while its two neighbours were checked.
+  // `asOfBlock` is computed from the body's coverage, so it is exactly as recomputable as the other
+  // two — and it is the field a human reads to decide whether a list is current enough to bother
+  // with. An envelope edited to say 21,000,000 over a body that stops at 19,000,000 is a lie a
+  // `head -12` cannot catch and a successful load would never contradict.
+  if (envelope.asOfBlock !== asOfBlockOf(body.coverage).toString()) {
+    throw new PoolListError("pool list envelope's asOfBlock disagrees with its body — the envelope was edited")
   }
 
   if (body.wrappedNative.toLowerCase() !== expected.manifest.wrappedNative.toLowerCase()) {

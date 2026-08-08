@@ -3,15 +3,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
-import type { Address } from 'viem'
 
-import { PoolIndex, POOL_INDEX_SCHEMA_VERSION, serializeSnapshot, v2PoolRef } from '../src/experimental/index'
+import { PoolIndex, POOL_INDEX_SCHEMA_VERSION, serializeSnapshot } from '../src/experimental/index'
 
 import { CACHE_MAX_POOLS, cacheDir, cacheEnabled, cachePath, flushCacheSave, loadCache, saveCache, scheduleCacheSave } from './cache'
-
-const WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2' as Address
-const USDC = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as Address
-const POOL = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc' as Address
+import { USDC, WARM_DELTA, warmIndex, WETH } from './testing'
 
 /**
  * Every test below points `$XDG_CACHE_HOME` at a fresh temp dir, so nothing here can read, write, or
@@ -31,14 +27,6 @@ afterEach(async () => {
   else process.env.XDG_CACHE_HOME = savedXdg
   await rm(dir, { recursive: true, force: true })
 })
-
-/** An index with one pool and a covered range — the smallest thing worth caching. */
-function warmIndex(): PoolIndex {
-  const index = new PoolIndex(WETH)
-  index.upsert({ pool: v2PoolRef(POOL, USDC, WETH), source: 'event', createdAtBlock: 10_008_355n })
-  index.addCoverage('v2', WETH, { fromBlock: 10_000_835n, toBlock: 21_000_000n })
-  return index
-}
 
 describe('cache location', () => {
   it('honors $XDG_CACHE_HOME and keys by chain id, not by endpoint', () => {
@@ -77,10 +65,9 @@ describe('save/load round trip', () => {
     expect(loaded.note).toMatch(/loaded 1 pools/)
     expect(loaded.index!.pair(USDC, WETH).map((r) => r.pool.id)).toEqual(original.pair(USDC, WETH).map((r) => r.pool.id))
     // The point of the whole exercise: a warm run asks for the delta plus the reorg overlap, not the
-    // eleven million blocks of history the first run paid for.
-    expect(loaded.index!.uncovered('v2', WETH, 10_000_835n, 21_000_100n)).toEqual([
-      { fromBlock: 20_999_969n, toBlock: 21_000_100n },
-    ])
+    // eleven million blocks of history the first run paid for. The same range a list's ADOPTED
+    // coverage produces in `poolList.test.ts` — one constant, so the two really are the same claim.
+    expect(loaded.index!.uncovered('v2', WETH, 10_000_835n, 21_000_100n)).toEqual(WARM_DELTA)
   })
 
   it('writes atomically — tmp + rename, leaving no partial file behind', async () => {
