@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test'
+import { afterEach, expect, test } from 'bun:test'
 import type { Hex, PublicClient } from 'viem'
 import { decodeFunctionData, encodeAbiParameters, encodeFunctionResult, zeroAddress } from 'viem'
 
@@ -611,29 +611,70 @@ test('an abort mid-round skips the calls still queued for a permit — never sen
 // address is a wiring bug these tests must catch, not tolerate.
 // ---------------------------------------------------------------------------
 
+/**
+ * Stub-contract breaches, drained by the `afterEach` below.
+ *
+ * A THROW FROM INSIDE `aggregate3` IS NOT LOUD, WHICH IS WHY THIS ARRAY EXISTS. `aggregateCalls`
+ * catches everything the outer `eth_call` raises and coarsens it to a `TransportError` per slot
+ * (deliberately — see `internal/multicall.ts`), so a stub that merely throws on a wiring mistake
+ * reports it as a plausible provider hiccup and the test goes on to assert a tally that happens to
+ * be self-consistent. Recording the breach out-of-band and failing the test unconditionally is what
+ * makes "the round sent a call nothing scripted" a test failure rather than a transport statistic.
+ */
+const stubViolations: string[] = []
+
+function violate(message: string): never {
+  stubViolations.push(message)
+  throw new Error(message)
+}
+
+afterEach(() => {
+  const seen = stubViolations.splice(0, stubViolations.length)
+  expect(seen, 'the multicall stub was asked something no test scripted').toEqual([])
+})
+
 function multicallStubClient(
   returns: Record<string, StubEntry>,
-  opts: { outerOutcomes?: ('serve' | Error)[] } = {},
+  opts: { outerOutcomes?: ('serve' | Error)[]; blockNumber?: bigint } = {},
 ): { client: Pick<PublicClient, 'request'>; outer: { count: number } } {
   const outer = { count: 0 }
+  const expectedBlockTag = `0x${(opts.blockNumber ?? 1n).toString(16)}`
   let outerIndex = 0
   const client = {
     async request(args: any) {
-      const [{ to, data }] = args.params
+      const [{ to, data }, blockTag] = args.params
       if ((to as string).toLowerCase() !== MULTICALL3_ADDRESS.toLowerCase()) {
-        throw new Error(`multicallStubClient: eth_call to ${to} — the round should have aggregated through Multicall3`)
+        violate(`multicallStubClient: eth_call to ${to} — the round should have aggregated through Multicall3`)
+      }
+      // The aggregate3 must be BLOCK-PINNED at the same block the round was asked for. A round that
+      // pinned `latest` (or the wrong block) prices against state no other call in the search saw,
+      // and every tally below would still add up — `multicall.test.ts` asserts this on its own stub,
+      // and the two must not drift.
+      if (blockTag !== expectedBlockTag) {
+        violate(`multicallStubClient: aggregate3 sent at blockTag ${blockTag}, expected ${expectedBlockTag}`)
       }
       const { functionName, args: decodedArgs } = decodeFunctionData({ abi: MULTICALL3_ABI, data })
-      if (functionName !== 'aggregate3') throw new Error(`multicallStubClient: unexpected function ${functionName}`)
+      if (functionName !== 'aggregate3') violate(`multicallStubClient: unexpected function ${functionName}`)
       outer.count++
       const outcome = opts.outerOutcomes?.[outerIndex++] ?? 'serve'
       if (outcome instanceof Error) throw outcome
       const calls = decodedArgs[0] as readonly { target: string; allowFailure: boolean; callData: Hex }[]
       const results = calls.map((call) => {
+        // `allowFailure: false` makes the WHOLE aggregate3 revert on the first inner failure, which
+        // would turn every per-call revert this suite scripts into an outer transport failure. It is
+        // the one Call3 field that changes what the results mean, so it is asserted, not assumed.
+        if (!call.allowFailure) violate('multicallStubClient: aggregate3 arrived without allowFailure')
         const entry = returns[callKey(call.target, call.callData)]
-        if (entry === undefined || entry === 'revert') return { success: false, returnData: '0x' as Hex }
+        // UNSCRIPTED IS NOT "REVERTED". These two used to share a branch, and the conflation meant a
+        // round that sent the WRONG CALLDATA — a round-2 segment chained off the wrong realized
+        // amount, an encoder that changed shape, a pool key built from the wrong currency order —
+        // was served a clean, plausible on-chain revert. The test then asserted `failed: 1`, got it,
+        // and passed, having verified nothing about the calldata that is the entire point of the
+        // fixture. The per-call `stubClient` above has always been loud here; this one now is too.
+        if (entry === undefined) violate(`multicallStubClient: no stub registered for ${callKey(call.target, call.callData)}`)
+        if (entry === 'revert') return { success: false, returnData: '0x' as Hex }
         if (entry === 'revert-with-data') return { success: false, returnData: NOT_ENOUGH_LIQUIDITY_DATA }
-        if (entry === 'rate-limit') throw new Error('multicallStubClient: a 429 cannot happen inside aggregate3')
+        if (entry === 'rate-limit') violate('multicallStubClient: a 429 cannot happen inside aggregate3')
         return { success: true, returnData: entry }
       })
       return encodeFunctionResult({ abi: MULTICALL3_ABI, functionName: 'aggregate3', result: results })
@@ -641,6 +682,42 @@ function multicallStubClient(
   } as unknown as Pick<PublicClient, 'request'>
   return { client, outer }
 }
+
+// THE FIXTURE'S OWN REGRESSION TEST. Everything below leans on the stub being an honest chain, and
+// the one way it silently stopped being one was serving an UNSCRIPTED call as a revert: a round that
+// sent the wrong calldata got a clean, plausible `failed: 1` and the assertion about it passed.
+// Scripting round 2 off the wrong realized amount is exactly what a chaining bug looks like on the
+// wire, so it is the shape the guard is proved against.
+test('multicall stub: a call nothing scripted is a fixture violation, never a plausible on-chain revert', async () => {
+  const round1Call = v4Module.encodeQuote([v4Leg], 100n, manifest).call
+  // Round 2's real input IS round 1's realized 500. Scripting 499 leaves the real call unscripted.
+  const wrongRound2 = v3Module.encodeQuote([v3Leg], 499n, manifest).call
+  const realRound2 = v3Module.encodeQuote([v3Leg], 500n, manifest).call
+  const { client } = multicallStubClient({
+    ...entryFor(round1Call, v4Return(500n)),
+    ...entryFor(wrongRound2, v3Return(900n)),
+  })
+
+  const { quoted, stats } = await quoteCandidates({
+    client,
+    modules,
+    manifest,
+    candidates: [mixedV4toV3],
+    amountIn: 100n,
+    blockNumber: 1n,
+    multicall3: MULTICALL3_ADDRESS,
+  })
+
+  // Drained here rather than by the `afterEach`, because THIS test is the one that wants a violation.
+  expect(stubViolations.splice(0, stubViolations.length)).toEqual([
+    `multicallStubClient: no stub registered for ${callKey(realRound2.to, realRound2.data)}`,
+  ])
+  // And the outcome the caller sees is the conservative one, not a fabricated on-chain refusal:
+  // `aggregateCalls` coarsens a failed outer call to `TransportError`. Before the guard this read
+  // `{ attempted: 1, succeeded: 0, failed: 1, transportFailed: 0 }` — an invented revert.
+  expect(quoted).toHaveLength(0)
+  expect(stats).toEqual({ attempted: 1, succeeded: 0, failed: 0, transportFailed: 1 })
+})
 
 test('multicall path: mixed two-hop still chains realized output into round 2 — two aggregate3 calls, same quote, same stats', async () => {
   const round1Call = v4Module.encodeQuote([v4Leg], 100n, manifest).call
