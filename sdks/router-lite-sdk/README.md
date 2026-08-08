@@ -537,6 +537,49 @@ const router = createRouter({ client, manifest, concurrency: 8, logChunkBlocks: 
 Both are optional; a zero-config caller gets the shared concurrency bound and the adaptive scan
 window without asking for either.
 
+### Quoting rounds go out through Multicall3
+
+There is no knob for this one, and it is the reason `concurrency` buys less than it used to.
+A quoting round's `eth_call`s are aggregated into `aggregate3` calls of **50** against the chain's
+Multicall3, so a full round (at most 78 candidates) is 2 requests instead of 78. Each chunk is still
+one ordinary block-pinned `eth_call` holding one semaphore permit, so nothing above changes meaning.
+What changes is the unit a **rate limiter** charges: measured against a burst-limited public
+endpoint (mainnet.base.org, which 429s bursts of ≥ 4), 20 concurrent individual quotes lost ~95% of
+the round while one `aggregate3` carrying the same quotes landed complete. That is the difference
+between a 3-5% quote success rate and a finished search on exactly the zero-config endpoints this
+package is meant to work against.
+
+**The address is probed, not assumed.** Multicall3 is a CREATE2 deployment at the same address on
+250+ chains, so no manifest states it — but an `aggregate3` sent to an address with *no* code
+**succeeds** with `0x`, and every inner result would vanish into the outer decode as a chain-wide
+silent "no route". So the router spends one `eth_getCode` at that address, **once per router
+instance**, before it ever aggregates. The probe is fired concurrently with manifest validation, so
+on the first search it hides behind a round trip that was already happening and afterwards behind
+nothing at all. Code present → every search aggregates; code absent → every search quotes
+call-by-call, permanently, exactly as before aggregation existed. A probe that *failed* is not
+cached: nothing was learned, so that search quotes per-call and the next one asks again.
+
+**`manifestFor` gained a `multicall3` override** for the rare chain that deployed Multicall3
+somewhere non-canonical. It is a **scalar, not a bundle** — a single address has no halves to fall
+out of sync, so it is replaced on its own rather than wholesale — and unlike `wrappedNative` it is
+**removable**: passing `multicall3: undefined` explicitly restores the canonical default rather than
+being rejected.
+
+```ts
+const weird = manifestFor(12345, { wrappedNative, multicall3: '0x…' }) // non-canonical deployment
+const back = manifestFor(1, { multicall3: undefined })                 // back to the canonical one
+```
+
+Two things this does **not** change. Aggregation cannot forward a per-call `from` or `value`, so any
+call carrying either is dispatched individually — the partition is on the call's own shape, not on
+callers remembering, and no quote call this package builds carries either today. And it cannot
+change what a v4 hook sees: a hook's `sender` is the address that called the PoolManager, which is
+the quoter contract in both envelopes. That is proved on a fork rather than argued —
+`integration/adversarial.fork.test.ts` gates a pool behind a hook that writes the sender it saw into
+its own revert data, and both envelopes record the V4Quoter, byte-identically. The one figure that
+*is* envelope-dependent is [`gasEstimate`](#quotegasestimate-reported-never-ranked), which is why it
+is display-only.
+
 ## Runs in browsers and edge workers
 
 The package ships one runtime dependency (viem), performs no I/O of its own — the caller hands it a
@@ -545,7 +588,14 @@ is no filesystem access, no `process.env`, no `Buffer`, no `node:` import anywhe
 publishes, so the same build that runs on a Node server runs unmodified in a browser tab, a service
 worker, a Cloudflare Worker, or a Vercel edge function. Bundled for `target: browser` with both
 entry points imported, the whole thing — router, wave engine, encoder, all five built-in manifests,
-viem included and tree-shaken — is **144 kB minified, 44.8 kB gzipped**.
+viem included and tree-shaken — is **~144 kB minified, ~45 kB gzipped**.
+
+Those two numbers are a **recorded baseline, not a constant**: they are minifier output, so they
+move with the bun version (144,433 B / 44,800 B gzipped under bun 1.3.14 with viem 2.47.2, the
+toolchain the baseline was recorded on) and a different bun would print a slightly different pair
+for byte-identical source. That is why CI pins `bun-version: 1.3.14` in the workflows that run this
+suite, and why the assertion below is a 1.5x budget rather than a tight pin — the failure worth
+catching is a dependency that stops tree-shaking, not a minifier release.
 
 That is certified, not asserted: `src/browser.certification.test.ts` runs in the ordinary suite
 (`bun test`, hence in CI) and checks three things on every commit. It parses every file the two
@@ -577,20 +627,24 @@ engine. A recipient that turns out to be one of the pools the chosen route trade
 a layer later, when the plan exists. `UnsupportedRouteError` (a route shape outside the closed
 supported set of {single, two-hop} × {v2, v3, v4, mixed} × {erc20, native} in/out, exact-input,
 optional permit) falls in the same bucket. Manifest validation is *not* synchronous: on first use,
-the router spends one `getChainId` call to confirm the manifest's `chainId` matches the connected
-client (cached forever after — a mismatch is a permanent property of that pairing) and, when an
-`execution` bundle is present with a `codeHash` set, one `eth_getCode` call to confirm the deployed
-bytecode at `execution.address` hashes to it. Either check failing rejects that first call with
-`RouterConfigError`. Everything else — no route found, a reverting quote, a provider outage — is a
+the router confirms the manifest's `chainId` matches the connected client — spending one
+`getChainId` call to read it, **unless** the caller supplied [`assumeChainId`](#api-surface), which
+replaces that *read* with a value the caller already observed on this same client (the comparison
+itself always runs) — and, when an `execution` bundle is present with a `codeHash` set, one
+`eth_getCode` call to confirm the deployed bytecode at `execution.address` hashes to it. Both
+outcomes are cached forever after: a mismatch is a permanent property of that pairing. Either check
+failing rejects that first call with `RouterConfigError`. Everything else — no route found, a reverting quote, a provider outage — is a
 **result**, never a throw; see [Status semantics](#status-semantics).
 
 ## API surface
 
 | Export | What it is |
 | --- | --- |
-| `createRouter({ client, manifest, index?, maxPools?, concurrency?, logChunkBlocks? })` | Builds a `Router`. `index`/`maxPools` are optional PoolIndex-lifecycle knobs — see [PoolIndex lifecycle](#poolindex-lifecycle). `concurrency`/`logChunkBlocks` are transport-tuning knobs — see [Transport options](#transport-options). No policy object, no other mode/budget knobs. |
+| `createRouter({ client, manifest, index?, maxPools?, concurrency?, logChunkBlocks?, assumeChainId? })` | Builds a `Router`. `index`/`maxPools` are optional PoolIndex-lifecycle knobs — see [PoolIndex lifecycle](#poolindex-lifecycle). `concurrency`/`logChunkBlocks` are transport-tuning knobs — see [Transport options](#transport-options). No policy object, no other mode/budget knobs. |
+| `assumeChainId?: number` | A validation *shortcut*, not a knob: the chain id you have **already read off this same client**, supplied so manifest validation skips its `eth_chainId` round trip. It replaces the read, never the check — the value is still compared against `manifest.chainId` and still throws `RouterConfigError` on a mismatch, and the `eth_getCode` immutable fingerprint behind it is untouched. **The misuse hazard is the whole story:** pass an id from a config file, an env var, or `manifest.chainId` itself and the cross-check becomes a tautology — you have disabled the one thing it exists to catch (a manifest pointed at the wrong chain) to save one round trip. Only a caller that probed *this* client for *this* value may pass it; a CLI that autodetects the chain from its endpoint is the motivating case, and it saves ~0.9s on the critical path of every invocation. |
 | `router.getQuote` / `router.getSwap` | Promises resolving at the first actionable result. |
-| `router.quotes` / `router.swaps` | Async iterators yielding the improving best after every wave. |
+| `router.quotes(req, opts?)` / `router.swaps(req, opts?)` | Async iterators yielding the improving best after every wave. `opts` is `IterateOptions`. |
+| `IterateOptions { onFirstRoute? }` | Per-**search** options, offered on the iterator shapes only. `onFirstRoute(route: QuotedRoute)` fires once, as soon as the search has priced anything at all — up to a whole wave before the first yield carries it. For a quote that route *is* the leader of the `status: 'quote'` result that follows; for a swap it is only a priced lead (nothing compiled, simulated, or checked against the trader's readiness), which is why it is named for the route and not for the verdict. A later wave may improve on it; the yielded results stay the only authority. Not offered on `getQuote`/`getSwap`, which resolve at the same moment they would have called it — and deliberately not a field on the request, which stays a serializable description of a trade. |
 | `router.ingestPool(hint)` | Validates a hint and upserts it into the router's index. |
 | `router.ingestLogs(logs)` / `router.ingestReceipt(receipt)` | Feed known pool-creation logs (or a whole receipt) into the index ahead of a search. |
 | `router.stats()` | A sizes-only snapshot of what the router's index currently holds — see [PoolIndex lifecycle](#poolindex-lifecycle). |
@@ -600,14 +654,31 @@ bytecode at `execution.address` hashes to it. Either check failing rejects that 
 | `manifestFor(chainId, overrides?)`, `MAINNET_MANIFEST`, `BASE_MANIFEST`, `UNICHAIN_MANIFEST`, `ARBITRUM_MANIFEST`, `ROBINHOOD_MANIFEST` | Chain configuration: the required top-level `wrappedNative`, per-protocol deployment bundles, an optional Universal Router deployment (`execution` — omitted for [quote-only](#quote-only-mode) manifests), and the `chain` bundle of chain facts (block time, reorg depth) — see [Supported chains](#supported-chains). |
 | `RouterConfigError`, `UnsupportedRouteError` | The two typed throws — see [Error handling](#error-handling). |
 
-Pure, no-stability-guarantee building blocks — `generateRoutes`, `compileExecutionPlan`,
-`encodeExecutionPlan`, the `PoolIndex` class, the `PROTOCOL_MODULES` registry (and the individual
-`v2Module`/`v3Module`/`v4Module`, plus the `ProtocolModule`/`QuoteProbe`/`FeeDiscovery`/`Custody`
-types), and `buildHookData` — are exported from `@uniswap/router-lite-sdk/experimental` for callers
-building their own search policy. Every argument these functions need is constructible from that
-subpath alone (plus the public types from the package root): `generateRoutes` only requires
-`hookData` when stamping v4 hook data (it otherwise defaults to empty), and
-`compileExecutionPlan`'s `modules` defaults to `PROTOCOL_MODULES`.
+The package root also exports two closed sets **as values**, not only as types, so a caller can walk
+them instead of hand-copying a literal that silently stops matching: `REASON_CODES` (every
+[`reason.code`](#reason-c4-p5)) and `PROTOCOLS` (`['v2', 'v3', 'v4']` — exactly the key set of
+`SearchReport.discovery`, so a per-protocol table or a `Record<Protocol, …>` builder can be derived
+rather than transcribed).
+
+Pure, no-stability-guarantee building blocks are exported from
+`@uniswap/router-lite-sdk/experimental` for callers building their own search policy:
+
+| `/experimental` export | What it is |
+| --- | --- |
+| `generateRoutes` | Enumerate candidate routes from a `PoolIndex`. |
+| `compileExecutionPlan` | `QuotedRoute` → version-neutral `ExecutionPlan`. |
+| `encoderFor(commandSet)` | Returns the encoder bound to that command set (`'ur-2.0'` / `'ur-2.1'`), which turns an `ExecutionPlan` into calldata. **This is the name** — there is no `encodeExecutionPlan` export; the command set has to be chosen before there is anything to encode with. |
+| `PoolIndex`, `POOL_INDEX_SCHEMA_VERSION` | The index class and the schema version its snapshots are checked against exactly. |
+| `serializeSnapshot` / `parseSnapshot` | The bigint-safe JSON pair for a `PoolIndexSnapshot`. |
+| `PROTOCOL_MODULES`, `v2Module` / `v3Module` / `v4Module` | The registry and the individual protocol modules (plus the `ProtocolModule` / `QuoteProbe` / `FeeDiscovery` / `Custody` / `CommandSet` types). |
+| `v2PoolRef` / `v3PoolRef` / `v4PoolRef` | The `PoolRef` constructors. A `PoolRef` carries derived fields (`id`, `currencies`) only these know how to fill, so a caller holding `PoolIndex.upsert` or `generateRoutes` cannot build an argument without them. |
+| `isHooked(ref)` | Whether a pool ref carries a v4 hook — readable protocol-agnostically, so it is safe to call on a v2/v3 ref. |
+| `buildHookData` | Builds the request-scoped `poolId → hookData` map from a request's hints. |
+
+Every argument these functions need is constructible from that subpath alone (plus the public types
+from the package root) — `src/experimental/surface.test.ts` is the compile-time guard that keeps it
+true: `generateRoutes` only requires `hookData` when stamping v4 hook data (it otherwise defaults to
+empty), and `compileExecutionPlan`'s `modules` defaults to `PROTOCOL_MODULES`.
 
 ## Supported chains
 
@@ -707,6 +778,20 @@ Three private workspaces sit beside `src/`, none of them published:
 
 `bun run typecheck:all` typechecks the package and all three (plus `scripts/`); `bun run lint` covers `src` and `cli`.
 
+Everything that needs a network is **opt-in and off by default**, so `bun test src cli` is hermetic.
+The complete set of environment variables the private workspaces read:
+
+| Variable | Read by | What it does |
+| --- | --- | --- |
+| `ROUTER_LITE_FORK=1` | `integration/anvil.ts` | Opts the anvil-fork suites in. Also requires `anvil` to be on `PATH`; without both, every fork suite skips. |
+| `ROUTER_LITE_SKIP_FORK=1` | `integration/anvil.ts` | Force-skips the fork suites **even when opted in** — the CI kill switch, checked before `ROUTER_LITE_FORK`. |
+| `MAINNET_RPC_URL` | `integration/anvil.ts` | The archive endpoint anvil forks from. Strongly recommended: without it the harness falls back to a list of public candidates, which are rate-limited and often cannot serve the pinned block. |
+| `ROUTER_LITE_CANARY=1` | `canary/env.ts` | Opts the live-RPC canary in. Never PR-blocking. |
+| `CANARY_RPC_URL_1` | `canary/env.ts` | The primary canary endpoint. Required — `ROUTER_LITE_CANARY=1` alone does not enable the canary. |
+| `CANARY_RPC_URL_2`, `CANARY_RPC_URL_3` | `canary/env.ts` | Optional. Together with `_1` they form the **same-chain provider matrix** the canary compares against itself. |
+| `CANARY_RPC_URL_ROBINHOOD` | `canary/env.ts` | Robinhood Chain's endpoint. Deliberately *not* a fourth `CANARY_RPC_URL_*`: those three are one chain seen three ways, this is a different chain. Its suites skip when it is unset, even with the canary on. |
+| `ETH_RPC_URL` | `cli/`, `scripts/` | The endpoint for the CLI and the recorder/pool-list scripts (`--rpc` overrides it). Passed through the environment rather than a command line, where a keyed URL would land in a process listing. |
+
 ### Recorded-replay golden sessions
 
 `src/replay.golden.test.ts` is the hermetic "does the router find the RIGHT answer" layer: each
@@ -752,4 +837,4 @@ request and regeneration re-records the conversation; (c) a session is deliberat
 newer block; (d) the canonical result shape gains a field — `--regold`, above, no network. They never legitimately change on their own: the recorder derives every golden from a
 strict replay and proves two replays agree before writing, so a golden diff with no code change is a
 determinism bug. Fixtures are redacted by construction (no RPC URLs — provider error messages pass
-through the keyed-URL redaction rule) and total ~1.3 MB across 7 sessions.
+through the keyed-URL redaction rule) and total ~1.1 MB across 7 sessions.

@@ -361,6 +361,40 @@ as a pure win.
 > the warm cache now *beats* cold, by reaching a nonstandard-tier WETH/USDC pool speculation cannot
 > guess. See the spec's "Candidate selection" section and `search/candidates.ts#comparePoolPriority`.
 
+### The nightly canary does NOT publish this list
+
+Everything above is a **local, unbounded** build, and it is the best case on purpose: the source
+cache came from exactly the scan a list wants to publish, so nothing was dropped and all 8 of 8
+scopes were claimed. The lists the canary uploads as artifacts
+(`.github/workflows/router-lite-canary.yml`) are built with two bounds the local run had none of:
+
+```
+bun scripts/buildPoolList.ts --chain <id> --warm <tokens> --warm-budget 180s --max-pools 400000
+```
+
+Both bounds make the published list **smaller, and specifically weaker where Tier A is strong.**
+
+- **`--warm-budget 180s`** caps each `rl discover <token>` warm run, so the source snapshot is
+  whatever coverage that run banked before the budget cut it off — partial, not complete. Fewer
+  scopes reach full coverage, and a scope whose pool set is not kept in full **cannot be claimed at
+  all** (the invariant [above](#the-curation-rule)). A budget-truncated build therefore
+  loses *coverage scopes*, not merely tail pools. (The flag's default is `120s`; the canary raises
+  it to 180s, which buys more of the scan, not all of it.)
+- **`--max-pools 400000`** is a ceiling below the 655,193 pools the unbounded mainnet build carried,
+  so ~255k pools have to go — and they go by **dropping whole scopes, largest first**, never by
+  truncating one. Largest-first is the right rule (it is the only one that keeps every surviving
+  scope's coverage claim honest) and it is also the rule that costs the most Tier A value per pool
+  dropped: the biggest scope on mainnet is a core-intermediate adjacency scope, which is exactly the
+  thing that is most expensive to re-derive and the reason to adopt coverage in the first place.
+
+So read the numbers above as the ceiling of what the format can do, not as a description of the
+artifact you will download. A canary list is a good **Tier B** list — the pools are still the
+expensive part, and a Tier B consumer re-scans the ranges anyway — while its Tier A benefit is
+whatever scopes survived both bounds, which is fewer than 8 of 8 and may be zero. A list that cannot
+fit even one scope publishes its pools with no coverage at all, which is still a perfectly good
+Tier B list. Rebuild locally, unbounded, if you want the collapse-the-scans behaviour the
+measurements show.
+
 ---
 
 ## What phase 2 adds
