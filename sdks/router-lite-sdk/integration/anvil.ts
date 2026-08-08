@@ -40,9 +40,6 @@ export const FORK_RPC_CANDIDATES: readonly string[] = process.env.MAINNET_RPC_UR
   ? [process.env.MAINNET_RPC_URL]
   : ['https://gateway.tenderly.co/public/mainnet', 'https://eth-mainnet.public.blastapi.io', 'https://eth.merkle.io']
 
-/** The endpoint a caller gets when it does not care which one — the head of the candidate list. */
-export const FORK_RPC_MAINNET = FORK_RPC_CANDIDATES[0]!
-
 /**
  * The one place the fork block is pinned. Chosen as a round number below the chain tip at the time
  * this harness was written (tip was 25,678,686), and comfortably after the v4 PoolManager deployment
