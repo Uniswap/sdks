@@ -1,6 +1,6 @@
-import { expect, test } from 'bun:test'
+import { afterEach, expect, test } from 'bun:test'
 import type { Address, Hex, PublicClient } from 'viem'
-import { decodeFunctionData, encodeFunctionResult, toHex } from 'viem'
+import { decodeFunctionData, toHex } from 'viem'
 
 import { AbortedCallError, NodeStateError, TransportError } from '../errors'
 import type { EthCall } from '../types'
@@ -8,7 +8,7 @@ import type { EthCall } from '../types'
 import { MULTICALL3_ABI } from './abis'
 import { aggregateCalls, InnerCallFailure, MULTICALL3_ADDRESS, MULTICALL_CHUNK } from './multicall'
 import { createSemaphore } from './rpc'
-import { headerNotFoundError, rateLimitHttpError } from './testing'
+import { headerNotFoundError, rateLimitHttpError, recordStubViolation, serveAggregate3, takeStubViolations } from './testing'
 
 // ---------------------------------------------------------------------------
 // The stub decodes each aggregate3's Call3[] exactly as the deployed contract
@@ -17,6 +17,10 @@ import { headerNotFoundError, rateLimitHttpError } from './testing'
 // this module's own internals. Anything the stub is not scripted for is a loud
 // stub error, never a silent default.
 // ---------------------------------------------------------------------------
+
+afterEach(() => {
+  expect(takeStubViolations(), 'the aggregate3 stub was asked something no test scripted').toEqual([])
+})
 
 const TARGET_A = `0x${'aa'.repeat(20)}` as Address
 const TARGET_B = `0x${'bb'.repeat(20)}` as Address
@@ -47,32 +51,41 @@ function stubMulticallClient(script: InnerScript, opts: StubOptions = {}): {
   let outerIndex = 0
   const client = {
     async request(args: any) {
-      if (args.method !== 'eth_call') throw new Error(`stub: unexpected method ${args.method}`)
+      if (args.method !== 'eth_call') recordStubViolation(`stub: unexpected method ${args.method}`)
       const [{ to, data }, blockTag] = args.params
-      let decoded: { functionName: string; args: readonly unknown[] } | undefined
+      let isAggregate = false
       try {
-        decoded = decodeFunctionData({ abi: MULTICALL3_ABI, data })
+        isAggregate = decodeFunctionData({ abi: MULTICALL3_ABI, data }).functionName === 'aggregate3'
       } catch {
         // not an aggregate3 call — fall through to the direct table
       }
-      if (decoded?.functionName === 'aggregate3') {
-        const calls = decoded.args[0] as readonly { target: Address; allowFailure: boolean; callData: Hex }[]
-        outerCalls.push({ to: (to as string).toLowerCase(), targets: calls.map((c) => c.target.toLowerCase()) })
-        opts.onOuterCall?.((to as string).toLowerCase(), calls.length, blockTag)
+      if (isAggregate) {
         const outcome = opts.outerOutcomes?.[outerIndex++] ?? 'serve'
+        // The envelope is decoded (and its Call3 fields verified) even when the outcome is a
+        // failure, so `outerCalls` records what a 429'd chunk was CARRYING — which is what the
+        // chunk-correlation assertions are about.
+        const served = serveAggregate3({
+          data,
+          blockTag,
+          expectBlockNumber: BLOCK,
+          onEnvelope: (inner) => {
+            outerCalls.push({ to: (to as string).toLowerCase(), targets: inner.map((c) => c.target) })
+            opts.onOuterCall?.((to as string).toLowerCase(), inner.length, blockTag)
+          },
+          serve: (target, callData) => {
+            const entry = script[innerKey(target, callData)]
+            if (entry === undefined) recordStubViolation(`stub: no inner script for ${innerKey(target, callData)}`)
+            if (entry === 'throw-outer') throw new Error('stub: inner entry demanded an outer failure')
+            if (!entry.success) throw Object.assign(new Error('execution reverted'), { data: entry.returnData })
+            return entry.returnData
+          },
+        })
         if (outcome instanceof Error) throw outcome
         if (outcome !== 'serve') return outcome.garbage
-        const results = calls.map((call) => {
-          if (!call.allowFailure) throw new Error('stub: aggregate3 arrived without allowFailure')
-          const entry = script[innerKey(call.target, call.callData)]
-          if (entry === undefined) throw new Error(`stub: no inner script for ${innerKey(call.target, call.callData)}`)
-          if (entry === 'throw-outer') throw new Error('stub: inner entry demanded an outer failure')
-          return entry
-        })
-        return encodeFunctionResult({ abi: MULTICALL3_ABI, functionName: 'aggregate3', result: results })
+        return served
       }
       const entry = opts.direct?.[innerKey(to as string, data as string)]
-      if (entry === undefined) throw new Error(`stub: unexpected direct eth_call to ${to}`)
+      if (entry === undefined) recordStubViolation(`stub: unexpected direct eth_call to ${to}`)
       if (entry instanceof Error) throw entry
       return entry
     },

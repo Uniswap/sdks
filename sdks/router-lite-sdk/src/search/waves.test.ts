@@ -1,14 +1,13 @@
-import { expect, test } from 'bun:test'
+import { afterEach, expect, test } from 'bun:test'
 import type { Address, Hex, Log } from 'viem'
-import { decodeFunctionData, encodeAbiParameters, encodeFunctionResult, toHex, zeroAddress } from 'viem'
+import { encodeAbiParameters, toHex, zeroAddress } from 'viem'
 
 import { DEFAULT_REORG_OVERLAP_BLOCKS, FEE_DISCOVERY_MAX_REQUESTS, MAX_INTERMEDIATES, PREFLIGHT_TOP_K } from '../constants'
 import { UnsupportedRouteError } from '../errors'
-import { MULTICALL3_ABI } from '../internal/abis'
 import { sortAddresses } from '../internal/currency'
 import { MULTICALL3_ADDRESS } from '../internal/multicall'
 import { createSemaphore } from '../internal/rpc'
-import { assertResultCoherent, rateLimitHttpError, v2Ref, v3Ref, v4Ref } from '../internal/testing'
+import { assertResultCoherent, rateLimitHttpError, recordStubViolation, serveAggregate3, takeStubViolations, v2Ref, v3Ref, v4Ref } from '../internal/testing'
 import { wave0PairScanBlocks } from '../manifest'
 import { isDiscredited, PoolIndex } from '../pools/poolIndex'
 import { routeId } from '../protocols'
@@ -405,38 +404,30 @@ function stubClient(script: ClientScript): { client: SearchContext['client']; co
 
       if (script.multicall3 !== undefined && target === script.multicall3.toLowerCase()) {
         counters.aggregate3Calls++
-        const decoded = decodeFunctionData({ abi: MULTICALL3_ABI, data })
-        if (decoded.functionName !== 'aggregate3') throw new Error(`stubClient: unexpected multicall function ${decoded.functionName}`)
-        const inner = decoded.args[0] as readonly { target: Address; allowFailure: boolean; callData: Hex }[]
-        // Recorded before the outcome: a 429'd envelope still carried these.
-        for (const c of inner) {
-          const k = `${c.target.toLowerCase()}:${c.callData}`
-          counters.dispatchedByKey.set(k, (counters.dispatchedByKey.get(k) ?? 0) + 1)
-        }
-        if (counters.aggregate3Calls <= (script.failAggregate3Calls ?? 0)) throw rateLimitHttpError()
-        const results = inner.map((c) => {
-          const innerTarget = c.target.toLowerCase()
-          // Sender/value-shaped calls (a preflight simulation, the readiness reads) must never be
-          // aggregated — their semantics depend on who is asking.
-          if ([UNIVERSAL_ROUTER, PERMIT2, TOKEN_A, TOKEN_B].some((a) => a.toLowerCase() === innerTarget)) {
-            throw new Error(`stubClient: non-quote call to ${innerTarget} arrived inside aggregate3`)
-          }
-          if (!c.allowFailure) throw new Error('stubClient: aggregate3 arrived without allowFailure')
-          // This file's quote answers are `toHex(amountOut)`, which is odd-nibbled for most values —
-          // fine verbatim over the wire, but an ABI `bytes` must be whole bytes, and viem would
-          // right-pad an odd value (turning 0x1f4 into 0x1f40: 500 into 8000). Left-padding instead
-          // preserves the stub protocol's `BigInt(returnData)` decode exactly.
-          const evenHex = (h: Hex): Hex => (h.length % 2 === 0 ? h : (`0x0${h.slice(2)}` as Hex))
-          try {
-            return { success: true as const, returnData: evenHex(serveQuoteCall(innerTarget, c.callData)) }
-          } catch (err) {
-            // The deployed contract's own allowFailure behavior: the revert's data (or none) becomes
-            // the failed Result's returnData.
-            const revertData = (err as { data?: unknown }).data
-            return { success: false as const, returnData: typeof revertData === 'string' ? evenHex(revertData as Hex) : '0x' }
-          }
+        const failing = counters.aggregate3Calls <= (script.failAggregate3Calls ?? 0)
+        const served = serveAggregate3({
+          data,
+          blockTag: args.params[1],
+          expectBlockNumber: script.blockNumber?.() ?? BLOCK_NUMBER,
+          onEnvelope: (inner) => {
+            for (const c of inner) {
+              // Recorded before the outcome is known: a 429'd envelope still carried these.
+              const k = `${c.target}:${c.callData}`
+              counters.dispatchedByKey.set(k, (counters.dispatchedByKey.get(k) ?? 0) + 1)
+              // Sender/value-shaped calls (a preflight simulation, the readiness reads) must never
+              // be aggregated — their semantics depend on who is asking.
+              if ([UNIVERSAL_ROUTER, PERMIT2, TOKEN_A, TOKEN_B].some((a) => a.toLowerCase() === c.target)) {
+                recordStubViolation(`stubClient: non-quote call to ${c.target} arrived inside aggregate3`)
+              }
+            }
+          },
+          // A failing envelope must not SERVE anything (a 429 never reaches the contract), so its
+          // inner calls are not answered and never reach `callsByKey` — which is exactly the
+          // difference `dispatchedByKey` above measures.
+          serve: (innerTarget, callData) => (failing ? '0x' : serveQuoteCall(innerTarget, callData)),
         })
-        return encodeFunctionResult({ abi: MULTICALL3_ABI, functionName: 'aggregate3', result: results })
+        if (failing) throw rateLimitHttpError()
+        return served
       }
 
       if (target === UNIVERSAL_ROUTER.toLowerCase()) {
@@ -563,6 +554,10 @@ function makeContext(
 
 const quoteReq: QuoteRequest = { tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN }
 const swapReq: SwapRequest = { ...quoteReq, trader: TRADER }
+
+afterEach(() => {
+  expect(takeStubViolations(), 'the aggregate3 stub was asked something no test scripted').toEqual([])
+})
 
 async function drain(gen: AsyncGenerator<InternalResult>): Promise<InternalResult[]> {
   const events: InternalResult[] = []

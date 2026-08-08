@@ -1,6 +1,6 @@
-import { describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, test } from 'bun:test'
 import type { Address, Hex, Log, PublicClient } from 'viem'
-import { decodeFunctionData, encodeAbiParameters, encodeEventTopics, encodeFunctionResult, toHex, zeroAddress } from 'viem'
+import { decodeFunctionData, encodeAbiParameters, encodeEventTopics, toHex, zeroAddress } from 'viem'
 
 import {
   MAX_DEADLINE_SECONDS,
@@ -14,7 +14,17 @@ import { RouterConfigError } from './errors'
 import { MULTICALL3_ABI, V2_FACTORY_ABI } from './internal/abis'
 import { sortAddresses } from './internal/currency'
 import { MULTICALL3_ADDRESS } from './internal/multicall'
-import { assertResultCoherent, emptyReport, headerNotFoundError, rateLimitHttpError, rateLimitRpcError, v4Ref } from './internal/testing'
+import {
+  assertResultCoherent,
+  emptyReport,
+  headerNotFoundError,
+  rateLimitHttpError,
+  rateLimitRpcError,
+  recordStubViolation,
+  serveAggregate3,
+  takeStubViolations,
+  v4Ref,
+} from './internal/testing'
 import { manifestFor } from './manifest'
 import { PoolIndex } from './pools/poolIndex'
 import { computeV2PairAddress, v2Module } from './protocols/v2'
@@ -2304,6 +2314,10 @@ describe('transport options (C4-P6)', () => {
 // ---------------------------------------------------------------------------
 
 describe('Multicall3 probe and aggregation (facade)', () => {
+  afterEach(() => {
+    expect(takeStubViolations(), 'the aggregate3 stub was asked something no test scripted').toEqual([])
+  })
+
   type MulticallWrap = {
     client: PublicClient
     /** eth_getCode calls per (lowercased) address. */
@@ -2341,23 +2355,36 @@ describe('Multicall3 probe and aggregation (facade)', () => {
           const [{ to, data }, blockTag] = args.params
           if ((to as string).toLowerCase() === address) {
             wrap.aggregate3Calls++
-            const decoded = decodeFunctionData({ abi: MULTICALL3_ABI, data })
-            const inner = decoded.args[0] as readonly { target: Address; allowFailure: boolean; callData: Hex }[]
-            const results = await Promise.all(
+            // The inner calls are replayed through the base stub, which is ASYNC, while
+            // `serveAggregate3` (like the deployed contract) is synchronous — so they are resolved
+            // first and the shared envelope handler serves from the resolved table. That handler is
+            // what asserts `allowFailure` and the block tag here; this copy used to assert neither,
+            // which made `router.test.ts` the most permissive of the four aggregate3 fixtures while
+            // being the one that exercises the whole facade.
+            const inner = decodeFunctionData({ abi: MULTICALL3_ABI, data })
+              .args[0] as readonly { target: Address; allowFailure: boolean; callData: Hex }[]
+            const answers = new Map<string, Hex | Error>()
+            await Promise.all(
               inner.map(async (c) => {
+                const key = `${c.target.toLowerCase()}:${c.callData}`
                 try {
-                  const returnData = (await base.request({
-                    method: 'eth_call',
-                    params: [{ to: c.target, data: c.callData }, blockTag],
-                  } as never)) as Hex
-                  return { success: true as const, returnData }
+                  answers.set(key, (await base.request({ method: 'eth_call', params: [{ to: c.target, data: c.callData }, blockTag] } as never)) as Hex)
                 } catch (err) {
-                  const revertData = (err as { data?: unknown }).data
-                  return { success: false as const, returnData: (typeof revertData === 'string' ? revertData : '0x') as Hex }
+                  answers.set(key, err as Error)
                 }
               }),
             )
-            return encodeFunctionResult({ abi: MULTICALL3_ABI, functionName: 'aggregate3', result: results })
+            return serveAggregate3({
+              data,
+              blockTag,
+              expectBlockNumber: BigInt(blockTag as string),
+              serve: (target, callData) => {
+                const answer = answers.get(`${target}:${callData}`)
+                if (answer === undefined) recordStubViolation(`withMulticall: no answer resolved for ${target}:${callData}`)
+                if (answer instanceof Error) throw answer
+                return answer
+              },
+            })
           }
           // Readiness/preflight targets are legitimate direct calls; anything else is a quote.
           const special = [UNIVERSAL_ROUTER, PERMIT2, TOKEN_A, TOKEN_B].map((a) => a.toLowerCase())

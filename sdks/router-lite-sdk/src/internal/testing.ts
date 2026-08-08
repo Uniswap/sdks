@@ -1,10 +1,12 @@
-import type { Address, TypedDataDomain } from 'viem'
-import { zeroHash } from 'viem'
+import type { Address, Hex, TypedDataDomain } from 'viem'
+import { decodeFunctionData, encodeFunctionResult, zeroHash } from 'viem'
 
 import { PREFLIGHT_TOP_K } from '../constants'
 import { WAVE_COUNT } from '../search/waves'
 import type { BlockRef, Protocol, QuoteResult, ReasonCode, SearchReport, SwapResult } from '../types'
 import { protocolRecord, zeroQuoting, zeroReportEnumeration, zeroVerification } from '../types'
+
+import { MULTICALL3_ABI } from './abis'
 
 /**
  * The {@link PoolRef} constructors, re-exported under their test-facing names. A `PoolRef` carries
@@ -467,4 +469,148 @@ export function assertResultCoherent(r: QuoteResult | SwapResult): void {
     )
   }
   if (v.preflightAttempted < 0) throw new Error('preflightAttempted must not be negative')
+}
+
+// ---------------------------------------------------------------------------
+// The shared `aggregate3` envelope stub.
+//
+// FOUR TEST FILES GREW THEIR OWN, AND THEY DRIFTED. `internal/multicall.test.ts`
+// asserted `allowFailure` and the block tag and was loud about an unscripted
+// inner call; `quote/quote.test.ts` asserted neither and served an unscripted
+// call as a clean revert; `search/waves.test.ts` asserted `allowFailure` only;
+// `router.test.ts` asserted nothing at all. Every one of those is the same
+// four-line decode of the same Call3[], and each divergence is a class of bug
+// one file catches and the others wave through — which is the worst possible
+// place for a fixture to disagree with itself, because the thing they are all
+// fixtures FOR is a single shared function.
+//
+// So the envelope handling lives here once: decode, verify the two fields that
+// change what the results MEAN, hand each inner call to the caller's own
+// registry, and re-encode. What stays per-file is the registry — the answers
+// are what each suite is actually about.
+//
+// A THROW IS NOT LOUD ENOUGH ON ITS OWN, which is why {@link takeStubViolations}
+// exists. `internal/multicall.ts` catches everything an outer `eth_call` raises
+// and coarsens it to a `TransportError` per slot (deliberately: an aggregator
+// anomaly is not evidence about any inner call). So a stub that merely throws
+// on a wiring mistake reports it as a plausible provider hiccup, and the test
+// goes on to assert a tally that happens to be self-consistent. Violations are
+// therefore recorded out-of-band as well, and drained by an `afterEach` in each
+// file, which is what turns "the round asked something no test scripted" into a
+// test failure rather than a transport statistic.
+// ---------------------------------------------------------------------------
+
+/**
+ * A `NotEnoughLiquidity(bytes32 poolId)`-shaped custom-error revert — real revert data, so unlike a
+ * data-less revert it must NEVER be treated as amount-independent (C4-H3). The exact bytes do not
+ * matter to the classifier; only that `data` is non-empty and stays byte-identical across the suites
+ * that assert on it.
+ */
+export const NOT_ENOUGH_LIQUIDITY_DATA: Hex = '0xf29b7f9800000000000000000000000000000000000000000000000000000000000001'
+
+const stubViolationLog: string[] = []
+
+/**
+ * A breach of the stub's contract, as opposed to a scripted revert.
+ *
+ * IT IS A CLASS AND NOT A PLAIN `Error` BECAUSE {@link serveAggregate3} CATCHES. A `serve` callback
+ * signals a scripted revert by throwing (that is the deployed contract's allowFailure behavior), so
+ * the envelope loop has to catch — and a violation thrown from the same callback would be caught by
+ * the same `catch` and turned into a tidy failed `Result`, which is EXACTLY the unscripted-reads-as-
+ * reverted bug the loudness exists to kill, reintroduced one layer up. The class is what lets the
+ * loop tell "this call is scripted to revert" from "this call is not scripted at all" and rethrow
+ * only the second.
+ */
+export class StubViolationError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'StubViolationError'
+    Object.setPrototypeOf(this, StubViolationError.prototype)
+  }
+}
+
+/**
+ * Records a stub-contract breach and throws it. `never`-returning so a call site reads as the
+ * terminator it is. See the section header for why recording is not redundant with throwing.
+ */
+export function recordStubViolation(message: string): never {
+  stubViolationLog.push(message)
+  throw new StubViolationError(message)
+}
+
+/** Drains the recorded breaches. Call from an `afterEach` and assert it is empty. */
+export function takeStubViolations(): string[] {
+  return stubViolationLog.splice(0, stubViolationLog.length)
+}
+
+export type ServeAggregate3Args = {
+  /** The `eth_call` payload: `params[0].data`. Must decode as `aggregate3`. */
+  data: Hex
+  /** The `eth_call` block tag: `params[1]`. */
+  blockTag: unknown
+  /**
+   * The block the round is pinned to. A round that pinned `latest`, or the wrong block, prices
+   * against state no other call in the search saw — and every tally downstream would still add up.
+   * `undefined` skips the check, for the (rare) stub that legitimately does not know it.
+   */
+  expectBlockNumber?: bigint | undefined
+  /**
+   * Answers one inner call. Return the raw success data; THROW to make it a failed `Result` — the
+   * deployed contract's own `allowFailure` behavior, with a thrown error's `data` (when it has one)
+   * becoming the failed slot's `returnData`, exactly as a real revert's bytes do.
+   */
+  serve: (target: string, callData: Hex) => Hex
+  /** Called once per envelope, before anything is served, with what it carried. */
+  onEnvelope?: (inner: readonly { target: string; callData: Hex }[]) => void
+}
+
+/**
+ * Serves one `aggregate3` envelope the way the deployed contract does, verifying the two things
+ * about it that change what its results mean:
+ *
+ *  - `allowFailure` on every `Call3`. False makes ONE inner revert take down the whole envelope, so
+ *    every per-call revert a suite scripts would arrive as an outer transport failure instead —
+ *    which several of these suites assert the tallies of.
+ *  - the outer call's block tag, against the block the round was asked for.
+ *
+ * Both are {@link recordStubViolation}s rather than plain throws, per the section header.
+ */
+export function serveAggregate3(args: ServeAggregate3Args): Hex {
+  const { data, blockTag, expectBlockNumber, serve, onEnvelope } = args
+  const decoded = decodeFunctionData({ abi: MULTICALL3_ABI, data })
+  if (decoded.functionName !== 'aggregate3') recordStubViolation(`aggregate3 stub: unexpected function ${decoded.functionName}`)
+  const inner = decoded.args[0] as readonly { target: Address; allowFailure: boolean; callData: Hex }[]
+
+  if (expectBlockNumber !== undefined) {
+    const expected = `0x${expectBlockNumber.toString(16)}`
+    if (blockTag !== expected) {
+      recordStubViolation(`aggregate3 stub: envelope sent at blockTag ${String(blockTag)}, expected ${expected}`)
+    }
+  }
+  onEnvelope?.(inner.map((c) => ({ target: c.target.toLowerCase(), callData: c.callData })))
+
+  const results = inner.map((c) => {
+    if (!c.allowFailure) recordStubViolation('aggregate3 stub: envelope arrived without allowFailure')
+    try {
+      return { success: true as const, returnData: evenBytes(serve(c.target.toLowerCase(), c.callData)) }
+    } catch (err) {
+      // A violation is not a revert — see {@link StubViolationError}.
+      if (err instanceof StubViolationError) throw err
+      const revertData = (err as { data?: unknown }).data
+      return { success: false as const, returnData: typeof revertData === 'string' ? evenBytes(revertData as Hex) : '0x' }
+    }
+  })
+  return encodeFunctionResult({ abi: MULTICALL3_ABI, functionName: 'aggregate3', result: results })
+}
+
+/**
+ * Left-pads an odd-nibbled hex string to whole bytes.
+ *
+ * Some suites answer quotes with a bare `toHex(amountOut)`, which is odd-nibbled for most values —
+ * fine verbatim over the wire, but an ABI `bytes` must be whole bytes, and viem would RIGHT-pad an
+ * odd value (turning `0x1f4` into `0x1f40`: 500 into 8000). Left-padding preserves a
+ * `BigInt(returnData)` decode exactly.
+ */
+function evenBytes(h: Hex): Hex {
+  return h.length % 2 === 0 ? h : (`0x0${h.slice(2)}` as Hex)
 }
