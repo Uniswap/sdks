@@ -226,6 +226,34 @@ describe('the router the CLI builds', () => {
     expect(methods).toContain('eth_getCode')
   })
 
+  test('--trust-coverage without --pool-list is rejected before the endpoint is touched', async () => {
+    // AN ARGUMENT MISTAKE MAY NOT COST A CACHE REWRITE. This check used to run after the chain probe,
+    // after the (multi-hundred-megabyte, on mainnet) cache load, and after the save was registered —
+    // so `rl quote … --trust-coverage` with no list spent a round trip, a full snapshot read and a
+    // full snapshot write before printing a complaint that was decidable from `parsed` alone.
+    //
+    // The transport is the assertion: a fetch of any kind means the probe ran.
+    const wire = stubFetch(() => {
+      throw new Error('the endpoint must not be touched for a flag combination that is wrong on its face')
+    })
+    const parsed = args()
+    parsed.booleans.add('trust-coverage')
+    // ...and the cache is deliberately LEFT ON here (the only test in this file that does), because
+    // the load and the save registration are exactly what must not happen.
+    parsed.booleans.delete('no-cache')
+
+    await expect(buildChainContext(parsed)).rejects.toThrow(/--trust-coverage only means something with --pool-list/)
+    expect(wire).toEqual([])
+
+    // ...and it is the flag combination that is refused, not the flag: with a list named, the run
+    // gets as far as the endpoint (where this stub then fails it).
+    const withList = args()
+    withList.booleans.add('trust-coverage')
+    withList.strings.set('pool-list', '/nonexistent.poollist.json')
+    await expect(buildChainContext(withList)).rejects.toThrow(/did not answer eth_chainId/)
+    expect(wire.length).toBeGreaterThan(0)
+  })
+
   test('--concurrency is validated against the SDK’s own bounds', async () => {
     stubFetch(chainIdThen('0x1'))
     const withConcurrency = (value: string): ParsedArgs => {

@@ -195,14 +195,24 @@ export async function resolveToken(
   // ask again) for a lost read, `UsageError` (exit 3) for an intermediate that genuinely is not an
   // ERC-20 here.
   if (failures.length === 1) throw failures[0]
-  // More than one, and no single error is the story. Still inconclusive rather than a usage mistake,
-  // which is the distinction `RpcError` exists for: a script told 3 ("fix your arguments") for
-  // something a retry would have fixed is exactly the bug that class was introduced to end.
+  // More than one, and no single error is the story — but the CLASS still is, and it is decided by
+  // what the failures actually were rather than by how many there were.
+  //
+  // `RpcError` (exit 2, "ask again") is right when ANY failure was a lost read: a retry may turn that
+  // candidate into the match, so the run is inconclusive. It is WRONG when every failure was a
+  // `UsageError` — an intermediate whose `decimals()` the EVM rejected is not an ERC-20 here, and a
+  // thing that answers no `decimals()` answers no `symbol()` either, so it can never have been the
+  // token asked for. Nothing is pending, and the chain was in fact read completely: retrying is
+  // guaranteed to produce this same error forever, which is exactly the outcome exit 2 tells a script
+  // to keep trying. Two-or-more of them used to be reported as 2 purely because the count was >1.
   if (failures.length > 1) {
-    throw new RpcError(
+    const unretryable = failures.every((f) => f instanceof UsageError)
+    const detail =
       `could not resolve '${input}': ${failures.length} of this chain's ${candidates.length} core intermediates did not ` +
-        `answer (first: ${firstLine(failures[0])}) — of the rest, the resolvable symbols are: ${available}`,
-    )
+      `answer (first: ${firstLine(failures[0])}) — of the rest, the resolvable symbols are: ${available}`
+    throw unretryable
+      ? new UsageError(`${detail}. None of those is an ERC-20 on this chain, so none of them could have been '${input}'`)
+      : new RpcError(detail)
   }
 
   throw new UsageError(

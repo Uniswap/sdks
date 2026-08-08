@@ -89,6 +89,17 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
   const budgetArg = parsed.strings.get('budget')
   const budgetMs = budgetArg !== undefined ? parseBudget(budgetArg) : undefined
   const concurrency = parseConcurrency(parsed.strings.get('concurrency'))
+  const poolListSpec = parsed.strings.get('pool-list')
+  const trustCoverage = parsed.booleans.has('trust-coverage')
+  // ARGUMENT MISTAKES ARE DECIDED BEFORE ANYTHING IS SPENT, next to the other two pure parses above.
+  // This check used to sit down beside the `applyPoolList` call it is about — after the chain probe,
+  // after the full cache load, and after the save was registered — so `--trust-coverage` with no
+  // `--pool-list` cost a round trip, a multi-hundred-megabyte snapshot read, and (via the registered
+  // save that `rl.ts` flushes in its `finally`) a rewrite of that same snapshot, before printing a
+  // one-line complaint about a flag combination that was decidable from `parsed` alone.
+  if (trustCoverage && poolListSpec === undefined) {
+    throw new UsageError('--trust-coverage only means something with --pool-list <path-or-https-url>')
+  }
 
   // Detect the chain with a short, unretried probe — an unreachable/misconfigured endpoint should
   // be a friendly one-liner in seconds, not viem's full retry ladder ending in a stack.
@@ -153,7 +164,8 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
   }
 
   let index = fresh
-  if (cacheEnabled(parsed.booleans)) {
+  const cacheOn = cacheEnabled(parsed.booleans)
+  if (cacheOn) {
     const started = Date.now()
     const loaded = await loadCache(chain.chainId, fresh)
     const loadMs = Date.now() - started
@@ -170,11 +182,6 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
     console.error(dim(`cache: chain ${chain.chainId} · ${cachePath(chain.chainId)}${slow}`))
     // The detail (hit/miss, why it was discarded, what was saved) stays under --verbose.
     note(loaded.note)
-
-    // Registered here rather than at each command's end so no command can forget it, and flushed by
-    // `rl.ts` in a `finally` (and by its signal handler) so a partial, failed, or Ctrl-C'd search
-    // still banks the coverage it really learned.
-    scheduleCacheSave(async () => note(await saveCache(chain.chainId, index)))
   } else {
     note('cache: disabled (--no-cache)')
   }
@@ -187,14 +194,20 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
   // trust tiers. Any failure here is fatal (exit 4 via `rl.ts`) rather than a note: unlike the cache,
   // a pool list is something the user explicitly asked for, so silently proceeding without it would
   // answer a different question than the one asked.
-  const poolListSpec = parsed.strings.get('pool-list')
-  const trustCoverage = parsed.booleans.has('trust-coverage')
-  if (trustCoverage && poolListSpec === undefined) {
-    throw new UsageError('--trust-coverage only means something with --pool-list <path-or-https-url>')
-  }
   if (poolListSpec !== undefined) {
     console.error(dim(await applyPoolList(index, poolListSpec, { chainId, manifest: chain.manifest, trustCoverage })))
   }
+
+  // THE SAVE IS REGISTERED LAST, after every source that contributes to `index` has contributed.
+  // Registered at all — rather than at each command's end — so no command can forget it, and flushed
+  // by `rl.ts` in a `finally` (and by its signal handler) so a partial, failed, or Ctrl-C'd search
+  // still banks the coverage it really learned. It used to be registered above, before the pool list
+  // was applied, which was correct only because the list MUTATES the index in place rather than
+  // replacing it: the closure and the merge agreed on an object identity nothing stated. Registering
+  // after the last writer makes "the save sees everything the run assembled" true by position rather
+  // than by that coincidence — and it means a `--pool-list` that fails its checks (exit 4) never
+  // registers a save at all.
+  if (cacheOn) scheduleCacheSave(async () => note(await saveCache(chain.chainId, index)))
 
   const router = createRouter({
     client,

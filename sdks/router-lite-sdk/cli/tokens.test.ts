@@ -193,6 +193,12 @@ function rateLimited(): Error {
   return Object.assign(new Error('HTTP request failed.\nStatus: 429\nURL: https://rpc.example/key'), { status: 429 })
 }
 
+/** The node answered and the EVM rejected the call: there is no ERC-20 at this address, now or on
+ * any retry. `classifyRpcError` calls this `execution`, which is what makes it a `UsageError`. */
+function notAnErc20(): Error {
+  return new Error('execution reverted')
+}
+
 /** A client answering per ADDRESS: `{ symbol, decimals }` to serve it, an `Error` to fail its reads. */
 function chainClient(meta: Record<string, { symbol: string; decimals: number } | Error>): PublicClient {
   return {
@@ -267,6 +273,46 @@ describe('resolveToken', () => {
     await expect(failure).rejects.not.toThrow(UsageError)
     await expect(failure).rejects.toThrow(/2 of this chain's 3 core intermediates did not answer/)
     await expect(failure).rejects.toThrow(/WETH/) // ...and it still says what DID resolve
+  })
+
+  // -------------------------------------------------------------------------
+  // …AND SEVERAL UNREAD CANDIDATES ARE NOT ALL THE SAME KIND OF UNREAD. The
+  // count of failures decides nothing on its own; what they WERE decides the
+  // exit class, because that class is a claim about whether asking again could
+  // change the answer.
+  // -------------------------------------------------------------------------
+
+  it('is a USAGE error, not an rpc one, when every failed candidate simply is not an ERC-20', async () => {
+    // Two of the three intermediates answer no `decimals()` — the EVM said so, not the transport. A
+    // thing with no `decimals()` has no `symbol()` either, so neither could ever have been 'dai': the
+    // chain WAS read completely, and exit 2 ("inconclusive, try again") would send a script into a
+    // retry loop whose every iteration reproduces this exact error.
+    const client = chainClient({
+      [WETH]: { symbol: 'WETH', decimals: 18 },
+      [TOKEN]: notAnErc20(),
+      [WBTC]: notAnErc20(),
+    })
+
+    const failure = resolveToken(client, manifest(), 'dai')
+    await expect(failure).rejects.toThrow(UsageError)
+    await expect(failure).rejects.not.toThrow(RpcError)
+    await expect(failure).rejects.toThrow(/None of those is an ERC-20 on this chain/)
+    await expect(failure).rejects.toThrow(/WETH/) // it still says what DID resolve
+  })
+
+  it('is an rpc error the moment ONE of the failures was a lost read, however many were not', async () => {
+    // The mixed case is inconclusive for the ordinary reason: the rate-limited candidate is still
+    // unread, and a retry may yet turn it into the match.
+    const client = chainClient({
+      [WETH]: { symbol: 'WETH', decimals: 18 },
+      [TOKEN]: notAnErc20(),
+      [WBTC]: rateLimited(),
+    })
+
+    const failure = resolveToken(client, manifest(), 'dai')
+    await expect(failure).rejects.toThrow(RpcError)
+    await expect(failure).rejects.not.toThrow(UsageError)
+    await expect(failure).rejects.toThrow(/2 of this chain's 3 core intermediates did not answer/)
   })
 
   it('with every candidate read and none matching, the token really is unknown here', async () => {
