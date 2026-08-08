@@ -296,7 +296,10 @@ export async function scanLogs(
   range: BlockRange,
   opts: {
     signal?: AbortSignal
-    sleep?: (ms: number) => Promise<void>
+    /** `| undefined` like the four below it, so a caller threading a possibly-absent seam through
+     * (`search/discovery.ts#scanOpts`) need not spread it conditionally: an explicit `undefined`
+     * means "no override" here exactly as it does for `semaphore` and `initialChunk`. */
+    sleep?: ((ms: number) => Promise<void>) | undefined
     semaphore?: Semaphore | undefined
     initialChunk?: bigint | undefined
     widthMemory?: ScanWidthMemory | undefined

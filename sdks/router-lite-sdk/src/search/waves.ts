@@ -259,6 +259,19 @@ export type SearchContext = {
    */
   onFirstRoute?: ((route: QuotedRoute) => void) | undefined
   /**
+   * Overrides the `eth_getLogs` retry backoff timer (`internal/logScan.ts`'s own `opts.sleep`),
+   * threaded into every scan this search issues.
+   *
+   * A SEAM, AND ONLY A SEAM — the same role, and the same justification, as {@link quoteInterleaveMs}
+   * below and as `scanLogs`' `opts.sleep` for a direct caller. The minimum-window retry ladder is
+   * defined in wall-clock time (`BACKOFF_BASE_MS` doubling to `BACKOFF_MAX_MS`, bounded by
+   * `MAX_BACKOFF_TOTAL_MS`), so a unit test of a FAILING endpoint has no way to observe the
+   * give-up-and-report-partial behaviour without actually sleeping through the escalation: one such
+   * test in `waves.test.ts` spent 1.75 real seconds proving that discovery reports `failed`. Nothing
+   * in `router.ts` sets it, so every real search sleeps exactly as before.
+   */
+  scanSleep?: ((ms: number) => Promise<void>) | undefined
+  /**
    * How often a scan-bound wave pauses to quote what it has discovered so far
    * ({@link quoteWhileDiscovering}); {@link QUOTE_INTERLEAVE_MS} when absent, which is every real
    * router (`createRouter` does not expose it and nothing in `router.ts` sets it).

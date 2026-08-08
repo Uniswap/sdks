@@ -79,11 +79,15 @@ function scanOpts(run: Run): {
   semaphore?: Semaphore | undefined
   initialChunk?: bigint | undefined
   widthMemory?: ScanWidthMemory | undefined
+  sleep?: ((ms: number) => Promise<void>) | undefined
 } {
   return {
     ...(run.req.signal !== undefined && { signal: run.req.signal }),
     semaphore: run.ctx.semaphore,
     initialChunk: run.ctx.logChunkBlocks,
+    // The retry-backoff clock, when the caller injected one (`SearchContext.scanSleep`). Absent —
+    // which is every real search — `scanLogs` uses its own `delay`, unchanged.
+    sleep: run.ctx.scanSleep,
     // The index's own scan-width memory, by reference (`PoolIndex.scanWidth`). This is the seam that
     // makes the width descent a per-endpoint cost instead of a per-scan one: a cold search here runs
     // SEVEN scans — three protocols x two topic-slot adjacency queries, plus the v4 exact-pair scan —

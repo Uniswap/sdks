@@ -2,7 +2,7 @@ import { afterEach, expect, test } from 'bun:test'
 import type { Address, Hex, Log } from 'viem'
 import { encodeAbiParameters, toHex, zeroAddress } from 'viem'
 
-import { DEFAULT_REORG_OVERLAP_BLOCKS, FEE_DISCOVERY_MAX_REQUESTS, MAX_INTERMEDIATES, PREFLIGHT_TOP_K } from '../constants'
+import { BACKOFF_BASE_MS, DEFAULT_REORG_OVERLAP_BLOCKS, FEE_DISCOVERY_MAX_REQUESTS, MAX_INTERMEDIATES, PREFLIGHT_TOP_K } from '../constants'
 import { UnsupportedRouteError } from '../errors'
 import { sortAddresses } from '../internal/currency'
 import { MULTICALL3_ADDRESS } from '../internal/multicall'
@@ -1068,7 +1068,17 @@ test('a non-endpoint focusToken never displaces an endpoint scan', async () => {
 
 test('discovery is never complete while an endpoint adjacency scan is failing', async () => {
   const { client, counters } = stubClient({ failScansFor: [TOKEN_B.toLowerCase()], logs: () => [] })
-  const ctx = makeContext(client, manifestWith({ deploymentBlock: BLOCK_NUMBER - 100n }))
+  // A FAILING endpoint means the minimum-window retry ladder runs for real: BACKOFF_BASE_MS doubling
+  // toward BACKOFF_MAX_MS, per sub-range, which is 1.75 REAL seconds of this file's runtime spent
+  // proving a statement about `discovery.status`. The waits are recorded instead of taken, so the
+  // escalation still happens in full — same number of retries, same give-ups, same report — and the
+  // assertions below are unchanged.
+  const waits: number[] = []
+  const ctx = makeContext(client, manifestWith({ deploymentBlock: BLOCK_NUMBER - 100n }), {
+    scanSleep: async (ms) => {
+      waits.push(ms)
+    },
+  })
 
   const events = await drain(searchWaves(ctx, quoteReq, 'quote'))
   const report = events.at(-1)!.report
@@ -1077,6 +1087,10 @@ test('discovery is never complete while an endpoint adjacency scan is failing', 
   expect(report.discovery.v2.status).toBe('failed')
   expect(classify('quote', events.at(-1)!).status).toBe('inconclusive') // never an authoritative no-route
   assertCoherent('quote', events)
+  // The ladder really ran — a seam that silently swallowed the retries would make the assertions
+  // above true for the wrong reason.
+  expect(waits.length).toBeGreaterThan(0)
+  expect(Math.max(...waits)).toBeGreaterThanOrEqual(BACKOFF_BASE_MS)
 })
 
 test('v3 fee-tier discovery reaches a pool on a governance-enabled tier', async () => {
@@ -1727,7 +1741,11 @@ test('a scan-bound wave quotes what it discovers WHILE it discovers it, so an ab
       ...quoteEntry([latePool], AMOUNT_IN, 6_000n),
     },
     logs: (endpoint) => (endpoint === TOKEN_A.toLowerCase() ? [early, late] : []),
-    logDelayMs: 25,
+    // 8ms x 10 chunks, against a 2ms pump below: the only thing this scenario needs from the clock
+    // is that a chunk take several pump intervals, so both are scaled down together rather than
+    // pinned high. The abort trigger is a FACT about the index (`pair().length >= 2`), not a
+    // deadline, so shrinking the numbers cannot change which chunk it fires on.
+    logDelayMs: 8,
     // The budget expiring: the moment the scan has surfaced BOTH pools, the caller's clock is up.
     abortWhen: () => index.pair(TOKEN_A, TOKEN_B).length >= 2,
     controller,
@@ -1738,7 +1756,7 @@ test('a scan-bound wave quotes what it discovers WHILE it discovers it, so an ab
     logChunkBlocks: chunk,
     // The pump's interval, shortened so the test observes passes without spending
     // QUOTE_INTERLEAVE_MS of wall clock per one — the role `scanLogs`' `opts.sleep` plays for backoff.
-    quoteInterleaveMs: 10,
+    quoteInterleaveMs: 2,
   })
   const events = await drain(searchWaves(ctx, { ...quoteReq, signal: controller.signal }, 'quote'))
 
