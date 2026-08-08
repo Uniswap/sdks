@@ -1,9 +1,45 @@
 # router-lite-sdk — Design
 
-**Date:** 2026-08-03 (rev 5: amended for the implemented package — pure protocol
-modules, structured reasons, transport knobs, quote-while-discovering)
-**Status:** Approved direction; rev 5 describes what `sdks/router-lite-sdk` does
+**Date:** 2026-08-03 (rev 6: quoting aggregates through Multicall3, reported
+`gasEstimate`, published pool lists, the certified browser claim)
+**Status:** Approved direction; rev 6 describes what `sdks/router-lite-sdk` does
 **Package:** `sdks/router-lite-sdk` → `@uniswap/router-lite-sdk`
+
+### Revision 6 — what changed, and why
+
+Rev 5's normative text said "never Multicall3" in two places while the package
+was already aggregating every quoting round through it. That is the
+contradiction this revision exists to resolve; the rest is the surface and the
+test layers rev 5 predates.
+
+- **Quoting aggregates through Multicall3, and the sender rule is now
+  mechanical rather than conventional.** A quoting round's `eth_call`s go out
+  as `aggregate3` chunks (`internal/multicall.ts`), because one chunk is one
+  rate-limit charge — the difference between a 3-5% and a 100% quote success
+  rate on a burst-limited public endpoint. The rule rev 5 wrote as "never
+  Multicall3 for sender-sensitive quotes" survives *unweakened*, enforced by
+  `aggregateCalls` partitioning on the call's own shape: a call carrying `from`
+  or `value` is dispatched individually, always. No quote call this package
+  builds carries either, and the fork test named below is the normative
+  evidence that this costs nothing. See "Quoting → Aggregation".
+- **`RouteQuote` gained `gasEstimate?: bigint`** — the gas word QuoterV2 and
+  V4Quoter already returned and this package used to discard. Reported, never
+  ranked: the "gas-aware ranking" non-goal is unchanged in substance and
+  reworded to say so precisely.
+- **`ChainManifest` gained `multicall3?: Address`**, a scalar override for a
+  chain that deployed Multicall3 off the canonical CREATE2 address. Absent
+  means "the canonical one" — and either way the router *probes* before it
+  aggregates.
+- **Pool lists** (`docs/pool-lists.md`): the index snapshot crossing an
+  organization boundary, with a two-tier coverage-trust model. Entirely a CLI
+  and script concern; `src/` still performs no I/O.
+- **The testing section grew five layers** rev 5 did not have: browser/edge
+  certification, a build-closure guard, the multicall suite including the
+  fork sender proof, pool-list tests, and a golden corpus split by what
+  actually varies.
+- **`candidatesGenerated` counts quote DISPATCHES**, which is what it always
+  literally counted; a transport-failed candidate now gets one retry, so the
+  distinction can finally arise. See "SearchReport".
 
 ### Revision 5 — what changed, and why
 
