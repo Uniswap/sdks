@@ -575,6 +575,22 @@ for (const run of COMMAND_SET_RUNS) {
 
   test(`${run.goldensFile.replace('./', '')} covers every shape and matches the current encoding`, () => {
     if (UPDATE_GOLDENS) {
+      // A REGENERATION MUST BE A WHOLE ONE, OR IT IS A TRUNCATION. `producedGoldens` is filled by
+      // the per-shape tests ABOVE, so it only ever holds the shapes that actually RAN AND PASSED in
+      // this process — and `bun test` makes partial runs one flag away (`-t`, a single file path, a
+      // shape whose universal-router-sdk construction timed out under load). Regenerating from that
+      // rewrites the file with the subset, and because the shapes that vanished are the ones nothing
+      // compared, the loss is invisible: the very next run passes, against a corpus that silently
+      // stopped covering half the encoder. This assertion is the one thing standing between
+      // `UPDATE_GOLDENS=1 bun test -t v4` and a permanently narrower differential suite.
+      //
+      // Per COMMAND SET, not globally: each run writes its own file from its own shapes, so the
+      // denominator is this run's `SHAPES` and a whole-suite count would pass a half-written pair.
+      expect(
+        Object.keys(producedGoldens).length,
+        `refusing to regenerate ${run.goldensFile}: ${Object.keys(producedGoldens).length}/${SHAPES.length} shapes ran ` +
+          '— a filtered or partly-failed run would silently truncate the golden corpus. Re-run without a -t filter.',
+      ).toBe(SHAPES.length)
       writeFileSync(goldensPath, `${JSON.stringify(producedGoldens, null, 2)}\n`)
       return
     }
