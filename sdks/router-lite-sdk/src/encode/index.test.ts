@@ -7,6 +7,7 @@ import type { CommandSet, ExecutionPlan, PoolRef, UniversalRouterDeployment } fr
 import { COMMAND_SETS } from '../types'
 
 import { encodeExecutionPlan } from './ur20'
+import { encodeExecutionPlanUr21 } from './ur21'
 
 import { encoderFor } from './index'
 
@@ -27,10 +28,31 @@ const plan: ExecutionPlan = {
   deliverOutput: { recipient: UR, currency: WETH, minAmountOut: 990n },
 }
 
-test('encoderFor(\'ur-2.0\') dispatches to the ur-2.0 encoder', () => {
-  const encoder = encoderFor('ur-2.0')
-  expect(encoder).toBe(encodeExecutionPlan)
-  expect(encoder(plan, deployment, 1_700_000_000n)).toEqual(encodeExecutionPlan(plan, deployment, 1_700_000_000n))
+// IDENTITY, NOT AGREEMENT. `expect(encoder(plan, ...)).toEqual(encodeExecutionPlan(plan, ...))` was
+// the assertion here, and it is `f(x) === f(x)` — `encoder` IS `encodeExecutionPlan`, so the call
+// compares a function's output with its own and passes for every possible registry. What has content
+// is WHICH function came back, and that the two sets do not come back with the same one (below).
+test('encoderFor(\'ur-2.0\') dispatches to the ur-2.0 encoder itself', () => {
+  expect(encoderFor('ur-2.0')).toBe(encodeExecutionPlan)
+})
+
+// The ur-2.1 half was missing outright: the registry could have mapped 'ur-2.1' to the 2.0 encoder
+// and every test in this file passed. The differential suite would eventually have caught it (it
+// compares each set against its own `UniversalRouterVersion`), but only after building 73 shapes
+// twice through universal-router-sdk — this is the one-line version of the same claim.
+test('encoderFor(\'ur-2.1\') dispatches to the ur-2.1 encoder itself', () => {
+  expect(encoderFor('ur-2.1')).toBe(encodeExecutionPlanUr21)
+})
+
+// And the two are genuinely different functions producing genuinely different calldata, which is what
+// makes the identity assertions above discriminating rather than decorative: a registry that pointed
+// both sets at one encoder would satisfy neither.
+test('the two registered encoders are distinct, and encode the same plan differently', () => {
+  const ur21Deployment: UniversalRouterDeployment = { ...deployment, commandSet: 'ur-2.1' }
+  expect(encodeExecutionPlanUr21).not.toBe(encodeExecutionPlan)
+  expect(encoderFor('ur-2.1')(plan, ur21Deployment, 1_700_000_000n).data).not.toBe(
+    encoderFor('ur-2.0')(plan, deployment, 1_700_000_000n).data,
+  )
 })
 
 test('encoderFor throws UnsupportedRouteError for an unregistered command set', () => {
@@ -64,7 +86,15 @@ const secondPlan: ExecutionPlan = {
   deliverOutput: { recipient: UR, currency: USDC, minAmountOut: 400n },
 }
 
-test('encoderFor(\'ur-2.0\') dispatch holds for a second, unrelated route shape (v2, distinct tokens/addresses)', () => {
-  const encoder = encoderFor('ur-2.0')
-  expect(encoder(secondPlan, deployment, 1_700_000_100n)).toEqual(encodeExecutionPlan(secondPlan, deployment, 1_700_000_100n))
+// The same non-tautology applied to the second shape: what the fixture buys is that BOTH sets encode
+// it, and encode it differently — a claim about the registry, not about a function agreeing with
+// itself. (`encoderFor('ur-2.0') === encodeExecutionPlan` is already asserted above, so re-invoking
+// one against the other here proved nothing about this shape either.)
+test('both registered encoders handle a second, unrelated route shape (v2, distinct tokens/addresses) — and still disagree', () => {
+  const ur21Deployment: UniversalRouterDeployment = { ...deployment, commandSet: 'ur-2.1' }
+  const ur20 = encoderFor('ur-2.0')(secondPlan, deployment, 1_700_000_100n)
+  const ur21 = encoderFor('ur-2.1')(secondPlan, ur21Deployment, 1_700_000_100n)
+  expect(ur20.data.length).toBeGreaterThan(2)
+  expect(ur21.data).not.toBe(ur20.data)
+  expect(ur21.value).toBe(ur20.value)
 })
