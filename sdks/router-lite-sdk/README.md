@@ -10,7 +10,9 @@ assets with one or few pools, where a launcher can hand the router its creation 
 pool is routable with zero historical scanning.
 
 The SDK is built on [viem](https://viem.sh) — bring your own `PublicClient`, no transport of its
-own.
+own. That is its only dependency, and it performs no I/O itself, so it runs unmodified in browsers
+and edge workers (44.8 kB gzipped, certified on every commit — see
+[Runs in browsers and edge workers](#runs-in-browsers-and-edge-workers)).
 
 ## Installation
 
@@ -534,6 +536,30 @@ const router = createRouter({ client, manifest, concurrency: 8, logChunkBlocks: 
 
 Both are optional; a zero-config caller gets the shared concurrency bound and the adaptive scan
 window without asking for either.
+
+## Runs in browsers and edge workers
+
+The package ships one runtime dependency (viem), performs no I/O of its own — the caller hands it a
+`PublicClient`, and every RPC goes through that — and cancels with a standard `AbortSignal`. There
+is no filesystem access, no `process.env`, no `Buffer`, no `node:` import anywhere in what it
+publishes, so the same build that runs on a Node server runs unmodified in a browser tab, a service
+worker, a Cloudflare Worker, or a Vercel edge function. Bundled for `target: browser` with both
+entry points imported, the whole thing — router, wave engine, encoder, all five built-in manifests,
+viem included and tree-shaken — is **144 kB minified, 44.8 kB gzipped**.
+
+That is certified, not asserted: `src/browser.certification.test.ts` runs in the ordinary suite
+(`bun test`, hence in CI) and checks three things on every commit. It parses every file the two
+published entry points reach with TypeScript's own parser and rejects a Node builtin import or a
+Node-only global (`process`, `Buffer`, `__dirname`, `require`); it really bundles the package with
+`Bun.build` for `target: browser` and again under the `worker` / `workerd` / `edge-light` export
+conditions an edge runtime's bundler adds, requiring a clean build with no Node specifier and no
+injected `process.env` shim, byte-identical across all four; and it measures the gzipped bundle
+against a recorded baseline with a 1.5x budget — loose enough to absorb a minifier version bump or a
+feature, tight enough to catch the one failure that actually matters, a dependency that stops
+tree-shaking and doubles the download for every consumer.
+
+`sideEffects: false` and an `exports` map with `types` first and ESM before CJS (asserted by the
+same test) are what let a bundler drop the parts a given consumer never imports.
 
 ## Error handling
 
