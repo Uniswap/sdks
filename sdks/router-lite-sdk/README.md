@@ -107,9 +107,11 @@ Calling `getSwap`/`swaps` on a manifest with no `execution` bundle throws `Route
 synchronously, before any RPC — see [Error handling](#error-handling).
 
 Quote-only is not only a caller's choice: it is also the honest shape for a chain whose Universal
-Router this package cannot encode for. `ROBINHOOD_MANIFEST` (`chainId: 4663`) ships that way for
-exactly that reason — see [Supported chains](#supported-chains) — so `manifestFor(4663)` needs no
-`{ execution: undefined }` override to reach the behaviour above.
+Router this package cannot encode for. `ROBINHOOD_MANIFEST` (`chainId: 4663`) shipped that way
+while its only Universal Router (a 2.1.1 deployment) had no encoder here; the `ur-2.1` command set
+closed that gap and the manifest now swaps — see [Supported chains](#supported-chains) — so
+reaching the behaviour above on any built-in chain now takes the `{ execution: undefined }`
+override shown here.
 
 ## Status semantics
 
@@ -561,15 +563,19 @@ overrides required:
 | Base | `8453` | `BASE_MANIFEST` | `2` | `150n` | `302,400` | yes |
 | Unichain | `130` | `UNICHAIN_MANIFEST` | `1` | `300n` | `604,800` | yes |
 | Arbitrum One | `42161` | `ARBITRUM_MANIFEST` | `0.25` | `1200n` | `2,419,200` | yes |
-| Robinhood Chain | `4663` | `ROBINHOOD_MANIFEST` | `0.1` | `3000n` | `6,048,000` | **no — [quote-only](#quote-only-mode)** |
+| Robinhood Chain | `4663` | `ROBINHOOD_MANIFEST` | `0.1` | `3000n` | `6,048,000` | yes — `ur-2.1` |
 
-Each ships v2/v3/v4 protocol bundles (factory/poolManager addresses and deployment blocks) and
-`coreIntermediates`, and the first four ship the Universal Router 2.0 deployment too. Every address
-and deployment block was independently verified against that chain's RPC — see the `VERIFIED` comment
-block directly above each manifest constant in `src/manifest.ts` for the exact
+Each ships v2/v3/v4 protocol bundles (factory/poolManager addresses and deployment blocks),
+`coreIntermediates`, and a Universal Router deployment — the first four under `commandSet:
+'ur-2.0'`, Robinhood Chain under `'ur-2.1'` (its only router is a 2.1.1 deployment; see
+`src/encode/ur21.ts` for what that changes and how it was verified). Every address and deployment
+block was independently verified against that chain's RPC — see the `VERIFIED` comment block
+directly above each manifest constant in `src/manifest.ts` for the exact
 `eth_getCode`/`eth_call`/`eth_getLogs` evidence, method, and date. All five have also now been
 verified to actually route a live trade, not merely to hold correct-looking addresses; the
-first-live-quote results are recorded alongside the manifests in that same file.
+first-live-quote results are recorded alongside the manifests in that same file, and Robinhood
+Chain's swaps are proved by live `eth_simulateV1` execution (`canary/robinhood.test.ts` — the chain
+cannot be forked, so simulation is the execution proof there).
 
 Two entries are documented exceptions, both stated as such in `src/manifest.ts`:
 
@@ -577,14 +583,13 @@ Two entries are documented exceptions, both stated as such in `src/manifest.ts`:
   does not serve archive state far enough back to binary-search it, so it is pinned to the v3
   factory's own verified block. Safe because an early bound only costs extra scan work, never a
   missed pool.
-- **Robinhood Chain ships NO `execution` bundle, so it quotes but cannot swap.** The chain has all
-  three protocols deployed, but its only Universal Router is a 2.1.1 deployment and this package's
-  `COMMAND_SETS` is `['ur-2.0']` — there is no encoder for it. Rather than mislabel a 2.1.1 router
-  as 2.0, the manifest omits `execution`, so `getQuote`/`quotes` work normally and
-  `getSwap`/`swaps` throw `RouterConfigError` immediately. A caller who has verified 2.0-compatible
-  calldata for that chain can attach their own bundle via
-  `manifestFor(4663, { execution: … })`. `coreIntermediates` there is wrapped native + **USDG**
-  ("Global Dollar"), not USDC — no USDC deployment exists on that chain.
+- **Robinhood Chain's Universal Router is a 2.1.1 deployment, carried under
+  `commandSet: 'ur-2.1'`.** The 2.1 command set differs from 2.0 only in the ABI of the three
+  exact-in swap payloads (each gains a `minHopPriceX36` per-hop-floor field, emitted empty), but
+  the deployed router *requires* that layout — a 2.0-shaped payload reverts or misparses, which is
+  why the manifest shipped quote-only until `src/encode/ur21.ts` existed rather than mislabel the
+  router `'ur-2.0'`. `coreIntermediates` there is wrapped native + **USDG** ("Global Dollar"), not
+  USDC — no USDC deployment exists on that chain.
 
 For any other chain, build a manifest via
 `manifestFor(chainId, { wrappedNative, execution?, chain?, v2?, v3?, v4?, coreIntermediates? })` —

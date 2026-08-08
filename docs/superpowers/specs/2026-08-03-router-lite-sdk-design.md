@@ -554,13 +554,29 @@ Version binding:
 ```ts
 type UniversalRouterDeployment = {
   address: Address
-  commandSet: 'ur-2.0'        // closed supported set; extended deliberately
+  commandSet: 'ur-2.0' | 'ur-2.1'  // closed supported set; extended deliberately
   codeHash?: Hex              // keccak of the deployed code, verified at init when provided
                               // (the immutable cross-check below is stronger, and always on)
   permit2: Address
   wrappedNative: Address      // UR's own immutable; also drives native-family normalization
 }
 ```
+
+**The commandSet axis was proved by its second implementation** (2026-08-07):
+`ur-2.1`, the UR 2.1.1 family, landed exactly as this section promised —
+register an encoder behind `encoderFor`, extend `COMMAND_SETS`, flip the
+manifest; no public API change, no call-site hunt. The implementation shape
+validated a refinement of the "700-line encoder per set" picture: 2.1 changes
+only the ABI of the three exact-in swap payloads (`minHopPriceX36`), so the
+custody walker is shared (`encode/core.ts`) and each set is a thin
+`SwapPayloadCodec` (`ur20.ts`/`ur21.ts`) — the versioned surface is versioned,
+the fund-loss-critical custody logic exists once. The differential oracle ran
+per set as specified (the full shape matrix against `universal-router-sdk`
+pinned to `V2_1_1`, own goldens file), plus two oracles the spec did not
+anticipate: behavioral verification of the deployed router's dispatch table
+(2.0-shaped payloads revert `SliceOutOfBounds`/misparse — `encode/ur21.ts`),
+and live `eth_simulateV1` execution as the proof on a chain that cannot be
+forked (`canary/robinhood.test.ts`).
 
 Differential oracle: `universal-router-sdk` devDependency pinned per
 `commandSet`, plus golden calldata vectors in-repo and fork execution — SDK

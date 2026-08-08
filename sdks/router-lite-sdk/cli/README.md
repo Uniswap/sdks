@@ -58,8 +58,9 @@ the tx's own `minAmountOut`) — distinct from `2` because the chain gave a verd
 ## Notes
 
 - **Chains**: the chain is **detected** from the connected endpoint (`eth_chainId`) and mapped to
-  one of the five built-in manifests (`rl chains` lists them; Robinhood Chain is quote-only,
-  exactly as the SDK ships it). `--chain <id>` never selects anything — it *asserts*, erroring
+  one of the five built-in manifests (`rl chains` lists them; all five swap — Robinhood Chain via
+  the `ur-2.1` command set, exactly as the SDK ships it). `--chain <id>` never selects anything —
+  it *asserts*, erroring
   when the endpoint serves a different chain (the wrong-`$ETH_RPC_URL` guard). Chains without a
   built-in manifest need SDK-level `manifestFor` overrides and are out of scope here.
 - **Tokens**: symbols resolve against the manifest's own `coreIntermediates` by on-chain `symbol()`
