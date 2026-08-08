@@ -203,9 +203,25 @@ export type QuoteCandidatesArgs = {
 export type QuoteCandidatesResult = {
   quoted: QuotedRoute[]
   stats: QuoteStats
-  /** Candidates that failed only in the transport channel. Handed back (not just counted) so the
-   * caller can keep them out of the negative cache — a 429 must never be recorded as
-   * "this pool does not quote at this block". */
+  /**
+   * Candidates that failed only in the transport channel — a 429, a timeout, a dropped socket, a
+   * node that could not serve the pinned block. Nothing was learned about these routes, so they are
+   * handed back rather than merely counted.
+   *
+   * TWO THINGS THE CALLER DOES WITH THEM, and the second is the one that took a while to arrive.
+   * They are already excluded from `amountIndependentFailures` here, so a caller that only ever
+   * negative-caches that list cannot record a 429 as "this pool does not quote at this block". But
+   * NOT negative-caching a route is worth nothing if the search never asks about it again, and
+   * `search/waves.ts` filters every later enumeration against `state.seen` — into which the
+   * candidate went before this call. So the engine also uses this list to RELEASE those routeIds
+   * (once each; see `waves.ts#retryTransportFailures`) so a later wave or interleave pass re-quotes
+   * them.
+   *
+   * Aggregation is what made that second use mandatory rather than tidy. `internal/multicall.ts`
+   * replicates an outer failure across the whole chunk, so ONE 429 marks up to `MULTICALL_CHUNK`
+   * (50) candidates transport-failed at once — fifty routes dropped from the rest of the search on
+   * one provider hiccup, with the report saying only `transportFailed: 50` and `rpc-degraded`.
+   */
   transportFailures: RouteCandidate[]
   /**
    * Execution-channel failures (a real revert, not a transport failure) whose revert carried NO

@@ -334,6 +334,13 @@ type ClientScript = {
    *    sender/value-shaped and must never be aggregated.
    */
   multicall3?: Address
+  /**
+   * The first N OUTER aggregate3 envelopes fail with a 429 — the chunk-correlated transport failure
+   * `internal/multicall.ts` replicates across every candidate the envelope carried. The one shape
+   * that cannot be produced by scripting individual calls, and the one the engine's retry rule is
+   * about.
+   */
+  failAggregate3Calls?: number
 }
 
 type Counters = {
@@ -351,6 +358,13 @@ type Counters = {
   callsByKey: Map<string, number>
   /** OUTER aggregate3 envelopes served (`script.multicall3` mode only). */
   aggregate3Calls: number
+  /**
+   * Inner quote calls the engine PUT ON THE WIRE, counted from the decoded envelope BEFORE its
+   * outcome is decided — so a chunk lost to a 429 still counts what it was carrying.
+   * `callsByKey` counts calls that were ANSWERED; the difference between the two is exactly the
+   * work a transport failure destroyed, which is what the retry rule is about.
+   */
+  dispatchedByKey: Map<string, number>
 }
 
 function stubClient(script: ClientScript): { client: SearchContext['client']; counters: Counters } {
@@ -364,6 +378,7 @@ function stubClient(script: ClientScript): { client: SearchContext['client']; co
     pairScanRanges: [],
     callsByKey: new Map(),
     aggregate3Calls: 0,
+    dispatchedByKey: new Map(),
   }
   const calls = script.calls ?? {}
   const balance = script.readiness?.balance ?? 10n ** 24n
@@ -393,6 +408,12 @@ function stubClient(script: ClientScript): { client: SearchContext['client']; co
         const decoded = decodeFunctionData({ abi: MULTICALL3_ABI, data })
         if (decoded.functionName !== 'aggregate3') throw new Error(`stubClient: unexpected multicall function ${decoded.functionName}`)
         const inner = decoded.args[0] as readonly { target: Address; allowFailure: boolean; callData: Hex }[]
+        // Recorded before the outcome: a 429'd envelope still carried these.
+        for (const c of inner) {
+          const k = `${c.target.toLowerCase()}:${c.callData}`
+          counters.dispatchedByKey.set(k, (counters.dispatchedByKey.get(k) ?? 0) + 1)
+        }
+        if (counters.aggregate3Calls <= (script.failAggregate3Calls ?? 0)) throw rateLimitHttpError()
         const results = inner.map((c) => {
           const innerTarget = c.target.toLowerCase()
           // Sender/value-shaped calls (a preflight simulation, the readiness reads) must never be
@@ -583,9 +604,19 @@ function reasonFor(search: SearchReport): Reason {
  * search did manage to find. */
 function classify(kind: 'quote' | 'swap', e: InternalResult): QuoteResult | SwapResult {
   const search = e.report
+  // Mirrors `router.ts#isSearchComplete` FIELD FOR FIELD. It had drifted — three axes short — and
+  // the drift was invisible until a search actually lost calls to the transport: with
+  // `transportFailed` absent from the predicate, a search whose every quote 429'd was classified
+  // `no-route` here, which is precisely the confident-no-liquidity lie the split between `failed`
+  // and `transportFailed` exists to prevent, and which `assertResultCoherent` refuses outright. A
+  // helper that classifies more generously than production is a helper that certifies results
+  // production would never produce.
   const complete =
     !search.aborted &&
     search.quoting.unattempted === 0 &&
+    search.quoting.transportFailed === 0 &&
+    !search.verificationDegraded &&
+    !search.headRegressed &&
     Object.values(search.discovery).every((d) => d.status === 'complete' || d.status === 'disabled')
   const noViableRoute: Reason = { code: 'no-viable-route', detail: 'none' }
 
@@ -1825,6 +1856,83 @@ test('multicall parity: the same world quotes to the same result, with the same 
   expect(aggregated.counters.aggregate3Calls).toBeGreaterThan(0)
   expect([...aggregated.counters.callsByKey.entries()].sort()).toEqual([...perCall.counters.callsByKey.entries()].sort())
   assertCoherent('quote', aggregatedEvents)
+})
+
+// ---------------------------------------------------------------------------
+// Transport failures are released for one retry.
+//
+// `quoteCandidates` has always handed its transport failures back so the caller
+// could keep them out of the negative cache — and nothing consumed the list, so
+// the candidates stayed in `state.seen` and no later wave ever asked again.
+// Aggregation turned that from a per-candidate loss into a chunk-sized one: a
+// single outer 429 marks up to MULTICALL_CHUNK candidates transport-failed at
+// once, all of them already `seen`, and the search ranks whatever survived while
+// the report says only `transportFailed: N`.
+// ---------------------------------------------------------------------------
+
+test('a chunk lost to a 429 is re-quoted by a later pass — one outer failure must not drop the route for the whole search', async () => {
+  const directPool = stubPoolRef('v2', TOKEN_A, TOKEN_B)
+  const directLegs: RouteLeg[] = [{ pool: directPool, currencyIn: TOKEN_A, currencyOut: TOKEN_B }]
+  const directKey = `${quoteTarget(directPool).toLowerCase()}:${quoteData(directLegs, AMOUNT_IN)}`
+
+  // The FIRST outer envelope 429s. Wave 0's route probes travel in it, so the direct pool's quote is
+  // transport-lost — it exists and would have priced at 100.
+  const { client, counters } = stubClient({
+    calls: { ...quoteEntry([directPool], AMOUNT_IN, 100n) },
+    multicall3: MULTICALL3_ADDRESS,
+    failAggregate3Calls: 1,
+  })
+  const ctx = makeContext(client, manifestWith(), { multicall3: MULTICALL3_ADDRESS })
+  // A WARM index, because that is what makes the retry reachable: a released routeId only helps if
+  // some later enumeration produces the candidate again, and enumeration draws from the index. A
+  // wave-0 SPECULATIVE probe against a pool nothing has ever recorded is produced by nothing else in
+  // the search, so releasing it there pays off only once a scan finds the pool — which is exactly
+  // why the release is not limited to `quoteNew` (see `waves.ts#retryTransportFailures`).
+  ctx.index.upsert({ pool: directPool, source: 'event', createdAtBlock: 100n })
+
+  const events = await drain(searchWaves(ctx, quoteReq, 'quote'))
+
+  // Put on the wire twice: once in the envelope that 429'd, once by the pass that got the route back.
+  expect(counters.dispatchedByKey.get(directKey)).toBe(2)
+  // ANSWERED once — the first dispatch was destroyed by the transport, which is the whole point:
+  // before the release, that was the only dispatch this route ever got.
+  expect(counters.callsByKey.get(directKey)).toBe(1)
+
+  const last = events[events.length - 1]!
+  expect(last.best?.quote.amountOut).toBe(100n)
+  expect(routeId(last.best!.route)).toBe(routeId({ legs: directLegs }))
+
+  // The transport failure is still REPORTED — a retry that succeeded does not erase the round that
+  // failed, and `rpc-degraded` remains the honest verdict about this search's provider.
+  expect(last.report.quoting.transportFailed).toBeGreaterThan(0)
+  // And the accounting still closes. A retried candidate is DISPATCHED twice, so it is counted twice
+  // in `candidatesGenerated` — which is exactly what keeps the per-call increments equal and both
+  // conservation bounds intact (see `waves.ts#retryTransportFailures`).
+  assertCoherent('quote', events)
+})
+
+test('the retry is ONE retry — an endpoint 429ing every envelope is never re-asked a third time', async () => {
+  const directPool = stubPoolRef('v2', TOKEN_A, TOKEN_B)
+  const directLegs: RouteLeg[] = [{ pool: directPool, currencyIn: TOKEN_A, currencyOut: TOKEN_B }]
+  const directKey = `${quoteTarget(directPool).toLowerCase()}:${quoteData(directLegs, AMOUNT_IN)}`
+
+  // Every envelope fails. Waves 1-3 each re-enumerate and `quoteWhileDiscovering` re-enumerates on a
+  // timer, so an unbounded rule would aim a retry storm at the provider that is already refusing.
+  const { client, counters } = stubClient({
+    calls: { ...quoteEntry([directPool], AMOUNT_IN, 100n) },
+    multicall3: MULTICALL3_ADDRESS,
+    failAggregate3Calls: 1_000,
+  })
+  const ctx = makeContext(client, manifestWith(), { multicall3: MULTICALL3_ADDRESS })
+  ctx.index.upsert({ pool: directPool, source: 'event', createdAtBlock: 100n })
+
+  const events = await drain(searchWaves(ctx, quoteReq, 'quote'))
+
+  expect(counters.dispatchedByKey.get(directKey)).toBe(2) // the original dispatch plus one retry, no more
+  const last = events[events.length - 1]!
+  expect(last.best).toBeUndefined()
+  expect(last.report.quoting.transportFailed).toBeGreaterThan(0)
+  assertCoherent('quote', events)
 })
 
 test('multicall C4-H3: a bare inner failure is negative-cached — the second search at the same block never re-asks', async () => {

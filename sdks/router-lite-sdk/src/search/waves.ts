@@ -54,7 +54,13 @@ import { evaluate } from './leader'
 //
 //   wave 0  hints (validated) + cached pools + speculative direct probes from
 //           every enabled module + a RECENT-WINDOW v4 exact-pair Initialize
-//           scan + (swaps) the route-independent readiness reads — all
+//           scan + the CONTENTION-GATED core half-pair probes
+//           (`probeContendedCoreLegs` — wave 1's `tokenIn -> core` /
+//           `core -> tokenOut` evidence pass, pulled a wave early for exactly
+//           the cores whose legs already face per-pair slot pressure in the
+//           index this search woke up with, because wave 0's closing
+//           enumeration is the only one an anytime consumer ever sees)
+//           + (swaps) the route-independent readiness reads — all
 //           concurrently, because a launcher-hinted brand-new asset should be
 //           routable without a single historical log scan
 //   wave 1  core intermediates: probe both legs of tokenIn -> core -> tokenOut
@@ -323,9 +329,38 @@ export type EngineState = {
    * of the SEARCH, not of the wave or the call that happened to price the first route, so the latch
    * lives here with the rest of the search's memory. */
   announcedFirstRoute: boolean
-  /** routeIds ever submitted for quoting — a route is never quoted twice in one search. */
+  /**
+   * routeIds ever submitted for quoting — a route is never quoted twice in one search.
+   *
+   * WITH ONE EXCEPTION, AND IT IS THE POINT OF {@link transportRetried}: a candidate whose quote was
+   * lost in the TRANSPORT channel is REMOVED from this set once the round settles, so a later wave
+   * (or a later `quoteWhileDiscovering` pass) may submit it again. Membership therefore means "this
+   * route has been asked about and the chain answered", not "an `eth_call` was addressed to it".
+   *
+   * WHY IT HAS TO. Aggregation made transport failure CHUNK-CORRELATED: one outer 429 marks up to
+   * `MULTICALL_CHUNK` (50) candidates transport-failed at once (`internal/multicall.ts` coarsens an
+   * outer failure across the whole chunk, deliberately). Every one of them was already in `seen`, so
+   * before this they were never re-quoted for the rest of the search — a single provider hiccup
+   * silently removed fifty routes from consideration, and the search went on to rank whatever
+   * survived. The failure is invisible in the result: the report says `transportFailed: 50` and
+   * `rpc-degraded`, which is honest about the round and says nothing about the fifty routes that
+   * were never revisited even though three more waves ran.
+   */
   seen: Set<string>
-  /** Discovery-probe ids already fired (probe results are pool evidence, not routes). */
+  /**
+   * routeIds already given their one second chance after a transport failure.
+   *
+   * ONE RETRY, NOT UNLIMITED, because the retry is driven by re-enumeration and re-enumeration is
+   * frequent: waves 1-3 each re-enumerate, and `quoteWhileDiscovering` re-enumerates every
+   * `QUOTE_INTERLEAVE_MS` for the whole of a scan-bound wave. Against an endpoint that is 429ing
+   * every `eth_call` — precisely the endpoint that produces these failures — an unbounded rule turns
+   * each interleave pass into a fresh retry of everything, which is a retry storm aimed at a
+   * provider that is already refusing. Capped at one, the worst case is that a search dispatches
+   * each candidate twice.
+   */
+  transportRetried: Set<string>
+  /** Discovery-probe ids already fired (probe results are pool evidence, not routes). Cleared for a
+   * transport-failed probe on the same one-shot terms as {@link seen} — see {@link retryTransportFailures}. */
   probed: Set<string>
   execution: Map<string, ExecutionState>
   /** routeId -> everything `search/leader.ts#compileAndEncode` produced for it. */
@@ -421,6 +456,7 @@ export function initialState(block: BlockRef, headRegressed: boolean): EngineSta
     quoted: new Map(),
     announcedFirstRoute: false,
     seen: new Set(),
+    transportRetried: new Set(),
     probed: new Set(),
     execution: new Map(),
     compiledById: new Map(),
@@ -638,6 +674,50 @@ function recordFailures(run: Run, amountIndependentFailures: RouteCandidate[]): 
   }
 }
 
+/**
+ * Returns candidates the TRANSPORT lost to the pool a later pass may draw from — the one consumer of
+ * `QuoteCandidatesResult.transportFailures`.
+ *
+ * A 429, a dropped socket, a node that could not serve the pinned block: none of them is evidence
+ * about the route, which is why they are already kept out of the negative cache
+ * (`quote/quote.ts` excludes them from `amountIndependentFailures` at the source). But keeping a
+ * route out of the negative cache is worth nothing if it stays in `state.seen`, because `seen` is
+ * what the next wave's enumeration filters against: the candidate is never submitted again, and the
+ * search simply proceeds without it. Aggregation raised the stakes from one candidate per hiccup to
+ * a whole `MULTICALL_CHUNK` (see {@link EngineState.seen}).
+ *
+ * THE ACCOUNTING, WHICH IS WHY THIS IS SAFE TO DO AT ALL. A retried candidate is counted AGAIN in
+ * `enumeration.candidatesGenerated`, because both counters move together in the callers below:
+ * every dispatching site does `candidatesGenerated += fresh.length` and
+ * `attempted + unattempted += fresh.length` (the latter as `stats.attempted` plus the
+ * `fresh.length - stats.attempted` shortfall), so the two increments are EQUAL, per call,
+ * unconditionally. Both conservation bounds `internal/testing.ts#assertResultCoherent` enforces are
+ * preserved by that equality rather than by argument:
+ *
+ *   * `unattempted <= candidatesGenerated` — per call, `unattempted` moves by at most what
+ *     `candidatesGenerated` moves by.
+ *   * `candidatesGenerated <= attempted + unattempted` — per call, exactly equal; a retry adds one
+ *     more equal pair.
+ *
+ * So `candidatesGenerated` reads as "candidate quote DISPATCHES generated", which is what it has
+ * always literally counted; before retries existed the distinction could not arise. The alternative
+ * — a separate ever-generated set, so the count stays one-per-distinct-route — was rejected: it
+ * breaks the per-call equality, and then `unattempted <= candidatesGenerated` has to be argued from
+ * the fact that a retried candidate was necessarily `attempted` in the round that released it, which
+ * is a proof rather than a construction, and the kind of proof a fourth quoting channel would
+ * silently invalidate.
+ */
+function retryTransportFailures(run: Run, transportFailures: RouteCandidate[], from: 'seen' | 'probed'): void {
+  const { state } = run
+  for (const candidate of transportFailures) {
+    const id = routeId(candidate)
+    if (state.transportRetried.has(id)) continue
+    state.transportRetried.add(id)
+    if (from === 'seen') state.seen.delete(id)
+    else state.probed.delete(`probe:${id}`)
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Quoting steps
 // ---------------------------------------------------------------------------
@@ -702,7 +782,7 @@ async function quoteNew(run: Run, candidates: RouteCandidate[]): Promise<void> {
   if (fresh.length === 0) return
 
   state.enumeration.candidatesGenerated += fresh.length
-  const { quoted, stats, amountIndependentFailures } = await quoteCandidates({
+  const { quoted, stats, amountIndependentFailures, transportFailures } = await quoteCandidates({
     client: run.ctx.client,
     modules: run.ctx.modules,
     manifest: run.ctx.manifest,
@@ -716,6 +796,7 @@ async function quoteNew(run: Run, candidates: RouteCandidate[]): Promise<void> {
 
   tallyQuoting(state, stats)
   state.quoting.unattempted += fresh.length - stats.attempted
+  retryTransportFailures(run, transportFailures, 'seen')
   recordSuccess(run, quoted)
   recordQuoteEvidence(run, quoted)
   recordFailures(run, amountIndependentFailures)
@@ -735,7 +816,7 @@ async function runRouteProbes(run: Run, probes: QuoteProbe[]): Promise<void> {
   if (fresh.length === 0) return
 
   state.enumeration.candidatesGenerated += fresh.length
-  const { quoted, stats, amountIndependentFailures } = await probeQuotes({
+  const { quoted, stats, amountIndependentFailures, transportFailures } = await probeQuotes({
     client: run.ctx.client,
     probes: fresh,
     amountIn: run.req.amountIn,
@@ -756,6 +837,7 @@ async function runRouteProbes(run: Run, probes: QuoteProbe[]): Promise<void> {
   // outcomes, with nothing anywhere saying where the rest went — the conservation invariant
   // `internal/testing.ts#assertResultCoherent` now enforces.
   state.quoting.unattempted += fresh.length - stats.attempted
+  retryTransportFailures(run, transportFailures, 'seen')
   recordSuccess(run, quoted)
   recordQuoteEvidence(run, quoted)
   recordFailures(run, amountIndependentFailures)
@@ -809,7 +891,7 @@ async function runDiscoveryProbes(run: Run, probes: QuoteProbe[]): Promise<void>
   })
   if (fresh.length === 0) return
 
-  const { quoted, stats, amountIndependentFailures } = await probeQuotes({
+  const { quoted, stats, amountIndependentFailures, transportFailures } = await probeQuotes({
     client: run.ctx.client,
     probes: fresh,
     amountIn: run.req.amountIn,
@@ -820,6 +902,11 @@ async function runDiscoveryProbes(run: Run, probes: QuoteProbe[]): Promise<void>
   })
 
   tallyQuoting(state, stats)
+  // A half-pair probe lost to the transport is released for one retry exactly as a route candidate
+  // is — and here the accounting question does not even arise, since this channel claims no
+  // `candidatesGenerated` and no `unattempted` (see the note directly below). Without it a chunk-wide
+  // 429 permanently costs the evidence pass the very leg-selection signal it exists to produce.
+  retryTransportFailures(run, transportFailures, 'probed')
   // AND DELIBERATELY NO `unattempted` LINE HERE — this is NOT the `runRouteProbes` hole repeated.
   // That one was a leak: it claimed `candidatesGenerated` it then failed to account for. This
   // function claims none (see the docstring above), so there is nothing to conserve, and

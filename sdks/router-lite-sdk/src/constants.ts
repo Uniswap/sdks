@@ -207,9 +207,20 @@ export const MAX_INTERMEDIATES = 8
  * impossibility: raise `MAX_INTERMEDIATES` or either pool cap and this grows with it.
  *
  * At today's values (`MAX_POOLS_DIRECT = 6`, `MAX_INTERMEDIATES = 8`, `MAX_POOLS_PER_LEG = 3`) this is
- * `6 + 8 * 9 = 78` — 78 `eth_call`s in a single quoting round under the router-wide semaphore
- * (`DEFAULT_CONCURRENCY = 20`), well within what a realistic wave 0 already issues concurrently
- * (batched, not simultaneous — see `internal/rpc.ts#mapConcurrent`).
+ * `6 + 8 * 9 = 78`.
+ *
+ * WHAT 78 COSTS ON THE WIRE IS NO LONGER 78 REQUESTS. On a chain with a probed Multicall3 deployment
+ * a quoting round travels as `ceil(78 / MULTICALL_CHUNK)` = 2 `aggregate3` calls, each holding ONE
+ * semaphore permit and drawing ONE rate-limit charge (`internal/multicall.ts`, which explains why 50
+ * and why the chunk count only has to be small rather than 1). That is what keeps this ceiling
+ * affordable on the burst-limited public endpoints the zero-config path meets — and it is also why
+ * the ceiling has a second, subtler cost: an outer failure is replicated across a whole chunk, so one
+ * 429 can transport-fail up to 50 candidates at once (`search/waves.ts#retryTransportFailures` is
+ * what stops that from removing them from the search).
+ *
+ * Where no Multicall3 is deployed it is 78 individual `eth_call`s under the router-wide semaphore
+ * (`DEFAULT_CONCURRENCY = 20`) — batched, not simultaneous (see `internal/rpc.ts#mapConcurrent`) —
+ * which is what a realistic wave 0 already issued before aggregation existed.
  */
 export const MAX_QUOTE_CANDIDATES = MAX_POOLS_DIRECT + MAX_INTERMEDIATES * MAX_POOLS_PER_LEG ** 2
 
