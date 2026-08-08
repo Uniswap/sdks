@@ -343,6 +343,7 @@ async function main(): Promise<void> {
 
   const { body, stats } = curate(source, {
     coreIntermediates: manifest.coreIntermediates ?? [manifest.wrappedNative],
+    factories: [manifest.v2?.factory, manifest.v3?.factory, manifest.v4?.poolManager].filter((a): a is Address => a !== undefined),
     wrappedNative: manifest.wrappedNative,
     topPairs: args.topPairs,
     ...(args.maxPools !== undefined ? { maxPools: args.maxPools } : {}),

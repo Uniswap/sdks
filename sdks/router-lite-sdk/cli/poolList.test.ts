@@ -54,6 +54,9 @@ function sourceIndex(): PoolIndex {
   index.addCoverage('v2', USDC, { fromBlock: 10_000_835n, toBlock: 20_900_000n })
   index.addCoverage('v2', index.pairScope(USDC, DAI), { fromBlock: 10_000_835n, toBlock: 21_000_000n })
   index.addCoverage('v2', LONGTAIL, { fromBlock: 15_000_000n, toBlock: 21_000_000n })
+  // The fee-discovery scan's own scope: keyed by FACTORY, not by a token endpoint, and holding no
+  // pools at all (a factory is never one of a pool's currencies).
+  index.addCoverage('v3', MAINNET.v3!.factory, { fromBlock: 12_369_621n, toBlock: 21_000_000n })
   index.addEnabledFees('v3', MAINNET.v3!.factory, [100, 500, 3000, 10_000])
   return index
 }
@@ -61,6 +64,7 @@ function sourceIndex(): PoolIndex {
 function curated(): { body: PoolIndexSnapshot; claimed: string[] } {
   const { body, stats } = curate(sourceIndex().toSnapshot(), {
     coreIntermediates: MAINNET.coreIntermediates ?? [],
+    factories: [MAINNET.v2!.factory, MAINNET.v3!.factory, MAINNET.v4!.poolManager],
     wrappedNative: MAINNET.wrappedNative,
     topPairs: 25,
   })
@@ -96,6 +100,7 @@ describe('curation', () => {
   it('claims the core-intermediate adjacency scopes and drops the long-tail one, pools and all', () => {
     const { body, stats } = curate(sourceIndex().toSnapshot(), {
       coreIntermediates: [WETH, USDC],
+      factories: [],
       wrappedNative: WETH,
       topPairs: 25,
     })
@@ -112,6 +117,7 @@ describe('curation', () => {
     // Claim only v3 WETH: the three v2 pools are outside every claimed scope and must not ship.
     const { body, stats } = curate(sourceIndex().toSnapshot(), {
       coreIntermediates: [WETH],
+      factories: [],
       wrappedNative: WETH,
       topPairs: 0,
     })
@@ -126,6 +132,7 @@ describe('curation', () => {
     const source = sourceIndex().toSnapshot()
     const { body, stats } = curate(source, {
       coreIntermediates: [WETH, USDC],
+      factories: [],
       wrappedNative: WETH,
       topPairs: 25,
       maxPools: 2,
@@ -152,7 +159,7 @@ describe('curation', () => {
       lastQuoteFailureBlock: 20_000_001n,
     })
     index.addCoverage('v2', WETH, { fromBlock: 1n, toBlock: 100n })
-    const { body, stats } = curate(index.toSnapshot(), { coreIntermediates: [WETH], wrappedNative: WETH, topPairs: 0 })
+    const { body, stats } = curate(index.toSnapshot(), { coreIntermediates: [WETH], factories: [], wrappedNative: WETH, topPairs: 0 })
 
     expect(stats.hintsDowngraded).toBe(1)
     const [rec] = body.pools
@@ -165,10 +172,18 @@ describe('curation', () => {
     expect(rec!.lastQuoteFailureBlock).toBeUndefined()
   })
 
+  it("claims the fee-discovery FACTORY scope, whose pool set is empty by construction", () => {
+    // Without this the consumer re-runs a full-history sweep of the factory's own FeeAmountEnabled
+    // logs to rediscover the tiers the list already handed it.
+    const { body, claimed } = curated()
+    expect(claimed).toContain(`v3:${MAINNET.v3!.factory.toLowerCase()}`)
+    expect(body.enabledFees).toEqual([[`v3:${MAINNET.v3!.factory.toLowerCase()}`, [100, 500, 3000, 10_000]]])
+  })
+
   it('never publishes the endpoint-specific learnedScanWidth', () => {
     const index = sourceIndex()
     index.scanWidth().learnedScanWidth = 100_000n
-    const { body } = curate(index.toSnapshot(), { coreIntermediates: [WETH], wrappedNative: WETH, topPairs: 0 })
+    const { body } = curate(index.toSnapshot(), { coreIntermediates: [WETH], factories: [], wrappedNative: WETH, topPairs: 0 })
     expect(body.learnedScanWidth).toBeUndefined()
   })
 
@@ -224,6 +239,17 @@ describe('the envelope', () => {
     expect(typeof parsed.body.reorgOverlapBlocks).toBe('bigint')
     expect(typeof parsed.body.pools[0]!.createdAtBlock).toBe('bigint')
     expect(typeof parsed.body.coverage[0]![1][0]!.fromBlock).toBe('bigint')
+  })
+
+  it('pretty-prints the header a human reads and keeps the body compact', () => {
+    const text = publishedText()
+    const header = text.slice(0, text.indexOf('"body"'))
+    expect(header).toContain('\n  "chainId": 1,')
+    expect(header).toContain('\n  "manifestFingerprint": {')
+    // The body — the hundreds of megabytes nobody reads — carries no indentation at all.
+    expect(text.slice(text.indexOf('"body"'))).not.toContain('\n  ')
+    // …and it is still ordinary JSON on the way back in.
+    expect(parsePoolList(text).body.pools.length).toBe(4)
   })
 
   it('reports asOfBlock as the LEAST current claim, not the most', () => {

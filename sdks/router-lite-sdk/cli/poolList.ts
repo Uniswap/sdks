@@ -318,6 +318,20 @@ export function stripEndpointSpecific(rec: PoolRecord): PoolRecord {
 export type CurateOptions = {
   /** Adjacency scopes to claim — the manifest's core intermediates. Native-folded and lowercased here. */
   coreIntermediates: Address[]
+  /**
+   * The manifest's factory / pool-manager addresses. These share the coverage cache's key space with
+   * token endpoints but are NOT adjacency scopes: they are what the FEE-DISCOVERY scan
+   * (`search/waves.ts#discoverFeeTiers`) records its progress under, and that scan is a full-history
+   * sweep of a factory's own `FeeAmountEnabled` logs — expensive, and its result (`enabledFees`) is
+   * already published alongside. Claiming the scope is what lets a consumer skip the sweep instead of
+   * re-running it to rediscover tiers the list already handed it.
+   *
+   * INSEPARABILITY HOLDS VACUOUSLY HERE, and not by accident: a factory is never one of a pool's
+   * currencies (`PoolIndex.addEnabledFees` relies on exactly that to share the key space safely), so
+   * a factory scope contains no pools and there is no pool set to keep in full. The assertion still
+   * runs over it — it just has nothing to find.
+   */
+  factories: Address[]
   wrappedNative: Address
   /** How many `pair:` scopes to claim, ranked by how many pools they hold. */
   topPairs: number
@@ -371,6 +385,7 @@ export function curate(
   const { wrappedNative, topPairs } = options
   const wanted = new Set(options.coreIntermediates.map((a) => toGraphNode(a, wrappedNative)))
   wanted.add(toGraphNode(wrappedNative, wrappedNative))
+  for (const factory of options.factories) wanted.add(factory.toLowerCase() as Address)
 
   // Rank every candidate scope the source actually has coverage for. Adjacency scopes named by the
   // manifest are always eligible; pair scopes compete on pool count.
@@ -486,9 +501,24 @@ export function buildEnvelope(args: {
   }
 }
 
-/** The published file's text — pretty-printed, because a pool list is something people read and diff. */
+/**
+ * The published file's text: a PRETTY-PRINTED HEADER over a COMPACT BODY.
+ *
+ * The split is a size decision that costs nothing. A real mainnet list is a few hundred megabytes of
+ * pool records, and indenting them adds ~40% (measured: 275 MB compact, 387 MB at `null, 2`) to
+ * something no human will ever read — while the header is a dozen lines that everyone reads first
+ * (`head -12 1.poollist.json` answers "which chain, how current, which factories" with no tooling).
+ * So the header gets the whitespace and the body does not.
+ *
+ * The body is emitted last and spliced in, which keeps this a single pass over the (large) body
+ * string rather than a second full serialization. The result is ordinary JSON — nothing on the read
+ * side knows or cares how the whitespace was distributed.
+ */
 export function serializeEnvelope(env: PoolListEnvelope): string {
-  return `${JSON.stringify(env, null, 2)}\n`
+  const { body, ...meta } = env
+  const head = JSON.stringify(meta, null, 2)
+  // `head` always ends in `\n}` (meta is never empty), which the body's entry replaces.
+  return `${head.slice(0, head.length - 2)},\n  "body": ${JSON.stringify(body)}\n}\n`
 }
 
 /**
