@@ -29,7 +29,8 @@ import type {
   UniversalRouterDeployment,
 } from '../types'
 
-import { COMMAND, encodeExecutionPlan, V4_ACTION } from './ur20'
+import { COMMAND, V4_ACTION } from './core'
+import { encodeExecutionPlan } from './ur20'
 
 const modules: Record<Protocol, ProtocolModule> = { v2: v2Module, v3: v3Module, v4: v4Module }
 
@@ -406,13 +407,17 @@ test('R4: a v3 operation carrying native is rejected at the boundary, never enco
 // `sdk-core`.
 // ---------------------------------------------------------------------------
 
-test('R6: every ur-2.0 COMMAND byte equals universal-router-sdk CommandType', () => {
+// NOT "ur-2.0" bytes, which is what these two were called: `COMMAND` and `V4_ACTION` live in
+// `core.ts` and are shared verbatim by BOTH command sets (`ur21.ts` revises the three swap-payload
+// ABIs and nothing else). Naming them after one set implied a per-set table that does not exist —
+// and implied, wrongly, that ur-2.1's bytes were going unchecked somewhere.
+test('R6: every shared COMMAND byte equals universal-router-sdk CommandType', () => {
   for (const [name, byte] of Object.entries(COMMAND)) {
     expect(CommandType[name as keyof typeof CommandType], `COMMAND.${name}`).toBe(byte)
   }
 })
 
-test('R6: every V4_ACTION byte equals v4-sdk Actions', () => {
+test('R6: every shared V4_ACTION byte equals v4-sdk Actions', () => {
   for (const [name, byte] of Object.entries(V4_ACTION)) {
     expect(Actions[name as keyof typeof Actions], `V4_ACTION.${name}`).toBe(byte)
   }

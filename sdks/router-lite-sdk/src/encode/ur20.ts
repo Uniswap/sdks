@@ -21,11 +21,6 @@ import { encodeExecutionPlanFor } from './core'
 // warning.
 // ---------------------------------------------------------------------------
 
-// Re-exported for the R6 parity tests (`ur20.test.ts`) only — see `core.ts` for the terms. The
-// bytes are shared across command sets; this remains the import site the tests were written
-// against.
-export { COMMAND, V4_ACTION } from './core'
-
 const V2_SWAP_PARAMS = parseAbiParameters(
   'address recipient, uint256 amountIn, uint256 amountOutMin, address[] path, bool payerIsUser',
 )

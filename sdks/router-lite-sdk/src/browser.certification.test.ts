@@ -1,10 +1,11 @@
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, relative, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 
 import { expect, test } from 'bun:test'
 import ts from 'typescript'
+
+import { ENTRY_POINTS, importClosure, importedSpecifiers, PKG_ROOT } from './internal/moduleGraph'
 
 // ---------------------------------------------------------------------------
 // BROWSER / EDGE-WORKER CERTIFICATION — the claim, mechanically checked.
@@ -34,8 +35,10 @@ import ts from 'typescript'
 //      300 kB one without a single line of this package changing.
 //
 // It needs no dependency that is not already here: `Bun.build` is the test
-// runner's own bundler, and `typescript` is already a devDependency (see
-// `build.surface.test.ts`, whose closure walk this shares).
+// runner's own bundler, and `typescript` is already a devDependency. The
+// closure walk is genuinely shared with `build.surface.test.ts` now — both
+// import it from `internal/moduleGraph.ts` — rather than being a second copy
+// that merely claimed to be.
 //
 // IT BUNDLES `src/`, NOT `dist/`, and that is the right call rather than a
 // shortcut: `dist/` need not exist when `bun test` runs (and does not, on a
@@ -45,10 +48,7 @@ import ts from 'typescript'
 // builds compile exactly the closure of these same two entry points.
 // ---------------------------------------------------------------------------
 
-const PKG = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-
-/** The two subpaths `package.json#exports` publishes — the whole shipped surface. */
-const ENTRY_POINTS = ['src/index.ts', 'src/experimental/index.ts']
+const PKG = PKG_ROOT
 
 /**
  * Node builtins, with and without the `node:` prefix. The prefixed form is what this package would
@@ -73,37 +73,17 @@ const NODE_BUILTINS = [
  */
 const NODE_GLOBALS = ['process', 'Buffer', '__dirname', '__filename', 'require', 'global']
 
-/** The file a relative specifier names, or `undefined` for a bare package specifier (`viem`). */
-function resolveSpecifier(fromFile: string, specifier: string): string | undefined {
-  if (!specifier.startsWith('.')) return undefined
-  const base = resolve(dirname(join(PKG, fromFile)), specifier)
-  for (const candidate of [`${base}.ts`, join(base, 'index.ts'), `${base}.json`, base]) {
-    if (existsSync(candidate) && statSync(candidate).isFile()) return relative(PKG, candidate)
-  }
-  return undefined
-}
-
-/** Every file reachable from `entries` by import/export/`require`/dynamic `import()`. */
-function importClosure(entries: string[]): string[] {
-  const seen = new Set<string>()
-  const queue = [...entries]
-  while (queue.length > 0) {
-    const file = queue.pop()!
-    if (seen.has(file)) continue
-    seen.add(file)
-    for (const imported of ts.preProcessFile(readFileSync(join(PKG, file), 'utf8'), true, true).importedFiles) {
-      const target = resolveSpecifier(file, imported.fileName)
-      if (target !== undefined && !seen.has(target)) queue.push(target)
-    }
-  }
-  return [...seen].filter((f) => f.endsWith('.ts')).sort()
+/** The shipped `.ts` files, sorted — the closure of both entry points, walked once per run. */
+let shippedFilesCache: string[] | undefined
+function shippedFiles(): string[] {
+  shippedFilesCache ??= [...importClosure(ENTRY_POINTS)].filter((f) => f.endsWith('.ts')).sort()
+  return shippedFilesCache
 }
 
 test('no file the package ships imports a Node builtin', () => {
   const offenders: string[] = []
-  for (const file of importClosure(ENTRY_POINTS)) {
-    for (const imported of ts.preProcessFile(readFileSync(join(PKG, file), 'utf8'), true, true).importedFiles) {
-      const spec = imported.fileName
+  for (const file of shippedFiles()) {
+    for (const spec of importedSpecifiers(file)) {
       const bare = spec.startsWith('node:') ? spec.slice(5) : spec
       if (spec.startsWith('node:') || NODE_BUILTINS.includes(bare.split('/')[0]!)) {
         offenders.push(`${file} -> ${spec}`)
@@ -120,7 +100,7 @@ test('no file the package ships reads a Node-only global', () => {
   // scan flags the first (wrongly) and, if it ever crept into a non-test file, would have no way to
   // tell it apart from the second.
   const offenders: string[] = []
-  for (const file of importClosure(ENTRY_POINTS)) {
+  for (const file of shippedFiles()) {
     const source = ts.createSourceFile(file, readFileSync(join(PKG, file), 'utf8'), ts.ScriptTarget.ES2020, true)
     const visit = (node: ts.Node): void => {
       if (ts.isIdentifier(node) && NODE_GLOBALS.includes(node.text)) {
@@ -170,7 +150,27 @@ const SIZE_BUDGET = 1.5
  * config's `include`, so a crashed run would leave one behind for `tsc` to compile into `dist/` and
  * for `build.surface.test.ts` to (correctly) fail on.
  */
-async function bundle(conditions?: string[]): Promise<{ text: string; gzip: number }> {
+type Bundle = { text: string; gzip: number }
+
+/**
+ * Memoized per condition set. Three tests want the plain browser bundle and one wants three edge
+ * variants, so this file used to run SIX bundles of the whole package — three of them byte-identical
+ * repeats of the same build — for four assertions. Keyed by the conditions rather than cached
+ * globally, because the edge builds are the point of one of those tests.
+ */
+const bundles = new Map<string, Promise<Bundle>>()
+
+function bundle(conditions?: string[]): Promise<Bundle> {
+  const key = conditions?.join(',') ?? '<browser>'
+  let cached = bundles.get(key)
+  if (cached === undefined) {
+    cached = buildBundle(conditions)
+    bundles.set(key, cached)
+  }
+  return cached
+}
+
+async function buildBundle(conditions?: string[]): Promise<Bundle> {
   const entry = join(tmpdir(), `router-lite-browser-certification-${process.pid}-${Math.random().toString(36).slice(2)}.ts`)
   await Bun.write(
     entry,
@@ -214,7 +214,7 @@ test('the whole public surface bundles clean for a browser, pulling in no Node b
   // what this package needs — Bun's browser target injects those shims silently when something asks.
   expect(text).not.toContain('process.env')
   expect(text).not.toContain('__dirname')
-}, 60_000)
+}, 30_000)
 
 test('it bundles identically under edge-worker export conditions', async () => {
   // `workerd` (Cloudflare), `edge-light` (Vercel) and `worker` are the conditions an edge runtime's
@@ -227,7 +227,7 @@ test('it bundles identically under edge-worker export conditions', async () => {
     const edge = await bundle(conditions)
     expect({ conditions, bytes: edge.text.length }).toEqual({ conditions, bytes: browser.text.length })
   }
-}, 120_000)
+}, 30_000)
 
 test('the bundle stays within its recorded size budget', async () => {
   const { text, gzip } = await bundle()
@@ -241,7 +241,7 @@ test('the bundle stays within its recorded size budget', async () => {
   // The other direction, so a bundle that silently collapsed to nothing (a resolution change that
   // emits an empty module, a future entry-point rename) cannot pass this file by being small.
   expect(gzip).toBeGreaterThan(BASELINE_GZIP_BYTES / 4)
-}, 60_000)
+}, 30_000)
 
 // ---------------------------------------------------------------------------
 // Packaging: the conditions a bundler actually reads.
@@ -284,7 +284,10 @@ test('package.json declares the export conditions a browser/edge bundler needs',
 
   // The legacy top-level fields still have to agree with the map — bundlers that predate `exports`
   // (and some `resolve.mainFields` configurations) read `module` and would otherwise get CJS.
-  expect(pkg.module).toBe(pkg.exports['.']!['import']!.replace('./', './'))
+  // `.replace('./', './')` used to sit on this line — an identity substitution that made the
+  // assertion look like it was normalizing something. It was not; `module` and the `import`
+  // condition are the same string, and that is the whole claim.
+  expect(pkg.module).toBe(pkg.exports['.']!['import']!)
   expect(pkg.main).toBe(pkg.exports['.']!['require']!)
   expect(pkg.types).toBe(pkg.exports['.']!['types']!)
 })

@@ -1,6 +1,7 @@
 import { UnsupportedRouteError } from '../errors'
-import type { CommandSet, EncodedTx, ExecutionPlan, UniversalRouterDeployment } from '../types'
+import type { CommandSet } from '../types'
 
+import type { PlanEncoder } from './core'
 import { encodeExecutionPlan } from './ur20'
 import { encodeExecutionPlanUr21 } from './ur21'
 
@@ -16,13 +17,14 @@ import { encodeExecutionPlanUr21 } from './ur21'
 // encoder.
 // ---------------------------------------------------------------------------
 
-type Encoder = (plan: ExecutionPlan, deployment: UniversalRouterDeployment, deadline: bigint) => EncodedTx
-
-const ENCODERS: Record<CommandSet, Encoder> = { 'ur-2.0': encodeExecutionPlan, 'ur-2.1': encodeExecutionPlanUr21 }
+// The registry's value type is `core.ts#PlanEncoder` — the type `encodeExecutionPlanFor` already
+// RETURNS — rather than a structurally-identical local restatement of it. A second spelling of one
+// signature is a second thing to keep in step, and this one had no way of noticing if it fell out.
+const ENCODERS: Record<CommandSet, PlanEncoder> = { 'ur-2.0': encodeExecutionPlan, 'ur-2.1': encodeExecutionPlanUr21 }
 
 /** The encoder for `commandSet`, or throws {@link UnsupportedRouteError} — the same error a route
  * outside the closed supported shape throws — for anything outside the registered set. */
-export function encoderFor(commandSet: CommandSet): Encoder {
+export function encoderFor(commandSet: CommandSet): PlanEncoder {
   const encoder = ENCODERS[commandSet]
   if (!encoder)
     throw new UnsupportedRouteError(

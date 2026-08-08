@@ -1,9 +1,10 @@
-import { existsSync, readFileSync, statSync } from 'node:fs'
-import { dirname, join, relative, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { existsSync } from 'node:fs'
+import { dirname, join, relative } from 'node:path'
 
 import { expect, test } from 'bun:test'
 import ts from 'typescript'
+
+import { ENTRY_POINTS, importClosure, PKG_ROOT } from './internal/moduleGraph'
 
 // ---------------------------------------------------------------------------
 // WHAT SHIPS IS EXACTLY WHAT THE ENTRY POINTS REACH.
@@ -28,13 +29,12 @@ import ts from 'typescript'
 // The file list comes from TypeScript's own config parser, so this is the
 // build's real answer (the same one `tsc --listFiles` prints) rather than a
 // re-implementation of its glob semantics, and the closure comes from
-// TypeScript's own preprocessor rather than a regex over the source.
+// TypeScript's own preprocessor rather than a regex over the source — via
+// `internal/moduleGraph.ts`, shared with `browser.certification.test.ts` so the
+// two certifications can never walk subtly different graphs.
 // ---------------------------------------------------------------------------
 
-const PKG = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-
-/** The two subpaths `package.json#exports` publishes. Everything shipped must be reachable from one. */
-const ENTRY_POINTS = ['src/index.ts', 'src/experimental/index.ts']
+const PKG = PKG_ROOT
 
 /** Every config that emits into `dist/`, i.e. every config whose output is published. */
 const BUILD_CONFIGS = ['tsconfig.esm.json', 'tsconfig.cjs.json', 'tsconfig.types.json']
@@ -47,38 +47,6 @@ function buildFiles(configName: string): string[] {
   const parsed = ts.parseJsonConfigFileContent(read.config, ts.sys, dirname(configPath), undefined, configPath)
   expect(parsed.errors).toEqual([])
   return parsed.fileNames.map((f) => relative(PKG, f))
-}
-
-/**
- * The file a relative specifier names, or `undefined` for a bare package specifier (`viem`) — those
- * are dependencies, not files this package ships.
- */
-function resolveSpecifier(fromFile: string, specifier: string): string | undefined {
-  if (!specifier.startsWith('.')) return undefined
-  const base = resolve(dirname(join(PKG, fromFile)), specifier)
-  for (const candidate of [`${base}.ts`, join(base, 'index.ts'), `${base}.json`, base]) {
-    if (existsSync(candidate) && statSync(candidate).isFile()) return relative(PKG, candidate)
-  }
-  return undefined
-}
-
-/** Every file reachable from `entries` by import/export/`require`/dynamic `import()`. */
-function importClosure(entries: string[]): Set<string> {
-  const seen = new Set<string>()
-  const queue = [...entries]
-  while (queue.length > 0) {
-    const file = queue.pop()!
-    if (seen.has(file)) continue
-    seen.add(file)
-    // `ts.preProcessFile` is the compiler's own scanner: it sees `import`, `export … from`,
-    // `import type`, dynamic `import()` and `require()`, including the forms a regex over the text
-    // routinely misses (multi-line specifiers, `export * as ns from`).
-    for (const imported of ts.preProcessFile(readFileSync(join(PKG, file), 'utf8'), true, true).importedFiles) {
-      const target = resolveSpecifier(file, imported.fileName)
-      if (target !== undefined && !seen.has(target)) queue.push(target)
-    }
-  }
-  return seen
 }
 
 test('every file the published builds compile is reachable from an exported entry point', () => {
@@ -103,7 +71,7 @@ test('the closure is the real one: it reaches deep internals and stops at the te
   }
   // The two modules that exist only for the suites and the recorder. Neither is imported by anything
   // the package exports, which is precisely why neither may be compiled into `dist/`.
-  for (const testOnly of ['src/internal/testing.ts', 'src/internal/replay.ts']) {
+  for (const testOnly of ['src/internal/testing.ts', 'src/internal/replay.ts', 'src/internal/moduleGraph.ts']) {
     expect(existsSync(join(PKG, testOnly))).toBe(true) // still there, so the check below means something
     expect([...closure]).not.toContain(testOnly)
   }

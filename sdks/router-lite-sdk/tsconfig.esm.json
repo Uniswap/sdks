@@ -6,5 +6,5 @@
     "target": "es2020"
   },
   "include": ["src/**/*"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts", "src/**/testing.ts", "src/internal/replay.ts"]
+  "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts", "src/**/testing.ts", "src/internal/replay.ts", "src/internal/moduleGraph.ts"]
 }
