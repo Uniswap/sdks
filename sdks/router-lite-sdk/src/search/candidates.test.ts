@@ -85,6 +85,56 @@ describe('generateRoutes', () => {
     expect(kept.some((p) => (p as any).poolId === (newest.pool as any).poolId)).toBe(true)
   })
 
+  test('quote evidence outranks creation recency under leg contention: the old liquid pool survives a dense pair', () => {
+    // The warm-index regression, at the enumeration seam (measured live: XPR/WETH, 13 pools, the
+    // liquid v3 0.3% pool from block 12.5M pruned in favor of the 3 newest junk pools). The liquid
+    // pool is the OLDEST record; the junk pools are all newer, so the age tie-break can never keep
+    // it. Only this search's own quoted output can.
+    const index = new PoolIndex(WETH)
+    const liquid = v3Rec(TOKEN_A, WETH, 3000, { createdAtBlock: 100n })
+    const junk = Array.from({ length: MAX_POOLS_PER_LEG + 2 }, (_, i) =>
+      v3Rec(TOKEN_A, WETH, 1000 + i, { createdAtBlock: BigInt(5000 + i) }),
+    )
+    for (const rec of [liquid, ...junk]) index.upsert(rec)
+    index.upsert(v3Rec(WETH, USDC, 500, { createdAtBlock: 50n }))
+
+    const args: GenerateRoutesArgs = { tokenIn: TOKEN_A, tokenOut: USDC, index, hookData: new Map(), wrappedNative: WETH }
+    const inLegPools = (candidates: ReturnType<typeof generateRoutes>['candidates']): Set<string> =>
+      new Set(candidates.filter((c) => c.legs.length === 2).map((c) => c.legs[0]!.pool.id))
+
+    // Without evidence, newest-first drops the liquid pool — the defect `quoteEvidence` exists to fix.
+    expect(inLegPools(generateRoutes(args).candidates).has(liquid.pool.id)).toBe(false)
+
+    const withEvidence = generateRoutes({ ...args, quoteEvidence: new Map([[liquid.pool.id, 100_000n]]) })
+    expect(inLegPools(withEvidence.candidates).has(liquid.pool.id)).toBe(true)
+  })
+
+  test('within evidenced pools, larger observed output ranks first; the reserved newest slot still holds', () => {
+    const index = new PoolIndex(WETH)
+    const pools = Array.from({ length: MAX_POOLS_PER_LEG + 2 }, (_, i) =>
+      v3Rec(TOKEN_A, WETH, 1000 + i, { createdAtBlock: BigInt(100 + i) }),
+    )
+    for (const rec of pools) index.upsert(rec)
+    index.upsert(v3Rec(WETH, USDC, 500))
+
+    // Every pool evidenced, ranked oldest-best (the exact inverse of the age tie-break), so the
+    // selection is decided by evidence alone — except the newest pool, unevidenced, which must
+    // still ride the reserved slot (a fresh deployment is never starved out by a full cap).
+    const quoteEvidence = new Map(pools.slice(0, -1).map((rec, i) => [rec.pool.id, BigInt(1_000_000 - i)]))
+    const { candidates } = generateRoutes({
+      tokenIn: TOKEN_A,
+      tokenOut: USDC,
+      index,
+      hookData: new Map(),
+      wrappedNative: WETH,
+      quoteEvidence,
+    })
+    const selected = new Set(candidates.filter((c) => c.legs.length === 2).map((c) => c.legs[0]!.pool.id))
+    expect(selected.size).toBe(MAX_POOLS_PER_LEG)
+    for (const rec of pools.slice(0, MAX_POOLS_PER_LEG - 1)) expect(selected.has(rec.pool.id)).toBe(true) // best evidence
+    expect(selected.has(pools.at(-1)!.pool.id)).toBe(true) // reserved newest slot
+  })
+
   test('a 6th direct pool (v2 + 4 v3 tiers + v4) all get quoted on a major pair — the reconciled direct cap admits it', () => {
     // C4-P7: MAX_POOLS_DIRECT was raised from 3 to 6 specifically so a realistic major pair (one v2
     // pool, the four standard v3 fee tiers, and a v4 pool) enumerates every one of its direct pools

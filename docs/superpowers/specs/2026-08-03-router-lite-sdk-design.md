@@ -208,7 +208,16 @@ Wave engine ──────── owns stopping policy and caps; drives the p
      │           CREATE2-computed pair, v3 QuoterV2 across enabled fees
      │           (quote reverts ⇒ no pool), v4 standard no-hook configs
      │           via V4Quoter — + v4 exact-pair Initialize logs +
-     │           readiness reads + block header, all in one batch
+     │           readiness reads + block header, all in one batch.
+     │           WARM-INDEX EVIDENCE PASS: when a core intermediate's
+     │           legs already face per-pair slot pressure in the index
+     │           this search woke up with (pair records > MAX_POOLS_PER_LEG
+     │           — a cached/pool-list index, never a cold one), the core
+     │           half-pair probes run HERE, two-staged (in-legs at the
+     │           request amount, out-legs at the best realized
+     │           intermediate output), so wave 0's enumeration — the
+     │           anytime contract's first answer — ranks contended legs
+     │           on quote evidence rather than creation recency
      │   Wave 1 (2 RTTs): speculative core-intermediate legs; round 2
      │           feeds realized first-leg outputs into second legs
      │           (same-protocol 2-hops quote whole-path in round 1)
@@ -441,10 +450,39 @@ Intermediate priority: hints → previously successful (this instance) →
 configured core intermediates → intermediates from newest endpoint pools →
 remaining neighbors, stable order.
 
-Pool-within-pair priority: hinted → previously successful for the
-direction/amount bucket → newest-created → an unhooked pool where available →
-remaining, deterministic order. One slot per pair is always reserved for the
-newest-initialized pool.
+Pool-within-pair priority: hinted → **this search's own quote evidence**
+(largest observed single-leg output first; evidenced over unevidenced) →
+previously successful (most recent success block) → newest-created → an
+unhooked pool where available → remaining, deterministic order. One slot per
+pair is always reserved for the newest-initialized pool.
+
+**Quote evidence is the warm-index fix, and it is quote-is-probe applied to
+selection.** Without it, a dense pair under slot pressure fell through to
+newest-created — which on mainnet is liquidity-HOSTILE, because a pair's
+junk/copycat pools postdate its canonical liquid pool. Measured live
+(XPR → USDC, 13 XPR/WETH pools, no direct pool): a cold cache found 0.2575 USDC
+through the old v3 0.3% pool; a warm 655k-pool cache found 0.0460 — 5.6x worse
+— because all three `MAX_POOLS_PER_LEG` slots went to freshly-created v4 junk
+and the liquid pool was never quoted. The evidence is free: it is the
+`amountOut` of single-leg quotes the search already pays for (direct
+candidates, wave-0/fee route probes, and the half-pair discovery probes, which
+now also `markSuccess` their pools instead of discarding the outcome). Values
+are per-search, never persisted — they are only commensurable within one pair
+at one block at one amount, which is exactly the only place selection compares
+them. Success-block recency alone cannot do this job: it is boolean per block,
+so junk that answers a quote (with a terrible price) ties the liquid pool and
+the tie falls back to the broken recency key.
+
+Two consequences follow. First, the core half-pair probes moved a wave early
+*under contention only* (see the wave diagram): wave 0's enumeration is the
+anytime contract's first — often only — answer, and evidence that arrives in
+wave 1 is evidence that answer never sees. Second, the out-legs are probed at
+the best realized intermediate output rather than `amountIn` (which is
+denominated in tokenIn and therefore dimensionally wrong for the second leg —
+measured live, the dust-amount ranking cost 0.3% by preferring a 0.01%-fee v4
+pool over the v3 0.05% pool that wins at the realized amount). After both, the
+warm cache quoted 0.257667 vs cold's 0.257458 on the same pair — the warmer
+index now WINS, by knowing a nonstandard-tier pool speculation cannot reach.
 
 Negative results (pool exists but unquoteable) are cached only for the pinned
 block.

@@ -37,6 +37,28 @@ export type GenerateRoutesArgs = {
   /** Priority order for two-hop intermediates: hinted tokens, then this list (the engine merges
    * successful and core intermediates into it, in priority order), then newest, then stable. */
   successfulIntermediates?: string[]
+  /**
+   * Best single-leg quoted `amountOut` observed THIS SEARCH, keyed by `pool.id` — the engine's own
+   * probe/quote results fed back into selection (see `search/waves.ts#recordQuoteEvidence`).
+   *
+   * WHY SELECTION NEEDS IT (the warm-index regression this fixes): with no evidence, the per-pair
+   * ranking below falls through to newest-`createdAtBlock`, which under slot pressure is not merely
+   * liquidity-blind but liquidity-HOSTILE — on a dense mainnet index the junk/copycat pools of a
+   * pair postdate the canonical liquid one, so a selection of 3-of-13 handed every slot to junk and
+   * the pool that actually carries the pair was never quoted at all. A cold search dodged this only
+   * by accident of arrival order (its wave-1 probes quoted the liquid pool while the index was
+   * still sparse, and the success mark held the slot once density arrived); a warm index faces full
+   * density from wave 0 and, measured live, routed 5.6x worse than cold on the same chain state.
+   *
+   * WHY THE VALUES ARE COMPARABLE, AND EXACTLY WHERE. Scores are compared ONLY between pools of the
+   * same pair, inside one `selectPools` call — and within one search every single-leg quote of a
+   * given pair used the same input amount, the same direction (each two-hop leg contains an
+   * endpoint, so a pair's orientation is fixed for the whole search), and the same pinned block. A
+   * bigger number is therefore a strictly better answer to the identical question, which is a
+   * ranking signal no static heuristic (age, provenance, fee tier) can beat. It is deliberately
+   * per-search and never persisted: across blocks/amounts the numbers stop being commensurable.
+   */
+  quoteEvidence?: ReadonlyMap<string, bigint>
 }
 
 export type GenerateRoutesResult = {
@@ -93,15 +115,33 @@ function sourceTier(rec: PoolRecord): number {
 
 /**
  * Per-pair pool priority, as a total order: hinted first (unless discredited, which sinks below
- * everything — see {@link sourceTier}), then previously-successful (most recent success first),
- * then newest `createdAtBlock`, then unhooked v4 over hooked, then a fully deterministic tie-break
- * by pool identity. Used both to rank pools within the cap and (via `pickNewest`) to decide who
- * gets the reserved newest-pool slot.
+ * everything — see {@link sourceTier}), then this search's own quote evidence (largest observed
+ * single-leg output first, evidenced over unevidenced — see
+ * {@link GenerateRoutesArgs.quoteEvidence}), then previously-successful (most recent success
+ * first), then newest `createdAtBlock`, then unhooked v4 over hooked, then a fully deterministic
+ * tie-break by pool identity. Used both to rank pools within the cap and (via `pickNewest`) to
+ * decide who gets the reserved newest-pool slot.
+ *
+ * EVIDENCE OUTRANKS HISTORY OUTRANKS AGE, and the order is the point: `lastQuoteSuccessBlock` is
+ * boolean-per-block — a junk pool that answered a quote with a terrible price carries the same
+ * mark, at the same block, as the pool that carries the pair — so once several pools of one pair
+ * have succeeded, success recency alone collapses back to the newest-created tie-break that
+ * mis-ranks dense pairs in the first place. The quoted output is the only signal that separates
+ * "answered" from "answered well", and it is fresher than any success block by construction (it
+ * was measured at THIS search's pinned block, at this request's amount).
  */
-function comparePoolPriority(a: PoolRecord, b: PoolRecord): number {
+function comparePoolPriority(a: PoolRecord, b: PoolRecord, quoteEvidence?: ReadonlyMap<string, bigint>): number {
   const aHint = sourceTier(a)
   const bHint = sourceTier(b)
   if (aHint !== bHint) return aHint - bHint
+
+  const aOut = quoteEvidence?.get(a.pool.id)
+  const bOut = quoteEvidence?.get(b.pool.id)
+  if (aOut !== undefined || bOut !== undefined) {
+    if (aOut === undefined) return 1
+    if (bOut === undefined) return -1
+    if (aOut !== bOut) return aOut > bOut ? -1 : 1
+  }
 
   const aSucc = a.lastQuoteSuccessBlock
   const bSucc = b.lastQuoteSuccessBlock
@@ -146,8 +186,12 @@ function pickNewest(records: PoolRecord[]): PoolRecord | undefined {
 }
 
 /** Selects ≤ `cap` records by `comparePoolPriority`, with one slot always reserved for the newest `createdAtBlock` pool. */
-function selectPools(records: PoolRecord[], cap: number): { selected: PoolRecord[]; prunedCount: number } {
-  const sorted = [...records].sort(comparePoolPriority)
+function selectPools(
+  records: PoolRecord[],
+  cap: number,
+  quoteEvidence?: ReadonlyMap<string, bigint>,
+): { selected: PoolRecord[]; prunedCount: number } {
+  const sorted = [...records].sort((a, b) => comparePoolPriority(a, b, quoteEvidence))
   if (sorted.length <= cap) return { selected: sorted, prunedCount: 0 }
 
   let selected = sorted.slice(0, cap)
@@ -224,7 +268,7 @@ function orderIntermediates(
  * is enforced here — the wave engine (Task 17) just quotes what comes back.
  */
 export function generateRoutes(args: GenerateRoutesArgs): GenerateRoutesResult {
-  const { tokenIn, tokenOut, index, hookData = new Map<string, Hex>(), wrappedNative, successfulIntermediates = [] } = args
+  const { tokenIn, tokenOut, index, hookData = new Map<string, Hex>(), wrappedNative, successfulIntermediates = [], quoteEvidence } = args
 
   const inNode = toGraphNode(tokenIn, wrappedNative)
   const outNode = toGraphNode(tokenOut, wrappedNative)
@@ -233,7 +277,7 @@ export function generateRoutes(args: GenerateRoutesArgs): GenerateRoutesResult {
 
   // Direct pools. Linear cost (one candidate per pool kept), so this gets the larger cap.
   const directRecords = index.pair(tokenIn, tokenOut)
-  const directSelection = selectPools(directRecords, MAX_POOLS_DIRECT)
+  const directSelection = selectPools(directRecords, MAX_POOLS_DIRECT, quoteEvidence)
   prunedPools += directSelection.prunedCount
   const directCandidates: RouteCandidate[] = directSelection.selected.map((rec) => ({
     legs: [materializeLeg(rec.pool, inNode, wrappedNative, hookData)],
@@ -257,8 +301,8 @@ export function generateRoutes(args: GenerateRoutesArgs): GenerateRoutesResult {
   // gets the smaller cap — see MAX_POOLS_PER_LEG's doc comment.
   const twoHopCandidates: RouteCandidate[] = []
   for (const node of selectedIntermediates) {
-    const inSelection = selectPools(neighborsIn.get(node)!, MAX_POOLS_PER_LEG)
-    const outSelection = selectPools(neighborsOut.get(node)!, MAX_POOLS_PER_LEG)
+    const inSelection = selectPools(neighborsIn.get(node)!, MAX_POOLS_PER_LEG, quoteEvidence)
+    const outSelection = selectPools(neighborsOut.get(node)!, MAX_POOLS_PER_LEG, quoteEvidence)
     prunedPools += inSelection.prunedCount + outSelection.prunedCount
 
     for (const r1 of inSelection.selected) {

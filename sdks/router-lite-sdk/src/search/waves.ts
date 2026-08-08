@@ -4,6 +4,7 @@ import {
   DEFAULT_CONCURRENCY,
   FEE_DISCOVERY_MAX_REQUESTS,
   MAX_INTERMEDIATES,
+  MAX_POOLS_PER_LEG,
   maxPlausibleHeadRegression,
   QUOTE_INTERLEAVE_MS,
 } from '../constants'
@@ -383,6 +384,13 @@ export type EngineState = {
   pairScanned: BlockRange[]
   /** Graph nodes that have proven useful as intermediates, in priority order. */
   intermediatePriority: string[]
+  /** Best single-leg quoted `amountOut` per `pool.id`, THIS search only — the feedback that lets
+   * enumeration's per-pair selection prefer pools the search has already seen answer well over
+   * pools that are merely newest (see `GenerateRoutesArgs.quoteEvidence` for why this is the one
+   * signal that separates a dense pair's liquid pool from its junk, and why the values are only
+   * comparable within one search). Written by {@link recordQuoteEvidence}; read by
+   * {@link quoteEnumerated}. */
+  quoteEvidence: Map<string, bigint>
   focus?: CurrencyRef
   aborted: boolean
   /** Set when the `latest` block this search pinned is BELOW one an earlier search on the same
@@ -430,6 +438,7 @@ export function initialState(block: BlockRef, headRegressed: boolean): EngineSta
     discovery: protocolRecord<ProtocolDiscovery>(() => ({ complete: new Set(), failed: false, covered: [] })),
     pairScanned: [],
     intermediatePriority: [],
+    quoteEvidence: new Map(),
     aborted: false,
     verification: zeroVerification(),
   }
@@ -556,6 +565,25 @@ function rememberPool(run: Run, record: PoolRecord): void {
   const [c0, c1] = record.pool.currencies
   const known = run.ctx.index.pair(c0, c1).some((r) => r.pool.id === record.pool.id)
   if (!known) run.ctx.index.upsert(record)
+}
+
+/**
+ * Feeds a quoting round's SINGLE-LEG results back into enumeration's per-pair selection
+ * (`EngineState.quoteEvidence`). Single-leg only, and that is a correctness line, not a shortcut: a
+ * multi-leg quote's `amountOut` is the product of every leg, so crediting it to any one pool would
+ * rank that pool on its neighbors' behavior. Every channel that quotes single legs feeds this —
+ * direct-pair candidates and wave-0/fee route probes via their callers below, and the half-pair
+ * discovery probes via {@link runDiscoveryProbes} — because the half-pair probes are precisely the
+ * calls that price a contended leg's standard-tier pools before enumeration must choose which 3
+ * survive (`MAX_POOLS_PER_LEG`).
+ */
+function recordQuoteEvidence(run: Run, quoted: QuotedRoute[]): void {
+  for (const q of quoted) {
+    if (q.route.legs.length !== 1) continue
+    const id = q.route.legs[0]!.pool.id
+    const best = run.state.quoteEvidence.get(id)
+    if (best === undefined || q.quote.amountOut > best) run.state.quoteEvidence.set(id, q.quote.amountOut)
+  }
 }
 
 function recordSuccess(run: Run, quoted: QuotedRoute[]): void {
@@ -689,6 +717,7 @@ async function quoteNew(run: Run, candidates: RouteCandidate[]): Promise<void> {
   tallyQuoting(state, stats)
   state.quoting.unattempted += fresh.length - stats.attempted
   recordSuccess(run, quoted)
+  recordQuoteEvidence(run, quoted)
   recordFailures(run, amountIndependentFailures)
   recordQuoted(run, quoted)
 }
@@ -728,6 +757,7 @@ async function runRouteProbes(run: Run, probes: QuoteProbe[]): Promise<void> {
   // `internal/testing.ts#assertResultCoherent` now enforces.
   state.quoting.unattempted += fresh.length - stats.attempted
   recordSuccess(run, quoted)
+  recordQuoteEvidence(run, quoted)
   recordFailures(run, amountIndependentFailures)
   // THE EARLIEST POINT IN A SEARCH THAT A PRICE EXISTS, in the ordinary (unhinted, cached-index)
   // case: wave 0's route probes are one round trip, and they run concurrently with a log scan that
@@ -736,12 +766,28 @@ async function runRouteProbes(run: Run, probes: QuoteProbe[]): Promise<void> {
 }
 
 /**
- * Probes single legs purely to learn whether their pools exist. The returned amounts are for one
- * leg at the full input amount, which is not a quote for anything the caller asked about, so they
- * are discarded — only the pool identities survive, into the index.
+ * Probes single legs to learn whether their pools exist AND how well they answer. The returned
+ * amounts are for one leg at the full input amount, which is not a quote for anything the caller
+ * asked about, so they never become a route, a `state.quoted` entry, or a `candidatesGenerated` —
+ * but they are NOT discarded: a successful probe marks its pool successful in the index
+ * (`markSuccess`) and feeds `recordQuoteEvidence`, exactly the per-pair signal enumeration's leg
+ * selection ranks by.
+ *
+ * THE DISCARD USED TO BE TOTAL, AND IT WAS THE WARM-INDEX ROUTE-QUALITY BUG. Half-pair core probes
+ * are the one channel that prices a contended leg's standard-tier pools (`tokenIn -> core`,
+ * `core -> tokenOut`) regardless of how dense the index already is — on a warm 655k-pool mainnet
+ * index they had ALREADY quoted the liquid XPR/WETH v3 0.3% pool at 5.6x the best route the search
+ * went on to return, and threw the answer away: `rememberPool` alone is a no-op on a pool the index
+ * already knows, so warm enumeration kept handing every `MAX_POOLS_PER_LEG` slot to
+ * newest-`createdAtBlock` junk and the liquid pool was never quoted as a route at all. A cold
+ * search only ever dodged this by arrival order (these same probes ran while the index was sparse,
+ * and the success marks they'd have earned as wave-1 route quotes held the slots once density
+ * arrived). Recording the success is also what makes the hint story symmetric: failures were
+ * already recorded below, so a discredited-but-genuine hinted pool on an intermediate pair could
+ * accumulate failure history here but never earn back its rank.
  *
  * They are still `eth_call` quotes that succeeded or reverted, so they count in the report's
- * quoting stats; what they never do is become a route or a `candidatesGenerated`.
+ * quoting stats.
  *
  * A PROBE'S FAILURE IS EVIDENCE TOO, AND IT IS THE EVIDENCE THAT MATTERS MOST (C4-H4 round 2). This
  * is the only place a *half-pair* leg is quoted on its own — `tokenIn -> core`, `neighbor ->
@@ -784,8 +830,14 @@ async function runDiscoveryProbes(run: Run, probes: QuoteProbe[]): Promise<void>
   // name candidates that do not exist. Nothing is lost by the omission: a probe is only ever skipped
   // by an abort, and `state.aborted` already reports that axis.
   recordFailures(run, amountIndependentFailures)
+  recordQuoteEvidence(run, quoted)
   for (const q of quoted) {
-    for (const leg of q.route.legs) rememberPool(run, { pool: leg.pool, source: 'factory' })
+    // Every probe here is single-leg by construction, so — unlike `recordFailures`' two-leg
+    // attribution gap — the success is unambiguously this one pool's.
+    for (const leg of q.route.legs) {
+      rememberPool(run, { pool: leg.pool, source: 'factory' })
+      run.ctx.index.markSuccess(leg.pool, run.state.block.number)
+    }
   }
 }
 
@@ -799,6 +851,7 @@ async function quoteEnumerated(run: Run): Promise<void> {
     hookData: ctx.hookData,
     wrappedNative: ctx.manifest.wrappedNative,
     successfulIntermediates: state.intermediatePriority,
+    quoteEvidence: state.quoteEvidence,
   })
   // Last enumeration wins: each wave re-enumerates over a strictly larger index, so the most
   // recent call is the one that describes what the finished search actually pruned.
@@ -994,6 +1047,15 @@ async function wave0(run: Run): Promise<void> {
 
   const probes = enabledModules(ctx).flatMap((m) => m.speculativeDirect(req.tokenIn, req.tokenOut, req.amountIn, ctx.manifest))
 
+  // Cores are first-class intermediates from the very first enumeration, not from wave 1. Free (no
+  // RPC), and load-bearing on a warm index: wave 0's closing `quoteEnumerated` is the anytime
+  // contract's FIRST answer, and on a dense cached index `orderIntermediates`' fallback ranking
+  // (newest-touching-pool) is exactly the recency heuristic that mis-ranks dense graphs.
+  for (const core of coresOf(run)) {
+    const key = core.toLowerCase()
+    if (!state.intermediatePriority.includes(key)) state.intermediatePriority.push(key)
+  }
+
   const readiness =
     run.kind === 'swap'
       ? checkReadiness({
@@ -1012,7 +1074,11 @@ async function wave0(run: Run): Promise<void> {
         })
       : Promise.resolve(undefined)
 
-  const [, , , readinessResult] = await Promise.all([
+  // Readiness deliberately FIRST, so the one element this destructuring names can never be silently
+  // renumbered by a probe/scan added to the batch (which is exactly how `probeContendedCoreLegs`'s
+  // insertion briefly handed `readinessResult` a probe pass's `undefined`).
+  const [readinessResult] = await Promise.all([
+    readiness,
     resolveHints(run),
     // THE WINDOW IS THIS WAVE'S DECISION, and it is the one that makes wave 0 a latency budget
     // rather than a completeness one (see this file's header). The pair scan reaches back roughly a
@@ -1024,7 +1090,7 @@ async function wave0(run: Run): Promise<void> {
     // `constants.ts#WAVE0_RECENT_WINDOW_SECONDS`.
     scanExactPairRecent(run, { window: wave0PairScanBlocks(ctx.manifest) }),
     runRouteProbes(run, probes),
-    readiness,
+    probeContendedCoreLegs(run),
   ])
   if (readinessResult !== undefined) {
     state.requirements = readinessResult.requirements
@@ -1038,6 +1104,77 @@ async function wave0(run: Run): Promise<void> {
   }
 
   await quoteEnumerated(run)
+}
+
+/** The manifest's core intermediates (wrapped native when it declares none), minus any that IS an
+ * endpoint of this request — an endpoint can never be its own intermediate. */
+function coresOf(run: Run): Address[] {
+  const { ctx, req } = run
+  const endpoints = new Set([node(req.tokenIn, ctx.manifest), node(req.tokenOut, ctx.manifest)])
+  return (ctx.manifest.coreIntermediates ?? [ctx.manifest.wrappedNative]).filter((t) => !endpoints.has(t.toLowerCase() as Address))
+}
+
+/**
+ * Wave 0's warm-index evidence pass: the core half-pair probes (`tokenIn -> core`,
+ * `core -> tokenOut`), issued a wave early for exactly the cores whose legs ALREADY face per-pair
+ * slot pressure in the index this search woke up with.
+ *
+ * WHY A WAVE EARLY: wave 0's closing `quoteEnumerated` is the first improvement the engine yields,
+ * and an anytime consumer (`getQuote`, the CLI without `--watch`) rightly stops there. On a cold
+ * index that enumeration has nothing to mis-rank — the index is empty or near it — but on a warm
+ * dense index it is the whole game, and without evidence its contended-leg selection falls back to
+ * newest-`createdAtBlock` junk (see `GenerateRoutesArgs.quoteEvidence`). Wave 1's probes produced
+ * exactly the missing evidence one wave after the only enumeration that consumer will ever see —
+ * measured live, the warm-cache XPR/USDC quote kept returning the 5.6x-worse junk route even with
+ * evidence-ranked selection in place, because the evidence arrived after the answer.
+ *
+ * WHY GATED ON CONTENTION, PER CORE: a cold or sparse index (`pair(...)` at or under
+ * `MAX_POOLS_PER_LEG` on both legs) enumerates every pool it knows, so evidence cannot change the
+ * outcome and the probes would be pure added wave-0 cost on exactly the latency-critical path —
+ * ungated, a majors quote would pay ~2 x |cores| x |protocol tiers| extra `eth_call`s for nothing.
+ * Gated, the sparse case costs zero new requests, and the dense case pays two concurrent
+ * `aggregate3` rounds' worth of calls it would have paid in wave 1 anyway (`state.probed` dedup
+ * makes the full search's total identical).
+ *
+ * WHY TWO STAGES, NOT ONE BATCH: evidence is only as honest as the amount it was measured at, and
+ * `req.amountIn` is denominated in TOKEN IN — for the `core -> tokenOut` leg it is dimensionally
+ * the wrong number, wrong by whatever the price and decimal gap between tokenIn and the core is.
+ * Measured live (XPR at 4 decimals -> WETH at 18): the out-leg probes quoted WETH -> USDC with 10^6
+ * wei of WETH — dust — where a 0.01%-fee v4 pool out-ranks the deep v3 0.05% pool that wins at the
+ * route's realized intermediate amount (~10^14 wei), and the warm best came out 0.3% under cold's.
+ * So the in-legs are probed first at the request amount (their true input), and the out-legs at the
+ * best realized intermediate output stage 1 observed — the same number the leading route's second
+ * leg will actually be fed. A core whose stage 1 produced nothing falls back to `req.amountIn`,
+ * which is the pre-existing behavior of the wave-1 probes and still ranks a pair's pools under
+ * SOME consistent amount. The price is one extra sequential round trip, paid only under contention,
+ * inside a wave that is concurrently waiting on a log scan anyway.
+ */
+async function probeContendedCoreLegs(run: Run): Promise<void> {
+  const { ctx, req, state } = run
+  const contended = coresOf(run).filter(
+    (core) =>
+      ctx.index.pair(req.tokenIn, core).length > MAX_POOLS_PER_LEG ||
+      ctx.index.pair(core, req.tokenOut).length > MAX_POOLS_PER_LEG,
+  )
+  if (contended.length === 0) return
+
+  // Stage 1: tokenIn -> core, at the request amount — exactly the input any in-leg would see.
+  const inProbes = contended.flatMap((core) =>
+    enabledModules(ctx).flatMap((m) => m.speculativeDirect(req.tokenIn, core, req.amountIn, ctx.manifest)),
+  )
+  await runDiscoveryProbes(run, inProbes)
+
+  // Stage 2: core -> tokenOut, at the best realized intermediate amount stage 1 observed for that
+  // core (see the docstring for why req.amountIn would be the wrong number here).
+  const outProbes = contended.flatMap((core) => {
+    let realized: bigint | undefined
+    for (const rec of ctx.index.pair(req.tokenIn, core)) {
+      const out = state.quoteEvidence.get(rec.pool.id)
+      if (out !== undefined && (realized === undefined || out > realized)) realized = out
+    }
+    return enabledModules(ctx).flatMap((m) => m.speculativeDirect(core, req.tokenOut, realized ?? req.amountIn, ctx.manifest))
+  })
+  await runDiscoveryProbes(run, outProbes)
 }
 
 /** Validates caller hints into pool records. A hint is an assertion, never trusted as identity: the
@@ -1066,10 +1203,10 @@ async function resolveHints(run: Run): Promise<void> {
  */
 async function wave1(run: Run): Promise<void> {
   const { ctx, req, state } = run
-  const wrapped = ctx.manifest.wrappedNative
-  const endpoints = new Set([node(req.tokenIn, ctx.manifest), node(req.tokenOut, ctx.manifest)])
-  const cores = (ctx.manifest.coreIntermediates ?? [wrapped]).filter((t) => !endpoints.has(t.toLowerCase() as Address))
+  const cores = coresOf(run)
 
+  // Idempotent with wave 0's push (which see) — kept so this wave stays self-sufficient about the
+  // cores whose legs it is about to probe.
   for (const core of cores) {
     const key = core.toLowerCase()
     if (!state.intermediatePriority.includes(key)) state.intermediatePriority.push(key)

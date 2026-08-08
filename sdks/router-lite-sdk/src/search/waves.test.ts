@@ -1228,6 +1228,75 @@ test('a repeat search on a warm index re-scans only the reorg overlap', async ()
   expect(counters.pairScanRanges).toEqual([{ fromBlock: BLOCK_NUMBER - DEFAULT_REORG_OVERLAP_BLOCKS + 1n, toBlock: BLOCK_NUMBER }])
 })
 
+test('a warm dense index finds the route a cold search finds: quote evidence, not creation recency, holds the contended leg slots', async () => {
+  // THE LIVE SHAPE THIS PINS (mainnet, 2026-08-07): `rl quote XPR USDC 100` against a cold cache
+  // found 0.2575 USDC via the old, liquid XPR/WETH v3 0.3% pool; the same quote against a warmed
+  // 655k-pool index found 0.0460 — 5.6x worse — because the XPR/WETH leg selection
+  // (`MAX_POOLS_PER_LEG = 3` of 13) ranked by newest `createdAtBlock` and handed all three slots to
+  // freshly-created junk pools, so the liquid pool was never even quoted. The cold search only won
+  // by accident of arrival order: its wave-1 core probe quoted the liquid pool while the index was
+  // still sparse, and the success mark it earned then held its slot once density arrived.
+  //
+  // World: no direct A/B pool, WETH the only intermediate. A/WETH carries one OLD liquid pool on
+  // the standard tier (so the wave-1 core half-pair probe reaches it — exactly how the real cold
+  // search first touched XPR/WETH v3 0.3%) plus MAX_POOLS_PER_LEG + 1 junk pools on unguessable
+  // tiers, all NEWER, all quoting successfully but terribly (the live junk quoted 0.0460, not
+  // nothing). WETH/B is a single healthy pool so the contention under test is exactly one leg.
+  const liquid = stubPoolRef('v3', TOKEN_A, WETH)
+  const out = stubPoolRef('v3', WETH, TOKEN_B)
+  const junk = Array.from({ length: 4 }, (_, i) => stubPoolRef('v3', TOKEN_A, WETH, { tag: `a${i}` }))
+
+  const calls = {
+    ...quoteEntry([liquid], AMOUNT_IN, 100_000n), // the half-pair core probe's real answer
+    ...quoteEntry([out], AMOUNT_IN, 95_000n), // cold wave 1 probes the out-leg at the request amount…
+    ...quoteEntry([out], 100_000n, 95_000n), // …warm wave 0 probes it at stage 1's realized output
+    ...quoteEntry([liquid, out], AMOUNT_IN, 90_000n), // the route the cold search finds
+    ...Object.assign({}, ...junk.map((j, i) => quoteEntry([j, out], AMOUNT_IN, 500n + BigInt(i)))),
+  }
+
+  const record = (pool: PoolRef, createdAtBlock: bigint): PoolRecord => ({ pool, createdAtBlock, source: 'event' })
+  const world = [record(liquid, 200n), ...junk.map((j, i) => record(j, 900n + BigInt(i)))]
+
+  // COLD: the pools arrive through TOKEN_A's adjacency scan, after wave 1's probes already ran.
+  const cold = stubClient({
+    calls,
+    logs: (endpoint) => {
+      if (endpoint === TOKEN_A.toLowerCase()) {
+        return world.map((rec) => ({ blockNumber: rec.createdAtBlock, record: rec }) as unknown as Log & { record: PoolRecord })
+      }
+      if (endpoint === TOKEN_B.toLowerCase()) {
+        return [{ blockNumber: 100n, record: record(out, 100n) } as unknown as Log & { record: PoolRecord }]
+      }
+      return []
+    },
+  })
+  const coldCtx = makeContext(cold.client, manifestWith({ v3: true }))
+  const coldEvents = await drain(searchWaves(coldCtx, quoteReq, 'quote'))
+  assertCoherent('quote', coldEvents)
+  const coldBest = coldEvents.at(-1)!.best!.quote.amountOut
+
+  // WARM: the same world, already in the index (a cache/pool-list load) — every scan finds nothing
+  // new, so enumeration faces the full density from wave 0.
+  const warm = stubClient({ calls })
+  const warmCtx = makeContext(warm.client, manifestWith({ v3: true }))
+  for (const rec of [...world, record(out, 100n)]) warmCtx.index.upsert(rec)
+  const warmEvents = await drain(searchWaves(warmCtx, quoteReq, 'quote'))
+  assertCoherent('quote', warmEvents)
+  const warmBest = warmEvents.at(-1)!.best!.quote.amountOut
+
+  // The core promise under test: an index that knows MORE must never route WORSE.
+  expect(coldBest).toBe(90_000n)
+  expect(warmBest).toBe(coldBest)
+
+  // And not just eventually: wave 0's yield is the FIRST answer, and it is the only one an anytime
+  // consumer (`getQuote`, the CLI without `--watch`) ever sees — evidence that arrives in wave 1 is
+  // evidence that consumer's answer never benefited from. The contended-leg core probes run in
+  // wave 0 (`probeContendedCoreLegs`) precisely so the first yield is already evidence-ranked;
+  // before that, this first event carried the junk route (measured live: 0.0460 vs 0.2574 USDC)
+  // even while the final drained result was correct.
+  expect(warmEvents[0]!.best!.quote.amountOut).toBe(90_000n)
+})
+
 test('a hinted native v4 pool speculatively re-quoted in wave 0 keeps its hint provenance', async () => {
   // Reviewer-demonstrated regression: rememberPool's "already known" dedup guard used to read a v4
   // pool's raw poolKey.currency0/1 (never mapping address(0) -> 'native'), so for a native v4 pool it

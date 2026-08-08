@@ -351,6 +351,16 @@ is the pre-existing behaviour of a very large index under `MAX_POOLS_PER_LEG` / 
 pruning, not something a list introduces. It is worth knowing before anyone treats "load a big list"
 as a pure win.
 
+> **RESOLVED (2026-08-08).** Root-caused and fixed in the search engine, not in pool lists: under
+> slot pressure the per-pair selection fell through to newest-`createdAtBlock`, which on a dense
+> pair hands every slot to junk/copycat pools (they postdate the liquid pool by construction), and
+> the half-pair core probes that had *already quoted the liquid pool* discarded the result. Selection
+> now ranks contended legs by the search's own single-leg quote evidence, and the core probes run in
+> wave 0 (two-staged, out-legs at the realized intermediate amount) whenever the woken index is dense
+> enough for it to matter. Re-measured on this exact case: cold 0.257458, warm-655k **0.257667** —
+> the warm cache now *beats* cold, by reaching a nonstandard-tier WETH/USDC pool speculation cannot
+> guess. See the spec's "Candidate selection" section and `search/candidates.ts#comparePoolPriority`.
+
 ---
 
 ## What phase 2 adds
