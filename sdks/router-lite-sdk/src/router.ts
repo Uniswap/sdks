@@ -860,6 +860,38 @@ export function createRouter(opts: CreateRouterOptions): Router {
   // `internal/rpc.ts`'s header for the measured before/after.
   const semaphore = createSemaphore(opts.concurrency ?? DEFAULT_CONCURRENCY)
 
+  // ---------------------------------------------------------------------------
+  // THE ONCE-CELL PATTERN, WRITTEN TWICE HERE — THIS ONE AND `resolveMulticall3`
+  // BELOW — AND THE SECOND COPY IS WHY IT IS SPELLED OUT.
+  //
+  // Both answer a question about `(client, manifest)` that has a permanent
+  // answer, at most once per router, with concurrent callers sharing one
+  // in-flight promise rather than racing. Four rules make that safe, and every
+  // future once-cell here has to reproduce all four:
+  //
+  //   1. THE CACHE HOLDS THE ANSWER, NOT THE FACT THAT WE ASKED. The stored
+  //      value is a discriminated record (`{kind:'ok'} | {kind:'config-error'}`,
+  //      `{address: Address | null}`), never a bare boolean, so "no" is cached
+  //      as deliberately as "yes". A cell that only remembered success re-probes
+  //      forever on the negative path — one `eth_getCode` per search, on exactly
+  //      the chains that will never have an answer.
+  //   2. A TRANSPORT FAILURE IS NOT AN ANSWER AND IS NEVER CACHED. It says
+  //      nothing about the manifest or the deployment, so the next call asks
+  //      again rather than being permanently bricked by one blip. The two
+  //      differ in what they do MEANWHILE: validation rethrows (a config error
+  //      the caller must see), while the multicall probe falls back to the
+  //      conservative path (per-call quoting, correct on any chain), because
+  //      it has one and validation does not.
+  //   3. THE IN-FLIGHT PROMISE IS CLEARED IN `finally`, so a failed attempt
+  //      does not leave every later caller awaiting a promise that already
+  //      rejected.
+  //   4. THE REQUEST HOLDS A SEMAPHORE PERMIT like every other
+  //      `client.request` in this package (`internal/rpc.ts`). Both are leaf
+  //      requests — nothing nested inside — so acquiring carries no
+  //      lock-ordering risk, even though neither can contribute to a sustained
+  //      peak.
+  // ---------------------------------------------------------------------------
+
   // A chainId mismatch is a deterministic, permanent property of (client, manifest) — once
   // observed it is cached forever, and every future call rejects with the same `RouterConfigError`
   // without another round trip. Anything else (a transient `getChainId` failure: the node is
@@ -893,6 +925,10 @@ export function createRouter(opts: CreateRouterOptions): Router {
 
   // ---------------------------------------------------------------------------
   // Multicall3 probe — the aggregation fallback's one decision, made once.
+  //
+  // THE SECOND ONCE-CELL. Same four rules as `ensureManifestValidated` above
+  // (see the block over it, which is where they are stated); what follows is
+  // only what is specific to this question.
   //
   // Quoting rounds go through Multicall3 `aggregate3` (see `internal/multicall.ts` for the measured
   // why) ONLY on a chain where the deployment is real, and "is it real" is answered by reading the
