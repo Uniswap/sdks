@@ -572,8 +572,10 @@ export type ConversionOperation =
 export type ExecutionOperation = SwapOperation | ConversionOperation
 
 /** The Universal Router command-set families this package knows how to encode for — closed,
- * extended deliberately. `encoderFor` (`encode/index.ts`) dispatches on this set. */
-export const COMMAND_SETS = ['ur-2.0'] as const
+ * extended deliberately. `encoderFor` (`encode/index.ts`) dispatches on this set. `ur-2.1` is the
+ * UR 2.1.1 deployment family: identical command/action bytes and custody to `ur-2.0`, three swap
+ * payload ABIs extended with `minHopPriceX36` — see `encode/ur21.ts` for sources and proof. */
+export const COMMAND_SETS = ['ur-2.0', 'ur-2.1'] as const
 export type CommandSet = (typeof COMMAND_SETS)[number]
 
 /**

@@ -20,6 +20,7 @@ import { v2Module } from '../protocols/v2'
 import { v3Module } from '../protocols/v3'
 import { v4Module } from '../protocols/v4'
 import type {
+  CommandSet,
   CurrencyRef,
   ExecutionPlan,
   Permit2PermitSingle,
@@ -29,13 +30,19 @@ import type {
   UniversalRouterDeployment,
 } from '../types'
 
+import type { PlanEncoder } from './core'
 import { encodeExecutionPlan } from './ur20'
+import { encodeExecutionPlanUr21 } from './ur21'
 
 // ---------------------------------------------------------------------------
 // Differential oracle: every supported route shape is built twice — once as a
-// QuotedRoute -> ExecutionPlan -> our `ur-2.0` encoder, and once as a
-// router-sdk Trade -> universal-router-sdk `SwapRouter.swapCallParameters` —
-// and the two calldatas are compared byte for byte.
+// QuotedRoute -> ExecutionPlan -> our command-set encoder, and once as a
+// router-sdk Trade -> universal-router-sdk `SwapRouter.swapCallParameters`
+// pinned to the matching `UniversalRouterVersion` — and the two calldatas are
+// compared byte for byte. THE WHOLE MATRIX RUNS ONCE PER COMMAND SET (`ur-2.0`
+// against `V2_0`, `ur-2.1` against `V2_1_1`), because the sets differ in wire
+// layout (the three `minHopPriceX36` ABI extensions — see `ur21.ts`) while
+// sharing every fixture, custody rule and documented divergence below.
 //
 // Option pinning (each of these is a place where the two APIs do not map 1:1;
 // the choice is made so the *semantics* line up, never to paper over a
@@ -49,8 +56,12 @@ import { encodeExecutionPlan } from './ur20'
 //  * `deadlineOrPreviousBlockhash` is always set, because SwapRouter drops to
 //    the two-argument `execute(bytes,bytes[])` overload when it is absent and
 //    we always emit the three-argument one.
-//  * `urVersion: V2_0` — the command set we encode. V2_1_1+ appends
-//    `minHopPriceX36` to every v2/v3/v4 swap payload.
+//  * `urVersion` — pinned per run to the version whose command set is under
+//    test (see COMMAND_SET_RUNS below): `V2_0` for `ur-2.0`, `V2_1_1` for
+//    `ur-2.1`. V2_1_1 appends `minHopPriceX36` to every v2/v3/v4 exact-in
+//    swap payload; the SDK defaults it to the same empty array we always emit
+//    (`ur21.ts#NO_PER_HOP_FLOORS`), so both sides encode per-hop floors
+//    disabled and the comparison stays semantics-for-semantics.
 //  * `safeMode`, `fee`, `flatFee`, `useRouterBalance`, `nativeErc20Input`,
 //    `tokenTransferMode` are all left at their defaults: each adds commands
 //    (an ETH sweep, PAY_PORTION, TRANSFER, a proxy wrapper) that have no
@@ -90,11 +101,26 @@ const RECIPIENT = '0x3333333333333333333333333333333333333333' as Address
 const UR = '0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af' as Address
 const PERMIT2 = '0x000000000022D473030F116dDEE9F6B43aC78BA3' as Address
 
-const deployment: UniversalRouterDeployment = {
-  address: UR,
-  commandSet: 'ur-2.0',
-  permit2: PERMIT2,
-  wrappedNative: WETH.address as Address,
+/**
+ * One row per command set: our encoder + deployment pin on one side, the SDK's
+ * `UniversalRouterVersion` on the other, and the goldens file that freezes the run's output. The
+ * fixture addresses (mainnet's UR/Permit2) are shared — they are fixtures, not chain claims; the
+ * command set is a property of the deployment object, which is exactly what each encoder pins on.
+ */
+const COMMAND_SET_RUNS: {
+  commandSet: CommandSet
+  encoder: PlanEncoder
+  urVersion: UniversalRouterVersion
+  goldensFile: string
+  /** '' for ur-2.0 so its test names — and its goldens file — stay exactly as first written. */
+  suffix: string
+}[] = [
+  { commandSet: 'ur-2.0', encoder: encodeExecutionPlan, urVersion: UniversalRouterVersion.V2_0, goldensFile: './goldens.json', suffix: '' },
+  { commandSet: 'ur-2.1', encoder: encodeExecutionPlanUr21, urVersion: UniversalRouterVersion.V2_1_1, goldensFile: './goldens-ur21.json', suffix: ' [ur-2.1]' },
+]
+
+function deploymentFor(commandSet: CommandSet): UniversalRouterDeployment {
+  return { address: UR, commandSet, permit2: PERMIT2, wrappedNative: WETH.address as Address }
 }
 
 const DEADLINE = 1_700_000_000n
@@ -313,7 +339,11 @@ function buildCase(shape: Shape): BuiltCase {
 // The two encoders
 // ---------------------------------------------------------------------------
 
-function encodeOurs(built: BuiltCase): { plan: ExecutionPlan; data: Hex; value: bigint } {
+function encodeOurs(
+  built: BuiltCase,
+  encoder: PlanEncoder,
+  deployment: UniversalRouterDeployment,
+): { plan: ExecutionPlan; data: Hex; value: bigint } {
   const plan = compileExecutionPlan({
     quoted: {
       route: { legs: built.legs },
@@ -328,11 +358,11 @@ function encodeOurs(built: BuiltCase): { plan: ExecutionPlan; data: Hex; value: 
     wrappedNative: WETH.address as Address,
     modules,
   })
-  const tx = encodeExecutionPlan(plan, deployment, DEADLINE)
+  const tx = encoder(plan, deployment, DEADLINE)
   return { plan, data: tx.data, value: tx.value }
 }
 
-function encodeTheirs(built: BuiltCase): { data: Hex; value: bigint } {
+function encodeTheirs(built: BuiltCase, urVersion: UniversalRouterVersion): { data: Hex; value: bigint } {
   const inputAmount = CurrencyAmount.fromRawAmount(built.inCurrency, built.amountIn.toString())
   const outputAmount = CurrencyAmount.fromRawAmount(built.outCurrency, built.amountOut.toString())
   const protocols = new Set(built.sdkPools.map((pool) => (pool instanceof Pair ? 'v2' : pool instanceof V3Pool ? 'v3' : 'v4')))
@@ -384,7 +414,7 @@ function encodeTheirs(built: BuiltCase): { data: Hex; value: bigint } {
     slippageTolerance: SDK_SLIPPAGE,
     recipient: RECIPIENT,
     deadlineOrPreviousBlockhash: DEADLINE.toString(),
-    urVersion: UniversalRouterVersion.V2_0,
+    urVersion,
     ...(built.permit
       ? {
           inputTokenPermit: {
@@ -498,9 +528,11 @@ const SHAPES: Shape[] = [
 //
 // The differential comparison is only as good as the fixtures feeding it: a
 // silent change to a pool, an amount or the option pinning above would move
-// *both* sides together and still be "byte-identical". `goldens.json` freezes
-// every shape's plan and its calldata, so any such drift shows up as a diff in
-// a reviewable file rather than as a green test.
+// *both* sides together and still be "byte-identical". One goldens file PER
+// COMMAND SET (`goldens.json` for `ur-2.0`, `goldens-ur21.json` for `ur-2.1`)
+// freezes every shape's plan and its calldata, so any such drift shows up as
+// a diff in a reviewable file rather than as a green test — and a change to
+// one set's wire format can never masquerade as a regeneration of the other's.
 //
 // Regenerate deliberately, never reflexively — a golden that changed is a
 // change in what users would broadcast:
@@ -508,7 +540,6 @@ const SHAPES: Shape[] = [
 //     UPDATE_GOLDENS=1 bun test src/encode/differential.test.ts
 // ---------------------------------------------------------------------------
 
-const GOLDENS_PATH = fileURLToPath(new URL('./goldens.json', import.meta.url))
 const UPDATE_GOLDENS = process.env['UPDATE_GOLDENS'] === '1'
 
 type Golden = { plan: unknown; calldata: string; value: string }
@@ -518,32 +549,48 @@ function withTaggedBigints(value: unknown): string {
   return JSON.stringify(value, (_key, raw) => (typeof raw === 'bigint' ? { $bigint: raw.toString() } : raw), 2)
 }
 
-const storedGoldens: Record<string, Golden> = existsSync(GOLDENS_PATH)
-  ? JSON.parse(readFileSync(GOLDENS_PATH, 'utf8'))
-  : {}
-const producedGoldens: Record<string, Golden> = {}
+for (const run of COMMAND_SET_RUNS) {
+  const goldensPath = fileURLToPath(new URL(run.goldensFile, import.meta.url))
+  const storedGoldens: Record<string, Golden> = existsSync(goldensPath)
+    ? JSON.parse(readFileSync(goldensPath, 'utf8'))
+    : {}
+  const producedGoldens: Record<string, Golden> = {}
+  const deployment = deploymentFor(run.commandSet)
 
-for (const shape of SHAPES) {
-  const name = shapeName(shape)
-  test(`byte-identical with universal-router-sdk: ${name}`, () => {
-    const built = buildCase(shape)
-    const ours = encodeOurs(built)
-    assertMatches(built, ours, encodeTheirs(built))
-    producedGoldens[name] = {
-      plan: JSON.parse(withTaggedBigints(ours.plan)),
-      calldata: ours.data,
-      value: ours.value.toString(),
+  for (const shape of SHAPES) {
+    const name = shapeName(shape)
+    test(`byte-identical with universal-router-sdk${run.suffix}: ${name}`, () => {
+      const built = buildCase(shape)
+      const ours = encodeOurs(built, run.encoder, deployment)
+      assertMatches(built, ours, encodeTheirs(built, run.urVersion))
+      producedGoldens[name] = {
+        plan: JSON.parse(withTaggedBigints(ours.plan)),
+        calldata: ours.data,
+        value: ours.value.toString(),
+      }
+    // 30s (vs. bun's 5s default): under CPU contention, universal-router-sdk's Trade construction is
+    // slow enough to flake here — reproduced taking ~17s under load at 6bf70b99, no regression on our side.
+    }, 30_000)
+  }
+
+  test(`${run.goldensFile.replace('./', '')} covers every shape and matches the current encoding`, () => {
+    if (UPDATE_GOLDENS) {
+      writeFileSync(goldensPath, `${JSON.stringify(producedGoldens, null, 2)}\n`)
+      return
     }
-  // 30s (vs. bun's 5s default): under CPU contention, universal-router-sdk's Trade construction is
-  // slow enough to flake here — reproduced taking ~17s under load at 6bf70b99, no regression on our side.
-  }, 30_000)
+    expect(Object.keys(producedGoldens).sort()).toEqual(Object.keys(storedGoldens).sort())
+    expect(producedGoldens).toEqual(storedGoldens)
+  })
 }
 
-test('goldens.json covers every shape and matches the current encoding', () => {
-  if (UPDATE_GOLDENS) {
-    writeFileSync(GOLDENS_PATH, `${JSON.stringify(producedGoldens, null, 2)}\n`)
-    return
+// The two sets share fixtures but not wire format: if any shape ever encodes byte-identically
+// across the sets, either the 2.1 codec stopped emitting its ABI extensions or a fixture collapsed.
+test('no shape encodes identically under ur-2.0 and ur-2.1', () => {
+  for (const shape of SHAPES) {
+    const built = buildCase(shape)
+    const ours20 = encodeOurs(built, encodeExecutionPlan, deploymentFor('ur-2.0'))
+    const ours21 = encodeOurs(built, encodeExecutionPlanUr21, deploymentFor('ur-2.1'))
+    expect(ours21.data, shapeName(shape)).not.toBe(ours20.data)
+    expect(ours21.value, shapeName(shape)).toBe(ours20.value)
   }
-  expect(Object.keys(producedGoldens).sort()).toEqual(Object.keys(storedGoldens).sort())
-  expect(producedGoldens).toEqual(storedGoldens)
-})
+}, 30_000)
