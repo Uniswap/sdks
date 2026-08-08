@@ -6,7 +6,7 @@ import { gunzipSync } from 'node:zlib'
 import { describe, expect, test } from 'bun:test'
 
 import { canonicalizeResult, captureError, rebuildError, replayClient, requestFromSession } from './internal/replay'
-import type { RecordedSession } from './internal/replay'
+import type { CanonicalRoute, RecordedSession } from './internal/replay'
 import { assertResultCoherent } from './internal/testing'
 import { manifestFor } from './manifest'
 import { createRouter } from './router'
@@ -137,4 +137,82 @@ describe('recorded-replay goldens', () => {
       30_000,
     )
   }
+})
+
+// ---------------------------------------------------------------------------
+// THE GOLDEN SCHEMA, PINNED IN THE TEST AND NOT IN THE GOLDENS.
+//
+// The deep-equal above is a fixed point, and a fixed point cannot notice a
+// field that stopped existing: if the engine silently stopped reporting a
+// canonical field, ONE `scripts/recordSession.ts --regold` rewrites every
+// golden without it — from the same recorded conversations, so nothing
+// re-records, nothing errors, and the diff is a plausible-looking removal —
+// and every run afterwards is green against a corpus that has stopped
+// asserting the thing.
+//
+// `gasEstimate` is the field that made this concrete: it lives in a return slot
+// of the very quoter calls these sessions replay and was discarded on decode
+// for most of this package's life. A decode that started reading the wrong
+// slot again, or a two-segment sum quietly dropped, would produce goldens that
+// are perfectly self-consistent.
+//
+// So the SHAPE is asserted here, against rules derived from the production
+// contract rather than from the files:
+//
+//   * the key set is closed — a field that vanished fails, and so does one
+//     that appeared without anybody deciding to add it;
+//   * `gasEstimate` is present EXACTLY when the route has no v2 leg. That is
+//     `quote/quote.ts#sumGasEstimates`' all-or-nothing rule restated: a v2
+//     segment is local constant-product arithmetic over `getReserves()` and
+//     measures no gas, so one v2 leg makes the whole route's sum undefined.
+//     Stated as an `iff`, so "gas stopped being reported" and "gas got
+//     synthesized for a route nothing simulated" are both failures.
+// ---------------------------------------------------------------------------
+
+const REQUIRED_ROUTE_KEYS = ['amountIn', 'amountOut', 'intermediateAmounts', 'path', 'protocols', 'routeId']
+const OPTIONAL_ROUTE_KEYS = ['gasEstimate', 'promotedOverComplex']
+
+describe('the golden canonical shape (independent of the deep-equal)', () => {
+  const allRoutes: { label: string; route: CanonicalRoute }[] = []
+
+  for (const file of files) {
+    const session = loadSession(file)
+    const routes = [...(session.golden.best ? [session.golden.best] : []), ...session.golden.alternatives]
+    for (const route of routes) allRoutes.push({ label: session.label, route })
+
+    test(`${session.label}: every golden route carries the whole canonical shape, and gas exactly where it is measurable`, () => {
+      if (session.golden.status === 'quote') expect(routes.length).toBeGreaterThan(0)
+      for (const route of routes) {
+        const keys = Object.keys(route).sort()
+        expect(
+          keys.filter((k) => !REQUIRED_ROUTE_KEYS.includes(k) && !OPTIONAL_ROUTE_KEYS.includes(k)),
+          `${session.label} ${route.routeId}: golden route carries a key the canonical shape does not declare`,
+        ).toEqual([])
+        expect(
+          REQUIRED_ROUTE_KEYS.filter((k) => !keys.includes(k)),
+          `${session.label} ${route.routeId}: golden route is MISSING a canonical field — one --regold can do this silently`,
+        ).toEqual([])
+
+        // The iff. `protocols` is this route's own leg list, so the rule is checked against the
+        // route rather than against a remembered expectation per session.
+        const measurable = !route.protocols.includes('v2')
+        expect(
+          route.gasEstimate !== undefined,
+          `${session.label} ${route.routeId} (${route.protocols.join('+')}): gasEstimate should be ${measurable ? 'present' : 'absent'}`,
+        ).toBe(measurable)
+        if (measurable) expect(route.gasEstimate).toMatch(/^\d+$/)
+        expect(route.amountIn).toMatch(/^\d+$/)
+        expect(route.amountOut).toMatch(/^\d+$/)
+        expect(route.path.length).toBe(route.protocols.length + 1)
+      }
+    })
+  }
+
+  // The rules above are only worth anything if the corpus exercises both sides of the iff. Without
+  // this, a corpus that drifted to v2-only routes would satisfy "gas absent" everywhere and the
+  // vanishing-field guard would be back to asserting nothing.
+  test('the corpus exercises both sides of the gas rule', () => {
+    expect(allRoutes.some(({ route }) => route.gasEstimate !== undefined)).toBe(true)
+    expect(allRoutes.some(({ route }) => route.protocols.includes('v2'))).toBe(true)
+  })
 })
