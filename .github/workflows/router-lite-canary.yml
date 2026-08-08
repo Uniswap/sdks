@@ -136,6 +136,73 @@ jobs:
           max_attempts: 2
           command: bun test sdks/router-lite-sdk/canary
 
+      # -------------------------------------------------------------------
+      # Publish pool lists from what the canary just warmed.
+      #
+      # WHY HERE AND NOT IN ITS OWN WORKFLOW. Building a list needs a warm
+      # snapshot, and warming one is the expensive part — a full-history
+      # adjacency sweep against a keyed archive endpoint. The canary already
+      # holds exactly that endpoint and has just spent 5-30 minutes driving
+      # real searches through it. A separate workflow would re-pay the warming
+      # cost nightly for no new information.
+      #
+      # THE SOURCE IS THE CLI'S OWN CACHE, not the canary suite's in-process
+      # indexes: the canary builds routers directly against viem clients and
+      # never touches `cli/cache.ts`. So this step warms the cache itself, via
+      # `buildPoolList.ts --warm` (which drives `rl discover` per token — the
+      # tool that already knows how to bound a search and bank partial
+      # coverage), against an $XDG_CACHE_HOME scoped to the runner.
+      #
+      # NON-BLOCKING, LIKE EVERY OTHER ROW HERE. `continue-on-error: true`
+      # plus a per-chain `|| true`: an endpoint that rate-limits the warm run,
+      # or a curation assertion that fires, must not turn the canary red — the
+      # canary's job is to report on the SDK against live chains, and a missing
+      # artifact is self-evident from the artifact list. A curation failure
+      # that matters shows up as a build error in this step's log and as an
+      # absent list, which is the same signal, unmissable, without the pinned
+      # failure issue firing for something that is not a routing regression.
+      #
+      # THE LISTS ARE ARTIFACTS, NOT COMMITS. Nothing here writes to the repo:
+      # a pool list is a cache of re-readable chain state (see
+      # docs/pool-lists.md), it is regenerated nightly, and committing hundreds
+      # of megabytes of it would be storing the one thing that is cheapest to
+      # rebuild. Consumers fetch the artifact.
+      - name: 🧾 Build pool lists from the warmed state
+        if: always()
+        continue-on-error: true
+        env:
+          CANARY_RPC_URL_1: ${{ secrets.CANARY_RPC_URL_1 }}
+          CANARY_RPC_URL_ROBINHOOD: ${{ secrets.CANARY_RPC_URL_ROBINHOOD }}
+          XDG_CACHE_HOME: ${{ runner.temp }}/rl-cache
+        run: |
+          set -u
+          cd sdks/router-lite-sdk
+          # chain id : env var holding its endpoint : tokens to warm on
+          build() {
+            chain="$1"; url="$2"; warm="$3"
+            if [ -z "$url" ]; then
+              echo "::notice::no endpoint configured for chain $chain — skipping its pool list"
+              return 0
+            fi
+            echo "--- pool list: chain $chain ---"
+            # The URL is passed through the environment, never on a command line (a process listing
+            # is world-readable on a runner), and `buildPoolList.ts` never prints it.
+            ETH_RPC_URL="$url" bun scripts/buildPoolList.ts --chain "$chain" --warm "$warm" \
+              --warm-budget 180s --max-pools 400000 || echo "::warning::pool list for chain $chain failed — see above"
+          }
+          build 1 "${CANARY_RPC_URL_1:-}" "usdc,weth"
+          build 4663 "${CANARY_RPC_URL_ROBINHOOD:-}" "weth"
+          ls -la pool-lists/ 2>/dev/null || echo "no pool lists were produced"
+
+      - name: 📤 Upload pool lists
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: router-lite-pool-lists-${{ github.run_id }}
+          path: sdks/router-lite-sdk/pool-lists/*.poollist.json
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: 📤 Upload latency benchmarks
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
