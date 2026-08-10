@@ -38,7 +38,7 @@ import type { InternalResult, Run } from './waves'
 //     `inconclusive` rather than inventing an errand.)
 //
 //  2. REQUIREMENTS ARE COMPUTED ONCE, IN WAVE 0, AND NEVER RECOMPUTED. The
-//     readiness reads run in `wave0` (concurrently with the probes) and land in
+//     readiness reads run in `wave0a` (concurrently with the probes) and land in
 //     `state.requirements`; every later wave reads that same snapshot at the
 //     same pinned block. That is what makes the gating *stable*: a route
 //     verified in wave 1 and a route gated `needs-action` in wave 3 were judged

@@ -7,6 +7,7 @@ import {
   MAX_POOLS_PER_LEG,
   maxPlausibleHeadRegression,
   QUOTE_INTERLEAVE_MS,
+  WAVE0_PAIR_SCAN_GRACE_MS,
 } from '../constants'
 import { RpcUnavailableError } from '../errors'
 import { toGraphNode } from '../internal/currency'
@@ -64,9 +65,9 @@ import { evaluate } from './leader'
 //           routable without a single historical log scan. EVERYTHING HERE
 //           SETTLES IN ONE OR TWO ROUND TRIPS.
 //   wave 0b the RECENT-WINDOW v4 exact-pair Initialize scan — DISPATCHED by
-//           wave 0a (so its round trips overlap 0a's, and a healthy endpoint
-//           loses no wall clock to the split) but AWAITED here, one stage
-//           later, so the quotes above are never gated on a log query. See
+//           wave 0a (so its round trips overlap 0a's) and waited on there only
+//           for a BOUNDED grace, then AWAITED in full here, so the quotes above
+//           are never gated on a log query for longer than that grace. See
 //           WAVE 0 ANSWERS BEFORE THE PAIR SCAN LANDS below.
 //   wave 1  core intermediates: probe both legs of tokenIn -> core -> tokenOut
 //   wave 2  focus-endpoint adjacency (see `selectFocus`), then exact-pair
@@ -114,13 +115,23 @@ import { evaluate } from './leader'
 // — a launcher handing us a brand-new pool on a provider having a bad minute —
 // and the old shape defeated it exactly when it mattered.
 //
-// So the scan is DISPATCHED in wave 0a and AWAITED in wave 0b. Four properties
-// make that split free rather than merely faster:
+// So the scan is DISPATCHED in wave 0a, waited on there for a BOUNDED GRACE
+// (`WAVE0_PAIR_SCAN_GRACE_MS`, 500ms), and AWAITED IN FULL in wave 0b. The
+// grace is not a hedge — it is what keeps the fix from trading one failure for
+// another. A bare split bounds the degraded provider perfectly and quietly
+// wrecks the healthy one, because span-capped is the COMMON endpoint: a scan
+// that is many chunked requests is never finished when the probes are, so an
+// actionable wave 0a excludes its pools essentially always (23 of 32 recorded
+// log queries went unrequested on the hermetic Base corpus). Half a second
+// covers the single-request keyed-endpoint case (~0.3-0.9s measured) and is
+// all a timeout-shaped endpoint can ever take from the caller.
+//
+// Four properties make the arrangement sound:
 //
 //  - No wall clock is lost when both are fast. The scan's first request goes
 //    out before 0a awaits anything, so the two overlap exactly as they did
-//    under the `Promise.all`; 0b then awaits a promise that is usually already
-//    settled.
+//    under the `Promise.all`; the grace then usually finds it already settled,
+//    and 0b awaits a promise that is already done.
 //  - Nothing 0b discovers is lost. `runPairScan` writes to the shared index,
 //    and 0b closes with the same `quoteWhileDiscovering` + `quoteEnumerated`
 //    pair the scan-bound waves use, so a pool only the scan can find is priced
@@ -140,17 +151,14 @@ import { evaluate } from './leader'
 // has already printed its answer.
 //
 // The second is that a PROMISE-shaped caller whose wave 0a is already actionable
-// (a validated hint, or a direct pair the speculative probes hit) now resolves
+// (a validated hint, or a direct pair the speculative probes hit) can resolve
 // without the pair scan's pools in its enumeration, where before it waited for
-// them. That is the definition of "first actionable" doing its job, and it is
-// bounded in exactly the way that matters: a wave 0a with NO answer — the
-// brand-new-asset case the recent-window scan exists for — is not actionable, so
-// the search runs on into 0b and the scan still decides it. The iterator shapes
-// (`quotes()`/`swaps()`) always see the merged result. Measured on the committed
-// replay goldens (Base ETH->USDC, a majors pair with a dozen direct pools): the
-// best route, its amount, and every alternative are byte-identical; only the
-// report's enumeration/quoting counters shrink, because the search stopped
-// earlier having correctly done less work.
+// them however long they took. The grace is what makes that a narrow case rather
+// than the default: it only happens on a provider that cannot finish this window
+// in half a second. And it stays bounded in the way that matters — a wave 0a
+// with NO answer (the brand-new-asset case the recent-window scan exists for) is
+// not actionable, so the search runs on into 0b and the scan still decides it,
+// and the iterator shapes (`quotes()`/`swaps()`) always see the merged result.
 //
 // Speculative probes come in two flavors, and conflating them would be a
 // correctness bug: a *route probe* (wave 0a) quotes tokenIn -> tokenOut and its
@@ -1290,8 +1298,9 @@ function startRecentPairScan(run: Run): { done: Promise<void>; cancel: () => voi
  *
  * WHAT IS NOT HERE IS THE POINT. The exact-pair log scan is DISPATCHED here — first, before this
  * stage awaits anything, so its round trips overlap the probes' exactly as they did when both sat
- * under one `Promise.all` — and AWAITED in wave 0b. Nothing this stage yields is gated on a log
- * query (C5-B; see this file's header for the measurements).
+ * under one `Promise.all` — waited on for a BOUNDED grace at the end, and AWAITED IN FULL in wave
+ * 0b. Nothing this stage yields is gated on a log query for longer than that grace (C5-B; see this
+ * file's header and `constants.ts#WAVE0_PAIR_SCAN_GRACE_MS` for the measurements).
  */
 async function wave0a(run: Run): Promise<void> {
   const { ctx, req, state } = run
@@ -1348,6 +1357,22 @@ async function wave0a(run: Run): Promise<void> {
       state.verificationDegraded = true
     }
   }
+
+  // THE GRACE, AND WHY THE SPLIT ALONE WAS NOT THE WHOLE ANSWER. Dropping the scan from this stage
+  // outright bounded the degraded case perfectly and quietly wrecked the healthy one: SPAN-CAPPED is
+  // the common provider, not the exceptional one, so a scan that is many chunked requests — and
+  // therefore never finished by the time the probes are — excluded its pools from the only
+  // enumeration a promise-shaped caller ever sees, essentially always (23 of 32 recorded log queries
+  // went unrequested on the hermetic Base corpus). Waiting a BOUNDED moment recovers the
+  // single-request keyed-endpoint case at a cost the timeout-shaped endpoint can no longer inflate:
+  // see `constants.ts#WAVE0_PAIR_SCAN_GRACE_MS` for the measurements behind the number.
+  //
+  // `settleOrAfter`, not a bare race: it clears its own timer, so a fast scan does not leave a
+  // half-second handle holding a Node event loop open behind an answer that has already been given.
+  // It also swallows the scan's rejection — deliberately. This is a scheduling wait, not the await
+  // that owns the failure; wave 0b awaits the same promise and rethrows there, so a scan that throws
+  // still fails the search, exactly once, for the consumer that gets that far.
+  await settleOrAfter(state.pairScan.done, WAVE0_PAIR_SCAN_GRACE_MS)
 
   await quoteEnumerated(run)
 }

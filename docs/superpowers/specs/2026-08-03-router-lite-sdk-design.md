@@ -275,13 +275,16 @@ Wave engine ──────── owns stopping policy and caps; drives the p
      │   Wave 0b (scan-bound): the v4 exact-pair Initialize logs over the
      │           recent window. DISPATCHED by wave 0a, before it awaits
      │           anything, so the two overlap exactly as they did when
-     │           they shared one batch — but AWAITED here, one stage
-     │           later, so a log query can never gate wave 0a's price.
-     │           On a timeout-shaped endpoint that scan spends its whole
-     │           retry ladder (~40s measured) while a hinted answer sits
-     │           finished; the split is what lets the promise shapes
-     │           return it. See "Wave 0 answers before the pair scan
-     │           lands" below
+     │           they shared one batch; waited on there only for a
+     │           BOUNDED grace (WAVE0_PAIR_SCAN_GRACE_MS, 500ms) and
+     │           AWAITED IN FULL here, so a log query can gate wave 0a's
+     │           price by at most that grace. On a timeout-shaped
+     │           endpoint the scan spends its whole retry ladder (~40s
+     │           measured) while a hinted answer sits finished; the split
+     │           is what lets the promise shapes return it, and the grace
+     │           is what keeps the healthy single-request case inside
+     │           wave 0a's enumeration. See "Wave 0 answers before the
+     │           pair scan lands" below
      │   Wave 1 (2 RTTs): speculative core-intermediate legs; round 2
      │           feeds realized first-leg outputs into second legs
      │           (same-protocol 2-hops quote whole-path in round 1)
@@ -397,11 +400,23 @@ when the provider degrades.
 
 The wave is therefore **evaluated in two stages**. Wave 0a *dispatches* the scan
 — first, before it awaits anything, so the round trips overlap exactly as they
-did under the single batch — then awaits only the probes, hints and readiness
-reads, and is evaluated and yielded. Wave 0b awaits the scan, folds its pools in
-(quoting as they arrive, like every other scan-bound stage), and is evaluated
-again; `signatureOf` suppresses that second yield unless the scan actually
-improved on 0a, so an extra event only ever means an extra improvement.
+did under the single batch — awaits the probes, hints and readiness reads, then
+gives the scan a **bounded grace** (`WAVE0_PAIR_SCAN_GRACE_MS`, 500ms) to land
+before it is evaluated and yielded. Wave 0b awaits the scan in full, folds its
+pools in (quoting as they arrive, like every other scan-bound stage), and is
+evaluated again; `signatureOf` suppresses that second yield unless the scan
+actually improved on 0a, so an extra event only ever means an extra improvement.
+
+**The grace is load-bearing, not a hedge.** A bare split bounds the degraded
+provider perfectly and quietly wrecks the healthy one, because span-capped is the
+COMMON endpoint rather than the exceptional one: a scan that is many chunked
+requests is never finished when the probes are, so an actionable wave 0a excludes
+its pools essentially always — measured at 23 of 32 recorded log queries going
+unrequested on the hermetic Base replay corpus. Half a second covers the
+single-request keyed-endpoint case (~0.3-0.9s measured, README "Log scanning is
+budgeted") and is the most a timeout-shaped endpoint can ever take from the
+caller. Both directions are strictly better than the extreme they replace:
+bounded where the old shape was unbounded, inclusive where a bare split was not.
 
 Four properties keep the split honest:
 
@@ -422,14 +437,15 @@ Four properties keep the split honest:
   0a's answer and walked away would leave an `eth_getLogs` ladder running behind
   a CLI that has already printed its result.
 
-The deliberate cost: a promise-shaped call that is *already* actionable after
-wave 0a resolves without the scan's pools in its enumeration. A search with no
-answer yet — the brand-new-asset case the window exists for — is not actionable,
-so it runs on into 0b and the scan still decides it, and the iterator shapes
-always see the merged result. Measured against the committed replay goldens
-(Base ETH→USDC, a majors pair with a dozen direct pools): identical best route,
-amount and alternatives; 23 fewer RPC calls; only the report's
-enumeration/quoting counters shrink.
+The residual cost, on a provider too slow to finish the window inside the grace:
+a promise-shaped call that is *already* actionable after wave 0a resolves without
+the scan's pools in its enumeration. A search with no answer yet — the
+brand-new-asset case the window exists for — is not actionable, so it runs on
+into 0b and the scan still decides it, and the iterator shapes always see the
+merged result. The committed replay goldens (Base ETH→USDC, a majors pair with a
+dozen direct pools) are byte-identical to their pre-C5-B values, which is the
+regression guard for the grace: remove it and all four
+enumeration/quoting counters move.
 
 ## Discovery
 

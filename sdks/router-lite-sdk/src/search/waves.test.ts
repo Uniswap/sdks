@@ -1382,10 +1382,14 @@ test('C5-B: the first quote is on the wire before ANY log query comes back', asy
   expect(first.best?.quote.amountOut).toBe(100n)
   // The scan was on the wire the whole time...
   expect(counters.pairScansDispatched).toBeGreaterThan(0)
-  // ...and NOTHING the caller received was sequenced after a log query coming back, because not one
-  // had. Under the old `Promise.all` the first entry here was necessarily `getLogs`.
+  // ...and it did come back inside the grace, so wave 0a's enumeration includes it — this is the
+  // healthy provider, and dropping its pools is what the grace exists to prevent.
+  expect(atYield).toContain('getLogs')
+  // AND THE ORDER IS STILL THE CLAIM. The first quote was dispatched and answered BEFORE that log
+  // query returned, which is the whole of C5-B: under the old `Promise.all` no quote could be served
+  // until the scan had, so the first entry here was necessarily `getLogs`.
   expect(atYield[0]).toBe('quote')
-  expect(atYield).not.toContain('getLogs')
+  expect(atYield.indexOf('quote')).toBeLessThan(atYield.indexOf('getLogs'))
 })
 
 test('C5-B: both fast — a pool only the wave-0b scan can find still routes, before wave 1', async () => {
@@ -1407,6 +1411,72 @@ test('C5-B: both fast — a pool only the wave-0b scan can find still routes, be
   expect(counters.scans).toBe(0) // no adjacency wave ran: this is wave 0's answer
   expect(counters.pairScans).toBeGreaterThan(0)
   await gen.return(undefined as never)
+})
+
+// Both halves of the pair scan's abort plumbing, each isolated so it fails on its OWN removal.
+// They were mutation-survivable before these existed: deleting `searchWaves`' `pairScan?.cancel()`
+// and deleting `startRecentPairScan`'s `req.signal` forwarding each left the whole suite green,
+// because every other test either finishes the scan or never notices that it kept running. What
+// makes these two bite is `pairScansDispatched` — a count of requests PUT ON THE WIRE, which is the
+// only thing that changes when a scan nobody is waiting for keeps going.
+
+test('C5-B: abandoning the iterator at wave 0a cancels the scan it dispatched', async () => {
+  // No `signal` on the request at all, deliberately: the caller-abort path cannot mask a broken
+  // cancel here, so this fails if and only if `searchWaves`' `finally` stops cancelling.
+  let openGate = (): void => {}
+  const gate = new Promise<void>((resolve) => {
+    openGate = resolve
+  })
+
+  const directPool = stubPoolRef('v2', TOKEN_A, TOKEN_B)
+  const { client, counters } = stubClient({
+    calls: { ...quoteEntry([directPool], AMOUNT_IN, 100n) },
+    pairLogs: [v4PairLog(BLOCK_NUMBER - 10n)],
+    pairScanGate: gate,
+  })
+  // A chunk ceiling far below the recent window, so the scan is MANY requests: a cancel that does
+  // not happen is visible as the next chunk going out, and a one-request scan could never show it.
+  const ctx = makeContext(client, manifestWith({ v4: true, deploymentBlock: V4_DEPLOY_BLOCK }), { logChunkBlocks: 1_000n })
+
+  const gen = searchWaves(ctx, quoteReq, 'quote')
+  const first = (await gen.next()).value as InternalResult // costs the grace: the gate outlasts it
+  expect(first.best?.quote.amountOut).toBe(100n)
+  expect(counters.pairScansDispatched).toBe(1) // chunk 1 is out and stuck behind the gate
+
+  // Exactly what `getQuote` does with an answer in hand.
+  await gen.return(undefined as never)
+
+  // Now let chunk 1 answer. A cancelled scan reads its signal and stops; an uncancelled one walks
+  // on into the next batch of chunks against a search nobody is waiting for.
+  openGate()
+  await new Promise((r) => setTimeout(r, 50))
+  expect(counters.pairScansDispatched).toBe(1)
+})
+
+test('C5-B: the caller\'s own abort still stops the scan, through the forwarding controller', async () => {
+  // The scan runs on a controller of its own (so the generator can cancel it), which is only safe
+  // because that controller FORWARDS `req.signal`. Drop the forwarding and the caller's abort stops
+  // reaching the scan: wave 0b goes on awaiting it to completion, chunk after chunk, long after the
+  // search has been told to stop.
+  const controller = new AbortController()
+  const directPool = stubPoolRef('v2', TOKEN_A, TOKEN_B)
+  const { client, counters } = stubClient({
+    calls: { ...quoteEntry([directPool], AMOUNT_IN, 100n) },
+    pairLogs: [v4PairLog(BLOCK_NUMBER - 10n)],
+    logDelayMs: 1,
+    abortWhen: () => true, // the caller's budget expires on the scan's very first answer
+    controller,
+  })
+  const ctx = makeContext(client, manifestWith({ v4: true, deploymentBlock: V4_DEPLOY_BLOCK }), { logChunkBlocks: 1_000n })
+
+  const events = await drain(searchWaves(ctx, { ...quoteReq, signal: controller.signal }, 'quote'))
+
+  expect(events.at(-1)!.report.aborted).toBe(true)
+  expect(events.at(-1)!.best?.quote.amountOut).toBe(100n)
+  // The recent window is ~50 chunks wide at this ceiling. Stopping on the abort costs the batch
+  // already in flight and nothing more; ignoring it costs all of them.
+  expect(counters.pairScansDispatched).toBeGreaterThan(0)
+  expect(counters.pairScansDispatched).toBeLessThan(10)
 })
 
 test('C5-B: an abort inside wave 0b keeps wave 0a\'s answer and reports the aborted axis', async () => {

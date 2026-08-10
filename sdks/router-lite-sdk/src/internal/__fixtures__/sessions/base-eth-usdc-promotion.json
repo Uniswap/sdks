@@ -160,15 +160,15 @@
         "exhaustiveWithinMaxHops": false,
         "intermediatesDiscovered": 0,
         "intermediatesSelected": 0,
-        "candidatesGenerated": 9,
-        "poolsPruned": 3,
+        "candidatesGenerated": 10,
+        "poolsPruned": 10,
         "candidatesPruned": 0,
         "intermediatesPruned": 0
       },
       "quoting": {
-        "attempted": 9,
+        "attempted": 10,
         "succeeded": 9,
-        "failed": 0,
+        "failed": 1,
         "transportFailed": 0,
         "unattempted": 0
       },

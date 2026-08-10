@@ -253,17 +253,20 @@ answer is a bug in the record, not a chain that rewound, and it must not brick t
   quotes with no historical scanning — plus one bounded, recent-window v4 log scan for exact-pair
   discovery (not a full history scan). A brand-new pool outside that window is only reachable via
   `ingestReceipt`/`ingestPool`; the remaining history is completed in later waves.
-- **Wave 0's quotes are never gated on wave 0's log scan.** The two run concurrently, as they always
-  did, but the wave is evaluated in two stages: the probes (hints, cached pools, speculative direct
-  quotes, readiness) resolve and are handed to you first, and the recent-window exact-pair scan is
-  folded in a stage later — before any of the later waves, and before anything an iterator would
-  call complete. On a healthy endpoint you see no difference (the scan lands in one request); on a
-  throttling or hanging one, `getQuote`/`getSwap` return the hinted or direct-pair answer they
-  already have instead of waiting out the scan's retry ladder. The trade is deliberate and narrow:
-  a promise-shaped call that is *already* actionable after the probes resolves without the scan's
-  pools in its enumeration. A search with no answer yet — the brand-new-asset case the window exists
-  for — is not actionable, so it runs on and the scan still decides it; `quotes()`/`swaps()` always
-  see the merged result.
+- **Wave 0's quotes wait at most half a second for wave 0's log scan.** The two run concurrently, as
+  they always did, but the wave is evaluated in two stages. The probes (hints, cached pools,
+  speculative direct quotes, readiness) resolve first and then give the recent-window exact-pair scan
+  a bounded **500ms grace** to land; whatever has not landed by then is folded in one stage later —
+  still before any of the later waves, and before anything an iterator would call complete. On a
+  healthy endpoint you see no difference at all: that window resolves in a single `eth_getLogs` at
+  ~0.3-0.9s, well inside the grace, so the scan's pools are in the very first result. On a throttling
+  or hanging one, `getQuote`/`getSwap` return the hinted or direct-pair answer they already have
+  after the grace instead of waiting out the scan's whole retry ladder (~40s measured). The residual
+  trade is narrow and deliberate: on a provider too slow to finish the window in half a second, a
+  promise-shaped call that is *already* actionable resolves without the scan's pools in its
+  enumeration. A search with no answer yet — the brand-new-asset case the window exists for — is not
+  actionable, so it runs on and the scan still decides it; `quotes()`/`swaps()` always see the merged
+  result.
 - **v4 pools at a nonstandard `(fee, tickSpacing)` are never speculatively probed.** Wave 0's
   no-scan-required guessing only tries the four standard, no-hook configs (100/1, 500/10, 3000/60,
   10000/200 — `STANDARD_V4_CONFIGS`); a pool at any other tier — which is every hooked pool, and any

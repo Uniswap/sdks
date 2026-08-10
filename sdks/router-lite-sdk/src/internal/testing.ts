@@ -458,10 +458,11 @@ export function assertResultCoherent(r: QuoteResult | SwapResult): void {
     )
   }
 
-  // C4-P7: `verifyLeader` spends at most `PREFLIGHT_TOP_K` real simulations per wave, and the engine
-  // runs at most `WAVE_COUNT` waves — so a per-search cumulative total above that product is not a
-  // report of legitimate work, it is a bug in how `preflightAttempted` is accumulated (e.g. double
-  // counting across waves, or a stray increment outside `verifyLeader`'s own budgeted loop).
+  // C4-P7: `verifyLeader` spends at most `PREFLIGHT_TOP_K` real simulations per evaluated STAGE, and
+  // the engine runs at most `WAVE_COUNT` stages (five since C5-B split wave 0 into 0a/0b, which is
+  // why this reads stages rather than waves) — so a per-search cumulative total above that product
+  // is not a report of legitimate work, it is a bug in how `preflightAttempted` is accumulated (e.g.
+  // double counting across stages, or a stray increment outside `verifyLeader`'s own budgeted loop).
   const v = r.search.verification
   if (v.preflightAttempted > PREFLIGHT_TOP_K * WAVE_COUNT) {
     throw new Error(

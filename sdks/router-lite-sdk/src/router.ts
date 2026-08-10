@@ -125,7 +125,7 @@ export type CreateRouterOptions = {
    * forever, with no escape, rather than fail with a named `RouterConfigError`.
    *
    * THIS IS A GLOBAL BOUND, NOT A PER-BATCH ONE. Wave 0 fires hint validation, route/discovery
-   * probes, and (for swaps) the readiness reads all concurrently (see `search/waves.ts#wave0`) — a
+   * probes, and (for swaps) the readiness reads all concurrently (see `search/waves.ts#wave0a`) — a
    * router with no shared bound sees a real peak equal to the SUM of every concurrently-running
    * batch's own limit, not any single one of them (measured at ~44 in-flight calls for a realistic
    * wave 0 before this option existed). One semaphore, built once per router instance and threaded

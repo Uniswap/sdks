@@ -2349,9 +2349,11 @@ describe('pre-search RPC sequencing (C5-A)', () => {
           return gated(`eth_getCode:${addr.toLowerCase()}`)
         }
         if (args.method === 'eth_getLogs') {
-          // Wave 0's exact-pair scan runs CONCURRENTLY with the quote probes (see `waves.ts#wave0`)
-          // — never gated, so it can never be mistaken for one of the sequential reads this test
-          // measures. An empty answer is fine: only the dispatch of the quote probe matters here.
+          // Wave 0a DISPATCHES the exact-pair scan and never awaits it (only wave 0b does — see
+          // `waves.ts#wave0a`), so it is deliberately left ungated here: gating it would inject a
+          // sequential round this test would then misattribute to the pre-search sequence, and
+          // answering it immediately keeps wave 0a's grace from costing wall clock. An empty answer
+          // is fine — only the dispatch of the quote probe matters.
           record('eth_getLogs')
           return []
         }
@@ -2399,13 +2401,31 @@ describe('pre-search RPC sequencing (C5-A)', () => {
     // Nothing left to gate — let the rest of the search play out so the promise settles.
     await result
 
-    expect(waveOf.get('quote')).toBe(1)
+    // WHAT A RED HERE MEANS, so a maintainer does not have to reverse-engineer it from a bare
+    // `expected 1, got 2`. These four numbers are RELEASE ROUNDS, not assertions about correctness:
+    // round 0 is everything dispatched before this test resolved anything, round 1 is everything
+    // that could only dispatch once round 0's answers landed. A number that grew by one means some
+    // read that used to be concurrent now waits on another — usually a new `await` inserted ahead of
+    // `dispatchPinnedBlock`/`resolveMulticall3` in `router.ts`, or a `SearchContext` field that
+    // cannot be built until an earlier round resolves. Nothing is *broken* when this fails; the
+    // search got one round trip slower on its critical path, which is the whole thing C5-A bought
+    // and the only reason this test exists. Fix the ordering, or — if the extra round is genuinely
+    // unavoidable — move the number here and say why in this comment.
+    const depth = (key: string): string => `${key} dispatched in release round ${waveOf.get(key)}`
+
+    expect(waveOf.get('quote'), `pre-search depth regressed: ${depth('quote')}, expected 1`).toBe(1)
     // The three reads that used to span two sequential rounds now share the same wave: chain
     // validation, the execution address's code (also validation), and the pinned block all dispatch
     // BEFORE anything is released.
-    expect(waveOf.get('eth_chainId')).toBe(0)
-    expect(waveOf.get(`eth_getCode:${UNIVERSAL_ROUTER.toLowerCase()}`)).toBe(0)
-    expect(waveOf.get('eth_getBlockByNumber')).toBe(0)
+    expect(waveOf.get('eth_chainId'), `${depth('eth_chainId')}, expected 0 — manifest validation must dispatch immediately`).toBe(0)
+    expect(
+      waveOf.get(`eth_getCode:${UNIVERSAL_ROUTER.toLowerCase()}`),
+      `${depth(`eth_getCode:${UNIVERSAL_ROUTER.toLowerCase()}`)}, expected 0 — the immutable fingerprint read is part of the same validation batch`,
+    ).toBe(0)
+    expect(
+      waveOf.get('eth_getBlockByNumber'),
+      `${depth('eth_getBlockByNumber')}, expected 0 — C5-A: the pinned block must dispatch on request arrival, not after the SearchContext exists`,
+    ).toBe(0)
   })
 })
 

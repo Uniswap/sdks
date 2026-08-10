@@ -242,7 +242,7 @@ export const DEFAULT_DEADLINE_SECONDS = 300
  * `eth_getLogs`) may be in flight AT ONCE, across every operation sharing this router instance —
  * NOT a per-batch limit, whatever this constant's name used to suggest. Wave 0 fires hint
  * validation, route probes, and (for swaps) the readiness reads all concurrently
- * (`search/waves.ts#wave0`), so without a shared bound the real peak is the SUM of each operation's
+ * (`search/waves.ts#wave0a`), so without a shared bound the real peak is the SUM of each operation's
  * own batch size, not any one of them — measured at ~44 in-flight calls for a realistic wave 0
  * before this option existed, more than double what a reader of the old per-batch doc comment would
  * have expected. 20 is a conservative default comfortably under the connection-pool ceilings of
@@ -666,3 +666,37 @@ export const MAX_BACKOFF_TOTAL_MS = 60_000
  * 12s yields 50,400 blocks (the old constant, to within 1% — the window was always approximate).
  */
 export const WAVE0_RECENT_WINDOW_SECONDS = 604_800
+
+/**
+ * How long wave 0a will WAIT for the recent-window pair scan it dispatched before closing without
+ * it (C5-B). Not a timeout on the scan — it keeps running and wave 0b still awaits it in full; this
+ * is only how much of it the FIRST evaluated stage is willing to include.
+ *
+ * WHY A GRACE AND NOT ONE OF THE TWO EXTREMES, both of which this package has now shipped and
+ * measured:
+ *
+ *  - Waiting UNBOUNDED (the pre-C5-B shape, a single `Promise.all`) makes the first-actionable
+ *    answer hostage to a log query. On a timeout-shaped endpoint the scan spends its whole budgeted
+ *    retry ladder — ~40s measured — while a hinted or direct-pair price sits finished in
+ *    `state.quoted`, which is the launcher/fallback case wave 0 exists for, defeated exactly when
+ *    the provider degrades.
+ *  - Waiting ZERO excludes the scan from the first evaluated stage far more often than "a slow
+ *    provider" suggests, because SPAN-CAPPED is the common case, not the exceptional one: any
+ *    endpoint that caps `eth_getLogs` turns this window into many chunked requests, so an actionable
+ *    wave 0a resolves without the scan's pools essentially always. Measured on the hermetic Base
+ *    ETH->USDC replay corpus: 23 of the session's 32 recorded log queries went unrequested.
+ *
+ * 500ms IS DERIVED FROM THE HEALTHY CASE, NOT PICKED FOR ROUNDNESS. Measured 2026-08-05 against a
+ * keyed mainnet endpoint, the entire wave-0 window resolves in ONE `eth_getLogs` at ~0.3-0.9s
+ * (README, "Log scanning is budgeted"), so a half second covers the single-request case that a
+ * well-behaved provider actually produces. A degraded provider costs the grace and no more: wave 0a
+ * proceeds, the caller gets its answer, and the scan is folded in by wave 0b for anyone still
+ * pulling. Both directions are therefore strictly better than the extreme they replace — bounded
+ * where the old shape was unbounded, and inclusive where a bare split was not.
+ *
+ * It is milliseconds of WALL CLOCK, so it joins {@link QUOTE_INTERLEAVE_MS} and the backoff ladder
+ * as one of the handful of time-shaped constants here; like them it is never a correctness
+ * boundary, only a scheduling one — nothing observable changes if it elapses, and nothing is
+ * dropped when it does.
+ */
+export const WAVE0_PAIR_SCAN_GRACE_MS = 500

@@ -29,7 +29,7 @@ import { classifyRpcError } from './rpcErrors'
 // per-CALL — every `mapConcurrent(items, MAX_CONCURRENT_CALLS, fn)` batch gets its own fresh
 // budget. That is fine in isolation, but wave 0 fires several such batches at once (hint
 // validation, route probes, and — for swaps — the readiness reads, all under one `Promise.all` in
-// `search/waves.ts#wave0`), so the REAL peak in-flight `client.request` count is the SUM of every
+// `search/waves.ts#wave0a`), so the REAL peak in-flight `client.request` count is the SUM of every
 // concurrently-running batch's own limit, not any single one of them (measured at ~44 for a
 // realistic wave 0, more than double the doc comment's claimed bound). A {@link Semaphore} fixes
 // that by being a bound the ROUTER holds once (`createSemaphore` in `router.ts#createRouter`) and
