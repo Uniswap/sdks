@@ -53,7 +53,7 @@ export function ingestLogs(run: Run, module_: ProtocolModule, logs: Log[]): void
  * router re-running the same request re-scans only the block delta plus the reorg overlap, instead
  * of the entire v4 history every single time.
  */
-export type ExactPairPlan = { module_: ProtocolModule; query: LogQuery; scope: string; deployBlock: bigint }
+type ExactPairPlan = { module_: ProtocolModule; query: LogQuery; scope: string; deployBlock: bigint }
 
 export function exactPairPlan(run: Run): ExactPairPlan | undefined {
   const { ctx, req } = run

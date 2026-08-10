@@ -21,7 +21,7 @@ import type { EncodedTx } from '../types'
 // still not revert-reason interpretation — the reason stays opaque.
 // ---------------------------------------------------------------------------
 
-export type PreflightResult =
+type PreflightResult =
   | { ok: true }
   /** The node executed the call and the EVM rejected it. Authoritative: this tx would not succeed. */
   | { ok: false; kind: 'reverted'; revertData?: Hex }

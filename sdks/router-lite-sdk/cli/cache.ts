@@ -88,6 +88,7 @@ import type { Address } from 'viem'
 
 import { parseSnapshot, PoolIndex, serializeSnapshot, type PoolIndexSnapshot } from '../src/experimental/index'
 import { PROTOCOLS, type BlockRange, type Protocol } from '../src/index'
+import { intersectRanges } from '../src/internal/ranges'
 
 import type { FlagSpec } from './args'
 
@@ -338,30 +339,12 @@ export type CacheProtocolSummary = { pct: number; complete: boolean }
 
 /** Merges `ranges` (from however many distinct coverage-scope keys share a protocol — a direct
  * pair's scope and an adjacency endpoint's scope can overlap) and sums the covered span within
- * `[lo, hi]`, so overlapping scopes are never double-counted. */
+ * `[lo, hi]`, so overlapping scopes are never double-counted. Composed from `src/internal/ranges.ts`'s
+ * set arithmetic — intersecting against the single `[lo, hi]` window both clips every range to it and
+ * merges the overlaps, which is the one definition of that algebra this package has. */
 function mergedCoveredSpan(ranges: BlockRange[], lo: bigint, hi: bigint): bigint {
-  const clipped = ranges
-    .map((r) => ({ fromBlock: r.fromBlock > lo ? r.fromBlock : lo, toBlock: r.toBlock < hi ? r.toBlock : hi }))
-    .filter((r) => r.fromBlock <= r.toBlock)
-    .sort((a, b) => (a.fromBlock < b.fromBlock ? -1 : a.fromBlock > b.fromBlock ? 1 : 0))
-
-  let total = 0n
-  let curFrom: bigint | undefined
-  let curTo: bigint | undefined
-  for (const r of clipped) {
-    if (curTo === undefined) {
-      curFrom = r.fromBlock
-      curTo = r.toBlock
-    } else if (r.fromBlock <= curTo + 1n) {
-      if (r.toBlock > curTo) curTo = r.toBlock
-    } else {
-      total += curTo - curFrom! + 1n
-      curFrom = r.fromBlock
-      curTo = r.toBlock
-    }
-  }
-  if (curTo !== undefined) total += curTo - curFrom! + 1n
-  return total
+  const clipped = intersectRanges(ranges, [{ fromBlock: lo, toBlock: hi }])
+  return clipped.reduce((total, r) => total + (r.toBlock - r.fromBlock + 1n), 0n)
 }
 
 /**

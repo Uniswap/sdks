@@ -134,7 +134,7 @@ const V4_SETTLE_PARAMS = parseAbiParameters('address currency, uint256 amount, b
 const V4_TAKE_PARAMS = parseAbiParameters('address currency, address recipient, uint256 amount')
 
 /** One hop of a v4 path as the wire speaks it — the struct member of `SWAP_EXACT_IN`'s `path`. */
-export type V4PathKey = {
+type V4PathKey = {
   intermediateCurrency: Address
   fee: bigint
   tickSpacing: number

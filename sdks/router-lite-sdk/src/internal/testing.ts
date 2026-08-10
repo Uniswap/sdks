@@ -522,7 +522,7 @@ const stubViolationLog: string[] = []
  * loop tell "this call is scripted to revert" from "this call is not scripted at all" and rethrow
  * only the second.
  */
-export class StubViolationError extends Error {
+class StubViolationError extends Error {
   constructor(message: string) {
     super(message)
     this.name = 'StubViolationError'
@@ -544,7 +544,7 @@ export function takeStubViolations(): string[] {
   return stubViolationLog.splice(0, stubViolationLog.length)
 }
 
-export type ServeAggregate3Args = {
+type ServeAggregate3Args = {
   /** The `eth_call` payload: `params[0].data`. Must decode as `aggregate3`. */
   data: Hex
   /** The `eth_call` block tag: `params[1]`. */

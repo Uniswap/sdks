@@ -42,7 +42,7 @@ export const ENTRY_POINTS = ['src/index.ts', 'src/experimental/index.ts']
  * The file a relative specifier names, or `undefined` for a bare package specifier (`viem`) — those
  * are dependencies, not files this package ships.
  */
-export function resolveSpecifier(fromFile: string, specifier: string): string | undefined {
+function resolveSpecifier(fromFile: string, specifier: string): string | undefined {
   if (!specifier.startsWith('.')) return undefined
   const base = resolve(dirname(join(PKG_ROOT, fromFile)), specifier)
   for (const candidate of [`${base}.ts`, join(base, 'index.ts'), `${base}.json`, base]) {

@@ -4,8 +4,10 @@
 // Builds ONE chain's publishable pool list from a warm `rl` cache.
 //
 // Usage (ALWAYS through `chainz exec`, so the keyed RPC URL never reaches a
-// shell history or this script's output — it is read from $ETH_RPC_URL and
-// never printed, logged, or written into the list):
+// shell history or this script's output — the endpoint is `--rpc <url>` /
+// `$ETH_RPC_URL` / `$RPC_URL` (`cli/chains.ts#resolveRpcUrl`'s precedence,
+// shared by every entry point in this package) and is never printed, logged,
+// or written into the list):
 //
 //   # from whatever the CLI's cache already holds for this chain
 //   chainz exec 1 -- bun scripts/buildPoolList.ts
@@ -43,7 +45,9 @@ import { fileURLToPath } from 'node:url'
 
 import { createPublicClient, http, type Address, type PublicClient } from 'viem'
 
+import { parseArgs, type FlagSpec } from '../cli/args'
 import { cachePath } from '../cli/cache'
+import { resolveRpcUrl } from '../cli/chains'
 import {
   buildEnvelope,
   curate,
@@ -65,6 +69,7 @@ const OUT_DIR = join(PKG_ROOT, 'pool-lists')
 const SAMPLE_POOLS = 200
 
 type Args = {
+  rpc?: string
   chain?: number
   from?: string
   out?: string
@@ -76,57 +81,45 @@ type Args = {
   skipVerify: boolean
 }
 
-function parseArgs(argv: string[]): Args {
-  const args: Args = { warm: [], warmBudget: '120s', topPairs: 25, sample: SAMPLE_POOLS, skipVerify: false }
-  for (let i = 0; i < argv.length; i++) {
-    const flag = argv[i]!
-    const next = (): string => {
-      const v = argv[++i]
-      if (v === undefined) throw new Error(`missing value for ${flag}`)
-      return v
-    }
-    switch (flag) {
-      case '--chain':
-        args.chain = Number(next())
-        break
-      case '--from':
-        args.from = next()
-        break
-      case '--out':
-        args.out = next()
-        break
-      case '--warm':
-        args.warm.push(...next().split(',').map((t) => t.trim()).filter(Boolean))
-        break
-      case '--warm-budget':
-        args.warmBudget = next()
-        break
-      case '--top-pairs':
-        args.topPairs = Number(next())
-        break
-      case '--max-pools':
-        args.maxPools = Number(next())
-        break
-      case '--sample':
-        args.sample = Number(next())
-        break
-      case '--skip-verify':
-        // For a chain with no reachable endpoint, or a rebuild of a list whose pools were verified
-        // minutes ago. It is a FLAG and not a default because an unverified list is exactly the
-        // thing this script exists to not produce.
-        args.skipVerify = true
-        break
-      default:
-        throw new Error(`unknown flag ${flag}`)
-    }
-  }
-  return args
+const FLAGS: FlagSpec = {
+  rpc: { kind: 'string' },
+  chain: { kind: 'string' },
+  from: { kind: 'string' },
+  out: { kind: 'string' },
+  warm: { kind: 'strings' },
+  'warm-budget': { kind: 'string' },
+  'top-pairs': { kind: 'string' },
+  'max-pools': { kind: 'string' },
+  sample: { kind: 'string' },
+  'skip-verify': { kind: 'boolean' },
 }
 
-function rpcUrl(): string {
-  const url = process.env.ETH_RPC_URL ?? process.env.RPC_URL
-  if (!url) throw new Error('no RPC URL: run through `chainz exec <chain> -- bun scripts/buildPoolList.ts` (or set ETH_RPC_URL)')
-  return url
+function readArgs(argv: string[]): Args {
+  const parsed = parseArgs(argv, FLAGS)
+  const args: Args = { warm: [], warmBudget: '120s', topPairs: 25, sample: SAMPLE_POOLS, skipVerify: false }
+  const rpc = parsed.strings.get('rpc')
+  if (rpc !== undefined) args.rpc = rpc
+  const chain = parsed.strings.get('chain')
+  if (chain !== undefined) args.chain = Number(chain)
+  const from = parsed.strings.get('from')
+  if (from !== undefined) args.from = from
+  const out = parsed.strings.get('out')
+  if (out !== undefined) args.out = out
+  const warm = parsed.lists.get('warm') ?? []
+  for (const spec of warm) args.warm.push(...spec.split(',').map((t) => t.trim()).filter(Boolean))
+  const warmBudget = parsed.strings.get('warm-budget')
+  if (warmBudget !== undefined) args.warmBudget = warmBudget
+  const topPairs = parsed.strings.get('top-pairs')
+  if (topPairs !== undefined) args.topPairs = Number(topPairs)
+  const maxPools = parsed.strings.get('max-pools')
+  if (maxPools !== undefined) args.maxPools = Number(maxPools)
+  const sample = parsed.strings.get('sample')
+  if (sample !== undefined) args.sample = Number(sample)
+  // `--skip-verify`: for a chain with no reachable endpoint, or a rebuild of a list whose pools were
+  // verified minutes ago. It is a FLAG and not a default because an unverified list is exactly the
+  // thing this script exists to not produce.
+  if (parsed.booleans.has('skip-verify')) args.skipVerify = true
+  return args
 }
 
 /** Drives `rl discover <token>` once per `--warm` token so the cache this script reads is warm. */
@@ -176,8 +169,8 @@ function report(stats: CurationStats, asOfBlock: string, bytes: number, out: str
 }
 
 async function main(): Promise<void> {
-  const args = parseArgs(process.argv.slice(2))
-  const url = rpcUrl()
+  const args = readArgs(process.argv.slice(2))
+  const url = resolveRpcUrl(args.rpc)
 
   // The chain identifies ITSELF from the endpoint (the same rule `cli/chains.ts` documents);
   // `--chain` is an assertion cross-checked against it, never a selector.

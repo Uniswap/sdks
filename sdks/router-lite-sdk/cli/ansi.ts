@@ -45,8 +45,8 @@ export function shortHex(hex: string): string {
   return `${hex.slice(0, 6)}…${hex.slice(-4)}`
 }
 
-/** Every SGR escape this module ever emits — the only shape `visibleWidth`/`padEndVisible`/
- * `padStartVisible` need to strip, since `paint` is the sole producer. */
+/** Every SGR escape this module ever emits — the only shape `visibleWidth`/`padEndVisible`
+ * need to strip, since `paint` is the sole producer. */
 const ANSI_RE = /\x1b\[[0-9;]*m/g
 
 /**
@@ -67,9 +67,3 @@ export function padEndVisible(s: string, width: number): string {
   return pad > 0 ? s + ' '.repeat(pad) : s
 }
 
-/** Left-pads `s` with spaces to `width` VISIBLE columns — see {@link visibleWidth}. A no-op if `s`
- * is already at or past `width`. */
-export function padStartVisible(s: string, width: number): string {
-  const pad = width - visibleWidth(s)
-  return pad > 0 ? ' '.repeat(pad) + s : s
-}

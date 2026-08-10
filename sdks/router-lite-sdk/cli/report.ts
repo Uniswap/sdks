@@ -92,9 +92,10 @@ const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 /**
  * A pool, as it appears INLINE in a route: `v3 0.01%`, `v4 0%+hooks`, `v4 dyn+hooks`. No address —
  * that is the whole point of this shape, and the reason it is a different function from
- * {@link poolAddressDetail} rather than one function with a formatting flag buried in the middle of
- * a switch. `opts.addresses` restores the OLD inline shape (fee/tickSpacing plus the address, and for
- * v4 the hooks address too) for a reader who wants it back on every line — `--addresses`.
+ * {@link poolAddressLabel} (via {@link renderPoolDetailLines}) rather than one function with a
+ * formatting flag buried in the middle of a switch. `opts.addresses` restores the OLD inline shape
+ * (fee/tickSpacing plus the address, and for v4 the hooks address too) for a reader who wants it
+ * back on every line — `--addresses`.
  */
 export function describePool(pool: PoolRef, opts: { addresses?: boolean } = {}): string {
   if (!opts.addresses) return describePoolCompact(pool)
@@ -352,7 +353,7 @@ export function budgetNoteFor(result: QuoteResult | SwapResult, budgetMs: number
  *
  * Used BOTH retrospectively (the command layer renders this once, after the search, from the wave
  * history it collected regardless of `--watch`) and as the source of truth `--watch`'s live stream
- * mirrors line-for-line (`waves.ts#renderTimelineLine`) — the two are the same wording so a
+ * mirrors line-for-line ({@link renderTimelineWaveLine}) — the two are the same wording so a
  * `--watch` run and its own retrospective summary never disagree.
  */
 export function renderTimeline(

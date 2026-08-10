@@ -98,7 +98,7 @@ export function canonicalKey(method: string, params: unknown): string {
  * `nestedData` is geth's `data.data` position — kept apart because `collectFacts` treats a
  * zero-length `'0x'` differently at the two positions.
  */
-export type RecordedErrorFrame = {
+type RecordedErrorFrame = {
   message?: string
   details?: string
   name?: string
@@ -109,7 +109,7 @@ export type RecordedErrorFrame = {
 }
 
 /** A captured error's `cause` chain, outermost frame first. */
-export type RecordedError = { frames: RecordedErrorFrame[] }
+type RecordedError = { frames: RecordedErrorFrame[] }
 
 /** One recorded (method, canonical params) → result | error entry. */
 export type SessionEntry = {
@@ -221,7 +221,7 @@ export function rebuildError(recorded: RecordedError): Error {
 // Replay transport
 // ---------------------------------------------------------------------------
 
-export type ReplayHarness = {
+type ReplayHarness = {
   client: PublicClient
   /** Canonical keys the replay has served so far. */
   requestedKeys: ReadonlySet<string>
@@ -297,7 +297,7 @@ export type CanonicalRoute = {
   promotedOverComplex?: true
 }
 
-export type CanonicalReport = {
+type CanonicalReport = {
   block: { number: string; timestamp: string }
   discovery: Record<string, { status: string; coveredRanges: { fromBlock: string; toBlock: string }[]; demandFloor: string }>
   enumeration: SearchReport['enumeration']

@@ -9,7 +9,9 @@ import { gunzipSync, gzipSync } from 'node:zlib'
 import { createPublicClient, custom, http } from 'viem'
 import type { PublicClient } from 'viem'
 
-import { redactHeaderValues, redactKeyedUrl, registerRpcHeaders } from '../cli/redact'
+import { parseArgs, type FlagSpec } from '../cli/args'
+import { resolveRpcUrl } from '../cli/chains'
+import { redact, registerRpcHeaders } from '../cli/redact'
 import { resolveRpcHeaders } from '../cli/rpcHeaders'
 import type { QuoteResult } from '../src'
 import { createRouter, manifestFor } from '../src'
@@ -91,50 +93,36 @@ type Args = {
   force: boolean
 }
 
-function parseArgs(argv: string[]): Args {
-  const args: Args = { all: false, regold: false, force: false }
-  for (let i = 0; i < argv.length; i++) {
-    const flag = argv[i]!
-    const next = (): string => {
-      const v = argv[++i]
-      if (v === undefined) throw new Error(`missing value for ${flag}`)
-      return v
-    }
-    switch (flag) {
-      case '--label':
-        args.label = next()
-        break
-      case '--rpc':
-        args.rpc = next()
-        break
-      case '--chain':
-        args.chain = Number(next())
-        break
-      case '--token-in':
-        args.tokenIn = next()
-        break
-      case '--token-out':
-        args.tokenOut = next()
-        break
-      case '--amount-in':
-        args.amountIn = next()
-        break
-      case '--notes':
-        args.notes = next()
-        break
-      case '--all':
-        args.all = true
-        break
-      case '--force':
-        args.force = true
-        break
-      case '--regold':
-        args.regold = true
-        break
-      default:
-        throw new Error(`unknown flag ${flag}`)
-    }
-  }
+const FLAGS: FlagSpec = {
+  label: { kind: 'string' },
+  rpc: { kind: 'string' },
+  chain: { kind: 'string' },
+  'token-in': { kind: 'string' },
+  'token-out': { kind: 'string' },
+  'amount-in': { kind: 'string' },
+  notes: { kind: 'string' },
+  all: { kind: 'boolean' },
+  force: { kind: 'boolean' },
+  regold: { kind: 'boolean' },
+}
+
+function readArgs(argv: string[]): Args {
+  const parsed = parseArgs(argv, FLAGS)
+  const args: Args = { all: parsed.booleans.has('all'), regold: parsed.booleans.has('regold'), force: parsed.booleans.has('force') }
+  const label = parsed.strings.get('label')
+  if (label !== undefined) args.label = label
+  const rpc = parsed.strings.get('rpc')
+  if (rpc !== undefined) args.rpc = rpc
+  const chain = parsed.strings.get('chain')
+  if (chain !== undefined) args.chain = Number(chain)
+  const tokenIn = parsed.strings.get('token-in')
+  if (tokenIn !== undefined) args.tokenIn = tokenIn
+  const tokenOut = parsed.strings.get('token-out')
+  if (tokenOut !== undefined) args.tokenOut = tokenOut
+  const amountIn = parsed.strings.get('amount-in')
+  if (amountIn !== undefined) args.amountIn = amountIn
+  const notes = parsed.strings.get('notes')
+  if (notes !== undefined) args.notes = notes
   return args
 }
 
@@ -234,13 +222,6 @@ function rpcHeaders(): Record<string, string> {
   return headers
 }
 
-/** Both redaction rules, composed: the keyed-URL rule plus this run's registered header values.
- * Every message this script persists into a fixture, or prints, goes through this — never
- * `redactKeyedUrl` alone — so a header value can never land in either place. */
-function redact(message: string): string {
-  return redactHeaderValues(redactKeyedUrl(message))
-}
-
 /**
  * A recording client over the live endpoint. `fallback: true` answers map-first (so replays of a
  * pinned head stay pinned) and records only the misses.
@@ -298,8 +279,7 @@ async function strictReplay(session: RecordedSession): Promise<{ result: QuoteRe
 async function recordOne(args: Args): Promise<void> {
   const label = args.label
   if (!label) throw new Error('--label is required')
-  const rpc = args.rpc ?? process.env.RPC_URL ?? process.env.ETH_RPC_URL
-  if (!rpc) throw new Error('no RPC URL: pass --rpc @rpc via `chainz exec <chain> -- ...`, or set RPC_URL/ETH_RPC_URL')
+  const rpc = resolveRpcUrl(args.rpc)
 
   const existing = loadExistingSession(label)
   const chainId = args.chain ?? existing?.chainId
@@ -490,7 +470,7 @@ async function regoldAll(): Promise<void> {
   console.log(`\n[regold] ${changed} of ${files.length} session golden(s) updated (no RPC was used)`)
 }
 
-const args = parseArgs(process.argv.slice(2))
+const args = readArgs(process.argv.slice(2))
 if (args.regold) {
   await regoldAll()
 } else if (args.all) {

@@ -2309,7 +2309,7 @@ describe('transport options (C4-P6)', () => {
 // C5-A: the pre-search RPC sequence's depth, pinned so it cannot regress.
 //
 // `getQuote` used to have THREE round trips strictly ahead of wave 0's first quote probe: manifest
-// validation's `eth_getChainId`+`eth_getCode` (already concurrent with each other), the multicall3
+// validation's `eth_chainId`+`eth_getCode` (already concurrent with each other), the multicall3
 // probe's own `eth_getCode` (already concurrent with validation), and — the one this fixes —
 // `searchWaves`'s pinned-block `eth_getBlockByNumber`, which did not even DISPATCH until a
 // `SearchContext` existed, which needed validation and the multicall probe to have already

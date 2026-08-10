@@ -33,7 +33,7 @@ import type { ExecutionPlan } from '../types'
 // ---------------------------------------------------------------------------
 
 /** What a shape's golden says, once the two files are joined on its name. */
-export type Golden = { plan: ExecutionPlan; calldata: string; value: string }
+type Golden = { plan: ExecutionPlan; calldata: string; value: string }
 
 /** The half of a golden that does NOT vary with the command set. */
 export type GoldenPlan = { plan: unknown; value: string }

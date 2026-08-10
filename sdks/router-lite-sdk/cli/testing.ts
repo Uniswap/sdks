@@ -33,12 +33,12 @@ export const DAI = '0x6B175474E89094C44Da98b954EedeAC495271d0F' as Address
 export const LONGTAIL = '0x1111111111111111111111111111111111111111' as Address
 
 export const POOL_WETH_USDC = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc' as Address
-export const POOL_WETH_DAI = '0xA478c2975Ab1Ea89e8196811F51A7B7Ade33eB11' as Address
+const POOL_WETH_DAI = '0xA478c2975Ab1Ea89e8196811F51A7B7Ade33eB11' as Address
 export const POOL_WETH_LONGTAIL = '0xcccccccccccccccccccccccccccccccccccccccc' as Address
 export const POOL_USDC_DAI = '0xdddddddddddddddddddddddddddddddddddddddd' as Address
 
 /** The block a warm index's coverage reaches. */
-export const WARM_TO_BLOCK = 21_000_000n
+const WARM_TO_BLOCK = 21_000_000n
 
 /**
  * What a {@link warmIndex} still has to scan when a search asks for `10_000_835..21_000_100`: the

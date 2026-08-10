@@ -183,7 +183,7 @@ makes.
 The CLI prints it dimmed on route lines (`~90k gas`), rounded to three significant figures because
 that is as much precision as the figure actually has.
 
-### `reason` (C4-P5)
+### `reason`
 
 `no-route` and `inconclusive` both carry `reason: { code: ReasonCode; detail: string }` instead of a
 bare string. `code` is the part a caller may safely `switch`/`===` on — a closed, exported union —
@@ -379,7 +379,7 @@ paying a few MB to never re-scan them is a bargain. A process that fields a long
 pairs (an aggregator relaying arbitrary user-chosen tokens) can instead accumulate this forever: one
 long-tail trade's WETH-adjacency scan alone has been measured at 150–250 MB, permanently.
 
-Five knobs manage that lifecycle:
+Four knobs manage that lifecycle:
 
 - **`router.stats(): RouterStats`** — a sizes-only snapshot (`pools`, `adjacencyEdges`,
   `coverageScopes`, `negativeCacheBlocks`, `enabledFeeFactories`), safe to log on an interval. It
@@ -657,7 +657,7 @@ ceiling of 2^128), `slippageBps` (integer in `[0, 10000]`), `deadlineSeconds` (i
 `recipient` addresses, which may be neither the zero address, nor a Universal Router sentinel, nor
 one of the contracts the trade is *about* (`tokenIn`, `tokenOut`, the Universal Router, Permit2, or
 the wrapped-native token — output sent to any of those is unrecoverable), and — swap requests only,
-since quoting has no execution bundle to be missing (C4-P3) — a manifest whose `execution` bundle is
+since quoting has no execution bundle to be missing — a manifest whose `execution` bundle is
 absent, which `getSwap`/`swaps` reject with `RouterConfigError` before either reaches the wave
 engine. A recipient that turns out to be one of the pools the chosen route trades through is caught
 a layer later, when the plan exists. `UnsupportedRouteError` (a route shape outside the closed
@@ -692,7 +692,7 @@ failing rejects that first call with `RouterConfigError`. Everything else — no
 
 The package root also exports two closed sets **as values**, not only as types, so a caller can walk
 them instead of hand-copying a literal that silently stops matching: `REASON_CODES` (every
-[`reason.code`](#reason-c4-p5)) and `PROTOCOLS` (`['v2', 'v3', 'v4']` — exactly the key set of
+[`reason.code`](#reason)) and `PROTOCOLS` (`['v2', 'v3', 'v4']` — exactly the key set of
 `SearchReport.discovery`, so a per-protocol table or a `Record<Protocol, …>` builder can be derived
 rather than transcribed).
 
@@ -829,8 +829,12 @@ The complete set of environment variables the private workspaces read:
 | `CANARY_RPC_URL_1` | `canary/env.ts` | The primary canary endpoint. Required — `ROUTER_LITE_CANARY=1` alone does not enable the canary. |
 | `CANARY_RPC_URL_2`, `CANARY_RPC_URL_3` | `canary/env.ts` | Optional. Together with `_1` they form the **same-chain provider matrix** the canary compares against itself. |
 | `CANARY_RPC_URL_ROBINHOOD` | `canary/env.ts` | Robinhood Chain's endpoint. Deliberately *not* a fourth `CANARY_RPC_URL_*`: those three are one chain seen three ways, this is a different chain. Its suites skip when it is unset, even with the canary on. |
-| `ETH_RPC_URL` | `cli/`, `scripts/` | The endpoint for the CLI and the recorder/pool-list scripts (`--rpc` overrides it). Passed through the environment rather than a command line, where a keyed URL would land in a process listing. |
+| `ETH_RPC_URL` | `cli/`, `scripts/` | The endpoint for the CLI and the recorder/pool-list scripts. Passed through the environment rather than a command line, where a keyed URL would land in a process listing. Part of the `--rpc > $ETH_RPC_URL > $RPC_URL` precedence every entry point shares — see `cli/chains.ts#resolveRpcUrl`. |
+| `RPC_URL` | `cli/`, `scripts/` | The same endpoint as `ETH_RPC_URL`, one rung lower in the shared `--rpc > $ETH_RPC_URL > $RPC_URL` precedence — a fallback for a caller that already exports this more generic name for other tooling. |
 | `ETH_RPC_HEADERS` | `cli/`, `scripts/recordSession.ts` | Extra RPC headers, foundry's own format (comma-separated `Name: value` pairs) — exactly what `chainz exec`/`chainz shell` export, so a header-authenticated gateway needs no flag at all. The CLI's `--rpc-header <spec>` (repeatable) overrides an env pair of the same name; both are parsed by the one shared `cli/rpcHeaders.ts`. Values are never printed or cached. |
+| `UNISWAP_API_KEY` | `scripts/compare.ts` | The Trading API key `compare.ts` needs to quote the API side of its side-by-side comparison. Unset means the `api` column reads `skipped` rather than the script failing — `--dry-run` needs no key at all. |
+| `XDG_CACHE_HOME` | `cli/cache.ts` | Where the CLI's on-disk pool-index cache lives: `$XDG_CACHE_HOME/router-lite` when set, else `~/.cache/router-lite`. |
+| `NO_COLOR` | `cli/ansi.ts` | Disables ANSI styling in CLI output (https://no-color.org) — checked alongside "is stdout a TTY", so piping output already disables color without it. |
 
 ### Recorded-replay golden sessions
 

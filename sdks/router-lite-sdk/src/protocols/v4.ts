@@ -40,7 +40,7 @@ export const STANDARD_V4_CONFIGS: readonly { fee: number; tickSpacing: number }[
 ]
 
 /** The PathKey struct consumed by `V4Quoter.quoteExactInput`'s `path` array. */
-export type PathKeyStruct = {
+type PathKeyStruct = {
   intermediateCurrency: Address
   fee: number
   tickSpacing: number

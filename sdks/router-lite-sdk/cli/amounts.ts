@@ -8,6 +8,8 @@
 // amount is never more than what the quote actually says.
 // ---------------------------------------------------------------------------
 
+import { groupThousands } from './format'
+
 /** Thrown for any human-input parse failure; rendered as a one-liner, never a stack. */
 export class AmountError extends Error {}
 
@@ -46,7 +48,7 @@ export function formatAmount(amount: bigint, decimals: number, maxFractionDigits
   const whole = abs / base
   const frac = abs % base
 
-  const grouped = whole.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  const grouped = groupThousands(whole)
   const fracDigits = Math.min(maxFractionDigits, decimals)
   const fracFull = frac.toString().padStart(decimals, '0')
   const fracShown = fracFull.slice(0, fracDigits).replace(/0+$/, '')
@@ -71,7 +73,7 @@ export function formatFixed(amount: bigint, decimals: number, fractionDigits: nu
   const whole = abs / base
   const frac = abs % base
 
-  const grouped = whole.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  const grouped = groupThousands(whole)
   const digits = Math.max(0, Math.min(fractionDigits, decimals))
   const fracFull = frac.toString().padStart(decimals, '0')
   const fracShown = fracFull.slice(0, digits).padEnd(digits, '0')

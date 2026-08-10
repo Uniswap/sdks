@@ -12,6 +12,17 @@ describe('resolveRpcUrl', () => {
     expect(resolveRpcUrl(undefined, { ETH_RPC_URL: 'https://env.example/B' })).toBe('https://env.example/B')
   })
 
+  it('falls back to $RPC_URL, last, when neither --rpc nor $ETH_RPC_URL is set', () => {
+    expect(resolveRpcUrl(undefined, { RPC_URL: 'https://env.example/C' })).toBe('https://env.example/C')
+  })
+
+  it('pins the full precedence order: --rpc > $ETH_RPC_URL > $RPC_URL', () => {
+    const all = { ETH_RPC_URL: 'https://env.example/B', RPC_URL: 'https://env.example/C' }
+    expect(resolveRpcUrl('https://flag.example/A', all)).toBe('https://flag.example/A')
+    expect(resolveRpcUrl(undefined, all)).toBe('https://env.example/B')
+    expect(resolveRpcUrl(undefined, { RPC_URL: all.RPC_URL })).toBe('https://env.example/C')
+  })
+
   it('rejects an empty/missing endpoint with the chainz composition pattern in the message', () => {
     expect(() => resolveRpcUrl(undefined, {})).toThrow(UsageError)
     expect(() => resolveRpcUrl(undefined, { ETH_RPC_URL: '  ' })).toThrow(/chainz exec 1 -- bun cli\/rl\.ts/)

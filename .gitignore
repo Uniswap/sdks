@@ -12,3 +12,6 @@ node_modules
 
 # spec workflow mcp from Uniswap
 .spec-workflow/
+
+# scratch investigation scripts — never meant to be committed (see a8b500e0)
+scratch/

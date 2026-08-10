@@ -1031,63 +1031,51 @@ export function createRouter(opts: CreateRouterOptions): Router {
     }
   }
 
-  async function getQuote(req: QuoteRequest): Promise<QuoteResult> {
-    validateQuoteRequest(req, manifest)
-    // All three dispatched BEFORE the validation await so their round trips overlap (C5-A):
-    // `resolveMulticall3` and `ensureManifestValidated` are once-cells and never reject uncaught by
-    // themselves; `pinnedBlock`'s no-op `.catch` is what keeps a search that never reaches
-    // `searchWaves` (a `RouterConfigError` below) from logging an unhandled rejection for it.
-    const multicallProbe = resolveMulticall3()
-    const pinnedBlock = dispatchPinnedBlock()
-    pinnedBlock.catch(() => {})
-    try {
-      await ensureManifestValidated()
-    } catch (err) {
-      if (err instanceof RouterConfigError) throw err
-      return rpcUnavailable(manifest)
-    }
-    const ctx = buildContext(req, await multicallProbe, pinnedBlock)
-    try {
-      for await (const e of searchWaves(ctx, req, 'quote')) {
-        const result = classifyQuote(e)
-        if (result.status === 'quote' || e.done) return result
-      }
-      /* istanbul ignore next -- searchWaves always yields a done:true final event before returning */
-      throw new Error('unreachable: searchWaves completed without a done event')
-    } catch (err) {
-      if (err instanceof RpcUnavailableError) return rpcUnavailable(manifest)
-      throw err
-    }
-  }
+  /** One of `searchWaves`'s own events, or the sentinel this function yields in its place when the
+   * search never reaches `searchWaves` at all (an outage during manifest validation) or is cut short
+   * by one mid-search (`RpcUnavailableError`) — both cases a caller answers with {@link rpcUnavailable}. */
+  type SearchEvent = { event: InternalResult } | { outage: true }
 
-  async function getSwap(req: SwapRequest): Promise<SwapResult> {
-    validateSwapRequest(req, manifest)
-    const multicallProbe = resolveMulticall3()
-    const pinnedBlock = dispatchPinnedBlock()
-    pinnedBlock.catch(() => {})
-    try {
-      await ensureManifestValidated()
-    } catch (err) {
-      if (err instanceof RouterConfigError) throw err
-      return rpcUnavailable(manifest)
-    }
-    const ctx = buildContext(req, await multicallProbe, pinnedBlock)
-    try {
-      for await (const e of searchWaves(ctx, req, 'swap')) {
-        const result = classifySwap(e)
-        if (result.status === 'ready' || result.status === 'needs-action' || e.done) return result
-      }
-      /* istanbul ignore next -- searchWaves always yields a done:true final event before returning */
-      throw new Error('unreachable: searchWaves completed without a done event')
-    } catch (err) {
-      if (err instanceof RpcUnavailableError) return rpcUnavailable(manifest)
-      throw err
-    }
-  }
-
-  function quotes(req: QuoteRequest, iterate?: IterateOptions): AsyncIterable<QuoteResult> {
-    validateQuoteRequest(req, manifest)
+  /**
+   * The preamble shared by all four search entry points below — everything between "a validated
+   * request" and "a stream of `searchWaves` events" — parameterized by the two things that differ
+   * per pair (quote/swap): which synchronous `validate*Request` runs, and which `searchWaves` `kind`
+   * to search as. Classifying an event into the public result union, and deciding when to stop
+   * consuming them, stays with each of the four callers below: `getQuote`/`getSwap` stop at the
+   * first actionable status (a different one each) or the final event, while `quotes`/`swaps` simply
+   * forward every event — that difference was always going to need call-site-specific code, so this
+   * helper does not try to abstract it away.
+   *
+   * NOT an `async function`/`async function*` ITSELF UP TO THE `validate` CALL — that call has to
+   * run synchronously, on the caller's own stack, the instant `startSearch` is invoked, because
+   * `quotes`/`swaps` promise a malformed request throws before the generator they return is ever
+   * driven (see the router-test comment on `swaps()` for the load-bearing case). An `async`/generator
+   * function body never runs synchronously to its first `await`/`yield` the way a plain function
+   * does, so `validate` has to happen here, before the `(async function* () {...})()` below is even
+   * constructed. Everything after that line is free to be lazy.
+   *
+   * SURFACING A FAILURE IS THE ONE THING DELIBERATELY LEFT TO THE CALLER. `ensureManifestValidated`
+   * rejecting with a `RouterConfigError` is always rethrown here, uncaught — a promise-shaped caller
+   * lets that propagate as its own rejection, a generator-shaped caller lets it propagate as its
+   * iterator's first `.next()` rejecting; both are exactly what "rethrow" already meant for each
+   * shape before this helper existed. Anything else from `ensureManifestValidated`, and any
+   * `RpcUnavailableError` from the search loop itself, becomes one final `{ outage: true }` yield — a
+   * promise-shaped caller's loop returns `rpcUnavailable(manifest)` immediately on seeing it, a
+   * generator-shaped caller yields that same value and stops, matching the `return`/`yield`-then-
+   * `return` split each used to spell out individually.
+   */
+  function startSearch<Req extends QuoteRequest>(
+    req: Req,
+    validate: (req: Req, manifest: ChainManifest) => void,
+    kind: 'quote' | 'swap',
+    iterate?: IterateOptions,
+  ): AsyncGenerator<SearchEvent> {
+    validate(req, manifest)
     return (async function* () {
+      // All three dispatched BEFORE the validation await so their round trips overlap (C5-A):
+      // `resolveMulticall3` and `ensureManifestValidated` are once-cells and never reject uncaught by
+      // themselves; `pinnedBlock`'s no-op `.catch` is what keeps a search that never reaches
+      // `searchWaves` (a `RouterConfigError` below) from logging an unhandled rejection for it.
       const multicallProbe = resolveMulticall3()
       const pinnedBlock = dispatchPinnedBlock()
       pinnedBlock.catch(() => {})
@@ -1095,39 +1083,50 @@ export function createRouter(opts: CreateRouterOptions): Router {
         await ensureManifestValidated()
       } catch (err) {
         if (err instanceof RouterConfigError) throw err
-        yield rpcUnavailable(manifest)
+        yield { outage: true }
         return
       }
       const ctx = buildContext(req, await multicallProbe, pinnedBlock, iterate)
       try {
-        for await (const e of searchWaves(ctx, req, 'quote')) yield classifyQuote(e)
+        for await (const e of searchWaves(ctx, req, kind)) yield { event: e }
       } catch (err) {
         if (!(err instanceof RpcUnavailableError)) throw err
-        yield rpcUnavailable(manifest)
+        yield { outage: true }
       }
     })()
   }
 
-  function swaps(req: SwapRequest, iterate?: IterateOptions): AsyncIterable<SwapResult> {
-    validateSwapRequest(req, manifest)
+  async function getQuote(req: QuoteRequest): Promise<QuoteResult> {
+    for await (const item of startSearch(req, validateQuoteRequest, 'quote')) {
+      if ('outage' in item) return rpcUnavailable(manifest)
+      const result = classifyQuote(item.event)
+      if (result.status === 'quote' || item.event.done) return result
+    }
+    /* istanbul ignore next -- searchWaves always yields a done:true final event before returning */
+    throw new Error('unreachable: searchWaves completed without a done event')
+  }
+
+  async function getSwap(req: SwapRequest): Promise<SwapResult> {
+    for await (const item of startSearch(req, validateSwapRequest, 'swap')) {
+      if ('outage' in item) return rpcUnavailable(manifest)
+      const result = classifySwap(item.event)
+      if (result.status === 'ready' || result.status === 'needs-action' || item.event.done) return result
+    }
+    /* istanbul ignore next -- searchWaves always yields a done:true final event before returning */
+    throw new Error('unreachable: searchWaves completed without a done event')
+  }
+
+  function quotes(req: QuoteRequest, iterate?: IterateOptions): AsyncIterable<QuoteResult> {
+    const search = startSearch(req, validateQuoteRequest, 'quote', iterate)
     return (async function* () {
-      const multicallProbe = resolveMulticall3()
-      const pinnedBlock = dispatchPinnedBlock()
-      pinnedBlock.catch(() => {})
-      try {
-        await ensureManifestValidated()
-      } catch (err) {
-        if (err instanceof RouterConfigError) throw err
-        yield rpcUnavailable(manifest)
-        return
-      }
-      const ctx = buildContext(req, await multicallProbe, pinnedBlock, iterate)
-      try {
-        for await (const e of searchWaves(ctx, req, 'swap')) yield classifySwap(e)
-      } catch (err) {
-        if (!(err instanceof RpcUnavailableError)) throw err
-        yield rpcUnavailable(manifest)
-      }
+      for await (const item of search) yield 'outage' in item ? rpcUnavailable(manifest) : classifyQuote(item.event)
+    })()
+  }
+
+  function swaps(req: SwapRequest, iterate?: IterateOptions): AsyncIterable<SwapResult> {
+    const search = startSearch(req, validateSwapRequest, 'swap', iterate)
+    return (async function* () {
+      for await (const item of search) yield 'outage' in item ? rpcUnavailable(manifest) : classifySwap(item.event)
     })()
   }
 
@@ -1203,7 +1202,7 @@ export function createRouter(opts: CreateRouterOptions): Router {
   }
 
   function ingestReceipt(receipt: Pick<TransactionReceipt, 'logs'>): void {
-    ingestLogs(receipt.logs as unknown as Log[])
+    ingestLogs(receipt.logs)
   }
 
   function stats(): RouterStats {

@@ -30,9 +30,11 @@ import {
 } from './abis'
 import { ANVIL_DEPLOYER, type AnvilClient } from './anvil'
 import ARTIFACTS from './artifacts/contracts.json'
-// Type-only: the harness hands back the SDK's own `PoolRef`/`PoolKey` so refs can be passed straight
-// into router hints. `../src/types` has no runtime imports, so this needs no build of the parent.
-import type { CurrencyRef, PoolKey, PoolRef } from '../src/types'
+// Type-only, from the public entry point rather than `@uniswap/router-lite-sdk`: the harness hands
+// back the SDK's own `PoolRef`/`PoolKey` so refs can be passed straight into router hints, and a
+// type-only import is erased before anything resolves, so this needs no build of the parent (unlike
+// a runtime import of the package name, which resolves through `dist/`).
+import type { CurrencyRef, PoolKey, PoolRef } from '../src/index'
 
 // ---------------------------------------------------------------------------
 // worldBuilder — the ground-truth factory every fork test builds on.

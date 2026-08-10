@@ -7,6 +7,7 @@ import {
   type RouteLeg,
   type Router,
 } from '@uniswap/router-lite-sdk'
+import { v4Module } from '@uniswap/router-lite-sdk/experimental'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import {
   BaseError,
@@ -26,7 +27,6 @@ import { FORK_BLOCK, forkTestsEnabled, startAnvilFork, type AnvilClient } from '
 import { aggregateCalls, InnerCallFailure, MULTICALL3_ADDRESS } from '../src/internal/multicall'
 import { ethCall } from '../src/internal/rpc'
 import { revertDataOf } from '../src/internal/rpcErrors'
-import { v4Module } from '../src/protocols/v4'
 import {
   balanceOf,
   executeSwap,

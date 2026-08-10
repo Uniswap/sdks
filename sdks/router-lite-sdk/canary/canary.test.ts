@@ -3,16 +3,13 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { createRouter, MAINNET_MANIFEST, type PoolKey, type Router, type SwapRequest } from '@uniswap/router-lite-sdk'
+import { adjacencyQueries, v2Module, v3Module, v4Module } from '@uniswap/router-lite-sdk/experimental'
 import { beforeAll, describe, expect, it } from 'bun:test'
 import { decodeEventLog, encodeEventTopics, parseEther, type Address, type Hex, type PublicClient } from 'viem'
 
 import { V4_POOL_MANAGER_ABI } from '../src/internal/abis'
 import { scanLogs } from '../src/internal/logScan'
 import { assertResultCoherent } from '../src/internal/testing'
-import { adjacencyQueries } from '../src/protocols/adjacency'
-import { v2Module } from '../src/protocols/v2'
-import { v3Module } from '../src/protocols/v3'
-import { v4Module } from '../src/protocols/v4'
 import type { BlockRange, MergedLogQuery } from '../src/types'
 
 import { canaryEnabled, canaryLog, canaryProviders, freshClient, primaryProvider, type CanaryProvider } from './env'

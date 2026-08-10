@@ -49,7 +49,7 @@ import type { CurrencyRef, ExecutionRequirement, Permit2PermitSingle } from '../
 // read get an ON-CHAIN ANSWER — rather than twice in two vocabularies.
 // ---------------------------------------------------------------------------
 
-export type CheckReadinessArgs = {
+type CheckReadinessArgs = {
   client: Pick<PublicClient, 'request'>
   trader: Address
   currencyIn: CurrencyRef
@@ -155,7 +155,7 @@ async function readErc20State(
  * The missing check contributes no requirement — a fabricated one, stated with a hard number
  * (`available: 0n`), is worse than a reported gap in knowledge.
  */
-export type ReadinessResult = { requirements: ExecutionRequirement[]; degraded: boolean }
+type ReadinessResult = { requirements: ExecutionRequirement[]; degraded: boolean }
 
 /**
  * True when this read never produced an ON-CHAIN ANSWER, so its value must be neither trusted nor

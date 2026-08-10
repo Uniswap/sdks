@@ -431,7 +431,7 @@ export function rankRoutes(quoted: QuotedRoute[]): QuotedRoute[] {
   return [promoted, ...rest]
 }
 
-export type ProbeQuotesArgs = {
+type ProbeQuotesArgs = {
   client: Pick<PublicClient, 'request'>
   probes: QuoteProbe[]
   amountIn: bigint

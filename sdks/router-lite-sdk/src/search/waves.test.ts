@@ -1700,24 +1700,24 @@ test('a hinted native v4 pool speculatively re-quoted in wave 0 keeps its hint p
 
 test('selectFocus prefers the request field, then the hinted endpoint, then the smaller neighborhood', async () => {
   const index = new PoolIndex(WETH)
-  expect(selectFocus({ ...quoteReq, focusToken: TOKEN_B }, index)).toBe(TOKEN_B)
+  expect(selectFocus({ ...quoteReq, focusToken: TOKEN_B }, index, WETH)).toBe(TOKEN_B)
 
   // A focus that is not an endpoint is ignored rather than scanned instead of one.
-  expect(selectFocus({ ...quoteReq, focusToken: MID }, index)).toBe(TOKEN_A)
+  expect(selectFocus({ ...quoteReq, focusToken: MID }, index, WETH)).toBe(TOKEN_A)
 
   // Nothing known about either endpoint: tokenIn wins.
-  expect(selectFocus(quoteReq, index)).toBe(TOKEN_A)
+  expect(selectFocus(quoteReq, index, WETH)).toBe(TOKEN_A)
 
   // TOKEN_B is hinted, TOKEN_A is not.
   index.upsert({ pool: stubPoolRef('v2', TOKEN_B, MID), source: 'hint' })
-  expect(selectFocus(quoteReq, index)).toBe(TOKEN_B)
+  expect(selectFocus(quoteReq, index, WETH)).toBe(TOKEN_B)
 
   // Both hinted: the endpoint with fewer cached neighbors wins.
   const index2 = new PoolIndex(WETH)
   index2.upsert({ pool: stubPoolRef('v2', TOKEN_A, MID), source: 'hint' })
   index2.upsert({ pool: stubPoolRef('v2', TOKEN_B, MID), source: 'hint' })
   index2.upsert({ pool: stubPoolRef('v2', TOKEN_B, WETH), source: 'hint' })
-  expect(selectFocus(quoteReq, index2)).toBe(TOKEN_A)
+  expect(selectFocus(quoteReq, index2, WETH)).toBe(TOKEN_A)
 })
 
 test('UnsupportedRouteError in compileOperation is caught and route is skipped (business outcome)', async () => {

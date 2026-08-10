@@ -41,19 +41,22 @@ function supportedList(): string {
 }
 
 /**
- * The RPC endpoint to connect to: `--rpc` wins, `$ETH_RPC_URL` is the fallback (that variable is
- * exactly what `chainz exec <chain> --` exports, so chainz-driven usage needs no flag at all), and
- * having neither is a friendly one-liner showing the composition pattern. `env` is injectable for
- * tests; nothing here ever prints the resolved URL.
+ * The RPC endpoint to connect to, and the single precedence every entry point in this package
+ * (`cli/rl.ts`, `scripts/compare.ts`, `scripts/buildPoolList.ts`, `scripts/recordSession.ts`) shares:
+ * `--rpc` wins, `$ETH_RPC_URL` is next (that variable is exactly what `chainz exec <chain> --`
+ * exports, so chainz-driven usage needs no flag at all), and `$RPC_URL` is the last, more generic
+ * fallback for callers that already export that name for other tooling. Having none of the three is
+ * a friendly one-liner showing the composition pattern. `env` is injectable for tests; nothing here
+ * ever prints the resolved URL.
  */
 export function resolveRpcUrl(
   rpcFlag: string | undefined,
   env: Record<string, string | undefined> = process.env,
 ): string {
-  const url = rpcFlag ?? env.ETH_RPC_URL
+  const url = rpcFlag ?? env.ETH_RPC_URL ?? env.RPC_URL
   if (url !== undefined && url.trim().length > 0) return url.trim()
   throw new UsageError(
-    'no RPC endpoint — pass --rpc <url> or export ETH_RPC_URL ' +
+    'no RPC endpoint — pass --rpc <url>, export ETH_RPC_URL, or export RPC_URL ' +
       '(e.g. drive it through chainz: `chainz exec 1 -- bun cli/rl.ts quote eth usdc 1`)',
   )
 }

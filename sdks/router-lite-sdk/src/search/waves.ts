@@ -235,7 +235,7 @@ import { evaluate } from './leader'
 /** The client surface the engine needs: `request`, and nothing else. Every read the engine makes —
  * block header, pinned `eth_call`, `eth_getLogs` — goes through it, so a caller can satisfy the
  * whole engine with one function, and a test can observe every RPC in one place. */
-export type SearchClient = Pick<PublicClient, 'request'>
+type SearchClient = Pick<PublicClient, 'request'>
 
 /**
  * The highest `latest` block any search on this router has pinned, carried ACROSS searches by the
@@ -370,10 +370,7 @@ export type SearchContext = {
 }
 
 // The engine's routes are plain {@link RankedRoute}s: `execution`, plus the raw `revertData` of a
-// simulation that reverted, both of which the public result union declares. (There used to be an
-// `EvaluatedRoute = RankedRoute & { revertData?: Hex }` alias here, for a `revertData` the public
-// type did not admit to carrying — the field is declared on `RankedRoute` now, so the alias would be
-// an exact synonym for it.)
+// simulation that reverted, both of which the public result union declares.
 
 export type InternalResult = {
   best?: RankedRoute
@@ -395,7 +392,7 @@ export type InternalResult = {
 // Engine state
 // ---------------------------------------------------------------------------
 
-export type ProtocolDiscovery = {
+type ProtocolDiscovery = {
   /** Graph-node endpoints whose adjacency came back fully covered. Completeness is judged against
    * the *trade's* two endpoints by name, never against a count of whatever happened to be scanned. */
   complete: Set<string>
@@ -403,7 +400,7 @@ export type ProtocolDiscovery = {
   failed: boolean
 }
 
-export type ExecutionState = { status: RankedRoute['execution']; revertData?: Hex }
+type ExecutionState = { status: RankedRoute['execution']; revertData?: Hex }
 
 /**
  * What one compile+encode produced for a route: the calldata, and the two numbers that calldata
@@ -417,7 +414,7 @@ export type ExecutionState = { status: RankedRoute['execution']; revertData?: He
  * record makes it unstateable instead — there is no write that sets one without the other, and no
  * read that can find one without the other.
  */
-export type CompiledRoute = { tx: EncodedTx; limits: CompiledLimits }
+type CompiledRoute = { tx: EncodedTx; limits: CompiledLimits }
 
 export type EngineState = {
   block: BlockRef
@@ -1170,11 +1167,6 @@ function hasHintedPool(index: PoolIndex, endpoint: CurrencyRef): boolean {
   return touchingRecords(index, endpoint).some((r) => r.source === 'hint')
 }
 
-/** Identity comparison for currencies when no wrappedNative is available to normalize the family. */
-function normalizeRef(c: CurrencyRef): string {
-  return c === 'native' ? 'native' : c.toLowerCase()
-}
-
 function newestHintedBlock(index: PoolIndex, endpoint: CurrencyRef): bigint | undefined {
   let best: bigint | undefined
   for (const r of touchingRecords(index, endpoint)) {
@@ -1201,13 +1193,13 @@ function newestHintedBlock(index: PoolIndex, endpoint: CurrencyRef): bigint | un
  * neighbor cross-product at a token neither side of the trade touches. A focus that is neither
  * endpoint is ignored, and the normal ordering decides.
  */
-export function selectFocus(req: QuoteRequest, index: PoolIndex, wrappedNative?: Address): CurrencyRef {
+export function selectFocus(req: QuoteRequest, index: PoolIndex, wrappedNative: Address): CurrencyRef {
   const { tokenIn, tokenOut } = req
 
   if (req.focusToken !== undefined) {
-    const focusNode = wrappedNative ? toGraphNode(req.focusToken, wrappedNative) : normalizeRef(req.focusToken)
-    const inNode = wrappedNative ? toGraphNode(tokenIn, wrappedNative) : normalizeRef(tokenIn)
-    const outNode = wrappedNative ? toGraphNode(tokenOut, wrappedNative) : normalizeRef(tokenOut)
+    const focusNode = toGraphNode(req.focusToken, wrappedNative)
+    const inNode = toGraphNode(tokenIn, wrappedNative)
+    const outNode = toGraphNode(tokenOut, wrappedNative)
     if (focusNode === inNode) return tokenIn
     if (focusNode === outNode) return tokenOut
   }

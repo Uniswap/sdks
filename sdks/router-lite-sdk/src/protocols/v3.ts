@@ -35,7 +35,7 @@ import type { ProtocolModule, QuoteProbe } from './types'
 // ---------------------------------------------------------------------------
 
 /** The four fee tiers enabled at v3 factory genesis, in hundredths of a bip. */
-export const STANDARD_V3_FEES: readonly number[] = [100, 500, 3000, 10000]
+const STANDARD_V3_FEES: readonly number[] = [100, 500, 3000, 10000]
 
 /**
  * keccak256 of the UniswapV3Pool creation code — the CREATE2 init code hash shared by the mainnet v3

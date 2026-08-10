@@ -62,7 +62,7 @@ export type ScopeDemand = AdjacencyScope & { shape: AdjacencyShape; uncovered: B
  * the endpoint in the other currency slot is invisible to the first filter — which is why they are
  * returned together rather than as two independent scans.
  */
-export type MergedScan = {
+type MergedScan = {
   queries: MergedLogQuery[]
   ranges: BlockRange[]
   covers: AdjacencyScope[]
