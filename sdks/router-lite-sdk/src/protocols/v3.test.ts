@@ -9,6 +9,7 @@ import { MAINNET_MANIFEST } from '../manifest'
 import type { PoolRef, RouteLeg } from '../types'
 
 import quoterFixture from './__fixtures__/quoterV2.mainnet.json'
+import { adjacencyQueries } from './adjacency'
 import { computeV3PoolAddress, encodeV3Path, mergeEnabledFees, V3_POOL_INIT_CODE_HASH, v3Module } from './v3'
 
 const USDC = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as const
@@ -174,17 +175,19 @@ test('feeDiscovery scans the factory, ignores foreign logs, and probes the disco
 })
 
 test('adjacency: token lands in topic1 for one query and topic2 for the other', () => {
-  const [asToken0, asToken1] = v3Module.adjacency(USDC, MAINNET_MANIFEST)
+  const [asToken0, asToken1] = adjacencyQueries([v3Module.adjacencyShape(MAINNET_MANIFEST)!], [USDC])
   const padded = pad(USDC).toLowerCase()
-  expect(asToken0.topics[1]!.toLowerCase()).toBe(padded)
-  expect(asToken0.topics[2]).toBeNull()
-  expect(asToken1.topics[1]).toBeNull()
-  expect(asToken1.topics[2]!.toLowerCase()).toBe(padded)
+  expect(asToken0!.topics[1]).toEqual([padded])
+  expect(asToken0!.topics[2]).toBeUndefined()
+  expect(asToken1!.topics[1]).toBeNull()
+  expect(asToken1!.topics[2]).toEqual([padded])
 })
 
-test('adjacency topic0 pins the PoolCreated selector (drift guard)', () => {
-  const [query] = v3Module.adjacency(USDC, MAINNET_MANIFEST)
-  expect(query.topics[0]).toBe('0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118')
+test('the adjacency shape pins the PoolCreated selector and the pair’s topic slot (drift guard)', () => {
+  const shape = v3Module.adjacencyShape(MAINNET_MANIFEST)!
+  expect(shape.topic0).toBe('0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118')
+  expect(shape.emitter.toLowerCase()).toBe(V3_FACTORY.toLowerCase())
+  expect(shape.slot).toBe(1)
 })
 
 test('validateHint returns null when the factory disagrees with the asserted pool', async () => {

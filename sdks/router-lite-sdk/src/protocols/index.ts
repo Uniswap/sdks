@@ -22,6 +22,11 @@ export { v3Module } from './v3'
 export { v4Module } from './v4'
 export type { FeeDiscovery, ProtocolModule, QuoteProbe } from './types'
 
+// The adjacency vocabulary: the shape a module states about its creation events, and the one builder
+// that turns any set of them into `eth_getLogs` filters (merged or narrow — same construction).
+export { adjacencyQueries } from './adjacency'
+export type { AdjacencyShape } from './adjacency'
+
 // The PoolRef vocabulary itself: the three constructors (the only way a ref is ever built), the one
 // predicate — `isHooked` — that anything outside a module needs to ask about a pool's shape, and
 // `routeId`, which is nothing but those refs' own `id`s in leg order.

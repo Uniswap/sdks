@@ -277,6 +277,21 @@ answer is a bug in the record, not a chain that rewound, and it must not brick t
   A pool nobody hinted, on a tier nobody scanned to yet, is invisible until one of those two things
   happens — same as any other protocol's un-scanned history, and consistent with "Wave 0 is not zero
   RPC" above, just for the probe-surface axis rather than the log-history one.
+- **Endpoint adjacency is scanned in four `eth_getLogs` chains, not twelve.** `eth_getLogs` accepts
+  an *address array* and an *array within one topic position*, so a single request asks the v2
+  factory **and** the v3 factory — `topics[0] = [PairCreated, PoolCreated]` — about **both** ends of
+  your trade at once. v2 and v3 merge because both index the pair at the same two topic slots; v4's
+  `Initialize` puts the PoolId first, so its currencies sit one slot deeper and it merges only with
+  itself. Where a cold search used to run 3 protocols x 2 endpoints x 2 topic slots = 12 request
+  chains, it runs 4, and both endpoints are now scanned in the same wave instead of one per wave —
+  so a two-hop route through a token neither end has cached becomes reachable a whole wave earlier.
+  Measured live on mainnet: the merged v2+v3 request took 49ms against 134ms for the two it replaces,
+  and returned exactly the union of their logs.
+  Merging never widens what is scanned. A merged request records its coverage under every
+  (protocol, endpoint) scope it asked for, so it is only issued over blocks *every* one of those
+  scopes still needs — v2 and v3 have different deployment blocks (~2.4M apart on mainnet), and on a
+  warm router the two endpoints' cached coverage rarely matches. The leftovers are scanned by
+  narrower requests, so nothing is ever recorded as covered that was not actually asked for.
 - **Log scanning is budgeted, so a throttling endpoint yields partial discovery rather than an
   unbounded scan.** Each `eth_getLogs` walk adapts its block window to whatever the provider will
   actually serve — starting at the whole remaining range (up to a 16M-block ceiling, or
@@ -530,7 +545,10 @@ itself):
   regrowth ceiling. Scans **start wide and bisect down** — the first request spans
   `min(remaining range, ceiling)`, a refusal halves it, and the window climbs back after a run of
   clean chunks — because `eth_getLogs` caps are per-*query*, not per-endpoint (a selective filter
-  sails through a span a busy one cannot), and because per-request latency is dominated by the round
+  sails through a span a busy one cannot; a merged adjacency filter, returning the union of what its
+  constituents would have, caps at a narrower span than any of them and pulls the router's shared
+  learned width down with it — the safe direction, since the regrowth ratchet climbs back out within
+  a few doublings), and because per-request latency is dominated by the round
   trip rather than the width: measured live on a keyed mainnet endpoint, a 10,000-block window cost
   456ms per request and a 1,000,000-block window cost 89ms. Discovering the real width therefore pays
   for itself immediately, and the descent is bounded by ~log2 of the range. How much that descent

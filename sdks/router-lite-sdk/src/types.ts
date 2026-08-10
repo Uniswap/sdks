@@ -241,6 +241,19 @@ export type QuoteCall = { call: EthCall; decode(returnData: Hex): DecodedQuote }
 
 export type LogQuery = { address: Address; topics: (Hex | null)[] }
 
+/**
+ * The MERGED form of {@link LogQuery}: several emitters, and several accepted values per topic slot.
+ *
+ * `eth_getLogs` has always supported both — an `address` ARRAY (match any of these contracts) and an
+ * ARRAY WITHIN one topic position (match any of these values there) — and the adjacency scans are
+ * built on exactly that: one request asks the v2 factory AND the v3 factory, for `PairCreated` OR
+ * `PoolCreated`, with either of the trade's two endpoints in the token slot. Twelve query chains
+ * (3 protocols x 2 endpoints x 2 token slots) collapse to four. See
+ * `protocols/adjacency.ts#adjacencyQueries` for the construction and `search/adjacencyPlan.ts` for
+ * which scopes may legally share one request.
+ */
+export type MergedLogQuery = { address: Address[]; topics: (Hex | Hex[] | null)[] }
+
 /** Custody semantics for a single execution operation: who pays in, who receives out. */
 export type Custody = { payer: 'trader-via-permit2' | 'router'; recipient: 'router' | 'final' }
 

@@ -16,7 +16,7 @@ import { RouterConfigError, UnsupportedRouteError } from '../errors'
 import { QUOTER_V2_ABI, V3_FACTORY_ABI } from '../internal/abis'
 import { sortAddresses } from '../internal/currency'
 import { narrowTopics } from '../internal/logScan'
-import type { ChainManifest, CurrencyRef, DecodedQuote, EthCall, ExecutionOperation, LogQuery, RouteLeg } from '../types'
+import type { ChainManifest, CurrencyRef, DecodedQuote, EthCall, ExecutionOperation, RouteLeg } from '../types'
 
 import { v3PoolRef } from './poolRef'
 import type { ProtocolModule, QuoteProbe } from './types'
@@ -61,13 +61,9 @@ function requireV3(m: ChainManifest): NonNullable<ChainManifest['v3']> {
   return m.v3
 }
 
-/** The two adjacency-query filters for `token` against the v3 factory's `PoolCreated`, one per indexed slot. */
-function v3AdjacencyQueries(contract: Address, token: Address): [LogQuery, LogQuery] {
-  return [
-    { address: contract, topics: narrowTopics(encodeEventTopics({ abi: V3_FACTORY_ABI, eventName: 'PoolCreated', args: { token0: token } })) },
-    { address: contract, topics: narrowTopics(encodeEventTopics({ abi: V3_FACTORY_ABI, eventName: 'PoolCreated', args: { token1: token } })) },
-  ]
-}
+/** `PoolCreated`'s topic0, derived from the ABI rather than written down — the drift guard in
+ * `v3.test.ts` pins the value this produces. */
+const POOL_CREATED_TOPIC0 = encodeEventTopics({ abi: V3_FACTORY_ABI, eventName: 'PoolCreated' })[0]
 
 /** 'native' normalizes to the wrapped address on-chain; concrete addresses pass through. */
 function resolveAddress(c: CurrencyRef, wrappedNative: Address): Address {
@@ -180,9 +176,13 @@ export const v3Module = {
     return directProbesForFees(a, b, amountIn, STANDARD_V3_FEES, m.v3, m.wrappedNative)
   },
 
-  adjacency(endpoint, m) {
-    if (!m.v3) return []
-    return v3AdjacencyQueries(m.v3.factory, endpoint)
+  adjacencyShape(m) {
+    if (!m.v3) return undefined
+    // `PoolCreated(token0 indexed, token1 indexed, fee indexed, tickSpacing, pool)` — the pair sits
+    // at topics 1/2, exactly where v2's `PairCreated` puts it, so one `eth_getLogs` over
+    // `[v2Factory, v3Factory]` with `topics[0] = [PairCreated, PoolCreated]` answers both at once
+    // (`protocols/adjacency.ts`).
+    return { emitter: m.v3.factory, topic0: POOL_CREATED_TOPIC0, slot: 1, topicAddress: (endpoint) => endpoint }
   },
 
   feeDiscovery: {

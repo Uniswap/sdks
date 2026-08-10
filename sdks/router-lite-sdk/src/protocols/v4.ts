@@ -53,16 +53,9 @@ function requireV4(m: ChainManifest): { poolManager: Address; deploymentBlock: b
   return m.v4
 }
 
-/** The two adjacency-query filters for `token` against the PoolManager's `Initialize`, one per
- * indexed currency slot. `Initialize` indexes (id, currency0, currency1) — the pool id occupies
- * topic1, so the token pair sits one slot further right (topic2/topic3) than v2/v3's PairCreated/
- * PoolCreated (topic1/topic2). */
-function v4AdjacencyQueries(contract: Address, token: Address): [LogQuery, LogQuery] {
-  return [
-    { address: contract, topics: narrowTopics(encodeEventTopics({ abi: V4_POOL_MANAGER_ABI, eventName: 'Initialize', args: { currency0: token } })) },
-    { address: contract, topics: narrowTopics(encodeEventTopics({ abi: V4_POOL_MANAGER_ABI, eventName: 'Initialize', args: { currency1: token } })) },
-  ]
-}
+/** `Initialize`'s topic0, derived from the ABI rather than written down — the drift guard in
+ * `v4.test.ts` pins the value this produces. */
+const INITIALIZE_TOPIC0 = encodeEventTopics({ abi: V4_POOL_MANAGER_ABI, eventName: 'Initialize' })[0]
 
 /** The exact-pair `Initialize` filter for the sorted (currency0, currency1). */
 function v4ExactPairQuery(contract: Address, a: Address, b: Address): LogQuery {
@@ -144,14 +137,22 @@ export const v4Module = {
     })
   },
 
-  adjacency(endpoint, m) {
-    if (!m.v4) return []
-    // The graph normalizes the native family to `wrappedNative`, but v4 Initialize topics index
-    // the raw on-chain currency — address(0) for native, never the wrapped address — so the
-    // wrapped-native endpoint is mapped back to address(0) before building the query.
+  adjacencyShape(m) {
+    if (!m.v4) return undefined
     const wrappedNative = m.wrappedNative
-    const v4Endpoint = isAddressEqual(endpoint, wrappedNative) ? zeroAddress : endpoint
-    return v4AdjacencyQueries(m.v4.poolManager, v4Endpoint)
+    // `Initialize(id indexed, currency0 indexed, currency1 indexed, ...)` — the pool id takes
+    // topic1, so the currencies sit one slot deeper than v2/v3's pair (topics 2/3). v4 therefore
+    // merges only with itself; the planner groups by exactly this number.
+    //
+    // The graph normalizes the native family to `wrappedNative`, but v4's topics index the raw
+    // on-chain currency — address(0) for native, never the wrapped address — so a wrapped-native
+    // endpoint is mapped back before it can match anything.
+    return {
+      emitter: m.v4.poolManager,
+      topic0: INITIALIZE_TOPIC0,
+      slot: 2,
+      topicAddress: (endpoint) => (isAddressEqual(endpoint, wrappedNative) ? zeroAddress : endpoint),
+    }
   },
 
   exactPair(a, b, m) {

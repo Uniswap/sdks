@@ -9,6 +9,11 @@ import { decodeEventLog, encodeEventTopics, parseEther, type Address, type Hex, 
 import { V4_POOL_MANAGER_ABI } from '../src/internal/abis'
 import { scanLogs } from '../src/internal/logScan'
 import { assertResultCoherent } from '../src/internal/testing'
+import { adjacencyQueries } from '../src/protocols/adjacency'
+import { v2Module } from '../src/protocols/v2'
+import { v3Module } from '../src/protocols/v3'
+import { v4Module } from '../src/protocols/v4'
+import type { BlockRange, MergedLogQuery } from '../src/types'
 
 import { canaryEnabled, canaryLog, canaryProviders, freshClient, primaryProvider, type CanaryProvider } from './env'
 import { CANARY_TRADER, simulateSwapE2E } from './simulate'
@@ -390,6 +395,108 @@ describe.skipIf(!RUN || canaryProviders().length < 2)('cross-provider quote agre
     }
     expect(qa.best.quote.amountOut).toBe(qb.best.quote.amountOut)
   }, 60_000)
+})
+
+// ---------------------------------------------------------------------------
+// MERGED-SCAN CONFORMANCE (C5-C) — the one row that ASSERTS a provider's
+// `eth_getLogs` semantics rather than the SDK's behavior.
+//
+// The adjacency scans ask one request what used to take six: an ADDRESS ARRAY
+// (`[v2Factory, v3Factory]`) and an ARRAY WITHIN A TOPIC POSITION (`topics[0] =
+// [PairCreated, PoolCreated]`, and both of the trade's endpoints OR-ed in the
+// token slot). Both are core `eth_getLogs` — in the JSON-RPC spec since
+// Frontier, not an extension — and the engine has NO RUNTIME FALLBACK to
+// per-protocol queries, deliberately: a provider that mishandled either would
+// return a SILENTLY SMALLER log set, which is indistinguishable at runtime from
+// a chain that simply has fewer pools, and a heuristic guess in the hot path
+// would cost every search a probe to answer a question that has one correct
+// answer per provider.
+//
+// So the check lives here, where it can be conclusive: the merged result set
+// must equal, EXACTLY, the union of the individual queries it replaces. This is
+// the audit's own live check (mainnet, 2026-08: v2+v3 merged returned 29+3 = 32
+// logs in one 49ms request against 134ms for the two separate ones, set-equal)
+// promoted to something repeatable against every provider the repo is pointed
+// at. If a provider ever fails it, the fix is a manifest/router flag that stops
+// the planner merging — `search/adjacencyPlan.ts` would then emit one scan per
+// scope, the same construction with one-element arrays — not a runtime probe.
+// ---------------------------------------------------------------------------
+
+/** Recent window the conformance row compares over: wide enough for both factories to have created
+ * pools touching WETH/USDC, narrow enough for any provider to serve it in a request or two. */
+const CONFORMANCE_WINDOW_BLOCKS = 100_000n
+
+/** A log's identity, independent of field ordering or the provider's formatting. */
+function logId(log: { blockNumber?: bigint | null; transactionHash?: Hex | null; logIndex?: number | null }): string {
+  return `${log.blockNumber ?? '?'}:${log.transactionHash ?? '?'}:${log.logIndex ?? '?'}`
+}
+
+describe.skipIf(!RUN)('merged adjacency conformance (canary, live head)', () => {
+  /** Every log `queries` return over `range`, by identity — `undefined` when any scan came back
+   * incomplete, which makes the comparison meaningless rather than failing. */
+  async function idsFor(client: PublicClient, queries: readonly MergedLogQuery[], range: BlockRange): Promise<Set<string> | undefined> {
+    const ids = new Set<string>()
+    for (const query of queries) {
+      const scan = await scanLogs(client, query, range, {})
+      if (!scan.complete) return undefined
+      for (const log of scan.logs) ids.add(logId(log))
+    }
+    return ids
+  }
+
+  for (const provider of canaryProviders()) {
+    it(`${provider.label}: a merged query returns EXACTLY the union of the queries it replaces`, async () => {
+      const head = await provider.client.getBlockNumber()
+      const range: BlockRange = { fromBlock: head - CONFORMANCE_WINDOW_BLOCKS, toBlock: head }
+      const endpoints = [MAINNET_MANIFEST.wrappedNative, USDC]
+
+      const v2Shape = v2Module.adjacencyShape(MAINNET_MANIFEST)!
+      const v3Shape = v3Module.adjacencyShape(MAINNET_MANIFEST)!
+      const v4Shape = v4Module.adjacencyShape(MAINNET_MANIFEST)!
+
+      // Two comparisons, because they exercise different halves of the claim: v2+v3 merges ACROSS
+      // protocols (address array AND OR-topic0 AND OR-token) while v4 merges only its two endpoints
+      // (OR-token alone, one slot deeper behind the pool-id topic).
+      for (const [label, shapes] of [
+        ['v2+v3', [v2Shape, v3Shape]],
+        ['v4', [v4Shape]],
+      ] as const) {
+        const merged = await idsFor(provider.client, adjacencyQueries(shapes, endpoints), range)
+        const individual = new Set<string>()
+        let individualComplete = true
+        for (const shape of shapes) {
+          for (const endpoint of endpoints) {
+            const ids = await idsFor(provider.client, adjacencyQueries([shape], [endpoint]), range)
+            if (!ids) individualComplete = false
+            else for (const id of ids) individual.add(id)
+          }
+        }
+
+        if (!merged || !individualComplete) {
+          // A capped or flaky provider is not a conformance failure — it is a scan that did not
+          // finish, and comparing partial sets would fail for the wrong reason.
+          canaryLog(`${provider.label} ${label}: a scan came back incomplete — skipping the comparison`)
+          continue
+        }
+
+        canaryLog(`${provider.label} ${label}: merged vs union`, {
+          blocks: CONFORMANCE_WINDOW_BLOCKS.toString(),
+          mergedChains: 2, // one per topic slot, always — that is the whole saving
+          individualChains: shapes.length * endpoints.length * 2,
+          mergedLogs: merged.size,
+          unionLogs: individual.size,
+        })
+
+        // The premise: if neither side found anything, the window proved nothing and a green row
+        // would be a lie about what was checked.
+        expect(individual.size).toBeGreaterThan(0)
+        // Set equality, both directions. A provider that ignored the address array would return MORE
+        // (some third contract's logs); one that honored only the first array element would return
+        // LESS — the dangerous direction, and the one a runtime check could never tell from reality.
+        expect([...merged].sort()).toEqual([...individual].sort())
+      }
+    }, 300_000)
+  }
 })
 
 // ---------------------------------------------------------------------------

@@ -70,9 +70,14 @@ test('getAmountOut applies the 0.3% fee', () => {
   expect(getAmountOut(1000n, 1_000_000n, 1_000_000n)).toBe(996n)
 })
 
-test('adjacency topic0 pins the PairCreated selector (drift guard)', () => {
-  const [query] = v2Module.adjacency(USDC, MAINNET_MANIFEST)
-  expect(query.topics[0]).toBe('0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9')
+test('the adjacency shape pins the PairCreated selector, the factory, and the pair’s topic slot (drift guard)', () => {
+  const shape = v2Module.adjacencyShape(MAINNET_MANIFEST)!
+  expect(shape.topic0).toBe('0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9')
+  expect(shape.emitter.toLowerCase()).toBe(V2_FACTORY.toLowerCase())
+  // topics 1/2 — the same slots v3's PoolCreated uses, which is what makes the two mergeable.
+  expect(shape.slot).toBe(1)
+  // v2 has no native spelling of its own: the graph node IS the topic value.
+  expect(shape.topicAddress(USDC)).toBe(USDC)
 })
 
 test('speculativeDirect probe decodes reserves into a quote', () => {

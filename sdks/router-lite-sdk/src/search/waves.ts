@@ -70,10 +70,14 @@ import { evaluate } from './leader'
 //           are never gated on a log query for longer than that grace. See
 //           WAVE 0 ANSWERS BEFORE THE PAIR SCAN LANDS below.
 //   wave 1  core intermediates: probe both legs of tokenIn -> core -> tokenOut
-//   wave 2  focus-endpoint adjacency (see `selectFocus`), then exact-pair
-//           probes from each discovered neighbor to the other endpoint
-//   wave 3  the other endpoint's adjacency, then the full bounded cross
-//           product over everything the index now knows
+//   wave 2  adjacency for BOTH endpoints, in four merged `eth_getLogs` chains
+//           rather than twelve (C5-C — address arrays and OR-topics; see
+//           `discovery.ts#scanAdjacency`), plus the exact pair's remaining
+//           history; then exact-pair probes from each discovered neighbor to
+//           the other endpoint
+//   wave 3  a retry of that adjacency for whatever wave 2 did not manage to
+//           cover (free when it covered everything), then the full bounded
+//           cross product over everything the index now knows
 //
 // The engine's stages live in three sibling files, each with its own header:
 // `discovery.ts` (log-scan orchestration), `leader.ts` (compile/encode/
@@ -512,6 +516,16 @@ export type EngineState = {
    * identical scan of the same 32 blocks in every single search). */
   pairScanned: BlockRange[]
   /**
+   * Adjacency ranges this search has already covered, keyed by
+   * `adjacencyPlan.ts#scopeKey` — the same handoff `pairScanned` is, for the same reason.
+   *
+   * `PoolIndex.uncovered` re-opens the tail of whatever it has covered on every read (the standing
+   * reorg overlap), so without this wave 3 would re-request the last 32 blocks of everything wave 2
+   * had just covered — in every single search. Only ranges actually COVERED go in, so a range a
+   * wave failed on is still retried by the next one.
+   */
+  adjacencyScanned: Map<string, BlockRange[]>
+  /**
    * Wave 0's recent-window exact-pair scan, DISPATCHED by wave 0a and AWAITED by wave 0b — the one
    * piece of engine work whose start and its await live in different stages, which is the whole of
    * the C5-B split (see this file's header).
@@ -583,6 +597,7 @@ export function initialState(block: BlockRef, headRegressed: boolean): EngineSta
     },
     discovery: protocolRecord<ProtocolDiscovery>(() => ({ complete: new Set(), failed: false, covered: [] })),
     pairScanned: [],
+    adjacencyScanned: new Map(),
     intermediatePriority: [],
     quoteEvidence: new Map(),
     aborted: false,
@@ -1170,16 +1185,21 @@ function newestHintedBlock(index: PoolIndex, endpoint: CurrencyRef): bigint | un
 }
 
 /**
- * Picks the endpoint whose adjacency wave 2 scans. Order (spec): explicit `focusToken` → the
- * endpoint that appears in a hint → the endpoint with fewer cached adjacent pools → the endpoint
- * with the newer hinted pool → `tokenIn`. For a fresh launch this makes the two-hop search
- * complete relative to the new asset's adjacency without ever pulling WETH's or USDC's.
+ * Picks the endpoint the search treats as the interesting one. Order (spec): explicit `focusToken`
+ * → the endpoint that appears in a hint → the endpoint with fewer cached adjacent pools → the
+ * endpoint with the newer hinted pool → `tokenIn`.
  *
- * The result is *always one of the two endpoints*. `focusToken` names which endpoint to scan first,
- * not an arbitrary token to scan instead: honoring a non-endpoint focus would leave one endpoint's
- * adjacency never scanned while the report still claimed complete discovery, turning a search that
- * never looked into an authoritative "no route exists". A focus that is neither endpoint is
- * ignored, and the normal ordering decides.
+ * WHAT IT STILL DECIDES, NOW THAT ONE REQUEST SCANS BOTH ENDPOINTS (C5-C). Both endpoints' adjacency
+ * rides in wave 2's merged filters, so this no longer picks which endpoint gets scanned FIRST —
+ * there is no longer a first. It picks the neighborhood wave 2 then probes OUTWARD from
+ * (`pickNeighbors(run, focus, ...)`, each new neighbor probed against the other endpoint), which for
+ * a fresh launch is what keeps the second wave's probe budget aimed at the new asset's few pools
+ * rather than at WETH's thousands.
+ *
+ * The result is *always one of the two endpoints*. `focusToken` names an endpoint to prefer, not an
+ * arbitrary token to probe from instead: honoring a non-endpoint focus would aim the whole
+ * neighbor cross-product at a token neither side of the trade touches. A focus that is neither
+ * endpoint is ignored, and the normal ordering decides.
  */
 export function selectFocus(req: QuoteRequest, index: PoolIndex, wrappedNative?: Address): CurrencyRef {
   const { tokenIn, tokenOut } = req
@@ -1550,18 +1570,27 @@ async function wave1(run: Run): Promise<void> {
   await quoteEnumerated(run)
 }
 
-/** Focus-endpoint adjacency, then exact-pair probes from each new neighbor to the other endpoint. */
+/** Adjacency (both endpoints, merged), then exact-pair probes from each new neighbor to the other endpoint. */
 async function wave2(run: Run): Promise<void> {
   const { ctx, req, state } = run
   const focus = selectFocus(req, ctx.index, ctx.manifest.wrappedNative)
   state.focus = focus
-
-  // Wave 2 is already scan-bound, so the exact pair's remaining history rides along with the focus
-  // adjacency rather than adding a wave of its own — and, being the wave most likely to outlive the
-  // caller's budget, it is the one `quoteWhileDiscovering` exists for.
-  await quoteWhileDiscovering(run, Promise.all([scanAdjacency(run, focus), completeExactPairScan(run)]))
-
   const other = otherEndpoint(run, focus)
+
+  // BOTH ENDPOINTS, IN THE SAME REQUESTS (C5-C). The endpoint sits in ONE topic slot, and a topic
+  // slot OR-matches an array, so "pools touching tokenIn or tokenOut" is the same request count as
+  // "pools touching tokenIn" — four chains for the whole search where the focus endpoint alone used
+  // to cost six. Splitting the two endpoints across waves 2 and 3 bought wave 2 nothing once they
+  // stopped being separate requests, and cost wave 3 a full second scan chain. Wave 3 still calls
+  // `scanAdjacency` for the other endpoint: with everything covered it is free (`state
+  // .adjacencyScanned` keeps it from re-asking the reorg tail), and where wave 2 was cut short —
+  // aborted, budget-exhausted, a provider hole — it is the retry.
+  //
+  // Wave 2 is already scan-bound, so the exact pair's remaining history rides along with the
+  // adjacency scans rather than adding a wave of its own — and, being the wave most likely to
+  // outlive the caller's budget, it is the one `quoteWhileDiscovering` exists for.
+  await quoteWhileDiscovering(run, Promise.all([scanAdjacency(run, [focus, other]), completeExactPairScan(run)]))
+
   const endpoints = [node(req.tokenIn, ctx.manifest), node(req.tokenOut, ctx.manifest)]
   const neighbors = pickNeighbors(run, focus, endpoints, MAX_INTERMEDIATES)
   const probes = neighbors.flatMap((neighbor) =>
@@ -1572,10 +1601,18 @@ async function wave2(run: Run): Promise<void> {
   await quoteEnumerated(run)
 }
 
-/** The other endpoint's adjacency, then the complete bounded cross product over both neighborhoods. */
+/**
+ * The other endpoint's adjacency — a RETRY since C5-C, wave 2's merged scans having asked for it
+ * already — then the complete bounded cross product over both neighborhoods.
+ *
+ * It stays a real call rather than becoming a no-op: everything wave 2 covered is subtracted here
+ * (`EngineState.adjacencyScanned`), so a wave 2 that finished costs this wave nothing at all, while a
+ * wave 2 that was aborted, ran out of request budget, or hit a provider hole leaves exactly the
+ * blocks it missed for this wave to ask about again.
+ */
 async function wave3(run: Run): Promise<void> {
   const focus = run.state.focus ?? selectFocus(run.req, run.ctx.index, run.ctx.manifest.wrappedNative)
-  await quoteWhileDiscovering(run, scanAdjacency(run, otherEndpoint(run, focus)))
+  await quoteWhileDiscovering(run, scanAdjacency(run, [otherEndpoint(run, focus), focus]))
   await quoteEnumerated(run)
 }
 

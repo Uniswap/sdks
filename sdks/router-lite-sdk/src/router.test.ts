@@ -161,17 +161,21 @@ function stubClient(script: ClientScript): { client: PublicClient; counters: Cou
         // the scanner is supposed to always send its topic filter (see `internal/logScan.ts`).
         if (!Array.isArray(filter.topics) || filter.topics.length === 0)
           throw new Error('stubClient: eth_getLogs arrived with no topic filter')
-        // Indexed-address topics are 32-byte left-padded; unpad back to a plain lowercase address so
-        // callers can key `logs`/`scannedEndpoints` by the address itself, not its topic encoding.
-        const rawTopic = [filter.topics[1], filter.topics[2]].find((t: unknown) => typeof t === 'string') as
-          | string
-          | undefined
-        const endpoint = rawTopic !== undefined ? (`0x${rawTopic.slice(-40)}`.toLowerCase() as Address) : undefined
-        if (endpoint !== undefined) counters.scannedEndpoints.add(endpoint)
-        if (!script.logs || endpoint === undefined) return []
+        // A topic position holds `null` (anything), one value, or — since C5-C — an ARRAY of accepted
+        // values, which is how one adjacency request carries BOTH of the trade's endpoints. Indexed
+        // address topics are 32-byte left-padded; unpad back to plain lowercase addresses so callers
+        // can key `logs`/`scannedEndpoints` by the address itself, not its topic encoding.
+        const slot = (topic: unknown): string[] =>
+          (topic === null || topic === undefined ? [] : Array.isArray(topic) ? topic : [topic]).filter((t): t is string => typeof t === 'string')
+        const bound = [filter.topics[1], filter.topics[2]].map(slot).find((values) => values.length > 0) ?? []
+        const endpoints = bound.map((t) => `0x${t.slice(-40)}`.toLowerCase() as Address)
+        for (const endpoint of endpoints) counters.scannedEndpoints.add(endpoint)
+        if (!script.logs || endpoints.length === 0) return []
         const from = BigInt(filter.fromBlock)
         const to = BigInt(filter.toBlock)
-        return script.logs(endpoint).filter((log) => log.blockNumber >= from && log.blockNumber <= to)
+        // A node answers a merged filter with the union over its accepted values, so this stub does
+        // too; ingestion is idempotent, so a log matching both endpoints arriving twice is harmless.
+        return endpoints.flatMap((endpoint) => script.logs!(endpoint)).filter((log) => log.blockNumber >= from && log.blockNumber <= to)
       }
       if (args.method !== 'eth_call') throw new Error(`stubClient: unexpected method ${args.method}`)
 

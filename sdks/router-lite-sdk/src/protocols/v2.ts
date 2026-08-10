@@ -4,8 +4,7 @@ import { decodeEventLog, decodeFunctionResult, encodeEventTopics, encodeFunction
 import { RouterConfigError, UnsupportedRouteError } from '../errors'
 import { V2_FACTORY_ABI, V2_PAIR_ABI } from '../internal/abis'
 import { sortAddresses } from '../internal/currency'
-import { narrowTopics } from '../internal/logScan'
-import type { ChainManifest, CurrencyRef, DecodedQuote, ExecutionOperation, LogQuery, RouteLeg } from '../types'
+import type { ChainManifest, CurrencyRef, DecodedQuote, ExecutionOperation, RouteLeg } from '../types'
 
 import { v2PoolRef } from './poolRef'
 import type { ProtocolModule, QuoteProbe } from './types'
@@ -67,13 +66,9 @@ function requireV2(m: ChainManifest): NonNullable<ChainManifest['v2']> {
   return m.v2
 }
 
-/** The two adjacency-query filters for `token` against the v2 factory's `PairCreated`, one per indexed slot. */
-function v2AdjacencyQueries(contract: Address, token: Address): [LogQuery, LogQuery] {
-  return [
-    { address: contract, topics: narrowTopics(encodeEventTopics({ abi: V2_FACTORY_ABI, eventName: 'PairCreated', args: { token0: token } })) },
-    { address: contract, topics: narrowTopics(encodeEventTopics({ abi: V2_FACTORY_ABI, eventName: 'PairCreated', args: { token1: token } })) },
-  ]
-}
+/** `PairCreated`'s topic0, derived from the ABI rather than written down — the drift guard in
+ * `v2.test.ts` pins the value this produces. */
+const PAIR_CREATED_TOPIC0 = encodeEventTopics({ abi: V2_FACTORY_ABI, eventName: 'PairCreated' })[0]
 
 /** 'native' normalizes to the wrapped address on-chain; concrete addresses pass through. */
 function resolveAddress(c: CurrencyRef, wrappedNative: Address): Address {
@@ -124,9 +119,12 @@ export const v2Module = {
     return [probe]
   },
 
-  adjacency(endpoint, m) {
-    if (!m.v2) return []
-    return v2AdjacencyQueries(m.v2.factory, endpoint)
+  adjacencyShape(m) {
+    if (!m.v2) return undefined
+    // `PairCreated(token0 indexed, token1 indexed, pair, count)` — the pair sits at topics 1/2, the
+    // same slots v3's `PoolCreated` uses, which is exactly what lets the two factories share one
+    // `eth_getLogs` (see `protocols/adjacency.ts`).
+    return { emitter: m.v2.factory, topic0: PAIR_CREATED_TOPIC0, slot: 1, topicAddress: (endpoint) => endpoint }
   },
 
   parsePoolLog(log, m) {

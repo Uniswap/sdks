@@ -1,4 +1,4 @@
-import type { Address, Hex, Log } from 'viem'
+import type { Hex, Log } from 'viem'
 
 import type {
   ChainManifest,
@@ -14,6 +14,8 @@ import type {
   RouteCandidate,
   RouteLeg,
 } from '../types'
+
+import type { AdjacencyShape } from './adjacency'
 
 // ---------------------------------------------------------------------------
 // ProtocolModule — the per-protocol plugin surface (v2/v3/v4), internal only.
@@ -45,7 +47,17 @@ export interface ProtocolModule {
   readonly id: Protocol
   enabled(m: ChainManifest): boolean
   speculativeDirect(a: CurrencyRef, b: CurrencyRef, amountIn: bigint, m: ChainManifest): QuoteProbe[]
-  adjacency(endpoint: Address, m: ChainManifest): LogQuery[]
+  /**
+   * Where this protocol's pool-creation events live and how they index the pool's currencies —
+   * enough for `protocols/adjacency.ts` to BUILD the "every pool touching X" filters, rather than
+   * the filters themselves.
+   *
+   * IT IS A SHAPE AND NOT A QUERY BECAUSE SHAPES COMPOSE (C5-C). Two protocols whose currencies sit
+   * at the same topic slots can be asked in ONE `eth_getLogs` — address array plus OR-topics — and a
+   * module that hands back finished filters can never be merged with another module's. `undefined`
+   * when the manifest does not configure this protocol.
+   */
+  adjacencyShape(m: ChainManifest): AdjacencyShape | undefined
   exactPair?(a: CurrencyRef, b: CurrencyRef, m: ChainManifest): LogQuery
   feeDiscovery?: FeeDiscovery
   parsePoolLog(log: Log, m: ChainManifest): PoolRecord | null

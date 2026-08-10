@@ -2,7 +2,7 @@ import type { Hex, Log, PublicClient } from 'viem'
 import { formatLog } from 'viem'
 
 import { MAX_REQUESTS_PER_SCAN, MIN_CHUNK } from '../constants'
-import type { BlockRange, LogQuery } from '../types'
+import type { BlockRange, LogQuery, MergedLogQuery } from '../types'
 
 import { batchLimit, initialPolicy, nextStep, refusalFactsOf } from './logScanPolicy'
 import { maxBig, mergeRanges, minBig } from './ranges'
@@ -202,6 +202,20 @@ export function narrowTopics(topics: (Hex | Hex[] | null)[]): (Hex | null)[] {
  * 1,300x the requests, with nothing anywhere saying why. A stored `learnedScanWidth` of 10,000 in
  * that same situation costs the regrowth ratchet a handful of doublings to climb back out of, which
  * is a hint being wrong — the failure mode it is allowed to have.
+ *
+ * MERGED QUERIES SHARE THIS MEMORY, AND THAT IS THE CONSERVATIVE DIRECTION (C5-C). Both fields are
+ * per ENDPOINT/PROVIDER, not per query: they answer "how wide a window will this provider serve",
+ * and providers cap on RESULT COUNT as often as on span. A merged adjacency filter (v2's factory AND
+ * v3's, both of the trade's endpoints — `protocols/adjacency.ts`) returns the UNION of what its
+ * constituents would have returned, so it hits a result-count cap at a narrower span than any one of
+ * them would have. The learned width therefore settles at the narrowest span any query in the search
+ * needed, and every other query starts there.
+ *
+ * That is a small over-chunking of the narrow queries, never a correctness problem: `learnedScanWidth`
+ * is a HINT, the regrowth ratchet climbs back out of it within a few doublings, and the alternative —
+ * a width memory keyed by query shape — would re-pay the descent per shape and lose far more than
+ * the over-chunking costs. Erring narrow is also the only direction that cannot fail: a width that is
+ * too wide costs a refusal plus a halving, a width that is too narrow costs some extra requests.
  */
 export type ScanWidthMemory = {
   /** Widest window this endpoint has been observed to serve. A start hint; never a bound. */
@@ -292,7 +306,7 @@ export function delay(ms: number, signal?: AbortSignal): Promise<void> {
  */
 export async function scanLogs(
   client: Pick<PublicClient, 'request'>,
-  query: LogQuery,
+  query: LogQuery | MergedLogQuery,
   range: BlockRange,
   opts: {
     signal?: AbortSignal

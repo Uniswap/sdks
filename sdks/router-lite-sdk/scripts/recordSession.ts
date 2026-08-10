@@ -58,7 +58,11 @@ import { assertResultCoherent } from '../src/internal/testing'
 //           the GOLDEN is written from that replay result (never the live one)
 //
 // Identical requests during recording must return identical results (the run
-// is block-pinned); a mismatch warns loudly and keeps the FIRST answer.
+// is block-pinned); a mismatch warns loudly and keeps the FIRST answer — with
+// one exception, `healTransientErrors` below: a recorded ERROR is re-asked once,
+// because a block-pinned read that succeeds on a second ask never had an error
+// as its true answer, and baking one in made every later replay strictly worse
+// than the live run it came from.
 // ---------------------------------------------------------------------------
 
 const SESSIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'internal', '__fixtures__', 'sessions')
@@ -131,6 +135,40 @@ function loadExistingSession(label: string): RecordedSession | undefined {
   return undefined
 }
 
+/**
+ * Re-asks every key whose recorded answer is an ERROR, and keeps the success if one comes back.
+ *
+ * WHY A REPLAY WAS OTHERWISE STRICTLY WORSE THAN THE LIVE RUN IT CAME FROM. A block-pinned read has
+ * one true answer, so an error recorded for it is one of two very different things: a FACT about the
+ * endpoint (a declared `eth_getLogs` cap — "query exceeds max block range 100000" — which re-errors
+ * every time and must be replayed, since the scanner's descent is exactly the behavior these
+ * sessions exist to pin), or a TRANSIENT transport failure (a 2s gateway timeout on a window the
+ * same endpoint serves hundreds of times over). `remember` keeps the first answer, so a transient
+ * failure was baked in permanently — and because the live run's own retry then succeeded at a
+ * DIFFERENT key, nothing ever overwrote it. Measured on the mainnet two-hop session: 8 timeouts at a
+ * 50,400-block span that succeeded 927 times, each becoming a permanent coverage hole, which is what
+ * turned a live `quote` into a replayed `inconclusive — rpc-degraded`.
+ *
+ * Re-asking separates the two by the only test that can: real caps re-error identically and stay,
+ * transient failures heal. One extra request per errored key, at the same pinned block.
+ */
+async function healTransientErrors(url: string, store: Map<string, SessionEntry>, label: string): Promise<void> {
+  const errored = [...store].filter(([, entry]) => entry.error)
+  if (errored.length === 0) return
+  const inner = http(url, { timeout: 120_000, fetchOptions: { headers: rpcHeaders() } })({})
+  let healed = 0
+  for (const [key, entry] of errored) {
+    try {
+      const result = await inner.request({ method: entry.method, params: entry.params } as never)
+      store.set(key, { method: entry.method, params: entry.params, result: result ?? null })
+      healed++
+    } catch {
+      // Re-errored: a fact about this endpoint at this window, and the session should replay it.
+    }
+  }
+  if (healed > 0) console.log(`[record:${label}]   healed ${healed}/${errored.length} recorded error(s) that re-asked cleanly`)
+}
+
 /** Records into `store`; identical keys must agree (block-pinned run) — a mismatch warns, first wins. */
 function remember(store: Map<string, SessionEntry>, method: string, params: unknown, entry: SessionEntry): void {
   const key = canonicalKey(method, params)
@@ -147,11 +185,36 @@ function remember(store: Map<string, SessionEntry>, method: string, params: unkn
 }
 
 /**
+ * `ETH_RPC_HEADERS` as viem `fetchOptions.headers`, or `{}` when it is unset.
+ *
+ * `chainz exec` hands the endpoint over as a URL **plus** headers when the gateway authenticates by
+ * header rather than by a key in the path — and this script's whole usage contract is "always through
+ * `chainz exec`", so ignoring them meant every recording against such a gateway came back
+ * `rpc-unavailable` and wrote a two-entry fixture over a good one. Format is one `Name: value` per
+ * line, which is what `chainz` emits.
+ *
+ * NOTHING FROM HERE CAN REACH A FIXTURE: a session holds only (method, canonical params) ->
+ * result|error, and `captureError`'s frames carry a message/name/status/code — never request headers.
+ * The URL, which viem *does* put in error messages, is redacted by `redactKeyedUrl` as before.
+ */
+function rpcHeaders(): Record<string, string> {
+  const raw = process.env.ETH_RPC_HEADERS
+  if (!raw) return {}
+  const headers: Record<string, string> = {}
+  for (const line of raw.split('\n')) {
+    const at = line.indexOf(':')
+    if (at <= 0) continue
+    headers[line.slice(0, at).trim()] = line.slice(at + 1).trim()
+  }
+  return headers
+}
+
+/**
  * A recording client over the live endpoint. `fallback: true` answers map-first (so replays of a
  * pinned head stay pinned) and records only the misses.
  */
 function recordingClient(url: string, store: Map<string, SessionEntry>, fallback: boolean): PublicClient {
-  const inner = http(url, { timeout: 120_000 })({})
+  const inner = http(url, { timeout: 120_000, fetchOptions: { headers: rpcHeaders() } })({})
   const transport = custom(
     {
       async request({ method, params }: { method: string; params?: unknown }) {
@@ -230,6 +293,7 @@ async function recordOne(args: Args): Promise<void> {
   console.log(`[record:${label}] pass 1: live recording (chain ${chainId})...`)
   const liveResult = await runQuote(recordingClient(rpc, store, false), session)
   console.log(`[record:${label}]   live: ${summarize(liveResult)} @ block ${liveResult.search.block.number}`)
+  await healTransientErrors(rpc, store, label)
   session.entries = [...store.values()]
 
   // Converge: strict replay; on an unrecorded key, run a map-first/live-fallback pass to record the
@@ -247,6 +311,7 @@ async function recordOne(args: Args): Promise<void> {
       if (round === 3 || !(err instanceof Error) || !err.message.includes('UNRECORDED REQUEST')) throw err
       console.log(`[record:${label}] pass ${round + 2}: replay missed a key; recording the gap live (map-first, head stays pinned)...`)
       await runQuote(recordingClient(rpc, store, true), session)
+      await healTransientErrors(rpc, store, label)
       session.entries = [...store.values()]
     }
   }

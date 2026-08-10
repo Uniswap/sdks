@@ -288,10 +288,15 @@ Wave engine ──────── owns stopping policy and caps; drives the p
      │   Wave 1 (2 RTTs): speculative core-intermediate legs; round 2
      │           feeds realized first-leg outputs into second legs
      │           (same-protocol 2-hops quote whole-path in round 1)
-     │   Wave 2 (scan-bound): adjacency of the focus endpoint; exact-pair
-     │           probes from each neighbor to the other endpoint
-     │   Wave 3 (scan-bound): adjacency of the other endpoint; complete
-     │           bounded shared-neighbor cross product
+     │   Wave 2 (scan-bound): adjacency of BOTH endpoints in four merged
+     │           `eth_getLogs` chains rather than twelve (address arrays
+     │           + OR-topics; see "Event-based adjacency"); the exact
+     │           pair's remaining history; then exact-pair probes from
+     │           each neighbor to the other endpoint
+     │   Wave 3 (scan-bound): a retry of that adjacency for whatever
+     │           wave 2 did not manage to cover (free when it covered
+     │           everything); complete bounded shared-neighbor cross
+     │           product
      │
      │   EVERY SCAN-BOUND STAGE QUOTES WHILE IT DISCOVERS (0b and 1-3):
      │   the stage's scans run concurrently with a re-enumerate-and-quote
@@ -305,7 +310,8 @@ Wave engine ──────── owns stopping policy and caps; drives the p
      ▼
 Stage primitives
      discover/probe ── the engine issues every RPC; ProtocolModules only
-     │                 describe them (adjacency/exact-pair LogQuery,
+     │                 describe them (an AdjacencyShape the engine
+     │                 merges into filters, exact-pair LogQuery,
      │                 speculative QuoteProbes, log parsing) → PoolRecords
      ▼
      quote ─────────── whole-path canonical quotes (v3 QuoterV2 path,
@@ -324,12 +330,16 @@ Stage primitives
 
 ### Focus endpoint
 
-Wave 2 scans **one** endpoint's adjacency — the one likely to be small.
-Chosen by: `focusToken` request field → endpoint appearing in a hint →
-endpoint with fewer cached adjacent pools → endpoint with the newer hinted
-pool → `tokenIn`. For a new launch this makes the two-hop search complete
-relative to the new asset's adjacency without pulling the enormous WETH/USDC
-adjacency sets.
+Both endpoints' adjacency rides in wave 2's merged filters, so the focus no
+longer decides which endpoint is *scanned* first — there is no longer a first.
+It decides the neighborhood wave 2 then probes **outward** from: each discovered
+neighbor is probed against the other endpoint, and that probe budget is what a
+new launch wants aimed at the new asset's few pools rather than at WETH's
+thousands. Chosen by: `focusToken` request field → endpoint appearing in a hint
+→ endpoint with fewer cached adjacent pools → endpoint with the newer hinted
+pool → `tokenIn`. The result is always one of the two endpoints; a `focusToken`
+naming anything else is ignored, since aiming the neighbor cross product at a
+token neither side of the trade touches is never what was meant.
 
 ### ProtocolModule (internal contract)
 
@@ -345,7 +355,7 @@ interface ProtocolModule {
   readonly id: Protocol                                   // 'v2' | 'v3' | 'v4'
   enabled(m: ChainManifest): boolean
   speculativeDirect(a: CurrencyRef, b: CurrencyRef, amountIn: bigint, m: ChainManifest): QuoteProbe[]
-  adjacency(endpoint: Address, m: ChainManifest): LogQuery[]
+  adjacencyShape(m: ChainManifest): AdjacencyShape | undefined
   exactPair?(a: CurrencyRef, b: CurrencyRef, m: ChainManifest): LogQuery
   feeDiscovery?: FeeDiscovery                             // v3 only: { query, feesFromLogs, probes }
   parsePoolLog(log: Log, m: ChainManifest): PoolRecord | null
@@ -368,7 +378,13 @@ strictly better here, for reasons that all turned out to be load-bearing:
   handling, regrowth, backoff, chunk batching and the cross-scan width memory
   are written once and every protocol gets them, instead of three copies
   drifting apart.
-- **Modules are testable with no transport at all.** `adjacency` returns a
+- **Shapes compose; finished filters do not.** `adjacencyShape` states *where*
+  the creation events live and *which* topic slots hold the currencies, rather
+  than handing back a built filter. That is what lets the engine ask two
+  protocols in one `eth_getLogs` — a module returning its own `LogQuery[]` could
+  never be merged with another module's, and the 12→4 reduction above would be
+  unreachable without reaching into each module.
+- **Modules are testable with no transport at all.** `adjacencyShape` returns a
   value to assert on. Only `validateHint` is async, and it takes the caller's
   `call` function rather than a client — the engine still owns the semaphore.
 
@@ -453,12 +469,55 @@ enumeration/quoting counters move.
 
 All three protocols index pool-creation topics by token (v2 `PairCreated`,
 v3 `PoolCreated`, v4 `Initialize`, whose body carries the full `PoolKey`).
-"Every pool containing X" is a pair of `eth_getLogs` filters per protocol;
-"the exact pair (A,B)" is one. Filters are generated from each ABI (topic
-positions differ; v4's first indexed arg is the PoolId). Scans run
+"Every pool containing X" is a pair of `eth_getLogs` filters — one per indexed
+currency slot, because a pool whose creation event put X in the *other* slot is
+invisible to the first — and "the exact pair (A,B)" is one filter. A module does
+not build those filters: it states an `AdjacencyShape` (emitter, topic0, the
+topic index of the first currency, and how a graph node maps to a topic value),
+and `protocols/adjacency.ts` builds every filter from a set of shapes. Scans run
 recent-first from the pinned block toward the protocol's `deploymentBlock`,
-bisecting ranges on provider caps. v4 poolIds are recomputed from decoded
-keys and checked against the indexed id.
+bisecting ranges on provider caps. v4 poolIds are recomputed from decoded keys
+and checked against the indexed id.
+
+**Adjacency scans are merged: 12 query chains become 4.** `eth_getLogs` accepts
+an *address array* and an *array within one topic position* (OR-matching), both
+core JSON-RPC rather than extensions. So one request asks the v2 factory **and**
+the v3 factory — `topics[0] = [PairCreated, PoolCreated]` — for **both** of the
+trade's endpoints at once, since the endpoint occupies a single topic slot that
+may hold either value. v2 and v3 merge because both index the pair at topics
+1/2; v4's `Initialize` puts the PoolId in topic1, so its currencies sit one slot
+deeper (topics 2/3) and it merges only with itself. Where a cold search used to
+run 3 protocols × 2 endpoints × 2 topic slots = 12 chains, it now runs 4. Both
+endpoints therefore ride in **wave 2**; wave 3's `scanAdjacency` call is a retry
+of whatever wave 2 did not cover, free when it covered everything. Measured live
+on mainnet: v2+v3 merged is one 49ms request against 134ms for the two it
+replaces, returning exactly the union of their logs.
+
+**Merging is a segmentation, never a widening — this is the part that can lose
+pools.** A merged query records its covered range under *every* constituent
+(protocol, endpoint) scope, so it may only be issued over blocks every
+constituent actually still wants. Two things routinely make those differ: v2 and
+v3 have **different deployment blocks** (~2.4M apart on mainnet — flooring a
+merge at the later one would silently drop v2's early history *and* record it as
+covered), and the two endpoints' **coverage caches disagree** on a warm router.
+`search/adjacencyPlan.ts` is a pure function that cuts every scope's uncovered
+ranges at every other scope's boundaries, yielding maximal segments over which
+the demanding set is constant; each distinct set gets one merged query pair over
+exactly its own segments, and a segment only one scope wants gets the same
+construction with one-element arrays — so "narrow" is not a second code path.
+The coverage a scan claims is the full cross product of its protocols and
+endpoints, which is honest precisely because the filter's token slot is built
+over that same cross product.
+
+A merged response mixes protocols, so ingestion dispatches each log to a module
+**by emitter address**; every `parsePoolLog` also guards its own emitter, so
+misrouting would be safe but wasteful. There is **no runtime fallback** to
+per-protocol queries: a provider mishandling an address array or an OR-topic
+returns a silently *smaller* log set, indistinguishable at runtime from a chain
+with fewer pools, so the check lives in the canary suite as a merged-vs-union
+set-equality row run against every configured provider. If one ever fails it,
+the escape hatch is a manifest/router flag that stops the planner merging, not a
+heuristic in the scan path.
 
 Scans **start wide**: the first request spans `min(remaining range, ceiling)`,
 where the ceiling is 16M blocks (`MAX_SCAN_WINDOW` — the widest single request
@@ -482,15 +541,24 @@ cap is one observation about one busy filter ("that range returned too many
 logs") and only narrows the current window — clamping the ceiling on it would
 pin every later, more selective query to the width of the worst one.
 
-**Width discovery is remembered, not re-paid per scan.** A cold search runs
-seven scans (three protocols × two topic slots, plus the v4 exact-pair scan),
-each of which used to re-derive the same provider cap. `ScanWidthMemory` —
+**Width discovery is remembered, not re-paid per scan.** A cold search runs five
+scans (four merged adjacency chains, plus the v4 exact-pair scan — it was seven
+before merging, and twelve adjacency chains before that), each of which used to
+re-derive the same provider cap. `ScanWidthMemory` —
 held by the `PoolIndex`, so it outlives the search — carries
 `learnedScanWidth` (the widest window actually *served*: a hint, narrowing the
 start) and `declaredScanCap` (a ceiling the endpoint *stated*: a bound). Only
 the hint crosses a process boundary in a snapshot: a snapshot is keyed by
 chain, and two providers share one, so a wrong hint costs a few regrowth
 doublings while a wrong ceiling would cap every scan forever.
+
+Because caps are per-*query* while the memory is per-endpoint, a **merged** query
+— returning the union of what its constituents would have returned — trips a
+result-count cap at a narrower span than any one of them, and the shared hint
+then settles at that narrower width. That is the conservative direction and
+deliberately accepted: `learnedScanWidth` is a hint the regrowth ratchet climbs
+back out of within a few doublings, whereas a memory keyed by query shape would
+re-pay the descent per shape and lose more than the over-chunking costs.
 
 Once a width has actually been served, chunks at that width go out
 `SCAN_CHUNK_CONCURRENCY` (4) at a time; the first chunk of any width always

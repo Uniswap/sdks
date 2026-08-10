@@ -161,13 +161,12 @@ function stubModule(id: 'v2' | 'v3'): ProtocolModule {
       return [{ candidate: { legs }, quote: stubQuote(legs, amountIn) }]
     },
 
-    adjacency(endpoint, m) {
-      const contract = id === 'v2' ? m.v2!.factory : m.v3!.factory
-      const topic = endpoint.toLowerCase() as Hex
-      return [
-        { address: contract, topics: [TOPIC[id], topic] },
-        { address: contract, topics: [TOPIC[id], null, topic] },
-      ]
+    // Topics 1/2, like both real factories — which is what makes the v2 and v3 stubs MERGE into one
+    // `eth_getLogs` here exactly as the real modules do (`protocols/adjacency.ts`).
+    adjacencyShape(m) {
+      const contract = id === 'v2' ? m.v2?.factory : m.v3?.factory
+      if (!contract) return undefined
+      return { emitter: contract, topic0: TOPIC[id], slot: 1, topicAddress: (endpoint: Address) => endpoint }
     },
 
     exactPair(a, b, m) {
@@ -224,12 +223,11 @@ const v4StubModule: ProtocolModule = {
   enabled: (m) => !!m.v4,
   speculativeDirect: () => [],
 
-  adjacency(endpoint, m) {
-    const topic = endpoint.toLowerCase() as Hex
-    return [
-      { address: m.v4!.poolManager, topics: [V4_TOPIC, null, topic] },
-      { address: m.v4!.poolManager, topics: [V4_TOPIC, null, null, topic] },
-    ]
+  adjacencyShape(m) {
+    if (!m.v4) return undefined
+    // One slot deeper than v2/v3 (the pool id takes topic1), mirroring the real event — which is
+    // also what keeps the v4 stub out of the v2+v3 merge.
+    return { emitter: m.v4.poolManager, topic0: V4_TOPIC, slot: 2, topicAddress: (endpoint: Address) => endpoint }
   },
 
   exactPair(a, b, m) {
@@ -510,12 +508,36 @@ function stubClient(script: ClientScript): { client: SearchContext['client']; co
     return entry
   }
 
+  /**
+   * A topic position's accepted values, as a real node reads them: `null` matches anything, a bare
+   * string matches one value, and an ARRAY OR-matches every value in it.
+   *
+   * Adjacency filters arrive in the array form since C5-C — one request per topic slot carrying
+   * every merged protocol's topic0 and both of the trade's endpoints — while the exact-pair and
+   * fee-discovery filters stay single-valued, so every classifier below reads slots through here.
+   */
+  function slotValues(topic: unknown): string[] {
+    if (topic === null || topic === undefined) return []
+    return (Array.isArray(topic) ? topic : [topic]).filter((t): t is string => typeof t === 'string')
+  }
+
+  /** Topic slots 1..n as their accepted-value sets; a slot with values is BOUND. */
+  function boundSlots(filter: any): string[][] {
+    return (filter.topics as unknown[]).slice(1).map(slotValues).filter((values) => values.length > 0)
+  }
+
+  /** A 32-byte topic word back to the lowercased address it left-pads — how a node reads an indexed
+   * `address` param, and what the script's `logs`/`failScansFor` keys are written in. */
+  function topicToAddress(topic: string): string {
+    return (topic.length === 66 ? `0x${topic.slice(26)}` : topic).toLowerCase()
+  }
+
   /** The v4 exact-pair query, told apart from the v4 adjacency queries the same way `serveLogs`
-   * does it: two bound token topics rather than one. Hoisted out so the gate above can be applied
+   * does it: two bound token slots rather than one. Hoisted out so the gate above can be applied
    * BEFORE the request is served, which `serveLogs`' own classification is too late for. */
   function isPairQuery(filter: any): boolean {
-    if (!Array.isArray(filter?.topics) || filter.topics[0] !== V4_TOPIC) return false
-    return (filter.topics as (string | null)[]).slice(1).filter((t) => typeof t === 'string').length >= 2
+    if (!Array.isArray(filter?.topics) || !slotValues(filter.topics[0]).includes(V4_TOPIC)) return false
+    return boundSlots(filter).length >= 2
   }
 
   /**
@@ -538,7 +560,9 @@ function stubClient(script: ClientScript): { client: SearchContext['client']; co
       return block >= fromBlock && block <= toBlock
     }
 
-    if (filter.topics[0] === FEE_TOPIC) {
+    const topic0 = slotValues(filter.topics[0])
+
+    if (topic0.includes(FEE_TOPIC)) {
       counters.feeScans++
       if (script.feeScanMaxSpan !== undefined && toBlock - fromBlock + 1n > script.feeScanMaxSpan) {
         throw new Error('query returned more than 10000 results')
@@ -546,37 +570,46 @@ function stubClient(script: ClientScript): { client: SearchContext['client']; co
       return (script.feeLogs ?? []).filter(inRange)
     }
 
-    if (filter.topics[0] === V4_TOPIC) {
-      const bound = (filter.topics as (string | null)[]).slice(1).filter((t): t is string => typeof t === 'string')
-      // Two bound token topics is an exact-pair query; one is an adjacency query.
-      if (bound.length >= 2) {
-        counters.pairScans++
-        counters.pairScanRanges.push({ fromBlock, toBlock })
-        return (script.pairLogs ?? []).filter(inRange)
-      }
-      counters.scans++
-      if (bound[0] !== undefined) counters.scannedEndpoints.add(bound[0].toLowerCase())
-      return []
+    const bound = boundSlots(filter)
+
+    if (topic0.includes(V4_TOPIC) && bound.length >= 2) {
+      // Two bound token slots is an exact-pair query; one is an adjacency query.
+      counters.pairScans++
+      counters.pairScanRanges.push({ fromBlock, toBlock })
+      return (script.pairLogs ?? []).filter(inRange)
     }
 
+    // An ADJACENCY request, and since C5-C it carries EVERY endpoint the plan merged into it — the
+    // trade's two, OR-matched inside one topic slot — for every protocol in `topic0`. A node answers
+    // it with the union over those endpoints, so this stub does too.
     counters.scans++
-    const endpoint = [filter.topics[1], filter.topics[2]].find((t: unknown) => typeof t === 'string') as
-      | string
-      | undefined
-    if (endpoint === undefined) return []
-    counters.scannedEndpoints.add(endpoint.toLowerCase())
-    if (script.failScansFor?.includes(endpoint.toLowerCase())) throw new Error('log source unavailable')
+    const endpoints = (bound[0] ?? []).map(topicToAddress)
+    if (endpoints.length === 0) return []
+    for (const endpoint of endpoints) counters.scannedEndpoints.add(endpoint)
+    // A broken log source is a property of the REQUEST, not of one endpoint inside it: a merged
+    // query that carries a failing endpoint fails whole, which is the honest consequence of merging
+    // (and what the engine's per-scope coverage bookkeeping has to survive).
+    if (endpoints.some((e) => script.failScansFor?.includes(e))) throw new Error('log source unavailable')
+    if (topic0.includes(V4_TOPIC)) return [] // the v4 stub has no adjacency logs to serve
     if (!script.logs) return []
-    return script.logs(endpoint.toLowerCase()).filter(inRange)
+    return endpoints.flatMap((endpoint) => script.logs!(endpoint)).filter(inRange)
   }
 
   return { client, counters }
 }
 
+/**
+ * A creation log as an adjacency scan would return it.
+ *
+ * `address` is the protocol's OWN factory and not a fixed one, because a merged response is routed
+ * back to a module BY EMITTER (`discovery.ts#ingestMerged`) — the one field that tells a v2 log from
+ * a v3 log in a mixed answer without decoding it. A fixture that stamped every log with the same
+ * factory would hand v3's logs to the v2 module, whose `parsePoolLog` correctly rejects them.
+ */
 function scannedRecord(id: 'v2' | 'v3', a: CurrencyRef, b: CurrencyRef, createdAtBlock: bigint): Log & { record: PoolRecord } {
   const pool = stubPoolRef(id, a, b, { tag: SCANNED_TAG })
   return {
-    address: V2_FACTORY,
+    address: id === 'v2' ? V2_FACTORY : V3_FACTORY,
     topics: [TOPIC[id]],
     data: '0x',
     blockNumber: createdAtBlock,
@@ -783,11 +816,15 @@ test('iterator yields only on improvement, final yield has done=true', async () 
   })
   const ctx = makeContext(client, manifestWith())
 
-  // wave 0 quotes the direct pool (100n); the MID leg pools only become known once *both*
-  // endpoints' adjacency has been scanned, so the improvement lands in the final wave.
+  // Wave 0 quotes the direct pool (100n); the MID leg pools only become known once *both*
+  // endpoints' adjacency has been scanned — which since C5-C is WAVE 2, both endpoints riding in
+  // the same merged `eth_getLogs`. So the improvement is yielded there, and the final wave yields
+  // once more (unconditionally, `done: true`) with nothing further to add. Before merging, the two
+  // endpoints were split across waves 2 and 3 and the improvement could not land until the last one
+  // — the extra 250n below is that latency win, made visible.
   const events = await drain(searchWaves(ctx, quoteReq, 'quote'))
 
-  expect(events.map((e) => e.best?.quote.amountOut)).toEqual([100n, 250n])
+  expect(events.map((e) => e.best?.quote.amountOut)).toEqual([100n, 250n, 250n])
   expect(events.at(-1)!.done).toBe(true)
   expect(counters.scans).toBeGreaterThan(0)
   assertCoherent('quote', events)
@@ -843,7 +880,7 @@ test('onFirstRoute fires ONCE, with the leader, before the wave-0 yield', async 
   expect(announced).toHaveLength(1)
   expect(announced[0]!.quote.amountOut).toBe(100n) // wave 0's direct route, the leader at that moment
   // ...and the later improvement does NOT re-announce: "first" means first, not "best so far".
-  expect(events.map((e) => e.best?.quote.amountOut)).toEqual([100n, 250n])
+  expect(events.map((e) => e.best?.quote.amountOut)).toEqual([100n, 250n, 250n])
   expect(timeline.filter((t) => t === 'first')).toHaveLength(1)
 })
 
@@ -889,7 +926,7 @@ test('a throwing onFirstRoute cannot fail the search', async () => {
 
   const events = await drain(searchWaves(ctx, quoteReq, 'quote'))
 
-  expect(events.map((e) => e.best?.quote.amountOut)).toEqual([100n, 250n])
+  expect(events.map((e) => e.best?.quote.amountOut)).toEqual([100n, 250n, 250n])
   expect(events.at(-1)!.done).toBe(true)
   assertCoherent('quote', events)
 })

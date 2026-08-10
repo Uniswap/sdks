@@ -42,7 +42,7 @@ function enabledModule(id: Protocol): ProtocolModule {
     id,
     enabled: () => true,
     speculativeDirect: () => [],
-    adjacency: () => [],
+    adjacencyShape: () => undefined,
     parsePoolLog: () => null,
     validateHint: async () => null,
     encodeQuote: () => {

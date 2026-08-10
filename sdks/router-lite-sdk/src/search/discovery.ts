@@ -7,6 +7,8 @@ import type { Semaphore } from '../internal/rpc'
 import type { ProtocolModule } from '../protocols/types'
 import type { BlockRange, CurrencyRef, LogQuery } from '../types'
 
+import { planAdjacencyScans, scopeKey } from './adjacencyPlan'
+import type { ScopeDemand } from './adjacencyPlan'
 import { deploymentBlockOf, enabledModules, node } from './context'
 import type { Run } from './waves'
 
@@ -157,66 +159,130 @@ export async function completeExactPairScan(run: Run): Promise<void> {
 }
 
 /**
- * Scans every enabled protocol's creation events for pools touching `endpoint`, over the ranges the
- * index has not already covered, and folds both the pools and the coverage back in.
+ * Routes a merged response's logs back to the protocol that emitted them.
  *
- * Protocols and topic-position queries are independent scans against independent contracts, so they
- * all run concurrently — an adjacency wave costs one scan chain's latency, not six. The uncovered
- * RANGES within one query stay sequential here, because each is handed to `scanLogs` in turn and
- * that call adapts its window to the provider's cap as it goes; the CHUNKS inside one such call are
- * not (P1 — `scanLogs` dispatches up to `SCAN_CHUNK_CONCURRENCY` of them at once once it has learned
- * a width the endpoint will serve), so this fan-out multiplies with that one under the router's
- * shared semaphore. See `constants.ts#SCAN_CHUNK_CONCURRENCY` for why that product is deliberately
- * kept near the semaphore's own size rather than far above it.
+ * A merged scan's answer MIXES PROTOCOLS — one request can carry v2 `PairCreated` and v3
+ * `PoolCreated` logs interleaved — so ingestion dispatches on the emitter address, which is the one
+ * field that distinguishes them without decoding. Every `parsePoolLog` already guards its own
+ * emitter, so handing a log to the wrong module is safe (it returns `null`); dispatching is about
+ * not doing three decodes per log, and about a log from an address no enabled module claims being
+ * dropped rather than tried three times.
  */
-export async function scanAdjacency(run: Run, endpoint: CurrencyRef): Promise<void> {
+function ingestMerged(run: Run, byEmitter: Map<string, ProtocolModule>, logs: Log[]): void {
+  for (const log of logs) {
+    const module_ = typeof log?.address === 'string' ? byEmitter.get(log.address.toLowerCase()) : undefined
+    if (!module_) continue
+    const record = module_.parsePoolLog(log, run.ctx.manifest)
+    if (record) run.ctx.index.upsert(record)
+  }
+}
+
+/**
+ * Scans every enabled protocol's creation events for pools touching any of `endpoints`, over the
+ * ranges the index has not already covered, and folds both the pools and the coverage back in.
+ *
+ * ONE REQUEST CHAIN ANSWERS SEVERAL (protocol, endpoint) SCOPES AT ONCE (C5-C). `eth_getLogs` takes
+ * an address array and OR-matches an array within one topic position, so v2's and v3's factories —
+ * whose creation events index the pair at the same two topic slots — and both of the trade's
+ * endpoints ride in a single filter. What used to be twelve chains (3 protocols x 2 endpoints x 2
+ * token slots) is four: [v2+v3, both endpoints, slot A], [v2+v3, both endpoints, slot B], and the
+ * same pair for v4, whose currencies sit one slot deeper behind the pool-id topic. Measured live on
+ * mainnet: v2+v3 merged is one 49ms request against 134ms for the two it replaces, returning exactly
+ * the union of their logs (29 + 3 = 32, checked for set equality — the check the canary suite now
+ * repeats against every provider).
+ *
+ * WHICH SCOPES SHARE WHICH REQUEST OVER WHICH BLOCKS IS NOT DECIDED HERE. `adjacencyPlan.ts` owns
+ * that, and it is pure: differing deployment floors (v2 predates v3) and differing cache states (one
+ * endpoint warm, one cold) mean a merge is only legal over the blocks every constituent still wants,
+ * with the remainders scanned narrower. This function does the I/O and the bookkeeping.
+ *
+ * The plan's scans run concurrently — an adjacency wave costs one scan chain's latency, not twelve.
+ * The uncovered RANGES within one query stay sequential, because each is handed to `scanLogs` in
+ * turn and that call adapts its window to the provider's cap as it goes; the CHUNKS inside one such
+ * call are not (P1 — `scanLogs` dispatches up to `SCAN_CHUNK_CONCURRENCY` of them at once once it
+ * has learned a width the endpoint will serve), so this fan-out multiplies with that one under the
+ * router's shared semaphore. Merging cuts the first factor by three, which is headroom given back to
+ * the semaphore rather than spent. See `constants.ts#SCAN_CHUNK_CONCURRENCY`.
+ *
+ * NO RUNTIME FALLBACK TO PER-PROTOCOL QUERIES, DELIBERATELY. Address arrays and OR-topics are core
+ * `eth_getLogs`, not an extension, and a runtime "did this provider mishandle the merge?" check is
+ * unanswerable in general — the wrong answer is a SILENTLY SMALLER log set, which looks exactly like
+ * a chain with fewer pools. So the check lives where it can be conclusive: the canary suite's
+ * merged-vs-union set-equality row, run against every real provider the repo is pointed at. If a
+ * provider ever fails it, the escape hatch to add is a manifest/router flag that stops the planner
+ * from merging (the planner would emit one scan per scope — the same construction with one-element
+ * arrays), not a heuristic in this path.
+ */
+export async function scanAdjacency(run: Run, endpoints: CurrencyRef[]): Promise<void> {
   const { ctx, req, state } = run
-  const endpointNode = node(endpoint, ctx.manifest)
   const opts = scanOpts(run)
+  const head = state.block.number
 
+  const nodes = [...new Map(endpoints.map((e) => [node(e, ctx.manifest).toLowerCase(), node(e, ctx.manifest)])).values()]
+
+  const byEmitter = new Map<string, ProtocolModule>()
+  const demands: ScopeDemand[] = []
+  for (const module_ of enabledModules(ctx)) {
+    const shape = module_.adjacencyShape(ctx.manifest)
+    const deployBlock = deploymentBlockOf(ctx.manifest, module_.id)
+    if (!shape || deployBlock === undefined) continue
+    byEmitter.set(shape.emitter.toLowerCase(), module_)
+    for (const endpoint of nodes) {
+      // MINUS WHAT THIS SEARCH ALREADY SCANNED, for the same reason `state.pairScanned` exists: the
+      // coverage cache re-opens its own tail on every read (reorg overlap), so wave 3 would otherwise
+      // re-request the last 32 blocks of everything wave 2 just covered, in every single search. A
+      // range wave 2 FAILED on is not in `adjacencyScanned` and is still retried here.
+      const uncovered = subtractRanges(
+        ctx.index.uncovered(module_.id, endpoint, deployBlock, head),
+        state.adjacencyScanned.get(scopeKey({ protocol: module_.id, endpoint })) ?? [],
+      )
+      demands.push({ protocol: module_.id, endpoint, shape, uncovered })
+    }
+  }
+
+  const covered = new Map<string, BlockRange[]>()
   await Promise.all(
-    enabledModules(ctx).map(async (module_) => {
-      const deployBlock = deploymentBlockOf(ctx.manifest, module_.id)
-      if (deployBlock === undefined) return
-      const queries = module_.adjacency(endpointNode, ctx.manifest)
-      if (queries.length === 0) return
-
-      const discovery = state.discovery[module_.id]
-      const ranges = ctx.index.uncovered(module_.id, endpointNode, deployBlock, state.block.number)
-      if (ranges.length === 0) {
-        discovery.complete.add(endpointNode)
-        return
-      }
-
-      let complete = true
+    planAdjacencyScans(demands).map(async (scan) => {
       const perQuery = await Promise.all(
-        queries.map(async (query) => {
-          const covered: BlockRange[] = []
-          for (const range of ranges) {
-            if (req.signal?.aborted) {
-              complete = false
-              break
-            }
+        scan.queries.map(async (query) => {
+          const acc: BlockRange[] = []
+          for (const range of scan.ranges) {
+            if (req.signal?.aborted) break
             // Chunk-by-chunk ingestion (see `runPairScan`): an adjacency scan is the longest thing
             // the engine does, and holding its pools back until the last chunk landed is what made a
             // budget-expired wave 2 worth nothing at all.
-            const scan = await scanLogs(ctx.client, query, range, { ...opts, onLogs: (logs) => ingestLogs(run, module_, logs) })
-            covered.push(...scan.covered)
-            if (!scan.complete) complete = false
+            const result = await scanLogs(ctx.client, query, range, { ...opts, onLogs: (logs) => ingestMerged(run, byEmitter, logs) })
+            acc.push(...result.covered)
           }
-          return mergeRanges(covered)
+          return mergeRanges(acc)
         }),
       )
-
+      // A range is covered for these scopes only where BOTH topic-slot filters covered it — a pool
+      // whose creation event put the endpoint in the other slot would be missed otherwise.
       const shared = intersectAll(perQuery)
-      for (const range of shared) ctx.index.addCoverage(module_.id, endpointNode, range)
-      discovery.covered.push(...shared)
-      // Covering nothing at all is a source failure — unless the caller pulled the plug, which is
-      // reported on its own axis (`aborted`) and must not be blamed on the provider.
-      if (shared.length === 0 && !req.signal?.aborted) discovery.failed = true
-      if (complete) discovery.complete.add(endpointNode)
+      if (shared.length === 0) return
+      for (const scope of scan.covers) {
+        const key = scopeKey(scope)
+        covered.set(key, [...(covered.get(key) ?? []), ...shared])
+      }
     }),
   )
+
+  for (const demand of demands) {
+    const key = scopeKey(demand)
+    const got = mergeRanges(covered.get(key) ?? [])
+    const discovery = state.discovery[demand.protocol]
+    for (const range of got) ctx.index.addCoverage(demand.protocol, demand.endpoint, range)
+    discovery.covered.push(...got)
+    state.adjacencyScanned.set(key, mergeRanges([...(state.adjacencyScanned.get(key) ?? []), ...got]))
+    // Complete means nothing this scope still wanted is left — which covers an abort, a given-up
+    // sub-range and an exhausted request budget alike, without any of them needing its own flag.
+    if (subtractRanges(demand.uncovered, got).length === 0) discovery.complete.add(demand.endpoint)
+    // Covering nothing at all, having asked for something, is a source failure — unless the caller
+    // pulled the plug, which is reported on its own axis (`aborted`) and must not be blamed on the
+    // provider.
+    else if (got.length === 0 && !req.signal?.aborted) discovery.failed = true
+  }
 }
 
 /**

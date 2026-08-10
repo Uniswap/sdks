@@ -10,6 +10,7 @@ import type { PoolKey, PoolRef, RouteLeg } from '../types'
 
 import initFixture from './__fixtures__/v4Initialize.mainnet.json'
 import quoterFixture from './__fixtures__/v4Quoter.mainnet.json'
+import { adjacencyQueries } from './adjacency'
 import { STANDARD_V4_CONFIGS, toPathKeys, v4Module } from './v4'
 
 const USDC = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as const
@@ -115,19 +116,23 @@ test('toPathKeys maps each leg to its output currency, resolving native to addre
   expect(pathKeys).toEqual([{ intermediateCurrency: USDC, fee: 500, tickSpacing: 10, hooks: zeroAddress, hookData: '0x' }])
 })
 
-test('adjacency maps the wrapped-native endpoint back to address(0) for v4 topics', () => {
-  const wrappedNative = MAINNET_MANIFEST.wrappedNative
-  const [queryByNative] = v4Module.adjacency(wrappedNative, MAINNET_MANIFEST)
-  const [queryByZero] = v4Module.adjacency(zeroAddress, MAINNET_MANIFEST)
-  expect(queryByNative).toEqual(queryByZero)
+test('the adjacency shape maps the wrapped-native endpoint back to address(0) for v4 topics', () => {
+  const shape = v4Module.adjacencyShape(MAINNET_MANIFEST)!
+  expect(shape.topicAddress(MAINNET_MANIFEST.wrappedNative)).toBe(zeroAddress)
+  expect(shape.topicAddress(zeroAddress)).toBe(zeroAddress)
+  // Everything else passes straight through — only the native family is folded.
+  expect(shape.topicAddress(USDC)).toBe(USDC)
 })
 
 test('adjacency shifts one slot right of v2/v3 for the poolId topic', () => {
   // Initialize indexes (id, currency0, currency1) — the pool id occupies topic1, so the token
   // pair sits one slot further right (topic2) than v2's PairCreated/v3's PoolCreated (topic1).
-  const [asCurrency0] = v4Module.adjacency(USDC, MAINNET_MANIFEST)
-  expect(asCurrency0.topics[1]).toBeNull() // id
-  expect(asCurrency0.topics[2]!.toLowerCase()).toBe(pad(USDC).toLowerCase())
+  // The shape says so via `slot`, which is also what keeps v4 out of the v2+v3 merge.
+  const shape = v4Module.adjacencyShape(MAINNET_MANIFEST)!
+  expect(shape.slot).toBe(2)
+  const [asCurrency0] = adjacencyQueries([shape], [USDC])
+  expect(asCurrency0!.topics[1]).toBeNull() // id
+  expect(asCurrency0!.topics[2]).toEqual([pad(USDC).toLowerCase() as Hex])
 })
 
 test('exactPair builds a sorted v4 Initialize query', () => {
@@ -135,9 +140,10 @@ test('exactPair builds a sorted v4 Initialize query', () => {
   expect(query.address.toLowerCase()).toBe(POOL_MANAGER.toLowerCase())
 })
 
-test('adjacency topic0 pins the Initialize selector (drift guard)', () => {
-  const [query] = v4Module.adjacency(USDC, MAINNET_MANIFEST)
-  expect(query.topics[0]).toBe('0xdd466e674ea557f56295e2d0218a125ea4b4f0f6f3307b95f85e6110838d6438')
+test('the adjacency shape pins the Initialize selector and the PoolManager emitter (drift guard)', () => {
+  const shape = v4Module.adjacencyShape(MAINNET_MANIFEST)!
+  expect(shape.topic0).toBe('0xdd466e674ea557f56295e2d0218a125ea4b4f0f6f3307b95f85e6110838d6438')
+  expect(shape.emitter.toLowerCase()).toBe(POOL_MANAGER.toLowerCase())
 })
 
 test('parsePoolLog returns null when log address does not match the configured PoolManager', () => {
