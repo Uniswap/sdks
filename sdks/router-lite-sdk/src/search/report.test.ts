@@ -117,7 +117,9 @@ test('discoveryStatus: a disabled protocol reports disabled before looking at di
 
 // ---------------------------------------------------------------------------
 // `buildReport`'s `coveredRanges`/`demandFloor`: cumulative index knowledge at
-// search end, not this run's own scan traffic.
+// search end, not this run's own scan traffic — INTERSECTED across the trade's
+// endpoints, matching `discoveryStatus`'s own AND (both endpoints must be
+// known before a protocol counts as `complete`), never unioned.
 //
 // `reorgOverlapBlocks: 0n` on every index built below is deliberate: `uncovered`
 // always re-opens the tip's last `reorgOverlapBlocks` regardless of how
@@ -160,13 +162,15 @@ test('buildReport: a warm-cache search that scans nothing new still reports the 
   expect(report.discovery.v2.demandFloor).toBe(0n)
 })
 
-test('buildReport: a fully-cached endpoint is not dropped just because the OTHER endpoint still needs scanning', () => {
-  // The degenerate case this bug produced: one endpoint (TOKEN_A) is fully known from an earlier
-  // search and needed no scan this run at all; TOKEN_B has never been touched. Overall status is
-  // correctly `partial` (discoveryStatus judges both endpoints by name), but the report must not
-  // discard TOKEN_A's entire known history just because no scan *walked* it this run — the old
-  // per-run `.covered` bookkeeping only recorded ranges a scan actually returned, so a scope that
-  // needed zero scanning reported zero coverage even though the index knew it end-to-end.
+test('buildReport: coverage is AND across endpoints, matching discoveryStatus — a fully-cached endpoint alone reports zero while the other is untouched', () => {
+  // `coveredRanges` must intersect the two endpoints' coverage, never union it. `discoveryStatus`
+  // (this file, above) calls a protocol `complete` only once BOTH endpoints are fully known
+  // (`endpointNodes.every(...)`) — a route needs every pool touching either endpoint, not just one —
+  // so a coverage bar built from the union would show a near-full bar under a `partial` label
+  // whenever one endpoint happens to be fully cached and the other has never been touched at all,
+  // indefinitely, until the untouched endpoint is finally scanned. TOKEN_A is fully known here;
+  // TOKEN_B has no coverage in the index at all, so the intersection — and the honest answer to "how
+  // much does the router know for THIS pair" — is nothing.
   const run = makeRunWithIndex()
   const head = run.state.block.number
 
@@ -177,6 +181,37 @@ test('buildReport: a fully-cached endpoint is not dropped just because the OTHER
   const report = buildReport(run)
 
   expect(report.discovery.v2.status).toBe('partial')
+  expect(report.discovery.v2.coveredRanges).toEqual([])
+})
+
+test('buildReport: partially overlapping endpoint coverage reports exactly the overlap', () => {
+  const run = makeRunWithIndex()
+  const head = run.state.block.number
+
+  // TOKEN_A's adjacency is known for [0, 700]; TOKEN_B's for [400, head]. Only [400, 700] is known
+  // for BOTH endpoints, which is the intersection this scenario pins.
+  run.ctx.index.addCoverage('v2', TOKEN_A, { fromBlock: 0n, toBlock: 700n })
+  run.ctx.index.addCoverage('v2', TOKEN_B, { fromBlock: 400n, toBlock: head })
+
+  const report = buildReport(run)
+
+  expect(report.discovery.v2.coveredRanges).toEqual([{ fromBlock: 400n, toBlock: 700n }])
+})
+
+test('buildReport: two trade endpoints that collapse onto one graph node still report that single scope — intersection over one scope is a no-op', () => {
+  // native+wrapped (or any trade whose two currencies share a node once `node()` folds native onto
+  // wrapped) leaves `coveredRangesFor` with exactly ONE endpoint after de-duplication. `intersectAll`
+  // over a single-element input must return that element unchanged, not collapse to `[]` — the
+  // degenerate case the AND semantics could plausibly get wrong if it intersected the single scope
+  // against an implicit empty second operand instead of just not having one.
+  const run = makeRunWithIndex()
+  run.req.tokenOut = TOKEN_A // same node as tokenIn — only one endpoint scope is ever demanded
+  const head = run.state.block.number
+
+  run.ctx.index.addCoverage('v2', TOKEN_A, { fromBlock: 0n, toBlock: head })
+
+  const report = buildReport(run)
+
   expect(report.discovery.v2.coveredRanges).toEqual([{ fromBlock: 0n, toBlock: head }])
 })
 

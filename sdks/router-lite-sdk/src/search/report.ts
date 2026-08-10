@@ -1,6 +1,6 @@
 import type { Address } from 'viem'
 
-import { mergeRanges, subtractRanges } from '../internal/ranges'
+import { intersectAll, subtractRanges } from '../internal/ranges'
 import type { BlockRange, Protocol, SearchReport } from '../types'
 import { protocolRecord } from '../types'
 
@@ -45,9 +45,17 @@ export function discoveryStatus(
 /**
  * Cumulative index coverage for one protocol over this search's demanded scopes: the two trade
  * endpoints, each queried against `ctx.index` (so this reads whatever the cache holds AFTER this
- * search's own scans landed, not what this run happened to walk), unioned into one merged set —
- * "how much does the router know for this search", the way `discoveryStatus` already judges
- * completeness against both endpoints by name rather than a count of whatever got scanned.
+ * search's own scans landed, not what this run happened to walk), INTERSECTED across endpoints —
+ * never unioned.
+ *
+ * This has to be AND, matching `discoveryStatus`'s own `endpointNodes.every(...)`: that function
+ * calls a protocol `complete` only once BOTH endpoints' adjacency is fully known, because a route
+ * needs every pool touching either endpoint, not just one of them. A bar built from the union would
+ * disagree with the word next to it — reading near-full while the status still says `partial`,
+ * indefinitely, whenever one endpoint is fully cached and the other has never been touched. The
+ * intersection is what "the router knows this pair, here" actually means: the same reasoning
+ * `discovery.ts#scanAdjacency` already applies one layer down, intersecting a single endpoint's two
+ * topic-slot queries before it will call that endpoint's range covered at all.
  *
  * A protocol with no deployment block configured (disabled on this chain) reports no coverage: there
  * is no demand to measure against.
@@ -58,8 +66,8 @@ function coveredRangesFor(run: Run, protocol: Protocol, endpointNodes: Address[]
   const head = state.block.number
   const endpoints = new Map(endpointNodes.map((n) => [n.toLowerCase(), n]))
   const demand = [{ fromBlock: deployBlock, toBlock: head }]
-  return mergeRanges(
-    [...endpoints.values()].flatMap((endpoint) => subtractRanges(demand, ctx.index.uncovered(protocol, endpoint, deployBlock, head))),
+  return intersectAll(
+    [...endpoints.values()].map((endpoint) => subtractRanges(demand, ctx.index.uncovered(protocol, endpoint, deployBlock, head))),
   )
 }
 
