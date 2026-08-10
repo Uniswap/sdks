@@ -87,6 +87,7 @@ import { join } from 'node:path'
 import type { Address } from 'viem'
 
 import { parseSnapshot, PoolIndex, serializeSnapshot, type PoolIndexSnapshot } from '../src/experimental/index'
+import { PROTOCOLS, type BlockRange, type Protocol } from '../src/index'
 
 import type { FlagSpec } from './args'
 
@@ -313,6 +314,93 @@ export async function saveCache(chainId: number, index: PoolIndex): Promise<stri
     await rm(tmp, { force: true }).catch(() => {}) // never strand a partial snapshot
     return `cache: not saved (${why})`
   }
+}
+
+// ---------------------------------------------------------------------------
+// The cache summary line's data — the pure half. `context.ts` calls this on
+// whatever `loadCache` restored (pools, coverage) and hands the result to
+// `report.ts#renderCacheLine`, which is the actual string formatting.
+//
+// Computed PRE-SEARCH, from the snapshot alone, with no new RPC call: the
+// live chain head is a search's own first read, a whole wave away, and the
+// cache line has to be printable before that. So "head" here is a PROXY —
+// the highest block ANY coverage range in the whole snapshot reaches, across
+// every protocol and scope — not the chain's real tip. That makes the
+// percentage a measure of "how internally caught-up is this cache", not "how
+// caught up is this cache with the live chain": a snapshot that is a month
+// stale but was fully scanned up to the block it stopped at still reads
+// 100% here, and correctly so — the real staleness is exactly the delta the
+// upcoming search's first wave will close, and is not this line's job to
+// guess at.
+// ---------------------------------------------------------------------------
+
+export type CacheProtocolSummary = { pct: number; complete: boolean }
+
+/** Merges `ranges` (from however many distinct coverage-scope keys share a protocol — a direct
+ * pair's scope and an adjacency endpoint's scope can overlap) and sums the covered span within
+ * `[lo, hi]`, so overlapping scopes are never double-counted. */
+function mergedCoveredSpan(ranges: BlockRange[], lo: bigint, hi: bigint): bigint {
+  const clipped = ranges
+    .map((r) => ({ fromBlock: r.fromBlock > lo ? r.fromBlock : lo, toBlock: r.toBlock < hi ? r.toBlock : hi }))
+    .filter((r) => r.fromBlock <= r.toBlock)
+    .sort((a, b) => (a.fromBlock < b.fromBlock ? -1 : a.fromBlock > b.fromBlock ? 1 : 0))
+
+  let total = 0n
+  let curFrom: bigint | undefined
+  let curTo: bigint | undefined
+  for (const r of clipped) {
+    if (curTo === undefined) {
+      curFrom = r.fromBlock
+      curTo = r.toBlock
+    } else if (r.fromBlock <= curTo + 1n) {
+      if (r.toBlock > curTo) curTo = r.toBlock
+    } else {
+      total += curTo - curFrom! + 1n
+      curFrom = r.fromBlock
+      curTo = r.toBlock
+    }
+  }
+  if (curTo !== undefined) total += curTo - curFrom! + 1n
+  return total
+}
+
+/**
+ * Per-protocol coverage fraction against each protocol's OWN demand floor — the same denominator
+ * shape `SearchReport.discovery[p].demandFloor` uses, just computed here without a live head (see
+ * this section's header). A protocol absent from `demandFloors` (no bundle in the manifest) is
+ * OMITTED from the result — the caller renders that as `disabled`, distinct from a present protocol
+ * reporting a legitimate `0%`.
+ */
+export function summarizeCacheCoverage(
+  coverage: readonly (readonly [string, BlockRange[]])[],
+  // `bigint | undefined` (rather than the optional-key `Partial<Record<...>>` shape) on purpose: the
+  // natural caller reads `chain.manifest.v2?.deploymentBlock`, which is ALWAYS a present key whose
+  // value happens to be `undefined` for a protocol with no manifest bundle, never an absent key — and
+  // `exactOptionalPropertyTypes` treats those two shapes as distinct.
+  demandFloors: Record<Protocol, bigint | undefined>,
+): Partial<Record<Protocol, CacheProtocolSummary>> {
+  let approxHead: bigint | undefined
+  for (const [, ranges] of coverage) {
+    for (const r of ranges) {
+      if (approxHead === undefined || r.toBlock > approxHead) approxHead = r.toBlock
+    }
+  }
+
+  const result: Partial<Record<Protocol, CacheProtocolSummary>> = {}
+  for (const p of PROTOCOLS) {
+    const floor = demandFloors[p]
+    if (floor === undefined) continue
+    if (approxHead === undefined || approxHead < floor) {
+      result[p] = { pct: 0, complete: false }
+      continue
+    }
+    const ranges = coverage.filter(([key]) => key.startsWith(`${p}:`)).flatMap(([, r]) => r)
+    const covered = mergedCoveredSpan(ranges, floor, approxHead)
+    const span = approxHead - floor + 1n
+    const fraction = span > 0n ? Number((covered * 1000n) / span) / 1000 : 0
+    result[p] = { pct: fraction, complete: fraction >= 0.999 }
+  }
+  return result
 }
 
 // ---------------------------------------------------------------------------

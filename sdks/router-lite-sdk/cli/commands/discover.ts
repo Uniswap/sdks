@@ -19,10 +19,11 @@ import type { CurrencyRef, PoolRecord, Protocol, QuoteResult } from '../../src/i
 // by relative path — the same escape hatch `canary/simulate.ts` documents — rather than re-deriving
 // the discredit rule or the native/wrapped-native family rule here and drifting.
 import { sameFamily } from '../../src/internal/currency'
+import { blockTimeSecondsOf } from '../../src/manifest'
 import { isDiscredited } from '../../src/pools/poolIndex'
 import { bold, cyan, dim, green, red, shortHex, yellow } from '../ansi'
 import { parseArgs, UsageError } from '../args'
-import { describePool, jsonify, renderSearchReport, viewKey, type RenderCtx, type TokenView } from '../report'
+import { describePool, jsonify, renderConfidencePanel, viewKey, type RenderCtx, type TokenView } from '../report'
 import { fetchTokenMeta, resolveToken, type ResolvedToken } from '../tokens'
 
 import { buildChainContext, COMMON_FLAGS, hydrateViews, startBudget, type ChainContext } from './context'
@@ -101,7 +102,13 @@ export async function cmdDiscover(argv: string[]): Promise<number> {
     console.log(dim(`index: ${stats.pools} pools · ${stats.adjacencyEdges} adjacency edges · ${stats.coverageScopes} coverage scopes`))
     if (final) {
       console.log('')
-      console.log(renderSearchReport(final.search).join('\n'))
+      console.log(
+        renderConfidencePanel(final.search, {
+          mode: 'quote',
+          blockTimeSeconds: blockTimeSecondsOf(ctx.chain.manifest),
+          ...(ctx.budgetMs !== undefined ? { budgetMs: ctx.budgetMs } : {}),
+        }).join('\n'),
+      )
     }
     return 0
   } finally {
@@ -172,5 +179,7 @@ function renderRecord(rec: PoolRecord, token: ResolvedToken, renderCtx: RenderCt
         : (rec.quoteFailureBlocks ?? 0) > 0
           ? yellow(`${rec.quoteFailureBlocks} failed block(s)`)
           : dim('never quoted')
-  return [describePool(rec.pool), `↔ ${counterpart}`, provenance, created, quoteMark].filter(Boolean).join('  ')
+  // `discover` exists to answer "which pools does the SDK see" — the address IS the answer here,
+  // unlike a route line where it is demoted detail, so this always renders it inline.
+  return [describePool(rec.pool, { addresses: true }), `↔ ${counterpart}`, provenance, created, quoteMark].filter(Boolean).join('  ')
 }

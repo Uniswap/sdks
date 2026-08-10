@@ -44,3 +44,32 @@ export function shortHex(hex: string): string {
   if (!hex.startsWith('0x') || hex.length <= 12) return hex
   return `${hex.slice(0, 6)}…${hex.slice(-4)}`
 }
+
+/** Every SGR escape this module ever emits — the only shape `visibleWidth`/`padEndVisible`/
+ * `padStartVisible` need to strip, since `paint` is the sole producer. */
+const ANSI_RE = /\x1b\[[0-9;]*m/g
+
+/**
+ * The width a styled string actually occupies on screen — `paint`'s escape codes cost bytes but no
+ * columns, so `.length` over-counts a colored string by exactly the width of its open/close codes.
+ * The runners-up delta table pads columns to their widest CELL, and column widths computed from raw
+ * `.length` would drift between a colored run and a `--json`/test run of the identical data — this
+ * is what keeps the two aligned the same way.
+ */
+export function visibleWidth(s: string): number {
+  return s.replace(ANSI_RE, '').length
+}
+
+/** Right-pads `s` with spaces to `width` VISIBLE columns — see {@link visibleWidth}. A no-op if `s`
+ * is already at or past `width`. */
+export function padEndVisible(s: string, width: number): string {
+  const pad = width - visibleWidth(s)
+  return pad > 0 ? s + ' '.repeat(pad) : s
+}
+
+/** Left-pads `s` with spaces to `width` VISIBLE columns — see {@link visibleWidth}. A no-op if `s`
+ * is already at or past `width`. */
+export function padStartVisible(s: string, width: number): string {
+  const pad = width - visibleWidth(s)
+  return pad > 0 ? ' '.repeat(pad) + s : s
+}

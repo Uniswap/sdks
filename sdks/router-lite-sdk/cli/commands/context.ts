@@ -8,6 +8,8 @@
 // source, never a possibly-stale `dist/`.
 // ---------------------------------------------------------------------------
 
+import { stat } from 'node:fs/promises'
+
 import { createPublicClient, http, type Address, type PublicClient } from 'viem'
 
 // `DEFAULT_CONCURRENCY`/`MAX_CONCURRENCY` are the SDK's own bounds for the option `--concurrency`
@@ -19,7 +21,7 @@ import { createRouter, type PoolHint, type QuotedRoute, type Router } from '../.
 import { parseAmount, parseBudget } from '../amounts'
 import { dim } from '../ansi'
 import { UsageError, type FlagSpec, type ParsedArgs } from '../args'
-import { CACHE_FLAGS, cacheEnabled, cachePath, loadCache, saveCache, scheduleCacheSave } from '../cache'
+import { CACHE_FLAGS, cacheEnabled, cachePath, loadCache, saveCache, scheduleCacheSave, summarizeCacheCoverage } from '../cache'
 import {
   assertChainMatches,
   clientTimeoutMs,
@@ -31,7 +33,7 @@ import {
 import { parseHint } from '../hints'
 import { applyPoolList } from '../poolList'
 import { redactKeyedUrl, redactHeaderValues, registerRpcHeaders } from '../redact'
-import { viewKey, type RenderCtx, type TokenView } from '../report'
+import { renderCacheLine, viewKey, type RenderCtx, type TokenView } from '../report'
 import { resolveRpcHeaders } from '../rpcHeaders'
 import { fetchTokenMeta, resolveToken, type ResolvedToken } from '../tokens'
 
@@ -60,6 +62,10 @@ export const TRADE_FLAGS: FlagSpec = {
   ...COMMON_FLAGS,
   watch: { kind: 'boolean', alias: 'w' },
   hint: { kind: 'strings' },
+  // Restores pool addresses inline on every route line (best and alternatives alike), and
+  // suppresses the best route's dim detail line(s) that exist only to hold the address this puts
+  // back inline — see `report.ts#describePool`/`renderPoolDetailLines`.
+  addresses: { kind: 'boolean' },
 }
 
 export type ChainContext = {
@@ -192,13 +198,43 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
     // never named, silently, is one they cannot reason about: the only way to notice it had resolved
     // a DIFFERENT chain than intended (and was therefore neither reading nor writing the file they
     // expected) was to go looking. Naming the resolved chain id and the exact path on every cached
-    // run makes that self-evident, and costs one dim line on stderr. The load time is appended only
-    // when it is large enough to be felt — a multi-hundred-megabyte snapshot adds real seconds before
-    // the search starts, and an unexplained pause is the other thing a user cannot reason about.
-    const slow = loadMs > 500 ? ` · ${(loadMs / 1000).toFixed(1)}s load` : ''
-    console.error(dim(`cache: chain ${chain.chainId} · ${cachePath(chain.chainId)}${slow}`))
-    // The detail (hit/miss, why it was discarded, what was saved) stays under --verbose.
-    note(loaded.note)
+    // run makes that self-evident. It now also carries what the cache actually KNOWS — pool count,
+    // per-protocol coverage, and how stale the file is — computed purely from the loaded snapshot
+    // (`summarizeCacheCoverage`; see its header for why that is a proxy for "caught up", not "caught
+    // up with the live chain") since the real head is a search's own read, a whole wave away.
+    //
+    // `ageMs` comes from a SEPARATE `stat`, not `loadMs`/`loaded`: neither the load path nor
+    // `CacheLoad` carries the file's mtime, and reaching for it is best-effort — a failed `stat`
+    // (the file vanished between `loadCache`'s read and this line, a sandboxed FS) simply omits the
+    // age rather than failing a command over a cosmetic line.
+    let ageMs: number | undefined
+    if (loaded.index) {
+      try {
+        ageMs = Date.now() - (await stat(cachePath(chain.chainId))).mtimeMs
+      } catch {
+        // best-effort — see above
+      }
+    }
+    const demandFloors = {
+      v2: chain.manifest.v2?.deploymentBlock,
+      v3: chain.manifest.v3?.deploymentBlock,
+      v4: chain.manifest.v4?.deploymentBlock,
+    }
+    const perProtocol = summarizeCacheCoverage(index.toSnapshot().coverage, demandFloors)
+    console.error(
+      dim(
+        renderCacheLine({
+          chainId: chain.chainId,
+          pools: index.stats().pools,
+          perProtocol,
+          loadMs,
+          ...(ageMs !== undefined ? { ageMs } : {}),
+        }),
+      ),
+    )
+    // The detail (hit/miss, why it was discarded, what was saved, the exact path) stays under
+    // --verbose — `cachePath` is still named there so a curious reader can still find the file.
+    note(`${loaded.note} (${cachePath(chain.chainId)})`)
   } else {
     note('cache: disabled (--no-cache)')
   }
@@ -408,6 +444,27 @@ export async function hydrateViews(
  * of alternatives, each at most two hops — a dozen distinct leg tokens already covers every token
  * that can appear on screen, and every fetch beyond that is latency the user waits on for nothing. */
 const MAX_LEG_METADATA_FETCHES = 12
+
+/**
+ * Classifies the search's first (unverified) lead for the "how it went" timeline — `cache` when its
+ * leg-0 pool was already known BEFORE this search started, `hint` as a best-effort fallback when the
+ * trade carried a `--hint` and the pool was not pre-known, `probe` otherwise.
+ *
+ * A BEST-EFFORT APPROXIMATION, NAMED AS ONE. Distinguishing "the index already had this exact pool"
+ * from "this exact pool is new" is precise — `preExistingDirect` is a snapshot of `index.pair(tokenIn,
+ * tokenOut)` taken before the search runs, and pool identity is exact-match. Distinguishing a hint
+ * from a fresh speculative probe is NOT: `PoolHint` is an unvalidated, pre-identity shape (no `id` —
+ * see `types.ts`), so re-deriving whether THIS SPECIFIC pool matches a given hint would mean
+ * reimplementing the SDK's own hint-to-`PoolRef` normalization here, for a line whose entire job is
+ * "roughly where did this come from". `hasHints` is the cheaper, honest proxy: a trade run with a
+ * `--hint` and a fresh (non-cached) first lead is overwhelmingly that hint confirming itself, and a
+ * wrong label here costs a reader one word on an ALREADY-`(unverified)` line, never a wrong quote.
+ */
+export function classifyLeadOrigin(route: QuotedRoute, preExistingDirect: ReadonlySet<string>, hasHints: boolean): 'cache' | 'hint' | 'probe' {
+  const leadPoolId = route.route.legs[0]?.pool.id
+  if (leadPoolId !== undefined && preExistingDirect.has(leadPoolId)) return 'cache'
+  return hasHints ? 'hint' : 'probe'
+}
 
 /**
  * Fills the render context with symbols/decimals for every intermediate token appearing in the

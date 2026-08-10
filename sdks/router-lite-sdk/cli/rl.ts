@@ -94,10 +94,12 @@ ${bold('common options')}
                           endpoint with connection headroom — 40 measurably beat 20 on a keyed
                           mainnet endpoint; lower it against a shared or rate-limited quota.
   --hint <spec>           assert a pool for the pair: v2 | v3@500 | v4@3000/60[/0xHooks][:0xHookData]
-  --watch, -w             stream every search wave to the end of the bounded search. A leading
-                          \`first\` line reports the search's first priced route the moment it exists,
-                          which is a whole wave before the \`wave 1\` line.
-  --verbose, -v           stream waves, stop at the first actionable result
+  --addresses             restore inline pool addresses on every route line (best and alternatives
+                          alike) instead of the default compact notation (\`v3 0.01%\`) with the
+                          leading route's own address demoted to a dim line underneath.
+  --watch, -w             stream the "how it went" timeline live, to the end of the bounded search,
+                          instead of only printing it once at the end.
+  --verbose, -v           stream the timeline live, stop at the first actionable result
   --json                  machine output (NDJSON per wave with --watch)
   --no-cache              skip the on-disk pool index (~/.cache/router-lite/<chainId>.json).
                           It is ON by default: a warm second run re-scans only the block delta,

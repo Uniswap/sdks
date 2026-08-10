@@ -2,22 +2,25 @@
 // `rl quote <tokenIn> <tokenOut> <amount>` — price a trade and show how the
 // search got there.
 //
-// Three speeds, mirroring the SDK's own two call shapes:
-//  - default: `getQuote` — resolves at the first actionable wave, like a
-//    production caller would;
-//  - `--verbose`: iterate `quotes()`, streaming one line per wave, stopping
-//    at the first actionable result (same answer as default, but showing the
-//    road there);
-//  - `--watch`: iterate `quotes()` to the very end of the bounded search —
-//    every wave, including the ones that only improve the answer.
+// Every mode — default, `--verbose`, `--watch` — iterates the SAME
+// `ctx.router.quotes()` generator now (see `waves.ts`'s header for why that
+// is provably identical to the old default path's `getQuote` call), so the
+// "how it went" timeline is available whether or not it is also streamed
+// live:
+//  - default: stop at the first actionable wave (a leader exists) — same
+//    answer `getQuote` would give, timeline rendered once at the end;
+//  - `--verbose`: identical stop condition, timeline streamed live too;
+//  - `--watch`: drains the whole bounded search, timeline streamed live and
+//    then recapped in the final panel.
 // ---------------------------------------------------------------------------
 
 import type { QuoteRequest } from '../../src/index'
+import { blockTimeSecondsOf } from '../../src/manifest'
 import { parseArgs } from '../args'
-import { exitCodeFor, jsonify, renderQuoteResult, type TradeContext } from '../report'
+import { exitCodeFor, jsonify, renderQuoteResult, type FirstLeadInfo, type TradeContext } from '../report'
 import { firstRouteReporter, iterateWaves } from '../waves'
 
-import { buildChainContext, hydrateLegSymbols, resolveTrade, startBudget, TRADE_FLAGS } from './context'
+import { buildChainContext, classifyLeadOrigin, hydrateLegSymbols, resolveTrade, startBudget, TRADE_FLAGS } from './context'
 
 
 export async function cmdQuote(argv: string[]): Promise<number> {
@@ -28,6 +31,7 @@ export async function cmdQuote(argv: string[]): Promise<number> {
   const json = parsed.booleans.has('json')
   const watch = parsed.booleans.has('watch')
   const verbose = parsed.booleans.has('verbose')
+  const addresses = parsed.booleans.has('addresses')
   // The budget clock and the elapsed-time origin start together, HERE — everything above this line
   // is setup (chain detection, cache load, token metadata) and is not what `--budget` bounds.
   const budget = startBudget(ctx.budgetMs)
@@ -47,45 +51,64 @@ export async function cmdQuote(argv: string[]): Promise<number> {
     }
     const tradeCtx: TradeContext = { tokenIn: trade.tokenIn.ref, tokenOut: trade.tokenOut.ref, amountIn: trade.amountIn }
 
-    if (!watch && !verbose) {
-      const result = await ctx.router.getQuote(request)
-      const elapsed = Date.now() - started
-      if (json) {
-        console.log(jsonify(result))
-      } else {
-        await hydrateLegSymbols(ctx, trade.renderCtx, [...('best' in result && result.best ? [result.best] : []), ...result.alternatives])
-        console.log(renderQuoteResult(result, tradeCtx, trade.renderCtx, elapsed).join('\n'))
-      }
-      return exitCodeFor(result.status)
-    }
+    // A snapshot of what the index already knew about this EXACT pair before the search touches it
+    // — the only way `classifyLeadOrigin` can tell "the cache already had this" from "this search's
+    // own probe just found it".
+    const preExistingDirect = new Set(ctx.index.pair(trade.tokenIn.ref, trade.tokenOut.ref).map((r) => r.pool.id))
+    let first: FirstLeadInfo | undefined
+    // `--watch`/`--verbose` PRINT per wave (NDJSON under `--json`, a narrative line otherwise); the
+    // default path stays silent until the end either way — see `waves.ts`'s header for why that is
+    // what keeps a default `--json` run byte-identical to `jsonify(final)` alone.
+    const stream = watch || verbose
 
     // The SDK prices a direct route a whole wave before the search's FIRST wave yields (its probes
     // are one round trip; the wave also waits on a log scan). `onFirstRoute` is how a streaming view
     // gets to say so at the moment it becomes true instead of seconds later — see
     // `src/router.ts#IterateOptions`.
-    //
-    // THE ENGINE COUNTS WAVES FROM 0 AND THIS STREAM PRINTS THEM FROM 1, which is worth stating
-    // because this comment used to say "wave 0" about a line that reaches the terminal as `wave 1`.
-    // `iterateWaves` increments before it prints, so the wave described above is the one a reader
-    // sees as `wave 1`; the display numbering is not renumbered to match the engine, because the
-    // number in front of a user should count the lines they have actually been shown.
     const results = ctx.router.quotes(request, {
-      onFirstRoute: firstRouteReporter({ json, started, tradeCtx, renderCtx: trade.renderCtx }),
+      onFirstRoute: firstRouteReporter({
+        json,
+        stream,
+        started,
+        classify: (route) => classifyLeadOrigin(route, preExistingDirect, trade.hints.length > 0),
+        record: (info) => {
+          first = info
+        },
+      }),
     })
-    const final = await iterateWaves(results, tradeCtx, trade.renderCtx, {
+    const { final, history } = await iterateWaves(results, {
       json,
       started,
-      // `--watch` drains the whole bounded search; `--verbose` alone stops at the first actionable
-      // wave, which for a quote is any result carrying a leader.
+      // `--watch` drains the whole bounded search; the default path and `--verbose` both stop at the
+      // first actionable wave — the same answer `getQuote` would give (see this file's header).
       stopAt: (result) => !watch && result.status === 'quote',
-      hydrate: (routes) => hydrateLegSymbols(ctx, trade.renderCtx, routes),
+      stream,
+      trade: tradeCtx,
+      renderCtx: trade.renderCtx,
+      getFirst: () => first,
+      ...(ctx.budgetMs !== undefined ? { budgetMs: ctx.budgetMs } : {}),
     })
     if (!final) return 2
-    if (!json) {
-      await hydrateLegSymbols(ctx, trade.renderCtx, [...('best' in final && final.best ? [final.best] : []), ...final.alternatives])
-      console.log('')
-      console.log(renderQuoteResult(final, tradeCtx, trade.renderCtx, Date.now() - started).join('\n'))
+
+    if (json) {
+      if (!stream) console.log(jsonify(final))
+      // `--watch`/`--verbose` already streamed every wave as NDJSON; nothing more to print.
+      return exitCodeFor(final.status)
     }
+
+    await hydrateLegSymbols(ctx, trade.renderCtx, [...('best' in final && final.best ? [final.best] : []), ...final.alternatives])
+    if (stream) console.log('')
+    console.log(
+      renderQuoteResult(final, tradeCtx, trade.renderCtx, {
+        elapsedMs: Date.now() - started,
+        addresses,
+        verbose,
+        ...(ctx.budgetMs !== undefined ? { budgetMs: ctx.budgetMs } : {}),
+        blockTimeSeconds: blockTimeSecondsOf(ctx.chain.manifest),
+        ...(first !== undefined ? { first } : {}),
+        waves: history,
+      }).join('\n'),
+    )
     return exitCodeFor(final.status)
   } finally {
     budget.cancel()

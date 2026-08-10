@@ -59,6 +59,64 @@ export function formatAmount(amount: bigint, decimals: number, maxFractionDigits
 }
 
 /**
+ * Formats raw units at `decimals` as a grouped decimal string with an EXACT `fractionDigits` — no
+ * trimming, unlike {@link formatAmount}. Exists for column-aligned tables (the runners-up delta
+ * table): two rows whose amounts are `0.30` and `0.4` read as unaligned decimal points the moment
+ * one of them trims a trailing zero, and a table is exactly the place that has to line up.
+ */
+export function formatFixed(amount: bigint, decimals: number, fractionDigits: number): string {
+  const negative = amount < 0n
+  const abs = negative ? -amount : amount
+  const base = 10n ** BigInt(decimals)
+  const whole = abs / base
+  const frac = abs % base
+
+  const grouped = whole.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  const digits = Math.max(0, Math.min(fractionDigits, decimals))
+  const fracFull = frac.toString().padStart(decimals, '0')
+  const fracShown = fracFull.slice(0, digits).padEnd(digits, '0')
+
+  const out = digits > 0 ? `${grouped}.${fracShown}` : grouped
+  return negative ? `-${out}` : out
+}
+
+/**
+ * The fewest fraction digits (within `[min, min(max, decimals)]`) at which every amount in
+ * `amounts` renders DISTINCT from every other, and no nonzero amount renders as a flat `0` — "enough
+ * decimals to distinguish the deltas" from the runners-up table, without defaulting to full
+ * precision when two decimal places already tell the whole story (`-0.30` / `-0.42`, not
+ * `-0.300000` / `-0.420000`).
+ *
+ * Starts at `min` (2 by default — a table of whole-unit deltas with no decimals at all reads as
+ * "these are all the same") and grows until the collision/all-zero test passes or `max` is reached,
+ * at which point it returns `max` regardless — two genuinely-identical amounts are not a formatting
+ * bug for this function to paper over.
+ */
+export function adaptiveFractionDigits(amounts: bigint[], decimals: number, opts: { min?: number; max?: number } = {}): number {
+  const min = opts.min ?? 2
+  const max = Math.min(opts.max ?? 6, decimals)
+  if (min >= max) return max
+  for (let digits = min; digits <= max; digits++) {
+    const seen = new Set<string>()
+    let ok = true
+    for (const a of amounts) {
+      const shown = formatFixed(a < 0n ? -a : a, decimals, digits)
+      if (a !== 0n && /^0(\.0*)?$/.test(shown)) {
+        ok = false
+        break
+      }
+      if (seen.has(shown)) {
+        ok = false
+        break
+      }
+      seen.add(shown)
+    }
+    if (ok) return digits
+  }
+  return max
+}
+
+/**
  * Parses a `--budget` duration (`'900ms'`, `'10s'`, `'2m'`) into milliseconds for
  * `AbortSignal.timeout`. A unit is REQUIRED: a bare `'900'` reads as 900ms to someone fresh from
  * the SDK docs and as 900s to someone thinking in seconds, and a silently misread budget is worse

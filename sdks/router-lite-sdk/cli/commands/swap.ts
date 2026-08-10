@@ -2,8 +2,9 @@
 // `rl swap <tokenIn> <tokenOut> <amount> --trader 0x…` — build (and
 // optionally prove) executable Universal Router calldata.
 //
-// Same wave semantics as `quote` (`--verbose` streams to first actionable,
-// `--watch` drains the bounded search), plus:
+// Same wave semantics as `quote` (see that file's header for why every mode
+// — default, `--verbose`, `--watch` — now iterates the same generator and
+// always collects the "how it went" timeline), plus:
 //  - the full tx (to / value / calldata) and the compiled limits the SDK
 //    asserts inside it (`minAmountOut`, `deadline` — echoed, not re-derived);
 //  - `needs-action` requirements as a checklist;
@@ -15,13 +16,14 @@
 import { isAddress, type Address } from 'viem'
 
 import type { SwapRequest, SwapResult } from '../../src/index'
+import { blockTimeSecondsOf } from '../../src/manifest'
 import { bold, dim, green, red, yellow } from '../ansi'
 import { parseArgs, UsageError } from '../args'
-import { amountFor, exitCodeFor, jsonify, renderSwapResult, type TradeContext } from '../report'
+import { amountFor, exitCodeFor, jsonify, renderSwapResult, type FirstLeadInfo, type TradeContext } from '../report'
 import { probeSimulateV1Support, simulateSwap } from '../simulate'
 import { firstRouteReporter, iterateWaves } from '../waves'
 
-import { buildChainContext, hydrateLegSymbols, resolveTrade, startBudget, TRADE_FLAGS, type ChainContext } from './context'
+import { buildChainContext, classifyLeadOrigin, hydrateLegSymbols, resolveTrade, startBudget, TRADE_FLAGS, type ChainContext } from './context'
 
 
 const SWAP_FLAGS = {
@@ -69,6 +71,7 @@ export async function cmdSwap(argv: string[]): Promise<number> {
   const json = parsed.booleans.has('json')
   const watch = parsed.booleans.has('watch')
   const verbose = parsed.booleans.has('verbose')
+  const addresses = parsed.booleans.has('addresses')
   // Same placement as `quote`'s: `--budget` bounds the SEARCH, so its clock (and the elapsed-time
   // origin that shares it) starts here rather than back in `buildChainContext`.
   const budget = startBudget(ctx.budgetMs)
@@ -92,33 +95,57 @@ export async function cmdSwap(argv: string[]): Promise<number> {
     }
     const tradeCtx: TradeContext = { tokenIn: trade.tokenIn.ref, tokenOut: trade.tokenOut.ref, amountIn: trade.amountIn }
 
-    let final: SwapResult | undefined
-    if (!watch && !verbose) {
-      final = await ctx.router.getSwap(request)
-    } else {
-      // A swap's first priced route is a LEAD, not an executable answer (nothing is compiled or
-      // simulated yet) — `firstRouteReporter` labels it as such; see `src/router.ts#IterateOptions`.
-      const results = ctx.router.swaps(request, {
-        onFirstRoute: firstRouteReporter({ json, started, tradeCtx, renderCtx: trade.renderCtx }),
-      })
-      final = await iterateWaves(results, tradeCtx, trade.renderCtx, {
+    const preExistingDirect = new Set(ctx.index.pair(trade.tokenIn.ref, trade.tokenOut.ref).map((r) => r.pool.id))
+    let first: FirstLeadInfo | undefined
+    // `--watch`/`--verbose` PRINT per wave (NDJSON under `--json`, a narrative line otherwise); the
+    // default path stays silent until the end either way — see `waves.ts`'s header for why that is
+    // what keeps a default `--json` run byte-identical to `jsonify(final)` alone.
+    const stream = watch || verbose
+
+    // A swap's first priced route is a LEAD, not an executable answer (nothing is compiled or
+    // simulated yet) — the timeline's `(unverified)` suffix already says so; see
+    // `src/router.ts#IterateOptions`.
+    const results = ctx.router.swaps(request, {
+      onFirstRoute: firstRouteReporter({
         json,
+        stream,
         started,
-        // `--watch` drains the whole bounded search; `--verbose` alone stops at the first actionable
-        // wave, which for a swap is a result that carries a transaction.
-        stopAt: (result) => !watch && (result.status === 'ready' || result.status === 'needs-action'),
-        hydrate: (routes) => hydrateLegSymbols(ctx, trade.renderCtx, routes),
-      })
-      if (!json && final) console.log('')
-    }
+        classify: (route) => classifyLeadOrigin(route, preExistingDirect, trade.hints.length > 0),
+        record: (info) => {
+          first = info
+        },
+      }),
+    })
+    const { final, history } = await iterateWaves(results, {
+      json,
+      started,
+      // `--watch` drains the whole bounded search; the default path and `--verbose` both stop at the
+      // first actionable wave — the same answer `getSwap` would give (see `quote.ts`'s header).
+      stopAt: (result) => !watch && (result.status === 'ready' || result.status === 'needs-action'),
+      stream,
+      trade: tradeCtx,
+      renderCtx: trade.renderCtx,
+      getFirst: () => first,
+      ...(ctx.budgetMs !== undefined ? { budgetMs: ctx.budgetMs } : {}),
+    })
     if (!final) return 2
 
-    const elapsed = Date.now() - started
-    if (json && !watch && !verbose) {
-      console.log(jsonify(final))
-    } else if (!json) {
+    if (json) {
+      if (!stream) console.log(jsonify(final))
+    } else {
       await hydrateLegSymbols(ctx, trade.renderCtx, [...('best' in final && final.best ? [final.best] : []), ...final.alternatives])
-      console.log(renderSwapResult(final, tradeCtx, trade.renderCtx, elapsed).join('\n'))
+      if (stream) console.log('')
+      console.log(
+        renderSwapResult(final, tradeCtx, trade.renderCtx, {
+          elapsedMs: Date.now() - started,
+          addresses,
+          verbose,
+          ...(ctx.budgetMs !== undefined ? { budgetMs: ctx.budgetMs } : {}),
+          blockTimeSeconds: blockTimeSecondsOf(ctx.chain.manifest),
+          ...(first !== undefined ? { first } : {}),
+          waves: history,
+        }).join('\n'),
+      )
     }
 
     if (parsed.booleans.has('simulate')) {

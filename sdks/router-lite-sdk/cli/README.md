@@ -63,6 +63,54 @@ chainz exec 1 -- bun cli/rl.ts quote eth usdc 1 --json | jq .best.quote.amountOu
 From the package root, `bun run cli -- quote eth usdc 1` works too, and `bun link` in `cli/`
 puts `rl` on your PATH.
 
+## Reading the output
+
+A quote reads top to bottom as a story — the answer, the route it came from, how the search got
+there, what almost won instead, and how much to trust it:
+
+```
+✔ 1 ETH → 1,877.84 USDC  best of 40 routes · 62.6s
+  ETH ─ v3 0.01% → USDC
+        pool 0xE055…939F
+
+how it went
+  82ms    lead from cache (unverified)
+  700ms   confirmed on-chain — 86 of 124 candidate routes priced, lead holds
+  62.6s   scanned pool history for anything better — nothing beat it (budget reached — 60.0s)
+
+runners-up                Δ vs best
+    -0.30 USDC   -1.6 bps   ETH ─ v4 0%+hooks → USDT ─ v4 0%+hooks → USDC ~424k gas
+    -0.42 USDC   -2.2 bps   ETH ─ v3 0.05% → USDC                         ~89k gas
+    … and 37 more
+
+confidence
+  priced at block #25,727,084 · 2026-08-10 20:47 UTC
+  pool knowledge   v2 ▰▰▰▰▰▱▱▱▱▱ 48.3% since #10.0M (~Aug 2020) · v3 ▰▰▰▱▱▱▱▱▱▱ 30.9% since #12.3M (~Jul 2021) · v4 complete
+  routes checked   127 = 90 priced · 37 probed pools that don't exist · 0 lost to RPC
+  breadth          explored 8 of 5,992 intermediate tokens — not exhaustive
+  verification     none (quote mode — use swap or --simulate to preflight)
+  notes            budget reached (60.0s)
+```
+
+- **Route notation** never shows a pool address inline (`v3 0.01%`, `v4 0%+hooks` for a hooked pool,
+  `v4 dyn+hooks` for a dynamic-fee one) — the winning route's own address(es) sit on a dim line
+  underneath instead, hop-numbered once a route has two legs. `--addresses` restores the old
+  address-inclusive notation everywhere, alternatives included, and drops the now-redundant detail
+  line.
+- **"how it went"** is the search's timeline: when the first (unverified) lead showed up and where
+  it came from (`cache`/a `--hint`/a fresh probe), the wave that confirmed it on-chain, and whatever
+  waves ran after that — "nothing beat it" or "found a better route: +N". It is always printed, not
+  only under `--watch`; `--watch`/`--verbose` stream the same lines live as the search runs instead
+  of waiting for the end.
+- **"runners-up"** is the alternatives as a delta table: signed Δ in the out-token's units and in
+  bps, both against the best, columns aligned and capped at 5 rows (`… and N more`).
+- **"confidence"** is the SDK's `SearchReport` reworded as plain sentences: pool knowledge (per-
+  protocol discovery coverage, with an approximate calendar age for a partial protocol's scan
+  floor), routes checked (the quoting funnel — `attempted = priced + probed-nonexistent + lost-to-
+  RPC`), breadth (how many intermediate tokens were actually explored), verification, and any
+  `notes` (an abort from the CLI's own `--budget` renders `budget reached (Ns)` in yellow; an abort
+  from an external signal renders `aborted` in red — the CLI, not the SDK, knows which).
+
 ## Exit codes
 
 Scripting contract: `0` actionable (quote / ready / needs-action) · `1` no-route ·
@@ -99,10 +147,15 @@ never treat as "carry on".
   budget, no retries) so a stalled endpoint can't pin a wave far past it. A single in-flight
   request can still overrun a very tight budget by up to that capped timeout. Without a budget the
   search is bounded in *work*, not in seconds — a throttled endpoint can take a long time.
-- **`--verbose` vs `--watch`**: both stream a line per search wave; `--verbose` stops at the first
-  actionable result (what `getQuote`/`getSwap` would return), `--watch` drains the whole bounded
-  search (what the `quotes()`/`swaps()` iterators expose). Wave lines are numbered from `wave 1`
-  (the engine counts its own waves from 0; the display counts the lines you have been shown).
+- **`--verbose` vs `--watch`**: both stream the "how it went" timeline live, one line per wave as it
+  lands, instead of only printing it once at the end; `--verbose` stops at the first actionable
+  result (what `getQuote`/`getSwap` would return — the same result the default, non-streamed path
+  gives), `--watch` drains the whole bounded search (what the `quotes()`/`swaps()` iterators
+  expose). The timeline is identical either way — `--watch`/`--verbose` just show it happening
+  instead of waiting for the recap at the end.
+- **`--addresses`** restores inline pool addresses on every route line (the leading route and every
+  alternative alike) and drops the leading route's now-redundant dim address line. Off by default —
+  see "Reading the output" above for why the addresses move off the route line in the first place.
 - **`--concurrency <n>`** caps in-flight RPC requests, `1`–`1024`, defaulting to the SDK's `20`.
   The right value is a property of the *endpoint*, which only you know: `40` measurably beat `20`
   on a keyed mainnet endpoint, while a shared or rate-limited quota wants less. It is validated
@@ -125,9 +178,16 @@ the same block history to re-learn the same pools. After a search, the index is 
 by **chain id only** — two providers serving the same chain see the same pools, so they share one
 file.
 
-- Every cached run prints one unconditional `cache: chain <id> · <path>` line to **stderr**, plus
-  the load time when it is large enough to feel. `--verbose` adds what was loaded, discarded, or
-  saved. Nothing the cache does ever touches stdout, so `--json` stays machine-clean.
+- Every cached run prints one unconditional summary line to **stderr** — pool count, per-protocol
+  coverage against each protocol's own deployment floor (`✓` once a protocol is caught up, a percent
+  otherwise, `disabled` when the manifest carries no bundle for it), how long ago the file was last
+  written, and the load time when it is large enough to feel:
+  `cache: chain 1 · 1,204 pools · v2 34% v3 61% v4 ✓ · updated 3m ago · 0.7s load`. The percentages
+  are computed from the snapshot alone, before the search's own read of the live chain head — so
+  they measure how internally caught-up the cache is, not how caught up it is with the chain right
+  now (that gap is exactly what the upcoming search's first wave closes). `--verbose` adds what was
+  loaded, discarded, or saved, and the exact file path. Nothing the cache does ever touches stdout,
+  so `--json` stays machine-clean.
 - Restoring is safe because coverage is **block-ranged**: a snapshot from last week claims to have
   scanned up to block *N*, so the next search asks for *N+1..head* plus the standing reorg overlap.
   A stale cache is a bigger delta scan, never a wrong answer — there is no TTL.
@@ -236,22 +296,23 @@ API response parsing against hand-written fixtures (success with a split route, 
 
 ## Tests
 
-`bun test` in this directory runs 13 files and touches no network — the CLI itself is the live
+`bun test` in this directory runs 14 files and touches no network — the CLI itself is the live
 tool:
 
 | file | what it owns |
 | --- | --- |
 | `args.test.ts` | flag/positional parsing |
-| `amounts.test.ts` | human and raw amount parsing, `--budget` durations |
+| `amounts.test.ts` | human and raw amount parsing, `--budget` durations, the delta table's fixed-precision/adaptive-digits helpers |
+| `format.test.ts` | duration/age humanizing boundaries, thousands grouping, block abbreviation, the calendar-age approximation |
 | `chains.test.ts` | chainz list parsing, `--chain` assertion matching |
 | `hints.test.ts` | `--hint` spec parsing |
 | `rpcHeaders.test.ts` | `--rpc-header`/`$ETH_RPC_HEADERS` parsing (foundry format) and the flag-over-env merge |
 | `redact.test.ts` | keyed-URL scrubbing, and registered RPC-header-value scrubbing |
-| `report.test.ts` | every rendered line, snapshotted against a canned `SearchReport` |
-| `waves.test.ts` | the `--watch`/`--verbose` stream as a stream: ordering, NDJSON event types |
+| `report.test.ts` | every rendered line — route/address demotion, the runners-up delta table, the timeline, the confidence panel (incl. budget-vs-external abort phrasing) — snapshotted against canned data |
+| `waves.test.ts` | the `--watch`/`--verbose` stream as a stream: ordering, live narrative lines, NDJSON event types, and that the full wave history is always collected |
 | `simulate.test.ts` | `eth_simulateV1` payload construction and verdict evaluation |
 | `tokens.test.ts` | symbol/address resolution, and which failures are retryable |
-| `cache.test.ts` | save/load round trip, discard rules, atomic writes, tmp sweeping |
+| `cache.test.ts` | save/load round trip, discard rules, atomic writes, tmp sweeping, the pre-search cache-summary coverage math |
 | `poolList.test.ts` | curation, the envelope, trust tiers, verify-before-publish |
 | `commands/context.test.ts` | the setup seam: `--budget`'s clock, the transport (incl. RPC headers), `--pool-list` |
 

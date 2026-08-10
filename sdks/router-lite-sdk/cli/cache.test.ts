@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 
 import { PoolIndex, POOL_INDEX_SCHEMA_VERSION, serializeSnapshot } from '../src/experimental/index'
 
-import { CACHE_MAX_POOLS, cacheDir, cacheEnabled, cachePath, flushCacheSave, loadCache, saveCache, scheduleCacheSave } from './cache'
+import { CACHE_MAX_POOLS, cacheDir, cacheEnabled, cachePath, flushCacheSave, loadCache, saveCache, scheduleCacheSave, summarizeCacheCoverage } from './cache'
 import { USDC, WARM_DELTA, warmIndex, WETH } from './testing'
 
 /**
@@ -259,6 +259,45 @@ describe('a corrupt cache file is never a crash (F1)', () => {
     expect(loaded.index).toBeUndefined()
     expect(loaded.note).toMatch(/malformed/)
     expect(loaded.note).toMatch(/discard it and start fresh/)
+  })
+})
+
+describe('summarizeCacheCoverage — the pre-search cache-line math', () => {
+  it('omits a protocol entirely when the manifest carries no bundle for it — "disabled", not "0%"', () => {
+    const summary = summarizeCacheCoverage([], { v2: 1_000n, v3: undefined, v4: 2_000n })
+    expect(summary.v3).toBeUndefined()
+  })
+
+  it('reports 0% (never "disabled") for a present protocol with nothing scanned yet — a cold cache', () => {
+    const summary = summarizeCacheCoverage([], { v2: 1_000n, v3: undefined, v4: undefined })
+    expect(summary.v2).toEqual({ pct: 0, complete: false })
+  })
+
+  it('uses the highest covered block ANYWHERE in the snapshot as the head proxy, per protocol', () => {
+    const coverage: [string, { fromBlock: bigint; toBlock: bigint }[]][] = [
+      ['v2:0xaaa', [{ fromBlock: 1_000n, toBlock: 1_999n }]], // fully covers v2's [1000, 1999] span
+      ['v3:0xbbb', [{ fromBlock: 1_000n, toBlock: 1_499n }]], // covers only half of v3's own span
+    ]
+    const summary = summarizeCacheCoverage(coverage, { v2: 1_000n, v3: 1_000n, v4: undefined })
+    expect(summary.v2).toEqual({ pct: 1, complete: true })
+    expect(summary.v3!.pct).toBeCloseTo(0.5, 1)
+    expect(summary.v3!.complete).toBe(false)
+  })
+
+  it('never double-counts overlapping ranges from two different coverage-scope keys sharing a protocol', () => {
+    const coverage: [string, { fromBlock: bigint; toBlock: bigint }[]][] = [
+      ['v2:0xaaa', [{ fromBlock: 1_000n, toBlock: 1_999n }]],
+      ['v2:pair:0xaaa-0xbbb', [{ fromBlock: 1_500n, toBlock: 1_999n }]], // fully overlaps the tail above
+    ]
+    const summary = summarizeCacheCoverage(coverage, { v2: 1_000n, v3: undefined, v4: undefined })
+    // Naive summing would read 1,000 + 500 = 1,500 covered out of a 1,000-block span — over 100%.
+    expect(summary.v2).toEqual({ pct: 1, complete: true })
+  })
+
+  it('treats a protocol whose demand floor sits past the head proxy as legitimately 0%, not NaN/negative', () => {
+    const coverage: [string, { fromBlock: bigint; toBlock: bigint }[]][] = [['v2:0xaaa', [{ fromBlock: 1_000n, toBlock: 1_999n }]]]
+    const summary = summarizeCacheCoverage(coverage, { v2: undefined, v3: 5_000n, v4: undefined })
+    expect(summary.v3).toEqual({ pct: 0, complete: false })
   })
 })
 
