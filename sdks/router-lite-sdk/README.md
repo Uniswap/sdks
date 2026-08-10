@@ -810,7 +810,10 @@ Three private workspaces sit beside `src/`, none of them published:
   `chainz exec 1 -- bun cli/rl.ts quote eth usdc 1`) that runs the SDK straight from `src/` with
   no build step: quotes, swaps (with an `eth_simulateV1` execution proof), per-token pool
   discovery dumps, and a readable rendering of every result's `SearchReport`. The endpoint is a
-  parameter (`--rpc`/`$ETH_RPC_URL`); the chain is detected from it. See `cli/README.md`.
+  parameter (`--rpc`/`$ETH_RPC_URL`); the chain is detected from it. A header-authenticated gateway
+  is the same story — `--rpc-header "Name: value"` (repeatable) or `$ETH_RPC_HEADERS` (foundry's
+  format, which `chainz exec`/`chainz shell` export automatically) — and header values are
+  credentials the CLI never prints, caches, or lets an error message echo back. See `cli/README.md`.
 
 `bun run typecheck:all` typechecks the package and all three (plus `scripts/`); `bun run lint` covers `src` and `cli`.
 
@@ -827,6 +830,7 @@ The complete set of environment variables the private workspaces read:
 | `CANARY_RPC_URL_2`, `CANARY_RPC_URL_3` | `canary/env.ts` | Optional. Together with `_1` they form the **same-chain provider matrix** the canary compares against itself. |
 | `CANARY_RPC_URL_ROBINHOOD` | `canary/env.ts` | Robinhood Chain's endpoint. Deliberately *not* a fourth `CANARY_RPC_URL_*`: those three are one chain seen three ways, this is a different chain. Its suites skip when it is unset, even with the canary on. |
 | `ETH_RPC_URL` | `cli/`, `scripts/` | The endpoint for the CLI and the recorder/pool-list scripts (`--rpc` overrides it). Passed through the environment rather than a command line, where a keyed URL would land in a process listing. |
+| `ETH_RPC_HEADERS` | `cli/`, `scripts/recordSession.ts` | Extra RPC headers, foundry's own format (comma-separated `Name: value` pairs) — exactly what `chainz exec`/`chainz shell` export, so a header-authenticated gateway needs no flag at all. The CLI's `--rpc-header <spec>` (repeatable) overrides an env pair of the same name; both are parsed by the one shared `cli/rpcHeaders.ts`. Values are never printed or cached. |
 
 ### Recorded-replay golden sessions
 
@@ -841,7 +845,11 @@ saw fails loudly by name, because a change to what the search *asks* is a delibe
 regeneration, not noise.
 
 Regenerate a session (or record a new one) through `chainz exec`, so the keyed RPC URL never
-touches the fixture or the output:
+touches the fixture or the output. A gateway that authenticates by header rather than a keyed URL
+needs no extra step here — `chainz exec` exports `$ETH_RPC_HEADERS` (foundry's format) alongside
+the URL, and `recordSession.ts` reads it automatically through the same parser the CLI's
+`--rpc-header` uses (`cli/rpcHeaders.ts`), with header values redacted out of anything it prints or
+records exactly like a keyed URL is:
 
 ```bash
 # re-record one session (request + notes are reused from the existing fixture)

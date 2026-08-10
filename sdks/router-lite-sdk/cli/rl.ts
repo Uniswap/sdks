@@ -17,9 +17,12 @@
 //    `eth_chainId` against that endpoint. `--chain <id>` is an assertion
 //    cross-checked against that answer, never a selector.
 //
-//  - KEYED URLS NEVER PRINT. The endpoint routinely carries a vendor key,
-//    and viem embeds the full URL in its error text — so every error path
-//    below is scrubbed with `redactKeyedUrl` before it reaches a terminal.
+//  - KEYED URLS AND RPC HEADER VALUES NEVER PRINT. The endpoint routinely
+//    carries a vendor key, and viem embeds the full URL in its error text;
+//    `--rpc-header`/$ETH_RPC_HEADERS (see `rpcHeaders.ts`) hand this CLI
+//    header credentials the same way. Every error path below is scrubbed
+//    with `redact` (`redact.ts` — keyed-URL rule plus a registered-header-
+//    value scrub) before it reaches a terminal.
 //
 //  - EXPECTED FAILURES ARE ONE-LINERS. `RouterConfigError` /
 //    `UnsupportedRouteError` / usage mistakes render as a single friendly
@@ -57,7 +60,7 @@ import { cmdDiscover } from './commands/discover'
 import { cmdQuote } from './commands/quote'
 import { cmdSwap } from './commands/swap'
 import { PoolListError } from './poolList'
-import { redactKeyedUrl } from './redact'
+import { redact } from './redact'
 import { RpcError } from './tokens'
 
 
@@ -78,6 +81,11 @@ ${bold('chain')}     detected from the endpoint via eth_chainId; \`rl chains\` l
 ${bold('common options')}
   --chain, -c <id>        ASSERT the chain id — errors if the endpoint serves a different chain
   --rpc <url>             endpoint (overrides $ETH_RPC_URL; never printed)
+  --rpc-header <spec>     repeatable — an extra header for the RPC transport, 'Name: value' (the
+                          same foundry format $ETH_RPC_HEADERS carries, which chainz exec/shell
+                          export automatically). Explicit flags override an env pair of the same
+                          name (case-insensitive). Values are credentials: never printed, never
+                          cached, scrubbed out of any error text that echoes one back.
   --budget, -b <dur>      best-effort budget for the SEARCH (unit required: 900ms, 10s, 2m) — an
                           AbortSignal the search honors between waves; transport timeouts/retries
                           derive from it. The clock starts when the search does: chain detection,
@@ -118,9 +126,10 @@ ${bold('swap options')}
   --simulate, -s          prove the tx via eth_simulateV1 — no keys, no funds
 
 ${bold('examples')} (rl = \`bun cli/rl.ts\` from the package dir)
-  chainz exec 1 -- rl quote eth usdc 1
+  chainz exec 1 -- rl quote eth usdc 1                  # headers flow automatically from chainz
   chainz exec base -- rl quote eth usdc 1 --watch
   ETH_RPC_URL=… rl quote 0x6B17…71d0F usdc 250 --budget 5s --hint v3@500
+  ETH_RPC_URL=… rl quote eth usdc 1 --rpc-header "X-Api-Key: secret"  # header-authed endpoint, no chainz
   chainz exec 1 -- rl swap eth usdc 0.5 --trader 0x1111111111111111111111111111111111111111 --simulate
   chainz exec 130 -- rl discover 0xTOKEN --chain 130
 
@@ -156,7 +165,7 @@ async function main(): Promise<number> {
     return await dispatch(command, rest)
   } catch (err) {
     if (err instanceof UsageError || err instanceof AmountError) {
-      console.error(`${red('error:')} ${redactKeyedUrl(err.message)}`)
+      console.error(`${red('error:')} ${redact(err.message)}`)
       console.error(dim('run `rl help` for usage'))
       return 3
     }
@@ -164,22 +173,22 @@ async function main(): Promise<number> {
     // that treats 3 as "fix your input" and 2 as "try again" must not be told to fix a correct
     // address because the provider rate-limited a `decimals()` read.
     if (err instanceof RpcError) {
-      console.error(`${red('rpc error:')} ${redactKeyedUrl(err.message)}`)
+      console.error(`${red('rpc error:')} ${redact(err.message)}`)
       return 2
     }
     // A rejected `--pool-list`: exit 4 (see the exit-code block in this file's header for why), but
     // as a one-liner — the failure is fully diagnosed in the message and a stack would only bury it.
     if (err instanceof PoolListError) {
-      console.error(`${red('pool-list error:')} ${redactKeyedUrl(err.message)}`)
+      console.error(`${red('pool-list error:')} ${redact(err.message)}`)
       return 4
     }
     if (err instanceof RouterConfigError || err instanceof UnsupportedRouteError) {
-      console.error(`${red('config error:')} ${redactKeyedUrl(err.message)}`)
+      console.error(`${red('config error:')} ${redact(err.message)}`)
       return 3
     }
     const message = err instanceof Error ? (err.stack ?? err.message) : String(err)
     console.error(red('unexpected error:'))
-    console.error(redactKeyedUrl(message))
+    console.error(redact(message))
     return 4
   } finally {
     // The on-disk pool index (P2), written on EVERY exit path including the error ones: a search that

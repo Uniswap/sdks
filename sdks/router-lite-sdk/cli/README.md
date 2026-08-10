@@ -7,8 +7,11 @@ SDK's `SearchReport` diagnostics as a readable panel instead of raw JSON.
 The CLI takes parameters and nothing else — no child processes, no config discovery. The endpoint
 arrives as `--rpc <url>` or `$ETH_RPC_URL` (exactly what `chainz exec <chain> --` exports, so
 chainz composes from the *outside*), and the chain identifies itself via `eth_chainId` against
-that endpoint. Keyed RPC URLs are never printed — errors are scrubbed through the same redaction
-rule the canary suite uses.
+that endpoint. Extra RPC headers — for a gateway that authenticates by header rather than by a key
+in the URL — arrive the same way: `--rpc-header "Name: value"` (repeatable) or `$ETH_RPC_HEADERS`
+(foundry's own format, comma-separated `Name: value` pairs, exactly what `chainz exec`/`chainz
+shell` export automatically). Keyed RPC URLs and header values are never printed — errors are
+scrubbed through the same redaction rule the canary suite uses.
 
 ## 30-second tour
 
@@ -40,6 +43,12 @@ chainz exec 130 -- bun cli/rl.ts discover 0xNEWTOKEN
 
 # Guard against pointing at the wrong endpoint: --chain <id> is an assertion, not a selector
 chainz exec base -- bun cli/rl.ts quote eth usdc 1 --chain 8453
+
+# Header-authenticated gateway: chainz exports $ETH_RPC_HEADERS automatically (no flag needed)...
+chainz exec 1 -- bun cli/rl.ts quote eth usdc 1
+
+# ...or without chainz, name the header(s) explicitly — repeatable, merges over $ETH_RPC_HEADERS
+ETH_RPC_URL=https://… bun cli/rl.ts quote eth usdc 1 --rpc-header "X-Api-Key: secret"
 
 # Start from a published pool list instead of re-scanning history (pools only, by default)
 chainz exec 1 -- bun cli/rl.ts quote eth usdc 1 --pool-list ./1.poollist.json
@@ -98,6 +107,14 @@ never treat as "carry on".
   The right value is a property of the *endpoint*, which only you know: `40` measurably beat `20`
   on a keyed mainnet endpoint, while a shared or rate-limited quota wants less. It is validated
   against the SDK's own bounds before the endpoint is touched.
+- **`--rpc-header "Name: value"`** (repeatable) / **`$ETH_RPC_HEADERS`** add extra headers to every
+  RPC request — for a gateway that authenticates by header instead of (or in addition to) a keyed
+  URL. The env var is foundry's own wire format (comma-separated `Name: value` pairs), which is
+  exactly what `chainz exec`/`chainz shell` export, so headers just work when you compose with
+  chainz and need no flag at all. An explicit `--rpc-header` overrides an env pair of the same name
+  (case-insensitive). Header **values are credentials**: they are never printed, never cached, and
+  scrubbed out of any error text that happens to echo one back — `--verbose` shows header *names*
+  only. They also never change what the on-disk cache keys on (chain id only; see below).
 
 ## The on-disk cache (on by default)
 
@@ -148,7 +165,7 @@ A list that fails any of its checks exits `4` and does not run; see the exit-cod
 
 ## Tests
 
-`bun test` in this directory runs 12 files and touches no network — the CLI itself is the live
+`bun test` in this directory runs 13 files and touches no network — the CLI itself is the live
 tool:
 
 | file | what it owns |
@@ -157,14 +174,15 @@ tool:
 | `amounts.test.ts` | human and raw amount parsing, `--budget` durations |
 | `chains.test.ts` | chainz list parsing, `--chain` assertion matching |
 | `hints.test.ts` | `--hint` spec parsing |
-| `redact.test.ts` | keyed-URL scrubbing |
+| `rpcHeaders.test.ts` | `--rpc-header`/`$ETH_RPC_HEADERS` parsing (foundry format) and the flag-over-env merge |
+| `redact.test.ts` | keyed-URL scrubbing, and registered RPC-header-value scrubbing |
 | `report.test.ts` | every rendered line, snapshotted against a canned `SearchReport` |
 | `waves.test.ts` | the `--watch`/`--verbose` stream as a stream: ordering, NDJSON event types |
 | `simulate.test.ts` | `eth_simulateV1` payload construction and verdict evaluation |
 | `tokens.test.ts` | symbol/address resolution, and which failures are retryable |
 | `cache.test.ts` | save/load round trip, discard rules, atomic writes, tmp sweeping |
 | `poolList.test.ts` | curation, the envelope, trust tiers, verify-before-publish |
-| `commands/context.test.ts` | the setup seam: `--budget`'s clock, the transport, `--pool-list` |
+| `commands/context.test.ts` | the setup seam: `--budget`'s clock, the transport (incl. RPC headers), `--pool-list` |
 
 `cli/testing.ts` holds the fixtures more than one of them needs. `bun run typecheck:cli` (or
 `typecheck:all`) from the package root typechecks it; `bun run lint` lints `src` and `cli`

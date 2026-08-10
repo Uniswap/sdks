@@ -9,7 +9,8 @@ import { gunzipSync, gzipSync } from 'node:zlib'
 import { createPublicClient, custom, http } from 'viem'
 import type { PublicClient } from 'viem'
 
-import { redactKeyedUrl } from '../cli/redact'
+import { redactHeaderValues, redactKeyedUrl, registerRpcHeaders } from '../cli/redact'
+import { resolveRpcHeaders } from '../cli/rpcHeaders'
 import type { QuoteResult } from '../src'
 import { createRouter, manifestFor } from '../src'
 import {
@@ -212,23 +213,32 @@ function remember(store: Map<string, SessionEntry>, method: string, params: unkn
  * `chainz exec` hands the endpoint over as a URL **plus** headers when the gateway authenticates by
  * header rather than by a key in the path — and this script's whole usage contract is "always through
  * `chainz exec`", so ignoring them meant every recording against such a gateway came back
- * `rpc-unavailable` and wrote a two-entry fixture over a good one. Format is one `Name: value` per
- * line, which is what `chainz` emits.
+ * `rpc-unavailable` and wrote a two-entry fixture over a good one. Parsed by `cli/rpcHeaders.ts`'s
+ * `resolveRpcHeaders` — the SAME parser `rl`'s chain-touching commands use for `--rpc-header`/
+ * `$ETH_RPC_HEADERS` — rather than a second copy of it here: it is chainz's exact wire format
+ * (comma-separated `Name: value` pairs; see that file's header for why a comma cannot be part of a
+ * value), and one parser is the only way this script and the CLI can't drift on what counts as
+ * well-formed.
  *
- * NOTHING FROM HERE CAN REACH A FIXTURE: a session holds only (method, canonical params) ->
- * result|error, and `captureError`'s frames carry a message/name/status/code — never request headers.
- * The URL, which viem *does* put in error messages, is redacted by `redactKeyedUrl` as before.
+ * REGISTERED FOR REDACTION, not just parsed: `registerRpcHeaders` (below) makes every header VALUE
+ * scrubbable out of anything this script prints or writes afterwards — see `remember`/`recordingClient`,
+ * which capture errors THROUGH that same redaction on their way into a fixture. NOTHING FROM A
+ * SESSION CAN CARRY A HEADER VALUE OTHERWISE: a session holds only (method, canonical params) ->
+ * result|error, and `captureError`'s frames carry a message/name/status/code — never request
+ * headers — but a gateway's own error text can echo back the value it rejected (the same shape a
+ * keyed URL's failure takes), which is exactly the leak `redactHeaderValues` exists to close.
  */
 function rpcHeaders(): Record<string, string> {
-  const raw = process.env.ETH_RPC_HEADERS
-  if (!raw) return {}
-  const headers: Record<string, string> = {}
-  for (const line of raw.split('\n')) {
-    const at = line.indexOf(':')
-    if (at <= 0) continue
-    headers[line.slice(0, at).trim()] = line.slice(at + 1).trim()
-  }
+  const headers = resolveRpcHeaders(process.env.ETH_RPC_HEADERS, [])
+  registerRpcHeaders(headers)
   return headers
+}
+
+/** Both redaction rules, composed: the keyed-URL rule plus this run's registered header values.
+ * Every message this script persists into a fixture, or prints, goes through this — never
+ * `redactKeyedUrl` alone — so a header value can never land in either place. */
+function redact(message: string): string {
+  return redactHeaderValues(redactKeyedUrl(message))
 }
 
 /**
@@ -253,7 +263,7 @@ function recordingClient(url: string, store: Map<string, SessionEntry>, fallback
           remember(store, method, params, { method, params: canonical, result: result ?? null })
           return result
         } catch (err) {
-          remember(store, method, params, { method, params: canonical, error: captureError(err, redactKeyedUrl) })
+          remember(store, method, params, { method, params: canonical, error: captureError(err, redact) })
           throw err
         }
       },

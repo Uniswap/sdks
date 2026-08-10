@@ -7,9 +7,10 @@ import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 
 import { manifestFor } from '../../src/index'
-import type { ParsedArgs } from '../args'
+import { UsageError, type ParsedArgs } from '../args'
 import { flushCacheSave } from '../cache'
 import { buildEnvelope, parsePoolList, PoolListError, serializeEnvelope } from '../poolList'
+import { redactHeaderValues, resetRpcHeaders } from '../redact'
 import { MAINNET, publishedListText, USDC, WETH } from '../testing'
 
 import { buildChainContext, startBudget } from './context'
@@ -43,9 +44,11 @@ import { buildChainContext, startBudget } from './context'
 // touches a network, and the budgets are milliseconds rather than seconds.
 // ---------------------------------------------------------------------------
 
-/** One `fetch` the transport made: the URL and the parsed JSON-RPC body (an object, or an ARRAY
- * when something batched it — which is the distinction the last test in this file turns on). */
-type Wire = { url: string; body: any }
+/** One `fetch` the transport made: the URL, the parsed JSON-RPC body (an object, or an ARRAY when
+ * something batched it — which is the distinction the last test in this file turns on), and the
+ * request headers viem's http transport built (content-type plus whatever `fetchOptions.headers`
+ * added — the seam the `--rpc-header`/`$ETH_RPC_HEADERS` tests below inspect). */
+type Wire = { url: string; body: any; headers: Record<string, string> }
 
 type Handler = (body: any) => { status?: number; result?: unknown; hang?: boolean }
 
@@ -60,7 +63,7 @@ function stubFetch(handler: Handler): Wire[] {
   const wire: Wire[] = []
   globalThis.fetch = (async (input: any, init: any) => {
     const body = JSON.parse(String(init?.body ?? 'null'))
-    wire.push({ url: String(input), body })
+    wire.push({ url: String(input), body, headers: { ...(init?.headers ?? {}) } })
     const answer = handler(body)
     if (answer.hang) return new Promise<Response>(() => {})
     if (answer.status !== undefined && answer.status >= 400) {
@@ -84,13 +87,17 @@ function chainIdThen(result: unknown, opts: { status?: number; hang?: boolean } 
 
 const RPC = 'https://rpc.example.invalid/'
 
-function args(opts: { budget?: string } = {}): ParsedArgs {
+function args(opts: { budget?: string; rpcHeaders?: string[]; verbose?: boolean } = {}): ParsedArgs {
   const strings = new Map<string, string>([['rpc', RPC]])
   if (opts.budget !== undefined) strings.set('budget', opts.budget)
+  const lists = new Map<string, string[]>()
+  if (opts.rpcHeaders !== undefined) lists.set('rpc-header', opts.rpcHeaders)
+  const booleans = new Set(['no-cache'])
+  if (opts.verbose) booleans.add('verbose')
   // `no-cache`: these tests are about the client and the clock, and a cache read/write would put
   // this file's behaviour at the mercy of the developer's `~/.cache` (see `cache.test.ts`, which
   // owns that surface and sandboxes `$XDG_CACHE_HOME` for it).
-  return { positionals: [], booleans: new Set(['no-cache']), strings, lists: new Map() }
+  return { positionals: [], booleans, strings, lists }
 }
 
 afterEach(() => {
@@ -549,5 +556,95 @@ describe('the client the CLI builds', () => {
     await expect(ctx.client.request({ method: 'eth_blockNumber' })).rejects.toThrow()
 
     expect(wire.length - beforeCalls).toBe(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 4. `--rpc-header` / `$ETH_RPC_HEADERS` — both transports this file already
+// proved don't batch and don't retry ALSO carry whatever headers this run
+// resolved, and redaction is registered before the very first request (the
+// chain probe) so even that request's failure is covered.
+// ---------------------------------------------------------------------------
+
+describe('RPC headers reach the transport', () => {
+  const savedEnv = process.env.ETH_RPC_HEADERS
+
+  afterEach(() => {
+    if (savedEnv === undefined) delete process.env.ETH_RPC_HEADERS
+    else process.env.ETH_RPC_HEADERS = savedEnv
+    resetRpcHeaders()
+  })
+
+  test('an explicit --rpc-header reaches both the chain-detection probe and the main client', async () => {
+    delete process.env.ETH_RPC_HEADERS
+    const wire = stubFetch(chainIdThen('0x1'))
+    const ctx = await buildChainContext(args({ rpcHeaders: ['X-Api-Key: secret-123'] }))
+    await ctx.client.request({ method: 'eth_blockNumber' })
+
+    expect(wire.length).toBeGreaterThanOrEqual(2) // eth_chainId (probe) + eth_blockNumber (main client)
+    for (const call of wire) expect(call.headers['X-Api-Key']).toBe('secret-123')
+  })
+
+  test('$ETH_RPC_HEADERS (foundry format: comma-separated "Name: value") is read as a fallback', async () => {
+    process.env.ETH_RPC_HEADERS = 'X-Api-Key: from-env, Authorization: Bearer abc'
+    const wire = stubFetch(chainIdThen('0x1'))
+    await buildChainContext(args())
+
+    expect(wire[0]!.headers['X-Api-Key']).toBe('from-env')
+    expect(wire[0]!.headers.Authorization).toBe('Bearer abc')
+  })
+
+  test('an explicit --rpc-header MERGES OVER an env pair of the same name (case-insensitive), leaves others alone', async () => {
+    process.env.ETH_RPC_HEADERS = 'x-api-key: from-env, X-Other: untouched'
+    const wire = stubFetch(chainIdThen('0x1'))
+    await buildChainContext(args({ rpcHeaders: ['X-Api-Key: from-flag'] }))
+
+    expect(wire[0]!.headers['X-Api-Key']).toBe('from-flag')
+    expect(wire[0]!.headers['X-Other']).toBe('untouched')
+  })
+
+  test('no env, no flag: neither transport carries an extra header at all', async () => {
+    delete process.env.ETH_RPC_HEADERS
+    const wire = stubFetch(chainIdThen('0x1'))
+    await buildChainContext(args())
+
+    // Only what viem's http transport adds on its own (content-type) — nothing this feature added.
+    expect(wire[0]!.headers['X-Api-Key']).toBeUndefined()
+  })
+
+  test('a malformed --rpc-header is a UsageError (exit 3), and the endpoint is never touched', async () => {
+    delete process.env.ETH_RPC_HEADERS
+    const wire = stubFetch(chainIdThen('0x1'))
+    await expect(buildChainContext(args({ rpcHeaders: ['not-a-header'] }))).rejects.toThrow(UsageError)
+    expect(wire).toEqual([])
+  })
+
+  test('--verbose prints the header NAME, never the value', async () => {
+    delete process.env.ETH_RPC_HEADERS
+    stubFetch(chainIdThen('0x1'))
+    const stderr: string[] = []
+    const realError = console.error
+    console.error = (...parts: unknown[]): void => {
+      stderr.push(parts.map(String).join(' '))
+    }
+    try {
+      await buildChainContext(args({ rpcHeaders: ['X-Api-Key: super-secret-value'], verbose: true }))
+    } finally {
+      console.error = realError
+    }
+    const joined = stderr.join('\n')
+    expect(joined).toContain('X-Api-Key')
+    expect(joined).not.toContain('super-secret-value')
+  })
+
+  test('a header value that comes back inside an error message is scrubbed, not printed', async () => {
+    delete process.env.ETH_RPC_HEADERS
+    stubFetch(() => ({ status: 401, hang: false }))
+    // The upstream 401 body text is irrelevant here — viem's own HttpRequestError never embeds a
+    // response body of arbitrary shape, so this asserts the REGISTRATION half directly: once
+    // `buildChainContext` has resolved the headers (even though the probe below still fails for an
+    // unrelated reason — a 500 the stub returns), the value is scrubbable from ANY text afterwards.
+    await expect(buildChainContext(args({ rpcHeaders: ['X-Api-Key: super-secret-value'] }))).rejects.toThrow()
+    expect(redactHeaderValues('leaked super-secret-value here')).toBe('leaked <X-Api-Key: redacted> here')
   })
 })

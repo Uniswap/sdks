@@ -30,8 +30,9 @@ import {
 } from '../chains'
 import { parseHint } from '../hints'
 import { applyPoolList } from '../poolList'
-import { redactKeyedUrl } from '../redact'
+import { redactKeyedUrl, redactHeaderValues, registerRpcHeaders } from '../redact'
 import { viewKey, type RenderCtx, type TokenView } from '../report'
+import { resolveRpcHeaders } from '../rpcHeaders'
 import { fetchTokenMeta, resolveToken, type ResolvedToken } from '../tokens'
 
 /**
@@ -50,6 +51,7 @@ export const COMMON_FLAGS: FlagSpec = {
   verbose: { kind: 'boolean', alias: 'v' },
   'pool-list': { kind: 'string' },
   'trust-coverage': { kind: 'boolean' },
+  'rpc-header': { kind: 'strings' },
   ...CACHE_FLAGS,
 }
 
@@ -85,6 +87,12 @@ export type ChainContext = {
  */
 export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContext> {
   const rpcUrl = resolveRpcUrl(parsed.strings.get('rpc'))
+  // `--rpc-header`/`$ETH_RPC_HEADERS`, resolved and registered for redaction BEFORE the chain probe
+  // a few lines down — the first network request this function makes — so even a failure on THAT
+  // request is covered. A malformed pair is a `UsageError` here too, next to the other argument
+  // mistakes this function decides before anything is spent.
+  const headers = resolveRpcHeaders(process.env.ETH_RPC_HEADERS, parsed.lists.get('rpc-header') ?? [])
+  registerRpcHeaders(headers)
   const asserted = parseChainAssertion(parsed.strings.get('chain'))
   const budgetArg = parsed.strings.get('budget')
   const budgetMs = budgetArg !== undefined ? parseBudget(budgetArg) : undefined
@@ -103,14 +111,16 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
 
   // Detect the chain with a short, unretried probe — an unreachable/misconfigured endpoint should
   // be a friendly one-liner in seconds, not viem's full retry ladder ending in a stack.
-  const probe = createPublicClient({ transport: http(rpcUrl, { timeout: 10_000, retryCount: 0 }) }) as PublicClient
+  const probe = createPublicClient({
+    transport: http(rpcUrl, { timeout: 10_000, retryCount: 0, fetchOptions: { headers } }),
+  }) as PublicClient
   let chainId: number
   try {
     chainId = await probe.getChainId()
   } catch (err) {
     const message = err instanceof Error ? err.message.split('\n')[0]! : String(err)
     throw new UsageError(
-      `the RPC endpoint did not answer eth_chainId — check --rpc/$ETH_RPC_URL (${redactKeyedUrl(message)})`,
+      `the RPC endpoint did not answer eth_chainId — check --rpc/$ETH_RPC_URL (${redactHeaderValues(redactKeyedUrl(message))})`,
     )
   }
   assertChainMatches(asserted, chainId)
@@ -144,7 +154,7 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
   // overshot — a 20s window returned at 29s, because the signal cannot interrupt a request whose
   // twenty members the transport has already fused into one.
   const client = createPublicClient({
-    transport: http(rpcUrl, { batch: false, timeout, ...(budgetMs !== undefined ? { retryCount: 0 } : {}) }),
+    transport: http(rpcUrl, { batch: false, timeout, fetchOptions: { headers }, ...(budgetMs !== undefined ? { retryCount: 0 } : {}) }),
   }) as PublicClient
   const fresh = new PoolIndex(chain.manifest.wrappedNative, {
     reorgOverlapBlocks: chain.manifest.chain?.reorgOverlapBlocks,
@@ -162,6 +172,13 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
   const note = (line: string): void => {
     if (verbose) console.error(dim(line))
   }
+  // NAMES ONLY, under --verbose, same as everything else `note` reports. The values themselves
+  // never reach this line (or any other): they go straight from `resolveRpcHeaders` into the two
+  // transports above, and `redactHeaderValues` (registered on them a few lines up) is the backstop
+  // for the one path that isn't this file printing on purpose — a value coming back inside an
+  // error message from the endpoint it was sent to.
+  const headerNames = Object.keys(headers)
+  if (headerNames.length > 0) note(`rpc-header: ${headerNames.join(', ')}`)
 
   let index = fresh
   const cacheOn = cacheEnabled(parsed.booleans)
