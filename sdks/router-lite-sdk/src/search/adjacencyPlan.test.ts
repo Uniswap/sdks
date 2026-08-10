@@ -84,7 +84,8 @@ describe('the cold search: identical demands merge as far as topic slots allow',
 
   test('six scopes become TWO scans — v2+v3 together, v4 alone one slot deeper', () => {
     // The headline number: 12 query chains (6 scopes x 2 topic slots) become 4 (2 scans x 2), which
-    // is the whole of C5-C stated as a count.
+    // is the whole of C5-C stated as a count. This is the SAME-FLOOR case; the differing-floor
+    // describe below is where mainnet's cold search pays 6 instead, and pins why.
     expect(plan).toHaveLength(2)
     expect(plan.flatMap((s) => s.queries)).toHaveLength(4)
 

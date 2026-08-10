@@ -47,6 +47,13 @@ export type { PoolIndexOptions, PoolIndexSnapshot, PoolIndexStats } from '../poo
 export { PROTOCOL_MODULES, v2Module, v3Module, v4Module } from '../protocols'
 export type { FeeDiscovery, ProtocolModule, QuoteProbe } from '../protocols'
 
+// `adjacencyShape` is the one `ProtocolModule` member whose type a caller could reach but not NAME
+// — a custom module has to return an `AdjacencyShape`, and `adjacencyQueries` is what turns any set
+// of them into the merged `eth_getLogs` filters the engine issues. Exporting both keeps the module
+// surface constructible from this file alone, the same rule the rest of it follows.
+export { adjacencyQueries } from '../protocols'
+export type { AdjacencyShape } from '../protocols'
+
 // `PoolRef` carries derived fields (`id`, `currencies`) that only its constructors know how to fill,
 // so a caller holding `PoolIndex.upsert` or `generateRoutes` cannot build one without these — the
 // same constructibility rule the rest of this file exists to keep (see `surface.test.ts`).

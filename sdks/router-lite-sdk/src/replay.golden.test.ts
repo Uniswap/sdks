@@ -125,15 +125,27 @@ describe('the error capture/rebuild round trip', () => {
 //
 // TO LIFT THIS: point `scripts/recordSession.ts --rpc` at an archive endpoint
 // that serves wide `eth_getLogs` windows, re-record both labels, and delete the
-// entry. The `test.skip` keeps the gap VISIBLE in every run rather than letting
-// it pass as a silent green — and the guard below keeps the list from outliving
-// the sessions it names.
+// entry. Nothing about that is left to memory: the `test.skip` names the gap in
+// every run, the warning below prints it on a bare `bun test`, the guard keeps
+// the list from outliving the sessions it names, and the companion test below
+// FAILS the moment a re-recorded session reproduces its golden — so a
+// quarantine cannot survive the fix it is waiting for.
 // ---------------------------------------------------------------------------
 
 const QUARANTINED: Record<string, string> = {
   'mainnet-atokens-two-hop': 'C5-C changed the adjacency request shapes; needs a wide-window archive endpoint to re-record',
   'mainnet-no-route': 'C5-C changed the adjacency request shapes; needs a wide-window archive endpoint to re-record',
 }
+
+/**
+ * Wall clock the obsolescence probe gives one quarantined replay.
+ *
+ * A session whose recording MATCHES what the search asks replays with no misses and no backoff —
+ * the six live sessions in this corpus take ~100ms between them — so anything that has not answered
+ * inside this is still stale, and is stale precisely BECAUSE it is spending the budget in
+ * `scanLogs`' real retry ladder on requests the recording cannot answer.
+ */
+const OBSOLESCENCE_PROBE_MS = 8_000
 
 describe('recorded-replay goldens', () => {
   test('the session corpus exists', () => {
@@ -146,6 +158,54 @@ describe('recorded-replay goldens', () => {
     const labels = new Set(files.map((f) => loadSession(f).label))
     expect(Object.keys(QUARANTINED).filter((label) => !labels.has(label))).toEqual([])
   })
+
+  for (const [label, reason] of Object.entries(QUARANTINED)) {
+    // ...and it says so out loud, so a bare `bun test` names the gap instead of reporting a green
+    // run over a corpus that has quietly stopped asserting two of its answers.
+    // eslint-disable-next-line no-console
+    console.warn(`[replay] QUARANTINED session "${label}" is NOT being replayed — ${reason}`)
+  }
+
+  for (const label of Object.keys(QUARANTINED)) {
+    const file = files.find((f) => loadSession(f).label === label)
+    if (!file) continue // the guard above already fails on this; do not also throw during collection
+
+    /**
+     * THE QUARANTINE'S OWN EXPIRY. It attempts the replay for real and fails if the session now
+     * reproduces its golden — which is exactly the state a successful re-record leaves behind, so
+     * the entry above cannot outlive the endpoint problem that justified it.
+     *
+     * Bounded rather than run to completion, because a STALE session does not fail fast: every
+     * unrecorded key surfaces as a provider error inside `scanLogs`, which answers with its real
+     * backoff ladder and would spend minutes proving what it proves in the first second. The
+     * `AbortSignal` is the bound AND the cleanup — without it the losing side of the race would go
+     * on issuing the ladder behind every later test in the file.
+     */
+    test(`${label}: the quarantine is still needed (a re-recorded session must fail this)`, async () => {
+      const session = loadSession(file)
+      const harness = replayClient(session)
+      const router = createRouter({ client: harness.client, manifest: manifestFor(session.chainId) })
+      const controller = new AbortController()
+
+      const replayed = router
+        .getQuote({ ...requestFromSession(session), signal: controller.signal })
+        .then((result) => canonicalizeResult(result))
+        .catch(() => undefined)
+      const timedOut = Symbol('timed out')
+      const outcome = await Promise.race([replayed, new Promise<typeof timedOut>((r) => setTimeout(() => r(timedOut), OBSOLESCENCE_PROBE_MS))])
+      controller.abort()
+      void replayed.catch(() => undefined)
+
+      // The signal only ever fires AFTER the race is decided, so a session that answered inside the
+      // budget answered with the abort unfired — its result is the honest one to compare.
+      if (outcome !== timedOut && outcome !== undefined && JSON.stringify(outcome) === JSON.stringify(session.golden)) {
+        throw new Error(
+          `[replay:${label}] this session REPRODUCES ITS GOLDEN AGAIN — it has been re-recorded, so ` +
+            `delete its entry from QUARANTINED (and this test will go with it).`,
+        )
+      }
+    }, OBSOLESCENCE_PROBE_MS + 10_000)
+  }
 
   for (const file of files) {
     const session = loadSession(file)

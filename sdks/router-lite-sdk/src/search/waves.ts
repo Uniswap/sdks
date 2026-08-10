@@ -71,7 +71,8 @@ import { evaluate } from './leader'
 //           WAVE 0 ANSWERS BEFORE THE PAIR SCAN LANDS below.
 //   wave 1  core intermediates: probe both legs of tokenIn -> core -> tokenOut
 //   wave 2  adjacency for BOTH endpoints, in four merged `eth_getLogs` chains
-//           rather than twelve (C5-C — address arrays and OR-topics; see
+//           rather than twelve — six where v2 and v3 deployed apart, as on
+//           mainnet (C5-C — address arrays and OR-topics; see
 //           `discovery.ts#scanAdjacency`), plus the exact pair's remaining
 //           history; then exact-pair probes from each discovered neighbor to
 //           the other endpoint

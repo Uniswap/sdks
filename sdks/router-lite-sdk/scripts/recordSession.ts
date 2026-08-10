@@ -42,8 +42,14 @@ import { assertResultCoherent } from '../src/internal/testing'
 //   bun scripts/recordSession.ts --all
 //
 //   # rebuild every session's GOLDEN from the bytes already recorded — NO
-//   # network, no RPC URL, no chainz (see `regoldAll` below):
+//   # network, no RPC URL, no chainz (see `regoldAll` below). This only works
+//   # when the recorded BYTES still answer what the search asks: a change to
+//   # the SHAPE of a request retires the recording and needs a live re-record.
 //   bun scripts/recordSession.ts --regold
+//
+//   # ...and `--force` overrides the one refusal this script has, which is
+//   # writing a session that both shrank AND asserts less than the one it
+//   # replaces (see `guardAgainstDegradedOverwrite`).
 //
 // HOW A SESSION BECOMES A FIXED POINT OF THE HERMETIC PATH. A live run and a
 // replay can quote slightly different candidate SETS (the 5s interleave timer
@@ -68,6 +74,9 @@ import { assertResultCoherent } from '../src/internal/testing'
 const SESSIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'internal', '__fixtures__', 'sessions')
 const GZIP_THRESHOLD_BYTES = 2 * 1024 * 1024
 
+/** Per-request timeout for {@link healTransientErrors}' re-ask pass — short by design; see there. */
+const HEAL_TIMEOUT_MS = 15_000
+
 type Args = {
   label?: string
   rpc?: string
@@ -78,10 +87,11 @@ type Args = {
   notes?: string
   all: boolean
   regold: boolean
+  force: boolean
 }
 
 function parseArgs(argv: string[]): Args {
-  const args: Args = { all: false, regold: false }
+  const args: Args = { all: false, regold: false, force: false }
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i]!
     const next = (): string => {
@@ -113,6 +123,9 @@ function parseArgs(argv: string[]): Args {
         break
       case '--all':
         args.all = true
+        break
+      case '--force':
+        args.force = true
         break
       case '--regold':
         args.regold = true
@@ -151,11 +164,20 @@ function loadExistingSession(label: string): RecordedSession | undefined {
  *
  * Re-asking separates the two by the only test that can: real caps re-error identically and stay,
  * transient failures heal. One extra request per errored key, at the same pinned block.
+ *
+ * BOUNDED, BECAUSE THIS PASS IS PURE UPSIDE AND MUST NOT BECOME THE COST. A capped endpoint can
+ * leave hundreds of errored keys (227 on the mainnet two-hop session), and re-asking them at the
+ * recorder's ordinary 120s timeout would let a handful of hanging requests add half an hour to a
+ * recording to heal nothing. {@link HEAL_TIMEOUT_MS} is deliberately short: a re-ask that does not
+ * come back promptly is itself evidence the failure was not the cheap transient kind this pass
+ * exists for, so giving up on it and keeping the recorded error is the right answer, not a
+ * compromise. Sequential on purpose — this runs against an endpoint that has just been refusing
+ * requests, and firing hundreds at it concurrently is how a heal pass becomes a rate-limit.
  */
 async function healTransientErrors(url: string, store: Map<string, SessionEntry>, label: string): Promise<void> {
   const errored = [...store].filter(([, entry]) => entry.error)
   if (errored.length === 0) return
-  const inner = http(url, { timeout: 120_000, fetchOptions: { headers: rpcHeaders() } })({})
+  const inner = http(url, { timeout: HEAL_TIMEOUT_MS, fetchOptions: { headers: rpcHeaders() } })({})
   let healed = 0
   for (const [key, entry] of errored) {
     try {
@@ -339,7 +361,49 @@ async function recordOne(args: Args): Promise<void> {
     console.log(`[record:${label}]   info: ${unrequested.length} recorded-but-unrequested key(s) under strict replay (live-only interleave quotes; harmless)`)
   }
 
+  guardAgainstDegradedOverwrite(label, session, args.force)
   writeSession(label, session)
+}
+
+/**
+ * How much a golden ASSERTS, so a rewrite that asserts less can be recognized as one.
+ *
+ * `quote` pins a route and an amount; `no-route` is an authoritative negative that only a COMPLETE
+ * discovery can claim; `inconclusive` pins neither and is what a session decays into when the
+ * endpoint underneath it degrades.
+ */
+function goldenRank(status: string): number {
+  return status === 'quote' ? 3 : status === 'no-route' ? 2 : 1
+}
+
+/**
+ * Refuses to overwrite an existing session when the new one both SHRANK and asserts LESS.
+ *
+ * The failure this exists for is silent and was hit for real: a recording run against a
+ * misconfigured or refusing endpoint completes "successfully", writes a two-entry session whose
+ * golden is `inconclusive — rpc-unavailable`, and replaces a good fixture with something that still
+ * passes its own replay. Nothing errors, the suite stays green, and the corpus has quietly stopped
+ * asserting an answer — the same class of loss the golden-shape guard in `replay.golden.test.ts`
+ * was written for, arriving through the recorder instead.
+ *
+ * BOTH conditions, deliberately. A session that GREW while degrading is the honest shape of a
+ * provider that now caps `eth_getLogs` (more requests, less complete discovery) and is a legitimate
+ * re-record; a session that shrank while asserting the same thing or more is a scanner that got
+ * cheaper, which is the point of most of this package's work. Only the two together mean the
+ * recording bought less with less. `--force` is the deliberate override.
+ */
+function guardAgainstDegradedOverwrite(label: string, session: RecordedSession, force: boolean): void {
+  const existing = loadExistingSession(label)
+  if (!existing || force) return
+  const shrank = session.entries.length * 2 < existing.entries.length
+  const degraded = goldenRank(session.golden.status) < goldenRank(existing.golden.status)
+  if (!shrank || !degraded) return
+  throw new Error(
+    `[record:${label}] REFUSING TO OVERWRITE: the new session has ${session.entries.length} entries against ` +
+      `${existing.entries.length}, and its golden degraded from '${existing.golden.status}' to '${session.golden.status}'. ` +
+      `That is what a recording against a refusing or misconfigured endpoint looks like — check the RPC URL and any ` +
+      `required headers first. Pass --force if the loss is genuinely intended.`,
+  )
 }
 
 /** Writes a session to disk (gzipped past {@link GZIP_THRESHOLD_BYTES}), removing the other form. */

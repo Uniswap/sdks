@@ -216,6 +216,14 @@ export function narrowTopics(topics: (Hex | Hex[] | null)[]): (Hex | null)[] {
  * a width memory keyed by query shape — would re-pay the descent per shape and lose far more than
  * the over-chunking costs. Erring narrow is also the only direction that cannot fail: a width that is
  * too wide costs a refusal plus a halving, a width that is too narrow costs some extra requests.
+ *
+ * The one thing that narrowing DOES spend is budget headroom: `MAX_REQUESTS_PER_SCAN` bounds requests,
+ * not blocks, so a merged chain settling at roughly a third of the width buys roughly a third of the
+ * range per scan — against a result-count-capping provider a merged chain can reach its budget on a
+ * history a per-protocol one would have finished. It is still a large net win (a third of the range
+ * per chain, but a third as many chains, and one round trip where there were three), and the
+ * shortfall reports itself the way every other bounded scan does: uncovered blocks and `partial`
+ * discovery, carried to the next search rather than lost.
  */
 export type ScanWidthMemory = {
   /** Widest window this endpoint has been observed to serve. A start hint; never a bound. */

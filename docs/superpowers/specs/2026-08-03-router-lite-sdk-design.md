@@ -289,7 +289,8 @@ Wave engine ──────── owns stopping policy and caps; drives the p
      │           feeds realized first-leg outputs into second legs
      │           (same-protocol 2-hops quote whole-path in round 1)
      │   Wave 2 (scan-bound): adjacency of BOTH endpoints in four merged
-     │           `eth_getLogs` chains rather than twelve (address arrays
+     │           `eth_getLogs` chains rather than twelve — six where v2
+     │           and v3 deployed apart, as on mainnet (address arrays
      │           + OR-topics; see "Event-based adjacency"); the exact
      │           pair's remaining history; then exact-pair probes from
      │           each neighbor to the other endpoint
@@ -479,7 +480,8 @@ recent-first from the pinned block toward the protocol's `deploymentBlock`,
 bisecting ranges on provider caps. v4 poolIds are recomputed from decoded keys
 and checked against the indexed id.
 
-**Adjacency scans are merged: 12 query chains become 4.** `eth_getLogs` accepts
+**Adjacency scans are merged: 12 query chains become 4** (6 cold on chains where v2 and v3
+deployed apart, e.g. mainnet — see the segmentation paragraph below). `eth_getLogs` accepts
 an *address array* and an *array within one topic position* (OR-matching), both
 core JSON-RPC rather than extensions. So one request asks the v2 factory **and**
 the v3 factory — `topics[0] = [PairCreated, PoolCreated]` — for **both** of the
@@ -487,7 +489,8 @@ trade's endpoints at once, since the endpoint occupies a single topic slot that
 may hold either value. v2 and v3 merge because both index the pair at topics
 1/2; v4's `Initialize` puts the PoolId in topic1, so its currencies sit one slot
 deeper (topics 2/3) and it merges only with itself. Where a cold search used to
-run 3 protocols × 2 endpoints × 2 topic slots = 12 chains, it now runs 4. Both
+run 3 protocols × 2 endpoints × 2 topic slots = 12 chains, it now runs 4 — 6 cold on mainnet, where
+the pre-v3 stretch is a segment only v2 can be asked about. Both
 endpoints therefore ride in **wave 2**; wave 3's `scanAdjacency` call is a retry
 of whatever wave 2 did not cover, free when it covered everything. Measured live
 on mainnet: v2+v3 merged is one 49ms request against 134ms for the two it

@@ -277,13 +277,17 @@ answer is a bug in the record, not a chain that rewound, and it must not brick t
   A pool nobody hinted, on a tier nobody scanned to yet, is invisible until one of those two things
   happens — same as any other protocol's un-scanned history, and consistent with "Wave 0 is not zero
   RPC" above, just for the probe-surface axis rather than the log-history one.
-- **Endpoint adjacency is scanned in four `eth_getLogs` chains, not twelve.** `eth_getLogs` accepts
+- **Endpoint adjacency is scanned in four `eth_getLogs` chains, not twelve.** (Six cold on chains
+  where v2 and v3 deployed apart, e.g. mainnet — see the segmentation note below.) `eth_getLogs` accepts
   an *address array* and an *array within one topic position*, so a single request asks the v2
   factory **and** the v3 factory — `topics[0] = [PairCreated, PoolCreated]` — about **both** ends of
   your trade at once. v2 and v3 merge because both index the pair at the same two topic slots; v4's
   `Initialize` puts the PoolId first, so its currencies sit one slot deeper and it merges only with
   itself. Where a cold search used to run 3 protocols x 2 endpoints x 2 topic slots = 12 request
-  chains, it runs 4, and both endpoints are now scanned in the same wave instead of one per wave —
+  chains, it runs 4 — 6 cold on chains where v2 and v3 deployed apart, because the stretch below v3's
+  deployment block is a segment of its own that only v2 can be asked about (mainnet's gap is ~2.4M
+  blocks; a chain whose factories launched together never pays it). Both endpoints are now scanned in
+  the same wave instead of one per wave —
   so a two-hop route through a token neither end has cached becomes reachable a whole wave earlier.
   Measured live on mainnet: the merged v2+v3 request took 49ms against 134ms for the two it replaces,
   and returned exactly the union of their logs.

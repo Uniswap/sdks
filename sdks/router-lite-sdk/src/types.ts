@@ -248,7 +248,8 @@ export type LogQuery = { address: Address; topics: (Hex | null)[] }
  * ARRAY WITHIN one topic position (match any of these values there) — and the adjacency scans are
  * built on exactly that: one request asks the v2 factory AND the v3 factory, for `PairCreated` OR
  * `PoolCreated`, with either of the trade's two endpoints in the token slot. Twelve query chains
- * (3 protocols x 2 endpoints x 2 token slots) collapse to four. See
+ * (3 protocols x 2 endpoints x 2 token slots) collapse to four — six on a chain whose v2 and v3
+ * deployed apart, where the pre-v3 stretch is a segment only v2 can be asked about. See
  * `protocols/adjacency.ts#adjacencyQueries` for the construction and `search/adjacencyPlan.ts` for
  * which scopes may legally share one request.
  */

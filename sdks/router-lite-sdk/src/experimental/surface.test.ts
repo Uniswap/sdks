@@ -1,13 +1,16 @@
 import { expect, test } from 'bun:test'
-import type { Address } from 'viem'
+import type { Address, Hex } from 'viem'
+import { pad } from 'viem'
 
+import { MAINNET_MANIFEST } from '../index'
 import type { PoolRecord, PoolRef, QuotedRoute, RouteLeg, UniversalRouterDeployment } from '../index'
 
-import type { Custody, FeeDiscovery, PoolIndexSnapshot, ProtocolModule, QuoteProbe } from './index'
+import type { AdjacencyShape, Custody, FeeDiscovery, PoolIndexSnapshot, ProtocolModule, QuoteProbe } from './index'
 import * as experimentalModule from './index'
 import {
   PROTOCOL_MODULES,
   PoolIndex,
+  adjacencyQueries,
   buildHookData,
   compileExecutionPlan,
   encoderFor,
@@ -48,6 +51,7 @@ const EXPERIMENTAL_VALUE_EXPORTS = [
   'POOL_INDEX_SCHEMA_VERSION',
   'PROTOCOL_MODULES',
   'PoolIndex',
+  'adjacencyQueries',
   'buildHookData',
   'compileExecutionPlan',
   'encoderFor',
@@ -116,6 +120,22 @@ test('PROTOCOL_MODULES and the individual protocol modules satisfy ProtocolModul
   expect(modules.v2!.id).toBe('v2')
   expect(modules.v3!.id).toBe('v3')
   expect(modules.v4!.id).toBe('v4')
+})
+
+test('AdjacencyShape is nameable, and adjacencyQueries builds a merged filter from shapes alone', () => {
+  // The constructibility rule this file exists for: a caller writing its own `ProtocolModule` must
+  // be able to spell `adjacencyShape`'s return type, and to turn shapes into the filters the engine
+  // issues, using nothing but this subpath.
+  const shape: AdjacencyShape | undefined = PROTOCOL_MODULES.v3.adjacencyShape(MAINNET_MANIFEST)
+  expect(shape).toBeDefined()
+  const v2Shape = PROTOCOL_MODULES.v2.adjacencyShape(MAINNET_MANIFEST)!
+
+  // Both factories in one address array, both selectors OR-ed in topic0 — the merge, from the
+  // public surface.
+  const [first] = adjacencyQueries([v2Shape, shape!], [USDC])
+  expect(first!.address).toHaveLength(2)
+  expect(first!.topics[0]).toHaveLength(2)
+  expect(first!.topics[1]).toEqual([pad(USDC.toLowerCase() as Hex, { size: 32 })])
 })
 
 test('FeeDiscovery and QuoteProbe are reachable, importable types', () => {

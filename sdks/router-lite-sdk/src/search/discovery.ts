@@ -186,10 +186,18 @@ function ingestMerged(run: Run, byEmitter: Map<string, ProtocolModule>, logs: Lo
  * whose creation events index the pair at the same two topic slots — and both of the trade's
  * endpoints ride in a single filter. What used to be twelve chains (3 protocols x 2 endpoints x 2
  * token slots) is four: [v2+v3, both endpoints, slot A], [v2+v3, both endpoints, slot B], and the
- * same pair for v4, whose currencies sit one slot deeper behind the pool-id topic. Measured live on
- * mainnet: v2+v3 merged is one 49ms request against 134ms for the two it replaces, returning exactly
- * the union of their logs (29 + 3 = 32, checked for set equality — the check the canary suite now
- * repeats against every provider).
+ * same pair for v4, whose currencies sit one slot deeper behind the pool-id topic.
+ *
+ * FOUR IS THE SAME-FLOOR COUNT; A COLD MAINNET SEARCH PAYS SIX. Where v2 and v3 deployed apart, the
+ * stretch below v3's block is a segment only v2 may be asked about, so the slot-1 group emits two
+ * scan pairs rather than one (mainnet's gap is ~2.4M blocks). That is the planner refusing to floor
+ * a merge at the later deployment — see the next paragraph, and `adjacencyPlan.ts`, for why the
+ * alternative silently loses pools. A chain whose factories launched together never pays it, and a
+ * warm search pays it only for the blocks still uncovered.
+ *
+ * Measured live on mainnet: v2+v3 merged is one 49ms request against 134ms for the two it replaces,
+ * returning exactly the union of their logs (29 + 3 = 32, checked for set equality — the check the
+ * canary suite now repeats against every provider).
  *
  * WHICH SCOPES SHARE WHICH REQUEST OVER WHICH BLOCKS IS NOT DECIDED HERE. `adjacencyPlan.ts` owns
  * that, and it is pure: differing deployment floors (v2 predates v3) and differing cache states (one
