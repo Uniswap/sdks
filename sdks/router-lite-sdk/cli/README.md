@@ -163,6 +163,77 @@ still a large win — the pools arrive, and the ranges are simply re-scanned.
 
 A list that fails any of its checks exits `4` and does not run; see the exit-code note above.
 
+## `scripts/compare.ts` — router-lite vs the Trading API
+
+A comparison tester, not part of `rl`: it quotes a matrix of pairs through BOTH this package's
+router (straight from `src/`, same convention as `rl`) and the [Uniswap Trading
+API](https://trade-api.gateway.uniswap.org), and reports amount-out deltas (bps, signed —
+positive means router-lite found *more* output), latency, and route shapes side by side. Run it
+from the package root:
+
+```bash
+cd sdks/router-lite-sdk
+
+# Router-lite side only (no $UNISWAP_API_KEY) — the api column reads "skipped"
+chainz exec 1 -- bun scripts/compare.ts --rpc @rpc
+
+# Both sides
+UNISWAP_API_KEY=… chainz exec 1 -- bun scripts/compare.ts --rpc @rpc
+
+# See the exact Trading API request bodies without spending a key or quoting anything
+bun scripts/compare.ts --rpc https://… --dry-run
+
+# Override the built-in mainnet matrix
+bun scripts/compare.ts --rpc https://… --pair "USDC/WETH:5000" --pair "eth/pepe:2"
+
+# Machine-readable, one JSON document with every row + the summary
+bun scripts/compare.ts --rpc https://… --json | jq .summary
+```
+
+- **Endpoint**: `--rpc <url>` / `$ETH_RPC_URL` / `--rpc-header` / `$ETH_RPC_HEADERS`, identically to
+  `rl` (same resolver, same redaction — keyed URLs and header values never print). **Mainnet only**
+  for now: the built-in pair matrix is mainnet-specific addresses, so a non-mainnet endpoint is
+  rejected up front *unless* you supply your own pairs with `--pair`.
+- **`$UNISWAP_API_KEY`**: sent as the `x-api-key` header on every Trading API call, never logged —
+  scrubbed out of any error text (including a redacted request/response dump) the same way an RPC
+  header value is. Unset it to run router-lite only.
+- **`--pair "TOKENA/TOKENB[:amount]"`** (repeatable): overrides the built-in matrix. Each side is a
+  symbol, `eth`/`native`, or a `0x…` address — resolved the same way `rl quote`'s positionals are,
+  which means a bad one is a loud error, not a dropped pair (see below). `amount` is human units
+  (`5000`, `0.5`); defaults to `1`.
+- **The built-in matrix** (12 mainnet pairs — bluechip, stable/stable, memecoin, long-tail,
+  memecoin→memecoin via a forced intermediate, and a v2-only long-tail) is **batch-verified on-chain**
+  at startup: every address's `symbol()`/`decimals()` is read and cross-checked against what the
+  matrix expects. A mismatch — a stale hardcoded address, a redeploy — **drops that one pair with a
+  warning** rather than aborting the run; the same failure on a **user-supplied `--pair`** aborts
+  immediately, because a mistyped argument needs to be fixed, not silently skipped.
+- **`--budget <dur>`** (unit required, same parser as `rl`; default `10s`) bounds each pair's *own*
+  search clock — a slow long-tail pair cannot eat into the next pair's allowance. Records both the
+  moment the search has ANY price (`first-actionable`, same signal as `rl quote --verbose`'s `first`
+  line) and the final best once the budget expires (like `rl quote --watch`).
+- **`--no-cache`** / **`--cache`**: the same on-disk pool-index cache `rl` uses (see above), on by
+  default.
+- **`--dry-run`**: prints the Trading API request bodies this run WOULD send and exits — no
+  `$UNISWAP_API_KEY` needed. It still connects to `--rpc` (decimals/symbol verification happens
+  first, so a dry-run body is never built from a wrong address), it just never POSTs.
+- **Request shape, corrected against the live API**: the obvious AMM-only field,
+  `routingPreference: "CLASSIC"`, is *rejected* by the API (it only accepts `BEST_PRICE`/`FASTEST`).
+  `protocols: ["V2","V3","V4"]` is what actually restricts routing to classic AMM pools — confirmed
+  against a live key, response echoes `routing: "CLASSIC"` — so that is the only body this script
+  ever sends. Native ETH is sent as the zero address.
+- **Route shapes differ structurally, by design**: `quote.route` in the API's response is an ARRAY
+  OF ARRAYS (parallel paths — a single ETH→USDC quote can come back as a 3-way split), while
+  router-lite always reports one best route. The report calls out a split (`quote.routeString` is
+  used directly for display) and the summary says so once — it is not a discrepancy to chase.
+- **Exit codes**: `0` whenever the run completes — a delta, a `no-route`, a dropped built-in pair are
+  all *data*, not failure. Nonzero only for an infra/usage failure: the RPC unreachable, a malformed
+  `--pair`, an unresolvable user-supplied token, or every attempted Trading API call coming back
+  `401` (that means `$UNISWAP_API_KEY` is wrong, not that router-lite lost every comparison).
+
+`scripts/compare.test.ts` unit-tests every pure piece — delta-bps math, `--pair` parsing, and Trading
+API response parsing against hand-written fixtures (success with a split route, the API's confirmed
+`{errorCode, detail}` 400 shape, and an unknown shape) — with no network anywhere in that file.
+
 ## Tests
 
 `bun test` in this directory runs 13 files and touches no network — the CLI itself is the live

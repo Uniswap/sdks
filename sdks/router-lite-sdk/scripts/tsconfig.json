@@ -13,5 +13,5 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true
   },
-  "include": ["*.ts"]
+  "include": ["*.ts", "../typings/bun-test.d.ts"]
 }
