@@ -233,6 +233,141 @@ export function getTickDataLensForFactory(factoryAddress: string): Address | und
 }
 
 // ---------------------------------------------------------------------------
+// LBPStrategy deployment registry (append-only)
+// ---------------------------------------------------------------------------
+
+/** One historical LBPStrategy deployment on a specific chain. */
+export interface LbpStrategyDeployment {
+  chainId: number
+  /** The LBPStrategy instance. */
+  strategy: Address
+  /** Human-readable deployment tag (not an on-chain value). */
+  description: string
+}
+
+/**
+ * Every LBPStrategy ever deployed — current and historical.
+ * Append-only: indexed launches permanently reference the strategy that created them, so when a
+ * strategy is redeployed the new entry is added and the old ones are kept. Downstream indexers
+ * resolve historical strategies through this registry to backfill older launches.
+ */
+export const LBP_STRATEGY_DEPLOYMENTS: readonly LbpStrategyDeployment[] = [
+  {
+    chainId: SupportedChainId.MAINNET,
+    strategy: getAddress('0xb98766A35cdc28415be0767D4EA41e39fBA3e000'),
+    description: 'v3.0.0',
+  },
+  {
+    chainId: SupportedChainId.MAINNET,
+    strategy: getAddress('0x49380c4EfaB1b491006aF7FabAB8B3459F0E6000'),
+    description: 'v3.1.0',
+  },
+  {
+    chainId: SupportedChainId.BASE,
+    strategy: getAddress('0x5bB4bAfafEc57BEd50D864AAA9D1ef992611e000'),
+    description: 'v3.0.0',
+  },
+  {
+    chainId: SupportedChainId.BASE,
+    strategy: getAddress('0x34385dD739FE5464892BF0bA4CC42492804dA000'),
+    description: 'v3.1.0',
+  },
+  {
+    chainId: SupportedChainId.UNICHAIN,
+    strategy: getAddress('0x824A3eCDe463DD45cC156b64CEfA132596C9A000'),
+    description: 'v3.0.0',
+  },
+  {
+    chainId: SupportedChainId.UNICHAIN,
+    strategy: getAddress('0x298eA05D0356B2Ae5cCAa3169E471783ee9EA000'),
+    description: 'v3.1.0',
+  },
+  {
+    chainId: SupportedChainId.ARBITRUM_ONE,
+    strategy: getAddress('0x18608AD558dcD233F7854242bbAef73988Bee000'),
+    description: 'v3.0.0',
+  },
+  {
+    chainId: SupportedChainId.ARBITRUM_ONE,
+    strategy: getAddress('0x8Af0775a70Cc94D71DFc0fE809435e833F2Fe000'),
+    description: 'v3.1.0',
+  },
+  {
+    chainId: SupportedChainId.ROBINHOOD,
+    strategy: getAddress('0x095e38a2135aeBcfFa98A5B6911591937f912000'),
+    description: 'v3.0.0-legacy (not blocknumberish aware)',
+  },
+  {
+    chainId: SupportedChainId.ROBINHOOD,
+    strategy: getAddress('0x843747f4c08E3393E55508F577296bA48E8Ca000'),
+    description: 'v3.0.0 (blocknumberish-aware redeploy)',
+  },
+  {
+    chainId: SupportedChainId.ROBINHOOD,
+    strategy: getAddress('0x05d552391067389EE44fec3924157ed33F976000'),
+    description: 'v3.1.0',
+  },
+  {
+    chainId: SupportedChainId.AVALANCHE,
+    strategy: getAddress('0xcAcd77134b072b4AD5621f585b0b422C6Da4E000'),
+    description: 'v3.0.0',
+  },
+  {
+    chainId: SupportedChainId.AVALANCHE,
+    strategy: getAddress('0x57BD0A9Cd933c89Ba55e086D53031367b6406000'),
+    description: 'v3.1.0',
+  },
+  {
+    chainId: SupportedChainId.XLAYER,
+    strategy: getAddress('0x95bcb80e3804a085d23778F2956c305d6488e000'),
+    description: 'v3.0.0',
+  },
+  {
+    chainId: SupportedChainId.XLAYER,
+    strategy: getAddress('0x58DF162fF41e5cB42B8515f75F90C1841938A000'),
+    description: 'v3.1.0',
+  },
+  {
+    chainId: SupportedChainId.SEPOLIA,
+    strategy: getAddress('0x3f37838651B5AD71D4e01Ec9745862A5D9DF2000'),
+    description: 'v3.0.0',
+  },
+  {
+    chainId: SupportedChainId.SEPOLIA,
+    strategy: getAddress('0x96641d91e223c766F45b19d09494F5925C3cE000'),
+    description: 'v3.1.0',
+  },
+  {
+    chainId: SupportedChainId.BASE_SEPOLIA,
+    strategy: getAddress('0x0e1793a989c682117fcBfB3a9aA8e451D37D2000'),
+    description: 'v3.0.0',
+  },
+  {
+    chainId: SupportedChainId.BASE_SEPOLIA,
+    strategy: getAddress('0xB06428b62c259eE982cE3D9BED47391dC9A5E000'),
+    description: 'v3.1.0',
+  },
+]
+
+/**
+ * Strategy address (lowercased) → deployment, derived from {@link LBP_STRATEGY_DEPLOYMENTS}.
+ * Keys are lowercased so lookups are case-insensitive.
+ */
+export const LBP_STRATEGY_DEPLOYMENT_BY_STRATEGY: ReadonlyMap<string, LbpStrategyDeployment> = new Map(
+  LBP_STRATEGY_DEPLOYMENTS.map((deployment) => [deployment.strategy.toLowerCase(), deployment])
+)
+
+/** Every LBPStrategy deployment on `chainId`. */
+export function getLbpStrategyDeployments(chainId: number): readonly LbpStrategyDeployment[] {
+  return LBP_STRATEGY_DEPLOYMENTS.filter((deployment) => deployment.chainId === chainId)
+}
+
+/** Resolves a stored strategy address (case-insensitive) to its deployment. */
+export function getLbpStrategyDeployment(strategyAddress: string): LbpStrategyDeployment | undefined {
+  return LBP_STRATEGY_DEPLOYMENT_BY_STRATEGY.get(strategyAddress.toLowerCase())
+}
+
+// ---------------------------------------------------------------------------
 // Instant Launch deployment registry (variant-keyed, append-only)
 // ---------------------------------------------------------------------------
 

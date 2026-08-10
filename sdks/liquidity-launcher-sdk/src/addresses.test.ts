@@ -10,9 +10,13 @@ import {
   getInstantLaunchDeployments,
   getInstantLaunchStrategy,
   getLauncherAddresses,
+  getLbpStrategyDeployment,
+  getLbpStrategyDeployments,
   getTickDataLensForFactory,
   INSTANT_LAUNCH_DEPLOYMENT_BY_STRATEGY,
   INSTANT_LAUNCH_DEPLOYMENTS,
+  LBP_STRATEGY_DEPLOYMENT_BY_STRATEGY,
+  LBP_STRATEGY_DEPLOYMENTS,
   isCreatorFeesPositionRecipient,
   selectTokenFactory,
   TICK_DATA_LENS_BY_FACTORY,
@@ -118,6 +122,32 @@ const ROBINHOOD_STRATEGY_GENERATIONS = [
   // 3e05da8 (2026-07-30, current)
   { on: '0x9F67B864B565966dfCc2E0C6bA2483b2D5fF4b00', off: '0x16b63f1c8415FD68591c31FB3c6796a333DD640C' },
 ] as const
+
+describe('LBPStrategy deployment registry', () => {
+  it('carries the three historical Robinhood LBPStrategy generations', () => {
+    const deployments = getLbpStrategyDeployments(SupportedChainId.ROBINHOOD)
+    expect(deployments).toHaveLength(3)
+    
+    expect(deployments[0]!.strategy).toBe(getAddress('0x095e38a2135aeBcfFa98A5B6911591937f912000'))
+    expect(deployments[1]!.strategy).toBe(getAddress('0x843747f4c08E3393E55508F577296bA48E8Ca000'))
+    expect(deployments[2]!.strategy).toBe(getAddress('0x05d552391067389EE44fec3924157ed33F976000'))
+  })
+
+  it('keeps every historical generation resolvable (append-only)', () => {
+    const mainnet = getLbpStrategyDeployments(SupportedChainId.MAINNET)
+    expect(mainnet).toHaveLength(2)
+    expect(mainnet[0]!.strategy).toBe(getAddress('0xb98766A35cdc28415be0767D4EA41e39fBA3e000')) // v3.0.0
+    expect(mainnet[1]!.strategy).toBe(getAddress('0x49380c4EfaB1b491006aF7FabAB8B3459F0E6000')) // v3.1.0
+  })
+
+  it('getLbpStrategyDeployment reverse-resolves case-insensitively and derives from the registry', () => {
+    expect(LBP_STRATEGY_DEPLOYMENT_BY_STRATEGY.size).toBe(LBP_STRATEGY_DEPLOYMENTS.length)
+    for (const deployment of LBP_STRATEGY_DEPLOYMENTS) {
+      expect(getLbpStrategyDeployment(deployment.strategy.toUpperCase().replace('0X', '0x'))).toBe(deployment)
+    }
+    expect(getLbpStrategyDeployment('0x0000000000000000000000000000000000000001')).toBeUndefined()
+  })
+})
 
 describe('Instant Launch deployment registry', () => {
   it('carries all three canonical Robinhood strategy generations from the liquidity-launcher dev README', () => {
