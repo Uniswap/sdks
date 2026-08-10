@@ -478,6 +478,32 @@ describe('parseDeclaredCap — providers that state the window they would serve'
   }
 
   // -------------------------------------------------------------------------
+  // Two more dialects a live latency audit (C5-A) caught this parser missing.
+  // Both returned `{}` before {@link DECLARED_CAP_EXCEEDS_LIMIT}/
+  // {@link DECLARED_CAP_RANGES_OVER} existed — verified in-tree against the
+  // exact wording below before either pattern was added — which cost ~11
+  // blind halvings per scan and settled the window ~22% under the cap the
+  // provider had already stated in plain English.
+  // -------------------------------------------------------------------------
+  test('mevblocker-style "range N exceeds limit of M": the cap is the SECOND number, not the first', () => {
+    const declared = parseDeclaredCap(new Error('range 500000 exceeds limit of 10000'))
+    expect(declared.capBlocks).toBe(10_000n)
+    expect(declared.capKind).toBe('span')
+    // Two bare numbers with no `-` between them: nothing here is a suggested range, only the
+    // request's own (rejected) width and the accepted one, so `retryRange` must stay unset.
+    expect(declared.retryRange).toBeUndefined()
+  })
+
+  test('a free-plan span cap: "ranges over N blocks are not supported on free plan"', () => {
+    const declared = parseDeclaredCap(new Error('ranges over 10000 blocks are not supported on free plan'))
+    expect(declared.capBlocks).toBe(10_000n)
+    // No response-size language and no suggested range — a plan-tier ceiling that refuses the
+    // identical width again next request, so it is a policy, not a density observation.
+    expect(declared.capKind).toBe('span')
+    expect(declared.retryRange).toBeUndefined()
+  })
+
+  // -------------------------------------------------------------------------
   // capKind: a stated block count is not always a POLICY.
   //
   // This is the distinction that keeps `logScan`'s ceiling clamp from being a

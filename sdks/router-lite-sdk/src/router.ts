@@ -10,6 +10,7 @@ import {
   MAX_HINTS_PER_REQUEST,
   MAX_PERMIT2_UINT48,
   MAX_PERMIT2_UINT160,
+  maxPlausibleHeadRegression,
   MIN_CHUNK,
 } from './constants'
 import { RouterConfigError, RpcUnavailableError } from './errors'
@@ -22,7 +23,7 @@ import type { PoolIndexStats } from './pools/poolIndex'
 import { PROTOCOL_MODULES } from './protocols'
 import { assertHintAddresses, buildHookData } from './search/hookData'
 import type { HeadWatermark, InternalResult, SearchContext } from './search/waves'
-import { searchWaves } from './search/waves'
+import { fetchBlock, searchWaves } from './search/waves'
 import type {
   BlockRef,
   ChainManifest,
@@ -979,7 +980,37 @@ export function createRouter(opts: CreateRouterOptions): Router {
     return multicallInFlight
   }
 
-  function buildContext(req: QuoteRequest, multicall3: Address | null, iterate?: IterateOptions): SearchContext {
+  /**
+   * Fires the search's pinned-block read (`eth_getBlockByNumber('latest')`) THE MOMENT A REQUEST
+   * COMES IN, rather than after `ensureManifestValidated`/`resolveMulticall3` have been awaited and a
+   * `SearchContext` built (C5-A) — the one round trip in the pre-search sequence that used to start
+   * only once the other two were done, for no reason a real dependency required: `fetchBlock` reads
+   * only `client`/`head`/`semaphore`, none of which come FROM validation or the multicall probe, so it
+   * has never needed either of their answers.
+   *
+   * Not a once-cell: unlike a chainId mismatch or a multicall3 deployment, "what block is the chain
+   * at right now" has no permanent answer to cache — a fresh read is exactly what every call wants,
+   * every time. What moves here is WHEN that read is issued, not whether it repeats.
+   *
+   * Every caller of this function attaches a no-op `.catch` immediately (below), because a call whose
+   * `ensureManifestValidated` rejects with a `RouterConfigError` never goes on to await this promise
+   * at all — and an unawaited rejection is an unhandled-rejection warning waiting to fire, the same
+   * reason `manifest.ts#validateManifest`'s own `codeRead` carries one. The ORIGINAL promise (not the
+   * caught one) is still what reaches `SearchContext.pinnedBlock`, so `searchWaves` sees the real
+   * rejection — a transport failure here still becomes the `RpcUnavailableError` it always did,
+   * `fetchBlock`'s head-regression self-heal still runs, and the watermark is still written exactly
+   * once per resolved read. Nothing about the OUTCOME changes, only when the request goes out.
+   */
+  function dispatchPinnedBlock(): Promise<{ block: BlockRef; regressed: boolean }> {
+    return fetchBlock(client, maxPlausibleHeadRegression(reorgOverlapBlocksOf(manifest)), head, semaphore)
+  }
+
+  function buildContext(
+    req: QuoteRequest,
+    multicall3: Address | null,
+    pinnedBlock: Promise<{ block: BlockRef; regressed: boolean }>,
+    iterate?: IterateOptions,
+  ): SearchContext {
     return {
       client,
       manifest,
@@ -988,6 +1019,7 @@ export function createRouter(opts: CreateRouterOptions): Router {
       hookData: buildHookData(req.hints),
       head,
       semaphore,
+      pinnedBlock,
       ...(multicall3 !== null && { multicall3 }),
       logChunkBlocks: opts.logChunkBlocks,
       onFirstRoute: iterate?.onFirstRoute,
@@ -996,16 +1028,20 @@ export function createRouter(opts: CreateRouterOptions): Router {
 
   async function getQuote(req: QuoteRequest): Promise<QuoteResult> {
     validateQuoteRequest(req, manifest)
-    // Dispatched BEFORE the validation await so the two round trips overlap (both are cached after
-    // the first search); `resolveMulticall3` never rejects, so nothing here needs a handler.
+    // All three dispatched BEFORE the validation await so their round trips overlap (C5-A):
+    // `resolveMulticall3` and `ensureManifestValidated` are once-cells and never reject uncaught by
+    // themselves; `pinnedBlock`'s no-op `.catch` is what keeps a search that never reaches
+    // `searchWaves` (a `RouterConfigError` below) from logging an unhandled rejection for it.
     const multicallProbe = resolveMulticall3()
+    const pinnedBlock = dispatchPinnedBlock()
+    pinnedBlock.catch(() => {})
     try {
       await ensureManifestValidated()
     } catch (err) {
       if (err instanceof RouterConfigError) throw err
       return rpcUnavailable(manifest)
     }
-    const ctx = buildContext(req, await multicallProbe)
+    const ctx = buildContext(req, await multicallProbe, pinnedBlock)
     try {
       for await (const e of searchWaves(ctx, req, 'quote')) {
         const result = classifyQuote(e)
@@ -1022,13 +1058,15 @@ export function createRouter(opts: CreateRouterOptions): Router {
   async function getSwap(req: SwapRequest): Promise<SwapResult> {
     validateSwapRequest(req, manifest)
     const multicallProbe = resolveMulticall3()
+    const pinnedBlock = dispatchPinnedBlock()
+    pinnedBlock.catch(() => {})
     try {
       await ensureManifestValidated()
     } catch (err) {
       if (err instanceof RouterConfigError) throw err
       return rpcUnavailable(manifest)
     }
-    const ctx = buildContext(req, await multicallProbe)
+    const ctx = buildContext(req, await multicallProbe, pinnedBlock)
     try {
       for await (const e of searchWaves(ctx, req, 'swap')) {
         const result = classifySwap(e)
@@ -1046,6 +1084,8 @@ export function createRouter(opts: CreateRouterOptions): Router {
     validateQuoteRequest(req, manifest)
     return (async function* () {
       const multicallProbe = resolveMulticall3()
+      const pinnedBlock = dispatchPinnedBlock()
+      pinnedBlock.catch(() => {})
       try {
         await ensureManifestValidated()
       } catch (err) {
@@ -1053,7 +1093,7 @@ export function createRouter(opts: CreateRouterOptions): Router {
         yield rpcUnavailable(manifest)
         return
       }
-      const ctx = buildContext(req, await multicallProbe, iterate)
+      const ctx = buildContext(req, await multicallProbe, pinnedBlock, iterate)
       try {
         for await (const e of searchWaves(ctx, req, 'quote')) yield classifyQuote(e)
       } catch (err) {
@@ -1067,6 +1107,8 @@ export function createRouter(opts: CreateRouterOptions): Router {
     validateSwapRequest(req, manifest)
     return (async function* () {
       const multicallProbe = resolveMulticall3()
+      const pinnedBlock = dispatchPinnedBlock()
+      pinnedBlock.catch(() => {})
       try {
         await ensureManifestValidated()
       } catch (err) {
@@ -1074,7 +1116,7 @@ export function createRouter(opts: CreateRouterOptions): Router {
         yield rpcUnavailable(manifest)
         return
       }
-      const ctx = buildContext(req, await multicallProbe, iterate)
+      const ctx = buildContext(req, await multicallProbe, pinnedBlock, iterate)
       try {
         for await (const e of searchWaves(ctx, req, 'swap')) yield classifySwap(e)
       } catch (err) {

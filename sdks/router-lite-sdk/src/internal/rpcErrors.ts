@@ -218,6 +218,34 @@ const DECLARED_CAP_BLOCKS = /\b([\d][\d,_]*) block range\b/i
  */
 const DECLARED_CAP_LIMITED_TO = /\blimited to (?:an?\s+)?([\d][\d,_]*)\s+(?:block\s+)?range\b/i
 
+/**
+ * mevblocker-style: "range 500000 exceeds limit of 10000" — the requested span first, the accepted
+ * one second. THE CAP IS THE SECOND NUMBER, deliberately captured as such rather than reusing
+ * whichever group a shared pattern would put first: a caller that read the 500000 as the cap would
+ * widen every subsequent request instead of narrowing it, which is the opposite of what this whole
+ * module exists to do. No retry range is volunteered here — only two bare numbers either side of
+ * "exceeds limit of" — so {@link DECLARED_RETRY_RANGE_DEC} (which requires a `-` between its pair)
+ * correctly leaves `retryRange` unset for this dialect; the cap stands alone as a span policy.
+ *
+ * Verified in-tree: before this pattern existed, `parseDeclaredCap` returned `{}` for this message —
+ * a live miss that cost ~11 blind halvings (`MAX_SCAN_WINDOW` down past `MIN_CHUNK`) and settled the
+ * scan window at the last power-of-two step under 10,000 rather than the cap itself, ~22% narrower
+ * than the endpoint would actually have served.
+ */
+const DECLARED_CAP_EXCEEDS_LIMIT = /\brange\s+[\d][\d,_]*\s+exceeds\s+limit\s+of\s+([\d][\d,_]*)/i
+
+/**
+ * A free-tier plan cap: "ranges over 10000 blocks are not supported on free plan". One number, no
+ * suggested range, and no response-size language — a plan-tier ceiling that will refuse the identical
+ * width again next request, so it reads as a span policy exactly like quicknode's `limited to` cap
+ * above, not a density observation.
+ *
+ * Verified in-tree: also returned `{}` before this pattern existed, for the same reason as
+ * {@link DECLARED_CAP_EXCEEDS_LIMIT} — neither `DECLARED_CAP_BLOCKS` (wants the literal phrase
+ * `N block range`) nor `DECLARED_CAP_LIMITED_TO` (wants `limited to`) matches "ranges over N blocks".
+ */
+const DECLARED_CAP_RANGES_OVER = /\branges?\s+over\s+([\d][\d,_]*)\s+blocks?\b/i
+
 /** drpc: "query exceeds max results 20000, retry with the range 25683953-25685027". */
 const DECLARED_RETRY_RANGE_DEC = /\brange\s+(\d[\d,_]*)\s*-\s*(\d[\d,_]*)/i
 
@@ -255,7 +283,11 @@ export function parseDeclaredCap(err: unknown): DeclaredCap {
       if (bounds && bounds[1]! >= bounds[0]!) declared.retryRange = { fromBlock: bounds[0]!, toBlock: bounds[1]! }
     }
     if (declared.capBlocks === undefined) {
-      const cap = DECLARED_CAP_BLOCKS.exec(message) ?? DECLARED_CAP_LIMITED_TO.exec(message)
+      const cap =
+        DECLARED_CAP_BLOCKS.exec(message) ??
+        DECLARED_CAP_LIMITED_TO.exec(message) ??
+        DECLARED_CAP_EXCEEDS_LIMIT.exec(message) ??
+        DECLARED_CAP_RANGES_OVER.exec(message)
       if (cap) {
         const blocks = toBig(cap[1]!)
         if (blocks > 0n) declared.capBlocks = blocks

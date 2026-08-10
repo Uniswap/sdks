@@ -2302,6 +2302,114 @@ describe('transport options (C4-P6)', () => {
 })
 
 // ---------------------------------------------------------------------------
+// C5-A: the pre-search RPC sequence's depth, pinned so it cannot regress.
+//
+// `getQuote` used to have THREE round trips strictly ahead of wave 0's first quote probe: manifest
+// validation's `eth_getChainId`+`eth_getCode` (already concurrent with each other), the multicall3
+// probe's own `eth_getCode` (already concurrent with validation), and — the one this fixes —
+// `searchWaves`'s pinned-block `eth_getBlockByNumber`, which did not even DISPATCH until a
+// `SearchContext` existed, which needed validation and the multicall probe to have already
+// RESOLVED. `router.ts#dispatchPinnedBlock` fires that read the moment a request comes in, same as
+// the other two, so all three now share one wave and only one release round separates the request
+// from the first quote dispatch.
+//
+// MEASURED BY RELEASE ROUNDS, NOT WALL-CLOCK TIME. Every RPC method the pre-search sequence touches
+// is gated behind a manually-resolved promise; nothing advances until this test releases it. That
+// makes "how many round trips are strictly sequential" a fact about the PROMISE GRAPH — provable
+// without a timer, and immune to the flakiness a `setTimeout`-based measurement would carry.
+// ---------------------------------------------------------------------------
+
+describe('pre-search RPC sequencing (C5-A)', () => {
+  test('the pinned block overlaps validation and the multicall probe: one release round, not two, precedes the first wave-0 quote dispatch', async () => {
+    const manifest = baseManifest({ v4: false })
+    const [probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+    const quoteTarget = probe!.quote.call.to.toLowerCase()
+
+    type Gate = { key: string; resolve: (v: unknown) => void }
+    const pendingGates: Gate[] = []
+    let wave = 0
+    // First-seen wave per key — the metric this test exists to pin.
+    const waveOf = new Map<string, number>()
+    const record = (key: string): void => {
+      if (!waveOf.has(key)) waveOf.set(key, wave)
+    }
+    const gated = (key: string): Promise<unknown> => {
+      record(key)
+      return new Promise((resolve) => pendingGates.push({ key, resolve }))
+    }
+
+    const client: PublicClient = {
+      async getChainId() {
+        return gated('eth_chainId') as Promise<number>
+      },
+      async request(args: any) {
+        if (args.method === 'eth_getBlockByNumber') return gated('eth_getBlockByNumber')
+        if (args.method === 'eth_getCode') {
+          const [addr] = args.params as [Address]
+          return gated(`eth_getCode:${addr.toLowerCase()}`)
+        }
+        if (args.method === 'eth_getLogs') {
+          // Wave 0's exact-pair scan runs CONCURRENTLY with the quote probes (see `waves.ts#wave0`)
+          // — never gated, so it can never be mistaken for one of the sequential reads this test
+          // measures. An empty answer is fine: only the dispatch of the quote probe matters here.
+          record('eth_getLogs')
+          return []
+        }
+        if (args.method === 'eth_call') {
+          const [{ to }] = args.params as [{ to: Address }]
+          const target = to.toLowerCase()
+          record(target === quoteTarget ? 'quote' : `eth_call:${target}`)
+          if (target === quoteTarget) throw new Error('execution reverted') // no pool; only the dispatch matters
+          return '0x'
+        }
+        throw new Error(`unexpected method ${args.method}`)
+      },
+    } as unknown as PublicClient
+
+    const router = createRouter({ client, manifest })
+    const result = router.getQuote({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN })
+
+    // Drains every dispatch the current promise graph can reach WITHOUT a gate being released —
+    // i.e., everything wave 0 issues on its own.
+    const flush = async (): Promise<void> => {
+      for (let i = 0; i < 30; i++) await Promise.resolve()
+    }
+    await flush()
+
+    // Release whatever is outstanding, one round at a time, until the quote probe has been
+    // dispatched. The number of rounds this loop needs IS the sequential depth.
+    while (!waveOf.has('quote') && pendingGates.length > 0) {
+      wave++
+      const batch = pendingGates.splice(0, pendingGates.length)
+      for (const g of batch) {
+        if (g.key === 'eth_chainId') g.resolve(CHAIN_ID)
+        else if (g.key === 'eth_getBlockByNumber') g.resolve({ number: toHex(BLOCK_NUMBER), hash: BLOCK_HASH, timestamp: toHex(BLOCK_TIMESTAMP) })
+        else if (g.key.startsWith('eth_getCode:')) {
+          const addr = g.key.slice('eth_getCode:'.length)
+          // The execution address needs its immutables embedded to pass validation; anything else
+          // (the multicall probe's address) answers '0x' — no deployment, so quoting stays per-call
+          // and the multicall probe's own once-cell resolves to `null` without another round trip.
+          const embed = [WRAPPED, PERMIT2, V2_FACTORY].map((a) => a.slice(2).toLowerCase()).join('')
+          g.resolve(addr === UNIVERSAL_ROUTER.toLowerCase() ? `0x${embed}` : '0x')
+        }
+      }
+      await flush()
+    }
+
+    // Nothing left to gate — let the rest of the search play out so the promise settles.
+    await result
+
+    expect(waveOf.get('quote')).toBe(1)
+    // The three reads that used to span two sequential rounds now share the same wave: chain
+    // validation, the execution address's code (also validation), and the pinned block all dispatch
+    // BEFORE anything is released.
+    expect(waveOf.get('eth_chainId')).toBe(0)
+    expect(waveOf.get(`eth_getCode:${UNIVERSAL_ROUTER.toLowerCase()}`)).toBe(0)
+    expect(waveOf.get('eth_getBlockByNumber')).toBe(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Multicall3 adoption at the facade: the once-per-router probe and both of its
 // permanent verdicts. Every OTHER test in this file runs the per-call path
 // because `stubClient` answers `eth_getCode` with '0x' for anything that is

@@ -281,6 +281,19 @@ export type SearchContext = {
    * observe a single pass. Exactly the role `scanLogs`'s `opts.sleep` plays for the retry backoff.
    */
   quoteInterleaveMs?: number | undefined
+  /**
+   * A pinned-block fetch DISPATCHED BEFORE this context existed, so its round trip overlaps
+   * manifest validation and the multicall3 probe instead of starting after them (C5-A). `router.ts`
+   * fires {@link fetchBlock} the moment a request comes in — using the same `client`/`head`/
+   * `semaphore` this context carries, just read a few lines earlier off the same closure — and hands
+   * the resulting promise in here rather than letting `searchWaves` call `fetchBlock` itself. Absent
+   * for a one-off engine run (unit tests below the facade, `experimental` callers): `searchWaves`
+   * then falls back to fetching fresh, exactly as it always has, so nothing below the facade has to
+   * know this seam exists. Whichever way the block arrives, the head-watermark read/write and the
+   * regression self-heal in {@link fetchBlock} run identically — this field only changes WHEN the
+   * request goes out, never what happens with the answer.
+   */
+  pinnedBlock?: Promise<{ block: BlockRef; regressed: boolean }>
 }
 
 // The engine's routes are plain {@link RankedRoute}s: `execution`, plus the raw `revertData` of a
@@ -563,7 +576,7 @@ async function requestHead(client: SearchClient, semaphore?: Semaphore): Promise
  * pinned and the regression is reported, rather than an `RpcUnavailableError` escalating a degraded
  * search into a total `rpc-unavailable` outage.
  */
-async function fetchBlock(
+export async function fetchBlock(
   client: SearchClient,
   maxRegression: bigint,
   head?: HeadWatermark,
@@ -1424,12 +1437,17 @@ export async function* searchWaves(
   req: QuoteRequest | SwapRequest,
   kind: 'quote' | 'swap',
 ): AsyncGenerator<InternalResult> {
-  const { block, regressed } = await fetchBlock(
+  // `ctx.pinnedBlock`, when present, is a fetch `router.ts` already dispatched before this context
+  // existed (C5-A) — awaited here instead of re-issued, so its round trip is the one that overlapped
+  // manifest validation and the multicall3 probe rather than a fresh one starting after them. A
+  // one-off engine run below the facade carries no such promise and gets the exact fetch this always
+  // issued.
+  const { block, regressed } = await (ctx.pinnedBlock ?? fetchBlock(
     ctx.client,
     maxPlausibleHeadRegression(reorgOverlapBlocksOf(ctx.manifest)),
     ctx.head,
     ctx.semaphore,
-  )
+  ))
   // The one seam where `req` and `kind` — two independently-typed parameters of this exported
   // function's public (ctx, req, kind) surface — are asserted to be the correlated pair `Run`'s
   // variants require. Every caller in this codebase passes them paired (`getQuote`/`quotes` always
