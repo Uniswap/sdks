@@ -758,6 +758,18 @@ describe('quote-only manifests (C4-P3)', () => {
     expect(() => router.swaps(req)).toThrow(RouterConfigError)
   })
 
+  // `quotes()`'s twin of the `swaps()` case above — both entry points share `startSearch` (`router.ts`),
+  // whose synchronous `validate(req, manifest)` call runs before the async generator it returns is ever
+  // constructed, for either request shape. A malformed `amountIn` (rather than the swap-only "no
+  // execution bundle" check above) is what `validateQuoteRequest` alone can reject.
+  test('quotes() throws synchronously (before the async generator is ever driven), same as swaps()', () => {
+    const manifest = quoteOnlyManifest()
+    const router = createRouter({ client: poisonedClient(), manifest })
+    const req: QuoteRequest = { tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: 0n }
+
+    expect(() => router.quotes(req)).toThrow(RouterConfigError)
+  })
+
   test('manifest.wrappedNative disagreeing with manifest.execution.wrappedNative throws RouterConfigError at createRouter', () => {
     const manifest: ChainManifest = { ...baseManifest(), wrappedNative: `0x${'ff'.repeat(20)}` as Address }
     expect(() => createRouter({ client: poisonedClient(), manifest })).toThrow(RouterConfigError)

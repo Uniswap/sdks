@@ -5,7 +5,7 @@ import { pad } from 'viem'
 import { MAINNET_MANIFEST } from '../index'
 import type { PoolRecord, PoolRef, QuotedRoute, RouteLeg, UniversalRouterDeployment } from '../index'
 
-import type { AdjacencyShape, Custody, FeeDiscovery, PoolIndexSnapshot, ProtocolModule, QuoteProbe } from './index'
+import type { AdjacencyShape, Custody, FeeDiscovery, PoolIndexOptions, PoolIndexSnapshot, ProtocolModule, QuoteProbe } from './index'
 import * as experimentalModule from './index'
 import {
   PROTOCOL_MODULES,
@@ -89,6 +89,15 @@ test('PoolIndex is constructible and upsert-able from only public/`.../experimen
   const record: PoolRecord = { pool: v2WethUsdc, source: 'hint' }
   index.upsert(record)
   expect(index.pair(USDC, WETH)).toHaveLength(1)
+})
+
+// `PoolIndexOptions` is `PoolIndex`'s own constructor's second-argument type — a caller building
+// that argument up separately (rather than as an inline literal) needs to name it from this same
+// subpath, exactly like `PoolRecord`/`PoolRef` above for `upsert`'s argument.
+test('PoolIndexOptions is nameable from `.../experimental` for PoolIndex\'s constructor', () => {
+  const options: PoolIndexOptions = { maxPools: 10 }
+  const index = new PoolIndex(WETH, options)
+  expect(index.stats().pools).toBe(0)
 })
 
 test('generateRoutes is callable without hookData — it defaults to an empty map', () => {

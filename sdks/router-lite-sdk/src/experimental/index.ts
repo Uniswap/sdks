@@ -42,7 +42,7 @@ export { encoderFor } from '../encode'
 export type { CommandSet } from '../types'
 
 export { PoolIndex, POOL_INDEX_SCHEMA_VERSION, parseSnapshot, serializeSnapshot } from '../pools/poolIndex'
-export type { PoolIndexSnapshot, PoolIndexStats } from '../pools/poolIndex'
+export type { PoolIndexOptions, PoolIndexSnapshot, PoolIndexStats } from '../pools/poolIndex'
 
 export { PROTOCOL_MODULES, v2Module, v3Module, v4Module } from '../protocols'
 export type { FeeDiscovery, ProtocolModule, QuoteProbe } from '../protocols'
