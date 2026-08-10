@@ -256,22 +256,32 @@ Wave engine ──────── owns stopping policy and caps; drives the p
      │               batch. Preflight of the leader is NOT pipelined against
      │               the next wave (see "Preflight is not pipelined" below)
      │
-     │   Wave 0 (1 RTT + 1 preflight RTT): hints (v4 hints validate
+     │   Wave 0a (1 RTT + 1 preflight RTT): hints (v4 hints validate
      │           locally via poolId recompute) + cached pools +
      │           SPECULATIVE direct quotes — v2 getReserves at the
      │           CREATE2-computed pair, v3 QuoterV2 across enabled fees
      │           (quote reverts ⇒ no pool), v4 standard no-hook configs
-     │           via V4Quoter — + v4 exact-pair Initialize logs +
-     │           readiness reads + block header, all in one batch.
-     │           WARM-INDEX EVIDENCE PASS: when a core intermediate's
-     │           legs already face per-pair slot pressure in the index
-     │           this search woke up with (pair records > MAX_POOLS_PER_LEG
-     │           — a cached/pool-list index, never a cold one), the core
-     │           half-pair probes run HERE, two-staged (in-legs at the
-     │           request amount, out-legs at the best realized
-     │           intermediate output), so wave 0's enumeration — the
-     │           anytime contract's first answer — ranks contended legs
-     │           on quote evidence rather than creation recency
+     │           via V4Quoter — + readiness reads + block header, all in
+     │           one batch. WARM-INDEX EVIDENCE PASS: when a core
+     │           intermediate's legs already face per-pair slot pressure
+     │           in the index this search woke up with (pair records >
+     │           MAX_POOLS_PER_LEG — a cached/pool-list index, never a
+     │           cold one), the core half-pair probes run HERE,
+     │           two-staged (in-legs at the request amount, out-legs at
+     │           the best realized intermediate output), so wave 0a's
+     │           enumeration — the anytime contract's first answer —
+     │           ranks contended legs on quote evidence rather than
+     │           creation recency
+     │   Wave 0b (scan-bound): the v4 exact-pair Initialize logs over the
+     │           recent window. DISPATCHED by wave 0a, before it awaits
+     │           anything, so the two overlap exactly as they did when
+     │           they shared one batch — but AWAITED here, one stage
+     │           later, so a log query can never gate wave 0a's price.
+     │           On a timeout-shaped endpoint that scan spends its whole
+     │           retry ladder (~40s measured) while a hinted answer sits
+     │           finished; the split is what lets the promise shapes
+     │           return it. See "Wave 0 answers before the pair scan
+     │           lands" below
      │   Wave 1 (2 RTTs): speculative core-intermediate legs; round 2
      │           feeds realized first-leg outputs into second legs
      │           (same-protocol 2-hops quote whole-path in round 1)
@@ -280,15 +290,15 @@ Wave engine ──────── owns stopping policy and caps; drives the p
      │   Wave 3 (scan-bound): adjacency of the other endpoint; complete
      │           bounded shared-neighbor cross product
      │
-     │   waves 1-3 QUOTE WHILE THEY DISCOVER: the wave's scans run
-     │   concurrently with a re-enumerate-and-quote pass every
-     │   QUOTE_INTERLEAVE_MS (5s), fed by chunk-by-chunk `onLogs`
-     │   ingestion, and close with one final pass — so a wave whose
-     │   scans outlive the caller's budget still buys prices, not only
-     │   pools. getSwap additionally compiles, encodes, and preflights
-     │   the leader. Promises resolve at the first actionable result;
-     │   iterators yield after every wave that improves the best;
-     │   AbortSignal is honored between batches.
+     │   EVERY SCAN-BOUND STAGE QUOTES WHILE IT DISCOVERS (0b and 1-3):
+     │   the stage's scans run concurrently with a re-enumerate-and-quote
+     │   pass every QUOTE_INTERLEAVE_MS (5s), fed by chunk-by-chunk
+     │   `onLogs` ingestion, and close with one final pass — so a stage
+     │   whose scans outlive the caller's budget still buys prices, not
+     │   only pools. getSwap additionally compiles, encodes, and
+     │   preflights the leader. Promises resolve at the first actionable
+     │   result; iterators yield after every stage that improves the
+     │   best; AbortSignal is honored between batches.
      ▼
 Stage primitives
      discover/probe ── the engine issues every RPC; ProtocolModules only
@@ -373,6 +383,53 @@ ask for — and never asking for it is precisely what lets `getSwap` resolve a
 hinted route with zero log scans. The cost is one preflight round trip of
 serial latency per improving wave. See the KNOWN DEVIATION note in
 `search/waves.ts`.
+
+### Wave 0 answers before the pair scan lands
+
+Wave 0 used to await its probes and its recent-window v4 exact-pair scan under
+one `Promise.all`, so the first-actionable answer — one `aggregate3` round trip
+— was sequenced behind a log query. On a healthy keyed endpoint that costs
+nothing (the whole window resolves in a single ~0.3s request); on a
+timeout-shaped one the scan spends its entire budgeted retry ladder (~40s
+measured) while a hinted or direct-pair price sits finished in `state.quoted`.
+That is precisely the launcher/fallback case wave 0 exists for, defeated exactly
+when the provider degrades.
+
+The wave is therefore **evaluated in two stages**. Wave 0a *dispatches* the scan
+— first, before it awaits anything, so the round trips overlap exactly as they
+did under the single batch — then awaits only the probes, hints and readiness
+reads, and is evaluated and yielded. Wave 0b awaits the scan, folds its pools in
+(quoting as they arrive, like every other scan-bound stage), and is evaluated
+again; `signatureOf` suppresses that second yield unless the scan actually
+improved on 0a, so an extra event only ever means an extra improvement.
+
+Four properties keep the split honest:
+
+- **Readiness is still computed once, concurrently, in the first stage**, so
+  `leader.ts`'s requirements-before-simulation invariant is untouched: every
+  `evaluate` the generator runs, wave 0a's included, already has
+  `state.requirements` in hand.
+- **The report cannot overclaim.** The pair scan is pair-scoped and never writes
+  `ProtocolDiscovery.complete` (that is the adjacency waves' job), so a consumer
+  that stops at wave 0a reads `v4: partial` exactly as it did before.
+- **Coverage bookkeeping is unchanged.** `state.pairScanned` is written by the
+  same `runPairScan`, and wave 2's `completeExactPairScan` subtracts it exactly
+  as before — wave 0b is awaited before wave 1, so no later wave can observe a
+  half-recorded window.
+- **The scan never outlives the search.** It carries its own `AbortController`
+  (forwarding `req.signal`, so it is strictly an *additional* way to stop), and
+  `searchWaves` cancels it in a `finally` — otherwise a `getQuote` that took wave
+  0a's answer and walked away would leave an `eth_getLogs` ladder running behind
+  a CLI that has already printed its result.
+
+The deliberate cost: a promise-shaped call that is *already* actionable after
+wave 0a resolves without the scan's pools in its enumeration. A search with no
+answer yet — the brand-new-asset case the window exists for — is not actionable,
+so it runs on into 0b and the scan still decides it, and the iterator shapes
+always see the merged result. Measured against the committed replay goldens
+(Base ETH→USDC, a majors pair with a dozen direct pools): identical best route,
+amount and alternatives; 23 fewer RPC calls; only the report's
+enumeration/quoting counters shrink.
 
 ## Discovery
 

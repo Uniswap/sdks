@@ -73,16 +73,26 @@ export function exactPairPlan(run: Run): ExactPairPlan | undefined {
  * declared `| undefined` on `scanLogs`'s own opts, so passing `ctx`'s possibly-absent values through
  * directly (rather than the `signal`-style conditional spread) is not an `exactOptionalPropertyTypes`
  * violation — both sides agree an explicit `undefined` is a legal, meaningful "no override".
+ *
+ * `signal` OVERRIDES the request's, and exactly one caller supplies one: wave 0a's DETACHED pair
+ * scan (`waves.ts#startRecentPairScan`), whose lifetime is not the request's — it can outlive a
+ * consumer that walked away at wave 0a's yield with its answer already in hand. The controller it
+ * passes forwards `req.signal`, so an override is strictly WIDER than the request's signal, never
+ * narrower: a caller's abort still stops the scan, and abandoning the generator now stops it too.
  */
-function scanOpts(run: Run): {
+function scanOpts(
+  run: Run,
+  signal?: AbortSignal,
+): {
   signal?: AbortSignal
   semaphore?: Semaphore | undefined
   initialChunk?: bigint | undefined
   widthMemory?: ScanWidthMemory | undefined
   sleep?: ((ms: number) => Promise<void>) | undefined
 } {
+  const effective = signal ?? run.req.signal
   return {
-    ...(run.req.signal !== undefined && { signal: run.req.signal }),
+    ...(effective !== undefined && { signal: effective }),
     semaphore: run.ctx.semaphore,
     initialChunk: run.ctx.logChunkBlocks,
     // The retry-backoff clock, when the caller injected one (`SearchContext.scanSleep`). Absent —
@@ -99,17 +109,18 @@ function scanOpts(run: Run): {
   }
 }
 
-export async function runPairScan(run: Run, plan: ExactPairPlan, ranges: BlockRange[]): Promise<void> {
+export async function runPairScan(run: Run, plan: ExactPairPlan, ranges: BlockRange[], signal?: AbortSignal): Promise<void> {
   const { ctx, req, state } = run
+  const stop = signal ?? req.signal
   for (const range of ranges) {
-    if (req.signal?.aborted) return
+    if (stop?.aborted) return
     state.pairScanned.push(range)
     // Ingested chunk by chunk (`onLogs`) rather than in one pass over `scan.logs` at the end: the
     // pools a long scan finds are worth having in the index the moment they are known, because
     // `waves.ts#quoteWhileDiscovering` is running alongside and can only price what the index holds.
     // `upsert` is idempotent, so nothing here depends on a chunk being delivered exactly once.
     const scan = await scanLogs(ctx.client, plan.query, range, {
-      ...scanOpts(run),
+      ...scanOpts(run, signal),
       onLogs: (logs) => ingestLogs(run, plan.module_, logs),
     })
     for (const covered of scan.covered) ctx.index.addCoverage('v4', plan.scope, covered)
@@ -122,15 +133,19 @@ export async function runPairScan(run: Run, plan: ExactPairPlan, ranges: BlockRa
  *
  * `window` is a PARAMETER, not a constant read here: how far back a wave is willing to look is the
  * wave engine's call, and only it knows which wave is running and what latency that wave owes the
- * caller. See `waves.ts#wave0`'s call site for the window it passes and why.
+ * caller. See `waves.ts#wave0a`'s call site for the window it passes and why.
+ *
+ * `signal`, likewise, is the wave engine's: this is the one scan the engine DISPATCHES in one stage
+ * and AWAITS in the next (wave 0a / wave 0b), so it is also the one whose lifetime can exceed the
+ * generator's. See {@link scanOpts} and `waves.ts#startRecentPairScan`.
  */
-export async function scanExactPairRecent(run: Run, opts: { window: bigint }): Promise<void> {
+export async function scanExactPairRecent(run: Run, opts: { window: bigint; signal?: AbortSignal }): Promise<void> {
   const plan = exactPairPlan(run)
   if (!plan) return
   const head = run.state.block.number
   const windowStart = maxBig(plan.deployBlock, head - opts.window + 1n)
   const uncovered = run.ctx.index.uncovered('v4', plan.scope, plan.deployBlock, head)
-  await runPairScan(run, plan, intersectRanges(uncovered, [{ fromBlock: windowStart, toBlock: head }]))
+  await runPairScan(run, plan, intersectRanges(uncovered, [{ fromBlock: windowStart, toBlock: head }]), opts.signal)
 }
 
 /** The pair's remaining history, completed in the scan-bound waves alongside adjacency. */

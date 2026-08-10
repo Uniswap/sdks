@@ -34,10 +34,12 @@ export type IterateWavesOptions<R extends WaveResult> = {
  * Builds the `onFirstRoute` handler (`src/router.ts#IterateOptions`) both streaming commands hand to
  * the SDK: one `first` line, on the same clock as the wave lines that follow.
  *
- * WHY THE STREAM NEEDED A SECOND KIND OF LINE AT ALL. The engine's wave 0 fires its speculative
- * route probes concurrently with a log scan, so on a warm mainnet index it holds a printable price
- * seconds before the wave — and therefore the first wave line — lands. Everything in that gap is a
- * `--watch` reader looking at a blank terminal while the answer already exists.
+ * WHY THE STREAM NEEDED A SECOND KIND OF LINE AT ALL. The engine's wave 0a fires its speculative
+ * route probes concurrently with everything else it awaits, and its stage does not close until the
+ * enumeration, compilation and (for a swap) preflight that follow have run — so it holds a printable
+ * price before the wave, and therefore the first wave line, lands. Everything in that gap is a
+ * `--watch` reader looking at a blank terminal while the answer already exists. (The gap used to
+ * also span wave 0's exact-pair log scan, which is wave 0b's now — see `search/waves.ts`' header.)
  *
  * The `emitted` latch is this module's own, not a restatement of the SDK's: the engine already
  * promises to call this once per search, and a host that prints a duplicate line the day that

@@ -371,8 +371,8 @@ export function renderSwapResult(result: SwapResult, trade: TradeContext, ctx: R
 }
 
 /**
- * The `first` line: the moment the search HAS a price, which lands up to a whole wave before wave 0
- * yields (`src/router.ts#IterateOptions.onFirstRoute`).
+ * The `first` line: the moment the search HAS a price, which lands before wave 0a yields
+ * (`src/router.ts#IterateOptions.onFirstRoute`).
  *
  * Shaped like a wave line on purpose — same columns, same `+Nms` origin — so the stream reads as one
  * timeline rather than two. It carries no `[n/m quoted]` counters and no improvement marker, because

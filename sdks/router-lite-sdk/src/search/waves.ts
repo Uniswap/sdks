@@ -52,17 +52,22 @@ import { evaluate } from './leader'
 // a stage primitive that holds no policy at all, so this file is where the
 // search's shape lives:
 //
-//   wave 0  hints (validated) + cached pools + speculative direct probes from
-//           every enabled module + a RECENT-WINDOW v4 exact-pair Initialize
-//           scan + the CONTENTION-GATED core half-pair probes
+//   wave 0a hints (validated) + cached pools + speculative direct probes from
+//           every enabled module + the CONTENTION-GATED core half-pair probes
 //           (`probeContendedCoreLegs` — wave 1's `tokenIn -> core` /
 //           `core -> tokenOut` evidence pass, pulled a wave early for exactly
 //           the cores whose legs already face per-pair slot pressure in the
-//           index this search woke up with, because wave 0's closing
-//           enumeration is the only one an anytime consumer ever sees)
+//           index this search woke up with, because wave 0a's closing
+//           enumeration is the first one an anytime consumer ever sees)
 //           + (swaps) the route-independent readiness reads — all
 //           concurrently, because a launcher-hinted brand-new asset should be
-//           routable without a single historical log scan
+//           routable without a single historical log scan. EVERYTHING HERE
+//           SETTLES IN ONE OR TWO ROUND TRIPS.
+//   wave 0b the RECENT-WINDOW v4 exact-pair Initialize scan — DISPATCHED by
+//           wave 0a (so its round trips overlap 0a's, and a healthy endpoint
+//           loses no wall clock to the split) but AWAITED here, one stage
+//           later, so the quotes above are never gated on a log query. See
+//           WAVE 0 ANSWERS BEFORE THE PAIR SCAN LANDS below.
 //   wave 1  core intermediates: probe both legs of tokenIn -> core -> tokenOut
 //   wave 2  focus-endpoint adjacency (see `selectFocus`), then exact-pair
 //           probes from each discovered neighbor to the other endpoint
@@ -99,8 +104,56 @@ import { evaluate } from './leader'
 //     outlast the caller's budget converts its whole runtime into pools and
 //     none of it into prices — see that function's header for the live numbers.
 //
+// WAVE 0 ANSWERS BEFORE THE PAIR SCAN LANDS (C5-B). Wave 0 used to await its
+// probes and its exact-pair log scan under one `Promise.all`, which made the
+// first-actionable answer — one `aggregate3` round trip — hostage to a log
+// query. On a healthy keyed endpoint that costs nothing (the scan is ~0.3s and
+// the probes are slower); on a timeout-shaped one the scan spends its whole
+// retry ladder, ~40s, while a hinted or direct-pair price sat finished in
+// `state.quoted` the entire time. That is precisely the case wave 0 exists for
+// — a launcher handing us a brand-new pool on a provider having a bad minute —
+// and the old shape defeated it exactly when it mattered.
+//
+// So the scan is DISPATCHED in wave 0a and AWAITED in wave 0b. Four properties
+// make that split free rather than merely faster:
+//
+//  - No wall clock is lost when both are fast. The scan's first request goes
+//    out before 0a awaits anything, so the two overlap exactly as they did
+//    under the `Promise.all`; 0b then awaits a promise that is usually already
+//    settled.
+//  - Nothing 0b discovers is lost. `runPairScan` writes to the shared index,
+//    and 0b closes with the same `quoteWhileDiscovering` + `quoteEnumerated`
+//    pair the scan-bound waves use, so a pool only the scan can find is priced
+//    before wave 1 — and priced AS IT ARRIVES, not only at the end.
+//  - The report cannot overclaim. The pair scan never writes
+//    `ProtocolDiscovery.complete` (it is pair-scoped, not endpoint-scoped —
+//    see `discovery.ts#exactPairPlan`), so a consumer that stops at 0a reads
+//    `v4: partial` exactly as it did when the scan ran inside wave 0.
+//  - The extra yield is an improvement event, not a new kind of event.
+//    `signatureOf` still suppresses a stage that changed nothing, so 0b yields
+//    only when the scan actually found something better.
+//
+// TWO COSTS, BOTH PAID KNOWINGLY. The first is a scan nobody is waiting for: a
+// consumer that takes 0a's answer and walks away leaves the dispatched scan in
+// flight. It is cancelled — see `startRecentPairScan` and `searchWaves`'
+// `finally` — rather than left to hold a Node event loop open behind a CLI that
+// has already printed its answer.
+//
+// The second is that a PROMISE-shaped caller whose wave 0a is already actionable
+// (a validated hint, or a direct pair the speculative probes hit) now resolves
+// without the pair scan's pools in its enumeration, where before it waited for
+// them. That is the definition of "first actionable" doing its job, and it is
+// bounded in exactly the way that matters: a wave 0a with NO answer — the
+// brand-new-asset case the recent-window scan exists for — is not actionable, so
+// the search runs on into 0b and the scan still decides it. The iterator shapes
+// (`quotes()`/`swaps()`) always see the merged result. Measured on the committed
+// replay goldens (Base ETH->USDC, a majors pair with a dozen direct pools): the
+// best route, its amount, and every alternative are byte-identical; only the
+// report's enumeration/quoting counters shrink, because the search stopped
+// earlier having correctly done less work.
+//
 // Speculative probes come in two flavors, and conflating them would be a
-// correctness bug: a *route probe* (wave 0) quotes tokenIn -> tokenOut and its
+// correctness bug: a *route probe* (wave 0a) quotes tokenIn -> tokenOut and its
 // result is a real quoted route; a *discovery probe* (waves 1-2) quotes one
 // leg of a prospective two-hop and is only evidence that the pool exists — its
 // amount is meaningless for the trade, so the pool is upserted into the index
@@ -112,7 +165,7 @@ import { evaluate } from './leader'
 // chain's own blocks — from the pinned head; on a
 // cold mainnet index the full v4 history is millions of blocks, and scanning
 // it inline would put hundreds of sequential chunked `eth_getLogs` in front of
-// the first yield, which is the opposite of what wave 0 is for. The remaining
+// wave 0b's yield, which is the opposite of what wave 0 is for. The remaining
 // history is completed in wave 2, which is scan-bound anyway. That split is
 // safe *only* because completeness is reported separately: discovery never
 // reads `complete` until the adjacency scans that subsume the pair scan have
@@ -232,16 +285,23 @@ export type SearchContext = {
    * Fired ONCE per search, with the leading route, the moment this search first has a price at all
    * — which is up to a whole wave earlier than the first yield.
    *
-   * WHY THE ENGINE PUSHES THIS RATHER THAN YIELDING IT. Wave 0 runs its speculative route probes
-   * CONCURRENTLY with the exact-pair log scan (see {@link wave0}), and the probes are one round trip
-   * while the scan is many: on a warm mainnet index the probes answer at ~3.3s and the wave — and
-   * therefore the wave's yield — lands at ~7s. Everything between those two numbers is time a
-   * streaming consumer spends with a printable answer already sitting in `state.quoted` and no way
-   * to learn of it. Yielding an extra early event instead would have said the same thing at the cost
-   * of changing the generator's yield SEQUENCE, which is a contract three other things rest on: the
-   * facade's "stop at the first actionable event" loops (`router.ts`), the yield-count assertions in
-   * `waves.test.ts`, and the recorded-replay goldens. A callback adds a strictly new channel and
-   * moves none of them.
+   * WHY THE ENGINE PUSHES THIS RATHER THAN YIELDING IT. Wave 0a runs its speculative route probes
+   * CONCURRENTLY with everything else it awaits (hints, readiness, the contended-core evidence pass
+   * — see {@link wave0a}), and the probes are one round trip while a two-stage evidence pass is
+   * three: on a warm mainnet index the probes answer well before the stage they sit in closes.
+   * Everything in that gap is time a streaming consumer spends with a printable answer already
+   * sitting in `state.quoted` and no way to learn of it. Yielding an extra early event instead would
+   * have said the same thing at the cost of changing the generator's yield SEQUENCE, which is a
+   * contract three other things rest on: the facade's "stop at the first actionable event" loops
+   * (`router.ts`), the yield-count assertions in `waves.test.ts`, and the recorded-replay goldens. A
+   * callback adds a strictly new channel and moves none of them.
+   *
+   * THE GAP IT COVERS GOT SMALLER, AND THAT IS THE POINT (C5-B). It used to also span the wave-0
+   * exact-pair log scan — many round trips, and on a degraded provider tens of seconds — because the
+   * wave awaited the scan before yielding. The scan is wave 0b's now, so the first YIELD lands
+   * roughly where this callback does. The callback is not thereby redundant: it still fires from the
+   * quoting call itself, ahead of the enumeration, compilation and (for a swap) preflight simulation
+   * that stand between a price existing and a stage closing.
    *
    * IT IS A NOTIFICATION, NOT A RESULT. What it carries is the current leader of `rankRoutes` over
    * everything priced so far — a real, quoted route, but one no later wave is bound by: a better
@@ -443,6 +503,22 @@ export type EngineState = {
    * (the coverage cache always re-opens its tail for reorgs, which would otherwise cost a second
    * identical scan of the same 32 blocks in every single search). */
   pairScanned: BlockRange[]
+  /**
+   * Wave 0's recent-window exact-pair scan, DISPATCHED by wave 0a and AWAITED by wave 0b — the one
+   * piece of engine work whose start and its await live in different stages, which is the whole of
+   * the C5-B split (see this file's header).
+   *
+   * It lives on the state rather than in a closure because the two stages are separate entries in
+   * {@link WAVES}, and it carries its own `cancel` because it can outlive the search: a consumer
+   * that takes wave 0a's answer and stops pulling never reaches wave 0b, so nothing would otherwise
+   * ever stop the scan. `searchWaves` cancels it in a `finally`, which covers the abandoned
+   * iterator, the abort, and the ordinary completed search alike (cancelling a settled scan is a
+   * no-op).
+   *
+   * Absent only before wave 0a has run — every search sets it, including one on a chain with no v4
+   * deployment, where the scan is an immediately-resolved no-op (`exactPairPlan` returns undefined).
+   */
+  pairScan?: { done: Promise<void>; cancel: () => void }
   /** Graph nodes that have proven useful as intermediates, in priority order. */
   intermediatePriority: string[]
   /** Best single-leg quoted `amountOut` per `pool.id`, THIS search only — the feedback that lets
@@ -868,8 +944,9 @@ async function runRouteProbes(run: Run, probes: QuoteProbe[]): Promise<void> {
   recordQuoteEvidence(run, quoted)
   recordFailures(run, amountIndependentFailures)
   // THE EARLIEST POINT IN A SEARCH THAT A PRICE EXISTS, in the ordinary (unhinted, cached-index)
-  // case: wave 0's route probes are one round trip, and they run concurrently with a log scan that
-  // is many. `recordQuoted` is what turns that into something a streaming consumer can see.
+  // case: wave 0a's route probes are one round trip, and nothing slower is allowed to gate them —
+  // the log scan they used to share a `Promise.all` with is wave 0b's now (C5-B). `recordQuoted` is
+  // what turns that into something a streaming consumer can see before the stage even closes.
   recordQuoted(run, quoted)
 }
 
@@ -1150,18 +1227,83 @@ function pickNeighbors(run: Run, endpoint: CurrencyRef, exclude: Address[], cap:
 // ---------------------------------------------------------------------------
 
 /**
- * Hints, cached pools, speculative direct probes, the v4 exact-pair scan, and (for swaps) the
- * route-independent readiness reads — all in flight at once. The exact-pair scan is a log query and
- * therefore the slow one, so it must never gate the probes; everything is folded in before the
- * wave's candidates are enumerated and ranked.
+ * Fires wave 0's recent-window exact-pair scan and hands back a handle wave 0b can await — the one
+ * scan in the engine that is started in one stage and awaited in the next (C5-B, see this file's
+ * header for why).
+ *
+ * THE WINDOW IS THE WAVE ENGINE'S DECISION, and it is the one that makes wave 0 a latency budget
+ * rather than a completeness one. The pair scan reaches back roughly a week of this chain's own
+ * blocks and no further; wave 2 finishes the history. DERIVED FROM THE MANIFEST, not a constant
+ * (C4-P1): the policy is "roughly the last week", and only this chain's block time turns that into
+ * a block count. A fixed block count would mean a week on mainnet and a day on Base for the same
+ * code — see `constants.ts#WAVE0_RECENT_WINDOW_SECONDS`.
+ *
+ * IT CARRIES ITS OWN ABORT CONTROLLER because its lifetime is no longer the stage's. The consumer
+ * this whole split exists for — `getSwap`/`getQuote`, which stop at the first actionable result —
+ * takes wave 0a's answer and never pulls wave 0b, so without a cancel the scan would keep issuing
+ * `eth_getLogs` (and, on the endpoint shape that motivated C5-B, keep sleeping through a ~40s retry
+ * ladder) against a search nobody is waiting for: semaphore permits spent for a caller that has
+ * gone, and a Node event loop held open behind a CLI that has already printed its answer — the same
+ * failure mode `settleOrAfter` exists to avoid one stage over. The controller FORWARDS `req.signal`
+ * rather than replacing it, so the caller's own abort still stops the scan exactly as it always did;
+ * this is strictly an additional way to stop, never a way to keep going.
+ *
+ * The no-op rejection handler is the twin of that: with nothing awaiting `done` on the fast path, a
+ * scan that threw would surface as an unhandled rejection. Wave 0b awaits the ORIGINAL promise, so
+ * the failure is still raised — and still fails the search — for the consumer that gets that far.
  */
-async function wave0(run: Run): Promise<void> {
+function startRecentPairScan(run: Run): { done: Promise<void>; cancel: () => void } {
+  const controller = new AbortController()
+  const outer = run.req.signal
+  const forward = (): void => controller.abort()
+
+  if (outer?.aborted) controller.abort()
+  else outer?.addEventListener('abort', forward, { once: true })
+
+  // Unsubscribed on BOTH exits, not just the scan's own: `req.signal` is frequently one long-lived
+  // budget signal shared across many searches on a router, and the pathological case this whole
+  // function exists for — a scan that is wedged and never settles — is exactly the one where the
+  // `finally` below never runs. Leaving the listener behind there would accumulate one per search on
+  // a signal that outlives all of them.
+  const release = (): void => outer?.removeEventListener('abort', forward)
+
+  const done = scanExactPairRecent(run, {
+    window: wave0PairScanBlocks(run.ctx.manifest),
+    signal: controller.signal,
+  }).finally(release)
+  done.catch(() => {})
+
+  return {
+    done,
+    cancel: () => {
+      controller.abort()
+      release()
+    },
+  }
+}
+
+/**
+ * Wave 0a — everything that can answer in a round trip or two: hints, cached pools, speculative
+ * direct probes, the contention-gated core evidence pass, and (for swaps) the route-independent
+ * readiness reads, all in flight at once, because a launcher-hinted brand-new asset should be
+ * routable without a single historical log scan.
+ *
+ * WHAT IS NOT HERE IS THE POINT. The exact-pair log scan is DISPATCHED here — first, before this
+ * stage awaits anything, so its round trips overlap the probes' exactly as they did when both sat
+ * under one `Promise.all` — and AWAITED in wave 0b. Nothing this stage yields is gated on a log
+ * query (C5-B; see this file's header for the measurements).
+ */
+async function wave0a(run: Run): Promise<void> {
   const { ctx, req, state } = run
+
+  // FIRST, and before any `await`: the scan's first request goes out while this stage's own probes
+  // are still being assembled, which is what keeps the split free on a healthy endpoint.
+  state.pairScan = startRecentPairScan(run)
 
   const probes = enabledModules(ctx).flatMap((m) => m.speculativeDirect(req.tokenIn, req.tokenOut, req.amountIn, ctx.manifest))
 
   // Cores are first-class intermediates from the very first enumeration, not from wave 1. Free (no
-  // RPC), and load-bearing on a warm index: wave 0's closing `quoteEnumerated` is the anytime
+  // RPC), and load-bearing on a warm index: wave 0a's closing `quoteEnumerated` is the anytime
   // contract's FIRST answer, and on a dense cached index `orderIntermediates`' fallback ranking
   // (newest-touching-pool) is exactly the recency heuristic that mis-ranks dense graphs.
   for (const core of coresOf(run)) {
@@ -1188,23 +1330,14 @@ async function wave0(run: Run): Promise<void> {
       : Promise.resolve(undefined)
 
   // Readiness deliberately FIRST, so the one element this destructuring names can never be silently
-  // renumbered by a probe/scan added to the batch (which is exactly how `probeContendedCoreLegs`'s
+  // renumbered by a probe added to the batch (which is exactly how `probeContendedCoreLegs`'s
   // insertion briefly handed `readinessResult` a probe pass's `undefined`).
-  const [readinessResult] = await Promise.all([
-    readiness,
-    resolveHints(run),
-    // THE WINDOW IS THIS WAVE'S DECISION, and it is the one that makes wave 0 a latency budget
-    // rather than a completeness one (see this file's header). The pair scan reaches back roughly a
-    // week of this chain's own blocks and no further; wave 2 finishes the history.
-    //
-    // DERIVED FROM THE MANIFEST, not a constant (C4-P1): the policy is "roughly the last week", and
-    // only this chain's block time turns that into a block count. A fixed block count would mean a
-    // week on mainnet and a day on Base for the same code — see
-    // `constants.ts#WAVE0_RECENT_WINDOW_SECONDS`.
-    scanExactPairRecent(run, { window: wave0PairScanBlocks(ctx.manifest) }),
-    runRouteProbes(run, probes),
-    probeContendedCoreLegs(run),
-  ])
+  //
+  // AND THIS BATCH IS WHAT THE `leader.ts` INVARIANT MEANS BY "ONCE, IN WAVE 0, CONCURRENTLY": the
+  // readiness reads are awaited here, in the FIRST stage, so every `evaluate` the generator runs —
+  // wave 0a's included — already has `state.requirements` in hand. Splitting the wave moved the pair
+  // scan out; it did not move this.
+  const [readinessResult] = await Promise.all([readiness, resolveHints(run), runRouteProbes(run, probes), probeContendedCoreLegs(run)])
   if (readinessResult !== undefined) {
     state.requirements = readinessResult.requirements
     // A requirement set assembled from reads that did not all land is not a to-do list anyone should
@@ -1216,6 +1349,24 @@ async function wave0(run: Run): Promise<void> {
     }
   }
 
+  await quoteEnumerated(run)
+}
+
+/**
+ * Wave 0b — the recent-window exact-pair scan wave 0a dispatched, awaited and folded in.
+ *
+ * SCAN-BOUND, SO IT QUOTES AS IT GOES, exactly like waves 1-3 (this file's header, property 4). The
+ * scan is the only thing in this stage and the only thing in wave 0 that a capped or timing-out
+ * endpoint can stretch past the caller's budget, so an abort landing inside it must strand at most
+ * one interleave's worth of discovery rather than every pool the scan surfaced.
+ *
+ * A `undefined` handle means wave 0a never ran (nothing else can produce one), so there is nothing
+ * to await; a chain with no v4 deployment still sets the handle, around an already-resolved no-op.
+ */
+async function wave0b(run: Run): Promise<void> {
+  const pairScan = run.state.pairScan
+  if (pairScan === undefined) return
+  await quoteWhileDiscovering(run, pairScan.done)
   await quoteEnumerated(run)
 }
 
@@ -1232,7 +1383,7 @@ function coresOf(run: Run): Address[] {
  * `core -> tokenOut`), issued a wave early for exactly the cores whose legs ALREADY face per-pair
  * slot pressure in the index this search woke up with.
  *
- * WHY A WAVE EARLY: wave 0's closing `quoteEnumerated` is the first improvement the engine yields,
+ * WHY A WAVE EARLY: wave 0a's closing `quoteEnumerated` is the first improvement the engine yields,
  * and an anytime consumer (`getQuote`, the CLI without `--watch`) rightly stops there. On a cold
  * index that enumeration has nothing to mis-rank — the index is empty or near it — but on a warm
  * dense index it is the whole game, and without evidence its contended-leg selection falls back to
@@ -1259,8 +1410,15 @@ function coresOf(run: Run): Address[] {
  * best realized intermediate output stage 1 observed — the same number the leading route's second
  * leg will actually be fed. A core whose stage 1 produced nothing falls back to `req.amountIn`,
  * which is the pre-existing behavior of the wave-1 probes and still ranks a pair's pools under
- * SOME consistent amount. The price is one extra sequential round trip, paid only under contention,
- * inside a wave that is concurrently waiting on a log scan anyway.
+ * SOME consistent amount. The price is one extra sequential round trip, paid only under contention.
+ *
+ * THAT ROUND TRIP USED TO BE FREE AND IS NOT ANY MORE (C5-B). Wave 0 awaited a log scan, so these
+ * two probe rounds hid entirely underneath it; wave 0a awaits nothing slower, so under contention
+ * they ARE the stage's critical path. The trade is unchanged in kind and still worth making: the
+ * dense-index enumeration these probes feed is the first — and, for an anytime consumer, the only —
+ * answer the search produces, and a first answer 5.6x off the achievable price is not a latency win.
+ * They remain gated on contention precisely so the sparse/cold case, where evidence cannot change
+ * the outcome, pays nothing at all.
  */
 async function probeContendedCoreLegs(run: Run): Promise<void> {
   const { ctx, req, state } = run
@@ -1396,9 +1554,14 @@ async function wave3(run: Run): Promise<void> {
   await quoteEnumerated(run)
 }
 
-const WAVES: ((run: Run) => Promise<void>)[] = [wave0, wave1, wave2, wave3]
+// FIVE STAGES, FOUR WAVES. `wave0a`/`wave0b` are two entries because the generator's evaluate-and-
+// yield step lives BETWEEN entries — that is the only reason they are split, and it is the whole
+// C5-B fix: wave 0a's answer reaches the caller without waiting on wave 0b's log scan. They remain
+// one wave conceptually (one latency budget, one recent-window look at the pair), and nothing
+// downstream numbers them: the CLI's `wave N` counts YIELDS, not entries here.
+const WAVES: ((run: Run) => Promise<void>)[] = [wave0a, wave0b, wave1, wave2, wave3]
 
-/** The number of waves the engine runs, exported so callers reasoning about a per-search cumulative
+/** The number of stages the engine runs, exported so callers reasoning about a per-search cumulative
  * count (e.g. `internal/testing.ts#assertResultCoherent`'s `preflightAttempted` sanity bound) have an
  * honest ceiling to check against instead of a hand-copied literal that could drift from `WAVES`. */
 export const WAVE_COUNT = WAVES.length
@@ -1420,13 +1583,19 @@ function signatureOf(result: InternalResult): string {
 // ---------------------------------------------------------------------------
 
 /**
- * Runs the bounded wave search, yielding the current best after every wave that improves it (or
+ * Runs the bounded wave search, yielding the current best after every STAGE that improves it (or
  * changes its requirements/verification status) and always yielding a final `done: true` result
  * carrying the complete {@link SearchReport}.
  *
- * The generator is lazy: a wave runs only when the consumer pulls. A caller that stops at the first
+ * The generator is lazy: a stage runs only when the consumer pulls. A caller that stops at the first
  * actionable result never pays for the later waves' log scans, and abandoning the iterator early
  * keeps everything the shared `PoolIndex` learned along the way.
+ *
+ * STAGES, NOT WAVES, IS THE HONEST WORD FOR WHAT THIS LOOP ITERATES (C5-B): wave 0 is two entries in
+ * {@link WAVES}, so that its probe half can be evaluated and yielded without waiting on its log-scan
+ * half. Nothing about the yield CONTRACT changes — `signatureOf` still suppresses a stage that
+ * changed nothing observable, so the extra entry produces an extra yield only when wave 0b's scan
+ * actually improved on wave 0a's answer, which is an improvement event like any other.
  *
  * `signal` is honored between waves and passed down into the log scanner and the quoting engine;
  * an abort finalizes immediately with `report.aborted = true`, `done: true`, and the best route
@@ -1458,23 +1627,33 @@ export async function* searchWaves(
 
   let lastSignature: string | undefined
 
-  for (let i = 0; i < WAVES.length; i++) {
-    if (req.signal?.aborted) {
-      run.state.aborted = true
-      yield await evaluate(run, true)
-      return
-    }
+  try {
+    for (let i = 0; i < WAVES.length; i++) {
+      if (req.signal?.aborted) {
+        run.state.aborted = true
+        yield await evaluate(run, true)
+        return
+      }
 
-    await WAVES[i]!(run)
-    if (req.signal?.aborted) run.state.aborted = true
+      await WAVES[i]!(run)
+      if (req.signal?.aborted) run.state.aborted = true
 
-    const done = run.state.aborted || i === WAVES.length - 1
-    const result = await evaluate(run, done)
-    const signature = signatureOf(result)
-    if (done || signature !== lastSignature) {
-      lastSignature = signature
-      yield result
+      const done = run.state.aborted || i === WAVES.length - 1
+      const result = await evaluate(run, done)
+      const signature = signatureOf(result)
+      if (done || signature !== lastSignature) {
+        lastSignature = signature
+        yield result
+      }
+      if (done) return
     }
-    if (done) return
+  } finally {
+    // THE ONE THING THAT CAN OUTLIVE THIS GENERATOR (C5-B): wave 0a DISPATCHES the recent-window
+    // pair scan and wave 0b awaits it, so a consumer that takes wave 0a's answer and stops pulling —
+    // which is exactly what `getQuote`/`getSwap` do, and exactly what the split is for — leaves that
+    // scan in flight with nothing left to await it. Cancelling here covers every exit this generator
+    // has (abandoned mid-iteration, aborted, or finished normally) with one line, and cancelling a
+    // scan that already settled is a no-op, so the ordinary path pays nothing for it.
+    run.state.pairScan?.cancel()
   }
 }

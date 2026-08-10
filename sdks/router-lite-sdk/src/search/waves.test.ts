@@ -295,6 +295,17 @@ type ClientScript = {
   feeScanMaxSpan?: bigint
   /** v4 `Initialize` history matched by the exact-pair query. */
   pairLogs?: (Log & { record: PoolRecord })[]
+  /**
+   * Held in front of every EXACT-PAIR `eth_getLogs`, and nothing else — the timeout-shaped provider
+   * C5-B is about, expressed as a promise a test can simply never resolve.
+   *
+   * It is the only way to script the shape the wave-0 split exists for: a pair scan that is
+   * genuinely in flight and genuinely not finishing, while every `eth_call` around it answers
+   * normally. `logDelayMs` cannot stand in for it (it delays every scan by a fixed amount and always
+   * finishes), and a slow-but-finite delay would let a regression pass by merely being slower than
+   * the test's patience rather than by being wrong.
+   */
+  pairScanGate?: Promise<void>
   /** Endpoints (lowercased) whose adjacency scans always fail, simulating a broken log source. */
   failScansFor?: string[]
   /** Consumed in order by preflight simulations; anything past the end succeeds. */
@@ -348,8 +359,23 @@ type Counters = {
   calls: number
   scannedEndpoints: Set<string>
   feeScans: number
+  /** Exact-pair `eth_getLogs` that were ANSWERED. */
   pairScans: number
+  /**
+   * Exact-pair `eth_getLogs` that were PUT ON THE WIRE — counted before `pairScanGate`, so the
+   * difference between this and `pairScans` is exactly the scan that is in flight and unfinished.
+   * "Dispatched but never completed" is the whole claim C5-B makes about wave 0a, and one counter
+   * cannot express it.
+   */
+  pairScansDispatched: number
   pairScanRanges: { fromBlock: bigint; toBlock: bigint }[]
+  /**
+   * Every quote `eth_call` served and every `eth_getLogs` COMPLETED, in the order they happened —
+   * `'quote'` / `'getLogs'`. The counters above say how much of each the search did; only an
+   * ordering can say that the first price was not sequenced behind a log query, which is the
+   * latency claim itself rather than a proxy for it.
+   */
+  timeline: ('quote' | 'getLogs')[]
   /** Every `eth_call` this stub actually served (registered or reverted), keyed by `${to}:${data}` —
    * finer-grained than `calls` so a test can assert exactly one candidate's call count across
    * multiple `searchWaves` invocations sharing the same `PoolIndex`. Inner aggregate3 calls count
@@ -374,7 +400,9 @@ function stubClient(script: ClientScript): { client: SearchContext['client']; co
     scannedEndpoints: new Set(),
     feeScans: 0,
     pairScans: 0,
+    pairScansDispatched: 0,
     pairScanRanges: [],
+    timeline: [],
     callsByKey: new Map(),
     aggregate3Calls: 0,
     dispatchedByKey: new Map(),
@@ -392,8 +420,14 @@ function stubClient(script: ClientScript): { client: SearchContext['client']; co
       }
       if (args.method === 'eth_getBalance') return toHex(balance)
       if (args.method === 'eth_getLogs') {
+        // Counted the instant the request ARRIVES — ahead of every delay and gate below, because a
+        // test's whole point may be that this request went out and never came back.
+        const pairQuery = isPairQuery(args.params[0])
+        if (pairQuery) counters.pairScansDispatched++
         if (script.logDelayMs !== undefined) await new Promise((r) => setTimeout(r, script.logDelayMs))
+        if (pairQuery && script.pairScanGate !== undefined) await script.pairScanGate
         const served = serveLogs(args.params[0])
+        counters.timeline.push('getLogs')
         if (script.abortWhen?.()) script.controller?.abort()
         return served
       }
@@ -461,6 +495,7 @@ function stubClient(script: ClientScript): { client: SearchContext['client']; co
    * regardless of which dispatch path a test runs under. */
   function serveQuoteCall(target: string, data: Hex): Hex {
     counters.calls++
+    counters.timeline.push('quote')
     if (script.abortAfterCalls !== undefined && counters.calls >= script.abortAfterCalls) script.controller?.abort()
 
     const key = `${target}:${data}`
@@ -473,6 +508,14 @@ function stubClient(script: ClientScript): { client: SearchContext['client']; co
       throw new Error('execution reverted') // no pool there
     }
     return entry
+  }
+
+  /** The v4 exact-pair query, told apart from the v4 adjacency queries the same way `serveLogs`
+   * does it: two bound token topics rather than one. Hoisted out so the gate above can be applied
+   * BEFORE the request is served, which `serveLogs`' own classification is too late for. */
+  function isPairQuery(filter: any): boolean {
+    if (!Array.isArray(filter?.topics) || filter.topics[0] !== V4_TOPIC) return false
+    return (filter.topics as (string | null)[]).slice(1).filter((t) => typeof t === 'string').length >= 2
   }
 
   /**
@@ -563,6 +606,25 @@ async function drain(gen: AsyncGenerator<InternalResult>): Promise<InternalResul
   const events: InternalResult[] = []
   for await (const e of gen) events.push(e)
   return events
+}
+
+/**
+ * Pulls a search through WAVE 0 — both of its stages (C5-B: 0a's probes, then 0b's recent-window
+ * exact-pair scan) — and returns the last event seen.
+ *
+ * The second pull is CONDITIONAL, and that is the honest shape of the split rather than a hedge.
+ * Wave 0b yields only when its scan improved on wave 0a (`signatureOf` suppresses a stage that
+ * changed nothing observable), and how fast a scripted scan answers decides which of the two stages
+ * a pool it finds first shows up in — a scan that resolves in a microtask lands inside 0a, one that
+ * takes a timer's turn lands in 0b. Both are correct; neither is something a test should pin.
+ *
+ * What a caller pairs this with instead is `counters.scans === 0` — no ADJACENCY scan has run — which
+ * proves the answer really came from wave 0 rather than from a later wave the second pull reached.
+ */
+async function throughWave0(gen: AsyncGenerator<InternalResult>): Promise<InternalResult> {
+  const first = (await gen.next()).value as InternalResult
+  if (first.best !== undefined || first.done) return first
+  return (await gen.next()).value as InternalResult
 }
 
 /** How `getSwap`/`getQuote` consume the engine: stop pulling at the first actionable result. */
@@ -1169,10 +1231,12 @@ test('wave 0 scans only the recent window; the deep history completes in the sca
   const ctx = makeContext(client, manifestWith({ v4: true, deploymentBlock: V4_DEPLOY_BLOCK }))
 
   const gen = searchWaves(ctx, quoteReq, 'quote')
-  const first = (await gen.next()).value as InternalResult
+  const first = await throughWave0(gen)
 
-  // Wave 0 found the pool without reading a single pre-window block.
+  // Wave 0 found the pool without reading a single pre-window block — and without any adjacency
+  // scan, so it really was wave 0 (0a or 0b) and not a later wave that happened to be pulled.
   expect(first.best?.quote.amountOut).toBe(900n)
+  expect(counters.scans).toBe(0)
   expect(counters.pairScanRanges.every((r) => r.fromBlock >= WAVE0_WINDOW_START)).toBe(true)
   // The pre-window history is still outstanding (the trailing entry is the standing reorg overlap).
   expect(ctx.index.uncovered('v4', ctx.index.pairScope(TOKEN_A, TOKEN_B), V4_DEPLOY_BLOCK, BLOCK_NUMBER)[0]).toEqual({
@@ -1211,14 +1275,17 @@ test('wave 0\'s window is the MANIFEST\'s week, not mainnet\'s — a 2s chain sc
   expect(wave0PairScanBlocks(fastChain)).toBe(302_400n) // 604800/2 — six times mainnet's 50_400
   expect(windowStart).toBeLessThan(launchedThreeDaysAgo) // the launch is inside the derived window
 
-  const first = (await searchWaves(ctx, quoteReq, 'quote').next()).value as InternalResult
+  const first = await throughWave0(searchWaves(ctx, quoteReq, 'quote'))
 
-  // Wave 0 alone found it, and reached no further back than the derived window.
+  // Wave 0 alone found it (no adjacency scan ran), and reached no further back than the derived window.
   expect(first.best?.quote.amountOut).toBe(900n)
+  expect(counters.scans).toBe(0)
   expect(counters.pairScanRanges.every((r) => r.fromBlock >= windowStart)).toBe(true)
   expect(counters.pairScanRanges.some((r) => r.fromBlock < WAVE0_WINDOW_START)).toBe(true) // past mainnet's reach
 
-  // The mainnet-shaped manifest, given the identical chain, misses the same launch in wave 0.
+  // The mainnet-shaped manifest, given the identical chain, misses the same launch in wave 0. One
+  // pull is enough and is the point: wave 0a yields, and there is nothing for wave 0b's window to
+  // add, so the search is still empty when the anytime consumer first hears from it.
   const { client: client2 } = stubClient({
     calls: { ...quoteEntry([pool], AMOUNT_IN, 900n) },
     pairLogs: [v4PairLog(launchedThreeDaysAgo)],
@@ -1226,6 +1293,149 @@ test('wave 0\'s window is the MANIFEST\'s week, not mainnet\'s — a 2s chain sc
   const slowCtx = makeContext(client2, manifestWith({ v4: true, deploymentBlock: V4_DEPLOY_BLOCK }))
   const slowFirst = (await searchWaves(slowCtx, quoteReq, 'quote').next()).value as InternalResult
   expect(slowFirst.best).toBeUndefined()
+})
+
+// ---------------------------------------------------------------------------
+// C5-B — wave 0 answers before the pair scan lands.
+//
+// Wave 0 used to await its probes and its exact-pair log scan under one
+// `Promise.all`, so the first-actionable answer (one `aggregate3` round trip)
+// was hostage to a log query. Live, on a timeout-shaped endpoint, that meant a
+// hinted route sitting finished in `state.quoted` for the ~40s the scan spent
+// on its retry ladder — the launcher case wave 0 exists for, defeated exactly
+// when the provider degraded. The scan is DISPATCHED in wave 0a and AWAITED in
+// wave 0b now; these four tests pin both halves of that, and the fact that
+// nothing else moved.
+// ---------------------------------------------------------------------------
+
+test('C5-B: a pair scan that never lands cannot gate wave 0 — a hinted swap resolves with the scan still in flight', async () => {
+  // THE LIVE DEFECT, REPRODUCED. The gate below never resolves, which is the endpoint that motivated
+  // the split expressed exactly: the exact-pair `eth_getLogs` is genuinely on the wire and genuinely
+  // not coming back, while every `eth_call` around it answers normally.
+  //
+  // Before the split this search could not return at all — wave 0's `Promise.all` awaited the scan.
+  let openGate = (): void => {}
+  const gate = new Promise<void>((resolve) => {
+    openGate = resolve
+  })
+
+  const hintedPool = stubPoolRef('v3', TOKEN_A, TOKEN_B, { fee: NONSTANDARD_FEE })
+  const scannedV4 = stubV4PoolRef(TOKEN_A, TOKEN_B)
+  const { client, counters } = stubClient({
+    calls: {
+      ...quoteEntry([hintedPool], AMOUNT_IN, 100n),
+      // Deliberately the BETTER route: if the scan ever landed inside wave 0a, this is what the
+      // result would say, so the assertion below distinguishes "did not wait" from "waited and the
+      // scan had nothing".
+      ...quoteEntry([scannedV4], AMOUNT_IN, 5_000n),
+    },
+    pairLogs: [v4PairLog(BLOCK_NUMBER - 10n)],
+    pairScanGate: gate,
+  })
+  const ctx = makeContext(client, manifestWith({ v3: true, v4: true, deploymentBlock: V4_DEPLOY_BLOCK }))
+  const req: SwapRequest = { ...swapReq, hints: [{ protocol: 'v3', token0: TOKEN_A, token1: TOKEN_B, fee: NONSTANDARD_FEE }] }
+
+  const events = await drainUntilActionable(searchWaves(ctx, req, 'swap'))
+
+  // The first actionable result arrived on the hint alone.
+  expect(events).toHaveLength(1)
+  expect(events[0]!.best?.execution).toBe('verified')
+  expect(events[0]!.best?.quote.amountOut).toBe(100n)
+  expect(events[0]!.tx?.to).toBe(UNIVERSAL_ROUTER)
+
+  // ...with the scan dispatched (so the two really do overlap) and ZERO completions.
+  expect(counters.pairScansDispatched).toBeGreaterThan(0)
+  expect(counters.pairScans).toBe(0)
+
+  // AND THE REPORT NEVER CLAIMS THE SCAN IT DID NOT GET. The pair scan is pair-scoped and writes no
+  // endpoint coverage, so v4 reads `partial` here exactly as it did when the scan ran inside wave 0
+  // — a consumer that stops on this event can never mistake a windowed look for an exhaustive one.
+  expect(events[0]!.report.discovery.v4.status).toBe('partial')
+  assertCoherent('swap', events)
+
+  openGate() // let the abandoned scan wind down rather than leaving it wedged for the file's afterEach
+})
+
+test('C5-B: the first quote is on the wire before ANY log query comes back', async () => {
+  // The latency claim itself, not a proxy for it. Ordering, not counting: a regression that
+  // re-introduced the `Promise.all` would still quote everything this test quotes — just after the
+  // scan, which is the only thing that was ever wrong with it.
+  const directPool = stubPoolRef('v2', TOKEN_A, TOKEN_B)
+  const { client, counters } = stubClient({
+    calls: { ...quoteEntry([directPool], AMOUNT_IN, 100n) },
+    pairLogs: [v4PairLog(BLOCK_NUMBER - 10n)],
+    // Every scan takes a timer's turn; every `eth_call` resolves in a microtask. So an engine that
+    // orders the first quote behind the scan is off by a whole macrotask, and an engine that does
+    // not is off by nothing.
+    logDelayMs: 5,
+  })
+  const ctx = makeContext(client, manifestWith({ v4: true, deploymentBlock: V4_DEPLOY_BLOCK }))
+
+  const gen = searchWaves(ctx, quoteReq, 'quote')
+  const first = (await gen.next()).value as InternalResult
+  const atYield = [...counters.timeline]
+  // Abandoning the iterator with wave 0a's answer in hand is exactly what `getQuote` does, and it
+  // is what runs `searchWaves`' `finally` — the cancel that keeps the dispatched scan from
+  // outliving the search.
+  await gen.return(undefined as never)
+
+  expect(first.best?.quote.amountOut).toBe(100n)
+  // The scan was on the wire the whole time...
+  expect(counters.pairScansDispatched).toBeGreaterThan(0)
+  // ...and NOTHING the caller received was sequenced after a log query coming back, because not one
+  // had. Under the old `Promise.all` the first entry here was necessarily `getLogs`.
+  expect(atYield[0]).toBe('quote')
+  expect(atYield).not.toContain('getLogs')
+})
+
+test('C5-B: both fast — a pool only the wave-0b scan can find still routes, before wave 1', async () => {
+  // The other half of the split, and the one a naive "just drop the scan from wave 0" would break.
+  // No hint and no guessable direct pair, so wave 0a has nothing at all; the v4 pool arrives only
+  // through the Initialize log, and it still decides the answer inside wave 0 — no adjacency scan
+  // has run, so nothing later could have supplied it.
+  const scannedV4 = stubV4PoolRef(TOKEN_A, TOKEN_B)
+  const { client, counters } = stubClient({
+    calls: { ...quoteEntry([scannedV4], AMOUNT_IN, 900n) },
+    pairLogs: [v4PairLog(BLOCK_NUMBER - 10n)],
+  })
+  const ctx = makeContext(client, manifestWith({ v4: true, deploymentBlock: V4_DEPLOY_BLOCK }))
+
+  const gen = searchWaves(ctx, quoteReq, 'quote')
+  const throughZero = await throughWave0(gen)
+
+  expect(throughZero.best?.quote.amountOut).toBe(900n)
+  expect(counters.scans).toBe(0) // no adjacency wave ran: this is wave 0's answer
+  expect(counters.pairScans).toBeGreaterThan(0)
+  await gen.return(undefined as never)
+})
+
+test('C5-B: an abort inside wave 0b keeps wave 0a\'s answer and reports the aborted axis', async () => {
+  // The abort seam the split created. Wave 0a's probes are microtasks and the scan takes a timer's
+  // turn, so the caller's budget expiring on the first log answer lands squarely inside wave 0b —
+  // after 0a has priced and yielded, before 0b could fold anything in.
+  const controller = new AbortController()
+  const directPool = stubPoolRef('v2', TOKEN_A, TOKEN_B)
+  const scannedV4 = stubV4PoolRef(TOKEN_A, TOKEN_B)
+  const { client, counters } = stubClient({
+    calls: { ...quoteEntry([directPool], AMOUNT_IN, 100n), ...quoteEntry([scannedV4], AMOUNT_IN, 9_000n) },
+    pairLogs: [v4PairLog(BLOCK_NUMBER - 10n)],
+    logDelayMs: 4,
+    abortWhen: () => true, // the budget expires the moment the pair scan answers
+    controller,
+  })
+  const ctx = makeContext(client, manifestWith({ v4: true, deploymentBlock: V4_DEPLOY_BLOCK }))
+
+  const events = await drain(searchWaves(ctx, { ...quoteReq, signal: controller.signal }, 'quote'))
+  const final = events.at(-1)!
+
+  expect(final.report.aborted).toBe(true)
+  expect(final.done).toBe(true)
+  // Best-so-far from wave 0a survives; the 9_000n route the scan surfaced is never priced, and the
+  // report says so rather than quietly dropping it.
+  expect(final.best?.quote.amountOut).toBe(100n)
+  expect(counters.scans).toBe(0) // no adjacency wave ran after the abort
+  expect(final.report.discovery.v4.status).toBe('partial')
+  assertCoherent('quote', events)
 })
 
 test('the head-regression bound scales with the manifest\'s reorg depth, not a mainnet constant', async () => {
