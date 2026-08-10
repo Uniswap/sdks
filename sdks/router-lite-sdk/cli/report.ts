@@ -7,9 +7,13 @@
 // a compact, honest panel:
 //
 //  - one coverage line per protocol, with a proportional bar for `partial`
-//    (denominator: pinned head minus the earliest covered `fromBlock` — the
-//    span discovery itself chose to care about; there is no absolute "total
-//    history" denominator that wouldn't mislead more);
+//    (denominator: pinned head minus the protocol's demanded floor —
+//    `SearchReport.discovery[p].demandFloor`, the deployment block, fixed per
+//    protocol so the percentage cannot drift between runs depending on which
+//    sub-range happened to get scanned; there is no absolute "total history"
+//    denominator that wouldn't mislead more). `coveredRanges` is cumulative
+//    index knowledge at search end, not this run's own scan traffic, so a
+//    fully-cached protocol that scanned nothing this run still renders full;
 //  - quoting stats in the SDK's own invariant form
 //    (`attempted = ok + reverted + transport-lost`), because a revert and a
 //    429 are different evidence and the report keeps them apart on purpose;
@@ -196,14 +200,18 @@ function coverageLine(status: SearchReport['discovery'][keyof SearchReport['disc
     case 'failed':
       return `${red(bar(0))} ${red('failed — no coverage claimed')}`
     case 'partial': {
-      const ranges = status.coveredRanges
-      if (ranges.length === 0) return `${yellow(bar(0))} ${yellow('partial — nothing covered yet')}`
+      const { coveredRanges: ranges, demandFloor } = status
+      // The denominator is the DEMANDED floor (the protocol's deployment block), never
+      // `min(coveredRanges)` — that would make the percentage self-referential to whichever
+      // sub-range this run happened to scan, drifting between otherwise-identical runs as the cache
+      // warms. `demandFloor` is fixed per protocol, so this fraction is stable and can only grow
+      // across searches that share a cache.
+      if (ranges.length === 0) return `${yellow(bar(0))} ${yellow(`partial — nothing covered yet since #${demandFloor}`)}`
       const covered = ranges.reduce((sum, r) => sum + (r.toBlock - r.fromBlock + 1n), 0n)
-      const earliest = ranges.reduce((min, r) => (r.fromBlock < min ? r.fromBlock : min), ranges[0]!.fromBlock)
-      const span = head - earliest + 1n
+      const span = head - demandFloor + 1n
       const fraction = span > 0n ? Number((covered * 1000n) / span) / 1000 : 0
       const pct = (fraction * 100).toFixed(1)
-      return `${yellow(bar(fraction))} ${yellow(`partial — ${pct}% of blocks since #${earliest} (${ranges.length} range${ranges.length === 1 ? '' : 's'})`)}`
+      return `${yellow(bar(fraction))} ${yellow(`partial — ${pct}% of blocks since #${demandFloor} (${ranges.length} range${ranges.length === 1 ? '' : 's'})`)}`
     }
   }
 }

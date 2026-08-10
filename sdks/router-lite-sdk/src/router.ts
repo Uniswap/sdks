@@ -21,6 +21,7 @@ import { assertChainData, assertWrappedNativeConsistency, requireExecution, reor
 import { PoolIndex } from './pools/poolIndex'
 import type { PoolIndexStats } from './pools/poolIndex'
 import { PROTOCOL_MODULES } from './protocols'
+import { deploymentBlockOf } from './search/context'
 import { assertHintAddresses, buildHookData } from './search/hookData'
 import type { HeadWatermark, InternalResult, SearchContext } from './search/waves'
 import { fetchBlock, searchWaves } from './search/waves'
@@ -742,6 +743,10 @@ function buildOutageReport(manifest: ChainManifest): SearchReport {
   const discovery = protocolRecord<SearchReport['discovery'][Protocol]>((p) => ({
     status: manifest[p] !== undefined ? 'failed' : 'disabled',
     coveredRanges: [],
+    // No scan ever ran, so there is nothing to derive coverage from either — the demand floor is
+    // still the protocol's real deployment block (where the manifest configures one) so a caller
+    // reading it off this report sees the same number a real search's report would have used.
+    demandFloor: deploymentBlockOf(manifest, p) ?? ZERO_BLOCK.number,
   }))
 
   return {

@@ -299,7 +299,7 @@ export type CanonicalRoute = {
 
 export type CanonicalReport = {
   block: { number: string; timestamp: string }
-  discovery: Record<string, { status: string; coveredRanges: { fromBlock: string; toBlock: string }[] }>
+  discovery: Record<string, { status: string; coveredRanges: { fromBlock: string; toBlock: string }[]; demandFloor: string }>
   enumeration: SearchReport['enumeration']
   quoting: SearchReport['quoting']
   aborted: boolean
@@ -341,6 +341,7 @@ function canonicalReport(r: SearchReport): CanonicalReport {
       coveredRanges: [...d.coveredRanges]
         .sort((a, b) => (a.fromBlock < b.fromBlock ? -1 : a.fromBlock > b.fromBlock ? 1 : 0))
         .map((range) => ({ fromBlock: range.fromBlock.toString(), toBlock: range.toBlock.toString() })),
+      demandFloor: d.demandFloor.toString(),
     }
   }
   return {

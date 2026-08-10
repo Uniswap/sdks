@@ -790,7 +790,7 @@ test('classifySwap: requirements present but no candidate ever compiled falls th
   if (complete.status === 'no-route') expect(complete.alternatives).toContainEqual(fakeBest)
   assertResultCoherent(complete)
 
-  const incompleteReport = { ...emptyReport(), discovery: { ...emptyReport().discovery, v2: { status: 'partial' as const, coveredRanges: [] } } }
+  const incompleteReport = { ...emptyReport(), discovery: { ...emptyReport().discovery, v2: { status: 'partial' as const, coveredRanges: [], demandFloor: 0n } } }
   const incomplete = classifySwap({ best: fakeBest, alternatives: [], requirements: [requirement], report: incompleteReport, done: true })
   expect(incomplete.status).toBe('inconclusive')
   // This candidate is `execution: 'failed'` — the chain rejected it — so it is demoted into
@@ -995,7 +995,7 @@ test('classifySwap: partial discovery (no best) classifies inconclusive/discover
   // trouble) — the ONLY thing standing between this search and a completed verdict is one protocol's
   // discovery never finishing. `inconclusiveReason` must name that axis specifically, not fall back
   // to a generic code.
-  const report: SearchReport = { ...emptyReport(), discovery: { ...emptyReport().discovery, v2: { status: 'partial', coveredRanges: [] } } }
+  const report: SearchReport = { ...emptyReport(), discovery: { ...emptyReport().discovery, v2: { status: 'partial', coveredRanges: [], demandFloor: 0n } } }
 
   const r = classifySwap({ alternatives: [], report, done: true })
 

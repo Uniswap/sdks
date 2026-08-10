@@ -460,7 +460,25 @@ export type RankedRoute = QuotedRoute & {
 
 export type SearchReport = {
   block: BlockRef
-  discovery: Record<Protocol, { status: 'complete' | 'partial' | 'disabled' | 'failed'; coveredRanges: BlockRange[] }>
+  /**
+   * Per-protocol discovery coverage — CUMULATIVE INDEX KNOWLEDGE, not this run's scan traffic.
+   *
+   * `coveredRanges` is the merged set of blocks this search's index can *currently* answer for, over
+   * the demanded scopes (this trade's two endpoints, unioned): `demand − uncovered`, queried against
+   * the index right after this search's own scans landed. It is stable and monotone across searches
+   * that share a cache — a warm run that scans nothing new still reports everything the cache already
+   * knows, and running the same search twice in a row can only grow (never shrink) the covered
+   * fraction. This is deliberately NOT a record of which ranges this particular run's `eth_getLogs`
+   * calls happened to walk; that number resets every search and would make the reported coverage
+   * drift downward as the cache warms and there is less left to scan — exactly the dishonesty this
+   * field exists to rule out. `demandFloor` is the deployment-floor block the demand is measured
+   * from — fixed per protocol, so a percentage/denominator built from it (`head - demandFloor + 1`)
+   * does not wander between runs depending on which sub-range happened to get scanned.
+   */
+  discovery: Record<
+    Protocol,
+    { status: 'complete' | 'partial' | 'disabled' | 'failed'; coveredRanges: BlockRange[]; demandFloor: bigint }
+  >
   enumeration: {
     exhaustiveWithinMaxHops: boolean
     intermediatesDiscovered: number

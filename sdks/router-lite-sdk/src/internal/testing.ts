@@ -29,7 +29,7 @@ const ZERO_BLOCK: BlockRef = {
 export function emptyReport(): SearchReport {
   return {
     block: ZERO_BLOCK,
-    discovery: protocolRecord<SearchReport['discovery'][Protocol]>(() => ({ status: 'disabled', coveredRanges: [] })),
+    discovery: protocolRecord<SearchReport['discovery'][Protocol]>(() => ({ status: 'disabled', coveredRanges: [], demandFloor: 0n })),
     enumeration: zeroReportEnumeration(),
     quoting: zeroQuoting(),
     aborted: false,

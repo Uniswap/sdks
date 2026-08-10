@@ -401,7 +401,6 @@ export type ProtocolDiscovery = {
   complete: Set<string>
   /** A scan that asked for a non-empty range and got nothing back at all. */
   failed: boolean
-  covered: BlockRange[]
 }
 
 export type ExecutionState = { status: RankedRoute['execution']; revertData?: Hex }
@@ -596,7 +595,7 @@ export function initialState(block: BlockRef, headRegressed: boolean): EngineSta
       intermediatesDiscovered: 0,
       intermediatesSelected: 0,
     },
-    discovery: protocolRecord<ProtocolDiscovery>(() => ({ complete: new Set(), failed: false, covered: [] })),
+    discovery: protocolRecord<ProtocolDiscovery>(() => ({ complete: new Set(), failed: false })),
     pairScanned: [],
     adjacencyScanned: new Map(),
     intermediatePriority: [],

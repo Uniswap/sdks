@@ -61,14 +61,18 @@ const REPORT: SearchReport = {
     timestamp: 1_735_689_600n, // 2025-01-01T00:00:00Z
   },
   discovery: {
-    v2: { status: 'complete', coveredRanges: [{ fromBlock: 10_000_830n, toBlock: 23_456_789n }] },
-    v3: { status: 'disabled', coveredRanges: [] },
+    v2: { status: 'complete', coveredRanges: [{ fromBlock: 10_000_830n, toBlock: 23_456_789n }], demandFloor: 10_000_830n },
+    v3: { status: 'disabled', coveredRanges: [], demandFloor: 0n },
     v4: {
       status: 'partial',
       coveredRanges: [
         { fromBlock: 21_400_000n, toBlock: 21_500_000n },
         { fromBlock: 22_000_000n, toBlock: 23_456_789n },
       ],
+      // Deliberately EARLIER than the first covered range's `fromBlock` (21,400,000): the
+      // denominator is the demanded deployment floor, never `min(coveredRanges)` — a regression
+      // back to the latter would still pass a fixture where the two happen to coincide.
+      demandFloor: 21_000_000n,
     },
   },
   enumeration: {
@@ -91,7 +95,7 @@ describe('renderSearchReport', () => {
       '  block         #23456789 0x12ab…cd34 2025-01-01T00:00:00Z',
       '  discovery  v2 ▰▰▰▰▰▰▰▰▰▰ complete',
       '             v3 ▱▱▱▱▱▱▱▱▱▱ disabled (no bundle in manifest)',
-      '             v4 ▰▰▰▰▰▰▰▰▱▱ partial — 75.6% of blocks since #21400000 (2 ranges)',
+      '             v4 ▰▰▰▰▰▰▱▱▱▱ partial — 63.3% of blocks since #21000000 (2 ranges)',
       '  enumeration   14 candidates · 3/7 intermediates · exhaustive within 2 hops',
       '                pruned: 2 pools, 4 intermediates, 0 candidates',
       '  quoting       18 attempted = 12 ok + 6 reverted + 0 transport-lost',
@@ -108,6 +112,21 @@ describe('renderSearchReport', () => {
     }
     const lines = renderSearchReport(noisy)
     expect(lines[lines.length - 1]).toBe('  flags         aborted · head-regressed · preflight-budget-exhausted')
+  })
+
+  it('a `complete` protocol renders full/complete even with empty coveredRanges — never "nothing covered yet"', () => {
+    // The degenerate case the coverage-honesty fix rules out: a protocol fully known from an earlier
+    // search can finish a run with nothing NEW walked (so `coveredRanges` may legitimately be empty
+    // for a scope that needed no scanning at all) while still being `complete`. The renderer's
+    // `complete` branch must key off `status` alone, never treat an empty `coveredRanges` as "nothing
+    // is known".
+    const zeroScanButComplete = {
+      ...REPORT,
+      discovery: { ...REPORT.discovery, v2: { status: 'complete' as const, coveredRanges: [], demandFloor: 0n } },
+    }
+    const lines = renderSearchReport(zeroScanButComplete)
+    expect(lines).toContain('  discovery  v2 ▰▰▰▰▰▰▰▰▰▰ complete')
+    expect(lines.some((l) => l.includes('nothing covered yet'))).toBe(false)
   })
 })
 

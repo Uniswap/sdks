@@ -1,10 +1,10 @@
 import type { Address } from 'viem'
 
-import { mergeRanges } from '../internal/ranges'
-import type { Protocol, SearchReport } from '../types'
+import { mergeRanges, subtractRanges } from '../internal/ranges'
+import type { BlockRange, Protocol, SearchReport } from '../types'
 import { protocolRecord } from '../types'
 
-import { node } from './context'
+import { deploymentBlockOf, node } from './context'
 import type { Run } from './waves'
 
 // ---------------------------------------------------------------------------
@@ -42,16 +42,43 @@ export function discoveryStatus(
   return 'complete'
 }
 
+/**
+ * Cumulative index coverage for one protocol over this search's demanded scopes: the two trade
+ * endpoints, each queried against `ctx.index` (so this reads whatever the cache holds AFTER this
+ * search's own scans landed, not what this run happened to walk), unioned into one merged set —
+ * "how much does the router know for this search", the way `discoveryStatus` already judges
+ * completeness against both endpoints by name rather than a count of whatever got scanned.
+ *
+ * A protocol with no deployment block configured (disabled on this chain) reports no coverage: there
+ * is no demand to measure against.
+ */
+function coveredRangesFor(run: Run, protocol: Protocol, endpointNodes: Address[], deployBlock: bigint | undefined): BlockRange[] {
+  const { ctx, state } = run
+  if (deployBlock === undefined) return []
+  const head = state.block.number
+  const endpoints = new Map(endpointNodes.map((n) => [n.toLowerCase(), n]))
+  const demand = [{ fromBlock: deployBlock, toBlock: head }]
+  return mergeRanges(
+    [...endpoints.values()].flatMap((endpoint) => subtractRanges(demand, ctx.index.uncovered(protocol, endpoint, deployBlock, head))),
+  )
+}
+
 export function buildReport(run: Run): SearchReport {
   const { ctx, req, state } = run
 
   const inNode = node(req.tokenIn, ctx.manifest)
   const outNode = node(req.tokenOut, ctx.manifest)
 
-  const discovery = protocolRecord<SearchReport['discovery'][Protocol]>((p) => ({
-    status: discoveryStatus(run, p, [inNode, outNode]),
-    coveredRanges: mergeRanges(state.discovery[p].covered),
-  }))
+  const discovery = protocolRecord<SearchReport['discovery'][Protocol]>((p) => {
+    const deployBlock = deploymentBlockOf(ctx.manifest, p)
+    return {
+      status: discoveryStatus(run, p, [inNode, outNode]),
+      coveredRanges: coveredRangesFor(run, p, [inNode, outNode], deployBlock),
+      // Fixed per protocol regardless of which sub-ranges this run scanned — the denominator a
+      // percentage is built from must not wander between otherwise-identical runs.
+      demandFloor: deployBlock ?? state.block.number,
+    }
+  })
 
   const discoveryComplete = Object.values(discovery).every((d) => d.status === 'complete' || d.status === 'disabled')
 

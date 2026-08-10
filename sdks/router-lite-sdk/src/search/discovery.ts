@@ -281,7 +281,6 @@ export async function scanAdjacency(run: Run, endpoints: CurrencyRef[]): Promise
     const got = mergeRanges(covered.get(key) ?? [])
     const discovery = state.discovery[demand.protocol]
     for (const range of got) ctx.index.addCoverage(demand.protocol, demand.endpoint, range)
-    discovery.covered.push(...got)
     state.adjacencyScanned.set(key, mergeRanges([...(state.adjacencyScanned.get(key) ?? []), ...got]))
     // Complete means nothing this scope still wanted is left — which covers an abort, a given-up
     // sub-range and an exhausted request budget alike, without any of them needing its own flag.

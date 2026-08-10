@@ -117,15 +117,18 @@
       "discovery": {
         "v2": {
           "status": "partial",
-          "coveredRanges": []
+          "coveredRanges": [],
+          "demandFloor": "10000835"
         },
         "v3": {
           "status": "partial",
-          "coveredRanges": []
+          "coveredRanges": [],
+          "demandFloor": "12369621"
         },
         "v4": {
           "status": "partial",
-          "coveredRanges": []
+          "coveredRanges": [],
+          "demandFloor": "21688329"
         }
       },
       "enumeration": {

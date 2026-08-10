@@ -507,7 +507,6 @@ describe('scanAdjacency — a given-up sub-range is never claimed as covered', (
     await scanAdjacency(run, [TOKEN_A])
 
     expect(run.state.discovery.v3.failed).toBe(true)
-    expect(run.state.discovery.v3.covered).toEqual([])
     expect(run.ctx.index.uncovered('v3', TOKEN_A, DEPLOY, HEAD)).toEqual([{ fromBlock: DEPLOY, toBlock: HEAD }])
   })
 
