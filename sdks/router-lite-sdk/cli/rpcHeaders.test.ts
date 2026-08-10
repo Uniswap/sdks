@@ -89,6 +89,12 @@ describe('resolveRpcHeaders', () => {
     expect(resolveRpcHeaders('x-api-key: from-env', ['X-API-KEY: from-flag'])).toEqual({ 'X-API-KEY': 'from-flag' })
   })
 
+  it('two --rpc-header flags for the same name: the LAST one wins, case-insensitively — no env involved', () => {
+    expect(resolveRpcHeaders(undefined, ['X-Api-Key: first', 'X-Api-Key: second'])).toEqual({ 'X-Api-Key': 'second' })
+    // Casing may differ between the two occurrences too; the LAST flag's casing is what's kept.
+    expect(resolveRpcHeaders(undefined, ['X-Api-Key: first', 'x-api-key: second'])).toEqual({ 'x-api-key': 'second' })
+  })
+
   it('an unset env and no flags resolves to no headers at all', () => {
     expect(resolveRpcHeaders(undefined, [])).toEqual({})
   })
