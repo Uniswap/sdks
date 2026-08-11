@@ -456,7 +456,7 @@ export async function* search(
       if (req.signal?.aborted === true && !state.aborted) applyAbort(state)
 
       const dispatched = await pump(state, pumpCtx, req)
-      const quoted = composeRoutes(state, pumpCtx, req)
+      const quoted = composeRoutes(state, pumpCtx, req, kind)
       if (verifier !== undefined && state.requirements !== undefined) verifier.consider(quoted)
 
       const evaluated = quoted.map((q) => withExecution(state, q))

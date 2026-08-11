@@ -27,10 +27,11 @@ export type { FeeDiscovery, ProtocolModule } from './types'
 export { adjacencyQueries } from './adjacency'
 export type { AdjacencyShape } from './adjacency'
 
-// The PoolRef vocabulary itself: the three constructors (the only way a ref is ever built), the one
-// predicate — `isHooked` — that anything outside a module needs to ask about a pool's shape, and
-// `routeId`, which is nothing but those refs' own `id`s in leg order.
-export { isHooked, routeId, v2PoolRef, v3PoolRef, v4PoolRef } from './poolRef'
+// The PoolRef vocabulary itself: the three constructors (the only way a ref is ever built), the two
+// predicates — `isHooked`, and `hasReturnsDeltaHook` (the swap-RETURNS_DELTA permission bits, i.e.
+// "this pool's quote is the hook's claim") — that anything outside a module needs to ask about a
+// pool's shape, and `routeId`, which is nothing but those refs' own `id`s in leg order.
+export { hasReturnsDeltaHook, isHooked, routeId, v2PoolRef, v3PoolRef, v4PoolRef } from './poolRef'
 export type { V4PoolRef } from './poolRef'
 
 export const PROTOCOL_MODULES: Record<Protocol, ProtocolModule> = { v2: v2Module, v3: v3Module, v4: v4Module }

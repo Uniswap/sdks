@@ -1,10 +1,10 @@
 {
   "schemaVersion": 2,
-  "label": "hermetic-hooked-promoted",
+  "label": "hermetic-echo-hook-unverifiable",
   "chainId": 31337,
   "kind": "quote",
-  "recordedAt": "2026-08-11T19:41:12.991Z",
-  "notes": "The simplicity margin, marked. A HOOKED v4 pool prices ~2bps above a plain v2 pool on the same pair — inside `SIMPLICITY_MARGIN_BPS` (5) — so ranking promotes the simple route to `best` and marks it `promotedOverComplex`. The only fixture whose `best` is deliberately outpriced by its own `alternatives`, which is exactly the shape `assertResultCoherent` accepts ONLY when that marker is set.",
+  "recordedAt": "2026-08-11T19:41:12.992Z",
+  "notes": "The unverifiable-quote partition, marked. A v4 pool whose hooks address carries BEFORE_SWAP_RETURNS_DELTA (the live Arbitrum echo hook) answers `amountIn` back as `amountOut` — numerically plausible, above the honest v2 price, and structurally just a hook's claim — so quote-mode ranking partitions it below the verifiable route: `best` is the honest pool with NO promotion marker, and the echo route sits in `alternatives` outpricing it, licensed by its own `quoteUnverifiable: true`. The second legal `best`-outpriced-by-alternatives shape `assertResultCoherent` accepts, and the golden that pins the marker end-to-end.",
   "manifest": {
     "chainId": 31337,
     "wrappedNative": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
@@ -51,10 +51,10 @@
         {
           "pool": {
             "protocol": "v2",
-            "address": "0x0000000000000000000000000000000000002300",
+            "address": "0x0000000000000000000000000000000000002500",
             "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
             "token1": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
-            "id": "v2:0x0000000000000000000000000000000000002300",
+            "id": "v2:0x0000000000000000000000000000000000002500",
             "currencies": [
               "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
               "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
@@ -67,15 +67,15 @@
         {
           "pool": {
             "protocol": "v4",
-            "poolId": "0xb55163ca190221cb2e0b1954fa80ede94b67ad4ef5ceff5bee3f484d27f69976",
+            "poolId": "0x864f0534cf2c893e7dded2b99bb2784649149ad7486688ce6f1cbee2276149b6",
             "poolKey": {
               "currency0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
               "currency1": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
-              "fee": 3000,
-              "tickSpacing": 60,
-              "hooks": "0x99999999999999999999999999999999999999c0"
+              "fee": 0,
+              "tickSpacing": 10,
+              "hooks": "0x063386E9845E5d5aC7AFfBB538fcA57F59764088"
             },
-            "id": "v4:0xb55163ca190221cb2e0b1954fa80ede94b67ad4ef5ceff5bee3f484d27f69976",
+            "id": "v4:0x864f0534cf2c893e7dded2b99bb2784649149ad7486688ce6f1cbee2276149b6",
             "currencies": [
               "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
               "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
@@ -118,15 +118,15 @@
         "m": {
           "pool": {
             "protocol": "v4",
-            "poolId": "0xb55163ca190221cb2e0b1954fa80ede94b67ad4ef5ceff5bee3f484d27f69976",
+            "poolId": "0x864f0534cf2c893e7dded2b99bb2784649149ad7486688ce6f1cbee2276149b6",
             "poolKey": {
               "currency0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
               "currency1": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
-              "fee": 3000,
-              "tickSpacing": 60,
-              "hooks": "0x99999999999999999999999999999999999999c0"
+              "fee": 0,
+              "tickSpacing": 10,
+              "hooks": "0x063386E9845E5d5aC7AFfBB538fcA57F59764088"
             },
-            "id": "v4:0xb55163ca190221cb2e0b1954fa80ede94b67ad4ef5ceff5bee3f484d27f69976",
+            "id": "v4:0x864f0534cf2c893e7dded2b99bb2784649149ad7486688ce6f1cbee2276149b6",
             "currencies": [
               "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
               "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
@@ -135,7 +135,7 @@
           "currencyIn": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
           "currencyOut": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
           "amountIn": "$bigint:1000000",
-          "amountOut": "$bigint:997198",
+          "amountOut": "$bigint:1000000",
           "gasEstimate": "$bigint:90000"
         }
       }
@@ -147,10 +147,10 @@
         "m": {
           "pool": {
             "protocol": "v2",
-            "address": "0x0000000000000000000000000000000000002300",
+            "address": "0x0000000000000000000000000000000000002500",
             "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
             "token1": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
-            "id": "v2:0x0000000000000000000000000000000000002300",
+            "id": "v2:0x0000000000000000000000000000000000002500",
             "currencies": [
               "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
               "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
@@ -183,7 +183,7 @@
   "golden": {
     "status": "quote",
     "best": {
-      "routeId": "v2:0x0000000000000000000000000000000000002300",
+      "routeId": "v2:0x0000000000000000000000000000000000002500",
       "protocols": [
         "v2"
       ],
@@ -193,12 +193,11 @@
       ],
       "amountIn": "1000000",
       "amountOut": "996999",
-      "intermediateAmounts": [],
-      "promotedOverComplex": true
+      "intermediateAmounts": []
     },
     "alternatives": [
       {
-        "routeId": "v4:0xb55163ca190221cb2e0b1954fa80ede94b67ad4ef5ceff5bee3f484d27f69976",
+        "routeId": "v4:0x864f0534cf2c893e7dded2b99bb2784649149ad7486688ce6f1cbee2276149b6",
         "protocols": [
           "v4"
         ],
@@ -207,9 +206,10 @@
           "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
         ],
         "amountIn": "1000000",
-        "amountOut": "997198",
+        "amountOut": "1000000",
         "intermediateAmounts": [],
-        "gasEstimate": "90000"
+        "gasEstimate": "90000",
+        "quoteUnverifiable": true
       }
     ],
     "report": {

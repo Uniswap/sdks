@@ -630,8 +630,13 @@ function inconclusiveReason(report: SearchReport): Reason {
  * nothing anywhere naming the simplicity margin as the cause. It travels; only the two verification
  * fields are stripped.
  */
-function toQuoted({ route, quote, promotedOverComplex }: QuotedRoute): QuotedRoute {
-  return { route, quote, ...(promotedOverComplex !== undefined && { promotedOverComplex }) }
+function toQuoted({ route, quote, promotedOverComplex, quoteUnverifiable }: QuotedRoute): QuotedRoute {
+  return {
+    route,
+    quote,
+    ...(promotedOverComplex !== undefined && { promotedOverComplex }),
+    ...(quoteUnverifiable !== undefined && { quoteUnverifiable }),
+  }
 }
 
 /** Exported for direct unit testing of the quote-side classification mapping — the twin of

@@ -230,6 +230,28 @@ export type QuotedRoute = {
    * too.
    */
   promotedOverComplex?: true
+  /**
+   * Set (to `true`; absent otherwise) when any leg's v4 hook address carries a swap RETURNS_DELTA
+   * permission bit (`protocols/poolRef.ts#hasReturnsDeltaHook` — BEFORE_SWAP_RETURNS_DELTA or
+   * AFTER_SWAP_RETURNS_DELTA, encoded in the hook contract's own address per v4-core `Hooks.sol`).
+   *
+   * WHY IT EXISTS: the v4 quoter runs the same code path the swap would, and a returns-delta hook
+   * is PERMITTED to replace the swap's amounts — so the quoter's reported `amountOut` for such a
+   * pool is the hook's claim, not pool math, and nothing forces the hook to honour it when real
+   * tokens settle. The quote is unverifiable BY CONSTRUCTION: only a simulation of the actual swap
+   * (swap mode's preflight, or `--simulate`) can tell an honest returns-delta hook from one that
+   * echoes `amountIn` back as `amountOut` — observed live on Arbitrum, where echo hooks "quoted"
+   * raw 100e18 into a 6-decimal token and outranked every real route.
+   *
+   * A STRUCTURAL FACT ABOUT THE ROUTE, stamped by `rankRoutes` in BOTH modes and travelling with
+   * the route object exactly like `promotedOverComplex` (survives `router.ts#toQuoted`, spreads
+   * through `search/verifier.ts#withExecution`). In QUOTE mode it also has a ranking consequence:
+   * a route carrying it never outranks the best route without it, however large its claimed
+   * `amountOut` (`quote/rank.ts`); if ONLY such routes exist for the pair they may lead — a price
+   * is better than nothing — still wearing the marker. In SWAP mode ordering is untouched:
+   * preflight simulates the real trade and is the authority there.
+   */
+  quoteUnverifiable?: true
 }
 
 export type EncodedTx = { to: Address; data: Hex; value: bigint }

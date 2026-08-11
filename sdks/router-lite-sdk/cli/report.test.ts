@@ -552,6 +552,55 @@ describe('result rendering', () => {
     expect(() => assertResultCoherent(result)).not.toThrow()
   })
 
+  it('marks a hook-reported (returns-delta) route: caveat on a leading line, compact mark on runners-up', () => {
+    // Live regression, Arbitrum, `rl quote eth 0xFd08…cbb9 100 --budget 10s`: echo hooks (…4088)
+    // answered amountIn as amountOut — "100,000,000,000,000 USD₮0" for 100 ETH — and led the quote.
+    // The partition (`quote/rank.ts`) now keeps the verifiable route on top and the echo route in
+    // the runners-up, where its absurd Δ needs the mark to not read as a broken sort.
+    const echoPool: PoolRef = {
+      id: 'v4:0x0adb000000000000000000000000000000000000000000000000000000013c00',
+      currencies: ['native', USDC],
+      protocol: 'v4',
+      poolId: '0x0adb000000000000000000000000000000000000000000000000000000013c00',
+      poolKey: {
+        currency0: '0x0000000000000000000000000000000000000000',
+        currency1: USDC,
+        fee: 0,
+        tickSpacing: 10,
+        hooks: '0x063386E9845E5d5aC7AFfBB538fcA57F59764088',
+      },
+    }
+    const echoRoute = {
+      route: { legs: [{ pool: echoPool, currencyIn: 'native' as const, currencyOut: USDC }] },
+      quote: { amountIn: 10n ** 18n, amountOut: 10n ** 18n, intermediateAmounts: [] },
+      quoteUnverifiable: true as const,
+    }
+    const demoted: QuoteResult = {
+      status: 'quote',
+      best: {
+        route: { legs: [{ pool: V3_POOL, currencyIn: 'native', currencyOut: USDC }] },
+        quote: { amountIn: 10n ** 18n, amountOut: 1_906_256_081n, intermediateAmounts: [] },
+      },
+      alternatives: [echoRoute],
+      search: REPORT,
+    }
+    const lines = renderQuoteResult(demoted, trade, CTX)
+    // The verifiable leader carries neither the caveat nor a promotion note — no promotion happened.
+    expect(lines[1]).toBe('  ETH ─ v3 0.05% → USDC')
+    expect(lines.join('\n')).not.toContain('promoted-over-complex')
+    // The echo route's runners-up row carries the compact mark.
+    const row = lines.find((l) => l.includes('v4 0%+hooks'))
+    expect(row).toContain('hook-reported')
+    // The engine's honesty invariant agrees: the alternative's own marker licenses the inversion.
+    expect(() => assertResultCoherent(demoted)).not.toThrow()
+
+    // And when ONLY unverifiable routes exist (they may lead — a price is better than nothing),
+    // the leading line itself wears the full caveat.
+    const onlyEcho: QuoteResult = { status: 'quote', best: echoRoute, alternatives: [], search: REPORT }
+    const led = renderQuoteResult(onlyEcho, trade, CTX)
+    expect(led[1]).toBe('  ETH ─ v4 0%+hooks → USDC  hook-reported quote — unverifiable without simulation')
+  })
+
   it('prints the quoter gas figure, dimmed and rounded, on the best line', () => {
     const result: QuoteResult = {
       status: 'quote',

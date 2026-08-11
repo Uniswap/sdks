@@ -50,8 +50,16 @@ const V3_FACTORY = `0x${'55'.repeat(20)}` as Address
 const V3_QUOTER = `0x${'44'.repeat(20)}` as Address
 const V4_POOL_MANAGER = `0x${'77'.repeat(20)}` as Address
 const V4_QUOTER = `0x${'88'.repeat(20)}` as Address
-/** A non-zero hooks address — the whole reason v4 appears in this corpus at all (see {@link fakeV4}). */
-const HOOK = `0x${'99'.repeat(20)}` as Address
+/** A non-zero hooks address — the whole reason v4 appears in this corpus at all (see {@link fakeV4}).
+ * The low 16 bits are 0x99C0: swap/liquidity permission flags but NEITHER swap RETURNS_DELTA bit
+ * (3, 2 — `protocols/poolRef.ts#hasReturnsDeltaHook`), so a pool wearing it is "complex" (hooked)
+ * yet VERIFIABLE — the simplicity-margin fixture needs a hooked pool whose quote is still pool
+ * math, or the unverifiable partition would demote it before the margin ever ran. */
+const HOOK = `0x${'99'.repeat(19)}c0` as Address
+/** A hooks address CARRYING a swap RETURNS_DELTA bit — the live Arbitrum echo hook (…4088,
+ * BEFORE_SWAP_RETURNS_DELTA), whose deployed instance answers `amountIn` back as `amountOut`.
+ * The address matters only for its low bits; using the live one documents the provenance. */
+const ECHO_HOOK = '0x063386E9845E5d5aC7AFfBB538fcA57F59764088' as Address
 
 const V2_TOPIC: Hex = '0xf2'
 const V3_TOPIC: Hex = '0xf3'
@@ -70,6 +78,10 @@ type Fate =
   /** Every quote for this pool fails in the TRANSPORT — a 4xx from the gateway, which
    * `internal/rpcErrors.ts#classifyRpcError` reads as a fact about the provider, never about the pool. */
   | { kind: 'transport' }
+  /** The pool "quotes" exactly `amountIn` — the live Arbitrum echo-hook shape (a RETURNS_DELTA hook
+   * whose claim the quoter reports verbatim). Numerically plausible, so nothing at decode can
+   * condemn it; only the ranking partition keeps it from leading a quote. */
+  | { kind: 'echo' }
 
 type World = Map<string, Fate>
 
@@ -93,6 +105,7 @@ function worldQuote(world: World, target?: Address): ProtocolModule['encodeQuote
       call: { to: target ?? (pool.protocol === 'v4' ? V3_QUOTER : pool.address), data: idData(pool, leg.currencyIn, amountIn) },
       decode: () => {
         const fate = world.get(pool.id)
+        if (fate?.kind === 'echo') return { amountOut: amountIn, gasEstimate: V3_GAS }
         if (!fate || fate.kind !== 'price') throw new Error('no pool here')
         const zeroForOne = String(leg.currencyIn).toLowerCase() === String(pool.currencies[0]).toLowerCase()
         const [reserveIn, reserveOut] = zeroForOne ? [fate.r0, fate.r1] : [fate.r1, fate.r0]
@@ -430,6 +443,37 @@ export const HERMETIC_SCENARIOS: HermeticScenario[] = [
       const hooked = v4Ref({ currency0: T_IN, currency1: T_OUT, fee: 3000, tickSpacing: 60, hooks: HOOK })
       world.set(hooked.id, { kind: 'price', r0: 10n ** 12n, r1: (10n ** 12n * 10_002n) / 10_000n })
       index.upsert({ pool: hooked, source: 'event', createdAtBlock: 2n })
+      const request: QuoteRequest = { tokenIn: T_IN, tokenOut: T_OUT, amountIn: AMOUNT_IN }
+      return { ctx: contextOf(world, manifest, index), request }
+    },
+  },
+  {
+    label: 'hermetic-echo-hook-unverifiable',
+    kind: 'quote',
+    expect: 'quote',
+    notes:
+      'The unverifiable-quote partition, marked. A v4 pool whose hooks address carries ' +
+      'BEFORE_SWAP_RETURNS_DELTA (the live Arbitrum echo hook) answers `amountIn` back as ' +
+      '`amountOut` — numerically plausible, above the honest v2 price, and structurally just a ' +
+      "hook's claim — so quote-mode ranking partitions it below the verifiable route: `best` is " +
+      'the honest pool with NO promotion marker, and the echo route sits in `alternatives` ' +
+      'outpricing it, licensed by its own `quoteUnverifiable: true`. The second legal ' +
+      '`best`-outpriced-by-alternatives shape `assertResultCoherent` accepts, and the golden that ' +
+      'pins the marker end-to-end.',
+    build: () => {
+      const world: World = new Map()
+      const manifest = manifestOf({ v2: true, v4: true })
+      const index = new PoolIndex(WETH)
+      // The honest pool: constant-product math, ~997k out for 1M in — the route that must lead.
+      const honest = v2Ref(addr(0x2500), T_IN, T_OUT)
+      world.set(honest.id, { kind: 'price', r0: 10n ** 12n, r1: 10n ** 12n })
+      index.upsert({ pool: honest, source: 'event', createdAtBlock: 1n })
+      // The echo pool: quotes exactly AMOUNT_IN (1M), which OUTPRICES the honest route on
+      // amountOut alone — the exact live shape that ranked 100 ETH -> "100,000,000,000,000 USD₮0"
+      // best on Arbitrum before the partition existed.
+      const echo = v4Ref({ currency0: T_IN, currency1: T_OUT, fee: 0, tickSpacing: 10, hooks: ECHO_HOOK })
+      world.set(echo.id, { kind: 'echo' })
+      index.upsert({ pool: echo, source: 'event', createdAtBlock: 2n })
       const request: QuoteRequest = { tokenIn: T_IN, tokenOut: T_OUT, amountIn: AMOUNT_IN }
       return { ctx: contextOf(world, manifest, index), request }
     },

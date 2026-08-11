@@ -585,7 +585,7 @@ test('a garbage-quoting pool (negative-int128 amountOut) never enters compositio
 
   // The lie is rejected at the decode seam, so it can never be a measurement — the honest sibling
   // is the ONLY composed route rather than a runner-up to an absurd 2^128-k winner.
-  const routes = composeRoutes(state, ctx, req)
+  const routes = composeRoutes(state, ctx, req, 'quote')
   expect(routes).toHaveLength(1)
   expect(routes[0]!.route.legs[0]!.pool.id).toBe(honest.id)
   expect(state.quoting).toEqual({ attempted: 2, succeeded: 1, failed: 1, transportFailed: 0, unattempted: 0 })
@@ -636,7 +636,7 @@ test('every planned leg is TOUCHED whether or not it prices: a two-hop out-leg t
   const req: QuoteRequest = { tokenIn: T_IN, tokenOut: T_OUT, amountIn: 1_000_000n }
 
   await runToDry(state, ctx, req)
-  expect(composeRoutes(state, ctx, req)).toHaveLength(0) // the out-leg never priced: no route at all
+  expect(composeRoutes(state, ctx, req, 'quote')).toHaveLength(0) // the out-leg never priced: no route at all
 
   // A genuinely new pool arrives — the only thing that triggers eviction. The out-leg, touched at
   // this search's pinned block by planning alone, is not the victim; the never-planned pool is.
@@ -717,7 +717,7 @@ test('an improved mX invalidates the stale out-leg measurements and re-measures 
   expect(state.legsMeasured).toBe(settledBefore + 2) // strong in-leg + re-measured out-leg
   expect(state.quoting.attempted).toBe(state.legsMeasured)
 
-  const composed = composeRoutes(state, ctx, req)
+  const composed = composeRoutes(state, ctx, req, 'quote')
   const twoHop = composed.find((r) => r.route.legs.length === 2)!
   expect(twoHop.quote.intermediateAmounts).toEqual([strongAmount])
   expect(twoHop.route.legs[0]!.pool.id).toBe(strongIn.id)
@@ -777,7 +777,7 @@ test('composed quotes: directs verbatim, two-hops exact-chained with intermediat
   state.intermediates.selected = [x]
 
   await runToDry(state, ctx, req)
-  const composed = composeRoutes(state, ctx, req)
+  const composed = composeRoutes(state, ctx, req, 'quote')
 
   expect(composed).toHaveLength(3)
   const mx = state.mX.get(x)!
@@ -806,10 +806,10 @@ test('a route with any leg negative at the pinned block is excluded from composi
   const direct = newPool(index, world, T_IN, T_OUT, { kind: 'price', r0: 10n ** 9n, r1: 10n ** 9n })
 
   await runToDry(state, ctx, req)
-  expect(composeRoutes(state, ctx, req)).toHaveLength(1)
+  expect(composeRoutes(state, ctx, req, 'quote')).toHaveLength(1)
 
   index.markNegative(direct, BLOCK.number)
-  expect(composeRoutes(state, ctx, req)).toHaveLength(0)
+  expect(composeRoutes(state, ctx, req, 'quote')).toHaveLength(0)
 })
 
 // ---------------------------------------------------------------------------
@@ -932,7 +932,7 @@ test('property: dominance under partial failure — the best composed route equa
     fc.asyncProperty(revertingWorldArb, async (spec) => {
       const built = buildPriceWorld(spec)
       await runToDry(built.state, built.ctx, built.req)
-      const composed = composeRoutes(built.state, built.ctx, built.req)
+      const composed = composeRoutes(built.state, built.ctx, built.req, 'quote')
       const oracle = bruteBest(built, spec.amountIn)
 
       for (const { inPools } of built.xs) {
@@ -1087,8 +1087,8 @@ test('a waker detaches the round and applies outcomes per envelope — exactly o
   expect(detached.state.legsMeasured).toBe(awaited.state.legsMeasured)
   expect(detached.state.measurements.size).toBe(awaited.state.measurements.size)
   expect(pumpDry(detached.state, detached.ctx)).toBe(false) // outcomes arrived — the next cycle must re-plan
-  const composed = composeRoutes(detached.state, detached.ctx, detached.req)
-  expect(composed.length).toBe(composeRoutes(awaited.state, awaited.ctx, awaited.req).length)
+  const composed = composeRoutes(detached.state, detached.ctx, detached.req, 'quote')
+  expect(composed.length).toBe(composeRoutes(awaited.state, awaited.ctx, awaited.req, 'quote').length)
   expect(composed[0]!.quote.amountOut).toBe(detached.bestOut)
 })
 

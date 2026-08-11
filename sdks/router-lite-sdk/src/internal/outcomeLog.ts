@@ -218,6 +218,10 @@ export type CanonicalRoute = {
    */
   gasEstimate?: string
   promotedOverComplex?: true
+  /** The structural returns-delta-hook marker (`types.ts#QuotedRoute.quoteUnverifiable`): this
+   * route's quote is a hook's claim, and in quote mode it never outranks a verifiable route. In a
+   * golden exactly as on the live object — present as `true` or absent, never `false`. */
+  quoteUnverifiable?: true
   /** Verification's verdict on this route. Present on every route of a SWAP result and on none of a
    * quote's (`router.ts#toQuoted` strips it) — asserted as that iff by the schema-pin test. */
   execution?: string
@@ -265,6 +269,7 @@ function canonicalRoute(q: QuotedRoute | RankedRoute): CanonicalRoute {
     intermediateAmounts: q.quote.intermediateAmounts.map((a) => a.toString()),
     ...(q.quote.gasEstimate !== undefined && { gasEstimate: q.quote.gasEstimate.toString() }),
     ...(q.promotedOverComplex !== undefined && { promotedOverComplex: q.promotedOverComplex }),
+    ...(q.quoteUnverifiable !== undefined && { quoteUnverifiable: q.quoteUnverifiable }),
     ...(ranked.execution !== undefined && { execution: ranked.execution }),
     ...(ranked.revertData !== undefined && { revertData: ranked.revertData.toLowerCase() }),
   }
@@ -499,7 +504,7 @@ export function foldOutcomes(entries: OutcomeEntry[], ctx: FoldContext): FoldOut
     hints: request.hints ?? [],
     client: NO_CLIENT,
   }
-  const routes = composeRoutes(state, pumpCtx, request)
+  const routes = composeRoutes(state, pumpCtx, request, ctx.kind)
   const evaluated = routes.map((q) => withExecution(state, q))
   const best = evaluated.length > 0 ? pickLeader(evaluated, leaderFromLog(entries)) : undefined
   const ranked = best === undefined ? [] : [best, ...evaluated.filter((e) => e !== best)]

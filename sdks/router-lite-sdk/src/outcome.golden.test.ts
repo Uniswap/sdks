@@ -155,7 +155,7 @@ describe('outcome-log goldens', () => {
 // ---------------------------------------------------------------------------
 
 const REQUIRED_ROUTE_KEYS = ['amountIn', 'amountOut', 'intermediateAmounts', 'path', 'protocols', 'routeId']
-const OPTIONAL_ROUTE_KEYS = ['gasEstimate', 'promotedOverComplex', 'execution', 'revertData']
+const OPTIONAL_ROUTE_KEYS = ['gasEstimate', 'promotedOverComplex', 'quoteUnverifiable', 'execution', 'revertData']
 
 /** The fixture's own top-level shape. A `--regold` cannot touch it, but a recorder change can — and a
  * `context` field that quietly stopped being written would make every fold read a default instead. */
@@ -341,6 +341,28 @@ describe('the corpus covers every verdict the goldens exist to pin', () => {
       const complex = g.golden.alternatives.find((a) => BigInt(a.amountOut) > BigInt(best.amountOut))!
       expect(new Set(complex.protocols).size > 1 || complex.protocols.includes('v4')).toBe(true)
       expect(new Set(best.protocols).size).toBe(1)
+    }
+  })
+
+  test('an UNVERIFIABLE-QUOTE partition — a returns-delta-hooked route outpricing `best`, licensed by its own marker', () => {
+    // The other legal best-outpriced-by-alternatives shape: the echo route claims MORE than the
+    // honest route delivers (the live Arbitrum defect this corpus pins), and quote-mode ranking
+    // demotes it structurally — `best` wears NO promotion marker, because no promotion happened;
+    // the licence is `quoteUnverifiable` on the outpricing alternative itself.
+    const partitioned = goldens.filter(
+      (g) =>
+        g.kind === 'quote' &&
+        g.golden.best !== undefined &&
+        g.golden.best.promotedOverComplex !== true &&
+        g.golden.alternatives.some((a) => a.quoteUnverifiable === true && BigInt(a.amountOut) > BigInt(g.golden.best!.amountOut)),
+    )
+    expect(partitioned.length).toBeGreaterThan(0)
+    for (const g of partitioned) {
+      expect(g.golden.best!.quoteUnverifiable).toBeUndefined() // the leader is the VERIFIABLE route
+      // Every unverifiable route is v4 — the marker is v4 hook address bits and nothing else.
+      for (const alt of g.golden.alternatives.filter((a) => a.quoteUnverifiable === true)) {
+        expect(alt.protocols).toContain('v4')
+      }
     }
   })
 

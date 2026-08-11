@@ -684,9 +684,11 @@ function legOf(m: Measurement, ctx: PumpCtx): RouteLeg {
  *
  * `intermediateAmounts` carries `[m_X]`; `gasEstimate` is the two legs' sum, absent if either leg
  * lacks one (v2 legs never carry one — a v2 quote is local reserve math and measures no gas). A route with any leg negative at the pinned block is excluded. Ranking — order,
- * tie-breaks, and the simplicity margin — is `rankRoutes`, unchanged.
+ * tie-breaks, the quote-mode unverifiable partition, and the simplicity margin — is `rankRoutes`,
+ * unchanged; `kind` exists solely to be handed to it (the partition is quote-mode-only — swap
+ * mode's preflight is the authority on unverifiable quotes, so its ordering never moves).
  */
-export function composeRoutes(state: SearchState, ctx: PumpCtx, req: QuoteRequest): QuotedRoute[] {
+export function composeRoutes(state: SearchState, ctx: PumpCtx, req: QuoteRequest, kind: 'quote' | 'swap'): QuotedRoute[] {
   const wrappedNative = ctx.manifest.wrappedNative
   const inNode = toGraphNode(req.tokenIn, wrappedNative)
   const outNode = toGraphNode(req.tokenOut, wrappedNative)
@@ -743,5 +745,5 @@ export function composeRoutes(state: SearchState, ctx: PumpCtx, req: QuoteReques
       })
     }
   }
-  return rankRoutes(quoted)
+  return rankRoutes(quoted, kind)
 }

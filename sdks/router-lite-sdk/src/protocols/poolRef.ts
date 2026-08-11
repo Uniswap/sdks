@@ -100,3 +100,35 @@ export function v4PoolRef(poolKey: PoolKey): V4PoolRef {
 export function isHooked(ref: PoolRef): boolean {
   return ref.protocol === 'v4' && !isAddressEqual(ref.poolKey.hooks, zeroAddress)
 }
+
+// v4 hook permissions are encoded in the hook CONTRACT ADDRESS itself — the lowest 14 bits are
+// flags (v4-core `Hooks.sol`; mirrored by v4-sdk's `hookFlagIndex`, which the test pins these two
+// constants against). The two that matter here are the swap RETURNS_DELTA permissions:
+//
+//   bit 3  BEFORE_SWAP_RETURNS_DELTA   the hook may replace the swap's input/output amounts
+//   bit 2  AFTER_SWAP_RETURNS_DELTA    the hook may take from / add to the output after the swap
+//
+// Either one means the pool's QUOTE is the hook's claim rather than pool math: the quoter runs the
+// same code path the swap would, so whatever delta the hook returns IS the reported amount — and
+// nothing forces the hook to honour it when real tokens settle. Observed live on Arbitrum as hooks
+// echoing `amountIn` back as `amountOut` (raw 100e18 "into" a 6-decimal token), numerically
+// plausible per-leg and catastrophic across decimals. This predicate is the STRUCTURAL fact ranking
+// and reporting build on — read from the address bits, no RPC, no heuristics about the amount.
+const BEFORE_SWAP_RETURNS_DELTA_FLAG = 1 << 3
+const AFTER_SWAP_RETURNS_DELTA_FLAG = 1 << 2
+const SWAP_RETURNS_DELTA_MASK = BEFORE_SWAP_RETURNS_DELTA_FLAG | AFTER_SWAP_RETURNS_DELTA_FLAG
+
+/**
+ * True for a v4 pool whose hook address carries BEFORE_SWAP_RETURNS_DELTA or
+ * AFTER_SWAP_RETURNS_DELTA — the pools whose quoted `amountOut` is unverifiable by construction
+ * (see the flag constants above). Always false for v2/v3, and for v4 pools whose hooks (zero or
+ * not) carry neither delta bit: a before/after-swap hook that cannot return deltas cannot make the
+ * quoter report an amount the pool math didn't produce.
+ */
+export function hasReturnsDeltaHook(ref: PoolRef): boolean {
+  if (ref.protocol !== 'v4') return false
+  // Last 4 bytes only, exactly like v4-sdk's `Hook._hasPermission`: all 14 flag bits live there,
+  // and 32 bits stay comfortably inside Number precision.
+  const flags = Number.parseInt(ref.poolKey.hooks.slice(-8), 16)
+  return (flags & SWAP_RETURNS_DELTA_MASK) !== 0
+}

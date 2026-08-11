@@ -199,7 +199,20 @@ function executionBadge(route: RankedRoute): string {
   const marks: string[] = [EXECUTION_BADGE[route.execution](route.execution)]
   if (route.revertData) marks.push(dim(`revert ${shortHex(route.revertData)}`))
   if (route.promotedOverComplex) marks.push(cyan('promoted-over-complex'))
+  if (route.quoteUnverifiable) marks.push(yellow('hook-reported'))
   return marks.join(' ')
+}
+
+/**
+ * The caveat a returns-delta-hooked route's line carries (`QuotedRoute.quoteUnverifiable`): its
+ * quoted amount is the HOOK'S CLAIM, not pool math — the quoter delegates to the hook, and a
+ * RETURNS_DELTA permission means the reported amount is whatever the hook answered, honoured or
+ * not when real tokens settle. Rendered in full on a LEADING quote line (the number above it is
+ * the one a reader is about to act on); the compact `hook-reported` mark on runners-up and swap
+ * badges is the same fact at table width.
+ */
+function unverifiableNote(route: QuotedRoute | RankedRoute): string {
+  return route.quoteUnverifiable ? `  ${yellow('hook-reported quote — unverifiable without simulation')}` : ''
 }
 
 /**
@@ -215,8 +228,15 @@ function executionBadge(route: RankedRoute): string {
  */
 function promotionNote(best: QuotedRoute | RankedRoute, alternatives: (QuotedRoute | RankedRoute)[], out: CurrencyRef, ctx: RenderCtx): string[] {
   if (!best.promotedOverComplex) return []
+  // `quoteUnverifiable` alternatives are excluded from the "what was given up" figure: their
+  // amounts are hook claims (an echo route's Δ would report giving up billions), and the margin
+  // never promoted over them anyway — the partition had already put them below every verifiable
+  // route before the promotion ran.
   const outpriced = alternatives.reduce<QuotedRoute | RankedRoute | undefined>(
-    (top, alt) => (alt.quote.amountOut > best.quote.amountOut && (!top || alt.quote.amountOut > top.quote.amountOut) ? alt : top),
+    (top, alt) =>
+      alt.quoteUnverifiable !== true && alt.quote.amountOut > best.quote.amountOut && (!top || alt.quote.amountOut > top.quote.amountOut)
+        ? alt
+        : top,
     undefined,
   )
   const label = cyan('promoted-over-complex')
@@ -294,7 +314,10 @@ export function renderRunnersUp(
     const amount = amountCells[i]!.padStart(amountWidth, ' ')
     const bps = bpsCells[i]!.padStart(bpsWidth, ' ')
     const route = padEndVisible(routeCells[i]!, routeWidth)
-    const badge = isRanked(alt) ? `  ${executionBadge(alt)}` : ''
+    // Quote-side alternatives have no execution badge; the hook-reported mark still applies (an
+    // echo route sitting in the runners-up is exactly what the partition demoted, and the mark is
+    // why its absurd Δ is not a broken sort). Ranked (swap) rows carry it inside `executionBadge`.
+    const badge = isRanked(alt) ? `  ${executionBadge(alt)}` : alt.quoteUnverifiable ? `  ${yellow('hook-reported')}` : ''
     lines.push(`    ${amount}   ${bps}   ${route}${gasNote(alt)}${badge}`)
   })
   if (overflow > 0) lines.push(dim(`    … and ${overflow} more`))
@@ -811,7 +834,7 @@ export function renderQuoteResult(result: QuoteResult, trade: TradeContext, ctx:
   if (result.status === 'quote') {
     const totalRoutes = result.alternatives.length + 1
     lines.push(renderHeadline('quote', trade, result.best, totalRoutes, ctx, opts.elapsedMs))
-    lines.push(`  ${renderRoute(result.best.route, ctx, opts)}${gasNote(result.best)}`)
+    lines.push(`  ${renderRoute(result.best.route, ctx, opts)}${gasNote(result.best)}${unverifiableNote(result.best)}`)
     lines.push(...highImpactWarning(result.best))
     lines.push(...renderPoolDetailLines(result.best.route, opts))
     lines.push(...promotionNote(result.best, result.alternatives, trade.tokenOut, ctx))
