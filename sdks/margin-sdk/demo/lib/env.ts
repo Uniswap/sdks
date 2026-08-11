@@ -1,13 +1,19 @@
+import fs from 'node:fs'
+import path from 'node:path'
+
 import { type Subprocess } from 'bun'
 import {
   http,
+  type Abi,
   type Address,
+  type Hex,
   type PublicClient,
   type TestClient,
   type WalletClient,
   createPublicClient,
   createTestClient,
   createWalletClient,
+  zeroAddress,
 } from 'viem'
 import { mainnet } from 'viem/chains'
 
@@ -53,6 +59,13 @@ export interface Ctx {
   longMarket: Market
   /** Short ETH: collateral USDC, debt WETH. */
   shortMarket: Market
+  /**
+   * The Universal Router the position swaps route through (a per-call parameter of the margin
+   * flows). Deployed onto the fork by `withAnvil` from the pinned v4-periphery build — it must
+   * carry already-unlocked `V4_SWAP` support (post-#491), which the canonical historical mainnet
+   * deployments predate. Placeholder (zero) until `withAnvil` resolves it.
+   */
+  universalRouter: Address
 }
 
 export function buildCtx(rpcUrl: string): Ctx {
@@ -71,7 +84,56 @@ export function buildCtx(rpcUrl: string): Ctx {
     poolKey: toPoolKey({ currencyA: weth, currencyB: USDC, fee: 500, tickSpacing: 10 }),
     longMarket: { collateral: weth, debt: USDC },
     shortMarket: { collateral: USDC, debt: weth },
+    universalRouter: zeroAddress,
   }
+}
+
+/**
+ * Resolves the Universal Router the demo flows route through. `MARGIN_DEMO_UNIVERSAL_ROUTER`
+ * points at an existing deployment on the fork; otherwise a fresh UR is deployed from the pinned
+ * v4-periphery build's artifact (the same artifact the periphery's `MarginRouteHelpers` deploys
+ * via `vm.getCode`), bound to the canonical PoolManager/Permit2/WETH9 with the v2/v3 parameters
+ * zero — the demos route only over v4 pools.
+ */
+async function resolveUniversalRouter(ctx: Ctx): Promise<Address> {
+  const override = process.env.MARGIN_DEMO_UNIVERSAL_ROUTER
+  if (override) return override as Address
+
+  const peripheryPath = process.env.V4_PERIPHERY_PATH ?? `${process.env.HOME}/dev/v4-periphery`
+  const artifactPath = path.join(peripheryPath, 'foundry-out/UniversalRouter.sol/UniversalRouter.json')
+  if (!fs.existsSync(artifactPath)) {
+    throw new Error(
+      `Universal Router artifact not found at ${artifactPath} — run \`forge build\` in the v4-periphery checkout ` +
+        '(V4_PERIPHERY_PATH), or set MARGIN_DEMO_UNIVERSAL_ROUTER to an existing post-#491 deployment'
+    )
+  }
+  const artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf8')) as { abi: Abi; bytecode: { object: Hex } }
+  const hash = await ctx.wallet.deployContract({
+    abi: artifact.abi,
+    bytecode: artifact.bytecode.object,
+    account: DEPLOYER,
+    chain: mainnet,
+    args: [
+      {
+        permit2: ctx.addresses.permit2,
+        weth9: ctx.weth,
+        v2Factory: zeroAddress,
+        v3Factory: zeroAddress,
+        pairInitCodeHash: `0x${'0'.repeat(64)}`,
+        poolInitCodeHash: `0x${'0'.repeat(64)}`,
+        v4PoolManager: ctx.addresses.poolManager,
+        permissionsAdapterFactory: zeroAddress,
+        v3NFTPositionManager: zeroAddress,
+        v4PositionManager: zeroAddress,
+        spokePool: zeroAddress,
+      },
+    ],
+  })
+  const receipt = await ctx.publicClient.waitForTransactionReceipt({ hash })
+  if (receipt.status !== 'success' || !receipt.contractAddress) {
+    throw new Error('Universal Router deployment onto the fork failed')
+  }
+  return receipt.contractAddress
 }
 
 async function waitForRpc(rpcUrl: string, timeoutMs = 60_000): Promise<void> {
@@ -119,6 +181,10 @@ export async function startAnvil(): Promise<{ rpcUrl: string; proc: Subprocess }
       '--port',
       String(port),
       '--auto-impersonate',
+      // The pinned v4-periphery Universal Router build (default 44444444-runs profile) has a
+      // runtime above the EIP-170 limit; the periphery's own fork tests deploy the same artifact
+      // under forge's relaxed test EVM, so relax anvil the same way for the demo deploy.
+      '--disable-code-size-limit',
       '--silent',
     ],
     { stdout: 'ignore', stderr: 'inherit' }
@@ -128,13 +194,17 @@ export async function startAnvil(): Promise<{ rpcUrl: string; proc: Subprocess }
   return { rpcUrl, proc }
 }
 
-/** Boots a fork, funds the deployer with gas ETH, runs `fn`, and tears the fork down. */
+/**
+ * Boots a fork, funds the deployer with gas ETH, resolves the Universal Router (deploying one
+ * from the pinned v4-periphery build if none is supplied), runs `fn`, and tears the fork down.
+ */
 export async function withAnvil(fn: (ctx: Ctx) => Promise<void>): Promise<void> {
   const { rpcUrl, proc } = await startAnvil()
   try {
     const ctx = buildCtx(rpcUrl)
     await ctx.testClient.setBalance({ address: DEPLOYER, value: 1_000n * 10n ** 18n })
-    await fn(ctx)
+    const universalRouter = await resolveUniversalRouter(ctx)
+    await fn({ ...ctx, universalRouter })
   } finally {
     proc.kill()
   }

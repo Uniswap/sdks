@@ -17,6 +17,7 @@ import {
   deal,
   ensurePermit2,
   fmt,
+  demoRoute,
   note,
   ok,
   quoteSwapInput,
@@ -26,8 +27,10 @@ import {
 import {
   LENDING_ADAPTER_ABI,
   MARGIN_ACCOUNT_ABI,
+  MARGIN_ROUTER_ABI,
   MarginPlanner,
   OPEN_DELTA,
+  buildV4ExactOutRoute,
   closePositionCall,
   collateralToBuyForLeverage,
   executeCall,
@@ -35,13 +38,13 @@ import {
   getPosition,
   impliedLtv,
   parseLeverageX18,
-  swapZeroForOne,
+  withSlippageUp,
 } from '../src'
 
 const SUB_ID = 6n
 
 export async function run(ctx: Ctx): Promise<void> {
-  const { addresses, deployer, longMarket: market, poolKey, weth, usdc } = ctx
+  const { addresses, deployer, longMarket: market, weth, usdc } = ctx
   const adapter = addresses.lendingAdapters.morphoBlue!
   const router = addresses.marginRouter
   const account = getMarginAccountAddress(1, deployer, SUB_ID)
@@ -59,17 +62,27 @@ export async function run(ctx: Ctx): Promise<void> {
   const collateralToBuy = collateralToBuyForLeverage(equity, leverage)
   const { capped: maxDebtIn } = await quoteSwapInput(ctx, market, market.debt, collateralToBuy, 50)
 
+  // The route the ROUTE_SWAP action runs: buy the collateral exact-output on the demo pool and
+  // deliver it straight to the account (the route, not a TAKE, moves the output).
+  const openRoute = buildV4ExactOutRoute({
+    poolKey: ctx.poolKey,
+    input: market.debt,
+    output: market.collateral,
+    amountOut: collateralToBuy,
+    amountInMaximum: maxDebtIn,
+    recipient: account,
+  })
   const openPlan = new MarginPlanner()
     .setAccount(SUB_ID) // bind (and lazily deploy) the caller's sub-account
     .pullToAccount(market.collateral, equity, true) // equity via Permit2, straight to the account
-    .swapExactOutSingle({
-      poolKey,
-      zeroForOne: swapZeroForOne(market, market.debt, poolKey), // opens sell the debt
-      amountOut: collateralToBuy,
-      amountInMaximum: maxDebtIn, // the binding slippage cap, from a real quote
+    .routeSwap({
+      universalRouter: ctx.universalRouter,
+      input: market.debt,
+      maxIn: maxDebtIn, // the binding slippage cap (the router's scoped Permit2 allowance)
+      commands: openRoute.commands,
+      inputs: openRoute.inputs,
     })
-    .assertFill(market.collateral, collateralToBuy) // all-or-nothing on thin pools
-    .take(market.collateral, account, OPEN_DELTA) // bought collateral → the account
+    .assertAccountBalance(market.collateral, equity + collateralToBuy) // all-or-nothing under-fill guard
     .supplyCollateral(adapter, market, OPEN_DELTA) // supply the account's full balance
     .borrow(adapter, market, OPEN_DELTA, router) // draw exactly the swap's debt, to the router
     .settle(market.debt, OPEN_DELTA, false) // router pays the PoolManager
@@ -80,10 +93,14 @@ export async function run(ctx: Ctx): Promise<void> {
     ctx,
     executeCall({ marginRouter: router, unlockData: openPlan, deadline: await deadline(ctx) })
   )
-  // execute plans emit account-level events (not Position* snapshots) — decode with the SDK ABI.
+  // execute plans emit account-level events plus a PositionUpdated snapshot per position mutation
+  // (the curated-only Position* events do not fire) — decode with the SDK ABIs.
   const accountEvents = parseEventLogs({ abi: MARGIN_ACCOUNT_ABI, logs: openReceipt.logs })
   const eventNames = accountEvents.map((event) => event.eventName)
   assert(eventNames.includes('CollateralSupplied') && eventNames.includes('Borrowed'), 'account-level events emitted')
+  const snapshots = parseEventLogs({ abi: MARGIN_ROUTER_ABI, logs: openReceipt.logs, eventName: 'PositionUpdated' })
+  // one snapshot after the supply and one after the borrow; the LAST one is the resulting state
+  assert(snapshots.length === 2, 'PositionUpdated snapshot emitted per mutation (indexers need no extra RPC)')
 
   let position = await getPosition(ctx.publicClient, { adapter, account, market })
   assert(
@@ -147,7 +164,8 @@ export async function run(ctx: Ctx): Promise<void> {
   note('the owner can always exit on the lending protocol directly — funds are never trapped behind the router')
 
   // Clean finish through the curated close.
-  const closeQuote = await quoteSwapInput(ctx, market, market.collateral, afterHatch.debtAmount, 100)
+  const debtToBuy = withSlippageUp(afterHatch.debtAmount, 10) // accrual buffer: the route must buy >= live debt
+  const closeQuote = await quoteSwapInput(ctx, market, market.collateral, debtToBuy, 100)
   await send(
     ctx,
     closePositionCall({
@@ -155,8 +173,14 @@ export async function run(ctx: Ctx): Promise<void> {
       params: {
         adapter,
         market,
-        poolKey,
         maxCollateralIn: closeQuote.capped,
+        ...demoRoute(ctx, {
+          input: market.collateral,
+          output: market.debt,
+          amountOut: debtToBuy,
+          maxIn: closeQuote.capped,
+          recipient: account,
+        }),
         subId: SUB_ID,
         deadline: await deadline(ctx),
       },

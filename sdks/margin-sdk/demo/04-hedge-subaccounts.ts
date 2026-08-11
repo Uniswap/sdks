@@ -13,6 +13,7 @@ import {
   assertApprox,
   deadline,
   deal,
+  demoRoute,
   ensurePermit2,
   fmt,
   note,
@@ -28,13 +29,14 @@ import {
   getPosition,
   increasePositionCall,
   parseLeverageX18,
+  withSlippageUp,
 } from '../src'
 
 const LONG_SUB_ID = 4n
 const SHORT_SUB_ID = 5n
 
 export async function run(ctx: Ctx): Promise<void> {
-  const { addresses, deployer, longMarket, shortMarket, poolKey, weth, usdc } = ctx
+  const { addresses, deployer, longMarket, shortMarket, weth, usdc } = ctx
   const router = addresses.marginRouter
   const morpho = addresses.lendingAdapters.morphoBlue!
   const aaveV3 = addresses.lendingAdapters.aaveV3!
@@ -63,10 +65,16 @@ export async function run(ctx: Ctx): Promise<void> {
       params: {
         adapter: morpho,
         market: longMarket,
-        poolKey,
         equity: longEquity,
         collateralToBuy: longBuy,
         maxDebtIn: longQuote.capped,
+        ...demoRoute(ctx, {
+          input: longMarket.debt,
+          output: longMarket.collateral,
+          amountOut: longBuy,
+          maxIn: longQuote.capped,
+          recipient: longAccount,
+        }),
         subId: LONG_SUB_ID,
         deadline: await deadline(ctx),
       },
@@ -89,10 +97,16 @@ export async function run(ctx: Ctx): Promise<void> {
       params: {
         adapter: aaveV3,
         market: shortMarket,
-        poolKey,
         equity: shortEquity,
         collateralToBuy: shortBuyUsdc,
         maxDebtIn: shortQuote.capped,
+        ...demoRoute(ctx, {
+          input: shortMarket.debt,
+          output: shortMarket.collateral,
+          amountOut: shortBuyUsdc,
+          maxIn: shortQuote.capped,
+          recipient: shortAccount,
+        }),
         subId: SHORT_SUB_ID,
         deadline: await deadline(ctx),
       },
@@ -107,7 +121,8 @@ export async function run(ctx: Ctx): Promise<void> {
   assertApprox(short.debtAmount, long.collateralAmount, 150, 'net ETH delta ≈ 0 (within live-pool swap impact)')
 
   // Close the short; the long is untouched (accounts are fully isolated).
-  const closeQuote = await quoteSwapInput(ctx, shortMarket, shortMarket.collateral, short.debtAmount, 100)
+  const debtToBuy = withSlippageUp(short.debtAmount, 10) // accrual buffer: the route must buy >= live debt
+  const closeQuote = await quoteSwapInput(ctx, shortMarket, shortMarket.collateral, debtToBuy, 100)
   await send(
     ctx,
     closePositionCall({
@@ -115,8 +130,14 @@ export async function run(ctx: Ctx): Promise<void> {
       params: {
         adapter: aaveV3,
         market: shortMarket,
-        poolKey,
         maxCollateralIn: closeQuote.capped,
+        ...demoRoute(ctx, {
+          input: shortMarket.collateral,
+          output: shortMarket.debt,
+          amountOut: debtToBuy,
+          maxIn: closeQuote.capped,
+          recipient: shortAccount,
+        }),
         subId: SHORT_SUB_ID,
         deadline: await deadline(ctx),
       },

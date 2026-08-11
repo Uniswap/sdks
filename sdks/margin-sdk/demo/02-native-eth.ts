@@ -15,6 +15,7 @@ import {
   fmt,
   note,
   ok,
+  demoRoute,
   quoteSwapInput,
   routerEvent,
   section,
@@ -28,12 +29,13 @@ import {
   getPosition,
   increasePositionCall,
   parseLeverageX18,
+  withSlippageUp,
 } from '../src'
 
 const SUB_ID = 1n
 
 export async function run(ctx: Ctx): Promise<void> {
-  const { addresses, deployer, longMarket: market, poolKey, weth } = ctx
+  const { addresses, deployer, longMarket: market, weth } = ctx
   const adapter = addresses.lendingAdapters.morphoBlue!
   const router = addresses.marginRouter
 
@@ -54,10 +56,16 @@ export async function run(ctx: Ctx): Promise<void> {
       params: {
         adapter,
         market,
-        poolKey,
         equity: 0n,
         collateralToBuy,
         maxDebtIn,
+        ...demoRoute(ctx, {
+          input: market.debt,
+          output: market.collateral,
+          amountOut: collateralToBuy,
+          maxIn: maxDebtIn,
+          recipient: account,
+        }),
         subId: SUB_ID,
         deadline: await deadline(ctx),
       },
@@ -84,7 +92,8 @@ export async function run(ctx: Ctx): Promise<void> {
   assert(position.collateralAmount === 2n * equity + topUp, 'native addCollateral credited the account in WETH')
 
   // Close: the residual comes back as the collateral token (WETH), not native ETH.
-  const closeQuote = await quoteSwapInput(ctx, market, market.collateral, position.debtAmount, 100)
+  const debtToBuy = withSlippageUp(position.debtAmount, 10) // accrual buffer: the route must buy >= live debt
+  const closeQuote = await quoteSwapInput(ctx, market, market.collateral, debtToBuy, 100)
   const wethBefore = await balanceOf(ctx, weth, deployer)
   await send(
     ctx,
@@ -93,8 +102,14 @@ export async function run(ctx: Ctx): Promise<void> {
       params: {
         adapter,
         market,
-        poolKey,
         maxCollateralIn: closeQuote.capped,
+        ...demoRoute(ctx, {
+          input: market.collateral,
+          output: market.debt,
+          amountOut: debtToBuy,
+          maxIn: closeQuote.capped,
+          recipient: account,
+        }),
         subId: SUB_ID,
         deadline: await deadline(ctx),
       },

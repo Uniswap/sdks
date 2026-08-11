@@ -16,6 +16,7 @@ import {
   ensurePermit2,
   fmt,
   fmtWad,
+  demoRoute,
   note,
   ok,
   quoteSwapInput,
@@ -34,6 +35,7 @@ import {
   increasePositionCall,
   parseLeverageX18,
   WAD,
+  withSlippageUp,
 } from '../src'
 
 // One Aave position per (owner, subId): Aave health is account-wide, so each venue gets its own
@@ -41,7 +43,7 @@ import {
 const SUB_IDS: Partial<Record<LendingVenue, bigint>> = { aaveV3: 2n, aaveV4: 3n }
 
 async function shortLifecycle(ctx: Ctx, venue: LendingVenue): Promise<void> {
-  const { addresses, deployer, shortMarket: market, poolKey } = ctx
+  const { addresses, deployer, shortMarket: market } = ctx
   const adapter = addresses.lendingAdapters[venue]!
   const router = addresses.marginRouter
   const subId = SUB_IDS[venue]!
@@ -66,6 +68,7 @@ async function shortLifecycle(ctx: Ctx, venue: LendingVenue): Promise<void> {
     )}`
   )
 
+  const account = getMarginAccountAddress(1, deployer, subId)
   const openReceipt = await send(
     ctx,
     increasePositionCall({
@@ -73,10 +76,16 @@ async function shortLifecycle(ctx: Ctx, venue: LendingVenue): Promise<void> {
       params: {
         adapter,
         market,
-        poolKey,
         equity,
         collateralToBuy,
         maxDebtIn,
+        ...demoRoute(ctx, {
+          input: market.debt,
+          output: market.collateral,
+          amountOut: collateralToBuy,
+          maxIn: maxDebtIn,
+          recipient: account,
+        }),
         maxLtvAfter: impliedLtv(leverage) + parseUnits('0.05', 18),
         subId,
         deadline: await deadline(ctx),
@@ -93,7 +102,6 @@ async function shortLifecycle(ctx: Ctx, venue: LendingVenue): Promise<void> {
     'short direction is just the reversed (collateral, debt) pairing — no flag'
   )
 
-  const account = getMarginAccountAddress(1, deployer, subId)
   const position = await getPosition(ctx.publicClient, { adapter, account, market })
   // Aave positionOf reads the rebasing aToken balance: allow index-rounding wei, unlike Morpho.
   assertApprox(position.collateralAmount, 2n * equity, 1, `2x short holds ≈${fmt(2n * equity, 6, 'USDC')} collateral`)
@@ -109,12 +117,26 @@ async function shortLifecycle(ctx: Ctx, venue: LendingVenue): Promise<void> {
   )
 
   // Close it: sell USDC collateral, buy back the WETH debt (premium-inclusive on Aave v4).
-  const closeQuote = await quoteSwapInput(ctx, market, market.collateral, position.debtAmount, 100)
+  const debtToBuy = withSlippageUp(position.debtAmount, 10) // accrual buffer: the route must buy >= live debt
+  const closeQuote = await quoteSwapInput(ctx, market, market.collateral, debtToBuy, 100)
   const closeReceipt = await send(
     ctx,
     closePositionCall({
       marginRouter: router,
-      params: { adapter, market, poolKey, maxCollateralIn: closeQuote.capped, subId, deadline: await deadline(ctx) },
+      params: {
+        adapter,
+        market,
+        maxCollateralIn: closeQuote.capped,
+        ...demoRoute(ctx, {
+          input: market.collateral,
+          output: market.debt,
+          amountOut: debtToBuy,
+          maxIn: closeQuote.capped,
+          recipient: account,
+        }),
+        subId,
+        deadline: await deadline(ctx),
+      },
     })
   )
   const decreased = routerEvent<{ debtTotal: bigint; collateralTotal: bigint; collateralReturned: bigint }>(

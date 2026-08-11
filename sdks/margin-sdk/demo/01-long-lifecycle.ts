@@ -18,6 +18,7 @@ import {
   fmtWad,
   note,
   ok,
+  demoRoute,
   quoteSwapInput,
   routerEvent,
   section,
@@ -39,12 +40,13 @@ import {
   getIsSupportedMarket,
   parseLeverageX18,
   predictMarginAccountAddress,
+  withSlippageUp,
 } from '../src'
 
 const SUB_ID = 0n
 
 export async function run(ctx: Ctx): Promise<void> {
-  const { addresses, deployer, longMarket: market, poolKey, weth } = ctx
+  const { addresses, deployer, longMarket: market, weth } = ctx
   const adapter = addresses.lendingAdapters.morphoBlue!
   const router = addresses.marginRouter
 
@@ -90,10 +92,17 @@ export async function run(ctx: Ctx): Promise<void> {
       params: {
         adapter,
         market,
-        poolKey,
         equity,
         collateralToBuy,
         maxDebtIn,
+        // the route buys collateralToBuy exact-output and delivers it to the account
+        ...demoRoute(ctx, {
+          input: market.debt,
+          output: market.collateral,
+          amountOut: collateralToBuy,
+          maxIn: maxDebtIn,
+          recipient: predicted,
+        }),
         maxLtvAfter: impliedLtv(leverage) + parseUnits('0.05', 18), // bound leverage by health too
         subId: SUB_ID,
         deadline: await deadline(ctx),
@@ -163,10 +172,16 @@ export async function run(ctx: Ctx): Promise<void> {
       params: {
         adapter,
         market,
-        poolKey,
         equity: 0n,
         collateralToBuy: extraBuy,
         maxDebtIn: extraQuote.capped,
+        ...demoRoute(ctx, {
+          input: market.debt,
+          output: market.collateral,
+          amountOut: extraBuy,
+          maxIn: extraQuote.capped,
+          recipient: predicted,
+        }),
         subId: SUB_ID,
         deadline: await deadline(ctx),
       },
@@ -191,9 +206,16 @@ export async function run(ctx: Ctx): Promise<void> {
       params: {
         adapter,
         market,
-        poolKey,
         debtToRepay: repay,
         maxCollateralIn: decreaseQuote.capped,
+        // the decrease route sells collateral to buy exactly the repay amount, to the account
+        ...demoRoute(ctx, {
+          input: market.collateral,
+          output: market.debt,
+          amountOut: repay,
+          maxIn: decreaseQuote.capped,
+          recipient: predicted,
+        }),
         maxLtvAfter: position.currentLtv + parseUnits('0.02', 18),
         subId: SUB_ID,
         deadline: await deadline(ctx),
@@ -205,7 +227,10 @@ export async function run(ctx: Ctx): Promise<void> {
   assert(afterDecrease.currentLtv < position.currentLtv, 'partial delever lowered the LTV')
 
   // -- 9. Full close: FULL_CLOSE sentinel, residual (realized PnL) returned to the caller --------
-  const closeQuote = await quoteSwapInput(ctx, market, market.collateral, afterDecrease.debtAmount, 100)
+  // A full-close route must buy AT LEAST the live debt: buffer the read for accrual between the
+  // quote and inclusion (over-bought debt is returned to the caller after the unlock).
+  const debtToBuy = withSlippageUp(afterDecrease.debtAmount, 10)
+  const closeQuote = await quoteSwapInput(ctx, market, market.collateral, debtToBuy, 100)
   const wethBefore = await balanceOf(ctx, weth, deployer)
   const closeReceipt = await send(
     ctx,
@@ -214,8 +239,14 @@ export async function run(ctx: Ctx): Promise<void> {
       params: {
         adapter,
         market,
-        poolKey,
         maxCollateralIn: closeQuote.capped,
+        ...demoRoute(ctx, {
+          input: market.collateral,
+          output: market.debt,
+          amountOut: debtToBuy,
+          maxIn: closeQuote.capped,
+          recipient: predicted,
+        }),
         subId: SUB_ID,
         deadline: await deadline(ctx),
       },

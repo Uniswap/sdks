@@ -16,6 +16,7 @@ import {
   MARGIN_ROUTER_ABI,
   MAX_UINT160,
   type Market,
+  buildV4ExactOutRoute,
   swapZeroForOne,
   withSlippageUp,
   permit2ApproveCall,
@@ -245,4 +246,29 @@ export async function quoteSwapInput(
 export async function deadline(ctx: Ctx): Promise<bigint> {
   const block = await ctx.publicClient.getBlock()
   return block.timestamp + 1_800n
+}
+
+// ---------------------------------------------------------------------------
+// Universal Router routes
+// ---------------------------------------------------------------------------
+
+/**
+ * Builds the route fields a curated position call consumes: the single-pool v4 exact-output route
+ * over the demo pool (buy `amountOut` of `output` with `input`, delivered to `recipient` — the
+ * caller's MarginAccount) paired with the fork's Universal Router. Spread the result into
+ * `IncreaseParams`/`DecreaseParams`.
+ */
+export function demoRoute(
+  ctx: Ctx,
+  p: { input: Address; output: Address; amountOut: bigint; maxIn: bigint; recipient: Address }
+): { universalRouter: Address; routeCommands: Hex; routeInputs: Hex[] } {
+  const { commands, inputs } = buildV4ExactOutRoute({
+    poolKey: ctx.poolKey,
+    input: p.input,
+    output: p.output,
+    amountOut: p.amountOut,
+    amountInMaximum: p.maxIn,
+    recipient: p.recipient,
+  })
+  return { universalRouter: ctx.universalRouter, routeCommands: commands, routeInputs: inputs }
 }
