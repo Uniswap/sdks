@@ -1,7 +1,8 @@
 import type { Address, Hex, Log } from 'viem'
 import { decodeEventLog, decodeFunctionResult, encodeEventTopics, encodeFunctionData, isAddressEqual, zeroAddress } from 'viem'
 
-import { RouterConfigError, UnsupportedRouteError } from '../errors'
+import { MAX_PLAUSIBLE_AMOUNT_OUT } from '../constants'
+import { ImplausibleQuoteError, RouterConfigError, UnsupportedRouteError } from '../errors'
 import { V4_POOL_MANAGER_ABI, V4_QUOTER_ABI } from '../internal/abis'
 import { sortAddresses } from '../internal/currency'
 import { narrowTopics } from '../internal/logScan'
@@ -112,6 +113,12 @@ function quoterQuote(quoter: Address, legs: RouteLeg[], amountIn: bigint): Quote
     },
     decode(returnData: Hex): DecodedQuote {
       const result = decodeFunctionResult({ abi: V4_QUOTER_ABI, functionName: 'quoteExactInput', data: returnData })
+      // The plausibility gate (see MAX_PLAUSIBLE_AMOUNT_OUT): a v4 output is an int128 delta, so a
+      // value in [2^127, 2^128) is a NEGATIVE delta the V4Quoter reported without sign-checking —
+      // observed live from RETURNS_DELTA hooks. Thrown HERE, at the decode seam, so the measurement
+      // executor settles the leg as 'reverted' evidence about the hook rather than admitting a
+      // price that would outrank every honest route.
+      if (result[0] >= MAX_PLAUSIBLE_AMOUNT_OUT) throw new ImplausibleQuoteError(result[0])
       // `result[1]` is V4Quoter's own `gasEstimate` word — reported verbatim, never used to rank.
       // See `RouteQuote.gasEstimate` for what it measures and how far it moves between envelopes.
       return { amountOut: result[0], gasEstimate: result[1] }

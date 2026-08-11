@@ -90,6 +90,23 @@ export const MAX_HINTS_PER_REQUEST = 64
 export const MAX_AMOUNT_IN = 2n ** 128n
 
 /**
+ * basis: derived
+ * Exclusive ceiling on a DECODED quote's `amountOut`: 2^127.
+ *
+ * A v4 swap's output is an `int128` delta inside the PoolManager, so no honest quote can ever reach
+ * 2^127 — the range [2^127, 2^128) is exactly a negative int128 reinterpreted as unsigned. That is
+ * not a theoretical shape: live Arbitrum pools whose RETURNS_DELTA hooks yield a negative output
+ * delta have been observed answering `quoteExactInput` with `2^128 - k` (the V4Quoter reports the
+ * delta word without sign-checking it), and an engine that admits such a value ranks the lying pool
+ * above every real route in the pair. Anything at or above this is rejected AT THE DECODE SEAM
+ * (`protocols/v3.ts`/`v4.ts`) as an {@link ImplausibleQuoteError} — see that class for how the
+ * rejection is classified. v3's QuoterV2 returns a genuine uint256, but the same ceiling applies for
+ * symmetry and for the downstream fact that an amount at or above {@link MAX_AMOUNT_IN} (= 2^128 >
+ * this) could never be re-encoded as a v4 leg's input anyway.
+ */
+export const MAX_PLAUSIBLE_AMOUNT_OUT = 2n ** 127n
+
+/**
  * basis: policy
  * Max `deadlineSeconds` a swap request may ask for: 24 hours.
  *

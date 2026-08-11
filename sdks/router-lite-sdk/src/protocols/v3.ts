@@ -12,7 +12,8 @@ import {
   zeroAddress,
 } from 'viem'
 
-import { RouterConfigError, UnsupportedRouteError } from '../errors'
+import { MAX_PLAUSIBLE_AMOUNT_OUT } from '../constants'
+import { ImplausibleQuoteError, RouterConfigError, UnsupportedRouteError } from '../errors'
 import { QUOTER_V2_ABI, V3_FACTORY_ABI } from '../internal/abis'
 import { sortAddresses } from '../internal/currency'
 import { narrowTopics } from '../internal/logScan'
@@ -136,6 +137,11 @@ function quoterQuote(quoter: Address, path: Hex, amountIn: bigint): QuoteCall {
     call: { to: quoter, data: encodeFunctionData({ abi: QUOTER_V2_ABI, functionName: 'quoteExactInput', args: [path, amountIn] }) },
     decode(returnData: Hex): DecodedQuote {
       const result = decodeFunctionResult({ abi: QUOTER_V2_ABI, functionName: 'quoteExactInput', data: returnData })
+      // The plausibility gate, mirroring v4's (see MAX_PLAUSIBLE_AMOUNT_OUT): QuoterV2's amountOut
+      // is a genuine uint256, but nothing at or above 2^127 can be an honest quote either — and it
+      // could never be re-encoded as a downstream v4 leg's uint128 input anyway. Thrown at the
+      // decode seam so the leg settles as 'reverted' evidence instead of a ranking-poisoning price.
+      if (result[0] >= MAX_PLAUSIBLE_AMOUNT_OUT) throw new ImplausibleQuoteError(result[0])
       // `result[3]` is QuoterV2's own `gasEstimate` word — reported verbatim, never used to rank.
       // See `RouteQuote.gasEstimate` for what it does and does not measure (and for why it moves
       // between call envelopes).

@@ -971,11 +971,14 @@ test('ingestLogs survives malformed entries: every valid log is still indexed, n
   assertResultCoherent(res)
 })
 
-test('a quote whose amountOut overflows uint128 degrades that candidate instead of throwing: the search falls through to the next (C4-H4)', async () => {
+test('a quote whose amountOut cannot be real (>= 2^127) is rejected at decode: the search falls through to the next candidate (C4-H4)', async () => {
   // `amountIn` is bounded below 2^128 by validation, but `amountOut` comes from the chain — a
-  // hostile/broken quoter or a hooked pool can answer with a number whose slippage floor does not
-  // fit the Universal Router's `uint128 amountOutMinimum`. viem throws IntegerOutOfRangeError deep
-  // inside the encoder; that must degrade the candidate, not abort the whole search.
+  // hostile/broken quoter or a hooked pool can answer with an absurd number (a RETURNS_DELTA hook's
+  // negative int128 delta reads as `2^128 - k`; this scripts 2^129 for the same range). That shape
+  // used to travel all the way to the encoder and be demoted by viem's IntegerOutOfRangeError; it is
+  // now stopped at the DECODE seam (`ImplausibleQuoteError`, `protocols/v4.ts`), so the lying pool
+  // never composes a candidate at all — it can neither lead nor linger as a runner-up — and the
+  // search falls through to the honest route rather than crashing.
   const manifest = baseManifest({ v2Block: BLOCK_NUMBER - 500n })
   const v4Probe = directProbes(v4Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)[0]!
   const v2Probe = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)[0]!
@@ -984,7 +987,7 @@ test('a quote whose amountOut overflows uint128 degrades that candidate instead 
 
   const { client } = stubClient({
     calls: {
-      // Ranks first by a mile, and is un-encodable: 2^129 * (1 - 1%) is still over uint128.
+      // Would rank first by a mile if admitted — and could never be encoded (over uint128) anyway.
       ...entryFor(v4Probe.quote.call, v4Return(2n ** 129n)),
       ...entryFor(v2Probe.quote.call, v2Return(10n ** 24n, 10n ** 24n, zeroForOne)),
     },
@@ -995,10 +998,11 @@ test('a quote whose amountOut overflows uint128 degrades that candidate instead 
 
   expect(res.status).toBe('ready')
   if (res.status === 'ready') {
-    // The runner-up, not the leader: the absurd v4 quote was demoted rather than crashing the search.
+    // The honest v2 route leads, and the absurd v4 quote is nowhere in the result: rejected as a
+    // failed measurement (a data-carrying 'reverted' outcome), not ranked and then demoted.
     expect(res.best.route.legs[0]!.pool.protocol).toBe('v2')
-    const overflowed = res.alternatives.find((a) => a.route.legs[0]!.pool.protocol === 'v4')
-    expect(overflowed?.execution).toBe('failed')
+    expect(res.alternatives.some((a) => a.route.legs.some((l) => l.pool.protocol === 'v4'))).toBe(false)
+    expect(res.search.quoting.failed).toBeGreaterThanOrEqual(1)
   }
   assertResultCoherent(res)
 })

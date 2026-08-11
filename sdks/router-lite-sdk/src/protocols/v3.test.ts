@@ -3,6 +3,7 @@ import { computePoolAddress, encodeRouteToPath, FeeAmount, Pool, Route as V3Rout
 import { expect, test } from 'bun:test'
 import { encodeAbiParameters, encodeEventTopics, pad } from 'viem'
 
+import { ImplausibleQuoteError } from '../errors'
 import { V3_FACTORY_ABI } from '../internal/abis'
 import { v3Ref } from '../internal/testing'
 import { MAINNET_MANIFEST } from '../manifest'
@@ -175,6 +176,26 @@ test('decode extracts amountOut from QuoterV2 return', () => {
   // The fourth return word is QuoterV2's own `gasEstimate`; it rides along on the decode and is
   // reported, never ranked on (`RouteQuote.gasEstimate`).
   expect(v3Module.encodeQuote(legs, 1n, MAINNET_MANIFEST).decode(ret)).toEqual({ amountOut: 123n, gasEstimate: 45_678n })
+})
+
+test('decode rejects an amountOut >= 2^127 as ImplausibleQuoteError; the boundary below passes', () => {
+  const legs: RouteLeg[] = [
+    {
+      pool: v3Ref(computeV3PoolAddress(V3_FACTORY, USDC, WETH, 500), USDC, WETH, 500),
+      currencyIn: USDC,
+      currencyOut: WETH,
+    },
+  ]
+  const qc = v3Module.encodeQuote(legs, 1n, MAINNET_MANIFEST)
+  const quoterV2Returns = [{ type: 'uint256' }, { type: 'uint160[]' }, { type: 'uint32[]' }, { type: 'uint256' }] as const
+  // Same gate as v4's (where the negative-int128 shape was observed live) — symmetry, and nothing
+  // at or above 2^127 could be re-encoded as a downstream v4 leg's uint128 input anyway.
+  expect(() => qc.decode(encodeAbiParameters(quoterV2Returns, [2n ** 128n - 5n, [], [], 45_678n]))).toThrow(ImplausibleQuoteError)
+  expect(() => qc.decode(encodeAbiParameters(quoterV2Returns, [2n ** 127n, [], [], 45_678n]))).toThrow(ImplausibleQuoteError)
+  expect(qc.decode(encodeAbiParameters(quoterV2Returns, [2n ** 127n - 1n, [], [], 45_678n]))).toEqual({
+    amountOut: 2n ** 127n - 1n,
+    gasEstimate: 45_678n,
+  })
 })
 
 test('mergeEnabledFees adds nonstandard fees once', () => {

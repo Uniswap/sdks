@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test'
 import type { Hex, Log } from 'viem'
 import { decodeFunctionData, encodeAbiParameters, encodeEventTopics, pad, zeroAddress } from 'viem'
 
+import { ImplausibleQuoteError } from '../errors'
 import { V4_POOL_MANAGER_ABI, V4_QUOTER_ABI } from '../internal/abis'
 import { computeV4PoolId } from '../internal/poolId'
 import { v4Ref } from '../internal/testing'
@@ -181,6 +182,23 @@ test('decode matches a recorded mainnet V4Quoter returndata fixture', () => {
   expect(decoded.amountOut).toBe(BigInt(quoterFixture.amountOut))
   // V4Quoter's second return word, from the same recorded bytes (see the v3 twin of this test).
   expect(decoded.gasEstimate).toBe(64_798n)
+})
+
+test('decode rejects a negative-int128 amountOut (>= 2^127) as ImplausibleQuoteError; the boundary below passes', () => {
+  const legs: RouteLeg[] = [{ pool: v4Ref(ethUsdcKey), currencyIn: 'native', currencyOut: USDC }]
+  const qc = v4Module.encodeQuote(legs, 10n ** 16n, MAINNET_MANIFEST)
+  const returns = [{ type: 'uint256' }, { type: 'uint256' }] as const
+  // The live Arbitrum shape: a RETURNS_DELTA hook's negative output delta reported by the V4Quoter
+  // as `2^128 - k` (observed k ≈ 5e14 for a 0.01 ETH exact input).
+  const negativeDelta = 2n ** 128n - 499_999_999_900_313n
+  expect(() => qc.decode(encodeAbiParameters(returns, [negativeDelta, 64_798n]))).toThrow(ImplausibleQuoteError)
+  // Exactly 2^127 is already inside the negative-int128 range and throws too.
+  expect(() => qc.decode(encodeAbiParameters(returns, [2n ** 127n, 64_798n]))).toThrow(ImplausibleQuoteError)
+  // One below the ceiling decodes: the gate rejects only what cannot be a real int128 delta.
+  expect(qc.decode(encodeAbiParameters(returns, [2n ** 127n - 1n, 64_798n]))).toEqual({
+    amountOut: 2n ** 127n - 1n,
+    gasEstimate: 64_798n,
+  })
 })
 
 test('parsePoolLog reconstructs a recorded mainnet Initialize log with a matching recomputed poolId', () => {

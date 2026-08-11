@@ -86,6 +86,36 @@ export class NodeStateError extends TransportError {
 }
 
 /**
+ * Thrown by a protocol module's quote `decode` for a returned `amountOut` that cannot be a real
+ * quote: at or above 2^127 ({@link MAX_PLAUSIBLE_AMOUNT_OUT}) — the range where a negative int128
+ * output delta reads as a huge unsigned value. The observed live shape is a v4 pool whose
+ * RETURNS_DELTA hook yields a negative delta that the V4Quoter reports verbatim as `2^128 - k`;
+ * admitted as a price, it outranks every honest route in the pair.
+ *
+ * CLASSIFICATION IS THE POINT OF THE CLASS. The pool EXISTS — its creation log is real, its quoter
+ * call succeeded on-chain — so this is evidence that the hook LIES, not that the pool is absent.
+ * `quote/measure.ts#isAmountIndependentFailure` therefore reads this error as amount-DEPENDENT
+ * (`amountIndependent: false`): the leg settles as a data-carrying 'reverted' outcome that is never
+ * negative-cached and never feeds the hint-discredit history. A plain decode `Error` would have read
+ * amount-independent and poisoned both.
+ *
+ * INTERNAL — deliberately not exported from `index.ts`, same as {@link TransportError}: callers see
+ * the outcome only through the report's `quoting.failed` axis.
+ */
+export class ImplausibleQuoteError extends Error {
+  /** The decoded, rejected value — preserved for logs; nothing ranks or caches it. */
+  readonly amountOut: bigint
+
+  constructor(amountOut: bigint) {
+    super(`quoter returned an implausible amountOut ${amountOut} (>= 2^127 — a negative int128 read as unsigned)`)
+    this.name = 'ImplausibleQuoteError'
+    this.amountOut = amountOut
+    // Restore prototype chain for instanceof across the ts→es target downlevel.
+    Object.setPrototypeOf(this, ImplausibleQuoteError.prototype)
+  }
+}
+
+/**
  * Thrown by {@link ethCall} for a call that was NEVER SENT because the caller's `AbortSignal` fired
  * while it sat in the router's semaphore queue.
  *

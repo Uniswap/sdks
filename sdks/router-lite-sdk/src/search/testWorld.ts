@@ -44,13 +44,17 @@ import type { CurrencyRef, PoolRef, Protocol } from '../types'
  *  - `revert` — a data-less revert: the pool-absent, amount-independent shape, and the only one
  *    that may reach the negative cache (C4-H3);
  *  - `revert-data` — a revert that names a reason, so it may depend on the amount asked for;
- *  - `transport` — nothing was learned about this pool at all.
+ *  - `transport` — nothing was learned about this pool at all;
+ *  - `implausible` — the quoter ANSWERED, with an amountOut in the negative-int128-as-unsigned
+ *    range (>= 2^127): the decode seam rejects it (`ImplausibleQuoteError`), and the leg must
+ *    settle as an amount-DEPENDENT revert — the pool exists; its hook lies.
  */
 export type Fate =
   | { kind: 'price'; r0: bigint; r1: bigint; gas?: bigint }
   | { kind: 'revert' }
   | { kind: 'revert-data' }
   | { kind: 'transport' }
+  | { kind: 'implausible' }
 
 /** pool.id -> fate. The whole world a suite scripts. */
 export type World = Map<string, Fate>

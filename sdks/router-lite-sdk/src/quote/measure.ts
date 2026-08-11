@@ -1,7 +1,7 @@
 import type { Address, Hex, PublicClient } from 'viem'
 
 import { DEFAULT_CONCURRENCY } from '../constants'
-import { AbortedCallError, TransportError } from '../errors'
+import { AbortedCallError, ImplausibleQuoteError, TransportError } from '../errors'
 import { aggregateCalls, InnerCallFailure, MULTICALL_CHUNK } from '../internal/multicall'
 import { ethCall, mapConcurrent } from '../internal/rpc'
 import type { Semaphore } from '../internal/rpc'
@@ -110,8 +110,14 @@ export async function runQuoteRound(args: RunRoundArgs): Promise<Array<DecodedQu
  * directly off aggregate3's decoded `Result` (never through `classifyRpcError` — it was constructed,
  * not classified), while a per-call revert is a thrown provider error whose bytes `revertDataOf`
  * digs out of the cause chain. Same question, asked in one place so the two can never drift.
+ *
+ * An {@link ImplausibleQuoteError} (the decode seam's plausibility rejection — a negative-int128
+ * amountOut read as unsigned) is NEVER amount-independent: the pool exists and answered; its hook
+ * lies. Reading it as pool-absent would negative-cache a real pool and feed the hint-discredit
+ * history on nothing but its hook's arithmetic — see the class's docstring.
  */
 export function isAmountIndependentFailure(err: Error): boolean {
+  if (err instanceof ImplausibleQuoteError) return false
   if (err instanceof InnerCallFailure) return err.revertData === undefined
   return revertDataOf(err) === undefined
 }

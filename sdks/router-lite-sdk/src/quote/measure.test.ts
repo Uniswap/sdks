@@ -188,6 +188,19 @@ test('a pool-absent v2 read decodes to nothing and reports as an amount-independ
   expect(outcomes).toEqual([{ key: 'empty', kind: 'reverted', amountIndependent: true }])
 })
 
+test('a negative-int128 amountOut (>= 2^127) settles as reverted and amount-DEPENDENT — never negative-cacheable', async () => {
+  // The live Arbitrum shape: a RETURNS_DELTA hook's negative output delta, reported by the V4Quoter
+  // as `2^128 - k`. The real v4 decode rejects it (`ImplausibleQuoteError`), and the classification
+  // seam must read that as amount-dependent: the pool EXISTS — its hook lies — so `true` here would
+  // negative-cache a real pool and feed the hint-discredit history on its hook's arithmetic.
+  const leg = req('liar', v4UsdcWeth, USDC, WETH, 10n ** 16n)
+  const client = stubClient(entryFor(encoded(v4UsdcWeth, USDC, WETH, 10n ** 16n), v4Return(2n ** 128n - 499_999_999_900_313n)))
+
+  const outcomes = await measureLegs({ client, modules, manifest, legs: [leg], blockNumber: 1n })
+
+  expect(outcomes).toEqual([{ key: 'liar', kind: 'reverted', amountIndependent: false }])
+})
+
 test('a 429 is transport, never a revert — nothing was learned about that leg', async () => {
   const leg = req('k1', v4UsdcWeth, USDC, WETH, 1n)
   const client = stubClient(entryFor(encoded(v4UsdcWeth, USDC, WETH, 1n), 'rate-limit'))

@@ -4,7 +4,7 @@ import type { Address, Hex, PublicClient } from 'viem'
 import { zeroHash } from 'viem'
 
 import { HINT_DISCREDIT_FAILURE_BLOCKS, MEASUREMENT_PAIR_CEILING, PUMP_ROUND_CAP } from '../constants'
-import { TransportError } from '../errors'
+import { ImplausibleQuoteError, TransportError } from '../errors'
 import { toGraphNode } from '../internal/currency'
 import { createSemaphore } from '../internal/rpc'
 import { NOT_ENOUGH_LIQUIDITY_DATA, v2Ref, v4Ref } from '../internal/testing'
@@ -71,6 +71,9 @@ function fakeModule(world: World, id: Protocol = 'v2'): ProtocolModule {
           if (!fate || fate.kind === 'revert') throw new Error('no pool here')
           if (fate.kind === 'revert-data') throw Object.assign(new Error('reverted'), { data: NOT_ENOUGH_LIQUIDITY_DATA })
           if (fate.kind === 'transport') throw new TransportError('scripted 429')
+          // The decode seam's plausibility rejection (`protocols/v3.ts`/`v4.ts`): the quoter
+          // answered with a negative-int128 amountOut read as unsigned.
+          if (fate.kind === 'implausible') throw new ImplausibleQuoteError(2n ** 128n - 5n)
           const amountOut = fatePrice(fate, pool, leg.currencyIn, amountIn)!
           return { amountOut, ...(fate.gas !== undefined && { gasEstimate: fate.gas }) }
         },
@@ -454,6 +457,26 @@ test('a revert WITH data fails the leg without negative-caching the pool', async
 
   expect(index.isNegative(pool, BLOCK.number)).toBe(false)
   expect(state.quoting).toEqual({ attempted: 1, succeeded: 0, failed: 1, transportFailed: 0, unattempted: 0 })
+})
+
+test('a garbage-quoting pool (negative-int128 amountOut) never enters composition while its honest sibling does', async () => {
+  const { state, ctx, req, world, index } = fakeSetup()
+  const liar = newPool(index, world, T_IN, T_OUT, { kind: 'implausible' })
+  const honest = newPool(index, world, T_IN, T_OUT, { kind: 'price', r0: 10n ** 12n, r1: 10n ** 12n })
+
+  await runToDry(state, ctx, req)
+
+  // The lie is rejected at the decode seam, so it can never be a measurement — the honest sibling
+  // is the ONLY composed route rather than a runner-up to an absurd 2^128-k winner.
+  const routes = composeRoutes(state, ctx, req)
+  expect(routes).toHaveLength(1)
+  expect(routes[0]!.route.legs[0]!.pool.id).toBe(honest.id)
+  expect(state.quoting).toEqual({ attempted: 2, succeeded: 1, failed: 1, transportFailed: 0, unattempted: 0 })
+
+  // And it is evidence about the HOOK, not the pool's existence: no negative cache (the pool would
+  // otherwise vanish from the very next same-block search) and no discredit history.
+  expect(index.isNegative(liar, BLOCK.number)).toBe(false)
+  expect(index.pair(T_IN, T_OUT).find((r) => r.pool.id === liar.id)!.quoteFailureBlocks).toBeUndefined()
 })
 
 // ---------------------------------------------------------------------------
