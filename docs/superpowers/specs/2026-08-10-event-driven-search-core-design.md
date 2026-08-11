@@ -61,7 +61,7 @@ async function* search(ctx, req, kind): AsyncGenerator<EngineEvent> {
       maybeVerify(state, ctx, req, wake)         // swaps only, §3.4
       yield* emitChanges(state)                  // lead / progress, coalesced per cycle
       if (state.aborted || allConverged(state, sources, frontiers)) { yield finalEvent(state); return }
-      if (pumpDry(state)) {
+      if (quiet(state, sources)) {               // pump dry AND readiness settled AND verifier idle
         coverage.demandFull()                    // the gate — idempotent after first call
         frontiers.advance()                      // intermediates batch; no-op at the limit
       }
@@ -78,6 +78,7 @@ Rules that keep the loop from re-accreting `waves.ts`'s fate:
 
 - The loop **sequences only**. Pricing, coverage, verification, state mutation, event derivation, and report assembly live in sibling modules. The loop body stays under ~80 lines.
 - The **notifier** is the only wake mechanism: poked by source progress (the existing `onLogs` chunk seam), source settlement, measurement-round settlement, preflight settlement, and abort. It coalesces (many pokes before the next `await` produce one wake), and the pump early-exits when the index version has not moved since its last cycle — so a storm of chunk arrivals costs one planning pass, and a wake with no new knowledge costs O(1). No timers exist anywhere in the engine.
+- **The gate opens on QUIET, not merely on a dry pump** (amended 2026-08-11 — see [Amendments](#amendments)): pump dry **and** readiness settled **and** the verifier idle. "Cheap information exhausted" (§2.3) includes the answers already in flight — a hinted swap's preflight is one round trip from resolving, and opening every scope's full history underneath it would bill the caller for scans its answer never needed. This is the structural form of the launcher promise (a hinted `getSwap` issues zero unbounded log scans); `pumpDry` alone would break it.
 - **Pull-drivenness is the laziness contract.** The generator suspends at `yield`; a consumer that stops pulling stops the frontier from widening. In-flight work is cancelled by `finally` when the consumer abandons the iterator.
 
 ### 3.2 The pricing pump
@@ -149,7 +150,9 @@ type SearchEvent<R> =
 
 ## 5. Errors and abort
 
-Unchanged taxonomy: business outcomes are data through `apply`, never throws; transport ≠ revert ≠ node-state ≠ head-regression keep their separate axes; `RpcUnavailableError` escapes only from the pinned-block fetch. Lifetime management collapses to one rule: the generator's `finally` aborts the `SourceSet`. Nothing can outlive a search. `req.signal` is observed at the loop top and inside sources exactly as today.
+Unchanged taxonomy: business outcomes are data through `apply`, never throws; transport ≠ revert ≠ node-state ≠ head-regression keep their separate axes; `RpcUnavailableError` escapes only from the pinned-block fetch. Lifetime management collapses to one rule: the generator's `finally` aborts the `SourceSet`. `req.signal` is observed at the loop top and inside sources exactly as today.
+
+**Bounded preflight carve-out** (amended 2026-08-11 — see [Amendments](#amendments)): one thing may outlive the search, and exactly one — an in-flight preflight `eth_call`. `preflightTx` takes no `AbortSignal` and `Verifier.consider()` has no signal seam, so threading the `SourceSet`'s signal through would widen two otherwise-blessed contracts for a single bounded call. It is safe because it is inert: its settlement writes only through `applyPreflight` and pokes a notifier nobody awaits any more, both after the search's `final`. The corollary on the read side is that the **facade folds each engine event into its public result AT RECEIPT** rather than holding a reference to `state` and folding later — a fold deferred past `final` could observe a mutation from that one settlement. No other source, scan, or measurement may outlive a search.
 
 ## 6. Deletions and survivals
 
@@ -194,3 +197,21 @@ Each step lands green: steps 1–3 are additive; step 4 is the cutover behind th
 - **Out-leg latency**: out-legs wait for an in-leg round (as today's chained round 2 did) — no regression, but worth confirming on the latency matrix.
 - **Dominance edge cases**: near liquidity cliffs a non-best in-leg could theoretically compose better. The dominance argument covers monotone legs; fee-on-transfer and hooked pools are monotone in practice but adversarial hooks are not — the verifier (preflight) remains the authority before any `ready`, and alternatives are exact quotes. Accepted.
 - **Migration blast radius**: contained by sequencing (§9) and by the behavioral suite porting before the cutover.
+
+## Amendments
+
+Changes to this spec made *after* it was approved, during implementation. Each was adopted through a task review rather than by silent edit; the body above is updated in place and points back here.
+
+### 2026-08-11 — §3.1: the gate opens on QUIET, not on a dry pump
+
+**Was:** `if (pumpDry(state)) { coverage.demandFull(); frontiers.advance() }`.
+**Is:** the same block guarded by *pump dry AND readiness settled AND verifier idle*.
+
+Adopted in the Task 8 (solver loop) review, which verdicted the quiet condition as the correct reading of Decision 3's "cheap information exhausted" rather than a widening of it. A dry pump is not the same claim as an exhausted one: a hinted `getSwap` typically reaches a dry pump with its readiness reads and its preflight still in flight, one round trip from an answer. Opening every scope's full `[deployBlock, head]` at that instant would issue unbounded history scans for a search about to settle without them, breaking the launcher promise the eager pair-scope slice exists to keep. The condition is structural, so the promise is a counted contract test (`loop.test.ts`) rather than a timing accident.
+
+### 2026-08-11 — §5: the bounded preflight carve-out is blessed
+
+**Was:** "Nothing can outlive a search."
+**Is:** exactly one in-flight `eth_call` — a preflight simulation — may outlive it, and the facade folds every event into its public result at receipt.
+
+Adopted during implementation review as the smaller of two evils. `verify/preflight.ts#preflightTx` takes no `AbortSignal` and `Verifier.consider()` exposes no signal seam; cancelling the last preflight would mean widening both contracts for one bounded call whose settlement is already inert (it writes through `applyPreflight` into a state nobody reads again, and pokes a notifier nobody awaits). The carve-out is bounded in count (at most one preflight is ever in flight), in shape (an `eth_call`, never a scan or a measurement round), and in effect (no event, no yield, no report). The at-receipt fold in `router.ts` is the invariant that keeps it inert: no public result holds a live reference to `SearchState`.

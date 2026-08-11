@@ -28,7 +28,7 @@ chainz exec 1 -- bun cli/rl.ts quote eth usdc 1
 ETH_RPC_URL=https://… bun cli/rl.ts quote eth usdc 1
 bun cli/rl.ts quote eth usdc 1 --rpc https://…
 
-# Watch the bounded search improve, event by event, on Base, capped at 20s
+# Watch the search converge, event by event, on Base, capped at 20s
 chainz exec base -- bun cli/rl.ts quote eth usdc 1 --watch --budget 20s
 
 # Assert a pool the search can't see yet (v2 | v3@fee | v4@fee/tickSpacing[/hooks][:hookData])
@@ -102,7 +102,9 @@ confidence
   fresh probe) and what it priced; every later `lead` as "found a better route: +N" (or, for a swap,
   "confirmed executable on-chain" when the leader became executable); and the `final` event closing
   with how many legs got measured. Under `--watch`/`--verbose` the engine's `progress` events show up
-  too, as live "still searching" lines. It is always printed, not only under `--watch`;
+  too, as live "still searching" lines — one whose counters read exactly as the previous line's is
+  suppressed (the engine's axes are finer-grained than the line), though `--json` NDJSON still
+  carries every event. It is always printed, not only under `--watch`;
   `--watch`/`--verbose` stream the same lines live as the search runs instead of waiting for the
   end.
 - **"runners-up"** is the alternatives as a delta table: signed Δ in the out-token's units and in
@@ -110,7 +112,12 @@ confidence
 - **"confidence"** is the SDK's `SearchReport` reworded as plain sentences: pool knowledge (per-
   protocol discovery coverage, with an approximate calendar age for a partial protocol's scan
   floor), legs measured (the measurement funnel — legs are deduped by pool/direction/amount, so this
-  counts work done rather than routes considered: how many settled, and how they landed), breadth
+  counts work done rather than routes considered: how many settled, and how they landed). **The
+  three outcome counts need not sum to the settled count**, and that is not a rendering bug: the
+  leading number is `enumeration.legsMeasured`, which counts legs that reached a terminal state,
+  while `priced`/`couldn't price`/`lost to RPC` are the `quoting` counters, which count
+  **dispatches** — so a leg lost to the transport and re-dispatched once appears in both `lost to
+  RPC` and (if the retry priced) `priced`, having settled exactly once. Then breadth
   (how many intermediate tokens the frontier reached, `still widening` while eligible ones remain
   unreached), verification, a `pair ceiling` warning line on the rare pool-spam pair that tripped the
   measurement backstop, and any `notes` (an abort from the CLI's own `--budget` renders `budget
@@ -156,8 +163,8 @@ never treat as "carry on".
 - **`--verbose` vs `--watch`**: both stream the "how it went" timeline live, one line per search
   event as it lands, instead of only printing it once at the end; `--verbose` stops at the first
   actionable `lead` (what `getQuote`/`getSwap` would return — the same result the default,
-  non-streamed path gives), `--watch` drains the whole bounded search (what the `quotes()`/`swaps()`
-  iterators expose). The timeline is identical either way — `--watch`/`--verbose` just show it
+  non-streamed path gives), `--watch` drains the search to its `final` event (what the `quotes()`/`swaps()`
+  iterators expose — the search widens for as long as something keeps pulling). The timeline is identical either way — `--watch`/`--verbose` just show it
   happening instead of waiting for the recap at the end.
 - **`--json` output**: without `--watch`/`--verbose` it is exactly one object, the final result
   (`jsonify(final)`). WITH either of them it is **NDJSON: one line per search event**, each

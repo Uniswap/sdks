@@ -1,9 +1,10 @@
 # Router Lite SDK
 
 Find a working direct or one-intermediate route across configured Uniswap v2, v3, and v4
-deployments using bounded, RPC-only discovery, and return executable Universal Router calldata when
-the route can be verified. A **fallback and new-asset router**: bounded hops, bounded candidates,
-and partial history are explicit, reported properties — never overstated.
+deployments using RPC-only discovery, and return executable Universal Router calldata when the route
+can be verified. A **fallback and new-asset router**, and an [anytime one](#mental-model): there is a
+best answer at every moment, improving as knowledge arrives. Bounded hops and partial history are
+explicit, reported properties — never overstated.
 
 Two use cases: (1) a fallback when the main routing stack fails or returns nothing; (2) brand-new
 assets with one or few pools, where a launcher can hand the router its creation receipt and the
@@ -23,16 +24,59 @@ bun add @uniswap/router-lite-sdk viem
 
 ## Mental model
 
-`await router.getSwap(req)` resolves at the first actionable route; `for await (const r of
-router.swaps(req))` yields the improving best after each search wave until the bounded search
-completes; a standard `AbortSignal` cancels either, and the instance keeps everything it learned
+The search is an **anytime algorithm**: at every moment there is a current best answer plus an
+honesty report, and both improve monotonically as knowledge arrives. `await router.getSwap(req)`
+resolves at the first actionable route; `for await (const ev of router.swaps(req))` streams every
+improvement as a [`SearchEvent`](#the-event-stream-lead--progress--final) until the search
+converges; a standard `AbortSignal` cancels either, and the instance keeps everything it learned
 (pool identities, scan coverage) for the next call — by default for as long as the instance lives;
 see [PoolIndex lifecycle](#poolindex-lifecycle) for how to observe, bound, clear, or hand off that
-memory. Under the hood, the router pins a block, then
-searches in widening waves — hints and speculative direct quotes first, then core intermediates,
-then endpoint adjacency, where the quote call itself proves a pool exists — verifying the leader
-with readiness reads plus a real-trader Universal Router simulation, and reporting exactly how far
-the search got.
+memory.
+
+Under the hood there are no waves, stages, tiers, or timers. The router pins a block, then one loop
+sequences **three convergence processes**, each running on its own data-driven cadence and waking
+the loop whenever it learns something:
+
+- **The pricing pump** converges toward *every measurable leg of every relevant pair, priced at the
+  pinned block, at the amount that leg would actually see*. A "leg" is one (pool, direction, amount)
+  measurement, and that triple is also its dedup key — so one measurement serves every candidate
+  route that crosses it, and the report counts work done rather than routes considered. Nothing is
+  *selected* per pair: pools are measured, and the winner is whichever priced best. Two-hop routes
+  are **composed** from measured legs, with the out-leg priced at exactly the in-leg's realized
+  output — so a two-hop quote is an exact chained on-chain number, not an estimate built from two
+  independent ones.
+- **The coverage worker** converges toward *every demanded log scope covered*, walking uncovered
+  ranges head-backward (the head end is mandatory anyway, warm searches only need the head-adjacent
+  delta, and brand-new pools are the one scan-discoverable class with a temporal prior). Pools flow
+  into the pump chunk by chunk as each `eth_getLogs` lands, so prices improve *during* a scan rather
+  than after it.
+- **The verifier** converges the leader toward a verdict: compile and encode, then the trader's
+  readiness reads, then a real Universal Router preflight simulation — at most one in flight, racing
+  discovery rather than waiting for it. A leader that reverts is marked `failed` with its verbatim
+  `revertData` and the next candidate is tried.
+
+**The cost gate — cheap information first.** Until the search goes *quiet* — pump dry **and**
+readiness settled **and** verifier idle — the only scanning demanded is one bounded, recent-window
+scan of the exact pair (see [the launcher recipe](#launcher-recipe-routing-a-brand-new-pool-immediately)).
+Only on quiet does the gate open every scope's full `[deploymentBlock, head]`. Quiet, rather than
+merely "the pump has nothing due", is what makes the launcher promise structural: a hinted
+`getSwap` whose preflight is one round trip from resolving issues **zero** unbounded log scans, and
+that is a counted contract test rather than a timing accident.
+
+**The intermediates frontier.** Two-hop intermediates are not capped — they are a frontier that
+advances one batch (`MAX_INTERMEDIATES`, 8) per quiet cycle, ordered hinted → manifest cores →
+newest-pool-touching discovered node. So `enumeration.intermediatesPruned` reads *"not reached
+yet"*, never *"capped"*: a consumer that keeps pulling drives it to zero.
+
+**Exhaustive in the limit.** There is exactly one advance rule — *when the search goes quiet and the
+consumer is still pulling, the gate opens and every frontier advances one notch* — and "still
+pulling" is structural, not a heuristic: the loop body only runs between pulls of the generator, so
+a consumer that stops freezes both coverage and the frontier immediately, and abandoning the
+iterator aborts everything in flight. Given a consumer that keeps pulling, coverage reaches the
+deployment floors, every eligible intermediate is eventually selected, and
+`search.enumeration.exhaustiveWithinMaxHops: true` is actually reachable — where the old wave engine
+was bounded forever. What that costs is reported, never hidden: every axis of
+[`SearchReport`](#status-semantics) says how far this particular search actually got.
 
 ## Quickstart
 
@@ -80,15 +124,75 @@ if (result.status === 'ready') {
 console.log(result.status, result.alternatives.length, result.search.quoting)
 ```
 
-To watch the search improve wave-by-wave instead of waiting for the final result, iterate instead
-of awaiting — the same `AbortSignal` still applies (`tokenIn`/`tokenOut`/`amountIn`/`trader` as above):
+### The event stream: `lead` / `progress` / `final`
+
+To watch the search improve instead of waiting for one answer, iterate instead of awaiting. The
+iterators yield `SearchEvent`s, not bare results — the same `AbortSignal` still applies
+(`tokenIn`/`tokenOut`/`amountIn`/`trader` as in the quickstart above):
 
 ```ts
-for await (const r of router.swaps({ tokenIn, tokenOut, amountIn, trader, signal: AbortSignal.timeout(900) })) {
-  if (r.status === 'ready' || r.status === 'needs-action') break // good enough, stop early
-  // r.search reports how far discovery/quoting/verification got so far
+import type { SwapResult } from '@uniswap/router-lite-sdk' // `SearchEvent<SwapResult>` is what this yields
+
+for await (const ev of router.swaps({ tokenIn, tokenOut, amountIn, trader, signal: AbortSignal.timeout(900) })) {
+  if (ev.type === 'progress') {
+    // An axis of the report moved without the answer moving — the engine's heartbeat.
+    console.log(ev.search.enumeration.legsMeasured, ev.search.enumeration.intermediatesSelected)
+    continue
+  }
+  // `lead` and `final` both carry a FULL result — exactly what `getSwap` would have resolved with
+  // had the search stopped there. No delta logic, no accumulation.
+  const result: SwapResult = ev.result
+  if (ev.type === 'lead' && (result.status === 'ready' || result.status === 'needs-action')) {
+    break // good enough — abandoning the iterator aborts everything still in flight
+  }
 }
 ```
+
+Three arms, and every one of them is total:
+
+| `ev.type` | Fires when | Carries |
+| --- | --- | --- |
+| `lead` | The best route's observable identity changed — a new `routeId`, a better `amountOut`, a new execution status, or a `tx` appearing. | `result`: a full interim `QuoteResult`/`SwapResult`. |
+| `progress` | A report axis moved without a new lead. Coalesced to at most one per engine wake cycle. | `search`: a bare `SearchReport`. |
+| `final` | Exactly once, always last — the search settled: every process converged, or the caller's `AbortSignal` fired. (A consumer that simply stops pulling gets no `final`; it gets nothing more at all, which is the same guarantee seen from the other side.) | `result`: the settled result, identical in shape to what the promise surface answers with. |
+
+`getQuote`/`getSwap` are themselves consumers of this same stream: each stops at the first
+actionable `lead` (`quote` for quotes; `ready`/`needs-action` for swaps) or at `final`, whichever
+comes first. There is one search behind both shapes, so nothing about a promise-shaped call is a
+different code path from an iterated one.
+
+### `getSwap` is anytime, and "first actionable" is a real choice
+
+Because `getSwap`/`getQuote` stop at the **first** actionable lead, they deliberately return before
+the search has converged — that is the point of an anytime algorithm, and it is what keeps a hinted
+or cached trade at one round trip. The consequence worth stating plainly: **a route through a pool
+that only a log scan could have found may not be in the index yet when the promise resolves.** If a hint, the
+index, or a speculative direct measurement can answer, the answer comes back before the coverage
+worker has walked the history that would have turned up a better pool — the price is real and
+verified, but it is the best of what was known *at that moment*, not the best that exists.
+
+A consumer that wants convergence rather than latency has two ways to ask for it, and both are the
+public API rather than a knob:
+
+```ts
+import type { QuoteResult } from '@uniswap/router-lite-sdk'
+
+// (1) Drain the stream to `final`: the search widens for exactly as long as you keep pulling.
+for await (const ev of router.quotes({ tokenIn, tokenOut, amountIn })) {
+  if (ev.type === 'final') console.log(ev.result.search.enumeration.exhaustiveWithinMaxHops)
+}
+
+// (2) Or spend a fixed budget and take the best answer it bought.
+const signal = AbortSignal.timeout(10_000)
+let best: QuoteResult | undefined
+for await (const ev of router.quotes({ tokenIn, tokenOut, amountIn, signal })) {
+  if (ev.type !== 'progress') best = ev.result
+}
+```
+
+Either way `result.search` is the receipt: `discovery` per protocol, `enumeration.intermediatesPruned`
+(how much frontier is left), and `enumeration.exhaustiveWithinMaxHops` all say precisely how much of
+the space this particular answer is the best of.
 
 ### Quote-only mode
 
@@ -102,7 +206,8 @@ const quoteOnly = manifestFor(1, { execution: undefined }) // no Universal Route
 const router = createRouter({ client, manifest: quoteOnly })
 
 const usdc = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as Address
-const { best } = await router.getQuote({ tokenIn: 'native', tokenOut: usdc, amountIn: 10n ** 18n })
+const result = await router.getQuote({ tokenIn: 'native', tokenOut: usdc, amountIn: 10n ** 18n })
+if (result.status === 'quote') console.log(result.best.quote.amountOut) // `best` lives on that arm alone
 ```
 
 Calling `getSwap`/`swaps` on a manifest with no `execution` bundle throws `RouterConfigError`
@@ -125,24 +230,50 @@ a transaction, swaps always do:
 | `quote` | quotes | A route was found and priced: `best`, with `alternatives` listing the runners-up. Quote routes are plain `QuotedRoute`s — quoting verifies nothing, so no execution status rides along. (A quote's `no-route`/`inconclusive` always carries an *empty* `alternatives`: nothing priced means no runners-up.) |
 | `ready` | swaps | The exact `tx` simulated successfully from the real trader at the reported block. Send it as-is. `best.execution` is always `'verified'`. `limits` echoes the compiled plan's own `minAmountOut`/`deadline` — the same numbers asserted inside `tx`, not a re-derivation from `slippageBps`/`deadlineSeconds` with its own chance to disagree. |
 | `needs-action` | swaps | A route was found and encoded, but listed `requirements` (approval, Permit2 allowance, balance) are missing — execution is necessarily unverified until they're met. `best.execution` is always `'needs-action'`. A Permit2-*signature* requirement (as opposed to the on-chain allowance above) is future work: `ExecutionRequirement` has no arm for it today, since nothing in this package produces one yet. `limits` is present here too, for the same reason as `ready`'s. |
-| `no-route` | both | The bounded search **completed** and found nothing viable. For swaps, this also covers "a route was found but every candidate failed execution verification with an authoritative revert" — `alternatives` carries every candidate that was tried, including the nominal best, so the caller can see what was attempted. A verification that could not be *carried out* (see `inconclusive`) is never one of these. |
-| `inconclusive` | both | The search did **not** complete — abort, provider failure, or pruning got in the way. Provider trouble is always `inconclusive`, never `no-route`. It is an *incomplete* search, not an empty one: **for swaps**, whatever it did find comes back with it — `best`, and `tx` when one was compiled (the two travel together: there is never a `tx` without the `best` it is calldata for). **For quotes there is no `best` on this status at all**, and that asymmetry is deliberate: a price is a price, so a quote that found a leader is reported `quote` however incomplete the search that found it — the truncation shows up on `search` (`aborted`, the per-protocol `discovery` statuses, `quoting.unattempted`), which is the same evidence the `reason` code is built from. A quote is `inconclusive` only when nothing priced. A candidate that **reverted** in preflight is never the `best` here: it is demoted into `alternatives` as `execution: 'failed'` (with its `revertData`) exactly as on the `no-route` path, and no `tx` is offered for it — a revert stays authoritative however incomplete the rest of the search was. |
+| `no-route` | both | The search **converged** — nothing measurable was left — and found nothing viable. For swaps, this also covers "a route was found but every candidate failed execution verification with an authoritative revert" — `alternatives` carries every candidate that was tried, including the nominal best, so the caller can see what was attempted. A verification that could not be *carried out* (see `inconclusive`) is never one of these. |
+| `inconclusive` | both | The search did **not** complete — an abort, a provider failure, or legs left unmeasured got in the way. Provider trouble is always `inconclusive`, never `no-route`. It is an *incomplete* search, not an empty one: **for swaps**, whatever it did find comes back with it — `best`, and `tx` when one was compiled (the two travel together: there is never a `tx` without the `best` it is calldata for). **For quotes there is no `best` on this status at all**, and that asymmetry is deliberate: a price is a price, so a quote that found a leader is reported `quote` however incomplete the search that found it — the truncation shows up on `search` (`aborted`, the per-protocol `discovery` statuses, `quoting.unattempted`), which is the same evidence the `reason` code is built from. A quote is `inconclusive` only when nothing priced. A candidate that **reverted** in preflight is never the `best` here: it is demoted into `alternatives` as `execution: 'failed'` (with its `revertData`) exactly as on the `no-route` path, and no `tx` is offered for it — a revert stays authoritative however incomplete the rest of the search was. |
 
 Every result carries `search: SearchReport` and `alternatives`, whatever its status — the two fields
 sit on the union's base rather than on individual variants, so logging and telemetry read them off
 any result without narrowing first, and an empty `alternatives` means "nothing else priced" rather
 than "this variant doesn't have the field". `SearchReport` has independent completeness axes:
-discovery coverage per protocol, enumeration/pruning, quote attempts, execution verification, a
-preflight-simulation budget (`search.verification`), whether the search was aborted, and whether its
-pinned head went backwards — so "no v2 route" is always distinguishable from "v2 wasn't searched."
+discovery coverage per protocol, how far the search space was explored (`enumeration`), leg
+measurements (`quoting`), a preflight-simulation budget (`search.verification`), whether the search
+was aborted, and whether its pinned head went backwards — so "no v2 route" is always distinguishable
+from "v2 wasn't searched."
+
+### Reading `search.enumeration`
+
+Four counts and two verdicts, all of them about *how much of the space this answer is the best of*:
+
+| Field | What it says |
+| --- | --- |
+| `intermediatesDiscovered` | Eligible two-hop intermediate nodes the index currently knows about, refreshed every cycle. |
+| `intermediatesSelected` | How many of them the frontier has actually reached and priced legs for. |
+| `intermediatesPruned` | `discovered − selected` — read it as **"not reached yet"**, never as "capped". The frontier advances a batch per quiet cycle, so a consumer that keeps pulling drives this to zero; the old `MAX_INTERMEDIATES` cap held it above zero forever. |
+| `legsMeasured` | Leg measurements that reached a terminal state — priced, reverted, or lost to the transport past their one retry. Legs are deduped by (pool, direction, amount), so this counts **work done**, not routes considered: one leg serves every candidate that crosses it. |
+| `pairCeilingHit` | The abuse backstop fired: some pair held more pools than `MEASUREMENT_PAIR_CEILING` (128) and the excess was never measured. Not a selection cap — a pair that trips it is a pool-spam pair, and the search is no longer exhaustive over it. |
+| `exhaustiveWithinMaxHops` | True only when nothing measurable was left out: discovery complete on every enabled protocol, the frontier having reached every intermediate it found, the pair ceiling untouched, no abort, and no leg left unattempted or lost to the transport. |
+
+The old pruning counters are **gone**, along with the caps they reported: there is no
+`poolsPruned`, no `candidatesPruned`, and no `candidatesGenerated`, because per-pair pool selection
+and the candidate cap that made them meaningful no longer exist. Everything measurable is measured;
+what is left is what the frontier has not reached *yet*, which is `intermediatesPruned`'s job alone.
+
+`quoting` counts the same measurements one level down, by channel (`attempted === succeeded + failed
++ transportFailed`). These count **dispatches**, so a leg re-dispatched after a transport loss is
+counted twice, while `enumeration.legsMeasured` counts **settled** legs and therefore never exceeds
+`attempted`.
 
 `search.verification.preflightAttempted` is the running total of real preflight simulations this
-search issued; `preflightBudgetExhausted` is true when the most recent search wave gave up on its
-leader after exhausting its per-wave simulation budget while other, untried candidates remained.
-Neither one changes a `no-route` verdict into `inconclusive` — a candidate that reverted in
-preflight is real evidence the route does not execute, whatever else was left untried, and
-`alternatives` already shows exactly what was attempted (see `search/verifier.ts` for the reasoning,
-mirrored in `router.ts#isSearchComplete`).
+search issued; `preflightBudgetExhausted` is true when the verifier's most recent walk down the
+ranked list gave up after exhausting its simulation budget while an untried candidate remained. That
+budget (`PREFLIGHT_TOP_K`) is now **per search**, not per wave — there are no waves to spend it
+per — so a deep search issues strictly fewer simulations than the old engine did. Neither field
+changes a `no-route` verdict into `inconclusive`: a candidate that reverted in preflight is real
+evidence the route does not execute, whatever else was left untried, and `alternatives` already
+shows exactly what was attempted (see `search/verifier.ts` for the reasoning, mirrored in
+`router.ts#isSearchComplete`).
 
 Swap routes are `RankedRoute`s, and one field beyond `execution`/`revertData` can appear on any of
 them: `promotedOverComplex: true`, set when a mixed-protocol or hooked route would have priced
@@ -249,34 +380,29 @@ answer is a bug in the record, not a chain that rewound, and it must not brick t
   wrapped-native value, or anything with a leading wrap/unwrap); Permit2-paid legs never strand
   anything, since an unspent allowance is simply never drawn. See the encoder's deep-dive comment
   in `src/encode/ur20.ts` for the full reasoning.
-- **Wave 0 is not zero RPC.** The first wave includes hints, cached pools, and speculative direct
-  quotes with no historical scanning — plus one bounded, recent-window v4 log scan for exact-pair
-  discovery (not a full history scan). A brand-new pool outside that window is only reachable via
-  `ingestReceipt`/`ingestPool`; the remaining history is completed in later waves.
-- **Wave 0's quotes wait at most half a second for wave 0's log scan.** The two run concurrently, as
-  they always did, but the wave is evaluated in two stages. The probes (hints, cached pools,
-  speculative direct quotes, readiness) resolve first and then give the recent-window exact-pair scan
-  a bounded **500ms grace** to land; whatever has not landed by then is folded in one stage later —
-  still before any of the later waves, and before anything an iterator would call complete. On a
-  healthy endpoint you see no difference at all: that window resolves in a single `eth_getLogs` at
-  ~0.3-0.9s, well inside the grace, so the scan's pools are in the very first result. On a throttling
-  or hanging one, `getQuote`/`getSwap` return the hinted or direct-pair answer they already have
-  after the grace instead of waiting out the scan's whole retry ladder (~40s measured). The residual
-  trade is narrow and deliberate: on a provider too slow to finish the window in half a second, a
-  promise-shaped call that is *already* actionable resolves without the scan's pools in its
-  enumeration. A search with no answer yet — the brand-new-asset case the window exists for — is not
-  actionable, so it runs on and the scan still decides it; `quotes()`/`swaps()` always see the merged
-  result.
-- **v4 pools at a nonstandard `(fee, tickSpacing)` are never speculatively probed.** Wave 0's
-  no-scan-required guessing only tries the four standard, no-hook configs (100/1, 500/10, 3000/60,
-  10000/200 — `STANDARD_V4_CONFIGS`); a pool at any other tier — which is every hooked pool, and any
-  v3-style custom fee tier reused on v4 — is reachable only via a `hints`/`ingestPool`/`ingestReceipt`
-  assertion or the pair/adjacency log scans, never via a wave-0 guess. Discovery reporting `v4:
-  complete` is a claim about LOG coverage, not about probe surface: it means every relevant
-  `Initialize` log has been scanned, not that every fee/hook combination was ever tried speculatively.
-  A pool nobody hinted, on a tier nobody scanned to yet, is invisible until one of those two things
-  happens — same as any other protocol's un-scanned history, and consistent with "Wave 0 is not zero
-  RPC" above, just for the probe-surface axis rather than the log-history one.
+- **The pre-gate path is not zero RPC.** Before the [cost gate](#mental-model) opens, the search
+  measures hints, cached pools, and locally derivable pool identities (v2/v3 CREATE2 addresses at
+  standard and fee-scan-discovered tiers, v4 standard configs) with no historical scanning — plus one
+  bounded, recent-window log scan of the exact pair, which is the latency guarantee for the
+  brand-new-asset case, not a full history scan. A brand-new pool outside that window is reachable
+  before the gate only via `ingestReceipt`/`ingestPool`/`hints`; the remaining history is scanned
+  after the gate opens.
+- **A first-actionable answer can predate the history that would have improved it.** The quotes are
+  never stale — everything is measured at the pinned block — but `getQuote`/`getSwap` stop at the
+  first actionable lead, so a pool only a log scan could have found may not be in the index yet when
+  they resolve. That is the anytime bargain, stated once more because it is the one behavior a
+  latency-shaped caller and a best-price-shaped caller should choose differently: see
+  [`getSwap` is anytime](#getswap-is-anytime-and-first-actionable-is-a-real-choice).
+- **v4 pools at a nonstandard `(fee, tickSpacing)` are never guessed.** The no-scan-required
+  hypotheses only cover the four standard, no-hook configs (100/1, 500/10, 3000/60, 10000/200 —
+  `STANDARD_V4_CONFIGS`); a pool at any other tier — which is every hooked pool, and any v3-style
+  custom fee tier reused on v4 — is reachable only via a `hints`/`ingestPool`/`ingestReceipt`
+  assertion or the pair/adjacency log scans, never via a guess. Discovery reporting `v4: complete` is
+  a claim about LOG coverage, not about hypothesis surface: it means every relevant `Initialize` log
+  has been scanned, not that every fee/hook combination was ever tried. A pool nobody hinted, on a
+  tier nobody scanned to yet, is invisible until one of those two things happens — same as any other
+  protocol's un-scanned history, and consistent with "the pre-gate path is not zero RPC" above, just
+  for the hypothesis axis rather than the log-history one.
 - **Endpoint adjacency is scanned in four `eth_getLogs` chains, not twelve.** (Six cold on chains
   where v2 and v3 deployed apart, e.g. mainnet — see the segmentation note below.) `eth_getLogs` accepts
   an *address array* and an *array within one topic position*, so a single request asks the v2
@@ -286,9 +412,9 @@ answer is a bug in the record, not a chain that rewound, and it must not brick t
   itself. Where a cold search used to run 3 protocols x 2 endpoints x 2 topic slots = 12 request
   chains, it runs 4 — 6 cold on chains where v2 and v3 deployed apart, because the stretch below v3's
   deployment block is a segment of its own that only v2 can be asked about (mainnet's gap is ~2.4M
-  blocks; a chain whose factories launched together never pays it). Both endpoints are now scanned in
-  the same wave instead of one per wave —
-  so a two-hop route through a token neither end has cached becomes reachable a whole wave earlier.
+  blocks; a chain whose factories launched together never pays it). Both endpoints are demanded
+  together and converge concurrently, rather than one being scanned before the other, so a two-hop
+  route through a token neither end has cached becomes reachable as soon as either chain lands it.
   Measured live on mainnet: the merged v2+v3 request took 49ms against 134ms for the two it replaces,
   and returned exactly the union of their logs.
   Merging never widens what is scanned. A merged request records its coverage under every
@@ -310,7 +436,7 @@ answer is a bug in the record, not a chain that rewound, and it must not brick t
   60s) — so any caller with a latency budget should pass an `AbortSignal`, which is the only
   wall-clock bound there is. On a well-behaved endpoint the budget is now almost entirely headroom:
   measured 2026-08-05, keyed mainnet endpoint, a cold first-actionable result costs ONE
-  `eth_getLogs` call (~0.3-0.9s — the whole wave-0 window resolved in a single request), and a full
+  `eth_getLogs` call (~0.3-0.9s — the whole eager pair-scan window resolved in a single request), and a full
   cold drain to complete discovery lands inside a 60s budget at ~310-473 `eth_getLogs` calls total —
   not the ~2,600 a fixed 10,000-block window used to cost. These move run to run with mainnet load
   and provider mood, and a timeout-shaped provider (one that hangs rather than rejecting an
@@ -480,7 +606,7 @@ discover usdc` goes from 59s cold (budget-aborted, v2 discovery still partial) t
 with `eth_getLogs` dropping to 14 on the warm run — the 14 being the standing reorg-overlap
 re-scans. (Run to run variance is real here too — treat 59s/4.8s as representative, not exact.) The
 cost is on the other side: a maximal 275 MB snapshot adds ~1.5s to load, so a major-pair `rl quote`
-that would have resolved in wave 0 without the index gets slower (and more thorough) rather than
+that would have resolved off the cheap pre-gate path without the index gets slower (and more thorough) rather than
 faster. See `cli/cache.ts` for the size bound and the numbers behind it.
 
 ### Pool lists: the same snapshot, published
@@ -533,8 +659,8 @@ itself):
 
 - **`concurrency`** (default `20`) — a REAL, router-wide bound on how many `eth_call`/`eth_getLogs`
   requests may be in flight at once, across every concurrent operation sharing this router instance:
-  hint validation, route/discovery probes, readiness reads, and preflight all fire concurrently
-  within a single search (see [Status semantics](#status-semantics)'s wave 0), so without a shared
+  leg measurements, log scans, readiness reads, and preflight all fire concurrently within a single
+  search (the three convergence processes of the [mental model](#mental-model) run at once), so without a shared
   bound the real peak is the SUM of every concurrently-running operation's own batch size, not any
   one of them — a router with no coordination between them can see 40+ requests in flight at once
   even though nothing asked for that. One semaphore, built once per router instance, is what makes
@@ -576,8 +702,9 @@ window without asking for either.
 ### Quoting rounds go out through Multicall3
 
 There is no knob for this one, and it is the reason `concurrency` buys less than it used to.
-A quoting round's `eth_call`s are aggregated into `aggregate3` calls of **50** against the chain's
-Multicall3, so a full round (at most 78 candidates) is 2 requests instead of 78. Each chunk is still
+A measurement round's `eth_call`s are aggregated into `aggregate3` calls of **50** against the
+chain's Multicall3, so a round of legs is a handful of requests instead of one per leg (a round is
+itself capped at `PUMP_ROUND_CAP` = 400 legs). Each chunk is still
 one ordinary block-pinned `eth_call` holding one semaphore permit, so nothing above changes meaning.
 What changes is the unit a **rate limiter** charges: measured against a burst-limited public
 endpoint (mainnet.base.org, which 429s bursts of ≥ 4), 20 concurrent individual quotes lost ~95% of
@@ -623,7 +750,7 @@ The package ships one runtime dependency (viem), performs no I/O of its own — 
 is no filesystem access, no `process.env`, no `Buffer`, no `node:` import anywhere in what it
 publishes, so the same build that runs on a Node server runs unmodified in a browser tab, a service
 worker, a Cloudflare Worker, or a Vercel edge function. Bundled for `target: browser` with both
-entry points imported, the whole thing — router, wave engine, encoder, all five built-in manifests,
+entry points imported, the whole thing — router, search engine, encoder, all five built-in manifests,
 viem included and tree-shaken — is **~144 kB minified, ~45 kB gzipped**.
 
 Those two numbers are a **recorded baseline, not a constant**: they are minifier output, so they
@@ -658,7 +785,7 @@ ceiling of 2^128), `slippageBps` (integer in `[0, 10000]`), `deadlineSeconds` (i
 one of the contracts the trade is *about* (`tokenIn`, `tokenOut`, the Universal Router, Permit2, or
 the wrapped-native token — output sent to any of those is unrecoverable), and — swap requests only,
 since quoting has no execution bundle to be missing — a manifest whose `execution` bundle is
-absent, which `getSwap`/`swaps` reject with `RouterConfigError` before either reaches the wave
+absent, which `getSwap`/`swaps` reject with `RouterConfigError` before either reaches the search
 engine. A recipient that turns out to be one of the pools the chosen route trades through is caught
 a layer later, when the plan exists. `UnsupportedRouteError` (a route shape outside the closed
 supported set of {single, two-hop} × {v2, v3, v4, mixed} × {erc20, native} in/out, exact-input,
@@ -678,9 +805,9 @@ failing rejects that first call with `RouterConfigError`. Everything else — no
 | --- | --- |
 | `createRouter({ client, manifest, index?, maxPools?, concurrency?, logChunkBlocks?, assumeChainId? })` | Builds a `Router`. `index`/`maxPools` are optional PoolIndex-lifecycle knobs — see [PoolIndex lifecycle](#poolindex-lifecycle). `concurrency`/`logChunkBlocks` are transport-tuning knobs — see [Transport options](#transport-options). No policy object, no other mode/budget knobs. |
 | `assumeChainId?: number` | A validation *shortcut*, not a knob: the chain id you have **already read off this same client**, supplied so manifest validation skips its `eth_chainId` round trip. It replaces the read, never the check — the value is still compared against `manifest.chainId` and still throws `RouterConfigError` on a mismatch, and the `eth_getCode` immutable fingerprint behind it is untouched. **The misuse hazard is the whole story:** pass an id from a config file, an env var, or `manifest.chainId` itself and the cross-check becomes a tautology — you have disabled the one thing it exists to catch (a manifest pointed at the wrong chain) to save one round trip. Only a caller that probed *this* client for *this* value may pass it; a CLI that autodetects the chain from its endpoint is the motivating case, and it saves ~0.9s on the critical path of every invocation. |
-| `router.getQuote` / `router.getSwap` | Promises resolving at the first actionable result. |
-| `router.quotes(req, opts?)` / `router.swaps(req, opts?)` | Async iterators yielding the improving best after every wave. `opts` is `IterateOptions`. |
-| `IterateOptions { onFirstRoute? }` | Per-**search** options, offered on the iterator shapes only. `onFirstRoute(route: QuotedRoute)` fires once, as soon as the search has priced anything at all — up to a whole wave before the first yield carries it. For a quote that route *is* the leader of the `status: 'quote'` result that follows; for a swap it is only a priced lead (nothing compiled, simulated, or checked against the trader's readiness), which is why it is named for the route and not for the verdict. A later wave may improve on it; the yielded results stay the only authority. Not offered on `getQuote`/`getSwap`, which resolve at the same moment they would have called it — and deliberately not a field on the request, which stays a serializable description of a trade. |
+| `router.getQuote` / `router.getSwap` | Promises resolving at the first actionable result — an anytime answer, not a converged one; see [`getSwap` is anytime](#getswap-is-anytime-and-first-actionable-is-a-real-choice). |
+| `router.quotes(req)` / `router.swaps(req)` | Async iterators over `SearchEvent<QuoteResult>` / `SearchEvent<SwapResult>` — a `lead` per improved best, coalesced `progress` when only the report moved, one terminal `final`. There is no options argument: `IterateOptions`/`onFirstRoute` are gone, because the first `lead` **is** that callback, in order, on the one stream. See [the event stream](#the-event-stream-lead--progress--final). |
+| `SearchEvent<R>` | The stream's closed union: `{ type: 'lead'; result: R }`, `{ type: 'progress'; search: SearchReport }`, `{ type: 'final'; result: R }`. Exported as a type from the package root. |
 | `router.ingestPool(hint)` | Validates a hint and upserts it into the router's index. |
 | `router.ingestLogs(logs)` / `router.ingestReceipt(receipt)` | Feed known pool-creation logs (or a whole receipt) into the index ahead of a search. |
 | `router.stats()` | A sizes-only snapshot of what the router's index currently holds — see [PoolIndex lifecycle](#poolindex-lifecycle). |
@@ -721,7 +848,7 @@ empty), and `compileExecutionPlan`'s `modules` defaults to `PROTOCOL_MODULES`.
 Five chains ship as built-in manifests — `manifestFor(chainId)` works out of the box for each, no
 overrides required:
 
-| Chain | `chainId` | Manifest constant | `blockTimeSeconds` | `reorgOverlapBlocks` | wave-0 window (blocks) | swaps? |
+| Chain | `chainId` | Manifest constant | `blockTimeSeconds` | `reorgOverlapBlocks` | eager pair-scan window (blocks) | swaps? |
 | --- | --- | --- | --- | --- | --- | --- |
 | Mainnet | `1` | `MAINNET_MANIFEST` | `12` | `32n` | `50,400` | yes |
 | Base | `8453` | `BASE_MANIFEST` | `2` | `150n` | `302,400` | yes |
@@ -774,17 +901,14 @@ never removes it.
 ### The `chain` bundle: block time and reorg depth
 
 ```ts
-const base = manifestFor(8453, {
-  execution: { /* Base UR deployment */ },
-  chain: { blockTimeSeconds: 2, reorgOverlapBlocks: 600n },
-})
+const base = manifestFor(8453, { chain: { blockTimeSeconds: 2, reorgOverlapBlocks: 600n } })
 ```
 
 Both fields are facts about the chain, not tuning knobs, and both default to mainnet's answer:
 
 | Field | Default | What reads it |
 | --- | --- | --- |
-| `blockTimeSeconds` | `12` | Converts this package's time-shaped policies into block counts. Today: wave 0's recent-launch scan window, which is one week of wall-clock — `ceil(604800 / blockTimeSeconds)` blocks, so 50,400 on mainnet, 302,400 at 2s, 2,419,200 at 0.25s. Leaving it at the mainnet default on a 2s chain shrinks that window to ~28 hours, and a token launched the day before yesterday stops being visible to the fast path. The unit is **seconds** — values above 3,600 are rejected as a milliseconds mix-up. |
+| `blockTimeSeconds` | `12` | Converts this package's time-shaped policies into block counts. Today: the eager pre-gate pair-scan window (`wave0PairScanBlocks`, a surviving code identifier), which is one week of wall-clock — `ceil(604800 / blockTimeSeconds)` blocks, so 50,400 on mainnet, 302,400 at 2s, 2,419,200 at 0.25s. Leaving it at the mainnet default on a 2s chain shrinks that window to ~28 hours, and a token launched the day before yesterday stops being visible to the fast path. The unit is **seconds** — values above 3,600 are rejected as a milliseconds mix-up. |
 | `reorgOverlapBlocks` | `32n` | How much already-covered tip every warm scan re-opens, and the unit the head-regression guard is 4x of. Mainnet's 32 is one beacon epoch; on an L2 the depth that matters is an unsafe-head rewind, usually much larger in that chain's faster blocks. |
 
 Because `reorgOverlapBlocks` is baked into a `PoolIndex` when it is constructed, injecting an index
@@ -807,6 +931,25 @@ similar) — they index the historical implementation-plan documents this codeba
 Those plan documents themselves are gone (deleted in commit `e65a1988`, once superseded), but the
 tags are kept in code deliberately, as archaeology pointers: `git log --grep <tag>` finds the commits
 that did the work a tag refers to, which is usually enough context on its own.
+
+### Where the engine lives
+
+`src/search/` is the whole engine, one module per responsibility (the old `waves.ts` staged pipeline
+is gone — with it, `quoteWhileDiscovering`, the wave-0a/0b split, the detached pair scan, the
+`onFirstRoute` side-channel, and per-pair pool selection):
+
+| Module | Owns |
+| --- | --- |
+| `loop.ts` | **Sequencing only.** The async generator behind `quotes()`/`swaps()`: one cycle per wake — pump → verify → emit → terminate-or-widen — plus the quiet gate and the frontier advance. It decides *when* each of the others runs and nothing else. |
+| `pump.ts` | Pricing: due-leg planning, one batched measurement round per call, hypotheses (CREATE2/standard-config/hint pool identities), and dominance composition into direct and two-hop routes. |
+| `coverage.ts` | Scanning: demand as a pure function of (scopes, gate state), `uncovered = demand − have`, merged plan (`adjacencyPlan.ts`), head-backward walk, chunk-by-chunk ingest, and the per-protocol discovery verdict. |
+| `verifier.ts` | The leader's verdict: memoized compile/encode, the readiness gate, one preflight in flight, fall-through on revert, and the per-search `PREFLIGHT_TOP_K` budget. |
+| `state.ts` | Single-writer `SearchState`: every mutation goes through a typed `apply*`, which is what makes the report's counter invariants hold by construction (and what the outcome-log goldens replay). |
+| `notify.ts` | The one wake primitive (a coalescing notifier) and `SourceSet`, the tracked-promise/abort bundle the loop's `finally` tears down. |
+| `report.ts` | `buildReport(state)` — a pure fold from state to `SearchReport`. |
+
+The design document behind all of this, including the two amendments adopted during implementation,
+is `docs/superpowers/specs/2026-08-10-event-driven-search-core-design.md` in the monorepo root.
 
 Three private workspaces sit beside `src/`, none of them published:
 

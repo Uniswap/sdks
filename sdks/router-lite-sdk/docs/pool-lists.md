@@ -317,7 +317,7 @@ probed 594 pools (every pool in the claimed pair scope plus a 200-pool stride sa
 Multicall3 in ~4 requests; all 594 existed. The published file is 274.66 MB.
 
 The consumer: `rl quote XPR USDC 100` — a long-tail token with 13 WETH pools across v2/v3/v4 and **no
-USDC pool at all**, so wave-0 speculative direct probes cannot resolve it and the search has to reach
+USDC pool at all**, so the locally derivable pool hypotheses cannot resolve it and the search has to reach
 the adjacency the list carries. Every run starts from an empty cache directory; `eth_getLogs` counted
 at the transport.
 
@@ -355,11 +355,19 @@ as a pure win.
 > slot pressure the per-pair selection fell through to newest-`createdAtBlock`, which on a dense
 > pair hands every slot to junk/copycat pools (they postdate the liquid pool by construction), and
 > the half-pair core probes that had *already quoted the liquid pool* discarded the result. Selection
-> now ranks contended legs by the search's own single-leg quote evidence, and the core probes run in
-> wave 0 (two-staged, out-legs at the realized intermediate amount) whenever the woken index is dense
-> enough for it to matter. Re-measured on this exact case: cold 0.257458, warm-655k **0.257667** —
-> the warm cache now *beats* cold, by reaching a nonstandard-tier WETH/USDC pool speculation cannot
-> guess. See the spec's "Candidate selection" section and `search/candidates.ts#comparePoolPriority`.
+> now ranks contended legs by the search's own single-leg quote evidence, and the core probes run on
+> the cheap pre-scan path (out-legs at the realized intermediate amount) whenever the woken index is
+> dense enough for it to matter. Re-measured on this exact case: cold 0.257458, warm-655k
+> **0.257667** — the warm cache now *beats* cold, by reaching a nonstandard-tier WETH/USDC pool
+> speculation cannot guess.
+>
+> **Superseded (2026-08-10) by the event-driven search core**, which removes the failure mode rather
+> than compensating for it: there is no per-pair pool *selection* left to fall through — every pool on
+> a relevant pair is measured (deduped by pool/direction/amount, bounded only by the
+> `MEASUREMENT_PAIR_CEILING` abuse backstop), so a junk pool can no longer displace a liquid one for a
+> slot, and the compensations named above (`comparePoolPriority`, quote evidence, the two-staged core
+> probes) are all deleted. The observation this note preserves — a warm/dense index used to be able to
+> price *worse* than a cold one — is exactly what "measure, don't select" is there to make impossible.
 
 ### The nightly canary does NOT publish this list
 
