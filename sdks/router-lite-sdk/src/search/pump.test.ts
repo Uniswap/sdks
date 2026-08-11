@@ -3,12 +3,12 @@ import fc from 'fast-check'
 import type { Address, Hex, PublicClient } from 'viem'
 import { zeroHash } from 'viem'
 
-import { MEASUREMENT_PAIR_CEILING, PUMP_ROUND_CAP } from '../constants'
+import { HINT_DISCREDIT_FAILURE_BLOCKS, MEASUREMENT_PAIR_CEILING, PUMP_ROUND_CAP } from '../constants'
 import { TransportError } from '../errors'
 import { createSemaphore } from '../internal/rpc'
 import { NOT_ENOUGH_LIQUIDITY_DATA, v2Ref, v4Ref } from '../internal/testing'
 import { MAINNET_MANIFEST } from '../manifest'
-import { PoolIndex } from '../pools/poolIndex'
+import { isDiscredited, PoolIndex } from '../pools/poolIndex'
 import { PROTOCOL_MODULES } from '../protocols'
 import type { ProtocolModule } from '../protocols/types'
 import { computeV2PairAddress } from '../protocols/v2'
@@ -18,6 +18,7 @@ import type {
   CurrencyRef,
   PoolHint,
   PoolKey,
+  PoolRecord,
   PoolRef,
   Protocol,
   QuoteRequest,
@@ -435,6 +436,97 @@ test('a revert WITH data fails the leg without negative-caching the pool', async
   expect(state.quoting).toEqual({ attempted: 1, succeeded: 0, failed: 1, transportFailed: 0, unattempted: 0 })
 })
 
+// ---------------------------------------------------------------------------
+// The index bookkeeping the pump owns beyond upsert/negative-cache: the LRU
+// touch that keeps a bounded index from evicting what a search is USING, and
+// the hint-discredit history that its data-less reverts feed.
+//
+// Ported from the deleted `waves.test.ts` (`quoteEnumerated touches every
+// enumerated candidate leg`, `C4-H4: a junk hint is discredited by the engine's
+// own discovery probes failing at two blocks`). The ladders themselves live in
+// `poolIndex.test.ts`; what these pin is that the ENGINE actually climbs them —
+// the earlier version of the discredit test called `markNegative` by hand and
+// passed against an engine whose failing probes recorded nothing at all.
+// ---------------------------------------------------------------------------
+
+test('every planned leg is TOUCHED whether or not it prices: a two-hop out-leg that never quotes survives maxPools eviction over an untouched older pool', async () => {
+  const world: World = new Map()
+  const index = new PoolIndex(WN, { maxPools: 3 })
+  const x = X_TOKENS[0]!
+  // The in-leg prices (so the out-leg becomes due at mX at all); the out-leg reverts WITH data, the
+  // one outcome that writes nothing to the index — no `markSuccess`, no `markNegative`. `touchAll`
+  // is therefore the ONLY thing that ever touched it.
+  newPool(index, world, T_IN, x, { kind: 'price', r0: 10n ** 12n, r1: 10n ** 12n })
+  const outLeg = newPool(index, world, x, T_OUT, { kind: 'revert-data' })
+  // Unrelated to this trade, touched only by its own creation block — the eviction target.
+  const stale = newPool(index, world, addr(0xdd01), addr(0xdd02), { kind: 'price', r0: 1n, r1: 1n })
+  expect(index.stats().pools).toBe(3) // at cap, nothing evicted yet: 3 is not > 3
+
+  const fake = fakeModule(world)
+  const ctx: PumpCtx = {
+    index,
+    modules: { v2: fake, v3: fakeModule(world, 'v3'), v4: fakeModule(world, 'v4') },
+    manifest: FAKE_MANIFEST,
+    hookData: new Map(),
+    hints: [],
+    client: worldClient(),
+  }
+  const state = createState(BLOCK, false)
+  state.intermediates.selected = [x.toLowerCase()]
+  const req: QuoteRequest = { tokenIn: T_IN, tokenOut: T_OUT, amountIn: 1_000_000n }
+
+  await runToDry(state, ctx, req)
+  expect(composeRoutes(state, ctx, req)).toHaveLength(0) // the out-leg never priced: no route at all
+
+  // A genuinely new pool arrives — the only thing that triggers eviction. The out-leg, touched at
+  // this search's pinned block by planning alone, is not the victim; the never-planned pool is.
+  newPool(index, world, T_IN, addr(0xdd03), { kind: 'price', r0: 1n, r1: 1n }, BLOCK.number)
+
+  expect(index.stats().pools).toBe(3)
+  expect(index.pair(x, T_OUT).some((r) => r.pool.id === outLeg.id)).toBe(true)
+  // Evicted — gone, not merely stale: its adjacency entry is cleared with it.
+  expect(index.pair(addr(0xdd01), addr(0xdd02))).toEqual([])
+  expect(index.pair(addr(0xdd01), addr(0xdd02)).some((r) => r.pool.id === stale.id)).toBe(false)
+})
+
+test('the engine\'s own data-less reverts feed the discredit history: two DISTINCT blocks discredit a hinted pool, repeats at one block never do', async () => {
+  const factory = addr(0xf)
+  const manifest: ChainManifest = { chainId: 1, wrappedNative: WN, v2: { factory, deploymentBlock: 0n } }
+  const hint: PoolHint = { protocol: 'v2', token0: T_IN, token1: T_OUT }
+  const hinted = v2Ref(computeV2PairAddress(factory, T_IN, T_OUT), T_IN, T_OUT)
+
+  const world: World = new Map()
+  world.set(hinted.id, { kind: 'revert' }) // the asserted pool does not exist: a data-less revert
+  const index = new PoolIndex(WN)
+  // The hint is in the index, at the TOP of the provenance order on nothing but the caller's word —
+  // which is the whole reason the discredit ladder exists.
+  index.upsert({ pool: hinted, source: 'hint' })
+  const fake = fakeModule(world)
+  const ctx: PumpCtx = {
+    index,
+    modules: { v2: fake, v3: fakeModule(world, 'v3'), v4: fakeModule(world, 'v4') },
+    manifest,
+    hookData: new Map(),
+    hints: [hint],
+    client: worldClient(),
+  }
+  const req: QuoteRequest = { tokenIn: T_IN, tokenOut: T_OUT, amountIn: 1_000_000n }
+  const recordOf = (): PoolRecord => index.pair(T_IN, T_OUT).find((r) => r.pool.id === hinted.id)!
+
+  // Ten searches at ONE block — a caller retrying, or ten concurrent requests landing on the same
+  // head. None of them may manufacture the evidence two genuinely different blocks must provide.
+  for (let i = 0; i < 10; i++) await runToDry(createState(BLOCK, false), ctx, req)
+  expect(recordOf().quoteFailureBlocks).toBe(1)
+  expect(isDiscredited(recordOf())).toBe(false)
+
+  // One block later the pool is contradicted a second time, with no successful quote to its name.
+  // Nothing in this test touched the index's failure history by hand.
+  await runToDry(createState({ ...BLOCK, number: BLOCK.number + 1n }, false), ctx, req)
+  expect(recordOf().quoteFailureBlocks).toBe(HINT_DISCREDIT_FAILURE_BLOCKS)
+  expect(isDiscredited(recordOf())).toBe(true)
+  expect(recordOf().source).toBe('hint') // demoted, never rewritten or deleted
+})
+
 test('an improved mX invalidates the stale out-leg measurements and re-measures at the new amount', async () => {
   const { state, ctx, req, world, index } = fakeSetup()
   const x = X_TOKENS[0]!
@@ -667,6 +759,52 @@ const mixedWorldArb = fc.record({
     }),
     { maxLength: 3 },
   ),
+})
+
+let sawRetry = false
+
+test('property: dedup survives the ONE sanctioned duplicate — every leg key is on the wire at most twice, and exactly twice only for transport-fated legs', async () => {
+  // The dedup property above runs a world in which nothing is lost to the transport, so it can
+  // demand strict uniqueness. A transport loss is the single case the engine deliberately re-asks
+  // (`state.ts#applyMeasurement`: the key is released for ONE retry, then the loss is terminal), and
+  // it is exactly the case where a rule stated as "never twice" would be wrong and a rule stated as
+  // "at most twice" would be too weak — a regression that released EVERY failed key for a retry
+  // would satisfy the bound while doubling the call volume of every reverting pool on chain.
+  await fc.assert(
+    fc.asyncProperty(mixedWorldArb, async (spec) => {
+      const setup = fakeSetup({ amountIn: spec.amountIn })
+      const transportPools = new Set<string>()
+      const add = (a: Address, b: Address, fate: Fate): void => {
+        const pool = newPool(setup.index, setup.world, a, b, fate)
+        if (fate.kind === 'transport') transportPools.add(pool.id)
+      }
+      for (const fate of spec.directs) add(T_IN, T_OUT, fate)
+      spec.xs.forEach((xSpec, i) => {
+        const x = X_TOKENS[i]!
+        for (const fate of xSpec.inPools) add(T_IN, x, fate)
+        for (const fate of xSpec.outPools) add(x, T_OUT, fate)
+      })
+      setup.state.intermediates.selected = spec.xs.map((_, i) => X_TOKENS[i]!.toLowerCase())
+
+      await runToDry(setup.state, setup.ctx, setup.req)
+
+      const counts = new Map<string, number>()
+      for (const key of setup.record) counts.set(key, (counts.get(key) ?? 0) + 1)
+      if ([...counts.values()].some((c) => c === 2)) sawRetry = true
+      for (const [key, count] of counts) {
+        const poolId = key.split('|')[0]!
+        expect(count).toBeLessThanOrEqual(2)
+        if (count === 2) expect(transportPools.has(poolId)).toBe(true)
+      }
+      // `attempted` is the WIRE count, not the settled-key count: a released-then-terminal key
+      // settles once while costing two dispatches, so the retry has to show up here too.
+      expect(setup.state.quoting.attempted).toBe(setup.record.length)
+    }),
+    { numRuns: 60 },
+  )
+  // The bound is only worth stating if the sanctioned duplicate actually occurred somewhere in the
+  // run — otherwise a mutant that never retried at all would satisfy every assertion above.
+  expect(sawRetry).toBe(true)
 })
 
 test('property: conservation — attempted === succeeded + failed + transportFailed over arbitrary outcome mixes', async () => {

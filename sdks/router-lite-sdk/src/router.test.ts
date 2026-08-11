@@ -2668,3 +2668,261 @@ describe('Multicall3 probe and aggregation (facade)', () => {
     expect(base.counters.preflights).toBe(1) // the simulation went out as itself, never aggregated
   })
 })
+
+// ---------------------------------------------------------------------------
+// Ported from the deleted `waves.test.ts`, at the layer that now owns each
+// claim, plus the concurrency scenarios spec §8 asks for. Everything here runs
+// through the REAL facade — two searches really do race on one router, and the
+// index they share is a real `PoolIndex` under a real bound.
+// ---------------------------------------------------------------------------
+
+/** Wraps a client to count `eth_call`s per (lowercased) target and, optionally, to reject one
+ * target's calls with real revert DATA — the shape the negative cache must refuse to generalize. */
+function countingClient(
+  base: PublicClient,
+  opts: { revertWithData?: Address } = {},
+): { client: PublicClient; callsTo: (target: Address) => number } {
+  const counts = new Map<string, number>()
+  const client = {
+    ...base,
+    async request(args: any) {
+      if (args.method === 'eth_call') {
+        const target = ((args.params[0] as { to: string }).to ?? '').toLowerCase()
+        counts.set(target, (counts.get(target) ?? 0) + 1)
+        if (opts.revertWithData !== undefined && target === opts.revertWithData.toLowerCase()) {
+          throw Object.assign(new Error('execution reverted'), { data: '0xf29b7f98' })
+        }
+      }
+      return base.request(args)
+    },
+  } as unknown as PublicClient
+  return { client, callsTo: (target) => counts.get(target.toLowerCase()) ?? 0 }
+}
+
+test('the head-regression self-heal bound scales with the manifest\'s reorg depth, not a mainnet constant', async () => {
+  // `maxPlausibleHeadRegression` is a multiple of THIS chain's overlap. The same 200-block drop is
+  // two different facts on two different chains: on mainnet (overlap 32) it is far outside anything
+  // a replica or a reorg produces, so the WATERMARK is what was wrong and it self-heals; on a chain
+  // that rewinds 600 blocks it is an ordinary lagging replica, and reporting it is the whole point
+  // of the axis. A bound pinned to mainnet's number silently converts the second case into the first.
+  async function regressBy(reorgOverlapBlocks: bigint, drop: bigint): Promise<boolean> {
+    const manifest: ChainManifest = {
+      ...baseManifest({ v2Block: BLOCK_NUMBER + 1_000_000n, v4: false }),
+      chain: { blockTimeSeconds: 12, reorgOverlapBlocks },
+    }
+    let head = BLOCK_NUMBER
+    const { client } = stubClient({ blockNumber: () => head })
+    const router = createRouter({ client, manifest })
+    const req: SwapRequest = { tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, trader: TRADER }
+
+    await router.getSwap(req) // watermark: N
+    head = BLOCK_NUMBER - drop
+    const after = await router.getSwap(req)
+    assertResultCoherent(after)
+    return after.search.headRegressed
+  }
+
+  expect(await regressBy(32n, 200n)).toBe(false) // mainnet-shaped: beyond the bound, so the watermark heals
+  expect(await regressBy(600n, 200n)).toBe(true) // deep-reorg chain: 200 is well inside it, an ordinary lag
+})
+
+test('a data-less revert is negative-cached across searches at the same head; a data-carrying one is re-quoted', async () => {
+  // Two properties of ONE cache, both about the same shared `PoolIndex` the router holds across
+  // requests. A data-less revert is the pool-absent shape and generalizes: a second search at the
+  // same block must not re-ask. A data-carrying revert (NotEnoughLiquidity, a hook rejection, a
+  // rounding revert) is potentially amount- or context-dependent and generalizes to nothing, so a
+  // second search — standing in for a concurrent request at another amount — has to re-quote it.
+  const manifest = baseManifest({ v2Block: BLOCK_NUMBER + 1_000_000n, v4: false })
+  const pair = computeV2PairAddress(V2_FACTORY, TOKEN_A, TOKEN_B)
+  const req: QuoteRequest = { tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN }
+
+  // Nothing registered for the pair: every call is the default data-less "no pool there" revert.
+  const bare = countingClient(stubClient({}).client)
+  const bareRouter = createRouter({ client: bare.client, manifest })
+  await bareRouter.getQuote(req)
+  expect(bare.callsTo(pair)).toBe(1)
+  await bareRouter.getQuote(req)
+  expect(bare.callsTo(pair)).toBe(1) // skipped entirely — the pool is negative at this block
+
+  const withData = countingClient(stubClient({}).client, { revertWithData: pair })
+  const dataRouter = createRouter({ client: withData.client, manifest })
+  await dataRouter.getQuote(req)
+  expect(withData.callsTo(pair)).toBe(1)
+  await dataRouter.getQuote(req)
+  expect(withData.callsTo(pair)).toBe(2) // re-quoted: this verdict was never entitled to generalize
+})
+
+test('a warm dense index finds the route a cold search finds — warm and cold converge by construction', async () => {
+  // THE LIVE SHAPE THIS PINS (mainnet, 2026-08-07): `rl quote XPR USDC 100` found 0.2575 USDC
+  // against a cold cache and 0.0460 — 5.6x worse — against a warmed 655k-pool index, because leg
+  // selection ranked by creation recency and handed every slot to freshly-created junk, so the
+  // liquid pool was never quoted at all. The cold search only won by accident of arrival order.
+  //
+  // The engine has no leg slots any more and the intermediates frontier is a growing set rather
+  // than a chosen one, so warm and cold have to converge — but "by construction" is a claim about
+  // code, and this is the scenario that would have caught the old one: MORE intermediates than one
+  // frontier batch (MAX_INTERMEDIATES = 8), with the liquid pair sitting in the middle of them.
+  const manifest = baseManifest({ v2Block: BLOCK_NUMBER - 500n, v4: false })
+  const xs = Array.from({ length: 11 }, (_, i) => `0x${(0xd0 + i).toString(16)}${'0'.repeat(38)}` as Address)
+  const LIQUID = xs[7]! // neither first nor last in any ordering the frontier might use
+
+  const calls: Record<string, Hex> = {}
+  for (const x of xs) {
+    const inCall = v2Module.speculativeDirect(TOKEN_A, x, AMOUNT_IN, manifest)[0]!.quote.call
+    const outCall = v2Module.speculativeDirect(x, TOKEN_B, AMOUNT_IN, manifest)[0]!.quote.call
+    const inZeroForOne = sortAddresses(TOKEN_A, x)[0]!.toLowerCase() === TOKEN_A.toLowerCase()
+    const outZeroForOne = sortAddresses(x, TOKEN_B)[0]!.toLowerCase() === x.toLowerCase()
+    const deep = x === LIQUID
+    Object.assign(
+      calls,
+      entryFor(inCall, v2Return(10n ** 18n, deep ? 10n ** 21n : 10n ** 18n, inZeroForOne)),
+      entryFor(outCall, v2Return(10n ** 18n, deep ? 10n ** 21n : 10n ** 18n, outZeroForOne)),
+    )
+  }
+  const creationLogs = (endpoint: string): Log<bigint, number, false>[] => {
+    // The junk pairs are the NEWEST — the ordering that used to decide which pools got quoted.
+    if (endpoint === TOKEN_A.toLowerCase()) {
+      return xs.map((x, i) => pairCreatedLog(manifest, TOKEN_A, x, x === LIQUID ? BLOCK_NUMBER - 400n : BLOCK_NUMBER - 10n + BigInt(i)))
+    }
+    if (endpoint === TOKEN_B.toLowerCase()) {
+      return xs.map((x, i) => pairCreatedLog(manifest, x, TOKEN_B, x === LIQUID ? BLOCK_NUMBER - 400n : BLOCK_NUMBER - 10n + BigInt(i)))
+    }
+    return []
+  }
+  const req: QuoteRequest = { tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN }
+
+  async function drainToFinal(router: ReturnType<typeof createRouter>): Promise<QuoteResult> {
+    let last: QuoteResult | undefined
+    for await (const e of router.quotes(req)) {
+      if (e.type === 'progress') continue
+      last = e.result
+      assertResultCoherent(e.result)
+    }
+    return last!
+  }
+
+  // COLD: an empty index; every pool arrives during the search, from the adjacency scans.
+  const cold = stubClient({ calls, logs: creationLogs })
+  const coldRouter = createRouter({ client: cold.client, manifest })
+  const coldResult = await drainToFinal(coldRouter)
+
+  // WARM: the same world already in the index before the search starts (a cache/pool-list load), so
+  // enumeration faces the full density from the very first cycle.
+  const warm = stubClient({ calls, logs: creationLogs })
+  const warmRouter = createRouter({ client: warm.client, manifest })
+  warmRouter.ingestLogs([...creationLogs(TOKEN_A.toLowerCase()), ...creationLogs(TOKEN_B.toLowerCase())])
+  expect(warmRouter.stats().pools).toBe(xs.length * 2)
+  const warmResult = await drainToFinal(warmRouter)
+
+  expect(cold.counters.scans).toBeGreaterThan(0) // the cold run really had to discover the world
+  expect(coldResult.status).toBe('quote')
+  expect(warmResult.status).toBe('quote')
+  if (coldResult.status !== 'quote' || warmResult.status !== 'quote') throw new Error('unreachable')
+
+  // The core promise: an index that knows MORE must never route WORSE.
+  const via = (r: QuoteResult & { status: 'quote' }): string[] => r.best.route.legs.map((l) => String(l.currencyOut).toLowerCase())
+  expect(via(coldResult)).toEqual([LIQUID.toLowerCase(), TOKEN_B.toLowerCase()])
+  expect(via(warmResult)).toEqual([LIQUID.toLowerCase(), TOKEN_B.toLowerCase()])
+  expect(warmResult.best.quote.amountOut).toBe(coldResult.best.quote.amountOut)
+})
+
+// ---------------------------------------------------------------------------
+// Two searches on ONE router (spec §8). The router is a long-lived object with
+// one shared `PoolIndex`, so concurrency is the normal case, not an edge one:
+// every write one search makes is visible to the other mid-flight.
+// ---------------------------------------------------------------------------
+
+test('two concurrent searches on one router: different pairs, same head — both coherent, and the shared index holds both', async () => {
+  const manifest = baseManifest({ v2Block: BLOCK_NUMBER - 500n, v4: false })
+  const aMid = v2Module.speculativeDirect(TOKEN_A, MID, AMOUNT_IN, manifest)[0]!.quote.call
+  const midB = v2Module.speculativeDirect(MID, TOKEN_B, AMOUNT_IN, manifest)[0]!.quote.call
+  const aMidZeroForOne = sortAddresses(TOKEN_A, MID)[0]!.toLowerCase() === TOKEN_A.toLowerCase()
+  const midBZeroForOne = sortAddresses(MID, TOKEN_B)[0]!.toLowerCase() === MID.toLowerCase()
+
+  const { client } = stubClient({
+    calls: {
+      ...entryFor(aMid, v2Return(10n ** 18n, 10n ** 18n, aMidZeroForOne)),
+      ...entryFor(midB, v2Return(10n ** 18n, 10n ** 18n, midBZeroForOne)),
+    },
+    logs: (endpoint) =>
+      endpoint === TOKEN_A.toLowerCase()
+        ? [pairCreatedLog(manifest, TOKEN_A, MID, BLOCK_NUMBER - 400n)]
+        : endpoint === TOKEN_B.toLowerCase()
+          ? [pairCreatedLog(manifest, MID, TOKEN_B, BLOCK_NUMBER - 400n)]
+          : endpoint === MID.toLowerCase()
+            ? [pairCreatedLog(manifest, TOKEN_A, MID, BLOCK_NUMBER - 400n)]
+            : [],
+  })
+  const router = createRouter({ client, manifest })
+
+  // The two-hop A -> MID -> B and the direct A -> MID, launched together: they share the A/MID pool
+  // and the A endpoint's adjacency coverage, and one is a SWAP, so a preflight rides along too.
+  const [twoHop, direct] = await Promise.all([
+    router.getQuote({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN }),
+    router.getSwap({ tokenIn: TOKEN_A, tokenOut: MID, amountIn: AMOUNT_IN, trader: TRADER }),
+  ])
+
+  assertResultCoherent(twoHop)
+  assertResultCoherent(direct)
+  expect(twoHop.status).toBe('quote')
+  if (twoHop.status === 'quote') expect(twoHop.best.route.legs).toHaveLength(2)
+  expect(direct.status).toBe('ready')
+  if (direct.status === 'ready') expect(direct.best.route.legs).toHaveLength(1)
+  // Both searches' pools are in the one shared index, and neither clobbered the other's.
+  expect(router.stats().pools).toBe(2)
+})
+
+test('two concurrent searches under maxPools pressure: one search\'s scans evict the other\'s intermediates, and both still terminate coherently', async () => {
+  // The ROUTER-level twin of the loop's frontier-shrink regression (`search/loop.test.ts`). There
+  // the eviction is simulated inside one search; here it is REAL and caused by the other search:
+  // two live searches sharing one bounded index, each upserting pools that push the other's
+  // never-quoted neighbor pools out — WITHOUT bumping the victim's `indexVersion`. That is exactly
+  // the interleaving that used to park a search one comparison short of `final`, forever, so the
+  // load-bearing assertion is that both promises settle at all.
+  const manifest = baseManifest({ v2Block: BLOCK_NUMBER - 500n, v4: false })
+  const OTHER_IN = `0x${'a7'.repeat(20)}` as Address
+  const OTHER_OUT = `0x${'b7'.repeat(20)}` as Address
+  const MID2 = `0x${'c7'.repeat(20)}` as Address
+
+  const pairs: [Address, Address][] = [
+    [TOKEN_A, MID],
+    [MID, TOKEN_B],
+    [OTHER_IN, MID2],
+    [MID2, OTHER_OUT],
+  ]
+  const calls: Record<string, Hex> = {}
+  for (const [a, b] of pairs) {
+    const call = v2Module.speculativeDirect(a, b, AMOUNT_IN, manifest)[0]!.quote.call
+    Object.assign(calls, entryFor(call, v2Return(10n ** 18n, 10n ** 18n, sortAddresses(a, b)[0]!.toLowerCase() === a.toLowerCase())))
+  }
+  const byEndpoint = new Map<string, Log<bigint, number, false>[]>()
+  // DISTINCT creation blocks: the LRU touch a scan-sourced upsert records is the pool's creation
+  // block, and a pool touched at the block the triggering upsert itself names is protected — so
+  // four pools all created at one block would fill the index without ever evicting anything.
+  pairs.forEach(([a, b], i) => {
+    const log = pairCreatedLog(manifest, a, b, BLOCK_NUMBER - 400n + BigInt(i))
+    for (const endpoint of [a, b]) {
+      const key = endpoint.toLowerCase()
+      byEndpoint.set(key, [...(byEndpoint.get(key) ?? []), log])
+    }
+  })
+  const { client } = stubClient({ calls, logs: (endpoint) => byEndpoint.get(endpoint) ?? [] })
+  // Two pools is half of what the two searches between them need, so every scan that lands evicts
+  // something the OTHER search is mid-way through reasoning about.
+  const router = createRouter({ client, manifest, maxPools: 2 })
+
+  const settled = await Promise.race([
+    Promise.all([
+      router.getQuote({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN }),
+      router.getQuote({ tokenIn: OTHER_IN, tokenOut: OTHER_OUT, amountIn: AMOUNT_IN }),
+    ]),
+    new Promise<'hung'>((resolve) => setTimeout(() => resolve('hung'), 5_000)),
+  ])
+
+  expect(settled).not.toBe('hung')
+  if (settled === 'hung') throw new Error('unreachable')
+  for (const result of settled) assertResultCoherent(result)
+  // A real eviction scenario, not a cap that never bit: the two searches between them upserted four
+  // pools into an index that can hold two.
+  expect(router.stats().pools).toBeLessThan(pairs.length)
+})

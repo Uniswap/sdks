@@ -112,6 +112,7 @@ function harness(
     readiness?: boolean
     recording?: boolean
     req?: SwapRequest
+    modules?: VerifierCtx['modules']
   } = {},
 ): Harness {
   const state = createState(BLOCK, false, opts.recording)
@@ -120,7 +121,12 @@ function harness(
   }
   const wake = createNotifier()
   const req: SwapRequest = opts.req ?? { tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: 1000n, trader: TRADER }
-  const verifier = new Verifier({ state, ctx: { client, manifest: manifest(), modules: PROTOCOL_MODULES }, req, wake })
+  const verifier = new Verifier({
+    state,
+    ctx: { client, manifest: manifest(), modules: opts.modules ?? PROTOCOL_MODULES },
+    req,
+    wake,
+  })
   return { state, wake, verifier }
 }
 
@@ -335,6 +341,31 @@ test('an uncompilable route fails at zero budget cost and names its reason', () 
   // `PREFLIGHT_TOP_K` budgets round trips, not disqualifications.
   expect(state.verification.preflightAttempted).toBe(0)
   expect(verifier.idle()).toBe(true)
+})
+
+test('a TypeError from compileOperation propagates as a bug — never a business outcome', () => {
+  // The other side of the test above, and the reason `compileAndEncode` catches by TYPE rather than
+  // catching everything: `UnsupportedRouteError` is a statement about this candidate, but a
+  // `TypeError` out of a protocol module is a defect in the package. Swallowing it would turn every
+  // such bug into a silent `failed` route and a confident `no-route` verdict — which is exactly the
+  // shape that is impossible to diagnose from a caller's report.
+  const client: VerifierCtx['client'] = {
+    request: async () => {
+      throw new Error('a compile failure must never reach preflight')
+    },
+  } as VerifierCtx['client']
+  const modules: VerifierCtx['modules'] = {
+    ...PROTOCOL_MODULES,
+    v2: {
+      ...PROTOCOL_MODULES.v2,
+      compileOperation() {
+        throw new TypeError('Cannot read properties of undefined')
+      },
+    },
+  }
+  const { verifier } = harness(client, { modules })
+
+  expect(() => verifier.consider([quotedAt('44')])).toThrow(TypeError)
 })
 
 test('a candidate already verified leads without a second simulation', () => {

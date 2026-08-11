@@ -252,3 +252,71 @@ test('buildReport: the demand floor is the deployment floor, not min(coveredRang
   // earliest covered range's `fromBlock` (500n).
   expect(report.discovery.v2.demandFloor).toBe(0n)
 })
+
+// ---------------------------------------------------------------------------
+// `enumeration`: the frontier ratio and the exhaustiveness verdict it drives.
+//
+// Ported from the deleted `waves.test.ts` (`intermediatesPruned (C4-P7)`),
+// which drove it through a whole wave engine over MAX_INTERMEDIATES + 1 core
+// intermediates. The count is no longer re-derived from the index at report
+// time — the frontier writes both halves — so the fold is where the claim now
+// lives, and all three numbers still have to reconcile from one sample.
+// ---------------------------------------------------------------------------
+
+/** Everything except the frontier looking exhaustive, so `exhaustiveWithinMaxHops` is decided by the
+ * frontier alone rather than by whichever other axis happened to be unset. */
+function completeDiscovery(run: Fold): void {
+  for (const protocol of ['v2', 'v3', 'v4'] as Protocol[]) {
+    run.state.discovery[protocol].complete.add(TOKEN_A.toLowerCase())
+    run.state.discovery[protocol].complete.add(TOKEN_B.toLowerCase())
+  }
+}
+
+test('buildReport: enumeration reconciles — discovered = selected + pruned, from one sample of the frontier', () => {
+  const run = makeRunWithIndex()
+  completeDiscovery(run)
+  // One more eligible intermediate than the frontier has selected: exactly one is
+  // eligible-but-unreached, and the report must say so by name and not only by folding it into the
+  // boolean below.
+  run.state.intermediates.discovered = 9
+  run.state.intermediates.selected = Array.from({ length: 8 }, (_, i) => `0x${(0xc0 + i).toString(16)}`)
+
+  const report = buildReport(run.state, run.ctx, run.req)
+
+  expect(report.enumeration.intermediatesDiscovered).toBe(9)
+  expect(report.enumeration.intermediatesSelected).toBe(8)
+  expect(report.enumeration.intermediatesPruned).toBe(1)
+  expect(report.enumeration.intermediatesDiscovered).toBe(
+    report.enumeration.intermediatesSelected + report.enumeration.intermediatesPruned,
+  )
+  // The pre-existing verdict this count already drove — kept in sync, not duplicated logic.
+  expect(report.enumeration.exhaustiveWithinMaxHops).toBe(false)
+})
+
+test('buildReport: a frontier that reached everything eligible IS exhaustive', () => {
+  const run = makeRunWithIndex()
+  completeDiscovery(run)
+  run.state.intermediates.discovered = 3
+  run.state.intermediates.selected = ['0xc0', '0xc1', '0xc2']
+
+  const report = buildReport(run.state, run.ctx, run.req)
+
+  expect(report.enumeration.intermediatesPruned).toBe(0)
+  expect(report.enumeration.exhaustiveWithinMaxHops).toBe(true)
+})
+
+test('buildReport: a frontier ahead of `discovered` never reports a NEGATIVE prune', () => {
+  // The frontier selects from one walk and `discovered` is refreshed by the next, so a shrinking
+  // index (a concurrent search evicting pools under `maxPools`) can leave `selected` momentarily
+  // larger. A raw subtraction would print `-2 pruned` and, worse, fail the `=== 0` exhaustiveness
+  // check for a search that reached strictly more than it discovered.
+  const run = makeRunWithIndex()
+  completeDiscovery(run)
+  run.state.intermediates.discovered = 1
+  run.state.intermediates.selected = ['0xc0', '0xc1', '0xc2']
+
+  const report = buildReport(run.state, run.ctx, run.req)
+
+  expect(report.enumeration.intermediatesPruned).toBe(0)
+  expect(report.enumeration.exhaustiveWithinMaxHops).toBe(true)
+})
