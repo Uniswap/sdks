@@ -96,8 +96,9 @@ export async function cmdQuote(argv: string[]): Promise<number> {
     }
     const cause = budget.cause() // settled by now — the search is over
     // The answering route's price impact — the same annotation `getQuote` stamps on its own answer,
-    // mirrored here because this command answers off the stream (see `context.ts`). One extra
-    // envelope, leader-only; failure (or an expired budget) degrades to an absent figure.
+    // mirrored here because this command answers off the stream (see `context.ts` for what it costs
+    // on the wire: one `aggregate3` where Multicall3 is deployed, one `eth_call` per leg where it is
+    // not). Leader-only; failure (or an expired budget) degrades to an absent figure.
     const answered = await annotateAnsweringImpact(ctx, final, signal)
 
     if (json) {

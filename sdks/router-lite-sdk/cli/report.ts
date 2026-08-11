@@ -320,7 +320,18 @@ export function renderRunnersUp(
     const badge = isRanked(alt) ? `  ${executionBadge(alt)}` : alt.quoteUnverifiable ? `  ${yellow('hook-reported')}` : ''
     lines.push(`    ${amount}   ${bps}   ${route}${gasNote(alt)}${badge}`)
   })
-  if (overflow > 0) lines.push(dim(`    … and ${overflow} more`))
+  // THE OVERFLOW LINE NAMES ITS HOOK-REPORTED SHARE. The 5-row cap is a display choice, but the
+  // partition that put those rows below the fold is not: `quoteUnverifiable` alternatives are
+  // demoted wholesale (their amounts are hook CLAIMS, not pool math), so a pair whose deep venues
+  // are all hooked shows five ordinary routes and a bare "… and 12 more" — reading as twelve
+  // ordinary routes nobody bothered to print, rather than as twelve amounts that are unverifiable
+  // by construction. Silent only when there are none, so a clean quote gains no noise.
+  if (overflow > 0) {
+    const hidden = alternatives.slice(shown.length)
+    const unverifiable = hidden.filter((alt) => alt.quoteUnverifiable === true).length
+    const note = unverifiable > 0 ? ` (${unverifiable} hook-reported, demoted)` : ''
+    lines.push(dim(`    … and ${overflow} more${note}`))
+  }
   return lines
 }
 
@@ -476,18 +487,21 @@ export function renderTimelineLine(
   previousBest: bigint | undefined,
   trade: TradeContext,
   ctx: RenderCtx,
-  budgetNote: string,
+  /** {@link abortNoteFor}'s output — the trailing note naming whichever source stopped the search
+   * (its `--budget` timer, or the user's ^C), empty while nothing has. Named for the note it
+   * carries rather than for one of the two causes it can report. */
+  abortNote: string,
 ): string {
   const timing = `  ${timelineTiming(event.elapsedMs)}`
   switch (event.type) {
     case 'progress':
-      return `${timing}${dim(progressBody(event.search))}${budgetNote}`
+      return `${timing}${dim(progressBody(event.search))}${abortNote}`
     case 'lead':
-      return `${timing}${renderLeadBody(event.result, previousBest, trade.tokenOut, ctx)}${budgetNote}`
+      return `${timing}${renderLeadBody(event.result, previousBest, trade.tokenOut, ctx)}${abortNote}`
     case 'final': {
       const best = leaderOf(event.result)
       const body = best ? legsNote(event.result.search) : `nothing priced — ${legsNote(event.result.search)}`
-      return `${timing}search complete — ${body}${budgetNote}`
+      return `${timing}search complete — ${body}${abortNote}`
     }
   }
 }
@@ -739,7 +753,9 @@ function renderHeadline(
 const HIGH_IMPACT_WARN_BPS = -500
 
 /** `impact -12.3 bps` on the result line, when the answering route carries the measurement — dimmed
- * in the ordinary range, red at/below the warning threshold so the number itself flags the trade. */
+ * in the ordinary range, red STRICTLY BELOW {@link HIGH_IMPACT_WARN_BPS} (a route landing exactly
+ * ON the threshold reads as ordinary), so the number itself flags the trade. Same comparison as
+ * {@link highImpactWarning}, so the red number and the ⚠ line can never disagree about one route. */
 function impactNote(route: QuotedRoute | RankedRoute): string {
   const bps = route.quote.priceImpactBps
   if (bps === undefined) return ''
@@ -747,8 +763,9 @@ function impactNote(route: QuotedRoute | RankedRoute): string {
   return `  ${bps < HIGH_IMPACT_WARN_BPS ? red(label) : dim(label)}`
 }
 
-/** The warning line under the leading route when impact is worse than {@link HIGH_IMPACT_WARN_BPS}:
- * the one line a caller about to paste calldata into a wallet should not be able to miss. */
+/** The warning line under the leading route when impact is STRICTLY BELOW
+ * {@link HIGH_IMPACT_WARN_BPS} (exactly on it is not a warning): the one line a caller about to
+ * paste calldata into a wallet should not be able to miss. */
 function highImpactWarning(route: QuotedRoute | RankedRoute): string[] {
   const bps = route.quote.priceImpactBps
   if (bps === undefined || bps >= HIGH_IMPACT_WARN_BPS) return []

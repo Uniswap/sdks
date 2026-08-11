@@ -57,7 +57,8 @@ test('the first signal aborts the shared interrupt, says so once, and does NOT e
   expect(running.cause()).toBe('interrupt') // and the run will be LABELLED interrupted, not budgeted
   expect(exits).toEqual([]) // no exit: the render is still owed to the user
   expect(warnings).toHaveLength(1)
-  expect(warnings[0]).toContain('press ^C again to exit immediately')
+  // Signal-agnostic: this same arm serves SIGTERM, where "press ^C" is advice nobody can take.
+  expect(warnings[0]).toContain('signal again to exit immediately')
   expect(terminationExitCode()).toBe(130) // what rl.ts overrides main's code with, after the render
 })
 

@@ -81,7 +81,10 @@ export function onTerminationSignal(signo: number, io: TerminationIO = defaultIO
   }
   firstSigno = signo
   triggerInterrupt() // the search sees this between cycles and stops issuing requests
-  io.warn('interrupted — finishing up and banking the cache; press ^C again to exit immediately')
+  // SIGNAL-AGNOSTIC WORDING: this arm serves SIGTERM too (a `timeout 30s rl …`, a killed CI step),
+  // and "press ^C again" is advice nobody in that position can take — the second delivery comes
+  // from the same sender, not from a keyboard.
+  io.warn('interrupted — finishing up and banking the cache; signal again to exit immediately')
 }
 
 const defaultIO: TerminationIO = {

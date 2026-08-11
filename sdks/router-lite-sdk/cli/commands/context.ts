@@ -10,7 +10,7 @@
 
 import { stat } from 'node:fs/promises'
 
-import { createPublicClient, http, type Address, type PublicClient } from 'viem'
+import { createPublicClient, http, type Address, type Hex, type PublicClient } from 'viem'
 
 // deep import: deliberately unblessed — `DEFAULT_CONCURRENCY`/`MAX_CONCURRENCY` are the SDK's own
 // bounds for the option `--concurrency` maps to, imported by relative path so `--help` and the
@@ -19,7 +19,7 @@ import { createPublicClient, http, type Address, type PublicClient } from 'viem'
 // real, externally-meaningful deployment), so they stay a deep import rather than joining
 // `experimental/index.ts`'s bless list.
 import { DEFAULT_CONCURRENCY, MAX_CONCURRENCY } from '../../src/constants'
-import { measureRouteImpact, PoolIndex, PROTOCOL_MODULES } from '../../src/experimental/index'
+import { measureRouteImpact, MULTICALL3_ADDRESS, PoolIndex, PROTOCOL_MODULES } from '../../src/experimental/index'
 import { createRouter, type PoolHint, type QuotedRoute, type QuoteResult, type Router, type SwapResult } from '../../src/index'
 import { parseAmount, parseBudget } from '../amounts'
 import { dim } from '../ansi'
@@ -79,10 +79,46 @@ export type ChainContext = {
   /** The injected index, exposed so `discover` can read back what a search learned. */
   index: PoolIndex
   /**
+   * This chain's Multicall3 deployment, IN FLIGHT — one `eth_getCode` started during setup,
+   * resolving to the address when there is code there and to `undefined` when there is not (or when
+   * the probe got no answer). CLI-side reads that happen OUTSIDE the router — today
+   * {@link annotateAnsweringImpact} — await it to route their calls through `aggregate3` instead of
+   * one `eth_call` per call.
+   *
+   * A PROMISE, NOT AN ADDRESS, so setup never blocks on it. Awaiting it in `buildChainContext` would
+   * put a round trip in front of every command — including `chains` and `discover`, which never
+   * want the answer — and, against an endpoint that accepts the connection and then stalls, up to a
+   * full client timeout (30s; 120s on 4663) before the first token was even resolved. Nobody needs
+   * it until a result is being annotated, and by then it resolved long ago. It never rejects (see
+   * {@link probeMulticall3}), so leaving it unawaited is not an unhandled rejection.
+   */
+  multicall3Probe: Promise<Address | undefined>
+  /**
    * `--budget`, parsed — NOT a live clock. The command starts it, with {@link startBudget}, at the
    * moment its search does; see that function for why the difference is the whole point.
    */
   budgetMs?: number
+}
+
+/**
+ * Is Multicall3 really deployed at `address` on the endpoint's chain?
+ *
+ * THE SAME QUESTION `router.ts#resolveMulticall3` ASKS, ASKED SEPARATELY ON PURPOSE. The router's
+ * answer is a private once-cell behind the facade, unreachable from a host, and the canonical
+ * address must never be assumed: an `aggregate3` sent to an address with no code "succeeds" with
+ * `0x` and silently loses every call in it, so `eth_getCode` is the only safe test. `length > 2` is
+ * that test — `'0x'` is exactly the two-character prefix, so anything longer is bytecode.
+ *
+ * TOTAL BY CONSTRUCTION: a transport failure resolves to `undefined` (nothing was learned, so the
+ * conservative per-call path runs) rather than failing the command over an optimization.
+ */
+async function probeMulticall3(client: PublicClient, address: Address): Promise<Address | undefined> {
+  try {
+    const code = (await client.request({ method: 'eth_getCode', params: [address, 'latest'] } as any)) as Hex
+    return typeof code === 'string' && code.length > 2 ? address : undefined
+  } catch {
+    return undefined
+  }
 }
 
 /**
@@ -170,6 +206,11 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
   const fresh = new PoolIndex(chain.manifest.wrappedNative, {
     reorgOverlapBlocks: chain.manifest.chain?.reorgOverlapBlocks,
   })
+
+  // FIRED HERE, AWAITED BY WHOEVER NEEDS IT — see {@link ChainContext.multicall3Probe}. Started as
+  // early as the client exists so the round trip runs under the cache load below (a warm mainnet
+  // snapshot is real seconds) rather than in front of anything.
+  const multicall3Probe = probeMulticall3(client, chain.manifest.multicall3 ?? MULTICALL3_ADDRESS)
 
   // The on-disk cache (P2): a process is exactly the lifetime of a `PoolIndex`, so without this every
   // invocation re-scans the same block history to re-learn the same pools. Restoring one is safe
@@ -279,7 +320,7 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
     ...(concurrency !== undefined ? { concurrency } : {}),
     ...(logChunkBlocks !== undefined ? { logChunkBlocks } : {}),
   })
-  const base = { chain, client, router, index }
+  const base = { chain, client, router, index, multicall3Probe }
   return budgetMs !== undefined ? { ...base, budgetMs } : base
 }
 
@@ -595,9 +636,22 @@ export function makeLeadClassifier(
  * Mirrors the facade's answering-route price-impact annotation for a result this CLI chose off the
  * STREAM: `getQuote`/`getSwap` stamp `priceImpactBps` on the route they answer with, but streamed
  * leads are deliberately unannotated — and the default/`--verbose`/`--watch` paths all answer off
- * `quotes()`/`swaps()`. Same measurement (`measureRouteImpact`, one extra envelope, leader-only),
- * same degrade-to-absent posture: a failed reference never blocks or fails the render, and an
+ * `quotes()`/`swaps()`. Same measurement (`measureRouteImpact`, leader-only), same
+ * degrade-to-absent posture: a failed reference never blocks or fails the render, and an
  * already-annotated result (should the stream ever start carrying it) is passed through untouched.
+ *
+ * WHAT IT COSTS ON THE WIRE, EXACTLY. `measureRouteImpact` re-quotes each leg at a dust reference
+ * amount in ONE `measureLegs` round. On a chain where {@link ChainContext.multicall3Probe} found
+ * Multicall3 that round is a single `aggregate3` — one request, whatever the hop count; without it
+ * (no deployment, or the probe got no answer) it is one `eth_call` PER LEG, i.e. two for a two-hop
+ * route. Threading the probe's answer is what makes the first case the ordinary one: the router's
+ * own probed address is a private once-cell behind the facade, so a host that wants the aggregated
+ * shape has to have asked the question itself.
+ *
+ * NO SEMAPHORE, DELIBERATELY. `measureRouteImpact` takes one, and the router's is not reachable
+ * from out here — it is internal to `createRouter`. That is acceptable precisely because this call
+ * happens AFTER the search has settled, so there is no concurrent round for it to contend with:
+ * the round is one request on the multicall path and at most a couple ungated ones without it.
  */
 export async function annotateAnsweringImpact<R extends QuoteResult | SwapResult>(
   ctx: ChainContext,
@@ -607,6 +661,8 @@ export async function annotateAnsweringImpact<R extends QuoteResult | SwapResult
   if (result.status !== 'quote' && result.status !== 'ready' && result.status !== 'needs-action') return result
   const best = result.best
   if (best.quote.priceImpactBps !== undefined) return result
+  // Settled long ago in practice — `buildChainContext` started it, and a search has run since.
+  const multicall3 = await ctx.multicall3Probe
   const impact = await measureRouteImpact({
     client: ctx.client,
     modules: PROTOCOL_MODULES,
@@ -614,6 +670,7 @@ export async function annotateAnsweringImpact<R extends QuoteResult | SwapResult
     blockNumber: result.search.block.number,
     route: best.route,
     quote: best.quote,
+    ...(multicall3 !== undefined && { multicall3 }),
     ...(signal !== undefined && { signal }),
   })
   if (impact === undefined) return result

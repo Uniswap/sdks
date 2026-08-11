@@ -66,7 +66,8 @@ import { AmountError, parseAmount, parseBudget } from '../cli/amounts'
 import { bold, cyan, dim, green, red, setColorEnabled, yellow } from '../cli/ansi'
 import { parseArgs, UsageError, type FlagSpec } from '../cli/args'
 import { CACHE_FLAGS, flushCacheSave } from '../cli/cache'
-import { buildChainContext, hydrateLegSymbols, startBudget, type ChainContext } from '../cli/commands/context'
+import { buildChainContext, hydrateLegSymbols, interruptSignal, startBudget, type ChainContext } from '../cli/commands/context'
+import { onTerminationSignal, terminationExitCode } from '../cli/interrupt'
 import { redact } from '../cli/redact'
 import { amountFor, jsonify, renderRoute, viewKey, type RenderCtx } from '../cli/report'
 import { fetchTokenMeta, resolveToken, RpcError, type ResolvedToken } from '../cli/tokens'
@@ -628,7 +629,16 @@ export type LiteSideResult =
       flags: LiteFlags
       evidence: LiteEvidence
     }
-  | { kind: 'error'; message: string; finalMs: number }
+  | {
+      kind: 'error'
+      message: string
+      finalMs: number
+      /** {@link LiteFlags.hardStopped}, for the one error arm that can carry it: a row whose stream
+       * was cut at the wall-clock guard before it ever produced an event has no `SearchReport` to
+       * hang a `flags` object off, but it IS a hard-stopped row and {@link summarize} counts it as
+       * one. Optional rather than required because the THROWN arm (transport, config) never is. */
+      hardStopped?: boolean
+    }
 
 /** Folds a settled search's report into {@link LiteEvidence}. */
 export function liteEvidence(search: QuoteResult['search']): LiteEvidence {
@@ -699,7 +709,10 @@ async function quoteLite(
       tokenIn: pair.tokenIn.ref,
       tokenOut: pair.tokenOut.ref,
       amountIn: pair.amountIn,
-      ...(budget.signal ? { signal: budget.signal } : {}),
+      // `startBudget` ALWAYS hands back a signal (the budget's timer composed with the process-wide
+      // interrupt, or the bare interrupt when unbudgeted — see `cli/commands/context.ts`), so there
+      // is no absent case to spread around.
+      signal: budget.signal,
     }
     const iterator = ctx.router.quotes(request)[Symbol.asyncIterator]()
     const deadline = new Promise<typeof DEADLINE>((resolve) => {
@@ -740,7 +753,13 @@ async function quoteLite(
       // the honest thing to compare against a Trading API response. `--converge` opts back into the
       // drain for a focused re-run of a handful of pairs, where minutes-per-row is affordable and the
       // question is convergence rather than coverage.
-      if (!converge && final.status === 'quote') break
+      //
+      // `firstRoundComplete` is part of that rule, not a refinement of it: `cli/commands/quote.ts`
+      // stops at the first quote WHOSE FIRST MEASUREMENT ROUND HAS SETTLED, and a lead that arrives
+      // mid-round is a partial reading of a round still landing legs. Stopping without it compared a
+      // strictly earlier snapshot than `getQuote` returns — a systematic, silent bias against this
+      // router on exactly the rows (deep pairs, many legs) the sweep exists to measure.
+      if (!converge && final.status === 'quote' && final.search.firstRoundComplete) break
       // Both bounds still apply — to `--converge`, and to any row that never settles (a no-route pair
       // keeps searching until something stops it). The signal is cooperative, so the engine keeps
       // producing after it fires; stopping at the first event AFTER it keeps every result the budget
@@ -755,7 +774,9 @@ async function quoteLite(
   }
 
   const finalMs = Date.now() - started
-  if (!final) return { kind: 'error', message: 'search yielded no result', finalMs }
+  // A row that hard-stopped before its FIRST event still hard-stopped — losing that here is how a
+  // sweep's budget-adherence count silently under-reports exactly the worst rows.
+  if (!final) return { kind: 'error', message: 'search yielded no result', finalMs, ...(hardStopped ? { hardStopped } : {}) }
 
   const flags: LiteFlags = {
     aborted: final.search.aborted,
@@ -1135,7 +1156,7 @@ export function summarize(rows: ComparisonRow[]): Summary {
   const missCounts = { 'no-route': 0, delta: 0, error: 0, reverse: 0 } satisfies Record<MissClass, number>
   for (const { missClass } of findMisses(rows)) missCounts[missClass]++
   const missesTotal = MISS_CLASSES.reduce((sum, c) => sum + missCounts[c], 0)
-  const hardStopped = rows.filter((r) => r.lite.kind !== 'error' && r.lite.flags.hardStopped).length
+  const hardStopped = rows.filter((r) => (r.lite.kind === 'error' ? r.lite.hardStopped === true : r.lite.flags.hardStopped)).length
 
   const worst = deltas.length > 0 ? deltas.reduce((min, d) => (d < min ? d : min)) : undefined
   const medianDelta = median(deltas)
@@ -1173,6 +1194,7 @@ function renderLiteSide(lite: LiteSideResult, pair: ResolvedPair, renderCtx: Ren
     lines.push(`         ${dim(lite.route)}`)
   } else if (lite.kind === 'error') {
     lines.push(`  lite   ${red('error')} ${lite.message} (${lite.finalMs}ms)`)
+    if (lite.hardStopped) lines.push(`         ${dim('flags: hard-stopped (stream still producing past the budget)')}`)
   } else {
     lines.push(`  lite   ${yellow(lite.kind)} ${lite.reasonCode} — ${lite.reasonDetail} (${lite.finalMs}ms)`)
   }
@@ -1324,24 +1346,27 @@ const DEFAULT_BUDGET_SPEC = `${DEFAULT_BUDGET_MS}ms`
 
 /**
  * Writes this script's default into the `--budget` FLAG when the caller gave none — before
- * `buildChainContext` reads it.
+ * `buildChainContext` reads it — and hands back the spec that is now in force.
  *
- * NOT COSMETIC, AND NOT REDUNDANT with the `?? DEFAULT_BUDGET_MS` further down. `--budget` shapes two
- * different things: the search's abort clock (`startBudget`, per pair, which the fallback below
- * covered) and the viem TRANSPORT's timeout and retry policy, which only `buildChainContext` can set
- * because that is where the client is built. A default that lived only in this file therefore left
- * the transport on its unbudgeted settings — a 30s per-request timeout times viem's default retries —
- * so the abort signal fired on schedule at 10s and then waited on an `eth_getLogs` that was still
- * allowed minutes to finish. MEASURED, on a warm mainnet cache: the first two rows of a sweep with
- * the documented 10s per-pair budget reported `final 150543ms` and `final 94177ms`, both flagged
- * `aborted`. Across 111 rows that is the difference between a 25-minute sweep and a 3-hour one.
+ * DEFAULTING THE FLAG IS THE POINT, not a convenience. `--budget` shapes two different things: the
+ * search's abort clock (`startBudget`, per pair) and the viem TRANSPORT's timeout and retry policy,
+ * which only `buildChainContext` can set because that is where the client is built. A default that
+ * lived only in this file therefore left the transport on its unbudgeted settings — a 30s
+ * per-request timeout times viem's default retries — so the abort signal fired on schedule at 10s
+ * and then waited on an `eth_getLogs` that was still allowed minutes to finish. MEASURED, on a warm
+ * mainnet cache: the first two rows of a sweep with the documented 10s per-pair budget reported
+ * `final 150543ms` and `final 94177ms`, both flagged `aborted`. Across 111 rows that is the
+ * difference between a 25-minute sweep and a 3-hour one.
  *
- * Defaulting the flag rather than threading a second parameter keeps ONE spelling of the budget:
- * `buildChainContext` and the per-pair clock read the same string, so they cannot disagree about what
- * this script's default is.
+ * Returning the effective spec keeps ONE spelling of the budget with no second fallback anywhere:
+ * `buildChainContext` and the per-pair clock read the same string, so they cannot disagree about
+ * what this script's default is.
  */
-export function defaultTheBudgetFlag(strings: Map<string, string>, spec: string = DEFAULT_BUDGET_SPEC): void {
-  if (!strings.has('budget')) strings.set('budget', spec)
+export function defaultTheBudgetFlag(strings: Map<string, string>, spec: string = DEFAULT_BUDGET_SPEC): string {
+  const existing = strings.get('budget')
+  if (existing !== undefined) return existing
+  strings.set('budget', spec)
+  return spec
 }
 
 async function main(): Promise<number> {
@@ -1352,8 +1377,9 @@ async function main(): Promise<number> {
   if (json) setColorEnabled(false)
   const userPairSpecs = parsed.lists.get('pair') ?? []
   // BEFORE `buildChainContext`, which is the only place the transport's timeout/retry policy can be
-  // derived from `--budget` — see {@link defaultTheBudgetFlag} for what leaving it unset cost.
-  defaultTheBudgetFlag(parsed.strings)
+  // derived from `--budget` — see {@link defaultTheBudgetFlag} for what leaving it unset cost. The
+  // spec it returns is the one now in force, so the per-pair clock below needs no second default.
+  const budgetSpec = defaultTheBudgetFlag(parsed.strings)
 
   // `buildChainContext` does the chain-touching setup this script shares with `rl quote`: resolves
   // the RPC endpoint, resolves+REGISTERS `--rpc-header`/`$ETH_RPC_HEADERS` for redaction (before its
@@ -1389,8 +1415,7 @@ async function main(): Promise<number> {
     const apiKey = process.env.UNISWAP_API_KEY
     if (!apiKey && !json) console.log(dim('note: $UNISWAP_API_KEY is unset — running router-lite only; the api column will read "skipped"'))
 
-    const budgetArg = parsed.strings.get('budget')
-    const budgetMs = budgetArg !== undefined ? parseBudget(budgetArg) : DEFAULT_BUDGET_MS
+    const budgetMs = parseBudget(budgetSpec)
     if (!json) {
       console.log(
         bold(`compare — ${ctx.chain.label} (${ctx.chain.chainId}): ${pairs.length} rows`) +
@@ -1406,17 +1431,30 @@ async function main(): Promise<number> {
     // would make every pair's latency measurement a function of how many OTHER pairs happened to be
     // running at the same moment instead of a property of that pair alone.
     const rows: ComparisonRow[] = []
+    // ^C STOPS THE SWEEP, IT DOES NOT DISCARD IT — the same contract `rl` has (`cli/interrupt.ts`),
+    // and it matters more here: a matrix run is minutes to hours of real quoting, and an interrupt
+    // twenty rows in used to throw all twenty away. `onTerminationSignal` (registered at the bottom
+    // of this file) aborts the process-wide interrupt controller, which every per-pair budget
+    // composes into its signal, so the row in flight winds down on its own; this check catches the
+    // loop between rows and falls through to the summary and the MISSES section over whatever was
+    // collected. A partial sweep is a partial answer, not no answer.
     for (const pair of pairs) {
+      if (interruptSignal().aborted) break
       const lite = await quoteLite(ctx, renderCtx, pair, budgetMs, converge)
       const api = apiKey ? await quoteTradingApi(pair, ctx.chain.chainId, apiKey) : { kind: 'skipped' as const }
       rows.push({ pair, lite, api })
       if (!json) printRow(rows[rows.length - 1]!, renderCtx)
     }
+    const interrupted = interruptSignal().aborted
+    if (interrupted && !json) {
+      console.log('')
+      console.log(yellow(`interrupted — reporting the ${rows.length} of ${pairs.length} row${pairs.length === 1 ? '' : 's'} already swept`))
+    }
 
     const summary = summarize(rows)
     if (json) {
       const misses = findMisses(rows).map(({ row, missClass }) => ({ label: row.pair.label, missClass }))
-      console.log(jsonify({ chainId: ctx.chain.chainId, apiKeyPresent: Boolean(apiKey), rows, summary, misses }))
+      console.log(jsonify({ chainId: ctx.chain.chainId, apiKeyPresent: Boolean(apiKey), interrupted, rows, summary, misses }))
     } else {
       printSummary(summary)
       printMisses(rows, renderCtx, ctx.chain.chainId)
@@ -1445,9 +1483,23 @@ async function main(): Promise<number> {
 const isEntryPoint = process.argv[1] !== undefined && process.argv[1] === fileURLToPath(import.meta.url)
 
 if (isEntryPoint) {
+  // ^C/SIGTERM: stop between rows, still print the summary and the MISSES for everything already
+  // swept, and exit 128+signo — `cli/interrupt.ts`'s contract verbatim, wired exactly as `rl.ts`
+  // wires it (a second signal exits immediately). The row loop in `main` reads the same
+  // process-wide controller this aborts.
+  for (const [signal, signo] of [
+    ['SIGINT', 2],
+    ['SIGTERM', 15],
+  ] as const) {
+    process.on(signal, () => {
+      onTerminationSignal(signo)
+    })
+  }
   main()
     .then((code) => {
-      process.exitCode = code
+      // An interrupted sweep finished GRACEFULLY (rows reported, cache banked) but is still an
+      // interrupted process to the shell: 128+signo wins over whatever the run itself concluded.
+      process.exitCode = terminationExitCode() ?? code
     })
     .catch((err) => {
       // Mirrors `cli/rl.ts`'s own top-level mapping, collapsed to this script's simpler exit
