@@ -215,3 +215,8 @@ Adopted in the Task 8 (solver loop) review, which verdicted the quiet condition 
 **Is:** exactly one in-flight `eth_call` — a preflight simulation — may outlive it, and the facade folds every event into its public result at receipt.
 
 Adopted during implementation review as the smaller of two evils. `verify/preflight.ts#preflightTx` takes no `AbortSignal` and `Verifier.consider()` exposes no signal seam; cancelling the last preflight would mean widening both contracts for one bounded call whose settlement is already inert (it writes through `applyPreflight` into a state nobody reads again, and pokes a notifier nobody awaits). The carve-out is bounded in count (at most one preflight is ever in flight), in shape (an `eth_call`, never a scan or a measurement round), and in effect (no event, no yield, no report). The at-receipt fold in `router.ts` is the invariant that keeps it inert: no public result holds a live reference to `SearchState`.
+
+### 2026-08-11 — §3.4: the readiness ordering invariant shipped as a guard + assertion, not a parameter
+
+**Was:** "the verify function takes the settled readiness outcome as a parameter, so it cannot run before readiness resolves."
+**Is:** a loop-side ordering guard (`loop.ts` calls `verifier.consider(quoted)` only once `state.requirements !== undefined`) plus a verifier-side throw-assertion (`verifier.ts` throws if `consider()` ever runs before readiness settled) — the same guarantee, enforced structurally rather than by the function's signature. Adopted in the Task 7 review.

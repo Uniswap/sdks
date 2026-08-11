@@ -75,10 +75,14 @@ import { assertResultCoherent } from './resultCoherence'
 //     state living in a shared `PoolIndex`; neither is derivable from one
 //     search's outcomes.
 //
-// Two `SearchState` fields are deliberately NOT reproduced, because nothing the
+// Three `SearchState` fields are deliberately NOT reproduced, because nothing the
 // golden asserts reads them: `gateOpened` (a coverage-worker latch, reported
-// nowhere) and `indexVersion` (the pump's own re-plan cursor). Both are written
-// outside `apply*`; a deferred ledger note in `state.ts` records the same fact.
+// nowhere), `indexVersion` (the pump's own re-plan cursor), and
+// `verification.preflightBudgetExhausted` (written directly by the verifier, not
+// through `applyPreflight`). All three are written outside `apply*`; a deferred
+// ledger note in `state.ts` records the same fact. The recorder's fixed-point
+// proof fails loud on any fixture where `preflightBudgetExhausted` was true, so
+// the golden format cannot silently mis-pin it.
 //
 // The one derived quantity the fold DOES rebuild is `m_X`, the best in-leg per
 // intermediate — see {@link replayEntries} for why it is a re-derivation rather

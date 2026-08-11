@@ -261,7 +261,8 @@ live/fork-gated suites without their environment.
    application, evidence-first order, vanguard envelope; lead now 1.3 s warm / 139 ms cold on the
    same endpoint). The residual is CPU: `orderedIntermediates` re-walks both endpoints' neighbor
    maps (~7,700 eligible intermediates) every planning pass. Optimization filed: memoize the
-   discovered ordering against `indexVersion`.
+   discovered ordering against `indexVersion`. Note also that envelope-cadence wakes make this
+   planning cost per-envelope, not per-round, on warm dense pairs.
 3. **Trading-API parity unexercised on this branch** — run
    `UNISWAP_API_KEY=… chainz exec 1 -- bun scripts/compare.ts --pair eth/usdc --pair usdc/wbtc`
    before release; the harness itself is verified working.

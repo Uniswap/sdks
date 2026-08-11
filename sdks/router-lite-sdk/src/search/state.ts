@@ -85,11 +85,13 @@ export type SearchState = {
    * below.
    *
    * IT IS COMPLETE FOR WHAT `apply*` OWNS AND NOTHING ELSE, which is the honest boundary rather than
-   * an omission. Four fields on this type are written by their owners directly — `indexVersion` and
+   * an omission. Five fields on this type are written by their owners directly — `indexVersion` and
    * `pairCeilingHit` (the pump), `gateOpened` (the coverage worker's `demandFull`), `intermediates`
-   * (the loop's frontier advance) — plus the `compiledById` memo. A fold therefore reproduces every
-   * counter, measurement and verdict from the log alone, and takes the rest from the fixture; see
-   * `internal/outcomeLog.ts`'s header for which of them the golden actually reads.
+   * (two loop-cycle-synchronous writers: `loop.ts`'s `advanceIntermediates` AND `pump.ts`'s
+   * `planDueLegs`, pump.ts:330), and `verification.preflightBudgetExhausted` (written directly by the
+   * verifier at `verifier.ts:274,296`) — plus the `compiledById` memo. A fold therefore reproduces
+   * every counter, measurement and verdict from the log alone, and takes the rest from the fixture;
+   * see `internal/outcomeLog.ts`'s header for which of them the golden actually reads.
    */
   outcomeLog?: OutcomeEntry[] | undefined
 }
