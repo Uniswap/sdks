@@ -179,9 +179,14 @@ never treat as "carry on".
 - **`--budget`** (unit required: `900ms`, `10s`, `2m`) is a **best-effort** budget, not a hard
   wall-clock cap: it becomes an `AbortSignal` the search observes *between* its own cycles, and the
   transport's own per-request timeout and retries are derived from it (requests capped at the
-  budget, no retries) so a stalled endpoint can't pin the search far past it. A single in-flight
-  request can still overrun a very tight budget by up to that capped timeout. Without a budget the
-  search is bounded in *work*, not in seconds — a throttled endpoint can take a long time.
+  budget, no retries) so a stalled endpoint can't pin the search far past it. **Expiry cancels
+  queued work; one in-flight provider call may run to completion** — the scanner checks the signal
+  before dispatching every chunk, but viem's `request` takes no per-call signal, so whatever was
+  already on the wire drains (concurrently) and the wall time can overshoot the budget by up to one
+  request's duration, itself capped at the budget-derived per-request timeout. A drained 15s budget
+  has been measured returning at +5.8s on the tail of one wide `eth_getLogs`; that overshoot is
+  structural, not a bug to tune away. Without a budget the search is bounded in *work*, not in
+  seconds — a throttled endpoint can take a long time.
 - **`--verbose` vs `--watch`**: both stream the "how it went" timeline live, one line per search
   event as it lands, instead of only printing it once at the end. `--verbose` and the default
   (non-streamed) path share **one** stop rule: the first result that carries a quote **and whose
@@ -249,14 +254,25 @@ file.
   different `wrappedNative` or a different reorg overlap are all *discarded*, never fatal.
 - It is written on **every** exit path, including errors and Ctrl-C — a search that died partway
   still learned real coverage, and throwing it away would make exactly the runs that are already
-  going badly permanently slow.
+  going badly permanently slow. But it is only *re*-written when the run **materially changed** the
+  index (new pools, meaningfully extended coverage, new fee tiers): a warm run that merely re-read
+  what the cache already knew skips the whole serialize+write (~1s on a maximal cache; `--verbose`
+  reports `cache: unchanged — save skipped`). Quote timestamps and a coverage tip a few blocks ahead
+  don't count — the next run's standing reorg-overlap re-scan re-covers that tail in the same
+  request it already issues.
+- The cache is bounded at 1,000,000 pools per chain. At the bound the save **prunes** the snapshot
+  to its 900,000 most-recently-touched pools — warning on stderr: `cache: at bound — pruned N
+  coldest pools` — rather than refusing to write. (It used to silently stop saving instead, which
+  froze the heaviest chain's cache forever.) The live search keeps everything; only what's persisted
+  is trimmed, in the same least-recently-touched order the SDK's own `maxPools` eviction uses.
 - **Ctrl-C renders before it exits.** The first ^C stops the search *immediately* — no drain wait —
   and prints the result panel from the best route already found — labelled `interrupted` — then
   banks the cache and exits `130`; a second ^C exits at once, no flush, no panel. "Immediately"
   means the stream stops *consuming*, not that every in-flight call dies on the spot: calls still
-  queued die unsent, but one already on the wire settles in the background, behind the panel that
-  already printed. On a stalled endpoint that background work can keep the process alive after the
-  panel is on screen, until the transport's own timeout — that's what the second ^C is for. Under a
+  queued die unsent, and one already on the wire is simply abandoned — after the panel, the run
+  banks the cache (the one thing left worth waiting for; ~1s when a large cache actually changed)
+  and then exits **explicitly**, never waiting out a straggling call's transport timeout. The
+  second ^C skips even the cache bank — that's what it is for. Under a
   wrapper whose own process dies on ^C (e.g. `chainz exec`), the shell prompt can come back
   **before** the panel prints: the panel is the interrupted `rl` process finishing behind it, not a
   stray job. Running `bun cli/rl.ts` directly (with `$ETH_RPC_URL` exported) avoids the interleave.
@@ -428,7 +444,7 @@ tool:
 | `simulate.test.ts` | `eth_simulateV1` payload construction and verdict evaluation |
 | `interrupt.test.ts` | the two-signal Ctrl-C contract: the first signal aborts the shared controller and returns (no exit — the render is still owed), the second exits `128+signo` with no second notice |
 | `tokens.test.ts` | symbol/address resolution, and which failures are retryable |
-| `cache.test.ts` | save/load round trip, discard rules, atomic writes, tmp sweeping, the pre-search cache-summary coverage math |
+| `cache.test.ts` | save/load round trip, the no-op save skip, bound pruning, discard rules, atomic writes, tmp sweeping, the pre-search cache-summary coverage math |
 | `poolList.test.ts` | curation, the envelope, trust tiers, verify-before-publish |
 | `commands/context.test.ts` | the setup seam: `--budget`'s clock, the transport (incl. RPC headers), `--pool-list` |
 | `commands/discover.test.ts` | `discover`'s counterparty column — by currency family, so a native query never names WETH as its own counterpart |

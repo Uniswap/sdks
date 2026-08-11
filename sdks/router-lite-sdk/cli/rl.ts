@@ -59,7 +59,7 @@ import { cmdChains } from './commands/chains'
 import { cmdDiscover } from './commands/discover'
 import { cmdQuote } from './commands/quote'
 import { cmdSwap } from './commands/swap'
-import { onTerminationSignal, terminationExitCode } from './interrupt'
+import { finalExitCode, onTerminationSignal } from './interrupt'
 import { PoolListError } from './poolList'
 import { redact } from './redact'
 import { RpcError } from './tokens'
@@ -90,7 +90,9 @@ ${bold('common options')}
   --budget, -b <dur>      best-effort budget for the SEARCH (unit required: 900ms, 10s, 2m) — an
                           AbortSignal the search observes between cycles; transport timeouts/retries
                           derive from it. The clock starts when the search does: chain detection,
-                          the cache load and token metadata are NOT charged to it.
+                          the cache load and token metadata are NOT charged to it. Expiry cancels
+                          queued work; one in-flight provider call may run to completion, so the
+                          wall time can overshoot by up to one request's (budget-capped) duration.
   --concurrency <n>       max in-flight RPC requests, 1-1024 (SDK default: 20). Raise it for an
                           endpoint with connection headroom — 40 measurably beat 20 on a keyed
                           mainnet endpoint; lower it against a shared or rate-limited quota.
@@ -228,6 +230,20 @@ for (const [signal, signo] of [
 }
 
 const code = await main()
-// An interrupted run finished GRACEFULLY (result rendered, cache banked), but to the shell it is
-// still an interrupted process: 128+signo, whatever the command itself concluded.
-process.exitCode = terminationExitCode() ?? code
+// EXIT EXPLICITLY, DO NOT WAIT FOR THE EVENT LOOP. This used to be `process.exitCode = …`, which
+// exits only when the loop drains — and a cold run's loop is held open ~2s past the printed answer
+// by whatever the aborted search left in flight (measured: one wide `eth_getLogs` viem cannot
+// cancel — its `request` takes no per-call signal). Everything that must complete has completed by
+// this line: the command rendered its result inside `main`, and `main`'s `finally` awaited
+// `flushCacheSave` on every path (the interrupt path included — `interrupt.ts`'s first arm returns
+// into this same flow; only a SECOND signal exits without it, by contract). The empty writes below
+// are the flush barrier for the exit itself: stream writes complete in order, so awaiting one
+// enqueued last guarantees every result byte reached a pipe reader before `process.exit` tears the
+// process down mid-buffer.
+//
+// `finalExitCode`: an interrupted run finished GRACEFULLY (result rendered, cache banked), but to
+// the shell it is still an interrupted process — 128+signo, whatever the command concluded.
+await Promise.all(
+  [process.stdout, process.stderr].map((stream) => new Promise<void>((resolve) => stream.write('', () => resolve()))),
+)
+process.exit(finalExitCode(code))

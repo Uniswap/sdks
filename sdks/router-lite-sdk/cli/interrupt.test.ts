@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from 'bun:test'
 
 import { resetInterruptForTests, startBudget } from './commands/context'
-import { onTerminationSignal, resetTerminationForTests, terminationExitCode, type TerminationIO } from './interrupt'
+import { finalExitCode, onTerminationSignal, resetTerminationForTests, terminationExitCode, type TerminationIO } from './interrupt'
 
 // ---------------------------------------------------------------------------
 // The ^C contract (`interrupt.ts`), unit-tested with an injected exit.
@@ -80,4 +80,16 @@ test('SIGTERM carries its own signo: terminationExitCode 143, immediate second e
   expect(terminationExitCode()).toBe(143)
   onTerminationSignal(15, io)
   expect(exits).toEqual([143])
+})
+
+test('finalExitCode — the code rl.ts hands process.exit: the command’s own, until a signal landed', () => {
+  // The extracted last-line decision (`rl.ts` now exits EXPLICITLY rather than letting the loop
+  // drain — an in-flight getLogs was holding cold runs open ~2s past the printed answer). The
+  // process.exit call itself is untestable here; this pins the one thing it is handed.
+  expect(finalExitCode(0)).toBe(0)
+  expect(finalExitCode(4)).toBe(4) // an error exit stays an error exit
+  const { io } = recordingIO()
+  onTerminationSignal(2, io)
+  expect(finalExitCode(0)).toBe(130) // gracefully-finished, but interrupted to the shell
+  expect(finalExitCode(1)).toBe(130) // whatever the command concluded
 })

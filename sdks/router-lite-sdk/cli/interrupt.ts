@@ -62,6 +62,19 @@ export function terminationExitCode(): number | undefined {
   return firstSigno === undefined ? undefined : 128 + firstSigno
 }
 
+/**
+ * The one code the process must exit with, given what the command itself concluded: the command's
+ * own code, overridden by 128+signo when a termination signal landed — an interrupted run finished
+ * GRACEFULLY (result rendered, cache banked), but to the shell it is still an interrupted process.
+ *
+ * Extracted from `rl.ts`'s last line so the decision is unit-testable; the `process.exit(...)` call
+ * that consumes it is the part a unit test cannot exercise (see `rl.ts` for why the exit is
+ * explicit rather than falling off the event loop).
+ */
+export function finalExitCode(commandCode: number): number {
+  return terminationExitCode() ?? commandCode
+}
+
 /** Test seam: forgets prior signal deliveries so each test starts at "no ^C yet". */
 export function resetTerminationForTests(): void {
   firstSigno = undefined
