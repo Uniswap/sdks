@@ -24,7 +24,7 @@ import { createRouter, type PoolHint, type QuotedRoute, type QuoteResult, type R
 import { parseAmount, parseBudget } from '../amounts'
 import { dim } from '../ansi'
 import { UsageError, type FlagSpec, type ParsedArgs } from '../args'
-import { CACHE_FLAGS, cacheEnabled, cachePath, loadCache, saveCache, scheduleCacheSave, summarizeCacheCoverage } from '../cache'
+import { CACHE_FLAGS, cacheBaseline, cacheEnabled, cachePath, loadCache, saveCache, scheduleCacheSave, summarizeCacheCoverage } from '../cache'
 import {
   assertChainMatches,
   clientTimeoutMs,
@@ -285,6 +285,13 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
     note('cache: disabled (--no-cache)')
   }
 
+  // The save-skip baseline (see `cache.ts`'s no-op-save section): what the index materially holds
+  // RIGHT NOW, i.e. exactly what the on-disk snapshot holds (or an empty fingerprint on a cold
+  // start). Taken here — after the load, BEFORE `--pool-list` merges — so a list's contribution
+  // always reads as a change worth saving, keeping `--trust-coverage`'s documented "adopted
+  // coverage outlives this flag via your cache" true.
+  const sinceLoad = cacheOn ? cacheBaseline(index) : undefined
+
   // `--pool-list` (phase 1): a published snapshot from somewhere else, merged INTO whatever the
   // cache just restored. It runs after the cache load, and deliberately not instead of it — both are
   // snapshot-shaped and `cli/poolList.ts#hydratePoolList` unions them through the index's own public
@@ -306,7 +313,7 @@ export async function buildChainContext(parsed: ParsedArgs): Promise<ChainContex
   // after the last writer makes "the save sees everything the run assembled" true by position rather
   // than by that coincidence — and it means a `--pool-list` that fails its checks (exit 4) never
   // registers a save at all.
-  if (cacheOn) scheduleCacheSave(async () => note(await saveCache(chain.chainId, index)))
+  if (sinceLoad !== undefined) scheduleCacheSave(async () => note(await saveCache(chain.chainId, index, { sinceLoad })))
 
   const router = createRouter({
     client,

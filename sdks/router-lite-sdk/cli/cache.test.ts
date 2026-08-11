@@ -1,13 +1,25 @@
-import { mkdtemp, mkdir, readdir, readFile, rm, utimes, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readdir, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 
-import { PoolIndex, POOL_INDEX_SCHEMA_VERSION, serializeSnapshot } from '../src/experimental/index'
+import { POOL_INDEX_SCHEMA_VERSION, serializeSnapshot, v2PoolRef } from '../src/experimental/index'
 
-import { CACHE_MAX_POOLS, cacheDir, cacheEnabled, cachePath, flushCacheSave, loadCache, saveCache, scheduleCacheSave, summarizeCacheCoverage } from './cache'
-import { USDC, WARM_DELTA, warmIndex, WETH } from './testing'
+import {
+  cacheBaseline,
+  cacheDir,
+  cacheEnabled,
+  cachePath,
+  flushCacheSave,
+  loadCache,
+  pruneColdest,
+  saveCache,
+  scheduleCacheSave,
+  SPAN_DIRTY_BLOCKS,
+  summarizeCacheCoverage,
+} from './cache'
+import { DAI, LONGTAIL, POOL_USDC_DAI, sourceIndex, USDC, WARM_DELTA, warmIndex, WETH } from './testing'
 
 /**
  * Every test below points `$XDG_CACHE_HOME` at a fresh temp dir, so nothing here can read, write, or
@@ -84,6 +96,74 @@ describe('save/load round trip', () => {
   })
 })
 
+describe('the no-op save skip', () => {
+  /** Saves, reloads, and hands back the reloaded index with its load-time baseline — the exact
+   * state `context.ts` is in when it registers the exit-time save. */
+  async function warmLoaded() {
+    await saveCache(1, warmIndex())
+    const path = join(dir, 'router-lite', '1.json')
+    // Pin a known old mtime so "the file was not rewritten" is a strict, deterministic read.
+    const old = new Date(Date.now() - 60 * 60 * 1000)
+    await utimes(path, old, old)
+    const loaded = await loadCache(1, warmIndex())
+    return { index: loaded.index!, sinceLoad: cacheBaseline(loaded.index!), path, mtimeMs: (await stat(path)).mtimeMs }
+  }
+
+  it('skips the write when the run learned nothing material — quote evidence and identity merges included', async () => {
+    const { index, sinceLoad, path, mtimeMs } = await warmLoaded()
+
+    // Everything a warm quote run actually does to the index (measured live on Base):
+    index.markSuccess(index.pair(USDC, WETH)[0]!.pool, 21_000_050n) // quote evidence — not material
+    index.upsert({ pool: index.pair(USDC, WETH)[0]!.pool, source: 'event', createdAtBlock: 10_008_355n }) // identity merge: bumps version(), changes nothing
+    index.addCoverage('v2', WETH, { fromBlock: 21_000_000n, toBlock: 21_000_000n + SPAN_DIRTY_BLOCKS - 1n }) // tip-advance within the drift bound
+
+    const note = await saveCache(1, index, { sinceLoad })
+    expect(note).toMatch(/cache: unchanged — save skipped/)
+    expect((await stat(path)).mtimeMs).toBe(mtimeMs) // no write happened at all
+  })
+
+  it('a new pool saves', async () => {
+    const { index, sinceLoad } = await warmLoaded()
+    index.upsert({ pool: v2PoolRef(POOL_USDC_DAI, USDC, DAI), source: 'event', createdAtBlock: 11_000_000n })
+    expect(await saveCache(1, index, { sinceLoad })).toMatch(/saved 2 pools/)
+  })
+
+  it('a merge that actually changed a pool saves — an earlier createdAtBlock', async () => {
+    const { index, sinceLoad } = await warmLoaded()
+    index.upsert({ pool: index.pair(USDC, WETH)[0]!.pool, source: 'event', createdAtBlock: 9_000_000n })
+    expect(await saveCache(1, index, { sinceLoad })).toMatch(/saved 1 pools/)
+  })
+
+  it('a coverage-only change past the drift bound saves — the cold mega-scan must never be lost', async () => {
+    const { index, sinceLoad } = await warmLoaded()
+    index.addCoverage('v2', WETH, { fromBlock: 21_000_000n, toBlock: 21_000_000n + SPAN_DIRTY_BLOCKS + 1n })
+    expect(await saveCache(1, index, { sinceLoad })).toMatch(/saved 1 pools/)
+  })
+
+  it('a new coverage scope saves regardless of its size — first knowledge of an endpoint', async () => {
+    const { index, sinceLoad } = await warmLoaded()
+    index.addCoverage('v3', DAI, { fromBlock: 20_999_000n, toBlock: 21_000_000n })
+    expect(await saveCache(1, index, { sinceLoad })).toMatch(/saved 1 pools · 2 coverage scopes/)
+  })
+
+  it('a fee-only change saves', async () => {
+    const { index, sinceLoad } = await warmLoaded()
+    index.addEnabledFees('v3', WETH, [500])
+    expect(await saveCache(1, index, { sinceLoad })).toMatch(/saved 1 pools/)
+  })
+
+  it('a cold run that learned nothing writes no file at all', async () => {
+    const fresh = warmIndex()
+    const note = await saveCache(7777, fresh, { sinceLoad: cacheBaseline(fresh) })
+    expect(note).toMatch(/save skipped/)
+    expect((await readdir(join(dir, 'router-lite')).catch(() => []))).toEqual([])
+  })
+
+  it('without a baseline the save is unconditional — the pre-existing contract', async () => {
+    expect(await saveCache(1, warmIndex())).toMatch(/saved 1 pools/)
+  })
+})
+
 describe('starting fresh', () => {
   it('reports a cold start when there is no file at all', async () => {
     const loaded = await loadCache(999, warmIndex())
@@ -129,20 +209,44 @@ describe('starting fresh', () => {
 })
 
 describe('bounds and failure containment', () => {
-  it('skips the save past CACHE_MAX_POOLS, leaving any existing snapshot intact', async () => {
-    await saveCache(1, warmIndex())
-    const before = await readFile(join(dir, 'router-lite', '1.json'), 'utf8')
+  // The bound used to SKIP the save entirely — meaning the day a chain's index outgrew it, its
+  // cache silently stopped learning forever (Base was measured at 974,723 of the 1,000,000 bound).
+  // It now prunes the SNAPSHOT to 90% of the bound and writes. `maxPools` here is the documented
+  // test seam: materializing a million real pools would dwarf the code under test.
+  it('past the bound: prunes to 90%, keeps the most-recently-touched pools, and says so', async () => {
+    const index = sourceIndex() // 4 pools, createdAtBlock 10.0M / 11.0M / 12.4M / 15.0M
+    const note = await saveCache(1, index, { maxPools: 3 }) // target: floor(3 * 0.9) = 2
 
-    const huge = warmIndex()
-    // `stats()` is what the guard reads, so a stub of exactly that is the whole fixture needed —
-    // materializing 50,001 real pools would make this test slower than the code path it guards.
-    const oversized = Object.assign(Object.create(Object.getPrototypeOf(huge) as object) as PoolIndex, huge, {
-      stats: () => ({ ...huge.stats(), pools: CACHE_MAX_POOLS + 1 }),
-    })
-    const note = await saveCache(1, oversized)
+    expect(note).toMatch(/saved 2 pools/)
+    expect(note).toMatch(/pruned 2 coldest pools/)
+    // The prune touched only what was WRITTEN — the live index keeps everything it had.
+    expect(index.stats().pools).toBe(4)
 
-    expect(note).toMatch(new RegExp(`not saved.*${CACHE_MAX_POOLS + 1} pools.*${CACHE_MAX_POOLS} bound`))
-    expect(await readFile(join(dir, 'router-lite', '1.json'), 'utf8')).toBe(before) // untouched
+    const reloaded = await loadCache(1, index)
+    expect(reloaded.index!.stats().pools).toBe(2)
+    // Touch order is the snapshot's own LRU reconstruction (createdAtBlock here): the two newest
+    // survive, the two coldest are gone.
+    expect(reloaded.index!.pair(LONGTAIL, WETH)).toHaveLength(1) // created 15.0M — hottest
+    expect(reloaded.index!.pair(DAI, WETH)).toHaveLength(1) // created 12.4M
+    expect(reloaded.index!.pair(USDC, DAI)).toHaveLength(0) // created 11.0M — pruned
+    expect(reloaded.index!.pair(USDC, WETH)).toHaveLength(0) // created 10.0M — pruned
+  })
+
+  it('under the bound: untouched, no prune note', async () => {
+    const note = await saveCache(1, sourceIndex(), { maxPools: 4 })
+    expect(note).toMatch(/saved 4 pools/)
+    expect(note).not.toMatch(/pruned/)
+  })
+
+  it('pruneColdest: never-touched records sort coldest, and a within-bound array is returned as-is', () => {
+    const hot = { pool: v2PoolRef(USDC, USDC, WETH), source: 'event' as const, createdAtBlock: 100n }
+    const warm = { pool: v2PoolRef(DAI, DAI, WETH), source: 'event' as const, lastQuoteSuccessBlock: 50n }
+    const never = { pool: v2PoolRef(LONGTAIL, LONGTAIL, WETH), source: 'hint' as const } // no blocks at all
+    const pools = [never, hot, warm]
+
+    expect(pruneColdest(pools, 3)).toBe(pools) // within bound: the same array, not a copy
+    expect(pruneColdest(pools, 2)).toEqual([hot, warm]) // the -1n sentinel goes first
+    expect(pruneColdest(pools, 1)).toEqual([hot])
   })
 
   it('never throws when the cache location is unwritable — the answer was already computed', async () => {

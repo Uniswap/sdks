@@ -70,9 +70,9 @@
 // (`JSON.stringify` out, `readFile(…, 'utf8')` in), so a snapshot can never
 // exceed the runtime's maximum string length — ~512 MB on V8, ~2 GB on JSC.
 // `CACHE_MAX_POOLS` (~420 MB at the bound) sits deliberately under the tighter
-// of those, so the guard trips before the runtime does and the failure is a
-// note rather than an allocation error. Anything that raises the bound has to
-// move to a streaming format first.
+// of those, so the bound trips before the runtime does and the outcome is a
+// pruned save rather than an allocation error. Anything that raises the bound
+// has to move to a streaming format first.
 //
 // KEYED URLS NEVER PRINT HERE EITHER (see `rl.ts`): nothing in this file ever
 // touches the endpoint, and the cache is keyed by CHAIN ID, not by endpoint —
@@ -87,7 +87,7 @@ import { join } from 'node:path'
 import type { Address } from 'viem'
 
 import { intersectRanges, parseSnapshot, PoolIndex, serializeSnapshot, type PoolIndexSnapshot } from '../src/experimental/index'
-import { PROTOCOLS, type BlockRange, type Protocol } from '../src/index'
+import { PROTOCOLS, type BlockRange, type PoolRecord, type Protocol } from '../src/index'
 // A deep import, like `poolList.ts`'s `assertSnapshotShape`: this is the coverage cache's key FORMAT,
 // an internal detail of the snapshot the CLI reads back, not something a downstream caller should be
 // keying its own data with. Imported rather than re-spelled so the prefix below cannot drift from it.
@@ -148,13 +148,19 @@ export const CACHE_FLAGS: FlagSpec = {
  * measuring cold latency, or who wants neither cost, passes `--no-cache`; deleting the file is
  * always safe.
  *
- * SKIPPING, NOT TRUNCATING, AND SKIPPING THE *WHOLE* SAVE. Writing a partial snapshot would be worse
- * than writing none, because COVERAGE AND POOLS ARE INSEPARABLE: coverage says "these blocks have
- * been scanned", so a snapshot carrying coverage without the pools that scan found would make the
- * next run skip the scan AND have nothing to show for it — an index that confidently knows nothing.
- * Any truncation rule has to keep those two consistent, and none of the cheap ones do. Skipping also
- * leaves whatever smaller snapshot is already on disk intact, which beats replacing it with an
- * arbitrary subset.
+ * PRUNING, NOT SKIPPING (perf follow-up). This bound used to skip the WHOLE save, on the argument
+ * that coverage and pools are inseparable — a snapshot carrying coverage without the pools its scans
+ * found would make the next run skip the scan AND miss the pools. That argument proved wrong about
+ * its own premise: the SDK's OWN `maxPools` eviction (a live, bounded index on a long-running
+ * server) evicts pools while their coverage stays, and `fromSnapshot({ maxPools })` trims an
+ * oversized snapshot the same way — an evicted pool is FORGOTTEN, not re-scanned, and the SDK
+ * accepts that everywhere as the price of a bound. What skipping actually bought was a cache that
+ * silently stopped learning FOREVER once the heaviest chain crossed the line (Base was measured at
+ * 974,723 of the bound), with the only symptom a `--verbose` note nobody reads. So the save now
+ * prunes to 90% of the bound (UNDER it, so one heavy discover doesn't re-prune on every following
+ * run) by the same touch order the SDK's restore-time eviction uses, warns on stderr, and writes —
+ * the coldest tenth of the index is the least valuable knowledge in it, and losing it beats losing
+ * everything the future would have learned.
  */
 export const CACHE_MAX_POOLS = 1_000_000
 
@@ -277,8 +283,161 @@ async function sweepStaleTmp(): Promise<void> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// "Did this run actually learn anything?" — the no-op-save guard (P-perf).
+//
+// Serializing a maximal snapshot is ~1s of every warm run's wall time, paid on
+// EVERY exit — measured, a warm Base quote spent 1.05s re-writing 474 MB whose
+// every material byte was already on disk. So the save takes a baseline
+// captured at load time and skips the serialize+write when nothing MATERIAL
+// changed.
+//
+// WHAT COUNTS AS MATERIAL, AND WHY `version()` IS NOT THE SIGNAL. The obvious
+// signal is `PoolIndex.version()` — but it bumps on every `upsert` INCLUDING a
+// merge that changed nothing (the reorg-overlap re-scan re-upserts every pool
+// created in the overlap window on every run), so it over-triggers; and it does
+// NOT bump on `addCoverage`/`addEnabledFees`, so alone it also under-triggers.
+// The fingerprint below is content-level instead, built on monotonicity: in
+// this CLI's index (always UNBOUNDED — no `maxPools`, so nothing is ever
+// evicted) every material field moves in one direction only, which makes
+// per-field sums/counts EXACT change detectors, immune to cancellation:
+//
+//   * pool count only grows (insert; no evictions in an unbounded index);
+//   * per-pool `createdAtBlock` only moves earlier (`earliest` merge), and only
+//     ever gains definedness — so (defined-count, sum) changes iff any did;
+//   * per-pool `source` only upgrades rank — so per-source counts change iff
+//     any did;
+//   * coverage only grows (`mergeRanges` union) — total covered span changes
+//     iff any scope's coverage did;
+//   * enabled-fee sets only grow — total tier count changes iff any did.
+//
+// Quote EVIDENCE (`lastQuoteSuccessBlock`/failure counters, moved by
+// `markSuccess`/`markNegative`) is deliberately NOT material — the same line
+// `version()`'s own doc draws. Every warm run re-stamps those fields on the
+// pools it priced; saving 474 MB to persist "this pool quoted again at a newer
+// block" is exactly the no-op this guard exists to skip.
+//
+// THE ONE JUDGMENT CALL: A PURE COVERAGE TIP-ADVANCE IS NOT MATERIAL EITHER,
+// UP TO A BOUND. Measured (Base, back-to-back warm quotes): the only change a
+// warm run makes is the coverage tip advancing by the blocks mined since the
+// last save (+114 blocks) — no pools, no fees, no scopes. Counting that as
+// dirty would make this guard fire never, and skipping it is nearly free:
+// `uncovered()` re-opens the last `reorgOverlapBlocks` behind the tip on every
+// search anyway, and an un-saved tip delta merely widens that one tail range —
+// the SAME single `eth_getLogs` request either way until the delta approaches a
+// scan-chunk width (thousands of blocks at minimum). The skip is also
+// self-correcting rather than compounding: the baseline is what's ON DISK, so
+// consecutive skipped runs measure a GROWING delta against the same file and
+// the save fires once the accumulated drift crosses {@link SPAN_DIRTY_BLOCKS}.
+// And crucially, a delta scan that actually FOUND pools marks the run dirty
+// through the pool fingerprint — so coverage can only be "lost" for ranges
+// that verifiably contained nothing.
+// ---------------------------------------------------------------------------
+
+/**
+ * How far the total covered span may drift past the on-disk snapshot before a coverage-only change
+ * forces a save. ~5.5h of Base blocks / ~33h of mainnet blocks; re-scanning it costs the next run
+ * zero extra `eth_getLogs` in the warm steady state (it rides in the reorg-overlap re-scan's own
+ * tail request). Deliberately far under any scan-chunk width, and bounded — see the section header.
+ */
+export const SPAN_DIRTY_BLOCKS = 10_000n
+
+/** What {@link saveCache} compares to decide a run learned nothing — see the section header for
+ * why each field is in (and what is deliberately out). Capture it with {@link cacheBaseline} at
+ * load time, BEFORE anything else (a `--pool-list`) contributes to the index. */
+export type CacheBaseline = {
+  /** `count|createdDefined|createdSum|source:count,…` — the pool-SET content, evidence excluded. */
+  poolSet: string
+  /** Total covered blocks across every scope — monotone, so equal means untouched. */
+  coverageSpan: bigint
+  coverageScopes: number
+  /** Total enabled fee tiers across every factory — monotone, same argument. */
+  feeTiers: number
+  learnedScanWidth: bigint | undefined
+}
+
+/** The material-content fingerprint of `index`, as of now. One O(pools) pass (~30ms at Base's
+ * 974k pools — noise next to the ~1s serialize it lets {@link saveCache} skip). */
+export function cacheBaseline(index: PoolIndex): CacheBaseline {
+  return fingerprintSnapshot(index.toSnapshot())
+}
+
+function fingerprintSnapshot(snap: PoolIndexSnapshot): CacheBaseline {
+  let createdSum = 0n
+  let createdDefined = 0
+  const sources = new Map<string, number>()
+  for (const rec of snap.pools) {
+    if (rec.createdAtBlock !== undefined) {
+      createdSum += rec.createdAtBlock
+      createdDefined++
+    }
+    sources.set(rec.source, (sources.get(rec.source) ?? 0) + 1)
+  }
+  const sourceCounts = [...sources]
+    .sort(([a], [b]) => (a < b ? -1 : 1))
+    .map(([source, count]) => `${source}:${count}`)
+    .join(',')
+  let coverageSpan = 0n
+  for (const [, ranges] of snap.coverage) {
+    for (const r of ranges) coverageSpan += r.toBlock - r.fromBlock + 1n
+  }
+  let feeTiers = 0
+  for (const [, tiers] of snap.enabledFees) feeTiers += tiers.length
+  return {
+    poolSet: `${snap.pools.length}|${createdDefined}|${createdSum}|${sourceCounts}`,
+    coverageSpan,
+    coverageScopes: snap.coverage.length,
+    feeTiers,
+    learnedScanWidth: snap.learnedScanWidth,
+  }
+}
+
+/** Anything but a small pure tip-advance is material. A SHRINKING span cannot happen today
+ * (coverage only merges); it is treated as dirty anyway, because "save on anything unexplained"
+ * is the failure mode that loses nothing. */
+function materiallyChanged(now: CacheBaseline, since: CacheBaseline): boolean {
+  if (now.poolSet !== since.poolSet) return true
+  if (now.coverageScopes !== since.coverageScopes) return true
+  if (now.feeTiers !== since.feeTiers) return true
+  if (now.learnedScanWidth !== since.learnedScanWidth) return true
+  if (now.coverageSpan < since.coverageSpan) return true
+  return now.coverageSpan - since.coverageSpan > SPAN_DIRTY_BLOCKS
+}
+
+/** The restore-time LRU clock, spelled once: the exact coalesce `PoolIndex.fromSnapshot` rebuilds
+ * `lastTouched` from (via `upsert`), with the same "never touched sorts first" `-1n` sentinel its
+ * `evictIfNeeded` uses. Keeping the spelling identical is what makes {@link pruneColdest} "the
+ * index's own eviction order, computed without paying for a 1M-pool rebuild". */
+function touchEquivalent(rec: PoolRecord): bigint {
+  return rec.createdAtBlock ?? rec.lastQuoteSuccessBlock ?? rec.lastQuoteFailureBlock ?? -1n
+}
+
+/**
+ * The `keep` most-recently-touched records of `pools`, by {@link touchEquivalent} order — what
+ * {@link saveCache} writes when the index has outgrown {@link CACHE_MAX_POOLS}. Returns the input
+ * array untouched when it is already within `keep`. Ties beyond the cut fall wherever the sort
+ * leaves them, exactly as the SDK's own restore-time eviction ties do.
+ */
+export function pruneColdest(pools: PoolRecord[], keep: number): PoolRecord[] {
+  if (pools.length <= keep) return pools
+  const keyed = pools.map((rec) => [touchEquivalent(rec), rec] as const)
+  keyed.sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0)) // hottest first
+  return keyed.slice(0, keep).map(([, rec]) => rec)
+}
+
 /**
  * Writes `index` back to `chainId`'s cache file, atomically. Returns the `--verbose` note.
+ *
+ * SKIPS THE WHOLE SERIALIZE+WRITE WHEN THE RUN LEARNED NOTHING — when `sinceLoad` (the baseline
+ * `context.ts` captured at load time) shows no material change; see this section's header for what
+ * counts. That is ~1s off every warm run that merely re-read what the cache already knew.
+ *
+ * PRUNES INSTEAD OF REFUSING AT THE BOUND. Past {@link CACHE_MAX_POOLS} pools the snapshot is cut
+ * to its {@link CACHE_PRUNE_TARGET} most-recently-touched records before serializing — same order
+ * the SDK's own restore-time eviction would use — with a one-line stderr warning. The previous
+ * behaviour (skip the save entirely, note it under `--verbose` only) meant the heaviest chain's
+ * cache silently stopped learning the day it crossed the bound. Pruning is applied to the SNAPSHOT,
+ * never the live index: the running search keeps everything it has.
  *
  * ATOMIC BECAUSE THE READER IS THE SAME TOOL. `rl` is run repeatedly and often concurrently (two
  * terminals, a `watch`, a script), and a plain `writeFile` truncates in place: a reader arriving
@@ -301,18 +460,41 @@ async function sweepStaleTmp(): Promise<void> {
  * case this cannot clean up is the process being killed mid-write, which is what `sweepStaleTmp`
  * exists for.
  */
-export async function saveCache(chainId: number, index: PoolIndex): Promise<string> {
+export async function saveCache(
+  chainId: number,
+  index: PoolIndex,
+  options?: {
+    /** Skip the save entirely when nothing material changed since this baseline. Omitted = always save. */
+    sinceLoad?: CacheBaseline
+    /** Test seam for the prune path — materializing >{@link CACHE_MAX_POOLS} real pools in a test
+     * would dwarf the code under test. Production callers never pass it. */
+    maxPools?: number
+  },
+): Promise<string> {
   const path = cachePath(chainId)
-  const stats = index.stats()
-  if (stats.pools > CACHE_MAX_POOLS) {
-    return `cache: not saved — ${stats.pools} pools exceeds the ${CACHE_MAX_POOLS} bound (see cli/cache.ts)`
+  const snap = index.toSnapshot()
+  if (options?.sinceLoad !== undefined && !materiallyChanged(fingerprintSnapshot(snap), options.sinceLoad)) {
+    return `cache: unchanged — save skipped (${path})`
+  }
+  const bound = options?.maxPools ?? CACHE_MAX_POOLS
+  let pruneNote = ''
+  if (snap.pools.length > bound) {
+    const target = Math.floor(bound * 0.9)
+    const evicted = snap.pools.length - target
+    // `toSnapshot`'s container arrays are fresh copies, so replacing `pools` here mutates nothing
+    // the live index (or anyone else) holds.
+    snap.pools = pruneColdest(snap.pools, target)
+    // Unconditional stderr, not a --verbose note: the bound quietly discarding knowledge is a fact
+    // the user should see once per affected run — unlike the old silent stop, which they never saw.
+    console.error(`cache: at bound — pruned ${evicted} coldest pools`)
+    pruneNote = ` (pruned ${evicted} coldest pools at the ${bound} bound)`
   }
   const tmp = `${path}.${process.pid}.tmp`
   try {
     await mkdir(cacheDir(), { recursive: true })
-    await writeFile(tmp, serializeSnapshot(index.toSnapshot()), 'utf8')
+    await writeFile(tmp, serializeSnapshot(snap), 'utf8')
     await rename(tmp, path)
-    return `cache: saved ${stats.pools} pools · ${stats.coverageScopes} coverage scopes to ${path}`
+    return `cache: saved ${snap.pools.length} pools · ${snap.coverage.length} coverage scopes to ${path}${pruneNote}`
   } catch (err) {
     const why = err instanceof Error ? err.message.split('\n')[0]! : String(err)
     await rm(tmp, { force: true }).catch(() => {}) // never strand a partial snapshot
