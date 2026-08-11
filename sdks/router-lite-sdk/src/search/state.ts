@@ -62,12 +62,17 @@ export type SearchState = {
   /** Keys already given their one re-release after a transport loss. */
   transportRetried: Set<string>
   /**
-   * True once the search's FIRST measurement wave has settled: the round the initial planning pass
-   * dispatches, PLUS everything that round's own answers make due before the pump first goes dry —
-   * the out-legs woken by its in-leg answers (re-planned as `m_X` improves), and each transport-lost
-   * key's one retry. Structurally: the first moment `pumpDry` holds (nothing due over current
-   * knowledge, nothing in flight). The axis `SearchReport.firstRoundComplete` reports and the
-   * facade's answer gate reads.
+   * True once the search's FIRST measurement wave has settled — and the rule is the whole rule:
+   * EVERYTHING THAT BECAME DUE BEFORE THE PUMP FIRST WENT DRY, WHATEVER MADE IT DUE. Structurally
+   * that is the first moment `pumpDry` holds (nothing due over current knowledge, nothing in
+   * flight), which is a statement about the wave, not about any list of things that can join it.
+   *
+   * What that sweeps in, as EXAMPLES rather than an inventory: the round the initial planning pass
+   * dispatched; the out-legs woken by that round's own in-leg answers (re-planned as `m_X`
+   * improves); each transport-lost key's one retry; and pools an eager scan happened to land while
+   * the wave was still settling — a discovery that arrives pre-dryness is due, so it is part of the
+   * first round exactly like anything else the wave learned about. The axis
+   * `SearchReport.firstRoundComplete` reports and the facade's answer gate reads.
    *
    * WRITTEN BY THE LOOP, not by `apply*`: dryness is the pump's own verdict (its private cursor
    * plus `inFlightKeys`), which only the loop observes once per cycle — the same single-writer
@@ -79,8 +84,18 @@ export type SearchState = {
   firstRoundComplete: boolean
   /** Graph node -> the best in-leg reaching it. Written by the pump's composition step. */
   mX: Map<string, { amount: bigint; fromPoolId: string }>
-  /** The two-hop intermediates frontier: what it has selected so far, how many it can see, and the
-   * batch notch it grows by. */
+  /**
+   * The two-hop intermediates frontier: what it has selected so far, and how many it can see.
+   *
+   * `notch` IS OBSERVABILITY, NOT MECHANISM. It counts how many times
+   * `loop.ts#advanceIntermediates` has grown the frontier, and NOTHING IN PRODUCTION READS IT: the
+   * batch size is a constant, `buildReport` reports `selected`/`discovered` only, and the facade
+   * never sees it. Its readers are tests and the golden fixtures (`FixtureContext.intermediates`
+   * round-trips it), where "the frontier grew twice" is a cheap, exact assertion about a loop whose
+   * other evidence is aggregate. Kept for that, deliberately — and flagged as a removal candidate
+   * at the next `OUTCOME_LOG_SCHEMA_VERSION` bump, since dropping it now would re-record every
+   * fixture in the corpus to delete a field nobody is confused by.
+   */
   intermediates: { selected: string[]; discovered: number; notch: number }
   quoting: SearchReport['quoting']
   legsMeasured: number
@@ -100,17 +115,21 @@ export type SearchState = {
    * order — the golden format `internal/outcomeLog.ts` folds back through the `apply*` functions
    * below.
    *
-   * IT IS COMPLETE FOR WHAT `apply*` OWNS AND NOTHING ELSE, which is the honest boundary rather than
-   * an omission. Six fields on this type are written by their owners directly — `indexVersion` and
-   * `pairCeilingHit` (the pump), `firstRoundComplete` (the loop, at the pump's first dry moment; a
-   * fixture carries the final verdict in its context), `gateOpened` (the coverage worker's
-   * `demandFull`), `intermediates`
-   * (two loop-cycle-synchronous writers: `loop.ts`'s `advanceIntermediates` AND `pump.ts`'s
-   * `planDueLegs`), and `verification.preflightBudgetExhausted` (written directly by
-   * `verifier.ts#Verifier.advance`, which clears it per walk and sets it on the cap branch) — plus the
-   * `compiledById` memo. A fold therefore reproduces
-   * every counter, measurement and verdict from the log alone, and takes the rest from the fixture;
-   * see `internal/outcomeLog.ts`'s header for which of them the golden actually reads.
+   * IT IS COMPLETE FOR WHAT `apply*` OWNS AND NOTHING ELSE, which is the honest boundary rather
+   * than an omission. Six fields on this type are written by their owners directly:
+   *
+   *   - `indexVersion`, `pairCeilingHit` — the pump;
+   *   - `firstRoundComplete` — the loop, at the pump's first dry moment (a fixture carries the
+   *     final verdict in its context);
+   *   - `gateOpened` — the coverage worker's `demandFull`;
+   *   - `intermediates` — two loop-cycle-synchronous writers, `loop.ts`'s `advanceIntermediates`
+   *     and `pump.ts`'s `planDueLegs`;
+   *   - `verification.preflightBudgetExhausted` — `verifier.ts#Verifier.advance`, which clears it
+   *     per walk and sets it on the cap branch.
+   *
+   * Plus the `compiledById` memo. A fold therefore reproduces every counter, measurement and
+   * verdict from the log alone, and takes the rest from the fixture; see
+   * `internal/outcomeLog.ts`'s header for which of them the golden actually reads.
    */
   outcomeLog?: OutcomeEntry[] | undefined
 }

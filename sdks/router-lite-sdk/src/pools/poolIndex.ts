@@ -240,6 +240,25 @@ export type PoolIndexSnapshot = {
 export const BIGINT_TAG = '$bigint:'
 
 /**
+ * The `JSON.stringify` replacer that implements {@link BIGINT_TAG}'s encoding, and its reviver.
+ *
+ * EXPORTED BESIDE THE TAG, AND THAT IS THE POINT. The tag alone is only half the convention — the
+ * `startsWith`/`slice` on the way back in is the other half, and a caller handed just the marker
+ * re-derives it. `internal/outcomeLog.ts` had its own copy of both, correct but separately
+ * maintained: two implementations of one wire format, either of which could be tightened (a stricter
+ * digit check, a different collision guard) without the other noticing. Sharing the functions makes
+ * "encodes them the same way" true by construction rather than by review.
+ */
+export function bigintReplacer(_key: string, value: unknown): unknown {
+  return typeof value === 'bigint' ? `${BIGINT_TAG}${value.toString()}` : value
+}
+
+/** The inverse of {@link bigintReplacer} — see it for why the pair is exported together. */
+export function bigintReviver(_key: string, value: unknown): unknown {
+  return typeof value === 'string' && value.startsWith(BIGINT_TAG) ? BigInt(value.slice(BIGINT_TAG.length)) : value
+}
+
+/**
  * A snapshot as JSON, with every `bigint` encoded as a tagged string (see {@link BIGINT_TAG}).
  *
  * Exists as a PAIR with {@link parseSnapshot} so that the bigint round trip is one library decision
@@ -249,9 +268,7 @@ export const BIGINT_TAG = '$bigint:'
  * `createdAtBlock` is `"18000000"` and whose every block comparison is then silently wrong.
  */
 export function serializeSnapshot(snap: PoolIndexSnapshot): string {
-  return JSON.stringify(snap, (_key, value: unknown) =>
-    typeof value === 'bigint' ? `${BIGINT_TAG}${value.toString()}` : value,
-  )
+  return JSON.stringify(snap, bigintReplacer)
 }
 
 /**
@@ -266,9 +283,7 @@ export function serializeSnapshot(snap: PoolIndexSnapshot): string {
  * fabricated record, which this package has never defended against and documents as such.
  */
 export function parseSnapshot(json: string): PoolIndexSnapshot {
-  return JSON.parse(json, (_key, value: unknown) =>
-    typeof value === 'string' && value.startsWith(BIGINT_TAG) ? BigInt(value.slice(BIGINT_TAG.length)) : value,
-  ) as PoolIndexSnapshot
+  return JSON.parse(json, bigintReviver) as PoolIndexSnapshot
 }
 
 function bad(what: string): never {

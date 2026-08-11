@@ -17,7 +17,7 @@ import type { PumpCtx } from './pump'
 import { buildReport } from './report'
 import { applyAbort, applyReadiness, createState } from './state'
 import type { SearchState } from './state'
-import { pickLeader, Verifier, withExecution } from './verifier'
+import { rankWithExecution, Verifier } from './verifier'
 
 // ---------------------------------------------------------------------------
 // THE SOLVER LOOP (spec §3.1) — the module that SEQUENCES the event-driven
@@ -125,6 +125,12 @@ export type SearchContext = {
 // The pinned block
 // ---------------------------------------------------------------------------
 
+/** The three fields this engine reads off an `eth_getBlockByNumber('latest')` response, hex as the
+ * wire sends them. Named once because {@link requestHead} needs the shape twice — as the variable's
+ * declared type and as the cast on an untyped `client.request` — and two inline copies of one
+ * structural type are two places for a field to be added to. */
+type RawHead = { number: Hex; hash: Hex; timestamp: Hex }
+
 /**
  * One `eth_getBlockByNumber('latest')`. This is the engine's only throw — a transport failure or a
  * null/absent response both surface as {@link RpcUnavailableError}, never a plain `Error`, so the
@@ -138,14 +144,10 @@ export type SearchContext = {
  * that never touch the bound at all, on top of whatever it was actually limiting.
  */
 async function requestHead(client: SearchClient, semaphore?: Semaphore): Promise<BlockRef> {
-  let raw: { number: Hex; hash: Hex; timestamp: Hex } | null
+  let raw: RawHead | null
   await semaphore?.acquire()
   try {
-    raw = (await client.request({ method: 'eth_getBlockByNumber', params: ['latest', false] } as any)) as {
-      number: Hex
-      hash: Hex
-      timestamp: Hex
-    } | null
+    raw = (await client.request({ method: 'eth_getBlockByNumber', params: ['latest', false] } as any)) as RawHead | null
   } catch (err) {
     throw new RpcUnavailableError('failed to fetch the pinned block for this search', { cause: err })
   } finally {
@@ -457,19 +459,32 @@ export async function* search(
 
       const dispatched = await pump(state, pumpCtx, req)
       const quoted = composeRoutes(state, pumpCtx, req, kind)
-      if (verifier !== undefined && state.requirements !== undefined) verifier.consider(quoted)
+      // The same predicate the gate below uses, said once: a verifier may only walk a candidate
+      // list once readiness has landed, because `withExecution`'s verdicts are meaningless (and
+      // `needs-action` unpromisable) while `state.requirements` is still unknown.
+      if (verifier !== undefined && readinessSettled()) verifier.consider(quoted)
 
-      const evaluated = quoted.map((q) => withExecution(state, q))
-      const best = evaluated.length > 0 ? pickLeader(evaluated, verifier?.leaderId()) : undefined
-      const ranked = best === undefined ? [] : [best, ...evaluated.filter((e) => e !== best)]
+      const ranked = rankWithExecution(state, quoted, verifier?.leaderId())
+      const best = ranked[0]
 
       // `pumpDry`'s second parameter is unused today (blessed signature): dryness is the pump's
       // own verdict (its cursor, plus no round in flight), and the ctx rides along for the day
       // planning needs it.
       const dry = pumpDry(state, pumpCtx)
+      // THE CYCLE'S TWO QUIETNESS READINGS, TAKEN TOGETHER. `dry` is the pump's; this is the
+      // verifier's, and both the termination check and the gate below read THESE values rather than
+      // re-asking — a cycle that reported itself quiet in one check and busy in the other would be
+      // describing two different moments. No verifier means permanently idle (quote mode has none).
+      // The only transition an intervening `yield` can hide is busy→idle (nothing after the
+      // `consider` above starts a preflight), which costs at most one extra cycle: a settling
+      // preflight pokes the loop, so the gate is re-evaluated immediately afterwards.
+      const verifierIdle = verifier?.idle() ?? true
       // THE FIRST-ROUND FLIP: the first time the pump goes dry, the initial measurement wave has
-      // settled — the round the initial planning pass dispatched, plus the out-legs its in-leg
-      // answers made due (at their final m_X) and every transport-lost key's one retry. This is the
+      // settled. The rule is exactly that and nothing narrower — EVERYTHING DUE BEFORE THIS MOMENT,
+      // WHATEVER MADE IT DUE. Typically that means the round the initial planning pass dispatched,
+      // the out-legs its in-leg answers made due (at their final m_X), and every transport-lost
+      // key's one retry; it equally means a pool an eager scan landed while the wave was still
+      // settling, because a discovery that arrives pre-dryness is due like any other. This is the
       // moment the promise surfaces are first allowed to answer, so it is decided BEFORE this
       // cycle's report fold and lead emission: the flip cycle's own `lead` (leadSignature carries
       // the axis) is what `getQuote`/`getSwap` return on. Monotone by construction — nothing ever
@@ -499,7 +514,7 @@ export async function* search(
         (state.aborted && state.inFlightKeys.size === 0) ||
         (sources.settled() &&
           dry &&
-          (verifier?.idle() ?? true) &&
+          verifierIdle &&
           state.intermediates.selected.length >= state.intermediates.discovered)
       ) {
         yield { type: 'final', ranked, state, report }
@@ -523,7 +538,7 @@ export async function* search(
       // The gate and the frontier advance only when the search is QUIET (see the module header's
       // ordering decision 2): dry alone is not "cheap information exhausted" while readiness or a
       // preflight is still answering.
-      if (dry && readinessSettled() && (verifier?.idle() ?? true)) {
+      if (dry && readinessSettled() && verifierIdle) {
         worker.demandFull() // the gate — the ONLY writer of state.gateOpened, idempotent
         // Poked on a selection AND on a bare `discovered` refresh: the termination check above read
         // the pre-refresh value, and if the eligible set shrank under this search (cross-search

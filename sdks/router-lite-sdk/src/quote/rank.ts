@@ -36,6 +36,35 @@ function isQuoteUnverifiable(route: RouteCandidate): boolean {
   return route.legs.some((leg) => hasReturnsDeltaHook(leg.pool))
 }
 
+/**
+ * One candidate with its two markers made honest for THIS ranking — the normalize step
+ * {@link rankRoutes} runs over its whole input before sorting.
+ *
+ * THE PROMOTION MARKER IS A RANKING'S OUTPUT, NEVER ITS INPUT. The engine re-ranks the accumulated
+ * composed set on EVERY cycle, so a route promoted in one cycle comes back into the next still
+ * carrying the marker. Once a later measurement outprices the complex leader outright, or the
+ * leader itself has been demoted, the promotion is no longer happening — but the marker would ride
+ * along unchanged, and it is not decorative: `assertResultCoherent` reads it as the licence for a
+ * `best` outpriced by its own `alternatives`, and the CLI prints it as the explanation. Stripping
+ * it here makes ranking idempotent: `rankRoutes(rankRoutes(x))` deep-equals `rankRoutes(x)`, and
+ * the marker on the way out always describes the promotion that just happened.
+ *
+ * `quoteUnverifiable` is the opposite kind of fact — structural, derived from the legs alone — so
+ * it is RECOMPUTED rather than stripped: stamped where the legs say so, corrected on the
+ * (hand-built-input) route whose legs say otherwise, and both idempotently.
+ *
+ * RETURNS THE INPUT ITSELF when neither marker needs to change, which is the overwhelmingly common
+ * case: callers (and tests) rely on an untouched route staying referentially identical.
+ */
+function freshMarkers(candidate: QuotedRoute): QuotedRoute {
+  const unverifiable = isQuoteUnverifiable(candidate.route)
+  const stale = candidate.promotedOverComplex !== undefined || (candidate.quoteUnverifiable === true && !unverifiable)
+  const missing = unverifiable && candidate.quoteUnverifiable === undefined
+  if (!stale && !missing) return candidate
+  const { promotedOverComplex: _stale, quoteUnverifiable: _recomputed, ...rest } = candidate
+  return unverifiable ? { ...rest, quoteUnverifiable: true as const } : rest
+}
+
 function compareRoutes(a: QuotedRoute, b: QuotedRoute): number {
   if (a.quote.amountOut !== b.quote.amountOut) return a.quote.amountOut > b.quote.amountOut ? -1 : 1
   const transitionsDelta = protocolTransitions(a.route) - protocolTransitions(b.route)
@@ -80,29 +109,9 @@ function compareRoutes(a: QuotedRoute, b: QuotedRoute): number {
  * partition (and the CLI's caveat) always has the route's own explanation on the route itself.
  */
 export function rankRoutes(quoted: QuotedRoute[], kind: 'quote' | 'swap'): QuotedRoute[] {
-  // THE PROMOTION MARKER IS THIS CALL'S OUTPUT, NEVER ITS INPUT. The engine re-ranks the accumulated
-  // composed set on EVERY cycle, so a route promoted in one cycle comes back into the next still
-  // carrying the marker. Once a later measurement outprices the complex leader outright, or the
-  // leader itself has been demoted, the promotion is no longer happening — but the marker would
-  // ride along unchanged, and it is not decorative: `assertResultCoherent` reads it as the licence
-  // for a `best` outpriced by its own `alternatives`, and the CLI prints it as the explanation.
-  // Stripping it up front makes this function idempotent: `rankRoutes(rankRoutes(x))` deep-equals
-  // `rankRoutes(x)`, and the marker on the way out always describes the promotion that just
-  // happened. `quoteUnverifiable` is the opposite kind of fact — structural, derived from the legs
-  // alone — so it is RECOMPUTED rather than stripped: stamped where the legs say so, corrected on
-  // the (hand-built-input) route whose legs say otherwise, and both idempotently. Copying only the
-  // routes whose markers actually change keeps every other route referentially identical to its
-  // input, which callers (and tests) rely on.
-  const sorted = [...quoted]
-    .map((candidate): QuotedRoute => {
-      const unverifiable = isQuoteUnverifiable(candidate.route)
-      const stale = candidate.promotedOverComplex !== undefined || (candidate.quoteUnverifiable === true && !unverifiable)
-      const missing = unverifiable && candidate.quoteUnverifiable === undefined
-      if (!stale && !missing) return candidate
-      const { promotedOverComplex: _stale, quoteUnverifiable: _recomputed, ...rest } = candidate
-      return unverifiable ? { ...rest, quoteUnverifiable: true as const } : rest
-    })
-    .sort(compareRoutes)
+  // NORMALIZE → SORT → PARTITION → PROMOTE. Each step is one statement below, in that order; the
+  // markers are made honest before anything reads them (see {@link freshMarkers}).
+  const sorted = quoted.map(freshMarkers).sort(compareRoutes)
   if (sorted.length <= 1) return sorted
 
   // The partition. Stable within each block (`filter` keeps the sort's order), and a no-op when the

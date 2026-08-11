@@ -200,6 +200,32 @@ export function pickLeader(evaluated: RankedRoute[], leaderId: string | undefine
   )
 }
 
+/**
+ * A composed route set as the LEADER-FIRST ranked list every result carries: each candidate dressed
+ * with what verification learned ({@link withExecution}), the leader chosen ({@link pickLeader}),
+ * and the rest left in the order `rankRoutes` already put them in.
+ *
+ * ONE SPELLING, TWO CALLERS, AND THE SECOND IS THE REASON. `loop.ts` does this every cycle and
+ * `internal/outcomeLog.ts#foldOutcomes` does it once per replayed fixture — and the fold's entire
+ * claim is that it reproduces the live path rather than approximating it. Two hand-copied
+ * three-liners can drift by one `filter` predicate and the golden corpus would go on passing
+ * against a ranking the engine no longer produces. `leaderId` differs between them (the live
+ * verifier's current verdict vs `leaderFromLog`'s replayed one) and stays a parameter for exactly
+ * that reason; everything after it is shared.
+ *
+ * Empty in, empty out — a search that priced nothing has no leader to name.
+ */
+export function rankWithExecution(
+  state: Pick<SearchState, 'execution'>,
+  quoted: QuotedRoute[],
+  leaderId: string | undefined,
+): RankedRoute[] {
+  const evaluated = quoted.map((q) => withExecution(state, q))
+  if (evaluated.length === 0) return []
+  const best = pickLeader(evaluated, leaderId)
+  return [best, ...evaluated.filter((e) => e !== best)]
+}
+
 export class Verifier {
   private readonly state: SearchState
   private readonly ctx: VerifierCtx

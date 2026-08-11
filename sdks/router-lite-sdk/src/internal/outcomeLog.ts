@@ -1,7 +1,7 @@
 import type { Address, Hex } from 'viem'
 
 import { manifestFor } from '../manifest'
-import { BIGINT_TAG, PoolIndex } from '../pools/poolIndex'
+import { bigintReplacer, bigintReviver, PoolIndex } from '../pools/poolIndex'
 import type { PoolIndexSnapshot } from '../pools/poolIndex'
 import { PROTOCOL_MODULES, routeId } from '../protocols'
 import { classifyQuote, classifySwap, foldEvent } from '../router'
@@ -12,7 +12,7 @@ import type { PumpCtx, RoundInLeg } from '../search/pump'
 import { buildReport } from '../search/report'
 import { applyAbort, applyCoverage, applyMeasurement, applyPreflight, applyReadiness, createState } from '../search/state'
 import type { OutcomeEntry, SearchState } from '../search/state'
-import { compileAndEncode, pickLeader, withExecution } from '../search/verifier'
+import { compileAndEncode, rankWithExecution } from '../search/verifier'
 import type {
   BlockRef,
   ChainManifest,
@@ -65,9 +65,13 @@ import { assertResultCoherent } from './resultCoherence'
 //  1. THE PINNED BLOCK AND THE HEAD VERDICT (`block`, `headRegressed`) — decided
 //     by `loop.ts#fetchBlock` before any outcome exists.
 //  2. THE FRONTIER, THE PAIR CEILING, AND THE FIRST-ROUND VERDICT
-//     (`intermediates`, `pairCeilingHit`, `firstRoundComplete`) — written by
-//     `loop.ts#advanceIntermediates`, `pump.ts#measurablePools`, and the pump's
-//     dispatch bookkeeping (`state.ts#beginFirstRound` + the settle countdown).
+//     (`intermediates`, `pairCeilingHit`, `firstRoundComplete`) — three fields,
+//     three separate writers, none of them an `apply*`: the frontier is
+//     `loop.ts#advanceIntermediates` and `pump.ts#planDueLegs`; the ceiling is
+//     `pump.ts#measurablePools`, which sets it on the one branch that truncates a
+//     pair's candidate list; and the first-round verdict is the LOOP's own flip
+//     the first cycle `pumpDry` holds (`loop.ts`, just before the report fold) —
+//     an observation of the pump's dryness, which the pump itself never records.
 //     `buildReport` reads all three (the selected/discovered ratio, the
 //     exhaustiveness axis, the first-round axis), so a fixture that omitted
 //     them would fold a report that describes a different search.
@@ -175,26 +179,23 @@ export type OutcomeFixture = {
 /**
  * A fixture as JSON, with every `bigint` encoded as a tagged string.
  *
- * The tag is `pools/poolIndex.ts`'s own {@link BIGINT_TAG}, imported rather than re-declared: a
- * fixture EMBEDS a `PoolIndexSnapshot`, so a second marker would mean one file whose bigints need two
- * revivers to read. Every string a fixture contains is a pool ref id, a `0x` address/poolId/hex
- * payload, `'native'`, an enum member, a label, or free-text `notes` — and `notes` is written by
- * whoever runs the recorder, which is the one place the collision is worth naming: a note beginning
- * `$bigint:` would revive as a number. It is not caller-controlled input, and the round-trip test
- * pins the behavior rather than leaving it to be rediscovered.
+ * The encoding is `pools/poolIndex.ts`'s own — {@link bigintReplacer}/{@link bigintReviver},
+ * imported rather than re-implemented: a fixture EMBEDS a `PoolIndexSnapshot`, so a second dialect
+ * would mean one file whose bigints need two revivers to read. Every string a fixture contains is a
+ * pool ref id, a `0x` address/poolId/hex payload, `'native'`, an enum member, a label, or free-text
+ * `notes` — and `notes` is written by whoever runs the recorder, which is the one place the
+ * collision is worth naming: a note beginning `$bigint:` would revive as a number. It is not
+ * caller-controlled input, and the round-trip test pins the behavior rather than leaving it to be
+ * rediscovered.
  */
 export function serializeFixture(fixture: OutcomeFixture): string {
-  return JSON.stringify(fixture, (_key, value: unknown) =>
-    typeof value === 'bigint' ? `${BIGINT_TAG}${value.toString()}` : value,
-  )
+  return JSON.stringify(fixture, bigintReplacer)
 }
 
 /** The inverse of {@link serializeFixture}. A deserializer, not a validator — {@link foldOutcomes}
  * checks the one thing that decides whether the shape can be trusted at all (the schema version). */
 export function parseFixture(json: string): OutcomeFixture {
-  return JSON.parse(json, (_key, value: unknown) =>
-    typeof value === 'string' && value.startsWith(BIGINT_TAG) ? BigInt(value.slice(BIGINT_TAG.length)) : value,
-  ) as OutcomeFixture
+  return JSON.parse(json, bigintReviver) as OutcomeFixture
 }
 
 // ---------------------------------------------------------------------------
@@ -468,7 +469,7 @@ function leaderFromLog(entries: OutcomeEntry[]): string | undefined {
  * Replays an outcome log into the result and report it produced.
  *
  * Everything below the fixture is the REAL engine: `apply*` rebuilds the ledger and every counter,
- * `composeRoutes` composes, `withExecution`/`pickLeader` rank, `compileAndEncode` produces the
+ * `composeRoutes` composes, `rankWithExecution` ranks (the loop's own step, shared), `compileAndEncode` produces the
  * leader's calldata, `buildReport` folds the report, and `classifyQuote`/`classifySwap` decide the
  * status. A regression in any of them changes the answer here.
  *
@@ -505,9 +506,10 @@ export function foldOutcomes(entries: OutcomeEntry[], ctx: FoldContext): FoldOut
     client: NO_CLIENT,
   }
   const routes = composeRoutes(state, pumpCtx, request, ctx.kind)
-  const evaluated = routes.map((q) => withExecution(state, q))
-  const best = evaluated.length > 0 ? pickLeader(evaluated, leaderFromLog(entries)) : undefined
-  const ranked = best === undefined ? [] : [best, ...evaluated.filter((e) => e !== best)]
+  // The loop's own ranking step, called rather than re-spelled — see `verifier.ts#rankWithExecution`
+  // for why a fold that copied it could drift out from under this whole corpus in silence.
+  const ranked = rankWithExecution(state, routes, leaderFromLog(entries))
+  const best = ranked[0]
 
   if (ctx.kind === 'swap' && best !== undefined && (best.execution === 'verified' || best.execution === 'needs-action')) {
     compileAndEncode(state, { manifest, modules }, request as SwapRequest, best)
