@@ -992,3 +992,19 @@ test('a waker detaches the round and applies outcomes per envelope — exactly o
   expect(composed.length).toBe(composeRoutes(awaited.state, awaited.ctx, awaited.req).length)
   expect(composed[0]!.quote.amountOut).toBe(detached.bestOut)
 })
+
+test('planning is evidence-first: most recently proven pools head the round, then newest-created, with never-proven after', () => {
+  const { state, ctx, req, world, index } = fakeSetup()
+  const neverOld = newPool(index, world, T_IN, T_OUT, { kind: 'price', r0: 1n, r1: 1n }, 1n)
+  const neverNew = newPool(index, world, T_IN, T_OUT, { kind: 'price', r0: 1n, r1: 1n }, 5n)
+  const provenOnce = newPool(index, world, T_IN, T_OUT, { kind: 'price', r0: 1n, r1: 1n }, 2n)
+  const provenLatest = newPool(index, world, T_IN, T_OUT, { kind: 'price', r0: 1n, r1: 1n }, 3n)
+  index.markSuccess(provenOnce, 40n)
+  index.markSuccess(provenLatest, 90n)
+
+  const planned = planDueLegs(state, ctx, req)
+
+  // Dispatch order is envelope order (the vanguard is this list's head), so the evidence sort is
+  // a latency fact, not cosmetics: last search's winner must sit in the first envelope.
+  expect(planned.map((p) => p.leg.pool.id)).toEqual([provenLatest.id, provenOnce.id, neverNew.id, neverOld.id])
+})

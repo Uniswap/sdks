@@ -3,7 +3,7 @@ import fc from 'fast-check'
 import type { Address, Hex, Log, PublicClient } from 'viem'
 import { encodeAbiParameters } from 'viem'
 
-import { MAX_INTERMEDIATES } from '../constants'
+import { MAX_INTERMEDIATES, PUMP_VANGUARD_LEGS } from '../constants'
 import { RpcUnavailableError } from '../errors'
 import providerErrors from '../internal/__fixtures__/providerErrors.json'
 import { v2Ref, v3Ref, v4Ref } from '../internal/testing'
@@ -1179,19 +1179,20 @@ test('RpcUnavailableError from the pinned-block fetch propagates', async () => {
 // not hold its first answers hostage to its last.
 // ---------------------------------------------------------------------------
 
-test('a two-envelope round leads at envelope cadence — the first 50 legs price and lead while the second envelope is still held on the wire', async () => {
+test('a multi-envelope round leads at envelope cadence — the vanguard prices and leads while every later leg is still held on the wire', async () => {
   const world: World = new Map()
   const manifest = manifestOf({ v2: true })
   const index = new PoolIndex(WETH)
-  // 60 direct pools, planned in insertion order: legs 51..60 are the round's second dispatch
-  // group. Every group-2 quote parks on a gate that never releases until the test says so — if the
-  // first lead needed the whole round, `gen.next()` would hang on the gate and the test would time
-  // out, which is exactly the regression this pins against.
+  // 60 direct pools with identical (absent) evidence, so planning keeps insertion order: legs
+  // beyond the vanguard are the round's later dispatch groups. Every post-vanguard quote parks on
+  // a gate that never releases until the test says so — if the first lead needed more than the
+  // vanguard envelope, `gen.next()` would hang on the gate and the test would time out, which is
+  // exactly the regression this pins against.
   const pools: PoolRef[] = []
   for (let i = 0; i < 60; i++) {
     pools.push(newPool(index, world, T_IN, T_OUT, { kind: 'price', r0: 10n ** 12n, r1: 10n ** 12n + BigInt(60 - i) * 10n ** 6n }))
   }
-  const lateIds = new Set(pools.slice(50).map((p) => p.id))
+  const lateIds = new Set(pools.slice(PUMP_VANGUARD_LEGS).map((p) => p.id))
   let release!: () => void
   const gate = new Promise<void>((resolve) => {
     release = resolve
@@ -1212,15 +1213,17 @@ test('a two-envelope round leads at envelope cadence — the first 50 legs price
   let first = await gen.next()
   while (!first.done && first.value.type === 'progress') first = await gen.next()
 
-  // The lead arrived off the first envelope alone: every group-2 quote is still parked.
+  // The lead arrived off the vanguard envelope alone: every later quote is still parked.
   expect(first.value!.type).toBe('lead')
   if (first.value!.type !== 'lead') throw new Error('unreachable')
-  expect(held).toBe(10) // group 2 really was dispatched concurrently — on the wire, not skipped
-  expect(first.value!.ranked.length).toBe(50)
+  // The rest really was dispatched concurrently — held on the wire, not skipped. (Not all 48 at
+  // once: the per-call path's own concurrency bound queues the rest behind the gated ones.)
+  expect(held).toBeGreaterThan(0)
+  expect(first.value!.ranked.length).toBe(PUMP_VANGUARD_LEGS)
   for (const ranked of first.value!.ranked) {
     expect(lateIds.has(ranked.route.legs[0]!.pool.id)).toBe(false)
   }
-  // …and the group's own best leads (insertion order made pool 0 the strict maximum).
+  // …and the vanguard's own best leads (insertion order made pool 0 the strict maximum).
   expect(first.value!.ranked[0]!.route.legs[0]!.pool.id).toBe(pools[0]!.id)
 
   release()

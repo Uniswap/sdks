@@ -1,6 +1,6 @@
 import type { Address, Hex, PublicClient } from 'viem'
 
-import { MEASUREMENT_PAIR_CEILING, PUMP_ROUND_CAP } from '../constants'
+import { MEASUREMENT_PAIR_CEILING, PUMP_ROUND_CAP, PUMP_VANGUARD_LEGS } from '../constants'
 import { sortAddresses, toGraphNode } from '../internal/currency'
 import type { Semaphore } from '../internal/rpc'
 import type { PoolIndex } from '../pools/poolIndex'
@@ -265,6 +265,17 @@ export function orderedIntermediates(ctx: PumpCtx, req: QuoteRequest): string[] 
  * 'hint' provenance even when the index or a hypothesis also produces it (so its success upserts at
  * hint rank, exactly as the old resolver did), and the ceiling — which slices this list's tail —
  * can never silently drop a caller's own hint to keep a spam pool.
+ *
+ * THE REST OF THE ORDER IS EVIDENCE-FIRST, and it is load-bearing for latency rather than for
+ * coverage: index pools sort by most recent proven quote (`lastQuoteSuccessBlock`), then newest
+ * creation — the same two priors the old selection ranked on — with never-proven pools and then
+ * bare hypotheses after. Planning order is dispatch order is ENVELOPE order (a detached round's
+ * vanguard is exactly this list's head — see {@link pump}), so on a warm pair the first envelope
+ * to settle carries last search's winner, and the first lead a `getQuote` stops at is the best
+ * KNOWN answer rather than whichever fifty legs happened to answer first. An ordering, never a
+ * selection: everything below the ceiling still measures; only WHEN moves. It also aims the
+ * ceiling's tail-slice at the least-evidenced pools, which is the only defensible thing for an
+ * abuse backstop to drop.
  */
 function measurablePools(state: SearchState, ctx: PumpCtx, a: CurrencyRef, b: CurrencyRef, hintRefs: PoolRef[]): { ref: PoolRef; provenance: Provenance }[] {
   const wrappedNative = ctx.manifest.wrappedNative
@@ -276,7 +287,14 @@ function measurablePools(state: SearchState, ctx: PumpCtx, a: CurrencyRef, b: Cu
     const [n0, n1] = [toGraphNode(ref.currencies[0], wrappedNative), toGraphNode(ref.currencies[1], wrappedNative)]
     if ((n0 === aNode && n1 === bNode) || (n0 === bNode && n1 === aNode)) byId.set(ref.id, { ref, provenance: 'hint' })
   }
-  for (const rec of ctx.index.pair(a, b)) {
+  const proven = (block: bigint | undefined): bigint => block ?? -1n
+  const indexed = [...ctx.index.pair(a, b)].sort((p, q) => {
+    const bySuccess = proven(q.lastQuoteSuccessBlock) - proven(p.lastQuoteSuccessBlock)
+    if (bySuccess !== 0n) return bySuccess > 0n ? 1 : -1
+    const byCreation = proven(q.createdAtBlock) - proven(p.createdAtBlock)
+    return byCreation === 0n ? 0 : byCreation > 0n ? 1 : -1
+  })
+  for (const rec of indexed) {
     if (!byId.has(rec.pool.id)) byId.set(rec.pool.id, { ref: rec.pool, provenance: 'index' })
   }
   for (const protocol of PROTOCOLS) {
@@ -538,7 +556,6 @@ export async function pump(state: SearchState, ctx: PumpCtx, req: QuoteRequest):
     client: ctx.client,
     modules: ctx.modules,
     manifest: ctx.manifest,
-    legs: round.map((p) => p.leg),
     blockNumber: state.block.number,
     semaphore: ctx.semaphore,
     multicall3: ctx.multicall3,
@@ -546,27 +563,42 @@ export async function pump(state: SearchState, ctx: PumpCtx, req: QuoteRequest):
   }
 
   if (wake === undefined) {
-    applyBatch(await measureLegs(dispatch))
+    applyBatch(await measureLegs({ ...dispatch, legs: round.map((p) => p.leg) }))
     return true
   }
 
-  void measureLegs({
-    ...dispatch,
-    onOutcomes: (batch) => {
-      applyBatch(batch)
-      wake.poke()
-    },
-  })
-    // The final, index-aligned return: every outcome the seam already delivered dedupes on
-    // `applied`; anything a delivery path skipped applies here.
-    .then(applyBatch)
-    .catch(() => {
-      // The bug-containment channel (see the docstring): settle every stranded key as transport.
-      applyBatch(round.filter((p) => !applied.has(p.leg.key)).map((p) => ({ key: p.leg.key, kind: 'transport' as const })))
+  const launch = (group: PlannedLeg[]): void => {
+    void measureLegs({
+      ...dispatch,
+      legs: group.map((p) => p.leg),
+      onOutcomes: (batch) => {
+        applyBatch(batch)
+        wake.poke()
+      },
     })
-    // The round is over — dry is now decidable, so the loop must look again even if the last
-    // envelope's poke already coalesced into a cycle that ran before this settled.
-    .finally(() => wake.poke())
+      // The final, index-aligned return: every outcome the seam already delivered dedupes on
+      // `applied`; anything a delivery path skipped applies here.
+      .then(applyBatch)
+      .catch(() => {
+        // The bug-containment channel (see the docstring): settle every stranded key as transport.
+        applyBatch(group.filter((p) => !applied.has(p.leg.key)).map((p) => ({ key: p.leg.key, kind: 'transport' as const })))
+      })
+      // This dispatch is over — dry may now be decidable, so the loop must look again even if the
+      // last envelope's poke already coalesced into a cycle that ran before this settled.
+      .finally(() => wake.poke())
+  }
+
+  // THE VANGUARD: a round wider than one small envelope leads with its evidence-ordered head
+  // (`measurablePools` plans proven pools first) as its own PUMP_VANGUARD_LEGS-sized dispatch,
+  // concurrent with the rest — a dozen light calls settle well before the MULTICALL_CHUNK-wide
+  // envelopes, so the first lead is both FAST and drawn from the best-evidenced legs instead of
+  // from whichever heavy envelope won the race. Costs at most one extra envelope per round.
+  if (round.length > PUMP_VANGUARD_LEGS) {
+    launch(round.slice(0, PUMP_VANGUARD_LEGS))
+    launch(round.slice(PUMP_VANGUARD_LEGS))
+  } else {
+    launch(round)
+  }
   return true
 }
 

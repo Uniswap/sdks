@@ -183,6 +183,20 @@ export const MEASUREMENT_PAIR_CEILING = 128
  * aggregate3 chunks (`MULTICALL_CHUNK` = 50); leftover due legs stay due for the next cycle. */
 export const PUMP_ROUND_CAP = 400
 
+/**
+ * basis: policy
+ * The size of a detached round's FIRST dispatch group — the vanguard envelope. A round bigger than
+ * this splits its evidence-ordered head (`search/pump.ts#measurablePools` plans most-recently-
+ * proven pools first) into its own small envelope, dispatched concurrently with the rest, so the
+ * legs most likely to contain the true best answer settle FIRST: a dozen light inner calls clear
+ * the provider while the 50-call envelopes (which on dense hooked pairs can run long enough to
+ * bisect) are still executing. An ordering-and-batching decision, never a selection: every leg
+ * still measures; only WHEN moves. 12 is four times the per-pair breadth the wave engine's wave-0
+ * selection led from (3-of-N), small enough that the envelope's inner gas can never approach a cap,
+ * and costs at most one extra envelope per round.
+ */
+export const PUMP_VANGUARD_LEGS = 12
+
 /** basis: policy
  * Max leader candidates preflighted (simulated) before falling through on genuine reverts. */
 export const PREFLIGHT_TOP_K = 3
