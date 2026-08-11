@@ -137,6 +137,31 @@ describe('the search event stream', () => {
     expect(timeline.map((e) => e.type)).toEqual(['final'])
   })
 
+  it('suppresses a narrative progress line whose counters did not move, but keeps every NDJSON one', async () => {
+    const moved: SearchReport = { ...REPORT, enumeration: { ...REPORT.enumeration, legsMeasured: 9 } }
+    const stream = (): SearchEvent<QuoteResult>[] => [
+      lead(3_912_401_234n),
+      { type: 'progress', search: REPORT },
+      { type: 'progress', search: REPORT }, // identical counters — nothing a reader could act on
+      { type: 'progress', search: moved },
+      { type: 'final', result: quoteAt(3_912_401_234n) },
+    ]
+
+    const narrative = captureStdout()
+    await consumeSearch(events(...stream()), baseOpts(true))
+    expect(narrative.filter((line) => line.includes('still searching'))).toHaveLength(2)
+
+    const ndjson = captureStdout()
+    await consumeSearch(events(...stream()), { ...baseOpts(true), json: true })
+    expect(ndjson.map((line) => (JSON.parse(line) as { event: string }).event)).toEqual([
+      'lead',
+      'progress',
+      'progress',
+      'progress',
+      'final',
+    ])
+  })
+
   it('stops at the first result `stopAt` accepts — the default/`--verbose` path', async () => {
     const lines = captureStdout()
     const { final, timeline } = await consumeSearch(events(lead(3_912_401_234n), lead(3_920_000_000n)), {

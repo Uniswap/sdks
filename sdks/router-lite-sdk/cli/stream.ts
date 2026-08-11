@@ -22,7 +22,11 @@
 //  - `progress`: a report axis moved without the answer moving. LIVE-ONLY:
 //    printed under `--watch`/`--verbose`, never collected, because a
 //    retrospective panel wants the answer's history rather than the engine's
-//    heartbeat.
+//    heartbeat. A narrative line identical to the previous one is suppressed
+//    (`progressKey`) — the engine's axes are finer-grained than the line, so a
+//    cycle that moved one the line does not show would otherwise print a
+//    duplicate. `--json` NDJSON is never suppressed: it mirrors the SDK's
+//    event stream one-for-one.
 //  - `final`: the search settled. Closes the timeline.
 //
 // `stopAt` is the one thing that still differs per mode: default/`--verbose`
@@ -43,7 +47,7 @@
 // hydrates once, for the final leading route, after the loop ends.
 // ---------------------------------------------------------------------------
 
-import type { QuotedRoute, QuoteResult, SearchEvent, SwapResult } from '../src/index'
+import type { QuotedRoute, QuoteResult, SearchEvent, SearchReport, SwapResult } from '../src/index'
 
 import {
   budgetNoteFor,
@@ -99,6 +103,13 @@ function leaderOf(result: SearchResult): QuotedRoute | undefined {
   return 'best' in result && result.best ? result.best : undefined
 }
 
+/** Exactly the counters a rendered `progress` line shows (`report.ts#renderTimelineLine`), as one
+ * comparable string — two events with the same key render byte-identical lines but for the timing. */
+function progressKey(search: SearchReport): string {
+  const e = search.enumeration
+  return `${search.quoting.succeeded}/${e.legsMeasured}/${e.intermediatesSelected}/${e.intermediatesDiscovered}`
+}
+
 /**
  * Streams (or silently collects) one entry per search event; returns the last result the stream
  * carried, the classified first lead, and the event history after it — regardless of `stream`.
@@ -111,12 +122,19 @@ export async function consumeSearch<R extends SearchResult>(
   let first: FirstLeadInfo | undefined
   let final: R | undefined
   let previousBest: bigint | undefined
+  let lastProgress: string | undefined
 
   for await (const event of events) {
     const elapsedMs = Date.now() - opts.started
 
     if (event.type === 'progress') {
-      if (opts.stream) print({ type: 'progress', elapsedMs, search: event.search }, previousBest, opts)
+      // A narrative progress line whose counters read exactly as the previous one's says nothing a
+      // reader can act on — the engine woke, an axis the LINE does not show moved. Suppressed for
+      // the narrative stream only: `--json` NDJSON mirrors the SDK's event stream one-for-one.
+      const key = progressKey(event.search)
+      const repeat = !opts.json && key === lastProgress
+      lastProgress = key
+      if (opts.stream && !repeat) print({ type: 'progress', elapsedMs, search: event.search }, previousBest, opts)
       continue
     }
 
