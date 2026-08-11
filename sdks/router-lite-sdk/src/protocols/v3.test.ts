@@ -136,6 +136,13 @@ test('hypotheses adds exactly one more pool per extraFees entry', () => {
   expect(extraPool.protocol === 'v3' && extraPool.fee).toBe(123)
 })
 
+test('hypotheses dedupes an extraFees entry that overlaps a standard tier', () => {
+  const hypotheses = v3Module.hypotheses(WETH, USDC, MAINNET_MANIFEST, [3000, 123])
+  expect(hypotheses).toHaveLength(5) // 4 standard + 123; the overlapping 3000 does not double up
+  expect(new Set(hypotheses.map((h) => h.id)).size).toBe(5)
+  expect(hypotheses.filter((h) => h.protocol === 'v3' && h.fee === 3000)).toHaveLength(1)
+})
+
 test('decode extracts amountOut from QuoterV2 return', () => {
   const legs: RouteLeg[] = [
     {

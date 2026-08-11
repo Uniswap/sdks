@@ -172,7 +172,11 @@ export const v3Module = {
   },
 
   hypotheses(a, b, m, extraFees = []) {
-    return v3Hypotheses(a, b, m, [...STANDARD_V3_FEES, ...extraFees])
+    // Deduped by fee: a caller's extraFees (typically `mergeEnabledFees`'s output) already includes
+    // every enabled tier, standard ones too — without this, an overlap yields two PoolRefs with the
+    // same id for one real pool.
+    const fees = [...new Set([...STANDARD_V3_FEES, ...extraFees])]
+    return v3Hypotheses(a, b, m, fees)
   },
 
   speculativeDirect(a, b, amountIn, m) {
