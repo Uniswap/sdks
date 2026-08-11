@@ -1,16 +1,15 @@
 import type { Address, PublicClient } from 'viem'
 
-import { DEFAULT_CONCURRENCY, SIMPLICITY_MARGIN_BPS } from '../constants'
+import { SIMPLICITY_MARGIN_BPS } from '../constants'
 import { AbortedCallError, TransportError } from '../errors'
-import { aggregateCalls, InnerCallFailure } from '../internal/multicall'
-import { ethCall, mapConcurrent } from '../internal/rpc'
 import type { Semaphore } from '../internal/rpc'
-import { revertDataOf } from '../internal/rpcErrors'
 import type { Segment } from '../internal/segment'
 import { segmentCandidate } from '../internal/segment'
 import { isHooked, routeId } from '../protocols'
 import type { ProtocolModule, QuoteProbe } from '../protocols/types'
-import type { ChainManifest, DecodedQuote, Protocol, QuoteCall, QuotedRoute, RouteCandidate, RouteQuote } from '../types'
+import type { ChainManifest, DecodedQuote, Protocol, QuotedRoute, RouteCandidate, RouteQuote } from '../types'
+
+import { encodeOr, isAmountIndependentFailure, runQuoteRound } from './measure'
 
 // ---------------------------------------------------------------------------
 // Quoting engine — segments each candidate into contiguous same-protocol
@@ -24,6 +23,10 @@ import type { ChainManifest, DecodedQuote, Protocol, QuoteCall, QuotedRoute, Rou
 // path, including a solo v2 leg) or exactly two (a protocol boundary crossing,
 // or two solo v2 legs back to back).
 //
+// THE ROUND MACHINERY ITSELF LIVES IN `measure.ts` (`runQuoteRound`,
+// `encodeOr`, `isAmountIndependentFailure`) — this file consumes it, as does
+// the measurement-first engine, so both dispatch through one implementation.
+//
 // `RouteQuote.intermediateAmounts` records realized amounts at *segment*
 // boundaries, not per-leg: a two-leg v3 (or v4) whole-path segment is one
 // `eth_call` and only its final output is ever observed on-chain, so there is
@@ -33,105 +36,6 @@ import type { ChainManifest, DecodedQuote, Protocol, QuoteCall, QuotedRoute, Rou
 // realized amount (segment 1's output, fed as segment 2's `amountIn`) for a
 // two-segment candidate.
 // ---------------------------------------------------------------------------
-
-type RunRoundArgs = {
-  client: Pick<PublicClient, 'request'>
-  /** One entry per candidate: the encoded quote, or the `Error` its encoding threw. Encoding happens
-   * at the caller (eagerly, per candidate, under {@link encodeOr}) rather than inside the dispatch
-   * workers, because the multicall path has to hold every call of a round at once — but "one bad
-   * candidate never takes down the batch" is a property of the ROUND, not of a dispatch strategy, so
-   * an encode failure travels as that candidate's slot exactly as it did when `mapConcurrent`
-   * captured the throw. */
-  calls: Array<QuoteCall | Error>
-  blockNumber: bigint
-  semaphore?: Semaphore | undefined
-  signal?: AbortSignal | undefined
-  multicall3?: Address | undefined
-}
-
-/** `encodeQuote`, with a throw demoted to the candidate's own slot — see {@link RunRoundArgs.calls}. */
-function encodeOr(encode: () => QuoteCall): QuoteCall | Error {
-  try {
-    return encode()
-  } catch (err) {
-    return err instanceof Error ? err : new Error(String(err))
-  }
-}
-
-/**
- * Executes one quoting round — every `QuoteCall` in `calls`, block-pinned — and returns one slot per
- * call, in order: the decoded amount, or the `Error` that stopped it. THE TWO DISPATCH PATHS PRODUCE
- * THE SAME SLOT VOCABULARY, which is what lets the tally code below stay single:
- *
- *  - `multicall3` absent (no deployment on this chain, or a caller below the router facade that
- *    never probed one): one `ethCall` per call under the shared semaphore — the original path,
- *    byte-for-byte.
- *  - `multicall3` present (the router's once-per-lifetime `eth_getCode` probe found code —
- *    `router.ts#resolveMulticall3`): the round goes through `aggregate3`
- *    (`internal/multicall.ts#aggregateCalls`, chunked, each chunk one permit). An inner failure
- *    arrives as {@link InnerCallFailure} instead of a thrown provider error — see
- *    {@link isAmountIndependentFailure} for the one place the difference is read.
- *
- * A decode failure is a plain `Error` slot on BOTH paths (aggregate3 returns success + `0x` for a
- * call to codeless address, exactly as a direct `eth_call` does — study-verified), so v2's
- * pool-absent shape (`getReserves()` where no pair exists → undecodable `0x`) keeps its existing
- * accounting: an execution-channel failure with no revert data, negative-cacheable.
- */
-async function runQuoteRound(args: RunRoundArgs): Promise<Array<DecodedQuote | Error>> {
-  const { client, calls, blockNumber, semaphore, signal, multicall3 } = args
-
-  if (multicall3 === undefined) {
-    return mapConcurrent(calls, semaphore ?? DEFAULT_CONCURRENCY, async (quoteCall) => {
-      // An encode failure travels as this candidate's slot — thrown here so `mapConcurrent` captures
-      // it exactly as it captured the throw when encoding ran inside this worker.
-      if (quoteCall instanceof Error) throw quoteCall
-      const returnData = await ethCall(client, quoteCall.call, blockNumber, semaphore, signal)
-      return quoteCall.decode(returnData)
-    })
-  }
-
-  const live = calls.flatMap((quoteCall, i) => (quoteCall instanceof Error ? [] : [{ quoteCall, i }]))
-  const raw = await aggregateCalls({
-    client,
-    multicall3,
-    calls: live.map(({ quoteCall }) => quoteCall.call),
-    blockNumber,
-    semaphore,
-    signal,
-  })
-  const results: Array<DecodedQuote | Error> = calls.map((quoteCall) =>
-    quoteCall instanceof Error ? quoteCall : new Error('unreachable: live slot never written'),
-  )
-  live.forEach(({ quoteCall, i }, j) => {
-    const slot = raw[j]!
-    if (slot instanceof Error) {
-      results[i] = slot
-      return
-    }
-    try {
-      results[i] = quoteCall.decode(slot)
-    } catch (err) {
-      results[i] = err instanceof Error ? err : new Error(String(err))
-    }
-  })
-  return results
-}
-
-/**
- * Whether an execution-channel quote failure is the amount-independent, pool-absent shape — the only
- * kind the caller may negative-cache (C4-H3, see {@link QuoteCandidatesResult.amountIndependentFailures}).
- * "Reverted with NO data" has two spellings, one per dispatch path: an {@link InnerCallFailure}
- * carries the sub-call's revert bytes on `revertData` directly off aggregate3's decoded `Result`
- * (never through `classifyRpcError`/`collectFacts` — it was constructed, not classified), while a
- * per-call revert is a thrown provider error whose bytes `revertDataOf` digs out of the cause chain.
- * Same question, same answer semantics ({@link revertDataOf}'s zero-length-`0x`-counts-as-none rule
- * is applied at construction on the multicall side), asked here in one place so the two can never
- * drift.
- */
-function isAmountIndependentFailure(err: Error): boolean {
-  if (err instanceof InnerCallFailure) return err.revertData === undefined
-  return revertDataOf(err) === undefined
-}
 
 /**
  * The gas figure for a whole route: the SUM of its segments' quoter estimates, or `undefined` if any
