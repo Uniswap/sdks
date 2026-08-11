@@ -296,6 +296,7 @@ export const DEFAULT_REORG_OVERLAP_BLOCKS = 32n
 export const NEGATIVE_CACHE_BLOCKS = 2n
 
 /**
+ * basis: policy
  * How far below the router's head watermark a fresh `latest` may plausibly sit and still be the
  * chain's doing — a lagging replica behind a load balancer, or a reorg — rather than the watermark
  * itself being wrong. Four times the reorg overlap this package already tolerates: deep enough that
@@ -307,8 +308,6 @@ export const NEGATIVE_CACHE_BLOCKS = 2n
  * A FUNCTION, not a constant, because the multiplicand is per-chain (C4-P1): the multiple of 4 is
  * the policy — "no honest lag runs four reorg depths deep" — and `reorgOverlapBlocks` is the chain
  * fact it multiplies. Callers pass `reorgOverlapBlocksOf(manifest)`, never the mainnet default.
- *
- * basis: policy
  */
 export function maxPlausibleHeadRegression(reorgOverlapBlocks: bigint): bigint {
   return reorgOverlapBlocks * 4n

@@ -632,15 +632,6 @@ export function manifestFor(chainId: number, overrides?: Partial<ChainManifest>)
 const MAX_BLOCK_TIME_SECONDS = 3_600
 
 /**
- * Rejects a `chain` bundle whose values cannot produce a usable window, synchronously and before any
- * RPC — the same posture as every other manifest check. Every failure here is silent otherwise: a
- * `blockTimeSeconds` of 0 makes {@link eagerPairScanBlocks} `Infinity` (and `BigInt(Infinity)` a
- * `RangeError` thrown from inside a search), an implausibly large one collapses the eager pair-scan window to
- * nothing while looking perfectly well-formed (see {@link MAX_BLOCK_TIME_SECONDS}), and a negative
- * `reorgOverlapBlocks` re-opens coverage *ahead* of the tip, which reads as "nothing to scan" rather
- * than as a configuration mistake.
- */
-/**
  * Rejects a manifest whose address fields are not syntactically valid addresses, naming the field,
  * synchronously and before any RPC.
  *
@@ -737,6 +728,15 @@ export function assertManifestNumerics(m: ChainManifest): void {
   }
 }
 
+/**
+ * Rejects a `chain` bundle whose values cannot produce a usable window, synchronously and before any
+ * RPC — the same posture as every other manifest check. Every failure here is silent otherwise: a
+ * `blockTimeSeconds` of 0 makes {@link eagerPairScanBlocks} `Infinity` (and `BigInt(Infinity)` a
+ * `RangeError` thrown from inside a search), an implausibly large one collapses the eager pair-scan window to
+ * nothing while looking perfectly well-formed (see {@link MAX_BLOCK_TIME_SECONDS}), and a negative
+ * `reorgOverlapBlocks` re-opens coverage *ahead* of the tip, which reads as "nothing to scan" rather
+ * than as a configuration mistake.
+ */
 export function assertChainData(m: ChainManifest): void {
   // Addresses first: everything downstream of a manifest — the consistency cross-check below, the
   // request path, the plan compiler — now compares them with viem rather than with lowercased

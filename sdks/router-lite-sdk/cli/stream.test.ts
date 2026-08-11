@@ -320,4 +320,23 @@ describe('the interrupt path', () => {
     expect(interrupted).toBe(false)
     expect(final?.search.aborted).toBe(true) // the ENGINE's drained final, not a stamped snapshot
   })
+
+  it('an interrupt landing after a genuine final settles does NOT stamp it aborted', async () => {
+    captureStdout()
+    const interrupt = new AbortController()
+    const finalResult = quoteAt(3_912_401_234n) // constructed with `search.aborted: false`
+    const { iterable, wasReturned } = parkedAfter([{ type: 'final', result: finalResult }])
+
+    // `stopAt` never fires (mirrors `--watch`, which drains to `done`), so the loop returns to its
+    // top after the `final` — exactly the gap this race lands in — before pulling again.
+    const consuming = consumeSearch(iterable, { ...baseOpts(true), interrupt: interrupt.signal })
+    await tick() // the final is consumed; the next pull is parked — the signal lands in the gap
+    interrupt.abort()
+    const { final, interrupted } = await consuming
+
+    expect(interrupted).toBe(true) // the signal WAS observed — this is not the budget-abort path
+    expect(final).toBe(finalResult) // returned exactly as received: no stamp, no copy
+    expect(final?.search.aborted).toBe(false) // the search settled on its own; the abort never touched it
+    expect(wasReturned()).toBe(true)
+  })
 })

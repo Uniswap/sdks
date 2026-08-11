@@ -110,8 +110,13 @@ export function newPool(
 
 /**
  * The `ProtocolModule` members a suite's fake does not exercise — spread into a fake to satisfy the
- * interface. Every one of them THROWS rather than answering: a fake that quietly returned `[]` from
- * a member a test did not mean to reach would let the test pass while measuring nothing.
+ * interface. `encodeQuote` and `compileOperation` THROW rather than answering: a fake that quietly
+ * returned `[]` from a member a test did not mean to reach would let the test pass while measuring
+ * nothing. `hypotheses` and `validateHint` cannot follow that rule — a search calls both on every
+ * cycle whether or not a suite means to exercise them, so throwing would fail suites that never
+ * touch this protocol at all; they instead answer with the emptiest honest reply (`hypotheses`
+ * returns `[]`, `validateHint` resolves `null`), which reads to the search as "this protocol found
+ * nothing to add," not as a hidden failure.
  */
 export const unused = {
   hypotheses: () => [],

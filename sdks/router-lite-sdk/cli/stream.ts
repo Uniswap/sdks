@@ -96,17 +96,25 @@ export type ConsumeOptions<R extends SearchResult> = {
   /** The process-wide INTERRUPT signal (`commands/context.ts#interruptSignal`) — the ^C half only,
    * never the composed budget signal. When it fires, this consumer stops pulling IMMEDIATELY (the
    * pending pull is raced against it, so a parked await cannot delay the break) and abandons the
-   * iterator, whose own teardown cancels everything in flight. A budget expiry is deliberately NOT
-   * routed here: it keeps the drain-then-`final` semantics, because nobody is sitting at a keyboard
-   * waiting on it. See {@link consumeSearch}'s docstring for the whole contract. */
+   * iterator — `it.return()`, fired without awaiting it. That wind-down aborts the dispatch signal
+   * every queued measurement call is composed onto, so each one dies unsent; a call already on the
+   * wire is not cancelled by it and settles in the background, behind the panel this consumer has
+   * already handed back — on a stalled endpoint the process can outlive that panel until the
+   * transport's own timeout, which is what the SECOND ^C is the escape from. A budget expiry is
+   * deliberately NOT routed here: it keeps the drain-then-`final` semantics, because nobody is
+   * sitting at a keyboard waiting on it. See {@link consumeSearch}'s docstring for the whole
+   * contract. */
   interrupt?: AbortSignal
 }
 
 export type ConsumeResult<R extends SearchResult> = {
   /** The last result the stream carried (`lead` or `final`), or `undefined` if it carried none. On
-   * an interrupted run this is the last LEAD's interim snapshot (a full result by the SDK's design),
-   * with `search.aborted` stamped true — the search WAS aborted, even though this snapshot predates
-   * the signal — so the abort note renders on it exactly as on a drained final. */
+   * an interrupted run this is USUALLY the last LEAD's interim snapshot (a full result by the SDK's
+   * design), with `search.aborted` stamped true — the search WAS aborted, even though this snapshot
+   * predates the signal — so the abort note renders on it exactly as on a drained final. The one
+   * exception: a `final` event already received right before the signal lands (the gap before the
+   * loop's next, `done` pull) is returned AS IS, unstamped — that search settled on its own, and
+   * `interrupted` being true does not make it so. */
   final: R | undefined
   /** The first `lead`, classified — the timeline's opening line. */
   first: FirstLeadInfo | undefined
@@ -114,7 +122,8 @@ export type ConsumeResult<R extends SearchResult> = {
    * raw material, always collected (this is what makes the timeline available outside `--watch`). */
   timeline: TimelineEvent[]
   /** True when `opts.interrupt` cut the stream short — the immediate-render path. `final` is then
-   * the last lead's snapshot (or `undefined` if the interrupt beat the first lead). */
+   * the last lead's snapshot (or `undefined` if the interrupt beat the first lead) — unless a `final`
+   * event had already landed, in which case it is that unstamped final; see {@link final}. */
   interrupted: boolean
   /** The last progress line's body, for the interrupted-before-any-lead notice — the only thing a
    * leadless interrupted run has to say about what the search was doing when it died. */
@@ -146,10 +155,14 @@ const INTERRUPTED = Symbol('interrupted')
  * the panel prints OVER a fresh shell prompt. The pending pull is therefore RACED against the
  * interrupt (a parked `it.next()` cannot delay the break), the loop exits with whatever the last
  * `lead` carried (a full interim snapshot by the SDK's design, stamped `aborted` on the way out),
- * and the iterator is ABANDONED — `it.return()`, fired without awaiting it, which runs the SDK
- * generator's own teardown (`sources.abortAll()`): every in-flight call cancels, and the coverage
- * learned so far is already in the shared index. A BUDGET expiry deliberately keeps the old
- * drain-then-`final` semantics — it reaches this loop as ordinary events, never as `interrupt`.
+ * and the iterator is ABANDONED — `it.return()`, fired without awaiting it, which aborts the SDK
+ * generator's dispatch signal (`sources.abortAll()`): every call still QUEUED dies unsent, but one
+ * already on the wire is not cancelled by it — it settles in the background, behind the panel this
+ * call already produced, and on a stalled endpoint the process can outlive that panel until the
+ * transport's own timeout (the second ^C is the escape for exactly that case). The coverage learned
+ * so far is already in the shared index regardless of how those trailing calls resolve. A BUDGET
+ * expiry deliberately keeps the old drain-then-`final` semantics — it reaches this loop as ordinary
+ * events, never as `interrupt`.
  */
 export async function consumeSearch<R extends SearchResult>(
   events: AsyncIterable<SearchEvent<R>>,
@@ -161,6 +174,10 @@ export async function consumeSearch<R extends SearchResult>(
   let previousBest: bigint | undefined
   let lastProgress: string | undefined
   let interrupted = false
+  // Whether `final` (above) was set FROM a `final` event rather than a `lead`'s interim snapshot —
+  // the one bit that lets the stamp below tell a genuinely-settled search apart from one still
+  // running.
+  let finalReceived = false
 
   const it = events[Symbol.asyncIterator]()
   const interrupt = opts.interrupt
@@ -201,6 +218,7 @@ export async function consumeSearch<R extends SearchResult>(
       }
 
       final = event.result
+      finalReceived = event.type === 'final'
       const best = leaderOf(event.result)
 
       // The first lead opens the timeline as its own (origin-labelled) line, so it is recorded rather
@@ -231,9 +249,14 @@ export async function consumeSearch<R extends SearchResult>(
     if (it.return !== undefined) void it.return(undefined).catch(() => {})
   }
 
-  // The interrupted snapshot predates the signal, so its report says `aborted: false` — but the RUN
-  // was aborted, and the abort note (rendered off `search.aborted` + `abortCause`) must say so.
-  if (interrupted && final !== undefined) {
+  // A LEAD's interim snapshot predates the signal, so its report says `aborted: false` — but the RUN
+  // was aborted, and the abort note (rendered off `search.aborted` + `abortCause`) must say so. Only
+  // stamp when `final` is a lead's snapshot, though: `interrupted` and a genuinely-received `final`
+  // event can both be true when the signal lands in the gap between that event and the loop's next
+  // (`done`) pull, and a search that settled on its own before anyone interrupted it must render
+  // without the interrupted note — stamping it here would blame the abort for an answer it never
+  // touched.
+  if (interrupted && final !== undefined && !finalReceived) {
     final = { ...final, search: { ...final.search, aborted: true } }
   }
   return { final, first, timeline, interrupted, ...(lastProgress !== undefined ? { lastProgress } : {}) }

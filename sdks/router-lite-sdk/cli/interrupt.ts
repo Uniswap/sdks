@@ -12,13 +12,17 @@
 // The contract, and how it got here in two steps:
 //
 //   FIRST SIGINT/SIGTERM — abort the process-wide interrupt controller
-//   (`commands/context.ts` composes it into every search signal, so the
-//   running search actually stops), print one stderr line, and RETURN. No
-//   flush, no exit: the search drains its in-flight round, the command
-//   renders its final panel (best route, runners-up, confidence — the answer
-//   the user interrupted FOR), and control flows back through `main`, whose
-//   `finally` banks the cache exactly as on any other exit. `rl.ts` then
-//   overrides the exit code with 128+signo (`terminationExitCode`), which is
+//   (`commands/context.ts` composes it into every search signal), print one
+//   stderr line, and RETURN. No flush, no exit, and no drain wait either:
+//   `cli/stream.ts#consumeSearch` races its pending pull against that same
+//   signal, so the instant it fires the stream stops consuming and hands back
+//   the LAST LEAD's interim snapshot (a full result by the SDK's own design) —
+//   the command renders its final panel (best route, runners-up, confidence —
+//   the answer the user interrupted FOR) off THAT immediately, not off a
+//   drained final it would otherwise wait seconds for. Control then flows back
+//   through `main`, whose `finally` banks the cache AFTER the panel has
+//   rendered — exactly as on any other exit. `rl.ts` then overrides the exit
+//   code with 128+signo (`terminationExitCode`) — 130 for SIGINT — which is
 //   what a shell expects from an interrupted process however gracefully it
 //   wound down. The first version of this handler flushed and exited RIGHT
 //   HERE, which killed the process in the gap between the stream's last line

@@ -223,13 +223,16 @@ file.
 - It is written on **every** exit path, including errors and Ctrl-C — a search that died partway
   still learned real coverage, and throwing it away would make exactly the runs that are already
   going badly permanently slow.
-- **Ctrl-C renders before it exits.** The first ^C stops the search *immediately* (in-flight work is
-  cancelled, not drained) and prints the result panel from the best route already found — labelled
-  `interrupted` — then banks the cache and exits `130`; a second ^C exits at once, no flush, no
-  panel. Under a wrapper whose own process dies on ^C (e.g. `chainz exec`), the shell prompt can
-  come back **before** the panel prints: the panel is the interrupted `rl` process finishing behind
-  it, not a stray job. Running `bun cli/rl.ts` directly (with `$ETH_RPC_URL` exported) avoids the
-  interleave.
+- **Ctrl-C renders before it exits.** The first ^C stops the search *immediately* — no drain wait —
+  and prints the result panel from the best route already found — labelled `interrupted` — then
+  banks the cache and exits `130`; a second ^C exits at once, no flush, no panel. "Immediately"
+  means the stream stops *consuming*, not that every in-flight call dies on the spot: calls still
+  queued die unsent, but one already on the wire settles in the background, behind the panel that
+  already printed. On a stalled endpoint that background work can keep the process alive after the
+  panel is on screen, until the transport's own timeout — that's what the second ^C is for. Under a
+  wrapper whose own process dies on ^C (e.g. `chainz exec`), the shell prompt can come back
+  **before** the panel prints: the panel is the interrupted `rl` process finishing behind it, not a
+  stray job. Running `bun cli/rl.ts` directly (with `$ETH_RPC_URL` exported) avoids the interleave.
 - `--no-cache` skips both the read and the write. Reach for it when you want to measure a cold
   search, or when you want a run that cannot inherit anything.
 
