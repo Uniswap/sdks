@@ -945,3 +945,50 @@ test('property: conservation — attempted === succeeded + failed + transportFai
     { numRuns: 60 },
   )
 })
+
+// ---------------------------------------------------------------------------
+// The detached, envelope-granular round (PumpCtx.wake)
+// ---------------------------------------------------------------------------
+
+test('a waker detaches the round and applies outcomes per envelope — exactly once, landing the identical ledger the awaited round lands', async () => {
+  // Twin worlds: 60 pools (two MULTICALL_CHUNK groups) with a sprinkle of pool-absent reverts,
+  // measured once through the awaited path and once through the detached (wake-driven) path. The
+  // detached path delivers every outcome TWICE — per settled envelope and again in the round's
+  // final return — so equality of the counters is the exactly-once proof: a double-apply would
+  // double `quoting.attempted`.
+  const build = (): FakeSetup & { bestOut: bigint } => {
+    const setup = fakeSetup()
+    let bestOut = 0n
+    for (let i = 0; i < 60; i++) {
+      const fate: Fate = i % 7 === 3 ? { kind: 'revert' } : { kind: 'price', r0: 10n ** 12n, r1: 10n ** 12n + BigInt(i) * 10n ** 6n }
+      const pool = newPool(setup.index, setup.world, T_IN, T_OUT, fate)
+      const out = fatePrice(fate, pool, T_IN, setup.req.amountIn)
+      if (out !== undefined && out > bestOut) bestOut = out
+    }
+    return { ...setup, bestOut }
+  }
+
+  const awaited = build()
+  await runToDry(awaited.state, awaited.ctx, awaited.req)
+
+  const detached = build()
+  let pokes = 0
+  detached.ctx.wake = { poke: () => pokes++, next: () => new Promise<void>(() => {}) }
+  expect(await pump(detached.state, detached.ctx, detached.req)).toBe(true)
+  // Dispatch returned before settlement — that IS the detachment — so drain by yielding.
+  for (let i = 0; i < 200 && detached.state.inFlightKeys.size > 0; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  }
+  expect(detached.state.inFlightKeys.size).toBe(0)
+  // One poke per settled envelope (2 groups) plus the round's own final settle.
+  expect(pokes).toBeGreaterThanOrEqual(3)
+
+  expect(detached.state.quoting).toEqual(awaited.state.quoting)
+  expect(detached.state.quoting.attempted).toBe(60)
+  expect(detached.state.legsMeasured).toBe(awaited.state.legsMeasured)
+  expect(detached.state.measurements.size).toBe(awaited.state.measurements.size)
+  expect(pumpDry(detached.state, detached.ctx)).toBe(false) // outcomes arrived — the next cycle must re-plan
+  const composed = composeRoutes(detached.state, detached.ctx, detached.req)
+  expect(composed.length).toBe(composeRoutes(awaited.state, awaited.ctx, awaited.req).length)
+  expect(composed[0]!.quote.amountOut).toBe(detached.bestOut)
+})

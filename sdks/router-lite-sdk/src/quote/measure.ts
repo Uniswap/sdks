@@ -2,7 +2,7 @@ import type { Address, Hex, PublicClient } from 'viem'
 
 import { DEFAULT_CONCURRENCY } from '../constants'
 import { AbortedCallError, TransportError } from '../errors'
-import { aggregateCalls, InnerCallFailure } from '../internal/multicall'
+import { aggregateCalls, InnerCallFailure, MULTICALL_CHUNK } from '../internal/multicall'
 import { ethCall, mapConcurrent } from '../internal/rpc'
 import type { Semaphore } from '../internal/rpc'
 import { revertDataOf } from '../internal/rpcErrors'
@@ -170,6 +170,21 @@ export type MeasureLegsArgs = {
    * `aggregate3`. Omitted, the per-call path runs. See {@link runQuoteRound}. */
   multicall3?: Address | undefined
   signal?: AbortSignal | undefined
+  /**
+   * The chunk-granular delivery seam: present, the round is dispatched as concurrent
+   * {@link MULTICALL_CHUNK}-sized groups (each exactly one `aggregate3` envelope on the multicall
+   * path — the same wire shape `aggregateCalls`' own chunking produced, now settled independently),
+   * and this is called once per group AS IT SETTLES, with that group's outcomes. A caller can
+   * therefore act on the first envelope's answers while later envelopes are still in flight — the
+   * measurement half of the design's chunk-arrival granularity (spec §3: knowledge lands at scan-
+   * chunk cadence; prices land at envelope cadence).
+   *
+   * The RETURN VALUE IS UNCHANGED — every outcome, index-aligned — so an outcome delivered here is
+   * seen twice by a caller that reads both. Dedup is the caller's job, by `key` (the pump's round
+   * bookkeeping already owns exactly that). Absent, dispatch is one undivided round, byte-for-byte
+   * as before.
+   */
+  onOutcomes?: ((outcomes: LegOutcome[]) => void) | undefined
 }
 
 /**
@@ -183,37 +198,29 @@ export type MeasureLegsArgs = {
  * defect that is, by construction, about the pool's own shape rather than the amount).
  */
 export async function measureLegs(args: MeasureLegsArgs): Promise<LegOutcome[]> {
-  const { client, modules, manifest, legs, blockNumber, semaphore, multicall3, signal } = args
+  const { client, modules, manifest, legs, blockNumber, semaphore, multicall3, signal, onOutcomes } = args
   if (legs.length === 0) return []
 
-  const results = await runQuoteRound({
-    client,
-    calls: legs.map((leg) =>
-      encodeOr(() =>
-        modules[leg.pool.protocol].encodeQuote(
-          [
-            {
-              pool: leg.pool,
-              currencyIn: leg.currencyIn,
-              currencyOut: leg.currencyOut,
-              // Absent stays ABSENT rather than becoming an explicit `undefined` — `RouteLeg.hookData`
-              // is an optional property under `exactOptionalPropertyTypes`.
-              ...(leg.hookData !== undefined && { hookData: leg.hookData }),
-            },
-          ],
-          leg.amountIn,
-          manifest,
-        ),
+  const calls = legs.map((leg) =>
+    encodeOr(() =>
+      modules[leg.pool.protocol].encodeQuote(
+        [
+          {
+            pool: leg.pool,
+            currencyIn: leg.currencyIn,
+            currencyOut: leg.currencyOut,
+            // Absent stays ABSENT rather than becoming an explicit `undefined` — `RouteLeg.hookData`
+            // is an optional property under `exactOptionalPropertyTypes`.
+            ...(leg.hookData !== undefined && { hookData: leg.hookData }),
+          },
+        ],
+        leg.amountIn,
+        manifest,
       ),
     ),
-    blockNumber,
-    semaphore,
-    signal,
-    multicall3,
-  })
+  )
 
-  return legs.map((leg, i) => {
-    const result = results[i]!
+  const toOutcome = (leg: LegRequest, result: DecodedQuote | Error): LegOutcome => {
     // Order is load-bearing: `AbortedCallError` is deliberately NOT a `TransportError`, and
     // `NodeStateError` deliberately IS one.
     if (result instanceof AbortedCallError) return { key: leg.key, kind: 'unattempted' }
@@ -225,5 +232,44 @@ export async function measureLegs(args: MeasureLegsArgs): Promise<LegOutcome[]> 
       amountOut: result.amountOut,
       ...(result.gasEstimate !== undefined && { gasEstimate: result.gasEstimate }),
     }
-  })
+  }
+
+  /** One dispatch group: the legs at `indices`, sent as one `runQuoteRound` (one aggregate3 envelope
+   * on the multicall path — an encode-failure slot travels inside its own group, so every group's
+   * outcome batch is exactly its slice of the round). */
+  const run = async (indices: number[]): Promise<LegOutcome[]> => {
+    const results = await runQuoteRound({
+      client,
+      calls: indices.map((i) => calls[i]!),
+      blockNumber,
+      semaphore,
+      signal,
+      multicall3,
+    })
+    return indices.map((legIndex, j) => toOutcome(legs[legIndex]!, results[j]!))
+  }
+
+  if (onOutcomes === undefined) {
+    return run(legs.map((_, i) => i))
+  }
+
+  // Chunk-granular dispatch: MULTICALL_CHUNK-sized groups, concurrently (the same shape
+  // `aggregateCalls` gave the undivided round — its chunks already ran under `mapConcurrent`, and
+  // every group here still holds one semaphore permit per envelope/call). Each group's outcomes are
+  // delivered the moment IT settles; the return still carries all of them, index-aligned.
+  const groups: number[][] = []
+  for (let i = 0; i < legs.length; i += MULTICALL_CHUNK) {
+    groups.push(legs.map((_, j) => j).slice(i, i + MULTICALL_CHUNK))
+  }
+  const all: LegOutcome[] = new Array<LegOutcome>(legs.length)
+  await Promise.all(
+    groups.map(async (group) => {
+      const outcomes = await run(group)
+      group.forEach((legIndex, j) => {
+        all[legIndex] = outcomes[j]!
+      })
+      onOutcomes(outcomes)
+    }),
+  )
+  return all
 }

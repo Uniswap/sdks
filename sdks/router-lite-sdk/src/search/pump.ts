@@ -8,7 +8,7 @@ import { v2PoolRef, v3PoolRef, v4PoolRef } from '../protocols/poolRef'
 import type { ProtocolModule } from '../protocols/types'
 import { computeV2PairAddress } from '../protocols/v2'
 import { computeV3PoolAddress } from '../protocols/v3'
-import type { LegRequest } from '../quote/measure'
+import type { LegOutcome, LegRequest } from '../quote/measure'
 import { measureLegs } from '../quote/measure'
 import { rankRoutes } from '../quote/rank'
 import type {
@@ -23,6 +23,7 @@ import type {
 } from '../types'
 import { PROTOCOLS } from '../types'
 
+import type { Notifier } from './notify'
 import type { LegDirection, Measurement, SearchState } from './state'
 import { applyMeasurement, legKey } from './state'
 
@@ -64,9 +65,13 @@ import { applyMeasurement, legKey } from './state'
 // dominated combinations are provably inferior rather than unpriced-and-hidden.
 //
 // This module is pull-driven and RPC-bounded: one `pump()` call plans over
-// current knowledge, dispatches at most PUMP_ROUND_CAP legs as ONE
-// `measureLegs` round, applies the outcomes, and returns. It creates no
-// timers, no detached work, and nothing that outlives the call.
+// current knowledge and dispatches at most PUMP_ROUND_CAP legs as ONE
+// `measureLegs` round. With a waker (`ctx.wake` — the live loop) the round is
+// DETACHED and outcomes apply per settled envelope, each application poking
+// the wake — leads at envelope cadence, with `inFlightKeys` holding `pumpDry`
+// false until the last answer lands (see `pump`'s docstring for the full
+// contract, including abort inertness and bug containment). Without one, the
+// round is awaited whole and nothing outlives the call. No timers either way.
 // ---------------------------------------------------------------------------
 
 export type PumpCtx = {
@@ -83,6 +88,14 @@ export type PumpCtx = {
   semaphore?: Semaphore | undefined
   multicall3?: Address | undefined
   signal?: AbortSignal | undefined
+  /**
+   * The search's wake notifier, when a loop is driving this pump. Present, a round is dispatched
+   * DETACHED and its outcomes apply per settled envelope (see {@link pump} — leads at envelope
+   * cadence); absent (unit pumps, golden replays, any caller without an event loop to wake), the
+   * round is awaited whole and `pump()` returns with every outcome applied, exactly the pre-seam
+   * behavior.
+   */
+  wake?: Notifier | undefined
 }
 
 /** Where a planned leg's pool identity came from — decides the on-success index bookkeeping
@@ -122,12 +135,16 @@ function cursorClean(state: SearchState): boolean {
 }
 
 /**
- * True when a `pump()` call right now would find nothing to do — the loop's gate for opening full
- * coverage and advancing the intermediates frontier. Structural, not speculative: it is exactly the
- * pump's own early-exit predicate, so the two can never disagree about what "dry" means.
+ * True when a `pump()` call right now would find nothing to do AND nothing it already asked for is
+ * still in flight — the loop's gate for opening full coverage and advancing the intermediates
+ * frontier, and one leg of its termination check. Structural, not speculative: the first half is
+ * exactly the pump's own early-exit predicate, so the two can never disagree about what "dry"
+ * means; the second half (`inFlightKeys`) is what keeps a DETACHED round's pending answers counted
+ * as work — without it a search could open the gate, or terminate, over measurements whose
+ * outcomes were one envelope away from arriving.
  */
 export function pumpDry(state: SearchState, _ctx: PumpCtx): boolean {
-  return cursorClean(state)
+  return cursorClean(state) && state.inFlightKeys.size === 0
 }
 
 /**
@@ -422,9 +439,32 @@ export function inLegIntermediate(leg: LegDirection, wrappedNative: Address, inN
  * false when there was nothing to do — including the O(1) early exit when neither the index version
  * nor the frontier has moved since the last look (see {@link PumpCursor}).
  *
- * An aborted search never dispatches: the same planned key can therefore never settle 'unattempted'
- * twice, because the only source of 'unattempted' is a round the abort caught mid-flight, and no
- * further round follows it.
+ * WITH A WAKER (`ctx.wake` — the live loop), THE ROUND IS DETACHED AND OUTCOMES APPLY PER SETTLED
+ * ENVELOPE: `pump()` returns at dispatch, each `MULTICALL_CHUNK`-sized group's outcomes are applied
+ * (and its in-legs folded, exactly as a smaller round) the moment that group settles, and every
+ * application pokes `wake` — so the loop recomposes and can emit a lead after the FIRST envelope
+ * instead of after the whole round. This is the measurement half of the design's granularity
+ * principle (spec §3: improvement at data-arrival cadence), and it is what keeps a dense warm
+ * pair's first lead from costing a full 250-leg round. Bookkeeping makes it safe by construction:
+ * `inFlightKeys` (set here, cleared per applied outcome) keeps {@link pumpDry} false — no gate, no
+ * termination — until every answer has landed, and the per-round `applied` set is the guarantee an
+ * outcome delivered both through the seam and the final return applies exactly once. Without a
+ * waker (unit pumps, golden replays), the round is awaited whole — the pre-seam behavior,
+ * byte-for-byte.
+ *
+ * ON THE CALLER'S ABORT the loop DRAINS the round before its `final` (its termination check holds
+ * while `inFlightKeys` is non-empty) — the same harvest the awaited round provided structurally, so
+ * an abort still keeps every price the wire already paid for. Only iterator ABANDONMENT leaves the
+ * round to settle after the fact: `sources.abortAll()` turns its unsent calls into 'unattempted'
+ * outcomes whose application writes through `applyMeasurement` into a state nobody reads again,
+ * poking a notifier nobody awaits — the same inertness argument as spec §5's preflight carve-out,
+ * documented alongside it in the loop's `finally`. An aborted search never dispatches a NEW round,
+ * so the same planned key can still never settle 'unattempted' twice.
+ *
+ * A rejected round is a bug — `measureLegs` is total by contract — but a bug must not park the
+ * search: `inFlightKeys` would never drain and the loop could never go dry. Mirroring
+ * `Verifier.dispatch`'s rule, every key the rejection stranded settles as the channel that means
+ * "we learned nothing": transport.
  */
 export async function pump(state: SearchState, ctx: PumpCtx, req: QuoteRequest): Promise<boolean> {
   if (state.aborted || ctx.signal?.aborted === true) return false
@@ -447,7 +487,54 @@ export async function pump(state: SearchState, ctx: PumpCtx, req: QuoteRequest):
     state.block.number,
   )
 
-  const outcomes = await measureLegs({
+  const wrappedNative = ctx.manifest.wrappedNative
+  const outNode = toGraphNode(req.tokenOut, wrappedNative)
+  /** Keys already applied, whichever channel delivered them first — the seam's dedup contract. */
+  const applied = new Set<string>()
+
+  // Applies one batch's outcomes and folds ITS in-legs into m_X — a batch is just a smaller round,
+  // and `foldRoundInLegs` is incremental by construction (a later batch's better in-leg still
+  // outdates an earlier batch's out-legs; an out-leg applied after its amount was already outdated
+  // is simply never composed, because composition reads out-legs at exactly m_X). Within one batch,
+  // every outcome applies BEFORE the fold, so an out-leg and the in-leg that outdates it landing in
+  // the same envelope still resolve exactly as they did in a whole-round fold.
+  const applyBatch = (outcomes: LegOutcome[]): void => {
+    const inLegs: RoundInLeg[] = []
+    for (const outcome of outcomes) {
+      if (applied.has(outcome.key)) continue
+      applied.add(outcome.key)
+      const p = byKey.get(outcome.key)!
+      if (outcome.kind === 'success') {
+        const m: Measurement = {
+          pool: p.leg.pool,
+          currencyIn: p.leg.currencyIn,
+          currencyOut: p.leg.currencyOut,
+          amountIn: p.leg.amountIn,
+          amountOut: outcome.amountOut,
+          ...(outcome.gasEstimate !== undefined && { gasEstimate: outcome.gasEstimate }),
+        }
+        applyMeasurement(state, { kind: 'success', m })
+        recordSuccess(state, ctx, p)
+        if (p.role.kind === 'in') inLegs.push({ x: p.role.x, amountOut: outcome.amountOut, poolId: p.leg.pool.id })
+      } else if (outcome.kind === 'reverted') {
+        applyMeasurement(state, { kind: 'reverted', key: outcome.key, pool: p.leg.pool, amountIndependent: outcome.amountIndependent })
+        // Only the amount-independent (pool-absent) shape is negative-cacheable — and `markNegative`
+        // is also what feeds the hint-discredit history (`recordQuoteFailure`) for indexed pools.
+        if (outcome.amountIndependent) ctx.index.markNegative(p.leg.pool, state.block.number)
+      } else if (outcome.kind === 'transport') {
+        applyMeasurement(state, { kind: 'transport', key: outcome.key, candidateRetry: true })
+      } else {
+        applyMeasurement(state, { kind: 'unattempted', key: outcome.key })
+      }
+    }
+    foldRoundInLegs(state, inLegs, wrappedNative, outNode)
+    // Dirty: this batch's outcomes may have made new legs due (a fresh m_X, a released transport
+    // loss, a leftover past the round cap) — the next cycle must plan to find out.
+    cursors.set(state, { indexVersion: state.indexVersion, selectedCount: state.intermediates.selected.length, dirty: true })
+  }
+
+  const wake = ctx.wake
+  const dispatch = {
     client: ctx.client,
     modules: ctx.modules,
     manifest: ctx.manifest,
@@ -456,43 +543,30 @@ export async function pump(state: SearchState, ctx: PumpCtx, req: QuoteRequest):
     semaphore: ctx.semaphore,
     multicall3: ctx.multicall3,
     signal: ctx.signal,
-  })
-
-  // Apply every outcome first, then fold m_X once: an out-leg and the in-leg that outdates it can
-  // land in one round, and the fold must see the round's complete picture before it invalidates.
-  const inLegs: RoundInLeg[] = []
-  for (const outcome of outcomes) {
-    const p = byKey.get(outcome.key)!
-    if (outcome.kind === 'success') {
-      const m: Measurement = {
-        pool: p.leg.pool,
-        currencyIn: p.leg.currencyIn,
-        currencyOut: p.leg.currencyOut,
-        amountIn: p.leg.amountIn,
-        amountOut: outcome.amountOut,
-        ...(outcome.gasEstimate !== undefined && { gasEstimate: outcome.gasEstimate }),
-      }
-      applyMeasurement(state, { kind: 'success', m })
-      recordSuccess(state, ctx, p)
-      if (p.role.kind === 'in') inLegs.push({ x: p.role.x, amountOut: outcome.amountOut, poolId: p.leg.pool.id })
-    } else if (outcome.kind === 'reverted') {
-      applyMeasurement(state, { kind: 'reverted', key: outcome.key, pool: p.leg.pool, amountIndependent: outcome.amountIndependent })
-      // Only the amount-independent (pool-absent) shape is negative-cacheable — and `markNegative`
-      // is also what feeds the hint-discredit history (`recordQuoteFailure`) for indexed pools.
-      if (outcome.amountIndependent) ctx.index.markNegative(p.leg.pool, state.block.number)
-    } else if (outcome.kind === 'transport') {
-      applyMeasurement(state, { kind: 'transport', key: outcome.key, candidateRetry: true })
-    } else {
-      applyMeasurement(state, { kind: 'unattempted', key: outcome.key })
-    }
   }
 
-  const wrappedNative = ctx.manifest.wrappedNative
-  foldRoundInLegs(state, inLegs, wrappedNative, toGraphNode(req.tokenOut, wrappedNative))
+  if (wake === undefined) {
+    applyBatch(await measureLegs(dispatch))
+    return true
+  }
 
-  // Dirty: this cycle's outcomes may have made new legs due (a fresh m_X, a released transport
-  // loss, a leftover past the round cap) — the next cycle must plan to find out.
-  cursors.set(state, { indexVersion: state.indexVersion, selectedCount, dirty: true })
+  void measureLegs({
+    ...dispatch,
+    onOutcomes: (batch) => {
+      applyBatch(batch)
+      wake.poke()
+    },
+  })
+    // The final, index-aligned return: every outcome the seam already delivered dedupes on
+    // `applied`; anything a delivery path skipped applies here.
+    .then(applyBatch)
+    .catch(() => {
+      // The bug-containment channel (see the docstring): settle every stranded key as transport.
+      applyBatch(round.filter((p) => !applied.has(p.leg.key)).map((p) => ({ key: p.leg.key, kind: 'transport' as const })))
+    })
+    // The round is over — dry is now decidable, so the loop must look again even if the last
+    // envelope's poke already coalesced into a cycle that ran before this settled.
+    .finally(() => wake.poke())
   return true
 }
 

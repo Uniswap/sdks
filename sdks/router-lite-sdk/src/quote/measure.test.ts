@@ -2,7 +2,7 @@ import { afterEach, expect, test } from 'bun:test'
 import type { Address, Hex, PublicClient } from 'viem'
 import { encodeAbiParameters, zeroAddress } from 'viem'
 
-import { MULTICALL3_ADDRESS } from '../internal/multicall'
+import { MULTICALL3_ADDRESS, MULTICALL_CHUNK } from '../internal/multicall'
 import { createSemaphore } from '../internal/rpc'
 import {
   NOT_ENOUGH_LIQUIDITY_DATA,
@@ -384,4 +384,95 @@ test('both dispatch paths report the identical outcomes for the identical world'
 
   expect(aggregated).toEqual(perCall)
   expect(perCall.map((o) => o.kind)).toEqual(['success', 'reverted', 'reverted', 'reverted'])
+})
+
+// ---------------------------------------------------------------------------
+// The chunk-granular delivery seam (`onOutcomes`) — the measurement half of
+// the engine's granularity principle: a round's first settled group is usable
+// while the rest is still on the wire.
+// ---------------------------------------------------------------------------
+
+/** 120 legs on one v4 pool, distinguished by amount (which is the key) — enough for three
+ * MULTICALL_CHUNK groups — each stubbed to price at twice its amount. */
+function chunkFixture(): { legs: LegRequest[]; world: Record<string, StubEntry> } {
+  const legs: LegRequest[] = []
+  let world: Record<string, StubEntry> = {}
+  for (let i = 1; i <= 120; i++) {
+    legs.push(req(`k${i}`, v4UsdcWeth, USDC, WETH, BigInt(i)))
+    world = { ...world, ...entryFor(encoded(v4UsdcWeth, USDC, WETH, BigInt(i)), v4Return(BigInt(2 * i))) }
+  }
+  return { legs, world }
+}
+
+test('onOutcomes delivers each MULTICALL_CHUNK-sized group of the input exactly once — disjoint batches whose union is the index-aligned return', async () => {
+  const { legs, world } = chunkFixture()
+  // One leg whose ENCODE throws, planted in the second group: an encode-failure slot travels inside
+  // its own group's batch — settled instantly, but never delivered twice and never dropped.
+  const throwingModules: Record<Protocol, ProtocolModule> = {
+    ...modules,
+    v3: {
+      ...v3Module,
+      encodeQuote() {
+        throw new Error('encoder exploded')
+      },
+    },
+  }
+  legs[60] = req('broken', v3WethDai, WETH, DAI, 1n)
+
+  const batches: LegOutcome[][] = []
+  const outcomes = await measureLegs({
+    client: stubClient(world),
+    modules: throwingModules,
+    manifest,
+    legs,
+    blockNumber: 1n,
+    onOutcomes: (batch) => batches.push(batch),
+  })
+
+  // The return is untouched by the seam: one outcome per input leg, index-aligned.
+  expect(outcomes.map((o) => o.key)).toEqual(legs.map((l) => l.key))
+  expect(outcomes[0]).toEqual({ key: 'k1', kind: 'success', amountOut: 2n, gasEstimate: 0n })
+  expect(outcomes[60]).toEqual({ key: 'broken', kind: 'reverted', amountIndependent: true })
+
+  // Groups settle concurrently, so arrival ORDER is theirs to race — but each batch is exactly one
+  // MULTICALL_CHUNK-sized slice of the input, every slice arrives, and no key arrives twice.
+  expect(batches.map((b) => b.length).sort((a, b) => a - b)).toEqual([20, 50, 50])
+  const starts = new Set<number>()
+  for (const batch of batches) {
+    const start = legs.findIndex((l) => l.key === batch[0]!.key)
+    expect(start % MULTICALL_CHUNK).toBe(0)
+    starts.add(start)
+    expect(batch.map((o) => o.key)).toEqual(legs.slice(start, start + batch.length).map((l) => l.key))
+  }
+  expect(starts.size).toBe(3)
+})
+
+test('multicall path: each dispatch group is exactly one aggregate3 envelope, delivered as it settles', async () => {
+  const { legs, world } = chunkFixture()
+  let envelopes = 0
+  const inner = multicallStubClient(world)
+  const client: Pick<PublicClient, 'request'> = {
+    request(args: never) {
+      envelopes++
+      return inner.request(args)
+    },
+  } as unknown as Pick<PublicClient, 'request'>
+
+  const batches: LegOutcome[][] = []
+  const outcomes = await measureLegs({
+    client,
+    modules,
+    manifest,
+    legs,
+    blockNumber: 1n,
+    multicall3: MULTICALL3_ADDRESS,
+    onOutcomes: (batch) => batches.push(batch),
+  })
+
+  // 120 legs = 3 groups = 3 envelopes on the wire — the same shape the undivided round produced —
+  // and one delivery per envelope.
+  expect(envelopes).toBe(3)
+  expect(batches.length).toBe(3)
+  expect(outcomes.map((o) => o.key)).toEqual(legs.map((l) => l.key))
+  expect(new Set(batches.flat().map((o) => o.key)).size).toBe(120)
 })

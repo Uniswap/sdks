@@ -376,6 +376,11 @@ export async function* search(
     semaphore: ctx.semaphore,
     multicall3: ctx.multicall3,
     signal: sources.signal,
+    // The waker turns each measurement round detached and envelope-granular (see `pump.ts`): a
+    // 250-leg round's first envelope recomposes — and can lead — while the other envelopes are
+    // still in flight. `pumpDry` counts in-flight keys, so the gate and the termination check
+    // below still wait for the round's last answer.
+    wake,
   }
   const worker = new CoverageWorker(
     {
@@ -435,8 +440,9 @@ export async function* search(
       const best = evaluated.length > 0 ? pickLeader(evaluated, verifier?.leaderId()) : undefined
       const ranked = best === undefined ? [] : [best, ...evaluated.filter((e) => e !== best)]
 
-      // `pumpDry`'s second parameter is unused today (blessed signature): dryness is the pump
-      // cursor's own verdict, and the ctx rides along for the day planning needs it.
+      // `pumpDry`'s second parameter is unused today (blessed signature): dryness is the pump's
+      // own verdict (its cursor, plus no round in flight), and the ctx rides along for the day
+      // planning needs it.
       const dry = pumpDry(state, pumpCtx)
       // One fold per cycle, AFTER the pump/verifier writes above: it decides `progress` coalescing
       // and rides out on whichever event this cycle emits.
@@ -447,8 +453,16 @@ export async function* search(
       // already reported on the discovery axis. A failed scope therefore terminates, never spins.
       // Judged BEFORE this cycle's lead/progress emission, so a terminal cycle emits exactly one
       // event — the `final`, which carries the full ranked list anyway.
+      //
+      // AN ABORT DRAINS THE IN-FLIGHT ROUND FIRST. A detached measurement round's answers may be
+      // mid-application when the abort's poke wakes this loop; terminating on `aborted` alone
+      // would emit a final missing prices the wire already paid for — the exact best-so-far the
+      // abort contract promises to keep (and what the awaited round delivered structurally, by
+      // blocking this check until it had applied everything). Draining costs what the old await
+      // cost: the round was never cancelled by `req.signal` either way (`sources` abort only in
+      // `finally`), so the batches keep applying and poking until `inFlightKeys` empties.
       if (
-        state.aborted ||
+        (state.aborted && state.inFlightKeys.size === 0) ||
         (sources.settled() &&
           dry &&
           (verifier?.idle() ?? true) &&
@@ -491,7 +505,11 @@ export async function* search(
     // preflight is NOT cancelled here — `preflightTx` takes no AbortSignal and `Verifier.consider()`
     // has no signal seam, so threading `sources.signal` in would widen two blessed contracts for
     // one bounded `eth_call`. Its settlement writes only through `applyPreflight` and pokes a
-    // notifier nobody is awaiting any more — harmless after `final`.
+    // notifier nobody is awaiting any more — harmless after `final`. On iterator ABANDONMENT, a
+    // detached measurement round settles the same inert way (this abort turns its unsent calls
+    // into 'unattempted' outcomes, applied through `applyMeasurement` into a state nobody reads
+    // again — see `pump.ts`); on a caller's abort or normal termination it cannot, because the
+    // termination check above drained `inFlightKeys` first.
     sources.abortAll()
   }
 }

@@ -1173,3 +1173,61 @@ test('RpcUnavailableError from the pinned-block fetch propagates', async () => {
 
   expect(search(ctx, req, 'quote').next()).rejects.toThrow(RpcUnavailableError)
 })
+
+// ---------------------------------------------------------------------------
+// Envelope-cadence leads: a round bigger than one MULTICALL_CHUNK group must
+// not hold its first answers hostage to its last.
+// ---------------------------------------------------------------------------
+
+test('a two-envelope round leads at envelope cadence — the first 50 legs price and lead while the second envelope is still held on the wire', async () => {
+  const world: World = new Map()
+  const manifest = manifestOf({ v2: true })
+  const index = new PoolIndex(WETH)
+  // 60 direct pools, planned in insertion order: legs 51..60 are the round's second dispatch
+  // group. Every group-2 quote parks on a gate that never releases until the test says so — if the
+  // first lead needed the whole round, `gen.next()` would hang on the gate and the test would time
+  // out, which is exactly the regression this pins against.
+  const pools: PoolRef[] = []
+  for (let i = 0; i < 60; i++) {
+    pools.push(newPool(index, world, T_IN, T_OUT, { kind: 'price', r0: 10n ** 12n, r1: 10n ** 12n + BigInt(60 - i) * 10n ** 6n }))
+  }
+  const lateIds = new Set(pools.slice(50).map((p) => p.id))
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  let held = 0
+  const { client } = makeClient({
+    onQuote: async (key) => {
+      if (lateIds.has(key.split('|')[0]!)) {
+        held++
+        await gate
+      }
+    },
+  })
+  const ctx = ctxOf(client, manifest, world, { index })
+  const req: QuoteRequest = { tokenIn: T_IN, tokenOut: T_OUT, amountIn: 1_000_000n }
+
+  const gen = search(ctx, req, 'quote')
+  let first = await gen.next()
+  while (!first.done && first.value.type === 'progress') first = await gen.next()
+
+  // The lead arrived off the first envelope alone: every group-2 quote is still parked.
+  expect(first.value!.type).toBe('lead')
+  if (first.value!.type !== 'lead') throw new Error('unreachable')
+  expect(held).toBe(10) // group 2 really was dispatched concurrently — on the wire, not skipped
+  expect(first.value!.ranked.length).toBe(50)
+  for (const ranked of first.value!.ranked) {
+    expect(lateIds.has(ranked.route.legs[0]!.pool.id)).toBe(false)
+  }
+  // …and the group's own best leads (insertion order made pool 0 the strict maximum).
+  expect(first.value!.ranked[0]!.route.legs[0]!.pool.id).toBe(pools[0]!.id)
+
+  release()
+  const rest = await collectAll(gen)
+  const final = rest[rest.length - 1]!
+  expect(final.type).toBe('final')
+  if (final.type !== 'final') throw new Error('unreachable')
+  expect(final.state.quoting.succeeded).toBe(60) // the held envelope's answers were harvested, not lost
+  expect(final.ranked.length).toBe(60)
+})
