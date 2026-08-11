@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import type { Address, Hex, Log } from 'viem'
 import { pad } from 'viem'
 
-import { DEFAULT_REORG_OVERLAP_BLOCKS, MIN_CHUNK } from '../constants'
+import { DEFAULT_REORG_OVERLAP_BLOCKS, MIN_CHUNK, SCAN_CHUNK_CONCURRENCY } from '../constants'
 import providerErrors from '../internal/__fixtures__/providerErrors.json'
 import { v2Ref, v3Ref } from '../internal/testing'
 import { wave0PairScanBlocks } from '../manifest'
@@ -382,6 +382,34 @@ describe('demandFull — re-arming a settled run', () => {
     expect(h.index.uncovered('v4', h.index.pairScope(TOKEN_A, TOKEN_B), DEPLOY, HEAD)).toEqual([TAIL])
   })
 
+  test('a gate that opens MID-PASS is not settled against: the widened scopes are asked before any verdict', async () => {
+    // THE STALE-DEMAND RACE. The eager pair scan is refused wholesale, so its pass ends with zero
+    // progress — but the gate opened while that pass was in flight. Judging that pass's verdict
+    // against the demand it never saw marks every adjacency scope `failed` without one request, and
+    // returns on `gateOpened` having never scanned the demand it just accepted.
+    const DEPLOY = 990_000n
+    const box: { h?: Harness } = {}
+    const { client, served } = stubClient({
+      answer: ({ topics }) => {
+        if (topics[0] !== V4_TOPIC) return []
+        box.h!.worker.demandFull()
+        throw new Error(UNREACHABLE)
+      },
+    })
+    box.h = makeWorker(client, manifestWith({ deploymentBlock: DEPLOY, v4: true }))
+    const h = box.h
+
+    h.worker.demandEager()
+    await h.worker.run(h.signal)
+
+    // The adjacency scopes really were asked...
+    expect(served.some((s) => Array.isArray(s.filter.topics[0]) && s.filter.topics[0].includes(V3_TOPIC))).toBe(true)
+    for (const endpoint of [TOKEN_A, TOKEN_B]) expect(h.state.discovery.v3.complete.has(endpoint)).toBe(true)
+    expect(h.state.discovery.v3.failed).toBe(false)
+    // ...and only the scope that really was refused reports the source failure.
+    expect(h.state.discovery.v4.failed).toBe(true)
+  })
+
   test('the gate opens every scope, and a converged limit demand reports `complete` per (protocol, endpoint)', async () => {
     const { client } = stubClient({ answer: () => [] })
     const h = makeWorker(client, manifestWith({ deploymentBlock: DEPLOY, v4: true }))
@@ -555,6 +583,52 @@ describe('convergence and the report', () => {
     // a multi-second backoff ladder.
     expect(UNREACHABLE).toContain('10 block range')
     expect(10n).toBeLessThan(MIN_CHUNK)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// (d2) ABORT: the signal arrives with the LAUNCH, and it has to reach the wire.
+// ---------------------------------------------------------------------------
+
+describe('abort', () => {
+  test('an abort mid-walk stops the scan: no further requests, and the abort is never blamed on the provider', async () => {
+    // `run(signal)`'s signal is the one the SourceSet owns — an abandoned iterator, a caller's
+    // abort, a finished search. If it does not reach `scanLogs`, a search nobody is waiting on keeps
+    // walking the whole history: the full walk here is 200 requests (100 chunks x two topic slots).
+    const DEPLOY = 900_000n
+    const box: { h?: Harness } = {}
+    let requests = 0
+    let abortedAt = 0
+    const { client, served } = stubClient({
+      answer: () => {
+        requests++
+        if (requests === 2) {
+          abortedAt = requests
+          box.h!.abort()
+        }
+        return []
+      },
+    })
+    box.h = makeWorker(client, manifestWith({ deploymentBlock: DEPLOY }), {
+      modules: { v2: disabled('v2'), v3: withoutFees(v3Module), v4: disabled('v4') },
+      logChunkBlocks: 1_000n,
+    })
+    const h = box.h
+
+    h.worker.demandFull()
+    await h.worker.run(h.signal) // resolves promptly, or this test times out
+
+    expect(abortedAt).toBe(2)
+    // At most what was already in flight when the signal fired — one batch per topic-slot query.
+    expect(served.length).toBeLessThanOrEqual(abortedAt + 2 * SCAN_CHUNK_CONCURRENCY)
+    expect(served.length).toBeLessThan(20) // against 200 for the walk it would otherwise finish
+    // An abort is reported on its own axis and must never be blamed on the provider, and nothing may
+    // be claimed complete off a walk that stopped early.
+    expect(h.state.discovery.v3.failed).toBe(false)
+    expect(h.state.discovery.v3.complete.size).toBe(0)
+    // Coverage is exactly the head chunk that was already on the wire when the signal fired — the
+    // walk stopped one chunk in, and everything below it is still honestly unscanned.
+    expect(h.index.uncovered('v3', TOKEN_A, DEPLOY, HEAD)[0]).toEqual({ fromBlock: DEPLOY, toBlock: HEAD - 1_000n })
   })
 })
 

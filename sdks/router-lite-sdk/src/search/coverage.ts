@@ -407,6 +407,13 @@ export class CoverageWorker {
   private readonly reported = new Set<string>()
   /** Poked when demand widens — the only thing that re-arms a settled `run()`. */
   private readonly widened: Notifier
+  /**
+   * Bumped by every widening. A pass SNAPSHOTS it and a zero-progress pass compares before it
+   * reports: demand that widened while the pass was in flight makes that pass's verdict describe a
+   * question nobody is asking any more, and settling on it would mark every newly-demanded scope
+   * `failed` without ever having asked the provider about it.
+   */
+  private demandEpoch = 0
 
   constructor(ctx: CoverageCtx, state: SearchState, req: Pick<QuoteRequest, 'tokenIn' | 'tokenOut'>) {
     this.ctx = ctx
@@ -437,6 +444,7 @@ export class CoverageWorker {
   demandEager(): void {
     if (this.eager) return
     this.eager = true
+    this.demandEpoch++
     this.widened.poke()
   }
 
@@ -448,6 +456,7 @@ export class CoverageWorker {
   demandFull(): void {
     if (this.state.gateOpened) return
     this.state.gateOpened = true
+    this.demandEpoch++
     this.widened.poke()
   }
 
@@ -466,13 +475,25 @@ export class CoverageWorker {
    *
    * TERMINATION is structural: `attempted` only grows and is bounded by `[floor, head]`, and a pass
    * counts as progress only when it covered blocks not already in it — so the number of passes is
-   * bounded by the number of distinct block ranges the provider can hand over.
+   * bounded by the number of distinct block ranges the provider can hand over (plus one per
+   * widening, which happens at most twice).
+   *
+   * THE SIGNAL ARRIVES WITH THE LAUNCH, NOT WITH CONSTRUCTION: the worker is built when the search
+   * builds its state and launched by the `SourceSet` that owns its lifetime, so `env.signal` is set
+   * here. Without this every `env.signal?.aborted` break below, and `scanOpts`' pass-through into
+   * `scanLogs`, is dead code — an abandoned iterator would keep the whole walk going.
    */
   async run(signal: AbortSignal): Promise<void> {
+    this.env.signal = signal
     const abort = aborted(signal)
     while (!signal.aborted && !this.state.aborted) {
+      const epoch = this.demandEpoch
       if (await this.pass()) continue
       if (signal.aborted || this.state.aborted) return
+      // Demand widened mid-pass: pass again against the wider demand rather than settling on a
+      // verdict about the narrower one. Checked AFTER the abort guard, so an aborted search still
+      // reports nothing.
+      if (this.demandEpoch !== epoch) continue
       this.report()
       // Once the gate is open, demand can never widen again — nothing could wake this loop, so the
       // source is genuinely finished.
