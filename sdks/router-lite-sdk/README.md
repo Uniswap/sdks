@@ -755,17 +755,18 @@ is no filesystem access, no `process.env`, no `Buffer`, no `node:` import anywhe
 publishes, so the same build that runs on a Node server runs unmodified in a browser tab, a service
 worker, a Cloudflare Worker, or a Vercel edge function. Bundled for `target: browser` with both
 entry points imported, the whole thing — router, search engine, encoder, all five built-in manifests,
-viem included and tree-shaken — is **~154 kB minified, ~48 kB gzipped**.
+viem included and tree-shaken — is **~154 kB minified, ~49 kB gzipped**.
 
 Those two numbers are a **recorded baseline, not a constant**, and they move for two different
 reasons. They are minifier output, so a different bun prints a slightly different pair for
 byte-identical source — which is why CI pins `bun-version: 1.3.14` in the workflows that run this
-suite. And they move when the package legitimately grows: the current reading (153,725 B minified /
-48,428 B gzipped, bun 1.3.14 with viem 2.47.2) was **re-recorded on 2026-08-11**, up from
-144,433 B / 44,800 B on that same toolchain — the +3.6 kB gzipped is the event-driven search core
-replacing the staged wave engine, not drift. The baseline is re-recorded in the commit that moves
-it, deliberately; the 1.5x budget below is headroom for a minifier release, never a place to hide
-real growth. The failure worth catching is a dependency that stops tree-shaking.
+suite. And they move when the package legitimately grows: the current reading (154,357 B minified /
+48,800 B gzipped, bun 1.3.14 with viem 2.47.2) was **re-recorded on 2026-08-11**, up from
+144,433 B / 44,800 B on that same toolchain — the +4.0 kB gzipped is the event-driven search core
+replacing the staged wave engine (+3.6 kB) and the performance and abort fixes that followed it
+(+0.4 kB), not drift. The baseline is re-recorded in the commit that moves it, deliberately; the
+1.5x budget below is headroom for a minifier release, never a place to hide real growth. The failure
+worth catching is a dependency that stops tree-shaking.
 
 That is certified, not asserted: `src/browser.certification.test.ts` runs in the ordinary suite
 (`bun test`, hence in CI) and checks three things on every commit. It parses every file the two

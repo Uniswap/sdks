@@ -128,18 +128,20 @@ test('no file the package ships reads a Node-only global', () => {
 // ---------------------------------------------------------------------------
 
 /**
- * Gzipped size of the minified browser bundle of BOTH entry points: **48,428 bytes gzipped, from
- * 153,725 bytes minified** — about 48 kB over the wire for the whole router plus all five built-in
+ * Gzipped size of the minified browser bundle of BOTH entry points: **48,800 bytes gzipped, from
+ * 154,357 bytes minified** — about 49 kB over the wire for the whole router plus all five built-in
  * manifests, viem included and tree-shaken. Re-recorded 2026-08-11, on the toolchain CI pins
  * (bun 1.3.14, viem 2.47.2).
  *
- * WHY IT MOVED, AND WHY RE-RECORDING WAS THE RIGHT ANSWER. The first baseline (44,800 B from
- * 144,433 B) was measured on the *same* bun and the *same* viem, so the +3,628 B is not minifier
- * drift — it is source: the event-driven search core replaced the staged wave engine, and the loop /
- * pump / coverage / verifier / state modules are genuinely more code than `waves.ts` was. A budget
- * that quietly absorbed real growth would be a budget that stops meaning anything, so the number is
- * moved deliberately, in the commit that grew it, rather than left to accumulate against a stale
- * reading of 108%.
+ * WHY IT MOVED, AND WHY RE-RECORDING WAS THE RIGHT ANSWER. Every reading here was taken on the
+ * *same* bun and the *same* viem, so none of the movement is minifier drift — all of it is source.
+ * The first baseline (44,800 B from 144,433 B) predates the event-driven search core: replacing the
+ * staged wave engine with the loop / pump / coverage / verifier / state modules cost +3,628 B, and
+ * the performance and correctness work that followed it — chunk-granular measurement delivery, the
+ * vanguard envelope and evidence-first planning, aggregate3 bisection, and the abort that cancels
+ * the in-flight round — a further +372 B. A budget that quietly absorbed real growth would be a
+ * budget that stops meaning anything, so the number is moved deliberately, in the commit that grew
+ * it, rather than left to accumulate against a stale reading of 101%.
  *
  * The budget is 1.5x, not a tight pin, ON PURPOSE. Minifier output moves with the bun version (CI
  * and a laptop are rarely on the same one) and a legitimate feature costs a few kB; neither should
@@ -148,7 +150,7 @@ test('no file the package ships reads a Node-only global', () => {
  * polyfills) and takes the bundle from tens of kB to hundreds in one line. Re-record this constant
  * when a change legitimately moves the real number — never widen `SIZE_BUDGET` to make room for one.
  */
-const BASELINE_GZIP_BYTES = 48_428
+const BASELINE_GZIP_BYTES = 48_800
 const SIZE_BUDGET = 1.5
 
 /**
