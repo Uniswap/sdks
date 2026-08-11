@@ -23,7 +23,7 @@ import type {
 } from '../types'
 import { PROTOCOLS } from '../types'
 
-import type { Measurement, SearchState } from './state'
+import type { LegDirection, Measurement, SearchState } from './state'
 import { applyMeasurement, legKey } from './state'
 
 // ---------------------------------------------------------------------------
@@ -340,6 +340,81 @@ function recordSuccess(state: SearchState, ctx: PumpCtx, planned: PlannedLeg): v
   state.indexVersion++
 }
 
+// ---------------------------------------------------------------------------
+// The m_X round-fold — SHARED with golden replay
+// ---------------------------------------------------------------------------
+
+/** One round's successful in-leg: which intermediate it reached, with how much, through which pool. */
+export type RoundInLeg = { x: string; amountOut: bigint; poolId: string }
+
+/** The `SearchState` fields the round-fold writes — structural, so `internal/outcomeLog.ts` can fold a
+ * replayed ledger with the same function that folds a live round. */
+type MXLedger = Pick<SearchState, 'mX' | 'measurements' | 'measuredKeys'>
+
+/**
+ * Folds ONE round's in-leg answers into `m_X` and invalidates whatever the improvement outdated —
+ * the composition step's entire amount policy, in one function.
+ *
+ *   - BEST PER X, first-occurring strict maximum: a tie is won by the leg that answered first, and an
+ *     incumbent `m_X` is only displaced by a strictly better one.
+ *   - A better `m_X` OUTDATES every out-leg priced at the old one. They were exact answers to a
+ *     question no route asks any more, so they leave the ledger and re-plan at the new amount.
+ *     Counters stay put — they count dispatches, which happened.
+ *
+ * WHY IT IS EXPORTED. `internal/outcomeLog.ts` replays a recorded outcome log through the same
+ * `apply*` functions a live search used, and it has to fold `m_X` exactly as `pump()` does or the
+ * composition it verifies is not the composition that ran. Held as a second copy there, a change to
+ * this policy would leave the fold on the old rule — and every committed golden would stay green
+ * while production composed differently, with the drift surfacing only at the next re-record. That is
+ * precisely the blind spot the goldens exist to close, so there is one implementation and both call
+ * it.
+ */
+export function foldRoundInLegs(state: MXLedger, round: Iterable<RoundInLeg>, wrappedNative: Address, outNode: string): void {
+  const bestIn = new Map<string, { amount: bigint; fromPoolId: string }>()
+  for (const leg of round) {
+    const current = bestIn.get(leg.x)
+    if (current === undefined || leg.amountOut > current.amount) bestIn.set(leg.x, { amount: leg.amountOut, fromPoolId: leg.poolId })
+  }
+
+  for (const [x, candidate] of bestIn) {
+    const current = state.mX.get(x)
+    if (current !== undefined && candidate.amount <= current.amount) continue
+    state.mX.set(x, candidate)
+    for (const [key, m] of [...state.measurements]) {
+      if (m.amountIn === candidate.amount) continue // already at the new amount — still exact
+      if (toGraphNode(m.currencyIn, wrappedNative) !== x || toGraphNode(m.currencyOut, wrappedNative) !== outNode) continue
+      state.measurements.delete(key)
+      state.measuredKeys.delete(key)
+    }
+  }
+}
+
+/**
+ * The intermediate a measured leg is an IN-LEG for, or `undefined` when it is not one — read off the
+ * leg's own DIRECTION rather than off the planner's role.
+ *
+ * THE STRUCTURAL INVERSE OF `planDueLegs`' ROLE ASSIGNMENT, and equal to it by construction:
+ *
+ *   - an in-leg is planned as `planPair(tokenIn, x, inNode, …)`, so it is oriented out of `inNode`
+ *     and its far side IS `x` — and the frontier loop skips `x === outNode`, so `to !== outNode`;
+ *   - a direct leg runs `inNode -> outNode`, which this rejects on the second test;
+ *   - an out-leg is planned as `planPair(x, tokenOut, x, …)` and the same loop skips `x === inNode`,
+ *     so it never leaves `inNode` and this rejects it on the first.
+ *
+ * The three role kinds are therefore disjoint under this rule, with no leg that is both. It exists
+ * because a recorded outcome carries a `Measurement` — pool, direction, amounts — and not the
+ * planner's `role`: the role is a fact about why a leg was DISPATCHED, which `applyMeasurement`'s
+ * vocabulary deliberately has no slot for. Widening that vocabulary to carry it would put a planning
+ * detail in the single-writer seam every source reports through, for one consumer's benefit.
+ * `pump.test.ts` pins the equivalence against real planned legs instead, so a change to the role
+ * assignment fails there rather than silently in a fold.
+ */
+export function inLegIntermediate(leg: LegDirection, wrappedNative: Address, inNode: string, outNode: string): string | undefined {
+  const from = toGraphNode(leg.currencyIn, wrappedNative)
+  const to = toGraphNode(leg.currencyOut, wrappedNative)
+  return from === inNode && to !== outNode ? to : undefined
+}
+
 /**
  * One pump cycle: plan due legs over current knowledge, dispatch at most PUMP_ROUND_CAP of them as
  * one `measureLegs` round, apply the outcomes, and fold new in-leg answers into `m_X` (invalidating
@@ -385,7 +460,7 @@ export async function pump(state: SearchState, ctx: PumpCtx, req: QuoteRequest):
 
   // Apply every outcome first, then fold m_X once: an out-leg and the in-leg that outdates it can
   // land in one round, and the fold must see the round's complete picture before it invalidates.
-  const bestIn = new Map<string, { amount: bigint; fromPoolId: string }>()
+  const inLegs: RoundInLeg[] = []
   for (const outcome of outcomes) {
     const p = byKey.get(outcome.key)!
     if (outcome.kind === 'success') {
@@ -399,12 +474,7 @@ export async function pump(state: SearchState, ctx: PumpCtx, req: QuoteRequest):
       }
       applyMeasurement(state, { kind: 'success', m })
       recordSuccess(state, ctx, p)
-      if (p.role.kind === 'in') {
-        const current = bestIn.get(p.role.x)
-        if (current === undefined || outcome.amountOut > current.amount) {
-          bestIn.set(p.role.x, { amount: outcome.amountOut, fromPoolId: p.leg.pool.id })
-        }
-      }
+      if (p.role.kind === 'in') inLegs.push({ x: p.role.x, amountOut: outcome.amountOut, poolId: p.leg.pool.id })
     } else if (outcome.kind === 'reverted') {
       applyMeasurement(state, { kind: 'reverted', key: outcome.key, pool: p.leg.pool, amountIndependent: outcome.amountIndependent })
       // Only the amount-independent (pool-absent) shape is negative-cacheable — and `markNegative`
@@ -418,20 +488,7 @@ export async function pump(state: SearchState, ctx: PumpCtx, req: QuoteRequest):
   }
 
   const wrappedNative = ctx.manifest.wrappedNative
-  const outNode = toGraphNode(req.tokenOut, wrappedNative)
-  for (const [x, candidate] of bestIn) {
-    const current = state.mX.get(x)
-    if (current !== undefined && candidate.amount <= current.amount) continue
-    state.mX.set(x, candidate)
-    // A better in-leg outdates every out-leg priced at the old m_X: delete them from the ledger so
-    // they re-plan at the new amount. Counters stay — they count dispatches, which happened.
-    for (const [key, m] of [...state.measurements]) {
-      if (m.amountIn === candidate.amount) continue // already at the new amount — still exact
-      if (toGraphNode(m.currencyIn, wrappedNative) !== x || toGraphNode(m.currencyOut, wrappedNative) !== outNode) continue
-      state.measurements.delete(key)
-      state.measuredKeys.delete(key)
-    }
-  }
+  foldRoundInLegs(state, inLegs, wrappedNative, toGraphNode(req.tokenOut, wrappedNative))
 
   // Dirty: this cycle's outcomes may have made new legs due (a fresh m_X, a released transport
   // loss, a leftover past the round cap) — the next cycle must plan to find out.

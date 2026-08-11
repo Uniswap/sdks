@@ -7,11 +7,11 @@ import { PROTOCOL_MODULES, routeId } from '../protocols'
 import { classifyQuote, classifySwap, foldEvent } from '../router'
 import { search } from '../search/loop'
 import type { EngineEvent, SearchContext } from '../search/loop'
-import { composeRoutes } from '../search/pump'
-import type { PumpCtx } from '../search/pump'
+import { composeRoutes, foldRoundInLegs, inLegIntermediate } from '../search/pump'
+import type { PumpCtx, RoundInLeg } from '../search/pump'
 import { buildReport } from '../search/report'
 import { applyAbort, applyCoverage, applyMeasurement, applyPreflight, applyReadiness, createState } from '../search/state'
-import type { Measurement, OutcomeEntry, SearchState } from '../search/state'
+import type { OutcomeEntry, SearchState } from '../search/state'
 import { compileAndEncode, pickLeader, withExecution } from '../search/verifier'
 import type {
   BlockRef,
@@ -366,19 +366,24 @@ const NO_CLIENT = {
 
 /**
  * Rebuilds the search's knowledge by pushing every recorded outcome back through the real `apply*`,
- * and re-derives `m_X` — the best in-leg per intermediate — as `pump.ts` does.
+ * and re-derives `m_X` — the best in-leg per intermediate — with `pump.ts`'s OWN round-fold.
  *
  * WHY `m_X` IS RE-DERIVED RATHER THAN RECORDED. It is not state a source reports; it is the pump's
  * own fold over the measurements it has, so recording it would put a derived quantity in a fixture
  * and let a composition regression be papered over by a golden that already knew the answer.
  *
- * WHY THE RE-DERIVATION IS EXACT. `pump()` applies a whole round's outcomes and then folds `m_X`
- * once, taking the round's best in-leg per X and keeping it only if it strictly beats the incumbent.
- * A round's outcomes are applied in one synchronous loop, so a round's entries are CONTIGUOUS in the
- * log; this walk flushes at every non-measurement entry and at the end. Two adjacent rounds with
- * nothing between them therefore fold as one block — which lands on the same answer, because
- * "first-occurring strict maximum" is what both a per-round fold and a merged fold select, and the
- * stale-out-leg invalidation that follows is monotone: it deletes exactly the out-legs priced at an
+ * NOTHING ABOUT THAT FOLD IS RE-IMPLEMENTED HERE. Both halves come from `pump.ts`:
+ * {@link foldRoundInLegs} is the amount policy (best-per-X, strict improvement, stale-out-leg
+ * invalidation) and {@link inLegIntermediate} is the role derivation. A private copy of either would
+ * mean a pump policy change leaving this fold on the old rule — every committed golden staying green
+ * while production composed differently, with the drift surfacing only at the next re-record.
+ *
+ * WHAT THIS FILE STILL OWNS IS THE ROUND BOUNDARY, and it is part of the fixture contract: `pump()`
+ * applies a whole round's outcomes in one synchronous loop and folds once afterwards, so a round's
+ * entries are CONTIGUOUS in the log. This walk therefore flushes at every non-measurement entry and
+ * at the end. Two adjacent rounds with nothing logged between them fold as one block — which lands on
+ * the same answer, because "first-occurring strict maximum" is what a per-round fold and a merged
+ * fold both select, and the invalidation is monotone: it deletes exactly the out-legs priced at an
  * amount that is no longer `m_X`, whether that is decided once or twice on the way there.
  *
  * The invalidation is replayed rather than skipped because it is observable in the REPORT: a deleted
@@ -389,38 +394,26 @@ function replayEntries(state: SearchState, entries: OutcomeEntry[], manifest: Ch
   const inNode = toGraphNode(req.tokenIn, wrappedNative)
   const outNode = toGraphNode(req.tokenOut, wrappedNative)
 
-  let block: Measurement[] = []
+  let round: RoundInLeg[] = []
   const flush = (): void => {
-    if (block.length === 0) return
-    const bestIn = new Map<string, { amount: bigint; fromPoolId: string }>()
-    for (const m of block) {
-      const from = toGraphNode(m.currencyIn, wrappedNative)
-      const to = toGraphNode(m.currencyOut, wrappedNative)
-      if (from !== inNode || to === outNode) continue
-      const current = bestIn.get(to)
-      if (current === undefined || m.amountOut > current.amount) bestIn.set(to, { amount: m.amountOut, fromPoolId: m.pool.id })
-    }
-    block = []
-    for (const [x, candidate] of bestIn) {
-      const current = state.mX.get(x)
-      if (current !== undefined && candidate.amount <= current.amount) continue
-      state.mX.set(x, candidate)
-      for (const [key, m] of [...state.measurements]) {
-        if (m.amountIn === candidate.amount) continue
-        if (toGraphNode(m.currencyIn, wrappedNative) !== x || toGraphNode(m.currencyOut, wrappedNative) !== outNode) continue
-        state.measurements.delete(key)
-        state.measuredKeys.delete(key)
-      }
-    }
+    if (round.length === 0) return
+    const batch = round
+    round = []
+    foldRoundInLegs(state, batch, wrappedNative, outNode)
   }
 
   for (const entry of entries) {
     if (entry.t !== 'measurement') flush()
     switch (entry.t) {
-      case 'measurement':
+      case 'measurement': {
         applyMeasurement(state, entry.o)
-        if (entry.o.kind === 'success') block.push(entry.o.m)
+        if (entry.o.kind === 'success') {
+          const m = entry.o.m
+          const x = inLegIntermediate(m, wrappedNative, inNode, outNode)
+          if (x !== undefined) round.push({ x, amountOut: m.amountOut, poolId: m.pool.id })
+        }
         break
+      }
       case 'coverage':
         applyCoverage(state, entry.p, entry.endpoint, entry.o)
         break

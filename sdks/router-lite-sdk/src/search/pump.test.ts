@@ -5,6 +5,7 @@ import { zeroHash } from 'viem'
 
 import { HINT_DISCREDIT_FAILURE_BLOCKS, MEASUREMENT_PAIR_CEILING, PUMP_ROUND_CAP } from '../constants'
 import { TransportError } from '../errors'
+import { toGraphNode } from '../internal/currency'
 import { createSemaphore } from '../internal/rpc'
 import { NOT_ENOUGH_LIQUIDITY_DATA, v2Ref, v4Ref } from '../internal/testing'
 import { MAINNET_MANIFEST } from '../manifest'
@@ -26,7 +27,7 @@ import type {
 
 import { buildHookData } from './hookData'
 import type { PlannedLeg, PumpCtx } from './pump'
-import { composeRoutes, orderedIntermediates, planDueLegs, pump, pumpDry } from './pump'
+import { composeRoutes, inLegIntermediate, orderedIntermediates, planDueLegs, pump, pumpDry } from './pump'
 import type { SearchState } from './state'
 import { createState, legKey } from './state'
 
@@ -311,6 +312,67 @@ test('legs keep the currency FORM of their own pool: a native v4 pool plans a na
     expect(p.leg.currencyIn).toBe('native')
     expect(p.leg.pool.currencies[0]).toBe('native') // v4 spells native as address(0) -> domain 'native'
     expect(p.leg.key).toBe(legKey(p.leg.pool.id, 'native', 5n))
+  }
+})
+
+// ---------------------------------------------------------------------------
+// The role derivation, pinned against the planner that assigns roles.
+//
+// `inLegIntermediate` reads a leg's role off its DIRECTION, because a recorded
+// outcome carries a `Measurement` and not the planner's `role` — the role says
+// why a leg was dispatched, which `applyMeasurement`'s single-writer vocabulary
+// deliberately has no slot for. `internal/outcomeLog.ts`'s fold depends on the
+// two agreeing exactly: a leg the planner called an in-leg that the derivation
+// calls anything else would drop out of the `m_X` fold, and a route composed
+// against the wrong `m_X` is a wrong number in a golden nothing else would
+// catch. So the equivalence is asserted here, against legs the REAL planner
+// produced, rather than argued in a comment next to the fold.
+// ---------------------------------------------------------------------------
+
+test('the fold\'s role derivation agrees with the planner on every planned leg, across all three roles', () => {
+  const { state, ctx, req, world, index } = fakeSetup()
+  const x = X_TOKENS[0]!
+  const priced: Fate = { kind: 'price', r0: 10n ** 9n, r1: 10n ** 9n }
+  newPool(index, world, T_IN, T_OUT, priced) // direct
+  newPool(index, world, T_IN, x, priced) // in-leg for x
+  newPool(index, world, x, T_OUT, priced) // out-leg for x
+  state.intermediates.selected = [x]
+  state.mX.set(x, { amount: 777n, fromPoolId: 'whatever' }) // makes the out-leg due
+
+  const planned = planDueLegs(state, ctx, req)
+  const inNode = toGraphNode(req.tokenIn, WN)
+  const outNode = toGraphNode(req.tokenOut, WN)
+
+  // Without all three kinds present the equivalence below would hold vacuously.
+  expect(new Set(planned.map((p) => p.role.kind))).toEqual(new Set(['direct', 'in', 'out']))
+
+  for (const p of planned) {
+    const derived = inLegIntermediate(p.leg, WN, inNode, outNode)
+    expect(
+      derived !== undefined,
+      `${p.leg.pool.id}: planner says role '${p.role.kind}', the derivation says ${derived === undefined ? 'not an in-leg' : `in-leg for ${derived}`}`,
+    ).toBe(p.role.kind === 'in')
+    if (p.role.kind === 'in') expect(derived).toBe(p.role.x)
+  }
+})
+
+test("the role derivation survives a native endpoint, where a leg's currency FORM is not its graph node", () => {
+  // The case a comparison against `req.tokenIn` rather than against its graph node would get wrong:
+  // a v4 pool on a native pair plans legs whose `currencyIn` is the string 'native', while the
+  // request's in-node is the wrapped-native ADDRESS. Every leg here is direct, so every one of them
+  // must derive as "not an in-leg" — the arm that would otherwise fold direct legs into `m_X`.
+  const ctx = realCtx(V4_ONLY)
+  const state = createState(BLOCK, false)
+  const wn = V4_ONLY.wrappedNative
+  const req: QuoteRequest = { tokenIn: 'native', tokenOut: USDC, amountIn: 5n }
+
+  const planned = planDueLegs(state, ctx, req)
+
+  expect(planned.length).toBeGreaterThan(0)
+  expect(planned.every((p) => p.leg.currencyIn === 'native')).toBe(true) // the form really does differ
+  for (const p of planned) {
+    expect(p.role.kind).toBe('direct')
+    expect(inLegIntermediate(p.leg, wn, toGraphNode(req.tokenIn, wn), toGraphNode(req.tokenOut, wn))).toBeUndefined()
   }
 })
 
