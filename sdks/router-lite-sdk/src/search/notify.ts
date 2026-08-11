@@ -56,7 +56,19 @@ export class SourceSet {
 
   launch(name: string, run: (signal: AbortSignal) => Promise<void>): void {
     this.launched++
-    run(this.signal)
+    // `run` is called synchronously — a source's first request goes out on the caller's own stack —
+    // so a `run` that throws BEFORE its first await would otherwise escape `launch` and crash the
+    // loop mid-setup. It settles exactly like an async rejection instead: recorded, counted, woken.
+    let running: Promise<void>
+    try {
+      running = run(this.signal)
+    } catch (error) {
+      this.errors.push({ name, error })
+      this.finished++
+      this.wake.poke()
+      return
+    }
+    running
       .catch((error: unknown) => {
         this.errors.push({ name, error })
       })

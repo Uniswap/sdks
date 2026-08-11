@@ -126,6 +126,25 @@ test('a rejecting source lands in failures(), never rethrown, never an unhandled
   }
 })
 
+test('a synchronously-throwing run() is recorded as a failure, counted settled, and pokes', async () => {
+  const notifier = createNotifier()
+  const set = new SourceSet(notifier)
+  const boom = new Error('threw before the first await')
+
+  // `launch` must stay a synchronous start (a source's first request goes out on the caller's own
+  // stack), so a `run` that throws BEFORE its first await cannot be allowed to escape `launch` —
+  // it settles exactly like an async rejection: recorded, counted, woken.
+  expect(() =>
+    set.launch('sync-boom', () => {
+      throw boom
+    }),
+  ).not.toThrow()
+
+  expect(set.settled()).toBe(true)
+  expect(set.failures()).toEqual([{ name: 'sync-boom', error: boom }])
+  await notifier.next() // the poke was latched — a pending next() resolves without another poke
+})
+
 test('settled() is false while any launched source is still running', async () => {
   const notifier = createNotifier()
   const set = new SourceSet(notifier)

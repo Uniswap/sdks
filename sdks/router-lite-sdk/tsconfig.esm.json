@@ -15,6 +15,7 @@
     // in-flight event-core modules — unwired until the loop lands (see docs/superpowers/plans/2026-08-10-event-driven-search-core.md Task 9)
     "src/search/notify.ts",
     "src/search/state.ts",
-    "src/search/pump.ts"
+    "src/search/pump.ts",
+    "src/search/loop.ts"
   ]
 }
