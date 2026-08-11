@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import type { Address, Hex, Log, PublicClient } from 'viem'
-import { decodeFunctionData, encodeAbiParameters, encodeEventTopics, toHex, zeroAddress } from 'viem'
+import { decodeFunctionData, encodeAbiParameters, encodeEventTopics, encodeFunctionData, toHex, zeroAddress } from 'viem'
 
 import {
   MAX_DEADLINE_SECONDS,
@@ -11,7 +11,7 @@ import {
   UR_MSG_SENDER,
 } from './constants'
 import { RouterConfigError } from './errors'
-import { MULTICALL3_ABI, V2_FACTORY_ABI } from './internal/abis'
+import { MULTICALL3_ABI, V2_FACTORY_ABI, V3_FACTORY_ABI } from './internal/abis'
 import { sortAddresses } from './internal/currency'
 import { MULTICALL3_ADDRESS } from './internal/multicall'
 import {
@@ -31,6 +31,8 @@ import {
   TRADER,
   UNIVERSAL_ROUTER,
   V2_FACTORY,
+  V3_FACTORY,
+  V3_QUOTER,
   V4_POOL_MANAGER,
   v2Return,
   v4Return,
@@ -43,11 +45,13 @@ import {
   serveAggregate3,
   takeStubViolations,
   v2Ref,
+  v3Ref,
   v4Ref,
 } from './internal/testing'
 import { manifestFor } from './manifest'
 import { isDiscredited, PoolIndex } from './pools/poolIndex'
 import { computeV2PairAddress, v2Module } from './protocols/v2'
+import { computeV3PoolAddress, v3Module } from './protocols/v3'
 import { v4Module } from './protocols/v4'
 import { createRouter } from './router'
 import type { Router } from './router'
@@ -120,6 +124,34 @@ function pairCreatedLog(manifest: ChainManifest, a: Address, b: Address, blockNu
     data: encodeAbiParameters([{ type: 'address' }, { type: 'uint256' }], [pair, 1n]),
     blockNumber,
   } as unknown as Log<bigint, number, false>
+}
+
+/** A real `PoolCreated` log for (a, b, fee) at `manifest`'s v3 factory — decodable by
+ * `v3Module.parsePoolLog`. `pool` is a free parameter on purpose: the factory event carries the
+ * deployed address, and nothing downstream re-derives it. */
+function poolCreatedLog(
+  manifest: ChainManifest,
+  a: Address,
+  b: Address,
+  fee: number,
+  pool: Address,
+  blockNumber: bigint,
+): Log<bigint, number, false> {
+  const [token0, token1] = sortAddresses(a, b)
+  return {
+    address: manifest.v3!.factory,
+    topics: encodeEventTopics({ abi: V3_FACTORY_ABI, eventName: 'PoolCreated', args: { token0, token1, fee } }),
+    data: encodeAbiParameters([{ type: 'int24' }, { type: 'address' }], [60, pool]),
+    blockNumber,
+  } as unknown as Log<bigint, number, false>
+}
+
+/** QuoterV2's four-word `quoteExactInput` return, with the gas word set. */
+function v3Return(amountOut: bigint, gasEstimate = 90_000n): Hex {
+  return encodeAbiParameters(
+    [{ type: 'uint256' }, { type: 'uint160[]' }, { type: 'uint32[]' }, { type: 'uint256' }],
+    [amountOut, [0n], [0], gasEstimate],
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -1202,6 +1234,105 @@ test('ingestLogs survives malformed entries: every valid log is still indexed, n
   assertResultCoherent(res)
 })
 
+test("a v3 PoolCreated log ingested through the facade makes an otherwise-unguessable pool routable", async () => {
+  // v3's `parsePoolLog` is reachable ONLY through `ingestLogs`/`ingestReceipt` — the coverage
+  // worker's adjacency pass goes through the shared `protocols/adjacency.ts` shape, so nothing else
+  // in this package ever calls it. The pool below sits on fee tier 250, which
+  // `v3Module.hypotheses` does not speculate on (`STANDARD_V3_FEES` is 100/500/3000/10000) and no
+  // `FeeAmountEnabled` log enables here, so the decoded event is the only thing that can put it in
+  // the index — and the only quote call the stub answers is that tier's.
+  const manifest = baseManifest({ v2Block: BLOCK_NUMBER - 500n, v3: true, v4: false })
+  const FEE = 250
+  const pool = v3Ref(computeV3PoolAddress(V3_FACTORY, TOKEN_A, TOKEN_B, FEE), TOKEN_A, TOKEN_B, FEE)
+  const quoteCall = v3Module.encodeQuote([{ pool, currencyIn: TOKEN_A, currencyOut: TOKEN_B }], AMOUNT_IN, manifest).call
+  expect(quoteCall.to.toLowerCase()).toBe(V3_QUOTER.toLowerCase())
+
+  const { client } = stubClient({ calls: { ...entryFor(quoteCall, v3Return(4242n)) } })
+  const router = createRouter({ client, manifest })
+
+  // The valid log sits LAST in a batch that leads with two entries v3's parser must skip: one from
+  // the right factory whose topics cannot be decoded as `PoolCreated`, and one hole. A batch that
+  // aborts on the first bad entry never reaches the log this test is about.
+  router.ingestLogs([
+    { address: manifest.v3!.factory, topics: [], data: '0x' },
+    null,
+    poolCreatedLog(manifest, TOKEN_A, TOKEN_B, FEE, pool.address, manifest.v3!.deploymentBlock + 5n),
+  ] as unknown as Log[])
+  expect(router.stats().pools).toBe(1) // exactly the one valid entry — the junk was skipped, not indexed
+
+  const res = await router.getQuote({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN })
+
+  expect(res.status).toBe('quote')
+  if (res.status !== 'quote') throw new Error('unreachable')
+  expect(res.best.route.legs).toHaveLength(1)
+  expect(res.best.route.legs[0]!.pool.id).toBe(pool.id)
+  expect(res.best.route.legs[0]!.pool.protocol).toBe('v3')
+  expect(res.best.quote.amountOut).toBe(4242n)
+  assertResultCoherent(res)
+})
+
+test("ingestPool validates a v3 hint over the router's own semaphore-gated eth_call at 'latest'", async () => {
+  // The OTHER door a caller-composed hint comes through, and the only caller of `ethCallLatest`.
+  // Two things are being pinned at once, because they are the two things that door owes the rest of
+  // the router: the validated record really lands in the long-lived index, and the round trip it
+  // costs is ordinary request traffic — block tag `latest` (ingestion has no pinned search block of
+  // its own) and counted against `concurrency` like everything else this router issues.
+  const manifest = baseManifest({ v2Block: BLOCK_NUMBER - 500n, v3: true, v4: false })
+  const FEE = 250
+  const hints: PoolHint[] = [
+    { protocol: 'v3', token0: TOKEN_A, token1: TOKEN_B, fee: FEE },
+    { protocol: 'v3', token0: TOKEN_A, token1: MID, fee: FEE },
+  ]
+  const getPoolCall = (a: Address, b: Address): { to: Address; data: Hex } => ({
+    to: V3_FACTORY,
+    data: encodeFunctionData({ abi: V3_FACTORY_ABI, functionName: 'getPool', args: [a, b, FEE] }),
+  })
+  const addressOf = (a: Address, b: Address): Address => computeV3PoolAddress(V3_FACTORY, a, b, FEE)
+  const { client: base } = stubClient({
+    calls: {
+      ...entryFor(getPoolCall(TOKEN_A, TOKEN_B), encodeAbiParameters([{ type: 'address' }], [addressOf(TOKEN_A, TOKEN_B)])),
+      ...entryFor(getPoolCall(TOKEN_A, MID), encodeAbiParameters([{ type: 'address' }], [addressOf(TOKEN_A, MID)])),
+    },
+  })
+
+  const blockTags: unknown[] = []
+  let inFlight = 0
+  let peak = 0
+  const client = {
+    ...base,
+    async request(args: { method: string; params: unknown[] }) {
+      if (args.method !== 'eth_call') return (base.request as (a: unknown) => Promise<unknown>)(args)
+      blockTags.push(args.params[1])
+      inFlight++
+      peak = Math.max(peak, inFlight)
+      try {
+        // A macrotask on the wire: without it both calls would settle synchronously and a peak of 1
+        // would say nothing about the semaphore.
+        await new Promise<void>((resolve) => setTimeout(resolve, 0))
+        return await (base.request as (a: unknown) => Promise<unknown>)(args)
+      } finally {
+        inFlight--
+      }
+    },
+  } as unknown as PublicClient
+
+  const router = createRouter({ client, manifest, concurrency: 1 })
+  await Promise.all(hints.map((hint) => router.ingestPool(hint)))
+
+  expect(router.stats().pools).toBe(2) // both validated records were upserted
+  expect(blockTags).toEqual(['latest', 'latest']) // never the pinned block — ingestion has none
+  expect(peak).toBe(1) // `concurrency: 1` really bound it: the second call waited for the first
+
+  // The control: a hint the factory says does not exist (`getPool` -> address(0)) is validated away
+  // rather than trusted, so nothing new enters the index.
+  const { client: denying } = stubClient({
+    calls: { ...entryFor(getPoolCall(TOKEN_B, MID), encodeAbiParameters([{ type: 'address' }], [zeroAddress])) },
+  })
+  const strict = createRouter({ client: denying, manifest })
+  await strict.ingestPool({ protocol: 'v3', token0: TOKEN_B, token1: MID, fee: FEE })
+  expect(strict.stats().pools).toBe(0)
+})
+
 test('a quote whose amountOut cannot be real (>= 2^127) is rejected at decode: the search falls through to the next candidate (C4-H4)', async () => {
   // `amountIn` is bounded below 2^128 by validation, but `amountOut` comes from the chain — a
   // hostile/broken quoter or a hooked pool can answer with an absurd number (a RETURNS_DELTA hook's
@@ -1385,6 +1516,88 @@ describe('hookData (request-scoped, keyed by lowercased poolId)', () => {
     if (second.status === 'quote') expect(second.best.route.legs[0]!.hookData).toBeUndefined()
     assertResultCoherent(second)
   })
+})
+
+test('abandoning router.quotes() after the first lead stops the wire — the break reaches the engine through the facade', async () => {
+  // `loop.test.ts` pins iterator abandonment on the ENGINE's generator. This is the same contract
+  // one layer up, where it is a different claim: `quotes()` is a `streamEvents` wrapper around that
+  // generator, so a `break` here only stops anything if the wrapper's own `for await` propagates
+  // `return()` down to the engine (an `events.push(...)`-then-replay shape, or a wrapper that
+  // buffered the engine into an array, would keep the whole search running past the consumer's exit
+  // while every existing facade test — all of which drain to `final` — stayed green).
+  const V2_BLOCK = BLOCK_NUMBER - 30_000n
+  const manifest = baseManifest({ v2Block: V2_BLOCK, v4: false })
+  const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+  const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
+
+  const hop = (from: Address, to: Address, reserveIn: bigint, reserveOut: bigint): Record<string, Hex> =>
+    entryFor(
+      directProbes(v2Module, from, to, AMOUNT_IN, manifest)[0]!.quote.call,
+      v2Return(reserveIn, reserveOut, sortAddresses(from, to)[0]!.toLowerCase() === from.toLowerCase()),
+    )
+
+  /** A fresh router over the same world, plus a counter for EVERY request it puts on the wire. */
+  const world = (): { client: PublicClient; requests: () => number } => {
+    const { client: scripted } = stubClient({
+      calls: {
+        // The direct pair prices badly but immediately — the first lead, before the gate opens.
+        ...entryFor(probe!.quote.call, v2Return(2n * 10n ** 24n, 10n ** 24n, token0.toLowerCase() === TOKEN_A.toLowerCase())),
+        // ...and a strictly better two-hop waits behind the adjacency walk the gate would open.
+        ...hop(TOKEN_A, MID, 10n ** 24n, 2n * 10n ** 24n),
+        ...hop(MID, TOKEN_B, 10n ** 24n, 10n ** 24n),
+      },
+      logs: (endpoint) =>
+        endpoint === TOKEN_A.toLowerCase()
+          ? [pairCreatedLog(manifest, TOKEN_A, MID, V2_BLOCK + 1n)]
+          : endpoint === TOKEN_B.toLowerCase()
+            ? [pairCreatedLog(manifest, MID, TOKEN_B, V2_BLOCK + 1n)]
+            : [],
+    })
+    let requests = 0
+    const client = {
+      ...scripted,
+      async request(args: { method: string }) {
+        requests++
+        // Every log chunk costs a macrotask, so the walk cannot outrun the abandonment.
+        if (args.method === 'eth_getLogs') await new Promise<void>((resolve) => setTimeout(resolve, 0))
+        return (scripted.request as (a: unknown) => Promise<unknown>)(args)
+      },
+    } as unknown as PublicClient
+    return { client, requests: () => requests }
+  }
+
+  const settle = async (): Promise<void> => {
+    for (let i = 0; i < 40; i++) await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  }
+  const req: QuoteRequest = { tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN }
+  const opts = { manifest, logChunkBlocks: 128n } // ~235 chunks per endpoint over the 30k window
+
+  const abandoned = world()
+  let led = false
+  for await (const e of createRouter({ client: abandoned.client, ...opts }).quotes(req)) {
+    if (e.type === 'lead') {
+      led = true
+      break
+    }
+    if (e.type === 'final') throw new Error('the search finalized before it ever led')
+  }
+  expect(led).toBe(true)
+
+  await settle()
+  const atRest = abandoned.requests()
+  await settle()
+  expect(abandoned.requests()).toBe(atRest) // nothing new goes out once whatever was dispatched lands
+
+  // The control, and the only thing that makes the number above mean anything: the same world
+  // consumed to `final` walks the whole adjacency history and finds the better route.
+  const drained = world()
+  const events = []
+  for await (const e of createRouter({ client: drained.client, ...opts }).quotes(req)) events.push(e)
+  const final = events.at(-1)!
+  expect(final.type).toBe('final')
+  if (final.type === 'progress' || final.result.status !== 'quote') throw new Error('unreachable')
+  expect(final.result.best.route.legs).toHaveLength(2) // the scans really did have something to add
+  expect(atRest).toBeLessThan(drained.requests() / 2) // ...and the abandoned run paid for none of it
 })
 
 test('a hint discredited by two real searches is restored by a creation log ingested MID-SEARCH, and prices again after', async () => {

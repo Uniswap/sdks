@@ -39,6 +39,8 @@ export const PERMIT2 = `0x${'33'.repeat(20)}` as Address
 export const V2_FACTORY = `0x${'44'.repeat(20)}` as Address
 export const V4_POOL_MANAGER = `0x${'55'.repeat(20)}` as Address
 export const V4_QUOTER = `0x${'66'.repeat(20)}` as Address
+export const V3_FACTORY = `0x${'77'.repeat(20)}` as Address
+export const V3_QUOTER = `0x${'88'.repeat(20)}` as Address
 
 export const CHAIN_ID = 1
 export const BLOCK_NUMBER = 1_000_000n
@@ -46,7 +48,14 @@ export const BLOCK_TIMESTAMP = 1_700_000_000n
 export const BLOCK_HASH = `0x${'ab'.repeat(32)}` as Hex
 export const AMOUNT_IN = 1000n
 
-export function baseManifest(opts: { v2Block?: bigint; v4?: boolean } = {}): ChainManifest {
+/**
+ * `v3` is OPT-IN (unlike `v4`) purely so this fixture's long-standing suites keep the wire they were
+ * written against: enabling v3 adds four speculative QuoterV2 probes per pair to every search, which
+ * the call-count assertions in `router.test.ts` would all have to be re-derived for. The v3 bundle
+ * is otherwise ordinary — the stub embeds {@link V3_FACTORY} in its fake Universal Router bytecode
+ * unconditionally, so `validateManifest`'s immutable fingerprint passes either way.
+ */
+export function baseManifest(opts: { v2Block?: bigint; v4?: boolean; v3?: boolean } = {}): ChainManifest {
   const m: ChainManifest = {
     chainId: CHAIN_ID,
     wrappedNative: WRAPPED,
@@ -55,6 +64,7 @@ export function baseManifest(opts: { v2Block?: bigint; v4?: boolean } = {}): Cha
     coreIntermediates: [],
   }
   if (opts.v4 ?? true) m.v4 = { poolManager: V4_POOL_MANAGER, deploymentBlock: 100n, quoter: V4_QUOTER }
+  if (opts.v3 === true) m.v3 = { factory: V3_FACTORY, deploymentBlock: 100n, v3QuoterV2: V3_QUOTER }
   return m
 }
 
@@ -137,7 +147,7 @@ export function stubClient(script: ClientScript): { client: PublicClient; counte
         // substring check without asserting anything about real Universal Router bytecode.
         const [addr] = args.params as [string]
         if (addr.toLowerCase() !== UNIVERSAL_ROUTER.toLowerCase()) return '0x'
-        const embed = [WRAPPED, PERMIT2, V2_FACTORY, V4_POOL_MANAGER].map((a) => a.slice(2).toLowerCase()).join('')
+        const embed = [WRAPPED, PERMIT2, V2_FACTORY, V3_FACTORY, V4_POOL_MANAGER].map((a) => a.slice(2).toLowerCase()).join('')
         return `0x${embed}` as Hex
       }
       if (args.method === 'eth_getLogs') {

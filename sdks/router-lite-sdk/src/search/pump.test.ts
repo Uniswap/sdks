@@ -26,7 +26,7 @@ import type {
 
 import { buildHookData } from './hookData'
 import type { PlannedLeg, PumpCtx } from './pump'
-import { composeRoutes, inLegIntermediate, orderedIntermediates, planDueLegs, pump, pumpDry } from './pump'
+import { composeRoutes, foldRoundInLegs, inLegIntermediate, orderedIntermediates, planDueLegs, pump, pumpDry } from './pump'
 import type { SearchState } from './state'
 import { createState, legKey } from './state'
 import type { Fate, World } from './testWorld'
@@ -698,6 +698,51 @@ test('the engine\'s own data-less reverts feed the discredit history: two DISTIN
   expect(recordOf().quoteFailureBlocks).toBe(HINT_DISCREDIT_FAILURE_BLOCKS)
   expect(isDiscredited(recordOf())).toBe(true)
   expect(recordOf().source).toBe('hint') // demoted, never rewritten or deleted
+})
+
+test('foldRoundInLegs: an EQUAL mX never displaces the incumbent — the tie rule, stated on the fold itself', () => {
+  // The documented policy is "an incumbent `m_X` is only displaced by a STRICTLY better one", and
+  // the two halves of that sentence are separately breakable. Stated directly on the exported fold
+  // rather than through a pump run, because a live round folds its own best-per-X first: two pools
+  // answering the same amount inside ONE round are settled by the first-occurring-maximum rule
+  // before the incumbent comparison is ever reached, so a `<=` weakened to `<` there is invisible.
+  // Only a SECOND round carrying an equal answer from a different pool reaches the incumbent test.
+  const x = X_TOKENS[0]!.toLowerCase()
+  const outNode = T_OUT.toLowerCase()
+  const incumbentPool = v2Ref(addr(0xd001), T_IN, X_TOKENS[0]!)
+  const challengerPool = v2Ref(addr(0xd002), T_IN, X_TOKENS[0]!)
+  const outPool = v2Ref(addr(0xd003), X_TOKENS[0]!, T_OUT)
+  const state = createState(BLOCK, false)
+
+  foldRoundInLegs(state, [{ x, amountOut: 500n, poolId: incumbentPool.id }], WN, outNode)
+  expect(state.mX.get(x)).toEqual({ amount: 500n, fromPoolId: incumbentPool.id })
+
+  // The out-leg priced at the incumbent m_X — the thing a displacement would invalidate.
+  const outKey = legKey(outPool.id, x, 500n)
+  state.measurements.set(outKey, {
+    pool: outPool,
+    currencyIn: X_TOKENS[0]!,
+    currencyOut: T_OUT,
+    amountIn: 500n,
+    amountOut: 900n,
+  })
+  state.measuredKeys.add(outKey)
+
+  // Round two: a DIFFERENT pool, the SAME amount. Ties go to the incumbent.
+  foldRoundInLegs(state, [{ x, amountOut: 500n, poolId: challengerPool.id }], WN, outNode)
+
+  expect(state.mX.get(x)!.fromPoolId).toBe(incumbentPool.id)
+  expect(state.mX.get(x)!.amount).toBe(500n)
+  // ...and because nothing was displaced, the out-leg priced at 500 is still an exact answer.
+  expect(state.measurements.has(outKey)).toBe(true)
+  expect(state.measuredKeys.has(outKey)).toBe(true)
+
+  // The control that makes the tie assertion mean something: one wei more DOES displace, and takes
+  // the now-stale out-leg with it.
+  foldRoundInLegs(state, [{ x, amountOut: 501n, poolId: challengerPool.id }], WN, outNode)
+  expect(state.mX.get(x)).toEqual({ amount: 501n, fromPoolId: challengerPool.id })
+  expect(state.measurements.has(outKey)).toBe(false)
+  expect(state.measuredKeys.has(outKey)).toBe(false)
 })
 
 test('an improved mX invalidates the stale out-leg measurements and re-measures at the new amount', async () => {

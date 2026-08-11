@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { encodeAbiParameters, pad, toHex, type Address, type Hex, type PublicClient } from 'viem'
+import { encodeAbiParameters, pad, toHex, zeroAddress, type Address, type Hex, type PublicClient } from 'viem'
 
 import { emptyReport } from '../src/experimental/index'
 import type { NeedsActionSwap, QuoteResult, ReadySwap, Router, SearchReport, SwapResult } from '../src/index'
@@ -9,10 +9,12 @@ import {
   buildSimulatePayload,
   evaluateSimulateResult,
   isSkipped,
+  probeSimulateV1Support,
   SIM_NATIVE_BALANCE,
   simulateSwap,
   traderInputCurrency,
   type SimulateBlockResult,
+  type SimulatePayload,
 } from './simulate'
 import { RpcError } from './tokens'
 
@@ -171,6 +173,57 @@ function routerAnswering(answer: SwapResult): Router {
 function clientReturning(blocks: unknown): PublicClient {
   return { request: async () => blocks } as unknown as PublicClient
 }
+
+describe('probeSimulateV1Support', () => {
+  // The gate the whole feature sits behind: `false` here is what turns `--simulate` into a reported
+  // `skipped` instead of a crash on an endpoint that has never heard of the method. Both directions
+  // matter — a probe that always answered `true` would surface as an opaque RPC error at the real
+  // request, and one that always answered `false` would silently disable `--simulate` everywhere.
+  const probingClient = (
+    answer: (params: unknown[]) => unknown,
+  ): { client: Pick<PublicClient, 'request'>; seen: { method: string; params: unknown[] }[] } => {
+    const seen: { method: string; params: unknown[] }[] = []
+    const client = {
+      async request(args: { method: string; params: unknown[] }) {
+        seen.push(args)
+        return answer(args.params)
+      },
+    } as unknown as Pick<PublicClient, 'request'>
+    return { client, seen }
+  }
+
+  it('reports support, and asks for it with the cheapest possible request', async () => {
+    const { client, seen } = probingClient(() => [{ calls: [] }])
+    expect(await probeSimulateV1Support(client)).toBe(true)
+
+    expect(seen).toHaveLength(1)
+    expect(seen[0]!.method).toBe('eth_simulateV1')
+    // `latest` (no historical state to fetch), one no-op call to the zero address, and both of the
+    // expensive options off — this probe must never cost more than an existence check.
+    const [payload, block] = seen[0]!.params as [SimulatePayload, string]
+    expect(block).toBe('latest')
+    expect(payload.validation).toBe(false)
+    expect(payload.traceTransfers).toBe(false)
+    expect(payload.blockStateCalls).toHaveLength(1)
+    expect(payload.blockStateCalls[0]!.calls).toEqual([{ to: zeroAddress, data: '0x' }])
+    expect(payload.blockStateCalls[0]!.stateOverrides).toBeUndefined()
+  })
+
+  it("swallows the endpoint's refusal — a method-not-found is `false`, never a throw", async () => {
+    // The shape a provider without `eth_simulateV1` actually returns.
+    const { client } = probingClient(() => {
+      throw Object.assign(new Error('the method eth_simulateV1 does not exist/is not available'), { code: -32601 })
+    })
+    expect(await probeSimulateV1Support(client)).toBe(false)
+  })
+
+  it('a transport failure is also just `false` — the probe never propagates anything', async () => {
+    const { client } = probingClient(() => {
+      throw new TypeError('fetch failed')
+    })
+    expect(await probeSimulateV1Support(client)).toBe(false)
+  })
+})
 
 describe('simulateSwap failure classes', () => {
   const noAcquisitionRoute: SwapResult = {

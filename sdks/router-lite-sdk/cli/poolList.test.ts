@@ -3,7 +3,17 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
-import { decodeFunctionData, encodeFunctionResult, pad, type Address, type Hex, type PublicClient } from 'viem'
+import {
+  decodeFunctionData,
+  encodeFunctionResult,
+  encodePacked,
+  keccak256,
+  pad,
+  parseAbi,
+  type Address,
+  type Hex,
+  type PublicClient,
+} from 'viem'
 
 import {
   MULTICALL3_ABI,
@@ -576,6 +586,56 @@ function truthfulAnswers(targets: PoolRecord[], manifest: ChainManifest): Record
   }
   return answers
 }
+
+describe("the v4 existence probe's slot math and its answer", () => {
+  // v4 has no factory mapping to ask, so `probeFor` reads the PoolManager's `pools[poolId].slot0`
+  // through `extsload` — two claims nothing else pins: WHICH slot it reads (a mapping-slot
+  // derivation, wrong by one and every pool reports missing), and HOW it reads the answer
+  // (`sqrtPriceX96` occupies the LOW 160 bits of slot0; everything above it is tick/fee packing,
+  // which an uninitialized pool can carry too). The `truthfulAnswers` fixture above exercises only
+  // the 'ok' direction of the second, and neither direction of the first.
+  const POOL_ID = `0x${'cd'.repeat(32)}` as Hex
+  const V4_REC: PoolRecord = {
+    pool: { id: `v4:${POOL_ID}`, currencies: [WETH, USDC], protocol: 'v4', poolId: POOL_ID },
+    source: 'event',
+  } as unknown as PoolRecord
+
+  const probe = (): NonNullable<ReturnType<typeof probeFor>> => {
+    const p = probeFor(V4_REC, MAINNET)
+    if (p === undefined) throw new Error('MAINNET declares a v4 deployment; probeFor must build a probe')
+    return p
+  }
+
+  it('reads pools[poolId].slot0 off the PoolManager — the mapping slot, derived independently here', () => {
+    const p = probe()
+    expect(p.call.to.toLowerCase()).toBe(MAINNET.v4!.poolManager.toLowerCase())
+    const { functionName, args } = decodeFunctionData({
+      abi: parseAbi(['function extsload(bytes32 slot) view returns (bytes32 value)']),
+      data: p.call.data,
+    })
+    expect(functionName).toBe('extsload')
+    // `keccak256(key ++ slot)` — Solidity's mapping derivation, spelled out rather than imported
+    // from the module under test, so an off-by-one in `V4_POOLS_SLOT` fails here.
+    const expected = keccak256(encodePacked(['bytes32', 'bytes32'], [POOL_ID, pad('0x06', { size: 32 })]))
+    expect(args![0]).toBe(expected)
+  })
+
+  it("calls a pool 'ok' only when sqrtPriceX96 — the LOW 160 bits — is non-zero", () => {
+    const p = probe()
+    const word = (hex: string): Hex => pad(`0x${hex}` as Hex, { size: 32 })
+
+    // A real initialized slot0: a plausible sqrtPriceX96 in the low 160 bits, tick/fee packing above.
+    expect(p.check(word('ffff0000000000000000000001' + '000001000000000000000000000000000000ab'))).toBe('ok')
+    expect(p.check(word('01'))).toBe('ok') // the smallest non-zero price still counts
+
+    // Never initialized: the whole word is zero.
+    expect(p.check(word('00'))).toBe('missing')
+    // THE DISCRIMINATING CASE: the high 96 bits carry tick/protocolFee/lpFee, and sqrtPriceX96 is
+    // zero. A check that tested the whole word for non-zero (or masked the wrong end) calls this
+    // pool live.
+    expect(p.check(`0x${'ff'.repeat(12)}${'00'.repeat(20)}` as Hex)).toBe('missing')
+  })
+})
 
 describe('verify-before-publish', () => {
   function targets(): PoolRecord[] {

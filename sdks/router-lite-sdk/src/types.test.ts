@@ -118,6 +118,48 @@ describe('domain types', () => {
     expect(() => assertResultCoherent(demoted)).not.toThrow()
   })
 
+  // -------------------------------------------------------------------------
+  // The per-code axis checks (C4-P5). Every OTHER suite feeds this function
+  // coherent results and asserts it stays quiet, which exercises these arms
+  // only in their silent direction — an arm deleted outright would still pass
+  // every one of them. These two feed it results whose `reason.code` names an
+  // axis the report does not set, and pin that it SPEAKS.
+  // -------------------------------------------------------------------------
+
+  test("`rpc-degraded` on a search with no transport, verification or head axis set is a classifier bug the checker names", () => {
+    // `aborted: true` is what carries the `inconclusive` status past the "some incompleteness axis
+    // is set" gate, so the only thing left for this to fail on is the code-to-axis match itself:
+    // nothing about this search was degraded by the RPC — it was stopped by its caller.
+    const misnamed: QuoteResult = {
+      status: 'inconclusive',
+      reason: { code: 'rpc-degraded', detail: 'test' },
+      alternatives: [],
+      search: { ...emptyReport(), aborted: true },
+    }
+    expect(() => assertResultCoherent(misnamed)).toThrow(/'rpc-degraded' without a transport\/verification\/head-regression axis/)
+
+    // The honest spellings of the same search: name the axis that IS set, or set the axis the code
+    // names. Both pass, so the throw above is about the mismatch and not about the shape.
+    expect(() => assertResultCoherent({ ...misnamed, reason: { code: 'aborted', detail: 'test' } })).not.toThrow()
+    expect(() =>
+      assertResultCoherent({ ...misnamed, search: { ...emptyReport(), aborted: true, verificationDegraded: true } }),
+    ).not.toThrow()
+  })
+
+  test("`discovery-incomplete` on a search where every protocol's discovery is clean is a classifier bug the checker names", () => {
+    const misnamed: QuoteResult = {
+      status: 'inconclusive',
+      reason: { code: 'discovery-incomplete', detail: 'test' },
+      alternatives: [],
+      search: { ...emptyReport(), aborted: true }, // every protocol `disabled` — nothing partial, nothing failed
+    }
+    expect(() => assertResultCoherent(misnamed)).toThrow(/'discovery-incomplete' without any protocol's discovery partial\/failed/)
+
+    const honest = emptyReport()
+    honest.discovery.v3 = { status: 'partial', coveredRanges: [], demandFloor: 0n }
+    expect(() => assertResultCoherent({ ...misnamed, search: { ...honest, aborted: true } })).not.toThrow()
+  })
+
   test('an inconclusive quote carries no leader at all', () => {
     const q: QuoteResult = {
       status: 'inconclusive',

@@ -780,6 +780,64 @@ describe('renderSwapResult', () => {
       ...renderConfidencePanel(REPORT, { mode: 'swap' }),
     ])
   })
+
+  it('an inconclusive swap that still has a leader renders the best-so-far panel and the unverified-tx hint — snapshot', () => {
+    // The FW5/P1 shape: the budget expired with the route priced and COMPILED but never simulated.
+    // Every other swap-panel test renders a `ready`/`needs-action` result, so this whole branch —
+    // the "best so far" line, the leader's route under an `unverified` badge, and the hint that says
+    // the calldata exists and how to get at it — has never been rendered in a test. The hint is the
+    // load-bearing line: without it a caller reads "inconclusive" and never learns the `tx` it asked
+    // for is sitting in the `--json` output.
+    const aborted: SearchReport = { ...REPORT, aborted: true }
+    const result: SwapResult = {
+      status: 'inconclusive',
+      reason: { code: 'aborted', detail: 'the search budget expired before the leader was simulated' },
+      best: {
+        route: { legs: [{ pool: V3_POOL, currencyIn: USDC, currencyOut: 'native' }] },
+        quote: { amountIn: 250_000_000n, amountOut: 100_000_000_000_000_000n, intermediateAmounts: [] },
+        execution: 'unverified',
+      },
+      tx: { to: UR, data: '0xdeadbeef', value: 0n },
+      search: aborted,
+      alternatives: [],
+    }
+    assertResultCoherent(result) // the fixture is a shape the SDK could really produce
+    const trade = { tokenIn: USDC, tokenOut: 'native' as const, amountIn: 250_000_000n }
+
+    expect(renderSwapResult(result, trade, CTX, { elapsedMs: 412 })).toEqual([
+      '◐ inconclusive  250 USDC → ETH',
+      'reason aborted — the search budget expired before the leader was simulated',
+      `  ${explainReason('aborted')}`,
+      'best so far 0.1 ETH (unverified — search was cut short)',
+      '  USDC ─ v3 0.05% → ETH  unverified',
+      '        pool 0xE055…939F',
+      '  unverified tx available — rerun with a bigger --budget to verify, or use --json to extract it',
+      '',
+      ...renderConfidencePanel(aborted, { mode: 'swap' }),
+    ])
+  })
+
+  it('the same inconclusive swap WITHOUT a compiled tx omits the hint, and says nothing about calldata', () => {
+    // The control for the line above: the hint is a statement about `result.tx` existing, so the arm
+    // that has no tx must not print it — a caller told to "use --json to extract it" would find
+    // nothing there.
+    const aborted: SearchReport = { ...REPORT, aborted: true }
+    const result: SwapResult = {
+      status: 'inconclusive',
+      reason: { code: 'aborted', detail: 'the search budget expired before the leader was compiled' },
+      best: {
+        route: { legs: [{ pool: V3_POOL, currencyIn: USDC, currencyOut: 'native' }] },
+        quote: { amountIn: 250_000_000n, amountOut: 100_000_000_000_000_000n, intermediateAmounts: [] },
+        execution: 'unverified',
+      },
+      search: aborted,
+      alternatives: [],
+    }
+    assertResultCoherent(result)
+    const lines = renderSwapResult(result, { tokenIn: USDC, tokenOut: 'native', amountIn: 250_000_000n }, CTX)
+    expect(lines.some((l) => l.includes('best so far'))).toBe(true)
+    expect(lines.some((l) => l.includes('unverified tx available'))).toBe(false)
+  })
 })
 
 describe('renderCacheLine', () => {

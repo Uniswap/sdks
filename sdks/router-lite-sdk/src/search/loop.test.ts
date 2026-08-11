@@ -573,6 +573,70 @@ test('a worker settled with failures terminates the search instead of spinning i
   expect(events.filter((e) => e.type === 'final')).toHaveLength(1)
 })
 
+test('an in-flight preflight holds off final even with every source settled, the pump dry and the frontier complete', async () => {
+  // THE TERMINATION GATE'S THIRD CONJUNCT, ISOLATED. Every other test that verifies a swap does so
+  // while the coverage worker is still walking, so `sources.settled()` carries the wait and the
+  // verifier's own quietness reading is never load-bearing: drop `verifierIdle` from the check and
+  // they all still pass. This world arranges the one arrangement where it is the ONLY thing left —
+  // the pool arrives on the FULL adjacency scan (created far below the eager window, so nothing
+  // cheap can find it), which means the gate is already open and coverage has already reported and
+  // settled by the time that pool is priced and its preflight goes out. At that moment the search
+  // is quiet on every axis but one, and terminating would hand the caller an `unverified` leader
+  // whose verdict was one round trip away.
+  const world: World = new Map()
+  const manifest = manifestOf({ v2: true })
+  const created = 1_000n // far below HEAD - eagerPairScanBlocks: unreachable until the gate opens
+  expect(created < HEAD - eagerPairScanBlocks(manifest)).toBe(true)
+  const pool = newPool(undefined, world, T_IN, T_OUT, { kind: 'price', r0: 10n ** 12n, r1: 10n ** 12n })
+  const poolLog = {
+    address: V2_FACTORY,
+    topics: [V2_TOPIC],
+    data: '0x',
+    blockNumber: created,
+    record: { pool, createdAtBlock: created, source: 'event' },
+  } as unknown as Log
+
+  let releasePreflight!: () => void
+  const held = new Promise<void>((resolve) => (releasePreflight = resolve))
+  const { client, preflights } = makeClient({
+    logs: ({ from, to }) => (from <= created && created <= to ? [poolLog] : []),
+    // The discovered pool's price lands several macrotasks after the chunk that found it, so the
+    // coverage source has genuinely finished its no-progress pass before the verifier has anything
+    // to simulate — the preflight is then the last thing on the wire, not one of two.
+    onQuote: () => ticks(6),
+    preflight: () => held, // genuinely on the wire, and not coming back until this test says so
+  })
+  const ctx = ctxOf(client, manifest, world)
+  ctx.modules = {
+    ...ctx.modules,
+    v2: { ...ctx.modules.v2, parsePoolLog: (log) => (log as Log & { record?: PoolRecord }).record ?? null },
+  }
+  const req: SwapRequest = { tokenIn: T_IN, tokenOut: T_OUT, amountIn: 1_000_000n, trader: TRADER }
+
+  const events: EngineEvent[] = []
+  const walked = (async () => {
+    for await (const e of search(ctx, req, 'swap')) events.push(e)
+  })()
+
+  await ticks(60)
+  expect(preflights()).toBe(1) // the simulation really is out...
+  const midway = events[events.length - 1]!
+  expect(midway.state.gateOpened).toBe(true) // ...and the gate really did open, so coverage settled
+  expect(midway.state.intermediates.selected.length).toBeGreaterThanOrEqual(midway.state.intermediates.discovered)
+  expect(events.filter((e) => e.type === 'final')).toHaveLength(0) // nothing quiet enough to end on
+
+  releasePreflight()
+  await walked
+
+  const final = events[events.length - 1]!
+  expect(final.type).toBe('final')
+  if (final.type !== 'final') throw new Error('unreachable')
+  expect(events.filter((e) => e.type === 'final')).toHaveLength(1)
+  // The verdict the held call bought — not the `unverified` a premature final would have shipped.
+  expect(final.ranked[0]!.execution).toBe('verified')
+  expect(final.ranked[0]!.route.legs[0]!.pool.id).toBe(pool.id)
+})
+
 test('an abort between wakes emits a final with aborted: true and the best-so-far', async () => {
   const world: World = new Map()
   const manifest = manifestOf({ v2: true })

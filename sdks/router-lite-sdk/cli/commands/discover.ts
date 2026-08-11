@@ -124,8 +124,16 @@ export async function cmdDiscover(argv: string[]): Promise<number> {
  * Native and wrapped-native are ONE graph family (the SDK's `sameFamily`, shared rather than
  * mirrored here), so discover never routes a token "against itself" and never mislabels a WETH pool
  * as a counterparty of ETH.
+ *
+ * Exported for its own tests: the three arms below are three different answers to "what does this
+ * token get priced against", and two of them (the same-family rejection, the core-intermediate walk
+ * that skips the native family) are unreachable from the command's happy path.
  */
-async function resolveCounterparty(ctx: ChainContext, token: ResolvedToken, viaArg: string | undefined): Promise<ResolvedToken> {
+export async function resolveCounterparty(
+  ctx: Pick<ChainContext, 'chain' | 'client'>,
+  token: ResolvedToken,
+  viaArg: string | undefined,
+): Promise<ResolvedToken> {
   const wrappedNative = ctx.chain.manifest.wrappedNative
   if (viaArg) {
     const via = await resolveToken(ctx.client, ctx.chain.manifest, viaArg)
