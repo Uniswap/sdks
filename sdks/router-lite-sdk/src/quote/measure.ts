@@ -1,4 +1,4 @@
-import type { Address, PublicClient } from 'viem'
+import type { Address, Hex, PublicClient } from 'viem'
 
 import { DEFAULT_CONCURRENCY } from '../constants'
 import { AbortedCallError, TransportError } from '../errors'
@@ -130,6 +130,11 @@ export type LegRequest = {
   currencyIn: CurrencyRef
   currencyOut: CurrencyRef
   amountIn: bigint
+  /** v4 only: the request-scoped hook data for this pool, which the caller keys per pool — one value
+   * per pool per search, so it never varies within a `key` and takes no part in leg identity. It
+   * must be threaded HERE and not at composition: this is where the quote is encoded, and a hooked
+   * pool quoted without its hook data is priced against a call the swap will not make. */
+  hookData?: Hex
 }
 
 /**
@@ -186,7 +191,16 @@ export async function measureLegs(args: MeasureLegsArgs): Promise<LegOutcome[]> 
     calls: legs.map((leg) =>
       encodeOr(() =>
         modules[leg.pool.protocol].encodeQuote(
-          [{ pool: leg.pool, currencyIn: leg.currencyIn, currencyOut: leg.currencyOut }],
+          [
+            {
+              pool: leg.pool,
+              currencyIn: leg.currencyIn,
+              currencyOut: leg.currencyOut,
+              // Absent stays ABSENT rather than becoming an explicit `undefined` — `RouteLeg.hookData`
+              // is an optional property under `exactOptionalPropertyTypes`.
+              ...(leg.hookData !== undefined && { hookData: leg.hookData }),
+            },
+          ],
           leg.amountIn,
           manifest,
         ),

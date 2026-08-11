@@ -253,6 +253,31 @@ test('a leg the abort caught in the semaphore queue is unattempted — not attem
   ])
 })
 
+test('a v4 leg carries its request-scoped hookData into the encoded quote', async () => {
+  // Hooked v4 pools price differently under different hook data, so the quote MUST be encoded with
+  // the request's bytes. This is the only place the leg is built, so a `LegRequest` that could not
+  // carry them would silently price every hooked pool against a call the swap will never make.
+  const hookData: Hex = '0xdeadbeef'
+  const withHook = modules.v4.encodeQuote([{ pool: v4UsdcWeth, currencyIn: USDC, currencyOut: WETH, hookData }], 100n, manifest).call
+  const withoutHook = encoded(v4UsdcWeth, USDC, WETH, 100n)
+  // The fixture is only meaningful if the bytes really differ — otherwise the stub below would be
+  // satisfied by an executor that dropped the field entirely.
+  expect(withHook.data).not.toBe(withoutHook.data)
+
+  // ONLY the hooked calldata is scripted: an executor that dropped `hookData` sends the other one
+  // and the stub records a violation instead of quietly returning an answer.
+  const client = stubClient(entryFor(withHook, v4Return(500n)))
+  const outcomes = await measureLegs({
+    client,
+    modules,
+    manifest,
+    legs: [{ ...req('hooked', v4UsdcWeth, USDC, WETH, 100n), hookData }],
+    blockNumber: 1n,
+  })
+
+  expect(outcomes).toEqual([{ key: 'hooked', kind: 'success', amountOut: 500n, gasEstimate: 0n }])
+})
+
 test('no legs is no round — no request goes out', async () => {
   const client = stubClient({})
   expect(await measureLegs({ client, modules, manifest, legs: [], blockNumber: 1n })).toEqual([])
