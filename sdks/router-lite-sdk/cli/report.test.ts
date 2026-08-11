@@ -166,6 +166,20 @@ describe('renderConfidencePanel', () => {
     expect(external.find((l) => l.startsWith('  notes'))).toBe('  notes            aborted')
   })
 
+  it('an interrupted run renders "interrupted", never "budget reached" — the cause outranks the budget', () => {
+    // THE MISLABEL THIS PINS: a ^C at 6.5s of a 60s budget used to render "budget reached (60.0s)",
+    // because the panel inferred the cause from the budget's mere presence.
+    const aborted = { ...REPORT, aborted: true }
+    const interrupted = renderConfidencePanel(aborted, { mode: 'swap', budgetMs: 60_000, abortCause: 'interrupt' })
+    expect(interrupted.find((l) => l.startsWith('  notes'))).toBe('  notes            interrupted')
+  })
+
+  it('a budget-fired run still renders the budget label when the cause says so', () => {
+    const aborted = { ...REPORT, aborted: true }
+    const budgeted = renderConfidencePanel(aborted, { mode: 'swap', budgetMs: 60_000, abortCause: 'budget' })
+    expect(budgeted.find((l) => l.startsWith('  notes'))).toBe('  notes            budget reached (60.0s)')
+  })
+
   it('lists every other anomaly flag under notes only when set', () => {
     const noisy = {
       ...REPORT,
@@ -599,6 +613,15 @@ describe('the "how it went" timeline', () => {
   it('never appends a budget note to an event the search did not actually abort on', () => {
     const events: TimelineEvent[] = [{ type: 'final', elapsedMs: 700, result: quoteWith(1_877_840_000n, 124, 86, false) }]
     expect(renderTimeline(FIRST, events, trade, CTX, { budgetMs: 60_000 })[2]).not.toContain('budget')
+  })
+
+  it('an interrupted run\'s abort note reads "(interrupted)", never "(budget reached)" — the cause outranks the budget', () => {
+    // THE MISLABEL THIS PINS: ^C at 6.5s of a 60s budget used to close the timeline with
+    // "(budget reached — 60.0s)", because the note inferred the cause from the budget's presence.
+    const events: TimelineEvent[] = [{ type: 'final', elapsedMs: 6_500, result: quoteWith(1_877_840_000n, 127, 90, true) }]
+    const line = renderTimeline(FIRST, events, trade, CTX, { budgetMs: 60_000, abortCause: 'interrupt' })[2]!
+    expect(line).toContain('(interrupted)')
+    expect(line).not.toContain('budget reached')
   })
 
   it('reports "nothing priced" on a final that never found a leader', () => {

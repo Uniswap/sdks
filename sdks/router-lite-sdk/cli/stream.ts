@@ -50,12 +50,13 @@
 import type { QuotedRoute, QuoteResult, SearchEvent, SearchReport, SwapResult } from '../src/index'
 
 import {
-  budgetNoteFor,
+  abortNoteFor,
   jsonify,
   progressBody,
   renderFirstLeadLine,
   renderTimelineLine,
   searchOf,
+  type AbortCause,
   type FirstLeadInfo,
   type LeadOrigin,
   type RenderCtx,
@@ -88,6 +89,10 @@ export type ConsumeOptions<R extends SearchResult> = {
    * how a command builds this from what the index already knew and what `--hint` named. */
   classify: (route: QuotedRoute) => LeadOrigin
   budgetMs?: number
+  /** `Budget.cause`, LIVE (a getter, not a snapshot): which source aborted the search's signal, once
+   * one has. Read per printed line, because the answer changes mid-stream — every line before the
+   * abort renders no note, and the line the search stops at must name the source that stopped it. */
+  abortCause?: () => AbortCause | undefined
 }
 
 export type ConsumeResult<R extends SearchResult> = {
@@ -179,5 +184,5 @@ function print<R extends SearchResult>(entry: TimelineEvent, previousBest: bigin
     )
     return
   }
-  console.log(renderTimelineLine(entry, previousBest, opts.trade, opts.renderCtx, budgetNoteFor(searchOf(entry), opts.budgetMs)))
+  console.log(renderTimelineLine(entry, previousBest, opts.trade, opts.renderCtx, abortNoteFor(searchOf(entry), opts.budgetMs, opts.abortCause?.())))
 }

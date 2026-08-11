@@ -176,6 +176,29 @@ describe('the budget signal', () => {
     expect(budget.signal.aborted).toBe(false)
     await new Promise<void>((resolve) => budget.signal.addEventListener('abort', () => resolve(), { once: true }))
     expect(budget.signal.aborted).toBe(true) // the timer, not the interrupt: nothing here pressed ^C
+    expect(budget.cause()).toBe('budget') // and the label names the timer, not the ^C nobody pressed
+  })
+
+  test('cause() attributes the abort to the source that actually fired — interrupt on a budgeted run', () => {
+    // The mislabel this seam exists to prevent: a ^C six seconds into a 60s budget must never be
+    // reported as "budget reached — 60.0s".
+    const budgeted = budgetFor(60_000)
+    const unbudgeted = budgetFor(undefined)
+    expect(budgeted.cause()).toBeUndefined() // nothing has fired: no label to claim
+    expect(unbudgeted.cause()).toBeUndefined()
+
+    triggerInterrupt()
+
+    expect(budgeted.cause()).toBe('interrupt')
+    expect(unbudgeted.cause()).toBe('interrupt')
+  })
+
+  test('cause() keeps the FIRST source: a timer firing after the interrupt cannot relabel the run', async () => {
+    const budget = budgetFor(20)
+    triggerInterrupt() // the user's ^C lands first...
+    expect(budget.cause()).toBe('interrupt')
+    await new Promise((r) => setTimeout(r, 40)) // ...then the 20ms timer fires anyway
+    expect(budget.cause()).toBe('interrupt') // the label stays with what the user experienced
   })
 
   test('THE CLOCK DOES NOT START DURING SETUP — only when the command starts its search', async () => {

@@ -1,17 +1,20 @@
 import { afterEach, expect, test } from 'bun:test'
 
 import { resetInterruptForTests, startBudget } from './commands/context'
-import { onTerminationSignal, resetTerminationForTests, type TerminationIO } from './interrupt'
+import { onTerminationSignal, resetTerminationForTests, terminationExitCode, type TerminationIO } from './interrupt'
 
 // ---------------------------------------------------------------------------
-// The ^C contract (`interrupt.ts`), unit-tested with an injected flush/exit.
+// The ^C contract (`interrupt.ts`), unit-tested with an injected exit.
 //
-// The one behavior worth guarding hard is the SECOND signal: the first
-// version of this handler re-entered the same flush on every ^C, so a user
-// whose cache save was the slow part had NO way to leave — the exact
-// "infinite hang" this module's header describes. Each test here injects its
-// own `exit` because the real one never returns; the assertions read what the
-// handler DID, not what it printed.
+// Two behaviors are worth guarding hard, one per wrong version this handler
+// has already shipped as:
+//   - the FIRST signal must NOT exit (v2 exited right here, killing the
+//     process between the stream's last line and the command's result panel);
+//   - the SECOND must exit immediately with no cleanup of its own (v1
+//     re-entered the flush on every ^C, so a slow cache save read as an
+//     infinite hang).
+// Each test injects its own `exit` because the real one never returns; the
+// assertions read what the handler DID, not what it printed.
 // ---------------------------------------------------------------------------
 
 afterEach(() => {
@@ -19,70 +22,61 @@ afterEach(() => {
   resetInterruptForTests()
 })
 
-/** An IO whose every effect is a recording: `flush` resolves when the test says so (immediately by
- * default), `exit` only notes the code, `warn` only collects the line. */
-function recordingIO(opts: { flushGate?: Promise<void> } = {}): {
-  io: TerminationIO
-  flushes: () => number
-  exits: number[]
-  warnings: string[]
-} {
-  let flushes = 0
+/** An IO whose every effect is a recording: `exit` only notes the code, `warn` only collects. */
+function recordingIO(): { io: TerminationIO; exits: number[]; warnings: string[] } {
   const exits: number[] = []
   const warnings: string[] = []
-  const io: TerminationIO = {
-    flush: async () => {
-      flushes++
-      await opts.flushGate
+  return {
+    io: {
+      exit: (code) => {
+        exits.push(code)
+      },
+      warn: (line) => {
+        warnings.push(line)
+      },
     },
-    exit: (code) => {
-      exits.push(code)
-    },
-    warn: (line) => {
-      warnings.push(line)
-    },
+    exits,
+    warnings,
   }
-  return { io, flushes: () => flushes, exits, warnings }
 }
 
-test('the first signal aborts the shared interrupt, says so once, flushes, and exits 128+signo', async () => {
+test('the first signal aborts the shared interrupt, says so once, and does NOT exit — the command finishes and renders', () => {
   // The search's own signal is how "the search actually stops" is observable from outside the
   // handler: `startBudget` composed the shared interrupt into it, so a running command's signal
-  // aborting IS the handler reaching the search.
+  // aborting IS the handler reaching the search. NOT exiting is the rest of the contract: control
+  // returns to the command, which drains, renders its final panel, and exits through `main` (whose
+  // `finally` banks the cache) with the code `terminationExitCode` dictates.
   const running = startBudget(undefined)
   expect(running.signal.aborted).toBe(false)
-  const { io, flushes, exits, warnings } = recordingIO()
+  expect(terminationExitCode()).toBeUndefined() // no ^C yet: main's own code stands
+  const { io, exits, warnings } = recordingIO()
 
-  await onTerminationSignal(2, io)
+  onTerminationSignal(2, io)
 
   expect(running.signal.aborted).toBe(true) // the shared controller fired — the search stops
+  expect(running.cause()).toBe('interrupt') // and the run will be LABELLED interrupted, not budgeted
+  expect(exits).toEqual([]) // no exit: the render is still owed to the user
   expect(warnings).toHaveLength(1)
   expect(warnings[0]).toContain('press ^C again to exit immediately')
-  expect(flushes()).toBe(1) // the cache was banked...
-  expect(exits).toEqual([130]) // ...and the exit is the shell's 128+signo for SIGINT
+  expect(terminationExitCode()).toBe(130) // what rl.ts overrides main's code with, after the render
 })
 
-test('the second signal exits immediately — no second flush, even while the first is still flushing', async () => {
-  // The user's second ^C means "now". The first call is parked INSIDE its flush (the gate below
-  // never releases until the test does), which is exactly when a slow cache save makes the second
-  // press matter — and when the old handler would have started flushing all over again.
-  let releaseFlush!: () => void
-  const gate = new Promise<void>((resolve) => (releaseFlush = resolve))
-  const { io, flushes, exits } = recordingIO({ flushGate: gate })
+test('the second signal exits immediately, without a second notice', () => {
+  const { io, exits, warnings } = recordingIO()
 
-  const first = onTerminationSignal(2, io)
-  await onTerminationSignal(2, io)
+  onTerminationSignal(2, io)
+  expect(exits).toEqual([])
+  onTerminationSignal(2, io)
 
-  expect(exits).toEqual([130]) // the second call exited without waiting on anything
-  expect(flushes()).toBe(1) // and started no flush of its own
-
-  releaseFlush()
-  await first
-  expect(exits).toEqual([130, 130]) // the first call's own exit still lands after its flush
+  expect(exits).toEqual([130]) // "now" means now: no flush, no render, no waiting
+  expect(warnings).toHaveLength(1) // the how-to-leave line prints once, on the first signal
 })
 
-test('SIGTERM carries its own signo: 128+15', async () => {
+test('SIGTERM carries its own signo: terminationExitCode 143, immediate second exit 143', () => {
   const { io, exits } = recordingIO()
-  await onTerminationSignal(15, io)
+  onTerminationSignal(15, io)
+  expect(exits).toEqual([])
+  expect(terminationExitCode()).toBe(143)
+  onTerminationSignal(15, io)
   expect(exits).toEqual([143])
 })

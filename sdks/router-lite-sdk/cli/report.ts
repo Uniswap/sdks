@@ -356,14 +356,26 @@ function timelineTiming(elapsedMs: number): string {
   return padEndVisible(humanizeDuration(elapsedMs), 8)
 }
 
+/** Which source aborted the search's signal, for honest labelling: the budget's own timer, or the
+ * user's ^C. Owned by `commands/context.ts#Budget.cause` (the composed signal makes attribution the
+ * host's to track); declared HERE because this module renders it and `context.ts` already imports
+ * from this file — the reverse import would be a cycle. */
+export type AbortCause = 'budget' | 'interrupt'
+
 /**
- * The trailing "(budget reached — Ns)" an event's line earns when ITS OWN report says `aborted`.
- * Needs no "is this the last event" bookkeeping at either call site (the retrospective render or
- * `stream.ts`'s live stream): `aborted` can only be `true` on the event a bounded search actually
- * stopped at, by construction — the generator never yields again after that.
+ * The trailing "(interrupted)" / "(budget reached — Ns)" an event's line earns when ITS OWN report
+ * says `aborted`. Needs no "is this the last event" bookkeeping at either call site (the
+ * retrospective render or `stream.ts`'s live stream): `aborted` can only be `true` on the event a
+ * bounded search actually stopped at, by construction — the generator never yields again after that.
+ *
+ * `cause` outranks `budgetMs`: a run interrupted at 6.5s of a 60s budget is "(interrupted)", never
+ * "(budget reached — 60.0s)" — the budget label is reserved for the timer actually firing. A caller
+ * with no attribution (hand-built results in tests) keeps the old budget-implies-budget reading.
  */
-export function budgetNoteFor(search: SearchReport, budgetMs: number | undefined): string {
-  if (!search.aborted || budgetMs === undefined) return ''
+export function abortNoteFor(search: SearchReport, budgetMs: number | undefined, cause?: AbortCause): string {
+  if (!search.aborted) return ''
+  if (cause === 'interrupt') return ` ${yellow('(interrupted)')}`
+  if (budgetMs === undefined) return ''
   return ` ${yellow(`(budget reached — ${humanizeDuration(budgetMs)})`)}`
 }
 
@@ -405,7 +417,7 @@ export function renderTimeline(
   events: TimelineEvent[],
   trade: TradeContext,
   ctx: RenderCtx,
-  opts: { budgetMs?: number } = {},
+  opts: { budgetMs?: number; abortCause?: AbortCause } = {},
 ): string[] {
   if (!first && events.length === 0) return []
   const lines = [bold('how it went')]
@@ -413,7 +425,7 @@ export function renderTimeline(
 
   let previousBest: bigint | undefined = first?.route.quote.amountOut
   for (const event of events) {
-    lines.push(renderTimelineLine(event, previousBest, trade, ctx, budgetNoteFor(searchOf(event), opts.budgetMs)))
+    lines.push(renderTimelineLine(event, previousBest, trade, ctx, abortNoteFor(searchOf(event), opts.budgetMs, opts.abortCause)))
     if (event.type === 'progress') continue
     const best = leaderOf(event.result)
     if (best) previousBest = best.quote.amountOut
@@ -524,6 +536,9 @@ export type ConfidencePanelOpts = {
   mode: 'quote' | 'swap'
   /** Present only for a budgeted run — see the `notes` line's abort phrasing below. */
   budgetMs?: number
+  /** Which source aborted the run, when the command knows (`Budget.cause`) — 'interrupt' renders
+   * the abort note as `interrupted`, whatever the budget was. See {@link abortNoteFor}. */
+  abortCause?: AbortCause
   /** From the chain manifest (`chain.manifest.chain?.blockTimeSeconds`) — drives the pool-knowledge
    * age approximation. Falls back to the SDK's own mainnet default when the manifest names none. */
   blockTimeSeconds?: number
@@ -580,7 +595,17 @@ export function renderConfidencePanel(report: SearchReport, opts: ConfidencePane
   }
 
   const notes: string[] = []
-  if (report.aborted) notes.push(opts.budgetMs !== undefined ? yellow(`budget reached (${humanizeDuration(opts.budgetMs)})`) : red('aborted'))
+  // Cause outranks the budget's presence (same rule as {@link abortNoteFor}): a ^C at 6.5s of a 60s
+  // budget is `interrupted`, and `budget reached` is reserved for the timer actually firing.
+  if (report.aborted) {
+    notes.push(
+      opts.abortCause === 'interrupt'
+        ? yellow('interrupted')
+        : opts.budgetMs !== undefined
+          ? yellow(`budget reached (${humanizeDuration(opts.budgetMs)})`)
+          : red('aborted'),
+    )
+  }
   if (report.headRegressed) notes.push(red('head-regressed'))
   if (report.verificationDegraded) notes.push(red('verification-degraded'))
   if (v.preflightBudgetExhausted) notes.push(yellow('preflight-budget-exhausted'))
@@ -723,6 +748,9 @@ export type RenderOpts = {
   /** Present only for a budgeted run — threads through to {@link renderConfidencePanel}'s abort
    * phrasing and the timeline's final "budget reached" note. */
   budgetMs?: number
+  /** `Budget.cause()` at render time — threads through to the panel's abort note and the timeline's
+   * trailing note, so an interrupted run never mislabels as "budget reached". */
+  abortCause?: AbortCause
   blockTimeSeconds?: number
   /** The first lead and the event history after it — both optional because a caller that never
    * streamed the search (a plain unit test constructing a result by hand) has neither, and the
@@ -732,7 +760,10 @@ export type RenderOpts = {
 }
 
 function renderTimelineBlock(trade: TradeContext, ctx: RenderCtx, opts: RenderOpts): string[] {
-  const timeline = renderTimeline(opts.first, opts.timeline ?? [], trade, ctx, opts.budgetMs !== undefined ? { budgetMs: opts.budgetMs } : {})
+  const timeline = renderTimeline(opts.first, opts.timeline ?? [], trade, ctx, {
+    ...(opts.budgetMs !== undefined ? { budgetMs: opts.budgetMs } : {}),
+    ...(opts.abortCause !== undefined ? { abortCause: opts.abortCause } : {}),
+  })
   return timeline.length > 0 ? ['', ...timeline] : []
 }
 
@@ -742,6 +773,7 @@ function confidenceOpts(mode: ConfidencePanelOpts['mode'], opts: RenderOpts): Co
   return {
     mode,
     ...(opts.budgetMs !== undefined ? { budgetMs: opts.budgetMs } : {}),
+    ...(opts.abortCause !== undefined ? { abortCause: opts.abortCause } : {}),
     ...(opts.blockTimeSeconds !== undefined ? { blockTimeSeconds: opts.blockTimeSeconds } : {}),
   }
 }

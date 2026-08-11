@@ -101,12 +101,14 @@ export async function cmdDiscover(argv: string[]): Promise<number> {
     console.log('')
     console.log(dim(`index: ${stats.pools} pools · ${stats.adjacencyEdges} adjacency edges · ${stats.coverageScopes} coverage scopes`))
     if (final) {
+      const cause = budget.cause() // settled by now — the search is over
       console.log('')
       console.log(
         renderConfidencePanel(final.search, {
           mode: 'quote',
           blockTimeSeconds: blockTimeSecondsOf(ctx.chain.manifest),
           ...(ctx.budgetMs !== undefined ? { budgetMs: ctx.budgetMs } : {}),
+          ...(cause !== undefined ? { abortCause: cause } : {}),
         }).join('\n'),
       )
     }

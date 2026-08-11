@@ -59,7 +59,7 @@ import { cmdChains } from './commands/chains'
 import { cmdDiscover } from './commands/discover'
 import { cmdQuote } from './commands/quote'
 import { cmdSwap } from './commands/swap'
-import { onTerminationSignal } from './interrupt'
+import { onTerminationSignal, terminationExitCode } from './interrupt'
 import { PoolListError } from './poolList'
 import { redact } from './redact'
 import { RpcError } from './tokens'
@@ -212,17 +212,22 @@ async function main(): Promise<number> {
 }
 
 // ---------------------------------------------------------------------------
-// Ctrl-C stops the search, banks the cache, and exits — twice means "now".
-// The whole contract (and why the first version of this handler read as an
-// infinite hang) lives in `interrupt.ts`; this is just the wiring.
+// Ctrl-C stops the search but lets the command FINISH — render the result,
+// bank the cache through `main`'s own `finally` — and only then exits with
+// 128+signo; a second ^C exits immediately. The whole contract (and the two
+// wrong versions that preceded it) lives in `interrupt.ts`; this is just the
+// wiring.
 // ---------------------------------------------------------------------------
 for (const [signal, signo] of [
   ['SIGINT', 2],
   ['SIGTERM', 15],
 ] as const) {
   process.on(signal, () => {
-    void onTerminationSignal(signo)
+    onTerminationSignal(signo)
   })
 }
 
-process.exitCode = await main()
+const code = await main()
+// An interrupted run finished GRACEFULLY (result rendered, cache banked), but to the shell it is
+// still an interrupted process: 128+signo, whatever the command itself concluded.
+process.exitCode = terminationExitCode() ?? code

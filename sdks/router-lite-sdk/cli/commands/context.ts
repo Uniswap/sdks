@@ -36,7 +36,7 @@ import {
 import { parseHint } from '../hints'
 import { applyPoolList } from '../poolList'
 import { redactKeyedUrl, redactHeaderValues, registerRpcHeaders } from '../redact'
-import { renderCacheLine, viewKey, type RenderCtx, type TokenView } from '../report'
+import { renderCacheLine, viewKey, type AbortCause, type RenderCtx, type TokenView } from '../report'
 import { resolveRpcHeaders } from '../rpcHeaders'
 import { fetchTokenMeta, resolveToken, type ResolvedToken } from '../tokens'
 
@@ -395,11 +395,11 @@ function parseLogChunk(raw: string | undefined): bigint | undefined {
 // One module-level controller, aborted exactly once by the FIRST SIGINT/SIGTERM
 // (`cli/interrupt.ts`, wired in `rl.ts`). `startBudget` composes it into every
 // signal it hands out, so every command's search — budgeted or not — actually
-// STOPS when the user interrupts, instead of streaming on while the handler's
-// cache flush serializes a multi-hundred-megabyte snapshot behind it. Before
-// this existed, ^C on a long `discover` looked like an infinite hang: the
-// search kept issuing requests, the flush waited its turn, and a second ^C
-// just re-entered the same handler.
+// STOPS when the user interrupts: the search drains, the command renders its
+// final result, and the run exits through `main`'s ordinary path (which banks
+// the cache) with 128+signo. Before this existed, ^C on a long `discover`
+// looked like an infinite hang: the search kept issuing requests, the cache
+// flush waited its turn, and a second ^C just re-entered the same handler.
 //
 // An unbudgeted run now gets THIS signal rather than `undefined`. The SDK
 // reads signal absence as "unbounded search", but it never branches on
@@ -424,9 +424,16 @@ export function resetInterruptForTests(): void {
   interrupt = new AbortController()
 }
 
+/** Which source aborted a {@link Budget}'s signal — the budget's own timer, or the user's ^C. The
+ * distinction exists purely for honest reporting: a run interrupted at 6.5s of a 60s budget must
+ * not be labelled "budget reached — 60.0s". Declared in `report.ts` (the module that renders it —
+ * the reverse import would be a cycle); re-exported here because this is where it is PRODUCED. */
+export type { AbortCause }
+
 /**
- * `--budget`'s live clock: the `AbortSignal` the search carries, and the handle that stops the timer
- * holding the process open once the command is done with it.
+ * `--budget`'s live clock: the `AbortSignal` the search carries, the handle that stops the timer
+ * holding the process open once the command is done with it, and — for reporting — which source
+ * actually fired.
  */
 export type Budget = {
   /** The search's signal: budget timer + interrupt for a budgeted run, the bare interrupt signal
@@ -434,6 +441,11 @@ export type Budget = {
   signal: AbortSignal
   /** Clears the timer. Idempotent, never throws, and a no-op for an unbudgeted run. */
   cancel: () => void
+  /** Which source aborted `signal`, or `undefined` while nothing has. FIRST source wins: an
+   * interrupt at 6.5s stays 'interrupt' even if the 60s timer later fires (and vice versa), so the
+   * label a consumer renders names the event the user actually experienced. Live — a streaming
+   * renderer may call it per line. */
+  cause: () => AbortCause | undefined
 }
 
 /**
@@ -451,10 +463,26 @@ export type Budget = {
  * open for the remainder of it.
  */
 export function startBudget(budgetMs: number | undefined): Budget {
-  if (budgetMs === undefined) return { signal: interrupt.signal, cancel: () => {} }
+  // Captured once: a test's `resetInterruptForTests` swap must not change which controller an
+  // already-started budget observes.
+  const int = interrupt.signal
+  if (budgetMs === undefined) {
+    return { signal: int, cancel: () => {}, cause: () => (int.aborted ? 'interrupt' : undefined) }
+  }
+  let cause: AbortCause | undefined
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), budgetMs)
-  return { signal: AbortSignal.any([controller.signal, interrupt.signal]), cancel: () => clearTimeout(timer) }
+  const timer = setTimeout(() => {
+    cause ??= 'budget'
+    controller.abort()
+  }, budgetMs)
+  // `??=` everywhere: the FIRST source to fire owns the label (see {@link Budget.cause}).
+  if (int.aborted) cause ??= 'interrupt'
+  else int.addEventListener('abort', () => (cause ??= 'interrupt'), { once: true })
+  return {
+    signal: AbortSignal.any([controller.signal, int]),
+    cancel: () => clearTimeout(timer),
+    cause: () => cause,
+  }
 }
 
 export type TradeContextResolved = {

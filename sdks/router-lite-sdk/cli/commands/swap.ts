@@ -115,8 +115,10 @@ export async function cmdSwap(argv: string[]): Promise<number> {
       renderCtx: trade.renderCtx,
       classify,
       ...(ctx.budgetMs !== undefined ? { budgetMs: ctx.budgetMs } : {}),
+      abortCause: budget.cause,
     })
     if (!final) return 2
+    const cause = budget.cause() // settled by now — the search is over
 
     if (json) {
       if (!stream) console.log(jsonify(final))
@@ -128,6 +130,7 @@ export async function cmdSwap(argv: string[]): Promise<number> {
           elapsedMs: Date.now() - started,
           addresses,
           ...(ctx.budgetMs !== undefined ? { budgetMs: ctx.budgetMs } : {}),
+          ...(cause !== undefined ? { abortCause: cause } : {}),
           blockTimeSeconds: blockTimeSecondsOf(ctx.chain.manifest),
           ...(first !== undefined ? { first } : {}),
           timeline,
