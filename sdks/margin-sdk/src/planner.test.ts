@@ -10,6 +10,7 @@ import { type PoolKey } from './types.js'
 const WETH: Address = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
 const USDC: Address = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
 const ADAPTER: Address = '0x9A7f8F5A9496D3c9dc0BEEfb44cCaC17CAAF28fa'
+const UR: Address = '0x1111111111111111111111111111111111111111'
 const ZERO: Address = '0x0000000000000000000000000000000000000000'
 const OWNER: Address = '0x1111111111111111111111111111111111111111'
 const ROUTER: Address = '0x0000000004BBC92D0657580CAe35aEBF054E5CDC'
@@ -35,6 +36,8 @@ const CAST = {
     '0x000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000000000de0b6b3a7640000',
   withdrawWeth1e18ToOwner:
     '0x0000000000000000000000009a7f8f5a9496d3c9dc0beefb44ccac17caaf28fa000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb480000000000000000000000000000000000000000000000000de0b6b3a76400000000000000000000000000001111111111111111111111111111111111111111',
+  routeSwapWeth1e18:
+    '0x0000000000000000000000001111111111111111111111111111111111111111000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000000000de0b6b3a764000000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000000011000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000002dead000000000000000000000000000000000000000000000000000000000000',
   swapExactOutSingle:
     '0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000003c000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000de0b6b3a764000000000000000000000000000000000000000000000000000000000000b3b53fc0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000000',
   settleUsdcOpenDeltaRouter:
@@ -75,6 +78,32 @@ describe('MarginPlanner action encodings (vs cast abi-encode ground truth)', () 
   test('assertFill', () => {
     const p = new MarginPlanner().assertFill(WETH, 10n ** 18n)
     expect(p.params[0]).toBe(CAST.assertFillWeth1e18 as `0x${string}`)
+  })
+
+  test('routeSwap (vs cast abi-encode of the decodeRouteSwap shape)', () => {
+    const p = new MarginPlanner().routeSwap({
+      universalRouter: UR,
+      input: WETH,
+      maxIn: 10n ** 18n,
+      commands: '0x10',
+      inputs: ['0xdead'],
+    })
+    expect(p.actions).toEqual([MarginAction.ROUTE_SWAP])
+    expect(MarginAction.ROUTE_SWAP).toBe(0x39)
+    expect(p.params[0]).toBe(CAST.routeSwapWeth1e18 as `0x${string}`)
+  })
+
+  test('assertAccountBalance shares the (currency, minAmount) shape with assertFill', () => {
+    const p = new MarginPlanner().setAccount(0n).assertAccountBalance(WETH, 10n ** 18n)
+    expect(p.actions[1]).toBe(MarginAction.ASSERT_ACCOUNT_BALANCE)
+    expect(MarginAction.ASSERT_ACCOUNT_BALANCE).toBe(0x3a)
+    expect(p.params[1]).toBe(CAST.assertFillWeth1e18 as `0x${string}`)
+  })
+
+  test('routeSwap rejects a zero Universal Router and a zero maxIn', () => {
+    const route = { input: WETH, maxIn: 1n, commands: '0x10' as const, inputs: ['0xdead' as const] }
+    expect(() => new MarginPlanner().routeSwap({ ...route, universalRouter: ZERO })).toThrow(MarginSdkError)
+    expect(() => new MarginPlanner().routeSwap({ ...route, universalRouter: UR, maxIn: 0n })).toThrow(MarginSdkError)
   })
 
   test('swapExactOutSingle', () => {
@@ -142,8 +171,14 @@ describe('MarginPlanner.finalize', () => {
 
   test('rejects account-scoped actions before SET_ACCOUNT (NoActiveAccount mirror)', () => {
     expect(() => new MarginPlanner().supplyCollateral(ADAPTER, MARKET, 0n).finalize()).toThrow(MarginSdkError)
-    // ASSERT_FILL and plain routing actions are not account-scoped
+    expect(() => new MarginPlanner().assertAccountBalance(WETH, 1n).finalize()).toThrow(MarginSdkError)
+    // ASSERT_FILL, ROUTE_SWAP, and plain routing actions are not account-scoped
     expect(() => new MarginPlanner().assertFill(WETH, 1n).finalize()).not.toThrow()
+    expect(() =>
+      new MarginPlanner()
+        .routeSwap({ universalRouter: UR, input: WETH, maxIn: 1n, commands: '0x10', inputs: ['0xdead'] })
+        .finalize()
+    ).not.toThrow()
     expect(() => new MarginPlanner().sweep(WETH, MSG_SENDER).finalize()).not.toThrow()
   })
 

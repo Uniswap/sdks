@@ -2,8 +2,9 @@
  * @uniswap/margin-sdk
  *
  * A framework-agnostic toolkit for the Uniswap v4 margin trading periphery: leveraged spot
- * positions built from a v4 swap plus a borrow/supply against an external lending venue (Morpho
- * Blue, Aave v3, Aave v4, Compound v3), all behind one MarginRouter.
+ * positions built from a Universal Router swap (sourcing v2/v3/v4 liquidity) plus a borrow/supply
+ * against an external lending venue (Morpho Blue, Aave v3, Aave v4, Compound v3), all behind one
+ * MarginRouter.
  */
 
 // Chains & addresses
@@ -23,10 +24,11 @@ export * from './market.js'
 export * from './account.js'
 export * from './math.js'
 
-// Entry-point encoders & the execute-plan builder
+// Entry-point encoders, the execute-plan builder & Universal Router route builders
 export * from './encode.js'
 export * from './actions.js'
 export * from './planner.js'
+export * from './route.js'
 
 // Reads (descriptors + viem helpers)
 export * from './reads.js'

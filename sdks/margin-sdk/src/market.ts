@@ -98,11 +98,11 @@ export function poolKeyMatchesMarket(poolKey: PoolKey, market: Market): boolean 
 }
 
 /**
- * Mirrors `Market.toSwapParams` direction derivation: the `zeroForOne` flag for a swap that sells
- * `input` through `poolKey`. Open/increase flows sell the market's debt (buy collateral);
- * close/decrease flows sell the collateral (buy debt to repay). Throws `MARKET_MISMATCH` when the
- * pool's currencies are not the market pair or `input` is not one of the market's currencies —
- * the same condition the contract rejects with `MarketSwapMismatch`.
+ * The `zeroForOne` flag for a swap that sells `input` through `poolKey`. Open/increase flows sell
+ * the market's debt (buy collateral); close/decrease flows sell the collateral (buy debt to
+ * repay). Throws `MARKET_MISMATCH` when the pool's currencies are not the market pair or `input`
+ * is not one of the market's currencies. Direction inside a Universal Router route is derived by
+ * `buildV4ExactOutRoute`; this helper serves plans that use the native v4 swap actions directly.
  */
 export function swapZeroForOne(market: Market, input: Address, poolKey: PoolKey): boolean {
   if (!poolKeyMatchesMarket(poolKey, market)) {

@@ -18,8 +18,7 @@ export interface MarginAddresses {
    * routing table; the caller selects the venue per call by passing the matching adapter. The
    * Aave v4 adapter is bound to a single Spoke and the Compound v3 adapter to a single Comet
    * (whose base token is the only borrowable debt) — a second Spoke/Comet is a second adapter
-   * instance. A venue absent from the record is not in that chain's live deployment yet
-   * (`compoundV3` on mainnet today).
+   * instance. A venue absent from the record is not in that chain's live deployment yet.
    */
   lendingAdapters: Partial<Record<LendingVenue, Address>>
   /** Permit2 (canonical address on every chain). Equity/collateral is pulled through it. */
@@ -34,17 +33,23 @@ const PERMIT2 = getAddress('0x000000000022D473030F116dDEE9F6B43aC78BA3')
 
 /**
  * All deployed margin stacks, keyed by numeric chain id. Mainnet addresses are the
- * `DeployMargin.s.sol` deployment documented in v4-periphery `docs/margin-trading.md`, verified
- * onchain (router `accountImplementation()` / `manager()` / `isAdapterAllowed(...)` read back).
+ * `DeployMargin.s.sol` CREATE2 deployment of the Universal-Router-per-call MarginRouter (the
+ * router that routes position swaps via `ROUTE_SWAP`), verified onchain: contract code, the
+ * governance read, and `isAdapterAllowed(...)` for every adapter read back true.
+ *
+ * The Universal Router is deliberately NOT part of this record: it is a per-call parameter
+ * (`IncreaseParams`/`DecreaseParams`/`ROUTE_SWAP`) so callers pick the deployment their route
+ * targets — it must carry already-unlocked `V4_SWAP` support.
  */
 export const MARGIN_ADDRESSES: Partial<Record<number, MarginAddresses>> = {
   [SupportedChainId.MAINNET]: {
-    marginRouter: getAddress('0x0000000004BBC92D0657580CAe35aEBF054E5CDC'),
-    marginAccountImplementation: getAddress('0x83Fc96d2B162dAF8532e5677C6Ec32A1Cb7882E4'),
+    marginRouter: getAddress('0x00000000000Dc78b00e36d3a7997Bd9c4cd9F1f0'),
+    marginAccountImplementation: getAddress('0x36e5317CEE9F70c0A41A97A4676899Dfe9a10239'),
     lendingAdapters: {
-      morphoBlue: getAddress('0x9A7f8F5A9496D3c9dc0BEEfb44cCaC17CAAF28fa'),
-      aaveV3: getAddress('0x8EeacdB24c7650478496845A61f03fF6BC263222'),
-      aaveV4: getAddress('0x3a9Cc5eEbAC911E5a316de1F2bCD166016d7469E'),
+      morphoBlue: getAddress('0x08e4C6b61D99B6f2AD472c16ECE641F63F5635D5'),
+      aaveV3: getAddress('0x2c0bDc6786D285665337Ce7d544C8bC80a23A55C'),
+      aaveV4: getAddress('0xaC98DBcdC8c9f665372BbBE68C6A9123A8CbA6Eb'),
+      compoundV3: getAddress('0xAaD2B75B9557748a16216f991613deFE42134c36'),
     },
     permit2: PERMIT2,
     poolManager: getAddress('0x000000000004444c5dc75cB358380D2e3dE08A90'),

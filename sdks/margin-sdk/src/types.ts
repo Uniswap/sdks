@@ -8,9 +8,13 @@ import { type Address, type Hex } from 'viem'
  * - IncreaseParams / DecreaseParams / AddCollateralParams: v4-periphery `IMarginRouter.sol`
  * - PositionData: v4-periphery `types/PositionData.sol`
  *
- * `Ltv` values are WAD-scaled bigints (1e18 == 100%); `LeverageX18` values are WAD multipliers
+ * `Ltv` values are WAD-scaled bigints (1e18 == 100%); leverage values are WAD multipliers
  * (1e18 == 1x). Fields the contract documents as optional-with-zero-default are optional here and
  * filled by the encoders.
+ *
+ * Position swaps route through the **Universal Router**, supplied per call: the caller builds the
+ * route offchain (`routeCommands`/`routeInputs`, e.g. with `buildV4ExactOutRoute`) so liquidity
+ * can be sourced across v2/v3/v4, and picks the Universal Router deployment the route targets.
  */
 
 /**
@@ -25,7 +29,7 @@ export interface Market {
   debt: Address
 }
 
-/** The v4 pool descriptor the leverage swap routes through. `currency0 < currency1`. */
+/** A v4 pool descriptor (used by plan swap actions and the v4 route builder). `currency0 < currency1`. */
 export interface PoolKey {
   currency0: Address
   currency1: Address
@@ -43,25 +47,39 @@ export interface IncreaseParams {
   adapter: Address
   /** The (collateral, debt) pair. This sets direction: long the collateral, short the debt. */
   market: Market
-  /** The v4 pool the leverage swap routes through; its currencies must equal the market pair. */
-  poolKey: PoolKey
   /**
    * Collateral equity the caller contributes, in the collateral token's native decimals. Pulled
    * via Permit2. Ignored when the call sends native ETH (`value > 0`) — pass 0 there.
    */
   equity: bigint
-  /** uint128. The exact collateral to buy on the swap (exact-output side), in native decimals. */
+  /**
+   * uint128. The exact collateral the route buys (its exact-output amount), in native decimals.
+   * The router asserts the account received it, so it must match the route's `amountOut`.
+   */
   collateralToBuy: bigint
   /**
-   * uint128. The mandatory, binding slippage bound: the absolute cap on debt spent as swap input,
-   * in the debt token's native decimals. Derive it from a quote, not spot price.
+   * uint128. The mandatory, binding slippage bound: the maximum debt the router flash-takes and
+   * lets the Universal Router spend (a scoped Permit2 allowance of exactly this much), independent
+   * of the route's own `amountInMaximum`. Derive it from a quote, not spot price.
    */
   maxDebtIn: bigint
-  /** Optional additional per-hop price bound (X36 fixed-point). Zero (default) disables it. */
-  minHopPriceX36?: bigint
+  /**
+   * The Universal Router the debt->collateral swap routes through. Supplied per call so the caller
+   * picks the deployment their route targets; must carry already-unlocked `V4_SWAP` support.
+   */
+  universalRouter: Address
+  /**
+   * The Universal Router command byte string for the debt->collateral swap. The route MUST buy
+   * `collateralToBuy` exact-output and deliver it to the caller's MarginAccount, drawing the input
+   * from the router (the payer) via Permit2 — see `buildV4ExactOutRoute` for the single-pool case.
+   */
+  routeCommands: Hex
+  /** The per-command ABI-encoded inputs for `routeCommands`. */
+  routeInputs: Hex[]
   /**
    * Optional resulting-LTV bound (WAD, 1e18 == 100%), asserted after the position settles. Zero
-   * (default) skips the check.
+   * (default) skips the check; a supplied bound must sit strictly below 1e18
+   * (`IneffectiveLtvBound` otherwise).
    */
   maxLtvAfter?: bigint
   /** Sub-account index; (caller, subId) determines the MarginAccount. Default 0. */
@@ -76,25 +94,36 @@ export interface DecreaseParams {
   adapter: Address
   /** The (collateral, debt) pair. */
   market: Market
-  /** The v4 pool the decrease swap routes through. */
-  poolKey: PoolKey
   /**
-   * The exact debt to repay (exact-output side of the swap), in the debt token's native decimals,
-   * or `FULL_CLOSE` (`type(uint256).max`) to fully close: repay all, withdraw all, return the
-   * residual to the caller.
+   * The exact debt the route buys and repays (its exact-output amount), in the debt token's
+   * native decimals, or `FULL_CLOSE` (`type(uint256).max`) to fully close: repay all, withdraw
+   * all, return the residual to the caller. On a full close the route must buy AT LEAST the
+   * current debt (quote it with a small accrual buffer); over-bought debt is returned.
    */
   debtToRepay: bigint
   /**
-   * uint128. The mandatory, binding slippage bound: the absolute cap on collateral sold, in the
-   * collateral token's native decimals. A zero-debt full close takes a swap-free path and ignores
-   * it.
+   * uint128. The mandatory, binding slippage bound: the maximum collateral the router flash-takes
+   * and lets the Universal Router spend (a scoped Permit2 allowance), independent of the route's
+   * own `amountInMaximum`. A zero-debt full close takes a swap-free path and ignores it.
    */
   maxCollateralIn: bigint
-  /** Optional additional per-hop price bound (X36 fixed-point). Zero (default) disables it. */
-  minHopPriceX36?: bigint
   /**
-   * The maximum LTV the position may have after a partial decrease (WAD). Mandatory for a partial
-   * decrease; ignored on a full close.
+   * The Universal Router the collateral->debt swap routes through. Required on the swap path (any
+   * partial decrease, and a full close of a position with debt); a zero-debt full close is
+   * swap-free and may omit it.
+   */
+  universalRouter?: Address
+  /**
+   * The Universal Router command byte string for the collateral->debt swap. The route MUST buy the
+   * target debt exact-output and deliver it to the caller's MarginAccount, drawing the input from
+   * the router (the payer) via Permit2. Same swap-path requirement as `universalRouter`.
+   */
+  routeCommands?: Hex
+  /** The per-command ABI-encoded inputs for `routeCommands`. */
+  routeInputs?: Hex[]
+  /**
+   * The maximum LTV the position may have after a partial decrease (WAD, strictly below 1e18).
+   * Mandatory for a partial decrease; ignored on a full close.
    */
   maxLtvAfter?: bigint
   /** Sub-account index identifying which MarginAccount to decrease or close. Default 0. */

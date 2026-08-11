@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { type Address, decodeFunctionData, toFunctionSelector } from 'viem'
 
 import { MARGIN_ACCOUNT_ABI, MARGIN_ROUTER_ABI } from './abis.js'
-import { ADDRESS_THIS, FULL_CLOSE, MSG_SENDER } from './constants.js'
+import { ADDRESS_THIS, FULL_CLOSE, MSG_SENDER, WAD } from './constants.js'
 import {
   accountBorrowCall,
   accountRepayCall,
@@ -25,37 +25,51 @@ import {
   increasePositionCall,
 } from './encode.js'
 import { MarginSdkError } from './errors.js'
-import { type IncreaseParams, type PoolKey } from './types.js'
+import { type IncreaseParams } from './types.js'
 
 const WETH: Address = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
 const USDC: Address = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
 const ADAPTER: Address = '0x9A7f8F5A9496D3c9dc0BEEfb44cCaC17CAAF28fa'
-const ROUTER: Address = '0x0000000004BBC92D0657580CAe35aEBF054E5CDC'
+const ROUTER: Address = '0x00000000000Dc78b00e36d3a7997Bd9c4cd9F1f0'
+const UNIVERSAL_ROUTER: Address = '0x1111111111111111111111111111111111111111'
 const ZERO: Address = '0x0000000000000000000000000000000000000000'
 
+function expectCode(fn: () => unknown, code: string): void {
+  let thrown: unknown
+  try {
+    fn()
+  } catch (error) {
+    thrown = error
+  }
+  expect(thrown).toBeInstanceOf(MarginSdkError)
+  expect((thrown as MarginSdkError).code).toBe(code as never)
+}
+
 const LONG_MARKET = { collateral: WETH, debt: USDC }
-const POOL: PoolKey = { currency0: USDC, currency1: WETH, fee: 3000, tickSpacing: 60, hooks: ZERO }
+const ROUTE = { universalRouter: UNIVERSAL_ROUTER, routeCommands: '0x10', routeInputs: ['0xdead'] } as const
 
 const BASE_INCREASE: IncreaseParams = {
   adapter: ADAPTER,
   market: LONG_MARKET,
-  poolKey: POOL,
   equity: 10n ** 18n,
   collateralToBuy: 10n ** 18n,
   maxDebtIn: 10_000n * 10n ** 6n,
+  ...ROUTE,
+  routeInputs: [...ROUTE.routeInputs],
   deadline: 1n,
 }
 
 /**
  * Ground-truth calldata generated with `cast calldata` from the deployed contract's signatures;
- * each selector was additionally confirmed against the live mainnet router (an expired deadline
- * reverts `DeadlinePassed`, proving the selector dispatched).
+ * each selector was additionally confirmed against the live mainnet router at
+ * 0x00000000000Dc78b00e36d3a7997Bd9c4cd9F1f0 (an expired deadline reverts `DeadlinePassed(1)`,
+ * proving the selector dispatched).
  */
 const CAST_INCREASE_CALLDATA =
-  '0xba63804f0000000000000000000000009a7f8f5a9496d3c9dc0beefb44ccac17caaf28fa000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000003c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000de0b6b3a76400000000000000000000000000000000000000000000000000000de0b6b3a764000000000000000000000000000000000000000000000000000000000002540be4000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001'
+  '0x084a1ed300000000000000000000000000000000000000000000000000000000000000200000000000000000000000009a7f8f5a9496d3c9dc0beefb44ccac17caaf28fa000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb480000000000000000000000000000000000000000000000000de0b6b3a76400000000000000000000000000000000000000000000000000000de0b6b3a764000000000000000000000000000000000000000000000000000000000002540be4000000000000000000000000001111111111111111111111111111111111111111000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000001c000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000011000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000002dead000000000000000000000000000000000000000000000000000000000000'
 
 const CAST_DECREASE_CALLDATA =
-  '0x12d833730000000000000000000000009a7f8f5a9496d3c9dc0beefb44ccac17caaf28fa000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000003c000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000f42400000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009b6e64a8ec6000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001'
+  '0x9b30450500000000000000000000000000000000000000000000000000000000000000200000000000000000000000009a7f8f5a9496d3c9dc0beefb44ccac17caaf28fa000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb4800000000000000000000000000000000000000000000000000000000000f42400000000000000000000000000000000000000000000000000de0b6b3a76400000000000000000000000000001111111111111111111111111111111111111111000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000001a000000000000000000000000000000000000000000000000009b6e64a8ec600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000011000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000002dead000000000000000000000000000000000000000000000000000000000000'
 
 const CAST_ADD_COLLATERAL_CALLDATA =
   '0x434f7ded0000000000000000000000009a7f8f5a9496d3c9dc0beefb44ccac17caaf28fa000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb480000000000000000000000000000000000000000000000000de0b6b3a764000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001'
@@ -65,8 +79,8 @@ const CAST_EXECUTE_CALLDATA =
 
 describe('entry point selectors (verified against the live mainnet router)', () => {
   const selectors: Record<string, string> = {
-    increasePosition: '0xba63804f',
-    decreasePosition: '0x12d83373',
+    increasePosition: '0x084a1ed3',
+    decreasePosition: '0x9b304505',
     addCollateral: '0x434f7ded',
     execute: '0xab5898e8',
     accountOf: '0x0c1905e5',
@@ -89,11 +103,13 @@ describe('encodeIncreasePosition', () => {
   })
 
   test('round-trips through decodeFunctionData', () => {
-    const data = encodeIncreasePosition({ ...BASE_INCREASE, minHopPriceX36: 5n, maxLtvAfter: 7n, subId: 9n })
+    const data = encodeIncreasePosition({ ...BASE_INCREASE, maxLtvAfter: 7n, subId: 9n })
     const { functionName, args } = decodeFunctionData({ abi: MARGIN_ROUTER_ABI, data })
     expect(functionName).toBe('increasePosition')
     const params = (args as readonly [Record<string, unknown>])[0]
-    expect(params.minHopPriceX36).toBe(5n)
+    expect(params.universalRouter).toBe(UNIVERSAL_ROUTER)
+    expect(params.routeCommands).toBe('0x10')
+    expect(params.routeInputs).toEqual(['0xdead'])
     expect(params.maxLtvAfter).toBe(7n)
     expect(params.subId).toBe(9n)
   })
@@ -110,9 +126,18 @@ describe('encodeIncreasePosition', () => {
     expect(() => encodeIncreasePosition({ ...BASE_INCREASE, collateralToBuy: 1n << 128n })).toThrow(MarginSdkError)
   })
 
-  test('rejects a pool that does not trade the market pair', () => {
-    const wrongPool: PoolKey = { ...POOL, currency1: ADAPTER }
-    expect(() => encodeIncreasePosition({ ...BASE_INCREASE, poolKey: wrongPool })).toThrow(MarginSdkError)
+  test('rejects a zero Universal Router (UniversalRouterNotSet mirror)', () => {
+    expectCode(() => encodeIncreasePosition({ ...BASE_INCREASE, universalRouter: ZERO }), 'UNIVERSAL_ROUTER_REQUIRED')
+  })
+
+  test('rejects an empty route', () => {
+    expect(() => encodeIncreasePosition({ ...BASE_INCREASE, routeCommands: '0x' })).toThrow(MarginSdkError)
+    expect(() => encodeIncreasePosition({ ...BASE_INCREASE, routeInputs: [] })).toThrow(MarginSdkError)
+  })
+
+  test('rejects an unbindable maxLtvAfter (IneffectiveLtvBound mirror)', () => {
+    expectCode(() => encodeIncreasePosition({ ...BASE_INCREASE, maxLtvAfter: WAD }), 'INEFFECTIVE_LTV_BOUND')
+    expect(() => encodeIncreasePosition({ ...BASE_INCREASE, maxLtvAfter: WAD - 1n })).not.toThrow()
   })
 
   test('rejects a native-ETH market currency', () => {
@@ -139,9 +164,10 @@ describe('encodeDecreasePosition', () => {
   const partial = {
     adapter: ADAPTER,
     market: LONG_MARKET,
-    poolKey: POOL,
     debtToRepay: 10n ** 6n,
     maxCollateralIn: 10n ** 18n,
+    ...ROUTE,
+    routeInputs: [...ROUTE.routeInputs],
     maxLtvAfter: 7n * 10n ** 17n,
     deadline: 1n,
   }
@@ -154,14 +180,49 @@ describe('encodeDecreasePosition', () => {
     expect(() => encodeDecreasePosition({ ...partial, maxLtvAfter: 0n })).toThrow(MarginSdkError)
   })
 
+  test('partial decrease rejects an unbindable maxLtvAfter', () => {
+    expectCode(() => encodeDecreasePosition({ ...partial, maxLtvAfter: WAD }), 'INEFFECTIVE_LTV_BOUND')
+  })
+
   test('partial decrease requires maxCollateralIn', () => {
     expect(() => encodeDecreasePosition({ ...partial, maxCollateralIn: 0n })).toThrow(MarginSdkError)
   })
 
-  test('full close ignores maxLtvAfter and allows zero maxCollateralIn (zero-debt path)', () => {
-    const data = encodeDecreasePosition({ ...partial, debtToRepay: FULL_CLOSE, maxLtvAfter: 0n, maxCollateralIn: 0n })
+  test('partial decrease requires the Universal Router route', () => {
+    expectCode(() => encodeDecreasePosition({ ...partial, universalRouter: ZERO }), 'UNIVERSAL_ROUTER_REQUIRED')
+    expect(() => encodeDecreasePosition({ ...partial, universalRouter: undefined })).toThrow(MarginSdkError)
+    expect(() => encodeDecreasePosition({ ...partial, routeCommands: '0x' })).toThrow(MarginSdkError)
+  })
+
+  test('full close allows an omitted route and zero bounds (zero-debt swap-free path)', () => {
+    const data = encodeDecreasePosition({
+      adapter: ADAPTER,
+      market: LONG_MARKET,
+      debtToRepay: FULL_CLOSE,
+      maxCollateralIn: 0n,
+      deadline: 1n,
+    })
     const { args } = decodeFunctionData({ abi: MARGIN_ROUTER_ABI, data })
-    expect((args as readonly [Record<string, unknown>])[0].debtToRepay).toBe(FULL_CLOSE)
+    const params = (args as readonly [Record<string, unknown>])[0]
+    expect(params.debtToRepay).toBe(FULL_CLOSE)
+    expect(params.universalRouter).toBe(ZERO)
+    expect(params.routeCommands).toBe('0x')
+  })
+
+  test('full close with a route requires a Universal Router for it', () => {
+    expectCode(
+      () =>
+        encodeDecreasePosition({
+          adapter: ADAPTER,
+          market: LONG_MARKET,
+          debtToRepay: FULL_CLOSE,
+          maxCollateralIn: 10n ** 18n,
+          routeCommands: '0x10',
+          routeInputs: ['0xdead'],
+          deadline: 1n,
+        }),
+      'UNIVERSAL_ROUTER_REQUIRED'
+    )
   })
 
   test('closePositionCall sets the FULL_CLOSE sentinel', () => {
@@ -170,8 +231,9 @@ describe('encodeDecreasePosition', () => {
       params: {
         adapter: ADAPTER,
         market: LONG_MARKET,
-        poolKey: POOL,
         maxCollateralIn: 5n * 10n ** 18n,
+        ...ROUTE,
+        routeInputs: [...ROUTE.routeInputs],
         deadline: 1n,
       },
     })
@@ -364,5 +426,11 @@ describe('address validation', () => {
     expect(() =>
       encodeIncreasePosition({ ...BASE_INCREASE, market: { collateral: 'not-an-address' as never, debt: USDC } })
     ).toThrow(MarginSdkError)
+  })
+
+  test('rejects a malformed universalRouter address', () => {
+    expect(() => encodeIncreasePosition({ ...BASE_INCREASE, universalRouter: '0xbad' as never })).toThrow(
+      MarginSdkError
+    )
   })
 })

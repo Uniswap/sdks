@@ -1,10 +1,10 @@
-import { type Address, type Hex, encodeFunctionData } from 'viem'
+import { type Address, type Hex, encodeFunctionData, isAddressEqual, zeroAddress } from 'viem'
 
 import { MARGIN_ACCOUNT_ABI, MARGIN_ROUTER_ABI, PERMIT2_ABI } from './abis.js'
 import { validateAccountRecipient } from './account.js'
-import { FULL_CLOSE, MAX_UINT48 } from './constants.js'
+import { FULL_CLOSE, MAX_UINT48, WAD } from './constants.js'
 import { MarginSdkError } from './errors.js'
-import { poolKeyMatchesMarket, validateAddress, validateMarket } from './market.js'
+import { validateAddress, validateMarket } from './market.js'
 import { toUint128 } from './math.js'
 import { type AddCollateralParams, type DecreaseParams, type IncreaseParams, type Market } from './types.js'
 
@@ -37,11 +37,9 @@ export function validateDeadline(deadline: bigint): void {
  *    straight into viem `simulateContract`/`writeContract` or wagmi `useWriteContract`.
  *
  * Always `simulateContract` before `writeContract` so reverts (`SlippageBoundRequired`,
- * `ZeroAmount`, `PositionUnhealthy`, `AdapterNotAllowed`, `DeadlinePassed`,
- * `NativeCollateralMismatch`, `IncompleteFill`) surface with a decoded message. (`ZeroAmount` is
- * the dedicated zero-amount error in current v4-periphery source; the live mainnet router predates
- * it and reverts those paths with `SlippageBoundRequired`. The SDK validates the inputs offchain
- * either way.)
+ * `ZeroAmount`, `IneffectiveLtvBound`, `UniversalRouterNotSet`, `PositionUnhealthy`,
+ * `AdapterNotAllowed`, `DeadlinePassed`, `NativeCollateralMismatch`, `IncompleteFill`) surface
+ * with a decoded message. The SDK validates the same inputs offchain first.
  */
 
 /** A framework-agnostic contract write descriptor. */
@@ -64,14 +62,42 @@ export interface AccountContractWrite {
   args: readonly unknown[]
 }
 
+/** Mirrors onchain `IneffectiveLtvBound`: a supplied bound at or above 100% can never bind. */
+function validateLtvBound(maxLtvAfter: bigint, context: string): void {
+  if (maxLtvAfter !== 0n && maxLtvAfter >= WAD) {
+    throw new MarginSdkError(
+      'INEFFECTIVE_LTV_BOUND',
+      `maxLtvAfter must sit strictly below 100% (1e18) to be able to bind${context}, got ${maxLtvAfter}`
+    )
+  }
+}
+
+/** Mirrors onchain `UniversalRouterNotSet` plus the SDK's route completeness checks. */
+function validateRoute(p: { universalRouter: Address; routeCommands: Hex; routeInputs: Hex[] }, flow: string): void {
+  validateAddress(p.universalRouter, 'universalRouter')
+  if (isAddressEqual(p.universalRouter, zeroAddress)) {
+    throw new MarginSdkError(
+      'UNIVERSAL_ROUTER_REQUIRED',
+      `${flow} routes the swap through the Universal Router; universalRouter must not be the zero address`
+    )
+  }
+  if (p.routeCommands === '0x' || p.routeInputs.length === 0) {
+    throw new MarginSdkError(
+      'INVALID_INPUT',
+      `${flow} requires a Universal Router route (routeCommands/routeInputs) that buys the exact output — build one with buildV4ExactOutRoute or the universal-router-sdk`
+    )
+  }
+}
+
 type IncreaseArgs = {
   adapter: Address
   market: { collateral: Address; debt: Address }
-  poolKey: IncreaseParams['poolKey']
   equity: bigint
   collateralToBuy: bigint
   maxDebtIn: bigint
-  minHopPriceX36: bigint
+  universalRouter: Address
+  routeCommands: Hex
+  routeInputs: Hex[]
   maxLtvAfter: bigint
   subId: bigint
   deadline: bigint
@@ -81,9 +107,7 @@ function normalizeIncrease(params: IncreaseParams, isNative: boolean): IncreaseA
   validateAddress(params.adapter, 'adapter')
   validateMarket(params.market)
   validateDeadline(params.deadline)
-  if (!poolKeyMatchesMarket(params.poolKey, params.market)) {
-    throw new MarginSdkError('MARKET_MISMATCH', 'pool currencies do not match the market (collateral, debt) pair')
-  }
+  validateRoute(params, 'increasePosition')
   if (params.collateralToBuy <= 0n) {
     throw new MarginSdkError(
       'INVALID_AMOUNT',
@@ -93,6 +117,7 @@ function normalizeIncrease(params: IncreaseParams, isNative: boolean): IncreaseA
   if (params.maxDebtIn <= 0n) {
     throw new MarginSdkError('SLIPPAGE_BOUND_REQUIRED', 'maxDebtIn is the binding slippage cap and must be non-zero')
   }
+  validateLtvBound(params.maxLtvAfter ?? 0n, '')
   if (isNative && params.equity !== 0n) {
     throw new MarginSdkError(
       'INVALID_INPUT',
@@ -105,11 +130,12 @@ function normalizeIncrease(params: IncreaseParams, isNative: boolean): IncreaseA
   return {
     adapter: params.adapter,
     market: params.market,
-    poolKey: params.poolKey,
     equity: params.equity,
     collateralToBuy: toUint128(params.collateralToBuy, 'collateralToBuy'),
     maxDebtIn: toUint128(params.maxDebtIn, 'maxDebtIn'),
-    minHopPriceX36: params.minHopPriceX36 ?? 0n,
+    universalRouter: params.universalRouter,
+    routeCommands: params.routeCommands,
+    routeInputs: params.routeInputs,
     maxLtvAfter: params.maxLtvAfter ?? 0n,
     subId: params.subId ?? 0n,
     deadline: params.deadline,
@@ -152,10 +178,11 @@ export function increasePositionCall(p: {
 type DecreaseArgs = {
   adapter: Address
   market: { collateral: Address; debt: Address }
-  poolKey: DecreaseParams['poolKey']
   debtToRepay: bigint
   maxCollateralIn: bigint
-  minHopPriceX36: bigint
+  universalRouter: Address
+  routeCommands: Hex
+  routeInputs: Hex[]
   maxLtvAfter: bigint
   subId: bigint
   deadline: bigint
@@ -165,16 +192,20 @@ function normalizeDecrease(params: DecreaseParams): DecreaseArgs {
   validateAddress(params.adapter, 'adapter')
   validateMarket(params.market)
   validateDeadline(params.deadline)
-  if (!poolKeyMatchesMarket(params.poolKey, params.market)) {
-    throw new MarginSdkError('MARKET_MISMATCH', 'pool currencies do not match the market (collateral, debt) pair')
-  }
   if (params.debtToRepay <= 0n) {
     throw new MarginSdkError('INVALID_AMOUNT', 'debtToRepay must be positive (or FULL_CLOSE to close the position)')
   }
   const isFullClose = params.debtToRepay === FULL_CLOSE
+  const route = {
+    universalRouter: params.universalRouter ?? zeroAddress,
+    routeCommands: params.routeCommands ?? ('0x' as Hex),
+    routeInputs: params.routeInputs ?? [],
+  }
   if (!isFullClose) {
-    // The contract requires both bounds on a partial decrease; a full close ignores maxLtvAfter,
-    // and a zero-debt full close also ignores maxCollateralIn (swap-free path).
+    // The contract requires the route and both bounds on a partial decrease; a full close ignores
+    // maxLtvAfter, and a zero-debt full close also ignores the route and maxCollateralIn
+    // (swap-free path).
+    validateRoute(route, 'a partial decrease')
     if (params.maxCollateralIn <= 0n) {
       throw new MarginSdkError(
         'SLIPPAGE_BOUND_REQUIRED',
@@ -187,14 +218,20 @@ function normalizeDecrease(params: DecreaseParams): DecreaseArgs {
         'maxLtvAfter is mandatory on a partial decrease (it bounds the resulting position health)'
       )
     }
+    validateLtvBound(params.maxLtvAfter ?? 0n, ' on a partial decrease')
+  } else if (route.routeCommands !== '0x' || route.routeInputs.length > 0) {
+    // A full close of a position with debt needs the route; only validate consistency here — the
+    // SDK cannot know offchain whether the position is debt-free (the swap-free path).
+    validateRoute(route, 'a full close with a route')
   }
   return {
     adapter: params.adapter,
     market: params.market,
-    poolKey: params.poolKey,
     debtToRepay: params.debtToRepay,
     maxCollateralIn: toUint128(params.maxCollateralIn, 'maxCollateralIn'),
-    minHopPriceX36: params.minHopPriceX36 ?? 0n,
+    universalRouter: route.universalRouter,
+    routeCommands: route.routeCommands,
+    routeInputs: route.routeInputs,
     maxLtvAfter: params.maxLtvAfter ?? 0n,
     subId: params.subId ?? 0n,
     deadline: params.deadline,
@@ -327,12 +364,10 @@ type AccountWithdrawCollateralArgs = readonly [
   adapter: Address,
   market: { collateral: Address; debt: Address },
   amount: bigint,
-  to: Address,
+  to: Address
 ]
 
-function normalizeAccountWithdrawCollateral(
-  params: AccountWithdrawCollateralParams
-): AccountWithdrawCollateralArgs {
+function normalizeAccountWithdrawCollateral(params: AccountWithdrawCollateralParams): AccountWithdrawCollateralArgs {
   validateAddress(params.adapter, 'adapter')
   validateMarket(params.market)
   validateAccountRecipient(params.to, 'withdrawCollateral')

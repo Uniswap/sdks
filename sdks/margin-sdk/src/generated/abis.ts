@@ -2,8 +2,8 @@
  * GENERATED FILE — DO NOT EDIT.
  *
  * Forge-generated ABI bindings for the margin trading periphery.
- * Pinned to v4-periphery commit e4a50623cc38e997a582c1eecd4e521e218ebfd3
- * (https://github.com/Uniswap/v4-periphery/commit/e4a50623cc38e997a582c1eecd4e521e218ebfd3)
+ * Pinned to v4-periphery commit 4202ba3b97e4aab58f6f6a019f4e2c1d5d2d0d43
+ * (https://github.com/Uniswap/v4-periphery/commit/4202ba3b97e4aab58f6f6a019f4e2c1d5d2d0d43)
  *
  * Regenerate with `bun run regenerate:abis`; CI verifies the bindings against a fresh build of
  * the pinned commit via `bun run check:abis`. LENDING_ADAPTER_ABI is the venue-agnostic surface:
@@ -16,7 +16,7 @@ import { type Abi } from 'viem'
 /** The v4-periphery source this file was generated from. */
 export const V4_PERIPHERY_PIN = {
   repository: 'Uniswap/v4-periphery',
-  commit: 'e4a50623cc38e997a582c1eecd4e521e218ebfd3',
+  commit: '4202ba3b97e4aab58f6f6a019f4e2c1d5d2d0d43',
 } as const
 
 /** src/MarginRouter.sol:MarginRouter */
@@ -169,7 +169,7 @@ export const MARGIN_ROUTER_ABI = [
     outputs: [
       {
         type: 'address',
-        name: 'account',
+        name: '',
       },
     ],
   },
@@ -201,32 +201,6 @@ export const MARGIN_ROUTER_ABI = [
             ],
           },
           {
-            type: 'tuple',
-            name: 'poolKey',
-            components: [
-              {
-                type: 'address',
-                name: 'currency0',
-              },
-              {
-                type: 'address',
-                name: 'currency1',
-              },
-              {
-                type: 'uint24',
-                name: 'fee',
-              },
-              {
-                type: 'int24',
-                name: 'tickSpacing',
-              },
-              {
-                type: 'address',
-                name: 'hooks',
-              },
-            ],
-          },
-          {
             type: 'uint256',
             name: 'debtToRepay',
           },
@@ -235,8 +209,16 @@ export const MARGIN_ROUTER_ABI = [
             name: 'maxCollateralIn',
           },
           {
-            type: 'uint256',
-            name: 'minHopPriceX36',
+            type: 'address',
+            name: 'universalRouter',
+          },
+          {
+            type: 'bytes',
+            name: 'routeCommands',
+          },
+          {
+            type: 'bytes[]',
+            name: 'routeInputs',
           },
           {
             type: 'uint256',
@@ -316,32 +298,6 @@ export const MARGIN_ROUTER_ABI = [
             ],
           },
           {
-            type: 'tuple',
-            name: 'poolKey',
-            components: [
-              {
-                type: 'address',
-                name: 'currency0',
-              },
-              {
-                type: 'address',
-                name: 'currency1',
-              },
-              {
-                type: 'uint24',
-                name: 'fee',
-              },
-              {
-                type: 'int24',
-                name: 'tickSpacing',
-              },
-              {
-                type: 'address',
-                name: 'hooks',
-              },
-            ],
-          },
-          {
             type: 'uint256',
             name: 'equity',
           },
@@ -354,8 +310,16 @@ export const MARGIN_ROUTER_ABI = [
             name: 'maxDebtIn',
           },
           {
-            type: 'uint256',
-            name: 'minHopPriceX36',
+            type: 'address',
+            name: 'universalRouter',
+          },
+          {
+            type: 'bytes',
+            name: 'routeCommands',
+          },
+          {
+            type: 'bytes[]',
+            name: 'routeInputs',
           },
           {
             type: 'uint256',
@@ -882,12 +846,84 @@ export const MARGIN_ROUTER_ABI = [
     ],
   },
   {
+    type: 'event',
+    name: 'PositionUpdated',
+    anonymous: false,
+    inputs: [
+      {
+        type: 'address',
+        name: 'owner',
+        indexed: true,
+      },
+      {
+        type: 'address',
+        name: 'account',
+        indexed: true,
+      },
+      {
+        type: 'address',
+        name: 'collateral',
+        indexed: false,
+      },
+      {
+        type: 'address',
+        name: 'debt',
+        indexed: false,
+      },
+      {
+        type: 'uint256',
+        name: 'collateralTotal',
+        indexed: false,
+      },
+      {
+        type: 'uint256',
+        name: 'debtTotal',
+        indexed: false,
+      },
+      {
+        type: 'uint256',
+        name: 'currentLtv',
+        indexed: false,
+      },
+      {
+        type: 'uint256',
+        name: 'maxLtv',
+        indexed: false,
+      },
+      {
+        type: 'uint256',
+        name: 'healthFactorWad',
+        indexed: false,
+      },
+    ],
+  },
+  {
     type: 'error',
     name: 'AdapterNotAllowed',
     inputs: [
       {
         type: 'address',
         name: 'adapter',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'AddressEmptyCode',
+    inputs: [
+      {
+        type: 'address',
+        name: 'target',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'AddressInsufficientBalance',
+    inputs: [
+      {
+        type: 'address',
+        name: 'account',
       },
     ],
   },
@@ -928,6 +964,11 @@ export const MARGIN_ROUTER_ABI = [
   },
   {
     type: 'error',
+    name: 'FailedInnerCall',
+    inputs: [],
+  },
+  {
+    type: 'error',
     name: 'IncompleteFill',
     inputs: [
       {
@@ -937,6 +978,16 @@ export const MARGIN_ROUTER_ABI = [
       {
         type: 'uint256',
         name: 'received',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'IneffectiveLtvBound',
+    inputs: [
+      {
+        type: 'uint256',
+        name: 'maxLtvAfter',
       },
     ],
   },
@@ -963,11 +1014,6 @@ export const MARGIN_ROUTER_ABI = [
   {
     type: 'error',
     name: 'InvalidHopPriceLength',
-    inputs: [],
-  },
-  {
-    type: 'error',
-    name: 'MarketSwapMismatch',
     inputs: [],
   },
   {
@@ -1012,7 +1058,22 @@ export const MARGIN_ROUTER_ABI = [
   },
   {
     type: 'error',
+    name: 'SafeERC20FailedOperation',
+    inputs: [
+      {
+        type: 'address',
+        name: 'token',
+      },
+    ],
+  },
+  {
+    type: 'error',
     name: 'SlippageBoundRequired',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'UniversalRouterNotSet',
     inputs: [],
   },
   {
@@ -1022,6 +1083,20 @@ export const MARGIN_ROUTER_ABI = [
       {
         type: 'uint256',
         name: 'action',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'V4ExactOutputUnfilled',
+    inputs: [
+      {
+        type: 'uint256',
+        name: 'amountOutRequested',
+      },
+      {
+        type: 'uint256',
+        name: 'amountOutReceived',
       },
     ],
   },

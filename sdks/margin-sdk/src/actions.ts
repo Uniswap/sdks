@@ -44,6 +44,14 @@ export enum MarginAction {
   SET_ACCOUNT = 0x37,
   /** Move a token into the active account (Permit2 pull or router balance). Zero amount reverts. */
   PULL_TO_ACCOUNT = 0x38,
+  /**
+   * Route a swap through a caller-supplied Universal Router (v2/v3/v4 liquidity) behind a
+   * flash-take of up to `maxIn` of `input`. The route must deliver the output to the active
+   * account and self-settle; follow with `ASSERT_ACCOUNT_BALANCE` to make it all-or-nothing.
+   */
+  ROUTE_SWAP = 0x39,
+  /** Assert the active account holds at least a minimum currency balance (`IncompleteFill` otherwise). */
+  ASSERT_ACCOUNT_BALANCE = 0x3a,
 }
 
 export type PlanAction = V4RouterAction | MarginAction
@@ -202,9 +210,24 @@ export const ACTION_ABI: Record<PlanAction, readonly AbiParameter[]> = {
     { name: 'amount', type: 'uint256' },
     { name: 'payerIsUser', type: 'bool' },
   ],
+  [MarginAction.ROUTE_SWAP]: [
+    { name: 'universalRouter', type: 'address' },
+    { name: 'input', type: 'address' },
+    { name: 'maxIn', type: 'uint256' },
+    { name: 'commands', type: 'bytes' },
+    { name: 'inputs', type: 'bytes[]' },
+  ],
+  [MarginAction.ASSERT_ACCOUNT_BALANCE]: [
+    { name: 'currency', type: 'address' },
+    { name: 'minAmount', type: 'uint256' },
+  ],
 }
 
-/** The margin actions that operate on the active account (require a preceding `SET_ACCOUNT`). */
+/**
+ * The margin actions that operate on the active account (require a preceding `SET_ACCOUNT`).
+ * `ROUTE_SWAP` dispatches account-independently onchain, but its route must deliver the output to
+ * the active account — pair it with `ASSERT_ACCOUNT_BALANCE` inside an account section.
+ */
 export const ACCOUNT_SCOPED_ACTIONS: ReadonlySet<number> = new Set([
   MarginAction.ACCOUNT_SUPPLY_COLLATERAL,
   MarginAction.ACCOUNT_WITHDRAW_COLLATERAL,
@@ -212,5 +235,6 @@ export const ACCOUNT_SCOPED_ACTIONS: ReadonlySet<number> = new Set([
   MarginAction.ACCOUNT_REPAY,
   MarginAction.ACCOUNT_SWEEP,
   MarginAction.ASSERT_HEALTH,
+  MarginAction.ASSERT_ACCOUNT_BALANCE,
   MarginAction.PULL_TO_ACCOUNT,
 ])

@@ -134,6 +134,37 @@ export class MarginPlanner {
     return this.add(MarginAction.ASSERT_FILL, [currency, minAmount])
   }
 
+  /**
+   * Routes a swap through `universalRouter` (sourcing liquidity across v2/v3/v4) behind a
+   * flash-take of up to `maxIn` of `input`: the router funds the Universal Router via a scoped
+   * Permit2 allowance of exactly `maxIn`, runs the caller-built `commands`/`inputs` (which MUST
+   * deliver the bought output to the active account and self-settle — see `buildV4ExactOutRoute`),
+   * then settles the unspent take. Leaves the same net delta a native v4 swap would, so a
+   * downstream borrow/settle nets via `OPEN_DELTA`. Follow with {@link assertAccountBalance} to
+   * make an exact-output route all-or-nothing.
+   */
+  routeSwap(p: { universalRouter: Address; input: Address; maxIn: bigint; commands: Hex; inputs: Hex[] }): this {
+    if (isAddressEqual(p.universalRouter, zeroAddress)) {
+      throw new MarginSdkError(
+        'UNIVERSAL_ROUTER_REQUIRED',
+        'ROUTE_SWAP dispatches the swap to universalRouter; it must not be the zero address'
+      )
+    }
+    if (p.maxIn <= 0n) {
+      throw new MarginSdkError('SLIPPAGE_BOUND_REQUIRED', 'ROUTE_SWAP maxIn caps the flash-take and must be non-zero')
+    }
+    return this.add(MarginAction.ROUTE_SWAP, [p.universalRouter, p.input, p.maxIn, p.commands, p.inputs])
+  }
+
+  /**
+   * Asserts the active account's wallet balance of `currency` is at least `minAmount`, reverting
+   * `IncompleteFill` otherwise — the account-side counterpart of {@link assertFill}, used after
+   * {@link routeSwap} to catch an exact-output under-fill before the position is built on it.
+   */
+  assertAccountBalance(currency: Address, minAmount: bigint): this {
+    return this.add(MarginAction.ASSERT_ACCOUNT_BALANCE, [currency, minAmount])
+  }
+
   // -------------------------------------------------------------------------
   // v4 routing actions
   // -------------------------------------------------------------------------

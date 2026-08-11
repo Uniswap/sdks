@@ -1,9 +1,9 @@
 import { type Address } from 'viem'
 
-/** WAD fixed-point scale: 1e18 == 100% for `Ltv` values and 1x for `LeverageX18` values. */
+/** WAD fixed-point scale: 1e18 == 100% for `Ltv` values and 1x for leverage multipliers. */
 export const WAD = 10n ** 18n
 
-/** 1x leverage in WAD (the `LeverageX18` lower bound; sub-1x leverage is invalid). */
+/** 1x leverage in WAD (the leverage lower bound; sub-1x leverage is invalid). */
 export const ONE_X18 = WAD
 
 export const MAX_UINT256 = (1n << 256n) - 1n
