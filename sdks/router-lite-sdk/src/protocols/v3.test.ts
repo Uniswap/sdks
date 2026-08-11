@@ -81,26 +81,26 @@ test('a manifest poolInitCodeHash override changes the computed pool address', (
   )
 })
 
-test('speculativeDirect derives every fee tier probe from the manifest, not the module constant', () => {
+test('hypotheses derives every fee tier pool from the manifest, not the module constant', () => {
   const foreign = { ...MAINNET_MANIFEST, v3: { ...MAINNET_MANIFEST.v3!, poolInitCodeHash: FOREIGN_POOL_INIT_CODE_HASH } }
-  const probes = v3Module.speculativeDirect(USDC, WETH, 10n ** 6n, foreign)
-  const canonical = v3Module.speculativeDirect(USDC, WETH, 10n ** 6n, MAINNET_MANIFEST)
+  const pools = v3Module.hypotheses(USDC, WETH, foreign)
+  const canonical = v3Module.hypotheses(USDC, WETH, MAINNET_MANIFEST)
 
-  expect(probes).toHaveLength(canonical.length)
-  for (let i = 0; i < probes.length; i++) {
-    const pool = probes[i]!.candidate.legs[0]!.pool
+  expect(pools).toHaveLength(canonical.length)
+  for (let i = 0; i < pools.length; i++) {
+    const pool = pools[i]!
     expect(pool.protocol === 'v3' && pool.address).toBe(
       computeV3PoolAddress(V3_FACTORY, USDC, WETH, pool.protocol === 'v3' ? pool.fee : 0, FOREIGN_POOL_INIT_CODE_HASH),
     )
-    expect(pool.id).not.toBe(canonical[i]!.candidate.legs[0]!.pool.id)
+    expect(pool.id).not.toBe(canonical[i]!.id)
   }
 })
 
-test('feeDiscovery probes honor the override too — a governance tier is not a second code path', () => {
+test('a fee-scan-discovered tier honors the override too — a governance tier is not a second code path', () => {
   const foreign = { ...MAINNET_MANIFEST, v3: { ...MAINNET_MANIFEST.v3!, poolInitCodeHash: FOREIGN_POOL_INIT_CODE_HASH } }
-  const [probe] = v3Module.feeDiscovery.probes(USDC, WETH, 10n ** 6n, [250], foreign)
-  const pool = probe!.candidate.legs[0]!.pool
-  expect(pool.protocol === 'v3' && pool.address).toBe(
+  const discovered = v3Module.hypotheses(USDC, WETH, foreign, [250]).filter((p) => p.protocol === 'v3' && p.fee === 250)
+  expect(discovered).toHaveLength(1)
+  expect(discovered[0]!.protocol === 'v3' && discovered[0]!.address).toBe(
     computeV3PoolAddress(V3_FACTORY, USDC, WETH, 250, FOREIGN_POOL_INIT_CODE_HASH),
   )
 })
@@ -116,16 +116,10 @@ test('encodeV3Path resolves a native leg to wrappedNative even when wrappedNativ
   expect(path.toLowerCase().endsWith(DAI.slice(2).toLowerCase())).toBe(true)
 })
 
-test('speculativeDirect emits one probe per standard fee', () => {
-  const probes = v3Module.speculativeDirect(USDC, WETH, 10n ** 6n, MAINNET_MANIFEST)
-  expect(probes.map((p) => (p.candidate.legs[0]!.pool as Extract<PoolRef, { protocol: 'v3' }>).fee)).toEqual([100, 500, 3000, 10000])
-})
-
-test('hypotheses returns the same 4 standard-tier pool ids speculativeDirect probes today', () => {
-  const probes = v3Module.speculativeDirect(USDC, WETH, 10n ** 6n, MAINNET_MANIFEST)
+test('hypotheses emits one pool per standard fee, in STANDARD_V3_FEES order', () => {
   const hypotheses = v3Module.hypotheses(USDC, WETH, MAINNET_MANIFEST)
-  expect(new Set(hypotheses.map((h) => h.id))).toEqual(new Set(probes.map((p) => p.candidate.legs[0]!.pool.id)))
   expect(hypotheses).toHaveLength(4)
+  expect(hypotheses.map((h) => (h as Extract<PoolRef, { protocol: 'v3' }>).fee)).toEqual([100, 500, 3000, 10000])
 })
 
 test('hypotheses adds exactly one more pool per extraFees entry', () => {
@@ -172,7 +166,7 @@ test('mergeEnabledFees adds nonstandard fees once', () => {
   expect(mergeEnabledFees([feeEnabledLog(250) as any, feeEnabledLog(100) as any, feeEnabledLog(250) as any])).toEqual([100, 250])
 })
 
-test('feeDiscovery scans the factory, ignores foreign logs, and probes the discovered tier', () => {
+test('feeDiscovery scans the factory, ignores foreign logs, and the discovered tier feeds hypotheses', () => {
   const discovery = v3Module.feeDiscovery!
   const query = discovery.query(MAINNET_MANIFEST)
   expect(query.address).toBe(V3_FACTORY)
@@ -185,15 +179,12 @@ test('feeDiscovery scans the factory, ignores foreign logs, and probes the disco
   })
   // A log from some other contract that happens to share the topic shape is not this factory's.
   const impostor = '0x00000000000000000000000000000000000000ff'
-  expect(discovery.feesFromLogs([feeLog(V3_FACTORY, 250) as any, feeLog(impostor, 999) as any], MAINNET_MANIFEST)).toEqual([250])
+  const discoveredFees = discovery.feesFromLogs([feeLog(V3_FACTORY, 250) as any, feeLog(impostor, 999) as any], MAINNET_MANIFEST)
+  expect(discoveredFees).toEqual([250])
 
-  const probes = discovery.probes(USDC, WETH, 1n, [250], MAINNET_MANIFEST)
-  expect(probes).toHaveLength(1)
-  expect(probes[0]!.candidate.legs[0]!.pool).toMatchObject({
-    protocol: 'v3',
-    fee: 250,
-    address: computeV3PoolAddress(V3_FACTORY, USDC, WETH, 250),
-  })
+  const pools = v3Module.hypotheses(USDC, WETH, MAINNET_MANIFEST, discoveredFees).filter((p) => p.protocol === 'v3' && p.fee === 250)
+  expect(pools).toHaveLength(1)
+  expect(pools[0]).toMatchObject({ protocol: 'v3', fee: 250, address: computeV3PoolAddress(V3_FACTORY, USDC, WETH, 250) })
 })
 
 test('adjacency: token lands in topic1 for one query and topic2 for the other', () => {

@@ -9,7 +9,7 @@ import { encodeExecutionPlanUr21 } from './ur21'
 // `encoderFor` — the dispatch seam between a compiled plan and the
 // command-set-specific encoder that turns it into calldata.
 //
-// Every real caller (the wave engine's `search/verifier.ts`, and `experimental`
+// Every real caller (the search engine's `search/verifier.ts`, and `experimental`
 // for callers building their own search policy) goes through this instead of
 // importing `encodeExecutionPlan` directly — which is why `ur-2.1` (the
 // second family, proving the extension axis) was a matter of registering it

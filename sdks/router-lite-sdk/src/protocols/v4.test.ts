@@ -64,17 +64,10 @@ test('validateHint sorts currencies and needs no RPC', async () => {
   expect((rec!.pool as any).poolKey.currency0 < (rec!.pool as any).poolKey.currency1).toBe(true)
 })
 
-test('speculativeDirect probes standard no-hook configs', () => {
-  const probes = v4Module.speculativeDirect('native', USDC, 10n ** 18n, MAINNET_MANIFEST)
-  expect(probes).toHaveLength(4)
-  for (const p of probes) expect((p.candidate.legs[0]!.pool as any).poolKey.hooks).toBe(zeroAddress)
-})
-
-test('hypotheses returns the same standard-config pool ids speculativeDirect probes today', () => {
-  const probes = v4Module.speculativeDirect('native', USDC, 10n ** 18n, MAINNET_MANIFEST)
+test('hypotheses derives standard no-hook configs', () => {
   const hypotheses = v4Module.hypotheses('native', USDC, MAINNET_MANIFEST)
-  expect(new Set(hypotheses.map((h) => h.id))).toEqual(new Set(probes.map((p) => p.candidate.legs[0]!.pool.id)))
   expect(hypotheses).toHaveLength(4)
+  for (const h of hypotheses) expect((h as any).poolKey.hooks).toBe(zeroAddress)
 })
 
 test('hypotheses ignores extraFees (v4 carries fee in the PoolKey, not a scan)', () => {
@@ -107,16 +100,16 @@ test('STANDARD_V4_CONFIGS matches the four genesis fee tiers and their canonical
   ])
 })
 
-test('speculativeDirect sorts native (address(0)) before the counter-token', () => {
+test('hypotheses sorts native (address(0)) before the counter-token', () => {
   // address(0) sorts first lexicographically, so 'native' as `a` should still land in currency0
   // regardless of argument order.
-  const [probe] = v4Module.speculativeDirect('native', USDC, 10n ** 18n, MAINNET_MANIFEST)
-  const poolKey = (probe!.candidate.legs[0]!.pool as any).poolKey
+  const [pool] = v4Module.hypotheses('native', USDC, MAINNET_MANIFEST)
+  const poolKey = (pool as any).poolKey
   expect(poolKey.currency0).toBe(zeroAddress)
   expect(poolKey.currency1.toLowerCase()).toBe(USDC.toLowerCase())
 
-  const [probeReversed] = v4Module.speculativeDirect(USDC, 'native', 10n ** 18n, MAINNET_MANIFEST)
-  const reversedKey = (probeReversed!.candidate.legs[0]!.pool as any).poolKey
+  const [poolReversed] = v4Module.hypotheses(USDC, 'native', MAINNET_MANIFEST)
+  const reversedKey = (poolReversed as any).poolKey
   expect(reversedKey.currency0).toBe(zeroAddress)
   expect(reversedKey.currency1.toLowerCase()).toBe(USDC.toLowerCase())
 })

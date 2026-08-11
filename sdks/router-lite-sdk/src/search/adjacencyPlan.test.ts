@@ -31,7 +31,7 @@ import type { AdjacencyScope, ScopeDemand } from './adjacencyPlan'
 //     want the same blocks.
 //
 // The plan is pure, which is what lets all of this be asserted without a
-// client, an index or a wave engine anywhere near it.
+// client, an index or a search engine anywhere near it.
 // ---------------------------------------------------------------------------
 
 const V2_FACTORY = `0x${'22'.repeat(20)}` as Address

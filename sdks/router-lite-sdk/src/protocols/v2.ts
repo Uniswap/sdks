@@ -4,10 +4,10 @@ import { decodeEventLog, decodeFunctionResult, encodeEventTopics, encodeFunction
 import { RouterConfigError, UnsupportedRouteError } from '../errors'
 import { V2_FACTORY_ABI, V2_PAIR_ABI } from '../internal/abis'
 import { sortAddresses } from '../internal/currency'
-import type { ChainManifest, CurrencyRef, DecodedQuote, ExecutionOperation, RouteLeg } from '../types'
+import type { ChainManifest, CurrencyRef, DecodedQuote, ExecutionOperation, QuoteCall } from '../types'
 
 import { v2PoolRef, type V2PoolRef } from './poolRef'
-import type { ProtocolModule, QuoteProbe } from './types'
+import type { ProtocolModule } from './types'
 
 // ---------------------------------------------------------------------------
 // v2 module — speculative reserves quoting.
@@ -76,7 +76,7 @@ function resolveAddress(c: CurrencyRef, wrappedNative: Address): Address {
   return c === 'native' ? wrappedNative : c
 }
 
-function reservesQuote(pairAddress: Address, zeroForOne: boolean, amountIn: bigint): QuoteProbe['quote'] {
+function reservesQuote(pairAddress: Address, zeroForOne: boolean, amountIn: bigint): QuoteCall {
   return {
     call: { to: pairAddress, data: encodeFunctionData({ abi: V2_PAIR_ABI, functionName: 'getReserves' }) },
     decode(returnData: Hex): DecodedQuote {
@@ -120,16 +120,6 @@ export const v2Module = {
   hypotheses(a, b, m) {
     const pool = v2Hypothesis(a, b, m)
     return pool ? [pool] : []
-  },
-
-  speculativeDirect(a, b, amountIn, m) {
-    const pool = v2Hypothesis(a, b, m)
-    if (!pool) return []
-    const aAddr = resolveAddress(a, m.wrappedNative)
-    const zeroForOne = isAddressEqual(aAddr, pool.token0)
-    const leg: RouteLeg = { pool, currencyIn: a, currencyOut: b }
-    const probe: QuoteProbe = { candidate: { legs: [leg] }, quote: reservesQuote(pool.address, zeroForOne, amountIn) }
-    return [probe]
   },
 
   adjacencyShape(m) {

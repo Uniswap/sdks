@@ -118,7 +118,6 @@ function worldQuote(world: World, target?: Address): ProtocolModule['encodeQuote
 }
 
 const unused = {
-  speculativeDirect: () => [],
   hypotheses: () => [],
   validateHint: async () => null,
   encodeQuote: () => {
@@ -127,7 +126,7 @@ const unused = {
   compileOperation: () => {
     throw new Error('not used')
   },
-} as unknown as Pick<ProtocolModule, 'speculativeDirect' | 'hypotheses' | 'validateHint' | 'encodeQuote' | 'compileOperation'>
+} as unknown as Pick<ProtocolModule, 'hypotheses' | 'validateHint' | 'encodeQuote' | 'compileOperation'>
 
 const disabledModule = (id: Protocol): ProtocolModule =>
   ({ id, enabled: () => false, adjacencyShape: () => undefined, parsePoolLog: () => null, ...unused }) as ProtocolModule
@@ -139,7 +138,6 @@ function fakeV2(world: World): ProtocolModule {
     ...PROTOCOL_MODULES.v2,
     enabled: (m) => !!m.v2,
     hypotheses: () => [],
-    speculativeDirect: () => [],
     adjacencyShape: (m) => (m.v2 ? { emitter: m.v2.factory, topic0: V2_TOPIC, slot: 1, topicAddress: (e: Address) => e } : undefined),
     parsePoolLog: () => null,
     encodeQuote: worldQuote(world),
@@ -151,7 +149,6 @@ function fakeV4(world: World): ProtocolModule {
     ...PROTOCOL_MODULES.v4,
     enabled: (m) => !!m.v4,
     hypotheses: () => [],
-    speculativeDirect: () => [],
     adjacencyShape: () => undefined,
     exactPair: (a, b, m) => ({
       address: m.v4!.poolManager,
@@ -173,14 +170,12 @@ function fakeV3(world: World): ProtocolModule {
   return {
     ...PROTOCOL_MODULES.v3,
     enabled: (m) => !!m.v3,
-    speculativeDirect: () => [],
     hypotheses: (a, b, _m, extraFees = []) =>
       extraFees.map((fee) => v3Ref(addr(0x3000 + fee), resolveAddress(a), resolveAddress(b), fee)),
     adjacencyShape: (m) => (m.v3 ? { emitter: m.v3.factory, topic0: V3_TOPIC, slot: 1, topicAddress: (e: Address) => e } : undefined),
     feeDiscovery: {
       query: (m) => ({ address: m.v3!.factory, topics: [FEE_TOPIC] }),
       feesFromLogs: (logs) => logs.map((l) => (l as Log & { fee?: number }).fee).filter((f): f is number => f !== undefined),
-      probes: () => [],
     },
     parsePoolLog: () => null,
     encodeQuote: worldQuote(world, V3_QUOTER),

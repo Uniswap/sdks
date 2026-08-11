@@ -42,9 +42,9 @@ import { assertResultCoherent } from '../src/internal/testing'
 const RUN = forkTestsEnabled()
 
 /**
- * A fee/tickSpacing pair no `speculativeDirect` probe will ever try: the v4 module speculates on
- * the four standard no-hook configs only (100/1, 500/10, 3000/60, 10000/200). A pool here is
- * therefore invisible to wave 0's probes and can only arrive through a log or an ingestion.
+ * A fee/tickSpacing pair no `hypotheses` pool will ever guess: the v4 module derives only the four
+ * standard no-hook configs (100/1, 500/10, 3000/60, 10000/200). A pool here is therefore invisible to
+ * the module's own hypotheses and can only arrive through a log or an ingestion.
  */
 const UNGUESSABLE = { fee: 4_242, tickSpacing: 42 } as const
 

@@ -83,7 +83,6 @@ function manifestWith(opts: { deploymentBlock: bigint; v4?: boolean; v2Block?: b
 
 /** Nothing in this file quotes, compiles or hints — those members exist only to satisfy the interface. */
 const unused = {
-  speculativeDirect: () => [],
   hypotheses: () => [],
   validateHint: async () => null,
   encodeQuote: () => {
@@ -92,7 +91,7 @@ const unused = {
   compileOperation: () => {
     throw new Error('not used')
   },
-} as unknown as Pick<ProtocolModule, 'speculativeDirect' | 'hypotheses' | 'validateHint' | 'encodeQuote' | 'compileOperation'>
+} as unknown as Pick<ProtocolModule, 'hypotheses' | 'validateHint' | 'encodeQuote' | 'compileOperation'>
 
 /**
  * A v3-shaped module. Its SHAPE (topics 1/2, identity endpoint mapping) is what `adjacencyQueries`
@@ -543,9 +542,9 @@ describe('convergence and the report', () => {
     // ahead of the adjacency waves that actually find the pair's pools — so against a narrowly-capped
     // provider it walked hundreds of chunks and (measured on Base) spent the caller's whole budget
     // before any adjacency request went out, leaving every protocol reporting "nothing covered yet".
-    // A request-count bound (`FEE_DISCOVERY_MAX_REQUESTS`) was what capped it then; the shape of the
-    // worker is what caps it now — the fee pass is a SIBLING of the adjacency pass, not a predecessor
-    // — and that is the claim worth pinning, because it is the one a refactor can silently undo.
+    // A request-count bound on the fee scan was what capped it then; the shape of the worker is what
+    // caps it now — the fee pass is a SIBLING of the adjacency pass, not a predecessor — and that is
+    // the claim worth pinning, because it is the one a refactor can silently undo.
     let releaseFees!: () => void
     const held = new Promise<void>((resolve) => (releaseFees = resolve))
     const feeChunks: number[] = []

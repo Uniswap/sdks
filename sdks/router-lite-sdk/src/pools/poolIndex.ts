@@ -891,7 +891,7 @@ export class PoolIndex {
    * within a couple of blocks (a pool that could not quote at block N says nothing about N+1), but
    * "this pool has never once quoted, across N separate blocks" is a fact that only accumulates by
    * outliving individual blocks. Kept as a COUNT plus the last block seen, so repeated failures at
-   * one block (concurrent requests at the same head, a wave re-quoting) count once and the memory
+   * one block (concurrent requests at the same head, a burst of re-quoting) count once and the memory
    * cost is two fields, not a growing set.
    *
    * PRECISELY: this counts blocks at which the failing block CHANGED, which is not the same as the

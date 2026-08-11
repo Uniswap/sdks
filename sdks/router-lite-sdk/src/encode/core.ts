@@ -78,7 +78,7 @@ import type {
 //     (a refund silently converts an exact-input trade into a partial one),
 //     and the rejecting side wants a preflight that detects the shortfall
 //     before broadcast rather than a command appended after the fact. Owner:
-//     the wave-engine/preflight tasks, plus a product decision.
+//     the search engine's verifier/preflight tasks, plus a product decision.
 // ---------------------------------------------------------------------------
 
 /**

@@ -5,10 +5,10 @@ import { RouterConfigError, UnsupportedRouteError } from '../errors'
 import { V4_POOL_MANAGER_ABI, V4_QUOTER_ABI } from '../internal/abis'
 import { sortAddresses } from '../internal/currency'
 import { narrowTopics } from '../internal/logScan'
-import type { ChainManifest, CurrencyRef, DecodedQuote, EthCall, ExecutionOperation, LogQuery, PoolKey, RouteLeg } from '../types'
+import type { ChainManifest, CurrencyRef, DecodedQuote, EthCall, ExecutionOperation, LogQuery, PoolKey, QuoteCall, RouteLeg } from '../types'
 
 import { v4PoolRef, type V4PoolRef } from './poolRef'
-import type { ProtocolModule, QuoteProbe } from './types'
+import type { ProtocolModule } from './types'
 
 // ---------------------------------------------------------------------------
 // v4 module — PoolManager singleton, V4Quoter speculative quoting.
@@ -98,7 +98,7 @@ export function toPathKeys(legs: RouteLeg[]): PathKeyStruct[] {
   })
 }
 
-function quoterQuote(quoter: Address, legs: RouteLeg[], amountIn: bigint): QuoteProbe['quote'] {
+function quoterQuote(quoter: Address, legs: RouteLeg[], amountIn: bigint): QuoteCall {
   const exactCurrency = toV4Address(legs[0]!.currencyIn)
   const path = toPathKeys(legs)
   return {
@@ -136,16 +136,6 @@ export const v4Module = {
 
   hypotheses(a, b, m, _extraFees?) {
     return v4Hypotheses(a, b, m)
-  },
-
-  speculativeDirect(a, b, amountIn, m) {
-    if (!m.v4) return []
-    const { quoter } = m.v4
-    return v4Hypotheses(a, b, m).map((pool) => {
-      const leg: RouteLeg = { pool, currencyIn: a, currencyOut: b }
-      const quote = quoterQuote(quoter, [leg], amountIn)
-      return { candidate: { legs: [leg] }, quote }
-    })
   },
 
   adjacencyShape(m) {

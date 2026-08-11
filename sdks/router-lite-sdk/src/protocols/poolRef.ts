@@ -13,7 +13,7 @@ import type { CurrencyRef, PoolKey, PoolRef, Protocol, RouteCandidate } from '..
 // see the type's own docs); they are derived here, once, so that every
 // consumer reads them instead of switching on `protocol` to recompute them.
 // Seven such re-derivations used to be spread across the index, the candidate
-// generator, the plan compiler and the wave engine, and one of them shipped
+// generator, the plan compiler and the search engine, and one of them shipped
 // wrong (a v4 native pool was linked into the graph under address(0) instead
 // of the native family).
 //

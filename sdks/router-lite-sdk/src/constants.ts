@@ -7,13 +7,15 @@ import type { Address } from 'viem'
 import { isAddressEqual, zeroAddress } from 'viem'
 
 /**
+ * basis: derived
  * Universal Router recipient sentinel meaning "the caller" (`msg.sender`). The encoder substitutes
  * it deliberately; a *plan* that carries it as a literal recipient address would silently redirect
  * funds, so {@link assertPlanInvariants} rejects it.
  */
 export const UR_MSG_SENDER = '0x0000000000000000000000000000000000000001' as Address
 
-/** Universal Router recipient sentinel meaning "the router itself" (`address(this)`). */
+/** basis: derived
+ * Universal Router recipient sentinel meaning "the router itself" (`address(this)`). */
 export const UR_ADDRESS_THIS = '0x0000000000000000000000000000000000000002' as Address
 
 /**
@@ -60,6 +62,7 @@ export function isUnusableCustodyAddress(address: Address): boolean {
 // ---------------------------------------------------------------------------
 
 /**
+ * basis: policy
  * Max `hints` a single {@link QuoteRequest} may carry.
  *
  * Every hint is validated (v3 costs an `eth_call` round trip; v2/v4 are local derivations) and every
@@ -73,6 +76,7 @@ export function isUnusableCustodyAddress(address: Address): boolean {
 export const MAX_HINTS_PER_REQUEST = 64
 
 /**
+ * basis: derived
  * Exclusive ceiling on `amountIn`: 2^128.
  *
  * The V4Quoter's `quoteExactInput` takes `uint128 amountIn` (and `uint128 amountOutMinimum` appears
@@ -86,6 +90,7 @@ export const MAX_HINTS_PER_REQUEST = 64
 export const MAX_AMOUNT_IN = 2n ** 128n
 
 /**
+ * basis: policy
  * Max `deadlineSeconds` a swap request may ask for: 24 hours.
  *
  * `deadlineSeconds` is added to the pinned block timestamp and encoded into the Universal Router's
@@ -97,6 +102,7 @@ export const MAX_AMOUNT_IN = 2n ** 128n
 export const MAX_DEADLINE_SECONDS = 86_400
 
 /**
+ * basis: derived
  * Exclusive ceiling on a Permit2 permit's `expiration` and `nonce`: 2^48.
  *
  * Both are `uint48` in Permit2's `PermitDetails` struct, and both arrive as plain JS `number`s (see
@@ -110,6 +116,7 @@ export const MAX_DEADLINE_SECONDS = 86_400
 export const MAX_PERMIT2_UINT48 = 2 ** 48
 
 /**
+ * basis: derived
  * Exclusive ceiling on a Permit2 permit's `details.amount`: 2^160.
  *
  * `uint160` in Permit2's `PermitDetails` — the deliberate width that lets an allowance and an
@@ -122,6 +129,7 @@ export const MAX_PERMIT2_UINT48 = 2 ** 48
 export const MAX_PERMIT2_UINT160 = 2n ** 160n
 
 /**
+ * basis: policy
  * Max bytes of `hookData` a v4 hint may carry.
  *
  * `hookData` is opaque caller bytes, copied verbatim into every quote call and into the final
@@ -133,6 +141,7 @@ export const MAX_PERMIT2_UINT160 = 2n ** 160n
 export const MAX_HOOK_DATA_BYTES = 4096
 
 /**
+ * basis: policy
  * Distinct blocks at which a hinted pool's quote must fail — with zero lifetime successes — before
  * the hint's provenance is discredited (see `pools/poolIndex.ts#isDiscredited`).
  *
@@ -155,29 +164,43 @@ export const MAX_HOOK_DATA_BYTES = 4096
  */
 export const HINT_DISCREDIT_FAILURE_BLOCKS = 2
 
-/** Max intermediate tokens considered when searching one-intermediate (2-hop) routes. */
+/**
+ * basis: policy
+ * Per-cycle growth batch for the intermediates frontier (`search/loop.ts#advanceIntermediates`) — the
+ * seed size selected before the first pump cycle, and the batch added on each subsequent quiet cycle.
+ * NOT a permanent cap: the frontier keeps growing by this many nodes every dry cycle until every
+ * eligible intermediate is selected, unlike the old constant of the same name that held the set at
+ * this size forever (see `types.ts#intermediatesPruned`'s docstring).
+ */
 export const MAX_INTERMEDIATES = 8
 
-/** Max pools measured on one pair. policy — abuse backstop against pool-spam pairs, not a selection cap. */
+/** basis: policy
+ * Max pools measured on one pair — an abuse backstop against pool-spam pairs, not a selection cap. */
 export const MEASUREMENT_PAIR_CEILING = 128
 
-/** Max legs one pump cycle dispatches in a single measurement round. policy — keeps one round under
- * ~8 aggregate3 chunks (`MULTICALL_CHUNK` = 50); leftover due legs stay due for the next cycle. */
+/** basis: policy
+ * Max legs one pump cycle dispatches in a single measurement round — keeps one round under ~8
+ * aggregate3 chunks (`MULTICALL_CHUNK` = 50); leftover due legs stay due for the next cycle. */
 export const PUMP_ROUND_CAP = 400
 
-/** Max leader candidates preflighted (simulated) before falling through on genuine reverts. */
+/** basis: policy
+ * Max leader candidates preflighted (simulated) before falling through on genuine reverts. */
 export const PREFLIGHT_TOP_K = 3
 
-/** A hooked or mixed-protocol route must beat a simpler one by more than this (bps) to win ranking. */
+/** basis: policy
+ * A hooked or mixed-protocol route must beat a simpler one by more than this (bps) to win ranking. */
 export const SIMPLICITY_MARGIN_BPS = 5
 
-/** Default slippage tolerance for a swap request, in bps. */
+/** basis: policy
+ * Default slippage tolerance for a swap request, in bps. */
 export const DEFAULT_SLIPPAGE_BPS = 100
 
-/** Default deadline window for a swap request, in seconds from the pinned block timestamp. */
+/** basis: policy
+ * Default deadline window for a swap request, in seconds from the pinned block timestamp. */
 export const DEFAULT_DEADLINE_SECONDS = 300
 
 /**
+ * basis: policy
  * Default for `createRouter`'s `concurrency` option (C4-P6): the size of the router-WIDE semaphore
  * (`internal/rpc.ts#createSemaphore`) bounding how many `client.request` calls (`eth_call` /
  * `eth_getLogs`) may be in flight AT ONCE, across every operation sharing this router instance —
@@ -193,6 +216,7 @@ export const DEFAULT_DEADLINE_SECONDS = 300
 export const DEFAULT_CONCURRENCY = 20
 
 /**
+ * basis: policy
  * Ceiling on `createRouter`'s `concurrency` option — validated in `router.ts#createRouter`,
  * synchronously, before any RPC (F1). `concurrency <= 0` (zero, negative, or `NaN`, which fails
  * every numeric comparison) makes `createSemaphore`'s `active < limit` check false forever: every
@@ -221,6 +245,7 @@ export const MAX_CONCURRENCY = 1024
 // ---------------------------------------------------------------------------
 
 /**
+ * basis: derived
  * Seconds per block on mainnet — the default when a manifest carries no `chain.blockTimeSeconds`.
  *
  * Post-merge Ethereum produces a block every 12s by protocol, modulo missed slots. Every window this
@@ -231,6 +256,7 @@ export const MAX_CONCURRENCY = 1024
 export const DEFAULT_BLOCK_TIME_SECONDS = 12
 
 /**
+ * basis: derived
  * Overlap re-scanned on top of `coveredThroughBlock + 1` for shallow-reorg tolerance — the default
  * when a manifest carries no `chain.reorgOverlapBlocks`.
  *
@@ -244,6 +270,7 @@ export const DEFAULT_BLOCK_TIME_SECONDS = 12
 export const DEFAULT_REORG_OVERLAP_BLOCKS = 32n
 
 /**
+ * basis: policy
  * How many blocks of history the pool index's negative cache retains (see `pools/poolIndex.ts`).
  * The cache exists ONLY to dedupe *within-block* retries — a pinned-block search re-run moments
  * later at the same head, or a concurrent request landing on the same head — never to remember
@@ -304,6 +331,7 @@ export function maxPlausibleHeadRegression(reorgOverlapBlocks: bigint): bigint {
 // ---------------------------------------------------------------------------
 
 /**
+ * basis: measured (2026-08, S1 study against a keyed Alchemy mainnet endpoint)
  * Widest `eth_getLogs` window the scanner will EVER ask for: the default ceiling on both the first
  * request of a scan (`min(remaining range, MAX_SCAN_WINDOW)`) and on regrowth, and the default for
  * `createRouter`'s `logChunkBlocks` option (C4-P6, which lowers it — see below).
@@ -362,6 +390,7 @@ export function maxPlausibleHeadRegression(reorgOverlapBlocks: bigint): bigint {
 export const MAX_SCAN_WINDOW = 16_000_000n
 
 /**
+ * basis: policy
  * The width the descent drops STRAIGHT to when a wide window fails in a way that cost the provider
  * real time, rather than being cheaply refused — instead of halving toward it one expensive step at
  * a time.
@@ -386,6 +415,7 @@ export const MAX_SCAN_WINDOW = 16_000_000n
 export const DESCENT_TIMEOUT_FALLBACK = 100_000n
 
 /**
+ * basis: policy
  * Floor on the window. Below this a scan is no longer usefully making progress, so an endpoint that
  * cannot answer this is failing, not capping, and the failure path (retry, then give the sub-range
  * up) takes over instead of bisecting toward 1.
@@ -413,6 +443,7 @@ export const DESCENT_TIMEOUT_FALLBACK = 100_000n
 export const MIN_CHUNK = 128n
 
 /**
+ * basis: policy
  * Failures at {@link MIN_CHUNK} on the *same* sub-range before it is given up (left out of `covered`
  * and reported as partial discovery). Two retries is enough to ride out a blip without turning one
  * permanently poisoned range — a block whose logs the node genuinely cannot serve — into a scan that
@@ -421,6 +452,7 @@ export const MIN_CHUNK = 128n
 export const MAX_CONSECUTIVE_MIN_FAILURES = 3
 
 /**
+ * basis: policy
  * Consecutive successful chunks before the window is doubled back toward the scan's ceiling
  * ({@link MAX_SCAN_WINDOW}, or `logChunkBlocks` when the caller pinned it lower).
  *
@@ -438,6 +470,7 @@ export const MAX_CONSECUTIVE_MIN_FAILURES = 3
 export const CHUNK_REGROWTH_SUCCESSES = 4
 
 /**
+ * basis: policy
  * How many `eth_getLogs` chunk requests ONE {@link scanLogs} call may have in flight at once, once
  * the working window width has been ESTABLISHED (P1).
  *
@@ -471,6 +504,7 @@ export const CHUNK_REGROWTH_SUCCESSES = 4
 export const SCAN_CHUNK_CONCURRENCY = 4
 
 /**
+ * basis: policy
  * Hard ceiling on `eth_getLogs` attempts (successes *and* failures) in one {@link scanLogs} call.
  *
  * THE BUDGET IS NOW MOSTLY HEADROOM, AND DELIBERATELY SO. A cold full-history scan against a
@@ -496,6 +530,7 @@ export const SCAN_CHUNK_CONCURRENCY = 4
 export const MAX_REQUESTS_PER_SCAN = 4_000
 
 /**
+ * basis: policy
  * First backoff delay before retrying a failed chunk at {@link MIN_CHUNK}, doubled per consecutive
  * failure and capped at {@link BACKOFF_MAX_MS}. Retrying a throttling endpoint immediately is how a
  * rate limit becomes a tight loop; 250ms is short enough that a one-off blip barely registers, and
@@ -504,6 +539,7 @@ export const MAX_REQUESTS_PER_SCAN = 4_000
 export const BACKOFF_BASE_MS = 250
 
 /**
+ * basis: policy
  * Ceiling on that delay. This package creates no other timers, so this is also the longest a pending
  * backoff can hold a Node event loop open after the caller has walked away (an abort clears the timer
  * immediately, so it only applies to a scan nobody aborted).
@@ -511,6 +547,7 @@ export const BACKOFF_BASE_MS = 250
 export const BACKOFF_MAX_MS = 2_000
 
 /**
+ * basis: policy
  * Total time one scan may spend *sleeping* between retries, across all of them.
  *
  * Per-retry caps do not compose: {@link MAX_REQUESTS_PER_SCAN} failures each waiting
@@ -525,6 +562,7 @@ export const BACKOFF_MAX_MS = 2_000
 export const MAX_BACKOFF_TOTAL_MS = 60_000
 
 /**
+ * basis: policy
  * How far back the EAGER exact-pair log scan reaches from the pinned head, IN SECONDS: one week.
  *
  * The eager slice is a latency budget, not a completeness budget: it exists for the brand-new-asset

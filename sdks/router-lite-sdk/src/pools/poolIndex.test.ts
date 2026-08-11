@@ -117,7 +117,7 @@ describe('PoolIndex', () => {
       idx.upsert(hinted)
       expect(isDiscredited(idx.pair(A, B)[0]!)).toBe(false)
 
-      // Concurrent requests at the same head, or a later wave re-quoting, must not stack up as
+      // Concurrent requests at the same head, or a later re-quoting pass, must not stack up as
       // independent evidence — otherwise one block's failure discredits a legitimate hint.
       idx.markNegative(hinted.pool, 100n)
       idx.markNegative(hinted.pool, 100n)
@@ -744,8 +744,8 @@ describe('PoolIndexSnapshot', () => {
 
     test('a v4-claiming ref with no poolKey used to load clean and detonate in RANKING — now it cannot load at all', () => {
       // The discriminant's own version of the poisoned-coverage regression, and the reason
-      // `protocol` has to be checked alongside the arm it selects. `comparePoolPriority`
-      // (`quote/rank.ts`) calls `isHooked`, which reads `ref.poolKey.hooks` the instant
+      // `protocol` has to be checked alongside the arm it selects. `compareRoutes`/`isComplex`
+      // (`quote/rank.ts`) call `isHooked`, which reads `ref.poolKey.hooks` the instant
       // `protocol === 'v4'` — so this payload restores into a perfectly ordinary-looking index and
       // then throws a bare TypeError from the middle of candidate enumeration, in a stack that
       // names nothing about caches and outside `cli/cache.ts`'s try.

@@ -39,16 +39,18 @@ test('a manifest initCodeHash override changes the computed pair address', () =>
   expect(overridden).not.toBe(canonical)
 })
 
-test('speculativeDirect derives its probe address from the manifest, not the module constant', () => {
+test('hypotheses derives the pool address from the manifest, not the module constant', () => {
   const foreign = { ...MAINNET_MANIFEST, v2: { ...MAINNET_MANIFEST.v2!, initCodeHash: FOREIGN_INIT_CODE_HASH } }
-  const [probe] = v2Module.speculativeDirect(USDC, WETH, 10n ** 6n, foreign)
-  const [canonicalProbe] = v2Module.speculativeDirect(USDC, WETH, 10n ** 6n, MAINNET_MANIFEST)
+  const [pool] = v2Module.hypotheses(USDC, WETH, foreign)
+  const [canonicalPool] = v2Module.hypotheses(USDC, WETH, MAINNET_MANIFEST)
 
-  const address = probe!.candidate.legs[0]!.pool
-  expect(address.protocol === 'v2' && address.address).toBe(computeV2PairAddress(V2_FACTORY, USDC, WETH, FOREIGN_INIT_CODE_HASH))
-  expect(probe!.candidate.legs[0]!.pool.id).not.toBe(canonicalProbe!.candidate.legs[0]!.pool.id)
-  // And the probe is aimed at that address, not merely labelled with it.
-  expect(probe!.quote.call.to).toBe(computeV2PairAddress(V2_FACTORY, USDC, WETH, FOREIGN_INIT_CODE_HASH))
+  expect(pool!.protocol === 'v2' && pool!.address).toBe(computeV2PairAddress(V2_FACTORY, USDC, WETH, FOREIGN_INIT_CODE_HASH))
+  expect(pool!.id).not.toBe(canonicalPool!.id)
+  // And a quote encoded against it is aimed at that address, not merely labelled with it.
+  const leg: RouteLeg = { pool: pool!, currencyIn: USDC, currencyOut: WETH }
+  expect(v2Module.encodeQuote([leg], 10n ** 6n, foreign).call.to).toBe(
+    computeV2PairAddress(V2_FACTORY, USDC, WETH, FOREIGN_INIT_CODE_HASH),
+  )
 })
 
 test('validateHint honors the manifest override — a canonical-address hint no longer matches', async () => {
@@ -80,37 +82,43 @@ test('the adjacency shape pins the PairCreated selector, the factory, and the pa
   expect(shape.topicAddress(USDC)).toBe(USDC)
 })
 
-test('speculativeDirect probe decodes reserves into a quote', () => {
-  const [probe] = v2Module.speculativeDirect(USDC, WETH, 10n ** 6n, MAINNET_MANIFEST)
-  expect(probe!.candidate.legs[0]!.pool.protocol).toBe('v2')
+/** The one hypothesis `hypotheses` derives for (USDC, WETH) on mainnet, as a leg. */
+function usdcWethLeg(): RouteLeg {
+  const [pool] = v2Module.hypotheses(USDC, WETH, MAINNET_MANIFEST)
+  return { pool: pool!, currencyIn: USDC, currencyOut: WETH }
+}
+
+test('encodeQuote decodes reserves into a quote', () => {
+  const leg = usdcWethLeg()
+  expect(leg.pool.protocol).toBe('v2')
+  const quote = v2Module.encodeQuote([leg], 10n ** 6n, MAINNET_MANIFEST)
   const reservesReturn = encodeAbiParameters(
     [{ type: 'uint112' }, { type: 'uint112' }, { type: 'uint32' }],
     [2_000_000n * 10n ** 6n, 1_000n * 10n ** 18n, 0], // reserve0=USDC (token0), reserve1=WETH
   )
-  const decoded = probe!.quote.decode(reservesReturn)
+  const decoded = quote.decode(reservesReturn)
   expect(decoded.amountOut).toBeGreaterThan(0n)
   // NO gas figure on a v2 quote, ever: this is local constant-product math over `getReserves()`,
   // not an on-chain swap simulation, so there is nothing that measured gas (`RouteQuote.gasEstimate`).
   expect(decoded.gasEstimate).toBeUndefined()
 })
 
-test('speculativeDirect decode throws on an absent pool (empty returndata)', () => {
-  const [probe] = v2Module.speculativeDirect(USDC, WETH, 10n ** 6n, MAINNET_MANIFEST)
-  expect(() => probe!.quote.decode('0x')).toThrow()
+test('encodeQuote decode throws on an absent pool (empty returndata)', () => {
+  const quote = v2Module.encodeQuote([usdcWethLeg()], 10n ** 6n, MAINNET_MANIFEST)
+  expect(() => quote.decode('0x')).toThrow()
 })
 
-test('speculativeDirect decode throws on an initialized-but-empty pair (zero reserves)', () => {
-  const [probe] = v2Module.speculativeDirect(USDC, WETH, 10n ** 6n, MAINNET_MANIFEST)
+test('encodeQuote decode throws on an initialized-but-empty pair (zero reserves)', () => {
+  const quote = v2Module.encodeQuote([usdcWethLeg()], 10n ** 6n, MAINNET_MANIFEST)
   const zeroReservesReturn = encodeAbiParameters(
     [{ type: 'uint112' }, { type: 'uint112' }, { type: 'uint32' }],
     [0n, 0n, 0],
   )
-  expect(() => probe!.quote.decode(zeroReservesReturn)).toThrow()
+  expect(() => quote.decode(zeroReservesReturn)).toThrow()
 })
 
 test('encodeQuote rejects multi-leg v2 segments', () => {
-  const [probe] = v2Module.speculativeDirect(USDC, WETH, 10n ** 6n, MAINNET_MANIFEST)
-  const leg = probe!.candidate.legs[0]!
+  const leg = usdcWethLeg()
   expect(() => v2Module.encodeQuote([leg, leg], 10n ** 6n, MAINNET_MANIFEST)).toThrow(UnsupportedRouteError)
 })
 
@@ -143,11 +151,10 @@ test('compileOperation maps custody', () => {
   expect(op).toMatchObject({ kind: 'v2-swap', payer: 'router', recipient: 'final' })
 })
 
-test('hypotheses returns exactly the one pool speculativeDirect probes today', () => {
-  const [probe] = v2Module.speculativeDirect(USDC, WETH, 10n ** 6n, MAINNET_MANIFEST)
+test('hypotheses returns exactly the one CREATE2 pair address for (a, b)', () => {
   const hypotheses = v2Module.hypotheses(USDC, WETH, MAINNET_MANIFEST)
   expect(hypotheses).toHaveLength(1)
-  expect(hypotheses[0]!.id).toBe(probe!.candidate.legs[0]!.pool.id)
+  expect(hypotheses[0]!.protocol === 'v2' && hypotheses[0]!.address).toBe(computeV2PairAddress(V2_FACTORY, USDC, WETH))
 })
 
 test('parsePoolLog returns null when log address does not match v2 factory', () => {

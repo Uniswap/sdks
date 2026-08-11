@@ -293,7 +293,7 @@ export function delay(ms: number, signal?: AbortSignal): Promise<void> {
  * width and ceiling and WRITTEN with whatever this scan learns — the seam that makes the descent a
  * per-endpoint cost rather than a per-call one. It is a plain mutable object shared by every scan on
  * one router (`search/coverage.ts` threads `PoolIndex`'s), and mutating it is safe under the
- * concurrent scans a single wave issues: both fields are monotone — the hint only rises, the cap
+ * concurrent scans a single coverage pass issues: both fields are monotone — the hint only rises, the cap
  * only falls — so interleaved writes converge on the same value whatever order they land in, and a
  * lost update costs one probe. Omitted, every line below behaves exactly as it did before this
  * option existed.

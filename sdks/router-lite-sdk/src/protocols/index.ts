@@ -20,7 +20,7 @@ import { v4Module } from './v4'
 export { v2Module } from './v2'
 export { v3Module } from './v3'
 export { v4Module } from './v4'
-export type { FeeDiscovery, ProtocolModule, QuoteProbe } from './types'
+export type { FeeDiscovery, ProtocolModule } from './types'
 
 // The adjacency vocabulary: the shape a module states about its creation events, and the one builder
 // that turns any set of them into `eth_getLogs` filters (merged or narrow — same construction).

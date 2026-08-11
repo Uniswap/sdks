@@ -16,22 +16,23 @@ import { RouterConfigError, UnsupportedRouteError } from '../errors'
 import { QUOTER_V2_ABI, V3_FACTORY_ABI } from '../internal/abis'
 import { sortAddresses } from '../internal/currency'
 import { narrowTopics } from '../internal/logScan'
-import type { ChainManifest, CurrencyRef, DecodedQuote, EthCall, ExecutionOperation, RouteLeg } from '../types'
+import type { ChainManifest, CurrencyRef, DecodedQuote, EthCall, ExecutionOperation, QuoteCall, RouteLeg } from '../types'
 
 import { v3PoolRef, type V3PoolRef } from './poolRef'
-import type { ProtocolModule, QuoteProbe } from './types'
+import type { ProtocolModule } from './types'
 
 // ---------------------------------------------------------------------------
 // v3 module — QuoterV2 speculative quoting.
 //
 // Unlike v2, a v3 pool address depends on the fee tier as well as the token
-// pair, so `speculativeDirect` emits one candidate per fee in
-// `STANDARD_V3_FEES` — the QuoterV2 call itself doubles as the existence
-// probe (a revert means no pool at that fee, not just an empty-reserves
-// pool). Non-standard fee tiers (enabled later via governance) are folded in
-// by `mergeEnabledFees` from scanned `FeeAmountEnabled` logs; that discovery
-// loop lives in the wave engine, not here — this module only exposes the
-// pure merge function.
+// pair, so `hypotheses` emits one identity per fee in `STANDARD_V3_FEES`
+// (plus any `extraFees` a caller passes) — the QuoterV2 call issued against
+// each one at measurement time doubles as the existence probe (a revert
+// means no pool at that fee, not just an empty-reserves pool). Non-standard
+// fee tiers (enabled later via governance) are folded in by `mergeEnabledFees`
+// from scanned `FeeAmountEnabled` logs; that discovery loop lives in
+// `search/coverage.ts`, not here — this module only exposes the pure merge
+// function.
 // ---------------------------------------------------------------------------
 
 /** The four fee tiers enabled at v3 factory genesis, in hundredths of a bip. */
@@ -130,7 +131,7 @@ function resolveLegToken(currencyIn: CurrencyRef, wrappedNative: Address): Addre
   return currencyIn === 'native' ? wrappedNative : currencyIn
 }
 
-function quoterQuote(quoter: Address, path: Hex, amountIn: bigint): QuoteProbe['quote'] {
+function quoterQuote(quoter: Address, path: Hex, amountIn: bigint): QuoteCall {
   return {
     call: { to: quoter, data: encodeFunctionData({ abi: QUOTER_V2_ABI, functionName: 'quoteExactInput', args: [path, amountIn] }) },
     decode(returnData: Hex): DecodedQuote {
@@ -153,17 +154,6 @@ function v3Hypotheses(a: CurrencyRef, b: CurrencyRef, m: ChainManifest, fees: re
   return fees.map((fee) => v3PoolRef(computeV3PoolAddress(v3.factory, aAddr, bAddr, fee, v3.poolInitCodeHash), token0, token1, fee))
 }
 
-/** One direct-pair probe per fee tier: the QuoterV2 call at the CREATE2 address *is* the existence check. */
-function directProbesForFees(a: CurrencyRef, b: CurrencyRef, amountIn: bigint, fees: readonly number[], m: ChainManifest): QuoteProbe[] {
-  const { v3 } = m
-  if (!v3) return []
-  return v3Hypotheses(a, b, m, fees).map((pool) => {
-    const leg: RouteLeg = { pool, currencyIn: a, currencyOut: b }
-    const path = encodeV3Path([leg], m.wrappedNative)
-    return { candidate: { legs: [leg] }, quote: quoterQuote(v3.v3QuoterV2, path, amountIn) }
-  })
-}
-
 export const v3Module = {
   id: 'v3',
 
@@ -177,10 +167,6 @@ export const v3Module = {
     // same id for one real pool.
     const fees = [...new Set([...STANDARD_V3_FEES, ...extraFees])]
     return v3Hypotheses(a, b, m, fees)
-  },
-
-  speculativeDirect(a, b, amountIn, m) {
-    return directProbesForFees(a, b, amountIn, STANDARD_V3_FEES, m)
   },
 
   adjacencyShape(m) {
@@ -205,10 +191,6 @@ export const v3Module = {
       // out, not thrown over.
       const fromFactory = logs.filter((log) => log.address.toLowerCase() === m.v3!.factory.toLowerCase())
       return mergeEnabledFees(fromFactory)
-    },
-
-    probes(a, b, amountIn, fees, m) {
-      return directProbesForFees(a, b, amountIn, fees, m)
     },
   },
 
@@ -284,7 +266,7 @@ export const v3Module = {
 
 /**
  * Parses `FeeAmountEnabled` logs into their fee values, deduped and sorted ascending. Pure — the
- * wave engine owns the scan/cache loop; this is only the merge.
+ * coverage worker (`search/coverage.ts`) owns the scan/cache loop; this is only the merge.
  */
 export function mergeEnabledFees(feeEvents: Log[]): number[] {
   const fees = new Set<number>()

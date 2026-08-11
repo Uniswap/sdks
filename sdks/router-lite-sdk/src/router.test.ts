@@ -27,11 +27,13 @@ import {
 } from './internal/testing'
 import { manifestFor } from './manifest'
 import { PoolIndex } from './pools/poolIndex'
+import type { ProtocolModule } from './protocols/types'
 import { computeV2PairAddress, v2Module } from './protocols/v2'
 import { v4Module } from './protocols/v4'
 import { classifyQuote, classifySwap, createRouter } from './router'
 import type {
   ChainManifest,
+  CurrencyRef,
   EncodedTx,
   ExecutionRequirement,
   Permit2PermitSingle,
@@ -40,6 +42,7 @@ import type {
   QuoteRequest,
   QuoteResult,
   RankedRoute,
+  RouteLeg,
   SearchReport,
   SwapRequest,
   SwapResult,
@@ -81,6 +84,16 @@ function baseManifest(opts: { v2Block?: bigint; v4?: boolean } = {}): ChainManif
   }
   if (opts.v4 ?? true) m.v4 = { poolManager: V4_POOL_MANAGER, deploymentBlock: 100n, quoter: V4_QUOTER }
   return m
+}
+
+/** Fixture-only stand-in for the deleted direct-probe helper: every hypothesis for (a, b), each
+ * paired with its own direct-pair `encodeQuote` — the exact `{ quote }` shape the old probe API
+ * returned, rebuilt from the two primitives (`hypotheses`, `encodeQuote`) that survive it. */
+function directProbes(module: ProtocolModule, a: CurrencyRef, b: CurrencyRef, amountIn: bigint, m: ChainManifest) {
+  return module.hypotheses(a, b, m).map((pool) => {
+    const leg: RouteLeg = { pool, currencyIn: a, currencyOut: b }
+    return { quote: module.encodeQuote([leg], amountIn, m) }
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -688,7 +701,7 @@ describe('createRouter — validation (before any RPC)', () => {
 
   test('a transient (non-RouterConfigError) chainId RPC failure is NOT cached: this call is inconclusive, the next call retries and can succeed', async () => {
     const manifest = baseManifest()
-    const [probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+    const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
     const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
     const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
 
@@ -728,7 +741,7 @@ describe('quote-only manifests (C4-P3)', () => {
   test('getQuote works end to end with no execution bundle at all', async () => {
     const manifest = quoteOnlyManifest()
     expect(manifest.execution).toBeUndefined()
-    const [probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+    const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
     const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
     const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
 
@@ -1040,8 +1053,8 @@ test('classifySwap: unattempted quote candidates (no best) classify inconclusive
 
 test('getSwap end-to-end: a pre-ingested v4 hint (on a fee tier no module speculates on) resolves to ready', async () => {
   const manifest = baseManifest()
-  // fee/tickSpacing outside STANDARD_V4_CONFIGS: unreachable by speculativeDirect guessing, only by
-  // the hint the caller ingests up front.
+  // fee/tickSpacing outside STANDARD_V4_CONFIGS: unreachable by the module's own `hypotheses`, only
+  // by the hint the caller ingests up front.
   const poolKey: PoolKey = { currency0: TOKEN_A, currency1: TOKEN_B, fee: 2500, tickSpacing: 50, hooks: zeroAddress }
   const hint: PoolHint = { protocol: 'v4', poolKey }
   const leg = { pool: v4Ref(poolKey), currencyIn: TOKEN_A, currencyOut: TOKEN_B }
@@ -1077,7 +1090,7 @@ test('a quote result carries plain QuotedRoutes: no execution/revertData rides a
   const manifest = baseManifest()
   const poolKey: PoolKey = { currency0: TOKEN_A, currency1: TOKEN_B, fee: 2500, tickSpacing: 50, hooks: zeroAddress }
   const v4Leg = { pool: v4Ref(poolKey), currencyIn: TOKEN_A, currencyOut: TOKEN_B }
-  const [v2Probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+  const [v2Probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
   const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
   const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
 
@@ -1109,7 +1122,7 @@ test('an abort before the leader could be simulated resolves inconclusive WITH t
   // its late answer must never decide anything) — leaving the leader `unverified`: nobody ruled it
   // out, nobody could confirm it. Everything the search established has to survive that.
   const manifest = baseManifest({ v2Block: BLOCK_NUMBER - 500n, v4: false })
-  const [probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+  const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
   const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
   const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
 
@@ -1142,7 +1155,7 @@ test('an abort whose leader had already REVERTED hands it back as an alternative
   // know is that this candidate reverts, so it is reported as a failed alternative (with its
   // verbatim revert data) and its calldata is withheld.
   const manifest = baseManifest({ v2Block: BLOCK_NUMBER - 500n, v4: false })
-  const [probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+  const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
   const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
   const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
 
@@ -1183,7 +1196,7 @@ test('ingestPool rejects a hint with an unknown protocol as a RouterConfigError,
 
 test('needs-action carries requirements and an encoded tx when Permit2 allowance is unmet', async () => {
   const manifest = baseManifest()
-  const [probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+  const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
   const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
   const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
 
@@ -1244,7 +1257,7 @@ test('a completed search whose only candidate fails preflight resolves to no-rou
   // adjacency scan and discovery reports `complete` without a single `getLogs` call — the search
   // still runs to genuine completion, it just never finds a second candidate to fall through to.
   const manifest = baseManifest({ v2Block: BLOCK_NUMBER + 1_000_000n, v4: false })
-  const [probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+  const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
   const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
   const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
 
@@ -1288,7 +1301,7 @@ test('a no-route caused by nothing being COMPILABLE names the cause, not just th
   // could have fixed itself — and the pool address is not knowable at request-validation time, so
   // this is the only layer that can say it.
   const manifest = baseManifest({ v2Block: BLOCK_NUMBER + 1_000_000n, v4: false })
-  const [probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+  const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
   const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
   const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
   const pairAddress = computeV2PairAddress(manifest.v2!.factory, TOKEN_A, TOKEN_B)
@@ -1569,7 +1582,7 @@ test('a failed head REFETCH degrades the search rather than escalating it to a t
 
 test('a 429 on the preflight call alone is inconclusive/rpc-degraded — the route stays unverified, never failed and never ready', async () => {
   const manifest = baseManifest({ v2Block: BLOCK_NUMBER + 1_000_000n, v4: false })
-  const [probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+  const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
   const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
   const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
 
@@ -1607,7 +1620,7 @@ test('a throttled readiness read never becomes a stated requirement: inconclusiv
   // `ethCall`, and coercing a throttled `balanceOf` to `0n` used to state `insufficient-balance
   // available: 0n` as fact — then short-circuit preflight, so nothing downstream could notice.
   const manifest = baseManifest({ v2Block: BLOCK_NUMBER + 1_000_000n, v4: false })
-  const [probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+  const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
   const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
   const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
 
@@ -1639,7 +1652,7 @@ test('a throttled readiness read never becomes a stated requirement: inconclusiv
 
 test('a genuinely unmet requirement (reads all landed) is still needs-action — the fix does not blunt real requirements', async () => {
   const manifest = baseManifest({ v2Block: BLOCK_NUMBER + 1_000_000n, v4: false })
-  const [probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+  const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
   const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
   const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
 
@@ -1666,7 +1679,7 @@ test('a preflight lost to the transport does not write the SEARCH off: the verif
   const manifest = baseManifest({ v2Block: BLOCK_NUMBER + 1_000_000n })
   const poolKey: PoolKey = { currency0: TOKEN_A, currency1: TOKEN_B, fee: 2500, tickSpacing: 50, hooks: zeroAddress }
   const v4Leg = { pool: v4Ref(poolKey), currencyIn: TOKEN_A, currencyOut: TOKEN_B }
-  const [v2Probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+  const [v2Probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
   const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
   const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
 
@@ -1700,8 +1713,8 @@ test('a second identical getQuote call reuses the persisted PoolIndex and issues
   // intermediate only when it is a neighbor of BOTH endpoints, which only the adjacency scans can
   // establish (coreIntermediates is empty, so nothing probes MID on its own).
   const manifest = baseManifest({ v2Block: BLOCK_NUMBER - 500n, v4: false })
-  const leg1Call = v2Module.speculativeDirect(TOKEN_A, MID, AMOUNT_IN, manifest)[0]!.quote.call
-  const leg2Call = v2Module.speculativeDirect(MID, TOKEN_B, AMOUNT_IN, manifest)[0]!.quote.call
+  const leg1Call = directProbes(v2Module, TOKEN_A, MID, AMOUNT_IN, manifest)[0]!.quote.call
+  const leg2Call = directProbes(v2Module, MID, TOKEN_B, AMOUNT_IN, manifest)[0]!.quote.call
   const [aMidToken0] = sortAddresses(TOKEN_A, MID)
   const [midBToken0] = sortAddresses(MID, TOKEN_B)
 
@@ -1735,8 +1748,8 @@ test('a second identical getQuote call reuses the persisted PoolIndex and issues
 
 test('ingestLogs (and ingestReceipt) upsert pools ahead of time, so a route resolves with no scanning at all', async () => {
   const manifest = baseManifest({ v2Block: BLOCK_NUMBER - 500n, v4: false })
-  const leg1Call = v2Module.speculativeDirect(TOKEN_A, MID, AMOUNT_IN, manifest)[0]!.quote.call
-  const leg2Call = v2Module.speculativeDirect(MID, TOKEN_B, AMOUNT_IN, manifest)[0]!.quote.call
+  const leg1Call = directProbes(v2Module, TOKEN_A, MID, AMOUNT_IN, manifest)[0]!.quote.call
+  const leg2Call = directProbes(v2Module, MID, TOKEN_B, AMOUNT_IN, manifest)[0]!.quote.call
   const [aMidToken0] = sortAddresses(TOKEN_A, MID)
   const [midBToken0] = sortAddresses(MID, TOKEN_B)
 
@@ -1761,8 +1774,8 @@ test('ingestLogs (and ingestReceipt) upsert pools ahead of time, so a route reso
 test('ingestLogs survives malformed entries: every valid log is still indexed, nothing throws (C4-H4)', async () => {
   // v2 AND v4 enabled, so all three parsers get handed the garbage, not just the one that matches.
   const manifest = baseManifest({ v2Block: BLOCK_NUMBER - 500n })
-  const leg1Call = v2Module.speculativeDirect(TOKEN_A, MID, AMOUNT_IN, manifest)[0]!.quote.call
-  const leg2Call = v2Module.speculativeDirect(MID, TOKEN_B, AMOUNT_IN, manifest)[0]!.quote.call
+  const leg1Call = directProbes(v2Module, TOKEN_A, MID, AMOUNT_IN, manifest)[0]!.quote.call
+  const leg2Call = directProbes(v2Module, MID, TOKEN_B, AMOUNT_IN, manifest)[0]!.quote.call
   const [aMidToken0] = sortAddresses(TOKEN_A, MID)
   const [midBToken0] = sortAddresses(MID, TOKEN_B)
 
@@ -1800,8 +1813,8 @@ test('a quote whose amountOut overflows uint128 degrades that candidate instead 
   // fit the Universal Router's `uint128 amountOutMinimum`. viem throws IntegerOutOfRangeError deep
   // inside the encoder; that must degrade the candidate, not abort the whole search.
   const manifest = baseManifest({ v2Block: BLOCK_NUMBER - 500n })
-  const v4Probe = v4Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)[0]!
-  const v2Probe = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)[0]!
+  const v4Probe = directProbes(v4Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)[0]!
+  const v2Probe = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)[0]!
   const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
   const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
 
@@ -1828,7 +1841,7 @@ test('a quote whose amountOut overflows uint128 degrades that candidate instead 
 
 test('quotes() streams SearchEvents: a lead per improvement, coalesced progress, one final always last', async () => {
   const manifest = baseManifest({ v2Block: BLOCK_NUMBER - 500n, v4: false })
-  const [probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+  const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
   const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
   const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
 
@@ -1980,8 +1993,8 @@ describe('PoolIndex lifecycle (C4-H5): stats, clearIndex, injection, bounded mod
       'against its own already-pinned (old) index',
     async () => {
       const manifest = baseManifest({ v2Block: BLOCK_NUMBER - 500n, v4: false })
-      const leg1Call = v2Module.speculativeDirect(TOKEN_A, MID, AMOUNT_IN, manifest)[0]!.quote.call
-      const leg2Call = v2Module.speculativeDirect(MID, TOKEN_B, AMOUNT_IN, manifest)[0]!.quote.call
+      const leg1Call = directProbes(v2Module, TOKEN_A, MID, AMOUNT_IN, manifest)[0]!.quote.call
+      const leg2Call = directProbes(v2Module, MID, TOKEN_B, AMOUNT_IN, manifest)[0]!.quote.call
       const [aMidToken0] = sortAddresses(TOKEN_A, MID)
       const [midBToken0] = sortAddresses(MID, TOKEN_B)
 
@@ -2024,8 +2037,8 @@ describe('PoolIndex lifecycle (C4-H5): stats, clearIndex, injection, bounded mod
 
   test("injection: an index warmed via one router's ingest is handed to a second router, which routes from it with zero scans (warm handoff)", async () => {
     const manifest = baseManifest({ v2Block: BLOCK_NUMBER - 500n, v4: false })
-    const leg1Call = v2Module.speculativeDirect(TOKEN_A, MID, AMOUNT_IN, manifest)[0]!.quote.call
-    const leg2Call = v2Module.speculativeDirect(MID, TOKEN_B, AMOUNT_IN, manifest)[0]!.quote.call
+    const leg1Call = directProbes(v2Module, TOKEN_A, MID, AMOUNT_IN, manifest)[0]!.quote.call
+    const leg2Call = directProbes(v2Module, MID, TOKEN_B, AMOUNT_IN, manifest)[0]!.quote.call
     const [aMidToken0] = sortAddresses(TOKEN_A, MID)
     const [midBToken0] = sortAddresses(MID, TOKEN_B)
     const calls = {
@@ -2118,7 +2131,7 @@ describe('transport options (C4-P6)', () => {
 
   test('assumeChainId reaches validateManifest: a client that cannot answer eth_chainId still searches', async () => {
     const manifest = baseManifest()
-    const [probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+    const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
     const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
     const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
     const { client } = stubClient({ calls: entryFor(probe!.quote.call, v2Return(10n ** 24n, 10n ** 24n, zeroForOne)) })
@@ -2138,7 +2151,7 @@ describe('transport options (C4-P6)', () => {
 
   test("quotes(): the first lead is the early answer, and getQuote() resolves with that same result", async () => {
     const manifest = baseManifest()
-    const [probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+    const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
     const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
     const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
     const { client } = stubClient({ calls: entryFor(probe!.quote.call, v2Return(10n ** 24n, 10n ** 24n, zeroForOne)) })
@@ -2162,7 +2175,7 @@ describe('transport options (C4-P6)', () => {
 
   test('swaps(): an interim lead is a LEAD, not a verdict — only a later event is entitled to say ready', async () => {
     const manifest = baseManifest()
-    const [probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+    const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
     const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
     const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
     const { client } = stubClient({ calls: entryFor(probe!.quote.call, v2Return(10n ** 24n, 10n ** 24n, zeroForOne)) })
@@ -2205,7 +2218,7 @@ describe('transport options (C4-P6)', () => {
 
   test('concurrency at the boundaries (1 and MAX_CONCURRENCY) is accepted', async () => {
     const manifest = baseManifest()
-    const [probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+    const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
     const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
     const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
     const { client } = stubClient({ calls: entryFor(probe!.quote.call, v2Return(10n ** 24n, 10n ** 24n, zeroForOne)) })
@@ -2336,7 +2349,7 @@ describe('transport options (C4-P6)', () => {
   test('defaults are unchanged: omitting concurrency/logChunkBlocks behaves exactly as before these options existed', async () => {
     // A plain end-to-end swap, no new options passed — the zero-config path stays exactly as it was.
     const manifest = baseManifest()
-    const [probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+    const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
     const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
     const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
 
@@ -2371,7 +2384,7 @@ describe('transport options (C4-P6)', () => {
 describe('pre-search RPC sequencing (C5-A)', () => {
   test('the pinned block overlaps validation and the multicall probe: one release round, not two, precedes the first measurement dispatch', async () => {
     const manifest = baseManifest({ v4: false })
-    const [probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
+    const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, manifest)
     const quoteTarget = probe!.quote.call.to.toLowerCase()
 
     type Gate = { key: string; resolve: (v: unknown) => void }
@@ -2577,7 +2590,7 @@ describe('Multicall3 probe and aggregation (facade)', () => {
 
   function v2World(): { client: PublicClient } {
     const m = manifest()
-    const [probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, m)
+    const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, m)
     const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
     const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
     return stubClient({ calls: entryFor(probe!.quote.call, v2Return(10n ** 24n, 10n ** 24n, zeroForOne)) })
@@ -2653,7 +2666,7 @@ describe('Multicall3 probe and aggregation (facade)', () => {
 
   test('a swap through aggregate3 still preflights directly and stays honest end to end', async () => {
     const m = manifest()
-    const [probe] = v2Module.speculativeDirect(TOKEN_A, TOKEN_B, AMOUNT_IN, m)
+    const [probe] = directProbes(v2Module, TOKEN_A, TOKEN_B, AMOUNT_IN, m)
     const [token0] = sortAddresses(TOKEN_A, TOKEN_B)
     const zeroForOne = token0.toLowerCase() === TOKEN_A.toLowerCase()
     const base = stubClient({ calls: entryFor(probe!.quote.call, v2Return(10n ** 24n, 10n ** 24n, zeroForOne)) })
@@ -2768,8 +2781,8 @@ test('a warm dense index finds the route a cold search finds — warm and cold c
 
   const calls: Record<string, Hex> = {}
   for (const x of xs) {
-    const inCall = v2Module.speculativeDirect(TOKEN_A, x, AMOUNT_IN, manifest)[0]!.quote.call
-    const outCall = v2Module.speculativeDirect(x, TOKEN_B, AMOUNT_IN, manifest)[0]!.quote.call
+    const inCall = directProbes(v2Module, TOKEN_A, x, AMOUNT_IN, manifest)[0]!.quote.call
+    const outCall = directProbes(v2Module, x, TOKEN_B, AMOUNT_IN, manifest)[0]!.quote.call
     const inZeroForOne = sortAddresses(TOKEN_A, x)[0]!.toLowerCase() === TOKEN_A.toLowerCase()
     const outZeroForOne = sortAddresses(x, TOKEN_B)[0]!.toLowerCase() === x.toLowerCase()
     const deep = x === LIQUID
@@ -2834,8 +2847,8 @@ test('a warm dense index finds the route a cold search finds — warm and cold c
 
 test('two concurrent searches on one router: different pairs, same head — both coherent, and the shared index holds both', async () => {
   const manifest = baseManifest({ v2Block: BLOCK_NUMBER - 500n, v4: false })
-  const aMid = v2Module.speculativeDirect(TOKEN_A, MID, AMOUNT_IN, manifest)[0]!.quote.call
-  const midB = v2Module.speculativeDirect(MID, TOKEN_B, AMOUNT_IN, manifest)[0]!.quote.call
+  const aMid = directProbes(v2Module, TOKEN_A, MID, AMOUNT_IN, manifest)[0]!.quote.call
+  const midB = directProbes(v2Module, MID, TOKEN_B, AMOUNT_IN, manifest)[0]!.quote.call
   const aMidZeroForOne = sortAddresses(TOKEN_A, MID)[0]!.toLowerCase() === TOKEN_A.toLowerCase()
   const midBZeroForOne = sortAddresses(MID, TOKEN_B)[0]!.toLowerCase() === MID.toLowerCase()
 
@@ -2892,7 +2905,7 @@ test('two concurrent searches under maxPools pressure: one search\'s scans evict
   ]
   const calls: Record<string, Hex> = {}
   for (const [a, b] of pairs) {
-    const call = v2Module.speculativeDirect(a, b, AMOUNT_IN, manifest)[0]!.quote.call
+    const call = directProbes(v2Module, a, b, AMOUNT_IN, manifest)[0]!.quote.call
     Object.assign(calls, entryFor(call, v2Return(10n ** 18n, 10n ** 18n, sortAddresses(a, b)[0]!.toLowerCase() === a.toLowerCase())))
   }
   const byEndpoint = new Map<string, Log<bigint, number, false>[]>()

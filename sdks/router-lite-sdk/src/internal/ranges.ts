@@ -5,8 +5,8 @@ import type { BlockRange } from '../types'
 //
 // Three call sites need the same algebra for different reasons: the log
 // scanner folds the chunks it actually covered, the pool index maintains its
-// per-(protocol, scope) coverage cache, and the wave engine reasons about what
-// *this* search observed (which is not the index's merged view). They used to
+// per-(protocol, scope) coverage cache, and the coverage worker (`search/coverage.ts`)
+// reasons about what *this* search observed (which is not the index's merged view). They used to
 // carry three near-identical private copies, one of which seeded its
 // accumulator with the caller's own first range object and then mutated it —
 // so merging a caller's array quietly rewrote the caller's data. Every

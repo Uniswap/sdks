@@ -18,7 +18,7 @@ import type { ProtocolModule } from '../protocols/types'
 import { v2Module } from '../protocols/v2'
 import { v3Module } from '../protocols/v3'
 import { v4Module } from '../protocols/v4'
-import type { ChainManifest, EthCall, PoolKey, PoolRef, Protocol } from '../types'
+import type { ChainManifest, EthCall, PoolKey, PoolRef, Protocol, RouteLeg } from '../types'
 
 import type { LegOutcome, LegRequest } from './measure'
 import { measureLegs } from './measure'
@@ -122,6 +122,16 @@ function encoded(pool: PoolRef, currencyIn: Address, currencyOut: Address, amoun
   return modules[pool.protocol].encodeQuote([{ pool, currencyIn, currencyOut }], amountIn, manifest).call
 }
 
+/** Fixture-only stand-in for the deleted direct-probe helper: every hypothesis for (a, b), each
+ * paired with its own direct-pair `encodeQuote` — the exact `{ candidate, quote }` shape the old
+ * probe API returned, rebuilt from the two primitives that survive it. */
+function directProbes(module: ProtocolModule, a: Address, b: Address, amountIn: bigint, m: ChainManifest) {
+  return module.hypotheses(a, b, m).map((pool) => {
+    const leg: RouteLeg = { pool, currencyIn: a, currencyOut: b }
+    return { candidate: { legs: [leg] }, quote: module.encodeQuote([leg], amountIn, m) }
+  })
+}
+
 test('per-call path: a decoded quote is a success outcome carrying amount and the quoter gas figure', async () => {
   const leg = req('k1', v4UsdcWeth, USDC, WETH, 100n)
   const client = stubClient(entryFor(encoded(v4UsdcWeth, USDC, WETH, 100n), v4Return(500n, 186_412n)))
@@ -134,7 +144,7 @@ test('per-call path: a decoded quote is a success outcome carrying amount and th
 test('a quoter that reports no gas figure yields a success outcome with no gasEstimate key at all', async () => {
   // v2 prices off reserves locally — there is no quoter and no gas word to report, and the absence
   // must be an ABSENT field rather than a zero a caller would sum into a total.
-  const [probe] = v2Module.speculativeDirect(USDC, WETH, 10n ** 6n, manifest)
+  const [probe] = directProbes(v2Module, USDC, WETH, 10n ** 6n, manifest)
   const legRef = probe!.candidate.legs[0]!
   const leg = req('k1', legRef.pool, legRef.currencyIn as Address, legRef.currencyOut as Address, 10n ** 6n)
   const client = stubClient(entryFor(probe!.quote.call, v2Return(2_000_000n * 10n ** 6n, 1_000n * 10n ** 18n, true)))
@@ -168,7 +178,7 @@ test('a pool-absent v2 read decodes to nothing and reports as an amount-independ
   // `getReserves()` at an address with no contract returns `0x` on both dispatch paths — an
   // execution-channel failure with no revert data, so the same negative-cacheable shape as a bare
   // revert even though nothing reverted.
-  const [probe] = v2Module.speculativeDirect(WETH, DAI, 10n ** 6n, manifest)
+  const [probe] = directProbes(v2Module, WETH, DAI, 10n ** 6n, manifest)
   const legRef = probe!.candidate.legs[0]!
   const leg = req('empty', legRef.pool, legRef.currencyIn as Address, legRef.currencyOut as Address, 10n ** 6n)
   const client = stubClient(entryFor(probe!.quote.call, '0x' as Hex))
@@ -209,9 +219,9 @@ test('an encode failure is that leg alone — the rest of the round is measured 
 
 test('a leg the abort caught in the semaphore queue is unattempted — not attempted, not blamed on the provider', async () => {
   const amountIn = 10n ** 6n
-  const [first] = v2Module.speculativeDirect(USDC, WETH, amountIn, manifest)
-  const [second] = v2Module.speculativeDirect(WETH, DAI, amountIn, manifest)
-  const [third] = v2Module.speculativeDirect(USDC, DAI, amountIn, manifest)
+  const [first] = directProbes(v2Module, USDC, WETH, amountIn, manifest)
+  const [second] = directProbes(v2Module, WETH, DAI, amountIn, manifest)
+  const [third] = directProbes(v2Module, USDC, DAI, amountIn, manifest)
   const legs = [first!, second!, third!].map((probe, i) => {
     const leg = probe.candidate.legs[0]!
     return req(`k${i}`, leg.pool, leg.currencyIn as Address, leg.currencyOut as Address, amountIn)
@@ -351,7 +361,7 @@ test('both dispatch paths report the identical outcomes for the identical world'
   const good = req('good', v4UsdcWeth, USDC, WETH, 1n)
   const bare = req('bare', v3WethDai, WETH, DAI, 1n)
   const withData = req('with-data', v3Ref('0x0000000000000000000000000000000000d004', USDC, WETH, 500), USDC, WETH, 1n)
-  const [emptyCodeProbe] = v2Module.speculativeDirect(USDC, DAI, 1n, manifest)
+  const [emptyCodeProbe] = directProbes(v2Module, USDC, DAI, 1n, manifest)
   const emptyLeg = emptyCodeProbe!.candidate.legs[0]!
   const empty = req('empty', emptyLeg.pool, emptyLeg.currencyIn as Address, emptyLeg.currencyOut as Address, 1n)
   const legs = [good, bare, withData, empty]

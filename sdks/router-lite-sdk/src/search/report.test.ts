@@ -42,7 +42,6 @@ function enabledModule(id: Protocol): ProtocolModule {
   return {
     id,
     enabled: () => true,
-    speculativeDirect: () => [],
     hypotheses: () => [],
     adjacencyShape: () => undefined,
     parsePoolLog: () => null,

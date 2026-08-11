@@ -89,7 +89,6 @@ function fakeModule(world: World, id: Protocol = 'v2'): ProtocolModule {
     id,
     enabled: () => true,
     hypotheses: () => [],
-    speculativeDirect: () => [],
     adjacencyShape: () => undefined,
     parsePoolLog: () => null,
     validateHint: () => Promise.resolve(null),

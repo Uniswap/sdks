@@ -13,7 +13,6 @@ import type {
   PoolIndexOptions,
   PoolIndexSnapshot,
   ProtocolModule,
-  QuoteProbe,
   RpcFailureKind,
 } from './index'
 import * as experimentalModule from './index'
@@ -181,11 +180,9 @@ test('AdjacencyShape is nameable, and adjacencyQueries builds a merged filter fr
   expect(first!.topics[1]).toEqual([pad(USDC.toLowerCase() as Hex, { size: 32 })])
 })
 
-test('FeeDiscovery and QuoteProbe are reachable, importable types', () => {
+test('FeeDiscovery is reachable, an importable type', () => {
   const feeDiscovery: FeeDiscovery | undefined = PROTOCOL_MODULES.v3.feeDiscovery
   expect(feeDiscovery === undefined || typeof feeDiscovery.query === 'function').toBe(true)
-  const probes: QuoteProbe[] = []
-  expect(probes).toHaveLength(0)
 })
 
 test('Custody is constructible and usable directly against ProtocolModule.compileOperation', () => {

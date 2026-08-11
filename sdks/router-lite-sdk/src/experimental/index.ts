@@ -46,7 +46,7 @@ export { PoolIndex, POOL_INDEX_SCHEMA_VERSION, parseSnapshot, serializeSnapshot 
 export type { PoolIndexOptions, PoolIndexSnapshot, PoolIndexStats } from '../pools/poolIndex'
 
 export { PROTOCOL_MODULES, v2Module, v3Module, v4Module } from '../protocols'
-export type { FeeDiscovery, ProtocolModule, QuoteProbe } from '../protocols'
+export type { FeeDiscovery, ProtocolModule } from '../protocols'
 
 // `adjacencyShape` is the one `ProtocolModule` member whose type a caller could reach but not NAME
 // — a custom module has to return an `AdjacencyShape`, and `adjacencyQueries` is what turns any set

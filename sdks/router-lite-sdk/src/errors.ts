@@ -95,8 +95,9 @@ export class NodeStateError extends TransportError {
  * failure would set `verificationDegraded`/`rpc-degraded` and blame a provider for a deadline the
  * caller set; counting it as a revert would be worse still (a fabricated on-chain fact, and a
  * poisoned negative cache). It is counted as nothing — the candidate is simply never `attempted`,
- * which is precisely what `SearchReport.quoting.unattempted` already means and how
- * `quoteCandidates` already treats a candidate dropped between rounds.
+ * which is precisely what `SearchReport.quoting.unattempted` already means and how the measurement
+ * executor (`quote/measure.ts#measureLegs`) and `applyMeasurement` (`search/state.ts`) already treat
+ * a leg the abort caught mid-flight.
  *
  * WHY THE SKIP EXISTS AT ALL. `createSemaphore` is a plain FIFO queue with no abort awareness: a
  * measurement round that dispatched 47 calls against 20 permits has most of them waiting, and each
