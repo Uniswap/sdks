@@ -153,3 +153,43 @@ test('intersectRanges property: membership is the AND of the two inputs\' member
     }),
   )
 })
+
+test('subtractRanges property: membership is `from` AND NOT `remove`, and nothing aliases an input', () => {
+  // The trickiest of the three, and the last to get a property (C4-T14). Its example tests cover the
+  // shapes someone thought of; the two bugs this module's header records were BOTH shapes nobody
+  // thought of — a returned array aliased to the caller's own `from`, and a widened range object
+  // shared with an input. So this property checks the algebra AND the aliasing, from one generator.
+  fc.assert(
+    fc.property(rangesArb(), rangesArb(), (from, remove) => {
+      // Snapshotted BEFORE the call: the mutation bug rewrote the caller's data in place, so a
+      // membership check against the post-call inputs would have agreed with a corrupted result.
+      const fromBefore = JSON.stringify(from, (_k, v) => (typeof v === 'bigint' ? v.toString() : v))
+      const removeBefore = JSON.stringify(remove, (_k, v) => (typeof v === 'bigint' ? v.toString() : v))
+
+      const difference = subtractRanges(from, remove)
+
+      for (let block = 0n; block <= DOMAIN_MAX; block++) {
+        if (membershipOf(difference, block) !== (membershipOf(from, block) && !membershipOf(remove, block))) return false
+      }
+
+      // Well-formedness: every surviving range still runs forwards. The two `cut.fromBlock - 1n` /
+      // `cut.toBlock + 1n` splits are where an off-by-one would mint an inverted range that
+      // `membershipOf` reads as empty — invisible to the membership check above, and poison to
+      // `mergeRanges` downstream.
+      if (difference.some((range) => range.fromBlock > range.toBlock)) return false
+
+      // The returned ARRAY is never an input array — the exact bug the header records, where the
+      // nothing-to-cut path returned `from` itself and a caller pushing onto the result grew its own
+      // input. Range OBJECTS are deliberately not checked for identity: a range no cut touches is
+      // passed through by reference on purpose, and the module only promises freshness for ranges it
+      // narrows or splits (the header's "every range these functions *widen* is a fresh object").
+      if ((difference as BlockRange[]) === from || (difference as BlockRange[]) === remove) return false
+      // Nothing an input holds changed value either, which is the half that pass-through sharing
+      // could still have broken.
+      if (JSON.stringify(from, (_k, v) => (typeof v === 'bigint' ? v.toString() : v)) !== fromBefore) return false
+      if (JSON.stringify(remove, (_k, v) => (typeof v === 'bigint' ? v.toString() : v)) !== removeBefore) return false
+
+      return true
+    }),
+  )
+})

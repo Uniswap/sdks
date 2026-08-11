@@ -7,6 +7,7 @@ import {
   MAX_HINTS_PER_REQUEST,
   MAX_HOOK_DATA_BYTES,
   DEFAULT_REORG_OVERLAP_BLOCKS,
+  HINT_DISCREDIT_FAILURE_BLOCKS,
   UR_ADDRESS_THIS,
   UR_MSG_SENDER,
 } from './constants'
@@ -23,14 +24,16 @@ import {
   recordStubViolation,
   serveAggregate3,
   takeStubViolations,
+  v2Ref,
   v4Ref,
 } from './internal/testing'
 import { manifestFor } from './manifest'
-import { PoolIndex } from './pools/poolIndex'
+import { isDiscredited, PoolIndex } from './pools/poolIndex'
 import type { ProtocolModule } from './protocols/types'
 import { computeV2PairAddress, v2Module } from './protocols/v2'
 import { v4Module } from './protocols/v4'
 import { classifyQuote, classifySwap, createRouter } from './router'
+import type { Router } from './router'
 import type {
   ChainManifest,
   CurrencyRef,
@@ -1927,6 +1930,86 @@ describe('hookData (request-scoped, keyed by lowercased poolId)', () => {
   })
 })
 
+test('a hint discredited by two real searches is restored by a creation log ingested MID-SEARCH, and prices again after', async () => {
+  // THE TWO UNIT HALVES, COMPOSED THROUGH REAL SEARCHES (C4-T14). Each end of this already has a
+  // test: `search/pump.test.ts` proves the engine's own data-less reverts feed the discredit history
+  // at two distinct blocks, and `pools/poolIndex.test.ts` proves an event-sourced upsert clears that
+  // history. Neither says the two ever meet — that a hint demoted by what the ENGINE measured is
+  // restored by what a HOST ingests while a search is in flight, and that the restored record is then
+  // usable rather than merely differently-shaped.
+  let head = BLOCK_NUMBER
+  const manifest = baseManifest({ v2Block: BLOCK_NUMBER - 500n, v4: false })
+  const hint: PoolHint = { protocol: 'v2', token0: TOKEN_A, token1: TOKEN_B }
+  const hintedPool = v2Ref(computeV2PairAddress(V2_FACTORY, TOKEN_A, TOKEN_B), TOKEN_A, TOKEN_B)
+  const quoteCall = v2Module.encodeQuote([{ pool: hintedPool, currencyIn: TOKEN_A, currencyOut: TOKEN_B }], AMOUNT_IN, manifest).call
+
+  // `calls` starts EMPTY, so the hinted pair's `getReserves` throws a data-less "execution reverted"
+  // — the pool-absent shape, and the only shape that discredits (a liquidity or hook revert carries
+  // data and must not).
+  const calls: Record<string, Hex> = {}
+  // Injected warm, holding the hint record already — the state a host reaches by handing on an index
+  // that has seen this hint before. A hint pool that has NEVER been in the index does not get
+  // discredited by a revert at all: it is negative-cached and simply not upserted (see
+  // `pump.test.ts`, "a hint hypothesis that reverts data-less is negative-cached, never upserted").
+  // The ladder this test is about only applies to a record that already claimed top provenance.
+  const index = new PoolIndex(manifest.wrappedNative)
+  index.upsert({ pool: hintedPool, source: 'hint' })
+  const recordOf = () => index.pair(TOKEN_A, TOKEN_B).find((r) => r.pool.id === hintedPool.id)!
+
+  let midSearch: (() => void) | undefined
+  const { client } = stubClient({ calls, blockNumber: () => head, midSearch: () => midSearch?.() })
+  const router = createRouter({ client, manifest, index })
+  const quote = () => router.getQuote({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN, hints: [hint] })
+
+  // Two searches at two DISTINCT blocks — one block's failures are one piece of evidence however
+  // many times they repeat, which is what keeps a busy caller from discrediting its own good hint.
+  await quote()
+  expect(recordOf().quoteFailureBlocks).toBe(1)
+  expect(isDiscredited(recordOf())).toBe(false)
+
+  head = BLOCK_NUMBER + 1n
+  await quote()
+  expect(recordOf().quoteFailureBlocks).toBe(HINT_DISCREDIT_FAILURE_BLOCKS)
+  expect(isDiscredited(recordOf())).toBe(true)
+  expect(recordOf().source).toBe('hint') // demoted, never deleted and never downgraded
+
+  // THE THIRD SEARCH. Its quote call still reverts — the pool is not funded yet — but partway through
+  // it, standing in for another task on the host, the pair's creation log arrives. The log lands
+  // BEFORE this search records its own failure, which is what makes the arithmetic below legible:
+  // two accumulated blocks are wiped, then this search's revert counts as the first block of a fresh
+  // history. Without the ingestion the record would be sitting on three failed blocks and still
+  // discredited; with it, one block and restored.
+  head = BLOCK_NUMBER + 2n
+  midSearch = () => {
+    midSearch = undefined // once: a pair is created once, not on every call
+    router.ingestLogs([pairCreatedLog(manifest, TOKEN_A, TOKEN_B, head)])
+  }
+  await quote()
+
+  expect(recordOf().quoteFailureBlocks).toBe(1)
+  expect(isDiscredited(recordOf())).toBe(false)
+  expect(recordOf().source).toBe('hint') // restored, not downgraded to the 'event' that restored it
+
+  // ...and the restored record is a working one, not just a differently-shaped one: once the pool
+  // actually answers, the search the caller opened having written it off quotes straight through it,
+  // and the success clears the remaining failure block outright.
+  head = BLOCK_NUMBER + 3n
+  Object.assign(calls, entryFor(quoteCall, v2Return(10n ** 21n, 10n ** 21n, sortAddresses(TOKEN_A, TOKEN_B)[0] === TOKEN_A)))
+  const priced = await quote()
+
+  assertResultCoherent(priced)
+  expect(priced.status).toBe('quote')
+  if (priced.status !== 'quote') throw new Error('unreachable')
+  expect(priced.best.route.legs[0]!.pool.id).toBe(hintedPool.id)
+  // The success is recorded, and THAT — not a rewritten counter — is what holds the demotion off from
+  // here on: `isDiscredited` requires `lastQuoteSuccessBlock === undefined`, so the failed block stays
+  // on the record as history while ceasing to count against it. The two recovery routes leave
+  // different traces on purpose, and this is the one that says "it worked" rather than "it exists".
+  expect(recordOf().quoteFailureBlocks).toBe(1)
+  expect(recordOf().lastQuoteSuccessBlock).toBe(BLOCK_NUMBER + 3n)
+  expect(isDiscredited(recordOf())).toBe(false)
+})
+
 describe('PoolIndex lifecycle (C4-H5): stats, clearIndex, injection, bounded mode', () => {
   const EMPTY_STATS = { pools: 0, adjacencyEdges: 0, coverageScopes: 0, negativeCacheBlocks: 0, enabledFeeFactories: 0 }
 
@@ -2919,23 +3002,56 @@ test('two concurrent searches under maxPools pressure: one search\'s scans evict
       byEndpoint.set(key, [...(byEndpoint.get(key) ?? []), log])
     }
   })
-  const { client } = stubClient({ calls, logs: (endpoint) => byEndpoint.get(endpoint) ?? [] })
-  // Two pools is half of what the two searches between them need, so every scan that lands evicts
-  // something the OTHER search is mid-way through reasoning about.
-  const router = createRouter({ client, manifest, maxPools: 2 })
+  // Both runs below share this one world description; each gets its own client so neither inherits
+  // the other's call history.
+  const newClient = () => stubClient({ calls, logs: (endpoint) => byEndpoint.get(endpoint) ?? [] }).client
 
-  const settled = await Promise.race([
-    Promise.all([
-      router.getQuote({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN }),
-      router.getQuote({ tokenIn: OTHER_IN, tokenOut: OTHER_OUT, amountIn: AMOUNT_IN }),
-    ]),
-    new Promise<'hung'>((resolve) => setTimeout(() => resolve('hung'), 5_000)),
-  ])
+  /** Runs the two searches concurrently on one router, resolving to `'hung'` rather than waiting
+   * forever if the interleaving parks a search short of `final` — the regression this test exists for. */
+  const raceBothSearches = (router: Router) =>
+    Promise.race([
+      Promise.all([
+        router.getQuote({ tokenIn: TOKEN_A, tokenOut: TOKEN_B, amountIn: AMOUNT_IN }),
+        router.getQuote({ tokenIn: OTHER_IN, tokenOut: OTHER_OUT, amountIn: AMOUNT_IN }),
+      ]),
+      new Promise<'hung'>((resolve) => setTimeout(() => resolve('hung'), 5_000)),
+    ])
+
+  // THE CONTROL, and the reason this test can claim anything about eviction at all. Same world, same
+  // two searches, an UNBOUNDED index: all four pools are reachable, all four are retained, and both
+  // searches find their two-hop. Without this run, the bounded run below asserts nothing — a bounded
+  // index cannot report more pools than its bound, so `pools < 4` there is true whether four pools
+  // entered it or one did (which is exactly what the assertion it replaced, C4-T14, was doing).
+  const controlIndex = new PoolIndex(manifest.wrappedNative) // no maxPools
+  const control = await raceBothSearches(createRouter({ client: newClient(), manifest, index: controlIndex }))
+  expect(control).not.toBe('hung')
+  if (control === 'hung') throw new Error('unreachable')
+  expect(control.map((r) => r.status)).toEqual(['quote', 'quote'])
+  expect(pairs.filter(([a, b]) => controlIndex.pair(a, b).length > 0)).toHaveLength(4)
+  expect(controlIndex.stats().pools).toBe(4)
+
+  // Two pools is half of what the two searches between them need, so every scan that lands evicts
+  // something the OTHER search is mid-way through reasoning about. The index is INJECTED rather than
+  // configured through `maxPools` so the assertions below can ask it per-pair what it still holds.
+  const index = new PoolIndex(manifest.wrappedNative, { maxPools: 2 })
+  const router = createRouter({ client: newClient(), manifest, index })
+  const settled = await raceBothSearches(router)
 
   expect(settled).not.toBe('hung')
   if (settled === 'hung') throw new Error('unreachable')
   for (const result of settled) assertResultCoherent(result)
-  // A real eviction scenario, not a cap that never bit: the two searches between them upserted four
-  // pools into an index that can hold two.
-  expect(router.stats().pools).toBeLessThan(pairs.length)
+
+  // EVICTION, OBSERVED — as a delta against the control, per-pair. Four pairs entered this index (the
+  // control proves this world offers exactly four and that both searches reach all of them); two of
+  // them are gone. That is a pool the index accepted and then threw away, which is the thing the word
+  // "eviction" names.
+  const stillHeld = pairs.filter(([a, b]) => index.pair(a, b).length > 0)
+  expect(stillHeld).toHaveLength(2)
+  expect(index.stats().pools).toBe(2)
+  // Eviction tears down the adjacency scaffolding with the pool (`evictPool` unlinks both
+  // directions), so a stale edge pointing at an evicted pool would show up here as a count above
+  // `2 * pools` — the leak that would leave the index reporting neighbours it can no longer resolve.
+  // The control's 8 is the same arithmetic on four surviving pools.
+  expect(index.stats().adjacencyEdges).toBe(4)
+  expect(controlIndex.stats().adjacencyEdges).toBe(8)
 })

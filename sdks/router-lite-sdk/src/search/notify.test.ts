@@ -103,6 +103,14 @@ test('a rejecting source lands in failures(), never rethrown, never an unhandled
   const onUnhandled = (reason: unknown) => unhandled.push(reason)
   process.on('unhandledRejection', onUnhandled)
 
+  // `unhandledRejection` is dispatched on a MACROTASK — the runtime decides a rejection is unhandled
+  // only after the microtask queue has drained and nothing attached a handler. Awaiting resolved
+  // promises (which is what this test did until C4-T14) never leaves the microtask queue, so the
+  // listener above could not have fired no matter what the code under test did, and
+  // `expect(unhandled).toEqual([])` was decorative: it asserted that a detector which had not yet been
+  // given a chance to run had not run. This hops a real macrotask instead.
+  const nextMacrotask = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
+
   try {
     const notifier = createNotifier()
     const set = new SourceSet(notifier)
@@ -113,14 +121,19 @@ test('a rejecting source lands in failures(), never rethrown, never an unhandled
       throw boom
     })
     await woken
-
-    // give the runtime a turn to flag any unhandled rejection before asserting none happened
-    await Promise.resolve()
-    await Promise.resolve()
+    await nextMacrotask()
 
     expect(set.settled()).toBe(true)
     expect(set.failures()).toEqual([{ name: 'bad', error: boom }])
     expect(unhandled).toEqual([])
+
+    // WHY THERE IS NO POSITIVE CONTROL HERE, since the obvious next move is to leak a rejection
+    // deliberately and watch the listener catch it: it was tried (C4-T14) and it cannot work under
+    // this runner. `void Promise.reject(new Error(...))` inside a bun test does not reach a
+    // `process.on('unhandledRejection')` listener — bun's test runner intercepts it first and fails
+    // the test outright. Which is the reassuring version of the answer: a `SourceSet` that leaked a
+    // rejection would fail this test through the RUNNER even if the listener above never fired, so the
+    // claim in this test's name rests on two independent detectors rather than on the weaker one.
   } finally {
     process.off('unhandledRejection', onUnhandled)
   }

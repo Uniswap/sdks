@@ -151,6 +151,22 @@ test('compileOperation maps custody', () => {
   expect(op).toMatchObject({ kind: 'v2-swap', payer: 'router', recipient: 'final' })
 })
 
+test("hypotheses resolves 'native' to the wrapped address — a v2 pair is the same pool either way", () => {
+  // v2 pools hold ERC-20s only; there is no native spelling of a v2 pair, so `native` and the wrapped
+  // address must name ONE pool. This is the contrast with v4 (`v4.test.ts` — "hypotheses sorts native
+  // (address(0)) before the counter-token"), where native is address(0) IN the PoolKey and therefore
+  // hashes to a genuinely different pool from the wrapped one. Getting this backwards in either
+  // direction is a silent wrong-address bug: the search probes a pair that does not exist and reports
+  // a confident `no-route`.
+  const [viaNative] = v2Module.hypotheses('native', USDC, MAINNET_MANIFEST)
+  const [viaWrapped] = v2Module.hypotheses(WETH, USDC, MAINNET_MANIFEST)
+  expect(viaNative).toEqual(viaWrapped!)
+  expect(viaNative!.currencies).toEqual([USDC, WETH]) // the wrapped address, never the string 'native'
+
+  // Symmetric in the slot it arrives in: the pair is sorted after resolution, not before.
+  expect(v2Module.hypotheses(USDC, 'native', MAINNET_MANIFEST)[0]).toEqual(viaNative!)
+})
+
 test('hypotheses returns exactly the one CREATE2 pair address for (a, b)', () => {
   const hypotheses = v2Module.hypotheses(USDC, WETH, MAINNET_MANIFEST)
   expect(hypotheses).toHaveLength(1)

@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "label": "hermetic-hinted-swap-ready",
+  "label": "hermetic-needs-action-swap",
   "chainId": 31337,
   "kind": "swap",
-  "recordedAt": "2026-08-11T09:43:31.398Z",
-  "notes": "A hinted v2 pool nothing else can reach: the caller asserts it, the pump proves it by measuring it, readiness finds the trader funded and approved, and the preflight simulates cleanly. The golden pins the compiled Universal Router calldata, which the fold recompiles rather than copies.",
+  "recordedAt": "2026-08-11T09:43:31.401Z",
+  "notes": "The swap verdict no quote-shaped fixture can reach: the same hinted, verified route as the ready swap, but the trader has not approved the token to Permit2. The plan compiles, the preflight simulates against the router's own state and passes, and the result still carries `tx` — gated behind ONE stated requirement rather than being downgraded to no-route, which is the distinction this fixture pins.",
   "manifest": {
     "chainId": 31337,
     "wrappedNative": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
@@ -100,7 +100,14 @@
     {
       "t": "readiness",
       "r": {
-        "requirements": [],
+        "requirements": [
+          {
+            "kind": "erc20-approval",
+            "token": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "spender": "0x3333333333333333333333333333333333333333",
+            "minimumAmount": "$bigint:1000000"
+          }
+        ],
         "degraded": false
       }
     },
@@ -131,7 +138,7 @@
       "t": "preflight",
       "routeId": "v2:0x27ba5470dcb3e780e4da69a1b453cc2f96828194",
       "o": {
-        "kind": "verified"
+        "kind": "needs-action"
       }
     },
     {
@@ -152,7 +159,7 @@
     }
   ],
   "golden": {
-    "status": "ready",
+    "status": "needs-action",
     "best": {
       "routeId": "v2:0x27ba5470dcb3e780e4da69a1b453cc2f96828194",
       "protocols": [
@@ -165,7 +172,7 @@
       "amountIn": "1000000",
       "amountOut": "996999",
       "intermediateAmounts": [],
-      "execution": "verified"
+      "execution": "needs-action"
     },
     "alternatives": [],
     "tx": {
@@ -177,6 +184,14 @@
       "minAmountOut": "987029",
       "deadline": "1700000300"
     },
+    "requirements": [
+      {
+        "kind": "erc20-approval",
+        "token": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+        "spender": "0x3333333333333333333333333333333333333333",
+        "minimumAmount": "1000000"
+      }
+    ],
     "report": {
       "block": {
         "number": "1000000",
@@ -223,7 +238,7 @@
       "verificationDegraded": false,
       "headRegressed": false,
       "verification": {
-        "preflightAttempted": 1,
+        "preflightAttempted": 0,
         "preflightBudgetExhausted": false
       }
     }

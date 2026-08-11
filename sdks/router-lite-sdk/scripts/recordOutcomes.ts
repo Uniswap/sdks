@@ -41,7 +41,7 @@ import { HERMETIC_SCENARIOS } from './hermeticWorlds'
 //
 // TWO CORPORA, ONE RECORDER (`recordOutcomeFixture`):
 //
-//   # the hermetic four — deterministic fake worlds, no network at all
+//   # the hermetic corpus — deterministic fake worlds, no network at all
 //   bun scripts/recordOutcomes.ts --hermetic
 //
 //   # a live golden, ALWAYS through `chainz exec` so the keyed RPC URL never
@@ -60,7 +60,7 @@ import { HERMETIC_SCENARIOS } from './hermeticWorlds'
 // Driving a mainnet search to `final` means walking every factory's whole
 // deployment history for a golden that is about the ANSWER — unaffordable, and
 // no more assertive, since the fold reproduces whichever moment was recorded.
-// The hermetic four run to `final`, where a fake world's entire history is a
+// The hermetic worlds run to `final`, where a fake world's entire history is a
 // few empty `eth_getLogs`.
 // ---------------------------------------------------------------------------
 

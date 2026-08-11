@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "label": "hermetic-two-hop-quote",
+  "label": "hermetic-mx-invalidation",
   "chainId": 31337,
   "kind": "quote",
-  "recordedAt": "2026-08-11T09:43:31.400Z",
-  "notes": "Composition and the gas rule in one fixture: a v3->v3 two-hop through the manifest core out-prices a v2 direct pool, so `best` carries the two legs' summed gasEstimate and its runner-up — priced by v2's local reserve math, which measures no gas — carries none.",
+  "recordedAt": "2026-08-11T09:43:31.403Z",
+  "notes": "The invalidation arm, pinned through a golden. A shallow (T_IN, WETH) pool sets m_X first and an out-leg is priced at that amount; then the adjacency scan — which only runs once the pump has gone dry — delivers a much deeper in-leg, m_X improves, and the out-leg measured at the old amount is outdated and re-measured at the new one. The log therefore contains the SAME out-leg pool at two different amounts, and the golden is the composition through the second.",
   "manifest": {
     "chainId": 31337,
     "wrappedNative": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
@@ -14,11 +14,6 @@
     "v2": {
       "factory": "0x6666666666666666666666666666666666666666",
       "deploymentBlock": "$bigint:0"
-    },
-    "v3": {
-      "factory": "0x5555555555555555555555555555555555555555",
-      "deploymentBlock": "$bigint:0",
-      "v3QuoterV2": "0x4444444444444444444444444444444444444444"
     }
   },
   "request": {
@@ -49,52 +44,50 @@
       "pools": [
         {
           "pool": {
-            "protocol": "v3",
-            "address": "0x0000000000000000000000000000000000003001",
+            "protocol": "v2",
+            "address": "0x0000000000000000000000000000000000002400",
             "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
             "token1": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-            "fee": 500,
-            "id": "v3:0x0000000000000000000000000000000000003001",
+            "id": "v2:0x0000000000000000000000000000000000002400",
             "currencies": [
               "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
               "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
             ]
           },
           "source": "event",
-          "createdAtBlock": "$bigint:10",
+          "createdAtBlock": "$bigint:1",
           "lastQuoteSuccessBlock": "$bigint:1000000"
         },
         {
           "pool": {
-            "protocol": "v3",
-            "address": "0x0000000000000000000000000000000000003002",
+            "protocol": "v2",
+            "address": "0x0000000000000000000000000000000000002401",
             "token0": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
             "token1": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-            "fee": 500,
-            "id": "v3:0x0000000000000000000000000000000000003002",
+            "id": "v2:0x0000000000000000000000000000000000002401",
             "currencies": [
               "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
               "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
             ]
           },
           "source": "event",
-          "createdAtBlock": "$bigint:11",
+          "createdAtBlock": "$bigint:2",
           "lastQuoteSuccessBlock": "$bigint:1000000"
         },
         {
           "pool": {
             "protocol": "v2",
-            "address": "0x0000000000000000000000000000000000002001",
-            "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
-            "token1": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
-            "id": "v2:0x0000000000000000000000000000000000002001",
+            "address": "0x0000000000000000000000000000000000002402",
+            "token0": "0xA1A1a1a1A1A1A1A1A1a1a1a1a1a1A1A1a1A1a1a1",
+            "token1": "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+            "id": "v2:0x0000000000000000000000000000000000002402",
             "currencies": [
-              "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
-              "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+              "0xA1A1a1a1A1A1A1A1A1a1a1a1a1a1A1A1a1A1a1a1",
+              "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
             ]
           },
           "source": "event",
-          "createdAtBlock": "$bigint:12",
+          "createdAtBlock": "$bigint:10",
           "lastQuoteSuccessBlock": "$bigint:1000000"
         }
       ],
@@ -116,24 +109,6 @@
               "toBlock": "$bigint:1000000"
             }
           ]
-        ],
-        [
-          "v3:0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
-          [
-            {
-              "fromBlock": "$bigint:0",
-              "toBlock": "$bigint:1000000"
-            }
-          ]
-        ],
-        [
-          "v3:0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
-          [
-            {
-              "fromBlock": "$bigint:0",
-              "toBlock": "$bigint:1000000"
-            }
-          ]
         ]
       ],
       "enabledFees": [],
@@ -148,34 +123,10 @@
         "m": {
           "pool": {
             "protocol": "v2",
-            "address": "0x0000000000000000000000000000000000002001",
-            "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
-            "token1": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
-            "id": "v2:0x0000000000000000000000000000000000002001",
-            "currencies": [
-              "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
-              "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
-            ]
-          },
-          "currencyIn": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
-          "currencyOut": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
-          "amountIn": "$bigint:1000000",
-          "amountOut": "$bigint:498499"
-        }
-      }
-    },
-    {
-      "t": "measurement",
-      "o": {
-        "kind": "success",
-        "m": {
-          "pool": {
-            "protocol": "v3",
-            "address": "0x0000000000000000000000000000000000003001",
+            "address": "0x0000000000000000000000000000000000002400",
             "token0": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
             "token1": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-            "fee": 500,
-            "id": "v3:0x0000000000000000000000000000000000003001",
+            "id": "v2:0x0000000000000000000000000000000000002400",
             "currencies": [
               "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
               "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
@@ -184,8 +135,7 @@
           "currencyIn": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
           "currencyOut": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
           "amountIn": "$bigint:1000000",
-          "amountOut": "$bigint:996999",
-          "gasEstimate": "$bigint:90000"
+          "amountOut": "$bigint:99699"
         }
       }
     },
@@ -195,12 +145,11 @@
         "kind": "success",
         "m": {
           "pool": {
-            "protocol": "v3",
-            "address": "0x0000000000000000000000000000000000003002",
+            "protocol": "v2",
+            "address": "0x0000000000000000000000000000000000002401",
             "token0": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
             "token1": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-            "fee": 500,
-            "id": "v3:0x0000000000000000000000000000000000003002",
+            "id": "v2:0x0000000000000000000000000000000000002401",
             "currencies": [
               "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
               "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
@@ -208,9 +157,31 @@
           },
           "currencyIn": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
           "currencyOut": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
-          "amountIn": "$bigint:996999",
-          "amountOut": "$bigint:994007",
-          "gasEstimate": "$bigint:90000"
+          "amountIn": "$bigint:99699",
+          "amountOut": "$bigint:99399"
+        }
+      }
+    },
+    {
+      "t": "measurement",
+      "o": {
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v2",
+            "address": "0x0000000000000000000000000000000000002402",
+            "token0": "0xA1A1a1a1A1A1A1A1A1a1a1a1a1a1A1A1a1A1a1a1",
+            "token1": "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+            "id": "v2:0x0000000000000000000000000000000000002402",
+            "currencies": [
+              "0xA1A1a1a1A1A1A1A1A1a1a1a1a1a1A1A1a1A1a1a1",
+              "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
+            ]
+          },
+          "currencyIn": "0xA1A1a1a1A1A1A1A1A1a1a1a1a1a1A1A1a1A1a1a1",
+          "currencyOut": "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+          "amountIn": "$bigint:1000000",
+          "amountOut": "$bigint:9969990"
         }
       }
     },
@@ -231,29 +202,36 @@
       }
     },
     {
-      "t": "coverage",
-      "p": "v3",
-      "endpoint": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+      "t": "measurement",
       "o": {
-        "kind": "complete"
-      }
-    },
-    {
-      "t": "coverage",
-      "p": "v3",
-      "endpoint": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
-      "o": {
-        "kind": "complete"
+        "kind": "success",
+        "m": {
+          "pool": {
+            "protocol": "v2",
+            "address": "0x0000000000000000000000000000000000002401",
+            "token0": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "token1": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "id": "v2:0x0000000000000000000000000000000000002401",
+            "currencies": [
+              "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+              "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            ]
+          },
+          "currencyIn": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "currencyOut": "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+          "amountIn": "$bigint:9969990",
+          "amountOut": "$bigint:9939981"
+        }
       }
     }
   ],
   "golden": {
     "status": "quote",
     "best": {
-      "routeId": "v3:0x0000000000000000000000000000000000003001>v3:0x0000000000000000000000000000000000003002",
+      "routeId": "v2:0x0000000000000000000000000000000000002402>v2:0x0000000000000000000000000000000000002401",
       "protocols": [
-        "v3",
-        "v3"
+        "v2",
+        "v2"
       ],
       "path": [
         "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
@@ -261,27 +239,12 @@
         "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
       ],
       "amountIn": "1000000",
-      "amountOut": "994007",
+      "amountOut": "9939981",
       "intermediateAmounts": [
-        "996999"
-      ],
-      "gasEstimate": "180000"
+        "9969990"
+      ]
     },
-    "alternatives": [
-      {
-        "routeId": "v2:0x0000000000000000000000000000000000002001",
-        "protocols": [
-          "v2"
-        ],
-        "path": [
-          "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
-          "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
-        ],
-        "amountIn": "1000000",
-        "amountOut": "498499",
-        "intermediateAmounts": []
-      }
-    ],
+    "alternatives": [],
     "report": {
       "block": {
         "number": "1000000",
@@ -299,14 +262,9 @@
           "demandFloor": "0"
         },
         "v3": {
-          "status": "complete",
-          "coveredRanges": [
-            {
-              "fromBlock": "0",
-              "toBlock": "999968"
-            }
-          ],
-          "demandFloor": "0"
+          "status": "disabled",
+          "coveredRanges": [],
+          "demandFloor": "1000000"
         },
         "v4": {
           "status": "disabled",
@@ -319,12 +277,12 @@
         "intermediatesDiscovered": 1,
         "intermediatesSelected": 1,
         "intermediatesPruned": 0,
-        "legsMeasured": 3,
+        "legsMeasured": 4,
         "pairCeilingHit": false
       },
       "quoting": {
-        "attempted": 3,
-        "succeeded": 3,
+        "attempted": 4,
+        "succeeded": 4,
         "failed": 0,
         "transportFailed": 0,
         "unattempted": 0

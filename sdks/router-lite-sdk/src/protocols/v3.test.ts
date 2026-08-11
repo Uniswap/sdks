@@ -127,7 +127,27 @@ test('hypotheses adds exactly one more pool per extraFees entry', () => {
   const withExtra = v3Module.hypotheses(USDC, WETH, MAINNET_MANIFEST, [123])
   expect(withExtra).toHaveLength(standard.length + 1)
   const extraPool = withExtra.find((h) => !standard.some((s) => s.id === h.id))!
-  expect(extraPool.protocol === 'v3' && extraPool.fee).toBe(123)
+  // Narrowed FIRST, then asserted. Written as `expect(extraPool.protocol === 'v3' && extraPool.fee)`
+  // (as it was until C4-T14) the two claims collapse into one expression whose failure message reads
+  // `expected false to be 123` — which names neither the protocol that was wrong nor the fee that
+  // was, and would report the same thing for a v2 ref as for a v3 ref on the wrong tier.
+  expect(extraPool.protocol).toBe('v3')
+  if (extraPool.protocol !== 'v3') throw new Error('unreachable')
+  expect(extraPool.fee).toBe(123)
+})
+
+test("hypotheses resolves 'native' to the wrapped address — v3 pools hold ERC-20s only", () => {
+  // The v2/v3 half of the native contrast v4 already tests (`v4.test.ts` — "hypotheses sorts native
+  // (address(0)) before the counter-token"). v3 pools have no native currency: `native` and the
+  // wrapped address must derive the SAME CREATE2 address on every tier, or the search probes
+  // addresses no pool lives at and reports a confident `no-route` for a pair that trades fine.
+  const viaNative = v3Module.hypotheses('native', USDC, MAINNET_MANIFEST)
+  const viaWrapped = v3Module.hypotheses(WETH, USDC, MAINNET_MANIFEST)
+  expect(viaNative.map((p) => p.id)).toEqual(viaWrapped.map((p) => p.id))
+  // Every tier's ref carries the wrapped address, never the string 'native'.
+  for (const pool of viaNative) expect(pool.currencies).toEqual([USDC, WETH])
+  // Symmetric in the slot native arrives in: the pair is sorted after resolution, not before.
+  expect(v3Module.hypotheses(USDC, 'native', MAINNET_MANIFEST).map((p) => p.id)).toEqual(viaNative.map((p) => p.id))
 })
 
 test('hypotheses dedupes an extraFees entry that overlaps a standard tier', () => {

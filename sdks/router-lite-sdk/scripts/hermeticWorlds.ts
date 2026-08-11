@@ -1,7 +1,7 @@
-import { encodeAbiParameters } from 'viem'
+import { decodeAbiParameters, encodeAbiParameters, pad } from 'viem'
 import type { Address, Hex, Log, PublicClient } from 'viem'
 
-import { v2Ref, v3Ref } from '../src/internal/testing'
+import { v2Ref, v3Ref, v4Ref } from '../src/internal/testing'
 import { PoolIndex } from '../src/pools/poolIndex'
 import { PROTOCOL_MODULES } from '../src/protocols'
 import type { ProtocolModule } from '../src/protocols/types'
@@ -10,9 +10,11 @@ import type { SearchContext } from '../src/search/loop'
 import type { ChainManifest, CurrencyRef, PoolRef, Protocol, QuoteRequest, SwapRequest } from '../src/types'
 
 // ---------------------------------------------------------------------------
-// THE HERMETIC CORPUS' FOUR WORLDS — deterministic, offline, and each built for
-// exactly one thing the golden corpus must contain: a ready swap, a two-hop
-// quote, a completed no-route, and an rpc-degraded search.
+// THE HERMETIC CORPUS' WORLDS — deterministic, offline, and each built for
+// exactly one thing the golden corpus must contain: a ready swap, a
+// needs-action swap, a two-hop quote, a completed no-route, an rpc-degraded
+// search, a simplicity-margin promotion over a hooked v4 pool, and an m_X
+// improvement that outdates an already-priced out-leg.
 //
 // The shape is `search/loop.test.ts`'s: a scripted constant-product world where
 // each pool's fate (price, revert, or a transport loss) is decided by a map
@@ -46,6 +48,10 @@ const PERMIT2 = `0x${'33'.repeat(20)}` as Address
 const V2_FACTORY = `0x${'66'.repeat(20)}` as Address
 const V3_FACTORY = `0x${'55'.repeat(20)}` as Address
 const V3_QUOTER = `0x${'44'.repeat(20)}` as Address
+const V4_POOL_MANAGER = `0x${'77'.repeat(20)}` as Address
+const V4_QUOTER = `0x${'88'.repeat(20)}` as Address
+/** A non-zero hooks address — the whole reason v4 appears in this corpus at all (see {@link fakeV4}). */
+const HOOK = `0x${'99'.repeat(20)}` as Address
 
 const V2_TOPIC: Hex = '0xf2'
 const V3_TOPIC: Hex = '0xf3'
@@ -118,9 +124,71 @@ function fakeV2(world: World): ProtocolModule {
     ...PROTOCOL_MODULES.v2,
     hypotheses: () => [],
     adjacencyShape: (m) => (m.v2 ? { emitter: m.v2.factory, topic0: V2_TOPIC, slot: 1, topicAddress: (e: Address) => e } : undefined),
+    // Decodes {@link creationLog}'s three-address payload. Every other fake returns `null` here
+    // because its world's pools are all in the index before the search starts; a world that needs a
+    // pool to APPEAR PART-WAY THROUGH has no other channel, since discovery is the only thing that
+    // ever adds one to a running search.
+    parsePoolLog: (log) => {
+      if (log?.topics?.[0] !== V2_TOPIC) return null
+      const [token0, token1, pair] = decodeAbiParameters([{ type: 'address' }, { type: 'address' }, { type: 'address' }], log.data)
+      return { pool: v2Ref(pair as Address, token0 as Address, token1 as Address), source: 'event', createdAtBlock: log.blockNumber ?? HEAD }
+    },
+    encodeQuote: worldQuote(world),
+  }
+}
+
+/**
+ * Answers an `eth_getLogs` filter the way a node would: a log is returned when every PINNED topic
+ * position matches it, where a position holds `null` (anything) or an array of accepted values (which
+ * is how one adjacency request carries both of the trade's endpoints).
+ *
+ * Emulated rather than pattern-matched on purpose. The engine issues two adjacency queries per
+ * protocol — one pinning the pair's endpoints at topic 1, one at topic 2 — and a scripted world that
+ * just answered "did this filter mention T_IN?" would hand the same creation log to both, ingesting a
+ * pool from a query that a real node would not have matched it against. The fixture would then record
+ * a discovery that could not happen on chain.
+ */
+function servedBy(filter: { topics?: unknown[] }, log: Log): boolean {
+  const topics = filter.topics ?? []
+  return topics.every((accepted, i) => {
+    if (accepted === null || accepted === undefined) return true
+    const actual = String(log.topics[i] ?? '').toLowerCase()
+    const values = (Array.isArray(accepted) ? accepted : [accepted]).map((v) => String(v).toLowerCase())
+    return values.includes(actual)
+  })
+}
+
+/** One `PairCreated`-shaped log, in the shape {@link fakeV2}'s `parsePoolLog` reads back. */
+function creationLog(pool: PoolRef, a: Address, b: Address, blockNumber: bigint): Log {
+  if (pool.protocol !== 'v2') throw new Error('creationLog is v2-shaped')
+  return {
+    address: V2_FACTORY,
+    topics: [V2_TOPIC, pad(a), pad(b)],
+    data: encodeAbiParameters([{ type: 'address' }, { type: 'address' }, { type: 'address' }], [a, b, pool.address]),
+    blockNumber,
+  } as unknown as Log
+}
+
+/**
+ * The REAL v4 module with quoting and discovery re-pointed at the world.
+ *
+ * Only quote-side: no hermetic world compiles a v4 swap, so `compileOperation` is inherited but never
+ * reached. What v4 is here FOR is `isHooked` — a v4 pool with a non-zero `hooks` address is the one
+ * shape that makes a route "complex" without crossing a protocol boundary, which is the only way to
+ * reach the simplicity-margin promotion (`quote/rank.ts`) on a single-protocol corpus.
+ */
+function fakeV4(world: World): ProtocolModule {
+  const module: ProtocolModule = {
+    ...PROTOCOL_MODULES.v4,
+    hypotheses: () => [],
+    adjacencyShape: () => undefined,
     parsePoolLog: () => null,
     encodeQuote: worldQuote(world),
   }
+  // Dropped, not stubbed — same reasoning as `fakeV3`'s `feeDiscovery`: an exact-pair Initialize scan
+  // would add a scope to every fixture that enables v4, and no world here hides a pool behind one.
+  delete (module as { exactPair?: unknown }).exactPair
+  return module
 }
 
 function fakeV3(world: World): ProtocolModule {
@@ -137,7 +205,7 @@ function fakeV3(world: World): ProtocolModule {
   return module
 }
 
-function manifestOf(opts: { v2?: boolean; v3?: boolean; execution?: boolean }): ChainManifest {
+function manifestOf(opts: { v2?: boolean; v3?: boolean; v4?: boolean; execution?: boolean }): ChainManifest {
   return {
     // A chain id no built-in manifest claims, so a fixture recorded here can only ever fold against
     // its own inline manifest — `manifestFor` would throw rather than quietly substitute a real chain.
@@ -149,6 +217,7 @@ function manifestOf(opts: { v2?: boolean; v3?: boolean; execution?: boolean }): 
     }),
     ...(opts.v2 === true && { v2: { factory: V2_FACTORY, deploymentBlock: 0n } }),
     ...(opts.v3 === true && { v3: { factory: V3_FACTORY, deploymentBlock: 0n, v3QuoterV2: V3_QUOTER } }),
+    ...(opts.v4 === true && { v4: { poolManager: V4_POOL_MANAGER, deploymentBlock: 0n, quoter: V4_QUOTER } }),
   }
 }
 
@@ -165,21 +234,40 @@ function gatewayRefusal(): Error {
   })
 }
 
-/** Every RPC one search issues, answered from the world: the pinned head, empty log scans, the
- * readiness reads (always "plenty", so a swap's leader is never gated `needs-action`), a preflight
- * that succeeds, and a quote decided by the pool's fate. */
-function scriptedClient(world: World): Pick<PublicClient, 'request'> {
+/** Per-world overrides of the two things the default script always answers "plenty" to. */
+type WorldOptions = {
+  /** ERC-20 `allowance(owner, spender)` — small enough to gate a swap `needs-action`. Balance and the
+   * Permit2 allowance stay generous, so the requirement the classifier reports names ONE cause. */
+  erc20Allowance?: bigint
+  /** Logs an `eth_getLogs` returns, decided per filter. The default answers every scan empty; a world
+   * that wants a pool to ARRIVE MID-SEARCH serves it here, since a scan is the only channel through
+   * which the engine learns about a pool it did not start with. */
+  logs?: (filter: { topics?: unknown[] }) => Log[]
+}
+
+/** Every RPC one search issues, answered from the world: the pinned head, log scans (empty unless the
+ * world scripts them), the readiness reads (generous by default, so a swap's leader is never gated
+ * `needs-action`), a preflight that succeeds, and a quote decided by the pool's fate. */
+function scriptedClient(world: World, options: WorldOptions = {}): Pick<PublicClient, 'request'> {
   return {
     async request(args: { method: string; params: unknown[] }) {
       const { method, params } = args
       if (method === 'eth_getBlockByNumber') {
         return { number: `0x${HEAD.toString(16)}`, hash: `0x${'ab'.repeat(32)}`, timestamp: `0x${TS.toString(16)}` }
       }
-      if (method === 'eth_getLogs') return [] as Log[]
+      if (method === 'eth_getLogs') return options.logs?.(params[0] as { topics?: unknown[] }) ?? ([] as Log[])
       if (method === 'eth_call') {
         const to = ((params[0] as { to: string }).to ?? '').toLowerCase()
         if (to === UR.toLowerCase()) return '0x' // the preflight simulates cleanly
         if (to === T_IN.toLowerCase() || to === T_OUT.toLowerCase()) {
+          // `balanceOf(address)` has one word of arguments, `allowance(address,address)` two — the
+          // only way to tell the two reads apart at this level, and the same discrimination
+          // `router.test.ts`'s stub makes.
+          const data = String((params[0] as { data?: string }).data ?? '0x')
+          const isAllowance = data.length > 10 + 64
+          if (isAllowance && options.erc20Allowance !== undefined) {
+            return encodeAbiParameters([{ type: 'uint256' }], [options.erc20Allowance])
+          }
           return encodeAbiParameters([{ type: 'uint256' }], [10n ** 30n]) // balanceOf / allowance
         }
         if (to === PERMIT2.toLowerCase()) {
@@ -195,14 +283,14 @@ function scriptedClient(world: World): Pick<PublicClient, 'request'> {
   } as unknown as Pick<PublicClient, 'request'>
 }
 
-function contextOf(world: World, manifest: ChainManifest, index: PoolIndex): SearchContext {
+function contextOf(world: World, manifest: ChainManifest, index: PoolIndex, options: WorldOptions = {}): SearchContext {
   return {
-    client: scriptedClient(world),
+    client: scriptedClient(world, options),
     manifest,
     modules: {
       v2: manifest.v2 ? fakeV2(world) : disabledModule('v2'),
       v3: manifest.v3 ? fakeV3(world) : disabledModule('v3'),
-      v4: disabledModule('v4'),
+      v4: manifest.v4 ? fakeV4(world) : disabledModule('v4'),
     },
     index,
     hookData: new Map(),
@@ -210,7 +298,7 @@ function contextOf(world: World, manifest: ChainManifest, index: PoolIndex): Sea
 }
 
 // ---------------------------------------------------------------------------
-// The four scenarios
+// The scenarios
 // ---------------------------------------------------------------------------
 
 export type HermeticScenario = {
@@ -292,6 +380,97 @@ export const HERMETIC_SCENARIOS: HermeticScenario[] = [
       }
       const request: QuoteRequest = { tokenIn: T_IN, tokenOut: T_OUT, amountIn: AMOUNT_IN }
       return { ctx: contextOf(world, manifest, index), request }
+    },
+  },
+  {
+    label: 'hermetic-needs-action-swap',
+    kind: 'swap',
+    expect: 'needs-action',
+    notes:
+      'The swap verdict no quote-shaped fixture can reach: the same hinted, verified route as the ready swap, ' +
+      'but the trader has not approved the token to Permit2. The plan compiles, the preflight simulates ' +
+      "against the router's own state and passes, and the result still carries `tx` — gated behind ONE stated " +
+      'requirement rather than being downgraded to no-route, which is the distinction this fixture pins.',
+    build: () => {
+      const world: World = new Map()
+      const manifest = manifestOf({ v2: true, execution: true })
+      const hinted = v2Ref(computeV2PairAddress(V2_FACTORY, T_IN, T_OUT), T_IN, T_OUT)
+      world.set(hinted.id, { kind: 'price', r0: 10n ** 12n, r1: 10n ** 12n })
+      const request: SwapRequest = {
+        tokenIn: T_IN,
+        tokenOut: T_OUT,
+        amountIn: AMOUNT_IN,
+        trader: TRADER,
+        hints: [{ protocol: 'v2', token0: T_IN, token1: T_OUT }],
+      }
+      // Balance and the Permit2 allowance stay generous; only the ERC-20 -> Permit2 approval is
+      // missing, so the requirement the result states has exactly one cause to name.
+      return { ctx: contextOf(world, manifest, new PoolIndex(WETH), { erc20Allowance: 0n }), request }
+    },
+  },
+  {
+    label: 'hermetic-hooked-promoted',
+    kind: 'quote',
+    expect: 'quote',
+    notes:
+      'The simplicity margin, marked. A HOOKED v4 pool prices ~2bps above a plain v2 pool on the same pair — ' +
+      'inside `SIMPLICITY_MARGIN_BPS` (5) — so ranking promotes the simple route to `best` and marks it ' +
+      '`promotedOverComplex`. The only fixture whose `best` is deliberately outpriced by its own ' +
+      '`alternatives`, which is exactly the shape `assertResultCoherent` accepts ONLY when that marker is set.',
+    build: () => {
+      const world: World = new Map()
+      const manifest = manifestOf({ v2: true, v4: true })
+      const index = new PoolIndex(WETH)
+      // The plain pool: the reference price, and the route that must end up leading.
+      const plain = v2Ref(addr(0x2300), T_IN, T_OUT)
+      world.set(plain.id, { kind: 'price', r0: 10n ** 12n, r1: 10n ** 12n })
+      index.upsert({ pool: plain, source: 'event', createdAtBlock: 1n })
+      // The hooked pool: 2bps deeper on the way out, so it wins on amountOut alone and loses to the
+      // margin. `isHooked` is what makes it complex — no protocol boundary is crossed by either route.
+      const hooked = v4Ref({ currency0: T_IN, currency1: T_OUT, fee: 3000, tickSpacing: 60, hooks: HOOK })
+      world.set(hooked.id, { kind: 'price', r0: 10n ** 12n, r1: (10n ** 12n * 10_002n) / 10_000n })
+      index.upsert({ pool: hooked, source: 'event', createdAtBlock: 2n })
+      const request: QuoteRequest = { tokenIn: T_IN, tokenOut: T_OUT, amountIn: AMOUNT_IN }
+      return { ctx: contextOf(world, manifest, index), request }
+    },
+  },
+  {
+    label: 'hermetic-mx-invalidation',
+    kind: 'quote',
+    expect: 'quote',
+    notes:
+      'The invalidation arm, pinned through a golden. A shallow (T_IN, WETH) pool sets m_X first and an ' +
+      'out-leg is priced at that amount; then the adjacency scan — which only runs once the pump has gone ' +
+      'dry — delivers a much deeper in-leg, m_X improves, and the out-leg measured at the old amount is ' +
+      'outdated and re-measured at the new one. The log therefore contains the SAME out-leg pool at two ' +
+      'different amounts, and the golden is the composition through the second.',
+    build: () => {
+      const world: World = new Map()
+      const manifest = manifestOf({ v2: true })
+      const index = new PoolIndex(WETH)
+      // Known up front: a shallow way in to WETH, and the one way out of it.
+      const weakIn = v2Ref(addr(0x2400), T_IN, WETH)
+      world.set(weakIn.id, { kind: 'price', r0: 10n ** 12n, r1: 10n ** 11n })
+      index.upsert({ pool: weakIn, source: 'event', createdAtBlock: 1n })
+      const out = v2Ref(addr(0x2401), WETH, T_OUT)
+      world.set(out.id, { kind: 'price', r0: 10n ** 12n, r1: 10n ** 12n })
+      index.upsert({ pool: out, source: 'event', createdAtBlock: 2n })
+      // NOT in the index: this one has to be DISCOVERED, which is what makes it arrive late. The
+      // coverage worker only scans adjacency once the pump goes dry (`search/loop.ts`'s gate), so by
+      // the time this pool exists the out-leg has already been priced at the shallow pool's m_X.
+      const strongIn = v2Ref(addr(0x2402), T_IN, WETH)
+      world.set(strongIn.id, { kind: 'price', r0: 10n ** 12n, r1: 10n ** 13n })
+      const log = creationLog(strongIn, T_IN, WETH, 10n)
+      const request: QuoteRequest = { tokenIn: T_IN, tokenOut: T_OUT, amountIn: AMOUNT_IN }
+      return {
+        ctx: contextOf(world, manifest, index, {
+          // Matched honestly: this log names (T_IN, WETH), so only the adjacency query that pins
+          // T_IN at topic 1 returns it — the one that pins the endpoints at topic 2 is asking about
+          // pools whose token1 is T_IN or T_OUT, and this pool's is WETH.
+          logs: (filter) => (servedBy(filter, log) ? [log] : []),
+        }),
+        request,
+      }
     },
   },
   {

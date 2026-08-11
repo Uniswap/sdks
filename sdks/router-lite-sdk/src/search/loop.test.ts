@@ -1039,6 +1039,20 @@ test('termination survives a cross-search frontier shrink while parked quiet (st
   // Phase 3: park the loop, then shrink the eligible set out from under it — the observable effect
   // of a concurrent search's upserts evicting these never-quoted pools under `maxPools`: the
   // neighbor intersection empties and NOTHING bumps this search's indexVersion.
+  //
+  // SIMULATED, AND COUPLED TO ONE IMPLEMENTATION DETAIL — read this before changing `pump.ts`.
+  // The shrink is staged by overwriting `index.neighbors`, because it is the only lever that empties
+  // the eligible set at a chosen instant: real eviction needs a second search interleaved to the
+  // exact microtask (that version exists, at the router level — see `router.test.ts`, "two concurrent
+  // searches under maxPools pressure"; it proves eviction is real but cannot park the loop on a
+  // chosen await, which is what THIS test is about). The cost is a coupling:
+  // `pump.ts#orderedIntermediates` derives its eligible set from `ctx.index.neighbors(tokenIn)` ∩
+  // `ctx.index.neighbors(tokenOut)`, and this stub only empties the frontier for as long as that
+  // stays true. If `orderedIntermediates` is ever rerouted onto a different index accessor (a cached
+  // adjacency snapshot, a `pair()`-based derivation, anything else), this test will keep passing
+  // while testing nothing — the frontier will not shrink, phase 4's assertions will describe a
+  // search that was never disturbed, and the regression it guards will be unguarded. Revisit it
+  // together with any such change.
   const untilVerified = gen.next()
   await ticks(5) // let the loop park on wake.next()
   const noNeighbors = () => new Map<string, never>()

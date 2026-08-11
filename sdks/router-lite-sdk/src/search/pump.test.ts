@@ -722,17 +722,61 @@ const reservesArb = fc.record({
   r1: fc.bigInt({ min: 1n, max: 10n ** 12n }),
 })
 
-const priceWorldArb = fc.record({
-  amountIn: fc.bigInt({ min: 1n, max: 10n ** 9n }),
-  directs: fc.array(reservesArb, { maxLength: 3 }),
-  xs: fc.array(
-    fc.record({
-      inPools: fc.array(reservesArb, { minLength: 1, maxLength: 3 }),
-      outPools: fc.array(reservesArb, { minLength: 1, maxLength: 3 }),
-    }),
-    { maxLength: 3 },
-  ),
-})
+const pricedFateArb: fc.Arbitrary<Fate> = reservesArb.map((r) => ({ kind: 'price', ...r }))
+
+/**
+ * A pool's scripted fate in a generated world: usually a real price, sometimes a revert (C4-T14).
+ *
+ * WHY REVERTS BELONG IN THE DOMINANCE WORLD. A world where everything prices only ever asks "does the
+ * composer pick the maximum?". The interesting claim is the one partial failure creates: when the
+ * BEST in-leg to an intermediate reverts, `mX` for that intermediate falls back to the best SURVIVING
+ * in-leg, every out-leg is then measured at that smaller amount, and the composed answer has to be
+ * the best route through what actually priced — not the unreachable one through the pool that died.
+ * The two revert shapes take different paths through the pump and both have to end up invisible: a
+ * data-less revert is the pool-absent signal and gets negative-cached (excluded from composition
+ * outright, and never re-planned), while a revert WITH data fails only that one leg.
+ *
+ * `transport` is deliberately NOT generated here. It is a fact about the provider rather than the
+ * chain — a leg lost to it is retried and its accounting is what `property: conservation` pins, and
+ * mixing it in would make this property's oracle depend on retry timing rather than on prices.
+ *
+ * Weighted heavily toward `price` so most generated worlds still HAVE a best route to be right about;
+ * an all-reverts world is a valid case (the composer must return nothing) but a rare one is enough.
+ */
+const revertingFateArb: fc.Arbitrary<Fate> = fc.oneof(
+  { weight: 8, arbitrary: pricedFateArb },
+  { weight: 1, arbitrary: fc.constant<Fate>({ kind: 'revert' }) },
+  { weight: 1, arbitrary: fc.constant<Fate>({ kind: 'revert-data' }) },
+)
+
+/** The same three fates plus `transport` — used by the dedup/accounting properties below, which are
+ * about how many times a leg reaches the wire rather than about what it prices. */
+const fateArb: fc.Arbitrary<Fate> = fc.oneof(
+  { weight: 3, arbitrary: pricedFateArb },
+  { weight: 1, arbitrary: fc.constant<Fate>({ kind: 'revert' }) },
+  { weight: 1, arbitrary: fc.constant<Fate>({ kind: 'revert-data' }) },
+  { weight: 1, arbitrary: fc.constant<Fate>({ kind: 'transport' }) },
+)
+
+/** The generated world shape, over an arbitrary per-pool fate. `priceWorldArb` below is this with
+ * every fate forced to `price` — the properties about DEDUP and ACCOUNTING want every leg to reach
+ * the wire, which a negative-cached pool by design does not. */
+const worldArbOver = (fate: fc.Arbitrary<Fate>, directsMax = 3) =>
+  fc.record({
+    amountIn: fc.bigInt({ min: 1n, max: 10n ** 9n }),
+    directs: fc.array(fate, { maxLength: directsMax }),
+    xs: fc.array(
+      fc.record({
+        inPools: fc.array(fate, { minLength: 1, maxLength: 3 }),
+        outPools: fc.array(fate, { minLength: 1, maxLength: 3 }),
+      }),
+      { maxLength: 3 },
+    ),
+  })
+
+const priceWorldArb = worldArbOver(pricedFateArb)
+const revertingWorldArb = worldArbOver(revertingFateArb)
+const mixedWorldArb = worldArbOver(fateArb, 4)
 
 type PriceWorldSpec = typeof priceWorldArb extends fc.Arbitrary<infer T> ? T : never
 
@@ -740,42 +784,64 @@ type BuiltWorld = FakeSetup & { directs: PoolRef[]; xs: { x: Address; inPools: P
 
 function buildPriceWorld(spec: PriceWorldSpec): BuiltWorld {
   const setup = fakeSetup({ amountIn: spec.amountIn })
-  const directs = spec.directs.map((r) => newPool(setup.index, setup.world, T_IN, T_OUT, { kind: 'price', ...r }))
+  const directs = spec.directs.map((fate) => newPool(setup.index, setup.world, T_IN, T_OUT, fate))
   const xs = spec.xs.map((xSpec, i) => {
     const x = X_TOKENS[i]!
     return {
       x,
-      inPools: xSpec.inPools.map((r) => newPool(setup.index, setup.world, T_IN, x, { kind: 'price', ...r })),
-      outPools: xSpec.outPools.map((r) => newPool(setup.index, setup.world, x, T_OUT, { kind: 'price', ...r })),
+      inPools: xSpec.inPools.map((fate) => newPool(setup.index, setup.world, T_IN, x, fate)),
+      outPools: xSpec.outPools.map((fate) => newPool(setup.index, setup.world, x, T_OUT, fate)),
     }
   })
   setup.state.intermediates.selected = xs.map(({ x }) => x.toLowerCase())
   return { ...setup, directs, xs }
 }
 
-/** Chained evaluation over EVERY (in, out) combination — the oracle dominance is judged against. */
+/**
+ * Chained evaluation over EVERY (in, out) combination — the oracle dominance is judged against.
+ *
+ * A pool whose fate is not `price` contributes nothing: `fatePrice` returns undefined for it, and the
+ * combination it would have carried is skipped rather than scored. That is the whole partial-failure
+ * claim, computed the dumb way — an intermediate whose in-legs ALL revert drops out entirely, and one
+ * that loses only its best in-leg is scored through the survivors.
+ */
 function bruteBest(built: BuiltWorld, amountIn: bigint): bigint | undefined {
   let best: bigint | undefined
-  const consider = (v: bigint) => {
-    if (best === undefined || v > best) best = v
+  const consider = (v: bigint | undefined) => {
+    if (v !== undefined && (best === undefined || v > best)) best = v
   }
-  for (const pool of built.directs) consider(fatePrice(built.world.get(pool.id)!, pool, T_IN, amountIn)!)
+  for (const pool of built.directs) consider(fatePrice(built.world.get(pool.id)!, pool, T_IN, amountIn))
   for (const { x, inPools, outPools } of built.xs) {
     for (const inPool of inPools) {
-      const mid = fatePrice(built.world.get(inPool.id)!, inPool, T_IN, amountIn)!
-      for (const outPool of outPools) consider(fatePrice(built.world.get(outPool.id)!, outPool, x, mid)!)
+      const mid = fatePrice(built.world.get(inPool.id)!, inPool, T_IN, amountIn)
+      if (mid === undefined) continue // this in-leg never priced, so nothing chains off it
+      for (const outPool of outPools) consider(fatePrice(built.world.get(outPool.id)!, outPool, x, mid))
     }
   }
   return best
 }
 
-test('property: dominance — the best composed route equals the brute-force best over ALL combinations', async () => {
+test('property: dominance under partial failure — the best composed route equals the brute-force best over everything that actually priced', async () => {
+  /** Set on any run where a two-hop's BEST in-leg reverted and the world still composed a route —
+   * the specific interleaving this property exists for, where `mX` has to fall back to a survivor. */
+  let sawSurvivorFallback = false
+
   await fc.assert(
-    fc.asyncProperty(priceWorldArb, async (spec) => {
+    fc.asyncProperty(revertingWorldArb, async (spec) => {
       const built = buildPriceWorld(spec)
       await runToDry(built.state, built.ctx, built.req)
       const composed = composeRoutes(built.state, built.ctx, built.req)
       const oracle = bruteBest(built, spec.amountIn)
+
+      for (const { inPools } of built.xs) {
+        const fates = inPools.map((p) => built.world.get(p.id)!)
+        // At least one in-leg died and at least one lived: `mX` is a survivor's amount, not the
+        // amount the dead leg would have produced.
+        if (fates.some((f) => f.kind !== 'price') && fates.some((f) => f.kind === 'price') && composed.length > 0) {
+          sawSurvivorFallback = true
+        }
+      }
+
       if (oracle === undefined) {
         expect(composed).toEqual([])
         return
@@ -783,8 +849,12 @@ test('property: dominance — the best composed route equals the brute-force bes
       expect(composed.length).toBeGreaterThan(0)
       expect(composed[0]!.quote.amountOut).toBe(oracle)
     }),
-    { numRuns: 60 },
+    { numRuns: 200 },
   )
+
+  // Same guard as the dedup property's `sawRetry`: a reverting world that never actually generated a
+  // partial failure would let this property pass as the price-only one it replaced (C4-T14).
+  expect(sawSurvivorFallback).toBe(true)
 })
 
 test('property: dedup — a full multi-cycle run never issues two identical (pool, direction, amount) calls', async () => {
@@ -801,25 +871,6 @@ test('property: dedup — a full multi-cycle run never issues two identical (poo
     }),
     { numRuns: 60 },
   )
-})
-
-const fateArb: fc.Arbitrary<Fate> = fc.oneof(
-  { weight: 3, arbitrary: reservesArb.map(({ r0, r1 }) => ({ kind: 'price', r0, r1 }) as Fate) },
-  { weight: 1, arbitrary: fc.constant<Fate>({ kind: 'revert' }) },
-  { weight: 1, arbitrary: fc.constant<Fate>({ kind: 'revert-data' }) },
-  { weight: 1, arbitrary: fc.constant<Fate>({ kind: 'transport' }) },
-)
-
-const mixedWorldArb = fc.record({
-  amountIn: fc.bigInt({ min: 1n, max: 10n ** 9n }),
-  directs: fc.array(fateArb, { maxLength: 4 }),
-  xs: fc.array(
-    fc.record({
-      inPools: fc.array(fateArb, { minLength: 1, maxLength: 3 }),
-      outPools: fc.array(fateArb, { minLength: 1, maxLength: 3 }),
-    }),
-    { maxLength: 3 },
-  ),
 })
 
 let sawRetry = false

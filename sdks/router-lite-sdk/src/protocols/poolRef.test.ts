@@ -3,9 +3,9 @@ import type { Address } from 'viem'
 import { zeroAddress } from 'viem'
 
 import { computeV4PoolId } from '../internal/poolId'
-import type { PoolKey } from '../types'
+import type { CurrencyRef, PoolKey, PoolRef, RouteCandidate } from '../types'
 
-import { isHooked, v2PoolRef, v3PoolRef, v4PoolRef } from './poolRef'
+import { isHooked, routeId, v2PoolRef, v3PoolRef, v4PoolRef } from './poolRef'
 
 const USDC = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as Address
 const WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2' as Address
@@ -42,6 +42,33 @@ test('v4 currencies are domain form (address(0) -> native) and its key order is 
   const unsorted: PoolKey = { currency0: WETH, currency1: USDC, fee: 500, tickSpacing: 10, hooks: zeroAddress }
   expect(v4PoolRef(unsorted).poolKey).toEqual(unsorted)
   expect(v4PoolRef(unsorted).currencies).toEqual([WETH, USDC])
+})
+
+test('routeId is determined by the ordered pool sequence, and by nothing else', () => {
+  // `routeId` is the identity the whole engine keys on: the compiled-plan memo (`search/verifier.ts`),
+  // the leader-change test that decides whether an event is a `lead` (`search/loop.ts`), the ranking
+  // tie-break (`quote/rank.ts`), and the outcome log's per-route entries. Every one of those breaks
+  // in a different, confusing way if the same route can produce two ids, or two routes one id — so
+  // the contract gets its own direct test rather than being inferred from those four call sites.
+  const a = v2PoolRef(V2_POOL, USDC, WETH)
+  const b = v3PoolRef(V3_POOL, WETH, USDC, 500)
+  const legs = (...refs: [PoolRef, CurrencyRef, CurrencyRef][]): RouteCandidate => ({
+    legs: refs.map(([pool, currencyIn, currencyOut]) => ({ pool, currencyIn, currencyOut })),
+  })
+
+  const usdcFirst = legs([a, USDC, WETH], [b, WETH, USDC])
+  // Same pools, same directions, freshly-built leg objects: identical id. (Reference identity is not
+  // what makes two candidates the same route — the engine builds candidates independently in
+  // different cycles and must still recognise them as one.)
+  expect(routeId(usdcFirst)).toBe(routeId(legs([a, USDC, WETH], [b, WETH, USDC])))
+
+  // Order is part of the identity: the same two pools traversed the other way round is a DIFFERENT
+  // route, and must not collide with the first in any of the four maps keyed by this string.
+  expect(routeId(legs([b, USDC, WETH], [a, WETH, USDC]))).not.toBe(routeId(usdcFirst))
+
+  // And the id is exactly the ordered pool ids — so it carries no amount, no block, and nothing else
+  // that varies between cycles for one route.
+  expect(routeId(usdcFirst)).toBe(`${a.id}>${b.id}`)
 })
 
 test('isHooked is true only for a v4 pool with a non-zero hooks address', () => {

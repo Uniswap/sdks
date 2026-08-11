@@ -163,6 +163,42 @@ const REQUIRED_FIXTURE_KEYS = ['schemaVersion', 'label', 'chainId', 'kind', 'rec
 const OPTIONAL_FIXTURE_KEYS = ['notes', 'manifest']
 const REQUIRED_CONTEXT_KEYS = ['block', 'headRegressed', 'intermediates', 'pairCeilingHit', 'hookData', 'index']
 
+/**
+ * The GOLDEN's own two levels, closing the gap the route-level pin above left open (C4-T14).
+ *
+ * `CanonicalRoute` was pinned; `CanonicalResult` and `CanonicalReport` were not, so a field that
+ * stopped being emitted at either of those levels — an axis dropped from the report, `limits` no
+ * longer written onto a swap — would survive a `--regold` in silence: every fixture would agree with
+ * a fold that had quietly stopped reporting it, and the deep-equal would pass. Only the enumerated
+ * key sets catch a vanishing field, because there is nothing left to compare it against.
+ *
+ * Split required/optional the same way as the route keys, and for the same reason: `reason` belongs
+ * only to a failed search, `tx`/`limits` only to a compiled swap, `requirements` only to
+ * `needs-action`. The `iff` tests below assert WHICH statuses may carry each — this pair only says
+ * the vocabulary is closed.
+ */
+const REQUIRED_RESULT_KEYS = ['status', 'alternatives', 'report']
+const OPTIONAL_RESULT_KEYS = ['reason', 'best', 'tx', 'limits', 'requirements']
+const REQUIRED_REPORT_KEYS = [
+  'block',
+  'discovery',
+  'enumeration',
+  'quoting',
+  'aborted',
+  'verificationDegraded',
+  'headRegressed',
+  'verification',
+]
+const REQUIRED_ENUMERATION_KEYS = [
+  'exhaustiveWithinMaxHops',
+  'intermediatesDiscovered',
+  'intermediatesSelected',
+  'intermediatesPruned',
+  'legsMeasured',
+  'pairCeilingHit',
+]
+const REQUIRED_QUOTING_KEYS = ['attempted', 'succeeded', 'failed', 'transportFailed', 'unattempted']
+
 describe('the golden canonical shape (independent of the deep-equal)', () => {
   const allRoutes: { label: string; route: CanonicalRoute }[] = []
 
@@ -181,6 +217,20 @@ describe('the golden canonical shape (independent of the deep-equal)', () => {
         `${fixture.label}: fixture is MISSING a declared field`,
       ).toEqual([])
       expect(Object.keys(fixture.context).sort()).toEqual([...REQUIRED_CONTEXT_KEYS].sort())
+
+      // The golden's own two levels — the vanishing-field guard, one rung up from the routes.
+      const resultKeys = Object.keys(fixture.golden).sort()
+      expect(
+        resultKeys.filter((k) => !REQUIRED_RESULT_KEYS.includes(k) && !OPTIONAL_RESULT_KEYS.includes(k)),
+        `${fixture.label}: golden carries a key CanonicalResult does not declare`,
+      ).toEqual([])
+      expect(
+        REQUIRED_RESULT_KEYS.filter((k) => !resultKeys.includes(k)),
+        `${fixture.label}: golden is MISSING a CanonicalResult field — one --regold can do this silently`,
+      ).toEqual([])
+      expect(Object.keys(fixture.golden.report).sort()).toEqual([...REQUIRED_REPORT_KEYS].sort())
+      expect(Object.keys(fixture.golden.report.enumeration).sort()).toEqual([...REQUIRED_ENUMERATION_KEYS].sort())
+      expect(Object.keys(fixture.golden.report.quoting).sort()).toEqual([...REQUIRED_QUOTING_KEYS].sort())
       expect(fixture.log.length).toBeGreaterThan(0)
       // Every entry is one of the five `apply*` vocabularies — a sixth would mean `state.ts` grew a
       // writer this format does not replay, which a fold would silently ignore.
@@ -253,6 +303,57 @@ describe('the corpus covers every verdict the goldens exist to pin', () => {
       expect(g.golden.best?.execution).toBe('verified')
       expect(g.golden.tx?.data).toMatch(/^0x[0-9a-f]+$/)
       expect(g.golden.limits?.minAmountOut).toMatch(/^\d+$/)
+    }
+  })
+
+  test('a NEEDS-ACTION swap — calldata handed back behind a stated requirement, not withheld (C4-T14)', () => {
+    const needsAction = goldens.filter((g) => g.kind === 'swap' && g.golden.status === 'needs-action')
+    expect(needsAction.length).toBeGreaterThan(0)
+    for (const g of needsAction) {
+      // The whole point of the verdict: the caller gets the transaction AND what stands between them
+      // and sending it. A corpus without this case cannot tell `needs-action` apart from `no-route`.
+      expect(g.golden.tx?.data).toMatch(/^0x[0-9a-f]+$/)
+      expect(g.golden.limits?.minAmountOut).toMatch(/^\d+$/)
+      expect(g.golden.requirements?.length).toBeGreaterThan(0)
+      for (const requirement of g.golden.requirements ?? []) expect(requirement.kind).toBeTruthy()
+    }
+  })
+
+  test('a PROMOTED-OVER-COMPLEX quote — a `best` deliberately outpriced by its own alternatives (C4-T14)', () => {
+    const promoted = goldens.filter((g) => g.golden.best?.promotedOverComplex === true)
+    expect(promoted.length).toBeGreaterThan(0)
+    for (const g of promoted) {
+      const best = g.golden.best!
+      // The marker is the LICENCE for this shape — `assertResultCoherent` rejects a `best` below an
+      // alternative without it — so the fixture has to actually be in that shape, or the marker is
+      // pinned on a result that never needed it.
+      expect(g.golden.alternatives.some((a) => BigInt(a.amountOut) > BigInt(best.amountOut))).toBe(true)
+      // ...and the route that lost is the complex one: hooked v4, or a protocol boundary.
+      const complex = g.golden.alternatives.find((a) => BigInt(a.amountOut) > BigInt(best.amountOut))!
+      expect(new Set(complex.protocols).size > 1 || complex.protocols.includes('v4')).toBe(true)
+      expect(new Set(best.protocols).size).toBe(1)
+    }
+  })
+
+  test('an m_X INVALIDATION — one out-leg pool measured twice in one search, at two different amounts (C4-T14)', () => {
+    // The arm where a better in-leg arrives after an out-leg has already been priced: `m_X` improves,
+    // every out-leg measured at the old amount is outdated, and the search re-measures rather than
+    // composing a route through an amount that is no longer on offer. It has a unit test; this pins it
+    // through a GOLDEN, where the recorded log is the engine's own account of having done it.
+    const withRemeasure = fixtures.filter(({ fixture }) => {
+      const seen = new Map<string, Set<string>>()
+      for (const entry of fixture.log) {
+        if (entry.t !== 'measurement' || entry.o.kind !== 'success') continue
+        const { pool, currencyIn, amountIn } = entry.o.m
+        const key = `${pool.id ?? JSON.stringify(pool)}|${String(currencyIn)}`
+        seen.set(key, (seen.get(key) ?? new Set()).add(String(amountIn)))
+      }
+      return [...seen.values()].some((amounts) => amounts.size > 1)
+    })
+    expect(withRemeasure.length).toBeGreaterThan(0)
+    for (const { fixture } of withRemeasure) {
+      // The re-measurement is not wasted work: the composed answer chains through the LATER amount.
+      expect(fixture.golden.best?.intermediateAmounts).toHaveLength(1)
     }
   })
 

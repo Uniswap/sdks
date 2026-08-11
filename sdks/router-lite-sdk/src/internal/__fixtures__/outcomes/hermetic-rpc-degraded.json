@@ -3,7 +3,7 @@
   "label": "hermetic-rpc-degraded",
   "chainId": 31337,
   "kind": "quote",
-  "recordedAt": "2026-08-11T08:50:12.325Z",
+  "recordedAt": "2026-08-11T09:43:31.404Z",
   "notes": "The other half of the no-route contract: the same pair, but the gateway 429s every quote instead of the chain answering. Discovery still completes, so only the transport-loss axis separates this from an authoritative no-route — and it must, or a rate-limited provider would be indistinguishable from a chain with no liquidity.",
   "manifest": {
     "chainId": 31337,
